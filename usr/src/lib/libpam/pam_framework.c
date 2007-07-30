@@ -296,7 +296,7 @@ pam_start(const char *service, const char *user,
 {
 	int	err;
 
-	*pamh = (struct pam_handle *)calloc(1, sizeof (struct pam_handle));
+	*pamh = calloc(1, sizeof (struct pam_handle));
 
 	pam_settrace();
 	pam_trace(PAM_DEBUG_DEFAULT,
@@ -480,7 +480,7 @@ pam_set_item(pam_handle_t *pamh, int item_type, const void *item)
 		if (pip->pi_addr != NULL)
 			free(pip->pi_addr);
 		size = sizeof (struct pam_conv);
-		if ((pip->pi_addr = (void *)calloc(1, size)) == NULL)
+		if ((pip->pi_addr = calloc(1, size)) == NULL)
 			return (PAM_BUF_ERR);
 		if (item != NULL)
 			(void) memcpy(pip->pi_addr, item, (unsigned int) size);
@@ -503,7 +503,7 @@ pam_set_item(pam_handle_t *pamh, int item_type, const void *item)
 			pam_repository_t *s, *d;
 
 			size = sizeof (struct pam_repository);
-			pip->pi_addr = (void *)calloc(1, size);
+			pip->pi_addr = calloc(1, size);
 			if (pip->pi_addr == NULL)
 				return (PAM_BUF_ERR);
 
@@ -706,8 +706,7 @@ parse_user_name(char *user_input, char **ret_username)
 	}
 
 	/* ret_username will be freed in pam_get_user(). */
-	if ((*ret_username = (char *)malloc((index + 1)*(sizeof (char))))
-	    == NULL)
+	if ((*ret_username = malloc(index + 1)) == NULL)
 		return (PAM_BUF_ERR);
 	(void) strcpy(*ret_username, username);
 	return (PAM_SUCCESS);
@@ -727,7 +726,6 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 	int	status;
 	char	*prompt = NULL;
 	char    *real_username;
-
 	struct pam_response *ret_resp = NULL;
 	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 
@@ -788,7 +786,7 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 
 			for (i = 0; i < len; i++) {
 				if ((ret_resp->resp[i] != ' ') &&
-					(ret_resp->resp[i] != '\t')) {
+				    (ret_resp->resp[i] != '\t')) {
 					state = USERNAME;
 					break;
 				}
@@ -797,6 +795,9 @@ pam_get_user(pam_handle_t *pamh, char **user, const char *prompt_override)
 			if (state == USERNAME)
 				break;
 		}
+		/* essentially empty response, try again */
+		free_resp(1, ret_resp);
+		ret_resp = NULL;
 	}
 
 	/* set PAM_USER */
@@ -1414,7 +1415,7 @@ pam_putenv(pam_handle_t *pamh, const char *name_value)
 
 	/* see if we were passed 'NAME=VALUE', 'NAME=', or 'NAME' */
 	if ((equal_sign = strchr(name_value, '=')) != 0) {
-		if ((name = (char *)calloc(equal_sign - name_value + 1,
+		if ((name = calloc(equal_sign - name_value + 1,
 		    sizeof (char))) == 0) {
 			error = PAM_BUF_ERR;
 			goto out;
@@ -1471,9 +1472,7 @@ pam_putenv(pam_handle_t *pamh, const char *name_value)
 		 * could not find a match in the PAM handle.
 		 * add the new value if there is one
 		 */
-		if ((traverse = (env_list *)calloc
-					(1,
-					sizeof (env_list))) == 0) {
+		if ((traverse = calloc(1, sizeof (env_list))) == 0) {
 			error = PAM_BUF_ERR;
 			goto out;
 		}
@@ -1570,7 +1569,7 @@ pam_getenvlist(pam_handle_t *pamh)
 	}
 
 	/* allocate the array we will return to the caller */
-	if ((list = (char **)calloc(length + 1, sizeof (char *))) == NULL) {
+	if ((list = calloc(length + 1, sizeof (char *))) == NULL) {
 		error = PAM_BUF_ERR;
 		goto out;
 	}
@@ -1630,9 +1629,9 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 	int	loading_functions = 0; /* are we currently loading functions? */
 
 	pam_trace(PAM_DEBUG_MODULE, "load_modules[%d:%s](%p, %s)=%s:%s",
-		pamh->include_depth, pam_trace_cname(pamh), (void *)pamh,
-		function_name, pam_trace_fname(pam_entry->pam_flag),
-		pam_entry->module_path);
+	    pamh->include_depth, pam_trace_cname(pamh), (void *)pamh,
+	    function_name, pam_trace_fname(pam_entry->pam_flag),
+	    pam_entry->module_path);
 
 	while (pam_entry != NULL) {
 		pam_trace(PAM_DEBUG_DEFAULT,
@@ -1654,19 +1653,17 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 			/* if the function has already been loaded, return */
 			authp = pam_entry->function_ptr;
 			if (!loading_functions &&
-				(((strcmp(function_name, PAM_SM_AUTHENTICATE)
-				== 0) &&
-				authp && authp->pam_sm_authenticate) ||
-				((strcmp(function_name, PAM_SM_SETCRED) == 0) &&
-				authp && authp->pam_sm_setcred))) {
+			    (((strcmp(function_name, PAM_SM_AUTHENTICATE)
+			    == 0) && authp && authp->pam_sm_authenticate) ||
+			    ((strcmp(function_name, PAM_SM_SETCRED) == 0) &&
+			    authp && authp->pam_sm_setcred))) {
 				return (PAM_SUCCESS);
 			}
 
 			/* function has not been loaded yet */
 			loading_functions = 1;
 			if (authp == NULL) {
-				authp = (struct auth_module *)calloc(1,
-				    sizeof (struct auth_module));
+				authp = calloc(1, sizeof (struct auth_module));
 				if (authp == NULL)
 					return (PAM_BUF_ERR);
 			}
@@ -1718,8 +1715,7 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 			 * already loaded it.  See PAM_AUTH_MODULE code.
 			 */
 			loading_functions = 1;
-			accountp = (struct account_module *)calloc(1,
-			    sizeof (struct account_module));
+			accountp = calloc(1, sizeof (struct account_module));
 			if (accountp == NULL)
 				return (PAM_BUF_ERR);
 
@@ -1760,8 +1756,8 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 
 			loading_functions = 1;
 			if (sessionp == NULL) {
-				sessionp = (struct session_module *)
-				    calloc(1, sizeof (struct session_module));
+				sessionp = calloc(1,
+				    sizeof (struct session_module));
 				if (sessionp == NULL)
 					return (PAM_BUF_ERR);
 			}
@@ -1780,15 +1776,13 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 
 			if ((strcmp(function_name, PAM_SM_OPEN_SESSION) == 0) &&
 			    load_function(mh, PAM_SM_OPEN_SESSION,
-				&sessionp->pam_sm_open_session)
-				!= PAM_SUCCESS) {
+			    &sessionp->pam_sm_open_session) != PAM_SUCCESS) {
 				free(sessionp);
 				return (PAM_SYMBOL_ERR);
 			} else if ((strcmp(function_name,
-					PAM_SM_CLOSE_SESSION) == 0) &&
-				    load_function(mh, PAM_SM_CLOSE_SESSION,
-					&sessionp->pam_sm_close_session)
-					!= PAM_SUCCESS) {
+			    PAM_SM_CLOSE_SESSION) == 0) &&
+			    load_function(mh, PAM_SM_CLOSE_SESSION,
+			    &sessionp->pam_sm_close_session) != PAM_SUCCESS) {
 				free(sessionp);
 				return (PAM_SYMBOL_ERR);
 			}
@@ -1808,8 +1802,7 @@ load_modules(pam_handle_t *pamh, int type, char *function_name,
 			 * already loaded it.  See PAM_AUTH_MODULE code.
 			 */
 			loading_functions = 1;
-			passwdp = (struct password_module *)
-				calloc(1, sizeof (struct password_module));
+			passwdp = calloc(1, sizeof (struct password_module));
 			if (passwdp == NULL)
 				return (PAM_BUF_ERR);
 
@@ -1905,8 +1898,7 @@ open_module(pam_handle_t *pamh, char *module_so)
 		return (NULL);
 	} else {
 		/* add this fd to the pam handle */
-		if ((module_fds = (fd_list *)calloc(1, sizeof (fd_list)))
-		    == 0) {
+		if ((module_fds = calloc(1, sizeof (fd_list))) == 0) {
 			(void) dlclose(lfd);
 			lfd = 0;
 			return (NULL);
@@ -2203,7 +2195,7 @@ get_pam_conf_entry(struct pam_fh *pam_fh, pam_handle_t *pamh, pamtab_t **pam)
 		goto out;
 	}
 
-	if ((*pam = (pamtab_t *)calloc(1, sizeof (pamtab_t))) == NULL) {
+	if ((*pam = calloc(1, sizeof (pamtab_t))) == NULL) {
 		__pam_log(LOG_AUTH | LOG_ERR, "strdup: out of memory");
 		goto out;
 	}
@@ -2349,14 +2341,14 @@ getpath:
 
 	/* allocate array for the module-specific options */
 	if (argc > 0) {
-		if (((*pam)->module_argv = (char **)
-			calloc(argc+1, sizeof (char *))) == 0) {
+		if (((*pam)->module_argv =
+		    calloc(argc+1, sizeof (char *))) == 0) {
 			__pam_log(LOG_AUTH | LOG_ERR, "calloc: out of memory");
 			goto out;
 		}
 		i = 0;
 		for (arg = read_next_token(&cp); arg;
-			arg = read_next_token(&cp)) {
+		    arg = read_next_token(&cp)) {
 			(*pam)->module_argv[i] = strdup(arg);
 			if ((*pam)->module_argv[i] == NULL) {
 				__pam_log(LOG_AUTH | LOG_ERR, "strdup failed");
@@ -2463,7 +2455,7 @@ nextline(struct pam_fh *pam_fh, pam_handle_t *pamh, int *err)
 		/* skip comment line */
 		while (*bufferp == '#') {
 			if ((ll = pam_conf_strnchr(bufferp, '\n',
-				bufferendp - bufferp)) != NULL) {
+			    bufferendp - bufferp)) != NULL) {
 				bufferp = ll;
 			} else {
 				/*
@@ -2721,8 +2713,7 @@ do_conv(pam_handle_t *pamh, int msg_style, int num_msg,
 	i = 0;
 	k = num_msg;
 
-	msg = (struct pam_message *)calloc(num_msg,
-	    sizeof (struct pam_message));
+	msg = calloc(num_msg, sizeof (struct pam_message));
 	if (msg == NULL) {
 		return (PAM_BUF_ERR);
 	}
