@@ -832,7 +832,7 @@ int
 kmc_insert_mapping(char *label)
 {
 	FILE	*map;
-	char	linebuf[MAXLINESIZE];
+	char	linebuf[IBUF_SIZE];
 	char	*cur_label;
 	int	max_cookie = 0, cur_cookie, rtn_cookie;
 	int	rtnerr = 0;
@@ -845,6 +845,10 @@ kmc_insert_mapping(char *label)
 	}
 
 	while (fgets(linebuf, sizeof (linebuf), map) != NULL) {
+
+		/* Skip blank lines, which often come near EOF. */
+		if (strlen(linebuf) == 0)
+			continue;
 
 		if (kmc_parse_line(linebuf, &cur_cookie, &cur_label) < 0) {
 			rtnerr = EINVAL;
@@ -889,7 +893,7 @@ char *
 kmc_lookup_by_cookie(int cookie)
 {
 	FILE		*map;
-	static char	linebuf[MAXLINESIZE];
+	static char	linebuf[IBUF_SIZE];
 	char		*cur_label;
 	int		cur_cookie;
 
