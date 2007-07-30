@@ -1382,29 +1382,28 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 		return (1); /* No mapping; advance to next mapping */
 	}
 
-	if ((fp = mp->map_file) == NULL) {
-		if ((fp = malloc(sizeof (file_info_t))) == NULL) {
-			P->core->core_errno = errno;
-			dprintf("failed to malloc mapping data\n");
-			return (0); /* Abort */
-		}
-
-		(void) memset(fp, 0, sizeof (file_info_t));
-
-		list_link(fp, &P->file_head);
-		mp->map_file = fp;
-		P->num_files++;
-
-		fp->file_ref = 1;
-		fp->file_fd = -1;
+	/*
+	 * Create a new file_info_t for this mapping, and therefore for
+	 * this load object.
+	 *
+	 * If there's an ELF header at the beginning of this mapping,
+	 * file_info_new() will try to use its section headers to
+	 * identify any other mappings that belong to this load object.
+	 */
+	if ((fp = mp->map_file) == NULL &&
+	    (fp = file_info_new(P, mp)) == NULL) {
+		P->core->core_errno = errno;
+		dprintf("failed to malloc mapping data\n");
+		return (0); /* Abort */
 	}
+	fp->file_map = mp;
 
+	/* Create a local copy of the load object representation */
 	if ((fp->file_lo = malloc(sizeof (rd_loadobj_t))) == NULL) {
 		P->core->core_errno = errno;
 		dprintf("failed to malloc mapping data\n");
 		return (0); /* Abort */
 	}
-
 	*fp->file_lo = *rlp;
 
 	if (fp->file_lname == NULL &&
@@ -1444,51 +1443,60 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 	if (fp->file_lname != NULL)
 		fp->file_lbase = basename(fp->file_lname);
 
-	/*
-	 * Associate the file and the mapping, and attempt to build
-	 * a symbol table for this file.
-	 */
-	(void) strcpy(fp->file_pname, mp->map_pmap.pr_mapname);
-	fp->file_map = mp;
-
-	Pbuild_file_symtab(P, fp);
-
-	if (fp->file_elf == NULL) {
-		dprintf("core_iter_mapping: no symtab - going to next\n");
-		return (1); /* No symbol table; advance to next mapping */
-	}
+	/* Associate the file and the mapping. */
+	(void) strncpy(fp->file_pname, mp->map_pmap.pr_mapname, PRMAPSZ);
+	fp->file_pname[PRMAPSZ - 1] = '\0';
 
 	/*
-	 * Locate the start of a data segment associated with this file.
-	 * Starting with that data segment, name all mappings that
-	 * fall within this file's address range after the file and
-	 * establish their mp->map_file links.
+	 * If no section headers were available then we'll have to
+	 * identify this load object's other mappings with what we've
+	 * got: the start and end of the object's corresponding
+	 * address space.
 	 */
-	if ((mp = core_find_data(P, fp->file_elf, fp->file_lo)) != NULL) {
-		dprintf("found data for %s at %p (pr_offset 0x%llx)\n",
-		    fp->file_pname, (void *)fp->file_lo->rl_data_base,
-		    mp->map_pmap.pr_offset);
+	if (fp->file_saddrs == NULL) {
+		for (mp = fp->file_map + 1; mp < P->mappings + P->map_count &&
+		    mp->map_pmap.pr_vaddr < rlp->rl_bend; mp++) {
 
-		for (; mp < P->mappings + P->map_count; mp++) {
-			if (mp->map_pmap.pr_vaddr > fp->file_lo->rl_bend)
-				break;
 			if (mp->map_file == NULL) {
-				dprintf("%s: associating segment at %p\n",
+				dprintf("core_iter_mapping %s: associating "
+				    "segment at %p\n",
 				    fp->file_pname,
 				    (void *)mp->map_pmap.pr_vaddr);
 				mp->map_file = fp;
 				fp->file_ref++;
 			} else {
-				dprintf("%s: segment at %p already associated "
-				    "with %s\n", fp->file_pname,
+				dprintf("core_iter_mapping %s: segment at "
+				    "%p already associated with %s\n",
+				    fp->file_pname,
 				    (void *)mp->map_pmap.pr_vaddr,
-				    mp->map_file->file_pname);
+				    (mp == fp->file_map ? "this file" :
+				    mp->map_file->file_pname));
 			}
-
-			if (!(mp->map_pmap.pr_mflags & MA_BREAK))
-				(void) strcpy(mp->map_pmap.pr_mapname,
-				    fp->file_pname);
 		}
+	}
+
+	/* Ensure that all this file's mappings are named. */
+	for (mp = fp->file_map; mp < P->mappings + P->map_count &&
+	    mp->map_file == fp; mp++) {
+		if (mp->map_pmap.pr_mapname[0] == '\0' &&
+		    !(mp->map_pmap.pr_mflags & MA_BREAK)) {
+			(void) strncpy(mp->map_pmap.pr_mapname, fp->file_pname,
+			    PRMAPSZ);
+			mp->map_pmap.pr_mapname[PRMAPSZ - 1] = '\0';
+		}
+	}
+
+	/* Attempt to build a symbol table for this file. */
+	Pbuild_file_symtab(P, fp);
+	if (fp->file_elf == NULL)
+		dprintf("core_iter_mapping: no symtab for %s\n",
+		    fp->file_pname);
+
+	/* Locate the start of a data segment associated with this file. */
+	if ((mp = core_find_data(P, fp->file_elf, fp->file_lo)) != NULL) {
+		dprintf("found data for %s at %p (pr_offset 0x%llx)\n",
+		    fp->file_pname, (void *)fp->file_lo->rl_data_base,
+		    mp->map_pmap.pr_offset);
 	} else {
 		dprintf("core_iter_mapping: no data found for %s\n",
 		    fp->file_pname);

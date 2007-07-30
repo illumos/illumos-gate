@@ -263,6 +263,7 @@ extern	char 	*Pfindexec(struct ps_prochandle *, const char *,
 	int (*)(const char *, void *), void *);
 extern	int	getlwpstatus(struct ps_prochandle *, lwpid_t, lwpstatus_t *);
 int	Pstopstatus(struct ps_prochandle *, long, uint32_t);
+extern	file_info_t *file_info_new(struct ps_prochandle *, map_info_t *);
 
 extern	int	Padd_mapping(struct ps_prochandle *, off64_t, file_info_t *,
     prmap_t *);

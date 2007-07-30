@@ -171,13 +171,13 @@ get_saddrs(struct ps_prochandle *P, uintptr_t ehdr_start, uint_t *n)
 /*
  * Allocation function for a new file_info_t
  */
-static file_info_t *
+file_info_t *
 file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 {
 	file_info_t *fptr;
 	map_info_t *mp;
-	uintptr_t addr;
-	uint_t i, j;
+	uintptr_t mstart, mend, sstart, send;
+	uint_t i;
 
 	if ((fptr = calloc(1, sizeof (file_info_t))) == NULL)
 		return (NULL);
@@ -201,22 +201,38 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 	    &fptr->file_nsaddrs)) == NULL)
 		return (fptr);
 
-	i = j = 0;
 	mp = P->mappings;
-	while (j < P->map_count && i < fptr->file_nsaddrs) {
-		addr = fptr->file_saddrs[i];
-		if (addr >= mp->map_pmap.pr_vaddr &&
-		    addr < mp->map_pmap.pr_vaddr + mp->map_pmap.pr_size &&
-		    mp->map_file == NULL) {
-			mp->map_file = fptr;
-			fptr->file_ref++;
-		}
+	i = 0;
+	while (mp < P->mappings + P->map_count && i < fptr->file_nsaddrs) {
 
-		if (addr < mp->map_pmap.pr_vaddr + mp->map_pmap.pr_size) {
-			i++;
-		} else {
+		/* Calculate the start and end of the mapping and section */
+		mstart = mp->map_pmap.pr_vaddr;
+		mend = mp->map_pmap.pr_vaddr + mp->map_pmap.pr_size;
+		sstart = fptr->file_saddrs[i];
+		send = fptr->file_saddrs[i + 1];
+
+		if (mend <= sstart) {
+			/* This mapping is below the current section */
 			mp++;
-			j++;
+		} else if (mstart >= send) {
+			/* This mapping is above the current section */
+			i += 2;
+		} else {
+			/* This mapping overlaps the current section */
+			if (mp->map_file == NULL) {
+				dprintf("file_info_new: associating "
+				    "segment at %p\n",
+				    (void *)mp->map_pmap.pr_vaddr);
+				mp->map_file = fptr;
+				fptr->file_ref++;
+			} else {
+				dprintf("file_info_new: segment at %p "
+				    "already associated with %s\n",
+				    (void *)mp->map_pmap.pr_vaddr,
+				    (mp == mptr ? "this file" :
+				    mp->map_file->file_pname));
+			}
+			mp++;
 		}
 	}
 
@@ -596,9 +612,17 @@ Paddr_to_text_map(struct ps_prochandle *P, uintptr_t addr)
 		file_info_t *fptr = build_map_symtab(P, mptr);
 		const prmap_t *pmp = &mptr->map_pmap;
 
+		/*
+		 * Assume that if rl_data_base is NULL, it means that no
+		 * data section was found for this load object, and that
+		 * a section must be text. Otherwise, a section will be
+		 * text unless it ends above the start of the data
+		 * section.
+		 */
 		if (fptr != NULL && fptr->file_lo != NULL &&
-		    fptr->file_lo->rl_base >= pmp->pr_vaddr &&
-		    fptr->file_lo->rl_base < pmp->pr_vaddr + pmp->pr_size)
+		    (fptr->file_lo->rl_data_base == NULL ||
+		    pmp->pr_vaddr + pmp->pr_size <
+		    fptr->file_lo->rl_data_base))
 			return (pmp);
 	}
 
@@ -906,6 +930,7 @@ is_mapping_in_file(struct ps_prochandle *P, map_info_t *mptr, file_info_t *fptr)
 	prmap_t *pmap = &mptr->map_pmap;
 	rd_loadobj_t *lop = fptr->file_lo;
 	uint_t i;
+	uintptr_t mstart, mend, sstart, send;
 
 	/*
 	 * We can get for free the start address of the text and data
@@ -927,7 +952,7 @@ is_mapping_in_file(struct ps_prochandle *P, map_info_t *mptr, file_info_t *fptr)
 	 * only one will be seen to enclose that section's start address.
 	 * Thus, to be rigorous, we ask not whether this mapping encloses
 	 * the start of a section, but whether there exists a section that
-	 * encloses the start of this mapping.
+	 * overlaps this mapping.
 	 *
 	 * If we don't already have the section addresses, and we successfully
 	 * get them, then we cache them in case we come here again.
@@ -936,10 +961,14 @@ is_mapping_in_file(struct ps_prochandle *P, map_info_t *mptr, file_info_t *fptr)
 	    (fptr->file_saddrs = get_saddrs(P,
 	    fptr->file_map->map_pmap.pr_vaddr, &fptr->file_nsaddrs)) == NULL)
 		return (0);
+
+	mstart = mptr->map_pmap.pr_vaddr;
+	mend = mptr->map_pmap.pr_vaddr + mptr->map_pmap.pr_size;
 	for (i = 0; i < fptr->file_nsaddrs; i += 2) {
-		/* Does this section enclose the start of the mapping? */
-		if (fptr->file_saddrs[i] <= pmap->pr_vaddr &&
-		    fptr->file_saddrs[i + 1] > pmap->pr_vaddr)
+		/* Does this section overlap the mapping? */
+		sstart = fptr->file_saddrs[i];
+		send = fptr->file_saddrs[i + 1];
+		if (!(mend <= sstart || mstart >= send))
 			return (1);
 	}
 
@@ -1513,18 +1542,31 @@ optimize_symtab(sym_tbl_t *symtab)
 	}
 
 	/*
-	 * Sort the two tables according to the appropriate criteria.
+	 * Sort the two tables according to the appropriate criteria,
+	 * unless the user has overridden this behaviour.
+	 *
+	 * An example where we might not sort the tables is the relatively
+	 * unusual case of a process with very large symbol tables in which
+	 * we perform few lookups. In such a case the total time would be
+	 * dominated by the sort. It is difficult to determine a priori
+	 * how many lookups an arbitrary client will perform, and
+	 * hence whether the symbol tables should be sorted. We therefore
+	 * sort the tables by default, but provide the user with a
+	 * "chicken switch" in the form of the LIBPROC_NO_QSORT
+	 * environment variable.
 	 */
-	(void) mutex_lock(&sort_mtx);
-	sort_strs = symtab->sym_strs;
-	sort_syms = syms;
+	if (!_libproc_no_qsort) {
+		(void) mutex_lock(&sort_mtx);
+		sort_strs = symtab->sym_strs;
+		sort_syms = syms;
 
-	qsort(symtab->sym_byaddr, count, sizeof (uint_t), byaddr_cmp);
-	qsort(symtab->sym_byname, count, sizeof (uint_t), byname_cmp);
+		qsort(symtab->sym_byaddr, count, sizeof (uint_t), byaddr_cmp);
+		qsort(symtab->sym_byname, count, sizeof (uint_t), byname_cmp);
 
-	sort_strs = NULL;
-	sort_syms = NULL;
-	(void) mutex_unlock(&sort_mtx);
+		sort_strs = NULL;
+		sort_syms = NULL;
+		(void) mutex_unlock(&sort_mtx);
+	}
 
 	free(syms);
 }
@@ -2084,12 +2126,11 @@ sym_prefer(GElf_Sym *sym1, char *name1, GElf_Sym *sym2, char *name2)
 }
 
 /*
- * Look up a symbol by address in the specified symbol table.
- * Adjustment to 'addr' must already have been made for the
- * offset of the symbol if this is a dynamic library symbol table.
+ * Use a binary search to do the work of sym_by_addr().
  */
 static GElf_Sym *
-sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
+sym_by_addr_binary(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp,
+    uint_t *idp)
 {
 	GElf_Sym sym, osym;
 	uint_t i, oid, *byaddr = symtab->sym_byaddr;
@@ -2154,10 +2195,70 @@ sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
 }
 
 /*
- * Look up a symbol by name in the specified symbol table.
+ * Use a linear search to do the work of sym_by_addr().
  */
 static GElf_Sym *
-sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
+sym_by_addr_linear(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symbolp,
+    uint_t *idp)
+{
+	size_t symn = symtab->sym_symn;
+	char *strs = symtab->sym_strs;
+	GElf_Sym sym, *symp = NULL;
+	GElf_Sym osym, *osymp = NULL;
+	int i, id;
+
+	if (symtab->sym_data_pri == NULL || symn == 0 || strs == NULL)
+		return (NULL);
+
+	for (i = 0; i < symn; i++) {
+		if ((symp = symtab_getsym(symtab, i, &sym)) != NULL) {
+			if (addr >= sym.st_value &&
+			    addr < sym.st_value + sym.st_size) {
+				if (osymp)
+					symp = sym_prefer(
+					    symp, strs + symp->st_name,
+					    osymp, strs + osymp->st_name);
+				if (symp != osymp) {
+					osym = sym;
+					osymp = &osym;
+					id = i;
+				}
+			}
+		}
+	}
+	if (osymp) {
+		*symbolp = osym;
+		if (idp)
+			*idp = id;
+		return (symbolp);
+	}
+	return (NULL);
+}
+
+/*
+ * Look up a symbol by address in the specified symbol table.
+ * Adjustment to 'addr' must already have been made for the
+ * offset of the symbol if this is a dynamic library symbol table.
+ *
+ * Use a linear or a binary search depending on whether or not we
+ * chose to sort the table in optimize_symtab().
+ */
+static GElf_Sym *
+sym_by_addr(sym_tbl_t *symtab, GElf_Addr addr, GElf_Sym *symp, uint_t *idp)
+{
+	if (_libproc_no_qsort) {
+		return (sym_by_addr_linear(symtab, addr, symp, idp));
+	} else {
+		return (sym_by_addr_binary(symtab, addr, symp, idp));
+	}
+}
+
+/*
+ * Use a binary search to do the work of sym_by_name().
+ */
+static GElf_Sym *
+sym_by_name_binary(sym_tbl_t *symtab, const char *name, GElf_Sym *symp,
+    uint_t *idp)
 {
 	char *strs = symtab->sym_strs;
 	uint_t i, *byname = symtab->sym_byname;
@@ -2189,6 +2290,48 @@ sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
 	}
 
 	return (NULL);
+}
+
+/*
+ * Use a linear search to do the work of sym_by_name().
+ */
+static GElf_Sym *
+sym_by_name_linear(sym_tbl_t *symtab, const char *name, GElf_Sym *symp,
+    uint_t *idp)
+{
+	size_t symn = symtab->sym_symn;
+	char *strs = symtab->sym_strs;
+	int i;
+
+	if (symtab->sym_data_pri == NULL || symn == 0 || strs == NULL)
+		return (NULL);
+
+	for (i = 0; i < symn; i++) {
+		if (symtab_getsym(symtab, i, symp) &&
+		    strcmp(name, strs + symp->st_name) == 0) {
+			if (idp)
+				*idp = i;
+			return (symp);
+		}
+	}
+
+	return (NULL);
+}
+
+/*
+ * Look up a symbol by name in the specified symbol table.
+ *
+ * Use a linear or a binary search depending on whether or not we
+ * chose to sort the table in optimize_symtab().
+ */
+static GElf_Sym *
+sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
+{
+	if (_libproc_no_qsort) {
+		return (sym_by_name_linear(symtab, name, symp, idp));
+	} else {
+		return (sym_by_name_binary(symtab, name, symp, idp));
+	}
 }
 
 /*

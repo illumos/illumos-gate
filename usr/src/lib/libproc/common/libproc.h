@@ -82,6 +82,8 @@ struct ps_prochandle;
 struct ps_lwphandle;
 
 extern	int	_libproc_debug;	/* set non-zero to enable debugging fprintfs */
+extern	int	_libproc_no_qsort;	/* set non-zero to inhibit sorting */
+					/* of symbol tables */
 
 #if defined(__sparc)
 #define	R_RVAL1	R_O0		/* register holding a function return value */

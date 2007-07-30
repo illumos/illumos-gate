@@ -55,6 +55,9 @@
 #include "P32ton.h"
 
 int	_libproc_debug;		/* set non-zero to enable debugging printfs */
+int	_libproc_no_qsort;	/* set non-zero to inhibit sorting */
+				/* of symbol tables */
+
 sigset_t blockable_sigs;	/* signals to block when we need to be safe */
 static	int	minfd;	/* minimum file descriptor returned by dupfd(fd, 0) */
 char	procfs_path[PATH_MAX] = "/proc";
@@ -93,6 +96,7 @@ void
 _libproc_init(void)
 {
 	_libproc_debug = getenv("LIBPROC_DEBUG") != NULL;
+	_libproc_no_qsort = getenv("LIBPROC_NO_QSORT") != NULL;
 
 	(void) sigfillset(&blockable_sigs);
 	(void) sigdelset(&blockable_sigs, SIGKILL);
@@ -359,7 +363,7 @@ Pxcreate(const char *file,	/* executable file name */
 		 * to get the information later.
 		 */
 		(void) Pread_string(P, execpath, sizeof (execpath),
-			(off_t)P->status.pr_lwp.pr_sysarg[0]);
+		    (off_t)P->status.pr_lwp.pr_sysarg[0]);
 		if (path != NULL)
 			(void) strncpy(path, execpath, len);
 		/*
@@ -1556,23 +1560,23 @@ prldump(const char *caller, lwpstatus_t *lsp)
 		break;
 	case PR_SIGNALLED:
 		dprintf("%s: SIGNALLED %s\n", caller,
-			proc_signame(lsp->pr_what, name, sizeof (name)));
+		    proc_signame(lsp->pr_what, name, sizeof (name)));
 		break;
 	case PR_FAULTED:
 		dprintf("%s: FAULTED %s\n", caller,
-			proc_fltname(lsp->pr_what, name, sizeof (name)));
+		    proc_fltname(lsp->pr_what, name, sizeof (name)));
 		break;
 	case PR_SYSENTRY:
 		dprintf("%s: SYSENTRY %s\n", caller,
-			proc_sysname(lsp->pr_what, name, sizeof (name)));
+		    proc_sysname(lsp->pr_what, name, sizeof (name)));
 		break;
 	case PR_SYSEXIT:
 		dprintf("%s: SYSEXIT %s\n", caller,
-			proc_sysname(lsp->pr_what, name, sizeof (name)));
+		    proc_sysname(lsp->pr_what, name, sizeof (name)));
 		break;
 	case PR_JOBCONTROL:
 		dprintf("%s: JOBCONTROL %s\n", caller,
-			proc_signame(lsp->pr_what, name, sizeof (name)));
+		    proc_signame(lsp->pr_what, name, sizeof (name)));
 		break;
 	case PR_SUSPENDED:
 		dprintf("%s: SUSPENDED\n", caller);
@@ -1884,8 +1888,8 @@ Psetrun(struct ps_prochandle *P,
 	int sbits = (PR_DSTOP | PR_ISTOP | PR_ASLEEP);
 
 	long ctl[1 +					/* PCCFAULT	*/
-		1 + sizeof (siginfo_t)/sizeof (long) +	/* PCSSIG/PCCSIG */
-		2 ];					/* PCRUN	*/
+	    1 + sizeof (siginfo_t)/sizeof (long) +	/* PCSSIG/PCCSIG */
+	    2 ];					/* PCRUN	*/
 
 	long *ctlp = ctl;
 	size_t size;
@@ -2036,7 +2040,7 @@ int
 Psetbkpt(struct ps_prochandle *P, uintptr_t address, ulong_t *saved)
 {
 	long ctl[1 + sizeof (priovec_t) / sizeof (long) +	/* PCREAD */
-		1 + sizeof (priovec_t) / sizeof (long)];	/* PCWRITE */
+	    1 + sizeof (priovec_t) / sizeof (long)];	/* PCWRITE */
 	long *ctlp = ctl;
 	size_t size;
 	priovec_t *iovp;
@@ -2129,15 +2133,15 @@ execute_bkpt(
 	ulong_t saved)			/* the saved instruction */
 {
 	long ctl[
-		1 + sizeof (sigset_t) / sizeof (long) +		/* PCSHOLD */
-		1 + sizeof (fltset_t) / sizeof (long) +		/* PCSFAULT */
-		1 + sizeof (priovec_t) / sizeof (long) +	/* PCWRITE */
-		2 +						/* PCRUN */
-		1 +						/* PCWSTOP */
-		1 +						/* PCCFAULT */
-		1 + sizeof (priovec_t) / sizeof (long) +	/* PCWRITE */
-		1 + sizeof (fltset_t) / sizeof (long) +		/* PCSFAULT */
-		1 + sizeof (sigset_t) / sizeof (long)];		/* PCSHOLD */
+	    1 + sizeof (sigset_t) / sizeof (long) +		/* PCSHOLD */
+	    1 + sizeof (fltset_t) / sizeof (long) +		/* PCSFAULT */
+	    1 + sizeof (priovec_t) / sizeof (long) +		/* PCWRITE */
+	    2 +							/* PCRUN */
+	    1 +							/* PCWSTOP */
+	    1 +							/* PCCFAULT */
+	    1 + sizeof (priovec_t) / sizeof (long) +		/* PCWRITE */
+	    1 + sizeof (fltset_t) / sizeof (long) +		/* PCSFAULT */
+	    1 + sizeof (sigset_t) / sizeof (long)];		/* PCSHOLD */
 	long *ctlp = ctl;
 	sigset_t unblock;
 	size_t size;
@@ -2231,8 +2235,8 @@ Pxecbkpt(struct ps_prochandle *P, ulong_t saved)
 	Psync(P);
 
 	error = execute_bkpt(ctlfd,
-		&P->status.pr_flttrace, &P->status.pr_lwp.pr_lwphold,
-		P->status.pr_lwp.pr_reg[R_PC], saved);
+	    &P->status.pr_flttrace, &P->status.pr_lwp.pr_lwphold,
+	    P->status.pr_lwp.pr_reg[R_PC], saved);
 	rv = Pstopstatus(P, PCNULL, 0);
 
 	if (error != 0) {
@@ -2425,7 +2429,7 @@ Pxecwapt(struct ps_prochandle *P, const prwatch_t *wp)
 
 	Psync(P);
 	error = execute_wapt(ctlfd,
-		&P->status.pr_flttrace, &P->status.pr_lwp.pr_lwphold, wp);
+	    &P->status.pr_flttrace, &P->status.pr_lwp.pr_lwphold, wp);
 	rv = Pstopstatus(P, PCNULL, 0);
 
 	if (error != 0) {
@@ -2820,7 +2824,7 @@ retry:
 
 		for (i = 0; i < P->core->core_nlwp; i++, lwp = list_prev(lwp)) {
 			sp = (lwp->lwp_psinfo.pr_sname == 'Z')? NULL :
-				&lwp->lwp_status;
+			    &lwp->lwp_status;
 			if ((rv = func(cd, sp, &lwp->lwp_psinfo)) != 0)
 				break;
 		}
@@ -3040,9 +3044,9 @@ Lgrab(struct ps_prochandle *P, lwpid_t lwpid, int *perr)
 	L->lwp_ctlfd = fd;
 
 	L->lwp_state =
-		((L->lwp_status.pr_flags & (PR_STOPPED|PR_ISTOP))
-		== (PR_STOPPED|PR_ISTOP))?
-		PS_STOP : PS_RUN;
+	    ((L->lwp_status.pr_flags & (PR_STOPPED|PR_ISTOP))
+	    == (PR_STOPPED|PR_ISTOP))?
+	    PS_STOP : PS_RUN;
 
 	*perr = 0;
 	(void) mutex_unlock(&P->proc_lock);
@@ -3412,8 +3416,8 @@ Lsetrun(struct ps_lwphandle *L,
 	int sbits = (PR_DSTOP | PR_ISTOP | PR_ASLEEP);
 
 	long ctl[1 +					/* PCCFAULT	*/
-		1 + sizeof (siginfo_t)/sizeof (long) +	/* PCSSIG/PCCSIG */
-		2 ];					/* PCRUN	*/
+	    1 + sizeof (siginfo_t)/sizeof (long) +	/* PCSSIG/PCCSIG */
+	    2 ];					/* PCRUN	*/
 
 	long *ctlp = ctl;
 	size_t size;
@@ -3503,8 +3507,8 @@ Lxecbkpt(struct ps_lwphandle *L, ulong_t saved)
 
 	Lsync(L);
 	error = execute_bkpt(L->lwp_ctlfd,
-		&P->status.pr_flttrace, &L->lwp_status.pr_lwphold,
-		L->lwp_status.pr_reg[R_PC], saved);
+	    &P->status.pr_flttrace, &L->lwp_status.pr_lwphold,
+	    L->lwp_status.pr_reg[R_PC], saved);
 	rv = Lstopstatus(L, PCNULL, 0);
 
 	if (error != 0) {
@@ -3539,7 +3543,7 @@ Lxecwapt(struct ps_lwphandle *L, const prwatch_t *wp)
 
 	Lsync(L);
 	error = execute_wapt(L->lwp_ctlfd,
-		&P->status.pr_flttrace, &L->lwp_status.pr_lwphold, wp);
+	    &P->status.pr_flttrace, &L->lwp_status.pr_lwphold, wp);
 	rv = Lstopstatus(L, PCNULL, 0);
 
 	if (error != 0) {
