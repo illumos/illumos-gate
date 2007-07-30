@@ -651,10 +651,11 @@ process_offline_inst(instance_t *inst)
  * bind fails, returns -1, else the fd of the bound socket.
  */
 static int
-create_bound_socket(const char *fmri, socket_info_t *sock_info)
+create_bound_socket(const instance_t *inst, socket_info_t *sock_info)
 {
 	int		fd;
 	int		on = 1;
+	const char	*fmri = inst->fmri;
 	rpc_info_t	*rpc = sock_info->pr_info.ri;
 	const char	*proto = sock_info->pr_info.proto;
 
@@ -718,8 +719,13 @@ create_bound_socket(const char *fmri, socket_info_t *sock_info)
 		rpc->netbuf.maxlen = SS_ADDRLEN(ss);
 	}
 
-	if (sock_info->type == SOCK_STREAM)
-		(void) listen(fd, CONNECTION_BACKLOG);
+	if (sock_info->type == SOCK_STREAM) {
+		int qlen = inst->config->basic->conn_backlog;
+
+		debug_msg("Listening for service %s with backlog queue"
+		    " size %d", fmri, qlen);
+		(void) listen(fd, qlen);
+	}
 
 	return (fd);
 }
@@ -1021,7 +1027,7 @@ create_bound_fds(instance_t *instance)
 		if (pi->listen_fd != -1)
 			continue;
 		if (cfg->istlx) {
-			pi->listen_fd = create_bound_endpoint(instance->fmri,
+			pi->listen_fd = create_bound_endpoint(instance,
 			    (tlx_info_t *)pi);
 		} else {
 			/*
@@ -1033,7 +1039,7 @@ create_bound_fds(instance_t *instance)
 			 * version complains if it's absent.
 			 */
 			void *p = pi;
-			pi->listen_fd = create_bound_socket(instance->fmri,
+			pi->listen_fd = create_bound_socket(instance,
 			    (socket_info_t *)p);
 		}
 		if (pi->listen_fd == -1) {

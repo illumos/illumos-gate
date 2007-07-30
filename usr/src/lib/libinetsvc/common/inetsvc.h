@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +71,7 @@ extern "C" {
 #define	PR_AUTO_CONVERTED_NAME		"converted"
 #define	PR_VERSION_NAME			"version"
 #define	PR_SOURCE_LINE_NAME		"source_line"
+#define	PR_CONNECTION_BACKLOG_NAME	"connection_backlog"
 
 /*
  * Provide index values for inetd property locations in the property table, for
@@ -98,6 +98,7 @@ extern "C" {
 #define	PT_INHERIT_ENV_INDEX		18
 #define	PT_DO_TCP_TRACE_INDEX		19
 #define	PT_DO_TCP_WRAPPERS_INDEX	20
+#define	PT_CONNECTION_BACKLOG_INDEX	21
 
 /*
  * Names of method properties.
@@ -274,6 +275,9 @@ typedef struct {
 
 	/* specific address to bind instance to */
 	char		*bind_addr;
+
+	/* connection backlog queue size */
+	int64_t		conn_backlog;
 } basic_cfg_t;
 
 typedef enum uds_request {

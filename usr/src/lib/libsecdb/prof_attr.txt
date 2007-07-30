@@ -45,11 +45,14 @@ DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMng
 File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
+Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
+Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.manage.idmap,solaris.smf.value.idmap;help=RtIdmapMngmnt.html
+Inetd Management:::Manage inetd configuration parameters:auths=solaris.smf.manage.inetd,solaris.smf.value.inetd;help=RtInetdMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
-Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa;profiles=Network Wifi Management;help=RtNetMngmnt.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa;profiles=Network Wifi Management,Inetd Management;help=RtNetMngmnt.html
 Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
@@ -57,8 +60,6 @@ Network Link Security:::Manage network link security:auths=solaris.network.link.
 Network IPsec Management:::Manage IPsec and IKE:auths=solaris.smf.manage.ipsec,solaris.smf.value.ipsec;help=RtNetIPsec.html
 Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
-Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.manage.idmap,solaris.smf.value.idmap;help=RtIdmapMngmnt.html
-Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
 Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
 Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html

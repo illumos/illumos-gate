@@ -1,15 +1,14 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
  You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  or http://www.opensolaris.org/os/licensing.
@@ -146,6 +145,17 @@
 		<propval name='bind_addr' type='astring' value='' />
 		<propval name='bind_fail_max' type='integer' value='-1' />
 		<propval name='bind_fail_interval' type='integer' value='-1' />
+		<propval name='connection_backlog' type='integer' value='10' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.inetd' />
+	</property_group>
+
+	<property_group name='general' type='framework'>
+		<!-- to manage inetd -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.inetd' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.inetd' />
 	</property_group>
 
 	<stability value='Unstable' />

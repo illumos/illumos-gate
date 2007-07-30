@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,8 @@ static inetd_prop_t inetd_properties[] = {
 	{PR_DO_TCP_TRACE_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
 	{PR_DO_TCP_WRAPPERS_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
+	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
+	{PR_CONNECTION_BACKLOG_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
 	{NULL},
 };
@@ -784,7 +786,7 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 			    sizeof (SOCKET_PROTO_UDP) - 1) == 0) {
 				invalid_proto = B_TRUE;
 			} else if (cfg->istlx && (nconf != NULL) &&
-				(nconf->nc_semantics == NC_TPI_CLTS)) {
+			    (nconf->nc_semantics == NC_TPI_CLTS)) {
 					invalid_proto = B_TRUE;
 			}
 			if (invalid_proto) {

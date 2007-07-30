@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,9 +71,6 @@ extern "C" {
 #define	PR_NAME_START_PIDS	"start_pids"
 #define	PR_NAME_CUR_INT_STATE	"cur_state"
 #define	PR_NAME_NEXT_INT_STATE	"next_state"
-
-/* Connection backlog applied to connection oriented services. */
-#define	CONNECTION_BACKLOG	10
 
 /*
  * Instance states used internal to svc.inetd.
@@ -278,7 +275,7 @@ extern void destroy_rpc_info(rpc_info_t *);
 extern boolean_t rpc_info_equal(const rpc_info_t *, const rpc_info_t *);
 extern int register_rpc_service(const char *, const rpc_info_t *);
 extern void unregister_rpc_service(const char *, const rpc_info_t *);
-extern int create_bound_endpoint(const char *, tlx_info_t *);
+extern int create_bound_endpoint(const instance_t *, tlx_info_t *);
 extern void close_net_fd(instance_t *, int);
 extern int tlx_accept(const char *, tlx_info_t *, struct sockaddr_storage *);
 extern struct t_call *dequeue_conind(uu_list_t *);
