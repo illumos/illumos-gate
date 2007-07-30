@@ -4002,6 +4002,16 @@ disable_nonsubgraph_leaves(graph_vertex_t *v, void *arg)
 {
 	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
 
+	/*
+	 * We must skip exclusion dependencies because they are allowed to
+	 * complete dependency cycles.  This is correct because A's exclusion
+	 * dependency on B doesn't bear on the order in which they should be
+	 * stopped.  Indeed, the exclusion dependency should guarantee that
+	 * they are never online at the same time.
+	 */
+	if (v->gv_type == GVT_GROUP && v->gv_depgroup == DEPGRP_EXCLUDE_ALL)
+		return;
+
 	/* If v isn't an instance, recurse on its dependencies. */
 	if (v->gv_type != GVT_INST)
 		goto recurse;
