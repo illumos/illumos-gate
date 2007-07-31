@@ -146,6 +146,8 @@ static int	ip_sioctl_subnet_tail(ipif_t *ipif, in6_addr_t, in6_addr_t,
     queue_t *q, mblk_t *mp, boolean_t need_up);
 static int	ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp,
     sin_t *sin, boolean_t x_arp_ioctl, boolean_t if_arp_ioctl);
+static int	ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
+    int ioccmd, struct linkblk *li, boolean_t doconsist);
 static ipaddr_t	ip_subnet_mask(ipaddr_t addr, ipif_t **, ip_stack_t *);
 static void	ip_wput_ioctl(queue_t *q, mblk_t *mp);
 static void	ipsq_flush(ill_t *ill);
@@ -157,6 +159,7 @@ static void	ipsq_delete(ipsq_t *);
 static ipif_t	*ipif_allocate(ill_t *ill, int id, uint_t ire_type,
 		    boolean_t initialize);
 static void	ipif_check_bcast_ires(ipif_t *test_ipif);
+static ire_t	**ipif_create_bcast_ires(ipif_t *ipif, ire_t **irep);
 static boolean_t ipif_comp_multi(ipif_t *old_ipif, ipif_t *new_ipif,
 		    boolean_t isv6);
 static void	ipif_down_delete_ire(ire_t *ire, char *ipif);
@@ -10078,19 +10081,14 @@ ip_sioctl_arp(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 void
 ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 {
-	mblk_t *mp1;
-	mblk_t *mp2;
-	struct linkblk *li;
-	queue_t	*ipwq;
-	char	*name;
-	struct qinit *qinfo;
-	struct ipmx_s *ipmxp;
-	ill_t	*ill = NULL;
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	int	err = 0;
+	mblk_t		*mp1, *mp2;
+	struct linkblk	*li;
+	struct ipmx_s	*ipmxp;
+	ill_t		*ill;
+	int		ioccmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
+	int		err = 0;
 	boolean_t	entered_ipsq = B_FALSE;
-	boolean_t islink;
-	queue_t *dwq = NULL;
+	boolean_t	islink;
 	ip_stack_t	*ipst;
 
 	if (CONN_Q(q))
@@ -10098,11 +10096,10 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	else
 		ipst = ILLQ_TO_IPST(q);
 
-	ASSERT(iocp->ioc_cmd == I_PLINK || iocp->ioc_cmd == I_PUNLINK ||
-	    iocp->ioc_cmd == I_LINK || iocp->ioc_cmd == I_UNLINK);
+	ASSERT(ioccmd == I_PLINK || ioccmd == I_PUNLINK ||
+	    ioccmd == I_LINK || ioccmd == I_UNLINK);
 
-	islink = (iocp->ioc_cmd == I_PLINK || iocp->ioc_cmd == I_LINK) ?
-	    B_TRUE : B_FALSE;
+	islink = (ioccmd == I_PLINK || ioccmd == I_LINK);
 
 	mp1 = mp->b_cont;	/* This is the linkblk info */
 	li = (struct linkblk *)mp1->b_rptr;
@@ -10121,115 +10118,36 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	/*
 	 * If I_{P}LINK/I_{P}UNLINK is issued by a utility other than
 	 * ifconfig which didn't push ARP on top of the dummy mux, we won't
-	 * get the special mblk above.  For backward compatibility, we just
-	 * return success.  The utility will use SIOCSLIFMUXID to store
-	 * the muxids.  This is not atomic, and can leave the streams
-	 * unplumbable if the utility is interrrupted, before it does the
-	 * SIOCSLIFMUXID.
+	 * get the special mblk above.  For backward compatibility, we
+	 * request ip_sioctl_plink_ipmod() to skip the consistency checks.
+	 * The utility will use SIOCSLIFMUXID to store the muxids.  This is
+	 * not atomic, and can leave the streams unplumbable if the utility
+	 * is interrupted before it does the SIOCSLIFMUXID.
 	 */
 	if (mp2 == NULL) {
-		/*
-		 * At this point we don't know whether or not this is the
-		 * IP module stream or the ARP device stream.  We need to
-		 * walk the lower stream in order to find this out, since
-		 * the capability negotiation is done only on the IP module
-		 * stream.  IP module instance is identified by the module
-		 * name IP, non-null q_next, and it's wput not being ip_lwput.
-		 * STREAMS ensures that the lower stream (l_qbot) will not
-		 * vanish until this ioctl completes. So we can safely walk
-		 * the stream or refer to the q_ptr.
-		 */
-		ipwq = li->l_qbot;
-		while (ipwq != NULL) {
-			qinfo = ipwq->q_qinfo;
-			name = qinfo->qi_minfo->mi_idname;
-			if (name != NULL && name[0] != NULL &&
-			    (strcmp(name, ip_mod_info.mi_idname) == 0) &&
-			    ((void *)(qinfo->qi_putp) != (void *)ip_lwput) &&
-			    (ipwq->q_next != NULL)) {
-				break;
-			}
-			ipwq = ipwq->q_next;
-		}
-		/*
-		 * This looks like an IP module stream, so trigger
-		 * the capability reset or re-negotiation if necessary.
-		 */
-		if (ipwq != NULL) {
-			ill = ipwq->q_ptr;
-			ASSERT(ill != NULL);
-
-			if (ipsq == NULL) {
-				ipsq = ipsq_try_enter(NULL, ill, q, mp,
-				    ip_sioctl_plink, NEW_OP, B_TRUE);
-				if (ipsq == NULL)
-					return;
-				entered_ipsq = B_TRUE;
-			}
-			ASSERT(IAM_WRITER_ILL(ill));
-			/*
-			 * Store the upper read queue of the module
-			 * immediately below IP, and count the total
-			 * number of lower modules.  Do this only
-			 * for I_PLINK or I_LINK event.
-			 */
-			ill->ill_lmod_rq = NULL;
-			ill->ill_lmod_cnt = 0;
-			if (islink && (dwq = ipwq->q_next) != NULL) {
-				ill->ill_lmod_rq = RD(dwq);
-
-				while (dwq != NULL) {
-					ill->ill_lmod_cnt++;
-					dwq = dwq->q_next;
-				}
-			}
-			/*
-			 * There's no point in resetting or re-negotiating if
-			 * we are not bound to the driver, so only do this if
-			 * the DLPI state is idle (up); we assume such state
-			 * since ill_ipif_up_count gets incremented in
-			 * ipif_up_done(), which is after we are bound to the
-			 * driver.  Note that in the case of logical
-			 * interfaces, IP won't rebind to the driver unless
-			 * the ill_ipif_up_count is 0, meaning that all other
-			 * IP interfaces (including the main ipif) are in the
-			 * down state.  Because of this, we use such counter
-			 * as an indicator, instead of relying on the IPIF_UP
-			 * flag, which is per ipif instance.
-			 */
-			if (ill->ill_ipif_up_count > 0) {
-				if (islink)
-					ill_capability_probe(ill);
-				else
-					ill_capability_reset(ill);
-			}
-		}
+		err = ip_sioctl_plink_ipmod(ipsq, q, mp, ioccmd, li, B_FALSE);
+		if (err == EINPROGRESS)
+			return;
 		goto done;
 	}
 
 	/*
-	 * This is an I_{P}LINK sent down by ifconfig on
-	 * /dev/arp. ARP has appended this last (3rd) mblk,
-	 * giving more info. STREAMS ensures that the lower
-	 * stream (l_qbot) will not vanish until this ioctl
-	 * completes. So we can safely walk the stream or refer
-	 * to the q_ptr.
+	 * This is an I_{P}LINK sent down by ifconfig through the ARP module;
+	 * ARP has appended this last mblk to tell us whether the lower stream
+	 * is an arp-dev stream or an IP module stream.
 	 */
 	ipmxp = (struct ipmx_s *)mp2->b_rptr;
 	if (ipmxp->ipmx_arpdev_stream) {
 		/*
-		 * The operation is occuring on the arp-device
-		 * stream.
+		 * The lower stream is the arp-dev stream.
 		 */
 		ill = ill_lookup_on_name(ipmxp->ipmx_name, B_FALSE, B_FALSE,
 		    q, mp, ip_sioctl_plink, &err, NULL, ipst);
 		if (ill == NULL) {
-			if (err == EINPROGRESS) {
+			if (err == EINPROGRESS)
 				return;
-			} else {
-				err = EINVAL;
-				goto done;
-			}
+			err = EINVAL;
+			goto done;
 		}
 
 		if (ipsq == NULL) {
@@ -10243,128 +10161,145 @@ ip_sioctl_plink(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		}
 		ASSERT(IAM_WRITER_ILL(ill));
 		ill_refrele(ill);
+
 		/*
-		 * To ensure consistency between IP and ARP,
-		 * the following LIFO scheme is used in
-		 * plink/punlink. (IP first, ARP last).
-		 * This is because the muxid's are stored
-		 * in the IP stream on the ill.
+		 * To ensure consistency between IP and ARP, the following
+		 * LIFO scheme is used in plink/punlink. (IP first, ARP last).
+		 * This is because the muxid's are stored in the IP stream on
+		 * the ill.
 		 *
-		 * I_{P}LINK: ifconfig plinks the IP stream before
-		 * plinking the ARP stream. On an arp-dev
-		 * stream, IP checks that it is not yet
-		 * plinked, and it also checks that the
-		 * corresponding IP stream is already plinked.
+		 * I_{P}LINK: ifconfig plinks the IP stream before plinking
+		 * the ARP stream. On an arp-dev stream, IP checks that it is
+		 * not yet plinked, and it also checks that the corresponding
+		 * IP stream is already plinked.
 		 *
-		 * I_{P}UNLINK: ifconfig punlinks the ARP stream
-		 * before punlinking the IP stream. IP does
-		 * not allow punlink of the IP stream unless
-		 * the arp stream has been punlinked.
-		 *
+		 * I_{P}UNLINK: ifconfig punlinks the ARP stream before
+		 * punlinking the IP stream. IP does not allow punlink of the
+		 * IP stream unless the arp stream has been punlinked.
 		 */
 		if ((islink &&
 		    (ill->ill_arp_muxid != 0 || ill->ill_ip_muxid == 0)) ||
-		    (!islink &&
-		    ill->ill_arp_muxid != li->l_index)) {
+		    (!islink && ill->ill_arp_muxid != li->l_index)) {
 			err = EINVAL;
 			goto done;
 		}
-		if (islink) {
-			ill->ill_arp_muxid = li->l_index;
-		} else {
-			ill->ill_arp_muxid = 0;
-		}
+		ill->ill_arp_muxid = islink ? li->l_index : 0;
 	} else {
 		/*
-		 * This must be the IP module stream with or
-		 * without arp. Walk the stream and locate the
-		 * IP module. An IP module instance is
-		 * identified by the module name IP, non-null
-		 * q_next, and it's wput not being ip_lwput.
+		 * The lower stream is probably an IP module stream.  Do
+		 * consistency checking.
 		 */
-		ipwq = li->l_qbot;
-		while (ipwq != NULL) {
-			qinfo = ipwq->q_qinfo;
-			name = qinfo->qi_minfo->mi_idname;
-			if (name != NULL && name[0] != NULL &&
-			    (strcmp(name, ip_mod_info.mi_idname) == 0) &&
-			    ((void *)(qinfo->qi_putp) != (void *)ip_lwput) &&
-			    (ipwq->q_next != NULL)) {
-				break;
-			}
-			ipwq = ipwq->q_next;
-		}
-		if (ipwq != NULL) {
-			ill = ipwq->q_ptr;
-			ASSERT(ill != NULL);
-
-			if (ipsq == NULL) {
-				ipsq = ipsq_try_enter(NULL, ill, q, mp,
-				    ip_sioctl_plink, NEW_OP, B_TRUE);
-				if (ipsq == NULL)
-					return;
-				entered_ipsq = B_TRUE;
-			}
-			ASSERT(IAM_WRITER_ILL(ill));
-			/*
-			 * Return error if the ip_mux_id is
-			 * non-zero and command is I_{P}LINK.
-			 * If command is I_{P}UNLINK, return
-			 * error if the arp-devstr is not
-			 * yet punlinked.
-			 */
-			if ((islink && ill->ill_ip_muxid != 0) ||
-			    (!islink && ill->ill_arp_muxid != 0)) {
-				err = EINVAL;
-				goto done;
-			}
-			ill->ill_lmod_rq = NULL;
-			ill->ill_lmod_cnt = 0;
-			if (islink) {
-				/*
-				 * Store the upper read queue of the module
-				 * immediately below IP, and count the total
-				 * number of lower modules.
-				 */
-				if ((dwq = ipwq->q_next) != NULL) {
-					ill->ill_lmod_rq = RD(dwq);
-
-					while (dwq != NULL) {
-						ill->ill_lmod_cnt++;
-						dwq = dwq->q_next;
-					}
-				}
-				ill->ill_ip_muxid = li->l_index;
-			} else {
-				ill->ill_ip_muxid = 0;
-			}
-
-			/*
-			 * See comments above about resetting/re-
-			 * negotiating driver sub-capabilities.
-			 */
-			if (ill->ill_ipif_up_count > 0) {
-				if (islink)
-					ill_capability_probe(ill);
-				else
-					ill_capability_reset(ill);
-			}
-		}
+		err = ip_sioctl_plink_ipmod(ipsq, q, mp, ioccmd, li, B_TRUE);
+		if (err == EINPROGRESS)
+			return;
 	}
 done:
-	iocp->ioc_count = 0;
-	iocp->ioc_error = err;
 	if (err == 0)
-		mp->b_datap->db_type = M_IOCACK;
+		miocack(q, mp, 0, 0);
 	else
-		mp->b_datap->db_type = M_IOCNAK;
-	qreply(q, mp);
+		miocnak(q, mp, 0, err);
 
 	/* Conn was refheld in ip_sioctl_copyin_setup */
 	if (CONN_Q(q))
 		CONN_OPER_PENDING_DONE(Q_TO_CONN(q));
 	if (entered_ipsq)
 		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+}
+
+/*
+ * Process I_{P}LINK and I_{P}UNLINK requests named by `ioccmd' and pointed to
+ * by `mp' and `li' for the IP module stream (if li->q_bot is in fact an IP
+ * module stream).  If `doconsist' is set, then do the extended consistency
+ * checks requested by ifconfig(1M) and (atomically) set ill_ip_muxid here.
+ * Returns zero on success, EINPROGRESS if the operation is still pending, or
+ * an error code on failure.
+ */
+static int
+ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
+    struct linkblk *li, boolean_t doconsist)
+{
+	ill_t  		*ill;
+	queue_t		*ipwq, *dwq;
+	const char	*name;
+	struct qinit	*qinfo;
+	boolean_t	islink = (ioccmd == I_PLINK || ioccmd == I_LINK);
+
+	/*
+	 * Walk the lower stream to verify it's the IP module stream.
+	 * The IP module is identified by its name, wput function,
+	 * and non-NULL q_next.  STREAMS ensures that the lower stream
+	 * (li->l_qbot) will not vanish until this ioctl completes.
+	 */
+	for (ipwq = li->l_qbot; ipwq != NULL; ipwq = ipwq->q_next) {
+		qinfo = ipwq->q_qinfo;
+		name = qinfo->qi_minfo->mi_idname;
+		if (name != NULL && strcmp(name, ip_mod_info.mi_idname) == 0 &&
+		    qinfo->qi_putp != (pfi_t)ip_lwput && ipwq->q_next != NULL) {
+			break;
+		}
+	}
+
+	/*
+	 * If this isn't an IP module stream, bail.
+	 */
+	if (ipwq == NULL)
+		return (0);
+
+	ill = ipwq->q_ptr;
+	ASSERT(ill != NULL);
+
+	if (ipsq == NULL) {
+		ipsq = ipsq_try_enter(NULL, ill, q, mp, ip_sioctl_plink,
+		    NEW_OP, B_TRUE);
+		if (ipsq == NULL)
+			return (EINPROGRESS);
+	}
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	if (doconsist) {
+		/*
+		 * Consistency checking requires that I_{P}LINK occurs
+		 * prior to setting ill_ip_muxid, and that I_{P}UNLINK
+		 * occurs prior to clearing ill_arp_muxid.
+		 */
+		if ((islink && ill->ill_ip_muxid != 0) ||
+		    (!islink && ill->ill_arp_muxid != 0)) {
+			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			return (EINVAL);
+		}
+	}
+
+	/*
+	 * As part of I_{P}LINKing, stash the number of downstream modules and
+	 * the read queue of the module immediately below IP in the ill.
+	 * These are used during the capability negotiation below.
+	 */
+	ill->ill_lmod_rq = NULL;
+	ill->ill_lmod_cnt = 0;
+	if (islink && ((dwq = ipwq->q_next) != NULL)) {
+		ill->ill_lmod_rq = RD(dwq);
+		for (; dwq != NULL; dwq = dwq->q_next)
+			ill->ill_lmod_cnt++;
+	}
+
+	if (doconsist)
+		ill->ill_ip_muxid = islink ? li->l_index : 0;
+
+	/*
+	 * If there's at least one up ipif on this ill, then we're bound to
+	 * the underlying driver via DLPI.  In that case, renegotiate
+	 * capabilities to account for any possible change in modules
+	 * interposed between IP and the driver.
+	 */
+	if (ill->ill_ipif_up_count > 0) {
+		if (islink)
+			ill_capability_probe(ill);
+		else
+			ill_capability_reset(ill);
+	}
+
+	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	return (0);
 }
 
 /*
@@ -14837,13 +14772,6 @@ ill_down_ipifs(ill_t *ill, mblk_t *mp, int index, boolean_t chk_nofailover)
 			(void) ipif_logical_down(ipif, NULL, NULL);
 			ipif_non_duplicate(ipif);
 			ipif_down_tail(ipif);
-			/*
-			 * We don't do ipif_multicast_down for IPv4 in
-			 * ipif_down. We need to set this so that
-			 * ipif_multicast_up will join the
-			 * ALLHOSTS_GROUP on to_ill.
-			 */
-			ipif->ipif_multicast_up = B_FALSE;
 		}
 	}
 }
@@ -17561,17 +17489,6 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 
 		if (V4_PART_OF_V6(ilm->ilm_v6addr) ==
 		    htonl(INADDR_ALLHOSTS_GROUP)) {
-			/*
-			 * We joined this in ipif_multicast_up
-			 * and we never did an ipif_multicast_down
-			 * for IPv4. If nobody else from the userland
-			 * has reference, we free the ilm, and later
-			 * when this ipif comes up on the new ill,
-			 * we will join this again.
-			 */
-			if (--ilm->ilm_refcnt == 0)
-				goto delete_ilm;
-
 			new_ilm = ilm_lookup_ipif(ipif,
 			    V4_PART_OF_V6(ilm->ilm_v6addr));
 			if (new_ilm != NULL) {
@@ -18941,12 +18858,10 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * Blow away v6 memberships we established in ipif_multicast_up(); the
-	 * v4 ones are left alone (as is the ipif_multicast_up flag, so we
-	 * know not to rejoin when the interface is brought back up).
+	 * Blow away memberships we established in ipif_multicast_up().
 	 */
-	if (ipif->ipif_isv6)
-		ipif_multicast_down(ipif);
+	ipif_multicast_down(ipif);
+
 	/*
 	 * Remove from the mapping for __sin6_src_id. We insert only
 	 * when the address is not INADDR_ANY. As IPv4 addresses are
@@ -19449,11 +19364,9 @@ ipif_free_tail(ipif_t *ipif)
 	 */
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
 	/*
-	 * Remove all multicast memberships on the interface now.
-	 * This removes IPv4 multicast memberships joined within
-	 * the kernel as ipif_down does not do ipif_multicast_down
-	 * for IPv4. IPv6 is not handled here as the multicast memberships
-	 * are based on ill and not on ipif.
+	 * Remove all IPv4 multicast memberships on the interface now.
+	 * IPv6 is not handled here as the multicast memberships are
+	 * tied to the ill rather than the ipif.
 	 */
 	ilm_free(ipif);
 
@@ -19849,9 +19762,9 @@ ipif_multicast_up(ipif_t *ipif)
 }
 
 /*
- * Blow away any IPv6 multicast groups that we joined in ipif_multicast_up();
- * any explicit memberships are blown away in ill_leave_multicast() when the
- * ill is brought down.
+ * Blow away any multicast groups that we joined in ipif_multicast_up().
+ * (Explicit memberships are blown away in ill_leave_multicast() when the
+ * ill is brought down.)
  */
 static void
 ipif_multicast_down(ipif_t *ipif)
@@ -19864,9 +19777,17 @@ ipif_multicast_down(ipif_t *ipif)
 	if (!ipif->ipif_multicast_up)
 		return;
 
-	ASSERT(ipif->ipif_isv6);
-
 	ip1dbg(("ipif_multicast_down - delmulti\n"));
+
+	if (!ipif->ipif_isv6) {
+		err = ip_delmulti(htonl(INADDR_ALLHOSTS_GROUP), ipif, B_TRUE,
+		    B_TRUE);
+		if (err != 0)
+			ip0dbg(("ipif_multicast_down: failed %d\n", err));
+
+		ipif->ipif_multicast_up = 0;
+		return;
+	}
 
 	/*
 	 * Leave the all hosts multicast address. Similar to ip_addmulti_v6,
@@ -20602,61 +20523,11 @@ ipif_up_done(ipif_t *ipif)
 	}
 
 	/*
-	 * If the interface address is set, create the broadcast IREs.
-	 *
-	 * ire_create_bcast checks if the proposed new IRE matches
-	 * any existing IRE's with the same physical interface (ILL).
-	 * This should get rid of duplicates.
-	 * ire_create_bcast also check IPIF_NOXMIT and does not create
-	 * any broadcast ires.
+	 * Create any necessary broadcast IREs.
 	 */
 	if ((ipif->ipif_subnet != INADDR_ANY) &&
-	    (ipif->ipif_flags & IPIF_BROADCAST)) {
-		ipaddr_t addr;
-
-		ip1dbg(("ipif_up_done: creating broadcast IRE\n"));
-		irep = ire_check_and_create_bcast(ipif, 0, irep,
-		    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-		irep = ire_check_and_create_bcast(ipif, INADDR_BROADCAST, irep,
-		    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-
-		/*
-		 * For backward compatibility, we need to create net
-		 * broadcast ire's based on the old "IP address class
-		 * system."  The reason is that some old machines only
-		 * respond to these class derived net broadcast.
-		 *
-		 * But we should not create these net broadcast ire's if
-		 * the subnet_mask is shorter than the IP address class based
-		 * derived netmask.  Otherwise, we may create a net
-		 * broadcast address which is the same as an IP address
-		 * on the subnet.  Then TCP will refuse to talk to that
-		 * address.
-		 *
-		 * Nor do we need IRE_BROADCAST ire's for the interface
-		 * with the netmask as 0xFFFFFFFF, as IRE_LOCAL for that
-		 * interface is already created.  Creating these broadcast
-		 * ire's will only create confusion as the "addr" is going
-		 * to be same as that of the IP address of the interface.
-		 */
-		if (net_mask < subnet_mask) {
-			addr = net_mask & ipif->ipif_subnet;
-			irep = ire_check_and_create_bcast(ipif, addr, irep,
-			    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-			irep = ire_check_and_create_bcast(ipif,
-			    ~net_mask | addr, irep,
-			    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-		}
-
-		if (subnet_mask != 0xFFFFFFFF) {
-			addr = ipif->ipif_subnet;
-			irep = ire_check_and_create_bcast(ipif, addr, irep,
-			    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-			irep = ire_check_and_create_bcast(ipif,
-			    ~subnet_mask|addr, irep,
-			    (MATCH_IRE_TYPE | MATCH_IRE_ILL));
-		}
-	}
+	    (ipif->ipif_flags & IPIF_BROADCAST))
+		irep = ipif_create_bcast_ires(ipif, irep);
 
 	ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 
@@ -21653,48 +21524,221 @@ ip_sioctl_sifname(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 }
 
 /*
- * Net and subnet broadcast ire's are now specific to the particular
- * physical interface (ill) and not to any one locigal interface (ipif).
- * However, if a particular logical interface is being taken down, it's
- * associated ire's will be taken down as well.  Hence, when we go to
- * take down or change the local address, broadcast address or netmask
- * of a specific logical interface, we must check to make sure that we
- * have valid net and subnet broadcast ire's for the other logical
- * interfaces which may have been shared with the logical interface
- * being brought down or changed.
+ * Create any IRE_BROADCAST entries for `ipif', and store those entries in
+ * `irep'.  Returns a pointer to the next free `irep' entry (just like
+ * ire_check_and_create_bcast()).
+ */
+static ire_t **
+ipif_create_bcast_ires(ipif_t *ipif, ire_t **irep)
+{
+	ipaddr_t addr;
+	ipaddr_t netmask = ip_net_mask(ipif->ipif_lcl_addr);
+	ipaddr_t subnetmask = ipif->ipif_net_mask;
+	int flags = MATCH_IRE_TYPE | MATCH_IRE_ILL;
+
+	ip1dbg(("ipif_create_bcast_ires: creating broadcast IREs\n"));
+
+	ASSERT(ipif->ipif_flags & IPIF_BROADCAST);
+
+	if (ipif->ipif_lcl_addr == INADDR_ANY ||
+	    (ipif->ipif_flags & IPIF_NOLOCAL))
+		netmask = htonl(IN_CLASSA_NET);		/* fallback */
+
+	irep = ire_check_and_create_bcast(ipif, 0, irep, flags);
+	irep = ire_check_and_create_bcast(ipif, INADDR_BROADCAST, irep, flags);
+
+	/*
+	 * For backward compatibility, we create net broadcast IREs based on
+	 * the old "IP address class system", since some old machines only
+	 * respond to these class derived net broadcast.  However, we must not
+	 * create these net broadcast IREs if the subnetmask is shorter than
+	 * the IP address class based derived netmask.  Otherwise, we may
+	 * create a net broadcast address which is the same as an IP address
+	 * on the subnet -- and then TCP will refuse to talk to that address.
+	 */
+	if (netmask < subnetmask) {
+		addr = netmask & ipif->ipif_subnet;
+		irep = ire_check_and_create_bcast(ipif, addr, irep, flags);
+		irep = ire_check_and_create_bcast(ipif, ~netmask | addr, irep,
+		    flags);
+	}
+
+	/*
+	 * Don't create IRE_BROADCAST IREs for the interface if the subnetmask
+	 * is 0xFFFFFFFF, as an IRE_LOCAL for that interface is already
+	 * created.  Creating these broadcast IREs will only create confusion
+	 * as `addr' will be the same as the IP address.
+	 */
+	if (subnetmask != 0xFFFFFFFF) {
+		addr = ipif->ipif_subnet;
+		irep = ire_check_and_create_bcast(ipif, addr, irep, flags);
+		irep = ire_check_and_create_bcast(ipif, ~subnetmask | addr,
+		    irep, flags);
+	}
+
+	return (irep);
+}
+
+/*
+ * Broadcast IRE info structure used in the functions below.  Since we
+ * allocate BCAST_COUNT of them on the stack, keep the bit layout compact.
+ */
+typedef struct bcast_ireinfo {
+	uchar_t		bi_type;	/* BCAST_* value from below */
+	uchar_t		bi_willdie:1, 	/* will this IRE be going away? */
+			bi_needrep:1,	/* do we need to replace it? */
+			bi_haverep:1,	/* have we replaced it? */
+			bi_pad:5;
+	ipaddr_t	bi_addr;	/* IRE address */
+	ipif_t		*bi_backup;	/* last-ditch ipif to replace it on */
+} bcast_ireinfo_t;
+
+enum { BCAST_ALLONES, BCAST_ALLZEROES, BCAST_NET, BCAST_SUBNET, BCAST_COUNT };
+
+/*
+ * Check if `ipif' needs the dying broadcast IRE described by `bireinfop', and
+ * return B_TRUE if it should immediately be used to recreate the IRE.
+ */
+static boolean_t
+ipif_consider_bcast(ipif_t *ipif, bcast_ireinfo_t *bireinfop)
+{
+	ipaddr_t addr;
+
+	ASSERT(!bireinfop->bi_haverep && bireinfop->bi_willdie);
+
+	switch (bireinfop->bi_type) {
+	case BCAST_NET:
+		addr = ipif->ipif_subnet & ip_net_mask(ipif->ipif_subnet);
+		if (addr != bireinfop->bi_addr)
+			return (B_FALSE);
+		break;
+	case BCAST_SUBNET:
+		if (ipif->ipif_subnet != bireinfop->bi_addr)
+			return (B_FALSE);
+		break;
+	}
+
+	bireinfop->bi_needrep = 1;
+	if (ipif->ipif_flags & (IPIF_DEPRECATED|IPIF_NOLOCAL|IPIF_ANYCAST)) {
+		if (bireinfop->bi_backup == NULL)
+			bireinfop->bi_backup = ipif;
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Create the broadcast IREs described by `bireinfop' on `ipif', and return
+ * them ala ire_check_and_create_bcast().
+ */
+static ire_t **
+ipif_create_bcast(ipif_t *ipif, bcast_ireinfo_t *bireinfop, ire_t **irep)
+{
+	ipaddr_t mask, addr;
+
+	ASSERT(!bireinfop->bi_haverep && bireinfop->bi_needrep);
+
+	addr = bireinfop->bi_addr;
+	irep = ire_create_bcast(ipif, addr, irep);
+
+	switch (bireinfop->bi_type) {
+	case BCAST_NET:
+		mask = ip_net_mask(ipif->ipif_subnet);
+		irep = ire_create_bcast(ipif, addr | ~mask, irep);
+		break;
+	case BCAST_SUBNET:
+		mask = ipif->ipif_net_mask;
+		irep = ire_create_bcast(ipif, addr | ~mask, irep);
+		break;
+	}
+
+	bireinfop->bi_haverep = 1;
+	return (irep);
+}
+
+/*
+ * Walk through all of the ipifs on `ill' that will be affected by `test_ipif'
+ * going away, and determine if any of the broadcast IREs (named by `bireinfop')
+ * that are going away are still needed.  If so, have ipif_create_bcast()
+ * recreate them (except for the deprecated case, as explained below).
+ */
+static ire_t **
+ill_create_bcast(ill_t *ill, ipif_t *test_ipif, bcast_ireinfo_t *bireinfo,
+    ire_t **irep)
+{
+	int i;
+	ipif_t *ipif;
+
+	ASSERT(!ill->ill_isv6);
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		/*
+		 * Skip this ipif if it's (a) the one being taken down, (b)
+		 * not in the same zone, or (c) has no valid local address.
+		 */
+		if (ipif == test_ipif ||
+		    ipif->ipif_zoneid != test_ipif->ipif_zoneid ||
+		    ipif->ipif_subnet == 0 ||
+		    (ipif->ipif_flags & (IPIF_UP|IPIF_BROADCAST|IPIF_NOXMIT)) !=
+		    (IPIF_UP|IPIF_BROADCAST))
+			continue;
+
+		/*
+		 * For each dying IRE that hasn't yet been replaced, see if
+		 * `ipif' needs it and whether the IRE should be recreated on
+		 * `ipif'.  If `ipif' is deprecated, ipif_consider_bcast()
+		 * will return B_FALSE even if `ipif' needs the IRE on the
+		 * hopes that we'll later find a needy non-deprecated ipif.
+		 * However, the ipif is recorded in bi_backup for possible
+		 * subsequent use by ipif_check_bcast_ires().
+		 */
+		for (i = 0; i < BCAST_COUNT; i++) {
+			if (!bireinfo[i].bi_willdie || bireinfo[i].bi_haverep)
+				continue;
+			if (!ipif_consider_bcast(ipif, &bireinfo[i]))
+				continue;
+			irep = ipif_create_bcast(ipif, &bireinfo[i], irep);
+		}
+
+		/*
+		 * If we've replaced all of the broadcast IREs that are going
+		 * to be taken down, we know we're done.
+		 */
+		for (i = 0; i < BCAST_COUNT; i++) {
+			if (bireinfo[i].bi_willdie && !bireinfo[i].bi_haverep)
+				break;
+		}
+		if (i == BCAST_COUNT)
+			break;
+	}
+	return (irep);
+}
+
+/*
+ * Check if `test_ipif' (which is going away) is associated with any existing
+ * broadcast IREs, and whether any other ipifs (e.g., on the same ill) were
+ * using those broadcast IREs.  If so, recreate the broadcast IREs on one or
+ * more of those other ipifs.  (The old IREs will be deleted in ipif_down().)
  *
- * There is one set of 0.0.0.0 and 255.255.255.255 per ill. Usually it
- * is tied to the first interface coming UP. If that ipif is going down,
- * we need to recreate them on the next valid ipif.
+ * This is necessary because broadcast IREs are shared.  In particular, a
+ * given ill has one set of all-zeroes and all-ones broadcast IREs (for every
+ * zone), plus one set of all-subnet-ones, all-subnet-zeroes, all-net-ones,
+ * and all-net-zeroes for every net/subnet (and every zone) it has IPIF_UP
+ * ipifs on.  Thus, if there are two IPIF_UP ipifs on the same subnet with the
+ * same zone, they will share the same set of broadcast IREs.
  *
- * Note: assume that the ipif passed in is still up so that it's IRE
- * entries are still valid.
+ * Note: the upper bound of 12 IREs comes from the worst case of replacing all
+ * six pairs (loopback and non-loopback) of broadcast IREs (all-zeroes,
+ * all-ones, subnet-zeroes, subnet-ones, net-zeroes, and net-ones).
  */
 static void
 ipif_check_bcast_ires(ipif_t *test_ipif)
 {
-	ipif_t	*ipif;
-	ire_t	*test_subnet_ire, *test_net_ire;
-	ire_t	*test_allzero_ire, *test_allone_ire;
-	ire_t	*ire_array[12];
-	ire_t	**irep = &ire_array[0];
-	ire_t	**irep1;
-	ipaddr_t net_addr, subnet_addr, net_mask, subnet_mask;
-	ipaddr_t test_net_addr, test_subnet_addr;
-	ipaddr_t test_net_mask, test_subnet_mask;
-	boolean_t need_net_bcast_ire = B_FALSE;
-	boolean_t need_subnet_bcast_ire = B_FALSE;
-	boolean_t allzero_bcast_ire_created = B_FALSE;
-	boolean_t allone_bcast_ire_created = B_FALSE;
-	boolean_t net_bcast_ire_created = B_FALSE;
-	boolean_t subnet_bcast_ire_created = B_FALSE;
-
-	ipif_t  *backup_ipif_net = (ipif_t *)NULL;
-	ipif_t  *backup_ipif_subnet = (ipif_t *)NULL;
-	ipif_t  *backup_ipif_allzeros = (ipif_t *)NULL;
-	ipif_t  *backup_ipif_allones = (ipif_t *)NULL;
-	uint64_t check_flags = IPIF_DEPRECATED | IPIF_NOLOCAL | IPIF_ANYCAST;
-	ip_stack_t	*ipst = test_ipif->ipif_ill->ill_ipst;
+	ill_t		*ill = test_ipif->ipif_ill;
+	ire_t		*ire, *ire_array[12]; 		/* see note above */
+	ire_t		**irep1, **irep = &ire_array[0];
+	uint_t 		i, willdie;
+	ipaddr_t	mask = ip_net_mask(test_ipif->ipif_subnet);
+	bcast_ireinfo_t	bireinfo[BCAST_COUNT];
 
 	ASSERT(!test_ipif->ipif_isv6);
 	ASSERT(IAM_WRITER_IPIF(test_ipif));
@@ -21707,229 +21751,60 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 	    (test_ipif->ipif_flags & IPIF_NOXMIT))
 		return;
 
-	test_allzero_ire = ire_ctable_lookup(0, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
-	    ipst);
+	bzero(bireinfo, sizeof (bireinfo));
+	bireinfo[0].bi_type = BCAST_ALLZEROES;
+	bireinfo[0].bi_addr = 0;
 
-	test_allone_ire = ire_ctable_lookup(INADDR_BROADCAST, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
-	    ipst);
+	bireinfo[1].bi_type = BCAST_ALLONES;
+	bireinfo[1].bi_addr = INADDR_BROADCAST;
 
-	test_net_mask = ip_net_mask(test_ipif->ipif_subnet);
-	test_subnet_mask = test_ipif->ipif_net_mask;
+	bireinfo[2].bi_type = BCAST_NET;
+	bireinfo[2].bi_addr = test_ipif->ipif_subnet & mask;
 
-	/*
-	 * If no net mask set, assume the default based on net class.
-	 */
-	if (test_subnet_mask == 0)
-		test_subnet_mask = test_net_mask;
+	if (test_ipif->ipif_net_mask != 0)
+		mask = test_ipif->ipif_net_mask;
+	bireinfo[3].bi_type = BCAST_SUBNET;
+	bireinfo[3].bi_addr = test_ipif->ipif_subnet & mask;
 
 	/*
-	 * Check if there is a network broadcast ire associated with this ipif
+	 * Figure out what (if any) broadcast IREs will die as a result of
+	 * `test_ipif' going away.  If none will die, we're done.
 	 */
-	test_net_addr = test_net_mask  & test_ipif->ipif_subnet;
-	test_net_ire = ire_ctable_lookup(test_net_addr, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
-	    ipst);
+	for (i = 0, willdie = 0; i < BCAST_COUNT; i++) {
+		ire = ire_ctable_lookup(bireinfo[i].bi_addr, 0, IRE_BROADCAST,
+		    test_ipif, ALL_ZONES, NULL,
+		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF), ill->ill_ipst);
+		if (ire != NULL) {
+			willdie++;
+			bireinfo[i].bi_willdie = 1;
+			ire_refrele(ire);
+		}
+	}
 
-	/*
-	 * Check if there is a subnet broadcast IRE associated with this ipif
-	 */
-	test_subnet_addr = test_subnet_mask  & test_ipif->ipif_subnet;
-	test_subnet_ire = ire_ctable_lookup(test_subnet_addr, 0, IRE_BROADCAST,
-	    test_ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
-	    ipst);
-
-	/*
-	 * No broadcast ire's associated with this ipif.
-	 */
-	if ((test_subnet_ire == NULL) && (test_net_ire == NULL) &&
-	    (test_allzero_ire == NULL) && (test_allone_ire == NULL)) {
+	if (willdie == 0)
 		return;
-	}
 
 	/*
-	 * We have established which bcast ires have to be replaced.
-	 * Next we try to locate ipifs that match there ires.
-	 * The rules are simple: If we find an ipif that matches on the subnet
-	 * address it will also match on the net address, the allzeros and
-	 * allones address. Any ipif that matches only on the net address will
-	 * also match the allzeros and allones addresses.
-	 * The other criterion is the ipif_flags. We look for non-deprecated
-	 * (and non-anycast and non-nolocal) ipifs as the best choice.
-	 * ipifs with check_flags matching (deprecated, etc) are used only
-	 * if good ipifs are not available. While looping, we save existing
-	 * deprecated ipifs as backup_ipif.
-	 * We loop through all the ipifs for this ill looking for ipifs
-	 * whose broadcast addr match the ipif passed in, but do not have
-	 * their own broadcast ires. For creating 0.0.0.0 and
-	 * 255.255.255.255 we just need an ipif on this ill to create.
+	 * Walk through all the ipifs that will be affected by the dying IREs,
+	 * and recreate the IREs as necessary.
 	 */
-	for (ipif = test_ipif->ipif_ill->ill_ipif; ipif != NULL;
-	    ipif = ipif->ipif_next) {
-
-		ASSERT(!ipif->ipif_isv6);
-		/*
-		 * Already checked the ipif passed in.
-		 */
-		if (ipif == test_ipif) {
-			continue;
-		}
-
-		/*
-		 * We only need to recreate broadcast ires if another ipif in
-		 * the same zone uses them. The new ires must be created in the
-		 * same zone.
-		 */
-		if (ipif->ipif_zoneid != test_ipif->ipif_zoneid) {
-			continue;
-		}
-
-		/*
-		 * Only interested in logical interfaces with valid local
-		 * addresses or with the ability to broadcast.
-		 */
-		if ((ipif->ipif_subnet == 0) ||
-		    !(ipif->ipif_flags & IPIF_BROADCAST) ||
-		    (ipif->ipif_flags & IPIF_NOXMIT) ||
-		    !(ipif->ipif_flags & IPIF_UP)) {
-			continue;
-		}
-		/*
-		 * Check if there is a net broadcast ire for this
-		 * net address.  If it turns out that the ipif we are
-		 * about to take down owns this ire, we must make a
-		 * new one because it is potentially going away.
-		 */
-		if (test_net_ire && (!net_bcast_ire_created)) {
-			net_mask = ip_net_mask(ipif->ipif_subnet);
-			net_addr = net_mask & ipif->ipif_subnet;
-			if (net_addr == test_net_addr) {
-				need_net_bcast_ire = B_TRUE;
-				/*
-				 * Use DEPRECATED ipif only if no good
-				 * ires are available. subnet_addr is
-				 * a better match than net_addr.
-				 */
-				if ((ipif->ipif_flags & check_flags) &&
-				    (backup_ipif_net == NULL)) {
-					backup_ipif_net = ipif;
-				}
-			}
-		}
-		/*
-		 * Check if there is a subnet broadcast ire for this
-		 * net address.  If it turns out that the ipif we are
-		 * about to take down owns this ire, we must make a
-		 * new one because it is potentially going away.
-		 */
-		if (test_subnet_ire && (!subnet_bcast_ire_created)) {
-			subnet_mask = ipif->ipif_net_mask;
-			subnet_addr = ipif->ipif_subnet;
-			if (subnet_addr == test_subnet_addr) {
-				need_subnet_bcast_ire = B_TRUE;
-				if ((ipif->ipif_flags & check_flags) &&
-				    (backup_ipif_subnet == NULL)) {
-					backup_ipif_subnet = ipif;
-				}
-			}
-		}
-
-
-		/* Short circuit here if this ipif is deprecated */
-		if (ipif->ipif_flags & check_flags) {
-			if ((test_allzero_ire != NULL) &&
-			    (!allzero_bcast_ire_created) &&
-			    (backup_ipif_allzeros == NULL)) {
-				backup_ipif_allzeros = ipif;
-			}
-			if ((test_allone_ire != NULL) &&
-			    (!allone_bcast_ire_created) &&
-			    (backup_ipif_allones == NULL)) {
-				backup_ipif_allones = ipif;
-			}
-			continue;
-		}
-
-		/*
-		 * Found an ipif which has the same broadcast ire as the
-		 * ipif passed in and the ipif passed in "owns" the ire.
-		 * Create new broadcast ire's for this broadcast addr.
-		 */
-		if (need_net_bcast_ire && !net_bcast_ire_created) {
-			irep = ire_create_bcast(ipif, net_addr, irep);
-			irep = ire_create_bcast(ipif,
-			    ~net_mask | net_addr, irep);
-			net_bcast_ire_created = B_TRUE;
-		}
-		if (need_subnet_bcast_ire && !subnet_bcast_ire_created) {
-			irep = ire_create_bcast(ipif, subnet_addr, irep);
-			irep = ire_create_bcast(ipif,
-			    ~subnet_mask | subnet_addr, irep);
-			subnet_bcast_ire_created = B_TRUE;
-		}
-		if (test_allzero_ire != NULL && !allzero_bcast_ire_created) {
-			irep = ire_create_bcast(ipif, 0, irep);
-			allzero_bcast_ire_created = B_TRUE;
-		}
-		if (test_allone_ire != NULL && !allone_bcast_ire_created) {
-			irep = ire_create_bcast(ipif, INADDR_BROADCAST, irep);
-			allone_bcast_ire_created = B_TRUE;
-		}
-		/*
-		 * Once we have created all the appropriate ires, we
-		 * just break out of this loop to add what we have created.
-		 * This has been indented similar to ire_match_args for
-		 * readability.
-		 */
-		if (((test_net_ire == NULL) ||
-		    (net_bcast_ire_created)) &&
-		    ((test_subnet_ire == NULL) ||
-		    (subnet_bcast_ire_created)) &&
-		    ((test_allzero_ire == NULL) ||
-		    (allzero_bcast_ire_created)) &&
-		    ((test_allone_ire == NULL) ||
-		    (allone_bcast_ire_created))) {
-			break;
-		}
-	}
+	irep = ill_create_bcast(ill, test_ipif, bireinfo, irep);
 
 	/*
-	 * Create bcast ires on deprecated ipifs if no non-deprecated ipifs
-	 * exist. 6 pairs of bcast ires are needed.
-	 * Note - the old ires are deleted in ipif_down.
+	 * Scan through the set of broadcast IREs and see if there are any
+	 * that we need to replace that have not yet been replaced.  If so,
+	 * replace them using the appropriate backup ipif.
 	 */
-	if (need_net_bcast_ire && !net_bcast_ire_created && backup_ipif_net) {
-		ipif = backup_ipif_net;
-		irep = ire_create_bcast(ipif, net_addr, irep);
-		irep = ire_create_bcast(ipif, ~net_mask | net_addr, irep);
-		net_bcast_ire_created = B_TRUE;
-	}
-	if (need_subnet_bcast_ire && !subnet_bcast_ire_created &&
-	    backup_ipif_subnet) {
-		ipif = backup_ipif_subnet;
-		irep = ire_create_bcast(ipif, subnet_addr, irep);
-		irep = ire_create_bcast(ipif,
-		    ~subnet_mask | subnet_addr, irep);
-		subnet_bcast_ire_created = B_TRUE;
-	}
-	if (test_allzero_ire != NULL && !allzero_bcast_ire_created &&
-	    backup_ipif_allzeros) {
-		irep = ire_create_bcast(backup_ipif_allzeros, 0, irep);
-		allzero_bcast_ire_created = B_TRUE;
-	}
-	if (test_allone_ire != NULL && !allone_bcast_ire_created &&
-	    backup_ipif_allones) {
-		irep = ire_create_bcast(backup_ipif_allones,
-		    INADDR_BROADCAST, irep);
-		allone_bcast_ire_created = B_TRUE;
+	for (i = 0; i < BCAST_COUNT; i++) {
+		if (bireinfo[i].bi_needrep && !bireinfo[i].bi_haverep)
+			irep = ipif_create_bcast(bireinfo[i].bi_backup,
+			    &bireinfo[i], irep);
 	}
 
 	/*
-	 * If we can't create all of them, don't add any of them.
-	 * Code in ip_wput_ire and ire_to_ill assumes that we
-	 * always have a non-loopback copy and loopback copy
-	 * for a given address.
+	 * If we can't create all of them, don't add any of them.  (Code in
+	 * ip_wput_ire() and ire_to_ill() assumes that we always have a
+	 * non-loopback copy and loopback copy for a given address.)
 	 */
 	for (irep1 = irep; irep1 > ire_array; ) {
 		irep1--;
@@ -21941,27 +21816,15 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 				if (*irep != NULL)
 					ire_delete(*irep);
 			}
-			goto bad;
+			return;
 		}
 	}
-	for (irep1 = irep; irep1 > ire_array; ) {
-		int error;
 
+	for (irep1 = irep; irep1 > ire_array; ) {
 		irep1--;
-		error = ire_add(irep1, NULL, NULL, NULL, B_FALSE);
-		if (error == 0) {
+		if (ire_add(irep1, NULL, NULL, NULL, B_FALSE) == 0)
 			ire_refrele(*irep1);		/* Held in ire_add */
-		}
 	}
-bad:
-	if (test_allzero_ire != NULL)
-		ire_refrele(test_allzero_ire);
-	if (test_allone_ire != NULL)
-		ire_refrele(test_allone_ire);
-	if (test_net_ire != NULL)
-		ire_refrele(test_net_ire);
-	if (test_subnet_ire != NULL)
-		ire_refrele(test_subnet_ire);
 }
 
 /*

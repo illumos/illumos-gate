@@ -217,8 +217,8 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	 * Record the phyint values. Also insert the phyint into the
 	 * phyint group by calling phyint_insert().
 	 */
-	(void) strncpy(pi->pi_name, pi_name, sizeof (pi->pi_name));
-	pi->pi_name[sizeof (pi->pi_name) - 1] = '\0';
+	(void) strlcpy(pi->pi_name, pi_name, sizeof (pi->pi_name));
+	pi->pi_taddrthresh = getcurrentsec() + TESTADDR_CONF_TIME;
 	pi->pi_ifindex = ifindex;
 	pi->pi_icmpid =
 	    htons(((getpid() & 0xFF) << 8) | (pi->pi_ifindex & 0xFF));
@@ -361,8 +361,7 @@ phyint_group_create(const char *name)
 		return (NULL);
 	}
 
-	(void) strncpy(pg->pg_name, name, sizeof (pg->pg_name));
-	pg->pg_name[sizeof (pg->pg_name) - 1] = '\0';
+	(void) strlcpy(pg->pg_name, name, sizeof (pg->pg_name));
 	pg->pg_sig = gensig();
 
 	pg->pg_fdt = user_failure_detection_time;
@@ -1186,7 +1185,7 @@ phyint_inst_print(struct phyint_instance *pii)
 	if (pii->pii_target_next != NULL) {
 		logdebug("pi_target_next %s %s\n", AF_STR(pii->pii_af),
 		    pr_addr(pii->pii_af, pii->pii_target_next->tg_address,
-			abuf, sizeof (abuf)));
+		    abuf, sizeof (abuf)));
 	} else {
 		logdebug("pi_target_next NULL\n");
 	}
@@ -1194,7 +1193,7 @@ phyint_inst_print(struct phyint_instance *pii)
 	if (pii->pii_rtt_target_next != NULL) {
 		logdebug("pi_rtt_target_next %s %s\n", AF_STR(pii->pii_af),
 		    pr_addr(pii->pii_af, pii->pii_rtt_target_next->tg_address,
-			abuf, sizeof (abuf)));
+		    abuf, sizeof (abuf)));
 	} else {
 		logdebug("pi_rtt_target_next NULL\n");
 	}
@@ -1436,7 +1435,7 @@ logint_init_from_k(struct phyint_instance *pii, char *li_name)
 		    ~(IFF_FAILED | IFF_RUNNING)) != 0 ||
 		    !IN6_ARE_ADDR_EQUAL(&testaddr, &li->li_addr) ||
 		    (!ptp && !IN6_ARE_ADDR_EQUAL(&test_subnet,
-			&li->li_subnet)) ||
+		    &li->li_subnet)) ||
 		    (!ptp && test_subnet_len != li->li_subnet_len) ||
 		    (ptp && !IN6_ARE_ADDR_EQUAL(&tgaddr, &li->li_dstaddr))) {
 			/*
@@ -2039,12 +2038,13 @@ target_delete(struct target *tg)
 	pii_other = phyint_inst_other(pii);
 
 	/*
-	 * If there are no targets on both instances,
-	 * go back to PI_NOTARGETS state, since we cannot
-	 * probe this phyint any more. For more details,
-	 * please see phyint state diagram in mpd_probe.c.
+	 * If there are no targets on both instances and the interface is
+	 * online, go back to PI_NOTARGETS state, since we cannot probe this
+	 * phyint any more.  For more details, please see phyint state
+	 * diagram in mpd_probe.c.
 	 */
-	if (!PROBE_CAPABLE(pii_other))
+	if (!PROBE_CAPABLE(pii_other) &&
+	    pii->pii_phyint->pi_state != PI_OFFLINE)
 		phyint_chstate(pii->pii_phyint, PI_NOTARGETS);
 }
 

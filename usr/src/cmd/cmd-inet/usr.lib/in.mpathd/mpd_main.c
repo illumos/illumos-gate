@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ static void	init_router_targets();
 static void	cleanup(void);
 static int	setup_listener(int af);
 static void	check_config(void);
+static void	check_testconfig(void);
 static void	check_addr_unique(struct phyint_instance *,
     struct sockaddr_storage *);
 static void	init_host_targets(void);
@@ -102,6 +103,12 @@ getcurrenttime(void)
 	 */
 	cur_time = (uint_t)(gethrtime() / 1000000LL);
 	return (cur_time);
+}
+
+uint64_t
+getcurrentsec(void)
+{
+	return (gethrtime() / NANOSEC);
 }
 
 /*
@@ -434,35 +441,12 @@ initifs()
 	free(buf);
 
 	/*
-	 * If the test address is now unique, and if it was not unique
-	 * previously,	clear the li_dupaddrmsg_printed flag and log a
-	 * recovery message
-	 */
-	for (pii = phyint_instances; pii != NULL; pii = pii->pii_next) {
-		struct logint *li;
-		char abuf[INET6_ADDRSTRLEN];
-
-		li = pii->pii_probe_logint;
-		if ((li != NULL) && !li->li_dupaddr &&
-		    li->li_dupaddrmsg_printed) {
-			logerr("Test address %s is unique in group; enabling "
-			    "probe-based failure detection on %s\n",
-			    pr_addr(pii->pii_af, li->li_addr, abuf,
-				sizeof (abuf)), pii->pii_phyint->pi_name);
-			li->li_dupaddrmsg_printed = 0;
-		}
-	}
-
-	/*
 	 * Scan for phyints and logints that have disappeared from the
 	 * kernel, and delete them.
 	 */
-	pii = phyint_instances;
-
-	while (pii != NULL) {
+	for (pii = phyint_instances; pii != NULL; pii = next_pii) {
 		next_pii = pii->pii_next;
 		check_if_removed(pii);
-		pii = next_pii;
 	}
 
 	/*
@@ -535,7 +519,7 @@ initifs()
  * Check that a given test address is unique across all of the interfaces in a
  * group.  (e.g., IPv6 link-locals may not be inherently unique, and binding
  * to such an (IFF_NOFAILOVER) address can produce unexpected results.)
- * Log an error and alert the user.
+ * Any issues will be reported by check_testconfig().
  */
 static void
 check_addr_unique(struct phyint_instance *ourpii, struct sockaddr_storage *ss)
@@ -545,7 +529,6 @@ check_addr_unique(struct phyint_instance *ourpii, struct sockaddr_storage *ss)
 	struct in6_addr		addr;
 	struct phyint_instance	*pii;
 	struct sockaddr_in	*sin;
-	char			abuf[INET6_ADDRSTRLEN];
 
 	if (ss->ss_family == AF_INET) {
 		sin = (struct sockaddr_in *)ss;
@@ -573,23 +556,11 @@ check_addr_unique(struct phyint_instance *ourpii, struct sockaddr_storage *ss)
 		    pii->pii_probe_logint == NULL)
 			continue;
 
-		if (!IN6_ARE_ADDR_EQUAL(&addr,
-		    &pii->pii_probe_logint->li_addr)) {
-			continue;
-		}
-
 		/*
-		 * This test address is not unique. Set the dupaddr bit
-		 * and log an error message if not already logged.
+		 * If this test address is not unique, set the dupaddr bit.
 		 */
-		pii->pii_probe_logint->li_dupaddr = 1;
-		if (!pii->pii_probe_logint->li_dupaddrmsg_printed) {
-			logerr("Test address %s is not unique in group; "
-			    "disabling probe-based failure detection on %s\n",
-			    pr_addr(ss->ss_family, addr, abuf, sizeof (abuf)),
-			    pii->pii_phyint->pi_name);
-			pii->pii_probe_logint->li_dupaddrmsg_printed = 1;
-		}
+		if (IN6_ARE_ADDR_EQUAL(&addr, &pii->pii_probe_logint->li_addr))
+			pii->pii_probe_logint->li_dupaddr = 1;
 	}
 }
 
@@ -681,10 +652,10 @@ select_test_ifs(void)
 		if (pii->pii_phyint->pi_flags & IFF_OFFLINE) {
 			if (pii->pii_phyint->pi_state != PI_OFFLINE) {
 				logerr("shouldn't be probing offline"
-					" interface %s (state is: %u)."
-					" Stopping probes.\n",
-					pii->pii_phyint->pi_name,
-					pii->pii_phyint->pi_state);
+				    " interface %s (state is: %u)."
+				    " Stopping probes.\n",
+				    pii->pii_phyint->pi_name,
+				    pii->pii_phyint->pi_state);
 				stop_probing(pii->pii_phyint);
 			}
 			continue;
@@ -748,11 +719,9 @@ select_test_ifs(void)
 
 		if (probe_logint == NULL) {
 			/*
-			 * We don't have a test address. Don't print an
-			 * error message immediately. check_config() will
-			 * take care of it. Zero out the probe stats array
-			 * since it is no longer relevant. Optimize by
-			 * checking if it is already zeroed out.
+			 * We don't have a test address; zero out the probe
+			 * stats array since it is no longer relevant.
+			 * Optimize by checking if it is already zeroed out.
 			 */
 			int pr_ndx;
 
@@ -850,6 +819,8 @@ select_test_ifs(void)
 		}
 	}
 
+	check_testconfig();
+
 	/*
 	 * Try to populate the target list. init_router_targets populates
 	 * the target list from the routing table. If our target list is
@@ -859,6 +830,67 @@ select_test_ifs(void)
 	if (target_scan_reqd) {
 		init_router_targets();
 		init_host_targets();
+	}
+}
+
+/*
+ * Check test address configuration, and log warnings if appropriate.  Note
+ * that this function only logs pre-existing conditions (e.g., that probe-
+ * based failure detection is disabled).
+ */
+static void
+check_testconfig(void)
+{
+	struct phyint	*pi;
+	struct logint  	*li;
+	char		abuf[INET6_ADDRSTRLEN];
+
+	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
+		if (pi->pi_flags & IFF_OFFLINE)
+			continue;
+
+		if (PROBE_ENABLED(pi->pi_v4) || PROBE_ENABLED(pi->pi_v6)) {
+			if (pi->pi_taddrmsg_printed ||
+			    pi->pi_duptaddrmsg_printed) {
+				logerr("Test address now configured on "
+				    "interface %s; enabling probe-based "
+				    "failure detection on it\n", pi->pi_name);
+				pi->pi_taddrmsg_printed = 0;
+				pi->pi_duptaddrmsg_printed = 0;
+			}
+			continue;
+		}
+
+		li = NULL;
+		if (pi->pi_v4 != NULL && pi->pi_v4->pii_probe_logint != NULL &&
+		    pi->pi_v4->pii_probe_logint->li_dupaddr)
+			li = pi->pi_v4->pii_probe_logint;
+
+		if (pi->pi_v6 != NULL && pi->pi_v6->pii_probe_logint != NULL &&
+		    pi->pi_v6->pii_probe_logint->li_dupaddr)
+			li = pi->pi_v6->pii_probe_logint;
+
+		if (li != NULL) {
+			if (!pi->pi_duptaddrmsg_printed) {
+				(void) pr_addr(li->li_phyint_inst->pii_af,
+				    li->li_addr, abuf, sizeof (abuf));
+				logerr("Test address %s is not unique in "
+				    "group; disabling probe-based failure "
+				    "detection on %s\n", abuf, pi->pi_name);
+				pi->pi_duptaddrmsg_printed = 1;
+			}
+			continue;
+		}
+
+		if (getcurrentsec() < pi->pi_taddrthresh)
+			continue;
+
+		if (!pi->pi_taddrmsg_printed) {
+			logerr("No test address configured on interface %s; "
+			    "disabling probe-based failure detection on it\n",
+			    pi->pi_name);
+			pi->pi_taddrmsg_printed = 1;
+		}
 	}
 }
 
@@ -946,37 +978,6 @@ check_config(void)
 			}
 
 		}
-	}
-
-	/*
-	 * In order to perform probe-based failure detection, a phyint must
-	 * have at least 1 test/probe address for sending and receiving probes
-	 * (either on IPv4 or IPv6 instance or both).  If no test address has
-	 * been configured, notify the administrator, but continue on since we
-	 * can still perform load spreading, along with "link up/down" based
-	 * failure detection.
-	 */
-	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		if (pi->pi_flags & IFF_OFFLINE)
-			continue;
-
-		if ((pi->pi_v4 == NULL ||
-		    pi->pi_v4->pii_probe_logint == NULL) &&
-		    (pi->pi_v6 == NULL ||
-		    pi->pi_v6->pii_probe_logint == NULL)) {
-			if (!pi->pi_taddrmsg_printed) {
-				logerr("No test address configured on "
-				    "interface %s; disabling probe-based "
-				    "failure detection on it\n", pi->pi_name);
-				pi->pi_taddrmsg_printed = 1;
-			}
-		} else if (pi->pi_taddrmsg_printed) {
-			logerr("Test address now configured on interface %s; "
-			    "enabling probe-based failure detection on it\n",
-			    pi->pi_name);
-			pi->pi_taddrmsg_printed = 0;
-		}
-
 	}
 }
 
@@ -1071,6 +1072,11 @@ run_timeouts(void)
 	if (debug & D_TIMER)
 		logdebug("run_timeouts()\n");
 
+	if ((getcurrenttime() - last_initifs_time) > IF_SCAN_INTERVAL) {
+		initifs();
+		check_config();
+	}
+
 	next = TIMER_INFINITY;
 
 	for (pii = phyint_instances; pii != NULL; pii = next_pii) {
@@ -1096,11 +1102,6 @@ run_timeouts(void)
 	 */
 	if (next > IF_SCAN_INTERVAL)
 		next = IF_SCAN_INTERVAL;
-
-	if ((getcurrenttime() - last_initifs_time) > IF_SCAN_INTERVAL) {
-		initifs();
-		check_config();
-	}
 
 	if (debug & D_TIMER)
 		logdebug("run_timeouts: %u ms\n", next);
@@ -1366,7 +1367,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 	 */
 	/*LINTED*/
 	sdl = (struct sockaddr_dl *)((char *)ifm + ifm->ifm_msglen -
-		sizeof (struct sockaddr_dl));
+	    sizeof (struct sockaddr_dl));
 
 	assert(sdl->sdl_family == AF_LINK);
 
@@ -1379,8 +1380,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 	 */
 	if (sdl->sdl_nlen >= sizeof (sdl->sdl_data)) {
 		if (debug & D_LINKNOTE)
-			logdebug("process_rtm_ifinfo: "
-				"phyint name too long\n");
+			logdebug("process_rtm_ifinfo: phyint name too long\n");
 		return (_B_TRUE);
 	}
 	sdl->sdl_data[sdl->sdl_nlen] = 0;
@@ -1389,7 +1389,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 	if (pi == NULL) {
 		if (debug & D_LINKNOTE)
 			logdebug("process_rtm_ifinfo: phyint lookup failed"
-				" for %s\n", sdl->sdl_data);
+			    " for %s\n", sdl->sdl_data);
 		return (_B_TRUE);
 	}
 
@@ -1494,7 +1494,7 @@ process_rtsock(int rtsock_v4, int rtsock_v6)
 	for (type = AF_INET; ; type = AF_INET6) {
 		for (;;) {
 			nbytes = read((type == AF_INET) ? rtsock_v4 :
-				rtsock_v6, msg, sizeof (msg));
+			    rtsock_v6, msg, sizeof (msg));
 			if (nbytes <= 0) {
 				/* No more messages */
 				break;
@@ -1524,9 +1524,8 @@ process_rtsock(int rtsock_v4, int rtsock_v6)
 
 			case RTM_IFINFO:
 				rtm_ifinfo_seen = _B_TRUE;
-				need_if_scan |=
-					process_rtm_ifinfo((if_msghdr_t *)rtm,
-					type);
+				need_if_scan |= process_rtm_ifinfo(
+				    (if_msghdr_t *)rtm, type);
 				break;
 
 			case RTM_ADD:
@@ -2747,6 +2746,12 @@ process_cmd(int newfd, union mi_commands *mpi)
 		 * when to display messages.
 		 */
 		(void) change_lif_flags(pi, IFF_OFFLINE, _B_FALSE);
+
+		/*
+		 * Give the requestor time to configure test addresses
+		 * before complaining that they're missing.
+		 */
+		pi->pi_taddrthresh = getcurrentsec() + TESTADDR_CONF_TIME;
 
 		return (send_result(newfd, IPMP_SUCCESS, 0));
 

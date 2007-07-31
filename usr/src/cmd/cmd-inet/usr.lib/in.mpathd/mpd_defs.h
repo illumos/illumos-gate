@@ -132,6 +132,13 @@ extern "C" {
 #define	MIN_SETTLING_TIME	(60000000000LL) /* (In ns) 60 secs */
 
 /*
+ * An admin or script might place a phyint in a group before assigning a test
+ * address.  To give them time to configure a test address, we delay whining
+ * about it being missing for TESTADDR_CONF_TIME seconds.
+ */
+#define	TESTADDR_CONF_TIME	20
+
+/*
  * The circular probe stats array should be able to hold enough
  * samples to detect phyint failure, target failure, phyint repair
  * and target repair.
@@ -207,6 +214,7 @@ extern void	logdebug(char *fmt, ...);
 extern void	logperror(char *str);
 
 extern int	poll_add(int fd);
+extern uint64_t	getcurrentsec(void);
 extern uint_t	getcurrenttime(void);
 
 #ifdef	__cplusplus

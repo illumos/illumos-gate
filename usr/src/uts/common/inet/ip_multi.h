@@ -78,9 +78,6 @@ extern void		ill_leave_multicast(ill_t *);
 extern void		ill_recover_multicast(ill_t *);
 
 extern	void		ilm_free(ipif_t *);
-extern	ilm_t		*ilm_lookup_ill_withsrc(ill_t *, ipaddr_t, ipaddr_t);
-extern	ilm_t		*ilm_lookup_ill_withsrc_v6(ill_t *, const in6_addr_t *,
-    const in6_addr_t *);
 extern	ilm_t		*ilm_lookup_ill(ill_t *, ipaddr_t, zoneid_t);
 extern	ilm_t		*ilm_lookup_ill_v6(ill_t *, const in6_addr_t *,
     zoneid_t);

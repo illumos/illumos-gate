@@ -1309,13 +1309,12 @@ typedef struct ipif_s {
 	/* Exclusive bit fields, protected by ipsq_t */
 	unsigned int
 		ipif_multicast_up : 1,	/* We have joined the allhosts group */
-		ipif_solmcast_up : 1,	/* We joined solicited node mcast */
 		ipif_replace_zero : 1,	/* Replacement for zero */
 		ipif_was_up : 1,	/* ipif was up before */
-
 		ipif_addr_ready : 1,	/* DAD is done */
+
 		ipif_was_dup : 1,	/* DAD had failed */
-		ipif_pad_to_31 : 26;
+		ipif_pad_to_31 : 27;
 
 	int	ipif_orig_ifindex;	/* ifindex before SLIFFAILOVER */
 	uint_t	ipif_seqid;		/* unique index across all ills */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,8 @@ struct phyint {
 	enum pi_state	pi_state;	/* State of the phyint */
 	uint64_t	pi_flags;	/* Phyint flags from kernel */
 	uint16_t	pi_icmpid;	/* icmp id in icmp echo request */
+	uint64_t	pi_taddrthresh;	/* time (in secs) to delay logging */
+					/* about missing test addresses */
 	/*
 	 * The pi_whenup array is a circular buffer of the most recent
 	 * times (in milliseconds since some arbitrary point of time in
@@ -219,6 +221,7 @@ struct phyint {
 		pi_full  : 1,		/* failback done, full  */
 					/* More details in probe.c */
 		pi_taddrmsg_printed : 1,	/* testaddr msg printed */
+		pi_duptaddrmsg_printed : 1,	/* dup testaddr msg printed */
 		pi_cfgmsg_printed : 1,	/* bad config msg printed */
 		pi_lfmsg_printed : 1,   /* link-flapping msg printed */
 		pi_link_state : 1;	/* interface link state */
@@ -319,9 +322,7 @@ struct logint {
 	uint_t		li_oifindex;	/* original ifindex (SIOCGLIFOINDEX) */
 	uint_t
 			li_in_use : 1,	/* flag to detect deleted logints */
-			li_dupaddr : 1,	/* This test address is not unique */
-			li_dupaddrmsg_printed : 1;
-					/* Error has been logged to console */
+			li_dupaddr : 1;	/* test address is not unique */
 };
 
 

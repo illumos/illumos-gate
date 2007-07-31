@@ -802,7 +802,7 @@ ip_ll_addmulti_v6(ipif_t *ipif, const in6_addr_t *v6groupp)
 		ip1dbg(("ip_ll_addmulti_v6: MULTI_BCAST\n"));
 		return (0);
 	}
-	if (ill->ill_ipif_up_count == 0) {
+	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
 		 * when we get the DL_BIND_ACK bringing the interface up.
@@ -1071,7 +1071,7 @@ ip_ll_delmulti_v6(ipif_t *ipif, const in6_addr_t *v6group)
 		ip1dbg(("ip_ll_delmulti_v6: MULTI_BCAST\n"));
 		return (0);
 	}
-	if (ill->ill_ipif_up_count == 0) {
+	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
 		 * when we get the DL_BIND_ACK bringing the interface up.
@@ -1097,7 +1097,7 @@ ip_join_allmulti(ipif_t *ipif)
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
-	if (ill->ill_ipif_up_count == 0) {
+	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
 		 * when we get the DL_BIND_ACK bringing the interface up.
@@ -1143,7 +1143,7 @@ ip_leave_allmulti(ipif_t *ipif)
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
-	if (ill->ill_ipif_up_count == 0) {
+	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
 		 * when we get the DL_BIND_ACK bringing the interface up.
@@ -1485,67 +1485,11 @@ ill_leave_multicast(ill_t *ill)
 			 */
 			ASSERT(ill->ill_group == NULL);
 		} else {
-			(void) ip_ll_send_disabmulti_req(ill, &ilm->ilm_v6addr);
+			(void) ip_ll_delmulti_v6(ill->ill_ipif,
+			    &ilm->ilm_v6addr);
 		}
 	}
 }
-
-/*
- * Find an ilm for matching the ill and which has the source in its
- * INCLUDE list or does not have it in its EXCLUDE list
- */
-ilm_t *
-ilm_lookup_ill_withsrc(ill_t *ill, ipaddr_t group, ipaddr_t src)
-{
-	in6_addr_t	v6group, v6src;
-
-	/*
-	 * INADDR_ANY is represented as the IPv6 unspecified addr.
-	 */
-	if (group == INADDR_ANY)
-		v6group = ipv6_all_zeros;
-	else
-		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
-	IN6_IPADDR_TO_V4MAPPED(src, &v6src);
-
-	return (ilm_lookup_ill_withsrc_v6(ill, &v6group, &v6src));
-}
-
-ilm_t *
-ilm_lookup_ill_withsrc_v6(ill_t *ill, const in6_addr_t *v6group,
-    const in6_addr_t *v6src)
-{
-	ilm_t	*ilm;
-	boolean_t isinlist;
-	int	i, numsrc;
-
-	/*
-	 * If the source is in any ilm's INCLUDE list, or if
-	 * it is not in any ilm's EXCLUDE list, we have a hit.
-	 */
-	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
-		if (IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group)) {
-
-			isinlist = B_FALSE;
-			numsrc = (ilm->ilm_filter == NULL) ?
-			    0 : ilm->ilm_filter->sl_numsrc;
-			for (i = 0; i < numsrc; i++) {
-				if (IN6_ARE_ADDR_EQUAL(v6src,
-				    &ilm->ilm_filter->sl_addr[i])) {
-					isinlist = B_TRUE;
-					break;
-				}
-			}
-			if ((isinlist && ilm->ilm_fmode == MODE_IS_INCLUDE) ||
-			    (!isinlist && ilm->ilm_fmode == MODE_IS_EXCLUDE))
-				return (ilm);
-			else
-				return (NULL);
-		}
-	}
-	return (NULL);
-}
-
 
 /* Find an ilm for matching the ill */
 ilm_t *
