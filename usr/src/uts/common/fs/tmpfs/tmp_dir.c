@@ -346,7 +346,7 @@ tdirenter(
 			if (error == 0) {
 				if (found != NULL) {
 					vnevent_rename_dest(TNTOV(found),
-					TNTOV(dir), name);
+					    TNTOV(dir), name);
 				}
 			}
 
