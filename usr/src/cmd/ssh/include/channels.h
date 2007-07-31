@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	$OpenBSD: channels.h,v 1.70 2002/06/24 14:33:27 markus Exp $	*/
@@ -146,6 +146,10 @@ struct Channel {
 #define CHAN_OUTPUT_WAIT_IEOF		2
 #define CHAN_OUTPUT_CLOSED		3
 
+/*
+ * Other channel flag bits are specific to each type of channel and are
+ * defined locally with the code that uses them.
+ */
 #define CHAN_CLOSE_SENT			0x01
 #define CHAN_CLOSE_RCVD			0x02
 #define CHAN_EOF_SENT			0x04
