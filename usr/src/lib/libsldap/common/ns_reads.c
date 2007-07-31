@@ -69,7 +69,7 @@ __ns_ldap_freeEntry(ns_ldap_entry_t *ep)
 			free(ep->attr_pair[j]->attrname);
 		if (ep->attr_pair[j]->attrvalue) {
 			for (k = 0; (k < ep->attr_pair[j]->value_count) &&
-				    (ep->attr_pair[j]->attrvalue[k]); k++) {
+			    (ep->attr_pair[j]->attrvalue[k]); k++) {
 				free(ep->attr_pair[j]->attrvalue[k]);
 			}
 			free(ep->attr_pair[j]->attrvalue);
@@ -335,14 +335,14 @@ __s_api_cvtEntry(LDAP	*ld,
 		return (NS_LDAP_MEMORY);
 
 	if (service != NULL &&
-		(strncasecmp(service, "auto_", 5) == 0 ||
-		strcasecmp(service, "automount") == 0))
+	    (strncasecmp(service, "auto_", 5) == 0 ||
+	    strcasecmp(service, "automount") == 0))
 		auto_service = TRUE;
 	/*
 	 * see if schema mapping existed for the given service
 	 */
 	mapping = __ns_ldap_getOrigAttribute(service,
-			NS_HASH_SCHEMA_MAPPING_EXISTED);
+	    NS_HASH_SCHEMA_MAPPING_EXISTED);
 	if (mapping) {
 		schema_mapping_existed = TRUE;
 		__s_api_free2dArray(mapping);
@@ -367,7 +367,7 @@ __s_api_cvtEntry(LDAP	*ld,
 		 * and objectclass mapping.
 		 */
 		mapping = __ns_ldap_getOrigAttribute("automount",
-			NS_HASH_SCHEMA_MAPPING_EXISTED);
+		    NS_HASH_SCHEMA_MAPPING_EXISTED);
 		if (mapping) {
 			schema_mapping_existed = TRUE;
 			__s_api_free2dArray(mapping);
@@ -377,7 +377,7 @@ __s_api_cvtEntry(LDAP	*ld,
 
 	nAttrs = 1;  /* start with 1 for the DN attr */
 	for (attr = ldap_first_attribute(ld, e, &ber); attr != NULL;
-		attr = ldap_next_attribute(ld, e, ber)) {
+	    attr = ldap_next_attribute(ld, e, ber)) {
 		nAttrs++;
 		ldap_memfree(attr);
 		attr = NULL;
@@ -393,7 +393,7 @@ __s_api_cvtEntry(LDAP	*ld,
 	 * ep->attr_count will be updated later if that is true.
 	 */
 	ap = (ns_ldap_attr_t **)calloc(ep->attr_count + 1,
-					sizeof (ns_ldap_attr_t *));
+	    sizeof (ns_ldap_attr_t *));
 	if (ap == NULL) {
 		__ns_ldap_freeEntry(ep);
 		ep = NULL;
@@ -421,7 +421,7 @@ __s_api_cvtEntry(LDAP	*ld,
 	}
 	ap[0]->value_count = 1;
 	if ((ap[0]->attrvalue = (char **)
-		calloc(2, sizeof (char *))) == NULL) {
+	    calloc(2, sizeof (char *))) == NULL) {
 		ldap_memfree(dn);
 		dn = NULL;
 		__ns_ldap_freeEntry(ep);
@@ -445,10 +445,10 @@ __s_api_cvtEntry(LDAP	*ld,
 	dn = NULL;
 
 	if ((flags & NS_LDAP_NOMAP) == 0 && auto_service &&
-		schema_mapping_existed) {
+	    schema_mapping_existed) {
 		rc = __s_api_convert_automountmapname(service,
-				&ap[0]->attrvalue[0],
-				error);
+		    &ap[0]->attrvalue[0],
+		    error);
 		if (rc != NS_LDAP_SUCCESS) {
 			__ns_ldap_freeEntry(ep);
 			ep = NULL;
@@ -458,103 +458,144 @@ __s_api_cvtEntry(LDAP	*ld,
 
 	/* other attributes */
 	for (attr = ldap_first_attribute(ld, e, &ber), j = 1;
-		attr != NULL && j != nAttrs;
-		attr = ldap_next_attribute(ld, e, ber), j++) {
-	    /* allocate new attr name */
+	    attr != NULL && j != nAttrs;
+	    attr = ldap_next_attribute(ld, e, ber), j++) {
+		/* allocate new attr name */
 
-	    if ((ap[j] = (ns_ldap_attr_t *)
-		calloc(1, sizeof (ns_ldap_attr_t))) == NULL) {
-		    ber_free(ber, 0);
-		    ber = NULL;
-		    __ns_ldap_freeEntry(ep);
-		    ep = NULL;
-		    if (gecos_mapping)
-			__s_api_free2dArray(gecos_mapping);
-		    gecos_mapping = NULL;
-		    return (NS_LDAP_MEMORY);
-	    }
-
-	    if ((flags & NS_LDAP_NOMAP) || schema_mapping_existed == FALSE)
-		mapping = NULL;
-	    else
-		mapping = __ns_ldap_getOrigAttribute(service, attr);
-
-	    if (mapping == NULL && auto_service &&
-		schema_mapping_existed &&
-		(flags & NS_LDAP_NOMAP) == 0)
-		/*
-		 * if service == auto_* and no
-		 * schema mapping found
-		 * and schema_mapping_existed is TRUE
-		 * and NS_LDAP_NOMAP is not set
-		 * then try automount
-		 * e.g.
-		 * NS_LDAP_ATTRIBUTEMAP = automount:automountMapName=AAA
-		 */
-		mapping = __ns_ldap_getOrigAttribute("automount", attr);
-
-	    if (mapping == NULL) {
-		if ((ap[j]->attrname = strdup(attr)) == NULL) {
-		    ber_free(ber, 0);
-		    ber = NULL;
-		    __ns_ldap_freeEntry(ep);
-		    ep = NULL;
-		    if (gecos_mapping)
-			__s_api_free2dArray(gecos_mapping);
-		    gecos_mapping = NULL;
-		    return (NS_LDAP_MEMORY);
+		if ((ap[j] = (ns_ldap_attr_t *)
+		    calloc(1, sizeof (ns_ldap_attr_t))) == NULL) {
+			ber_free(ber, 0);
+			ber = NULL;
+			__ns_ldap_freeEntry(ep);
+			ep = NULL;
+			if (gecos_mapping)
+				__s_api_free2dArray(gecos_mapping);
+			gecos_mapping = NULL;
+			return (NS_LDAP_MEMORY);
 		}
-	    } else {
-		/*
-		 * for "gecos" 1 to N mapping,
-		 * do not remove the mapped attribute,
-		 * just create a new gecos attribute
-		 * and append it to the end of the attribute list
-		 */
-		if (strcasecmp(mapping[0], "gecos") == 0) {
-			ap[j]->attrname = strdup(attr);
-			gecos_mapping_existed = TRUE;
-		} else
-			ap[j]->attrname = strdup(mapping[0]);
 
-		if (ap[j]->attrname == NULL) {
-		    ber_free(ber, 0);
-		    ber = NULL;
-		    __ns_ldap_freeEntry(ep);
-		    ep = NULL;
-		    if (gecos_mapping)
-			__s_api_free2dArray(gecos_mapping);
-		    gecos_mapping = NULL;
-		    return (NS_LDAP_MEMORY);
-		}
-		/*
-		 * 1 to N attribute mapping processing
-		 * is only done for "gecos"
-		 */
+		if ((flags & NS_LDAP_NOMAP) || schema_mapping_existed == FALSE)
+			mapping = NULL;
+		else
+			mapping = __ns_ldap_getOrigAttribute(service, attr);
 
-		if (strcasecmp(mapping[0], "gecos") == 0) {
+		if (mapping == NULL && auto_service &&
+		    schema_mapping_existed && (flags & NS_LDAP_NOMAP) == 0)
 			/*
-			 * get attribute mapping for "gecos",
-			 * need to know the number and order of the
-			 * mapped attributes
+			 * if service == auto_* and no schema mapping found
+			 * and schema_mapping_existed is TRUE and NS_LDAP_NOMAP
+			 * is not set then try automount e.g.
+			 * NS_LDAP_ATTRIBUTEMAP = automount:automountMapName=AAA
 			 */
-			if (gecos_mapping == NULL) {
-				gecos_mapping =
-					__ns_ldap_getMappedAttributes(service,
-						mapping[0]);
-				if (gecos_mapping == NULL ||
-					gecos_mapping[0] == NULL) {
+			mapping = __ns_ldap_getOrigAttribute("automount",
+			    attr);
+
+		if (mapping == NULL) {
+			if ((ap[j]->attrname = strdup(attr)) == NULL) {
+				ber_free(ber, 0);
+				ber = NULL;
+				__ns_ldap_freeEntry(ep);
+				ep = NULL;
+				if (gecos_mapping)
+					__s_api_free2dArray(gecos_mapping);
+				gecos_mapping = NULL;
+				return (NS_LDAP_MEMORY);
+			}
+		} else {
+			/*
+			 * for "gecos" 1 to N mapping,
+			 * do not remove the mapped attribute,
+			 * just create a new gecos attribute
+			 * and append it to the end of the attribute list
+			 */
+			if (strcasecmp(mapping[0], "gecos") == 0) {
+				ap[j]->attrname = strdup(attr);
+				gecos_mapping_existed = TRUE;
+			} else
+				ap[j]->attrname = strdup(mapping[0]);
+
+			if (ap[j]->attrname == NULL) {
+				ber_free(ber, 0);
+				ber = NULL;
+				__ns_ldap_freeEntry(ep);
+				ep = NULL;
+				if (gecos_mapping)
+					__s_api_free2dArray(gecos_mapping);
+				gecos_mapping = NULL;
+				return (NS_LDAP_MEMORY);
+			}
+			/*
+			 * 1 to N attribute mapping processing
+			 * is only done for "gecos"
+			 */
+
+			if (strcasecmp(mapping[0], "gecos") == 0) {
+				/*
+				 * get attribute mapping for "gecos",
+				 * need to know the number and order of the
+				 * mapped attributes
+				 */
+				if (gecos_mapping == NULL) {
+					gecos_mapping =
+					    __ns_ldap_getMappedAttributes(
+					    service, mapping[0]);
+					if (gecos_mapping == NULL ||
+					    gecos_mapping[0] == NULL) {
+						/*
+						 * this should never happens,
+						 * syslog the error
+						 */
+						(void) sprintf(errstr,
+						    gettext(
+						    "Attribute mapping "
+						    "inconsistency "
+						    "found for attributes "
+						    "'%s' and '%s'."),
+						    mapping[0], attr);
+						syslog(LOG_ERR, "libsldap: %s",
+						    errstr);
+
+						ber_free(ber, 0);
+						ber = NULL;
+						__ns_ldap_freeEntry(ep);
+						ep = NULL;
+						__s_api_free2dArray(mapping);
+						mapping = NULL;
+						if (gecos_mapping)
+							__s_api_free2dArray(
+							    gecos_mapping);
+						gecos_mapping = NULL;
+						return (NS_LDAP_INTERNAL);
+					}
+				}
+
+				/*
+				 * is this attribute the 1st, 2nd, or
+				 * 3rd attr in the mapping list?
+				 */
+				gecos_attr_matched = FALSE;
+				for (i = 0; i < 3 && gecos_mapping[i]; i++) {
+					if (gecos_mapping[i] &&
+					    strcasecmp(gecos_mapping[i],
+					    attr) == 0) {
+						gecos_val_index[i] = j;
+						gecos_attr_matched = TRUE;
+						break;
+					}
+				}
+				if (gecos_attr_matched == FALSE) {
 					/*
-					 * this should never happens,
+					 * Not match found.
+					 * This should never happens,
 					 * syslog the error
 					 */
 					(void) sprintf(errstr,
-						gettext(
-						"Attribute mapping "
-						"inconsistency "
-						"found for attributes "
-						"'%s' and '%s'."),
-						mapping[0], attr);
+					    gettext(
+					    "Attribute mapping "
+					    "inconsistency "
+					    "found for attributes "
+					    "'%s' and '%s'."),
+					    mapping[0], attr);
 					syslog(LOG_ERR, "libsldap: %s", errstr);
 
 					ber_free(ber, 0);
@@ -563,137 +604,103 @@ __s_api_cvtEntry(LDAP	*ld,
 					ep = NULL;
 					__s_api_free2dArray(mapping);
 					mapping = NULL;
-					if (gecos_mapping)
-						__s_api_free2dArray(
-							gecos_mapping);
+					__s_api_free2dArray(gecos_mapping);
 					gecos_mapping = NULL;
 					return (NS_LDAP_INTERNAL);
 				}
 			}
+			__s_api_free2dArray(mapping);
+			mapping = NULL;
+		}
 
-			/*
-			 * is this attribute the 1st, 2nd, or
-			 * 3rd attr in the mapping list?
-			 */
-			gecos_attr_matched = FALSE;
-			for (i = 0; i < 3 && gecos_mapping[i]; i++) {
-				if (gecos_mapping[i] &&
-					strcasecmp(gecos_mapping[i],
-						attr) == 0) {
-					gecos_val_index[i] = j;
-					gecos_attr_matched = TRUE;
-					break;
+		if ((vals = ldap_get_values(ld, e, attr)) != NULL) {
+
+			if ((ap[j]->value_count =
+			    ldap_count_values(vals)) == 0) {
+				ldap_value_free(vals);
+				vals = NULL;
+				continue;
+			} else {
+				ap[j]->attrvalue = (char **)
+				    calloc(ap[j]->value_count+1,
+				    sizeof (char *));
+				if (ap[j]->attrvalue == NULL) {
+					ber_free(ber, 0);
+					ber = NULL;
+					__ns_ldap_freeEntry(ep);
+					ep = NULL;
+					if (gecos_mapping)
+						__s_api_free2dArray(
+						    gecos_mapping);
+					gecos_mapping = NULL;
+					return (NS_LDAP_MEMORY);
 				}
 			}
-			if (gecos_attr_matched == FALSE) {
-				/*
-				 * Not match found.
-				 * This should never happens,
-				 * syslog the error
-				 */
-				(void) sprintf(errstr,
-					gettext(
-					"Attribute mapping "
-					"inconsistency "
-					"found for attributes "
-					"'%s' and '%s'."),
-					mapping[0], attr);
-				syslog(LOG_ERR, "libsldap: %s", errstr);
 
-				ber_free(ber, 0);
-				ber = NULL;
-				__ns_ldap_freeEntry(ep);
-				ep = NULL;
-				__s_api_free2dArray(mapping);
-				mapping = NULL;
-				__s_api_free2dArray(gecos_mapping);
-				gecos_mapping = NULL;
-				return (NS_LDAP_INTERNAL);
-			}
-		}
-		__s_api_free2dArray(mapping);
-		mapping = NULL;
-	    }
+			/* map object classes if necessary */
+			if ((flags & NS_LDAP_NOMAP) == 0 &&
+			    schema_mapping_existed && ap[j]->attrname &&
+			    strcasecmp(ap[j]->attrname, "objectclass") == 0) {
+				for (k = 0; k < ap[j]->value_count; k++) {
+					mapping =
+					    __ns_ldap_getOrigObjectClass(
+					    service, vals[k]);
 
-	    if ((vals = ldap_get_values(ld, e, attr)) != NULL) {
+					if (mapping == NULL && auto_service)
+						/*
+						 * if service == auto_* and no
+						 * schema mapping found
+						 * then try automount
+						 */
+						mapping =
+						__ns_ldap_getOrigObjectClass(
+						    "automount", vals[k]);
 
-		if ((ap[j]->value_count = ldap_count_values(vals)) == 0) {
-		    ldap_value_free(vals);
-		    vals = NULL;
-		    continue;
-		} else {
-		    ap[j]->attrvalue = (char **)
-			calloc(ap[j]->value_count+1, sizeof (char *));
-		    if (ap[j]->attrvalue == NULL) {
-			    ber_free(ber, 0);
-			    ber = NULL;
-			    __ns_ldap_freeEntry(ep);
-			    ep = NULL;
-			    if (gecos_mapping)
-				__s_api_free2dArray(gecos_mapping);
-			    gecos_mapping = NULL;
-			    return (NS_LDAP_MEMORY);
-		    }
-		}
-
-		/* map object classes if necessary */
-		if ((flags & NS_LDAP_NOMAP) == 0 &&
-		    schema_mapping_existed && ap[j]->attrname &&
-		    strcasecmp(ap[j]->attrname, "objectclass") == 0) {
-		    for (k = 0; k < ap[j]->value_count; k++) {
-			mapping =
-			    __ns_ldap_getOrigObjectClass(service, vals[k]);
-
-			if (mapping == NULL && auto_service)
-				/*
-				 * if service == auto_* and no
-				 * schema mapping found
-				 * then try automount
-				 */
-				mapping =
-				    __ns_ldap_getOrigObjectClass(
-					"automount", vals[k]);
-
-			if (mapping == NULL) {
-			    ap[j]->attrvalue[k] = strdup(vals[k]);
+					if (mapping == NULL) {
+						ap[j]->attrvalue[k] =
+						    strdup(vals[k]);
+					} else {
+						ap[j]->attrvalue[k] =
+						    strdup(mapping[0]);
+						__s_api_free2dArray(mapping);
+						mapping = NULL;
+					}
+					if (ap[j]->attrvalue[k] == NULL) {
+						ber_free(ber, 0);
+						ber = NULL;
+						__ns_ldap_freeEntry(ep);
+						ep = NULL;
+						if (gecos_mapping)
+							__s_api_free2dArray(
+							    gecos_mapping);
+						gecos_mapping = NULL;
+						return (NS_LDAP_MEMORY);
+					}
+				}
 			} else {
-			    ap[j]->attrvalue[k] = strdup(mapping[0]);
-			    __s_api_free2dArray(mapping);
-			    mapping = NULL;
+				for (k = 0; k < ap[j]->value_count; k++) {
+					if ((ap[j]->attrvalue[k] =
+					    strdup(vals[k])) == NULL) {
+						ber_free(ber, 0);
+						ber = NULL;
+						__ns_ldap_freeEntry(ep);
+						ep = NULL;
+						if (gecos_mapping)
+							__s_api_free2dArray(
+							    gecos_mapping);
+						gecos_mapping = NULL;
+						return (NS_LDAP_MEMORY);
+					}
+				}
 			}
-			if (ap[j]->attrvalue[k] == NULL) {
-				ber_free(ber, 0);
-				ber = NULL;
-				__ns_ldap_freeEntry(ep);
-				ep = NULL;
-				if (gecos_mapping)
-					__s_api_free2dArray(gecos_mapping);
-				gecos_mapping = NULL;
-				return (NS_LDAP_MEMORY);
-			}
-		    }
-		} else {
-		    for (k = 0; k < ap[j]->value_count; k++) {
-			if ((ap[j]->attrvalue[k] = strdup(vals[k])) == NULL) {
-				ber_free(ber, 0);
-				ber = NULL;
-				__ns_ldap_freeEntry(ep);
-				ep = NULL;
-				if (gecos_mapping)
-					__s_api_free2dArray(gecos_mapping);
-				gecos_mapping = NULL;
-				return (NS_LDAP_MEMORY);
-			}
-		    }
+
+			ap[j]->attrvalue[k] = NULL;
+			ldap_value_free(vals);
+			vals = NULL;
 		}
 
-		ap[j]->attrvalue[k] = NULL;
-		ldap_value_free(vals);
-		vals = NULL;
-	    }
-
-	    ldap_memfree(attr);
-	    attr = NULL;
+		ldap_memfree(attr);
+		attr = NULL;
 	}
 
 	ber_free(ber, 0);
@@ -720,8 +727,8 @@ __s_api_cvtEntry(LDAP	*ld,
 				f = k;
 
 			if (k != -1 && ap[k]->value_count > 0 &&
-				ap[k]->attrvalue[0] &&
-				strlen(ap[k]->attrvalue[0]) > 0) {
+			    ap[k]->attrvalue[0] &&
+			    strlen(ap[k]->attrvalue[0]) > 0) {
 
 				if (k == f) {
 					/*
@@ -730,15 +737,15 @@ __s_api_cvtEntry(LDAP	*ld,
 					 * mapping attributes
 					 */
 					ap[nAttrs] = (ns_ldap_attr_t *)
-						calloc(1,
-						sizeof (ns_ldap_attr_t));
+					    calloc(1,
+					    sizeof (ns_ldap_attr_t));
 					if (ap[nAttrs] == NULL) {
 						__ns_ldap_freeEntry(ep);
 						ep = NULL;
 						return (NS_LDAP_MEMORY);
 					}
 					ap[nAttrs]->attrvalue = (char **)calloc(
-						2, sizeof (char *));
+					    2, sizeof (char *));
 					if (ap[nAttrs]->attrvalue == NULL) {
 						__ns_ldap_freeEntry(ep);
 						ep = NULL;
@@ -746,16 +753,16 @@ __s_api_cvtEntry(LDAP	*ld,
 					}
 					/* add 1 more for a possible "," */
 					ap[nAttrs]->attrvalue[0] =
-						(char *)calloc(
-						strlen(ap[f]->attrvalue[0]) +
-						2, 1);
+					    (char *)calloc(
+					    strlen(ap[f]->attrvalue[0]) +
+					    2, 1);
 					if (ap[nAttrs]->attrvalue[0] == NULL) {
 						__ns_ldap_freeEntry(ep);
 						ep = NULL;
 						return (NS_LDAP_MEMORY);
 					}
 					(void) strcpy(ap[nAttrs]->attrvalue[0],
-						ap[f]->attrvalue[0]);
+					    ap[f]->attrvalue[0]);
 
 					ap[nAttrs]->attrname = strdup("gecos");
 					if (ap[nAttrs]->attrname == NULL) {
@@ -775,11 +782,11 @@ __s_api_cvtEntry(LDAP	*ld,
 					 * ap[k]->attrvalue[0]
 					 */
 					tmp = (char *)realloc(
-						    ap[nAttrs]->attrvalue[0],
-						    strlen(ap[nAttrs]->
-							attrvalue[0]) +
-						    strlen(ap[k]->
-							attrvalue[0]) + 2);
+					    ap[nAttrs]->attrvalue[0],
+					    strlen(ap[nAttrs]->
+					    attrvalue[0]) +
+					    strlen(ap[k]->
+					    attrvalue[0]) + 2);
 					if (tmp == NULL) {
 						__ns_ldap_freeEntry(ep);
 						ep = NULL;
@@ -787,9 +794,9 @@ __s_api_cvtEntry(LDAP	*ld,
 					}
 					ap[nAttrs]->attrvalue[0] = tmp;
 					(void) strcat(ap[nAttrs]->attrvalue[0],
-						",");
+					    ",");
 					(void) strcat(ap[nAttrs]->attrvalue[0],
-						ap[k]->attrvalue[0]);
+					    ap[k]->attrvalue[0]);
 				}
 			}
 		}
@@ -813,15 +820,15 @@ __s_api_getEntry(ns_ldap_cookie_t *cookie)
 		return (NS_LDAP_INVALID_PARAM);
 	}
 	ret = __s_api_cvtEntry(cookie->conn->ld, cookie->service,
-				cookie->resultMsg, cookie->i_flags,
-				&curEntry, &cookie->errorp);
+	    cookie->resultMsg, cookie->i_flags,
+	    &curEntry, &cookie->errorp);
 	if (ret != NS_LDAP_SUCCESS) {
 		return (ret);
 	}
 
 	if (cookie->result == NULL) {
 		cookie->result = (ns_ldap_result_t *)
-			calloc(1, sizeof (ns_ldap_result_t));
+		    calloc(1, sizeof (ns_ldap_result_t));
 		if (cookie->result == NULL) {
 			__ns_ldap_freeEntry(curEntry);
 			curEntry = NULL;
@@ -863,14 +870,14 @@ __s_api_get_cachemgr_data(const char *type,
 
 	space.s_d.ldap_call.ldap_callnumber = GETCACHE;
 	(void) snprintf(space.s_d.ldap_call.ldap_u.domainname,
-		DOORBUFFERSIZE - sizeof (space.s_d.ldap_call.ldap_callnumber),
-		"%s%s%s",
-		type,
-		DOORLINESEP,
-		from);
+	    DOORBUFFERSIZE - sizeof (space.s_d.ldap_call.ldap_callnumber),
+	    "%s%s%s",
+	    type,
+	    DOORLINESEP,
+	    from);
 	ndata = sizeof (space);
 	adata = sizeof (ldap_call_t) +
-		strlen(space.s_d.ldap_call.ldap_u.domainname) + 1;
+	    strlen(space.s_d.ldap_call.ldap_u.domainname) + 1;
 	sptr = &space.s_d;
 
 	rc = __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
@@ -899,24 +906,24 @@ __s_api_set_cachemgr_data(const char *type,
 #endif
 
 	if ((from == NULL) || (from[0] == '\0') ||
-		(to == NULL) || (to[0] == '\0'))
+	    (to == NULL) || (to[0] == '\0'))
 		return (-1);
 
 	(void) memset(space.s_b, 0, DOORBUFFERSIZE);
 
 	space.s_d.ldap_call.ldap_callnumber = SETCACHE;
 	(void) snprintf(space.s_d.ldap_call.ldap_u.domainname,
-		DOORBUFFERSIZE - sizeof (space.s_d.ldap_call.ldap_callnumber),
-		"%s%s%s%s%s",
-		type,
-		DOORLINESEP,
-		from,
-		DOORLINESEP,
-		to);
+	    DOORBUFFERSIZE - sizeof (space.s_d.ldap_call.ldap_callnumber),
+	    "%s%s%s%s%s",
+	    type,
+	    DOORLINESEP,
+	    from,
+	    DOORLINESEP,
+	    to);
 
 	ndata = sizeof (space);
 	adata = sizeof (ldap_call_t) +
-		strlen(space.s_d.ldap_call.ldap_u.domainname) + 1;
+	    strlen(space.s_d.ldap_call.ldap_u.domainname) + 1;
 	sptr = &space.s_d;
 
 	rc = __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
@@ -986,11 +993,11 @@ init_search_state_machine()
 	cfg = __s_api_loadrefresh_config();
 	cookie->connectionId = -1;
 	if (cfg == NULL ||
-		cfg->paramList[NS_LDAP_SEARCH_TIME_P].ns_ptype == NS_UNKNOWN) {
+	    cfg->paramList[NS_LDAP_SEARCH_TIME_P].ns_ptype == NS_UNKNOWN) {
 		cookie->search_timeout.tv_sec = NS_DEFAULT_SEARCH_TIMEOUT;
 	} else {
 		cookie->search_timeout.tv_sec =
-			cfg->paramList[NS_LDAP_SEARCH_TIME_P].ns_i;
+		    cfg->paramList[NS_LDAP_SEARCH_TIME_P].ns_i;
 	}
 	if (cfg != NULL)
 		__s_api_release_config(cfg);
@@ -1083,7 +1090,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 	 * If not, just return success.
 	 */
 	mapping = __ns_ldap_getOrigAttribute(service,
-			NS_HASH_SCHEMA_MAPPING_EXISTED);
+	    NS_HASH_SCHEMA_MAPPING_EXISTED);
 
 	if (mapping == NULL && auto_service)
 		/*
@@ -1092,7 +1099,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 		 * then try automount
 		 */
 		mapping = __ns_ldap_getOrigAttribute(
-			"automount", NS_HASH_SCHEMA_MAPPING_EXISTED);
+		    "automount", NS_HASH_SCHEMA_MAPPING_EXISTED);
 
 	if (mapping)
 		__s_api_free2dArray(mapping);
@@ -1130,7 +1137,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 	 * get memory for info arrays
 	 */
 	info = (filter_mapping_info_t **)calloc(num_eq + 1,
-			sizeof (filter_mapping_info_t *));
+	    sizeof (filter_mapping_info_t *));
 
 	if (info == NULL) {
 		free(filter_c);
@@ -1148,7 +1155,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 		case TOKENSEPARATOR:
 			if (!in_quote && !is_value) {
 				info1 = (filter_mapping_info_t *)calloc(1,
-					sizeof (filter_mapping_info_t));
+				    sizeof (filter_mapping_info_t));
 				if (!info1) {
 					free(filter_c);
 					for (i = 0; i < num_veq; i++)
@@ -1213,7 +1220,8 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 		 * it points to the end of the last name processed + 2
 		 */
 		for (tail = info[i]->veq_pos; (tail > filter_c_next) &&
-			(*(tail - 1) == SPACETOK); tail--);
+		    (*(tail - 1) == SPACETOK); tail--)
+			;
 
 		/*
 		 * mark the end of the left side string (the key)
@@ -1228,7 +1236,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 		for (c = tail; filter_c_next <= c; c--) {
 			/* OPARATOK is '(' */
 			if (*c == OPARATOK ||
-				*c == SPACETOK) {
+			    *c == SPACETOK) {
 				key = c + 1;
 				break;
 			}
@@ -1237,7 +1245,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 
 		if ((key + oc_len) <= tail) {
 			if (strncasecmp(key, "objectclass",
-				oc_len) == 0) {
+			    oc_len) == 0) {
 				/*
 				 * assertion is "objectclass=ocname",
 				 * ocname is the one needs to be mapped
@@ -1247,14 +1255,15 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 				 */
 				head = info[i]->veq_pos;
 				for (head = info[i]->veq_pos + 1;
-					*head && *head == SPACETOK; head++);
+				    *head && *head == SPACETOK; head++)
+					;
 
 				/* ignore empty ocname */
 				if (!(*head))
 					continue;
 
 				info[i]->name_start = head - filter_c +
-					filter;
+				    filter;
 
 				/*
 				 * now find the end of the ocname
@@ -1262,12 +1271,12 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 				for (c = head; ; c++) {
 					/* CPARATOK is ')' */
 					if (*c == CPARATOK ||
-						*c == '\0' ||
-						*c == SPACETOK) {
+					    *c == '\0' ||
+					    *c == SPACETOK) {
 						*c = '\0';
 						info[i]->name_end =
-							c - filter_c - 1 +
-							filter;
+						    c - filter_c - 1 +
+						    filter;
 						filter_c_next = c + 1;
 						info[i]->oc_or_attr = 'o';
 						info[i]->from_name = head;
@@ -1295,12 +1304,12 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 
 		if (info[i]->oc_or_attr == 'a')
 			info[i]->mapping =
-			__ns_ldap_getMappedAttributes(service,
-				info[i]->from_name);
+			    __ns_ldap_getMappedAttributes(service,
+			    info[i]->from_name);
 		else
 			info[i]->mapping =
-			__ns_ldap_getMappedObjectClass(service,
-				info[i]->from_name);
+			    __ns_ldap_getMappedObjectClass(service,
+			    info[i]->from_name);
 
 		if (info[i]->mapping == NULL && auto_service)  {
 			/*
@@ -1311,16 +1320,16 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 			 */
 			if (info[i]->oc_or_attr == 'a')
 				info[i]->mapping =
-				__ns_ldap_getMappedAttributes("automount",
-					info[i]->from_name);
+				    __ns_ldap_getMappedAttributes("automount",
+				    info[i]->from_name);
 			else
 				info[i]->mapping =
-				__ns_ldap_getMappedObjectClass("automount",
-					info[i]->from_name);
+				    __ns_ldap_getMappedObjectClass("automount",
+				    info[i]->from_name);
 		}
 
 		if (info[i]->mapping == NULL ||
-			info[i]->mapping[0] == NULL) {
+		    info[i]->mapping[0] == NULL) {
 			info[i]->to_name = NULL;
 		} else if (info[i]->mapping[1] == NULL) {
 			info[i]->to_name = info[i]->mapping[0];
@@ -1332,22 +1341,22 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 			 * not allowed
 			 */
 			(void) sprintf(errstr,
-				gettext(
-				"Multiple attribute or objectclass "
-				"mapping for '%s' in filter "
-				"'%s' not allowed."),
-				info[i]->from_name, filter);
+			    gettext(
+			    "Multiple attribute or objectclass "
+			    "mapping for '%s' in filter "
+			    "'%s' not allowed."),
+			    info[i]->from_name, filter);
 			err = strdup(errstr);
 			if (err)
 				MKERROR(LOG_WARNING, cookie->errorp,
-				NS_CONFIG_SYNTAX,
-				err, NULL);
+				    NS_CONFIG_SYNTAX,
+				    err, NULL);
 
 			free(filter_c);
 			for (j = 0; j < num_veq; j++) {
 				if (info[j]->mapping)
 					__s_api_free2dArray(
-						info[j]->mapping);
+					    info[j]->mapping);
 				free(info[j]);
 			}
 			free(info);
@@ -1372,7 +1381,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 			for (j = 0; j < num_veq; j++) {
 				if (info[j]->mapping)
 					__s_api_free2dArray(
-						info[j]->mapping);
+					    info[j]->mapping);
 				free(info[j]);
 			}
 			free(info);
@@ -1381,17 +1390,18 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 
 		for (i = 0; i < num_veq; i++) {
 			if (info[i]->to_name != NULL &&
-				info[i]->to_name != NULL) {
+			    info[i]->to_name != NULL) {
 
-			/*
-			 * copy the original filter data
-			 * between the last name and current
-			 * name
-			 */
-			if ((last_copied + 1) != info[i]->name_start)
-				(void) strncat(*new_filter, last_copied + 1,
-					info[i]->name_start -
-					last_copied - 1);
+				/*
+				 * copy the original filter data
+				 * between the last name and current
+				 * name
+				 */
+				if ((last_copied + 1) != info[i]->name_start)
+					(void) strncat(*new_filter,
+					    last_copied + 1,
+					    info[i]->name_start -
+					    last_copied - 1);
 
 				/* the data is copied */
 				last_copied = info[i]->name_end;
@@ -1405,11 +1415,11 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 
 			/* copy the filter data after the last name */
 			if (i == (num_veq -1) &&
-				info[i]->name_end <
-					(filter + strlen(filter)))
+			    info[i]->name_end <
+			    (filter + strlen(filter)))
 				(void) strncat(*new_filter, last_copied + 1,
-					filter + strlen(filter) -
-					last_copied - 1);
+				    filter + strlen(filter) -
+				    last_copied - 1);
 		}
 
 	}
@@ -1438,8 +1448,8 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 
 	dptr = *cookie->sdpos;
 	scope = cookie->i_flags & (NS_LDAP_SCOPE_BASE |
-			NS_LDAP_SCOPE_ONELEVEL |
-			NS_LDAP_SCOPE_SUBTREE);
+	    NS_LDAP_SCOPE_ONELEVEL |
+	    NS_LDAP_SCOPE_SUBTREE);
 	if (scope)
 		cookie->scope = scope;
 	else
@@ -1458,9 +1468,9 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 
 	filter = NULL;
 	if (cookie->use_filtercb && cookie->init_filter_cb &&
-		dptr->filter && strlen(dptr->filter) > 0) {
+	    dptr->filter && strlen(dptr->filter) > 0) {
 		(*cookie->init_filter_cb)(dptr, &filter,
-			cookie->userdata);
+		    cookie->userdata);
 	}
 	if (filter == NULL) {
 		if (cookie->i_filter == NULL) {
@@ -1522,7 +1532,7 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 	baselen = strlen(dptr->basedn);
 	if (baselen > 0 && dptr->basedn[baselen-1] == COMMATOK) {
 		rc = __ns_ldap_getParam(NS_LDAP_SEARCH_BASEDN_P,
-				(void ***)&param, &cookie->errorp);
+		    (void ***)&param, &cookie->errorp);
 		if (rc != NS_LDAP_SUCCESS) {
 			cookie->err_rc = rc;
 			return (-1);
@@ -1578,9 +1588,9 @@ get_current_session(ns_ldap_cookie_t *cookie)
 	int		fail_if_new_pwd_reqd = 1;
 
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
-		cookie->i_auth, &connectionId, &conp,
-		&cookie->errorp, fail_if_new_pwd_reqd,
-		cookie->nopasswd_acct_mgmt);
+	    cookie->i_auth, &connectionId, &conp,
+	    &cookie->errorp, fail_if_new_pwd_reqd,
+	    cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1591,7 +1601,7 @@ get_current_session(ns_ldap_cookie_t *cookie)
 	 */
 	if (rc == NS_LDAP_SUCCESS_WITH_INFO) {
 		(void) __ns_ldap_freeError(
-			&cookie->errorp);
+		    &cookie->errorp);
 		cookie->errorp = NULL;
 		rc = NS_LDAP_SUCCESS;
 	}
@@ -1618,9 +1628,9 @@ get_next_session(ns_ldap_cookie_t *cookie)
 		DropConnection(cookie->connectionId, cookie->i_flags);
 
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
-		cookie->i_auth, &connectionId, &conp,
-		&cookie->errorp, fail_if_new_pwd_reqd,
-		cookie->nopasswd_acct_mgmt);
+	    cookie->i_auth, &connectionId, &conp,
+	    &cookie->errorp, fail_if_new_pwd_reqd,
+	    cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1631,7 +1641,7 @@ get_next_session(ns_ldap_cookie_t *cookie)
 	 */
 	if (rc == NS_LDAP_SUCCESS_WITH_INFO) {
 		(void) __ns_ldap_freeError(
-			&cookie->errorp);
+		    &cookie->errorp);
 		cookie->errorp = NULL;
 		rc = NS_LDAP_SUCCESS;
 	}
@@ -1657,9 +1667,9 @@ get_referral_session(ns_ldap_cookie_t *cookie)
 		DropConnection(cookie->connectionId, cookie->i_flags);
 
 	rc = __s_api_getConnection(cookie->refpos->refHost, 0,
-		cookie->i_auth, &connectionId, &conp,
-		&cookie->errorp, fail_if_new_pwd_reqd,
-		cookie->nopasswd_acct_mgmt);
+	    cookie->i_auth, &connectionId, &conp,
+	    &cookie->errorp, fail_if_new_pwd_reqd,
+	    cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1670,7 +1680,7 @@ get_referral_session(ns_ldap_cookie_t *cookie)
 	 */
 	if (rc == NS_LDAP_SUCCESS_WITH_INFO) {
 		(void) __ns_ldap_freeError(
-			&cookie->errorp);
+		    &cookie->errorp);
 		cookie->errorp = NULL;
 		rc = NS_LDAP_SUCCESS;
 	}
@@ -1691,13 +1701,13 @@ paging_supported(ns_ldap_cookie_t *cookie)
 
 	cookie->listType = 0;
 	rc = __s_api_isCtrlSupported(cookie->conn,
-			LDAP_CONTROL_VLVREQUEST);
+	    LDAP_CONTROL_VLVREQUEST);
 	if (rc == NS_LDAP_SUCCESS) {
 		cookie->listType = VLVCTRLFLAG;
 		return (1);
 	}
 	rc = __s_api_isCtrlSupported(cookie->conn,
-			LDAP_CONTROL_SIMPLE_PAGE);
+	    LDAP_CONTROL_SIMPLE_PAGE);
 	if (rc == NS_LDAP_SUCCESS) {
 		cookie->listType = SIMPLEPAGECTRLFLAG;
 		return (1);
@@ -1720,15 +1730,15 @@ setup_vlv_params(ns_ldap_cookie_t *cookie)
 	rc = ldap_create_sort_keylist(&sortkeylist, SORTKEYLIST);
 	if (rc != LDAP_SUCCESS) {
 		(void) ldap_get_option(cookie->conn->ld,
-			LDAP_OPT_ERROR_NUMBER, &rc);
+		    LDAP_OPT_ERROR_NUMBER, &rc);
 		return (rc);
 	}
 	rc = ldap_create_sort_control(cookie->conn->ld,
-			sortkeylist, 1, &sortctrl);
+	    sortkeylist, 1, &sortctrl);
 	ldap_free_sort_keylist(sortkeylist);
 	if (rc != LDAP_SUCCESS) {
 		(void) ldap_get_option(cookie->conn->ld,
-				LDAP_OPT_ERROR_NUMBER, &rc);
+		    LDAP_OPT_ERROR_NUMBER, &rc);
 		return (rc);
 	}
 
@@ -1741,11 +1751,11 @@ setup_vlv_params(ns_ldap_cookie_t *cookie)
 	vlist.ldvlist_extradata = NULL;
 
 	rc = ldap_create_virtuallist_control(cookie->conn->ld,
-			&vlist, &vlvctrl);
+	    &vlist, &vlvctrl);
 	if (rc != LDAP_SUCCESS) {
 		ldap_control_free(sortctrl);
 		(void) ldap_get_option(cookie->conn->ld, LDAP_OPT_ERROR_NUMBER,
-									&rc);
+		    &rc);
 		return (rc);
 	}
 
@@ -1773,10 +1783,10 @@ setup_simplepg_params(ns_ldap_cookie_t *cookie)
 	_freeControlList(&cookie->p_serverctrls);
 
 	rc = ldap_create_page_control(cookie->conn->ld, LISTPAGESIZE,
-		cookie->ctrlCookie, (char)0, &pgctrl);
+	    cookie->ctrlCookie, (char)0, &pgctrl);
 	if (rc != LDAP_SUCCESS) {
 		(void) ldap_get_option(cookie->conn->ld, LDAP_OPT_ERROR_NUMBER,
-									&rc);
+		    &rc);
 		return (rc);
 	}
 
@@ -1803,31 +1813,31 @@ proc_result_referrals(ns_ldap_cookie_t *cookie)
 	if (cookie->refpos == NULL) {
 		cookie->new_state = END_RESULT;
 		rc = ldap_parse_result(cookie->conn->ld,
-			cookie->resultMsg,
-			&errCode, NULL,
-			NULL, &referrals,
-			NULL, 0);
+		    cookie->resultMsg,
+		    &errCode, NULL,
+		    NULL, &referrals,
+		    NULL, 0);
 		if (rc != NS_LDAP_SUCCESS) {
 			(void) ldap_get_option(cookie->conn->ld,
-					LDAP_OPT_ERROR_NUMBER,
-					&cookie->err_rc);
+			    LDAP_OPT_ERROR_NUMBER,
+			    &cookie->err_rc);
 			cookie->new_state = LDAP_ERROR;
 			return;
 		}
 		if (errCode == LDAP_REFERRAL) {
 			for (i = 0; referrals[i] != NULL;
-				i++) {
+			    i++) {
 				/* add to referral list */
 				rc = __s_api_addRefInfo(
-					&cookie->reflist,
-					referrals[i],
-					cookie->basedn,
-					&cookie->scope,
-					cookie->filter,
-					cookie->conn->ld);
+				    &cookie->reflist,
+				    referrals[i],
+				    cookie->basedn,
+				    &cookie->scope,
+				    cookie->filter,
+				    cookie->conn->ld);
 				if (rc != NS_LDAP_SUCCESS) {
 					cookie->new_state =
-						ERROR;
+					    ERROR;
 					break;
 				}
 			}
@@ -1848,27 +1858,27 @@ proc_search_references(ns_ldap_cookie_t *cookie)
 	 */
 	if (cookie->refpos == NULL) {
 		refurls = ldap_get_reference_urls(
-				cookie->conn->ld,
-				cookie->resultMsg);
+		    cookie->conn->ld,
+		    cookie->resultMsg);
 		if (refurls == NULL) {
 			(void) ldap_get_option(cookie->conn->ld,
-					LDAP_OPT_ERROR_NUMBER,
-					&cookie->err_rc);
+			    LDAP_OPT_ERROR_NUMBER,
+			    &cookie->err_rc);
 			cookie->new_state = LDAP_ERROR;
 			return;
 		}
 		for (i = 0; refurls[i] != NULL; i++) {
 			/* add to referral list */
 			rc = __s_api_addRefInfo(
-				&cookie->reflist,
-				refurls[i],
-				cookie->basedn,
-				&cookie->scope,
-				cookie->filter,
-				cookie->conn->ld);
+			    &cookie->reflist,
+			    refurls[i],
+			    cookie->basedn,
+			    &cookie->scope,
+			    cookie->filter,
+			    cookie->conn->ld);
 			if (rc != NS_LDAP_SUCCESS) {
 				cookie->new_state =
-					ERROR;
+				    ERROR;
 				break;
 			}
 		}
@@ -1895,39 +1905,39 @@ multi_result(ns_ldap_cookie_t *cookie)
 
 	if (cookie->listType == VLVCTRLFLAG) {
 		rc = ldap_parse_result(cookie->conn->ld, cookie->resultMsg,
-			&errCode, NULL, NULL, &referrals, &retCtrls, 0);
+		    &errCode, NULL, NULL, &referrals, &retCtrls, 0);
 		if (rc != LDAP_SUCCESS) {
 			(void) ldap_get_option(cookie->conn->ld,
-					LDAP_OPT_ERROR_NUMBER,
-					&cookie->err_rc);
+			    LDAP_OPT_ERROR_NUMBER,
+			    &cookie->err_rc);
 			(void) sprintf(errstr,
-				gettext("LDAP ERROR (%d): %s.\n"),
-				cookie->err_rc,
-				gettext(ldap_err2string(cookie->err_rc)));
+			    gettext("LDAP ERROR (%d): %s.\n"),
+			    cookie->err_rc,
+			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-				NULL);
+			    NULL);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
 		}
 		if (errCode == LDAP_REFERRAL) {
 			for (i = 0; referrals[i] != NULL;
-				i++) {
+			    i++) {
 				/* add to referral list */
 				rc = __s_api_addRefInfo(
-					&cookie->reflist,
-					referrals[i],
-					cookie->basedn,
-					&cookie->scope,
-					cookie->filter,
-					cookie->conn->ld);
+				    &cookie->reflist,
+				    referrals[i],
+				    cookie->basedn,
+				    &cookie->scope,
+				    cookie->filter,
+				    cookie->conn->ld);
 				if (rc != NS_LDAP_SUCCESS) {
-						ldap_value_free(
-						referrals);
+					ldap_value_free(
+					    referrals);
 					if (retCtrls)
 						ldap_controls_free(
-						retCtrls);
+						    retCtrls);
 					return (ERROR);
 				}
 			}
@@ -1938,8 +1948,8 @@ multi_result(ns_ldap_cookie_t *cookie)
 		}
 		if (retCtrls) {
 			rc = ldap_parse_virtuallist_control(
-					cookie->conn->ld, retCtrls,
-					&target_posp, &list_size, &errCode);
+			    cookie->conn->ld, retCtrls,
+			    &target_posp, &list_size, &errCode);
 			if (rc == LDAP_SUCCESS) {
 				cookie->index = target_posp + LISTPAGESIZE;
 				if (cookie->index > list_size) {
@@ -1953,39 +1963,39 @@ multi_result(ns_ldap_cookie_t *cookie)
 			finished = 1;
 	} else if (cookie->listType == SIMPLEPAGECTRLFLAG) {
 		rc = ldap_parse_result(cookie->conn->ld, cookie->resultMsg,
-			&errCode, NULL, NULL, &referrals, &retCtrls, 0);
+		    &errCode, NULL, NULL, &referrals, &retCtrls, 0);
 		if (rc != LDAP_SUCCESS) {
 			(void) ldap_get_option(cookie->conn->ld,
-					LDAP_OPT_ERROR_NUMBER,
-					&cookie->err_rc);
+			    LDAP_OPT_ERROR_NUMBER,
+			    &cookie->err_rc);
 			(void) sprintf(errstr,
-				gettext("LDAP ERROR (%d): %s.\n"),
-				cookie->err_rc,
-				gettext(ldap_err2string(cookie->err_rc)));
+			    gettext("LDAP ERROR (%d): %s.\n"),
+			    cookie->err_rc,
+			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-				NULL);
+			    NULL);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
 		}
 		if (errCode == LDAP_REFERRAL) {
 			for (i = 0; referrals[i] != NULL;
-				i++) {
+			    i++) {
 				/* add to referral list */
 				rc = __s_api_addRefInfo(
-					&cookie->reflist,
-					referrals[i],
-					cookie->basedn,
-					&cookie->scope,
-					cookie->filter,
-					cookie->conn->ld);
+				    &cookie->reflist,
+				    referrals[i],
+				    cookie->basedn,
+				    &cookie->scope,
+				    cookie->filter,
+				    cookie->conn->ld);
 				if (rc != NS_LDAP_SUCCESS) {
-						ldap_value_free(
-						referrals);
+					ldap_value_free(
+					    referrals);
 					if (retCtrls)
 						ldap_controls_free(
-						retCtrls);
+						    retCtrls);
 					return (ERROR);
 				}
 			}
@@ -1999,12 +2009,12 @@ multi_result(ns_ldap_cookie_t *cookie)
 				ber_bvfree(cookie->ctrlCookie);
 			cookie->ctrlCookie = NULL;
 			rc = ldap_parse_page_control(
-					cookie->conn->ld, retCtrls,
-					&count, &cookie->ctrlCookie);
+			    cookie->conn->ld, retCtrls,
+			    &count, &cookie->ctrlCookie);
 			if (rc == LDAP_SUCCESS) {
 				if ((cookie->ctrlCookie == NULL) ||
-					(cookie->ctrlCookie->bv_val == NULL) ||
-					(cookie->ctrlCookie->bv_len == 0))
+				    (cookie->ctrlCookie->bv_val == NULL) ||
+				    (cookie->ctrlCookie->bv_len == 0))
 					finished = 1;
 			}
 			ldap_controls_free(retCtrls);
@@ -2062,6 +2072,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 
 	for (;;) {
 		switch (cookie->state) {
+		case CLEAR_RESULTS:
+			(void) ldap_abandon_ext(cookie->conn->ld,
+			    cookie->msgId, NULL, NULL);
+			cookie->new_state = EXIT;
+			break;
 		case GET_ACCT_MGMT_INFO:
 			/*
 			 * Set the flag to get ldap account management controls.
@@ -2088,11 +2103,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				cookie->attribute = NULL;
 			}
 			if ((cookie->i_flags & NS_LDAP_NOMAP) == 0 &&
-				cookie->i_attr) {
+			    cookie->i_attr) {
 				cookie->attribute =
-					__ns_ldap_mapAttributeList(
-						cookie->service,
-						cookie->i_attr);
+				    __ns_ldap_mapAttributeList(
+				    cookie->service,
+				    cookie->i_attr);
 			}
 			break;
 		case NEXT_SEARCH_DESCRIPTOR:
@@ -2125,11 +2140,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				break;
 			}
 			(void) sprintf(errstr,
-				gettext("Session error no available conn.\n"),
-				state);
+			    gettext("Session error no available conn.\n"),
+			    state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-				NULL);
+			    NULL);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			cookie->new_state = EXIT;
@@ -2185,15 +2200,15 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			break;
 		case DO_SEARCH:
 			rc = ldap_search_ext(cookie->conn->ld,
-				cookie->basedn,
-				cookie->scope,
-				cookie->filter,
-				cookie->attribute,
-				0,
-				cookie->p_serverctrls,
-				NULL,
-				&cookie->search_timeout, 0,
-				&cookie->msgId);
+			    cookie->basedn,
+			    cookie->scope,
+			    cookie->filter,
+			    cookie->attribute,
+			    0,
+			    cookie->p_serverctrls,
+			    NULL,
+			    &cookie->search_timeout, 0,
+			    &cookie->msgId);
 			if (rc != LDAP_SUCCESS) {
 				if (rc == LDAP_BUSY ||
 				    rc == LDAP_UNAVAILABLE ||
@@ -2218,12 +2233,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					 * is up again.
 					 */
 					if (rc == LDAP_CONNECT_ERROR ||
-						rc == LDAP_SERVER_DOWN) {
+					    rc == LDAP_SERVER_DOWN) {
 						ret = __s_api_removeServer(
 						    cookie->conn->serverAddr);
 						if (ret == NOSERVER &&
 						    cookie->conn_auth_type
-							== NS_LDAP_AUTH_NONE) {
+						    == NS_LDAP_AUTH_NONE) {
 							/*
 							 * Couldn't remove
 							 * server from server
@@ -2245,10 +2260,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 							 * kept alive
 							 */
 							DropConnection(
-							cookie->connectionId,
-							NS_LDAP_NEW_CONN);
+							    cookie->
+							    connectionId,
+							    NS_LDAP_NEW_CONN);
 							cookie->connectionId =
-								-1;
+							    -1;
 						}
 					}
 					break;
@@ -2261,15 +2277,15 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			break;
 		case NEXT_RESULT:
 			rc = ldap_result(cookie->conn->ld, cookie->msgId,
-				LDAP_MSG_ONE,
-				(struct timeval *)&cookie->search_timeout,
-				&cookie->resultMsg);
+			    LDAP_MSG_ONE,
+			    (struct timeval *)&cookie->search_timeout,
+			    &cookie->resultMsg);
 			if (rc == LDAP_RES_SEARCH_RESULT) {
 				cookie->new_state = END_RESULT;
 				/* check and process referrals info */
 				if (cookie->followRef)
 					proc_result_referrals(
-						cookie);
+					    cookie);
 				(void) ldap_msgfree(cookie->resultMsg);
 				cookie->resultMsg = NULL;
 				break;
@@ -2289,11 +2305,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					break;
 				case -1:
 					rc = ldap_get_lderrno(cookie->conn->ld,
-						    NULL, NULL);
+					    NULL, NULL);
 					break;
 				default:
 					rc = ldap_result2error(cookie->conn->ld,
-						cookie->resultMsg, 1);
+					    cookie->resultMsg, 1);
 					break;
 				}
 				if (rc == LDAP_TIMEOUT ||
@@ -2302,9 +2318,9 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						(void) __s_api_removeServer(
 						    cookie->conn->serverAddr);
 					if (cookie->connectionId > -1) {
-							DropConnection(
-							cookie->connectionId,
-							NS_LDAP_NEW_CONN);
+						DropConnection(
+						    cookie->connectionId,
+						    NS_LDAP_NEW_CONN);
 						cookie->connectionId = -1;
 					}
 					cookie->err_from_result = 1;
@@ -2325,8 +2341,8 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			/* get account management response control */
 			if (cookie->nopasswd_acct_mgmt == 1) {
 				rc = ldap_get_entry_controls(cookie->conn->ld,
-					cookie->resultMsg,
-					&(cookie->resultctrl));
+				    cookie->resultMsg,
+				    &(cookie->resultctrl));
 				if (rc != LDAP_SUCCESS) {
 					cookie->new_state = LDAP_ERROR;
 					cookie->err_rc = rc;
@@ -2345,12 +2361,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			break;
 		case MULTI_RESULT:
 			rc = ldap_result(cookie->conn->ld, cookie->msgId,
-				LDAP_MSG_ONE,
-				(struct timeval *)&cookie->search_timeout,
-				&cookie->resultMsg);
+			    LDAP_MSG_ONE,
+			    (struct timeval *)&cookie->search_timeout,
+			    &cookie->resultMsg);
 			if (rc == LDAP_RES_SEARCH_RESULT) {
 				rc = ldap_result2error(cookie->conn->ld,
-					cookie->resultMsg, 0);
+				    cookie->resultMsg, 0);
 				if (rc != LDAP_SUCCESS) {
 					cookie->err_rc = rc;
 					cookie->new_state = LDAP_ERROR;
@@ -2364,7 +2380,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			}
 			/* handle referrals if necessary */
 			if (rc == LDAP_RES_SEARCH_REFERENCE &&
-				cookie->followRef) {
+			    cookie->followRef) {
 				proc_search_references(cookie);
 				(void) ldap_msgfree(cookie->resultMsg);
 				cookie->resultMsg = NULL;
@@ -2377,11 +2393,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					break;
 				case -1:
 					rc = ldap_get_lderrno(cookie->conn->ld,
-						    NULL, NULL);
+					    NULL, NULL);
 					break;
 				default:
 					rc = ldap_result2error(cookie->conn->ld,
-						cookie->resultMsg, 1);
+					    cookie->resultMsg, 1);
 					break;
 				}
 				if (rc == LDAP_TIMEOUT ||
@@ -2390,9 +2406,9 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						(void) __s_api_removeServer(
 						    cookie->conn->serverAddr);
 					if (cookie->connectionId > -1) {
-							DropConnection(
-							cookie->connectionId,
-							NS_LDAP_NEW_CONN);
+						DropConnection(
+						    cookie->connectionId,
+						    NS_LDAP_NEW_CONN);
 						cookie->connectionId = -1;
 					}
 					cookie->err_from_result = 1;
@@ -2425,10 +2441,10 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (cookie->use_usercb && cookie->callback) {
 				rc = 0;
 				for (nextEntry = cookie->result->entry;
-					nextEntry != NULL;
-					nextEntry = nextEntry->next) {
+				    nextEntry != NULL;
+				    nextEntry = nextEntry->next) {
 					rc = (*cookie->callback)(nextEntry,
-						cookie->userdata);
+					    cookie->userdata);
 
 					if (rc == NS_LDAP_CB_DONE) {
 					/* cb doesn't want any more data */
@@ -2467,28 +2483,28 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				 */
 				if (cookie->followRef && cookie->reflist)
 					cookie->new_state =
-						NEXT_REFERRAL;
+					    NEXT_REFERRAL;
 				else
 					cookie->new_state =
-						NEXT_SEARCH_DESCRIPTOR;
+					    NEXT_SEARCH_DESCRIPTOR;
 			break;
 		case NEXT_REFERRAL:
 			/* get next referral info */
 			if (cookie->refpos == NULL)
 				cookie->refpos =
-					cookie->reflist;
+				    cookie->reflist;
 			else
 				cookie->refpos =
-					cookie->refpos->next;
+				    cookie->refpos->next;
 			/* check see if done with all referrals */
 			if (cookie->refpos != NULL)
 				cookie->new_state =
-					GET_REFERRAL_SESSION;
+				    GET_REFERRAL_SESSION;
 			else {
 				__s_api_deleteRefInfo(cookie->reflist);
 				cookie->reflist = NULL;
 				cookie->new_state =
-					NEXT_SEARCH_DESCRIPTOR;
+				    NEXT_SEARCH_DESCRIPTOR;
 			}
 			break;
 		case GET_REFERRAL_SESSION:
@@ -2502,33 +2518,33 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (cookie->err_from_result) {
 				if (cookie->err_rc == LDAP_SERVER_DOWN) {
 					(void) sprintf(errstr,
-						gettext("LDAP ERROR (%d): "
-							"Error occurred during"
-							" receiving results. "
-							"This may be due to a "
-							"stalled connection."),
-							cookie->err_rc);
+					    gettext("LDAP ERROR (%d): "
+					    "Error occurred during"
+					    " receiving results. "
+					    "This may be due to a "
+					    "stalled connection."),
+					    cookie->err_rc);
 				} else if (cookie->err_rc == LDAP_TIMEOUT) {
 					(void) sprintf(errstr,
-						gettext("LDAP ERROR (%d): "
-							"Error occurred during"
-							" receiving results. %s"
-							"."), cookie->err_rc,
-							ldap_err2string(
-							cookie->err_rc));
+					    gettext("LDAP ERROR (%d): "
+					    "Error occurred during"
+					    " receiving results. %s"
+					    "."), cookie->err_rc,
+					    ldap_err2string(
+					    cookie->err_rc));
 				}
 			} else
 				(void) sprintf(errstr,
-					gettext("LDAP ERROR (%d): %s."),
-					cookie->err_rc,
-					ldap_err2string(cookie->err_rc));
+				    gettext("LDAP ERROR (%d): %s."),
+				    cookie->err_rc,
+				    ldap_err2string(cookie->err_rc));
 			err = strdup(errstr);
 			if (cookie->err_from_result) {
 				MKERROR(LOG_WARNING, *errorp, cookie->err_rc,
-					err, NULL);
+				    err, NULL);
 			} else {
 				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
-					err, NULL);
+				    err, NULL);
 			}
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
@@ -2536,11 +2552,11 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 		default:
 		case ERROR:
 			(void) sprintf(errstr,
-				gettext("Internal State machine exit (%d).\n"),
-				cookie->state);
+			    gettext("Internal State machine exit (%d).\n"),
+			    cookie->state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			NULL);
+			    NULL);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (ERROR);
@@ -2554,7 +2570,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	/*NOTREACHED*/
 #if 0
 	(void) sprintf(errstr,
-		gettext("Unexpected State machine error.\n"));
+	    gettext("Unexpected State machine error.\n"));
 	err = strdup(errstr);
 	MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err, NULL);
 	cookie->err_rc = NS_LDAP_INTERNAL;
@@ -2604,7 +2620,7 @@ __ns_ldap_list(
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(flags,
-		&cookie->followRef, errorp);
+	    &cookie->followRef, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		return (rc);
@@ -2612,7 +2628,7 @@ __ns_ldap_list(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-		&sdlist, errorp);
+	    &sdlist, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		*errorp = error;
@@ -2622,14 +2638,14 @@ __ns_ldap_list(
 	if (sdlist == NULL) {
 		/* Create default service Desc */
 		sdlist = (ns_ldap_search_desc_t **)calloc(2,
-					sizeof (ns_ldap_search_desc_t *));
+		    sizeof (ns_ldap_search_desc_t *));
 		if (sdlist == NULL) {
 			delete_search_cookie(cookie);
 			cookie = NULL;
 			return (NS_LDAP_MEMORY);
 		}
 		dptr = (ns_ldap_search_desc_t *)
-				calloc(1, sizeof (ns_ldap_search_desc_t));
+		    calloc(1, sizeof (ns_ldap_search_desc_t));
 		if (dptr == NULL) {
 			free(sdlist);
 			delete_search_cookie(cookie);
@@ -2747,7 +2763,7 @@ __s_api_find_domainname(
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(flags,
-		&cookie->followRef, errorp);
+	    &cookie->followRef, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		return (rc);
@@ -2755,14 +2771,14 @@ __s_api_find_domainname(
 
 	/* Create default service Desc */
 	sdlist = (ns_ldap_search_desc_t **)calloc(2,
-				sizeof (ns_ldap_search_desc_t *));
+	    sizeof (ns_ldap_search_desc_t *));
 	if (sdlist == NULL) {
 		delete_search_cookie(cookie);
 		cookie = NULL;
 		return (NS_LDAP_MEMORY);
 	}
 	dptr = (ns_ldap_search_desc_t *)
-			calloc(1, sizeof (ns_ldap_search_desc_t));
+	    calloc(1, sizeof (ns_ldap_search_desc_t));
 	if (dptr == NULL) {
 		free(sdlist);
 		delete_search_cookie(cookie);
@@ -2797,7 +2813,7 @@ __s_api_find_domainname(
 		rc = NS_LDAP_NOTFOUND;
 	if (rc == NS_LDAP_SUCCESS) {
 		value = __ns_ldap_getAttr(cookie->result->entry,
-			_NIS_DOMAIN);
+		    _NIS_DOMAIN);
 		if (value[0])
 			*domainname = strdup(value[0]);
 		else
@@ -2839,7 +2855,7 @@ __ns_ldap_firstEntry(
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-			&sdlist, errorp);
+	    &sdlist, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		*errorp = error;
 		return (rc);
@@ -2847,12 +2863,12 @@ __ns_ldap_firstEntry(
 	if (sdlist == NULL) {
 		/* Create default service Desc */
 		sdlist = (ns_ldap_search_desc_t **)calloc(2,
-					sizeof (ns_ldap_search_desc_t *));
+		    sizeof (ns_ldap_search_desc_t *));
 		if (sdlist == NULL) {
 			return (NS_LDAP_MEMORY);
 		}
 		dptr = (ns_ldap_search_desc_t *)
-				calloc(1, sizeof (ns_ldap_search_desc_t));
+		    calloc(1, sizeof (ns_ldap_search_desc_t));
 		if (dptr == NULL) {
 			free(sdlist);
 			return (NS_LDAP_MEMORY);
@@ -2868,7 +2884,7 @@ __ns_ldap_firstEntry(
 			}
 			if (sdlist) {
 				(void) __ns_ldap_freeSearchDescriptors(
-					&sdlist);
+				    &sdlist);
 
 				sdlist = NULL;
 			}
@@ -2908,7 +2924,7 @@ __ns_ldap_firstEntry(
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(flags,
-		&cookie->followRef, errorp);
+	    &cookie->followRef, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		delete_search_cookie(cookie);
 		return (rc);
@@ -3037,7 +3053,7 @@ __ns_ldap_endEntry(
 	cookie->result = NULL;
 
 	/* Complete search */
-	rc = search_state_machine(cookie, EXIT, 0);
+	rc = search_state_machine(cookie, CLEAR_RESULTS, 0);
 
 	/* Copy results back to user */
 	rc = cookie->err_rc;
@@ -3109,8 +3125,8 @@ __ns_ldap_auth(const ns_cred_t *auth,
 		return (NS_LDAP_INVALID_PARAM);
 
 	rc = __s_api_getConnection(NULL, flags | NS_LDAP_NEW_CONN,
-			auth, &connectionId, &conp, errorp,
-			do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
+	    auth, &connectionId, &conp, errorp,
+	    do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
 	if (rc == NS_LDAP_OP_FAILED && *errorp)
 		(void) __ns_ldap_freeError(errorp);
 
@@ -3217,10 +3233,10 @@ __ns_ldap_uid2dn(const char *uid,
 	 * hence the use of NS_LDAP_NOT_CVT_DN in flags
 	 */
 	rc = __ns_ldap_list("passwd", filter,
-				__s_api_merge_SSD_filter,
-				NULL, cred, NS_LDAP_NOT_CVT_DN,
-				&result, errorp, NULL,
-				userdata);
+	    __s_api_merge_SSD_filter,
+	    NULL, cred, NS_LDAP_NOT_CVT_DN,
+	    &result, errorp, NULL,
+	    userdata);
 	free(filter);
 	filter = NULL;
 	free(userdata);
@@ -3237,9 +3253,9 @@ __ns_ldap_uid2dn(const char *uid,
 		result = NULL;
 		*userDN = NULL;
 		(void) sprintf(errstr,
-			gettext("Too many entries are returned for %s"), uid);
+		    gettext("Too many entries are returned for %s"), uid);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_INTERNAL);
 	}
 
@@ -3295,10 +3311,10 @@ __ns_ldap_host2dn(const char *host,
 	 * hence the use of NS_LDAP_NOT_CVT_DN in flags
 	 */
 	rc = __ns_ldap_list("hosts", filter,
-				__s_api_merge_SSD_filter,
-				NULL, cred, NS_LDAP_NOT_CVT_DN, &result,
-				errorp, NULL,
-				userdata);
+	    __s_api_merge_SSD_filter,
+	    NULL, cred, NS_LDAP_NOT_CVT_DN, &result,
+	    errorp, NULL,
+	    userdata);
 	free(filter);
 	filter = NULL;
 	free(userdata);
@@ -3316,9 +3332,9 @@ __ns_ldap_host2dn(const char *host,
 		result = NULL;
 		*hostDN = NULL;
 		(void) sprintf(errstr,
-			gettext("Too many entries are returned for %s"), host);
+		    gettext("Too many entries are returned for %s"), host);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_INTERNAL);
 	}
 
@@ -3379,7 +3395,7 @@ __ns_ldap_dn2domain(const char *dn,
 	for (i = 0; rdns[i]; i++) {
 		dns[i] = newdn + strlen(newdn);
 		(void) strcat(newdn,
-			__s_api_remove_rdn_space(rdns[i]));
+		    __s_api_remove_rdn_space(rdns[i]));
 		(void) strcat(newdn, ",");
 	}
 	/* remove the last ',' */
@@ -3399,13 +3415,13 @@ __ns_ldap_dn2domain(const char *dn,
 		 *  try cache manager first
 		 */
 		rc = __s_api_get_cachemgr_data(NS_CACHE_DN2DOMAIN,
-				dns[i], domain);
+		    dns[i], domain);
 		if (rc != NS_LDAP_SUCCESS) {
 			/*
 			 *  try ldap server second
 			 */
 			rc = __s_api_find_domainname(dns[i], domain,
-				cred, errorp);
+			    cred, errorp);
 		} else {
 			/*
 			 * skip the last one,
@@ -3420,9 +3436,9 @@ __ns_ldap_dn2domain(const char *dn,
 			 */
 			for (j = 0; j <= i; j++) {
 				(void) __s_api_set_cachemgr_data(
-					NS_CACHE_DN2DOMAIN,
-					dns[j],
-					*domain);
+				    NS_CACHE_DN2DOMAIN,
+				    dns[j],
+				    *domain);
 			}
 			break;
 		}
@@ -3456,7 +3472,7 @@ __ns_ldap_getServiceAuthMethods(const char *service,
 	*errorp = NULL;
 
 	if ((service == NULL) || (service[0] == '\0') ||
-		(auth == NULL))
+	    (auth == NULL))
 		return (NS_LDAP_INVALID_PARAM);
 
 	*auth = NULL;
@@ -3482,7 +3498,7 @@ __ns_ldap_getServiceAuthMethods(const char *service,
 		send = srv;
 		srv++;
 		for (max = 1; (send = strchr(++send, SEMITOK)) != NULL;
-			max++) {}
+		    max++) {}
 		authpp = (ns_auth_t **)calloc(++max, sizeof (ns_auth_t *));
 		if (authpp == NULL) {
 			(void) __ns_ldap_freeParam(&param);
@@ -3499,9 +3515,10 @@ __ns_ldap_getServiceAuthMethods(const char *service,
 			if (i == -1) {
 				(void) __ns_ldap_freeParam(&param);
 				(void) sprintf(errstr,
-		gettext("Unsupported serviceAuthenticationMethod: %s.\n"), srv);
+				gettext("Unsupported "
+				    "serviceAuthenticationMethod: %s.\n"), srv);
 				MKERROR(LOG_WARNING, *errorp, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				__s_api_release_config(cfg);
 				return (NS_LDAP_CONFIG);
 			}
@@ -4147,9 +4164,9 @@ unescape_filterval(char *val)
 				}
 			}
 			if (firstdigit) {
-			    firstdigit = 0;
+				firstdigit = 0;
 			} else {
-			    escape = 0;
+				escape = 0;
 			}
 
 		} else if (*s != '\\') {
@@ -4301,7 +4318,7 @@ parse_acct_cont_resp_msg(LDAPControl **ectrls, AcctUsableResponse_t *acctResp)
 
 	for (i = 0; ectrls[i] != NULL; i++) {
 		if (strcmp(ectrls[i]->ldctl_oid, NS_LDAP_ACCOUNT_USABLE_CONTROL)
-			== 0)
+		    == 0)
 			goto found;
 		/* We have found some other control, ignore & continue */
 	}
@@ -4321,28 +4338,28 @@ found:
 	switch (tag) {
 		case 0: acctResp->choice = 0;
 			if (ber_scanf(ber, "i", &seconds_before_expiry)
-				== LBER_ERROR) {
+			    == LBER_ERROR) {
 				/* Ldap decoding error */
 				ber_free(ber, 1);
 				return (NS_LDAP_INTERNAL);
 			}
 			(acctResp->AcctUsableResp).seconds_before_expiry =
-				seconds_before_expiry;
+			    seconds_before_expiry;
 			ber_free(ber, 1);
 			return (NS_LDAP_SUCCESS);
 		case 1: acctResp->choice = 1;
 			if (ber_scanf(ber, "{bbb", &inactive, &reset, &expired)
-				== LBER_ERROR) {
+			    == LBER_ERROR) {
 				/* Ldap decoding error */
 				ber_free(ber, 1);
 				return (NS_LDAP_INTERNAL);
 			}
 			(acctResp->AcctUsableResp).more_info.inactive =
-				inactive;
+			    inactive;
 			(acctResp->AcctUsableResp).more_info.reset =
-				reset;
+			    reset;
 			(acctResp->AcctUsableResp).more_info.expired =
-				expired;
+			    expired;
 			break;
 		default: /* Ldap decoding error */
 			ber_free(ber, 1);
@@ -4360,7 +4377,7 @@ found:
 				return (NS_LDAP_INTERNAL);
 			}
 			(acctResp->AcctUsableResp).more_info.rem_grace =
-				rem_grace;
+			    rem_grace;
 			if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
 				ber_free(ber, 1);
 				return (NS_LDAP_SUCCESS);
@@ -4375,7 +4392,7 @@ timeb4unlock:
 				return (NS_LDAP_INTERNAL);
 			}
 			(acctResp->AcctUsableResp).more_info.sec_b4_unlock =
-				sec_b4_unlock;
+			    sec_b4_unlock;
 			break;
 		default:
 unknowntag:
@@ -4420,7 +4437,7 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(0,
-		&cookie->followRef, &error);
+	    &cookie->followRef, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		(void) __ns_ldap_freeError(&error);
 		goto out;
@@ -4428,7 +4445,7 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
-		&sdlist, &error);
+	    &sdlist, &error);
 	if (rc != NS_LDAP_SUCCESS) {
 		(void) __ns_ldap_freeError(&error);
 		goto out;
@@ -4437,13 +4454,13 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 	if (sdlist == NULL) {
 		/* Create default service Desc */
 		sdlist = (ns_ldap_search_desc_t **)calloc(2,
-				sizeof (ns_ldap_search_desc_t *));
+		    sizeof (ns_ldap_search_desc_t *));
 		if (sdlist == NULL) {
 			rc = NS_LDAP_MEMORY;
 			goto out;
 		}
 		dptr = (ns_ldap_search_desc_t *)
-				calloc(1, sizeof (ns_ldap_search_desc_t));
+		    calloc(1, sizeof (ns_ldap_search_desc_t));
 		if (dptr == NULL) {
 			free(sdlist);
 			rc = NS_LDAP_MEMORY;
@@ -4514,7 +4531,7 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 			goto out;
 
 	if ((rc = parse_acct_cont_resp_msg(cookie->resultctrl, acctResp))
-		!= NS_LDAP_SUCCESS)
+	    != NS_LDAP_SUCCESS)
 		goto out;
 
 	rc = NS_LDAP_SUCCESS;

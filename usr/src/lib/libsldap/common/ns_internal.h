@@ -514,7 +514,8 @@ typedef enum {
 	GET_REFERRAL_SESSION	= 18,
 	ERROR			= 19,
 	LDAP_ERROR		= 20,
-	GET_ACCT_MGMT_INFO	= 21
+	GET_ACCT_MGMT_INFO	= 21,
+	CLEAR_RESULTS		= 22
 } ns_state_t;
 
 /*
