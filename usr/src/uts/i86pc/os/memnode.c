@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,7 +151,7 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 	if (!cancelled) {
 		delta_pgcnt = end - start;
 		node_size = mem_node_config[mnode].physmax -
-				mem_node_config[mnode].physbase;
+		    mem_node_config[mnode].physbase;
 
 		if (node_size > delta_pgcnt) {
 			/*
@@ -232,7 +231,7 @@ mem_node_alloc()
 	 */
 	for (mnode = 0; mnode < max_mem_nodes; mnode++)
 		if (cas32((uint32_t *)&mem_node_config[mnode].exists,
-			0, 1) == 0)
+		    0, 1) == 0)
 			break;
 
 	if (mnode >= max_mem_nodes)
@@ -273,7 +272,7 @@ mem_node_memlist_pages(int mnode, struct memlist *mlist)
 	for (pmem = mlist; pmem; pmem = pmem->next) {
 		cur_base = btop(pmem->address);
 		cur_end = cur_base + btop(pmem->size) - 1;
-		if (end <= cur_base || base >= cur_end)
+		if (end < cur_base || base > cur_end)
 			continue;
 		npgs = npgs + (MIN(cur_end, end) -
 		    MAX(cur_base, base)) + 1;

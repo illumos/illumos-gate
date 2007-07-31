@@ -335,7 +335,7 @@ kcage_next_range(int incage, pfn_t lo, pfn_t hi,
 	rw_enter(&kcage_range_rwlock, RW_READER);
 
 	for (lp = incage ? kcage_glist : kcage_current_glist;
-		lp != NULL; lp = lp->next) {
+	    lp != NULL; lp = lp->next) {
 
 		pfn_t klo, khi;
 
@@ -886,7 +886,7 @@ kcage_recalc_preferred_size(pgcnt_t preferred_size)
 			    segkmem_heaplp_quantum), 0x40000000UL) / PAGESIZE;
 		}
 		kcage_kmemlp_mincage = MIN(lpmincage,
-			    (segkmem_kmemlp_max / PAGESIZE));
+		    (segkmem_kmemlp_max / PAGESIZE));
 		preferred_size = MAX(kcage_kmemlp_mincage, preferred_size);
 	}
 	return (preferred_size);
@@ -1006,11 +1006,7 @@ kcage_init(pgcnt_t preferred_size)
 	 */
 	if (SEGKMEM_USE_LARGEPAGES) {
 		extern void page_freelist_coalesce_all(int mnode);
-		extern int max_mem_nodes;
-		int mnode, max_mnodes = max_mem_nodes;
-		for (mnode = 0; mnode < max_mnodes; mnode++) {
-			page_freelist_coalesce_all(mnode);
-		}
+		page_freelist_coalesce_all(-1);	/* do all mnodes */
 	}
 
 	ksp = kstat_create("kcage", 0, "kcage_page_list", "misc",
@@ -1288,7 +1284,7 @@ kcage_freemem_add(pgcnt_t npages)
 	wakeup_pcgs();  /* wakeup threads in pcgs() */
 
 	if (kcage_needfree != 0 &&
-		kcage_freemem >= (kcage_throttlefree + kcage_needfree)) {
+	    kcage_freemem >= (kcage_throttlefree + kcage_needfree)) {
 
 		mutex_enter(&kcage_throttle_mutex);
 		cv_broadcast(&kcage_throttle_cv);
@@ -1467,7 +1463,7 @@ kcage_expand()
 	 * have enough free pages to page_relocate() even a single page.
 	 */
 	wanted = MAX(kcage_lotsfree, kcage_throttlefree + kcage_needfree)
-		- kcage_freemem;
+	    - kcage_freemem;
 	if (wanted <= 0)
 		return (0);
 	else if (freemem < pageout_reserve + 1) {
@@ -1683,7 +1679,7 @@ kcage_cageout()
 #endif
 
 	CALLB_CPR_INIT(&cprinfo, &kcage_cageout_mutex,
-		callb_generic_cpr, "cageout");
+	    callb_generic_cpr, "cageout");
 
 	mutex_enter(&kcage_cageout_mutex);
 	kcage_cageout_thread = curthread;
@@ -1724,7 +1720,7 @@ again:
 	pages_skipped = 0;
 	shared_skipped = 0;
 	while ((kcage_freemem < kcage_lotsfree || kcage_needfree) &&
-		(pfn = kcage_walk_cage(pfn == PFN_INVALID)) != PFN_INVALID) {
+	    (pfn = kcage_walk_cage(pfn == PFN_INVALID)) != PFN_INVALID) {
 
 		if (start_pfn == PFN_INVALID)
 			start_pfn = pfn;
@@ -1820,7 +1816,7 @@ again:
 			 * In pass {0, 1, 2}, skip page if mod bit is set.
 			 */
 			prm = hat_pagesync(pp,
-				HAT_SYNC_DONTZERO | HAT_SYNC_STOPON_MOD);
+			    HAT_SYNC_DONTZERO | HAT_SYNC_STOPON_MOD);
 
 			/* On first pass ignore ref'd pages */
 			if (pass <= 1 && (prm & P_REF)) {
@@ -1833,7 +1829,7 @@ again:
 			/* On pass 2, page_destroy if mod bit is not set */
 			if (pass <= 2) {
 				if (pp->p_szc != 0 || (prm & P_MOD) ||
-					pp->p_lckcnt || pp->p_cowcnt) {
+				    pp->p_lckcnt || pp->p_cowcnt) {
 					pages_skipped = 1;
 					page_unlock(pp);
 				} else {
@@ -1843,7 +1839,7 @@ again:
 					 * checking if mod bit is set
 					 */
 					(void) hat_pageunload(pp,
-						HAT_FORCE_PGUNLOAD);
+					    HAT_FORCE_PGUNLOAD);
 
 					/*
 					 * skip this page if modified

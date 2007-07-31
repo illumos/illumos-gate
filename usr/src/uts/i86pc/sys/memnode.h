@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,9 +49,6 @@ extern "C" {
 
 #define	PFN_2_MEM_NODE(pfn)			\
 	((max_mem_nodes > 1) ? plat_pfn_to_mem_node(pfn) : 0)
-
-#define	LGRPHAND_2_MEM_NODE(lgrp_plat_hand)	\
-	((max_mem_nodes > 1) ? plat_lgrphand_to_mem_node(lgrp_plat_hand) : 0)
 
 #define	MEM_NODE_2_LGRPHAND(mnode)		\
 	((max_mem_nodes > 1) ? plat_mem_node_to_lgrphand(mnode) : \
@@ -89,7 +85,6 @@ extern void mem_node_pre_del_slice(pfn_t, pfn_t);
 extern void mem_node_post_del_slice(pfn_t, pfn_t, int);
 extern int mem_node_alloc(void);
 extern pgcnt_t mem_node_memlist_pages(int, struct memlist *);
-
 
 extern struct mem_node_conf	mem_node_config[];
 extern uint64_t			mem_node_physalign;

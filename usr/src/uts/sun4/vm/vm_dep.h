@@ -107,6 +107,92 @@ extern kmutex_t	*fpc_mutex[NPC_MUTEX];
 extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 
 /*
+ * Iterator provides the info needed to convert RA to PA.
+ * MEM_NODE_ITERATOR_INIT() should be called before
+ * PAGE_NEXT_PFN_FOR_COLOR() if pfn was not obtained via a previous
+ * PAGE_NEXT_PFN_FOR_COLOR() call. Iterator caches color 2 hash
+ * translations requiring initializer call if color or ceq_mask changes,
+ * even if pfn doesn't. MEM_NODE_ITERATOR_INIT() must also be called before
+ * PFN_2_COLOR() that uses a valid iterator argument.
+ */
+#ifdef	sun4v
+
+typedef struct mem_node_iterator {
+	uint_t mi_mnode;		/* mnode in which to iterate */
+	int mi_init;			/* set to 1 when first init */
+	int mi_last_mblock;		/* last mblock visited */
+	uint_t mi_hash_ceq_mask;	/* cached copy of ceq_mask */
+	uint_t mi_hash_color;		/* cached copy of color */
+	uint_t mi_mnode_mask;		/* number of mask bits */
+	uint_t mi_mnode_pfn_shift;	/* mnode position in pfn */
+	pfn_t mi_mblock_base;		/* first valid pfn in current mblock */
+	pfn_t mi_mblock_end;		/* last valid pfn in current mblock */
+	pfn_t mi_ra_to_pa;		/* ra adjustment for current mblock */
+	pfn_t mi_mnode_pfn_mask;	/* mask to obtain mnode id bits */
+} mem_node_iterator_t;
+
+#define	MEM_NODE_ITERATOR_DECL(it) \
+	mem_node_iterator_t it
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it) \
+	(pfn) = plat_mem_node_iterator_init((pfn), (mnode), (it), 1)
+
+extern pfn_t plat_mem_node_iterator_init(pfn_t, int,
+    mem_node_iterator_t *, int);
+extern pfn_t plat_rapfn_to_papfn(pfn_t);
+extern int interleaved_mnodes;
+
+#else	/* sun4v */
+
+#define	MEM_NODE_ITERATOR_DECL(it) \
+	void *it = NULL
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it)
+
+#endif	/* sun4v */
+
+/*
+ * Return the mnode limits so that hpc_counters length and base
+ * index can be determined. When interleaved_mnodes is set, we
+ * create an array only for the first mnode that exists. All other
+ * mnodes will share the array in this case.
+ * If interleaved_mnodes is not set, simply return the limits for
+ * the given mnode.
+ */
+#define	HPM_COUNTERS_LIMITS(mnode, physbase, physmax, first)		\
+	if (!interleaved_mnodes) {					\
+		(physbase) = mem_node_config[(mnode)].physbase;		\
+		(physmax) = mem_node_config[(mnode)].physmax;		\
+		(first) = (mnode);					\
+	} else if ((first) < 0) {					\
+		mem_node_max_range(&(physbase), &(physmax));		\
+		(first) = (mnode);					\
+	}
+
+#define	PAGE_CTRS_WRITE_LOCK(mnode)					\
+	if (!interleaved_mnodes) {					\
+		rw_enter(&page_ctrs_rwlock[(mnode)], RW_WRITER);	\
+		page_freelist_lock(mnode);				\
+	} else {							\
+		/* changing shared hpm_counters */			\
+		int _i;							\
+		for (_i = 0; _i < max_mem_nodes; _i++) {		\
+			rw_enter(&page_ctrs_rwlock[_i], RW_WRITER);	\
+			page_freelist_lock(_i);				\
+		}							\
+	}
+
+#define	PAGE_CTRS_WRITE_UNLOCK(mnode)					\
+	if (!interleaved_mnodes) {					\
+		page_freelist_unlock(mnode);				\
+		rw_exit(&page_ctrs_rwlock[(mnode)]);			\
+	} else {							\
+		int _i;							\
+		for (_i = 0; _i < max_mem_nodes; _i++) {		\
+			page_freelist_unlock(_i);			\
+			rw_exit(&page_ctrs_rwlock[_i]);			\
+		}							\
+	}
+
+/*
  * cpu specific color conversion functions
  */
 extern uint_t page_get_nsz_color_mask_cpu(uchar_t, uint_t);
@@ -118,11 +204,14 @@ extern uint_t page_get_nsz_color_cpu(uchar_t, uint_t);
 extern uint_t page_get_color_shift_cpu(uchar_t, uchar_t);
 #pragma weak page_get_color_shift_cpu
 
+extern uint_t page_convert_color_cpu(uint_t, uchar_t, uchar_t);
+#pragma weak page_convert_color_cpu
+
 extern pfn_t page_next_pfn_for_color_cpu(pfn_t,
-    uchar_t, uint_t, uint_t, uint_t);
+    uchar_t, uint_t, uint_t, uint_t, void *);
 #pragma weak page_next_pfn_for_color_cpu
 
-extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
+extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t, void *);
 #pragma weak page_pfn_2_color_cpu
 
 #define	PAGE_GET_COLOR_SHIFT(szc, nszc)				\
@@ -131,9 +220,14 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
 	    (hw_page_array[(nszc)].hp_shift -			\
 		hw_page_array[(szc)].hp_shift))
 
-#define	PFN_2_COLOR(pfn, szc)					\
+#define	PAGE_CONVERT_COLOR(ncolor, szc, nszc)			\
+	((&page_convert_color_cpu != NULL) ?			\
+	    page_convert_color_cpu(ncolor, szc, nszc) :		\
+	    ((ncolor) << PAGE_GET_COLOR_SHIFT((szc), (nszc))))
+
+#define	PFN_2_COLOR(pfn, szc, it)				\
 	((&page_pfn_2_color_cpu != NULL) ?			\
-	    page_pfn_2_color_cpu(pfn, szc) :			\
+	    page_pfn_2_color_cpu(pfn, szc, it) :		\
 	    ((pfn & (hw_page_array[0].hp_colors - 1)) >>	\
 		(hw_page_array[szc].hp_shift -			\
 		    hw_page_array[0].hp_shift)))
@@ -151,7 +245,7 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
  * This macro calculates the next sequential pfn with the specified
  * color using color equivalency mask
  */
-#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask)        \
+#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask, it)    \
 	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
 	if (&page_next_pfn_for_color_cpu == NULL) {                           \
 		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
@@ -165,8 +259,8 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
 			pfn = (pfn > spfn ? pfn : pfn + stride) << pfn_shift; \
 		}                                                             \
 	} else {                                                              \
-		pfn = page_next_pfn_for_color_cpu(pfn, szc, color,	      \
-		    ceq_mask, color_mask);                                    \
+	    pfn = page_next_pfn_for_color_cpu(pfn, szc, color,		      \
+		ceq_mask, color_mask, it);				      \
 	}
 
 /* get the color equivalency mask for the next szc */
@@ -182,7 +276,7 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
 	    page_get_nsz_color_cpu(szc, color))
 
 /* Find the bin for the given page if it was of size szc */
-#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc))
+#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc, (void *)(-1)))
 
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
@@ -335,16 +429,31 @@ typedef	struct {
  * when memory is added (kphysm_add_memory_dynamic) or deleted
  * (kphysm_del_cleanup).
  */
-#define	PLCNT_MODIFY_MAX(startpfn, cnt) {				\
-	pfn_t	pfn = startpfn, endpfn = startpfn + ABS(cnt);		\
-	while (pfn < endpfn) {						\
-		int mn = PFN_2_MEM_NODE(pfn);				\
-		long inc = MIN(endpfn, mem_node_config[mn].physmax + 1)	\
-		    - pfn;						\
-		pfn += inc;						\
-		atomic_add_long(&plcnt[mn][MTYPE_RELOC].plc_mt_pgmax, 	\
-		    ((cnt) < 0) ? -inc: inc);				\
-	}								\
+#define	PLCNT_MODIFY_MAX(pfn, cnt) {					       \
+	spgcnt_t _cnt = (spgcnt_t)(cnt);				       \
+	pgcnt_t _acnt = ABS(_cnt);					       \
+	int _mn;							       \
+	pgcnt_t _np;							       \
+	if (&plat_mem_node_intersect_range != NULL) {			       \
+		for (_mn = 0; _mn < max_mem_nodes; _mn++) {		       \
+			plat_mem_node_intersect_range((pfn), _acnt, _mn, &_np);\
+			if (_np == 0)					       \
+				continue;				       \
+			atomic_add_long(&plcnt[_mn][MTYPE_RELOC].plc_mt_pgmax, \
+			    (_cnt < 0) ? -_np : _np);			       \
+		}							       \
+	} else {							       \
+		pfn_t _pfn = (pfn);					       \
+		pfn_t _endpfn = _pfn + _acnt;				       \
+		while (_pfn < _endpfn) {				       \
+			_mn = PFN_2_MEM_NODE(_pfn);			       \
+			_np = MIN(_endpfn, mem_node_config[_mn].physmax + 1) - \
+			    _pfn;					       \
+			_pfn += _np;					       \
+			atomic_add_long(&plcnt[_mn][MTYPE_RELOC].plc_mt_pgmax, \
+			    (_cnt < 0) ? -_np : _np);			       \
+		}							       \
+	}								       \
 }
 
 extern plcnt_t	plcnt;
@@ -495,17 +604,17 @@ switch (consistent_coloring) {						\
 			(vac_shift - MMU_PAGESHIFT));			\
 		if ((szc) == 0 || &page_pfn_2_color_cpu == NULL) {	\
 			pfn += slew;					\
-			bin = PFN_2_COLOR(pfn, szc);			\
+			bin = PFN_2_COLOR(pfn, szc, NULL);		\
 		} else {						\
-			bin = PFN_2_COLOR(pfn, szc);			\
+			bin = PFN_2_COLOR(pfn, szc, NULL);		\
 			bin += slew >> (vac_shift - MMU_PAGESHIFT);	\
 			bin &= hw_page_array[(szc)].hp_colors - 1;	\
 		}							\
 		break;                                                  \
 	}                                                               \
 	case 1:                                                         \
-		bin = PFN_2_COLOR(((uintptr_t)addr >> MMU_PAGESHIFT),   \
-					szc);	                        \
+		bin = PFN_2_COLOR(((uintptr_t)addr >> MMU_PAGESHIFT),	\
+		    szc, NULL);						\
 		break;                                                  \
 	case 2: {                                                       \
 		int cnt = as_color_bin(as);				\

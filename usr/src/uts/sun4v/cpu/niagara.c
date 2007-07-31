@@ -193,9 +193,10 @@ cpu_map_exec_units(struct cpu *cp)
 
 	/*
 	 * Niagara systems just have one chip. Therefore, the chip id
-	 * is always 0.
+	 * mpipe id are always 0.
 	 */
 	cp->cpu_m.cpu_chip = 0;
+	cp->cpu_m.cpu_mpipe = 0;
 }
 
 static int niagara_cpucnt;

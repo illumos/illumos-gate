@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +82,7 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 		end = roundup(end, btop(mem_node_physalign)) - 1;
 	}
 
-	if (&plat_slice_add)
+	if (&plat_slice_add != NULL)
 		plat_slice_add(start, end);
 
 	mnode = PFN_2_MEM_NODE(start);
@@ -148,7 +147,7 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 	if (!cancelled) {
 		delta_pgcnt = end - start;
 		node_size = mem_node_config[mnode].physmax -
-				mem_node_config[mnode].physbase;
+		    mem_node_config[mnode].physbase;
 
 		if (node_size > delta_pgcnt) {
 			/*
@@ -180,7 +179,7 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 			mem_node_config[mnode].exists = 0;
 		}
 
-		if (&plat_slice_del)
+		if (&plat_slice_del != NULL)
 			plat_slice_del(start, end);
 	}
 }
@@ -195,7 +194,7 @@ startup_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	/* LINTED: ASSERT will always true or false */
 	ASSERT(NBBY * sizeof (mnodeset_t) >= max_mem_nodes);
 
-	if (&plat_build_mem_nodes) {
+	if (&plat_build_mem_nodes != NULL) {
 		plat_build_mem_nodes(list, nelems);
 	} else {
 		/*
@@ -226,7 +225,7 @@ mem_node_alloc()
 	 */
 	for (mnode = 0; mnode < max_mem_nodes; mnode++)
 		if (cas32((uint32_t *)&mem_node_config[mnode].exists,
-			0, 1) == 0)
+		    0, 1) == 0)
 			break;
 
 	if (mnode >= max_mem_nodes)
@@ -247,27 +246,39 @@ mem_node_alloc()
  * Find the intersection between a memnode and a memlist
  * and returns the number of pages that overlap.
  *
- * Assumes the list is protected from DR operations by
- * the memlist lock.
+ * Grab the memlist lock to protect the list from DR operations.
  */
 pgcnt_t
 mem_node_memlist_pages(int mnode, struct memlist *mlist)
 {
 	pfn_t		base, end;
 	pfn_t		cur_base, cur_end;
-	pgcnt_t		npgs;
+	pgcnt_t		npgs = 0;
+	pgcnt_t		pages;
 	struct memlist	*pmem;
+
+	if (&plat_mem_node_intersect_range != NULL) {
+		memlist_read_lock();
+
+		for (pmem = mlist; pmem; pmem = pmem->next) {
+			plat_mem_node_intersect_range(btop(pmem->address),
+			    btop(pmem->size), mnode, &pages);
+			npgs += pages;
+		}
+
+		memlist_read_unlock();
+		return (npgs);
+	}
 
 	base = mem_node_config[mnode].physbase;
 	end = mem_node_config[mnode].physmax;
-	npgs = 0;
 
 	memlist_read_lock();
 
 	for (pmem = mlist; pmem; pmem = pmem->next) {
 		cur_base = btop(pmem->address);
 		cur_end = cur_base + btop(pmem->size) - 1;
-		if (end <= cur_base || base >= cur_end)
+		if (end < cur_base || base > cur_end)
 			continue;
 		npgs = npgs + (MIN(cur_end, end) -
 		    MAX(cur_base, base)) + 1;
@@ -276,4 +287,35 @@ mem_node_memlist_pages(int mnode, struct memlist *mlist)
 	memlist_read_unlock();
 
 	return (npgs);
+}
+
+/*
+ * Find MIN(physbase) and MAX(physmax) over all mnodes
+ *
+ * Called during startup and DR to find hpm_counters limits when
+ * interleaved_mnodes is set.
+ * NOTE: there is a race condition with DR if it tries to change more than
+ * one mnode in parallel. Sizing shared hpm_counters depends on finding the
+ * min(physbase) and max(physmax) across all mnodes. Therefore, the caller of
+ * page_ctrs_adjust must ensure that mem_node_config does not change while it
+ * is running.
+ */
+void
+mem_node_max_range(pfn_t *basep, pfn_t *maxp)
+{
+	int mnode;
+	pfn_t max = 0;
+	pfn_t base = (pfn_t)-1;
+
+	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
+		if (mem_node_config[mnode].exists == 0)
+			continue;
+		if (max < mem_node_config[mnode].physmax)
+			max = mem_node_config[mnode].physmax;
+		if (base > mem_node_config[mnode].physbase)
+			base = mem_node_config[mnode].physbase;
+	}
+	ASSERT(base != (pfn_t)-1 && max != 0);
+	*basep = base;
+	*maxp = max;
 }

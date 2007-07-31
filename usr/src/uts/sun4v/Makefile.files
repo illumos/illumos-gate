@@ -62,6 +62,7 @@ CORE_OBJS +=	mach_xc.o
 CORE_OBJS +=	mem_cage.o
 CORE_OBJS +=	mem_config.o
 CORE_OBJS +=	memlist_new.o
+CORE_OBJS +=	mpo.o
 CORE_OBJS +=	ppage.o
 CORE_OBJS +=	promif_asr.o
 CORE_OBJS +=	promif_cpu.o

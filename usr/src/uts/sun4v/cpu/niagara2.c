@@ -198,9 +198,9 @@ cpu_map_exec_units(struct cpu *cp)
 	 * share the same L2 cache. If no such info is available, we
 	 * set the cpu to belong to the defacto chip 0.
 	 */
-	cp->cpu_m.cpu_chip = cpunodes[cp->cpu_id].l2_cache_mapping;
-	if (cp->cpu_m.cpu_chip == NO_CHIP_MAPPING_FOUND)
-		cp->cpu_m.cpu_chip = 0;
+	cp->cpu_m.cpu_mpipe = cpunodes[cp->cpu_id].l2_cache_mapping;
+	if (cp->cpu_m.cpu_mpipe == NO_L2_CACHE_MAPPING_FOUND)
+		cp->cpu_m.cpu_mpipe = CPU_L2_CACHEID_INVALID;
 }
 
 static int cpucnt;
@@ -283,22 +283,112 @@ cpu_trapstat_data(void *buf, uint_t tstat_pgszs)
 	}
 }
 
+/*
+ * Page coloring support for hashed cache index mode
+ */
+
+/*
+ * Node id bits from machine description (MD).  Node id distinguishes
+ * local versus remote memory. Because of MPO, page allocation does
+ * not cross node boundaries. Therefore, remove the node id bits from
+ * the color, since they are fixed. Either bit 30, or 31:30 in
+ * Victoria Falls processors.
+ * The number of node id bits is always 0 in Niagara2.
+ */
+typedef struct n2color {
+	uchar_t nnbits;	/* number of node id bits */
+	uchar_t nnmask; /* mask for node id bits */
+	uchar_t	lomask;	/* mask for bits below node id */
+	uchar_t lobits;	/* number of bits below node id */
+} n2color_t;
+
+n2color_t n2color[MMU_PAGE_SIZES];
+static uchar_t nhbits[] = {7, 7, 6, 5, 5, 5};
+
+/*
+ * Remove node id bits from color bits 32:28.
+ * This will reduce the number of colors.
+ * No change if number of node bits is zero.
+ */
+static inline uint_t
+n2_hash2color(uint_t color, uchar_t szc)
+{
+	n2color_t m = n2color[szc];
+
+	if (m.nnbits > 0) {
+		color = ((color >> m.nnbits) & ~m.lomask) | (color & m.lomask);
+		ASSERT((color & ~(hw_page_array[szc].hp_colors - 1)) == 0);
+	}
+
+	return (color);
+}
+
+/*
+ * Restore node id bits into page color.
+ * This will increase the number of colors to match N2.
+ * No change if number of node bits is zero.
+ */
+static inline uint_t
+n2_color2hash(uint_t color, uchar_t szc, uint_t node)
+{
+	n2color_t m = n2color[szc];
+
+	if (m.nnbits > 0) {
+		color = ((color & ~m.lomask) << m.nnbits) | (color & m.lomask);
+		color |= (node & m.nnmask) << m.lobits;
+	}
+
+	return (color);
+}
+
 /* NI2 L2$ index is pa[32:28]^pa[17:13].pa[19:18]^pa[12:11].pa[10:6] */
+
+/*
+ * iterator NULL means pfn is VA, do not adjust ra_to_pa
+ * iterator (-1) means pfn is RA, need to convert to PA
+ * iterator non-null means pfn is RA, use ra_to_pa
+ */
 uint_t
-page_pfn_2_color_cpu(pfn_t pfn, uchar_t szc)
+page_pfn_2_color_cpu(pfn_t pfn, uchar_t szc, void *cookie)
+{
+	mem_node_iterator_t *it = cookie;
+	uint_t color;
+
+	ASSERT(szc <= TTE256M);
+
+	if (it == ((mem_node_iterator_t *)(-1))) {
+		pfn = plat_rapfn_to_papfn(pfn);
+	} else if (it != NULL) {
+		ASSERT(pfn >= it->mi_mblock_base && pfn <= it->mi_mblock_end);
+		pfn = pfn + it->mi_ra_to_pa;
+	}
+	pfn = PFN_BASE(pfn, szc);
+	color = ((pfn >> 15) ^ pfn) & 0x1f;
+	if (szc < TTE4M) {
+		/* 19:18 */
+		color = (color << 2) | ((pfn >> 5) & 0x3);
+		if (szc > TTE64K)
+			color >>= 1;    /* 19 */
+	}
+	return (n2_hash2color(color, szc));
+}
+
+static uint_t
+page_papfn_2_color_cpu(pfn_t papfn, uchar_t szc)
 {
 	uint_t color;
 
 	ASSERT(szc <= TTE256M);
 
-	pfn = PFN_BASE(pfn, szc);
-	color = ((pfn >> 15) ^ pfn) & 0x1f;
-	if (szc >= TTE4M)
-		return (color);
-
-	color = (color << 2) | ((pfn >> 5) & 0x3);
-
-	return (szc <= TTE64K ? color : (color >> 1));
+	papfn = PFN_BASE(papfn, szc);
+	color = ((papfn >> 15) ^ papfn) & 0x1f;
+	if (szc < TTE4M) {
+		/* 19:18 */
+		color = (color << 2) | ((papfn >> 5) & 0x3);
+		if (szc > TTE64K)
+			color >>= 1;    /* 19 */
+	}
+	return (color);
 }
 
 #if TTE256M != 5
@@ -310,46 +400,91 @@ page_get_nsz_color_mask_cpu(uchar_t szc, uint_t mask)
 {
 	static uint_t ni2_color_masks[5] = {0x63, 0x1e, 0x3e, 0x1f, 0x1f};
 	ASSERT(szc < TTE256M);
-
+	mask = n2_color2hash(mask, szc, 0);
 	mask &= ni2_color_masks[szc];
-	return ((szc == TTE64K || szc == TTE512K) ? (mask >> 1) : mask);
+	if (szc == TTE64K || szc == TTE512K)
+		mask >>= 1;
+	return (n2_hash2color(mask, szc + 1));
 }
 
 uint_t
 page_get_nsz_color_cpu(uchar_t szc, uint_t color)
 {
 	ASSERT(szc < TTE256M);
-	return ((szc == TTE64K || szc == TTE512K) ? (color >> 1) : color);
+	color = n2_color2hash(color, szc, 0);
+	if (szc == TTE64K || szc == TTE512K)
+		color >>= 1;
+	return (n2_hash2color(color, szc + 1));
 }
 
 uint_t
 page_get_color_shift_cpu(uchar_t szc, uchar_t nszc)
 {
+	uint_t s;
 	ASSERT(nszc >= szc);
 	ASSERT(nszc <= TTE256M);
 
-	if (szc == nszc)
-		return (0);
-	if (szc <= TTE64K)
-		return ((nszc >= TTE4M) ? 2 : ((nszc >= TTE512K) ? 1 : 0));
-	if (szc == TTE512K)
-		return (1);
+	s = nhbits[szc] - n2color[szc].nnbits;
+	s -= nhbits[nszc] - n2color[nszc].nnbits;
 
-	return (0);
+	return (s);
 }
+
+uint_t
+page_convert_color_cpu(uint_t ncolor, uchar_t szc, uchar_t nszc)
+{
+	uint_t color;
+
+	ASSERT(nszc > szc);
+	ASSERT(nszc <= TTE256M);
+	ncolor = n2_color2hash(ncolor, nszc, 0);
+	color = ncolor << (nhbits[szc] - nhbits[nszc]);
+	color = n2_hash2color(color, szc);
+	return (color);
+}
+
+#define	PAPFN_2_MNODE(pfn) \
+	(((pfn) & it->mi_mnode_pfn_mask) >> it->mi_mnode_pfn_shift)
 
 /*ARGSUSED*/
 pfn_t
 page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
-    uint_t ceq_mask, uint_t color_mask)
+    uint_t ceq_mask, uint_t color_mask, void *cookie)
 {
+	mem_node_iterator_t *it = cookie;
 	pfn_t pstep = PNUM_SIZE(szc);
 	pfn_t npfn, pfn_ceq_mask, pfn_color;
 	pfn_t tmpmask, mask = (pfn_t)-1;
+	uint_t pfnmn;
 
 	ASSERT((color & ~ceq_mask) == 0);
+	ASSERT(pfn >= it->mi_mblock_base && pfn <= it->mi_mblock_end);
 
-	if (((page_pfn_2_color_cpu(pfn, szc) ^ color) & ceq_mask) == 0) {
+	/* convert RA to PA for accurate color calculation */
+	if (it->mi_init) {
+		/* first call after it, so cache these values */
+		it->mi_hash_ceq_mask =
+		    n2_color2hash(ceq_mask, szc, it->mi_mnode_mask);
+		it->mi_hash_color =
+		    n2_color2hash(color, szc, it->mi_mnode);
+		it->mi_init = 0;
+	} else {
+		ASSERT(it->mi_hash_ceq_mask ==
+		    n2_color2hash(ceq_mask, szc, it->mi_mnode_mask));
+		ASSERT(it->mi_hash_color ==
+		    n2_color2hash(color, szc, it->mi_mnode));
+	}
+	ceq_mask = it->mi_hash_ceq_mask;
+	color = it->mi_hash_color;
+	pfn += it->mi_ra_to_pa;
+
+	/* restart here when we switch memblocks */
+next_mem_block:
+	if (szc <= TTE64K) {
+		pfnmn = PAPFN_2_MNODE(pfn);
+	}
+	if (((page_papfn_2_color_cpu(pfn, szc) ^ color) & ceq_mask) == 0 &&
+	    (szc > TTE64K || pfnmn == it->mi_mnode)) {
 
 		/* we start from the page with correct color */
 		if (szc >= TTE512K) {
@@ -361,18 +496,19 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 				pfn_ceq_mask = ((ceq_mask & 1) << 6) |
 				    ((ceq_mask >> 1) << 15);
 			}
-			pfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
-			return (pfn);
+			npfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
+			goto done;
 		} else {
 			/*
 			 * We deal 64K or 8K page. Check if we could the
 			 * satisfy the request without changing PA[32:28]
 			 */
 			pfn_ceq_mask = ((ceq_mask & 3) << 5) | (ceq_mask >> 2);
+			pfn_ceq_mask |= it->mi_mnode_pfn_mask;
 			npfn = ADD_MASKED(pfn, pstep, pfn_ceq_mask, mask);
 
 			if ((((npfn ^ pfn) >> 15) & 0x1f) == 0)
-				return (npfn);
+				goto done;
 
 			/*
 			 * for next pfn we have to change bits PA[32:28]
@@ -382,15 +518,14 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 			npfn |= (ceq_mask & color & 3) << 5;
 			pfn_ceq_mask = (szc == TTE8K) ? 0 :
 			    (ceq_mask & 0x1c) << 13;
+			pfn_ceq_mask |= it->mi_mnode_pfn_mask;
 			npfn = ADD_MASKED(npfn, (1 << 15), pfn_ceq_mask, mask);
 
 			/*
 			 * set bits PA[17:13] to match the color
 			 */
-			ceq_mask >>= 2;
-			color = (color >> 2) & ceq_mask;
-			npfn |= ((npfn >> 15) ^ color) & ceq_mask;
-			return (npfn);
+			npfn |= ((npfn >> 15) ^ (color >> 2)) & (ceq_mask >> 2);
+			goto done;
 		}
 	}
 
@@ -405,9 +540,9 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 		} else {
 			/* try get the right color by changing bit PA[19:19] */
 			npfn = pfn + pstep;
-			if (((page_pfn_2_color_cpu(npfn, szc) ^ color) &
+			if (((page_papfn_2_color_cpu(npfn, szc) ^ color) &
 			    ceq_mask) == 0)
-				return (npfn);
+				goto done;
 
 			/* page color is PA[32:28].PA[19:19] */
 			pfn_ceq_mask = ((ceq_mask & 1) << 6) |
@@ -419,34 +554,45 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 		while (npfn <= pfn) {
 			npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask, mask);
 		}
-		return (npfn);
+		goto done;
 	}
 
 	/*
-	 * We deal 64K or 8K page of incorrect color.
+	 *  We deal 64K or 8K page of incorrect color.
 	 * Try correcting color without changing PA[32:28]
 	 */
-
 	pfn_ceq_mask = ((ceq_mask & 3) << 5) | (ceq_mask >> 2);
 	pfn_color = ((color & 3) << 5) | (color >> 2);
-	npfn = (pfn & ~(pfn_t)0x7f);
-	npfn |= (((pfn >> 15) & 0x1f) ^ pfn_color) & pfn_ceq_mask;
-	npfn = (szc == TTE64K) ? (npfn & ~(pfn_t)0x7) : npfn;
+	if (pfnmn == it->mi_mnode) {
+		npfn = (pfn & ~(pfn_t)0x7f);
+		npfn |= (((pfn >> 15) & 0x1f) ^ pfn_color) & pfn_ceq_mask;
+		npfn = (szc == TTE64K) ? (npfn & ~(pfn_t)0x7) : npfn;
 
-	if (((page_pfn_2_color_cpu(npfn, szc) ^ color) & ceq_mask) == 0) {
-
-		/* the color is fixed - find the next page */
-		while (npfn <= pfn) {
-			npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask, mask);
+		if (((page_papfn_2_color_cpu(npfn, szc) ^ color) &
+		    ceq_mask) == 0) {
+			/* the color is fixed - find the next page */
+			pfn_ceq_mask |= it->mi_mnode_pfn_mask;
+			while (npfn <= pfn) {
+				npfn = ADD_MASKED(npfn, pstep, pfn_ceq_mask,
+				    mask);
+			}
+			if ((((npfn ^ pfn) >> 15) & 0x1f) == 0)
+				goto done;
 		}
-		if ((((npfn ^ pfn) >> 15) & 0x1f) == 0)
-			return (npfn);
 	}
 
 	/* to fix the color need to touch PA[32:28] */
 	npfn = (szc == TTE8K) ? ((pfn >> 15) << 15) :
 	    (((pfn >> 18) << 18) | ((color & 0x1c) << 13));
+
+	/* fix mnode if input pfn is in the wrong mnode. */
+	if ((pfnmn = PAPFN_2_MNODE(npfn)) != it->mi_mnode) {
+		npfn += ((it->mi_mnode - pfnmn) & it->mi_mnode_mask) <<
+		    it->mi_mnode_pfn_shift;
+	}
+
 	tmpmask = (szc == TTE8K) ? 0 : (ceq_mask & 0x1c) << 13;
+	tmpmask |= it->mi_mnode_pfn_mask;
 
 	while (npfn <= pfn) {
 		npfn = ADD_MASKED(npfn, (1 << 15), tmpmask, mask);
@@ -456,25 +602,58 @@ page_next_pfn_for_color_cpu(pfn_t pfn, uchar_t szc, uint_t color,
 	npfn |= (((npfn >> 15) & 0x1f) ^ pfn_color) & pfn_ceq_mask;
 	npfn = (szc == TTE64K) ? (npfn & ~(pfn_t)0x7) : npfn;
 
-	ASSERT(((page_pfn_2_color_cpu(npfn, szc) ^ color) & ceq_mask) == 0);
+done:
+	ASSERT(((page_papfn_2_color_cpu(npfn, szc) ^ color) & ceq_mask) == 0);
+	ASSERT(PAPFN_2_MNODE(npfn) == it->mi_mnode);
+
+	/* PA to RA */
+	npfn -= it->mi_ra_to_pa;
+
+	/* check for possible memblock switch */
+	if (npfn > it->mi_mblock_end) {
+		pfn = plat_mem_node_iterator_init(npfn, it->mi_mnode, it, 0);
+		if (pfn == (pfn_t)-1)
+			return (pfn);
+		ASSERT(pfn >= it->mi_mblock_base && pfn <= it->mi_mblock_end);
+		pfn += it->mi_ra_to_pa;
+		goto next_mem_block;
+	}
 
 	return (npfn);
 }
 
 /*
  * init page coloring
+ * VF encodes node_id for an L-group in either bit 30 or 31:30,
+ * which effectively reduces the number of colors available per mnode.
  */
 void
 page_coloring_init_cpu()
 {
 	int i;
+	uchar_t id;
+	uchar_t lo;
+	uchar_t hi;
+	n2color_t m;
+	mem_node_iterator_t it;
+	static uchar_t idmask[] = {0, 0x7, 0x1f, 0x1f, 0x1f, 0x1f};
 
-	hw_page_array[0].hp_colors = 1 << 7;
-	hw_page_array[1].hp_colors = 1 << 7;
-	hw_page_array[2].hp_colors = 1 << 6;
-
-	for (i = 3; i < mmu_page_sizes; i++) {
-		hw_page_array[i].hp_colors = 1 << 5;
+	(void) plat_mem_node_iterator_init(0, 0, &it, 1);
+	for (i = 0; i < mmu_page_sizes; i++) {
+		memset(&m, 0, sizeof (m));
+		id = it.mi_mnode_pfn_mask >> 15;	/* node id mask */
+		id &= idmask[i];
+		lo = lowbit(id);
+		if (lo > 0) {
+			hi = highbit(id);
+			m.nnbits = hi - lo + 1;
+			m.nnmask = (1 << m.nnbits) - 1;
+			lo += nhbits[i] - 5;
+			m.lomask = (1 << (lo - 1)) - 1;
+			m.lobits = lo - 1;
+		}
+		hw_page_array[i].hp_colors = 1 << (nhbits[i] - m.nnbits);
+		n2color[i] = m;
 	}
 }
 
@@ -486,6 +665,7 @@ page_set_colorequiv_arr_cpu(void)
 {
 	static uint_t nequiv_shades_log2[MMU_PAGE_SIZES] = {2, 5, 0, 0, 0, 0};
 
+	nequiv_shades_log2[1] -= n2color[1].nnbits;
 	if (colorequiv > 1) {
 		int i;
 		uint_t sv_a = lowbit(colorequiv) - 1;

@@ -598,6 +598,15 @@ int	lgrp_plat_latency(lgrp_handle_t, lgrp_handle_t);
 lgrp_handle_t	lgrp_plat_root_hand(void);
 void	lgrp_plat_probe(void);
 
+extern uint32_t		lgrp_expand_proc_thresh;
+extern uint32_t		lgrp_expand_proc_diff;
+extern pgcnt_t		lgrp_mem_free_thresh;
+extern uint32_t		lgrp_loadavg_tolerance;
+extern uint32_t		lgrp_loadavg_max_effect;
+extern uint32_t		lgrp_load_thresh;
+extern lgrp_mem_policy_t lgrp_mem_policy_root;
+extern int		tsb_lgrp_affinity;
+
 #endif	/* _KERNEL && _KMEMUSER */
 
 #ifdef	__cplusplus

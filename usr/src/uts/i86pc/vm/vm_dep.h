@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/clock.h>
 #include <vm/hat_pte.h>
 #include <sys/param.h>
+#include <sys/memnode.h>
 
 /*
  * WARNING: vm_dep.h is included by files in common. As such, macros
@@ -285,10 +286,41 @@ extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 extern page_t *page_get_mnode_freelist(int, uint_t, int, uchar_t, uint_t);
 extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 
-#define	PAGE_GET_COLOR_SHIFT(szc, nszc)                          \
+/* mem node iterator is not used on x86 */
+#define	MEM_NODE_ITERATOR_DECL(it)
+#define	MEM_NODE_ITERATOR_INIT(pfn, mnode, it)
+
+/*
+ * interleaved_mnodes mode is never set on x86, therefore,
+ * simply return the limits of the given mnode, which then
+ * determines the length of hpm_counters array for the mnode.
+ */
+#define	HPM_COUNTERS_LIMITS(mnode, physbase, physmax, first) 	\
+	{							\
+		(physbase) = mem_node_config[(mnode)].physbase;	\
+		(physmax) = mem_node_config[(mnode)].physmax;	\
+		(first) = (mnode);				\
+	}
+
+#define	PAGE_CTRS_WRITE_LOCK(mnode)				\
+	{							\
+		rw_enter(&page_ctrs_rwlock[(mnode)], RW_WRITER);\
+		page_freelist_lock(mnode);			\
+	}
+
+#define	PAGE_CTRS_WRITE_UNLOCK(mnode)				\
+	{							\
+		page_freelist_unlock(mnode);			\
+		rw_exit(&page_ctrs_rwlock[(mnode)]);		\
+	}
+
+#define	PAGE_GET_COLOR_SHIFT(szc, nszc)				\
 	    (hw_page_array[(nszc)].hp_shift - hw_page_array[(szc)].hp_shift)
 
-#define	PFN_2_COLOR(pfn, szc)						\
+#define	PAGE_CONVERT_COLOR(ncolor, szc, nszc)			\
+	    ((ncolor) << PAGE_GET_COLOR_SHIFT((szc), (nszc)))
+
+#define	PFN_2_COLOR(pfn, szc, it)					\
 	(((pfn) & page_colors_mask) >>			                \
 	(hw_page_array[szc].hp_shift - hw_page_array[0].hp_shift))
 
@@ -305,7 +337,7 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
  * This macro calculates the next sequential pfn with the specified
  * color using color equivalency mask
  */
-#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask)        \
+#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask, it)    \
 	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
 	{								      \
 		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
@@ -329,7 +361,7 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 	((color) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc)))
 
 /* Find the bin for the given page if it was of size szc */
-#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc))
+#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc, NULL))
 
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 

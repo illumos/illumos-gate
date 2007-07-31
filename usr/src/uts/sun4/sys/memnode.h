@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,15 +65,12 @@ extern "C" {
  * nodes, so the platform can always make everything work.
  */
 
-#ifndef	MAX_MEM_NODES
+#ifndef MAX_MEM_NODES
 #define	MAX_MEM_NODES	(4)
 #endif	/* MAX_MEM_NODES */
 
 #define	PFN_2_MEM_NODE(pfn)			\
 	((max_mem_nodes > 1) ? plat_pfn_to_mem_node(pfn) : 0)
-
-#define	LGRPHAND_2_MEM_NODE(lgrp_plat_hand)	\
-	((max_mem_nodes > 1) ? plat_lgrphand_to_mem_node(lgrp_plat_hand) : 0)
 
 #define	MEM_NODE_2_LGRPHAND(mnode)		\
 	((max_mem_nodes > 1) ? plat_mem_node_to_lgrphand(mnode) : \
@@ -90,12 +86,14 @@ extern void plat_assign_lgrphand_to_mem_node(lgrp_handle_t, int);
 extern lgrp_handle_t plat_mem_node_to_lgrphand(int);
 extern void plat_slice_add(pfn_t, pfn_t);
 extern void plat_slice_del(pfn_t, pfn_t);
+extern void plat_mem_node_intersect_range(pfn_t, pgcnt_t, int, pgcnt_t *);
 
 #pragma	weak plat_pfn_to_mem_node
 #pragma	weak plat_lgrphand_to_mem_node
 #pragma	weak plat_mem_node_to_lgrphand
 #pragma	weak plat_slice_add
 #pragma	weak plat_slice_del
+#pragma weak plat_mem_node_intersect_range
 
 struct	mem_node_conf {
 	int	exists;		/* only try if set, list may still be empty */
@@ -111,7 +109,8 @@ extern void mem_node_pre_del_slice(pfn_t, pfn_t);
 extern void mem_node_post_del_slice(pfn_t, pfn_t, int);
 extern int mem_node_alloc(void);
 extern pgcnt_t mem_node_memlist_pages(int, struct memlist *);
-
+extern void mem_node_add_slice(pfn_t start, pfn_t end);
+extern void mem_node_max_range(pfn_t *, pfn_t *);
 
 extern struct mem_node_conf	mem_node_config[];
 extern uint64_t			mem_node_physalign;

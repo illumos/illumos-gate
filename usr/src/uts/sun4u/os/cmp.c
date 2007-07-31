@@ -280,3 +280,30 @@ cmp_set_nosteal_interval(void)
 	/* Set the nosteal interval (used by disp_getbest()) to 100us */
 	nosteal_nsec = 100000UL;
 }
+/*
+ * Return 1 if CMT load balancing policies should be
+ * implemented across instances of the specified hardware
+ * sharing relationship.
+ */
+int
+pg_cmt_load_bal_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_IPIPE ||
+	    hw == PGHW_FPU ||
+	    hw == PGHW_CHIP)
+		return (1);
+	else
+		return (0);
+}
+/*
+ * Return 1 if thread affinity polices should be implemented
+ * for instances of the specifed hardware sharing relationship.
+ */
+int
+pg_cmt_affinity_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
+}

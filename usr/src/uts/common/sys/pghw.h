@@ -52,15 +52,10 @@ typedef enum pghw_type {
 	PGHW_CACHE,
 	PGHW_FPU,
 	PGHW_MPIPE,
+	PGHW_CHIP,
 	PGHW_MEMORY,
 	PGHW_NUM_COMPONENTS
 } pghw_type_t;
-
-/*
- * Consider the physical processor sharing relationship
- * equivalant to a shared pipe to memory.
- */
-#define	PGHW_CHIP	PGHW_MPIPE
 
 /*
  * Anonymous instance id

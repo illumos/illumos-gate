@@ -146,11 +146,12 @@ extern void bzero(void *addr, size_t count);
 
 int	cpu_trapstat_conf(int cmd);
 void	cpu_trapstat_data(void *buf, uint_t pgszs);
-
+/* Used  by the fill_cpu() function */
 #define	NO_MAPPING_FOUND		0xffffffff
 #define	NO_EU_MAPPING_FOUND		NO_MAPPING_FOUND
 #define	NO_CHIP_MAPPING_FOUND		NO_MAPPING_FOUND
 #define	NO_CORE_MAPPING_FOUND		NO_MAPPING_FOUND
+#define	NO_L2_CACHE_MAPPING_FOUND	NO_MAPPING_FOUND
 /*
  * Default MMU pagesize mask for sun4v architecture.
  */

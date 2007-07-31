@@ -97,7 +97,7 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 		return (1);
 	case PGHW_FPU:
 		return (1);
-	case PGHW_CHIP:
+	case PGHW_MPIPE:
 		return (1);
 	}
 	return (0);
@@ -120,8 +120,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	switch (hw) {
 	case PGHW_IPIPE:
 		return (cpu->cpu_m.cpu_ipipe);
-	case PGHW_CHIP:
-		return (cpu->cpu_m.cpu_chip);
+	case PGHW_MPIPE:
+		return (cpu->cpu_m.cpu_mpipe);
 	case PGHW_FPU:
 		return (cpu->cpu_m.cpu_fpu);
 	default:
@@ -143,7 +143,7 @@ pg_plat_hw_level(pghw_type_t hw)
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
 		PGHW_FPU,
-		PGHW_CHIP,
+		PGHW_MPIPE,
 		PGHW_NUM_COMPONENTS
 	};
 
@@ -164,7 +164,7 @@ pg_plat_cmt_load_bal_hw(pghw_type_t hw)
 {
 	if (hw == PGHW_IPIPE ||
 	    hw == PGHW_FPU ||
-	    hw == PGHW_CHIP)
+	    hw == PGHW_MPIPE)
 		return (1);
 	else
 		return (0);
@@ -194,4 +194,31 @@ void
 cmp_set_nosteal_interval(void)
 {
 	nosteal_nsec = 0;
+}
+/*
+ * Return 1 if CMT load balancing policies should be
+ * implemented across instances of the specified hardware
+ * sharing relationship.
+ */
+int
+pg_cmt_load_bal_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_IPIPE ||
+	    hw == PGHW_FPU ||
+	    hw == PGHW_MPIPE)
+		return (1);
+	else
+		return (0);
+}
+/*
+ * Return 1 if thread affinity polices should be implemented
+ * for instances of the specifed hardware sharing relationship.
+ */
+int
+pg_cmt_affinity_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
 }

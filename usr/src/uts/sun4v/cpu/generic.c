@@ -35,6 +35,7 @@
 #include <sys/elf_SPARC.h>
 #include <vm/hat_sfmmu.h>
 #include <vm/page.h>
+#include <vm/vm_dep.h>
 #include <sys/cpuvar.h>
 #include <sys/async.h>
 #include <sys/cmn_err.h>
@@ -166,6 +167,10 @@ cpu_map_exec_units(struct cpu *cp)
 	cp->cpu_m.cpu_fpu = cpunodes[cp->cpu_id].fpu_mapping;
 	if (cp->cpu_m.cpu_fpu == NO_EU_MAPPING_FOUND)
 		cp->cpu_m.cpu_fpu = (id_t)(cp->cpu_id);
+
+	cp->cpu_m.cpu_mpipe = cpunodes[cp->cpu_id].l2_cache_mapping;
+	if (cp->cpu_m.cpu_mpipe == NO_L2_CACHE_MAPPING_FOUND)
+		cp->cpu_m.cpu_mpipe = CPU_L2_CACHEID_INVALID;
 
 	cp->cpu_m.cpu_core = (id_t)(cp->cpu_id);
 

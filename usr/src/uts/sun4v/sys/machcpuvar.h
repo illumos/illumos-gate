@@ -104,6 +104,7 @@ typedef struct ptl1_state {
  */
 #define	CPU_CHIPID_INVALID	-1
 #define	CPU_COREID_INVALID	-1
+#define	CPU_L2_CACHEID_INVALID	-1
 
 /*
  * Machine specific fields of the cpu struct
@@ -177,6 +178,7 @@ struct	machcpu {
 	uint16_t	*cpu_list;		/* uint16_t [NCPU] */
 	uint64_t	cpu_list_ra;		/* cpu list ra */
 	id_t		cpu_ipipe;		/* cpu int exec unit id */
+	id_t		cpu_mpipe;		/* cpu memory pipe id */
 	id_t		cpu_fpu;		/* cpu fpu unit id */
 	id_t		cpu_core;		/* cpu core id */
 	id_t		cpu_chip;		/* cpu chip id */
