@@ -404,6 +404,7 @@ const fs_operation_def_t nfs4_vnodeops_template[] = {
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = nfs4_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = nfs4_getsecattr },
 	VOPNAME_SHRLOCK,	{ .vop_shrlock = nfs4_shrlock },
+	VOPNAME_VNEVENT, 	{ .vop_vnevent = fs_vnevent_support },
 	NULL,			NULL
 };
 
@@ -6387,6 +6388,7 @@ nfs4_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	vnode_t *tempvp;
 	enum createmode4 createmode;
 	bool_t must_trunc = FALSE;
+	int	truncating = 0;
 
 	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
@@ -6517,6 +6519,7 @@ top:
 							AT_TYPE | AT_MODE);
 					vattr.va_type = VREG;
 					createmode = UNCHECKED4;
+					truncating = 1;
 					goto create_otw;
 				}
 			}
@@ -6526,6 +6529,16 @@ top:
 	if (error) {
 		VN_RELE(vp);
 	} else {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		/*
+		 * existing file got truncated, notify.
+		 */
+		trp = VTOR4(vp);
+		tvp = vp;
+		if (IS_SHADOW(vp, trp))
+			tvp = RTOV4(trp);
+		vnevent_create(tvp);
 		*vpp = vp;
 	}
 	return (error);
@@ -6620,6 +6633,18 @@ create_otw:
 		goto top;
 	}
 	nfs_rw_exit(&drp->r_rwlock);
+	if (truncating && !error && *vpp) {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		/*
+		 * existing file got truncated, notify.
+		 */
+		tvp = *vpp;
+		trp = VTOR4(tvp);
+		if (IS_SHADOW(vp, trp))
+			tvp = RTOV4(trp);
+		vnevent_create(tvp);
+	}
 	return (error);
 }
 
@@ -7262,6 +7287,15 @@ recov_retry:
 	if (resp)
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)resp);
 
+	if (e.error == 0) {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		trp = VTOR4(vp);
+		tvp = vp;
+		if (IS_SHADOW(vp, trp))
+			tvp = RTOV4(trp);
+		vnevent_remove(tvp, dvp, nm);
+	}
 	VN_RELE(vp);
 	return (e.error);
 }
@@ -7472,6 +7506,18 @@ recov_retry:
 	ASSERT(nfs4_consistent_type(nvp));
 	VN_RELE(nvp);
 
+	if (!e.error) {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		/*
+		 * Notify the source file of this link operation.
+		 */
+		trp = VTOR4(svp);
+		tvp = svp;
+		if (IS_SHADOW(svp, trp))
+			tvp = RTOV4(trp);
+		vnevent_link(tvp);
+	}
 out:
 	kmem_free(argop, argoplist_size);
 	if (resp)
@@ -7507,7 +7553,7 @@ nfs4rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 {
 	int error;
 	mntinfo4_t *mi;
-	vnode_t *nvp;
+	vnode_t *nvp = NULL;
 	vnode_t *ovp = NULL;
 	char *tmpname = NULL;
 	rnode4_t *rp;
@@ -7706,7 +7752,6 @@ link_call:
 		(void) nfs4delegreturn(VTOR4(nvp), NFS4_DR_PUSH|NFS4_DR_REOPEN);
 
 		ASSERT(nfs4_consistent_type(nvp));
-		VN_RELE(nvp);
 	}
 
 	if (ovp == NULL) {
@@ -7728,6 +7773,9 @@ link_call:
 		if (error) {
 			nfs_rw_exit(&odrp->r_rwlock);
 			nfs_rw_exit(&ndrp->r_rwlock);
+			if (nvp) {
+				VN_RELE(nvp);
+			}
 			return (error);
 		}
 		ASSERT(ovp != NULL);
@@ -7755,6 +7803,9 @@ link_call:
 		VN_RELE(ovp);
 		nfs_rw_exit(&odrp->r_rwlock);
 		nfs_rw_exit(&ndrp->r_rwlock);
+		if (nvp) {
+			VN_RELE(nvp);
+		}
 		return (EINVAL);
 	}
 
@@ -7811,6 +7862,9 @@ link_call:
 		}
 		mutex_exit(&rp->r_statelock);
 
+		if (nvp) {
+			VN_RELE(nvp);
+		}
 		goto link_call;
 	}
 
@@ -7818,6 +7872,9 @@ link_call:
 		VN_RELE(ovp);
 		nfs_rw_exit(&odrp->r_rwlock);
 		nfs_rw_exit(&ndrp->r_rwlock);
+		if (nvp) {
+			VN_RELE(nvp);
+		}
 		return (error);
 	}
 
@@ -7853,6 +7910,47 @@ link_call:
 	}
 	mutex_exit(&rp->r_statelock);
 
+	/*
+	 * Notify the rename vnevents to source vnode, and to the target
+	 * vnode if it already existed.
+	 */
+	if (error == 0) {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		/*
+		 * Notify the vnode. Each links is represented by
+		 * a different vnode, in nfsv4.
+		 */
+		if (nvp) {
+			trp = VTOR4(nvp);
+			tvp = nvp;
+			if (IS_SHADOW(nvp, trp))
+				tvp = RTOV4(trp);
+			vnevent_rename_dest(tvp, ndvp, nnm);
+		}
+
+		/*
+		 * if the source and destination directory are not the
+		 * same notify the destination directory.
+		 */
+		if (VTOR4(odvp) != VTOR4(ndvp)) {
+			trp = VTOR4(ndvp);
+			tvp = ndvp;
+			if (IS_SHADOW(ndvp, trp))
+				tvp = RTOV4(trp);
+			vnevent_rename_dest_dir(tvp);
+		}
+
+		trp = VTOR4(ovp);
+		tvp = ovp;
+		if (IS_SHADOW(ovp, trp))
+			tvp = RTOV4(trp);
+		vnevent_rename_src(tvp, odvp, onm);
+	}
+
+	if (nvp) {
+		VN_RELE(nvp);
+	}
 	VN_RELE(ovp);
 
 	nfs_rw_exit(&odrp->r_rwlock);
@@ -8560,6 +8658,16 @@ recov_retry:
 
 	if (resp)
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)resp);
+
+	if (e.error == 0) {
+		vnode_t *tvp;
+		rnode4_t *trp;
+		trp = VTOR4(vp);
+		tvp = vp;
+		if (IS_SHADOW(vp, trp))
+			tvp = RTOV4(trp);
+		vnevent_rmdir(tvp, dvp, nm);
+	}
 
 	VN_RELE(vp);
 
@@ -10768,7 +10876,14 @@ nfs4_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 static int
 nfs4_realvp(vnode_t *vp, vnode_t **vpp)
 {
-	return (EINVAL);
+	rnode4_t *rp;
+	rp = VTOR4(vp);
+
+	if (IS_SHADOW(vp, rp)) {
+		vp = RTOV4(rp);
+	}
+	*vpp = vp;
+	return (0);
 }
 
 /*

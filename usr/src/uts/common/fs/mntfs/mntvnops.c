@@ -46,6 +46,8 @@
 static mntnode_t *mntgetnode(vnode_t *);
 
 vnodeops_t *mntvnodeops;
+vnodeops_t *mntdummyvnodeops;
+extern struct vnode *mntdummyvp;
 
 /*
  * Design of kernel mnttab accounting.
@@ -488,6 +490,40 @@ typedef struct extmnttab32 {
 #endif
 
 /*
+ * called to generate a dummy read vop call so that
+ * any module monitoring /etc/mnttab for access gets notified.
+ */
+static void
+mntdummyreadop()
+{
+	struct uio	uio;
+	struct iovec	iov;
+	char		tbuf[1];
+
+	/*
+	 * Make a VOP_READ call on the dummy vnode so that any
+	 * module interested in mnttab getting modified could
+	 * intercept this vnode and capture the event.
+	 *
+	 * Pass a dummy uio struct. Nobody should reference the buffer.
+	 * We need to pass a valid uio struct pointer to take care of
+	 * any module intercepting this vnode which could attempt to
+	 * look at it. Currently only the file events notification
+	 * module intercepts this vnode.
+	 */
+	bzero(&uio, sizeof (uio));
+	bzero(&iov, sizeof (iov));
+	iov.iov_base = tbuf;
+	iov.iov_len = 0;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_loffset = 0;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_resid = 0;
+	(void) VOP_READ(mntdummyvp, &uio, 0, kcred, NULL);
+}
+
+/*
  * Snapshot the latest version of the kernel mounted resource information
  *
  * There are two types of snapshots: one destined for reading, and one destined
@@ -633,7 +669,7 @@ mntfs_snapshot(mntnode_t *mnp, int forread, int datamodel)
 		mntfs_freesnap(snap);
 		return (ENOMEM);
 	}
-
+	mntdummyreadop();
 	return (0);
 }
 
@@ -760,7 +796,7 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 		error = uiomove(buf, len, UIO_READ, uio);
 	}
 	kmem_free(buf, len);
-
+	mntdummyreadop();
 	return (error);
 }
 
@@ -1128,6 +1164,22 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 	return (error);
 }
 
+/* ARGSUSED */
+static int
+mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
+	caller_context_t *ct)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+mntdummywrite(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
+	caller_context_t *ct)
+{
+	return (0);
+}
+
 
 /*
  * /mntfs vnode operations vector
@@ -1146,4 +1198,11 @@ const fs_operation_def_t mnt_vnodeops_template[] = {
 	VOPNAME_DISPOSE,	{ .error = fs_error },
 	VOPNAME_SHRLOCK,	{ .error = fs_error },
 	NULL,			NULL
+};
+
+const fs_operation_def_t mnt_dummyvnodeops_template[] = {
+	VOPNAME_READ, 		{ .vop_read = mntdummyread },
+	VOPNAME_WRITE, 		{ .vop_write = mntdummywrite },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL, NULL
 };

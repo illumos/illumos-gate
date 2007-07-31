@@ -1165,6 +1165,10 @@ top:
 				VN_RELE(ZTOV(zp));
 				goto top;
 			}
+
+			if (error == 0) {
+				vnevent_create(ZTOV(zp));
+			}
 		}
 	}
 out:
@@ -1250,7 +1254,7 @@ top:
 		goto out;
 	}
 
-	vnevent_remove(vp);
+	vnevent_remove(vp, dvp, name);
 
 	dnlc_remove(dvp, name);
 
@@ -1513,7 +1517,7 @@ top:
 		goto out;
 	}
 
-	vnevent_rmdir(vp);
+	vnevent_rmdir(vp, dvp, name);
 
 	/*
 	 * Grab a lock on the directory to make sure that noone is
@@ -2433,9 +2437,17 @@ top:
 		}
 	}
 
-	vnevent_rename_src(ZTOV(szp));
+	vnevent_rename_src(ZTOV(szp), sdvp, snm);
 	if (tzp)
-		vnevent_rename_dest(ZTOV(tzp));
+		vnevent_rename_dest(ZTOV(tzp), tdvp, tnm);
+
+	/*
+	 * notify the target directory if it is not the same
+	 * as source directory.
+	 */
+	if (tdvp != sdvp) {
+		vnevent_rename_dest_dir(tdvp);
+	}
 
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, szp->z_id);	/* nlink changes */
@@ -2767,6 +2779,10 @@ top:
 	dmu_tx_commit(tx);
 
 	zfs_dirent_unlock(dl);
+
+	if (error == 0) {
+		vnevent_link(svp);
+	}
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -3701,6 +3717,7 @@ const fs_operation_def_t zfs_dvnodeops_template[] = {
 	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = zfs_getsecattr },
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = zfs_setsecattr },
+	VOPNAME_VNEVENT, 	{ .vop_vnevent = fs_vnevent_support },
 	NULL,			NULL
 };
 

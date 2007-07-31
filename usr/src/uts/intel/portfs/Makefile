@@ -20,7 +20,7 @@
 #
 #
 # uts/intel/portfs/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@
 #
 UTSBASE	= ../..
 
-PORTFS_OBJS	+= port.o port_vnops.o port_fd.o
+PORTFS_OBJS	+= port.o port_vnops.o port_fd.o port_fop.o
 
 #
 #	Define the module and object file sets.

@@ -2985,6 +2985,10 @@ again:
 					    cr);
 					rw_exit(&ip->i_rwlock);
 				}
+
+			}
+			if (error == 0) {
+				vnevent_create(ITOV(ip));
 			}
 		}
 	}
@@ -3131,7 +3135,7 @@ retry_remove:
 	if (rmvp != NULL) {
 		/* Only send the event if there were no errors */
 		if (error == 0)
-			vnevent_remove(rmvp);
+			vnevent_remove(rmvp, vp, nm);
 		VN_RELE(rmvp);
 	}
 out:
@@ -3209,6 +3213,10 @@ unlock:
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_LINK, trans_size);
 		ufs_lockfs_end(ulp);
+	}
+
+	if (!error) {
+		vnevent_link(svp);
 	}
 out:
 	return (error);
@@ -3590,14 +3598,22 @@ unlock:
 	 */
 	if (error == 0) {
 		if (tvp != NULL)
-			vnevent_rename_dest(tvp);
+			vnevent_rename_dest(tvp, tdvp, tnm);
+
+		/*
+		 * Notify the target directory of the rename event
+		 * if source and target directories are not same.
+		 */
+		if (sdvp != tdvp)
+			vnevent_rename_dest_dir(tdvp);
+
 		/*
 		 * Note that if ufs_direnter_lr() returned ESAME then
 		 * this event will still be sent.  This isn't expected
 		 * to be a problem for anticipated usage by consumers.
 		 */
 		if (sip != NULL)
-			vnevent_rename_src(ITOV(sip));
+			vnevent_rename_src(ITOV(sip), sdvp, snm);
 	}
 
 	if (tvp != NULL)
@@ -3743,7 +3759,7 @@ retry_rmdir:
 	if (rmvp != NULL) {
 		/* Only send the event if there were no errors */
 		if (error == 0)
-			vnevent_rmdir(rmvp);
+			vnevent_rmdir(rmvp, vp, nm);
 		VN_RELE(rmvp);
 	}
 out:

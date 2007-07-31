@@ -104,10 +104,13 @@ _info(struct modinfo *modinfop)
  * is ever modified to become unloadable.
  */
 
-static int	mntfstype;
+extern int	mntfstype;
 static major_t	mnt_major;
 static minor_t	mnt_minor;
 static kmutex_t	mnt_minor_lock;
+
+extern struct vnode *mntdummyvp;
+struct vnodeops *mntdummyvnodeops;
 
 /*
  * /mnttab VFS operations vector.
@@ -122,6 +125,7 @@ mntinitrootnode(mntnode_t *mnp)
 	bzero((caddr_t)mnp, sizeof (*mnp));
 
 	mnp->mnt_vnode = vn_alloc(KM_SLEEP);
+	mntdummyvp = vn_alloc(KM_SLEEP);
 
 	vp = MTOV(mnp);
 
@@ -129,6 +133,10 @@ mntinitrootnode(mntnode_t *mnp)
 	vn_setops(vp, mntvnodeops);
 	vp->v_type = VREG;
 	vp->v_data = (caddr_t)mnp;
+	mntdummyvp->v_flag = VNOMOUNT|VNOMAP|VNOSWAP|VNOCACHE;
+	vn_setops(mntdummyvp, mntdummyvnodeops);
+	mntdummyvp->v_type = VREG;
+	mntdummyvp->v_data = (caddr_t)mnp;
 }
 
 static int
@@ -142,6 +150,7 @@ mntinit(int fstype, char *name)
 		NULL,			NULL
 	};
 	extern const fs_operation_def_t mnt_vnodeops_template[];
+	extern const fs_operation_def_t mnt_dummyvnodeops_template[];
 	int error;
 
 	mntfstype = fstype;
@@ -158,6 +167,10 @@ mntinit(int fstype, char *name)
 	/* Vnode ops too. */
 
 	error = vn_make_ops(name, mnt_vnodeops_template, &mntvnodeops);
+	if (!error) {
+		error = vn_make_ops(name, mnt_dummyvnodeops_template,
+		    &mntdummyvnodeops);
+	}
 	if (error != 0) {
 		(void) vfs_freevfsops_by_type(fstype);
 		cmn_err(CE_WARN, "mntinit: bad vnode ops template");
@@ -236,6 +249,7 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	vfsp->vfs_bsize = DEV_BSIZE;
 	mntinitrootnode(mnp);
 	MTOV(mnp)->v_vfsp = vfsp;
+	mntdummyvp->v_vfsp = vfsp;
 	mnp->mnt_mountvp = mvp;
 	vn_exists(MTOV(mnp));
 	return (0);
@@ -250,6 +264,22 @@ mntunmount(struct vfs *vfsp, int flag, struct cred *cr)
 
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);
+
+	/*
+	 * Ensure that the dummy vnode is not being referenced.
+	 */
+	if (mntdummyvp) {
+		mutex_enter(&mntdummyvp->v_lock);
+		if (vp->v_count > 1) {
+			mutex_exit(&mntdummyvp->v_lock);
+			return (EBUSY);
+		}
+
+		mutex_exit(&mntdummyvp->v_lock);
+		vn_invalid(mntdummyvp);
+		vn_free(mntdummyvp);
+		mntdummyvp = NULL;
+	}
 
 	/*
 	 * Ensure that no /mnttab vnodes are in use on this mount point.

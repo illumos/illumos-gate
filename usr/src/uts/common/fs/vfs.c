@@ -138,8 +138,9 @@ int vfshsz = 512;		/* # of heads/locks in vfs hash arrays */
 				/* must be power of 2!	*/
 timespec_t vfs_mnttab_ctime;	/* mnttab created time */
 timespec_t vfs_mnttab_mtime;	/* mnttab last modified time */
-char *vfs_dummyfstype = "\0";
 struct pollhead vfs_pollhd;	/* for mnttab pollers */
+struct vnode *mntdummyvp;	/* Will be set once mntfs is loaded */
+int	mntfstype;		/* will be set once mnt fs is mounted */
 
 /*
  * Table for generic options recognized in the VFS layer and acted
@@ -1437,6 +1438,10 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	vfs_setresource(vfsp, resource);
 	vfs_setmntpoint(vfsp, mountpt);
 
+	/*
+	 * going to mount on this vnode, so notify.
+	 */
+	vnevent_mountedover(vp);
 	error = VFS_MOUNT(vfsp, vp, uap, credp);
 
 	if (uap->flags & MS_RDONLY)
@@ -2634,6 +2639,9 @@ void
 vfs_mnttab_modtimeupd()
 {
 	hrtime_t oldhrt, newhrt;
+	struct uio	uio;
+	struct iovec	iov;
+	char		buf[1];
 
 	ASSERT(RW_WRITE_HELD(&vfslist));
 	oldhrt = ts2hrt(&vfs_mnttab_mtime);
@@ -2649,6 +2657,30 @@ vfs_mnttab_modtimeupd()
 		hrt2ts(newhrt, &vfs_mnttab_mtime);
 	}
 	pollwakeup(&vfs_pollhd, (short)POLLRDBAND);
+
+	if (mntdummyvp != NULL)	{
+		/*
+		 * Make a VOP_WRITE call on the dummy vnode so that any
+		 * module interested in mnttab getting modified could
+		 * intercept this vnode and capture the event.
+		 *
+		 * Pass a dummy uio struct. Nobody should reference the
+		 * buffer. We need to pass a valid uio struct pointer to take
+		 * care of any module intercepting this vnode which could
+		 * attempt to look at it. Currently only the file events
+		 * notification module intercepts this vnode.
+		 */
+		bzero(&uio, sizeof (uio));
+		bzero(&iov, sizeof (iov));
+		iov.iov_base = buf;
+		iov.iov_len = 0;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_loffset = 0;
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_resid = 0;
+		(void) VOP_WRITE(mntdummyvp, &uio, 0, kcred, NULL);
+	}
 }
 
 int

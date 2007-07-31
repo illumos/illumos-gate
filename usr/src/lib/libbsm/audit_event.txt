@@ -344,6 +344,7 @@
 298:AUE_PF_POLICY_FLIP:Flip IPsec policy:as
 299:AUE_PF_POLICY_FLUSH:Flush IPsec policy rules:as
 300:AUE_PF_POLICY_ALGS:Update IPsec algorithms:as
+301:AUE_PORTFS:portfs(2) - file events source:fa
 #
 # user level audit events
 #	2048 -  6143	Reserved

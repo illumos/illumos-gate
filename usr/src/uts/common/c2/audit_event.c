@@ -74,6 +74,8 @@
 #include <sys/socketvar.h>
 #include <netinet/in.h>
 #include <sys/ddi.h>
+#include <sys/port_impl.h>
+
 
 extern token_t	*au_to_sock_inet(struct sockaddr_in *);
 
@@ -92,6 +94,7 @@ static au_event_t	aui_execv(au_event_t);
 static au_event_t	aui_execve(au_event_t);
 static au_event_t	aui_memcntl(au_event_t);
 static au_event_t	aui_sysinfo(au_event_t);
+static au_event_t	aui_portfs(au_event_t);
 static au_event_t	aui_auditsys(au_event_t);
 static au_event_t	aui_modctl(au_event_t);
 static au_event_t	aui_acl(au_event_t);
@@ -577,7 +580,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 180 (loadable) kaio */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 181 (loadable) */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 182 (loadable) */
+aui_portfs,	AUE_PORTFS,	aus_null,	/* 182 (loadable) portfs */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 183 (loadable) */
 		auf_null,	0,
@@ -5606,5 +5609,36 @@ aui_forksys(au_event_t e)
 		break;
 	}
 
+	return (e);
+}
+
+/*ARGSUSED*/
+static au_event_t
+aui_portfs(au_event_t e)
+{
+	struct a {		/* portfs */
+		long	a1;
+		long	a2;
+		long	a3;
+	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
+
+	/*
+	 * check opcode
+	 */
+	switch (((uint_t)uap->a1) & PORT_CODE_MASK) {
+	case PORT_ASSOCIATE:
+	case PORT_DISSOCIATE:
+		/*
+		 * check source
+		 */
+		if ((uint_t)uap->a3 == PORT_SOURCE_FILE) {
+			e = AUE_PORTFS;
+		} else {
+			e = AUE_NULL;
+		}
+		break;
+	default:
+		e = AUE_NULL;
+	}
 	return (e);
 }
