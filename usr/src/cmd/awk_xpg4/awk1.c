@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <locale.h>
+#include <search.h>
 
 static char	*progfiles[NPFILE];	/* Programmes files for yylex */
 static char	**progfilep = &progfiles[0]; /* Pointer to last file */
@@ -556,6 +556,7 @@ yyhex()
 					c = ';';
 					break;
 				}
+			/*FALLTHRU*/
 			case AND:
 			case OR:
 			case COMMA:
@@ -689,6 +690,7 @@ yyhex()
 		if (!catterm || lexlast != CONSTANT || wasfield)
 			break;
 
+	/*FALLTHRU*/
 	case UFUNC:
 	case FUNC:
 	case GETLINE:
@@ -705,8 +707,10 @@ yyhex()
 	/* { */ case '}':
 		if (nbrace == 0)
 			savetoken = ';';
+	/*FALLTHRU*/
 	case ';':
 		inprint = 0;
+	/*FALLTHRU*/
 	default:
 		if (c == DEFFUNC)
 			isfuncdef = 1;
@@ -834,6 +838,7 @@ do_funparm:
 			needsplit = 1;
 		} else if (np == varENVIRON)
 			needenviron = 1;
+	/*FALLTHRU*/
 	case PARM:
 		return (VAR);
 
@@ -842,6 +847,7 @@ do_funparm:
 		 * It is ok to redefine functions as parameters
 		 */
 		if (funparm) goto do_funparm;
+	/*FALLTHRU*/
 	case FUNC:
 	case GETLINE:
 		/*
@@ -1058,14 +1064,13 @@ renode(wchar_t *s)
 
 	np = emptynode(RE, 0);
 	np->n_left = np->n_right = NNULL;
-	np->n_regexp = (REGEXP)emalloc(sizeof (regex_t));
-	if ((n = REGWCOMP(np->n_regexp, s, REG_EXTENDED)) != REG_OK) {
+	if ((n = REGWCOMP(&np->n_regexp, s)) != REG_OK) {
 		int m;
 		char *p;
 
-		m = regerror(n, np->n_regexp, NULL, 0);
+		m = REGWERROR(n, np->n_regexp, NULL, 0);
 		p = (char *)emalloc(m);
-		regerror(n, np->n_regexp, p, m);
+		REGWERROR(n, np->n_regexp, p, m);
 		awkerr("/%S/: %s", s, p);
 	}
 	return (np);
@@ -1303,7 +1308,7 @@ char *s;
 	if ((w = (wchar_t *)malloc(n * sizeof (wchar_t))) == NULL)
 		return (NULL);
 
-	if (mbstowcs(w, s, n) == -1)
+	if (mbstowcs(w, s, n) == (size_t)-1)
 		return (NULL);
 	return (w);
 
@@ -1409,24 +1414,158 @@ wcoff(const wchar_t *astring, const int off)
 	return (s - astring);
 }
 
-int
-int_regwcomp(regex_t *r, const wchar_t *pattern, int uflags)
+#define	NREGHASH	64
+#define	NREGHOLD	1024	/* max number unused entries */
+
+static int	nregunref;
+
+struct reghashq {
+	struct qelem hq;
+	struct regcache *regcachep;
+};
+
+struct regcache {
+	struct qelem	lq;
+	wchar_t	*pattern;
+	regex_t	re;
+	int	refcnt;
+	struct reghashq	hash;
+};
+
+static struct qelem reghash[NREGHASH], reglink;
+
+/*
+ * Generate a hash value of the given wchar string.
+ * The hashing method is similar to what Java does for strings.
+ */
+static uint_t
+regtxthash(const wchar_t *str)
 {
+	int k = 0;
+
+	while (*str != L'\0')
+		k = (31 * k) + *str++;
+
+	k += ~(k << 9);
+	k ^=  (k >> 14);
+	k +=  (k << 4);
+	k ^=  (k >> 10);
+
+	return (k % NREGHASH);
+}
+
+int
+int_regwcomp(REGEXP *r, const wchar_t *pattern)
+{
+	regex_t re;
 	char *mbpattern;
 	int ret;
+	uint_t key;
+	struct qelem *qp;
+	struct regcache *rcp;
+
+	key = regtxthash(pattern);
+	for (qp = reghash[key].q_forw; qp != NULL; qp = qp->q_forw) {
+		rcp = ((struct reghashq *)qp)->regcachep;
+		if (*rcp->pattern == *pattern &&
+		    wcscmp(rcp->pattern, pattern) == 0)
+			break;
+	}
+	if (qp != NULL) {
+		/* update link. put this one at the beginning */
+		if (rcp != (struct regcache *)reglink.q_forw) {
+			remque(&rcp->lq);
+			insque(&rcp->lq, &reglink);
+		}
+		if (rcp->refcnt == 0)
+			nregunref--;	/* no longer unref'ed */
+		rcp->refcnt++;
+		*(struct regcache **)r = rcp;
+		return (REG_OK);
+	}
 
 	if ((mbpattern = wcstombsdup((wchar_t *)pattern)) == NULL)
 		return (REG_ESPACE);
 
-	ret = regcomp(r, mbpattern, uflags);
+	ret = regcomp(&re, mbpattern, REG_EXTENDED);
 
 	free(mbpattern);
 
+	if (ret != REG_OK)
+		return (ret);
+
+	if ((rcp = malloc(sizeof (struct regcache))) == NULL)
+		return (REG_ESPACE);
+	rcp->re = re;
+	if ((rcp->pattern = wsdup(pattern)) == NULL) {
+		regfree(&re);
+		free(rcp);
+		return (REG_ESPACE);
+	}
+	rcp->refcnt = 1;
+	insque(&rcp->lq, &reglink);
+	insque(&rcp->hash.hq, &reghash[key]);
+	rcp->hash.regcachep = rcp;
+
+	*(struct regcache **)r = rcp;
 	return (ret);
 }
 
+void
+int_regwfree(REGEXP r)
+{
+	int	cnt;
+	struct qelem *qp, *nqp;
+	struct regcache *rcp;
+
+	rcp = (struct regcache *)r;
+
+	if (--rcp->refcnt != 0)
+		return;
+
+	/* this cache has no reference */
+	if (++nregunref < NREGHOLD)
+		return;
+
+	/*
+	 * We've got too much unref'ed regex. Free half of least
+	 * used regex.
+	 */
+	cnt = 0;
+	for (qp = reglink.q_forw; qp != NULL; qp = nqp) {
+		nqp = qp->q_forw;
+		rcp = (struct regcache *)qp;
+		if (rcp->refcnt != 0)
+			continue;
+
+		/* free half of them */
+		if (++cnt < (NREGHOLD / 2))
+			continue;
+
+		/* detach and free */
+		remque(&rcp->lq);
+		remque(&rcp->hash.hq);
+
+		/* free up */
+		free(rcp->pattern);
+		regfree(&rcp->re);
+		free(rcp);
+
+		nregunref--;
+	}
+}
+
+size_t
+int_regwerror(int errcode, REGEXP r, char *errbuf, size_t bufsiz)
+{
+	struct regcache *rcp;
+
+	rcp = (struct regcache *)r;
+	return (regerror(errcode, &rcp->re, errbuf, bufsiz));
+}
+
 int
-int_regwexec(const regex_t *r,	/* compiled RE */
+int_regwexec(REGEXP r,		/* compiled RE */
 	const wchar_t *astring,	/* subject string */
 	size_t nsub,		/* number of subexpressions */
 	int_regwmatch_t *sub,	/* subexpression pointers */
@@ -1435,6 +1574,7 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 	char *mbs;
 	regmatch_t *mbsub = NULL;
 	int i;
+	struct regcache *rcp;
 
 	if ((mbs = wcstombsdup((wchar_t *)astring)) == NULL)
 		return (REG_ESPACE);
@@ -1444,7 +1584,9 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 			return (REG_ESPACE);
 	}
 
-	i = regexec(r, mbs, nsub, mbsub, flags);
+	rcp = (struct regcache *)r;
+
+	i = regexec(&rcp->re, mbs, nsub, mbsub, flags);
 
 	/* Now, adjust the pointers/counts in sub */
 	if (i == REG_OK && nsub > 0 && mbsub) {
@@ -1472,7 +1614,7 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 }
 
 int
-int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
+int_regwdosuba(REGEXP rp,		/* compiled RE: Pattern */
 	const wchar_t *rpl,		/* replacement string: /rpl/ */
 	const wchar_t *src,		/* source string */
 	wchar_t **dstp,			/* destination string */
@@ -1494,7 +1636,7 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 /* handle overflow of dst. we need "i" more bytes */
 #ifdef OVERFLOW
 #undef OVERFLOW
-#define	OVERFLOW(i) if (1) { \
+#define	OVERFLOW(i) { \
 		int pos = op - dst; \
 		dst = (wchar_t *)realloc(odst = dst, \
 			(len += len + i) * sizeof (wchar_t)); \
@@ -1502,7 +1644,7 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 			goto nospace; \
 		op = dst + pos; \
 		end = dst + len; \
-	} else
+	}
 #endif
 
 	*dstp = dst = (wchar_t *)malloc(len * sizeof (wchar_t));
@@ -1521,7 +1663,7 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 	while ((regerr = int_regwexec(rp, ip, NSUB, rm, flags)) == REG_OK) {
 		/* Copy text preceding match */
 		if (op + (i = rm[0].rm_sp - ip) >= end)
-			OVERFLOW(i);
+			OVERFLOW(i)
 		while (i--)
 			*op++ = *ip++;
 
@@ -1546,11 +1688,11 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 			if (rmp ==  NULL) {	/* Ordinary character. */
 				*op++ = c;
 				if (op >= end)
-					OVERFLOW(1);
+					OVERFLOW(1)
 			} else if (rmp->rm_sp != NULL && rmp->rm_ep != NULL) {
 				ip = rmp->rm_sp;
 				if (op + (i = rmp->rm_ep - rmp->rm_sp) >= end)
-					OVERFLOW(i);
+					OVERFLOW(i)
 				while (i--)
 					*op++ = *ip++;
 			}
@@ -1563,7 +1705,7 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 			/* If empty match copy next char */
 			*op++ = *ip++;
 			if (op >= end)
-				OVERFLOW(1);
+				OVERFLOW(1)
 		}
 		flags = REG_NOTBOL;
 	}
@@ -1573,7 +1715,7 @@ int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 
 	/* Copy rest of text */
 	if (op + (i =  wcslen(ip)) >= end)
-		OVERFLOW(i);
+		OVERFLOW(i)
 	while (i--)
 		*op++ = *ip++;
 	*op++ = '\0';

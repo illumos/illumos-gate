@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  * awk -- executor
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright 1985, 1994 by Mortice Kern Systems Inc.  All rights reserved.
@@ -75,12 +74,12 @@ static int	exprtest(NODE *np);
 /*
  * These are portable to two's complement integer machines
  */
-#define	addoverflow()	if ((i1^i2)>=0 && (iresult^i1)<0) goto overflow
-#define	suboverflow()	if ((i1^i2)<0 && (iresult^i2)>=0) goto overflow
+#define	addoverflow()	if ((i1^i2) >= 0 && (iresult^i1) < 0) goto overflow
+#define	suboverflow()	if ((i1^i2) < 0 && (iresult^i2) >= 0) goto overflow
 #endif
-#define	muloverflow()	if (((short)i1!=i1 || (short)i2!=i2)	\
-			 && ((i2!=0 && iresult/i2!=i1)		\
-			  || (i1==LONG_MIN && i2==-1)))	  goto overflow
+#define	muloverflow()	if (((short)i1 != i1 || (short)i2 != i2) &&	\
+			    ((i2 != 0 && iresult/i2 != i1) ||		\
+			    (i1 == LONG_MIN && i2 == -1)))	  goto overflow
 
 static char	notarray[] = "scalar \"%s\" cannot be used as array";
 static char	badarray[] = "array \"%s\" cannot be used as a scalar";
@@ -105,7 +104,7 @@ static NODE	*retval;		/* Last return value of a function */
  * for-in loops. This needs to be global so that delete can check to see
  * if it is deleting the next node to be used by a loop.
  */
-#define NFORINLOOP	10
+#define	NFORINLOOP	10
 static NODE*	forindex[NFORINLOOP];
 static NODE**	next_forin = forindex;
 
@@ -123,14 +122,14 @@ strassign(NODE *np, STRING string, int flags, size_t length)
 	else if (np->n_type == GETLINE || np->n_type == KEYWORD)
 		awkerr(gettext("inadmissible use of reserved keyword"));
 	if (np->n_flags & FSPECIAL) {
-		(void)nassign(np, stringnode(string, flags, length));
+		(void) nassign(np, stringnode(string, flags, length));
 		return;
 	}
 	if (isastring(np->n_flags))
 		free((wchar_t *)np->n_string);
 	np->n_strlen = length++;
 	if (flags & FALLOC) {
-		length *= sizeof(wchar_t);
+		length *= sizeof (wchar_t);
 		np->n_string = (STRING) emalloc(length);
 		(void) memcpy((void *)np->n_string, string, length);
 	} else {
@@ -168,7 +167,7 @@ nassign(NODE *np, NODE *value)
 		if (np == varRS || np == varFS) {
 			if (isastring(np->n_flags))
 				free((void *)np->n_string);
-			len = sizeof(wchar_t) * ((np->n_strlen =
+			len = sizeof (wchar_t) * ((np->n_strlen =
 				wcslen(cp = exprstring(value)))+1);
 			np->n_string = emalloc(len);
 			(void) memcpy((wchar_t *)np->n_string, cp, len);
@@ -182,7 +181,7 @@ nassign(NODE *np, NODE *value)
 					awkrecord = charrecord;
 			} else if (np == varFS) {
 				if (resep != (REGEXP)NULL) {
-					regfree(resep);
+					REGWFREE(resep);
 					resep = (REGEXP)NULL;
 				}
 				if (wcslen((wchar_t *)np->n_string) > 1)
@@ -199,8 +198,8 @@ nassign(NODE *np, NODE *value)
 		free((wchar_t *)np->n_string);
 	if (isstring(value->n_flags)) {
 		np->n_strlen = value->n_strlen;
-		if (value->n_flags&FALLOC || value->n_string!=_null) {
-			len = (np->n_strlen+1) * sizeof(wchar_t);
+		if (value->n_flags&FALLOC || value->n_string != _null) {
+			len = (np->n_strlen+1) * sizeof (wchar_t);
 			np->n_string = emalloc(len);
 			(void) memcpy(np->n_string, value->n_string, len);
 			np->n_flags &= FSAVE;
@@ -224,15 +223,15 @@ nassign(NODE *np, NODE *value)
 static void
 setrefield(NODE *np)
 {
-	static regex_t re;
+	static REGEXP re;
 	int n;
 
-	if ((n = REGWCOMP(&re, np->n_string, REG_EXTENDED)) != REG_OK) {
-		regerror(n, &re, (char *)linebuf, sizeof(linebuf));
+	if ((n = REGWCOMP(&re, np->n_string)) != REG_OK) {
+		REGWERROR(n, &re, (char *)linebuf, sizeof (linebuf));
 		awkerr(gettext("syntax error \"%s\" in /%s/\n"),
 			(char *)linebuf, np->n_string);
 	}
-	resep = &re;
+	resep = re;
 	awkfield = refield;
 }
 
@@ -251,6 +250,7 @@ top:
 	switch (left->n_type) {
 	case INDEX:
 		left = exprreduce(left);
+	/*FALLTHRU*/
 	case VAR:
 		return (nassign(left, right));
 
@@ -331,7 +331,7 @@ stringnode(STRING s, int how, size_t length)
 	np = emptynode(CONSTANT, 0);
 	np->n_strlen = length;
 	if (how & FALLOC) {
-		np->n_string = emalloc(length = (length+1) * sizeof(wchar_t));
+		np->n_string = emalloc(length = (length+1) * sizeof (wchar_t));
 		(void) memcpy(np->n_string, s, length);
 	} else {
 		np->n_string = s;
@@ -358,7 +358,7 @@ strsave(wchar_t *old)
 	STRING new;
 	register size_t len;
 
-	new = (STRING)emalloc(len = (wcslen(old)+1) * sizeof(wchar_t));
+	new = (STRING)emalloc(len = (wcslen(old)+1) * sizeof (wchar_t));
 	(void) memcpy(new, old, len);
 	return (new);
 }
@@ -372,11 +372,12 @@ emptynode(int type, size_t length)
 {
 	register NODE *np;
 
-	if (length==0 && running && fnodep < &nodes[NSNODE]) {
+	if (length == 0 && running && fnodep < &nodes[NSNODE]) {
 		np = fnodep++;
 	} else {
-		np = (NODE *) emalloc(sizeof(NODE)+(length * sizeof(wchar_t)));
-		if (running && type!=VAR && type!=ARRAY) {
+		np = (NODE *)emalloc(sizeof (NODE) +
+		    (length * sizeof (wchar_t)));
+		if (running && type != VAR && type != ARRAY) {
 			np->n_next = freelist;
 			freelist = np;
 		}
@@ -397,8 +398,7 @@ freenode(NODE *np)
 	if (isastring(np->n_flags))
 		free((wchar_t *)np->n_string);
 	else if (np->n_type == RE) {
-		regfree(np->n_regexp);
-		free((wchar_t *)np->n_regexp);
+		REGWFREE(np->n_regexp);
 	}
 	free((wchar_t *)np);
 }
@@ -415,7 +415,7 @@ kinstall(LOCCHARP name, int type)
 	l = wcslen(name);
 	np = emptynode(KEYWORD, l);
 	np->n_keywtype = type;
-	(void) memcpy(np->n_name, name, (l+1) * sizeof(wchar_t));
+	(void) memcpy(np->n_name, name, (l+1) * sizeof (wchar_t));
 	addsymtab(np);
 }
 
@@ -431,9 +431,9 @@ finstall(LOCCHARP name, FUNCTION func, int type)
 	l = wcslen(name);
 	np = emptynode(type, l);
 	np->n_function = func;
-	(void) memcpy(np->n_name, name, (l+1) * sizeof(wchar_t));
+	(void) memcpy(np->n_name, name, (l+1) * sizeof (wchar_t));
 	addsymtab(np);
-	return np;
+	return (np);
 }
 
 /*
@@ -445,12 +445,12 @@ finstall(LOCCHARP name, FUNCTION func, int type)
 NODE *
 vlookup(wchar_t *name, int nocreate)
 {
-	register ushort hash;
+	register ushort_t hash;
 	register NODE *np;
 
-	np = symtab[hashbuck(hash = dohash((wchar_t*)name))];
+	np = symtab[hashbuck(hash = dohash((wchar_t *)name))];
 	while (np != NNULL) {
-		if (np->n_hash==hash && wcscmp(name, np->n_name)==0)
+		if (np->n_hash == hash && wcscmp(name, np->n_name) == 0)
 			return (np);
 		np = np->n_next;
 	}
@@ -462,7 +462,7 @@ vlookup(wchar_t *name, int nocreate)
 		np->n_strlen = 0;
 		np->n_string = _null;
 		(void) memcpy(np->n_name, name,
-			(hash+1) * sizeof(wchar_t));
+			(hash+1) * sizeof (wchar_t));
 		addsymtab(np);
 	}
 	return (np);
@@ -495,7 +495,7 @@ delsymtab(NODE *np, int fflag)
 	register NODE *rnp;
 	register NODE *prevp;
 	register NODE **sptr;
-	register ushort h;
+	register ushort_t h;
 
 
 
@@ -588,7 +588,7 @@ execute(NODE *wp)
 		} else if (phase != 0) {
 			if (np->n_type != phase)
 				continue;
-		} else if ((type = np->n_type)==BEGIN || type==END) {
+		} else if ((type = np->n_type) == BEGIN || type == END) {
 			continue;
 		} else if (type == COMMA) {
 			/*
@@ -630,8 +630,7 @@ freetemps()
 		if (isastring(np->n_flags)) {
 			free((wchar_t *)np->n_string);
 		} else if (np->n_type == RE) {
-			regfree(np->n_regexp);
-			free((wchar_t *)np->n_regexp);
+			REGWFREE(np->n_regexp);
 		}
 	}
 	fnodep = &nodes[0];
@@ -671,41 +670,42 @@ action(NODE *wp)
 		 */
 		switch (np->n_type) {
 		case ASG:
-			(void)assign(np->n_left, np->n_right);
+			(void) assign(np->n_left, np->n_right);
 			continue;
 
 		case PRINT:
 			s_print(np);
 			continue;
-	
+
 		case PRINTF:
 			s_prf(np);
 			continue;
-	
+
 		case EXIT:
 			if (np->n_left != NNULL)
 				act = (int)exprint(np->n_left); else
 				act = 0;
 			doend(act);
 			/* NOTREACHED */
-	
+
 		case RETURN:
 			if (slevel == 0)
 				awkerr(gettext("return outside of a function"));
-			np = np->n_left!=NNULL
+			np = np->n_left != NNULL
 			    ? exprreduce(np->n_left)
 			    : const0;
 			retval = emptynode(CONSTANT, 0);
 			retval->n_flags = FINT;
-			(void)nassign(retval, np);
+			(void) nassign(retval, np);
 			return (RETURN);
 
 		case NEXT:
 			loopexit = NEXT;
+		/*FALLTHRU*/
 		case BREAK:
 		case CONTINUE:
 			return (np->n_type);
-	
+
 		case DELETE:
 			if ((l = np->n_left)->n_type == PARM) {
 				l = l->n_next;
@@ -716,10 +716,10 @@ action(NODE *wp)
 			case ARRAY:
 				delarray(l);
 				break;
-	
+
 			case INDEX:
 				if ((np = l->n_left)->n_type == PARM) {
-	 				np = np->n_next;
+					np = np->n_next;
 					if (!(np->n_flags & FLARRAY))
 						np = np->n_alink;
 				}
@@ -743,9 +743,10 @@ action(NODE *wp)
 				}
 				delsymtab(l, 1);
 				break;
-	
+
 			case VAR:
-				if (isstring(l->n_flags) && l->n_string==_null)
+				if (isstring(l->n_flags) &&
+				    l->n_string == _null)
 					break;
 			default:
 				awkerr(gettext(
@@ -753,30 +754,30 @@ action(NODE *wp)
 				break;
 			}
 			continue;
-	
+
 		case WHILE:
 		case DO:
 			if ((act = s_while(np)) != 0)
 				break;
 			continue;
-	
+
 		case FOR:
 			if ((act = s_for(np)) != 0)
 				break;
 			continue;
-	
+
 		case FORIN:
 			if ((act = s_forin(np)) != 0)
 				break;
 			continue;
-	
+
 		case IF:
 			if ((act = s_if(np)) != 0)
 				break;
 			continue;
 
 		default:
-			(void)exprreduce(np);
+			(void) exprreduce(np);
 			if (loopexit != 0) {
 				act = loopexit;
 				break;
@@ -825,7 +826,7 @@ exprint(NODE *np)
 			return (np->n_int);
 		if (np->n_flags & FREAL)
 			return ((INT)np->n_real);
-		return ((INT)watoll(np->n_string));
+		return ((INT)wcstoll(np->n_string, NULL, 10));
 
 	default:
 		awkerr(interr, "exprint");
@@ -841,7 +842,7 @@ REAL
 exprreal(NODE *np)
 {
 	if (loopexit)
-		return (loopexit);
+		return ((REAL)loopexit);
 	if (isleaf(np->n_flags)) {
 		if (np->n_type == PARM)
 			np = np->n_next;
@@ -862,7 +863,7 @@ exprreal(NODE *np)
 		awkerr(interr, "exprreal");
 	}
 	/* NOTREACHED */
-	return (0);
+	return ((REAL)0);
 }
 
 /*
@@ -889,9 +890,9 @@ exprstring(NODE *np)
 			char *tmp;
 			(void) wsprintf(numbuf,
 		(const char *) (tmp = wcstombsdup(exprstring(varCONVFMT))),
-				(double) np->n_real);
+				(double)np->n_real);
 			if (tmp != NULL)
-				free (tmp);
+				free(tmp);
 		}
 		return ((STRING)numbuf);
 
@@ -955,17 +956,17 @@ exprconcat(NODE *np, int len)
 	wchar_t *cp;
 	wchar_t rnumbuf[NUMSIZE];
 
-	if (isleaf(rnp->n_flags) && rnp->n_type==PARM)
+	if (isleaf(rnp->n_flags) && rnp->n_type == PARM)
 		rnp = rnp->n_next;
 	if (isstring(rnp->n_flags)) {
 		rsp = rnp->n_string;
 		rlen = rnp->n_strlen;
 	} else
-		rlen = wcslen((wchar_t*)(rsp = exprstring(rnp)));
+		rlen = wcslen((wchar_t *)(rsp = exprstring(rnp)));
 	if (rsp == numbuf) {	/* static, so save a copy */
-		(void) memcpy(rnumbuf, (wchar_t*)rsp,
-			(rlen+1) * sizeof(wchar_t));
-		rsp=rnumbuf;
+		(void) memcpy(rnumbuf, (wchar_t *)rsp,
+			(rlen+1) * sizeof (wchar_t));
+		rsp = rnumbuf;
 	}
 	len += rlen;
 	if (lnp->n_type == CONCAT) {
@@ -975,18 +976,18 @@ exprconcat(NODE *np, int len)
 	} else {
 		register STRING	lsp;
 
-		if (isleaf(lnp->n_flags) && lnp->n_type==PARM)
+		if (isleaf(lnp->n_flags) && lnp->n_type == PARM)
 			lnp = lnp->n_next;
 		if (isstring(lnp->n_flags)) {
 			lsp = lnp->n_string;
 			llen = lnp->n_strlen;
 		} else
-			llen = wcslen((wchar_t*)(lsp = exprstring(lnp)));
-		cp = emalloc((llen+len+1) * sizeof(wchar_t));
-		(void) memcpy(cp, (wchar_t*)lsp, llen * sizeof(wchar_t));
+			llen = wcslen((wchar_t *)(lsp = exprstring(lnp)));
+		cp = emalloc((llen+len+1) * sizeof (wchar_t));
+		(void) memcpy(cp, (wchar_t *)lsp, llen * sizeof (wchar_t));
 		lnp = stringnode(cp, FNOALLOC, llen);
 	}
-	(void) memcpy(cp+llen, (wchar_t*)rsp, (rlen+1) * sizeof(wchar_t));
+	(void) memcpy(cp+llen, (wchar_t *)rsp, (rlen+1) * sizeof (wchar_t));
 	lnp->n_strlen += rlen;
 	return (lnp);
 }
@@ -1009,7 +1010,7 @@ exprreduce(NODE *np)
 	 * a var or constant is a leaf-node (no further reduction required)
 	 * so return immediately.
 	 */
-	if ((t = np->n_type)==VAR || t==CONSTANT)
+	if ((t = np->n_type) == VAR || t == CONSTANT)
 		return (np);
 	/*
 	 * If it's a parameter then it is probably a leaf node but it
@@ -1049,7 +1050,7 @@ exprreduce(NODE *np)
 			aname = tnp->n_name;
 		}
 		if (tnp->n_type != ARRAY) {
-			if (!isstring(tnp->n_flags) || tnp->n_string!=_null)
+			if (!isstring(tnp->n_flags) || tnp->n_string != _null)
 				awkerr(notarray, fname);
 			else {
 				/* promotion to array */
@@ -1067,7 +1068,7 @@ exprreduce(NODE *np)
 			}
 		}
 		if (tnp == varSYMTAB) {
-			if (np==NNULL || np->n_type==COMMA)
+			if (np == NNULL || np->n_type == COMMA)
 				awkerr(gettext(
 				    "SYMTAB must have exactly one index"));
 			np = vlook(exprstring(np));
@@ -1082,7 +1083,7 @@ exprreduce(NODE *np)
 				np->n_flags |= FINARRAY;
 			}
 		} else
-			np = vlookup(cp, 1)==NNULL ? const0 : const1;
+			np = vlookup(cp, 1) == NNULL ? const0 : const1;
 		if (cp != indexbuf)
 			free(cp);
 		return (np);
@@ -1094,29 +1095,30 @@ exprreduce(NODE *np)
 		return (np);
 
 	case NOT:
-		return (intnode(exprtest(np->n_left)==0 ? (INT)1 : (INT)0));
+		return (intnode(exprtest(np->n_left) == 0 ? (INT)1 : (INT)0));
 
 	case AND:
-		return ((exprtest(np->n_left) != 0
-		    && exprtest(np->n_right) != 0) ? const1 : const0);
+		return ((exprtest(np->n_left) != 0 &&
+		    exprtest(np->n_right) != 0) ? const1 : const0);
 
 	case OR:
-		return ((exprtest(np->n_left) != 0
-		    || exprtest(np->n_right) != 0) ? const1 : const0);
+		return ((exprtest(np->n_left) != 0 ||
+		    exprtest(np->n_right) != 0) ? const1 : const0);
 
 	case EXP:
 		{
-                        double f1, f2;  
-              
-			/* evaluate expressions in proper order before
+			double f1, f2;
+
+			/*
+			 * evaluate expressions in proper order before
 			 * calling pow().
 			 * Can't guarantee that compiler will do this
 			 * correctly for us if we put them inline.
 			 */
-                        f1 = (double)exprreal(np->n_left);
-                        f2 = (double)exprreal(np->n_right);
-                        return (realnode((REAL)pow(f1, f2)));
-                }
+			f1 = (double)exprreal(np->n_left);
+			f2 = (double)exprreal(np->n_right);
+			return (realnode((REAL)pow(f1, f2)));
+		}
 
 	case QUEST:
 		if (np->n_right->n_type != COLON)
@@ -1154,7 +1156,7 @@ do_inc_op:
 		else
 			tnp = intnode(exprint(np));
 		inc_oper->n_left = np;
-		(void)assign(np, inc_oper);
+		(void) assign(np, inc_oper);
 		return (tnp);
 
 	case PRE_DEC:
@@ -1191,7 +1193,7 @@ do_asn_op:
 			np = exprreduce(np);
 		asn_oper->n_left = np;
 		return (assign(np, asn_oper));
-		
+
 
 	case GETLINE:
 		return (f_getline(np));
@@ -1222,9 +1224,11 @@ do_asn_op:
 	case ARRAY:
 		awkerr(badarray, np->n_name);
 
+	/*FALLTHRU*/
 	case UFUNC:
 		awkerr(varnotfunc, np->n_name);
 
+	/*FALLTHRU*/
 	default:
 		awkerr(gettext("panic: exprreduce(%d)"), t);
 		/* NOTREACHED */
@@ -1245,16 +1249,16 @@ arithmetic(NODE *np)
 	register REAL r1, r2;
 
 	left = exprreduce(np->n_left);
-	if (isreal(left->n_flags)
-	|| (isstring(left->n_flags) && (type_of(left)&FVREAL))) {
+	if (isreal(left->n_flags) ||
+	    (isstring(left->n_flags) && (type_of(left)&FVREAL))) {
 		type = FREAL;
 		r1 = exprreal(left);
 		r2 = exprreal(np->n_right);
 	} else {
 		i1 = exprint(left);
 		right = exprreduce(np->n_right);
-		if (isreal(right->n_flags)
-		 || (isstring(right->n_flags) && (type_of(right)&FVREAL))) {
+		if (isreal(right->n_flags) ||
+		    (isstring(right->n_flags) && (type_of(right)&FVREAL))) {
 
 			type = FREAL;
 			r1 = i1;
@@ -1326,7 +1330,7 @@ reswitch:
 		}
 		break;
 	}
-	return (type==FINT ? intnode(iresult) : realnode(r1));
+	return (type == FINT ? intnode(iresult) : realnode(r1));
 }
 
 /*
@@ -1423,22 +1427,22 @@ do_strcmp:
 #endif
 	switch (np->n_type) {
 	case EQ:
-		return (cmp==0 ? const1 : const0);
+		return (cmp == 0 ? const1 : const0);
 
 	case  NE:
-		return (cmp!=0 ? const1 : const0);
+		return (cmp != 0 ? const1 : const0);
 
 	case GE:
-		return (cmp>=0 ? const1 : const0);
+		return (cmp >= 0 ? const1 : const0);
 
 	case LE:
-		return (cmp<=0 ? const1 : const0);
+		return (cmp <= 0 ? const1 : const0);
 
 	case GT:
-		return (cmp>0 ? const1 : const0);
+		return (cmp > 0 ? const1 : const0);
 
 	case LT:
-		return (cmp<0 ? const1 : const0);
+		return (cmp < 0 ? const1 : const0);
 
 	default:
 		awkerr(interr, "comparison");
@@ -1467,7 +1471,7 @@ type_of(NODE *np)
 		return (FSTRING|FVINT);
 	while (iswspace(*cp))
 		cp++;
-	if (*cp=='-' || *cp=='+')
+	if (*cp == '-' || *cp == '+')
 		cp++;
 	while (*cp != '\0') {
 		switch (*cp) {
@@ -1534,7 +1538,7 @@ rfield(INT fieldno)
 		return (stringnode(linebuf, FSTATIC|FSENSE, lbuflen));
 	if (!splitdone)
 		fieldsplit();
-	if (fieldno>nfield || fieldno<0)
+	if (fieldno > nfield || fieldno < 0)
 		return (stringnode(_null, FSTATIC, 0));
 	cp = fields[fieldno-1];
 	return (stringnode(cp, FSTATIC|FSENSE, wcslen(cp)));
@@ -1552,7 +1556,7 @@ fieldsplit()
 	wchar_t *ep;
 
 	if (fieldbuf == NULL)
-		fieldbuf = emalloc(NLINE * sizeof(wchar_t));
+		fieldbuf = emalloc(NLINE * sizeof (wchar_t));
 	fcount = 0;
 	ep = linebuf;
 	op = fieldbuf;
@@ -1561,7 +1565,7 @@ fieldsplit()
 		if (fcount > NFIELD)
 			awkerr(tmfld, NFIELD);
 		n = ep-ip;
-		(void) memcpy(op, ip, n * sizeof(wchar_t));
+		(void) memcpy(op, ip, n * sizeof (wchar_t));
 		op += n;
 		*op++ = '\0';
 	}
@@ -1569,7 +1573,7 @@ fieldsplit()
 		varNF->n_int = fcount;
 	else {
 		constant->n_int = fcount;
-		(void)nassign(varNF, constant);
+		(void) nassign(varNF, constant);
 	}
 	nfield = fcount;
 	splitdone++;
@@ -1594,22 +1598,22 @@ lfield(INT fieldno, NODE *np)
 	newlen = wcslen(newval = (wchar_t *)exprstring(np));
 	if (fieldno == 0) {
 		splitdone = 0;
-		(void) memcpy(linebuf, newval, (newlen+1) * sizeof(wchar_t));
+		(void) memcpy(linebuf, newval, (newlen+1) * sizeof (wchar_t));
 		lbuflen = newlen;
 		fieldsplit();
 	} else {
 		seplen = wcslen(sep = (wchar_t *)exprstring(varOFS));
 		if (!splitdone)
 			fieldsplit();
-		if (--fieldno < nfield
-		 && (newlen <= wcslen(fields[fieldno]))) {
+		if (--fieldno < nfield &&
+		    (newlen <= wcslen(fields[fieldno]))) {
 			(void) memcpy(fields[fieldno], newval,
-				(newlen+1) * sizeof(wchar_t));
+				(newlen+1) * sizeof (wchar_t));
 		} else {
 			register wchar_t *buf;
 
 			buf = fieldbuf;
-			fieldbuf = emalloc(NLINE * sizeof(wchar_t));
+			fieldbuf = emalloc(NLINE * sizeof (wchar_t));
 			if (fieldno >= nfield) {
 				if (fieldno >= NFIELD)
 					awkerr(tmfld, NFIELD);
@@ -1619,12 +1623,13 @@ lfield(INT fieldno, NODE *np)
 			}
 			fields[fieldno] = newval;
 			op = fieldbuf;
-			for (i=0; i<nfield; i++) {
+			for (i = 0; i < nfield; i++) {
 				newlen = wcslen(cp = fields[i])+1;
 				fields[i] = op;
 				if (op+newlen >= fieldbuf+NLINE)
 					awkerr(toolong, NLINE);
-				(void) memcpy(op, cp, newlen * sizeof(wchar_t));
+				(void) memcpy(op, cp,
+				    newlen * sizeof (wchar_t));
 				op += newlen;
 			}
 			free(buf);
@@ -1636,11 +1641,11 @@ lfield(INT fieldno, NODE *np)
 		i = 0;
 		while (i < nfield) {
 			newlen = wcslen(cp = fields[i++]);
-			(void) memcpy(op, cp, newlen * sizeof(wchar_t));
+			(void) memcpy(op, cp, newlen * sizeof (wchar_t));
 			op += newlen;
 			if (i < nfield) {
-				(void) memcpy(op, sep, 
-					seplen * sizeof(wchar_t));
+				(void) memcpy(op, sep,
+					seplen * sizeof (wchar_t));
 				op += seplen;
 			}
 			if (op >= &linebuf[NLINE])
@@ -1652,7 +1657,7 @@ lfield(INT fieldno, NODE *np)
 			varNF->n_int = nfield;
 		else {
 			constant->n_int = nfield;
-			(void)nassign(varNF, constant);
+			(void) nassign(varNF, constant);
 		}
 	}
 	return (np);
@@ -1671,9 +1676,9 @@ userfunc(NODE *np)
 	register NODE *temp;
 	NODE *fnp;
 
-	if ((fnp = np->n_left)==NNULL)
+	if ((fnp = np->n_left) == NNULL)
 		awkerr(gettext("impossible function call"));
-	if (fnp->n_type!=UFUNC)
+	if (fnp->n_type != UFUNC)
 		awkerr(varnotfunc, fnp->n_name);
 
 #ifndef M_STKCHK
@@ -1695,7 +1700,8 @@ userfunc(NODE *np)
 		templist = temptail = NNULL;
 		actlist = np->n_right;
 		formlist = fnp->n_left;
-		/* pass through formal list, setting up a list
+		/*
+		 * pass through formal list, setting up a list
 		 * (on templist) containing temps for the values
 		 * of the actuals.
 		 * If the actual list runs out before the formal
@@ -1732,14 +1738,14 @@ userfunc(NODE *np)
 				t = VAR;
 				break;
 			}
-			temp = emptynode(t, len=wcslen(formal->n_name));
-			(void) memcpy(temp->n_name,formal->n_name,
-				(len+1) * sizeof(wchar_t));
+			temp = emptynode(t, len = wcslen(formal->n_name));
+			(void) memcpy(temp->n_name, formal->n_name,
+			    (len+1) * sizeof (wchar_t));
 			temp->n_flags = FSTRING|FVINT;
 			temp->n_string = _null;
 			temp->n_strlen = 0;
 			if (t == VAR)
-				(void)assign(temp, actual);
+				(void) assign(temp, actual);
 			if (t != ARRAY)
 				temp->n_flags |= FLARRAY;
 			temp->n_scope = scope_tag;
@@ -1906,7 +1912,7 @@ s_for(NODE *np)
 	testnp = getlist(&listp);
 	incnp = getlist(&listp);
 	if (initnp != NNULL)
-		(void)exprreduce(initnp);
+		(void) exprreduce(initnp);
 	for (;;) {
 		if (exprtest(testnp) == 0)
 			break;
@@ -1924,7 +1930,7 @@ s_for(NODE *np)
 		}
 	clabel:
 		if (incnp != NNULL)
-			(void)exprreduce(incnp);
+			(void) exprreduce(incnp);
 	}
 	return (act);
 }
@@ -1962,14 +1968,14 @@ s_forin(NODE *np)
 		np = NNULL;
 		nbuck = 0;
 	} else {
-		/*l
+		/*
 		 * At this point if the node is not actually an array
 		 * check to see if it has already been established as
 		 * a scalar. If it is a scalar then flag an error. If
 		 * not then promote the object to an array type.
 		 */
 		if (np->n_type != ARRAY) {
-			if (!isstring(np->n_flags) || np->n_string!=_null)
+			if (!isstring(np->n_flags) || np->n_string != _null)
 				awkerr(notarray, np->n_name);
 			else {
 				/* promotion to array */
@@ -2050,8 +2056,8 @@ symwalk(int *buckp, NODE **npp)
 				return (*npp = NNULL);
 			np = symtab[(*buckp)++];
 		}
-		if (np->n_type == VAR
-		 && (!isstring(np->n_flags) || np->n_string!=_null)) {
+		if (np->n_type == VAR &&
+		    (!isstring(np->n_flags) || np->n_string != _null)) {
 			*npp = np->n_next;
 			return (np);
 		}
@@ -2095,11 +2101,11 @@ exprtest(NODE *np)
 static wchar_t *
 makeindex(NODE *np, wchar_t *array, int tag)
 {
-	static wchar_t tags[sizeof(int)];
+	static wchar_t tags[sizeof (int)];
 	static wchar_t tag_chars[] = M_MB_L("0123456789ABCDEF");
 	register wchar_t *cp;
 	register NODE *index;
-	register uint n;
+	register uint_t n;
 	register int len;
 	register wchar_t *indstr;
 	register wchar_t *sep;
@@ -2119,7 +2125,7 @@ makeindex(NODE *np, wchar_t *array, int tag)
 		wchar_t *ocp;
 		size_t i;
 
-		if (isleaf(np->n_flags) && np->n_type==PARM)
+		if (isleaf(np->n_flags) && np->n_type == PARM)
 			np = np->n_next;
 		if (isstring(np->n_flags)) {
 			indstr = np->n_string;
@@ -2132,8 +2138,8 @@ makeindex(NODE *np, wchar_t *array, int tag)
 		if (i < NINDEXBUF)
 			ocp = indexbuf;
 		else
-			ocp = emalloc(i * sizeof(wchar_t));
-		(void) memcpy(ocp, array, n * sizeof(wchar_t));
+			ocp = emalloc(i * sizeof (wchar_t));
+		(void) memcpy(ocp, array, n * sizeof (wchar_t));
 		cp = ocp+n;
 		if (taglen) {
 			*cp++ = '[';
@@ -2141,7 +2147,7 @@ makeindex(NODE *np, wchar_t *array, int tag)
 				*cp++ = tags[--taglen];
 		}
 		*cp++ = ']';
-		(void) memcpy(cp, indstr, (len+1) * sizeof(wchar_t));
+		(void) memcpy(cp, indstr, (len+1) * sizeof (wchar_t));
 
 		return (ocp);
 	}
@@ -2151,9 +2157,9 @@ makeindex(NODE *np, wchar_t *array, int tag)
 		indstr = exprstring(index);
 		len = wcslen(indstr);
 		if (n == 0) {
-			cp = emalloc(sizeof(wchar_t) * ((n = wcslen(array)) +
+			cp = emalloc(sizeof (wchar_t) * ((n = wcslen(array)) +
 				len + 3 + taglen));
-			(void) memcpy(cp, array, n * sizeof(wchar_t)); 
+			(void) memcpy(cp, array, n * sizeof (wchar_t));
 			if (taglen) {
 				cp[n++] = '[';
 				while (taglen)
@@ -2161,11 +2167,11 @@ makeindex(NODE *np, wchar_t *array, int tag)
 			}
 			cp[n++] = ']';
 		} else {
-			cp = erealloc(cp, (n+len+seplen+1) * sizeof(wchar_t));
-			(void) memcpy(cp+n, sep, seplen * sizeof(wchar_t));
+			cp = erealloc(cp, (n+len+seplen+1) * sizeof (wchar_t));
+			(void) memcpy(cp+n, sep, seplen * sizeof (wchar_t));
 			n += seplen;
 		}
-		(void) memcpy(cp+n, indstr, (len+1) * sizeof(wchar_t));
+		(void) memcpy(cp+n, indstr, (len+1) * sizeof (wchar_t));
 		n += len;
 	}
 	return (cp);
@@ -2213,8 +2219,8 @@ promote(NODE *n)
 	 */
 	while (prev != NNULL) {
 		prev->n_flags &= ~FLARRAY;
-		next=prev->n_alink;
+		next = prev->n_alink;
 		prev->n_alink = n;
-		prev=next;
+		prev = next;
 	}
 }

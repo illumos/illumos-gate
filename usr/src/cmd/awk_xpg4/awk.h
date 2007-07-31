@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,15 +59,15 @@
 #define	NPFILE		32	/* Number of -[fl] options allowed */
 #define	NRECUR		3000	/* Maximum recursion depth */
 
-#define M_LDATA	1
+#define	M_LDATA	1
 #ifdef M_LDATA
-# define	NLINE	20000	/* Longest input record */
-# define	NFIELD	4000	/* Number of fields allowed */
-# define	NBUCKET	1024	/* # of symtab buckets (power of 2) */
+#define	NLINE	20000	/* Longest input record */
+#define	NFIELD	4000	/* Number of fields allowed */
+#define	NBUCKET	1024	/* # of symtab buckets (power of 2) */
 #else
-# define	NLINE	2048	/* Longest input record */
-# define	NFIELD	1024	/* Number of fields allowed */
-# define	NBUCKET	256	/* # of symtab buckets (power of 2) */
+#define	NLINE	2048	/* Longest input record */
+#define	NFIELD	1024	/* Number of fields allowed */
+#define	NBUCKET	256	/* # of symtab buckets (power of 2) */
 #endif
 
 #define	NSNODE		40	/* Number of cached nodes */
@@ -81,10 +80,10 @@
  * return a value.
  */
 int	bcmp();
-#define	memcmp(b1,b2,n)	bcmp(b1,b2,n)
+#define	memcmp(b1, b2, n)	bcmp(b1, b2, n)
 void	bcopy();
-#define	memcpy(b1,b2,n)	bcopy(b2,b1,(int)n)
-#endif	/*BSD*/
+#define	memcpy(b1, b2, n)	bcopy(b2, b1, (int)n)
+#endif	/* BSD */
 #define	vlook(n)	vlookup(n, 0)
 
 /*
@@ -93,24 +92,24 @@ void	bcopy();
 typedef	double		REAL;
 typedef	long long	INT;
 typedef	wchar_t		*STRING;
-typedef	struct NODE	*(*FUNCTION)(struct NODE * np);
-typedef	regex_t		*REGEXP;
+typedef	struct NODE	*(*FUNCTION)(struct NODE *np);
+typedef	void		*REGEXP;
 
 /*
  * Node in the AWK interpreter expression tree.
  */
 typedef	struct	NODE	{
-	ushort	n_type;
+	ushort_t	n_type;
 	struct NODE	*n_next;		/* Symbol table/PARM link */
-	ushort	n_flags;			/* Node flags, type */
+	ushort_t	n_flags;		/* Node flags, type */
 
 
 
 
 	union	{
 		struct	{
-			ushort	N_hash;			/* Full hash value */
-			struct NODE *N_alink;		/* Array link */
+			ushort_t	N_hash;		/* Full hash value */
+			struct NODE	*N_alink;	/* Array link */
 			union	{
 				struct	{
 					STRING	N_string;
@@ -126,7 +125,7 @@ typedef	struct	NODE	{
 		struct	{
 			struct	NODE	*N_left;
 			struct	NODE	*N_right;
-			ushort	N_lineno;
+			ushort_t	N_lineno;
 		}	n_op;
 		struct {
 			struct	NODE	*N_left;	/* Used for fliplist */
@@ -184,7 +183,7 @@ typedef	struct	NODE	{
 #define	FNONTOK		0x200	/* Node has non-token type */
 #define	FVINT		0x400	/* Node looks like an integer */
 #define	FVREAL		0x800	/* Node looks like a real number */
-#define FLARRAY		0x1000	/* Local array node */
+#define	FLARRAY		0x1000	/* Local array node */
 
 /*
  * n_flags macros
@@ -192,7 +191,7 @@ typedef	struct	NODE	{
  */
 #define	isleaf(f)	(!((f)&FNONTOK))
 #define	isstring(f)	((f)&FSTRING)
-#define	isastring(f)	(((f)&(FSTRING|FALLOC))==(FSTRING|FALLOC))
+#define	isastring(f)	(((f)&(FSTRING|FALLOC)) == (FSTRING|FALLOC))
 #define	isnumber(f)	((f)&(FINT|FVINT|FREAL|FVREAL))
 #define	isreal(f)	((f)&(FREAL|FVREAL))
 #define	isint(f)	((f)&(FINT|FVINT))
@@ -209,19 +208,19 @@ typedef	struct	NODE	{
  * Awkrun prototype default name
  */
 #if defined(DOS)
-# if defined(__386__)
-#  define AWK_PROTOTYPE  M_ETCDIR(awkrunf.dos)
-#  define AWK_LPROTOTYPE M_ETCDIR(awkrunf.dos)
-# else
-#  define AWK_PROTOTYPE  M_ETCDIR(awkrun.dos)
-#  define AWK_LPROTOTYPE M_ETCDIR(awkrunl.dos)
-# endif
-#elif defined(OS2)
-# define AWK_PROTOTYPE M_ETCDIR(awkrun.os2)
-#elif defined(NT)
-# define AWK_PROTOTYPE M_ETCDIR(awkrun.nt)
+#if defined(__386__)
+#define	AWK_PROTOTYPE  M_ETCDIR(awkrunf.dos)
+#define	AWK_LPROTOTYPE M_ETCDIR(awkrunf.dos)
 #else
-# define AWK_PROTOTYPE M_ETCDIR(awkrun.mod)
+#define	AWK_PROTOTYPE  M_ETCDIR(awkrun.dos)
+#define	AWK_LPROTOTYPE M_ETCDIR(awkrunl.dos)
+#endif
+#elif defined(OS2)
+#define	AWK_PROTOTYPE M_ETCDIR(awkrun.os2)
+#elif defined(NT)
+#define	AWK_PROTOTYPE M_ETCDIR(awkrun.nt)
+#else
+#define	AWK_PROTOTYPE M_ETCDIR(awkrun.mod)
 #endif
 
 /*
@@ -261,7 +260,7 @@ typedef	struct	RESFUNC {
  * Structure holding list of open files.
  */
 typedef	struct	OFILE	{
-	ushort	f_mode;			/* Open mode: WRITE, APPEND, PIPE */
+	ushort_t f_mode;		/* Open mode: WRITE, APPEND, PIPE */
 	FILE	*f_fp;			/* File pointer if open */
 	char	*f_name;		/* Remembered file name */
 }	OFILE;
@@ -271,9 +270,9 @@ int	yyparse(void);
 
 /* Global functions -- awk1.c */
 #ifdef __WATCOMC__
-# pragma aux yyerror aborts;
-# pragma aux awkerr aborts;
-# pragma aux awkperr aborts;
+#pragma aux yyerror aborts;
+#pragma aux awkerr aborts;
+#pragma aux awkperr aborts;
 #endif
 void	yyerror(char *msg, ...);
 void	awkerr(char *fmt, ...);
@@ -400,8 +399,8 @@ extern	uchar_t	catterm;
 extern	uint_t	lexlast;
 extern	uint_t	lineno;
 extern	uchar_t	needsplit, needenviron, doing_begin, begin_getline;
-extern	ushort	slevel;
-extern	ushort	loopexit;
+extern	ushort_t	slevel;
+extern	ushort_t	loopexit;
 extern	wchar_t	radixpoint;
 extern	REGEXP	resep;
 extern	RESERVED	reserved[];
@@ -456,24 +455,22 @@ extern	void		awkerr(char *, ...);
  * number of chars needed to hold the number.
  */
 #ifdef M_NUMSIZE
-#define NUMSIZE M_NUMSIZE
+#define	NUMSIZE M_NUMSIZE
 #else
-#define NUMSIZE 30
+#define	NUMSIZE 30
 #endif
 
-#define M_MB_L(s)       L##s
+#define	M_MB_L(s)	L##s
 #ifdef  __STDC__
-#define ANSI(x) x
-#define _VOID   void            /* Used in VOID *malloc() */
+#define	ANSI(x) x
 #else
-#define const
-#define signed
-#define volatile
-#define ANSI(x) ()
-#define _VOID   char            /* Used in _VOID *malloc() */
+#define	const
+#define	signed
+#define	volatile
+#define	ANSI(x) ()
 #endif
 
-#define isWblank(x) (((x) == ' ' || (x) == '\t') ? 1 : 0 )
+#define	isWblank(x) (((x) == ' ' || (x) == '\t') ? 1 : 0)
 
 
 /*
@@ -482,6 +479,8 @@ extern	void		awkerr(char *, ...);
 #define	REGWMATCH_T	int_regwmatch_t
 #define	REGWCOMP	int_regwcomp
 #define	REGWEXEC	int_regwexec
+#define	REGWFREE	int_regwfree
+#define	REGWERROR	int_regwerror
 #define	REGWDOSUBA	int_regwdosuba
 
 typedef struct {
@@ -489,8 +488,10 @@ typedef struct {
 	regoff_t	rm_so, rm_eo;
 } int_regwmatch_t;
 
-extern int int_regwcomp(regex_t *, const wchar_t *, int);
-extern int int_regwexec(const regex_t *, const wchar_t *, size_t,
+extern int int_regwcomp(REGEXP *, const wchar_t *);
+extern int int_regwexec(REGEXP, const wchar_t *, size_t,
 			int_regwmatch_t *, int);
-extern int int_regwdosuba(regex_t *, const wchar_t *,
+extern void int_regwfree(REGEXP);
+extern size_t int_regwerror(int, REGEXP, char *, size_t);
+extern int int_regwdosuba(REGEXP, const wchar_t *,
 			const wchar_t *, wchar_t **, int, int *);
