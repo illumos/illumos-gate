@@ -3986,6 +3986,33 @@ hme_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
+/*
+ * Software IP checksum, for the edge cases that the
+ * hardware can't handle.  See hmestart for more info.
+ */
+static uint16_t
+hme_cksum(void *data, int len)
+{
+	uint16_t	*words = data;
+	int		i, nwords = len / 2;
+	uint32_t	sum = 0;
+
+	/* just add up the words */
+	for (i = 0; i < nwords; i++) {
+		sum += *words++;
+	}
+
+	/* pick up residual byte ... assume even half-word allocations */
+	if (len % 2) {
+		sum += (*words & 0xff00);
+	}
+
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum = (sum >> 16) + (sum & 0xffff);
+
+	return (~(sum & 0xffff));
+}
+
 static boolean_t
 hmestart_dma(struct hme *hmep, mblk_t *mp)
 {
@@ -4050,18 +4077,26 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 	 * a DMA handle to the mblk and set up an IO mapping..
 	 */
 
+	/*
+	 * Note that for checksum offload, the hardware cannot
+	 * generate correct checksums if the packet is smaller than
+	 * 64-bytes.  In such a case, we bcopy the packet and use
+	 * a software checksum.
+	 */
+
 	ASSERT(mp->b_wptr >= mp->b_rptr);
 	len1 = mp->b_wptr - mp->b_rptr;
 	bp = mp->b_cont;
 
-	if (bp == NULL) {
+	if (bp == NULL && (len1 >= 64)) {
 		len2 = 0;
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, TX_MSG,
 		    "hmestart: 1 buf: len = %ld b_rptr = %p",
 		    len1, mp->b_rptr);
 	} else if ((bp->b_cont == NULL) &&
-	    ((len2 = bp->b_wptr - bp->b_rptr) >= 4)) {
+	    ((len2 = bp->b_wptr - bp->b_rptr) >= 4) &&
+	    ((len1 + len2) >= 64)) {
 
 		ASSERT(bp->b_wptr >= bp->b_rptr);
 
@@ -4086,6 +4121,14 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 
 		bp = NULL;
 		len2 = 0;
+
+		if ((csflags != 0) && (len1 < 64)) {
+			uint16_t sum;
+			sum = hme_cksum(mp->b_rptr + start_offset,
+			    len1 - start_offset);
+			bcopy(&sum, mp->b_rptr + stuff_offset, 20);
+			csflags = 0;
+		}
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_NONE, TX_MSG,
 		    "hmestart: > 1 buf: len = %ld b_rptr = %p",
@@ -4293,10 +4336,17 @@ hmestart(struct hme *hmep, mblk_t *mp)
 	 * the ptes reserved by dvma_reserve
 	 */
 
+	/*
+	 * Note that for checksum offload, the hardware cannot
+	 * generate correct checksums if the packet is smaller than
+	 * 64-bytes.  In such a case, we bcopy the packet and use
+	 * a software checksum.
+	 */
+
 	bp = mp->b_cont;
 
 	len1 = mp->b_wptr - mp->b_rptr;
-	if (bp == NULL) {
+	if (bp == NULL && (len1 >= 64)) {
 		dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
 		    len1, 2 * i, &c);
 		dvma_sync(hmep->hme_dvmaxh, 2 * i, DDI_DMA_SYNC_FORDEV);
@@ -4310,8 +4360,9 @@ hmestart(struct hme *hmep, mblk_t *mp)
 
 	} else {
 
-		if ((bp->b_cont == NULL) &&
-		    ((len2 = bp->b_wptr - bp->b_rptr) >= 4)) {
+		if ((bp != NULL) && (bp->b_cont == NULL) &&
+		    ((len2 = bp->b_wptr - bp->b_rptr) >= 4) &&
+		    ((len1 + len2) >= 64)) {
 			/*
 			 * Check with HW: The minimum len restriction
 			 * different for 64-bit burst ?
@@ -4357,6 +4408,14 @@ hmestart(struct hme *hmep, mblk_t *mp)
 			mcopymsg(mp, bp->b_rptr);
 			mp = bp;
 			hmep->hme_tmblkp[i] = mp;
+
+			if ((csflags) && (len1 < 64)) {
+				uint16_t sum;
+				sum = hme_cksum(bp->b_rptr + start_offset,
+				    len1 - start_offset);
+				bcopy(&sum, bp->b_rptr + stuff_offset, 2);
+				csflags = 0;
+			}
 
 			dvma_kaddr_load(hmep->hme_dvmaxh,
 			    (caddr_t)mp->b_rptr, len1, 2 * i, &c);
