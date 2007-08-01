@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,12 +33,14 @@
 #include <unistd.h>
 #include <locale.h>
 #include <strings.h>
+#include <stdlib.h>
+#include <libintl.h>
 #include "cron.h"
+#include "getresponse.h"
 
 extern time_t	num();
 extern char	*errmsg();
-
-extern void audit_at_delete(char *, char *, int);
+extern void	audit_at_delete(char *, char *, int);
 
 #define	SUPERUSER	0			/* is user super-user? */
 #define	CANTCD		"can't change directory to the at directory"
@@ -63,6 +65,9 @@ static void atperror2(char *msg, char *name);
 static void aterror(char *msg);
 static void powner(char *file);
 
+int	getjoblist(struct dirent ***, struct stat ***, int (*)());
+int	removentry(char *, struct stat *, uid_t);
+
 int
 main(int argc, char **argv)
 {
@@ -71,7 +76,6 @@ main(int argc, char **argv)
 	int allflag = 0;		/* remove all jobs belonging to user? */
 	int jobexists;			/* does a requested job exist? */
 	char *pp;
-	char *getuser();
 	struct dirent **namelist;	/* names of jobs in spooling area */
 	struct stat **statlist;
 	struct passwd *pwd;
@@ -81,6 +85,7 @@ main(int argc, char **argv)
 	 * usage info and exit.
 	 */
 	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
 	if (argc < 2)
 		usage();
 
@@ -245,8 +250,13 @@ removentry(char *filename, struct stat *statptr, uid_t user)
 {
 	struct passwd *pwd;
 	char *pp;
-	char *getuser();
 	int r;
+
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(1);
+	}
 
 	if (!fflag)
 		printf("%s: ", filename);
@@ -266,8 +276,8 @@ removentry(char *filename, struct stat *statptr, uid_t user)
 				powner(filename);
 				printf(") ");
 			}
-			printf("remove it? ");
-			if (!yes())
+			printf(gettext("remove it? "));
+			if (yes() == 0)
 				return (0);
 		}
 
@@ -326,9 +336,7 @@ getjoblist(struct dirent ***namelistp, struct stat ***statlistp,
 	int i;
 	struct stat *statptr;	/* pointer to file stat structure */
 	struct stat **statlist;
-	extern int alphasort();		/* sort jobs by date of execution */
 	extern int filewanted();	/* should a file be listed in queue? */
-
 	if (chdir(ATDIR) < 0)
 		atabortperror(CANTCD);
 
@@ -363,26 +371,6 @@ getjoblist(struct dirent ***namelistp, struct stat ***statlistp,
 	*statlistp = statlist;
 	return (numjobs);
 }
-
-
-/*
- * Get answer to interactive prompts, eating all characters beyond the first
- * one. If a 'y' is typed, return 1.
- */
-int
-yes(void)
-{
-	int ch;				/* dummy variable */
-	int ch1;			/* dummy variable */
-
-	ch = ch1 = getchar();
-	while (ch1 != '\n' && ch1 != EOF)
-		ch1 = getchar();
-	if (isupper(ch))
-		ch = tolower(ch);
-	return (ch == 'y');
-}
-
 
 /*
  * Get the full login name of a person using his/her user id.

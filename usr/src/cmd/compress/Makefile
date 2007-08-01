@@ -1,10 +1,10 @@
 #
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,23 +20,36 @@
 # CDDL HEADER END
 #
 #
+
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= compress
+SRCS= compress.c $(SRC)/common/util/getresponse.c
+OBJS= compress.o getresponse.o
 
 include ../Makefile.cmd
 
 .KEEP_STATE:
 
 CFLAGS += $(CCVERBOSE)
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
+LINTFLAGS += -u
+
 LDLIBS += -lsec
 
 all: $(PROG) 
+
+%.o:  $(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+$(PROG):        $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 install: all $(ROOTPROG)
 	$(RM) $(ROOTBIN)/uncompress $(ROOTBIN)/zcat
@@ -44,7 +57,8 @@ install: all $(ROOTPROG)
 	$(LN) $(ROOTPROG) $(ROOTBIN)/zcat
 
 clean:
+	$(RM) $(OBJS)
 
-lint:	lint_PROG
+lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,12 +28,16 @@
 
 PROG= tar
 DEFAULTFILES= tar.dfl
+OBJS1=		tar.o
+OBJS=		$(OBJS1) getresponse.o
+SRCS=		$(OBJS1:%.o=%.c) $(SRC)/common/util/getresponse.c
 
 include ../Makefile.cmd
 
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 DCFILE= $(PROG).dc
 
+LINTFLAGS += -u
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsol
 LDLIBS += -lsec $(LAZYLIBS)
@@ -60,9 +64,18 @@ install: all $(ROOTUSRSBINPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK)
 $(ROOTSYMLINK):
 	$(RM) $@; $(SYMLINK) ../sbin/$(PROG) $@
 
-clean:
+$(PROG):	$(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
-lint:	lint_PROG
+%.o:	$(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+clean:
+	$(RM) $(OBJS)   
+
+lint:	lint_SRCS
 
 $(DCFILE):
 	$(RM) messages.po

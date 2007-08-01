@@ -1,10 +1,8 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,21 +18,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/mv/Makefile
 #
 
 PROG=		mv
 XPG4PROG=	mv
-OBJS=           mv.o
+OBJS1=		mv.o
+OBJS=           $(OBJS1) getresponse.o
 CPFILE=		cp
 LNFILE=		ln
 XPG4OBJS=	$(OBJS:%.o=xpg4_%.o)
-SRCS=		$(OBJS:%.o=%.c)
+SRCS=		$(OBJS1:%.o=%.c) $(SRC)/common/util/getresponse.c
+
 ROOTLINKS= $(ROOTBIN)/$(CPFILE) $(ROOTBIN)/$(LNFILE)
 ROOTXPG4LINKS= $(ROOTXPG4BIN)/$(CPFILE) $(ROOTXPG4BIN)/$(LNFILE)
 
@@ -45,10 +43,9 @@ clean $(XPG4)	:= OBJS += values-xpg4.o
 CLOBBERFILES += $(CPFILE) $(LNFILE)
 CFLAGS	+=	$(CCVERBOSE)
 $(XPG4) := CFLAGS += -DXPG4
-LINTFLAGS += -DXPG4
+LINTFLAGS += -DXPG4 -u
 XGETFLAGS += -a -x mv.xcl
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
-LINTFLAGS += -DXPG4
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 
 lint :=	LDLIBS += -lcmdutils -lavl -lsec
 $(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
@@ -58,8 +55,6 @@ $(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
 
 all:	$(PROG) $(CPFILE) $(LNFILE) $(XPG4)
 
-
-
 $(PROG):	$$(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
@@ -68,10 +63,19 @@ $(XPG4):	$$(XPG4OBJS)
 	$(LINK.c) -o $@ $(XPG4OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-xpg4_%.o:	%.c
-	$(COMPILE.c) -o $@ $<
+%.o:    $(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
 
-%values-xpg4.o: ../../lib/common/common/values-xpg4.c
+xpg4_%.o:    %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+xpg4_%.o:    $(SRC)/common/util/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%values-xpg4.o:		../../lib/common/common/values-xpg4.c
 	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
 
 $(CPFILE):	$(PROG)

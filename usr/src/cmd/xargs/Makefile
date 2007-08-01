@@ -21,15 +21,22 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG= xargs
+PROG= 			xargs
 # /usr/xpg6/bin/xargs is a symlink to /usr/bin/xargs
-ROOTXPG6SYMLINK= $(ROOTXPG6BIN)/xargs
+ROOTXPG6SYMLINK= 	$(ROOTXPG6BIN)/xargs
+
+OBJS1=			xargs.o
+OBJS=			$(OBJS1) getresponse.o
+SRCS=			$(OBJS1:%.o=%.c) $(SRC)/common/util/getresponse.c
 
 include ../Makefile.cmd
+
+CPPFLAGS += -I $(SRC)/common/util
+LINTFLAGS += -u
 
 .KEEP_STATE:
 
@@ -37,12 +44,21 @@ all: $(PROG)
 
 install: all $(ROOTPROG) $(ROOTXPG6SYMLINK)
 
+$(PROG):	$(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o:	$(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
 $(ROOTXPG6SYMLINK):	$(ROOTPROG)
 	-$(RM)	$@
 	-$(SYMLINK)	../../bin/$(PROG) $@
 
 clean:
+	$(RM) $(OBJS)
 
-lint:	lint_PROG
+lint:	lint_SRCS
 
 include ../Makefile.targ

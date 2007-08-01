@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -47,6 +47,7 @@
 #include <libintl.h>
 #include <security/pam_appl.h>
 #include "cron.h"
+#include "getresponse.h"
 
 #if defined(XPG4)
 #define	VIPATH	"/usr/xpg4/bin/vi"
@@ -86,8 +87,8 @@
 	"     editing the crontab data - usually a minor typing error.\n\n"
 #define	BADREAD		"error reading your crontab file"
 #define	ED_PROMPT	\
-	"     Edit again, to ensure crontab information is intact (%c/%c)?\n"\
-	"     ('%c' will discard edits.)"
+	"     Edit again, to ensure crontab information is intact (%s/%s)?\n"\
+	"     ('%s' will discard edits.)"
 #define	NAMETOOLONG	"login name too long"
 
 extern int	per_errno;
@@ -103,15 +104,12 @@ char		*tnam;
 char		edtemp[5+13+1];
 char		line[CTLINESIZE];
 static		char	login[UNAMESIZE];
-static		char	yeschr;
-static		char	nochr;
 
-static int yes(void);
-static int next_field(int, int);
-static void catch(int);
-static void crabort(char *);
-static void cerror(char *);
-static void copycron(FILE *);
+static int	next_field(int, int);
+static void	catch(int);
+static void	crabort(char *);
+static void	cerror(char *);
+static void	copycron(FILE *);
 
 int
 main(int argc, char **argv)
@@ -142,8 +140,12 @@ main(int argc, char **argv)
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	yeschr = *nl_langinfo(YESSTR);
-	nochr = *nl_langinfo(NOSTR);
+
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(1);
+	}
 
 	while ((c = getopt(argc, argv, "elr")) != EOF)
 		switch (c) {
@@ -296,23 +298,24 @@ main(int argc, char **argv)
 			}
 #endif
 			(void) snprintf(buf, sizeof (buf),
-				"%s %s", editor, edtemp);
+			    "%s %s", editor, edtemp);
 			sleep(1);
 
 			while (1) {
 				ret = system(buf);
 				/* sanity checks */
 				if ((tmpfp = fopen(edtemp, "r")) == NULL)
-				    crabort("can't open temporary file");
+					crabort("can't open temporary file");
 				if (fstat(fileno(tmpfp), &stbuf) < 0)
-				    crabort("can't stat temporary file");
+					crabort("can't stat temporary file");
 				if (stbuf.st_size == 0)
-				    crabort("temporary file empty");
+					crabort("temporary file empty");
 				if (omodtime == stbuf.st_mtime) {
-				    (void) unlink(edtemp);
-				    fprintf(stderr, gettext(
-					"The crontab file was not changed.\n"));
-				    exit(1);
+					(void) unlink(edtemp);
+					fprintf(stderr, gettext(
+					    "The crontab file was not"
+					    " changed.\n"));
+					exit(1);
 				}
 				if ((ret) && (errno != EINTR)) {
 				/*
@@ -325,7 +328,7 @@ main(int argc, char **argv)
 				if (isatty(fileno(stdin))) {
 				    /* Interactive */
 					fprintf(stdout, gettext(ED_PROMPT),
-					    yeschr, nochr, nochr);
+					    yesstr, nostr, nostr);
 					fflush(stdout);
 
 					if (yes()) {
@@ -337,9 +340,9 @@ main(int argc, char **argv)
 						exit(1);
 					}
 				} else {
-				    /* Non-interactive, dump changes */
-				    (void) unlink(edtemp);
-				    exit(1);
+					/* Non-interactive, dump changes */
+					(void) unlink(edtemp);
+					exit(1);
 				}
 			}
 			exit(0);
@@ -546,18 +549,4 @@ char *msg;
 	}
 	fprintf(stderr, "crontab: %s\n", gettext(msg));
 	exit(1);
-}
-
-static int
-yes(void)
-{
-	int	first_char;
-	int	dummy_char;
-
-	first_char = dummy_char = getchar();
-	while ((dummy_char != '\n')	&&
-	    (dummy_char != '\0')	&&
-	    (dummy_char != EOF))
-		dummy_char = getchar();
-	return (first_char == yeschr);
 }

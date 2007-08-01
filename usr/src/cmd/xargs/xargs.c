@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdarg.h>
-#include <libgen.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <wchar.h>
@@ -46,6 +45,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <stdarg.h>
+#include "getresponse.h"
 
 #define	HEAD	0
 #define	TAIL	1
@@ -94,7 +94,6 @@ static int	TRACE = FALSE;
 static int	INSERT = FALSE;
 static int	linesize = 0;
 static int	ibufsize = 0;
-static char	*yesstr;	/* the string contains int'l for "yes"	*/
 static int	exitstat = 0;	/* our exit status			*/
 static int	mac;		/* modified argc, after parsing		*/
 static char	**mav;		/* modified argv, after parsing		*/
@@ -137,7 +136,6 @@ static void	usage();
 static void	parseargs();
 static void	saveinput();
 
-
 int
 main(int argc, char **argv)
 {
@@ -149,7 +147,6 @@ main(int argc, char **argv)
 
 
 	/* initialization */
-
 	blank = wctype("blank");
 	n_inserts = 0;
 	psave = saveargv;
@@ -158,20 +155,10 @@ main(int argc, char **argv)
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't 		*/
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-
-	/*
-	 * now we get the appropriate "yes" string for our locale.
-	 * since this may be a multibyte character, we store the
-	 * string which is returned. later on, when we're looking for
-	 * a "y" in response to our prompt, we'll use the first
-	 * multibyte character of yesstr as a comparision.
-	 */
-	initbuf = nl_langinfo(YESSTR);	/* initbuf is a tmp placeholder here */
-	if ((yesstr = malloc(strlen(initbuf) + 1)) == NULL) {
-		perror(gettext("xargs: Memory allocation failure"));
+	if (init_yes() < 0) {
+		ermsg(gettext(ERR_MSG_INIT_YES), strerror(errno));
 		exit(1);
 	}
-	(void) strcpy(yesstr, initbuf);
 
 	parseargs(argc, argv);
 
@@ -788,51 +775,6 @@ ermsg(char *messages, ...)
 	OK = FALSE;
 }
 
-
-/*
- * Function: int rpmatch(char *)
- *
- * Description:
- *
- *	Internationalized get yes / no answer.
- *
- * Inputs:
- *	s	-> Pointer to answer to compare against.
- *
- * Returns:
- *	TRUE	-> Answer was affirmative
- *	FALSE	-> Answer was negative
- */
-
-static int
-rpmatch(char *s)
-{
-	static char	*default_yesexpr = "^[Yy].*";
-	static char	*compiled_yesexpr = (char *)NULL;
-
-	/* Execute once to initialize */
-	if (compiled_yesexpr == (char *)NULL) {
-		char	*yesexpr;
-
-		/* get yes expression according to current locale */
-		yesexpr = nl_langinfo(YESEXPR);
-		/*
-		 * If the was no expression or if there is a compile error
-		 * use default yes expression.  Anchor
-		 */
-		if ((yesexpr == (char *)NULL) || (*yesexpr == (char)NULL) ||
-		    ((compiled_yesexpr =
-		    regcmp(yesexpr, 0)) == NULL))
-			compiled_yesexpr = regcmp(default_yesexpr, 0);
-	}
-
-	/* match yesexpr */
-	if (regex(compiled_yesexpr, s) == NULL) {
-		return (FALSE);
-	}
-	return (TRUE);
-}
-
 static int
 echoargs()
 {
@@ -869,7 +811,6 @@ echoargs()
 	 * of our desired y/n input. so, we see if there's any extra
 	 * input, and if there is, then we will store it.
 	 */
-
 	saveinput();
 
 	(void) write(2, "?...", 4);	/* ask the user for input	*/
@@ -891,14 +832,7 @@ echoargs()
 			;
 	}
 
-	/*
-	 * now we have to figure out whether the user typed an
-	 * internationalized version of 'y' for yes. note that in some
-	 * countries, they've gotten used to typing an ASCII 'y'! so
-	 * even if our int'l version fails, we will check for an ASCII
-	 * 'y', in order to be backwards compatible.
-	 */
-	return (rpmatch(reply));
+	return (yes_check(reply));
 }
 
 

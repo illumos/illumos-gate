@@ -56,7 +56,6 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <locale.h>
-#include <langinfo.h>
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
@@ -64,6 +63,7 @@
 #include <sys/acl.h>
 #include <libcmdutils.h>
 #include <aclutils.h>
+#include "getresponse.h"
 
 #define	FTYPE(A)	(A.st_mode)
 #define	FMODE(A)	(A.st_mode)
@@ -94,7 +94,6 @@
 #define	SMALLFILESIZE	(32*1024)	/* don't use mmap on little files */
 
 static char		*dname(char *);
-static int		getresp(void);
 static int		lnkfil(char *, char *);
 static int		cpymve(char *, char *);
 static int		chkfiles(char *, char **);
@@ -115,9 +114,6 @@ static int		copyattributes(char *, char *);
 static void		timestruc_to_timeval(timestruc_t *, struct timeval *);
 static tree_node_t	*create_tnode(dev_t, ino_t);
 
-extern	int 		errno;
-extern  char 		*optarg;
-extern	int 		optind, opterr;
 static struct stat 	s1, s2;
 static int 		cpy = FALSE;
 static int 		mve = FALSE;
@@ -136,8 +132,6 @@ static int		Pflg = 0;	/* do not follow symlinks */
 static int		atflg = 0;
 static int		attrsilent = 0;
 static int		targetexists = 0;
-static char		yeschr[SCHAR_MAX + 2];
-static char		nochr[SCHAR_MAX + 2];
 static int		cmdarg;		/* command line argument */
 static avl_tree_t	*stree = NULL;	/* source file inode search tree */
 static acl_t		*s1acl;
@@ -167,9 +161,11 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-
-	(void) strncpy(yeschr, nl_langinfo(YESSTR), SCHAR_MAX + 2);
-	(void) strncpy(nochr, nl_langinfo(NOSTR), SCHAR_MAX + 2);
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(3);
+	}
 
 	if (EQ(cmd, "mv"))
 		mve = TRUE;
@@ -851,9 +847,9 @@ copy:
 				attret = copyattributes(source, target);
 				if (attret != 0 && !attrsilent) {
 					(void) fprintf(stderr, gettext(
-						"%s: Failed to preserve"
-						" extended attributes of file"
-						" %s\n"), cmd, source);
+					    "%s: Failed to preserve"
+					    " extended attributes of file"
+					    " %s\n"), cmd, source);
 				}
 
 				if (mve && attret != 0) {
@@ -904,7 +900,7 @@ copy:
 		}
 		(void) fprintf(stderr,
 		    gettext("%s: %s: unknown file type 0x%x\n"), cmd,
-			source, (s1.st_mode & S_IFMT));
+		    source, (s1.st_mode & S_IFMT));
 		return (1);
 
 cleanup:
@@ -1082,7 +1078,7 @@ chkfiles(char *source, char **to)
 {
 	char	*buf = (char *)NULL;
 	int	(*statf)() = (cpy &&
-		    !(Pflg || (Hflg && !cmdarg))) ? stat : lstat;
+	    !(Pflg || (Hflg && !cmdarg))) ? stat : lstat;
 	char    *target = *to;
 	int	error;
 
@@ -1143,7 +1139,7 @@ chkfiles(char *source, char **to)
 			if ((buf = (char *)malloc(len)) == NULL) {
 				(void) fprintf(stderr,
 				    gettext("%s: Insufficient memory to "
-					"%s %s\n "), cmd, cmd, source);
+				    "%s %s\n "), cmd, cmd, source);
 				exit(3);
 			}
 			(void) snprintf(buf, len, "%s/%s",
@@ -1232,8 +1228,8 @@ chkfiles(char *source, char **to)
 				(void) fprintf(stderr,
 				    gettext("%s: overwrite %s and override "
 				    "protection %o (%s/%s)? "), cmd, target,
-				    FMODE(s2) & MODEBITS, yeschr, nochr);
-				if (getresp()) {
+				    FMODE(s2) & MODEBITS, yesstr, nostr);
+				if (yes() == 0) {
 					if (buf != NULL)
 						free(buf);
 					return (2);
@@ -1241,8 +1237,8 @@ chkfiles(char *source, char **to)
 			} else if (overwrite && ISREG(s2)) {
 				(void) fprintf(stderr,
 				    gettext("%s: overwrite %s (%s/%s)? "),
-				    cmd, target, yeschr, nochr);
-				if (getresp()) {
+				    cmd, target, yesstr, nostr);
+				if (yes() == 0) {
 					if (buf != NULL)
 						free(buf);
 					return (2);
@@ -1254,8 +1250,8 @@ chkfiles(char *source, char **to)
 				    "%o (%s/%s)? "),
 				    /*CSTYLED*/
 				    cmd, target, FMODE(s2) & MODEBITS,
-				    yeschr, nochr);
-				if (getresp()) {
+				    yesstr, nostr);
+				if (yes() == 0) {
 					if (buf != NULL)
 						free(buf);
 					return (2);
@@ -1393,35 +1389,6 @@ dname(char *name)
 	return (name);
 }
 
-static int
-getresp(void)
-{
-	register int	c, i;
-	char	ans_buf[SCHAR_MAX + 1];
-
-	/*
-	 * Get response from user. Based on
-	 * first character, make decision.
-	 * Discard rest of line.
-	 */
-	for (i = 0; ; i++) {
-		c = getchar();
-		if (c == '\n' || c == 0 || c == EOF) {
-			ans_buf[i] = 0;
-			break;
-		}
-		if (i < SCHAR_MAX)
-			ans_buf[i] = c;
-	}
-	if (i >= SCHAR_MAX) {
-		i = SCHAR_MAX;
-		ans_buf[SCHAR_MAX] = 0;
-	}
-	if ((i == 0) | (strncmp(yeschr, ans_buf, i)))
-		return (1);
-	return (0);
-}
-
 static void
 usage(void)
 {
@@ -1435,12 +1402,13 @@ usage(void)
 		    "       mv [-f] [-i] f1 ... fn d1\n"
 		    "       mv [-f] [-i] d1 d2\n"));
 	} else if (lnk) {
-		(void) fprintf(stderr, gettext(
 #ifdef XPG4
+		(void) fprintf(stderr, gettext(
 		    "Usage: ln [-f] [-s] f1 [f2]\n"
 		    "       ln [-f] [-s] f1 ... fn d1\n"
 		    "       ln [-f] -s d1 d2\n"));
 #else
+		(void) fprintf(stderr, gettext(
 		    "Usage: ln [-f] [-n] [-s] f1 [f2]\n"
 		    "       ln [-f] [-n] [-s] f1 ... fn d1\n"
 		    "       ln [-f] [-n] -s d1 d2\n"));
@@ -1617,7 +1585,6 @@ copydir(char *source, char *target)
 		s1save = s1;
 		if (s1acl != NULL) {
 			s1acl_save = acl_dup(s1acl);
-#ifdef XPG4
 			if (s1acl_save == NULL) {
 				(void) fprintf(stderr, gettext("%s: "
 				    "Insufficient memory to save acl"
@@ -1625,6 +1592,14 @@ copydir(char *source, char *target)
 				if (pflg)
 					return (1);
 
+			}
+#ifdef XPG4
+			else {
+				(void) fprintf(stderr, gettext("%s: "
+				    "Insufficient memory to save acl"
+				    " entry\n"), cmd);
+				if (pflg)
+					return (1);
 			}
 #endif
 		}
@@ -1812,9 +1787,9 @@ copyattributes(char *source, char *target)
 
 		if (!attrsilent) {
 			(void) fprintf(stderr,
-				gettext("%s: could not retrieve stat"
-					" information for attribute directory"
-					"of file %s: "), cmd, source);
+			    gettext("%s: could not retrieve stat"
+			    " information for attribute directory"
+			    "of file %s: "), cmd, source);
 			perror("");
 			++error;
 		}
@@ -1891,9 +1866,9 @@ copyattributes(char *source, char *target)
 		if (fchmod(targetdirfd, attrdir.st_mode) == -1) {
 			if (!attrsilent) {
 				(void) fprintf(stderr,
-					gettext("%s: failed to set file mode"
-					" correctly on attribute directory of"
-					" file %s: "), cmd, target);
+				    gettext("%s: failed to set file mode"
+				    " correctly on attribute directory of"
+				    " file %s: "), cmd, target);
 				perror("");
 				++error;
 			}
@@ -1920,8 +1895,8 @@ copyattributes(char *source, char *target)
 		if (futimesat(targetdirfd, ".", times) < 0) {
 			if (!attrsilent) {
 				(void) fprintf(stderr,
-					gettext("%s: cannot set attribute times"
-					" for %s: "), cmd, target);
+				    gettext("%s: cannot set attribute times"
+				    " for %s: "), cmd, target);
 				perror("");
 				++error;
 			}
@@ -1996,8 +1971,8 @@ copyattributes(char *source, char *target)
 
 	while (dp = readdir(srcdirp)) {
 		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-			(dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-			dp->d_name[2] == '\0'))
+		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
+		    dp->d_name[2] == '\0'))
 			continue;
 
 		if ((srcattrfd = openat(sourcedirfd, dp->d_name,
@@ -2095,8 +2070,8 @@ copyattributes(char *source, char *target)
 		if (srcbuf == NULL) {
 			if (!attrsilent) {
 			(void) fprintf(stderr,
-				gettext("%s: could not allocate memory"
-					" for path buffer: "), cmd);
+			    gettext("%s: could not allocate memory"
+			    " for path buffer: "), cmd);
 				perror("");
 				++error;
 			}
@@ -2108,8 +2083,8 @@ copyattributes(char *source, char *target)
 		if (targbuf == NULL) {
 			if (!attrsilent) {
 				(void) fprintf(stderr,
-					gettext("%s: could not allocate memory"
-						" for path buffer: "), cmd);
+				    gettext("%s: could not allocate memory"
+				    " for path buffer: "), cmd);
 				perror("");
 				++error;
 			}
@@ -2170,7 +2145,7 @@ copyattributes(char *source, char *target)
 				} else {
 					if (!attrsilent) {
 						(void) fprintf(stderr,
-							gettext(
+						    gettext(
 				"%s: cannot set permissions of attribute"
 				" %s for %s: "), cmd, dp->d_name, target);
 						perror("");

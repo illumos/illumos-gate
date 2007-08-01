@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,7 @@ MANIFEST =	cron.xml
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 ROOTMETHOD =	$(ROOTLIBSVCMETHOD)/svc-cron
 
-CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
+CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 
 ROOTVAR =	$(ROOT)/var
 
@@ -54,8 +54,9 @@ SCRIPT =	batch
 XPG4SCRIPT =	batch.xpg4
 
 POFILE=		$(PROG1)_cmd.po
-POFILES=	at.po crontab.po funcs.po batch.po
-XGETFLAGS=	-a -x $(PROG1).xcl
+POFILES1=	at.po crontab.po funcs.po batch.po
+POFILES=	$(POFILES1) atrm.po
+$(POFILES1) :=	XGETFLAGS= -a -x $(PROG1).xcl
 
 ROOTDIRS =	$(ROOTSPCRON) $(ROOTCROND) \
 		$(ROOTCRONTABS) $(ROOTATJOBS)
@@ -68,15 +69,19 @@ ROOTPROG =	$(PROG1:%=$(ROOTUSRSBIN)/%) $(PROG2:%=$(ROOTBIN)/%)	\
 
 ROOTSYMLINK =	$(ROOTLIBCRON) $(ROOTETC)/cron
 
+GETRESPSRC=	$(SRC)/common/util/getresponse.c
+GETRESPOBJ=	getresponse.o
 COMMONOBJ1=	permit.o
 COMMONOBJ2=	funcs.o
 COMMONOBJS=	$(COMMONOBJ1) $(COMMONOBJ2)
 CRONOBJS=	cron.o elm.o
 ATOBJS=		at.o att1.o att2.o
 XPG4OBJS=	values-xpg4.o
-ATRMOBJS=	atrm.o
+ATRMOBJS1=	atrm.o
+ATRMOBJS=	$(ATRMOBJS1) $(GETRESPOBJ)
 ATQOBJS=	atq.o
-CRONTABOBJS=	crontab.o
+CRONTABOBJS1=	crontab.o
+CRONTABOBJS=	$(CRONTABOBJS1) $(GETRESPOBJ)
 
 # /usr/xpg*/bin/crontab isn't linked with values-xpg*.o since it isn't
 # required by any specific behavior differences; this makes these
@@ -97,16 +102,14 @@ crontab :=	POBJS = $(CRONTABOBJS) $(COMMONOBJS)
 crontab.xpg4 :=	POBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
 crontab.xpg6 :=	POBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
 
-at.o objs.xpg4/at.o funcs.o objs.xpg4/funcs.o objs.xpg6/funcs.o permit.o \
-objs.xpg4/permit.o objs.xpg6/permit.o crontab.o objs.xpg4/crontab.o \
-objs.xpg6/crontab.o elm.o := CFLAGS += $(CCVERBOSE)
+CFLAGS += $(CCVERBOSE)
 
-NOBJS=		$(CRONOBJS) $(ATOBJS) $(ATRMOBJS) $(ATQOBJS) $(CRONTABOBJS) \
+NOBJS=		$(CRONOBJS) $(ATOBJS) $(ATRMOBJS1) $(ATQOBJS) $(CRONTABOBJS1) \
 		$(COMMONOBJS)
 OBJS =		$(NOBJS) $(XPG4COMMONOBJS) $(XPG4ATOBJS) $(XPG4CTOBJS) \
-		$(XPG6COMMONOBJS) $(XPG6CTOBJS)
+		$(XPG6COMMONOBJS) $(XPG6CTOBJS) $(GETRESPOBJ)
 		
-SRCS =		$(NOBJS:%.o=%.c)
+SRCS =		$(NOBJS:%.o=%.c) $(GETRESPSRC)
 
 CLOBBERFILES +=	$(SCRIPT) $(XPG4SCRIPT)
 
@@ -151,6 +154,8 @@ lint :=		LDLIBS += -lproject -lsecdb -lcontract -lpam
 $(XPG4) := CFLAGS += -DXPG4
 $(XPG6) := CFLAGS += -DXPG6
 
+LINTFLAGS += -u
+
 $(ROOTSVCSYSTEM)/cron.xml := OWNER = root
 $(ROOTSVCSYSTEM)/cron.xml := GROUP = sys
 $(ROOTSVCSYSTEM)/cron.xml := FILEMODE = 0444
@@ -179,13 +184,13 @@ $(XPG6) :	objs.xpg6 $$(POBJS)
 		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-objs.xpg6/%.o:	%.c
+objs.xpg6/%.o:		%.c
 	$(COMPILE.c) -o $@ $<
 
 objs.xpg6:
 	-@mkdir -p $@
 
-objs.xpg4/%.o:	%.c
+objs.xpg4/%.o:		%.c
 	$(COMPILE.c) -o $@ $<
 
 objs.xpg4:
@@ -193,6 +198,18 @@ objs.xpg4:
 
 objs.xpg4/values-xpg4.o:	../../lib/common/common/values-xpg4.c
 	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+
+%.o:			$(SRC)/common/util/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
+objs.xpg4/%.o:	$(SRC)/common/util/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs.xpg6/%.o:	$(SRC)/common/util/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 att1.c :	att1.y
 		$(YACC.y) -d att1.y

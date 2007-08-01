@@ -69,6 +69,8 @@
 #include <iconv.h>
 #include <assert.h>
 #include <aclutils.h>
+#include "getresponse.h"
+
 #if defined(__SunOS_5_6) || defined(__SunOS_5_7)
 extern int defcntl();
 #endif
@@ -447,7 +449,6 @@ static int is_prefix(char *s1, char *s2);
 static int response(void);
 static int build_dblock(const char *, const char *, const char,
 	const int filetype, const struct stat *, const dev_t, const char *);
-static wchar_t yesnoresponse(void);
 static unsigned int hash(char *str);
 
 #ifdef	_iBCS2
@@ -656,6 +657,12 @@ main(int argc, char *argv[])
 		usage();
 
 	tfile = NULL;
+
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(2);
+	}
 
 	/*
 	 *  For XPG4 compatibility, we must be able to accept the "--"
@@ -3279,15 +3286,11 @@ xsfile(int ofd)
 
 	/* make sure we do extractions in order */
 	if (extno != 1) {	/* starting in middle of file? */
-		wchar_t yeschar;
-		wchar_t nochar;
-		(void) mbtowc(&yeschar, nl_langinfo(YESSTR), MB_LEN_MAX);
-		(void) mbtowc(&nochar, nl_langinfo(NOSTR), MB_LEN_MAX);
 		(void) printf(gettext(
 		    "tar: first extent read is not #1\n"
-		    "OK to read file beginning with extent #%d (%wc/%wc) ? "),
-		    extno, yeschar, nochar);
-		if (yesnoresponse() != yeschar) {
+		    "OK to read file beginning with extent #%d (%s/%s) ? "),
+		    extno, yesstr, nostr);
+		if (yes() == 0) {
 canit:
 			passtape();
 			if (close(ofd) != 0)
@@ -3958,7 +3961,7 @@ checkw(char c, char *name)
 		if (vflag)
 			longt(&stbuf, ' ');	/* do we have acl info here */
 		(void) fprintf(vfile, "%s: ", name);
-		if (response() == 'y') {
+		if (yes() == 1) {
 			return (1);
 		}
 		return (0);
@@ -5163,21 +5166,6 @@ check_prefix(char **namep, char **dirp, char **compp)
 	*dirp = dir;
 	*compp = component;
 }
-
-
-static wchar_t
-yesnoresponse(void)
-{
-	wchar_t c;
-
-	c = getwchar();
-	if (c != '\n')
-		while (getwchar() != '\n')
-			;
-	else c = 0;
-	return (c);
-}
-
 
 /*
  * Return true if the object indicated by the file descriptor and type
@@ -7368,7 +7356,7 @@ append_ext_attr(char *shortname, char **secinfo, int *len)
 		 * append DIR_TYPE
 		 */
 		(void) append_secattr(secinfo, len, 1,
-			"\0", DIR_TYPE);
+		    "\0", DIR_TYPE);
 
 		/*
 		 * Get and append attribute types LBL_TYPE.
@@ -7831,7 +7819,7 @@ rebuild_lk_comp_path(char *str, char **namep)
 					    getzoneidbylabel(&bslabel)) == -1) {
 						(void) fprintf(stderr,
 						    gettext("tar: can't get "
-							"zone ID for %s\n"),
+						    "zone ID for %s\n"),
 						    tempbuf);
 						return (-1);
 					}
@@ -7840,7 +7828,7 @@ rebuild_lk_comp_path(char *str, char **namep)
 						/* Badly configured zone info */
 						(void) fprintf(stderr,
 						    gettext("tar: can't get "
-							"zonename for %s\n"),
+						    "zonename for %s\n"),
 						    tempbuf);
 						return (-1);
 					}
@@ -7873,8 +7861,8 @@ rebuild_lk_comp_path(char *str, char **namep)
 		default:
 
 			(void) fprintf(stderr, gettext(
-				"tar: error rebuilding path %s\n"),
-				*namep);
+			    "tar: error rebuilding path %s\n"),
+			    *namep);
 			*buf = '\0';
 			str++;
 			return (-1);
@@ -7913,8 +7901,8 @@ check_ext_attr(char *filename)
 	if (getlabel(filename, &currentlabel) != 0) {
 		(void) fprintf(stderr,
 		    gettext("tar: can't get label for "
-			" %s, getlabel() error: %s\n"),
-			filename, strerror(errno));
+		    " %s, getlabel() error: %s\n"),
+		    filename, strerror(errno));
 		return (0);
 	} else if ((blequal(&currentlabel, &bs_label)) == 0) {
 		char	*src_label = NULL;	/* ascii label */
@@ -7923,11 +7911,11 @@ check_ext_attr(char *filename)
 		if (bsltos(&bs_label, &src_label, 0, 0) <= 0) {
 			(void) fprintf(stderr,
 			    gettext("tar: can't interpret requested label for"
-				" %s\n"), filename);
+			    " %s\n"), filename);
 		} else {
 			(void) fprintf(stderr,
 			    gettext("tar: can't apply label %s to %s\n"),
-				src_label, filename);
+			    src_label, filename);
 			free(src_label);
 		}
 		(void) fprintf(stderr,

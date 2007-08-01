@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,14 +137,8 @@ static char rcs_ident[] =
 #include <fcntl.h>
 #include <dirent.h>
 #include <aclutils.h>
-
-/*
- * Multi-byte handling for 'y' or 'n'
- */
-static char	*yesstr;		/* string contains int'l for "yes" */
-static char	*nostr;			/* string contains int'l for "yes" */
-static int	ynsize = 0;		/* # of (multi)bytes for "y" */
-static char	*yesorno;		/* int'l input for 'y' */
+#include <errno.h>
+#include "getresponse.h"
 
 static int n_bits;			/* number of bits/code */
 static int maxbits = BITS;	/* user settable max # bits/code */
@@ -342,7 +336,7 @@ main(int argc, char *argv[])
 	struct stat statbuf;
 	struct stat ostatbuf;
 	int ch;				/* XCU4 */
-	char	*p, *yptr, *nptr;
+	char	*p;
 	extern int optind, optopt;
 	extern char *optarg;
 	int dash_count = 0;		/* times "-" is on cmdline */
@@ -353,22 +347,12 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	/* Build multi-byte char for 'y' char */
-	if ((yptr = nl_langinfo(YESSTR)) == NULL)
-		yptr = "y";
 
-	yesstr = (char *)malloc(strlen(yptr) + 1);
-	(void) strcpy(yesstr, yptr);
-	/* Build multi-byte char for 'n' char */
-	if ((nptr = nl_langinfo(NOSTR)) == NULL)
-		nptr = "n";
-
-	nostr = (char *)malloc(strlen(nptr) + 1);
-	(void) strcpy(nostr, nptr);
-
-	/* Build multi-byte char for input char */
-	yesorno = (char *)malloc((size_t)ynsize + 1);
-	ynsize = mblen(yesstr, strlen(yesstr));
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(1);
+	}
 
 	/* This bg check only works for sh. */
 	if ((oldint = signal(SIGINT, SIG_IGN)) != SIG_IGN) {
@@ -461,14 +445,14 @@ main(int argc, char *argv[])
 				p = optarg;
 				if (!p) {
 					(void) fprintf(stderr, gettext(
-						"Missing maxbits\n"));
+					    "Missing maxbits\n"));
 					Usage();
 					exit(1);
 				}
 				maxbits = strtoul(optarg, &p, 10);
 				if (*p) {
 					(void) fprintf(stderr, gettext(
-						"Missing maxbits\n"));
+					    "Missing maxbits\n"));
 					Usage();
 					exit(1);
 				}
@@ -484,7 +468,7 @@ main(int argc, char *argv[])
 				break;
 			default:
 				(void) fprintf(stderr, gettext(
-					"Unknown flag: '%c'\n"), optopt);
+				    "Unknown flag: '%c'\n"), optopt);
 				Usage();
 				exit(1);
 		}
@@ -497,7 +481,7 @@ main(int argc, char *argv[])
 	if (zcat_cmd && (Fflg | Cflg | cflg |
 	    bflg | qflg | dflg | nomagic)) {
 		(void) fprintf(stderr, gettext(
-			"Invalid Option\n"));
+		    "Invalid Option\n"));
 		Usage();
 		exit(1);
 	}
@@ -517,8 +501,8 @@ main(int argc, char *argv[])
 
 	if (dash_count > 1) {
 		(void) fprintf(stderr,
-			gettext("%s may only appear once in the file"
-				" list\n"), "\"-\"");
+		    gettext("%s may only appear once in the file"
+		    " list\n"), "\"-\"");
 		exit(1);
 	}
 
@@ -529,8 +513,8 @@ main(int argc, char *argv[])
 
 	if (fileptr - filelist > 1 && cflg && !do_decomp) {
 		(void) fprintf(stderr,
-			gettext("compress: only one file may be compressed"
-				" to stdout\n"));
+		    gettext("compress: only one file may be compressed"
+		    " to stdout\n"));
 		exit(1);
 	}
 
@@ -544,13 +528,13 @@ main(int argc, char *argv[])
 
 	if ((infile = fopen("/dev/null", "r")) == NULL) {
 		(void) fprintf(stderr, gettext("Error opening /dev/null for "
-			"input\n"));
+		    "input\n"));
 		exit(1);
 	}
 
 	if ((outfile = fopen("/dev/null", "w")) == NULL) {
 		(void) fprintf(stderr, gettext("Error opening /dev/null for "
-			"output\n"));
+		    "output\n"));
 		exit(1);
 	}
 
@@ -587,12 +571,12 @@ main(int argc, char *argv[])
 					/* No .Z: tack one on */
 
 					if (strlcpy(tempname, *fileptr,
-						sizeof (tempname)) >=
-						sizeof (tempname)) {
+					    sizeof (tempname)) >=
+					    sizeof (tempname)) {
 						(void) fprintf(stderr,
 						    gettext("%s: filename "
-							"too long\n"),
-							*fileptr);
+						    "too long\n"),
+						    *fileptr);
 						perm_stat = 1;
 						continue;
 					}
@@ -629,9 +613,9 @@ main(int argc, char *argv[])
 				    (getc(inp) !=
 				    (magic_header[1] & 0xFF))) {
 					(void) fprintf(stderr, gettext(
-						"%s: not in compressed "
-						"format\n"),
-						*fileptr);
+					    "%s: not in compressed "
+					    "format\n"),
+					    *fileptr);
 					perm_stat = 1;
 					continue;
 				}
@@ -650,11 +634,11 @@ main(int argc, char *argv[])
 
 				if (maxbits > BITS) {
 					(void) fprintf(stderr,
-						gettext("%s: compressed "
-							"with %d bits, "
-							"can only handle"
-							" %d bits\n"),
-						*fileptr, maxbits, BITS);
+					    gettext("%s: compressed "
+					    "with %d bits, "
+					    "can only handle"
+					    " %d bits\n"),
+					    *fileptr, maxbits, BITS);
 					perm_stat = 1;
 					continue;
 				}
@@ -664,12 +648,12 @@ main(int argc, char *argv[])
 				/* Generate output filename */
 
 				if (strlcpy(ofname, *fileptr,
-					    sizeof (ofname)) >=
+				    sizeof (ofname)) >=
 				    sizeof (ofname)) {
 					(void) fprintf(stderr,
-						gettext("%s: filename "
-							"too long\n"),
-						*fileptr);
+					    gettext("%s: filename "
+					    "too long\n"),
+					    *fileptr);
 					perm_stat = 1;
 					continue;
 				}
@@ -705,9 +689,9 @@ main(int argc, char *argv[])
 				if (strcmp(*fileptr +
 				    strlen(*fileptr) - 2, ".Z") == 0) {
 					(void) fprintf(stderr, gettext(
-						"%s: already has .Z "
-						"suffix -- no change\n"),
-						*fileptr);
+					    "%s: already has .Z "
+					    "suffix -- no change\n"),
+					    *fileptr);
 					perm_stat = 1;
 					continue;
 				}
@@ -750,18 +734,18 @@ main(int argc, char *argv[])
 					/* Generate output filename */
 
 					if (strlcpy(ofname, *fileptr,
-						sizeof (ofname)) >=
-						sizeof (ofname)) {
+					    sizeof (ofname)) >=
+					    sizeof (ofname)) {
 						(void) fprintf(stderr,
 						    gettext("%s: filename "
-							"too long\n"),
-							*fileptr);
+						    "too long\n"),
+						    *fileptr);
 						perm_stat = 1;
 						continue;
 					}
 
 					if (addDotZ(ofname,
-						sizeof (ofname)) < 0) {
+					    sizeof (ofname)) < 0) {
 						perm_stat = 1;
 						continue;
 					}
@@ -773,32 +757,25 @@ main(int argc, char *argv[])
 
 		if (!overwrite && !use_stdout) {
 			if (stat(ofname, &ostatbuf) == 0) {
-				yesorno[ynsize] = (char)NULL;
 				(void) fprintf(stderr, gettext(
-					"%s already exists;"), ofname);
+				    "%s already exists;"), ofname);
 				if (bgnd_flag == 0 && isatty(2)) {
 					int cin;
 
 					(void) fprintf(stderr, gettext(
-						" do you wish to overwr"
-						"ite %s (%s or %s)? "),
-						ofname, yesstr, nostr);
+					    " do you wish to overwr"
+					    "ite %s (%s or %s)? "),
+					    ofname, yesstr, nostr);
 					(void) fflush(stderr);
-					for (cin = 0; cin < LINE_MAX;
-					    cin++)
+					for (cin = 0; cin < LINE_MAX; cin++)
 						line[cin] = 0;
 					(void) read(2, line, LINE_MAX);
-					(void) strncpy(yesorno, line,
-						ynsize);
 
-					if (!((strncmp(yesstr, yesorno,
-						ynsize) == 0) ||
-						(yesorno[0] == 'y') ||
-						(yesorno[0] == 'Y'))) {
+					if (yes_check(line) == 0) {
 						(void) fprintf(stderr,
-							gettext(
-							"\tnot overwri"
-							"tten\n"));
+						    gettext(
+						    "\tnot overwri"
+						    "tten\n"));
 						continue;
 					}
 				} else {
@@ -810,10 +787,10 @@ main(int argc, char *argv[])
 					 */
 
 					(void) fprintf(stderr, gettext(
-						"%s: File exists, -f not"
-						" specified, and ru"
-						"nning in the backgro"
-						"und.\n"), *fileptr);
+					    "%s: File exists, -f not"
+					    " specified, and ru"
+					    "nning in the backgro"
+					    "und.\n"), *fileptr);
 					perm_stat = 1;
 					continue;
 				}
@@ -832,12 +809,12 @@ main(int argc, char *argv[])
 			precious = 0;
 			if (!quiet) {
 				(void) fprintf(stderr, "%s: ",
-					*fileptr);
+				    *fileptr);
 				newline_needed = 1;
 			}
 		} else if (!quiet && !do_decomp) {
 			(void) fprintf(stderr, "%s: ",
-				*fileptr);
+			    *fileptr);
 				newline_needed = 1;
 		}
 
@@ -876,8 +853,8 @@ main(int argc, char *argv[])
 			if (ferror(inp) || jmpval == 2) {
 				if (do_decomp) {
 					(void) fprintf(stderr, gettext(
-						"uncompress: %s: corrupt"
-						" input\n"), *fileptr);
+					    "uncompress: %s: corrupt"
+					    " input\n"), *fileptr);
 				} else {
 					perror(*fileptr);
 				}
@@ -923,9 +900,9 @@ main(int argc, char *argv[])
 				if (!force && perm_stat == 0) {
 					if (quiet) {
 						(void) fprintf(stderr, gettext(
-							"%s: -- file "
-							"unchanged\n"),
-							*fileptr);
+						    "%s: -- file "
+						    "unchanged\n"),
+						    *fileptr);
 					}
 
 					perm_stat = 2;
@@ -950,7 +927,7 @@ cinterr(int hshift)
 {
 	/* we have exceeded the hash table */
 	(void) fprintf(stderr,
-		"internal error: hashtable exceeded - hsize = %ld\n", hsize);
+	    "internal error: hashtable exceeded - hsize = %ld\n", hsize);
 	(void) fprintf(stderr, "hshift = %d, %d\n", hshift, (1 << hshift) -1);
 	(void) fprintf(stderr, "maxbits = %d\n", maxbits);
 	(void) fprintf(stderr, "n_bits = %d\n", n_bits);
@@ -1010,7 +987,7 @@ compress()
 		if ((putc(magic_header[0], outp) == EOF ||
 		    putc(magic_header[1], outp) == EOF ||
 		    putc((char)(maxbits | block_compress),
-			outp) == EOF) &&
+		    outp) == EOF) &&
 		    ferror(outp)) {
 			ioerror();
 		}
@@ -1126,27 +1103,27 @@ compress()
 	if (!quiet) {
 #ifdef DEBUG
 		(void) fprintf(stderr,
-			"%lld chars in, %lld codes (%lld bytes) out, "
-			"compression factor: ",
-			(count_long)in_count, (count_long)out_count,
-			(count_long) bytes_out);
+		    "%lld chars in, %lld codes (%lld bytes) out, "
+		    "compression factor: ",
+		    (count_long)in_count, (count_long)out_count,
+		    (count_long) bytes_out);
 		prratio(stderr, (count_long)in_count,
-			(count_long)bytes_out);
+		    (count_long)bytes_out);
 		(void) fprintf(stderr, "\n");
 		(void) fprintf(stderr, "\tCompression as in compact: ");
 		prratio(stderr,
-			(count_long)in_count-(count_long)bytes_out,
-			(count_long)in_count);
+		    (count_long)in_count-(count_long)bytes_out,
+		    (count_long)in_count);
 		(void) fprintf(stderr, "\n");
 		(void) fprintf(stderr,
-			"\tLargest code (of last block) was %d"
-			" (%d bits)\n",
-			free_ent - 1, n_bits);
+		    "\tLargest code (of last block) was %d"
+		    " (%d bits)\n",
+		    free_ent - 1, n_bits);
 #else /* !DEBUG */
 		(void) fprintf(stderr, gettext("Compression: "));
 		prratio(stderr,
-			(count_long)in_count-(count_long)bytes_out,
-			(count_long)in_count);
+		    (count_long)in_count-(count_long)bytes_out,
+		    (count_long)in_count);
 #endif /* DEBUG */
 	}
 	/* report if no savings */
@@ -1186,7 +1163,7 @@ output(code_int code)
 #ifdef DEBUG
 	if (verbose)
 		(void) fprintf(stderr, "%5d%c", code,
-			(col += 6) >= 74 ? (col = 0, '\n') : ' ');
+		    (col += 6) >= 74 ? (col = 0, '\n') : ' ');
 #endif /* DEBUG */
 	if (code >= 0) {
 		/*
@@ -1264,7 +1241,7 @@ output(code_int code)
 #ifdef DEBUG
 			if (debug) {
 				(void) fprintf(stderr,
-					"\nChange to %d bits\n", n_bits);
+				    "\nChange to %d bits\n", n_bits);
 				col = 0;
 			}
 #endif /* DEBUG */
@@ -1495,7 +1472,7 @@ printcodes()
 			col = 0;
 		}
 		(void) fprintf(stderr, "%5d%c",
-			code, (col += 6) >= 74 ? (col = 0, '\n') : ' ');
+		    code, (col += 6) >= 74 ? (col = 0, '\n') : ' ');
 	}
 	(void) putc('\n', stderr);
 }
@@ -1525,18 +1502,18 @@ dump_tab()	/* dump string table */
 			de_stack[--stack_top] = '\n';
 			de_stack[--stack_top] = '"';
 			stack_top =
-				in_stack((htabof(sorttab[i]) >> maxbits) & 0xff,
-					stack_top);
+			    in_stack((htabof(sorttab[i]) >> maxbits) & 0xff,
+			    stack_top);
 			for (ent = htabof(sorttab[i]) & ((1 << maxbits) -1);
-				ent > 256;
-				ent = htabof(sorttab[ent]) & ((1<<maxbits)-1)) {
+			    ent > 256;
+			    ent = htabof(sorttab[ent]) & ((1<<maxbits)-1)) {
 				stack_top = in_stack(
-					htabof(sorttab[ent]) >> maxbits,
-					stack_top);
+				    htabof(sorttab[ent]) >> maxbits,
+				    stack_top);
 			}
 			stack_top = in_stack(ent, stack_top);
 			(void) fwrite(&de_stack[stack_top], 1,
-				STACK_SIZE - stack_top, stderr);
+			    STACK_SIZE - stack_top, stderr);
 			stack_top = STACK_SIZE;
 		}
 	} else if (!debug) {	/* decompressing */
@@ -1546,20 +1523,20 @@ dump_tab()	/* dump string table */
 			c = tab_suffixof(ent);
 			if (isascii(c) && isprint(c))
 				(void) fprintf(stderr, "%5d: %5d/'%c'  \"",
-					ent, tab_prefixof(ent), c);
+				    ent, tab_prefixof(ent), c);
 			else
 				(void) fprintf(stderr, "%5d: %5d/\\%03o \"",
-					ent, tab_prefixof(ent), c);
+				    ent, tab_prefixof(ent), c);
 			de_stack[--stack_top] = '\n';
 			de_stack[--stack_top] = '"';
 			for (; ent != NULL;
-				ent = (ent >= FIRST ? tab_prefixof(ent) :
-						NULL)) {
+			    ent = (ent >= FIRST ? tab_prefixof(ent) :
+			    NULL)) {
 				stack_top = in_stack(tab_suffixof(ent),
-								stack_top);
+				    stack_top);
 			}
 			(void) fwrite(&de_stack[stack_top], 1,
-				STACK_SIZE - stack_top, stderr);
+			    STACK_SIZE - stack_top, stderr);
 			stack_top = STACK_SIZE;
 		}
 	}
@@ -1617,12 +1594,12 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 		perror(ifname);
 		return;
 	} else if ((ifstat->st_mode &
-			S_IFMT /* 0170000 */) != S_IFREG /* 0100000 */) {
+	    S_IFMT /* 0170000 */) != S_IFREG /* 0100000 */) {
 		if (quiet) {
 			(void) fprintf(stderr, "%s: ", ifname);
 		}
 		(void) fprintf(stderr, gettext(
-			" -- not a regular file: unchanged"));
+		    " -- not a regular file: unchanged"));
 		newline_needed = 1;
 		perm_stat = 1;
 	} else if (ifstat->st_nlink > 1) {
@@ -1630,22 +1607,22 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 			(void) fprintf(stderr, "%s: ", ifname);
 		}
 		(void) fprintf(stderr, gettext(
-			" -- has %d other links: unchanged"),
-			(uint_t)ifstat->st_nlink - 1);
+		    " -- has %d other links: unchanged"),
+		    (uint_t)ifstat->st_nlink - 1);
 		newline_needed = 1;
 		perm_stat = 1;
 	} else if (didnt_shrink && !force) {
 		/* No compression: remove file.Z */
 		if (!quiet) {
 			(void) fprintf(stderr, gettext(
-				" -- file unchanged"));
+			    " -- file unchanged"));
 			newline_needed = 1;
 		}
 	} else if ((pathconf(ifname, _PC_XATTR_EXISTS) == 1) &&
-			(mv_xattrs(ifname, ofname, 0) < 0)) {
+	    (mv_xattrs(ifname, ofname, 0) < 0)) {
 		(void) fprintf(stderr, gettext(
-			"%s: -- cannot preserve extended attributes, "
-			"file unchanged"), ifname);
+		    "%s: -- cannot preserve extended attributes, "
+		    "file unchanged"), ifname);
 		newline_needed = 1;
 		/* Move attributes back ... */
 		(void) mv_xattrs(ofname, ifname, 1);
@@ -1682,7 +1659,7 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 			perror(ifname);
 		if (!quiet) {
 			(void) fprintf(stderr, gettext(
-				" -- replaced with %s"), ofname);
+			    " -- replaced with %s"), ofname);
 			newline_needed = 1;
 		}
 		return;		/* Successful return */
@@ -1729,7 +1706,7 @@ cl_block(count_long in_count)	/* table clear for block compress */
 #ifdef DEBUG
 	if (debug) {
 		(void) fprintf(stderr, "count: %lld, ratio: ",
-			(count_long)in_count);
+		    (count_long)in_count);
 		prratio(stderr, (count_long)in_count, (count_long)bytes_out);
 		(void) fprintf(stderr, "\n");
 	}
@@ -1808,7 +1785,7 @@ prratio(FILE *stream, count_long num, count_long den)
 		q = -q;
 	}
 	(void) fprintf(stream, "%d%s%02d%%", q / 100,
-			localeconv()->decimal_point, q % 100);
+	    localeconv()->decimal_point, q % 100);
 }
 
 static void
@@ -1872,8 +1849,8 @@ addDotZ(char *fn, size_t fnsize)
 
 	if ((strlen(local_basename(fn)) + 2) > (size_t)max_name) {
 		(void) fprintf(stderr,
-			gettext("%s: filename too long to tack on .Z:"
-				" %s\n"), progname, fn);
+		    gettext("%s: filename too long to tack on .Z:"
+		    " %s\n"), progname, fn);
 		return (-1);
 	}
 
@@ -1881,15 +1858,15 @@ addDotZ(char *fn, size_t fnsize)
 
 	if ((strlen(fn) + 2) > (size_t)max_path - 1) {
 		(void) fprintf(stderr,
-			gettext("%s: Pathname too long to tack on .Z:"
-				" %s\n"), progname, fn);
+		    gettext("%s: Pathname too long to tack on .Z:"
+		    " %s\n"), progname, fn);
 		return (-1);
 	}
 
 	if (strlcat(fn, ".Z", fnsize) >= fnsize) {
 		(void) fprintf(stderr,
-			gettext("%s: Buffer overflow adding .Z to %s\n"),
-				progname, fn);
+		    gettext("%s: Buffer overflow adding .Z to %s\n"),
+		    progname, fn);
 		return (-1);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,8 @@
 #include <unistd.h>
 #include <locale.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 #include "cron.h"
 
 extern char	*errmsg();
@@ -131,7 +133,7 @@ main(int argc, char **argv)
 			atabortperror("can't allocate list of users");
 		for (i = 0; i < argc; i++) {
 			if ((chkauthattr(CRONADMIN_AUTH, pr.pw_name)) ||
-					strcmp(pr.pw_name, argv[i]) == 0) {
+			    strcmp(pr.pw_name, argv[i]) == 0) {
 				if ((pp = getpwnam(argv[i])) == NULL) {
 					(void) fprintf(stderr,
 					    "atq: No such user %s\n", argv[i]);
@@ -204,7 +206,7 @@ main(int argc, char **argv)
 			if (argnum != argc) c = pr.pw_name;
 			else c = *argv;
 		printf("no files for %s.\n", (argnum == 1) ?
-					c : "specified users");
+		    c : "specified users");
 		exit(0);
 	}
 	printqueue(uidlist, argnum);
@@ -370,7 +372,6 @@ static void
 printdate(char *filename)
 {
 	time_t	jobdate;
-	extern time_t num();
 	struct tm *unpackeddate;
 	char date[18];				/* reformatted execution date */
 
@@ -499,7 +500,6 @@ execution(struct dirent **d1, struct dirent **d2)
 	char *name1, *name2;
 	time_t time1, time2;
 	int seq1, seq2;
-	extern time_t num();
 
 	name1 = (*d1)->d_name;
 	name2 = (*d2)->d_name;

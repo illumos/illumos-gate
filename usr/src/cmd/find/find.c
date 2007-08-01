@@ -52,12 +52,12 @@
 #include <locale.h>
 #include <string.h>
 #include <strings.h>
-#include <libgen.h>
 #include <ctype.h>
 #include <wait.h>
 #include <fnmatch.h>
 #include <langinfo.h>
 #include <ftw.h>
+#include "getresponse.h"
 
 #define	A_DAY		(long)(60*60*24)	/* a day full of seconds */
 #define	A_MIN		(long)(60)
@@ -244,7 +244,7 @@ main(int argc, char **argv)
 	cmdname = argv[0];
 	if (time(&now) == (time_t)(-1)) {
 		(void) fprintf(stderr, gettext("%s: time() %s\n"),
-			cmdname, strerror(errno));
+		    cmdname, strerror(errno));
 		exit(1);
 	}
 	while ((c = getopt(argc, argv, "HL")) != -1) {
@@ -304,8 +304,8 @@ main(int argc, char **argv)
 
 		if (freenode == NULL) {
 			(void) fprintf(stderr, gettext("%s: can't append -print"
-				" implicitly; try explicit -print option\n"),
-				cmdname);
+			    " implicitly; try explicit -print option\n"),
+			    cmdname);
 			exit(1);
 		}
 		savenode = topnode;
@@ -343,8 +343,8 @@ main(int argc, char **argv)
 		 */
 		if ((cwdpath = getcwd(NULL, PATH_MAX)) == NULL) {
 			(void) fprintf(stderr,
-				gettext("%s : cannot get the current working "
-					"directory\n"), cmdname);
+			    gettext("%s : cannot get the current working "
+			    "directory\n"), cmdname);
 			exit(1);
 		} else
 			free(cwdpath);
@@ -390,6 +390,12 @@ int *actionp;
 	char **com;
 	int i;
 	enum Command wasop = PRINT;
+
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(1);
+	}
 
 	for (av = argv; *av && (argp = lookup(*av)); av++) {
 		np->next = 0;
@@ -995,7 +1001,9 @@ ok(name, argv)
 char *name;
 char *argv[];
 {
-	int c, yes = 0;
+	int  c;
+	int i = 0;
+	char resp[LINE_MAX + 1];
 
 	(void) fflush(stdout); 	/* to flush possible `-print' */
 
@@ -1005,14 +1013,19 @@ char *argv[];
 		(void) fprintf(stderr, "< {} ... %s >?   ", name);
 
 	(void) fflush(stderr);
-	if ((c = tolower(getchar())) == *nl_langinfo(YESSTR))
-		yes = 1;
-	while (c != '\n')
+
+	while ((c = getchar()) != '\n') {
 		if (c == EOF)
 			exit(2);
-		else
-			c = getchar();
-	return (yes? doexec(name, argv, NULL): 0);
+		if (i < LINE_MAX)
+			resp[i++] = c;
+	}
+	resp[i] = '\0';
+
+	if (yes_check(resp))
+		return (doexec(name, argv, NULL));
+	else
+		return (0);
 }
 
 /*
@@ -1343,7 +1356,7 @@ getshell()
 	if (((sh = getenv("SHELL")) != 0) && *sh == '/') {
 		if (u = getuid()) {
 			if ((u != geteuid() || getgid() != getegid()) &&
-					!access(sh, 2))
+			    access(sh, 2) == 0)
 				goto defshell;
 			s = strrchr(sh, '/');
 			*s = 0;
@@ -1645,8 +1658,8 @@ init_remote_fs()
 
 	if ((fp = fopen(REMOTE_FS, "r")) == NULL) {
 		(void) fprintf(stderr,
-			gettext("%s: Warning: can't open %s, ignored\n"),
-				REMOTE_FS, cmdname);
+		    gettext("%s: Warning: can't open %s, ignored\n"),
+		    REMOTE_FS, cmdname);
 		/* Use default string name for NFS */
 		remote_fstypes[fstype_index++] = "nfs";
 		return;

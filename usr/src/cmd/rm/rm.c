@@ -47,6 +47,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <values.h>
+#include "getresponse.h"
 
 #define	E_OK	010		/* make __accessat() use effective ids */
 
@@ -70,9 +71,6 @@ static struct dlist top = {
 	(int)AT_FDCWD,
 	DIR_CANTCLOSE,
 };
-
-static char yeschr[SCHAR_MAX + 2];
-static char nochr[SCHAR_MAX + 2];
 
 static struct dlist *cur, *rec;
 
@@ -102,9 +100,6 @@ main(int argc, char **argv)
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-
-	(void) strncpy(yeschr, nl_langinfo(YESSTR), SCHAR_MAX + 1);
-	(void) strncpy(nochr, nl_langinfo(NOSTR), SCHAR_MAX + 1);
 
 	while ((c = getopt(argc, argv, "frRi")) != EOF)
 		switch (c) {
@@ -160,6 +155,12 @@ main(int argc, char **argv)
 	pathbuf = malloc(pathbuflen);
 	if (pathbuf == NULL)
 		memerror();
+
+	if (init_yes() < 0) {
+		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
+		    strerror(errno));
+		exit(2);
+	}
 
 	for (; *argv != NULL; argv++) {
 		char *p = strrchr(*argv, '/');
@@ -371,7 +372,7 @@ rm(const char *entry, struct dlist *caller)
 		 */
 		if (interactive && !confirm(stderr,
 		    gettext("rm: examine files in directory %s (%s/%s)? "),
-		    pathbuf, yeschr, nochr)) {
+		    pathbuf, yesstr, nostr)) {
 			return (0);
 		}
 
@@ -390,7 +391,7 @@ rm(const char *entry, struct dlist *caller)
 		    __accessat(caller->fd, entry, W_OK|X_OK|E_OK) != 0 &&
 		    !confirm(stderr,
 		    gettext("rm: examine files in directory %s (%s/%s)? "),
-		    pathbuf, yeschr, nochr)) {
+		    pathbuf, yesstr, nostr)) {
 			return (0);
 		}
 #endif
@@ -424,7 +425,7 @@ rm(const char *entry, struct dlist *caller)
  */
 				if (!confirm(stderr,
 				    gettext("rm: remove %s (%s/%s)? "),
-				    pathbuf, yeschr, nochr)) {
+				    pathbuf, yesstr, nostr)) {
 					errcnt++;
 					return (0);
 				}
@@ -500,7 +501,7 @@ unlinkit:
 	 */
 	if (interactive) {
 		if (!confirm(stderr, gettext("rm: remove %s (%s/%s)? "),
-		    pathbuf, yeschr, nochr)) {
+		    pathbuf, yesstr, nostr)) {
 			return (0);
 		}
 	} else if (!silent && flag == 0) {
@@ -523,7 +524,7 @@ unlinkit:
 		    __accessat(caller->fd, entry, W_OK|E_OK) != 0 &&
 		    !confirm(stdout,
 		    gettext("rm: %s: override protection %o (%s/%s)? "),
-		    pathbuf, temp.st_mode & 0777, yeschr, nochr)) {
+		    pathbuf, temp.st_mode & 0777, yesstr, nostr)) {
 			return (0);
 		}
 	}
@@ -561,30 +562,6 @@ unlinkit:
 		errcnt++;
 	}
 	return (0);
-}
-
-static int
-yes(void)
-{
-	int i, b;
-	char ans[SCHAR_MAX + 1];
-
-	for (i = 0; ; i++) {
-		b = getchar();
-		if (b == '\n' || b == '\0' || b == EOF) {
-			ans[i] = 0;
-			break;
-		}
-		if (i < SCHAR_MAX)
-			ans[i] = (char)b;
-	}
-	if (i >= SCHAR_MAX) {
-		i = SCHAR_MAX;
-		ans[SCHAR_MAX] = 0;
-	}
-	if ((i == 0) | (strncmp(yeschr, ans, i)))
-		return (0);
-	return (1);
 }
 
 static int
