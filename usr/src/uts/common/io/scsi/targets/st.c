@@ -11753,6 +11753,66 @@ st_is_not_wormable(struct scsi_tape *un)
 }
 
 static writablity
+st_is_hp_dat_tape_worm(struct scsi_tape *un)
+{
+	writablity wrt;
+
+	ST_FUNC(ST_DEVINFO, st_is_hp_dat_tape_worm);
+
+	/* Mode sense should be current */
+	if (un->un_mspl->media_type == 1) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has WORM media loaded\n");
+		wrt = WORM;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has non WORM media loaded\n");
+		wrt = RDWR;
+	}
+	return (wrt);
+}
+
+#define	HP_DAT_INQUIRY 0x4A
+static writablity
+st_is_hp_dat_worm(struct scsi_tape *un)
+{
+	char *buf;
+	int result;
+	writablity wrt;
+
+	ST_FUNC(ST_DEVINFO, st_is_hp_dat_worm);
+
+	buf = kmem_zalloc(HP_DAT_INQUIRY, KM_SLEEP);
+
+	result = st_get_special_inquiry(un, HP_DAT_INQUIRY, buf, 0);
+
+	if (result != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Standard Inquiry for WORM support failed");
+		wrt = FAILED;
+	} else if ((buf[40] & 1) == 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive is NOT WORMable\n");
+		/* This drive doesn't support it so don't check again */
+		un->un_dp->options &= ~ST_WORMABLE;
+		wrt = RDWR;
+		un->un_wormable = st_is_not_wormable;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive supports WORM version %d\n", buf[40] >> 1);
+		un->un_wormable = st_is_hp_dat_tape_worm;
+		wrt = un->un_wormable(un);
+	}
+
+	kmem_free(buf, HP_DAT_INQUIRY);
+
+	/*
+	 * If drive doesn't support it no point in checking further.
+	 */
+	return (wrt);
+}
+
+static writablity
 st_is_hp_lto_tape_worm(struct scsi_tape *un)
 {
 	writablity wrt;
@@ -12182,6 +12242,14 @@ st_is_drive_worm(struct scsi_tape *un)
 	case MT_LTO:
 		if (strncmp("HP ", un->un_dp->vid, 3) == 0) {
 			wrt = st_is_hp_lto_worm(un);
+		} else {
+			wrt = st_is_t10_worm(un);
+		}
+		break;
+
+	case MT_ISDAT:
+		if (strncmp("HP ", un->un_dp->vid, 3) == 0) {
+			wrt = st_is_hp_dat_worm(un);
 		} else {
 			wrt = st_is_t10_worm(un);
 		}

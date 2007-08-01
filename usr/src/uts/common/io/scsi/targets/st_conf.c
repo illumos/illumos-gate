@@ -1104,6 +1104,41 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
+   * HP DAT-160
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "HP DDS-6 DAT",           /* .name            Display ("pretty") name     */
+    14,                       /* .length          Length of next item...      */
+    "HP      DAT160",         /* .vid             Vendor-product ID string    */
+    MT_ISDAT,                 /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*    00001           Supports variable length  */
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*    10000           Mode select compression   */
+    ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
+                              /*  -------                                     */
+                              /*  1018619                                     */
+    -1,                       /* .max_rretries      Not Used                  */
+    -1,                       /* .max_wretries      Not Used                  */
+    {0x48, 0x48, 0x48, 0x48}, /* .densities       Density codes               */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes Not Used        */
+    0,                        /* .non_motion_timeout Nothing Special          */
+    MINUTES(5),               /* .io_timeout                                  */
+    MINUTES(10),              /* .rewind_timeout                              */
+    MINUTES(20),              /* .space_timeout                               */
+    MINUTES(10),              /* .load_timeout                                */
+    MINUTES(10),              /* .unload_timeout                              */
+    MINUTES(300)              /* .erase_timeout      5 hours                  */
+  },
+
+  /*
    * HP Ultrium LTO Gen 4
    * [1] This drive supports two densites at this time.
    *     In reality the type of media GEN 3 or GEN 4 selects the density.
