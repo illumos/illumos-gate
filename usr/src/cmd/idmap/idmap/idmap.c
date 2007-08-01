@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <strings.h>
+#include <errno.h>
+#include <limits.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
 
@@ -242,6 +244,23 @@ static cmd_ops_t commands[] = {
 	}
 };
 
+
+/*
+ * Compare two strings just like strcmp, but stop before the end of
+ * the s2
+ */
+static int
+strcmp_no0(const char *s1, const char *s2) {
+	return (strncmp(s1, s2, strlen(s2)));
+}
+
+/* The same as strcmp_no0, but case insensitive. */
+static int
+strcasecmp_no0(const char *s1, const char *s2) {
+	return (strncasecmp(s1, s2, strlen(s2)));
+}
+
+
 /* Print help message */
 static void
 help() {
@@ -358,7 +377,6 @@ fini_udt_command(int ok) {
 	fini_command();
 }
 
-
 /* Convert numeric expression of the direction to it's string form */
 static char *
 direction2string(int direction) {
@@ -370,7 +388,9 @@ direction2string(int direction) {
 	case DIR_U2W:
 		return ("<=");
 	default:
-		(void) fprintf(stderr, gettext("Internal error.\n"));
+		/* This can never happen: */
+		(void) fprintf(stderr,
+		    gettext("Internal error: invalid direction.\n"));
 		return ("");
 	}
 	/* never reached */
@@ -391,39 +411,97 @@ needs_protection(char *what) {
 	return (0);
 }
 
-/* Protect all shell-special characters by '\\'  */
-static int
-shell_app(char **res, char *string) {
-	size_t res_len = 0;
-	size_t res_size = 24;
-	int i;
-	char c;
 
-	*res = (char *)malloc(res_size * sizeof (char));
-	if (*res == NULL) {
+/*
+ * Returns 1 if c is a shell-meta-character requiring quoting, 0
+ * otherwise.
+ *
+ * We don't quote '*' and ':' because they cannot do any harm
+ * a) they have no meaning to idmap_engine b) even ifsomebody copy &
+ * paste idmap output to a shell commandline, there is the identity
+ * type string in front of them. On the other hand, '*' and ':' are
+ * everywhere.
+ */
+static int
+is_shell_special(char c) {
+	if (isspace(c))
+		return (1);
+
+	if (strchr("&^{}#;'\"\\`!$()[]><|~", c) != NULL)
+		return (1);
+
+	return (0);
+}
+
+/*
+ * Quote any shell meta-characters in the given string.  If 'quote' is
+ * true then use double-quotes to quote the whole string, else use
+ * back-slash to quote each individual meta-character.
+ *
+ * The resulting string is placed in *res.  Callers must free *res if the
+ * return value isn't 0 (even if the given string had no meta-chars).
+ * If there are any errors this returns -1, else 0.
+ */
+static int
+shell_app(char **res, char *string, int quote) {
+	int i, j;
+	uint_t noss = 0; /* Number Of Shell Special chars in the input */
+	uint_t noqb = 0; /* Number Of Quotes and Backslahes in the input */
+	char *out;
+	size_t len_orig = strlen(string);
+	size_t len;
+
+	/* First, let us count how many characters we need to quote: */
+	for (i = 0; i < len_orig; i++) {
+		if (is_shell_special(string[i])) {
+			noss++;
+			if (string[i] == '"' || string[i] == '\\')
+				noqb++;
+		}
+
+	}
+
+	/* Do we need to quote at all? */
+	if (noss == 0) {
+		out = strdup(string);
+		if (out == NULL) {
+			(void) fprintf(stderr, gettext("Not enough memory.\n"));
+			return (-1);
+		}
+		*res = out;
+		return (0);
+	}
+
+	/* What is the length of the result? */
+	if (quote)
+		len = strlen(string) + 2 + noqb + 1; /* 2 for quotation marks */
+	else
+		len = strlen(string) + noss + 1;
+
+	out = (char *)malloc(len * sizeof (char));
+	if (out == NULL) {
 		(void) fprintf(stderr, gettext("Not enough memory.\n"));
 		return (-1);
 	}
 
-	for (i = 0; string[i] != '\0'; i++) {
-		c = string[i];
+	j = 0;
+	if (quote)
+		out[j++] = '"';
 
-		if (strchr("\"\\ \t#$", c) != NULL)
-			(*res)[res_len++] = '\\';
-		(*res)[res_len++] = c;
-
-		if (res_size - 1 <= res_len) {
-			res_size *= 2;
-			*res = (char *)realloc(*res, res_size * sizeof (char));
-			if (*res == NULL) {
-				(void) fprintf(stderr,
-				    gettext("Not enough memory.\n"));
-				return (-1);
-			}
+	for (i = 0; i < len_orig; i++) {
+		/* Quote the dangerous chars by a backslash */
+		if (quote && (string[i] == '"' || string[i] == '\\') ||
+			(!quote && is_shell_special(string[i]))) {
+			out[j++] = '\\';
 		}
+		out[j++] = string[i];
 	}
 
-	(*res)[res_len++] = '\0';
+	if (quote)
+		out[j++] = '"';
+
+	out[j] = '\0';
+	*res = out;
 	return (0);
 }
 
@@ -526,7 +604,7 @@ nm2unixname(name_mapping_t *nm, char **unixname) {
 		return (0);
 	}
 
-	if (shell_app(&it, nm->unixname))
+	if (shell_app(&it, nm->unixname, 0))
 		return (-1);
 
 	length = strlen(ID_UNIXNAME ":") + strlen(it);
@@ -645,11 +723,11 @@ print_mapping(name_mapping_t *nm)
 			    gettext("Opposite direction of the mapping: "));
 			f = stderr;
 		}
-		if (shell_app(&winname, nm->winname))
+		if (shell_app(&winname, nm->winname, 1))
 			return (-1);
 
 		if (pnm_file != f) {
-			(void) fprintf(f, "%s = %s\n", nm->unixname, winname);
+			(void) fprintf(f, "%s=%s\n", nm->unixname, winname);
 		} else if (pnm_last_unixname != NULL &&
 		    strcmp(pnm_last_unixname, nm->unixname) == 0) {
 			(void) fprintf(f, " %s", winname);
@@ -659,7 +737,7 @@ print_mapping(name_mapping_t *nm)
 				free(pnm_last_unixname);
 			}
 			pnm_last_unixname = strdup(nm->unixname);
-			(void) fprintf(f, "%s = %s", nm->unixname, winname);
+			(void) fprintf(f, "%s=%s", nm->unixname, winname);
 		}
 
 		free(winname);
@@ -700,7 +778,7 @@ print_mapping(name_mapping_t *nm)
 		if (nm2winqn(nm, &winname1) < 0)
 			return (-1);
 
-		if (shell_app(&winname, winname1)) {
+		if (shell_app(&winname, winname1, 0)) {
 			free(winname1);
 			return (-1);
 		}
@@ -726,7 +804,9 @@ print_mapping(name_mapping_t *nm)
 		free(unixname);
 		break;
 	default:
-		(void) fprintf(stderr, gettext("Internal error.\n"));
+		/* This can never happen: */
+		(void) fprintf(stderr,
+		    gettext("Internal error: invalid print format.\n"));
 		return (-1);
 	}
 
@@ -880,7 +960,200 @@ strndup(char *from, size_t length) {
 	return (out);
 }
 
-/* Does line start with USERMAP_CFG IP qualifier? */
+/*
+ * Convert pid from string to it's numerical representation. If it is
+ * a valid string, i.e. number of a proper length, return 1. Otherwise
+ * print an error message and return 0.
+ */
+static int
+pid_convert(char *string, uid_t *number, int type) {
+	int i;
+	long long ll;
+	char *type_string;
+	size_t len = strlen(string);
+
+	if (type == TYPE_GID)
+		type_string = ID_GID;
+	else if (type == TYPE_UID)
+		type_string = ID_UID;
+	else
+		return (0);
+
+	for (i = 0; i < len; i++) {
+		if (!isdigit(string[i])) {
+			(void) fprintf(stderr,
+			    gettext("\"%s\" is not a valid %s: the non-digit"
+				" character '%c' found.\n"), string,
+			    type_string, string[i]);
+			return (0);
+		}
+	}
+
+	ll = atoll(string);
+
+	/* Isn't it too large? */
+	if (type == TYPE_UID && (uid_t)ll != ll ||
+	    type == TYPE_GID && (gid_t)ll != ll) {
+		(void) fprintf(stderr,
+		    gettext("%llu: too large for a %s.\n"), ll,
+		    type_string);
+		return (0);
+	}
+
+	*number = (uid_t)ll;
+	return (1);
+}
+
+/*
+ * Convert SID from string to prefix and rid. If it has a valid
+ * format, i.e. S(\-\d+)+, return 1. Otherwise print an error
+ * message and return 0.
+ */
+static int
+sid_convert(char *from, char **prefix, idmap_rid_t *rid) {
+	int i, j;
+	char *cp;
+	char *ecp;
+	char *prefix_end;
+	u_longlong_t	a;
+	unsigned long	r;
+
+	if (strcmp_no0(from, "S-1-") != 0) {
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": it doesn't start "
+			"with \"%s\".\n"), ID_SID, from, "S-1-");
+		return (0);
+	}
+
+	if (strlen(from) <= strlen("S-1-")) {
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": the authority and RID parts are"
+			" missing.\n"),
+		    ID_SID, from);
+		return (0);
+	}
+
+	/* count '-'s */
+	for (j = 0, cp = strchr(from, '-');
+		cp != NULL;
+		j++, cp = strchr(cp + 1, '-')) {
+		/* can't end on a '-' */
+		if (*(cp + 1) == '\0') {
+			(void) fprintf(stderr,
+			    gettext("Invalid %s \"%s\": '-' at the end.\n"),
+			    ID_SID, from);
+			return (0);
+		} else 	if (*(cp + 1) == '-') {
+			(void) fprintf(stderr,
+			    gettext("Invalid %s \"%s\": double '-'.\n"),
+			    ID_SID, from);
+			return (0);
+		}
+	}
+
+
+	/* check that we only have digits and '-' */
+	i = strspn(from + 1, "0123456789-") + 1;
+	if (i < strlen(from)) {
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": invalid character '%c'.\n"),
+		    ID_SID, from, from[i]);
+		return (0);
+	}
+
+
+	cp = from + strlen("S-1-");
+
+	/* 64-bit safe parsing of unsigned 48-bit authority value */
+	errno = 0;
+	a = strtoull(cp, &ecp, 10);
+
+	/* errors parsing the authority or too many bits */
+	if (cp == ecp || (a == 0 && errno == EINVAL)) {
+			(void) fprintf(stderr,
+			gettext("Invalid %s \"%s\": unable to parse the "
+			    "authority \"%.*s\".\n"), ID_SID, from, ecp - cp,
+			cp);
+		    return (0);
+	}
+
+	if ((a == ULLONG_MAX && errno == ERANGE) ||
+	    (a & 0x0000ffffffffffffULL) != a) {
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": the authority "
+			"\"%.*s\" is too large.\n"), ID_SID, from,
+		    ecp - cp, cp);
+		return (0);
+	}
+
+	cp = ecp;
+
+	if (j < 3) {
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": must have at least one RID.\n"),
+		    ID_SID, from);
+		return (0);
+	}
+
+	for (i = 2; i < j; i++) {
+		if (*cp++ != '-') {
+			/* Should never happen */
+			(void) fprintf(stderr,
+			    gettext("Invalid %s \"%s\": internal error:"
+				" '-' missing.\n"),
+			    ID_SID, from);
+			return (0);
+		}
+		/* 32-bit safe parsing of unsigned 32-bit RID */
+		errno = 0;
+		r = strtoul(cp, &ecp, 10);
+
+		/* errors parsing the RID */
+		if (cp == ecp || (r == 0 && errno == EINVAL)) {
+			/* should never happen */
+			    (void) fprintf(stderr,
+				gettext("Invalid %s \"%s\": internal error: "
+				    "unable to parse the RID "
+				    "after \"%.*s\".\n"), ID_SID,
+				from, cp - from, from);
+			    return (0);
+		}
+
+		if (r == ULONG_MAX && errno == ERANGE) {
+			(void) fprintf(stderr,
+			    gettext("Invalid %s \"%s\": the RID \"%.*s\""
+				" is too large.\n"), ID_SID,
+			    from, ecp - cp, cp);
+			return (0);
+		}
+		prefix_end = cp;
+		cp = ecp;
+	}
+
+	/* check that all of the string SID has been consumed */
+	if (*cp != '\0') {
+		/* Should never happen */
+		(void) fprintf(stderr,
+		    gettext("Invalid %s \"%s\": internal error: "
+			"something is still left.\n"),
+		    ID_SID, from);
+		return (0);
+	}
+
+	*rid = (idmap_rid_t)r;
+
+	/* -1 for the '-' at the end: */
+	*prefix = strndup(from, prefix_end - from - 1);
+	if (*prefix == NULL) {
+		(void) fprintf(stderr,
+		    gettext("Not enough memory.\n"));
+		return (0);
+	}
+
+	return (1);
+}
+
+/* Does the line start with USERMAP_CFG IP qualifier? */
 static int
 ucp_is_IP_qualifier(char *line) {
 	char *it;
@@ -1133,7 +1406,9 @@ line2nm(char *line, int line_num, name_mapping_t *nm, format_t f) {
 	case SMBUSERS:
 		return (sup_line2nm(line, line_num, nm));
 	default:
-		(void) fprintf(stderr, gettext("Internal error.\n"));
+		/* This can never happen */
+		(void) fprintf(stderr,
+		    gettext("Internal error: invalid line format.\n"));
 	}
 
 	return (-1);
@@ -1350,7 +1625,7 @@ list_name_mappings(int list_users, int list_groups, format_t format, FILE *fi)
 	return (0);
 }
 
-/* Export command handler */
+/* Export command handler  */
 static int
 /* LINTED E_FUNC_ARG_UNUSED */
 do_export(flag_t *f, int argc, char **argv) {
@@ -1425,21 +1700,6 @@ print_flags(flag_t *f)
 		else if (f[c])
 			(void) printf("FLAG: -%c, VALUE: %s\n", c, f[c]);
 	}
-}
-
-/*
- * Compare two strings just like strcmp, but stop before the end of
- * the s2
- */
-static int
-strcmp_no0(const char *s1, const char *s2) {
-	return (strncmp(s1, s2, strlen(s2)));
-}
-
-/* The same as strcmp_no0, but case insensitive. */
-static int
-strcasecmp_no0(const char *s1, const char *s2) {
-	return (strncasecmp(s1, s2, strlen(s2)));
 }
 
 /*
@@ -1786,7 +2046,9 @@ nm2type(name_mapping_t *nm, int type, char **to) {
 	case TYPE_UN:
 		return (nm2unixname(nm, to));
 	default:
-		(void) fprintf(stderr, gettext("Internal error.\n"));
+		/* This can never happen: */
+		(void) fprintf(stderr,
+		    gettext("Internal error: invalid name type.\n"));
 		return (-1);
 	}
 	/* never reached */
@@ -1875,22 +2137,15 @@ do_show_mapping(flag_t *f, int argc, char **argv)
 	}
 
 	if (type_from == TYPE_SID) {
-		char *p, *end, *sid;
-		sid = argv[0] + 4;
-		if ((p = strrchr(sid, '-')) == NULL) {
-			(void) fprintf(stderr,
-			    gettext("Invalid SID %s\n"), sid);
+		if (!sid_convert(root, &nm->sidprefix, &nm->rid)) {
+			stat = IDMAP_ERR_ARG;
 			goto cleanup;
 		}
-		/* Replace '-' by string terminator so that sid = sidprefix */
-		*p = 0;
-		nm->sidprefix = strdup(sid);
-		nm->rid = strtoll(p + 1, &end, 10);
-		/* Restore '-' */
-		*p = '-';
-
 	} else if (type_from == TYPE_UID || type_from == TYPE_GID) {
-		nm->pid = (uid_t)atol(root);
+		if (!pid_convert(root, &nm->pid, type_from)) {
+			stat = IDMAP_ERR_ARG;
+			goto cleanup;
+		}
 	}
 
 /*
@@ -1997,7 +2252,9 @@ do_show_mapping(flag_t *f, int argc, char **argv)
 			    &map_stat);
 			nm->is_user = I_NO;
 		} else {
-			(void) fprintf(stderr, gettext("Internal error.\n"));
+			/* This can never happen: */
+			(void) fprintf(stderr,
+			    gettext("Internal error in show.\n"));
 			exit(1);
 		}
 
