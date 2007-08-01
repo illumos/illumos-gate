@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@ do_pam_kbdint(Authctxt *authctxt)
 	int		 retval, retval2;
 	pam_handle_t	*pamh = authctxt->pam->h;
 	const char	*where = "authenticating";
+	char		*text = NULL;
 
 	debug2("Calling pam_authenticate()");
 	if ((retval = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
@@ -99,6 +100,25 @@ do_pam_kbdint(Authctxt *authctxt)
 
 	if (retval == PAM_NEW_AUTHTOK_REQD) {
 		if (authctxt->valid && authctxt->pw != NULL) {
+			/* send password expiration warning */
+			message_cat(&text,
+			    gettext("Warning: Your password has expired,"
+			    " please change it now."));
+			packet_start(SSH2_MSG_USERAUTH_INFO_REQUEST);
+			packet_put_cstring("");		/* name */
+			packet_put_cstring(text);	/* instructions */
+			packet_put_cstring("");		/* language, unused */
+			packet_put_int(0);
+			packet_send();
+			packet_write_wait();
+			debug("expiration message sent");
+			if (text)
+				xfree(text);
+			/*
+			 * wait for the response so it does not mix
+			 * with the upcoming PAM conversation
+			 */
+			packet_read_expect(SSH2_MSG_USERAUTH_INFO_RESPONSE);
 			/*
 			 * Can't use temporarily_use_uid() and restore_uid()
 			 * here because we need (euid == 0 && ruid == pw_uid)
@@ -344,7 +364,8 @@ input_userauth_info_response_pam(int type, u_int32_t seqnr, void *ctxt)
 	}
 
 	if (nresp < conv_ctxt->num_expected)
-		fatal("%s: too few replies", __func__);
+		fatal("%s: too few replies (%d < %d)", __func__,
+		    nresp, conv_ctxt->num_expected);
 
 	/* XXX - This could make a covert channel... */
 	if (nresp > conv_ctxt->num_expected)
