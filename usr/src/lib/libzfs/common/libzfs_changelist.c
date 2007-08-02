@@ -226,8 +226,9 @@ changelist_postfix(prop_changelist_t *clp)
 		 * We always re-share even if the filesystem is currently
 		 * shared, so that we can adopt any new options.
 		 */
-		if (cn->cn_shared ||
-		    (clp->cl_prop == ZFS_PROP_SHARENFS && clp->cl_waslegacy)) {
+		if (cn->cn_shared || (clp->cl_waslegacy &&
+		    (clp->cl_prop == ZFS_PROP_SHARENFS ||
+		    clp->cl_prop == ZFS_PROP_MOUNTPOINT))) {
 			if (zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARENFS,
 			    shareopts, sizeof (shareopts), NULL, NULL, 0,
 			    B_FALSE) == 0 && strcmp(shareopts, "off") == 0) {
@@ -608,8 +609,7 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 */
 	if (zfs_prop_get(zhp, prop, property, sizeof (property),
 	    NULL, NULL, 0, B_FALSE) == 0 &&
-	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0 ||
-	    strcmp(property, "off") == 0))
+	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0))
 		clp->cl_waslegacy = B_TRUE;
 
 	return (clp);

@@ -49,6 +49,7 @@ typedef enum {
 
 int pool_namecheck(const char *, namecheck_err_t *, char *);
 int dataset_namecheck(const char *, namecheck_err_t *, char *);
+int mountpoint_namecheck(const char *, namecheck_err_t *);
 int dataset_name_hidden(const char *);
 int snapshot_namecheck(const char *, namecheck_err_t *, char *);
 int permset_namecheck(const char *, namecheck_err_t *, char *);

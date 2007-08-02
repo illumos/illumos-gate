@@ -240,6 +240,50 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 	}
 }
 
+
+/*
+ * mountpoint names must be of the following form:
+ *
+ *	/[component][/]*[component][/]
+ */
+int
+mountpoint_namecheck(const char *path, namecheck_err_t *why)
+{
+	const char *start, *end;
+
+	/*
+	 * Make sure none of the mountpoint component names are too long.
+	 * If a component name is too long then the mkdir of the mountpoint
+	 * will fail but then the mountpoint property will be set to a value
+	 * that can never be mounted.  Better to fail before setting the prop.
+	 * Extra slashes are OK, they will be tossed by the mountpoint mkdir.
+	 */
+
+	if (path == NULL || *path != '/') {
+		if (why)
+			*why = NAME_ERR_LEADING_SLASH;
+		return (-1);
+	}
+
+	/* Skip leading slash  */
+	start = &path[1];
+	do {
+		end = start;
+		while (*end != '/' && *end != '\0')
+			end++;
+
+		if (end - start >= MAXNAMELEN) {
+			if (why)
+				*why = NAME_ERR_TOOLONG;
+			return (-1);
+		}
+		start = end + 1;
+
+	} while (*end != '\0');
+
+	return (0);
+}
+
 /*
  * For pool names, we have the same set of valid characters as described in
  * dataset names, with the additional restriction that the pool name must begin

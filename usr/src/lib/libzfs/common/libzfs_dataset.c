@@ -944,17 +944,33 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 			break;
 
 		case ZFS_PROP_MOUNTPOINT:
+		{
+			namecheck_err_t why;
+
 			if (strcmp(strval, ZFS_MOUNTPOINT_NONE) == 0 ||
 			    strcmp(strval, ZFS_MOUNTPOINT_LEGACY) == 0)
 				break;
 
-			if (strval[0] != '/') {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "'%s' must be an absolute path, "
-				    "'none', or 'legacy'"), propname);
+			if (mountpoint_namecheck(strval, &why)) {
+				switch (why) {
+				case NAME_ERR_LEADING_SLASH:
+					zfs_error_aux(hdl,
+					    dgettext(TEXT_DOMAIN,
+					    "'%s' must be an absolute path, "
+					    "'none', or 'legacy'"), propname);
+					break;
+				case NAME_ERR_TOOLONG:
+					zfs_error_aux(hdl,
+					    dgettext(TEXT_DOMAIN,
+					    "component of '%s' is too long"),
+					    propname);
+					break;
+				}
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
+		}
+
 			/*FALLTHRU*/
 
 		case ZFS_PROP_SHARENFS:
