@@ -2964,7 +2964,9 @@ extern vmem_t *ip_minor_arena;
 #define	ips_ip_dup_recovery		ips_param_arr[54].ip_param_value
 #define	ips_ip_restrict_interzone_loopback ips_param_arr[55].ip_param_value
 #define	ips_ip_lso_outbound		ips_param_arr[56].ip_param_value
-#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[57].ip_param_value
+#define	ips_igmp_max_version		ips_param_arr[57].ip_param_value
+#define	ips_mld_max_version		ips_param_arr[58].ip_param_value
+#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[59].ip_param_value
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST

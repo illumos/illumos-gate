@@ -880,6 +880,8 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	3600000, 300000, "ip_dup_recovery" },
 	{  0,	1,	1,	"ip_restrict_interzone_loopback" },
 	{  0,	1,	1,	"ip_lso_outbound" },
+	{  IGMP_V1_ROUTER, IGMP_V3_ROUTER, IGMP_V3_ROUTER, "igmp_max_version" },
+	{  MLD_V1_ROUTER, MLD_V2_ROUTER, MLD_V2_ROUTER, "mld_max_version" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #else

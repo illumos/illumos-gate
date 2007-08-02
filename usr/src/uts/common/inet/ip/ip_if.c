@@ -4821,7 +4821,6 @@ ill_init(queue_t *q, ill_t *ill)
 	ill->ill_ipf_gen = 0;
 
 	ill->ill_global_timer = INFINITY;
-	ill->ill_mcast_type = IGMP_V3_ROUTER;	/* == MLD_V2_ROUTER */
 	ill->ill_mcast_v1_time = ill->ill_mcast_v2_time = 0;
 	ill->ill_mcast_v1_tset = ill->ill_mcast_v2_tset = 0;
 	ill->ill_mcast_rv = MCAST_DEF_ROBUSTNESS;
@@ -5093,7 +5092,6 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	/* Set ill_name_set for ill_phyint_reinit to work properly */
 
 	ill->ill_global_timer = INFINITY;
-	ill->ill_mcast_type = IGMP_V3_ROUTER;	/* == MLD_V2_ROUTER */
 	ill->ill_mcast_v1_time = ill->ill_mcast_v2_time = 0;
 	ill->ill_mcast_v1_tset = ill->ill_mcast_v2_tset = 0;
 	ill->ill_mcast_rv = MCAST_DEF_ROBUSTNESS;
@@ -22956,6 +22954,9 @@ ill_phyint_reinit(ill_t *ill)
 	if (ill->ill_isv6) {
 		ill->ill_icmp6_mib->ipv6IfIcmpIfIndex =
 		    ill->ill_phyint->phyint_ifindex;
+		ill->ill_mcast_type = ipst->ips_mld_max_version;
+	} else {
+		ill->ill_mcast_type = ipst->ips_igmp_max_version;
 	}
 
 	/*

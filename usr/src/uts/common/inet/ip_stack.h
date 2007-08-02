@@ -215,7 +215,7 @@ struct ip_stack {
 /* ip.c */
 	/* Following protected by ips_igmp_timer_lock */
 	int 		ips_igmp_time_to_next;	/* Time since last timeout */
-	int 		ips_igmp_timer_fired_last;
+	int 		ips_igmp_timer_scheduled_last;
 	int		ips_igmp_deferred_next;
 	timeout_id_t	ips_igmp_timeout_id;
 	/* Protected by igmp_timer_lock */
@@ -223,7 +223,7 @@ struct ip_stack {
 
 	/* Following protected by mld_timer_lock */
 	int 		ips_mld_time_to_next;	/* Time since last timeout */
-	int 		ips_mld_timer_fired_last;
+	int 		ips_mld_timer_scheduled_last;
 	int		ips_mld_deferred_next;
 	timeout_id_t	ips_mld_timeout_id;
 	/* Protected by mld_timer_lock */
