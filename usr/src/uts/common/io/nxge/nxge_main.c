@@ -334,7 +334,7 @@ ddi_dma_attr_t nxge_rx_dma_attr = {
 	0xffffffffffffffff,	/* maximum segment size */
 	1,			/* scatter/gather list length */
 	(unsigned int) 1,	/* granularity */
-	0			/* attribute flags */
+	DDI_DMA_RELAXED_ORDERING /* attribute flags */
 };
 
 ddi_dma_lim_t nxge_dma_limits = {
