@@ -48,6 +48,7 @@ d none usr 755 root sys
 d none usr/platform 755 root sys
 d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
 d none usr/platform/SUNW,Netra-CP3060 755 root sys
+d none usr/platform/SUNW,Netra-CP3260 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise-T5120 755 root sys
@@ -66,6 +67,7 @@ s none usr/platform/SUNW,T5140/sbin=../sun4v/sbin
 #
 d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3260/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
@@ -75,12 +77,14 @@ d none usr/platform/SUNW,T5140/lib 755 root bin
 #
 f none usr/platform/SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1 644 root bin
 f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Netra-CP3260/lib/libprtdiag_psr.so.1 644 root bin
 
 #
 # create libpcp library
 #
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so=../../sun4v/lib/libpcp.so
+s none usr/platform/SUNW,Netra-CP3260/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so=../../sun4v/lib/libpcp.so
@@ -88,6 +92,7 @@ s none usr/platform/SUNW,T5140/lib/libpcp.so=../../sun4v/lib/libpcp.so
 
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+s none usr/platform/SUNW,Netra-CP3260/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
@@ -98,6 +103,7 @@ s none usr/platform/SUNW,T5140/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 #
 s none usr/platform/SUNW,Sun-Fire-T200/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Netra-CP3060/lib/fs=../../sun4v/lib/fs
+s none usr/platform/SUNW,Netra-CP3260/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fs=../../sun4v/lib/fs

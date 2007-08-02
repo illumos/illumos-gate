@@ -33,7 +33,8 @@ sparc_SUBDIRS =	sun4u \
 		SUNW,SPARC-Enterprise \
 		SUNW,Sun-Blade-T6320 \
 		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140
+		SUNW,T5140 \
+		SUNW,Netra-CP3260
 
 i386_SUBDIRS = i86pc \
 		SUNW,Sun-Fire-X4500

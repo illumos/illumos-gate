@@ -24,35 +24,36 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libpcp/sparc/Makefile
+# lib/libprtdiag_psr/sparc/monza/Makefile
 
-UTSBASE= ../../../uts
+UTSBASE   = ../../../../../src/uts
 
-PLATINCS += -I$(USR_PLAT_DIR)/sun4v/include -I$(UTSBASE)/sun4v
-
-PLATFORM_OBJECTS= libpcp.o pcp_utils.o
-
-#
-# platform library directory (/usr/platform/SUNW,Sun-Fire-T200/lib)
-#
-PLATFORM=sun4v
-LINKED_PLATFORMS = SUNW,Sun-Fire-T200 \
-		SUNW,Netra-CP3060 \
-		SUNW,Sun-Blade-T6300 \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-CP3260
-
+PLATFORM_OBJECTS= monza.o
 
 include ../Makefile.com
 
 #
+# Override the PSR_MACH variable to use sun4v libraries
+#
+PSR_MACH=sun4v
+
+IFLAGS +=  -I ../../../libprtdiag/inc
+IFLAGS += -I$(SRC)/cmd/picl/plugins/inc
+LDLIBS += -lpicl
+
+LINTFLAGS += $(IFLAGS)
+
+PLATFORM=SUNW,Netra-CP3260
+
+.KEEP_STATE:
+
+PLATLIBS= $(USR_PLAT_DIR)/$(PLATFORM)/lib
+
+install:	all $(USR_PSM_LIBS) $(LINKED_PRTDIAG_DIRS)
+
+#
 # install rules
 #
-
-$(PLATLIBS)/libpcp.so:
-	$(RM) -r $@; $(SYMLINK) libpcp.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
 
 $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)
@@ -60,22 +61,32 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 $(USR_PSM_LIB_DIR):
 	$(INS.dir.root.sys)
 
-$(LINKED_DIRS):   $(USR_PLAT_DIR)
+$(LINKED_DIRS):	$(USR_PLAT_DIR)
 	-$(INS.dir.root.sys)
 
-$(LINKED_LIB_DIRS):  $(LINKED_DIRS)
+$(LINKED_LIB_DIRS):	$(LINKED_DIRS)
 	-$(INS.dir.root.sys)
 
-$(LINKED_LIBPCP_DIR): $(USR_PLAT_DIR)
-	-$(INS.slink7)
-
-$(LINKED_LIBPCP1_DIR): $(USR_PLAT_DIR)
+$(LINKED_PRTDIAG_DIRS):	$(USR_PLAT_DIR)
 	-$(INS.slink6)
 
-$(LINKED_LLIBLPCP_DIR): $(USR_PLAT_DIR)
-	-$(INS.slink8)
+#
+# used for message files
+#
+POFILE=		libprtdiag_psr_monto.po
+POFILES=	monto.po
 
-install: all $(USR_PSM_LIBS) $(PLATLIBS)/libpcp.so \
-	$(LINKED_DIRS) $(LINKED_LIB_DIRS) \
-	$(LINKED_LIBPCP_DIR) $(LINKED_LIBPCP1_DIR) \
-	$(LINKED_LLIBLPCP_DIR)
+
+_msg:	$(MSGDOMAIN) $(POFILE)
+	$(RM) $(MSGDOMAIN)/$(POFILE)
+	$(CP) $(POFILE) $(MSGDOMAIN)
+
+$(POFILE):	$(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
+
+$(POFILES):
+	$(RM) messages.po
+	$(XGETTEXT) $(XGETFLAGS) `$(GREP) -l gettext common/monza.c`
+	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
+	$(RM) messages.po

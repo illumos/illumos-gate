@@ -18,31 +18,18 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libprtdiag_psr/sparc/Makefile
 
-PRTDIAG_PLATFORMS=	desktop tazmo javelin sunfire starfire serengeti \
-			montecarlo littleneck starcat daktari cherrystone \
-			lw8 snowbird ontario schumacher opl montoya monza
+PLATFORMS = SUNW,Netra-CP3260
+CLASS = platform
+DTDFILE =
+TOPOFILE = Netra-CP3260-hc-topology.xml
 
-all :=		TARGET= all
-lint :=		TARGET= lint
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-_msg :=		TARGET= _msg
+SRCDIR = ../SUNW,Netra-CP3260
 
-.KEEP_STATE:
-
-all lint clean clobber install _msg : $(PRTDIAG_PLATFORMS)
-
-$(PRTDIAG_PLATFORMS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
+include ../Makefile.map
