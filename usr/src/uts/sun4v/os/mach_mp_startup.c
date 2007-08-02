@@ -265,7 +265,7 @@ cpu_mp_init(void)
 	/* N.B. This must happen after xc_init() has run. */
 	recalc_xc_timeouts();
 
-	if (!(domaining_capabilities & DOMAINING_ENABLED))
+	if (!domaining_enabled())
 		return;
 
 	cif_cpu_mp_ready = 1;

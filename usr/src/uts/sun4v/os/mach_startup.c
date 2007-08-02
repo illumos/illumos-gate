@@ -436,7 +436,7 @@ load_mach_drivers(void)
 	 * modules if domaining is not supported.  Also,
 	 * we must be able to run on non-LDOMs firmware.
 	 */
-	if (!(domaining_capabilities & DOMAINING_SUPPORTED))
+	if (!domaining_supported())
 		return;
 
 	/*
@@ -454,8 +454,7 @@ load_mach_drivers(void)
 	if (modload("misc", "platsvc") == -1)
 		cmn_err(CE_NOTE, "!'platsvc' module failed to load");
 
-	if ((domaining_capabilities & DOMAINING_ENABLED) &&
-	    modload("misc", "dr_cpu") == -1)
+	if (domaining_enabled() && modload("misc", "dr_cpu") == -1)
 		cmn_err(CE_NOTE, "!'dr_cpu' module failed to load");
 
 	/*

@@ -54,6 +54,7 @@
 #include <sys/soft_state.h>
 #include <sys/promimpl.h>
 #include <sys/hsvc.h>
+#include <sys/ldoms.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -93,10 +94,60 @@ extern void init_mondo_nocheck(xcfunc_t *func, uint64_t arg1, uint64_t arg2);
 extern void kdi_flush_idcache(int, int, int, int);
 extern uint64_t get_cpuaddr(uint64_t, uint64_t);
 
+
+#define	BOOT_CMD_MAX_LEN	256
+#define	BOOT_CMD_BASE		"boot "
+
+/*
+ * In an LDoms system we do not save the user's boot args in NVRAM
+ * as is done on legacy systems.  Instead, we format and send a
+ * 'reboot-command' variable to the variable service.  The contents
+ * of the variable are retrieved by OBP and used verbatim for
+ * the next boot.
+ */
+static void
+store_boot_cmd(char *args)
+{
+	static char	cmd_buf[BOOT_CMD_MAX_LEN];
+	size_t		len;
+	pnode_t		node;
+	size_t		base_len;
+	size_t		args_len;
+	size_t		args_max;
+
+	(void) strcpy(cmd_buf, BOOT_CMD_BASE);
+
+	base_len = strlen(BOOT_CMD_BASE);
+	len = base_len + 1;
+
+	if (args != NULL) {
+		args_len = strlen(args);
+		args_max = BOOT_CMD_MAX_LEN - len;
+
+		if (args_len > args_max) {
+			cmn_err(CE_WARN, "Reboot command too long (%ld), "
+			    "truncating command arguments", len + args_len);
+
+			args_len = args_max;
+		}
+
+		len += args_len;
+		(void) strncpy(&cmd_buf[base_len], args, args_len);
+	}
+
+	node = prom_optionsnode();
+	if ((node == OBP_NONODE) || (node == OBP_BADNODE) ||
+	    prom_setprop(node, "reboot-command", cmd_buf, len) == -1)
+		cmn_err(CE_WARN, "Unable to store boot command for "
+		    "use on reboot");
+}
+
+
 /*
  * Machine dependent code to reboot.
- * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
- * to a string to be used as the argument string when rebooting.
+ *
+ * "bootstr", when non-null, points to a string to be used as the
+ * argument string when rebooting.
  *
  * "invoke_cb" is a boolean. It is set to true when mdboot() can safely
  * invoke CB_CL_MDBOOT callbacks before shutting the system down, i.e. when
@@ -116,6 +167,46 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	 * either rebooting or halting the machine.
 	 */
 	rconsvp = NULL;
+
+	switch (fcn) {
+	case AD_HALT:
+	case AD_POWEROFF:
+		break;
+	default:
+		if (bootstr == NULL) {
+			switch (fcn) {
+
+			case AD_BOOT:
+				bootstr = "";
+				break;
+
+			case AD_IBOOT:
+				bootstr = "-a";
+				break;
+
+			case AD_SBOOT:
+				bootstr = "-s";
+				break;
+
+			case AD_SIBOOT:
+				bootstr = "-sa";
+				break;
+			default:
+				cmn_err(CE_WARN,
+				    "mdboot: invalid function %d", fcn);
+				bootstr = "";
+				break;
+			}
+		}
+	}
+
+	/*
+	 * If LDoms is running, we must save the boot string before we
+	 * enter restricted mode.  This is possible only if we are not
+	 * being called from panic.
+	 */
+	if (domaining_enabled() && invoke_cb)
+		store_boot_cmd(bootstr);
 
 	/*
 	 * At a high interrupt level we can't:
@@ -158,40 +249,16 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 
 	if (fcn == AD_HALT) {
 		mach_set_soft_state(SIS_TRANSITION,
-				&SOLARIS_SOFT_STATE_HALT_MSG);
+		    &SOLARIS_SOFT_STATE_HALT_MSG);
 		halt((char *)NULL);
 	} else if (fcn == AD_POWEROFF) {
 		mach_set_soft_state(SIS_TRANSITION,
-				&SOLARIS_SOFT_STATE_POWER_MSG);
+		    &SOLARIS_SOFT_STATE_POWER_MSG);
 		power_down(NULL);
 	} else {
-		if (bootstr == NULL) {
-			switch (fcn) {
-
-			case AD_BOOT:
-				bootstr = "";
-				break;
-
-			case AD_IBOOT:
-				bootstr = "-a";
-				break;
-
-			case AD_SBOOT:
-				bootstr = "-s";
-				break;
-
-			case AD_SIBOOT:
-				bootstr = "-sa";
-				break;
-			default:
-				cmn_err(CE_WARN,
-				    "mdboot: invalid function %d", fcn);
-				bootstr = "";
-				break;
-			}
-		}
 		mach_set_soft_state(SIS_TRANSITION,
-				&SOLARIS_SOFT_STATE_REBOOT_MSG);
+		    &SOLARIS_SOFT_STATE_REBOOT_MSG);
+
 		reboot_machine(bootstr);
 	}
 	/* MAYBE REACHED */
@@ -239,7 +306,8 @@ panic_idle(void)
 	CPU->cpu_m.in_prom = 1;
 	membar_stld();
 
-	for (;;);
+	for (;;)
+		;
 }
 
 /*
@@ -318,7 +386,7 @@ panic_enter_hw(int spl)
 			 * that the current level 14 has been serviced.
 			 */
 			wr_clr_softint((1 << PIL_14) |
-				TICK_INT_MASK | STICK_INT_MASK);
+			    TICK_INT_MASK | STICK_INT_MASK);
 		}
 
 		enable_vec_intr(opstate);
@@ -483,7 +551,7 @@ clear_watchdog_on_exit(void)
 {
 	if (watchdog_enabled && watchdog_activated) {
 		prom_printf("Debugging requested; hardware watchdog "
-			"suspended.\n");
+		    "suspended.\n");
 		(void) watchdog_suspend();
 	}
 }
@@ -976,7 +1044,8 @@ kdi_tickwait(clock_t nticks)
 {
 	clock_t endtick = gettick() + nticks;
 
-	while (gettick() < endtick);
+	while (gettick() < endtick)
+		;
 }
 
 static void
@@ -1031,7 +1100,7 @@ sun4v_system_claim(void)
 	 */
 	if (soft_state_saved_state == -1) {
 		mach_get_soft_state(&soft_state_saved_state,
-				&SOLARIS_SOFT_STATE_SAVED_MSG);
+		    &SOLARIS_SOFT_STATE_SAVED_MSG);
 	}
 	/*
 	 * check again as the read above may or may not have worked and if
@@ -1039,7 +1108,7 @@ sun4v_system_claim(void)
 	 */
 	if (soft_state_saved_state != -1) {
 		mach_set_soft_state(SIS_TRANSITION,
-				&SOLARIS_SOFT_STATE_DEBUG_MSG);
+		    &SOLARIS_SOFT_STATE_DEBUG_MSG);
 	}
 }
 
@@ -1052,7 +1121,7 @@ sun4v_system_release(void)
 	 */
 	if (soft_state_saved_state != -1) {
 		mach_set_soft_state(soft_state_saved_state,
-					&SOLARIS_SOFT_STATE_SAVED_MSG);
+		    &SOLARIS_SOFT_STATE_SAVED_MSG);
 		soft_state_saved_state = -1;
 	}
 }
@@ -1366,9 +1435,9 @@ mach_soft_state_init(void)
 	}
 	for (i = 0; i < SOLARIS_SOFT_STATE_MSG_CNT; i++) {
 		ASSERT(strlen((const char *)(void *)
-				soft_state_message_strings + i) < SSM_SIZE);
-		if ((ra = va_to_pa((void *)(soft_state_message_strings + i))) ==
-									-1ll) {
+		    soft_state_message_strings + i) < SSM_SIZE);
+		if ((ra = va_to_pa(
+		    (void *)(soft_state_message_strings + i))) == -1ll) {
 			return;
 		}
 		soft_state_message_ra[i] = ra;
@@ -1389,8 +1458,8 @@ mach_set_soft_state(uint64_t state, uint64_t *string_ra)
 		rc = hv_soft_state_set(state, *string_ra);
 
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN, "hv_soft_state_set returned %ld\n",
-				rc);
+			cmn_err(CE_WARN,
+			    "hv_soft_state_set returned %ld\n", rc);
 		}
 	}
 }
@@ -1398,13 +1467,13 @@ mach_set_soft_state(uint64_t state, uint64_t *string_ra)
 void
 mach_get_soft_state(uint64_t *state, uint64_t *string_ra)
 {
-	int	rc;
+	uint64_t	rc;
 
 	if (soft_state_initialized && *string_ra) {
 		rc = hv_soft_state_get(*string_ra, state);
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN, "hv_soft_state_get returned %d\n",
-				rc);
+			cmn_err(CE_WARN,
+			    "hv_soft_state_get returned %ld\n", rc);
 			*state = -1;
 		}
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,11 @@ extern uint_t domaining_capabilities;
 /* values for domaining_capabilities word (above) */
 #define	DOMAINING_SUPPORTED	0x1
 #define	DOMAINING_ENABLED	0x2
+
+#define	domaining_supported()						\
+	((domaining_capabilities & DOMAINING_SUPPORTED) != 0)
+#define	domaining_enabled()						\
+	((domaining_capabilities & DOMAINING_ENABLED) != 0)
 
 
 #ifdef	__cplusplus

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,7 +257,7 @@ cif_init(void)
 	 * Check if domaining is enabled. If not, do not
 	 * initialize the kernel CIF handler.
 	 */
-	if (!(domaining_capabilities & DOMAINING_ENABLED))
+	if (!domaining_enabled())
 		return;
 
 	/*
