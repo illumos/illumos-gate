@@ -3522,8 +3522,8 @@ nxge_is_supported_phy(uint32_t id, uint8_t type)
 	switch (type) {
 	case CLAUSE_45_TYPE:
 		for (i = 0; i < cl45_arr_len; i++) {
-			if ((nxge_supported_cl45_ids[i] & PHY_ID_MASK) ==
-			    (id & PHY_ID_MASK)) {
+			if ((nxge_supported_cl45_ids[i] & BCM_PHY_ID_MASK) ==
+			    (id & BCM_PHY_ID_MASK)) {
 				found = B_TRUE;
 				break;
 			}
@@ -3531,8 +3531,8 @@ nxge_is_supported_phy(uint32_t id, uint8_t type)
 		break;
 	case CLAUSE_22_TYPE:
 		for (i = 0; i < cl22_arr_len; i++) {
-			if ((nxge_supported_cl22_ids[i] & PHY_ID_MASK) ==
-			    (id & PHY_ID_MASK)) {
+			if ((nxge_supported_cl22_ids[i] & BCM_PHY_ID_MASK) ==
+			    (id & BCM_PHY_ID_MASK)) {
 				found = B_TRUE;
 				break;
 			}
@@ -3561,9 +3561,9 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	uint32_t	pma_pmd_dev_id = 0;
 	uint32_t	pcs_dev_id = 0;
 	uint32_t	phy_id = 0;
-	uint32_t	port_pma_pmd_dev_id[4];
-	uint32_t	port_pcs_dev_id[4];
-	uint32_t	port_phy_id[4];
+	uint32_t	port_pma_pmd_dev_id[NXGE_PORTS_NEPTUNE];
+	uint32_t	port_pcs_dev_id[NXGE_PORTS_NEPTUNE];
+	uint32_t	port_phy_id[NXGE_PORTS_NEPTUNE];
 	uint8_t		pma_pmd_dev_fd[NXGE_MAX_PHY_PORTS];
 	uint8_t		pcs_dev_fd[NXGE_MAX_PHY_PORTS];
 	uint8_t		phy_fd[NXGE_MAX_PHY_PORTS];
@@ -3601,8 +3601,9 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			pma_pmd_dev_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] "
 			    "PMA/PMD dev found", i));
-			if (j < 4) {
-				port_pma_pmd_dev_id[j] = pma_pmd_dev_id;
+			if (j < NXGE_PORTS_NEPTUNE) {
+				port_pma_pmd_dev_id[j] = pma_pmd_dev_id &
+				    BCM_PHY_ID_MASK;
 				j++;
 			}
 		} else {
@@ -3623,8 +3624,9 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			pcs_dev_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PCS "
 			    "dev found", i));
-			if (k < 4) {
-				port_pcs_dev_id[k] = pcs_dev_id;
+			if (k < NXGE_PORTS_NEPTUNE) {
+				port_pcs_dev_id[k] = pcs_dev_id &
+				    BCM_PHY_ID_MASK;
 				k++;
 			}
 		} else {
@@ -3661,8 +3663,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			phy_fd[i] = 1;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID"
 			    "found", i));
-			if (l < 4) {
-				port_phy_id[l] = phy_id;
+			if (l < NXGE_PORTS_NEPTUNE) {
+				port_phy_id[l] = phy_id & BCM_PHY_ID_MASK;
 				l++;
 			}
 		} else {
@@ -3676,12 +3678,12 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		switch (total_phy_fd) {
 		case 2:
 			/* 2 10G, 2 1G */
-			if (((port_pcs_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pcs_dev_id[1] == PHY_10G_FIBRE) ||
-			    (port_pma_pmd_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pma_pmd_dev_id[1] == PHY_10G_FIBRE)) &&
-			    (port_phy_id[0] == PHY_1G_COPPER &&
-			    port_phy_id[1] == PHY_1G_COPPER)) {
+			if ((((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
+			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) &&
+			    ((port_phy_id[0] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[1] == PHY_BCM5464R_FAMILY))) {
 				hw_p->niu_type = NEPTUNE_2_10GF_2_1GC;
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -3696,10 +3698,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		case 0:
 			/* 2 10G */
-			if ((port_pcs_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pcs_dev_id[1] == PHY_10G_FIBRE) ||
-			    (port_pma_pmd_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pma_pmd_dev_id[1] == PHY_10G_FIBRE)) {
+			if (((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
+			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) {
 				hw_p->niu_type = NEPTUNE_2_10GF;
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -3709,14 +3711,14 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			break;
 		case 4:
 			/* Maramba with 2 XAUI */
-			if (((port_pcs_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pcs_dev_id[1] == PHY_10G_FIBRE) ||
-			    (port_pma_pmd_dev_id[0] == PHY_10G_FIBRE &&
-			    port_pma_pmd_dev_id[1] == PHY_10G_FIBRE)) &&
-			    (port_phy_id[0] == PHY_1G_COPPER &&
-			    port_phy_id[1] == PHY_1G_COPPER &&
-			    port_phy_id[2] == PHY_1G_COPPER &&
-			    port_phy_id[3] == PHY_1G_COPPER)) {
+			if ((((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
+			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) &&
+			    ((port_phy_id[0] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[1] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[2] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[3] == PHY_BCM5464R_FAMILY))) {
 				hw_p->niu_type = NEPTUNE_2_10GF_2_1GC;
 
 				/*
@@ -3754,13 +3756,12 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			    "Unsupported neptune type 5"));
 			goto error_exit;
 		}
+		break;
 	case 1:
 		switch (total_phy_fd) {
 		case 3:
-			if (((port_pcs_dev_id[0] & PHY_ID_MASK) ==
-			    (BCM8704_DEV_ID & PHY_ID_MASK)) ||
-			    ((port_pma_pmd_dev_id[0] & PHY_ID_MASK) ==
-			    (BCM8704_DEV_ID & PHY_ID_MASK))) {
+			if ((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) ||
+			    (port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY)) {
 				/* The 10G port is BCM8704 */
 				for (i = NXGE_EXT_PHY_PORT_ST;
 				    i < NXGE_MAX_PHY_PORTS; i++) {
@@ -3817,10 +3818,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		case 4:
 			/* Maramba with 1 XAUI */
-			if (((port_pcs_dev_id[0] & PHY_ID_MASK) ==
-			    (BCM8704_DEV_ID & PHY_ID_MASK)) ||
-			    ((port_pma_pmd_dev_id[0] & PHY_ID_MASK) ==
-			    (BCM8704_DEV_ID & PHY_ID_MASK))) {
+			if ((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) ||
+			    (port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY)) {
 				/* The 10G port is BCM8704 */
 				for (i = NXGE_EXT_PHY_PORT_ST;
 				    i < NXGE_MAX_PHY_PORTS; i++) {
@@ -3882,14 +3881,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	case 0:
 		switch (total_phy_fd) {
 		case 4:
-			if (((port_phy_id[0] & PHY_ID_MASK) ==
-			    (BCM5464R_PHY_ID & PHY_ID_MASK)) &&
-			    ((port_phy_id[1] & PHY_ID_MASK) ==
-			    (BCM5464R_PHY_ID & PHY_ID_MASK)) &&
-			    ((port_phy_id[2] & PHY_ID_MASK) ==
-			    (BCM5464R_PHY_ID & PHY_ID_MASK)) &&
-			    ((port_phy_id[3] & PHY_ID_MASK) ==
-			    (BCM5464R_PHY_ID & PHY_ID_MASK))) {
+			if ((port_phy_id[0] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[1] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[2] == PHY_BCM5464R_FAMILY) &&
+			    (port_phy_id[3] == PHY_BCM5464R_FAMILY)) {
 
 				hw_p->niu_type = NEPTUNE_4_1GC;
 

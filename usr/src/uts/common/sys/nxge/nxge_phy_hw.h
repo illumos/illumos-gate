@@ -45,11 +45,19 @@ extern "C" {
 #define	NXGE_PHY_ID_REG_1		2
 #define	NXGE_PHY_ID_REG_2		3
 
+/*
+ * The BCM_PHY_ID_MASK is explained below:
+ * The first nibble (bits 0 through 3) is changed with every revision
+ * of the silicon. So these bits are masked out to support future revisions
+ * of the same chip. The third nibble (bits 8 through 11) is changed for
+ * different chips of the same family. So these bits are masked out to
+ * support chips of the same family.
+ */
+#define	BCM_PHY_ID_MASK			0xfffff0f0
 #define	BCM8704_DEV_ID			0x206033
 #define	BCM5464R_PHY_ID			0x2060b1
-#define	PHY_10G_FIBRE			BCM8704_DEV_ID
-#define	PHY_1G_COPPER			BCM5464R_PHY_ID
-#define	PHY_ID_MASK			0xfffff0f0
+#define	PHY_BCM8704_FAMILY		(BCM8704_DEV_ID & BCM_PHY_ID_MASK)
+#define	PHY_BCM5464R_FAMILY		(BCM5464R_PHY_ID & BCM_PHY_ID_MASK)
 
 #define	CLAUSE_45_TYPE	1
 #define	CLAUSE_22_TYPE	2
