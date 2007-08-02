@@ -629,9 +629,9 @@ pm_init(void)
 	pm_cpr_cb_id = callb_add(pm_cpr_callb, (void *)NULL,
 	    CB_CL_CPR_PM, "pm_cpr");
 	pm_panic_cb_id = callb_add(pm_panic_callb, (void *)NULL,
-		    CB_CL_PANIC, "pm_panic");
+	    CB_CL_PANIC, "pm_panic");
 	pm_halt_cb_id = callb_add(pm_halt_callb, (void *)NULL,
-		    CB_CL_HALT, "pm_halt");
+	    CB_CL_HALT, "pm_halt");
 
 	/*
 	 * Create a thread to do dependency processing.
@@ -1593,7 +1593,7 @@ pm_devi_lock_held(dev_info_t *dip)
 	lock_loan_t *cur;
 
 	if (DEVI_BUSY_OWNED(dip))
-	    return (1);
+		return (1);
 
 	/* return false if no locks borrowed */
 	if (lock_loan_head.pmlk_next == NULL)
@@ -1827,7 +1827,7 @@ pm_unkeeps(int count, char *keeper, char **keptpaths, int pwr)
 				keeper_on = 0;
 				PM_LOCK_POWER(dip, &circ);
 				for (j = 0; j < PM_NUMCMPTS(dip); j++) {
-				    cp = &DEVI(dip)->devi_pm_components[j];
+					cp = &DEVI(dip)->devi_pm_components[j];
 					if (cur_power(cp)) {
 						keeper_on++;
 						break;
@@ -1836,7 +1836,7 @@ pm_unkeeps(int count, char *keeper, char **keptpaths, int pwr)
 				if (keeper_on && (PM_SKBU(kept) == 0)) {
 					pm_rele_power(kept);
 					DEVI(kept)->devi_pm_flags
-						&= ~PMC_SKIP_BRINGUP;
+					    &= ~PMC_SKIP_BRINGUP;
 				}
 				PM_UNLOCK_POWER(dip, circ);
 			} else if (pwr) {
@@ -2428,7 +2428,7 @@ pm_power(dev_info_t *dip, int comp, int level)
 		ASSERT(info);
 		(void) pm_phc_impl(dip, comp, phc_lvl, 0);
 		PMD(PMD_PHC, ("%s: phc %s@%s(%s#%d) comp=%d level=%d\n",
-			pmf, PM_DEVICE(dip), comp, phc_lvl))
+		    pmf, PM_DEVICE(dip), comp, phc_lvl))
 	}
 
 	PMD(PMD_FAIL, ("%s: can't set comp=%d (%s) of %s@%s(%s#%d) to "
@@ -2927,7 +2927,7 @@ pm_power_has_changed(dev_info_t *dip, int comp, int level)
 					    "!pm: parent kuc not updated due "
 					    "to possible deadlock.\n");
 					return (pm_phc_impl(dip,
-						    comp, level, 1));
+					    comp, level, 1));
 				}
 				old_level = cur_power(cp);
 				if (pdip && !PM_WANTS_NOTIFICATION(pdip) &&
@@ -3940,7 +3940,7 @@ e_pm_destroy_components(dev_info_t *dip)
 		kmem_free(cp->pmc_comp.pmc_name, cp->pmc_comp.pmc_name_sz);
 		kmem_free(cp->pmc_comp.pmc_lnames, nlevels * sizeof (char *));
 		kmem_free(cp->pmc_comp.pmc_lname_buf,
-				cp->pmc_comp.pmc_lnames_sz);
+		    cp->pmc_comp.pmc_lnames_sz);
 	}
 	kmem_free(DEVI(dip)->devi_pm_components, DEVI(dip)->devi_pm_comp_size);
 	DEVI(dip)->devi_pm_components = NULL;
@@ -4728,7 +4728,7 @@ e_pm_props(dev_info_t *dip)
 		} else {
 			cmn_err(CE_NOTE, "!device %s@%s has unrecognized "
 			    "%s property value '%s'", PM_NAME(dip),
-			PM_ADDR(dip), "pm-class", pp);
+			    PM_ADDR(dip), "pm-class", pp);
 		}
 		kmem_free(pp, len);
 	}
@@ -4910,7 +4910,7 @@ pm_ctlops(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t op, void *a, void *v)
 	if (!d || !r)
 		return (DDI_FAILURE);
 	ASSERT(DEVI(d)->devi_ops && DEVI(d)->devi_ops->devo_bus_ops &&
-		DEVI(d)->devi_ops->devo_bus_ops->bus_ctl);
+	    DEVI(d)->devi_ops->devo_bus_ops->bus_ctl);
 
 	fp = DEVI(d)->devi_ops->devo_bus_ops->bus_ctl;
 	return ((*fp)(d, r, op, a, v));
@@ -5272,7 +5272,7 @@ pm_kept(char *keptp)
 					path =
 					    kmem_alloc(length, KM_SLEEP);
 					paths = kmem_alloc(sizeof (char **),
-						    KM_SLEEP);
+					    KM_SLEEP);
 					(void) strcpy(path, keptp);
 					paths[0] = path;
 					dp->pdr_kept_paths = paths;
@@ -5301,7 +5301,7 @@ pm_kept(char *keptp)
 						bcopy(dp->pdr_kept_paths,
 						    paths, length);
 						kmem_free(dp->pdr_kept_paths,
-							length);
+						    length);
 					}
 					dp->pdr_kept_paths = paths;
 					length = strlen(keptp) + 1;
@@ -5337,7 +5337,7 @@ pm_kept(char *keptp)
 					path =
 					    kmem_alloc(length, KM_SLEEP);
 					paths = kmem_alloc(sizeof (char **),
-						KM_SLEEP);
+					    KM_SLEEP);
 					(void) strcpy(path, keptp);
 					paths[0] = path;
 					dp->pdr_kept_paths = paths;
@@ -5346,7 +5346,7 @@ pm_kept(char *keptp)
 			}
 #ifdef DEBUG
 			if (pm_debug & PMD_DEP)
-			    prdeps("After from pm_kept\n");
+				prdeps("After from pm_kept\n");
 #endif
 		}
 	}
@@ -6158,7 +6158,7 @@ pm_discard_dependencies(void)
 				kmem_free(rp->pdr_kept_paths[i], length);
 			}
 			kmem_free(rp->pdr_kept_paths,
-				rp->pdr_kept_count * sizeof (char **));
+			    rp->pdr_kept_count * sizeof (char **));
 		}
 		kmem_free(rp, rp->pdr_size);
 	}
@@ -7944,8 +7944,7 @@ pm_restore_direct_lvl_walk(dev_info_t *dip, void *arg)
 			if (PM_CURPOWER(dip, i) == *ip)
 				continue;
 			if (pm_set_power(dip, i, *ip, PM_LEVEL_EXACT,
-			    PM_CANBLOCK_BYPASS, 0, &result) !=
-				DDI_SUCCESS) {
+			    PM_CANBLOCK_BYPASS, 0, &result) != DDI_SUCCESS) {
 				cmn_err(CE_WARN, "cpr: unable "
 				    "to restore power level of "
 				    "component %d of directly "
@@ -8611,6 +8610,7 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		pm_hold_power(pdip);
 	}
 	PM_LOCK_POWER(dip, &circ);
+	clevel = PM_CURPOWER(dip, comp);
 	/*
 	 * It's possible that a call was made to pm_update_maxpower()
 	 * on another thread before we took the lock above. So, we need to
@@ -8624,7 +8624,6 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		*iresp = DDI_FAILURE;
 		goto post_notify;
 	}
-	clevel = PM_CURPOWER(dip, comp);
 	PMD(PMD_SET, ("%s: %s@%s(%s#%d), cmp=%d, olvl=%d, nlvl=%d, clvl=%d, "
 	    "dir=%s\n", pmf, PM_DEVICE(dip), comp, bpc->bpc_olevel, nlevel,
 	    clevel, dir))
@@ -8917,15 +8916,15 @@ pm_busop_match_request(dev_info_t *dip, void *arg)
 		 */
 		PM_UNLOCK_POWER(dip, circ);
 		PMD(PMD_SET, ("%s: blocking\n", pmf))
-		    /* pm_block releases dip lock */
-		    switch (pm_block(dip, comp, nlevel, clevel)) {
-		    case PMP_RELEASE:
-				return (EAGAIN);
-		    case PMP_SUCCEED:
-				return (DDI_SUCCESS);
-		    case PMP_FAIL:
-				return (DDI_FAILURE);
-		    }
+		/* pm_block releases dip lock */
+		switch (pm_block(dip, comp, nlevel, clevel)) {
+		case PMP_RELEASE:
+			return (EAGAIN);
+		case PMP_SUCCEED:
+			return (DDI_SUCCESS);
+		case PMP_FAIL:
+			return (DDI_FAILURE);
+		}
 	} else {
 		ASSERT(0);
 	}
