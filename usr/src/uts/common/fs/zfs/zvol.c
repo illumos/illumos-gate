@@ -114,9 +114,9 @@ int zvol_maxphys = DMU_MAX_ACCESS/2;
 static int zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio);
 
 static void
-zvol_size_changed(zvol_state_t *zv, dev_t dev)
+zvol_size_changed(zvol_state_t *zv, major_t maj)
 {
-	dev = makedevice(getmajor(dev), zv->zv_minor);
+	dev_t dev = makedevice(maj, zv->zv_minor);
 
 	VERIFY(ddi_prop_update_int64(dev, zfs_dip,
 	    "Size", zv->zv_volsize) == DDI_SUCCESS);
@@ -315,7 +315,7 @@ zil_replay_func_t *zvol_replay_vector[TX_MAX_TYPE] = {
  * Create a minor node for the specified volume.
  */
 int
-zvol_create_minor(const char *name, dev_t dev)
+zvol_create_minor(const char *name, major_t maj)
 {
 	zvol_state_t *zv;
 	objset_t *os;
@@ -452,7 +452,7 @@ zvol_create_minor(const char *name, dev_t dev)
 
 	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector);
 
-	zvol_size_changed(zv, dev);
+	zvol_size_changed(zv, maj);
 
 	/* XXX this should handle the possible i/o error */
 	VERIFY(dsl_prop_register(dmu_objset_ds(zv->zv_objset),
@@ -512,7 +512,7 @@ zvol_remove_minor(const char *name)
 }
 
 int
-zvol_set_volsize(const char *name, dev_t dev, uint64_t volsize)
+zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 {
 	zvol_state_t *zv;
 	dmu_tx_t *tx;
@@ -559,7 +559,7 @@ zvol_set_volsize(const char *name, dev_t dev, uint64_t volsize)
 
 	if (error == 0) {
 		zv->zv_volsize = volsize;
-		zvol_size_changed(zv, dev);
+		zvol_size_changed(zv, maj);
 	}
 
 	mutex_exit(&zvol_state_lock);

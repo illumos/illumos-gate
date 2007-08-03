@@ -23,37 +23,39 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_UNIQUE_H
-#define	_SYS_UNIQUE_H
+#ifndef	_SYS_RPRWLOCK_H
+#define	_SYS_RPRWLOCK_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/inttypes.h>
+#include <sys/list.h>
 #include <sys/zfs_context.h>
+#include <sys/refcount.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/* The number of significant bits in each unique value. */
-#define	UNIQUE_BITS	56
+typedef struct rprwlock {
+	kmutex_t	rw_lock;
+	kthread_t	*rw_writer;
+	kcondvar_t	rw_cv;
+	refcount_t	rw_count;
+} rprwlock_t;
 
-void unique_init(void);
-void unique_fini(void);
-
-/*
- * Return a new unique value (which will not be uniquified against until
- * it is unique_insert()-ed.
- */
-uint64_t unique_create(void);
-
-/* Return a unique value, which equals the one passed in if possible. */
-uint64_t unique_insert(uint64_t value);
-
-/* Indicate that this value no longer needs to be uniquified against. */
-void unique_remove(uint64_t value);
+void rprw_init(rprwlock_t *rwl);
+void rprw_destroy(rprwlock_t *rwl);
+void rprw_enter_read(rprwlock_t *rwl, void *tag);
+void rprw_enter_write(rprwlock_t *rwl, void *tag);
+void rprw_enter(rprwlock_t *rwl, krw_t rw, void *tag);
+void rprw_exit(rprwlock_t *rwl, void *tag);
+boolean_t rprw_held(rprwlock_t *rwl, krw_t rw);
+#define	RPRW_READ_HELD(x)	rprw_held(x, RW_READER)
+#define	RPRW_WRITE_HELD(x)	rprw_held(x, RW_WRITER)
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _SYS_UNIQUE_H */
+#endif /* _SYS_RPRWLOCK_H */

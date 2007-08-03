@@ -157,7 +157,7 @@ void zfs_znode_byteswap(void *buf, size_t size);
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
 void dmu_objset_close(objset_t *os);
-int dmu_objset_evict_dbufs(objset_t *os, int try);
+int dmu_objset_evict_dbufs(objset_t *os, boolean_t try);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
     objset_t *clone_parent,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);

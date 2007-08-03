@@ -98,7 +98,8 @@ typedef enum {
 	ZPOOL_PROP_AUTOREPLACE,
 	ZPOOL_PROP_DELEGATION,
 	ZFS_PROP_VERSION,
-	ZPOOL_PROP_NAME			/* XXX must be last! */
+	ZPOOL_PROP_NAME,
+	ZFS_NUM_PROPS
 } zfs_prop_t;
 
 typedef zfs_prop_t zpool_prop_t;
@@ -160,16 +161,15 @@ int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 uint64_t zpool_prop_default_numeric(zpool_prop_t);
-const char *zfs_prop_perm(zfs_prop_t);
 
 /*
  * Property Iterator
  */
 typedef zfs_prop_t (*zfs_prop_f)(zfs_prop_t, void *);
 typedef zpool_prop_t (*zpool_prop_f)(zpool_prop_t, void *);
-extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
-extern zfs_prop_t zfs_prop_iter_ordered(zfs_prop_f, void *, boolean_t);
-extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
+extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *);
+extern zfs_prop_t zfs_prop_iter_ordered(zfs_prop_f, void *);
+extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *);
 
 /*
  * On-disk version number.

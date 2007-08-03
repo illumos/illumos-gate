@@ -37,18 +37,12 @@
 #include <sys/zfs_context.h>
 #include <sys/avl.h>
 #include <sys/refcount.h>
+#include <sys/rprwlock.h>
 #include <sys/bplist.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-typedef struct spa_config_lock {
-	kmutex_t	scl_lock;
-	refcount_t	scl_count;
-	kthread_t	*scl_writer;
-	kcondvar_t	scl_cv;
-} spa_config_lock_t;
 
 typedef struct spa_error_entry {
 	zbookmark_t	se_bookmark;
@@ -152,11 +146,12 @@ struct spa {
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	boolean_t	spa_delegation;		/* delegation on/off */
 	/*
-	 * spa_refcnt must be the last element because it changes size based on
-	 * compilation options.  In order for the MDB module to function
-	 * correctly, the other fields must remain in the same location.
+	 * spa_refcnt & spa_config_lock must be the last elements
+	 * because refcount_t changes size based on compilation options.
+	 * In order for the MDB module to function correctly, the other
+	 * fields must remain in the same location.
 	 */
-	spa_config_lock_t spa_config_lock;	/* configuration changes */
+	rprwlock_t	spa_config_lock;	/* configuration changes */
 	refcount_t	spa_refcount;		/* number of opens */
 };
 

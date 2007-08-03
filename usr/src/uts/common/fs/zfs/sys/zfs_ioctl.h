@@ -133,8 +133,6 @@ typedef struct zfs_cmd {
 	uint64_t	zc_nvlist_dst;	/* really (char *) */
 	uint64_t	zc_nvlist_dst_size;
 	uint64_t	zc_cookie;
-	uint64_t	zc_cred;
-	uint64_t	zc_dev;
 	uint64_t	zc_objset_type;
 	uint64_t	zc_perm_action;
 	uint64_t 	zc_history;	/* really (char *) */

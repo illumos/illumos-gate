@@ -73,7 +73,6 @@ static int zfs_root(vfs_t *vfsp, vnode_t **vpp);
 static int zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp);
 static int zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp);
 static void zfs_freevfs(vfs_t *vfsp);
-static void zfs_objset_close(zfsvfs_t *zfsvfs);
 
 static const fs_operation_def_t zfs_vfsops_template[] = {
 	VFSNAME_MOUNT,		{ .vfs_mount = zfs_mount },
@@ -526,7 +525,8 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
 	    offsetof(znode_t, z_link_node));
-	rw_init(&zfsvfs->z_um_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zfsvfs->z_unmount_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zfsvfs->z_unmount_inactive_lock, NULL, RW_DEFAULT, NULL);
 
 	/* Initialize the generic filesystem structure. */
 	vfsp->vfs_bcount = 0;
@@ -1009,6 +1009,8 @@ static int
 zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
+	objset_t *os = zfsvfs->z_os;
+	znode_t	*zp, *nextzp;
 	int ret;
 
 	ret = secpolicy_fs_unmount(cr, vfsp);
@@ -1036,58 +1038,102 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		return (ret);
 	}
 
-	if (fflag & MS_FORCE) {
-		vfsp->vfs_flag |= VFS_UNMOUNTED;
-		zfsvfs->z_unmounted1 = B_TRUE;
-
+	if (!(fflag & MS_FORCE)) {
 		/*
-		 * Ensure that z_unmounted1 reaches global visibility
-		 * before z_op_cnt.
+		 * Check the number of active vnodes in the file system.
+		 * Our count is maintained in the vfs structure, but the
+		 * number is off by 1 to indicate a hold on the vfs
+		 * structure itself.
+		 *
+		 * The '.zfs' directory maintains a reference of its
+		 * own, and any active references underneath are
+		 * reflected in the vnode count.
 		 */
-		membar_producer();
-
-		/*
-		 * Wait for all zfs threads to leave zfs.
-		 * Grabbing a rwlock as reader in all vops and
-		 * as writer here doesn't work because it too easy to get
-		 * multiple reader enters as zfs can re-enter itself.
-		 * This can lead to deadlock if there is an intervening
-		 * rw_enter as writer.
-		 * So a file system threads ref count (z_op_cnt) is used.
-		 * A polling loop on z_op_cnt may seem inefficient, but
-		 * - this saves all threads on exit from having to grab a
-		 *   mutex in order to cv_signal
-		 * - only occurs on forced unmount in the rare case when
-		 *   there are outstanding threads within the file system.
-		 */
-		while (zfsvfs->z_op_cnt) {
-			delay(1);
-		}
-
-		zfs_objset_close(zfsvfs);
-
-		return (0);
-	}
-	/*
-	 * Check the number of active vnodes in the file system.
-	 * Our count is maintained in the vfs structure, but the number
-	 * is off by 1 to indicate a hold on the vfs structure itself.
-	 *
-	 * The '.zfs' directory maintains a reference of its own, and any active
-	 * references underneath are reflected in the vnode count.
-	 */
-	if (zfsvfs->z_ctldir == NULL) {
-		if (vfsp->vfs_count > 1)
-			return (EBUSY);
-	} else {
-		if (vfsp->vfs_count > 2 ||
-		    (zfsvfs->z_ctldir->v_count > 1 && !(fflag & MS_FORCE))) {
-			return (EBUSY);
+		if (zfsvfs->z_ctldir == NULL) {
+			if (vfsp->vfs_count > 1)
+				return (EBUSY);
+		} else {
+			if (vfsp->vfs_count > 2 ||
+			    zfsvfs->z_ctldir->v_count > 1) {
+				return (EBUSY);
+			}
 		}
 	}
 
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
-	zfs_objset_close(zfsvfs);
+
+	rw_enter(&zfsvfs->z_unmount_lock, RW_WRITER);
+	rw_enter(&zfsvfs->z_unmount_inactive_lock, RW_WRITER);
+
+	/*
+	 * At this point there are no vops active, and any new vops will
+	 * fail with EIO since we have z_unmount_lock for writer (only
+	 * relavent for forced unmount).
+	 *
+	 * Release all holds on dbufs.
+	 * Note, the dmu can still callback via znode_pageout_func()
+	 * which can zfs_znode_free() the znode.  So we lock
+	 * z_all_znodes; search the list for a held dbuf; drop the lock
+	 * (we know zp can't disappear if we hold a dbuf lock) then
+	 * regrab the lock and restart.
+	 */
+	mutex_enter(&zfsvfs->z_znodes_lock);
+	for (zp = list_head(&zfsvfs->z_all_znodes); zp; zp = nextzp) {
+		nextzp = list_next(&zfsvfs->z_all_znodes, zp);
+		if (zp->z_dbuf_held) {
+			/* dbufs should only be held when force unmounting */
+			zp->z_dbuf_held = 0;
+			mutex_exit(&zfsvfs->z_znodes_lock);
+			dmu_buf_rele(zp->z_dbuf, NULL);
+			/* Start again */
+			mutex_enter(&zfsvfs->z_znodes_lock);
+			nextzp = list_head(&zfsvfs->z_all_znodes);
+		}
+	}
+	mutex_exit(&zfsvfs->z_znodes_lock);
+
+	/*
+	 * Set the unmounted flag and let new vops unblock.
+	 * zfs_inactive will have the unmounted behavior, and all other
+	 * vops will fail with EIO.
+	 */
+	zfsvfs->z_unmounted = B_TRUE;
+	rw_exit(&zfsvfs->z_unmount_lock);
+	rw_exit(&zfsvfs->z_unmount_inactive_lock);
+
+	/*
+	 * Unregister properties.
+	 */
+	if (!dmu_objset_is_snapshot(os))
+		zfs_unregister_callbacks(zfsvfs);
+
+	/*
+	 * Close the zil. NB: Can't close the zil while zfs_inactive
+	 * threads are blocked as zil_close can call zfs_inactive.
+	 */
+	if (zfsvfs->z_log) {
+		zil_close(zfsvfs->z_log);
+		zfsvfs->z_log = NULL;
+	}
+
+	/*
+	 * Evict all dbufs so that cached znodes will be freed
+	 */
+	if (dmu_objset_evict_dbufs(os, B_TRUE)) {
+		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
+		(void) dmu_objset_evict_dbufs(os, B_FALSE);
+	}
+
+	/*
+	 * Finally close the objset
+	 */
+	dmu_objset_close(os);
+
+	/*
+	 * We can now safely destroy the '.zfs' directory node.
+	 */
+	if (zfsvfs->z_ctldir != NULL)
+		zfsctl_destroy(zfsvfs);
 
 	return (0);
 }
@@ -1177,92 +1223,13 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 }
 
 static void
-zfs_objset_close(zfsvfs_t *zfsvfs)
-{
-	znode_t		*zp, *nextzp;
-	objset_t	*os = zfsvfs->z_os;
-
-	/*
-	 * For forced unmount, at this point all vops except zfs_inactive
-	 * are erroring EIO. We need to now suspend zfs_inactive threads
-	 * while we are freeing dbufs before switching zfs_inactive
-	 * to use behaviour without a objset.
-	 */
-	rw_enter(&zfsvfs->z_um_lock, RW_WRITER);
-
-	/*
-	 * Release all holds on dbufs
-	 * Note, although we have stopped all other vop threads and
-	 * zfs_inactive(), the dmu can callback via znode_pageout_func()
-	 * which can zfs_znode_free() the znode.
-	 * So we lock z_all_znodes; search the list for a held
-	 * dbuf; drop the lock (we know zp can't disappear if we hold
-	 * a dbuf lock; then regrab the lock and restart.
-	 */
-	mutex_enter(&zfsvfs->z_znodes_lock);
-	for (zp = list_head(&zfsvfs->z_all_znodes); zp; zp = nextzp) {
-		nextzp = list_next(&zfsvfs->z_all_znodes, zp);
-		if (zp->z_dbuf_held) {
-			/* dbufs should only be held when force unmounting */
-			zp->z_dbuf_held = 0;
-			mutex_exit(&zfsvfs->z_znodes_lock);
-			dmu_buf_rele(zp->z_dbuf, NULL);
-			/* Start again */
-			mutex_enter(&zfsvfs->z_znodes_lock);
-			nextzp = list_head(&zfsvfs->z_all_znodes);
-		}
-	}
-	mutex_exit(&zfsvfs->z_znodes_lock);
-
-	/*
-	 * Unregister properties.
-	 */
-	if (!dmu_objset_is_snapshot(os))
-		zfs_unregister_callbacks(zfsvfs);
-
-	/*
-	 * Switch zfs_inactive to behaviour without an objset.
-	 * It just tosses cached pages and frees the znode & vnode.
-	 * Then re-enable zfs_inactive threads in that new behaviour.
-	 */
-	zfsvfs->z_unmounted2 = B_TRUE;
-	rw_exit(&zfsvfs->z_um_lock); /* re-enable any zfs_inactive threads */
-
-	/*
-	 * Close the zil. Can't close the zil while zfs_inactive
-	 * threads are blocked as zil_close can call zfs_inactive.
-	 */
-	if (zfsvfs->z_log) {
-		zil_close(zfsvfs->z_log);
-		zfsvfs->z_log = NULL;
-	}
-
-	/*
-	 * Evict all dbufs so that cached znodes will be freed
-	 */
-	if (dmu_objset_evict_dbufs(os, 1)) {
-		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
-		(void) dmu_objset_evict_dbufs(os, 0);
-	}
-
-	/*
-	 * Finally close the objset
-	 */
-	dmu_objset_close(os);
-
-	/*
-	 * We can now safely destroy the '.zfs' directory node.
-	 */
-	if (zfsvfs->z_ctldir != NULL)
-		zfsctl_destroy(zfsvfs);
-
-}
-
-static void
 zfs_freevfs(vfs_t *vfsp)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 
+	mutex_destroy(&zfsvfs->z_znodes_lock);
+	rw_destroy(&zfsvfs->z_unmount_lock);
+	rw_destroy(&zfsvfs->z_unmount_inactive_lock);
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));
 
 	atomic_add_32(&zfs_active_fs_count, -1);

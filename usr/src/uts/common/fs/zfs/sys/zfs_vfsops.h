@@ -52,10 +52,9 @@ struct zfsvfs {
 	uint_t		z_acl_mode;	/* acl chmod/mode behavior */
 	uint_t		z_acl_inherit;	/* acl inheritance behavior */
 	boolean_t	z_atime;	/* enable atimes mount option */
-	boolean_t	z_unmounted1;	/* unmounted phase 1 */
-	boolean_t	z_unmounted2;	/* unmounted phase 2 */
-	uint32_t	z_op_cnt;	/* vnode/vfs operations ref count */
-	krwlock_t	z_um_lock;	/* rw lock for umount phase 2 */
+	boolean_t	z_unmounted;	/* unmounted */
+	krwlock_t	z_unmount_lock;
+	krwlock_t	z_unmount_inactive_lock;
 	list_t		z_all_znodes;	/* all vnodes in the fs */
 	kmutex_t	z_znodes_lock;	/* lock for z_all_znodes */
 	vnode_t		*z_ctldir;	/* .zfs directory pointer */

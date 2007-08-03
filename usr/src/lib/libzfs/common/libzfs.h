@@ -107,7 +107,6 @@ enum {
 	EZFS_BADWHO,		/* invalid permission who */
 	EZFS_BADPERM,		/* invalid permission */
 	EZFS_BADPERMSET,	/* invalid permission set name */
-	EZFS_PERMSET_CIRCULAR,	/* circular dependency on permset */
 	EZFS_NODELEGATION,	/* delegated administration is disabled */
 	EZFS_PERMRDONLY,	/* pemissions are readonly */
 	EZFS_UNKNOWN

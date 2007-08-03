@@ -343,7 +343,7 @@ usage(boolean_t requested)
 		    "PROPERTY", "VALUES");
 
 		/* Iterate over all properties */
-		(void) zpool_prop_iter(print_prop_cb, fp, B_FALSE);
+		(void) zpool_prop_iter(print_prop_cb, fp);
 	}
 
 	/*
@@ -3759,25 +3759,12 @@ find_command_idx(char *command, int *idx)
 	return (1);
 }
 
-zpool_prop_t
-propset_cb(zpool_prop_t prop, void *data)
-{
-	char *cmdname = (char *)data;
-
-	if (strcmp(cmdname, zpool_prop_to_name(prop)) == 0)
-		return (prop);
-
-	return (ZFS_PROP_CONT);
-}
-
 int
 main(int argc, char **argv)
 {
 	int ret;
 	int i;
 	char *cmdname;
-	boolean_t found = B_FALSE;
-	char *str;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -3820,41 +3807,20 @@ main(int argc, char **argv)
 	if (find_command_idx(cmdname, &i) == 0) {
 		current_command = &command_table[i];
 		ret = command_table[i].func(argc - 1, argv + 1);
-		found = B_TRUE;
-	}
-
-	/*
-	 * 'freeze' is a vile debugging abomination, so we treat it as such.
-	 */
-	if (strcmp(cmdname, "freeze") == 0 && argc == 3) {
+	} else if (strchr(cmdname, '=')) {
+		verify(find_command_idx("set", &i) == 0);
+		current_command = &command_table[i];
+		ret = command_table[i].func(argc, argv);
+	} else if (strcmp(cmdname, "freeze") == 0 && argc == 3) {
+		/*
+		 * 'freeze' is a vile debugging abomination, so we treat
+		 * it as such.
+		 */
 		char buf[16384];
 		int fd = open(ZFS_DEV, O_RDWR);
 		(void) strcpy((void *)buf, argv[2]);
 		return (!!ioctl(fd, ZFS_IOC_POOL_FREEZE, buf));
-	}
-
-	/* is this a zpool property=value */
-	if (found == B_FALSE && ((str = strchr(cmdname, '=')) != NULL)) {
-		*str = '\0';
-		if (zpool_prop_iter(propset_cb, cmdname,
-		    B_FALSE) != ZFS_PROP_INVAL) {
-			if (find_command_idx("set", &i) == 0) {
-				*str = '=';
-				current_command = &command_table[i];
-				ret = command_table[i].func(argc, argv);
-				found = B_TRUE;
-			}
-		}
-
-		if (found == B_FALSE) {
-			*str = '=';
-			(void) fprintf(stderr,
-			    gettext("invalid property '%s'\n"), cmdname);
-			found = B_TRUE;
-		}
-	}
-
-	if (found == B_FALSE) {
+	} else {
 		(void) fprintf(stderr, gettext("unrecognized "
 		    "command '%s'\n"), cmdname);
 		usage(B_FALSE);

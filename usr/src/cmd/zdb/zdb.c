@@ -2287,6 +2287,7 @@ main(int argc, char **argv)
 
 	kernel_init(FREAD);
 	g_zfs = libzfs_init();
+	ASSERT(g_zfs != NULL);
 
 	/*
 	 * Disable vdev caching.  If we don't do this, live pool traversal

@@ -45,6 +45,7 @@
 #include <sys/dsl_prop.h>
 #include <sys/fs/zfs.h>
 #include <sys/metaslab_impl.h>
+#include "zfs_prop.h"
 
 /*
  * SPA locking
@@ -76,11 +77,10 @@
  *	some references in the DMU.  Internally we check against SPA_MINREF, but
  *	present the image of a zero/non-zero value to consumers.
  *
- * spa_config_lock (per-spa crazy rwlock)
+ * spa_config_lock (per-spa read-priority rwlock)
  *
- *	This SPA special is a recursive rwlock, capable of being acquired from
- *	asynchronous threads.  It has protects the spa_t from config changes,
- *	and must be held in the following circumstances:
+ *	This protects the spa_t from config changes, and must be held in
+ *	the following circumstances:
  *
  *		- RW_READER to perform I/O to the spa
  *		- RW_WRITER to change the vdev config
@@ -257,7 +257,7 @@ spa_add(const char *name, const char *altroot)
 	spa->spa_final_txg = UINT64_MAX;
 
 	refcount_create(&spa->spa_refcount);
-	refcount_create(&spa->spa_config_lock.scl_count);
+	rprw_init(&spa->spa_config_lock);
 
 	avl_add(&spa_namespace_avl, spa);
 
@@ -298,10 +298,10 @@ spa_remove(spa_t *spa)
 	spa_config_set(spa, NULL);
 
 	refcount_destroy(&spa->spa_refcount);
-	refcount_destroy(&spa->spa_config_lock.scl_count);
+
+	rprw_destroy(&spa->spa_config_lock);
 
 	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
-	mutex_destroy(&spa->spa_config_lock.scl_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
 	mutex_destroy(&spa->spa_errlog_lock);
 	mutex_destroy(&spa->spa_scrub_lock);
@@ -518,79 +518,22 @@ spa_spare_activate(vdev_t *vd)
  * SPA config locking
  * ==========================================================================
  */
-
-/*
- * Acquire the config lock.  The config lock is a special rwlock that allows for
- * recursive enters.  Because these enters come from the same thread as well as
- * asynchronous threads working on behalf of the owner, we must unilaterally
- * allow all reads access as long at least one reader is held (even if a write
- * is requested).  This has the side effect of write starvation, but write locks
- * are extremely rare, and a solution to this problem would be significantly
- * more complex (if even possible).
- *
- * We would like to assert that the namespace lock isn't held, but this is a
- * valid use during create.
- */
 void
 spa_config_enter(spa_t *spa, krw_t rw, void *tag)
 {
-	spa_config_lock_t *scl = &spa->spa_config_lock;
-
-	mutex_enter(&scl->scl_lock);
-
-	if (scl->scl_writer != curthread) {
-		if (rw == RW_READER) {
-			while (scl->scl_writer != NULL)
-				cv_wait(&scl->scl_cv, &scl->scl_lock);
-		} else {
-			while (scl->scl_writer != NULL ||
-			    !refcount_is_zero(&scl->scl_count))
-				cv_wait(&scl->scl_cv, &scl->scl_lock);
-			scl->scl_writer = curthread;
-		}
-	}
-
-	(void) refcount_add(&scl->scl_count, tag);
-
-	mutex_exit(&scl->scl_lock);
+	rprw_enter(&spa->spa_config_lock, rw, tag);
 }
 
-/*
- * Release the spa config lock, notifying any waiters in the process.
- */
 void
 spa_config_exit(spa_t *spa, void *tag)
 {
-	spa_config_lock_t *scl = &spa->spa_config_lock;
-
-	mutex_enter(&scl->scl_lock);
-
-	ASSERT(!refcount_is_zero(&scl->scl_count));
-	if (refcount_remove(&scl->scl_count, tag) == 0) {
-		cv_broadcast(&scl->scl_cv);
-		scl->scl_writer = NULL;  /* OK in either case */
-	}
-
-	mutex_exit(&scl->scl_lock);
+	rprw_exit(&spa->spa_config_lock, tag);
 }
 
-/*
- * Returns true if the config lock is held in the given manner.
- */
 boolean_t
 spa_config_held(spa_t *spa, krw_t rw)
 {
-	spa_config_lock_t *scl = &spa->spa_config_lock;
-	boolean_t held;
-
-	mutex_enter(&scl->scl_lock);
-	if (rw == RW_WRITER)
-		held = (scl->scl_writer == curthread);
-	else
-		held = !refcount_is_zero(&scl->scl_count);
-	mutex_exit(&scl->scl_lock);
-
-	return (held);
+	return (rprw_held(&spa->spa_config_lock, rw));
 }
 
 /*
@@ -1105,6 +1048,7 @@ spa_init(int mode)
 	zio_init();
 	dmu_init();
 	zil_init();
+	zfs_prop_init();
 	spa_config_load();
 }
 
@@ -1116,6 +1060,7 @@ spa_fini(void)
 	zil_fini();
 	dmu_fini();
 	zio_fini();
+	unique_fini();
 	refcount_fini();
 
 	avl_destroy(&spa_namespace_avl);

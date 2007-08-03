@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_DSL_PERMS_H
-#define	_SYS_DSL_PERMS_H
+#ifndef	_SYS_DSL_DELEG_H
+#define	_SYS_DSL_DELEG_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -48,30 +48,13 @@ extern "C" {
 #define	ZFS_DELEG_PERM_SHARE		"share"
 #define	ZFS_DELEG_PERM_SEND		"send"
 #define	ZFS_DELEG_PERM_RECEIVE		"receive"
-#define	ZFS_DELEG_PERM_QUOTA		"quota"
-#define	ZFS_DELEG_PERM_RESERVATION	"reservation"
-#define	ZFS_DELEG_PERM_VOLSIZE		"volsize"
-#define	ZFS_DELEG_PERM_RECORDSIZE	"recordsize"
-#define	ZFS_DELEG_PERM_MOUNTPOINT	"mountpoint"
-#define	ZFS_DELEG_PERM_SHARENFS		"sharenfs"
-#define	ZFS_DELEG_PERM_CHECKSUM		"checksum"
-#define	ZFS_DELEG_PERM_COMPRESSION	"compression"
-#define	ZFS_DELEG_PERM_ATIME		"atime"
-#define	ZFS_DELEG_PERM_DEVICES		"devices"
-#define	ZFS_DELEG_PERM_EXEC		"exec"
-#define	ZFS_DELEG_PERM_SETUID		"setuid"
-#define	ZFS_DELEG_PERM_READONLY		"readonly"
-#define	ZFS_DELEG_PERM_ZONED		"zoned"
-#define	ZFS_DELEG_PERM_SNAPDIR		"snapdir"
-#define	ZFS_DELEG_PERM_ACLMODE		"aclmode"
-#define	ZFS_DELEG_PERM_ACLINHERIT	"aclinherit"
 #define	ZFS_DELEG_PERM_ALLOW		"allow"
-#define	ZFS_DELEG_PERM_CANMOUNT		"canmount"
 #define	ZFS_DELEG_PERM_USERPROP		"userprop"
-#define	ZFS_DELEG_PERM_SHAREISCSI	"shareiscsi"
-#define	ZFS_DELEG_PERM_XATTR		"xattr"
-#define	ZFS_DELEG_PERM_COPIES		"copies"
-#define	ZFS_DELEG_PERM_VERSION		"version"
+
+/*
+ * Note: the names of properties that are marked delegatable are also
+ * valid delegated permissions
+ */
 
 int dsl_deleg_get(const char *ddname, nvlist_t **nvp);
 int dsl_deleg_set(const char *ddname, nvlist_t *nvp, boolean_t unset);
@@ -80,10 +63,10 @@ void dsl_deleg_set_create_perms(dsl_dir_t *dd, dmu_tx_t *tx, cred_t *cr);
 int dsl_deleg_can_allow(char *ddname, nvlist_t *nvp, cred_t *cr);
 int dsl_deleg_can_unallow(char *ddname, nvlist_t *nvp, cred_t *cr);
 int dsl_deleg_destroy(objset_t *os, uint64_t zapobj, dmu_tx_t *tx);
-boolean_t dsl_delegation_on(objset_t  *os);
+boolean_t dsl_delegation_on(objset_t *os);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_DSL_PERMS_H */
+#endif	/* _SYS_DSL_DELEG_H */

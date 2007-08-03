@@ -47,11 +47,11 @@ extern "C" {
 #define	ZFS_DELEG_NA		'-'
 
 extern char *zfs_deleg_perm_tab[];
-int zfs_deleg_type(char *attr);
 
 int zfs_deleg_verify_nvlist(nvlist_t *nvlist);
-void zfs_deleg_whokey(char *attr, char type,
+void zfs_deleg_whokey(char *attr, zfs_deleg_who_type_t type,
     char checkflag, void *data);
+const char *zfs_deleg_canonicalize_perm(const char *perm);
 
 #ifdef	__cplusplus
 }

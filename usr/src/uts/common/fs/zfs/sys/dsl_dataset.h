@@ -87,6 +87,7 @@ typedef struct dsl_dataset {
 	dsl_dataset_phys_t *ds_phys;
 	dmu_buf_t *ds_dbuf;
 	uint64_t ds_object;
+	uint64_t ds_fsid_guid;
 
 	/* only used in syncing context: */
 	struct dsl_dataset *ds_prev; /* only valid for non-snapshots */
@@ -109,6 +110,9 @@ typedef struct dsl_dataset {
 
 	/* no locking; only for making guesses */
 	uint64_t ds_trysnap_txg;
+
+	/* for objset_open() */
+	kmutex_t ds_opening_lock;
 
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[MAXNAMELEN];

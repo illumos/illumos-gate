@@ -839,14 +839,14 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 		 */
 		strval = NULL;
 		switch (zfs_prop_get_type(prop)) {
-		case prop_type_boolean:
+		case PROP_TYPE_BOOLEAN:
 			if (prop_parse_boolean(hdl, elem, &intval) != 0) {
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
 			break;
 
-		case prop_type_string:
+		case PROP_TYPE_STRING:
 			if (nvpair_type(elem) != DATA_TYPE_STRING) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "'%s' must be a string"),
@@ -863,14 +863,14 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 			}
 			break;
 
-		case prop_type_number:
+		case PROP_TYPE_NUMBER:
 			if (prop_parse_number(hdl, elem, prop, &intval) != 0) {
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
 			break;
 
-		case prop_type_index:
+		case PROP_TYPE_INDEX:
 			if (prop_parse_index(hdl, elem, prop, &intval) != 0) {
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
@@ -1312,21 +1312,12 @@ zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
 	nvlist_t *perms_nvp = NULL;
 	nvlist_t *sets_nvp = NULL;
 	char errbuf[1024];
-	char *who_tok;
+	char *who_tok, *perm;
 	int error;
 
 	*nvp = NULL;
 
 	if (perms) {
-		/* Make sure permission string doesn't have an '=' sign in it */
-		if (strchr(perms, '=') != NULL) {
-			(void) snprintf(errbuf, sizeof (errbuf),
-			    dgettext(TEXT_DOMAIN,
-			    "permissions can't contain equal sign : '%s'"),
-			    perms);
-			return (zfs_error(zhp->zfs_hdl, EZFS_BADPERM, errbuf));
-		}
-
 		if ((error = nvlist_alloc(&perms_nvp,
 		    NV_UNIQUE_NAME, 0)) != 0) {
 			return (1);
@@ -1351,6 +1342,12 @@ zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
 		char what;
 
 		if ((error = permset_namecheck(whostr, &why, &what)) != 0) {
+			nvlist_free(who_nvp);
+			if (perms_nvp)
+				nvlist_free(perms_nvp);
+			if (sets_nvp)
+				nvlist_free(sets_nvp);
+
 			switch (why) {
 			case NAME_ERR_NO_AT:
 				zfs_error_aux(zhp->zfs_hdl,
@@ -1368,74 +1365,28 @@ zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
 	 * The first nvlist perms_nvp will have normal permissions and the
 	 * other sets_nvp will have only permssion set names in it.
 	 */
+	for (perm = strtok(perms, ","); perm; perm = strtok(NULL, ",")) {
+		const char *perm_canonical = zfs_deleg_canonicalize_perm(perm);
 
-
-	while (perms && *perms != '\0') {
-		char *value;
-		char *perm_name;
-		nvlist_t *update_nvp;
-		int  perm_num;
-		char canonical_name[64];
-		char *canonicalp = canonical_name;
-
-
-		update_nvp = perms_nvp;
-
-		perm_num = getsubopt(&perms, zfs_deleg_perm_tab, &value);
-		if (perm_num == -1) {
-			zfs_prop_t prop;
-
-			prop = zfs_name_to_prop(value);
-			if (prop != ZFS_PROP_INVAL) {
-				(void) snprintf(canonical_name,
-				    sizeof (canonical_name), "%s",
-				    zfs_prop_to_name(prop));
-				perm_num = getsubopt(&canonicalp,
-				    zfs_deleg_perm_tab, &value);
-			}
+		if (perm_canonical) {
+			verify(nvlist_add_boolean(perms_nvp,
+			    perm_canonical) == 0);
+		} else if (perm[0] == '@') {
+			verify(nvlist_add_boolean(sets_nvp, perm) == 0);
+		} else {
+			nvlist_free(who_nvp);
+			nvlist_free(perms_nvp);
+			nvlist_free(sets_nvp);
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADPERM, perm));
 		}
-		if (perm_num != -1) {
-			perm_name = zfs_deleg_perm_tab[perm_num];
-		} else {  /* check and see if permission is a named set */
-			if (value[0] == '@') {
-
-				/*
-				 * make sure permssion set isn't defined
-				 * in terms of itself. ie.
-				 * @set1 = create,destroy,@set1
-				 */
-				if (who_type == ZFS_DELEG_NAMED_SET &&
-				    strcmp(value, whostr) == 0) {
-					nvlist_free(who_nvp);
-					nvlist_free(perms_nvp);
-					if (sets_nvp)
-						nvlist_free(sets_nvp);
-					(void) snprintf(errbuf,
-					    sizeof (errbuf),
-					    dgettext(TEXT_DOMAIN,
-					    "Invalid permission %s"), value);
-					return (zfs_error(zhp->zfs_hdl,
-					    EZFS_PERMSET_CIRCULAR, errbuf));
-				}
-				update_nvp = sets_nvp;
-				perm_name = value;
-			} else {
-				nvlist_free(who_nvp);
-				nvlist_free(perms_nvp);
-				if (sets_nvp)
-					nvlist_free(sets_nvp);
-				return (zfs_error(zhp->zfs_hdl,
-				    EZFS_BADPERM, value));
-			}
-		}
-		verify(nvlist_add_boolean(update_nvp, perm_name) == 0);
 	}
 
 	if (whostr && who_type != ZFS_DELEG_CREATE) {
 		who_tok = strtok(whostr, ",");
 		if (who_tok == NULL) {
 			nvlist_free(who_nvp);
-			nvlist_free(perms_nvp);
+			if (perms_nvp)
+				nvlist_free(perms_nvp);
 			if (sets_nvp)
 				nvlist_free(sets_nvp);
 			(void) snprintf(errbuf, sizeof (errbuf),
@@ -1455,7 +1406,8 @@ zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
 		    &who_id);
 		if (error) {
 			nvlist_free(who_nvp);
-			nvlist_free(perms_nvp);
+			if (perms_nvp)
+				nvlist_free(perms_nvp);
 			if (sets_nvp)
 				nvlist_free(sets_nvp);
 			(void) snprintf(errbuf, sizeof (errbuf),
@@ -1468,7 +1420,6 @@ zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
 		/*
 		 * add entries for both local and descendent when required
 		 */
-
 		zfs_perms_add_who_nvlist(who_nvp, who_id, who_tok,
 		    perms_nvp, sets_nvp, who_type, inherit);
 
@@ -2321,13 +2272,13 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 
 	default:
 		switch (zfs_prop_get_type(prop)) {
-		case prop_type_number:
-		case prop_type_boolean:
-		case prop_type_index:
+		case PROP_TYPE_NUMBER:
+		case PROP_TYPE_BOOLEAN:
+		case PROP_TYPE_INDEX:
 			*val = getprop_uint64(zhp, prop, source);
 			break;
 
-		case prop_type_string:
+		case PROP_TYPE_STRING:
 		default:
 			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
 			    "cannot get non-numeric property"));
@@ -2536,7 +2487,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 
 	default:
 		switch (zfs_prop_get_type(prop)) {
-		case prop_type_number:
+		case PROP_TYPE_NUMBER:
 			if (get_numeric_property(zhp, prop, src,
 			    &source, &val) != 0)
 				return (-1);
@@ -2547,12 +2498,12 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 				zfs_nicenum(val, propbuf, proplen);
 			break;
 
-		case prop_type_string:
+		case PROP_TYPE_STRING:
 			(void) strlcpy(propbuf,
 			    getprop_string(zhp, prop, &source), proplen);
 			break;
 
-		case prop_type_boolean:
+		case PROP_TYPE_BOOLEAN:
 			if (get_numeric_property(zhp, prop, src,
 			    &source, &val) != 0)
 				return (-1);
@@ -2560,7 +2511,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 
 			break;
 
-		case prop_type_index:
+		case PROP_TYPE_INDEX:
 			val = getprop_uint64(zhp, prop, &source);
 			if (zfs_prop_index_to_string(prop, val,
 			    &strval) != 0)

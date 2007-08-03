@@ -192,13 +192,15 @@ typedef struct znode {
  */
 #define	ZFS_ENTER(zfsvfs) \
 	{ \
-		atomic_add_32(&(zfsvfs)->z_op_cnt, 1); \
-		if ((zfsvfs)->z_unmounted1) { \
+		if (rw_tryenter(&(zfsvfs)->z_unmount_lock, RW_READER) == 0) \
+			return (EIO); \
+		if ((zfsvfs)->z_unmounted) { \
 			ZFS_EXIT(zfsvfs); \
 			return (EIO); \
 		} \
 	}
-#define	ZFS_EXIT(zfsvfs) atomic_add_32(&(zfsvfs)->z_op_cnt, -1)
+
+#define	ZFS_EXIT(zfsvfs) rw_exit(&(zfsvfs)->z_unmount_lock)
 
 /*
  * Macros for dealing with dmu_buf_hold

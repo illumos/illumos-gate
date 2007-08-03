@@ -280,7 +280,7 @@ zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 		break;
 	}
 
-	return (zfs_secpolicy_write_perms(name, zfs_prop_perm(prop), cr));
+	return (zfs_secpolicy_write_perms(name, zfs_prop_to_name(prop), cr));
 }
 
 int
@@ -1175,7 +1175,7 @@ retry:
 }
 
 static int
-zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
+zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 {
 	nvpair_t *elem;
 	int error;
@@ -1200,13 +1200,13 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				return (EINVAL);
 
 			error = zfs_secpolicy_write_perms(name,
-			    ZFS_DELEG_PERM_USERPROP, cr);
+			    ZFS_DELEG_PERM_USERPROP, CRED());
 			if (error)
 				return (error);
 			continue;
 		}
 
-		if ((error = zfs_secpolicy_setprop(name, prop, cr)) != 0)
+		if ((error = zfs_secpolicy_setprop(name, prop, CRED())) != 0)
 			return (error);
 
 		/*
@@ -1285,7 +1285,8 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 
 		case ZFS_PROP_VOLSIZE:
 			if ((error = nvpair_value_uint64(elem, &intval)) != 0 ||
-			    (error = zvol_set_volsize(name, dev, intval)) != 0)
+			    (error = zvol_set_volsize(name,
+			    ddi_driver_major(zfs_dip), intval)) != 0)
 				return (error);
 			break;
 
@@ -1304,7 +1305,7 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 		default:
 			if (nvpair_type(elem) == DATA_TYPE_STRING) {
 				if (zfs_prop_get_type(prop) !=
-				    prop_type_string)
+				    PROP_TYPE_STRING)
 					return (EINVAL);
 				VERIFY(nvpair_value_string(elem, &strval) == 0);
 				if ((error = dsl_prop_set(name,
@@ -1317,15 +1318,15 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				VERIFY(nvpair_value_uint64(elem, &intval) == 0);
 
 				switch (zfs_prop_get_type(prop)) {
-				case prop_type_number:
+				case PROP_TYPE_NUMBER:
 					break;
-				case prop_type_boolean:
+				case PROP_TYPE_BOOLEAN:
 					if (intval > 1)
 						return (EINVAL);
 					break;
-				case prop_type_string:
+				case PROP_TYPE_STRING:
 					return (EINVAL);
-				case prop_type_index:
+				case PROP_TYPE_INDEX:
 					if (zfs_prop_index_to_string(prop,
 					    intval, &unused) != 0)
 						return (EINVAL);
@@ -1366,13 +1367,12 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 			if (!zfs_prop_user(zc->zc_value))
 				return (EINVAL);
 			error = zfs_secpolicy_write_perms(zc->zc_name,
-			    ZFS_DELEG_PERM_USERPROP,
-			    (cred_t *)(uintptr_t)zc->zc_cred);
+			    ZFS_DELEG_PERM_USERPROP, CRED());
 		} else {
 			if (!zfs_prop_inheritable(prop))
 				return (EINVAL);
 			error = zfs_secpolicy_setprop(zc->zc_name,
-			    prop, (cred_t *)(uintptr_t)zc->zc_cred);
+			    prop, CRED());
 		}
 		if (error)
 			return (error);
@@ -1383,8 +1383,7 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	if ((error = get_nvlist(zc, &nvl)) != 0)
 		return (error);
 
-	error = zfs_set_prop_nvlist(zc->zc_name, zc->zc_dev,
-	    (cred_t *)(uintptr_t)zc->zc_cred, nvl);
+	error = zfs_set_prop_nvlist(zc->zc_name, nvl);
 
 	nvlist_free(nvl);
 	return (error);
@@ -1555,7 +1554,7 @@ zfs_ioc_iscsi_perm_check(zfs_cmd_t *zc)
 	}
 	nvlist_free(nvp);
 	error = dsl_deleg_access(zc->zc_name,
-	    ZFS_DELEG_PERM_SHAREISCSI, usercred);
+	    zfs_prop_to_name(ZFS_PROP_SHAREISCSI), usercred);
 	crfree(usercred);
 	return (error);
 }
@@ -1565,7 +1564,6 @@ zfs_ioc_set_fsacl(zfs_cmd_t *zc)
 {
 	int error;
 	nvlist_t *fsaclnv = NULL;
-	cred_t *cr;
 
 	if ((error = get_nvlist(zc, &fsaclnv)) != 0)
 		return (error);
@@ -1584,13 +1582,15 @@ zfs_ioc_set_fsacl(zfs_cmd_t *zc)
 	 * the nvlist(s)
 	 */
 
-	cr = (cred_t *)(uintptr_t)zc->zc_cred;
-	error = secpolicy_zfs(cr);
+	error = secpolicy_zfs(CRED());
 	if (error) {
-		if (zc->zc_perm_action == B_FALSE)
-			error = dsl_deleg_can_allow(zc->zc_name, fsaclnv, cr);
-		else
-			error = dsl_deleg_can_unallow(zc->zc_name, fsaclnv, cr);
+		if (zc->zc_perm_action == B_FALSE) {
+			error = dsl_deleg_can_allow(zc->zc_name,
+			    fsaclnv, CRED());
+		} else {
+			error = dsl_deleg_can_unallow(zc->zc_name,
+			    fsaclnv, CRED());
+		}
 	}
 
 	if (error == 0)
@@ -1617,7 +1617,7 @@ zfs_ioc_get_fsacl(zfs_cmd_t *zc)
 static int
 zfs_ioc_create_minor(zfs_cmd_t *zc)
 {
-	return (zvol_create_minor(zc->zc_name, zc->zc_dev));
+	return (zvol_create_minor(zc->zc_name, ddi_driver_major(zfs_dip)));
 }
 
 static int
@@ -1766,9 +1766,7 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	 * It would be nice to do this atomically.
 	 */
 	if (error == 0) {
-		if ((error = zfs_set_prop_nvlist(zc->zc_name,
-		    zc->zc_dev, (cred_t *)(uintptr_t)zc->zc_cred,
-		    nvprops)) != 0)
+		if ((error = zfs_set_prop_nvlist(zc->zc_name, nvprops)) != 0)
 			(void) dmu_objset_destroy(zc->zc_name);
 	}
 
@@ -2185,6 +2183,7 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		return (zvol_ioctl(dev, cmd, arg, flag, cr, rvalp));
 
 	vec = cmd - ZFS_IOC;
+	ASSERT3U(getmajor(dev), ==, ddi_driver_major(zfs_dip));
 
 	if (vec >= sizeof (zfs_ioc_vec) / sizeof (zfs_ioc_vec[0]))
 		return (EINVAL);
@@ -2193,11 +2192,8 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 	error = xcopyin((void *)arg, zc, sizeof (zfs_cmd_t));
 
-	if (error == 0) {
-		zc->zc_cred = (uintptr_t)cr;
-		zc->zc_dev = dev;
+	if (error == 0)
 		error = zfs_ioc_vec[vec].zvec_secpolicy(zc, cr);
-	}
 
 	/*
 	 * Ensure that all pool/dataset names are valid before we pass down to

@@ -940,6 +940,7 @@ ZFS_COMMON_OBJS +=		\
 	lzjb.o			\
 	metaslab.o		\
 	refcount.o		\
+	rprwlock.o		\
 	sha256.o		\
 	spa.o			\
 	spa_config.o		\

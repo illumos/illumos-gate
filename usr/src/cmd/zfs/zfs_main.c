@@ -380,7 +380,7 @@ usage(boolean_t requested)
 		    "PROPERTY", "EDIT", "INHERIT", "VALUES");
 
 		/* Iterate over all properties */
-		(void) zfs_prop_iter_ordered(usage_prop_cb, fp, B_FALSE);
+		(void) zfs_prop_iter_ordered(usage_prop_cb, fp);
 
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
@@ -3829,17 +3829,6 @@ find_command_idx(char *command, int *idx)
 	return (1);
 }
 
-zfs_prop_t
-propset_cb(zfs_prop_t prop, void *data)
-{
-	char *cmdname = (char *)data;
-
-	if (strcmp(cmdname, zfs_prop_to_name(prop)) == 0)
-		return (prop);
-
-	return (ZFS_PROP_CONT);
-}
-
 int
 main(int argc, char **argv)
 {
@@ -3847,8 +3836,6 @@ main(int argc, char **argv)
 	int i;
 	char *progname;
 	char *cmdname;
-	char *str;
-	boolean_t found = B_FALSE;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -3927,38 +3914,11 @@ main(int argc, char **argv)
 		if (find_command_idx(cmdname, &i) == 0) {
 			current_command = &command_table[i];
 			ret = command_table[i].func(argc - 1, argv + 1);
-			found = B_TRUE;
-		}
-
-		/*
-		 * Check and see if they are doing property=value
-		 */
-		if (found == B_FALSE &&
-		    ((str = strchr(cmdname, '=')) != NULL)) {
-			*str = '\0';
-			if (zfs_prop_iter(propset_cb, cmdname,
-			    B_FALSE) != ZFS_PROP_INVAL)
-				found = B_TRUE;
-
-			if (found == B_FALSE && zfs_prop_user(cmdname))
-				found = B_TRUE;
-
-			if (found == B_TRUE &&
-			    find_command_idx("set", &i) == 0) {
-				*str = '=';
-				current_command = &command_table[i];
-				ret = command_table[i].func(argc, argv);
-			} else {
-				(void) fprintf(stderr,
-				    gettext("invalid property '%s'\n"),
-				    cmdname);
-				found = B_TRUE;
-				ret = 1;
-			}
-
-		}
-
-		if (found == B_FALSE) {
+		} else if (strchr(cmdname, '=') != NULL) {
+			verify(find_command_idx("set", &i) == 0);
+			current_command = &command_table[i];
+			ret = command_table[i].func(argc, argv);
+		} else {
 			(void) fprintf(stderr, gettext("unrecognized "
 			    "command '%s'\n"), cmdname);
 			usage(B_FALSE);

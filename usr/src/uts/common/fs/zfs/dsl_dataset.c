@@ -218,7 +218,6 @@ static void
 dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 {
 	dsl_dataset_t *ds = dsv;
-	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
 	/* open_refcount == DS_REF_MAX when deleting */
 	ASSERT(ds->ds_open_refcount == 0 ||
@@ -226,7 +225,7 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 
 	dprintf_ds(ds, "evicting %s\n", "");
 
-	unique_remove(ds->ds_phys->ds_fsid_guid);
+	unique_remove(ds->ds_fsid_guid);
 
 	if (ds->ds_user_ptr != NULL)
 		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
@@ -239,10 +238,10 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	bplist_close(&ds->ds_deadlist);
 	dsl_dir_close(ds->ds_dir, ds);
 
-	if (list_link_active(&ds->ds_synced_link))
-		list_remove(&dp->dp_synced_objsets, ds);
+	ASSERT(!list_link_active(&ds->ds_synced_link));
 
 	mutex_destroy(&ds->ds_lock);
+	mutex_destroy(&ds->ds_opening_lock);
 	mutex_destroy(&ds->ds_deadlist.bpl_lock);
 
 	kmem_free(ds, sizeof (dsl_dataset_t));
@@ -299,6 +298,7 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 		ds->ds_phys = dbuf->db_data;
 
 		mutex_init(&ds->ds_lock, NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(&ds->ds_opening_lock, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ds->ds_deadlist.bpl_lock, NULL, MUTEX_DEFAULT,
 		    NULL);
 
@@ -314,6 +314,7 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			 * just opened it.
 			 */
 			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_opening_lock);
 			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			dmu_buf_rele(dbuf, tag);
@@ -364,6 +365,7 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			}
 			dsl_dir_close(ds->ds_dir, ds);
 			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_opening_lock);
 			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			if (err) {
@@ -372,12 +374,8 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			}
 			ds = winner;
 		} else {
-			uint64_t new =
+			ds->ds_fsid_guid =
 			    unique_insert(ds->ds_phys->ds_fsid_guid);
-			if (new != ds->ds_phys->ds_fsid_guid) {
-				/* XXX it won't necessarily be synced... */
-				ds->ds_phys->ds_fsid_guid = new;
-			}
 		}
 	}
 	ASSERT3P(ds->ds_dbuf, ==, dbuf);
@@ -554,7 +552,6 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 	dsphys = dbuf->db_data;
 	dsphys->ds_dir_obj = dd->dd_object;
 	dsphys->ds_fsid_guid = unique_create();
-	unique_remove(dsphys->ds_fsid_guid); /* it isn't open yet */
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
@@ -603,7 +600,6 @@ dsl_dataset_create_sync(dsl_dir_t *pdd,
 	dsphys = dbuf->db_data;
 	dsphys->ds_dir_obj = dd->dd_object;
 	dsphys->ds_fsid_guid = unique_create();
-	unique_remove(dsphys->ds_fsid_guid); /* it isn't open yet */
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
@@ -1390,7 +1386,6 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsphys = dbuf->db_data;
 	dsphys->ds_dir_obj = ds->ds_dir->dd_object;
 	dsphys->ds_fsid_guid = unique_create();
-	unique_remove(dsphys->ds_fsid_guid); /* it isn't open yet */
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_prev_snap_obj = ds->ds_phys->ds_prev_snap_obj;
@@ -1453,9 +1448,15 @@ dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 	ASSERT(ds->ds_user_ptr != NULL);
 	ASSERT(ds->ds_phys->ds_next_snap_obj == 0);
 
+	/*
+	 * in case we had to change ds_fsid_guid when we opened it,
+	 * sync it out now.
+	 */
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+	ds->ds_phys->ds_fsid_guid = ds->ds_fsid_guid;
+
 	dsl_dir_dirty(ds->ds_dir, tx);
 	dmu_objset_sync(ds->ds_user_ptr, zio, tx);
-	/* Unneeded? bplist_close(&ds->ds_deadlist); */
 }
 
 void
@@ -1511,7 +1512,7 @@ dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat)
 uint64_t
 dsl_dataset_fsid_guid(dsl_dataset_t *ds)
 {
-	return (ds->ds_phys->ds_fsid_guid);
+	return (ds->ds_fsid_guid);
 }
 
 void

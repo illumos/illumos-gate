@@ -172,21 +172,19 @@ create_BasicProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 	jobject propValue = NULL;
 
 	if (convert_str != NULL) {
-	    char propbuf[ZFS_MAXPROPLEN];
-	    int result = zfs_prop_get(zhp, prop, propbuf,
-		sizeof (propbuf), &srctype, source, sizeof (source), 1);
+		char propbuf[ZFS_MAXPROPLEN];
+		int result = zfs_prop_get(zhp, prop, propbuf,
+		    sizeof (propbuf), &srctype, source, sizeof (source), 1);
 
-	    if (result == 0) {
-		propValue = convert_str(env, propbuf);
-	    }
+		if (result == 0)
+			propValue = convert_str(env, propbuf);
 	} else {
-	    uint64_t value;
-	    int result = zfs_prop_get_numeric(
-		zhp, prop, &value, &srctype, source, sizeof (source));
+		uint64_t value;
+		int result = zfs_prop_get_numeric(
+		    zhp, prop, &value, &srctype, source, sizeof (source));
 
-	    if (result == 0) {
-		propValue = convert_uint64(env, value);
-	    }
+		if (result == 0)
+			propValue = convert_uint64(env, value);
 	}
 
 	if (propValue != NULL) {
@@ -267,21 +265,19 @@ create_ObjectProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 	jobject propValue = NULL;
 
 	if (convert_str != NULL) {
-	    char propbuf[ZFS_MAXPROPLEN];
-	    int result = zfs_prop_get(zhp, prop, propbuf,
-		sizeof (propbuf), &srctype, source, sizeof (source), 1);
+		char propbuf[ZFS_MAXPROPLEN];
+		int result = zfs_prop_get(zhp, prop, propbuf,
+		    sizeof (propbuf), &srctype, source, sizeof (source), 1);
 
-	    if (result == 0) {
-		propValue = convert_str(env, propbuf);
-	    }
+		if (result == 0)
+			propValue = convert_str(env, propbuf);
 	} else {
-	    uint64_t value;
-	    int result = zfs_prop_get_numeric(
-		zhp, prop, &value, &srctype, source, sizeof (source));
+		uint64_t value;
+		int result = zfs_prop_get_numeric(
+		    zhp, prop, &value, &srctype, source, sizeof (source));
 
-	    if (result == 0) {
-		propValue = convert_uint64(env, value);
-	    }
+		if (result == 0)
+			propValue = convert_uint64(env, value);
 	}
 
 	if (propValue != NULL) {
@@ -520,10 +516,12 @@ zjni_get_default_property(JNIEnv *env, zfs_prop_t prop)
 
 	for (i = 0; props_custom[i].prop != ZFS_PROP_INVAL; i++) {
 		if (prop == props_custom[i].prop) {
-		    return create_default_ObjectProperty(env,
-			props_custom[i].prop, props_custom[i].convert_str,
-			props_custom[i].convert_uint64,
-			props_custom[i].propClass, props_custom[i].valueClass);
+			return create_default_ObjectProperty(env,
+			    props_custom[i].prop,
+			    props_custom[i].convert_str,
+			    props_custom[i].convert_uint64,
+			    props_custom[i].propClass,
+			    props_custom[i].valueClass);
 		}
 	}
 
@@ -546,8 +544,7 @@ zjni_get_property_from_name(const char *name)
 {
 	zfs_prop_t prop;
 
-	prop = zfs_prop_iter(zjni_get_property_from_name_cb, (void *)name,
-	    B_FALSE);
+	prop = zfs_prop_iter(zjni_get_property_from_name_cb, (void *)name);
 	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
 }
 

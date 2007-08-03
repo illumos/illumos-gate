@@ -48,7 +48,7 @@ dodefault(const char *propname, int intsz, int numint, void *buf)
 	    zfs_prop_readonly(prop))
 		return (ENOENT);
 
-	if (zfs_prop_get_type(prop) == prop_type_string) {
+	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
 		if (intsz != 1)
 			return (EOVERFLOW);
 		(void) strncpy(buf, zfs_prop_default_string(prop), numint);

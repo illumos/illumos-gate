@@ -318,7 +318,8 @@ vdev_label_read_config(vdev_t *vd)
 	zio_t *zio;
 	int l;
 
-	ASSERT(spa_config_held(spa, RW_READER));
+	ASSERT(spa_config_held(spa, RW_READER) ||
+	    spa_config_held(spa, RW_WRITER));
 
 	if (vdev_is_dead(vd))
 		return (NULL);

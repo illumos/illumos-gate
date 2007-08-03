@@ -37,7 +37,9 @@
 #include <libnvpair.h>
 #include <ctype.h>
 #endif
+/* XXX includes zfs_context.h, so why bother with the above? */
 #include <sys/dsl_deleg.h>
+#include "zfs_prop.h"
 #include "zfs_deleg.h"
 #include "zfs_namecheck.h"
 
@@ -57,108 +59,84 @@ char *zfs_deleg_perm_tab[] = {
 	ZFS_DELEG_PERM_SHARE,
 	ZFS_DELEG_PERM_SEND,
 	ZFS_DELEG_PERM_RECEIVE,
-	ZFS_DELEG_PERM_QUOTA,
-	ZFS_DELEG_PERM_RESERVATION,
-	ZFS_DELEG_PERM_VOLSIZE,
-	ZFS_DELEG_PERM_RECORDSIZE,
-	ZFS_DELEG_PERM_MOUNTPOINT,
-	ZFS_DELEG_PERM_SHARENFS,
-	ZFS_DELEG_PERM_CHECKSUM,
-	ZFS_DELEG_PERM_COMPRESSION,
-	ZFS_DELEG_PERM_ATIME,
-	ZFS_DELEG_PERM_DEVICES,
-	ZFS_DELEG_PERM_EXEC,
-	ZFS_DELEG_PERM_SETUID,
-	ZFS_DELEG_PERM_READONLY,
-	ZFS_DELEG_PERM_ZONED,
-	ZFS_DELEG_PERM_SNAPDIR,
-	ZFS_DELEG_PERM_ACLMODE,
-	ZFS_DELEG_PERM_ACLINHERIT,
 	ZFS_DELEG_PERM_ALLOW,
-	ZFS_DELEG_PERM_CANMOUNT,
 	ZFS_DELEG_PERM_USERPROP,
-	ZFS_DELEG_PERM_SHAREISCSI,
-	ZFS_DELEG_PERM_XATTR,
-	ZFS_DELEG_PERM_COPIES,
-	ZFS_DELEG_PERM_VERSION,
 	NULL
 };
 
-int
-zfs_deleg_type(char *name)
-{
-	return (name[0]);
-}
-
 static int
-zfs_valid_permission_name(char *perm)
+zfs_valid_permission_name(const char *perm)
 {
-	int i;
-	for (i = 0; zfs_deleg_perm_tab[i] != NULL; i++) {
-		if (strcmp(perm, zfs_deleg_perm_tab[i]) == 0)
-			return (0);
-	}
+	if (zfs_deleg_canonicalize_perm(perm))
+		return (0);
 
 	return (permset_namecheck(perm, NULL, NULL));
+}
+
+const char *
+zfs_deleg_canonicalize_perm(const char *perm)
+{
+	int i;
+	zfs_prop_t prop;
+
+	for (i = 0; zfs_deleg_perm_tab[i] != NULL; i++) {
+		if (strcmp(perm, zfs_deleg_perm_tab[i]) == 0)
+			return (perm);
+	}
+
+	prop = zfs_name_to_prop(perm);
+	if (prop != ZFS_PROP_INVAL && zfs_prop_delegatable(prop))
+		return (zfs_prop_to_name(prop));
+	return (NULL);
+
 }
 
 static int
 zfs_validate_who(char *who)
 {
-	int error = 0;
 	char *p;
 
-	switch (zfs_deleg_type(who)) {
+	if (who[2] != ZFS_DELEG_FIELD_SEP_CHR)
+		return (-1);
+
+	switch (who[0]) {
 	case ZFS_DELEG_USER:
 	case ZFS_DELEG_GROUP:
 	case ZFS_DELEG_USER_SETS:
 	case ZFS_DELEG_GROUP_SETS:
-		if ((who[1] != 'l' || who[1] != 'd') &&
-		    (who[2] != ZFS_DELEG_FIELD_SEP_CHR)) {
-			error = -1;
-			break;
-		}
-
-		for (p = &who[3]; p && *p; p++)
-			if (!isdigit(*p)) {
-				error = -1;
-			}
+		if (who[1] != ZFS_DELEG_LOCAL && who[1] != ZFS_DELEG_DESCENDENT)
+			return (-1);
+		for (p = &who[3]; *p; p++)
+			if (!isdigit(*p))
+				return (-1);
 		break;
+
 	case ZFS_DELEG_NAMED_SET:
 	case ZFS_DELEG_NAMED_SET_SETS:
-		error =  permset_namecheck(&who[3], NULL, NULL);
-		break;
+		if (who[1] != ZFS_DELEG_NA)
+			return (-1);
+		return (permset_namecheck(&who[3], NULL, NULL));
 
 	case ZFS_DELEG_CREATE:
 	case ZFS_DELEG_CREATE_SETS:
+		if (who[1] != ZFS_DELEG_NA)
+			return (-1);
+		if (who[3] != '\0')
+			return (-1);
+		break;
+
 	case ZFS_DELEG_EVERYONE:
 	case ZFS_DELEG_EVERYONE_SETS:
+		if (who[1] != ZFS_DELEG_LOCAL && who[1] != ZFS_DELEG_DESCENDENT)
+			return (-1);
 		if (who[3] != '\0')
-			error = -1;
-		break;
-	default:
-		error = -1;
-	}
-
-	return (error);
-}
-
-static int
-zfs_validate_iflags(char *who)
-{
-	switch (zfs_deleg_type(who)) {
-	case ZFS_DELEG_NAMED_SET:
-	case ZFS_DELEG_NAMED_SET_SETS:
-	case ZFS_DELEG_CREATE:
-	case ZFS_DELEG_CREATE_SETS:
-		if (who[1] != '-')
 			return (-1);
 		break;
+
 	default:
-		if (who[1] != 'l' && who[1] != 'd')
-			return (-1);
-		break;
+		return (-1);
 	}
+
 	return (0);
 }
 
@@ -180,9 +158,6 @@ zfs_deleg_verify_nvlist(nvlist_t *nvp)
 		if (zfs_validate_who(nvpair_name(who)))
 			return (-1);
 
-		if (zfs_validate_iflags(nvpair_name(who)))
-			return (-1);
-
 		error = nvlist_lookup_nvlist(nvp, nvpair_name(who), &perms);
 
 		if (error && error != ENOENT)
@@ -197,9 +172,8 @@ zfs_deleg_verify_nvlist(nvlist_t *nvp)
 		do {
 			error = zfs_valid_permission_name(
 			    nvpair_name(perm_name));
-			if (error) {
+			if (error)
 				return (-1);
-			}
 		} while (perm_name = nvlist_next_nvpair(perms, perm_name));
 	} while (who = nvlist_next_nvpair(nvp, who));
 	return (0);
@@ -220,7 +194,8 @@ zfs_deleg_verify_nvlist(nvlist_t *nvp)
  * data - is either a permission set name or a 64 bit uid/gid.
  */
 void
-zfs_deleg_whokey(char *attr, char type, char inheritchr, void *data)
+zfs_deleg_whokey(char *attr, zfs_deleg_who_type_t type,
+    char inheritchr, void *data)
 {
 	int len = ZFS_MAX_DELEG_NAME;
 	uint64_t *id = data;
@@ -243,8 +218,12 @@ zfs_deleg_whokey(char *attr, char type, char inheritchr, void *data)
 		(void) snprintf(attr, len, "%c-%c", type,
 		    ZFS_DELEG_FIELD_SEP_CHR);
 		break;
-	default:
+	case ZFS_DELEG_EVERYONE:
+	case ZFS_DELEG_EVERYONE_SETS:
 		(void) snprintf(attr, len, "%c%c%c", type, inheritchr,
 		    ZFS_DELEG_FIELD_SEP_CHR);
+		break;
+	default:
+		ASSERT(!"bad zfs_deleg_who_type_t");
 	}
 }

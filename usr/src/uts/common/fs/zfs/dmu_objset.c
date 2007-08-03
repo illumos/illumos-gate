@@ -149,8 +149,10 @@ int
 dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
     objset_impl_t **osip)
 {
-	objset_impl_t *winner, *osi;
+	objset_impl_t *osi;
 	int i, err, checksum;
+
+	ASSERT(ds == NULL || MUTEX_HELD(&ds->ds_opening_lock));
 
 	osi = kmem_zalloc(sizeof (objset_impl_t), KM_SLEEP);
 	osi->os.os = osi;
@@ -245,12 +247,13 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	osi->os_meta_dnode = dnode_special_open(osi,
 	    &osi->os_phys->os_meta_dnode, DMU_META_DNODE_OBJECT);
 
-	if (ds != NULL) {
-		winner = dsl_dataset_set_user_ptr(ds, osi, dmu_objset_evict);
-		if (winner) {
-			dmu_objset_evict(ds, osi);
-			osi = winner;
-		}
+	/*
+	 * We should be the only thread trying to do this because we
+	 * have ds_opening_lock
+	 */
+	if (ds) {
+		VERIFY(NULL == dsl_dataset_set_user_ptr(ds, osi,
+		    dmu_objset_evict));
 	}
 
 	*osip = osi;
@@ -274,6 +277,7 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 		return (err);
 	}
 
+	mutex_enter(&ds->ds_opening_lock);
 	osi = dsl_dataset_get_user_ptr(ds);
 	if (osi == NULL) {
 		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
@@ -284,6 +288,7 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 			return (err);
 		}
 	}
+	mutex_exit(&ds->ds_opening_lock);
 
 	os->os = osi;
 	os->os_mode = mode;
@@ -304,7 +309,7 @@ dmu_objset_close(objset_t *os)
 }
 
 int
-dmu_objset_evict_dbufs(objset_t *os, int try)
+dmu_objset_evict_dbufs(objset_t *os, boolean_t try)
 {
 	objset_impl_t *osi = os->os;
 	dnode_t *dn;
@@ -402,7 +407,11 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	dnode_t *mdn;
 
 	ASSERT(dmu_tx_is_syncing(tx));
+	if (ds)
+		mutex_enter(&ds->ds_opening_lock);
 	VERIFY(0 == dmu_objset_open_impl(spa, ds, bp, &osi));
+	if (ds)
+		mutex_exit(&ds->ds_opening_lock);
 	mdn = osi->os_meta_dnode;
 
 	dnode_allocate(mdn, DMU_OT_DNODE, 1 << DNODE_BLOCK_SHIFT,
@@ -802,9 +811,10 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	zb.zb_object = 0;
 	zb.zb_level = -1;
 	zb.zb_blkid = 0;
-	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg))
+	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg)) {
 		dsl_dataset_block_kill(os->os_dsl_dataset,
 		    os->os_rootbp, pio, tx);
+	}
 	zio = arc_write(pio, os->os_spa, os->os_md_checksum,
 	    os->os_md_compress,
 	    dmu_get_replication_level(os, &zb, DMU_OT_OBJSET),

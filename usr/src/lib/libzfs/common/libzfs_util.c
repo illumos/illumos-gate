@@ -44,6 +44,7 @@
 #include <libzfs.h>
 
 #include "libzfs_impl.h"
+#include "zfs_prop.h"
 
 int
 libzfs_errno(libzfs_handle_t *hdl)
@@ -186,9 +187,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "invalid permission"));
 	case EZFS_BADPERMSET:
 		return (dgettext(TEXT_DOMAIN, "invalid permission set name"));
-	case EZFS_PERMSET_CIRCULAR:
-		return (dgettext(TEXT_DOMAIN,
-		    "Cannot define a permission set in terms of itself"));
 	case EZFS_NODELEGATION:
 		return (dgettext(TEXT_DOMAIN, "delegated administration is "
 		    "disabled on pool"));
@@ -555,6 +553,8 @@ libzfs_init(void)
 	}
 
 	hdl->libzfs_sharetab = fopen("/etc/dfs/sharetab", "r");
+
+	zfs_prop_init();
 
 	return (hdl);
 }

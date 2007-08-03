@@ -3005,8 +3005,8 @@ zfs_inactive(vnode_t *vp, cred_t *cr)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	int error;
 
-	rw_enter(&zfsvfs->z_um_lock, RW_READER);
-	if (zfsvfs->z_unmounted2) {
+	rw_enter(&zfsvfs->z_unmount_inactive_lock, RW_READER);
+	if (zfsvfs->z_unmounted) {
 		ASSERT(zp->z_dbuf_held == 0);
 
 		if (vn_has_cached_data(vp)) {
@@ -3022,7 +3022,7 @@ zfs_inactive(vnode_t *vp, cred_t *cr)
 		} else {
 			mutex_exit(&zp->z_lock);
 		}
-		rw_exit(&zfsvfs->z_um_lock);
+		rw_exit(&zfsvfs->z_unmount_inactive_lock);
 		VFS_RELE(zfsvfs->z_vfs);
 		return;
 	}
@@ -3053,7 +3053,7 @@ zfs_inactive(vnode_t *vp, cred_t *cr)
 	}
 
 	zfs_zinactive(zp);
-	rw_exit(&zfsvfs->z_um_lock);
+	rw_exit(&zfsvfs->z_unmount_inactive_lock);
 }
 
 /*

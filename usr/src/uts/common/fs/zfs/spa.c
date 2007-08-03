@@ -132,12 +132,13 @@ spa_activate(spa_t *spa)
 
 	rw_init(&spa->spa_traverse_lock, NULL, RW_DEFAULT, NULL);
 
+	rprw_init(&spa->spa_config_lock);
+
 	mutex_init(&spa->spa_async_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_config_cache_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlog_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_config_lock.scl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);

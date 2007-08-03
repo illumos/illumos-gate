@@ -108,7 +108,7 @@ uint64_t dmu_objset_fsid_guid(objset_t *os);
 int dmu_objset_find(char *name, int func(char *, void *), void *arg,
     int flags);
 void dmu_objset_byteswap(void *buf, size_t size);
-int dmu_objset_evict_dbufs(objset_t *os, int try);
+int dmu_objset_evict_dbufs(objset_t *os, boolean_t try);
 
 /* called from dsl */
 void dmu_objset_sync(objset_impl_t *os, zio_t *zio, dmu_tx_t *tx);

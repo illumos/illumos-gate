@@ -40,15 +40,17 @@ extern "C" {
  * in the kernel, but the string value in userland.
  */
 typedef enum {
-	prop_type_number,	/* numeric value */
-	prop_type_string,	/* string value */
-	prop_type_boolean,	/* boolean value */
-	prop_type_index		/* numeric value indexed by string */
+	PROP_TYPE_NUMBER,	/* numeric value */
+	PROP_TYPE_STRING,	/* string value */
+	PROP_TYPE_BOOLEAN,	/* boolean value */
+	PROP_TYPE_INDEX		/* numeric value indexed by string */
 } zfs_proptype_t;
 
 zfs_proptype_t zfs_prop_get_type(zfs_prop_t);
 zfs_proptype_t zpool_prop_get_type(zpool_prop_t);
 size_t zfs_prop_width(zfs_prop_t, boolean_t *);
+boolean_t zfs_prop_delegatable(zfs_prop_t prop);
+void zfs_prop_init(void);
 
 #ifdef	__cplusplus
 }

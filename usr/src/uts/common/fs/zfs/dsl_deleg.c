@@ -89,17 +89,16 @@
 /*
  * Validate that user is allowed to delegate specified permissions.
  *
- * In order to delegate "create" you must have create"
+ * In order to delegate "create" you must have "create"
  * and "allow".
  */
 int
 dsl_deleg_can_allow(char *ddname, nvlist_t *nvp, cred_t *cr)
 {
 	nvpair_t *whopair = NULL;
-	int error = 0;
+	int error;
 
-	if ((error = dsl_deleg_access(ddname,
-	    ZFS_DELEG_PERM_ALLOW, cr)) != 0)
+	if ((error = dsl_deleg_access(ddname, ZFS_DELEG_PERM_ALLOW, cr)) != 0)
 		return (error);
 
 	while (whopair = nvlist_next_nvpair(nvp, whopair)) {
@@ -114,12 +113,11 @@ dsl_deleg_can_allow(char *ddname, nvlist_t *nvp, cred_t *cr)
 			if (strcmp(perm, ZFS_DELEG_PERM_ALLOW) == 0)
 				return (EPERM);
 
-			if ((error = dsl_deleg_access(ddname,
-			    perm, cr)) != 0)
+			if ((error = dsl_deleg_access(ddname, perm, cr)) != 0)
 				return (error);
 		}
 	}
-	return (error);
+	return (0);
 }
 
 /*
@@ -132,25 +130,23 @@ dsl_deleg_can_unallow(char *ddname, nvlist_t *nvp, cred_t *cr)
 {
 	nvpair_t *whopair = NULL;
 	int error;
+	char idstr[32];
 
-	if ((error = dsl_deleg_access(ddname,
-	    ZFS_DELEG_PERM_ALLOW, cr)) != 0)
+	if ((error = dsl_deleg_access(ddname, ZFS_DELEG_PERM_ALLOW, cr)) != 0)
 		return (error);
+
+	(void) snprintf(idstr, sizeof (idstr), "%lld",
+	    (longlong_t)crgetuid(cr));
 
 	while (whopair = nvlist_next_nvpair(nvp, whopair)) {
 		zfs_deleg_who_type_t type = nvpair_name(whopair)[0];
-		char idstr[32];
 
 		if (type != ZFS_DELEG_USER &&
 		    type != ZFS_DELEG_USER_SETS)
 			return (EPERM);
 
-		(void) snprintf(idstr, sizeof (idstr), "%lld",
-		    (longlong_t)crgetuid(cr));
 		if (strcmp(idstr, &nvpair_name(whopair)[3]) != 0)
 			return (EPERM);
-
-		continue;
 	}
 	return (0);
 }
@@ -184,6 +180,7 @@ dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		uint64_t jumpobj;
 
 		if (nvpair_value_nvlist(whopair, &perms) != 0) {
+			ASSERT(pa->p_unset);
 			if (zap_lookup(mos, zapobj, whokey, 8,
 			    1, &jumpobj) == 0) {
 				(void) zap_remove(mos, zapobj, whokey, tx);
@@ -201,7 +198,7 @@ dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			 * If object doesn't exist and we are removing
 			 * it, then just continue to next item in nvlist
 			 */
-			if (pa->p_unset == 1)
+			if (pa->p_unset)
 				continue;
 			jumpobj = zap_create(mos, DMU_OT_DSL_PERMS,
 			    DMU_OT_NONE, 0, tx);
@@ -359,8 +356,8 @@ dsl_deleg_get(const char *ddname, nvlist_t **nvp)
  */
 typedef struct perm_set {
 	avl_node_t	p_node;
-	char		p_setname[ZFS_MAX_DELEG_NAME];
 	boolean_t	p_matched;
+	char		p_setname[ZFS_MAX_DELEG_NAME];
 } perm_set_t;
 
 static int
@@ -408,7 +405,7 @@ dsl_check_access(objset_t *mos, uint64_t zapobj,
  * check a specified user/group for a requested permission
  */
 static int
-dsl_check_user_access(objset_t *os, uint64_t zapobj, const char *perm,
+dsl_check_user_access(objset_t *mos, uint64_t zapobj, const char *perm,
     int checkflag, cred_t *cr)
 {
 	const	gid_t *gids;
@@ -418,19 +415,19 @@ dsl_check_user_access(objset_t *os, uint64_t zapobj, const char *perm,
 
 	/* check for user */
 	id = crgetuid(cr);
-	if (dsl_check_access(os, zapobj,
+	if (dsl_check_access(mos, zapobj,
 	    ZFS_DELEG_USER, checkflag, &id, perm) == 0)
 		return (0);
 
 	/* check for users primary group */
 	id = crgetgid(cr);
-	if (dsl_check_access(os, zapobj,
+	if (dsl_check_access(mos, zapobj,
 	    ZFS_DELEG_GROUP, checkflag, &id, perm) == 0)
 		return (0);
 
 	/* check for everyone entry */
 	id = -1;
-	if (dsl_check_access(os, zapobj,
+	if (dsl_check_access(mos, zapobj,
 	    ZFS_DELEG_EVERYONE, checkflag, &id, perm) == 0)
 		return (0);
 
@@ -439,7 +436,7 @@ dsl_check_user_access(objset_t *os, uint64_t zapobj, const char *perm,
 	gids = crgetgroups(cr);
 	for (i = 0; i != ngids; i++) {
 		id = gids[i];
-		if (dsl_check_access(os, zapobj,
+		if (dsl_check_access(mos, zapobj,
 		    ZFS_DELEG_GROUP, checkflag, &id, perm) == 0)
 			return (0);
 	}
@@ -581,11 +578,6 @@ dsl_deleg_access(const char *ddname, const char *perm, cred_t *cr)
 			    zfs_prop_to_name(ZFS_PROP_ZONED),
 			    8, 1, &zoned, NULL) != 0)
 				break;
-
-			/*
-			 * if zoned property isn't set then break
-			 * out and return EPERM.
-			 */
 			if (!zoned)
 				break;
 		}
@@ -595,12 +587,10 @@ dsl_deleg_access(const char *ddname, const char *perm, cred_t *cr)
 			continue;
 
 		dsl_load_user_sets(mos, zapobj, &permsets, checkflag, cr);
-		setnode = avl_first(&permsets);
 again:
 		expanded = B_FALSE;
 		for (setnode = avl_first(&permsets); setnode;
 		    setnode = AVL_NEXT(&permsets, setnode)) {
-
 			if (setnode->p_matched == B_TRUE)
 				continue;
 
@@ -636,10 +626,8 @@ success:
 	dsl_dir_close(startdd, FTAG);
 
 	cookie = NULL;
-	while ((setnode = avl_destroy_nodes(&permsets, &cookie)) != NULL) {
-		/* These sets were used but never defined! */
+	while ((setnode = avl_destroy_nodes(&permsets, &cookie)) != NULL)
 		kmem_free(setnode, sizeof (perm_set_t));
-	}
 
 	return (error);
 }
@@ -649,12 +637,11 @@ success:
  */
 
 static void
-copy_create_perms(objset_t *mos, uint64_t pzapobj, dsl_dir_t *dd,
+copy_create_perms(dsl_dir_t *dd, uint64_t pzapobj,
     boolean_t dosets, uint64_t uid, dmu_tx_t *tx)
 {
-	int error;
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
 	uint64_t jumpobj, pjumpobj;
-	uint64_t zero = 0;
 	uint64_t zapobj = dd->dd_phys->dd_deleg_zapobj;
 	zap_cursor_t zc;
 	zap_attribute_t za;
@@ -663,13 +650,8 @@ copy_create_perms(objset_t *mos, uint64_t pzapobj, dsl_dir_t *dd,
 	zfs_deleg_whokey(whokey,
 	    dosets ? ZFS_DELEG_CREATE_SETS : ZFS_DELEG_CREATE,
 	    ZFS_DELEG_LOCAL, NULL);
-	error = zap_lookup(mos, pzapobj, whokey, 8, 1, &pjumpobj);
-	if (error != 0)
+	if (zap_lookup(mos, pzapobj, whokey, 8, 1, &pjumpobj) != 0)
 		return;
-
-	zfs_deleg_whokey(whokey,
-	    dosets ? ZFS_DELEG_USER_SETS : ZFS_DELEG_USER,
-	    ZFS_DELEG_LOCAL, &uid);
 
 	if (zapobj == 0) {
 		dmu_buf_will_dirty(dd->dd_dbuf, tx);
@@ -677,6 +659,9 @@ copy_create_perms(objset_t *mos, uint64_t pzapobj, dsl_dir_t *dd,
 		    DMU_OT_DSL_PERMS, DMU_OT_NONE, 0, tx);
 	}
 
+	zfs_deleg_whokey(whokey,
+	    dosets ? ZFS_DELEG_USER_SETS : ZFS_DELEG_USER,
+	    ZFS_DELEG_LOCAL, &uid);
 	if (zap_lookup(mos, zapobj, whokey, 8, 1, &jumpobj) == ENOENT) {
 		jumpobj = zap_create(mos, DMU_OT_DSL_PERMS, DMU_OT_NONE, 0, tx);
 		VERIFY(zap_add(mos, zapobj, whokey, 8, 1, &jumpobj, tx) == 0);
@@ -685,6 +670,7 @@ copy_create_perms(objset_t *mos, uint64_t pzapobj, dsl_dir_t *dd,
 	for (zap_cursor_init(&zc, mos, pjumpobj);
 	    zap_cursor_retrieve(&zc, &za) == 0;
 	    zap_cursor_advance(&zc)) {
+		uint64_t zero = 0;
 		ASSERT(za.za_integer_length == 8 && za.za_num_integers == 1);
 
 		VERIFY(zap_update(mos, jumpobj, za.za_name,
@@ -700,20 +686,20 @@ void
 dsl_deleg_set_create_perms(dsl_dir_t *sdd, dmu_tx_t *tx, cred_t *cr)
 {
 	dsl_dir_t *dd;
-	objset_t *mos = sdd->dd_pool->dp_meta_objset;
+	uint64_t uid = crgetuid(cr);
 
 	if (spa_version(dmu_objset_spa(sdd->dd_pool->dp_meta_objset)) <
 	    ZFS_VERSION_DELEGATED_PERMS)
 		return;
 
 	for (dd = sdd->dd_parent; dd != NULL; dd = dd->dd_parent) {
-		uint64_t pobj = dd->dd_phys->dd_deleg_zapobj;
+		uint64_t pzapobj = dd->dd_phys->dd_deleg_zapobj;
 
-		if (pobj == 0)
+		if (pzapobj == 0)
 			continue;
 
-		copy_create_perms(mos, pobj, sdd, B_FALSE, crgetuid(cr), tx);
-		copy_create_perms(mos, pobj, sdd, B_TRUE, crgetuid(cr), tx);
+		copy_create_perms(sdd, pzapobj, B_FALSE, uid, tx);
+		copy_create_perms(sdd, pzapobj, B_TRUE, uid, tx);
 	}
 }
 

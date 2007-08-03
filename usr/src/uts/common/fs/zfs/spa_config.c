@@ -270,7 +270,8 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	vdev_t *rvd = spa->spa_root_vdev;
 	unsigned long hostid = 0;
 
-	ASSERT(spa_config_held(spa, RW_READER));
+	ASSERT(spa_config_held(spa, RW_READER) ||
+	    spa_config_held(spa, RW_WRITER));
 
 	if (vd == NULL)
 		vd = rvd;

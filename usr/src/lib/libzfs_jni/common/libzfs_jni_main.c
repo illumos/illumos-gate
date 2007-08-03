@@ -176,14 +176,13 @@ Java_com_sun_zfs_common_model_SystemDataModel_getPool(JNIEnv *env,
 
 	/* Verify that object is Pool, not some other Dataset */
 	if (pool != NULL) {
-	    jclass class = (*env)->FindClass(
-		env, ZFSJNI_PACKAGE_DATA "Pool");
+		jclass class = (*env)->FindClass(
+		    env, ZFSJNI_PACKAGE_DATA "Pool");
 
-	    jboolean is_pool = (*env)->IsInstanceOf(env, pool, class);
+		jboolean is_pool = (*env)->IsInstanceOf(env, pool, class);
 
-	    if (is_pool != JNI_TRUE) {
-		pool = NULL;
-	    }
+		if (is_pool != JNI_TRUE)
+			pool = NULL;
 	}
 
 	return (pool);
@@ -570,7 +569,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getValidPropertyNames(JNIEnv *env,
 			map_data.env = env;
 			map_data.type = mappings[i].type;
 			map_data.list = list;
-			(void) zfs_prop_iter(mapping_cb, &map_data, B_FALSE);
+			(void) zfs_prop_iter(mapping_cb, &map_data);
 			break;
 		}
 	}

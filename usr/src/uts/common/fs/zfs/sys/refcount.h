@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ typedef struct refcount {
 	int64_t rc_removed_count;
 } refcount_t;
 
-/* Note: refcount_t should be initialized to zero before use. */
+/* Note: refcount_t must be initialized with refcount_create() */
 
 void refcount_create(refcount_t *rc);
 void refcount_destroy(refcount_t *rc);

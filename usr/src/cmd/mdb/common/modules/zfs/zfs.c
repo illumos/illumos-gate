@@ -770,54 +770,26 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-void
-abuf_help(void)
-{
-	mdb_printf("::abuf_find dva_word[0] dva_word[1]\n");
-}
-
 /*ARGSUSED*/
 static int
 arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kstat_named_t *stats;
 	GElf_Sym sym;
-	int nstats, i, j;
+	int nstats, i;
 	uint_t opt_a = FALSE;
+	uint_t opt_b = FALSE;
+	uint_t shift = 0;
+	const char *suffix;
 
-	/*
-	 * In its default mode, ::arc prints exactly what one would see with
-	 * the legacy "arc::print".  The legacy[] array tracks the order of
-	 * the legacy "arc" structure -- and whether the variable can be found
-	 * in a global variable or within the arc_stats (the default).
-	 */
-	struct {
-		const char *name;
-		const char *var;
-	} legacy[] = {
-		{ "anon",		"arc_anon" },
-		{ "mru",		"arc_mru" },
-		{ "mru_ghost",		"arc_mru_ghost" },
-		{ "mfu",		"arc_mfu" },
-		{ "mfu_ghost",		"arc_mfu_ghost" },
-		{ "size" },
-		{ "p" },
-		{ "c" },
-		{ "c_min" },
-		{ "c_max" },
-		{ "hits" },
-		{ "misses" },
-		{ "deleted" },
-		{ "recycle_miss" },
-		{ "mutex_miss" },
-		{ "evict_skip" },
-		{ "hash_elements" },
-		{ "hash_elements_max" },
-		{ "hash_collisions" },
-		{ "hash_chains" },
-		{ "hash_chain_max" },
-		{ "no_grow",		"arc_no_grow" },
-		{ NULL }
+	static const char *bytestats[] = {
+		"p", "c", "c_min", "c_max", "size", NULL
+	};
+
+	static const char *extras[] = {
+		"arc_no_grow", "arc_tempreserve",
+		"arc_meta_used", "arc_meta_limit", "arc_meta_max",
+		NULL
 	};
 
 	if (mdb_lookup_by_name("arc_stats", &sym) == -1) {
@@ -834,82 +806,85 @@ arc_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	nstats = sym.st_size / sizeof (kstat_named_t);
 
-	if (mdb_getopts(argc, argv, 'a',
-	    MDB_OPT_SETBITS, TRUE, &opt_a, NULL) != argc)
+	/* NB: -a / opt_a are ignored for backwards compatability */
+	if (mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, TRUE, &opt_a,
+	    'b', MDB_OPT_SETBITS, TRUE, &opt_b,
+	    'k', MDB_OPT_SETBITS, 10, &shift,
+	    'm', MDB_OPT_SETBITS, 20, &shift,
+	    'g', MDB_OPT_SETBITS, 30, &shift,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	mdb_printf("{\n");
+	if (!opt_b && !shift)
+		shift = 20;
 
-	if (opt_a) {
-		for (i = 0; i < nstats; i++) {
-			mdb_printf("    %s = 0x%llx\n", stats[i].name,
+	switch (shift) {
+	case 0:
+		suffix = "B";
+		break;
+	case 10:
+		suffix = "KB";
+		break;
+	case 20:
+		suffix = "MB";
+		break;
+	case 30:
+		suffix = "GB";
+		break;
+	default:
+		suffix = "XX";
+	}
+
+	for (i = 0; i < nstats; i++) {
+		int j;
+		boolean_t bytes = B_FALSE;
+
+		for (j = 0; bytestats[j]; j++) {
+			if (strcmp(stats[i].name, bytestats[j]) == 0) {
+				bytes = B_TRUE;
+				break;
+			}
+		}
+
+		if (bytes) {
+			mdb_printf("%-25s = %9llu %s\n", stats[i].name,
+			    stats[i].value.ui64 >> shift, suffix);
+		} else {
+			mdb_printf("%-25s = %9llu\n", stats[i].name,
 			    stats[i].value.ui64);
 		}
-
-		mdb_printf("}\n");
-		return (DCMD_OK);
 	}
 
-	for (i = 0; legacy[i].name != NULL; i++) {
-		if (legacy[i].var != NULL) {
-			uint64_t buf;
+	for (i = 0; extras[i]; i++) {
+		uint64_t buf;
 
-			if (mdb_lookup_by_name(legacy[i].var, &sym) == -1) {
-				mdb_warn("failed to find '%s'", legacy[i].var);
-				return (DCMD_ERR);
-			}
-
-			if (sym.st_size != sizeof (uint64_t) &&
-			    sym.st_size != sizeof (uint32_t)) {
-				mdb_warn("expected scalar for legacy "
-				    "variable '%s'\n", legacy[i].var);
-				return (DCMD_ERR);
-			}
-
-			if (mdb_vread(&buf, sym.st_size, sym.st_value) == -1) {
-				mdb_warn("couldn't read '%s'", legacy[i].var);
-				return (DCMD_ERR);
-			}
-
-			mdb_printf("    %s = ", legacy[i].name);
-
-			if (sym.st_size == sizeof (uint64_t))
-				mdb_printf("%a\n", buf);
-
-			if (sym.st_size == sizeof (uint32_t))
-				mdb_printf("%d\n", *((uint32_t *)&buf));
-
-			continue;
+		if (mdb_lookup_by_name(extras[i], &sym) == -1) {
+			mdb_warn("failed to find '%s'", extras[i]);
+			return (DCMD_ERR);
 		}
 
-		for (j = 0; j < nstats; j++) {
-			if (strcmp(legacy[i].name, stats[j].name) != 0)
-				continue;
-
-			mdb_printf("    %s = ", stats[j].name);
-
-			if (stats[j].value.ui64 == 0) {
-				/*
-				 * To remain completely output compatible with
-				 * the legacy arc::print, we print 0 not as
-				 * "0x0" but rather 0.
-				 */
-				mdb_printf("0\n");
-			} else {
-				mdb_printf("0x%llx\n", stats[j].value.ui64);
-			}
-
-			break;
+		if (sym.st_size != sizeof (uint64_t) &&
+		    sym.st_size != sizeof (uint32_t)) {
+			mdb_warn("expected scalar for variable '%s'\n",
+			    extras[i]);
+			return (DCMD_ERR);
 		}
 
-		if (j == nstats) {
-			mdb_warn("couldn't find statistic in 'arc_stats' "
-			    "for field '%s'\n", legacy[i].name);
+		if (mdb_vread(&buf, sym.st_size, sym.st_value) == -1) {
+			mdb_warn("couldn't read '%s'", extras[i]);
+			return (DCMD_ERR);
 		}
+
+		mdb_printf("%-25s = ", extras[i]);
+
+		/* NB: all the 64-bit extras happen to be byte counts */
+		if (sym.st_size == sizeof (uint64_t))
+			mdb_printf("%9llu %s\n", buf >> shift, suffix);
+
+		if (sym.st_size == sizeof (uint32_t))
+			mdb_printf("%9d\n", *((uint32_t *)&buf));
 	}
-
-	mdb_printf("}\n");
-
 	return (DCMD_OK);
 }
 
@@ -1033,14 +1008,6 @@ spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (mdb_call_dcmd("nvlist", (uintptr_t)spa.spa_config, flags,
 	    0, NULL));
-}
-
-void
-vdev_help(void)
-{
-	mdb_printf("[vdev_t*]::vdev [-er]\n"
-	    "\t-> -e display vdev stats\n"
-	    "\t-> -r recursive (visit all children)\n");
 }
 
 /*
@@ -1920,14 +1887,14 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
  */
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "arc", "[-a]", "print ARC variables", arc_print },
+	{ "arc", "[-bkmg]", "print ARC variables", arc_print },
 	{ "blkptr", ":", "print blkptr_t", blkptr },
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",
 	"\t[-O objset_t*] [-n objset_name | \"mos\"] [-o object | \"mdn\"] \n"
 	"\t[-l level] [-b blkid | \"bonus\"]",
-	"find dmu_buf_impl_t's that meet criterion", dbufs },
+	"find dmu_buf_impl_t's that match specified criteria", dbufs },
 	{ "abuf_find", "dva_word[0] dva_word[1]",
 	"find arc_buf_hdr_t of a specified DVA",
 	abuf_find },
@@ -1936,7 +1903,10 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "spa_verify", ":", "verify spa_t consistency", spa_verify },
 	{ "spa_space", ":[-b]", "print spa_t on-disk space usage", spa_space },
 	{ "spa_vdevs", ":", "given a spa_t, print vdev summary", spa_vdevs },
-	{ "vdev", ":[-re]", "vdev_t summary", vdev_print },
+	{ "vdev", ":[-re]\n"
+	"\t-r display recursively\n"
+	"\t-e print statistics\n",
+	"vdev_t summary", vdev_print },
 	{ "zio", ":", "zio_t summary", zio_print },
 	{ "zio_state", "?", "print out all zio_t structures on system or "
 	    "for a particular pool", zio_state },

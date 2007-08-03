@@ -350,7 +350,7 @@ dnode_sync_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
  * Try to kick all the dnodes dbufs out of the cache...
  */
 int
-dnode_evict_dbufs(dnode_t *dn, int try)
+dnode_evict_dbufs(dnode_t *dn, boolean_t try)
 {
 	int progress;
 	int pass = 0;
