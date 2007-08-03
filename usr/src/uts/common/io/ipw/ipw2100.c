@@ -548,6 +548,19 @@ ipw2100_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/* ARGSUSED */
+int
+ipw2100_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
+{
+	struct ipw2100_softc	*sc =
+	    ddi_get_soft_state(ipw2100_ssp, ddi_get_instance(dip));
+	ASSERT(sc != NULL);
+
+	ipw2100_stop(sc);
+
+	return (DDI_SUCCESS);
+}
+
 static void
 ipw2100_tables_init(struct ipw2100_softc *sc)
 {
@@ -1030,10 +1043,10 @@ ipw2100_hwconf_get(struct ipw2100_softc *sc)
 	 * formatted MAC address string
 	 */
 	(void) snprintf(sc->sc_macstr, sizeof (sc->sc_macstr),
-		"%02x:%02x:%02x:%02x:%02x:%02x",
-		sc->sc_macaddr[0], sc->sc_macaddr[1],
-		sc->sc_macaddr[2], sc->sc_macaddr[3],
-		sc->sc_macaddr[4], sc->sc_macaddr[5]);
+	    "%02x:%02x:%02x:%02x:%02x:%02x",
+	    sc->sc_macaddr[0], sc->sc_macaddr[1],
+	    sc->sc_macaddr[2], sc->sc_macaddr[3],
+	    sc->sc_macaddr[4], sc->sc_macaddr[5]);
 
 	/*
 	 * channel mask
@@ -1572,8 +1585,8 @@ ipw2100_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	ieee80211com_t	*ic = (ieee80211com_t *)arg;
 	IPW2100_DBG(IPW2100_DBG_GLD, (((struct ipw2100_softc *)arg)->sc_dip,
-		CE_CONT,
-		"ipw2100_m_stat(): enter\n"));
+	    CE_CONT,
+	    "ipw2100_m_stat(): enter\n"));
 	/*
 	 * some of below statistic data are from hardware, some from net80211
 	 */
@@ -1628,8 +1641,8 @@ ipw2100_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
 	/* not supported */
 	IPW2100_DBG(IPW2100_DBG_GLD, (((struct ipw2100_softc *)arg)->sc_dip,
-		CE_CONT,
-		"ipw2100_m_multicst(): enter\n"));
+	    CE_CONT,
+	    "ipw2100_m_multicst(): enter\n"));
 
 	return (DDI_SUCCESS);
 }
@@ -2362,11 +2375,11 @@ ipw2100_fix_channel(struct ieee80211com *ic, mblk_t *m)
 	while (frm < efrm) {
 		if (*frm == IEEE80211_ELEMID_DSPARMS) {
 #if IEEE80211_CHAN_MAX < 255
-		    if (frm[2] <= IEEE80211_CHAN_MAX)
+			if (frm[2] <= IEEE80211_CHAN_MAX)
 #endif
-		    {
-			ic->ic_curchan = &ic->ic_sup_channels[frm[2]];
-		    }
+			{
+				ic->ic_curchan = &ic->ic_sup_channels[frm[2]];
+			}
 		}
 		frm += frm[1] + 2;
 	}
@@ -2464,7 +2477,7 @@ ipw2100_intr(caddr_t arg)
 
 			for (; sc->sc_rx_cur != ridx;
 			    sc->sc_rx_cur = RING_FORWARD(
-				sc->sc_rx_cur, 1, IPW2100_NUM_RXBD)) {
+			    sc->sc_rx_cur, 1, IPW2100_NUM_RXBD)) {
 
 				i	= sc->sc_rx_cur;
 				status	= &sc->sc_status[i];
@@ -2549,7 +2562,7 @@ ipw2100_intr(caddr_t arg)
 							    IEEE80211_S_SCAN,
 							    -1);
 						ic->ic_flags |=
-							IEEE80211_F_SCAN;
+						    IEEE80211_F_SCAN;
 
 						break;
 					default:
@@ -2613,7 +2626,7 @@ ipw2100_intr(caddr_t arg)
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ipw2100_devops, nulldev, nulldev, ipw2100_attach,
-    ipw2100_detach, nodev, NULL, D_MP, NULL);
+    ipw2100_detach, ipw2100_reset, NULL, D_MP, NULL);
 
 static struct modldrv ipw2100_modldrv = {
 	&mod_driverops,
