@@ -6534,12 +6534,10 @@ top:
 		/*
 		 * existing file got truncated, notify.
 		 */
+		trp = VTOR4(vp);
 		tvp = vp;
-		if (vp->v_type == VREG) {
-			trp = VTOR4(vp);
-			if (IS_SHADOW(vp, trp))
-				tvp = RTOV4(trp);
-		}
+		if (IS_SHADOW(vp, trp))
+			tvp = RTOV4(trp);
 		vnevent_create(tvp);
 		*vpp = vp;
 	}
@@ -6643,7 +6641,7 @@ create_otw:
 		 */
 		tvp = *vpp;
 		trp = VTOR4(tvp);
-		if (IS_SHADOW(tvp, trp))
+		if (IS_SHADOW(vp, trp))
 			tvp = RTOV4(trp);
 		vnevent_create(tvp);
 	}
@@ -10881,7 +10879,7 @@ nfs4_realvp(vnode_t *vp, vnode_t **vpp)
 	rnode4_t *rp;
 	rp = VTOR4(vp);
 
-	if (vp->v_type == VREG && IS_SHADOW(vp, rp)) {
+	if (IS_SHADOW(vp, rp)) {
 		vp = RTOV4(rp);
 	}
 	*vpp = vp;

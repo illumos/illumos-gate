@@ -500,9 +500,6 @@ mntdummyreadop()
 	struct iovec	iov;
 	char		tbuf[1];
 
-	if (mntdummyvp == NULL)
-		return;
-
 	/*
 	 * Make a VOP_READ call on the dummy vnode so that any
 	 * module interested in mnttab getting modified could

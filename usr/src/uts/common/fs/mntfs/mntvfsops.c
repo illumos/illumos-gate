@@ -266,6 +266,22 @@ mntunmount(struct vfs *vfsp, int flag, struct cred *cr)
 		return (EPERM);
 
 	/*
+	 * Ensure that the dummy vnode is not being referenced.
+	 */
+	if (mntdummyvp) {
+		mutex_enter(&mntdummyvp->v_lock);
+		if (vp->v_count > 1) {
+			mutex_exit(&mntdummyvp->v_lock);
+			return (EBUSY);
+		}
+
+		mutex_exit(&mntdummyvp->v_lock);
+		vn_invalid(mntdummyvp);
+		vn_free(mntdummyvp);
+		mntdummyvp = NULL;
+	}
+
+	/*
 	 * Ensure that no /mnttab vnodes are in use on this mount point.
 	 */
 	mutex_enter(&vp->v_lock);
