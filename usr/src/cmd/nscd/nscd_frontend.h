@@ -76,6 +76,7 @@ extern "C" {
 
 /* prototypes */
 uid_t _nscd_get_client_euid();
+int _nscd_check_client_read_priv();
 int _nscd_setup_server(char *execname, char **argv);
 int _nscd_setup_child_server(int did);
 int _nscd_get_clearance(sema_t *sema);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,12 +82,15 @@ _nscd_free_nsw_state(
 				continue;
 			if (s->getent == 1)
 				(void) NSS_INVOKE_DBOP(s->be[i],
-					NSS_DBOP_ENDENT, 0);
+				    NSS_DBOP_ENDENT, 0);
 			(void) NSS_INVOKE_DBOP(s->be[i],
-				NSS_DBOP_DESTRUCTOR, 0);
+			    NSS_DBOP_DESTRUCTOR, 0);
 		}
 		free(s->be);
 	}
+
+	if (s->be_constr != NULL)
+		free(s->be_constr);
 
 	s->base = NULL;
 
@@ -144,14 +147,14 @@ _nscd_free_all_nsw_state_base()
 
 		base = nscd_nsw_state_base[i];
 		_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,
-			NSCD_LOG_LEVEL_DEBUG)
+		    NSCD_LOG_LEVEL_DEBUG)
 		(me, "freeing db state base (%d) %p \n", i, base);
 
 		if (base == NULL)
 			continue;
 
 		nscd_nsw_state_base[i] = (nscd_nsw_state_base_t *)
-			_nscd_set((nscd_acc_data_t *)base, NULL);
+		    _nscd_set((nscd_acc_data_t *)base, NULL);
 	}
 	(void) rw_unlock(&nscd_nsw_state_base_lock);
 }
@@ -203,6 +206,19 @@ _nscd_create_nsw_state(
 		(me, "db be array %p allocated\n", s->be);
 	}
 
+	s->be_constr = (nss_backend_constr_t *)calloc(s->max_src,
+	    sizeof (nss_backend_constr_t));
+	if (s->be_constr == NULL) {
+		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
+		(me, "not able to allocate s->be_constr\n");
+
+		_nscd_free_nsw_state(s);
+		return (NULL);
+	} else {
+		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "db be constructor array %p allocated\n", s->be_constr);
+	}
+
 	s->be_db_pp = calloc(s->max_src, sizeof (nscd_db_t ***));
 	if (s->be_db_pp == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
@@ -241,7 +257,7 @@ _nscd_create_nsw_state(
 		(me, "source name = %s, index = %d\n", srcn, srci);
 
 		be_db_p = (nscd_db_t **)_nscd_get(
-				(nscd_acc_data_t *)nscd_src_backend_db[srci]);
+		    (nscd_acc_data_t *)nscd_src_backend_db[srci]);
 		if (be_db_p == NULL) {
 			_nscd_free_nsw_state(s);
 			return (NULL);
@@ -255,7 +271,7 @@ _nscd_create_nsw_state(
 		be = NULL;
 		dbn = params->p.name;
 		dbe = _nscd_get_db_entry(be_db, NSCD_DATA_BACKEND_INFO,
-			(const char *)dbn, NSCD_GET_FIRST_DB_ENTRY, 0);
+		    (const char *)dbn, NSCD_GET_FIRST_DB_ENTRY, 0);
 		if (dbe != NULL)
 			be_info = (nscd_be_info_t *)*(dbe->data_array);
 
@@ -263,15 +279,19 @@ _nscd_create_nsw_state(
 			_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "no backend info or be_constr is NULL "
 			    "for <%s : %s>\n", NSCD_NSW_SRC_NAME(srci),
-				dbn);
-		} else
+			    dbn);
+		} else {
+			s->be_constr[i] = be_info->be_constr;
 			be = (be_info->be_constr)(dbn,
-				NSCD_NSW_SRC_NAME(srci), 0);
+			    NSCD_NSW_SRC_NAME(srci), 0);
+			if (be == NULL)
+				s->recheck_be = nscd_true;
+		}
 
 		if (be == NULL) {
 			_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
 			(me, "not able to init be for <%s : %s>\n",
-			NSCD_NSW_SRC_NAME(srci), dbn);
+			    NSCD_NSW_SRC_NAME(srci), dbn);
 
 			_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "releasing db be ptr %p\n", be_db_p);
@@ -295,6 +315,48 @@ _nscd_create_nsw_state(
 	}
 
 	return (s);
+}
+
+/*
+ * Try to initialize the backend instances one more time
+ * in case the dependencies the backend libraries depend
+ * on are now available
+ */
+static void
+check_be_array(
+	nscd_nsw_state_t	*s)
+{
+	int			i;
+	char			*dbn;
+	char			*srcn;
+	struct __nsw_lookup_v1	*lkp;
+
+	dbn = NSCD_NSW_DB_NAME(s->dbi);
+
+	s->recheck_be = nscd_false;
+	for (i = 0;  i < s->max_src;  i++) {
+
+		if (i == 0)
+			lkp = s->config->lookups;
+		else
+			lkp = lkp->next;
+		if (lkp == NULL)
+			return;
+
+		srcn = lkp->service_name;
+
+		/*
+		 * it is possible that 's->be[i]' could not be
+		 * initialized earlier due to a dependency not
+		 * yet available (e.g., nis on domain name),
+		 * try to initialize one more time
+		 */
+		if (s->be[i] == NULL && s->be_constr[i] != NULL) {
+			s->be[i] = (s->be_constr[i])(dbn, srcn, 0);
+			if (s->be[i] == NULL)
+				s->recheck_be = nscd_true;
+		}
+	}
 }
 
 static nscd_rc_t
@@ -322,13 +384,13 @@ _get_nsw_state_int(
 	 */
 	if (params->p.flags & NSS_USE_DEFAULT_CONFIG) {
 		rc = _nscd_create_sw_struct(dbi, -1, (char *)params->p.name,
-			(char *)params->p.default_config, NULL, params);
+		    (char *)params->p.default_config, NULL, params);
 		if (rc != NSCD_SUCCESS)
 			return (rc);
 
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no base nsw config created for %s (sources: %s)\n",
-				params->p.name, params->p.default_config);
+		    params->p.name, params->p.default_config);
 
 		ret = _nscd_create_nsw_state(params);
 		if (ret == NULL)
@@ -351,7 +413,7 @@ _get_nsw_state_int(
 		dbi = i;
 
 		nswcfg = (nscd_nsw_config_t **)_nscd_get(
-			(nscd_acc_data_t *)nscd_nsw_config[i]);
+		    (nscd_acc_data_t *)nscd_nsw_config[i]);
 
 		/*
 		 * if nsw data structures not created yet, get the
@@ -360,26 +422,26 @@ _get_nsw_state_int(
 		 */
 		if (nswcfg == NULL) {
 			nswcfg1 = (nscd_nsw_config_t **)_nscd_get(
-			(nscd_acc_data_t *)nscd_nsw_config[params->cfgdbi]);
+			    (nscd_acc_data_t *)nscd_nsw_config[params->cfgdbi]);
 			if (nswcfg1 == NULL) {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "no nsw config for %s\n",
-					params->p.name);
+				    params->p.name);
 				return (NSCD_CREATE_NSW_STATE_FAILED);
 			}
 
 			rc = _nscd_create_sw_struct(i, params->cfgdbi,
-				params->p.name, (*nswcfg1)->nsw_cfg_str,
-				NULL, params);
+			    params->p.name, (*nswcfg1)->nsw_cfg_str,
+			    NULL, params);
 			_nscd_release((nscd_acc_data_t *)nswcfg1);
 			if (rc != NSCD_SUCCESS)
 				return (rc);
 
 			_NSCD_LOG(NSCD_LOG_NSW_STATE,
-				NSCD_LOG_LEVEL_DEBUG)
+			    NSCD_LOG_LEVEL_DEBUG)
 				(me, "nsw config created for %s (%s)\n",
-				params->p.name, (*nswcfg1)->nsw_cfg_str);
+				    params->p.name, (*nswcfg1)->nsw_cfg_str);
 		} else
 			_nscd_release((nscd_acc_data_t *)nswcfg);
 	}
@@ -397,7 +459,7 @@ _get_nsw_state_int(
 	 * is available' signal.
 	 */
 	assert(base == (nscd_nsw_state_base_t *)_nscd_mutex_lock(
-		(nscd_acc_data_t *)base));
+	    (nscd_acc_data_t *)base));
 
 	if (tid == NULL) {
 		ctrl_p = &base->nsw_state;
@@ -410,13 +472,14 @@ _get_nsw_state_int(
 			_nscd_logit(me, "tid = %d\n", *tid);
 			_nscd_logit(me, "tid in base = %d\n", base->tid);
 			_nscd_logit(me, "number of free nsw_state = %d\n",
-				ctrl_p->free);
+			    ctrl_p->free);
 			_nscd_logit(me, "number of nsw state allocated = %d\n",
-				ctrl_p->allocated);
+			    ctrl_p->allocated);
 			_nscd_logit(me, "first nsw state on list = %p\n",
-				ctrl_p->first);
+			    ctrl_p->first);
 			_nscd_logit(me, "number of waiter = %d\n",
-				ctrl_p->waiter);
+			    ctrl_p->waiter);
+
 		}
 	}
 
@@ -432,20 +495,20 @@ _get_nsw_state_int(
 		while (wait_cond) {
 			if (!thread_only)
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "waiting for nsw state signal\n");
 			else
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "waiting for per thread "
 				    "nsw state signal\n");
 
 			if (thread_only) {
 				_nscd_cond_wait((nscd_acc_data_t *)base,
-					&base->thr_cond);
+				    &base->thr_cond);
 
 				if (base->used_by_thr == 0 &&
-					ctrl_p->first != NULL)
+				    ctrl_p->first != NULL)
 					wait_cond = 0;
 			} else {
 				_nscd_cond_wait((nscd_acc_data_t *)base, NULL);
@@ -456,15 +519,15 @@ _get_nsw_state_int(
 
 			if (!thread_only)
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "woke from cond wait ...wait_cond = %d\n",
-					wait_cond);
+				    wait_cond);
 			else
 
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "woke from cond wait (per thread) "
-					"...wait_cond = %d\n", wait_cond);
+				    "...wait_cond = %d\n", wait_cond);
 
 		}
 
@@ -485,10 +548,10 @@ _get_nsw_state_int(
 			geti = params->dbi;
 
 		params->nswcfg = (nscd_nsw_config_t **)_nscd_get(
-			(nscd_acc_data_t *)nscd_nsw_config[geti]);
+		    (nscd_acc_data_t *)nscd_nsw_config[geti]);
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "got a nsw config %p for index %d\n",
-			params->nswcfg, geti);
+		    params->nswcfg, geti);
 
 		ctrl_p->first = _nscd_create_nsw_state(params);
 		if (ctrl_p->first != NULL) {
@@ -496,13 +559,13 @@ _get_nsw_state_int(
 
 			if (tid == NULL) {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "got a new nsw_state %p\n", ctrl_p->first);
 			} else {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "got a new per thread nsw_state %p\n",
-				ctrl_p->first);
+				    ctrl_p->first);
 			}
 			ctrl_p->allocated++;
 			ctrl_p->free++;
@@ -515,6 +578,8 @@ _get_nsw_state_int(
 	}
 
 	ret = ctrl_p->first;
+	if (ret->recheck_be == nscd_true)
+		check_be_array(ret);
 	ctrl_p->first = ret->next;
 	ret->next = NULL;
 	ctrl_p->free--;
@@ -528,13 +593,13 @@ _get_nsw_state_int(
 			_nscd_logit(me, "tid = %d\n", *tid);
 			_nscd_logit(me, "tid in base = %d\n", base->tid);
 			_nscd_logit(me, "number of free nsw_state = %d\n",
-				ctrl_p->free);
+			    ctrl_p->free);
 			_nscd_logit(me, "number od nsw state allocated = %d\n",
-				ctrl_p->allocated);
+			    ctrl_p->allocated);
 			_nscd_logit(me, "first nsw state on list = %p\n",
-				ctrl_p->first);
+			    ctrl_p->first);
 			_nscd_logit(me, "number of waiter = %d\n",
-				ctrl_p->waiter);
+			    ctrl_p->waiter);
 		}
 	}
 	else
@@ -621,13 +686,12 @@ _put_nsw_state_int(
 		_nscd_logit(me, "tid = %d\n", (tid == NULL) ? -1 : *tid);
 		_nscd_logit(me, "tid in base = %d\n", base->tid);
 		_nscd_logit(me, "number of free nsw_state = %d\n",
-			ctrl_p->free);
+		    ctrl_p->free);
 		_nscd_logit(me, "number od nsw state allocated = %d\n",
-			ctrl_p->allocated);
+		    ctrl_p->allocated);
 		_nscd_logit(me, "first nsw state on list = %p\n",
-			ctrl_p->first);
-		_nscd_logit(me, "number of waiter = %d\n",
-			ctrl_p->waiter);
+		    ctrl_p->first);
+		_nscd_logit(me, "number of waiter = %d\n", ctrl_p->waiter);
 	}
 
 	if (ctrl_p->first != NULL) {
@@ -660,18 +724,17 @@ _put_nsw_state_int(
 		_nscd_logit(me, "tid = %d\n", (tid == NULL) ? -1 : *tid);
 		_nscd_logit(me, "tid in base = %d\n", base->tid);
 		_nscd_logit(me, "number of free nsw_state = %d\n",
-			ctrl_p->free);
+		    ctrl_p->free);
 		_nscd_logit(me, "number od nsw state allocated = %d\n",
-			ctrl_p->allocated);
+		    ctrl_p->allocated);
 		_nscd_logit(me, "first nsw state on list = %p\n",
-			ctrl_p->first);
-		_nscd_logit(me, "tnumber of waiter = %d\n",
-			ctrl_p->waiter);
+		    ctrl_p->first);
+		_nscd_logit(me, "tnumber of waiter = %d\n", ctrl_p->waiter);
 	}
 
 	_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "done putting back nsw state %p, thread_only = %d\n",
-			s, thread_only);
+	    s, thread_only);
 
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 
@@ -706,21 +769,20 @@ _nscd_init_nsw_state_base(
 		(void) rw_rdlock(&nscd_nsw_state_base_lock);
 
 	base = (nscd_nsw_state_base_t *)_nscd_alloc(
-		NSCD_DATA_NSW_STATE_BASE,
-		sizeof (nscd_nsw_state_base_t),
-		_nscd_free_nsw_state_base,
-		NSCD_ALLOC_MUTEX | NSCD_ALLOC_COND);
+	    NSCD_DATA_NSW_STATE_BASE,
+	    sizeof (nscd_nsw_state_base_t),
+	    _nscd_free_nsw_state_base,
+	    NSCD_ALLOC_MUTEX | NSCD_ALLOC_COND);
 
 	if (base == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,
-			NSCD_LOG_LEVEL_ERROR)
+		    NSCD_LOG_LEVEL_ERROR)
 		(me, "not able to allocate a nsw state base\n");
 		if (lock)
 			(void) rw_unlock(&nscd_nsw_state_base_lock);
 		return (NSCD_NO_MEMORY);
 	}
-	_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,
-			NSCD_LOG_LEVEL_DEBUG)
+	_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 		(me, "nsw state base %p allocated\n", base);
 
 	/*
@@ -736,8 +798,8 @@ _nscd_init_nsw_state_base(
 	base->nsw_state_thr.max = NSCD_SW_CFG(cfgdbi).max_nsw_state_per_thread;
 
 	nscd_nsw_state_base[dbi] = (nscd_nsw_state_base_t *)_nscd_set(
-		(nscd_acc_data_t *)nscd_nsw_state_base[dbi],
-		(nscd_acc_data_t *)base);
+	    (nscd_acc_data_t *)nscd_nsw_state_base[dbi],
+	    (nscd_acc_data_t *)base);
 
 	if (lock)
 		(void) rw_unlock(&nscd_nsw_state_base_lock);
@@ -760,16 +822,15 @@ _nscd_init_all_nsw_state_base()
 
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,
-				NSCD_LOG_LEVEL_ERROR)
+			    NSCD_LOG_LEVEL_ERROR)
 			(me, "not able to initialize a nsw db state "
-				"base (%d)\n", i);
+			    "base (%d)\n", i);
 
 			(void) rw_unlock(&nscd_nsw_state_base_lock);
 			return (rc);
 		}
 	}
-	_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,
-			NSCD_LOG_LEVEL_DEBUG)
+	_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "all nsw state base initialized\n");
 
 	(void) rw_unlock(&nscd_nsw_state_base_lock);
@@ -784,7 +845,7 @@ _nscd_alloc_nsw_state_base()
 	(void) rw_rdlock(&nscd_nsw_state_base_lock);
 
 	nscd_nsw_state_base = calloc(NSCD_NUM_DB,
-		sizeof (nscd_nsw_state_base_t *));
+	    sizeof (nscd_nsw_state_base_t *));
 	if (nscd_nsw_state_base == NULL) {
 		(void) rw_unlock(&nscd_nsw_state_base_lock);
 		return (NSCD_NO_MEMORY);

@@ -55,7 +55,7 @@ retry_test(nss_status_t res, int n, struct __nsw_lookup_v1 *lkp)
 		if (res == NSS_SUCCESS) {
 			__NSW_UNPAUSE_ACTION(lkp->actions[__NSW_TRYAGAIN]);
 			__NSW_UNPAUSE_ACTION(
-				lkp->actions[__NSW_NISSERVDNS_TRYAGAIN]);
+			    lkp->actions[__NSW_NISSERVDNS_TRYAGAIN]);
 		}
 		return (0);
 	}
@@ -224,10 +224,10 @@ getparams(
 			if (*n != 'h' && *n != 'i' && *n != 's' && *n != 'a')
 				break;
 			if (strcmp(n, NSS_DBNAM_HOSTS) == 0 &&
-				search_fnum == NSS_DBOP_HOSTS_BYNAME)
+			    search_fnum == NSS_DBOP_HOSTS_BYNAME)
 				params->dnsi = 0;
 			else if (strcmp(n, NSS_DBNAM_IPNODES) == 0 &&
-				search_fnum == NSS_DBOP_IPNODES_BYNAME)
+			    search_fnum == NSS_DBOP_IPNODES_BYNAME)
 				params->dnsi = 1;
 			else if (strcmp(n, NSS_DBNAM_SHADOW) == 0)
 				params->privdb = 1;
@@ -299,7 +299,7 @@ nscd_initf(nss_db_params_t	*p)
 	if (pbuf->dbd_len <= sizeof (nss_dbd_t)) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "invalid db front params data ? dbd_len = %d\n",
-		pbuf->dbd_len);
+		    pbuf->dbd_len);
 		return;
 	}
 
@@ -315,11 +315,11 @@ nscd_initf(nss_db_params_t	*p)
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "db frontend params: name =%s, config_name = %s, "
 	"default_config = %s, flags = %x\n", p->name,
-	(p->config_name && *p->config_name != '\0' ?
-				p->config_name : "<NOT SPECIFIED>"),
-	(p->default_config && *p->default_config != '\0' ?
-				p->default_config : "<NOT SPECIFIED>"),
-	p->flags);
+	    (p->config_name && *p->config_name != '\0' ?
+	    p->config_name : "<NOT SPECIFIED>"),
+	    (p->default_config && *p->default_config != '\0' ?
+	    p->default_config : "<NOT SPECIFIED>"),
+	    p->flags);
 }
 
 
@@ -363,23 +363,22 @@ trace_result(
 		src = NSCD_NSW_SRC_NAME(srci);
 
 	if (res == NSS_SUCCESS) {
-		_nscd_logit(me,
-"%s: database: %s, operation: %d, source: %s returned >>%s<<, length = %d\n",
-		res_str, db, op, src, arg->buf.buffer, arg->returnlen);
-
+		_nscd_logit(me, "%s: database: %s, operation: %d, "
+		    "source: %s returned >>%s<<, length = %d\n",
+		    res_str, db, op, src, arg->buf.buffer, arg->returnlen);
 		return;
 	}
 
-	_nscd_logit(me,
-"%s: database: %s, operation: %d, source: %s, erange= %d, errno: %s \n",
-		res_str, db, op, src, arg->erange, strerror(arg->h_errno));
+	_nscd_logit(me, "%s: database: %s, operation: %d, source: %s, "
+	    "erange= %d, errno: %s \n",
+	    res_str, db, op, src, arg->erange, strerror(arg->h_errno));
 }
 
 /*
  * Determine if a request should be done locally in the getXbyY caller's
  * process. Return none zero if yes, 0 otherwise. This should be called
  * before the switch engine steps through the backends/sources.
- * This function returnis 1 if:
+ * This function returns 1 if:
  *   -- the database is exec_attr and the search_flag is GET_ALL
  */
 static int
@@ -393,8 +392,7 @@ try_local(
 	char			*me = "try_local";
 
 	if (strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_EXECATTR) == 0) {
-		if ((ep = ap->key.attrp) != NULL &&
-				ep->search_flag == GET_ALL)
+		if ((ep = ap->key.attrp) != NULL && ep->search_flag == GET_ALL)
 			rc = 1;
 	}
 
@@ -411,7 +409,7 @@ try_local(
  * Determine if a request should be done locally in the getXbyY caller's
  * process. Return none zero if yes, 0 otherwise. This should be called
  * before the switch engine invokes any backend.
- * This function returnis 1 if:
+ * This function returns 1 if:
  *   -- the database is shadow and the source is nisplus
  */
 static int
@@ -423,7 +421,7 @@ try_local2(
 	char	*me = "try_local2";
 
 	if (*NSCD_NSW_DB_NAME(dbi) == 's' &&
-		strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_SHADOW) == 0) {
+	    strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_SHADOW) == 0) {
 		if (strcmp(NSCD_NSW_SRC_NAME(srci), "nisplus") == 0)
 			rc = 1;
 	}
@@ -474,8 +472,7 @@ get_gss_func(void **func_p)
 	if (handle == NULL) {
 		handle = dlopen("libgss.so.1", RTLD_LAZY);
 		if (handle == NULL) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_ERROR)
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to dlopen libgss.so.1\n");
 			(void) mutex_unlock(&func_lock);
 			return (NSCD_CFG_DLOPEN_ERROR);
@@ -535,8 +532,7 @@ get_dns_funcs(int dnsi, void **func_p)
 	if (handle == NULL) {
 		handle = dlopen("nss_dns.so.1", RTLD_LAZY);
 		if (handle == NULL) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_ERROR)
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to dlopen nss_dns.so.1\n");
 			(void) mutex_unlock(&func_lock);
 			return (NSCD_CFG_DLOPEN_ERROR);
@@ -611,8 +607,8 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "rootp = %p, initf = %p, search_fnum = %d, "
-		"search_args = %p\n", rootp, initf,
-		search_fnum, search_args);
+	    "search_args = %p\n", rootp, initf,
+	    search_fnum, search_args);
 
 	NSCD_SW_STATS_G.lookup_request_received_g++;
 	NSCD_SW_STATS_G.lookup_request_in_progress_g++;
@@ -620,7 +616,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	/* determine db index, cfg db index, etc */
 	if (getparams(search_fnum, initf, &params) ==
-			NSCD_CFG_UNSUPPORTED_SWITCH_DB) {
+	    NSCD_CFG_UNSUPPORTED_SWITCH_DB) {
 		/*
 		 * if unsupported database and the request is from the
 		 * the door, tell the door client to try it locally
@@ -655,7 +651,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	/* if lookup not enabled, return NSS_UNAVAIL  */
 	if (!(NSCD_SW_CFG_G.enable_lookup_g == nscd_true &&
-		NSCD_SW_CFG(dbi).enable_lookup == nscd_true)) {
+	    NSCD_SW_CFG(dbi).enable_lookup == nscd_true)) {
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "lookup not enabled for %s\n", NSCD_NSW_DB_NAME(dbi));
@@ -665,12 +661,12 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	/* determine if loopback checking is configured */
 	if (NSCD_SW_CFG_G.enable_loopback_checking_g == nscd_true &&
-		NSCD_SW_CFG(dbi).enable_loopback_checking == nscd_true) {
+	    NSCD_SW_CFG(dbi).enable_loopback_checking == nscd_true) {
 		check_loopback = 1;
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "loopback checking enabled for %s\n",
-		NSCD_NSW_DB_NAME(dbi));
+		    NSCD_NSW_DB_NAME(dbi));
 	}
 
 	if (check_loopback) {
@@ -703,7 +699,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "database = %s, config = >>%s<<\n", NSCD_NSW_DB_NAME(dbi),
-	(*s->nsw_cfg_p)->nsw_cfg_str);
+	    (*s->nsw_cfg_p)->nsw_cfg_str);
 
 	for (n_src = 0;  n_src < s->max_src;  n_src++) {
 		nss_backend_t		*be;
@@ -733,10 +729,9 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 		/* if no privilege to look up, skip */
 		if (params.privdb == 1 && swret != NULL &&
-			strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 &&
-			_nscd_get_client_euid() != 0) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_DEBUG)
+		    strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 &&
+		    _nscd_check_client_read_priv() != 0) {
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "no privilege to look up, skip source\n");
 
 			goto next_src;
@@ -747,9 +742,8 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 		/* stop if the source is one that should be TRYLOCAL */
 		if (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC ||
-			(params.privdb && try_local2(dbi, srci) == 1)) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+		    (params.privdb && try_local2(dbi, srci) == 1)) {
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "returning TRYLOCAL ... \n");
 			res = NSS_TRYLOCAL;
 			goto free_nsw_state;
@@ -761,12 +755,12 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 				if (k->fnum == search_fnum) {
 
 					_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-						NSCD_LOG_LEVEL_DEBUG)
+					    NSCD_LOG_LEVEL_DEBUG)
 					(me, "loopback detected: "
-					"source = %s, database = %s "
-					"search fnum = %d\n",
-					NSCD_NSW_SRC_NAME(srci),
-					NSCD_NSW_DB_NAME(dbi), search_fnum);
+					    "source = %s, database = %s "
+					    "search fnum = %d\n",
+					    NSCD_NSW_SRC_NAME(srci),
+					    NSCD_NSW_DB_NAME(dbi), search_fnum);
 
 				NSCD_SW_STATS_G.loopback_nsw_db_skipped_g++;
 				NSCD_SW_STATS(dbi).loopback_nsw_db_skipped++;
@@ -779,14 +773,14 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 			funcp = NSS_LOOKUP_DBOP(be, search_fnum);
 
 		if ((params.dnsi >= 0 && be == 0) || (params.dnsi  < 0 &&
-			(be == 0 || (smf_state != NSCD_SVC_STATE_UNINITED &&
-			smf_state < SCF_STATE_ONLINE) || funcp == 0))) {
+		    (be == 0 || (smf_state != NSCD_SVC_STATE_UNINITED &&
+		    smf_state < SCF_STATE_ONLINE) || funcp == 0))) {
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+			    NSCD_LOG_LEVEL_DEBUG)
 			(me, "unable to look up source %s: be = %p, "
 			"smf state = %d, funcp = %p\n",
-			NSCD_NSW_SRC_NAME(srci), be, smf_state, funcp);
+			    NSCD_NSW_SRC_NAME(srci), be, smf_state, funcp);
 
 			goto next_src;
 		}
@@ -816,9 +810,9 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 			}
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+			    NSCD_LOG_LEVEL_DEBUG)
 			(me, "looking up source = %s, loop# = %d \n",
-			NSCD_NSW_SRC_NAME(srci), n_loop);
+			    NSCD_NSW_SRC_NAME(srci), n_loop);
 
 			/*
 			 * search the backend, if hosts lookups,
@@ -826,8 +820,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 			 */
 			if (params.dnsi >= 0) {
 				res = search_dns_withttl(swret,
-					NSCD_NSW_SRC_NAME(srci),
-					params.dnsi);
+				    NSCD_NSW_SRC_NAME(srci), params.dnsi);
 				/*
 				 * if not able to get ttl, fall back
 				 * to the regular backend call
@@ -860,10 +853,10 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 			 */
 			if (_whoami == NSCD_CHILD && swret != NULL)
 				swret->fallback = set_fallback_flag(
-				NSCD_NSW_SRC_NAME(srci), res);
+				    NSCD_NSW_SRC_NAME(srci), res);
 
 			_NSCD_LOG_IF(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG) {
+			    NSCD_LOG_LEVEL_DEBUG) {
 
 				/*
 				 * set up to trace the result/status
@@ -873,10 +866,10 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 					nss_pheader_t *phdr;
 					struct nss_XbyY_args *arg;
 					arg = (struct nss_XbyY_args *)
-						search_args;
+					    search_args;
 					phdr = (nss_pheader_t *)swret->pbuf;
 					arg->buf.buffer = (char *)phdr +
-						phdr->data_off;
+					    phdr->data_off;
 					arg->returnlen = phdr->data_len;
 					if (phdr->p_errno == ERANGE)
 						arg->erange = 1;
@@ -884,7 +877,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 				}
 
 				trace_result(dbi, srci, search_fnum, res,
-				(nss_XbyY_args_t *)search_args);
+				    (nss_XbyY_args_t *)search_args);
 			}
 
 			n_loop++;
@@ -1011,7 +1004,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "rootp = %p, initf = %p, contextpp = %p \n",
-		rootp, initf, contextpp);
+	    rootp, initf, contextpp);
 
 	/*
 	 * Get the nsw db index via the initf function. If unsupported
@@ -1026,7 +1019,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	/* if no privilege to look up, return */
 	if (params.privdb == 1 && swret != NULL &&
-		((nss_pheader_t *)(swret->pbuf))->p_euid != 0) {
+	    _nscd_check_client_read_priv() != 0) {
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no privilege \n");
@@ -1035,7 +1028,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	if ((contextp = (nscd_getent_context_t *)contextpp->ctx) == 0) {
 		if ((_nscd_get_getent_ctx(contextpp, &params)) !=
-			NSCD_SUCCESS) {
+		    NSCD_SUCCESS) {
 			return;
 		}
 		contextp = (nscd_getent_context_t *)contextpp->ctx;
@@ -1044,7 +1037,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	if (s == 0) {
 		if (_nscd_get_nsw_state(&root, &params) !=
-				NSCD_SUCCESS) {
+		    NSCD_SUCCESS) {
 			return;
 		}
 		s = (nscd_nsw_state_t *)root.s;
@@ -1069,7 +1062,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		}
 	}
 	for (n_src = 0, be = 0; n_src < s->max_src &&
-		(be = s->be[n_src]) == 0; n_src++) {
+	    (be = s->be[n_src]) == 0; n_src++) {
 		;
 	}
 
@@ -1091,14 +1084,14 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		srci = (*s->nsw_cfg_p)->src_idx[i];
 		st = _nscd_get_smf_state(srci, params.dbi, 1);
 		if (st == NSCD_SVC_STATE_UNKNOWN_SRC ||
-			st == NSCD_SVC_STATE_UNINITED || (params.privdb &&
-			try_local2(params.dbi, srci) == 1)) {
+		    st == NSCD_SVC_STATE_UNINITED || (params.privdb &&
+		    try_local2(params.dbi, srci) == 1)) {
 			nss_endent_u(rootp, initf, contextpp);
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_DEBUG)
+			    NSCD_LOG_LEVEL_DEBUG)
 			(me, "backend (%s) not available (state = %d)\n",
-			NSCD_NSW_SRC_NAME(srci), st);
+			    NSCD_NSW_SRC_NAME(srci), st);
 
 			return;
 		}
@@ -1119,14 +1112,14 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "rootp = %p, initf = %p, contextpp = %p, args = %p\n",
-		rootp, initf, contextpp, args);
+	    rootp, initf, contextpp, args);
 
 	if ((contextp = (nscd_getent_context_t *)contextpp->ctx) == 0) {
 		nss_setent_u(rootp, initf, contextpp);
 		if ((contextp = (nscd_getent_context_t *)contextpp->ctx) == 0) {
 			/* Give up */
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_ERROR)
+			    NSCD_LOG_LEVEL_ERROR)
 			(me, "not able to obtain getent context ... give up\n");
 
 			return (NSS_UNAVAIL);
@@ -1161,11 +1154,11 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 			res = NSS_UNAVAIL;
 		} else {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+			    NSCD_LOG_LEVEL_DEBUG)
 			(me, "database: %s, backend: %s, nsswitch config: %s\n",
-				NSCD_NSW_DB_NAME(s->dbi),
-				lkp->service_name,
-				(*s->nsw_cfg_p)->nsw_cfg_str);
+			    NSCD_NSW_DB_NAME(s->dbi),
+			    lkp->service_name,
+			    (*s->nsw_cfg_p)->nsw_cfg_str);
 
 			res = NSS_INVOKE_DBOP(be, NSS_DBOP_GETENT, args);
 		}
@@ -1173,7 +1166,7 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		if (__NSW_ACTION_V1(lkp, res) == __NSW_RETURN) {
 			if (res != __NSW_SUCCESS) {
 				end_iter_u(rootp,
-					(struct nss_getent_context *)contextp);
+				    (struct nss_getent_context *)contextp);
 			}
 			return (res);
 		}
@@ -1181,7 +1174,7 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		do {
 			n_src++;
 		} while (n_src < s->max_src &&
-				(be = s->be[n_src]) == 0);
+		    (be = s->be[n_src]) == 0);
 		if (be == 0) {
 			/*
 			 * This is the case where we failed to get the backend
@@ -1210,7 +1203,7 @@ nss_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "rootp = %p, initf = %p, contextpp = %p \n",
-		rootp, initf, contextpp);
+	    rootp, initf, contextpp);
 
 	if ((contextp = (nscd_getent_context_t *)contextpp->ctx) == 0) {
 		/* nss_endent() on an unused context is a no-op */
@@ -1274,7 +1267,7 @@ nss_psearch(void *buffer, size_t length)
 	}
 
 	status = nss_packed_arg_init(buffer, length,
-			NULL, &initf, &dbop, &arg);
+	    NULL, &initf, &dbop, &arg);
 	if (status != NSS_SUCCESS) {
 		NSCD_RETURN_STATUS(pbuf, status, -1);
 	}
@@ -1316,10 +1309,10 @@ nss_psearch(void *buffer, size_t length)
 		rc = get_gss_func((void **)&func);
 		if (rc == NSCD_SUCCESS) {
 			if (func(&stat, GSS_C_NO_CREDENTIAL,
-				NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
+			    NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
 
 				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 			(me, "NSS_ALTRETRY: fallback to main nscd needed\n");
 
 				status = NSS_ALTRETRY;
@@ -1340,8 +1333,8 @@ nss_psearch(void *buffer, size_t length)
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "switch engine result: source is %s, status %d, "
 	"herrno is %d, errno is %s\n",
-	(swret.srci != -1) ? NSCD_NSW_SRC_NAME(swret.srci) : "<NOTSET>",
-	pbuf->p_status, pbuf->p_herrno, strerror(pbuf->p_errno));
+	    (swret.srci != -1) ? NSCD_NSW_SRC_NAME(swret.srci) : "<NOTSET>",
+	    pbuf->p_status, pbuf->p_herrno, strerror(pbuf->p_errno));
 
 	/* clear the TSD key used by the generic initf */
 	clear_initf_key();
@@ -1390,14 +1383,14 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 	 */
 	if (cookie->p1_seqnum == NSCD_P0_COOKIE_SEQNUM) {
 		nscd_getent_p0_cookie_t *p0c =
-			(nscd_getent_p0_cookie_t *)cookie;
+		    (nscd_getent_p0_cookie_t *)cookie;
 		if (p0c->p0_time == _nscd_get_start_time())
 			NSCD_RETURN_STATUS_SUCCESS(pbuf);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "cookie # = %lld,  sequence # = %lld\n",
-		cookie->p1_cookie_num, cookie->p1_seqnum);
+	    cookie->p1_cookie_num, cookie->p1_seqnum);
 
 	ctx = _nscd_is_getent_ctx(cookie->p1_cookie_num);
 
@@ -1410,7 +1403,7 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 
 	/* if not called by nss_psetent, verify sequence number */
 	if (setent != 1 && ctx->seq_num !=
-			(nscd_seq_num_t)cookie->p1_seqnum) {
+	    (nscd_seq_num_t)cookie->p1_seqnum) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "invalid sequence # (%lld)\n", cookie->p1_seqnum);
 
@@ -1451,10 +1444,10 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 		rc = get_gss_func((void **)&func);
 		if (rc == NSCD_SUCCESS) {
 			if (func(&stat, GSS_C_NO_CREDENTIAL,
-				NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
+			    NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
 
 				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 			(me, "NSS_TRYLOCAL: fallback to caller process\n");
 				NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
 			}
@@ -1493,7 +1486,7 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 	p0c->p0_seqnum = NSCD_P0_COOKIE_SEQNUM;
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "returning a p0 cookie: pid = %ld, time = %ld, seq #= %llx\n",
-		p0c->p0_pid, p0c->p0_time, p0c->p0_seqnum);
+	    p0c->p0_pid, p0c->p0_time, p0c->p0_seqnum);
 
 	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
 }
@@ -1511,7 +1504,7 @@ delayed_setent(nss_pheader_t *pbuf, nss_db_initf_t initf,
 	 * check credential
 	 */
 	_nscd_APP_check_cred(pbuf, &pid, "NSCD_DELAYED_SETENT",
-		NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR);
+	    NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR);
 	if (NSCD_STATUS_IS_NOT_OK(pbuf)) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "invalid credential\n");
@@ -1543,13 +1536,13 @@ delayed_setent(nss_pheader_t *pbuf, nss_db_initf_t initf,
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "NSS_TRYLOCAL: cookie # = %lld,  sequence # = %lld\n",
-		*cookie_num_p, *seqnum_p);
+		    *cookie_num_p, *seqnum_p);
 		NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "NSS_SUCCESS: cookie # = %lld,  sequence # = %lld\n",
-	ctx->cookie_num, ctx->seq_num);
+	    ctx->cookie_num, ctx->seq_num);
 
 	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
 }
@@ -1591,10 +1584,10 @@ nss_pgetent(void *buffer, size_t length)
 	/* if no context yet, get one */
 	if (contextp->ctx ==  NULL) {
 		nscd_getent_p0_cookie_t *p0c =
-			(nscd_getent_p0_cookie_t *)cookie_num_p;
+		    (nscd_getent_p0_cookie_t *)cookie_num_p;
 
 		delayed_setent(pbuf, initf, contextp, cookie_num_p,
-			seqnum_p, p0c->p0_pid);
+		    seqnum_p, p0c->p0_pid);
 		if (NSCD_STATUS_IS_NOT_OK(pbuf)) {
 			clear_initf_key();
 			return;
@@ -1602,7 +1595,7 @@ nss_pgetent(void *buffer, size_t length)
 	}
 
 	status = nss_packed_context_init(buffer, length,
-			NULL, &initf, &contextp, &arg);
+	    NULL, &initf, &contextp, &arg);
 	if (status != NSS_SUCCESS) {
 		NSCD_RETURN_STATUS(pbuf, status, -1);
 	}
@@ -1621,8 +1614,8 @@ nss_pgetent(void *buffer, size_t length)
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "getent OK, new sequence # = %lld, len = %lld,"
-		" data = >>%s<<\n", *seqnum_p,
-		pbuf->data_len, (char *)buffer + pbuf->data_off);
+		    " data = >>%s<<\n", *seqnum_p,
+		    pbuf->data_len, (char *)buffer + pbuf->data_off);
 	} else {
 		/* release the resources used */
 		ctx = (nscd_getent_context_t *)contextp->ctx;
@@ -1632,7 +1625,7 @@ nss_pgetent(void *buffer, size_t length)
 		}
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "getent failed, status = %d, sequence # = %lld\n",
-			status, *seqnum_p);
+		    status, *seqnum_p);
 	}
 
 	/* clear the TSD key used by the generic initf */
@@ -1663,7 +1656,7 @@ nss_pendent(void *buffer, size_t length)
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "endent, cookie = %lld, sequence # = %lld\n",
-		*cookie_num_p, *seqnum_p);
+	    *cookie_num_p, *seqnum_p);
 
 	/* Perform local endent and reset context */
 	nss_endent(NULL, NULL, contextp);

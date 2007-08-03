@@ -114,7 +114,7 @@ getbymember(be, a)
 		switch (netid_lookup(&grdata, be)) {
 		case NSS_SUCCESS:
 			/*
-			 * Return SUCESS only if array is full.
+			 * Return SUCCESS only if array is full.
 			 * Explained in <nss_dbdefs.h>.
 			 */
 			argp->numgids = grdata.numgids;
@@ -151,7 +151,14 @@ getbymember(be, a)
 		if (r)
 			nis_freeresult(r);
 		argp->numgids = grdata.numgids;
-		return (NSS_SUCCESS);
+
+		/*
+		 * Return SUCCESS only if array is full.
+		 * Explained in <nss_dbdefs.h>.
+		 */
+		return ((argp->numgids == argp->maxgids)
+			? NSS_SUCCESS
+			: NSS_NOTFOUND);
 	}
 	r = __nis_list_localcb(be->table_name, NIS_LIST_COMMON | ALL_RESULTS |
 				__nis_force_hard_lookups, gr_cback, &grdata);
@@ -160,7 +167,14 @@ getbymember(be, a)
 
 	nis_freeresult(r);
 	argp->numgids = grdata.numgids;
-	return (NSS_SUCCESS);
+
+	/*
+	 * Return SUCCESS only if array is full.
+	 * Explained in <nss_dbdefs.h>.
+	 */
+	return ((argp->numgids == argp->maxgids)
+		? NSS_SUCCESS
+		: NSS_NOTFOUND);
 }
 
 
@@ -361,8 +375,8 @@ netid_lookup(struct memdata *grdata, nisplus_backend_ptr_t be)
 	 * in the Answerbook.
 	 */
 	r = __nis_list_localcb(buf,
-			NIS_LIST_COMMON | __nis_force_hard_lookups,
-			netid_cback, grdata);
+	    NIS_LIST_COMMON | __nis_force_hard_lookups,
+	    netid_cback, grdata);
 
 	if (r == 0)
 		return (NSS_NOTFOUND);

@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,28 +32,38 @@
 
 if (smf_is_system_labeled); then
 	if (smf_is_nonglobalzone); then
+		if [ ! -f /var/tsol/doors/nscd_per_label ]; then
 
-        	# If needed create a door to the global zone daemon.
-        	if [ ! -L /var/run/name_service_door ]; then
-                	ln -s /var/tsol/doors/name_service_door /var/run || \
-                    	exit $SMF_EXIT_ERR_FATAL
-        	fi
+        		# If needed create a door to the global zone daemon.
+        		if [ -r /var/run/name_service_door ]; then
+				rm /var/run/name_service_door
+        		fi
+                	ln -s /var/tsol/doors/name_service_door  \
+				/var/run || exit $SMF_EXIT_ERR_FATAL
 
-        	# If current service duration is not "transient", create
-        	# a dummy background process to preserve contract lifetime.
-        	duration=""
-        	if /bin/svcprop -q -c -p startd/duration $SMF_FMRI ; then
-                	duration=`/bin/svcprop -c -p startd/duration $SMF_FMRI`
-        	fi
-        	if [ "$duration" != "transient" ]; then
-                	( while true ; do sleep 3600 ; done ) &
-        	fi
+        		# If current service duration is not "transient",
+        		# create a dummy background process to preserve
+			# contract lifetime.
+        		duration=""
+        		if /bin/svcprop -q -c -p startd/duration $SMF_FMRI
+			    then
+                		duration=`/bin/svcprop -c -p startd/duration  \
+					$SMF_FMRI`
+        		fi
+        		if [ "$duration" != "transient" ]; then
+                		( while true ; do sleep 3600 ; done ) &
+        		fi
 
-        	# The real daemon is not started in non-global zones,
-		# so exit now.
-        	exit $SMF_EXIT_OK
+        		# The real daemon is not started in non-global zones,
+			# so exit now.
+        		exit $SMF_EXIT_OK
+		else
+        		# remove the door to the global zone daemon
+        		if [ -L /var/run/name_service_door ]; then
+                		rm /var/run/name_service_door
+        		fi
+		fi
 	fi
-
 fi
 
 if [ -f /etc/nscd.conf -a -f /usr/sbin/nscd ]; then

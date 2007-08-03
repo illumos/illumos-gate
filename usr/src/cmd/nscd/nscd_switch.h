@@ -107,11 +107,13 @@ typedef struct nscd_nsw_state {
 	int				dbi;	/* which database? */
 	int				max_src; /* is == config->num_lookups */
 	int				getent; /* used by getent */
+	nscd_bool_t			recheck_be; /* if set, check/init be */
 	nss_db_params_t			p;
 	struct __nsw_switchconfig_v1	*config;
 	nscd_nsw_config_t		**nsw_cfg_p;
 	nscd_nsw_state_base_t		*base;
 	nss_backend_t			**be; /* array of backends */
+	nss_backend_constr_t		*be_constr; /* be constructor array */
 	nscd_db_t			***be_db_pp;
 	struct nscd_nsw_state		*next;
 } nscd_nsw_state_t;

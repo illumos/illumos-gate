@@ -114,7 +114,7 @@ server_create(door_info_t *dip)
 	}
 	(void) mutex_unlock(&create_lock);
 	(void) thr_create(NULL, 0, server_tsd_bind, NULL,
-			THR_BOUND|THR_DETACHED, NULL);
+	    THR_BOUND|THR_DETACHED, NULL);
 }
 
 /*
@@ -204,11 +204,11 @@ restart_if_cfgfile_changed()
 		if (last_resolv_modified >= 0) {
 			if (stat("/etc/resolv.conf", &res_buf) < 0) {
 				if (last_resolv_modified == 0)
-				    last_resolv_modified = -1;
+					last_resolv_modified = -1;
 				else
-				    res_buf.st_mtime = last_resolv_modified;
+					res_buf.st_mtime = last_resolv_modified;
 			} else if (last_resolv_modified == 0) {
-			    last_resolv_modified = res_buf.st_mtime;
+				last_resolv_modified = res_buf.st_mtime;
 			}
 		}
 
@@ -240,7 +240,7 @@ restart_if_cfgfile_changed()
 			 */
 			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_INFO)
 			(me, "nscd restart due to %s or %s change\n",
-				"/etc/nsswitch.conf", "resolv.conf");
+			    "/etc/nsswitch.conf", "resolv.conf");
 			/*
 			 * try to restart under smf
 			 */
@@ -259,7 +259,7 @@ restart_if_cfgfile_changed()
 		}
 
 	} else
-	    (void) mutex_unlock(&nsswitch_lock);
+		(void) mutex_unlock(&nsswitch_lock);
 }
 
 uid_t
@@ -278,6 +278,30 @@ _nscd_get_client_euid()
 	id = ucred_geteuid(uc);
 	ucred_free(uc);
 	return (id);
+}
+
+/*
+ * Check to see if the door client has PRIV_FILE_DAC_READ privilege.
+ * Return 0 if yes, -1 otherwise.
+ */
+int
+_nscd_check_client_read_priv()
+{
+	int			rc = 0;
+	ucred_t			*uc = NULL;
+	const priv_set_t	*eset;
+	char			*me = "_nscd_check_client_read_priv";
+
+	if (door_ucred(&uc) != 0) {
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "door_ucred: %s\n", strerror(errno));
+		return (-1);
+	}
+	eset = ucred_getprivset(uc, PRIV_EFFECTIVE);
+	if (!priv_ismember(eset, PRIV_FILE_DAC_READ))
+		rc = -1;
+	ucred_free(uc);
+	return (rc);
 }
 
 static void
@@ -304,13 +328,13 @@ N2N_check_priv(
 	zoneid = ucred_getzoneid(uc);
 
 	if ((zoneid != GLOBAL_ZONEID && zoneid != getzoneid()) ||
-		eset != NULL ? !priv_ismember(eset, PRIV_SYS_ADMIN) :
-		ucred_geteuid(uc) != 0) {
+	    eset != NULL ? !priv_ismember(eset, PRIV_SYS_ADMIN) :
+	    ucred_geteuid(uc) != 0) {
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
 		(me, "%s call failed(cred): caller pid %d, uid %d, "
-		"euid %d, zoneid %d\n", dc_str, ucred_getpid(uc),
-		ucred_getruid(uc), ucred_geteuid(uc), zoneid);
+		    "euid %d, zoneid %d\n", dc_str, ucred_getpid(uc),
+		    ucred_getruid(uc), ucred_geteuid(uc), zoneid);
 		ucred_free(uc);
 
 		NSCD_RETURN_STATUS(phdr, NSS_ERROR, EACCES);
@@ -318,8 +342,8 @@ N2N_check_priv(
 
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 	(me, "nscd received %s cmd from pid %d, uid %d, "
-	"euid %d, zoneid %d\n", dc_str, ucred_getpid(uc),
-	ucred_getruid(uc), ucred_geteuid(uc), zoneid);
+	    "euid %d, zoneid %d\n", dc_str, ucred_getpid(uc),
+	    ucred_getruid(uc), ucred_geteuid(uc), zoneid);
 
 	ucred_free(uc);
 
@@ -353,7 +377,7 @@ _nscd_APP_check_cred(
 	NSCD_SET_STATUS_SUCCESS(phdr);
 	pid = ucred_getpid(uc);
 	if (NSS_PACKED_CRED_CHECK(buf, ruid = ucred_getruid(uc),
-		euid = ucred_geteuid(uc))) {
+	    euid = ucred_geteuid(uc))) {
 		if (pidp != NULL) {
 			if (*pidp == (pid_t)-1)
 				*pidp = pid;
@@ -370,10 +394,10 @@ _nscd_APP_check_cred(
 	if (NSCD_STATUS_IS_NOT_OK(phdr)) {
 		_NSCD_LOG(log_comp, log_level)
 		(me, "%s call failed: caller pid %d (input pid = %d), ruid %d, "
-		"euid %d, header ruid %d, header euid %d\n", dc_str,
-		pid, (pidp != NULL) ? *pidp : -1, ruid, euid,
-		((nss_pheader_t *)(buf))->p_ruid,
-		((nss_pheader_t *)(buf))->p_euid);
+		    "euid %d, header ruid %d, header euid %d\n", dc_str,
+		    pid, (pidp != NULL) ? *pidp : -1, ruid, euid,
+		    ((nss_pheader_t *)(buf))->p_ruid,
+		    ((nss_pheader_t *)(buf))->p_euid);
 	}
 }
 
@@ -409,7 +433,7 @@ pheader_error(nss_pheader_t *phdr, uint32_t call_number)
 
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
 	("pheader_error", "call number %s: invalid packed buffer header\n",
-		call_num_str);
+	    call_num_str);
 
 	NSCD_SET_STATUS(phdr, NSS_ERROR, EINVAL);
 	return (-1);
@@ -462,14 +486,14 @@ validate_pheader(
 	 * of the header must match the size of nss_pheader_t
 	 */
 	if (phdr->p_version != NSCD_HEADER_REV ||
-			phdr->dbd_off != sizeof (nss_pheader_t))
+	    phdr->dbd_off != sizeof (nss_pheader_t))
 		return (pheader_error(phdr, call_number));
 
 	/*
 	 * buffer size and offsets must be in multiple of 4
 	 */
 	if ((arg_size & 3) || (phdr->dbd_off & 3) || (phdr->key_off & 3) ||
-		(phdr->data_off & 3))
+	    (phdr->data_off & 3))
 		return (pheader_error(phdr, call_number));
 
 	/*
@@ -565,11 +589,10 @@ N2Nbuf_error(nss_pheader_t *phdr, uint32_t call_number)
 	}
 
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
-	("N2Nbuf_error", "call number %s: invalid N2N buffer\n",
-		call_num_str);
+	("N2Nbuf_error", "call number %s: invalid N2N buffer\n", call_num_str);
 
 	NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_DOOR_BUFFER_CHECK_FAILED);
+	    NSCD_DOOR_BUFFER_CHECK_FAILED);
 
 	return (-1);
 }
@@ -607,7 +630,7 @@ validate_N2Nbuf(
 	 * of the header must match the size of nss_pheader_t
 	 */
 	if (phdr->p_version != NSCD_HEADER_REV ||
-			phdr->dbd_off != sizeof (nss_pheader_t))
+	    phdr->dbd_off != sizeof (nss_pheader_t))
 		return (N2Nbuf_error(phdr, call_number));
 
 	/*
@@ -615,7 +638,7 @@ validate_N2Nbuf(
 	 * offsets should be equal
 	 */
 	if (phdr->dbd_off != phdr->key_off ||
-		phdr->dbd_off != phdr->data_off)
+	    phdr->dbd_off != phdr->data_off)
 		return (N2Nbuf_error(phdr, call_number));
 
 	/*
@@ -640,7 +663,7 @@ lookup(char *argp, size_t arg_size)
 	nss_pheader_t		*phdr = (nss_pheader_t *)(void *)argp;
 
 	NSCD_ALLOC_LOOKUP_BUFFER(argp, arg_size, phdr, space,
-		sizeof (space));
+	    sizeof (space));
 
 	/*
 	 * make sure the first couple bytes of the data area is null,
@@ -674,8 +697,7 @@ getent(char *argp, size_t arg_size)
 	char			space[NSCD_LOOKUP_BUFSIZE];
 	nss_pheader_t		*phdr = (nss_pheader_t *)(void *)argp;
 
-	NSCD_ALLOC_LOOKUP_BUFFER(argp, arg_size, phdr,
-		space, sizeof (space));
+	NSCD_ALLOC_LOOKUP_BUFFER(argp, arg_size, phdr, space, sizeof (space));
 
 	nss_pgetent(argp, arg_size);
 
@@ -776,7 +798,7 @@ if_selfcred_return_per_user_door(char *argp, size_t arg_size,
 	 */
 	if (per_user_is_on == 1) {
 		rc = need_per_user_door(argp, whoami,
-			_nscd_get_client_euid(), &dblist);
+		    _nscd_get_client_euid(), &dblist);
 		if (rc == -1)
 			per_user_is_on = 0;
 	}
@@ -850,7 +872,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 
 		/* make sure the packed buffer header is good */
 		if (validate_pheader(argp, arg_size,
-				phdr->nsc_callnumber) == -1)
+		    phdr->nsc_callnumber) == -1)
 			(void) door_return(argp, arg_size, NULL, 0);
 
 		switch (phdr->nsc_callnumber) {
@@ -860,7 +882,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		/* if a fallback to main nscd, skip per-user setup */
 		if (phdr->p_status != NSS_ALTRETRY)
 			if_selfcred_return_per_user_door(argp, arg_size,
-				dp, _whoami);
+			    dp, _whoami);
 		lookup(argp, arg_size);
 
 		break;
@@ -868,10 +890,10 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		case NSCD_SETENT:
 
 		_nscd_APP_check_cred(argp, &ent_pid, "NSCD_SETENT",
-			NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT);
+		    NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT);
 		if (NSCD_STATUS_IS_OK(phdr)) {
 			if_selfcred_return_per_user_door(argp, arg_size,
-				dp, _whoami);
+			    dp, _whoami);
 			nss_psetent(argp, arg_size, ent_pid);
 		}
 		break;
@@ -906,7 +928,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "Unknown name service door call op %x\n",
-		phdr->nsc_callnumber);
+		    phdr->nsc_callnumber);
 
 		NSCD_SET_STATUS(phdr, NSS_ERROR, EINVAL);
 		break;
@@ -918,7 +940,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	iam = NSCD_MAIN;
 	callnum = phdr->nsc_callnumber & ~NSCD_WHOAMI;
 	if (callnum == NSCD_IMHERE ||
-		callnum == NSCD_PULSE || callnum == NSCD_FORK)
+	    callnum == NSCD_PULSE || callnum == NSCD_FORK)
 		iam = phdr->nsc_callnumber & NSCD_WHOAMI;
 	else
 		callnum = phdr->nsc_callnumber;
@@ -972,7 +994,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			_nscd_peruser_getadmin(argp, sizeof (nscd_admin_t));
 		} else {
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-				NSCD_SELF_CRED_NOT_CONFIGURED);
+			    NSCD_SELF_CRED_NOT_CONFIGURED);
 		}
 		break;
 
@@ -1014,7 +1036,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	default:
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "Unknown name service door call op %d\n",
-			phdr->nsc_callnumber);
+		    phdr->nsc_callnumber);
 
 		NSCD_SET_STATUS(phdr, NSS_ERROR, EINVAL);
 
@@ -1049,9 +1071,8 @@ _nscd_setup_server(char *execname, char **argv)
 	max_servers_set = 1;
 
 	(void) thr_keycreate(&lookup_state_key, NULL);
-	(void) sema_init(&common_sema,
-			frontend_cfg_g.common_worker_threads,
-			USYNC_THREAD, 0);
+	(void) sema_init(&common_sema, frontend_cfg_g.common_worker_threads,
+	    USYNC_THREAD, 0);
 
 	/* Establish server thread pool */
 	(void) door_server_create(server_create);
@@ -1059,7 +1080,7 @@ _nscd_setup_server(char *execname, char **argv)
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_keycreate (server thread): %s\n",
-			strerror(errnum));
+		    strerror(errnum));
 		return (-1);
 	}
 
@@ -1077,16 +1098,16 @@ _nscd_setup_server(char *execname, char **argv)
 		return (fd);
 
 	/* bind to file system */
-	if (is_system_labeled()) {
+	if (is_system_labeled() && (getzoneid() == GLOBAL_ZONEID)) {
 		if (stat(TSOL_NAME_SERVICE_DOOR, &buf) < 0) {
 			int newfd;
 			if ((newfd = creat(TSOL_NAME_SERVICE_DOOR, 0444)) < 0) {
 				errnum = errno;
 				_NSCD_LOG(NSCD_LOG_FRONT_END,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "Cannot create %s: %s\n",
-					TSOL_NAME_SERVICE_DOOR,
-					strerror(errnum));
+				    TSOL_NAME_SERVICE_DOOR,
+				    strerror(errnum));
 				bind_failed = 1;
 			}
 			(void) close(newfd);
@@ -1095,10 +1116,9 @@ _nscd_setup_server(char *execname, char **argv)
 			if (errno != EEXIST) {
 				errnum = errno;
 				_NSCD_LOG(NSCD_LOG_FRONT_END,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "Cannot symlink %s: %s\n",
-					NAME_SERVICE_DOOR,
-					strerror(errnum));
+				    NAME_SERVICE_DOOR, strerror(errnum));
 				bind_failed = 1;
 			}
 		}
@@ -1108,7 +1128,7 @@ _nscd_setup_server(char *execname, char **argv)
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 			(me, "Cannot create %s: %s\n", NAME_SERVICE_DOOR,
-				strerror(errnum));
+			    strerror(errnum));
 			bind_failed = 1;
 		}
 		(void) close(newfd);
@@ -1121,11 +1141,10 @@ _nscd_setup_server(char *execname, char **argv)
 
 	if (fattach(fd, NAME_SERVICE_DOOR) < 0) {
 		if ((errno != EBUSY) ||
-		(fdetach(NAME_SERVICE_DOOR) <  0) ||
-		(fattach(fd, NAME_SERVICE_DOOR) < 0)) {
+		    (fdetach(NAME_SERVICE_DOOR) <  0) ||
+		    (fattach(fd, NAME_SERVICE_DOOR) < 0)) {
 			errnum = errno;
-			_NSCD_LOG(NSCD_LOG_FRONT_END,
-				NSCD_LOG_LEVEL_ERROR)
+			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 			(me, "fattach: %s\n", strerror(errnum));
 			(void) door_revoke(fd);
 			return (-1);
@@ -1136,11 +1155,11 @@ _nscd_setup_server(char *execname, char **argv)
 	 * kick off routing socket monitor thread
 	 */
 	if (thr_create(NULL, NULL,
-		(void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
+	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create (routing socket monitor): %s\n",
-			strerror(errnum));
+		    strerror(errnum));
 
 		(void) door_revoke(fd);
 		return (-1);
@@ -1190,9 +1209,8 @@ _nscd_setup_child_server(int did)
 	 * Keep DOOR_REFUSE_DESC (self-cred nscds don't fork)
 	 */
 	(void) close(did);
-	if ((fd = door_create(switcher,
-		NAME_SERVICE_DOOR_COOKIE,
-		DOOR_REFUSE_DESC|DOOR_UNREF|DOOR_NO_CANCEL)) < 0) {
+	if ((fd = door_create(switcher, NAME_SERVICE_DOOR_COOKIE,
+	    DOOR_REFUSE_DESC|DOOR_UNREF|DOOR_NO_CANCEL)) < 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_create failed: %s", strerror(errnum));
@@ -1203,11 +1221,11 @@ _nscd_setup_child_server(int did)
 	 * kick off routing socket monitor thread
 	 */
 	if (thr_create(NULL, NULL,
-		(void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
+	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create (routing socket monitor): %s\n",
-			strerror(errnum));
+		    strerror(errnum));
 		(void) door_revoke(fd);
 		return (-1);
 	}
@@ -1257,30 +1275,27 @@ _nscd_cfg_frontend_notify(
 	 */
 
 	if (_nscd_cfg_flag_is_set(dflag, NSCD_CFG_DFLAG_INIT) ||
-		_nscd_cfg_flag_is_set(dflag, NSCD_CFG_DFLAG_GROUP)) {
+	    _nscd_cfg_flag_is_set(dflag, NSCD_CFG_DFLAG_GROUP)) {
 		/*
 		 * group data is received, copy in the
 		 * entire strcture
 		 */
-		if (_nscd_cfg_flag_is_set(pdesc->pflag,
-			NSCD_CFG_PFLAG_GLOBAL))
-			frontend_cfg_g =
-				*(nscd_cfg_global_frontend_t *)data;
+		if (_nscd_cfg_flag_is_set(pdesc->pflag, NSCD_CFG_PFLAG_GLOBAL))
+			frontend_cfg_g = *(nscd_cfg_global_frontend_t *)data;
 		else
 			frontend_cfg[nswdb->index] =
-				*(nscd_cfg_frontend_t *)data;
+			    *(nscd_cfg_frontend_t *)data;
 
 	} else {
 		/*
 		 * individual paramater is received: copy in the
 		 * parameter value.
 		 */
-		if (_nscd_cfg_flag_is_set(pdesc->pflag,
-			NSCD_CFG_PFLAG_GLOBAL))
+		if (_nscd_cfg_flag_is_set(pdesc->pflag, NSCD_CFG_PFLAG_GLOBAL))
 			dp = (char *)&frontend_cfg_g + pdesc->p_offset;
 		else
 			dp = (char *)&frontend_cfg[nswdb->index] +
-				pdesc->p_offset;
+			    pdesc->p_offset;
 		(void) memcpy(dp, data, pdesc->p_size);
 	}
 
@@ -1335,7 +1350,7 @@ _nscd_init_cache_sema(sema_t *sema, char *cache_name)
 
 	if (max_servers == 0)
 		max_servers = frontend_cfg_g.common_worker_threads +
-		frontend_cfg_g.cache_hit_threads;
+		    frontend_cfg_g.cache_hit_threads;
 
 	for (i = 0; i < NSCD_NUM_DB; i++) {
 
@@ -1383,19 +1398,19 @@ rts_mon(void)
 		if (rdlen <= 0) {
 			if (rdlen == 0 || (errno != EINTR && errno != EAGAIN)) {
 				_NSCD_LOG(NSCD_LOG_FRONT_END,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "routing socket read: %s\n",
-					strerror(errno));
+				    strerror(errno));
 				thr_exit(0);
 			}
 			continue;
 		}
 		if (ifam->ifam_version != RTM_VERSION) {
 				_NSCD_LOG(NSCD_LOG_FRONT_END,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "rx unknown version (%d) on "
-					"routing socket.\n",
-					ifam->ifam_version);
+				    "routing socket.\n",
+				    ifam->ifam_version);
 			continue;
 		}
 		switch (ifam->ifam_type) {
@@ -1404,7 +1419,7 @@ rts_mon(void)
 			/* if no ipnodes cache, then nothing to do */
 			idx = get_cache_idx("ipnodes");
 			if (cache_ctx_p[idx] == NULL ||
-				cache_ctx_p[idx]->reaper_on != nscd_true)
+			    cache_ctx_p[idx]->reaper_on != nscd_true)
 				break;
 			nsc_invalidate(cache_ctx_p[idx], NULL, NULL);
 			break;

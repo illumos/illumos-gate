@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <locale.h>
+#include <sys/stat.h>
 #include <tsol/label.h>
 #include <zone.h>
 #include "cache.h"
@@ -129,12 +130,17 @@ main(int argc, char ** argv)
 	/*
 	 * The admin model for TX is that labeled zones are managed
 	 * in global zone where most trusted configuration database
-	 * resides.
+	 * resides. However, nscd will run in any labeled zone if
+	 * file /var/tsol/doors/nscd_per_label exists.
 	 */
 	if (is_system_labeled() && (getzoneid() != GLOBAL_ZONEID)) {
-		(void) fprintf(stderr,
-gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
-		exit(1);
+		struct stat sbuf;
+		if (stat(TSOL_NSCD_PER_LABEL_FILE, &sbuf) < 0) {
+			(void) fprintf(stderr,
+			gettext("With Trusted Extensions nscd runs only in the "
+			    "global zone (if nscd_per_label flag not set)\n"));
+			exit(1);
+		}
 	}
 
 	/*
@@ -142,7 +148,7 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 	 */
 	if (geteuid()) {
 		if (argc != 2 ||
-			(strcmp(argv[1], "-g") && strcmp(argv[1], "-G"))) {
+		    (strcmp(argv[1], "-g") && strcmp(argv[1], "-G"))) {
 			(void) fprintf(stderr,
 	gettext("Must be root to use any option other than -g\n\n"));
 			usage(argv[0]);
@@ -151,7 +157,7 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 		if (_nscd_doorcall(NSCD_PING) != NSS_SUCCESS) {
 			(void) fprintf(stderr,
 			gettext("%s doesn't appear to be running.\n"),
-				argv[0]);
+			    argv[0]);
 			exit(1);
 		}
 		if (_nscd_client_getadmin(argv[1][1]) != 0) {
@@ -215,7 +221,7 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 
 	}
 	if (errflg)
-	    usage(argv[0]);
+		usage(argv[0]);
 
 	/*
 	 *  perform more initialization and load configuration
@@ -262,31 +268,31 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 		case 'p':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'p',
-				getcacheopt(optarg),
-				msg, sizeof (msg)) == -1)
+			    getcacheopt(optarg),
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
 		case 'n':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'n',
-				getcacheopt(optarg),
-				msg, sizeof (msg)) == -1)
+			    getcacheopt(optarg),
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
 		case 'c':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'c',
-				getcacheopt(optarg),
-				msg, sizeof (msg)) == -1)
+			    getcacheopt(optarg),
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
 		case 'i':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'i', NULL,
-				msg, sizeof (msg)) == -1)
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
@@ -294,14 +300,14 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 			doset++;
 			(void) strlcpy(logfile, optarg, 128);
 			(void) _nscd_add_admin_mod(NULL, 'l', optarg,
-				msg, sizeof (msg));
+			    msg, sizeof (msg));
 			break;
 
 		case 'd':
 			doset++;
 			debug_level = atoi(optarg);
 			(void) _nscd_add_admin_mod(NULL, 'd', optarg,
-				msg, sizeof (msg));
+			    msg, sizeof (msg));
 			break;
 
 		case 'S':
@@ -319,16 +325,16 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 		case 'h':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'h',
-				getcacheopt(optarg),
-				msg, sizeof (msg)) == -1)
+			    getcacheopt(optarg),
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
 		case 'e':
 			doset++;
 			if (_nscd_add_admin_mod(optarg, 'e',
-				getcacheopt(optarg),
-				msg, sizeof (msg)) == -1)
+			    getcacheopt(optarg),
+			    msg, sizeof (msg)) == -1)
 				errflg++;
 			break;
 
@@ -344,9 +350,9 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 	}
 
 	if (errflg) {
-	    if (*msg != '\0')
-		(void) fprintf(stderr, "\n%s: %s\n\n", argv[0], msg);
-	    usage(argv[0]);
+		if (*msg != '\0')
+			(void) fprintf(stderr, "\n%s: %s\n\n", argv[0], msg);
+		usage(argv[0]);
 	}
 
 	/*
@@ -374,7 +380,7 @@ gettext("With Trusted Extensions nscd runs only in the global zone.\n"));
 			if (!showstats && !doset) {
 				(void) fprintf(stderr,
 gettext("%s already running.... no administration option specified\n"),
-					argv[0]);
+				    argv[0]);
 			}
 			exit(0);
 		}
@@ -403,7 +409,7 @@ gettext("%s already running.... no administration option specified\n"),
 				(void) strcpy(logfile, "/dev/null");
 
 			(void) _nscd_add_admin_mod(NULL, 'l', logfile,
-				msg, sizeof (msg));
+			    msg, sizeof (msg));
 		}
 
 		/* activate command options */
@@ -421,7 +427,7 @@ gettext("%s already running.... no administration option specified\n"),
 			 * is configured
 			 */
 			_nscd_start_forker(saved_execname, saved_argc,
-				saved_argv);
+			    saved_argv);
 		} else {
 			/*
 			 * daemonize the nscd (forker nscd will also
@@ -449,8 +455,8 @@ gettext("%s already running.... no administration option specified\n"),
 
 		for (ret = NSS_ALTRETRY; ret == NSS_ALTRETRY; )
 			ret = _nscd_doorcall_sendfd(_doorfd,
-				NSCD_IMHERE | (NSCD_FORKER & NSCD_WHOAMI),
-				NULL, 0, NULL);
+			    NSCD_IMHERE | (NSCD_FORKER & NSCD_WHOAMI),
+			    NULL, 0, NULL);
 	}
 
 	for (;;) {
@@ -466,32 +472,32 @@ static void
 usage(char *s)
 {
 	(void) fprintf(stderr,
-		"Usage: %s [-d debug_level] [-l logfilename]\n", s);
+	    "Usage: %s [-d debug_level] [-l logfilename]\n", s);
 	(void) fprintf(stderr,
-		"	[-p cachename,positive_time_to_live]\n");
+	    "	[-p cachename,positive_time_to_live]\n");
 	(void) fprintf(stderr,
-		"	[-n cachename,negative_time_to_live]\n");
+	    "	[-n cachename,negative_time_to_live]\n");
 	(void) fprintf(stderr,
-		"	[-i cachename]\n");
+	    "	[-i cachename]\n");
 	(void) fprintf(stderr,
-		"	[-h cachename,keep_hot_count]\n");
+	    "	[-h cachename,keep_hot_count]\n");
 	(void) fprintf(stderr,
-		"	[-e cachename,\"yes\"|\"no\"] [-g] " \
-		"[-c cachename,\"yes\"|\"no\"]\n");
+	    "	[-e cachename,\"yes\"|\"no\"] [-g] " \
+	    "[-c cachename,\"yes\"|\"no\"]\n");
 	(void) fprintf(stderr,
-		"	[-f configfilename] \n");
+	    "	[-f configfilename] \n");
 	(void) fprintf(stderr,
-		"\n	Supported caches:\n");
+	    "\n	Supported caches:\n");
 	(void) fprintf(stderr,
-		"	  audit_user, auth_attr, bootparams, ethers\n");
+	    "	  audit_user, auth_attr, bootparams, ethers\n");
 	(void) fprintf(stderr,
-		"	  exec_attr, group, hosts, ipnodes, netmasks\n");
+	    "	  exec_attr, group, hosts, ipnodes, netmasks\n");
 	(void) fprintf(stderr,
-		"	  networks, passwd, printers, prof_attr, project\n");
+	    "	  networks, passwd, printers, prof_attr, project\n");
 	(void) fprintf(stderr,
-		"	  protocols, rpc, services, tnrhtp, tnrhdb\n");
+	    "	  protocols, rpc, services, tnrhtp, tnrhdb\n");
 	(void) fprintf(stderr,
-		"	  user_attr\n");
+	    "	  user_attr\n");
 	exit(1);
 }
 
@@ -519,7 +525,7 @@ detachfromtty(void)
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "unable to fork: pid = %d, %s\n",
-		getpid(), strerror(errno));
+		    getpid(), strerror(errno));
 
 		exit(1);
 		break;
