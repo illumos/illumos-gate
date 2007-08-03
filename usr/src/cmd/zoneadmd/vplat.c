@@ -4101,6 +4101,12 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 			zerror(zlogp, B_FALSE, "%s: "
 			    "cannot create a zone from a chrooted "
 			    "environment", "zone_create");
+		} else if (xerr == ZE_LABELINUSE) {
+			char zonename[ZONENAME_MAX];
+			(void) getzonenamebyid(getzoneidbylabel(zlabel),
+			    zonename, ZONENAME_MAX);
+			zerror(zlogp, B_FALSE, "The zone label is already "
+			    "used by the zone '%s'.", zonename);
 		} else {
 			zerror(zlogp, B_TRUE, "%s failed", "zone_create");
 		}

@@ -3479,6 +3479,10 @@ zone_create(const char *zone_name, const char *zone_root,
 			error = EEXIST;
 		else
 			error = EBUSY;
+
+		if (insert_label_hash)
+			error2 = ZE_LABELINUSE;
+
 		goto errout;
 	}
 

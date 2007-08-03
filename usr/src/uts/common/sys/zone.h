@@ -196,6 +196,7 @@ typedef struct {
 #define	ZE_UNKNOWN	0	/* No extended error info */
 #define	ZE_CHROOTED	1	/* tried to zone_create from chroot */
 #define	ZE_AREMOUNTS	2	/* there are mounts within the zone */
+#define	ZE_LABELINUSE	3	/* label is already in use by some other zone */
 
 /* zone_status */
 typedef enum {
