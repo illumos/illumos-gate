@@ -38,8 +38,11 @@ SUNWprivate {
 	brand_get_installopts;
 	brand_get_login_cmd;
 	brand_get_modname;
+	brand_get_postattach;
 	brand_get_postclone;
 	brand_get_postinstall;
+	brand_get_predetach;
+	brand_get_preuninstall;
 	brand_get_user_cmd;
 	brand_get_verify_adm;
 	brand_get_verify_cfg;

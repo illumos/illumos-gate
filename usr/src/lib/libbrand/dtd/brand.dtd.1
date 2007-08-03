@@ -201,6 +201,27 @@
 <!ATTLIST user_cmd>
 
 <!--
+  postattach
+
+    Path to a script that will perform any necessary post-processing on
+    a zone after it has been attached.  The additional argument could be '-F'
+    if this is a forced attach.
+
+    If this program exits with a non-zero exit status, the attach operation
+    will fail.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Root of zone
+      %*	Additional arguments, if any
+
+    It has no attributes.
+-->
+<!ELEMENT postattach	(#PCDATA) >
+<!ATTLIST postattach>
+
+<!--
   postclone
 
     Path to a script that will perform any necessary post-processing on
@@ -235,6 +256,54 @@
 -->
 <!ELEMENT postinstall	(#PCDATA) >
 <!ATTLIST postinstall>
+
+<!--
+  predetach
+
+    Path to a script that will perform any necessary pre-processing on
+    a zone before it is detached.  The additional argument could be '-n'
+    if this is a dry-run detach.
+
+    It is possible that if the zone fails to detach after invoking this
+    program, future attempts to detach the zone will invoke this program again.
+    So this program should be designed to gracefully handle the case where
+    it is run multiple times on the same zone.  If this program exits with
+    a non-zero exit status, the detach operation will fail.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Root of zone
+      %*	Additional arguments, if any
+
+    It has no attributes.
+-->
+<!ELEMENT predetach	(#PCDATA) >
+<!ATTLIST predetach>
+
+<!--
+  preuninstall
+
+    Path to a script that will perform any necessary pre-processing on
+    a zone before it is uninstalled.  The additional argument could be '-F'
+    if this is a forced uninstall.
+
+    It is possible that if the zone fails to uninstall after invoking this
+    program, future attempts to uninstall the zone will invoke this program
+    again.  So this program should be designed to gracefully handle the case
+    where it is run multiple times on the same zone.  If this program exits
+    with a non-zero exit status, the uninstall operation will fail.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Root of zone
+      %*	Additional arguments, if any
+
+    It has no attributes.
+-->
+<!ELEMENT preuninstall	(#PCDATA) >
+<!ATTLIST preuninstall>
 
 <!--
   privilege
@@ -278,6 +347,7 @@
 
 <!ELEMENT brand		(modname?, initname, login_cmd, user_cmd, install,
 			installopts?, boot?, halt?, verify_cfg?, verify_adm?,
-			postclone?, postinstall?, privilege+)>
+			postattach?, postclone?, postinstall?, predetach?,
+			preuninstall?, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>

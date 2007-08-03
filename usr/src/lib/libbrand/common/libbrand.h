@@ -58,12 +58,18 @@ extern int brand_get_halt(brand_handle_t, const char *, const char *,
 extern int brand_get_initname(brand_handle_t, char *, size_t);
 extern int brand_get_install(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
-extern int brand_get_postinstall(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
 extern int brand_get_installopts(brand_handle_t, char *, size_t);
 extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_modname(brand_handle_t, char *, size_t);
+extern int brand_get_postattach(brand_handle_t, const char *, const char *,
+    char *, size_t, int, char **);
 extern int brand_get_postclone(brand_handle_t, const char *, const char *,
+    char *, size_t, int, char **);
+extern int brand_get_postinstall(brand_handle_t, const char *, const char *,
+    char *, size_t, int, char **);
+extern int brand_get_predetach(brand_handle_t, const char *, const char *,
+    char *, size_t, int, char **);
+extern int brand_get_preuninstall(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
 extern int brand_get_user_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_verify_cfg(brand_handle_t, char *, size_t);

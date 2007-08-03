@@ -4455,8 +4455,10 @@ detach_func(int argc, char *argv[])
 	int lockfd;
 	int err, arg;
 	char zonepath[MAXPATHLEN];
+	char cmdbuf[MAXPATHLEN];
 	zone_dochandle_t handle;
 	boolean_t execute = B_TRUE;
+	brand_handle_t bh = NULL;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot detach zone in alternate root"));
@@ -4526,6 +4528,40 @@ detach_func(int argc, char *argv[])
 		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
 		zonecfg_fini_handle(handle);
 		return (Z_ERR);
+	}
+
+	/* Fetch the predetach hook from the brand configuration.  */
+	if ((bh = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_predetach(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+		zerror("invalid brand configuration: missing predetach "
+		    "resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+	brand_close(bh);
+
+	/* If we have a brand predetach hook, run it. */
+	if (strlen(cmdbuf) > EXEC_LEN) {
+		int status;
+
+		/* If this is a dry-run, pass that flag to the hook. */
+		if (!execute && addopt(cmdbuf, 0, "-n", sizeof (cmdbuf))
+		    != Z_OK) {
+			zerror("Predetach command line too long");
+			return (Z_ERR);
+		}
+
+		status = do_subproc(cmdbuf);
+		if (subproc_status(gettext("brand-specific predetach"),
+		    status, B_FALSE) != ZONE_SUBPROC_OK) {
+			return (Z_ERR);
+		}
 	}
 
 	if (execute && grab_lock_file(target_zone, &lockfd) != Z_OK) {
@@ -4872,9 +4908,11 @@ attach_func(int argc, char *argv[])
 	zone_dochandle_t athandle = NULL;
 	char zonepath[MAXPATHLEN];
 	char brand[MAXNAMELEN], atbrand[MAXNAMELEN];
+	char cmdbuf[MAXPATHLEN];
 	boolean_t execute = B_TRUE;
 	boolean_t retried = B_FALSE;
 	char *manifest_path;
+	brand_handle_t bh = NULL;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot attach zone in alternate root"));
@@ -4931,6 +4969,30 @@ attach_func(int argc, char *argv[])
 		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
 		zonecfg_fini_handle(handle);
 		return (Z_ERR);
+	}
+
+	/* Fetch the postattach hook from the brand configuration.  */
+	if ((bh = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_postattach(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+		zerror("invalid brand configuration: missing postattach "
+		    "resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+	brand_close(bh);
+
+	/* If we have a brand postattach hook and the force flag, append it. */
+	if (strlen(cmdbuf) > EXEC_LEN && force) {
+		if (addopt(cmdbuf, 0, "-F", sizeof (cmdbuf)) != Z_OK) {
+			zerror("Postattach command line too long");
+			return (Z_ERR);
+		}
 	}
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
@@ -5032,6 +5094,23 @@ done:
 	if (athandle != NULL)
 		zonecfg_fini_handle(athandle);
 
+	/* If we have a brand postattach hook, run it. */
+	if (err == Z_OK && strlen(cmdbuf) > EXEC_LEN) {
+		int status;
+
+		status = do_subproc(cmdbuf);
+		if (subproc_status(gettext("brand-specific postattach"),
+		    status, B_FALSE) != ZONE_SUBPROC_OK) {
+			if ((err = zone_set_state(target_zone,
+			    ZONE_STATE_CONFIGURED)) != Z_OK) {
+				errno = err;
+				zperror(gettext("could not reset state"),
+				    B_TRUE);
+			}
+			return (Z_ERR);
+		}
+	}
+
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
@@ -5065,9 +5144,11 @@ uninstall_func(int argc, char *argv[])
 {
 	char line[ZONENAME_MAX + 128];	/* Enough for "Are you sure ..." */
 	char rootpath[MAXPATHLEN], zonepath[MAXPATHLEN];
+	char cmdbuf[MAXPATHLEN];
 	boolean_t force = B_FALSE;
 	int lockfd, answer;
 	int err, arg;
+	brand_handle_t bh = NULL;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot uninstall zone in alternate root"));
@@ -5155,6 +5236,39 @@ uninstall_func(int argc, char *argv[])
 		    "subdirectories of %s.\n"), rootpath);
 		(void) zonecfg_find_mounts(rootpath, zfm_print, NULL);
 		return (Z_ERR);
+	}
+
+	/* Fetch the uninstall hook from the brand configuration.  */
+	if ((bh = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_preuninstall(bh, target_zone, zonepath,
+	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL)
+	    != 0) {
+		zerror("invalid brand configuration: missing preuninstall "
+		    "resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+	brand_close(bh);
+
+	if (strlen(cmdbuf) > EXEC_LEN) {
+		int status;
+
+		/* If we have the force flag, append it. */
+		if (force && addopt(cmdbuf, 0, "-F", sizeof (cmdbuf)) != Z_OK) {
+			zerror("Preuninstall command line too long");
+			return (Z_ERR);
+		}
+
+		status = do_subproc(cmdbuf);
+		if (subproc_status(gettext("brand-specific preuninstall"),
+		    status, B_FALSE) != ZONE_SUBPROC_OK) {
+			return (Z_ERR);
+		}
 	}
 
 	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
