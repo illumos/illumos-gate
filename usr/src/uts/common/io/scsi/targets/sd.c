@@ -10225,6 +10225,7 @@ sd_xbuf_init(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	xp->xb_retry_count	= 0;
 	xp->xb_victim_retry_count = 0;
 	xp->xb_ua_retry_count	= 0;
+	xp->xb_nr_retry_count	= 0;
 	xp->xb_sense_bp		= NULL;
 	xp->xb_sense_status	= 0;
 	xp->xb_sense_state	= 0;
@@ -14139,6 +14140,7 @@ sd_mark_rqs_busy(struct sd_lun *un, struct buf *bp)
 	sense_xp->xb_retry_count	= 0;
 	sense_xp->xb_victim_retry_count = 0;
 	sense_xp->xb_ua_retry_count	= 0;
+	sense_xp->xb_nr_retry_count 	= 0;
 	sense_xp->xb_dma_resid  = 0;
 
 	/* Clean up the fields for auto-request sense */
@@ -15811,7 +15813,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 	 * report NOT READY errors only if media is present.
 	 */
 	if ((ISCD(un) && (asc == 0x3A)) ||
-	    (xp->xb_retry_count > 0)) {
+	    (xp->xb_nr_retry_count > 0)) {
 		SD_UPDATE_ERRSTATS(un, sd_harderrs);
 		SD_UPDATE_ERRSTATS(un, sd_rq_ntrdy_err);
 	}
@@ -15819,7 +15821,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 	/*
 	 * Just fail if the "not ready" retry limit has been reached.
 	 */
-	if (xp->xb_retry_count >= un->un_notready_retry_count) {
+	if (xp->xb_nr_retry_count >= un->un_notready_retry_count) {
 		/* Special check for error message printing for removables. */
 		if (un->un_f_has_removable_media && (asc == 0x04) &&
 		    (ascq >= 0x04)) {
@@ -15863,7 +15865,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 			 * warning messages.
 			 *
 			 * Note: This code preserves the legacy behavior of
-			 * comparing xb_retry_count against zero for fibre
+			 * comparing xb_nr_retry_count against zero for fibre
 			 * channel targets instead of comparing against the
 			 * un_reset_retry_count value.  The reason for this
 			 * discrepancy has been so utterly lost beneath the
@@ -15872,7 +15874,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 			 */
 			if (un->un_f_is_fibre == TRUE) {
 				if (((sd_level_mask & SD_LOGMASK_DIAG) ||
-				    (xp->xb_retry_count > 0)) &&
+				    (xp->xb_nr_retry_count > 0)) &&
 				    (un->un_startstop_timeid == NULL)) {
 					scsi_log(SD_DEVINFO(un), sd_label,
 					    CE_WARN, "logical unit not ready, "
@@ -15881,7 +15883,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 				}
 			} else {
 				if (((sd_level_mask & SD_LOGMASK_DIAG) ||
-				    (xp->xb_retry_count >
+				    (xp->xb_nr_retry_count >
 				    un->un_reset_retry_count)) &&
 				    (un->un_startstop_timeid == NULL)) {
 					scsi_log(SD_DEVINFO(un), sd_label,
@@ -15996,7 +15998,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 		 */
 		un->un_startstop_timeid = timeout(sd_start_stop_unit_callback,
 		    un, SD_BSY_TIMEOUT / 2);
-		xp->xb_retry_count++;
+		xp->xb_nr_retry_count++;
 		sd_set_retry_bp(un, bp, 0, kstat_waitq_enter);
 		return;
 
@@ -16035,7 +16037,7 @@ do_retry:
 	 * Retry the command, as some targets may report NOT READY for
 	 * several seconds after being reset.
 	 */
-	xp->xb_retry_count++;
+	xp->xb_nr_retry_count++;
 	si.ssi_severity = SCSI_ERR_RETRYABLE;
 	sd_retry_command(un, bp, SD_RETRIES_NOCHECK, sd_print_sense_msg,
 	    &si, EIO, SD_BSY_TIMEOUT, NULL);
@@ -16408,7 +16410,7 @@ sd_sense_key_aborted_command(struct sd_lun *un, struct buf *bp,
 	 * as some drives report this as a spurious error.
 	 */
 	sd_retry_command(un, bp, SD_RETRIES_STANDARD, sd_print_sense_msg,
-	    &si, EIO, (clock_t)0, NULL);
+	    &si, EIO, drv_usectohz(100000), NULL);
 }
 
 

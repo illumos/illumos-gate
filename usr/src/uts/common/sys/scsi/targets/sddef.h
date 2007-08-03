@@ -1322,6 +1322,7 @@ struct sd_xbuf {
 	short	xb_retry_count;
 	short	xb_victim_retry_count;
 	short	xb_ua_retry_count;	/* unit_attention retry counter */
+	short	xb_nr_retry_count;	/* not ready retry counter */
 
 	/*
 	 * Various status and data used when a RQS command is run on
