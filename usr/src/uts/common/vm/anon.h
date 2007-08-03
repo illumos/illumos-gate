@@ -427,7 +427,7 @@ extern void	anon_array_exit(anon_sync_obj_t *);
 #define	anon_resv(size)			\
 	anon_resvmem((size), 1, curproc->p_zone, 1)
 #define	anon_resv_zone(size, zone)	anon_resvmem((size), 1, zone, 1)
-#define	anon_checkspace(size, zone)	anon_resvmem((size), 0, zone, 1)
+#define	anon_checkspace(size, zone)	anon_resvmem((size), 0, zone, 0)
 #define	anon_try_resv_zone(size, zone)	anon_resvmem((size), 1, zone, 0)
 
 /*

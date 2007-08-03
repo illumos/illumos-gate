@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ tmp_resv(
 	zone = tm->tm_vfsp->vfs_zone;
 	if (pagecreate && ((tm->tm_anonmem + pages > tm->tm_anonmax) ||
 	    (!anon_checkspace(ptob(pages + tmpfs_minfree), zone)) ||
-	    (anon_resv_zone(delta, zone) == 0))) {
+	    (anon_try_resv_zone(delta, zone) == 0))) {
 		return (1);
 	}
 
