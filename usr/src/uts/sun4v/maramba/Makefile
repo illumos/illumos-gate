@@ -65,6 +65,8 @@ check		:=	TARGET= check
 
 modlist: 
 
+def:
+
 lintlib:      unix
 
 IMPLEMENTED_PLATFORM	= SUNW,T5140
