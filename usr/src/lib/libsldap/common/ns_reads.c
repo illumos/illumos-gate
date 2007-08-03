@@ -652,9 +652,9 @@ __s_api_cvtEntry(LDAP	*ld,
 						 * schema mapping found
 						 * then try automount
 						 */
-						mapping =
-						__ns_ldap_getOrigObjectClass(
-						    "automount", vals[k]);
+					mapping =
+					    __ns_ldap_getOrigObjectClass(
+					    "automount", vals[k]);
 
 					if (mapping == NULL) {
 						ap[j]->attrvalue[k] =
@@ -4286,122 +4286,395 @@ setup_acctmgmt_params(ns_ldap_cookie_t *cookie)
 }
 
 /*
- * **** This function needs to be moved to libldap library ****
- * parse_acct_cont_resp_msg() parses the message received by server according to
- * following format:
- * BER encoding:
- * * account is usable *ti*
- * 	+t: tag is 0
- * 	+i: contains the num of seconds before expiration. -1 means no expiry.
- * * account is not usable *t{bbbtiti}*
- *	+t: tag is 1
+ * int get_new_acct_more_info(BerElement *ber,
+ *     AcctUsableResponse_t *acctResp)
+ *
+ * Decode the more_info data from an Account Management control response,
+ * when the account is not usable and when code style is from recent LDAP
+ * servers (see below comments for parse_acct_cont_resp_msg() to get more
+ * details on coding styles and ASN1 description).
+ *
+ * Expected BER encoding: {tbtbtbtiti}
+ *      +t: tag is 0
  *	+b: TRUE if inactive due to account inactivation
+ *      +t: tag is 1
  * 	+b: TRUE if password has been reset
+ *      +t: tag is 2
  * 	+b: TRUE if password is expired
+ *	+t: tag is 3
+ *	+i: contains num of remaining grace, 0 means no grace
+ *	+t: tag is 4
+ *	+i: contains num of seconds before auto-unlock. -1 means acct is locked
+ *		forever (i.e. until reset)
+ *
+ * Asumptions:
+ * - ber is not null
+ * - acctResp is not null and is initialized with default values for the
+ *   fields in its AcctUsableResp.more_info structure
+ * - the ber stream is received in the correct order, per the ASN1 description.
+ *   We do not check this order and make the asumption that it is correct.
+ *   Note that the ber stream may not (and will not in most cases) contain
+ *   all fields.
+ */
+static int
+get_new_acct_more_info(BerElement *ber, AcctUsableResponse_t *acctResp)
+{
+	int		rc = NS_LDAP_SUCCESS;
+	char		errstr[MAXERROR];
+	ber_tag_t	rTag = LBER_DEFAULT;
+	ber_len_t	rLen = 0;
+	ber_int_t	rValue;
+	char		*last;
+	int		berRC = 0;
+
+	/*
+	 * Look at what more_info BER element is/are left to be decoded.
+	 * look at each of them 1 by 1, without checking on their order
+	 * and possible multi values.
+	 */
+	for (rTag = ber_first_element(ber, &rLen, &last);
+	    rTag != LBER_END_OF_SEQORSET;
+	    rTag = ber_next_element(ber, &rLen, last)) {
+
+		berRC = 0;
+		switch (rTag) {
+		case 0 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE:
+			/* inactive */
+			berRC = ber_scanf(ber, "b", &rValue);
+			if (berRC != LBER_ERROR) {
+				(acctResp->AcctUsableResp).more_info.
+				    inactive = (rValue != 0) ? 1 : 0;
+			}
+			break;
+
+		case 1 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE:
+			/* reset */
+			berRC = ber_scanf(ber, "b", &rValue);
+			if (berRC != LBER_ERROR) {
+				(acctResp->AcctUsableResp).more_info.reset
+				    = (rValue != 0) ? 1 : 0;
+			}
+			break;
+
+		case 2 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE:
+			/* expired */
+			berRC = ber_scanf(ber, "b", &rValue);
+			if (berRC != LBER_ERROR) {
+				(acctResp->AcctUsableResp).more_info.expired
+				    = (rValue != 0) ? 1 : 0;
+			}
+			break;
+
+		case 3 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE:
+			/* remaining grace */
+			berRC = ber_scanf(ber, "i", &rValue);
+			if (berRC != LBER_ERROR) {
+				(acctResp->AcctUsableResp).more_info.rem_grace
+				    = rValue;
+			}
+			break;
+
+		case 4 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE:
+			/* seconds before unlock */
+			berRC = ber_scanf(ber, "i", &rValue);
+			if (berRC != LBER_ERROR) {
+				(acctResp->AcctUsableResp).more_info.
+				    sec_b4_unlock = rValue;
+			}
+			break;
+
+		default :
+			(void) sprintf(errstr,
+			    gettext("invalid reason tag 0x%x"), rTag);
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
+			break;
+		}
+		if (berRC == LBER_ERROR) {
+			(void) sprintf(errstr,
+			    gettext("error 0x%x decoding value for "
+			    "tag 0x%x"), berRC, rTag);
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
+		}
+		if (rc != NS_LDAP_SUCCESS) {
+			/* exit the for loop */
+			break;
+		}
+	}
+
+	return (rc);
+}
+
+/*
+ * int get_old_acct_opt_more_info(BerElement *ber,
+ *     AcctUsableResponse_t *acctResp)
+ *
+ * Decode the optional more_info data from an Account Management control
+ * response, when the account is not usable and when code style is from LDAP
+ * server 5.2p4 (see below comments for parse_acct_cont_resp_msg() to get more
+ * details on coding styles and ASN1 description).
+ *
+ * Expected BER encoding: titi}
  *	+t: tag is 2
  *	+i: contains num of remaining grace, 0 means no grace
  *	+t: tag is 3
  *	+i: contains num of seconds before auto-unlock. -1 means acct is locked
  *		forever (i.e. until reset)
+ *
+ * Asumptions:
+ * - ber is a valid BER element
+ * - acctResp is initialized for the fields in its AcctUsableResp.more_info
+ *   structure
  */
+static int
+get_old_acct_opt_more_info(ber_tag_t tag, BerElement *ber,
+    AcctUsableResponse_t *acctResp)
+{
+	int		rc = NS_LDAP_SUCCESS;
+	char		errstr[MAXERROR];
+	ber_len_t	len;
+	int		rem_grace, sec_b4_unlock;
+
+	switch (tag) {
+	case 2:
+		/* decode and maybe 3 is following */
+		if ((tag = ber_scanf(ber, "i", &rem_grace)) == LBER_ERROR) {
+			(void) sprintf(errstr, gettext("Can not get "
+			    "rem_grace"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
+			break;
+		}
+		(acctResp->AcctUsableResp).more_info.rem_grace = rem_grace;
+
+		if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
+			/* this is a success case, break to exit */
+			(void) sprintf(errstr, gettext("No more "
+			    "optional data"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			break;
+		}
+
+		if (tag == 3) {
+			if (ber_scanf(ber, "i", &sec_b4_unlock) == LBER_ERROR) {
+				(void) sprintf(errstr,
+				    gettext("Can not get sec_b4_unlock "
+				    "- 1st case"));
+				syslog(LOG_DEBUG, "libsldap: %s", errstr);
+				rc = NS_LDAP_INTERNAL;
+				break;
+			}
+			(acctResp->AcctUsableResp).more_info.sec_b4_unlock =
+			    sec_b4_unlock;
+		} else { /* unknown tag */
+			(void) sprintf(errstr, gettext("Unknown tag "
+			    "- 1st case"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
+			break;
+		}
+		break;
+
+	case 3:
+		if (ber_scanf(ber, "i", &sec_b4_unlock) == LBER_ERROR) {
+			(void) sprintf(errstr, gettext("Can not get "
+			    "sec_b4_unlock - 2nd case"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
+			break;
+		}
+		(acctResp->AcctUsableResp).more_info.sec_b4_unlock =
+		    sec_b4_unlock;
+		break;
+
+	default: /* unknown tag */
+		(void) sprintf(errstr, gettext("Unknown tag - 2nd case"));
+		syslog(LOG_DEBUG, "libsldap: %s", errstr);
+		rc = NS_LDAP_INTERNAL;
+		break;
+	}
+
+	return (rc);
+}
+
+/*
+ * **** This function needs to be moved to libldap library ****
+ * parse_acct_cont_resp_msg() parses the message received by server according to
+ * following format (ASN1 notation):
+ *
+ *	ACCOUNT_USABLE_RESPONSE::= CHOICE {
+ *		is_available		[0] INTEGER,
+ *				** seconds before expiration **
+ *		is_not_available	[1] more_info
+ *	}
+ *	more_info::= SEQUENCE {
+ *		inactive		[0] BOOLEAN DEFAULT FALSE,
+ *		reset			[1] BOOLEAN DEFAULT FALSE,
+ *		expired			[2] BOOLEAN DEFAULT FALSE,
+ *		remaining_grace		[3] INTEGER OPTIONAL,
+ *		seconds_before_unlock	[4] INTEGER OPTIONAL
+ *	}
+ */
+/*
+ * #define used to make the difference between coding style as done
+ * by LDAP server 5.2p4 and newer LDAP servers. There are 4 values:
+ * - DS52p4_USABLE: 5.2p4 coding style, account is usable
+ * - DS52p4_NOT_USABLE: 5.2p4 coding style, account is not usable
+ * - NEW_USABLE: newer LDAP servers coding style, account is usable
+ * - NEW_NOT_USABLE: newer LDAP servers coding style, account is not usable
+ *
+ * An account would be considered not usable if for instance:
+ * - it's been made inactive in the LDAP server
+ * - or its password was reset in the LDAP server database
+ * - or its password expired
+ * - or the account has been locked, possibly forever
+ */
+#define	DS52p4_USABLE		0x00
+#define	DS52p4_NOT_USABLE	0x01
+#define	NEW_USABLE		0x00 | LBER_CLASS_CONTEXT | LBER_PRIMITIVE
+#define	NEW_NOT_USABLE		0x01 | LBER_CLASS_CONTEXT | LBER_CONSTRUCTED
 static int
 parse_acct_cont_resp_msg(LDAPControl **ectrls, AcctUsableResponse_t *acctResp)
 {
+	int		rc = NS_LDAP_SUCCESS;
 	BerElement	*ber;
-	int 		tag;
+	ber_tag_t 	tag;
 	ber_len_t	len;
-	int		seconds_before_expiry, i;
-	int		inactive, reset, expired, rem_grace, sec_b4_unlock;
+	int		i;
+	char		errstr[MAXERROR];
+	/* used for any coding style when account is usable */
+	int		seconds_before_expiry;
+	/* used for 5.2p4 coding style when account is not usable */
+	int		inactive, reset, expired;
 
-	if (ectrls == NULL)
+	if (ectrls == NULL) {
+		(void) sprintf(errstr, gettext("Invalid ectrls parameter"));
+		syslog(LOG_DEBUG, "libsldap: %s", errstr);
 		return (NS_LDAP_INVALID_PARAM);
+	}
 
 	for (i = 0; ectrls[i] != NULL; i++) {
 		if (strcmp(ectrls[i]->ldctl_oid, NS_LDAP_ACCOUNT_USABLE_CONTROL)
-		    == 0)
-			goto found;
-		/* We have found some other control, ignore & continue */
+		    == 0) {
+			break;
+		}
 	}
-	/* Ldap control is not found */
-	return (NS_LDAP_NOTFOUND);
 
-found:
+	if (ectrls[i] == NULL) {
+		/* Ldap control is not found */
+		(void) sprintf(errstr, gettext("Account Usable Control "
+		    "not found"));
+		syslog(LOG_DEBUG, "libsldap: %s", errstr);
+		return (NS_LDAP_NOTFOUND);
+	}
+
+	/* Allocate a BER element from the control value and parse it. */
 	if ((ber = ber_init(&ectrls[i]->ldctl_value)) == NULL)
 		return (NS_LDAP_MEMORY);
 
 	if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
 		/* Ldap decoding error */
+		(void) sprintf(errstr, gettext("Error decoding 1st tag"));
+		syslog(LOG_DEBUG, "libsldap: %s", errstr);
 		ber_free(ber, 1);
 		return (NS_LDAP_INTERNAL);
 	}
 
 	switch (tag) {
-		case 0: acctResp->choice = 0;
-			if (ber_scanf(ber, "i", &seconds_before_expiry)
-			    == LBER_ERROR) {
-				/* Ldap decoding error */
-				ber_free(ber, 1);
-				return (NS_LDAP_INTERNAL);
-			}
-			(acctResp->AcctUsableResp).seconds_before_expiry =
-			    seconds_before_expiry;
-			ber_free(ber, 1);
-			return (NS_LDAP_SUCCESS);
-		case 1: acctResp->choice = 1;
-			if (ber_scanf(ber, "{bbb", &inactive, &reset, &expired)
-			    == LBER_ERROR) {
-				/* Ldap decoding error */
-				ber_free(ber, 1);
-				return (NS_LDAP_INTERNAL);
-			}
-			(acctResp->AcctUsableResp).more_info.inactive =
-			    inactive;
-			(acctResp->AcctUsableResp).more_info.reset =
-			    reset;
-			(acctResp->AcctUsableResp).more_info.expired =
-			    expired;
+	case DS52p4_USABLE:
+	case NEW_USABLE:
+		acctResp->choice = 0;
+		if (ber_scanf(ber, "i", &seconds_before_expiry)
+		    == LBER_ERROR) {
+			/* Ldap decoding error */
+			(void) sprintf(errstr, gettext("Can not get "
+			    "seconds_before_expiry"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
 			break;
-		default: /* Ldap decoding error */
-			ber_free(ber, 1);
-			return (NS_LDAP_INTERNAL);
-	}
+		}
+		/* ber_scanf() succeeded */
+		(acctResp->AcctUsableResp).seconds_before_expiry =
+		    seconds_before_expiry;
+		break;
 
-	if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
-		ber_free(ber, 1);
-		return (NS_LDAP_SUCCESS);
-	}
-
-	switch (tag) {
-		case 2: if (ber_scanf(ber, "i", &rem_grace) == LBER_ERROR) {
-				ber_free(ber, 1);
-				return (NS_LDAP_INTERNAL);
-			}
-			(acctResp->AcctUsableResp).more_info.rem_grace =
-			    rem_grace;
-			if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
-				ber_free(ber, 1);
-				return (NS_LDAP_SUCCESS);
-			}
-			if (tag == 3)
-				goto timeb4unlock;
-			goto unknowntag;
-		case 3:
-timeb4unlock:
-			if (ber_scanf(ber, "i", &sec_b4_unlock) == LBER_ERROR) {
-				ber_free(ber, 1);
-				return (NS_LDAP_INTERNAL);
-			}
-			(acctResp->AcctUsableResp).more_info.sec_b4_unlock =
-			    sec_b4_unlock;
+	case DS52p4_NOT_USABLE:
+		acctResp->choice = 1;
+		if (ber_scanf(ber, "{bbb", &inactive, &reset, &expired)
+		    == LBER_ERROR) {
+			/* Ldap decoding error */
+			(void) sprintf(errstr, gettext("Can not get "
+			    "inactive/reset/expired"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			rc = NS_LDAP_INTERNAL;
 			break;
-		default:
-unknowntag:
-			ber_free(ber, 1);
-			return (NS_LDAP_INTERNAL);
+		}
+		/* ber_scanf() succeeded */
+		(acctResp->AcctUsableResp).more_info.inactive =
+		    ((inactive == 0) ? 0 : 1);
+		(acctResp->AcctUsableResp).more_info.reset =
+		    ((reset == 0) ? 0 : 1);
+		(acctResp->AcctUsableResp).more_info.expired =
+		    ((expired == 0) ? 0 : 1);
+		(acctResp->AcctUsableResp).more_info.rem_grace = 0;
+		(acctResp->AcctUsableResp).more_info.sec_b4_unlock = 0;
+
+		if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
+			/* this is a success case, break to exit */
+			(void) sprintf(errstr, gettext("No optional data"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			break;
+		}
+
+		/*
+		 * Look at what optional more_info BER element is/are
+		 * left to be decoded.
+		 */
+		rc = get_old_acct_opt_more_info(tag, ber, acctResp);
+		break;
+
+	case NEW_NOT_USABLE:
+		acctResp->choice = 1;
+		/*
+		 * Recent LDAP servers won't code more_info data for default
+		 * values (see above comments on ASN1 description for what
+		 * fields have default values & what fields are optional).
+		 */
+		(acctResp->AcctUsableResp).more_info.inactive = 0;
+		(acctResp->AcctUsableResp).more_info.reset = 0;
+		(acctResp->AcctUsableResp).more_info.expired = 0;
+		(acctResp->AcctUsableResp).more_info.rem_grace = 0;
+		(acctResp->AcctUsableResp).more_info.sec_b4_unlock = 0;
+
+		if (len == 0) {
+			/*
+			 * Nothing else to decode; this is valid and we
+			 * use default values set above.
+			 */
+			(void) sprintf(errstr, gettext("more_info is "
+			    "empty, using default values"));
+			syslog(LOG_DEBUG, "libsldap: %s", errstr);
+			break;
+		}
+
+		/*
+		 * Look at what more_info BER element is/are left to
+		 * be decoded.
+		 */
+		rc = get_new_acct_more_info(ber, acctResp);
+		break;
+
+	default:
+		(void) sprintf(errstr, gettext("unknwon coding style "
+		    "(tag: 0x%x)"), tag);
+		syslog(LOG_DEBUG, "libsldap: %s", errstr);
+		rc = NS_LDAP_INTERNAL;
+		break;
 	}
 
 	ber_free(ber, 1);
-	return (NS_LDAP_SUCCESS);
+	return (rc);
 }
 
 /*
