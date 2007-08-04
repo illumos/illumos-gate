@@ -39,6 +39,7 @@
 #include <sys/sysmacros.h>
 #include <vm/page.h>
 
+#include "dist.h"
 #include "kmem.h"
 #include "leaky.h"
 
@@ -353,12 +354,12 @@ kmem_slabs_print_dist(uint_t *ks_bucket, size_t buffers_per_slab,
 	 */
 	complete[0] = buffers_per_slab;
 	complete[1] = buffers_per_slab + 1;
-	distarray = mdb_dist_linear(buckets - 1, 1, buffers_per_slab - 1);
+	distarray = dist_linear(buckets - 1, 1, buffers_per_slab - 1);
 
 	mdb_printf("%*s\n", LABEL_WIDTH, "Allocated");
-	mdb_dist_print_header("Buffers", LABEL_WIDTH, "Slabs");
+	dist_print_header("Buffers", LABEL_WIDTH, "Slabs");
 
-	mdb_dist_print_bucket(complete, 0, ks_bucket, total, LABEL_WIDTH);
+	dist_print_bucket(complete, 0, ks_bucket, total, LABEL_WIDTH);
 	/*
 	 * Print bucket ranges in descending order after the first bucket for
 	 * completely allocated slabs, so a person can see immediately whether
@@ -367,8 +368,7 @@ kmem_slabs_print_dist(uint_t *ks_bucket, size_t buffers_per_slab,
 	 * extra terminating bucket.
 	 */
 	for (i = buckets - 2; i >= 0; i--) {
-		mdb_dist_print_bucket(distarray, i, ks_bucket, total,
-		    LABEL_WIDTH);
+		dist_print_bucket(distarray, i, ks_bucket, total, LABEL_WIDTH);
 	}
 	mdb_printf("\n");
 }

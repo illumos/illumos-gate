@@ -50,6 +50,8 @@ include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
+dmod/$(MODULE) := LDLIBS += -lm
+
 #
 # We are not actually hardwiring some dependency on i86pc, we just need to
 # include sys/param.h with _MACHDEP defined, and this forces the inclusion of

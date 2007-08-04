@@ -30,6 +30,7 @@ MDBTGT = proc
 MODSRCS_DIR = ../../../common/modules/genunix
 
 COMMONSRCS = \
+	dist.c \
 	libumem.c \
 	misc.c \
 	umem.c
@@ -59,6 +60,8 @@ CPPFLAGS += -I$(MODSRCS_DIR)
 include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
 include ../../../Makefile.module
+
+dmod/$(MODULE) := LDLIBS += -lm
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<

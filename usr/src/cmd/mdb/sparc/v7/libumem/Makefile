@@ -30,6 +30,7 @@ MDBTGT = proc
 MODSRCS_DIR = ../../../common/modules/genunix
 
 MODSRCS = \
+	dist.c \
 	kgrep.c \
 	leaky.c \
 	leaky_subr.c \
@@ -45,6 +46,8 @@ CPPFLAGS += -I$(MODSRCS_DIR)
 
 include ../../Makefile.sparcv7
 include ../../../Makefile.module
+
+dmod/$(MODULE) := LDLIBS += -lm
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<

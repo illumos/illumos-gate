@@ -37,6 +37,7 @@ GENUNIX_SRCS =		\
 	ctxop.c		\
 	cyclic.c	\
 	devinfo.c	\
+	dist.c		\
 	findstack.c	\
 	fm.c		\
 	genunix.c	\

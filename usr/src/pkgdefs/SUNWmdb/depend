@@ -50,4 +50,14 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
-P SUNWlibms	Math & Microtasking Libraries (Usr)
+
+#
+# MDB is very carefully written to be independent of as many things on
+# the system as possible. Do not add any dependencies without adequate
+# review and discussion on mdb-discuss@opensolaris.org.
+
+#
+# MDB has dynamic module loading and failure handling. If you load a
+# module which needs a package that is not installed, then you get a
+# nice failure message about that. MDB's package should not depend at
+# install time on other packages, regardless of module dependencies.

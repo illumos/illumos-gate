@@ -35,6 +35,7 @@
 
 #include "misc.h"
 #include "leaky.h"
+#include "dist.h"
 
 #include "umem_pagesize.h"
 
@@ -3669,14 +3670,13 @@ umem_malloc_print_dist(uint_t *um_bucket, size_t minmalloc, size_t maxmalloc,
 	}
 
 	if (geometric)
-		distarray = mdb_dist_geometric(buckets, minb, maxb,
-		    minbucketsize);
+		distarray = dist_geometric(buckets, minb, maxb, minbucketsize);
 	else
-		distarray = mdb_dist_linear(buckets, minb, maxb);
+		distarray = dist_linear(buckets, minb, maxb);
 
-	mdb_dist_print_header("malloc size", 11, "count");
+	dist_print_header("malloc size", 11, "count");
 	for (i = 0; i < buckets; i++) {
-		mdb_dist_print_bucket(distarray, i, um_bucket, um_malloc, 11);
+		dist_print_bucket(distarray, i, um_bucket, um_malloc, 11);
 	}
 	mdb_printf("\n");
 }
