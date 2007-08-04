@@ -5973,10 +5973,6 @@ ipftuneable_t lcl_ipf_tuneables[] = {
 			0,		IPFT_WRDISABLED },
 	{ { NULL }, "fr_defnaticmpage",	1,	0x7fffffff,
 			0,	IPFT_WRDISABLED },
-	{ { NULL },	"nat_flush_lvl_hi",	1,	100,
-			0,		0 },
-	{ { NULL },	"nat_flush_lvl_lo",	1,	100,
-			0,		0 },
 	/* frag */
 	{ { NULL },	"ipfr_size",		1,	0x7fffffff,
 			0,		IPFT_WRDISABLED },
@@ -6065,8 +6061,6 @@ static void ipftuneable_setdefs(ipf_stack_t *ifs)
 	ifs->ifs_fr_defnatage = DEF_NAT_AGE;
 	ifs->ifs_fr_defnatipage = 120;		/* 60 seconds */
 	ifs->ifs_fr_defnaticmpage = 6;		/* 3 seconds */
-	ifs->ifs_nat_flush_lvl_hi = NAT_FLUSH_HI;
-	ifs->ifs_nat_flush_lvl_lo = NAT_FLUSH_LO;
 
 #ifdef IPFILTER_LOG
 	/* it comes from fr_loginit() in IPF log */
@@ -6145,8 +6139,6 @@ ipftuneable_alloc(ipf_stack_t *ifs)
     TUNE_SET(ifs, "nat_logging", ifs_nat_logging);
     TUNE_SET(ifs, "fr_defnatage", ifs_fr_defnatage);
     TUNE_SET(ifs, "fr_defnaticmpage", ifs_fr_defnaticmpage);
-    TUNE_SET(ifs, "nat_flush_lvl_hi", ifs_nat_flush_lvl_hi);
-    TUNE_SET(ifs, "nat_flush_lvl_lo", ifs_nat_flush_lvl_lo);
     TUNE_SET(ifs, "ipfr_size", ifs_ipfr_size);
     TUNE_SET(ifs, "fr_ipfrttl", ifs_fr_ipfrttl);
 #ifdef IPFILTER_LOG

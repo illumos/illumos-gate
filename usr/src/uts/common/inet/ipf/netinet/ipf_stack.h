@@ -227,10 +227,6 @@ struct ipf_stack {
 	natstat_t		ifs_nat_stats;
 	int			ifs_fr_nat_lock;
 	int			ifs_fr_nat_init;
-	uint_t			ifs_nat_flush_lvl_hi;
-	uint_t			ifs_nat_flush_lvl_lo;
-	ulong_t			ifs_nat_last_force_flush;
-	int			ifs_nat_doflush;
 
 	/* ip_pool.c */
 	ip_pool_stat_t		ifs_ipoolstat;
