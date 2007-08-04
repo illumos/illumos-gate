@@ -350,6 +350,8 @@ static const struct amd_rev_mapent {
 #define	MWAIT_NUM_SUBC_STATES(cpi, c_state)			\
 	BITX((cpi)->cpi_std[5].cp_edx, c_state + 3, c_state)
 
+static void intel_cpuid_4_cache_info(void *, struct cpuid_info *);
+
 static void
 synth_amd_info(struct cpuid_info *cpi)
 {
@@ -2683,11 +2685,22 @@ intel_walk_cacheinfo(struct cpuid_info *cpi,
 
 	if ((dp = cpi->cpi_cacheinfo) == NULL)
 		return;
-	for (i = 0; i < cpi->cpi_ncache; i++, dp++)
+	for (i = 0; i < cpi->cpi_ncache; i++, dp++) {
+		/*
+		 * For overloaded descriptor 0x49 we use cpuid function 4
+		 * if supported by the current processor, to update
+		 * cache information.
+		 */
+		if (*dp == 0x49 && cpi->cpi_maxeax >= 0x4) {
+			intel_cpuid_4_cache_info(arg, cpi);
+			continue;
+		}
+
 		if ((ct = find_cacheent(intel_ctab, *dp)) != NULL) {
 			if (func(arg, ct) != 0)
 				break;
 		}
+	}
 }
 
 /*
@@ -2738,6 +2751,42 @@ add_cacheent_props(void *arg, const struct cachetab *ct)
 		    ct->ct_line_size);
 	add_cache_prop(devi, ct->ct_label, size_str, ct->ct_size);
 	return (0);
+}
+
+/*
+ * Add L2 or L3 cache-information using cpuid function 4. This
+ * function is called from intel_walk_cacheinfo() when descriptor
+ * 0x49 is encountered.
+ */
+static void
+intel_cpuid_4_cache_info(void *arg, struct cpuid_info *cpi)
+{
+	uint32_t level, i;
+
+	struct cachetab ct;
+
+	for (i = 0; i < cpi->cpi_std_4_size; i++) {
+		level = CPI_CACHE_LVL(cpi->cpi_std_4[i]);
+
+		if (level == 2 || level == 3) {
+			ct.ct_assoc = CPI_CACHE_WAYS(cpi->cpi_std_4[i]) + 1;
+			ct.ct_line_size =
+			    CPI_CACHE_COH_LN_SZ(cpi->cpi_std_4[i]) + 1;
+			ct.ct_size = ct.ct_assoc *
+			    (CPI_CACHE_PARTS(cpi->cpi_std_4[i]) + 1) *
+			    ct.ct_line_size *
+			    (cpi->cpi_std_4[i]->cp_ecx + 1);
+
+			if (level == 2) {
+				ct.ct_label = l2_cache_str;
+			} else if (level == 3) {
+				ct.ct_label = l3_cache_str;
+			}
+
+			(void) add_cacheent_props(arg,
+			    (const struct cachetab *) (&ct));
+		}
+	}
 }
 
 static const char fully_assoc[] = "fully-associative?";
