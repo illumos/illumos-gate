@@ -118,14 +118,13 @@ struct vnodeops *mntdummyvnodeops;
 static int	mntmount(), mntunmount(), mntroot(), mntstatvfs();
 
 static void
-mntinitrootnode(mntnode_t *mnp)
+mntinitrootnode(mntnode_t *mnp, struct vfs *vfsp)
 {
 	struct vnode *vp;
 
 	bzero((caddr_t)mnp, sizeof (*mnp));
 
 	mnp->mnt_vnode = vn_alloc(KM_SLEEP);
-	mntdummyvp = vn_alloc(KM_SLEEP);
 
 	vp = MTOV(mnp);
 
@@ -133,10 +132,23 @@ mntinitrootnode(mntnode_t *mnp)
 	vn_setops(vp, mntvnodeops);
 	vp->v_type = VREG;
 	vp->v_data = (caddr_t)mnp;
-	mntdummyvp->v_flag = VNOMOUNT|VNOMAP|VNOSWAP|VNOCACHE;
-	vn_setops(mntdummyvp, mntdummyvnodeops);
-	mntdummyvp->v_type = VREG;
-	mntdummyvp->v_data = (caddr_t)mnp;
+
+	/*
+	 * Only one global mntdummyvp is required, which
+	 * needs to get created when the global zone(first zone)
+	 * gets mounted. Since this module does not have a _fini routine,
+	 * the mntdummyvp vnode does not have to be freed.
+	 */
+	if (mntdummyvp == NULL) {
+		struct vnode *tvp;
+		tvp = vn_alloc(KM_SLEEP);
+		tvp->v_flag = VNOMOUNT|VNOMAP|VNOSWAP|VNOCACHE;
+		vn_setops(tvp, mntdummyvnodeops);
+		tvp->v_type = VREG;
+		tvp->v_data = (caddr_t)mnp;
+		tvp->v_vfsp = vfsp;
+		mntdummyvp = tvp;
+	}
 }
 
 static int
@@ -247,9 +259,8 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	mutex_exit(&mnt_minor_lock);
 	vfs_make_fsid(&vfsp->vfs_fsid, vfsp->vfs_dev, mntfstype);
 	vfsp->vfs_bsize = DEV_BSIZE;
-	mntinitrootnode(mnp);
+	mntinitrootnode(mnp, vfsp);
 	MTOV(mnp)->v_vfsp = vfsp;
-	mntdummyvp->v_vfsp = vfsp;
 	mnp->mnt_mountvp = mvp;
 	vn_exists(MTOV(mnp));
 	return (0);
@@ -264,22 +275,6 @@ mntunmount(struct vfs *vfsp, int flag, struct cred *cr)
 
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);
-
-	/*
-	 * Ensure that the dummy vnode is not being referenced.
-	 */
-	if (mntdummyvp) {
-		mutex_enter(&mntdummyvp->v_lock);
-		if (vp->v_count > 1) {
-			mutex_exit(&mntdummyvp->v_lock);
-			return (EBUSY);
-		}
-
-		mutex_exit(&mntdummyvp->v_lock);
-		vn_invalid(mntdummyvp);
-		vn_free(mntdummyvp);
-		mntdummyvp = NULL;
-	}
 
 	/*
 	 * Ensure that no /mnttab vnodes are in use on this mount point.
