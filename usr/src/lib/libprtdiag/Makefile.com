@@ -46,7 +46,7 @@ IFLAGS		+= -I $(UTSBASE)/sun4u/sunfire
 IFLAGS		+= -I $(UTSBASE)/sun4u/serengeti
 CPPFLAGS	= $(IFLAGS) $(CPPFLAGS.master)
 CFLAGS		+= $(CCVERBOSE)
-LDLIBS		+= -lc -lkstat -lm
+LDLIBS		+= -lc -lkstat
 DYNFLAGS	+= -Wl,-f/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
 
 # There should be a mapfile here

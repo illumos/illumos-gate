@@ -41,7 +41,7 @@ OBJECTS		= io.o cpu.o memory.o kstat.o prom.o \
 include		../../Makefile.com
 
 SRCS		= $(OBJECTS:%.o=../../common/%.c)
-LDLIBS		+= -lpicl
+LDLIBS		+= -lpicl -lm
 
 #
 # used for creating message catalogue files
