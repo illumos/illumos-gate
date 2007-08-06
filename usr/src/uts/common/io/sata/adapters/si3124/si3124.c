@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2810,6 +2810,9 @@ si_initialize_controller(si_ctl_state_t *si_ctlp)
 
 		/* Clear Port Reset. */
 		ddi_put32(si_ctlp->sictl_port_acc_handle,
+			(uint32_t *)PORT_CONTROL_SET(si_ctlp, port),
+			PORT_CONTROL_SET_BITS_PORT_RESET);
+		ddi_put32(si_ctlp->sictl_port_acc_handle,
 			(uint32_t *)PORT_CONTROL_CLEAR(si_ctlp, port),
 			PORT_CONTROL_CLEAR_BITS_PORT_RESET);
 
@@ -3511,12 +3514,12 @@ si_intr(caddr_t arg1, caddr_t arg2)
 		if (port_intr_status & INTR_COMMAND_COMPLETE) {
 			(void) si_intr_command_complete(si_ctlp, si_portp,
 							port);
+		} else {
+			/* Clear the interrupts */
+			ddi_put32(si_ctlp->sictl_port_acc_handle,
+			    (uint32_t *)(PORT_INTERRUPT_STATUS(si_ctlp, port)),
+			    port_intr_status & INTR_MASK);
 		}
-
-		/* Clear the interrupts */
-		ddi_put32(si_ctlp->sictl_port_acc_handle,
-			(uint32_t *)(PORT_INTERRUPT_STATUS(si_ctlp, port)),
-			port_intr_status & INTR_MASK);
 
 		/*
 		 * Note that we did not clear the interrupt for command
@@ -3610,7 +3613,7 @@ si_intr_command_complete(
 	if (!si_portp->siport_pending_tags) {
 		/*
 		 * Spurious interrupt. Nothing to be done.
-		 * Do read the slot_status to clear the interrupt.
+		 * The interrupt was cleared when slot_status was read.
 		 */
 		mutex_exit(&si_portp->siport_mutex);
 		return (SI_SUCCESS);
