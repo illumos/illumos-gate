@@ -584,9 +584,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 			}
 
 			if (alarm_type == SSAT_VISIBLE) {
-			    ADD_NODE(PICL_CLASS_LED)
+				ADD_NODE(PICL_CLASS_LED)
 			} else {
-			    ADD_NODE(PICL_CLASS_ALARM)
+				ADD_NODE(PICL_CLASS_ALARM)
 			}
 
 			add_prop(nodeh, &proph, node_name, row, PP_STATE,
@@ -1210,7 +1210,7 @@ add_thresholds(picl_nodehdl_t node, int row, int *snmp_syserr_p)
 	if (enabled & UPPER_NON_CRITICAL) {
 		threshold(node,
 		    OID_sunPlatNumericSensorUpperThresholdNonCritical, row,
-		    PICL_PROP_HIGH_POWER_OFF, snmp_syserr_p);
+		    PICL_PROP_HIGH_WARNING, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 	}
 	if (enabled & UPPER_CRITICAL) {
@@ -1222,7 +1222,7 @@ add_thresholds(picl_nodehdl_t node, int row, int *snmp_syserr_p)
 	if (enabled & UPPER_FATAL) {
 		threshold(node,
 		    OID_sunPlatNumericSensorUpperThresholdFatal, row,
-		    PICL_PROP_HIGH_WARNING, snmp_syserr_p);
+		    PICL_PROP_HIGH_POWER_OFF, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 	}
 }
@@ -1417,8 +1417,8 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 
 	case PP_BATT_STATUS:
 		ret = add_volatile_prop(nodeh, PICL_PROP_BATTERY_STATUS,
-			PICL_PTYPE_CHARSTRING, PICL_READ, MAX_BATTERYSTATUS_LEN,
-			read_volprop, NULL, php);
+		    PICL_PTYPE_CHARSTRING, PICL_READ, MAX_BATTERYSTATUS_LEN,
+		    read_volprop, NULL, php);
 		if (ret == PICL_SUCCESS) {
 			save_volprop(*php, OID_sunPlatBatteryStatus, row,
 			    VPT_BATTERYSTATUS);
@@ -1567,9 +1567,9 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		    row, &phys_descr, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 		if ((ret == 0) && phys_descr && *phys_descr) {
-		    (void) add_string_prop(nodeh,
-			PICL_PROP_PHYS_DESCRIPTION, phys_descr);
-		    free((void *) phys_descr);
+			(void) add_string_prop(nodeh,
+			    PICL_PROP_PHYS_DESCRIPTION, phys_descr);
+			free((void *) phys_descr);
 		}
 		break;
 
@@ -1653,7 +1653,6 @@ snmpplugin_log_append(void)
 	    (snmpplugin_dbuf + snmpplugin_dbuf_sz)) {
 		snmpplugin_dbuf_realloc();
 		if (snmpplugin_dbuf == NULL) {
-			(void) mutex_unlock(&snmpplugin_dbuf_lock);
 			return;
 		}
 	}

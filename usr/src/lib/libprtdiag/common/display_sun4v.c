@@ -45,6 +45,8 @@
 #include <sys/dkio.h>
 #include <sys/systeminfo.h>
 #include <picldefs.h>
+#include <math.h>
+#include <errno.h>
 #include "pdevinfo.h"
 #include "display.h"
 #include "display_sun4v.h"
@@ -427,20 +429,20 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 		(void) strlcpy(pci_card.model, model, sizeof (pci_card.model));
 
 		/* Print NAC name */
-		log_printf("%-12s", pci_card.status);
+		log_printf("%-18s", pci_card.status);
 		/* Print IO Type */
 		log_printf("%-6s", pci_card.bus_type);
 		/* Printf Card Name */
-		log_printf("%-46s", pci_card.name);
+		log_printf("%-44s", pci_card.name);
 		/* Print Card Model */
 		log_printf("%-8s", pci_card.model);
 		log_printf("\n");
 		/* Print Status */
-		log_printf("%-12s", val);
+		log_printf("%-18s", val);
 		/* Print IO Type */
 		log_printf("%-6s", "");
 		/* Print Parent Path */
-		log_printf("%-46s", pci_card.notes);
+		log_printf("%-44s", pci_card.notes);
 		log_printf("\n");
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
@@ -456,22 +458,22 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 void
 sun4v_display_pci(picl_nodehdl_t plafh)
 {
-	char *fmt = "%-11s %-5s %-45s %-8s";
+	char *fmt = "%-17s %-5s %-44s %-8s";
 	/* Have we printed the column headings? */
 	static int banner = FALSE;
 
 	if (banner == FALSE) {
 		log_printf("\n");
-		log_printf("============================");
+		log_printf("================================");
 		log_printf(" IO Devices ");
-		log_printf("============================");
+		log_printf("================================");
 		log_printf("\n");
 		log_printf(fmt, "Slot +", "Bus", "Name +", "Model", 0);
 		log_printf("\n");
 		log_printf(fmt, "Status", "Type", "Path", "", 0);
 		log_printf("\n");
 		log_printf("---------------------------------"
-		    "------------------------------------\n");
+		    "-------------------------------------------\n");
 		banner = TRUE;
 	}
 
@@ -933,6 +935,7 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	char val[PICL_PROPNAMELEN_MAX];
 	picl_nodehdl_t parenth;
 	char *names[PARENT_NAMES];
+	char *base_units[PICL_PROPNAMELEN_MAX];
 	char *loc;
 	int i;
 	char *prop;
@@ -940,6 +943,8 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	int32_t lo_warning, lo_shutdown;
 	int32_t hi_warning, hi_shutdown;
 	int32_t current_val;
+	int32_t exponent;
+	double display_val;
 
 	if (class_node_found == 0) {
 		class_node_found = 1;
@@ -981,7 +986,7 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		}
 	i = 0;
 	while (err == PICL_SUCCESS) {
-		if (parenth == chassish || parenth == phyplatformh)
+		if (parenth == phyplatformh)
 			break;
 		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
 		    names[i++], PICL_PROPNAMELEN_MAX);
@@ -1004,7 +1009,7 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		(void) strlcat(loc, names[i],
 		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
-	log_printf("%-21s", loc);
+	log_printf("%-31s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)
 		free(names[i]);
 	free(loc);
@@ -1035,21 +1040,34 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_SHUTDOWN,
 	    &hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
 		hi_shutdown = INVALID_THRESHOLD;
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_EXPONENT,
+	    &exponent, sizeof (exponent)) != PICL_SUCCESS)
+		exponent = 0;
+	if (exponent == 0)
+		display_val = (double)current_val;
+	else
+		display_val = (double)current_val *
+		    pow((double)10, (double)exponent);
+	err = picl_get_propval_by_name(nodeh,
+	    PICL_PROP_BASE_UNITS, base_units,
+	    sizeof (base_units));
+	if (err != PICL_SUCCESS)
+		base_units[0] = '\0';
 
 	if ((lo_shutdown != INVALID_THRESHOLD &&
 	    current_val <= lo_shutdown) ||
 	    (hi_shutdown != INVALID_THRESHOLD &&
 	    current_val >= hi_shutdown)) {
 		log_printf("%-s", "failed (");
-		log_printf("%-d", current_val);
-		log_printf("%-s", ")");
+		log_printf("%-.*f", abs(exponent), display_val);
+		log_printf("%-s %s", base_units, ")");
 	} else if ((lo_warning != INVALID_THRESHOLD &&
 	    current_val <= lo_warning) ||
 	    (hi_warning != INVALID_THRESHOLD &&
 	    current_val >= hi_warning)) {
 		log_printf("%-s", "warning (");
-		log_printf("%-d", current_val);
-		log_printf("%-s", ")");
+		log_printf("%-.*f", abs(exponent), display_val);
+		log_printf("%-s %s", base_units, ")");
 	} else
 		log_printf("%-s", "ok");
 
@@ -1108,7 +1126,7 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 		}
 	i = 0;
 	while (err == PICL_SUCCESS) {
-		if (parenth == chassish || parenth == phyplatformh)
+		if (parenth == phyplatformh)
 			break;
 		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
 		    names[i++], PICL_PROPNAMELEN_MAX);
@@ -1131,7 +1149,7 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 		(void) strlcat(loc, names[i],
 		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
-	log_printf("%-21s", loc);
+	log_printf("%-31s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)
 		free(names[i]);
 	free(loc);
@@ -1153,7 +1171,7 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 static void
 sun4v_env_print_fan_sensors()
 {
-	char *fmt = "%-20s %-14s %-10s\n";
+	char *fmt = "%-30s %-14s %-10s\n";
 	/*
 	 * If there isn't any fan sensor node, return now.
 	 */
@@ -1172,9 +1190,9 @@ sun4v_env_print_fan_sensors()
 			return;
 		}
 	}
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	log_printf(fmt, "Location", "Sensor", "Status", 0);
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_RPM_SENSOR,
 	    PICL_PROP_SPEED, sun4v_env_print_sensor_callback);
 }
@@ -1182,7 +1200,7 @@ sun4v_env_print_fan_sensors()
 static void
 sun4v_env_print_fan_indicators()
 {
-	char *fmt = "%-20s %-14s %-10s\n";
+	char *fmt = "%-30s %-14s %-10s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_RPM_INDICATOR, (void *)PICL_CLASS_RPM_INDICATOR,
 	    sun4v_env_print_indicator_callback);
@@ -1198,17 +1216,17 @@ sun4v_env_print_fan_indicators()
 			return;
 		}
 	}
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	log_printf(fmt, "Location", "Sensor", "Condition", 0);
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_RPM_INDICATOR,
-	    PICL_CLASS_RPM_INDICATOR, sun4v_env_print_indicator_callback);
+	    (void *)PICL_PROP_CONDITION, sun4v_env_print_indicator_callback);
 }
 
 static void
 sun4v_env_print_temp_sensors()
 {
-	char *fmt = "%-20s %-14s %-10s\n";
+	char *fmt = "%-30s %-14s %-10s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_TEMPERATURE_SENSOR,
 	    (void *)PICL_PROP_TEMPERATURE,
@@ -1226,9 +1244,9 @@ sun4v_env_print_temp_sensors()
 			return;
 		}
 	}
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	log_printf(fmt, "Location", "Sensor", "Status", 0);
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_TEMPERATURE_SENSOR,
 	    (void *)PICL_PROP_TEMPERATURE, sun4v_env_print_sensor_callback);
@@ -1237,7 +1255,7 @@ sun4v_env_print_temp_sensors()
 static void
 sun4v_env_print_temp_indicators()
 {
-	char *fmt = "%-20s %-14s %-8s\n";
+	char *fmt = "%-30s %-14s %-8s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_TEMPERATURE_INDICATOR, (void *)PICL_PROP_CONDITION,
 	    sun4v_env_print_indicator_callback);
@@ -1253,9 +1271,9 @@ sun4v_env_print_temp_indicators()
 			return;
 		}
 	}
-	log_printf("---------------------------------------\n");
+	log_printf("-------------------------------------------------\n");
 	log_printf(fmt, "Location", "Indicator", "Condition", 0);
-	log_printf("---------------------------------------\n");
+	log_printf("-------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_TEMPERATURE_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
@@ -1265,7 +1283,7 @@ sun4v_env_print_temp_indicators()
 static void
 sun4v_env_print_current_sensors()
 {
-	char *fmt = "%-20s %-14s %-10s\n";
+	char *fmt = "%-30s %-14s %-10s\n";
 	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_CURRENT_SENSOR,
 	    (void *)PICL_PROP_CURRENT, sun4v_env_print_sensor_callback);
 	if (!class_node_found)
@@ -1280,9 +1298,9 @@ sun4v_env_print_current_sensors()
 			return;
 		}
 	}
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	log_printf(fmt, "Location", "Sensor", "Status", 0);
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_CURRENT_SENSOR, (void *)PICL_PROP_CURRENT,
 	    sun4v_env_print_sensor_callback);
@@ -1291,7 +1309,7 @@ sun4v_env_print_current_sensors()
 static void
 sun4v_env_print_current_indicators()
 {
-	char *fmt = "%-20s %-14s %-8s\n";
+	char *fmt = "%-30s %-14s %-8s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_CURRENT_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
@@ -1308,9 +1326,9 @@ sun4v_env_print_current_indicators()
 			return;
 		}
 	}
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	log_printf(fmt, "Location", "Indicator", "Condition", 0);
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_CURRENT_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
@@ -1320,7 +1338,7 @@ sun4v_env_print_current_indicators()
 static void
 sun4v_env_print_voltage_sensors()
 {
-	char *fmt = "%-20s %-14s %-10s\n";
+	char *fmt = "%-30s %-14s %-10s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_VOLTAGE_SENSOR,
 	    PICL_PROP_VOLTAGE,
@@ -1337,9 +1355,9 @@ sun4v_env_print_voltage_sensors()
 			return;
 		}
 	}
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	log_printf(fmt, "Location", "Sensor", "Status", 0);
-	log_printf("------------------------------------------\n");
+	log_printf("----------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_VOLTAGE_SENSOR,
 	    (void *)PICL_PROP_VOLTAGE,
@@ -1349,7 +1367,7 @@ sun4v_env_print_voltage_sensors()
 static void
 sun4v_env_print_voltage_indicators()
 {
-	char *fmt = "%-20s %-14s %-8s\n";
+	char *fmt = "%-30s %-14s %-8s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_VOLTAGE_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
@@ -1366,9 +1384,9 @@ sun4v_env_print_voltage_indicators()
 			return;
 		}
 	}
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	log_printf(fmt, "Location", "Indicator", "Condition", 0);
-	log_printf("---------------------------------------------\n");
+	log_printf("-------------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_VOLTAGE_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
@@ -1378,7 +1396,7 @@ sun4v_env_print_voltage_indicators()
 static void
 sun4v_env_print_LEDs()
 {
-	char *fmt = "%-20s %-14s %-8s\n";
+	char *fmt = "%-30s %-14s %-8s\n";
 	if (syserrlog == 0)
 		return;
 	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_LED,
@@ -1386,9 +1404,9 @@ sun4v_env_print_LEDs()
 	if (!class_node_found)
 		return;
 	log_printf("\nLEDs:\n");
-	log_printf("-----------------------------------------\n");
+	log_printf("---------------------------------------------------\n");
 	log_printf(fmt, "Location", "LED", "State", 0);
-	log_printf("-----------------------------------------\n");
+	log_printf("---------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_LED,
 	    (void *)PICL_PROP_STATE, sun4v_env_print_indicator_callback);
 }
@@ -1447,7 +1465,7 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 		}
 	i = 0;
 	while (err == PICL_SUCCESS) {
-		if (parenth == chassish || parenth == phyplatformh)
+		if (parenth == phyplatformh)
 			break;
 		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
 		    names[i++], PICL_PROPNAMELEN_MAX);
@@ -1470,7 +1488,7 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 		(void) strlcat(loc, names[i],
 		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
-	log_printf("%-21s", loc);
+	log_printf("%-31s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)
 		free(names[i]);
 	free(loc);
@@ -1483,7 +1501,7 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 static void
 sun4v_print_fru_status()
 {
-	char *fmt = "%-20s %-9s %-8s\n";
+	char *fmt = "%-30s %-9s %-8s\n";
 	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fru_status_callback);
 	if (!class_node_found)
@@ -1496,7 +1514,7 @@ sun4v_print_fru_status()
 
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
-		    PICL_CLASS_MODULE, NULL,
+		    NULL, NULL,
 		    sun4v_print_fru_status_callback);
 		if (all_status_ok) {
 			log_printf("All FRUs are enabled.\n");
@@ -1504,8 +1522,8 @@ sun4v_print_fru_status()
 		}
 	}
 	log_printf(fmt, "Location", "Name", "Status", 0);
-	log_printf("----------------------------------------\n");
-	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_MODULE, NULL,
+	log_printf("--------------------------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fru_status_callback);
 }
 
