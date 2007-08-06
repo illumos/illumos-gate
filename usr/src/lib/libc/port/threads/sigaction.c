@@ -214,45 +214,32 @@ out:
  * We are out of the critical region and are ready to take a signal.
  * The kernel has all signals blocked on this lwp, but our value of
  * ul_sigmask is the correct signal mask for the previous context.
+ *
+ * We call __sigresend() to atomically restore the signal mask and
+ * cause the signal to be sent again with the remembered siginfo.
+ * We will not return successfully from __sigresend() until the
+ * application's signal handler has been run via sigacthandler().
  */
 void
 take_deferred_signal(int sig)
 {
+	extern int __sigresend(int, siginfo_t *, sigset_t *);
 	ulwp_t *self = curthread;
-	siginfo_t siginfo;
 	siginfo_t *sip;
-	ucontext_t uc;
-	volatile int returning;
+	int error;
 
-	ASSERT(self->ul_critical == 0);
-	ASSERT(self->ul_sigdefer == 0);
-	ASSERT(self->ul_cursig == 0);
+	ASSERT((self->ul_critical | self->ul_sigdefer | self->ul_cursig) == 0);
 
-	returning = 0;
-	uc.uc_flags = UC_ALL;
-	/*
-	 * We call _private_getcontext (a libc-private synonym for
-	 * _getcontext) rather than _getcontext because we need to
-	 * avoid the dynamic linker and link auditing problems here.
-	 */
-	(void) _private_getcontext(&uc);
-	/*
-	 * If the application signal handler calls setcontext() on
-	 * the ucontext we give it, it returns here, then we return.
-	 */
-	if (returning)
-		return;
-	returning = 1;
-	ASSERT(sigequalset(&uc.uc_sigmask, &maskset));
 	if (self->ul_siginfo.si_signo == 0)
 		sip = NULL;
-	else {
-		(void) _private_memcpy(&siginfo,
-		    &self->ul_siginfo, sizeof (siginfo));
-		sip = &siginfo;
-	}
-	uc.uc_sigmask = self->ul_sigmask;
-	call_user_handler(sig, sip, &uc);
+	else
+		sip = &self->ul_siginfo;
+
+	/* EAGAIN can happen only for a pending SIGSTOP signal */
+	while ((error = __sigresend(sig, sip, &self->ul_sigmask)) == EAGAIN)
+		continue;
+	if (error)
+		thr_panic("take_deferred_signal(): __sigresend() failed");
 }
 
 void

@@ -4940,6 +4940,16 @@ expound(private_t *pri, long r0, int raw)
 			show_sigaction(pri, (long)pri->sys_args[2],
 				"old", r0);
 		break;
+	case SYS_signotify:
+		if (pri->sys_nargs > 1)
+			show_siginfo(pri, (long)pri->sys_args[1]);
+		break;
+	case SYS_sigresend:
+		if (pri->sys_nargs > 1)
+			show_siginfo(pri, (long)pri->sys_args[1]);
+		if (pri->sys_nargs > 2)
+			show_sigset(pri, (long)pri->sys_args[2], "sigmask");
+		break;
 	case SYS_sigpending:
 		if (!err && pri->sys_nargs > 1)
 			show_sigset(pri, (long)pri->sys_args[1], "sigmask");

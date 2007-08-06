@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,11 +28,22 @@
 
 	.file	"%M%"
 
-/* unpublished system call for POSIX message queues -- __signotify */
-/* int __signotify (int cmd, siginfo_t *siginfo, signotify_id_t *sn_id); */
-
 #include "SYS.h"
 
+/*
+ * Unpublished system call for POSIX message queues.
+ * int __signotify(int cmd, siginfo_t *siginfo, signotify_id_t *sn_id);
+ */
 	SYSCALL2_RVAL1(__signotify,signotify)
 	RET
 	SET_SIZE(__signotify)
+
+/*
+ * Unpublished system call to support deferred signals in libc.
+ * int __sigresend(int sig, siginfo_t *siginfo, sigset_t *mask);
+ */
+	ENTRY(__sigresend)
+	SYSTRAP_RVAL1(sigresend)
+	SYSLWPERR
+	RET
+	SET_SIZE(__sigresend)

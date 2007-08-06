@@ -299,8 +299,7 @@ extern "C" {
 #define	SYS_waitsys	107
 #define	SYS_sigsendsys	108
 #define	SYS_hrtsys	109
-#define	SYS_acancel	110
-#define	SYS_async	111
+#define	SYS_sigresend	111
 #define	SYS_priocntlsys	112
 #define	SYS_pathconf	113
 #define	SYS_mincore	114

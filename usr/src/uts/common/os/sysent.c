@@ -116,6 +116,7 @@ int	sigsuspend();
 int	sigaltstack();
 int	sigaction();
 int	sigpending();
+int	sigresend();
 int	sigtimedwait();
 int	getsetcontext();
 int	stat();
@@ -565,8 +566,8 @@ struct sysent sysent[NSYSCALL] =
 	/* 109 */ IF_x86(
 			SYSENT_AP("hrtsys",	hrtsys,		5),
 			SYSENT_LOADABLE()),
-	/* 110 */ SYSENT_LOADABLE(),		/* was acancel */
-	/* 111 */ SYSENT_LOADABLE(),		/* was async */
+	/* 110 */ SYSENT_LOADABLE(),
+	/* 111 */ SYSENT_CI("sigresend",	sigresend,	3),
 	/* 112 */ SYSENT_CL("priocntlsys",	priocntlsys,	5),
 	/* 113 */ SYSENT_CL("pathconf",		pathconf,	2),
 	/* 114 */ SYSENT_CI("mincore",		mincore,	3),
@@ -962,8 +963,8 @@ struct sysent sysent32[NSYSCALL] =
 	/* 109 */ IF_x86(
 			SYSENT_AP("hrtsys",	hrtsys,		5),
 			SYSENT_LOADABLE32()),
-	/* 110 */ SYSENT_LOADABLE32(),		/* was acancel */
-	/* 111 */ SYSENT_LOADABLE32(),		/* was async */
+	/* 110 */ SYSENT_LOADABLE32(),
+	/* 111 */ SYSENT_CI("sigresend",	sigresend,	3),
 	/* 112 */ SYSENT_CI("priocntlsys",	priocntlsys,	5),
 	/* 113 */ SYSENT_CI("pathconf",		pathconf,	2),
 	/* 114 */ SYSENT_CI("mincore",		mincore,	3),

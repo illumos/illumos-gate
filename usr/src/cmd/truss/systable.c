@@ -332,8 +332,8 @@ const struct systable systable[] = {
 {"waitid",	4, DEC, NOV, IDT, DEC, HEX, WOP},		/* 107 */
 {"sigsendsys",	2, DEC, NOV, HEX, SIG},				/* 108 */
 {"hrtsys",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 109 */
-{"acancel",	3, DEC, NOV, DEC, HEX, DEC},			/* 110 */
-{"async",	3, DEC, NOV, DEC, HEX, DEC},			/* 111 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"sigresend",	3, DEC, NOV, SIG, HEX, HEX},			/* 111 */
 {"priocntlsys",	5, DEC, NOV, DEC, HEX, DEC, PC4, PC5},		/* 112 */
 {"pathconf",	2, DEC, NOV, STG, PTC},				/* 113 */
 {"mincore",	3, DEC, NOV, HEX, UNS, HEX},			/* 114 */

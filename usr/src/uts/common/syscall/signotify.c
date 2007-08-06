@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/fault.h>
 #include <sys/signal.h>
 #include <sys/siginfo.h>
+#include <sys/schedctl.h>
 #include <vm/as.h>
 #include <sys/debug.h>
 #include <sys/contract/process_impl.h>
@@ -223,4 +224,60 @@ signotify(int cmd, siginfo_t *siginfo, signotify_id_t *sn_id)
 		return (set_errno(EFAULT));
 
 	return (0);
+}
+
+int
+sigresend(int sig, siginfo_t *siginfo, sigset_t *mask)
+{
+	kthread_t *t = curthread;
+	proc_t *p = ttoproc(t);
+	klwp_t *lwp = ttolwp(t);
+	sigqueue_t *sqp = kmem_zalloc(sizeof (*sqp), KM_SLEEP);
+	sigset_t set;
+	k_sigset_t kset;
+	int error;
+
+	if (sig <= 0 || sig >= NSIG || sigismember(&cantmask, sig)) {
+		error = EINVAL;
+		goto bad;
+	}
+
+	if (siginfo == NULL) {
+		sqp->sq_info.si_signo = sig;
+		sqp->sq_info.si_code = SI_NOINFO;
+	} else {
+		if (copyin_siginfo(get_udatamodel(), siginfo, &sqp->sq_info)) {
+			error = EFAULT;
+			goto bad;
+		}
+		if (sqp->sq_info.si_signo != sig) {
+			error = EINVAL;
+			goto bad;
+		}
+	}
+
+	if (copyin(mask, &set, sizeof (set))) {
+		error = EFAULT;
+		goto bad;
+	}
+	sigutok(&set, &kset);
+
+	mutex_enter(&p->p_lock);
+	if (lwp->lwp_cursig || lwp->lwp_curinfo) {
+		mutex_exit(&p->p_lock);
+		t->t_sig_check = 1;
+		error = EAGAIN;
+		goto bad;
+	}
+	lwp->lwp_cursig = sig;
+	lwp->lwp_curinfo = sqp;
+	schedctl_finish_sigblock(t);
+	t->t_hold = kset;
+	mutex_exit(&p->p_lock);
+
+	t->t_sig_check = 1;
+	return (0);
+bad:
+	kmem_free(sqp, sizeof (*sqp));
+	return (set_errno(error));
 }
