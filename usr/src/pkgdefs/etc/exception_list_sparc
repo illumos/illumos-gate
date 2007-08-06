@@ -912,18 +912,6 @@ usr/lib/sparcv9/llib-lpri.ln		sparc
 #
 usr/include/sys/u8_textprep_data.h	sparc
 #
-# libidmap is private, so the compilation links and lint libraries are
-# not delivered
-#
-usr/lib/llib-lidmap			sparc
-usr/lib/libidmap.so			sparc
-usr/lib/llib-lidmap.ln			sparc
-usr/lib/sparcv9/libidmap.so		sparc
-usr/lib/sparcv9/llib-lidmap.ln		sparc
-usr/include/idmap.h			sparc
-usr/include/sys/idmap.h			sparc
-usr/include/sys/kidmap.h		sparc
-#
 # SQLite is private, used by SMF (svc.configd) and idmapd
 #
 usr/lib/libsqlite-native.o		sparc

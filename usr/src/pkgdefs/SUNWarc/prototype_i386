@@ -86,6 +86,7 @@ s none usr/lib/amd64/llib-ldoor.ln=../../../lib/amd64/llib-ldoor.ln
 s none usr/lib/amd64/llib-lefi.ln=../../../lib/amd64/llib-lefi.ln
 s none usr/lib/amd64/llib-lelf.ln=../../../lib/amd64/llib-lelf.ln
 f none usr/lib/amd64/llib-lexacct.ln 644 root bin
+f none usr/lib/amd64/llib-lidmap.ln 644 root bin
 f none usr/lib/amd64/llib-lform.ln 644 root bin
 s none usr/lib/amd64/llib-lgen.ln=../../../lib/amd64/llib-lgen.ln
 f none usr/lib/amd64/llib-lgss.ln 644 root bin

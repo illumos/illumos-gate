@@ -131,6 +131,7 @@ d none usr/include/hal 755 root bin
 f none usr/include/hal/libhal.h 644 root bin
 f none usr/include/hal/libhal-storage.h 644 root bin
 f none usr/include/iconv.h 644 root bin
+f none usr/include/idmap.h 644 root bin
 f none usr/include/ieeefp.h 644 root bin
 d none usr/include/inet 755 root bin
 f none usr/include/inet/arp.h 644 root bin
@@ -813,6 +814,7 @@ d none usr/include/sys/ib/clients/ibd 755 root bin
 f none usr/include/sys/ib/clients/ibd/ibd.h 644 root bin
 f none usr/include/sys/id_space.h 644 root bin
 f none usr/include/sys/id32.h 644 root bin
+f none usr/include/sys/idmap.h 644 root bin
 f none usr/include/sys/inline.h 644 root bin
 f none usr/include/sys/instance.h 644 root bin
 f none usr/include/sys/inttypes.h 644 root bin
@@ -834,6 +836,7 @@ f none usr/include/sys/kcpc.h 644 root bin
 f none usr/include/sys/kdi.h 644 root bin
 f none usr/include/sys/kdi_impl.h 644 root bin
 f none usr/include/sys/kdi_machimpl.h 644 root bin
+f none usr/include/sys/kidmap.h 644 root bin
 f none usr/include/sys/klwp.h 644 root bin
 f none usr/include/sys/kmem.h 644 root bin
 f none usr/include/sys/kmem_impl.h 644 root bin

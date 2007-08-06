@@ -136,6 +136,7 @@ s none usr/lib/libgen.so.1=../../lib/libgen.so.1
 s none usr/lib/libgen.so=../../lib/libgen.so.1
 s none usr/ccs/lib/libgen.so=../../../lib/libgen.so.1
 f none usr/lib/libidmap.so.1 755 root bin
+s none usr/lib/libidmap.so=./libidmap.so.1
 f none usr/lib/libinetsvc.so.1 755 root bin
 s none usr/lib/libinetutil.so.1=../../lib/libinetutil.so.1
 f none usr/lib/libike.so.1 755 root bin

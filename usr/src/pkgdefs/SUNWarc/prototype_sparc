@@ -82,6 +82,7 @@ s none usr/lib/sparcv9/llib-ldoor.ln=../../../lib/sparcv9/llib-ldoor.ln
 s none usr/lib/sparcv9/llib-lefi.ln=../../../lib/sparcv9/llib-lefi.ln
 s none usr/lib/sparcv9/llib-lelf.ln=../../../lib/sparcv9/llib-lelf.ln
 f none usr/lib/sparcv9/llib-lexacct.ln 644 root bin
+f none usr/lib/sparcv9/llib-lidmap.ln 644 root bin
 f none usr/lib/sparcv9/llib-lform.ln 644 root bin
 s none usr/lib/sparcv9/llib-lgen.ln=../../../lib/sparcv9/llib-lgen.ln
 f none usr/lib/sparcv9/llib-lgss.ln 644 root bin
