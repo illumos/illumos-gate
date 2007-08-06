@@ -2663,9 +2663,13 @@ ztest_scrub(ztest_args_t *za)
 {
 	spa_t *spa = dmu_objset_spa(za->za_os);
 
+	mutex_enter(&spa_namespace_lock);
 	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING, B_FALSE);
+	mutex_exit(&spa_namespace_lock);
 	(void) poll(NULL, 0, 1000); /* wait a second, then force a restart */
+	mutex_enter(&spa_namespace_lock);
 	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING, B_FALSE);
+	mutex_exit(&spa_namespace_lock);
 }
 
 /*

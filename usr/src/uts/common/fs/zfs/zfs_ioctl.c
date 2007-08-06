@@ -796,9 +796,9 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	spa_config_enter(spa, RW_READER, FTAG);
+	mutex_enter(&spa_namespace_lock);
 	error = spa_scrub(spa, zc->zc_cookie, B_FALSE);
-	spa_config_exit(spa, FTAG);
+	mutex_exit(&spa_namespace_lock);
 
 	spa_close(spa, FTAG);
 
@@ -2014,8 +2014,8 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	vdev_t *vd;
-	int error;
 	uint64_t txg;
+	int error;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);

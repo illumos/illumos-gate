@@ -2609,6 +2609,9 @@ spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force)
 	uint64_t mintxg, maxtxg;
 	vdev_t *rvd = spa->spa_root_vdev;
 
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(!spa_config_held(spa, RW_WRITER));
+
 	if ((uint_t)type >= POOL_SCRUB_TYPES)
 		return (ENOTSUP);
 
@@ -3247,8 +3250,8 @@ spa_evict_all(void)
 		spa_open_ref(spa, FTAG);
 		mutex_exit(&spa_namespace_lock);
 		spa_async_suspend(spa);
-		VERIFY(spa_scrub(spa, POOL_SCRUB_NONE, B_TRUE) == 0);
 		mutex_enter(&spa_namespace_lock);
+		VERIFY(spa_scrub(spa, POOL_SCRUB_NONE, B_TRUE) == 0);
 		spa_close(spa, FTAG);
 
 		if (spa->spa_state != POOL_STATE_UNINITIALIZED) {

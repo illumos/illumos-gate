@@ -1689,8 +1689,7 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 		vdev_config_dirty(vd->vdev_top);
 
 		if (vd->vdev_faulted)
-			VERIFY(spa_scrub(spa, POOL_SCRUB_RESILVER,
-			    B_TRUE) == 0);
+			spa_async_request(spa, SPA_ASYNC_RESILVER);
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);
 	}

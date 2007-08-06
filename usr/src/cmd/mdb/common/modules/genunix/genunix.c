@@ -110,6 +110,10 @@
  */
 #define	NINTR		16
 
+#define	KILOS		10
+#define	MEGS		20
+#define	GIGS		30
+
 #ifndef STACK_BIAS
 #define	STACK_BIAS	0
 #endif
@@ -1092,7 +1096,7 @@ static datafmt_t kmemfmt[] = {
 	{ "   buf",	"  size",	"------",	"%6u "		},
 	{ "   buf",	"in use",	"------",	"%6u "		},
 	{ "   buf",	" total",	"------",	"%6u "		},
-	{ "   memory",	"   in use",	"---------",	"%9u "		},
+	{ "   memory",	"   in use",	"----------",	"%9u%c "	},
 	{ "    alloc",	"  succeed",	"---------",	"%9u "		},
 	{ "alloc",	" fail",	"-----",	"%5u "		},
 	{ NULL,		NULL,		NULL,		NULL		}
@@ -1101,9 +1105,9 @@ static datafmt_t kmemfmt[] = {
 static datafmt_t vmemfmt[] = {
 	{ "vmem                     ", "name                     ",
 	"-------------------------", "%-*s "				},
-	{ "   memory",	"   in use",	"---------",	"%9llu "	},
-	{ "    memory",	"     total",	"----------",	"%10llu "	},
-	{ "   memory",	"   import",	"---------",	"%9llu "	},
+	{ "   memory",	"   in use",	"----------",	"%9llu%c "	},
+	{ "    memory",	"     total",	"-----------",	"%10llu%c "	},
+	{ "   memory",	"   import",	"----------",	"%9llu%c "	},
 	{ "    alloc",	"  succeed",	"---------",	"%9llu "	},
 	{ "alloc",	" fail",	"-----",	"%5llu "	},
 	{ NULL,		NULL,		NULL,		NULL		}
@@ -1196,7 +1200,9 @@ out:
 	mdb_printf((dfp++)->fmt, cp->cache_bufsize);
 	mdb_printf((dfp++)->fmt, total - avail);
 	mdb_printf((dfp++)->fmt, total);
-	mdb_printf((dfp++)->fmt, meminuse >> kap->ka_shift);
+	mdb_printf((dfp++)->fmt, meminuse >> kap->ka_shift,
+	    kap->ka_shift == GIGS ? 'G' : kap->ka_shift == MEGS ? 'M' :
+	    kap->ka_shift == KILOS ? 'K' : 'B');
 	mdb_printf((dfp++)->fmt, alloc);
 	mdb_printf((dfp++)->fmt, cp->cache_alloc_fail);
 	mdb_printf("\n");
@@ -1218,9 +1224,11 @@ kmastat_vmem_totals(uintptr_t addr, const vmem_t *v, kmastat_args_t *kap)
 
 	len = MIN(17, strlen(v->vm_name));
 
-	mdb_printf("Total [%s]%*s %6s %6s %6s %9u %9u %5u\n", v->vm_name,
+	mdb_printf("Total [%s]%*s %6s %6s %6s %9u%c %9u %5u\n", v->vm_name,
 	    17 - len, "", "", "", "",
-	    kv->kv_meminuse >> kap->ka_shift, kv->kv_alloc, kv->kv_fail);
+	    kv->kv_meminuse >> kap->ka_shift,
+	    kap->ka_shift == GIGS ? 'G' : kap->ka_shift == MEGS ? 'M' :
+	    kap->ka_shift == KILOS ? 'K' : 'B', kv->kv_alloc, kv->kv_fail);
 
 	return (WALK_NEXT);
 }
@@ -1246,9 +1254,15 @@ kmastat_vmem(uintptr_t addr, const vmem_t *v, const uint_t *shiftp)
 
 	mdb_printf("%*s", ident, "");
 	mdb_printf((dfp++)->fmt, 25 - ident, v->vm_name);
-	mdb_printf((dfp++)->fmt, vkp->vk_mem_inuse.value.ui64);
-	mdb_printf((dfp++)->fmt, vkp->vk_mem_total.value.ui64);
-	mdb_printf((dfp++)->fmt, vkp->vk_mem_import.value.ui64 >> *shiftp);
+	mdb_printf((dfp++)->fmt, vkp->vk_mem_inuse.value.ui64 >> *shiftp,
+	    *shiftp == GIGS ? 'G' : *shiftp == MEGS ? 'M' :
+	    *shiftp == KILOS ? 'K' : 'B');
+	mdb_printf((dfp++)->fmt, vkp->vk_mem_total.value.ui64 >> *shiftp,
+	    *shiftp == GIGS ? 'G' : *shiftp == MEGS ? 'M' :
+	    *shiftp == KILOS ? 'K' : 'B');
+	mdb_printf((dfp++)->fmt, vkp->vk_mem_import.value.ui64 >> *shiftp,
+	    *shiftp == GIGS ? 'G' : *shiftp == MEGS ? 'M' :
+	    *shiftp == KILOS ? 'K' : 'B');
 	mdb_printf((dfp++)->fmt, vkp->vk_alloc.value.ui64);
 	mdb_printf((dfp++)->fmt, vkp->vk_fail.value.ui64);
 
@@ -1267,9 +1281,9 @@ kmastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	ka.ka_shift = 0;
 	if (mdb_getopts(argc, argv,
-	    'k', MDB_OPT_SETBITS, 10, &ka.ka_shift,
-	    'm', MDB_OPT_SETBITS, 20, &ka.ka_shift,
-	    'g', MDB_OPT_SETBITS, 30, &ka.ka_shift, NULL) != argc)
+	    'k', MDB_OPT_SETBITS, KILOS, &ka.ka_shift,
+	    'm', MDB_OPT_SETBITS, MEGS, &ka.ka_shift,
+	    'g', MDB_OPT_SETBITS, GIGS, &ka.ka_shift, NULL) != argc)
 		return (DCMD_USAGE);
 
 	for (dfp = kmemfmt; dfp->hdr1 != NULL; dfp++)
