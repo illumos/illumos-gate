@@ -83,7 +83,7 @@ extern "C" {
 
 #include <netinet/in.h>
 
-#define	RDS_VERSION	3
+#define	RDS_VERSION	4
 
 /*
  * RDS Well known service id
@@ -136,14 +136,18 @@ extern "C" {
  * This data is sent with the CM REQ message by the initiater of the
  * RC channel.
  *
+ * cm_ip_pvt - ibt_ip_cm_info_t
  * version - RDS version
  * arch - only interoperate with homogeneous Solaris (x32, x64, sparcv9).
- * remip - IP address of the passive/remote node
- * localip - IP address of the active/local node
  * eptype - RDS_EP_TYPE_CTRL or RDS_EP_TYPE_DATA
+ * failover - flag to indicate failover.
+ * last_bufid - used during failover, indicates the last buffer the remote
+ *     received.
  * user_buffer_size - Packet size on the sending node. This is also the size
  *     of the SGL buffer used in the send and receive WRs. This should be
  *     same size on the both active and passive nodes.
+ * ack_rkey - RKEY for the RDMA acknowledgement buffer.
+ * ack_addr - Registered MR address to receive RDMA acknowledgement.
  */
 typedef struct rds_cm_private_data_s {
 	uint8_t		cmp_ip_pvt[IBT_IP_HDR_PRIV_DATA_SZ];
@@ -151,8 +155,6 @@ typedef struct rds_cm_private_data_s {
 	uint8_t		cmp_arch;
 	uint8_t		cmp_eptype;
 	uint8_t		cmp_failover;
-	ipaddr_t	cmp_remip;
-	ipaddr_t	cmp_localip;
 	uintptr_t	cmp_last_bufid;
 	uint32_t	cmp_user_buffer_size;
 	ibt_rkey_t	cmp_ack_rkey;

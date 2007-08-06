@@ -89,6 +89,9 @@
  * Connection failover
  */
 
+#define	SRCIP	src_addr.un.ip4addr
+#define	DSTIP	dst_addr.un.ip4addr
+
 /*
  * Handle an incoming CM REQ
  */
@@ -103,6 +106,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	rds_session_t		*sp;
 	rds_ep_t		*ep;
 	ibt_channel_hdl_t	chanhdl;
+	ibt_ip_cm_info_t	ipcm_info;
 	int			ret;
 
 	RDS_DPRINTF2("rds_handle_cm_req", "Enter");
@@ -130,12 +134,31 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	bcopy((uint8_t *)evp->cm_priv_data, &cmp,
 	    sizeof (rds_cm_private_data_t));
 
-	RDS_DPRINTF2(LABEL, "REQ Received: From IP: 0x%x To IP: 0x%x type: %d",
-	    cmp.cmp_localip, cmp.cmp_remip, cmp.cmp_eptype);
+	/* extract the CM IP info */
+	ret = ibt_get_ip_data(evp->cm_priv_data_len, evp->cm_priv_data,
+	    &ipcm_info);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rds_handle_cm_req", "ibt_get_ip_data failed: %d",
+		    ret);
+		return (IBT_CM_REJECT);
+	}
+
+	RDS_DPRINTF2("rds_handle_cm_req",
+	    "REQ Received: From IP: 0x%x To IP: 0x%x type: %d",
+	    ipcm_info.SRCIP, ipcm_info.DSTIP, cmp.cmp_eptype);
 
 	if (cmp.cmp_version != RDS_VERSION) {
 		RDS_DPRINTF0(LABEL, "Version Mismatch: Local version: %d "
 		    "Remote version: %d", RDS_VERSION, cmp.cmp_version);
+		return (IBT_CM_REJECT);
+	}
+
+	/* RDS supports V4 addresses only */
+	if ((ipcm_info.src_addr.family != AF_INET) ||
+	    (ipcm_info.dst_addr.family != AF_INET)) {
+		RDS_DPRINTF2(LABEL, "Unsupported Address Family: "
+		    "src: %d dst: %d", ipcm_info.src_addr.family,
+		    ipcm_info.dst_addr.family);
 		return (IBT_CM_REJECT);
 	}
 
@@ -171,7 +194,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 	/* Is there a session to the destination node? */
 	rw_enter(&statep->rds_sessionlock, RW_READER);
-	sp = rds_session_lkup(statep, cmp.cmp_localip, rgid.gid_guid);
+	sp = rds_session_lkup(statep, ipcm_info.SRCIP, rgid.gid_guid);
 	rw_exit(&statep->rds_sessionlock);
 
 	if (sp == NULL) {
@@ -180,12 +203,12 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		 * remote ip in the private data is the local ip and vice
 		 * versa
 		 */
-		sp = rds_session_create(statep, cmp.cmp_remip, cmp.cmp_localip,
-		    reqp, RDS_SESSION_PASSIVE);
+		sp = rds_session_create(statep, ipcm_info.DSTIP,
+		    ipcm_info.SRCIP, reqp, RDS_SESSION_PASSIVE);
 		if (sp == NULL) {
 			/* Check the list anyway. */
 			rw_enter(&statep->rds_sessionlock, RW_READER);
-			sp = rds_session_lkup(statep, cmp.cmp_localip,
+			sp = rds_session_lkup(statep, ipcm_info.SRCIP,
 			    rgid.gid_guid);
 			rw_exit(&statep->rds_sessionlock);
 			if (sp == NULL) {
@@ -240,7 +263,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		/* move the session to init state */
 		rw_enter(&sp->session_lock, RW_WRITER);
 		ret = rds_session_reinit(sp, lgid);
-		sp->session_myip = cmp.cmp_remip;
+		sp->session_myip = ipcm_info.DSTIP;
 		sp->session_lgid = lgid;
 		sp->session_rgid = rgid;
 		if (ret != 0) {
@@ -823,9 +846,9 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 
 	bzero(&ipcm_info, sizeof (ibt_ip_cm_info_t));
 	ipcm_info.src_addr.family = AF_INET;
-	ipcm_info.src_addr.un.ip4addr = sp->session_myip;
+	ipcm_info.SRCIP = sp->session_myip;
 	ipcm_info.dst_addr.family = AF_INET;
-	ipcm_info.dst_addr.un.ip4addr = sp->session_remip;
+	ipcm_info.DSTIP = sp->session_remip;
 	ipcm_info.src_port = 6556; /* based on OFED RDS */
 	ret = ibt_format_ip_private_data(&ipcm_info,
 	    sizeof (rds_cm_private_data_t), &cmp);
@@ -844,8 +867,6 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 
 	cmp.cmp_version = RDS_VERSION;
 	cmp.cmp_arch = RDS_THIS_ARCH;
-	cmp.cmp_remip = sp->session_remip;
-	cmp.cmp_localip = sp->session_myip;
 	cmp.cmp_eptype = ep->ep_type;
 	cmp.cmp_failover = sp->session_failover;
 	cmp.cmp_last_bufid = ep->ep_rbufid;
