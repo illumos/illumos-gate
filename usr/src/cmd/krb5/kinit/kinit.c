@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1006,6 +1006,39 @@ k5_kinit(opts, k5)
 	com_err(progname, code, gettext("while storing credentials"));
 	goto cleanup;
     }
+
+	/*
+	 * Solaris Kerberos:
+	 * The service ticket may or may not be host-based. If the requested
+	 * ticket is host-based and a "fallback" mechanism is being used to
+	 * determine the realm, subsequent searches by kerberos applications
+	 * will search for a service ticket with an empty server realm. If a
+	 * fallback mechanism is not being used, then it will search for a
+	 * service ticket with a server realm. By storing the credentials
+	 * twice (with and without a server realm), we ensure that the
+	 * credential will be found in both cases.
+	 */
+	if (opts->service_name) {
+
+		free(my_creds.server->realm.data);
+		my_creds.server->realm.data =
+		    malloc(strlen(KRB5_REFERRAL_REALM) + 1);
+		if (!my_creds.server->realm.data) {
+			code = ENOMEM;
+			goto cleanup;
+		}
+		
+		strlcpy(my_creds.server->realm.data, KRB5_REFERRAL_REALM,
+		    strlen(KRB5_REFERRAL_REALM) + 1);
+		my_creds.server->realm.length = strlen(KRB5_REFERRAL_REALM);
+
+ 		code = krb5_cc_store_cred(k5->ctx, k5->cc, &my_creds);
+		if (code) {
+			com_err(progname, code,
+			    gettext("while storing credentials"));
+			goto cleanup;
+		}
+	}
 
     if (opts->action == RENEW) {
         _kwarnd_del_warning(opts->principal_name);

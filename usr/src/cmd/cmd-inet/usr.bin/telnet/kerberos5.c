@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,6 +223,8 @@ kerberos5_send(Authenticator *ap)
 	}
 
 	(void) memset((char *)&creds, 0, sizeof (creds));
+	if (auth_debug_mode)
+		printf("telnet: calling krb5_sname_to_principal\n");
 	if ((retval = krb5_sname_to_principal(telnet_context, RemoteHostName,
 		"host", KRB5_NT_SRV_HST, &creds.server))) {
 		if (auth_debug_mode)
@@ -231,10 +233,13 @@ kerberos5_send(Authenticator *ap)
 			error_message(retval));
 		return (0);
 	}
+	if (auth_debug_mode)
+		printf("telnet: done calling krb5_sname_to_principal\n");
 
 	if (telnet_krb5_realm != NULL) {
 		krb5_data rdata;
 
+		rdata.magic = 0;
 		rdata.length = strlen(telnet_krb5_realm);
 		rdata.data = (char *)malloc(rdata.length + 1);
 		if (rdata.data == NULL) {

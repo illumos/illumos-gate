@@ -34,7 +34,7 @@
  * is allowed by RFC 1510: "If a hierarchical orginization is not used
  * it may be necessary to consult some database in order to construct
  * an authentication path between realms."  The database is contained
- * in the [capath] section of the krb5.conf file.
+ * in the [capaths] section of the krb5.conf file.
  * Client to server paths are defined. There are n**2 possible
  * entries, but only those entries which are needed by the client
  * or server need be present in its krb5.conf file. (n entries or 2*n
@@ -45,10 +45,10 @@
  * other ANL, NERSC and PNL. Each of these orginizations wants to
  * use its DNS name in the realm, ANL.GOV. In addition ANL wants
  * to authenticatite to HAL.COM via a K5.MOON and K5.JUPITER
- * A [capath] section of the krb5.conf file for the ANL.GOV clients
+ * A [capaths] section of the krb5.conf file for the ANL.GOV clients
  * and servers would look like:
  *
- * [capath]
+ * [capaths]
  * ANL.GOV = {
  *		NERSC.GOV = ES.NET
  *		PNL.GOV = ES.NET
@@ -103,7 +103,7 @@
  * in order to get from the source realm to the destination realm.  It
  * takes a realm separater character (normally ., but presumably there
  * for all those X.500 realms) .  There are two modes it runs in: the
- * ANL krb5.confmode and the hierarchy mode.  The ANL mode is
+ * ANL krb5.conf mode and the hierarchy mode.  The ANL mode is
  * fairly obvious.  The hierarchy mode looks for common components in
  * both the client and server realms.  In general, the pointer scp and
  * ccp are used to walk through the client and server realms.  The
@@ -116,11 +116,7 @@
  */
 
 krb5_error_code
-krb5_walk_realm_tree(context, client, server, tree, realm_branch_char)
-    krb5_context context;
-    const krb5_data *client, *server;
-    krb5_principal **tree;
-    int realm_branch_char;
+krb5_walk_realm_tree(krb5_context context, const krb5_data *client, const krb5_data *server, krb5_principal **tree, int realm_branch_char)
 {
     krb5_error_code retval;
     krb5_principal *rettree;
@@ -128,123 +124,135 @@ krb5_walk_realm_tree(context, client, server, tree, realm_branch_char)
     register char *prevccp = 0, *prevscp = 0;
     char *com_sdot = 0, *com_cdot = 0;
     register int i, links = 0;
-    int clen, slen;
+    int clen, slen = -1;
     krb5_data tmpcrealm, tmpsrealm;
     int nocommon = 1;
 
 #ifdef CONFIGURABLE_AUTHENTICATION_PATH
-	const char *cap_names[4];
-	char *cap_client, *cap_server;
-	char **cap_nodes;
-        krb5_error_code cap_code;
+    const char *cap_names[4];
+    char *cap_client, *cap_server;
+    char **cap_nodes;
+    krb5_error_code cap_code;
 #endif
-	if (!(client->data &&server->data))
-	  return KRB5_NO_TKT_IN_RLM;
-#ifdef CONFIGURABLE_AUTHENTICATION_PATH
-	if ((cap_client = (char *)malloc(client->length + 1)) == NULL)
-		return ENOMEM;
-	strncpy(cap_client, client->data, client->length);
-	cap_client[client->length] = '\0';
-	if ((cap_server = (char *)malloc(server->length + 1)) == NULL) {
-		krb5_xfree(cap_client);
-		return ENOMEM;
-	}
-	strncpy(cap_server, server->data, server->length);
-	cap_server[server->length] = '\0';
-	cap_names[0] = "capaths";
-	cap_names[1] = cap_client;
-	cap_names[2] = cap_server;
-	cap_names[3] = 0;
-	cap_code = profile_get_values(context->profile, cap_names, &cap_nodes);
-	krb5_xfree(cap_names[1]);    /* done with client string */
-	if (cap_code == 0) {     /* found a path, so lets use it */
-		links = 0;
-		if (*cap_nodes[0] != '.') { /* a link of . means direct */
-		 	while(cap_nodes[links]) {
-				links++;
-			}
-		}
-		cap_nodes[links] = cap_server; /* put server on end of list */
-						/* this simplifies the code later and make */
-						/* cleanup eaiser as well */
-		links++;		/* count the null entry at end */
-	} else {			/* no path use hierarchical method */
-	krb5_xfree(cap_names[2]); /* failed, don't need server string */
+
+#ifdef DEBUG_REFERRALS
+    printf("krb5_walk_realm_tree starting\n");
+    printf("  client is %s\n",client->data);
+    printf("  server is %s\n",server->data);
 #endif
-    clen = client->length;
-    slen = server->length;
 
-    for (com_cdot = ccp = client->data + clen - 1,
-	 com_sdot = scp = server->data + slen - 1;
-	 clen && slen && *ccp == *scp ;
-	 ccp--, scp--, 	clen--, slen--) {
-	if (*ccp == realm_branch_char) {
-	    com_cdot = ccp;
-	    com_sdot = scp;
-	    nocommon = 0;
-	}
-    }
-
-    /* ccp, scp point to common root.
-       com_cdot, com_sdot point to common components. */
-    /* handle case of one ran out */
-    if (!clen) {
-	/* construct path from client to server, down the tree */
-	if (!slen)
-	    /* in the same realm--this means there is no ticket
-	       in this realm. */
-	    return KRB5_NO_TKT_IN_RLM;
-	if (*scp == realm_branch_char) {
-	    /* one is a subdomain of the other */
-	    com_cdot = client->data;
-	    com_sdot = scp;
-	    nocommon = 0;
-	} /* else normal case of two sharing parents */
-    }
-    if (!slen) {
-	/* construct path from client to server, up the tree */
-	if (*ccp == realm_branch_char) {
-	    /* one is a subdomain of the other */
-	    com_sdot = server->data;
-	    com_cdot = ccp;
-	    nocommon = 0;
-	} /* else normal case of two sharing parents */
-    }
-    /* determine #links to/from common ancestor */
-    if (nocommon)
-	links = 1;
-    else
-	links = 2;
-    /* if no common ancestor, artificially set up common root at the last
-       component, then join with special code */
-    for (ccp = client->data; ccp < com_cdot; ccp++) {
-	if (*ccp == realm_branch_char) {
-	    links++;
-	    if (nocommon)
-		prevccp = ccp;
-	}
-    }
-
-    for (scp = server->data; scp < com_sdot; scp++) {
-	if (*scp == realm_branch_char) {
-	    links++;
-	    if (nocommon)
-		prevscp = scp;
-	}
-    }
-    if (nocommon) {
-	if (prevccp)
-	    com_cdot = prevccp;
-	if (prevscp)
-	    com_sdot = prevscp;
-
-	if(com_cdot == client->data + client->length -1)
-	   com_cdot = client->data - 1 ;
-	if(com_sdot == server->data + server->length -1)
-	   com_sdot = server->data - 1 ;
-    }
+    if (!(client->data &&server->data))
+      return KRB5_NO_TKT_IN_RLM;
 #ifdef CONFIGURABLE_AUTHENTICATION_PATH
-	}		/* end of if use hierarchical method */
+    if ((cap_client = (char *)malloc(client->length + 1)) == NULL)
+	return ENOMEM;
+    strncpy(cap_client, client->data, client->length);
+    cap_client[client->length] = '\0';
+    if ((cap_server = (char *)malloc(server->length + 1)) == NULL) {
+	krb5_xfree(cap_client);
+	return ENOMEM;
+    }
+    strncpy(cap_server, server->data, server->length);
+    cap_server[server->length] = '\0';
+    cap_names[0] = "capaths";
+    cap_names[1] = cap_client;
+    cap_names[2] = cap_server;
+    cap_names[3] = 0;
+    cap_code = profile_get_values(context->profile, cap_names, &cap_nodes);
+    krb5_xfree(cap_client);  /* done with client string */
+    cap_names[1] = 0;
+    if (cap_code == 0) {     /* found a path, so lets use it */
+	links = 0;
+	if (*cap_nodes[0] != '.') { /* a link of . means direct */
+	    while(cap_nodes[links]) {
+		links++;
+	    }
+	}
+	if (cap_nodes[links] != NULL)
+	    krb5_xfree(cap_nodes[links]);
+
+	cap_nodes[links] = cap_server; /* put server on end of list */
+	/* this simplifies the code later and make */
+	/* cleanup eaiser as well */
+	links++;		/* count the null entry at end */
+    } else {			/* no path use hierarchical method */
+	krb5_xfree(cap_server); /* failed, don't need server string */
+	cap_names[2] = 0;
+#endif
+	clen = client->length;
+	slen = server->length;
+
+	for (com_cdot = ccp = client->data + clen - 1,
+		 com_sdot = scp = server->data + slen - 1;
+	     clen && slen && *ccp == *scp ;
+	     ccp--, scp--, 	clen--, slen--) {
+	    if (*ccp == realm_branch_char) {
+		com_cdot = ccp;
+		com_sdot = scp;
+		nocommon = 0;
+	    }
+	}
+
+	/* ccp, scp point to common root.
+	   com_cdot, com_sdot point to common components. */
+	/* handle case of one ran out */
+	if (!clen) {
+	    /* construct path from client to server, down the tree */
+	    if (!slen)
+		/* in the same realm--this means there is no ticket
+		   in this realm. */
+		return KRB5_NO_TKT_IN_RLM;
+	    if (*scp == realm_branch_char) {
+		/* one is a subdomain of the other */
+		com_cdot = client->data;
+		com_sdot = scp;
+		nocommon = 0;
+	    } /* else normal case of two sharing parents */
+	}
+	if (!slen) {
+	    /* construct path from client to server, up the tree */
+	    if (*ccp == realm_branch_char) {
+		/* one is a subdomain of the other */
+		com_sdot = server->data;
+		com_cdot = ccp;
+		nocommon = 0;
+	    } /* else normal case of two sharing parents */
+	}
+	/* determine #links to/from common ancestor */
+	if (nocommon)
+	    links = 1;
+	else
+	    links = 2;
+	/* if no common ancestor, artificially set up common root at the last
+	   component, then join with special code */
+	for (ccp = client->data; ccp < com_cdot; ccp++) {
+	    if (*ccp == realm_branch_char) {
+		links++;
+		if (nocommon)
+		    prevccp = ccp;
+	    }
+	}
+
+	for (scp = server->data; scp < com_sdot; scp++) {
+	    if (*scp == realm_branch_char) {
+		links++;
+		if (nocommon)
+		    prevscp = scp;
+	    }
+	}
+	if (nocommon) {
+	    if (prevccp)
+		com_cdot = prevccp;
+	    if (prevscp)
+		com_sdot = prevscp;
+
+	    if(com_cdot == client->data + client->length -1)
+		com_cdot = client->data - 1 ;
+	    if(com_sdot == server->data + server->length -1)
+		com_sdot = server->data - 1 ;
+	}
+#ifdef CONFIGURABLE_AUTHENTICATION_PATH
+    }		/* end of if use hierarchical method */
 #endif
 
     if (!(rettree = (krb5_principal *)calloc(links+2,
@@ -257,131 +265,154 @@ krb5_walk_realm_tree(context, client, server, tree, realm_branch_char)
 	return retval;
     }
 #ifdef CONFIGURABLE_AUTHENTICATION_PATH
-	links--;				/* dont count the null entry on end */
-	if (cap_code == 0) {    /* found a path above */
-		tmpcrealm.data = client->data;
-		tmpcrealm.length = client->length;
-		while( i-1 <= links) {
+    links--;				/* dont count the null entry on end */
+    if (cap_code == 0) {    /* found a path above */
+	tmpcrealm.data = client->data;
+	tmpcrealm.length = client->length;
+	while( i-1 <= links) {
 			
-			tmpsrealm.data = cap_nodes[i-1];
-			/* don't count trailing whitespace from profile_get */
-			tmpsrealm.length = strcspn(cap_nodes[i-1],"\t ");
-			if ((retval = krb5_tgtname(context,
-						   &tmpsrealm,
-						   &tmpcrealm,
-						   &rettree[i]))) {
-				while (i) {
-					krb5_free_principal(context, rettree[i-1]);
-					i--;
-	    		}
-	    		krb5_xfree(rettree);
-				/* cleanup the cap_nodes from profile_get */
-				for (i = 0; i<=links; i++) {
-					krb5_xfree(cap_nodes[i]);
-				}
-				krb5_xfree((char *)cap_nodes);
-	    		return retval;
-			}
-			tmpcrealm.data = tmpsrealm.data;	
-			tmpcrealm.length = tmpsrealm.length;
-			i++;
+	    tmpsrealm.data = cap_nodes[i-1];
+	    /* don't count trailing whitespace from profile_get */
+	    tmpsrealm.length = strcspn(cap_nodes[i-1],"\t ");
+	    if ((retval = krb5_tgtname(context,
+				       &tmpsrealm,
+				       &tmpcrealm,
+				       &rettree[i]))) {
+		while (i) {
+		    krb5_free_principal(context, rettree[i-1]);
+		    i--;
 		}
-		/* cleanup the cap_nodes from profile_get last one has server */
+		krb5_xfree(rettree);
+				/* cleanup the cap_nodes from profile_get */
 		for (i = 0; i<=links; i++) {
-			krb5_xfree(cap_nodes[i]);
+		    krb5_xfree(cap_nodes[i]);
 		}
 		krb5_xfree((char *)cap_nodes);
-	} else {  /* if not cap then use hierarchical method */
+		return retval;
+	    }
+	    tmpcrealm.data = tmpsrealm.data;	
+	    tmpcrealm.length = tmpsrealm.length;
+	    i++;
+	}
+	/* cleanup the cap_nodes from profile_get last one has server */
+	for (i = 0; i<=links; i++) {
+	    krb5_xfree(cap_nodes[i]);
+	}
+	krb5_xfree((char *)cap_nodes);
+    } else {  /* if not cap then use hierarchical method */
 #endif
-    for (prevccp = ccp = client->data;
-	 ccp <= com_cdot;
-	 ccp++) {
-	if (*ccp != realm_branch_char)
-	    continue;
-	++ccp;				/* advance past dot */
-	tmpcrealm.data = prevccp;
-	tmpcrealm.length = client->length -
-	    (prevccp - client->data);
-	tmpsrealm.data = ccp;
-	tmpsrealm.length = client->length -
-	    (ccp - client->data);
-	if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
-				   &rettree[i]))) {
-	    while (i) {
-		krb5_free_principal(context, rettree[i-1]);
-		i--;
+	for (prevccp = ccp = client->data;
+	     ccp <= com_cdot;
+	     ccp++) {
+	    if (*ccp != realm_branch_char)
+		continue;
+	    ++ccp;				/* advance past dot */
+	    tmpcrealm.data = prevccp;
+	    tmpcrealm.length = client->length -
+		(prevccp - client->data);
+	    tmpsrealm.data = ccp;
+	    tmpsrealm.length = client->length -
+		(ccp - client->data);
+	    if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
+				       &rettree[i]))) {
+		while (i) {
+		    krb5_free_principal(context, rettree[i-1]);
+		    i--;
+		}
+		krb5_xfree(rettree);
+		return retval;
 	    }
-	    krb5_xfree(rettree);
-	    return retval;
+	    prevccp = ccp;
+	    i++;
 	}
-	prevccp = ccp;
-	i++;
-    }
-    if (nocommon) {
-	tmpcrealm.data = com_cdot + 1;
-	tmpcrealm.length = client->length -
-	    (com_cdot + 1 - client->data);
-	tmpsrealm.data = com_sdot + 1;
-	tmpsrealm.length = server->length -
-	    (com_sdot + 1 - server->data);
-	if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
-				   &rettree[i]))) {
-	    while (i) {
-		krb5_free_principal(context, rettree[i-1]);
-		i--;
+	if (nocommon) {
+	    tmpcrealm.data = com_cdot + 1;
+	    tmpcrealm.length = client->length -
+		(com_cdot + 1 - client->data);
+	    tmpsrealm.data = com_sdot + 1;
+	    tmpsrealm.length = server->length -
+		(com_sdot + 1 - server->data);
+	    if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
+				       &rettree[i]))) {
+		while (i) {
+		    krb5_free_principal(context, rettree[i-1]);
+		    i--;
+		}
+		krb5_xfree(rettree);
+		return retval;
 	    }
-	    krb5_xfree(rettree);
-	    return retval;
+	    i++;
 	}
-	i++;
-    }
 
-    for (prevscp = com_sdot + 1, scp = com_sdot - 1;
-	 scp > server->data;
-	 scp--) {
-	if (*scp != realm_branch_char)
-	    continue;
-	if (scp - 1 < server->data)
-	    break;			/* XXX only if . starts realm? */
-	tmpcrealm.data = prevscp;
-	tmpcrealm.length = server->length -
-	    (prevscp - server->data);
-	tmpsrealm.data = scp + 1;
-	tmpsrealm.length = server->length -
-	    (scp + 1 - server->data);
-	if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
-				   &rettree[i]))) {
-	    while (i) {
-		krb5_free_principal(context, rettree[i-1]);
-		i--;
+	for (prevscp = com_sdot + 1, scp = com_sdot - 1;
+	     scp > server->data;
+	     scp--) {
+	    if (*scp != realm_branch_char)
+		continue;
+	    if (scp - 1 < server->data)
+		break;			/* XXX only if . starts realm? */
+	    tmpcrealm.data = prevscp;
+	    tmpcrealm.length = server->length -
+		(prevscp - server->data);
+	    tmpsrealm.data = scp + 1;
+	    tmpsrealm.length = server->length -
+		(scp + 1 - server->data);
+	    if ((retval = krb5_tgtname(context, &tmpsrealm, &tmpcrealm,
+				       &rettree[i]))) {
+		while (i) {
+		    krb5_free_principal(context, rettree[i-1]);
+		    i--;
+		}
+		krb5_xfree(rettree);
+		return retval;
 	    }
-	    krb5_xfree(rettree);
-	    return retval;
+	    prevscp = scp + 1;
+	    i++;
 	}
-	prevscp = scp + 1;
-	i++;
-    }
-    if (slen && com_sdot >= server->data) {
-	/* only necessary if building down tree from ancestor or client */
-	/* however, we can get here if we have only one component
-	   in the server realm name, hence we make sure we found a component
-	   separator there... */
-	tmpcrealm.data = prevscp;
-	tmpcrealm.length = server->length -
-	    (prevscp - server->data);
-	if ((retval = krb5_tgtname(context, server, &tmpcrealm,
-				   &rettree[i]))) {
-	    while (i) {
-		krb5_free_principal(context, rettree[i-1]);
-		i--;
+	if (slen && com_sdot >= server->data) {
+	    /* only necessary if building down tree from ancestor or client */
+	    /* however, we can get here if we have only one component
+	       in the server realm name, hence we make sure we found a component
+	       separator there... */
+	    tmpcrealm.data = prevscp;
+	    tmpcrealm.length = server->length -
+		(prevscp - server->data);
+	    if ((retval = krb5_tgtname(context, server, &tmpcrealm,
+				       &rettree[i]))) {
+		while (i) {
+		    krb5_free_principal(context, rettree[i-1]);
+		    i--;
+		}
+		krb5_xfree(rettree);
+		return retval;
 	    }
-	    krb5_xfree(rettree);
-	    return retval;
 	}
-    }
 #ifdef CONFIGURABLE_AUTHENTICATION_PATH
-	}
+    }
 #endif
     *tree = rettree;
+
+#ifdef DEBUG_REFERRALS
+    printf("krb5_walk_realm_tree ending; tree (length %d) is:\n",links);
+    for(i=0;i<links+2;i++) {
+        if ((*tree)[i])
+	    krb5int_dbgref_dump_principal("krb5_walk_realm_tree tree",(*tree)[i]);
+	else
+	    printf("tree element %i null\n");
+    }
+#endif
     return 0;
 }
+
+#ifdef DEBUG_REFERRALS
+void krb5int_dbgref_dump_principal(char *d, krb5_principal p)
+{
+    int n;
+	      
+    printf("  **%s: ",d);
+    for (n=0;n<p->length;n++)
+	printf("%s<%.*s>",(n>0)?"/":"",p->data[n].length,p->data[n].data);
+    printf("@<%.*s>  (length %d, type %d)\n",p->realm.length,p->realm.data,
+	   p->length, p->type);
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,20 +95,18 @@ krb5_copy_principal(krb5_context context, krb5_const_principal inprinc, krb5_pri
      * realm and principle component strings alway leave a null byte after
      * 'length' bytes that needs to be malloc/freed.
      */
-    if (tempprinc->realm.length) {
-        tempprinc->realm.data = MALLOC(tempprinc->realm.length + 1);
-        if (!tempprinc->realm.data) {
-	    for (i = 0; i < nelems; i++)
-                FREE(krb5_princ_component(context, tempprinc, i)->data,
-			krb5_princ_component(context, inprinc, i)->length + 1);
-	    FREE(tempprinc->data, nelems * sizeof(krb5_data));
-	    FREE(tempprinc, sizeof(krb5_principal_data));
-	    return ENOMEM;
+    tempprinc->realm.data = MALLOC(tempprinc->realm.length + 1);
+    if (!tempprinc->realm.data) {
+    for (i = 0; i < nelems; i++)
+        FREE(krb5_princ_component(context, tempprinc, i)->data,
+            krb5_princ_component(context, inprinc, i)->length + 1);
+        FREE(tempprinc->data, nelems * sizeof(krb5_data));
+        FREE(tempprinc, sizeof(krb5_principal_data));
+        return ENOMEM;
         }
-	memcpy(tempprinc->realm.data, inprinc->realm.data,
-	       inprinc->realm.length);
-    } else
-        tempprinc->realm.data = 0;
+    memcpy(tempprinc->realm.data, inprinc->realm.data,
+           inprinc->realm.length);
+    tempprinc->realm.data[tempprinc->realm.length] = 0;
 
     *outprinc = tempprinc;
     return 0;

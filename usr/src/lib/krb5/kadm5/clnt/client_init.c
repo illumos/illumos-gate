@@ -598,6 +598,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
      krb5_int32 starttime;
      char *server = NULL;
      krb5_principal serverp = NULL, clientp = NULL;
+     krb5_principal saved_server = NULL;
      bool_t cpw = FALSE;
 
 	ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
@@ -855,6 +856,15 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	if (code)
 		goto error;
 
+	/*
+	 * Solaris Kerberos:
+	 * Save the original creds.server as krb5_get_init_creds*() always
+	 * sets the realm of the server to the client realm. 
+	 */
+	code = krb5_copy_principal(handle->context, creds.server, &saved_server);
+	if (code)
+		goto error;
+
 	if (init_type == INIT_PASS) {
 		code = krb5_get_init_creds_password(handle->context,
 			&creds, creds.client, pass, NULL,
@@ -883,8 +893,20 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
      if (code != 0) {
 		ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"failed to obtain credentials cache\n"));
+		krb5_free_principal(handle->context, saved_server);
 		goto error;
 	}
+
+	/* 
+	 * Solaris Kerberos:
+	 * If the server principal had an empty realm then store that in
+	 * the cred cache and not the server realm as returned by
+	 * krb5_get_init_creds(). This ensures that rpcsec_gss will find
+	 * the credential in the cred cache even if a "fallback" method is
+	 * being used to determine the realm.
+	 */
+	krb5_free_principal(handle->context, creds.server);
+	creds.server = saved_server;
 
 	/*
 	 * If we got this far, save the creds in the cache.

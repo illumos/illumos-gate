@@ -4,41 +4,46 @@
  */
 
 /*
- * Copyright (C) 1989-1995 by the Massachusetts Institute of Technology,
+ * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001, 2003,2006 by the Massachusetts Institute of Technology,
  * Cambridge, MA, USA.  All Rights Reserved.
- *
- * This software is being provided to you, the LICENSEE, by the
- * Massachusetts Institute of Technology (M.I.T.) under the following
- * license.  By obtaining, using and/or copying this software, you agree
- * that you have read, understood, and will comply with these terms and
- * conditions:
- *
+ * 
+ * This software is being provided to you, the LICENSEE, by the 
+ * Massachusetts Institute of Technology (M.I.T.) under the following 
+ * license.  By obtaining, using and/or copying this software, you agree 
+ * that you have read, understood, and will comply with these terms and 
+ * conditions:  
+ * 
  * Export of this software from the United States of America may
  * require a specific license from the United States Government.
  * It is the responsibility of any person or organization contemplating
  * export to obtain such a license before exporting.
- *
- * WITHIN THAT CONSTRAINT, permission to use, copy, modify and distribute
- * this software and its documentation for any purpose and without fee or
- * royalty is hereby granted, provided that you agree to comply with the
- * following copyright notice and statements, including the disclaimer, and
- * that the same appear on ALL copies of the software and documentation,
- * including modifications that you make for internal use or for
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify and distribute 
+ * this software and its documentation for any purpose and without fee or 
+ * royalty is hereby granted, provided that you agree to comply with the 
+ * following copyright notice and statements, including the disclaimer, and 
+ * that the same appear on ALL copies of the software and documentation, 
+ * including modifications that you make for internal use or for 
  * distribution:
- *
- * THIS SOFTWARE IS PROVIDED "AS IS", AND M.I.T. MAKES NO REPRESENTATIONS
- * OR WARRANTIES, EXPRESS OR IMPLIED.  By way of example, but not
- * limitation, M.I.T. MAKES NO REPRESENTATIONS OR WARRANTIES OF
- * MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF
- * THE LICENSED SOFTWARE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY
- * PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
- *
- * The name of the Massachusetts Institute of Technology or M.I.T. may NOT
- * be used in advertising or publicity pertaining to distribution of the
- * software.  Title to copyright in this software and any associated
- * documentation shall at all times remain with M.I.T., and USER agrees to
+ * 
+ * THIS SOFTWARE IS PROVIDED "AS IS", AND M.I.T. MAKES NO REPRESENTATIONS 
+ * OR WARRANTIES, EXPRESS OR IMPLIED.  By way of example, but not 
+ * limitation, M.I.T. MAKES NO REPRESENTATIONS OR WARRANTIES OF 
+ * MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF 
+ * THE LICENSED SOFTWARE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY 
+ * PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.   
+ * 
+ * The name of the Massachusetts Institute of Technology or M.I.T. may NOT 
+ * be used in advertising or publicity pertaining to distribution of the 
+ * software.  Title to copyright in this software and any associated 
+ * documentation shall at all times remain with M.I.T., and USER agrees to 
  * preserve same.
+ *
+ * Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.  
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -256,6 +261,13 @@ struct sockaddr;
 
 /* Get mutex support; currently used only for the replay cache.  */
 #include "k5-thread.h"
+
+/*
+ * Solaris Kerberos:
+ * Define whether or not to do a reverse lookup when looking up a host in DNS.
+ */
+#define REV_LOOKUP 1
+#define NO_REV_LOOKUP 0
 
 
 /* krb5/krb5.h includes many other .h files in the krb5 subdirectory.
@@ -647,6 +659,18 @@ krb5_error_code krb5_write_message
 	(krb5_context, krb5_pointer, krb5_data *);
 
 krb5_error_code krb5int_get_fq_local_hostname (char *, size_t);
+
+/*
+ * Solaris Kerberos
+ * The following two functions are needed for better realm
+ * determination based on the DNS domain name.
+ */
+krb5_error_code krb5int_lookup_host(int , const char *, char **);
+
+krb5_error_code krb5int_domain_get_realm(krb5_context, const char *,
+    char **);
+krb5_error_code krb5int_fqdn_get_realm(krb5_context, const char *,
+    char **);
 
 krb5_error_code krb5_os_init_context
         (krb5_context);
@@ -2230,5 +2254,21 @@ krb5_boolean KRB5_CALLCONV is_in_keytype
  * Use krb5_getuid() to select the mechanism to obtain the uid.
  */
 extern uid_t	krb5_getuid();
+/*
+ * Referral definitions, debugging hooks, and subfunctions.
+ */
+#define        KRB5_REFERRAL_MAXHOPS	5
+/* #define DEBUG_REFERRALS */
+
+#ifdef DEBUG_REFERRALS
+void krb5int_dbgref_dump_principal(char *, krb5_principal);
+#endif
+
+/* Common hostname-parsing code. */
+krb5_error_code KRB5_CALLCONV krb5int_clean_hostname
+	(krb5_context,
+		const char *,
+		char *,
+		size_t);
 
 #endif /* _KRB5_INT_H */

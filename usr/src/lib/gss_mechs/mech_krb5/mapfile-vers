@@ -558,6 +558,7 @@ SUNWprivate_1.1 {
 	krb5_init_secure_context;
 	krb5_internalize_opaque;
 	krb5_is_permitted_enctype;
+	krb5_is_referral_realm;
 	krb5_is_thread_safe;
 	krb5_kdc_rep_decrypt_proc;
 	krb5_kt_add_entry;

@@ -709,6 +709,28 @@ load_root_cred_using_keytab(
 		*minor_status = code;
 		return (GSS_S_FAILURE);
 	}
+
+	/*
+	 * Solaris Kerberos:
+	 * If the client's realm is empty (using a fallback method to determine
+	 * the realm) then make sure to set the client's realm to the default
+	 * realm. This ensures that the TGT is built correctly.
+	 */
+	if (krb5_is_referral_realm(&(me->realm))) {
+		char *realm;
+
+		free(me->realm.data);
+		code = krb5_get_default_realm(context, &realm);
+		if (code) {
+			(void) krb5_kt_close(context, keytab);
+			*minor_status = code;
+			return (GSS_S_FAILURE);
+		}
+
+		me->realm.data = realm;
+		me->realm.length = strlen(realm);
+	}
+
 	my_creds.client = me;
 
 	if((code = krb5_build_principal_ext(context, &server,

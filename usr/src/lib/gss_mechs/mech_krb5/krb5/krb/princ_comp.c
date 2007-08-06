@@ -67,3 +67,23 @@ krb5_principal_compare(krb5_context context, krb5_const_principal princ1, krb5_c
     }
     return TRUE;
 }
+
+krb5_boolean KRB5_CALLCONV krb5_is_referral_realm(const krb5_data *r)
+{
+    /*
+     * Check for a match with KRB5_REFERRAL_REALM.  Currently this relies
+     * on that string constant being zero-length.  (Unlike principal realm
+     * names, KRB5_REFERRAL_REALM is known to be a string.)
+     */
+#ifdef DEBUG_REFERRALS
+#if 0
+    printf("krb5_is_ref_realm: checking <%s> for referralness: %s\n",
+	   r->data,(r->length==0)?"true":"false");
+#endif
+#endif
+    assert(strlen(KRB5_REFERRAL_REALM)==0);
+    if (r->length==0)
+        return TRUE;
+    else
+        return FALSE;
+}

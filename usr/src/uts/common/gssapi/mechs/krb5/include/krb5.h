@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -25,14 +25,14 @@
 /*
  * include/krb5.h
  *
- * Copyright 1989,1990,1995 by the Massachusetts Institute of Technology.
+ * Copyright 1989,1990,1995,2001, 2003  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -324,6 +324,16 @@ typedef const krb5_principal_data *krb5_const_principal;
             (((i) < krb5_princ_size(context, princ)) \
              ? (princ)->data + (i)                   \
              : NULL) 
+
+/*
+ * Constants for realm referrals.
+ */
+#define        KRB5_REFERRAL_REALM	""
+
+/*
+ * Referral-specific functions.
+ */
+krb5_boolean KRB5_CALLCONV krb5_is_referral_realm(const krb5_data *);
 
 /*
  * end "base-defs.h"
@@ -636,6 +646,9 @@ krb5_error_code KRB5_CALLCONV
 #define KRB5_KEYUSAGE_PA_SAM_CHALLENGE_TRACKID	26
 #define KRB5_KEYUSAGE_PA_SAM_RESPONSE		27
 
+/* Defined in KDC referrals draft */
+#define KRB5_KEYUSAGE_PA_REFERRAL		26 /* XXX note conflict with above */
+
 krb5_boolean KRB5_CALLCONV krb5_c_valid_enctype
         (krb5_enctype ktype);
 krb5_boolean KRB5_CALLCONV krb5_c_valid_cksumtype
@@ -707,7 +720,7 @@ size_t KRB5_CALLCONV krb5_checksum_size
 /* #define	KDC_OPT_RESERVED	0x00080000 */
 /* #define	KDC_OPT_RESERVED	0x00040000 */
 #define	KDC_OPT_REQUEST_ANONYMOUS	0x00020000
-/* #define	KDC_OPT_RESERVED	0x00010000 */
+#define	KDC_OPT_CANONICALIZE		0x00010000
 /* #define	KDC_OPT_RESERVED	0x00008000 */
 /* #define	KDC_OPT_RESERVED	0x00004000 */
 /* #define	KDC_OPT_RESERVED	0x00002000 */
@@ -892,6 +905,7 @@ size_t KRB5_CALLCONV krb5_checksum_size
 #define KRB5_PADATA_PK_AS_REQ		14 /* PKINIT */
 #define KRB5_PADATA_PK_AS_REP		15 /* PKINIT */
 #define KRB5_PADATA_ETYPE_INFO2 	19
+#define KRB5_PADATA_REFERRAL		25 /* draft referral system */
 #define KRB5_PADATA_SAM_CHALLENGE_2	30 /* draft challenge system, updated */
 #define KRB5_PADATA_SAM_RESPONSE_2	31 /* draft challenge system, updated */
 
@@ -2319,6 +2333,10 @@ krb5_error_code KRB5_CALLCONV krb5_aname_to_localname
 krb5_error_code KRB5_CALLCONV krb5_get_host_realm
 	(krb5_context,
 		const char *,
+		char *** );
+krb5_error_code KRB5_CALLCONV krb5_get_fallback_host_realm
+	(krb5_context,
+		krb5_data *,
 		char *** );
 krb5_error_code KRB5_CALLCONV krb5_free_host_realm
 	(krb5_context,

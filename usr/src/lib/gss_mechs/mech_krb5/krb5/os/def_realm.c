@@ -30,9 +30,20 @@
  * krb5_free_default_realm() functions.
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #include <k5-int.h>
 #include "os-proto.h"
 #include <stdio.h>
+
+/* 
+ * Solaris Kerberos:
+ * For krb5int_foreach_localaddr()
+ */
+#include "foreachaddr.h"
 
 #ifdef KRB5_DNS_LOOKUP	     
 #ifdef WSHELPER
@@ -57,6 +68,52 @@
 #endif /* KRB5_DNS_LOOKUP */
 
 /*
+ * Solaris Kerberos:
+ * The following prototype is needed because it is a
+ * private interface that does not have a prototype in any .h
+ */
+extern struct hostent *res_gethostbyaddr(const char *addr, int len, int type);
+
+/*
+ * Solaris Kerberos:
+ * krb5int_address_get_realm() given an address (either IPv4 or IPv6) tries to
+ * find a realm based on the DNS name of that address. Assumes that its being
+ * used as a callback for krb5int_foreach_localaddr().
+ */
+static int krb5int_address_get_realm(void *data, struct sockaddr *addr) {
+	
+	krb5_context context = data;
+	struct hostent *he = NULL;
+
+	switch (addr->sa_family) {
+		case AF_INET:
+			he = res_gethostbyaddr((char*)(&sa2sin(addr)->sin_addr),
+			    sizeof(sa2sin(addr)->sin_addr), AF_INET);
+			break;
+		case AF_INET6:
+			he = res_gethostbyaddr(
+			    (char*)(&sa2sin6(addr)->sin6_addr),
+			    sizeof(sa2sin6(addr)->sin6_addr), AF_INET6);
+			break;
+	}
+
+	if (he) {
+		/* Try to find realm using returned DNS name */
+		krb5int_fqdn_get_realm(context, he->h_name,
+		    &context->default_realm);
+
+		/* If a realm was found return 1 to immediately halt
+		 * krb5int_foreach_localaddr()
+		 */ 
+		if (context->default_realm != 0) {
+			return (1);
+		}
+	}
+	return (0);
+}
+
+
+/*
  * Retrieves the default realm to be used if no user-specified realm is
  *  available.  [e.g. to interpret a user-typed principal name with the
  *  realm omitted for convenience]
@@ -75,16 +132,15 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
 {
     char *realm = 0;
     char *cp;
+    char localhost[MAX_DNS_NAMELEN+1];
     krb5_error_code retval;
+
+    (void) memset(localhost, 0, sizeof(localhost));
 
     if (!context || (context->magic != KV5M_CONTEXT)) 
 	    return KV5M_CONTEXT;
 
     if (!context->default_realm) {
-        /*
-         * XXX should try to figure out a reasonable default based
-         * on the host's DNS domain.
-         */
         context->default_realm = 0;
         if (context->profile != 0) {
             retval = profile_get_string(context->profile, "libdefaults",
@@ -101,13 +157,9 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
                 profile_release_string(realm);
             }
         }
-#ifndef KRB5_DNS_LOOKUP
-        else 
-            return KRB5_CONFIG_CANTOPEN;
-#else /* KRB5_DNS_LOOKUP */
         if (context->default_realm == 0) {
-            int use_dns =  _krb5_use_dns_realm(context);
-            if ( use_dns ) {
+#ifdef KRB5_DNS_LOOKUP
+            if (_krb5_use_dns_realm(context)) {
 		/*
 		 * Since this didn't appear in our config file, try looking
 		 * it up via DNS.  Look for a TXT records of the form:
@@ -117,9 +169,7 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
 		 * _kerberos.<searchlist>
 		 *
 		 */
-		char localhost[MAX_DNS_NAMELEN+1];
 		char * p;
-
 		krb5int_get_fq_local_hostname (localhost, sizeof(localhost));
 
 		if ( localhost[0] ) {
@@ -142,10 +192,43 @@ krb5_get_default_realm(krb5_context context, char **lrealm)
 		if (retval) {
 		    return(KRB5_CONFIG_NODEFREALM);
 		}
-            }
-        }
+            } else
 #endif /* KRB5_DNS_LOOKUP */
-    }
+             {
+
+	/*
+	 * Solaris Kerberos:
+	 * Try to find a realm based on one of the local IP addresses
+	 */
+	(void) krb5int_foreach_localaddr(context,
+	    krb5int_address_get_realm, 0, 0);
+
+	/*
+	 * Solaris Kerberos:
+	 * As a final fallback try to find a realm based on the resolver search
+	 * list
+	 */
+	if (context->default_realm == 0) {
+		struct __res_state res;
+		int i;
+
+		(void) memset(&res, 0, sizeof (res));
+
+		if (res_ninit(&res) == 0) {
+			for (i = 0; res.dnsrch[i]; i++) {
+				krb5int_domain_get_realm(context,
+				    res.dnsrch[i], &context->default_realm); 
+
+				if (context->default_realm != 0)
+					break;
+			}
+		res_ndestroy(&res);
+		}
+	}
+
+	}
+	}
+	}
 
     if (context->default_realm == 0)
 	return(KRB5_CONFIG_NODEFREALM);

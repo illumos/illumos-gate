@@ -29,6 +29,10 @@
  * krb5_get_host_realm()
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  Figures out the Kerberos realm names for host, filling in a
@@ -67,7 +71,7 @@
  * host names should be in the usual form (e.g. FOO.BAR.BAZ)
  */
 
-#define NEED_SOCKETS
+
 #include "k5-int.h"
 #include "os-proto.h"
 #include <ctype.h>
@@ -78,26 +82,11 @@
 #include <strings.h>
 #endif
 
-#ifdef KRB5_DNS_LOOKUP       
-#ifdef WSHELPER
-#include <wshelper.h>
-#else /* WSHELPER */
-#include <arpa/inet.h>       
-#include <arpa/nameser.h>
-#ifndef T_TXT /* not defined on SunOS 4 */
-#  define T_TXT 15
-#endif
-#include <resolv.h>          
-#include <netdb.h>
-#endif /* WSHELPER */
-#endif /* KRB5_DNS_LOOKUP */ 
-
 #include <fake-addrinfo.h>
 
 #ifdef KRB5_DNS_LOOKUP
 
 #include "dnsglue.h"
-
 /*
  * Try to look up a TXT record pointing to a Kerberos realm
  */
@@ -141,33 +130,32 @@ krb5_try_realm_txt_rr(const char *prefix, const char *name, char **realm)
     }
     ret = krb5int_dns_init(&ds, host, C_IN, T_TXT);
     if (ret < 0)
-      goto errout;
+	goto errout;
 
     ret = krb5int_dns_nextans(ds, &base, &rdlen);
     if (ret < 0 || base == NULL)
-      goto errout;
+	goto errout;
 
     p = base;
     if (!INCR_OK(base, rdlen, p, 1))
-      goto errout;
-
+	goto errout;
     len = *p++;
     *realm = malloc((size_t)len + 1);
     if (*realm == NULL) {
-      retval = ENOMEM; 
-      goto errout;
+	retval = ENOMEM;
+	goto errout;
     }
     strncpy(*realm, (const char *)p, (size_t)len);
     (*realm)[len] = '\0';
     /* Avoid a common error. */
     if ( (*realm)[len-1] == '.' )
-      (*realm)[len-1] = '\0';
+	(*realm)[len-1] = '\0';
     retval = 0;
 
 errout:
     if (ds != NULL) {
-      krb5int_dns_fini(ds);
-      ds = NULL;
+	krb5int_dns_fini(ds);
+	ds = NULL;
     }
     return retval;
 }
@@ -176,7 +164,6 @@ errout:
 #define MAXDNAME (16 * MAXHOSTNAMELEN)
 #endif /* MAXDNAME */
 #endif /* KRB5_DNS_LOOKUP */
-
 
 krb5_error_code krb5int_translate_gai_error (int);
 
@@ -187,7 +174,6 @@ krb5int_get_fq_hostname (char *buf, size_t bufsize, const char *name)
     int err;
 
     memset (&hints, 0, sizeof (hints));
-    hints.ai_family = AF_UNSPEC;
     hints.ai_flags = AI_CANONNAME;
     err = getaddrinfo (name, 0, &hints, &ai);
     if (err)
@@ -217,52 +203,15 @@ krb5_error_code KRB5_CALLCONV
 krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
 {
     char **retrealms;
-    char *default_realm, *realm, *cp, *temp_realm;
+    char *realm, *cp, *temp_realm;
     krb5_error_code retval;
-    int l;
     char local_host[MAXDNAME+1];
 
-    if (host) {
-	/* Filter out numeric addresses if the caller utterly failed to
-	   convert them to names.  */
-	/* IPv4 - dotted quads only */
-	if (strspn(host, "01234567890.") == strlen(host)) {
-	    /* All numbers and dots... if it's three dots, it's an
-	       IP address, and we reject it.  But "12345" could be
-	       a local hostname, couldn't it?  We'll just assume
-	       that a name with three dots is not meant to be an
-	       all-numeric hostname three all-numeric domains down
-	       from the current domain.  */
-	    int ndots = 0;
-	    const char *p;
-	    for (p = host; *p; p++)
-		if (*p == '.')
-		    ndots++;
-	    if (ndots == 3)
-		return KRB5_ERR_NUMERIC_REALM;
-	}
-	if (strchr(host, ':'))
-	    /* IPv6 numeric address form?  Bye bye.  */
-	    return KRB5_ERR_NUMERIC_REALM;
+#ifdef DEBUG_REFERRALS
+    printf("get_host_realm(host:%s) called\n",host);
+#endif
 
-	/* Should probably error out if strlen(host) > MAX_DNS_NAMELEN.  */
-	strncpy(local_host, host, sizeof(local_host));
-	local_host[sizeof(local_host) - 1] = '\0';
-    } else {
-	retval = krb5int_get_fq_local_hostname (local_host,
-						sizeof (local_host));
-	if (retval)
-	    return retval;
-    }
-
-    for (cp = local_host; *cp; cp++) {
-	if (isupper((int) (*cp)))
-	    *cp = tolower((int) *cp);
-    }
-    l = strlen(local_host);
-    /* strip off trailing dot */
-    if (l && local_host[l-1] == '.')
-	    local_host[l-1] = 0;
+    krb5int_clean_hostname(context, host, local_host, sizeof local_host);
 
     /*
        Search for the best match for the host or domain.
@@ -277,9 +226,15 @@ krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
      */
 
     cp = local_host;
-    realm = default_realm = (char *)NULL;
+#ifdef DEBUG_REFERRALS
+    printf("  local_host: %s\n",local_host);
+#endif
+    realm = (char *)NULL;
     temp_realm = 0;
     while (cp) {
+#ifdef DEBUG_REFERRALS
+        printf("  trying to look up %s in the domain_realm map\n",cp);
+#endif
 	retval = profile_get_string(context->profile, "domain_realm", cp,
 				    0, (char *)NULL, &temp_realm);
 	if (retval)
@@ -290,15 +245,17 @@ krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
 	/* Setup for another test */
 	if (*cp == '.') {
 	    cp++;
-	    if (default_realm == (char *)NULL) {
-		/* If nothing else works, use the host's domain */
-		default_realm = cp;
-	    }
 	} else {
 	    cp = strchr(cp, '.');
 	}
     }
+#ifdef DEBUG_REFERRALS
+    printf("  done searching the domain_realm map\n");
+#endif
     if (temp_realm) {
+#ifdef DEBUG_REFERRALS
+    printf("  temp_realm is %s\n",temp_realm);
+#endif
         realm = malloc(strlen(temp_realm) + 1);
         if (!realm) {
             profile_release_string(temp_realm);
@@ -308,47 +265,13 @@ krb5_get_host_realm(krb5_context context, const char *host, char ***realmsp)
         profile_release_string(temp_realm);
     }
 
-#ifdef KRB5_DNS_LOOKUP
     if (realm == (char *)NULL) {
-        int use_dns = _krb5_use_dns_realm(context);
-        if ( use_dns ) {
-            /*
-             * Since this didn't appear in our config file, try looking
-             * it up via DNS.  Look for a TXT records of the form:
-             *
-             * _kerberos.<hostname>
-             *
-             */
-            cp = local_host;
-            do {
-                retval = krb5_try_realm_txt_rr("_kerberos", cp, &realm);
-                cp = strchr(cp,'.');
-                if (cp) 
-                    cp++;
-            } while (retval && cp && cp[0]);
-        }
+        if (!(cp = (char *)malloc(strlen(KRB5_REFERRAL_REALM)+1)))
+	    return ENOMEM;
+	strcpy(cp, KRB5_REFERRAL_REALM);
+	realm = cp;
     }
-#endif /* KRB5_DNS_LOOKUP */
-    if (realm == (char *)NULL) {
-        if (default_realm != (char *)NULL) {
-            /* We are defaulting to the realm of the host */
-            if (!(cp = (char *)malloc(strlen(default_realm)+1)))
-                return ENOMEM;
-            strcpy(cp, default_realm);
-            realm = cp;
-
-            /* Assume the realm name is upper case */
-            for (cp = realm; *cp; cp++)
-                if (islower((int) (*cp)))
-                    *cp = toupper((int) *cp);
-        } else {    
-            /* We are defaulting to the local realm */
-            retval = krb5_get_default_realm(context, &realm);
-            if (retval) {
-                return retval;
-            }
-        }
-    }
+    
     if (!(retrealms = (char **)calloc(2, sizeof(*retrealms)))) {
 	if (realm != (char *)NULL)
 	    free(realm);
@@ -404,3 +327,221 @@ krb5int_translate_gai_error (int num)
     /* abort (); */
     return -1;
 }
+
+
+/*
+ * Ganked from krb5_get_host_realm; handles determining a fallback realm
+ * to try in the case where referrals have failed and it's time to go
+ * look at TXT records or make a DNS-based assumption.
+ */
+
+krb5_error_code KRB5_CALLCONV
+krb5_get_fallback_host_realm(krb5_context context, krb5_data *hdata, char ***realmsp)
+{
+    char **retrealms;
+    char *realm = (char *)NULL, *cp;
+    krb5_error_code retval;
+    char local_host[MAXDNAME+1], host[MAXDNAME+1];
+
+    /* Convert what we hope is a hostname to a string. */
+    memcpy(host, hdata->data, hdata->length);
+    host[hdata->length]=0;
+
+#ifdef DEBUG_REFERRALS
+    printf("get_fallback_host_realm(host >%s<) called\n",host);
+#endif
+
+    krb5int_clean_hostname(context, host, local_host, sizeof local_host);
+
+#ifdef DEBUG_REFERRALS
+    printf("  local_host: %s\n",local_host);
+#endif
+
+#ifdef KRB5_DNS_LOOKUP
+    if (_krb5_use_dns_realm(context)) {
+        /*
+         * Since this didn't appear in our config file, try looking
+         * it up via DNS.  Look for a TXT records of the form:
+         *
+         * _kerberos.<hostname>
+         *
+         */
+        cp = local_host;
+        do {
+            retval = krb5_try_realm_txt_rr("_kerberos", cp, &realm);
+            cp = strchr(cp,'.');
+            if (cp) 
+                cp++;
+        } while (retval && cp && cp[0]);
+    } else
+#endif /* KRB5_DNS_LOOKUP */
+    {
+        /*
+         * Solaris Kerberos:
+         * Fallback to looking for a realm based on the DNS domain
+         * of the host. Note: "local_host" here actually refers to the
+         * host and NOT necessarily the local hostnane.
+         */
+        (void) krb5int_fqdn_get_realm(context, local_host,
+                                    &realm);
+#ifdef DEBUG_REFERRALS
+        printf("  done finding DNS-based default realm: >%s<\n",realm);
+#endif
+    }
+
+      
+    if (realm == (char *)NULL) {
+        /* We are defaulting to the local realm */
+        retval = krb5_get_default_realm(context, &realm);
+        if (retval) {
+             return retval;
+        }
+    }
+    if (!(retrealms = (char **)calloc(2, sizeof(*retrealms)))) {
+	if (realm != (char *)NULL)
+	    free(realm);
+	return ENOMEM;
+    }
+
+    retrealms[0] = realm;
+    retrealms[1] = 0;
+    
+    *realmsp = retrealms;
+    return 0;
+}
+
+/*
+ * Common code for krb5_get_host_realm and krb5_get_fallback_host_realm
+ * to do basic sanity checks on supplied hostname.
+ */
+krb5_error_code KRB5_CALLCONV
+krb5int_clean_hostname(krb5_context context, const char *host, char *local_host, size_t lhsize)
+{
+    char *cp;
+    krb5_error_code retval;
+    int l;
+
+    local_host[0]=0;
+#ifdef DEBUG_REFERRALS
+    printf("krb5int_clean_hostname called: host<%s>, local_host<%s>, size %d\n",host,local_host,lhsize);
+#endif
+    if (host) {
+	/* Filter out numeric addresses if the caller utterly failed to
+	   convert them to names.  */
+	/* IPv4 - dotted quads only */
+	if (strspn(host, "01234567890.") == strlen(host)) {
+	    /* All numbers and dots... if it's three dots, it's an
+	       IP address, and we reject it.  But "12345" could be
+	       a local hostname, couldn't it?  We'll just assume
+	       that a name with three dots is not meant to be an
+	       all-numeric hostname three all-numeric domains down
+	       from the current domain.  */
+	    int ndots = 0;
+	    const char *p;
+	    for (p = host; *p; p++)
+		if (*p == '.')
+		    ndots++;
+	    if (ndots == 3)
+		return KRB5_ERR_NUMERIC_REALM;
+	}
+	if (strchr(host, ':'))
+	    /* IPv6 numeric address form?  Bye bye.  */
+	    return KRB5_ERR_NUMERIC_REALM;
+
+	/* Should probably error out if strlen(host) > MAXDNAME.  */
+	strncpy(local_host, host, lhsize);
+	local_host[lhsize - 1] = '\0';
+    } else {
+        retval = krb5int_get_fq_local_hostname (local_host, lhsize);
+	if (retval)
+	    return retval;
+    }
+
+    /* fold to lowercase */
+    for (cp = local_host; *cp; cp++) {
+	if (isupper((unsigned char) (*cp)))
+	    *cp = tolower((unsigned char) *cp);
+    }
+    l = strlen(local_host);
+    /* strip off trailing dot */
+    if (l && local_host[l-1] == '.')
+	    local_host[l-1] = 0;
+
+#ifdef DEBUG_REFERRALS
+    printf("krb5int_clean_hostname ending: host<%s>, local_host<%s>, size %d\n",host,local_host,lhsize);
+#endif
+    return 0;
+}
+
+/*
+ * Solaris Kerberos:
+ * Walk through the components of a domain. At each
+ * stage determine if a KDC can be located for that domain.
+ * Return a realm corresponding to the upper-cased domain name
+ * for which a KDC was found or NULL if no KDC was found.
+ */
+krb5_error_code
+krb5int_domain_get_realm(krb5_context context, const char *domain, char **realm) {
+    krb5_error_code retval;
+    struct addrlist addrlist;
+    krb5_data drealm;
+    char *cp = NULL;
+    char *fqdn = NULL;
+
+    *realm = NULL;
+    memset(&drealm, 0, sizeof (drealm));
+
+    if (!(fqdn = malloc(strlen(domain) + 1))) {
+        return (ENOMEM);
+    }
+    strlcpy(fqdn, domain, strlen(domain) + 1);
+
+    /* Upper case the domain (for use as a realm) */
+    for (cp = fqdn; *cp; cp++)
+        if (islower((int)(*cp)))
+            *cp = toupper((int)*cp);
+
+    cp = fqdn;
+    while (strchr(cp, '.') != NULL) {
+
+        drealm.length = strlen(cp);
+        drealm.data = cp;
+
+        /* Find a kdc based on this part of the domain name */
+        retval = krb5_locate_kdc(context, &drealm, &addrlist, 0, SOCK_DGRAM, 0);
+        krb5int_free_addrlist(&addrlist);
+
+        if (!retval) { /* Found a KDC! */
+            if (!(*realm = malloc(strlen(cp) + 1))) {
+                free(fqdn);
+                return (ENOMEM);
+            }
+            strlcpy(*realm, cp, strlen(cp) + 1);
+            break;
+        }
+
+        cp = strchr(cp, '.');
+        cp++;
+    }
+    free(fqdn);
+    return (0);
+}
+
+/*
+ * Solaris Kerberos:
+ * Discards the first component of the fqdn and calls
+ * krb5int_domain_get_realm() with the remaining string (domain).
+ *
+ */
+krb5_error_code
+krb5int_fqdn_get_realm(krb5_context context, const char *fqdn, char **realm) {
+    char *domain = strchr(fqdn, '.');
+
+    if (domain) {
+        domain++;
+        return (krb5int_domain_get_realm(context, domain, realm));
+    } else {
+        return (-1);
+    }
+}
+

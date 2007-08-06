@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,10 +125,10 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 			size = 0;
 			i++;
 		} else if (c == REALM_SEP) {
-			if (parsed_realm || !*(cp + 1))
+			if (parsed_realm)
 				/*
-				 * Multiple realm separaters or null
-				 * realm names are not allowed!
+				 * Multiple realm separaters
+				 * not allowed; zero-length realms are.
 				 */
 				return (KRB5_PARSE_MALFORMED);
 			parsed_realm = cp + 1;
