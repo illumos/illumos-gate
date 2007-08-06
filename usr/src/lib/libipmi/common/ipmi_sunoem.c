@@ -96,9 +96,10 @@ ipmi_sunoem_led_set(ipmi_handle_t *ihp, ipmi_sdr_generic_locator_t *dev,
 	if (check_sunoem(ihp) != 0)
 		return (-1);
 
-	cmd.ic_sls_devaddr = dev->is_gl_slaveaddr;
+	cmd.ic_sls_slaveaddr = dev->is_gl_slaveaddr;
+	cmd.ic_sls_channel_msb = dev->is_gl_channel_msb;
 	cmd.ic_sls_type = dev->is_gl_oem;
-	cmd.ic_sls_ctladdr = dev->is_gl_accessaddr;
+	cmd.ic_sls_accessaddr = dev->is_gl_accessaddr;
 	cmd.ic_sls_hwinfo = dev->is_gl_oem;
 	cmd.ic_sls_mode = mode;
 
@@ -114,9 +115,10 @@ ipmi_sunoem_led_get(ipmi_handle_t *ihp, ipmi_sdr_generic_locator_t *dev,
 	if (check_sunoem(ihp) != 0)
 		return (-1);
 
-	cmd.ic_slg_devaddr = dev->is_gl_slaveaddr;
+	cmd.ic_slg_slaveaddr = dev->is_gl_slaveaddr;
+	cmd.ic_slg_channel_msb = dev->is_gl_channel_msb;
 	cmd.ic_slg_type = dev->is_gl_oem;
-	cmd.ic_slg_ctladdr = dev->is_gl_accessaddr;
+	cmd.ic_slg_accessaddr = dev->is_gl_accessaddr;
 	cmd.ic_slg_hwinfo = dev->is_gl_oem;
 
 	return (ipmi_send_sunoem_led_get(ihp, &cmd, mode));

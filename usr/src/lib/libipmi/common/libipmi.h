@@ -139,7 +139,7 @@ typedef struct ipmi_deviceid {
 	uint8_t		__reserved:3;
 	uint8_t		id_dev_rev:4;
 #endif
-#if defined(_BIT_FIELD_LTOH)
+#if defined(_BIT_FIELDS_LTOH)
 	uint8_t		id_firm_major:7;
 	uint8_t		id_dev_available:1;
 #else
@@ -403,9 +403,21 @@ extern int ipmi_set_sensor_reading(ipmi_handle_t *,
 #define	IPMI_CMD_SUNOEM_LED_SET		0x22
 
 typedef struct ipmi_cmd_sunoem_led_set {
-	uint8_t		ic_sls_devaddr;		/* device slave address */
+#if defined(_BIT_FIELDS_LTOH)
+	uint8_t		ic_sls_channel_msb:1;	/* device slave address */
+	uint8_t		ic_sls_slaveaddr:7;	/* (from SDR record) */
+#else
+	uint8_t		ic_sls_slaveaddr:7;
+	uint8_t		ic_sls_channel_msb:1;
+#endif
 	uint8_t		ic_sls_type;		/* led type */
-	uint8_t		ic_sls_ctladdr;		/* controller address */
+#if defined(_BIT_FIELDS_LTOH)
+	uint8_t		__reserved:1;		/* device access address */
+	uint8_t		ic_sls_accessaddr:7;	/* (from SDR record) */
+#else
+	uint8_t		ic_sls_accessaddr:7;
+	uint8_t		__reserved:1;
+#endif
 	uint8_t		ic_sls_hwinfo;		/* OEM hardware info */
 	uint8_t		ic_sls_mode;		/* LED mode */
 	uint8_t		ic_sls_force;		/* force direct access */
@@ -413,9 +425,21 @@ typedef struct ipmi_cmd_sunoem_led_set {
 } ipmi_cmd_sunoem_led_set_t;
 
 typedef struct ipmi_cmd_sunoem_led_get {
-	uint8_t		ic_slg_devaddr;		/* device slave address */
+#if defined(_BIT_FIELDS_LTOH)
+	uint8_t		ic_slg_channel_msb:1;	/* device slave address */
+	uint8_t		ic_slg_slaveaddr:7;	/* (from SDR record) */
+#else
+	uint8_t		ic_slg_slaveaddr:7;
+	uint8_t		ic_slg_channel_msb:1;
+#endif
 	uint8_t		ic_slg_type;		/* led type */
-	uint8_t		ic_slg_ctladdr;		/* controller address */
+#if defined(_BIT_FIELDS_LTOH)
+	uint8_t		__reserved:1;		/* device access address */
+	uint8_t		ic_slg_accessaddr:7;	/* (from SDR record) */
+#else
+	uint8_t		ic_slg_accessaddr:7;
+	uint8_t		__reserved:1;
+#endif
 	uint8_t		ic_slg_hwinfo;		/* OEM hardware info */
 	uint8_t		ic_slg_force;		/* force direct access */
 } ipmi_cmd_sunoem_led_get_t;

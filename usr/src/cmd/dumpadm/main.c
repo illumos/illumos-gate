@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,10 +164,16 @@ main(int argc, char *argv[])
 		 * In override mode, we try to force an update.  If this
 		 * fails, we re-load the kernel configuration and write that
 		 * out to the file in order to force the file in sync.
+		 *
+		 * We allow the file to be read-only but print a warning to the
+		 * user that indicates it hasn't been updated.
 		 */
 		if (dconf_update(&dc, 0) == -1)
 			(void) dconf_getdev(&dc);
-		if (dconf_write(&dc) == -1)
+		if (dc.dc_readonly)
+			warn(gettext("kernel settings updated, but "
+			    "%s is read-only\n"), PATH_CONFIG);
+		else if (dconf_write(&dc) == -1)
 			return (E_ERROR);
 
 	} else if (modified) {
@@ -176,6 +181,12 @@ main(int argc, char *argv[])
 		 * If we're modifying the configuration, then try
 		 * to update it, and write out the file if successful.
 		 */
+		if (dc.dc_readonly) {
+			warn(gettext("failed to update settings: %s is "
+			    "read-only\n"), PATH_CONFIG);
+			return (E_ERROR);
+		}
+
 		if (dconf_update(&dc, dflag) == -1 ||
 		    dconf_write(&dc) == -1)
 			return (E_ERROR);

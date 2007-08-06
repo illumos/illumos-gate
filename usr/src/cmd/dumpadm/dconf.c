@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +108,7 @@ dconf_init(dumpconf_t *dcp, int dcmode)
 	dcp->dc_conf_fp = NULL;
 	dcp->dc_conf_fd = -1;
 	dcp->dc_dump_fd = -1;
+	dcp->dc_readonly = B_FALSE;
 }
 
 int
@@ -116,6 +116,7 @@ dconf_open(dumpconf_t *dcp, const char *dpath, const char *fpath, int dcmode)
 {
 	char buf[BUFSIZ];
 	int line;
+	const char *fpmode = "r+";
 
 	dconf_init(dcp, dcmode);
 
@@ -125,11 +126,19 @@ dconf_open(dumpconf_t *dcp, const char *dpath, const char *fpath, int dcmode)
 	}
 
 	if ((dcp->dc_conf_fd = open(fpath, O_RDWR | O_CREAT, DC_PERM)) == -1) {
-		warn(gettext("failed to open %s"), fpath);
-		return (-1);
+		/*
+		 * Attempt to open the file read-only.
+		 */
+		if ((dcp->dc_conf_fd = open(fpath, O_RDONLY)) == -1) {
+			warn(gettext("failed to open %s"), fpath);
+			return (-1);
+		}
+
+		dcp->dc_readonly = B_TRUE;
+		fpmode = "r";
 	}
 
-	if ((dcp->dc_conf_fp = fdopen(dcp->dc_conf_fd, "r+")) == NULL) {
+	if ((dcp->dc_conf_fp = fdopen(dcp->dc_conf_fd, fpmode)) == NULL) {
 		warn(gettext("failed to open stream for %s"), fpath);
 		return (-1);
 	}
@@ -355,7 +364,7 @@ dconf_update(dumpconf_t *dcp, int checkinuse)
 	error = 0;
 
 	if (checkinuse && (dm_inuse(dcp->dc_device, &msg, DM_WHO_DUMP,
-		    &error) || error)) {
+	    &error) || error)) {
 		if (error != 0) {
 			warn(gettext("failed to determine if %s is"
 			    " in use"), dcp->dc_device);

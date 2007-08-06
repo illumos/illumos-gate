@@ -4226,7 +4226,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "a child dataset already has a snapshot "
 			    "with the new name"));
-			(void) zfs_error(hdl, EZFS_CROSSTARGET, errbuf);
+			(void) zfs_error(hdl, EZFS_EXISTS, errbuf);
 		} else {
 			(void) zfs_standard_error(zhp->zfs_hdl, errno, errbuf);
 		}

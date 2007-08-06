@@ -260,7 +260,7 @@ static const char *const systable[] = {
 	"systeminfo",		/* 139 */
 	"sharefs",		/* 140 */
 	"seteuid",		/* 141 */
-	NULL,			/* 142 */
+	"forksys",		/* 142 */
 	"fork1",		/* 143 */
 	"sigtimedwait",		/* 144 */
 	"lwp_info",		/* 145 */
