@@ -979,8 +979,18 @@ kern_flush_ifp(struct interface *ifp)
 	int i;
 
 	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
+		/*
+		 * Only calculate phy ifp when the passed ifp is
+		 * a logical IP interface. Otherwise the call
+		 * ifwithname(phy ifname) will return NULL as we
+		 * unlinked ifp from hashtables prior to this call
+		 * in ifdel.
+		 */
+		if (strchr(ifp->int_phys->phyi_name, ':')) {
+			ifp = ifwithname(ifp->int_phys->phyi_name);
+		}
 	}
+
 	for (i = 0; i < KHASH_SIZE; i++) {
 		kprev = NULL;
 		for (k = khash_bins[i]; k != NULL; k = knext) {
