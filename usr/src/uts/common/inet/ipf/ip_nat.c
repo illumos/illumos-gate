@@ -140,7 +140,6 @@ static const char rcsid[] = "@(#)$Id: ip_nat.c,v 2.195.2.42 2005/08/11 19:51:36 
 /* ======================================================================== */
 
 
-
 static	int	nat_flushtable __P((ipf_stack_t *));
 static	int	nat_clearlist __P((ipf_stack_t *));
 static	void	nat_addnat __P((struct ipnat *, ipf_stack_t *));
@@ -173,6 +172,23 @@ static	void	nat_mssclamp __P((tcphdr_t *, u_32_t, u_short *));
 static	INLINE	int nat_wildok __P((nat_t *, int, int, int, int));
 static	int	nat_getnext __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 static	int	nat_iterator __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
+static	int	nat_extraflush __P((int, ipf_stack_t *));
+static	int	nat_earlydrop __P((ipftq_t *, int, ipf_stack_t *));
+static	int	nat_flushclosing __P((int, ipf_stack_t *));
+
+
+/*
+ * Below we declare a list of constants used only in the nat_extraflush()
+ * routine.  We are placing it here, instead of in nat_extraflush() itself,
+ * because we want to make it visible to tools such as mdb, nm etc., so the
+ * values can easily be altered during debugging.
+ */
+static	const int	idletime_tab[] = {
+	IPF_TTLVAL(30),		/* 30 seconds */
+	IPF_TTLVAL(1800),	/* 30 minutes */
+	IPF_TTLVAL(43200),	/* 12 hours */
+	IPF_TTLVAL(345600),	/* 4 days */
+};
 
 
 /* ------------------------------------------------------------------------ */
@@ -805,6 +821,8 @@ ipf_stack_t *ifs;
 			ret = nat_flushtable(ifs);
 		else if (arg == 1)
 			ret = nat_clearlist(ifs);
+		else if (arg >= 2 && arg <= 4)
+			ret = nat_extraflush(arg - 2, ifs);
 		else
 			error = EINVAL;
 		if (getlock) {
@@ -1071,7 +1089,7 @@ ipf_stack_t *ifs;
 
 	if (n->in_tqehead[0] != NULL) {
 		if (fr_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
-			fr_freetimeoutqueue(n->in_tqehead[1], ifs);
+			fr_freetimeoutqueue(n->in_tqehead[0], ifs);
 		}
 	}
 
@@ -1298,6 +1316,13 @@ ipf_stack_t *ifs;
 	error = fr_inobj(data, &ipn, IPFOBJ_NATSAVE);
 	if (error != 0)
 		return error;
+
+	/*
+	 * Trigger automatic call to nat_extraflush() if the
+	 * table has reached capcity specified by hi watermark.
+	 */
+	if (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_lvl_hi)
+		ifs->ifs_nat_doflush = 1;
 
 	/*
 	 * Initialise early because of code at junkput label.
@@ -2181,6 +2206,13 @@ int direction;
 	u_32_t sumd;
 	int move;
 	ipf_stack_t *ifs = fin->fin_ifs;
+
+	/*
+	 * Trigger automatic call to nat_extraflush() if the
+	 * table has reached capcity specified by hi watermark.
+	 */
+	if (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_lvl_hi)
+		ifs->ifs_nat_doflush = 1;
 
 	if (ifs->ifs_nat_stats.ns_inuse >= ifs->ifs_ipf_nattable_max) {
 		ifs->ifs_nat_stats.ns_memfail++;
@@ -3677,6 +3709,7 @@ maskloop:
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
+			nat->nat_touched = ifs->ifs_fr_ticks;
 			fin->fin_nat = nat;
 		}
 	} else
@@ -3989,6 +4022,7 @@ maskloop:
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
+			nat->nat_touched = ifs->ifs_fr_ticks;
 			fin->fin_nat = nat;
 			fin->fin_state = nat->nat_state;
 		}
@@ -4347,6 +4381,11 @@ ipf_stack_t *ifs;
 		    (ifq->ifq_ref == 0)) {
 			fr_freetimeoutqueue(ifq, ifs);
 		}
+	}
+
+	if (ifs->ifs_nat_doflush != 0) {
+		(void) nat_extraflush(2, ifs);
+		ifs->ifs_nat_doflush = 0;
 	}
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
@@ -5165,4 +5204,238 @@ ipf_stack_t *ifs;
 	}
 
 	return error;
+}
+
+
+/* -------------------------------------------------------------------- */
+/* Function:	nat_earlydrop						*/
+/* Returns:	number of dropped/removed entries from the queue	*/
+/* Parameters:	ifq - pointer to queue with entries to be processed	*/
+/*		maxidle - entry must be idle this long to be dropped	*/
+/*		ifs - ipf stack instance				*/
+/*									*/
+/* Function is invoked from nat_extraflush() only.  Removes entries	*/
+/* form specified timeout queue, based on how long they've sat idle,	*/
+/* without waiting for it to happen on its own.				*/
+/* -------------------------------------------------------------------- */
+static int nat_earlydrop(ifq, maxidle, ifs)
+ipftq_t *ifq;
+int maxidle;
+ipf_stack_t *ifs;
+{
+	ipftqent_t *tqe, *tqn;
+	nat_t *nat;
+	unsigned int dropped;
+	int droptick;
+
+	if (ifq == NULL)
+		return (0);
+
+	dropped = 0;
+
+	/*
+	 * Determine the tick representing the idle time we're interested
+	 * in.  If an entry exists in the queue, and it was touched before
+	 * that tick, then it's been idle longer than maxidle ... remove it.
+	 */
+	droptick = ifs->ifs_fr_ticks - maxidle;
+	tqn = ifq->ifq_head;
+	while ((tqe = tqn) != NULL && tqe->tqe_touched < droptick) {
+		tqn = tqe->tqe_next;
+		nat = tqe->tqe_parent;
+		nat_delete(nat, ISL_EXPIRE, ifs);
+		dropped++;
+	}
+	return (dropped);
+}
+
+
+/* --------------------------------------------------------------------- */
+/* Function:	nat_flushclosing					 */
+/* Returns:	int - number of NAT entries deleted			 */
+/* Parameters:	stateval(I) - State at which to start removing entries	 */
+/*		ifs - ipf stack instance				 */
+/*									 */
+/* Remove nat table entries for TCP connections which are in the process */
+/* of closing, and are in (or "beyond") state specified by 'stateval'.	 */
+/* --------------------------------------------------------------------- */
+static int nat_flushclosing(stateval, ifs)
+int stateval;
+ipf_stack_t *ifs;
+{
+	ipftq_t *ifq, *ifqn;
+	ipftqent_t *tqe, *tqn;
+	nat_t *nat;
+	int dropped;
+
+	dropped = 0;
+
+	/*
+	 * Start by deleting any entries in specific timeout queues.
+	 */
+	ifqn = &ifs->ifs_nat_tqb[stateval];
+	while ((ifq = ifqn) != NULL) {
+		ifqn = ifq->ifq_next;
+		dropped += nat_earlydrop(ifq, (int)0, ifs);
+	}
+
+	/*
+	 * Next, look through user defined queues for closing entries.
+	 */
+	ifqn = ifs->ifs_nat_utqe;
+	while ((ifq = ifqn) != NULL) {
+		ifqn = ifq->ifq_next;
+		tqn = ifq->ifq_head;
+		while ((tqe = tqn) != NULL) {
+			tqn = tqe->tqe_next;
+			nat = tqe->tqe_parent;
+			if (nat->nat_p != IPPROTO_TCP)
+				continue;
+			if ((nat->nat_tcpstate[0] >= stateval) &&
+			    (nat->nat_tcpstate[1] >= stateval)) {
+				nat_delete(nat, NL_EXPIRE, ifs);
+				dropped++;
+			}
+		}
+	}
+	return (dropped);
+}
+
+
+/* --------------------------------------------------------------------- */
+/* Function:	nat_extraflush						 */
+/* Returns:	int - number of NAT entries deleted			 */
+/* Parameters:	which(I) - how to flush the active NAT table		 */
+/*		ifs - ipf stack instance				 */
+/* Write Locks:	ipf_nat							 */
+/*									 */
+/* Flush nat tables.  Three actions currently defined:			 */
+/*									 */
+/* which == 0 :	Flush all nat table entries.				 */
+/*									 */
+/* which == 1 :	Flush entries with TCP connections which have started	 */
+/*		to close on both ends.					 */
+/*									 */
+/* which == 2 :	First, flush entries which are "almost" closed.  If that */
+/*		does not take us below specified threshold in the table, */
+/*		we want to flush entries with TCP connections which have */
+/*		been idle for a long time.  Start with connections idle	 */
+/*		over 12 hours,  and then work backwards in half hour	 */
+/*		increments to at most 30 minutes idle, and finally work	 */
+/*		back in 30 second increments to at most 30 seconds.	 */
+/* --------------------------------------------------------------------- */
+static int nat_extraflush(which, ifs)
+int which;
+ipf_stack_t *ifs;
+{
+	ipftq_t *ifq, *ifqn;
+	nat_t *nat, **natp;
+	int idletime, removed, idle_idx;
+	SPL_INT(s);
+
+	removed = 0;
+
+	SPL_NET(s);
+	switch (which)
+	{
+	case 0:
+		natp = &ifs->ifs_nat_instances;
+		while ((nat = *natp) != NULL) {
+			natp = &nat->nat_next;
+			nat_delete(nat, ISL_FLUSH, ifs);
+			removed++;
+		}
+		break;
+
+	case 1:
+		removed = nat_flushclosing(IPF_TCPS_CLOSE_WAIT, ifs);
+		break;
+
+	case 2:
+		removed = nat_flushclosing(IPF_TCPS_FIN_WAIT_2, ifs);
+
+		/*
+		 * Be sure we haven't done this in the last 10 seconds.
+		 */
+		if (ifs->ifs_fr_ticks - ifs->ifs_nat_last_force_flush <
+		    IPF_TTLVAL(10))
+			break;
+		ifs->ifs_nat_last_force_flush = ifs->ifs_fr_ticks;
+
+		/*
+		 * Determine initial threshold for minimum idle time based on
+		 * how long ipfilter has been running.  Ipfilter needs to have
+		 * been up as long as the smallest interval to continue on.
+		 *
+		 * Minimum idle times stored in idletime_tab and indexed by
+		 * idle_idx.  Start at upper end of array and work backwards.
+		 *
+		 * Once the index is found, set the initial idle time to the
+		 * first interval before the current ipfilter run time.
+		 */
+		if (ifs->ifs_fr_ticks < idletime_tab[0])
+			break;  /* switch */
+		idle_idx = (sizeof (idletime_tab) / sizeof (int)) - 1;
+		if (ifs->ifs_fr_ticks > idletime_tab[idle_idx]) {
+			idletime = idletime_tab[idle_idx];
+		} else {
+			while ((idle_idx > 0) &&
+			    (ifs->ifs_fr_ticks < idletime_tab[idle_idx]))
+				idle_idx--;
+			idletime = (ifs->ifs_fr_ticks /
+				    idletime_tab[idle_idx]) *
+				    idletime_tab[idle_idx];
+		}
+
+		while ((idle_idx >= 0) &&
+		    (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_lvl_lo)) {
+			/*
+			 * Start with appropriate timeout queue.
+			 */
+			removed += nat_earlydrop(
+					&ifs->ifs_nat_tqb[IPF_TCPS_ESTABLISHED],
+					idletime, ifs);
+
+			/*
+			 * Make sure we haven't already deleted enough
+			 * entries before checking the user defined queues.
+			 */
+			if (NAT_TAB_WATER_LEVEL(ifs) <=
+			    ifs->ifs_nat_flush_lvl_lo)
+				break;
+
+			/*
+			 * Next, look through the user defined queues.
+			 */
+			ifqn = ifs->ifs_nat_utqe;
+			while ((ifq = ifqn) != NULL) {
+				ifqn = ifq->ifq_next;
+				removed += nat_earlydrop(ifq, idletime, ifs);
+			}
+
+			/*
+			 * Adjust the granularity of idle time.
+			 *
+			 * If we reach an interval boundary, we need to
+			 * either adjust the idle time accordingly or exit
+			 * the loop altogether (if this is very last check).
+			 */
+			idletime -= idletime_tab[idle_idx];
+			if (idletime < idletime_tab[idle_idx]) {
+				if (idle_idx != 0) {
+					idletime = idletime_tab[idle_idx] -
+					    idletime_tab[idle_idx - 1];
+					idle_idx--;
+				} else {
+					break;  /* while */
+				}
+			}
+		}
+		break;
+	default:
+		break;
+	}
+
+	SPL_X(s);
+	return (removed);
 }

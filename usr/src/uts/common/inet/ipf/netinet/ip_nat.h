@@ -5,7 +5,7 @@
  *
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.90.2.11 2005/06/18 02:41:32 darrenr Exp $
-*
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -82,6 +82,18 @@
 
 #define	DEF_NAT_AGE	1200     /* 10 minutes (600 seconds) */
 
+/*
+ * Default hi and lo watermarks used with forced flush of nat table.
+ */
+
+#define	NAT_FLUSH_HI	95
+#define	NAT_FLUSH_LO	75
+
+/* How full is the nat table? */
+
+#define	NAT_TAB_WATER_LEVEL(x)	((x)->ifs_nat_stats.ns_inuse * 100 \
+				/ (x)->ifs_ipf_nattable_max)
+
 struct ipstate;
 struct ap_session;
 
@@ -137,6 +149,7 @@ typedef	struct	nat	{
 #define	nat_seq		nat_un.nat_uni.ici_seq
 #define	nat_id		nat_un.nat_uni.ici_id
 #define	nat_tcpstate	nat_tqe.tqe_state
+#define	nat_touched	nat_tqe.tqe_touched
 
 /*
  * Values for nat_dir
@@ -421,7 +434,6 @@ typedef	struct	natlog {
 
 #define	NAT_SYSSPACE		0x80000000
 #define	NAT_LOCKHELD		0x40000000
-
 
 extern	void	fr_natsync __P((void *, ipf_stack_t *));
 extern	void	fr_nataddrsync __P((void *, struct in_addr *, ipf_stack_t *));

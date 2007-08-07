@@ -32,6 +32,7 @@ icmpreplytype4
 icmpreplytype6
 icmptoicmp6types
 icmptoicmp6unreach
+idletime_tab
 ip6exthdr
 ipf_cb_ops
 ipf_dev_info
