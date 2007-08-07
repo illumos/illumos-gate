@@ -429,20 +429,45 @@ sctp_heartbeat_timer(sctp_t *sctp)
 	 */
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		/*
-		 * Don't send heartbeat to this address if
-		 * 1. it is not reachable OR
-		 * 2. hb_interval == 0 and the address has been confirmed.
+		 * If the peer is unreachable because there is no available
+		 * source address, call sctp_get_ire() to see if it is
+		 * reachable now.  If it is OK, the state will become
+		 * unconfirmed.  And the following code to handle unconfirmed
+		 * address will be executed.  If it is still not OK,
+		 * re-schedule.  If heartbeat is enabled, only try this
+		 * up to the normal heartbeat max times.  But if heartbeat
+		 * is disable, this retry may go on forever.
 		 */
-		if (fp->state == SCTP_FADDRS_UNREACH ||
-		    (fp->hb_interval == 0 &&
-		    fp->state != SCTP_FADDRS_UNCONFIRMED)) {
+		if (fp->state == SCTP_FADDRS_UNREACH) {
+			sctp_get_ire(sctp, fp);
+			if (fp->state == SCTP_FADDRS_UNREACH) {
+				if (fp->hb_enabled &&
+				    ++fp->strikes > fp->max_retr &&
+				    sctp_faddr_dead(sctp, fp,
+				    SCTP_FADDRS_DOWN) == -1) {
+					/* Assoc is dead */
+					return;
+				}
+				fp->hb_expiry = now + SET_HB_INTVL(fp);
+				goto set_expiry;
+			} else {
+				/* Send a heartbeat immediately. */
+				fp->hb_expiry = now;
+			}
+		}
+		/*
+		 * Don't send heartbeat to this address if it is not
+		 * hb_enabled and the address has been confirmed.
+		 */
+		if (!fp->hb_enabled && fp->state != SCTP_FADDRS_UNCONFIRMED) {
 			continue;
 		}
 
 		/*
 		 * The heartbeat timer is expired.  If the address is dead,
 		 * we still send heartbeat to it in case it becomes alive
-		 * again.  But we will only send once every hb_interval.
+		 * again.  But we will only send once in a while, calculated
+		 * by SET_HB_INTVL().
 		 *
 		 * If the address is alive and there is a hearbeat pending,
 		 * resend the heartbeat and start exponential backoff on the
@@ -495,7 +520,16 @@ dead_addr:
 					continue;
 				}
 			} else {
-				fp->hb_expiry = now + fp->rto;
+				/*
+				 * If there is unack'ed data, no need to
+				 * send a heart beat.
+				 */
+				if (fp->suna > 0) {
+					fp->hb_expiry = now + SET_HB_INTVL(fp);
+					goto set_expiry;
+				} else {
+					fp->hb_expiry = now + fp->rto;
+				}
 			}
 			/*
 			 * Note that the total number of heartbeat we can send
@@ -510,6 +544,7 @@ dead_addr:
 			if (fp->state != SCTP_FADDRS_UNCONFIRMED || cnt-- > 0)
 				sctp_send_heartbeat(sctp, fp);
 		}
+set_expiry:
 		if (fp->hb_expiry < earliest_expiry || earliest_expiry == 0)
 			earliest_expiry = fp->hb_expiry;
 	}
@@ -577,24 +612,13 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	}
 
 	switch (sctp->sctp_state) {
-	case SCTPS_ESTABLISHED:
-		/*
-		 * Reset the heartbeat expiry time.  We don't need a heartbeat
-		 * timer running if we are retransmitting.  Otherwise, the drop
-		 * of heartbeat may just make this peer address to be marked
-		 * dead faster as fp->strikes is also increased for heartbeat.
-		 */
-		fp->hb_expiry = lbolt64 + SET_HB_INTVL(fp);
-		fp->hb_pending = B_FALSE;
+	case SCTPS_SHUTDOWN_RECEIVED:
+		(void) sctp_shutdown_received(sctp, NULL, B_FALSE, B_TRUE,
+		    NULL);
 
 		/* FALLTHRU */
+	case SCTPS_ESTABLISHED:
 	case SCTPS_SHUTDOWN_PENDING:
-	case SCTPS_SHUTDOWN_RECEIVED:
-		if (sctp->sctp_state == SCTPS_SHUTDOWN_RECEIVED) {
-			(void) sctp_shutdown_received(sctp, NULL, B_FALSE,
-			    B_TRUE, NULL);
-		}
-
 		if (sctp->sctp_xmit_head == NULL &&
 		    sctp->sctp_xmit_unsent == NULL) {
 			/* Nothing to retransmit */

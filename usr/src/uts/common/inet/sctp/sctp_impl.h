@@ -511,7 +511,8 @@ typedef struct sctp_faddr_s {
 			pmtu_discovered : 1,
 
 			rc_timer_running : 1,
-			isv4 : 1;
+			isv4 : 1,
+			hb_enabled : 1;
 
 	mblk_t		*rc_timer_mp;	/* reliable control chunk timer */
 	ire_t		*ire;		/* cached IRE */
@@ -532,7 +533,7 @@ typedef struct sctp_faddr_s {
  */
 #define	SET_HB_INTVL(fp)					\
 	((fp)->hb_interval + (fp)->rto + ((fp)->rto >> 1) -	\
-	(uint_t)gethrtime() % (fp)->rto);
+	(uint_t)gethrtime() % (fp)->rto)
 
 #define	SCTP_IPIF_HASH	16
 
@@ -769,7 +770,8 @@ typedef struct sctp_s {
 		sctp_rexmitting : 1,	/* SCTP is retransmitting */
 		sctp_zero_win_probe : 1,	/* doing zero win probe */
 
-		sctp_dummy : 8;
+		sctp_ulp_discon_done : 1,	/* ulp_disconnecting done */
+		sctp_dummy : 7;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -809,6 +811,7 @@ typedef struct sctp_s {
 #define	sctp_linklocal sctp_bits.sctp_linklocal
 #define	sctp_rexmitting sctp_bits.sctp_rexmitting
 #define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
+#define	sctp_ulp_discon_done sctp_bits.sctp_ulp_discon_done
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt

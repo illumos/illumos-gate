@@ -1985,9 +1985,14 @@ restart_timer:
 	oldfp->strikes++;
 	sctp->sctp_strikes++;
 	SCTP_CALC_RXT(oldfp, sctp->sctp_rto_max);
-	if (oldfp->suna != 0)
+	/*
+	 * If there is still some data in the oldfp, restart the
+	 * retransmission timer.  If there is no data, the heartbeat will
+	 * continue to run so it will do its job in checking the reachability
+	 * of the oldfp.
+	 */
+	if (oldfp != fp && oldfp->suna != 0)
 		SCTP_FADDR_TIMER_RESTART(sctp, oldfp, oldfp->rto);
-	sctp->sctp_active = lbolt64;
 
 	/*
 	 * Should we restart the timer of the new fp?  If there is
@@ -2003,6 +2008,8 @@ restart_timer:
 	 * be conservative and restart the timer of the new fp.
 	 */
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+
+	sctp->sctp_active = lbolt64;
 }
 
 /*

@@ -57,6 +57,7 @@ static int		sctp_get_all_ipifs(sctp_t *, int);
 static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
 			    boolean_t, boolean_t);
 static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *);
+static void		sctp_fix_saddr(sctp_t *, in6_addr_t *);
 static int		sctp_compare_ipif_list(sctp_ipif_hash_t *,
 			    sctp_ipif_hash_t *);
 static int		sctp_copy_ipifs(sctp_ipif_hash_t *, sctp_t *, int);
@@ -491,6 +492,26 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 	return (0);
 }
 
+/*
+ * Given a source address, walk through the peer address list to see
+ * if the source address is being used.  If it is, reset that.
+ */
+static void
+sctp_fix_saddr(sctp_t *sctp, in6_addr_t *saddr)
+{
+	sctp_faddr_t	*fp;
+
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+		if (!IN6_ARE_ADDR_EQUAL(&fp->saddr, saddr))
+			continue;
+		if (fp->ire != NULL) {
+			IRE_REFRELE_NOTR(fp->ire);
+			fp->ire = NULL;
+		}
+		V6_SET_ZERO(fp->saddr);
+	}
+}
+
 static void
 sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
 {
@@ -508,6 +529,7 @@ sctp_ipif_hash_remove(sctp_t *sctp, sctp_ipif_t *ipif)
 			    ipif_obj);
 			sctp->sctp_saddrs[hindex].ipif_count--;
 			sctp->sctp_nsaddrs--;
+			sctp_fix_saddr(sctp, &ipif->sctp_ipif_saddr);
 			SCTP_IPIF_REFRELE(ipif_obj->saddr_ipifp);
 			kmem_free(ipif_obj, sizeof (sctp_saddr_ipif_t));
 			break;
@@ -1352,7 +1374,8 @@ sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
  * mark as dontsrc when processing an INIT-ACK.
  */
 void
-sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete)
+sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete,
+    in6_addr_t *no_del_addr)
 {
 	int			i;
 	int			l;
@@ -1381,6 +1404,11 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete)
 
 			ipif = obj->saddr_ipifp;
 			scanned++;
+
+			if (IN6_ARE_ADDR_EQUAL(&ipif->sctp_ipif_saddr,
+			    no_del_addr)) {
+				goto next_obj;
+			}
 
 			/*
 			 * Delete/mark dontsrc loopback/linklocal addresses and
@@ -1419,7 +1447,7 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete)
 
 /* Get the first valid address from the list. Called with no locks held */
 in6_addr_t
-sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6)
+sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6, boolean_t *addr_set)
 {
 	int			i;
 	int			l;
@@ -1438,6 +1466,7 @@ sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6)
 			if (!SCTP_DONT_SRC(obj) &&
 			    ipif->sctp_ipif_isv6 == isv6 &&
 			    ipif->sctp_ipif_state == SCTP_IPIFS_UP) {
+				*addr_set = B_TRUE;
 				return (ipif->sctp_ipif_saddr);
 			}
 			scanned++;
@@ -1453,7 +1482,7 @@ got_none:
 		addr =  ipv6_all_zeros;
 	else
 		IN6_IPADDR_TO_V4MAPPED(0, &addr);
-
+	*addr_set = B_FALSE;
 	return (addr);
 }
 

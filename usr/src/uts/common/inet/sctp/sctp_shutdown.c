@@ -164,8 +164,10 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 	}
 
 	/* Don't allow sending new data */
-	if (!SCTP_IS_DETACHED(sctp))
+	if (!SCTP_IS_DETACHED(sctp) && !sctp->sctp_ulp_discon_done) {
 		sctp->sctp_ulp_disconnecting(sctp->sctp_ulpd);
+		sctp->sctp_ulp_discon_done = B_TRUE;
+	}
 
 	/*
 	 * If there is unsent or unacked data, try sending them out now.

@@ -64,20 +64,17 @@ void
 sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	boolean_t v6 = !fp->isv4;
+	boolean_t addr_set;
 
-	if (sctp->sctp_bound_to_all) {
-		V6_SET_ZERO(fp->saddr);
-	} else {
-		fp->saddr = sctp_get_valid_addr(sctp, v6);
-		if (!v6 && IN6_IS_ADDR_V4MAPPED_ANY(&fp->saddr) ||
-		    v6 && IN6_IS_ADDR_UNSPECIFIED(&fp->saddr)) {
-			fp->state = SCTP_FADDRS_UNREACH;
-			/* Disable heartbeat. */
-			fp->hb_expiry = 0;
-			fp->hb_pending = B_FALSE;
-			fp->strikes = 0;
-		}
-	}
+	fp->saddr = sctp_get_valid_addr(sctp, v6, &addr_set);
+	/*
+	 * If there is no source address avaialble, mark this peer address
+	 * as unreachable for now.  When the heartbeat timer fires, it will
+	 * call sctp_get_ire() to re-check if there is any source address
+	 * available.
+	 */
+	if (!addr_set)
+		fp->state = SCTP_FADDRS_UNREACH;
 }
 
 /*
@@ -148,15 +145,6 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		if (fp->state == SCTP_FADDRS_UNREACH)
 			return;
 		goto check_current;
-	}
-
-	dprint(2, ("ire2faddr: got ire for %x:%x:%x:%x, ",
-	    SCTP_PRINTADDR(fp->faddr)));
-	if (fp->isv4) {
-		dprint(2, ("src = %x\n", ire->ire_src_addr));
-	} else {
-		dprint(2, ("src=%x:%x:%x:%x\n",
-		    SCTP_PRINTADDR(ire->ire_src_addr_v6)));
 	}
 
 	/* Make sure the laddr is part of this association */
@@ -323,6 +311,7 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 	int isv4;
 	sctp_faddr_t *fp;
 	sctp_stack_t *sctps = sctp->sctp_sctps;
+	boolean_t src_changed = B_FALSE;
 
 	ASSERT(sctp->sctp_current != NULL || sendto != NULL);
 	if (sendto == NULL) {
@@ -333,12 +322,20 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 	isv4 = fp->isv4;
 
 	/* Try to look for another IRE again. */
-	if (fp->ire == NULL)
+	if (fp->ire == NULL) {
 		sctp_get_ire(sctp, fp);
+		/*
+		 * Although we still may not get an IRE, the source address
+		 * may be changed in sctp_get_ire().  Set src_changed to
+		 * true so that the source address is copied again.
+		 */
+		src_changed = B_TRUE;
+	}
 
 	/* There is no suitable source address to use, return. */
 	if (fp->state == SCTP_FADDRS_UNREACH)
 		return (NULL);
+	ASSERT(!IN6_IS_ADDR_V4MAPPED_ANY(&fp->saddr));
 
 	if (isv4) {
 		ipsctplen = sctp->sctp_hdr_len;
@@ -361,16 +358,10 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 		ipha_t *iph = (ipha_t *)mp->b_rptr;
 
 		bcopy(sctp->sctp_iphc, mp->b_rptr, ipsctplen);
-		if (fp != sctp->sctp_current) {
-			/* fiddle with the dst addr */
+		if (fp != sctp->sctp_current || src_changed) {
+			/* Fix the source and destination addresses. */
 			IN6_V4MAPPED_TO_IPADDR(&fp->faddr, iph->ipha_dst);
-			/* fix up src addr */
-			if (!IN6_IS_ADDR_V4MAPPED_ANY(&fp->saddr)) {
-				IN6_V4MAPPED_TO_IPADDR(&fp->saddr,
-				    iph->ipha_src);
-			} else if (sctp->sctp_bound_to_all) {
-				iph->ipha_src = INADDR_ANY;
-			}
+			IN6_V4MAPPED_TO_IPADDR(&fp->saddr, iph->ipha_src);
 		}
 		/* set or clear the don't fragment bit */
 		if (fp->df) {
@@ -380,16 +371,10 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 		}
 	} else {
 		bcopy(sctp->sctp_iphc6, mp->b_rptr, ipsctplen);
-		if (fp != sctp->sctp_current) {
-			/* fiddle with the dst addr */
+		if (fp != sctp->sctp_current || src_changed) {
+			/* Fix the source and destination addresses. */
 			((ip6_t *)(mp->b_rptr))->ip6_dst = fp->faddr;
-			/* fix up src addr */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&fp->saddr)) {
-				((ip6_t *)(mp->b_rptr))->ip6_src = fp->saddr;
-			} else if (sctp->sctp_bound_to_all) {
-				bzero(&((ip6_t *)(mp->b_rptr))->ip6_src,
-				    sizeof (in6_addr_t));
-			}
+			((ip6_t *)(mp->b_rptr))->ip6_src = fp->saddr;
 		}
 	}
 	ASSERT(sctp->sctp_connp != NULL);
@@ -568,6 +553,14 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 	((sctpt_t *)(timer_mp->b_rptr))->sctpt_faddr = faddr;
 
 	sctp_init_faddr(sctp, faddr, addr, timer_mp);
+
+	/* Check for subnet broadcast. */
+	if (faddr->ire != NULL && faddr->ire->ire_type & IRE_BROADCAST) {
+		IRE_REFRELE_NOTR(faddr->ire);
+		sctp_timer_free(timer_mp);
+		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
+		return (EADDRNOTAVAIL);
+	}
 	ASSERT(faddr->next == NULL);
 
 	if (sctp->sctp_faddrs == NULL) {
@@ -666,6 +659,8 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 	if (fp->state != SCTP_FADDRS_ALIVE) {
 		fp->state = SCTP_FADDRS_ALIVE;
 		sctp_intf_event(sctp, fp->faddr, SCTP_ADDR_AVAILABLE, 0);
+		/* Should have a full IRE now */
+		sctp_get_ire(sctp, fp);
 
 		/*
 		 * If this is the primary, switch back to it now.  And
@@ -673,14 +668,10 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 		 * it.
 		 */
 		if (fp == sctp->sctp_primary) {
+			ASSERT(fp->state != SCTP_FADDRS_UNREACH);
 			sctp_set_faddr_current(sctp, fp);
-			sctp_get_ire(sctp, fp);
 			return;
 		}
-	}
-	if (fp->ire == NULL) {
-		/* Should have a full IRE now */
-		sctp_get_ire(sctp, fp);
 	}
 }
 
@@ -1400,7 +1391,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	if (remaining < sizeof (*ph)) {
 		if (check_saddr) {
 			sctp_check_saddr(sctp, supp_af, psctp == NULL ?
-			    B_FALSE : B_TRUE);
+			    B_FALSE : B_TRUE, hdrdaddr);
 		}
 		ASSERT(sctp_saddr_lookup(sctp, hdrdaddr, 0) != NULL);
 		return (0);
@@ -1444,6 +1435,10 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				 * Screen out broad/multicasts & loopback.
 				 * If the endpoint only accepts v6 address,
 				 * go to the next one.
+				 *
+				 * Subnet broadcast check is done in
+				 * sctp_add_faddr().  If the address is
+				 * a broadcast address, it won't be added.
 				 */
 				bcopy(ph + 1, &ta, sizeof (ta));
 				if (ta == 0 ||
@@ -1453,15 +1448,9 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				    sctp->sctp_connp->conn_ipv6_v6only) {
 					goto next;
 				}
-				/*
-				 * XXX also need to check for subnet
-				 * broadcasts. This should probably
-				 * wait until we have full access
-				 * to the ILL tables.
-				 */
-
 				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
 				    (ph + 1), &addr);
+
 				/* Check for duplicate. */
 				if (sctp_lookup_faddr(sctp, &addr) != NULL)
 					goto next;
@@ -1469,8 +1458,9 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				/* OK, add it to the faddr set */
 				err = sctp_add_faddr(sctp, &addr, KM_NOSLEEP,
 				    B_FALSE);
+				/* Something is wrong...  Try the next one. */
 				if (err != 0)
-					return (err);
+					goto next;
 			}
 		} else if (ph->sph_type == htons(PARM_ADDR6) &&
 		    sctp->sctp_family == AF_INET6) {
@@ -1497,8 +1487,9 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				err = sctp_add_faddr(sctp,
 				    (in6_addr_t *)(ph + 1), KM_NOSLEEP,
 				    B_FALSE);
+				/* Something is wrong...  Try the next one. */
 				if (err != 0)
-					return (err);
+					goto next;
 			}
 		} else if (ph->sph_type == htons(PARM_FORWARD_TSN)) {
 			if (sctp_options != NULL)
@@ -1510,7 +1501,7 @@ next:
 	}
 	if (check_saddr) {
 		sctp_check_saddr(sctp, supp_af, psctp == NULL ? B_FALSE :
-		    B_TRUE);
+		    B_TRUE, hdrdaddr);
 	}
 	ASSERT(sctp_saddr_lookup(sctp, hdrdaddr, 0) != NULL);
 	/*
@@ -1861,6 +1852,7 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	fp->lastactive = lbolt64;
 	fp->timer_mp = timer_mp;
 	fp->hb_pending = B_FALSE;
+	fp->hb_enabled = B_TRUE;
 	fp->timer_running = 0;
 	fp->df = 1;
 	fp->pmtu_discovered = 0;

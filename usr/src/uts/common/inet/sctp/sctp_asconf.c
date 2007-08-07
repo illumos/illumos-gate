@@ -917,6 +917,7 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	sctp_parm_hdr_t		*ph;
 	boolean_t		isv4;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	boolean_t		saddr_set;
 
 	if (sctp->sctp_cchunk_pend || sctp->sctp_cxmit_list == NULL ||
 	    /* Queue it for later transmission if not yet established */
@@ -953,12 +954,12 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 		if (ipha->ipha_src != INADDR_ANY) {
 			bcopy(&ipha->ipha_src, ph + 1, IP_ADDR_LEN);
 		} else {
-			ipaddr = sctp_get_valid_addr(sctp, B_FALSE);
+			ipaddr = sctp_get_valid_addr(sctp, B_FALSE, &saddr_set);
 			/*
 			 * All the addresses are down.
 			 * Maybe we might have better luck next time.
 			 */
-			if (IN6_IS_ADDR_V4MAPPED_ANY(&ipaddr)) {
+			if (!saddr_set) {
 				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
 				freeb(ipmp);
 				return;
@@ -975,12 +976,12 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 		if (!IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 			bcopy(&ip6->ip6_src, ph + 1, IPV6_ADDR_LEN);
 		} else {
-			ipaddr = sctp_get_valid_addr(sctp, B_TRUE);
+			ipaddr = sctp_get_valid_addr(sctp, B_TRUE, &saddr_set);
 			/*
 			 * All the addresses are down.
 			 * Maybe we might have better luck next time.
 			 */
-			if (IN6_IS_ADDR_UNSPECIFIED(&ipaddr)) {
+			if (!saddr_set) {
 				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
 				freeb(ipmp);
 				return;

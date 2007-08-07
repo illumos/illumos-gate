@@ -447,7 +447,6 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 			return (err);
 		}
 		RUN_SCTP(sctp);
-		sctp->sctp_bound_to_all = 1;
 		/* FALLTHRU */
 	}
 
@@ -490,16 +489,18 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 			WAKE_SCTP(sctp);
 			return (err);
 		}
+		cur_fp = sctp->sctp_faddrs;
+
 		/* No valid src addr, return. */
-		if (sctp->sctp_faddrs->state == SCTP_FADDRS_UNREACH) {
+		if (cur_fp->state == SCTP_FADDRS_UNREACH) {
 			mutex_exit(&tbf->tf_lock);
 			WAKE_SCTP(sctp);
 			return (EADDRNOTAVAIL);
 		}
-		sctp->sctp_primary = sctp->sctp_faddrs;
-		sctp->sctp_current = sctp->sctp_faddrs;
-		cur_fp = sctp->sctp_current;
-		sctp->sctp_mss = sctp->sctp_faddrs->sfa_pmss;
+
+		sctp->sctp_primary = cur_fp;
+		sctp->sctp_current = cur_fp;
+		sctp->sctp_mss = cur_fp->sfa_pmss;
 		sctp_conn_hash_insert(tbf, sctp, 1);
 		mutex_exit(&tbf->tf_lock);
 
@@ -541,6 +542,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 
 		/* Send the INIT to the peer */
 		SCTP_FADDR_TIMER_RESTART(sctp, cur_fp, cur_fp->rto);
+		sctp->sctp_state = SCTPS_COOKIE_WAIT;
 		/*
 		 * sctp_init_mp() could result in modifying the source
 		 * address list, so take the hash lock.
@@ -549,12 +551,24 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		initmp = sctp_init_mp(sctp);
 		if (initmp == NULL) {
 			mutex_exit(&tbf->tf_lock);
+			/*
+			 * It may happen that all the source addresses
+			 * (loopback/link local) are removed.  In that case,
+			 * faile the connect.
+			 */
+			if (sctp->sctp_nsaddrs == 0) {
+				sctp_conn_hash_remove(sctp);
+				SCTP_FADDR_TIMER_STOP(cur_fp);
+				WAKE_SCTP(sctp);
+				return (EADDRNOTAVAIL);
+			}
+
+			/* Otherwise, let the retransmission timer retry */
 			WAKE_SCTP(sctp);
-			/* let timer retry */
-			return (0);
+			goto notify_ulp;
 		}
 		mutex_exit(&tbf->tf_lock);
-		sctp->sctp_state = SCTPS_COOKIE_WAIT;
+
 		/*
 		 * On a clustered note send this notification to the clustering
 		 * subsystem.
@@ -584,6 +598,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		IP_PUT(initmp, sctp->sctp_connp, sctp->sctp_current->isv4);
 		BUMP_LOCAL(sctp->sctp_opkts);
 
+notify_ulp:
 		sctp->sctp_ulp_prop(sctp->sctp_ulpd,
 		    sctps->sctps_wroff_xtra + hdrlen + sizeof (sctp_data_hdr_t),
 		    0);
