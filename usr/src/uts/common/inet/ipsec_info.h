@@ -199,17 +199,11 @@ typedef struct ipsec_out_s {
 		ipsec_out_attach_if : 1,
 		ipsec_out_unspec_src : 1,	/* IPv6 ip6i_t info */
 		ipsec_out_reachable : 1, 	/* NDP reachability info */
-		/*
-		 * Following bit is used by ip_mrtun_forward to convey
-		 * xmit_ill information along with ICMP error msg
-		 */
-		ipsec_out_xmit_if: 1,
-
 		ipsec_out_failed: 1,
+
 		ipsec_out_se_done: 1,
 		ipsec_out_esp_done: 1,
 		ipsec_out_ah_done: 1,
-
 		ipsec_out_need_policy: 1,
 
 		/*
@@ -230,7 +224,7 @@ typedef struct ipsec_out_s {
 		 */
 		ipsec_out_icmp_loopback: 1,
 		ipsec_out_ip_nexthop : 1,	/* IP_NEXTHOP option is set */
-		ipsec_out_pad_bits : 11;
+		ipsec_out_pad_bits : 12;
 	cred_t	*ipsec_out_cred;
 	uint32_t ipsec_out_capab_ill_index;
 

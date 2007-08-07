@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,18 +28,13 @@
 
 PROG4=	ncalogd
 PROG5=	ncakmod
-MIPD=	mipagent
 PPPD=	pppd
-PROG=	$(PROG4) $(PROG5) \
-	$(MIPD) $(PPPD)
+PROG=	$(PROG4) $(PROG5) $(PPPD)
 
 include ../../../Makefile.cmd
 
 STARTINET3= $(ROOTETC)/rc2.d/S94ncalogd
 STARTINET4= $(ROOTETC)/rc2.d/S42ncakmod
-
-MIPDK= K06mipagent
-MIPDS= S80mipagent
 
 PPPDK=	K50pppd
 PPPDS=	S47pppd
@@ -65,9 +59,6 @@ $(INITD)/% : % $(INITD)
 
 ln_PROG : $(ETCINITPROG)
 	@for dir in rc0.d rcS.d rc1.d; do \
-		echo $(LN) $(INITD)/$(MIPD) $(ROOTETC)/$$dir/$(MIPDK); \
-		$(RM) $(ROOTETC)/$$dir/$(MIPDK); \
-		$(LN) $(INITD)/$(MIPD) $(ROOTETC)/$$dir/$(MIPDK); \
 		echo $(LN) $(INITD)/$(PROG4) $(ROOTETC)/$$dir/K34ncalogd; \
 		$(RM) $(ROOTETC)/$$dir/K34ncalogd; \
 		$(LN) $(INITD)/$(PROG4) $(ROOTETC)/$$dir/K34ncalogd; \
@@ -75,10 +66,6 @@ ln_PROG : $(ETCINITPROG)
 		$(RM) $(ROOTETC)/$$dir/$(PPPDK); \
 		$(LN) $(INITD)/$(PPPD) $(ROOTETC)/$$dir/$(PPPDK); \
 	done
-	-$(RM) $(ROOTETC)/rc2.d/$(MIPDK)
-	$(LN) $(INITD)/$(MIPD) $(ROOTETC)/rc2.d/$(MIPDK)
-	-$(RM) $(ROOTETC)/rc3.d/$(MIPDS)
-	$(LN) $(INITD)/$(MIPD) $(ROOTETC)/rc3.d/$(MIPDS)
 	-$(RM) $(STARTINET3)
 	$(LN) $(INITD)/$(PROG4) $(STARTINET3)
 	-$(RM) $(STARTINET4)

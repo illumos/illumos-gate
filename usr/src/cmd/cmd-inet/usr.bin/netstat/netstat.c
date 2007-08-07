@@ -167,8 +167,6 @@ static char		*pr_net(uint_t addr, uint_t mask,
 			    char *dst, uint_t dstlen);
 static char		*pr_netaddr(uint_t addr, uint_t mask,
 			    char *dst, uint_t dstlen);
-static char		*pr_netclassless(ipaddr_t addr, ipaddr_t mask,
-			    char *dst, size_t dstlen);
 static char		*fmodestr(uint_t fmode);
 static char		*portname(uint_t port, char *proto,
 			    char *dst, uint_t dstlen);
@@ -289,16 +287,10 @@ static int sctpRemoteEntrySize;
 #define	protocol_selected(p)	(proto == IPPROTO_MAX || proto == (p))
 
 /* Machinery used for -f (filter) option */
-#define	FK_AF		0
-#define	FK_INIF		1
-#define	FK_OUTIF	2
-#define	FK_SRC		3
-#define	FK_DST		4
-#define	FK_FLAGS	5
-#define	NFILTERKEYS	6
+enum { FK_AF = 0, FK_OUTIF, FK_DST, FK_FLAGS, NFILTERKEYS };
 
 static const char *filter_keys[NFILTERKEYS] = {
-	"af", "inif", "outif", "src", "dst", "flags"
+	"af", "outif", "dst", "flags"
 };
 
 /* Flags on routes */
@@ -3856,8 +3848,6 @@ typedef struct sec_attr_list_s {
 
 static boolean_t ire_report_item_v4(const mib2_ipRouteEntry_t *, boolean_t,
     const sec_attr_list_t *);
-static boolean_t ire_report_item_v4src(const mib2_ipRouteEntry_t *, boolean_t,
-    const sec_attr_list_t *);
 static boolean_t ire_report_item_v6(const mib2_ipv6RouteEntry_t *, boolean_t,
     const sec_attr_list_t *);
 static const char *pr_secattr(const sec_attr_list_t *);
@@ -3986,18 +3976,6 @@ ire_report(const mib_item_t *item)
 				print_hdr_once_v4 = ire_report_item_v4(rp,
 				    print_hdr_once_v4, aptr);
 			}
-			if (v4a != NULL)
-				v4a -= item->length / ipRouteEntrySize;
-			print_hdr_once_v4 = B_TRUE;
-			for (rp = (mib2_ipRouteEntry_t *)item->valp;
-			    (char *)rp < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
-			    rp = (mib2_ipRouteEntry_t *)((char *)rp +
-			    ipRouteEntrySize)) {
-				aptr = v4a == NULL ? NULL : *v4a++;
-				print_hdr_once_v4 = ire_report_item_v4src(rp,
-				    print_hdr_once_v4, aptr);
-			}
 		} else {
 			for (rp6 = (mib2_ipv6RouteEntry_t *)item->valp;
 			    (char *)rp6 < (char *)item->valp + item->length;
@@ -4108,19 +4086,9 @@ ire_filter_match_v4(const mib2_ipRouteEntry_t *rp, uint_t flag_b)
 					if (fp->u.f_family != AF_INET)
 						continue; /* 'for' loop 2 */
 					break;
-				case FK_INIF:
-					if (!dev_name_match(&rp->ipRouteInfo.
-					    re_in_ill, fp->u.f_ifname))
-						continue; /* 'for' loop 2 */
-					break;
 				case FK_OUTIF:
 					if (!dev_name_match(&rp->ipRouteIfIndex,
 					    fp->u.f_ifname))
-						continue; /* 'for' loop 2 */
-					break;
-				case FK_SRC:
-					if (!v4_addr_match(rp->ipRouteInfo.
-					    re_in_src_addr, IP_HOST_MASK, fp))
 						continue; /* 'for' loop 2 */
 					break;
 				case FK_DST:
@@ -4220,9 +4188,7 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 	char			flags[10];	/* RTF_ flags */
 	uint_t			flag_b;
 
-	if (rp->ipRouteInfo.re_in_src_addr != 0 ||
-	    rp->ipRouteInfo.re_in_ill.o_length != 0 ||
-	    !(Aflag || (rp->ipRouteInfo.re_ire_type != IRE_CACHE &&
+	if (!(Aflag || (rp->ipRouteInfo.re_ire_type != IRE_CACHE &&
 	    rp->ipRouteInfo.re_ire_type != IRE_BROADCAST &&
 	    rp->ipRouteInfo.re_ire_type != IRE_LOCAL))) {
 		return (first);
@@ -4272,97 +4238,6 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 		    rp->ipRouteInfo.re_obpkt + rp->ipRouteInfo.re_ibpkt,
 		    octetstr(&rp->ipRouteIfIndex, 'a',
 		    ifname, sizeof (ifname)),
-		    pr_secattr(attrs));
-	}
-	return (first);
-}
-
-static const char ire_hdr_src_v4[] =
-"\n%s Table: IPv4 Source-Specific\n";
-static const char ire_hdr_src_v4_compat[] =
-"\n%s Table: Source-Specific\n";
-static const char ire_hdr_src_v4_verbose[] =
-"  Destination        In If       Source            Gateway         "
-"  Out If    Mxfrg  Rtt  Ref Flg  Out  In/Fwd %s\n"
-"------------------ ----------- ----------------- ----------------- "
-"----------- ----- ----- --- --- ----- ------ %s\n";
-static const char ire_hdr_src_v4_normal[] =
-"  Destination    In If     Source          Gateway       Flags  Use   "
-" Out If  %s\n"
-"--------------- -------- --------------- --------------- ----- ------ "
-"-------- %s\n";
-
-/*
- * Report a source-specific route.
- */
-static boolean_t
-ire_report_item_v4src(const mib2_ipRouteEntry_t *rp, boolean_t first,
-    const sec_attr_list_t *attrs)
-{
-	char	dstbuf[MAXHOSTNAMELEN + 1];
-	char	srcbuf[MAXHOSTNAMELEN + 1];
-	char	gwbuf[MAXHOSTNAMELEN + 1];
-	char	inif[LIFNAMSIZ + 1];
-	char	outif[LIFNAMSIZ + 1];
-	uint_t	flag_b;
-	char	flags[10];
-
-	/*
-	 * If this isn't a source specific route, or if it's filtered
-	 * out, then ignore it.
-	 */
-	if ((rp->ipRouteInfo.re_in_src_addr == 0 &&
-	    rp->ipRouteInfo.re_in_ill.o_length == 0) ||
-	    !(Aflag || (rp->ipRouteInfo.re_ire_type != IRE_CACHE &&
-	    rp->ipRouteInfo.re_ire_type != IRE_BROADCAST &&
-	    rp->ipRouteInfo.re_ire_type != IRE_LOCAL))) {
-		return (first);
-	}
-
-	flag_b = form_v4_route_flags(rp, flags);
-
-	if (!ire_filter_match_v4(rp, flag_b))
-		return (first);
-
-	if (first) {
-		(void) printf(v4compat ? ire_hdr_src_v4_compat :
-		    ire_hdr_src_v4, Vflag ? "IRE" : "Routing");
-		(void) printf(Vflag ? ire_hdr_src_v4_verbose :
-		    ire_hdr_src_v4_normal,
-		    RSECflag ? "  Gateway security attributes  " : "",
-		    RSECflag ? "-------------------------------" : "");
-		first = B_FALSE;
-	}
-
-	/*
-	 * This is special-cased here because the kernel doesn't actually
-	 * pay any attention to the destination address on mrtun entries.
-	 * Saying "default" would be misleading, though technically correct.
-	 */
-	if (rp->ipRouteInfo.re_in_src_addr != 0 && rp->ipRouteDest == 0 &&
-	    rp->ipRouteMask == 0)
-		(void) strlcpy(dstbuf, "    --", sizeof (dstbuf));
-	else
-		(void) pr_netclassless(rp->ipRouteDest, rp->ipRouteMask,
-		    dstbuf, sizeof (dstbuf));
-	(void) octetstr(&rp->ipRouteInfo.re_in_ill, 'a', inif, sizeof (inif));
-	(void) pr_addrnz(rp->ipRouteInfo.re_in_src_addr, srcbuf,
-	    sizeof (srcbuf));
-	(void) octetstr(&rp->ipRouteIfIndex, 'a', outif, sizeof (outif));
-	(void) pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf));
-	if (Vflag) {
-		(void) printf("%-18s %-11s %-17s %-17s %-11s %4u%c %5u %3u "
-		    "%-3s %5u %6u %s\n",
-		    dstbuf, inif, srcbuf, gwbuf,  outif,
-		    rp->ipRouteInfo.re_max_frag,
-		    rp->ipRouteInfo.re_frag_flag ? '*' : ' ',
-		    rp->ipRouteInfo.re_rtt, rp->ipRouteInfo.re_ref, flags,
-		    rp->ipRouteInfo.re_obpkt, rp->ipRouteInfo.re_ibpkt,
-		    pr_secattr(attrs));
-	} else {
-		(void) printf("%-15s %-8s %-15s %-15s %-5s %6u %-8s %s\n",
-		    dstbuf, inif, srcbuf, gwbuf, flags,
-		    rp->ipRouteInfo.re_obpkt + rp->ipRouteInfo.re_ibpkt, outif,
 		    pr_secattr(attrs));
 	}
 	return (first);
@@ -4449,20 +4324,9 @@ ire_filter_match_v6(const mib2_ipv6RouteEntry_t *rp6, uint_t flag_b)
 						/* 'for' loop 2 */
 						continue;
 					break;
-				case FK_INIF:
-					if (fp->u.f_ifname != NULL)
-						/* 'for' loop 2 */
-						continue;
-					break;
 				case FK_OUTIF:
 					if (!dev_name_match(&rp6->
 					    ipv6RouteIfIndex, fp->u.f_ifname))
-						/* 'for' loop 2 */
-						continue;
-					break;
-				case FK_SRC:
-					if (!v6_addr_match(&rp6->ipv6RouteInfo.
-					    re_src_addr, IPV6_ABITS, fp))
 						/* 'for' loop 2 */
 						continue;
 					break;
@@ -5985,61 +5849,6 @@ pr_netaddr(uint_t addr, uint_t mask, char *dst, uint_t dstlen)
 	return (dst);
 }
 
-
-/*
- * Return the standard IPv4 classess host or network identifier.
- *
- *	Returns "default" for the default route.
- *	Returns "x.x.x.x" or host name if mask is 255.255.255.255.
- *	Returns "x.x.x.x/y" (y is bit count) if mask is contiguous.
- *	Otherwise, returns "x.x.x.x/m.m.m.m" (undesirable mask).
- *
- * Can also return "****" if inet_ntop fails -- insufficient dst space
- * available.  (Shouldn't happen otherwise.)
- */
-static char *
-pr_netclassless(ipaddr_t addr, ipaddr_t mask, char *dst, size_t dstlen)
-{
-	struct hostent *hp;
-	int error_num;
-	struct in_addr in;
-	char *cp;
-	int slen;
-
-	if (addr == INADDR_ANY && mask == INADDR_ANY) {
-		(void) strlcpy(dst, "default", dstlen);
-		return (dst);
-	}
-	if (mask == IP_HOST_MASK && !Nflag &&
-	    (hp = getipnodebyaddr(&addr, sizeof (addr), AF_INET,
-		&error_num)) != NULL) {
-		(void) strlcpy(dst, hp->h_name, dstlen);
-		freehostent(hp);
-		return (dst);
-	}
-	in.s_addr = addr;
-	if (inet_ntop(AF_INET, &in, dst, dstlen) == NULL) {
-		(void) strlcpy(dst, "****", dstlen);
-		return (dst);
-	}
-	if (mask != IP_HOST_MASK) {
-		slen = strlen(dst);
-		cp = dst + slen;
-		dstlen -= slen;
-		if (mask == 0) {
-			/* Illegal on non-zero addresses */
-			(void) strlcpy(cp, "/0", dstlen);
-		} else if ((mask | (mask - 1)) == IP_HOST_MASK) {
-			(void) snprintf(cp, dstlen, "/%d",
-			    IP_ABITS - ffs(mask) + 1);
-		} else {
-			/* Ungood; non-contiguous mask */
-			(void) pr_mask(mask, cp, dstlen);
-		}
-	}
-	return (dst);
-}
-
 /*
  * Return the filter mode as a string:
  *	1 => "INCLUDE"
@@ -6263,7 +6072,6 @@ process_filter(char *arg)
 		}
 		break;
 
-	case FK_INIF:
 	case FK_OUTIF:
 		if (strcmp(arg, "none") == 0) {
 			newf->u.f_ifname = NULL;
@@ -6283,7 +6091,6 @@ process_filter(char *arg)
 		newf->u.f_ifname = arg;
 		break;
 
-	case FK_SRC:
 	case FK_DST:
 		V4MASK_TO_V6(IP_HOST_MASK, newf->u.a.f_mask);
 		if (strcmp(arg, "any") == 0) {

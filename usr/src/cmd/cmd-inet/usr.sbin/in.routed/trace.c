@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -555,7 +555,6 @@ static struct bits if_bits[] = {
 	{ IFF_NORTEXCH,		0,		"NORTEXCH" },
 	{ IFF_IPV4,		0,		"IPv4" },
 	{ IFF_IPV6,		0,		"IPv6" },
-	{ IFF_MIPRUNNING,	0,		"MIP" },
 	{ IFF_NOFAILOVER,	0,		"NOFAILOVER" },
 	{ IFF_FAILED,		0,		"FAILED" },
 	{ IFF_STANDBY,		0,		"STANDBY" },

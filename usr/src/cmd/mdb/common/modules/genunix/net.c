@@ -906,19 +906,6 @@ get_v4flags(const ire_t *ire, char *flags)
 }
 
 static int
-ip_mask_to_plen(ipaddr_t mask)
-{
-	int i;
-
-	if (mask == 0)
-		return (0);
-	for (i = 32; i > 0; i--, mask >>= 1)
-		if (mask & 1)
-			break;
-	return (i);
-}
-
-static int
 netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
 	const ire_t *ire = walk_data;
@@ -926,8 +913,7 @@ netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	ipaddr_t gate;
 	char flags[10], intf[LIFNAMSIZ + 1];
 
-	if (ire->ire_ipversion != IPV4_VERSION || ire->ire_in_src_addr != 0 ||
-	    ire->ire_in_ill != NULL)
+	if (ire->ire_ipversion != IPV4_VERSION)
 		return (WALK_NEXT);
 
 	if (!(*opts & NETSTAT_ALL) && (ire->ire_type == IRE_CACHE ||
@@ -968,79 +954,6 @@ netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	} else {
 		mdb_printf("%?p %-*I %-*I %-5s %4u %5u %s\n", kaddr,
 		    ADDR_V4_WIDTH, ire->ire_addr, ADDR_V4_WIDTH, gate, flags,
-		    ire->ire_refcnt,
-		    ire->ire_ob_pkt_count + ire->ire_ib_pkt_count, intf);
-	}
-
-	return (WALK_NEXT);
-}
-
-static int
-netstat_irev4src_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
-{
-	const ire_t *ire = walk_data;
-	uint_t *opts = cb_data;
-	ipaddr_t gate;
-	char flags[10], intf[LIFNAMSIZ + 1], srcif[LIFNAMSIZ + 1];
-	char dest[ADDR_V4_WIDTH + 3 + 1];
-	ill_t ill;
-
-	if (ire->ire_ipversion != IPV4_VERSION ||
-	    (ire->ire_in_src_addr == 0 && ire->ire_in_ill == NULL))
-		return (WALK_NEXT);
-
-	if (!(*opts & NETSTAT_ALL) && (ire->ire_type == IRE_CACHE ||
-	    ire->ire_type == IRE_BROADCAST || ire->ire_type == IRE_LOCAL))
-		return (WALK_NEXT);
-
-	if (*opts & NETSTAT_FIRST) {
-		*opts &= ~NETSTAT_FIRST;
-		mdb_printf("\n%<u>%s Table: IPv4 Source-Specific%</u>\n",
-		    (*opts & NETSTAT_VERBOSE) ? "IRE" : "Routing");
-		if (*opts & NETSTAT_VERBOSE) {
-			mdb_printf("%<u>%-?s %-*s In If       %-*s %-*s "
-			    "Out If      Mxfrg Rtt   Ref Flg Out   In/Fwd"
-			    "%</u>\n",
-			    "Address", ADDR_V4_WIDTH+3, "Destination",
-			    ADDR_V4_WIDTH, "Source", ADDR_V4_WIDTH, "Gateway");
-		} else {
-			mdb_printf("%<u>%-?s %-*s In If    %-*s %-*s Flags "
-			    "Ref  Use   Out If%</u>\n",
-			    "Address", ADDR_V4_WIDTH+3, "Destination",
-			    ADDR_V4_WIDTH, "Source", ADDR_V4_WIDTH, "Gateway");
-		}
-	}
-
-	gate = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK|IRE_BROADCAST)) ?
-	    ire->ire_src_addr : ire->ire_gateway_addr;
-
-	get_v4flags(ire, flags);
-
-	get_ifname(ire, intf);
-
-	srcif[0] = '\0';
-	if (mdb_vread(&ill, sizeof (ill), (uintptr_t)ire->ire_in_ill) != -1)
-		(void) mdb_readstr(srcif, MIN(LIFNAMSIZ, ill.ill_name_length),
-		    (uintptr_t)ill.ill_name);
-
-	if (ire->ire_in_src_addr != 0 && ire->ire_addr == 0 &&
-	    ire->ire_mask == 0)
-		strcpy(dest, "  --");
-	else
-		mdb_snprintf(dest, sizeof (dest), "%I/%d", ire->ire_addr,
-		    ip_mask_to_plen(ire->ire_mask));
-
-	if (*opts & NETSTAT_VERBOSE) {
-		mdb_printf("%?p %-*s %-11s %-*I %-*I %-11s %5u%c %4u %3u %-3s "
-		    "%5u %u\n", kaddr, ADDR_V4_WIDTH+3, dest, srcif,
-		    ADDR_V4_WIDTH, ire->ire_in_src_addr, ADDR_V4_WIDTH, gate,
-		    intf, ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
-		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt, flags,
-		    ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
-	} else {
-		mdb_printf("%?p %-*s %-8s %-*I %-*I %-5s %4u %5u %s\n", kaddr,
-		    ADDR_V4_WIDTH+3, dest, srcif, ADDR_V4_WIDTH,
-		    ire->ire_in_src_addr, ADDR_V4_WIDTH, gate, flags,
 		    ire->ire_refcnt,
 		    ire->ire_ob_pkt_count + ire->ire_ib_pkt_count, intf);
 	}
@@ -1186,12 +1099,6 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (opts & NETSTAT_V4) {
 			opts |= NETSTAT_FIRST;
 			if (mdb_walk("ip`ire", netstat_irev4_cb, &opts) == -1) {
-				mdb_warn("failed to walk ip`ire");
-				return (DCMD_ERR);
-			}
-			opts |= NETSTAT_FIRST;
-			if (mdb_walk("ip`ire", netstat_irev4src_cb,
-			    &opts) == -1) {
 				mdb_warn("failed to walk ip`ire");
 				return (DCMD_ERR);
 			}

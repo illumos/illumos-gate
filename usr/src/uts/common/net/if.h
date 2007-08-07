@@ -148,7 +148,7 @@ struct ifnet {
 
 #define	IFF_IPV4	0x0001000000	/* IPv4 interface */
 #define	IFF_IPV6	0x0002000000	/* IPv6 interface */
-#define	IFF_MIPRUNNING	0x0004000000	/* Mobile IP controls this interface */
+					/* 0x0004000000 was IFF_MIPRUNNING */
 #define	IFF_NOFAILOVER	0x0008000000	/* Don't failover on NIC failure */
 
 #define	IFF_FAILED	0x0010000000	/* NIC has failed */

@@ -66,13 +66,12 @@ K5RSHDOBJS=	in.rshd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
 SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
-		in.talkd inetadm inetconv ipqosconf kssl/kssladm \
-		kssl/ksslcfg  mipagentconfig mipagentstat ping routeadm \
-		snoop sppptun traceroute wificonfig ipsecutils
+		in.talkd inetadm inetconv ipqosconf kssl/kssladm kssl/ksslcfg \
+		ping routeadm snoop sppptun traceroute wificonfig ipsecutils
 
-MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
-		inetadm inetconv ipqosconf kssl/ksslcfg mipagentconfig \
-		mipagentstat routeadm sppptun snoop wificonfig
+MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd inetadm \
+		inetconv ipqosconf kssl/ksslcfg routeadm sppptun snoop \
+		wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
@@ -85,8 +84,7 @@ LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
 LINTSUBDIRS=	bootconfchk in.rdisc in.routed in.talkd inetadm inetconv \
-		ipqosconf mipagentstat ping routeadm sppptun traceroute \
-		wificonfig ipsecutils
+		ipqosconf ping routeadm sppptun traceroute wificonfig ipsecutils
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=

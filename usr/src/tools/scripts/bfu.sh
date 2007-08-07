@@ -2871,7 +2871,6 @@ remove_perl_500503()
 {
 	# Packages to remove.
 	typeset -r perl_pkgs='SUNWopl5m SUNWopl5p SUNWopl5u'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	#
@@ -2922,7 +2921,6 @@ remove_eof_wildcat()
 {
 	# Packages to remove
 	typeset -r wildcat_pkgs='SUNWwrsa SUNWwrsd SUNWwrsu SUNWwrsm'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	#
@@ -2996,7 +2994,6 @@ remove_eof_aset()
 {
 	# Packages to remove
 	typeset -r aset_pkgs='SUNWast'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	printf 'Removing ASET... '
@@ -3041,7 +3038,6 @@ remove_eof_bind8()
 {
 	# Packages to remove
 	typeset -r bind8_pkg='SUNWinamd'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	printf 'Removing BIND 8 named server/tools... '
@@ -3121,7 +3117,6 @@ remove_perl_583()
 	# Packages to remove.
 	#
 	typeset -r perl_pkgs='SUNWperl583man SUNWperl583usr SUNWperl583root'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 
 	#
 	# First, attempt to remove the packages cleanly if possible.
@@ -3193,7 +3188,6 @@ remove_eof_fns()
 {
 	# Packages to remove
 	typeset -r fns_pkgs='SUNWfnx5x SUNWfnsx5 SUNWfnsx SUNWfns'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	printf 'Removing FNS/XFN ... '
@@ -3271,7 +3265,6 @@ remove_eof_fns()
 remove_eof_face() {
 	# Packages to remove
 	typeset -r face_pkgs='SUNWfac'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	printf 'Removing AT&T FACE... '
@@ -3313,7 +3306,6 @@ remove_eof_face() {
 remove_eof_dmi() {
 	# Packages to remove
 	typeset -r dmi_pkgs='SUNWsadmi'
-	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
 	typeset pkg
 
 	printf 'Removing DMI... '
@@ -3401,6 +3393,42 @@ remove_eof_vold()
 	rm -f $rootprefix/etc/vold.conf
 	rm -f $rootprefix/etc/rmmount.conf
 
+	printf '\n'
+}
+
+#
+# Remove the obsolete Mobile IP packages
+#
+remove_eof_mobileip() {
+	typeset -r mip_pkgs='SUNWmipr SUNWmipu'
+	typeset pkg
+
+	printf 'Removing Mobile IP... '
+
+	for pkg in $mip_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+		fi
+	done
+
+	# In case that did not work, do it manually.
+	if [[ -d $rootprefix/var/sadm/pkg/SUNWmipr ]]; then
+		rm "$rootprefix/etc/inet/mipagent.conf"*
+		rm "$rootprefix/etc/init.d/mipagent"
+		rm "$rootprefix/etc/rc0.d/K06mipagent"
+		rm "$rootprefix/etc/rc1.d/K06mipagent"
+		rm "$rootprefix/etc/rc2.d/K06mipagent"
+		rm "$rootprefix/etc/rc3.d/S80mipagent"
+		rm "$rootprefix/etc/rcS.d/K06mipagent"
+		rm "$rootprefix/etc/snmp/conf/mipagent"*
+	fi
+	if [[ -d $rootprefix/var/sadm/pkg/SUNWmipu ]]; then
+		rm "$rootprefix/usr/lib/inet/mipagent"
+		rm "$rootprefix/usr/sbin/mipagentconfig"
+		rm "$rootprefix/usr/sbin/mipagentstat"
+	fi
 	printf '\n'
 }
 
@@ -5117,6 +5145,7 @@ mondo_loop() {
 
 	cd $root || fail "Cannot cd $root"
 	rootprefix=${root%/}
+	pkgroot="-R $rootprefix"
 
 	if [ "$karch" = "i86pc" -a "$diskless" = "no" -a "$zone" = "global" ]
 	then
@@ -5789,9 +5818,16 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove obsolete Mobile IP software
+	#
+	if [[ -f $rootprefix/etc/init.d/mipagent || \
+	    -f $rootprefix/usr/lib/inet/mipagent ]]; then
+		remove_eof_mobileip
+	fi
+
+	#
 	# Remove SUNWcoff package
 	#
-	pkgroot=${rootprefix:+-R $rootprefix}
 	pkg=SUNWcoff
 	if [ $target_isa = i386 ]; then
 		if pkginfo $pkgroot -q $pkg; then

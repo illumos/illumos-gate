@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,9 +31,7 @@ SYMPROG= hosts inetd.conf networks protocols services netmasks sock2path
 PROG= datemsk.ndpd ipaddrsel.conf ipsecalgs ipsecinit.sample \
     ipqosconf.1.sample ipqosconf.2.sample ipqosconf.3.sample \
     wanboot.conf.sample
-#mipagent config file permissions need to be tighter
-PROG2=	mipagent.conf-sample mipagent.conf.fa-sample mipagent.conf.ha-sample
-ETCPROG= $(SYMPROG) $(PROG) $(PROG2)
+ETCPROG= $(SYMPROG) $(PROG)
 SUBDIRS= default dhcp init.d ike nca ppp secret
 
 include ../../Makefile.cmd
@@ -47,7 +45,6 @@ INETVARDIR=	$(ROOTVAR)/inet
 DIRS= 		$(INETETCDIR) $(INETVARDIR)
 SYMDIR= 	inet
 ETCINETPROG=	$(ETCPROG:%=$(INETETCDIR)/%)
-ETCINETPROG2=	$(PROG2:%=$(INETETCDIR)/%)
 # Only old /etc/inet files get symlinks in /etc.
 SYMETCPROG=	$(SYMPROG:%=sym_%)
 SYMIPNODES=	$(INETETCDIR)/ipnodes
@@ -55,8 +52,6 @@ SYMIPNODES=	$(INETETCDIR)/ipnodes
 FILEMODE= 0444
 OWNER= root
 GROUP= sys
-
-$(ETCINETPROG2):=	FILEMODE= 0600
 
 .KEEP_STATE:
 

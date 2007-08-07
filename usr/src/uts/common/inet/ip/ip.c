@@ -353,11 +353,6 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * are sorted on address and locked starting from highest addressed lock
  * downward.
  *
- * Mobile-IP scenarios
- *
- * irb_lock -> ill_lock -> ire_mrtun_lock
- * irb_lock -> ill_lock -> ire_srcif_table_lock
- *
  * IPsec scenarios
  *
  * ipsa_lock -> ill_g_lock -> ill_lock
@@ -487,7 +482,7 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * TCP and UDP fanout routines.
  *
  * Forwarding (in and out)
- * Hooks are placed in ip_rput_forward and ip_mrtun_forward.
+ * Hooks are placed in ip_rput_forward.
  *
  * IP Policy Framework processing (IPPF processing)
  * Policy processing for a packet is initiated by ip_process, which ascertains
@@ -607,7 +602,6 @@ uint_t ip_max_frag_dups = 10;
 static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 
 static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
-static void	ip_ipsec_out_prepend(mblk_t *, mblk_t *, ill_t *);
 
 static void	icmp_frag_needed(queue_t *, mblk_t *, int, zoneid_t,
 		    ip_stack_t *);
@@ -644,10 +638,9 @@ static void	ip_fanout_tcp(queue_t *, mblk_t *, ill_t *, ipha_t *, uint_t,
 static void	ip_fanout_udp(queue_t *, mblk_t *, ill_t *, ipha_t *, uint32_t,
 		    boolean_t, uint_t, boolean_t, boolean_t, ill_t *, zoneid_t);
 static void	ip_lrput(queue_t *, mblk_t *);
-static void	ip_mrtun_forward(ire_t *, ill_t *, mblk_t *);
 ipaddr_t	ip_net_mask(ipaddr_t);
-void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
-		    zoneid_t, ip_stack_t *);
+void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, conn_t *, zoneid_t,
+		    ip_stack_t *);
 static void	ip_newroute_ipif(queue_t *, mblk_t *, ipif_t *, ipaddr_t,
 		    conn_t *, uint32_t, zoneid_t, ip_opt_info_t *);
 char		*ip_nv_lookup(nv_t *, int);
@@ -908,10 +901,6 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    "ip_ipif_status" },
 	{  ip_ire_report,	NULL,		NULL,
 	    "ipv4_ire_status" },
-	{  ip_ire_report_mrtun,	NULL,		NULL,
-	    "ipv4_mrtun_ire_status" },
-	{  ip_ire_report_srcif,	NULL,		NULL,
-	    "ipv4_srcif_ire_status" },
 	{  ip_ire_report_v6,	NULL,		NULL,
 	    "ipv6_ire_status" },
 	{  ip_conn_report,	NULL,		NULL,
@@ -930,12 +919,12 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
-#define	IPNDP_CGTP_FILTER_OFFSET	16
+#define	IPNDP_CGTP_FILTER_OFFSET	14
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
 	    "ip_cgtp_filter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_soft_rings_cnt, "ip_soft_rings_cnt" },
-#define	IPNDP_IPMP_HOOK_OFFSET	18
+#define	IPNDP_IPMP_HOOK_OFFSET	16
 	{  ip_param_generic_get, ipmp_hook_emulation_set, NULL,
 	    "ipmp_hook_emulation" },
 };
@@ -3162,14 +3151,12 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 	    (uchar_t *)&ip_g_all_ones,		/* mask */
 	    (uchar_t *)&save_ire->ire_src_addr,	/* source addr */
 	    (uchar_t *)&gateway,		/* gateway addr */
-	    NULL,				/* no in_srcaddr */
 	    &save_ire->ire_max_frag,		/* max frag */
 	    NULL,				/* no src nce */
 	    NULL,				/* no rfq */
 	    NULL,				/* no stq */
 	    IRE_HOST,
 	    NULL,				/* ipif */
-	    NULL,				/* in_ill */
 	    0,					/* cmask */
 	    0,					/* phandle */
 	    0,					/* ihandle */
@@ -3265,7 +3252,6 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	ire_t	*ire;
 	mblk_t *ipsec_mp;
 	ipsec_out_t	*io = NULL;
-	boolean_t xmit_if_on = B_FALSE;
 
 	if (mctl_present) {
 		/*
@@ -3303,8 +3289,6 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		} else {
 			ASSERT(in->ipsec_info_type == IPSEC_OUT);
 			io = (ipsec_out_t *)in;
-			if (io->ipsec_out_xmit_if)
-				xmit_if_on = B_TRUE;
 			/*
 			 * Clear out ipsec_out_proc_begin, so we do a fresh
 			 * ire lookup.
@@ -3362,7 +3346,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	if (ire != NULL &&
 	    (ire->ire_zoneid == zoneid || ire->ire_zoneid == ALL_ZONES)) {
 		src = ipha->ipha_dst;
-	} else if (!xmit_if_on) {
+	} else {
 		if (ire != NULL)
 			ire_refrele(ire);
 		ire = ire_route_lookup(dst, 0, 0, 0, NULL, NULL, zoneid, NULL,
@@ -3374,34 +3358,6 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			return;
 		}
 		src = ire->ire_src_addr;
-	} else {
-		ipif_t	*ipif = NULL;
-		ill_t	*ill;
-		/*
-		 * This must be an ICMP error coming from
-		 * ip_mrtun_forward(). The src addr should
-		 * be equal to the IP-addr of the outgoing
-		 * interface.
-		 */
-		if (io == NULL) {
-			/* This is not a IPSEC_OUT type control msg */
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-			freemsg(ipsec_mp);
-			return;
-		}
-		ill = ill_lookup_on_ifindex(io->ipsec_out_ill_index, B_FALSE,
-		    NULL, NULL, NULL, NULL, ipst);
-		if (ill != NULL) {
-			ipif = ipif_get_next_ipif(NULL, ill);
-			ill_refrele(ill);
-		}
-		if (ipif == NULL) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-			freemsg(ipsec_mp);
-			return;
-		}
-		src = ipif->ipif_src_addr;
-		ipif_refrele(ipif);
 	}
 
 	if (ire != NULL)
@@ -7592,217 +7548,6 @@ ip_massage_options(ipha_t *ipha, netstack_t *ns)
 }
 
 /*
- * This function's job is to forward data to the reverse tunnel (FA->HA)
- * after doing a few checks. It is assumed that the incoming interface
- * of the packet is always different than the outgoing interface and the
- * ire_type of the found ire has to be a non-resolver type.
- *
- * IPQoS notes
- * IP policy is invoked twice for a forwarded packet, once on the read side
- * and again on the write side if both, IPP_FWD_IN and IPP_FWD_OUT are
- * enabled.
- */
-static void
-ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
-{
-	ipha_t		*ipha;
-	queue_t		*q;
-	uint32_t 	pkt_len;
-#define	rptr    ((uchar_t *)ipha)
-	uint32_t 	sum;
-	uint32_t 	max_frag;
-	mblk_t		*first_mp;
-	uint32_t	ill_index;
-	ipxmit_state_t	pktxmit_state;
-	ill_t		*out_ill;
-	ip_stack_t	*ipst = in_ill->ill_ipst;
-
-	ASSERT(ire != NULL);
-	ASSERT(ire->ire_ipif->ipif_net_type == IRE_IF_NORESOLVER);
-	ASSERT(ire->ire_stq != NULL);
-
-	/* Initiate read side IPPF processing */
-	if (IPP_ENABLED(IPP_FWD_IN, ipst)) {
-		ill_index = in_ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_FWD_IN, &mp, ill_index);
-		if (mp == NULL) {
-			ip2dbg(("ip_mrtun_forward: inbound pkt "
-			    "dropped during IPPF processing\n"));
-			return;
-		}
-	}
-
-	if (((in_ill->ill_flags & ((ill_t *)ire->ire_stq->q_ptr)->ill_flags &
-	    ILLF_ROUTER) == 0) ||
-	    (in_ill == (ill_t *)ire->ire_stq->q_ptr)) {
-		BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsForwProhibits);
-		ip0dbg(("ip_mrtun_forward: Can't forward :"
-		    "forwarding is not turned on\n"));
-		goto drop_pkt;
-	}
-
-	/*
-	 * Don't forward if the interface is down
-	 */
-	if (ire->ire_ipif->ipif_ill->ill_ipif_up_count == 0) {
-		goto discard_pkt;
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
-	pkt_len = ntohs(ipha->ipha_length);
-	/* Adjust the checksum to reflect the ttl decrement. */
-	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
-	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
-	if (ipha->ipha_ttl-- <= 1) {
-		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInCksumErrs);
-			goto drop_pkt;
-		}
-		q = ire->ire_stq;
-		if ((first_mp = allocb(sizeof (ipsec_info_t),
-		    BPRI_HI)) == NULL) {
-			goto discard_pkt;
-		}
-		BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsForwProhibits);
-		ip_ipsec_out_prepend(first_mp, mp, in_ill);
-		/* Sent by forwarding path, and router is global zone */
-		icmp_time_exceeded(q, first_mp, ICMP_TTL_EXCEEDED,
-		    GLOBAL_ZONEID, ipst);
-		return;
-	}
-
-	/* Get the ill_index of the ILL */
-	ill_index = ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
-
-	/*
-	 * This location is chosen for the placement of the forwarding hook
-	 * because at this point we know that we have a path out for the
-	 * packet but haven't yet applied any logic (such as fragmenting)
-	 * that happen as part of transmitting the packet out.
-	 */
-	out_ill = ire->ire_ipif->ipif_ill;
-
-	DTRACE_PROBE4(ip4__forwarding__start,
-	    ill_t *, in_ill, ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
-
-	FW_HOOKS(ipst->ips_ip4_forwarding_event,
-	    ipst->ips_ipv4firewall_forwarding,
-	    in_ill, out_ill, ipha, mp, mp, ipst);
-
-	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
-
-	if (mp == NULL)
-		return;
-	pkt_len = ntohs(ipha->ipha_length);
-
-	/*
-	 * ip_mrtun_forward is only used by foreign agent to reverse
-	 * tunnel the incoming packet. So it does not do any option
-	 * processing for source routing.
-	 */
-	max_frag = ire->ire_max_frag;
-	if (pkt_len > max_frag) {
-		/*
-		 * It needs fragging on its way out.  We haven't
-		 * verified the header checksum yet.  Since we
-		 * are going to put a surely good checksum in the
-		 * outgoing header, we have to make sure that it
-		 * was good coming in.
-		 */
-		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInCksumErrs);
-			goto drop_pkt;
-		}
-
-		/* Initiate write side IPPF processing */
-		if (IPP_ENABLED(IPP_FWD_OUT, ipst)) {
-			ip_process(IPP_FWD_OUT, &mp, ill_index);
-			if (mp == NULL) {
-				ip2dbg(("ip_mrtun_forward: outbound pkt "\
-				    "dropped/deferred during ip policy "\
-				    "processing\n"));
-				return;
-			}
-		}
-		if ((first_mp = allocb(sizeof (ipsec_info_t),
-		    BPRI_HI)) == NULL) {
-			goto discard_pkt;
-		}
-		ip_ipsec_out_prepend(first_mp, mp, in_ill);
-		mp = first_mp;
-
-		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0, GLOBAL_ZONEID, ipst);
-		return;
-	}
-
-	ip2dbg(("ip_mrtun_forward: ire type (%d)\n", ire->ire_type));
-
-	ASSERT(ire->ire_ipif != NULL);
-
-	DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
-	    ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,
-	    ipst->ips_ipv4firewall_physical_out,
-	    NULL, out_ill, ipha, mp, mp, ipst);
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	if (mp == NULL)
-		return;
-
-	/* Now send the packet to the tunnel interface */
-	mp->b_prev = SET_BPREV_FLAG(IPP_FWD_OUT);
-	q = ire->ire_stq;
-	pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_FALSE);
-	if ((pktxmit_state == SEND_FAILED) ||
-	    (pktxmit_state == LLHDR_RESLV_FAILED)) {
-		ip2dbg(("ip_mrtun_forward: failed to send packet to ill %p\n",
-		    q->q_ptr));
-	}
-
-	return;
-discard_pkt:
-	BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInDiscards);
-drop_pkt:;
-	ip2dbg(("ip_mrtun_forward: dropping pkt\n"));
-	freemsg(mp);
-#undef	rptr
-}
-
-/*
- * Fills the ipsec_out_t data structure with appropriate fields and
- * prepends it to mp which contains the IP hdr + data that was meant
- * to be forwarded. Please note that ipsec_out_info data structure
- * is used here to communicate the outgoing ill path at ip_wput()
- * for the ICMP error packet. This has nothing to do with ipsec IP
- * security. ipsec_out_t is really used to pass the info to the module
- * IP where this information cannot be extracted from conn.
- * This functions is called by ip_mrtun_forward().
- */
-void
-ip_ipsec_out_prepend(mblk_t *first_mp, mblk_t *mp, ill_t *xmit_ill)
-{
-	ipsec_out_t	*io;
-
-	ASSERT(xmit_ill != NULL);
-	first_mp->b_datap->db_type = M_CTL;
-	first_mp->b_wptr += sizeof (ipsec_info_t);
-	/*
-	 * This is to pass info to ip_wput in absence of conn.
-	 * ipsec_out_secure will be B_FALSE because of this.
-	 * Thus ipsec_out_secure being B_FALSE indicates that
-	 * this is not IPSEC security related information.
-	 */
-	bzero(first_mp->b_rptr, sizeof (ipsec_info_t));
-	io = (ipsec_out_t *)first_mp->b_rptr;
-	io->ipsec_out_type = IPSEC_OUT;
-	io->ipsec_out_len = sizeof (ipsec_out_t);
-	first_mp->b_cont = mp;
-	io->ipsec_out_ill_index =
-	    xmit_ill->ill_phyint->phyint_ifindex;
-	io->ipsec_out_xmit_if = B_TRUE;
-	io->ipsec_out_ns = xmit_ill->ill_ipst->ips_netstack;
-}
-
-/*
  * Return the network mask
  * associated with the specified address.
  */
@@ -7933,7 +7678,7 @@ ip_grab_attach_ill(ill_t *ill, mblk_t *first_mp, int ifindex, boolean_t isv6,
  *	are not NULL.
  */
 void
-ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
+ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
     zoneid_t zoneid, ip_stack_t *ipst)
 {
 	areq_t	*areq;
@@ -8023,8 +7768,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 	 * For example, we know that there is no IRE_CACHE for this dest,
 	 * but there may be an IRE_OFFSUBNET which specifies a gateway.
 	 * ire_ftable_lookup will look up the gateway, etc.
-	 * Check if in_ill != NULL. If it is true, the packet must be
-	 * from an incoming interface where RTA_SRCIFP is set.
 	 * Otherwise, given ire_ftable_lookup algorithm, only one among routes
 	 * to the destination, of equal netmask length in the forward table,
 	 * will be recursively explored. If no information is available
@@ -8062,10 +7805,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 	 * ire_add_then_send. Some legacy code paths (e.g. cgtp) would need
 	 * to be modified to accomodate this solution.
 	 */
-	if (in_ill != NULL) {
-		ire = ire_srcif_table_lookup(dst, IRE_IF_RESOLVER, NULL,
-		    in_ill, MATCH_IRE_TYPE);
-	} else if (ip_nexthop) {
+	if (ip_nexthop) {
 		/*
 		 * The first time we come here, we look for an IRE_INTERFACE
 		 * entry for the specified nexthop, set the dst to be the
@@ -8219,27 +7959,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 				ill_refrele(attach_ill);
 			goto icmp_err_ret;
 		}
-
-		/*
-		 * When RTA_SRCIFP is used to add a route, then an interface
-		 * route is added in the source interface's routing table.
-		 * If the outgoing interface of this route is of type
-		 * IRE_IF_RESOLVER, then upon creation of the ire,
-		 * ire_nce->nce_res_mp is set to NULL.
-		 * Later, when this route is first used for forwarding
-		 * a packet, ip_newroute() is called
-		 * to resolve the hardware address of the outgoing ipif.
-		 * We do not come here for IRE_IF_NORESOLVER entries in the
-		 * source interface based table. We only come here if the
-		 * outgoing interface is a resolver interface and we don't
-		 * have the ire_nce->nce_res_mp information yet.
-		 * If in_ill is not null that means it is called from
-		 * ip_rput.
-		 */
-
-		ASSERT(ire->ire_in_ill == NULL ||
-		    (ire->ire_type == IRE_IF_RESOLVER &&
-		    ire->ire_nce != NULL && ire->ire_nce->nce_res_mp == NULL));
 
 		/*
 		 * Verify that the returned IRE does not have either
@@ -8594,14 +8313,12 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
 			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 			    (uchar_t *)&gw,		/* gateway address */
-			    NULL,
 			    &save_ire->ire_max_frag,
 			    save_ire->ire_nce,		/* src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,			/* IRE type */
 			    src_ipif,
-			    in_ill,			/* incoming ill */
 			    (sire != NULL) ?
 			    sire->ire_mask : 0, 	/* Parent mask */
 			    (sire != NULL) ?
@@ -8740,14 +8457,12 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
 			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 			    (uchar_t *)&gw,		/* gateway address */
-			    NULL,
 			    &save_ire->ire_max_frag,
 			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
 			    src_ipif,
-			    in_ill,			/* Incoming ill */
 			    save_ire->ire_mask,		/* Parent mask */
 			    (sire != NULL) ?		/* Parent handle */
 			    sire->ire_phandle : 0,
@@ -8907,14 +8622,12 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
 			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 			    (uchar_t *)&gw,		/* gateway address */
-			    NULL,			/* no in_src_addr */
 			    NULL,			/* ire_max_frag */
 			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
 			    src_ipif,			/* Interface ipif */
-			    in_ill,			/* Incoming ILL */
 			    save_ire->ire_mask,		/* Parent mask */
 			    0,
 			    save_ire->ire_ihandle,	/* Interface handle */
@@ -9079,11 +8792,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 	if (mp->b_prev) {
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
-		if (in_ill != NULL) {
-			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInDiscards);
-		} else {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-		}
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 	} else {
 		if (dst_ill != NULL) {
 			BUMP_MIB(dst_ill->ill_ip_mib, ipIfStatsOutDiscards);
@@ -9116,11 +8825,7 @@ icmp_err_ret:
 	if (mp->b_prev) {
 		mp->b_next = NULL;
 		mp->b_prev = NULL;
-		if (in_ill != NULL) {
-			BUMP_MIB(in_ill->ill_ip_mib, ipIfStatsInNoRoutes);
-		} else {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInNoRoutes);
-		}
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInNoRoutes);
 		q = WR(q);
 	} else {
 		/*
@@ -9409,14 +9114,8 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		}
 
 		/*
-		 * In case of IP_XMIT_IF, it is possible that the outgoing
-		 * interface does not have an interface ire.
-		 * Example: Thousands of mobileip PPP interfaces to mobile
-		 * nodes. We don't want to create interface ires because
-		 * packets from other mobile nodes must not take the route
-		 * via interface ires to the visiting mobile node without
-		 * going through the home agent, in absence of mobileip
-		 * route optimization.
+		 * In the case of IP_XMIT_IF, it is possible that the
+		 * outgoing interface does not have an interface ire.
 		 */
 		if (CLASSD(ipha_dst) && (connp == NULL ||
 		    connp->conn_xmit_if_ill == NULL) &&
@@ -9471,11 +9170,8 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			/*
 			 * The only ways we can come here are:
 			 * 1) IP_XMIT_IF socket option is set
-			 * 2) ICMP error message generated from
-			 *    ip_mrtun_forward() routine and it needs
-			 *    to go through the specified ill.
-			 * 3) SO_DONTROUTE socket option is set
-			 * 4) IP_PKTINFO option is passed in as ancillary data.
+			 * 2) SO_DONTROUTE socket option is set
+			 * 3) IP_PKTINFO option is passed in as ancillary data.
 			 * In all cases, the new ire will not be added
 			 * into cache table.
 			 */
@@ -9504,14 +9200,12 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
 			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 			    NULL,			/* gateway address */
-			    NULL,
 			    &ipif->ipif_mtu,
 			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
 			    src_ipif,
-			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
 			    (fire != NULL) ?		/* Parent handle */
 			    fire->ire_phandle : 0,
@@ -9664,7 +9358,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
 			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 			    NULL,			/* gateway address */
-			    NULL,			/* no in_src_addr */
 			    (ire_marks & IRE_MARK_NOADD) ?
 			    ipif->ipif_mtu : 0,		/* max_frag */
 			    NULL,			/* no src nce */
@@ -9672,7 +9365,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
 			    src_ipif,
-			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
 			    (fire != NULL) ?		/* Parent handle */
 			    fire->ire_phandle : 0,
@@ -10716,8 +10408,7 @@ setit:
 			 * determines the outgoing interface for
 			 * unicast packets. Also no IRE_CACHE entry
 			 * is added for the destination of the
-			 * outgoing packets. This feature is needed
-			 * for mobile IP.
+			 * outgoing packets.
 			 */
 			connp->conn_xmit_if_ill = ill;
 			connp->conn_orig_xmit_ifindex = (ill == NULL) ?
@@ -13798,13 +13489,9 @@ done:
 
 /*
  * Deal with the fact that there is no ire for the destination.
- * The incoming ill (in_ill) is passed in to ip_newroute only
- * in the case of packets coming from mobile ip forward tunnel.
- * It must be null otherwise.
  */
 static ire_t *
-ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
-    ipaddr_t dst)
+ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
 {
 	ipha_t	*ipha;
 	ill_t	*ill;
@@ -13858,19 +13545,12 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 	 */
 	DB_CKSUMFLAGS(mp) = 0;
 
-	if (in_ill != NULL) {
-		/*
-		 * Now hand the packet to ip_newroute.
-		 */
-		ip_newroute(q, mp, dst, in_ill, NULL, GLOBAL_ZONEID, ipst);
-		return (NULL);
-	}
 	ire = ire_forward(dst, &check_multirt, NULL, NULL,
 	    MBLK_GETLABEL(mp), ipst);
 
 	if (ire == NULL && check_multirt) {
 		/* Let ip_newroute handle CGTP  */
-		ip_newroute(q, mp, dst, in_ill, NULL, GLOBAL_ZONEID, ipst);
+		ip_newroute(q, mp, dst, NULL, GLOBAL_ZONEID, ipst);
 		return (NULL);
 	}
 
@@ -15171,14 +14851,12 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 *	o Tsol disabled
 		 *	o CGTP disabled
 		 *	o ipp_action_count is 0
-		 *	o Mobile IP not running
 		 *	o no options in the packet
 		 *	o not a RSVP packet
 		 * 	o not a multicast packet
 		 */
 		if (!is_system_labeled() &&
 		    !ip_cgtp_filter && ipp_action_count == 0 &&
-		    ill->ill_mrtun_refcnt == 0 && ill->ill_srcif_refcnt == 0 &&
 		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
 		    !ll_multicast && !CLASSD(dst)) {
 			if (ire == NULL)
@@ -15266,100 +14944,10 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 				continue;
 		}
 
-
-		/*
-		 * Check if the packet is coming from the Mobile IP
-		 * forward tunnel interface
-		 */
-		if (ill->ill_srcif_refcnt > 0) {
-			ire = ire_srcif_table_lookup(dst, IRE_INTERFACE,
-			    NULL, ill, MATCH_IRE_TYPE);
-			if (ire != NULL && ire->ire_nce->nce_res_mp == NULL &&
-			    ire->ire_ipif->ipif_net_type == IRE_IF_RESOLVER) {
-
-				/* We need to resolve the link layer info */
-				ire_refrele(ire);
-				ire = NULL;
-				(void) ip_rput_noire(q, (ill_t *)q->q_ptr, mp,
-				    ll_multicast, dst);
-				continue;
-			}
-		}
-
 		if (ire == NULL) {
 			ire = ire_cache_lookup(dst, ALL_ZONES,
 			    MBLK_GETLABEL(mp), ipst);
 		}
-
-		/*
-		 * If mipagent is running and reverse tunnel is created as per
-		 * mobile node request, then any packet coming through the
-		 * incoming interface from the mobile-node, should be reverse
-		 * tunneled to it's home agent except those that are destined
-		 * to foreign agent only.
-		 * This needs source address based ire lookup. The routing
-		 * entries for source address based lookup are only created by
-		 * mipagent program only when a reverse tunnel is created.
-		 * Reference : RFC2002, RFC2344
-		 */
-		if (ill->ill_mrtun_refcnt > 0) {
-			ipaddr_t	srcaddr;
-			ire_t		*tmp_ire;
-
-			tmp_ire = ire;	/* Save, we might need it later */
-			if (ire == NULL || (ire->ire_type != IRE_LOCAL &&
-			    ire->ire_type != IRE_BROADCAST)) {
-				srcaddr = ipha->ipha_src;
-				ire = ire_mrtun_lookup(srcaddr, ill);
-				if (ire != NULL) {
-					/*
-					 * Should not be getting iphada packet
-					 * here. we should only get those for
-					 * IRE_LOCAL traffic, excluded above.
-					 * Fail-safe (drop packet) in the event
-					 * hardware is misbehaving.
-					 */
-					if (first_mp != mp) {
-						/* IPsec KSTATS: beancount me */
-						freemsg(first_mp);
-					} else {
-						/*
-						 * This packet must be forwarded
-						 * to Reverse Tunnel
-						 */
-						ip_mrtun_forward(ire, ill, mp);
-					}
-					ire_refrele(ire);
-					ire = NULL;
-					if (tmp_ire != NULL) {
-						ire_refrele(tmp_ire);
-						tmp_ire = NULL;
-					}
-					TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-					    "ip_input_end: q %p (%S)",
-					    q, "uninit");
-					continue;
-				}
-			}
-			/*
-			 * If this packet is from a non-mobilenode  or a
-			 * mobile-node which does not request reverse
-			 * tunnel service
-			 */
-			ire = tmp_ire;
-		}
-
-
-		/*
-		 * If we reach here that means the incoming packet satisfies
-		 * one of the following conditions:
-		 *   - packet is from a mobile node which does not request
-		 *	reverse tunnel
-		 *   - packet is from a non-mobile node, which is the most
-		 *	common case
-		 *   - packet is from a reverse tunnel enabled mobile node
-		 *	and destined to foreign agent only
-		 */
 
 		if (ire == NULL) {
 			/*
@@ -15370,7 +14958,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			 * packets i.e. if they will go out over the
 			 * same interface as they came in on.
 			 */
-			ire = ip_rput_noire(q, NULL, mp, ll_multicast, dst);
+			ire = ip_rput_noire(q, mp, ll_multicast, dst);
 			if (ire == NULL)
 				continue;
 		}
@@ -19049,16 +18637,6 @@ ip_snmp_get_mib2_ip_route_media(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
 	ire_walk_v4(ip_snmp_get2_v4, &ird, zoneid, ipst);
-	if (zoneid == GLOBAL_ZONEID) {
-		/*
-		 * Those IREs are used by Mobile-IP; since mipagent(1M)
-		 * requires the sys_net_config or sys_ip_config privilege,
-		 * it can only run in the global zone or an exclusive-IP zone,
-		 * and both those have a conn_zoneid == GLOBAL_ZONEID.
-		 */
-		ire_walk_srcif_table_v4(ip_snmp_get2_v4, &ird, ipst);
-		ire_walk_ill_mrtun(0, 0, ip_snmp_get2_v4, &ird, NULL, ipst);
-	}
 
 	/* ipRouteEntryTable in mpctl */
 	optp = (struct opthdr *)&mpctl->b_rptr[sizeof (struct T_optmgmt_ack)];
@@ -19437,23 +19015,12 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 	re->ipRouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
 	re->ipRouteInfo.re_ibpkt	= ire->ire_ib_pkt_count;
 	re->ipRouteInfo.re_flags	= ire->ire_flags;
-	re->ipRouteInfo.re_in_ill.o_length = 0;
 
 	if (ire->ire_flags & RTF_DYNAMIC) {
 		re->ipRouteInfo.re_ire_type	= IRE_HOST_REDIRECT;
 	} else {
 		re->ipRouteInfo.re_ire_type	= ire->ire_type;
 	}
-
-	if (ire->ire_in_ill != NULL) {
-		re->ipRouteInfo.re_in_ill.o_length =
-		    ire->ire_in_ill->ill_name_length == 0 ? 0 :
-		    MIN(OCTET_LENGTH, ire->ire_in_ill->ill_name_length - 1);
-		bcopy(ire->ire_in_ill->ill_name,
-		    re->ipRouteInfo.re_in_ill.o_bytes,
-		    re->ipRouteInfo.re_in_ill.o_length);
-	}
-	re->ipRouteInfo.re_in_src_addr = ire->ire_in_src_addr;
 
 	if (!snmp_append_data2(ird->ird_route.lp_head, &ird->ird_route.lp_tail,
 	    (char *)re, (int)sizeof (*re))) {
@@ -20572,9 +20139,8 @@ standard_path:
 		 * Try to resolve another multiroute if
 		 * ire_multirt_need_resolve() deemed it necessary.
 		 */
-		if (copy_mp != NULL) {
-			ip_newroute(q, copy_mp, dst, NULL, connp, zoneid, ipst);
-		}
+		if (copy_mp != NULL)
+			ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
 		if (need_decref)
 			CONN_DEC_REF(connp);
 		return;
@@ -20702,9 +20268,8 @@ standard_path:
 	 * Try to resolve another multiroute if
 	 * ire_multirt_resolvable() deemed it necessary
 	 */
-	if (copy_mp != NULL) {
-		ip_newroute(q, copy_mp, dst, NULL, connp, zoneid, ipst);
-	}
+	if (copy_mp != NULL)
+		ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
 	if (need_decref)
 		CONN_DEC_REF(connp);
 	return;
@@ -20829,11 +20394,7 @@ notdata:
 		uint_t ifindex;
 
 		io = (ipsec_out_t *)first_mp->b_rptr;
-		if (io->ipsec_out_attach_if ||
-		    io->ipsec_out_xmit_if ||
-		    io->ipsec_out_ip_nexthop) {
-			ill_t	*ill;
-
+		if (io->ipsec_out_attach_if || io->ipsec_out_ip_nexthop) {
 			/*
 			 * We may have lost the conn context if we are
 			 * coming here from ip_newroute(). Copy the
@@ -20849,40 +20410,8 @@ notdata:
 			} else {
 				ASSERT(io->ipsec_out_ill_index != 0);
 				ifindex = io->ipsec_out_ill_index;
-				ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
-				    NULL, NULL, NULL, NULL, ipst);
-				/*
-				 * ipsec_out_xmit_if bit is used to tell
-				 * ip_wput to use the ill to send outgoing data
-				 * as we have no conn when data comes from ICMP
-				 * error msg routines. Currently this feature is
-				 * only used by ip_mrtun_forward routine.
-				 */
-				if (io->ipsec_out_xmit_if) {
-					xmit_ill = ill;
-					if (xmit_ill == NULL) {
-						ip1dbg(("ip_output:bad ifindex "
-						    "for xmit_ill %d\n",
-						    ifindex));
-						freemsg(first_mp);
-						BUMP_MIB(&ipst->ips_ip_mib,
-						    ipIfStatsOutDiscards);
-						ASSERT(!need_decref);
-						return;
-					}
-					/* Free up the ipsec_out_t mblk */
-					ASSERT(first_mp->b_cont == mp);
-					first_mp->b_cont = NULL;
-					freeb(first_mp);
-					/* Just send the IP header+ICMP+data */
-					first_mp = mp;
-					ipha = (ipha_t *)mp->b_rptr;
-					dst = ipha->ipha_dst;
-					goto send_from_ill;
-				} else {
-					attach_ill = ill;
-				}
-
+				attach_ill = ill_lookup_on_ifindex(ifindex,
+				    B_FALSE, NULL, NULL, NULL, NULL, ipst);
 				if (attach_ill == NULL) {
 					ASSERT(xmit_ill == NULL);
 					ip1dbg(("ip_output: bad ifindex for "
@@ -21608,8 +21137,7 @@ noirefound:
 			 */
 			mp->b_prev = NULL;
 			mp->b_next = NULL;
-			ip_newroute(q, first_mp, dst, NULL, connp, zoneid,
-			    ipst);
+			ip_newroute(q, first_mp, dst, connp, zoneid, ipst);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 			    "ip_wput_end: q %p (%S)", q, "newroute");
 			if (attach_ill != NULL)
@@ -21691,7 +21219,7 @@ noirefound:
 				copy_mp = NULL;
 			}
 		} else {
-			ip_newroute(q, copy_mp, dst, NULL, connp, zoneid, ipst);
+			ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
 		}
 	}
 	if (attach_ill != NULL)
@@ -24250,11 +23778,7 @@ free_mmd:		IP_STAT(ipst, ip_frag_mdt_discarded);
 		if (ire->ire_ipif != NULL)
 			atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, pkts);
 	} else {
-		/*
-		 * The type is IB_PKT in the forwarding path and in
-		 * the mobile IP case when the packet is being reverse-
-		 * tunneled to the home agent.
-		 */
+		/* The type is IB_PKT in the forwarding path. */
 		ire->ire_ib_pkt_count += pkts;
 		ASSERT(!IRE_IS_LOCAL(ire));
 		if (ire->ire_type & IRE_BROADCAST) {
@@ -25645,8 +25169,8 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif, zoneid_t zoneid)
  * NOTE : This function does not ire_refrele the ire argument passed in.
  *
  * Copy the link layer header and do IPQoS if needed. Frees the mblk on
- * failure. The nce_fp_mp can vanish any time in the case of IRE_MIPRTUN
- * and IRE_BROADCAST due to DL_NOTE_FASTPATH_FLUSH. Hence we have to hold
+ * failure. The nce_fp_mp can vanish any time in the case of
+ * IRE_BROADCAST due to DL_NOTE_FASTPATH_FLUSH. Hence we have to hold
  * the ire_lock to access the nce_fp_mp in this case.
  * IPQoS assumes that the first M_DATA contains the IP header. So, if we are
  * prepending a fastpath message IPQoS processing must precede it, we also set
@@ -26256,8 +25780,8 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 * the ipha_ident field to IP_HDR_INCLUDED.
 		 */
 		ipha->ipha_ident = IP_HDR_INCLUDED;
-		ip_newroute(q, ipsec_mp, dst, NULL,
-		    (CONN_Q(q) ? Q_TO_CONN(q) : NULL), zoneid, ipst);
+		ip_newroute(q, ipsec_mp, dst, (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
+		    zoneid, ipst);
 	}
 	goto done;
 send:

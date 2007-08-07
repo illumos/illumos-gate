@@ -6976,8 +6976,10 @@ ipsec_needs_processing_v6(mblk_t *mp, uint8_t *nexthdr)
 			if ((uchar_t *)desthdr +  ehdrlen > endptr)
 				return (IPSEC_MEMORY_ERROR);
 			/*
-			 * Return DONT_PROCESS because of potential Mobile IPv6
-			 * cruft for destination options.
+			 * Return DONT_PROCESS because the destination
+			 * options header may be for each hop in a
+			 * routing-header, and we only want AH if we're
+			 * finished with routing headers.
 			 */
 			if (*nexthdrp == IPPROTO_DSTOPTS)
 				return (IPSEC_HDR_DONT_PROCESS);

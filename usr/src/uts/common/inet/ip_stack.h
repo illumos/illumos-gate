@@ -242,8 +242,6 @@ struct ip_stack {
 
 	/* This is dynamically allocated in ip_ire_init */
 	struct irb	 *ips_ip_cache_table;
-	/* This is dynamically allocated in ire_add_mrtun */
-	struct irb	*ips_ip_mrtun_table;
 
 #define	IPV6_ABITS		128
 #define	IP6_MASK_TABLE_SIZE	(IPV6_ABITS + 1)	/* 129 ptrs */
@@ -258,19 +256,7 @@ struct ip_stack {
 	 * dynamically in ire_add.
 	 */
 	kmutex_t	ips_ire_ft_init_lock;
-	kmutex_t	ips_ire_mrtun_lock; /* Protects mrtun table and count */
-	kmutex_t	ips_ire_srcif_table_lock; /* Same as above */
-	/*
-	 * The following counts are used to determine whether a walk is
-	 * needed through the reverse tunnel table or through ills
-	 */
 	kmutex_t	ips_ire_handle_lock;	/* Protects ire_handle */
-
-	/* # of ires in reverse tun table */
-	uint_t		ips_ire_mrtun_count;
-
-	/* # of ires in all srcif tables */
-	uint_t		ips_ire_srcif_table_count;
 
 	uint32_t	ips_ip_cache_table_size;
 	uint32_t	ips_ip6_cache_table_size;

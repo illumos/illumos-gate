@@ -484,7 +484,6 @@ ire_format(uintptr_t addr, const ire_t *irep, uint_t *verbose)
 		{ "IF_RESOLVER", IRE_IF_RESOLVER,	IRE_IF_RESOLVER	},
 		{ "HOST",	IRE_HOST,		IRE_HOST	},
 		{ "HOST_REDIRECT", IRE_HOST_REDIRECT,	IRE_HOST_REDIRECT },
-		{ "MIPRTUN",	IRE_MIPRTUN,		IRE_MIPRTUN	},
 		{ NULL,		0,			0		}
 	};
 

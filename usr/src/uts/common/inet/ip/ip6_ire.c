@@ -304,9 +304,8 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 	}
 
 	/* ire_init_common will free the mblks upon encountering any failure */
-	if (!ire_init_common(ire, max_fragp, NULL, rfq, stq, type,
-	    ipif, NULL, phandle, ihandle, flags, IPV6_VERSION, ulp_info,
-	    gc, gcgrp, ipst))
+	if (!ire_init_common(ire, max_fragp, NULL, rfq, stq, type, ipif,
+	    phandle, ihandle, flags, IPV6_VERSION, ulp_info, gc, gcgrp, ipst))
 		return (NULL);
 
 	return (ire);

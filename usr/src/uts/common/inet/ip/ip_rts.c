@@ -86,8 +86,7 @@ static void	rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst,
 static int	rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp,
     in6_addr_t *gw_addrp, in6_addr_t *net_maskp, in6_addr_t *authorp,
     in6_addr_t *if_addrp, in6_addr_t *src_addrp, ushort_t *indexp,
-    ushort_t *src_indexp, sa_family_t *afp, tsol_rtsecattr_t *rtsecattr,
-    int *error);
+    sa_family_t *afp, tsol_rtsecattr_t *rtsecattr, int *error);
 static void	rts_getifdata(if_data_t *if_data, const ipif_t *ipif);
 static int	rts_getmetrics(ire_t *ire, rt_metrics_t *metrics);
 static mblk_t	*rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire,
@@ -234,8 +233,7 @@ ip_rts_request_retry(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy)
  * Processes requests received on a routing socket. It extracts all the
  * arguments and calls the appropriate function to process the request.
  *
- * RTA_SRC bit flag requests are sent by mipagent and 'route -setsrc'.
- * RTA_SRCIFP bit flag requests are sent by mipagent only.
+ * RTA_SRC bit flag requests are sent by 'route -setsrc'.
  *
  * In general, this function does not consume the message supplied but rather
  * sends the message upstream with an appropriate UNIX errno.
@@ -272,9 +270,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	ipaddr_t	src_addr;
 	ipaddr_t	net_mask;
 	ushort_t	index;
-	ushort_t	src_index;
 	ipif_t		*ipif = NULL;
-	ipif_t		*src_ipif = NULL;
 	ipif_t		*tmp_ipif = NULL;
 	IOCP		iocp = (IOCP)mp->b_rptr;
 	conn_t		*connp;
@@ -363,8 +359,8 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	}
 
 	found_addrs = rts_getaddrs(rtm, &dst_addr_v6, &gw_addr_v6, &net_mask_v6,
-	    &author_v6, &if_addr_v6, &src_addr_v6, &index, &src_index, &af,
-	    &rtsecattr, &error);
+	    &author_v6, &if_addr_v6, &src_addr_v6, &index, &af, &rtsecattr,
+	    &error);
 
 	if (error != 0)
 		goto done;
@@ -382,18 +378,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	 */
 	switch (af) {
 	case AF_INET:
-		/*
-		 * RTA_SRCIFP is supported for interface route only.
-		 * Thus a gateway route with srcifindex is rejected,
-		 * except if it's a request to add reverse tunnel
-		 * route.
-		 */
-		if ((rtm->rtm_flags & RTF_GATEWAY) &&
-		    (found_addrs & RTA_SRCIFP) &&
-		    !(found_addrs & RTA_SRC)) {
-			error = EINVAL;
-			goto done;
-		}
 		IN6_V4MAPPED_TO_IPADDR(&dst_addr_v6, dst_addr);
 		IN6_V4MAPPED_TO_IPADDR(&src_addr_v6, src_addr);
 		IN6_V4MAPPED_TO_IPADDR(&gw_addr_v6, gw_addr);
@@ -404,13 +388,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			IN6_V4MAPPED_TO_IPADDR(&net_mask_v6, net_mask);
 		break;
 	case AF_INET6:
-		/*
-		 * RTA_SRCIFP is not a valid flag for IPv6 routes.
-		 */
-		if (found_addrs & RTA_SRCIFP) {
-			error = EINVAL;
-			goto done;
-		}
 		if (((found_addrs & RTA_NETMASK) == 0) ||
 		    (rtm->rtm_flags & RTF_HOST))
 			net_mask_v6 = ipv6_all_ones;
@@ -470,23 +447,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		match_flags |= MATCH_IRE_ILL;
 	}
 
-	/* RTA_SRCIFP is unsupported on AF_INET6. */
-	if (af == AF_INET && src_index != 0) {
-		ill_t   *ill;
-
-		/* If ILL_CHANGING the request is queued in the ipsq. */
-		ill = ill_lookup_on_ifindex(src_index, B_FALSE,
-		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error,
-		    ipst);
-		if (ill == NULL) {
-			if (error != EINPROGRESS)
-				error = EINVAL;
-			goto done;
-		}
-
-		src_ipif = ipif_get_next_ipif(NULL, ill);
-		ill_refrele(ill);
-	}
 	/*
 	 * If a netmask was supplied in the message, then subsequent route
 	 * lookups will attempt to match on the netmask as well.
@@ -540,18 +500,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		case AF_INET:
 			if (src_addr != INADDR_ANY) {
 				/*
-				 * If there is a source address, but
-				 * no RTF_SETSRC modifier, setup a MobileIP
-				 * reverse tunnel.
-				 */
-				if ((rtm->rtm_flags & RTF_SETSRC) == 0) {
-					error = ip_mrtun_rt_add(src_addr,
-					    rtm->rtm_flags, ipif,
-					    src_ipif, &ire, CONNP_TO_WQ(connp),
-					    ioc_mp, ip_rts_request_retry, ipst);
-					break;
-				}
-				/*
 				 * The RTF_SETSRC flag is present, check that
 				 * the supplied src address is not the loopback
 				 * address. This would produce martian packets.
@@ -590,7 +538,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			}
 
 			error = ip_rt_add(dst_addr, net_mask, gw_addr, src_addr,
-			    rtm->rtm_flags, ipif, src_ipif, &ire, B_FALSE,
+			    rtm->rtm_flags, ipif, &ire, B_FALSE,
 			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
 			    rtsap, ipst);
 			if (ipif != NULL)
@@ -598,16 +546,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			break;
 		case AF_INET6:
 			if (!IN6_IS_ADDR_UNSPECIFIED(&src_addr_v6)) {
-				/*
-				 * If there is a source address, but
-				 * no RTF_SETSRC modifier, reject, as
-				 * MobileIP IPv6 reverse tunnels are
-				 * not supported.
-				 */
-				if ((rtm->rtm_flags & RTF_SETSRC) == 0) {
-					error = EINVAL;
-					goto done;
-				}
 				/*
 				 * The RTF_SETSRC flag is present, check that
 				 * the supplied src address is not the loopback
@@ -681,19 +619,10 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 		switch (af) {
 		case AF_INET:
-			/*
-			 * If there is a source address, delete
-			 * a MobileIP reverse tunnel.
-			 */
-			if (src_addr != INADDR_ANY) {
-				error = ip_mrtun_rt_delete(src_addr,
-				    src_ipif);
-				break;
-			}
 			error = ip_rt_delete(dst_addr, net_mask, gw_addr,
-			    found_addrs, rtm->rtm_flags, ipif, src_ipif,
-			    B_FALSE, CONNP_TO_WQ(connp), ioc_mp,
-			    ip_rts_request_retry, ipst);
+			    found_addrs, rtm->rtm_flags, ipif, B_FALSE,
+			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
+			    ipst);
 			break;
 		case AF_INET6:
 			error = ip_rt_delete_v6(&dst_addr_v6, &net_mask_v6,
@@ -1077,8 +1006,6 @@ done:
 		ire_refrele(sire);
 	if (ipif != NULL)
 		ipif_refrele(ipif);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
 	if (tmp_ipif != NULL)
 		ipif_refrele(tmp_ipif);
 
@@ -1459,8 +1386,8 @@ rts_getmetrics(ire_t *ire, rt_metrics_t *metrics)
 static int
 rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp, in6_addr_t *gw_addrp,
     in6_addr_t *net_maskp, in6_addr_t *authorp, in6_addr_t *if_addrp,
-    in6_addr_t *in_src_addrp, ushort_t *indexp, ushort_t *src_indexp,
-    sa_family_t *afp, tsol_rtsecattr_t *rtsecattr, int *error)
+    in6_addr_t *in_src_addrp, ushort_t *indexp, sa_family_t *afp,
+    tsol_rtsecattr_t *rtsecattr, int *error)
 {
 	struct sockaddr *sa;
 	int	i;
@@ -1478,7 +1405,6 @@ rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp, in6_addr_t *gw_addrp,
 	*if_addrp = ipv6_all_zeros;
 	*in_src_addrp = ipv6_all_zeros;
 	*indexp = 0;
-	*src_indexp = 0;
 	*afp = AF_UNSPEC;
 	rtsecattr->rtsa_cnt = 0;
 	*error = 0;
@@ -1534,15 +1460,6 @@ rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp, in6_addr_t *gw_addrp,
 			/* Source address of the incoming packet */
 			size = rts_copyfromsockaddr(sa, in_src_addrp);
 			*afp = sa->sa_family;
-			break;
-		case RTA_SRCIFP:
-			/* Return incoming interface index pointer */
-			if (sa->sa_family != AF_LINK &&
-			    sa->sa_family != AF_UNSPEC)
-				return (0);
-			sdl = (struct sockaddr_dl *)cp;
-			*src_indexp = sdl->sdl_index;
-			size = sizeof (struct sockaddr_dl);
 			break;
 		case RTA_IFA:
 			if (sa->sa_family != *afp && sa->sa_family != AF_UNSPEC)
@@ -1626,12 +1543,6 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 			break;
 		case RTA_IFP:
 			cp += ill_dls_info((struct sockaddr_dl *)cp, ipif);
-			break;
-		case RTA_SRCIFP:
-			/*
-			 * RTA_SRCIFP is not yet supported
-			 * for RTM_GET and RTM_CHANGE
-			 */
 			break;
 		case RTA_IFA:
 		case RTA_SRC:
@@ -1748,7 +1659,6 @@ rts_data_msg_size(int rtm_addrs, sa_family_t af, uint_t sacnt)
 		case RTA_GATEWAY:
 		case RTA_NETMASK:
 		case RTA_SRC:
-		case RTA_SRCIFP:
 		case RTA_IFA:
 		case RTA_AUTHOR:
 		case RTA_BRD:

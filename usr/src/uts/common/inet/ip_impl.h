@@ -128,8 +128,8 @@ extern "C" {
 	 */								\
 	if ((ill) != NULL && ILL_HCKSUM_CAPABLE(ill) &&			\
 	    !((ire)->ire_flags & RTF_MULTIRT) &&			\
-	    (!((ire)->ire_type & (IRE_BROADCAST|IRE_MIPRTUN)) ||	\
-	    (ill)->ill_type == IFT_ETHER) &&				\
+	    (!((ire)->ire_type & IRE_BROADCAST) ||			\
+	    (ill)->ill_type == IFT_ETHER) &&			\
 	    (ipsec_len) == 0 &&						\
 	    (((ire)->ire_ipversion == IPV4_VERSION &&			\
 	    (start) == IP_SIMPLE_HDR_LENGTH &&				\

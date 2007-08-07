@@ -90,7 +90,7 @@ extern "C" {
 
 #define	IFF_LOGINT_FLAGS	(IFF_UP|IFF_BROADCAST|IFF_POINTOPOINT| \
     IFF_UNNUMBERED|IFF_DHCPRUNNING|IFF_PRIVATE|IFF_NOXMIT|IFF_NOLOCAL| \
-    IFF_DEPRECATED|IFF_ADDRCONF|IFF_ANYCAST|IFF_MIPRUNNING|IFF_NOFAILOVER| \
+    IFF_DEPRECATED|IFF_ADDRCONF|IFF_ANYCAST|IFF_NOFAILOVER| \
     IFF_PREFERRED|IFF_TEMPORARY|IFF_FIXEDMTU|IFF_DUPLICATE)
 
 #define	IPIF_REPL_CHECK(to_ipif, failback_cmd)				\
@@ -133,7 +133,6 @@ extern "C" {
 #define	IPIF_DEPRECATED		IFF_DEPRECATED	/* address deprecated */
 #define	IPIF_ADDRCONF		IFF_ADDRCONF	/* stateless addrconf */
 #define	IPIF_ANYCAST		IFF_ANYCAST	/* Anycast address */
-#define	IPIF_MIPRUNNING		IFF_MIPRUNNING	/* Mobip Controlled interface */
 #define	IPIF_NOFAILOVER		IFF_NOFAILOVER	/* No failover on NIC failure */
 #define	IPIF_PREFERRED		IFF_PREFERRED	/* Prefer as source address */
 #define	IPIF_TEMPORARY		IFF_TEMPORARY	/* RFC3041 */
@@ -302,18 +301,13 @@ extern	int	ip_ipif_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
 
 extern	int	ip_rt_add(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t, int,
-    ipif_t *, ipif_t *, ire_t **, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
+    ipif_t *, ire_t **, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
     struct rtsa_s *, ip_stack_t *);
-extern	int	ip_mrtun_rt_add(ipaddr_t, int, ipif_t *, ipif_t *, ire_t **,
-    queue_t *, mblk_t *, ipsq_func_t, ip_stack_t *);
 extern	int	ip_rt_add_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, int, ipif_t *, ire_t **,
     queue_t *, mblk_t *, ipsq_func_t, struct rtsa_s *, ip_stack_t *ipst);
 extern	int	ip_rt_delete(ipaddr_t, ipaddr_t, ipaddr_t, uint_t, int,
-    ipif_t *, ipif_t *, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
-    ip_stack_t *);
-extern	int	ip_mrtun_rt_delete(ipaddr_t, ipif_t *);
-
+    ipif_t *, boolean_t, queue_t *, mblk_t *, ipsq_func_t, ip_stack_t *);
 extern	int	ip_rt_delete_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, uint_t, int, ipif_t *, queue_t *, mblk_t *,
     ipsq_func_t, ip_stack_t *);

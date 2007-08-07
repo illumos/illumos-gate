@@ -603,12 +603,6 @@ typedef struct ip_m_s {
 #define	IRE_HOST		0x0100	/* Host route entry */
 #define	IRE_HOST_REDIRECT	0x0200	/* only used for T_SVR4_OPTMGMT_REQ */
 
-/*
- * IRE_MIPRTUN is only set on the ires in the ip_mrtun_table.
- * This ire_type must not be set for ftable and ctable routing entries.
- */
-#define	IRE_MIPRTUN		0x0400	/* Reverse tunnel route entry */
-
 #define	IRE_INTERFACE		(IRE_IF_NORESOLVER | IRE_IF_RESOLVER)
 #define	IRE_OFFSUBNET		(IRE_DEFAULT | IRE_PREFIX | IRE_HOST)
 #define	IRE_CACHETABLE		(IRE_CACHE | IRE_BROADCAST | IRE_LOCAL | \
@@ -634,13 +628,9 @@ typedef struct ip_m_s {
 #define	IRE_MARK_HIDDEN		0x0004	/* Typically Used by in.mpathd */
 
 /*
- * ire with IRE_MARK_NOADD is  created in ip_newroute_ipif, when outgoing
+ * ire with IRE_MARK_NOADD is created in ip_newroute_ipif, when outgoing
  * interface is specified by IP_XMIT_IF socket option. This ire is not
- * added in IRE_CACHE.  For example, this is used by mipagent to prevent
- * any entry to be added in the cache table. We do not want to add any
- * entry for a mobile-node in the routing table for foreign agent originated
- * packets. Adding routes in cache table in this case, may run the risks of
- * incorrect routing path in case of private overlapping addresses.
+ * added in IRE_CACHE.
  */
 #define	IRE_MARK_NOADD		0x0008	/* Mark not to add ire in cache */
 
@@ -1941,27 +1931,7 @@ typedef struct ill_s {
 	uint64_t		ill_flags;
 	ill_group_t		*ill_group;
 	struct ill_s		*ill_group_next;
-	/*
-	 * Reverse tunnel related count. This count
-	 * determines how many mobile nodes are using this
-	 * ill to send packet to reverse tunnel via foreign
-	 * agent. A non-zero count specifies presence of
-	 * mobile node(s) using reverse tunnel through this
-	 * interface.
-	 */
-	uint32_t		ill_mrtun_refcnt;
 
-	/*
-	 * This count is bumped up when a route is added with
-	 * RTA_SRCIFP bit flag using routing socket.
-	 */
-	uint32_t		ill_srcif_refcnt;
-	/*
-	 * Pointer to the special interface based routing table.
-	 * This routing table is created dynamically when RTA_SRCIFP
-	 * is set by the routing socket.
-	 */
-	irb_t			*ill_srcif_table;
 	kmutex_t	ill_lock;	/* Please see table below */
 	/*
 	 * The ill_nd_lla* fields handle the link layer address option
@@ -2093,9 +2063,6 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_flags			ill_lock		ill_lock
  * ill_group			ipsq, ill_g_lock, ill_lock	Any of them
  * ill_group_next		ipsq, ill_g_lock, ill_lock	Any of them
- * ill_mrtun_refcnt		ill_lock		ill_lock
- * ill_srcif_refcnt		ill_lock		ill_lock
- * ill_srcif_table		ill_lock		ill_lock
  * ill_nd_lla_mp		ipsq + down ill		only when ill is up
  * ill_nd_lla			ipsq + down ill		only when ill is up
  * ill_nd_lla_len		ipsq + down ill		only when ill is up
@@ -2462,17 +2429,15 @@ extern struct kmem_cache *rt_entry_cache;
 
 /*
  * Lock the fast path mp for access, since the fp_mp can be deleted
- * due a DL_NOTE_FASTPATH_FLUSH in the case of IRE_BROADCAST and IRE_MIPRTUN
+ * due a DL_NOTE_FASTPATH_FLUSH in the case of IRE_BROADCAST
  */
 
 #define	LOCK_IRE_FP_MP(ire) {				\
-		if ((ire)->ire_type == IRE_BROADCAST ||	\
-		    (ire)->ire_type == IRE_MIPRTUN)	\
+		if ((ire)->ire_type == IRE_BROADCAST)	\
 			mutex_enter(&ire->ire_nce->nce_lock);	\
 	}
 #define	UNLOCK_IRE_FP_MP(ire) {				\
-		if ((ire)->ire_type == IRE_BROADCAST ||	\
-		    (ire)->ire_type == IRE_MIPRTUN)	\
+		if ((ire)->ire_type == IRE_BROADCAST)	\
 			mutex_exit(&ire->ire_nce->nce_lock);	\
 	}
 
@@ -2540,16 +2505,6 @@ typedef struct ire_s {
 	 */
 	kmutex_t	ire_lock;
 	uint_t		ire_ipif_seqid; /* ipif_seqid of ire_ipif */
-	/*
-	 * For regular routes in forwarding table and cache table the
-	 * the following entries are NULL/zero. Only reverse tunnel
-	 * table and interface based forwarding table use these fields.
-	 * Routes added with RTA_SRCIFP and RTA_SRC respectively have
-	 * non-zero values for the following fields.
-	 */
-	ill_t		*ire_in_ill;	/* Incoming ill interface */
-	ipaddr_t	ire_in_src_addr;
-					/* source ip-addr of incoming packet */
 	clock_t		ire_last_used_time;	/* Last used time */
 	tsol_ire_gw_secattr_t *ire_gw_secattr; /* gateway security attributes */
 	zoneid_t	ire_zoneid;	/* for local address discrimination */
@@ -3225,8 +3180,8 @@ extern boolean_t ip_local_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern boolean_t ip_remote_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern ipaddr_t ip_massage_options(ipha_t *, netstack_t *);
 extern ipaddr_t ip_net_mask(ipaddr_t);
-extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
-		    zoneid_t, ip_stack_t *);
+extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, conn_t *, zoneid_t,
+		    ip_stack_t *);
 extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
     boolean_t);
 extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);

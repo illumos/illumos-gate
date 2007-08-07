@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -202,9 +202,8 @@ typedef struct rt_msghdr {
 #define	RTA_AUTHOR	0x40	/* sockaddr for author of redirect */
 #define	RTA_BRD		0x80	/* for NEWADDR, broadcast or p-p dest addr */
 #define	RTA_SRC		0x100	/* source sockaddr present */
-#define	RTA_SRCIFP	0x200	/* source interface index sockaddr present */
 
-#define	RTA_NUMBITS	10	/* Number of bits used in RTA_* */
+#define	RTA_NUMBITS	9	/* Number of bits used in RTA_* */
 
 /*
  * Index offsets for sockaddr_storage array for alternate internal encoding.
@@ -219,7 +218,6 @@ typedef struct rt_msghdr {
 #define	RTAX_AUTHOR	6
 #define	RTAX_BRD	7
 #define	RTAX_SRC	8
-#define	RTAX_SRCIFP	9
 #define	RTAX_MAX	RTA_NUMBITS	/* size of array to allocate */
 
 /*

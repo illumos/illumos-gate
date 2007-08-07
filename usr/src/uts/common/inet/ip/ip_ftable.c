@@ -262,7 +262,6 @@ found_default_ire:
 		}
 	}
 found_ire_held:
-	ASSERT(ire->ire_type != IRE_MIPRTUN && ire->ire_in_ill == NULL);
 	if ((flags & MATCH_IRE_RJ_BHOLE) &&
 	    (ire->ire_flags & (RTF_BLACKHOLE | RTF_REJECT))) {
 		return (ire);
@@ -1010,7 +1009,6 @@ create_irecache:
 		    (uchar_t *)&ip_g_all_ones,	/* mask */
 		    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 		    (uchar_t *)&gw,		/* gateway address */
-		    NULL,
 		    (save_ire->ire_type == IRE_IF_RESOLVER ?  NULL:
 		    &save_ire->ire_max_frag),
 		    NULL,
@@ -1018,7 +1016,6 @@ create_irecache:
 		    dst_ill->ill_wq,		/* send-to queue */
 		    IRE_CACHE,			/* IRE type */
 		    src_ipif,
-		    NULL,
 		    ire->ire_mask,		/* Parent mask */
 		    0,
 		    ire->ire_ihandle,	/* Interface handle */

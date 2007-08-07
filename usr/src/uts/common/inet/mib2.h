@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -719,8 +719,6 @@ typedef struct mib2_ipRouteEntry {
 		Counter		re_obpkt;
 		Counter		re_ibpkt;
 		int		re_flags;
-		DeviceName	re_in_ill;	/* Input interface */
-		IpAddress	re_in_src_addr;	/* Input source address */
 	} 		ipRouteInfo;
 } mib2_ipRouteEntry_t;
 

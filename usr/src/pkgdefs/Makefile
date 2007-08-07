@@ -256,8 +256,6 @@ COMMON_SUBDIRS= \
 	SUNWmdr \
 	SUNWmdu \
 	SUNWmibii \
-	SUNWmipr \
-	SUNWmipu \
 	SUNWncar \
 	SUNWncau \
 	SUNWnfsckr \

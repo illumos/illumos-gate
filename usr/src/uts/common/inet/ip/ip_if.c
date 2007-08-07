@@ -189,8 +189,6 @@ static int	ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q);
 static void	ill_dl_down(ill_t *ill);
 static void	ill_down(ill_t *ill);
 static void	ill_downi(ire_t *ire, char *ill_arg);
-static void	ill_downi_mrtun_srcif(ire_t *ire, char *ill_arg);
-static void	ill_down_tail(ill_t *ill);
 static void	ill_free_mib(ill_t *ill);
 static void	ill_glist_delete(ill_t *);
 static boolean_t ill_has_usable_ipif(ill_t *);
@@ -480,7 +478,6 @@ static nv_t	ipif_nv_tbl[] = {
 	{ ILLF_NORTEXCH,	"NORTEXCH" },
 	{ ILLF_IPV4,		"IPV4" },
 	{ ILLF_IPV6,		"IPV6" },
-	{ IPIF_MIPRUNNING,	"MIP" },
 	{ IPIF_NOFAILOVER,	"NOFAILOVER" },
 	{ PHYI_FAILED,		"FAILED" },
 	{ PHYI_STANDBY,		"STANDBY" },
@@ -887,8 +884,6 @@ ill_delete_tail(ill_t *ill)
 
 	while (ill->ill_ipif != NULL)
 		ipif_free_tail(ill->ill_ipif);
-
-	ill_down_tail(ill);
 
 	/*
 	 * We have removed all references to ilm from conn and the ones joined
@@ -1560,7 +1555,6 @@ ipif_all_down_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
 	}
-	ill_down_tail(ill);
 	freemsg(mp);
 	ipsq_current_finish(ipsq);
 }
@@ -1610,56 +1604,12 @@ ill_down(ill_t *ill)
 	/* Blow off any IREs dependent on this ILL. */
 	ire_walk(ill_downi, (char *)ill, ipst);
 
-	mutex_enter(&ipst->ips_ire_mrtun_lock);
-	if (ipst->ips_ire_mrtun_count != 0) {
-		mutex_exit(&ipst->ips_ire_mrtun_lock);
-		ire_walk_ill_mrtun(0, 0, ill_downi_mrtun_srcif,
-		    (char *)ill, NULL, ipst);
-	} else {
-		mutex_exit(&ipst->ips_ire_mrtun_lock);
-	}
-
-	/*
-	 * If any interface based forwarding table exists
-	 * Blow off the ires there dependent on this ill
-	 */
-	mutex_enter(&ipst->ips_ire_srcif_table_lock);
-	if (ipst->ips_ire_srcif_table_count > 0) {
-		mutex_exit(&ipst->ips_ire_srcif_table_lock);
-		ire_walk_srcif_table_v4(ill_downi_mrtun_srcif, (char *)ill,
-		    ipst);
-	} else {
-		mutex_exit(&ipst->ips_ire_srcif_table_lock);
-	}
-
 	/* Remove any conn_*_ill depending on this ill */
 	ipcl_walk(conn_cleanup_ill, (caddr_t)ill, ipst);
 
 	if (ill->ill_group != NULL) {
 		illgrp_delete(ill);
 	}
-}
-
-static void
-ill_down_tail(ill_t *ill)
-{
-	int	i;
-
-	/* Destroy ill_srcif_table if it exists */
-	/* Lock not reqd really because nobody should be able to access */
-	mutex_enter(&ill->ill_lock);
-	if (ill->ill_srcif_table != NULL) {
-		ill->ill_srcif_refcnt = 0;
-		for (i = 0; i < IP_SRCIF_TABLE_SIZE; i++) {
-			rw_destroy(&ill->ill_srcif_table[i].irb_lock);
-		}
-		kmem_free(ill->ill_srcif_table,
-		    IP_SRCIF_TABLE_SIZE * sizeof (irb_t));
-		ill->ill_srcif_table = NULL;
-		ill->ill_srcif_refcnt = 0;
-		ill->ill_mrtun_refcnt = 0;
-	}
-	mutex_exit(&ill->ill_lock);
 }
 
 /*
@@ -1680,25 +1630,6 @@ ill_downi(ire_t *ire, char *ill_arg)
 	 */
 	if ((ire->ire_ipif != NULL && ire->ire_ipif->ipif_ill == ill) ||
 	    (ire->ire_type == IRE_CACHE && ire->ire_stq == ill->ill_wq)) {
-		ire_delete(ire);
-	}
-}
-
-/*
- * A seperate routine for deleting revtun and srcif based routes
- * are needed because the ires only deleted when the interface
- * is unplumbed. Also these ires have ire_in_ill non-null as well.
- * we want to keep mobile IP specific code separate.
- */
-static void
-ill_downi_mrtun_srcif(ire_t *ire, char *ill_arg)
-{
-	ill_t   *ill = (ill_t *)ill_arg;
-
-	ASSERT(ire->ire_in_ill != NULL);
-
-	if ((ire->ire_in_ill != NULL && ire->ire_in_ill == ill) ||
-	    (ire->ire_stq == ill->ill_wq) || (ire->ire_stq == ill->ill_rq)) {
 		ire_delete(ire);
 	}
 }
@@ -6321,8 +6252,7 @@ ill_is_quiescent(ill_t *ill)
 		}
 	}
 	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0 ||
-	    ill->ill_nce_cnt != 0 || ill->ill_srcif_refcnt != 0 ||
-	    ill->ill_mrtun_refcnt != 0) {
+	    ill->ill_nce_cnt != 0) {
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -6910,9 +6840,9 @@ ip_m_lookup(t_uscalar_t mac_type)
  */
 int
 ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
-    ipaddr_t src_addr, int flags, ipif_t *ipif_arg, ipif_t *src_ipif,
-    ire_t **ire_arg, boolean_t ioctl_msg, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, struct rtsa_s *sp, ip_stack_t *ipst)
+    ipaddr_t src_addr, int flags, ipif_t *ipif_arg, ire_t **ire_arg,
+    boolean_t ioctl_msg, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    struct rtsa_s *sp, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ire_t	*gw_ire = NULL;
@@ -6941,28 +6871,25 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 * Prevent routes with a zero gateway from being created (since
 	 * interfaces can currently be plumbed and brought up no assigned
 	 * address).
-	 * For routes with RTA_SRCIFP, the gateway address can be 0.0.0.0.
 	 */
-	if (gw_addr == 0 && src_ipif == NULL)
+	if (gw_addr == 0)
 		return (ENETUNREACH);
 	/*
 	 * Get the ipif, if any, corresponding to the gw_addr
 	 */
-	if (gw_addr != 0) {
-		ipif = ipif_lookup_interface(gw_addr, dst_addr, q, mp, func,
-		    &error, ipst);
-		if (ipif != NULL) {
-			if (IS_VNI(ipif->ipif_ill)) {
-				ipif_refrele(ipif);
-				return (EINVAL);
-			}
-			ipif_refheld = B_TRUE;
-		} else if (error == EINPROGRESS) {
-			ip1dbg(("ip_rt_add: null and EINPROGRESS"));
-			return (EINPROGRESS);
-		} else {
-			error = 0;
+	ipif = ipif_lookup_interface(gw_addr, dst_addr, q, mp, func, &error,
+	    ipst);
+	if (ipif != NULL) {
+		if (IS_VNI(ipif->ipif_ill)) {
+			ipif_refrele(ipif);
+			return (EINVAL);
 		}
+		ipif_refheld = B_TRUE;
+	} else if (error == EINPROGRESS) {
+		ip1dbg(("ip_rt_add: null and EINPROGRESS"));
+		return (EINPROGRESS);
+	} else {
+		error = 0;
 	}
 
 	if (ipif != NULL) {
@@ -6999,14 +6926,12 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			    (uchar_t *)&mask,		/* mask */
 			    (uchar_t *)&ipif->ipif_src_addr,
 			    NULL,			/* no gateway */
-			    NULL,
 			    &ipif->ipif_mtu,
 			    NULL,
 			    ipif->ipif_rq,		/* recv-from queue */
 			    NULL,			/* no send-to queue */
 			    ipif->ipif_ire_type,	/* LOOPBACK */
 			    ipif,
-			    NULL,
 			    0,
 			    0,
 			    0,
@@ -7083,8 +7008,6 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	/* RTF_GATEWAY not set */
 	if (!(flags & RTF_GATEWAY)) {
 		queue_t	*stq;
-		queue_t	*rfq = NULL;
-		ill_t	*in_ill = NULL;
 
 		if (sp != NULL) {
 			ip2dbg(("ip_rt_add: gateway security attributes "
@@ -7125,13 +7048,6 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			match_flags |= MATCH_IRE_IPIF;
 		}
 		ASSERT(ipif != NULL);
-		/*
-		 * If src_ipif is not NULL, we have to create
-		 * an ire with non-null ire_in_ill value
-		 */
-		if (src_ipif != NULL) {
-			in_ill = src_ipif->ipif_ill;
-		}
 
 		/*
 		 * We check for an existing entry at this point.
@@ -7142,32 +7058,14 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 */
 		if (!ioctl_msg)
 			match_flags |= MATCH_IRE_MASK;
-		if (src_ipif != NULL) {
-			/* Look up in the special table */
-			ire = ire_srcif_table_lookup(dst_addr, IRE_INTERFACE,
-			    ipif, src_ipif->ipif_ill, match_flags);
-		} else {
-			ire = ire_ftable_lookup(dst_addr, mask, 0,
-			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
-			    NULL, match_flags, ipst);
-		}
+		ire = ire_ftable_lookup(dst_addr, mask, 0, IRE_INTERFACE, ipif,
+		    NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
 		if (ire != NULL) {
 			ire_refrele(ire);
 			if (ipif_refheld)
 				ipif_refrele(ipif);
 			return (EEXIST);
 		}
-
-		if (src_ipif != NULL) {
-			/*
-			 * Create the special ire for the IRE table
-			 * which hangs out of ire_in_ill. This ire
-			 * is in-between IRE_CACHE and IRE_INTERFACE.
-			 * Thus rfq is non-NULL.
-			 */
-			rfq = ipif->ipif_rq;
-		}
-		/* Create the usual interface ires */
 
 		stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
 		    ? ipif->ipif_rq : ipif->ipif_wq;
@@ -7182,14 +7080,12 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		    (uint8_t *)&mask,
 		    (uint8_t *)&ipif->ipif_src_addr,
 		    NULL,
-		    NULL,
 		    &ipif->ipif_mtu,
 		    NULL,
-		    rfq,
+		    NULL,
 		    stq,
 		    ipif->ipif_net_type,
 		    ipif,
-		    in_ill,
 		    0,
 		    0,
 		    0,
@@ -7240,11 +7136,6 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		ipif_refheld = B_FALSE;
 	}
 
-	if (src_ipif != NULL) {
-		/* RTA_SRCIFP is not supported on RTF_GATEWAY */
-		ip2dbg(("ip_rt_add: SRCIF cannot be set with gateway route\n"));
-		return (EINVAL);
-	}
 	/*
 	 * Get an interface IRE for the specified gateway.
 	 * If we don't have an IRE_IF_NORESOLVER or IRE_IF_RESOLVER for the
@@ -7323,14 +7214,12 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	    (uchar_t *)(((src_addr != INADDR_ANY) &&
 	    (flags & RTF_SETSRC)) ?  &src_addr : NULL),
 	    (uchar_t *)&gw_addr,		/* gateway address */
-	    NULL,				/* no in-srcaddress */
 	    &gw_ire->ire_max_frag,
 	    NULL,				/* no src nce */
 	    NULL,				/* no recv-from queue */
 	    NULL,				/* no send-to queue */
 	    (ushort_t)type,			/* IRE type */
 	    ipif_arg,
-	    NULL,
 	    0,
 	    0,
 	    0,
@@ -7419,14 +7308,7 @@ save_ire:
 	if (gw_ire != NULL) {
 		ire_refrele(gw_ire);
 	}
-	/*
-	 * We do not do save_ire for the routes added with RTA_SRCIFP
-	 * flag. This route is only added and deleted by mipagent.
-	 * So, for simplicity of design, we refrain from saving
-	 * ires that are created with srcif value. This may change
-	 * in future if we find more usage of srcifp feature.
-	 */
-	if (ipif != NULL && src_ipif == NULL) {
+	if (ipif != NULL) {
 		/*
 		 * Save enough information so that we can recreate the IRE if
 		 * the interface goes down and then up.  The metrics associated
@@ -7458,7 +7340,6 @@ save_ire:
 /*
  * ip_rt_delete is called to delete an IPv4 route.
  * ipif_arg is passed in to associate it with the correct interface.
- * src_ipif is passed to associate the incoming interface of the packet.
  * We may need to restart this operation if the ipif cannot be looked up
  * due to an exclusive operation that is currently in progress. The restart
  * entry point is specified by 'func'
@@ -7466,9 +7347,8 @@ save_ire:
 /* ARGSUSED4 */
 int
 ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
-    uint_t rtm_addrs, int flags, ipif_t *ipif_arg, ipif_t *src_ipif,
-    boolean_t ioctl_msg, queue_t *q, mblk_t *mp, ipsq_func_t func,
-    ip_stack_t *ipst)
+    uint_t rtm_addrs, int flags, ipif_t *ipif_arg, boolean_t ioctl_msg,
+    queue_t *q, mblk_t *mp, ipsq_func_t func, ip_stack_t *ipst)
 {
 	ire_t	*ire = NULL;
 	ipif_t	*ipif;
@@ -7513,33 +7393,15 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 *
 	 * For more detail on specifying routes by gateway address and by
 	 * interface index, see the comments in ip_rt_add().
-	 * gw_addr could be zero in some cases when both RTA_SRCIFP and
-	 * RTA_IFP are specified. If RTA_SRCIFP is specified and  both
-	 * RTA_IFP and gateway_addr are NULL/zero, then delete will not
-	 * succeed.
 	 */
-	if (src_ipif != NULL) {
-		if (ipif_arg == NULL && gw_addr != 0) {
-			ipif_arg = ipif_lookup_interface(gw_addr, dst_addr,
-			    q, mp, func, &err, ipst);
-			if (ipif_arg != NULL)
-				ipif_refheld = B_TRUE;
-		}
-		if (ipif_arg == NULL) {
-			err = (err == EINPROGRESS) ? err : ESRCH;
-			return (err);
-		}
-		ipif = ipif_arg;
-	} else {
-		ipif = ipif_lookup_interface(gw_addr, dst_addr,
-		    q, mp, func, &err, ipst);
-		if (ipif != NULL)
-			ipif_refheld = B_TRUE;
-		else if (err == EINPROGRESS)
-			return (err);
-		else
-			err = 0;
-	}
+	ipif = ipif_lookup_interface(gw_addr, dst_addr, q, mp, func, &err,
+	    ipst);
+	if (ipif != NULL)
+		ipif_refheld = B_TRUE;
+	else if (err == EINPROGRESS)
+		return (err);
+	else
+		err = 0;
 	if (ipif != NULL) {
 		if (ipif_arg != NULL) {
 			if (ipif_refheld) {
@@ -7551,20 +7413,14 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		} else {
 			match_flags |= MATCH_IRE_IPIF;
 		}
-		if (src_ipif != NULL) {
-			ire = ire_srcif_table_lookup(dst_addr, IRE_INTERFACE,
-			    ipif, src_ipif->ipif_ill, match_flags);
-		} else {
-			if (ipif->ipif_ire_type == IRE_LOOPBACK) {
-				ire = ire_ctable_lookup(dst_addr, 0,
-				    IRE_LOOPBACK, ipif, ALL_ZONES, NULL,
-				    match_flags, ipst);
-			}
-			if (ire == NULL) {
-				ire = ire_ftable_lookup(dst_addr, mask, 0,
-				    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
-				    NULL, match_flags, ipst);
-			}
+		if (ipif->ipif_ire_type == IRE_LOOPBACK) {
+			ire = ire_ctable_lookup(dst_addr, 0, IRE_LOOPBACK, ipif,
+			    ALL_ZONES, NULL, match_flags, ipst);
+		}
+		if (ire == NULL) {
+			ire = ire_ftable_lookup(dst_addr, mask, 0,
+			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
+			    match_flags, ipst);
 		}
 	}
 
@@ -7580,28 +7436,19 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 * In any case, MATCH_IRE_IPIF is cleared and MATCH_IRE_GW is
 		 * set as the route being looked up is not a traditional
 		 * interface route.
-		 * Since we do not add gateway route with srcipif, we don't
-		 * expect to find it either.
 		 */
-		if (src_ipif != NULL) {
-			if (ipif_refheld)
-				ipif_refrele(ipif);
-			return (ESRCH);
-		} else {
-			match_flags &= ~MATCH_IRE_IPIF;
-			match_flags |= MATCH_IRE_GW;
-			if (ipif_arg != NULL)
-				match_flags |= MATCH_IRE_ILL;
-			if (mask == IP_HOST_MASK)
-				type = IRE_HOST;
-			else if (mask == 0)
-				type = IRE_DEFAULT;
-			else
-				type = IRE_PREFIX;
-			ire = ire_ftable_lookup(dst_addr, mask, gw_addr, type,
-			    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags,
-			    ipst);
-		}
+		match_flags &= ~MATCH_IRE_IPIF;
+		match_flags |= MATCH_IRE_GW;
+		if (ipif_arg != NULL)
+			match_flags |= MATCH_IRE_ILL;
+		if (mask == IP_HOST_MASK)
+			type = IRE_HOST;
+		else if (mask == 0)
+			type = IRE_DEFAULT;
+		else
+			type = IRE_PREFIX;
+		ire = ire_ftable_lookup(dst_addr, mask, gw_addr, type, ipif_arg,
+		    NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
 	}
 
 	if (ipif_refheld)
@@ -7627,14 +7474,8 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	}
 
 	ipif = ire->ire_ipif;
-	/*
-	 * Removing from ipif_saved_ire_mp is not necessary
-	 * when src_ipif being non-NULL. ip_rt_add does not
-	 * save the ires which src_ipif being non-NULL.
-	 */
-	if (ipif != NULL && src_ipif == NULL) {
+	if (ipif != NULL)
 		ipif_remove_ire(ipif, ire);
-	}
 	if (ioctl_msg)
 		ip_rts_rtmsg(RTM_OLDDEL, ire, 0, ipst);
 	ire_delete(ire);
@@ -7688,7 +7529,7 @@ ip_siocaddrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	}
 
 	error = ip_rt_add(dst_addr, mask, gw_addr, 0, rt->rt_flags, NULL, NULL,
-	    NULL, B_TRUE, q, mp, ip_process_ioctl, NULL, ipst);
+	    B_TRUE, q, mp, ip_process_ioctl, NULL, ipst);
 	if (ipif != NULL)
 		ipif_refrele(ipif);
 	return (error);
@@ -7740,8 +7581,8 @@ ip_siocdelrt(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	}
 
 	error = ip_rt_delete(dst_addr, mask, gw_addr,
-	    RTA_DST | RTA_GATEWAY | RTA_NETMASK, rt->rt_flags, NULL, NULL,
-	    B_TRUE, q, mp, ip_process_ioctl, ipst);
+	    RTA_DST | RTA_GATEWAY | RTA_NETMASK, rt->rt_flags, NULL, B_TRUE, q,
+	    mp, ip_process_ioctl, ipst);
 	if (ipif != NULL)
 		ipif_refrele(ipif);
 	return (error);
@@ -15225,7 +15066,6 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 		    (uchar_t *)&ire->ire_mask,
 		    (uchar_t *)&ire->ire_src_addr,
 		    (uchar_t *)&ire->ire_gateway_addr,
-		    (uchar_t *)&ire->ire_in_src_addr,
 		    ire->ire_stq == NULL ? &ip_loopback_mtu :
 		    &ire->ire_ipif->ipif_mtu,
 		    ire->ire_nce,
@@ -15233,7 +15073,6 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 		    ire->ire_stq,
 		    ire->ire_type,
 		    ire->ire_ipif,
-		    ire->ire_in_ill,
 		    ire->ire_cmask,
 		    ire->ire_phandle,
 		    ire->ire_ihandle,
@@ -15533,14 +15372,12 @@ redo:
 		    (uchar_t *)&clear_ire->ire_mask,
 		    (uchar_t *)&clear_ire->ire_src_addr,
 		    (uchar_t *)&clear_ire->ire_gateway_addr,
-		    (uchar_t *)&clear_ire->ire_in_src_addr,
 		    &clear_ire->ire_max_frag,
 		    NULL, /* let ire_nce_init derive the resolver info */
 		    clear_ire->ire_rfq,
 		    clear_ire->ire_stq,
 		    clear_ire->ire_type,
 		    clear_ire->ire_ipif,
-		    clear_ire->ire_in_ill,
 		    clear_ire->ire_cmask,
 		    clear_ire->ire_phandle,
 		    clear_ire->ire_ihandle,
@@ -15566,14 +15403,12 @@ redo:
 				    (uchar_t *)&clear_ire_stq->ire_mask,
 				    (uchar_t *)&clear_ire_stq->ire_src_addr,
 				    (uchar_t *)&clear_ire_stq->ire_gateway_addr,
-				    (uchar_t *)&clear_ire_stq->ire_in_src_addr,
 				    &clear_ire_stq->ire_max_frag,
 				    NULL,
 				    clear_ire_stq->ire_rfq,
 				    clear_ire_stq->ire_stq,
 				    clear_ire_stq->ire_type,
 				    clear_ire_stq->ire_ipif,
-				    clear_ire_stq->ire_in_ill,
 				    clear_ire_stq->ire_cmask,
 				    clear_ire_stq->ire_phandle,
 				    clear_ire_stq->ire_ihandle,
@@ -18903,28 +18738,6 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * Need to add these also to be saved and restored when the
-	 * ipif is brought down and up
-	 */
-	mutex_enter(&ipst->ips_ire_mrtun_lock);
-	if (ipst->ips_ire_mrtun_count != 0) {
-		mutex_exit(&ipst->ips_ire_mrtun_lock);
-		ire_walk_ill_mrtun(0, 0, ipif_down_delete_ire,
-		    (char *)ipif, NULL, ipst);
-	} else {
-		mutex_exit(&ipst->ips_ire_mrtun_lock);
-	}
-
-	mutex_enter(&ipst->ips_ire_srcif_table_lock);
-	if (ipst->ips_ire_srcif_table_count > 0) {
-		mutex_exit(&ipst->ips_ire_srcif_table_lock);
-		ire_walk_srcif_table_v4(ipif_down_delete_ire, (char *)ipif,
-		    ipst);
-	} else {
-		mutex_exit(&ipst->ips_ire_srcif_table_lock);
-	}
-
-	/*
 	 * Cleaning up the conn_ire_cache or conns must be done only after the
 	 * ires have been deleted above. Otherwise a thread could end up
 	 * caching an ire in a conn after we have finished the cleanup of the
@@ -19921,14 +19734,12 @@ ipif_recover_ire(ipif_t *ipif)
 		    (uint8_t *)&ifrt->ifrt_mask,
 		    src_addr,
 		    gateway_addr,
-		    NULL,
 		    &ifrt->ifrt_max_frag,
 		    NULL,
 		    rfq,
 		    stq,
 		    type,
 		    ipif,
-		    NULL,
 		    0,
 		    0,
 		    0,
@@ -20436,14 +20247,12 @@ ipif_up_done(ipif_t *ipif)
 		    (uchar_t *)&ip_g_all_ones,		/* mask */
 		    (uchar_t *)&src_ipif->ipif_src_addr, /* source address */
 		    NULL,				/* no gateway */
-		    NULL,
 		    &ip_loopback_mtuplus,		/* max frag size */
 		    NULL,
 		    ipif->ipif_rq,			/* recv-from queue */
 		    NULL,				/* no send-to queue */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
 		    ipif,
-		    NULL,
 		    0,
 		    0,
 		    0,
@@ -20502,14 +20311,12 @@ ipif_up_done(ipif_t *ipif)
 		    (uchar_t *)&route_mask,		/* mask */
 		    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 		    NULL,				/* no gateway */
-		    NULL,
 		    &ipif->ipif_mtu,			/* max frag */
 		    NULL,
 		    NULL,				/* no recv queue */
 		    stq,				/* send-to queue */
 		    ill->ill_net_type,			/* IF_[NO]RESOLVER */
 		    ipif,
-		    NULL,
 		    0,
 		    0,
 		    0,
@@ -21368,14 +21175,12 @@ ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif)
 	    (uchar_t *)&ipif->ipif_net_mask,	/* mask */
 	    (uchar_t *)&nipif->ipif_src_addr,	/* src addr */
 	    NULL,				/* no gateway */
-	    NULL,
 	    &ipif->ipif_mtu,			/* max frag */
 	    NULL,				/* no src nce */
 	    NULL,				/* no recv from queue */
 	    stq,				/* send-to queue */
 	    ill->ill_net_type,			/* IF_[NO]RESOLVER */
 	    ipif,
-	    NULL,
 	    0,
 	    0,
 	    0,
@@ -23438,167 +23243,6 @@ ipif_init(ip_stack_t *ipst)
 }
 
 /*
- * This is called by ip_rt_add when src_addr value is other than zero.
- * src_addr signifies the source address of the incoming packet. For
- * reverse tunnel route we need to create a source addr based routing
- * table. This routine creates ip_mrtun_table if it's empty and then
- * it adds the route entry hashed by source address. It verifies that
- * the outgoing interface is always a non-resolver interface (tunnel).
- */
-int
-ip_mrtun_rt_add(ipaddr_t in_src_addr, int flags, ipif_t *ipif_arg,
-    ipif_t *src_ipif, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func,
-    ip_stack_t *ipst)
-{
-	ire_t   *ire;
-	ire_t	*save_ire;
-	ipif_t  *ipif;
-	ill_t   *in_ill = NULL;
-	ill_t	*out_ill;
-	queue_t	*stq;
-	mblk_t	*dlureq_mp;
-	int	error;
-
-	if (ire_arg != NULL)
-		*ire_arg = NULL;
-	ASSERT(in_src_addr != INADDR_ANY);
-
-	ipif = ipif_arg;
-	if (ipif != NULL) {
-		out_ill = ipif->ipif_ill;
-	} else {
-		ip1dbg(("ip_mrtun_rt_add: ipif is NULL\n"));
-		return (EINVAL);
-	}
-
-	if (src_ipif == NULL) {
-		ip1dbg(("ip_mrtun_rt_add: src_ipif is NULL\n"));
-		return (EINVAL);
-	}
-	in_ill = src_ipif->ipif_ill;
-
-	/*
-	 * Check for duplicates. We don't need to
-	 * match out_ill, because the uniqueness of
-	 * a route is only dependent on src_addr and
-	 * in_ill.
-	 */
-	ire = ire_mrtun_lookup(in_src_addr, in_ill);
-	if (ire != NULL) {
-		ire_refrele(ire);
-		return (EEXIST);
-	}
-	if (ipif->ipif_net_type != IRE_IF_NORESOLVER) {
-		ip2dbg(("ip_mrtun_rt_add: outgoing interface is type %d\n",
-		    ipif->ipif_net_type));
-		return (EINVAL);
-	}
-
-	stq = ipif->ipif_wq;
-	ASSERT(stq != NULL);
-
-	/*
-	 * The outgoing interface must be non-resolver
-	 * interface.
-	 */
-	dlureq_mp = ill_dlur_gen(NULL,
-	    out_ill->ill_phys_addr_length, out_ill->ill_sap,
-	    out_ill->ill_sap_length);
-
-	if (dlureq_mp == NULL) {
-		ip1dbg(("ip_newroute: dlureq_mp NULL\n"));
-		return (ENOMEM);
-	}
-
-	/* Create the IRE. */
-
-	ire = ire_create(
-	    NULL,				/* Zero dst addr */
-	    NULL,				/* Zero mask */
-	    NULL,				/* Zero gateway addr */
-	    NULL,				/* Zero ipif_src addr */
-	    (uint8_t *)&in_src_addr,		/* in_src-addr */
-	    &ipif->ipif_mtu,
-	    NULL,
-	    NULL,				/* rfq */
-	    stq,
-	    IRE_MIPRTUN,
-	    ipif,
-	    in_ill,
-	    0,
-	    0,
-	    0,
-	    flags,
-	    &ire_uinfo_null,
-	    NULL,
-	    NULL,
-	    ipst);
-
-	if (ire == NULL) {
-		freeb(dlureq_mp);
-		return (ENOMEM);
-	}
-	ip2dbg(("ip_mrtun_rt_add: mrtun route is created with type %d\n",
-	    ire->ire_type));
-	save_ire = ire;
-	ASSERT(save_ire != NULL);
-	error = ire_add_mrtun(&ire, q, mp, func);
-	/*
-	 * If ire_add_mrtun() failed, the ire passed in was freed
-	 * so there is no need to do so here.
-	 */
-	if (error != 0) {
-		return (error);
-	}
-
-	/* Duplicate check */
-	if (ire != save_ire) {
-		/* route already exists by now */
-		ire_refrele(ire);
-		return (EEXIST);
-	}
-
-	if (ire_arg != NULL) {
-		/*
-		 * Store the ire that was just added. the caller
-		 * ip_rts_request responsible for doing ire_refrele()
-		 * on it.
-		 */
-		*ire_arg = ire;
-	} else {
-		ire_refrele(ire);	/* held in ire_add_mrtun */
-	}
-
-	return (0);
-}
-
-/*
- * It is called by ip_rt_delete() only when mipagent requests to delete
- * a reverse tunnel route that was added by ip_mrtun_rt_add() before.
- */
-
-int
-ip_mrtun_rt_delete(ipaddr_t in_src_addr, ipif_t *src_ipif)
-{
-	ire_t   *ire = NULL;
-
-	if (in_src_addr == INADDR_ANY)
-		return (EINVAL);
-	if (src_ipif == NULL)
-		return (EINVAL);
-
-	/* search if this route exists in the ip_mrtun_table */
-	ire = ire_mrtun_lookup(in_src_addr, src_ipif->ipif_ill);
-	if (ire == NULL) {
-		ip2dbg(("ip_mrtun_rt_delete: ire not found\n"));
-		return (ESRCH);
-	}
-	ire_delete(ire);
-	ire_refrele(ire);
-	return (0);
-}
-
-/*
  * Lookup the ipif corresponding to the onlink destination address. For
  * point-to-point interfaces, it matches with remote endpoint destination
  * address. For point-to-multipoint interfaces it only tries to match the
@@ -23780,14 +23424,12 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst, ip_stack_t *ipst)
 		    (uchar_t *)&ip_g_all_ones,
 		    (uchar_t *)&ire_dst->ire_src_addr,
 		    (uchar_t *)&ire->ire_gateway_addr,
-		    NULL,
 		    &ipif_prim->ipif_mtu,
 		    NULL,
 		    ipif_prim->ipif_rq,
 		    ipif_prim->ipif_wq,
 		    IRE_BROADCAST,
 		    ipif_prim,
-		    NULL,
 		    0,
 		    0,
 		    0,

@@ -724,8 +724,7 @@ ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr, uint32_t hw_addr_length)
  *
  * Finally, if it's unresolved or if the arls match, we just update the MAC
  * address.  This allows a published 'static' entry to be updated by an ARP
- * request from the node for which we're a proxy ARP server -- e.g., when a
- * mobile node returns home.  If the address has changed, then tell IP.
+ * request from the node for which we're a proxy ARP server.
  *
  * Note that this logic does not update published ARP entries for mismatched
  * arls, as for example when we proxy arp across 2 subnets with differing

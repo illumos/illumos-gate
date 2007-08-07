@@ -56,7 +56,6 @@ static if_flags_t	if_flags_tbl[] = {
 	{ IFF_NORTEXCH,		"NORTEXCH" },
 	{ IFF_IPV4,		"IPv4" },
 	{ IFF_IPV6,		"IPv6" },
-	{ IFF_MIPRUNNING,	"MIP" },
 	{ IFF_NOFAILOVER,	"NOFAILOVER" },
 	{ IFF_FAILED,		"FAILED" },
 	{ IFF_STANDBY,		"STANDBY" },

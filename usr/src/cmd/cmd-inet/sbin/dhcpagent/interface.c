@@ -58,8 +58,8 @@ static uint_t cached_v4_max_mtu, cached_v6_max_mtu;
 /*
  * Interface flags to watch: things that should be under our direct control.
  */
-#define	DHCP_IFF_WATCH	(IFF_DHCPRUNNING | IFF_DEPRECATED | \
-	IFF_ADDRCONF | IFF_MIPRUNNING | IFF_TEMPORARY)
+#define	DHCP_IFF_WATCH	(IFF_DHCPRUNNING | IFF_DEPRECATED | IFF_ADDRCONF | \
+	IFF_TEMPORARY)
 
 static void clear_lif_dhcp(dhcp_lif_t *);
 
@@ -1201,8 +1201,8 @@ set_lif_dhcp(dhcp_lif_t *lif, boolean_t is_adopting)
 	 * Check for conflicting sources of address control, and other
 	 * unacceptable configurations.
 	 */
-	if (lifr.lifr_flags & (IFF_LOOPBACK|IFF_ADDRCONF|IFF_MIPRUNNING|
-	    IFF_TEMPORARY|IFF_VIRTUAL)) {
+	if (lifr.lifr_flags & (IFF_LOOPBACK|IFF_ADDRCONF|IFF_TEMPORARY|
+	    IFF_VIRTUAL)) {
 		dhcpmsg(MSG_ERR, "set_lif_dhcp: cannot use %s: flags are %llx",
 		    lif->lif_name, lifr.lifr_flags);
 		return (DHCP_IPC_E_INVIF);
@@ -1324,8 +1324,8 @@ clear_lif_deprecated(dhcp_lif_t *lif)
 	 * Check for conflicting sources of address control, and other
 	 * unacceptable configurations.
 	 */
-	if (lifr.lifr_flags & (IFF_LOOPBACK|IFF_ADDRCONF|IFF_MIPRUNNING|
-	    IFF_TEMPORARY|IFF_VIRTUAL)) {
+	if (lifr.lifr_flags & (IFF_LOOPBACK|IFF_ADDRCONF|IFF_TEMPORARY|
+	    IFF_VIRTUAL)) {
 		dhcpmsg(MSG_ERR, "clear_lif_deprecated: cannot use %s: flags "
 		    "are %llx", lif->lif_name, lifr.lifr_flags);
 		return (B_FALSE);
