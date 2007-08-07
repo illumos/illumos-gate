@@ -17,7 +17,6 @@ usr/src/cmd/cmd-inet/usr.bin/pppdump/LICENSE.top
 usr/src/cmd/cmd-inet/usr.bin/rdist/THIRDPARTYLICENSE
 usr/src/cmd/cmd-inet/usr.bin/telnet/THIRDPARTYLICENSE
 usr/src/cmd/cmd-inet/usr.lib/in.mpathd/THIRDPARTYLICENSE
-usr/src/cmd/cmd-inet/usr.lib/mipagent/THIRDPARTYLICENSE
 usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.arp
 usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.comsat
 usr/src/cmd/cmd-inet/usr.sbin/THIRDPARTYLICENSE.rlogind
