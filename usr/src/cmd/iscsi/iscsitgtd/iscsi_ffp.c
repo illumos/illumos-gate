@@ -244,6 +244,10 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	rsp->flags	= ISCSI_FLAG_FINAL;
 	rsp->itt	= hp->itt;
 
+	(void) pthread_mutex_lock(&c->c_mutex);
+	rsp->statsn	= htonl(c->c_statsn++);
+	(void) pthread_mutex_unlock(&c->c_mutex);
+
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	if (ntohl(hp->cmdsn) > c->c_sess->s_seencmdsn)
 		c->c_sess->s_seencmdsn = ntohl(hp->cmdsn);

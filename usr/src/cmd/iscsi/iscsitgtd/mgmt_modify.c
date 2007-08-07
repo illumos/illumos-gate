@@ -324,9 +324,6 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			    != NULL) {
 				isns_mods |= ISNS_MOD_TPGT;
 				break;
-			} else {
-				xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
-				return (msg);
 			}
 		}
 
