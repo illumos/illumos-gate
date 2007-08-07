@@ -66,17 +66,19 @@ struct zfsvfs {
 };
 
 /*
- * The total file ID size is limited to 12 bytes (including the length
- * field) in the NFSv2 protocol.  For historical reasons, this same limit
- * is currently being imposed by the Solaris NFSv3 implementation...
- * although the protocol actually permits a maximum of 64 bytes.  It will
- * not be possible to expand beyond 12 bytes without abandoning support
- * of NFSv2 and making some changes to the Solaris NFSv3 implementation.
+ * Normal filesystems (those not under .zfs/snapshot) have a total
+ * file ID size limited to 12 bytes (including the length field) due to
+ * NFSv2 protocol's limitation of 32 bytes for a filehandle.  For historical
+ * reasons, this same limit is being imposed by the Solaris NFSv3 implementation
+ * (although the NFSv3 protocol actually permits a maximum of 64 bytes).  It
+ * is not possible to expand beyond 12 bytes without abandoning support
+ * of NFSv2.
  *
- * For the time being, we will partition up the available space as follows:
+ * For normal filesystems, we partition up the available space as follows:
  *	2 bytes		fid length (required)
  *	6 bytes		object number (48 bits)
  *	4 bytes		generation number (32 bits)
+ *
  * We reserve only 48 bits for the object number, as this is the limit
  * currently defined and imposed by the DMU.
  */
@@ -86,6 +88,22 @@ typedef struct zfid_short {
 	uint8_t		zf_gen[4];		/* gen[i] = gen >> (8 * i) */
 } zfid_short_t;
 
+/*
+ * Filesystems under .zfs/snapshot have a total file ID size of 22 bytes
+ * (including the length field).  This makes files under .zfs/snapshot
+ * accessible by NFSv3 and NFSv4, but not NFSv2.
+ *
+ * For files under .zfs/snapshot, we partition up the available space
+ * as follows:
+ *	2 bytes		fid length (required)
+ *	6 bytes		object number (48 bits)
+ *	4 bytes		generation number (32 bits)
+ *	6 bytes		objset id (48 bits)
+ *	4 bytes		currently just zero (32 bits)
+ *
+ * We reserve only 48 bits for the object number and objset id, as these are
+ * the limits currently defined and imposed by the DMU.
+ */
 typedef struct zfid_long {
 	zfid_short_t	z_fid;
 	uint8_t		zf_setid[6];		/* obj[i] = obj >> (8 * i) */

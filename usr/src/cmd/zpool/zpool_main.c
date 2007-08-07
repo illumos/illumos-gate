@@ -2852,7 +2852,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 static void
 print_error_log(zpool_handle_t *zhp)
 {
-	nvlist_t *nverrlist;
+	nvlist_t *nverrlist = NULL;
 	nvpair_t *elem;
 	char *pathname;
 	size_t len = MAXPATHLEN * 2;
@@ -3128,7 +3128,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 			 * precise count by fetching the entire log and
 			 * uniquifying the results.
 			 */
-			if (nerr < 100 && !cbp->cb_verbose &&
+			if (nerr > 0 && nerr < 100 && !cbp->cb_verbose &&
 			    zpool_get_errlog(zhp, &nverrlist) == 0) {
 				nvpair_t *elem;
 
