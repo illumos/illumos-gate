@@ -614,6 +614,19 @@ ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/* ARGSUSED */
+int
+ipw2200_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
+{
+	struct ipw2200_softc	*sc =
+	    ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
+	ASSERT(sc != NULL);
+
+	ipw2200_stop(sc);
+
+	return (DDI_SUCCESS);
+}
+
 static void
 ipw2200_stop(struct ipw2200_softc *sc)
 {
@@ -1620,7 +1633,7 @@ ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 	if ((ic->ic_state != IEEE80211_S_RUN) && (state == IEEE80211_S_RUN)) {
 		mac_link_update(ic->ic_mach, LINK_STATE_UP);
 	} else if ((ic->ic_state == IEEE80211_S_RUN) &&
-		(state != IEEE80211_S_RUN)) {
+	    (state != IEEE80211_S_RUN)) {
 		mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 	}
 
@@ -2550,7 +2563,7 @@ ipw2200_intr(caddr_t arg)
 			ridx = ipw2200_csr_get32(sc,
 			    IPW2200_CSR_CMD_READ_INDEX);
 			i = RING_FORWARD(sc->sc_cmd_cur,
-			sc->sc_cmd_free, IPW2200_CMD_RING_SIZE);
+			    sc->sc_cmd_free, IPW2200_CMD_RING_SIZE);
 			len = RING_FLEN(i, ridx, IPW2200_CMD_RING_SIZE);
 
 			IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
@@ -2628,7 +2641,7 @@ ipw2200_intr(caddr_t arg)
 			 */
 			ipw2200_csr_put32(sc, IPW2200_CSR_RX_WRITE_INDEX,
 			    RING_BACKWARD(sc->sc_rx_cur, 1,
-				IPW2200_RX_RING_SIZE));
+			    IPW2200_RX_RING_SIZE));
 		}
 		if (ireg & IPW2200_INTR_TX1_TRANSFER) {
 			mutex_enter(&sc->sc_tx_lock);
@@ -2671,7 +2684,7 @@ ipw2200_intr(caddr_t arg)
  *  Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ipw2200_devops, nulldev, nulldev, ipw2200_attach,
-    ipw2200_detach, nodev, NULL, D_MP, NULL);
+    ipw2200_detach, ipw2200_reset, NULL, D_MP, NULL);
 
 static struct modldrv ipw2200_modldrv = {
 	&mod_driverops,
