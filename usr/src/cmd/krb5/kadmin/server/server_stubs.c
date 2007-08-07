@@ -837,6 +837,8 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
     kadm5_server_handle_t handle;
     restriction_t *rp;
     gss_name_t name = NULL;
+    size_t tlen1, tlen2, clen, slen;
+    char *tdots1, *tdots2, *cdots, *sdots;
 
     xdr_free(xdr_generic_ret, (char *) &ret);
 
@@ -854,8 +856,18 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
 	 ret.code = KADM5_BAD_PRINCIPAL;
 	 goto error;
     }
-    sprintf(prime_arg, "%s to %s", prime_arg1, prime_arg2);
+    tlen1 = strlen(prime_arg1);
+    trunc_name(&tlen1, &tdots1);
+    tlen2 = strlen(prime_arg2);
+    trunc_name(&tlen2, &tdots2);
+    clen = strlen(client_name);
+    trunc_name(&clen, &cdots);
+    slen = strlen(service_name);
+    trunc_name(&slen, &sdots);
 
+    (void) snprintf(prime_arg, sizeof (prime_arg), "%.*s%s to %.*s*s",
+	tlen1, prime_arg1, tdots1,
+	tlen2, prime_arg2, tdots2);
     ret.code = KADM5_OK;
 
 	if (!(name = get_clnt_name(rqstp))) {
@@ -882,8 +894,15 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_rename_principal",
 				    prime_arg, client_name);
-	 log_unauth("kadm5_rename_principal", prime_arg, client_name,
-		    service_name, client_addr(rqstp, buf));
+		krb5_klog_syslog(LOG_NOTICE,
+		    "Unauthorized request: kadm5_rename_principal, "
+		    "%.*s%s to %.*s%s, "    
+		    "client=%.*s%s, service=%.*s%s, addr=%s",
+		    tlen1, prime_arg1, tdots1,
+		    tlen2, prime_arg2, tdots2,
+		    clen, client_name, cdots,
+		    slen, service_name, sdots,
+		    client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_rename_principal((void *)handle, arg->src,
 						arg->dest);
@@ -891,9 +910,15 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_rename_principal",
 				prime_arg, client_name, ret.code);
-	 log_done("kadm5_rename_principal", prime_arg,
-		((ret.code == 0) ? "success" : error_message(ret.code)), 
-		client_name, service_name, client_addr(rqstp, buf));
+		krb5_klog_syslog(LOG_NOTICE,
+		    "Request: kadm5_rename_principal, "
+		    "%.*s%s to %.*s%s, %s, "
+		    "client=%.*s%s, service=%.*s%s, addr=%s",
+		    tlen1, prime_arg1, tdots1,
+		    tlen2, prime_arg2, tdots2,
+		    clen, client_name, cdots,
+		    slen, service_name, sdots,
+		    client_addr(rqstp, buf));
     }
 
 error:
