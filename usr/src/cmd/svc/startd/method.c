@@ -411,6 +411,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 	char *cmd;
 	const char *errf;
 	char **nenv;
+	int rsmc_errno = 0;
 
 	cmd = uu_msprintf("exec %s", method);
 
@@ -425,12 +426,12 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 		(void) setpgrp();
 
 	/* Set credentials. */
-	errno = restarter_set_method_context(mcp, &errf);
-	if (errno != 0) {
+	rsmc_errno = restarter_set_method_context(mcp, &errf);
+	if (rsmc_errno != 0) {
 		(void) fputs("svc.startd could not set context for method: ",
 		    stderr);
 
-		if (errno == -1) {
+		if (rsmc_errno == -1) {
 			if (strcmp(errf, "core_set_process_path") == 0) {
 				(void) fputs("Could not set corefile path.\n",
 				    stderr);
@@ -445,7 +446,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 				uu_warn("%s:%d: Bad function name \"%s\" for "
 				    "error %d from "
 				    "restarter_set_method_context().\n",
-				    __FILE__, __LINE__, errf, errno);
+				    __FILE__, __LINE__, errf, rsmc_errno);
 #endif
 				abort();
 			}
@@ -454,7 +455,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 		}
 
 		if (errf != NULL && strcmp(errf, "pool_set_binding") == 0) {
-			switch (errno) {
+			switch (rsmc_errno) {
 			case ENOENT:
 				(void) fprintf(stderr, "%s: the pool could not "
 				    "be found\n", errf);
@@ -474,7 +475,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 #ifndef NDEBUG
 				uu_warn("%s:%d: Bad error %d for function %s "
 				    "in restarter_set_method_context().\n",
-				    __FILE__, __LINE__, errno, errf);
+				    __FILE__, __LINE__, rsmc_errno, errf);
 #endif
 				abort();
 			}
@@ -483,9 +484,10 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 		}
 
 		if (errf != NULL) {
+			errno = rsmc_errno;
 			perror(errf);
 
-			switch (errno) {
+			switch (rsmc_errno) {
 			case EINVAL:
 			case EPERM:
 			case ENOENT:
@@ -500,7 +502,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 			}
 		}
 
-		switch (errno) {
+		switch (rsmc_errno) {
 		case ENOMEM:
 			(void) fputs("Out of memory.\n", stderr);
 			exit(1);
@@ -516,7 +518,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 #ifndef NDEBUG
 			uu_warn("%s:%d: Bad miscellaneous error %d from "
 			    "restarter_set_method_context().\n", __FILE__,
-			    __LINE__, errno);
+			    __LINE__, rsmc_errno);
 #endif
 			abort();
 		}
@@ -847,9 +849,9 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		/* Unlock the instance while waiting for the method. */
 		MUTEX_UNLOCK(&inst->ri_lock);
 
-		do
+		do {
 			r = waitpid(pid, &ret_status, NULL);
-		while (r == -1 && errno == EINTR);
+		} while (r == -1 && errno == EINTR);
 		if (r == -1)
 			err = errno;
 
