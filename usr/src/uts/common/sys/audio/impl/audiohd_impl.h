@@ -60,6 +60,8 @@ extern "C" {
 #define	AUDIOHD_VID_AD1988B	0x11d4198b
 
 #define	AUDIOHD_VID_INTEL	0x8086
+#define	AUDIOHD_VID_ATI		0x1002
+
 
 /*
  * Only for Intel hardware:
@@ -67,8 +69,12 @@ extern "C" {
  */
 #define	AUDIOHD_INTEL_PCI_TCSEL 0x44
 
-/* vendor-id and device-id for ATI SB450 */
-#define	AUDIOHD_ATI_SB450	0x437d1002
+/*
+ * Only for ATI SB450:
+ * MISC control register 2
+ */
+#define	AUDIOHD_ATI_PCI_MISC2	0x42
+#define	AUDIOHD_ATI_MISC2_SNOOP	0x02
 
 #define	AUDIOHDC_NID(x)		x
 #define	AUDIOHDC_NULL_NODE	-1

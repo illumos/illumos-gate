@@ -833,7 +833,7 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 
 	/* set playback stream tag */
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL + 2,
-	    (statep->hda_play_stag) << 4 | 4);
+	    (statep->hda_play_stag) << 4);
 
 	/* Enable interrupt and start DMA */
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL,
@@ -1092,7 +1092,7 @@ audiohd_ad_start_record(audiohdl_t ahandle, int stream)
 
 	/* set stream tag to 1 */
 	AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL + 2,
-	    statep->hda_record_stag << 4 | 4);
+	    statep->hda_record_stag << 4);
 	statep->hda_flags |= AUDIOHD_RECORD_STARTED;
 
 	/* start DMA */
@@ -1327,26 +1327,43 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 	pci_config_put16(statep->hda_pci_handle, PCI_CONF_COMM,
 	    cmdreg | PCI_COMM_MAE | PCI_COMM_ME);
 
-	/*
-	 * Currently, Intel (G)MCH and ICHx chipsets support PCI Express
-	 * QoS. It implemenets two VCs(virtual channels) and allows OS
-	 * software to map 8 traffic classes to the two VCs. Some BIOSes
-	 * initialize HD audio hardware to use TC7 (traffic class 7) and
-	 * map TC7 to VC1 as Intel recommended. However, solaris doesn't
-	 * PCI express QoS yet. As a result, this driver can not work for
-	 * those hardware without touching PCI express control registers.
-	 * So, here, we set TCSEL to 0 so as to use TC0/VC0 (VC0 is always
-	 * enabled and TC0 is always mapped to VC0) for All Intel Hd audio
-	 * controllers.
-	 */
 	vid = pci_config_get16(statep->hda_pci_handle, PCI_CONF_VENID);
-	if (vid == AUDIOHD_VID_INTEL) {
+	switch (vid) {
+
+	case AUDIOHD_VID_INTEL:
+		/*
+		 * Currently, Intel (G)MCH and ICHx chipsets support PCI
+		 * Express QoS. It implemenets two VCs(virtual channels)
+		 * and allows OS software to map 8 traffic classes to the
+		 * two VCs. Some BIOSes initialize HD audio hardware to
+		 * use TC7 (traffic class 7) and to map TC7 to VC1 as Intel
+		 * recommended. However, solaris doesn't support PCI express
+		 * QoS yet. As a result, this driver can not work for those
+		 * hardware without touching PCI express control registers.
+		 * Here, we set TCSEL to 0 so as to use TC0/VC0 (VC0 is
+		 * always enabled and TC0 is always mapped to VC0) for all
+		 * Intel HD audio controllers.
+		 */
 		cTmp = pci_config_get8(statep->hda_pci_handle,
 		    AUDIOHD_INTEL_PCI_TCSEL);
 		pci_config_put8(statep->hda_pci_handle,
 		    AUDIOHD_INTEL_PCI_TCSEL, (cTmp & 0xf8));
-	}
+		break;
 
+	case AUDIOHD_VID_ATI:
+		/*
+		 * Refer to ATI SB450 datesheet. We set snoop for SB450
+		 * like hardware.
+		 */
+		cTmp = pci_config_get8(statep->hda_pci_handle,
+		    AUDIOHD_ATI_PCI_MISC2);
+		pci_config_put8(statep->hda_pci_handle, AUDIOHD_ATI_PCI_MISC2,
+		    (cTmp & 0xf8) | AUDIOHD_ATI_MISC2_SNOOP);
+		break;
+
+	default:
+		break;
+	}
 
 	return (AUDIO_SUCCESS);
 

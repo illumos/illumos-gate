@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,8 @@ extern "C" {
 #define	AUDIOHD_DEFAULT_BAL			AUDIO_MID_BALANCE
 #define	AUDIOHD_DEFAULT_MONITOR_GAIN		0
 
-#define	AUDIOHD_DEV_NAME	"audiohd"
-#define	AUDIOHD_DEV_CONFIG	"hda audio config"
+#define	AUDIOHD_DEV_NAME	"SUNW,audiohd"
+#define	AUDIOHD_DEV_CONFIG	"onboard1"
 #define	AUDIOHD_DEV_VERSION	"a"
 
 #ifdef __cplusplus
