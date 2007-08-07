@@ -27,8 +27,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 #
-# This test verifies that USDT providers are removed when its associated
-# load object is closed via dlclose(3dl).
+# This test verifies that performing a dlclose(3dl) on a library doesn't
+# cause existing pid provider probes to become invalid.
 #
 
 if [ $# != 1 ]; then
@@ -107,6 +107,12 @@ cat > main.c <<EOF
 #include <unistd.h>
 #include <stdio.h>
 
+static void
+foo(void)
+{
+	(void) close(-1);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -119,7 +125,7 @@ main(int argc, char **argv)
 
 	(void) dlclose(live);
 
-	pause();
+	foo();
 
 	return (0);
 }
@@ -132,25 +138,30 @@ if [ $? -ne 0 ]; then
 fi
 
 script() {
-	$dtrace -w -x bufsize=1k -c ./main -qs /dev/stdin <<EOF
-	syscall::pause:entry
-	/pid == \$target/
+	$dtrace -c ./main -s /dev/stdin <<EOF
+	pid\$target:a.out:foo:entry
 	{
-		system("$dtrace -l -P test_prov*");
-		system("kill %d", \$target);
+		gotit = 1;
 		exit(0);
 	}
 
 	tick-1s
 	/i++ == 5/
 	{
-		printf("failed\n");
+		printf("test timed out");
+		exit(1);
+	}
+
+	END
+	/!gotit/
+	{
+		printf("program ended without hitting probe");
 		exit(1);
 	}
 EOF
 }
 
-script 2>&1
+script
 status=$?
 
 cd /

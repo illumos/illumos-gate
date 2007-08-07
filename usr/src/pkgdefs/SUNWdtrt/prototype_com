@@ -1340,6 +1340,7 @@ f none SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh.out 0444 root bin
+f none SUNWdtrt/tst/common/usdt/tst.dlclose3.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.fork.ksh 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.fork.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/usdt/tst.forker.exe 0555 root bin

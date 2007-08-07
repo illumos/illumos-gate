@@ -1120,6 +1120,7 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 	int found = 0;
 	ctf_id_t id;
 	uint_t n;
+	int justone;
 
 	uint_t mask = 0; /* mask of dt_module flags to match */
 	uint_t bits = 0; /* flag bits that must be present */
@@ -1133,6 +1134,7 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 		if (dt_module_load(dtp, dmp) == -1)
 			return (-1); /* dt_errno is set for us */
 		n = 1;
+		justone = 1;
 
 	} else {
 		if (object == DTRACE_OBJ_KMODS)
@@ -1142,6 +1144,7 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 
 		dmp = dt_list_next(&dtp->dt_modlist);
 		n = dtp->dt_nmods;
+		justone = 0;
 	}
 
 	if (tip == NULL)
@@ -1153,12 +1156,11 @@ dtrace_lookup_by_type(dtrace_hdl_t *dtp, const char *object, const char *name,
 
 		/*
 		 * If we can't load the CTF container, continue on to the next
-		 * module.  If our search was scoped to only one module (n = 1)
-		 * then return immediately, leaving dt_errno set to the error
-		 * from dt_module_getctf() on the module given by the caller.
+		 * module.  If our search was scoped to only one module then
+		 * return immediately leaving dt_errno unmodified.
 		 */
 		if (dt_module_getctf(dtp, dmp) == NULL) {
-			if (n == 1)
+			if (justone)
 				return (-1);
 			continue;
 		}

@@ -31,6 +31,9 @@ unload()
 	# Get the list of services whose processes have USDT probes.  Ideally
 	# it would be possible to unload the fasttrap provider while USDT
 	# probes exist -- once that fix is integrated, this hack can go away
+	# We create two lists -- one of regular SMF services and one of legacy
+	# services -- since each must be enabled and disabled using a specific
+	# mechanism.
 	#
 	pids=$(dtrace -l | \
 	    perl -ne 'print "$1\n" if (/^\s*\S+\s+\S*\D(\d+)\s+/);' | \
@@ -38,12 +41,19 @@ unload()
 
 	ctids=$(ps -p $pids -o ctid | tail +2 | sort | uniq)
 	svcs=
+	lrcs=
 
 	for ct in $ctids
 	do
 		line=$(svcs -o fmri,ctid | grep " $ct\$")
 		svc=$(echo $line | cut -d' ' -f1)
-		svcs="$svcs $svc"
+
+		if [[ $(svcs -Ho STA $svc) == "LRC" ]]; then
+			lrc=$(svcs -Ho SVC $svc | tr _ '?')
+			lrcs="$lrcs $lrc"
+		else
+			svcs="$svcs $svc"
+	fi
 	done
 
 	for svc in $svcs
@@ -51,23 +61,37 @@ unload()
 		svcadm disable -ts $svc
 	done
 
-	modunload -i 0
-	modunload -i 0
-	modunload -i 0
+	for lrc in $lrcs
+	do
+		#
+		# Does it seem a little paternalistic that lsvcrun requires
+		# this environment variable to be set? I'd say so...
+		#
+		SMF_RESTARTER=svc:/system/svc/restarter:default \
+		    /lib/svc/bin/lsvcrun $lrc stop
+	done
 
-	if ( modinfo | grep dtrace ); then
-		for svc in $svcs
-		do
-			svcadm enable -ts $svc
-		done
-		echo $tst: could not unload dtrace
-		exit 1
-	fi
+	modunload -i 0
+	modunload -i 0
+	modunload -i 0
+	modinfo | grep dtrace
+	success=$?
 
 	for svc in $svcs
 	do
 		svcadm enable -ts $svc
 	done
+
+	for lrc in $lrcs
+	do
+		SMF_RESTARTER=svc:/system/svc/restarter:default \
+		    /lib/svc/bin/lsvcrun $lrc start
+	done
+
+	if [ ! $success ]; then
+		echo $tst: could not unload dtrace
+		exit 1
+	fi
 }
 
 script1()

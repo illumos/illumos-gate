@@ -434,7 +434,7 @@ fasttrap_fork(proc_t *p, proc_t *cp)
 		mutex_enter(&bucket->ftb_mtx);
 		for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 			if (tp->ftt_pid == ppid &&
-			    !tp->ftt_proc->ftpc_defunct) {
+			    tp->ftt_proc->ftpc_acount != 0) {
 				int ret = fasttrap_tracepoint_remove(cp, tp);
 				ASSERT(ret == 0);
 			}
@@ -518,7 +518,7 @@ again:
 	mutex_enter(&bucket->ftb_mtx);
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 		if (tp->ftt_pid != pid || tp->ftt_pc != pc ||
-		    tp->ftt_proc->ftpc_defunct)
+		    tp->ftt_proc->ftpc_acount == 0)
 			continue;
 
 		/*
@@ -1152,10 +1152,11 @@ fasttrap_proc_lookup(pid_t pid)
 	mutex_enter(&bucket->ftb_mtx);
 
 	for (fprc = bucket->ftb_data; fprc != NULL; fprc = fprc->ftpc_next) {
-		if (fprc->ftpc_pid == pid && !fprc->ftpc_defunct) {
+		if (fprc->ftpc_pid == pid && fprc->ftpc_acount != 0) {
 			mutex_enter(&fprc->ftpc_mtx);
 			mutex_exit(&bucket->ftb_mtx);
-			fprc->ftpc_count++;
+			fprc->ftpc_rcount++;
+			atomic_add_64(&fprc->ftpc_acount, 1);
 			mutex_exit(&fprc->ftpc_mtx);
 
 			return (fprc);
@@ -1170,7 +1171,8 @@ fasttrap_proc_lookup(pid_t pid)
 
 	new_fprc = kmem_zalloc(sizeof (fasttrap_proc_t), KM_SLEEP);
 	new_fprc->ftpc_pid = pid;
-	new_fprc->ftpc_count = 1;
+	new_fprc->ftpc_rcount = 1;
+	new_fprc->ftpc_acount = 1;
 
 	mutex_enter(&bucket->ftb_mtx);
 
@@ -1179,10 +1181,11 @@ fasttrap_proc_lookup(pid_t pid)
 	 * been created for this pid while we weren't under the bucket lock.
 	 */
 	for (fprc = bucket->ftb_data; fprc != NULL; fprc = fprc->ftpc_next) {
-		if (fprc->ftpc_pid == pid && !fprc->ftpc_defunct) {
+		if (fprc->ftpc_pid == pid && fprc->ftpc_acount != 0) {
 			mutex_enter(&fprc->ftpc_mtx);
 			mutex_exit(&bucket->ftb_mtx);
-			fprc->ftpc_count++;
+			fprc->ftpc_rcount++;
+			atomic_add_64(&fprc->ftpc_acount, 1);
 			mutex_exit(&fprc->ftpc_mtx);
 
 			kmem_free(new_fprc, sizeof (fasttrap_proc_t));
@@ -1208,14 +1211,20 @@ fasttrap_proc_release(fasttrap_proc_t *proc)
 
 	mutex_enter(&proc->ftpc_mtx);
 
-	ASSERT(proc->ftpc_count != 0);
+	ASSERT(proc->ftpc_rcount != 0);
 
-	if (--proc->ftpc_count != 0) {
+	if (--proc->ftpc_rcount != 0) {
 		mutex_exit(&proc->ftpc_mtx);
 		return;
 	}
 
 	mutex_exit(&proc->ftpc_mtx);
+
+	/*
+	 * There should definitely be no live providers associated with this
+	 * process at this point.
+	 */
+	ASSERT(proc->ftpc_acount == 0);
 
 	bucket = &fasttrap_procs.fth_table[FASTTRAP_PROCS_INDEX(pid)];
 	mutex_enter(&bucket->ftb_mtx);
@@ -1437,13 +1446,12 @@ fasttrap_provider_retire(pid_t pid, const char *name, int mprov)
 	}
 
 	/*
-	 * Mark the provider to be removed in our post-processing step,
-	 * mark it retired, and mark its proc as defunct (though it may
-	 * already be marked defunct by another provider that shares the
-	 * same proc). Marking it indicates that we should try to remove it;
-	 * setting the retired flag indicates that we're done with this
-	 * provider; setting the proc to be defunct indicates that all
-	 * tracepoints associated with the traced process should be ignored.
+	 * Mark the provider to be removed in our post-processing step, mark it
+	 * retired, and drop the active count on its proc. Marking it indicates
+	 * that we should try to remove it; setting the retired flag indicates
+	 * that we're done with this provider; dropping the active the proc
+	 * releases our hold, and when this reaches zero (as it will during
+	 * exit or exec) the proc and associated providers become defunct.
 	 *
 	 * We obviously need to take the bucket lock before the provider lock
 	 * to perform the lookup, but we need to drop the provider lock
@@ -1452,7 +1460,7 @@ fasttrap_provider_retire(pid_t pid, const char *name, int mprov)
 	 * bucket lock therefore protects the integrity of the provider hash
 	 * table.
 	 */
-	fp->ftp_proc->ftpc_defunct = 1;
+	atomic_add_64(&fp->ftp_proc->ftpc_acount, -1);
 	fp->ftp_retired = 1;
 	fp->ftp_marked = 1;
 	provid = fp->ftp_provid;
@@ -1696,15 +1704,15 @@ fasttrap_meta_provide(void *arg, dtrace_helper_provdesc_t *dhpv, pid_t pid)
 	 * The highest stability class that fasttrap supports is ISA; cap
 	 * the stability of the new provider accordingly.
 	 */
-	if (dhpv->dthpv_pattr.dtpa_provider.dtat_class >= DTRACE_CLASS_COMMON)
+	if (dhpv->dthpv_pattr.dtpa_provider.dtat_class > DTRACE_CLASS_ISA)
 		dhpv->dthpv_pattr.dtpa_provider.dtat_class = DTRACE_CLASS_ISA;
-	if (dhpv->dthpv_pattr.dtpa_mod.dtat_class >= DTRACE_CLASS_COMMON)
+	if (dhpv->dthpv_pattr.dtpa_mod.dtat_class > DTRACE_CLASS_ISA)
 		dhpv->dthpv_pattr.dtpa_mod.dtat_class = DTRACE_CLASS_ISA;
-	if (dhpv->dthpv_pattr.dtpa_func.dtat_class >= DTRACE_CLASS_COMMON)
+	if (dhpv->dthpv_pattr.dtpa_func.dtat_class > DTRACE_CLASS_ISA)
 		dhpv->dthpv_pattr.dtpa_func.dtat_class = DTRACE_CLASS_ISA;
-	if (dhpv->dthpv_pattr.dtpa_name.dtat_class >= DTRACE_CLASS_COMMON)
+	if (dhpv->dthpv_pattr.dtpa_name.dtat_class > DTRACE_CLASS_ISA)
 		dhpv->dthpv_pattr.dtpa_name.dtat_class = DTRACE_CLASS_ISA;
-	if (dhpv->dthpv_pattr.dtpa_args.dtat_class >= DTRACE_CLASS_COMMON)
+	if (dhpv->dthpv_pattr.dtpa_args.dtat_class > DTRACE_CLASS_ISA)
 		dhpv->dthpv_pattr.dtpa_args.dtat_class = DTRACE_CLASS_ISA;
 
 	if ((provider = fasttrap_provider_lookup(pid, dhpv->dthpv_provname,
@@ -2003,7 +2011,7 @@ err:
 		while (tp != NULL) {
 			if (instr.ftiq_pid == tp->ftt_pid &&
 			    instr.ftiq_pc == tp->ftt_pc &&
-			    !tp->ftt_proc->ftpc_defunct)
+			    tp->ftt_proc->ftpc_acount != 0)
 				break;
 
 			tp = tp->ftt_next;

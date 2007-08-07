@@ -43,7 +43,7 @@ dtrace=$1
 id=$!
 
 while kill -0 $id >/dev/null 2>&1; do
-	$dtrace -s /dev/stdin <<-EOF
+	$dtrace -p $id -s /dev/stdin <<-EOF
 		forker*:::fire
 		/i++ == 4/
 		{

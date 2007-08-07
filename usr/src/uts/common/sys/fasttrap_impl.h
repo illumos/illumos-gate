@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,9 @@ extern "C" {
  * providers. Those providers are each represented by a fasttrap_provider_t.
  * All providers for a given process have a pointer to a shared
  * fasttrap_proc_t. The fasttrap_proc_t has two states: active or defunct.
- * It becomes defunct when the process performs an exit or an exec.
+ * When the count of live providers goes to zero it becomes defunct; providers
+ * drop their count when they are removed individually or en masse when a
+ * process exits or performs an exec.
  *
  * Each probe is represented by a fasttrap_probe_t which has a pointer to
  * its associated provider as well as a list of fasttrap_id_tp_t structures
@@ -70,8 +72,8 @@ extern "C" {
 
 typedef struct fasttrap_proc {
 	pid_t ftpc_pid;				/* process ID for this proc */
-	uint_t ftpc_defunct;			/* denotes a lame duck proc */
-	uint64_t ftpc_count;			/* reference count */
+	uint64_t ftpc_acount;			/* count of active providers */
+	uint64_t ftpc_rcount;			/* provider reference count */
 	kmutex_t ftpc_mtx;			/* proc lock */
 	struct fasttrap_proc *ftpc_next;	/* next proc in hash chain */
 } fasttrap_proc_t;
