@@ -919,7 +919,7 @@ extern int deleg_setattr(femarg_t *, vattr_t *, int, cred_t *,
 extern int deleg_space(femarg_t *, int, flock64_t *, int, offset_t, cred_t *,
 		caller_context_t *);
 extern int deleg_setsecattr(femarg_t *, vsecattr_t *, int, cred_t *);
-extern int deleg_vnevent(femarg_t *, vnevent_t, vnode_t *, char *);
+extern int deleg_vnevent(femarg_t *, vnevent_t);
 
 extern void rfs4_mon_hold(void *);
 extern void rfs4_mon_rele(void *);

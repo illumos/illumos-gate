@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,29 +98,12 @@ typedef struct port_source {
 	int	portsrc_cnt;		/* # of associations */
 	void	(*portsrc_close)(void *, int, pid_t, int);
 	void	*portsrc_closearg;	/* callback arg */
-	void	*portsrc_data;		/* Private data of source */
 	struct port_source *portsrc_next;
 	struct port_source *portsrc_prev;
 } port_source_t;
 
 
 /*
- * PORT_SOURCE_FILE cache structure.
- */
-#define	PORTFOP_HASHSIZE	256	/* cache space for fop events */
-
-/*
- * One cache for each port that uses PORT_SOURCE_FILE.
- */
-typedef struct portfop_cache {
-	kmutex_t	pfc_lock;	/* lock to protect cache */
-	kcondvar_t	pfc_lclosecv;	/* last close cv */
-	int		pfc_objcount;	/* track how many file obj are hashed */
-	struct portfop	*pfc_hash[PORTFOP_HASHSIZE]; /* hash table */
-} portfop_cache_t;
-
-/*
- * PORT_SOURCE_FD cache per port.
  * One cache for each port that uses PORT_SOURCE_FD.
  * pc_lock must be the first element of port_fdcache_t to keep it
  * synchronized with the offset of pc_lock in pollcache_t (see pollrelock()).
@@ -164,8 +147,6 @@ void	port_init_event(port_kevent_t *, uintptr_t, void *,
 int	port_dup_event(port_kevent_t *, port_kevent_t **, int);
 int	port_associate_fd(struct port *, int, uintptr_t, int, void *);
 int	port_dissociate_fd(struct port *, uintptr_t);
-int	port_associate_fop(struct port *, int, uintptr_t, int, void *);
-int	port_dissociate_fop(struct port *, uintptr_t);
 
 /* misc functions */
 void	port_free_event_local(port_kevent_t *, int counter);

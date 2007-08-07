@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,6 @@ extern "C" {
 #include <sys/port.h>
 #include <sys/port_kernel.h>
 #include <sys/vnode.h>
-#include <sys/fem.h>
 
 /*
  * port system call codes
@@ -213,138 +212,6 @@ typedef struct portfd {
 	(&(pcp)->pc_hash[((fd) % (pcp)->pc_hashsize)])
 
 /*
- * PORT_SOURCE_FILE -- File Events Notification sources
- */
-#define	PORT_FOP_BUCKET(pcp, id) \
-	(portfop_t **)(&(pcp)->pfc_hash[(((ulong_t)id >> 8) & \
-	    (PORTFOP_HASHSIZE - 1))])
-
-/*
- * This structure is used to register a file object to be watched.
- *
- * The pfop_flags are protected by the vnode's pvp_mutex lock.
- * The pfop list (vnode's list) is protected by the pvp_mutex when it is on
- * the vnode's list.
- *
- * All the rest of the fields are protected by the port's source cache lock
- * pfcp_lock.
- */
-typedef struct  portfop {
-	int		pfop_events;
-	int		pfop_flags;	/* above flags. */
-	uintptr_t	pfop_object;	/* object address */
-	vnode_t		*pfop_vp;
-	vnode_t		*pfop_dvp;
-	port_t		*pfop_pp;
-	fem_t		*pfop_fem;
-	list_node_t	pfop_node;	/* list of pfop's per vnode */
-	struct portfop	*pfop_hashnext;	/* hash list */
-	pid_t		pfop_pid;	/* owner of portfop */
-	struct portfop_cache *pfop_pcache;
-	port_kevent_t	*pfop_pev;	/* event pointers */
-	char		*pfop_cname;	/* file component name */
-	int		pfop_clen;
-} portfop_t;
-
-/*
- * pfop_flags
- */
-#define		PORT_FOP_ACTIVE		0x1
-#define		PORT_FOP_REMOVING	0x2
-#define		PORT_FOP_KEV_ONQ	0x4
-
-typedef struct portfop_vfs {
-	vfs_t		*pvfs;
-	int		pvfs_unmount;	/* 1 if unmount in progress */
-	list_t		pvfs_pvplist;	/* list of vnodes from */
-	fsem_t		*pvfs_fsemp;
-	struct portfop_vfs *pvfs_next;	/* hash list */
-} portfop_vfs_t;
-
-typedef struct portfop_vfs_hash {
-	kmutex_t	pvfshash_mutex;
-	struct portfop_vfs *pvfshash_pvfsp;
-} portfop_vfs_hash_t;
-
-typedef struct portfop_vp {
-	vnode_t		*pvp_vp;
-	kmutex_t	pvp_mutex;
-	int		pvp_cnt;	/* number of watches */
-	list_t		pvp_pfoplist;
-	list_node_t	pvp_pvfsnode;
-	struct portfop *pvp_lpfop;	/* oldest pfop */
-	fem_t		*pvp_femp;
-	struct portfop_vfs *pvp_pvfsp;
-} portfop_vp_t;
-
-#define	PORTFOP_PVFSHASH_SZ	256
-#define	PORTFOP_PVFSHASH(vfsp)	(((uintptr_t)(vfsp) >> 4) % PORTFOP_PVFSHASH_SZ)
-
-/*
- * file operations flag.
- */
-
-/*
- * PORT_SOURCE_FILE - vnode operations
- */
-
-#define	FOP_FILE_OPEN		0x00000001
-#define	FOP_FILE_READ		0x00000002
-#define	FOP_FILE_WRITE		0x00000004
-#define	FOP_FILE_MAP		0x00000008
-#define	FOP_FILE_IOCTL		0x00000010
-#define	FOP_FILE_CREATE		0x00000020
-#define	FOP_FILE_MKDIR		0x00000040
-#define	FOP_FILE_SYMLINK	0x00000080
-#define	FOP_FILE_LINK		0x00000100
-#define	FOP_FILE_RENAME		0x00000200
-#define	FOP_FILE_REMOVE		0x00000400
-#define	FOP_FILE_RMDIR		0x00000800
-#define	FOP_FILE_READDIR	0x00001000
-#define	FOP_FILE_RENAMESRC	0x00002000
-#define	FOP_FILE_RENAMEDST	0x00004000
-#define	FOP_FILE_REMOVEFILE	0x00008000
-#define	FOP_FILE_REMOVEDIR	0x00010000
-#define	FOP_FILE_SETSECATTR	0x00020000
-#define	FOP_FILE_SETATTR_ATIME	0x00040000
-#define	FOP_FILE_SETATTR_MTIME	0x00080000
-#define	FOP_FILE_SETATTR_CTIME	0x00100000
-#define	FOP_FILE_LINK_SRC	0x00200000
-
-/*
- * File modification event.
- */
-#define	FOP_MODIFIED_MASK	(FOP_FILE_WRITE|FOP_FILE_CREATE \
-				|FOP_FILE_REMOVE|FOP_FILE_LINK \
-				|FOP_FILE_RENAMESRC|FOP_FILE_RENAMEDST \
-				|FOP_FILE_MKDIR|FOP_FILE_RMDIR \
-				|FOP_FILE_SYMLINK|FOP_FILE_SETATTR_MTIME)
-
-/*
- * File access event
- */
-#define	FOP_ACCESS_MASK		(FOP_FILE_READ|FOP_FILE_READDIR \
-				|FOP_FILE_MAP|FOP_FILE_SETATTR_ATIME)
-
-/*
- * File attrib event
- */
-#define	FOP_ATTRIB_MASK		(FOP_FILE_WRITE|FOP_FILE_CREATE \
-				|FOP_FILE_REMOVE|FOP_FILE_LINK \
-				|FOP_FILE_RENAMESRC|FOP_FILE_RENAMEDST \
-				|FOP_FILE_MKDIR|FOP_FILE_RMDIR \
-				|FOP_FILE_SYMLINK|FOP_FILE_SETATTR_CTIME \
-				|FOP_FILE_LINK_SRC|FOP_FILE_SETSECATTR)
-
-
-/*
- * valid watchable events
- */
-#define	FILE_EVENTS_MASK	(FILE_ACCESS|FILE_MODIFIED|FILE_ATTRIB \
-				|FILE_NOFOLLOW)
-/* --- End file events --- */
-
-/*
  * port_kstat_t contains the event port kernel values which are
  * exported to kstat.
  * Currently only the number of active ports is exported.
@@ -356,7 +223,7 @@ typedef struct port_kstat {
 /* misc functions */
 int	port_alloc_event_block(port_t *, int, int, struct port_kevent **);
 void	port_push_eventq(port_queue_t *);
-int	port_remove_done_event(struct port_kevent *);
+void	port_remove_done_event(struct port_kevent *);
 struct	port_kevent *port_get_kevent(list_t *, struct port_kevent *);
 void	port_block(port_queue_t *);
 void	port_unblock(port_queue_t *);

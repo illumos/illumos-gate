@@ -218,7 +218,6 @@ const fs_operation_def_t nfs_vnodeops_template[] = {
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = nfs_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = nfs_getsecattr },
 	VOPNAME_SHRLOCK,	{ .vop_shrlock = nfs_shrlock },
-	VOPNAME_VNEVENT, 	{ .vop_vnevent = fs_vnevent_support },
 	NULL,			NULL
 };
 
@@ -1965,13 +1964,8 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		nfs_rw_exit(&drp->r_rwlock);
 		if (error) {
 			VN_RELE(vp);
-		} else {
-			/*
-			 * existing file got truncated, notify.
-			 */
-			vnevent_create(vp);
+		} else
 			*vpp = vp;
-		}
 		return (error);
 	}
 
@@ -2252,9 +2246,6 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 		}
 	}
 
-	if (error == 0) {
-		vnevent_remove(vp, dvp, nm);
-	}
 	VN_RELE(vp);
 
 	nfs_rw_exit(&drp->r_rwlock);
@@ -2306,12 +2297,6 @@ nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 
 	nfs_rw_exit(&tdrp->r_rwlock);
 
-	if (!error) {
-		/*
-		 * Notify the source file of this link operation.
-		 */
-		vnevent_link(svp);
-	}
 	return (error);
 }
 
@@ -2338,7 +2323,7 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 	enum nfsstat status;
 	struct nfsrnmargs args;
 	int douprintf;
-	vnode_t *nvp = NULL;
+	vnode_t *nvp;
 	vnode_t *ovp = NULL;
 	char *tmpname;
 	rnode_t *rp;
@@ -2494,6 +2479,8 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 			}
 			mutex_exit(&rp->r_statelock);
 		}
+
+		VN_RELE(nvp);
 	}
 
 	if (ovp == NULL) {
@@ -2517,9 +2504,6 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 		if (error) {
 			nfs_rw_exit(&odrp->r_rwlock);
 			nfs_rw_exit(&ndrp->r_rwlock);
-			if (nvp) {
-				VN_RELE(nvp);
-			}
 			return (error);
 		}
 		ASSERT(ovp != NULL);
@@ -2593,20 +2577,6 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 		}
 	}
 
-	if (error == 0) {
-		if (nvp)
-			vnevent_rename_dest(nvp, ndvp, nnm);
-
-		if (odvp != ndvp)
-			vnevent_rename_dest_dir(ndvp);
-
-		ASSERT(ovp != NULL);
-		vnevent_rename_src(ovp, odvp, onm);
-	}
-
-	if (nvp) {
-		VN_RELE(nvp);
-	}
 	VN_RELE(ovp);
 
 	nfs_rw_exit(&odrp->r_rwlock);
@@ -2788,9 +2758,6 @@ nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 			error = EEXIST;
 	}
 
-	if (error == 0) {
-		vnevent_rmdir(vp, dvp, nm);
-	}
 	VN_RELE(vp);
 
 	nfs_rw_exit(&drp->r_rwlock);

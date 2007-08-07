@@ -467,9 +467,9 @@ pc_dirremove(
 
 	if (error == 0) {
 		if (type == VDIR) {
-			vnevent_rmdir(PCTOV(pcp), vp, namep);
+			vnevent_rmdir(PCTOV(pcp));
 		} else {
-			vnevent_remove(PCTOV(pcp), vp, namep);
+			vnevent_remove(PCTOV(pcp));
 		}
 	}
 
@@ -633,7 +633,7 @@ top:
 		newisdir = tpcp->pc_entry.pcd_attr & PCA_DIR;
 
 		brelse(slot.sl_bp);
-		vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm);
+		vnevent_rename_dest(PCTOV(tpcp));
 		VN_RELE(PCTOV(tpcp));
 
 		/*
@@ -815,11 +815,7 @@ top:
 		}
 	}
 out:
-	vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm);
-	if (dp != tdp) {
-		vnevent_rename_dest_dir(PCTOV(tdp));
-	}
-
+	vnevent_rename_src(PCTOV(pcp));
 	VN_RELE(PCTOV(pcp));
 
 	return (error);

@@ -633,7 +633,7 @@ fs_shrlock(struct vnode *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 
 /*ARGSUSED1*/
 int
-fs_vnevent_nosupport(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
+fs_vnevent_nosupport(vnode_t *vp, vnevent_t vnevent)
 {
 	ASSERT(vp != NULL);
 	return (ENOTSUP);
@@ -641,7 +641,7 @@ fs_vnevent_nosupport(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
 
 /*ARGSUSED1*/
 int
-fs_vnevent_support(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
+fs_vnevent_support(vnode_t *vp, vnevent_t vnevent)
 {
 	ASSERT(vp != NULL);
 	return (0);

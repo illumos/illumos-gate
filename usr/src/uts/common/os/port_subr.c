@@ -197,7 +197,7 @@ port_send_event(port_kevent_t *pkevp)
 	 * ports if being polled.
 	 */
 	if (pkevp->portkev_source != PORT_SOURCE_FD &&
-	    portq->portq_flags & PORTQ_POLLIN) {
+				portq->portq_flags & PORTQ_POLLIN) {
 		portq->portq_flags &= ~PORTQ_POLLIN;
 		mutex_exit(&portq->portq_mutex);
 		pollwakeup(&pkevp->portkev_port->port_pollhd, POLLIN);
@@ -390,11 +390,10 @@ port_remove_event_doneq(port_kevent_t *pkevp, port_queue_t *portq)
  * Currently this function is required to cancel a fired event because
  * the application is delivering new association data (see port_associate_fd()).
  */
-int
+void
 port_remove_done_event(port_kevent_t *pkevp)
 {
 	port_queue_t	*portq;
-	int	removed = 0;
 
 	portq = &pkevp->portkev_port->port_queue;
 	mutex_enter(&portq->portq_mutex);
@@ -412,11 +411,9 @@ port_remove_done_event(port_kevent_t *pkevp)
 		}
 		/* now remove event from the port queue */
 		port_remove_event_doneq(pkevp, portq);
-		removed = 1;
 	}
 	port_unblock(portq);
 	mutex_exit(&portq->portq_mutex);
-	return (removed);
 }
 
 /*
@@ -779,16 +776,4 @@ port_dissociate_ksource(int port, int source, port_source_t *ps)
 	mutex_exit(&pp->port_queue.portq_source_mutex);
 	releasef(port);
 	return (0);
-}
-
-void
-free_fopdata(vnode_t *vp)
-{
-	portfop_vp_t *pvp;
-	pvp = vp->v_fopdata;
-	ASSERT(pvp->pvp_femp == NULL);
-	mutex_destroy(&pvp->pvp_mutex);
-	list_destroy(&pvp->pvp_pfoplist);
-	kmem_free(pvp, sizeof (*pvp));
-	vp->v_fopdata = NULL;
 }

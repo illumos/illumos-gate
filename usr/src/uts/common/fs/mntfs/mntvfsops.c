@@ -104,13 +104,10 @@ _info(struct modinfo *modinfop)
  * is ever modified to become unloadable.
  */
 
-extern int	mntfstype;
+static int	mntfstype;
 static major_t	mnt_major;
 static minor_t	mnt_minor;
 static kmutex_t	mnt_minor_lock;
-
-extern struct vnode *mntdummyvp;
-struct vnodeops *mntdummyvnodeops;
 
 /*
  * /mnttab VFS operations vector.
@@ -118,7 +115,7 @@ struct vnodeops *mntdummyvnodeops;
 static int	mntmount(), mntunmount(), mntroot(), mntstatvfs();
 
 static void
-mntinitrootnode(mntnode_t *mnp, struct vfs *vfsp)
+mntinitrootnode(mntnode_t *mnp)
 {
 	struct vnode *vp;
 
@@ -132,23 +129,6 @@ mntinitrootnode(mntnode_t *mnp, struct vfs *vfsp)
 	vn_setops(vp, mntvnodeops);
 	vp->v_type = VREG;
 	vp->v_data = (caddr_t)mnp;
-
-	/*
-	 * Only one global mntdummyvp is required, which
-	 * needs to get created when the global zone(first zone)
-	 * gets mounted. Since this module does not have a _fini routine,
-	 * the mntdummyvp vnode does not have to be freed.
-	 */
-	if (mntdummyvp == NULL) {
-		struct vnode *tvp;
-		tvp = vn_alloc(KM_SLEEP);
-		tvp->v_flag = VNOMOUNT|VNOMAP|VNOSWAP|VNOCACHE;
-		vn_setops(tvp, mntdummyvnodeops);
-		tvp->v_type = VREG;
-		tvp->v_data = (caddr_t)mnp;
-		tvp->v_vfsp = vfsp;
-		mntdummyvp = tvp;
-	}
 }
 
 static int
@@ -162,7 +142,6 @@ mntinit(int fstype, char *name)
 		NULL,			NULL
 	};
 	extern const fs_operation_def_t mnt_vnodeops_template[];
-	extern const fs_operation_def_t mnt_dummyvnodeops_template[];
 	int error;
 
 	mntfstype = fstype;
@@ -179,10 +158,6 @@ mntinit(int fstype, char *name)
 	/* Vnode ops too. */
 
 	error = vn_make_ops(name, mnt_vnodeops_template, &mntvnodeops);
-	if (!error) {
-		error = vn_make_ops(name, mnt_dummyvnodeops_template,
-		    &mntdummyvnodeops);
-	}
 	if (error != 0) {
 		(void) vfs_freevfsops_by_type(fstype);
 		cmn_err(CE_WARN, "mntinit: bad vnode ops template");
@@ -259,7 +234,7 @@ mntmount(struct vfs *vfsp, struct vnode *mvp,
 	mutex_exit(&mnt_minor_lock);
 	vfs_make_fsid(&vfsp->vfs_fsid, vfsp->vfs_dev, mntfstype);
 	vfsp->vfs_bsize = DEV_BSIZE;
-	mntinitrootnode(mnp, vfsp);
+	mntinitrootnode(mnp);
 	MTOV(mnp)->v_vfsp = vfsp;
 	mnp->mnt_mountvp = mvp;
 	vn_exists(MTOV(mnp));

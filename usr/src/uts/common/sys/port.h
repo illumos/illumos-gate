@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@ extern "C" {
 #define	PORT_SOURCE_FD		4
 #define	PORT_SOURCE_ALERT	5
 #define	PORT_SOURCE_MQ		6
-#define	PORT_SOURCE_FILE	7
 
 typedef struct port_event {
 	int		portev_events;	/* event data is source specific */
@@ -58,23 +57,7 @@ typedef	struct	port_notify {
 } port_notify_t;
 
 
-typedef struct file_obj {
-	timestruc_t	fo_atime;	/* Access time from stat(2) */
-	timestruc_t	fo_mtime;	/* Modification time from stat(2) */
-	timestruc_t	fo_ctime;	/* Change time from stat(2) */
-	uintptr_t	fo_pad[3];	/* For future expansion */
-	char		*fo_name;	/* Null terminated file name */
-} file_obj_t;
-
 #if defined(_SYSCALL32)
-
-typedef struct file_obj32 {
-	timestruc32_t	fo_atime;	/* Access time got from stat(2) */
-	timestruc32_t	fo_mtime;	/* Modification time from stat(2) */
-	timestruc32_t	fo_ctime;	/* Change time from stat(2) */
-	caddr32_t	fo_pad[3];	/* For future expansion */
-	caddr32_t	fo_name;	/* Null terminated file name */
-} file_obj32_t;
 
 typedef struct port_event32 {
 	int		portev_events;	/* events detected */
@@ -95,45 +78,6 @@ typedef	struct	port_notify32 {
 #define	PORT_ALERT_SET		0x01
 #define	PORT_ALERT_UPDATE	0x02
 #define	PORT_ALERT_INVALID	(PORT_ALERT_SET | PORT_ALERT_UPDATE)
-
-/*
- * PORT_SOURCE_FILE - events
- */
-
-/*
- * User watchable file events
- */
-#define	FILE_ACCESS		0x00000001
-#define	FILE_MODIFIED		0x00000002
-#define	FILE_ATTRIB		0x00000004
-#define	FILE_NOFOLLOW		0x10000000
-
-/*
- * exception file events
- */
-
-/*
- * The watched file..
- */
-#define	FILE_DELETE		0x00000010
-#define	FILE_RENAME_TO		0x00000020
-#define	FILE_RENAME_FROM	0x00000040
-/*
- * The filesystem on which the watched file resides got
- * unmounted.
- */
-#define	UNMOUNTED		0x20000000
-/*
- * Some other file/filesystem got mounted over the
- * watched file/directory.
- */
-#define	MOUNTEDOVER		0x40000000
-
-/*
- * Helper type
- */
-#define	FILE_EXCEPTION		(UNMOUNTED|FILE_DELETE|FILE_RENAME_TO \
-				|FILE_RENAME_FROM|MOUNTEDOVER)
 
 #ifdef	__cplusplus
 }

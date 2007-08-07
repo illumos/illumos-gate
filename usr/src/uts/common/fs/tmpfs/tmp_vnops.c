@@ -975,10 +975,6 @@ again:
 			}
 			*vpp = newvp;
 		}
-
-		if (error == 0) {
-			vnevent_create(*vpp);
-		}
 		return (0);
 	}
 
@@ -1047,7 +1043,7 @@ tmp_remove(struct vnode *dvp, char *nm, struct cred *cred)
 
 	rw_exit(&tp->tn_rwlock);
 	rw_exit(&parent->tn_rwlock);
-	vnevent_remove(TNTOV(tp), dvp, nm);
+	vnevent_remove(TNTOV(tp));
 	tmpnode_rele(tp);
 
 	TRACE_3(TR_FAC_TMPFS, TR_TMPFS_REMOVE,
@@ -1097,9 +1093,6 @@ tmp_link(struct vnode *dvp, struct vnode *srcvp, char *tnm, struct cred *cred)
 	error = tdirenter(tm, parent, tnm, DE_LINK, (struct tmpnode *)NULL,
 		from, NULL, (struct tmpnode **)NULL, cred);
 	rw_exit(&parent->tn_rwlock);
-	if (error == 0) {
-		vnevent_link(srcvp);
-	}
 	return (error);
 }
 
@@ -1190,15 +1183,6 @@ tmp_rename(
 		if (error == ESAME)
 			error = 0;
 		goto done;
-	}
-	vnevent_rename_src(TNTOV(fromtp), odvp, onm);
-
-	/*
-	 * Notify the target directory if not same as
-	 * source directory.
-	 */
-	if (ndvp != odvp) {
-		vnevent_rename_dest_dir(ndvp);
 	}
 
 	/*
@@ -1354,7 +1338,7 @@ done:
 done1:
 	rw_exit(&self->tn_rwlock);
 	rw_exit(&parent->tn_rwlock);
-	vnevent_rmdir(TNTOV(self), dvp, nm);
+	vnevent_rmdir(TNTOV(self));
 	tmpnode_rele(self);
 
 	return (error);

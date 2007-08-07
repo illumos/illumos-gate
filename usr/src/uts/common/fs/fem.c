@@ -1595,7 +1595,7 @@ vhead_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag,
 }
 
 static int
-vhead_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
+vhead_vnevent(vnode_t *vp, vnevent_t vnevent)
 {
 	femarg_t	farg;
 	struct fem_list	*femsp;
@@ -1607,7 +1607,7 @@ vhead_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
 		func = (int (*)()) (vp->v_op->vop_vnevent);
 		arg0 = vp;
 		fem_unlock(vp->v_femhead);
-		errc = (*func)(arg0, vnevent, dvp, cname);
+		errc = (*func)(arg0, vnevent);
 	} else {
 		fem_addref(femsp);
 		fem_unlock(vp->v_femhead);
@@ -1615,7 +1615,7 @@ vhead_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
 		farg.fa_fnode = femsp->feml_nodes + femsp->feml_tos;
 		vsop_find(&farg, &func, int, &arg0, vop_vnevent,
 			femop_vnevent);
-		errc = (*func)(arg0, vnevent, dvp, cname);
+		errc = (*func)(arg0, vnevent);
 		fem_release(femsp);
 	}
 	return (errc);
@@ -2583,7 +2583,7 @@ vnext_shrlock(femarg_t *vf, int cmd, struct shrlock *shr, int flag,
 }
 
 int
-vnext_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *cname)
+vnext_vnevent(femarg_t *vf, vnevent_t vnevent)
 {
 	int (*func)() = NULL;
 	void *arg0 = NULL;
@@ -2593,9 +2593,8 @@ vnext_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *cname)
 	vsop_find(vf, &func, int, &arg0, vop_vnevent, femop_vnevent);
 	ASSERT(func != NULL);
 	ASSERT(arg0 != NULL);
-	return ((*func)(arg0, vnevent, dvp, cname));
+	return ((*func)(arg0, vnevent));
 }
-
 
 int
 vfsnext_mount(fsemarg_t *vf, vnode_t *mvp, struct mounta *uap, cred_t *cr)

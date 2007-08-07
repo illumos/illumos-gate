@@ -732,7 +732,6 @@ udf_create(struct vnode *dvp,
 				(void) ud_itrunc(ip, 0, 0, cr);
 				rw_exit(&ip->i_rwlock);
 			}
-			vnevent_create(ITOV(ip));
 		}
 	}
 
@@ -820,10 +819,6 @@ udf_link(struct vnode *tdvp,
 	rw_exit(&tdp->i_rwlock);
 	ITIMES(sip);
 	ITIMES(tdp);
-
-	if (error == 0) {
-		vnevent_link(svp);
-	}
 
 	return (error);
 }
@@ -918,7 +913,6 @@ udf_rename(struct vnode *sdvp,
 		rw_exit(&tdp->i_rwlock);
 		goto errout;
 	}
-	vnevent_rename_src(ITOV(sip), sdvp, snm);
 	rw_exit(&tdp->i_rwlock);
 
 	rw_enter(&sdp->i_rwlock, RW_WRITER);

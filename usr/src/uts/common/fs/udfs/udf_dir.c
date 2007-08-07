@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -555,13 +556,9 @@ out:
 		 */
 		if (err == 0) {
 			if (tip) {
-				vnevent_rename_dest(ITOV(tip), ITOV(tdp),
-				    namep);
+				vnevent_rename_dest(ITOV(tip));
 			}
-
-			if (sdp != tdp) {
-				vnevent_rename_dest_dir(ITOV(tdp));
-			}
+			vnevent_rename_src(ITOV(sip));
 		}
 
 		/*
@@ -852,9 +849,9 @@ out_novfs:
 		 */
 		if (err == 0) {
 			if (op == DR_REMOVE) {
-				vnevent_remove(ITOV(ip), ITOV(dp), namep);
+				vnevent_remove(ITOV(ip));
 			} else if (op == DR_RMDIR) {
-				vnevent_rmdir(ITOV(ip), ITOV(dp), namep);
+				vnevent_rmdir(ITOV(ip));
 			}
 		}
 		VN_RELE(ITOV(ip));

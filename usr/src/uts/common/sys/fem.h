@@ -233,9 +233,7 @@ struct fem_head {
 			int flag, cred_t *cr);				\
 	int (*femop_shrlock)(femarg_t *vf, int cmd,			\
 			struct shrlock *shr, int flag, cred_t *cr);	\
-	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent,		\
-			vnode_t *dvp, char *cname)
-	/* NB: No ";" */
+	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent)	/* NB: No ";" */
 
 struct fem {
 	const char *name;
@@ -342,8 +340,7 @@ extern int vnext_getsecattr(femarg_t *vf, vsecattr_t *vsap, int flag,
 			cred_t *cr);
 extern int vnext_shrlock(femarg_t *vf, int cmd, struct shrlock *shr,
 			int flag, cred_t *cr);
-extern int vnext_vnevent(femarg_t *vf, vnevent_t vevent, vnode_t *dvp,
-			char *cname);
+extern int vnext_vnevent(femarg_t *vf, vnevent_t vevent);
 
 extern int vfsnext_mount(fsemarg_t *vf, vnode_t *mvp, struct mounta *uap,
 			cred_t *cr);

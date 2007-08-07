@@ -89,9 +89,6 @@ static vopstats_t *vs_templatep;
 /* Kmem cache handle for vsk_anchor_t allocations */
 kmem_cache_t *vsk_anchor_cache;
 
-/* file events cleanup routine */
-extern void free_fopdata(vnode_t *);
-
 /*
  * Root of AVL tree for the kstats associated with vopstats.  Lock protects
  * updates to vsktat_tree.
@@ -1991,10 +1988,10 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&vp->v_cv, NULL, CV_DEFAULT, NULL);
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
 	rw_init(&vp->v_mslock, NULL, RW_DEFAULT, NULL);
+
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
 	vp->v_path = NULL;
 	vp->v_mpssdata = NULL;
-	vp->v_fopdata = NULL;
 
 	return (0);
 }
@@ -2061,10 +2058,6 @@ vn_recycle(vnode_t *vp)
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
 		vp->v_path = NULL;
 	}
-
-	if (vp->v_fopdata != NULL) {
-		free_fopdata(vp);
-	}
 	vp->v_mpssdata = NULL;
 }
 
@@ -2117,7 +2110,6 @@ vn_alloc(int kmflag)
 
 	if (vp != NULL) {
 		vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
-		vp->v_fopdata = NULL;
 		vn_reinit(vp);
 	}
 
@@ -2145,10 +2137,6 @@ vn_free(vnode_t *vp)
 		mutex_destroy(&vp->v_femhead->femh_lock);
 		kmem_free(vp->v_femhead, sizeof (*(vp->v_femhead)));
 		vp->v_femhead = NULL;
-	}
-
-	if (vp->v_fopdata != NULL) {
-		free_fopdata(vp);
 	}
 	vp->v_mpssdata = NULL;
 	kmem_cache_free(vn_cache, vp);
@@ -2212,79 +2200,43 @@ vnevent_support(vnode_t *vp)
 	if (vp == NULL)
 		return (EINVAL);
 
-	return (VOP_VNEVENT(vp, VE_SUPPORT, NULL, NULL));
+	return (VOP_VNEVENT(vp, VE_SUPPORT));
 }
 
 void
-vnevent_rename_src(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rename_src(vnode_t *vp)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_SRC, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_RENAME_SRC);
 }
 
 void
-vnevent_rename_dest(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rename_dest(vnode_t *vp)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_DEST, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_RENAME_DEST);
 }
 
 void
-vnevent_rename_dest_dir(vnode_t *vp)
+vnevent_remove(vnode_t *vp)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_DEST_DIR, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_REMOVE);
 }
 
 void
-vnevent_remove(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rmdir(vnode_t *vp)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_REMOVE, dvp, name);
-}
-
-void
-vnevent_rmdir(vnode_t *vp, vnode_t *dvp, char *name)
-{
-	if (vp == NULL || vp->v_femhead == NULL) {
-		return;
-	}
-	(void) VOP_VNEVENT(vp, VE_RMDIR, dvp, name);
-}
-
-void
-vnevent_create(vnode_t *vp)
-{
-	if (vp == NULL || vp->v_femhead == NULL) {
-		return;
-	}
-	(void) VOP_VNEVENT(vp, VE_CREATE, NULL, NULL);
-}
-
-void
-vnevent_link(vnode_t *vp)
-{
-	if (vp == NULL || vp->v_femhead == NULL) {
-		return;
-	}
-	(void) VOP_VNEVENT(vp, VE_LINK, NULL, NULL);
-}
-
-void
-vnevent_mountedover(vnode_t *vp)
-{
-	if (vp == NULL || vp->v_femhead == NULL) {
-		return;
-	}
-	(void) VOP_VNEVENT(vp, VE_MOUNTEDOVER, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_RMDIR);
 }
 
 /*
@@ -3606,11 +3558,11 @@ fop_shrlock(
 }
 
 int
-fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm)
+fop_vnevent(vnode_t *vp, vnevent_t vnevent)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent, dvp, fnm);
+	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent);
 	VOPSTATS_UPDATE(vp, vnevent);
 	return (err);
 }

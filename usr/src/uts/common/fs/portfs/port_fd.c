@@ -285,7 +285,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 			 * Remove any events that where already fired
 			 * for this fd and are still in the port queue.
 			 */
-			(void) port_remove_done_event(pkevp);
+			port_remove_done_event(pkevp);
 		} else {
 			mutex_exit(&pkevp->portkev_lock);
 		}

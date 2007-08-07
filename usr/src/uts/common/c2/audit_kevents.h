@@ -337,10 +337,9 @@ extern "C" {
 #define	AUE_PF_POLICY_FLIP	298	/* =as Flip IPsec policy */
 #define	AUE_PF_POLICY_FLUSH	299	/* =as Flush IPsec policy rules */
 #define	AUE_PF_POLICY_ALGS	300	/* =as Update IPsec algorithms */
-#define	AUE_PORTFS		301	/* =fa */
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		301
+#define	MAX_KEVENTS		300
 
 
 #ifdef __cplusplus
