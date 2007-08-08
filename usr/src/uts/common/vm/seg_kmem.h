@@ -78,7 +78,6 @@ extern void segkmem_free(vmem_t *, void *, size_t);
 extern void *boot_alloc(void *, size_t, uint_t);
 extern void boot_mapin(caddr_t addr, size_t size);
 extern void kernelheap_init(void *, void *, char *, void *, void *);
-extern void kernelheap_extend(void *, void *);
 extern void segkmem_gc(void);
 
 extern void *segkmem_zio_alloc(vmem_t *, size_t, int);

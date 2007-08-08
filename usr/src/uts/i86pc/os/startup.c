@@ -140,35 +140,50 @@ static void startup_kmem(void);
 static void startup_modules(void);
 static void startup_vm(void);
 static void startup_end(void);
+static void layout_kernel_va(void);
 
 /*
  * Declare these as initialized data so we can patch them.
  */
 #ifdef __i386
+
 /*
  * Due to virtual address space limitations running in 32 bit mode, restrict
- * the amount of physical memory configured to a max of PHYSMEM32 pages (16g).
+ * the amount of physical memory configured to a max of PHYSMEM pages (16g).
  *
  * If the physical max memory size of 64g were allowed to be configured, the
  * size of user virtual address space will be less than 1g. A limited user
  * address space greatly reduces the range of applications that can run.
  *
- * If more physical memory than PHYSMEM32 is required, users should preferably
- * run in 64 bit mode which has no virtual address space limitation issues.
+ * If more physical memory than PHYSMEM is required, users should preferably
+ * run in 64 bit mode which has far looser virtual address space limitations.
  *
  * If 64 bit mode is not available (as in IA32) and/or more physical memory
- * than PHYSMEM32 is required in 32 bit mode, physmem can be set to the desired
+ * than PHYSMEM is required in 32 bit mode, physmem can be set to the desired
  * value or to 0 (to configure all available memory) via eeprom(1M). kernelbase
  * should also be carefully tuned to balance out the need of the user
  * application while minimizing the risk of kernel heap exhaustion due to
  * kernelbase being set too high.
  */
-#define	PHYSMEM32	0x400000
+#define	PHYSMEM	0x400000
 
-pgcnt_t physmem = PHYSMEM32;
-#else
-pgcnt_t physmem = 0;	/* memory size in pages, patch if you want less */
-#endif
+#else /* __amd64 */
+
+/*
+ * For now we can handle memory with physical addresses up to about
+ * 64 Terabytes. This keeps the kernel above the VA hole, leaving roughly
+ * half the VA space for seg_kpm. When systems get bigger than 64TB this
+ * code will need revisiting. There is an implicit assumption that there
+ * are no *huge* holes in the physical address space too.
+ */
+#define	TERABYTE		(1ul << 40)
+#define	PHYSMEM_MAX64		mmu_btop(64 * TERABYTE)
+#define	PHYSMEM			PHYSMEM_MAX64
+#define	AMD64_VA_HOLE_END	0xFFFF800000000000ul
+
+#endif /* __amd64 */
+
+pgcnt_t physmem = PHYSMEM;
 pgcnt_t obp_pages;	/* Memory used by PROM for its text and data */
 
 char *kobj_file_buf;
@@ -190,7 +205,10 @@ uintptr_t hole_start, hole_end;
  */
 caddr_t kpm_vbase;
 size_t  kpm_size;
-static int kpm_desired = 0;		/* Do we want to try to use segkpm? */
+static int kpm_desired;
+#ifdef __amd64
+static uintptr_t segkpm_base = (uintptr_t)SEGKPM_BASE;
+#endif
 
 /*
  * Configuration parameters set at boot time.
@@ -377,11 +395,11 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  * 			|   page_t structures	|  valloc_base + valloc_sz
  * 			|   memsegs, memlists, 	|
  * 			|   page hash, etc.	|
- * 0xFFFFFF00.00000000  |-----------------------|- valloc_base
+ * 0xFFFFFF00.00000000  |-----------------------|- valloc_base (lower if > 1TB)
  *			|	 segkpm		|
  * 0xFFFFFE00.00000000  |-----------------------|
  *			|	Red Zone	|
- * 0xFFFFFD80.00000000  |-----------------------|- KERNELBASE
+ * 0xFFFFFD80.00000000  |-----------------------|- KERNELBASE (lower if > 1TB)
  *			|     User stack	|- User space memory
  * 			|			|
  * 			| shared objects, etc	|	(grows downwards)
@@ -458,13 +476,10 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
 /* real-time-clock initialization parameters */
 extern time_t process_rtc_config_file(void);
 
-char		*final_kernelheap;
-char		*boot_kernelheap;
 uintptr_t	kernelbase;
 uintptr_t	postbootkernelbase;	/* not set till boot loader is gone */
 uintptr_t	eprom_kernelbase;
 size_t		segmapsize;
-static uintptr_t segmap_reserved;
 uintptr_t	segmap_start;
 int		segmapfreelists;
 pgcnt_t		npages;
@@ -610,12 +625,8 @@ startup(void)
 {
 	extern void startup_bios_disk(void);
 	extern void startup_pci_bios(void);
-	/*
-	 * Make sure that nobody tries to use sekpm until we have
-	 * initialized it properly.
-	 */
 #if defined(__amd64)
-	kpm_desired = kpm_enable;
+	kpm_desired = 1;
 #endif
 	kpm_enable = 0;
 
@@ -623,10 +634,10 @@ startup(void)
 	startup_init();
 	startup_memlist();
 	startup_kmem();
+	startup_vm();
 	startup_pci_bios();
 	startup_modules();
 	startup_bios_disk();
-	startup_vm();
 	startup_end();
 	progressbar_start();
 }
@@ -943,9 +954,8 @@ startup_memlist(void)
 	PRM_DEBUG(obp_pages);
 
 	/*
-	 * If physmem is patched to be non-zero, use it instead of
-	 * the computed value unless it is larger than the real
-	 * amount of memory on hand.
+	 * If physmem is patched to be non-zero, use it instead of the computed
+	 * value unless it is larger than the actual amount of memory on hand.
 	 */
 	if (physmem == 0 || physmem > npages) {
 		physmem = npages;
@@ -1013,11 +1023,34 @@ startup_memlist(void)
 #if defined(__amd64)
 	valloc_sz = ROUND_UP_LPAGE(valloc_sz);
 	valloc_base = VALLOC_BASE;
+
+	/*
+	 * The default values of VALLOC_BASE and SEGKPM_BASE should work
+	 * for values of physmax up to 1 Terabyte. They need adjusting when
+	 * memory is at addresses above 1 TB.
+	 */
+	if (physmax + 1 > mmu_btop(TERABYTE)) {
+		uint64_t kpm_resv_amount = mmu_ptob(physmax + 1);
+
+		/* Round to largest possible pagesize for now */
+		kpm_resv_amount = P2ROUNDUP(kpm_resv_amount, ONE_GIG);
+
+		segkpm_base = -(2 * kpm_resv_amount); /* down from top VA */
+
+		/* make sure we leave some space for user apps above hole */
+		segkpm_base = MAX(segkpm_base, AMD64_VA_HOLE_END + TERABYTE);
+		if (segkpm_base > SEGKPM_BASE)
+			segkpm_base = SEGKPM_BASE;
+		PRM_DEBUG(segkpm_base);
+
+		valloc_base = segkpm_base + kpm_resv_amount;
+		PRM_DEBUG(valloc_base);
+	}
 #else	/* __i386 */
 	valloc_base = (uintptr_t)(MISC_VA_BASE - valloc_sz);
 	valloc_base = P2ALIGN(valloc_base, mmu.level_size[1]);
-#endif	/* __i386 */
 	PRM_DEBUG(valloc_base);
+#endif	/* __i386 */
 
 	/*
 	 * do all the initial allocations
@@ -1102,7 +1135,7 @@ startup_kmem(void)
 	if (eprom_kernelbase && eprom_kernelbase != KERNELBASE)
 		cmn_err(CE_NOTE, "!kernelbase cannot be changed on 64-bit "
 		    "systems.");
-	kernelbase = (uintptr_t)KERNELBASE;
+	kernelbase = segkpm_base - KERNEL_REDZONE_SIZE;
 	core_base = (uintptr_t)COREHEAP_BASE;
 	core_size = (size_t)MISC_VA_BASE - COREHEAP_BASE;
 #else	/* __i386 */
@@ -1135,44 +1168,12 @@ startup_kmem(void)
 	PRM_DEBUG(core_size);
 	PRM_DEBUG(kernelbase);
 
-	/*
-	 * At this point, we can only use a portion of the kernelheap that
-	 * will be available after we boot.  32-bit systems have this
-	 * limitation.
-	 *
-	 * On 32-bit systems we have to leave room to place segmap below
-	 * the heap.  We don't yet know how large segmap will be, so we
-	 * have to be very conservative.
-	 *
-	 * On 64 bit systems there should be LOTS of room so just use
-	 * the next 4Gig below core_base.
-	 */
-#if defined(__amd64)
-
-	boot_kernelheap = (caddr_t)core_base  - FOURGB;
-	segmap_reserved = 0;
-
-#else	/* __i386 */
-
+#if defined(__i386)
 	segkp_fromheap = 1;
-	segmap_reserved = ROUND_UP_LPAGE(MAX(segmapsize, SEGMAPMAX));
-	boot_kernelheap =
-	    (caddr_t)ROUND_UP_LPAGE(kernelbase) + segmap_reserved;
-
 #endif	/* __i386 */
-	PRM_DEBUG(boot_kernelheap);
+
 	ekernelheap = (char *)core_base;
 	PRM_DEBUG(ekernelheap);
-	kernelheap = boot_kernelheap;
-
-	/*
-	 * If segmap is too large we can push the bottom of the kernel heap
-	 * higher than the base.  Or worse, it could exceed the top of the
-	 * VA space entirely, causing it to wrap around.
-	 */
-	if (kernelheap >= ekernelheap || (uintptr_t)kernelheap < kernelbase)
-		panic("too little memory available for kernelheap,"
-			    " use a different kernelbase");
 
 	/*
 	 * Now that we know the real value of kernelbase,
@@ -1185,23 +1186,33 @@ startup_kmem(void)
 	 *	just be declared as variables there?
 	 */
 
-#if defined(__amd64)
-	ASSERT(_kernelbase == KERNELBASE);
-	ASSERT(_userlimit == USERLIMIT);
-#else
 	*(uintptr_t *)&_kernelbase = kernelbase;
 	*(uintptr_t *)&_userlimit = kernelbase;
+#if !defined(__amd64)
 	*(uintptr_t *)&_userlimit32 = _userlimit;
 #endif
 	PRM_DEBUG(_kernelbase);
 	PRM_DEBUG(_userlimit);
 	PRM_DEBUG(_userlimit32);
 
+	layout_kernel_va();
+
+#if defined(__i386)
+	/*
+	 * If segmap is too large we can push the bottom of the kernel heap
+	 * higher than the base.  Or worse, it could exceed the top of the
+	 * VA space entirely, causing it to wrap around.
+	 */
+	if (kernelheap >= ekernelheap || (uintptr_t)kernelheap < kernelbase)
+		panic("too little address space available for kernelheap,"
+		    " use eeprom for lower kernelbase or smaller segmapsize");
+#endif	/* __i386 */
+
 	/*
 	 * Initialize the kernel heap. Note 3rd argument must be > 1st.
 	 */
-	kernelheap_init(boot_kernelheap, ekernelheap,
-	    boot_kernelheap + MMU_PAGESIZE,
+	kernelheap_init(kernelheap, ekernelheap,
+	    kernelheap + MMU_PAGESIZE,
 	    (void *)core_base, (void *)(core_base + core_size));
 
 	/*
@@ -1229,24 +1240,9 @@ startup_kmem(void)
 	 * than the available memory.
 	 */
 	if (orig_npages) {
-#ifdef __i386
-		/*
-		 * use npages for physmem in case it has been temporarily
-		 * modified via /etc/system in kmem_init/mod_read_system_file.
-		 */
-		if (npages == PHYSMEM32) {
-			cmn_err(CE_WARN, "!Due to 32-bit virtual"
-			    " address space limitations, limiting"
-			    " physmem to 0x%lx of 0x%lx available pages",
-			    npages, orig_npages);
-		} else {
-			cmn_err(CE_WARN, "!limiting physmem to 0x%lx of"
-			    " 0x%lx available pages", npages, orig_npages);
-		}
-#else
-		cmn_err(CE_WARN, "!limiting physmem to 0x%lx of"
-		    " 0x%lx available pages", npages, orig_npages);
-#endif
+		cmn_err(CE_WARN, "!%slimiting physmem to 0x%lx of 0x%lx pages",
+		    (npages == PHYSMEM ? "Due to virtual address space " : ""),
+		    npages, orig_npages);
 	}
 #if defined(__i386)
 	if (eprom_kernelbase && (eprom_kernelbase != kernelbase))
@@ -1307,11 +1303,6 @@ startup_modules(void)
 	 * maxmem is the amount of physical memory we're playing with.
 	 */
 	maxmem = physmem;
-
-	/*
-	 * Initialize the hat layer.
-	 */
-	hat_init();
 
 	/*
 	 * Initialize segment management stuff.
@@ -1452,18 +1443,12 @@ protect_boot_range(uintptr_t low, uintptr_t high, int setaside)
 }
 
 /*
- * Finish initializing the VM system, now that we are no longer
- * relying on the boot time memory allocators.
+ *
  */
 static void
-startup_vm(void)
+layout_kernel_va(void)
 {
-	struct segmap_crargs a;
-
-	extern int use_brk_lpg, use_stk_lpg;
-
-	PRM_POINT("startup_vm() starting...");
-
+	PRM_POINT("layout_kernel_va() starting...");
 	/*
 	 * Establish the final size of the kernel's heap, size of segmap,
 	 * segkp, etc.
@@ -1471,20 +1456,10 @@ startup_vm(void)
 
 #if defined(__amd64)
 
-	/*
-	 * Check if there is enough virtual address space in KPM region to
-	 * map physmax.
-	 */
-	kpm_vbase = (caddr_t)(uintptr_t)SEGKPM_BASE;
-	kpm_size = 0;
-	if (kpm_desired) {
-		kpm_size = ROUND_UP_LPAGE(mmu_ptob(physmax + 1));
-		if ((uintptr_t)kpm_vbase + kpm_size > (uintptr_t)VALLOC_BASE) {
-			kpm_size = 0;
-			kpm_desired = 0;
-		}
-	}
-
+	kpm_vbase = (caddr_t)segkpm_base;
+	kpm_size = ROUND_UP_LPAGE(mmu_ptob(physmax + 1));
+	if ((uintptr_t)kpm_vbase + kpm_size > (uintptr_t)valloc_base)
+		panic("not enough room for kpm!");
 	PRM_DEBUG(kpm_size);
 	PRM_DEBUG(kpm_vbase);
 
@@ -1512,35 +1487,28 @@ startup_vm(void)
 	PRM_DEBUG(segkp_base);
 	PRM_DEBUG(segkpsize);
 
+	/*
+	 * segzio is used for ZFS cached data. It uses a distinct VA
+	 * segment (from kernel heap) so that we can easily tell not to
+	 * include it in kernel crash dumps on 64 bit kernels. The trick is
+	 * to give it lots of VA, but not constrain the kernel heap.
+	 * We scale the size of segzio linearly with physmem up to
+	 * SEGZIOMAXSIZE. Above that amount it scales at 50% of physmem.
+	 */
 	segzio_base = segkp_base + mmu_ptob(segkpsize);
 	if (segzio_fromheap) {
 		segziosize = 0;
 	} else {
-		size_t size;
-		size_t physmem_b = mmu_ptob(physmem);
+		size_t physmem_size = mmu_ptob(physmem);
+		size_t size = (segziosize == 0) ?
+		    physmem_size : mmu_ptob(segziosize);
 
-		/* size is in bytes, segziosize is in pages */
-		if (segziosize == 0) {
-			size = physmem_b;
-		} else {
-			size = mmu_ptob(segziosize);
-		}
-
-		if (size < SEGZIOMINSIZE) {
+		if (size < SEGZIOMINSIZE)
 			size = SEGZIOMINSIZE;
-		} else if (size > SEGZIOMAXSIZE) {
+		if (size > SEGZIOMAXSIZE) {
 			size = SEGZIOMAXSIZE;
-			/*
-			 * SEGZIOMAXSIZE is capped at 512gb so that segzio
-			 * doesn't consume all of KVA.  However, if we have a
-			 * system that has more thant 512gb of physical memory,
-			 * we can actually consume about half of the difference
-			 * between 512gb and the rest of the available physical
-			 * memory.
-			 */
-			if (physmem_b > SEGZIOMAXSIZE) {
-				size += (physmem_b - SEGZIOMAXSIZE) / 2;
-			}
+			if (physmem_size > size)
+				size += (physmem_size - size) / 2;
 		}
 		segziosize = mmu_btop(ROUND_UP_LPAGE(size));
 	}
@@ -1559,7 +1527,6 @@ startup_vm(void)
 	segmap_start = ROUND_UP_LPAGE(kernelbase);
 #endif /* __i386 */
 	PRM_DEBUG(segmap_start);
-	ASSERT((caddr_t)segmap_start < boot_kernelheap);
 
 	/*
 	 * Users can change segmapsize through eeprom or /etc/system.
@@ -1571,11 +1538,6 @@ startup_vm(void)
 	segmapsize = MAX(ROUND_UP_LPAGE(segmapsize), SEGMAPDEFAULT);
 
 #if defined(__i386)
-	if (segmapsize > segmap_reserved) {
-		cmn_err(CE_NOTE, "!segmapsize may not be set > 0x%lx in "
-		    "/etc/system.  Use eeprom.", (long)SEGMAPMAX);
-		segmapsize = segmap_reserved;
-	}
 	/*
 	 * 32-bit systems don't have segkpm or segkp, so segmap appears at
 	 * the bottom of the kernel's address range.  Set aside space for a
@@ -1587,8 +1549,28 @@ startup_vm(void)
 
 	PRM_DEBUG(segmap_start);
 	PRM_DEBUG(segmapsize);
-	final_kernelheap = (caddr_t)ROUND_UP_LPAGE(segmap_start + segmapsize);
-	PRM_DEBUG(final_kernelheap);
+	kernelheap = (caddr_t)ROUND_UP_LPAGE(segmap_start + segmapsize);
+	PRM_DEBUG(kernelheap);
+	PRM_POINT("layout_kernel_va() done...");
+}
+
+/*
+ * Finish initializing the VM system, now that we are no longer
+ * relying on the boot time memory allocators.
+ */
+static void
+startup_vm(void)
+{
+	struct segmap_crargs a;
+
+	extern int use_brk_lpg, use_stk_lpg;
+
+	PRM_POINT("startup_vm() starting...");
+
+	/*
+	 * Initialize the hat layer.
+	 */
+	hat_init();
 
 	/*
 	 * Do final allocations of HAT data structures that need to
@@ -1658,18 +1640,6 @@ startup_vm(void)
 	 * Mangle the brand string etc.
 	 */
 	cpuid_pass3(CPU);
-
-	/*
-	 * Now that we can use memory outside the top 4GB (on 64-bit
-	 * systems) and we know the size of segmap, we can set the final
-	 * size of the kernel's heap.
-	 */
-	if (final_kernelheap < boot_kernelheap) {
-		PRM_POINT("kernelheap_extend()");
-		PRM_DEBUG(boot_kernelheap);
-		PRM_DEBUG(final_kernelheap);
-		kernelheap_extend(final_kernelheap, boot_kernelheap);
-	}
 
 #if defined(__amd64)
 
@@ -1890,7 +1860,7 @@ startup_end(void)
 	sti();
 
 	(void) add_avsoftintr((void *)&softlevel1_hdl, 1, softlevel1,
-		"softlevel1", NULL, NULL); /* XXX to be moved later */
+	    "softlevel1", NULL, NULL); /* XXX to be moved later */
 
 	PRM_POINT("startup_end() done");
 }
@@ -2180,13 +2150,8 @@ kvm_init(void)
 	(void) seg_attach(&kas, (caddr_t)valloc_base, valloc_sz, &kvalloc);
 	(void) segkmem_create(&kvalloc);
 
-	/*
-	 * We're about to map out /boot.  This is the beginning of the
-	 * system resource management transition. We can no longer
-	 * call into /boot for I/O or memory allocations.
-	 */
-	(void) seg_attach(&kas, final_kernelheap,
-	    ekernelheap - final_kernelheap, &kvseg);
+	(void) seg_attach(&kas, kernelheap,
+	    ekernelheap - kernelheap, &kvseg);
 	(void) segkmem_create(&kvseg);
 
 	if (core_size > 0) {
@@ -2274,12 +2239,11 @@ setup_mtrr(void)
 		vcnt = MAX_MTRRVAR;
 
 	for (i = 0, ecx = REG_MTRRPHYSBASE0, mtrrphys = mtrrphys_arr;
-		i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
+	    i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
 		mtrrphys->mtrrphys_base = rdmsr(ecx);
 		mtrrphys->mtrrphys_mask = rdmsr(ecx + 1);
-		if ((x86_feature & X86_PAT) && enable_relaxed_mtrr) {
+		if ((x86_feature & X86_PAT) && enable_relaxed_mtrr)
 			mtrrphys->mtrrphys_mask &= ~MTRRPHYSMASK_V;
-		}
 	}
 	if (x86_feature & X86_PAT) {
 		if (enable_relaxed_mtrr)
@@ -2366,42 +2330,40 @@ get_system_configuration(void)
 	char	prop[32];
 	u_longlong_t nodes_ll, cpus_pernode_ll, lvalue;
 
-	if (((BOP_GETPROPLEN(bootops, "nodes") > sizeof (prop)) ||
-		(BOP_GETPROP(bootops, "nodes", prop) < 0) 	||
-		(kobj_getvalue(prop, &nodes_ll) == -1) ||
-		(nodes_ll > MAXNODES))			   ||
-	    ((BOP_GETPROPLEN(bootops, "cpus_pernode") > sizeof (prop)) ||
-		(BOP_GETPROP(bootops, "cpus_pernode", prop) < 0) ||
-		(kobj_getvalue(prop, &cpus_pernode_ll) == -1))) {
-
+	if (BOP_GETPROPLEN(bootops, "nodes") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "nodes", prop) < 0 ||
+	    kobj_getvalue(prop, &nodes_ll) == -1 ||
+	    nodes_ll > MAXNODES ||
+	    BOP_GETPROPLEN(bootops, "cpus_pernode") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "cpus_pernode", prop) < 0 ||
+	    kobj_getvalue(prop, &cpus_pernode_ll) == -1) {
 		system_hardware.hd_nodes = 1;
 		system_hardware.hd_cpus_per_node = 0;
 	} else {
 		system_hardware.hd_nodes = (int)nodes_ll;
 		system_hardware.hd_cpus_per_node = (int)cpus_pernode_ll;
 	}
-	if ((BOP_GETPROPLEN(bootops, "kernelbase") > sizeof (prop)) ||
-		(BOP_GETPROP(bootops, "kernelbase", prop) < 0) 	||
-		(kobj_getvalue(prop, &lvalue) == -1))
-			eprom_kernelbase = NULL;
+
+	if (BOP_GETPROPLEN(bootops, "kernelbase") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "kernelbase", prop) < 0 ||
+	    kobj_getvalue(prop, &lvalue) == -1)
+		eprom_kernelbase = NULL;
 	else
-			eprom_kernelbase = (uintptr_t)lvalue;
+		eprom_kernelbase = (uintptr_t)lvalue;
 
-	if ((BOP_GETPROPLEN(bootops, "segmapsize") > sizeof (prop)) ||
-	    (BOP_GETPROP(bootops, "segmapsize", prop) < 0) ||
-	    (kobj_getvalue(prop, &lvalue) == -1)) {
+	if (BOP_GETPROPLEN(bootops, "segmapsize") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "segmapsize", prop) < 0 ||
+	    kobj_getvalue(prop, &lvalue) == -1)
 		segmapsize = SEGMAPDEFAULT;
-	} else {
+	else
 		segmapsize = (uintptr_t)lvalue;
-	}
 
-	if ((BOP_GETPROPLEN(bootops, "segmapfreelists") > sizeof (prop)) ||
-	    (BOP_GETPROP(bootops, "segmapfreelists", prop) < 0) ||
-	    (kobj_getvalue(prop, &lvalue) == -1)) {
+	if (BOP_GETPROPLEN(bootops, "segmapfreelists") > sizeof (prop) ||
+	    BOP_GETPROP(bootops, "segmapfreelists", prop) < 0 ||
+	    kobj_getvalue(prop, &lvalue) == -1)
 		segmapfreelists = 0;	/* use segmap driver default */
-	} else {
+	else
 		segmapfreelists = (int)lvalue;
-	}
 
 	/* physmem used to be here, but moved much earlier to fakebop.c */
 }

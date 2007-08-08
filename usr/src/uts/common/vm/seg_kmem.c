@@ -342,24 +342,6 @@ kernelheap_init(
 	    VM_SLEEP | VMC_POPULATOR);
 }
 
-/*
- * Grow kernel heap downward.
- */
-void
-kernelheap_extend(void *range_start, void *range_end)
-{
-	size_t len = (uintptr_t)range_end - (uintptr_t)range_start;
-
-	ASSERT(range_start < range_end && range_end == kernelheap);
-
-	if (vmem_add(heap_arena, range_start, len, VM_NOSLEEP) == NULL) {
-		cmn_err(CE_WARN, "Could not grow kernel heap below 0x%p",
-		    (void *)kernelheap);
-	} else {
-		kernelheap = range_start;
-	}
-}
-
 void
 boot_mapin(caddr_t addr, size_t size)
 {
@@ -449,14 +431,12 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 	    addr < seg->s_base || addr + size > seg->s_base + seg->s_size)
 		panic("segkmem_fault: bad args");
 
-	if (segkp_bitmap && seg == &kvseg) {
-		/*
-		 * If it is one of segkp pages, call segkp_fault.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_FAULT(hat, segkp, addr, size, type, rw));
-	}
+	/*
+	 * If it is one of segkp pages, call segkp_fault.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_FAULT(hat, segkp, addr, size, type, rw));
 
 	if (rw != S_READ && rw != S_WRITE && rw != S_OTHER)
 		return (FC_NOSUPPORT);
@@ -476,8 +456,8 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 				if (!hat_probe(kas.a_hat, addr)) {
 					addr -= PAGESIZE;
 					while (--pg >= 0) {
-						pp = page_find(vp,
-						(u_offset_t)(uintptr_t)addr);
+						pp = page_find(vp, (u_offset_t)
+						    (uintptr_t)addr);
 						if (pp)
 							page_unlock(pp);
 						addr -= PAGESIZE;
@@ -513,15 +493,12 @@ segkmem_setprot(struct seg *seg, caddr_t addr, size_t size, uint_t prot)
 	    addr < seg->s_base || addr + size > seg->s_base + seg->s_size)
 		panic("segkmem_setprot: bad args");
 
-	if (segkp_bitmap && seg == &kvseg) {
-
-		/*
-		 * If it is one of segkp pages, call segkp.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_SETPROT(segkp, addr, size, prot));
-	}
+	/*
+	 * If it is one of segkp pages, call segkp.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_SETPROT(segkp, addr, size, prot));
 
 	if (prot == 0)
 		hat_unload(kas.a_hat, addr, size, HAT_UNLOAD);
@@ -543,15 +520,13 @@ segkmem_checkprot(struct seg *seg, caddr_t addr, size_t size, uint_t prot)
 	if (seg->s_as != &kas)
 		segkmem_badop();
 
-	if (segkp_bitmap && seg == &kvseg) {
+	/*
+	 * If it is one of segkp pages, call into segkp.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_CHECKPROT(segkp, addr, size, prot));
 
-		/*
-		 * If it is one of segkp pages, call into segkp.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_CHECKPROT(segkp, addr, size, prot));
-	}
 	segkmem_badop();
 	return (0);
 }
@@ -569,15 +544,13 @@ segkmem_kluster(struct seg *seg, caddr_t addr, ssize_t delta)
 	if (seg->s_as != &kas)
 		segkmem_badop();
 
-	if (segkp_bitmap && seg == &kvseg) {
+	/*
+	 * If it is one of segkp pages, call into segkp.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_KLUSTER(segkp, addr, delta));
 
-		/*
-		 * If it is one of segkp pages, call into segkp.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_KLUSTER(segkp, addr, delta));
-	}
 	segkmem_badop();
 	return (0);
 }
@@ -692,15 +665,12 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 
 	ASSERT(ppp != NULL);
 
-	if (segkp_bitmap && seg == &kvseg) {
-		/*
-		 * If it is one of segkp pages, call into segkp.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_PAGELOCK(segkp, addr, len, ppp,
-						type, rw));
-	}
+	/*
+	 * If it is one of segkp pages, call into segkp.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_PAGELOCK(segkp, addr, len, ppp, type, rw));
 
 	if (type == L_PAGERECLAIM)
 		return (ENOTSUP);
@@ -758,15 +728,13 @@ segkmem_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp)
 	if (seg->s_as != &kas)
 		segkmem_badop();
 
-	if (segkp_bitmap && seg == &kvseg) {
+	/*
+	 * If it is one of segkp pages, call into segkp.
+	 */
+	if (segkp_bitmap && seg == &kvseg &&
+	    BT_TEST(segkp_bitmap, btop((uintptr_t)(addr - seg->s_base))))
+		return (SEGOP_GETMEMID(segkp, addr, memidp));
 
-		/*
-		 * If it is one of segkp pages, call into segkp.
-		 */
-		if (BT_TEST(segkp_bitmap,
-			btop((uintptr_t)(addr - seg->s_base))))
-			return (SEGOP_GETMEMID(segkp, addr, memidp));
-	}
 	segkmem_badop();
 	return (0);
 }
@@ -1540,7 +1508,7 @@ segkmem_alloc_ppa(vmem_t *vmp, size_t size, int vmflag)
 
 	addr = vmem_xalloc(vmp, size, ppaquantum, 0, 0, NULL, NULL, vmflag);
 	if (addr != NULL && segkmem_xalloc(vmp, addr, size, vmflag, 0,
-		segkmem_page_create, NULL) == NULL) {
+	    segkmem_page_create, NULL) == NULL) {
 		vmem_xfree(vmp, addr, size);
 		addr = NULL;
 	}

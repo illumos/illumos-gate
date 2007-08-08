@@ -546,13 +546,6 @@ param_calc(int platform_max_nprocs)
 		physmem = original_physmem;
 		cmn_err(CE_NOTE, "physmem limited to %ld", physmem);
 	}
-#else
-	if (physmem != original_physmem) {
-		cmn_err(CE_NOTE, "physmem cannot be modified to 0x%lx"
-		    " via /etc/system. Please use eeprom(1M) instead.",
-		    physmem);
-		physmem = original_physmem;
-	}
 #endif
 	if (maxusers == 0) {
 		pgcnt_t physmegs = physmem >> (20 - PAGESHIFT);
@@ -566,9 +559,8 @@ param_calc(int platform_max_nprocs)
 	}
 
 	if (ngroups_max > NGROUPS_MAX_DEFAULT)
-		cmn_err(CE_WARN,
-		"ngroups_max of %d > 16, NFS AUTH_SYS will not work properly",
-			ngroups_max);
+		cmn_err(CE_WARN, "ngroups_max of %d > %d, NFS AUTH_SYS will"
+		    " not work properly", ngroups_max, NGROUPS_MAX_DEFAULT);
 
 #ifdef DEBUG
 	/*
@@ -661,6 +653,14 @@ param_init(void)
 void
 param_check(void)
 {
+#if defined(__x86)
+	if (physmem != original_physmem) {
+		cmn_err(CE_NOTE, "physmem cannot be modified to 0x%lx"
+		    " via /etc/system. Please use eeprom(1M) instead.",
+		    physmem);
+		physmem = original_physmem;
+	}
+#endif
 	if (ngroups_max < NGROUPS_UMIN || ngroups_max > NGROUPS_UMAX)
 		ngroups_max = NGROUPS_MAX_DEFAULT;
 

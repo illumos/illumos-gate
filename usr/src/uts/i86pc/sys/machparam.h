@@ -120,17 +120,15 @@ extern "C" {
  * KERNELBASE is the virtual address at which the kernel segments start in
  * all contexts.
  *
- * KERNELBASE is not fixed on 32-bit systems.  The value of KERNELBASE can
- * change with installed memory and the eprom variable 'eprom_kernelbase'.
- * This value is fixed on 64-bit systems.
+ * KERNELBASE is not fixed.  The value of KERNELBASE can change with
+ * installed memory or on 32 bit systems the eprom variable 'eprom_kernelbase'.
  *
- * common/conf/param.c requires a compile time defined value for KERNELBASE
- * which it saves in the variable _kernelbase.  If kernelbase is modifed on
- * a 32-bit system, _kernelbase will be updated with the new value in
- * i86pc/os/startup.c.
+ * common/conf/param.c requires a compile time defined value for KERNELBASE.
+ * This value is save in the variable _kernelbase.  _kernelbase may then be
+ * modified with to a different value in i86pc/os/startup.c.
  *
- * i86 and i86pc files use kernelbase instead of KERNELBASE, which is
- * initialized in i86pc/os/startup.c.
+ * Most code should be using kernelbase, which resolves to a reference to
+ * _kernelbase.
  */
 #define	KERNEL_TEXT_amd64	UINT64_C(0xfffffffffb800000)
 #define	KERNEL_TEXT_i386	ADDRESS_C(0xfe800000)
@@ -148,20 +146,19 @@ extern "C" {
 /*
  * Base of 'core' heap area, which is used for kernel and module text/data
  * that must be within a 2GB range to allow for rip-relative addressing.
- *
- * XX64: because vmx and boot cannot be trusted to stay in a 1GB playpen at
- * the bottom of the upper 4GB range, we need to restrict the core heap to
- * the top 1GB for now.
  */
 #define	COREHEAP_BASE	ADDRESS_C(0xffffffffc0000000)
 
 /*
- * Beginning of the segkpm window
+ * Beginning of the segkpm window. A lower value than this is used if
+ * physical addresses exceed 1TB. See i86pc/os/startup.c
  */
 #define	SEGKPM_BASE	ADDRESS_C(0xfffffe0000000000)
 
 /*
- * This is valloc_base, above seg_kpm, but below everything else
+ * This is valloc_base, above seg_kpm, but below everything else.
+ * A lower value than this may be used if SEGKPM_BASE is adjusted.
+ * See i86pc/os/startup.c
  */
 #define	VALLOC_BASE	ADDRESS_C(0xffffff0000000000)
 
