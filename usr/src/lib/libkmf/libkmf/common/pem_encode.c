@@ -292,13 +292,10 @@ PEM_DecodeBlock(unsigned char *t, const unsigned char *f, int n)
 		b = conv_ascii2bin(*(f++));
 		c = conv_ascii2bin(*(f++));
 		d = conv_ascii2bin(*(f++));
-		if ((a & 0x80) || (b & 0x80) ||
-			(c & 0x80) || (d & 0x80))
+		if ((a & 0x80) || (b & 0x80) ||	(c & 0x80) || (d & 0x80))
 			return (-1);
-		l = ((((unsigned long)a)<<18L)|
-			(((unsigned long)b)<<12L)|
-			(((unsigned long)c)<< 6L)|
-			(((unsigned long)d)));
+		l = ((((unsigned long)a)<<18L) | (((unsigned long)b)<<12L) |
+		    (((unsigned long)c)<< 6L) | (((unsigned long)d)));
 		*(t++) = (unsigned char)(l>>16L)&0xff;
 		*(t++) = (unsigned char)(l>> 8L)&0xff;
 		*(t++) = (unsigned char)(l)&0xff;
@@ -491,7 +488,7 @@ Pem2Der(unsigned char *in, int inlen,
 {
 	int kmf_rv = 0;
 	PEM_ENCODE_CTX ctx;
-	int i, k, bl = 0;
+	int i, j, k, bl = 0;
 	char buf[2048];
 	char *nameB;
 	unsigned char *dataB;
@@ -507,16 +504,18 @@ Pem2Der(unsigned char *in, int inlen,
 		 * get a line (ended at '\n'), which returns
 		 * number of bytes in the line
 		 */
-		i = get_line(in, buf);
+		i = get_line(in + total, buf);
 		if (i <= 0) {
 			kmf_rv = KMF_ERR_ENCODING;
 			goto err;
 		}
 
-		while ((i >= 0) && (buf[i] <= ' ')) i--;
-		buf[++i] = '\n';
-		buf[++i] = '\0';
-		total += i;
+		j = i;
+		while ((j >= 0) && (buf[j] <= ' ')) j--;
+		buf[++j] = '\n';
+		buf[++j] = '\0';
+
+		total += i + 1;
 
 		if (strncmp(buf, "-----BEGIN ", 11) == 0) {
 			i = strlen(&(buf[11]));
@@ -549,15 +548,16 @@ Pem2Der(unsigned char *in, int inlen,
 
 		if (i <= 0) break;
 
-		while ((i >= 0) && (buf[i] <= ' '))
-			i--;
+		j = i;
+		while ((j >= 0) && (buf[j] <= ' '))
+			j--;
 
-		buf[++i] = '\n';
-		buf[++i] = '\0';
-		total += i;
+		buf[++j] = '\n';
+		buf[++j] = '\0';
+		total += i + 1;
 
 		if (buf[0] == '\n') break;
-		if ((dataB = realloc(dataB, bl+i+9)) == NULL) {
+		if ((dataB = realloc(dataB, bl+j+9)) == NULL) {
 			kmf_rv = KMF_ERR_MEMORY;
 			goto err;
 		}
@@ -566,22 +566,22 @@ Pem2Der(unsigned char *in, int inlen,
 			break;
 		}
 
-		(void) memcpy(&(dataB[bl]), buf, i);
-		dataB[bl+i] = '\0';
-		bl += i;
+		(void) memcpy(&(dataB[bl]), buf, j);
+		dataB[bl+j] = '\0';
+		bl += j;
 	}
 
 	i = strlen(nameB);
 	if ((strncmp(buf, "-----END ", 9) != 0) ||
-		(strncmp(nameB, &(buf[9]), i) != 0) ||
-		(strncmp(&(buf[9+i]), "-----", 5) != 0)) {
+	    (strncmp(nameB, &(buf[9]), i) != 0) ||
+	    (strncmp(&(buf[9+i]), "-----", 5) != 0)) {
 		kmf_rv = KMF_ERR_ENCODING;
 		goto err;
 	}
 
 	PEM_DecodeInit(&ctx);
 	i = PEM_DecodeUpdate(&ctx,
-		(unsigned char *)dataB, &bl, (unsigned char *)dataB, bl);
+	    (unsigned char *)dataB, &bl, (unsigned char *)dataB, bl);
 
 	if (i < 0) {
 		kmf_rv = KMF_ERR_ENCODING;

@@ -213,7 +213,7 @@ static verbcmd	cmds[] = {
 
 	"import keystore=nss objtype=cert\n\t\t"
 		"infile=input-fn\n\t\t"
-		"nickname=cert-nickname\n\t\t"
+		"label=cert-label\n\t\t"
 		"[ trust=trust-value ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
@@ -423,10 +423,10 @@ usage(int idx)
 	/* Display this block only in command-line mode. */
 	(void) fprintf(stdout, gettext("Usage:\n"));
 	(void) fprintf(stdout, gettext("   %s -?\t(help and usage)\n"),
-		prog);
+	    prog);
 	(void) fprintf(stdout, gettext("   %s -f option_file\n"), prog);
 	(void) fprintf(stdout, gettext("   %s subcommand [options...]\n"),
-		prog);
+	    prog);
 	(void) fprintf(stdout, gettext("where subcommands may be:\n"));
 
 	/* Display only those verbs that match the current tool mode. */
@@ -434,11 +434,11 @@ usage(int idx)
 		for (i = 0; i < num_cmds; i++) {
 			/* Do NOT i18n/l10n. */
 			(void) fprintf(stdout, "   %-8s	- %s\n",
-				cmds[i].verb, cmds[i].summary);
+			    cmds[i].verb, cmds[i].summary);
 		}
 		(void) fprintf(stdout, gettext("\nFurther details on the "
-			"subcommands can be found by adding \'help\'.\n"
-			"Ex: pktool gencert help\n\n"));
+		    "subcommands can be found by adding \'help\'.\n"
+		    "Ex: pktool gencert help\n\n"));
 	} else {
 		(void) fprintf(stdout, "\t%s\n", cmds[idx].synopsis);
 	}
@@ -469,8 +469,8 @@ process_arg_file(char *argfile, char ***argv, int *argc)
 
 	if ((fp = fopen(argfile, "rF")) == NULL) {
 		(void) fprintf(stderr,
-			gettext("Cannot read argfile %s: %s\n"),
-			argfile, strerror(errno));
+		    gettext("Cannot read argfile %s: %s\n"),
+		    argfile, strerror(errno));
 		return (errno);
 	}
 
@@ -486,8 +486,7 @@ process_arg_file(char *argfile, char ***argv, int *argc)
 		if (!strlen(argline))
 			continue;
 
-		(*argv) = realloc((*argv),
-			(nargs + 1) * sizeof (char *));
+		(*argv) = realloc((*argv), (nargs + 1) * sizeof (char *));
 		if ((*argv) == NULL) {
 			perror("memory error");
 			(void) fclose(fp);
