@@ -251,6 +251,22 @@ spa_add(const char *name, const char *altroot)
 
 	spa = kmem_zalloc(sizeof (spa_t), KM_SLEEP);
 
+	rw_init(&spa->spa_traverse_lock, NULL, RW_DEFAULT, NULL);
+
+	mutex_init(&spa->spa_uberblock_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_async_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_config_cache_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_errlog_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&spa->spa_scrub_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
+
 	spa->spa_name = spa_strdup(name);
 	spa->spa_state = POOL_STATE_UNINITIALIZED;
 	spa->spa_freeze_txg = UINT64_MAX;
@@ -301,12 +317,19 @@ spa_remove(spa_t *spa)
 
 	rprw_destroy(&spa->spa_config_lock);
 
-	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
-	mutex_destroy(&spa->spa_errlist_lock);
-	mutex_destroy(&spa->spa_errlog_lock);
-	mutex_destroy(&spa->spa_scrub_lock);
-	mutex_destroy(&spa->spa_config_cache_lock);
+	rw_destroy(&spa->spa_traverse_lock);
+
+	cv_destroy(&spa->spa_async_cv);
+	cv_destroy(&spa->spa_scrub_cv);
+	cv_destroy(&spa->spa_scrub_io_cv);
+
+	mutex_destroy(&spa->spa_uberblock_lock);
 	mutex_destroy(&spa->spa_async_lock);
+	mutex_destroy(&spa->spa_config_cache_lock);
+	mutex_destroy(&spa->spa_scrub_lock);
+	mutex_destroy(&spa->spa_errlog_lock);
+	mutex_destroy(&spa->spa_errlist_lock);
+	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
 	mutex_destroy(&spa->spa_history_lock);
 	mutex_destroy(&spa->spa_props_lock);
 
@@ -1033,6 +1056,7 @@ void
 spa_init(int mode)
 {
 	mutex_init(&spa_namespace_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa_spare_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&spa_namespace_cv, NULL, CV_DEFAULT, NULL);
 
 	avl_create(&spa_namespace_avl, spa_name_compare, sizeof (spa_t),
@@ -1068,6 +1092,7 @@ spa_fini(void)
 
 	cv_destroy(&spa_namespace_cv);
 	mutex_destroy(&spa_namespace_lock);
+	mutex_destroy(&spa_spare_lock);
 }
 
 /*

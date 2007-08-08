@@ -812,9 +812,11 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	if (dump_opt['d'] < 3)
 		return;
 
+	mutex_init(&bpl.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
 	VERIFY(0 == bplist_open(&bpl, mos, object));
 	if (bplist_empty(&bpl)) {
 		bplist_close(&bpl);
+		mutex_destroy(&bpl.bpl_lock);
 		return;
 	}
 
@@ -832,6 +834,7 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 
 	if (dump_opt['d'] < 5) {
 		bplist_close(&bpl);
+		mutex_destroy(&bpl.bpl_lock);
 		return;
 	}
 
@@ -847,6 +850,7 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	}
 
 	bplist_close(&bpl);
+	mutex_destroy(&bpl.bpl_lock);
 }
 
 /*ARGSUSED*/

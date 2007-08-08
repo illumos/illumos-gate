@@ -628,6 +628,10 @@ out:
 	if (error) {
 		if (zfsvfs->z_os)
 			dmu_objset_close(zfsvfs->z_os);
+		mutex_destroy(&zfsvfs->z_znodes_lock);
+		list_destroy(&zfsvfs->z_all_znodes);
+		rw_destroy(&zfsvfs->z_unmount_lock);
+		rw_destroy(&zfsvfs->z_unmount_inactive_lock);
 		kmem_free(zfsvfs, sizeof (zfsvfs_t));
 	} else {
 		atomic_add_32(&zfs_active_fs_count, 1);
@@ -1226,8 +1230,13 @@ static void
 zfs_freevfs(vfs_t *vfsp)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
+	int i;
+
+	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
+		mutex_destroy(&zfsvfs->z_hold_mtx[i]);
 
 	mutex_destroy(&zfsvfs->z_znodes_lock);
+	list_destroy(&zfsvfs->z_all_znodes);
 	rw_destroy(&zfsvfs->z_unmount_lock);
 	rw_destroy(&zfsvfs->z_unmount_inactive_lock);
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));

@@ -223,7 +223,7 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 			if (pvd->vdev_path)
 				fm_payload_set(ereport,
 				    FM_EREPORT_PAYLOAD_ZFS_PARENT_PATH,
-				    DATA_TYPE_STRING, vd->vdev_path, NULL);
+				    DATA_TYPE_STRING, pvd->vdev_path, NULL);
 			if (pvd->vdev_devid)
 				fm_payload_set(ereport,
 				    FM_EREPORT_PAYLOAD_ZFS_PARENT_DEVID,
@@ -263,14 +263,11 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 		 */
 		if (zio->io_logical != NULL)
 			fm_payload_set(ereport,
-			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJSET,
-			    DATA_TYPE_UINT64,
-			    zio->io_logical->io_bookmark.zb_objset,
 			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJECT,
 			    DATA_TYPE_UINT64,
 			    zio->io_logical->io_bookmark.zb_object,
 			    FM_EREPORT_PAYLOAD_ZFS_ZIO_LEVEL,
-			    DATA_TYPE_INT32,
+			    DATA_TYPE_INT64,
 			    zio->io_logical->io_bookmark.zb_level,
 			    FM_EREPORT_PAYLOAD_ZFS_ZIO_BLKID,
 			    DATA_TYPE_UINT64,

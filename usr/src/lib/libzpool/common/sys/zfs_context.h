@@ -198,8 +198,9 @@ extern kthread_t *zk_thread_create(void (*func)(), void *arg);
  * Mutexes
  */
 typedef struct kmutex {
-	void	*m_owner;
-	mutex_t	m_lock;
+	void		*m_owner;
+	boolean_t	initialized;
+	mutex_t		m_lock;
 } kmutex_t;
 
 #define	MUTEX_DEFAULT	USYNC_THREAD
@@ -228,6 +229,7 @@ extern void *mutex_owner(kmutex_t *mp);
  */
 typedef struct krwlock {
 	void		*rw_owner;
+	boolean_t	initialized;
 	rwlock_t	rw_lock;
 } krwlock_t;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -208,6 +208,10 @@ mzap_open(objset_t *os, uint64_t obj, dmu_buf_t *db)
 	winner = dmu_buf_set_user(db, zap, &zap->zap_m.zap_phys, zap_evict);
 
 	if (winner != NULL) {
+		rw_exit(&zap->zap_rwlock);
+		rw_destroy(&zap->zap_rwlock);
+		if (!zap->zap_ismicro)
+			mutex_destroy(&zap->zap_f.zap_num_entries_mtx);
 		kmem_free(zap, sizeof (zap_t));
 		return (winner);
 	}
@@ -465,6 +469,8 @@ zap_evict(dmu_buf_t *db, void *vzap)
 
 	if (zap->zap_ismicro)
 		mze_destroy(zap);
+	else
+		mutex_destroy(&zap->zap_f.zap_num_entries_mtx);
 
 	kmem_free(zap, sizeof (zap_t));
 }

@@ -130,19 +130,6 @@ spa_activate(spa_t *spa)
 		    TASKQ_PREPOPULATE);
 	}
 
-	rw_init(&spa->spa_traverse_lock, NULL, RW_DEFAULT, NULL);
-
-	rprw_init(&spa->spa_config_lock);
-
-	mutex_init(&spa->spa_async_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_config_cache_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_errlog_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
-
 	list_create(&spa->spa_dirty_list, sizeof (vdev_t),
 	    offsetof(vdev_t, vdev_dirty_node));
 
@@ -174,8 +161,6 @@ spa_deactivate(spa_t *spa)
 	txg_list_destroy(&spa->spa_vdev_txg_list);
 
 	list_destroy(&spa->spa_dirty_list);
-
-	rw_destroy(&spa->spa_traverse_lock);
 
 	for (t = 0; t < ZIO_TYPES; t++) {
 		taskq_destroy(spa->spa_zio_issue_taskq[t]);

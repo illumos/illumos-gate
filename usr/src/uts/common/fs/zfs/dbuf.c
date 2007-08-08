@@ -1176,7 +1176,8 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	} else {
 		ASSERT(db->db_buf != NULL);
 		ASSERT(list_head(&dr->dt.di.dr_children) == NULL);
-		/* XXX - mutex and list destroy? */
+		mutex_destroy(&dr->dt.di.dr_mtx);
+		list_destroy(&dr->dt.di.dr_children);
 	}
 	kmem_free(dr, sizeof (dbuf_dirty_record_t));
 
@@ -2243,6 +2244,8 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 			    >> (db->db_level * epbs), >=, db->db_blkid);
 			arc_set_callback(db->db_buf, dbuf_do_evict, db);
 		}
+		mutex_destroy(&dr->dt.di.dr_mtx);
+		list_destroy(&dr->dt.di.dr_children);
 	}
 	kmem_free(dr, sizeof (dbuf_dirty_record_t));
 

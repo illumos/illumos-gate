@@ -124,6 +124,7 @@ zfs_znode_cache_destructor(void *buf, void *cdarg)
 	rw_destroy(&zp->z_name_lock);
 	mutex_destroy(&zp->z_acl_lock);
 	avl_destroy(&zp->z_range_avl);
+	mutex_destroy(&zp->z_range_lock);
 
 	ASSERT(zp->z_dbuf_held == 0);
 	ASSERT(ZTOV(zp)->v_count == 0);
@@ -304,6 +305,11 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		return (error);
 	ASSERT(zfsvfs->z_root != 0);
 
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_UNLINKED_SET, 8, 1,
+	    &zfsvfs->z_unlinkedobj);
+	if (error)
+		return (error);
+
 	/*
 	 * Initialize zget mutex's
 	 */
@@ -311,15 +317,17 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		mutex_init(&zfsvfs->z_hold_mtx[i], NULL, MUTEX_DEFAULT, NULL);
 
 	error = zfs_zget(zfsvfs, zfsvfs->z_root, zpp);
-	if (error)
+	if (error) {
+		/*
+		 * On error, we destroy the mutexes here since it's not
+		 * possible for the caller to determine if the mutexes were
+		 * initialized properly.
+		 */
+		for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
+			mutex_destroy(&zfsvfs->z_hold_mtx[i]);
 		return (error);
+	}
 	ASSERT3U((*zpp)->z_id, ==, zfsvfs->z_root);
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_UNLINKED_SET, 8, 1,
-	    &zfsvfs->z_unlinkedobj);
-	if (error)
-		return (error);
-
 	return (0);
 }
 

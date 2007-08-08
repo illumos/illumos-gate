@@ -100,20 +100,24 @@ void
 zmutex_init(kmutex_t *mp)
 {
 	mp->m_owner = NULL;
+	mp->initialized = B_TRUE;
 	(void) _mutex_init(&mp->m_lock, USYNC_THREAD, NULL);
 }
 
 void
 zmutex_destroy(kmutex_t *mp)
 {
+	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mp->m_owner == NULL);
 	(void) _mutex_destroy(&(mp)->m_lock);
 	mp->m_owner = (void *)-1UL;
+	mp->initialized = B_FALSE;
 }
 
 void
 mutex_enter(kmutex_t *mp)
 {
+	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mp->m_owner != (void *)-1UL);
 	ASSERT(mp->m_owner != curthread);
 	VERIFY(mutex_lock(&mp->m_lock) == 0);
@@ -124,6 +128,7 @@ mutex_enter(kmutex_t *mp)
 int
 mutex_tryenter(kmutex_t *mp)
 {
+	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mp->m_owner != (void *)-1UL);
 	if (0 == mutex_trylock(&mp->m_lock)) {
 		ASSERT(mp->m_owner == NULL);
@@ -137,6 +142,7 @@ mutex_tryenter(kmutex_t *mp)
 void
 mutex_exit(kmutex_t *mp)
 {
+	ASSERT(mp->initialized == B_TRUE);
 	ASSERT(mutex_owner(mp) == curthread);
 	mp->m_owner = NULL;
 	VERIFY(mutex_unlock(&mp->m_lock) == 0);
@@ -145,6 +151,7 @@ mutex_exit(kmutex_t *mp)
 void *
 mutex_owner(kmutex_t *mp)
 {
+	ASSERT(mp->initialized == B_TRUE);
 	return (mp->m_owner);
 }
 
@@ -159,6 +166,7 @@ rw_init(krwlock_t *rwlp, char *name, int type, void *arg)
 {
 	rwlock_init(&rwlp->rw_lock, USYNC_THREAD, NULL);
 	rwlp->rw_owner = NULL;
+	rwlp->initialized = B_TRUE;
 }
 
 void
@@ -166,12 +174,14 @@ rw_destroy(krwlock_t *rwlp)
 {
 	rwlock_destroy(&rwlp->rw_lock);
 	rwlp->rw_owner = (void *)-1UL;
+	rwlp->initialized = B_FALSE;
 }
 
 void
 rw_enter(krwlock_t *rwlp, krw_t rw)
 {
 	ASSERT(!RW_LOCK_HELD(rwlp));
+	ASSERT(rwlp->initialized == B_TRUE);
 	ASSERT(rwlp->rw_owner != (void *)-1UL);
 	ASSERT(rwlp->rw_owner != curthread);
 
@@ -186,6 +196,7 @@ rw_enter(krwlock_t *rwlp, krw_t rw)
 void
 rw_exit(krwlock_t *rwlp)
 {
+	ASSERT(rwlp->initialized == B_TRUE);
 	ASSERT(rwlp->rw_owner != (void *)-1UL);
 
 	rwlp->rw_owner = NULL;
@@ -197,6 +208,7 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 {
 	int rv;
 
+	ASSERT(rwlp->initialized == B_TRUE);
 	ASSERT(rwlp->rw_owner != (void *)-1UL);
 
 	if (rw == RW_READER)
@@ -216,6 +228,7 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 int
 rw_tryupgrade(krwlock_t *rwlp)
 {
+	ASSERT(rwlp->initialized == B_TRUE);
 	ASSERT(rwlp->rw_owner != (void *)-1UL);
 
 	return (0);

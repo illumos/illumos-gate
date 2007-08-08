@@ -584,6 +584,7 @@ hdr_cons(void *vbuf, void *unused, int kmflag)
 	bzero(buf, sizeof (arc_buf_hdr_t));
 	refcount_create(&buf->b_refcnt);
 	cv_init(&buf->b_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&buf->b_freeze_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
@@ -599,6 +600,7 @@ hdr_dest(void *vbuf, void *unused)
 
 	refcount_destroy(&buf->b_refcnt);
 	cv_destroy(&buf->b_cv);
+	mutex_destroy(&buf->b_freeze_lock);
 }
 
 /*

@@ -334,6 +334,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	if (pio != NULL)
 		zio->io_flags |= (pio->io_flags & ZIO_FLAG_METADATA);
 	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&zio->io_cv, NULL, CV_DEFAULT, NULL);
 	zio_push_transform(zio, data, size, size);
 
 	/*
@@ -761,6 +762,7 @@ zio_wait(zio_t *zio)
 
 	error = zio->io_error;
 	mutex_destroy(&zio->io_lock);
+	cv_destroy(&zio->io_cv);
 	kmem_cache_free(zio_cache, zio);
 
 	return (error);
@@ -954,6 +956,8 @@ zio_done(zio_t *zio)
 		cv_broadcast(&zio->io_cv);
 		mutex_exit(&zio->io_lock);
 	} else {
+		mutex_destroy(&zio->io_lock);
+		cv_destroy(&zio->io_cv);
 		kmem_cache_free(zio_cache, zio);
 	}
 }
