@@ -21,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Common targets for sun4v platform-implementation specific modules.
@@ -79,6 +79,10 @@ $(USR_MONTOYA_LIB_DIR):	$(USR_MONTOYA_DIR)
 
 $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
 	$(INS.slink3)
+
+$(USR_MONTOYA_SBIN_LINKS): $(USR_MONTOYA_SBIN_DIR)
+	$(RM) -r $@; 
+	$(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 #
 #	Include common targets.

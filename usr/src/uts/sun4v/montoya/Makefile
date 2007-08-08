@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/montoya/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,6 +71,8 @@ IMPLEMENTED_PLATFORM	= SUNW,Netra-CP3060
 install:	$(ROOT_MONTOYA_DIR) $(USR_MONTOYA_DIR) \
 		$(USR_MONTOYA_LIB_DIR) \
 		$(ROOT_MONTOYA_LIB_DIR) \
+		$(USR_MONTOYA_SBIN_DIR) \
+		$(USR_MONTOYA_SBIN_LINKS) \
 		.WAIT $(MONTOYA_KMODS)
 
 $(MONTOYA_KMODS):	FRC

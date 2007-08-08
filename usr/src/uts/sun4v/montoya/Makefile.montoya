@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/montoya/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +56,8 @@ USR_MONTOYA_INC_DIR	= $(USR_MONTOYA_DIR)/include
 USR_MONTOYA_LIB_DIR	= $(USR_MONTOYA_DIR)/lib
 USR_MONTOYA_ISYS_DIR	= $(USR_MONTOYA_INC_DIR)/sys
 
+USR_MONTOYA_SBIN_LINKS	= $(USR_MONTOYA_SBIN_DIR)/prtdiag
+USR_MONTOYA_SBIN_LINKS	+= $(USR_MONTOYA_SBIN_DIR)/trapstat
 
 MONTOYA_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/montoya/lint-libs/$(OBJS_DIR)
 
