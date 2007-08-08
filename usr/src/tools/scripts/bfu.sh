@@ -3415,19 +3415,22 @@ remove_eof_mobileip() {
 
 	# In case that did not work, do it manually.
 	if [[ -d $rootprefix/var/sadm/pkg/SUNWmipr ]]; then
-		rm "$rootprefix/etc/inet/mipagent.conf"*
-		rm "$rootprefix/etc/init.d/mipagent"
-		rm "$rootprefix/etc/rc0.d/K06mipagent"
-		rm "$rootprefix/etc/rc1.d/K06mipagent"
-		rm "$rootprefix/etc/rc2.d/K06mipagent"
-		rm "$rootprefix/etc/rc3.d/S80mipagent"
-		rm "$rootprefix/etc/rcS.d/K06mipagent"
-		rm "$rootprefix/etc/snmp/conf/mipagent"*
+		rm -f "$rootprefix/etc/inet/mipagent.conf-sample"
+		rm -f "$rootprefix/etc/inet/mipagent.conf.fa-sample"
+		rm -f "$rootprefix/etc/inet/mipagent.conf.ha-sample"
+		rm -f "$rootprefix/etc/init.d/mipagent"
+		rm -f "$rootprefix/etc/rc0.d/K06mipagent"
+		rm -f "$rootprefix/etc/rc1.d/K06mipagent"
+		rm -f "$rootprefix/etc/rc2.d/K06mipagent"
+		rm -f "$rootprefix/etc/rc3.d/S80mipagent"
+		rm -f "$rootprefix/etc/rcS.d/K06mipagent"
+		rm -f "$rootprefix/etc/snmp/conf/mipagent.acl"
+		rm -f "$rootprefix/etc/snmp/conf/mipagent.reg"
 	fi
 	if [[ -d $rootprefix/var/sadm/pkg/SUNWmipu ]]; then
-		rm "$rootprefix/usr/lib/inet/mipagent"
-		rm "$rootprefix/usr/sbin/mipagentconfig"
-		rm "$rootprefix/usr/sbin/mipagentstat"
+		rm -f "$rootprefix/usr/lib/inet/mipagent"
+		rm -f "$rootprefix/usr/sbin/mipagentconfig"
+		rm -f "$rootprefix/usr/sbin/mipagentstat"
 	fi
 	printf '\n'
 }
@@ -5145,7 +5148,7 @@ mondo_loop() {
 
 	cd $root || fail "Cannot cd $root"
 	rootprefix=${root%/}
-	pkgroot="-R $rootprefix"
+	pkgroot=${rootprefix:+-R $rootprefix}
 
 	if [ "$karch" = "i86pc" -a "$diskless" = "no" -a "$zone" = "global" ]
 	then
