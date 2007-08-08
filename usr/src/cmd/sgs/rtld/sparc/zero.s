@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,19 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright (c) 1999 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routine to zero out a section of memory (the tail end of the data segment
- * upto a page boundary).  First nibble off any bytes up to the first double
+ * up to a page boundary).  First nibble off any bytes up to the first double
  * aligned word, and then clear doubles until the byte count is zero.  Note,
  * this assumes the count specified has been rounded to end on a double word
  * boundary.
@@ -81,6 +80,5 @@ zero(caddr_t addr, size_t len)
 1:
 	retl			! Go home
 	nop
-
 	SET_SIZE(zero)
 #endif

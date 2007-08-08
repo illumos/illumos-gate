@@ -2365,15 +2365,17 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	const char	*reference = MSG_INTL(mid);
 
 	/*
-	 * If the symbol reference already exists indicate that a reference
-	 * also came from the command line.
+	 * As an optimization, determine whether we've already generated this
+	 * reference.  If the symbol doesn't already exist we'll create it.
+	 * Or if the symbol does exist from a different source, we'll resolve
+	 * the conflict.
 	 */
 	/* LINTED */
 	hash = (Word)elf_hash(name);
-	if (sdp = ld_sym_find(name, hash, &where, ofl)) {
-		if (sdp->sd_ref == REF_DYN_SEEN)
-			sdp->sd_ref = REF_DYN_NEED;
-		return (sdp);
+	if ((sdp = ld_sym_find(name, hash, &where, ofl)) != NULL) {
+		if ((sdp->sd_sym->st_shndx == SHN_UNDEF) &&
+		    (sdp->sd_file->ifl_name == reference))
+			return (sdp);
 	}
 
 	/*
@@ -2415,9 +2417,15 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	sym->st_shndx = SHN_UNDEF;
 
 	DBG_CALL(Dbg_syms_process(ofl->ofl_lml, ifl));
-	DBG_CALL(Dbg_syms_global(ofl->ofl_lml, 0, name));
-	sdp = ld_sym_enter(name, sym, hash, ifl, ofl, 0, SHN_UNDEF,
-	    0, 0, &where);
+	if (sdp == NULL) {
+		DBG_CALL(Dbg_syms_global(ofl->ofl_lml, 0, name));
+		if ((sdp = ld_sym_enter(name, sym, hash, ifl, ofl, 0, SHN_UNDEF,
+		    0, 0, &where)) == (Sym_desc *)S_ERROR)
+			return ((Sym_desc *)S_ERROR);
+	} else if (ld_sym_resolve(sdp, sym, ifl, ofl, 0,
+	    SHN_UNDEF, 0) == S_ERROR)
+		return ((Sym_desc *)S_ERROR);
+
 	sdp->sd_flags &= ~FLG_SY_CLEAN;
 	sdp->sd_flags |= FLG_SY_CMDREF;
 

@@ -100,6 +100,10 @@
 @ MSG_ERR_BADSYM6	"%s: %s: bad symbol entry: %s: section[%d] \
 			 size: %#llx: symbol (address %#llx, size %#llx) \
 			 lies outside of containing section\n"
+@ MSG_ERR_BADSYM7	"%s: %s: suspicious global symbol entry: %s: lies \
+			 within local symbol range (index < %lld)\n"
+@ MSG_ERR_BADSYM8	"%s: %s: suspicious local symbol entry: %s: lies \
+			 within global symbol range (index >= %lld)\n"
 
 @ MSG_ERR_RELBADSYMNDX	"%s: bad symbol reference %d: from relocation \
 			 entry: %d\n"

@@ -1420,13 +1420,15 @@ symbols_getxindex(SYMTBL_STATE * state)
  * entry:
  *	state - Symbol table state
  *	symndx - Index of symbol within the table
+ *	info - Value of st_info (indicates local/global range)
  *	symndx_disp - Index to display. This may not be the same
  *		as symndx if the display is relative to the logical
  *		combination of the SUNW_ldynsym/dynsym tables.
  *	sym - Symbol to display
  */
 static void
-output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
+output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
+    Sym *sym)
 {
 	/*
 	 * Symbol types for which we check that the specified
@@ -1602,13 +1604,42 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	    (sym->st_shndx == SHN_XINDEX)) && (tshdr != NULL)) {
 		Word v = sym->st_value;
 			if (state->ehdr->e_type != ET_REL)
-			v -= tshdr->sh_addr;
+				v -= tshdr->sh_addr;
 		if (((v + sym->st_size) > tshdr->sh_size)) {
 			(void) fprintf(stderr,
 			    MSG_INTL(MSG_ERR_BADSYM6), state->file,
 			    state->secname, demangle(symname, state->flags),
 			    EC_WORD(shndx), EC_XWORD(tshdr->sh_size),
 			    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
+		}
+	}
+
+	/*
+	 * A typical symbol table uses the sh_info field to indicate one greater
+	 * than the symbol table index of the last local symbol, STB_LOCAL.
+	 * Therefore, symbol indexes less than sh_info should have local
+	 * binding.  Symbol indexes greater than, or equal to sh_info, should
+	 * have global binding.  Note, we exclude UNDEF/NOTY symbols with zero
+	 * value and size, as these symbols may be the result of an mcs(1)
+	 * section deletion.
+	 */
+	if (info) {
+		uchar_t	bind = ELF_ST_BIND(sym->st_info);
+
+		if ((symndx < info) && (bind != STB_LOCAL)) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM7), state->file,
+			    state->secname, demangle(symname, state->flags),
+			    EC_XWORD(info));
+
+		} else if ((symndx >= info) && (bind == STB_LOCAL) &&
+		    ((sym->st_shndx != SHN_UNDEF) ||
+		    (ELF_ST_TYPE(sym->st_info) != STT_NOTYPE) ||
+		    (sym->st_size != 0) || (sym->st_value != 0))) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_BADSYM8), state->file,
+			    state->secname, demangle(symname, state->flags),
+			    EC_XWORD(info));
 		}
 	}
 
@@ -1654,7 +1685,7 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 		Elf_syms_table_title(0, ELF_DBG_ELFDUMP);
 
 		for (symcnt = 0; symcnt < state.symn; symcnt++)
-			output_symbol(&state, symcnt, symcnt,
+			output_symbol(&state, symcnt, shdr->sh_info, symcnt,
 			    state.sym + symcnt);
 	}
 }
@@ -1785,10 +1816,10 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 			if (*ndx >= ldynsym_cnt) {
 				Word sec_ndx = *ndx - ldynsym_cnt;
 
-				output_symbol(&dynsym_state, sec_ndx,
+				output_symbol(&dynsym_state, sec_ndx, 0,
 				    *ndx, dynsym_state.sym + sec_ndx);
 			} else {
-				output_symbol(&ldynsym_state, *ndx,
+				output_symbol(&ldynsym_state, *ndx, 0,
 				    *ndx, ldynsym_state.sym + *ndx);
 			}
 		}
