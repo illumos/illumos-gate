@@ -206,6 +206,10 @@ static	int sata_mode_select_page_8(sata_pkt_txlate_t *,
     struct mode_cache_scsi3 *, int, int *, int *, int *);
 static	int sata_mode_select_page_1c(sata_pkt_txlate_t *,
     struct mode_info_excpt_page *, int, int *, int *, int *);
+static	int sata_build_msense_page_30(sata_drive_info_t *, int, uint8_t *);
+static	int sata_mode_select_page_30(sata_pkt_txlate_t *,
+    struct mode_acoustic_management *, int, int *, int *, int *);
+
 static	int sata_build_lsense_page_0(sata_drive_info_t *, uint8_t *);
 static	int sata_build_lsense_page_10(sata_drive_info_t *, uint8_t *,
     sata_hba_inst_t *);
@@ -270,7 +274,7 @@ extern uchar_t	scsi_cdb_size[];
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,			/* Type of module */
-	"SATA Module v%I%"		/* module name */
+	"SATA Module v1.23"		/* module name */
 };
 
 
@@ -4510,6 +4514,11 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 			/* power condition */
 			len += sata_build_msense_page_1a(sdinfo, pc, buf+len);
 			break;
+
+		case MODEPAGE_ACOUSTIC_MANAG:
+			/* acoustic management */
+			len += sata_build_msense_page_30(sdinfo, pc, buf+len);
+			break;
 		case MODEPAGE_ALLPAGES:
 			/* all pages */
 			len += sata_build_msense_page_1(sdinfo, pc, buf+len);
@@ -4519,6 +4528,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 				len += sata_build_msense_page_1c(sdinfo, pc,
 				    buf+len);
 			}
+			len += sata_build_msense_page_30(sdinfo, pc, buf+len);
 			break;
 		default:
 		err:
@@ -4757,6 +4767,31 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 				}
 				break;
 
+			case MODEPAGE_ACOUSTIC_MANAG:
+				stat = sata_mode_select_page_30(spx,
+				    (struct mode_acoustic_management *)
+				    &buf[len], pllen, &pagelen, &rval, &dmod);
+				/*
+				 * The pagelen value indicates the number of
+				 * parameter bytes already processed.
+				 * The rval is the return value from
+				 * sata_tran_start().
+				 * The stat indicates the overall status of
+				 * the operation(s).
+				 */
+				if (stat != SATA_SUCCESS)
+					/*
+					 * Page processing did not succeed -
+					 * all error info is already set-up,
+					 * just return
+					 */
+					pllen = 0; /* this breaks the loop */
+				else {
+					len += pagelen;
+					pllen -= pagelen;
+				}
+
+				break;
 			default:
 				*scsipkt->pkt_scbp = STATUS_CHECK;
 				sense = sata_arq_sense(spx);
@@ -6784,6 +6819,74 @@ sata_build_msense_page_1c(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 }
 
 
+static int
+sata_build_msense_page_30(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
+{
+	struct mode_acoustic_management *page =
+	    (struct mode_acoustic_management *)buf;
+	sata_id_t *sata_id = &sdinfo->satadrv_id;
+
+	/*
+	 * Most of the fields are set to 0, being not supported and/or disabled
+	 */
+	bzero(buf, PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT);
+
+	switch (pcntrl) {
+	case P_CNTRL_DEFAULT:
+		/*  default paramters not supported */
+		return (0);
+
+	case P_CNTRL_CURRENT:
+	case P_CNTRL_SAVED:
+		/* Saved and current are supported and are identical */
+		page->mode_page.code = MODEPAGE_ACOUSTIC_MANAG;
+		page->mode_page.length =
+		    PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT;
+		page->mode_page.ps = 1;
+
+		/* Word 83 indicates if feature is supported */
+		/* If feature is not supported */
+		if (!(sata_id->ai_cmdset83 & SATA_ACOUSTIC_MGMT)) {
+			page->acoustic_manag_enable =
+			    ACOUSTIC_DISABLED;
+		} else {
+			page->acoustic_manag_enable =
+			    (sata_id->ai_features86 & SATA_ACOUSTIC_MGMT
+			    != 0);
+			/* Word 94 inidicates the value */
+#ifdef	_LITTLE_ENDIAN
+			page->acoustic_manag_level =
+			    (uchar_t)sata_id->ai_acoustic;
+			page->vendor_recommended_value =
+			    sata_id->ai_acoustic >> 8;
+#else
+			page->acoustic_manag_level =
+			    sata_id->ai_acoustic >> 8;
+			page->vendor_recommended_value =
+			    (uchar_t)sata_id->ai_acoustic;
+#endif
+		}
+		break;
+
+	case P_CNTRL_CHANGEABLE:
+		page->mode_page.code = MODEPAGE_ACOUSTIC_MANAG;
+		page->mode_page.length =
+		    PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT;
+		page->mode_page.ps = 1;
+
+		/* Word 83 indicates if the feature is supported */
+		if (sata_id->ai_cmdset83 & SATA_ACOUSTIC_MGMT) {
+			page->acoustic_manag_enable =
+			    ACOUSTIC_ENABLED;
+			page->acoustic_manag_level = 0xff;
+		}
+		break;
+	}
+	return (PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT +
+	    sizeof (struct mode_page));
+}
+
+
 /*
  * Build Mode sense power condition page
  * NOT IMPLEMENTED.
@@ -7064,6 +7167,80 @@ sata_mode_select_page_1c(
 
 	return (SATA_FAILURE);
 }
+
+int
+sata_mode_select_page_30(sata_pkt_txlate_t *spx, struct
+    mode_acoustic_management *page, int parmlen, int *pagelen,
+    int *rval, int *dmod)
+{
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_drive_info_t *sdinfo;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	sata_id_t *sata_id;
+	struct scsi_extended_sense *sense;
+
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	sata_id = &sdinfo->satadrv_id;
+	*dmod = 0;
+
+	/* If parmlen is too short or the feature is not supported, drop it */
+	if (((PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT +
+	    sizeof (struct mode_page)) < parmlen) ||
+	    (! (sata_id->ai_cmdset83 & SATA_ACOUSTIC_MGMT))) {
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_INVALID_FIELD_IN_PARAMETER_LIST;
+		*pagelen = parmlen;
+		*rval = TRAN_ACCEPT;
+		return (SATA_FAILURE);
+	}
+
+	*pagelen = PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT +
+	    sizeof (struct mode_page);
+
+	/*
+	 * We can enable and disable acoustice management and
+	 * set the acoustic management level.
+	 */
+
+	/*
+	 * Set-up Internal SET FEATURES command(s)
+	 */
+	scmd->satacmd_flags.sata_data_direction = SATA_DIR_NODATA_XFER;
+	scmd->satacmd_addr_type = 0;
+	scmd->satacmd_device_reg = 0;
+	scmd->satacmd_status_reg = 0;
+	scmd->satacmd_error_reg = 0;
+	scmd->satacmd_cmd_reg = SATAC_SET_FEATURES;
+	if (page->acoustic_manag_enable) {
+		scmd->satacmd_features_reg = SATAC_SF_ENABLE_ACOUSTIC;
+		scmd->satacmd_sec_count_lsb = page->acoustic_manag_level;
+	} else {	/* disabling acoustic management */
+		scmd->satacmd_features_reg = SATAC_SF_DISABLE_ACOUSTIC;
+	}
+
+	/* Transfer command to HBA */
+	if (sata_hba_start(spx, rval) != 0)
+		/*
+		 * Pkt not accepted for execution.
+		 */
+		return (SATA_FAILURE);
+
+	/* Now process return */
+	if (spx->txlt_sata_pkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		sata_xlate_errors(spx);
+		return (SATA_FAILURE);
+	}
+
+	*dmod = 1;
+
+	return (SATA_SUCCESS);
+}
+
+
+
 
 /*
  * sata_build_lsense_page0() is used to create the

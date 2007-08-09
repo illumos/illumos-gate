@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <sys/scsi/generic/mode.h>
+
 /*
  * Common ATA commands (subset)
  */
@@ -116,9 +118,11 @@ extern "C" {
  */
 #define	SATAC_SF_ENABLE_WRITE_CACHE	0x02
 #define	SATAC_SF_TRANSFER_MODE		0x03
+#define	SATAC_SF_ENABLE_ACOUSTIC	0x42
 #define	SATAC_SF_DISABLE_READ_AHEAD	0x55
 #define	SATAC_SF_DISABLE_WRITE_CACHE	0x82
 #define	SATAC_SF_ENABLE_READ_AHEAD	0xaa
+#define	SATAC_SF_DISABLE_ACOUSTIC	0xc2
 
 /*
  * SET FEATURES transfer mode values
@@ -272,6 +276,7 @@ typedef struct sata_id {
 #define	SATA_EXT48		0x0400	/* 48 bit address feature */
 #define	SATA_RW_DMA_QUEUED_CMD	0x0002	/* R/W DMA Queued supported */
 #define	SATA_DWNLOAD_MCODE_CMD	0x0001	/* Download Microcode CMD supp/enbld */
+#define	SATA_ACOUSTIC_MGMT	0x0200	/* Acoustic Management features */
 
 /* Identify Device: command set supported/enabled bits - words 82 and 85 */
 
@@ -569,6 +574,28 @@ struct log_parameter {
 #define	SMART_MAGIC_VAL_4	0x2c
 
 #define	SCT_STATUS_LOG_PAGE	0xe0
+
+/*
+ * Acoustic management
+ */
+
+struct mode_acoustic_management {
+	struct mode_page	mode_page;	/* common mode page header */
+	uchar_t	acoustic_manag_enable;	/* Set to 1 enable, Set 0 disable */
+	uchar_t	acoustic_manag_level;	/* Acoustic management level	  */
+	uchar_t	vendor_recommended_value; /* Vendor recommended value	  */
+};
+
+#define	PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT 3 /* Acoustic manag pg len */
+#define	P_CNTRL_CURRENT		0
+#define	P_CNTRL_CHANGEABLE	1
+#define	P_CNTRL_DEFAULT		2
+#define	P_CNTRL_SAVED		3
+
+#define	ACOUSTIC_DISABLED	0
+#define	ACOUSTIC_ENABLED	1
+
+#define	MODEPAGE_ACOUSTIC_MANAG 0x30
 
 #ifdef	__cplusplus
 }
