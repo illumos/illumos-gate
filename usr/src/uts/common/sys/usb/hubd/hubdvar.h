@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,14 +197,10 @@ typedef struct hubd {
 	/* track transitions of child on each port */
 	uint16_t		h_port_state[MAX_PORTS + 1];
 
-	/* track reset state of each port */
-	boolean_t		h_reset_port[MAX_PORTS + 1];
-
 	/* track event registration of children */
 	uint8_t			h_child_events[MAX_PORTS + 1];
 
 	kcondvar_t		h_cv_reset_port;
-	kcondvar_t		h_cv_hotplug_dev;
 	uint_t			h_intr_completion_reason;
 	usb_log_handle_t	h_log_handle;	/* for logging msgs */
 
@@ -277,17 +273,7 @@ typedef struct hubd_hotplug_arg {
 	boolean_t	hotplug_during_attach;
 } hubd_hotplug_arg_t;
 
-/*
- * hubd reset thread argument data structure
- */
-typedef struct hubd_reset_arg {
-	hubd_t		*hubd;
-	/* The port needs to be reset */
-	uint16_t	reset_port;
-} hubd_reset_arg_t;
-
 _NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_hotplug_arg))
-_NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_reset_arg))
 
 #define	HUBD_UNIT(dev)		(getminor((dev)))
 #define	HUBD_MUTEX(hubd)	(&((hubd)->h_mutex))

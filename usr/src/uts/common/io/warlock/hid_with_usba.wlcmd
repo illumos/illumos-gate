@@ -85,7 +85,6 @@ root	usb_get_ep_data
 root	usb_register_hotplug_cbs
 root	usb_get_current_cfgidx
 root	usb_register_client
-root	usb_reset_device
 
 root	usba_common_power
 root	usba_common_register_events
@@ -109,7 +108,6 @@ root	hubd_disconnect_event_cb
 root	hubd_reconnect_event_cb
 
 root	hubd_hotplug_thread
-root	hubd_reset_thread
 root	hubd_cpr_post_user_callb
 
 root	ohci_intr

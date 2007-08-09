@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -44,7 +44,6 @@ root	usb_console_input_fini
 root	usb_console_input_init
 root	usb_console_read
 root	hubd_hotplug_thread
-root	hubd_reset_thread
 root	hubd_cpr_post_user_callb
 root	usb_get_dev_descr
 root	usb_get_if_number
@@ -115,7 +114,6 @@ root	usb_clr_feature
 root	usb_get_ep_data
 root	usb_register_hotplug_cbs
 root    usb_register_client
-root	usb_reset_device
 root	usb_ugen_power
 
 root    hubd_root_hub_cleanup_thread
