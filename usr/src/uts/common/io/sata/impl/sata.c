@@ -6851,7 +6851,7 @@ sata_build_msense_page_30(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 			    ACOUSTIC_DISABLED;
 		} else {
 			page->acoustic_manag_enable =
-			    (sata_id->ai_features86 & SATA_ACOUSTIC_MGMT
+			    ((sata_id->ai_features86 & SATA_ACOUSTIC_MGMT)
 			    != 0);
 			/* Word 94 inidicates the value */
 #ifdef	_LITTLE_ENDIAN
