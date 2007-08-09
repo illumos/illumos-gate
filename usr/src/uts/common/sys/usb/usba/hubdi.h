@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +61,7 @@ int usba_hubdi_bind_root_hub(dev_info_t *, uchar_t *, size_t,
 				usb_dev_descr_t *);
 int usba_hubdi_unbind_root_hub(dev_info_t *);
 
+int usba_hubdi_reset_device(dev_info_t *, usb_dev_reset_lvl_t);
 /* power budget control routines */
 void usba_hubdi_incr_power_budget(dev_info_t *, usba_device_t *);
 void usba_hubdi_decr_power_budget(dev_info_t *, usba_device_t *);

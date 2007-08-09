@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2334,6 +2334,73 @@ int usb_register_hotplug_cbs(
 	int		(*reconnect_event_handler)(dev_info_t *dip));
 
 void usb_unregister_hotplug_cbs(dev_info_t *dip);
+
+/*
+ *	Reset_level determines the extent to which the device is reset,
+ *	It has the following values:
+ *
+ *	USB_RESET_LVL_REATTACH	- The device is reset, the original driver is
+ *				  detached and a new driver attaching process
+ *				  is started according to the updated
+ *				  compatible name. This reset level applies to
+ *				  the firmware download with the descriptors
+ *				  changing, or other situations in which the
+ *				  device needs to be reenumerated.
+ *
+ *	USB_RESET_LVL_DEFAULT	- Default reset level. The device is reset, all
+ *				  error status is cleared, the device state
+ *				  machines and registers are also cleared and
+ *				  need to be reinitialized in the driver. The
+ *				  current driver remains attached. This reset
+ *				  level applies to hardware error recovery, or
+ *				  firmware download without descriptors
+ *				  changing.
+ */
+typedef enum {
+	USB_RESET_LVL_REATTACH		= 0,
+	USB_RESET_LVL_DEFAULT		= 1
+} usb_dev_reset_lvl_t;
+
+/*
+ * usb_reset_device:
+ *
+ * Client drivers call this function to request hardware reset for themselves,
+ * which may be required in some situations such as:
+ *
+ * 1) Some USB devices need the driver to upload firmware into devices' RAM
+ *    and initiate a hardware reset in order to activate the new firmware.
+ * 2) Hardware reset may help drivers to recover devices from an error state
+ *    caused by physical or firmware defects.
+ *
+ * Arguments:
+ *	dip		    - pointer to devinfo of the client
+ *	reset_level	    - see above
+ *
+ * Return values:
+ *	USB_SUCCESS	    - With USB_RESET_LVL_DEFAULT: the device was reset
+ *			      successfully.
+ *			    - With USB_RESET_LVL_REATTACH: reenumeration was
+ *			      started successfully or a previous reset is still
+ *			      in progress.
+ *	USB_FAILURE	    - The state of the device's parent hub is invalid
+ *			      (disconnected or suspended).
+ *			    - Called when the driver being detached.
+ *			    - The device failed to be reset with
+ *			      USB_RESET_LVL_DEFAULT specified.
+ *			    - Reenumeration failed to start up with
+ *			    - USB_RESET_LVL_REATTACH specified.
+ *	USB_INVALID_ARGS    - Invalid arguments.
+ *	USB_INVALID_PERM    - The driver of the dip doesn't own entire device.
+ *	USB_BUSY	    - One or more pipes other than the default control
+ *			      pipe are open on the device with
+ *			      USB_RESET_LVL_DEFAULT specified.
+ *	USB_INVALID_CONTEXT - Called from interrupt context with
+ *			      USB_RESET_LVL_DEFAULT specified.
+ */
+
+int usb_reset_device(
+	dev_info_t 		*dip,
+	usb_dev_reset_lvl_t	reset_level);
 
 
 /*

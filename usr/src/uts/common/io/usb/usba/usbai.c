@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +88,7 @@ void
 usba_usbai_initialization()
 {
 	usbai_log_handle = usb_alloc_log_hdl(NULL, "usbai", &usbai_errlevel,
-				&usbai_errmask, NULL, 0);
+	    &usbai_errmask, NULL, 0);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_usbai_initialization");
@@ -185,7 +184,7 @@ usba_clear_dprint_buf()
 		usba_buf_sptr = usba_debug_buf;
 		usba_buf_eptr = usba_debug_buf + usba_debug_buf_size;
 		bzero(usba_debug_buf, usba_debug_buf_size +
-					USBA_DEBUG_SIZE_EXTRA_ALLOC);
+		    USBA_DEBUG_SIZE_EXTRA_ALLOC);
 	}
 }
 
@@ -313,7 +312,7 @@ usb_vprintf(dev_info_t *dip, int level, char *label, char *fmt, va_list ap)
 
 			bcopy(usba_print_buf, usba_buf_sptr, left);
 			bcopy((caddr_t)usba_print_buf + left,
-				usba_debug_buf, len - left);
+			    usba_debug_buf, len - left);
 			usba_buf_sptr = usba_debug_buf + len - left;
 		} else {
 			bcopy(usba_print_buf, usba_buf_sptr, len);
@@ -711,7 +710,7 @@ usb_is_pm_enabled(dev_info_t *dip)
 		hcdi = usba_hcdi_get_hcdi(root_hub_dip);
 		if (hcdi && hcdi->hcdi_ops->usba_hcdi_pm_support) {
 			rval = hcdi->hcdi_ops->
-				usba_hcdi_pm_support(root_hub_dip);
+			    usba_hcdi_pm_support(root_hub_dip);
 			if (rval != USB_SUCCESS) {
 				USB_DPRINTF_L2(DPRINT_MASK_USBA,
 				    usbai_log_handle,
@@ -914,11 +913,11 @@ usb_create_pm_components(dev_info_t *dip, uint_t *pwr_states)
 	} else {
 		/* Parse the interface power descriptor */
 		rval = usba_parse_if_pwr_descr(usb_cfg,
-			cfg_length,
-			usba_get_ifno(dip),	/* interface index */
-			0,			/* XXXX alt interface index */
-			&ifpwr_descr,
-			USBA_IF_PWR_DESCR_SIZE);
+		    cfg_length,
+		    usba_get_ifno(dip),	/* interface index */
+		    0,			/* XXXX alt interface index */
+		    &ifpwr_descr,
+		    USBA_IF_PWR_DESCR_SIZE);
 
 		if (rval != USBA_IF_PWR_DESCR_SIZE) {
 			USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
@@ -944,7 +943,7 @@ usb_create_pm_components(dev_info_t *dip, uint_t *pwr_states)
 			    "%d=USB D%d State",
 			    lvl, USB_DEV_OS_PWR2USB_PWR(lvl));
 			pm_comp[n_prop] = kmem_zalloc(strlen(str) + 1,
-								KM_SLEEP);
+			    KM_SLEEP);
 			(void) strcpy(pm_comp[n_prop++], str);
 
 			*pwr_states |= USB_DEV_PWRMASK(lvl);
@@ -958,7 +957,7 @@ usb_create_pm_components(dev_info_t *dip, uint_t *pwr_states)
 
 	/* now create the actual components */
 	rval = ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-			"pm-components", pm_comp, n_prop);
+	    "pm-components", pm_comp, n_prop);
 	if (rval == DDI_PROP_SUCCESS) {
 		rval = USB_SUCCESS;
 	} else {
@@ -1115,7 +1114,7 @@ usb_register_hotplug_cbs(dev_info_t *dip,
 
 	mutex_enter(&usba_device->usb_mutex);
 	usba_device->usb_client_flags[usba_get_ifno(dip)] |=
-						USBA_CLIENT_FLAG_EV_CBS;
+	    USBA_CLIENT_FLAG_EV_CBS;
 	usba_device->usb_client_ev_cb_list->dip = dip;
 	mutex_exit(&usba_device->usb_mutex);
 
@@ -1230,7 +1229,7 @@ usb_register_event_cbs(dev_info_t *dip, usb_event_t *usb_evdata,
 
 	mutex_enter(&usba_device->usb_mutex);
 	usba_device->usb_client_flags[usba_get_ifno(dip)] |=
-						USBA_CLIENT_FLAG_EV_CBS;
+	    USBA_CLIENT_FLAG_EV_CBS;
 	usba_device->usb_client_ev_cb_list->dip = dip;
 	usba_device->usb_client_ev_cb_list->ev_data = usb_evdata;
 	mutex_exit(&usba_device->usb_mutex);
@@ -1280,6 +1279,12 @@ usb_unregister_event_cbs(dev_info_t *dip, usb_event_t *usb_evdata)
 
 	mutex_enter(&usba_device->usb_mutex);
 	usba_device->usb_client_flags[usba_get_ifno(dip)] &=
-						~USBA_CLIENT_FLAG_EV_CBS;
+	    ~USBA_CLIENT_FLAG_EV_CBS;
 	mutex_exit(&usba_device->usb_mutex);
+}
+
+int
+usb_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
+{
+	return (usba_hubdi_reset_device(dip, reset_level));
 }
