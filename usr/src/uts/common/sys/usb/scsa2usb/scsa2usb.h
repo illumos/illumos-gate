@@ -100,6 +100,9 @@ extern "C" {
 #define	MS_OTI_VID		0xea0	/* VendorID of OTI */
 #define	MS_OTI_DEVICE_6828	0x6828	/* PID for 6828 flash disk */
 
+#define	MS_SCANLOGIC_VID	0x04ce	/* VendorID of ScanLogic */
+#define	MS_SCANLOGIC_PID1	0x0002	/* SL USB Storage Device */
+
 /*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86
@@ -159,6 +162,8 @@ extern "C" {
  *		was successfully transfered, so need to ignore residue.
  * SCSA2USB_ATTRS_NO_MEDIA_CHECK: AMI Virtual Floppy devices need to
  *		check if media is ready before issuing READ CAPACITY.
+ * SCSA2USB_ATTRS_NO_CAP_ADJUST: Some devices return total logical block number
+ * 		instead of highest logical block address on READ_CAPACITY cmd.
  *
  * NOTE: If a device simply STALLs the GET_MAX_LUN BO class-specific command
  * and recovers then it will not be added to the scsa2usb_blacklist[] table
@@ -178,6 +183,7 @@ extern "C" {
 #define	SCSA2USB_ATTRS_INQUIRY		0x400	/* SCMD_INQUIRY */
 #define	SCSA2USB_ATTRS_USE_CSW_RESIDUE	0x800	/* for residue checking */
 #define	SCSA2USB_ATTRS_NO_MEDIA_CHECK	0x1000	/* for media checking */
+#define	SCSA2USB_ATTRS_NO_CAP_ADJUST	0x2000	/* for CAPACITY adjusting */
 #define	SCSA2USB_ATTRS_REDUCED_CMD	\
 	(SCSA2USB_ATTRS_DOORLOCK|SCSA2USB_ATTRS_MODE_SENSE| \
 	SCSA2USB_ATTRS_START_STOP|SCSA2USB_ATTRS_INQUIRY| \

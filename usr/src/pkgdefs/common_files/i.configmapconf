@@ -1,11 +1,9 @@
 #!/bin/sh
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -24,8 +22,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # Note that this script imposes restriction on the format of the new file
 # that is delivered by the package.
@@ -42,6 +40,7 @@ hex2dec()
 
 CLEANUP_FILE=/tmp/CLEANUP
 TMP_FILE=/tmp/configmap.$$
+TMP_FILE1=/tmp/configmap1.$$
 export TMP_FILE
 
 while read src dst
@@ -64,18 +63,7 @@ do
 
 	if [ -f ${CONF_MAP} ]
 	then
-		# There is an existing file on the system. Save it as .old
-		# if .old exists, move it to .old.xxx
-		if [ -f ${CONF_MAP_OLD} ]
-		then
-			# suffix is day, hr, min, sec
-			# - it should be unique enough
-			suffix=`date '+%d%H''%M''%S'`
-			mv ${CONF_MAP_OLD} ${CONF_MAP_OLD}.$suffix
-			echo "EXISTING_FILE_SAVED_TO_OLD: ${CONF_MAP_OLD} "\
-			    "${CONF_MAP_OLD}.$suffix" >>  ${CLEANUP_FILE}
-		fi
-		cp $CONF_MAP $CONF_MAP_OLD 
+		# There is an existing file on the system.
 
 		# build a string of items that we don't want from the new file.
 		grepstr="^\*|^\#"
@@ -153,8 +141,39 @@ do
 
 		# grepstr now contains all the entries that we don't want
 		# from new CONF_MAP
-		egrep -vi -f $TMP_FILE  $CONF_MAP_NEW >> $CONF_MAP
+		cp $CONF_MAP $TMP_FILE1
+		egrep -vi -f $TMP_FILE  $CONF_MAP_NEW >> $TMP_FILE1
 		rm $TMP_FILE
+
+		# Now, TMP_FILE1 is the real new config file to be stored.
+
+		# If the existing file and the new one are identical,
+		# nothing will be done.
+		cmp -s ${CONF_MAP} ${TMP_FILE1}
+		if [ $? = 0 ]
+		then
+			rm ${TMP_FILE1}
+			continue
+		fi
+
+		# The existing file is different with the new one. Save it as .old
+		# if .old exists, move it to .old.xxx
+		if [ -f ${CONF_MAP_OLD} ]
+		then
+			# suffix is day, hr, min, sec
+			# - it should be unique enough
+			suffix=`date '+%d%H''%M''%S'`
+			mv ${CONF_MAP_OLD} ${CONF_MAP_OLD}.$suffix
+			echo "EXISTING_FILE_RENAMED: ${CONF_MAP_OLD} "\
+			    "${CONF_MAP_OLD}.$suffix" >>  ${CLEANUP_FILE}
+		fi
+		cp $CONF_MAP $CONF_MAP_OLD
+		echo "EXISTING_FILE_RENAMED: ${CONF_MAP} ${CONF_MAP_OLD}"\
+		    >> ${CLEANUP_FILE}
+
+		# Replace the config file with the new one.
+		mv $TMP_FILE1 $CONF_MAP
+
 	else
 		# we are newly installing this file
 		cp $CONF_MAP_NEW $CONF_MAP

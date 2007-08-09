@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +68,7 @@ extern void	scsa2usb_handle_data_done(scsa2usb_state_t *, scsa2usb_cmd_t *,
 extern usb_bulk_req_t *scsa2usb_init_bulk_req(scsa2usb_state_t *,
 			    size_t, uint_t, usb_req_attrs_t, usb_flags_t);
 extern int	scsa2usb_bulk_timeout(int);
-extern int 	scsa2usb_clear_ept_stall(scsa2usb_state_t *, uint_t,
+extern int	scsa2usb_clear_ept_stall(scsa2usb_state_t *, uint_t,
 		    usb_pipe_handle_t, char *);
 extern void	scsa2usb_close_usb_pipes(scsa2usb_state_t *);
 
@@ -268,7 +267,7 @@ Data_Phase:
 			if (req->bulk_completion_reason == USB_CR_STALL) {
 				if (scsa2usbp->scsa2usb_cur_pkt) {
 					scsa2usbp->scsa2usb_cur_pkt->
-						pkt_reason = CMD_TRAN_ERR;
+					    pkt_reason = CMD_TRAN_ERR;
 				}
 			} else {
 				scsa2usb_bulk_only_handle_error(scsa2usbp, req);
@@ -287,6 +286,8 @@ Status_Phase:
 	 * Start status phase
 	 * read in CSW
 	 */
+	req->bulk_timeout = scsa2usb_bulk_timeout(SCSA2USB_BULK_PIPE_TIMEOUT);
+
 	for (nretry = 0; nretry < SCSA2USB_STATUS_RETRIES; nretry++) {
 		rval = scsa2usb_handle_status_start(scsa2usbp, req);
 
@@ -298,7 +299,7 @@ Status_Phase:
 			 * successfully, retry for limited times.
 			 */
 			scsa2usbp->scsa2usb_pkt_state =
-				    SCSA2USB_PKT_PROCESS_CSW;
+			    SCSA2USB_PKT_PROCESS_CSW;
 		} else {
 
 			break;
@@ -687,7 +688,7 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 		 * first adjust back the total_xfercount
 		 */
 		cmd->cmd_total_xfercount += cmd->cmd_xfercount -
-				cmd->cmd_resid_xfercount;
+		    cmd->cmd_resid_xfercount;
 
 		/*
 		 * now take the min of the reported residue by

@@ -347,6 +347,10 @@ static struct blacklist {
 	/* AMI Virtual Floppy */
 	{MS_AMI_VID, MS_AMI_VIRTUAL_FLOPPY, 0,
 	    SCSA2USB_ATTRS_NO_MEDIA_CHECK},
+
+	/* ScanLogic USB Storage Device */
+	{MS_SCANLOGIC_VID, MS_SCANLOGIC_PID1, 0,
+	    SCSA2USB_ATTRS_NO_CAP_ADJUST}
 };
 
 
@@ -4885,6 +4889,7 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 	struct scsi_pkt	*pkt = scsa2usbp->scsa2usb_cur_pkt;
 	mblk_t		*data = req->bulk_data;
 	int		len = data ? (data->b_wptr - data->b_rptr) : 0;
+	uint32_t	max_lba;
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
@@ -4940,10 +4945,37 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 				    cap->scsa2usb_read_cap_blen1,
 				    cap->scsa2usb_read_cap_blen0);
 
-				USB_DPRINTF_L3(DPRINT_MASK_SCSA,
+				max_lba = SCSA2USB_MK_32BIT(
+				    cap->scsa2usb_read_cap_lba3,
+				    cap->scsa2usb_read_cap_lba2,
+				    cap->scsa2usb_read_cap_lba1,
+				    cap->scsa2usb_read_cap_lba0);
+
+				/*
+				 * Some devices return total logical block
+				 * number instead of highest logical block
+				 * address. Adjust the value by minus 1.
+				 */
+				if (max_lba > 0 && (scsa2usbp->scsa2usb_attrs &
+				    SCSA2USB_ATTRS_NO_CAP_ADJUST) == 0) {
+					max_lba -= 1;
+					cap->scsa2usb_read_cap_lba0 =
+					    (uchar_t)(max_lba & 0xFF);
+					cap->scsa2usb_read_cap_lba1 =
+					    (uchar_t)(max_lba >> 8 & 0xFF);
+					cap->scsa2usb_read_cap_lba2 =
+					    (uchar_t)(max_lba >> 16 & 0xFF);
+					cap->scsa2usb_read_cap_lba3 =
+					    (uchar_t)(max_lba >> 24 & 0xFF);
+				}
+
+				USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 				    scsa2usbp->scsa2usb_log_handle,
-				    "lbasize=%d", scsa2usbp->
-				    scsa2usb_lbasize[pkt->pkt_address.a_lun]);
+				    "bytes in each logical block=0x%x,"
+				    "number of total logical blocks=0x%x",
+				    scsa2usbp->
+				    scsa2usb_lbasize[pkt->pkt_address.a_lun],
+				    max_lba + 1);
 			}
 			cmd->cmd_done = 1;
 			goto handle_data;
