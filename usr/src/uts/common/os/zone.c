@@ -1728,7 +1728,10 @@ zone_set_brand(zone_t *zone, const char *brand)
 		return (EPERM);
 	}
 
+	/* set up the brand specific data */
 	zone->zone_brand = bp;
+	ZBROP(zone)->b_init_brand_data(zone);
+
 	mutex_exit(&zone_status_lock);
 	return (0);
 }
@@ -3998,6 +4001,10 @@ zone_destroy(zoneid_t zoneid)
 
 	/* Get rid of the zone's kstats */
 	zone_kstat_delete(zone);
+
+	/* free brand specific data */
+	if (ZONE_IS_BRANDED(zone))
+		ZBROP(zone)->b_free_brand_data(zone);
 
 	/* Say goodbye to brand framework. */
 	brand_unregister_zone(zone->zone_brand);

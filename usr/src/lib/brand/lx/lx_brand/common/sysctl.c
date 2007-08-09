@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@ lx_sysctl(uintptr_t raw)
 		(void) strlcpy(namebuf, LX_UNAME_SYSNAME, oldlen);
 		break;
 	case LX_KERN_OSRELEASE:
-		(void) strlcpy(namebuf, LX_UNAME_RELEASE, oldlen);
+		(void) strlcpy(namebuf, lx_release, oldlen);
 		break;
 	case LX_KERN_VERSION:
 		(void) strlcpy(namebuf, LX_UNAME_VERSION, oldlen);

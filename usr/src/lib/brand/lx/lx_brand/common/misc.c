@@ -46,6 +46,7 @@
 #include <sys/lx_thunk_server.h>
 #include <unistd.h>
 #include <libintl.h>
+#include <zone.h>
 
 extern int sethostname(char *, int);
 
@@ -181,6 +182,27 @@ lx_getcwd(uintptr_t p1, uintptr_t p2)
 	}
 
 	return (len + 1);
+}
+
+int
+lx_get_kern_version(void)
+{
+	/*
+	 * Since this function is called quite often, and zone_getattr is slow,
+	 * we cache the kernel version in kvers_cache. -1 significes that no
+	 * value has yet been cached.
+	 */
+	static int kvers_cache = -1;
+	/* dummy variable for use in zone_getattr */
+	int kvers;
+
+	if (kvers_cache != -1)
+		return (kvers_cache);
+	if (zone_getattr(getzoneid(), LX_KERN_VERSION_NUM, &kvers, sizeof (int))
+	    != sizeof (int))
+		return (kvers_cache = LX_KERN_2_4);
+	else
+		return (kvers_cache = kvers);
 }
 
 int

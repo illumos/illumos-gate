@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@
 #include <sys/lx_brand.h>
 #include <sys/lx_debug.h>
 #include <sys/lx_thread.h>
+#include <sys/lx_futex.h>
 
 #define	LX_CSIGNAL		0x000000ff
 #define	LX_CLONE_VM		0x00000100
@@ -126,6 +127,7 @@ lx_exit(uintptr_t p1)
 {
 	int		ret, status = (int)p1;
 	lx_tsd_t	*lx_tsd;
+	int		zero = 0;
 
 	/*
 	 * If we are a vfork(2)ed child, we need to exit as quickly and
@@ -145,6 +147,19 @@ lx_exit(uintptr_t p1)
 
 	lx_tsd->lxtsd_exit = LX_EXIT;
 	lx_tsd->lxtsd_exit_status = status;
+
+	/*
+	 * Implement CLONE_CHILD_CLEARTID option to allow threading libraries
+	 * to work for newer kernels.
+	 */
+	if ((lx_get_kern_version() > LX_KERN_2_4) && (lx_tsd->c_flags &
+	    LX_CLONE_CHILD_CLEARTID)) {
+		/* We can't do much if these fail, since exit can't fail */
+		(void) uucopy(&zero, lx_tsd->c_ctidp, sizeof (int));
+		(void) lx_futex((uintptr_t)lx_tsd->c_ctidp, FUTEX_WAKE, 1, NULL,
+		    NULL, 0);
+	}
+
 
 	/*
 	 * Block all signals in the exit context to avoid taking any signals
@@ -295,6 +310,10 @@ clone_start(void *arg)
 		    strerror(errno));
 	}
 
+	/* store child_tidptr and flags */
+	lx_tsd.c_flags = cs->c_flags;
+	lx_tsd.c_ctidp = cs->c_ctidp;
+
 	/*
 	 * Do the final stack twiddling, reset %gs, and return to the
 	 * clone(2) path.
@@ -349,6 +368,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	volatile int clone_res;
 	int sig;
 	int rval;
+	int pid;
 	lx_regs_t *rp;
 	sigset_t sigmask;
 
@@ -367,14 +387,37 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		return (-EINVAL);
 
 	/*
-	 * CLONE_THREAD require CLONE_SIGHAND.  CLONE_THREAD and
-	 * CLONE_DETACHED must both be either set or cleared.
+	 * CLONE_THREAD requires CLONE_SIGHAND.
+	 *
+	 * CLONE_THREAD and CLONE_DETACHED must both be either set or cleared
+	 * in kernel 2.4 and prior.
+	 * In kernel 2.6 CLONE_DETACHED was dropped completely, so we no
+	 * longer have this requirement.
 	 */
-	if ((flags & CLONE_TD) &&
-	    (!(flags & LX_CLONE_SIGHAND) || ((flags & CLONE_TD) != CLONE_TD)))
-		return (-EINVAL);
+
+	if (flags & CLONE_TD) {
+		if (!(flags & LX_CLONE_SIGHAND))
+			return (-EINVAL);
+		if ((lx_get_kern_version() <= LX_KERN_2_4) &&
+		    (flags & CLONE_TD) != CLONE_TD)
+			return (-EINVAL);
+	}
 
 	rp = lx_syscall_regs();
+
+	/* test if pointer passed by user are writable */
+	if (flags & LX_CLONE_PARENT_SETTID) {
+		if (uucopy(ptidp, &pid, sizeof (int)) != 0)
+			return (-EFAULT);
+		if (uucopy(&pid, ptidp, sizeof (int)) != 0)
+			return (-EFAULT);
+	}
+	if (flags & LX_CLONE_CHILD_SETTID) {
+		if (uucopy(ctidp, &pid, sizeof (int)) != 0)
+			return (-EFAULT);
+		if (uucopy(&pid, ctidp, sizeof (int)) != 0)
+			return (-EFAULT);
+	}
 
 	/* See if this is a fork() operation or a thr_create().  */
 	if (IS_FORK(flags) || IS_VFORK(flags)) {
@@ -399,8 +442,26 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 				(void) sleep(lx_rpm_delay);
 		}
 
-		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID))
-			*((int *)ptidp) = rval;
+		/*
+		 * Since we've already forked, we can't do much if uucopy fails,
+		 * so we just ignore failure. Failure is unlikely since we've
+		 * tested the memory before we did the fork.
+		 */
+		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID)) {
+			(void) uucopy(&rval, ptidp, sizeof (int));
+		}
+
+		if (rval == 0 && (flags & LX_CLONE_CHILD_SETTID)) {
+			/*
+			 * lx_getpid should not fail, and if it does, there's
+			 * not much we can do about it since we've already
+			 * forked, so on failure, we just don't copy the
+			 * memory.
+			 */
+			pid = lx_getpid();
+			if (pid >= 0)
+				(void) uucopy(&pid, ctidp, sizeof (int));
+		}
 
 		/* Parent just returns */
 		if (rval != 0)
@@ -440,6 +501,20 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		lx_unsupported(gettext(
 		    "clone(2) passed unsupported signal: %d"), sig);
 		return (-ENOTSUP);
+	}
+
+	/*
+	 * Pretend failure can't happen since we've already forked, see comments
+	 * above.
+	 */
+	if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID)) {
+		(void) uucopy(&rval, ptidp, sizeof (int));
+	}
+
+	if (rval == 0 && (flags & LX_CLONE_CHILD_SETTID)) {
+		pid = lx_getpid();
+		if (pid >= 0)
+			(void) uucopy(&pid, ctidp, sizeof (int));
 	}
 
 	/*

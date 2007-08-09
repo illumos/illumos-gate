@@ -390,7 +390,7 @@ stol_sigcode(int si_code)
 	}
 }
 
-static int
+int
 stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 {
 	lx_siginfo_t lx_siginfo;
@@ -535,7 +535,7 @@ lx_sigaltstack(uintptr_t nsp, uintptr_t osp)
 
 	if (nsp) {
 		if (uucopy((void *)nsp, &ls, sizeof (lx_stack_t)) != 0)
-		    return (-errno);
+			return (-errno);
 
 		if ((ls.ss_flags & LX_SS_DISABLE) == 0 &&
 		    ls.ss_size < LX_MINSIGSTKSZ)
@@ -1677,7 +1677,7 @@ lx_siginit(void)
 
 		if (sa.sa_handler == SIG_IGN) {
 			lx_debug("marking signal %d (lx %d) as SIG_IGN",
-				sig, lx_sig);
+			    sig, lx_sig);
 			lx_sighandlers.lx_sa[lx_sig].lxsa_handler = SIG_IGN;
 		}
 	}
