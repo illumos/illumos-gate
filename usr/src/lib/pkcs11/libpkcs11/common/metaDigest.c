@@ -50,7 +50,7 @@ meta_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 	if (rv != CKR_OK)
 		return (rv);
 
-	rv = meta_operation_init(CKF_DIGEST, session, pMechanism, NULL);
+	rv = meta_operation_init_defer(CKF_DIGEST, session, pMechanism, NULL);
 
 	REFRELEASE(session);
 

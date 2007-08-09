@@ -37,6 +37,11 @@ extern "C" {
 
 #define	CKU_PUBLIC	2	/* default session auth. state */
 
+typedef struct cipher_mechs_threshold {
+	int		mech_type;
+	uint32_t	mech_threshold;
+} cipher_mechs_threshold_t;
+
 /*
  * This slot has limited hash support. It can not do multi-part
  * hashing (updates) and it can not hash input data of size
@@ -68,6 +73,9 @@ typedef struct kernel_slot {
 	 * CRYPTO_LIMITED_HASH_SUPPORT is set.
 	 */
 	int			sl_threshold;
+
+	int total_threshold_count;
+	cipher_mechs_threshold_t	sl_mechs_threshold[MAX_NUM_THRESHOLD];
 } kernel_slot_t;
 
 extern CK_ULONG slot_count;

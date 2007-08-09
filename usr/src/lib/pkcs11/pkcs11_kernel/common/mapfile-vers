@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,6 +95,11 @@ SUNW_1.1 {
 	C_VerifyUpdate;
 	C_WaitForSlotEvent;
 	C_WrapKey;
+};
+
+SUNWprivate {
+    global:
+	_SUNW_GetThreshold;
     local:
 	*;
 };

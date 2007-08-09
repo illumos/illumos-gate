@@ -52,6 +52,12 @@
 #include <sys/crypto/sched_impl.h>
 #include <sys/crypto/ioctl.h>
 
+extern int kcf_des3_threshold;
+extern int kcf_aes_threshold;
+extern int kcf_rc4_threshold;
+extern int kcf_md5_threshold;
+extern int kcf_sha1_threshold;
+
 /*
  * Locking notes:
  *
@@ -251,7 +257,7 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,					/* drv_modops */
-	"Cryptographic Library Interface v1.47",	/* drv_linkinfo */
+	"Cryptographic Library Interface v%I%",	/* drv_linkinfo */
 	&devops,
 };
 
@@ -560,8 +566,6 @@ crypto_release_minor(crypto_minor_t *cm)
 	mutex_exit(&crypto_lock);
 }
 
-extern int kcf_md5_threshold;
-
 /*
  * Build a list of functions and other information for the provider, pd.
  */
@@ -732,6 +736,22 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		    min(CRYPTO_MAX_BUFFER_LEN,
 		    curproc->p_task->tk_proj->kpj_data.kpd_crypto_mem_ctl));
 	}
+
+	fl->total_threshold_count = MAX_NUM_THRESHOLD;
+	fl->fl_threshold[0].mech_type = CKM_DES3_CBC;
+	fl->fl_threshold[0].mech_threshold = kcf_des3_threshold;
+	fl->fl_threshold[1].mech_type = CKM_DES3_ECB;
+	fl->fl_threshold[1].mech_threshold = kcf_des3_threshold;
+	fl->fl_threshold[2].mech_type = CKM_AES_CBC;
+	fl->fl_threshold[2].mech_threshold = kcf_aes_threshold;
+	fl->fl_threshold[3].mech_type = CKM_AES_ECB;
+	fl->fl_threshold[3].mech_threshold = kcf_aes_threshold;
+	fl->fl_threshold[4].mech_type = CKM_RC4;
+	fl->fl_threshold[4].mech_threshold = kcf_rc4_threshold;
+	fl->fl_threshold[5].mech_type = CKM_MD5;
+	fl->fl_threshold[5].mech_threshold = kcf_md5_threshold;
+	fl->fl_threshold[6].mech_type = CKM_SHA_1;
+	fl->fl_threshold[6].mech_threshold = kcf_sha1_threshold;
 }
 
 /* ARGSUSED */

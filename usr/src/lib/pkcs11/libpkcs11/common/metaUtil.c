@@ -32,6 +32,75 @@
 #include <strings.h>
 #include "metaGlobal.h"
 
+CK_RV
+meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
+	CK_MECHANISM *pMechanism, meta_object_t *key)
+{
+
+	if (session->init.pMech == NULL) {
+		session->init.pMech = malloc(sizeof (CK_MECHANISM));
+		if (session->init.pMech == NULL)
+			return (CKR_HOST_MEMORY);
+
+		(void) memcpy(session->init.pMech, pMechanism,
+		    sizeof (CK_MECHANISM));
+
+		if ((pMechanism->ulParameterLen > 0) &&
+		    (pMechanism->pParameter != NULL)) {
+			session->init.pMech->pParameter =
+			    malloc(pMechanism->ulParameterLen);
+			if (session->init.pMech->pParameter == NULL) {
+				free(session->init.pMech);
+				session->init.pMech = NULL;
+				return (CKR_HOST_MEMORY);
+			}
+			(void) memcpy(session->init.pMech->pParameter,
+			    pMechanism->pParameter, pMechanism->ulParameterLen);
+		} else {
+			session->init.pMech->pParameter = NULL;
+		}
+	} else { /* reuse it */
+		if ((pMechanism->ulParameterLen > 0) &&
+		    (pMechanism->pParameter != NULL)) {
+			if (pMechanism->ulParameterLen !=
+			    session->init.pMech->ulParameterLen) {
+				if (session->init.pMech->pParameter != NULL)
+					free(session->init.pMech->pParameter);
+				session->init.pMech->pParameter =
+				    malloc(pMechanism->ulParameterLen);
+				if (session->init.pMech->pParameter == NULL) {
+					free(session->init.pMech);
+					session->init.pMech = NULL;
+					return (CKR_HOST_MEMORY);
+				}
+			} /* otherwise reuse it */
+			(void) memcpy(session->init.pMech->pParameter,
+			    pMechanism->pParameter, pMechanism->ulParameterLen);
+		} else {
+			/*
+			 * free the previous pParameter if not yet freed
+			 * because we don't need it now.
+			 */
+			if (session->init.pMech->pParameter != NULL) {
+				free(session->init.pMech->pParameter);
+				session->init.pMech->pParameter = NULL;
+			}
+		}
+		/* copy the rest of data */
+		session->init.pMech->mechanism =
+		    pMechanism->mechanism;
+		session->init.pMech->ulParameterLen =
+		    pMechanism->ulParameterLen;
+	}
+
+	session->init.session = session;
+	session->init.optype = optype;
+	session->init.key = key;
+	session->init.done = B_FALSE;
+	session->init.app = B_TRUE;
+	return (CKR_OK);
+}
+
 /*
  * meta_operation_init
  *
@@ -53,6 +122,13 @@ meta_operation_init(CK_FLAGS optype, meta_session_t *session,
 	 */
 	if (session->op1.type != 0) {
 		meta_operation_cleanup(session, session->op1.type, B_FALSE);
+		if ((optype == CKF_ENCRYPT) || (optype == CKF_DECRYPT) ||
+		    (optype == CKF_DIGEST)) {
+			rv = meta_operation_init_defer(optype, session,
+			    pMechanism, key);
+			if (rv != CKR_OK)
+				return (rv);
+		}
 	}
 
 	mech_info.flags = optype;
@@ -205,8 +281,142 @@ loop_cleanup:
 		/* Save the session */
 		session->op1.session = init_session;
 		session->op1.type = optype;
+
+		session->init.slotnum = slotnum;
+		session->init.done = B_TRUE;
 	} else {
 		rv = save_rv;
+	}
+
+finish:
+	return (rv);
+}
+
+/*
+ * meta_operation_init_softtoken()
+ * It will always do the crypto init operation on softtoken slot.
+ */
+CK_RV
+meta_operation_init_softtoken(CK_FLAGS optype, meta_session_t *session,
+	CK_MECHANISM *pMechanism, meta_object_t *key)
+{
+	CK_RV rv = CKR_FUNCTION_FAILED;
+	slot_session_t *init_session = NULL;
+	slot_object_t *init_key;
+	CK_SLOT_ID fw_st_id;
+	CK_ULONG softtoken_slot_num;
+
+	softtoken_slot_num = get_softtoken_slotnum();
+	/*
+	 * If an operation is already active, cleanup existing operation
+	 * and start a new one.
+	 */
+	if (session->op1.type != 0) {
+		meta_operation_cleanup(session, session->op1.type, B_FALSE);
+		rv = meta_operation_init_defer(optype, session, pMechanism,
+		    key);
+		if (rv != CKR_OK)
+			return (rv);
+	}
+
+	/*
+	 * An actual session with the underlying slot is required
+	 * for the operation.  When the operation is successfully
+	 * completed, the underlying session with the slot
+	 * is not released back to the list of available sessions
+	 * pool.  This will help if the next operation can
+	 * also be done on the same slot, because it avoids
+	 * one extra trip to the session pool to get an idle session.
+	 * If the operation can't be done on that slot,
+	 * we release the session back to the session pool.
+	 */
+	if (session->op1.session != NULL) {
+		if ((session->op1.session)->slotnum ==
+		    softtoken_slot_num) {
+			init_session = session->op1.session;
+			/*
+			 * set it to NULL for now, assign it to
+			 * init_session again if it is successful
+			 */
+			session->op1.session = NULL;
+		} else {
+			init_session = NULL;
+		}
+	}
+
+	if (init_session == NULL) {
+		/* get the active session from softtoken slot */
+		rv = meta_get_slot_session(softtoken_slot_num,
+		    &init_session, session->session_flags);
+		if (rv != CKR_OK) {
+			goto finish;
+		}
+	}
+
+	/* if necessary, ensure a clone of the obj exists in softtoken slot */
+	if (optype != CKF_DIGEST) {
+		rv = meta_object_get_clone(key, softtoken_slot_num,
+		    init_session, &init_key);
+
+		if (rv != CKR_OK) {
+			if (init_session != NULL) {
+				meta_release_slot_session(init_session);
+				init_session = NULL;
+			}
+			goto finish;
+		}
+	}
+
+	fw_st_id = init_session->fw_st_id;
+
+	/*
+	 * Currently, we only support offloading encrypt, decrypt
+	 * and digest operations to softtoken based on kernel
+	 * threshold for the supported mechanisms.
+	 */
+	switch (optype) {
+		case CKF_ENCRYPT:
+			rv = FUNCLIST(fw_st_id)->C_EncryptInit(
+			    init_session->hSession, pMechanism,
+			    init_key->hObject);
+			break;
+		case CKF_DECRYPT:
+			rv = FUNCLIST(fw_st_id)->C_DecryptInit(
+			    init_session->hSession, pMechanism,
+			    init_key->hObject);
+			break;
+		case CKF_DIGEST:
+			rv = FUNCLIST(fw_st_id)->C_DigestInit(
+			    init_session->hSession, pMechanism);
+			break;
+
+		default:
+			/*NOTREACHED*/
+			rv = CKR_FUNCTION_FAILED;
+			break;
+	}
+
+	if (rv == CKR_OK) {
+
+		/*
+		 * If currently stored session is not the one being in use now,
+		 * release the previous one and store the current one
+		 */
+		if ((session->op1.session) &&
+		    (session->op1.session != init_session)) {
+			meta_release_slot_session(session->op1.session);
+		}
+
+		/* Save the session */
+		session->op1.session = init_session;
+		session->op1.type = optype;
+		/*
+		 * The init.done flag will be checked by the meta_do_operation()
+		 * to indicate whether the C_xxxInit has been done against
+		 * softtoken.
+		 */
+		session->init.done = B_TRUE;
+		session->init.slotnum = softtoken_slot_num;
 	}
 
 finish:
@@ -243,11 +453,90 @@ meta_do_operation(CK_FLAGS optype, int mode,
 	CK_SLOT_ID fw_st_id;
 	slot_session_t *slot_session = NULL;
 	slot_object_t *slot_object = NULL;
+	int threshold = 0;
 
 	boolean_t shutdown, finished_normally;
 
-	if (optype != session->op1.type) {
-		return (CKR_OPERATION_NOT_INITIALIZED);
+	/*
+	 * We've deferred the init for encrypt, decrypt and digest
+	 * operations. As we know the size of the input data now, we
+	 * can decide where to perform the real init operation based
+	 * on the kernel cipher-specific thresholds for certain
+	 * supported mechanisms.
+	 */
+	if ((optype == CKF_ENCRYPT) || (optype == CKF_DECRYPT) ||
+	    (optype == CKF_DIGEST)) {
+		if (Tmp_GetThreshold != NULL) {
+			if (!session->init.app) {
+				return (CKR_OPERATION_NOT_INITIALIZED);
+			}
+			threshold = Tmp_GetThreshold(
+			    session->init.pMech->mechanism);
+		}
+
+		if ((inLen > threshold) || (threshold == 0)) {
+			if ((session->init.app) && (!session->init.done)) {
+				/*
+				 * Call real init operation only if the
+				 * application has called C_xxxInit
+				 * but the real init operation has not
+				 * been done.
+				 */
+				rv = meta_operation_init(optype,
+				    session->init.session,
+				    session->init.pMech,
+				    session->init.key);
+				if (rv != CKR_OK)
+					goto exit;
+			} else if (!session->init.app) {
+				/*
+				 * This checking detects the case that
+				 * application calls C_En(De)Crypt/Digest
+				 * directly without calling C_xxxInit.
+				 */
+				return (CKR_OPERATION_NOT_INITIALIZED);
+			}
+		} else {
+			/*
+			 * The size of the input data is smaller than the
+			 * threshold so we'll use softoken to perform the
+			 * crypto operation for better performance reason.
+			 */
+			if ((session->init.app) && (!session->init.done))  {
+				/*
+				 * Call real init operation only if the
+				 * application has called C_xxxInit
+				 * but the real init operation has not
+				 * been done.
+				 */
+				rv = meta_operation_init_softtoken(optype,
+				    session->init.session,
+				    session->init.pMech,
+				    session->init.key);
+				if (rv != CKR_OK) {
+					/*
+					 * In case the operation fails in
+					 * softtoken, go back to use the
+					 * original slot again.
+					 */
+					rv = meta_operation_init(optype,
+					    session->init.session,
+					    session->init.pMech,
+					    session->init.key);
+					if (rv != CKR_OK)
+						goto exit;
+				}
+			} else if (!session->init.app) {
+				/*
+				 * This checking detects the case that
+				 * application calls C_En(De)Crypt/Digest
+				 * directly without calling C_xxxInit.
+				 */
+				return (CKR_OPERATION_NOT_INITIALIZED);
+			}
+		}
+	} else if (optype != session->op1.type) {
+			return (CKR_OPERATION_NOT_INITIALIZED);
 	}
 
 	slot_session = session->op1.session;
@@ -257,9 +546,9 @@ meta_do_operation(CK_FLAGS optype, int mode,
 		fw_st_id = slot_session->fw_st_id;
 	} else {
 		/* should never be here */
-		return (CKR_FUNCTION_FAILED);
+		rv = CKR_FUNCTION_FAILED;
+		goto exit;
 	}
-
 
 	/* Do the operation... */
 	if (optype == CKF_ENCRYPT && mode == MODE_SINGLE) {
@@ -358,6 +647,7 @@ meta_do_operation(CK_FLAGS optype, int mode,
 	 * going to remain active or not. We will assume a strict reading of
 	 * the spec, the operation will remain active.
 	 */
+exit:
 	if (rv == CKR_BUFFER_TOO_SMALL ||
 	    (rv == CKR_OK && out == NULL && optype != CKF_VERIFY)) {
 		/* Leave op active for retry (with larger buffer). */
@@ -374,10 +664,28 @@ meta_do_operation(CK_FLAGS optype, int mode,
 		}
 	}
 
-	if (shutdown)
+	if (shutdown) {
+		if (mode == MODE_SINGLE || mode == MODE_FINAL) {
+			session->init.app = B_FALSE;
+		}
+
 		meta_operation_cleanup(session, optype, finished_normally);
+	}
 
 	return (rv);
+}
+
+void
+free_session_mechanism(meta_session_t *session)
+{
+	if (session->init.pMech != NULL) {
+		if (session->init.pMech->pParameter != NULL) {
+			free(session->init.pMech->pParameter);
+			session->init.pMech->pParameter = NULL;
+		}
+		free(session->init.pMech);
+		session->init.pMech = NULL;
+	}
 }
 
 /*
@@ -398,10 +706,19 @@ meta_operation_cleanup(meta_session_t *session, CK_FLAGS optype,
 	if (!finished_normally) {
 		CK_BYTE dummy_buf[8];
 
-		if (session->op1.type == optype)
+		if (session->op1.type == optype) {
 			op = &session->op1;
-		else
+		} else {
+			if ((optype == CKF_ENCRYPT) ||
+			    (optype == CKF_DECRYPT) ||
+			    (optype == CKF_DIGEST)) {
+				session->op1.type = 0;
+				session->init.app = B_FALSE;
+				session->init.done = B_FALSE;
+				free_session_mechanism(session);
+			}
 			return;
+		}
 
 		hSession = op->session->hSession;
 		fw_st_id = op->session->fw_st_id;
@@ -456,6 +773,11 @@ meta_operation_cleanup(meta_session_t *session, CK_FLAGS optype,
 		session->op1.session = NULL;
 	}
 
+	if ((optype == CKF_ENCRYPT) || (optype == CKF_DECRYPT) ||
+	    (optype == CKF_DIGEST)) {
+		session->init.done = B_FALSE;
+		free_session_mechanism(session);
+	}
 	session->op1.type = 0;
 }
 

@@ -58,7 +58,7 @@ meta_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(CKF_ENCRYPT, session, pMechanism, key);
+	rv = meta_operation_init_defer(CKF_ENCRYPT, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);
@@ -184,7 +184,7 @@ meta_DecryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(CKF_DECRYPT, session, pMechanism, key);
+	rv = meta_operation_init_defer(CKF_DECRYPT, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);

@@ -69,6 +69,34 @@ kernel_get_slot_number()
 }
 
 /*
+ * This function will be used by metaslot to get the kernel
+ * provider's threshold value for a particular mechanism.
+ */
+int
+_SUNW_GetThreshold(CK_MECHANISM_TYPE mechanism)
+{
+
+	kernel_slot_t *pslot;
+	int i;
+
+	/*
+	 * We alway use the 1st slot in the kernel to
+	 * get the threshold because all the kernel
+	 * slots will have the same threshold value
+	 * with the same mechanism.
+	 */
+	pslot = slot_table[0];
+
+	for (i = 0; i < pslot->total_threshold_count; i++) {
+		if (mechanism == pslot->sl_mechs_threshold[i].mech_type)
+			return (pslot->sl_mechs_threshold[i].mech_threshold);
+	}
+
+	/* no matching mechanism */
+	return (0);
+}
+
+/*
  * To retrieve the crypto_function_list structure with boolean entries
  * indicating which functions are supported by the hardware provider which
  * is specified by the slot ID.
@@ -79,6 +107,7 @@ kernel_get_func_list(kernel_slot_t *pslot)
 	CK_RV rv = CKR_OK;
 	crypto_get_function_list_t  fl;
 	int r;
+	int i;
 
 	fl.fl_provider_id = pslot->sl_provider_id;
 
@@ -165,6 +194,15 @@ kernel_get_func_list(kernel_slot_t *pslot)
 		pslot->sl_flags = CRYPTO_LIMITED_HASH_SUPPORT;
 		pslot->sl_threshold = fl.fl_list.prov_hash_threshold;
 		pslot->sl_max_inlen = fl.fl_list.prov_hash_limit;
+	}
+
+	pslot->total_threshold_count = fl.fl_list.total_threshold_count;
+
+	for (i = 0; i < pslot->total_threshold_count; i++) {
+		pslot->sl_mechs_threshold[i].mech_type =
+		    fl.fl_list.fl_threshold[i].mech_type;
+		pslot->sl_mechs_threshold[i].mech_threshold =
+		    fl.fl_list.fl_threshold[i].mech_threshold;
 	}
 
 	return (CKR_OK);

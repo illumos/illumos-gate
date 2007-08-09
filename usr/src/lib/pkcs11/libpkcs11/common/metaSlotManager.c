@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@ slot_data_t *slots;
 CK_SLOT_ID metaslot_keystore_slotid;
 static CK_ULONG num_slots;
 static CK_ULONG objtok_slotnum;
+static CK_ULONG softtoken_slotnum;
 static boolean_t write_protected;
 
 /* protects the "metaslotLoggedIn" variable */
@@ -234,6 +234,18 @@ meta_slotManager_find_object_token() {
 		fw_st_id = slots[slot].fw_st_id;
 		true_id = TRUEID(fw_st_id);
 
+		(void) memset(&slotinfo, 0, sizeof (CK_SLOT_INFO));
+		rv = FUNCLIST(fw_st_id)->C_GetSlotInfo(true_id,
+		    &slotinfo);
+		if (rv != CKR_OK)
+			continue;
+
+		if (strncmp((char *)SOFT_SLOT_DESCRIPTION,
+		    (char *)slotinfo.slotDescription,
+		    SLOT_DESCRIPTION_SIZE) == 0) {
+			softtoken_slotnum = slot;
+		}
+
 		if (metaslot_config.keystore_slot_specified) {
 
 			unsigned char *slot;
@@ -347,6 +359,11 @@ get_keystore_slotnum()
 	return (objtok_slotnum);
 }
 
+CK_ULONG
+get_softtoken_slotnum()
+{
+	return (softtoken_slotnum);
+}
 
 CK_SLOT_ID
 meta_slotManager_get_framework_table_id(CK_ULONG slotnum)

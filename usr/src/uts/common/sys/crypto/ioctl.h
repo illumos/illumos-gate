@@ -43,9 +43,25 @@ extern "C" {
 
 #define	CRYPTO(x)		(('y' << 8) | (x))
 
+#define	MAX_NUM_THRESHOLD	7
+
+/* the PKCS11 Mechanisms */
+#define	CKM_RC4			0x00000111
+#define	CKM_DES3_ECB		0x00000132
+#define	CKM_DES3_CBC		0x00000133
+#define	CKM_MD5			0x00000210
+#define	CKM_SHA_1		0x00000220
+#define	CKM_AES_ECB		0x00001081
+#define	CKM_AES_CBC		0x00001082
+
 /*
  * General Purpose Ioctls
  */
+
+typedef struct fl_mechs_threshold {
+	int		mech_type;
+	uint32_t	mech_threshold;
+} fl_mechs_threshold_t;
 
 typedef struct crypto_function_list {
 	boolean_t fl_digest_init;
@@ -119,6 +135,9 @@ typedef struct crypto_function_list {
 	boolean_t prov_is_limited;
 	uint32_t prov_hash_threshold;
 	uint32_t prov_hash_limit;
+
+	int total_threshold_count;
+	fl_mechs_threshold_t	fl_threshold[MAX_NUM_THRESHOLD];
 } crypto_function_list_t;
 
 typedef struct crypto_get_function_list {

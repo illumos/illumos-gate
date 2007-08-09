@@ -308,6 +308,16 @@ typedef struct mech_support_info {
 	unsigned long num_supporting_slots;
 } mech_support_info_t;
 
+typedef struct	crypto_init {
+	CK_FLAGS optype;		/* place holder for init parameters */
+	struct metasession *session;	/* place holder for init parameters */
+	CK_MECHANISM *pMech;		/* place holder for init parameters */
+	struct metaobject *key;		/* place holder for init parameters */
+	CK_ULONG slotnum;	/* slot where the init operation took place */
+	boolean_t done;		/* set when the real init is done */
+	boolean_t app;		/* set when C_xxxInit is called by app */
+} crypto_init_t;
+
 /*
  * meta_session_t
  *
@@ -351,6 +361,9 @@ struct metasession {
 
 	/* C_FindObjects support. */
 	find_objs_info_t find_objs_info;
+
+	/* deferred init to be used by digest, encrypt, decrypt */
+	crypto_init_t	init;
 };
 
 
@@ -533,6 +546,7 @@ extern pthread_mutex_t initmutex;
 
 extern ses_to_be_freed_list_t ses_delay_freed;
 extern object_to_be_freed_list_t obj_delay_freed;
+extern int (*Tmp_GetThreshold)(CK_MECHANISM_TYPE);
 
 extern CK_BBOOL falsevalue;
 extern CK_BBOOL truevalue;
@@ -556,6 +570,8 @@ CK_RV meta_mechManager_slot_supports_mech(CK_MECHANISM_TYPE mechanism,
     boolean_t force_update, CK_MECHANISM_INFO *mech_info);
 
 CK_RV meta_operation_init(CK_FLAGS optype, meta_session_t *session,
+    CK_MECHANISM *pMechanism, meta_object_t *key);
+CK_RV meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
     CK_MECHANISM *pMechanism, meta_object_t *key);
 CK_RV meta_do_operation(CK_FLAGS optype, int mode,
     meta_session_t *session, meta_object_t *object,
@@ -655,6 +671,7 @@ int set_template_boolean(CK_ATTRIBUTE_TYPE type,
     CK_ATTRIBUTE *attributes, CK_ULONG num_attributes, boolean_t local,
     CK_BBOOL *value);
 CK_ULONG get_keystore_slotnum(void);
+CK_ULONG get_softtoken_slotnum(void);
 CK_SLOT_ID meta_slotManager_get_framework_table_id(CK_ULONG slotnum);
 CK_ULONG meta_slotManager_get_slotcount(void);
 boolean_t meta_slotManager_token_write_protected(void);

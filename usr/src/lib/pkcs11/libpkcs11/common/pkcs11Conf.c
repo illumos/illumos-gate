@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ CK_SLOT_ID fast_slot = 0;
 boolean_t metaslot_enabled = B_FALSE;
 boolean_t metaslot_auto_key_migrate = B_FALSE;
 metaslot_config_t metaslot_config;
+int (*Tmp_GetThreshold)(CK_MECHANISM_TYPE) = NULL;
 
 static const char *conf_err = "See cryptoadm(1M). Skipping this plug-in.";
 
@@ -413,7 +414,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		 */
 		if ((prov_rv != CKR_OK) ||
 		    (prov_info.cryptokiVersion.major !=
-			CRYPTOKI_VERSION_MAJOR))  {
+		    CRYPTOKI_VERSION_MAJOR))  {
 			if (prov_rv != CKR_OK) {
 				cryptoerror(LOG_ERR,
 				    "libpkcs11: Could not verify version of "
@@ -440,9 +441,9 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		 * to debug later.
 		 */
 		if ((prov_info.cryptokiVersion.minor <
-			CRYPTOKI_VERSION_WARN_MINOR) ||
+		    CRYPTOKI_VERSION_WARN_MINOR) ||
 		    (prov_info.cryptokiVersion.minor >
-			CRYPTOKI_VERSION_MINOR)) {
+		    CRYPTOKI_VERSION_MINOR)) {
 			cryptoerror(LOG_DEBUG,
 			    "libpkcs11: %s CRYPTOKI minor version, %d, may "
 			    "not be compatible with minor version %d.",
@@ -498,8 +499,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		}
 		if (kcfdfd == -1) {
 			cryptoerror(LOG_ERR, "libpkcs11: open %s: %s",
-				_PATH_KCFD_DOOR,
-			    strerror(errno));
+			    _PATH_KCFD_DOOR, strerror(errno));
 			goto verifycleanup;
 		}
 
@@ -508,7 +508,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 
 		if ((kda = malloc(sizeof (kcf_door_arg_t))) == NULL) {
 			cryptoerror(LOG_ERR, "libpkcs11: malloc of kda "
-				"failed: %s", strerror(errno));
+			    "failed: %s", strerror(errno));
 			goto verifycleanup;
 		}
 		kda->da_version = KCF_KCFD_VERSION1;
@@ -691,6 +691,15 @@ verifycleanup:
 			(void) pthread_mutex_unlock(&cur_slot->sl_mutex);
 		}
 
+		/*
+		 * Get the pointer to private interface _SUNW_GetThreshold()
+		 * in pkcs11_kernel.
+		 */
+
+		if (Tmp_GetThreshold == NULL) {
+			Tmp_GetThreshold =
+			    (int(*)())dlsym(dldesc, "_SUNW_GetThreshold");
+		}
 
 		/* Set and reset values to process next provider */
 		prov_count++;
