@@ -183,6 +183,9 @@ changelist_postfix(prop_changelist_t *clp)
 	 */
 	for (cn = uu_list_last(clp->cl_list); cn != NULL;
 	    cn = uu_list_prev(clp->cl_list, cn)) {
+
+		boolean_t sharenfs;
+
 		/*
 		 * If we are in the global zone, but this dataset is exported
 		 * to a local zone, do nothing.
@@ -217,7 +220,15 @@ changelist_postfix(prop_changelist_t *clp)
 			continue;
 		}
 
-		if ((clp->cl_waslegacy || cn->cn_mounted) &&
+		/*
+		 * Remount if previously mounted or mountpoint was legacy,
+		 * or sharenfs property is set.
+		 */
+		sharenfs = ((zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARENFS,
+		    shareopts, sizeof (shareopts), NULL, NULL, 0,
+		    B_FALSE) == 0) && (strcmp(shareopts, "off") != 0));
+
+		if ((cn->cn_mounted || clp->cl_waslegacy || sharenfs) &&
 		    !zfs_is_mounted(cn->cn_handle, NULL) &&
 		    zfs_mount(cn->cn_handle, NULL, 0) != 0)
 			ret = -1;
@@ -226,16 +237,11 @@ changelist_postfix(prop_changelist_t *clp)
 		 * We always re-share even if the filesystem is currently
 		 * shared, so that we can adopt any new options.
 		 */
-		if (cn->cn_shared || (clp->cl_waslegacy &&
-		    (clp->cl_prop == ZFS_PROP_SHARENFS ||
-		    clp->cl_prop == ZFS_PROP_MOUNTPOINT))) {
-			if (zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARENFS,
-			    shareopts, sizeof (shareopts), NULL, NULL, 0,
-			    B_FALSE) == 0 && strcmp(shareopts, "off") == 0) {
-				ret = zfs_unshare_nfs(cn->cn_handle, NULL);
-			} else {
+		if (cn->cn_shared || clp->cl_waslegacy || sharenfs) {
+			if (sharenfs)
 				ret = zfs_share_nfs(cn->cn_handle);
-			}
+			else
+				ret = zfs_unshare_nfs(cn->cn_handle, NULL);
 		}
 	}
 
@@ -604,12 +610,13 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	}
 
 	/*
-	 * If the property was previously 'legacy' or 'none', record this fact,
-	 * as the behavior of changelist_postfix() will be different.
+	 * If the mountpoint property was previously 'legacy', or 'none',
+	 * record it as the behavior of changelist_postfix() will be different.
 	 */
-	if (zfs_prop_get(zhp, prop, property, sizeof (property),
+	if ((clp->cl_prop == ZFS_PROP_MOUNTPOINT) &&
+	    (zfs_prop_get(zhp, prop, property, sizeof (property),
 	    NULL, NULL, 0, B_FALSE) == 0 &&
-	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0))
+	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0)))
 		clp->cl_waslegacy = B_TRUE;
 
 	return (clp);
