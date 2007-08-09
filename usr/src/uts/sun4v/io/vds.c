@@ -41,6 +41,7 @@
 #include <sys/modhash.h>
 #include <sys/note.h>
 #include <sys/pathname.h>
+#include <sys/sdt.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/sysmacros.h>
@@ -296,6 +297,8 @@ typedef struct vd_task {
 	vd_dring_payload_t	*request;	/* request task will perform */
 	struct buf		buf;		/* buf(9s) for I/O request */
 	ldc_mem_handle_t	mhdl;		/* task memory handle */
+	int			status;		/* status of processing task */
+	int	(*completef)(struct vd_task *task); /* completion func ptr */
 } vd_task_t;
 
 /*
@@ -348,7 +351,7 @@ typedef struct vds_operation {
 	char	*namep;
 	uint8_t	operation;
 	int	(*start)(vd_task_t *task);
-	void	(*complete)(void *arg);
+	int	(*complete)(vd_task_t *task);
 } vds_operation_t;
 
 typedef struct vd_ioctl {
@@ -892,6 +895,15 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 	return (status);
 }
 
+/*
+ * Return Values
+ *	EINPROGRESS	- operation was successfully started
+ *	EIO		- encountered LDC (aka. task error)
+ *	0		- operation completed successfully
+ *
+ * Side Effect
+ *     sets request->status = <disk operation status>
+ */
 static int
 vd_start_bio(vd_task_t *task)
 {
@@ -911,8 +923,11 @@ vd_start_bio(vd_task_t *task)
 	ASSERT((request->operation == VD_OP_BREAD) ||
 	    (request->operation == VD_OP_BWRITE));
 
-	if (request->nbytes == 0)
-		return (EINVAL);	/* no service for trivial requests */
+	if (request->nbytes == 0) {
+		/* no service for trivial requests */
+		request->status = EINVAL;
+		return (0);
+	}
 
 	PR1("%s %lu bytes at block %lu",
 	    (request->operation == VD_OP_BREAD) ? "Read" : "Write",
@@ -933,7 +948,7 @@ vd_start_bio(vd_task_t *task)
 	if (status != 0) {
 		PR0("ldc_mem_map() returned err %d ", status);
 		biofini(buf);
-		return (status);
+		return (EIO);
 	}
 
 	status = ldc_mem_acquire(task->mhdl, 0, buf->b_bcount);
@@ -941,7 +956,7 @@ vd_start_bio(vd_task_t *task)
 		(void) ldc_mem_unmap(task->mhdl);
 		PR0("ldc_mem_acquire() returned err %d ", status);
 		biofini(buf);
-		return (status);
+		return (EIO);
 	}
 
 	buf->b_flags |= (request->operation == VD_OP_BREAD) ? B_READ : B_WRITE;
@@ -952,10 +967,10 @@ vd_start_bio(vd_task_t *task)
 		    request->addr, request->nbytes);
 		if (rv < 0) {
 			request->nbytes = 0;
-			status = EIO;
+			request->status = EIO;
 		} else {
 			request->nbytes = rv;
-			status = 0;
+			request->status = 0;
 		}
 	} else {
 		if (slice == VD_SLICE_NONE) {
@@ -974,14 +989,26 @@ vd_start_bio(vd_task_t *task)
 			    buf->b_un.b_addr, request->addr, request->nbytes);
 			if (rv != 0) {
 				request->nbytes = 0;
-				status = EIO;
+				request->status = EIO;
 			} else {
-				status = 0;
+				request->status = 0;
 			}
 		} else {
-			status = ldi_strategy(vd->ldi_handle[slice], buf);
-			if (status == 0)
-				/* will complete on completionq */
+			request->status =
+			    ldi_strategy(vd->ldi_handle[slice], buf);
+
+			/*
+			 * This is to indicate to the caller that the request
+			 * needs to be finished by vd_complete_bio() by calling
+			 * biowait() there and waiting for that to return before
+			 * triggering the notification of the vDisk client.
+			 *
+			 * This is necessary when writing to real disks as
+			 * otherwise calls to ldi_strategy() would be serialized
+			 * behind the calls to biowait() and performance would
+			 * suffer.
+			 */
+			if (request->status == 0)
 				return (EINPROGRESS);
 		}
 	}
@@ -990,16 +1017,23 @@ vd_start_bio(vd_task_t *task)
 	rv = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
 	if (rv) {
 		PR0("ldc_mem_release() returned err %d ", rv);
+		status = EIO;
 	}
 	rv = ldc_mem_unmap(task->mhdl);
 	if (rv) {
-		PR0("ldc_mem_unmap() returned err %d ", status);
+		PR0("ldc_mem_unmap() returned err %d ", rv);
+		status = EIO;
 	}
 
 	biofini(buf);
+
 	return (status);
 }
 
+/*
+ * This function should only be called from vd_notify to ensure that requests
+ * are responded to in the order that they are received.
+ */
 static int
 send_msg(ldc_handle_t ldc_handle, void *msg, size_t msglen)
 {
@@ -1179,11 +1213,19 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status, int elem_nbytes)
 	return (accepted ? 0 : EINVAL);
 }
 
-static void
-vd_complete_bio(void *arg)
+/*
+ * Return Values
+ *	0	- operation completed successfully
+ *	EIO	- encountered LDC / task error
+ *
+ * Side Effect
+ *	sets request->status = <disk operation status>
+ */
+static int
+vd_complete_bio(vd_task_t *task)
 {
 	int			status		= 0;
-	vd_task_t		*task		= (vd_task_t *)arg;
+	int			rv		= 0;
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
 	struct buf		*buf		= &task->buf;
@@ -1194,8 +1236,9 @@ vd_complete_bio(void *arg)
 	ASSERT(task->msg != NULL);
 	ASSERT(task->msglen >= sizeof (*task->msg));
 	ASSERT(!vd->file);
+	ASSERT(request->slice != VD_SLICE_NONE);
 
-	/* Wait for the I/O to complete */
+	/* Wait for the I/O to complete [ call to ldi_strategy(9f) ] */
 	request->status = biowait(buf);
 
 	/* return back the number of bytes read/written */
@@ -1210,6 +1253,7 @@ vd_complete_bio(void *arg)
 		if (status == ECONNRESET) {
 			vd_mark_in_reset(vd);
 		}
+		rv = EIO;
 	}
 
 	/* Unmap the memory, even if in reset */
@@ -1220,13 +1264,81 @@ vd_complete_bio(void *arg)
 		if (status == ECONNRESET) {
 			vd_mark_in_reset(vd);
 		}
+		rv = EIO;
 	}
 
 	biofini(buf);
 
+	return (rv);
+}
+
+/*
+ * Description:
+ *	This function is called by the two functions called by a taskq
+ *	[ vd_complete_notify() and vd_serial_notify()) ] to send the
+ *	message to the client.
+ *
+ * Parameters:
+ *	arg 	- opaque pointer to structure containing task to be completed
+ *
+ * Return Values
+ *	None
+ */
+static void
+vd_notify(vd_task_t *task)
+{
+	int	status;
+
+	ASSERT(task != NULL);
+	ASSERT(task->vd != NULL);
+
+	if (task->vd->reset_state)
+		return;
+
+	/*
+	 * Send the "ack" or "nack" back to the client; if sending the message
+	 * via LDC fails, arrange to reset both the connection state and LDC
+	 * itself
+	 */
+	PR2("Sending %s",
+	    (task->msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
+
+	status = send_msg(task->vd->ldc_handle, task->msg, task->msglen);
+	switch (status) {
+	case 0:
+		break;
+	case ECONNRESET:
+		vd_mark_in_reset(task->vd);
+		break;
+	default:
+		PR0("initiating full reset");
+		vd_need_reset(task->vd, B_TRUE);
+		break;
+	}
+
+	DTRACE_PROBE1(task__end, vd_task_t *, task);
+}
+
+/*
+ * Description:
+ *	Mark the Dring entry as Done and (if necessary) send an ACK/NACK to
+ *	the vDisk client
+ *
+ * Parameters:
+ *	task 		- structure containing the request sent from client
+ *
+ * Return Values
+ *	None
+ */
+static void
+vd_complete_notify(vd_task_t *task)
+{
+	int			status		= 0;
+	vd_t			*vd		= task->vd;
+	vd_dring_payload_t	*request	= task->request;
+
 	/* Update the dring element for a dring client */
-	if (!vd->reset_state && (status == 0) &&
-	    (vd->xfer_mode == VIO_DRING_MODE)) {
+	if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE)) {
 		status = vd_mark_elem_done(vd, task->index,
 		    request->status, request->nbytes);
 		if (status == ECONNRESET)
@@ -1234,10 +1346,11 @@ vd_complete_bio(void *arg)
 	}
 
 	/*
-	 * If a transport error occurred, arrange to "nack" the message when
-	 * the final task in the descriptor element range completes
+	 * If a transport error occurred while marking the element done or
+	 * previously while executing the task, arrange to "nack" the message
+	 * when the final task in the descriptor element range completes
 	 */
-	if (status != 0)
+	if ((status != 0) || (task->status != 0))
 		task->msg->tag.vio_subtype = VIO_SUBTYPE_NACK;
 
 	/*
@@ -1248,27 +1361,28 @@ vd_complete_bio(void *arg)
 		return;
 	}
 
-	/*
-	 * Send the "ack" or "nack" back to the client; if sending the message
-	 * via LDC fails, arrange to reset both the connection state and LDC
-	 * itself
-	 */
-	PR1("Sending %s",
-	    (task->msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
-	if (!vd->reset_state) {
-		status = send_msg(vd->ldc_handle, task->msg, task->msglen);
-		switch (status) {
-		case 0:
-			break;
-		case ECONNRESET:
-			vd_mark_in_reset(vd);
-			break;
-		default:
-			PR0("initiating full reset");
-			vd_need_reset(vd, B_TRUE);
-			break;
-		}
-	}
+	vd_notify(task);
+}
+
+/*
+ * Description:
+ *	This is the basic completion function called to handle inband data
+ *	requests and handshake messages. All it needs to do is trigger a
+ *	message to the client that the request is completed.
+ *
+ * Parameters:
+ *	arg 	- opaque pointer to structure containing task to be completed
+ *
+ * Return Values
+ *	None
+ */
+static void
+vd_serial_notify(void *arg)
+{
+	vd_task_t		*task = (vd_task_t *)arg;
+
+	ASSERT(task != NULL);
+	vd_notify(task);
 }
 
 static void
@@ -1389,6 +1503,12 @@ vd_lbl2cksum(struct dk_label *label)
 
 /*
  * Handle ioctls to a disk slice.
+ *
+ * Return Values
+ *	0	- Indicates that there are no errors in disk operations
+ *	ENOTSUP	- Unknown disk label type or unsupported DKIO ioctl
+ *	EINVAL	- Not enough room to copy the EFI label
+ *
  */
 static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
@@ -1430,12 +1550,17 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		}
 
 	default:
+		/* Unknown disk label type */
 		return (ENOTSUP);
 	}
 }
 
 /*
- * Handle ioctls to a disk image.
+ * Handle ioctls to a disk image (file-based).
+ *
+ * Return Values
+ *	0	- Indicates that there are no errors
+ *	!= 0	- Disk operation returned an error
  */
 static int
 vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
@@ -1616,10 +1741,23 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	}
 }
 
+/*
+ * Description:
+ *	This is the function that processes the ioctl requests (farming it
+ *	out to functions that handle slices, files or whole disks)
+ *
+ * Return Values
+ *     0		- ioctl operation completed successfully
+ *     != 0		- The LDC error value encountered
+ *			  (propagated back up the call stack as a task error)
+ *
+ * Side Effect
+ *     sets request->status to the return value of the ioctl function.
+ */
 static int
 vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 {
-	int	rval = 0, status;
+	int	rval = 0, status = 0;
 	size_t	nbytes = request->nbytes;	/* modifiable copy */
 
 
@@ -1650,25 +1788,30 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	 * real driver perform the ioctl()
 	 */
 	if (vd->file) {
-		if ((status = vd_do_file_ioctl(vd, ioctl->cmd,
-		    (void *)ioctl->arg)) != 0)
-			return (status);
+		request->status =
+		    vd_do_file_ioctl(vd, ioctl->cmd, (void *)ioctl->arg);
+
 	} else if (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo) {
-		if ((status = vd_do_slice_ioctl(vd, ioctl->cmd,
-		    (void *)ioctl->arg)) != 0)
-			return (status);
-	} else if ((status = ldi_ioctl(vd->ldi_handle[request->slice],
-	    ioctl->cmd, (intptr_t)ioctl->arg, (vd_open_flags | FKIOCTL),
-	    kcred, &rval)) != 0) {
-		PR0("ldi_ioctl(%s) = errno %d", ioctl->cmd_name, status);
-		return (status);
-	}
+		request->status =
+		    vd_do_slice_ioctl(vd, ioctl->cmd, (void *)ioctl->arg);
+
+	} else {
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    ioctl->cmd, (intptr_t)ioctl->arg, (vd_open_flags | FKIOCTL),
+		    kcred, &rval);
+
 #ifdef DEBUG
-	if (rval != 0) {
-		PR0("%s set rval = %d, which is not being returned to client",
-		    ioctl->cmd_name, rval);
-	}
+		if (rval != 0) {
+			PR0("%s set rval = %d, which is not being returned to"
+			    " client", ioctl->cmd_name, rval);
+		}
 #endif /* DEBUG */
+	}
+
+	if (request->status != 0) {
+		PR0("ioctl(%s) = errno %d", ioctl->cmd_name, request->status);
+		return (0);
+	}
 
 	/* Convert data and send to client, if necessary */
 	if (ioctl->copyout != NULL)  {
@@ -1692,6 +1835,36 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 }
 
 #define	RNDSIZE(expr) P2ROUNDUP(sizeof (expr), sizeof (uint64_t))
+
+/*
+ * Description:
+ *	This generic function is called by the task queue to complete
+ *	the processing of the tasks. The specific completion function
+ *	is passed in as a field in the task pointer.
+ *
+ * Parameters:
+ *	arg 	- opaque pointer to structure containing task to be completed
+ *
+ * Return Values
+ *	None
+ */
+static void
+vd_complete(void *arg)
+{
+	vd_task_t	*task = (vd_task_t *)arg;
+
+	ASSERT(task != NULL);
+	ASSERT(task->status == EINPROGRESS);
+	ASSERT(task->completef != NULL);
+
+	task->status = task->completef(task);
+	if (task->status)
+		PR0("%s: Error %d completing task", __func__, task->status);
+
+	/* Now notify the vDisk client */
+	vd_complete_notify(task);
+}
+
 static int
 vd_ioctl(vd_task_t *task)
 {
@@ -1782,7 +1955,6 @@ vd_ioctl(vd_task_t *task)
 	if (request->nbytes)
 		kmem_free(buf, request->nbytes);
 
-	PR0("Returning %d", status);
 	return (status);
 }
 
@@ -1801,7 +1973,8 @@ vd_get_devid(vd_task_t *task)
 	if (vd->file) {
 		if (vd->file_devid == NULL) {
 			PR2("No Device ID");
-			return (ENOENT);
+			request->status = ENOENT;
+			return (0);
 		} else {
 			sz = ddi_devid_sizeof(vd->file_devid);
 			devid = kmem_alloc(sz, KM_SLEEP);
@@ -1811,7 +1984,8 @@ vd_get_devid(vd_task_t *task)
 		if (ddi_lyr_get_devid(vd->dev[request->slice],
 		    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
 			PR2("No Device ID");
-			return (ENOENT);
+			request->status = ENOENT;
+			return (0);
 		}
 	}
 
@@ -1876,22 +2050,36 @@ static const size_t	vds_noperations =
 
 /*
  * Process a task specifying a client I/O request
+ *
+ * Parameters:
+ *	task 		- structure containing the request sent from client
+ *
+ * Return Value
+ *	0	- success
+ *	ENOTSUP	- Unknown/Unsupported VD_OP_XXX operation
+ *	EINVAL	- Invalid disk slice
+ *	!= 0	- some other non-zero return value from start function
  */
 static int
-vd_process_task(vd_task_t *task)
+vd_do_process_task(vd_task_t *task)
 {
-	int			i, status;
+	int			i;
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
-
 
 	ASSERT(vd != NULL);
 	ASSERT(request != NULL);
 
 	/* Find the requested operation */
-	for (i = 0; i < vds_noperations; i++)
-		if (request->operation == vds_operation[i].operation)
+	for (i = 0; i < vds_noperations; i++) {
+		if (request->operation == vds_operation[i].operation) {
+			/* all operations should have a start func */
+			ASSERT(vds_operation[i].start != NULL);
+
+			task->completef = vds_operation[i].complete;
 			break;
+		}
+	}
 	if (i == vds_noperations) {
 		PR0("Unsupported operation %u", request->operation);
 		return (ENOTSUP);
@@ -1906,34 +2094,72 @@ vd_process_task(vd_task_t *task)
 		return (EINVAL);
 	}
 
-	PR1("operation : %s", vds_operation[i].namep);
+	/*
+	 * Call the function pointer that starts the operation.
+	 */
+	return (vds_operation[i].start(task));
+}
 
-	/* Start the operation */
-	if ((status = vds_operation[i].start(task)) != EINPROGRESS) {
-		PR0("operation : %s returned status %d",
-		    vds_operation[i].namep, status);
-		request->status = status;	/* op succeeded or failed */
-		return (0);			/* but request completed */
+/*
+ * Description:
+ *	This function is called by both the in-band and descriptor ring
+ *	message processing functions paths to actually execute the task
+ *	requested by the vDisk client. It in turn calls its worker
+ *	function, vd_do_process_task(), to carry our the request.
+ *
+ *	Any transport errors (e.g. LDC errors, vDisk protocol errors) are
+ *	saved in the 'status' field of the task and are propagated back
+ *	up the call stack to trigger a NACK
+ *
+ *	Any request errors (e.g. ENOTTY from an ioctl) are saved in
+ *	the 'status' field of the request and result in an ACK being sent
+ *	by the completion handler.
+ *
+ * Parameters:
+ *	task 		- structure containing the request sent from client
+ *
+ * Return Value
+ *	0		- successful synchronous request.
+ *	!= 0		- transport error (e.g. LDC errors, vDisk protocol)
+ *	EINPROGRESS	- task will be finished in a completion handler
+ */
+static int
+vd_process_task(vd_task_t *task)
+{
+	vd_t	*vd = task->vd;
+	int	status;
+
+	DTRACE_PROBE1(task__start, vd_task_t *, task);
+
+	task->status =  vd_do_process_task(task);
+
+	/*
+	 * If the task processing function returned EINPROGRESS indicating
+	 * that the task needs completing then schedule a taskq entry to
+	 * finish it now.
+	 *
+	 * Otherwise the task processing function returned either zero
+	 * indicating that the task was finished in the start function (and we
+	 * don't need to wait in a completion function) or the start function
+	 * returned an error - in both cases all that needs to happen is the
+	 * notification to the vDisk client higher up the call stack.
+	 * If the task was using a Descriptor Ring, we need to mark it as done
+	 * at this stage.
+	 */
+	if (task->status == EINPROGRESS) {
+		/* Queue a task to complete the operation */
+		(void) ddi_taskq_dispatch(vd->completionq, vd_complete,
+		    task, DDI_SLEEP);
+
+	} else if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE)) {
+		/* Update the dring element if it's a dring client */
+		status = vd_mark_elem_done(vd, task->index,
+		    task->request->status, task->request->nbytes);
+		if (status == ECONNRESET)
+			vd_mark_in_reset(vd);
 	}
 
-	ASSERT(vds_operation[i].complete != NULL);	/* debug case */
-	if (vds_operation[i].complete == NULL) {	/* non-debug case */
-		PR0("Unexpected return of EINPROGRESS "
-		    "with no I/O completion handler");
-		request->status = EIO;	/* operation failed */
-		return (0);		/* but request completed */
-	}
-
-	PR1("operation : kick off taskq entry for %s", vds_operation[i].namep);
-
-	/* Queue a task to complete the operation */
-	status = ddi_taskq_dispatch(vd->completionq, vds_operation[i].complete,
-	    task, DDI_SLEEP);
-	/* ddi_taskq_dispatch(9f) guarantees success with DDI_SLEEP */
-	ASSERT(status == DDI_SUCCESS);
-
-	PR1("Operation in progress");
-	return (EINPROGRESS);	/* completion handler will finish request */
+	return (task->status);
 }
 
 /*
@@ -2493,12 +2719,7 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 	bcopy(msg, vd->dring_task[idx].msg, msglen);
 
 	vd->dring_task[idx].msglen	= msglen;
-	if ((status = vd_process_task(&vd->dring_task[idx])) != EINPROGRESS)
-		status = vd_mark_elem_done(vd, idx,
-		    vd->dring_task[idx].request->status,
-		    vd->dring_task[idx].request->nbytes);
-
-	return (status);
+	return (vd_process_task(&vd->dring_task[idx]));
 }
 
 static int
@@ -2765,7 +2986,7 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	int		status;
 	boolean_t	reset_ldc = B_FALSE;
-
+	vd_task_t	task;
 
 	/*
 	 * Check that the message is at least big enough for a "tag", so that
@@ -2796,12 +3017,12 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		_NOTE(FALLTHROUGH);
 	case EBADMSG:
 	case ENOTSUP:
-		/* "nack" invalid messages */
+		/* "transport" error will cause NACK of invalid messages */
 		msg->tag.vio_subtype = VIO_SUBTYPE_NACK;
 		break;
 
 	default:
-		/* "nack" failed messages */
+		/* "transport" error will cause NACK of invalid messages */
 		msg->tag.vio_subtype = VIO_SUBTYPE_NACK;
 		/* An LDC error probably occurred, so try resetting it */
 		reset_ldc = B_TRUE;
@@ -2811,11 +3032,26 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	PR1("\tResulting in state %d (%s)", vd->state,
 	    vd_decode_state(vd->state));
 
-	/* Send the "ack" or "nack" to the client */
-	PR1("Sending %s",
-	    (msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
-	if (send_msg(vd->ldc_handle, msg, msglen) != 0)
-		reset_ldc = B_TRUE;
+	/* populate the task so we can dispatch it on the taskq */
+	task.vd = vd;
+	task.msg = msg;
+	task.msglen = msglen;
+
+	/*
+	 * Queue a task to send the notification that the operation completed.
+	 * We need to ensure that requests are responded to in the correct
+	 * order and since the taskq is processed serially this ordering
+	 * is maintained.
+	 */
+	(void) ddi_taskq_dispatch(vd->completionq, vd_serial_notify,
+	    &task, DDI_SLEEP);
+
+	/*
+	 * To ensure handshake negotiations do not happen out of order, such
+	 * requests that come through this path should not be done in parallel
+	 * so we need to wait here until the response is sent to the client.
+	 */
+	ddi_taskq_wait(vd->completionq);
 
 	/* Arrange to reset the connection for nack'ed or failed messages */
 	if ((status != 0) || reset_ldc) {
@@ -2831,7 +3067,6 @@ static boolean_t
 vd_enabled(vd_t *vd)
 {
 	boolean_t	enabled;
-
 
 	mutex_enter(&vd->lock);
 	enabled = vd->enabled;
@@ -3383,7 +3618,7 @@ vd_setup_file(vd_t *vd)
 		(void) ldi_close(lhandle, FREAD, kcred);
 	}
 
-	PR0("using for file %s, dev %s, max_xfer = %u blks",
+	PR0("using file %s, dev %s, max_xfer = %u blks",
 	    file_path, dev_path, vd->max_xfer_sz);
 
 	vd->dk_geom.dkg_ncyl = label.dkl_ncyl;
@@ -4171,7 +4406,7 @@ static struct dev_ops vds_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"virtual disk server v%I%",
+	"virtual disk server",
 	&vds_ops,
 };
 

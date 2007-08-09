@@ -294,7 +294,7 @@ static	struct	dev_ops	vsw_ops = {
 extern	struct	mod_ops	mod_driverops;
 static struct modldrv vswmodldrv = {
 	&mod_driverops,
-	"sun4v Virtual Switch %I%",
+	"sun4v Virtual Switch",
 	&vsw_ops,
 };
 
@@ -577,20 +577,20 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* setup the unicast forwarding database  */
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_unicst_table-%d",
-							vswp->instance);
+	    vswp->instance);
 	D2(vswp, "creating unicast hash table (%s)...", hashname);
 	vswp->fdb = mod_hash_create_ptrhash(hashname, VSW_NCHAINS,
-		mod_hash_null_valdtor, sizeof (void *));
+	    mod_hash_null_valdtor, sizeof (void *));
 
 	progress |= PROG_fdb;
 
 	/* setup the multicast fowarding database */
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_mcst_table-%d",
-							vswp->instance);
+	    vswp->instance);
 	D2(vswp, "creating multicast hash table %s)...", hashname);
 	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
 	vswp->mfdb = mod_hash_create_ptrhash(hashname, VSW_NCHAINS,
-			mod_hash_null_valdtor, sizeof (void *));
+	    mod_hash_null_valdtor, sizeof (void *));
 
 	progress |= PROG_mfdb;
 
@@ -622,9 +622,9 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) snprintf(qname, TASKQ_NAMELEN, "vsw_taskq%d", vswp->instance);
 	if ((vswp->taskq_p = ddi_taskq_create(vswp->dip, qname, 1,
-					TASKQ_DEFAULTPRI, 0)) == NULL) {
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to create task queue",
-			vswp->instance);
+		    vswp->instance);
 		goto vsw_attach_fail;
 	}
 
@@ -632,9 +632,9 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* prevent auto-detaching */
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, vswp->dip,
-				DDI_NO_AUTODETACH, 1) != DDI_SUCCESS) {
+	    DDI_NO_AUTODETACH, 1) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "!Unable to set \"%s\" property for "
-			"instance %u", DDI_NO_AUTODETACH, instance);
+		    "instance %u", DDI_NO_AUTODETACH, instance);
 	}
 
 	/*
@@ -722,7 +722,7 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vswp->if_state & VSW_IF_REG) {
 		if (vsw_mac_unregister(vswp) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: Unable to detach from "
-				"MAC layer", vswp->instance);
+			    "MAC layer", vswp->instance);
 			return (DDI_FAILURE);
 		}
 	}
@@ -739,7 +739,7 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (vsw_detach_ports(vswp) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to detach ports",
-							vswp->instance);
+		    vswp->instance);
 		return (DDI_FAILURE);
 	}
 
@@ -879,18 +879,18 @@ vsw_get_md_physname(vsw_t *vswp, md_t *mdp, mde_cookie_t node, char *name)
 	char	*dev;
 
 	if (md_get_prop_data(mdp, node, physdev_propname,
-				(uint8_t **)(&physname), &len) != 0) {
+	    (uint8_t **)(&physname), &len) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to get name(s) of physical "
-				"device(s) from MD", vswp->instance);
+		    "device(s) from MD", vswp->instance);
 		return (1);
 	} else if ((strlen(physname) + 1) > LIFNAMSIZ) {
 		cmn_err(CE_WARN, "!vsw%d: %s is too long a device name",
-			vswp->instance, physname);
+		    vswp->instance, physname);
 		return (1);
 	} else {
 		(void) strncpy(name, physname, strlen(physname) + 1);
 		D2(vswp, "%s: using first device specified (%s)",
-			__func__, physname);
+		    __func__, physname);
 	}
 
 #ifdef DEBUG
@@ -904,15 +904,15 @@ vsw_get_md_physname(vsw_t *vswp, md_t *mdp, mde_cookie_t node, char *name)
 	 * we just use the first one.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, vswp->dip, 0,
-		"vsw_physname", &dev) == DDI_PROP_SUCCESS) {
+	    "vsw_physname", &dev) == DDI_PROP_SUCCESS) {
 		if ((strlen(dev) + 1) > LIFNAMSIZ) {
 			cmn_err(CE_WARN, "vsw%d: %s is too long a device name",
-				vswp->instance, dev);
+			    vswp->instance, dev);
 			ddi_prop_free(dev);
 			return (1);
 		} else {
 			cmn_err(CE_NOTE, "vsw%d: Using device name (%s) from "
-				"config file", vswp->instance, dev);
+			    "config file", vswp->instance, dev);
 
 			(void) strncpy(name, dev, strlen(dev) + 1);
 		}
@@ -949,13 +949,13 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	len = 0;
 	smode_num = 0;
 	if (md_get_prop_data(mdp, node, smode_propname,
-				(uint8_t **)(&smode), &len) != 0) {
+	    (uint8_t **)(&smode), &len) != 0) {
 		/*
 		 * Unable to get switch-mode property from MD, nothing
 		 * more we can do.
 		 */
 		cmn_err(CE_WARN, "!vsw%d: Unable to get switch mode property"
-			" from the MD", vswp->instance);
+		    " from the MD", vswp->instance);
 		*found = 0;
 		return (1);
 	}
@@ -980,8 +980,8 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 			modes[smode_num++] = VSW_LAYER3;
 		} else {
 			cmn_err(CE_WARN, "!vsw%d: Unknown switch mode %s, "
-				"setting to default switched mode",
-				vswp->instance, curr_mode);
+			    "setting to default switched mode",
+			    vswp->instance, curr_mode);
 			modes[smode_num++] = VSW_LAYER2;
 		}
 		curr_mode += strlen(curr_mode) + 1;
@@ -1014,7 +1014,7 @@ vsw_get_physaddr(vsw_t *vswp)
 
 	if (mac_open(vswp->physname, ddi_instance, &mh) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: mac_open %s failed",
-				vswp->instance, vswp->physname);
+		    vswp->instance, vswp->physname);
 		return (1);
 	}
 
@@ -1051,15 +1051,15 @@ vsw_get_hw_maddr(vsw_t *vswp)
 
 	if (!mac_capab_get(vswp->mh, MAC_CAPAB_MULTIADDRESS, &vswp->maddr)) {
 		cmn_err(CE_WARN, "!vsw%d: device (%s) does not support "
-			"setting multiple unicast addresses", vswp->instance,
-			vswp->physname);
+		    "setting multiple unicast addresses", vswp->instance,
+		    vswp->physname);
 		mutex_exit(&vswp->mac_lock);
 		return (1);
 	}
 	mutex_exit(&vswp->mac_lock);
 
 	D2(vswp, "%s: %d addrs : %d free", __func__,
-		vswp->maddr.maddr_naddr, vswp->maddr.maddr_naddrfree);
+	    vswp->maddr.maddr_naddr, vswp->maddr.maddr_naddrfree);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1103,12 +1103,12 @@ vsw_setup_switching(vsw_t *vswp)
 
 	if (rv == 1) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to setup specified "
-			"switching mode", vswp->instance);
+		    "switching mode", vswp->instance);
 		return (rv);
 	}
 
 	D2(vswp, "%s: Operating in mode %d", __func__,
-					vswp->smode[vswp->smode_idx]);
+	    vswp->smode[vswp->smode_idx]);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1139,7 +1139,7 @@ vsw_setup_layer2(vsw_t *vswp)
 			 * prefered switching method.
 			 */
 			cmn_err(CE_WARN, "!vsw%d: Unable to join as MAC layer "
-				"client", vswp->instance);
+			    "client", vswp->instance);
 			return (1);
 		}
 
@@ -1150,7 +1150,7 @@ vsw_setup_layer2(vsw_t *vswp)
 			 */
 			if (vsw_get_hw_maddr(vswp) != 0) {
 				cmn_err(CE_WARN, "!vsw%d: Unable to setup "
-					"layer2 switching", vswp->instance);
+				    "layer2 switching", vswp->instance);
 				vsw_mac_detach(vswp);
 				return (1);
 			}
@@ -1162,7 +1162,7 @@ vsw_setup_layer2(vsw_t *vswp)
 		 * required for layer 2.
 		 */
 		cmn_err(CE_WARN, "!vsw%d: no physical device name specified",
-			vswp->instance);
+		    vswp->instance);
 		return (1);
 	}
 
@@ -1209,13 +1209,13 @@ vsw_mac_attach(vsw_t *vswp)
 	mutex_enter(&vswp->mac_lock);
 	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "!vsw%d: invalid device name: %s",
-			vswp->instance, vswp->physname);
+		    vswp->instance, vswp->physname);
 		goto mac_fail_exit;
 	}
 
 	if ((mac_open(vswp->physname, ddi_instance, &vswp->mh)) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: mac_open %s failed",
-			vswp->instance, vswp->physname);
+		    vswp->instance, vswp->physname);
 		goto mac_fail_exit;
 	}
 
@@ -1233,7 +1233,7 @@ vsw_mac_attach(vsw_t *vswp)
 		 * Register our rx callback function.
 		 */
 		vswp->mrh = mac_rx_add(vswp->mh,
-			vsw_rx_queue_cb, (void *)vswp);
+		    vsw_rx_queue_cb, (void *)vswp);
 		ASSERT(vswp->mrh != NULL);
 
 		/*
@@ -1261,7 +1261,7 @@ vsw_mac_attach(vsw_t *vswp)
 	/* start the interface */
 	if (mac_start(vswp->mh) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Could not start mac interface",
-			vswp->instance);
+		    vswp->instance);
 		goto mac_fail_exit;
 	}
 
@@ -1389,8 +1389,8 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 		 * set the card into that mode.
 		 */
 		if ((vswp->smode_idx <= (vswp->smode_num - 2)) &&
-			(vswp->smode[vswp->smode_idx + 1]
-					== VSW_LAYER2_PROMISC)) {
+		    (vswp->smode[vswp->smode_idx + 1] ==
+		    VSW_LAYER2_PROMISC)) {
 			vswp->smode_idx += 1;
 			return (vsw_set_hw_promisc(vswp, port, type));
 		}
@@ -1406,11 +1406,11 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 	}
 
 	D2(vswp, "programmed addr %x:%x:%x:%x:%x:%x into slot %d "
-		"of device %s",
-		mac_addr.mma_addr[0], mac_addr.mma_addr[1],
-		mac_addr.mma_addr[2], mac_addr.mma_addr[3],
-		mac_addr.mma_addr[4], mac_addr.mma_addr[5],
-		mac_addr.mma_slot, vswp->physname);
+	    "of device %s",
+	    mac_addr.mma_addr[0], mac_addr.mma_addr[1],
+	    mac_addr.mma_addr[2], mac_addr.mma_addr[3],
+	    mac_addr.mma_addr[4], mac_addr.mma_addr[5],
+	    mac_addr.mma_slot, vswp->physname);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1510,11 +1510,11 @@ vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
 	 */
 	if (rv != ENOSPC) {
 		cmn_err(CE_WARN, "!vsw%d: error programming "
-			"address %x:%x:%x:%x:%x:%x into HW "
-			"err (%d)", vswp->instance,
-			mac->mma_addr[0], mac->mma_addr[1],
-			mac->mma_addr[2], mac->mma_addr[3],
-			mac->mma_addr[4], mac->mma_addr[5], rv);
+		    "address %x:%x:%x:%x:%x:%x into HW "
+		    "err (%d)", vswp->instance,
+		    mac->mma_addr[0], mac->mma_addr[1],
+		    mac->mma_addr[2], mac->mma_addr[3],
+		    mac->mma_addr[4], mac->mma_addr[5], rv);
 	}
 	D1(vswp, "%s: exit", __func__);
 	return (1);
@@ -1545,13 +1545,13 @@ vsw_unset_hw_addr(vsw_t *vswp, int slot)
 	rv = vswp->maddr.maddr_remove(mah, slot);
 	if (rv != 0) {
 		cmn_err(CE_WARN, "!vsw%d: unable to remove address "
-			"from slot %d in device %s (err %d)",
-			vswp->instance, slot, vswp->physname, rv);
+		    "from slot %d in device %s (err %d)",
+		    vswp->instance, slot, vswp->physname, rv);
 		return (1);
 	}
 
 	D2(vswp, "removed addr from slot %d in device %s",
-		slot, vswp->physname);
+	    slot, vswp->physname);
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
@@ -1583,7 +1583,7 @@ vsw_set_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
 			return (1);
 		}
 		cmn_err(CE_NOTE, "!vsw%d: switching device %s into "
-			"promiscuous mode", vswp->instance, vswp->physname);
+		    "promiscuous mode", vswp->instance, vswp->physname);
 	}
 	mutex_exit(&vswp->mac_lock);
 
@@ -1637,12 +1637,10 @@ vsw_unset_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
 		 */
 		if (plist->num_ports != 0) {
 			cmn_err(CE_NOTE, "!vsw%d: switching device %s back to "
-				"programmed mode", vswp->instance,
-				vswp->physname);
+			    "programmed mode", vswp->instance, vswp->physname);
 		} else {
 			cmn_err(CE_NOTE, "!vsw%d: switching device %s out of "
-				"promiscuous mode", vswp->instance,
-				vswp->physname);
+			    "promiscuous mode", vswp->instance, vswp->physname);
 		}
 	}
 	mutex_exit(&vswp->mac_lock);
@@ -1749,7 +1747,7 @@ vsw_prog_if(vsw_t *vswp)
 
 	READ_ENTER(&vswp->if_lockrw);
 	if ((vswp->if_state & VSW_IF_UP) &&
-		(vswp->addr_set != VSW_ADDR_HW)) {
+	    (vswp->addr_set != VSW_ADDR_HW)) {
 
 		addr.mma_addrlen = ETHERADDRL;
 		ether_copy(&vswp->if_addr, &addr.mma_addr);
@@ -1824,7 +1822,7 @@ vsw_prog_ports(vsw_t *vswp)
 			 */
 			if (tp->addr_set == VSW_ADDR_PROMISC)
 				(void) vsw_unset_hw_promisc(vswp,
-						tp, VSW_VNETPORT);
+				    tp, VSW_VNETPORT);
 
 			tp->addr_set = VSW_ADDR_HW;
 		}
@@ -1854,8 +1852,7 @@ vsw_mac_ring_tbl_init(vsw_t *vswp)
 
 	vswp->mac_ring_tbl_sz = vsw_mac_rx_rings;
 	vswp->mac_ring_tbl  =
-		kmem_alloc(vsw_mac_rx_rings * sizeof (vsw_mac_ring_t),
-		KM_SLEEP);
+	    kmem_alloc(vsw_mac_rx_rings * sizeof (vsw_mac_ring_t), KM_SLEEP);
 
 	for (i = 0; i < vswp->mac_ring_tbl_sz; i++)
 		vsw_mac_ring_tbl_entry_init(vswp, &vswp->mac_ring_tbl[i]);
@@ -1888,7 +1885,7 @@ vsw_mac_ring_tbl_destroy(vsw_t *vswp)
 
 	mutex_destroy(&vswp->mac_ring_lock);
 	kmem_free(vswp->mac_ring_tbl,
-		vswp->mac_ring_tbl_sz * sizeof (vsw_mac_ring_t));
+	    vswp->mac_ring_tbl_sz * sizeof (vsw_mac_ring_t));
 	vswp->mac_ring_tbl_sz = 0;
 }
 
@@ -1945,8 +1942,8 @@ vsw_mac_ring_add_cb(void *arg, mac_resource_t *mrp)
 			 * Create the worker thread.
 			 */
 			vqp->vq_worker = thread_create(NULL, 0,
-				vsw_queue_worker, ringp, 0, &p0,
-				TS_RUN, minclsyspri);
+			    vsw_queue_worker, ringp, 0, &p0,
+			    TS_RUN, minclsyspri);
 			if (vqp->vq_worker == NULL) {
 				vsw_queue_destroy(vqp);
 				vsw_mac_ring_tbl_entry_init(vswp, ringp);
@@ -1960,7 +1957,7 @@ vsw_mac_ring_add_cb(void *arg, mac_resource_t *mrp)
 				 */
 				mutex_enter(&vqp->vq_lock);
 				while ((vqp->vq_state != VSW_QUEUE_RUNNING) &&
-					(vqp->vq_state != VSW_QUEUE_DRAINED)) {
+				    (vqp->vq_state != VSW_QUEUE_DRAINED)) {
 					cv_wait(&vqp->vq_cv, &vqp->vq_lock);
 				}
 
@@ -1970,7 +1967,7 @@ vsw_mac_ring_add_cb(void *arg, mac_resource_t *mrp)
 				if (vqp->vq_state == VSW_QUEUE_DRAINED) {
 					vsw_queue_destroy(vqp);
 					vsw_mac_ring_tbl_entry_init(vswp,
-						ringp);
+					    ringp);
 					ringp = NULL;
 				}
 				mutex_exit(&vqp->vq_lock);
@@ -2055,7 +2052,7 @@ vsw_queue_worker(vsw_mac_ring_t *rrp)
 		 * to not running.
 		 */
 		while ((vqp->vq_state == VSW_QUEUE_RUNNING) &&
-				(vqp->vq_first == NULL)) {
+		    (vqp->vq_first == NULL)) {
 			cv_wait(&vqp->vq_cv, &vqp->vq_lock);
 		}
 
@@ -2072,7 +2069,7 @@ vsw_queue_worker(vsw_mac_ring_t *rrp)
 
 			/* switch the chain of packets received */
 			vswp->vsw_switch_frame(vswp, mp,
-						VSW_PHYSDEV, NULL, NULL);
+			    VSW_PHYSDEV, NULL, NULL);
 
 			mutex_enter(&vqp->vq_lock);
 		}
@@ -2271,7 +2268,7 @@ vsw_mac_unregister(vsw_t *vswp)
 		rv = mac_unregister(vswp->if_mh);
 		if (rv != 0) {
 			DWARN(vswp, "%s: unable to unregister from MAC "
-				"framework", __func__);
+			    "framework", __func__);
 
 			RW_EXIT(&vswp->if_lockrw);
 			D1(vswp, "%s: fail exit", __func__);
@@ -2415,8 +2412,8 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 				ret = mac_multicst_add(vswp->mh, mca);
 				if (ret != 0) {
 					cmn_err(CE_WARN, "!vsw%d: unable to "
-						"add multicast address",
-						vswp->instance);
+					    "add multicast address",
+					    vswp->instance);
 					mutex_exit(&vswp->mac_lock);
 					goto vsw_remove_addr;
 				}
@@ -2424,7 +2421,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			mutex_exit(&vswp->mac_lock);
 		} else {
 			cmn_err(CE_WARN, "!vsw%d: unable to add multicast "
-				"address", vswp->instance);
+			    "address", vswp->instance);
 		}
 		return (ret);
 	}
@@ -2514,10 +2511,10 @@ vsw_mdeg_register(vsw_t *vswp)
 	 * correct nodes.
 	 */
 	inst = ddi_prop_get_int(DDI_DEV_T_ANY, vswp->dip,
-		DDI_PROP_DONTPASS, reg_propname, -1);
+	    DDI_PROP_DONTPASS, reg_propname, -1);
 	if (inst == -1) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read %s property from "
-			"OBP device tree", vswp->instance, reg_propname);
+		    "OBP device tree", vswp->instance, reg_propname);
 		return (1);
 	}
 
@@ -2548,7 +2545,7 @@ vsw_mdeg_register(vsw_t *vswp)
 	    (void *)vswp, &mdeg_hdl);
 	if (rv != MDEG_SUCCESS) {
 		DERR(vswp, "%s: mdeg_register failed (%d) for vsw node",
-			__func__, rv);
+		    __func__, rv);
 		goto mdeg_reg_fail;
 	}
 
@@ -2573,7 +2570,7 @@ vsw_mdeg_register(vsw_t *vswp)
 
 mdeg_reg_fail:
 	cmn_err(CE_WARN, "!vsw%d: Unable to register MDEG callbacks",
-				vswp->instance);
+	    vswp->instance);
 	kmem_free(pspecp, templatesz);
 	kmem_free(inst_specp, sizeof (mdeg_node_spec_t));
 
@@ -2597,12 +2594,11 @@ vsw_mdeg_unregister(vsw_t *vswp)
 	if (vswp->inst_spec != NULL) {
 		if (vswp->inst_spec->specp != NULL) {
 			(void) kmem_free(vswp->inst_spec->specp,
-				sizeof (vsw_prop_template));
+			    sizeof (vsw_prop_template));
 			vswp->inst_spec->specp = NULL;
 		}
 
-		(void) kmem_free(vswp->inst_spec,
-			sizeof (mdeg_node_spec_t));
+		(void) kmem_free(vswp->inst_spec, sizeof (mdeg_node_spec_t));
 		vswp->inst_spec = NULL;
 	}
 
@@ -2628,9 +2624,9 @@ vsw_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	vswp = (vsw_t *)cb_argp;
 
 	D1(vswp, "%s: added %d : removed %d : curr matched %d"
-		" : prev matched %d", __func__, resp->added.nelem,
-		resp->removed.nelem, resp->match_curr.nelem,
-		resp->match_prev.nelem);
+	    " : prev matched %d", __func__, resp->added.nelem,
+	    resp->removed.nelem, resp->match_curr.nelem,
+	    resp->match_prev.nelem);
 
 	/*
 	 * Expect 'added' to be non-zero if virtual-network-switch
@@ -2642,18 +2638,18 @@ vsw_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
 			DERR(vswp, "%s: unable to get node name for "
-				"node(%d) 0x%lx", __func__, idx, node);
+			    "node(%d) 0x%lx", __func__, idx, node);
 			continue;
 		}
 
 		if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
 			DERR(vswp, "%s: prop(cfg-handle) not found port(%d)",
-				__func__, idx);
+			    __func__, idx);
 			continue;
 		}
 
 		D2(vswp, "%s: added node(%d) 0x%lx with name %s "
-			"and inst %d", __func__, idx, node, node_name, inst);
+		    "and inst %d", __func__, idx, node, node_name, inst);
 
 		vsw_get_initial_md_properties(vswp, mdp, node);
 	}
@@ -2670,18 +2666,18 @@ vsw_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
 			DERR(vswp, "%s: unable to get node name for "
-				"node(%d) 0x%lx", __func__, idx, node);
+			    "node(%d) 0x%lx", __func__, idx, node);
 			continue;
 		}
 
 		if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
 			DERR(vswp, "%s: prop(cfg-handle) not found port(%d)",
-				__func__, idx);
+			    __func__, idx);
 			continue;
 		}
 
 		D2(vswp, "%s: changed node(%d) 0x%lx with name %s "
-			"and inst %d", __func__, idx, node, node_name, inst);
+		    "and inst %d", __func__, idx, node, node_name, inst);
 
 		vsw_update_md_prop(vswp, mdp, node);
 	}
@@ -2708,9 +2704,9 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	vswp = (vsw_t *)cb_argp;
 
 	D2(vswp, "%s: added %d : removed %d : curr matched %d"
-		" : prev matched %d", __func__, resp->added.nelem,
-		resp->removed.nelem, resp->match_curr.nelem,
-		resp->match_prev.nelem);
+	    " : prev matched %d", __func__, resp->added.nelem,
+	    resp->removed.nelem, resp->match_curr.nelem,
+	    resp->match_prev.nelem);
 
 	/* process added ports */
 	for (idx = 0; idx < resp->added.nelem; idx++) {
@@ -2721,7 +2717,7 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		if (vsw_port_add(vswp, mdp, &node) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: Unable to add new port "
-				"(0x%lx)", vswp->instance, node);
+			    "(0x%lx)", vswp->instance, node);
 		}
 	}
 
@@ -2732,7 +2728,7 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		if (md_get_prop_val(mdp, node, id_propname, &inst)) {
 			DERR(vswp, "%s: prop(%s) not found in port(%d)",
-				__func__, id_propname, idx);
+			    __func__, id_propname, idx);
 			continue;
 		}
 
@@ -2740,7 +2736,7 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 		if (vsw_port_detach(vswp, inst) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: Unable to remove port %ld",
-				vswp->instance, inst);
+			    vswp->instance, inst);
 		}
 	}
 
@@ -2775,14 +2771,14 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			vswp->mdprops |= VSW_MD_PHYSNAME;
 	} else {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read name of physical "
-			"device from MD", vswp->instance);
+		    "device from MD", vswp->instance);
 		return;
 	}
 
 	/* mac address for vswitch device itself */
 	if (md_get_prop_val(mdp, node, macaddr_propname, &macaddr) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to get MAC address from MD",
-			vswp->instance);
+		    vswp->instance);
 
 		/*
 		 * Fallback to using the mac address of the physical
@@ -2790,12 +2786,11 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 */
 		if (vsw_get_physaddr(vswp) == 0) {
 			cmn_err(CE_NOTE, "!vsw%d: Using MAC address from "
-				"physical device (%s)", vswp->instance,
-				vswp->physname);
+			    "physical device (%s)", vswp->instance,
+			    vswp->physname);
 		} else {
 			cmn_err(CE_WARN, "!vsw%d: Unable to get MAC address"
-				"from device %s", vswp->instance,
-				vswp->physname);
+			    "from device %s", vswp->instance, vswp->physname);
 		}
 	} else {
 		WRITE_ENTER(&vswp->if_lockrw);
@@ -2807,11 +2802,10 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		vswp->mdprops |= VSW_MD_MACADDR;
 	}
 
-	if (vsw_get_md_smodes(vswp, mdp, node,
-				vswp->smode, &vswp->smode_num)) {
+	if (vsw_get_md_smodes(vswp, mdp, node, vswp->smode, &vswp->smode_num)) {
 		cmn_err(CE_WARN, "vsw%d: Unable to read %s property from "
-			"MD, defaulting to programmed mode", vswp->instance,
-			smode_propname);
+		    "MD, defaulting to programmed mode", vswp->instance,
+		    smode_propname);
 
 		for (i = 0; i < NUM_SMODES; i++)
 			vswp->smode[i] = VSW_LAYER2;
@@ -2839,7 +2833,7 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			 * able to operate in some other mode.
 			 */
 			cmn_err(CE_WARN, "vsw%d: Unable to register as "
-				"provider with MAC layer", vswp->instance);
+			    "provider with MAC layer", vswp->instance);
 		}
 	}
 
@@ -2889,26 +2883,25 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 * the vsw is being changed to 'routed' mode.
 		 */
 		if ((strlen(physname) != 0) &&
-			(ddi_parse(physname, drv,
-				&ddi_instance) != DDI_SUCCESS)) {
+		    (ddi_parse(physname, drv, &ddi_instance) != DDI_SUCCESS)) {
 			cmn_err(CE_WARN, "!vsw%d: new device name %s is not"
-				" a valid device name/instance",
-				vswp->instance, physname);
+			    " a valid device name/instance",
+			    vswp->instance, physname);
 			goto fail_reconf;
 		}
 
 		if (strcmp(physname, vswp->physname)) {
 			D2(vswp, "%s: device name changed from %s to %s",
-					__func__, vswp->physname, physname);
+			    __func__, vswp->physname, physname);
 
 			updated |= MD_physname;
 		} else {
 			D2(vswp, "%s: device name unchanged at %s",
-					__func__, vswp->physname);
+			    __func__, vswp->physname);
 		}
 	} else {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read name of physical "
-			"device from updated MD.", vswp->instance);
+		    "device from updated MD.", vswp->instance);
 		goto fail_reconf;
 	}
 
@@ -2917,17 +2910,17 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	 */
 	if (md_get_prop_val(mdp, node, macaddr_propname, &macaddr) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to get MAC address from MD",
-			vswp->instance);
+		    vswp->instance);
 		goto fail_reconf;
 	} else {
 		READ_ENTER(&vswp->if_lockrw);
 		for (i = ETHERADDRL - 1; i >= 0; i--) {
-			if (vswp->if_addr.ether_addr_octet[i]
-							!= (macaddr & 0xFF)) {
+			if (vswp->if_addr.ether_addr_octet[i] !=
+			    (macaddr & 0xFF)) {
 				D2(vswp, "%s: octet[%d] 0x%x != 0x%x",
-					__func__, i,
-					vswp->if_addr.ether_addr_octet[i],
-					(macaddr & 0xFF));
+				    __func__, i,
+				    vswp->if_addr.ether_addr_octet[i],
+				    (macaddr & 0xFF));
 				updated |= MD_macaddr;
 				break;
 			}
@@ -2939,22 +2932,21 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	/*
 	 * Check if switching modes have changed.
 	 */
-	if (vsw_get_md_smodes(vswp, mdp, node,
-				new_smode, &smode_num)) {
+	if (vsw_get_md_smodes(vswp, mdp, node, new_smode, &smode_num)) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read %s property from MD",
-					vswp->instance, smode_propname);
+		    vswp->instance, smode_propname);
 		goto fail_reconf;
 	} else {
 		ASSERT(smode_num != 0);
 		if (smode_num != vswp->smode_num) {
 			D2(vswp, "%s: number of modes changed from %d to %d",
-				__func__, vswp->smode_num, smode_num);
+			    __func__, vswp->smode_num, smode_num);
 		}
 
 		for (i = 0; i < smode_num; i++) {
 			if (new_smode[i] != vswp->smode[i]) {
 				D2(vswp, "%s: mode changed from %d to %d",
-					__func__, vswp->smode[i], new_smode[i]);
+				    __func__, vswp->smode[i], new_smode[i]);
 				updated |= MD_smode;
 				break;
 			}
@@ -2992,9 +2984,9 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 */
 		if (updated & MD_physname) {
 			cmn_err(CE_NOTE, "!vsw%d: changing from %s to %s",
-				vswp->instance, vswp->physname, physname);
+			    vswp->instance, vswp->physname, physname);
 			(void) strncpy(vswp->physname,
-					physname, strlen(physname) + 1);
+			    physname, strlen(physname) + 1);
 
 			if (strlen(vswp->physname) > 0)
 				vswp->mdprops |= VSW_MD_PHYSNAME;
@@ -3035,7 +3027,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 	if (updated & MD_macaddr) {
 		cmn_err(CE_NOTE, "!vsw%d: changing mac address to 0x%lx",
-				vswp->instance, macaddr);
+		    vswp->instance, macaddr);
 
 		WRITE_ENTER(&vswp->if_lockrw);
 		for (i = ETHERADDRL - 1; i >= 0; i--) {
@@ -3067,7 +3059,7 @@ fail_reconf:
 
 fail_update:
 	cmn_err(CE_WARN, "!vsw%d: update of configuration failed",
-			vswp->instance);
+	    vswp->instance);
 }
 
 /*
@@ -3091,7 +3083,7 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 
 	if (md_get_prop_val(mdp, *node, id_propname, &inst)) {
 		DWARN(vswp, "%s: prop(%s) not found", __func__,
-			id_propname);
+		    id_propname);
 		return (1);
 	}
 
@@ -3101,7 +3093,7 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 	 */
 	if ((num_nodes = md_node_count(mdp)) <= 0) {
 		DERR(vswp, "%s: invalid number of nodes found (%d)",
-			__func__, num_nodes);
+		    __func__, num_nodes);
 		return (1);
 	}
 
@@ -3111,9 +3103,8 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 	listsz = num_nodes * sizeof (mde_cookie_t);
 	listp = kmem_zalloc(listsz, KM_SLEEP);
 
-	nchan = md_scan_dag(mdp, *node,
-		md_find_name(mdp, chan_propname),
-		md_find_name(mdp, "fwd"), listp);
+	nchan = md_scan_dag(mdp, *node, md_find_name(mdp, chan_propname),
+	    md_find_name(mdp, "fwd"), listp);
 
 	if (nchan <= 0) {
 		DWARN(vswp, "%s: no %s nodes found", __func__, chan_propname);
@@ -3126,7 +3117,7 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 	/* use property from first node found */
 	if (md_get_prop_val(mdp, listp[0], id_propname, &ldc_id)) {
 		DWARN(vswp, "%s: prop(%s) not found\n", __func__,
-			id_propname);
+		    id_propname);
 		kmem_free(listp, listsz);
 		return (1);
 	}
@@ -3138,9 +3129,9 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 
 	/* read mac-address property */
 	if (md_get_prop_data(mdp, *node, remaddr_propname,
-					&addrp, &addrsz)) {
+	    &addrp, &addrsz)) {
 		DWARN(vswp, "%s: prop(%s) not found",
-				__func__, remaddr_propname);
+		    __func__, remaddr_propname);
 		return (1);
 	}
 
@@ -3190,7 +3181,7 @@ struct ether_addr *macaddr)
 	for (port = plist->head; port != NULL; port = port->p_next) {
 		if (port->p_instance == p_instance) {
 			DWARN(vswp, "%s: port instance %d already attached",
-				__func__, p_instance);
+			    __func__, p_instance);
 			RW_EXIT(&plist->lockrw);
 			return (1);
 		}
@@ -3217,8 +3208,7 @@ struct ether_addr *macaddr)
 	port->state = VSW_PORT_INIT;
 
 	if (nids > VSW_PORT_MAX_LDCS) {
-		D2(vswp, "%s: using first of %d ldc ids",
-			__func__, nids);
+		D2(vswp, "%s: using first of %d ldc ids", __func__, nids);
 		nids = VSW_PORT_MAX_LDCS;
 	}
 
@@ -3340,8 +3330,7 @@ vsw_detach_ports(vsw_t *vswp)
 	while ((port = plist->head) != NULL) {
 		if (vsw_plist_del_node(vswp, port)) {
 			DERR(vswp, "%s: Error deleting port %d"
-				" from port list", __func__,
-				port->p_instance);
+			    " from port list", __func__, port->p_instance);
 			RW_EXIT(&plist->lockrw);
 			return (1);
 		}
@@ -3365,7 +3354,7 @@ vsw_detach_ports(vsw_t *vswp)
 		RW_EXIT(&plist->lockrw);
 		if (vsw_port_delete(port)) {
 			DERR(vswp, "%s: Error deleting port %d",
-				__func__, port->p_instance);
+			    __func__, port->p_instance);
 			return (1);
 		}
 		WRITE_ENTER(&plist->lockrw);
@@ -3416,9 +3405,9 @@ vsw_port_delete(vsw_port_t *port)
 	ldcl = &port->p_ldclist;
 	WRITE_ENTER(&ldcl->lockrw);
 	while (ldcl->num_ldcs > 0) {
-		if (vsw_ldc_detach(port, ldcl->head->ldc_id) != 0) {;
+		if (vsw_ldc_detach(port, ldcl->head->ldc_id) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: unable to detach ldc %ld",
-					vswp->instance, ldcl->head->ldc_id);
+			    vswp->instance, ldcl->head->ldc_id);
 			RW_EXIT(&ldcl->lockrw);
 			return (1);
 		}
@@ -3476,7 +3465,7 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	rv = vio_create_mblks(vsw_num_mblks, vsw_mblk_size, &(ldcp->rxh));
 	if (rv) {
 		DWARN(vswp, "%s: unable to create free mblk pool for"
-			" channel %ld (rv %d)", __func__, ldc_id, rv);
+		    " channel %ld (rv %d)", __func__, ldc_id, rv);
 		kmem_free(ldcp, sizeof (vsw_ldc_t));
 		return (1);
 	}
@@ -3572,8 +3561,8 @@ ldc_attach_fail:
 			 * to free the pool when the device itself detaches.
 			 */
 			cmn_err(CE_WARN, "!vsw%d: Creation of ldc channel %ld "
-				"failed and cannot destroy associated mblk "
-				"pool", vswp->instance, ldc_id);
+			    "failed and cannot destroy associated mblk "
+			    "pool", vswp->instance, ldc_id);
 			ldcp->rxh->nextp =  vswp->rxh;
 			vswp->rxh = ldcp->rxh;
 		}
@@ -3630,7 +3619,7 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	 */
 	if ((rv = ldc_close(ldcp->ldc_handle)) != 0) {
 		DERR(vswp, "%s: error %d closing channel %lld",
-			__func__, rv, ldcp->ldc_id);
+		    __func__, rv, ldcp->ldc_id);
 		return (1);
 	}
 
@@ -3726,7 +3715,7 @@ vsw_ldc_init(vsw_ldc_t *ldcp)
 		 * end point may simply not be ready yet.
 		 */
 		D2(vswp, "%s: ldc_up err id(%lld) rv(%d)", __func__,
-			ldcp->ldc_id, rv);
+		    ldcp->ldc_id, rv);
 		LDC_EXIT_LOCK(ldcp);
 		return (1);
 	}
@@ -3747,7 +3736,7 @@ vsw_ldc_init(vsw_ldc_t *ldcp)
 
 	if (ldcp->ldc_status == LDC_UP) {
 		D2(vswp, "%s: channel %ld now UP (%ld)", __func__,
-			ldcp->ldc_id, istatus);
+		    ldcp->ldc_id, istatus);
 		mutex_exit(&ldcp->status_lock);
 		LDC_EXIT_LOCK(ldcp);
 
@@ -3776,7 +3765,7 @@ vsw_ldc_uninit(vsw_ldc_t *ldcp)
 	rv = ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_DISABLE);
 	if (rv != 0) {
 		DERR(vswp, "vsw_ldc_uninit(%lld): error disabling "
-			"interrupts (rv = %d)\n", ldcp->ldc_id, rv);
+		    "interrupts (rv = %d)\n", ldcp->ldc_id, rv);
 		LDC_EXIT_LOCK(ldcp);
 		return (1);
 	}
@@ -3890,7 +3879,7 @@ vsw_drain_ldcs(vsw_port_t *port)
 
 		if ((ldc_unreg_callback(ldcp->ldc_handle)) == 0) {
 			D2(vswp, "%s: unreg callback for chan %ld", __func__,
-				ldcp->ldc_id);
+			    ldcp->ldc_id);
 			mutex_exit(&ldcp->drain_cv_lock);
 			continue;
 		} else {
@@ -3906,13 +3895,13 @@ vsw_drain_ldcs(vsw_port_t *port)
 			 * Wait for it to finish.
 			 */
 			while (ldc_unreg_callback(ldcp->ldc_handle)
-								== EWOULDBLOCK)
+			    == EWOULDBLOCK)
 				(void) cv_timedwait(&ldcp->drain_cv,
-					&ldcp->drain_cv_lock, lbolt + hz);
+				    &ldcp->drain_cv_lock, lbolt + hz);
 
 			mutex_exit(&ldcp->drain_cv_lock);
 			D2(vswp, "%s: unreg callback for chan %ld after "
-				"timeout", __func__, ldcp->ldc_id);
+			    "timeout", __func__, ldcp->ldc_id);
 		}
 	}
 	RW_EXIT(&ldcl->lockrw);
@@ -3943,10 +3932,10 @@ vsw_drain_port_taskq(vsw_port_t *port)
 	port->state = VSW_PORT_DETACHING;
 
 	if ((vswp->taskq_p == NULL) ||
-		(ddi_taskq_dispatch(vswp->taskq_p, vsw_marker_task,
-			port, DDI_NOSLEEP) != DDI_SUCCESS)) {
+	    (ddi_taskq_dispatch(vswp->taskq_p, vsw_marker_task,
+	    port, DDI_NOSLEEP) != DDI_SUCCESS)) {
 		DERR(vswp, "%s: unable to dispatch marker task",
-			__func__);
+		    __func__);
 		mutex_exit(&port->state_lock);
 		return (1);
 	}
@@ -4062,7 +4051,7 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 		 * Channel has come up.
 		 */
 		D2(vswp, "%s: id(%ld) event(%llx) UP: status(%ld)",
-			__func__, ldcp->ldc_id, event, ldcp->ldc_status);
+		    __func__, ldcp->ldc_id, event, ldcp->ldc_status);
 
 		vsw_process_conn_evt(ldcp, VSW_CONN_UP);
 
@@ -4074,7 +4063,7 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 		 * Data available for reading.
 		 */
 		D2(vswp, "%s: id(ld) event(%llx) data READ",
-				__func__, ldcp->ldc_id, event);
+		    __func__, ldcp->ldc_id, event);
 
 		vsw_process_pkt(ldcp);
 
@@ -4085,7 +4074,7 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 
 	if (event & (LDC_EVT_DOWN | LDC_EVT_RESET)) {
 		D2(vswp, "%s: id(%ld) event (%lx) DOWN/RESET: status(%ld)",
-			__func__, ldcp->ldc_id, event, ldcp->ldc_status);
+		    __func__, ldcp->ldc_id, event, ldcp->ldc_status);
 
 		vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
 	}
@@ -4094,11 +4083,10 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 	 * Catch either LDC_EVT_WRITE which we don't support or any
 	 * unknown event.
 	 */
-	if (event & ~(LDC_EVT_UP | LDC_EVT_RESET
-					| LDC_EVT_DOWN | LDC_EVT_READ)) {
-
+	if (event &
+	    ~(LDC_EVT_UP | LDC_EVT_RESET | LDC_EVT_DOWN | LDC_EVT_READ)) {
 		DERR(vswp, "%s: id(%ld) Unexpected event=(%llx) status(%ld)",
-			__func__, ldcp->ldc_id, event, ldcp->ldc_status);
+		    __func__, ldcp->ldc_id, event, ldcp->ldc_status);
 	}
 
 vsw_cb_exit:
@@ -4134,7 +4122,7 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 	READ_ENTER(&ldcl->lockrw);
 
 	D2(vswp, "%s: in 0x%llx : out 0x%llx", __func__,
-		ldcp->lane_in.lstate, ldcp->lane_out.lstate);
+	    ldcp->lane_in.lstate, ldcp->lane_out.lstate);
 
 	vsw_free_lane_resources(ldcp, INBOUND);
 	vsw_free_lane_resources(ldcp, OUTBOUND);
@@ -4187,7 +4175,7 @@ vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 	 * and that the handshake should be restarted.
 	 */
 	if (((evt == VSW_CONN_RESET) || (evt == VSW_CONN_RESTART)) &&
-			(ldstub((uint8_t *)&ldcp->reset_active)))
+	    (ldstub((uint8_t *)&ldcp->reset_active)))
 		return;
 
 	/*
@@ -4210,8 +4198,7 @@ vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 	 */
 	mutex_enter(&ldcp->status_lock);
 	if (evt == VSW_CONN_UP) {
-		if ((ldcp->ldc_status == LDC_UP) ||
-					(ldcp->reset_active != 0)) {
+		if ((ldcp->ldc_status == LDC_UP) || (ldcp->reset_active != 0)) {
 			mutex_exit(&ldcp->status_lock);
 			return;
 		}
@@ -4232,7 +4219,7 @@ vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 
 	if ((conn = kmem_zalloc(sizeof (vsw_conn_evt_t), KM_NOSLEEP)) == NULL) {
 		cmn_err(CE_WARN, "!vsw%d: unable to allocate memory for"
-			" connection event", vswp->instance);
+		    " connection event", vswp->instance);
 		goto err_exit;
 	}
 
@@ -4240,9 +4227,9 @@ vsw_process_conn_evt(vsw_ldc_t *ldcp, uint16_t evt)
 	conn->ldcp = ldcp;
 
 	if (ddi_taskq_dispatch(vswp->taskq_p, vsw_conn_task, conn,
-		DDI_NOSLEEP) != DDI_SUCCESS) {
+	    DDI_NOSLEEP) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "!vsw%d: Can't dispatch connection task",
-			vswp->instance);
+		    vswp->instance);
 
 		kmem_free(conn, sizeof (vsw_conn_evt_t));
 		goto err_exit;
@@ -4285,7 +4272,7 @@ vsw_conn_task(void *arg)
 	mutex_enter(&ldcp->status_lock);
 	if (ldc_status(ldcp->ldc_handle, &curr_status) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read status of "
-			"channel %ld", vswp->instance, ldcp->ldc_id);
+		    "channel %ld", vswp->instance, ldcp->ldc_id);
 		mutex_exit(&ldcp->status_lock);
 		return;
 	}
@@ -4316,7 +4303,7 @@ vsw_conn_task(void *arg)
 	 */
 	if (ldc_status(ldcp->ldc_handle, &curr_status) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read status of "
-			"channel %ld", vswp->instance, ldcp->ldc_id);
+		    "channel %ld", vswp->instance, ldcp->ldc_id);
 		mutex_exit(&ldcp->status_lock);
 		return;
 	}
@@ -4327,16 +4314,16 @@ vsw_conn_task(void *arg)
 	if (curr_status == LDC_UP) {
 		if (ldcp->hcnt++ > vsw_num_handshakes) {
 			cmn_err(CE_WARN, "!vsw%d: exceeded number of permitted"
-				" handshake attempts (%d) on channel %ld",
-				vswp->instance, ldcp->hcnt, ldcp->ldc_id);
+			    " handshake attempts (%d) on channel %ld",
+			    vswp->instance, ldcp->hcnt, ldcp->ldc_id);
 			mutex_exit(&ldcp->status_lock);
 			return;
 		}
 
 		if (ddi_taskq_dispatch(vswp->taskq_p, vsw_send_ver, ldcp,
-			DDI_NOSLEEP) != DDI_SUCCESS) {
+		    DDI_NOSLEEP) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "!vsw%d: Can't dispatch version task",
-				vswp->instance);
+			    vswp->instance);
 
 			/*
 			 * Don't count as valid restart attempt if couldn't
@@ -4385,7 +4372,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_VER_INFO_RECV:
 		if (phase > VSW_MILESTONE0) {
 			DERR(vswp, "vsw_check_flag (%d): VER_INFO_RECV"
-				" when in state %d\n", ldcp->ldc_id, phase);
+			    " when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
@@ -4394,9 +4381,8 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_VER_ACK_RECV:
 	case VSW_VER_NACK_RECV:
 		if (!(state & VSW_VER_INFO_SENT)) {
-			DERR(vswp, "vsw_check_flag (%d): spurious VER_ACK"
-				" or VER_NACK when in state %d\n",
-				ldcp->ldc_id, phase);
+			DERR(vswp, "vsw_check_flag (%d): spurious VER_ACK or "
+			    "VER_NACK when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
@@ -4406,7 +4392,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_ATTR_INFO_RECV:
 		if ((phase < VSW_MILESTONE1) || (phase >= VSW_MILESTONE2)) {
 			DERR(vswp, "vsw_check_flag (%d): ATTR_INFO_RECV"
-				" when in state %d\n", ldcp->ldc_id, phase);
+			    " when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
@@ -4416,8 +4402,8 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_ATTR_NACK_RECV:
 		if (!(state & VSW_ATTR_INFO_SENT)) {
 			DERR(vswp, "vsw_check_flag (%d): spurious ATTR_ACK"
-				" or ATTR_NACK when in state %d\n",
-				ldcp->ldc_id, phase);
+			    " or ATTR_NACK when in state %d\n",
+			    ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
@@ -4427,7 +4413,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_DRING_INFO_RECV:
 		if (phase < VSW_MILESTONE1) {
 			DERR(vswp, "vsw_check_flag (%d): DRING_INFO_RECV"
-				" when in state %d\n", ldcp->ldc_id, phase);
+			    " when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
@@ -4436,9 +4422,9 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_DRING_ACK_RECV:
 	case VSW_DRING_NACK_RECV:
 		if (!(state & VSW_DRING_INFO_SENT)) {
-			DERR(vswp, "vsw_check_flag (%d): spurious DRING_ACK"
-				" or DRING_NACK when in state %d\n",
-				ldcp->ldc_id, phase);
+			DERR(vswp, "vsw_check_flag (%d): spurious DRING_ACK "
+			    " or DRING_NACK when in state %d\n",
+			    ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
@@ -4448,7 +4434,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_RDX_INFO_RECV:
 		if (phase < VSW_MILESTONE3) {
 			DERR(vswp, "vsw_check_flag (%d): RDX_INFO_RECV"
-				" when in state %d\n", ldcp->ldc_id, phase);
+			    " when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
@@ -4457,9 +4443,8 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_RDX_ACK_RECV:
 	case VSW_RDX_NACK_RECV:
 		if (!(state & VSW_RDX_INFO_SENT)) {
-			DERR(vswp, "vsw_check_flag (%d): spurious RDX_ACK"
-				" or RDX_NACK when in state %d\n",
-				ldcp->ldc_id, phase);
+			DERR(vswp, "vsw_check_flag (%d): spurious RDX_ACK or "
+			    "RDX_NACK when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		} else
@@ -4469,7 +4454,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 	case VSW_MCST_INFO_RECV:
 		if (phase < VSW_MILESTONE3) {
 			DERR(vswp, "vsw_check_flag (%d): VSW_MCST_INFO_RECV"
-				" when in state %d\n", ldcp->ldc_id, phase);
+			    " when in state %d\n", ldcp->ldc_id, phase);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return (1);
 		}
@@ -4477,7 +4462,7 @@ vsw_check_flag(vsw_ldc_t *ldcp, int dir, uint64_t flag)
 
 	default:
 		DERR(vswp, "vsw_check_flag (%lld): unknown flag (%llx)",
-				ldcp->ldc_id, flag);
+		    ldcp->ldc_id, flag);
 		return (1);
 	}
 
@@ -4497,7 +4482,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s (chan %lld): enter (phase %ld)", __func__,
-		ldcp->ldc_id, ldcp->hphase);
+	    ldcp->ldc_id, ldcp->hphase);
 
 	DUMP_FLAGS(ldcp->lane_in.lstate);
 	DUMP_FLAGS(ldcp->lane_out.lstate);
@@ -4511,7 +4496,7 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 */
 		if (ldcp->lane_out.lstate == 0) {
 			D2(vswp, "%s: (chan %lld) starting handshake "
-				"with peer", __func__, ldcp->ldc_id);
+			    "with peer", __func__, ldcp->ldc_id);
 			vsw_process_conn_evt(ldcp, VSW_CONN_UP);
 		}
 
@@ -4520,10 +4505,10 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * negotiated version info.
 		 */
 		if ((ldcp->lane_in.lstate & VSW_VER_ACK_SENT) &&
-			(ldcp->lane_out.lstate & VSW_VER_ACK_RECV)) {
+		    (ldcp->lane_out.lstate & VSW_VER_ACK_RECV)) {
 
 			D2(vswp, "%s: (chan %lld) leaving milestone 0",
-				__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 
 			/*
 			 * Next milestone is passed when attribute
@@ -4566,11 +4551,11 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * through.
 		 */
 		if ((ldcp->lane_in.xfer_mode == VIO_DRING_MODE) &&
-			(!(ldcp->lane_in.lstate & VSW_DRING_ACK_SENT)))
+		    (!(ldcp->lane_in.lstate & VSW_DRING_ACK_SENT)))
 			break;
 
 		D2(vswp, "%s: (chan %lld) leaving milestone 2",
-				__func__, ldcp->ldc_id);
+		    __func__, ldcp->ldc_id);
 
 		ldcp->hphase = VSW_MILESTONE3;
 		vsw_send_rdx(ldcp);
@@ -4584,36 +4569,36 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * Mark outbound lane as available to transmit data.
 		 */
 		if ((ldcp->lane_out.lstate & VSW_RDX_ACK_SENT) &&
-			(ldcp->lane_in.lstate & VSW_RDX_ACK_RECV)) {
+		    (ldcp->lane_in.lstate & VSW_RDX_ACK_RECV)) {
 
 			D2(vswp, "%s: (chan %lld) leaving milestone 3",
-				__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 			D2(vswp, "%s: ** handshake complete (0x%llx : "
-				"0x%llx) **", __func__, ldcp->lane_in.lstate,
-				ldcp->lane_out.lstate);
+			    "0x%llx) **", __func__, ldcp->lane_in.lstate,
+			    ldcp->lane_out.lstate);
 			ldcp->lane_out.lstate |= VSW_LANE_ACTIVE;
 			ldcp->hphase = VSW_MILESTONE4;
 			ldcp->hcnt = 0;
 			DISPLAY_STATE();
 		} else {
-			D2(vswp, "%s: still in milestone 3 (0x%llx :"
-				" 0x%llx", __func__, ldcp->lane_in.lstate,
-				ldcp->lane_out.lstate);
+			D2(vswp, "%s: still in milestone 3 (0x%llx : 0x%llx)",
+			    __func__, ldcp->lane_in.lstate,
+			    ldcp->lane_out.lstate);
 		}
 		break;
 
 	case VSW_MILESTONE4:
 		D2(vswp, "%s: (chan %lld) in milestone 4", __func__,
-							ldcp->ldc_id);
+		    ldcp->ldc_id);
 		break;
 
 	default:
 		DERR(vswp, "%s: (chan %lld) Unknown Phase %x", __func__,
-			ldcp->ldc_id, ldcp->hphase);
+		    ldcp->ldc_id, ldcp->hphase);
 	}
 
 	D1(vswp, "%s (chan %lld): exit (phase %ld)", __func__, ldcp->ldc_id,
-		ldcp->hphase);
+	    ldcp->hphase);
 }
 
 /*
@@ -4639,10 +4624,9 @@ vsw_supported_version(vio_ver_msg_t *vp)
 			 * minor number if necessary.
 			 */
 			if (vp->ver_minor > vsw_versions[i].ver_minor) {
-				D2(NULL, "%s: adjusting minor value"
-					" from %d to %d", __func__,
-					vp->ver_minor,
-					vsw_versions[i].ver_minor);
+				D2(NULL, "%s: adjusting minor value from %d "
+				    "to %d", __func__, vp->ver_minor,
+				    vsw_versions[i].ver_minor);
 				vp->ver_minor = vsw_versions[i].ver_minor;
 			}
 
@@ -4651,10 +4635,9 @@ vsw_supported_version(vio_ver_msg_t *vp)
 
 		if (vsw_versions[i].ver_major < vp->ver_major) {
 			if (vp->ver_minor > vsw_versions[i].ver_minor) {
-				D2(NULL, "%s: adjusting minor value"
-					" from %d to %d", __func__,
-					vp->ver_minor,
-					vsw_versions[i].ver_minor);
+				D2(NULL, "%s: adjusting minor value from %d "
+				    "to %d", __func__, vp->ver_minor,
+				    vsw_versions[i].ver_minor);
 				vp->ver_minor = vsw_versions[i].ver_minor;
 			}
 			return (1);
@@ -4694,9 +4677,8 @@ vsw_process_pkt(void *arg)
 		rv = ldc_read(ldcp->ldc_handle, (caddr_t)&dmsg, &msglen);
 
 		if (rv != 0) {
-			DERR(vswp, "%s :ldc_read err id(%lld) rv(%d) "
-				"len(%d)\n", __func__, ldcp->ldc_id,
-							rv, msglen);
+			DERR(vswp, "%s :ldc_read err id(%lld) rv(%d) len(%d)\n",
+			    __func__, ldcp->ldc_id, rv, msglen);
 		}
 
 		/* channel has been reset */
@@ -4707,7 +4689,7 @@ vsw_process_pkt(void *arg)
 
 		if (msglen == 0) {
 			D2(vswp, "%s: ldc_read id(%lld) NODATA", __func__,
-			ldcp->ldc_id);
+			    ldcp->ldc_id);
 			break;
 		}
 
@@ -4732,7 +4714,7 @@ vsw_process_pkt(void *arg)
 			break;
 		default:
 			DERR(vswp, "%s: Unknown tag(%lx) ", __func__,
-				"id(%lx)\n", tag.vio_msgtype, ldcp->ldc_id);
+			    "id(%lx)\n", tag.vio_msgtype, ldcp->ldc_id);
 			break;
 		}
 	} while (msglen);
@@ -4758,15 +4740,15 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	 * immediate (legitimate) data packet.
 	 */
 	if ((tag.vio_subtype_env == VIO_RDX) &&
-		(tag.vio_subtype == VIO_SUBTYPE_ACK)) {
+	    (tag.vio_subtype == VIO_SUBTYPE_ACK)) {
 
 		if (vsw_check_flag(ldcp, INBOUND, VSW_RDX_ACK_RECV))
 			return;
 
 		ldcp->lane_in.lstate |= VSW_RDX_ACK_RECV;
 		D2(vswp, "%s (%ld) handling RDX_ACK in place "
-			"(ostate 0x%llx : hphase %d)", __func__,
-			ldcp->ldc_id, ldcp->lane_in.lstate, ldcp->hphase);
+		    "(ostate 0x%llx : hphase %d)", __func__,
+		    ldcp->ldc_id, ldcp->lane_in.lstate, ldcp->hphase);
 		vsw_next_milestone(ldcp);
 		return;
 	}
@@ -4774,8 +4756,7 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	ctaskp = kmem_alloc(sizeof (vsw_ctrl_task_t), KM_NOSLEEP);
 
 	if (ctaskp == NULL) {
-		DERR(vswp, "%s: unable to alloc space for ctrl"
-			" msg", __func__);
+		DERR(vswp, "%s: unable to alloc space for ctrl msg", __func__);
 		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 		return;
 	}
@@ -4793,11 +4774,10 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	mutex_enter(&port->state_lock);
 	if (port->state == VSW_PORT_INIT) {
 		if ((vswp->taskq_p == NULL) ||
-			(ddi_taskq_dispatch(vswp->taskq_p,
-			vsw_process_ctrl_pkt, ctaskp, DDI_NOSLEEP)
-							!= DDI_SUCCESS)) {
+		    (ddi_taskq_dispatch(vswp->taskq_p, vsw_process_ctrl_pkt,
+		    ctaskp, DDI_NOSLEEP) != DDI_SUCCESS)) {
 			DERR(vswp, "%s: unable to dispatch task to taskq",
-				__func__);
+			    __func__);
 			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 			mutex_exit(&port->state_lock);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
@@ -4805,13 +4785,13 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 		}
 	} else {
 		DWARN(vswp, "%s: port %d detaching, not dispatching "
-			"task", __func__, port->p_instance);
+		    "task", __func__, port->p_instance);
 	}
 
 	mutex_exit(&port->state_lock);
 
 	D2(vswp, "%s: dispatched task to taskq for chan %d", __func__,
-			ldcp->ldc_id);
+	    ldcp->ldc_id);
 	D1(vswp, "%s: exit", __func__);
 }
 
@@ -4835,9 +4815,8 @@ vsw_process_ctrl_pkt(void *arg)
 	/* stale pkt check */
 	mutex_enter(&ldcp->hss_lock);
 	if (ctaskp->hss_id < ldcp->hss_id) {
-		DWARN(vswp, "%s: discarding stale packet belonging to"
-			" earlier (%ld) handshake session", __func__,
-			ctaskp->hss_id);
+		DWARN(vswp, "%s: discarding stale packet belonging to earlier"
+		    " (%ld) handshake session", __func__, ctaskp->hss_id);
 		mutex_exit(&ldcp->hss_lock);
 		return;
 	}
@@ -4847,7 +4826,7 @@ vsw_process_ctrl_pkt(void *arg)
 	if (ldcp->session_status & VSW_PEER_SESSION) {
 		if (ldcp->peer_session != tag.vio_sid) {
 			DERR(vswp, "%s (chan %d): invalid session id (%llx)",
-				__func__, ldcp->ldc_id, tag.vio_sid);
+			    __func__, ldcp->ldc_id, tag.vio_sid);
 			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
@@ -4878,8 +4857,7 @@ vsw_process_ctrl_pkt(void *arg)
 		vsw_process_ctrl_rdx_pkt(ldcp, &ctaskp->pktp);
 		break;
 	default:
-		DERR(vswp, "%s : unknown vio_subtype_env (%x)\n",
-							__func__, env);
+		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n", __func__, env);
 	}
 
 	kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
@@ -4925,10 +4903,10 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * if channel was reset.
 		 */
 		if ((ldcp->session_status & VSW_PEER_SESSION) &&
-			(ldcp->peer_session != ver_pkt->tag.vio_sid)) {
+		    (ldcp->peer_session != ver_pkt->tag.vio_sid)) {
 			DERR(vswp, "%s: updating session id for chan %lld "
-				"from %llx to %llx", __func__, ldcp->ldc_id,
-				ldcp->peer_session, ver_pkt->tag.vio_sid);
+			    "from %llx to %llx", __func__, ldcp->ldc_id,
+			    ldcp->peer_session, ver_pkt->tag.vio_sid);
 		}
 
 		ldcp->peer_session = ver_pkt->tag.vio_sid;
@@ -4945,7 +4923,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 */
 		if (ver_pkt->dev_class != VDEV_NETWORK) {
 			DERR(vswp, "%s: illegal device class %d", __func__,
-				ver_pkt->dev_class);
+			    ver_pkt->dev_class);
 
 			ver_pkt->tag.vio_sid = ldcp->local_session;
 			ver_pkt->tag.vio_subtype = VIO_SUBTYPE_NACK;
@@ -4953,7 +4931,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 
 			(void) vsw_send_msg(ldcp, (void *)ver_pkt,
-					sizeof (vio_ver_msg_t), B_TRUE);
+			    sizeof (vio_ver_msg_t), B_TRUE);
 
 			ldcp->lane_in.lstate |= VSW_VER_NACK_SENT;
 			vsw_next_milestone(ldcp);
@@ -4972,7 +4950,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			 */
 
 			D2(vswp, "%s: accepted ver %d:%d", __func__,
-				ver_pkt->ver_major, ver_pkt->ver_minor);
+			    ver_pkt->ver_major, ver_pkt->ver_minor);
 
 			/* Store accepted values */
 			ldcp->lane_in.ver_major = ver_pkt->ver_major;
@@ -4989,7 +4967,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			 */
 
 			D2(vswp, "%s: replying with ver %d:%d", __func__,
-				ver_pkt->ver_major, ver_pkt->ver_minor);
+			    ver_pkt->ver_major, ver_pkt->ver_minor);
 
 			/* Store updated values */
 			ldcp->lane_in.ver_major = ver_pkt->ver_major;
@@ -5003,7 +4981,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 		ver_pkt->tag.vio_sid = ldcp->local_session;
 		(void) vsw_send_msg(ldcp, (void *)ver_pkt,
-			sizeof (vio_ver_msg_t), B_TRUE);
+		    sizeof (vio_ver_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -5017,7 +4995,6 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* Store updated values */
 		ldcp->lane_in.ver_major = ver_pkt->ver_major;
 		ldcp->lane_in.ver_minor = ver_pkt->ver_minor;
-
 
 		ldcp->lane_out.lstate |= VSW_VER_ACK_RECV;
 		vsw_next_milestone(ldcp);
@@ -5038,7 +5015,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 */
 		if ((ver_pkt->ver_major == 0) && (ver_pkt->ver_minor == 0)) {
 			DERR(vswp, "%s: peer unable to negotiate any "
-				"further.", __func__);
+			    "further.", __func__);
 			ldcp->lane_out.lstate |= VSW_VER_NACK_RECV;
 			vsw_next_milestone(ldcp);
 			return;
@@ -5053,7 +5030,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if ((ver_pkt->ver_major == 0) && (ver_pkt->ver_minor == 0)) {
 			/* Nothing more we can do */
 			DERR(vswp, "%s: version negotiation failed.\n",
-								__func__);
+			    __func__);
 			ldcp->lane_out.lstate |= VSW_VER_NACK_RECV;
 			vsw_next_milestone(ldcp);
 		} else {
@@ -5062,8 +5039,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			ldcp->lane_out.ver_minor = ver_pkt->ver_minor;
 
 			D2(vswp, "%s: resending with updated values (%x, %x)",
-				__func__, ver_pkt->ver_major,
-				ver_pkt->ver_minor);
+			    __func__, ver_pkt->ver_major, ver_pkt->ver_minor);
 
 			ldcp->lane_out.lstate |= VSW_VER_INFO_SENT;
 			ver_pkt->tag.vio_sid = ldcp->local_session;
@@ -5072,7 +5048,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			DUMP_TAG_PTR((vio_msg_tag_t *)ver_pkt);
 
 			(void) vsw_send_msg(ldcp, (void *)ver_pkt,
-				sizeof (vio_ver_msg_t), B_TRUE);
+			    sizeof (vio_ver_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 
@@ -5081,7 +5057,7 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: unknown vio_subtype %x\n", __func__,
-			ver_pkt->tag.vio_subtype);
+		    ver_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld): exit\n", __func__, ldcp->ldc_id);
@@ -5134,7 +5110,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (vsw_check_attr(attr_pkt, ldcp->ldc_port)) {
 
 			DERR(vswp, "%s (chan %d): invalid attributes",
-				__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 
 			vsw_free_lane_resources(ldcp, INBOUND);
 
@@ -5144,7 +5120,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 			DUMP_TAG_PTR((vio_msg_tag_t *)attr_pkt);
 			ldcp->lane_in.lstate |= VSW_ATTR_NACK_SENT;
 			(void) vsw_send_msg(ldcp, (void *)attr_pkt,
-				sizeof (vnet_attr_msg_t), B_TRUE);
+			    sizeof (vnet_attr_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5189,7 +5165,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		ldcp->lane_in.lstate |= VSW_ATTR_ACK_SENT;
 
 		(void) vsw_send_msg(ldcp, (void *)attr_pkt,
-				sizeof (vnet_attr_msg_t), B_TRUE);
+		    sizeof (vnet_attr_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -5216,7 +5192,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: unknown vio_subtype %x\n", __func__,
-			attr_pkt->tag.vio_subtype);
+		    attr_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
@@ -5264,7 +5240,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (vsw_check_dring_info(dring_pkt)) {
 
 			DERR(vswp, "%s (%lld): invalid dring info",
-				__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 
 			vsw_free_lane_resources(ldcp, INBOUND);
 
@@ -5276,7 +5252,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
 
 			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t), B_TRUE);
+			    sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5300,17 +5276,16 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * the ldc layer.
 		 */
 		bcopy(&dring_pkt->cookie[0], &dp->cookie[0],
-			sizeof (ldc_mem_cookie_t));
+		    sizeof (ldc_mem_cookie_t));
 
 		D2(vswp, "%s: num_desc %ld : desc_size %ld", __func__,
-			dp->num_descriptors, dp->descriptor_size);
+		    dp->num_descriptors, dp->descriptor_size);
 		D2(vswp, "%s: options 0x%lx: ncookies %ld", __func__,
-			dp->options, dp->ncookies);
+		    dp->options, dp->ncookies);
 
 		if ((ldc_mem_dring_map(ldcp->ldc_handle, &dp->cookie[0],
-			dp->ncookies, dp->num_descriptors,
-			dp->descriptor_size, LDC_SHADOW_MAP,
-			&(dp->handle))) != 0) {
+		    dp->ncookies, dp->num_descriptors, dp->descriptor_size,
+		    LDC_SHADOW_MAP, &(dp->handle))) != 0) {
 
 			DERR(vswp, "%s: dring_map failed\n", __func__);
 
@@ -5324,7 +5299,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
 			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t), B_TRUE);
+			    sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5344,7 +5319,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			ldcp->lane_in.lstate |= VSW_DRING_NACK_SENT;
 			(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_reg_msg_t), B_TRUE);
+			    sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 			vsw_next_milestone(ldcp);
 			return;
@@ -5388,7 +5363,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		dring_pkt->dring_ident = dp->ident;
 
 		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-			sizeof (vio_dring_reg_msg_t), B_TRUE);
+		    sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 		ldcp->lane_in.lstate |= VSW_DRING_ACK_SENT;
 		vsw_next_milestone(ldcp);
@@ -5424,14 +5399,14 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 			if (dring_found == 0) {
 				DERR(NULL, "%s: unrecognised ring cookie",
-					__func__);
+				    __func__);
 				vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 				return;
 			}
 
 		} else {
 			DERR(vswp, "%s: DRING ACK received but no drings "
-				"allocated", __func__);
+			    "allocated", __func__);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
@@ -5454,7 +5429,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
-			dring_pkt->tag.vio_subtype);
+		    dring_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
@@ -5501,7 +5476,7 @@ vsw_process_ctrl_dring_unreg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
-			dring_pkt->tag.vio_subtype);
+		    dring_pkt->tag.vio_subtype);
 	}
 
 	vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
@@ -5577,7 +5552,7 @@ vsw_process_ctrl_mcst_pkt(vsw_ldc_t *ldcp, void *pkt)
 		for (i = 0; i < mcst_pkt->count; i++) {
 			if ((mcst_pkt->mca[i].ether_addr_octet[0] & 01) != 1) {
 				DERR(vswp, "%s: invalid multicast address",
-								__func__);
+				    __func__);
 				SND_MCST_NACK(ldcp, mcst_pkt);
 				return;
 			}
@@ -5598,7 +5573,7 @@ vsw_process_ctrl_mcst_pkt(vsw_ldc_t *ldcp, void *pkt)
 		DUMP_TAG_PTR((vio_msg_tag_t *)mcst_pkt);
 
 		(void) vsw_send_msg(ldcp, (void *)mcst_pkt,
-				sizeof (vnet_mcast_msg_t), B_TRUE);
+		    sizeof (vnet_mcast_msg_t), B_TRUE);
 		break;
 
 	case VIO_SUBTYPE_ACK:
@@ -5631,7 +5606,7 @@ vsw_process_ctrl_mcst_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: unknown vio_subtype %x\n", __func__,
-			mcst_pkt->tag.vio_subtype);
+		    mcst_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
@@ -5666,7 +5641,7 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 		ldcp->lane_out.lstate |= VSW_RDX_ACK_SENT;
 
 		(void) vsw_send_msg(ldcp, (void *)rdx_pkt,
-			sizeof (vio_rdx_msg_t), B_TRUE);
+		    sizeof (vio_rdx_msg_t), B_TRUE);
 
 		vsw_next_milestone(ldcp);
 		break;
@@ -5691,7 +5666,7 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s: Unknown vio_subtype %x\n", __func__,
-			rdx_pkt->tag.vio_subtype);
+		    rdx_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
@@ -5709,7 +5684,7 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 	if (ldcp->session_status & VSW_PEER_SESSION) {
 		if (ldcp->peer_session != tag.vio_sid) {
 			DERR(vswp, "%s (chan %d): invalid session id (%llx)",
-				__func__, ldcp->ldc_id, tag.vio_sid);
+			    __func__, ldcp->ldc_id, tag.vio_sid);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
@@ -5721,8 +5696,8 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 	 */
 	if (ldcp->hphase != VSW_MILESTONE4) {
 		DERR(vswp, "%s: got data packet before handshake complete "
-			"hphase %d (%x: %x)", __func__, ldcp->hphase,
-			ldcp->lane_in.lstate, ldcp->lane_out.lstate);
+		    "hphase %d (%x: %x)", __func__, ldcp->hphase,
+		    ldcp->lane_in.lstate, ldcp->lane_out.lstate);
 		DUMP_FLAGS(ldcp->lane_in.lstate);
 		DUMP_FLAGS(ldcp->lane_out.lstate);
 		vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
@@ -5740,8 +5715,7 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 	} else if (env == VIO_DESC_DATA) {
 		vsw_process_data_ibnd_pkt(ldcp, dpkt);
 	} else {
-		DERR(vswp, "%s : unknown vio_subtype_env (%x)\n",
-							__func__, env);
+		DERR(vswp, "%s: unknown vio_subtype_env (%x)\n", __func__, env);
 	}
 
 	D1(vswp, "%s(%lld): exit", __func__, ldcp->ldc_id);
@@ -5797,12 +5771,12 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 
 		READ_ENTER(&ldcp->lane_in.dlistrw);
 		if ((dp = vsw_ident2dring(&ldcp->lane_in,
-				dring_pkt->dring_ident)) == NULL) {
+		    dring_pkt->dring_ident)) == NULL) {
 			RW_EXIT(&ldcp->lane_in.dlistrw);
 
 			DERR(vswp, "%s(%lld): unable to find dring from "
-				"ident 0x%llx", __func__, ldcp->ldc_id,
-				dring_pkt->dring_ident);
+			    "ident 0x%llx", __func__, ldcp->ldc_id,
+			    dring_pkt->dring_ident);
 
 			SND_DRING_NACK(ldcp, dring_pkt);
 			return;
@@ -5815,20 +5789,19 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 		range_start = range_end = pos;
 
 		D2(vswp, "%s(%lld): start index %ld : end %ld\n",
-			__func__, ldcp->ldc_id, start, end);
+		    __func__, ldcp->ldc_id, start, end);
 
 		if (end == -1) {
 			num = -1;
 		} else if (end >= 0) {
-			num = end >= pos ?
-				end - pos + 1: (len - pos + 1) + end;
+			num = end >= pos ? end - pos + 1: (len - pos + 1) + end;
 
 			/* basic sanity check */
 			if (end > len) {
 				RW_EXIT(&ldcp->lane_in.dlistrw);
 				DERR(vswp, "%s(%lld): endpoint %lld outside "
-					"ring length %lld", __func__,
-					ldcp->ldc_id, end, len);
+				    "ring length %lld", __func__,
+				    ldcp->ldc_id, end, len);
 
 				SND_DRING_NACK(ldcp, dring_pkt);
 				return;
@@ -5836,7 +5809,7 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 		} else {
 			RW_EXIT(&ldcp->lane_in.dlistrw);
 			DERR(vswp, "%s(%lld): invalid endpoint %lld",
-				__func__, ldcp->ldc_id, end);
+			    __func__, ldcp->ldc_id, end);
 			SND_DRING_NACK(ldcp, dring_pkt);
 			return;
 		}
@@ -5844,11 +5817,11 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 		while (cnt != num) {
 vsw_recheck_desc:
 			if ((rv = ldc_mem_dring_acquire(dp->handle,
-							pos, pos)) != 0) {
+			    pos, pos)) != 0) {
 				RW_EXIT(&ldcp->lane_in.dlistrw);
 				DERR(vswp, "%s(%lld): unable to acquire "
-					"descriptor at pos %d: err %d",
-					__func__, pos, ldcp->ldc_id, rv);
+				    "descriptor at pos %d: err %d",
+				    __func__, pos, ldcp->ldc_id, rv);
 				SND_DRING_NACK(ldcp, dring_pkt);
 				return;
 			}
@@ -5876,8 +5849,8 @@ vsw_recheck_desc:
 				/* bounded - error - so NACK back */
 				RW_EXIT(&ldcp->lane_in.dlistrw);
 				DERR(vswp, "%s(%lld): descriptor not READY "
-					"(%d)", __func__, ldcp->ldc_id,
-					pub_addr->hdr.dstate);
+				    "(%d)", __func__, ldcp->ldc_id,
+				    pub_addr->hdr.dstate);
 				SND_DRING_NACK(ldcp, dring_pkt);
 				return;
 			}
@@ -5894,9 +5867,8 @@ vsw_recheck_desc:
 			if (prev_desc_ack) {
 				range_start = pos;
 
-				D2(vswp, "%s(%lld): updating range start "
-					"to be %d", __func__, ldcp->ldc_id,
-					range_start);
+				D2(vswp, "%s(%lld): updating range start to be "
+				    "%d", __func__, ldcp->ldc_id, range_start);
 
 				prev_desc_ack = B_FALSE;
 			}
@@ -5916,9 +5888,9 @@ vsw_recheck_desc:
 				ack_needed = B_TRUE;
 
 			D2(vswp, "%s(%lld): processing desc %lld at pos"
-				" 0x%llx : dstate 0x%lx : datalen 0x%lx",
-				__func__, ldcp->ldc_id, pos, pub_addr,
-				pub_addr->hdr.dstate, datalen);
+			    " 0x%llx : dstate 0x%lx : datalen 0x%lx",
+			    __func__, ldcp->ldc_id, pos, pub_addr,
+			    pub_addr->hdr.dstate, datalen);
 
 			/*
 			 * Mark that we are starting to process descriptor.
@@ -5934,8 +5906,15 @@ vsw_recheck_desc:
 				 * of 8 as this is required by ldc_mem_copy.
 				 */
 				DTRACE_PROBE(allocb);
-				mp = allocb(datalen + VNET_IPALIGN + 8,
-								BPRI_MED);
+				if ((mp = allocb(datalen + VNET_IPALIGN + 8,
+				    BPRI_MED)) == NULL) {
+					DERR(vswp, "%s(%ld): allocb failed",
+					    __func__, ldcp->ldc_id);
+					pub_addr->hdr.dstate = VIO_DESC_DONE;
+					(void) ldc_mem_dring_release(dp->handle,
+					    pos, pos);
+					break;
+				}
 			}
 
 			/*
@@ -5950,25 +5929,23 @@ vsw_recheck_desc:
 
 			ncookies = pub_addr->ncookies;
 			rv = ldc_mem_copy(ldcp->ldc_handle,
-				(caddr_t)mp->b_rptr, 0, &nbytes,
-				pub_addr->memcookie, ncookies,
-				LDC_COPY_IN);
+			    (caddr_t)mp->b_rptr, 0, &nbytes,
+			    pub_addr->memcookie, ncookies, LDC_COPY_IN);
 
 			if (rv != 0) {
-				DERR(vswp, "%s(%d): unable to copy in "
-					"data from %d cookies in desc %d"
-					" (rv %d)", __func__, ldcp->ldc_id,
-					ncookies, pos, rv);
+				DERR(vswp, "%s(%d): unable to copy in data "
+				    "from %d cookies in desc %d (rv %d)",
+				    __func__, ldcp->ldc_id, ncookies, pos, rv);
 				freemsg(mp);
 
 				pub_addr->hdr.dstate = VIO_DESC_DONE;
 				(void) ldc_mem_dring_release(dp->handle,
-								pos, pos);
+				    pos, pos);
 				break;
 			} else {
 				D2(vswp, "%s(%d): copied in %ld bytes"
-					" using %d cookies", __func__,
-					ldcp->ldc_id, nbytes, ncookies);
+				    " using %d cookies", __func__,
+				    ldcp->ldc_id, nbytes, ncookies);
 			}
 
 			/* adjust the read pointer to skip over the padding */
@@ -6007,16 +5984,15 @@ vsw_recheck_desc:
 				dring_pkt->end_idx = range_end;
 
 				DERR(vswp, "%s(%lld): processed %d %d, ACK"
-					" requested", __func__, ldcp->ldc_id,
-					dring_pkt->start_idx,
-					dring_pkt->end_idx);
+				    " requested", __func__, ldcp->ldc_id,
+				    dring_pkt->start_idx, dring_pkt->end_idx);
 
 				dring_pkt->dring_process_state = VIO_DP_ACTIVE;
 				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
 				dring_pkt->tag.vio_sid = ldcp->local_session;
+
 				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
-						sizeof (vio_dring_msg_t),
-						B_FALSE);
+				    sizeof (vio_dring_msg_t), B_FALSE);
 
 				/*
 				 * Check if ACK was successfully sent. If not
@@ -6040,7 +6016,7 @@ vsw_recheck_desc:
 			 */
 			if (chain > vsw_chain_len) {
 				D3(vswp, "%s(%lld): switching chain of %d "
-					"msgs", __func__, ldcp->ldc_id, chain);
+				    "msgs", __func__, ldcp->ldc_id, chain);
 				break;
 			}
 		}
@@ -6062,9 +6038,9 @@ vsw_recheck_desc:
 		/* send the chain of packets to be switched */
 		if (bp != NULL) {
 			D3(vswp, "%s(%lld): switching chain of %d msgs",
-					__func__, ldcp->ldc_id, chain);
+			    __func__, ldcp->ldc_id, chain);
 			vswp->vsw_switch_frame(vswp, bp, VSW_VNETPORT,
-							ldcp->ldc_port, NULL);
+			    ldcp->ldc_port, NULL);
 		}
 
 		DTRACE_PROBE1(msg_cnt, int, cnt);
@@ -6091,11 +6067,11 @@ vsw_recheck_desc:
 		dring_pkt->end_idx = range_end;
 
 		D2(vswp, "%s(%lld) processed : %d : %d, now stopping",
-			__func__, ldcp->ldc_id, dring_pkt->start_idx,
-			dring_pkt->end_idx);
+		    __func__, ldcp->ldc_id, dring_pkt->start_idx,
+		    dring_pkt->end_idx);
 
 		(void) vsw_send_msg(ldcp, (void *)dring_pkt,
-				sizeof (vio_dring_msg_t), B_TRUE);
+		    sizeof (vio_dring_msg_t), B_TRUE);
 		break;
 
 	case VIO_SUBTYPE_ACK:
@@ -6106,7 +6082,7 @@ vsw_recheck_desc:
 		 */
 		READ_ENTER(&ldcp->lane_out.dlistrw);
 		if ((dp = vsw_ident2dring(&ldcp->lane_out,
-			dring_pkt->dring_ident)) == NULL) {
+		    dring_pkt->dring_ident)) == NULL) {
 			RW_EXIT(&ldcp->lane_out.dlistrw);
 			DERR(vswp, "%s: unknown ident in ACK", __func__);
 			return;
@@ -6125,7 +6101,7 @@ vsw_recheck_desc:
 		num = end >= start ? end - start + 1: (len - start + 1) + end;
 
 		D2(vswp, "%s(%lld): start index %ld : end %ld : num %ld\n",
-			__func__, ldcp->ldc_id, start, end, num);
+		    __func__, ldcp->ldc_id, start, end, num);
 
 		mutex_enter(&dp->dlock);
 		dp->last_ack_recv = end;
@@ -6158,19 +6134,18 @@ vsw_recheck_desc:
 				mutex_exit(&priv_addr->dstate_lock);
 
 				D3(vswp, "clearing descp %d : pub state "
-					"0x%llx : priv state 0x%llx", i,
-					pub_addr->hdr.dstate,
-					priv_addr->dstate);
+				    "0x%llx : priv state 0x%llx", i,
+				    pub_addr->hdr.dstate, priv_addr->dstate);
 
 			} else {
 				mutex_exit(&priv_addr->dstate_lock);
 
 				if (dring_pkt->dring_process_state !=
-							VIO_DP_STOPPED) {
+				    VIO_DP_STOPPED) {
 					DERR(vswp, "%s: descriptor %lld at pos "
-						" 0x%llx not DONE (0x%lx)\n",
-						__func__, i, pub_addr,
-						pub_addr->hdr.dstate);
+					    " 0x%llx not DONE (0x%lx)\n",
+					    __func__, i, pub_addr,
+					    pub_addr->hdr.dstate);
 					RW_EXIT(&ldcp->lane_out.dlistrw);
 					return;
 				}
@@ -6186,8 +6161,8 @@ vsw_recheck_desc:
 		if (dring_pkt->dring_process_state == VIO_DP_STOPPED) {
 			DTRACE_PROBE(stop_process_recv);
 			D2(vswp, "%s(%lld): got stopping msg : %d : %d",
-				__func__, ldcp->ldc_id, dring_pkt->start_idx,
-				dring_pkt->end_idx);
+			    __func__, ldcp->ldc_id, dring_pkt->start_idx,
+			    dring_pkt->end_idx);
 
 			/*
 			 * Check next descriptor in public section of ring.
@@ -6222,12 +6197,11 @@ vsw_recheck_desc:
 				dring_pkt->end_idx = -1;
 
 				D2(vswp, "%s(%lld) : sending restart msg:"
-					" %d : %d", __func__, ldcp->ldc_id,
-					dring_pkt->start_idx,
-					dring_pkt->end_idx);
+				    " %d : %d", __func__, ldcp->ldc_id,
+				    dring_pkt->start_idx, dring_pkt->end_idx);
 
 				msg_rv = vsw_send_msg(ldcp, (void *)dring_pkt,
-					sizeof (vio_dring_msg_t), B_FALSE);
+				    sizeof (vio_dring_msg_t), B_FALSE);
 
 			} else {
 				mutex_exit(&priv_addr->dstate_lock);
@@ -6245,7 +6219,7 @@ vsw_recheck_desc:
 
 	case VIO_SUBTYPE_NACK:
 		DWARN(vswp, "%s(%lld): VIO_SUBTYPE_NACK",
-						__func__, ldcp->ldc_id);
+		    __func__, ldcp->ldc_id);
 		/*
 		 * Something is badly wrong if we are getting NACK's
 		 * for our data pkts. So reset the channel.
@@ -6256,7 +6230,7 @@ vsw_recheck_desc:
 
 	default:
 		DERR(vswp, "%s(%lld): Unknown vio_subtype %x\n", __func__,
-			ldcp->ldc_id, dring_pkt->tag.vio_subtype);
+		    ldcp->ldc_id, dring_pkt->tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
@@ -6273,10 +6247,7 @@ vsw_process_data_raw_pkt(vsw_ldc_t *ldcp, void *dpkt)
 	_NOTE(ARGUNUSED(dpkt))
 
 	D1(NULL, "%s (%lld): enter\n", __func__, ldcp->ldc_id);
-
-	DERR(NULL, "%s (%lld): currently  not supported",
-						__func__, ldcp->ldc_id);
-
+	DERR(NULL, "%s (%lld): currently unsupported", __func__, ldcp->ldc_id);
 	D1(NULL, "%s (%lld): exit\n", __func__, ldcp->ldc_id);
 }
 
@@ -6320,7 +6291,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		datalen = ibnd_desc->nbytes;
 
 		D2(vswp, "%s(%lld): processing inband desc : "
-			": datalen 0x%lx", __func__, ldcp->ldc_id, datalen);
+		    ": datalen 0x%lx", __func__, ldcp->ldc_id, datalen);
 
 		ncookies = ibnd_desc->ncookies;
 
@@ -6338,25 +6309,23 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		mp = allocb(datalen, BPRI_MED);
 		if (mp == NULL) {
 			DERR(vswp, "%s(%lld): allocb failed",
-					__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 			return;
 		}
 
 		rv = ldc_mem_copy(ldcp->ldc_handle, (caddr_t)mp->b_rptr,
-			0, &nbytes, ibnd_desc->memcookie, (uint64_t)ncookies,
-			LDC_COPY_IN);
+		    0, &nbytes, ibnd_desc->memcookie, (uint64_t)ncookies,
+		    LDC_COPY_IN);
 
 		if (rv != 0) {
 			DERR(vswp, "%s(%d): unable to copy in data from "
-				"%d cookie(s)", __func__,
-				ldcp->ldc_id, ncookies);
+			    "%d cookie(s)", __func__, ldcp->ldc_id, ncookies);
 			freemsg(mp);
 			return;
 		}
 
-		D2(vswp, "%s(%d): copied in %ld bytes using %d "
-			"cookies", __func__, ldcp->ldc_id, nbytes,
-			ncookies);
+		D2(vswp, "%s(%d): copied in %ld bytes using %d cookies",
+		    __func__, ldcp->ldc_id, nbytes, ncookies);
 
 		/*
 		 * Upper layer is expecting the IP header in the packet to
@@ -6367,7 +6336,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		nmp = allocb(datalen + VNET_IPALIGN, BPRI_MED);
 		if (nmp == NULL) {
 			DERR(vswp, "%s(%lld): allocb failed",
-				__func__, ldcp->ldc_id);
+			    __func__, ldcp->ldc_id);
 			freemsg(mp);
 			return;
 		}
@@ -6384,11 +6353,11 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		ibnd_desc->hdr.tag.vio_subtype = VIO_SUBTYPE_ACK;
 		ibnd_desc->hdr.tag.vio_sid = ldcp->local_session;
 		(void) vsw_send_msg(ldcp, (void *)ibnd_desc,
-				sizeof (vnet_ibnd_desc_t), B_TRUE);
+		    sizeof (vnet_ibnd_desc_t), B_TRUE);
 
 		/* send the packet to be switched */
 		vswp->vsw_switch_frame(vswp, nmp, VSW_VNETPORT,
-					ldcp->ldc_port, NULL);
+		    ldcp->ldc_port, NULL);
 
 		break;
 
@@ -6400,7 +6369,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		if (idx >= VSW_RING_NUM_EL) {
 			cmn_err(CE_WARN, "!vsw%d: corrupted ACK received "
-				"(idx %ld)", vswp->instance, idx);
+			    "(idx %ld)", vswp->instance, idx);
 			return;
 		}
 
@@ -6420,10 +6389,10 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 */
 		if (idx != dp->last_ack_recv) {
 			DWARN(vswp, "%s: dropped pkts detected, (%ld, %ld)",
-				__func__, dp->last_ack_recv, idx);
+			    __func__, dp->last_ack_recv, idx);
 			num = idx >= dp->last_ack_recv ?
-				idx - dp->last_ack_recv + 1:
-				(len - dp->last_ack_recv + 1) + idx;
+			    idx - dp->last_ack_recv + 1:
+			    (len - dp->last_ack_recv + 1) + idx;
 		}
 
 		/*
@@ -6440,15 +6409,15 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 			mutex_enter(&priv_addr->dstate_lock);
 			if (priv_addr->dstate != VIO_DESC_READY) {
 				DERR(vswp, "%s: (%ld) desc at index %ld not "
-					"READY (0x%lx)", __func__,
-					ldcp->ldc_id, idx, priv_addr->dstate);
+				    "READY (0x%lx)", __func__,
+				    ldcp->ldc_id, idx, priv_addr->dstate);
 				DERR(vswp, "%s: bound %d: ncookies %ld : "
-					"datalen %ld", __func__,
-					priv_addr->bound, priv_addr->ncookies,
-					priv_addr->datalen);
+				    "datalen %ld", __func__,
+				    priv_addr->bound, priv_addr->ncookies,
+				    priv_addr->datalen);
 			}
 			D2(vswp, "%s: (%lld) freeing descp at %lld", __func__,
-				ldcp->ldc_id, idx);
+			    ldcp->ldc_id, idx);
 			/* release resources associated with sent msg */
 			bzero(priv_addr->datap, priv_addr->datalen);
 			priv_addr->datalen = 0;
@@ -6476,7 +6445,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		if (idx >= VSW_RING_NUM_EL) {
 			DERR(vswp, "%s: corrupted NACK received (idx %lld)",
-				__func__, idx);
+			    __func__, idx);
 			return;
 		}
 
@@ -6501,7 +6470,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 	default:
 		DERR(vswp, "%s(%lld): Unknown vio_subtype %x\n", __func__,
-			ldcp->ldc_id, ibnd_desc->hdr.tag.vio_subtype);
+		    ldcp->ldc_id, ibnd_desc->hdr.tag.vio_subtype);
 	}
 
 	D1(vswp, "%s(%lld) exit", __func__, ldcp->ldc_id);
@@ -6567,7 +6536,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 		ehp = (struct ether_header *)mp->b_rptr;
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
-			__func__, MBLKSIZE(mp), MBLKL(mp));
+		    __func__, MBLKSIZE(mp), MBLKL(mp));
 
 		READ_ENTER(&vswp->if_lockrw);
 		if (ether_cmp(&ehp->ether_dhost, &vswp->if_addr) == 0) {
@@ -6648,12 +6617,10 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 */
 			if (IS_BROADCAST(ehp)) {
 				D3(vswp, "%s: BROADCAST pkt", __func__);
-				(void) vsw_forward_all(vswp, mp,
-								caller, arg);
+				(void) vsw_forward_all(vswp, mp, caller, arg);
 			} else if (IS_MULTICAST(ehp)) {
 				D3(vswp, "%s: MULTICAST pkt", __func__);
-				(void) vsw_forward_grp(vswp, mp,
-							caller, arg);
+				(void) vsw_forward_grp(vswp, mp, caller, arg);
 			} else {
 				/*
 				 * If the destination is unicast, and came
@@ -6677,14 +6644,14 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 						nmp = copymsg(mp);
 						if (nmp)
 							mac_rx(vswp->if_mh,
-								mrh, nmp);
+							    mrh, nmp);
 					} else {
 						RW_EXIT(&vswp->if_lockrw);
 					}
 					if ((ret_m = vsw_tx_msg(vswp, mp))
-								!= NULL) {
+					    != NULL) {
 						DERR(vswp, "%s: drop mblks to "
-							"phys dev", __func__);
+						    "phys dev", __func__);
 						freemsg(ret_m);
 					}
 
@@ -6709,9 +6676,9 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					 * over physical device.
 					 */
 					if ((ret_m = vsw_tx_msg(vswp, mp))
-								!= NULL) {
+					    != NULL) {
 						DERR(vswp, "%s: drop mblks to "
-							"phys dev", __func__);
+						    "phys dev", __func__);
 						freemsg(ret_m);
 					}
 				}
@@ -6760,7 +6727,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 		ehp = (struct ether_header *)mp->b_rptr;
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
-			__func__, MBLKSIZE(mp), MBLKL(mp));
+		    __func__, MBLKSIZE(mp), MBLKL(mp));
 
 		READ_ENTER(&plist->lockrw);
 		port = vsw_lookup_fdb(vswp, ehp);
@@ -6797,12 +6764,10 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 */
 			if (IS_BROADCAST(ehp)) {
 				D2(vswp, "%s: BROADCAST pkt", __func__);
-				(void) vsw_forward_all(vswp, mp,
-								caller, arg);
+				(void) vsw_forward_all(vswp, mp, caller, arg);
 			} else if (IS_MULTICAST(ehp)) {
 				D2(vswp, "%s: MULTICAST pkt", __func__);
-				(void) vsw_forward_grp(vswp, mp,
-							caller, arg);
+				(void) vsw_forward_grp(vswp, mp, caller, arg);
 			} else {
 				/*
 				 * Unicast pkt from vnet that we don't have
@@ -6815,13 +6780,13 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					if (vswp->if_state & VSW_IF_UP) {
 						RW_EXIT(&vswp->if_lockrw);
 						D2(vswp, "%s: sending up",
-							__func__);
+						    __func__);
 						mac_rx(vswp->if_mh, mrh, mp);
 					} else {
 						RW_EXIT(&vswp->if_lockrw);
 						/* Interface down, drop pkt */
 						D2(vswp, "%s I/F down",
-								__func__);
+						    __func__);
 						freemsg(mp);
 					}
 				}
@@ -6852,16 +6817,16 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	 * world if in either of layer 2 modes.
 	 */
 	if (((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-		(vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
-		((caller == VSW_LOCALDEV) || (caller == VSW_VNETPORT))) {
+	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
+	    ((caller == VSW_LOCALDEV) || (caller == VSW_VNETPORT))) {
 
 		nmp = dupmsg(mp);
 		if (nmp) {
 			if ((ret_m = vsw_tx_msg(vswp, nmp)) != NULL) {
 				DERR(vswp, "%s: dropping pkt(s) "
-				"consisting of %ld bytes of data for"
-				" physical device", __func__, MBLKL(ret_m));
-			freemsg(ret_m);
+				    "consisting of %ld bytes of data for"
+				    " physical device", __func__, MBLKL(ret_m));
+				freemsg(ret_m);
 			}
 		}
 	}
@@ -6943,15 +6908,14 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	 * vnets are interested in it.
 	 */
 	if (((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-		(vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
-		((caller == VSW_VNETPORT) || (caller == VSW_LOCALDEV))) {
+	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
+	    ((caller == VSW_VNETPORT) || (caller == VSW_LOCALDEV))) {
 		nmp = dupmsg(mp);
 		if (nmp) {
 			if ((ret_m = vsw_tx_msg(vswp, nmp)) != NULL) {
-				DERR(vswp, "%s: dropping pkt(s) "
-					"consisting of %ld bytes of "
-					"data for physical device",
-					__func__, MBLKL(ret_m));
+				DERR(vswp, "%s: dropping pkt(s) consisting of "
+				    "%ld bytes of data for physical device",
+				    __func__, MBLKL(ret_m));
 				freemsg(ret_m);
 			}
 		}
@@ -6959,9 +6923,9 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 
 	READ_ENTER(&vswp->mfdbrw);
 	if (mod_hash_find(vswp->mfdb, (mod_hash_key_t)key,
-				(mod_hash_val_t *)&entp) != 0) {
+	    (mod_hash_val_t *)&entp) != 0) {
 		D3(vswp, "%s: no table entry found for addr 0x%llx",
-								__func__, key);
+		    __func__, key);
 	} else {
 		/*
 		 * Send to list of devices associated with this address...
@@ -6970,25 +6934,23 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 
 			/* dont send to ourselves */
 			if ((caller == VSW_VNETPORT) &&
-				(tpp->d_addr == (void *)arg)) {
+			    (tpp->d_addr == (void *)arg)) {
 				port = (vsw_port_t *)tpp->d_addr;
 				D3(vswp, "%s: not sending to ourselves"
-					" : port %d", __func__,
-					port->p_instance);
+				    " : port %d", __func__, port->p_instance);
 				continue;
 
 			} else if ((caller == VSW_LOCALDEV) &&
-				(tpp->d_type == VSW_LOCALDEV)) {
+			    (tpp->d_type == VSW_LOCALDEV)) {
 				D3(vswp, "%s: not sending back up stack",
-					__func__);
+				    __func__);
 				continue;
 			}
 
 			if (tpp->d_type == VSW_VNETPORT) {
 				port = (vsw_port_t *)tpp->d_addr;
-				D3(vswp, "%s: sending to port %ld for "
-					" addr 0x%llx", __func__,
-					port->p_instance, key);
+				D3(vswp, "%s: sending to port %ld for addr "
+				    "0x%llx", __func__, port->p_instance, key);
 
 				nmp = dupmsg(mp);
 				if (nmp)
@@ -7000,8 +6962,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 						mac_rx(vswp->if_mh, NULL, nmp);
 					check_if = B_FALSE;
 					D3(vswp, "%s: sending up stack"
-						" for addr 0x%llx", __func__,
-						key);
+					    " for addr 0x%llx", __func__, key);
 				}
 			}
 		}
@@ -7016,12 +6977,12 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	 * and in promisc mode).
 	 */
 	if ((check_if) &&
-		((caller == VSW_VNETPORT) || (caller == VSW_PHYSDEV))) {
+	    ((caller == VSW_VNETPORT) || (caller == VSW_PHYSDEV))) {
 		READ_ENTER(&vswp->if_lockrw);
 		if (VSW_U_P(vswp->if_state)) {
 			RW_EXIT(&vswp->if_lockrw);
 			D3(vswp, "%s: (caller %d) finally sending up stack"
-				" for addr 0x%llx", __func__, caller, key);
+			    " for addr 0x%llx", __func__, caller, key);
 			nmp = copymsg(mp);
 			if (nmp)
 				mac_rx(vswp->if_mh, NULL, nmp);
@@ -7097,10 +7058,10 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	/* TODO: make test a macro */
 	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-		(ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
 		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
-			"packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
-			ldcp->lane_out.lstate);
+		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
+		    ldcp->lane_out.lstate);
 		freemsg(mp);
 		return (LDC_TX_FAILURE);
 	}
@@ -7113,7 +7074,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	if ((dp = ldcp->lane_out.dringp) == NULL) {
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 		DERR(vswp, "%s(%lld): no dring for outbound lane on"
-			" channel %d", __func__, ldcp->ldc_id, ldcp->ldc_id);
+		    " channel %d", __func__, ldcp->ldc_id, ldcp->ldc_id);
 		freemsg(mp);
 		return (LDC_TX_FAILURE);
 	}
@@ -7136,15 +7097,14 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	 */
 	if (vsw_dring_find_free_desc(dp, &priv_desc, &idx) != 0) {
 		D2(vswp, "%s(%lld): no descriptor available for ring "
-			"at 0x%llx", __func__, ldcp->ldc_id, dp);
+		    "at 0x%llx", __func__, ldcp->ldc_id, dp);
 
 		/* nothing more we can do */
 		status = LDC_TX_NORESOURCES;
 		goto vsw_dringsend_free_exit;
 	} else {
-		D2(vswp, "%s(%lld): free private descriptor found at pos "
-			"%ld addr 0x%llx\n", __func__, ldcp->ldc_id, idx,
-			priv_desc);
+		D2(vswp, "%s(%lld): free private descriptor found at pos %ld "
+		    "addr 0x%llx\n", __func__, ldcp->ldc_id, idx, priv_desc);
 	}
 
 	/* copy data into the descriptor */
@@ -7199,22 +7159,22 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 		if (dp->last_ack_recv == -1) {
 			dring_pkt.start_idx = 0;
 		} else {
-			dring_pkt.start_idx = (dp->last_ack_recv + 1) %
-						dp->num_descriptors;
+			dring_pkt.start_idx =
+			    (dp->last_ack_recv + 1) % dp->num_descriptors;
 		}
 		dring_pkt.end_idx = -1;
 		mutex_exit(&dp->dlock);
 
 		D3(vswp, "%s(%lld): dring 0x%llx : ident 0x%llx\n", __func__,
-			ldcp->ldc_id, dp, dring_pkt.dring_ident);
+		    ldcp->ldc_id, dp, dring_pkt.dring_ident);
 		D3(vswp, "%s(%lld): start %lld : end %lld : seq %lld\n",
-			__func__, ldcp->ldc_id, dring_pkt.start_idx,
-			dring_pkt.end_idx, dring_pkt.seq_num);
+		    __func__, ldcp->ldc_id, dring_pkt.start_idx,
+		    dring_pkt.end_idx, dring_pkt.seq_num);
 
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 
 		(void) vsw_send_msg(ldcp, (void *)&dring_pkt,
-					sizeof (vio_dring_msg_t), B_TRUE);
+		    sizeof (vio_dring_msg_t), B_TRUE);
 
 		/* free the message block */
 		freemsg(mp);
@@ -7223,7 +7183,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	} else {
 		mutex_exit(&dp->restart_lock);
 		D2(vswp, "%s(%lld): updating descp %d", __func__,
-			ldcp->ldc_id, idx);
+		    ldcp->ldc_id, idx);
 	}
 
 vsw_dringsend_free_exit:
@@ -7259,10 +7219,10 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	ASSERT(mp != NULL);
 
 	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-		(ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
 		DERR(vswp, "%s(%lld) status(%d) state (0x%llx), dropping pkt",
-			__func__, ldcp->ldc_id, ldcp->ldc_status,
-			ldcp->lane_out.lstate);
+		    __func__, ldcp->ldc_id, ldcp->ldc_status,
+		    ldcp->lane_out.lstate);
 		freemsg(mp);
 		return (LDC_TX_FAILURE);
 	}
@@ -7274,10 +7234,9 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	READ_ENTER(&ldcp->lane_out.dlistrw);
 	if ((dp = ldcp->lane_out.dringp) == NULL) {
 		DERR(vswp, "%s(%lld): no dring for outbound lane",
-			__func__, ldcp->ldc_id);
-		DERR(vswp, "%s(%lld) status(%d) state (0x%llx)",
-			__func__, ldcp->ldc_id, ldcp->ldc_status,
-			ldcp->lane_out.lstate);
+		    __func__, ldcp->ldc_id);
+		DERR(vswp, "%s(%lld) status(%d) state (0x%llx)", __func__,
+		    ldcp->ldc_id, ldcp->ldc_status, ldcp->lane_out.lstate);
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 		freemsg(mp);
 		return (LDC_TX_FAILURE);
@@ -7299,7 +7258,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 		if (warn_msg) {
 			DERR(vswp, "%s(%lld): no descriptor available for ring "
-			"at 0x%llx", __func__, ldcp->ldc_id, dp);
+			    "at 0x%llx", __func__, ldcp->ldc_id, dp);
 			warn_msg = 0;
 		}
 
@@ -7308,8 +7267,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 		goto vsw_descrsend_free_exit;
 	} else {
 		D2(vswp, "%s(%lld): free private descriptor found at pos "
-			"%ld addr 0x%x\n", __func__, ldcp->ldc_id, idx,
-			priv_desc);
+		    "%ld addr 0x%x\n", __func__, ldcp->ldc_id, idx, priv_desc);
 		warn_msg = 1;
 	}
 
@@ -7340,7 +7298,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	 */
 	for (i = 0; i < priv_desc->ncookies; i++) {
 		bcopy(&priv_desc->memcookie[i], &ibnd_msg.memcookie[i],
-			sizeof (ldc_mem_cookie_t));
+		    sizeof (ldc_mem_cookie_t));
 	}
 
 	ibnd_msg.hdr.desc_handle = idx;
@@ -7350,7 +7308,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	RW_EXIT(&ldcp->lane_out.dlistrw);
 
 	(void) vsw_send_msg(ldcp, (void *)&ibnd_msg,
-			sizeof (vnet_ibnd_desc_t), B_TRUE);
+	    sizeof (vnet_ibnd_desc_t), B_TRUE);
 
 vsw_descrsend_free_exit:
 
@@ -7479,7 +7437,7 @@ vsw_send_dring_info(vsw_ldc_t *ldcp)
 	dring_msg = vsw_create_dring_info_pkt(ldcp);
 	if (dring_msg == NULL) {
 		cmn_err(CE_WARN, "!vsw%d: %s: error creating msg",
-			vswp->instance, __func__);
+		    vswp->instance, __func__);
 		return;
 	}
 
@@ -7488,7 +7446,7 @@ vsw_send_dring_info(vsw_ldc_t *ldcp)
 	DUMP_TAG_PTR((vio_msg_tag_t *)dring_msg);
 
 	(void) vsw_send_msg(ldcp, dring_msg,
-		sizeof (vio_dring_reg_msg_t), B_TRUE);
+	    sizeof (vio_dring_reg_msg_t), B_TRUE);
 
 	kmem_free(dring_msg, sizeof (vio_dring_reg_msg_t));
 
@@ -7534,7 +7492,7 @@ vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "vsw_send_msg (%lld) enter : sending %d bytes",
-			ldcp->ldc_id, size);
+	    ldcp->ldc_id, size);
 
 	D2(vswp, "send_msg: type 0x%llx", tag->vio_msgtype);
 	D2(vswp, "send_msg: stype 0x%llx", tag->vio_subtype);
@@ -7547,9 +7505,8 @@ vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 	} while (rv == EWOULDBLOCK && --vsw_wretries > 0);
 
 	if ((rv != 0) || (msglen != size)) {
-		DERR(vswp, "vsw_send_msg:ldc_write failed: chan(%lld) "
-			"rv(%d) size (%d) msglen(%d)\n", ldcp->ldc_id,
-			rv, size, msglen);
+		DERR(vswp, "vsw_send_msg:ldc_write failed: chan(%lld) rv(%d) "
+		    "size (%d) msglen(%d)\n", ldcp->ldc_id, rv, size, msglen);
 	}
 	mutex_exit(&ldcp->ldc_txlock);
 
@@ -7559,8 +7516,7 @@ vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 	 * decide what to do.
 	 */
 	if (rv == ECONNRESET) {
-		DWARN(vswp, "%s (%lld) channel reset",
-					__func__, ldcp->ldc_id);
+		DWARN(vswp, "%s (%lld) channel reset", __func__, ldcp->ldc_id);
 
 		/*
 		 * N.B - must never be holding the dlistrw lock when
@@ -7595,7 +7551,7 @@ vsw_add_fdb(vsw_t *vswp, vsw_port_t *port)
 	 * Note: duplicate keys will be rejected by mod_hash.
 	 */
 	if (mod_hash_insert(vswp->fdb, (mod_hash_key_t)addr,
-				(mod_hash_val_t)port) != 0) {
+	    (mod_hash_val_t)port) != 0) {
 		DERR(vswp, "%s: unable to add entry into fdb.", __func__);
 		return (1);
 	}
@@ -7643,7 +7599,7 @@ vsw_lookup_fdb(vsw_t *vswp, struct ether_header *ehp)
 	D2(vswp, "%s: key = 0x%llx", __func__, key);
 
 	if (mod_hash_find(vswp->fdb, (mod_hash_key_t)key,
-				(mod_hash_val_t *)&port) != 0) {
+	    (mod_hash_val_t *)&port) != 0) {
 		D2(vswp, "%s: no port found", __func__);
 		return (NULL);
 	}
@@ -7689,7 +7645,7 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 		 */
 		if (mcst_pkt->set == 0x1) {
 			D3(vswp, "%s: adding multicast address 0x%llx for "
-				"port %ld", __func__, addr, port->p_instance);
+			    "port %ld", __func__, addr, port->p_instance);
 			if (vsw_add_mcst(vswp, VSW_VNETPORT, addr, port) == 0) {
 				/*
 				 * Update the list of multicast
@@ -7697,11 +7653,11 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * port structure to include this new
 				 * one.
 				 */
-				mcst_p = kmem_alloc(sizeof (mcst_addr_t),
-								KM_NOSLEEP);
+				mcst_p = kmem_alloc(
+				    sizeof (mcst_addr_t), KM_NOSLEEP);
 				if (mcst_p == NULL) {
 					DERR(vswp, "%s: unable to alloc mem",
-						__func__);
+					    __func__);
 					return (1);
 				}
 
@@ -7721,14 +7677,14 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 */
 				mutex_enter(&vswp->mac_lock);
 				if ((vswp->mh == NULL) ||
-					mac_multicst_add(vswp->mh,
-						(uchar_t *)&mcst_pkt->mca[i])) {
+				    mac_multicst_add(vswp->mh,
+				    (uchar_t *)&mcst_pkt->mca[i])) {
 					mutex_exit(&vswp->mac_lock);
 					cmn_err(CE_WARN, "!vsw%d: unable to "
-						"add multicast address",
-						vswp->instance);
+					    "add multicast address",
+					    vswp->instance);
 					(void) vsw_del_mcst(vswp, VSW_VNETPORT,
-						addr, port);
+					    addr, port);
 					vsw_del_addr(VSW_VNETPORT, port, addr);
 					return (1);
 				}
@@ -7736,8 +7692,8 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 
 			} else {
 				DERR(vswp, "%s: error adding multicast "
-					"address 0x%llx for port %ld",
-					__func__, addr, port->p_instance);
+				    "address 0x%llx for port %ld",
+				    __func__, addr, port->p_instance);
 				return (1);
 			}
 		} else {
@@ -7748,8 +7704,8 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 			 */
 			if (vsw_del_mcst(vswp, VSW_VNETPORT, addr, port) == 0) {
 				D3(vswp, "%s: deleting multicast address "
-					"0x%llx for port %ld", __func__, addr,
-					port->p_instance);
+				    "0x%llx for port %ld", __func__, addr,
+				    port->p_instance);
 
 				vsw_del_addr(VSW_VNETPORT, port, addr);
 
@@ -7763,20 +7719,20 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 */
 				mutex_enter(&vswp->mac_lock);
 				if ((vswp->mh == NULL) ||
-					mac_multicst_remove(vswp->mh,
-						(uchar_t *)&mcst_pkt->mca[i])) {
+				    mac_multicst_remove(vswp->mh,
+				    (uchar_t *)&mcst_pkt->mca[i])) {
 					mutex_exit(&vswp->mac_lock);
 					cmn_err(CE_WARN, "!vsw%d: unable to "
-						"remove multicast address",
-						vswp->instance);
+					    "remove multicast address",
+					    vswp->instance);
 					return (1);
 				}
 				mutex_exit(&vswp->mac_lock);
 
 			} else {
 				DERR(vswp, "%s: error deleting multicast "
-					"addr 0x%llx for port %ld",
-					__func__, addr, port->p_instance);
+				    "addr 0x%llx for port %ld",
+				    __func__, addr, port->p_instance);
 				return (1);
 			}
 		}
@@ -7809,7 +7765,7 @@ vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 		ASSERT(arg != NULL);
 		tgt = arg;
 		D2(NULL, "%s: port %d : address 0x%llx", __func__,
-			((vsw_port_t *)arg)->p_instance, addr);
+		    ((vsw_port_t *)arg)->p_instance, addr);
 	} else {
 		/*
 		 * We are being invoked via the m_multicst mac entry
@@ -7821,7 +7777,7 @@ vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 
 	WRITE_ENTER(&vswp->mfdbrw);
 	if (mod_hash_find(vswp->mfdb, (mod_hash_key_t)addr,
-				(mod_hash_val_t *)&ment) != 0) {
+	    (mod_hash_val_t *)&ment) != 0) {
 
 		/* address not currently in table */
 		ment = kmem_alloc(sizeof (mfdb_ent_t), KM_SLEEP);
@@ -7830,13 +7786,13 @@ vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 		ment->nextp = NULL;
 
 		if (mod_hash_insert(vswp->mfdb, (mod_hash_key_t)addr,
-			(mod_hash_val_t)ment) != 0) {
+		    (mod_hash_val_t)ment) != 0) {
 			DERR(vswp, "%s: hash table insertion failed", __func__);
 			kmem_free(ment, sizeof (mfdb_ent_t));
 			rv = 1;
 		} else {
 			D2(vswp, "%s: added initial entry for 0x%llx to "
-				"table", __func__, addr);
+			    "table", __func__, addr);
 		}
 	} else {
 		/*
@@ -7849,14 +7805,13 @@ vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 			if (tmp_ent->d_addr == (void *)tgt) {
 				if (devtype == VSW_VNETPORT) {
 					DERR(vswp, "%s: duplicate port entry "
-						"found for portid %ld and key "
-						"0x%llx", __func__,
-						((vsw_port_t *)arg)->p_instance,
-						addr);
+					    "found for portid %ld and key "
+					    "0x%llx", __func__,
+					    ((vsw_port_t *)arg)->p_instance,
+					    addr);
 				} else {
 					DERR(vswp, "%s: duplicate entry found"
-						"for key 0x%llx",
-						__func__, addr);
+					    "for key 0x%llx", __func__, addr);
 				}
 				rv = 1;
 				dup = 1;
@@ -7870,7 +7825,7 @@ vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 		 */
 		if (0 == dup) {
 			D2(vswp, "%s: added entry for 0x%llx to table",
-				__func__, addr);
+			    __func__, addr);
 			new_ent = kmem_alloc(sizeof (mfdb_ent_t), KM_SLEEP);
 			new_ent->d_addr = (void *)tgt;
 			new_ent->d_type = devtype;
@@ -7907,8 +7862,7 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 	if (devtype == VSW_VNETPORT) {
 		tgt = (vsw_port_t *)arg;
 		D2(vswp, "%s: removing port %d from mFDB for address"
-			" 0x%llx", __func__, ((vsw_port_t *)tgt)->p_instance,
-			addr);
+		    " 0x%llx", __func__, ((vsw_port_t *)tgt)->p_instance, addr);
 	} else {
 		D2(vswp, "%s: removing entry", __func__);
 		tgt = (void *)vswp;
@@ -7916,7 +7870,7 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 
 	WRITE_ENTER(&vswp->mfdbrw);
 	if (mod_hash_find(vswp->mfdb, (mod_hash_key_t)addr,
-				(mod_hash_val_t *)&ment) != 0) {
+	    (mod_hash_val_t *)&ment) != 0) {
 		D2(vswp, "%s: address 0x%llx not in table", __func__, addr);
 		RW_EXIT(&vswp->mfdbrw);
 		return (1);
@@ -7928,7 +7882,7 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 		if (curr_p->d_addr == (void *)tgt) {
 			if (devtype == VSW_VNETPORT) {
 				D2(vswp, "%s: port %d found", __func__,
-					((vsw_port_t *)tgt)->p_instance);
+				    ((vsw_port_t *)tgt)->p_instance);
 			} else {
 				D2(vswp, "%s: instance found", __func__);
 			}
@@ -7943,11 +7897,11 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 				kmem_free(curr_p, sizeof (mfdb_ent_t));
 				if (ment == NULL) {
 					(void) mod_hash_destroy(vswp->mfdb,
-							(mod_hash_val_t)addr);
+					    (mod_hash_val_t)addr);
 				} else {
 					(void) mod_hash_replace(vswp->mfdb,
-							(mod_hash_key_t)addr,
-							(mod_hash_val_t)ment);
+					    (mod_hash_key_t)addr,
+					    (mod_hash_val_t)ment);
 				}
 			} else {
 				/*
@@ -7988,7 +7942,7 @@ vsw_del_mcst_port(vsw_port_t *port)
 	mutex_enter(&port->mca_lock);
 	while (port->mcap != NULL) {
 		(void) vsw_del_mcst(vswp, VSW_VNETPORT,
-					port->mcap->addr, port);
+		    port->mcap->addr, port);
 
 		mcst_p = port->mcap->nextp;
 		kmem_free(port->mcap, sizeof (mcst_addr_t));
@@ -8016,9 +7970,8 @@ vsw_del_mcst_vsw(vsw_t *vswp)
 
 	while (vswp->mcap != NULL) {
 		DERR(vswp, "%s: deleting addr 0x%llx",
-			__func__, vswp->mcap->addr);
-		(void) vsw_del_mcst(vswp, VSW_LOCALDEV,
-				vswp->mcap->addr, NULL);
+		    __func__, vswp->mcap->addr);
+		(void) vsw_del_mcst(vswp, VSW_LOCALDEV, vswp->mcap->addr, NULL);
 
 		next_p = vswp->mcap->nextp;
 		kmem_free(vswp->mcap, sizeof (mcst_addr_t));
@@ -8045,7 +7998,7 @@ vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr)
 	mcst_addr_t	*curr_p = NULL;
 
 	D1(NULL, "%s: enter : devtype %d : addr 0x%llx",
-		__func__, devtype, addr);
+	    __func__, devtype, addr);
 
 	if (devtype == VSW_VNETPORT) {
 		port = (vsw_port_t *)arg;
@@ -8107,10 +8060,10 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 
 	/* create public section of ring */
 	if ((ldc_mem_dring_create(VSW_RING_NUM_EL,
-			VSW_PUB_SIZE, &dp->handle)) != 0) {
+	    VSW_PUB_SIZE, &dp->handle)) != 0) {
 
 		DERR(vswp, "vsw_create_dring(%lld): ldc dring create "
-			"failed", ldcp->ldc_id);
+		    "failed", ldcp->ldc_id);
 		goto create_fail_exit;
 	}
 
@@ -8121,7 +8074,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 	 */
 	if ((ldc_mem_dring_info(dp->handle, &minfo)) != 0) {
 		DERR(vswp, "vsw_create_dring(%lld): dring info failed\n",
-			ldcp->ldc_id);
+		    ldcp->ldc_id);
 		goto dring_fail_exit;
 	} else {
 		ASSERT(minfo.vaddr != 0);
@@ -8137,7 +8090,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 	 * create private portion of ring
 	 */
 	dp->priv_addr = (vsw_private_desc_t *)kmem_zalloc(
-		(sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL), KM_SLEEP);
+	    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL), KM_SLEEP);
 
 	if (vsw_setup_ring(ldcp, dp)) {
 		DERR(vswp, "%s: unable to setup ring", __func__);
@@ -8150,10 +8103,10 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 
 	/* bind dring to the channel */
 	if ((ldc_mem_dring_bind(ldcp->ldc_handle, dp->handle,
-		LDC_SHADOW_MAP, LDC_MEM_RW,
-		&dp->cookie[0], &dp->ncookies)) != 0) {
+	    LDC_SHADOW_MAP, LDC_MEM_RW,
+	    &dp->cookie[0], &dp->ncookies)) != 0) {
 		DERR(vswp, "vsw_create_dring: unable to bind to channel "
-			"%lld", ldcp->ldc_id);
+		    "%lld", ldcp->ldc_id);
 		goto dring_fail_exit;
 	}
 
@@ -8188,11 +8141,11 @@ create_fail_exit:
 		for (i = 0; i < VSW_RING_NUM_EL; i++) {
 			if (priv_addr->memhandle != NULL)
 				(void) ldc_mem_free_handle(
-						priv_addr->memhandle);
+				    priv_addr->memhandle);
 			priv_addr++;
 		}
 		kmem_free(dp->priv_addr,
-			(sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
+		    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
 	}
 	mutex_destroy(&dp->dlock);
 
@@ -8222,15 +8175,15 @@ vsw_create_privring(vsw_ldc_t *ldcp)
 	/* no public section */
 	dp->pub_addr = NULL;
 
-	dp->priv_addr = kmem_zalloc((sizeof (vsw_private_desc_t) *
-					VSW_RING_NUM_EL), KM_SLEEP);
+	dp->priv_addr = kmem_zalloc(
+	    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL), KM_SLEEP);
 
 	dp->num_descriptors = VSW_RING_NUM_EL;
 
 	if (vsw_setup_ring(ldcp, dp)) {
 		DERR(vswp, "%s: setup of ring failed", __func__);
 		kmem_free(dp->priv_addr,
-			(sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
+		    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
 		mutex_destroy(&dp->dlock);
 		kmem_free(dp, sizeof (dring_info_t));
 		return;
@@ -8292,7 +8245,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	dp->data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
 
 	D2(vswp, "%s: allocated %lld bytes at 0x%llx\n", name,
-		dp->data_sz, dp->data_addr);
+	    dp->data_sz, dp->data_addr);
 
 	tmpp = (uint64_t *)dp->data_addr;
 	offset = VSW_RING_EL_DATA_SZ / sizeof (tmpp);
@@ -8305,7 +8258,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 		mutex_init(&priv_addr->dstate_lock, NULL, MUTEX_DRIVER, NULL);
 
 		if ((ldc_mem_alloc_handle(ldcp->ldc_handle,
-			&priv_addr->memhandle)) != 0) {
+		    &priv_addr->memhandle)) != 0) {
 			DERR(vswp, "%s: alloc mem handle failed", name);
 			goto setup_ring_cleanup;
 		}
@@ -8313,40 +8266,39 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 		priv_addr->datap = (void *)tmpp;
 
 		rv = ldc_mem_bind_handle(priv_addr->memhandle,
-			(caddr_t)priv_addr->datap, VSW_RING_EL_DATA_SZ,
-			LDC_SHADOW_MAP, LDC_MEM_R|LDC_MEM_W,
-			&(priv_addr->memcookie[0]), &ncookies);
+		    (caddr_t)priv_addr->datap, VSW_RING_EL_DATA_SZ,
+		    LDC_SHADOW_MAP, LDC_MEM_R|LDC_MEM_W,
+		    &(priv_addr->memcookie[0]), &ncookies);
 		if (rv != 0) {
 			DERR(vswp, "%s(%lld): ldc_mem_bind_handle failed "
-				"(rv %d)", name, ldcp->ldc_id, rv);
+			    "(rv %d)", name, ldcp->ldc_id, rv);
 			goto setup_ring_cleanup;
 		}
 		priv_addr->bound = 1;
 
 		D2(vswp, "%s: %d: memcookie 0 : addr 0x%llx : size 0x%llx",
-			name, i, priv_addr->memcookie[0].addr,
-			priv_addr->memcookie[0].size);
+		    name, i, priv_addr->memcookie[0].addr,
+		    priv_addr->memcookie[0].size);
 
 		if (ncookies >= (uint32_t)(VSW_MAX_COOKIES + 1)) {
 			DERR(vswp, "%s(%lld) ldc_mem_bind_handle returned "
-				"invalid num of cookies (%d) for size 0x%llx",
-				name, ldcp->ldc_id, ncookies,
-				VSW_RING_EL_DATA_SZ);
+			    "invalid num of cookies (%d) for size 0x%llx",
+			    name, ldcp->ldc_id, ncookies, VSW_RING_EL_DATA_SZ);
 
 			goto setup_ring_cleanup;
 		} else {
 			for (j = 1; j < ncookies; j++) {
 				rv = ldc_mem_nextcookie(priv_addr->memhandle,
-					&(priv_addr->memcookie[j]));
+				    &(priv_addr->memcookie[j]));
 				if (rv != 0) {
 					DERR(vswp, "%s: ldc_mem_nextcookie "
-						"failed rv (%d)", name, rv);
+					    "failed rv (%d)", name, rv);
 					goto setup_ring_cleanup;
 				}
 				D3(vswp, "%s: memcookie %d : addr 0x%llx : "
-					"size 0x%llx", name, j,
-					priv_addr->memcookie[j].addr,
-					priv_addr->memcookie[j].size);
+				    "size 0x%llx", name, j,
+				    priv_addr->memcookie[j].addr,
+				    priv_addr->memcookie[j].size);
 			}
 
 		}
@@ -8362,8 +8314,8 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 
 			for (nc = 0; nc < pub_addr->ncookies; nc++) {
 				bcopy(&priv_addr->memcookie[nc],
-					&pub_addr->memcookie[nc],
-					sizeof (ldc_mem_cookie_t));
+				    &pub_addr->memcookie[nc],
+				    sizeof (ldc_mem_cookie_t));
 			}
 
 			pub_addr->hdr.dstate = VIO_DESC_FREE;
@@ -8420,7 +8372,7 @@ vsw_dring_find_free_desc(dring_info_t *dringp,
 	ASSERT(dringp->priv_addr != NULL);
 
 	D2(NULL, "%s: searching ring, dringp 0x%llx : start pos %lld",
-			__func__, dringp, dringp->end_idx);
+	    __func__, dringp, dringp->end_idx);
 
 	addr = (vsw_private_desc_t *)dringp->priv_addr + dringp->end_idx;
 
@@ -8438,7 +8390,7 @@ vsw_dring_find_free_desc(dring_info_t *dringp,
 	/* ring full */
 	if (ret == 1) {
 		D2(NULL, "%s: no desp free: started at %d", __func__,
-			dringp->end_idx);
+		    dringp->end_idx);
 	}
 
 	D1(NULL, "%s: exit\n", __func__);
@@ -8515,17 +8467,15 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 * and descriptor rings, not packet based transfer (VIO_PKT_MODE)
 	 */
 	if ((pkt->xfer_mode != VIO_DESC_MODE) &&
-			(pkt->xfer_mode != VIO_DRING_MODE)) {
-		D2(NULL, "vsw_check_attr: unknown mode %x\n",
-			pkt->xfer_mode);
+	    (pkt->xfer_mode != VIO_DRING_MODE)) {
+		D2(NULL, "vsw_check_attr: unknown mode %x\n", pkt->xfer_mode);
 		ret = 1;
 	}
 
 	/* Only support MAC addresses at moment. */
 	if ((pkt->addr_type != ADDR_TYPE_MAC) || (pkt->addr == 0)) {
 		D2(NULL, "vsw_check_attr: invalid addr_type %x, "
-			"or address 0x%llx\n", pkt->addr_type,
-			pkt->addr);
+		    "or address 0x%llx\n", pkt->addr_type, pkt->addr);
 		ret = 1;
 	}
 
@@ -8536,8 +8486,8 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 */
 	if (bcmp(&pkt->addr, &port->p_macaddr, ETHERADDRL) != 0) {
 		DERR(NULL, "vsw_check_attr: device supplied address "
-			"0x%llx doesn't match node address 0x%llx\n",
-			pkt->addr, port->p_macaddr);
+		    "0x%llx doesn't match node address 0x%llx\n",
+		    pkt->addr, port->p_macaddr);
 	}
 
 	/*
@@ -8546,9 +8496,9 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 * send back an ACK.
 	 */
 	if ((pkt->xfer_mode == VIO_DRING_MODE) &&
-				(pkt->ack_freq > 0)) {
+	    (pkt->ack_freq > 0)) {
 		D2(NULL, "vsw_check_attr: non zero ack freq "
-			" in SHM mode\n");
+		    " in SHM mode\n");
 		ret = 1;
 	}
 
@@ -8558,7 +8508,7 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 */
 	if ((pkt->mtu > VSW_MTU) || (pkt->mtu <= 0)) {
 		D2(NULL, "vsw_check_attr: invalid MTU (0x%llx)\n",
-			pkt->mtu);
+		    pkt->mtu);
 		ret = 1;
 	}
 
@@ -8580,8 +8530,8 @@ vsw_check_dring_info(vio_dring_reg_msg_t *pkt)
 	D1(NULL, "vsw_check_dring_info enter\n");
 
 	if ((pkt->num_descriptors == 0) ||
-		(pkt->descriptor_size == 0) ||
-		(pkt->ncookies != 1)) {
+	    (pkt->descriptor_size == 0) ||
+	    (pkt->ncookies != 1)) {
 		DERR(NULL, "vsw_check_dring_info: invalid dring msg");
 		ret = 1;
 	}
@@ -8598,7 +8548,7 @@ static int
 vsw_mem_cookie_match(ldc_mem_cookie_t *m1, ldc_mem_cookie_t *m2)
 {
 	if ((m1->addr != m2->addr) ||
-		(m2->size != m2->size)) {
+	    (m2->size != m2->size)) {
 		return (0);
 	} else {
 		return (1);
@@ -8613,9 +8563,9 @@ static int
 vsw_dring_match(dring_info_t *dp, vio_dring_reg_msg_t *msg)
 {
 	if ((msg->descriptor_size != dp->descriptor_size) ||
-		(msg->num_descriptors != dp->num_descriptors) ||
-		(msg->ncookies != dp->ncookies) ||
-		!(vsw_mem_cookie_match(&msg->cookie[0], &dp->cookie[0]))) {
+	    (msg->num_descriptors != dp->num_descriptors) ||
+	    (msg->ncookies != dp->ncookies) ||
+	    !(vsw_mem_cookie_match(&msg->cookie[0], &dp->cookie[0]))) {
 		return (0);
 	} else {
 		return (1);
@@ -8648,11 +8598,11 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 
 	if (dir == INBOUND) {
 		D2(ldcp->ldc_vswp, "%s: freeing INBOUND lane"
-			" of channel %lld", __func__, ldcp->ldc_id);
+		    " of channel %lld", __func__, ldcp->ldc_id);
 		lp = &ldcp->lane_in;
 	} else {
 		D2(ldcp->ldc_vswp, "%s: freeing OUTBOUND lane"
-			" of channel %lld", __func__, ldcp->ldc_id);
+		    " of channel %lld", __func__, ldcp->ldc_id);
 		lp = &ldcp->lane_out;
 	}
 
@@ -8711,17 +8661,17 @@ vsw_free_ring(dring_info_t *dp)
 			 */
 			for (i = 0; i < VSW_RING_NUM_EL; i++) {
 				paddr = (vsw_private_desc_t *)
-						dp->priv_addr + i;
+				    dp->priv_addr + i;
 				if (paddr->memhandle != NULL) {
 					if (paddr->bound == 1) {
 						rv = ldc_mem_unbind_handle(
-							paddr->memhandle);
+						    paddr->memhandle);
 
 						if (rv != 0) {
 							DERR(NULL, "error "
 							"unbinding handle for "
 							"ring 0x%llx at pos %d",
-							dp, i);
+							    dp, i);
 							mutex_exit(&dp->dlock);
 							return (rv);
 						}
@@ -8729,12 +8679,11 @@ vsw_free_ring(dring_info_t *dp)
 					}
 
 					rv = ldc_mem_free_handle(
-							paddr->memhandle);
+					    paddr->memhandle);
 					if (rv != 0) {
 						DERR(NULL, "error freeing "
-							"handle for ring "
-							"0x%llx at pos %d",
-							dp, i);
+						    "handle for ring 0x%llx "
+						    "at pos %d", dp, i);
 						mutex_exit(&dp->dlock);
 						return (rv);
 					}
@@ -8742,8 +8691,8 @@ vsw_free_ring(dring_info_t *dp)
 				}
 				mutex_destroy(&paddr->dstate_lock);
 			}
-			kmem_free(dp->priv_addr, (sizeof (vsw_private_desc_t)
-					* VSW_RING_NUM_EL));
+			kmem_free(dp->priv_addr,
+			    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
 		}
 
 		/*
@@ -8786,24 +8735,22 @@ display_state(void)
 		plist = &vswp->plist;
 		READ_ENTER(&plist->lockrw);
 		cmn_err(CE_CONT, "vsw instance %d has %d ports attached\n",
-			vswp->instance, plist->num_ports);
+		    vswp->instance, plist->num_ports);
 
 		for (port = plist->head; port != NULL; port = port->p_next) {
 			ldcl = &port->p_ldclist;
 			cmn_err(CE_CONT, "port %d : %d ldcs attached\n",
-				port->p_instance, ldcl->num_ldcs);
+			    port->p_instance, ldcl->num_ldcs);
 			READ_ENTER(&ldcl->lockrw);
 			ldcp = ldcl->head;
 			for (; ldcp != NULL; ldcp = ldcp->ldc_next) {
 				cmn_err(CE_CONT, "chan %lu : dev %d : "
-					"status %d : phase %u\n",
-					ldcp->ldc_id, ldcp->dev_class,
-					ldcp->ldc_status, ldcp->hphase);
+				    "status %d : phase %u\n",
+				    ldcp->ldc_id, ldcp->dev_class,
+				    ldcp->ldc_status, ldcp->hphase);
 				cmn_err(CE_CONT, "chan %lu : lsession %lu : "
-					"psession %lu\n",
-					ldcp->ldc_id,
-					ldcp->local_session,
-					ldcp->peer_session);
+				    "psession %lu\n", ldcp->ldc_id,
+				    ldcp->local_session, ldcp->peer_session);
 
 				cmn_err(CE_CONT, "Inbound lane:\n");
 				display_lane(&ldcp->lane_in);
@@ -8823,20 +8770,20 @@ display_lane(lane_t *lp)
 	dring_info_t	*drp;
 
 	cmn_err(CE_CONT, "ver 0x%x:0x%x : state %lx : mtu 0x%lx\n",
-		lp->ver_major, lp->ver_minor, lp->lstate, lp->mtu);
+	    lp->ver_major, lp->ver_minor, lp->lstate, lp->mtu);
 	cmn_err(CE_CONT, "addr_type %d : addr 0x%lx : xmode %d\n",
-		lp->addr_type, lp->addr, lp->xfer_mode);
+	    lp->addr_type, lp->addr, lp->xfer_mode);
 	cmn_err(CE_CONT, "dringp 0x%lx\n", (uint64_t)lp->dringp);
 
 	cmn_err(CE_CONT, "Dring info:\n");
 	for (drp = lp->dringp; drp != NULL; drp = drp->next) {
 		cmn_err(CE_CONT, "\tnum_desc %u : dsize %u\n",
-			drp->num_descriptors, drp->descriptor_size);
+		    drp->num_descriptors, drp->descriptor_size);
 		cmn_err(CE_CONT, "\thandle 0x%lx\n", drp->handle);
 		cmn_err(CE_CONT, "\tpub_addr 0x%lx : priv_addr 0x%lx\n",
-			(uint64_t)drp->pub_addr, (uint64_t)drp->priv_addr);
+		    (uint64_t)drp->pub_addr, (uint64_t)drp->priv_addr);
 		cmn_err(CE_CONT, "\tident 0x%lx : end_idx %lu\n",
-			drp->ident, drp->end_idx);
+		    drp->ident, drp->end_idx);
 		display_ring(drp);
 	}
 }
@@ -8859,15 +8806,14 @@ display_ring(dring_info_t *dringp)
 		}
 
 		if (dringp->priv_addr != NULL) {
-			priv_addr =
-				(vsw_private_desc_t *)dringp->priv_addr + i;
+			priv_addr = (vsw_private_desc_t *)dringp->priv_addr + i;
 
 			if (priv_addr->dstate == VIO_DESC_FREE)
 				priv_count++;
 		}
 	}
 	cmn_err(CE_CONT, "\t%lu elements: %lu priv free: %lu pub free\n",
-			i, priv_count, pub_count);
+	    i, priv_count, pub_count);
 }
 
 static void

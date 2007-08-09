@@ -75,6 +75,9 @@ int vntsddbg = 0x8;
 
 #define	VNTSD_INVALID_LISTEN_ADDR	    ((in_addr_t)-1)
 
+#define	LOCALHOST_IPv4	"127.0.0.1"
+#define	LOCALHOST_IPv6	"::1"
+
 static vntsd_t *vntsdp;
 
 
@@ -258,9 +261,8 @@ vntsd_exit(void)
 static void
 vntsd_help(void)
 {
-
 	(void) fprintf(stderr, gettext("Usage: vntsd -i <VCC device instance> "
-		    "[-p <listen address>] [-t <timeout in minutes>]\n"));
+	    "[-p <listen address>] [-t <timeout in minutes>]\n"));
 }
 
 /*
@@ -389,7 +391,9 @@ main(int argc, char ** argv)
 		exit(1);
 	}
 
-	if (listen_addr == NULL || strcmp(listen_addr, "localhost") == 0) {
+	if (listen_addr == NULL || strcmp(listen_addr, "localhost") == 0 ||
+	    strcmp(listen_addr, LOCALHOST_IPv4) == 0 ||
+	    strcmp(listen_addr, LOCALHOST_IPv6) == 0) {
 		/* by default listen on loopback interface */
 		vntsdp->ip_addr.s_addr = htonl(INADDR_LOOPBACK);
 	} else if (strcmp(listen_addr, "any") == 0) {

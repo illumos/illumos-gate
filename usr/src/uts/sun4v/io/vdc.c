@@ -282,7 +282,7 @@ static struct dev_ops vdc_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"virtual disk client %I%",
+	"virtual disk client",
 	&vdc_ops,
 };
 
@@ -2775,8 +2775,8 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	VDC_MARK_DRING_ENTRY_FREE(vdc, idx);
 
 	ldep->is_free = B_TRUE;
-	DMSG(vdc, 2, ": is_free = %d\n", ldep->is_free);
 	status = dep->payload.status;
+	DMSG(vdc, 2, ": is_free = %d : status = %d\n", ldep->is_free, status);
 
 	/*
 	 * If no buffers were used to transfer information to the server when
@@ -3453,8 +3453,8 @@ done:
 				cv_broadcast(&vdcp->membind_cv);
 				cv_broadcast(&vdcp->dring_free_cv);
 				mutex_exit(&vdcp->lock);
-				/* let them wake up */
-				drv_usecwait(vdc_min_timeout_ldc);
+				/* give the waiters enough time to wake up */
+				delay(vdc_hz_min_ldc_delay);
 				mutex_enter(&vdcp->lock);
 			}
 
@@ -3489,7 +3489,8 @@ done:
 				cv_signal(&vdcp->sync_pending_cv);
 				cv_signal(&vdcp->sync_blocked_cv);
 				mutex_exit(&vdcp->lock);
-				drv_usecwait(vdc_min_timeout_ldc);
+				/* give the waiters enough time to wake up */
+				delay(vdc_hz_min_ldc_delay);
 				mutex_enter(&vdcp->lock);
 			}
 
