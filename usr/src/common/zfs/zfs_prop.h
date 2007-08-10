@@ -42,7 +42,6 @@ extern "C" {
 typedef enum {
 	PROP_TYPE_NUMBER,	/* numeric value */
 	PROP_TYPE_STRING,	/* string value */
-	PROP_TYPE_BOOLEAN,	/* boolean value */
 	PROP_TYPE_INDEX		/* numeric value indexed by string */
 } zfs_proptype_t;
 

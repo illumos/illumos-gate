@@ -115,19 +115,11 @@ register_number(zfs_prop_t prop, const char *name, uint64_t def,
 }
 
 static void
-register_boolean(zfs_prop_t prop, const char *name, uint64_t def,
-    prop_attr_t attr, int objset_types, const char *values, const char *colname)
-{
-	register_impl(prop, name, PROP_TYPE_BOOLEAN, def, NULL, attr,
-	    objset_types, values, colname, B_TRUE, B_TRUE, NULL);
-}
-
-static void
 register_index(zfs_prop_t prop, const char *name, uint64_t def,
-    int objset_types, const char *values, const char *colname,
+    prop_attr_t attr, int objset_types, const char *values, const char *colname,
     const zfs_index_t *table)
 {
-	register_impl(prop, name, PROP_TYPE_INDEX, def, NULL, PROP_INHERIT,
+	register_impl(prop, name, PROP_TYPE_INDEX, def, NULL, attr,
 	    objset_types, values, colname, B_TRUE, B_TRUE, table);
 }
 
@@ -203,29 +195,73 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zfs_index_t boolean_table[] = {
+		{ "off",	0 },
+		{ "on",		1 },
+		{ NULL }
+	};
+
 	/* inherit index properties */
 	register_index(ZFS_PROP_CHECKSUM, "checksum", ZIO_CHECKSUM_DEFAULT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | fletcher2 | fletcher4 | sha256", "CHECKSUM",
 	    checksum_table);
 	register_index(ZFS_PROP_COMPRESSION, "compression",
-	    ZIO_COMPRESS_DEFAULT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    ZIO_COMPRESS_DEFAULT, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | lzjb | gzip | gzip-[1-9]", "COMPRESS", compress_table);
 	register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
-	    ZFS_TYPE_FILESYSTEM, "hidden | visible", "SNAPDIR", snapdir_table);
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
+	    "hidden | visible", "SNAPDIR", snapdir_table);
 	register_index(ZFS_PROP_ACLMODE, "aclmode", ZFS_ACL_GROUPMASK,
-	    ZFS_TYPE_FILESYSTEM, "discard | groupmask | passthrough", "ACLMODE",
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
+	    "discard | groupmask | passthrough", "ACLMODE",
 	    acl_mode_table);
 	register_index(ZFS_PROP_ACLINHERIT, "aclinherit", ZFS_ACL_SECURE,
-	    ZFS_TYPE_FILESYSTEM,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | secure | passthrough", "ACLINHERIT",
 	    acl_inherit_table);
 	register_index(ZFS_PROP_COPIES, "copies", 1,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "1 | 2 | 3", "COPIES", copies_table);
-	register_index(ZFS_PROP_VERSION, "version", 0,
+
+	/* inherit index (boolean) properties */
+	register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM, "on | off", "ATIME", boolean_table);
+	register_index(ZFS_PROP_DEVICES, "devices", 1, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "DEVICES",
+	    boolean_table);
+	register_index(ZFS_PROP_EXEC, "exec", 1, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "EXEC",
+	    boolean_table);
+	register_index(ZFS_PROP_SETUID, "setuid", 1, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "SETUID",
+	    boolean_table);
+	register_index(ZFS_PROP_READONLY, "readonly", 0, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "on | off", "RDONLY",
+	    boolean_table);
+	register_index(ZFS_PROP_ZONED, "zoned", 0, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM, "on | off", "ZONED", boolean_table);
+	register_index(ZFS_PROP_XATTR, "xattr", 1, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "XATTR",
+	    boolean_table);
+
+	/* default index properties */
+	register_index(ZFS_PROP_VERSION, "version", 0, PROP_DEFAULT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
 	    "1 | 2 | current", "VERSION", version_table);
+
+	/* default index (boolean) properties */
+	register_index(ZFS_PROP_CANMOUNT, "canmount", 1, PROP_DEFAULT,
+	    ZFS_TYPE_FILESYSTEM, "on | off", "CANMOUNT", boolean_table);
+	register_index(ZPOOL_PROP_DELEGATION, "delegation", 1, PROP_DEFAULT,
+	    ZFS_TYPE_POOL, "on | off", "DELEGATION", boolean_table);
+	register_index(ZPOOL_PROP_AUTOREPLACE, "autoreplace", 0, PROP_DEFAULT,
+	    ZFS_TYPE_POOL, "on | off", "REPLACE", boolean_table);
+
+	/* readonly index (boolean) properties */
+	register_index(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,
+	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED", boolean_table);
 
 	/* string properties */
 	register_string(ZFS_PROP_ORIGIN, "origin", NULL, PROP_READONLY,
@@ -268,34 +304,6 @@ zfs_prop_init(void)
 	register_number(ZFS_PROP_RECORDSIZE, "recordsize", SPA_MAXBLOCKSIZE,
 	    PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "512 to 128k, power of 2", "RECSIZE");
-
-	/* readonly boolean properties */
-	register_boolean(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,
-	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED");
-
-	/* default boolean properties */
-	register_boolean(ZFS_PROP_CANMOUNT, "canmount", 1, PROP_DEFAULT,
-	    ZFS_TYPE_FILESYSTEM, "on | off", "CANMOUNT");
-	register_boolean(ZPOOL_PROP_DELEGATION, "delegation", 1, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "DELEGATION");
-	register_boolean(ZPOOL_PROP_AUTOREPLACE, "autoreplace", 0, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "REPLACE");
-
-	/* inherit boolean properties */
-	register_boolean(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM, "on | off", "ATIME");
-	register_boolean(ZFS_PROP_DEVICES, "devices", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "DEVICES");
-	register_boolean(ZFS_PROP_EXEC, "exec", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "EXEC");
-	register_boolean(ZFS_PROP_SETUID, "setuid", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "SETUID");
-	register_boolean(ZFS_PROP_READONLY, "readonly", 0, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "on | off", "RDONLY");
-	register_boolean(ZFS_PROP_ZONED, "zoned", 0, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM, "on | off", "ZONED");
-	register_boolean(ZFS_PROP_XATTR, "xattr", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "XATTR");
 
 	/* hidden properties */
 	register_hidden(ZFS_PROP_CREATETXG, "createtxg", PROP_TYPE_NUMBER,
@@ -741,14 +749,6 @@ zfs_prop_width(zfs_prop_t prop, boolean_t *fixed)
 		 */
 		if (prop == ZFS_PROP_CREATION)
 			*fixed = B_FALSE;
-		break;
-	case PROP_TYPE_BOOLEAN:
-		/*
-		 * The maximum length of a boolean value is 3 characters, for
-		 * "off".
-		 */
-		if (ret < 3)
-			ret = 3;
 		break;
 	case PROP_TYPE_INDEX:
 		idx = zfs_prop_table[prop].pd_table;

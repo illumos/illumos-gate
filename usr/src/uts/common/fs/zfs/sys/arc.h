@@ -35,11 +35,11 @@ extern "C" {
 #endif
 
 #include <sys/zio.h>
+#include <sys/dmu.h>
 
 typedef struct arc_buf_hdr arc_buf_hdr_t;
 typedef struct arc_buf arc_buf_t;
 typedef void arc_done_func_t(zio_t *zio, arc_buf_t *buf, void *private);
-typedef void arc_byteswap_func_t(void *buf, size_t size);
 typedef int arc_evict_func_t(void *private);
 
 /* generic arc_done_func_t's which you can use */

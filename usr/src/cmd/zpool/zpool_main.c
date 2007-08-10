@@ -177,7 +177,7 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tadd [-fn] <pool> <vdev> ...\n"));
 	case HELP_ATTACH:
 		return (gettext("\tattach [-f] <pool> <device> "
-		    "<new_device>\n"));
+		    "<new-device>\n"));
 	case HELP_CLEAR:
 		return (gettext("\tclear <pool> [device]\n"));
 	case HELP_CREATE:
@@ -201,15 +201,14 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tiostat [-v] [pool] ... [interval "
 		    "[count]]\n"));
 	case HELP_LIST:
-		return (gettext("\tlist [-H] [-o field[,field]*] "
-		    "[pool] ...\n"));
+		return (gettext("\tlist [-H] [-o field[,...]] [pool] ...\n"));
 	case HELP_OFFLINE:
 		return (gettext("\toffline [-t] <pool> <device> ...\n"));
 	case HELP_ONLINE:
 		return (gettext("\tonline <pool> <device> ...\n"));
 	case HELP_REPLACE:
 		return (gettext("\treplace [-f] <pool> <device> "
-		    "[new_device]\n"));
+		    "[new-device]\n"));
 	case HELP_REMOVE:
 		return (gettext("\tremove <pool> <device>\n"));
 	case HELP_SCRUB:
@@ -221,7 +220,7 @@ get_usage(zpool_help_t idx) {
 		    "\tupgrade -v\n"
 		    "\tupgrade <-a | pool>\n"));
 	case HELP_GET:
-		return (gettext("\tget <all | property[,property]...> "
+		return (gettext("\tget <\"all\" | property[,...]> "
 		    "<pool> ...\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> <pool> \n"));

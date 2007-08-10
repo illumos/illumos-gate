@@ -153,11 +153,8 @@ static zfs_command_t command_table[] = {
 	{ "upgrade",	zfs_do_upgrade,		HELP_UPGRADE		},
 	{ NULL },
 	{ "mount",	zfs_do_mount,		HELP_MOUNT		},
-	{ NULL },
 	{ "unmount",	zfs_do_unmount,		HELP_UNMOUNT		},
-	{ NULL },
 	{ "share",	zfs_do_share,		HELP_SHARE		},
-	{ NULL },
 	{ "unshare",	zfs_do_unshare,		HELP_UNSHARE		},
 	{ NULL },
 	{ "send",	zfs_do_send,		HELP_SEND		},
@@ -180,18 +177,17 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tclone [-p] <snapshot> "
 		    "<filesystem|volume>\n"));
 	case HELP_CREATE:
-		return (gettext("\tcreate [-p] [[-o property=value] ... ] "
+		return (gettext("\tcreate [-p] [-o property=value] ... "
 		    "<filesystem>\n"
-		    "\tcreate [-ps] [-b blocksize] [[-o property=value] "
-		    "...]\n"
-		    "\t    -V <size> <volume>\n"));
+		    "\tcreate [-ps] [-b blocksize] [-o property=value] ... "
+		    "-V <size> <volume>\n"));
 	case HELP_DESTROY:
 		return (gettext("\tdestroy [-rRf] "
 		    "<filesystem|volume|snapshot>\n"));
 	case HELP_GET:
-		return (gettext("\tget [-rHp] [-o field[,field]...] "
-		    "[-s source[,source]...]\n"
-		    "\t    <all | property[,property]...> "
+		return (gettext("\tget [-rHp] [-o field[,...]] "
+		    "[-s source[,...]]\n"
+		    "\t    <\"all\" | property[,...]> "
 		    "[filesystem|volume|snapshot] ...\n"));
 	case HELP_INHERIT:
 		return (gettext("\tinherit [-r] <property> "
@@ -200,17 +196,15 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tupgrade [-v]\n"
 		    "\tupgrade [-r] [-V version] <-a | filesystem ...>\n"));
 	case HELP_LIST:
-		return (gettext("\tlist [-rH] [-o property[,property]...] "
-		    "[-t type[,type]...]\n"
-		    "\t    [-s property [-s property]...]"
-		    " [-S property [-S property]...]\n"
-		    "\t    [filesystem|volume|snapshot] ...\n"));
+		return (gettext("\tlist [-rH] [-o property[,...]] "
+		    "[-t type[,...]] [-s property] ...\n"
+		    "\t    [-S property] ... "
+		    "[filesystem|volume|snapshot] ...\n"));
 	case HELP_MOUNT:
 		return (gettext("\tmount\n"
-		    "\tmount [-o opts] [-vO] -a\n"
-		    "\tmount [-o opts] [-vO] <filesystem>\n"));
+		    "\tmount [-vO] [-o opts] <-a | filesystem>\n"));
 	case HELP_PROMOTE:
-		return (gettext("\tpromote <clone filesystem>\n"));
+		return (gettext("\tpromote <clone-filesystem>\n"));
 	case HELP_RECEIVE:
 		return (gettext("\treceive [-vnF] <filesystem|volume|"
 		"snapshot>\n"
@@ -223,63 +217,40 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-i <snapshot>] <snapshot>\n"));
+		return (gettext("\tsend [-i snapshot] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume> ...\n"));
 	case HELP_SHARE:
-		return (gettext("\tshare -a\n"
-		    "\tshare <filesystem>\n"));
+		return (gettext("\tshare <-a | filesystem>\n"));
 	case HELP_SNAPSHOT:
 		return (gettext("\tsnapshot [-r] "
-		    "<filesystem@name|volume@name>\n"));
+		    "<filesystem@snapname|volume@snapname>\n"));
 	case HELP_UNMOUNT:
-		return (gettext("\tunmount [-f] -a\n"
-		    "\tunmount [-f] <filesystem|mountpoint>\n"));
+		return (gettext("\tunmount [-f] "
+		    "<-a | filesystem|mountpoint>\n"));
 	case HELP_UNSHARE:
-		return (gettext("\tunshare [-f] -a\n"
-		    "\tunshare [-f] <filesystem|mountpoint>\n"));
+		return (gettext("\tunshare [-f] "
+		    "<-a | filesystem|mountpoint>\n"));
 	case HELP_ALLOW:
-		return (gettext("\tallow [-l][-d] <everyone|user|group>[,"
-		    "<everyone|user|group>...]\n\t    "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume\n"
-		    "\tallow [-l] [-d] -u <user> "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tallow [-l] [-d] -g <group> "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tallow [-l] [-d] -e "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tallow -c "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tallow -s @setname "
-		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
-		    "    <filesystem|volume>\n"));
-
+		return (gettext("\tallow [-ldug] "
+		    "<\"everyone\"|user|group>[,...] <perm|@setname>[,...]\n"
+		    "\t    <filesystem|volume>\n"
+		    "\tallow [-ld] -e <perm|@setname>[,...] "
+		    "<filesystem|volume>\n"
+		    "\tallow -c <perm|@setname>[,...] <filesystem|volume>\n"
+		    "\tallow -s @setname <perm|@setname>[,...] "
+		    "<filesystem|volume>\n"));
 	case HELP_UNALLOW:
-		return (gettext("\tunallow [-r][-l][-d] <everyone|user|group>[,"
-		    "<everyone|user|group>...] \n\t    "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tunallow [-r][-l][-d] -u user "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tunallow [-r][-l][-d] -g group "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tunallow [-r][-l][-d] -e "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tunallow [-r] -c "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume>\n"
-		    "\tunallow [-r] -s @setname "
-		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
-		    "    <filesystem|volume> \n\t"));
+		return (gettext("\tunallow [-rldug] "
+		    "<\"everyone\"|user|group>[,...]\n"
+		    "\t    [<perm|@setname>[,...]] <filesystem|volume>\n"
+		    "\tunallow [-rld] -e [<perm|@setname>[,...]] "
+		    "<filesystem|volume>\n"
+		    "\tunallow [-r] -c [<perm|@setname>[,...]] "
+		    "<filesystem|volume>\n"
+		    "\tunallow [-r] -s @setname [<perm|@setname>[,...]] "
+		    "<filesystem|volume>\n"));
 	}
 
 	abort();
@@ -1312,7 +1283,7 @@ zfs_do_inherit(int argc, char **argv)
 typedef struct upgrade_cbdata {
 	uint64_t cb_numupgraded;
 	uint64_t cb_numsamegraded;
-	uint64_t cb_numdowngradefailed;
+	uint64_t cb_numfailed;
 	uint64_t cb_version;
 	boolean_t cb_newer;
 	boolean_t cb_foundone;
@@ -1376,7 +1347,8 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 	/* upgrade */
 	if (version < cb->cb_version) {
 		char verstr[16];
-		(void) snprintf(verstr, sizeof (verstr), "%u", cb->cb_version);
+		(void) snprintf(verstr, sizeof (verstr),
+		    "%llu", cb->cb_version);
 		if (cb->cb_lastfs[0] && !same_pool(zhp, cb->cb_lastfs)) {
 			/*
 			 * If they did "zfs upgrade -a", then we could
@@ -1388,13 +1360,15 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 		}
 		if (zfs_prop_set(zhp, "version", verstr) == 0)
 			cb->cb_numupgraded++;
+		else
+			cb->cb_numfailed++;
 		(void) strcpy(cb->cb_lastfs, zfs_get_name(zhp));
 	} else if (version > cb->cb_version) {
 		/* can't downgrade */
 		(void) printf(gettext("%s: can not be downgraded; "
 		    "it is already at version %u\n"),
 		    zfs_get_name(zhp), version);
-		cb->cb_numdowngradefailed++;
+		cb->cb_numfailed++;
 	} else {
 		cb->cb_numsamegraded++;
 	}
@@ -1484,7 +1458,7 @@ zfs_do_upgrade(int argc, char **argv)
 			    "this version\n"),
 			    cb.cb_numsamegraded);
 		}
-		if (cb.cb_numdowngradefailed != 0)
+		if (cb.cb_numfailed != 0)
 			ret = 1;
 	} else {
 		/* List old-version filesytems */

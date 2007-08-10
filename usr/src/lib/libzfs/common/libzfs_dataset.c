@@ -498,8 +498,8 @@ str2shift(libzfs_handle_t *hdl, const char *buf)
  * properties or creating a volume.  'buf' is used to place an extended error
  * message for the caller to use.
  */
-static int
-nicestrtonum(libzfs_handle_t *hdl, const char *value, uint64_t *num)
+int
+zfs_nicestrtonum(libzfs_handle_t *hdl, const char *value, uint64_t *num)
 {
 	char *end;
 	int shift;
@@ -567,76 +567,14 @@ nicestrtonum(libzfs_handle_t *hdl, const char *value, uint64_t *num)
 	return (0);
 }
 
-int
-zfs_nicestrtonum(libzfs_handle_t *hdl, const char *str, uint64_t *val)
-{
-	return (nicestrtonum(hdl, str, val));
-}
-
 /*
  * The prop_parse_*() functions are designed to allow flexibility in callers
  * when setting properties.  At the DSL layer, all properties are either 64-bit
  * numbers or strings.  We want the user to be able to ignore this fact and
- * specify properties as native values (boolean, for example) or as strings (to
+ * specify properties as native values (numbers, for example) or as strings (to
  * simplify command line utilities).  This also handles converting index types
  * (compression, checksum, etc) from strings to their on-disk index.
  */
-
-static int
-prop_parse_boolean(libzfs_handle_t *hdl, nvpair_t *elem, uint64_t *val)
-{
-	uint64_t ret;
-
-	switch (nvpair_type(elem)) {
-	case DATA_TYPE_STRING:
-		{
-			char *value;
-			verify(nvpair_value_string(elem, &value) == 0);
-
-			if (strcmp(value, "on") == 0) {
-				ret = 1;
-			} else if (strcmp(value, "off") == 0) {
-				ret = 0;
-			} else {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "property '%s' must be 'on' or 'off'"),
-				    nvpair_name(elem));
-				return (-1);
-			}
-			break;
-		}
-
-	case DATA_TYPE_UINT64:
-		{
-			verify(nvpair_value_uint64(elem, &ret) == 0);
-			if (ret > 1) {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "'%s' must be a boolean value"),
-				    nvpair_name(elem));
-				return (-1);
-			}
-			break;
-		}
-
-	case DATA_TYPE_BOOLEAN_VALUE:
-		{
-			boolean_t value;
-			verify(nvpair_value_boolean_value(elem, &value) == 0);
-			ret = value;
-			break;
-		}
-
-	default:
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "'%s' must be a boolean value"),
-		    nvpair_name(elem));
-		return (-1);
-	}
-
-	*val = ret;
-	return (0);
-}
-
 static int
 prop_parse_number(libzfs_handle_t *hdl, nvpair_t *elem, zfs_prop_t prop,
     uint64_t *val)
@@ -652,7 +590,7 @@ prop_parse_number(libzfs_handle_t *hdl, nvpair_t *elem, zfs_prop_t prop,
 			if (strcmp(value, "none") == 0) {
 				isnone = B_TRUE;
 				ret = 0;
-			} else if (nicestrtonum(hdl, value, &ret) != 0) {
+			} else if (zfs_nicestrtonum(hdl, value, &ret) != 0) {
 				return (-1);
 			}
 			break;
@@ -839,13 +777,6 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 		 */
 		strval = NULL;
 		switch (zfs_prop_get_type(prop)) {
-		case PROP_TYPE_BOOLEAN:
-			if (prop_parse_boolean(hdl, elem, &intval) != 0) {
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
-			}
-			break;
-
 		case PROP_TYPE_STRING:
 			if (nvpair_type(elem) != DATA_TYPE_STRING) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -2023,7 +1954,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 		(void) strlcpy(zc.zc_value, propname, sizeof (zc.zc_value));
 
-		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SET_PROP, &zc) != 0)
+		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_INHERIT_PROP, &zc) != 0)
 			return (zfs_standard_error(hdl, errno, errbuf));
 
 		return (0);
@@ -2075,7 +2006,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 	if ((ret = changelist_prefix(cl)) != 0)
 		goto error;
 
-	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SET_PROP, &zc)) != 0) {
+	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_INHERIT_PROP, &zc)) != 0) {
 		return (zfs_standard_error(hdl, errno, errbuf));
 	} else {
 
@@ -2091,15 +2022,6 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 error:
 	changelist_free(cl);
 	return (ret);
-}
-
-void
-nicebool(int value, char *buf, size_t buflen)
-{
-	if (value)
-		(void) strlcpy(buf, "on", buflen);
-	else
-		(void) strlcpy(buf, "off", buflen);
 }
 
 /*
@@ -2273,7 +2195,6 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	default:
 		switch (zfs_prop_get_type(prop)) {
 		case PROP_TYPE_NUMBER:
-		case PROP_TYPE_BOOLEAN:
 		case PROP_TYPE_INDEX:
 			*val = getprop_uint64(zhp, prop, source);
 			break;
@@ -2503,14 +2424,6 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			    getprop_string(zhp, prop, &source), proplen);
 			break;
 
-		case PROP_TYPE_BOOLEAN:
-			if (get_numeric_property(zhp, prop, src,
-			    &source, &val) != 0)
-				return (-1);
-			nicebool(val, propbuf, proplen);
-
-			break;
-
 		case PROP_TYPE_INDEX:
 			val = getprop_uint64(zhp, prop, &source);
 			if (zfs_prop_index_to_string(prop, val,
@@ -2558,10 +2471,11 @@ zfs_prop_get_numeric(zfs_handle_t *zhp, zfs_prop_t prop, uint64_t *value,
 	/*
 	 * Check to see if this property applies to our object
 	 */
-	if (!zfs_prop_valid_for_type(prop, zhp->zfs_type))
+	if (!zfs_prop_valid_for_type(prop, zhp->zfs_type)) {
 		return (zfs_error_fmt(zhp->zfs_hdl, EZFS_PROPTYPE,
 		    dgettext(TEXT_DOMAIN, "cannot get property '%s'"),
 		    zfs_prop_to_name(prop)));
+	}
 
 	if (src)
 		*src = ZFS_SRC_NONE;

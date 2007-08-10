@@ -594,6 +594,23 @@ zfs_secpolicy_inject(zfs_cmd_t *zc, cred_t *cr)
 	return (secpolicy_zinject(cr));
 }
 
+static int
+zfs_secpolicy_inherit(zfs_cmd_t *zc, cred_t *cr)
+{
+	zfs_prop_t prop = zfs_name_to_prop(zc->zc_value);
+
+	if (prop == ZFS_PROP_INVAL) {
+		if (!zfs_prop_user(zc->zc_value))
+			return (EINVAL);
+		return (zfs_secpolicy_write_perms(zc->zc_name,
+		    ZFS_DELEG_PERM_USERPROP, cr));
+	} else {
+		if (!zfs_prop_inheritable(prop))
+			return (EINVAL);
+		return (zfs_secpolicy_setprop(zc->zc_name, prop, cr));
+	}
+}
+
 /*
  * Returns the nvlist as specified by the user in the zfs_cmd_t.
  */
@@ -1320,10 +1337,6 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				switch (zfs_prop_get_type(prop)) {
 				case PROP_TYPE_NUMBER:
 					break;
-				case PROP_TYPE_BOOLEAN:
-					if (intval > 1)
-						return (EINVAL);
-					break;
 				case PROP_TYPE_STRING:
 					return (EINVAL);
 				case PROP_TYPE_INDEX:
@@ -1356,30 +1369,6 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	nvlist_t *nvl;
 	int error;
 
-	/*
-	 * If zc_value is set, then this is an attempt to inherit a value.
-	 * Otherwise, zc_nvlist refers to a list of properties to set.
-	 */
-	if (zc->zc_value[0] != '\0') {
-		zfs_prop_t prop = zfs_name_to_prop(zc->zc_value);
-
-		if (prop == ZFS_PROP_INVAL) {
-			if (!zfs_prop_user(zc->zc_value))
-				return (EINVAL);
-			error = zfs_secpolicy_write_perms(zc->zc_name,
-			    ZFS_DELEG_PERM_USERPROP, CRED());
-		} else {
-			if (!zfs_prop_inheritable(prop))
-				return (EINVAL);
-			error = zfs_secpolicy_setprop(zc->zc_name,
-			    prop, CRED());
-		}
-		if (error)
-			return (error);
-
-		return (dsl_prop_set(zc->zc_name, zc->zc_value, 0, 0, NULL));
-	}
-
 	if ((error = get_nvlist(zc, &nvl)) != 0)
 		return (error);
 
@@ -1387,6 +1376,13 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 
 	nvlist_free(nvl);
 	return (error);
+}
+
+static int
+zfs_ioc_inherit_prop(zfs_cmd_t *zc)
+{
+	/* the property name has been validated by zfs_secpolicy_inherit() */
+	return (dsl_prop_set(zc->zc_name, zc->zc_value, 0, 0, NULL));
 }
 
 static int
@@ -2169,7 +2165,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_get_fsacl, zfs_secpolicy_read, DATASET_NAME, B_FALSE },
 	{ zfs_ioc_iscsi_perm_check, zfs_secpolicy_iscsi,
 	    DATASET_NAME, B_FALSE },
-	{ zfs_ioc_share, zfs_secpolicy_share, DATASET_NAME, B_FALSE }
+	{ zfs_ioc_share, zfs_secpolicy_share, DATASET_NAME, B_FALSE },
+	{ zfs_ioc_inherit_prop, zfs_secpolicy_inherit, DATASET_NAME, B_TRUE },
 };
 
 static int

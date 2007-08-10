@@ -330,7 +330,6 @@ extern uint64_t zfs_prop_default_numeric(zfs_prop_t);
 extern int zfs_prop_is_string(zfs_prop_t prop);
 extern const char *zfs_prop_column_name(zfs_prop_t);
 extern boolean_t zfs_prop_align_right(zfs_prop_t);
-extern void nicebool(int value, char *buf, size_t buflen);
 
 typedef struct zfs_proplist {
 	zfs_prop_t	pl_prop;

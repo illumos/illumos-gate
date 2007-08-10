@@ -181,11 +181,6 @@ typedef struct dmu_buf {
 typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 
 /*
- * Callback function to perform byte swapping on a block.
- */
-typedef void dmu_byteswap_func_t(void *buf, size_t size);
-
-/*
  * The names of zap entries in the DIRECTORY_OBJECT of the MOS.
  */
 #define	DMU_POOL_DIRECTORY_OBJECT	1
@@ -459,8 +454,10 @@ typedef struct dmu_object_info {
 	uint64_t doi_max_block_offset;
 } dmu_object_info_t;
 
+typedef void arc_byteswap_func_t(void *buf, size_t size);
+
 typedef struct dmu_object_type_info {
-	dmu_byteswap_func_t	*ot_byteswap;
+	arc_byteswap_func_t	*ot_byteswap;
 	boolean_t		ot_metadata;
 	char			*ot_name;
 } dmu_object_type_info_t;
