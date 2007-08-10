@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,9 +79,11 @@ extern "C" {
  */
 #define	VDC_MD_CHAN_NAME		"channel-endpoint"
 #define	VDC_MD_VDEV_NAME		"virtual-device"
+#define	VDC_MD_PORT_NAME		"virtual-device-port"
 #define	VDC_MD_DISK_NAME		"disk"
 #define	VDC_MD_CFG_HDL			"cfg-handle"
-#define	VDC_ID_PROP			"id"
+#define	VDC_MD_TIMEOUT			"vdc-timeout"
+#define	VDC_MD_ID			"id"
 
 /*
  * Definition of actions to be carried out when processing the sequence ID
@@ -280,6 +282,8 @@ typedef struct vdc {
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
 	struct vtoc	*vtoc;		/* structure to store VTOC data */
 	ddi_devid_t	devid;		/* device id */
+	uint64_t	ctimeout;	/* connection timeout in seconds */
+	boolean_t	ctimeout_reached; /* connection timeout has expired */
 
 	ldc_mem_info_t		dring_mem_info;		/* dring information */
 	uint_t			dring_curr_idx;		/* current index */

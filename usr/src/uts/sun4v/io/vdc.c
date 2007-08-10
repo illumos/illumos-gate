@@ -118,13 +118,15 @@ static int	vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 /* setup */
 static void	vdc_min(struct buf *bufp);
 static int	vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen);
-static int	vdc_do_ldc_init(vdc_t *vdc);
+static int	vdc_do_ldc_init(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_node);
 static int	vdc_start_ldc_connection(vdc_t *vdc);
 static int	vdc_create_device_nodes(vdc_t *vdc);
 static int	vdc_create_device_nodes_efi(vdc_t *vdc);
 static int	vdc_create_device_nodes_vtoc(vdc_t *vdc);
 static int	vdc_create_device_nodes_props(vdc_t *vdc);
-static int	vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id);
+static int	vdc_get_md_node(dev_info_t *dip, md_t **mdpp,
+		    mde_cookie_t *vd_nodep, mde_cookie_t *vd_portp);
+static int	vdc_get_ldc_id(md_t *, mde_cookie_t, uint64_t *);
 static int	vdc_do_ldc_up(vdc_t *vdc);
 static void	vdc_terminate_ldc(vdc_t *vdc);
 static int	vdc_init_descriptor_ring(vdc_t *vdc);
@@ -205,6 +207,8 @@ static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
  */
 static int	vdc_retries = 10;
 static int	vdc_hshake_retries = 3;
+
+static int	vdc_timeout = 0; /* units: seconds */
 
 /* calculated from 'vdc_usec_timeout' during attach */
 static uint64_t	vdc_hz_timeout;				/* units: Hz */
@@ -484,6 +488,8 @@ vdc_do_attach(dev_info_t *dip)
 	int		instance;
 	vdc_t		*vdc = NULL;
 	int		status;
+	md_t		*mdp;
+	mde_cookie_t	vd_node, vd_port;
 
 	ASSERT(dip != NULL);
 
@@ -545,8 +551,25 @@ vdc_do_attach(dev_info_t *dip)
 
 	vdc->initialized |= VDC_LOCKS;
 
+	/* get device and port MD node for this disk instance */
+	if (vdc_get_md_node(dip, &mdp, &vd_node, &vd_port) != 0) {
+		cmn_err(CE_NOTE, "[%d] Could not get machine description node",
+		    instance);
+		return (DDI_FAILURE);
+	}
+
+	/* set the connection timeout */
+	if (vd_port == NULL || (md_get_prop_val(mdp, vd_port,
+	    VDC_MD_TIMEOUT, &vdc->ctimeout) != 0)) {
+		vdc->ctimeout = 0;
+	}
+
 	/* initialise LDC channel which will be used to communicate with vds */
-	if ((status = vdc_do_ldc_init(vdc)) != 0) {
+	status = vdc_do_ldc_init(vdc, mdp, vd_node);
+
+	(void) md_fini_handle(mdp);
+
+	if (status != 0) {
 		cmn_err(CE_NOTE, "[%d] Couldn't initialize LDC", instance);
 		goto return_status;
 	}
@@ -628,24 +651,25 @@ vdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 }
 
 static int
-vdc_do_ldc_init(vdc_t *vdc)
+vdc_do_ldc_init(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_node)
 {
 	int			status = 0;
 	ldc_status_t		ldc_state;
 	ldc_attr_t		ldc_attr;
 	uint64_t		ldc_id = 0;
-	dev_info_t		*dip = NULL;
 
 	ASSERT(vdc != NULL);
 
-	dip = vdc->dip;
 	vdc->initialized |= VDC_LDC;
 
-	if ((status = vdc_get_ldc_id(dip, &ldc_id)) != 0) {
+	if ((status = vdc_get_ldc_id(mdp, vd_node, &ldc_id)) != 0) {
 		DMSG(vdc, 0, "[%d] Failed to get LDC channel ID property",
 		    vdc->instance);
 		return (EIO);
 	}
+
+	DMSGX(0, "[%d] LDC id is 0x%lx\n", vdc->instance, ldc_id);
+
 	vdc->ldc_id = ldc_id;
 
 	ldc_attr.devclass = LDC_DEV_BLK;
@@ -1817,16 +1841,19 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
 
 /*
  * Function:
- *	vdc_get_ldc_id()
+ *	vdc_get_md_node
  *
  * Description:
- *	This function gets the 'ldc-id' for this particular instance of vdc.
- *	The id returned is the guest domain channel endpoint LDC uses for
- *	communication with vds.
+ *	Get the MD, the device node and the port node for the given
+ *	disk instance. The caller is responsible for cleaning up the
+ *	reference to the returned MD (mdpp) by calling md_fini_handle().
  *
  * Arguments:
  *	dip	- dev info pointer for this instance of the device driver.
- *	ldc_id	- pointer to variable used to return the 'ldc-id' found.
+ *	mdpp	- the returned MD.
+ *	vd_nodep - the returned device node.
+ *	vd_portp - the returned port node. The returned port node is NULL
+ *		   if no port node is found.
  *
  * Return Code:
  *	0	- Success.
@@ -1834,26 +1861,23 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
  *	ENXIO	- Unexpected error communicating with MD framework
  */
 static int
-vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
+vdc_get_md_node(dev_info_t *dip, md_t **mdpp, mde_cookie_t *vd_nodep,
+    mde_cookie_t *vd_portp)
 {
 	int		status = ENOENT;
 	char		*node_name = NULL;
 	md_t		*mdp = NULL;
 	int		num_nodes;
 	int		num_vdevs;
-	int		num_chans;
+	int		num_vports;
 	mde_cookie_t	rootnode;
 	mde_cookie_t	*listp = NULL;
-	mde_cookie_t	*chanp = NULL;
 	boolean_t	found_inst = B_FALSE;
 	int		listsz;
 	int		idx;
 	uint64_t	md_inst;
 	int		obp_inst;
 	int		instance = ddi_get_instance(dip);
-
-	ASSERT(ldc_id != NULL);
-	*ldc_id = 0;
 
 	/*
 	 * Get the OBP instance number for comparison with the MD instance
@@ -1876,8 +1900,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 	DMSGX(1, "[%d] OBP inst=%d\n", instance, obp_inst);
 
 	/*
-	 * We now walk the MD nodes and if an instance of a vdc node matches
-	 * the instance got from OBP we get the ldc-id property.
+	 * We now walk the MD nodes to find the node for this vdisk.
 	 */
 	if ((mdp = md_get_handle()) == NULL) {
 		cmn_err(CE_WARN, "unable to init machine description");
@@ -1891,7 +1914,6 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 
 	/* allocate memory for nodes */
 	listp = kmem_zalloc(listsz, KM_SLEEP);
-	chanp = kmem_zalloc(listsz, KM_SLEEP);
 
 	rootnode = md_root_node(mdp);
 	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
@@ -1939,8 +1961,62 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 	}
 	DMSGX(0, "[%d] MD inst=%lx\n", instance, md_inst);
 
+	*vd_nodep = listp[idx];
+	*mdpp = mdp;
+
+	num_vports = md_scan_dag(mdp, *vd_nodep,
+	    md_find_name(mdp, VDC_MD_PORT_NAME),
+	    md_find_name(mdp, "fwd"), listp);
+
+	if (num_vports != 1) {
+		DMSGX(0, "Expected 1 '%s' node for '%s' port, found %d\n",
+		    VDC_MD_PORT_NAME, VDC_MD_VDEV_NAME, num_vports);
+	}
+
+	*vd_portp = (num_vports == 0)? NULL: listp[0];
+
+done:
+	kmem_free(listp, listsz);
+	return (status);
+}
+
+/*
+ * Function:
+ *	vdc_get_ldc_id()
+ *
+ * Description:
+ *	This function gets the 'ldc-id' for this particular instance of vdc.
+ *	The id returned is the guest domain channel endpoint LDC uses for
+ *	communication with vds.
+ *
+ * Arguments:
+ *	mdp	- pointer to the machine description.
+ *	vd_node	- the vdisk element from the MD.
+ *	ldc_id	- pointer to variable used to return the 'ldc-id' found.
+ *
+ * Return Code:
+ *	0	- Success.
+ *	ENOENT	- Expected node or property did not exist.
+ */
+static int
+vdc_get_ldc_id(md_t *mdp, mde_cookie_t vd_node, uint64_t *ldc_id)
+{
+	mde_cookie_t	*chanp = NULL;
+	int		listsz;
+	int		num_chans;
+	int		num_nodes;
+	int		status = 0;
+
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+
+	/* allocate memory for nodes */
+	chanp = kmem_zalloc(listsz, KM_SLEEP);
+
 	/* get the channels for this node */
-	num_chans = md_scan_dag(mdp, listp[idx],
+	num_chans = md_scan_dag(mdp, vd_node,
 	    md_find_name(mdp, VDC_MD_CHAN_NAME),
 	    md_find_name(mdp, "fwd"), chanp);
 
@@ -1952,31 +2028,21 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		goto done;
 
 	} else if (num_chans != 1) {
-		DMSGX(0, "[%d] Expected 1 '%s' node for '%s' port, found %d\n",
-		    instance, VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
-		    num_chans);
+		DMSGX(0, "Expected 1 '%s' node for '%s' port, found %d\n",
+		    VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME, num_chans);
 	}
 
 	/*
 	 * We use the first channel found (index 0), irrespective of how
 	 * many are there in total.
 	 */
-	if (md_get_prop_val(mdp, chanp[0], VDC_ID_PROP, ldc_id) != 0) {
-		cmn_err(CE_NOTE, "Channel '%s' property not found",
-		    VDC_ID_PROP);
+	if (md_get_prop_val(mdp, chanp[0], VDC_MD_ID, ldc_id) != 0) {
+		cmn_err(CE_NOTE, "Channel '%s' property not found", VDC_MD_ID);
 		status = ENOENT;
 	}
 
-	DMSGX(0, "[%d] LDC id is 0x%lx\n", instance, *ldc_id);
-
 done:
-	if (chanp)
-		kmem_free(chanp, listsz);
-	if (listp)
-		kmem_free(listp, listsz);
-
-	(void) md_fini_handle(mdp);
-
+	kmem_free(chanp, listsz);
 	return (status);
 }
 
@@ -2375,13 +2441,20 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 
 	do {
 		while (vdcp->state != VDC_STATE_RUNNING) {
-			cv_wait(&vdcp->running_cv, &vdcp->lock);
 
 			/* return error if detaching */
 			if (vdcp->state == VDC_STATE_DETACH) {
 				mutex_exit(&vdcp->lock);
 				return (ENXIO);
 			}
+
+			/* fail request if connection timeout is reached */
+			if (vdcp->ctimeout_reached) {
+				mutex_exit(&vdcp->lock);
+				return (EIO);
+			}
+
+			cv_wait(&vdcp->running_cv, &vdcp->lock);
 		}
 
 	} while (vdc_populate_descriptor(vdcp, operation, addr,
@@ -2596,27 +2669,29 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 	vdcp->sync_op_pending = B_TRUE;
 	mutex_exit(&vdcp->lock);
 
-	/*
-	 * No need to check return value - will return error only
-	 * in the DETACH case and we can fall through
-	 */
-	(void) vdc_send_request(vdcp, operation, addr,
+	status = vdc_send_request(vdcp, operation, addr,
 	    nbytes, slice, offset, cb_type, cb_arg, dir);
 
-	/*
-	 * block until our transaction completes.
-	 * Also anyone else waiting also gets to go next.
-	 */
 	mutex_enter(&vdcp->lock);
-	while (vdcp->sync_op_pending && vdcp->state != VDC_STATE_DETACH)
-		cv_wait(&vdcp->sync_pending_cv, &vdcp->lock);
 
-	DMSG(vdcp, 2, ": operation returned %d\n", vdcp->sync_op_status);
-	if (vdcp->state == VDC_STATE_DETACH) {
+	if (status != 0) {
 		vdcp->sync_op_pending = B_FALSE;
-		status = ENXIO;
 	} else {
-		status = vdcp->sync_op_status;
+		/*
+		 * block until our transaction completes.
+		 * Also anyone else waiting also gets to go next.
+		 */
+		while (vdcp->sync_op_pending && vdcp->state != VDC_STATE_DETACH)
+			cv_wait(&vdcp->sync_pending_cv, &vdcp->lock);
+
+		DMSG(vdcp, 2, ": operation returned %d\n",
+		    vdcp->sync_op_status);
+		if (vdcp->state == VDC_STATE_DETACH) {
+			vdcp->sync_op_pending = B_FALSE;
+			status = ENXIO;
+		} else {
+			status = vdcp->sync_op_status;
+		}
 	}
 
 	vdcp->sync_op_status = 0;
@@ -3135,6 +3210,11 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 	ASSERT(MUTEX_NOT_HELD(&vdcp->lock));
 	ASSERT(vdcp->state == VDC_STATE_HANDLE_PENDING);
 
+	if (vdcp->local_dring_backup == NULL) {
+		/* the pending requests have already been processed */
+		return (0);
+	}
+
 	DMSG(vdcp, 1, "restoring pending dring entries (len=%d, tail=%d)\n",
 	    vdcp->local_dring_backup_len, vdcp->local_dring_backup_tail);
 
@@ -3203,6 +3283,157 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 /*
  * Function:
+ *	vdc_cancel_backup_dring
+ *
+ * Description:
+ *	Cancel each descriptor in the backed up dring to vDisk server.
+ *	The Dring was backed up during connection reset.
+ *
+ * Arguments:
+ *	vdcp	- soft state pointer for this instance of the device driver.
+ *
+ * Return Code:
+ *	None
+ */
+void
+vdc_cancel_backup_ring(vdc_t *vdcp)
+{
+	vdc_local_desc_t *ldep;
+	struct buf 	*bufp;
+	int		count;
+	int		b_idx;
+	int		dring_size;
+
+	ASSERT(MUTEX_HELD(&vdcp->lock));
+	ASSERT(vdcp->state == VDC_STATE_INIT ||
+	    vdcp->state == VDC_STATE_INIT_WAITING ||
+	    vdcp->state == VDC_STATE_NEGOTIATE ||
+	    vdcp->state == VDC_STATE_RESETTING);
+
+	if (vdcp->local_dring_backup == NULL) {
+		/* the pending requests have already been processed */
+		return;
+	}
+
+	DMSG(vdcp, 1, "cancelling pending dring entries (len=%d, tail=%d)\n",
+	    vdcp->local_dring_backup_len, vdcp->local_dring_backup_tail);
+
+	/*
+	 * Walk the backup copy of the local descriptor ring and
+	 * cancel all the outstanding transactions.
+	 */
+	b_idx = vdcp->local_dring_backup_tail;
+	for (count = 0; count < vdcp->local_dring_backup_len; count++) {
+
+		ldep = &(vdcp->local_dring_backup[b_idx]);
+
+		/* only cancel outstanding transactions */
+		if (!ldep->is_free) {
+
+			DMSG(vdcp, 1, "cancelling entry idx=%x\n", b_idx);
+
+			/*
+			 * All requests have already been cleared from the
+			 * local descriptor ring and the LDC channel has been
+			 * reset so we will never get any reply for these
+			 * requests. Now we just have to notify threads waiting
+			 * for replies that the request has failed.
+			 */
+			switch (ldep->cb_type) {
+			case CB_SYNC:
+				ASSERT(vdcp->sync_op_pending);
+				vdcp->sync_op_status = EIO;
+				vdcp->sync_op_pending = B_FALSE;
+				cv_signal(&vdcp->sync_pending_cv);
+				break;
+
+			case CB_STRATEGY:
+				bufp = ldep->cb_arg;
+				ASSERT(bufp != NULL);
+				bufp->b_resid = bufp->b_bcount;
+				bioerror(bufp, EIO);
+				biodone(bufp);
+				break;
+
+			default:
+				ASSERT(0);
+			}
+
+		}
+
+		/* get the next element to cancel */
+		if (++b_idx >= vdcp->local_dring_backup_len)
+			b_idx = 0;
+	}
+
+	/* all done - now clear up pending dring copy */
+	dring_size = vdcp->local_dring_backup_len *
+	    sizeof (vdcp->local_dring_backup[0]);
+
+	(void) kmem_free(vdcp->local_dring_backup, dring_size);
+
+	vdcp->local_dring_backup = NULL;
+
+	DTRACE_IO2(processed, int, count, vdc_t *, vdcp);
+}
+
+/*
+ * Function:
+ *	vdc_connection_timeout
+ *
+ * Description:
+ *	This function is invoked if the timeout set to establish the connection
+ *	with vds expires. This will happen if we spend too much time in the
+ *	VDC_STATE_INIT_WAITING or VDC_STATE_NEGOTIATE states. Then we will
+ *	cancel any pending request and mark them as failed.
+ *
+ *	If the timeout does not expire, it will be cancelled when we reach the
+ *	VDC_STATE_HANDLE_PENDING or VDC_STATE_RESETTING state. This function can
+ *	be invoked while we are in the VDC_STATE_HANDLE_PENDING or
+ *	VDC_STATE_RESETTING state in which case we do nothing because the
+ *	timeout is being cancelled.
+ *
+ * Arguments:
+ *	arg	- argument of the timeout function actually a soft state
+ *		  pointer for the instance of the device driver.
+ *
+ * Return Code:
+ *	None
+ */
+void
+vdc_connection_timeout(void *arg)
+{
+	vdc_t 		*vdcp = (vdc_t *)arg;
+
+	mutex_enter(&vdcp->lock);
+
+	if (vdcp->state == VDC_STATE_HANDLE_PENDING ||
+	    vdcp->state == VDC_STATE_DETACH) {
+		/*
+		 * The connection has just been re-established or
+		 * we are detaching.
+		 */
+		vdcp->ctimeout_reached = B_FALSE;
+		mutex_exit(&vdcp->lock);
+		return;
+	}
+
+	vdcp->ctimeout_reached = B_TRUE;
+
+	/* notify requests waiting for sending */
+	cv_broadcast(&vdcp->running_cv);
+
+	/* cancel requests waiting for a result */
+	vdc_cancel_backup_ring(vdcp);
+
+	mutex_exit(&vdcp->lock);
+
+	cmn_err(CE_NOTE, "[%d] connection to service domain timeout",
+	    vdcp->instance);
+}
+
+/*
+ * Function:
  *	vdc_backup_local_dring()
  *
  * Description:
@@ -3221,6 +3452,7 @@ vdc_backup_local_dring(vdc_t *vdcp)
 {
 	int dring_size;
 
+	ASSERT(MUTEX_HELD(&vdcp->lock));
 	ASSERT(vdcp->state == VDC_STATE_RESETTING);
 
 	/*
@@ -3235,6 +3467,17 @@ vdc_backup_local_dring(vdc_t *vdcp)
 		    vdcp->local_dring_backup_tail);
 		return;
 	}
+
+	/*
+	 * The backup dring can be NULL and the local dring may not be
+	 * initialized. This can happen if we had a reset while establishing
+	 * a new connection but after the connection has timed out. In that
+	 * case the backup dring is NULL because the requests have been
+	 * cancelled and the request occured before the local dring is
+	 * initialized.
+	 */
+	if (!(vdcp->initialized & VDC_DRING_LOCAL))
+		return;
 
 	DMSG(vdcp, 1, "backing up the local descriptor ring (len=%d, "
 	    "tail=%d)\n", vdcp->dring_len, vdcp->dring_curr_idx);
@@ -3275,6 +3518,8 @@ static void
 vdc_process_msg_thread(vdc_t *vdcp)
 {
 	int	status;
+	int	ctimeout;
+	timeout_id_t tmid = 0;
 
 	mutex_enter(&vdcp->lock);
 
@@ -3294,8 +3539,27 @@ vdc_process_msg_thread(vdc_t *vdcp)
 		switch (vdcp->state) {
 		case VDC_STATE_INIT:
 
+			/*
+			 * If requested, start a timeout to check if the
+			 * connection with vds is established in the
+			 * specified delay. If the timeout expires, we
+			 * will cancel any pending request.
+			 *
+			 * If some reset have occurred while establishing
+			 * the connection, we already have a timeout armed
+			 * and in that case we don't need to arm a new one.
+			 */
+			ctimeout = (vdc_timeout != 0)?
+			    vdc_timeout : vdcp->ctimeout;
+
+			if (ctimeout != 0 && tmid == 0) {
+				tmid = timeout(vdc_connection_timeout, vdcp,
+				    ctimeout * drv_usectohz(1000000));
+			}
+
 			/* Check if have re-initializing repeatedly */
-			if (vdcp->hshake_cnt++ > vdc_hshake_retries) {
+			if (vdcp->hshake_cnt++ > vdc_hshake_retries &&
+			    vdcp->lifecycle != VDC_LC_ONLINE) {
 				cmn_err(CE_NOTE, "[%d] disk access failed.\n",
 				    vdcp->instance);
 				vdcp->state = VDC_STATE_DETACH;
@@ -3304,18 +3568,12 @@ vdc_process_msg_thread(vdc_t *vdcp)
 
 			/* Bring up connection with vds via LDC */
 			status = vdc_start_ldc_connection(vdcp);
-			switch (status) {
-			case EINVAL:
+			if (status == EINVAL) {
 				DMSG(vdcp, 0, "[%d] Could not start LDC",
 				    vdcp->instance);
 				vdcp->state = VDC_STATE_DETACH;
-				break;
-			case 0:
+			} else {
 				vdcp->state = VDC_STATE_INIT_WAITING;
-				break;
-			default:
-				vdcp->state = VDC_STATE_INIT_WAITING;
-				break;
 			}
 			break;
 
@@ -3382,6 +3640,7 @@ reset:
 			DMSG(vdcp, 0, "negotiation failed: resetting (%d)\n",
 			    status);
 			vdcp->state = VDC_STATE_RESETTING;
+			vdcp->self_reset = B_TRUE;
 done:
 			DMSG(vdcp, 0, "negotiation complete (state=0x%x)...\n",
 			    vdcp->state);
@@ -3389,7 +3648,28 @@ done:
 
 		case VDC_STATE_HANDLE_PENDING:
 
+			if (vdcp->ctimeout_reached) {
+				/*
+				 * The connection timeout had been reached so
+				 * pending requests have been cancelled. Now
+				 * that the connection is back we can reset
+				 * the timeout.
+				 */
+				ASSERT(vdcp->local_dring_backup == NULL);
+				ASSERT(tmid != 0);
+				tmid = 0;
+				vdcp->ctimeout_reached = B_FALSE;
+				vdcp->state = VDC_STATE_RUNNING;
+				DMSG(vdcp, 0, "[%d] connection to service "
+				    "domain is up", vdcp->instance);
+				break;
+			}
+
 			mutex_exit(&vdcp->lock);
+			if (tmid != 0) {
+				(void) untimeout(tmid);
+				tmid = 0;
+			}
 			status = vdc_resubmit_backup_dring(vdcp);
 			mutex_enter(&vdcp->lock);
 
@@ -3434,6 +3714,17 @@ done:
 			break;
 
 		case VDC_STATE_RESETTING:
+			/*
+			 * When we reach this state, we either come from the
+			 * VDC_STATE_RUNNING state and we can have pending
+			 * request but no timeout is armed; or we come from
+			 * the VDC_STATE_INIT_WAITING, VDC_NEGOTIATE or
+			 * VDC_HANDLE_PENDING state and there is no pending
+			 * request or pending requests have already been copied
+			 * into the backup dring. So we can safely keep the
+			 * connection timeout armed while we are in this state.
+			 */
+
 			DMSG(vdcp, 0, "Initiating channel reset "
 			    "(pending = %d)\n", (int)vdcp->threads_pending);
 
@@ -3478,6 +3769,14 @@ done:
 		case VDC_STATE_DETACH:
 			DMSG(vdcp, 0, "[%d] Reset thread exit cleanup ..\n",
 			    vdcp->instance);
+
+			/* cancel any pending timeout */
+			mutex_exit(&vdcp->lock);
+			if (tmid != 0) {
+				(void) untimeout(tmid);
+				tmid = 0;
+			}
+			mutex_enter(&vdcp->lock);
 
 			/*
 			 * Signal anyone waiting for connection
