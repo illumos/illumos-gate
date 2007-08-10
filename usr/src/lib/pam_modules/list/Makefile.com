@@ -22,51 +22,19 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/pam_modules/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include $(SRC)/Makefile.master
+LIBRARY=	pam_list.a
+VERS=		.1
+OBJECTS= 	list.o
 
-SUBDIRS = \
-	allow	\
-	authtok_get	\
-	authtok_check	\
-	authtok_store	\
-	deny		\
-	dhkeys		\
-	dial_auth	\
-	krb5		\
-	krb5_migrate	\
-	ldap		\
-	list		\
-	passwd_auth	\
-	rhosts_auth	\
-	roles		\
-	sample		\
-	tsol_acct	\
-	unix_auth	\
-	unix_account	\
-	unix_cred	\
-	unix_session
+include		../../Makefile.pam_modules
 
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/pam_modules/smartcard
+LDLIBS +=	-lpam -lc
 
-all :=		TARGET= all
-catalog :=	TARGET= _msg
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+all: $(LIBS)
 
-.KEEP_STATE:
+lint: lintcheck
 
-all clean clobber install lint _msg: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+include $(SRC)/lib/Makefile.targ

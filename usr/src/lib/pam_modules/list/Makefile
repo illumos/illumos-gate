@@ -22,51 +22,33 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/pam_modules/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include $(SRC)/Makefile.master
+include		../../Makefile.lib
 
-SUBDIRS = \
-	allow	\
-	authtok_get	\
-	authtok_check	\
-	authtok_store	\
-	deny		\
-	dhkeys		\
-	dial_auth	\
-	krb5		\
-	krb5_migrate	\
-	ldap		\
-	list		\
-	passwd_auth	\
-	rhosts_auth	\
-	roles		\
-	sample		\
-	tsol_acct	\
-	unix_auth	\
-	unix_account	\
-	unix_cred	\
-	unix_session
-
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/pam_modules/smartcard
+TEXT_DOMAIN=	SUNW_OST_SYSOSPAM
+POFILE=		list.po
+MSGFILES=	list.c
+SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
-catalog :=	TARGET= _msg
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
-_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber install lint _msg: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
-$(SUBDIRS): FRC
+_msg:	$(MSGDOMAINPOFILE)
+
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include 	$(SRC)/Makefile.msg.targ
+include		../../Makefile.targ
