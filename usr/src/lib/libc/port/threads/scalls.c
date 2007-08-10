@@ -35,81 +35,30 @@
 #include <sys/uio.h>
 
 /*
- * fork_lock is special -- We can't use lmutex_lock() (and thereby enter
- * a critical region) because the second thread to reach this point would
- * become unstoppable and the first thread would hang waiting for the
- * second thread to stop itself.  Therefore we don't use lmutex_lock() in
- * fork_lock_enter(), but we do defer signals (the other form of concurrency).
- *
- * fork_lock_enter() does triple-duty.  Not only does it serialize
- * calls to fork() and forkall(), but it also serializes calls to
- * thr_suspend() (fork() and forkall() also suspend other threads),
- * and furthermore it serializes I18N calls to functions in other
+ * fork_lock_enter() does triple-duty.  Not only does it (and atfork_lock)
+ * serialize calls to fork() and forkall(), but it also serializes calls to
+ * thr_suspend() and thr_continue() (fork() and forkall() also suspend other
+ * threads), and furthermore it serializes I18N calls to functions in other
  * dlopen()ed L10N objects that might be calling malloc()/free().
  */
-
-static void
-fork_lock_error(const char *who)
-{
-	char msg[200];
-
-	(void) strlcpy(msg, "deadlock condition: ", sizeof (msg));
-	(void) strlcat(msg, who, sizeof (msg));
-	(void) strlcat(msg, "() called from a fork handler", sizeof (msg));
-	thread_error(msg);
-}
-
-int
-fork_lock_enter(const char *who)
+void
+fork_lock_enter(void)
 {
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
-	int error = 0;
 
 	ASSERT(self->ul_critical == 0);
-	sigoff(self);
-	(void) _private_mutex_lock(&udp->fork_lock);
-	if (udp->fork_count) {
-		ASSERT(udp->fork_owner == self);
-		/*
-		 * This is a simple recursive lock except that we
-		 * inform the caller if we have been called from
-		 * a fork handler and let it deal with that fact.
-		 */
-		if (self->ul_fork) {
-			/*
-			 * We have been called from a fork handler.
-			 */
-			if (who != NULL &&
-			    udp->uberflags.uf_thread_error_detection)
-				fork_lock_error(who);
-			error = EDEADLK;
-		}
-	}
-	udp->fork_owner = self;
-	udp->fork_count++;
-	return (error);
+	(void) _private_mutex_lock(&self->ul_uberdata->fork_lock);
 }
 
 void
 fork_lock_exit(void)
 {
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
 
 	ASSERT(self->ul_critical == 0);
-	ASSERT(udp->fork_count != 0 && udp->fork_owner == self);
-	if (--udp->fork_count == 0)
-		udp->fork_owner = NULL;
-	(void) _private_mutex_unlock(&udp->fork_lock);
-	sigon(self);
+	(void) _private_mutex_unlock(&self->ul_uberdata->fork_lock);
 }
 
-/*
- * Note: Instead of making this function static, we reduce it to local
- * scope in the mapfile. That allows the linker to prevent it from
- * appearing in the .SUNW_dynsymsort section.
- */
 #pragma weak forkx = _private_forkx
 #pragma weak _forkx = _private_forkx
 pid_t
@@ -118,7 +67,6 @@ _private_forkx(int flags)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	pid_t pid;
-	int error;
 
 	if (self->ul_vfork) {
 		/*
@@ -139,34 +87,42 @@ _private_forkx(int flags)
 		return (pid);
 	}
 
-	if ((error = fork_lock_enter("fork")) != 0) {
+	sigoff(self);
+	if (self->ul_fork) {
 		/*
 		 * Cannot call fork() from a fork handler.
 		 */
-		fork_lock_exit();
-		errno = error;
+		sigon(self);
+		errno = EDEADLK;
 		return (-1);
 	}
 	self->ul_fork = 1;
+	(void) _private_mutex_lock(&udp->atfork_lock);
 
 	/*
 	 * The functions registered by pthread_atfork() are defined by
 	 * the application and its libraries and we must not hold any
-	 * internal libc locks while invoking them.  The fork_lock_enter()
-	 * function serializes fork(), thr_suspend(), pthread_atfork() and
-	 * dlclose() (which destroys whatever pthread_atfork() functions
-	 * the library may have set up).  If one of these pthread_atfork()
-	 * functions attempts to fork or suspend another thread or call
-	 * pthread_atfork() or dlclose a library, it will detect a deadlock
-	 * in fork_lock_enter().  Otherwise, the pthread_atfork() functions
+	 * internal lmutex_lock()-acquired locks while invoking them.
+	 * We hold only udp->atfork_lock to protect the atfork linkages.
+	 * If one of these pthread_atfork() functions attempts to fork
+	 * or to call pthread_atfork(), it will detect the error and
+	 * fail with EDEADLK.  Otherwise, the pthread_atfork() functions
 	 * are free to do anything they please (except they will not
 	 * receive any signals).
 	 */
 	_prefork_handler();
 
 	/*
+	 * Block every other thread attempting thr_suspend() or thr_continue().
+	 * This also blocks every other thread attempting calls to I18N
+	 * functions in dlopen()ed L10N objects, but this is benign;
+	 * the other threads will soon be suspended anyway.
+	 */
+	fork_lock_enter();
+
+	/*
 	 * Block all signals.
-	 * Just deferring them via sigon() is not enough.
+	 * Just deferring them via sigoff() is not enough.
 	 * We have to avoid taking a deferred signal in the child
 	 * that was actually sent to the parent before __forkx().
 	 */
@@ -198,16 +154,19 @@ _private_forkx(int flags)
 		unregister_locks();
 		postfork1_child();
 		restore_signals(self);
+		fork_lock_exit();
 		_postfork_child_handler();
 	} else {
 		/* restart all threads that were suspended for fork() */
 		continue_fork(0);
 		restore_signals(self);
+		fork_lock_exit();
 		_postfork_parent_handler();
 	}
 
+	(void) _private_mutex_unlock(&udp->atfork_lock);
 	self->ul_fork = 0;
-	fork_lock_exit();
+	sigon(self);
 
 	return (pid);
 }
@@ -238,7 +197,6 @@ _private_forkallx(int flags)
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	pid_t pid;
-	int error;
 
 	if (self->ul_vfork) {
 		if (udp->uberflags.uf_mt) {
@@ -253,12 +211,15 @@ _private_forkallx(int flags)
 		return (pid);
 	}
 
-	if ((error = fork_lock_enter("forkall")) != 0) {
-		fork_lock_exit();
-		errno = error;
+	sigoff(self);
+	if (self->ul_fork) {
+		sigon(self);
+		errno = EDEADLK;
 		return (-1);
 	}
 	self->ul_fork = 1;
+
+	fork_lock_enter();
 	block_all_signals(self);
 	suspend_fork();
 
@@ -276,8 +237,9 @@ _private_forkallx(int flags)
 		continue_fork(0);
 	}
 	restore_signals(self);
-	self->ul_fork = 0;
 	fork_lock_exit();
+	self->ul_fork = 0;
+	sigon(self);
 
 	return (pid);
 }
@@ -467,7 +429,7 @@ getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	int *bandp, int *flagsp)
 {
 	extern int _getpmsg(int, struct strbuf *, struct strbuf *,
-		int *, int *);
+	    int *, int *);
 	int rv;
 
 	PERFORM(_getpmsg(fd, ctlptr, dataptr, bandp, flagsp))
@@ -478,7 +440,7 @@ putmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int flags)
 {
 	extern int _putmsg(int, const struct strbuf *,
-		const struct strbuf *, int);
+	    const struct strbuf *, int);
 	int rv;
 
 	PERFORM(_putmsg(fd, ctlptr, dataptr, flags))
@@ -489,7 +451,7 @@ __xpg4_putmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int flags)
 {
 	extern int _putmsg(int, const struct strbuf *,
-		const struct strbuf *, int);
+	    const struct strbuf *, int);
 	int rv;
 
 	PERFORM(_putmsg(fd, ctlptr, dataptr, flags|MSG_XPG4))
@@ -500,7 +462,7 @@ putpmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int band, int flags)
 {
 	extern int _putpmsg(int, const struct strbuf *,
-		const struct strbuf *, int, int);
+	    const struct strbuf *, int, int);
 	int rv;
 
 	PERFORM(_putpmsg(fd, ctlptr, dataptr, band, flags))
@@ -511,7 +473,7 @@ __xpg4_putpmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int band, int flags)
 {
 	extern int _putpmsg(int, const struct strbuf *,
-		const struct strbuf *, int, int);
+	    const struct strbuf *, int, int);
 	int rv;
 
 	PERFORM(_putpmsg(fd, ctlptr, dataptr, band, flags|MSG_XPG4))
@@ -581,7 +543,7 @@ restart:
 			}
 		} else {
 			rqlapse = (hrtime_t)(uint32_t)rqtp->tv_sec * NANOSEC +
-				rqtp->tv_nsec;
+			    rqtp->tv_nsec;
 			lapse = gethrtime() - start;
 			if (rqlapse > lapse) {
 				hrt2ts(rqlapse - lapse, &reltime);
@@ -873,7 +835,7 @@ _pollsys(struct pollfd *fds, nfds_t nfd, const timespec_t *timeout,
 	const sigset_t *sigmask)
 {
 	extern int __pollsys(struct pollfd *, nfds_t, const timespec_t *,
-		const sigset_t *);
+	    const sigset_t *);
 	int rv;
 
 	PROLOGUE_MASK(sigmask)
@@ -887,7 +849,7 @@ int
 _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 {
 	extern int __sigtimedwait(const sigset_t *, siginfo_t *,
-		const timespec_t *);
+	    const timespec_t *);
 	siginfo_t info;
 	int sig;
 
@@ -924,7 +886,7 @@ int
 _sigqueue(pid_t pid, int signo, const union sigval value)
 {
 	extern int __sigqueue(pid_t pid, int signo,
-		/* const union sigval */ void *value, int si_code, int block);
+	    /* const union sigval */ void *value, int si_code, int block);
 	return (__sigqueue(pid, signo, value.sival_ptr, SI_QUEUE, 0));
 }
 

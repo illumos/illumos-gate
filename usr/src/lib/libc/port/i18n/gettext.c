@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,7 @@ _bindtextdomain(const char *domain, const char *binding)
 {
 	char	*res;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT(NULL);
 	res = _real_bindtextdomain_u(domain, binding, TP_BINDING);
 	fork_lock_exit();
@@ -85,7 +85,7 @@ _bind_textdomain_codeset(const char *domain, const char *codeset)
 {
 	char	*res;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT(NULL);
 	res = _real_bindtextdomain_u(domain, codeset, TP_CODESET);
 	fork_lock_exit();
@@ -102,7 +102,7 @@ _textdomain(const char *domain)
 	char	*res;
 	char	tmp_domain[TEXTDOMAINMAX + 1];
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT(NULL);
 	res = _textdomain_u(domain, tmp_domain);
 	if (res == NULL) {
@@ -123,7 +123,7 @@ _gettext(const char *msg_id)
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(NULL, msg_id, NULL, 0, LC_MESSAGES, 0);
 	fork_lock_exit();
@@ -141,7 +141,7 @@ _dgettext(const char *domain, const char *msg_id)
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(domain, msg_id, NULL, 0, LC_MESSAGES, 0);
 	fork_lock_exit();
@@ -155,7 +155,7 @@ _dcgettext(const char *domain, const char *msg_id, const int category)
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(domain, msg_id, NULL, 0, category, 0);
 	fork_lock_exit();
@@ -169,7 +169,7 @@ _ngettext(const char *msgid1, const char *msgid2, unsigned long int n)
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(NULL, msgid1, msgid2, n, LC_MESSAGES, 1);
 	fork_lock_exit();
@@ -184,7 +184,7 @@ _dngettext(const char *domain, const char *msgid1, const char *msgid2,
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(domain, msgid1, msgid2, n, LC_MESSAGES, 1);
 	fork_lock_exit();
@@ -199,7 +199,7 @@ _dcngettext(const char *domain, const char *msgid1, const char *msgid2,
 	char	*res;
 	int	errno_save = errno;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(domain, msgid1, msgid2, n, category, 1);
 	fork_lock_exit();

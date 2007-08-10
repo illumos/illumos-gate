@@ -653,17 +653,19 @@ typedef struct robust {
 
 /*
  * Make our hot locks reside on private cache lines (64 bytes).
- * pad_owner and pad_count (aka fork_owner and fork_count)
- * are used only in fork_lock_enter() and fork_lock_exit()
- * to implement the special form of mutual exclusion therein.
  */
 typedef struct {
 	mutex_t	pad_lock;
-	ulwp_t	*pad_owner;
-	size_t	pad_count;
-	char	pad_pad[64 -
-		(sizeof (mutex_t) + sizeof (ulwp_t *) + sizeof (size_t))];
+	char	pad_pad[64 - sizeof (mutex_t)];
 } pad_lock_t;
+
+/*
+ * Make our semi-hot locks reside on semi-private cache lines (32 bytes).
+ */
+typedef struct {
+	mutex_t	pad_lock;
+	char	pad_pad[32 - sizeof (mutex_t)];
+} pad32_lock_t;
 
 /*
  * The threads hash table is used for fast lookup and locking of an active
@@ -772,7 +774,8 @@ typedef struct {
  */
 typedef struct uberdata {
 	pad_lock_t	_link_lock;
-	pad_lock_t	_fork_lock;
+	pad32_lock_t	_fork_lock;
+	pad32_lock_t	_atfork_lock;
 	pad_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
 	siguaction_t	siguaction[NSIG];
@@ -816,8 +819,7 @@ typedef struct uberdata {
 
 #define	link_lock	_link_lock.pad_lock
 #define	fork_lock	_fork_lock.pad_lock
-#define	fork_owner	_fork_lock.pad_owner
-#define	fork_count	_fork_lock.pad_count
+#define	atfork_lock	_atfork_lock.pad_lock
 #define	tdb_hash_lock	_tdb_hash_lock.pad_lock
 
 #pragma align 64(__uberdata)
@@ -976,7 +978,8 @@ typedef struct ulwp32 {
 
 typedef struct uberdata32 {
 	pad_lock_t	_link_lock;
-	pad_lock_t	_fork_lock;
+	pad32_lock_t	_fork_lock;
+	pad32_lock_t	_atfork_lock;
 	pad_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
 	siguaction32_t	siguaction[NSIG];
@@ -1221,7 +1224,7 @@ extern	void	postfork1_child_sigev_aio(void);
 extern	void	postfork1_child_sigev_mq(void);
 extern	void	postfork1_child_sigev_timer(void);
 extern	void	postfork1_child_tpool(void);
-extern	int	fork_lock_enter(const char *);
+extern	void	fork_lock_enter(void);
 extern	void	fork_lock_exit(void);
 extern	void	suspend_fork(void);
 extern	void	continue_fork(int);

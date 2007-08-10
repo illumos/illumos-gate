@@ -68,7 +68,7 @@ extern int thr_kill(thread_t tid, int sig);
 extern thread_t thr_self(void);
 extern int mutex_lock(mutex_t *mp);
 extern int mutex_unlock(mutex_t *mp);
-extern int fork_lock_enter(const char *);
+extern void fork_lock_enter(void);
 extern void fork_lock_exit(void);
 extern void *lmalloc(size_t);
 extern void lfree(void *, size_t);

@@ -196,15 +196,15 @@ again:
 static void
 _preexec_atfork_unload(Lc_addr_range_t range[], uint_t count)
 {
-	uberdata_t *udp = curthread->ul_uberdata;
+	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
 	atfork_t *atfork_q;
 	atfork_t *atfp;
 	atfork_t *next;
 	void (*func)(void);
 	int start_again;
-	int error;
 
-	error = fork_lock_enter(NULL);
+	(void) _private_mutex_lock(&udp->atfork_lock);
 	if ((atfork_q = udp->atforklist) != NULL) {
 		atfp = atfork_q;
 		do {
@@ -217,7 +217,7 @@ _preexec_atfork_unload(Lc_addr_range_t range[], uint_t count)
 			    in_range(func, range, count)) ||
 			    ((func = atfp->child) != NULL &&
 			    in_range(func, range, count))) {
-				if (error) {
+				if (self->ul_fork) {
 					/*
 					 * dlclose() called from a fork handler.
 					 * Deleting the entry would wreak havoc.
@@ -245,7 +245,7 @@ _preexec_atfork_unload(Lc_addr_range_t range[], uint_t count)
 			}
 		} while ((atfp = next) != atfork_q || start_again);
 	}
-	fork_lock_exit();
+	(void) _private_mutex_unlock(&udp->atfork_lock);
 }
 
 /*

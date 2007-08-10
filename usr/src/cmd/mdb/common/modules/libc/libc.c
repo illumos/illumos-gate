@@ -721,12 +721,12 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("%#a\n", addr);
 
-	HD("&link_lock            &fork_lock            fork_owner");
+	HD("&link_lock            &fork_lock            &atfork_lock");
 	mdb_printf(OFFSTR "%s %s %s\n",
 		OFFSET(link_lock),
 		prt_addr((void *)(addr + OFFSET(link_lock)), 1),
 		prt_addr((void *)(addr + OFFSET(fork_lock)), 1),
-		prt_addr((void *)uberdata.fork_owner, 0));
+		prt_addr((void *)(addr + OFFSET(atfork_lock)), 0));
 
 	HD("&tdb_hash_lock        &tdb_hash_lock_stats  &siguaction[0]");
 	mdb_printf(OFFSTR "%s %s %s\n",

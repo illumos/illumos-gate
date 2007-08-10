@@ -75,6 +75,7 @@ extern const Lc_interface rtld_funcs[];
 uberdata_t __uberdata = {
 	{ DEFAULTMUTEX, NULL, 0 },	/* link_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* fork_lock */
+	{ RECURSIVEMUTEX, NULL, 0 },	/* atfork_lock */
 	{ DEFAULTMUTEX, NULL, 0 },	/* tdb_hash_lock */
 	{ 0, },				/* tdb_hash_lock_stats */
 	{ { 0 }, },			/* siguaction[NSIG] */
@@ -238,7 +239,7 @@ ulwp_clean(ulwp_t *ulwp)
 	ulwp->ul_schedctl = NULL;
 	ulwp->ul_bindflags = 0;
 	(void) _private_memset(&ulwp->ul_td_evbuf, 0,
-		sizeof (ulwp->ul_td_evbuf));
+	    sizeof (ulwp->ul_td_evbuf));
 	ulwp->ul_td_events_enable = 0;
 	ulwp->ul_qtype = 0;
 	ulwp->ul_usropts = 0;
@@ -255,10 +256,10 @@ ulwp_clean(ulwp_t *ulwp)
 	/* PROBE_SUPPORT end */
 	ulwp->ul_siglink = NULL;
 	(void) _private_memset(ulwp->ul_ftsd, 0,
-		sizeof (void *) * TSD_NFAST);
+	    sizeof (void *) * TSD_NFAST);
 	ulwp->ul_stsd = NULL;
 	(void) _private_memset(&ulwp->ul_spinlock, 0,
-		sizeof (ulwp->ul_spinlock));
+	    sizeof (ulwp->ul_spinlock));
 	ulwp->ul_spin_lock_spin = 0;
 	ulwp->ul_spin_lock_spin2 = 0;
 	ulwp->ul_spin_lock_sleep = 0;
@@ -432,7 +433,7 @@ find_stack(size_t stksize, size_t guardsize)
 			ulwp->ul_ix = -1;
 			if (guardsize)	/* protect the extra red zone */
 				(void) _private_mprotect(stk,
-					guardsize, PROT_NONE);
+				    guardsize, PROT_NONE);
 		}
 	}
 	return (ulwp);
@@ -746,7 +747,7 @@ _thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	long flags, thread_t *new_thread)
 {
 	return (_thrp_create(stk, stksize, func, arg, flags, new_thread,
-		curthread->ul_pri, curthread->ul_policy, 0));
+	    curthread->ul_pri, curthread->ul_policy, 0));
 }
 
 /*
@@ -1049,7 +1050,7 @@ _thrp_join(thread_t tid, thread_t *departed, void **status, int do_cancel)
 		ulwp->ul_forw = ulwp->ul_back = NULL;
 		udp->nzombies--;
 		ASSERT(ulwp->ul_dead && !ulwp->ul_detached &&
-			!(ulwp->ul_usropts & (THR_DETACHED|THR_DAEMON)));
+		    !(ulwp->ul_usropts & (THR_DETACHED|THR_DAEMON)));
 		/*
 		 * We can't call ulwp_unlock(ulwp) after we set
 		 * ulwp->ul_ix = -1 so we have to get a pointer to the
@@ -1065,7 +1066,7 @@ _thrp_join(thread_t tid, thread_t *departed, void **status, int do_cancel)
 			ulwp->ul_next = NULL;
 			if (udp->ulwp_replace_free == NULL)
 				udp->ulwp_replace_free =
-					udp->ulwp_replace_last = ulwp;
+				    udp->ulwp_replace_last = ulwp;
 			else {
 				udp->ulwp_replace_last->ul_next = ulwp;
 				udp->ulwp_replace_last = ulwp;
@@ -1345,7 +1346,7 @@ libc_init(void)
 #endif
 
 	self->ul_stktop =
-		(uintptr_t)uc.uc_stack.ss_sp + uc.uc_stack.ss_size;
+	    (uintptr_t)uc.uc_stack.ss_sp + uc.uc_stack.ss_size;
 	(void) _private_getrlimit(RLIMIT_STACK, &rl);
 	self->ul_stksiz = rl.rlim_cur;
 	self->ul_stk = (caddr_t)(self->ul_stktop - self->ul_stksiz);
@@ -1632,7 +1633,7 @@ postfork1_child()
 	/* no one in the child is on a sleep queue; reinitialize */
 	if (udp->queue_head) {
 		(void) _private_memset(udp->queue_head, 0,
-			2 * QHASHSIZE * sizeof (queue_head_t));
+		    2 * QHASHSIZE * sizeof (queue_head_t));
 		for (i = 0; i < 2 * QHASHSIZE; i++) {
 			mp = &udp->queue_head[i].qh_lock;
 			mp->mutex_flag = LOCK_INITED;
@@ -1674,7 +1675,7 @@ postfork1_child()
 				ulwp->ul_next = NULL;
 				if (udp->ulwp_replace_free == NULL) {
 					udp->ulwp_replace_free =
-						udp->ulwp_replace_last = ulwp;
+					    udp->ulwp_replace_last = ulwp;
 				} else {
 					udp->ulwp_replace_last->ul_next = ulwp;
 					udp->ulwp_replace_last = ulwp;
@@ -1932,7 +1933,7 @@ _thrp_suspend(thread_t tid, uchar_t whystopped)
 	 * This also allows only one suspension at a time.
 	 */
 	if (tid != self->ul_lwpid)
-		(void) fork_lock_enter(NULL);
+		fork_lock_enter();
 
 	if ((ulwp = find_lwp(tid)) == NULL)
 		error = ESRCH;
@@ -2077,7 +2078,7 @@ continue_fork(int child)
 	if (child) {
 		for (ulwp = self->ul_forw; ulwp != self; ulwp = ulwp->ul_forw) {
 			ulwp->ul_schedctl_called =
-				ulwp->ul_dead? &udp->uberflags : NULL;
+			    ulwp->ul_dead? &udp->uberflags : NULL;
 			ulwp->ul_schedctl = NULL;
 		}
 	}
@@ -2113,7 +2114,7 @@ _thrp_continue(thread_t tid, uchar_t whystopped)
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 
 	if ((ulwp = find_lwp(tid)) == NULL) {
 		fork_lock_exit();
@@ -2200,7 +2201,7 @@ do_exit_critical()
 			unsleep_self();
 			set_parking_flag(self, 0);
 			(void) _thrp_suspend(self->ul_lwpid,
-				self->ul_pleasestop);
+			    self->ul_pleasestop);
 		}
 		self->ul_critical--;
 
@@ -2635,7 +2636,7 @@ _thr_suspend_allmutators(void)
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 
 top:
 	lmutex_lock(&udp->link_lock);
@@ -2705,7 +2706,7 @@ _thr_continue_allmutators()
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 
 	lmutex_lock(&udp->link_lock);
 	if (!suspendedallmutators) {

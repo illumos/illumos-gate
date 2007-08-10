@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ _wdinitialize(void)
 		if (wdchknd == NULL)
 			wdchknd = wdchkind_C;
 		wdbdg = (int(*)(wchar_t, wchar_t, int))dlsym(modhandle,
-			"_wdbindf_");
+		    "_wdbindf_");
 		if (wdbdg == NULL)
 			wdbdg = wdbindf_C;
 		wddlm = (wchar_t *(*)(wchar_t, wchar_t, int))
@@ -120,7 +120,7 @@ wdinit()
 {
 	int res;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	res = _wdinitialize();
 	fork_lock_exit();
 	return (res);
@@ -135,7 +135,7 @@ wdchkind(wchar_t wc)
 {
 	int i;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	i = (*wdchknd)(wc);
@@ -170,7 +170,7 @@ wdbindf(wchar_t wc1, wchar_t wc2, int type)
 {
 	int i;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (!iswprint(wc1) || !iswprint(wc2)) {
@@ -203,7 +203,7 @@ wddelim(wchar_t wc1, wchar_t wc2, int type)
 {
 	wchar_t *i;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (!iswprint(wc1) || !iswprint(wc2)) {
@@ -230,7 +230,7 @@ mcfiller(void)
 {
 	wchar_t fillerchar;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (mcfllr) {
@@ -254,7 +254,7 @@ mcfiller(void)
 int
 mcwrap(void)
 {
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (mcwrp)

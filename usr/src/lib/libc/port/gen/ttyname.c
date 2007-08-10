@@ -215,7 +215,7 @@ _ttyname_common(struct stat64 *fsp, char *buffer, uint_t match_mask)
 	 * We can't use lmutex_lock() here because we call malloc()/free()
 	 * and _libc_gettext().  Use the brute-force fork_lock_enter().
 	 */
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 
 	/*
 	 * match special cases

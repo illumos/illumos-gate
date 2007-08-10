@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,33 +55,33 @@ _pthread_atfork(void (*prepare)(void),
 	uberdata_t *udp = self->ul_uberdata;
 	atfork_t *atfp;
 	atfork_t *head;
-	int error;
+	int error = 0;
 
-	if ((error = fork_lock_enter("pthread_atfork")) != 0) {
+	(void) _private_mutex_lock(&udp->atfork_lock);
+	if (self->ul_fork) {
 		/*
 		 * Cannot call pthread_atfork() from a fork handler.
 		 */
-		fork_lock_exit();
-		return (error);
-	}
-	if ((atfp = lmalloc(sizeof (atfork_t))) == NULL) {
-		fork_lock_exit();
-		return (ENOMEM);
-	}
-	atfp->prepare = prepare;
-	atfp->parent = parent;
-	atfp->child = child;
-	if ((head = udp->atforklist) == NULL) {
-		udp->atforklist = atfp;
-		atfp->forw = atfp->back = atfp;
+		error = EDEADLK;
+	} else if ((atfp = lmalloc(sizeof (atfork_t))) == NULL) {
+		error = ENOMEM;
 	} else {
-		head->back->forw = atfp;
-		atfp->forw = head;
-		atfp->back = head->back;
-		head->back = atfp;
+		atfp->prepare = prepare;
+		atfp->parent = parent;
+		atfp->child = child;
+		if ((head = udp->atforklist) == NULL) {
+			udp->atforklist = atfp;
+			atfp->forw = atfp->back = atfp;
+		} else {
+			head->back->forw = atfp;
+			atfp->forw = head;
+			atfp->back = head->back;
+			head->back = atfp;
+		}
 	}
-	fork_lock_exit();
-	return (0);
+
+	(void) _private_mutex_unlock(&udp->atfork_lock);
+	return (error);
 }
 
 /*
@@ -95,6 +95,7 @@ _prefork_handler(void)
 	atfork_t *atfork_q;
 	atfork_t *atfp;
 
+	ASSERT(MUTEX_OWNED(&udp->atfork_lock, curthread));
 	if ((atfork_q = udp->atforklist) != NULL) {
 		atfp = atfork_q = atfork_q->back;
 		do {
@@ -115,6 +116,7 @@ _postfork_parent_handler(void)
 	atfork_t *atfork_q;
 	atfork_t *atfp;
 
+	ASSERT(MUTEX_OWNED(&udp->atfork_lock, curthread));
 	if ((atfork_q = udp->atforklist) != NULL) {
 		atfp = atfork_q;
 		do {
@@ -135,6 +137,7 @@ _postfork_child_handler(void)
 	atfork_t *atfork_q;
 	atfork_t *atfp;
 
+	ASSERT(MUTEX_OWNED(&udp->atfork_lock, curthread));
 	if ((atfork_q = udp->atforklist) != NULL) {
 		atfp = atfork_q;
 		do {

@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,7 +151,7 @@ setnetgrent(const char *netgroup)
 		netgroup = "";
 	}
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	be = getnetgrent_backend;
 	if (be != NULL && NSS_INVOKE_DBOP(be, NSS_DBOP_SETENT,
 	    (void *)netgroup) != NSS_SUCCESS) {
@@ -185,7 +186,7 @@ getnetgrent_r(machinep, namep, domainp, buffer, buflen)
 	args.buflen	= buflen;
 	args.status	= NSS_NETGR_NO;
 
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (getnetgrent_backend != 0) {
 		(void) NSS_INVOKE_DBOP(getnetgrent_backend,
 			NSS_DBOP_GETENT, &args);
@@ -218,10 +219,10 @@ getnetgrent(machinep, namep, domainp)
 int
 endnetgrent()
 {
-	(void) fork_lock_enter(NULL);
+	fork_lock_enter();
 	if (getnetgrent_backend != 0) {
 		(void) NSS_INVOKE_DBOP(getnetgrent_backend,
-			NSS_DBOP_DESTRUCTOR, 0);
+		    NSS_DBOP_DESTRUCTOR, 0);
 		getnetgrent_backend = 0;
 	}
 	fork_lock_exit();
