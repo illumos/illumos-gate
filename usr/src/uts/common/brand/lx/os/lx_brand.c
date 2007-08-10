@@ -57,15 +57,11 @@
 
 int	lx_debug = 0;
 
-void	lx_init_brand_data(zone_t *);
-void	lx_free_brand_data(zone_t *);
 void	lx_setbrand(proc_t *);
 int	lx_getattr(zone_t *, int, void *, size_t *);
 int	lx_setattr(zone_t *, int, void *, size_t);
 int	lx_brandsys(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 		uintptr_t, uintptr_t, uintptr_t);
-int	lx_get_kern_version(void);
-void	lx_set_kern_version(zone_t *, int);
 void	lx_copy_procdata(proc_t *, proc_t *);
 
 extern void lx_setrval(klwp_t *, int, int);
@@ -91,8 +87,6 @@ static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 /* lx brand */
 struct brand_ops lx_brops = {
-	lx_init_brand_data,
-	lx_free_brand_data,
 	lx_brandsys,
 	lx_setbrand,
 	lx_getattr,
@@ -186,7 +180,6 @@ int
 lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 {
 	boolean_t val;
-	int num;
 
 	if (attr == LX_ATTR_RESTART_INIT) {
 		if (bufsize > sizeof (boolean_t))
@@ -197,13 +190,6 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 			return (EINVAL);
 		zone->zone_restart_init = val;
 		return (0);
-	} else if (attr == LX_KERN_VERSION_NUM) {
-		if (bufsize > sizeof (int))
-			return (ERANGE);
-		if (copyin(buf, &num, sizeof (num)) != 0)
-			return (EFAULT);
-		lx_set_kern_version(zone, num);
-		return (0);
 	}
 	return (EINVAL);
 }
@@ -212,7 +198,6 @@ lx_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 int
 lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 {
-	int num;
 	if (attr == LX_ATTR_RESTART_INIT) {
 		if (*bufsize < sizeof (boolean_t))
 			return (ERANGE);
@@ -220,14 +205,6 @@ lx_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 		    sizeof (boolean_t)) != 0)
 			return (EFAULT);
 		*bufsize = sizeof (boolean_t);
-		return (0);
-	} else if (attr == LX_KERN_VERSION_NUM) {
-		if (*bufsize < sizeof (int))
-			return (ERANGE);
-		num = lx_get_kern_version();
-		if (copyout(&num, buf, sizeof (int)) != 0)
-			return (EFAULT);
-		*bufsize = sizeof (int);
 		return (0);
 	}
 	return (-EINVAL);
@@ -350,27 +327,6 @@ lx_brand_systrace_disable(void)
 	lx_brand_int80_disable();
 
 	lx_systrace_enabled = 0;
-}
-
-void
-lx_init_brand_data(zone_t *zone)
-{
-	lx_zone_data_t *data;
-	ASSERT(zone->zone_brand == &lx_brand);
-	ASSERT(zone->zone_brand_data == NULL);
-	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
-	/*
-	 * Default kernel_version to LX_KERN_2_4, this can be changed by a call
-	 * to setattr() which is made during zone boot
-	 */
-	data->kernel_version = LX_KERN_2_4;
-	zone->zone_brand_data = data;
-}
-
-void
-lx_free_brand_data(zone_t *zone)
-{
-	kmem_free(zone->zone_brand_data, sizeof (lx_zone_data_t));
 }
 
 /*
@@ -592,12 +548,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 
 	default:
 		linux_call = cmd - B_EMULATE_SYSCALL;
-		/*
-		 * Only checking against highest syscall number for all kernel
-		 * versions, since check for specific kernel version is done
-		 * in userland prior to this call, and duplicating logic would
-		 * be redundant.
-		 */
 		if (linux_call >= 0 && linux_call < LX_NSYSCALLS) {
 			*rval = lx_emulate_syscall(linux_call, arg1, arg2,
 			    arg3, arg4, arg5, arg6);
@@ -606,24 +556,6 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	}
 
 	return (EINVAL);
-}
-
-int
-lx_get_zone_kern_version(zone_t *zone)
-{
-	return (((lx_zone_data_t *)zone->zone_brand_data)->kernel_version);
-}
-
-int
-lx_get_kern_version()
-{
-	return (lx_get_zone_kern_version(curzone));
-}
-
-void
-lx_set_kern_version(zone_t *zone, int vers)
-{
-	((lx_zone_data_t *)zone->zone_brand_data)->kernel_version = vers;
 }
 
 /*
@@ -831,10 +763,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * Linux 2.6 programs such as ps will print an error message if the
 	 * following aux entry is missing
 	 */
-	if (lx_get_kern_version() >= LX_KERN_2_6) {
-		phdr_auxv32[1].a_type = AT_CLKTCK;
-		phdr_auxv32[1].a_un.a_val = hz;
-	}
+	phdr_auxv32[1].a_type = AT_CLKTCK;
+	phdr_auxv32[1].a_un.a_val = hz;
 
 	if (copyout(&phdr_auxv32, args->auxp_brand,
 	    sizeof (phdr_auxv32)) == -1)

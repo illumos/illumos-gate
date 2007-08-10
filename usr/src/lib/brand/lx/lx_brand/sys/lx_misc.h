@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,8 +126,6 @@ extern int lx_lpid_to_spid(pid_t, pid_t *);
 
 extern int lx_ptrace_wait(siginfo_t *);
 extern void lx_ptrace_fork(void);
-
-extern int lx_get_kern_version(void);
 
 extern int lx_check_alloca(size_t);
 #define	SAFE_ALLOCA(sz)	(lx_check_alloca(sz) ? alloca(sz) : NULL)

@@ -1539,16 +1539,10 @@ lxpr_read_partitions(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 static void
 lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
-	char *vers;
-	if (lx_get_zone_kern_version(LXPTOZ(lxpnp)) <= LX_KERN_2_4)
-		vers = LX_UNAME_RELEASE_2_4;
-	else
-		vers = LX_UNAME_RELEASE_2_6;
-
 	lxpr_uiobuf_printf(uiobuf,
 	    "%s version %s (%s version %d.%d.%d) "
 	    "#%s SMP %s\n",
-	    LX_UNAME_SYSNAME, vers,
+	    LX_UNAME_SYSNAME, LX_UNAME_RELEASE,
 #if defined(__GNUC__)
 	    "gcc",
 	    __GNUC__,
@@ -1570,7 +1564,6 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *
  */
 /* ARGSUSED */
-
 static void
 lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
@@ -1579,10 +1572,6 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t idle_cum = 0;
 	ulong_t sys_cum  = 0;
 	ulong_t user_cum = 0;
-	ulong_t irq_cum = 0;
-	uint_t cpu_nrunnable_cum = 0;
-	uint_t w_io_cum = 0;
-
 	ulong_t pgpgin_cum    = 0;
 	ulong_t pgpgout_cum   = 0;
 	ulong_t pgswapout_cum = 0;
@@ -1591,9 +1580,6 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t pswitch_cum = 0;
 	ulong_t forks_cum = 0;
 	hrtime_t msnsecs[NCMSTATES];
-	int lx_kern_version = lx_get_zone_kern_version(LXPTOZ(lxpnp));
-	/* temporary variable since scalehrtime modifies data in place */
-	hrtime_t tmptime;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_STAT);
 
@@ -1624,16 +1610,6 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		pgswapin_cum += CPU_STATS(cp, vm.pgswapin);
 		pgswapout_cum += CPU_STATS(cp, vm.pgswapout);
 
-		if (lx_kern_version >= LX_KERN_2_6) {
-			cpu_nrunnable_cum += cp->cpu_disp->disp_nrunnable;
-			w_io_cum += CPU_STATS(cp, sys.iowait);
-			for (i = 0; i < NCMSTATES; i++) {
-				tmptime = cp->cpu_intracct[i];
-				scalehrtime(&tmptime);
-				irq_cum += NSEC_TO_TICK(tmptime);
-			}
-		}
-
 		for (i = 0; i < PIL_MAX; i++)
 			intr_cum += CPU_STATS(cp, sys.intr[i]);
 
@@ -1647,24 +1623,15 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cp = cp->cpu_next;
 	} while (cp != cpstart);
 
-	if (lx_kern_version >= LX_KERN_2_6) {
-		lxpr_uiobuf_printf(uiobuf,
-		    "cpu %ld %ld %ld %ld %ld %ld %ld\n",
-		    user_cum, 0, sys_cum, idle_cum, 0, irq_cum, 0);
-	} else {
-		lxpr_uiobuf_printf(uiobuf,
-		    "cpu %ld %ld %ld %ld\n",
-		    user_cum, 0, sys_cum, idle_cum);
-	}
+	lxpr_uiobuf_printf(uiobuf,
+	    "cpu %ld %ld %ld %ld\n",
+	    user_cum, 0, sys_cum, idle_cum);
 
 	/* Do per processor stats */
 	do {
-		int i;
-
 		ulong_t idle_ticks;
 		ulong_t sys_ticks;
 		ulong_t user_ticks;
-		ulong_t irq_ticks = 0;
 
 		/*
 		 * Don't count CPUs that aren't even in the system
@@ -1680,23 +1647,10 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		sys_ticks  = NSEC_TO_TICK(msnsecs[CMS_SYSTEM]);
 		user_ticks = NSEC_TO_TICK(msnsecs[CMS_USER]);
 
-		if (lx_kern_version >= LX_KERN_2_6) {
-			for (i = 0; i < NCMSTATES; i++) {
-				tmptime = cp->cpu_intracct[i];
-				scalehrtime(&tmptime);
-				irq_ticks += NSEC_TO_TICK(tmptime);
-			}
-
-			lxpr_uiobuf_printf(uiobuf,
-			    "cpu%d %ld %ld %ld %ld %ld %ld %ld\n",
-			    cp->cpu_id, user_ticks, 0, sys_ticks, idle_ticks,
-			    0, irq_ticks, 0);
-		} else {
-			lxpr_uiobuf_printf(uiobuf,
-			    "cpu%d %ld %ld %ld %ld\n",
-			    cp->cpu_id,
-			    user_ticks, 0, sys_ticks, idle_ticks);
-		}
+		lxpr_uiobuf_printf(uiobuf,
+		    "cpu%d %ld %ld %ld %ld\n",
+		    cp->cpu_id,
+		    user_ticks, 0, sys_ticks, idle_ticks);
 
 		if (pools_enabled)
 			cp = cp->cpu_next_part;
@@ -1706,39 +1660,19 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 	mutex_exit(&cpu_lock);
 
-	if (lx_kern_version >= LX_KERN_2_6) {
-		lxpr_uiobuf_printf(uiobuf,
-		    "page %lu %lu\n"
-		    "swap %lu %lu\n"
-		    "intr %lu\n"
-		    "ctxt %lu\n"
-		    "btime %lu\n"
-		    "processes %lu\n"
-		    "procs_running %lu\n"
-		    "procs_blocked %lu\n",
-		    pgpgin_cum, pgpgout_cum,
-		    pgswapin_cum, pgswapout_cum,
-		    intr_cum,
-		    pswitch_cum,
-		    boot_time,
-		    forks_cum,
-		    cpu_nrunnable_cum,
-		    w_io_cum);
-	} else {
-		lxpr_uiobuf_printf(uiobuf,
-		    "page %lu %lu\n"
-		    "swap %lu %lu\n"
-		    "intr %lu\n"
-		    "ctxt %lu\n"
-		    "btime %lu\n"
-		    "processes %lu\n",
-		    pgpgin_cum, pgpgout_cum,
-		    pgswapin_cum, pgswapout_cum,
-		    intr_cum,
-		    pswitch_cum,
-		    boot_time,
-		    forks_cum);
-	}
+	lxpr_uiobuf_printf(uiobuf,
+	    "page %lu %lu\n"
+	    "swap %lu %lu\n"
+	    "intr %lu\n"
+	    "ctxt %lu\n"
+	    "btime %lu\n"
+	    "processes %lu\n",
+	    pgpgin_cum, pgpgout_cum,
+	    pgswapin_cum, pgswapout_cum,
+	    intr_cum,
+	    pswitch_cum,
+	    boot_time,
+	    forks_cum);
 }
 
 
@@ -2164,10 +2098,6 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 		 */
 		return (VOP_ACCESS(lxpnp->lxpr_realvp, mode, flags, cr));
 	}
-
-	/* If user is root allow access regardless of permission bits */
-	if (secpolicy_proc_access(cr) == 0)
-		return (0);
 
 	/*
 	 * Access check is based on only
@@ -2922,8 +2852,11 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
 	if (vp->v_type != VLNK)
 		return (EINVAL);
 
-	/* Try to produce a symlink name for anything that has a realvp */
-	if (rvp != NULL) {
+	/*
+	 * Try to produce a symlink name for anything that's really a regular
+	 * file or directory (but not for anything else)
+	 */
+	if (rvp != NULL && (rvp->v_type == VDIR || rvp->v_type == VREG)) {
 		if ((error = lxpr_access(vp, VREAD, 0, CRED())) != 0)
 			return (error);
 		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0)

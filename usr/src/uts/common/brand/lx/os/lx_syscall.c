@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -342,54 +342,9 @@ lx_sysent_t lx_sysent[] =
 	LX_NOSYS("statfs64"),
 	LX_NOSYS("fstatfs64"),
 	LX_NOSYS("tgkill"),					/* 270 */
-	/* The following are Linux 2.6 system calls */
 	LX_NOSYS("utimes"),
 	LX_NOSYS("fadvise64_64"),
 	LX_NOSYS("vserver"),
-	LX_NOSYS("mbind"),
-	LX_NOSYS("get_mempolicy"),
-	LX_NOSYS("set_mempolicy"),
-	LX_NOSYS("mq_open"),
-	LX_NOSYS("mq_unlink"),
-	LX_NOSYS("mq_timedsend"),
-	LX_NOSYS("mq_timedreceive"),				/* 280 */
-	LX_NOSYS("mq_notify"),
-	LX_NOSYS("mq_getsetattr"),
-	LX_NOSYS("kexec_load"),
-	LX_NOSYS("waitid"),
-	LX_NOSYS("sys_setaltroot"),
-	LX_NOSYS("add_key"),
-	LX_NOSYS("request_key"),
-	LX_NOSYS("keyctl"),
-	LX_NOSYS("ioprio_set"),
-	LX_NOSYS("ioprio_get"),					/* 290 */
-	LX_NOSYS("inotify_init"),
-	LX_NOSYS("inotify_add_watch"),
-	LX_NOSYS("inotify_rm_watch"),
-	LX_NOSYS("migrate_pages"),
-	LX_NOSYS("openat"),
-	LX_NOSYS("mkdirat"),
-	LX_NOSYS("mknodat"),
-	LX_NOSYS("fchownat"),
-	LX_NOSYS("futimesat"),
-	LX_NOSYS("fstatat64"),					/* 300 */
-	LX_NOSYS("unlinkat"),
-	LX_NOSYS("renameat"),
-	LX_NOSYS("linkat"),
-	LX_NOSYS("syslinkat"),
-	LX_NOSYS("readlinkat"),
-	LX_NOSYS("fchmodat"),
-	LX_NOSYS("faccessat"),
-	LX_NOSYS("pselect6"),
-	LX_NOSYS("ppoll"),
-	LX_NOSYS("unshare"),					/* 310 */
-	LX_NOSYS("set_robust_list"),
-	LX_NOSYS("get_robust_list"),
-	LX_NOSYS("splice"),
-	LX_NOSYS("sync_file_range"),
-	LX_NOSYS("tee"),
-	LX_NOSYS("vmsplice"),
-	LX_NOSYS("move_pages"),
 	NULL	/* NULL-termination is required for lx_systrace */
 };
 

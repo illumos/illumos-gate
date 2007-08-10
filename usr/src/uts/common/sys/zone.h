@@ -411,7 +411,6 @@ typedef struct zone {
 
 	boolean_t	zone_restart_init;	/* Restart init if it dies? */
 	struct brand	*zone_brand;		/* zone's brand */
-	void 		*zone_brand_data;	/* store brand specific data */
 	id_t		zone_defaultcid;	/* dflt scheduling class id */
 	kstat_t		*zone_swapresv_kstat;
 	kstat_t		*zone_lockedmem_kstat;

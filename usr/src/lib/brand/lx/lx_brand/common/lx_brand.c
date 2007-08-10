@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,9 +165,7 @@ struct lx_sysent {
 	char	sy_narg;
 };
 
-static struct lx_sysent sysents[LX_NSYSCALLS + 1];
-/* Differs for kernel versions, set during lx_init */
-static int lx_max_syscall;
+static struct lx_sysent sysents[LINUX_MAX_SYSCALL + 1];
 
 static uintptr_t stack_bottom;
 
@@ -401,7 +399,7 @@ lx_emulate(lx_regs_t *rp)
 
 	syscall_num = rp->lxr_eax;
 
-	if (syscall_num < 0 || syscall_num > lx_max_syscall)
+	if (syscall_num < 0 || syscall_num > LINUX_MAX_SYSCALL)
 		s = &sysents[0];
 	else
 		s = &sysents[syscall_num];
@@ -640,23 +638,6 @@ lx_init(int argc, char *argv[], char *envp[])
 	char 		locale_translated_name[MAXLOCALENAMELEN];
 	static lx_tsd_t lx_tsd;
 
-	/* Look up the PID that serves as init for this zone */
-	if ((err = lx_lpid_to_spid(1, &zoneinit_pid)) < 0)
-		lx_err_fatal(gettext(
-		    "Unable to find PID for zone init process: %s"),
-		    strerror(err));
-
-	/*
-	 * Ubuntu init will fail if its TERM environment variable is not set
-	 * so if we are running init, and TERM is not set, we set term and
-	 * reexec so that the new environment variable is propagated to the
-	 * linux application stack.
-	 */
-	if ((getpid() == zoneinit_pid) && (getenv("TERM") == NULL)) {
-		if (setenv("TERM", "vt100", 1) < 0 || execv(argv[0], argv) < 0)
-			lx_err_fatal(gettext("failed to set TERM"));
-	}
-
 	if ((set_l10n_alternate_root("/native") == 0) &&
 	    (setlocale(LC_ALL, lx_translate_locale(locale_translated_name,
 	    sizeof (locale_translated_name))) != NULL) &&
@@ -678,22 +659,11 @@ lx_init(int argc, char *argv[], char *envp[])
 
 	lx_debug_init();
 
-	if (lx_get_kern_version() <= LX_KERN_2_4)
-		lx_max_syscall = LX_NSYSCALLS_2_4;
-	else
-		lx_max_syscall = LX_NSYSCALLS_2_6;
-
 	r = getenv("LX_RELEASE");
-	if (r == NULL) {
-		if (lx_get_kern_version() == LX_KERN_2_6)
-			(void) strlcpy(lx_release, LX_UNAME_RELEASE_2_6,
-			    sizeof (lx_release));
-		else
-			(void) strlcpy(lx_release, LX_UNAME_RELEASE_2_4,
-			    sizeof (lx_release));
-	} else {
+	if (r == NULL)
+		(void) strlcpy(lx_release, LX_UNAME_RELEASE, 128);
+	else
 		(void) strlcpy(lx_release, r, 128);
-	}
 
 	lx_debug("lx_release: %s\n", lx_release);
 
@@ -831,6 +801,12 @@ lx_init(int argc, char *argv[], char *envp[])
 	if ((err = thr_setspecific(lx_tsd_key, &lx_tsd)) != 0)
 		lx_err_fatal(gettext(
 		    "Unable to initialize thread-specific data: %s"),
+		    strerror(err));
+
+	/* Look up the PID that serves as init for this zone */
+	if ((err = lx_lpid_to_spid(1, &zoneinit_pid)) < 0)
+		lx_err_fatal(gettext(
+		    "Unable to find PID for zone init process: %s"),
 		    strerror(err));
 
 	/*
@@ -1251,54 +1227,5 @@ static struct lx_sysent sysents[] = {
 	{"clock_nanosleep", lx_clock_nanosleep,	0,	4},	/* 267 */
 	{"statfs64",	lx_statfs64,	0,		2},	/* 268 */
 	{"fstatfs64",	lx_fstatfs64,	0,		2},	/* 269 */
-	{"tgkill",	lx_tgkill,	0,		3},	/* 270 */
-
-	/* The following system calls only exist in kernel 2.6 and greater */
-	{"utimes",	utimes,		SYS_PASSTHRU,	2},	/* 271 */
-	{"fadvise64_64", NULL,		NOSYS_NULL,	0},	/* 272 */
-	{"vserver",	NULL,		NOSYS_NULL,	0},	/* 273 */
-	{"mbind",	NULL,		NOSYS_NULL,	0},	/* 274 */
-	{"get_mempolicy", NULL,		NOSYS_NULL,	0},	/* 275 */
-	{"set_mempolicy", NULL,		NOSYS_NULL,	0},	/* 276 */
-	{"mq_open",	NULL,		NOSYS_NULL,	0},	/* 277 */
-	{"mq_unlink",	NULL,		NOSYS_NULL,	0},	/* 278 */
-	{"mq_timedsend", NULL,		NOSYS_NULL,	0},	/* 279 */
-	{"mq_timedreceive", NULL,	NOSYS_NULL,	0},	/* 280 */
-	{"mq_notify",	NULL,		NOSYS_NULL,	0},	/* 281 */
-	{"mq_getsetattr", NULL,		NOSYS_NULL,	0},	/* 282 */
-	{"kexec_load",	NULL,		NOSYS_NULL,	0},	/* 283 */
-	{"waitid",	lx_waitid,	0,		4},	/* 284 */
-	{"sys_setaltroot", NULL,	NOSYS_NULL,	0},	/* 285 */
-	{"add_key",	NULL,		NOSYS_NULL,	0},	/* 286 */
-	{"request_key",	NULL,		NOSYS_NULL,	0},	/* 287 */
-	{"keyctl",	NULL,		NOSYS_NULL,	0},	/* 288 */
-	{"ioprio_set",	NULL,		NOSYS_NULL,	0},	/* 289 */
-	{"ioprio_get",	NULL,		NOSYS_NULL,	0},	/* 290 */
-	{"inotify_init", NULL,		NOSYS_NULL,	0},	/* 291 */
-	{"inotify_add_watch", NULL,	NOSYS_NULL,	0},	/* 292 */
-	{"inotify_rm_watch", NULL,	NOSYS_NULL,	0},	/* 293 */
-	{"migrate_pages", NULL,		NOSYS_NULL,	0},	/* 294 */
-	{"openat",	NULL,		NOSYS_NULL,	0},	/* 295 */
-	{"mkdirat",	NULL,		NOSYS_NULL,	0},	/* 296 */
-	{"mknodat",	NULL,		NOSYS_NULL,	0},	/* 297 */
-	{"fchownat",	NULL,		NOSYS_NULL,	0},	/* 298 */
-	{"futimesat",	NULL,		NOSYS_NULL,	0},	/* 299 */
-	{"fstatat64",	NULL,		NOSYS_NULL,	0},	/* 300 */
-	{"unlinkat",	NULL,		NOSYS_NULL,	0},	/* 301 */
-	{"renameat",	NULL,		NOSYS_NULL,	0},	/* 302 */
-	{"linkat",	NULL,		NOSYS_NULL,	0},	/* 303 */
-	{"symlinkat",	NULL,		NOSYS_NULL,	0},	/* 304 */
-	{"readlinkat",	NULL,		NOSYS_NULL,	0},	/* 305 */
-	{"fchmodat",	NULL,		NOSYS_NULL,	0},	/* 306 */
-	{"faccessat",	NULL,		NOSYS_NULL,	0},	/* 307 */
-	{"pselect6",	NULL,		NOSYS_NULL,	0},	/* 308 */
-	{"ppoll",	NULL,		NOSYS_NULL,	0},	/* 309 */
-	{"unshare",	NULL,		NOSYS_NULL,	0},	/* 310 */
-	{"set_robust_list", NULL,	NOSYS_NULL,	0},	/* 311 */
-	{"get_robust_list", NULL,	NOSYS_NULL,	0},	/* 312 */
-	{"splice",	NULL,		NOSYS_NULL,	0},	/* 313 */
-	{"sync_file_range", NULL,	NOSYS_NULL,	0},	/* 314 */
-	{"tee",		NULL,		NOSYS_NULL,	0},	/* 315 */
-	{"vmsplice",	NULL,		NOSYS_NULL,	0},	/* 316 */
-	{"move_pages",	NULL,		NOSYS_NULL,	0},	/* 317 */
+	{"tgkill",	lx_tgkill,	0,		3}	/* 270 */
 };

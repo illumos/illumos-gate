@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,10 +91,6 @@
 #define	LX_WALL		0x40000000
 #define	LX_WCLONE	0x80000000
 
-#define	LX_P_ALL	0x0
-#define	LX_P_PID	0x1
-#define	LX_P_GID	0x2
-
 static int
 ltos_options(uintptr_t options)
 {
@@ -145,36 +141,6 @@ lx_wstat(int code, int status)
 	}
 
 	return (stat);
-}
-
-/* wrapper to make solaris waitid work properly with ptrace */
-static int
-lx_waitid_helper(idtype_t idtype, id_t id, siginfo_t *info, int options)
-{
-	do {
-		/*
-		 * It's possible that we return EINVAL here if the idtype is
-		 * P_PID or P_PGID and id is out of bounds for a valid pid or
-		 * pgid, but Linux expects to see ECHILD. No good way occurs to
-		 * handle this so we'll punt for now.
-		 */
-		if (waitid(idtype, id, info, options) < 0)
-			return (-errno);
-
-		/*
-		 * If the WNOHANG flag was specified and no child was found
-		 * return 0.
-		 */
-		if ((options & WNOHANG) && info->si_pid == 0)
-			return (0);
-
-		/*
-		 * It's possible that we may have a spurious return for one of
-		 * the child processes created by the ptrace subsystem. If
-		 * that's the case, we simply try again.
-		 */
-	} while (lx_ptrace_wait(info) == -1);
-	return (0);
 }
 
 int
@@ -229,13 +195,29 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 
 	options |= WEXITED | WTRAPPED;
 
-	if ((rval = lx_waitid_helper(idtype, id, &info, options)) < 0)
-		return (rval);
+again:
+	/*
+	 * It's possible that we return EINVAL here if the idtype is P_PID or
+	 * P_PGID and id is out of bounds for a valid pid or pgid, but Linux
+	 * expects to see ECHILD. No good way occurs to handle this so we'll
+	 * punt for now.
+	 */
+	if (waitid(idtype, id, &info, options) < 0)
+		return (-errno);
+
 	/*
 	 * If the WNOHANG flag was specified and no child was found return 0.
 	 */
 	if ((options & WNOHANG) && info.si_pid == 0)
 		return (0);
+
+	/*
+	 * It's possible that we may have a spurious return for one of the
+	 * child processes created by the ptrace subsystem. In that's the case,
+	 * we simply try again.
+	 */
+	if (lx_ptrace_wait(&info) == -1)
+		goto again;
 
 	status = lx_wstat(info.si_code, info.si_status);
 
@@ -259,30 +241,4 @@ int
 lx_waitpid(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	return (lx_wait4(p1, p2, p3, NULL));
-}
-
-int
-lx_waitid(uintptr_t idtype, uintptr_t id, uintptr_t infop, uintptr_t opt)
-{
-	int rval, options;
-	siginfo_t s_infop = {0};
-	if ((options = ltos_options(opt)) == -1)
-		return (-1);
-	switch (idtype) {
-	case LX_P_ALL:
-		idtype = P_ALL;
-		break;
-	case LX_P_PID:
-		idtype = P_PID;
-		break;
-	case LX_P_GID:
-		idtype = P_GID;
-		break;
-	default:
-		return (-EINVAL);
-	}
-	if ((rval = lx_waitid_helper(idtype, (id_t)id, &s_infop, options)) < 0)
-		return (rval);
-
-	return (stol_siginfo(&s_infop, (lx_siginfo_t *)infop));
 }

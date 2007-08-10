@@ -75,8 +75,6 @@ struct intpdata;
 struct execa;
 
 struct brand_ops {
-	void	(*b_init_brand_data)(zone_t *);
-	void	(*b_free_brand_data)(zone_t *);
 	int	(*b_brandsys)(int, int64_t *, uintptr_t, uintptr_t, uintptr_t,
 		uintptr_t, uintptr_t, uintptr_t);
 	void	(*b_setbrand)(struct proc *);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,12 +39,10 @@ extern "C" {
 #define	FUTEX_CMP_REQUEUE	4
 #define	FUTEX_MAX_CMD		FUTEX_CMP_REQUEUE
 
-#ifdef _KERNEL
 extern long lx_futex(uintptr_t addr, int cmd, int val, uintptr_t lx_timeout,
-    uintptr_t addr2, int val2);
+	uintptr_t addr2, int val2);
 extern void lx_futex_init(void);
 extern int lx_futex_fini(void);
-#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

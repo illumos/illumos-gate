@@ -177,7 +177,7 @@ lxs_remove_autofsck()
  */
 static void
 lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
-    char **idev, char **odev, char **kvers)
+    char **idev, char **odev)
 {
 	struct zone_attrtab	attrtab;
 	int			err;
@@ -190,15 +190,13 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 
 	*idev = (char *)malloc(INTSTRLEN);
 	*odev = (char *)malloc(INTSTRLEN);
-	*kvers = (char *)malloc(INTSTRLEN);
-	if (*idev == NULL || *odev == NULL || *kvers == NULL)
+	if (*idev == NULL || *odev == NULL)
 		lxs_err(gettext("out of memory"));
 
 	*audio = B_FALSE;
 	*restart = B_FALSE;
 	bzero(*idev, INTSTRLEN);
 	bzero(*odev, INTSTRLEN);
-	bzero(*kvers, INTSTRLEN);
 	while ((err = zonecfg_getattrent(zdh, &attrtab)) == Z_OK) {
 		if ((strcmp(attrtab.zone_attr_name, "init-restart") == 0) &&
 		    (zonecfg_get_attr_boolean(&attrtab, restart) != Z_OK))
@@ -215,11 +213,6 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 			    attrtab.zone_attr_name);
 		if ((strcmp(attrtab.zone_attr_name, "audio-outputdev") == 0) &&
 		    (zonecfg_get_attr_string(&attrtab, *odev,
-		    INTSTRLEN) != Z_OK))
-			lxs_err(gettext("invalid type for zone attribute: %s"),
-			    attrtab.zone_attr_name);
-		if ((strcmp(attrtab.zone_attr_name, "kernel-version") == 0) &&
-		    (zonecfg_get_attr_string(&attrtab, *kvers,
 		    INTSTRLEN) != Z_OK))
 			lxs_err(gettext("invalid type for zone attribute: %s"),
 			    attrtab.zone_attr_name);
@@ -343,8 +336,7 @@ lxs_boot()
 	zoneid_t	zoneid;
 	zone_dochandle_t zdh;
 	boolean_t	audio, restart;
-	char		*idev, *odev, *kvers;
-	int		kversnum;
+	char		*idev, *odev;
 
 	lxs_make_initctl();
 	lxs_remove_autofsck();
@@ -358,7 +350,7 @@ lxs_boot()
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(zdh, &restart, &audio, &idev, &odev, &kvers);
+	lxs_getattrs(zdh, &restart, &audio, &idev, &odev);
 	zonecfg_fini_handle(zdh);
 
 	/* Configure the zone's audio support (if any). */
@@ -374,15 +366,6 @@ lxs_boot()
 	if (zone_setattr(zoneid, LX_ATTR_RESTART_INIT, &restart,
 	    sizeof (boolean_t)) == -1)
 		lxs_err(gettext("error setting zone's restart_init property"));
-
-	if ((kvers != NULL) && (strcmp(kvers, "2.6") == 0))
-		kversnum = LX_KERN_2_6;
-	else
-		kversnum = LX_KERN_2_4;
-
-	if (zone_setattr(zoneid, LX_KERN_VERSION_NUM, &kversnum,
-	    sizeof (int)) < 0)
-		lxs_err(gettext("unable to set kernel version"));
 
 	return (0);
 }
@@ -436,7 +419,7 @@ lxs_verify(char *xmlfile)
 	struct zone_dstab	dstab;
 	struct zone_devtab	devtab;
 	boolean_t		audio, restart;
-	char			*idev, *odev, *kvers;
+	char			*idev, *odev;
 	zone_iptype_t		iptype;
 
 	if ((handle = zonecfg_init_handle()) == NULL)
@@ -502,7 +485,7 @@ lxs_verify(char *xmlfile)
 	}
 
 	/* Extract any relevant attributes from the config file. */
-	lxs_getattrs(handle, &restart, &audio, &idev, &odev, &kvers);
+	lxs_getattrs(handle, &restart, &audio, &idev, &odev);
 	zonecfg_fini_handle(handle);
 
 	if (audio) {
@@ -514,11 +497,6 @@ lxs_verify(char *xmlfile)
 		if (!lxs_iodev_ok(odev))
 			lxs_err(gettext("invalid value for zone attribute: %s"),
 			    "audio-outputdev");
-	}
-	if (kvers) {
-		if ((strcmp(kvers, "2.4")) != 0 && (strcmp(kvers, "2.6") != 0))
-			lxs_err(gettext("invalid value for zone attribute: %s"),
-			    "kernel-version");
 	}
 	return (0);
 }

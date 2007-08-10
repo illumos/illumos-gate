@@ -31,7 +31,6 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <libintl.h>
 #include <strings.h>
 #include <alloca.h>
@@ -52,14 +51,6 @@
 #include <sys/lx_socket.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_misc.h>
-
-/*
- * This string is used to prefix all abstract namespace unix sockets, ie all
- * abstract namespace sockets are converted to regular sockets in the /tmp
- * directory with .ABSK_ prefixed to their names.
- */
-#define	ABST_PRFX "/tmp/.ABSK_"
-#define	ABST_PRFX_LEN 11
 
 static int lx_socket(ulong_t *);
 static int lx_bind(ulong_t *);
@@ -292,11 +283,6 @@ convert_cmsgs(int direction, struct lx_msghdr *msg, char *caller)
 	return (err);
 }
 
-/*
- * If inaddr is an abstract namespace unix socket, this function expects addr
- * to have enough memory to hold the expanded socket name, ie it must be of
- * size *len + ABST_PRFX_LEN.
- */
 static int
 convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 	struct sockaddr *inaddr, socklen_t inlen)
@@ -304,7 +290,6 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 	sa_family_t family;
 	int lx_in6_len;
 	int size;
-	int i, orig_len;
 
 	/*
 	 * Note that if the buffer at inaddr is ever smaller than inlen bytes,
@@ -356,66 +341,6 @@ convert_sockaddr(struct sockaddr *addr, socklen_t *len,
 				return (-EINVAL);
 
 			*len = inlen;
-
-			/*
-			 * Linux supports abstract unix sockets, which are
-			 * simply sockets that do not exist on the file system.
-			 * These sockets are denoted by beginning the path with
-			 * a NULL character. To support these, we strip out the
-			 * leading NULL character and change the path to point
-			 * to a real place in /tmp directory, by prepending
-			 * ABST_PRFX and replacing all illegal characters with
-			 * '_'.
-			 */
-			if (addr->sa_data[0] == '\0') {
-
-				/*
-				 * inlen is the entire size of the sockaddr_un
-				 * data structure, including the sun_family, so
-				 * we need to subtract this out. We subtract
-				 * 1 since we want to overwrite the leadin NULL
-				 * character, and thus do not include it in the
-				 * length.
-				 */
-				orig_len = inlen - sizeof (addr->sa_family) - 1;
-
-				/*
-				 * Since abstract paths can contain illegal
-				 * filename characters, we simply replace these
-				 * with '_'
-				 */
-				for (i = 1; i < orig_len + 1; i++) {
-					if (addr->sa_data[i] == '\0' ||
-					    addr->sa_data[i] == '/')
-						addr->sa_data[i] = '_';
-				}
-
-				/*
-				 * prepend ABST_PRFX to file name, minus the
-				 * leading NULL character. This places the
-				 * socket as a hidden file in the /tmp
-				 * directory.
-				 */
-				(void) memmove(addr->sa_data + ABST_PRFX_LEN,
-				    addr->sa_data + 1, orig_len);
-				bcopy(ABST_PRFX, addr->sa_data, ABST_PRFX_LEN);
-
-				/*
-				 * Since abstract socket paths may not be NULL
-				 * terminated, we must explicitly NULL terminate
-				 * our string.
-				 */
-				addr->sa_data[orig_len + ABST_PRFX_LEN] = '\0';
-
-				/*
-				 * Make len reflect the new len of our string.
-				 * Although we removed the NULL character at the
-				 * beginning of the string, we added a NULL
-				 * character to the end, so the net gain in
-				 * length is simply ABST_PRFX_LEN.
-				 */
-				*len = inlen + ABST_PRFX_LEN;
-			}
 			break;
 
 		default:
@@ -528,22 +453,6 @@ lx_socket(ulong_t *args)
 	/* Right now IPv6 sockets don't work */
 	if (domain == AF_INET6)
 		return (-EAFNOSUPPORT);
-
-	/*
-	 * Clients of the auditing subsystem used by CentOS 4 and 5 expects to
-	 * be able to create AF_ROUTE SOCK_RAW sockets to communicate with the
-	 * auditing daemons. Failure to create these sockets will cause login,
-	 * ssh and useradd, amoung other programs to fail. To trick these
-	 * programs into working, we convert the socket domain and type to
-	 * something that we do support. Then when sendto is call on these
-	 * sockets, we return an error code. See lx_sendto.
-	 */
-	if (domain == AF_ROUTE && type == SOCK_RAW) {
-		domain = AF_INET;
-		type = SOCK_STREAM;
-		protocol = 0;
-	}
-
 	fd = socket(domain, type, protocol);
 	if (fd >= 0)
 		return (fd);
@@ -559,70 +468,15 @@ lx_bind(ulong_t *args)
 {
 	int sockfd = (int)args[0];
 	struct stat64 statbuf;
-	struct sockaddr *name, oldname;
+	struct sockaddr *name;
 	socklen_t len;
-	int r, r2, ret, tmperrno;
-	int abst_sock;
-	struct stat sb;
+	int r;
 
-	if (uucopy((struct sockaddr *)args[1], &oldname,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
-
-	/*
-	 * Handle Linux abstract sockets, which are UNIX sockets whose path
-	 * begin with a NULL character.
-	 */
-	abst_sock = (oldname.sa_family == AF_UNIX) &&
-	    (oldname.sa_data[0] == '\0');
-
-	/*
-	 * convert_sockaddr will expand the socket path, if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((name = SAFE_ALLOCA((socklen_t)args[2] +
-	    abst_sock * ABST_PRFX_LEN)) == NULL)
+	if ((name = SAFE_ALLOCA((socklen_t)args[2])) == NULL)
 		return (-EINVAL);
-
 	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)args[1],
 	    (socklen_t)args[2])) < 0)
 		return (r);
-
-	/*
-	 * Linux abstract namespace unix sockets are simply socket that do not
-	 * exist on the filesystem. We emulate them by changing their paths
-	 * in covert_sockaddr so that they point real files names on the
-	 * filesystem. Because in Linux they do not exist on the filesystem
-	 * applications do not have to worry about deleting files, however in
-	 * our filesystem based emulate we do. To solve this problem, we first
-	 * check to see if the socket already exists before we create one. If it
-	 * does we attempt to connect to it to see if it is in use, or just
-	 * left over from a previous lx_bind call. If we are unable to connect,
-	 * we assume it is not in use and remove the file, then continue on
-	 * as if the file never existed.
-	 */
-	if (abst_sock && stat(name->sa_data, &sb) == 0 &&
-	    S_ISSOCK(sb.st_mode)) {
-		if ((r2 = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-			return (-ENOSR);
-		ret = connect(r2, name, len);
-		tmperrno = errno;
-		if (close(r2) < 0)
-			return (-EINVAL);
-
-		/*
-		 * if we can't connect to the socket, assume no one is using it
-		 * and remove it, otherwise assume it is in use and return
-		 * EADDRINUSE.
-		 */
-		if ((ret < 0) && (tmperrno == ECONNREFUSED)) {
-			if (unlink(name->sa_data) < 0) {
-				return (-EADDRINUSE);
-			}
-		} else {
-			return (-EADDRINUSE);
-		}
-	}
 
 	lx_debug("\tbind(%d, 0x%p, %d)", sockfd, name, len);
 
@@ -647,26 +501,11 @@ static int
 lx_connect(ulong_t *args)
 {
 	int sockfd = (int)args[0];
-	struct sockaddr *name, oldname;
+	struct sockaddr *name;
 	socklen_t len;
 	int r;
-	int abst_sock;
 
-	if (uucopy((struct sockaddr *)args[1], &oldname,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
-
-
-	/* Handle Linux abstract sockets */
-	abst_sock = (oldname.sa_family == AF_UNIX) &&
-	    (oldname.sa_data[0] == '\0');
-
-	/*
-	 * convert_sockaddr will expand the socket path, if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((name = SAFE_ALLOCA((socklen_t)args[2] +
-	    abst_sock * ABST_PRFX_LEN)) == NULL)
+	if ((name = SAFE_ALLOCA((socklen_t)args[2])) == NULL)
 		return (-EINVAL);
 
 	if ((r = convert_sockaddr(name, &len, (struct sockaddr *)args[1],
@@ -966,43 +805,24 @@ lx_sendto(ulong_t *args)
 	void *buf = (void *)args[1];
 	size_t len = (size_t)args[2];
 	int flags = (int)args[3];
-	struct sockaddr *to, oldto;
+	struct sockaddr *to;
 	socklen_t tolen;
 	ssize_t r;
-	int abst_sock;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
 
-	if (uucopy((struct sockaddr *)args[4], &oldto,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
-
-	/* Handle Linux abstract sockets */
-	abst_sock = (oldto.sa_family == AF_UNIX) &&
-	    (oldto.sa_data[0] == '\0');
-
-	/*
-	 * convert_sockaddr will expand the socket path, if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((to = SAFE_ALLOCA(args[5] + abst_sock * ABST_PRFX_LEN)) == NULL)
+	if ((to = SAFE_ALLOCA((socklen_t)args[5])) == NULL)
 		return (-EINVAL);
 
 	if ((r = convert_sockaddr(to, &tolen, (struct sockaddr *)args[4],
 	    (socklen_t)args[5])) < 0)
 		return (r);
 
-
 	lx_debug("\tsendto(%d, 0x%p, 0x%d, 0x%x, 0x%x, %d)", sockfd, buf, len,
 	    flags, to, tolen);
 
 	flags = convert_sockflags(flags);
-
-	/* return this error to make auditing subsystem happy */
-	if (to->sa_family == AF_ROUTE) {
-		return (-ECONNREFUSED);
-	}
 
 	/*
 	 * If nosigpipe is set, we want to emulate the Linux action of
@@ -1139,14 +959,6 @@ lx_setsockopt(ulong_t *args)
 	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
 		return (-ENOPROTOOPT);
 
-	/*
-	 * Linux sets this option when it wants to send credentials over a
-	 * socket. Currently we just ignore it to make Linux programs happy.
-	 */
-	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED))
-		return (0);
-
-
 	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
 		 * TCP_CORK is a Linux-only option that instructs the TCP
@@ -1212,13 +1024,8 @@ lx_getsockopt(ulong_t *args)
 	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
 		return (-ENOPROTOOPT);
 
-	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PASSCRED) ||
-	    (level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
+	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
-		 * Linux sets LX_SO_PASSCRED when it wants to send credentials
-		 * over a socket. Since we do not support it, it is never set
-		 * and we return 0.
-		 *
 		 * We don't support TCP_CORK but some apps rely on it.  So,
 		 * rather than return an error we just return 0.  This
 		 * isn't exactly a lie, since this option really isn't set,

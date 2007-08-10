@@ -31,7 +31,6 @@
 #ifndef _ASM
 #include <sys/types.h>
 #include <sys/cpuvar.h>
-#include <sys/zone.h>
 #endif
 
 #ifdef	__cplusplus
@@ -44,8 +43,7 @@ extern "C" {
  * Brand uname info
  */
 #define	LX_UNAME_SYSNAME	"Linux"
-#define	LX_UNAME_RELEASE_2_6	"2.6.18"
-#define	LX_UNAME_RELEASE_2_4	"2.4.21"
+#define	LX_UNAME_RELEASE	"2.4.21"
 #define	LX_UNAME_VERSION	"BrandZ fake linux"
 #define	LX_UNAME_MACHINE	"i686"
 
@@ -56,12 +54,7 @@ extern "C" {
 #define	LX_LIB		"lx_brand.so.1"
 #define	LX_LIB_PATH	LIB_PATH LX_LIB
 
-#define	LX_NSYSCALLS_2_4	270
-#define	LX_NSYSCALLS_2_6	317
-#define	LX_NSYSCALLS	LX_NSYSCALLS_2_6
-
-#define	LX_KERN_2_4	0
-#define	LX_KERN_2_6	1
+#define	LX_NSYSCALLS	270
 
 /*
  * brand(2) subcommands
@@ -83,7 +76,6 @@ extern "C" {
 #define	LX_VERSION		LX_VERSION_1
 
 #define	LX_ATTR_RESTART_INIT	ZONE_ATTR_BRAND_ATTRS
-#define	LX_KERN_VERSION_NUM	(ZONE_ATTR_BRAND_ATTRS + 1)
 
 /* Aux vector containing phdr of linux executable, used by lx_librtld_db */
 #define	AT_SUN_BRAND_LX_PHDR	AT_SUN_BRAND_AUX1
@@ -201,11 +193,6 @@ typedef struct lx_lwp_data {
 	uint_t	br_ptrace;		/* ptrace is active for this LWP */
 } lx_lwp_data_t;
 
-/* brand specific data */
-typedef struct lx_zone_data {
-	int kernel_version;
-} lx_zone_data_t;
-
 #define	BR_CPU_BOUND	0x0001
 
 #define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
@@ -215,9 +202,6 @@ typedef struct lx_zone_data {
 void	lx_brand_int80_callback(void);
 int64_t	lx_emulate_syscall(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 	uintptr_t, uintptr_t);
-
-extern int lx_get_zone_kern_version(zone_t *);
-extern int lx_get_kern_version(void);
 
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf

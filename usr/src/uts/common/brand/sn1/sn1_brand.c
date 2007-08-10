@@ -43,8 +43,6 @@
 
 char *sn1_emulation_table = NULL;
 
-void	sn1_init_brand_data(zone_t *);
-void	sn1_free_brand_data(zone_t *);
 void	sn1_setbrand(proc_t *);
 int	sn1_getattr(zone_t *, int, void *, size_t *);
 int	sn1_setattr(zone_t *, int, void *, size_t);
@@ -62,8 +60,6 @@ int	sn1_elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
 
 /* sn1 brand */
 struct brand_ops sn1_brops = {
-	sn1_init_brand_data,
-	sn1_free_brand_data,
 	sn1_brandsys,
 	sn1_setbrand,
 	sn1_getattr,
@@ -202,18 +198,6 @@ int
 sn1_initlwp(klwp_t *l)
 {
 	return (0);
-}
-
-/*ARGSUSED*/
-void
-sn1_init_brand_data(zone_t *zone)
-{
-}
-
-/*ARGSUSED*/
-void
-sn1_free_brand_data(zone_t *zone)
-{
 }
 
 /*ARGSUSED*/

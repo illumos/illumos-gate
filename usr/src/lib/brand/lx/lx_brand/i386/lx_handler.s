@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,13 +126,13 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	.align	16
 	ENTRY_NP(lx_handler_trace_table)
 	TJMP256
-	TJMP64
+	TJMP16
 	SET_SIZE(lx_handler_trace_table)
 
 	.align	16
 	ENTRY_NP(lx_handler_table)
 	JMP256
-	JMP64
+	JMP16
 	SET_SIZE(lx_handler_table)
 
 	ENTRY_NP(lx_handler_trace)
