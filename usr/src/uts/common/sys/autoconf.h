@@ -104,6 +104,11 @@ struct devnames {
 #define	DDI_INTR_API		0x0200	/* interrupt interface messages  */
 #define	DDI_INTR_IMPL		0x0400	/* interrupt implementation msgs */
 #define	DDI_INTR_NEXUS		0x0800	/* interrupt messages from nexuses */
+#define	DDI_DBG_RETIRE		0x1000	/* Retire related messages */
+#define	DDI_DBG_RTR_VRBOSE	0x2000	/* Verbose Retire messages */
+#define	DDI_DBG_RTR_TRACE	0x4000	/* Trace Retire messages */
+#define	LDI_EV_DEBUG		0x8000  /* LDI events debug messages */
+#define	LDI_EV_TRACE		0x10000 /* LDI events trace messages */
 
 extern int ddidebug;
 
@@ -118,6 +123,11 @@ extern int ddidebug;
 #define	DDI_INTR_APIDBG(args)	if (ddidebug & DDI_INTR_API) cmn_err args
 #define	DDI_INTR_IMPLDBG(args)	if (ddidebug & DDI_INTR_IMPL) cmn_err args
 #define	DDI_INTR_NEXDBG(args)	if (ddidebug & DDI_INTR_NEXUS) cmn_err args
+#define	RIO_DEBUG(args)		if (ddidebug & DDI_DBG_RETIRE) cmn_err args
+#define	RIO_VERBOSE(args)	if (ddidebug & DDI_DBG_RTR_VRBOSE) cmn_err args
+#define	RIO_TRACE(args)		if (ddidebug & DDI_DBG_RTR_TRACE) cmn_err args
+#define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
+#define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
 #else
 #define	NDI_CONFIG_DEBUG(args)
 #define	BMDPRINTF(args)
@@ -129,6 +139,11 @@ extern int ddidebug;
 #define	DDI_INTR_APIDBG(args)
 #define	DDI_INTR_IMPLDBG(args)
 #define	DDI_INTR_NEXDBG(args)
+#define	RIO_DEBUG(args)		if (ddidebug & DDI_DBG_RETIRE) cmn_err args
+#define	RIO_VERBOSE(args)	if (ddidebug & DDI_DBG_RTR_VRBOSE) cmn_err args
+#define	RIO_TRACE(args)		if (ddidebug & DDI_DBG_RTR_TRACE) cmn_err args
+#define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
+#define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
 #endif
 
 
@@ -255,6 +270,15 @@ extern int i_ddi_sysavail(void);
 extern int i_ddi_reconfig(void);
 extern void i_ddi_set_sysavail(void);
 extern void i_ddi_set_reconfig(void);
+
+/* I/O retire related */
+extern int e_ddi_retire_device(char *path, char **cons_array);
+extern int e_ddi_unretire_device(char *path);
+extern int e_ddi_mark_retiring(dev_info_t *dip, void *arg);
+extern int e_ddi_retire_notify(dev_info_t *dip, void *arg);
+extern int e_ddi_retire_finalize(dev_info_t *dip, void *arg);
+extern void e_ddi_degrade_finalize(dev_info_t *dip);
+extern void e_ddi_undegrade_finalize(dev_info_t *dip);
 
 #endif /* _KERNEL */
 

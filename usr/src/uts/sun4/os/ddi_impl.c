@@ -54,6 +54,8 @@
 #include <sys/fs/snode.h>
 #include <sys/ddi_isa.h>
 #include <sys/modhash.h>
+#include <sys/modctl.h>
+#include <sys/sunldi_impl.h>
 
 dev_info_t *get_intr_parent(dev_info_t *, dev_info_t *,
     ddi_intr_handle_impl_t *);
@@ -2036,31 +2038,127 @@ visit_node(pnode_t nodeid, struct pta *ap)
 	}
 }
 
-/*ARGSUSED*/
+/*
+ * NOTE: The caller of this function must check for device contracts
+ * or LDI callbacks against this dip before setting the dip offline.
+ */
 static int
-set_dip_offline(dev_info_t *dip, void *arg)
+set_infant_dip_offline(dev_info_t *dip, void *arg)
 {
+	char	*path = (char *)arg;
+
 	ASSERT(dip);
+	ASSERT(arg);
+
+	if (i_ddi_node_state(dip) >= DS_ATTACHED) {
+		(void) ddi_pathname(dip, path);
+		cmn_err(CE_WARN, "Attempt to set offline flag on attached "
+		    "node: %s", path);
+		return (DDI_FAILURE);
+	}
 
 	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (!DEVI_IS_DEVICE_OFFLINE(dip))
 		DEVI_SET_DEVICE_OFFLINE(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
 
+	return (DDI_SUCCESS);
+}
+
+typedef struct result {
+	char	*path;
+	int	result;
+} result_t;
+
+static int
+dip_set_offline(dev_info_t *dip, void *arg)
+{
+	int end;
+	result_t *resp = (result_t *)arg;
+
+	ASSERT(dip);
+	ASSERT(resp);
+
+	/*
+	 * We stop the walk if e_ddi_offline_notify() returns
+	 * failure, because this implies that one or more consumers
+	 * (either LDI or contract based) has blocked the offline.
+	 * So there is no point in conitnuing the walk
+	 */
+	if (e_ddi_offline_notify(dip) == DDI_FAILURE) {
+		resp->result = DDI_FAILURE;
+		return (DDI_WALK_TERMINATE);
+	}
+
+	/*
+	 * If set_infant_dip_offline() returns failure, it implies
+	 * that we failed to set a particular dip offline. This
+	 * does not imply that the offline as a whole should fail.
+	 * We want to do the best we can, so we continue the walk.
+	 */
+	if (set_infant_dip_offline(dip, resp->path) == DDI_SUCCESS)
+		end = DDI_SUCCESS;
+	else
+		end = DDI_FAILURE;
+
+	e_ddi_offline_finalize(dip, end);
+
 	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * The call to e_ddi_offline_notify() exists for the
+ * unlikely error case that a branch we are trying to
+ * create already exists and has device contracts or LDI
+ * event callbacks against it.
+ *
+ * We allow create to succeed for such branches only if
+ * no constraints block the offline.
+ */
+static int
+branch_set_offline(dev_info_t *dip, char *path)
+{
+	int		circ;
+	int		end;
+	result_t	res;
+
+
+	if (e_ddi_offline_notify(dip) == DDI_FAILURE) {
+		return (DDI_FAILURE);
+	}
+
+	if (set_infant_dip_offline(dip, path) == DDI_SUCCESS)
+		end = DDI_SUCCESS;
+	else
+		end = DDI_FAILURE;
+
+	e_ddi_offline_finalize(dip, end);
+
+	if (end == DDI_FAILURE)
+		return (DDI_FAILURE);
+
+	res.result = DDI_SUCCESS;
+	res.path = path;
+
+	ndi_devi_enter(dip, &circ);
+	ddi_walk_devs(ddi_get_child(dip), dip_set_offline, &res);
+	ndi_devi_exit(dip, circ);
+
+	return (res.result);
 }
 
 /*ARGSUSED*/
 static int
 create_prom_branch(void *arg, int has_changed)
 {
-	int		circ, c;
+	int		circ;
 	int		exists, rv;
 	pnode_t		nodeid;
 	struct ptnode	*tnp;
 	dev_info_t	*dip;
 	struct pta	*ap = arg;
 	devi_branch_t	*bp;
+	char		*path;
 
 	ASSERT(ap);
 	ASSERT(ap->fdip == NULL);
@@ -2086,6 +2184,7 @@ create_prom_branch(void *arg, int has_changed)
 	if (ap->head == NULL)
 		return (ENODEV);
 
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	rv = 0;
 	while ((tnp = ap->head) != NULL) {
 		ap->head = tnp->next;
@@ -2112,32 +2211,28 @@ create_prom_branch(void *arg, int has_changed)
 
 		kmem_free(tnp, sizeof (struct ptnode));
 
-		if (dip == NULL) {
+		/*
+		 * Hold the branch if it is not already held
+		 */
+		if (dip && !exists) {
+			e_ddi_branch_hold(dip);
+		}
+
+		ASSERT(dip == NULL || e_ddi_branch_held(dip));
+
+		/*
+		 * Set all dips in the newly created branch offline so that
+		 * only a "configure" operation can attach
+		 * the branch
+		 */
+		if (dip == NULL || branch_set_offline(dip, path)
+		    == DDI_FAILURE) {
 			ndi_devi_exit(ap->pdip, circ);
 			rv = EIO;
 			continue;
 		}
 
 		ASSERT(ddi_get_parent(dip) == ap->pdip);
-
-		/*
-		 * Hold the branch if it is not already held
-		 */
-		if (!exists)
-			e_ddi_branch_hold(dip);
-
-		ASSERT(e_ddi_branch_held(dip));
-
-		/*
-		 * Set all dips in the branch offline so that
-		 * only a "configure" operation can attach
-		 * the branch
-		 */
-		(void) set_dip_offline(dip, NULL);
-
-		ndi_devi_enter(dip, &c);
-		ddi_walk_devs(ddi_get_child(dip), set_dip_offline, NULL);
-		ndi_devi_exit(dip, c);
 
 		ndi_devi_exit(ap->pdip, circ);
 
@@ -2155,6 +2250,8 @@ create_prom_branch(void *arg, int has_changed)
 			bp->devi_branch_callback(dip, bp->arg, 0);
 	}
 
+	kmem_free(path, MAXPATHLEN);
+
 	return (rv);
 }
 
@@ -2162,9 +2259,10 @@ static int
 sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
 {
 	int			rv, circ, len;
-	int			i, flags;
+	int			i, flags, ret;
 	dev_info_t		*dip;
 	char			*nbuf;
+	char			*path;
 	static const char	*noname = "<none>";
 
 	ASSERT(pdip);
@@ -2258,9 +2356,23 @@ sid_node_create(dev_info_t *pdip, devi_branch_t *bp, dev_info_t **rdipp)
 		*rdipp = dip;
 
 	/*
-	 * Set device offline - only the "configure" op should cause an attach
+	 * Set device offline - only the "configure" op should cause an attach.
+	 * Note that it is safe to set the dip offline without checking
+	 * for either device contract or layered driver (LDI) based constraints
+	 * since there cannot be any contracts or LDI opens of this device.
+	 * This is because this node is a newly created dip with the parent busy
+	 * held, so no other thread can come in and attach this dip. A dip that
+	 * has never been attached cannot have contracts since by definition
+	 * a device contract (an agreement between a process and a device minor
+	 * node) can only be created against a device that has minor nodes
+	 * i.e is attached. Similarly an LDI open will only succeed if the
+	 * dip is attached. We assert below that the dip is not attached.
 	 */
-	(void) set_dip_offline(dip, NULL);
+	ASSERT(i_ddi_node_state(dip) < DS_ATTACHED);
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	ret = set_infant_dip_offline(dip, path);
+	ASSERT(ret == DDI_SUCCESS);
+	kmem_free(path, MAXPATHLEN);
 
 	return (rv);
 fail:

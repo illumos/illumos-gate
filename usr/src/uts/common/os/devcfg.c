@@ -38,6 +38,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/modctl.h>
+#include <sys/contract/device_impl.h>
 #include <sys/dacf.h>
 #include <sys/promif.h>
 #include <sys/cpuvar.h>
@@ -50,6 +51,9 @@
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/reboot.h>
+#include <sys/sysmacros.h>
+#include <sys/sunldi.h>
+#include <sys/sunldi_impl.h>
 
 #ifdef DEBUG
 int ddidebug = DDI_AUDIT;
@@ -192,6 +196,10 @@ static void ndi_devi_exit_and_wait(dev_info_t *dip,
     int circular, clock_t end_time);
 static int ndi_devi_unbind_driver(dev_info_t *dip);
 
+static void i_ddi_check_retire(dev_info_t *dip);
+
+
+
 /*
  * dev_info cache and node management
  */
@@ -324,6 +332,15 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 	mutex_init(&(devi->devi_pm_lock), NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&(devi->devi_pm_busy_lock), NULL, MUTEX_DEFAULT, NULL);
 
+	RIO_TRACE((CE_NOTE, "i_ddi_alloc_node: Initing contract fields: "
+	    "dip=%p, name=%s", (void *)devi, node_name));
+
+	mutex_init(&(devi->devi_ct_lock), NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&(devi->devi_ct_cv), NULL, CV_DEFAULT, NULL);
+	devi->devi_ct_count = -1;	/* counter not in use if -1 */
+	list_create(&(devi->devi_ct), sizeof (cont_device_t),
+	    offsetof(cont_device_t, cond_next));
+
 	i_ddi_set_node_state((dev_info_t *)devi, DS_PROTO);
 	da_log_enter((dev_info_t *)devi);
 	return ((dev_info_t *)devi);
@@ -389,7 +406,6 @@ i_ddi_free_node(dev_info_t *dip)
 	if (devi->devi_audit) {
 		kmem_free(devi->devi_audit, sizeof (devinfo_audit_t));
 	}
-	kmem_free(devi->devi_node_name, strlen(devi->devi_node_name) + 1);
 	if (devi->devi_device_class)
 		kmem_free(devi->devi_device_class,
 		    strlen(devi->devi_device_class) + 1);
@@ -397,6 +413,20 @@ i_ddi_free_node(dev_info_t *dip)
 	mutex_destroy(&(devi->devi_lock));
 	mutex_destroy(&(devi->devi_pm_lock));
 	mutex_destroy(&(devi->devi_pm_busy_lock));
+
+	RIO_TRACE((CE_NOTE, "i_ddi_free_node: destroying contract fields: "
+	    "dip=%p", (void *)dip));
+	contract_device_remove_dip(dip);
+	ASSERT(devi->devi_ct_count == -1);
+	ASSERT(list_is_empty(&(devi->devi_ct)));
+	cv_destroy(&(devi->devi_ct_cv));
+	list_destroy(&(devi->devi_ct));
+	/* free this last since contract_device_remove_dip() uses it */
+	mutex_destroy(&(devi->devi_ct_lock));
+	RIO_TRACE((CE_NOTE, "i_ddi_free_node: destroyed all contract fields: "
+	    "dip=%p, name=%s", (void *)dip, devi->devi_node_name));
+
+	kmem_free(devi->devi_node_name, strlen(devi->devi_node_name) + 1);
 
 	kmem_cache_free(ddi_node_cache, devi);
 }
@@ -1441,6 +1471,7 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 				i_ddi_set_node_state(dip, DS_PROBED);
 			break;
 		case DS_PROBED:
+			i_ddi_check_retire(dip);
 			atomic_add_long(&devinfo_attach_detach, 1);
 			if ((rv = attach_node(dip)) == DDI_SUCCESS)
 				i_ddi_set_node_state(dip, DS_ATTACHED);
@@ -5110,6 +5141,172 @@ ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
 	return (error);
 }
 
+/*
+ * Pay attention, the following is a bit tricky:
+ * There are three possible cases when constraints are applied
+ *
+ *	- A constraint is applied and the offline is disallowed.
+ *	  Simply return failure and block the offline
+ *
+ *	- A constraint is applied and the offline is allowed.
+ *	  Mark the dip as having passed the constraint and allow
+ *	  offline to proceed.
+ *
+ *	- A constraint is not applied. Allow the offline to proceed for now.
+ *
+ * In the latter two cases we allow the offline to proceed. If the
+ * offline succeeds (no users) everything is fine. It is ok for an unused
+ * device to be offlined even if no constraints were imposed on the offline.
+ * If the offline fails because there are users, we look at the constraint
+ * flag on the dip. If the constraint flag is set (implying that it passed
+ * a constraint) we allow the dip to be retired. If not, we don't allow
+ * the retire. This ensures that we don't allow unconstrained retire.
+ */
+int
+e_ddi_offline_notify(dev_info_t *dip)
+{
+	int retval;
+	int constraint;
+	int failure;
+
+	RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): entered: dip=%p",
+	    (void *) dip));
+
+	constraint = 0;
+	failure = 0;
+
+	/*
+	 * Start with userland constraints first - applied via device contracts
+	 */
+	retval = contract_device_offline(dip, DDI_DEV_T_ANY, 0);
+	switch (retval) {
+	case CT_NACK:
+		RIO_DEBUG((CE_NOTE, "Received NACK for dip=%p", (void *)dip));
+		failure = 1;
+		goto out;
+	case CT_ACK:
+		constraint = 1;
+		RIO_DEBUG((CE_NOTE, "Received ACK for dip=%p", (void *)dip));
+		break;
+	case CT_NONE:
+		/* no contracts */
+		RIO_DEBUG((CE_NOTE, "No contracts on dip=%p", (void *)dip));
+		break;
+	default:
+		ASSERT(retval == CT_NONE);
+	}
+
+	/*
+	 * Next, use LDI to impose kernel constraints
+	 */
+	retval = ldi_invoke_notify(dip, DDI_DEV_T_ANY, 0, LDI_EV_OFFLINE, NULL);
+	switch (retval) {
+	case LDI_EV_FAILURE:
+		contract_device_negend(dip, DDI_DEV_T_ANY, 0, CT_EV_FAILURE);
+		RIO_DEBUG((CE_NOTE, "LDI callback failed on dip=%p",
+		    (void *)dip));
+		failure = 1;
+		goto out;
+	case LDI_EV_SUCCESS:
+		constraint = 1;
+		RIO_DEBUG((CE_NOTE, "LDI callback success on dip=%p",
+		    (void *)dip));
+		break;
+	case LDI_EV_NONE:
+		/* no matching LDI callbacks */
+		RIO_DEBUG((CE_NOTE, "No LDI callbacks for dip=%p",
+		    (void *)dip));
+		break;
+	default:
+		ASSERT(retval == LDI_EV_NONE);
+	}
+
+out:
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	if ((DEVI(dip)->devi_flags & DEVI_RETIRING) && failure) {
+		RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): setting "
+		    "BLOCKED flag. dip=%p", (void *)dip));
+		DEVI(dip)->devi_flags |= DEVI_R_BLOCKED;
+		if (DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT) {
+			RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): "
+			    "blocked. clearing RCM CONSTRAINT flag. dip=%p",
+			    (void *)dip));
+			DEVI(dip)->devi_flags &= ~DEVI_R_CONSTRAINT;
+		}
+	} else if ((DEVI(dip)->devi_flags & DEVI_RETIRING) && constraint) {
+		RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): setting "
+		    "CONSTRAINT flag. dip=%p", (void *)dip));
+		DEVI(dip)->devi_flags |= DEVI_R_CONSTRAINT;
+	} else if ((DEVI(dip)->devi_flags & DEVI_RETIRING) &&
+	    DEVI(dip)->devi_ref == 0) {
+		/* also allow retire if device is not in use */
+		RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): device not in "
+		    "use. Setting CONSTRAINT flag. dip=%p", (void *)dip));
+		DEVI(dip)->devi_flags |= DEVI_R_CONSTRAINT;
+	} else {
+		/*
+		 * Note: We cannot ASSERT here that DEVI_R_CONSTRAINT is
+		 * not set, since other sources (such as RCM) may have
+		 * set the flag.
+		 */
+		RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): not setting "
+		    "constraint flag. dip=%p", (void *)dip));
+	}
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
+
+	RIO_VERBOSE((CE_NOTE, "e_ddi_offline_notify(): exit: dip=%p",
+	    (void *) dip));
+
+	return (failure ? DDI_FAILURE : DDI_SUCCESS);
+}
+
+void
+e_ddi_offline_finalize(dev_info_t *dip, int result)
+{
+	RIO_DEBUG((CE_NOTE, "e_ddi_offline_finalize(): entry: result=%s, "
+	    "dip=%p", result == DDI_SUCCESS ? "SUCCESS" : "FAILURE",
+	    (void *)dip));
+
+	contract_device_negend(dip, DDI_DEV_T_ANY, 0,  result == DDI_SUCCESS ?
+	    CT_EV_SUCCESS : CT_EV_FAILURE);
+
+	ldi_invoke_finalize(dip, DDI_DEV_T_ANY, 0,
+	    LDI_EV_OFFLINE, result == DDI_SUCCESS ?
+	    LDI_EV_SUCCESS : LDI_EV_FAILURE, NULL);
+
+	RIO_VERBOSE((CE_NOTE, "e_ddi_offline_finalize(): exit: dip=%p",
+	    (void *)dip));
+}
+
+void
+e_ddi_degrade_finalize(dev_info_t *dip)
+{
+	RIO_DEBUG((CE_NOTE, "e_ddi_degrade_finalize(): entry: "
+	    "result always = DDI_SUCCESS, dip=%p", (void *)dip));
+
+	contract_device_degrade(dip, DDI_DEV_T_ANY, 0);
+	contract_device_negend(dip, DDI_DEV_T_ANY, 0, CT_EV_SUCCESS);
+
+	ldi_invoke_finalize(dip, DDI_DEV_T_ANY, 0, LDI_EV_DEGRADE,
+	    LDI_EV_SUCCESS, NULL);
+
+	RIO_VERBOSE((CE_NOTE, "e_ddi_degrade_finalize(): exit: dip=%p",
+	    (void *)dip));
+}
+
+void
+e_ddi_undegrade_finalize(dev_info_t *dip)
+{
+	RIO_DEBUG((CE_NOTE, "e_ddi_undegrade_finalize(): entry: "
+	    "result always = DDI_SUCCESS, dip=%p", (void *)dip));
+
+	contract_device_undegrade(dip, DDI_DEV_T_ANY, 0);
+	contract_device_negend(dip, DDI_DEV_T_ANY, 0, CT_EV_SUCCESS);
+
+	RIO_VERBOSE((CE_NOTE, "e_ddi_undegrade_finalize(): exit: dip=%p",
+	    (void *)dip));
+}
 
 /*
  * detach a node with parent already held busy
@@ -5123,6 +5320,19 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 
 	ASSERT(pdip && DEVI_BUSY_OWNED(pdip));
 
+	/*
+	 * Invoke notify if offlining
+	 */
+	if (flags & NDI_DEVI_OFFLINE) {
+		RIO_DEBUG((CE_NOTE, "devi_detach_node: offlining dip=%p",
+		    (void *)dip));
+		if (e_ddi_offline_notify(dip) != DDI_SUCCESS) {
+			RIO_DEBUG((CE_NOTE, "devi_detach_node: offline NACKed"
+			    "dip=%p", (void *)dip));
+			return (NDI_FAILURE);
+		}
+	}
+
 	if (flags & NDI_POST_EVENT) {
 		if (i_ddi_devi_attached(pdip)) {
 			if (ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
@@ -5131,8 +5341,22 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 		}
 	}
 
-	if (i_ddi_detachchild(dip, flags) != DDI_SUCCESS)
+	if (i_ddi_detachchild(dip, flags) != DDI_SUCCESS) {
+		if (flags & NDI_DEVI_OFFLINE) {
+			RIO_DEBUG((CE_NOTE, "devi_detach_node: offline failed."
+			    " Calling e_ddi_offline_finalize with result=%d. "
+			    "dip=%p", DDI_FAILURE, (void *)dip));
+			e_ddi_offline_finalize(dip, DDI_FAILURE);
+		}
 		return (NDI_FAILURE);
+	}
+
+	if (flags & NDI_DEVI_OFFLINE) {
+		RIO_DEBUG((CE_NOTE, "devi_detach_node: offline succeeded."
+		    " Calling e_ddi_offline_finalize with result=%d, "
+		    "dip=%p", DDI_SUCCESS, (void *)dip));
+		e_ddi_offline_finalize(dip, DDI_SUCCESS);
+	}
 
 	if (flags & NDI_AUTODETACH)
 		return (NDI_SUCCESS);
@@ -7219,4 +7443,503 @@ int
 ibt_hw_is_present()
 {
 	return (ib_hw_status);
+}
+
+/*
+ * ASSERT that constraint flag is not set and then set the "retire attempt"
+ * flag.
+ */
+int
+e_ddi_mark_retiring(dev_info_t *dip, void *arg)
+{
+	char	**cons_array = (char **)arg;
+	char	*path;
+	int	constraint;
+	int	i;
+
+	constraint = 0;
+	if (cons_array) {
+		path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(dip, path);
+		for (i = 0; cons_array[i] != NULL; i++) {
+			if (strcmp(path, cons_array[i]) == 0) {
+				constraint = 1;
+				break;
+			}
+		}
+		kmem_free(path, MAXPATHLEN);
+	}
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT));
+	DEVI(dip)->devi_flags |= DEVI_RETIRING;
+	if (constraint)
+		DEVI(dip)->devi_flags |= DEVI_R_CONSTRAINT;
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	RIO_VERBOSE((CE_NOTE, "marked dip as undergoing retire process dip=%p",
+	    (void *)dip));
+
+	if (constraint)
+		RIO_DEBUG((CE_NOTE, "marked dip as constrained, dip=%p",
+		    (void *)dip));
+
+	if (MDI_PHCI(dip))
+		mdi_phci_mark_retiring(dip, cons_array);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+static void
+free_array(char **cons_array)
+{
+	int	i;
+
+	if (cons_array == NULL)
+		return;
+
+	for (i = 0; cons_array[i] != NULL; i++) {
+		kmem_free(cons_array[i], strlen(cons_array[i]) + 1);
+	}
+	kmem_free(cons_array, (i+1) * sizeof (char *));
+}
+
+/*
+ * Walk *every* node in subtree and check if it blocks, allows or has no
+ * comment on a proposed retire.
+ */
+int
+e_ddi_retire_notify(dev_info_t *dip, void *arg)
+{
+	int	*constraint = (int *)arg;
+
+	RIO_DEBUG((CE_NOTE, "retire notify: dip = %p", (void *)dip));
+
+	(void) e_ddi_offline_notify(dip);
+
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	if (!(DEVI(dip)->devi_flags & DEVI_RETIRING)) {
+		RIO_DEBUG((CE_WARN, "retire notify: dip in retire "
+		    "subtree is not marked: dip = %p", (void *)dip));
+		*constraint = 0;
+	} else if (DEVI(dip)->devi_flags & DEVI_R_BLOCKED) {
+		ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT));
+		RIO_DEBUG((CE_NOTE, "retire notify: BLOCKED: dip = %p",
+		    (void *)dip));
+		*constraint = 0;
+	} else if (!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT)) {
+		RIO_DEBUG((CE_NOTE, "retire notify: NO CONSTRAINT: "
+		    "dip = %p", (void *)dip));
+		*constraint = 0;
+	} else {
+		RIO_DEBUG((CE_NOTE, "retire notify: CONSTRAINT set: "
+		    "dip = %p", (void *)dip));
+	}
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	if (MDI_PHCI(dip))
+		mdi_phci_retire_notify(dip, constraint);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+int
+e_ddi_retire_finalize(dev_info_t *dip, void *arg)
+{
+	int constraint = *(int *)arg;
+	int finalize;
+	int phci_only;
+
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	if (!(DEVI(dip)->devi_flags & DEVI_RETIRING)) {
+		RIO_DEBUG((CE_WARN,
+		    "retire: unmarked dip(%p) in retire subtree",
+		    (void *)dip));
+		ASSERT(!(DEVI(dip)->devi_flags & DEVI_RETIRED));
+		ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT));
+		ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_BLOCKED));
+		mutex_exit(&DEVI(dip)->devi_lock);
+		return (DDI_WALK_CONTINUE);
+	}
+
+	/*
+	 * retire the device if constraints have been applied
+	 * or if the device is not in use
+	 */
+	finalize = 0;
+	if (constraint) {
+		ASSERT(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT);
+		ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_BLOCKED));
+		DEVI(dip)->devi_flags &= ~DEVI_R_CONSTRAINT;
+		DEVI(dip)->devi_flags &= ~DEVI_RETIRING;
+		DEVI(dip)->devi_flags |= DEVI_RETIRED;
+		mutex_exit(&DEVI(dip)->devi_lock);
+		(void) spec_fence_snode(dip, NULL);
+		RIO_DEBUG((CE_NOTE, "Fenced off: dip = %p", (void *)dip));
+		e_ddi_offline_finalize(dip, DDI_SUCCESS);
+	} else {
+		if (DEVI(dip)->devi_flags & DEVI_R_BLOCKED) {
+			ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT));
+			DEVI(dip)->devi_flags &= ~DEVI_R_BLOCKED;
+			DEVI(dip)->devi_flags &= ~DEVI_RETIRING;
+			/* we have already finalized during notify */
+		} else if (DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT) {
+			DEVI(dip)->devi_flags &= ~DEVI_R_CONSTRAINT;
+			DEVI(dip)->devi_flags &= ~DEVI_RETIRING;
+			finalize = 1;
+		} else {
+			DEVI(dip)->devi_flags &= ~DEVI_RETIRING;
+			/*
+			 * even if no contracts, need to call finalize
+			 * to clear the contract barrier on the dip
+			 */
+			finalize = 1;
+		}
+		mutex_exit(&DEVI(dip)->devi_lock);
+		RIO_DEBUG((CE_NOTE, "finalize: NOT retired: dip = %p",
+		    (void *)dip));
+		if (finalize)
+			e_ddi_offline_finalize(dip, DDI_FAILURE);
+		mutex_enter(&DEVI(dip)->devi_lock);
+		DEVI_SET_DEVICE_DEGRADED(dip);
+		mutex_exit(&DEVI(dip)->devi_lock);
+	}
+
+	/*
+	 * phci_only variable indicates no client checking, just
+	 * offline the PHCI. We set that to 0 to enable client
+	 * checking
+	 */
+	phci_only = 0;
+	if (MDI_PHCI(dip))
+		mdi_phci_retire_finalize(dip, phci_only);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Returns
+ * 	DDI_SUCCESS if constraints allow retire
+ *	DDI_FAILURE if constraints don't allow retire.
+ * cons_array is a NULL terminated array of node paths for
+ * which constraints have already been applied.
+ */
+int
+e_ddi_retire_device(char *path, char **cons_array)
+{
+	dev_info_t	*dip;
+	dev_info_t	*pdip;
+	int		circ;
+	int		circ2;
+	int		constraint;
+	char		*devnm;
+
+	/*
+	 * First, lookup the device
+	 */
+	dip = e_ddi_hold_devi_by_path(path, 0);
+	if (dip == NULL) {
+		/*
+		 * device does not exist. This device cannot be
+		 * a critical device since it is not in use. Thus
+		 * this device is always retireable. Return DDI_SUCCESS
+		 * to indicate this. If this device is ever
+		 * instantiated, I/O framework will consult the
+		 * the persistent retire store, mark it as
+		 * retired and fence it off.
+		 */
+		RIO_DEBUG((CE_NOTE, "Retire device: device doesn't exist."
+		    " NOP. Just returning SUCCESS. path=%s", path));
+		free_array(cons_array);
+		return (DDI_SUCCESS);
+	}
+
+	RIO_DEBUG((CE_NOTE, "Retire device: found dip = %p.", (void *)dip));
+
+	pdip = ddi_get_parent(dip);
+	ndi_hold_devi(pdip);
+
+	/*
+	 * Run devfs_clean() in case dip has no constraints and is
+	 * not in use, so is retireable but there are dv_nodes holding
+	 * ref-count on the dip. Note that devfs_clean() always returns
+	 * success.
+	 */
+	devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
+	(void) ddi_deviname(dip, devnm);
+	(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
+	kmem_free(devnm, MAXNAMELEN + 1);
+
+	ndi_devi_enter(pdip, &circ);
+
+	/* release hold from e_ddi_hold_devi_by_path */
+	ndi_rele_devi(dip);
+
+	/*
+	 * If it cannot make a determination, is_leaf_node() assumes
+	 * dip is a nexus.
+	 */
+	(void) e_ddi_mark_retiring(dip, cons_array);
+	if (!is_leaf_node(dip)) {
+		ndi_devi_enter(dip, &circ2);
+		ddi_walk_devs(ddi_get_child(dip), e_ddi_mark_retiring,
+		    cons_array);
+		ndi_devi_exit(dip, circ2);
+	}
+	free_array(cons_array);
+
+	/*
+	 * apply constraints
+	 */
+	RIO_DEBUG((CE_NOTE, "retire: subtree retire notify: path = %s", path));
+
+	constraint = 1;	/* assume constraints allow retire */
+	(void) e_ddi_retire_notify(dip, &constraint);
+	if (!is_leaf_node(dip)) {
+		ndi_devi_enter(dip, &circ2);
+		ddi_walk_devs(ddi_get_child(dip), e_ddi_retire_notify,
+		    &constraint);
+		ndi_devi_exit(dip, circ2);
+	}
+
+	/*
+	 * Now finalize the retire
+	 */
+	(void) e_ddi_retire_finalize(dip, &constraint);
+	if (!is_leaf_node(dip)) {
+		ndi_devi_enter(dip, &circ2);
+		ddi_walk_devs(ddi_get_child(dip), e_ddi_retire_finalize,
+		    &constraint);
+		ndi_devi_exit(dip, circ2);
+	}
+
+	if (!constraint) {
+		RIO_DEBUG((CE_WARN, "retire failed: path = %s", path));
+	} else {
+		RIO_DEBUG((CE_NOTE, "retire succeeded: path = %s", path));
+	}
+
+	ndi_devi_exit(pdip, circ);
+	ndi_rele_devi(pdip);
+	return (constraint ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+static int
+unmark_and_unfence(dev_info_t *dip, void *arg)
+{
+	char	*path = (char *)arg;
+
+	ASSERT(path);
+
+	(void) ddi_pathname(dip, path);
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(dip)->devi_flags &= ~DEVI_RETIRED;
+	DEVI_SET_DEVICE_ONLINE(dip);
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	RIO_VERBOSE((CE_NOTE, "Cleared RETIRED flag: dip=%p, path=%s",
+	    (void *)dip, path));
+
+	(void) spec_unfence_snode(dip);
+	RIO_DEBUG((CE_NOTE, "Unfenced device: %s", path));
+
+	if (MDI_PHCI(dip))
+		mdi_phci_unretire(dip);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+struct find_dip {
+	char	*fd_buf;
+	char	*fd_path;
+	dev_info_t *fd_dip;
+};
+
+static int
+find_dip_fcn(dev_info_t *dip, void *arg)
+{
+	struct find_dip *findp = (struct find_dip *)arg;
+
+	(void) ddi_pathname(dip, findp->fd_buf);
+
+	if (strcmp(findp->fd_path, findp->fd_buf) != 0)
+		return (DDI_WALK_CONTINUE);
+
+	ndi_hold_devi(dip);
+	findp->fd_dip = dip;
+
+	return (DDI_WALK_TERMINATE);
+}
+
+int
+e_ddi_unretire_device(char *path)
+{
+	int		circ;
+	char		*path2;
+	dev_info_t	*pdip;
+	dev_info_t	*dip;
+	struct find_dip	 find_dip;
+
+	ASSERT(path);
+	ASSERT(*path == '/');
+
+	if (strcmp(path, "/") == 0) {
+		cmn_err(CE_WARN, "Root node cannot be retired. Skipping "
+		    "device unretire: %s", path);
+		return (0);
+	}
+
+	/*
+	 * We can't lookup the dip (corresponding to path) via
+	 * e_ddi_hold_devi_by_path() because the dip may be offline
+	 * and may not attach. Use ddi_walk_devs() instead;
+	 */
+	find_dip.fd_buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	find_dip.fd_path = path;
+	find_dip.fd_dip = NULL;
+
+	pdip = ddi_root_node();
+
+	ndi_devi_enter(pdip, &circ);
+	ddi_walk_devs(ddi_get_child(pdip), find_dip_fcn, &find_dip);
+	ndi_devi_exit(pdip, circ);
+
+	kmem_free(find_dip.fd_buf, MAXPATHLEN);
+
+	if (find_dip.fd_dip == NULL) {
+		cmn_err(CE_WARN, "Device not found in device tree. Skipping "
+		    "device unretire: %s", path);
+		return (0);
+	}
+
+	dip = find_dip.fd_dip;
+
+	pdip = ddi_get_parent(dip);
+
+	ndi_hold_devi(pdip);
+
+	ndi_devi_enter(pdip, &circ);
+
+	path2 = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	(void) unmark_and_unfence(dip, path2);
+	if (!is_leaf_node(dip)) {
+		ndi_devi_enter(dip, &circ);
+		ddi_walk_devs(ddi_get_child(dip), unmark_and_unfence, path2);
+		ndi_devi_exit(dip, circ);
+	}
+
+	kmem_free(path2, MAXPATHLEN);
+
+	/* release hold from find_dip_fcn() */
+	ndi_rele_devi(dip);
+
+	ndi_devi_exit(pdip, circ);
+
+	ndi_rele_devi(pdip);
+
+	return (0);
+}
+
+/*
+ * Called before attach on a dip that has been retired.
+ */
+static int
+mark_and_fence(dev_info_t *dip, void *arg)
+{
+	char    *fencepath = (char *)arg;
+
+	/*
+	 * We have already decided to retire this device. The various
+	 * constraint checking should not be set.
+	 * NOTE that the retire flag may already be set due to
+	 * fenced -> detach -> fenced transitions.
+	 */
+	mutex_enter(&DEVI(dip)->devi_lock);
+	ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_CONSTRAINT));
+	ASSERT(!(DEVI(dip)->devi_flags & DEVI_R_BLOCKED));
+	ASSERT(!(DEVI(dip)->devi_flags & DEVI_RETIRING));
+	DEVI(dip)->devi_flags |= DEVI_RETIRED;
+	mutex_exit(&DEVI(dip)->devi_lock);
+	RIO_VERBOSE((CE_NOTE, "marked as RETIRED dip=%p", (void *)dip));
+
+	if (fencepath) {
+		(void) spec_fence_snode(dip, NULL);
+		RIO_DEBUG((CE_NOTE, "Fenced: %s",
+		    ddi_pathname(dip, fencepath)));
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Checks the retire database and:
+ *
+ * - if device is present in the retire database, marks the device retired
+ *   and fences it off.
+ * - if device is not in retire database, allows the device to attach normally
+ *
+ * To be called only by framework attach code on first attach attempt.
+ *
+ */
+static void
+i_ddi_check_retire(dev_info_t *dip)
+{
+	char		*path;
+	dev_info_t	*pdip;
+	int		circ;
+	int		phci_only;
+
+	pdip = ddi_get_parent(dip);
+
+	/*
+	 * Root dip is treated special and doesn't take this code path.
+	 * Also root can never be retired.
+	 */
+	ASSERT(pdip);
+	ASSERT(DEVI_BUSY_OWNED(pdip));
+	ASSERT(i_ddi_node_state(dip) < DS_ATTACHED);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	(void) ddi_pathname(dip, path);
+
+	RIO_VERBOSE((CE_NOTE, "Checking if dip should attach: dip=%p, path=%s",
+	    (void *)dip, path));
+
+	/*
+	 * Check if this device is in the "retired" store i.e.  should
+	 * be retired. If not, we have nothing to do.
+	 */
+	if (e_ddi_device_retired(path) == 0) {
+		RIO_VERBOSE((CE_NOTE, "device is NOT retired: path=%s", path));
+		kmem_free(path, MAXPATHLEN);
+		return;
+	}
+
+	RIO_DEBUG((CE_NOTE, "attach: device is retired: path=%s", path));
+
+	/*
+	 * Mark dips and fence off snodes (if any)
+	 */
+	RIO_DEBUG((CE_NOTE, "attach: Mark and fence subtree: path=%s", path));
+	(void) mark_and_fence(dip, path);
+	if (!is_leaf_node(dip)) {
+		ndi_devi_enter(dip, &circ);
+		ddi_walk_devs(ddi_get_child(dip), mark_and_fence, path);
+		ndi_devi_exit(dip, circ);
+	}
+
+	kmem_free(path, MAXPATHLEN);
+
+	/*
+	 * We don't want to check the client. We just want to
+	 * offline the PHCI
+	 */
+	phci_only = 1;
+	if (MDI_PHCI(dip))
+		mdi_phci_retire_finalize(dip, phci_only);
 }

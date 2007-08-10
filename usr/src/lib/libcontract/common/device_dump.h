@@ -23,28 +23,21 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_LIBCONTRACT_PRIV_H
-#define	_LIBCONTRACT_PRIV_H
+#ifndef	_DEVICE_DUMP_H
+#define	_DEVICE_DUMP_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/contract.h>
-#include <libcontract.h>
-#include <stdio.h>
+#include "libcontract_impl.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-extern int contract_latest(ctid_t *);
-extern int contract_open(ctid_t, const char *, const char *, int);
-extern int contract_abandon_id(ctid_t);
-extern ctid_t getctid(void);
-extern void contract_event_dump(FILE *, ct_evthdl_t, int);
-extern void contract_negend_dump(FILE *, ct_evthdl_t);
+extern void event_device(FILE *, ct_evthdl_t, int);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _LIBCONTRACT_PRIV_H */
+#endif	/* _DEVICE_DUMP_H */

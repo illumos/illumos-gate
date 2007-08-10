@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,8 @@ HDRDIR =	common
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-MSGFILES =	common/process_dump.c
+MSGFILES =	common/process_dump.c common/device_dump.c \
+		common/libcontract_priv.c
 POFILE =	libcontract.po
 
 all := 		TARGET = all
@@ -45,7 +46,8 @@ lint :=		TARGET = lint
 
 all clean clobber install lint: $(SUBDIRS)
 
-$(POFILE):	pofile_MSGFILES
+$(POFILE):	$(MSGFILES)
+	$(BUILDPO.msgfiles)
 
 install_h:	$(ROOTHDRS)
 

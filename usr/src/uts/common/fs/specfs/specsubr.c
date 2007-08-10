@@ -70,6 +70,7 @@
 struct vfs spec_vfs;
 static dev_t specdev;
 struct kmem_cache *snode_cache;
+int spec_debug = 0;
 
 static struct snode *sfind(dev_t, vtype_t, struct vnode *);
 static struct vnode *get_cvp(dev_t, vtype_t, struct snode *, int *);
@@ -259,6 +260,54 @@ makespecvp(dev_t dev, vtype_t type)
 	return (svp);
 }
 
+
+/*
+ * This function is called from spec_assoc_vp_with_devi(). That function
+ * associates a "new" dip with a common snode, releasing (any) old dip
+ * in the process. This function (spec_assoc_fence()) looks at the "new dip"
+ * and determines whether the snode should be fenced of or not. As the table
+ * below indicates, the value of old-dip is a don't care for all cases.
+ *
+ * old-dip	new-dip		common-snode
+ * =========================================
+ * Don't care	NULL		unfence
+ * Don't care	retired		fence
+ * Don't care	not-retired	unfence
+ *
+ * Since old-dip value is a "don't care", it is not passed into this function.
+ */
+static void
+spec_assoc_fence(dev_info_t *ndip, vnode_t *vp)
+{
+	int		fence;
+	struct snode	*csp;
+
+	ASSERT(vp);
+	ASSERT(vn_matchops(vp, spec_getvnodeops()));
+
+	fence = 0;
+	if (ndip != NULL) {
+		mutex_enter(&DEVI(ndip)->devi_lock);
+		if (DEVI(ndip)->devi_flags & DEVI_RETIRED)
+			fence = 1;
+		mutex_exit(&DEVI(ndip)->devi_lock);
+	}
+
+	csp = VTOCS(vp);
+	ASSERT(csp);
+
+	/* SFENCED flag only set on common snode */
+	mutex_enter(&csp->s_lock);
+	if (fence)
+		csp->s_flag |= SFENCED;
+	else
+		csp->s_flag &= ~SFENCED;
+	mutex_exit(&csp->s_lock);
+
+	FENDBG((CE_NOTE, "%sfenced common snode (%p) for new dip=%p",
+	    fence ? "" : "un", (void *)csp, (void *)ndip));
+}
+
 /*
  * Associate the common snode with a devinfo node.  This is called from:
  *
@@ -321,6 +370,8 @@ spec_assoc_vp_with_devi(struct vnode *vp, dev_info_t *dip)
 	if (olddip != dip)
 		csp->s_flag &= ~SSIZEVALID;
 	mutex_exit(&csp->s_lock);
+
+	spec_assoc_fence(dip, vp);
 
 	/* release the old */
 	if (olddip)
@@ -886,6 +937,116 @@ spec_is_selfclone(vnode_t *vp)
 		sp = VTOS(vp);
 		return ((sp->s_flag & SSELFCLONE) ? 1 : 0);
 	}
+
+	return (0);
+}
+
+/*
+ * We may be invoked with a NULL vp in which case we fence off
+ * all snodes associated with dip
+ */
+int
+spec_fence_snode(dev_info_t *dip, struct vnode *vp)
+{
+	struct snode	*sp;
+	struct snode	*csp;
+	int		retired;
+	int		i;
+	char		*path;
+	int		emitted;
+
+	ASSERT(dip);
+
+	retired = 0;
+	mutex_enter(&DEVI(dip)->devi_lock);
+	if (DEVI(dip)->devi_flags & DEVI_RETIRED)
+		retired = 1;
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	if (!retired)
+		return (0);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+
+
+	if (vp != NULL) {
+		ASSERT(vn_matchops(vp, spec_getvnodeops()));
+		csp = VTOCS(vp);
+		ASSERT(csp);
+		mutex_enter(&csp->s_lock);
+		csp->s_flag |= SFENCED;
+		mutex_exit(&csp->s_lock);
+		FENDBG((CE_NOTE, "fenced off snode(%p) for dip: %s",
+		    (void *)csp, path));
+		kmem_free(path, MAXPATHLEN);
+		return (0);
+	}
+
+	emitted = 0;
+	mutex_enter(&stable_lock);
+	for (i = 0; i < STABLESIZE; i++) {
+		for (sp = stable[i]; sp != NULL; sp = sp->s_next) {
+			ASSERT(sp->s_commonvp);
+			csp = VTOS(sp->s_commonvp);
+			if (csp->s_dip == dip) {
+				/* fence off the common snode */
+				mutex_enter(&csp->s_lock);
+				csp->s_flag |= SFENCED;
+				mutex_exit(&csp->s_lock);
+				if (!emitted) {
+					FENDBG((CE_NOTE, "fenced 1 of N"));
+					emitted++;
+				}
+			}
+		}
+	}
+	mutex_exit(&stable_lock);
+
+	FENDBG((CE_NOTE, "fenced off all snodes for dip: %s", path));
+	kmem_free(path, MAXPATHLEN);
+
+	return (0);
+}
+
+
+int
+spec_unfence_snode(dev_info_t *dip)
+{
+	struct snode	*sp;
+	struct snode	*csp;
+	int		i;
+	char		*path;
+	int		emitted;
+
+	ASSERT(dip);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+
+	emitted = 0;
+	mutex_enter(&stable_lock);
+	for (i = 0; i < STABLESIZE; i++) {
+		for (sp = stable[i]; sp != NULL; sp = sp->s_next) {
+			ASSERT(sp->s_commonvp);
+			csp = VTOS(sp->s_commonvp);
+			ASSERT(csp);
+			if (csp->s_dip == dip) {
+				/* unfence the common snode */
+				mutex_enter(&csp->s_lock);
+				csp->s_flag &= ~SFENCED;
+				mutex_exit(&csp->s_lock);
+				if (!emitted) {
+					FENDBG((CE_NOTE, "unfenced 1 of N"));
+					emitted++;
+				}
+			}
+		}
+	}
+	mutex_exit(&stable_lock);
+
+	FENDBG((CE_NOTE, "unfenced all snodes for dip: %s", path));
+	kmem_free(path, MAXPATHLEN);
 
 	return (0);
 }

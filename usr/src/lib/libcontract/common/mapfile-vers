@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,6 +29,7 @@ SUNW_1.1 {
     global:
 	ct_ctl_abandon;
 	ct_ctl_ack;
+	ct_ctl_nack;
 	ct_ctl_adopt;
 	ct_ctl_newct;
 	ct_ctl_qack;
@@ -85,6 +86,17 @@ SUNW_1.1 {
 	ct_tmpl_set_cookie;
 	ct_tmpl_set_critical;
 	ct_tmpl_set_informative;
+	ct_dev_tmpl_set_minor;
+	ct_dev_tmpl_set_aset;
+	ct_dev_tmpl_set_noneg;
+	ct_dev_tmpl_clear_noneg;
+	ct_dev_tmpl_get_minor;
+	ct_dev_tmpl_get_aset;
+	ct_dev_tmpl_get_noneg;
+	ct_dev_status_get_aset;
+	ct_dev_status_get_noneg;
+	ct_dev_status_get_dev_state;
+	ct_dev_status_get_minor;
 };
 
 SUNWprivate_1.1 {

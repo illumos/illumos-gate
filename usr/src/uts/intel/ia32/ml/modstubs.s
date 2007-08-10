@@ -457,6 +457,8 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(specfs, spec_devi_open_count,	nomod_minus_one);
 	NO_UNLOAD_STUB(specfs, spec_is_clone,		nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_is_selfclone,	nomod_zero);
+	NO_UNLOAD_STUB(specfs, spec_fence_snode,	nomod_minus_one);
+	NO_UNLOAD_STUB(specfs, spec_unfence_snode,	nomod_minus_one);
 	END_MODULE(specfs);
 #endif
 

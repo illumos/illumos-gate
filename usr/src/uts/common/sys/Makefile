@@ -845,7 +845,9 @@ SYSEVENTHDRS=		\
 
 CONTRACTHDRS=		\
 	process.h	\
-	process_impl.h
+	process_impl.h	\
+	device.h	\
+	device_impl.h
 
 USBHDRS=	\
 	usba.h	\

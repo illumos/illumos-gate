@@ -93,6 +93,7 @@
 #include <sys/esunddi.h>
 #include <sys/autoconf.h>
 #include <sys/sunndi.h>
+#include <sys/contract/device_impl.h>
 
 
 static int spec_open(struct vnode **, int, struct cred *);
@@ -153,7 +154,22 @@ static int spec_pathconf(struct	vnode *, int, ulong_t *, struct cred *);
 	mutex_exit(&csp->s_lock); \
 }
 
+#define	S_ISFENCED(sp)	((VTOS((sp)->s_commonvp))->s_flag & SFENCED)
+
 struct vnodeops *spec_vnodeops;
+
+/*
+ * *PLEASE NOTE*: If you add new entry points to specfs, do
+ * not forget to add support for fencing. A fenced snode
+ * is indicated by the SFENCED flag in the common snode.
+ * If a snode is fenced, determine if your entry point is
+ * a configuration operation (Example: open), a detection
+ * operation (Example: gettattr), an I/O operation (Example: ioctl())
+ * or an unconfiguration operation (Example: close). If it is
+ * a configuration or detection operation, fail the operation
+ * for a fenced snode with an ENXIO or EIO as appropriate. If
+ * it is any other operation, let it through.
+ */
 
 const fs_operation_def_t spec_vnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = spec_open },
@@ -530,6 +546,7 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	struct stdata *stp;
 	dev_info_t *dip;
 	int error, type;
+	contract_t *ct = NULL;
 	int open_returns_eintr;
 
 	flag &= ~FCREAT;		/* paranoia */
@@ -579,6 +596,10 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 		ddi_release_devi(dip);	/* from e_ddi_hold_devi_by_dev */
 	}
 
+	/* check if device fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 #ifdef  DEBUG
 	/* verify attach/open exclusion guarantee */
 	dip = csp->s_dip;
@@ -626,6 +647,18 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 			return (error);
 		sp = VTOS(*vpp);
 		csp = VTOS(sp->s_commonvp);
+	}
+
+	/*
+	 * create contracts only for userland opens
+	 * Successful open and cloning is done at this point.
+	 */
+	if (error == 0 && !(flag & FKLYR)) {
+		int spec_type;
+		spec_type = (STOV(csp)->v_type == VCHR) ? S_IFCHR : S_IFBLK;
+		if (contract_device_open(newdev, spec_type, NULL) != 0) {
+			error = EIO;
+		}
 	}
 
 	if (error == 0) {
@@ -729,6 +762,19 @@ streams_open:
 		UNLOCK_CSP(csp);
 	}
 
+	/*
+	 * create contracts only for userland opens
+	 * Successful open and cloning is done at this point.
+	 */
+	if (error == 0 && !(flag & FKLYR)) {
+		/* STREAM is of type S_IFCHR */
+		if (contract_device_open(newdev, S_IFCHR, &ct) != 0) {
+			UNLOCK_CSP(csp);
+			(void) spec_close(vp, flag, 1, 0, cr);
+			return (EIO);
+		}
+	}
+
 	if (error == 0) {
 		/* STREAMS devices don't have a size */
 		sp->s_size = csp->s_size = 0;
@@ -741,6 +787,11 @@ streams_open:
 			return (0);
 
 		/* strctty() was interrupted by a signal */
+		if (ct) {
+			/* we only create contracts for userland opens */
+			ASSERT(ttoproc(curthread));
+			(void) contract_abandon(ct, ttoproc(curthread), 0);
+		}
 		(void) spec_close(vp, flag, 1, 0, cr);
 		return (EINTR);
 	}
@@ -795,6 +846,7 @@ spec_close(
 	if (count > 1)
 		return (0);
 
+	/* we allow close to succeed even if device is fenced off */
 	sp = VTOS(vp);
 	cvp = sp->s_commonvp;
 
@@ -1157,6 +1209,13 @@ spec_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode, struct cred *cr,
 
 	if (vp->v_type != VCHR)
 		return (ENOTTY);
+
+	/*
+	 * allow ioctls() to go through even for fenced snodes, as they
+	 * may include unconfiguration operation - for example popping of
+	 * streams modules.
+	 */
+
 	sp = VTOS(vp);
 	dev = sp->s_dev;
 	if (STREAMSTAB(getmajor(dev))) {
@@ -1180,6 +1239,11 @@ spec_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 		vp = sp->s_commonvp;
 	}
 	sp = VTOS(vp);
+
+	/* we want stat() to fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 	realvp = sp->s_realvp;
 
 	if (realvp == NULL) {
@@ -1258,6 +1322,10 @@ spec_setattr(
 	struct vnode *realvp;
 	int error;
 
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 	if (vp->v_type == VCHR && vp->v_stream && (vap->va_mask & AT_SIZE)) {
 		/*
 		 * 1135080:	O_TRUNC should have no effect on
@@ -1293,6 +1361,10 @@ spec_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
 
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 	if ((realvp = sp->s_realvp) != NULL)
 		return (VOP_ACCESS(realvp, mode, flags, cr));
 	else
@@ -1309,6 +1381,11 @@ spec_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
     int mode, struct vnode **vpp, struct cred *cr, int flag)
 {
 	int error;
+	struct snode *sp = VTOS(dvp);
+
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
 
 	ASSERT(dvp && (dvp->v_flag & VROOT) && *name == '\0');
 	if (excl == NONEXCL) {
@@ -1332,6 +1409,8 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 	struct vnode *realvp;
 	struct vnode *cvp;
 	struct vattr va, vatmp;
+
+	/* allow syncing even if device is fenced off */
 
 	/* If times didn't change, don't flush anything. */
 	mutex_enter(&sp->s_lock);
@@ -2222,9 +2301,14 @@ spec_map(
 	struct cred *cred)
 {
 	int error = 0;
+	struct snode *sp = VTOS(vp);
 
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
+
+	/* fail map with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
 
 	/*
 	 * If file is locked, fail mapping attempt.
@@ -2314,6 +2398,10 @@ spec_addmap(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
+	/* fail with EIO if the device is fenced off */
+	if (S_ISFENCED(csp))
+		return (EIO);
+
 	npages = btopr(len);
 	LOCK_CSP(csp);
 	csp->s_mapcnt += npages;
@@ -2342,6 +2430,8 @@ spec_delmap(
 	/* segdev passes us the common vp */
 
 	ASSERT(vp != NULL && VTOS(vp)->s_commonvp == vp);
+
+	/* allow delmap to succeed even if device fenced off */
 
 	/*
 	 * XXX	Given the above assertion, this might not
@@ -2389,6 +2479,8 @@ spec_delmap(
 static int
 spec_dump(struct vnode *vp, caddr_t addr, int bn, int count)
 {
+	/* allow dump to succeed even if device fenced off */
+
 	ASSERT(vp->v_type == VBLK);
 	return (bdev_dump(vp->v_rdev, addr, bn, count));
 }
@@ -2438,6 +2530,10 @@ spec_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
 	struct snode *sp = VTOS(vp);
 	int error;
 
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 	/*
 	 * The acl(2) system calls VOP_RWLOCK on the file before setting an
 	 * ACL, but since specfs does not serialize reads and writes, this
@@ -2464,6 +2560,10 @@ spec_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
 
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
+
 	if ((realvp = sp->s_realvp) != NULL)
 		return (VOP_GETSECATTR(realvp, vsap, flag, cr));
 	else
@@ -2475,6 +2575,10 @@ spec_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 {
 	vnode_t *realvp;
 	struct snode *sp = VTOS(vp);
+
+	/* fail with ENXIO if the device is fenced off */
+	if (S_ISFENCED(sp))
+		return (ENXIO);
 
 	if ((realvp = sp->s_realvp) != NULL)
 		return (VOP_PATHCONF(realvp, cmd, valp, cr));

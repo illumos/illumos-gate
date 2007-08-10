@@ -69,6 +69,11 @@
 #include <sys/socketvar.h>
 #include <sys/kstr.h>
 
+/*
+ * Device contract related
+ */
+#include <sys/contract_impl.h>
+#include <sys/contract/device_impl.h>
 
 /*
  * Define macros to manipulate snode, vnode, and open device flags
@@ -97,10 +102,22 @@
 #define	LH_CBDEV	(0x2)	/* handle to a char/block device */
 
 /*
- * Define marco for devid property lookups
+ * Define macro for devid property lookups
  */
 #define	DEVID_PROP_FLAGS	(DDI_PROP_DONTPASS | \
 				DDI_PROP_TYPE_STRING|DDI_PROP_CANSLEEP)
+
+/*
+ * Dummy string for NDI events
+ */
+#define	NDI_EVENT_SERVICE	"NDI_EVENT_SERVICE"
+
+static void ldi_ev_lock(void);
+static void ldi_ev_unlock(void);
+
+#ifdef	LDI_OBSOLETE_EVENT
+int ldi_remove_event_handler(ldi_handle_t lh, ldi_callback_id_t id);
+#endif
 
 
 /*
@@ -112,6 +129,22 @@ static struct ldi_ident		*ldi_ident_hash[LI_HASH_SZ];
 static kmutex_t			ldi_handle_hash_lock[LH_HASH_SZ];
 static struct ldi_handle	*ldi_handle_hash[LH_HASH_SZ];
 static size_t			ldi_handle_hash_count;
+
+static struct ldi_ev_callback_list ldi_ev_callback_list;
+
+static uint32_t ldi_ev_id_pool = 0;
+
+struct ldi_ev_cookie {
+	char *ck_evname;
+	uint_t ck_sync;
+	uint_t ck_ctype;
+};
+
+static struct ldi_ev_cookie ldi_ev_cookies[] = {
+	{ LDI_EV_OFFLINE, 1, CT_DEV_EV_OFFLINE},
+	{ LDI_EV_DEGRADE, 0, CT_DEV_EV_DEGRADED},
+	{ NULL}			/* must terminate list */
+};
 
 void
 ldi_init(void)
@@ -127,6 +160,17 @@ ldi_init(void)
 		mutex_init(&ldi_ident_hash_lock[i], NULL, MUTEX_DEFAULT, NULL);
 		ldi_ident_hash[i] = NULL;
 	}
+
+	/*
+	 * Initialize the LDI event subsystem
+	 */
+	mutex_init(&ldi_ev_callback_list.le_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ldi_ev_callback_list.le_cv, NULL, CV_DEFAULT, NULL);
+	ldi_ev_callback_list.le_busy = 0;
+	ldi_ev_callback_list.le_thread = NULL;
+	list_create(&ldi_ev_callback_list.le_head,
+	    sizeof (ldi_ev_callback_impl_t),
+	    offsetof(ldi_ev_callback_impl_t, lec_list));
 }
 
 /*
@@ -334,7 +378,9 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 	lhp->lh_ref = 1;
 	lhp->lh_vp = vp;
 	lhp->lh_ident = ident;
+#ifdef	LDI_OBSOLETE_EVENT
 	mutex_init(lhp->lh_lock, NULL, MUTEX_DEFAULT, NULL);
+#endif
 
 	/* set the device type for this handle */
 	lhp->lh_type = 0;
@@ -398,10 +444,13 @@ handle_release(struct ldi_handle *lhp)
 
 	VN_RELE(lhp->lh_vp);
 	ident_release(lhp->lh_ident);
+#ifdef	LDI_OBSOLETE_EVENT
 	mutex_destroy(lhp->lh_lock);
+#endif
 	kmem_free(lhp, sizeof (struct ldi_handle));
 }
 
+#ifdef	LDI_OBSOLETE_EVENT
 /*
  * LDI event manipulation functions
  */
@@ -457,6 +506,7 @@ i_ldi_callback(dev_info_t *dip, ddi_eventcookie_t event_cookie,
 
 	lep->le_handler(lep->le_lhp, event_cookie, lep->le_arg, bus_impldata);
 }
+#endif
 
 /*
  * LDI open helper functions
@@ -1629,6 +1679,9 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	struct ldi_event	*lep;
 	int			err = 0;
+	int			notify = 0;
+	list_t			*listp;
+	ldi_ev_callback_impl_t	*lecp;
 
 	if (lh == NULL)
 		return (EINVAL);
@@ -1643,6 +1696,8 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred);
 		bflush(dev);
 	}
+
+#ifdef	LDI_OBSOLETE_EVENT
 
 	/*
 	 * Any event handlers should have been unregistered by the
@@ -1669,11 +1724,46 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 		    "failed to unregister layered event handlers before "
 		    "closing devices", lip->li_modname);
 	}
+#endif
 
 	/* do a layered close on the device */
 	err = VOP_CLOSE(handlep->lh_vp, flag | FKLYR, 1, (offset_t)0, cr);
 
 	LDI_OPENCLOSE((CE_WARN, "%s: lh=0x%p", "ldi close", (void *)lh));
+
+	/*
+	 * Search the event callback list for callbacks with this
+	 * handle. There are 2 cases
+	 * 1. Called in the context of a notify. The handle consumer
+	 *    is releasing its hold on the device to allow a reconfiguration
+	 *    of the device. Simply NULL out the handle and the notify callback.
+	 *    The finalize callback is still available so that the consumer
+	 *    knows of the final disposition of the device.
+	 * 2. Not called in the context of notify. NULL out the handle as well
+	 *    as the notify and finalize callbacks. Since the consumer has
+	 *    closed the handle, we assume it is not interested in the
+	 *    notify and finalize callbacks.
+	 */
+	ldi_ev_lock();
+
+	if (handlep->lh_flags & LH_FLAGS_NOTIFY)
+		notify = 1;
+	listp = &ldi_ev_callback_list.le_head;
+	for (lecp = list_head(listp); lecp; lecp = list_next(listp, lecp)) {
+		if (lecp->lec_lhp != handlep)
+			continue;
+		lecp->lec_lhp = NULL;
+		lecp->lec_notify = NULL;
+		LDI_EVDBG((CE_NOTE, "ldi_close: NULLed lh and notify"));
+		if (!notify) {
+			LDI_EVDBG((CE_NOTE, "ldi_close: NULLed finalize"));
+			lecp->lec_finalize = NULL;
+		}
+	}
+
+	if (notify)
+		handlep->lh_flags &= ~LH_FLAGS_NOTIFY;
+	ldi_ev_unlock();
 
 	/*
 	 * Free the handle even if the device close failed.  why?
@@ -2678,6 +2768,8 @@ ldi_prop_exists(ldi_handle_t lh, uint_t flags, char *name)
 	return (res);
 }
 
+#ifdef	LDI_OBSOLETE_EVENT
+
 int
 ldi_get_eventcookie(ldi_handle_t lh, char *name, ddi_eventcookie_t *ecp)
 {
@@ -2793,4 +2885,846 @@ ldi_remove_event_handler(ldi_handle_t lh, ldi_callback_id_t id)
 	handle_event_remove(lep);
 	kmem_free(lep, sizeof (struct ldi_event));
 	return (res);
+}
+
+#endif
+
+/*
+ * Here are some definitions of terms used in the following LDI events
+ * code:
+ *
+ * "LDI events" AKA "native events": These are events defined by the
+ * "new" LDI event framework. These events are serviced by the LDI event
+ * framework itself and thus are native to it.
+ *
+ * "LDI contract events": These are contract events that correspond to the
+ *  LDI events. This mapping of LDI events to contract events is defined by
+ * the ldi_ev_cookies[] array above.
+ *
+ * NDI events: These are events which are serviced by the NDI event subsystem.
+ * LDI subsystem just provides a thin wrapper around the NDI event interfaces
+ * These events are thereefore *not* native events.
+ */
+
+static int
+ldi_native_event(const char *evname)
+{
+	int i;
+
+	LDI_EVTRC((CE_NOTE, "ldi_native_event: entered: ev=%s", evname));
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (strcmp(ldi_ev_cookies[i].ck_evname, evname) == 0)
+			return (1);
+	}
+
+	return (0);
+}
+
+static uint_t
+ldi_ev_sync_event(const char *evname)
+{
+	int i;
+
+	ASSERT(ldi_native_event(evname));
+
+	LDI_EVTRC((CE_NOTE, "ldi_ev_sync_event: entered: %s", evname));
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (strcmp(ldi_ev_cookies[i].ck_evname, evname) == 0)
+			return (ldi_ev_cookies[i].ck_sync);
+	}
+
+	/*
+	 * This should never happen until non-contract based
+	 * LDI events are introduced. If that happens, we will
+	 * use a "special" token to indicate that there are no
+	 * contracts corresponding to this LDI event.
+	 */
+	cmn_err(CE_PANIC, "Unknown LDI event: %s", evname);
+
+	return (0);
+}
+
+static uint_t
+ldi_contract_event(const char *evname)
+{
+	int i;
+
+	ASSERT(ldi_native_event(evname));
+
+	LDI_EVTRC((CE_NOTE, "ldi_contract_event: entered: %s", evname));
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (strcmp(ldi_ev_cookies[i].ck_evname, evname) == 0)
+			return (ldi_ev_cookies[i].ck_ctype);
+	}
+
+	/*
+	 * This should never happen until non-contract based
+	 * LDI events are introduced. If that happens, we will
+	 * use a "special" token to indicate that there are no
+	 * contracts corresponding to this LDI event.
+	 */
+	cmn_err(CE_PANIC, "Unknown LDI event: %s", evname);
+
+	return (0);
+}
+
+char *
+ldi_ev_get_type(ldi_ev_cookie_t cookie)
+{
+	int i;
+	struct ldi_ev_cookie *cookie_impl = (struct ldi_ev_cookie *)cookie;
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (&ldi_ev_cookies[i] == cookie_impl) {
+			LDI_EVTRC((CE_NOTE, "ldi_ev_get_type: LDI: %s",
+			    ldi_ev_cookies[i].ck_evname));
+			return (ldi_ev_cookies[i].ck_evname);
+		}
+	}
+
+	/*
+	 * Not an LDI native event. Must be NDI event service.
+	 * Just return a generic string
+	 */
+	LDI_EVTRC((CE_NOTE, "ldi_ev_get_type: is NDI"));
+	return (NDI_EVENT_SERVICE);
+}
+
+static int
+ldi_native_cookie(ldi_ev_cookie_t cookie)
+{
+	int i;
+	struct ldi_ev_cookie *cookie_impl = (struct ldi_ev_cookie *)cookie;
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (&ldi_ev_cookies[i] == cookie_impl) {
+			LDI_EVTRC((CE_NOTE, "ldi_native_cookie: native LDI"));
+			return (1);
+		}
+	}
+
+	LDI_EVTRC((CE_NOTE, "ldi_native_cookie: is NDI"));
+	return (0);
+}
+
+static ldi_ev_cookie_t
+ldi_get_native_cookie(const char *evname)
+{
+	int i;
+
+	for (i = 0; ldi_ev_cookies[i].ck_evname != NULL; i++) {
+		if (strcmp(ldi_ev_cookies[i].ck_evname, evname) == 0) {
+			LDI_EVTRC((CE_NOTE, "ldi_get_native_cookie: found"));
+			return ((ldi_ev_cookie_t)&ldi_ev_cookies[i]);
+		}
+	}
+
+	LDI_EVTRC((CE_NOTE, "ldi_get_native_cookie: NOT found"));
+	return (NULL);
+}
+
+/*
+ * ldi_ev_lock() needs to be recursive, since layered drivers may call
+ * other LDI interfaces (such as ldi_close() from within the context of
+ * a notify callback. Since the notify callback is called with the
+ * ldi_ev_lock() held and ldi_close() also grabs ldi_ev_lock, the lock needs
+ * to be recursive.
+ */
+static void
+ldi_ev_lock(void)
+{
+	LDI_EVTRC((CE_NOTE, "ldi_ev_lock: entered"));
+
+	mutex_enter(&ldi_ev_callback_list.le_lock);
+	if (ldi_ev_callback_list.le_thread == curthread) {
+		ASSERT(ldi_ev_callback_list.le_busy >= 1);
+		ldi_ev_callback_list.le_busy++;
+	} else {
+		while (ldi_ev_callback_list.le_busy)
+			cv_wait(&ldi_ev_callback_list.le_cv,
+			    &ldi_ev_callback_list.le_lock);
+		ASSERT(ldi_ev_callback_list.le_thread == NULL);
+		ldi_ev_callback_list.le_busy = 1;
+		ldi_ev_callback_list.le_thread = curthread;
+	}
+	mutex_exit(&ldi_ev_callback_list.le_lock);
+
+	LDI_EVTRC((CE_NOTE, "ldi_ev_lock: exit"));
+}
+
+static void
+ldi_ev_unlock(void)
+{
+	LDI_EVTRC((CE_NOTE, "ldi_ev_unlock: entered"));
+	mutex_enter(&ldi_ev_callback_list.le_lock);
+	ASSERT(ldi_ev_callback_list.le_thread == curthread);
+	ASSERT(ldi_ev_callback_list.le_busy >= 1);
+
+	ldi_ev_callback_list.le_busy--;
+	if (ldi_ev_callback_list.le_busy == 0) {
+		ldi_ev_callback_list.le_thread = NULL;
+		cv_signal(&ldi_ev_callback_list.le_cv);
+	}
+	mutex_exit(&ldi_ev_callback_list.le_lock);
+	LDI_EVTRC((CE_NOTE, "ldi_ev_unlock: exit"));
+}
+
+int
+ldi_ev_get_cookie(ldi_handle_t lh, char *evname, ldi_ev_cookie_t *cookiep)
+{
+	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
+	dev_info_t		*dip;
+	dev_t			dev;
+	int			res;
+	struct snode		*csp;
+	ddi_eventcookie_t	ddi_cookie;
+	ldi_ev_cookie_t		tcookie;
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_get_cookie: entered: evname=%s",
+	    evname ? evname : "<NULL>"));
+
+	if (lh == NULL || evname == NULL ||
+	    strlen(evname) == 0 || cookiep == NULL) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_get_cookie: invalid args"));
+		return (LDI_EV_FAILURE);
+	}
+
+	*cookiep = NULL;
+
+	/*
+	 * First check if it is a LDI native event
+	 */
+	tcookie = ldi_get_native_cookie(evname);
+	if (tcookie) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_get_cookie: got native cookie"));
+		*cookiep = tcookie;
+		return (LDI_EV_SUCCESS);
+	}
+
+	/*
+	 * Not a LDI native event. Try NDI event services
+	 */
+
+	dev = handlep->lh_vp->v_rdev;
+
+	csp = VTOCS(handlep->lh_vp);
+	mutex_enter(&csp->s_lock);
+	if ((dip = csp->s_dip) != NULL)
+		e_ddi_hold_devi(dip);
+	mutex_exit(&csp->s_lock);
+	if (dip == NULL)
+		dip = e_ddi_hold_devi_by_dev(dev, 0);
+
+	if (dip == NULL) {
+		cmn_err(CE_WARN, "ldi_ev_get_cookie: No devinfo node for LDI "
+		    "handle: %p", (void *)handlep);
+		return (LDI_EV_FAILURE);
+	}
+
+	LDI_EVDBG((CE_NOTE, "Calling ddi_get_eventcookie: dip=%p, ev=%s",
+	    (void *)dip, evname));
+
+	res = ddi_get_eventcookie(dip, evname, &ddi_cookie);
+
+	ddi_release_devi(dip);
+
+	if (res == DDI_SUCCESS) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_get_cookie: NDI cookie found"));
+		*cookiep = (ldi_ev_cookie_t)ddi_cookie;
+		return (LDI_EV_SUCCESS);
+	} else {
+		LDI_EVDBG((CE_WARN, "ldi_ev_get_cookie: NDI cookie: failed"));
+		return (LDI_EV_FAILURE);
+	}
+}
+
+/*ARGSUSED*/
+static void
+i_ldi_ev_callback(dev_info_t *dip, ddi_eventcookie_t event_cookie,
+    void *arg, void *ev_data)
+{
+	ldi_ev_callback_impl_t *lecp = (ldi_ev_callback_impl_t *)arg;
+
+	ASSERT(lecp != NULL);
+	ASSERT(!ldi_native_cookie(lecp->lec_cookie));
+	ASSERT(lecp->lec_lhp);
+	ASSERT(lecp->lec_notify == NULL);
+	ASSERT(lecp->lec_finalize);
+
+	LDI_EVDBG((CE_NOTE, "i_ldi_ev_callback: ldh=%p, cookie=%p, arg=%p, "
+	    "ev_data=%p", (void *)lecp->lec_lhp, (void *)event_cookie,
+	    (void *)lecp->lec_arg, (void *)ev_data));
+
+	lecp->lec_finalize(lecp->lec_lhp, (ldi_ev_cookie_t)event_cookie,
+	    lecp->lec_arg, ev_data);
+}
+
+int
+ldi_ev_register_callbacks(ldi_handle_t lh, ldi_ev_cookie_t cookie,
+    ldi_ev_callback_t *callb, void *arg, ldi_callback_id_t *id)
+{
+	struct ldi_handle	*lhp = (struct ldi_handle *)lh;
+	ldi_ev_callback_impl_t	*lecp;
+	dev_t			dev;
+	struct snode		*csp;
+	dev_info_t		*dip;
+	int			ddi_event;
+
+	ASSERT(!servicing_interrupt());
+
+	if (lh == NULL || cookie == NULL || callb == NULL || id == NULL) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks: Invalid args"));
+		return (LDI_EV_FAILURE);
+	}
+
+	if (callb->cb_vers != LDI_EV_CB_VERS) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks: Invalid vers"));
+		return (LDI_EV_FAILURE);
+	}
+
+	if (callb->cb_notify == NULL && callb->cb_finalize == NULL) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks: NULL callb"));
+		return (LDI_EV_FAILURE);
+	}
+
+	*id = 0;
+
+	dev = lhp->lh_vp->v_rdev;
+	csp = VTOCS(lhp->lh_vp);
+	mutex_enter(&csp->s_lock);
+	if ((dip = csp->s_dip) != NULL)
+		e_ddi_hold_devi(dip);
+	mutex_exit(&csp->s_lock);
+	if (dip == NULL)
+		dip = e_ddi_hold_devi_by_dev(dev, 0);
+
+	if (dip == NULL) {
+		cmn_err(CE_WARN, "ldi_ev_register: No devinfo node for "
+		    "LDI handle: %p", (void *)lhp);
+		return (LDI_EV_FAILURE);
+	}
+
+	lecp = kmem_zalloc(sizeof (ldi_ev_callback_impl_t), KM_SLEEP);
+
+	ddi_event = 0;
+	if (!ldi_native_cookie(cookie)) {
+		if (callb->cb_notify || callb->cb_finalize == NULL) {
+			/*
+			 * NDI event services only accept finalize
+			 */
+			cmn_err(CE_WARN, "%s: module: %s: NDI event cookie. "
+			    "Only finalize"
+			    " callback supported with this cookie",
+			    "ldi_ev_register_callbacks",
+			    lhp->lh_ident->li_modname);
+			kmem_free(lecp, sizeof (ldi_ev_callback_impl_t));
+			ddi_release_devi(dip);
+			return (LDI_EV_FAILURE);
+		}
+
+		if (ddi_add_event_handler(dip, (ddi_eventcookie_t)cookie,
+		    i_ldi_ev_callback, (void *)lecp,
+		    (ddi_callback_id_t *)&lecp->lec_id)
+		    != DDI_SUCCESS) {
+			kmem_free(lecp, sizeof (ldi_ev_callback_impl_t));
+			ddi_release_devi(dip);
+			LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks(): "
+			    "ddi_add_event_handler failed"));
+			return (LDI_EV_FAILURE);
+		}
+		ddi_event = 1;
+		LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks(): "
+		    "ddi_add_event_handler success"));
+	}
+
+
+
+	ldi_ev_lock();
+
+	/*
+	 * Add the notify/finalize callback to the LDI's list of callbacks.
+	 */
+	lecp->lec_lhp = lhp;
+	lecp->lec_dev = lhp->lh_vp->v_rdev;
+	lecp->lec_spec = (lhp->lh_vp->v_type == VCHR) ?
+	    S_IFCHR : S_IFBLK;
+	lecp->lec_notify = callb->cb_notify;
+	lecp->lec_finalize = callb->cb_finalize;
+	lecp->lec_arg = arg;
+	lecp->lec_cookie = cookie;
+	if (!ddi_event)
+		lecp->lec_id = (void *)(uintptr_t)(++ldi_ev_id_pool);
+	else
+		ASSERT(lecp->lec_id);
+	lecp->lec_dip = dip;
+	list_insert_tail(&ldi_ev_callback_list.le_head, lecp);
+
+	*id = (ldi_callback_id_t)lecp->lec_id;
+
+	ldi_ev_unlock();
+
+	ddi_release_devi(dip);
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_register_callbacks: registered "
+	    "notify/finalize"));
+
+	return (LDI_EV_SUCCESS);
+}
+
+static int
+ldi_ev_device_match(ldi_ev_callback_impl_t *lecp, dev_info_t *dip,
+    dev_t dev, int spec_type)
+{
+	ASSERT(lecp);
+	ASSERT(dip);
+	ASSERT(dev != DDI_DEV_T_NONE);
+	ASSERT(dev != NODEV);
+	ASSERT((dev == DDI_DEV_T_ANY && spec_type == 0) ||
+	    (spec_type == S_IFCHR || spec_type == S_IFBLK));
+	ASSERT(lecp->lec_dip);
+	ASSERT(lecp->lec_spec == S_IFCHR || lecp->lec_spec == S_IFBLK);
+	ASSERT(lecp->lec_dev != DDI_DEV_T_ANY);
+	ASSERT(lecp->lec_dev != DDI_DEV_T_NONE);
+	ASSERT(lecp->lec_dev != NODEV);
+
+	if (dip != lecp->lec_dip)
+		return (0);
+
+	if (dev != DDI_DEV_T_ANY) {
+		if (dev != lecp->lec_dev || spec_type != lecp->lec_spec)
+			return (0);
+	}
+
+	LDI_EVTRC((CE_NOTE, "ldi_ev_device_match: MATCH dip=%p", (void *)dip));
+
+	return (1);
+}
+
+/*
+ * LDI framework function to post a "notify" event to all layered drivers
+ * that have registered for that event
+ *
+ * Returns:
+ *		LDI_EV_SUCCESS - registered callbacks allow event
+ *		LDI_EV_FAILURE - registered callbacks block event
+ *		LDI_EV_NONE    - No matching LDI callbacks
+ *
+ * This function is *not* to be called by layered drivers. It is for I/O
+ * framework code in Solaris, such as the I/O retire code and DR code
+ * to call while servicing a device event such as offline or degraded.
+ */
+int
+ldi_invoke_notify(dev_info_t *dip, dev_t dev, int spec_type, char *event,
+    void *ev_data)
+{
+	ldi_ev_callback_impl_t *lecp;
+	list_t	*listp;
+	int	ret;
+	char	*lec_event;
+
+	ASSERT(dip);
+	ASSERT(dev != DDI_DEV_T_NONE);
+	ASSERT(dev != NODEV);
+	ASSERT((dev == DDI_DEV_T_ANY && spec_type == 0) ||
+	    (spec_type == S_IFCHR || spec_type == S_IFBLK));
+	ASSERT(event);
+	ASSERT(ldi_native_event(event));
+	ASSERT(ldi_ev_sync_event(event));
+
+	LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): entered: dip=%p, ev=%s",
+	    (void *)dip, event));
+
+	ret = LDI_EV_NONE;
+	ldi_ev_lock();
+	listp = &ldi_ev_callback_list.le_head;
+	for (lecp = list_head(listp); lecp; lecp = list_next(listp, lecp)) {
+
+		/* Check if matching device */
+		if (!ldi_ev_device_match(lecp, dip, dev, spec_type))
+			continue;
+
+		if (lecp->lec_lhp == NULL) {
+			/*
+			 * Consumer has unregistered the handle and so
+			 * is no longer interested in notify events.
+			 */
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): No LDI "
+			    "handle, skipping"));
+			continue;
+		}
+
+		if (lecp->lec_notify == NULL) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): No notify "
+			    "callback. skipping"));
+			continue;	/* not interested in notify */
+		}
+
+		/*
+		 * Check if matching event
+		 */
+		lec_event = ldi_ev_get_type(lecp->lec_cookie);
+		if (strcmp(event, lec_event) != 0) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): Not matching"
+			    " event {%s,%s}. skipping", event, lec_event));
+			continue;
+		}
+
+		lecp->lec_lhp->lh_flags |= LH_FLAGS_NOTIFY;
+		if (lecp->lec_notify(lecp->lec_lhp, lecp->lec_cookie,
+		    lecp->lec_arg, ev_data) != LDI_EV_SUCCESS) {
+			ret = LDI_EV_FAILURE;
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): notify"
+			    " FAILURE"));
+			break;
+		}
+
+		/* We have a matching callback that allows the event to occur */
+		ret = LDI_EV_SUCCESS;
+
+		LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): 1 consumer success"));
+	}
+
+	if (ret != LDI_EV_FAILURE)
+		goto out;
+
+	LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): undoing notify"));
+
+	/*
+	 * Undo notifies already sent
+	 */
+	lecp = list_prev(listp, lecp);
+	for (; lecp; lecp = list_prev(listp, lecp)) {
+
+		/*
+		 * Check if matching device
+		 */
+		if (!ldi_ev_device_match(lecp, dip, dev, spec_type))
+			continue;
+
+
+		if (lecp->lec_finalize == NULL) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): no finalize, "
+			    "skipping"));
+			continue;	/* not interested in finalize */
+		}
+
+		/*
+		 * it is possible that in response to a notify event a
+		 * layered driver closed its LDI handle so it is ok
+		 * to have a NULL LDI handle for finalize. The layered
+		 * driver is expected to maintain state in its "arg"
+		 * parameter to keep track of the closed device.
+		 */
+
+		/* Check if matching event */
+		lec_event = ldi_ev_get_type(lecp->lec_cookie);
+		if (strcmp(event, lec_event) != 0) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): not matching "
+			    "event: %s,%s, skipping", event, lec_event));
+			continue;
+		}
+
+		LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): calling finalize"));
+
+		lecp->lec_finalize(lecp->lec_lhp, lecp->lec_cookie,
+		    LDI_EV_FAILURE, lecp->lec_arg, ev_data);
+
+		/*
+		 * If LDI native event and LDI handle closed in context
+		 * of notify, NULL out the finalize callback as we have
+		 * already called the 1 finalize above allowed in this situation
+		 */
+		if (lecp->lec_lhp == NULL &&
+		    ldi_native_cookie(lecp->lec_cookie)) {
+			LDI_EVDBG((CE_NOTE,
+			    "ldi_invoke_notify(): NULL-ing finalize after "
+			    "calling 1 finalize following ldi_close"));
+			lecp->lec_finalize = NULL;
+		}
+	}
+
+out:
+	ldi_ev_unlock();
+
+	if (ret == LDI_EV_NONE) {
+		LDI_EVDBG((CE_NOTE, "ldi_invoke_notify(): no matching "
+		    "LDI callbacks"));
+	}
+
+	return (ret);
+}
+
+/*
+ * Framework function to be called from a layered driver to propagate
+ * LDI "notify" events to exported minors.
+ *
+ * This function is a public interface exported by the LDI framework
+ * for use by layered drivers to propagate device events up the software
+ * stack.
+ */
+int
+ldi_ev_notify(dev_info_t *dip, minor_t minor, int spec_type,
+    ldi_ev_cookie_t cookie, void *ev_data)
+{
+	char		*evname = ldi_ev_get_type(cookie);
+	uint_t		ct_evtype;
+	dev_t		dev;
+	major_t		major;
+	int		retc;
+	int		retl;
+
+	ASSERT(spec_type == S_IFBLK || spec_type == S_IFCHR);
+	ASSERT(dip);
+	ASSERT(ldi_native_cookie(cookie));
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): entered: event=%s, dip=%p",
+	    evname, (void *)dip));
+
+	if (!ldi_ev_sync_event(evname)) {
+		cmn_err(CE_PANIC, "ldi_ev_notify(): %s not a "
+		    "negotiatable event", evname);
+		return (LDI_EV_SUCCESS);
+	}
+
+	major = ddi_driver_major(dip);
+	if (major == (major_t)-1) {
+		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(dip, path);
+		cmn_err(CE_WARN, "ldi_ev_notify: cannot derive major number "
+		    "for device %s", path);
+		kmem_free(path, MAXPATHLEN);
+		return (LDI_EV_FAILURE);
+	}
+	dev = makedevice(major, minor);
+
+	/*
+	 * Generate negotiation contract events on contracts (if any) associated
+	 * with this minor.
+	 */
+	LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): calling contract nego."));
+	ct_evtype = ldi_contract_event(evname);
+	retc = contract_device_negotiate(dip, dev, spec_type, ct_evtype);
+	if (retc == CT_NACK) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): contract neg. NACK"));
+		return (LDI_EV_FAILURE);
+	}
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): LDI invoke notify"));
+	retl = ldi_invoke_notify(dip, dev, spec_type, evname, ev_data);
+	if (retl == LDI_EV_FAILURE) {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): ldi_invoke_notify "
+		    "returned FAILURE. Calling contract negend"));
+		contract_device_negend(dip, dev, spec_type, CT_EV_FAILURE);
+		return (LDI_EV_FAILURE);
+	}
+
+	/*
+	 * The very fact that we are here indicates that there is a
+	 * LDI callback (and hence a constraint) for the retire of the
+	 * HW device. So we just return success even if there are no
+	 * contracts or LDI callbacks against the minors layered on top
+	 * of the HW minors
+	 */
+	LDI_EVDBG((CE_NOTE, "ldi_ev_notify(): returning SUCCESS"));
+	return (LDI_EV_SUCCESS);
+}
+
+/*
+ * LDI framework function to invoke "finalize" callbacks for all layered
+ * drivers that have registered callbacks for that event.
+ *
+ * This function is *not* to be called by layered drivers. It is for I/O
+ * framework code in Solaris, such as the I/O retire code and DR code
+ * to call while servicing a device event such as offline or degraded.
+ */
+void
+ldi_invoke_finalize(dev_info_t *dip, dev_t dev, int spec_type, char *event,
+    int ldi_result, void *ev_data)
+{
+	ldi_ev_callback_impl_t *lecp;
+	list_t	*listp;
+	char	*lec_event;
+	int	found = 0;
+
+	ASSERT(dip);
+	ASSERT(dev != DDI_DEV_T_NONE);
+	ASSERT(dev != NODEV);
+	ASSERT((dev == DDI_DEV_T_ANY && spec_type == 0) ||
+	    (spec_type == S_IFCHR || spec_type == S_IFBLK));
+	ASSERT(event);
+	ASSERT(ldi_native_event(event));
+	ASSERT(ldi_result == LDI_EV_SUCCESS || ldi_result == LDI_EV_FAILURE);
+
+	LDI_EVDBG((CE_NOTE, "ldi_invoke_finalize(): entered: dip=%p, result=%d"
+	    " event=%s", (void *)dip, ldi_result, event));
+
+	ldi_ev_lock();
+	listp = &ldi_ev_callback_list.le_head;
+	for (lecp = list_head(listp); lecp; lecp = list_next(listp, lecp)) {
+
+		if (lecp->lec_finalize == NULL) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_finalize(): No "
+			    "finalize. Skipping"));
+			continue;	/* Not interested in finalize */
+		}
+
+		/*
+		 * Check if matching device
+		 */
+		if (!ldi_ev_device_match(lecp, dip, dev, spec_type))
+			continue;
+
+		/*
+		 * It is valid for the LDI handle to be NULL during finalize.
+		 * The layered driver may have done an LDI close in the notify
+		 * callback.
+		 */
+
+		/*
+		 * Check if matching event
+		 */
+		lec_event = ldi_ev_get_type(lecp->lec_cookie);
+		if (strcmp(event, lec_event) != 0) {
+			LDI_EVDBG((CE_NOTE, "ldi_invoke_finalize(): Not "
+			    "matching event {%s,%s}. Skipping",
+			    event, lec_event));
+			continue;
+		}
+
+		LDI_EVDBG((CE_NOTE, "ldi_invoke_finalize(): calling finalize"));
+
+		found = 1;
+
+		lecp->lec_finalize(lecp->lec_lhp, lecp->lec_cookie,
+		    ldi_result, lecp->lec_arg, ev_data);
+
+		/*
+		 * If LDI native event and LDI handle closed in context
+		 * of notify, NULL out the finalize callback as we have
+		 * already called the 1 finalize above allowed in this situation
+		 */
+		if (lecp->lec_lhp == NULL &&
+		    ldi_native_cookie(lecp->lec_cookie)) {
+			LDI_EVDBG((CE_NOTE,
+			    "ldi_invoke_finalize(): NULLing finalize after "
+			    "calling 1 finalize following ldi_close"));
+			lecp->lec_finalize = NULL;
+		}
+	}
+	ldi_ev_unlock();
+
+	if (found)
+		return;
+
+	LDI_EVDBG((CE_NOTE, "ldi_invoke_finalize(): no matching callbacks"));
+}
+
+/*
+ * Framework function to be called from a layered driver to propagate
+ * LDI "finalize" events to exported minors.
+ *
+ * This function is a public interface exported by the LDI framework
+ * for use by layered drivers to propagate device events up the software
+ * stack.
+ */
+void
+ldi_ev_finalize(dev_info_t *dip, minor_t minor, int spec_type, int ldi_result,
+    ldi_ev_cookie_t cookie, void *ev_data)
+{
+	dev_t dev;
+	major_t major;
+	char *evname;
+	int ct_result = (ldi_result == LDI_EV_SUCCESS) ?
+	    CT_EV_SUCCESS : CT_EV_FAILURE;
+	uint_t ct_evtype;
+
+	ASSERT(dip);
+	ASSERT(spec_type == S_IFBLK || spec_type == S_IFCHR);
+	ASSERT(ldi_result == LDI_EV_SUCCESS || ldi_result == LDI_EV_FAILURE);
+	ASSERT(ldi_native_cookie(cookie));
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_finalize: entered: dip=%p", (void *)dip));
+
+	major = ddi_driver_major(dip);
+	if (major == (major_t)-1) {
+		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(dip, path);
+		cmn_err(CE_WARN, "ldi_ev_finalize: cannot derive major number "
+		    "for device %s", path);
+		kmem_free(path, MAXPATHLEN);
+		return;
+	}
+	dev = makedevice(major, minor);
+
+	evname = ldi_ev_get_type(cookie);
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_finalize: calling contracts"));
+	ct_evtype = ldi_contract_event(evname);
+	contract_device_finalize(dip, dev, spec_type, ct_evtype, ct_result);
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_finalize: calling ldi_invoke_finalize"));
+	ldi_invoke_finalize(dip, dev, spec_type, evname, ldi_result, ev_data);
+}
+
+int
+ldi_ev_remove_callbacks(ldi_callback_id_t id)
+{
+	ldi_ev_callback_impl_t	*lecp;
+	ldi_ev_callback_impl_t	*next;
+	ldi_ev_callback_impl_t	*found;
+	list_t			*listp;
+
+	ASSERT(!servicing_interrupt());
+
+	if (id == 0) {
+		cmn_err(CE_WARN, "ldi_ev_remove_callbacks: Invalid ID 0");
+		return (LDI_EV_FAILURE);
+	}
+
+	LDI_EVDBG((CE_NOTE, "ldi_ev_remove_callbacks: entered: id=%p",
+	    (void *)id));
+
+	ldi_ev_lock();
+
+	listp = &ldi_ev_callback_list.le_head;
+	next = found = NULL;
+	for (lecp = list_head(listp); lecp; lecp = next) {
+		next = list_next(listp, lecp);
+		if (lecp->lec_id == id) {
+			ASSERT(found == NULL);
+			list_remove(listp, lecp);
+			found = lecp;
+		}
+	}
+	ldi_ev_unlock();
+
+	if (found == NULL) {
+		cmn_err(CE_WARN, "No LDI event handler for id (%p)",
+		    (void *)id);
+		return (LDI_EV_SUCCESS);
+	}
+
+	if (!ldi_native_cookie(found->lec_cookie)) {
+		ASSERT(found->lec_notify == NULL);
+		if (ddi_remove_event_handler((ddi_callback_id_t)id)
+		    != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "failed to remove NDI event handler "
+			    "for id (%p)", (void *)id);
+			ldi_ev_lock();
+			list_insert_tail(listp, found);
+			ldi_ev_unlock();
+			return (LDI_EV_FAILURE);
+		}
+		LDI_EVDBG((CE_NOTE, "ldi_ev_remove_callbacks: NDI event "
+		    "service removal succeeded"));
+	} else {
+		LDI_EVDBG((CE_NOTE, "ldi_ev_remove_callbacks: removed "
+		    "LDI native callbacks"));
+	}
+	kmem_free(found, sizeof (ldi_ev_callback_impl_t));
+
+	return (LDI_EV_SUCCESS);
 }

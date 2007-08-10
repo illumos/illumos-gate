@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,10 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+extern int ct_debug;
+
+#define	CT_DEBUG(args)	if (ct_debug) cmn_err args
 
 #ifdef _SYSCALL32
 
@@ -110,7 +113,7 @@ typedef struct ctmplops {
 	int		(*ctop_set)(struct ct_template *, ct_param_t *,
 			const cred_t *);
 	int		(*ctop_get)(struct ct_template *, ct_param_t *);
-	int		(*ctop_create)(struct ct_template *);
+	int		(*ctop_create)(struct ct_template *, ctid_t *);
 	uint_t		allevents;
 } ctmplops_t;
 
@@ -127,6 +130,7 @@ typedef struct ct_template {
 	uint_t		ctmpl_ev_info;	/* term: informative events */
 } ct_template_t;
 
+
 typedef enum ct_listnum {
 	CTEL_CONTRACT,			/* ../contracts/type/<id>/events */
 	CTEL_BUNDLE,			/* ../contracts/type/bundle */
@@ -138,6 +142,12 @@ typedef enum ctqflags {
 	CTQ_DEAD = 1,	/* contract explicitly cancelled */
 	CTQ_REFFED = 2	/* queue is reference counted */
 } ctqflags_t;
+
+typedef enum ct_ack {
+	CT_ACK = 1,	/* accept break */
+	CT_NACK,	/* disallow break */
+	CT_NONE		/* no matching contracts */
+} ct_ack_t;
 
 /*
  * Contract event queue
@@ -198,6 +208,12 @@ typedef struct contops {
 	void	(*contop_destroy)(struct contract *);
 	void	(*contop_status)(struct contract *, zone_t *, int, nvlist_t *,
 	    void *, model_t);
+	int	(*contop_ack)(struct contract *, uint_t evtype,
+	    uint64_t evid);
+	int	(*contop_nack)(struct contract *, uint_t evtype,
+	    uint64_t evid);
+	int	(*contop_qack)(struct contract *, uint_t, uint64_t);
+	int	(*contop_newct)(struct contract *);
 } contops_t;
 
 typedef ct_template_t *(ct_f_default_t)(void);
@@ -220,6 +236,11 @@ typedef struct ct_type {
 typedef enum ctflags {
 	CTF_INHERIT = 0x1
 } ctflags_t;
+
+typedef struct ct_time {
+	long	ctm_total;	/* Total time allowed for event */
+	clock_t	ctm_start;	/* starting lbolt for event */
+} ct_time_t;
 
 /*
  * Contract
@@ -257,6 +278,8 @@ typedef struct contract {
 	struct contract	*ct_regent;	/* [prospective] regent contract */
 	int		ct_evcnt;	/* number of critical events */
 	ct_kevent_t	*ct_nevent;	/* negotiation event */
+	ct_time_t	ct_ntime;	/* negotiation time tracker */
+	ct_time_t	ct_qtime;	/* quantum time tracker */
 } contract_t;
 
 #define	CTLF_COPYOUT	0x1		/* performing copyout */
@@ -284,7 +307,7 @@ int ctmpl_get(ct_template_t *, ct_param_t *);
 ct_template_t *ctmpl_dup(ct_template_t *);
 void ctmpl_activate(ct_template_t *);
 void ctmpl_clear(ct_template_t *);
-int ctmpl_create(ct_template_t *);
+int ctmpl_create(ct_template_t *, ctid_t *);
 
 /*
  * Contract functions
@@ -294,12 +317,14 @@ int contract_abandon(contract_t *, struct proc *, int);
 int contract_adopt(contract_t *, struct proc *);
 void contract_destroy(contract_t *);
 void contract_exit(struct proc *);
-int contract_ack(contract_t *, uint64_t);
+int contract_ack(contract_t *ct, uint64_t evid, int cmd);
+int contract_qack(contract_t *ct, uint64_t evid);
+int contract_newct(contract_t *ct);
 
 /*
  * Event interfaces
  */
-void cte_publish_all(contract_t *, ct_kevent_t *, nvlist_t *, nvlist_t *);
+uint64_t cte_publish_all(contract_t *, ct_kevent_t *, nvlist_t *, nvlist_t *);
 void cte_add_listener(ct_equeue_t *, ct_listener_t *);
 void cte_remove_listener(ct_listener_t *);
 void cte_reset_listener(ct_listener_t *);
@@ -313,7 +338,7 @@ int cte_set_reliable(ct_listener_t *, const cred_t *);
 int contract_compar(const void *, const void *);
 void ctmpl_init(ct_template_t *, ctmplops_t *, ct_type_t *, void *);
 void ctmpl_copy(ct_template_t *, ct_template_t *);
-int ctmpl_create_inval(ct_template_t *);
+int ctmpl_create_inval(ct_template_t *, ctid_t *);
 int contract_ctor(contract_t *, ct_type_t *, ct_template_t *, void *, ctflags_t,
     struct proc *, int);
 void contract_hold(contract_t *);
@@ -351,6 +376,13 @@ ct_equeue_t *contract_type_pbundle(ct_type_t *, struct proc *);
 vnode_t *contract_vnode_get(contract_t *, vfs_t *);
 void contract_vnode_set(contract_t *, contract_vnode_t *, vnode_t *);
 int contract_vnode_clear(contract_t *, contract_vnode_t *);
+
+/*
+ * Negotiation stubs
+ */
+int contract_ack_inval(contract_t *, uint_t, uint64_t);
+int contract_qack_inval(contract_t *, uint_t, uint64_t);
+int contract_qack_notsup(contract_t *, uint_t, uint64_t);
 
 #ifdef	__cplusplus
 }

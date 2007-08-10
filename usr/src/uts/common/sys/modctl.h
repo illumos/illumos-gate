@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,6 +258,9 @@ struct modlinkage {
 #define	MODDEVNAME		37
 #define	MODGETDEVFSPATH_MI_LEN	38
 #define	MODGETDEVFSPATH_MI	39
+#define	MODRETIRE		40
+#define	MODUNRETIRE		41
+#define	MODISRETIRED		42
 
 /*
  * sub cmds for MODEVENTS
@@ -641,6 +644,7 @@ extern int modctl(int, ...);
 #define	MODDEBUG_LOADMSG	0x80000000	/* print "[un]loading..." msg */
 #define	MODDEBUG_ERRMSG		0x40000000	/* print detailed error msgs */
 #define	MODDEBUG_LOADMSG2	0x20000000	/* print 2nd level msgs */
+#define	MODDEBUG_RETIRE		0x10000000	/* print retire msgs */
 #define	MODDEBUG_FINI_EBUSY	0x00020000	/* pretend fini returns EBUSY */
 #define	MODDEBUG_NOAUL_IPP	0x00010000	/* no Autounloading ipp mods */
 #define	MODDEBUG_NOAUL_DACF	0x00008000	/* no Autounloading dacf mods */

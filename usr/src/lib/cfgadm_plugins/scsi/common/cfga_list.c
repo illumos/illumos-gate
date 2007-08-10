@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -383,13 +382,18 @@ out:
 }
 
 
+struct bus_state {
+	int	b_state;
+	int	b_retired;
+};
+
 static scfga_ret_t
 do_stat_bus(scfga_list_t *lap, int limited_bus_stat)
 {
 	cfga_list_data_t *clp = NULL;
 	ldata_list_t *listp = NULL;
 	int l_errno = 0;
-	uint_t devinfo_state = 0;
+	struct bus_state bstate = {0};
 	walkarg_t u;
 	scfga_ret_t ret;
 
@@ -399,10 +403,10 @@ do_stat_bus(scfga_list_t *lap, int limited_bus_stat)
 	u.node_args.flags = 0;
 	u.node_args.fcn = get_bus_state;
 
-	ret = walk_tree(lap->apidp->hba_phys, &devinfo_state, DINFOPROP, &u,
+	ret = walk_tree(lap->apidp->hba_phys, &bstate, DINFOPROP, &u,
 	    SCFGA_WALK_NODE, &l_errno);
 	if (ret == SCFGA_OK) {
-		lap->hba_rstate = bus_devinfo_to_recep_state(devinfo_state);
+		lap->hba_rstate = bus_devinfo_to_recep_state(bstate.b_state);
 	} else {
 		lap->hba_rstate = CFGA_STAT_NONE;
 	}
@@ -428,7 +432,8 @@ do_stat_bus(scfga_list_t *lap, int limited_bus_stat)
 	clp->ap_class[0] = '\0';	/* Filled by libcfgadm */
 	clp->ap_r_state = lap->hba_rstate;
 	clp->ap_o_state = CFGA_STAT_NONE; /* filled in later by the plug-in */
-	clp->ap_cond = CFGA_COND_UNKNOWN;
+	clp->ap_cond =
+	    (bstate.b_retired) ? CFGA_COND_FAILED : CFGA_COND_UNKNOWN;
 	clp->ap_busy = 0;
 	clp->ap_status_time = (time_t)-1;
 	clp->ap_info[0] = '\0';
@@ -446,9 +451,10 @@ do_stat_bus(scfga_list_t *lap, int limited_bus_stat)
 static int
 get_bus_state(di_node_t node, void *arg)
 {
-	uint_t *di_statep = (uint_t *)arg;
+	struct bus_state *bsp = (struct bus_state *)arg;
 
-	*di_statep = di_state(node);
+	bsp->b_state = di_state(node);
+	bsp->b_retired = di_retired(node);
 
 	return (DI_WALK_TERMINATE);
 }
@@ -512,7 +518,7 @@ do_stat_dev(
 	clp->ap_class[0] = '\0'; /* Filled in by libcfgadm */
 	clp->ap_r_state = lap->hba_rstate;
 	clp->ap_o_state = ostate;
-	clp->ap_cond = CFGA_COND_UNKNOWN;
+	clp->ap_cond = di_retired(node) ? CFGA_COND_FAILED : CFGA_COND_UNKNOWN;
 	clp->ap_busy = 0; /* no way to determine state change */
 	clp->ap_status_time = (time_t)-1;
 

@@ -355,6 +355,11 @@ extern void *di_parent_private_data(di_node_t node);
 extern void *di_driver_private_data(di_node_t node);
 
 /*
+ * The value of the dip's devi_flags field
+ */
+uint_t di_flags(di_node_t node);
+
+/*
  * Types of links for devlink lookup
  */
 #define	DI_PRIMARY_LINK		0x01
@@ -410,6 +415,19 @@ extern di_devlink_handle_t di_devlink_init_root(const char *root,
 extern int di_devlink_cache_walk(di_devlink_handle_t hdp, const char *re,
     const char *path, uint_t flags, void *arg,
     int (*devlink_callback)(di_devlink_t, void *));
+
+/*
+ * Private interfaces for I/O retire
+ */
+typedef struct di_retire {
+	void	*rt_hdl;
+	void	(*rt_abort)(void *hdl, const char *format, ...);
+	void	(*rt_debug)(void *hdl, const char *format, ...);
+} di_retire_t;
+
+extern int di_retire_device(char *path, di_retire_t *dp, int flags);
+extern int di_unretire_device(char *path, di_retire_t *dp);
+extern uint_t di_retired(di_node_t node);
 
 /*
  * Private interfaces for /etc/logindevperm

@@ -68,6 +68,7 @@
 #include <sys/nvpair.h>
 #include <sys/sunmdi.h>
 #include <sys/fs/dv_node.h>
+#include <sys/sunldi_impl.h>
 
 #ifdef __sparc
 #include <sys/archsystm.h>	/* getpil/setpil */
@@ -853,12 +854,28 @@ ndi_dc_devi_create(struct devctl_iocdata *dcp, dev_info_t *pdip, int flags,
 	 */
 	if (dcp->flags & DEVCTL_OFFLINE) {
 		/*
+		 * In the unlikely event that the dip was somehow attached by
+		 * the userland process (and device contracts or LDI opens
+		 * were registered against the dip) after it was created by
+		 * a previous DEVCTL_CONSTRUCT call, we start notify
+		 * proceedings on this dip. Note that we don't need to
+		 * return the dip after a failure of the notify since
+		 * for a contract or LDI handle to be created the dip was
+		 * already available to the user.
+		 */
+		if (e_ddi_offline_notify(cdip) == DDI_FAILURE) {
+			return (EBUSY);
+		}
+
+		/*
 		 * hand set the OFFLINE flag to prevent any asynchronous
 		 * autoconfiguration operations from attaching this node.
 		 */
 		mutex_enter(&(DEVI(cdip)->devi_lock));
 		DEVI_SET_DEVICE_OFFLINE(cdip);
 		mutex_exit(&(DEVI(cdip)->devi_lock));
+
+		e_ddi_offline_finalize(cdip, DDI_SUCCESS);
 
 		rv = ndi_devi_bind_driver(cdip, flags);
 		if (rv != NDI_SUCCESS) {

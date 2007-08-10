@@ -161,8 +161,6 @@ extern int make_mbind(char *, int, char *, struct bind **);
 
 static int minorperm_loaded = 0;
 
-
-
 void
 mod_setup(void)
 {
@@ -796,6 +794,217 @@ modctl_getmaj(char *uname, uint_t ulen, int *umajorp)
 	if (copyout(&major, umajorp, sizeof (major_t)) != 0)
 		return (EFAULT);
 	return (0);
+}
+
+static char **
+convert_constraint_string(char *constraints, size_t len)
+{
+	int	i;
+	int	n;
+	char	*p;
+	char	**array;
+
+	ASSERT(constraints != NULL);
+	ASSERT(len > 0);
+
+	for (i = 0, p = constraints; strlen(p) > 0; i++, p += strlen(p) + 1);
+
+	n = i;
+
+	if (n == 0) {
+		kmem_free(constraints, len);
+		return (NULL);
+	}
+
+	array = kmem_alloc((n + 1) * sizeof (char *), KM_SLEEP);
+
+	for (i = 0, p = constraints; i < n; i++, p += strlen(p) + 1) {
+		array[i] = i_ddi_strdup(p, KM_SLEEP);
+	}
+	array[n] = NULL;
+
+	kmem_free(constraints, len);
+
+	return (array);
+}
+/*ARGSUSED*/
+static int
+modctl_retire(char *path, char *uconstraints, size_t ulen)
+{
+	char	*pathbuf;
+	char	*devpath;
+	size_t	pathsz;
+	int	retval;
+	char	*constraints;
+	char	**cons_array;
+
+	if (path == NULL)
+		return (EINVAL);
+
+	if ((uconstraints == NULL) ^ (ulen == 0))
+		return (EINVAL);
+
+	pathbuf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	retval = copyinstr(path, pathbuf, MAXPATHLEN, &pathsz);
+	if (retval != 0) {
+		kmem_free(pathbuf, MAXPATHLEN);
+		return (retval);
+	}
+	devpath = i_ddi_strdup(pathbuf, KM_SLEEP);
+	kmem_free(pathbuf, MAXPATHLEN);
+
+	/*
+	 * First check if the device is already retired.
+	 * If it is, this becomes a NOP
+	 */
+	if (e_ddi_device_retired(devpath)) {
+		cmn_err(CE_NOTE, "Device: already retired: %s", devpath);
+		kmem_free(devpath, strlen(devpath) + 1);
+		return (0);
+	}
+
+	cons_array = NULL;
+	if (uconstraints) {
+		constraints = kmem_alloc(ulen, KM_SLEEP);
+		if (copyin(uconstraints, constraints, ulen)) {
+			kmem_free(constraints, ulen);
+			kmem_free(devpath, strlen(devpath) + 1);
+			return (EFAULT);
+		}
+		cons_array = convert_constraint_string(constraints, ulen);
+	}
+
+	/*
+	 * Try to retire the device first. The following
+	 * routine will return an error only if the device
+	 * is not retireable i.e. retire constraints forbid
+	 * a retire. A return of success from this routine
+	 * indicates that device is retireable.
+	 */
+	retval = e_ddi_retire_device(devpath, cons_array);
+	if (retval != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "constraints forbid retire: %s", devpath);
+		kmem_free(devpath, strlen(devpath) + 1);
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Ok, the retire succeeded. Persist the retire.
+	 * If retiring a nexus, we need to only persist the
+	 * nexus retire. Any children of a retired nexus
+	 * are automatically covered by the retire store
+	 * code.
+	 */
+	retval = e_ddi_retire_persist(devpath);
+	if (retval != 0) {
+		cmn_err(CE_WARN, "Failed to persist device retire: error %d: "
+		    "%s", retval, devpath);
+		kmem_free(devpath, strlen(devpath) + 1);
+		return (retval);
+	}
+	if (moddebug & MODDEBUG_RETIRE)
+		cmn_err(CE_NOTE, "Persisted retire of device: %s", devpath);
+
+	kmem_free(devpath, strlen(devpath) + 1);
+	return (0);
+}
+
+static int
+modctl_is_retired(char *path, int *statep)
+{
+	char	*pathbuf;
+	char	*devpath;
+	size_t	pathsz;
+	int	error;
+	int	status;
+
+	if (path == NULL || statep == NULL)
+		return (EINVAL);
+
+	pathbuf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	error = copyinstr(path, pathbuf, MAXPATHLEN, &pathsz);
+	if (error != 0) {
+		kmem_free(pathbuf, MAXPATHLEN);
+		return (error);
+	}
+	devpath = i_ddi_strdup(pathbuf, KM_SLEEP);
+	kmem_free(pathbuf, MAXPATHLEN);
+
+	if (e_ddi_device_retired(devpath))
+		status = 1;
+	else
+		status = 0;
+	kmem_free(devpath, strlen(devpath) + 1);
+
+	return (copyout(&status, statep, sizeof (status)) ? EFAULT : 0);
+}
+
+static int
+modctl_unretire(char *path)
+{
+	char	*pathbuf;
+	char	*devpath;
+	size_t	pathsz;
+	int	retired;
+	int	retval;
+
+	if (path == NULL)
+		return (EINVAL);
+
+	pathbuf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	retval = copyinstr(path, pathbuf, MAXPATHLEN, &pathsz);
+	if (retval != 0) {
+		kmem_free(pathbuf, MAXPATHLEN);
+		return (retval);
+	}
+	devpath = i_ddi_strdup(pathbuf, KM_SLEEP);
+	kmem_free(pathbuf, MAXPATHLEN);
+
+	/*
+	 * We check if a device is retired (first) before
+	 * unpersisting the retire, because we use the
+	 * retire store to determine if a device is retired.
+	 * If we unpersist first, the device will always appear
+	 * to be unretired. For the rationale behind unpersisting
+	 * a device that is not retired, see the next comment.
+	 */
+	retired = e_ddi_device_retired(devpath);
+
+	/*
+	 * We call unpersist unconditionally because the lookup
+	 * for retired devices (e_ddi_device_retired()), skips "bypassed"
+	 * devices. We still want to be able remove "bypassed" entries
+	 * from the persistent store, so we unpersist unconditionally
+	 * i.e. whether or not the entry is found on a lookup.
+	 *
+	 * e_ddi_retire_unpersist() returns 1 if it found and cleared
+	 * an entry from the retire store or 0 otherwise.
+	 */
+	if (e_ddi_retire_unpersist(devpath))
+		if (moddebug & MODDEBUG_RETIRE) {
+			cmn_err(CE_NOTE, "Unpersisted retire of device: %s",
+			    devpath);
+		}
+
+	/*
+	 * Check if the device is already unretired. If so,
+	 * the unretire becomes a NOP
+	 */
+	if (!retired) {
+		cmn_err(CE_NOTE, "Not retired: %s", devpath);
+		kmem_free(devpath, strlen(devpath) + 1);
+		return (0);
+	}
+
+	retval = e_ddi_unretire_device(devpath);
+	if (retval != 0) {
+		cmn_err(CE_WARN, "cannot unretire device: error %d, path %s\n",
+		    retval, devpath);
+	}
+
+	kmem_free(devpath, strlen(devpath) + 1);
+
+	return (retval);
 }
 
 static int
@@ -2067,6 +2276,18 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODDEVNAME:
 		error = modctl_moddevname((int)a1, a2, a3);
+		break;
+
+	case MODRETIRE:	/* retire device named by physpath a1 */
+		error = modctl_retire((char *)a1, (char *)a2, (size_t)a3);
+		break;
+
+	case MODISRETIRED:  /* check if a device is retired. */
+		error = modctl_is_retired((char *)a1, (int *)a2);
+		break;
+
+	case MODUNRETIRE:	/* unretire device named by physpath a1 */
+		error = modctl_unretire((char *)a1);
 		break;
 
 	default:

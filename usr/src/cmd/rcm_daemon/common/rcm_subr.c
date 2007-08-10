@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -797,6 +796,21 @@ rsrc_client_action(client_t *client, int cmd, void *arg)
 		rval = ops->rcmop_request_offline(hdl, client->alias,
 		    client->pid, targ->flag, &error, &depend_info);
 
+		/*
+		 * If this is a retire operation and we managed to call
+		 * into at least one client, set retcode to RCM_SUCCESS to
+		 * indicate that retire has been subject to constraints
+		 * This retcode will be further modified by actual return
+		 * code.
+		 */
+		if ((targ->flag & RCM_RETIRE_REQUEST) &&
+		    (targ->retcode == RCM_NO_CONSTRAINT)) {
+			rcm_log_message(RCM_DEBUG,
+			    "at least 1 client, constraint applied: %s\n",
+			    client->alias);
+			targ->retcode = RCM_SUCCESS;
+		}
+
 		/* Update the client's state after the operation. */
 		if ((targ->flag & RCM_QUERY) == 0) {
 			if (rval == RCM_SUCCESS) {
@@ -920,10 +934,22 @@ int
 rsrc_client_action_list(client_t *list, int cmd, void *arg)
 {
 	int error, rval = RCM_SUCCESS;
+	tree_walk_arg_t		*targ = (tree_walk_arg_t *)arg;
 
 	while (list) {
 		client_t *client = list;
 		list = client->next;
+
+		/*
+		 * Make offline idempotent in the retire
+		 * case
+		 */
+		if ((targ->flag & RCM_RETIRE_REQUEST) &&
+		    client->state == RCM_STATE_REMOVE) {
+			client->state = RCM_STATE_ONLINE;
+			rcm_log_message(RCM_DEBUG, "RETIRE: idempotent client "
+			    "state: REMOVE -> ONLINE: %s\n", client->alias);
+		}
 
 		if (client->state == RCM_STATE_REMOVE)
 			continue;
@@ -1408,8 +1434,20 @@ rsrc_tree_action(rsrc_node_t *root, int cmd, tree_walk_arg_t *arg)
 	rcm_log_message(RCM_TRACE2, "tree_action(%s, %d)\n", root->name, cmd);
 
 	arg->cmd = cmd;
-	arg->retcode = RCM_SUCCESS;
-	rsrc_walk(root, (void *)arg, node_action);
+
+	/*
+	 * If RCM_RETIRE_REQUEST is set, just walk one node and preset
+	 * retcode to NO_CONSTRAINT
+	 */
+	if (arg->flag & RCM_RETIRE_REQUEST) {
+		rcm_log_message(RCM_TRACE1, "tree_action: RETIRE_REQ: walking "
+		    "only root node: %s\n", root->name);
+		arg->retcode = RCM_NO_CONSTRAINT;
+		(void) node_action(root, arg);
+	} else {
+		arg->retcode = RCM_SUCCESS;
+		rsrc_walk(root, (void *)arg, node_action);
+	}
 
 	return (arg->retcode);
 }

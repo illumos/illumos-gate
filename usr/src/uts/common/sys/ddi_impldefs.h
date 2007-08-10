@@ -194,6 +194,12 @@ struct dev_info  {
 	char		*devi_addr_buf;		/* buffer for devi_addr */
 
 	char		*devi_rebinding_name;	/* binding_name of rebind */
+	/* For device contracts that have this dip's minor node as resource */
+	kmutex_t	devi_ct_lock;		/* contract lock */
+	kcondvar_t	devi_ct_cv;		/* contract cv */
+	int		devi_ct_count;		/* # of outstanding responses */
+	int		devi_ct_neg;		/* neg. occurred on dip */
+	list_t		devi_ct;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))
@@ -271,6 +277,11 @@ struct dev_info  {
 
 #define	DEVI_SET_DEVICE_ONLINE(dip)	{				\
 	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	if (DEVI(dip)->devi_state & DEVI_DEVICE_DEGRADED) {		\
+		mutex_exit(&DEVI(dip)->devi_lock);			\
+		e_ddi_undegrade_finalize(dip);				\
+		mutex_enter(&DEVI(dip)->devi_lock);			\
+	}								\
 	/* setting ONLINE clears DOWN, DEGRADED, OFFLINE */		\
 	DEVI(dip)->devi_state &= ~(DEVI_DEVICE_DOWN |			\
 	    DEVI_DEVICE_DEGRADED | DEVI_DEVICE_OFFLINE);		\
@@ -297,12 +308,20 @@ struct dev_info  {
 #define	DEVI_SET_DEVICE_DEGRADED(dip)	{				\
 	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
 	ASSERT(!DEVI_IS_DEVICE_OFFLINE(dip));				\
+	mutex_exit(&DEVI(dip)->devi_lock);				\
+	e_ddi_degrade_finalize(dip);					\
+	mutex_enter(&DEVI(dip)->devi_lock);				\
 	DEVI(dip)->devi_state |= (DEVI_DEVICE_DEGRADED | DEVI_S_REPORT); \
 	}
 
 #define	DEVI_SET_DEVICE_UP(dip)		{				\
 	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
 	ASSERT(!DEVI_IS_DEVICE_OFFLINE(dip));				\
+	if (DEVI(dip)->devi_state & DEVI_DEVICE_DEGRADED) {		\
+		mutex_exit(&DEVI(dip)->devi_lock);			\
+		e_ddi_undegrade_finalize(dip);				\
+		mutex_enter(&DEVI(dip)->devi_lock);			\
+	}								\
 	DEVI(dip)->devi_state &= ~(DEVI_DEVICE_DEGRADED | DEVI_DEVICE_DOWN); \
 	DEVI(dip)->devi_state |= DEVI_S_REPORT;				\
 	}
@@ -503,6 +522,11 @@ void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
 #define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
 #define	DEVI_PHCI_SIGNALS_VHCI	0x00000040 /* pHCI ndi_devi_exit signals vHCI */
 #define	DEVI_REBIND		0x00000080 /* post initchild driver rebind */
+#define	DEVI_RETIRED		0x00000100 /* device is retired */
+#define	DEVI_RETIRING		0x00000200 /* being evaluated for retire */
+#define	DEVI_R_CONSTRAINT	0x00000400 /* constraints have been applied  */
+#define	DEVI_R_BLOCKED		0x00000800 /* constraints block retire  */
+#define	DEVI_CT_NOP		0x00001000 /*  NOP contract event occurred */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
 #define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\

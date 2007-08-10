@@ -576,6 +576,8 @@ f none usr/include/sys/contract.h 644 root bin
 f none usr/include/sys/contract_impl.h 644 root bin
 f none usr/include/sys/contract/process.h 644 root bin
 f none usr/include/sys/contract/process_impl.h 644 root bin
+f none usr/include/sys/contract/device.h 644 root bin
+f none usr/include/sys/contract/device_impl.h 644 root bin
 f none usr/include/sys/copyops.h 644 root bin
 f none usr/include/sys/core.h 644 root bin
 f none usr/include/sys/corectl.h 644 root bin

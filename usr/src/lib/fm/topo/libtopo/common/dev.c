@@ -445,9 +445,10 @@ dev_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 			return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
 		unusable = 1;
 	} else {
+		uint_t retired = di_retired(dnode);
 		state = di_state(dnode);
-		if (state & (DI_DEVICE_OFFLINE | DI_DEVICE_DOWN |
-		    DI_BUS_QUIESCED | DI_BUS_DOWN))
+		if (retired || (state & (DI_DEVICE_OFFLINE | DI_DEVICE_DOWN |
+		    DI_BUS_QUIESCED | DI_BUS_DOWN)))
 			unusable = 1;
 		else
 			unusable = 0;

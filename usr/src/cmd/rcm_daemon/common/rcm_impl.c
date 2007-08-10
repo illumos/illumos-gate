@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +88,17 @@ common_resource_op(int cmd, char *rsrcname, pid_t pid, uint_t flag, int seq_num,
 		} else {
 			error = rsrc_tree_action(node, cmd, &arg);
 		}
+	} else if ((error == RCM_SUCCESS) && (flag & RCM_RETIRE_REQUEST)) {
+		/*
+		 * No matching node, so no client. This means there
+		 * is no constraint (RCM wise) on this retire. Return
+		 * RCM_NO_CONSTRAINT to indicate this
+		 */
+		rcm_log_message(RCM_TRACE1, "No client. Returning "
+		    "RCM_NO_CONSTRAINT: %s\n", rsrcname);
+		error = RCM_NO_CONSTRAINT;
 	}
+
 	return (error);
 }
 

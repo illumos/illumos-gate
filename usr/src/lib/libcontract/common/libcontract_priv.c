@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,16 +33,19 @@
 #include <stdio.h>
 #include <assert.h>
 #include <libuutil.h>
+#include <libintl.h>
 #include <string.h>
 #include <procfs.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
 #include "libcontract_impl.h"
 #include "process_dump.h"
+#include "device_dump.h"
 
 
 contract_type_t types[CTT_MAXTYPE] = {
-	{ "process", event_process }
+	{ "process", event_process },
+	{ "device", event_device }
 };
 
 static int
@@ -146,4 +148,24 @@ contract_event_dump(FILE *file, ct_evthdl_t hdl, int verbose)
 
 	type = info->event.ctev_cttype;
 	types[type].type_event(file, hdl, verbose);
+}
+
+void
+contract_negend_dump(FILE *file, ct_evthdl_t ev)
+{
+	ctevid_t nevid = 0;
+	ctid_t my_ctid = ct_event_get_ctid(ev);
+	ctid_t new_ctid = 0;
+	char *s;
+
+	(void) ct_event_get_nevid(ev, &nevid);
+	(void) ct_event_get_newct(ev, &new_ctid);
+
+	if (new_ctid != my_ctid) {
+		s = dgettext(TEXT_DOMAIN, "negotiation %llu succeeded\n");
+	} else {
+		s = dgettext(TEXT_DOMAIN, "negotiation %llu failed\n");
+	}
+	/*LINTED*/
+	(void) fprintf(file, s, (unsigned long long)nevid);
 }

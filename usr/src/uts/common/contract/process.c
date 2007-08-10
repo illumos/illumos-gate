@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -502,7 +501,7 @@ contract_process_adopt(contract_t *ct, proc_t *p)
 }
 
 /*
- * contract_process_status
+ * contract_process_abandon
  *
  * The process contract abandon entry point.
  */
@@ -632,11 +631,23 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 	}
 }
 
+/*ARGSUSED*/
+static int
+contract_process_newct(contract_t *ct)
+{
+	return (0);
+}
+
+/* process contracts don't negotiate */
 static contops_t contract_process_ops = {
 	contract_process_free,		/* contop_free */
 	contract_process_abandon,	/* contop_abandon */
 	contract_process_destroy,	/* contop_destroy */
-	contract_process_status		/* contop_status */
+	contract_process_status,	/* contop_status */
+	contract_ack_inval,		/* contop_ack */
+	contract_ack_inval,		/* contop_nack */
+	contract_qack_inval,		/* contop_qack */
+	contract_process_newct		/* contop_newct */
 };
 
 /*
@@ -774,7 +785,7 @@ contract_process_exit(cont_process_t *ctp, proc_t *p, int exitstatus)
 		event = kmem_zalloc(sizeof (ct_kevent_t), KM_SLEEP);
 		event->cte_flags = EVINFOP(ctp, CT_PR_EV_EXIT) ? CTE_INFO : 0;
 		event->cte_type = CT_PR_EV_EXIT;
-		cte_publish_all(ct, event, nvl, NULL);
+		(void) cte_publish_all(ct, event, nvl, NULL);
 		mutex_enter(&ct->ct_lock);
 	}
 	if (empty) {
@@ -793,7 +804,7 @@ contract_process_exit(cont_process_t *ctp, proc_t *p, int exitstatus)
 			event->cte_flags = EVINFOP(ctp, CT_PR_EV_EMPTY) ?
 			    CTE_INFO : 0;
 			event->cte_type = CT_PR_EV_EMPTY;
-			cte_publish_all(ct, event, nvl, NULL);
+			(void) cte_publish_all(ct, event, nvl, NULL);
 			mutex_enter(&ct->ct_lock);
 		}
 
@@ -877,7 +888,7 @@ contract_process_fork(ctmpl_process_t *rtmpl, proc_t *cp, proc_t *pp,
 		event = kmem_zalloc(sizeof (ct_kevent_t), KM_SLEEP);
 		event->cte_flags = EVINFOP(ctp, CT_PR_EV_FORK) ? CTE_INFO : 0;
 		event->cte_type = CT_PR_EV_FORK;
-		cte_publish_all(ct, event, nvl, NULL);
+		(void) cte_publish_all(ct, event, nvl, NULL);
 	}
 	return (ctp);
 }
@@ -924,7 +935,7 @@ contract_process_core(cont_process_t *ctp, proc_t *p, int sig,
 		event = kmem_zalloc(sizeof (ct_kevent_t), KM_SLEEP);
 		event->cte_flags = EVINFOP(ctp, CT_PR_EV_CORE) ? CTE_INFO : 0;
 		event->cte_type = CT_PR_EV_CORE;
-		cte_publish_all(ct, event, nvl, gnvl);
+		(void) cte_publish_all(ct, event, nvl, gnvl);
 	}
 
 	if (EVFATALP(ctp, CT_PR_EV_CORE)) {
@@ -956,7 +967,7 @@ contract_process_hwerr(cont_process_t *ctp, proc_t *p)
 		event = kmem_zalloc(sizeof (ct_kevent_t), KM_SLEEP);
 		event->cte_flags = EVINFOP(ctp, CT_PR_EV_HWERR) ? CTE_INFO : 0;
 		event->cte_type = CT_PR_EV_HWERR;
-		cte_publish_all(ct, event, nvl, NULL);
+		(void) cte_publish_all(ct, event, nvl, NULL);
 	}
 
 	if (EVFATALP(ctp, CT_PR_EV_HWERR)) {
@@ -1006,7 +1017,7 @@ contract_process_sig(cont_process_t *ctp, proc_t *p, int sig, pid_t pid,
 		event = kmem_zalloc(sizeof (ct_kevent_t), KM_SLEEP);
 		event->cte_flags = EVINFOP(ctp, CT_PR_EV_SIGNAL) ? CTE_INFO : 0;
 		event->cte_type = CT_PR_EV_SIGNAL;
-		cte_publish_all(ct, event, nvl, gnvl);
+		(void) cte_publish_all(ct, event, nvl, gnvl);
 	}
 
 	if (EVFATALP(ctp, CT_PR_EV_SIGNAL)) {

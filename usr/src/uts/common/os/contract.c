@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +173,8 @@
 #include <sys/proc.h>
 #include <sys/contract_impl.h>
 #include <sys/contract/process_impl.h>
+#include <sys/dditypes.h>
+#include <sys/contract/device_impl.h>
 #include <sys/systm.h>
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
@@ -181,6 +182,8 @@
 #include <sys/policy.h>
 #include <sys/zone.h>
 #include <sys/task.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 extern rctl_hndl_t rc_project_contract;
 
@@ -191,6 +194,7 @@ static kmutex_t		contract_lock;
 int			ct_ntypes = CTT_MAXTYPE;
 static ct_type_t	*ct_types_static[CTT_MAXTYPE];
 ct_type_t		**ct_types = ct_types_static;
+int			ct_debug;
 
 static void cte_queue_create(ct_equeue_t *, ct_listnum_t, int, int);
 static void cte_queue_destroy(ct_equeue_t *);
@@ -237,6 +241,7 @@ contract_init(void)
 	 * Initialize contract types.
 	 */
 	contract_process_init();
+	contract_device_init();
 
 	/*
 	 * Initialize p0/lwp0 contract state.
@@ -310,6 +315,9 @@ contract_ctor(contract_t *ct, ct_type_t *type, ct_template_t *tmpl, void *data,
 	ct->ct_ev_crit = tmpl->ctmpl_ev_crit;
 	ct->ct_cookie = tmpl->ctmpl_cookie;
 	ct->ct_owner = author;
+	ct->ct_ntime.ctm_total = -1;
+	ct->ct_qtime.ctm_total = -1;
+	ct->ct_nevent = NULL;
 
 	/*
 	 * Test project.max-contracts.
@@ -570,6 +578,12 @@ contract_abandon(contract_t *ct, proc_t *p, int explicit)
 	return (0);
 }
 
+int
+contract_newct(contract_t *ct)
+{
+	return (ct->ct_type->ct_type_ops->contop_newct(ct));
+}
+
 /*
  * contract_adopt
  *
@@ -647,11 +661,15 @@ contract_adopt(contract_t *ct, proc_t *p)
  * Acknowledges receipt of a critical event.
  */
 int
-contract_ack(contract_t *ct, uint64_t evid)
+contract_ack(contract_t *ct, uint64_t evid, int ack)
 {
 	ct_kevent_t *ev;
 	list_t *queue = &ct->ct_events.ctq_events;
 	int error = ESRCH;
+	int nego = 0;
+	uint_t evtype;
+
+	ASSERT(ack == CT_ACK || ack == CT_NACK);
 
 	mutex_enter(&ct->ct_lock);
 	mutex_enter(&ct->ct_events.ctq_lock);
@@ -660,9 +678,14 @@ contract_ack(contract_t *ct, uint64_t evid)
 	 */
 	for (ev = list_head(queue); ev; ev = list_next(queue, ev)) {
 		if (ev->cte_id == evid) {
+			if (ev->cte_flags & CTE_NEG)
+				nego = 1;
+			else if (ack == CT_NACK)
+				break;
 			if ((ev->cte_flags & (CTE_INFO | CTE_ACK)) == 0) {
 				ev->cte_flags |= CTE_ACK;
 				ct->ct_evcnt--;
+				evtype = ev->cte_type;
 				error = 0;
 			}
 			break;
@@ -671,7 +694,84 @@ contract_ack(contract_t *ct, uint64_t evid)
 	mutex_exit(&ct->ct_events.ctq_lock);
 	mutex_exit(&ct->ct_lock);
 
+	/*
+	 * Not all critical events are negotiation events, however
+	 * every negotiation event is a critical event. NEGEND events
+	 * are critical events but are not negotiation events
+	 */
+	if (error || !nego)
+		return (error);
+
+	if (ack == CT_ACK)
+		error = ct->ct_type->ct_type_ops->contop_ack(ct, evtype, evid);
+	else
+		error = ct->ct_type->ct_type_ops->contop_nack(ct, evtype, evid);
+
 	return (error);
+}
+
+/*ARGSUSED*/
+int
+contract_ack_inval(contract_t *ct, uint_t evtype, uint64_t evid)
+{
+	cmn_err(CE_PANIC, "contract_ack_inval: unsupported call: ctid: %u",
+	    ct->ct_id);
+	return (ENOSYS);
+}
+
+/*ARGSUSED*/
+int
+contract_qack_inval(contract_t *ct, uint_t evtype, uint64_t evid)
+{
+	cmn_err(CE_PANIC, "contract_ack_inval: unsupported call: ctid: %u",
+	    ct->ct_id);
+	return (ENOSYS);
+}
+
+/*ARGSUSED*/
+int
+contract_qack_notsup(contract_t *ct, uint_t evtype, uint64_t evid)
+{
+	return (ERANGE);
+}
+
+/*
+ * contract_qack
+ *
+ * Asks that negotiations be extended by another time quantum
+ */
+int
+contract_qack(contract_t *ct, uint64_t evid)
+{
+	ct_kevent_t *ev;
+	list_t *queue = &ct->ct_events.ctq_events;
+	int nego = 0;
+	uint_t evtype;
+
+	mutex_enter(&ct->ct_lock);
+	mutex_enter(&ct->ct_events.ctq_lock);
+
+	for (ev = list_head(queue); ev; ev = list_next(queue, ev)) {
+		if (ev->cte_id == evid) {
+			if ((ev->cte_flags & (CTE_NEG | CTE_ACK)) == CTE_NEG) {
+				evtype = ev->cte_type;
+				nego = 1;
+			}
+			break;
+		}
+	}
+	mutex_exit(&ct->ct_events.ctq_lock);
+	mutex_exit(&ct->ct_lock);
+
+	/*
+	 * Only a negotiated event (which is by definition also a critical
+	 * event) which has not yet been acknowledged can provide
+	 * time quanta to a negotiating owner process.
+	 */
+	if (!nego)
+		return (ESRCH);
+
+	return (ct->ct_type->ct_type_ops->contop_qack(ct, evtype, evid));
 }
 
 /*
@@ -840,6 +940,20 @@ contract_exit(proc_t *p)
 	}
 }
 
+static int
+get_time_left(struct ct_time *t)
+{
+	clock_t ticks_elapsed;
+	int secs_elapsed;
+
+	if (t->ctm_total == -1)
+		return (-1);
+
+	ticks_elapsed = ddi_get_lbolt() - t->ctm_start;
+	secs_elapsed = t->ctm_total - (drv_hztousec(ticks_elapsed)/MICROSEC);
+	return (secs_elapsed > 0 ? secs_elapsed : 0);
+}
+
 /*
  * contract_status_common
  *
@@ -897,8 +1011,8 @@ contract_status_common(contract_t *ct, zone_t *zone, void *status,
 		    CTS_OWNED : ct->ct_state);
 	}
 	STRUCT_FSET(lstatus, ctst_nevents, ct->ct_evcnt);
-	STRUCT_FSET(lstatus, ctst_ntime, -1);
-	STRUCT_FSET(lstatus, ctst_qtime, -1);
+	STRUCT_FSET(lstatus, ctst_ntime, get_time_left(&ct->ct_ntime));
+	STRUCT_FSET(lstatus, ctst_qtime, get_time_left(&ct->ct_qtime));
 	STRUCT_FSET(lstatus, ctst_nevid,
 	    ct->ct_nevent ? ct->ct_nevent->cte_id : 0);
 	STRUCT_FSET(lstatus, ctst_critical, ct->ct_ev_crit);
@@ -1469,9 +1583,9 @@ ctmpl_clear(ct_template_t *template)
  * Creates a new contract using the specified template.
  */
 int
-ctmpl_create(ct_template_t *template)
+ctmpl_create(ct_template_t *template, ctid_t *ctidp)
 {
-	return (template->ctmpl_ops->ctop_create(template));
+	return (template->ctmpl_ops->ctop_create(template, ctidp));
 }
 
 /*
@@ -1520,7 +1634,7 @@ ctmpl_copy(ct_template_t *new, ct_template_t *old)
  */
 /*ARGSUSED*/
 int
-ctmpl_create_inval(ct_template_t *template)
+ctmpl_create_inval(ct_template_t *template, ctid_t *ctidp)
 {
 	return (EINVAL);
 }
@@ -2046,18 +2160,33 @@ cte_publish(ct_equeue_t *q, ct_kevent_t *e, timespec_t *tsp)
  * be zallocated by the caller, and the event's flags and type must be
  * set.  The rest of the event's fields are initialized here.
  */
-void
+uint64_t
 cte_publish_all(contract_t *ct, ct_kevent_t *e, nvlist_t *data, nvlist_t *gdata)
 {
 	ct_equeue_t *q;
 	timespec_t ts;
+	uint64_t evid;
+	ct_kevent_t *negev;
+	int negend;
 
 	e->cte_contract = ct;
 	e->cte_data = data;
 	e->cte_gdata = gdata;
 	e->cte_refs = 3;
-	e->cte_id = atomic_add_64_nv(&ct->ct_type->ct_type_evid, 1);
+	evid = e->cte_id = atomic_add_64_nv(&ct->ct_type->ct_type_evid, 1);
 	contract_hold(ct);
+
+	/*
+	 * For a negotiation event we set the ct->ct_nevent field of the
+	 * contract for the duration of the negotiation
+	 */
+	negend = 0;
+	if (e->cte_flags & CTE_NEG) {
+		cte_hold(e);
+		ct->ct_nevent = e;
+	} else if (e->cte_type == CT_EV_NEGEND) {
+		negend = 1;
+	}
 
 	gethrestime(&ts);
 
@@ -2111,7 +2240,17 @@ cte_publish_all(contract_t *ct, ct_kevent_t *e, nvlist_t *data, nvlist_t *gdata)
 		cte_rele(e);
 	}
 
+	if (negend) {
+		mutex_enter(&ct->ct_lock);
+		negev = ct->ct_nevent;
+		ct->ct_nevent = NULL;
+		cte_rele(negev);
+		mutex_exit(&ct->ct_lock);
+	}
+
 	mutex_exit(&ct->ct_evtlock);
+
+	return (evid);
 }
 
 /*
@@ -2347,7 +2486,8 @@ cte_get_event(ct_listener_t *l, int nonblock, void *uaddr, const cred_t *cr,
 	STRUCT_FSET(ev, ctev_evid, temp->cte_id);
 	STRUCT_FSET(ev, ctev_cttype,
 	    temp->cte_contract->ct_type->ct_type_index);
-	STRUCT_FSET(ev, ctev_flags, temp->cte_flags & (CTE_ACK|CTE_INFO));
+	STRUCT_FSET(ev, ctev_flags, temp->cte_flags &
+	    (CTE_ACK|CTE_INFO|CTE_NEG));
 	STRUCT_FSET(ev, ctev_type, temp->cte_type);
 	STRUCT_FSET(ev, ctev_nbytes, len);
 	STRUCT_FSET(ev, ctev_goffset, size);

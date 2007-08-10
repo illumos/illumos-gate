@@ -998,6 +998,12 @@ di_flags(di_node_t node)
 	return (DI_NODE(node)->flags);
 }
 
+uint_t
+di_retired(di_node_t node)
+{
+	return (di_flags(node) & DEVI_RETIRED);
+}
+
 ddi_devid_t
 di_devid(di_node_t node)
 {

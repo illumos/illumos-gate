@@ -211,6 +211,9 @@ SUNWprivate_1.1 {
 	finddev_close;
 	finddev_next;
 	di_flags;
+	di_retire_device;
+	di_unretire_device;
+	di_retired;
     local:
 	*;
 };

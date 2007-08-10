@@ -119,6 +119,7 @@ struct snode {
 #define	SSELFCLONE	0x2000		/* represents a self cloning device */
 #define	SNOFLUSH	0x4000		/* do not flush device on fsync */
 #define	SCLOSING	0x8000		/* in last close(9E) */
+#define	SFENCED		0x10000		/* snode fenced off for I/O retire */
 
 #ifdef _KERNEL
 /*
@@ -127,6 +128,12 @@ struct snode {
 #define	VTOS(vp)	((struct snode *)((vp)->v_data))
 #define	VTOCS(vp)	(VTOS(VTOS(vp)->s_commonvp))
 #define	STOV(sp)	((sp)->s_vnode)
+
+extern int spec_debug;
+
+#define	SPEC_FENCE_DEBUG	0x0001	/* emit fence related debug messages */
+
+#define	FENDBG(args)	if (spec_debug & SPEC_FENCE_DEBUG) cmn_err args
 
 
 /*
@@ -167,6 +174,8 @@ void	spec_snode_walk(int (*callback)(struct snode *, void *), void *);
 int	spec_devi_open_count(struct snode *, dev_info_t **);
 int	spec_is_clone(struct vnode *);
 int	spec_is_selfclone(struct vnode *);
+int	spec_fence_snode(dev_info_t *dip, struct vnode *vp);
+int	spec_unfence_snode(dev_info_t *dip);
 
 
 /*

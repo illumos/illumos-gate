@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,9 @@ OBJECTS = \
 	libcontract.o \
 	libcontract_priv.o \
 	process.o \
-	process_dump.o
+	process_dump.o \
+	device.o \
+	device_dump.o
 
 # include library definition
 include ../../Makefile.lib

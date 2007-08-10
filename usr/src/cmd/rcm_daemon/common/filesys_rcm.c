@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,8 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/utssys.h>
+#include <unistd.h>
+#include <limits.h>
 
 #include "rcm_module.h"
 
@@ -71,6 +72,7 @@
 typedef struct hashentry {
 	int n_mounts;
 	char *special;
+	char *fstype;
 	char **mountps;
 	struct hashentry *next;
 } hashentry_t;
@@ -252,7 +254,11 @@ mnt_unregister(rcm_handle_t *hd)
 /*
  * mnt_offline()
  *
- *	Filesystem resources cannot be offlined.  Always returns failure.
+ *	Filesystem resources cannot be offlined. They can however be retired
+ *	if they don't provide a critical service. The offline entry point
+ *	checks if this is a retire operation and if it is and the filesystem
+ *	doesn't provide a critical service, the entry point returns success
+ *	For all other cases, failure is returned.
  *	Since no real action is taken, QUERY or not doesn't matter.
  */
 int
@@ -260,17 +266,58 @@ mnt_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
     char **errorp, rcm_info_t **dependent_info)
 {
 	char **dependents;
+	hashentry_t *entry;
+	int retval;
+	int i;
 
 	assert(hd != NULL);
 	assert(rsrc != NULL);
 	assert(id == (id_t)0);
 	assert(errorp != NULL);
 
+	*errorp = NULL;
+
 	rcm_log_message(RCM_TRACE1, "FILESYS: offline(%s)\n", rsrc);
 
 	/* Retrieve necessary info from the cache */
-	if (use_cache(rsrc, errorp, &dependents) < 0)
-		return (RCM_FAILURE);
+	if (use_cache(rsrc, errorp, &dependents) < 0) {
+		if (flags & RCM_RETIRE_REQUEST)
+			return (RCM_NO_CONSTRAINT);
+		else
+			return (RCM_FAILURE);
+	}
+
+	if (flags & RCM_RETIRE_REQUEST) {
+		(void) mutex_lock(&cache_lock);
+		if ((entry = cache_lookup(mnt_cache, rsrc)) == NULL) {
+			rcm_log_message(RCM_ERROR, "FILESYS: "
+			    "failed to look up \"%s\" in cache (%s).\n",
+			    rsrc, strerror(errno));
+			(void) mutex_unlock(&cache_lock);
+			retval = RCM_NO_CONSTRAINT;
+			goto out;
+		}
+
+		if (strcmp(entry->fstype, "zfs") == 0) {
+			retval = RCM_NO_CONSTRAINT;
+			rcm_log_message(RCM_TRACE1,
+			    "FILESYS: zfs: NO_CONSTRAINT: %s\n", rsrc);
+		} else {
+			retval = RCM_SUCCESS;
+			for (i = 0; dependents[i] != NULL; i++) {
+				if (is_critical(dependents[i])) {
+					retval = RCM_FAILURE;
+					rcm_log_message(RCM_TRACE1, "FILESYS: "
+					    "CRITICAL %s\n", rsrc);
+					break;
+				}
+			}
+		}
+		(void) mutex_unlock(&cache_lock);
+		goto out;
+	}
+
+	retval = RCM_FAILURE;
 
 	/* Convert the gathered dependents into an error message */
 	*errorp = create_message(MSG_HDR_STD, MSG_HDR_STD_MULTI, dependents);
@@ -279,9 +326,10 @@ mnt_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 		    "FILESYS: failed to construct offline message (%s).\n",
 		    strerror(errno));
 	}
-	free_list(dependents);
 
-	return (RCM_FAILURE);
+out:
+	free_list(dependents);
+	return (retval);
 }
 
 /*
@@ -441,13 +489,167 @@ mnt_resume(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **errorp,
 	return (rv);
 }
 
+static int
+get_spec(char *line, char *spec, size_t ssz)
+{
+	char	*cp;
+	char	*start;
+
+	if (strlcpy(spec, line, ssz) >= ssz) {
+		rcm_log_message(RCM_ERROR, "FILESYS: get_spec() failed: "
+		    "line: %s\n", line);
+		return (-1);
+	}
+
+	cp = spec;
+	while (*cp == ' ' || *cp == '\t')
+		cp++;
+
+	if (*cp == '#')
+		return (-1);
+
+	start = cp;
+
+	while (*cp != ' ' && *cp != '\t' && *cp != '\0')
+		cp++;
+	*cp = '\0';
+
+	(void) memmove(spec, start, strlen(start) + 1);
+
+	return (0);
+}
+
+static int
+path_match(char *rsrc, char *spec)
+{
+	char r[PATH_MAX];
+	char s[PATH_MAX];
+	size_t len;
+
+	if (realpath(rsrc, r) == NULL)
+		goto error;
+
+	if (realpath(spec, s) == NULL)
+		goto error;
+
+	len = strlen("/devices/");
+
+	if (strncmp(r, "/devices/", len) != 0) {
+		errno = ENXIO;
+		goto error;
+	}
+
+	if (strncmp(s, "/devices/", len) != 0) {
+		errno = ENXIO;
+		goto error;
+	}
+
+	len = strlen(r);
+	if (strncmp(r, s, len) == 0 && (s[len] == '\0' || s[len] == ':'))
+		return (0);
+	else
+		return (1);
+
+error:
+	rcm_log_message(RCM_DEBUG, "FILESYS: path_match() failed "
+	    "rsrc=%s spec=%s: %s\n", rsrc, spec, strerror(errno));
+	return (-1);
+}
+
+#define	VFSTAB		"/etc/vfstab"
+#define	RETIRED_PREFIX	"## RETIRED ##"
+
+static int
+disable_vfstab_entry(char *rsrc)
+{
+	FILE	*vfp;
+	FILE	*tfp;
+	int	retval;
+	int	update;
+	char	tmp[PATH_MAX];
+	char	line[MNT_LINE_MAX + 1];
+
+	vfp = fopen(VFSTAB, "r");
+	if (vfp == NULL) {
+		rcm_log_message(RCM_ERROR, "FILESYS: failed to open /etc/vfstab"
+		    " for reading: %s\n", strerror(errno));
+		return (RCM_FAILURE);
+	}
+
+	(void) snprintf(tmp, sizeof (tmp), "/etc/vfstab.retire.%lu", getpid());
+
+	tfp = fopen(tmp, "w");
+	if (tfp == NULL) {
+		rcm_log_message(RCM_ERROR, "FILESYS: failed to open "
+		    "/etc/vfstab.retire for writing: %s\n", strerror(errno));
+		(void) fclose(vfp);
+		return (RCM_FAILURE);
+	}
+
+	retval = RCM_SUCCESS;
+	update = 0;
+	while (fgets(line, sizeof (line), vfp)) {
+
+		char	spec[MNT_LINE_MAX + 1];
+		char	newline[MNT_LINE_MAX + 1];
+		char	*l;
+
+		if (get_spec(line, spec, sizeof (spec)) == -1) {
+			l = line;
+			goto foot;
+		}
+
+		if (path_match(rsrc, spec) != 0) {
+			l = line;
+			goto foot;
+		}
+
+		update = 1;
+
+		/* Paths match. Disable this entry */
+		(void) snprintf(newline, sizeof (newline), "%s %s",
+		    RETIRED_PREFIX, line);
+
+		rcm_log_message(RCM_TRACE1, "FILESYS: disabling line\n\t%s\n",
+		    line);
+
+		l = newline;
+foot:
+		if (fputs(l, tfp) == EOF) {
+			rcm_log_message(RCM_ERROR, "FILESYS: failed to write "
+			    "new vfstab: %s\n", strerror(errno));
+			update = 0;
+			retval = RCM_FAILURE;
+			break;
+		}
+	}
+
+	if (vfp)
+		(void) fclose(vfp);
+	if (tfp)
+		(void) fclose(tfp);
+
+	if (update) {
+		if (rename(tmp, VFSTAB) != 0) {
+			rcm_log_message(RCM_ERROR, "FILESYS: vfstab rename "
+			    "failed: %s\n", strerror(errno));
+			retval = RCM_FAILURE;
+		}
+	}
+
+	(void) unlink(tmp);
+
+	return (retval);
+}
+
 /*
  * mnt_remove()
  *
- *	Remove should never be called since offline always fails.
+ *	Remove will only be called in the retire case i.e. if RCM_RETIRE_NOTIFY
+ *	flag is set.
  *
- *	Return failure and log the mistake if a remove is ever received for a
- *	mounted filesystem resource.
+ *	If the flag is not set, then return failure and log the mistake if a
+ *	remove is ever received for a mounted filesystem resource.
  */
 int
 mnt_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **errorp,
@@ -460,11 +662,15 @@ mnt_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **errorp,
 
 	rcm_log_message(RCM_TRACE1, "FILESYS: remove(%s)\n", rsrc);
 
-	/* Log the mistake */
-	rcm_log_message(RCM_ERROR, "FILESYS: invalid remove of \"%s\"\n", rsrc);
-	*errorp = strdup(MSG_FAIL_REMOVE);
+	if (!(flag & RCM_RETIRE_NOTIFY)) {
+		/* Log the mistake */
+		rcm_log_message(RCM_ERROR, "FILESYS: invalid remove of "
+		    "\"%s\"\n", rsrc);
+		*errorp = strdup(MSG_FAIL_REMOVE);
+		return (RCM_FAILURE);
+	}
 
-	return (RCM_FAILURE);
+	return (disable_vfstab_entry(rsrc));
 }
 
 /*
@@ -617,6 +823,8 @@ free_entry(hashentry_t **entryp)
 		if (*entryp) {
 			if ((*entryp)->special)
 				free((*entryp)->special);
+			if ((*entryp)->fstype)
+				free((*entryp)->fstype);
 			free_list((*entryp)->mountps);
 			free(*entryp);
 		}
@@ -731,9 +939,10 @@ cache_sync(rcm_handle_t *hd, cache_t **cachep)
  * cache_insert()
  *
  *	Given a cache and a mnttab entry, this routine inserts that entry in
- *	the cache.  The mnttab entry's special device is added to the 'mounts'
- *	hashtable of the cache, and the entry's mountp value is added to the
- *	list of associated mountpoints for the corresponding hashtable entry.
+ *	the cache.  The mnttab entry's special device and filesystem type
+ *	is added to the 'mounts' hashtable of the cache, and the entry's
+ *	mountp value is added to the list of associated mountpoints for the
+ *	corresponding hashtable entry.
  *
  *	Locking: the cache must be locked before calling this function.
  *
@@ -751,7 +960,8 @@ cache_insert(cache_t *cache, struct mnttab *mt)
 	    (cache->mounts == NULL) ||
 	    (mt == NULL) ||
 	    (mt->mnt_special == NULL) ||
-	    (mt->mnt_mountp == NULL)) {
+	    (mt->mnt_mountp == NULL) ||
+	    (mt->mnt_fstype == NULL)) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -776,10 +986,11 @@ cache_insert(cache_t *cache, struct mnttab *mt)
 	if (entry == NULL) {
 		entry = (hashentry_t *)calloc(1, sizeof (hashentry_t));
 		if ((entry == NULL) ||
-		    ((entry->special = strdup(mt->mnt_special)) == NULL)) {
+		    ((entry->special = strdup(mt->mnt_special)) == NULL) ||
+		    ((entry->fstype = strdup(mt->mnt_fstype)) == NULL)) {
 			rcm_log_message(RCM_ERROR,
 			    "FILESYS: failed to allocate special device name "
-			    "(%s).\n", strerror(errno));
+			    "or filesystem type: (%s).\n", strerror(errno));
 			free_entry(&entry);
 			errno = ENOMEM;
 			return (-1);
@@ -1124,18 +1335,24 @@ is_critical(char *rsrc)
 
 	if ((strcmp(rsrc, "/") == 0) ||
 	    (strcmp(rsrc, "/usr") == 0) ||
+	    (strcmp(rsrc, "/lib") == 0) ||
 	    (strcmp(rsrc, "/usr/lib") == 0) ||
+	    (strcmp(rsrc, "/bin") == 0) ||
 	    (strcmp(rsrc, "/usr/bin") == 0) ||
 	    (strcmp(rsrc, "/tmp") == 0) ||
 	    (strcmp(rsrc, "/var") == 0) ||
 	    (strcmp(rsrc, "/var/run") == 0) ||
 	    (strcmp(rsrc, "/etc") == 0) ||
 	    (strcmp(rsrc, "/etc/mnttab") == 0) ||
-	    (strcmp(rsrc, "/sbin") == 0))
+	    (strcmp(rsrc, "/platform") == 0) ||
+	    (strcmp(rsrc, "/usr/platform") == 0) ||
+	    (strcmp(rsrc, "/sbin") == 0) ||
+	    (strcmp(rsrc, "/usr/sbin") == 0))
 		return (1);
 
 	return (0);
 }
+
 
 /*
  * use_cache()

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@ extern int ct_tmpl_get_informative(int, uint_t *);
 extern int ct_ctl_adopt(int);
 extern int ct_ctl_abandon(int);
 extern int ct_ctl_ack(int, ctevid_t);
+extern int ct_ctl_nack(int, ctevid_t);
 extern int ct_ctl_qack(int, ctevid_t);
 extern int ct_ctl_newct(int, ctevid_t, int);
 
@@ -112,6 +112,23 @@ extern int ct_pr_status_get_param(ct_stathdl_t, uint_t *);
 extern int ct_pr_status_get_fatal(ct_stathdl_t, uint_t *);
 extern int ct_pr_status_get_members(ct_stathdl_t, pid_t **, uint_t *);
 extern int ct_pr_status_get_contracts(ct_stathdl_t, ctid_t **, uint_t *);
+
+/*
+ * Device contract routines
+ */
+int ct_dev_tmpl_set_minor(int, char *);
+int ct_dev_tmpl_set_aset(int, uint_t);
+int ct_dev_tmpl_set_noneg(int);
+int ct_dev_tmpl_clear_noneg(int);
+int ct_dev_tmpl_get_minor(int, char *, size_t *);
+int ct_dev_tmpl_get_aset(int, uint_t *);
+int ct_dev_tmpl_get_noneg(int, uint_t *);
+int ct_dev_status_get_aset(ct_stathdl_t, uint_t *);
+int ct_dev_status_get_noneg(ct_stathdl_t, uint_t *);
+int ct_dev_status_get_dev_state(ct_stathdl_t, uint_t *);
+int ct_dev_status_get_minor(ct_stathdl_t, char **);
+
+
 
 #ifdef __cplusplus
 }

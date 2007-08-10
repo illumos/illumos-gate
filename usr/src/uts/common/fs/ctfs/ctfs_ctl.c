@@ -177,6 +177,7 @@ ctfs_ctl_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	contract_t	*ct = ctlnode->ctfs_ctl_contract;
 	int		error = 0;
 	uint64_t	event;
+	int		ack;
 
 	switch (cmd) {
 	case CT_CABANDON:
@@ -184,15 +185,21 @@ ctfs_ctl_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		break;
 
 	case CT_CACK:
+	case CT_CNACK:
 		if (copyin((void *)arg, &event, sizeof (uint64_t)))
 			return (EFAULT);
-		error = contract_ack(ct, event);
+		ack = (cmd == CT_CACK) ? CT_ACK : CT_NACK;
+		error = contract_ack(ct, event, ack);
 		break;
 
 	case CT_CNEWCT:
+		error = contract_newct(ct);
 		break;
 
 	case CT_CQREQ:
+		if (copyin((void *)arg, &event, sizeof (uint64_t)))
+			return (EFAULT);
+		error = contract_qack(ct, event);
 		break;
 
 	case CT_CADOPT:

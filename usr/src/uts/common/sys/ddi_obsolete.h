@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,6 +14,7 @@
 
 #include <sys/types.h>
 #include <sys/dditypes.h>
+#include <sys/sunldi.h>
 
 
 #ifdef	__cplusplus
@@ -191,6 +192,15 @@ extern void repoutsb(int port, uint8_t *addr, int count);
 extern void repoutsw(int port, uint16_t *addr, int count);
 extern void repoutsd(int port, uint32_t *addr, int count);
 #endif
+
+/* Obsolete LDI event interfaces */
+extern int ldi_get_eventcookie(ldi_handle_t, char *,
+    ddi_eventcookie_t *);
+extern int ldi_add_event_handler(ldi_handle_t, ddi_eventcookie_t,
+    void (*handler)(ldi_handle_t, ddi_eventcookie_t, void *, void *),
+    void *, ldi_callback_id_t *);
+extern int ldi_remove_event_handler(ldi_handle_t, ldi_callback_id_t);
+
 
 #endif /* not _DDI_STRICT */
 

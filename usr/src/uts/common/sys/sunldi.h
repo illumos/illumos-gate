@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +59,26 @@ typedef struct __ldi_handle		*ldi_handle_t;
 
 typedef struct __ldi_callback_id	*ldi_callback_id_t;
 
+typedef struct __ldi_ev_cookie		*ldi_ev_cookie_t;
+
+/*
+ * LDI event interface related
+ */
+#define	LDI_EV_SUCCESS	0
+#define	LDI_EV_FAILURE	(-1)
+#define	LDI_EV_NONE	(-2)	/* no matching callbacks registered */
+#define	LDI_EV_OFFLINE	"LDI:EVENT:OFFLINE"
+#define	LDI_EV_DEGRADE	"LDI:EVENT:DEGRADE"
+
+#define	LDI_EV_CB_VERS_1	1
+#define	LDI_EV_CB_VERS		LDI_EV_CB_VERS_1
+
+typedef struct ldi_ev_callback {
+	uint_t cb_vers;
+	int (*cb_notify)(ldi_handle_t, ldi_ev_cookie_t, void *, void *);
+	void (*cb_finalize)(ldi_handle_t, ldi_ev_cookie_t, int, void *, void *);
+} ldi_ev_callback_t;
+
 /*
  * LDI Ident manipulation functions
  */
@@ -93,13 +112,6 @@ extern int ldi_get_size(ldi_handle_t, uint64_t *);
 extern int ldi_prop_op(ldi_handle_t, ddi_prop_op_t, int,
     char *, caddr_t, int *);
 
-extern int ldi_get_eventcookie(ldi_handle_t, char *,
-    ddi_eventcookie_t *);
-extern int ldi_add_event_handler(ldi_handle_t, ddi_eventcookie_t,
-    void (*handler)(ldi_handle_t, ddi_eventcookie_t, void *, void *),
-    void *, ldi_callback_id_t *);
-extern int ldi_remove_event_handler(ldi_handle_t, ldi_callback_id_t);
-
 extern int ldi_strategy(ldi_handle_t, struct buf *);
 extern int ldi_dump(ldi_handle_t, caddr_t, daddr_t, int);
 extern int ldi_devmap(ldi_handle_t, devmap_cookie_t, offset_t,
@@ -132,6 +144,20 @@ extern int ldi_get_otyp(ldi_handle_t, int *);
 extern int ldi_get_devid(ldi_handle_t, ddi_devid_t *);
 extern int ldi_get_minor_name(ldi_handle_t, char **);
 
+/*
+ * LDI events related declarations
+ */
+extern int ldi_ev_get_cookie(ldi_handle_t lh, char *evname,
+    ldi_ev_cookie_t *cookiep);
+extern char *ldi_ev_get_type(ldi_ev_cookie_t cookie);
+extern int ldi_ev_register_callbacks(ldi_handle_t lh,
+    ldi_ev_cookie_t cookie, ldi_ev_callback_t *callb,
+    void *arg, ldi_callback_id_t *id);
+extern int ldi_ev_notify(dev_info_t *dip, minor_t minor, int spec_type,
+    ldi_ev_cookie_t cookie, void *ev_data);
+extern void ldi_ev_finalize(dev_info_t *dip, minor_t minor, int spec_type,
+    int ldi_result, ldi_ev_cookie_t cookie, void *ev_data);
+extern int ldi_ev_remove_callbacks(ldi_callback_id_t id);
 
 #endif	/* _KERNEL */
 

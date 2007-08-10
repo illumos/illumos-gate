@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,6 +272,15 @@ int e_devid_cache_register(dev_info_t *, ddi_devid_t);
 void e_devid_cache_unregister(dev_info_t *);
 int e_devid_cache_to_devt_list(ddi_devid_t, char *, int *, dev_t **);
 void e_devid_cache_free_devt_list(int, dev_t *);
+
+/*
+ * I/O retire persistent store
+ */
+void retire_store_init(void);
+void retire_store_read(void);
+int e_ddi_retire_persist(char *devpath);
+int e_ddi_retire_unpersist(char *devpath);
+int e_ddi_device_retired(char *devpath);
 
 /*
  * Resource control functions to lock down device memory.

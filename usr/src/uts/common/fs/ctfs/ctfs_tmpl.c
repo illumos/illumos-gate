@@ -114,6 +114,7 @@ ctfs_tmpl_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 {
 	ctfs_tmplnode_t	*tmplnode = vp->v_data;
 	ct_param_t param;
+	ctid_t ctid;
 	int error;
 
 	switch (cmd) {
@@ -127,7 +128,11 @@ ctfs_tmpl_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 		break;
 	case CT_TCREATE:
 		ASSERT(tmplnode->ctfs_tmn_tmpl != NULL);
-		return (ctmpl_create(tmplnode->ctfs_tmn_tmpl));
+		error = ctmpl_create(tmplnode->ctfs_tmn_tmpl, &ctid);
+		if (error)
+			return (error);
+		*rvalp = ctid;
+		break;
 	case CT_TSET:
 		if (copyin((void *)arg, &param, sizeof (ct_param_t)))
 			return (EFAULT);

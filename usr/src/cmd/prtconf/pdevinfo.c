@@ -673,6 +673,8 @@ dump_devs(di_node_t node, void *arg)
 		driver_name = di_driver_name(node);
 		if (driver_name != NULL)
 			(void) printf(" (driver name: %s)", driver_name);
+	} else if (di_retired(node)) {
+		(void) printf(" (retired)");
 	} else if (di_state(node) & DI_DRIVER_DETACHED)
 		(void) printf(" (driver not attached)");
 

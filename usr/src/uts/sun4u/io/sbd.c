@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5122,6 +5121,14 @@ sbd_get_comp_cond(dev_info_t *dip)
 	if (dip == NULL) {
 		PR_BYP("dip is NULL\n");
 		return (SBD_COND_UNKNOWN);
+	}
+
+	/*
+	 * If retired, return FAILED
+	 */
+	if (DEVI(dip)->devi_flags & DEVI_RETIRED) {
+		PR_CPU("dip is retired\n");
+		return (SBD_COND_FAILED);
 	}
 
 	if (ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,

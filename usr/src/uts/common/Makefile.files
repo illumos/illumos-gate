@@ -120,6 +120,7 @@ GENUNIX_OBJS +=	\
 		ddi_strtol.o	\
 		devcfg.o	\
 		devcache.o	\
+		device.o	\
 		devid.o		\
 		devid_cache.o	\
 		devid_scsi.o	\
@@ -244,6 +245,7 @@ GENUNIX_OBJS +=	\
 		refstr.o	\
 		rename.o	\
 		resolvepath.o	\
+		retire_store.o	\
 		process.o	\
 		rlimit.o	\
 		rmap.o		\

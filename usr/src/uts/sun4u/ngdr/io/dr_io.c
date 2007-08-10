@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +281,26 @@ dr_post_detach_io(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	return (rv);
 }
 
+static void
+dr_get_comp_cond(dr_io_unit_t *ip, dev_info_t *dip)
+{
+	if (dip == NULL) {
+		ip->sbi_cm.sbdev_cond = SBD_COND_UNKNOWN;
+		return;
+	}
+
+	if (DEVI(dip)->devi_flags & DEVI_RETIRED) {
+		ip->sbi_cm.sbdev_cond = SBD_COND_FAILED;
+		return;
+	}
+
+	if (DR_DEV_IS_ATTACHED(&ip->sbi_cm)) {
+		ip->sbi_cm.sbdev_cond = SBD_COND_OK;
+	} else if (DR_DEV_IS_PRESENT(&ip->sbi_cm)) {
+		ip->sbi_cm.sbdev_cond = SBD_COND_OK;
+	}
+}
+
 int
 dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 {
@@ -322,19 +342,6 @@ dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 			return (-1);
 		}
 
-		isp = &dsp->d_io;
-		bzero((caddr_t)isp, sizeof (*isp));
-
-		isp->is_cm.c_id.c_type = ip->sbi_cm.sbdev_type;
-		isp->is_cm.c_id.c_unit = ip->sbi_cm.sbdev_unum;
-		strncpy(isp->is_cm.c_id.c_name, pstat.type,
-			sizeof (isp->is_cm.c_id.c_name));
-		isp->is_cm.c_cond = ip->sbi_cm.sbdev_cond;
-		isp->is_cm.c_busy = ip->sbi_cm.sbdev_busy | pstat.busy;
-		isp->is_cm.c_time = ip->sbi_cm.sbdev_time;
-		isp->is_cm.c_ostate = ip->sbi_cm.sbdev_ostate;
-		isp->is_cm.c_sflags = 0;
-
 		dip = NULL;
 		err = drmach_get_dip(id, &dip);
 		if (err) {
@@ -343,7 +350,24 @@ dr_io_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 
 			sbd_err_clear(&err);
 			continue;
-		} else if (dip == NULL) {
+		}
+
+		isp = &dsp->d_io;
+		bzero((caddr_t)isp, sizeof (*isp));
+
+		isp->is_cm.c_id.c_type = ip->sbi_cm.sbdev_type;
+		isp->is_cm.c_id.c_unit = ip->sbi_cm.sbdev_unum;
+		strncpy(isp->is_cm.c_id.c_name, pstat.type,
+			sizeof (isp->is_cm.c_id.c_name));
+
+		dr_get_comp_cond(ip, dip);
+		isp->is_cm.c_cond = ip->sbi_cm.sbdev_cond;
+		isp->is_cm.c_busy = ip->sbi_cm.sbdev_busy | pstat.busy;
+		isp->is_cm.c_time = ip->sbi_cm.sbdev_time;
+		isp->is_cm.c_ostate = ip->sbi_cm.sbdev_ostate;
+		isp->is_cm.c_sflags = 0;
+
+		if (dip == NULL) {
 			isp->is_pathname[0] = '\0';
 			isp->is_referenced = 0;
 			isp->is_unsafe_count = 0;

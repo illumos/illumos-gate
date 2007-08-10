@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +50,17 @@ extern "C" {
  */
 #define	LH_HASH_SZ	32
 #define	LI_HASH_SZ	32
+
+/*
+ * Obsolete LDI event interfaces are available for now but are deprecated and a
+ * warning will be issued to consumers.
+ */
+#define	LDI_OBSOLETE_EVENT	1
+
+/*
+ * Flag for LDI handle's lh_flags field
+ */
+#define	LH_FLAGS_NOTIFY	0x0001		/* invoked in context of a notify */
 
 /*
  * LDI initialization function
@@ -87,20 +97,24 @@ struct ldi_handle {
 	/* protected by ldi_handle_hash_lock */
 	struct ldi_handle		*lh_next;
 	uint_t				lh_ref;
+	uint_t				lh_flags;
 
 	/* unique/static fields in the handle */
 	uint_t				lh_type;
 	struct ldi_ident		*lh_ident;
 	vnode_t				*lh_vp;
 
+#ifdef	LDI_OBSOLETE_EVENT
 	/* fields protected by lh_lock */
 	kmutex_t			lh_lock[1];
 	struct ldi_event		*lh_events;
+#endif
 };
 
 /*
  * LDI event information
  */
+#ifdef	LDI_OBSOLETE_EVENT
 typedef struct ldi_event {
 	/* fields protected by le_lhp->lh_lock */
 	struct ldi_event	*le_next;
@@ -112,6 +126,36 @@ typedef struct ldi_event {
 	void			*le_arg;
 	ddi_callback_id_t	le_id;
 } ldi_event_t;
+#endif
+
+typedef struct ldi_ev_callback_impl {
+	struct ldi_handle	*lec_lhp;
+	dev_info_t		*lec_dip;
+	dev_t			lec_dev;
+	int			lec_spec;
+	int			(*lec_notify)();
+	void			(*lec_finalize)();
+	void			*lec_arg;
+	void			*lec_cookie;
+	void			*lec_id;
+	list_node_t		lec_list;
+} ldi_ev_callback_impl_t;
+
+struct ldi_ev_callback_list {
+	kmutex_t	le_lock;
+	kcondvar_t	le_cv;
+	int		le_busy;
+	void		*le_thread;
+	list_t		le_head;
+};
+
+int ldi_invoke_notify(dev_info_t *dip, dev_t dev, int spec_type, char *event,
+    void *ev_data);
+void ldi_invoke_finalize(dev_info_t *dip, dev_t dev, int spec_type, char *event,
+    int ldi_result, void *ev_data);
+int e_ddi_offline_notify(dev_info_t *dip);
+void e_ddi_offline_finalize(dev_info_t *dip, int result);
+
 
 /*
  * LDI device usage interfaces

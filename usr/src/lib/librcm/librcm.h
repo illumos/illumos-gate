@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,8 @@ extern "C" {
 #define	RCM_REGISTER_EVENT	0x2000	/* private */
 #define	RCM_REGISTER_CAPACITY	0x4000	/* private */
 #define	RCM_SUSPENDED		0x8000	/* private */
+#define	RCM_RETIRE_REQUEST	0x10000
+#define	RCM_RETIRE_NOTIFY	0x20000
 
 /*
  * RCM return values
@@ -64,6 +66,7 @@ extern "C" {
 #define	RCM_SUCCESS		0
 #define	RCM_FAILURE		-1
 #define	RCM_CONFLICT		-2
+#define	RCM_NO_CONSTRAINT	-3
 
 /*
  * RCM resource states

@@ -4777,6 +4777,292 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	return (rv);
 }
 
+void
+mdi_phci_mark_retiring(dev_info_t *dip, char **cons_array)
+{
+	mdi_phci_t	*ph;
+	mdi_client_t	*ct;
+	mdi_pathinfo_t	*pip;
+	mdi_pathinfo_t	*next;
+	dev_info_t	*cdip;
+
+	if (!MDI_PHCI(dip))
+		return;
+
+	ph = i_devi_get_phci(dip);
+	if (ph == NULL) {
+		return;
+	}
+
+	MDI_PHCI_LOCK(ph);
+
+	if (MDI_PHCI_IS_OFFLINE(ph)) {
+		/* has no last path */
+		MDI_PHCI_UNLOCK(ph);
+		return;
+	}
+
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+
+		ct = MDI_PI(pip)->pi_client;
+		i_mdi_client_lock(ct, pip);
+		MDI_PI_UNLOCK(pip);
+
+		cdip = ct->ct_dip;
+		if (cdip && (i_ddi_node_state(cdip) >= DS_INITIALIZED) &&
+		    (i_mdi_client_compute_state(ct, ph) ==
+		    MDI_CLIENT_STATE_FAILED)) {
+			/* Last path. Mark client dip as retiring */
+			i_mdi_client_unlock(ct);
+			MDI_PHCI_UNLOCK(ph);
+			(void) e_ddi_mark_retiring(cdip, cons_array);
+			MDI_PHCI_LOCK(ph);
+			pip = next;
+		} else {
+			i_mdi_client_unlock(ct);
+			pip = next;
+		}
+	}
+
+	MDI_PHCI_UNLOCK(ph);
+
+	return;
+}
+
+void
+mdi_phci_retire_notify(dev_info_t *dip, int *constraint)
+{
+	mdi_phci_t	*ph;
+	mdi_client_t	*ct;
+	mdi_pathinfo_t	*pip;
+	mdi_pathinfo_t	*next;
+	dev_info_t	*cdip;
+
+	if (!MDI_PHCI(dip))
+		return;
+
+	ph = i_devi_get_phci(dip);
+	if (ph == NULL)
+		return;
+
+	MDI_PHCI_LOCK(ph);
+
+	if (MDI_PHCI_IS_OFFLINE(ph)) {
+		MDI_PHCI_UNLOCK(ph);
+		/* not last path */
+		return;
+	}
+
+	if (ph->ph_unstable) {
+		MDI_PHCI_UNLOCK(ph);
+		/* can't check for constraints */
+		*constraint = 0;
+		return;
+	}
+
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+
+		/*
+		 * The mdi_pathinfo state is OK. Check the client state.
+		 * If failover in progress fail the pHCI from offlining
+		 */
+		ct = MDI_PI(pip)->pi_client;
+		i_mdi_client_lock(ct, pip);
+		if ((MDI_CLIENT_IS_FAILOVER_IN_PROGRESS(ct)) ||
+		    (ct->ct_unstable)) {
+			/*
+			 * Failover is in progress, can't check for constraints 
+			 */
+			MDI_PI_UNLOCK(pip);
+			i_mdi_client_unlock(ct);
+			MDI_PHCI_UNLOCK(ph);
+			*constraint = 0;
+			return;
+		}
+		MDI_PI_UNLOCK(pip);
+
+		/*
+		 * Check to see of we are retiring the last path of this
+		 * client device...
+		 */
+		cdip = ct->ct_dip;
+		if (cdip && (i_ddi_node_state(cdip) >= DS_INITIALIZED) &&
+		    (i_mdi_client_compute_state(ct, ph) ==
+		    MDI_CLIENT_STATE_FAILED)) {
+			i_mdi_client_unlock(ct);
+			MDI_PHCI_UNLOCK(ph);
+			(void) e_ddi_retire_notify(cdip, constraint);
+			MDI_PHCI_LOCK(ph);
+			pip = next;
+		} else {
+			i_mdi_client_unlock(ct);
+			pip = next;
+		}
+	}
+
+	MDI_PHCI_UNLOCK(ph);
+
+	return;
+}
+
+/*
+ * offline the path(s) hanging off the PHCI. If the
+ * last path to any client, check that constraints
+ * have been applied.
+ */
+void
+mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
+{
+	mdi_phci_t	*ph;
+	mdi_client_t	*ct;
+	mdi_pathinfo_t	*pip;
+	mdi_pathinfo_t	*next;
+	dev_info_t	*cdip;
+	int		unstable = 0;
+	int		constraint;
+
+	if (!MDI_PHCI(dip))
+		return;
+
+	ph = i_devi_get_phci(dip);
+	if (ph == NULL) {
+		/* no last path and no pips */
+		return;
+	}
+
+	MDI_PHCI_LOCK(ph);
+
+	if (MDI_PHCI_IS_OFFLINE(ph)) {
+		MDI_PHCI_UNLOCK(ph);
+		/* no last path and no pips */
+		return;
+	}
+
+	/*
+	 * Check to see if the pHCI can be offlined
+	 */
+	if (ph->ph_unstable) {
+		unstable = 1;
+	}
+
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+
+		/*
+		 * if failover in progress fail the pHCI from offlining
+		 */
+		ct = MDI_PI(pip)->pi_client;
+		i_mdi_client_lock(ct, pip);
+		if ((MDI_CLIENT_IS_FAILOVER_IN_PROGRESS(ct)) ||
+		    (ct->ct_unstable)) {
+			unstable = 1;
+		}
+		MDI_PI_UNLOCK(pip);
+
+		/*
+		 * Check to see of we are removing the last path of this
+		 * client device...
+		 */
+		cdip = ct->ct_dip;
+		if (!phci_only && cdip &&
+		    (i_ddi_node_state(cdip) >= DS_INITIALIZED) &&
+		    (i_mdi_client_compute_state(ct, ph) ==
+		    MDI_CLIENT_STATE_FAILED)) {
+			i_mdi_client_unlock(ct);
+			MDI_PHCI_UNLOCK(ph);
+			/*
+			 * We don't retire clients we just retire the
+			 * path to a client. If it is the last path
+			 * to a client, constraints are checked and
+			 * if we pass the last path is offlined. MPXIO will
+			 * then fail all I/Os to the client. Since we don't
+			 * want to retire the client on a path error
+			 * set constraint = 0 so that the client dip
+			 * is not retired.
+			 */
+			constraint = 0;
+			(void) e_ddi_retire_finalize(cdip, &constraint);
+			MDI_PHCI_LOCK(ph);
+			pip = next;
+		} else {
+			i_mdi_client_unlock(ct);
+			pip = next;
+		}
+	}
+
+	/*
+	 * Cannot offline pip(s)
+	 */
+	if (unstable) {
+		cmn_err(CE_WARN, "PHCI in transient state, cannot "
+		    "retire, dip = %p", (void *)dip);
+		MDI_PHCI_UNLOCK(ph);
+		return;
+	}
+
+	/*
+	 * Mark the pHCI as offline
+	 */
+	MDI_PHCI_SET_OFFLINE(ph);
+
+	/*
+	 * Mark the child mdi_pathinfo nodes as transient
+	 */
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+		MDI_PI_SET_OFFLINING(pip);
+		MDI_PI_UNLOCK(pip);
+		pip = next;
+	}
+	MDI_PHCI_UNLOCK(ph);
+	/*
+	 * Give a chance for any pending commands to execute
+	 */
+	delay(1);
+	MDI_PHCI_LOCK(ph);
+	pip = ph->ph_path_head;
+	while (pip != NULL) {
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+		(void) i_mdi_pi_offline(pip, 0);
+		MDI_PI_LOCK(pip);
+		ct = MDI_PI(pip)->pi_client;
+		if (!MDI_PI_IS_OFFLINE(pip)) {
+			cmn_err(CE_WARN, "PHCI busy, cannot offline path: "
+			    "PHCI dip = %p", (void *)dip);
+			MDI_PI_UNLOCK(pip);
+			MDI_PHCI_SET_ONLINE(ph);
+			MDI_PHCI_UNLOCK(ph);
+			return;
+		}
+		MDI_PI_UNLOCK(pip);
+		pip = next;
+	}
+	MDI_PHCI_UNLOCK(ph);
+
+	return;
+}
+
+void
+mdi_phci_unretire(dev_info_t *dip)
+{
+	ASSERT(MDI_PHCI(dip));
+
+	/*
+	 * Online the phci
+	 */
+	i_mdi_phci_online(dip);
+}
+
 /*ARGSUSED*/
 static int
 i_mdi_client_offline(dev_info_t *dip, uint_t flags)

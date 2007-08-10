@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,6 +224,7 @@ i_ddi_devices_init(void)
 	list_create(&nvf_dirty_files, sizeof (nvfd_t),
 	    offsetof(nvfd_t, nvf_link));
 	mutex_init(&nvf_cache_mutex, NULL, MUTEX_DEFAULT, NULL);
+	retire_store_init();
 	devid_cache_init();
 }
 
@@ -235,6 +236,16 @@ i_ddi_devices_init(void)
 void
 i_ddi_read_devices_files(void)
 {
+	/*
+	 * The retire store should be the first file read as it
+	 * may need to offline devices. kfio_disable_read is not
+	 * used for retire. For the rationale see the tunable
+	 * ddi_retire_store_bypass and comments in:
+	 *	uts/common/os/retire_store.c
+	 */
+
+	retire_store_read();
+
 	if (!kfio_disable_read) {
 		mdi_read_devices_files();
 		devid_cache_read();

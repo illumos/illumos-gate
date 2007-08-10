@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,11 +65,11 @@ ct_tmpl_create(int fd, ctid_t *ctidp)
 }
 
 int
-ct_tmpl_set_internal(int fd, uint_t id, uint_t value)
+ct_tmpl_set_internal(int fd, uint_t id, uintptr_t value)
 {
 	ct_param_t param;
 	param.ctpm_id = id;
-	param.ctpm_value = value;
+	param.ctpm_value = (uint64_t)value;
 	if (ioctl(fd, CT_TSET, &param) == -1)
 		return (errno);
 	return (0);
@@ -108,6 +107,18 @@ ct_tmpl_get_internal(int fd, uint_t id, uint_t *value)
 	if (ioctl(fd, CT_TGET, &param) == -1)
 		return (errno);
 	*value = param.ctpm_value;
+	return (0);
+}
+
+int
+ct_tmpl_get_internal_string(int fd, uint_t id, char *value)
+{
+	ct_param_t param;
+
+	param.ctpm_id = id;
+	param.ctpm_value = (uint64_t)(uintptr_t)value;
+	if (ioctl(fd, CT_TGET, &param) == -1)
+		return (errno);
 	return (0);
 }
 
@@ -168,6 +179,14 @@ int
 ct_ctl_ack(int fd, ctevid_t event)
 {
 	if (ioctl(fd, CT_CACK, &event) == -1)
+		return (errno);
+	return (0);
+}
+
+int
+ct_ctl_nack(int fd, ctevid_t event)
+{
+	if (ioctl(fd, CT_CNACK, &event) == -1)
 		return (errno);
 	return (0);
 }
