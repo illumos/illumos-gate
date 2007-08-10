@@ -500,6 +500,7 @@ static void hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *req);
 static void hubd_exception_cb(usb_pipe_handle_t pipe,
 						usb_intr_req_t *req);
 static void hubd_hotplug_thread(void *arg);
+static void hubd_reset_thread(void *arg);
 static int hubd_create_child(dev_info_t *dip,
 		hubd_t		*hubd,
 		usba_device_t	*usba_device,
@@ -554,6 +555,7 @@ static int hubd_post_resume_event_cb(dev_info_t *dip);
 static int hubd_cpr_suspend(hubd_t *hubd);
 static void hubd_cpr_resume(dev_info_t *dip);
 static int hubd_restore_state_cb(dev_info_t *dip);
+static int hubd_check_same_device(hubd_t *hubd, usb_port_t port);
 
 static int hubd_init_power_budget(hubd_t *hubd);
 
@@ -1357,7 +1359,7 @@ hubd_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	/* physically zap the children we didn't find */
 	mutex_enter(HUBD_MUTEX(hubd));
 	for (port = 1; port <= hubd->h_hub_descr.bNbrPorts; port++) {
-		if (hubd->h_port_state[port] &	HUBD_CHILD_ZAP) {
+		if (hubd->h_port_state[port] &  HUBD_CHILD_ZAP) {
 			/* zap the dip and usba_device structure as well */
 			hubd_free_usba_device(hubd, hubd->h_usba_devices[port]);
 			hubd->h_children_dips[port] = NULL;
@@ -1824,6 +1826,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(HUBD_MUTEX(hubd), NULL, MUTEX_DRIVER,
 	    hubd->h_dev_data->dev_iblock_cookie);
 	cv_init(&hubd->h_cv_reset_port, NULL, CV_DRIVER, NULL);
+	cv_init(&hubd->h_cv_hotplug_dev, NULL, CV_DRIVER, NULL);
 
 	hubd->h_init_state |= HUBD_LOCKS_DONE;
 
@@ -2727,6 +2730,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 	if (hubd->h_init_state & HUBD_LOCKS_DONE) {
 		mutex_destroy(HUBD_MUTEX(hubd));
 		cv_destroy(&hubd->h_cv_reset_port);
+		cv_destroy(&hubd->h_cv_hotplug_dev);
 	}
 
 	ndi_devi_exit(dip, circ);
@@ -3831,8 +3835,20 @@ hubd_hotplug_thread(void *arg)
 	 * start polling can immediately kick off read callback
 	 * we need to set the h_hotplug_thread to 0 so that
 	 * the callback is not dropped
+	 *
+	 * if there is device during reset, still stop polling to avoid the
+	 * read callback interrupting the reset, the polling will be started
+	 * in hubd_reset_thread.
 	 */
-	hubd_start_polling(hubd, HUBD_ALWAYS_START_POLLING);
+	for (port = 1; port <= MAX_PORTS; port++) {
+		if (hubd->h_reset_port[port]) {
+
+			break;
+		}
+	}
+	if (port > MAX_PORTS) {
+		hubd_start_polling(hubd, HUBD_ALWAYS_START_POLLING);
+	}
 
 	/*
 	 * Earlier we would set the h_hotplug_thread = 0 before
@@ -3847,6 +3863,8 @@ hubd_hotplug_thread(void *arg)
 
 	/* mark this device as idle */
 	(void) hubd_pm_idle_component(hubd, hubd->h_dip, 0);
+
+	cv_broadcast(&hubd->h_cv_hotplug_dev);
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_hotplug_thread: exit");
@@ -4035,10 +4053,33 @@ hubd_handle_port_connect(hubd_t *hubd, usb_port_t port)
 
 				if (rval == USB_SUCCESS) {
 					/*
+					 * if the port is resetting, check if
+					 * device's descriptors have changed.
+					 */
+					if ((hubd->h_reset_port[port]) &&
+					    (hubd_check_same_device(hubd,
+					    port) != USB_SUCCESS)) {
+						retry = hubd_retry_enumerate;
+
+						break;
+					}
+
+					/*
 					 * set the default config for
 					 * this device
 					 */
 					hubd_setdevconfig(hubd, port);
+
+					/*
+					 * if we are doing Default reset, do
+					 * not post reconnect event since we
+					 * don't know where reset function is
+					 * called.
+					 */
+					if (hubd->h_reset_port[port]) {
+
+						return (USB_SUCCESS);
+					}
 
 					/*
 					 * indicate to the child that
@@ -6233,7 +6274,7 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 			if (hubd->h_children_dips[port] == child_dip) {
 				usba_device_t *ud =
 				    hubd->h_usba_devices[port];
-				hubd->h_children_dips[port] = NULL;
+					hubd->h_children_dips[port] = NULL;
 				if (ud) {
 					mutex_exit(HUBD_MUTEX(hubd));
 
@@ -7212,6 +7253,17 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 
 	/* should not happen, just in case */
 	if (hubd->h_dev_state == USB_DEV_SUSPENDED) {
+		mutex_exit(HUBD_MUTEX(hubd));
+		if (dcp) {
+			ndi_dc_freehdl(dcp);
+		}
+
+		return (EIO);
+	}
+
+	if (hubd->h_reset_port[port]) {
+		USB_DPRINTF_L2(DPRINT_MASK_CBOPS, hubd->h_log_handle,
+		    "This port is resetting, just return");
 		mutex_exit(HUBD_MUTEX(hubd));
 		if (dcp) {
 			ndi_dc_freehdl(dcp);
@@ -8338,4 +8390,450 @@ usba_hubdi_decr_power_budget(dev_info_t *dip, usba_device_t *child_ud)
 	mutex_enter(&child_ud->usb_mutex);
 	child_ud->usb_pwr_from_hub = pwr_value;
 	mutex_exit(&child_ud->usb_mutex);
+}
+
+/*
+ * hubd_wait_for_hotplug_exit:
+ * 	Waiting for the exit of the running hotplug thread or ioctl thread.
+ */
+static int
+hubd_wait_for_hotplug_exit(hubd_t *hubd)
+{
+	clock_t		until = ddi_get_lbolt() + drv_usectohz(1000000);
+	int		rval;
+
+	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
+
+	if (hubd->h_hotplug_thread) {
+		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		    "waiting for hubd hotplug thread exit");
+		rval = cv_timedwait(&hubd->h_cv_hotplug_dev,
+		    &hubd->h_mutex, until);
+
+		if ((rval <= 0) && (hubd->h_hotplug_thread)) {
+
+			return (USB_FAILURE);
+		}
+	}
+
+	return (USB_SUCCESS);
+}
+
+/*
+ * hubd_reset_thread:
+ *	handles the "USB_RESET_LVL_REATTACH" reset of usb device.
+ *
+ *	- delete the child (force detaching the device and its children)
+ *	- reset the corresponding parent hub port
+ *	- create the child (force re-attaching the device and its children)
+ */
+static void
+hubd_reset_thread(void *arg)
+{
+	hubd_reset_arg_t *hd_arg = (hubd_reset_arg_t *)arg;
+	hubd_t		*hubd = hd_arg->hubd;
+	uint16_t	reset_port = hd_arg->reset_port;
+	uint16_t	status, change;
+	hub_power_t	*hubpm;
+	dev_info_t	*hdip = hubd->h_dip;
+	dev_info_t	*rh_dip = hubd->h_usba_device->usb_root_hub_dip;
+	dev_info_t	*child_dip;
+	boolean_t	online_child = B_FALSE;
+	int		prh_circ, rh_circ, circ, devinst;
+	char		*devname;
+
+	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+	    "hubd_reset_thread:  started, hubd_reset_port = 0x%x", reset_port);
+
+	kmem_free(arg, sizeof (hubd_reset_arg_t));
+
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	child_dip = hubd->h_children_dips[reset_port];
+	ASSERT(child_dip != NULL);
+
+	devname = (char *)ddi_driver_name(child_dip);
+	devinst = ddi_get_instance(child_dip);
+
+	/* if our bus power entry point is active, quit the reset */
+	if (hubd->h_bus_pwr) {
+		USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		    "%s%d is under bus power management, cannot be reset. "
+		    "Please disconnect and reconnect this device.",
+		    devname, devinst);
+
+		goto Fail;
+	}
+
+	if (hubd_wait_for_hotplug_exit(hubd) == USB_FAILURE) {
+		/* we got woken up because of a timeout */
+		USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG,
+		    hubd->h_log_handle, "Time out when resetting the device"
+		    " %s%d. Please disconnect and reconnect this device.",
+		    devname, devinst);
+
+		goto Fail;
+	}
+
+	hubd->h_hotplug_thread++;
+
+	/* is this the root hub? */
+	if ((hdip == rh_dip) &&
+	    (hubd->h_dev_state == USB_DEV_PWRED_DOWN)) {
+		hubpm = hubd->h_hubpm;
+
+		/* mark the root hub as full power */
+		hubpm->hubp_current_power = USB_DEV_OS_FULL_PWR;
+		hubpm->hubp_time_at_full_power = ddi_get_time();
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		    "hubd_reset_thread: call pm_power_has_changed");
+
+		(void) pm_power_has_changed(hdip, 0,
+		    USB_DEV_OS_FULL_PWR);
+
+		mutex_enter(HUBD_MUTEX(hubd));
+		hubd->h_dev_state = USB_DEV_ONLINE;
+	}
+
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	/*
+	 * this ensures one reset activity per system at a time.
+	 * we enter the parent PCI node to have this serialization.
+	 * this also excludes ioctls and deathrow thread
+	 */
+	ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
+	ndi_devi_enter(rh_dip, &rh_circ);
+
+	/* exclude other threads */
+	ndi_devi_enter(hdip, &circ);
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	/*
+	 * We need to make sure that the child is still online for a hotplug
+	 * thread could have inserted which detached the child.
+	 */
+	if (hubd->h_children_dips[reset_port]) {
+		mutex_exit(HUBD_MUTEX(hubd));
+		/* First disconnect the device */
+		hubd_post_event(hubd, reset_port, USBA_EVENT_TAG_HOT_REMOVAL);
+		mutex_enter(HUBD_MUTEX(hubd));
+
+		/* Then force detaching the device */
+		if (hubd_delete_child(hubd, reset_port, NDI_DEVI_REMOVE,
+		    B_FALSE) != USB_SUCCESS) {
+			USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			    "%s%d cannot be reset due to other applications "
+			    "are using it, please first close these "
+			    "applications, then disconnect and reconnect"
+			    "the device.", devname, devinst);
+
+			mutex_exit(HUBD_MUTEX(hubd));
+			/* post a re-connect event */
+			hubd_post_event(hubd, reset_port,
+			    USBA_EVENT_TAG_HOT_INSERTION);
+			mutex_enter(HUBD_MUTEX(hubd));
+		} else {
+			(void) hubd_determine_port_status(hubd, reset_port,
+			    &status, &change, HUBD_ACK_ALL_CHANGES);
+
+			/* Reset the parent hubd port and create new child */
+			if (status & PORT_STATUS_CCS) {
+				online_child |=	(hubd_handle_port_connect(hubd,
+				    reset_port) == USB_SUCCESS);
+			}
+		}
+	}
+
+	/* release locks so we can do a devfs_clean */
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	/* delete cached dv_node's but drop locks first */
+	ndi_devi_exit(hdip, circ);
+	ndi_devi_exit(rh_dip, rh_circ);
+	ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+
+	(void) devfs_clean(rh_dip, NULL, 0);
+
+	/* now check if any children need onlining */
+	if (online_child) {
+		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		    "hubd_reset_thread: onlining children");
+
+		(void) ndi_devi_online(hubd->h_dip, 0);
+	}
+
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	/* allow hotplug thread now */
+	hubd->h_hotplug_thread--;
+Fail:
+	hubd_start_polling(hubd, 0);
+
+	/* mark this device as idle */
+	(void) hubd_pm_idle_component(hubd, hubd->h_dip, 0);
+
+	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+	    "hubd_reset_thread: exit, %d", hubd->h_hotplug_thread);
+
+	hubd->h_reset_port[reset_port] = B_FALSE;
+
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	ndi_rele_devi(hdip);
+}
+
+/*
+ * hubd_check_same_device:
+ * 	- open the default pipe of the device.
+ * 	- compare the old and new descriptors of the device.
+ * 	- close the default pipe.
+ */
+static int
+hubd_check_same_device(hubd_t *hubd, usb_port_t port)
+{
+	dev_info_t 		*dip = hubd->h_children_dips[port];
+	usb_pipe_handle_t	ph;
+	int 			rval = USB_FAILURE;
+
+	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
+
+	mutex_exit(HUBD_MUTEX(hubd));
+	/* Open the default pipe to operate the device */
+	if (usb_pipe_open(dip, NULL, NULL,
+	    USB_FLAGS_SLEEP| USBA_FLAGS_PRIVILEGED,
+	    &ph) == USB_SUCCESS) {
+		/*
+		 * Check that if the device's descriptors are different
+		 * from the values saved before the port reset.
+		 */
+		rval = usb_check_same_device(dip,
+		    hubd->h_log_handle, USB_LOG_L0,
+		    DPRINT_MASK_ALL, USB_CHK_ALL, NULL);
+
+		usb_pipe_close(dip, ph, USB_FLAGS_SLEEP |
+		    USBA_FLAGS_PRIVILEGED, NULL, NULL);
+	}
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	return (rval);
+}
+
+/*
+ * usba_hubdi_reset_device
+ * 	Called by usb_reset_device to handle usb device reset.
+ */
+int
+usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
+{
+	hubd_t			*hubd;
+	usb_port_t		port = 0;
+	dev_info_t		*hdip;
+	usb_pipe_state_t	prev_pipe_state = 0;
+	usba_device_t		*usba_device;
+	hubd_reset_arg_t	*arg;
+	int			i, ph_open_cnt;
+	int			rval = USB_FAILURE;
+
+	if ((!dip) || usba_is_root_hub(dip)) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	if (!usb_owns_device(dip)) {
+
+		return (USB_INVALID_PERM);
+	}
+
+	if ((reset_level != USB_RESET_LVL_REATTACH) &&
+	    (reset_level != USB_RESET_LVL_DEFAULT)) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	if ((hdip = ddi_get_parent(dip)) == NULL) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	if ((hubd = hubd_get_soft_state(hdip)) == NULL) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	/* make sure the hub is connected before trying any kinds of reset. */
+	if ((hubd->h_dev_state == USB_DEV_DISCONNECTED) ||
+	    (hubd->h_dev_state == USB_DEV_SUSPENDED)) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		    "usb_reset_device: the state %d of the hub/roothub "
+		    "associated to the device 0x%x is incorrect",
+		    hubd->h_dev_state, dip);
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		return (USB_INVALID_ARGS);
+	}
+
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	port = hubd_child_dip2port(hubd, dip);
+
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	if (hubd->h_reset_port[port]) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		    "usb_reset_device: the corresponding port is resetting");
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		return (USB_SUCCESS);
+	}
+
+	/*
+	 * For Default reset, client drivers should first close all the pipes
+	 * except default pipe before calling the function, also should not
+	 * call the function during interrupt context.
+	 */
+	if (reset_level == USB_RESET_LVL_DEFAULT) {
+		usba_device = hubd->h_usba_devices[port];
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		if (servicing_interrupt()) {
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+			    "usb_reset_device: during interrput context, quit");
+
+			return (USB_INVALID_CONTEXT);
+		}
+		/* Check if all the pipes have been closed */
+		for (ph_open_cnt = 0, i = 1; i < USBA_N_ENDPOINTS; i++) {
+			if (usba_device->usb_ph_list[i].usba_ph_data) {
+				ph_open_cnt++;
+				break;
+			}
+		}
+		if (ph_open_cnt) {
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+			    "usb_reset_device: %d pipes are still open",
+			    ph_open_cnt);
+
+			return (USB_BUSY);
+		}
+		mutex_enter(HUBD_MUTEX(hubd));
+	}
+
+	/* Don't perform reset while the device is detaching */
+	if (hubd->h_port_state[port] & HUBD_CHILD_DETACHING) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		    "usb_reset_device: the device is detaching, "
+		    "cannot be reset");
+		mutex_exit(HUBD_MUTEX(hubd));
+
+		return (USB_FAILURE);
+	}
+
+	hubd->h_reset_port[port] = B_TRUE;
+	hdip = hubd->h_dip;
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	/* Don't allow hub detached during the reset */
+	ndi_hold_devi(hdip);
+
+	mutex_enter(HUBD_MUTEX(hubd));
+	hubd_pm_busy_component(hubd, hdip, 0);
+	mutex_exit(HUBD_MUTEX(hubd));
+	/* go full power */
+	(void) pm_raise_power(hdip, 0, USB_DEV_OS_FULL_PWR);
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	hubd->h_hotplug_thread++;
+
+	/* stop polling if it was active */
+	if (hubd->h_ep1_ph) {
+		mutex_exit(HUBD_MUTEX(hubd));
+		(void) usb_pipe_get_state(hubd->h_ep1_ph, &prev_pipe_state,
+		    USB_FLAGS_SLEEP);
+		mutex_enter(HUBD_MUTEX(hubd));
+
+		if (prev_pipe_state == USB_PIPE_STATE_ACTIVE) {
+			hubd_stop_polling(hubd);
+		}
+	}
+
+	switch (reset_level) {
+	case USB_RESET_LVL_REATTACH:
+		mutex_exit(HUBD_MUTEX(hubd));
+		arg = (hubd_reset_arg_t *)kmem_zalloc(
+		    sizeof (hubd_reset_arg_t), KM_SLEEP);
+		arg->hubd = hubd;
+		arg->reset_port = port;
+		mutex_enter(HUBD_MUTEX(hubd));
+
+		if ((rval = usb_async_req(hdip, hubd_reset_thread,
+		    (void *)arg, 0)) == USB_SUCCESS) {
+			hubd->h_hotplug_thread--;
+			mutex_exit(HUBD_MUTEX(hubd));
+
+			return (USB_SUCCESS);
+		} else {
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
+			    "Cannot create reset thread, the device %s%d failed"
+			    " to reset", ddi_driver_name(dip),
+			    ddi_get_instance(dip));
+
+			kmem_free(arg, sizeof (hubd_reset_arg_t));
+		}
+
+		break;
+	case USB_RESET_LVL_DEFAULT:
+		/*
+		 * Reset hub port and then recover device's address, set back
+		 * device's configuration, hubd_handle_port_connect() will
+		 * handle errors happened during this process.
+		 */
+		if ((rval = hubd_handle_port_connect(hubd, port))
+		    == USB_SUCCESS) {
+			mutex_exit(HUBD_MUTEX(hubd));
+			/* re-open the default pipe */
+			rval = usba_persistent_pipe_open(usba_device);
+			mutex_enter(HUBD_MUTEX(hubd));
+			if (rval != USB_SUCCESS) {
+				USB_DPRINTF_L2(DPRINT_MASK_ATTA,
+				    hubd->h_log_handle, "failed to reopen "
+				    "default pipe after reset, disable hub"
+				    "port for %s%d", ddi_driver_name(dip),
+				    ddi_get_instance(dip));
+				/*
+				 * Disable port to set out a hotplug thread
+				 * which will handle errors.
+				 */
+				(void) hubd_disable_port(hubd, port);
+			}
+		}
+
+		break;
+	default:
+
+		break;
+	}
+
+	/* allow hotplug thread now */
+	hubd->h_hotplug_thread--;
+
+	if ((hubd->h_dev_state == USB_DEV_ONLINE) && hubd->h_ep1_ph &&
+	    (prev_pipe_state == USB_PIPE_STATE_ACTIVE)) {
+		hubd_start_polling(hubd, 0);
+	}
+
+	hubd_pm_idle_component(hubd, hdip, 0);
+
+	/* Clear reset mark for the port. */
+	hubd->h_reset_port[port] = B_FALSE;
+
+	mutex_exit(HUBD_MUTEX(hubd));
+
+	ndi_rele_devi(hdip);
+
+	return (rval);
 }

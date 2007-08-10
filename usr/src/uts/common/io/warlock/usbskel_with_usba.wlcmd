@@ -83,6 +83,7 @@ root	usb_serialize_access
 root	usb_is_pm_enabled
 root	usb_get_current_cfgidx
 root    usb_register_client
+root	usb_reset_device
 
 root    usb_ugen_attach
 root    usb_ugen_close
@@ -120,6 +121,7 @@ root    hcdi_shared_cb_thread
 
 root	hubd_bus_power
 root	hubd_hotplug_thread
+root	hubd_reset_thread
 root	hubd_restore_state_cb
 root    hubd_disconnect_event_cb
 root    hubd_post_resume_event_cb
