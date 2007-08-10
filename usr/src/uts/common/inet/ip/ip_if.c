@@ -10062,6 +10062,7 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 	const char	*name;
 	struct qinit	*qinfo;
 	boolean_t	islink = (ioccmd == I_PLINK || ioccmd == I_LINK);
+	boolean_t	entered_ipsq = B_FALSE;
 
 	/*
 	 * Walk the lower stream to verify it's the IP module stream.
@@ -10092,6 +10093,7 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		    NEW_OP, B_TRUE);
 		if (ipsq == NULL)
 			return (EINPROGRESS);
+		entered_ipsq = B_TRUE;
 	}
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -10103,7 +10105,8 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		 */
 		if ((islink && ill->ill_ip_muxid != 0) ||
 		    (!islink && ill->ill_arp_muxid != 0)) {
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			if (entered_ipsq)
+				ipsq_exit(ipsq, B_TRUE, B_TRUE);
 			return (EINVAL);
 		}
 	}
@@ -10137,7 +10140,9 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 			ill_capability_reset(ill);
 	}
 
-	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	if (entered_ipsq)
+		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+
 	return (0);
 }
 
