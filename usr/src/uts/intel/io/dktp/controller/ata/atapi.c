@@ -1123,7 +1123,7 @@ atapi_id_update(
 	 */
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD,
 		ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive is selected, and wait for not busy

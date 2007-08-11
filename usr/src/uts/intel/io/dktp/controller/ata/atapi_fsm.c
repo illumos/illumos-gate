@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +176,7 @@ atapi_start_cmd(
 	 * Select the drive
 	 */
 	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_pktp->ap_hd);
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive selected
@@ -228,7 +228,7 @@ atapi_start_cmd(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	if (!(ata_drvp->ad_flags & AD_NO_CDB_INTR)) {
 		/*
@@ -281,7 +281,6 @@ atapi_send_cdb(
 	ata_pkt_t	*ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 padding;
 
 	ADBG_TRACE(("atapi_send_cdb entered\n"));
@@ -304,7 +303,7 @@ atapi_send_cdb(
 	}
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 #ifdef ATA_DEBUG_XXX
 	{
@@ -381,7 +380,6 @@ atapi_pio_data_in(
 	ata_pkt_t	*ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 drive_bytes;
 	int		 xfer_bytes;
 	int		 xfer_words;
@@ -448,7 +446,7 @@ atapi_pio_data_in(
 	}
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 }
 
 
@@ -462,7 +460,6 @@ atapi_pio_data_out(
 	ata_pkt_t	*ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 drive_bytes;
 	int		 xfer_bytes;
 	int		 xfer_words;
@@ -515,7 +512,7 @@ atapi_pio_data_out(
 	ADBG_TRANSPORT(("atapi_pio_data_out: wrote 0x%x bytes\n", xfer_bytes));
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 }
 
 
@@ -569,20 +566,20 @@ atapi_device_reset(
 
 	/* select the drive */
 	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/* issue atapi DEVICE RESET */
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ATC_DEVICE_RESET);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * Re-select the drive (this is probably only necessary
 	 * when resetting drive 1).
 	 */
 	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/* allow the drive the full 6 seconds to respond */
 	/* LINTED */

@@ -35,7 +35,7 @@
 #include <sys/open.h>
 #include <sys/uio.h>
 #include <sys/cred.h>
-
+#include <sys/cpu.h>
 #include "ata_common.h"
 #include "ata_disk.h"
 #include "atapi.h"
@@ -441,7 +441,7 @@ ata_probe(
 	/* always leave the controller set to drive 0 */
 	if (drive != 0) {
 		ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD, ATDH_DRIVE0);
-		ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+		ata_nsecwait(400);
 	}
 
 out2:
@@ -540,7 +540,7 @@ ata_attach(
 	 */
 	ddi_put8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_drvhd,
 		first_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive selected
@@ -1363,7 +1363,7 @@ ata_uninit_drive(
 	 */
 	ddi_put8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_drvhd,
 		ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * Disable interrupts from the drive
@@ -1409,7 +1409,7 @@ ata_drive_type(
 	 * select the appropriate drive and LUN
 	 */
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD, drvhd);
-	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive is selected, and wait for not busy
@@ -1419,9 +1419,12 @@ ata_drive_type(
 
 	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS);
 
-	if (status & ATS_BSY) {
-		ADBG_TRACE(("ata_drive_type BUSY 0x%p 0x%x\n",
-			    ioaddr1, status));
+	/*
+	 * 0x0, 0x7f, or 0xff can happen when no drive is present
+	 */
+	if ((status & ATS_BSY) || (status == 0x0) || (status == 0x7f) ||
+	    (status == 0xff) || (status & ATS_DF)) {
+		ADBG_TRACE(("ata_drive_type 0x%p 0x%x\n", ioaddr1, status));
 		return (ATA_DEV_NONE);
 	}
 
@@ -1457,6 +1460,26 @@ ata_drive_type(
 }
 
 /*
+ * nsec-granularity time delay function
+ */
+void
+ata_nsecwait(clock_t count)
+{
+	extern int tsc_gethrtime_initted;
+
+	if (tsc_gethrtime_initted) {
+		hrtime_t end = gethrtime() + count;
+
+		while (gethrtime() < end) {
+			SMT_PAUSE();
+		}
+	} else {
+		drv_usecwait(1 + (count / 1000));
+	}
+}
+
+
+/*
  * Wait for a register of a controller to achieve a specific state.
  * To return normally, all the bits in the first sub-mask must be ON,
  * all the bits in the second sub-mask must be OFF.
@@ -1475,18 +1498,19 @@ ata_wait(
 	uint_t		timeout_usec)
 {
 	ushort_t val;
+	hrtime_t deadline = gethrtime() +
+	    (hrtime_t)timeout_usec * (NANOSEC / MICROSEC);
+
 
 	do  {
 		val = ddi_get8(io_hdl, (uchar_t *)ioaddr + AT_ALTSTATUS);
 		if ((val & onbits) == onbits && (val & offbits) == 0)
 			return (TRUE);
 		drv_usecwait(ata_usec_delay);
-		timeout_usec -= ata_usec_delay;
-	} while (timeout_usec > 0);
+	} while (gethrtime() < deadline);
 
 	return (FALSE);
 }
-
 
 
 /*
@@ -1508,6 +1532,8 @@ ata_wait3(
 	uint_t		timeout_usec)
 {
 	ushort_t val;
+	hrtime_t deadline = gethrtime() +
+	    (hrtime_t)timeout_usec * (NANOSEC / MICROSEC);
 
 	do  {
 		val = ddi_get8(io_hdl, (uchar_t *)ioaddr + AT_ALTSTATUS);
@@ -1532,8 +1558,7 @@ ata_wait3(
 		}
 
 		drv_usecwait(ata_usec_delay);
-		timeout_usec -= ata_usec_delay;
-	} while (timeout_usec > 0);
+	} while (gethrtime() < deadline);
 
 	return (FALSE);
 }
@@ -1567,9 +1592,15 @@ ata_id_common(
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_FEATURE, 0);
 
 	/*
-	 * enable interrupts from the device
+	 * Disable interrupts from the device.  ata_id_common() is
+	 * called at device probe time before the interrupt handled is
+	 * registered.  When the ata hardware is sharing its
+	 * interrupt with another device, the shared interrupt might
+	 * have already been unmasked in the interrupt controller and
+	 * triggering ata device interrupts will result in an
+	 * interrupt storm and a hung system.
 	 */
-	ddi_put8(io_hdl2, (uchar_t *)ioaddr2 + AT_DEVCTL, ATDC_D3);
+	ddi_put8(io_hdl2, (uchar_t *)ioaddr2 + AT_DEVCTL, ATDC_D3 | ATDC_NIEN);
 
 	/*
 	 * issue IDENTIFY DEVICE or IDENTIFY PACKET DEVICE command
@@ -1577,7 +1608,7 @@ ata_id_common(
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_CMD, id_cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * According to the ATA specification, some drives may have
@@ -1594,9 +1625,10 @@ ata_id_common(
 	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr1 + AT_STATUS);
 
 	/*
-	 * this happens if there's no drive present
+	 * 0x0, 0x7f, or 0xff can happen when no drive is present
 	 */
-	if (status == 0xff || status == 0x7f) {
+	if ((status == 0x0) || (status == 0x7f) || (status == 0xff) ||
+	    (status & ATS_DF)) {
 		/* invalid status, can't be an ATA or ATAPI device */
 		return (FALSE);
 	}
@@ -1631,7 +1663,7 @@ ata_id_common(
 		NBPSCTR >> 1, DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+	ata_nsecwait(400);
 
 
 	/*
@@ -1695,7 +1727,7 @@ ata_command(
 
 	/* select the drive */
 	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/* make certain the drive selected */
 	if (!ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2,
@@ -1723,7 +1755,7 @@ ata_command(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/* wait for not busy */
 	if (!ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2, 0, ATS_BSY, busy_wait)) {
@@ -2679,7 +2711,8 @@ ata_software_reset(
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
-	int		 time_left;
+	hrtime_t deadline;
+	uint_t usecs_left;
 
 	ADBG_TRACE(("ata_reset_bus entered\n"));
 
@@ -2704,7 +2737,8 @@ ata_software_reset(
 	/*
 	 * If drive 0 exists the test for completion is simple
 	 */
-	time_left = 31 * 1000000;
+	deadline = gethrtime() + ((hrtime_t)31 * NANOSEC);
+
 	if (CTL2DRV(ata_ctlp, 0, 0)) {
 		goto wait_for_not_busy;
 	}
@@ -2725,12 +2759,11 @@ ata_software_reset(
 	 */
 
 	/* give up if the drive doesn't settle within 31 seconds */
-	while (time_left > 0) {
+	while (gethrtime() < deadline) {
 		/*
 		 * delay 10msec each time around the loop
 		 */
 		drv_usecwait(10000);
-		time_left -= 10000;
 
 		/*
 		 * try to select drive 1
@@ -2754,10 +2787,11 @@ ata_software_reset(
 wait_for_not_busy:
 
 	/*
-	 * Now wait upto 31 seconds for BUSY to clear.
+	 * Now wait up to 31 seconds for BUSY to clear.
 	 */
+	usecs_left = (deadline - gethrtime()) / 1000;
 	(void) ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2, 0, ATS_BSY,
-		ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, time_left);
+		ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, usecs_left);
 
 	return (TRUE);
 }

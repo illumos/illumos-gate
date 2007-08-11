@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,6 @@ static	void	 ghd_doneq_pollmode_exit(ccc_t *cccp);
 static	uint_t	 ghd_doneq_process(caddr_t arg);
 static	void	 ghd_do_reset_notify_callbacks(ccc_t *cccp);
 
-static	uint_t	 ghd_dummy_intr(caddr_t arg);
 static	int	 ghd_poll(ccc_t *cccp, gpoll_t polltype, ulong_t polltime,
 			gcmd_t *poll_gcmdp, gtgt_t *gtgtp, void *intr_status);
 
@@ -254,22 +253,6 @@ ghd_do_reset_notify_callbacks(ccc_t *cccp)
 /* ***************************************************************** */
 
 
-
-/*
- * Autovector Interrupt Entry Point
- *
- *	Dummy return to be used before mutexes has been initialized
- *	guard against interrupts from drivers sharing the same irq line
- */
-
-/*ARGSUSED*/
-static uint_t
-ghd_dummy_intr(caddr_t arg)
-{
-	return (DDI_INTR_UNCLAIMED);
-}
-
-
 /*
  * ghd_register()
  *
@@ -328,46 +311,54 @@ ghd_register(char *labelp,
 	/* initialize the HBA's list headers */
 	CCCP_INIT(cccp);
 
-	/*
-	 *	Establish initial dummy interrupt handler
-	 *	get iblock cookie to initialize mutexes used in the
-	 *	real interrupt handler
-	 */
-	if (ddi_add_intr(dip, inumber, &cccp->ccc_iblock, NULL,
-	    ghd_dummy_intr, hba_handle) != DDI_SUCCESS) {
+	if (ddi_get_iblock_cookie(dip, inumber, &cccp->ccc_iblock)
+	    != DDI_SUCCESS) {
+
 		return (FALSE);
 	}
-	mutex_init(&cccp->ccc_hba_mutex, NULL, MUTEX_DRIVER, cccp->ccc_iblock);
-	ddi_remove_intr(dip, inumber, cccp->ccc_iblock);
 
-	/* Establish real interrupt handler */
+	mutex_init(&cccp->ccc_hba_mutex, NULL, MUTEX_DRIVER, cccp->ccc_iblock);
+
+	mutex_init(&cccp->ccc_waitq_mutex, NULL, MUTEX_DRIVER,
+	    cccp->ccc_iblock);
+
+	mutex_init(&cccp->ccc_reset_notify_mutex, NULL, MUTEX_DRIVER,
+	    cccp->ccc_iblock);
+
+	/* Establish interrupt handler */
 	if (ddi_add_intr(dip, inumber, &cccp->ccc_iblock, NULL,
 	    int_handler, (caddr_t)hba_handle) != DDI_SUCCESS) {
 		mutex_destroy(&cccp->ccc_hba_mutex);
+		mutex_destroy(&cccp->ccc_waitq_mutex);
+		mutex_destroy(&cccp->ccc_reset_notify_mutex);
+
 		return (FALSE);
 	}
-
-	mutex_init(&cccp->ccc_waitq_mutex, NULL,
-	    MUTEX_DRIVER, cccp->ccc_iblock);
-
-	mutex_init(&cccp->ccc_reset_notify_mutex, NULL,
-	    MUTEX_DRIVER, cccp->ccc_iblock);
 
 	if (ghd_timer_attach(cccp, tmrp, timeout_func) == FALSE) {
 		ddi_remove_intr(cccp->ccc_hba_dip, 0, cccp->ccc_iblock);
 		mutex_destroy(&cccp->ccc_hba_mutex);
 		mutex_destroy(&cccp->ccc_waitq_mutex);
+		mutex_destroy(&cccp->ccc_reset_notify_mutex);
+
 		return (FALSE);
 	}
 
 	if (ghd_doneq_init(cccp)) {
+
 		return (TRUE);
 	}
+
+	/*
+	 * ghd_doneq_init() returned error:
+	 */
 
 	ghd_timer_detach(cccp);
 	ddi_remove_intr(cccp->ccc_hba_dip, 0, cccp->ccc_iblock);
 	mutex_destroy(&cccp->ccc_hba_mutex);
 	mutex_destroy(&cccp->ccc_waitq_mutex);
+	mutex_destroy(&cccp->ccc_reset_notify_mutex);
+
 	return (FALSE);
 
 }

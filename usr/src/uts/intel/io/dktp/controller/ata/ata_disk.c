@@ -1905,7 +1905,7 @@ ata_disk_start_common(
 	}
 
 	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive selected
@@ -1969,7 +1969,6 @@ ata_disk_start(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 rc;
 
 	rc = ata_disk_start_common(ata_ctlp, ata_drvp, ata_pktp);
@@ -1983,7 +1982,7 @@ ata_disk_start(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	return (ATA_FSM_RC_OKAY);
 }
@@ -1997,7 +1996,6 @@ ata_disk_start_dma_in(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 rc;
 
 	rc = ata_disk_start_common(ata_ctlp, ata_drvp, ata_pktp);
@@ -2023,7 +2021,7 @@ ata_disk_start_dma_in(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the drive's busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	ata_pciide_dma_start(ata_ctlp, PCIIDE_BMICX_RWCON_WRITE_TO_MEMORY);
 
@@ -2039,7 +2037,6 @@ ata_disk_start_dma_out(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 rc;
 
 	rc = ata_disk_start_common(ata_ctlp, ata_drvp, ata_pktp);
@@ -2065,7 +2062,7 @@ ata_disk_start_dma_out(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the drive's busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	ata_pciide_dma_start(ata_ctlp, PCIIDE_BMICX_RWCON_READ_FROM_MEMORY);
 
@@ -2089,7 +2086,6 @@ ata_disk_start_pio_in(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 rc;
 
 	rc = ata_disk_start_common(ata_ctlp, ata_drvp, ata_pktp);
@@ -2102,7 +2098,7 @@ ata_disk_start_pio_in(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	return (ATA_FSM_RC_OKAY);
 }
@@ -2138,7 +2134,7 @@ ata_disk_start_pio_out(
 	ddi_put8(io_hdl1, ata_ctlp->ac_cmd, ata_pktp->ap_cmd);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * Wait for the drive to assert DRQ to send the first chunk
@@ -2562,7 +2558,6 @@ ata_disk_pio_xfer_data_in(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 count;
 
 	count = min(ata_pktp->ap_resid,
@@ -2581,7 +2576,7 @@ ata_disk_pio_xfer_data_in(
 		ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * this read command completed okay, bump the ptr and
@@ -2604,7 +2599,6 @@ ata_disk_pio_xfer_data_out(
 	ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
-	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
 	int		 count;
 
 	count = min(ata_pktp->ap_resid,
@@ -2623,7 +2617,7 @@ ata_disk_pio_xfer_data_out(
 		ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
-	ATA_DELAY_400NSEC(io_hdl2, ata_ctlp->ac_ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * save the count here so I can correctly adjust
@@ -3171,7 +3165,7 @@ ata_disk_id_update(
 	 */
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD,
 	    ata_drvp->ad_drive_bits);
-	ATA_DELAY_400NSEC(io_hdl2, ioaddr2);
+	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive is selected, and wait for not busy

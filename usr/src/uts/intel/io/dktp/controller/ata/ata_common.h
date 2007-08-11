@@ -650,31 +650,7 @@ int	ata_wait3(ddi_acc_handle_t io_hdl, caddr_t ioaddr, uchar_t onbits1,
 		uchar_t failure_offbits2, uchar_t failure_onbits3,
 		uchar_t failure_offbits3, uint_t timeout_usec);
 int	ata_test_lba_support(struct ata_id *aidp);
-
-/*
- * It's not clear to which of the two following delay mechanisms is
- * better.
- *
- * We really need something better than drv_usecwait(). The
- * granularity for drv_usecwait() currently is 10 usec. This means that
- * the ATA_DELAY_400NSEC macro delays 25 timers longer than necessary.
- *
- * Doing 4 inb()'s from the alternate status register is guaranteed
- * to take at least 400 nsecs (it may take as long as 4 usecs.
- * The problem with inb() is that on an x86 platform it also causes
- * a CPU synchronization, CPU write buffer flush, cache flush, and
- * flushes posted writes in any PCI bridge devices between the CPU
- * and the ATA controller.
- */
-#if 1
-#define	ATA_DELAY_400NSEC(H, A)					\
-	((void) ddi_get8((H), (uint8_t *)(A) + AT_ALTSTATUS), 	\
-	(void) ddi_get8((H), (uint8_t *)(A) + AT_ALTSTATUS),	\
-	(void) ddi_get8((H), (uint8_t *)(A) + AT_ALTSTATUS),	\
-	(void) ddi_get8((H), (uint8_t *)(A) + AT_ALTSTATUS))
-#else
-#define	ATA_DELAY_400NSEC(H, A)	((void) drv_usecwait(1))
-#endif
+void	ata_nsecwait(clock_t count);
 
 
 /*
