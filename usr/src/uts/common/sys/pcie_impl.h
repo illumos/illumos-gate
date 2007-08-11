@@ -154,6 +154,7 @@ typedef struct pcie_ppd {
 #define	PF_DMA_ADDR		(1 << 0)
 #define	PF_PIO_ADDR		(1 << 1)
 #define	PF_CFG_ADDR		(1 << 2)
+#define	PF_IO_ADDR		(1 << 3)
 
 #define	PF_SEND_ERPT_YES	1
 #define	PF_SEND_ERPT_UNKNOWN	0

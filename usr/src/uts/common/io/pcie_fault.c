@@ -237,7 +237,8 @@ pf_fini(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	/* no other code should set the flag to false */
 	ppd_p->ppd_fm_flags &= ~PF_FM_READY;
-	while (pf_held(dip));
+	while (pf_held(dip))
+		;
 	mutex_destroy(&ppd_p->ppd_fm_lock);
 }
 
@@ -252,7 +253,7 @@ pf_in_bus_range(pcie_ppd_t *ppd_p, pcie_req_id_t bdf)
 
 	/* check if given bdf falls within bridge's bus range */
 	if ((hdr_type == PCI_HEADER_ONE) &&
-		((bus_no >= br_p->lo) && (bus_no <= br_p->hi)))
+	    ((bus_no >= br_p->lo) && (bus_no <= br_p->hi)))
 		return (B_TRUE);
 	else
 		return (B_FALSE);
@@ -406,7 +407,7 @@ pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,
 		impl.pf_faddr = rc_pf_data_p->fault_addr;
 
 		if ((impl.pf_fbdf && pf_find_in_q(impl.pf_fbdf, dq_p,
-			 *dq_tail_p) == PF_DATA_NOT_FOUND) ||
+		    *dq_tail_p) == PF_DATA_NOT_FOUND) ||
 		    (!impl.pf_fbdf && impl.pf_faddr))
 			ret |= pf_pcie_dispatch(rpdip, &impl);
 	}
@@ -677,9 +678,9 @@ clear:
 	/* Clear the Advanced PCIe Errors */
 	if (aer_off) {
 		PCI_XCAP_PUT32(h, NULL, aer_off, PCIE_AER_CE_STS,
-			pf_data.aer_ce_status);
+		    pf_data.aer_ce_status);
 		PCI_XCAP_PUT32(h, NULL, aer_off, PCIE_AER_UCE_STS,
-			pf_data.aer_ue_status);
+		    pf_data.aer_ue_status);
 
 		if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
 			PCI_XCAP_PUT32(h, NULL, aer_off,
@@ -740,17 +741,17 @@ pf_hdl_lookup(dev_info_t *dip, uint64_t ena, uint32_t flag, uint32_t addr,
 	/* If we know the addr or bdf mark the handle as failed */
 	if (flag & PF_DMA_ADDR) {
 		if (pf_hdl_child_lookup(dip, dip, &derr, addr, bdf,
-			pf_dma_hdl_check) != PF_HDL_NOTFOUND)
+		    pf_dma_hdl_check) != PF_HDL_NOTFOUND)
 			found++;
 	}
 	if (flag & PF_PIO_ADDR) {
 		if (pf_hdl_child_lookup(dip, dip, &derr, addr, bdf,
-			pf_pio_hdl_check) != PF_HDL_NOTFOUND)
+		    pf_pio_hdl_check) != PF_HDL_NOTFOUND)
 			found++;
 	}
 	if (flag & PF_CFG_ADDR) {
 		if (pf_hdl_child_lookup(dip, dip, &derr, addr, bdf,
-			pf_cfg_hdl_check) != PF_HDL_NOTFOUND)
+		    pf_cfg_hdl_check) != PF_HDL_NOTFOUND)
 			found++;
 	}
 
@@ -788,7 +789,7 @@ pf_hdl_child_lookup(dev_info_t *rpdip, dev_info_t *dip,
 	/* If we can't find the handler check it's children */
 	for (tgt = fmhdl->fh_tgts; tgt != NULL; tgt = tgt->ft_next) {
 		if ((status = pf_hdl_child_lookup(rpdip, tgt->ft_dip, derr,
-			addr, bdf, cf)) != PF_HDL_NOTFOUND)
+		    addr, bdf, cf)) != PF_HDL_NOTFOUND)
 			goto done;
 	}
 
@@ -1039,7 +1040,8 @@ pf_get_parent_pcie_bridge(pf_data_t *dq_p, pf_data_t *pf_data_p)
 {
 	pf_data_t *bdg_pf_data_p;
 
-	ASSERT(pf_data_p->dev_type == PCIE_PCIECAP_DEV_TYPE_PCI_DEV);
+	if (pf_data_p->dev_type != PCIE_PCIECAP_DEV_TYPE_PCI_DEV)
+		return (NULL);
 
 	if (pf_data_p->parent_index == PF_DATA_NOT_FOUND)
 		return (NULL);
@@ -1048,7 +1050,7 @@ pf_get_parent_pcie_bridge(pf_data_t *dq_p, pf_data_t *pf_data_p)
 	    bdg_pf_data_p->dev_type != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI;
 	    bdg_pf_data_p = &dq_p[bdg_pf_data_p->parent_index]) {
 		if (!bdg_pf_data_p || (bdg_pf_data_p->parent_index ==
-			PF_DATA_NOT_FOUND))
+		    PF_DATA_NOT_FOUND))
 			return (NULL);
 	}
 
@@ -1086,7 +1088,7 @@ pf_matched_in_rc(pf_data_t *dq_p, pf_data_t *pf_data_p, uint32_t abort_type)
 		/* The Fault BDF is from PCIe-PCI Bridge's secondary bus */
 		if ((pf_data_p->dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
 		    ((rc_pf_data_p->fault_bdf & PCIE_REQ_ID_BUS_MASK) ==
-			pf_data_p->bdg_secbus))
+		    pf_data_p->bdg_secbus))
 			return (B_TRUE);
 	}
 
@@ -1684,7 +1686,7 @@ pf_analyse_perr_assert(dev_info_t *rpdip, ddi_fm_error_t *derr, uint32_t bit,
 
 	if (HAS_SAER_LOGS(pf_data_p, bit)) {
 		if (pf_pci_decode(rpdip, pf_data_p, &cmd, &bdf, &addr,
-			&trans_type) != DDI_SUCCESS)
+		    &trans_type) != DDI_SUCCESS)
 			return (PF_PANIC);
 
 		switch (cmd) {
@@ -1702,7 +1704,7 @@ pf_analyse_perr_assert(dev_info_t *rpdip, ddi_fm_error_t *derr, uint32_t bit,
 			 * UR Completion would have been sent.
 			 */
 			if (pf_matched_in_rc(dq_p, pf_data_p,
-				PCI_STAT_R_MAST_AB)) {
+			    PCI_STAT_R_MAST_AB)) {
 				sts = PF_HDL_FOUND;
 				err = PF_MATCHED_RC;
 				break;

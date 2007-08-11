@@ -1191,7 +1191,7 @@ PX_ERPT_SEND_DEC(ubc_fatal)
 					unum[0] = '\0';
 			}
 			fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
-					NULL, unum, NULL, offset);
+			    NULL, unum, NULL, offset);
 
 		} else if (eid == UBC_EID_CPU) {
 			int cpuid = (marked & UBC_MARKED_MAX_CPUID_MASK);
@@ -1326,7 +1326,7 @@ px_err_jbc_merge_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 * up the appropriate driver based on the PA.
 	 */
 	return (px_err_panic_handle(rpdip, csr_base, derr, err_reg_descr,
-		    err_bit_descr));
+	    err_bit_descr));
 }
 
 /* JBC Jbusint IN */
@@ -1381,7 +1381,7 @@ px_err_jbc_jbusint_in_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 * up the appropriate driver based on the PA.
 	 */
 	return (px_err_panic_handle(rpdip, csr_base, derr, err_reg_descr,
-		    err_bit_descr));
+	    err_bit_descr));
 }
 
 
@@ -1461,7 +1461,7 @@ px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 * up the appropriate driver based on the PA.
 	 */
 	return (px_err_panic_handle(rpdip, csr_base, derr, err_reg_descr,
-		    err_bit_descr));
+	    err_bit_descr));
 }
 
 /* Does address in DMCINT error log register match address of pcitool access? */
@@ -1496,7 +1496,7 @@ px_err_jbc_safe_acc_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	if (!pri)
 		return (px_err_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	/*
 	 * Got an error which is forgivable during a PCItool access.
 	 *
@@ -1510,7 +1510,7 @@ px_err_jbc_safe_acc_handle(dev_info_t *rpdip, caddr_t csr_base,
 	if ((derr->fme_flag != DDI_FM_ERR_UNEXPECTED) &&
 	    (px_jbc_pcitool_addr_match(rpdip, csr_base)))
 		return (px_err_protected_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 
 	return (px_err_jbc_dmcint_odcd_handle(rpdip, csr_base, derr,
 	    err_reg_descr, err_bit_descr));
@@ -1604,10 +1604,10 @@ px_err_imu_eq_ovfl_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	if ((err == PX_PANIC) && (pxu_p->cpr_flag == PX_NOT_CPR)) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	} else {
 		return (px_err_no_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	}
 }
 
@@ -1751,7 +1751,7 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 done:
 	return (px_err_no_panic_handle(rpdip, csr_base, derr, err_reg_descr,
-		    err_bit_descr));
+	    err_bit_descr));
 }
 
 /*
@@ -1782,7 +1782,7 @@ px_err_mmu_tfa_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 done:
 	return (px_err_no_panic_handle(rpdip, csr_base, derr, err_reg_descr,
-		    err_bit_descr));
+	    err_bit_descr));
 }
 
 /*
@@ -1802,7 +1802,7 @@ px_err_mmu_parity_handle(dev_info_t *rpdip, caddr_t csr_base,
 {
 	uint64_t mmu_tfa;
 	pcie_req_id_t bdf;
-	int status = DDI_FM_UNKNOWN;
+	int status = PF_HDL_NOTFOUND;
 
 	if (!PX_ERR_IS_PRI(err_bit_descr->bit))
 		goto done;
@@ -1813,12 +1813,12 @@ px_err_mmu_parity_handle(dev_info_t *rpdip, caddr_t csr_base,
 	    (uint32_t)mmu_tfa, bdf);
 
 done:
-	if (status == DDI_FM_UNKNOWN)
+	if (status == PF_HDL_NOTFOUND)
 		return (px_err_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	else
 		return (px_err_no_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 }
 
 /*
@@ -1863,10 +1863,10 @@ px_err_wuc_ruc_handle(dev_info_t *rpdip, caddr_t csr_base,
 done:
 	if ((sts == PF_HDL_NOTFOUND) && (pxu_p->cpr_flag == PX_NOT_CPR))
 		return (px_err_protected_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 
 	return (px_err_no_panic_handle(rpdip, csr_base, derr,
-		    err_reg_descr, err_bit_descr));
+	    err_reg_descr, err_bit_descr));
 }
 
 /*
@@ -1982,10 +1982,10 @@ px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	} else {
 		return (px_err_no_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	}
 }
 
@@ -2116,10 +2116,10 @@ px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	} else {
 		return (px_err_no_panic_handle(rpdip, csr_base, derr,
-			    err_reg_descr, err_bit_descr));
+		    err_reg_descr, err_bit_descr));
 	}
 }
 

@@ -165,7 +165,7 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 		    pec_p->pec_descr.U) {
 			if (pec_p->ue_reg_status & PCIE_AER_UCE_UR)
 				s_status |= PCI_STAT_R_MAST_AB;
-			if (pec_p->ue_reg_status | PCIE_AER_UCE_CA)
+			if (pec_p->ue_reg_status & PCIE_AER_UCE_CA)
 				s_status |= PCI_STAT_R_TARG_AB;
 		}
 
@@ -225,7 +225,7 @@ px_err_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 
 	/* Set the intr state to idle for the leaf that received the mondo */
 	if (px_lib_intr_setstate(rpdip, fault_p->px_fh_sysino,
-		INTR_IDLE_STATE) != DDI_SUCCESS) {
+	    INTR_IDLE_STATE) != DDI_SUCCESS) {
 		px_p->px_fm_mutex_owner = NULL;
 		mutex_exit(&px_p->px_fm_mutex);
 		return (DDI_INTR_UNCLAIMED);
@@ -573,13 +573,13 @@ px_pcie_epkt_severity(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	pf_data.rp_bdf = px_p->px_bdf;
 	temp = PCIE_AER_UCE_UR | PCIE_AER_UCE_CA;
 	if (((pec->pec_descr.dir == DIR_READ) || (pec->pec_descr.dir ==
-	    DIR_WRITE)) && pec->pec_descr.U && (pec->ue_reg_status == temp)) {
+	    DIR_WRITE)) && pec->pec_descr.U && (pec->ue_reg_status & temp)) {
 		pf_data.aer_h0 = (uint32_t)(pec->hdr[0]);
 		pf_data.aer_h1 = (uint32_t)(pec->hdr[0] >> 32);
 		pf_data.aer_h2 = (uint32_t)(pec->hdr[1]);
 		pf_data.aer_h3 = (uint32_t)(pec->hdr[1] >> 32);
 
-		if (pf_tlp_hdl_lookup(dip, derr, &pf_data) != DDI_FM_UNKNOWN)
+		if (pf_tlp_hdl_lookup(dip, derr, &pf_data) == PF_HDL_FOUND)
 			return (PX_NO_PANIC);
 		else
 			return (PX_PANIC);
@@ -645,5 +645,5 @@ px_mmu_handle_lookup(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	}
 
 	return (pf_hdl_lookup(dip, derr->fme_ena, PF_DMA_ADDR, addr,
-		    bdf));
+	    bdf));
 }

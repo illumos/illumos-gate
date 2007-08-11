@@ -38,11 +38,10 @@
 
 #define	PX_PCIE_PANIC_BITS \
 	(PCIE_AER_UCE_DLP | PCIE_AER_UCE_FCP | PCIE_AER_UCE_TO | \
-	PCIE_AER_UCE_RO | PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC | \
-	PCIE_AER_UCE_UR)
+	PCIE_AER_UCE_RO | PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC)
 #define	PX_PCIE_NO_PANIC_BITS \
 	(PCIE_AER_UCE_TRAINING | PCIE_AER_UCE_SD | PCIE_AER_UCE_CA | \
-	PCIE_AER_UCE_UC)
+	PCIE_AER_UCE_UC | PCIE_AER_UCE_UR)
 
 static void px_err_fill_pfd(dev_info_t *rpdip, px_err_pcie_t *regs);
 static int px_pcie_ptlp(dev_info_t *dip, ddi_fm_error_t *derr,
@@ -65,7 +64,7 @@ int
 px_fm_attach(px_t *px_p)
 {
 	px_p->px_fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
 	 * Initialize pci_target_queue for FMA handling of
@@ -271,6 +270,11 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 				addr = NULL;
 				bdf = (pcie_req_id_t)(addr_low >> 12);
 				break;
+			case PCI_ADDR_IO:
+				acc_type = PF_IO_ADDR;
+				addr = addr_low;
+				bdf = NULL;
+				break;
 			case PCI_ADDR_MEM32:
 				acc_type = PF_DMA_ADDR;
 				addr = addr_low;
@@ -287,6 +291,11 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 		mutex_exit(&px_p->px_fm_mutex);
 		i_ddi_fm_handler_enter(pdip);
 		return (DDI_FM_OK);
+	} else if (acc_type == PF_IO_ADDR) {
+		px_p->px_fm_mutex_owner = NULL;
+		mutex_exit(&px_p->px_fm_mutex);
+		i_ddi_fm_handler_enter(pdip);
+		return (DDI_FM_FATAL);
 	}
 
 	rc_err = px_err_cmn_intr(px_p, derr, PX_TRAP_CALL, PX_FM_BLOCK_ALL);
@@ -441,7 +450,7 @@ px_err_check_eq(dev_info_t *dip)
 		if (i + eq_no == pec_p->pec_corr_msg_msiq_id) /* skip CE q */
 			continue;
 		if ((px_lib_msiq_getstate(dip, i + eq_no, &msiq_state) !=
-			DDI_SUCCESS) || msiq_state == PCI_MSIQ_STATE_ERROR)
+		    DDI_SUCCESS) || msiq_state == PCI_MSIQ_STATE_ERROR)
 			return (PX_PANIC);
 	}
 	return (PX_NO_PANIC);
