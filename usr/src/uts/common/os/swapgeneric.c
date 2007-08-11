@@ -238,10 +238,10 @@ svm_rootconf(void)
 
 	if (error) {
 		cmn_err(CE_CONT, "Cannot remount root on %s fstype %s\n",
-			rootfs.bo_name, rootfs.bo_fstype);
+		    rootfs.bo_name, rootfs.bo_fstype);
 	} else {
 		cmn_err(CE_CONT, "?root remounted on %s fstype %s\n",
-			rootfs.bo_name, rootfs.bo_fstype);
+		    rootfs.bo_name, rootfs.bo_fstype);
 	}
 	return (error);
 }
@@ -305,7 +305,7 @@ loadrootmodules(void)
 {
 	struct vfssw	*vsw;
 	char		*this;
-	char 		*name;
+	char		*name;
 	int		err;
 /* ONC_PLUS EXTRACT END */
 	int		i, proplen, dhcacklen;
@@ -685,8 +685,16 @@ retry:
 static int
 load_boot_driver(char *drv)
 {
-	char	*drvname;
-	major_t	major;
+	char		*drvname;
+	major_t		major;
+#ifdef	sparc
+	struct devnames *dnp;
+	ddi_prop_t	*propp;
+	char		*module;
+	char		*dir, *mf;
+	int		plen;
+	int		mlen;
+#endif	/* sparc */
 
 	if ((major = ddi_name_to_major(drv)) == (major_t)-1) {
 		cmn_err(CE_CONT, "%s: no major number\n", drv);
@@ -709,6 +717,49 @@ load_boot_driver(char *drv)
 		cmn_err(CE_CONT, "%s: cannot load driver\n", drvname);
 		return (-1);
 	}
+
+#ifdef	sparc
+	/*
+	 * NOTE: this can be removed when newboot-sparc is delivered.
+	 *
+	 * Check to see if the driver had a 'ddi-forceload' global driver.conf
+	 * property to identify additional modules that need to be loaded.
+	 * The driver still needs to use ddi_modopen() to open these modules,
+	 * but the 'ddi-forceload' property allows the modules to be loaded
+	 * into memory prior to lights-out, so that driver ddi_modopen()
+	 * calls during lights-out (when mounting root) will work correctly.
+	 * Use of 'ddi-forceload' is only required for drivers involved in
+	 * getting root mounted.
+	 */
+	dnp = &devnamesp[major];
+	if (dnp->dn_global_prop_ptr && dnp->dn_global_prop_ptr->prop_list &&
+	    ((propp = i_ddi_prop_search(DDI_DEV_T_ANY,
+	    "ddi-forceload", DDI_PROP_TYPE_STRING,
+	    &dnp->dn_global_prop_ptr->prop_list)) != NULL)) {
+
+		module = (char *)propp->prop_val;
+		plen = propp->prop_len;
+		while (plen > 0) {
+			mlen = strlen(module);
+			mf = strrchr(module, '/');
+			if (mf) {
+				dir = module;
+				*mf++ = '\0';		/* '/' -> '\0' */
+			} else {
+				dir = "misc";
+				mf = module;
+			}
+			if (modloadonly(dir, mf) == -1)
+				cmn_err(CE_CONT,
+				    "misc/%s: can't load module\n", mf);
+			if (mf != module)
+				*(mf - 1) = '/';	/* '\0' -> '/' */
+
+			module += mlen + 1;
+			plen -= mlen + 1;
+		}
+	}
+#endif	/* sparc */
 
 	return (0);
 }
@@ -800,7 +851,7 @@ load_bootpath_drivers(char *bootpath)
 		*p = 0;
 
 		BMDPRINTF(("load_bootpath_drivers: parent=%s leaf=%s\n",
-			bootpath, leaf));
+		    bootpath, leaf));
 
 		dip = path_to_devinfo(pathcopy);
 		if (leaf) {
@@ -815,7 +866,7 @@ load_bootpath_drivers(char *bootpath)
 
 	if (dip == NULL) {
 		cmn_err(CE_WARN, "can't bind driver for boot path <%s>",
-			bootpath);
+		    bootpath);
 		kmem_free(pathcopy, pathcopy_len);
 		return (NULL);
 	}
@@ -884,7 +935,7 @@ load_boot_platform_modules(char *drv)
 		BMDPRINTF(("load_boot_platform_modules: %s\n", drv));
 	} else {
 		BMDPRINTF(("load_boot_platform_modules: %s -> %s\n",
-			drv, drvname));
+		    drv, drvname));
 	}
 #endif	/* DEBUG */
 

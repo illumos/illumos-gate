@@ -807,7 +807,8 @@ convert_constraint_string(char *constraints, size_t len)
 	ASSERT(constraints != NULL);
 	ASSERT(len > 0);
 
-	for (i = 0, p = constraints; strlen(p) > 0; i++, p += strlen(p) + 1);
+	for (i = 0, p = constraints; strlen(p) > 0; i++, p += strlen(p) + 1)
+		;
 
 	n = i;
 
@@ -1518,7 +1519,7 @@ modctl_modevents(int subcmd, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		break;
 	case MODEVENTS_POST_EVENT:
 		error = log_usr_sysevent((sysevent_t *)a2, (uint32_t)a3,
-			(sysevent_id_t *)a4);
+		    (sysevent_id_t *)a4);
 		break;
 	case MODEVENTS_REGISTER_EVENT:
 		error = log_sysevent_register((char *)a2, (char *)a3,
@@ -1568,7 +1569,7 @@ rem_minorperm(major_t major, char *drvname, mperm_t *mp, int is_clone)
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	if (strcmp(mp->mp_minorname, "*") == 0) {
 		wildmp = ((is_clone == 0) ?
-			&dnp->dn_mperm_wild : &dnp->dn_mperm_clone);
+		    &dnp->dn_mperm_wild : &dnp->dn_mperm_clone);
 		if (*wildmp)
 			freemp = *wildmp;
 		*wildmp = NULL;
@@ -1597,7 +1598,7 @@ rem_minorperm(major_t major, char *drvname, mperm_t *mp, int is_clone)
 	} else {
 		if (moddebug & MODDEBUG_MINORPERM) {
 			cmn_err(CE_CONT, MP_NO_MINOR,
-				drvname, mp->mp_minorname);
+			    drvname, mp->mp_minorname);
 		}
 	}
 
@@ -1624,7 +1625,7 @@ add_minorperm(major_t major, char *drvname, mperm_t *mp, int is_clone)
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	if (strcmp(mp->mp_minorname, "*") == 0) {
 		wildmp = ((is_clone == 0) ?
-			&dnp->dn_mperm_wild : &dnp->dn_mperm_clone);
+		    &dnp->dn_mperm_wild : &dnp->dn_mperm_clone);
 		if (*wildmp)
 			freemp = *wildmp;
 		*wildmp = mp;
@@ -1869,7 +1870,7 @@ modctl_remdrv_cleanup(const char *u_drvname)
 	for (pe = list_head(&wargs->wa_pathlist); pe != NULL;
 	    pe = list_next(&wargs->wa_pathlist, pe)) {
 		err = devfs_remdrv_cleanup((const char *)pe->pe_dir,
-			(const char *)pe->pe_nodename);
+		    (const char *)pe->pe_nodename);
 		if (rval == 0)
 			rval = err;
 	}
@@ -2199,12 +2200,12 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODGETDEVFSPATH_MI_LEN:	/* sizeof path nm of (major,instance) */
 		error = modctl_devfspath_mi_len((major_t)a1, (int)a2,
-			    (uint_t *)a3);
+		    (uint_t *)a3);
 		break;
 
 	case MODGETDEVFSPATH_MI:   	/* get path name of (major,instance) */
 		error = modctl_devfspath_mi((major_t)a1, (int)a2,
-			    (uint_t)a3, (char *)a4);
+		    (uint_t)a3, (char *)a4);
 		break;
 
 
@@ -2243,7 +2244,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODGETDEVPOLICY:	/* get device policy */
 		error = devpolicy_get((int *)a1, (size_t)a2,
-				(devplcysys_t *)a3);
+		    (devplcysys_t *)a3);
 		break;
 
 	case MODALLOCPRIV:
@@ -3026,7 +3027,7 @@ mod_askparams()
 	/*CONSTANTCONDITION*/
 	while (1) {
 		printf("Name of system file [%s]:  ",
-			systemfile ? systemfile : "/dev/null");
+		    systemfile ? systemfile : "/dev/null");
 
 		console_gets(s0, sizeof (s0));
 
@@ -3072,7 +3073,7 @@ mod_load(struct modctl *mp, int usepath)
 	    mod_sysctl(SYS_CHECK_EXCLUDE, mp->mod_filename) != 0) {
 		if (moddebug & MODDEBUG_LOADMSG) {
 			printf(mod_excl_msg, mp->mod_filename,
-				mp->mod_modname);
+			    mp->mod_modname);
 		}
 		return (ENXIO);
 	}
@@ -3103,10 +3104,10 @@ mod_load(struct modctl *mp, int usepath)
 		mp->mod_loadcnt++;
 		if (moddebug & MODDEBUG_LOADMSG) {
 			printf(load_msg, mp->mod_filename, mp->mod_id,
-				(void *)((struct module *)mp->mod_mp)->text,
-				(void *)((struct module *)mp->mod_mp)->data,
-				((struct module *)mp->mod_mp)->text_size,
-				((struct module *)mp->mod_mp)->data_size);
+			    (void *)((struct module *)mp->mod_mp)->text,
+			    (void *)((struct module *)mp->mod_mp)->data,
+			    ((struct module *)mp->mod_mp)->text_size,
+			    ((struct module *)mp->mod_mp)->data_size);
 		}
 
 		/*
@@ -3179,7 +3180,7 @@ mod_unload(struct modctl *mp)
 
 	if (moddebug & MODDEBUG_LOADMSG)
 		printf(unload_msg, mp->mod_modname,
-			mp->mod_id, mp->mod_loadcnt);
+		    mp->mod_id, mp->mod_loadcnt);
 
 	/*
 	 * If mod_ref is not zero, it means some modules might still refer
@@ -3271,7 +3272,7 @@ modinstall(struct modctl *mp)
 
 	if (moddebug & MODDEBUG_LOADMSG)
 		printf("installing %s, module id %d.\n",
-			mp->mod_modname, mp->mod_id);
+		    mp->mod_modname, mp->mod_id);
 
 	ASSERT(mp->mod_mp != NULL);
 	if (mod_install_requisites(mp) != 0) {
@@ -3286,11 +3287,11 @@ modinstall(struct modctl *mp)
 
 	if (moddebug & MODDEBUG_ERRMSG) {
 		printf("init '%s' id %d loaded @ 0x%p/0x%p size %lu/%lu\n",
-			mp->mod_filename, mp->mod_id,
-			(void *)((struct module *)mp->mod_mp)->text,
-			(void *)((struct module *)mp->mod_mp)->data,
-			((struct module *)mp->mod_mp)->text_size,
-			((struct module *)mp->mod_mp)->data_size);
+		    mp->mod_filename, mp->mod_id,
+		    (void *)((struct module *)mp->mod_mp)->text,
+		    (void *)((struct module *)mp->mod_mp)->data,
+		    ((struct module *)mp->mod_mp)->text_size,
+		    ((struct module *)mp->mod_mp)->data_size);
 	}
 
 	func = (int (*)())kobj_lookup(mp->mod_mp, "_init");
@@ -3574,9 +3575,9 @@ mod_uninstall_daemon(void)
 		 */
 		if (mod_uninstall_interval) {
 			ticks = ddi_get_lbolt() +
-				drv_usectohz(mod_uninstall_interval * 1000000);
+			    drv_usectohz(mod_uninstall_interval * 1000000);
 			(void) cv_timedwait(&mod_uninstall_cv,
-				&mod_uninstall_lock, ticks);
+			    &mod_uninstall_lock, ticks);
 		} else {
 			cv_wait(&mod_uninstall_cv, &mod_uninstall_lock);
 		}
@@ -4025,7 +4026,7 @@ mod_load_requisite(struct modctl *dep, char *on)
 		mod_make_requisite(dep, on_mod);
 	} else if (moddebug & MODDEBUG_ERRMSG) {
 		printf("error processing %s on which module %s depends\n",
-			on, dep->mod_modname);
+		    on, dep->mod_modname);
 	}
 	return (on_mod);
 }
@@ -4069,7 +4070,7 @@ mod_in_autounload()
 #define	popchar(p, c) \
 	c = *p++; \
 	if (c == 0) \
-		return (0);
+		return (0)
 
 int
 gmatch(const char *s, const char *p)
@@ -4085,7 +4086,7 @@ gmatch(const char *s, const char *p)
 	switch (c) {
 	case '\\':
 		/* skip to quoted character */
-		popchar(p, c)
+		popchar(p, c);
 		/*FALLTHRU*/
 
 	default:
@@ -4127,14 +4128,14 @@ gmatch(const char *s, const char *p)
 			notflag = 1;
 			p++;
 		}
-		popchar(p, c)
+		popchar(p, c);
 
 		do {
 			if (c == '-' && lc && *p != ']') {
 				/* test sc against range [c1-c2] */
-				popchar(p, c)
+				popchar(p, c);
 				if (c == '\\') {
-					popchar(p, c)
+					popchar(p, c);
 				}
 
 				if (notflag) {
@@ -4148,7 +4149,7 @@ gmatch(const char *s, const char *p)
 				/* keep going, may get a match next */
 			} else if (c == '\\') {
 				/* skip to quoted character */
-				popchar(p, c)
+				popchar(p, c);
 			}
 			lc = c;
 			if (notflag) {
@@ -4158,7 +4159,7 @@ gmatch(const char *s, const char *p)
 			} else if (sc == lc) {
 				ok++;
 			}
-			popchar(p, c)
+			popchar(p, c);
 		} while (c != ']');
 
 		/* recurse on remainder of string */
@@ -4383,10 +4384,8 @@ ddi_modopen(const char *modname, int mode, int *errnop)
 	if ((modname == NULL) || (mode != KRTLD_MODE_FIRST))
 		goto out;
 
-	/* find optional first '/' in modname */
-	mod = strchr(modname, '/');
-	if (mod != strrchr(modname, '/'))
-		goto out;		/* only one '/' is legal */
+	/* find last '/' in modname */
+	mod = strrchr(modname, '/');
 
 	if (mod) {
 		/* for subdir string without modification to argument */

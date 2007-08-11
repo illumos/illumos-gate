@@ -72,6 +72,7 @@ extern "C" {
 #define	SCBP_C(pkt)	((*(pkt)->pkt_scbp) & STATUS_MASK)
 
 int vhci_do_scsi_cmd(struct scsi_pkt *);
+/*PRINTFLIKE3*/
 void vhci_log(int, dev_info_t *, const char *, ...);
 
 /*
@@ -200,12 +201,6 @@ extern int vhci_debug;
 #define	VHCI_SCSI_CDB_SIZE		16
 #define	VHCI_SCSI_SCB_SIZE		(sizeof (struct scsi_arq_status))
 
-#define	SCSI_OPTIONS_VHCI_MASK		0x7000000
-#define	SCSI_OPTIONS_DISABLE_DEV_TYPE	0x7000000
-#define	SCSI_OPTIONS_SYMMETRIC		0x1000000
-#define	SCSI_OPTIONS_ASYMMETRIC		0x2000000
-#define	SCSI_OPTIONS_SUN_T3_ASYMMETRIC	0x3000000
-
 /*
  * flag to determine failover support
  */
@@ -214,15 +209,6 @@ extern int vhci_debug;
 #define	SCSI_EXPLICIT_FAILOVER	0x2
 #define	SCSI_BOTH_FAILOVER \
 	(SCSI_IMPLICIT_FAILOVER |  SCSI_EXPLICIT_FAILOVER)
-
-#define	SCSI_OPTIONS_VHCI(n)	((n) & SCSI_OPTIONS_VHCI_MASK)
-
-typedef struct vhci_dev_vidpid_entry {
-	char	vid[10];
-	int	vid_len;
-	char	pid[20];
-	int	pid_len;
-} vhci_dev_vidpid_entry_t;
 
 struct	scsi_vhci_swarg;
 
@@ -269,7 +255,7 @@ typedef struct vhci_prout {
 
 struct vhci_pkt {
 	struct scsi_pkt			*vpkt_tgt_pkt;
-	mdi_pathinfo_t			*vpkt_path; 	/* path pkt bound to */
+	mdi_pathinfo_t			*vpkt_path;	/* path pkt bound to */
 
 	/*
 	 * pHCI packet that does the actual work.
@@ -319,8 +305,14 @@ typedef struct scsi_vhci_lun {
 	 */
 	client_lb_t		svl_lb_policy_save;
 
+	/*
+	 * Failover ops and ops name selected for the lun.
+	 */
 	struct scsi_failover_ops	*svl_fops;
+	char			*svl_fops_name;
+
 	void			*svl_fops_ctpriv;
+
 	struct scsi_vhci_lun	*svl_hash_next;
 	char			*svl_lun_wwn;
 
@@ -365,7 +357,6 @@ typedef struct scsi_vhci_lun {
 	int			svl_xlf_capable; /* XLF implementation */
 	int			svl_sector_size;
 	int			svl_setcap_done;
-	uint16_t		svl_fo_type;	 /* failover type */
 	uint16_t		svl_fo_support;	 /* failover mode */
 } scsi_vhci_lun_t;
 
@@ -533,69 +524,167 @@ struct scsi_failover_ops {
 	int	sfo_rev;
 
 	/*
+	 * failover module name, begins with "f_"
+	 */
+	char	*sfo_name;
+
+	/*
+	 * devices supported by failover module
+	 *
+	 * NOTE: this is an aproximation, sfo_device_probe has the final say.
+	 */
+	char	**sfo_devices;
+
+	/*
+	 * initialize the failover module
+	 */
+	void	(*sfo_init)();
+
+	/*
 	 * identify device
 	 */
 	int	(*sfo_device_probe)(
 			struct scsi_device	*sd,
-			struct scsi_inquiry 	*stdinq,
-			void 			**ctpriv);
+			struct scsi_inquiry	*stdinq,
+			void			**ctpriv);
 
 	/*
 	 * housekeeping (free memory etc alloc'ed during probe
 	 */
 	void	(*sfo_device_unprobe)(
-			struct scsi_device 	*sd,
-			void 			*ctpriv);
+			struct scsi_device	*sd,
+			void			*ctpriv);
 
 	/*
 	 * bring a path ONLINE (ie make it ACTIVE)
 	 */
 	int	(*sfo_path_activate)(
-			struct scsi_device 	*sd,
-			char 			*pathclass,
-			void 			*ctpriv);
+			struct scsi_device	*sd,
+			char			*pathclass,
+			void			*ctpriv);
 
 	/*
 	 * inverse of above
 	 */
-	int 	(*sfo_path_deactivate)(
-			struct scsi_device 	*sd,
-			char 			*pathclass,
-			void 			*ctpriv);
+	int	(*sfo_path_deactivate)(
+			struct scsi_device	*sd,
+			char			*pathclass,
+			void			*ctpriv);
 
 	/*
 	 * returns operational characteristics of path
 	 */
 	int	(*sfo_path_get_opinfo)(
-			struct scsi_device 	*sd,
+			struct scsi_device	*sd,
 			struct scsi_path_opinfo *opinfo,
-			void 			*ctpriv);
+			void			*ctpriv);
 
 	/*
 	 * verify path is operational
 	 */
 	int	(*sfo_path_ping)(
-			struct scsi_device 	*sd,
-			void 			*ctpriv);
+			struct scsi_device	*sd,
+			void			*ctpriv);
 
 	/*
 	 * analyze SENSE data to detect externally initiated
 	 * failovers
 	 */
 	int	(*sfo_analyze_sense)(
-			struct scsi_device 		*sd,
-			struct scsi_extended_sense 	*sense,
-			void 				*ctpriv);
+			struct scsi_device		*sd,
+			struct scsi_extended_sense	*sense,
+			void				*ctpriv);
 
 	/*
 	 * return the next pathclass in order of preference
 	 * eg. "secondary" comes after "primary"
 	 */
 	int	(*sfo_pathclass_next)(
-			char 			*cur,
-			char 			**nxt,
-			void 			*ctpriv);
+			char			*cur,
+			char			**nxt,
+			void			*ctpriv);
 };
+
+/*
+ * Names of (too) 'well-known' failover ops.
+ *   NOTE: consumers of these names should look for a better way...
+ */
+#define	SFO_NAME_SYM		"f_sym"
+#define	SFO_NAME_TPGS		"f_tpgs"
+#define	SCSI_FAILOVER_IS_SYM(sfo)	\
+	((sfo) ? (strcmp((sfo)->sfo_name, SFO_NAME_SYM) == 0) : 0)
+#define	SCSI_FAILOVER_IS_TPGS(sfo)	\
+	((sfo) ? (strcmp((sfo)->sfo_name, SFO_NAME_TPGS) == 0) : 0)
+
+/*
+ * Macro to provide plumbing for basic failover module
+ */
+#define	_SCSI_FAILOVER_OP(sfo_name, local_name, ops_name, vers)		\
+	static struct modlmisc modlmisc = {				\
+		&mod_miscops, sfo_name  " " vers			\
+	};								\
+	static struct modlinkage modlinkage = {				\
+		MODREV_1, (void *)&modlmisc, NULL			\
+	};								\
+	int	_init()							\
+	{								\
+		return (mod_install(&modlinkage));			\
+	}								\
+	int	_fini()							\
+	{								\
+		return (mod_remove(&modlinkage));			\
+	}								\
+	int	_info(struct modinfo *modinfop)				\
+	{								\
+		return (mod_info(&modlinkage, modinfop));		\
+	}								\
+	static int	local_name##_device_probe(			\
+				struct scsi_device *,			\
+				struct scsi_inquiry *, void **);	\
+	static void	local_name##_device_unprobe(			\
+				struct scsi_device *, void *);		\
+	static int	local_name##_path_activate(			\
+				struct scsi_device *, char *, void *);	\
+	static int	local_name##_path_deactivate(			\
+				struct scsi_device *, char *, void *);	\
+	static int	local_name##_path_get_opinfo(			\
+				struct scsi_device *,			\
+				struct scsi_path_opinfo *, void *);	\
+	static int	local_name##_path_ping(				\
+				struct scsi_device *, void *);		\
+	static int	local_name##_analyze_sense(			\
+				struct scsi_device *,			\
+				struct scsi_extended_sense *, void *);	\
+	static int	local_name##_pathclass_next(			\
+				char *, char **, void *);		\
+	struct scsi_failover_ops ops_name##_failover_ops = {		\
+		SFO_REV,						\
+		sfo_name,						\
+		local_name##_dev_table,					\
+		NULL,							\
+		local_name##_device_probe,				\
+		local_name##_device_unprobe,				\
+		local_name##_path_activate,				\
+		local_name##_path_deactivate,				\
+		local_name##_path_get_opinfo,				\
+		local_name##_path_ping,					\
+		local_name##_analyze_sense,				\
+		local_name##_pathclass_next				\
+	}
+
+#ifdef	lint
+#define	SCSI_FAILOVER_OP(sfo_name, local_name, vers)			\
+	_SCSI_FAILOVER_OP(sfo_name, local_name, local_name, vers)
+#else	/* lint */
+#define	SCSI_FAILOVER_OP(sfo_name, local_name, vers)			\
+	_SCSI_FAILOVER_OP(sfo_name, local_name, scsi_vhci, vers)
+#endif	/* lint */
+
+/*
+ * Return values for sfo_device_probe
+ */
+#define	SFO_DEVICE_PROBE_VHCI	1	/* supported under scsi_vhci */
+#define	SFO_DEVICE_PROBE_PHCI	0	/* not supported under scsi_vhci */
 
 /* return values for sfo_analyze_sense() */
 #define	SCSI_SENSE_NOFAILOVER		0

@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,6 +76,100 @@ make_sed_script()
 /^# Force load driver to support hotplug activity (do not remove this property).$/d
 /^ddi-forceattach=1;$/d
 EOF
+	#
+	# convert old 'scsi-options' oriented device-type-scsi-options-list to
+	# new 'name' oriented scsi-vhci-failover-override
+	#
+	cat > $SEDSCRIPT << EOF
+/^# For enabling MPxIO support for 3rd party symmetric device need an$/d
+/^# entry similar to following in this file. Just replace the "SUN     SENA"$/d
+/^# part with the Vendor ID\/Product ID for the device, exactly as reported by$/d
+/^# Inquiry cmd.$/d
+/^# device-type-scsi-options-list =$/d
+/^# "SUN     SENA", "symmetric-option";$/d
+/^# symmetric-option = 0x1000000;$/d
+s/device-type-scsi-options-list/scsi-vhci-failover-override/
+EOF
+	# old 'symetric' scsi-options property of 1000000 -> f_sym name
+	SYMMETRIC_OPTION=`grep -v '^#' $2 | grep 1000000 | \
+		awk -F= '{print $1}'|awk '{print $1}'`
+	if [ "$SYMMETRIC_OPTION"x != "x" ]; then
+		echo "/^[ 	]*$SYMMETRIC_OPTION/d"	>> $SEDSCRIPT
+		echo "s/$SYMMETRIC_OPTION/f_sym/"	>> $SEDSCRIPT
+	fi
+
+	# old 'disable' scsi-options property of 7000000 -> NONE name
+	DISABLE_OPTION=`grep -v '^#' $2 | grep 7000000 | \
+		awk -F= '{print $1}'|awk '{print $1}'`
+	if [ "$DISABLE_OPTION"x != "x" ]; then
+		echo "/^[ 	]*$DISABLE_OPTION/d"	>> $SEDSCRIPT
+		echo "s/$DISABLE_OPTION/NONE/"		>> $SEDSCRIPT
+	fi
+}
+
+#
+# Make FAILOVER_MODULE_BLOCK file
+#
+make_fmbfile()
+{
+	#
+	# Form file with new scsi_vhci FAILOVER_MODULE_BLOCK information
+	#
+	cat > $FMBFILE << EOF
+#BEGIN: FAILOVER_MODULE_BLOCK (DO NOT MOVE OR DELETE)
+#
+# Declare scsi_vhci failover module paths with 'ddi-forceload' so that
+# they get loaded early enough to be available for scsi_vhci root use.
+#
+# NOTE: Correct operation depends on the value of 'ddi-forceload', this
+# value should not be changed. The ordering of entries is from
+# most-specific failover modules (with a "probe" implementation that is
+# completely VID/PID table based), to most generic (failover modules that
+# are based on T10 standards like TPGS). By convention the last part of a
+# failover module path, after "/scsi_vhci_", is called the
+# "failover-module-name", which begins with "f_" (like "f_asym_sun"). The
+# "failover-module-name" is also used in the override mechanism below.
+ddi-forceload =
+	"misc/scsi_vhci/scsi_vhci_f_asym_sun",
+	"misc/scsi_vhci/scsi_vhci_f_asym_lsi",
+	"misc/scsi_vhci/scsi_vhci_f_asym_emc",
+	"misc/scsi_vhci/scsi_vhci_f_sym_emc",
+	"misc/scsi_vhci/scsi_vhci_f_sym",
+	"misc/scsi_vhci/scsi_vhci_f_tpgs";
+
+#
+# For a device that has a GUID, discovered on a pHCI with mpxio enabled, vHCI
+# access also depends on one of the scsi_vhci failover modules accepting the
+# device.  The default way this occurs is by a failover module's "probe"
+# implementation (sfo_device_probe) indicating the device is supported under
+# scsi_vhci.  To override this default probe-oriented configuration in
+# order to
+#
+#    1)	establish support for a device not currently accepted under scsi_vhci
+#
+# or 2)	override the module selected by "probe"
+#
+# or 3)	disable scsi_vhci support for a device
+#
+# you can add a 'scsi-vhci-failover-override' tuple, as documented in
+# scsi_get_device_type_string(9F). For each tuple, the first part provides
+# basic device identity information (vid/pid) and the second part selects
+# the failover module by "failover-module-name". If you want to disable
+# scsi_vhci support for a device, use the special failover-module-name "NONE".
+# Currently, for each failover-module-name in 'scsi-vhci-failover-override'
+# (except "NONE") there needs to be a
+# "misc/scsi_vhci/scsi_vhci_<failover-module-name>" in 'ddi-forceload' above.
+#
+#	"                  111111"
+#	"012345670123456789012345",	"failover-module-name" or "NONE"
+#	"|-VID--||-----PID------|",
+# scsi-vhci-failover-override =
+#	"STK     FLEXLINE 400",		"f_asym_lsi",
+#	"SUN     T4",			"f_tpgs",
+#	"CME     XIRTEMMYS",		"NONE";
+#
+#END: FAILOVER_MODULE_BLOCK (DO NOT MOVE OR DELETE)
+EOF
 }
 
 #
@@ -93,9 +185,10 @@ update_scsi_vhci()
 	SEDSCRIPT=$PREFIX.sed
 	NEWIDENT1=$PREFIX.ident1
 	NEWIDENT2=$PREFIX.ident2
+	FMBFILE=$PREFIX.fb
 
 	# make sed script to do most of the work of upgrading
-	make_sed_script
+	make_sed_script $1 $2
 
 	# make sed script to replace old ident with new ident
 	IDENT="^#.*ident.*SMI\"$"
@@ -109,8 +202,14 @@ update_scsi_vhci()
 	retval=$?
 	if [ $retval -eq 0 ]; then
 		cp $TMPSCSIVHCI $2
+		grep "FAILOVER_MODULE_BLOCK" $2 >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			make_fmbfile
+			cat $FMBFILE >> $2
+		fi
 	fi
-	rm -f $NEWIDENT1 $NEWIDENT2 $SEDSCRIPT $TMPSCSIVHCI
+
+	rm -f $NEWIDENT1 $NEWIDENT2 $SEDSCRIPT $TMPSCSIVHCI $FMBFILE
 	return $retval
 }
 

@@ -163,6 +163,13 @@ d none boot/acpi 755 root sys
 d none boot/acpi/tables 755 root sys
 f none kernel/mac/mac_ether 755 root sys
 f none kernel/mac/mac_wifi 755 root sys
+d none kernel/misc/scsi_vhci 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_emc 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_lsi 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_sun 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_sym 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_sym_emc 755 root sys
+f none kernel/misc/scsi_vhci/scsi_vhci_f_tpgs 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/agpmaster 755 root sys
 f none kernel/misc/bootdev 755 root sys
@@ -352,6 +359,14 @@ f none kernel/ipp/amd64/ipgpc 755 root sys
 d none kernel/mac/amd64 755 root sys
 f none kernel/mac/amd64/mac_ether 755 root sys
 f none kernel/mac/amd64/mac_wifi 755 root sys
+d none kernel/misc/scsi_vhci/amd64 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_sun 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_emc 755 root sys
+f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_tpgs 755 root sys
+
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/agpmaster 755 root sys

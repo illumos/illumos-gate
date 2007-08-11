@@ -336,6 +336,11 @@ extern int		scsi_hba_probe(
 				struct scsi_device	*sd,
 				int			(*callback)(void));
 
+char			*scsi_get_device_type_string(
+				char			*prop_name,
+				dev_info_t		*hba_dip,
+				struct scsi_device	*devp);
+
 extern int		scsi_get_device_type_scsi_options(
 				dev_info_t		*hba_dip,
 				struct scsi_device	*devp,

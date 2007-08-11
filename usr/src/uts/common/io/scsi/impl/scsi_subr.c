@@ -115,7 +115,7 @@ scsi_poll(struct scsi_pkt *pkt)
 	 * every second as this status takes a while to change.
 	 */
 	for (busy_count = 0; busy_count < (pkt->pkt_time * SEC_TO_CSEC);
-		busy_count++) {
+	    busy_count++) {
 		int rc;
 		int poll_delay;
 
@@ -310,9 +310,8 @@ get_pktiopb(struct scsi_address *ap, caddr_t *datap, int cdblen, int statuslen,
 		local.b_flags = B_READ;
 	local.b_bcount = datalen;
 	pkt = (*tran->tran_init_pkt) (ap, NULL, &local,
-		cdblen, statuslen, 0, PKT_CONSISTENT,
-		(func == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC,
-		NULL);
+	    cdblen, statuslen, 0, PKT_CONSISTENT,
+	    (func == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC, NULL);
 	if (!pkt) {
 		i_ddi_mem_free(local.b_un.b_addr, NULL);
 		if (func != NULL_FUNC) {
@@ -1181,21 +1180,22 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 				(void) sprintf(&buf1[strlen(buf1)],
 				    "ASC: 0x%x (%s)", asc,
 				    scsi_asc_ascq_name(asc, ascq,
-					tmpbuf, asc_list));
+				    tmpbuf, asc_list));
 				buflen = strlen(buf1);
 				if (buflen < SCSI_ERRMSG_COLUMN_LEN) {
-				    pad[SCSI_ERRMSG_COLUMN_LEN - buflen] = '\0';
-				    (void) sprintf(&buf1[buflen],
-				    "%s ASCQ: 0x%x", pad, ascq);
+					pad[SCSI_ERRMSG_COLUMN_LEN - buflen] =
+					    '\0';
+					(void) sprintf(&buf1[buflen],
+					    "%s ASCQ: 0x%x", pad, ascq);
 				} else {
-				    (void) sprintf(&buf1[buflen], " ASCQ: 0x%x",
-					ascq);
+					(void) sprintf(&buf1[buflen],
+					    " ASCQ: 0x%x", ascq);
 				}
 				impl_scsi_log(dev,
-					label, CE_CONT, "%s\n", buf1);
-				impl_scsi_log(dev, label, CE_CONT,
-					"FRU: 0x%x (%s)\n",
-						fru_code, buf);
+				    label, CE_CONT, "%s\n", buf1);
+				impl_scsi_log(dev,
+				    label, CE_CONT, "FRU: 0x%x (%s)\n",
+				    fru_code, buf);
 				mutex_exit(&scsi_log_mutex);
 				return;
 			}
@@ -1215,7 +1215,7 @@ scsi_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
     struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep)
 {
 	scsi_vu_errmsg(devp, pkt, label, severity, blkno,
-		err_blkno, cmdlist, sensep, NULL, NULL);
+	    err_blkno, cmdlist, sensep, NULL, NULL);
 }
 
 /*PRINTFLIKE4*/
@@ -1265,8 +1265,8 @@ v_scsi_log(dev_info_t *dev, char *label, uint_t level,
 		if (level == CE_PANIC || level == CE_WARN ||
 		    level == CE_NOTE) {
 			(void) sprintf(name, "%s (%s%d):\n",
-				ddi_pathname(dev, scsi_log_buffer),
-				label, ddi_get_instance(dev));
+			    ddi_pathname(dev, scsi_log_buffer),
+			    label, ddi_get_instance(dev));
 		} else if (level >= (uint_t)SCSI_DEBUG) {
 			(void) sprintf(name,
 			    "%s%d:", label, ddi_get_instance(dev));
@@ -1299,83 +1299,120 @@ v_scsi_log(dev_info_t *dev, char *label, uint_t level,
 	case CE_WARN:
 	case CE_PANIC:
 		if (boot_only) {
-			cmn_err(level, "?%s\t%s", name,
-				&scsi_log_buffer[1]);
+			cmn_err(level, "?%s\t%s", name, &scsi_log_buffer[1]);
 		} else if (console_only) {
-			cmn_err(level, "^%s\t%s", name,
-				&scsi_log_buffer[1]);
+			cmn_err(level, "^%s\t%s", name, &scsi_log_buffer[1]);
 		} else if (log_only) {
-			cmn_err(level, "!%s\t%s", name,
-				&scsi_log_buffer[1]);
+			cmn_err(level, "!%s\t%s", name, &scsi_log_buffer[1]);
 		} else {
-			cmn_err(level, "%s\t%s", name,
-				scsi_log_buffer);
+			cmn_err(level, "%s\t%s", name, scsi_log_buffer);
 		}
 		break;
 	case (uint_t)SCSI_DEBUG:
 	default:
-		cmn_err(CE_CONT, "^DEBUG: %s\t%s", name,
-				scsi_log_buffer);
+		cmn_err(CE_CONT, "^DEBUG: %s\t%s", name, scsi_log_buffer);
 		break;
 	}
 }
 
-int
-scsi_get_device_type_scsi_options(dev_info_t *dip,
-    struct scsi_device *devp, int default_scsi_options)
+/*
+ * Lookup the 'prop_name' string array property and walk thru its list of
+ * tuple values looking for a tuple who's VID/PID string (first part of tuple)
+ * matches the inquiry VID/PID information for the scsi_device.  On a match,
+ * return a duplicate of the second part of the tuple.  If no match is found,
+ * return NULL. On non-NULL return, caller is responsible for freeing return
+ * result via:
+ *	kmem_free(string, strlen(string) + 1);
+ *
+ * This interface can either be used directly, or indirectly by
+ * scsi_get_device_type_scsi_options.
+ */
+char	*
+scsi_get_device_type_string(char *prop_name,
+    dev_info_t *dip, struct scsi_device *devp)
 {
+	struct scsi_inquiry	*inq = devp->sd_inq;
+	char			**tuples;
+	uint_t			ntuples;
+	int			i;
+	char			*tvp;		/* tuple vid/pid */
+	char			*trs;		/* tuple return string */
+	int			tvp_len;
 
-	caddr_t config_list	= NULL;
-	int options		= default_scsi_options;
-	struct scsi_inquiry  *inq = devp->sd_inq;
-	caddr_t vidptr, datanameptr;
-	int	vidlen, dupletlen;
-	int config_list_len, len;
+	/* if we have no inquiry data then we can't do this */
+	if (inq == NULL)
+		return (NULL);
 
 	/*
-	 * look up the device-type-scsi-options-list and walk thru
-	 * the list
-	 * compare the vendor ids of the earlier inquiry command and
-	 * with those vids in the list
-	 * if there is a match, lookup the scsi-options value
+	 * So that we can establish a 'prop_name' for all instances of a
+	 * device in the system in a single place if needed (via options.conf),
+	 * we loop going up to the root ourself. This way root lookup does
+	 * *not* specify DDI_PROP_DONTPASS, and the code will look on the
+	 * options node.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "device-type-scsi-options-list",
-	    (caddr_t)&config_list, &config_list_len) == DDI_PROP_SUCCESS) {
+	do {
+		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip,
+		    (ddi_get_parent(dip) ? DDI_PROP_DONTPASS : 0) |
+		    DDI_PROP_NOTPROM, prop_name, &tuples, &ntuples) ==
+		    DDI_PROP_SUCCESS) {
 
-		/*
-		 * Compare vids in each duplet - if it matches, get value for
-		 * dataname and then lookup scsi_options
-		 * dupletlen is calculated later.
-		 */
-		for (len = config_list_len, vidptr = config_list; len > 0;
-		    vidptr += dupletlen, len -= dupletlen) {
+			/* loop over tuples */
+			for (i = 0;  i < (ntuples/2); i++) {
+				/* split into vid/pid and return-string */
+				tvp = tuples[i * 2];
+				trs = tuples[(i * 2) + 1];
+				tvp_len = strlen(tvp);
 
-			vidlen = strlen(vidptr);
-			datanameptr = vidptr + vidlen + 1;
+				/* check for vid/pid match */
+				if ((tvp_len == 0) ||
+				    bcmp(tvp, inq->inq_vid, tvp_len))
+					continue;	/* no match */
 
-			if ((vidlen != 0) &&
-			    bcmp(inq->inq_vid, vidptr, vidlen) == 0) {
-				/*
-				 * get the data list
-				 */
-				options = ddi_prop_get_int(DDI_DEV_T_ANY,
-				    dip, 0,
-				    datanameptr, default_scsi_options);
-				break;
+				/* match, dup return-string */
+				trs = i_ddi_strdup(trs, KM_SLEEP);
+				ddi_prop_free(tuples);
+				return (trs);
 			}
-			dupletlen = vidlen + strlen(datanameptr) + 2;
+			ddi_prop_free(tuples);
 		}
-		kmem_free(config_list, config_list_len);
-	}
 
+		/* climb up to root one step at a time */
+		dip = ddi_get_parent(dip);
+	} while (dip);
+
+	return (NULL);
+}
+
+/*
+ * The 'device-type-scsi-options' mechanism can be used to establish a device
+ * specific scsi_options value for a particular device. This mechanism uses
+ * paired strings ("vendor_info", "options_property_name") from the string
+ * array "device-type-scsi-options" definition. A bcmp of the vendor info is
+ * done against the inquiry data (inq_vid). Here is an example of use:
+ *
+ * device-type-scsi-options-list =
+ *	"FOOLCO  Special x1000", "foolco-scsi-options",
+ *	"FOOLCO  Special y1000", "foolco-scsi-options";
+ * foolco-scsi-options = 0xXXXXXXXX;
+ */
+int
+scsi_get_device_type_scsi_options(dev_info_t *dip,
+    struct scsi_device *devp, int options)
+{
+	char	*string;
+
+	if ((string = scsi_get_device_type_string(
+	    "device-type-scsi-options-list", dip, devp)) != NULL) {
+		options = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+		    string, options);
+		kmem_free(string, strlen(string) + 1);
+	}
 	return (options);
 }
 
 /*
  * Functions for format-neutral sense data functions
  */
-
 int
 scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 {
@@ -1396,9 +1433,9 @@ scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 	 */
 	if ((es->es_class != CLASS_EXTENDED_SENSE) ||
 	    ((es->es_code != CODE_FMT_FIXED_CURRENT) &&
-		(es->es_code != CODE_FMT_FIXED_DEFERRED) &&
-		(es->es_code != CODE_FMT_DESCR_CURRENT) &&
-		(es->es_code != CODE_FMT_DESCR_DEFERRED))) {
+	    (es->es_code != CODE_FMT_FIXED_DEFERRED) &&
+	    (es->es_code != CODE_FMT_DESCR_CURRENT) &&
+	    (es->es_code != CODE_FMT_DESCR_DEFERRED))) {
 		/*
 		 * Sense data (if there's actually anything here) is not
 		 * in a format we can handle).
@@ -1411,7 +1448,7 @@ scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 	 */
 	if ((flags != NULL) &&
 	    ((es->es_code == CODE_FMT_FIXED_DEFERRED) ||
-		(es->es_code == CODE_FMT_DESCR_DEFERRED))) {
+	    (es->es_code == CODE_FMT_DESCR_DEFERRED))) {
 		*flags |= SNS_BUF_DEFERRED;
 	}
 
@@ -1427,7 +1464,7 @@ scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 		 */
 		if ((sense_buf_len < MIN_FIXED_SENSE_LEN) ||
 		    ((es->es_add_len + ADDL_SENSE_ADJUST) <
-			MIN_FIXED_SENSE_LEN)) {
+		    MIN_FIXED_SENSE_LEN)) {
 			result = SENSE_UNUSABLE;
 		} else {
 			/*
@@ -1436,7 +1473,7 @@ scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 			 */
 			if ((flags != NULL) &&
 			    (sense_buf_len <
-				(es->es_add_len + ADDL_SENSE_ADJUST))) {
+			    (es->es_add_len + ADDL_SENSE_ADJUST))) {
 				*flags |= SNS_BUF_OVERFLOW;
 			}
 
@@ -1458,7 +1495,7 @@ scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
 			 */
 			if ((flags != NULL) &&
 			    (sense_buf_len <
-				(ds->ds_addl_sense_length + sizeof (*ds)))) {
+			    (ds->ds_addl_sense_length + sizeof (*ds)))) {
 				*flags |= SNS_BUF_OVERFLOW;
 			}
 
@@ -1686,7 +1723,7 @@ scsi_sense_info_uint64(uint8_t *sense_buffer, int sense_buf_len,
 
 		isd = (struct scsi_information_sense_descr *)
 		    scsi_find_sense_descr(sense_buffer, sense_buf_len,
-			DESCR_INFORMATION);
+		    DESCR_INFORMATION);
 
 		if (isd) {
 			*information = SCSI_READ64(isd->isd_information);
@@ -1728,7 +1765,7 @@ scsi_sense_cmdspecific_uint64(uint8_t *sense_buffer, int sense_buf_len,
 
 		c = (struct scsi_cmd_specific_sense_descr *)
 		    scsi_find_sense_descr(sense_buffer, sense_buf_len,
-			DESCR_COMMAND_SPECIFIC);
+		    DESCR_COMMAND_SPECIFIC);
 
 		if (c) {
 			valid = 1;

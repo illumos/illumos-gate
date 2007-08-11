@@ -62,7 +62,7 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/bignum/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(COMMONBASE)/acl/%.c
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/acl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -287,7 +287,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/gssapi/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:  		$(UTSBASE)/common/gssapi/mechs/dummy/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/gssapi/mechs/dummy/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -463,11 +463,11 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/framework/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/audio/sada/mixer/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/mixer/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/bge/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/bge/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -650,7 +650,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ral/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/rge/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/rge/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -688,6 +688,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/targets/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/scsi_vhci/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/scsi_vhci/fops/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1151,7 +1159,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/zfs/%.c
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/zfs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln: 		$(UTSBASE)/common/gssapi/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/gssapi/%.c
 	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/gssapi/mechs/dummy/%.c
@@ -1443,6 +1451,12 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sata/impl/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/scsi_vhci/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/scsi_vhci/fops/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/conf/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1575,7 +1589,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/krtld/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/ktli/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:       	$(COMMONBASE)/lvm/%.c
+$(LINTS_DIR)/%.ln:		$(COMMONBASE)/lvm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/md4/%.c

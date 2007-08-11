@@ -371,7 +371,7 @@ DRV_KMODS	+= emul64
 #	Machine Specific Driver Modules (/kernel/drv):
 #
 DRV_KMODS	+= options
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= scsi_vhci
 
 #
 #	PCMCIA specific module(s)
@@ -550,10 +550,16 @@ MISC_KMODS	+= sysinit
 MISC_KMODS	+= tem
 MISC_KMODS	+= tlimod
 MISC_KMODS	+= usba usba10 usbs49_fw
+MISC_KMODS	+= scsi_vhci_f_sym
+MISC_KMODS	+= scsi_vhci_f_tpgs
+MISC_KMODS	+= scsi_vhci_f_asym_sun
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= phx
+$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi
+$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_emc
+$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_sym_emc
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):
