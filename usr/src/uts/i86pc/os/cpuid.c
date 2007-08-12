@@ -255,6 +255,10 @@ static struct cpuid_info cpuid_info0;
 /* A "new F6" is everything with family 6 that's not the above */
 #define	IS_NEW_F6(cpi) ((cpi->cpi_family == 6) && !IS_LEGACY_P6(cpi))
 
+/* Extended family/model support */
+#define	IS_EXTENDED_MODEL_INTEL(cpi) (cpi->cpi_family == 0x6 || \
+	cpi->cpi_family >= 0xf)
+
 /*
  * AMD family 0xf socket types.
  * First index is 0 for revs B thru E, 1 for F and G.
@@ -541,6 +545,9 @@ cpuid_pass1(cpu_t *cpu)
 	 */
 
 	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		if (IS_EXTENDED_MODEL_INTEL(cpi))
+			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
 	case X86_VENDOR_AMD:
 		if (CPI_FAMILY(cpi) == 0xf)
 			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
