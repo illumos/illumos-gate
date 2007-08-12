@@ -27,8 +27,6 @@
 # cmd/tsol/labeld/Makefile
 #
 
-ETCTSOLFILES=tnrhdb tnrhtp tnzonecfg
-
 include ../../Makefile.cmd
 
 all:=		TARGET= all
