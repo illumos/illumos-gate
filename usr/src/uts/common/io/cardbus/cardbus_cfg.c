@@ -2239,7 +2239,7 @@ cardbus_free_bridge_resources(dev_info_t *dip)
 	cardbus_err(dip, 6,
 	    "Need to free bus [%d] range [%d]\n",
 	    bus[0], bus[1] - bus[0] + 1);
-
+	kmem_free(bus, k);
 	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "available");
 	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "bus-range");
 
