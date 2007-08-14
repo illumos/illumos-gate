@@ -211,9 +211,12 @@ struct sata_drive_info {
 	uint32_t	satadrv_error_reg;	/* drive error reg */
 	uint16_t	satadrv_features_support; /* drive features support */
 	uint16_t	satadrv_queue_depth;    /* drive queue depth */
+	uint16_t	satadrv_atapi_cdb_len;	/* atapi supported cdb length */
+	uint16_t	satadrv_atapi_trans_ver; /* atapi transport version */
 	uint16_t	satadrv_settings;	/* drive settings flags */
 	uint16_t	satadrv_features_enabled; /* drive features enabled */
 	uint64_t	satadrv_capacity;	/* drive capacity */
+	uint64_t	satadrv_max_queue_depth; /* maximum queue depth */
 	sata_id_t	satadrv_id;		/* Device Identify Data */
 	struct sata_drive_stats satadrv_stats;	/* drive statistics */
 };
@@ -316,8 +319,10 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 /*
  * Valid i.e.supported device types mask (cport_dev_type, satadrv_type,
  * pmult_dev_type fields).
+ * ATA disks and ATAPI CD/DVD now.
  */
-#define	SATA_VALID_DEV_TYPE	(SATA_DTYPE_ATADISK)	/* only disks now */
+#define	SATA_VALID_DEV_TYPE	(SATA_DTYPE_ATADISK | \
+				SATA_DTYPE_ATAPICD)
 
 /*
  * Device feature_support (satadrv_features_support)
@@ -341,9 +346,10 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
  */
 #define	SATA_DEV_READ_AHEAD		0x0001	/* Read Ahead enabled */
 #define	SATA_DEV_WRITE_CACHE		0x0002	/* Write cache ON */
+#define	SATA_DEV_DMA			0x0004	/* DMA selected */
 #define	SATA_DEV_SERIAL_FEATURES 	0x8000	/* Serial ATA feat. enabled */
 #define	SATA_DEV_ASYNCH_NOTIFY		0x2000	/* Asynch-event enabled */
-
+#define	SATA_DEV_RMSN			0x0100	/* Rem Media Stat Notfc enbl */
 
 /*
  * Internal event and flags.
@@ -439,17 +445,19 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 
 /*
  * Additional scsi sense code definitions.
- * These definition should eventually be moved to scsi header files.
+ * These definition should eventually be moved to scsi header file
+ * usr/src/uts/common/sys/scsi/generic/sense.h
  */
-#define	SD_SCSI_NO_ADD_SENSE			0x00
-#define	SD_SCSI_LU_NOT_READY			0x04
-#define	SD_SCSI_WRITE_ERROR			0x0c
-#define	SD_SCSI_UNREC_READ_ERROR		0x11
-#define	SD_SCSI_INVALID_COMMAND_CODE		0x20
-#define	SD_SCSI_LBA_OUT_OF_RANGE		0x21
-#define	SD_SCSI_INVALID_FIELD_IN_CDB		0x24
-#define	SD_SCSI_INVALID_FIELD_IN_PARAMETER_LIST 0x26
-#define	SD_SCSI_SAVING_PARAMS_NOT_SUP		0x39
+#define	SD_SCSI_ASC_NO_ADD_SENSE			0x00
+#define	SD_SCSI_ASC_LU_NOT_READY			0x04
+#define	SD_SCSI_ASC_WRITE_ERROR				0x0c
+#define	SD_SCSI_ASC_UNREC_READ_ERROR			0x11
+#define	SD_SCSI_ASC_INVALID_COMMAND_CODE		0x20
+#define	SD_SCSI_ASC_LBA_OUT_OF_RANGE			0x21
+#define	SD_SCSI_ASC_INVALID_FIELD_IN_CDB		0x24
+#define	SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST 	0x26
+#define	SD_SCSI_ASC_RESET				0x29
+#define	SD_SCSI_ASC_SAVING_PARAMS_NOT_SUPPORTED		0x39
 
 
 /* SCSI defs missing from scsi headers */
@@ -705,6 +713,15 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_DBG_EVENTS_DAEMON	0x100
 #define	SATA_DBG_DMA_SETUP	0x400
 #define	SATA_DBG_DEV_SETTINGS	0x800
+#define	SATA_DBG_ATAPI		0x1000
+#define	SATA_DBG_ATAPI_PACKET	0x8000
+
+typedef struct sata_atapi_cmd {
+	uint8_t acdb[SATA_ATAPI_MAX_CDB_LEN];
+	uint8_t arqs[SATA_ATAPI_RQSENSE_LEN];
+	uint_t sata_pkt_reason;
+	uint_t scsi_pkt_reason;
+} sata_atapi_cmd_t;
 
 /* Debug macros */
 #define	SATADBG1(flag, sata, format, arg1) \

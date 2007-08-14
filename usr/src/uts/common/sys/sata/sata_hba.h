@@ -286,10 +286,14 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
  */
 #define	SATA_CMD_REV_1	1
 #define	SATA_CMD_REV_2	2
-#define	SATA_CMD_REV	SATA_CMD_REV_2
+#define	SATA_CMD_REV_3	3
+#define	SATA_CMD_REV	SATA_CMD_REV_3
 
 #define	SATA_ATAPI_MAX_CDB_LEN	16	/* Covers both 12 and 16 byte cdbs */
-#define	SATA_ATAPI_RQSENSE_LEN	24	/* Fixed size Request Sense data */
+#define	SATA_ATAPI_RQSENSE_LEN	24	/* Allocated Request Sense data */
+#define	SATA_ATAPI_MIN_RQSENSE_LEN 18	/* Min Fixed size Request Sense data */
+
+#define	SATA_ATAPI_RQSENSE_CDB_LEN 6	/* Request Sense CDB length */
 
 struct sata_cmd {
 	int		satacmd_rev;		/* version */
@@ -316,7 +320,7 @@ struct sata_cmd {
 		uint32_t	sata_copy_out_lba_high_lsb : 1;	 /* 24 */
 		uint32_t	sata_copy_out_device_reg : 1;	 /* 25 */
 		uint32_t	sata_copy_out_error_reg : 1;	 /* 26 */
-		uint32_t	: 5;		/* reserved */	 /* 27-31 */
+		uint32_t	sata_max_queue_depth: 5;	 /* 27-31 */
 	} satacmd_flags;
 	uint8_t 	satacmd_addr_type; 	/* addr type: LBA28, LBA48 */
 	uint8_t		satacmd_features_reg_ext; /* features reg extended */
@@ -336,19 +340,18 @@ struct sata_cmd {
 	uint8_t		satacmd_acdb_len;	/* ATAPI cdb length */
 	uint8_t		satacmd_acdb[SATA_ATAPI_MAX_CDB_LEN]; /* ATAPI cdb */
 
-						/*
-						 * Ptr to request sense cdb
-						 * request sense buf
-						 */
-	uint8_t		*satacmd_arq_cdb;
+						/* kept for binary compat. */
+	uint8_t		*pad1;			/* unused */
 
 	uint8_t 	satacmd_rqsense[SATA_ATAPI_RQSENSE_LEN];
-
 						/*
-						 * Ptr to FPDMA error
-						 * retrieval cmd
+						 * Error retrieval buffer
+						 * dma handle pointer
+						 * (for buffer DMA syncing)
+						 * Valid only in error
+						 * retrieval packet!
 						 */
-	const struct sata_cmd	*satacmd_rle_sata_cmd;
+	ddi_dma_handle_t *satacmd_err_ret_buf_handle;
 
 	int		satacmd_num_dma_cookies; /* number of dma cookies */
 						/* ptr to dma cookie list */
@@ -532,6 +535,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pkt))
 #define	SATA_PKT_RESET			7	/* Aborted by reset request */
 
 /*
+ * Error retrieval sata packet types
+ */
+#define	SATA_ERR_RETR_PKT_TYPE_NCQ	1
+#define	SATA_ERR_RETR_PKT_TYPE_ATAPI	2
+
+/*
  * Hoplug functions vector structure (rev 1)
  */
 #define	SATA_TRAN_HOTPLUG_OPS_REV_1	1
@@ -586,7 +595,8 @@ typedef struct sata_tran_pwrmgt_ops sata_tran_pwrmgt_ops_t;
  *
  */
 #define	SATA_TRAN_HBA_REV_1	1
-#define	SATA_TRAN_HBA_REV	SATA_TRAN_HBA_REV_1
+#define	SATA_TRAN_HBA_REV_2	2
+#define	SATA_TRAN_HBA_REV	SATA_TRAN_HBA_REV_2
 
 struct sata_hba_tran {
 	int		sata_tran_hba_rev;	/* version */
@@ -694,6 +704,8 @@ int 	sata_hba_attach(dev_info_t *, sata_hba_tran_t *, ddi_attach_cmd_t);
 int 	sata_hba_detach(dev_info_t *, ddi_detach_cmd_t);
 void 	sata_hba_fini(struct modlinkage *);
 void 	sata_hba_event_notify(dev_info_t *, sata_device_t *, int);
+sata_pkt_t *sata_get_error_retrieval_pkt(dev_info_t *, sata_device_t *, int);
+void	sata_free_error_retrieval_pkt(sata_pkt_t *);
 
 
 #ifdef	__cplusplus

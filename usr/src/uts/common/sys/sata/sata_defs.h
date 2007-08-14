@@ -118,11 +118,13 @@ extern "C" {
  */
 #define	SATAC_SF_ENABLE_WRITE_CACHE	0x02
 #define	SATAC_SF_TRANSFER_MODE		0x03
+#define	SATAC_SF_DISABLE_RMSN		0x31
 #define	SATAC_SF_ENABLE_ACOUSTIC	0x42
 #define	SATAC_SF_DISABLE_READ_AHEAD	0x55
 #define	SATAC_SF_DISABLE_WRITE_CACHE	0x82
 #define	SATAC_SF_ENABLE_READ_AHEAD	0xaa
 #define	SATAC_SF_DISABLE_ACOUSTIC	0xc2
+#define	SATAC_SF_ENABLE_RMSN		0x95
 
 /*
  * SET FEATURES transfer mode values
@@ -146,7 +148,7 @@ extern "C" {
 #define	SATA_TAG_QUEUING_MASK 0x1f
 /*
  * Identify Device data
- * Although bot ATA and ATAPI devices' Identify Data has the same lenght,
+ * Although both ATA and ATAPI devices' Identify Data have the same length,
  * some words have different meaning/content and/or are irrelevant for
  * other type of device.
  * Following is the ATA Device Identify data layout
@@ -181,8 +183,8 @@ typedef struct sata_id {
 	ushort_t ai_cursccp[2];	   /*  57  current sectors capacity	  */
 	ushort_t ai_mult2;	   /*  59  multiple sectors info	  */
 	ushort_t ai_addrsec[2];	   /*  60  LBA only: no of addr secs	  */
-	ushort_t ai_sworddma;	   /*  62  single word dma modes	  */
-	ushort_t ai_dworddma;	   /*  63  double word dma modes	  */
+	ushort_t ai_dirdma;	   /*  62  valid in ATA/ATAPI7, DMADIR	  */
+	ushort_t ai_dworddma;	   /*  63  multi word dma modes	  */
 	ushort_t ai_advpiomode;	   /*  64  advanced PIO modes supported	  */
 	ushort_t ai_minmwdma;	   /*  65  min multi-word dma cycle info  */
 	ushort_t ai_recmwdma;	   /*  66  rec multi-word dma cycle info  */
@@ -265,15 +267,21 @@ typedef struct sata_id {
 /* Identify Device: ai_validinfo (word 53) */
 
 #define	SATA_VALIDINFO_88	0x0004	/* word 88 supported fields valid */
+#define	SATA_VALIDINFO_70_64	0x0004	/* words 70-64 fields valid */
 
 /* Identify Device: ai_majorversion (word 80) */
 
+#define	SATA_MAJVER_7		0x0080	/* ATA/ATAPI-7 version supported */
+#define	SATA_MAJVER_654		0x0070	/* ATA/ATAPI-6,5 or 4 ver supported */
 #define	SATA_MAJVER_6		0x0040	/* ATA/ATAPI-6 version supported */
+#define	SATA_MAJVER_5		0x0020	/* ATA/ATAPI-7 version supported */
 #define	SATA_MAJVER_4		0x0010	/* ATA/ATAPI-4 version supported */
 
 /* Identify Device: command set supported/enabled bits - words 83 and 86 */
 
 #define	SATA_EXT48		0x0400	/* 48 bit address feature */
+#define	SATA_PWRUP_IN_STANDBY	0x0020	/* Power-up in standby mode supp/en */
+#define	SATA_RM_STATUS_NOTIFIC	0x0010	/* Removable Media Stat Notification */
 #define	SATA_RW_DMA_QUEUED_CMD	0x0002	/* R/W DMA Queued supported */
 #define	SATA_DWNLOAD_MCODE_CMD	0x0001	/* Download Microcode CMD supp/enbld */
 #define	SATA_ACOUSTIC_MGMT	0x0200	/* Acoustic Management features */
@@ -291,6 +299,7 @@ typedef struct sata_id {
 /* Identify Device: command set supported/enabled bits - words 84 & 87 */
 #define	SATA_SMART_SELF_TEST_SUPPORTED	0x0002	/* SMART self-test supported */
 
+/* Identify (Packet) Device word 63,  ATA/ATAPI-6 & 7 */
 #define	SATA_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
 #define	SATA_MDMA_2_SEL		0x0400	/* Multiword DMA mode 2 selected */
 #define	SATA_MDMA_1_SEL		0x0200	/* Multiword DMA mode 1 selected */
@@ -298,6 +307,11 @@ typedef struct sata_id {
 #define	SATA_MDMA_2_SUP		0x0004	/* Multiword DMA mode 2 supported */
 #define	SATA_MDMA_1_SUP		0x0002	/* Multiword DMA mode 1 supported */
 #define	SATA_MDMA_0_SUP		0x0001	/* Multiword DMA mode 0 supported */
+#define	SATA_MDMA_SUP_MASK	0x0007	/* Multiword DMA supported */
+
+/* Identify (Packet) Device Word 88 */
+#define	SATA_UDMA_SUP_MASK		0x007f	/* UDMA modes supported */
+#define	SATA_UDMA_SEL_MASK	0x7f00	/* UDMA modes selected */
 
 /* Identify Device: command set supported/enabled bits - word 206 */
 
@@ -338,15 +352,23 @@ typedef struct sata_id {
 
 /* ATAPI feature reg definitions */
 
-#define	SATA_ATAPI_F_OVERLAP	0x02
+#define	SATA_ATAPI_F_DATA_DIR_READ 0x04	/* DMA transfer to the host */
+#define	SATA_ATAPI_F_OVERLAP	0x02	/* Not used by Sun drivers */
+#define	SATA_ATAPI_F_DMA	0x01	/* Packet DMA command */
 
+
+/* ATAPI IDENTIFY_DRIVE capabilities word (49) */
+
+#define	SATA_ATAPI_ID_CAP_DMA		0x0100 /* if zero, check word 62  */
+#define	SATA_ATAPI_ID_CAP_OVERLAP	0x2000
 
 /*
- * ATAPI IDENTIFY_DRIVE capabilities word
+ * ATAPI Identify Packet Device word 62
+ * Word 62 is not valid for ATA/ATAPI-6
+ * Defs below are for ATA/ATAPI-7
  */
-
-#define	SATA_ATAPI_ID_CAP_DMA		0x0100
-#define	SATA_ATAPI_ID_CAP_OVERLAP	0x2000
+#define	SATA_ATAPI_ID_DMADIR_REQ	0x8000 /* DMA direction required */
+#define	SATA_ATAPI_ID_DMA_SUP		0x0400 /* DMA is supported */
 
 /*
  * ATAPI signature bits
@@ -415,6 +437,9 @@ typedef struct sata_id {
 /* device_reg */
 #define	SATA_ADH_LBA		0x40	/* addressing in LBA mode not chs */
 
+/* ATAPI transport version-in Inquiry data */
+#define	SATA_ATAPI_TRANS_VERSION(inq) \
+	(*((uint8_t *)(inq) + 3) >> 4)
 
 #define	SCSI_LOG_PAGE_HDR_LEN	4	/* # bytes of a SCSI log page header */
 #define	SCSI_LOG_PARAM_HDR_LEN	4	/* # byttes of a SCSI log param hdr */

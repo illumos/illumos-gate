@@ -213,7 +213,7 @@ i386)
 	# is called.
 	check_add_drv -b "${BASEDIR}" \
 		-m '* 0640 root sys' \
-		-i '"scsiclass,00"' \
+		-i '"scsiclass,00" "scsiclass,05"' \
 		sd
 	
 	# Call the rcs9.sh script to update necessary files in case of upgrade
