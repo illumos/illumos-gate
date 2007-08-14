@@ -548,6 +548,7 @@ cpuid_pass1(cpu_t *cpu)
 	case X86_VENDOR_Intel:
 		if (IS_EXTENDED_MODEL_INTEL(cpi))
 			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
+		break;
 	case X86_VENDOR_AMD:
 		if (CPI_FAMILY(cpi) == 0xf)
 			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
