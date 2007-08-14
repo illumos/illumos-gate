@@ -2457,7 +2457,7 @@ parse_allow_args(int *argc, char **argv[], boolean_t unallow,
 	char *options = unallow ? UNALLOWOPTIONS : ALLOWOPTIONS;
 	zfs_deleg_inherit_t deleg_type = ZFS_DELEG_NONE;
 	zfs_deleg_who_type_t who_type = ZFS_DELEG_WHO_UNKNOWN;
-	char *who;
+	char *who = NULL;
 	char *perms = NULL;
 	zfs_handle_t *zhp;
 
