@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,12 @@ static void kssl_cke_done(void *, int);
 	mac.cd_length = mac.cd_raw.iov_len = l; \
 	rv = crypto_mac_final(c, &mac, NULL); if (CRYPTO_ERR(rv)) goto end;
 
+/*
+ * This hack can go away once we have SSL3 MAC support by KCF
+ * software providers (See 4873559).
+ */
+extern int kcf_md5_threshold;
+
 int
 kssl_compute_record_mac(
 	ssl_t *ssl,
@@ -162,6 +168,7 @@ kssl_compute_record_mac(
 	KSSL_HASHCTX *ctx = &mac_ctx;
 	uchar_t temp[16], *p;
 	KSSLCipherSpec *spec;
+	boolean_t hash_use_ok = B_FALSE;
 	int rv = 0;
 
 	spec = &ssl->spec[direction];
@@ -169,8 +176,6 @@ kssl_compute_record_mac(
 	if (spec->mac_hashsz == 0) {
 		return (1);
 	}
-
-	/* mac_secret = ssl->mac_secret[direction]; */
 
 	p = temp;
 
@@ -190,29 +195,64 @@ kssl_compute_record_mac(
 	*p++ = (len >> 8) & 0xff;
 	*p++ = (len) & 0xff;
 
-	if (IS_TLS(ssl)) {
+	if (IS_TLS(ssl) || (spec->hmac_mech.cm_type != CRYPTO_MECH_INVALID &&
+	    len >= kcf_md5_threshold)) {
 		crypto_data_t dd, mac;
-		crypto_context_t ctx;
+		struct uio uio_pt;
+		struct iovec iovarray_pt[2];
 
-		dd.cd_format = CRYPTO_DATA_RAW;
+		/* init the array of iovecs for use in the uio struct */
+		iovarray_pt[0].iov_base = (char *)temp;
+		iovarray_pt[0].iov_len = (p - temp);
+		iovarray_pt[1].iov_base = (char *)buf;
+		iovarray_pt[1].iov_len = len;
+
+		/* init the uio struct for use in the crypto_data_t struct */
+		bzero(&uio_pt, sizeof (uio_pt));
+		uio_pt.uio_iov = iovarray_pt;
+		uio_pt.uio_iovcnt = 2;
+		uio_pt.uio_segflg = UIO_SYSSPACE;
+
+		dd.cd_format = CRYPTO_DATA_UIO;
 		dd.cd_offset = 0;
+		dd.cd_length =  (p - temp) + len;
+		dd.cd_miscdata = NULL;
+		dd.cd_uio = &uio_pt;
+
 		mac.cd_format = CRYPTO_DATA_RAW;
 		mac.cd_offset = 0;
+		mac.cd_raw.iov_base = (char *)digest;
+		mac.cd_length = mac.cd_raw.iov_len = spec->mac_hashsz;
 
-		HMAC_INIT(&spec->hmac_mech, &spec->hmac_key, &ctx);
-		HMAC_UPDATE(ctx, temp, p - temp);
-		HMAC_UPDATE(ctx, buf, len);
-		HMAC_FINAL(ctx, digest, spec->mac_hashsz);
-end:
+		/*
+		 * The calling context can tolerate a blocking call here.
+		 * For outgoing traffic, we are in user context
+		 * when called from strsock_kssl_output(). For incoming
+		 * traffic past the SSL handshake, we are in user
+		 * context when called from strsock_kssl_input(). During the
+		 * SSL handshake, we are called for client_finished message
+		 * handling from a squeue worker thread that gets scheduled
+		 * by an squeue_fill() call. This thread is not in interrupt
+		 * context and so can block.
+		 */
+		rv = crypto_mac(&spec->hmac_mech, &dd, &spec->hmac_key,
+		    NULL, &mac, NULL);
+
 		if (CRYPTO_ERR(rv)) {
+			hash_use_ok = (rv == CRYPTO_MECH_NOT_SUPPORTED &&
+			    !IS_TLS(ssl));
+			if (!hash_use_ok) {
 #ifdef	DEBUG
-			cmn_err(CE_WARN,
-				"kssl_compute_record_mac - crypto_mac error "
-				"0x%0x", rv);
+				cmn_err(CE_WARN, "kssl_compute_record_mac - "
+				    "crypto_mac error 0x%0x", rv);
 #endif	/* DEBUG */
-			KSSL_COUNTER(compute_mac_failure, 1);
+				KSSL_COUNTER(compute_mac_failure, 1);
+			}
 		}
-	} else {
+	} else
+		hash_use_ok = B_TRUE;
+
+	if (hash_use_ok) {
 		bcopy(&(ssl->mac_ctx[direction][0]), ctx,
 			sizeof (KSSL_HASHCTX));
 		spec->MAC_HashUpdate((void *)ctx, temp, p - temp);
@@ -1246,13 +1286,33 @@ kssl_spec_init(ssl_t *ssl, int dir)
 	}
 
 	/*
-	 * Initialize HMAC keys for TLS.
+	 * Initialize HMAC keys for TLS and SSL3 HMAC keys
+	 * for SSL 3.0.
 	 */
 	if (IS_TLS(ssl)) {
 		if (ssl->pending_malg == mac_md5) {
 			spec->hmac_mech = hmac_md5_mech;
 		} else if (ssl->pending_malg == mac_sha) {
 			spec->hmac_mech = hmac_sha1_mech;
+		}
+
+		spec->hmac_key.ck_format = CRYPTO_KEY_RAW;
+		spec->hmac_key.ck_data = ssl->mac_secret[dir];
+		spec->hmac_key.ck_length = spec->mac_hashsz * 8;
+	} else {
+		static uint32_t param;
+
+		spec->hmac_mech.cm_type = CRYPTO_MECH_INVALID;
+		spec->hmac_mech.cm_param = (caddr_t)&param;
+		spec->hmac_mech.cm_param_len = sizeof (param);
+		if (ssl->pending_malg == mac_md5) {
+			spec->hmac_mech.cm_type =
+			    crypto_mech2id("CKM_SSL3_MD5_MAC");
+			param = MD5_HASH_LEN;
+		} else if (ssl->pending_malg == mac_sha) {
+			spec->hmac_mech.cm_type =
+			    crypto_mech2id("CKM_SSL3_SHA1_MAC");
+			param = SHA1_HASH_LEN;
 		}
 
 		spec->hmac_key.ck_format = CRYPTO_KEY_RAW;

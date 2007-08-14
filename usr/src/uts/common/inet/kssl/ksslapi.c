@@ -399,7 +399,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 
 			if ((mp->b_cont == NULL) && (mplen == rec_sz)) {
 
-				mp->b_flag &= ~DBLK_COOKED;
+				DB_FLAGS(mp) &= ~DBLK_COOKED;
 				*decrmp = mp;
 				mutex_exit(&ssl->kssl_lock);
 				return (KSSL_CMD_DELIVER_PROXY);
