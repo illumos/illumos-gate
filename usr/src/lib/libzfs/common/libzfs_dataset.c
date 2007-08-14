@@ -2425,9 +2425,10 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			break;
 
 		case PROP_TYPE_INDEX:
-			val = getprop_uint64(zhp, prop, &source);
-			if (zfs_prop_index_to_string(prop, val,
-			    &strval) != 0)
+			if (get_numeric_property(zhp, prop, src,
+			    &source, &val) != 0)
+				return (-1);
+			if (zfs_prop_index_to_string(prop, val, &strval) != 0)
 				return (-1);
 			(void) strlcpy(propbuf, strval, proplen);
 			break;
