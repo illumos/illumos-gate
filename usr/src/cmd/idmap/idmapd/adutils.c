@@ -825,18 +825,21 @@ idmap_txtsid2hexbinsid(const char *txt, const rid_t *rid,
 			return (-1);
 	}
 
+	/* Adjust count for version and authority */
+	j -= 2;
+
+	/* we know the version number and RID count */
+	sid.version = 1;
+	sid.sub_authority_count = (rid != NULL) ? j + 1 : j;
+
 	/* must have at least one RID, but not too many */
-	if (j < 3 || (j - 1) > SID_MAX_SUB_AUTHORITIES ||
-	    (rid != NULL && j > SID_MAX_SUB_AUTHORITIES))
+	if (sid.sub_authority_count < 1 ||
+	    sid.sub_authority_count > SID_MAX_SUB_AUTHORITIES)
 		return (-1);
 
 	/* check that we only have digits and '-' */
 	if (strspn(txt + 1, "0123456789-") < (strlen(txt) - 1))
 		return (-1);
-
-	/* we know the version number and RID count */
-	sid.version = 1;
-	sid.sub_authority_count = j - 2;
 
 	cp = txt + strlen("S-1-");
 
@@ -854,7 +857,7 @@ idmap_txtsid2hexbinsid(const char *txt, const rid_t *rid,
 
 	sid.authority = (uint64_t)a;
 
-	for (i = 0; i < sid.sub_authority_count; i++) {
+	for (i = 0; i < j; i++) {
 		if (*cp++ != '-')
 			return (-1);
 		/* 64-bit safe parsing of unsigned 32-bit RID */
@@ -873,9 +876,8 @@ idmap_txtsid2hexbinsid(const char *txt, const rid_t *rid,
 	if (*cp != '\0')
 		return (-1);
 
-	if (rid != NULL) {
-		sid.sub_authorities[sid.sub_authority_count++] = *rid;
-	}
+	if (rid != NULL)
+		sid.sub_authorities[j] = *rid;
 
 	j = 1 + 1 + 6 + sid.sub_authority_count * 4;
 

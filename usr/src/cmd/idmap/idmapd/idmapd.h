@@ -88,11 +88,21 @@ extern idmapd_state_t	_idmapdstate;
 #define	UNLOCK_CONFIG() \
 	(void) rw_unlock(&_idmapdstate.rwlk_cfg);
 
+typedef struct hashentry {
+	uint_t	key;
+	uint_t	next;
+} hashentry_t;
+
 typedef struct lookup_state {
 	bool_t			sid2pid_done;
 	bool_t			pid2sid_done;
 	idmap_query_state_t	*ad_lookup;
 	int			ad_nqueries;
+	uint_t			curpos;
+	hashentry_t		*sid_history;
+	uint_t			sid_history_size;
+	idmap_mapping_batch	*batch;
+	idmap_ids_res		*result;
 } lookup_state_t;
 
 typedef struct list_cb_data {
@@ -107,9 +117,14 @@ typedef struct msg_table {
 	const char	*msg;
 } msg_table_t;
 
+/*
+ * Data structure to store well-known SIDs and
+ * associated mappings (if any)
+ */
 typedef struct wksids_table {
 	const char	*sidprefix;
 	uint32_t	rid;
+	const char	*winname;
 	int		is_user;
 	uid_t		pid;
 	int		direction;

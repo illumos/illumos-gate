@@ -93,8 +93,9 @@ load_config() {
 	}
 	if (_idmapdstate.cfg->pgcfg.global_catalog == NULL ||
 	    _idmapdstate.cfg->pgcfg.global_catalog[0] == '\0') {
-		idmapdlog(LOG_ERR, "%s: Global catalog DSnot configured; name "
-			"based and ephemeral mapping will not function", me);
+		idmapdlog(LOG_ERR,
+		    "%s: Global catalog server is not configured; "
+		    "name-based and ephemeral mapping will not function", me);
 	} else if (idmap_add_ds(_idmapdstate.ad,
 		    _idmapdstate.cfg->pgcfg.global_catalog, 0) != 0) {
 		idmapdlog(LOG_ERR, "%s: could not initialize AD DS context",
@@ -113,7 +114,7 @@ print_idmapdstate() {
 			me, _idmapdstate.daemon_mode == TRUE?"true":"false");
 		(void) fprintf(stderr, "%s: hostname=%s\n",
 			me, _idmapdstate.hostname);
-		(void) fprintf(stderr, "%s; name service domain=%s\n", me,
+		(void) fprintf(stderr, "%s: name service domain=%s\n", me,
 			_idmapdstate.domainname);
 
 		(void) fprintf(stderr, "%s: config=%s\n", me,

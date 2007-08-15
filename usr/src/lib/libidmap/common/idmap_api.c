@@ -1120,6 +1120,12 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 			if (gh->retlist[i].is_user)
 				*gh->retlist[i].is_user = 0;
 			break;
+		case IDMAP_POSIXID:
+			if (gh->retlist[i].uid)
+				*gh->retlist[i].uid = 60001;
+			if (gh->retlist[i].is_user)
+				*gh->retlist[i].is_user = -1;
+			break;
 		case IDMAP_SID:
 			if (gh->retlist[i].rid)
 				*gh->retlist[i].rid = id->idmap_id_u.sid.rid;
@@ -1193,6 +1199,8 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	(void) memset(&request, 0, sizeof (request));
 	(void) memset(&result, 0, sizeof (result));
 
+	if (is_user)
+		*is_user = -1;
 	if (pid)
 		*pid = UINT32_MAX;
 	if (unixname)
@@ -1247,8 +1255,13 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		goto out;
 	}
 
-	if (is_user)
-		*is_user = (mapping->id2.idtype == IDMAP_UID)?1:0;
+	if (mapping->id2.idtype == IDMAP_UID) {
+		if (is_user) *is_user = 1;
+	} else if (mapping->id2.idtype == IDMAP_GID) {
+		if (is_user) *is_user = 0;
+	} else {
+		goto out;
+	}
 	if (direction)
 		*direction = mapping->direction;
 	if (pid)
@@ -1518,7 +1531,13 @@ static stat_table_t stattable[] = {
 	{IDMAP_ERR_NOTMAPPED_WELLKNOWN,
 		gettext("No mapping for well-known SID"), EINVAL},
 	{IDMAP_ERR_RETRIABLE_NET_ERR,
-		gettext("Network error"), EINVAL},
+		gettext("Windows lookup failed"), EINVAL},
+	{IDMAP_ERR_W2U_NAMERULE_CONFLICT,
+		gettext("Duplicate rule or conflicts with an existing "
+		"Windows to UNIX name-based rule"), EINVAL},
+	{IDMAP_ERR_U2W_NAMERULE_CONFLICT,
+		gettext("Duplicate rule or conflicts with an existing "
+		"Unix to Windows name-based rule"), EINVAL},
 	{-1, NULL, 0}
 };
 #undef	gettext
@@ -1600,6 +1619,8 @@ idmap_string2stat(const char *str) {
 	return_cmp(CFG_CHANGE);
 	return_cmp(NOTMAPPED_WELLKNOWN);
 	return_cmp(RETRIABLE_NET_ERR);
+	return_cmp(W2U_NAMERULE_CONFLICT);
+	return_cmp(U2W_NAMERULE_CONFLICT);
 #undef return_cmp
 
 	return (IDMAP_ERR_OTHER);

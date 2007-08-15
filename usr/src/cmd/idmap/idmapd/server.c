@@ -94,7 +94,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	sqlite		*cache = NULL, *db = NULL;
 	lookup_state_t	state;
 	idmap_retcode	retcode, winrc;
-	int		i;
+	uint_t		i;
 
 	/* Init */
 	(void) memset(result, 0, sizeof (*result));
@@ -124,11 +124,28 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	}
 	result->ids.ids_len = batch.idmap_mapping_batch_len;
 
+	/* Allocate hash table to check for duplicate sids */
+	state.sid_history = calloc(batch.idmap_mapping_batch_len,
+			sizeof (*state.sid_history));
+	if (state.sid_history == NULL) {
+		idmapdlog(LOG_ERR, "Out of memory");
+		result->retcode = IDMAP_ERR_MEMORY;
+		goto out;
+	}
+	state.sid_history_size = batch.idmap_mapping_batch_len;
+	for (i = 0; i < state.sid_history_size; i++) {
+		state.sid_history[i].key = state.sid_history_size;
+		state.sid_history[i].next = state.sid_history_size;
+	}
+	state.batch = &batch;
+	state.result = result;
+
 	/* Init our 'done' flags */
 	state.sid2pid_done = state.pid2sid_done = TRUE;
 
 	/* First stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		state.curpos = i;
 		if (IS_BATCH_SID(batch, i)) {
 			retcode = sid2pid_first_pass(
 				&state,
@@ -179,6 +196,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Second stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		state.curpos = i;
 		/* Process sid to pid ONLY */
 		if (IS_BATCH_SID(batch, i)) {
 			if (IDMAP_ERROR(winrc))
@@ -208,6 +226,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		goto out;
 
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
+		state.curpos = i;
 		if (IS_BATCH_SID(batch, i)) {
 			(void) update_cache_sid2pid(
 				&state,
@@ -231,6 +250,8 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		(void) sql_exec_no_cb(cache, "END TRANSACTION;");
 
 out:
+	if (state.sid_history)
+		free(state.sid_history);
 	if (IDMAP_ERROR(result->retcode)) {
 		xdr_free(xdr_idmap_ids_res, (caddr_t)result);
 		result->ids.ids_len = 0;
