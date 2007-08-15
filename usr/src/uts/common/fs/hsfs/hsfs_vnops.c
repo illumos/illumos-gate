@@ -83,6 +83,13 @@
 
 #include <fs/fs_subr.h>
 
+/*
+ * This tunable allows us to ignore inode numbers from rrip-1.12.
+ * In this case, we fall back to our default inode algorithm.
+ */
+extern int use_rrip_inodes;
+
+
 /* ARGSUSED */
 static int
 hsfs_fsync(vnode_t *cp, int syncflag, cred_t *cred)
@@ -376,7 +383,6 @@ hsfs_readdir(
 	size_t		dname_size;
 	struct fbuf	*fbp;
 	uint_t		last_offset;	/* last index into current dir block */
-	ulong_t		dir_lbn;	/* lbn of directory */
 	ino64_t		dirino;	/* temporary storage before storing in dirent */
 	off_t		diroff;
 
@@ -385,7 +391,6 @@ hsfs_readdir(
 	if (dhp->hs_dirent.ext_size == 0)
 		hs_filldirent(vp, &dhp->hs_dirent);
 	dirsiz = dhp->hs_dirent.ext_size;
-	dir_lbn = dhp->hs_dirent.ext_lbn;
 	if (uiop->uio_loffset >= dirsiz) {	/* at or beyond EOF */
 		if (eofp)
 			*eofp = 1;
@@ -405,7 +410,7 @@ hsfs_readdir(
 		bytes_wanted = MIN(MAXBSIZE, dirsiz - (offset & MAXBMASK));
 
 		error = fbread(vp, (offset_t)(offset & MAXBMASK),
-			(unsigned int)bytes_wanted, S_READ, &fbp);
+		    (unsigned int)bytes_wanted, S_READ, &fbp);
 		if (error)
 			goto done;
 
@@ -425,7 +430,7 @@ hsfs_readdir(
 			 * a single utility function.
 			 */
 			hdlen = (int)((uchar_t)
-				HDE_DIR_LEN(&blkp[rel_offset(offset)]));
+			    HDE_DIR_LEN(&blkp[rel_offset(offset)]));
 			if (hdlen < HDE_ROOT_DIR_REC_SIZE ||
 			    offset + hdlen > last_offset) {
 				/*
@@ -446,8 +451,7 @@ hsfs_readdir(
 			 * XXX - maybe hs_parsedir() will detect EXISTENCE bit
 			 */
 			if (!hs_parsedir(fsp, &blkp[rel_offset(offset)],
-				&hd, dname, &dnamelen,
-					last_offset - rel_offset(offset))) {
+			    &hd, dname, &dnamelen, last_offset - offset)) {
 				/*
 				 * Determine if there is enough room
 				 */
@@ -461,33 +465,27 @@ hsfs_readdir(
 
 				diroff = offset + hdlen;
 				/*
-				 * Generate nodeid.
-				 * If a directory, nodeid points to the
-				 * canonical dirent describing the directory:
-				 * the dirent of the "." entry for the
-				 * directory, which is pointed to by all
-				 * dirents for that directory.
-				 * Otherwise, nodeid points to dirent of file.
+				 * If the media carries rrip-v1.12 or newer,
+				 * and we trust the inodes from the rrip data
+				 * (use_rrip_inodes != 0), use that data. If the
+				 * media has been created by a recent mkisofs
+				 * version, we may trust all numbers in the
+				 * starting extent number; otherwise, we cannot
+				 * do this for zero sized files and symlinks,
+				 * because if we did we'd end up mapping all of
+				 * them to the same node. We use HS_DUMMY_INO
+				 * in this case and make sure that we will not
+				 * map all files to the same meta data.
 				 */
-				if (hd.type == VDIR) {
-					dirino = (ino64_t)
-					    MAKE_NODEID(hd.ext_lbn, 0,
-					    vp->v_vfsp);
+				if (hd.inode != 0 && use_rrip_inodes) {
+					dirino = hd.inode;
+				} else if ((hd.ext_size == 0 ||
+				    hd.sym_link != (char *)NULL) &&
+				    (fsp->hsfs_flags & HSFSMNT_INODE) == 0) {
+					dirino = HS_DUMMY_INO;
 				} else {
-					struct hs_volume *hvp;
-					offset_t lbn, off;
-
-					/*
-					 * Normalize lbn and off
-					 */
-					hvp = &fsp->hsfs_vol;
-					lbn = dir_lbn +
-					    (offset >> hvp->lbn_shift);
-					off = offset & hvp->lbn_maxoffset;
-					dirino = (ino64_t)MAKE_NODEID(lbn,
-					    off, vp->v_vfsp);
+					dirino = hd.ext_lbn;
 				}
-
 
 				/* strncpy(9f) will zero uninitialized bytes */
 
@@ -557,6 +555,7 @@ hsfs_fid(struct vnode *vp, struct fid *fidp)
 	mutex_enter(&hp->hs_contents_lock);
 	fid->hf_dir_lbn = hp->hs_dir_lbn;
 	fid->hf_dir_off = (ushort_t)hp->hs_dir_off;
+	fid->hf_ino = hp->hs_nodeid;
 	mutex_exit(&hp->hs_contents_lock);
 	return (0);
 }
@@ -717,8 +716,8 @@ hsfs_getapage(
 	if (hp->hs_dirent.intlf_sz == 0) {
 		chunk_data_bytes = LBN_TO_BYTE(1, vp->v_vfsp);
 	} else {
-		chunk_data_bytes = LBN_TO_BYTE(hp->hs_dirent.intlf_sz,
-			vp->v_vfsp);
+		chunk_data_bytes =
+		    LBN_TO_BYTE(hp->hs_dirent.intlf_sz, vp->v_vfsp);
 	}
 
 reread:
@@ -824,8 +823,7 @@ again:
 		searchp = pp;
 		io_end = io_off + io_len;
 		for (count = 0, byte_offset = io_off;
-			byte_offset < io_end;
-			count++) {
+		    byte_offset < io_end; count++) {
 			ASSERT(count < bufcnt);
 
 			/* Compute disk address for interleaving. */
@@ -843,14 +841,13 @@ again:
 			offset_extra = byte_offset % chunk_data_bytes;
 
 			/* get virtual block number for driver */
-			driver_block = lbtodb(bof + xarsiz
-				+ offset_bytes + offset_extra);
+			driver_block =
+			    lbtodb(bof + xarsiz + offset_bytes + offset_extra);
 
 			if (lastp != searchp) {
 				/* this branch taken first time through loop */
-				va = vas[count]
-					= ppmapin(searchp, PROT_WRITE,
-						(caddr_t)-1);
+				va = vas[count] =
+				    ppmapin(searchp, PROT_WRITE, (caddr_t)-1);
 				/* ppmapin() guarantees not to return NULL */
 			} else {
 				vas[count] = NULL;
@@ -868,9 +865,9 @@ again:
 
 			bufs[count].b_lblkno = driver_block;
 
-			remaining_bytes = ((which_chunk_lbn + 1)
-				* chunk_data_bytes)
-				- byte_offset;
+			remaining_bytes =
+			    ((which_chunk_lbn + 1) * chunk_data_bytes)
+			    - byte_offset;
 
 			/*
 			 * remaining_bytes can't be zero, as we derived
@@ -905,7 +902,7 @@ again:
 
 			bufs[count].b_bufsize = bufs[count].b_bcount;
 			if (((offset_t)byte_offset + bufs[count].b_bcount) >
-				HS_MAXFILEOFF) {
+			    HS_MAXFILEOFF) {
 				break;
 			}
 			byte_offset += bufs[count].b_bcount;
@@ -976,7 +973,7 @@ again:
 		for (soff = off + PAGESIZE; plsz > 0;
 		    soff += PAGESIZE, plsz -= PAGESIZE) {
 			pp = page_lookup_nowait(vp, (u_offset_t)soff,
-					SE_SHARED);
+			    SE_SHARED);
 			if (pp == NULL)
 				break;
 			pl[index++] = pp;
@@ -1100,10 +1097,9 @@ hsfs_putpage(
 	if (!vn_has_cached_data(vp))	/* no pages mapped */
 		return (0);
 
-	if (len == 0)		/* from 'off' to EOF */
-		error = pvn_vplist_dirty(vp, off,
-					hsfs_putapage, flags, cr);
-	else {
+	if (len == 0) {		/* from 'off' to EOF */
+		error = pvn_vplist_dirty(vp, off, hsfs_putapage, flags, cr);
+	} else {
 		offset_t end_off = off + len;
 		offset_t file_size = VTOH(vp)->hs_dirent.ext_size;
 		offset_t io_off;
@@ -1122,11 +1118,11 @@ hsfs_putpage(
 			 */
 			if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 				pp = page_lookup(vp, io_off,
-					(flags & (B_INVAL | B_FREE)) ?
-					    SE_EXCL : SE_SHARED);
+				    (flags & (B_INVAL | B_FREE)) ?
+				    SE_EXCL : SE_SHARED);
 			} else {
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 			}
 
 			if (pp == NULL)
@@ -1142,7 +1138,7 @@ hsfs_putpage(
 			 */
 			if (pvn_getdirty(pp, flags) == 1) {
 				cmn_err(CE_NOTE,
-					"hsfs_putpage: dirty HSFS page");
+				    "hsfs_putpage: dirty HSFS page");
 				pvn_write_done(pp, flags |
 				    B_ERROR | B_WRITE | B_INVAL | B_FORCE);
 			}

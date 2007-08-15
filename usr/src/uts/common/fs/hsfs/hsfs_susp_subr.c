@@ -22,7 +22,7 @@
  * System Use Sharing protocol subroutines for High Sierra filesystem
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@ parse_sua(
 	int			*name_len_p,	/* location to put name len */
 	int			*name_change_p,	/* flags to signal name chg */
 	uchar_t			*dirp,		/* pointer to ISO dir entry */
+	uint_t			last_offset,	/* last ind. in cur. dirblock */
 	struct hs_direntry	*hdp,		/* loc to store dir info */
 	struct hsfs		*fsp,		/* filesystem pointer */
 	uchar_t			*search_sig,	/* signature to search for */
@@ -110,8 +111,15 @@ parse_sua(
 	 * between sizes of SUA and ISO directory entry. This entry
 	 * is corrupted, return an appropriate error.
 	 */
-	if (SUA_len < 0)
+	if (SUA_len < 0) {
+		hs_log_bogus_disk_warning(fsp, HSFS_ERR_NEG_SUA_LEN, 0);
 		return (SUA_EINVAL);
+	}
+
+	if ((tmp_SUA_p + tmp_SUA_len) > (dirp + last_offset)) {
+		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_SUA_LEN, 0);
+		return (SUA_EINVAL);
+	}
 
 	/*
 	 * Make sure that the continuation lenth is zero, as that is
@@ -141,7 +149,7 @@ parse_sua(
 
 	while (ret_val == -1) {
 		switch (parse_signatures(&sig_args, tmp_SUA_len, search_sig,
-					search_num)) {
+		    search_num)) {
 		case END_OF_SUA :
 			if (cont_info.cont_len) {
 
@@ -150,8 +158,8 @@ parse_sua(
 					goto clean_up;
 				}
 
-				sig_args.SUF_ptr = cont_p +
-					cont_info.cont_offset;
+				sig_args.SUF_ptr =
+				    cont_p + cont_info.cont_offset;
 
 				tmp_SUA_len = cont_info.cont_len;
 				cont_info.cont_len = 0;
@@ -373,13 +381,13 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 	fsp = VFS_TO_HSFS(vp->v_vfsp);
 	secno = LBN_TO_SEC(hdp->ext_lbn+hdp->xar_len, vp->v_vfsp);
 	secoff = LBN_TO_BYTE(hdp->ext_lbn+hdp->xar_len, vp->v_vfsp) &
-		MAXHSOFFSET;
+	    MAXHSOFFSET;
 	secbp = bread(fsp->hsfs_devvp->v_rdev, secno * 4, HS_SECTOR_SIZE);
 	error = geterror(secbp);
 
 	if (error != 0) {
 		cmn_err(CE_NOTE,
-			"hs_check_root_dirent: bread: error=(%d)", error);
+		    "hs_check_root_dirent: bread: error=(%d)", error);
 		goto end;
 	}
 
@@ -409,7 +417,7 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 		goto end;
 
 	if (strncmp(SUSP_SP, (char *)IDE_sys_use_area(root_ptr),
-		    SUF_SIG_LEN) == 0) {
+	    SUF_SIG_LEN) == 0) {
 		/*
 		 * We have a match of the sharing signature, so let's
 		 * call the sig_handler to do what is necessary. We can
@@ -421,11 +429,24 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 		if ((susp_sp->sig_handler)(&sig_args) == (uchar_t *)NULL) {
 			goto end;
 		}
-	} else
+	} else {
 		goto end;
+	}
 
-	(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL,
-					HS_SECTOR_SIZE - secoff);
+	/*
+	 * If the "ER" signature in the root directory is past any non SU
+	 * signature, the Rock Ridge signatures will be ignored. This happens
+	 * e.g. for filesystems created by mkisofs. In this case,
+	 * IS_RRIP_IMPLEMENTED(fsp) will return 0 when the "ER" signature is
+	 * parsed. Unfortunately, the results of this run will be cached for
+	 * the root vnode. The solution is to run hs_parsedir() a second time
+	 * for the root directory.
+	 */
+	if (hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL,
+	    HS_SECTOR_SIZE - secoff) == 0) {
+		(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL,
+		    (int *)NULL, HS_SECTOR_SIZE - secoff);
+	}
 
 	/*
 	 * If we did not get at least 1 extension, let's assume ISO and
@@ -503,21 +524,21 @@ get_cont_area(struct hsfs *fsp, uchar_t **buf_pp, cont_info_t *cont_info_p)
 		bzero((char *)*buf_pp, HS_SECTOR_SIZE);
 		partial_size = HS_SECTOR_SIZE - cont_info_p->cont_offset;
 		bcopy(&secbp->b_un.b_addr[cont_info_p->cont_offset],
-			(char *)*buf_pp, partial_size);
+		    (char *)*buf_pp, partial_size);
 		cont_info_p->cont_offset = 0;
 		brelse(secbp);
 
 		secbp = bread(fsp->hsfs_devvp->v_rdev, (secno + 1) * 4,
-				HS_SECTOR_SIZE);
+		    HS_SECTOR_SIZE);
 		error = geterror(secbp);
 		if (error != 0) {
 			cmn_err(CE_NOTE, "get_cont_area: bread(2): error=(%d)",
-				error);
+			    error);
 			brelse(secbp);
 			return (1);
 		}
 		bcopy(secbp->b_un.b_addr, (char *)&(*buf_pp)[partial_size],
-			cont_info_p->cont_len - partial_size);
+		    cont_info_p->cont_len - partial_size);
 	}
 
 	brelse(secbp);

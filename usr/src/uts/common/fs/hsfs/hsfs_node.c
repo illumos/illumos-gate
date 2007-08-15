@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,12 @@ static int hsfs_use_dnlc = 1;
  * Use "set hsfs:strict_iso9660_ordering = 1" in /etc/system to override.
  */
 static int strict_iso9660_ordering = 0;
+
+/*
+ * This tunable allows us to ignore inode numbers from rrip-1.12.
+ * In this case, we fall back to our default inode algorithm.
+ */
+int use_rrip_inodes = 1;
 
 static void hs_hsnode_cache_reclaim(void *unused);
 static void hs_addfreeb(struct hsfs *fsp, struct hsnode *hp);
@@ -306,7 +312,7 @@ hs_getfree(struct hsfs *fsp)
 	mutex_exit(&fsp->hsfs_free_lock);
 
 	for (tp = &fsp->hsfs_hash[HS_HPASH(hp)]; *tp != NULL;
-		tp = &(*tp)->hs_hash) {
+	    tp = &(*tp)->hs_hash) {
 		if (*tp == hp) {
 			struct vnode *vp;
 
@@ -320,14 +326,15 @@ hs_getfree(struct hsfs *fsp)
 				 * pvn_vplist_dirty will abort all old pages
 				 */
 				(void) pvn_vplist_dirty(vp, (u_offset_t)0,
-				hsfs_putapage, B_INVAL, (struct cred *)NULL);
+				    hsfs_putapage, B_INVAL,
+				    (struct cred *)NULL);
 			*tp = hp->hs_hash;
 			break;
 		}
 	}
 	if (hp->hs_dirent.sym_link != (char *)NULL) {
 		kmem_free(hp->hs_dirent.sym_link,
-			(size_t)(hp->hs_dirent.ext_size + 1));
+		    (size_t)(hp->hs_dirent.ext_size + 1));
 	}
 
 	mutex_destroy(&hp->hs_contents_lock);
@@ -362,12 +369,19 @@ hs_remfree(struct hsfs *fsp, struct hsnode *hp)
 
 /*
  * Look for hsnode in hash list.
- * Check equality of fsid and nodeid.
+ * If the inode number is != HS_DUMMY_INO (16), then only the inode
+ * number is used for the check.
+ * If the inode number is == HS_DUMMY_INO, we additionally always
+ * check the directory offset for the file to avoid caching the
+ * meta data for all zero sized to the first zero sized file that
+ * was touched.
+ *
  * If found, reactivate it if inactive.
+ *
  * Must be entered with hsfs_hash_lock held.
  */
 struct vnode *
-hs_findhash(ino64_t nodeid, struct vfs *vfsp)
+hs_findhash(ino64_t nodeid, uint_t lbn, uint_t off, struct vfs *vfsp)
 {
 	struct hsnode *tp;
 	struct hsfs *fsp;
@@ -380,6 +394,21 @@ hs_findhash(ino64_t nodeid, struct vfs *vfsp)
 	    tp = tp->hs_hash) {
 		if (tp->hs_nodeid == nodeid) {
 			struct vnode *vp;
+
+			if (nodeid == HS_DUMMY_INO) {
+				/*
+				 * If this is the dummy inode number, look for
+				 * matching dir_lbn and dir_off.
+				 */
+				for (; tp != NULL; tp = tp->hs_hash) {
+					if (tp->hs_nodeid == nodeid &&
+					    tp->hs_dir_lbn == lbn &&
+					    tp->hs_dir_off == off)
+						break;
+				}
+				if (tp == NULL)
+					return (NULL);
+			}
 
 			mutex_enter(&tp->hs_contents_lock);
 			vp = HTOV(tp);
@@ -432,13 +461,14 @@ hs_synchash(struct vfs *vfsp)
 		for (hp = fsp->hsfs_hash[i]; hp != NULL; hp = hp->hs_hash) {
 			vp = HTOV(hp);
 			if ((hp->hs_flags & HREF) && (vp != rvp ||
-				(vp == rvp && vp->v_count > 1))) {
+			    (vp == rvp && vp->v_count > 1))) {
 				busy = 1;
 				continue;
 			}
 			if (vn_has_cached_data(vp))
 				(void) pvn_vplist_dirty(vp, (u_offset_t)0,
-				hsfs_putapage, B_INVAL, (struct cred *)NULL);
+				    hsfs_putapage, B_INVAL,
+				    (struct cred *)NULL);
 		}
 	}
 	if (busy) {
@@ -498,14 +528,15 @@ hs_makenode(
 	fsp = VFS_TO_HSFS(vfsp);
 
 	/*
-	 * Construct the nodeid: in the case of a directory
+	 * Construct the data that allows us to re-read the meta data without
+	 * knowing the name of the file: in the case of a directory
 	 * entry, this should point to the canonical dirent, the "."
 	 * directory entry for the directory.  This dirent is pointed
 	 * to by all directory entries for that dir (including the ".")
 	 * entry itself.
 	 * In the case of a file, simply point to the dirent for that
-	 * file (there are no hard links in Rock Ridge, so there's no
-	 * need to determine what the canonical dirent is.
+	 * file (there are hard links in Rock Ridge, so we need to use
+	 * different data to contruct the node id).
 	 */
 	if (dp->type == VDIR) {
 		lbn = dp->ext_lbn;
@@ -519,13 +550,30 @@ hs_makenode(
 	hvp = &fsp->hsfs_vol;
 	lbn += off >> hvp->lbn_shift;
 	off &= hvp->lbn_maxoffset;
-	nodeid = (ino64_t)MAKE_NODEID(lbn, off, vfsp);
+	/*
+	 * If the media carries rrip-v1.12 or newer, and we trust the inodes
+	 * from the rrip data (use_rrip_inodes != 0), use that data. If the
+	 * media has been created by a recent mkisofs version, we may trust
+	 * all numbers in the starting extent number; otherwise, we cannot
+	 * do this for zero sized files and symlinks, because if we did we'd
+	 * end up mapping all of them to the same node.
+	 * We use HS_DUMMY_INO in this case and make sure that we will not
+	 * map all files to the same meta data.
+	 */
+	if (dp->inode != 0 && use_rrip_inodes) {
+		nodeid = dp->inode;
+	} else if ((dp->ext_size == 0 || dp->sym_link != (char *)NULL) &&
+	    (fsp->hsfs_flags & HSFSMNT_INODE) == 0) {
+		nodeid = HS_DUMMY_INO;
+	} else {
+		nodeid = dp->ext_lbn;
+	}
 
 	/* look for hsnode in cache first */
 
 	rw_enter(&fsp->hsfs_hash_lock, RW_READER);
 
-	if ((vp = hs_findhash(nodeid, vfsp)) == NULL) {
+	if ((vp = hs_findhash(nodeid, lbn, off, vfsp)) == NULL) {
 
 		/*
 		 * Not in cache.  However, someone else may have come
@@ -535,7 +583,7 @@ hs_makenode(
 		rw_exit(&fsp->hsfs_hash_lock);
 		rw_enter(&fsp->hsfs_hash_lock, RW_WRITER);
 
-		if ((vp = hs_findhash(nodeid, vfsp)) == NULL) {
+		if ((vp = hs_findhash(nodeid, lbn, off, vfsp)) == NULL) {
 			/*
 			 * Now we are really sure that the hsnode is not
 			 * in the cache.  Get one off freelist or else
@@ -544,7 +592,7 @@ hs_makenode(
 			hp = hs_getfree(fsp);
 
 			bcopy((caddr_t)dp, (caddr_t)&hp->hs_dirent,
-				sizeof (*dp));
+			    sizeof (*dp));
 			/*
 			 * We've just copied this pointer into hs_dirent,
 			 * and don't want 2 references to same symlink.
@@ -578,10 +626,10 @@ hs_makenode(
 			if (IS_DEVVP(vp)) {
 				rw_exit(&fsp->hsfs_hash_lock);
 				newvp = specvp(vp, vp->v_rdev, vp->v_type,
-						CRED());
+				    CRED());
 				if (newvp == NULL)
-				    cmn_err(CE_NOTE,
-					"hs_makenode: specvp failed");
+					cmn_err(CE_NOTE,
+					    "hs_makenode: specvp failed");
 				VN_RELE(vp);
 				return (newvp);
 			}
@@ -624,7 +672,7 @@ hs_freenode(vnode_t *vp, struct hsfs *fsp, int nopage)
 	if (nopage || (fsp->hsfs_nohsnode >= nhsnode)) {
 		/* remove this node from the hash list, if it's there */
 		for (tp = &fsp->hsfs_hash[HS_HPASH(hp)]; *tp != NULL;
-			tp = &(*tp)->hs_hash) {
+		    tp = &(*tp)->hs_hash) {
 
 			if (*tp == hp) {
 				*tp = hp->hs_hash;
@@ -634,7 +682,7 @@ hs_freenode(vnode_t *vp, struct hsfs *fsp, int nopage)
 
 		if (hp->hs_dirent.sym_link != (char *)NULL) {
 			kmem_free(hp->hs_dirent.sym_link,
-				(size_t)(hp->hs_dirent.ext_size + 1));
+			    (size_t)(hp->hs_dirent.ext_size + 1));
 			hp->hs_dirent.sym_link = NULL;
 		}
 		if (vn_has_cached_data(vp)) {
@@ -691,7 +739,7 @@ hs_remakenode(uint_t lbn, uint_t off, struct vfs *vfsp,
 
 	dirp = (uchar_t *)secbp->b_un.b_addr;
 	error = hs_parsedir(fsp, &dirp[off], &hd, (char *)NULL, (int *)NULL,
-						HS_SECTOR_SIZE - off);
+	    HS_SECTOR_SIZE - off);
 	if (!error) {
 		*vpp = hs_makenode(&hd, lbn, off, vfsp);
 		if (*vpp == NULL)
@@ -722,7 +770,7 @@ hs_dirlook(
 	struct hsfs	*fsp;
 	int		error = 0;
 	uint_t		offset;		/* real offset in directory */
-	uint_t		last_offset;	/* last index into current dir block */
+	uint_t		last_offset;	/* last index in directory */
 	char		*cmpname;	/* case-folded name */
 	int		cmpname_size;	/* how much memory we allocate for it */
 	int		cmpnamelen;
@@ -774,8 +822,8 @@ hs_dirlook(
 		 * remove it from the specified name
 		 */
 		if ((fsp->hsfs_flags & HSFSMNT_NOTRAILDOT) &&
-			name[namlen-1] == '.' &&
-				CAN_TRUNCATE_DOT(name, namlen))
+		    name[namlen-1] == '.' &&
+		    CAN_TRUNCATE_DOT(name, namlen))
 			name[--namlen] = '\0';
 		if (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2 ||
 		    fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
@@ -806,7 +854,7 @@ tryagain:
 		bytes_wanted = MIN(MAXBSIZE, dirsiz - (offset & MAXBMASK));
 
 		error = fbread(dvp, (offset_t)(offset & MAXBMASK),
-			(unsigned int)bytes_wanted, S_READ, &fbp);
+		    (unsigned int)bytes_wanted, S_READ, &fbp);
 		if (error)
 			goto done;
 
@@ -880,7 +928,7 @@ hs_parsedir(
 	struct hs_direntry	*hdp,
 	char			*dnp,
 	int			*dnlen,
-	int			last_offset)
+	int			last_offset)	/* last offset in dirp */
 {
 	char	*on_disk_name;
 	int	on_disk_namelen;
@@ -924,8 +972,8 @@ hs_parsedir(
 		hdp->gid = fsp -> hsfs_vol.vol_gid;
 		hdp->mode = hdp-> mode | (fsp -> hsfs_vol.vol_prot & 0777);
 	} else if ((fsp->hsfs_vol_type == HS_VOL_TYPE_ISO) ||
-		    (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2) ||
-		    (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET)) {
+	    (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2) ||
+	    (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET)) {
 
 		flags = IDE_FLAGS(dirp);
 		hs_parse_dirdate(IDE_cdate(dirp), &hdp->cdate);
@@ -953,6 +1001,7 @@ hs_parsedir(
 		hdp->uid = fsp -> hsfs_vol.vol_uid;
 		hdp->gid = fsp -> hsfs_vol.vol_gid;
 		hdp->mode = hdp-> mode | (fsp -> hsfs_vol.vol_prot & 0777);
+		hdp->inode = 0;		/* initialize with 0, then check rrip */
 
 		/*
 		 * Having this all filled in, let's see if we have any
@@ -960,12 +1009,13 @@ hs_parsedir(
 		 */
 		if (IS_SUSP_IMPLEMENTED(fsp)) {
 			error = parse_sua((uchar_t *)dnp, dnlen,
-					&name_change_flag, dirp, hdp, fsp,
-					(uchar_t *)NULL, NULL);
+			    &name_change_flag, dirp, last_offset,
+			    hdp, fsp,
+			    (uchar_t *)NULL, NULL);
 			if (error) {
 				if (hdp->sym_link) {
 					kmem_free(hdp->sym_link,
-						(size_t)(hdp->ext_size + 1));
+					    (size_t)(hdp->ext_size + 1));
 					hdp->sym_link = (char *)NULL;
 				}
 				return (error);
@@ -986,7 +1036,7 @@ hs_parsedir(
 	if (hdp->intlf_sz + hdp->intlf_sk) {
 		if ((hdp->intlf_sz == 0) || (hdp->intlf_sk == 0)) {
 			cmn_err(CE_NOTE,
-				"hsfs: interleaf size or skip factor error");
+			    "hsfs: interleaf size or skip factor error");
 			return (EINVAL);
 		}
 		if (hdp->ext_size == 0) {
@@ -1024,19 +1074,18 @@ hs_parsedir(
 	if (on_disk_dirlen < HDE_ROOT_DIR_REC_SIZE ||
 	    ((on_disk_dirlen > last_offset) ||
 	    ((HDE_FDESIZE + on_disk_namelen) > on_disk_dirlen))) {
-			hs_log_bogus_disk_warning(fsp,
-			    HSFS_ERR_BAD_DIR_ENTRY, 0);
+		hs_log_bogus_disk_warning(fsp,
+		    HSFS_ERR_BAD_DIR_ENTRY, 0);
 		return (EINVAL);
 	}
 
 	if (on_disk_namelen > fsp->hsfs_namelen &&
 	    hs_namelen(fsp, on_disk_name, on_disk_namelen) >
-							fsp->hsfs_namelen) {
+	    fsp->hsfs_namelen) {
 		hs_log_bogus_disk_warning(fsp,
-				fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
-				HSFS_ERR_BAD_JOLIET_FILE_LEN :
-				HSFS_ERR_BAD_FILE_LEN,
-				0);
+		    fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
+		    HSFS_ERR_BAD_JOLIET_FILE_LEN :
+		    HSFS_ERR_BAD_FILE_LEN, 0);
 	}
 	if (on_disk_namelen > ISO_NAMELEN_V2_MAX)
 		on_disk_namelen = fsp->hsfs_namemax;	/* Paranoia */
@@ -1044,9 +1093,8 @@ hs_parsedir(
 	if (dnp != NULL) {
 		if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
 			namelen = hs_jnamecopy(on_disk_name, dnp,
-							on_disk_namelen,
-							fsp->hsfs_namemax,
-							fsp->hsfs_flags);
+			    on_disk_namelen, fsp->hsfs_namemax,
+			    fsp->hsfs_flags);
 			/*
 			 * A negative return value means that the file name
 			 * has been truncated to fsp->hsfs_namemax.
@@ -1054,16 +1102,14 @@ hs_parsedir(
 			if (namelen < 0) {
 				namelen = -namelen;
 				hs_log_bogus_disk_warning(fsp,
-					HSFS_ERR_TRUNC_JOLIET_FILE_LEN,
-					0);
+				    HSFS_ERR_TRUNC_JOLIET_FILE_LEN, 0);
 			}
 		} else {
 			/*
 			 * HS_VOL_TYPE_ISO && HS_VOL_TYPE_ISO_V2
 			 */
 			namelen = hs_namecopy(on_disk_name, dnp,
-							on_disk_namelen,
-							fsp->hsfs_flags);
+			    on_disk_namelen, fsp->hsfs_flags);
 		}
 		if (namelen == 0)
 			return (EINVAL);
@@ -1273,7 +1319,7 @@ hs_log_bogus_joliet_warning(void)
 		return;
 	warned = 1;
 	cmn_err(CE_CONT, "hsfs: Warning: "
-		"file name contains bad UCS-2 chacarter\n");
+	    "file name contains bad UCS-2 chacarter\n");
 }
 
 
@@ -1361,14 +1407,14 @@ hs_filldirent(struct vnode *vp, struct hs_direntry *hdp)
 
 	if (vp->v_type != VDIR) {
 		cmn_err(CE_WARN, "hsfs_filldirent: vp (0x%p) not a directory",
-			(void *)vp);
+		    (void *)vp);
 		return;
 	}
 
 	fsp = VFS_TO_HSFS(vp ->v_vfsp);
 	secno = LBN_TO_SEC(hdp->ext_lbn+hdp->xar_len, vp->v_vfsp);
 	secoff = LBN_TO_BYTE(hdp->ext_lbn+hdp->xar_len, vp->v_vfsp) &
-			MAXHSOFFSET;
+	    MAXHSOFFSET;
 	secbp = bread(fsp->hsfs_devvp->v_rdev, secno * 4, HS_SECTOR_SIZE);
 	error = geterror(secbp);
 	if (error != 0) {
@@ -1384,7 +1430,7 @@ hs_filldirent(struct vnode *vp, struct hs_direntry *hdp)
 		/* keep on going */
 	}
 	(void) hs_parsedir(fsp, &secp[secoff], hdp, (char *)NULL,
-				(int *)NULL, HS_SECTOR_SIZE - secoff);
+	    (int *)NULL, HS_SECTOR_SIZE - secoff);
 
 end:
 	brelse(secbp);
@@ -1412,7 +1458,7 @@ process_dirblock(
 	int		dnamelen;	/* length of name */
 	struct hs_direntry hd;
 	int		hdlen;
-	uchar_t		*dirp;	/* the directory entry */
+	uchar_t		*dirp;		/* the directory entry */
 	int		res;
 	int		parsedir_res;
 	int		is_rrip;
@@ -1501,12 +1547,11 @@ process_dirblock(
 			    HSFS_ERR_BAD_DIR_ENTRY, 0);
 			goto skip_rec;
 		} else if (dnamelen > fsp->hsfs_namelen &&
-			hs_namelen(fsp, dname, dnamelen) > fsp->hsfs_namelen) {
+		    hs_namelen(fsp, dname, dnamelen) > fsp->hsfs_namelen) {
 			hs_log_bogus_disk_warning(fsp,
-				fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
-				HSFS_ERR_BAD_JOLIET_FILE_LEN :
-				HSFS_ERR_BAD_FILE_LEN,
-				0);
+			    fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
+			    HSFS_ERR_BAD_JOLIET_FILE_LEN :
+			    HSFS_ERR_BAD_FILE_LEN, 0);
 		}
 		if (dnamelen > ISO_NAMELEN_V2_MAX)
 			dnamelen = fsp->hsfs_namemax;	/* Paranoia */
@@ -1521,7 +1566,8 @@ process_dirblock(
 
 			rrip_name_str[0] = '\0';
 			rr_namelen = rrip_namecopy(nm, &rrip_name_str[0],
-			    &rrip_tmp_name[0], dirp, fsp, &hd);
+			    &rrip_tmp_name[0], dirp, last_offset - *offset,
+			    fsp, &hd);
 			if (hd.sym_link) {
 				kmem_free(hd.sym_link,
 				    (size_t)(hd.ext_size+1));
@@ -1566,7 +1612,7 @@ process_dirblock(
 			if (i > 0) {
 				dnamelen = i;
 			} else if (fsp->hsfs_vol_type != HS_VOL_TYPE_ISO_V2 &&
-				    fsp->hsfs_vol_type != HS_VOL_TYPE_JOLIET) {
+			    fsp->hsfs_vol_type != HS_VOL_TYPE_JOLIET) {
 				dnamelen = strip_trailing(fsp, dname, dnamelen);
 			}
 
@@ -1576,9 +1622,9 @@ process_dirblock(
 				(void) strncpy(uppercase_name, dname, dnamelen);
 			} else if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
 				dnamelen = hs_joliet_cp(dname, uppercase_name,
-								dnamelen);
+				    dnamelen);
 			} else if (uppercase_cp(dname, uppercase_name,
-								dnamelen)) {
+			    dnamelen)) {
 				hs_log_bogus_disk_warning(fsp,
 				    HSFS_ERR_LOWER_CASE_NM, 0);
 			}
@@ -1609,7 +1655,7 @@ process_dirblock(
 			/* name matches */
 			parsedir_res = hs_parsedir(fsp, dirp, &hd,
 			    (char *)NULL, (int *)NULL,
-					last_offset - rel_offset(*offset));
+			    last_offset - *offset);
 			if (!parsedir_res) {
 				uint_t lbn;	/* logical block number */
 
@@ -1641,7 +1687,7 @@ process_dirblock(
 				PD_return(FOUND_ENTRY)
 			}
 		} else if (strict_iso9660_ordering && !is_rrip &&
-			!HSFS_HAVE_LOWER_CASE(fsp) && res < 0) {
+		    !HSFS_HAVE_LOWER_CASE(fsp) && res < 0) {
 			/* name < dir entry */
 			RESTORE_NM(rrip_tmp_name, nm);
 			PD_return(WENT_PAST)
