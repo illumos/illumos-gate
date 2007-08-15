@@ -248,6 +248,7 @@ typedef struct vnode {
 	struct vnode	*v_msnext;	/* list of vnodes on an mset */
 	struct vnode	*v_msprev;	/* list of vnodes on an mset */
 	krwlock_t	v_mslock;	/* protects v_mset */
+	void		*v_fopdata;	/* list of file ops event watches */
 } vnode_t;
 
 #define	IS_DEVVP(vp)	\
@@ -465,7 +466,11 @@ typedef enum vnevent	{
 	VE_RENAME_SRC	= 1,	/* Rename, with vnode as source */
 	VE_RENAME_DEST	= 2,	/* Rename, with vnode as target/destination */
 	VE_REMOVE	= 3,	/* Remove of vnode's name */
-	VE_RMDIR	= 4	/* Remove of directory vnode's name */
+	VE_RMDIR	= 4,	/* Remove of directory vnode's name */
+	VE_CREATE	= 5,	/* Create with vnode's name which exists */
+	VE_LINK		= 6, 	/* Link with vnode's name as source */
+	VE_RENAME_DEST_DIR	= 7, 	/* Rename with vnode as target dir */
+	VE_MOUNTEDOVER	= 8 	/* File or Filesystem got mounted over vnode */
 } vnevent_t;
 
 /*
@@ -606,7 +611,8 @@ struct pollhead;
 				int, cred_t *);				\
 	int	(*vop_shrlock)(vnode_t *, int, struct shrlock *,	\
 				int, cred_t *);				\
-	int	(*vop_vnevent)(vnode_t *, vnevent_t)	/* NB: No ";" */
+	int	(*vop_vnevent)(vnode_t *, vnevent_t, vnode_t *, char *)	\
+	/* NB: No ";" */
 
 /*
  * Operations on vnodes.  Note: File systems must never operate directly
@@ -675,7 +681,7 @@ extern void	fop_dispose(vnode_t *, struct page *, int, int, cred_t *);
 extern int	fop_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
 extern int	fop_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
 extern int	fop_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *);
-extern int	fop_vnevent(vnode_t *, vnevent_t);
+extern int	fop_vnevent(vnode_t *, vnevent_t, vnode_t *, char *);
 
 #endif	/* _KERNEL */
 
@@ -765,8 +771,8 @@ extern int	fop_vnevent(vnode_t *, vnevent_t);
 	fop_setsecattr(vp, vsap, f, cr)
 #define	VOP_SHRLOCK(vp, cmd, shr, f, cr) \
 	fop_shrlock(vp, cmd, shr, f, cr)
-#define	VOP_VNEVENT(vp, vnevent) \
-	fop_vnevent(vp, vnevent)
+#define	VOP_VNEVENT(vp, vnevent, dvp, fnm) \
+	fop_vnevent(vp, vnevent, dvp, fnm)
 
 #define	VOPNAME_OPEN		"open"
 #define	VOPNAME_CLOSE		"close"
@@ -908,10 +914,14 @@ void vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
     const char *path, size_t plen);
 
 /* Vnode event notification */
-void	vnevent_rename_src(vnode_t *);
-void	vnevent_rename_dest(vnode_t *);
-void	vnevent_remove(vnode_t *);
-void	vnevent_rmdir(vnode_t *);
+void	vnevent_rename_src(vnode_t *, vnode_t *, char *);
+void	vnevent_rename_dest(vnode_t *, vnode_t *, char *);
+void	vnevent_remove(vnode_t *, vnode_t *, char *);
+void	vnevent_rmdir(vnode_t *, vnode_t *, char *);
+void	vnevent_create(vnode_t *);
+void	vnevent_link(vnode_t *);
+void	vnevent_rename_dest_dir(vnode_t *);
+void	vnevent_mountedover(vnode_t *);
 int	vnevent_support(vnode_t *);
 
 /* Context identification */

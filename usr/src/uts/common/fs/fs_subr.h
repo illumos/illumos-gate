@@ -22,7 +22,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,8 @@ extern void	fs_nodispose(struct vnode *, page_t *, int, int, struct cred *);
 extern int	fs_fab_acl(struct vnode *, vsecattr_t *, int flag, cred_t *);
 extern int	fs_shrlock(struct vnode *, int, struct shrlock *, int,
 			cred_t *);
-extern int	fs_vnevent_nosupport(vnode_t *, vnevent_t);
-extern int	fs_vnevent_support(vnode_t *, vnevent_t);
+extern int	fs_vnevent_nosupport(vnode_t *, vnevent_t, vnode_t *, char *);
+extern int	fs_vnevent_support(vnode_t *, vnevent_t, vnode_t *, char *);
 extern int	fs_acl_nontrivial(struct vnode *vp, struct cred *cr);
 extern int	fs_need_estale_retry(int);
 

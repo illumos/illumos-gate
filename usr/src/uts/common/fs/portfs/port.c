@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,8 @@
  *			   (see port_alert(3c)).
  * PORT_SOURCE_USER	 : events submitted by applications with
  *			   port_send(3c) or port_sendn(3c).
+ * PORT_SOURCE_FILE	 : events submitted per file being watched for file
+ *			   change events  (see port_create(3c).
  *
  * There is a user API implemented in the libc library as well as a
  * kernel API implemented in port_subr.c in genunix.
@@ -172,6 +174,21 @@
  * 	This type of event is generated from user level using the port_send()
  * 	function to send a user event to a port or the port_sendn() function
  * 	to send an event to a list of ports.
+ * PORT_SOURCE_FILE:
+ *	This event source uses the port_associate() interface to register
+ *	a file to be monitored for changes. The file name that needs to be
+ *	monitored is specified in the file_obj_t structure, a pointer to which
+ *	is passed as an argument. The event types to be monitored are specified
+ *	in the events argument.
+ *	A file events monitor is represented internal per port per object
+ *	address(the file_obj_t pointer). Which means there can be multiple
+ *	watches registered on the same file using different file_obj_t
+ *	structure pointer. With the help of the	FEM(File Event Monitoring)
+ *	hooks, the file's vnode ops are intercepted and relevant events
+ *	delivered. The port_dissociate() function is used to de-register a
+ *	file events monitor on a file. When the specified file is
+ *	removed/renamed, the file events watch/monitor is automatically
+ *	removed.
  *
  * EVENT DELIVERY / RETRIEVING EVENTS
  * Events remain in the port queue until:
@@ -214,6 +231,8 @@
  *    PORT_SOURCE_AIO events
  * 	This type of event is not shareable between processes.
  *    PORT_SOURCE_TIMER events
+ * 	This type of event is not shareable between processes.
+ *    PORT_SOURCE_FILE events
  * 	This type of event is not shareable between processes.
  *
  * FORK BEHAVIOUR
@@ -622,13 +641,19 @@ portfs(int opcode, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	}
 	case	PORT_ASSOCIATE:
 	{
-		/* currently only PORT_SOURCE_FD is implemented */
-		if ((int)a1 != PORT_SOURCE_FD) {
+		switch ((int)a1) {
+		case PORT_SOURCE_FD:
+			error = port_associate_fd(pp, (int)a1, (uintptr_t)a2,
+			    (int)a3, (void *)a4);
+			break;
+		case PORT_SOURCE_FILE:
+			error = port_associate_fop(pp, (int)a1, (uintptr_t)a2,
+			    (int)a3, (void *)a4);
+			break;
+		default:
 			error = EINVAL;
 			break;
 		}
-		error = port_associate_fd(pp, (int)a1, (uintptr_t)a2, (int)a3,
-			    (void *)a4);
 		break;
 	}
 	case	PORT_SEND:
@@ -654,12 +679,17 @@ portfs(int opcode, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	}
 	case	PORT_DISSOCIATE:
 	{
-		/* currently only PORT_SOURCE_FD is implemented */
-		if ((int)a1 != PORT_SOURCE_FD) {
+		switch ((int)a1) {
+		case PORT_SOURCE_FD:
+			error = port_dissociate_fd(pp, (uintptr_t)a2);
+			break;
+		case PORT_SOURCE_FILE:
+			error = port_dissociate_fop(pp, (uintptr_t)a2);
+			break;
+		default:
 			error = EINVAL;
 			break;
 		}
-		error = port_dissociate_fd(pp, (uintptr_t)a2);
 		break;
 	}
 	case	PORT_ALERT:

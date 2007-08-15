@@ -108,6 +108,7 @@ static char **vfs_copycancelopt_extend(char **const, int);
 static void vfs_freecancelopt(char **);
 static char *getrootfs(void);
 static int getmacpath(dev_info_t *, void *);
+static void vfs_mnttabvp_setup(void);
 
 struct ipmnt {
 	struct ipmnt	*mip_next;
@@ -140,6 +141,8 @@ timespec_t vfs_mnttab_ctime;	/* mnttab created time */
 timespec_t vfs_mnttab_mtime;	/* mnttab last modified time */
 char *vfs_dummyfstype = "\0";
 struct pollhead vfs_pollhd;	/* for mnttab pollers */
+struct vnode *vfs_mntdummyvp;	/* to fake mnttab read/write for file events */
+int	mntfstype;		/* will be set once mnt fs is mounted */
 
 /*
  * Table for generic options recognized in the VFS layer and acted
@@ -916,6 +919,7 @@ vfs_mountroot(void)
 #endif
 	}
 	kmem_free(path, plen + MAXPATHLEN);
+	vfs_mnttabvp_setup();
 }
 
 /*
@@ -1437,6 +1441,10 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	vfs_setresource(vfsp, resource);
 	vfs_setmntpoint(vfsp, mountpt);
 
+	/*
+	 * going to mount on this vnode, so notify.
+	 */
+	vnevent_mountedover(vp);
 	error = VFS_MOUNT(vfsp, vp, uap, credp);
 
 	if (uap->flags & MS_RDONLY)
@@ -2566,6 +2574,132 @@ vfs_freeopttbl(mntopts_t *mp)
 	}
 }
 
+
+/* ARGSUSED */
+static int
+vfs_mntdummyread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
+	caller_context_t *ct)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+vfs_mntdummywrite(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
+	caller_context_t *ct)
+{
+	return (0);
+}
+
+/*
+ * The dummy vnode is currently used only by file events notification
+ * module which is just interested in the timestamps.
+ */
+/* ARGSUSED */
+static int
+vfs_mntdummygetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+{
+	bzero(vap, sizeof (vattr_t));
+	vap->va_type = VREG;
+	vap->va_nlink = 1;
+	vap->va_ctime = vfs_mnttab_ctime;
+	/*
+	 * it is ok to just copy mtime as the time will be monotonically
+	 * increasing.
+	 */
+	vap->va_mtime = vfs_mnttab_mtime;
+	vap->va_atime = vap->va_mtime;
+	return (0);
+}
+
+static void
+vfs_mnttabvp_setup(void)
+{
+	vnode_t *tvp;
+	vnodeops_t *vfs_mntdummyvnops;
+	const fs_operation_def_t mnt_dummyvnodeops_template[] = {
+		VOPNAME_READ, 		{ .vop_read = vfs_mntdummyread },
+		VOPNAME_WRITE, 		{ .vop_write = vfs_mntdummywrite },
+		VOPNAME_GETATTR,	{ .vop_getattr = vfs_mntdummygetattr },
+		VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+		NULL,			NULL
+	};
+
+	if (vn_make_ops("mnttab", mnt_dummyvnodeops_template,
+	    &vfs_mntdummyvnops) != 0) {
+		cmn_err(CE_WARN, "vfs_mnttabvp_setup: vn_make_ops failed");
+		/* Shouldn't happen, but not bad enough to panic */
+		return;
+	}
+
+	/*
+	 * A global dummy vnode is allocated to represent mntfs files.
+	 * The mntfs file (/etc/mnttab) can be monitored for file events
+	 * and receive an event when mnttab changes. Dummy VOP calls
+	 * will be made on this vnode. The file events notification module
+	 * intercepts this vnode and delivers relevant events.
+	 */
+	tvp = vn_alloc(KM_SLEEP);
+	tvp->v_flag = VNOMOUNT|VNOMAP|VNOSWAP|VNOCACHE;
+	vn_setops(tvp, vfs_mntdummyvnops);
+	tvp->v_type = VREG;
+	/*
+	 * The mnt dummy ops do not reference v_data.
+	 * No other module intercepting this vnode should either.
+	 * Just set it to point to itself.
+	 */
+	tvp->v_data = (caddr_t)tvp;
+	tvp->v_vfsp = rootvfs;
+	vfs_mntdummyvp = tvp;
+}
+
+/*
+ * performs fake read/write ops
+ */
+static void
+vfs_mnttab_rwop(int rw)
+{
+	struct uio	uio;
+	struct iovec	iov;
+	char	buf[1];
+
+	if (vfs_mntdummyvp == NULL)
+		return;
+
+	bzero(&uio, sizeof (uio));
+	bzero(&iov, sizeof (iov));
+	iov.iov_base = buf;
+	iov.iov_len = 0;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_loffset = 0;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_resid = 0;
+	if (rw) {
+		(void) VOP_WRITE(vfs_mntdummyvp, &uio, 0, kcred, NULL);
+	} else {
+		(void) VOP_READ(vfs_mntdummyvp, &uio, 0, kcred, NULL);
+	}
+}
+
+/*
+ * Generate a write operation.
+ */
+void
+vfs_mnttab_writeop(void)
+{
+	vfs_mnttab_rwop(1);
+}
+
+/*
+ * Generate a read operation.
+ */
+void
+vfs_mnttab_readop(void)
+{
+	vfs_mnttab_rwop(0);
+}
+
 /*
  * Free any mnttab information recorded in the vfs struct.
  * The vfs must not be on the vfs list.
@@ -2649,6 +2783,7 @@ vfs_mnttab_modtimeupd()
 		hrt2ts(newhrt, &vfs_mnttab_mtime);
 	}
 	pollwakeup(&vfs_pollhd, (short)POLLRDBAND);
+	vfs_mnttab_writeop();
 }
 
 int

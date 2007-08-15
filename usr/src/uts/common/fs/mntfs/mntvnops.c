@@ -46,6 +46,7 @@
 static mntnode_t *mntgetnode(vnode_t *);
 
 vnodeops_t *mntvnodeops;
+extern void vfs_mnttab_readop(void);
 
 /*
  * Design of kernel mnttab accounting.
@@ -633,7 +634,7 @@ mntfs_snapshot(mntnode_t *mnp, int forread, int datamodel)
 		mntfs_freesnap(snap);
 		return (ENOMEM);
 	}
-
+	vfs_mnttab_readop();
 	return (0);
 }
 
@@ -760,7 +761,7 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 		error = uiomove(buf, len, UIO_READ, uio);
 	}
 	kmem_free(buf, len);
-
+	vfs_mnttab_readop();
 	return (error);
 }
 
@@ -1127,7 +1128,6 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 
 	return (error);
 }
-
 
 /*
  * /mntfs vnode operations vector

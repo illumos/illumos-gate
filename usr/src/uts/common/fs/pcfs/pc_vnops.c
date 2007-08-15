@@ -1052,8 +1052,11 @@ pcfs_create(
 		} else if ((vp->v_type == VREG) && (vap->va_mask & AT_SIZE) &&
 		    (vap->va_size == 0)) {
 			error = pc_truncate(pcp, 0L);
-			if (error)
+			if (error) {
 				VN_RELE(PCTOV(pcp));
+			} else {
+				vnevent_create(PCTOV(pcp));
+			}
 		}
 	}
 	if (error) {

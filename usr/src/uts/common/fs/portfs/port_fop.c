@@ -80,7 +80,7 @@
  * After an event is delivered, the file events watch gets de-activated. To
  * receive the next event, the process will have to re-register the watch and
  * activate it by calling port_associate() again. This behavior is intentional
- * and support proper multi threaded programming when using file events
+ * and supports proper multi threaded programming when using file events
  * notification API.
  *
  *
@@ -88,19 +88,19 @@
  * ------------------------
  *
  * Each file events watch is represented by 'portfop_t' in the kernel. A
- * cache(portfop_cache_t) of these file portfop_t's are maintained per event
+ * cache(in portfop_cache_t) of these portfop_t's are maintained per event
  * port by this source. The object here is the pointer to the file_obj
  * structure. The portfop_t's are hashed in using the object pointer. Therefore
- * it is possible to have multiple file event watches on a file by the same
+ * it is possible to have multiple file events watches on a file by the same
  * process by using different object structure(file_obj_t) and hence can
  * receive multiple event notification for a file. These watches can be for
  * different event types.
  *
  * The cached entries of these file objects are retained, even after delivering
- * an event makring them inactive, for performance reason. The assumption
+ * an event, marking them inactive for performance reasons. The assumption
  * is that the process would come back and re-register the file to receive
  * further events. When there are more then 'port_fop_maxpfps' watches per file
- * it will attempt to free the oldest inactive watch.
+ * it will attempt to free the oldest inactive watches.
  *
  * In case the event that is being delivered is an exception event, the cached
  * entries get removed. An exception event on a file or directory means its
@@ -116,7 +116,7 @@
  *
  * The list of file event watches per file are managed by the data structure
  * portfop_vp_t. The first time a file events watch is registered for a file,
- * the portfop_vp_t is installed on the vnode_t's member v_fopdata. This gets
+ * a portfop_vp_t is installed on the vnode_t's member v_fopdata. This gets
  * removed and freed only when the vnode becomes inactive. The FEM hooks are
  * also installed when the first watch is registered on a file. The FEM hooks
  * get un-installed when all the watches are removed.
@@ -139,7 +139,7 @@
  * File system support:
  * -------------------
  *
- * The file systems implementation has to provide vnode event notifications
+ * The file system implementation has to provide vnode event notifications
  * (vnevents) in order to support watching any files on that file system.
  * The vnode events(vnevents) are notifications provided by the file system
  * for name based file operations like rename, remove etc, which do not go
@@ -176,9 +176,9 @@
 #include <sys/atomic.h>
 
 /*
- * For special case support of /etc/mnttab
+ * For special case support of mnttab (/etc/mnttab).
  */
-extern struct vnode *mntdummyvp;
+extern struct vnode *vfs_mntdummyvp;
 extern int mntfstype;
 
 #define	PORTFOP_PVFSH(vfsp)	(&portvfs_hash[PORTFOP_PVFSHASH(vfsp)])
@@ -1168,13 +1168,14 @@ port_resolve_vp(vnode_t *vp)
 {
 	vnode_t *rvp;
 	/*
-	 * special case /etc/mnttab, the only mntfs type
-	 * file that can exist.
+	 * special case /etc/mnttab(mntfs type). The mntfstype != 0
+	 * if mntfs got mounted.
 	 */
-	if (mntdummyvp && vp->v_vfsp->vfs_fstype == mntfstype) {
+	if (vfs_mntdummyvp && mntfstype != 0 &&
+	    vp->v_vfsp->vfs_fstype == mntfstype) {
 		VN_RELE(vp);
-		vp = mntdummyvp;
-		VN_HOLD(mntdummyvp);
+		vp = vfs_mntdummyvp;
+		VN_HOLD(vfs_mntdummyvp);
 	}
 
 	/*
@@ -1369,7 +1370,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 		pfp->pfop_events = events;
 
 		/*
-		 * check if this pfp is being removed. Port_fop_excep()
+		 * check if this pfp is being removed. port_fop_excep()
 		 * will deliver an exception event.
 		 */
 		if (pfp->pfop_flags & PORT_FOP_REMOVING) {
@@ -1788,14 +1789,14 @@ port_fop_sendevent(vnode_t *vp, int events, vnode_t *dvp, char *cname)
 		mutex_exit(&pvp->pvp_mutex);
 
 		/*
-		 * contain the list size.
+		 * trim the list.
 		 */
 		port_fop_trimpfplist(vp);
 	}
 }
 
 /*
- * Given the file operation, map it to the events types and send.
+ * Given the file operation, map it to the event types and send.
  */
 void
 port_fop(vnode_t *vp, int op, int retval)
@@ -1971,9 +1972,7 @@ port_fop_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 	if (vap->va_mask & AT_ATIME) {
 		events |= FOP_FILE_SETATTR_ATIME;
 	}
-	if (vap->va_mask & (AT_SIZE|AT_CTIME)) {
-		events |= FOP_FILE_SETATTR_CTIME;
-	}
+	events |= FOP_FILE_SETATTR_CTIME;
 
 	port_fop(vp, events, retval);
 	return (retval);
@@ -1993,11 +1992,13 @@ port_fop_create(femarg_t *vf, char *name, vattr_t *vap, vcexcl_t excl,
 	 * modification time of the directory to determine if the
 	 * file was actually created.
 	 */
+	vatt.va_mask = AT_ATIME|AT_MTIME|AT_CTIME;
 	if (VOP_GETATTR(vp, &vatt, 0, CRED())) {
 		got = 0;
 	}
 	retval = vnext_create(vf, name, vap, excl, mode, vpp, cr, flag);
 
+	vatt1.va_mask = AT_ATIME|AT_MTIME|AT_CTIME;
 	if (got && !VOP_GETATTR(vp, &vatt1, 0, CRED())) {
 		if ((vatt1.va_mtime.tv_sec > vatt.va_mtime.tv_sec ||
 		    (vatt1.va_mtime.tv_sec = vatt.va_mtime.tv_sec &&

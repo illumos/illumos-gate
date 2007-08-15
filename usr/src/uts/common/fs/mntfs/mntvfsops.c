@@ -104,7 +104,7 @@ _info(struct modinfo *modinfop)
  * is ever modified to become unloadable.
  */
 
-static int	mntfstype;
+extern int	mntfstype;
 static major_t	mnt_major;
 static minor_t	mnt_minor;
 static kmutex_t	mnt_minor_lock;
