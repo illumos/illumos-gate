@@ -130,7 +130,7 @@ int	bcyl;				/* # other cyls */
 
 struct	mboot boot_sec;			/* fdisk partition info */
 int	xstart;				/* solaris partition start */
-char	x86_devname[80];		/* saved device name for fdisk */
+char	x86_devname[MAXNAMELEN];	/* saved device name for fdisk */
 					/* information accesses */
 struct	mctlr_list	*controlp;	/* master controller list ptr */
 
