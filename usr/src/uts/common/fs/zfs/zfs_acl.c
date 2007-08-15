@@ -168,6 +168,13 @@ zfs_mode_compute(znode_t *zp, zfs_acl_t *aclp)
 
 	for (i = 0, acep = aclp->z_acl;
 	    i != aclp->z_acl_count; i++, acep++) {
+
+		/*
+		 * Skip over inherit only ACEs
+		 */
+		if (acep->a_flags & ACE_INHERIT_ONLY_ACE)
+			continue;
+
 		entry_type = (acep->a_flags & ACE_TYPE_FLAGS);
 		if (entry_type == ACE_OWNER) {
 			if ((acep->a_access_mask & ACE_READ_DATA) &&
