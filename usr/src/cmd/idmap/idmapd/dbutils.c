@@ -1420,6 +1420,7 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 		 * the cache update routine doesn't update namecache.
 		 */
 		req->direction = _IDMAP_F_S2N_CACHE;
+		return (IDMAP_SUCCESS);
 	}
 
 	return (IDMAP_ERR_NOMAPPING);
