@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,8 @@
 #include <nfs/nfs.h>
 #include <nfs/export.h>
 #include <sys/cmn_err.h>
+
+#define	PSEUDOFS_SUFFIX		" (pseudo)"
 
 /*
  * A version of VOP_FID that deals with a remote VOP_FID for nfs.
@@ -42,8 +44,8 @@
  * nfs filesystem is also part of it. Thus, need to be able to setup a pseudo
  * exportinfo for an nfs node.
  *
- * e.g. mount an ufs filesystem on an nfs filesystem, then share the ufs
- *      filesystem. (like exporting a local disk from a "diskless" client)
+ * e.g. mount a filesystem on top of a nfs dir, and then share the new mount
+ *      (like exporting a local disk from a "diskless" client)
  */
 int
 vop_fid_pseudo(vnode_t *vp, fid_t *fidp)
@@ -124,20 +126,19 @@ nfs4_vget_pseudo(struct exportinfo *exi, vnode_t **vpp, fid_t *fidp)
  * a real export, the pathname to the export is
  * checked to see if all the directory components
  * are accessible via an NFSv4 client, i.e. are
- * exported.  If tree_climb() finds an unexported
+ * exported.  If treeclimb_export() finds an unexported
  * mountpoint along the path, then it calls this
  * function to export it.
  *
- * This pseudo export differs from a real export
- * in restriction on simple. read-only access,
- * and the addition of a "visible" list of directories.
- * A real export may have a visible list if it is a root of
- * a file system and at least one of its subtree resides in
- * a different file system is shared.
+ * This pseudo export differs from a real export in that
+ * it only allows read-only access.  A "visible" list of
+ * directories is added to filter lookup and readdir results
+ * to only contain dirnames which lead to descendant shares.
  *
- * A visible list is per file system. It resides in the exportinfo
- * for the pseudo node (VROOT) and it could reside in a real export
- * of a VROOT node.
+ * A visible list has a per-file-system scope.  Any exportinfo
+ * struct (real or pseudo) can have a visible list as long as
+ * a) its export root is VROOT
+ * b) a descendant of the export root is shared
  */
 int
 pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
@@ -147,8 +148,7 @@ pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
 	struct exportdata *kex;
 	fid_t fid;
 	fsid_t fsid;
-	int error;
-	char *pseudo;
+	int error, vpathlen;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
@@ -177,7 +177,7 @@ pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
 	exi->exi_visible = vis_head;
 	exi->exi_count = 1;
 	exi->exi_volatile_dev = (vfssw[vp->v_vfsp->vfs_fstype].vsw_flag &
-				VSW_VOLATILEDEV) ? 1 : 0;
+	    VSW_VOLATILEDEV) ? 1 : 0;
 	mutex_init(&exi->exi_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
@@ -193,12 +193,13 @@ pseudo_exportfs(vnode_t *vp, struct exp_visible *vis_head,
 	kex = &exi->exi_export;
 	kex->ex_flags = EX_PSEUDO;
 
-	/* Set up a generic pathname */
-
-	pseudo = "(pseudo)";
-	kex->ex_pathlen = strlen(pseudo);
+	vpathlen = vp->v_path ? strlen(vp->v_path) : 0;
+	kex->ex_pathlen = vpathlen + strlen(PSEUDOFS_SUFFIX);
 	kex->ex_path = kmem_alloc(kex->ex_pathlen + 1, KM_SLEEP);
-	(void) strcpy(kex->ex_path, pseudo);
+
+	if (vpathlen)
+		(void) strcpy(kex->ex_path, vp->v_path);
+	(void) strcpy(kex->ex_path + vpathlen, PSEUDOFS_SUFFIX);
 
 	/* Transfer the secinfo data from exdata to this new pseudo node */
 	if (exdata)
@@ -228,7 +229,9 @@ free_visible(struct exp_visible *head)
 	for (visp = head; visp; visp = next) {
 		if (visp->vis_vp != NULL)
 			VN_RELE(visp->vis_vp);
+
 		next = visp->vis_next;
+		srv_secinfo_list_free(visp->vis_secinfo, visp->vis_seccnt);
 		kmem_free(visp, sizeof (*visp));
 	}
 }
@@ -297,7 +300,7 @@ more_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 				 * set to 1.
 				 *
 				 * For example, if /export/home was shared
-				 * (and a UFS mountpoint), then "export" and
+				 * (and a mountpoint), then "export" and
 				 * "home" would each have visible structs in
 				 * the root pseudo exportinfo. The vis_exported
 				 * for home would be 1, and vis_exported for
@@ -383,6 +386,8 @@ less_visible(struct exportinfo *exi, struct exp_visible *vis_head)
 						prev->vis_next = next;
 
 					VN_RELE(vp2->vis_vp);
+					srv_secinfo_list_free(vp2->vis_secinfo,
+					    vp2->vis_seccnt);
 					kmem_free(vp2, sizeof (*vp1));
 				} else {
 					/*
@@ -566,6 +571,8 @@ treeclimb_export(struct exportinfo *exip)
 		visp->vis_ino = va.va_nodeid;
 		visp->vis_count = 1;
 		visp->vis_exported = exportdir;
+		visp->vis_secinfo = NULL;
+		visp->vis_seccnt = 0;
 		visp->vis_next = vis_head;
 		vis_head = visp;
 
@@ -660,7 +667,7 @@ treeclimb_unexport(struct exportinfo *exip)
 				 * the parent export.
 				 */
 				error = export_unlink(&vp->v_vfsp->vfs_fsid,
-						&fid, vp, NULL);
+				    &fid, vp, NULL);
 				if (error)
 					break;
 
@@ -694,6 +701,8 @@ treeclimb_unexport(struct exportinfo *exip)
 		visp->vis_ino = 0;
 		visp->vis_count = 1;
 		visp->vis_exported = exportdir;
+		visp->vis_secinfo = NULL;
+		visp->vis_seccnt = 0;
 		visp->vis_next = vis_head;
 		vis_head = visp;
 

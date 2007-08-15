@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,6 +317,10 @@ struct exportinfo {
 #endif /* VOLATILE_FH_TEST */
 };
 
+typedef struct exportinfo exportinfo_t;
+typedef struct exportdata exportdata_t;
+typedef struct secinfo secinfo_t;
+
 /*
  * exp_visible is a visible list per filesystem. It is for filesystems
  * that may need a limited view of its contents. A pseudo export and
@@ -343,7 +347,10 @@ struct exp_visible {
 	int			vis_count;
 	int			vis_exported;
 	struct exp_visible	*vis_next;
+	struct secinfo		*vis_secinfo;
+	int			vis_seccnt;
 };
+typedef struct exp_visible exp_visible_t;
 
 #define	PSEUDO(exi)	((exi)->exi_export.ex_flags & EX_PSEUDO)
 
@@ -418,6 +425,7 @@ extern int	nfs4_vget_pseudo(struct exportinfo *, vnode_t **, fid_t *);
  * information.
  */
 extern void	srv_secinfo_exp2pseu(struct exportdata *, struct exportdata *);
+extern void	srv_secinfo_list_free(struct secinfo *, int);
 
 /*
  * "public" and default (root) location for public filehandle

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include <sys/cmn_err.h>
 #include <sys/acl.h>
 #include <sys/utsname.h>
+#include <sys/sdt.h>
 #include <netinet/in.h>
 
 #include <rpc/types.h>
@@ -69,17 +70,25 @@
 struct exportinfo *exptable[EXPTABLESIZE];
 
 static int	unexport(fsid_t *, fid_t *, vnode_t *);
-static void	exportfree(struct exportinfo *);
-static int	loadindex(struct exportdata *);
+static void	exportfree(exportinfo_t *);
+static int	loadindex(exportdata_t *);
 
-extern void	nfsauth_cache_free(struct exportinfo *);
+extern void	nfsauth_cache_free(exportinfo_t *);
 extern int	sec_svc_loadrootnames(int, int, caddr_t **, model_t);
 extern void	sec_svc_freerootnames(int, int, caddr_t *);
 
+static int build_seclist_nodups(exportdata_t *, secinfo_t *, int);
+static void srv_secinfo_add(secinfo_t **, int *, secinfo_t *, int, int);
+static void srv_secinfo_remove(secinfo_t **, int *, secinfo_t *, int);
+static void pseudo_secinfo_add(exportinfo_t *, exp_visible_t *, exportinfo_t *);
+static void pseudo_secinfo_remove(exportinfo_t *, exp_visible_t *);
+static void free_pseudoanc(struct exp_visible *);
+static int srv_secinfo_treeclimb(exportinfo_t *, secinfo_t *, int, int);
+
 #ifdef VOLATILE_FH_TEST
-static struct ex_vol_rename *find_volrnm_fh(struct exportinfo *, nfs_fh4 *);
-static uint32_t find_volrnm_fh_id(struct exportinfo *, nfs_fh4 *);
-static void free_volrnm_list(struct exportinfo *);
+static struct ex_vol_rename *find_volrnm_fh(exportinfo_t *, nfs_fh4 *);
+static uint32_t find_volrnm_fh_id(exportinfo_t *, nfs_fh4 *);
+static void free_volrnm_list(exportinfo_t *);
 #endif /* VOLATILE_FH_TEST */
 
 /*
@@ -97,6 +106,14 @@ struct exportinfo *exi_public, *exi_root;
 fid_t exi_rootfid;	/* for checking the default public file handle */
 
 fhandle_t nullfh2;	/* for comparing V2 filehandles */
+
+/*
+ * macro for static dtrace probes to trace server namespace ref count mods.
+ */
+#define	SECREF_TRACE(seclist, tag, flav, aftcnt) \
+	DTRACE_PROBE4(nfss__d__nmspc__secref, struct secinfo *, (seclist), \
+		char *, (tag), int, (int)(flav), int, (int)(aftcnt))
+
 
 #define	exptablehash(fsid, fid) (nfs_fhhash((fsid), (fid)) & (EXPTABLESIZE - 1))
 
@@ -165,16 +182,16 @@ srv_secinfo_entry_free(struct secinfo *secp)
 {
 	if (secp->s_rootcnt > 0 && secp->s_rootnames != NULL) {
 		sec_svc_freerootnames(secp->s_secinfo.sc_rpcnum,
-				secp->s_rootcnt, secp->s_rootnames);
+		    secp->s_rootcnt, secp->s_rootnames);
 		secp->s_rootcnt = 0;
 	}
 
 	if ((secp->s_secinfo.sc_rpcnum == RPCSEC_GSS) &&
 	    (secp->s_secinfo.sc_gss_mech_type)) {
 		kmem_free(secp->s_secinfo.sc_gss_mech_type->elements,
-			secp->s_secinfo.sc_gss_mech_type->length);
+		    secp->s_secinfo.sc_gss_mech_type->length);
 		kmem_free(secp->s_secinfo.sc_gss_mech_type,
-			sizeof (rpc_gss_OID_desc));
+		    sizeof (rpc_gss_OID_desc));
 		secp->s_secinfo.sc_gss_mech_type = NULL;
 	}
 
@@ -219,21 +236,21 @@ srv_secinfo_copy(struct secinfo *from, struct secinfo *to)
 	if (from->s_secinfo.sc_rpcnum == RPCSEC_GSS) {
 		to->s_secinfo.sc_service = from->s_secinfo.sc_service;
 		bcopy(from->s_secinfo.sc_name, to->s_secinfo.sc_name,
-			strlen(from->s_secinfo.sc_name));
+		    strlen(from->s_secinfo.sc_name));
 		bcopy(from->s_secinfo.sc_gss_mech, to->s_secinfo.sc_gss_mech,
-			strlen(from->s_secinfo.sc_gss_mech));
+		    strlen(from->s_secinfo.sc_gss_mech));
 
 		/* copy mechanism oid */
 		to->s_secinfo.sc_gss_mech_type =
-			kmem_alloc(sizeof (rpc_gss_OID_desc), KM_SLEEP);
+		    kmem_alloc(sizeof (rpc_gss_OID_desc), KM_SLEEP);
 		to->s_secinfo.sc_gss_mech_type->length =
-			from->s_secinfo.sc_gss_mech_type->length;
+		    from->s_secinfo.sc_gss_mech_type->length;
 		to->s_secinfo.sc_gss_mech_type->elements =
-			kmem_alloc(from->s_secinfo.sc_gss_mech_type->length,
-					KM_SLEEP);
+		    kmem_alloc(from->s_secinfo.sc_gss_mech_type->length,
+		    KM_SLEEP);
 		bcopy(from->s_secinfo.sc_gss_mech_type->elements,
-			to->s_secinfo.sc_gss_mech_type->elements,
-			from->s_secinfo.sc_gss_mech_type->length);
+		    to->s_secinfo.sc_gss_mech_type->elements,
+		    from->s_secinfo.sc_gss_mech_type->length);
 	}
 
 	to->s_refcnt = from->s_refcnt;
@@ -242,31 +259,43 @@ srv_secinfo_copy(struct secinfo *from, struct secinfo *to)
 }
 
 /*
- * Create an secinfo array without duplicates to facilitate
- * flavor merging.
+ * Create a secinfo array without duplicates.  The condensed
+ * flavor list is used to propagate flavor ref counts  to an
+ * export's ancestor pseudonodes.
  */
-int32_t
-build_seclist_nodups(struct exportdata *data, struct secinfo *nsec)
+static int
+build_seclist_nodups(exportdata_t *exd, secinfo_t *nodups, int exponly)
 {
-	int	i, j, dup;	/* counters */
-	int	tcnt;		/* total sec count */
-	int32_t ncnt;
+	int ccnt, c;
+	int ncnt, n;
+	struct secinfo *cursec;
 
-	tcnt = data->ex_seccnt;
+	ncnt = 0;
+	ccnt = exd->ex_seccnt;
+	cursec = exd->ex_secinfo;
 
-	/* Populate exportdata structure only with non duplicate flavors */
-	for (i = 0, ncnt = 0; i < tcnt; i++) {
-		/* see if previous dup copied */
-		for (j = 0, dup = 0; j < i; j++) {
-			if (data->ex_secinfo[i].s_secinfo.sc_nfsnum ==
-			    data->ex_secinfo[j].s_secinfo.sc_nfsnum) {
-				dup = 1;
+	for (c = 0; c < ccnt; c++) {
+
+		if (exponly && ! SEC_REF_EXPORTED(&cursec[c]))
+			continue;
+
+		for (n = 0; n < ncnt; n++) {
+			if (nodups[n].s_secinfo.sc_nfsnum ==
+			    cursec[c].s_secinfo.sc_nfsnum)
 				break;
-			}
 		}
-		if (dup == 0) {
-			bcopy(&data->ex_secinfo[i], &nsec[ncnt],
-				sizeof (struct secinfo));
+
+		/*
+		 * The structure copy below also copys ptrs embedded
+		 * within struct secinfo.  The ptrs are copied but
+		 * they are never freed from the nodups array.  If
+		 * an ancestor's secinfo array doesn't contain one
+		 * of the nodups flavors, then the entry is properly
+		 * copied into the ancestor's secinfo array.
+		 * (see srv_secinfo_copy)
+		 */
+		if (n == ncnt) {
+			nodups[n] = cursec[c];
 			ncnt++;
 		}
 	}
@@ -274,42 +303,41 @@ build_seclist_nodups(struct exportdata *data, struct secinfo *nsec)
 }
 
 /*
- * Add the new security flavors from newdata to the current list, curdata.
- * Upon return, curdata has the newly merged secinfo list.
+ * Add the new security flavors from newdata to the current list, pcursec.
+ * Upon return, *pcursec has the newly merged secinfo list.
  *
- * There should be at least 1 secinfo entry in newdata.
+ * There should be at least 1 secinfo entry in newsec.
  *
  * This routine is used under the protection of exported_lock (RW_WRITER).
  */
-void
-srv_secinfo_add(struct exportdata *curdata, struct secinfo *newsecinfo,
-		int ncnt)
+static void
+srv_secinfo_add(secinfo_t **pcursec, int *pcurcnt, secinfo_t *newsec,
+    int newcnt, int is_pseudo)
 {
 	int ccnt, c;		/* sec count in current data - curdata */
-	int n;			/* sec count in new data - newsecinfo */
-	int tcnt, mcnt;		/* total sec count after merge */
+	int n;			/* index for newsec  - newsecinfo */
+	int tcnt;		/* total sec count after merge */
+	int mcnt;		/* total sec count after merge */
 	struct secinfo *msec;	/* merged secinfo list */
+	struct secinfo *cursec;
 
-	ccnt = curdata->ex_seccnt;
+	cursec = *pcursec;
+	ccnt = *pcurcnt;
 
-	ASSERT(ncnt > 0);
-	tcnt = ccnt + ncnt;
+	ASSERT(newcnt > 0);
+	tcnt = ccnt + newcnt;
 
-	for (n = 0; n < ncnt; n++) {
+	for (n = 0; n < newcnt; n++) {
 		for (c = 0; c < ccnt; c++) {
-		    if (newsecinfo[n].s_secinfo.sc_nfsnum ==
-			curdata->ex_secinfo[c].s_secinfo.sc_nfsnum) {
-
-			/*
-			 * add the reference count of the newsecinfo
-			 * to the curdata for this nfs flavor.
-			 */
-			curdata->ex_secinfo[c].s_refcnt +=
-				newsecinfo[n].s_refcnt;
-
-			tcnt--;
-			break;
-		    }
+			if (newsec[n].s_secinfo.sc_nfsnum ==
+			    cursec[c].s_secinfo.sc_nfsnum) {
+				cursec[c].s_refcnt++;
+				SECREF_TRACE(cursec, "add_ref",
+				    cursec[c].s_secinfo.sc_nfsnum,
+				    cursec[c].s_refcnt);
+				tcnt--;
+				break;
+			}
 		}
 	}
 
@@ -319,65 +347,73 @@ srv_secinfo_add(struct exportdata *curdata, struct secinfo *newsecinfo,
 	msec = kmem_zalloc(tcnt * sizeof (struct secinfo), KM_SLEEP);
 
 	/* move current secinfo list data to the new list */
-	for (c = 0; c < ccnt; c++) {
-
-		bcopy(&curdata->ex_secinfo[c], &msec[c],
-			sizeof (struct secinfo));
-	}
+	for (c = 0; c < ccnt; c++)
+		msec[c] = cursec[c];
 
 	/* Add the flavor that's not in the current data */
 	mcnt = ccnt;
-	for (n = 0; n < ncnt; n++) {
+	for (n = 0; n < newcnt; n++) {
 		for (c = 0; c < ccnt; c++) {
-		    if (newsecinfo[n].s_secinfo.sc_nfsnum ==
-			curdata->ex_secinfo[c].s_secinfo.sc_nfsnum)
+			if (newsec[n].s_secinfo.sc_nfsnum ==
+			    cursec[c].s_secinfo.sc_nfsnum)
 				break;
 		}
 
 		/* This is the one. Add it. */
 		if (c == ccnt) {
-		    srv_secinfo_copy(&newsecinfo[n], &msec[mcnt]);
-		    if (curdata->ex_flags & EX_PSEUDO)
-			msec[mcnt].s_flags = M_RO;
-		    mcnt++;
+			srv_secinfo_copy(&newsec[n], &msec[mcnt]);
+
+			if (is_pseudo)
+				msec[mcnt].s_flags = M_RO;
+
+			SECREF_TRACE(msec, "new_ref",
+			    msec[mcnt].s_secinfo.sc_nfsnum,
+			    msec[mcnt].s_refcnt);
+			mcnt++;
 		}
 	}
 
 	ASSERT(mcnt == tcnt);
+
 	/*
-	 * Done. Update curdata.
-	 * Free up the existing secinfo list in curdata and
-	 * set the new value.
+	 * Done. Update curdata. Free the old secinfo list in
+	 * curdata and return the new sec array info
 	 */
 	if (ccnt > 0)
-		kmem_free(curdata->ex_secinfo, ccnt * sizeof (struct secinfo));
-	curdata->ex_seccnt = tcnt;
-	curdata->ex_secinfo = msec;
+		kmem_free(cursec, ccnt * sizeof (struct secinfo));
+	*pcurcnt = tcnt;
+	*pcursec = msec;
 }
 
 /*
  * For NFS V4.
  * Remove the security data of the unexported node from its ancestors.
- * Assume there is at least one flavor entry in the current data, curdata.
+ * Assume there is at least one flavor entry in the current sec list
+ * (pcursec).
  *
  * This routine is used under the protection of exported_lock (RW_WRITER).
+ *
+ * Every element of remsec is an explicitly exported flavor.  If
+ * srv_secinfo_remove() is called fom an exportfs error path, then
+ * the flavor list was derived from the user's share cmdline,
+ * and all flavors are explicit.  If it was called from the unshare path,
+ * build_seclist_nodups() was called with the exponly flag.
  */
-void
-srv_secinfo_remove(struct exportdata *curdata,
-			struct secinfo *remsecinfo, int rcnt)
+static void
+srv_secinfo_remove(secinfo_t **pcursec, int *pcurcnt, secinfo_t *remsec,
+    int remcnt)
 {
 	int ccnt, c;		/* sec count in current data - curdata */
 	int r;			/* sec count in removal data - remsecinfo */
 	int tcnt, mcnt;		/* total sec count after removing */
 	struct secinfo *msec;	/* final secinfo list after removing */
+	struct secinfo *cursec;
 
-	ASSERT(curdata->ex_seccnt > 0);
-	ccnt = curdata->ex_seccnt;
+	cursec = *pcursec;
+	ccnt = *pcurcnt;
 	tcnt = ccnt;
 
-	for (r = 0; r < rcnt; r++) {
-
-	    if (SEC_REF_EXPORTED(&remsecinfo[r])) {
+	for (r = 0; r < remcnt; r++) {
 		/*
 		 * Remove a flavor only if the flavor was a shared flavor for
 		 * the remsecinfo exported node that's being unshared.
@@ -385,25 +421,28 @@ srv_secinfo_remove(struct exportdata *curdata,
 		 * need to keep it.
 		 */
 		for (c = 0; c < ccnt; c++) {
-		    if (remsecinfo[r].s_secinfo.sc_nfsnum ==
-			curdata->ex_secinfo[c].s_secinfo.sc_nfsnum) {
+			if (remsec[r].s_secinfo.sc_nfsnum ==
+			    cursec[c].s_secinfo.sc_nfsnum) {
 
-			/*
-			 * Decrement secinfo reference count by 1.
-			 * If this entry is invalid after decrementing
-			 * the count (i.e. count < 1), this entry will
-			 * be removed.
-			 */
-			curdata->ex_secinfo[c].s_refcnt--;
-			ASSERT(curdata->ex_secinfo[c].s_refcnt >= 0);
+				/*
+				 * Decrement secinfo reference count by 1.
+				 * If this entry is invalid after decrementing
+				 * the count (i.e. count < 1), this entry will
+				 * be removed.
+				 */
+				cursec[c].s_refcnt--;
 
-			if (SEC_REF_INVALID(&curdata->ex_secinfo[c]))
-				tcnt--;
+				SECREF_TRACE(cursec, "del_ref",
+				    cursec[c].s_secinfo.sc_nfsnum,
+				    cursec[c].s_refcnt);
 
-			break;
-		    }
+				ASSERT(cursec[c].s_refcnt >= 0);
+
+				if (SEC_REF_INVALID(&cursec[c]))
+					tcnt--;
+				break;
+			}
 		}
-	    }
 	}
 
 	ASSERT(tcnt >= 0);
@@ -411,9 +450,9 @@ srv_secinfo_remove(struct exportdata *curdata,
 		return; /* no change; no flavors to remove */
 
 	if (tcnt == 0) {
-		srv_secinfo_list_free(curdata->ex_secinfo, ccnt);
-		curdata->ex_seccnt = 0;
-		curdata->ex_secinfo = NULL;
+		srv_secinfo_list_free(cursec, ccnt);
+		*pcurcnt = 0;
+		*pcursec = NULL;
 		return;
 	}
 
@@ -422,12 +461,10 @@ srv_secinfo_remove(struct exportdata *curdata,
 	/* walk thru the given secinfo list to remove the flavors */
 	mcnt = 0;
 	for (c = 0; c < ccnt; c++) {
-
-		if (SEC_REF_INVALID(&curdata->ex_secinfo[c])) {
-			srv_secinfo_entry_free(&curdata->ex_secinfo[c]);
+		if (SEC_REF_INVALID(&cursec[c])) {
+			srv_secinfo_entry_free(&cursec[c]);
 		} else {
-			bcopy(&curdata->ex_secinfo[c], &msec[mcnt],
-				sizeof (struct secinfo));
+			msec[mcnt] = cursec[c];
 			mcnt++;
 		}
 	}
@@ -439,25 +476,158 @@ srv_secinfo_remove(struct exportdata *curdata,
 	 * within the list have either been moved to msec or freed
 	 * if it's invalid.
 	 */
-	kmem_free(curdata->ex_secinfo, ccnt * sizeof (struct secinfo));
-	curdata->ex_seccnt = tcnt;
-	curdata->ex_secinfo = msec;
-
+	kmem_free(*pcursec, ccnt * sizeof (struct secinfo));
+	*pcursec = msec;
+	*pcurcnt = tcnt;
 }
 
+
 /*
- * Upon re-sharing an export node, if there is more than 1 export reference
- * to an old flavor (i.e. some of its children shared with this flavor), this
- * flavor information needs to be transfered to the new shared node.
+ * pseudo_secinfo_add
+ *	ancexi: ancestor exportinfo
+ *	ancpseudo: linked list of ancestor pseudnodes
+ *	newexi: new export that needs to inherit implicitly allowed flavors
  *
- * Expect at least 1 secinfo entry in the old shared node - olddata.
- * Expect both curdata and olddata are not pseudo nodes.
+ * Increment secflavor ref counts in ancestor pseudonodes.  If newexi
+ * is non-NULL, then also set newexi's implicitly allowed flavors by
+ * copy the flavors in its pseudonode.
+ *
+ * There's no work to do if either the ancexi's pseudonode list
+ * or ancpseudo is empty.
+ *
+ * ancexi->exi_visible could be NULL because sec flavor refs are
+ * propagated after the namespace has been changed for the new
+ * share/unshare.  In the unshare case, the pseudnodes leading to
+ * this export have already been dereferenced and possibly destroyed.
+ * If the parent export had no other shared descendants, then its
+ * pseudonode list would be empty.
+ */
+static void
+pseudo_secinfo_add(exportinfo_t *ancexi, exp_visible_t *ancpseudo,
+    exportinfo_t *newexi)
+{
+	exp_visible_t	*av, *v;
+	fid_t		*nxfid = NULL;
+	secinfo_t	**pnewsec = NULL;
+	int		*pnewcnt = NULL;
+	int		is_pseudo;
+
+
+	if (ancexi->exi_visible == NULL || ancpseudo == NULL)
+		return;
+
+	is_pseudo = PSEUDO(ancexi);
+
+	/*
+	 * Prepare to set newexi's implicitly allowed flavors by
+	 * inheriting flavors from newexi's pseudnode.
+	 *	nxfid  : used to find the newexi's pseudonode
+	 *	pnewsec: newexi's secinfo array
+	 *	pnewcnt: newexi's secinfo count
+	 */
+	if (newexi) {
+		nxfid = &newexi->exi_fid;
+		pnewsec = &newexi->exi_export.ex_secinfo;
+		pnewcnt = &newexi->exi_export.ex_seccnt;
+	}
+
+	/*
+	 * find the pseudonodes which correspond to the ones in ancvis.
+	 */
+	for (av = ancpseudo; av != NULL; av = av->vis_next) {
+		for (v = ancexi->exi_visible; v != NULL; v = v->vis_next) {
+
+			if (EQFID(&av->vis_fid, &v->vis_fid)) {
+				/*
+				 * It's a match.  First check to see if newexi
+				 * needs to get implicitly allowed flavors from
+				 * its pseudonode.
+				 *
+				 * ancpseudo is built [by srv_secinfo_treeclimb]
+				 * such that vis_exported is only set for the
+				 * pseudonode corresponding to newexi's root.
+				 */
+				if (nxfid && av->vis_exported &&
+				    v->vis_seccnt > 0) {
+
+					srv_secinfo_add(pnewsec, pnewcnt,
+					    v->vis_secinfo, v->vis_seccnt,
+					    is_pseudo);
+
+					nxfid = NULL;
+				}
+
+				/*
+				 * Apply flavor refs for the new export to
+				 * each of the parexi's pseudonodes
+				 */
+				srv_secinfo_add(&v->vis_secinfo, &v->vis_seccnt,
+				    av->vis_secinfo, av->vis_seccnt, is_pseudo);
+
+				break;
+			}
+		}
+	}
+}
+
+
+/*
+ * pseudo_secinfo_remove
+ *	ancexi: ancestor exportinfo
+ *	ancpseudo: linked list of ancestor pseudnodes
+ *
+ * Decrement secflavor ref counts in ancestor pseudonodes.
+ */
+static void
+pseudo_secinfo_remove(exportinfo_t *ancexi, exp_visible_t *ancpseudo)
+{
+	exp_visible_t	*av, *v;
+
+	if (ancexi->exi_visible == NULL || ancpseudo == NULL)
+		return;
+
+	/*
+	 * find the pseudonodes which correspond to the ones in ancvis.
+	 */
+	for (av = ancpseudo; av != NULL; av = av->vis_next) {
+		for (v = ancexi->exi_visible; v != NULL; v = v->vis_next) {
+			if (EQFID(&av->vis_fid, &v->vis_fid)) {
+
+				srv_secinfo_remove(&v->vis_secinfo,
+				    &v->vis_seccnt, av->vis_secinfo,
+				    av->vis_seccnt);
+
+				break;
+			}
+		}
+	}
+}
+
+
+
+/*
+ * For the reshare case, sec flavor accounting happens in 3 steps:
+ * 1) propagate addition of new flavor refs up the ancestor tree
+ * 2) transfer flavor refs of descendants to new/reshared exportdata
+ * 3) propagate removal of old flavor refs up the ancestor tree
+ *
+ * srv_secinfo_exp2exp() implements step 2 of a reshare.  At this point,
+ * the new flavor list has already been propagated up through the
+ * ancestor tree via srv_secinfo_treeclimb().
+ *
+ * If there is more than 1 export reference to an old flavor (i.e. some
+ * of its children shared with this flavor), this flavor information
+ * needs to be transfered to the new exportdata struct.  A flavor in
+ * the old exportdata has descendant refs when s_refcnt > 1.
+ *
+ * Transferring descendant flavor refcnts happens in 2 passes:
+ * a) flavors used before (oldsecinfo) and after (curdata->ex_secinfo) reshare
+ * b) flavors used before but not after reshare
  *
  * This routine is used under the protection of exported_lock (RW_WRITER).
  */
 void
-srv_secinfo_exp2exp(struct exportdata *curdata, struct secinfo *oldsecinfo,
-			int ocnt)
+srv_secinfo_exp2exp(exportdata_t *curdata, secinfo_t *oldsecinfo, int ocnt)
 {
 	int ccnt, c;		/* sec count in current data - curdata */
 	int o;			/* sec count in old data - oldsecinfo */
@@ -470,85 +640,104 @@ srv_secinfo_exp2exp(struct exportdata *curdata, struct secinfo *oldsecinfo,
 	ASSERT(!(curdata->ex_flags & EX_PSEUDO));
 
 	/*
-	 * If the oldsecinfo has flavors with more than 1 reference count,
-	 * transfer the information to the curdata.
+	 * If the oldsecinfo has flavors with more than 1 reference count
+	 * and the flavor is specified in the reshare, transfer the flavor
+	 * refs to the new seclist (curdata.ex_secinfo).
 	 */
 	tcnt = ccnt + ocnt;
 
 	for (o = 0; o < ocnt; o++) {
 
-	    if (SEC_REF_SELF(&oldsecinfo[o])) {
-		tcnt--;
-	    } else {
-		for (c = 0; c < ccnt; c++) {
-		    if (oldsecinfo[o].s_secinfo.sc_nfsnum ==
-			curdata->ex_secinfo[c].s_secinfo.sc_nfsnum) {
-
-			/* add old reference to the current secinfo count */
-			curdata->ex_secinfo[c].s_refcnt +=
-				oldsecinfo[o].s_refcnt;
-
-			/* delete the old export flavor reference */
-			if (SEC_REF_EXPORTED(&oldsecinfo[o]))
-				curdata->ex_secinfo[c].s_refcnt--;
-
-			ASSERT(curdata->ex_secinfo[c].s_refcnt >= 0);
-
+		if (SEC_REF_SELF(&oldsecinfo[o])) {
 			tcnt--;
-			break;
-		    }
+			continue;
 		}
-	    }
+
+		for (c = 0; c < ccnt; c++) {
+			if (oldsecinfo[o].s_secinfo.sc_nfsnum ==
+			    curdata->ex_secinfo[c].s_secinfo.sc_nfsnum) {
+
+				/*
+				 * add old reference to the current
+				 * secinfo count
+				 */
+				curdata->ex_secinfo[c].s_refcnt +=
+				    oldsecinfo[o].s_refcnt;
+
+				/*
+				 * Delete the old export flavor
+				 * reference.  The initial reference
+				 * was created during srv_secinfo_add,
+				 * and the count is decremented below
+				 * to account for the initial reference.
+				 */
+				if (SEC_REF_EXPORTED(&oldsecinfo[o]))
+					curdata->ex_secinfo[c].s_refcnt--;
+
+				SECREF_TRACE(curdata->ex_path,
+				    "reshare_xfer_common_child_refs",
+				    curdata->ex_secinfo[c].s_secinfo.sc_nfsnum,
+				    curdata->ex_secinfo[c].s_refcnt);
+
+				ASSERT(curdata->ex_secinfo[c].s_refcnt >= 0);
+
+				tcnt--;
+				break;
+			}
+		}
 	}
 
 	if (tcnt == ccnt)
 		return; /* no more transfer to do */
 
 	/*
-	 * oldsecinfo has flavors refered by its children that are not
-	 * in the current (new) export flavor list. Add these flavors.
+	 * oldsecinfo has flavors referenced by its children that are not
+	 * in the current (new) export flavor list.  Add these flavors.
 	 */
 	msec = kmem_zalloc(tcnt * sizeof (struct secinfo), KM_SLEEP);
 
 	/* move current secinfo list data to the new list */
-	for (c = 0; c < ccnt; c++) {
-		bcopy(&curdata->ex_secinfo[c], &msec[c],
-			sizeof (struct secinfo));
-	}
+	for (c = 0; c < ccnt; c++)
+		msec[c] = curdata->ex_secinfo[c];
 
 	/*
 	 * Add the flavor that's not in the new export, but still
-	 * referred by its children.
+	 * referenced by its children.
 	 */
 	mcnt = ccnt;
 	for (o = 0; o < ocnt; o++) {
-	    if (! SEC_REF_SELF(&oldsecinfo[o])) {
-		for (c = 0; c < ccnt; c++) {
-		    if (oldsecinfo[o].s_secinfo.sc_nfsnum ==
-			curdata->ex_secinfo[c].s_secinfo.sc_nfsnum)
-				break;
-		}
+		if (! SEC_REF_SELF(&oldsecinfo[o])) {
+			for (c = 0; c < ccnt; c++) {
+				if (oldsecinfo[o].s_secinfo.sc_nfsnum ==
+				    curdata->ex_secinfo[c].s_secinfo.sc_nfsnum)
+					break;
+			}
 
-		/*
-		 * This is the one. Add it. Decrement the reference count
-		 * by 1 if the flavor is an explicitly shared flavor for
-		 * the oldsecinfo export node.
-		 */
-		if (c == ccnt) {
-		    srv_secinfo_copy(&oldsecinfo[o], &msec[mcnt]);
-		    if (SEC_REF_EXPORTED(&oldsecinfo[o]))
-			msec[mcnt].s_refcnt--;
-		    ASSERT(msec[mcnt].s_refcnt >= 0);
-		    mcnt++;
+			/*
+			 * This is the one. Add it. Decrement the ref count
+			 * by 1 if the flavor is an explicitly shared flavor
+			 * for the oldsecinfo export node.
+			 */
+			if (c == ccnt) {
+				srv_secinfo_copy(&oldsecinfo[o], &msec[mcnt]);
+				if (SEC_REF_EXPORTED(&oldsecinfo[o]))
+					msec[mcnt].s_refcnt--;
+
+				SECREF_TRACE(curdata,
+				    "reshare_xfer_implicit_child_refs",
+				    msec[mcnt].s_secinfo.sc_nfsnum,
+				    msec[mcnt].s_refcnt);
+
+				ASSERT(msec[mcnt].s_refcnt >= 0);
+				mcnt++;
+			}
 		}
-	    }
 	}
 
 	ASSERT(mcnt == tcnt);
 	/*
-	 * Done. Update curdata.
-	 * Free up the existing secinfo list in curdata and
-	 * set the new value.
+	 * Done. Update curdata, free the existing secinfo list in
+	 * curdata and set the new value.
 	 */
 	if (ccnt > 0)
 		kmem_free(curdata->ex_secinfo, ccnt * sizeof (struct secinfo));
@@ -565,7 +754,7 @@ srv_secinfo_exp2exp(struct exportdata *curdata, struct secinfo *oldsecinfo,
  * This routine is used under the protection of exported_lock (RW_WRITER).
  */
 void
-srv_secinfo_exp2pseu(struct exportdata *curdata, struct exportdata *olddata)
+srv_secinfo_exp2pseu(exportdata_t *curdata, exportdata_t *olddata)
 {
 	int ocnt, o;		/* sec count in transfer data - trandata */
 	int tcnt, mcnt;		/* total sec count after transfer */
@@ -583,8 +772,8 @@ srv_secinfo_exp2pseu(struct exportdata *curdata, struct exportdata *olddata)
 	tcnt = ocnt;
 
 	for (o = 0; o < ocnt; o++) {
-	    if (SEC_REF_SELF(&olddata->ex_secinfo[o]))
-		tcnt--;
+		if (SEC_REF_SELF(&olddata->ex_secinfo[o]))
+			tcnt--;
 	}
 
 	if (tcnt == 0)
@@ -594,19 +783,25 @@ srv_secinfo_exp2pseu(struct exportdata *curdata, struct exportdata *olddata)
 
 	mcnt = 0;
 	for (o = 0; o < ocnt; o++) {
-	    if (! SEC_REF_SELF(&olddata->ex_secinfo[o])) {
+		if (! SEC_REF_SELF(&olddata->ex_secinfo[o])) {
 
-		/*
-		 * Decrement the reference count by 1 if the flavor is
-		 * an explicitly shared flavor for the olddata export node.
-		 */
-		srv_secinfo_copy(&olddata->ex_secinfo[o], &msec[mcnt]);
-		msec[mcnt].s_flags = M_RO; /* for a pseudo node */
-		if (SEC_REF_EXPORTED(&olddata->ex_secinfo[o]))
-			msec[mcnt].s_refcnt--;
-		ASSERT(msec[mcnt].s_refcnt >= 0);
-		mcnt++;
-	    }
+			/*
+			 * Decrement the reference count by 1 if the flavor is
+			 * an explicitly shared flavor for the olddata export
+			 * node.
+			 */
+			srv_secinfo_copy(&olddata->ex_secinfo[o], &msec[mcnt]);
+			msec[mcnt].s_flags = M_RO;
+			if (SEC_REF_EXPORTED(&olddata->ex_secinfo[o]))
+				msec[mcnt].s_refcnt--;
+
+			SECREF_TRACE(curdata, "unshare_morph_pseudo",
+			    msec[mcnt].s_secinfo.sc_nfsnum,
+			    msec[mcnt].s_refcnt);
+
+			ASSERT(msec[mcnt].s_refcnt >= 0);
+			mcnt++;
+		}
 	}
 
 	ASSERT(mcnt == tcnt);
@@ -619,32 +814,41 @@ srv_secinfo_exp2pseu(struct exportdata *curdata, struct exportdata *olddata)
 	curdata->ex_secinfo = msec;
 }
 
+
 /*
  * For NFS V4.
  * Add or remove the newly exported or unexported security flavors of the
  * given exportinfo from its ancestors upto the system root.
  */
 int
-srv_secinfo_treeclimb(struct exportinfo *exip, bool_t isadd,
-			struct secinfo *exsecinfo, int exseccnt)
+srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 {
 	vnode_t *dvp, *vp;
 	fid_t fid;
 	int error = 0;
-	int exportdir;
-	struct exportinfo *exi;
+	int exportdir, set_implicit_flav;
+	struct exportinfo *exi = NULL;
+	exp_visible_t *anc_head = NULL, *anc;
 
 	ASSERT(RW_WRITE_HELD(&exported_lock));
 
-	if (exseccnt == 0)
+	if (seccnt == 0)
 		return (0);
 
 	vp = exip->exi_vp;
 	VN_HOLD(vp);
 	exportdir = 1;
 
-	for (;;) {
+	/*
+	 * If flavors are being added and the new export root isn't
+	 * also VROOT, its implicitly allowed flavors are inherited from
+	 * from its pseudonode.
+	 */
+	set_implicit_flav = (isadd && !(vp->v_flag & VROOT)) ? 1 : 0;
 
+	anc_head = NULL;
+	anc = NULL;
+	for (;;) {
 		bzero(&fid, sizeof (fid));
 		fid.fid_len = MAXFIDSZ;
 		error = vop_fid_pseudo(vp, &fid);
@@ -656,31 +860,42 @@ srv_secinfo_treeclimb(struct exportinfo *exip, bool_t isadd,
 			exi = checkexport4(&vp->v_vfsp->vfs_fsid, &fid, vp);
 
 			if (exi != NULL) {
+				secinfo_t **pxsec = &exi->exi_export.ex_secinfo;
+				int *pxcnt = &exi->exi_export.ex_seccnt;
 
-			    if (isadd) {
-				/*
-				 * Add the new security flavors to the
-				 * export entry of the current directory.
-				 */
-				srv_secinfo_add(&exi->exi_export, exsecinfo,
-						exseccnt);
-			    } else {
-				/*
-				 * Remove the unexported secinfo entries.
-				 */
-				srv_secinfo_remove(&exi->exi_export, exsecinfo,
-						exseccnt);
-			    }
+				if (isadd)
+					srv_secinfo_add(pxsec, pxcnt, sec,
+					    seccnt, PSEUDO(exi));
+				else
+					srv_secinfo_remove(pxsec, pxcnt, sec,
+					    seccnt);
 			}
 		}
 
 		/*
-		 * If at the root of the filesystem, need
-		 * to traverse across the mountpoint
-		 * and continue the climb on the mounted-on
-		 * filesystem.
+		 * If we're at the root of the filesystem:
+		 *   - manage pseudnode sec flavors
+		 *   - traverse mountpoint and continue treeclimb from the stub
 		 */
 		if (vp->v_flag & VROOT) {
+
+			if (exi != NULL) {
+				if (isadd) {
+					if (set_implicit_flav) {
+						pseudo_secinfo_add(exi,
+						    anc_head, exip);
+						set_implicit_flav = 0;
+					} else
+						pseudo_secinfo_add(exi,
+						    anc_head, NULL);
+				} else
+					pseudo_secinfo_remove(exi, anc_head);
+			}
+
+			if (anc_head) {
+				free_pseudoanc(anc_head);
+				anc_head = NULL;
+			}
 
 			if (VN_CMP(vp, rootdir)) {
 				/* at system root */
@@ -691,6 +906,24 @@ srv_secinfo_treeclimb(struct exportinfo *exip, bool_t isadd,
 			exportdir = 0;
 			continue;
 		}
+
+		/*
+		 * Build a temporary list of ancestor pseudonodes leading to
+		 * the ancestor VROOT export.  vis_exported identifies the
+		 * pseudonode that corresponds to root of export being
+		 * shared/unshared.
+		 */
+		anc = kmem_alloc(sizeof (exp_visible_t), KM_SLEEP);
+		anc->vis_next = anc_head;
+		VN_HOLD(vp);
+		anc->vis_vp = vp;
+		anc->vis_fid = fid;
+		anc->vis_ino = 0;
+		anc->vis_count = 1;
+		anc->vis_seccnt = seccnt;
+		anc->vis_secinfo = sec;
+		anc->vis_exported = exportdir;
+		anc_head = anc;
 
 		/*
 		 * Now, do a ".." to find parent dir of vp.
@@ -713,11 +946,38 @@ srv_secinfo_treeclimb(struct exportinfo *exip, bool_t isadd,
 	}
 
 	VN_RELE(vp);
+
+	if (anc_head)
+		free_pseudoanc(anc_head);
+
 	return (error);
 }
 
+/*
+ * Free a list of visible directories
+ */
+static void
+free_pseudoanc(struct exp_visible *head)
+{
+	struct exp_visible *visp, *next;
+
+	for (visp = head; visp; visp = next) {
+		if (visp->vis_vp != NULL)
+			VN_RELE(visp->vis_vp);
+		/*
+		 * we don't free vis_secinfo from the temporary pseudonode
+		 * ancestor list because it was never kmem_alloc'd.
+		 * srv_secinfo_treeclimb set it to point to the nodups
+		 * secinfo array (which is a stack var).
+		 */
+		next = visp->vis_next;
+		kmem_free(visp, sizeof (*visp));
+	}
+}
+
+
 void
-export_link(struct exportinfo *exi) {
+export_link(exportinfo_t *exi) {
 	int exporthash;
 
 	exporthash = exptablehash(&exi->exi_fsid, &exi->exi_fid);
@@ -743,9 +1003,9 @@ nfs_exportinit(void)
 	exi_public = exi_root;
 
 	exi_root->exi_export.ex_flags = EX_PUBLIC;
-	exi_root->exi_export.ex_pathlen = 2;	/* length of "/" */
+	exi_root->exi_export.ex_pathlen = 1;	/* length of "/" */
 	exi_root->exi_export.ex_path =
-		kmem_alloc(exi_root->exi_export.ex_pathlen, KM_SLEEP);
+	    kmem_alloc(exi_root->exi_export.ex_pathlen + 1, KM_SLEEP);
 	exi_root->exi_export.ex_path[0] = '/';
 	exi_root->exi_export.ex_path[1] = '\0';
 
@@ -765,7 +1025,7 @@ nfs_exportinit(void)
 	exi_root->exi_fh.fh_fsid = rootdir->v_vfsp->vfs_fsid;
 	exi_root->exi_fh.fh_xlen = exi_rootfid.fid_len;
 	bcopy(exi_rootfid.fid_data, exi_root->exi_fh.fh_xdata,
-			exi_rootfid.fid_len);
+	    exi_rootfid.fid_len);
 	exi_root->exi_fh.fh_len = sizeof (exi_root->exi_fh.fh_data);
 
 	/*
@@ -789,7 +1049,7 @@ nfs_exportfini(void)
 	 * Deallocate the place holder for the public file handle.
 	 */
 	srv_secinfo_list_free(exi_root->exi_export.ex_secinfo,
-				exi_root->exi_export.ex_seccnt);
+	    exi_root->exi_export.ex_seccnt);
 	mutex_destroy(&exi_root->exi_lock);
 	kmem_free(exi_root, sizeof (*exi_root));
 
@@ -844,33 +1104,44 @@ rfs_gsscallback(struct svc_req *req, gss_cred_id_t deleg, void *gss_context,
 
 	rw_enter(&exported_lock, RW_READER);
 	for (i = 0; i < EXPTABLESIZE; i++) {
-	    exi = exptable[i];
-	    while (exi) {
-		if (exi->exi_export.ex_seccnt > 0) {
-		    struct secinfo *secp;
+		exi = exptable[i];
+		while (exi) {
+			if (exi->exi_export.ex_seccnt > 0) {
+				struct secinfo *secp;
+				seconfig_t *se;
+				int seccnt;
 
-		    secp = exi->exi_export.ex_secinfo;
-		    for (j = 0; j < exi->exi_export.ex_seccnt; j++) {
-			/*
-			 *  If there is a map of the triplet
-			 *  (mechanism, service, qop) between raw_cred and
-			 *  the exported flavor, get the psudo flavor number.
-			 *  Also qop should not be NULL, it should be "default"
-			 *  or something else.
-			 */
-			if ((secp[j].s_secinfo.sc_rpcnum == RPCSEC_GSS) &&
-			(nfs_mech_equal(secp[j].s_secinfo.sc_gss_mech_type,
-			raw_cred->mechanism)) &&
-			(secp[j].s_secinfo.sc_service == raw_cred->service) &&
-			(raw_cred->qop == secp[j].s_secinfo.sc_qop)) {
-				*cookie = (void *)(uintptr_t)
-				    secp[j].s_secinfo.sc_nfsnum;
-				goto done;
+				secp = exi->exi_export.ex_secinfo;
+				seccnt = exi->exi_export.ex_seccnt;
+				for (j = 0; j < seccnt; j++) {
+					/*
+					 *  If there is a map of the triplet
+					 *  (mechanism, service, qop) between
+					 *  raw_cred and the exported flavor,
+					 *  get the psudo flavor number.
+					 *  Also qop should not be NULL, it
+					 *  should be "default" or something
+					 *  else.
+					 */
+					se = &secp[j].s_secinfo;
+					if ((se->sc_rpcnum == RPCSEC_GSS) &&
+
+					    (nfs_mech_equal(
+					    se->sc_gss_mech_type,
+					    raw_cred->mechanism)) &&
+
+					    (se->sc_service ==
+					    raw_cred->service) &&
+					    (raw_cred->qop == se->sc_qop)) {
+
+						*cookie = (void *)(uintptr_t)
+						    se->sc_nfsnum;
+						goto done;
+					}
+				}
 			}
-		    }
+			exi = exi->exi_hash;
 		}
-		exi = exi->exi_hash;
-	    }
 	}
 done:
 	rw_exit(&exported_lock);
@@ -917,7 +1188,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 {
 	vnode_t *vp;
 	vnode_t *dvp;
-	struct exportdata *kex;			/* kernel space exportdata */
+	struct exportdata *kex;
 	struct exportinfo *exi;
 	struct exportinfo *ex, *prev;
 	fid_t fid;
@@ -934,10 +1205,10 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	int allocd_seccnt;
 	STRUCT_HANDLE(exportfs_args, uap);
 	STRUCT_DECL(exportdata, uexi);
-	struct secinfo suniq[MAX_FLAVORS];	/* no duplicate flavors */
-	int32_t suniqcnt;			/* ex_seccnt for suniq */
-	struct secinfo suniqex[MAX_FLAVORS];	/* no duplicate flavors */
-	int32_t suniqcntex;			/* ex_seccnt for suniq */
+	struct secinfo newsec[MAX_FLAVORS];
+	int newcnt;
+	struct secinfo oldsec[MAX_FLAVORS];
+	int oldcnt;
 	int i;
 
 	STRUCT_SET_HANDLE(uap, model, args);
@@ -1024,7 +1295,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	exi->exi_vp = vp;
 	exi->exi_count = 1;
 	exi->exi_volatile_dev = (vfssw[vp->v_vfsp->vfs_fstype].vsw_flag &
-				VSW_VOLATILEDEV) ? 1 : 0;
+	    VSW_VOLATILEDEV) ? 1 : 0;
 	mutex_init(&exi->exi_lock, NULL, MUTEX_DEFAULT, NULL);
 	exi->exi_dvp = dvp;
 
@@ -1063,8 +1334,8 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	if (kex->ex_version != EX_CURRENT_VERSION) {
 		error = EINVAL;
 		cmn_err(CE_WARN,
-		"NFS: exportfs requires export struct version 2 - got %d\n",
-		kex->ex_version);
+		    "NFS: exportfs requires export struct version 2 - got %d\n",
+		    kex->ex_version);
 		goto out1;
 	}
 
@@ -1115,7 +1386,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 			goto out2;
 		}
 		kex->ex_log_buffer =
-			kmem_alloc(kex->ex_log_bufferlen + 1, KM_SLEEP);
+		    kmem_alloc(kex->ex_log_bufferlen + 1, KM_SLEEP);
 		bcopy(log_buffer, kex->ex_log_buffer, kex->ex_log_bufferlen);
 		kex->ex_log_buffer[kex->ex_log_bufferlen] = '\0';
 		kmem_free(log_buffer, MAXPATHLEN);
@@ -1345,26 +1616,40 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		error = treeclimb_export(exi);
 
 	/*
-	 * By this time all the kernel memory is allocated and we can
-	 * build a unique flavor list.
+	 * build a unique flavor list from the flavors specified
+	 * in the share cmd.  unique means that each flavor only
+	 * appears once in the secinfo list -- no duplicates allowed.
 	 */
-	suniqcnt = build_seclist_nodups(&exi->exi_export, suniq);
+	newcnt = build_seclist_nodups(&exi->exi_export, newsec, FALSE);
 
 	if (!error)
-		error = srv_secinfo_treeclimb(exi, TRUE, suniq, suniqcnt);
+		error = srv_secinfo_treeclimb(exi, newsec, newcnt, TRUE);
 
 	/*
 	 * If re-sharing an old export entry, update the secinfo data
 	 * depending on if the old entry is a pseudo node or not.
 	 */
 	if (!error && ex != NULL) {
-		suniqcntex = build_seclist_nodups(&ex->exi_export, suniqex);
+		oldcnt = build_seclist_nodups(&ex->exi_export, oldsec, FALSE);
 		if (PSEUDO(ex)) {
-		    srv_secinfo_add(&exi->exi_export, suniqex, suniqcntex);
+			/*
+			 * The dir being shared is a pseudo export root (which
+			 * will be transformed into a real export root).  The
+			 * flavor(s) of the new share were propagated to the
+			 * ancestors by srv_secinfo_treeclimb() above.  Now
+			 * transfer the implicit flavor refs from the old
+			 * pseudo exprot root to the new (real) export root.
+			 */
+			srv_secinfo_add(&exi->exi_export.ex_secinfo,
+			    &exi->exi_export.ex_seccnt, oldsec, oldcnt, TRUE);
 		} else {
-		    srv_secinfo_exp2exp(&exi->exi_export, suniqex, suniqcntex);
-		    error = srv_secinfo_treeclimb(ex, FALSE, suniqex,
-			suniqcntex);
+			/*
+			 * First transfer implicit flavor refs to new export.
+			 * Remove old flavor refs last.
+			 */
+			srv_secinfo_exp2exp(&exi->exi_export, oldsec, oldcnt);
+			error = srv_secinfo_treeclimb(ex, oldsec, oldcnt,
+			    FALSE);
 		}
 	}
 
@@ -1372,10 +1657,8 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 		goto out7;
 
 	/*
-	 * If it's a re-export and the old entry has a visible list,
-	 * then transfer its visible list to the new export.
-	 * Note: only VROOT node may have a visible list either
-	 * it is a PSEUDO node or a real export node.
+	 * If it's a re-export and the old entry has a pseudnode list,
+	 * transfer it to the new export.
 	 */
 	if (ex != NULL && (ex->exi_visible != NULL)) {
 		exi->exi_visible = ex->exi_visible;
@@ -1402,7 +1685,7 @@ out7:
 	 * will fail at the same place in the tree.
 	 */
 	(void) treeclimb_unexport(exi);
-	(void) srv_secinfo_treeclimb(exi, FALSE, suniq, suniqcnt);
+	(void) srv_secinfo_treeclimb(exi, newsec, newcnt, FALSE);
 
 	/*
 	 * Unlink and re-link the new and old export in exptable.
@@ -1424,7 +1707,7 @@ out5:
 
 	if (kex->ex_secinfo) {
 		kmem_free(kex->ex_secinfo,
-			kex->ex_seccnt * sizeof (struct secinfo));
+		    kex->ex_seccnt * sizeof (struct secinfo));
 	}
 
 out4:
@@ -1490,8 +1773,8 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 {
 	struct exportinfo *exi = NULL;
 	int error;
-	struct secinfo suniq[MAX_FLAVORS];
-	int32_t suniqcnt;
+	struct secinfo cursec[MAX_FLAVORS];
+	int curcnt;
 
 	rw_enter(&exported_lock, RW_WRITER);
 
@@ -1520,7 +1803,7 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 	 */
 	if (exi->exi_visible) {
 		error = pseudo_exportfs(exi->exi_vp, exi->exi_visible,
-						&exi->exi_export);
+		    &exi->exi_export);
 		if (error)
 			goto done;
 
@@ -1531,9 +1814,9 @@ unexport(fsid_t *fsid, fid_t *fid, vnode_t *vp)
 			goto done;
 	}
 
-	suniqcnt = build_seclist_nodups(&exi->exi_export, suniq);
+	curcnt = build_seclist_nodups(&exi->exi_export, cursec, TRUE);
 
-	error = srv_secinfo_treeclimb(exi, FALSE, suniq, suniqcnt);
+	error = srv_secinfo_treeclimb(exi, cursec, curcnt, FALSE);
 	if (error)
 		goto done;
 
@@ -1829,7 +2112,7 @@ nfs_vptoexi(vnode_t *dvp, vnode_t *vp, cred_t *cr, int *walk,
 }
 
 bool_t
-chk_clnt_sec(struct exportinfo *exi, struct svc_req *req)
+chk_clnt_sec(exportinfo_t *exi, struct svc_req *req)
 {
 	int i, nfsflavor;
 	struct secinfo *sp;
@@ -1854,7 +2137,7 @@ chk_clnt_sec(struct exportinfo *exi, struct svc_req *req)
  * Make an fhandle from a vnode
  */
 int
-makefh(fhandle_t *fh, vnode_t *vp, struct exportinfo *exi)
+makefh(fhandle_t *fh, vnode_t *vp, exportinfo_t *exi)
 {
 	int error;
 
@@ -1894,16 +2177,16 @@ makefh(fhandle_t *fh, vnode_t *vp, struct exportinfo *exi)
  *   of security flavors sent in the current overloaded filehandle.)
  */
 int
-makefh_ol(fhandle_t *fh, struct exportinfo *exi, uint_t sec_index)
+makefh_ol(fhandle_t *fh, exportinfo_t *exi, uint_t sec_index)
 {
 	static int max_cnt = (NFS_FHSIZE/sizeof (int)) - 1;
 	int totalcnt, i, *ipt, cnt;
 	char *c;
 
 	if (fh == (fhandle_t *)NULL ||
-		exi == (struct exportinfo *)NULL ||
-		sec_index > exi->exi_export.ex_seccnt ||
-		sec_index < 1)
+	    exi == (struct exportinfo *)NULL ||
+	    sec_index > exi->exi_export.ex_seccnt ||
+	    sec_index < 1)
 		return (EREMOTE);
 
 	totalcnt = exi->exi_export.ex_seccnt-sec_index+1;
@@ -1928,7 +2211,7 @@ makefh_ol(fhandle_t *fh, struct exportinfo *exi, uint_t sec_index)
 	ipt = (int *)(c + sizeof (int32_t));
 	for (i = 0; i < cnt; i++) {
 		*ipt++ = htonl(exi->exi_export.ex_secinfo[i+sec_index-1].
-				s_secinfo.sc_nfsnum);
+		    s_secinfo.sc_nfsnum);
 	}
 	return (0);
 }
@@ -1955,8 +2238,8 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fh->fh3_xlen = exi->exi_fid.fid_len;
 	bcopy(exi->exi_fid.fid_data, fh->fh3_xdata, fh->fh3_xlen);
 	fh->fh3_length = sizeof (fsid_t)
-			+ sizeof (ushort_t) + fh->fh3_len
-			+ sizeof (ushort_t) + fh->fh3_xlen;
+	    + sizeof (ushort_t) + fh->fh3_len
+	    + sizeof (ushort_t) + fh->fh3_xlen;
 	fh->fh3_flags = 0;
 	return (0);
 }
@@ -1988,12 +2271,13 @@ makefh3_ol(nfs_fh3 *fh, struct exportinfo *exi, uint_t sec_index)
 {
 	static int max_cnt = NFS3_FHSIZE/sizeof (int) - 1;
 	int totalcnt, cnt, *ipt, i;
+	secinfo_t *sec = exi->exi_export.ex_secinfo;
 	char *c;
 
 	if (fh == (nfs_fh3 *)NULL ||
-		exi == (struct exportinfo *)NULL ||
-		sec_index > exi->exi_export.ex_seccnt ||
-		sec_index < 1) {
+	    exi == (struct exportinfo *)NULL ||
+	    sec_index > exi->exi_export.ex_seccnt ||
+	    sec_index < 1) {
 		return (EREMOTE);
 	}
 
@@ -2019,8 +2303,7 @@ makefh3_ol(nfs_fh3 *fh, struct exportinfo *exi, uint_t sec_index)
 	 */
 	ipt = (int *)(c + sizeof (int32_t));
 	for (i = 0; i < cnt; i++) {
-		*(ipt+i) = htonl(
-		exi->exi_export.ex_secinfo[i+sec_index-1].s_secinfo.sc_nfsnum);
+		*(ipt+i) = htonl(sec[i+sec_index-1].s_secinfo.sc_nfsnum);
 	}
 	return (0);
 }
@@ -2053,7 +2336,7 @@ makefh4(nfs_fh4 *fh, vnode_t *vp, struct exportinfo *exi)
 	bzero(fh_fmtp->fh4_i.fhx_data, sizeof (fh_fmtp->fh4_i.fhx_data));
 	bzero(fh_fmtp->fh4_i.fhx_xdata, sizeof (fh_fmtp->fh4_i.fhx_xdata));
 	bcopy(exi->exi_fh.fh_xdata, fh_fmtp->fh4_i.fhx_xdata,
-		exi->exi_fh.fh_xlen);
+	    exi->exi_fh.fh_xlen);
 
 	fh_fmtp->fh4_len = fid.fid_len;
 	ASSERT(fid.fid_len <= sizeof (fh_fmtp->fh4_data));
@@ -2102,11 +2385,11 @@ nfs_fhtovp(fhandle_t *fh, struct exportinfo *exi)
 	fid_t *fidp;
 
 	TRACE_0(TR_FAC_NFS, TR_FHTOVP_START,
-		"fhtovp_start");
+	    "fhtovp_start");
 
 	if (exi == NULL) {
 		TRACE_1(TR_FAC_NFS, TR_FHTOVP_END,
-			"fhtovp_end:(%S)", "exi NULL");
+		    "fhtovp_end:(%S)", "exi NULL");
 		return (NULL);	/* not exported */
 	}
 
@@ -2115,7 +2398,7 @@ nfs_fhtovp(fhandle_t *fh, struct exportinfo *exi)
 	if (PUBLIC_FH2(fh)) {
 		if (exi->exi_export.ex_flags & EX_PUBLIC) {
 			TRACE_1(TR_FAC_NFS, TR_FHTOVP_END,
-				"fhtovp_end:(%S)", "root not exported");
+			    "fhtovp_end:(%S)", "root not exported");
 			return (NULL);
 		}
 		vp = exi->exi_vp;
@@ -2130,11 +2413,11 @@ nfs_fhtovp(fhandle_t *fh, struct exportinfo *exi)
 	error = VFS_VGET(vfsp, &vp, fidp);
 	if (error || vp == NULL) {
 		TRACE_1(TR_FAC_NFS, TR_FHTOVP_END,
-			"fhtovp_end:(%S)", "VFS_GET failed or vp NULL");
+		    "fhtovp_end:(%S)", "VFS_GET failed or vp NULL");
 		return (NULL);
 	}
 	TRACE_1(TR_FAC_NFS, TR_FHTOVP_END,
-		"fhtovp_end:(%S)", "end");
+	    "fhtovp_end:(%S)", "end");
 	return (vp);
 }
 
@@ -2531,7 +2814,7 @@ find_volrnm_fh_id(struct exportinfo *exi, nfs_fh4 *fh4p)
 	mutex_enter(&exi->exi_vol_rename_lock);
 	p = find_volrnm_fh(exi, fh4p);
 	volatile_id = (p ? p->vrn_fh_fmt.fh4_volatile_id :
-				exi->exi_volatile_id);
+	    exi->exi_volatile_id);
 	mutex_exit(&exi->exi_vol_rename_lock);
 	return (volatile_id);
 }
