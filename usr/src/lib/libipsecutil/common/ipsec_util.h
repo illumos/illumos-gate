@@ -125,7 +125,8 @@ extern void bail_msg(char *, ...);
  * take a FILE pointer.
  */
 
-extern int dump_sockaddr(struct sockaddr *, uint8_t, boolean_t, FILE *);
+extern int dump_sockaddr(struct sockaddr *, uint8_t, boolean_t, FILE *,
+    boolean_t);
 
 extern int dump_key(uint8_t *, uint_t, FILE *);
 
@@ -308,22 +309,22 @@ extern int in_masktoprefix(uint8_t *, boolean_t);
 /* SA support functions */
 
 extern void print_diagnostic(FILE *, uint16_t);
-extern void print_sadb_msg(struct sadb_msg *, time_t, boolean_t);
-extern void print_sa(char *, struct sadb_sa *);
-extern void printsatime(int64_t, const char *, const char *, const char *,
-    boolean_t);
-extern void print_lifetimes(time_t, struct sadb_lifetime *,
+extern void print_sadb_msg(FILE *, struct sadb_msg *, time_t, boolean_t);
+extern void print_sa(FILE *, char *, struct sadb_sa *);
+extern void printsatime(FILE *, int64_t, const char *, const char *,
+    const char *, boolean_t);
+extern void print_lifetimes(FILE *, time_t, struct sadb_lifetime *,
     struct sadb_lifetime *, struct sadb_lifetime *, boolean_t vflag);
-extern void print_address(char *, struct sadb_address *);
-extern void print_key(char *, struct sadb_key *);
-extern void print_ident(char *, struct sadb_ident *);
-extern void print_sens(char *, struct sadb_sens *);
-extern void print_prop(char *, struct sadb_prop *);
-extern void print_eprop(char *, struct sadb_prop *);
-extern void print_supp(char *, struct sadb_supported *);
-extern void print_spirange(char *, struct sadb_spirange *);
-extern void print_kmc(char *, struct sadb_x_kmc *);
-extern void print_samsg(uint64_t *, boolean_t, boolean_t);
+extern void print_address(FILE *, char *, struct sadb_address *, boolean_t);
+extern void print_key(FILE *, char *, struct sadb_key *);
+extern void print_ident(FILE *, char *, struct sadb_ident *);
+extern void print_sens(FILE *, char *, struct sadb_sens *);
+extern void print_prop(FILE *, char *, struct sadb_prop *);
+extern void print_eprop(FILE *, char *, struct sadb_prop *);
+extern void print_supp(FILE *, char *, struct sadb_supported *);
+extern void print_spirange(FILE *, char *, struct sadb_spirange *);
+extern void print_kmc(FILE *, char *, struct sadb_x_kmc *);
+extern void print_samsg(FILE *, uint64_t *, boolean_t, boolean_t, boolean_t);
 extern char *rparsesatype(int);
 extern char *rparsealg(uint8_t, int);
 extern char *rparseidtype(uint16_t);

@@ -872,7 +872,7 @@ key_write(int fd, void *msg, size_t len)
 		(void) printf(
 		    gettext("VERBOSE ON:  Message to kernel looks like:\n"));
 		(void) printf("==========================================\n");
-		print_samsg(msg, B_FALSE, vflag);
+		print_samsg(stdout, msg, B_FALSE, vflag, nflag);
 		(void) printf("==========================================\n");
 	}
 
@@ -1004,7 +1004,8 @@ dodump(int satype, FILE *ofile)
 		    msg->sadb_msg_seq != 0 &&
 		    msg->sadb_msg_errno == 0) {
 			if (ofile == NULL) {
-				print_samsg(get_buffer, B_FALSE, vflag);
+				print_samsg(stdout, get_buffer, B_FALSE, vflag,
+				    nflag);
 				(void) putchar('\n');
 			} else {
 				save_assoc(get_buffer, ofile);
@@ -1484,7 +1485,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				    "SA information bigger than %d bytes.\n"),
 				    SADB_64TO8(MAX_GET_SIZE));
 			}
-			print_samsg(buffer, B_FALSE, vflag);
+			print_samsg(stdout, buffer, B_FALSE, vflag, nflag);
 		}
 
 		handle_errors(ep, ebuf, B_TRUE, B_FALSE);
@@ -2911,7 +2912,7 @@ domonitor(boolean_t passive)
 		 * Q:  Should I use the same method of printing as GET does?
 		 * A:  For now, yes.
 		 */
-		print_samsg(get_buffer, B_TRUE, vflag);
+		print_samsg(stdout, get_buffer, B_TRUE, vflag, nflag);
 		(void) putchar('\n');
 	}
 }

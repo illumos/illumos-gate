@@ -52,8 +52,11 @@
 
 /*
  * This file contains support functions that are shared by the ipsec
- * utilities including ipseckey(1m) and ikeadm(1m).
+ * utilities and daemons including ipseckey(1m), ikeadm(1m) and in.iked(1m).
  */
+
+
+#define	EFD(file) (((file) == stdout) ? stderr : (file))
 
 /* Set standard default/initial values for globals... */
 boolean_t pflag = B_FALSE;	/* paranoid w.r.t. printing keying material */
@@ -125,7 +128,7 @@ bail_msg(char *fmt, ...)
 
 int
 dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
-    FILE *where)
+    FILE *where, boolean_t ignore_nss)
 {
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
@@ -182,7 +185,7 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 		    "%s: port %d, %s"), protocol,
 		    ntohs(port), printable_addr) < 0)
 			return (-1);
-		if (!nflag) {
+		if (ignore_nss == B_FALSE) {
 			/*
 			 * Do AF_independent reverse hostname lookup here.
 			 */
@@ -1349,100 +1352,104 @@ print_diagnostic(FILE *file, uint16_t diagnostic)
  * Prints the base PF_KEY message.
  */
 void
-print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
+print_sadb_msg(FILE *file, struct sadb_msg *samsg, time_t wallclock,
+    boolean_t vflag)
 {
 	if (wallclock != 0)
-		printsatime(wallclock, dgettext(TEXT_DOMAIN,
+		printsatime(file, wallclock, dgettext(TEXT_DOMAIN,
 		    "%sTimestamp: %s\n"), "", NULL,
 		    vflag);
 
-	(void) printf(dgettext(TEXT_DOMAIN, "Base message (version %u) type "),
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
+	    "Base message (version %u) type "),
 	    samsg->sadb_msg_version);
 	switch (samsg->sadb_msg_type) {
 	case SADB_RESERVED:
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "RESERVED (warning: set to 0)"));
 		break;
 	case SADB_GETSPI:
-		(void) printf("GETSPI");
+		(void) fprintf(file, "GETSPI");
 		break;
 	case SADB_UPDATE:
-		(void) printf("UPDATE");
+		(void) fprintf(file, "UPDATE");
 		break;
 	case SADB_ADD:
-		(void) printf("ADD");
+		(void) fprintf(file, "ADD");
 		break;
 	case SADB_DELETE:
-		(void) printf("DELETE");
+		(void) fprintf(file, "DELETE");
 		break;
 	case SADB_GET:
-		(void) printf("GET");
+		(void) fprintf(file, "GET");
 		break;
 	case SADB_ACQUIRE:
-		(void) printf("ACQUIRE");
+		(void) fprintf(file, "ACQUIRE");
 		break;
 	case SADB_REGISTER:
-		(void) printf("REGISTER");
+		(void) fprintf(file, "REGISTER");
 		break;
 	case SADB_EXPIRE:
-		(void) printf("EXPIRE");
+		(void) fprintf(file, "EXPIRE");
 		break;
 	case SADB_FLUSH:
-		(void) printf("FLUSH");
+		(void) fprintf(file, "FLUSH");
 		break;
 	case SADB_DUMP:
-		(void) printf("DUMP");
+		(void) fprintf(file, "DUMP");
 		break;
 	case SADB_X_PROMISC:
-		(void) printf("X_PROMISC");
+		(void) fprintf(file, "X_PROMISC");
 		break;
 	case SADB_X_INVERSE_ACQUIRE:
-		(void) printf("X_INVERSE_ACQUIRE");
+		(void) fprintf(file, "X_INVERSE_ACQUIRE");
 		break;
 	default:
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "Unknown (%u)"), samsg->sadb_msg_type);
 		break;
 	}
-	(void) printf(dgettext(TEXT_DOMAIN, ", SA type "));
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, ", SA type "));
 
 	switch (samsg->sadb_msg_satype) {
 	case SADB_SATYPE_UNSPEC:
-		(void) printf(dgettext(TEXT_DOMAIN, "<unspecified/all>"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "<unspecified/all>"));
 		break;
 	case SADB_SATYPE_AH:
-		(void) printf("AH");
+		(void) fprintf(file, "AH");
 		break;
 	case SADB_SATYPE_ESP:
-		(void) printf("ESP");
+		(void) fprintf(file, "ESP");
 		break;
 	case SADB_SATYPE_RSVP:
-		(void) printf("RSVP");
+		(void) fprintf(file, "RSVP");
 		break;
 	case SADB_SATYPE_OSPFV2:
-		(void) printf("OSPFv2");
+		(void) fprintf(file, "OSPFv2");
 		break;
 	case SADB_SATYPE_RIPV2:
-		(void) printf("RIPv2");
+		(void) fprintf(file, "RIPv2");
 		break;
 	case SADB_SATYPE_MIP:
-		(void) printf(dgettext(TEXT_DOMAIN, "Mobile IP"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Mobile IP"));
 		break;
 	default:
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "<unknown %u>"), samsg->sadb_msg_satype);
 		break;
 	}
 
-	(void) printf(".\n");
+	(void) fprintf(file, ".\n");
 
 	if (samsg->sadb_msg_errno != 0) {
-		(void) printf(dgettext(TEXT_DOMAIN, "Error %s from PF_KEY.\n"),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "Error %s from PF_KEY.\n"),
 		    strerror(samsg->sadb_msg_errno));
-		print_diagnostic(stdout, samsg->sadb_x_msg_diagnostic);
+		print_diagnostic(file, samsg->sadb_x_msg_diagnostic);
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "Message length %u bytes, seq=%u, pid=%u.\n"),
 	    SADB_64TO8(samsg->sadb_msg_len), samsg->sadb_msg_seq,
 	    samsg->sadb_msg_pid);
@@ -1452,82 +1459,82 @@ print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
  * Print the SA extension for PF_KEY.
  */
 void
-print_sa(char *prefix, struct sadb_sa *assoc)
+print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 {
 	if (assoc->sadb_sa_len != SADB_8TO64(sizeof (*assoc))) {
-		warnx(dgettext(TEXT_DOMAIN,
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
 		    "WARNING: SA info extension length (%u) is bad."),
 		    SADB_64TO8(assoc->sadb_sa_len));
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sSADB_ASSOC spi=0x%x, replay=%u, state="),
 	    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
 	switch (assoc->sadb_sa_state) {
 	case SADB_SASTATE_LARVAL:
-		(void) printf(dgettext(TEXT_DOMAIN, "LARVAL"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "LARVAL"));
 		break;
 	case SADB_SASTATE_MATURE:
-		(void) printf(dgettext(TEXT_DOMAIN, "MATURE"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "MATURE"));
 		break;
 	case SADB_SASTATE_DYING:
-		(void) printf(dgettext(TEXT_DOMAIN, "DYING"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DYING"));
 		break;
 	case SADB_SASTATE_DEAD:
-		(void) printf(dgettext(TEXT_DOMAIN, "DEAD"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
 		break;
 	default:
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "<unknown %u>"), assoc->sadb_sa_state);
 	}
 
 	if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "\n%sAuthentication algorithm = "),
 		    prefix);
-		(void) dump_aalg(assoc->sadb_sa_auth, stdout);
+		(void) dump_aalg(assoc->sadb_sa_auth, file);
 	}
 
 	if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "\n%sEncryption algorithm = "), prefix);
-		(void) dump_ealg(assoc->sadb_sa_encrypt, stdout);
+		(void) dump_ealg(assoc->sadb_sa_encrypt, file);
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN, "\n%sflags=0x%x < "), prefix,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "\n%sflags=0x%x < "), prefix,
 	    assoc->sadb_sa_flags);
 	if (assoc->sadb_sa_flags & SADB_SAFLAGS_PFS)
-		(void) printf("PFS ");
+		(void) fprintf(file, "PFS ");
 	if (assoc->sadb_sa_flags & SADB_SAFLAGS_NOREPLAY)
-		(void) printf("NOREPLAY ");
+		(void) fprintf(file, "NOREPLAY ");
 
 	/* BEGIN Solaris-specific flags. */
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_USED)
-		(void) printf("X_USED ");
+		(void) fprintf(file, "X_USED ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_UNIQUE)
-		(void) printf("X_UNIQUE ");
+		(void) fprintf(file, "X_UNIQUE ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_AALG1)
-		(void) printf("X_AALG1 ");
+		(void) fprintf(file, "X_AALG1 ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_AALG2)
-		(void) printf("X_AALG2 ");
+		(void) fprintf(file, "X_AALG2 ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_EALG1)
-		(void) printf("X_EALG1 ");
+		(void) fprintf(file, "X_EALG1 ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_EALG2)
-		(void) printf("X_EALG2 ");
+		(void) fprintf(file, "X_EALG2 ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATT_LOC)
-		(void) printf("X_NATT_LOC ");
+		(void) fprintf(file, "X_NATT_LOC ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATT_REM)
-		(void) printf("X_NATT_REM ");
+		(void) fprintf(file, "X_NATT_REM ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_TUNNEL)
-		(void) printf("X_TUNNEL ");
+		(void) fprintf(file, "X_TUNNEL ");
 	/* END Solaris-specific flags. */
 
-	(void) printf(">\n");
+	(void) fprintf(file, ">\n");
 }
 
 void
-printsatime(int64_t lt, const char *msg, const char *pfx, const char *pfx2,
-    boolean_t vflag)
+printsatime(FILE *file, int64_t lt, const char *msg, const char *pfx,
+    const char *pfx2, boolean_t vflag)
 {
 	char tbuf[TBUF_SIZE]; /* For strftime() call. */
 	const char *tp = tbuf;
@@ -1543,9 +1550,9 @@ printsatime(int64_t lt, const char *msg, const char *pfx, const char *pfx2,
 
 	if (strftime(tbuf, TBUF_SIZE, NULL, localtime_r(&t, &res)) == 0)
 		tp = dgettext(TEXT_DOMAIN, "<time conversion failed>");
-	(void) printf(msg, pfx, tp);
+	(void) fprintf(file, msg, pfx, tp);
 	if (vflag && (pfx2 != NULL))
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s\t(raw time value %llu)\n"), pfx2, lt);
 }
 
@@ -1553,7 +1560,7 @@ printsatime(int64_t lt, const char *msg, const char *pfx, const char *pfx2,
  * Print the SA lifetime information.  (An SADB_EXT_LIFETIME_* extension.)
  */
 void
-print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
+print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
     struct sadb_lifetime *hard, struct sadb_lifetime *soft, boolean_t vflag)
 {
 	int64_t scratch;
@@ -1563,65 +1570,65 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 
 	if (current != NULL &&
 	    current->sadb_lifetime_len != SADB_8TO64(sizeof (*current))) {
-		warnx(dgettext(TEXT_DOMAIN,
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
 		    "WARNING: CURRENT lifetime extension length (%u) is bad."),
 		    SADB_64TO8(current->sadb_lifetime_len));
 	}
 
 	if (hard != NULL &&
 	    hard->sadb_lifetime_len != SADB_8TO64(sizeof (*hard))) {
-		warnx(dgettext(TEXT_DOMAIN, "WARNING: HARD lifetime "
-		    "extension length (%u) is bad."),
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
+		    "WARNING: HARD lifetime extension length (%u) is bad."),
 		    SADB_64TO8(hard->sadb_lifetime_len));
 	}
 
 	if (soft != NULL &&
 	    soft->sadb_lifetime_len != SADB_8TO64(sizeof (*soft))) {
-		warnx(dgettext(TEXT_DOMAIN, "WARNING: SOFT lifetime "
-		    "extension length (%u) is bad."),
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
+		    "WARNING: SOFT lifetime extension length (%u) is bad."),
 		    SADB_64TO8(soft->sadb_lifetime_len));
 	}
 
-	(void) printf(" LT: Lifetime information\n");
+	(void) fprintf(file, " LT: Lifetime information\n");
 
 	if (current != NULL) {
 		/* Express values as current values. */
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s%llu bytes protected, %u allocations used.\n"),
 		    current_prefix, current->sadb_lifetime_bytes,
 		    current->sadb_lifetime_allocations);
-		printsatime(current->sadb_lifetime_addtime,
+		printsatime(file, current->sadb_lifetime_addtime,
 		    dgettext(TEXT_DOMAIN, "%sSA added at time %s\n"),
 		    current_prefix, current_prefix, vflag);
 		if (current->sadb_lifetime_usetime != 0) {
-			printsatime(current->sadb_lifetime_usetime,
+			printsatime(file, current->sadb_lifetime_usetime,
 			    dgettext(TEXT_DOMAIN,
 			    "%sSA first used at time %s\n"),
 			    current_prefix, current_prefix, vflag);
 		}
-		printsatime(wallclock, dgettext(TEXT_DOMAIN,
+		printsatime(file, wallclock, dgettext(TEXT_DOMAIN,
 		    "%sTime now is %s\n"), current_prefix, current_prefix,
 		    vflag);
 	}
 
 	if (soft != NULL) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%sSoft lifetime information:  "),
 		    soft_prefix);
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%llu bytes of lifetime, %u "
 		    "allocations.\n"), soft->sadb_lifetime_bytes,
 		    soft->sadb_lifetime_allocations);
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s%llu seconds of post-add lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_addtime);
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s%llu seconds of post-use lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (soft->sadb_lifetime_bytes != 0)
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "%s%llu more bytes can be protected.\n"),
 				    soft_prefix,
 				    (soft->sadb_lifetime_bytes >
@@ -1651,39 +1658,41 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				} else {
 					usedelta = TIME_MAX;
 				}
-				(void) printf("%s", soft_prefix);
+				(void) fprintf(file, "%s", soft_prefix);
 				scratch = MIN(adddelta, usedelta);
 				if (scratch >= 0) {
-					(void) printf(dgettext(TEXT_DOMAIN,
+					(void) fprintf(file,
+					    dgettext(TEXT_DOMAIN,
 					    "Soft expiration occurs in %lld "
 					    "seconds, "), scratch);
 				} else {
-					(void) printf(dgettext(TEXT_DOMAIN,
+					(void) fprintf(file,
+					    dgettext(TEXT_DOMAIN,
 					    "Soft expiration occurred "));
 				}
 				scratch += wallclock;
-				printsatime(scratch, dgettext(TEXT_DOMAIN,
+				printsatime(file, scratch, dgettext(TEXT_DOMAIN,
 				    "%sat %s.\n"), "", soft_prefix, vflag);
 			}
 		}
 	}
 
 	if (hard != NULL) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%sHard lifetime information:  "), hard_prefix);
-		(void) printf(dgettext(TEXT_DOMAIN, "%llu bytes of lifetime, "
-		    "%u allocations.\n"), hard->sadb_lifetime_bytes,
-		    hard->sadb_lifetime_allocations);
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%llu bytes of lifetime, %u allocations.\n"),
+		    hard->sadb_lifetime_bytes, hard->sadb_lifetime_allocations);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s%llu seconds of post-add lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_addtime);
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s%llu seconds of post-use lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (hard->sadb_lifetime_bytes != 0)
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "%s%llu more bytes can be protected.\n"),
 				    hard_prefix,
 				    (hard->sadb_lifetime_bytes >
@@ -1713,18 +1722,20 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				} else {
 					usedelta = TIME_MAX;
 				}
-				(void) printf("%s", hard_prefix);
+				(void) fprintf(file, "%s", hard_prefix);
 				scratch = MIN(adddelta, usedelta);
 				if (scratch >= 0) {
-					(void) printf(dgettext(TEXT_DOMAIN,
+					(void) fprintf(file,
+					    dgettext(TEXT_DOMAIN,
 					    "Hard expiration occurs in %lld "
 					    "seconds, "), scratch);
 				} else {
-					(void) printf(dgettext(TEXT_DOMAIN,
+					(void) fprintf(file,
+					    dgettext(TEXT_DOMAIN,
 					    "Hard expiration occured "));
 				}
 				scratch += wallclock;
-				printsatime(scratch, dgettext(TEXT_DOMAIN,
+				printsatime(file, scratch, dgettext(TEXT_DOMAIN,
 				    "%sat %s.\n"), "", hard_prefix, vflag);
 			}
 		}
@@ -1735,134 +1746,140 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
  * Print an SADB_EXT_ADDRESS_* extension.
  */
 void
-print_address(char *prefix, struct sadb_address *addr)
+print_address(FILE *file, char *prefix, struct sadb_address *addr,
+    boolean_t ignore_nss)
 {
 	struct protoent *pe;
 
-	(void) printf("%s", prefix);
+	(void) fprintf(file, "%s", prefix);
 	switch (addr->sadb_address_exttype) {
 	case SADB_EXT_ADDRESS_SRC:
-		(void) printf(dgettext(TEXT_DOMAIN, "Source address "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Source address "));
 		break;
 	case SADB_X_EXT_ADDRESS_INNER_SRC:
-		(void) printf(dgettext(TEXT_DOMAIN, "Inner source address "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "Inner source address "));
 		break;
 	case SADB_EXT_ADDRESS_DST:
-		(void) printf(dgettext(TEXT_DOMAIN, "Destination address "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "Destination address "));
 		break;
 	case SADB_X_EXT_ADDRESS_INNER_DST:
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "Inner destination address "));
 		break;
 	case SADB_X_EXT_ADDRESS_NATT_LOC:
-		(void) printf(dgettext(TEXT_DOMAIN, "NAT-T local address "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "NAT-T local address "));
 		break;
 	case SADB_X_EXT_ADDRESS_NATT_REM:
-		(void) printf(dgettext(TEXT_DOMAIN, "NAT-T remote address "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "NAT-T remote address "));
 		break;
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "(proto=%d"), addr->sadb_address_proto);
-	if (!nflag) {
+	if (ignore_nss == B_FALSE) {
 		if (addr->sadb_address_proto == 0) {
-			(void) printf(dgettext(TEXT_DOMAIN, "/<unspecified>"));
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "/<unspecified>"));
 		} else if ((pe = getprotobynumber(addr->sadb_address_proto))
 		    != NULL) {
-			(void) printf("/%s", pe->p_name);
+			(void) fprintf(file, "/%s", pe->p_name);
 		} else {
-			(void) printf(dgettext(TEXT_DOMAIN, "/<unknown>"));
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "/<unknown>"));
 		}
 	}
-	(void) printf(dgettext(TEXT_DOMAIN, ")\n%s"), prefix);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, ")\n%s"), prefix);
 	(void) dump_sockaddr((struct sockaddr *)(addr + 1),
-	    addr->sadb_address_prefixlen, B_FALSE, stdout);
+	    addr->sadb_address_prefixlen, B_FALSE, file, ignore_nss);
 }
 
 /*
  * Print an SADB_EXT_KEY extension.
  */
 void
-print_key(char *prefix, struct sadb_key *key)
+print_key(FILE *file, char *prefix, struct sadb_key *key)
 {
-	(void) printf("%s", prefix);
+	(void) fprintf(file, "%s", prefix);
 
 	switch (key->sadb_key_exttype) {
 	case SADB_EXT_KEY_AUTH:
-		(void) printf(dgettext(TEXT_DOMAIN, "Authentication"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Authentication"));
 		break;
 	case SADB_EXT_KEY_ENCRYPT:
-		(void) printf(dgettext(TEXT_DOMAIN, "Encryption"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Encryption"));
 		break;
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN, " key.\n%s"), prefix);
-	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits, stdout);
-	(void) putchar('\n');
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, " key.\n%s"), prefix);
+	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits, file);
+	(void) fprintf(file, "\n");
 }
 
 /*
  * Print an SADB_EXT_IDENTITY_* extension.
  */
 void
-print_ident(char *prefix, struct sadb_ident *id)
+print_ident(FILE *file, char *prefix, struct sadb_ident *id)
 {
 	boolean_t canprint = B_TRUE;
 
-	(void) printf("%s", prefix);
+	(void) fprintf(file, "%s", prefix);
 	switch (id->sadb_ident_exttype) {
 	case SADB_EXT_IDENTITY_SRC:
-		(void) printf(dgettext(TEXT_DOMAIN, "Source"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Source"));
 		break;
 	case SADB_EXT_IDENTITY_DST:
-		(void) printf(dgettext(TEXT_DOMAIN, "Destination"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "Destination"));
 		break;
 	}
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    " identity, uid=%d, type "), id->sadb_ident_id);
-	canprint = dump_sadb_idtype(id->sadb_ident_type, stdout, NULL);
-	(void) printf("\n%s", prefix);
+	canprint = dump_sadb_idtype(id->sadb_ident_type, file, NULL);
+	(void) fprintf(file, "\n%s", prefix);
 	if (canprint)
-		(void) printf("%s\n", (char *)(id + 1));
+		(void) fprintf(file, "%s\n", (char *)(id + 1));
 	else
-		(void) printf(dgettext(TEXT_DOMAIN, "<cannot print>\n"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "<cannot print>\n"));
 }
 
 /*
  * Print an SADB_SENSITIVITY extension.
  */
 void
-print_sens(char *prefix, struct sadb_sens *sens)
+print_sens(FILE *file, char *prefix, struct sadb_sens *sens)
 {
 	uint64_t *bitmap = (uint64_t *)(sens + 1);
 	int i;
 
-	(void) printf(
-	    dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sSensitivity DPD %d, sens level=%d, integ level=%d\n"),
 	    prefix, sens->sadb_sens_dpd, sens->sadb_sens_sens_level,
 	    sens->sadb_sens_integ_level);
 	for (i = 0; sens->sadb_sens_sens_len-- > 0; i++, bitmap++)
-		(void) printf(
-		    dgettext(TEXT_DOMAIN,
-		    "%s Sensitivity BM extended word %d 0x%llx\n"), i, *bitmap);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%s Sensitivity BM extended word %d 0x%llx\n"),
+		    prefix, i, *bitmap);
 	for (i = 0; sens->sadb_sens_integ_len-- > 0; i++, bitmap++)
-		(void) printf(
-		    dgettext(TEXT_DOMAIN,
-		    "%s Integrity BM extended word %d 0x%llx\n"), i, *bitmap);
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%s Integrity BM extended word %d 0x%llx\n"),
+		    prefix, i, *bitmap);
 }
 
 /*
  * Print an SADB_EXT_PROPOSAL extension.
  */
 void
-print_prop(char *prefix, struct sadb_prop *prop)
+print_prop(FILE *file, char *prefix, struct sadb_prop *prop)
 {
 	struct sadb_comb *combs;
 	int i, numcombs;
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sProposal, replay counter = %u.\n"), prefix,
 	    prop->sadb_prop_replay);
 
@@ -1872,59 +1889,61 @@ print_prop(char *prefix, struct sadb_prop *prop)
 	combs = (struct sadb_comb *)(prop + 1);
 
 	for (i = 0; i < numcombs; i++) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s Combination #%u "), prefix, i + 1);
 		if (combs[i].sadb_comb_auth != SADB_AALG_NONE) {
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "Authentication = "));
-			(void) dump_aalg(combs[i].sadb_comb_auth, stdout);
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) dump_aalg(combs[i].sadb_comb_auth, file);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "  minbits=%u, maxbits=%u.\n%s "),
 			    combs[i].sadb_comb_auth_minbits,
 			    combs[i].sadb_comb_auth_maxbits, prefix);
 		}
 
 		if (combs[i].sadb_comb_encrypt != SADB_EALG_NONE) {
-			(void) printf(dgettext(TEXT_DOMAIN, "Encryption = "));
-			(void) dump_ealg(combs[i].sadb_comb_encrypt, stdout);
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "Encryption = "));
+			(void) dump_ealg(combs[i].sadb_comb_encrypt, file);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "  minbits=%u, maxbits=%u.\n%s "),
 			    combs[i].sadb_comb_encrypt_minbits,
 			    combs[i].sadb_comb_encrypt_maxbits, prefix);
 		}
 
-		(void) printf(dgettext(TEXT_DOMAIN, "HARD: "));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "HARD: "));
 		if (combs[i].sadb_comb_hard_allocations)
-			(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u "),
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_hard_allocations);
 		if (combs[i].sadb_comb_hard_bytes)
-			(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu "),
-			    combs[i].sadb_comb_hard_bytes);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "bytes=%llu "), combs[i].sadb_comb_hard_bytes);
 		if (combs[i].sadb_comb_hard_addtime)
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "post-add secs=%llu "),
 			    combs[i].sadb_comb_hard_addtime);
 		if (combs[i].sadb_comb_hard_usetime)
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "post-use secs=%llu"),
 			    combs[i].sadb_comb_hard_usetime);
 
-		(void) printf(dgettext(TEXT_DOMAIN, "\n%s SOFT: "), prefix);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "\n%s SOFT: "),
+		    prefix);
 		if (combs[i].sadb_comb_soft_allocations)
-			(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u "),
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_soft_allocations);
 		if (combs[i].sadb_comb_soft_bytes)
-			(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu "),
-			    combs[i].sadb_comb_soft_bytes);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "bytes=%llu "), combs[i].sadb_comb_soft_bytes);
 		if (combs[i].sadb_comb_soft_addtime)
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "post-add secs=%llu "),
 			    combs[i].sadb_comb_soft_addtime);
 		if (combs[i].sadb_comb_soft_usetime)
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "post-use secs=%llu"),
 			    combs[i].sadb_comb_soft_usetime);
-		(void) putchar('\n');
+		(void) fprintf(file, "\n");
 	}
 }
 
@@ -1932,87 +1951,91 @@ print_prop(char *prefix, struct sadb_prop *prop)
  * Print an extended proposal (SADB_X_EXT_EPROP).
  */
 void
-print_eprop(char *prefix, struct sadb_prop *eprop)
+print_eprop(FILE *file, char *prefix, struct sadb_prop *eprop)
 {
 	uint64_t *sofar;
 	struct sadb_x_ecomb *ecomb;
 	struct sadb_x_algdesc *algdesc;
 	int i, j;
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sExtended Proposal, replay counter = %u, "), prefix,
 	    eprop->sadb_prop_replay);
-	(void) printf(dgettext(TEXT_DOMAIN, "number of combinations = %u.\n"),
-	    eprop->sadb_x_prop_numecombs);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
+	    "number of combinations = %u.\n"), eprop->sadb_x_prop_numecombs);
 
 	sofar = (uint64_t *)(eprop + 1);
 	ecomb = (struct sadb_x_ecomb *)sofar;
 
 	for (i = 0; i < eprop->sadb_x_prop_numecombs; ) {
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s Extended combination #%u:\n"), prefix, ++i);
 
-		(void) printf(dgettext(TEXT_DOMAIN, "%s HARD: "), prefix);
-		(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u, "),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s HARD: "),
+		    prefix);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_hard_allocations);
-		(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu, "),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%llu, "),
 		    ecomb->sadb_x_ecomb_hard_bytes);
-		(void) printf(dgettext(TEXT_DOMAIN, "post-add secs=%llu, "),
-		    ecomb->sadb_x_ecomb_hard_addtime);
-		(void) printf(dgettext(TEXT_DOMAIN, "post-use secs=%llu\n"),
-		    ecomb->sadb_x_ecomb_hard_usetime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "post-add secs=%llu, "), ecomb->sadb_x_ecomb_hard_addtime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "post-use secs=%llu\n"), ecomb->sadb_x_ecomb_hard_usetime);
 
-		(void) printf(dgettext(TEXT_DOMAIN, "%s SOFT: "), prefix);
-		(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u, "),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s SOFT: "),
+		    prefix);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_soft_allocations);
-		(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu, "),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%llu, "),
 		    ecomb->sadb_x_ecomb_soft_bytes);
-		(void) printf(dgettext(TEXT_DOMAIN, "post-add secs=%llu, "),
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "post-add secs=%llu, "),
 		    ecomb->sadb_x_ecomb_soft_addtime);
-		(void) printf(dgettext(TEXT_DOMAIN, "post-use secs=%llu\n"),
-		    ecomb->sadb_x_ecomb_soft_usetime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "post-use secs=%llu\n"), ecomb->sadb_x_ecomb_soft_usetime);
 
 		sofar = (uint64_t *)(ecomb + 1);
 		algdesc = (struct sadb_x_algdesc *)sofar;
 
 		for (j = 0; j < ecomb->sadb_x_ecomb_numalgs; ) {
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "%s Alg #%u "), prefix, ++j);
 			switch (algdesc->sadb_x_algdesc_satype) {
 			case SADB_SATYPE_ESP:
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for ESP "));
 				break;
 			case SADB_SATYPE_AH:
-				(void) printf(dgettext(TEXT_DOMAIN, "for AH "));
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
+				    "for AH "));
 				break;
 			default:
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for satype=%d "),
 				    algdesc->sadb_x_algdesc_satype);
 			}
 			switch (algdesc->sadb_x_algdesc_algtype) {
 			case SADB_X_ALGTYPE_CRYPT:
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "Encryption = "));
 				(void) dump_ealg(algdesc->sadb_x_algdesc_alg,
-				    stdout);
+				    file);
 				break;
 			case SADB_X_ALGTYPE_AUTH:
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "Authentication = "));
 				(void) dump_aalg(algdesc->sadb_x_algdesc_alg,
-				    stdout);
+				    file);
 				break;
 			default:
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "algtype(%d) = alg(%d)"),
 				    algdesc->sadb_x_algdesc_algtype,
 				    algdesc->sadb_x_algdesc_alg);
 				break;
 			}
 
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "  minbits=%u, maxbits=%u.\n"),
 			    algdesc->sadb_x_algdesc_minbits,
 			    algdesc->sadb_x_algdesc_maxbits);
@@ -2027,36 +2050,36 @@ print_eprop(char *prefix, struct sadb_prop *eprop)
  * Print an SADB_EXT_SUPPORTED extension.
  */
 void
-print_supp(char *prefix, struct sadb_supported *supp)
+print_supp(FILE *file, char *prefix, struct sadb_supported *supp)
 {
 	struct sadb_alg *algs;
 	int i, numalgs;
 
-	(void) printf(dgettext(TEXT_DOMAIN, "%sSupported "), prefix);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "%sSupported "), prefix);
 	switch (supp->sadb_supported_exttype) {
 	case SADB_EXT_SUPPORTED_AUTH:
-		(void) printf(dgettext(TEXT_DOMAIN, "authentication"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "authentication"));
 		break;
 	case SADB_EXT_SUPPORTED_ENCRYPT:
-		(void) printf(dgettext(TEXT_DOMAIN, "encryption"));
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "encryption"));
 		break;
 	}
-	(void) printf(dgettext(TEXT_DOMAIN, " algorithms.\n"));
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, " algorithms.\n"));
 
 	algs = (struct sadb_alg *)(supp + 1);
 	numalgs = supp->sadb_supported_len - SADB_8TO64(sizeof (*supp));
 	numalgs /= SADB_8TO64(sizeof (*algs));
 	for (i = 0; i < numalgs; i++) {
-		(void) printf("%s", prefix);
+		(void) fprintf(file, "%s", prefix);
 		switch (supp->sadb_supported_exttype) {
 		case SADB_EXT_SUPPORTED_AUTH:
-			(void) dump_aalg(algs[i].sadb_alg_id, stdout);
+			(void) dump_aalg(algs[i].sadb_alg_id, file);
 			break;
 		case SADB_EXT_SUPPORTED_ENCRYPT:
-			(void) dump_ealg(algs[i].sadb_alg_id, stdout);
+			(void) dump_ealg(algs[i].sadb_alg_id, file);
 			break;
 		}
-		(void) printf(dgettext(TEXT_DOMAIN,
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    " minbits=%u, maxbits=%u, ivlen=%u.\n"),
 		    algs[i].sadb_alg_minbits, algs[i].sadb_alg_maxbits,
 		    algs[i].sadb_alg_ivlen);
@@ -2067,9 +2090,9 @@ print_supp(char *prefix, struct sadb_supported *supp)
  * Print an SADB_EXT_SPIRANGE extension.
  */
 void
-print_spirange(char *prefix, struct sadb_spirange *range)
+print_spirange(FILE *file, char *prefix, struct sadb_spirange *range)
 {
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sSPI Range, min=0x%x, max=0x%x\n"), prefix,
 	    htonl(range->sadb_spirange_min),
 	    htonl(range->sadb_spirange_max));
@@ -2080,7 +2103,7 @@ print_spirange(char *prefix, struct sadb_spirange *range)
  */
 
 void
-print_kmc(char *prefix, struct sadb_x_kmc *kmc)
+print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 {
 	char *cookie_label;
 
@@ -2088,7 +2111,7 @@ print_kmc(char *prefix, struct sadb_x_kmc *kmc)
 	    NULL)
 		cookie_label = dgettext(TEXT_DOMAIN, "<Label not found.>");
 
-	(void) printf(dgettext(TEXT_DOMAIN,
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
 	    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
 	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
 }
@@ -2098,7 +2121,8 @@ print_kmc(char *prefix, struct sadb_x_kmc *kmc)
  * and GET.
  */
 void
-print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
+print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
+    boolean_t vflag, boolean_t ignore_nss)
 {
 	uint64_t *current;
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
@@ -2109,7 +2133,7 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 
 	(void) time(&wallclock);
 
-	print_sadb_msg(samsg, want_timestamp ? wallclock : 0, vflag);
+	print_sadb_msg(file, samsg, want_timestamp ? wallclock : 0, vflag);
 	current = (uint64_t *)(samsg + 1);
 	while (current - buffer < samsg->sadb_msg_len) {
 		int lenbytes;
@@ -2118,7 +2142,7 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 		lenbytes = SADB_64TO8(ext->sadb_ext_len);
 		switch (ext->sadb_ext_type) {
 		case SADB_EXT_SA:
-			print_sa(dgettext(TEXT_DOMAIN,
+			print_sa(file, dgettext(TEXT_DOMAIN,
 			    "SA: "), (struct sadb_sa *)current);
 			break;
 		/*
@@ -2136,79 +2160,79 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 			break;
 
 		case SADB_EXT_ADDRESS_SRC:
-			print_address(dgettext(TEXT_DOMAIN, "SRC: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "SRC: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		case SADB_X_EXT_ADDRESS_INNER_SRC:
-			print_address(dgettext(TEXT_DOMAIN, "INS: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "INS: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		case SADB_EXT_ADDRESS_DST:
-			print_address(dgettext(TEXT_DOMAIN, "DST: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "DST: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		case SADB_X_EXT_ADDRESS_INNER_DST:
-			print_address(dgettext(TEXT_DOMAIN, "IND: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "IND: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		case SADB_EXT_KEY_AUTH:
-			print_key(dgettext(TEXT_DOMAIN,
+			print_key(file, dgettext(TEXT_DOMAIN,
 			    "AKY: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_KEY_ENCRYPT:
-			print_key(dgettext(TEXT_DOMAIN,
+			print_key(file, dgettext(TEXT_DOMAIN,
 			    "EKY: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_IDENTITY_SRC:
-			print_ident(dgettext(TEXT_DOMAIN, "SID: "),
+			print_ident(file, dgettext(TEXT_DOMAIN, "SID: "),
 			    (struct sadb_ident *)current);
 			break;
 		case SADB_EXT_IDENTITY_DST:
-			print_ident(dgettext(TEXT_DOMAIN, "DID: "),
+			print_ident(file, dgettext(TEXT_DOMAIN, "DID: "),
 			    (struct sadb_ident *)current);
 			break;
 		case SADB_EXT_SENSITIVITY:
-			print_sens(dgettext(TEXT_DOMAIN, "SNS: "),
+			print_sens(file, dgettext(TEXT_DOMAIN, "SNS: "),
 			    (struct sadb_sens *)current);
 			break;
 		case SADB_EXT_PROPOSAL:
-			print_prop(dgettext(TEXT_DOMAIN, "PRP: "),
+			print_prop(file, dgettext(TEXT_DOMAIN, "PRP: "),
 			    (struct sadb_prop *)current);
 			break;
 		case SADB_EXT_SUPPORTED_AUTH:
-			print_supp(dgettext(TEXT_DOMAIN, "SUA: "),
+			print_supp(file, dgettext(TEXT_DOMAIN, "SUA: "),
 			    (struct sadb_supported *)current);
 			break;
 		case SADB_EXT_SUPPORTED_ENCRYPT:
-			print_supp(dgettext(TEXT_DOMAIN, "SUE: "),
+			print_supp(file, dgettext(TEXT_DOMAIN, "SUE: "),
 			    (struct sadb_supported *)current);
 			break;
 		case SADB_EXT_SPIRANGE:
-			print_spirange(dgettext(TEXT_DOMAIN, "SPR: "),
+			print_spirange(file, dgettext(TEXT_DOMAIN, "SPR: "),
 			    (struct sadb_spirange *)current);
 			break;
 		case SADB_X_EXT_EPROP:
-			print_eprop(dgettext(TEXT_DOMAIN, "EPR: "),
+			print_eprop(file, dgettext(TEXT_DOMAIN, "EPR: "),
 			    (struct sadb_prop *)current);
 			break;
 		case SADB_X_EXT_KM_COOKIE:
-			print_kmc(dgettext(TEXT_DOMAIN, "KMC: "),
+			print_kmc(file, dgettext(TEXT_DOMAIN, "KMC: "),
 			    (struct sadb_x_kmc *)current);
 			break;
 		case SADB_X_EXT_ADDRESS_NATT_REM:
-			print_address(dgettext(TEXT_DOMAIN, "NRM: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "NRM: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		case SADB_X_EXT_ADDRESS_NATT_LOC:
-			print_address(dgettext(TEXT_DOMAIN, "NLC: "),
-			    (struct sadb_address *)current);
+			print_address(file, dgettext(TEXT_DOMAIN, "NLC: "),
+			    (struct sadb_address *)current, ignore_nss);
 			break;
 		default:
-			(void) printf(dgettext(TEXT_DOMAIN,
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "UNK: Unknown ext. %d, len %d.\n"),
 			    ext->sadb_ext_type, lenbytes);
 			for (i = 0; i < ext->sadb_ext_len; i++)
-				(void) printf(dgettext(TEXT_DOMAIN,
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "UNK: 0x%llx\n"), ((uint64_t *)ext)[i]);
 			break;
 		}
@@ -2219,14 +2243,15 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 	 * Print lifetimes NOW.
 	 */
 	if (currentlt != NULL || hardlt != NULL || softlt != NULL)
-		print_lifetimes(wallclock, currentlt, hardlt, softlt, vflag);
+		print_lifetimes(file, wallclock, currentlt, hardlt, softlt,
+		    vflag);
 
 	if (current - buffer != samsg->sadb_msg_len) {
-		warnx(dgettext(TEXT_DOMAIN, "WARNING: insufficient buffer "
-		    "space or corrupt message."));
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
+		    "WARNING: insufficient buffer space or corrupt message."));
 	}
 
-	(void) fflush(stdout);	/* Make sure our message is out there. */
+	(void) fflush(file);	/* Make sure our message is out there. */
 }
 
 /*
