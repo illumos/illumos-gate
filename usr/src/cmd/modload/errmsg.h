@@ -137,7 +137,7 @@ extern "C" {
 
 /* remdrv messages */
 
-#define	REM_USAGE1 "Usage:\n\t rem_drv [ -b <basedir> ] driver_name\n"
+#define	REM_USAGE1 "Usage:\n\t rem_drv [ -C ] [ -b <basedir> ] driver_name\n"
 #define	ERR_NO_MAJ	"Cannot get major number for :  %s\n"
 #define	ERR_UNLINK	"Warning: Cannot remove %s from devfs namespace.\n"
 #define	ERR_PIPE	"System error : Cannot create pipe\n"

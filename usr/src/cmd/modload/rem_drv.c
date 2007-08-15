@@ -41,12 +41,17 @@
 #include <ftw.h>
 #include <sys/types.h>
 #include <sys/mkdev.h>
+#include <sys/modctl.h>
+#include <sys/instance.h>
+#include <libdevinfo.h>
+
 #include "addrem.h"
 #include "errmsg.h"
 
 #define	FT_DEPTH	15	/* device tree depth for nftw() */
 
 static void usage(void);
+static void cleanup_devfs_attributes(char *, char *);
 
 int
 main(int argc, char *argv[])
@@ -56,6 +61,7 @@ main(int argc, char *argv[])
 	int server = 0, mod_unloaded = 0;
 	int modid, found;
 	char maj_num[MAX_STR_MAJOR + 1];
+	int cleanup = 0;
 	int err;
 
 	(void) setlocale(LC_ALL, "");
@@ -71,7 +77,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	while ((opt = getopt(argc, argv, "b:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:C")) != -1) {
 		switch (opt) {
 		case 'b' :
 			server = 1;
@@ -81,6 +87,9 @@ main(int argc, char *argv[])
 				exit(1);
 			}
 			(void) strcat(basedir, optarg);
+			break;
+		case 'C':
+			cleanup = 1;
 			break;
 		case '?' :
 			usage();
@@ -182,7 +191,7 @@ main(int argc, char *argv[])
 		err = devfs_rm_minor_perm(driver_name, log_minorperm_error);
 		if (err != 0) {
 			(void) fprintf(stderr, gettext(ERR_UPDATE_PERM),
-				driver_name, err);
+			    driver_name, err);
 		}
 	}
 
@@ -192,22 +201,91 @@ main(int argc, char *argv[])
 	remove_entry(CLEAN_ALL, driver_name);
 
 	/*
-	 * Clean up any dangling devfs shadow nodes for this
-	 * driver so that, in the event the driver is re-added
+	 * Optionally clean up any dangling devfs shadow nodes for
+	 * this driver so that, in the event the driver is re-added
 	 * to the system, newly created nodes won't incorrectly
 	 * pick up these stale shadow node permissions.
 	 */
-	if (basedir == NULL || (strcmp(basedir, "/") == 0)) {
-		err = modctl(MODREMDRVCLEANUP, driver_name, 0, NULL);
-		if (err != 0) {
-			(void) fprintf(stderr, gettext(ERR_REMDRV_CLEANUP),
-				driver_name, err);
+	if (cleanup) {
+		if ((basedir == NULL || (strcmp(basedir, "/") == 0))) {
+			err = modctl(MODREMDRVCLEANUP, driver_name, 0, NULL);
+			if (err != 0) {
+				(void) fprintf(stderr,
+				    gettext(ERR_REMDRV_CLEANUP),
+				    driver_name, err);
+			}
+		} else if (strcmp(basedir, "/") != 0) {
+			cleanup_devfs_attributes(basedir, driver_name);
 		}
 	}
 
 	exit_unlock();
 
 	return (NOERR);
+}
+
+/*
+ * Optionally remove attribute nodes for a driver when
+ * removing drivers on a mounted root image.  Useful
+ * when reprovisioning a machine to return to default
+ * permission/ownership settings if the driver is
+ * re-installed.
+ */
+typedef struct cleanup_arg {
+	char	*ca_basedir;
+	char	*ca_drvname;
+} cleanup_arg_t;
+
+
+/*
+ * Callback to remove a minor node for a device
+ */
+/*ARGSUSED*/
+static int
+cleanup_minor_walker(void *cb_arg, const char *minor_path)
+{
+	if (unlink(minor_path) == -1) {
+		(void) fprintf(stderr, "rem_drv: error removing %s\n",
+		    minor_path, strerror(errno));
+	}
+	return (DI_WALK_CONTINUE);
+}
+
+/*
+ * Callback for each device registered in the binding file (path_to_inst)
+ */
+static int
+cleanup_device_walker(void *cb_arg, const char *inst_path,
+    int inst_number, const char *inst_driver)
+{
+	char path[MAXPATHLEN];
+	cleanup_arg_t *arg = (cleanup_arg_t *)cb_arg;
+	int rv = DI_WALK_CONTINUE;
+
+	if (strcmp(inst_driver, arg->ca_drvname) == 0) {
+		if (snprintf(path, MAXPATHLEN, "%s/devices%s",
+		    arg->ca_basedir, inst_path) < MAXPATHLEN) {
+			rv = devfs_walk_minor_nodes(path,
+			    cleanup_minor_walker, NULL);
+		}
+	}
+	return (rv);
+}
+
+static void
+cleanup_devfs_attributes(char *basedir, char *driver_name)
+{
+	int rv;
+	cleanup_arg_t arg;
+	char binding_path[MAXPATHLEN+1];
+
+	(void) snprintf(binding_path, MAXPATHLEN,
+	    "%s%s", basedir, INSTANCE_FILE);
+
+	arg.ca_basedir = basedir;
+	arg.ca_drvname = driver_name;
+	(void) devfs_parse_binding_file(binding_path,
+	    cleanup_device_walker, (void *)&arg);
 }
 
 static void

@@ -518,7 +518,7 @@ di_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	*devp = makedevice(getmajor(*devp), (minor_t)(m + DI_NODE_SPECIES));
 
 	dcmn_err((CE_CONT, "di_open: thread = %p, assigned minor = %d\n",
-		(void *)curthread, m + DI_NODE_SPECIES));
+	    (void *)curthread, m + DI_NODE_SPECIES));
 
 	return (0);
 }
@@ -548,7 +548,7 @@ di_close(dev_t dev, int flag, int otype, cred_t *cred_p)
 	mutex_enter(&di_lock);
 	di_states[m] = NULL;
 	dcmn_err((CE_CONT, "di_close: thread = %p, assigned minor = %d\n",
-		(void *)curthread, m + DI_NODE_SPECIES));
+	    (void *)curthread, m + DI_NODE_SPECIES));
 	mutex_exit(&di_lock);
 
 	return (0);
@@ -1021,7 +1021,7 @@ static di_off_t
 di_checkmem(struct di_state *st, di_off_t off, size_t size)
 {
 	dcmn_err3((CE_CONT, "di_checkmem: off=%x size=%x\n",
-			off, (int)size));
+	    off, (int)size));
 
 	/*
 	 * di_checkmem() shouldn't be called with a size of zero.
@@ -1055,7 +1055,7 @@ di_copyformat(di_off_t off, struct di_state *st, intptr_t arg, int mode)
 	struct di_all *all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 
 	dcmn_err2((CE_CONT, "di_copyformat: off=%x, arg=%p mode=%x\n",
-		off, (void *)arg, mode));
+	    off, (void *)arg, mode));
 
 	/*
 	 * Copyin data and check version.
@@ -1123,7 +1123,7 @@ di_mem_addr(struct di_state *st, di_off_t off)
 	struct di_mem *dcp = st->memlist;
 
 	dcmn_err3((CE_CONT, "di_mem_addr: dcp=%p off=%x\n",
-		(void *)dcp, off));
+	    (void *)dcp, off));
 
 	ASSERT(off < st->mem_size);
 
@@ -1133,7 +1133,7 @@ di_mem_addr(struct di_state *st, di_off_t off)
 	}
 
 	dcmn_err3((CE_CONT, "di_mem_addr: new off=%x, return = %p\n",
-		off, (void *)(dcp->buf + off)));
+	    off, (void *)(dcp->buf + off)));
 
 	return (dcp->buf + off);
 }
@@ -1395,6 +1395,12 @@ di_snapshot_and_clean(struct di_state *st)
 		 * So enable modunload only after the cleanup.
 		 */
 		i_ddi_clean_devices_files();
+		/*
+		 * Remove backing store nodes for unused devices,
+		 * which retain past permissions customizations
+		 * and may be undesired for newly configured devices.
+		 */
+		dev_devices_cleanup();
 	}
 	modunload_enable();
 
@@ -1416,8 +1422,8 @@ build_vhci_list(dev_info_t *vh_devinfo, void *arg)
 	dcmn_err3((CE_CONT, "build_vhci list\n"));
 
 	dcmn_err3((CE_CONT, "vhci node %s, instance #%d\n",
-		DEVI(vh_devinfo)->devi_node_name,
-		DEVI(vh_devinfo)->devi_instance));
+	    DEVI(vh_devinfo)->devi_node_name,
+	    DEVI(vh_devinfo)->devi_instance));
 
 	st = (struct di_state *)arg;
 	if (di_dip_find(st, vh_devinfo, &off) != 0) {
@@ -1426,7 +1432,7 @@ build_vhci_list(dev_info_t *vh_devinfo, void *arg)
 	}
 
 	dcmn_err3((CE_CONT, "st->mem_size: %d vh_devinfo off: 0x%x\n",
-		st->mem_size, off));
+	    st->mem_size, off));
 
 	all = (struct di_all *)(intptr_t)di_mem_addr(st, 0);
 	if (all->top_vhci_devinfo == 0) {
@@ -1464,7 +1470,7 @@ build_phci_list(dev_info_t *ph_devinfo, void *arg)
 	pwa = (phci_walk_arg_t *)arg;
 
 	dcmn_err3((CE_CONT, "build_phci list for vhci at offset: 0x%x\n",
-		pwa->off));
+	    pwa->off));
 
 	vh_di_node = (struct di_node *)(intptr_t)di_mem_addr(pwa->st, pwa->off);
 
@@ -1474,8 +1480,8 @@ build_phci_list(dev_info_t *ph_devinfo, void *arg)
 	}
 
 	dcmn_err3((CE_CONT, "phci node %s, instance #%d, at offset 0x%x\n",
-		DEVI(ph_devinfo)->devi_node_name,
-		DEVI(ph_devinfo)->devi_instance, off));
+	    DEVI(ph_devinfo)->devi_node_name,
+	    DEVI(ph_devinfo)->devi_instance, off));
 
 	if (vh_di_node->top_phci == 0) {
 		vh_di_node->top_phci = off;
@@ -1550,7 +1556,7 @@ di_copydevnm(di_off_t *off_p, struct di_state *st)
 	*off_p = off;
 
 	dcmn_err((CE_CONT, "Start copying devnamesp[%d] at offset 0x%x\n",
-		devcnt, off));
+	    devcnt, off));
 
 	dnp = (struct di_devnm *)(intptr_t)di_mem_addr(st, off);
 	off += size;
@@ -1570,13 +1576,13 @@ di_copydevnm(di_off_t *off_p, struct di_state *st)
 		 * the same problem.
 		 */
 		dcmn_err2((CE_CONT, "di_copydevnm: %s%d, off=%x\n",
-			devnamesp[i].dn_name, devnamesp[i].dn_instance,
-			off));
+		    devnamesp[i].dn_name, devnamesp[i].dn_instance,
+		    off));
 
 		off = di_checkmem(st, off, strlen(devnamesp[i].dn_name) + 1);
 		dnp[i].name = off;
 		(void) strcpy((char *)di_mem_addr(st, off),
-			devnamesp[i].dn_name);
+		    devnamesp[i].dn_name);
 		off += DI_ALIGN(strlen(devnamesp[i].dn_name) + 1);
 
 		mutex_enter(&devnamesp[i].dn_lock);
@@ -1636,7 +1642,7 @@ di_copytree(struct dev_info *root, di_off_t *off_p, struct di_state *st)
 	struct di_stack *dsp = kmem_zalloc(sizeof (struct di_stack), KM_SLEEP);
 
 	dcmn_err((CE_CONT, "di_copytree: root = %p, *off_p = %x\n",
-		(void *)root, *off_p));
+	    (void *)root, *off_p));
 
 	/* force attach drivers */
 	if (i_ddi_devi_attached((dev_info_t *)root) &&
@@ -1683,8 +1689,7 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 	struct di_node *me;
 	struct dev_info *node;
 
-	dcmn_err2((CE_CONT, "di_copynode: depth = %x\n",
-			dsp->depth));
+	dcmn_err2((CE_CONT, "di_copynode: depth = %x\n", dsp->depth));
 
 	node = TOP_NODE(dsp);
 
@@ -1698,7 +1703,7 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 	me = DI_NODE(di_mem_addr(st, off));
 
 	dcmn_err((CE_CONT, "copy node %s, instance #%d, at offset 0x%x\n",
-			node->devi_node_name, node->devi_instance, off));
+	    node->devi_node_name, node->devi_instance, off));
 
 	/*
 	 * Node parameters:
@@ -1791,7 +1796,7 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 		me->compat_names = off;
 		me->compat_length = node->devi_compat_length;
 		bcopy(node->devi_compat_names, di_mem_addr(st, off),
-			node->devi_compat_length);
+		    node->devi_compat_length);
 		off += node->devi_compat_length;
 	}
 
@@ -1884,19 +1889,19 @@ property:
 	if (node->devi_drv_prop_ptr) {	/* driver property list */
 		me->drv_prop = DI_ALIGN(off);
 		off = di_getprop(node->devi_drv_prop_ptr, &me->drv_prop, st,
-			node, DI_PROP_DRV_LIST);
+		    node, DI_PROP_DRV_LIST);
 	}
 
 	if (node->devi_sys_prop_ptr) {	/* system property list */
 		me->sys_prop = DI_ALIGN(off);
 		off = di_getprop(node->devi_sys_prop_ptr, &me->sys_prop, st,
-			node, DI_PROP_SYS_LIST);
+		    node, DI_PROP_SYS_LIST);
 	}
 
 	if (node->devi_hw_prop_ptr) {	/* hardware property list */
 		me->hw_prop = DI_ALIGN(off);
 		off = di_getprop(node->devi_hw_prop_ptr, &me->hw_prop, st,
-			node, DI_PROP_HW_LIST);
+		    node, DI_PROP_HW_LIST);
 	}
 
 	if (node->devi_global_prop_list == NULL) {
@@ -2455,7 +2460,7 @@ di_getmdata(struct ddi_minor_data *mnode, di_off_t *off_p, di_off_t node,
 
 		if (mnode->ddm_name) {
 			off = di_checkmem(st, off,
-				strlen(mnode->ddm_name) + 1);
+			    strlen(mnode->ddm_name) + 1);
 			me->name = off;
 			(void) strcpy(di_mem_addr(st, off), mnode->ddm_name);
 			off += DI_ALIGN(strlen(mnode->ddm_name) + 1);
@@ -2463,10 +2468,10 @@ di_getmdata(struct ddi_minor_data *mnode, di_off_t *off_p, di_off_t node,
 
 		if (mnode->ddm_node_type) {
 			off = di_checkmem(st, off,
-				strlen(mnode->ddm_node_type) + 1);
+			    strlen(mnode->ddm_node_type) + 1);
 			me->node_type = off;
 			(void) strcpy(di_mem_addr(st, off),
-					mnode->ddm_node_type);
+			    mnode->ddm_node_type);
 			off += DI_ALIGN(strlen(mnode->ddm_node_type) + 1);
 		}
 
@@ -3135,7 +3140,7 @@ di_match_drv_name(struct dev_info *node, struct di_state *st, int match)
 	struct di_priv_format *form;
 
 	dcmn_err2((CE_CONT, "di_match_drv_name: node = %s, match = %x\n",
-		node->devi_node_name, match));
+	    node->devi_node_name, match));
 
 	if (match == DI_MATCH_PARENT) {
 		node = DEVI(node->devi_parent);
@@ -3164,11 +3169,11 @@ di_match_drv_name(struct dev_info *node, struct di_state *st, int match)
 	if (match == DI_MATCH_PARENT) {
 		count = all->n_ppdata;
 		form = (struct di_priv_format *)
-			(intptr_t)(di_mem_addr(st, 0) + all->ppdata_format);
+		    (intptr_t)(di_mem_addr(st, 0) + all->ppdata_format);
 	} else {
 		count = all->n_dpdata;
 		form = (struct di_priv_format *)
-			(intptr_t)((caddr_t)all + all->dpdata_format);
+		    (intptr_t)((caddr_t)all + all->dpdata_format);
 	}
 
 	len = strlen(drv_name);
@@ -3240,8 +3245,8 @@ di_getprvdata(struct di_priv_format *pdp, struct dev_info *node,
 			 * first, get the pointer content
 			 */
 			if ((pdp->ptr[i].offset < 0) ||
-				(pdp->ptr[i].offset >
-				pdp->bytes - sizeof (char *)))
+			    (pdp->ptr[i].offset >
+			    pdp->bytes - sizeof (char *)))
 				goto failure;	/* wrong offset */
 
 			pa = di_mem_addr(st, off + pdp->ptr[i].offset);

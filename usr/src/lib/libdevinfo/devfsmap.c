@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +49,7 @@
 #endif /* __sparc */
 #include "libdevinfo.h"
 #include "device_info.h"
+#include <regex.h>
 
 #define	isnewline(ch)	((ch) == '\n' || (ch) == '\r' || (ch) == '\f')
 #define	isnamechar(ch)  (isalpha(ch) || isdigit(ch) || (ch) == '_' ||\
@@ -79,8 +79,6 @@
  */
 #define	QUOTE(x)	#x
 #define	VAL2STR(x)	QUOTE(x)
-
-#ifdef __sparc
 
 typedef enum {
 	CLIENT_TYPE_UNKNOWN,
@@ -135,7 +133,6 @@ struct conf_file {
 
 static char *tok_err = "Unexpected token '%s'\n";
 
-#endif /* __sparc */
 
 /* #define	DEBUG */
 
@@ -157,7 +154,6 @@ static void log_pathlist(char **);
 #define	logdmsg(args)	/* nothing */
 #endif /* DEBUG */
 
-#ifdef __sparc
 
 /*
  * Leave NEWLINE as the next character.
@@ -412,6 +408,8 @@ digit:
 
 	return (token);
 }
+
+#ifdef __sparc
 
 static void
 free_confent(struct conf_entry *confent)
@@ -1841,6 +1839,280 @@ devfs_install2target(const char *rootdir, const char *devname, char *buf,
 	return (get_target_devlink((char *)rootdir, physpath, buf, bufsz));
 }
 
+/*
+ * A parser for /etc/path_to_inst.
+ * The user-supplied callback is called once for each entry in the file.
+ * Returns 0 on success, ENOMEM/ENOENT/EINVAL on error.
+ * Callback may return DI_WALK_TERMINATE to terminate the walk,
+ * otherwise DI_WALK_CONTINUE.
+ */
+int
+devfs_parse_binding_file(const char *binding_file,
+	int (*callback)(void *, const char *, int,
+	    const char *), void *cb_arg)
+{
+	token_t token;
+	struct conf_file file;
+	char tokval[MAX_TOKEN_SIZE];
+	enum { STATE_RESET, STATE_DEVPATH, STATE_INSTVAL } state;
+	char *devpath;
+	char *bindname;
+	int instval = 0;
+	int rv;
+
+	if ((devpath = calloc(1, MAXPATHLEN)) == NULL)
+		return (ENOMEM);
+	if ((bindname = calloc(1, MAX_TOKEN_SIZE)) == NULL)
+		return (ENOMEM);
+
+	if ((file.fp = fopen(binding_file, "r")) == NULL) {
+		free(devpath);
+		free(bindname);
+		return (errno);
+	}
+
+	file.filename = (char *)binding_file;
+	file.linenum = 1;
+
+	state = STATE_RESET;
+	while ((token = lex(&file, tokval, MAX_TOKEN_SIZE)) != T_EOF) {
+		switch (token) {
+		case T_POUND:
+			/*
+			 * Skip comments.
+			 */
+			find_eol(file.fp);
+			break;
+		case T_NAME:
+		case T_STRING:
+			switch (state) {
+			case STATE_RESET:
+				if (strlcpy(devpath, tokval,
+				    MAXPATHLEN) >= MAXPATHLEN)
+					goto err;
+				state = STATE_DEVPATH;
+				break;
+			case STATE_INSTVAL:
+				if (strlcpy(bindname, tokval,
+				    MAX_TOKEN_SIZE) >= MAX_TOKEN_SIZE)
+					goto err;
+				rv = callback(cb_arg,
+				    devpath, instval, bindname);
+				if (rv == DI_WALK_TERMINATE)
+					goto done;
+				if (rv != DI_WALK_CONTINUE)
+					goto err;
+				state = STATE_RESET;
+				break;
+			default:
+				file_err(&file, tok_err, tokval);
+				state = STATE_RESET;
+				break;
+			}
+			break;
+		case T_DECVAL:
+		case T_HEXVAL:
+			switch (state) {
+			case STATE_DEVPATH:
+				instval = (int)strtol(tokval, NULL, 0);
+				state = STATE_INSTVAL;
+				break;
+			default:
+				file_err(&file, tok_err, tokval);
+				state = STATE_RESET;
+				break;
+			}
+			break;
+		case T_NEWLINE:
+			file.linenum++;
+			state = STATE_RESET;
+			break;
+		default:
+			file_err(&file, tok_err, tokval);
+			state = STATE_RESET;
+			break;
+		}
+	}
+
+done:
+	(void) fclose(file.fp);
+	free(devpath);
+	free(bindname);
+	return (0);
+
+err:
+	(void) fclose(file.fp);
+	free(devpath);
+	free(bindname);
+	return (EINVAL);
+}
+
+/*
+ * Walk the minor nodes of all children below the specified device
+ * by calling the provided callback with the path to each minor.
+ */
+static int
+devfs_walk_children_minors(const char *device_path, struct stat *st,
+    int (*callback)(void *, const char *), void *cb_arg, int *terminate)
+{
+	DIR *dir;
+	struct dirent *dp;
+	char *minor_path = NULL;
+	int need_close = 0;
+	int rv;
+
+	if ((minor_path = calloc(1, MAXPATHLEN)) == NULL)
+		return (ENOMEM);
+
+	if ((dir = opendir(device_path)) == NULL) {
+		rv = ENOENT;
+		goto err;
+	}
+	need_close = 1;
+
+	while ((dp = readdir(dir)) != NULL) {
+		if ((strcmp(dp->d_name, ".") == 0) ||
+		    (strcmp(dp->d_name, "..") == 0))
+			continue;
+		(void) snprintf(minor_path, MAXPATHLEN,
+		    "%s/%s", device_path, dp->d_name);
+		if (stat(minor_path, st) == -1)
+			continue;
+		if (S_ISDIR(st->st_mode)) {
+			rv = devfs_walk_children_minors(
+			    (const char *)minor_path, st,
+			    callback, cb_arg, terminate);
+			if (rv != 0)
+				goto err;
+			if (*terminate)
+				break;
+		} else {
+			rv = callback(cb_arg, minor_path);
+			if (rv == DI_WALK_TERMINATE) {
+				*terminate = 1;
+				break;
+			}
+			if (rv != DI_WALK_CONTINUE) {
+				rv = EINVAL;
+				goto err;
+			}
+		}
+	}
+
+	rv = 0;
+err:
+	if (need_close)
+		(void) closedir(dir);
+	if (minor_path)
+		free(minor_path);
+	return (rv);
+}
+
+/*
+ * Return the path to each minor node for a device by
+ * calling the provided callback.
+ */
+static int
+devfs_walk_device_minors(const char *device_path, struct stat *st,
+    int (*callback)(void *, const char *), void *cb_arg, int *terminate)
+{
+	char *minor_path;
+	char *devpath;
+	char *expr;
+	regex_t regex;
+	int need_regfree = 0;
+	int need_close = 0;
+	DIR *dir;
+	struct dirent *dp;
+	int rv;
+	char *p;
+
+	minor_path = calloc(1, MAXPATHLEN);
+	devpath = calloc(1, MAXPATHLEN);
+	expr = calloc(1, MAXNAMELEN);
+	if (devpath == NULL || expr == NULL || minor_path == NULL) {
+		rv = ENOMEM;
+		goto err;
+	}
+
+	rv = EINVAL;
+	if (strlcpy(devpath, device_path, MAXPATHLEN) >= MAXPATHLEN)
+		goto err;
+	if ((p = strrchr(devpath, '/')) == NULL)
+		goto err;
+	*p++ = 0;
+	if (strlen(p) == 0)
+		goto err;
+	if (snprintf(expr, MAXNAMELEN, "%s:.*", p) >= MAXNAMELEN)
+		goto err;
+	if (regcomp(&regex, expr, REG_EXTENDED) != 0)
+		goto err;
+	need_regfree = 1;
+
+	if ((dir = opendir(devpath)) == NULL) {
+		rv = ENOENT;
+		goto err;
+	}
+	need_close = 1;
+
+	while ((dp = readdir(dir)) != NULL) {
+		if ((strcmp(dp->d_name, ".") == 0) ||
+		    (strcmp(dp->d_name, "..") == 0))
+			continue;
+		(void) snprintf(minor_path, MAXPATHLEN,
+		    "%s/%s", devpath, dp->d_name);
+		if (stat(minor_path, st) == -1)
+			continue;
+		if ((S_ISBLK(st->st_mode) || S_ISCHR(st->st_mode)) &&
+		    regexec(&regex, dp->d_name, 0, NULL, 0) == 0) {
+			rv = callback(cb_arg, minor_path);
+			if (rv == DI_WALK_TERMINATE) {
+				*terminate = 1;
+				break;
+			}
+			if (rv != DI_WALK_CONTINUE) {
+				rv = EINVAL;
+				goto err;
+			}
+		}
+	}
+
+	rv = 0;
+err:
+	if (need_close)
+		(void) closedir(dir);
+	if (need_regfree)
+		regfree(&regex);
+	if (devpath)
+		free(devpath);
+	if (minor_path)
+		free(minor_path);
+	if (expr)
+		free(expr);
+	return (rv);
+}
+
+/*
+ * Perform a walk of all minor nodes for the specified device,
+ * and minor nodes below the device.
+ */
+int
+devfs_walk_minor_nodes(const char *device_path,
+	int (*callback)(void *, const char *), void *cb_arg)
+{
+	struct stat stbuf;
+	int rv;
+	int terminate = 0;
+
+	rv = devfs_walk_device_minors(device_path,
+	    &stbuf, callback, cb_arg, &terminate);
+	if (rv == 0 && terminate == 0) {
+		rv = devfs_walk_children_minors(device_path,
+		    &stbuf, callback, cb_arg, &terminate);
+	}
+	return (rv);
+}
+
 #ifdef DEBUG
 
 static void
@@ -1918,7 +2190,7 @@ log_confent_list(char *filename, struct conf_entry *confent_list,
 		if (confent->port != -1)
 			log_debug_msg("\tport = %d\n", confent->port);
 		log_debug_msg("\tmpxio_disable = \"%s\"\n\n",
-			    mpxio_disable_string(confent->mpxio_disable));
+		    mpxio_disable_string(confent->mpxio_disable));
 	}
 }
 

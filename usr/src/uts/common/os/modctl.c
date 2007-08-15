@@ -1816,7 +1816,11 @@ modctl_inst_walker(const char *path, in_node_t *np, in_drv_t *dp, void *arg)
 	struct path_elem *pe;
 	char *nodename;
 
-	if (strcmp(dp->ind_driver_name, wargs->wa_drvname) != 0)
+	/*
+	 * Search may be restricted to a single driver in the case of rem_drv
+	 */
+	if (wargs->wa_drvname &&
+	    strcmp(dp->ind_driver_name, wargs->wa_drvname) != 0)
 		return (INST_WALK_CONTINUE);
 
 	pe = kmem_zalloc(sizeof (*pe), KM_SLEEP);
@@ -1831,6 +1835,18 @@ modctl_inst_walker(const char *path, in_node_t *np, in_drv_t *dp, void *arg)
 	return (INST_WALK_CONTINUE);
 }
 
+/*
+ * /devices attribute nodes clean-up optionally performed
+ * when removing a driver (rem_drv -C).
+ *
+ * Removing attribute nodes allows a machine to be reprovisioned
+ * without the side-effect of inadvertently picking up stale
+ * device node ownership or permissions.
+ *
+ * Preserving attributes (not performing cleanup) allows devices
+ * attribute changes to be preserved across upgrades, as
+ * upgrade rather heavy-handedly does a rem_drv/add_drv cycle.
+ */
 static int
 modctl_remdrv_cleanup(const char *u_drvname)
 {
@@ -1892,6 +1908,62 @@ modctl_remdrv_cleanup(const char *u_drvname)
 
 	kmem_free(drvname, MAXMODCONFNAME);
 	return (rval);
+}
+
+/*
+ * Perform a cleanup of non-existent /devices attribute nodes,
+ * similar to rem_drv -C, but for all drivers/devices.
+ * This is also optional, performed as part of devfsadm -C.
+ */
+void
+dev_devices_cleanup()
+{
+	struct walk_args *wargs;
+	struct path_elem *pe;
+	dev_info_t *devi;
+	char *path;
+	int err;
+
+	/*
+	 * It's expected that all drivers have been loaded and
+	 * module unloading disabled while performing cleanup.
+	 */
+	ASSERT(modunload_disable_count > 0);
+
+	wargs = kmem_zalloc(sizeof (*wargs), KM_SLEEP);
+	wargs->wa_drvname = NULL;
+	list_create(&wargs->wa_pathlist,
+	    sizeof (struct path_elem), offsetof(struct path_elem, pe_node));
+
+	(void) e_ddi_walk_instances(modctl_inst_walker, (void *)wargs);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	for (pe = list_head(&wargs->wa_pathlist); pe != NULL;
+	    pe = list_next(&wargs->wa_pathlist, pe)) {
+		(void) snprintf(path, MAXPATHLEN, "%s/%s",
+		    pe->pe_dir, pe->pe_nodename);
+		devi = e_ddi_hold_devi_by_path(path, 0);
+		if (devi != NULL) {
+			ddi_release_devi(devi);
+		} else {
+			err = devfs_remdrv_cleanup((const char *)pe->pe_dir,
+			    (const char *)pe->pe_nodename);
+			if (err) {
+				cmn_err(CE_CONT,
+				    "devfs: %s: clean-up error %d\n",
+				    path, err);
+			}
+		}
+	}
+
+	while ((pe = list_head(&wargs->wa_pathlist)) != NULL) {
+		list_remove(&wargs->wa_pathlist, pe);
+		kmem_free(pe->pe_dir, pe->pe_dirlen);
+		kmem_free(pe, sizeof (*pe));
+	}
+	kmem_free(wargs, sizeof (*wargs));
+	kmem_free(path, MAXPATHLEN);
 }
 
 static int
@@ -4067,10 +4139,12 @@ mod_in_autounload()
 /*
  * gmatch adapted from libc, stripping the wchar stuff
  */
-#define	popchar(p, c) \
-	c = *p++; \
-	if (c == 0) \
-		return (0)
+#define	popchar(p, c)	{ \
+		c = *p++; \
+		if (c == 0) { \
+			return (0); \
+		} \
+	}
 
 int
 gmatch(const char *s, const char *p)

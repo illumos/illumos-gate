@@ -214,6 +214,8 @@ SUNWprivate_1.1 {
 	di_retire_device;
 	di_unretire_device;
 	di_retired;
+	devfs_parse_binding_file;
+	devfs_walk_minor_nodes;
     local:
 	*;
 };

@@ -459,6 +459,14 @@ extern int di_devname_get_mapent(char *, char *, nvlist_t **);
 extern int di_devname_action_on_key(nvlist_t *, uint8_t, char *, void *);
 
 /*
+ * Private interface for parsing path_to_inst binding file
+ */
+extern int devfs_parse_binding_file(const char *,
+	int (*)(void *, const char *, int, const char *), void *);
+extern int devfs_walk_minor_nodes(const char *,
+	int (*)(void *, const char *), void *);
+
+/*
  * finddev - alternate readdir to discover only /dev persisted device names
  */
 typedef struct __finddevhdl *finddevhdl_t;
