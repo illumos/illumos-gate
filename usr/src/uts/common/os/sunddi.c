@@ -7623,6 +7623,12 @@ ddi_devid_init(
 }
 
 int
+ddi_devid_get(dev_info_t *dip, ddi_devid_t *ret_devid)
+{
+	return (i_ddi_devi_get_devid(DDI_DEV_T_ANY, dip, ret_devid));
+}
+
+int
 i_ddi_devi_get_devid(dev_t dev, dev_info_t *dip, ddi_devid_t *ret_devid)
 {
 	char		*devidstr;

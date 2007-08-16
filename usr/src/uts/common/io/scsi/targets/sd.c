@@ -4637,6 +4637,16 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 	ASSERT((SD_DEVINFO(un)) == devi);
 
 	/*
+	 * If transport has already registered a devid for this target
+	 * then that takes precedence over the driver's determination
+	 * of the devid.
+	 */
+	if (ddi_devid_get(SD_DEVINFO(un), &un->un_devid) == DDI_SUCCESS) {
+		ASSERT(un->un_devid);
+		return; /* use devid registered by the transport */
+	}
+
+	/*
 	 * This is the case of antiquated Sun disk drives that have the
 	 * FAB_DEVID property set in the disk_table.  These drives
 	 * manage the devid's by storing them in last 2 available sectors

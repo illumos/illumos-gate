@@ -266,6 +266,7 @@ DRV_KMODS	+= mouse8042
 DRV_KMODS_32	+= mscsi
 DRV_KMODS_32	+= msm
 DRV_KMODS	+= nca
+DRV_KMODS	+= nv_sata
 DRV_KMODS	+= openeepr
 DRV_KMODS	+= pci_pci
 DRV_KMODS	+= pcic

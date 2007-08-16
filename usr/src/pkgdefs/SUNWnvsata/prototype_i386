@@ -45,8 +45,13 @@
 i pkginfo
 i copyright
 i depend
+i postinstall
+i postremove
 
 # nv_sata sata driver
 d none kernel	0755	root	sys
 d none kernel/drv	0755	root	sys
 d none kernel/drv/amd64	0755	root	sys
+f none kernel/drv/nv_sata 0755	root	sys
+f none kernel/drv/nv_sata.conf 0644	root	sys
+f none kernel/drv/amd64/nv_sata 0755	root	sys

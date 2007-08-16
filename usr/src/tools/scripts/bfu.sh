@@ -88,6 +88,7 @@ all_zones_files="
 	etc/cron.d/cron.deny
 	etc/crypto/pkcs11.conf
 	etc/default/*
+	etc/dev/reserved_devnames
 	etc/dfs/dfstab
 	etc/dumpdates
 	etc/ftpd/*

@@ -129,6 +129,7 @@ $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; $(MAKE) clean; $(MAKE) warlock
 warlock.sata:
 	@cd ../sata; $(MAKE) clean; $(MAKE) warlock
 	@cd ../si3124; $(MAKE) clean; $(MAKE) warlock
+	@cd ../nv_sata; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ahci; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
 		$(MAKE) clean; $(MAKE) warlock

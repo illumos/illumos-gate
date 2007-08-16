@@ -165,6 +165,10 @@ static gid_t sys_gid;
 /* /etc/devlink.tab unless devlinks -t used */
 static char *devlinktab_file = NULL;
 
+/* File and data structure to reserve enumerate IDs */
+static char *enumerate_file = ENUMERATE_RESERVED;
+static enumerate_file_t *enumerate_reserved = NULL;
+
 /* set if /dev link is new. speeds up rm_stale_links */
 static int linknew = TRUE;
 
@@ -1363,6 +1367,7 @@ lock_dev(void)
 		read_driver_aliases_file();
 		read_devlinktab_file();
 		read_logindevperm_file();
+		read_enumerate_file();
 	}
 
 	if (module_head != NULL)
@@ -4821,6 +4826,9 @@ find_enum_id(devfsadm_enumerate_t rules[], int nrules,
 
 	/* if matching entry already cached, return it */
 	if (matchcount == 1) {
+		/* should never create a link with a reserved ID */
+		vprint(ENUM_MID, "%s: 1 match w/ ID: %s\n", fcn, matchnp->id);
+		assert(matchnp->flags == 0);
 		*buf = s_strdup(matchnp->id);
 		free(cmp_str);
 		return (DEVFSADM_SUCCESS);
@@ -4836,6 +4844,10 @@ find_enum_id(devfsadm_enumerate_t rules[], int nrules,
 	numeral->rule_index = index;
 	numeral->cmp_str = cmp_str;
 	cmp_str = NULL;
+	numeral->flags = 0;
+	vprint(RSRV_MID, "%s: alloc new_id: %s numeral flags = %d\n",
+	    fcn, numeral->id, numeral->flags);
+
 
 	/* insert to head of list for fast lookups */
 	numeral->next = set->headnumeral;
@@ -4882,6 +4894,23 @@ lookup_enum_cache(numeral_set_t *set, char *cmp_str,
 	 * Check and see if a matching entry is already cached.
 	 */
 	for (np = set->headnumeral; np != NULL; np = np->next) {
+
+		/*
+		 * Skip reserved IDs
+		 */
+		if (np->flags & NUMERAL_RESERVED) {
+			vprint(RSRV_MID, "lookup_enum_cache: "
+			    "Cannot Match with reserved ID (%s), "
+			    "skipping\n", np->id);
+			assert(np->flags == NUMERAL_RESERVED);
+			continue;
+		} else {
+			vprint(RSRV_MID, "lookup_enum_cache: "
+			    "Attempting match with numeral ID: %s"
+			    " numeral flags = %d\n", np->id, np->flags);
+			assert(np->flags == 0);
+		}
+
 		if (np->cmp_str == NULL) {
 			vprint(ENUM_MID, "%s: invalid entry in enumerate"
 			    " cache. path: %s\n", fcn, np->full_path);
@@ -4930,6 +4959,7 @@ dump_enum_cache(numeral_set_t *setp)
 		vprint(ENUM_MID, "%s: full_path: %s\n", fcn, np->full_path);
 		vprint(ENUM_MID, "%s: rule_index: %d\n", fcn, np->rule_index);
 		vprint(ENUM_MID, "%s: cmp_str: %s\n", fcn, np->cmp_str);
+		vprint(ENUM_MID, "%s: flags: %d\n", fcn, np->flags);
 	}
 }
 #endif
@@ -4959,7 +4989,9 @@ get_enum_cache(devfsadm_enumerate_t rules[], int nrules)
 	/* linked list of numeral sets */
 	numeral_set_t *setp;
 	int i;
+	int ret;
 	char *path_left;
+	enumerate_file_t *entry;
 	char *fcn = "get_enum_cache";
 
 	/*
@@ -5014,6 +5046,33 @@ get_enum_cache(devfsadm_enumerate_t rules[], int nrules)
 	/* put this new cached set on the cached set list */
 	setp->next = head_numeral_set;
 	head_numeral_set = setp;
+
+	/*
+	 * For each RE, search the "reserved" list to create numeral IDs that
+	 * are reserved.
+	 */
+	for (entry = enumerate_reserved; entry; entry = entry->er_next) {
+
+		vprint(RSRV_MID, "parsing rstring: %s\n", entry->er_file);
+
+		for (i = 0; i < nrules; i++) {
+			path_left = s_strdup(setp->re[i]);
+			vprint(RSRV_MID, "parsing rule RE: %s\n", path_left);
+			ret = enumerate_parse(entry->er_file, path_left,
+			    setp, rules, i);
+			free(path_left);
+			if (ret == 1) {
+				/*
+				 * We found the reserved ID for this entry.
+				 * We still keep the entry since it is needed
+				 * by the new link bypass code in disks
+				 */
+				vprint(RSRV_MID, "found rsv ID: rstring: %s "
+				    "rule RE: %s\n", entry->er_file, path_left);
+				break;
+			}
+		}
+	}
 
 	/*
 	 * For each RE, search disk and cache any matches on the
@@ -5124,6 +5183,8 @@ new_id(numeral_t *numeral, int type, char *min)
 		}
 
 		for (np = numeral; np != NULL; np = np->next) {
+			assert(np->flags == 0 ||
+			    np->flags == NUMERAL_RESERVED);
 			letter[*np->id - 'a']++;
 		}
 
@@ -5151,6 +5212,8 @@ new_id(numeral_t *numeral, int type, char *min)
 
 		/* sort list */
 		for (np = numeral; np != NULL; np = np->next) {
+			assert(np->flags == 0 ||
+			    np->flags == NUMERAL_RESERVED);
 			temp = s_malloc(sizeof (temp_t));
 			temp->integer = atoi(np->id);
 			temp->next = NULL;
@@ -5193,6 +5256,114 @@ new_id(numeral_t *numeral, int type, char *min)
 	}
 
 	return (s_strdup(""));
+}
+
+static int
+enumerate_parse(char *rsvstr, char *path_left, numeral_set_t *setp,
+	    devfsadm_enumerate_t rules[], int index)
+{
+	char	*slash1 = NULL;
+	char	*slash2 = NULL;
+	char	*numeral_id;
+	char	*path_left_save;
+	char	*rsvstr_save;
+	int	ret = 0;
+	static int warned = 0;
+
+	rsvstr_save = rsvstr;
+	path_left_save = path_left;
+
+	if (rsvstr == NULL || rsvstr[0] == '\0' || rsvstr[0] == '/') {
+		if (!warned) {
+			err_print("invalid reserved filepath: %s\n",
+			    rsvstr ? rsvstr : "<NULL>");
+			warned = 1;
+		}
+		return (0);
+	}
+
+	vprint(RSRV_MID, "processing rule: %s, rstring: %s\n",
+	    path_left, rsvstr);
+
+
+	for (;;) {
+		/* get rid of any extra '/' in the reserve string */
+		while (*rsvstr == '/') {
+			rsvstr++;
+		}
+
+		/* get rid of any extra '/' in the RE */
+		while (*path_left == '/') {
+			path_left++;
+		}
+
+		if (slash1 = strchr(path_left, '/')) {
+			*slash1 = '\0';
+		}
+		if (slash2 = strchr(rsvstr, '/')) {
+			*slash2 = '\0';
+		}
+
+		if ((slash1 != NULL) ^ (slash2 != NULL)) {
+			ret = 0;
+			vprint(RSRV_MID, "mismatch in # of path components\n");
+			goto out;
+		}
+
+		/*
+		 *  Returns true if path_left matches the list entry.
+		 *  If it is the last path component, pass subexp
+		 *  so that it will return the corresponding ID in
+		 *  numeral_id.
+		 */
+		numeral_id = NULL;
+		if (match_path_component(path_left, rsvstr, &numeral_id,
+				    slash1 ? 0 : rules[index].subexp)) {
+
+			/* We have a match. */
+			if (slash1 == NULL) {
+				/* Is last path component */
+				vprint(RSRV_MID, "match and last component\n");
+				create_reserved_numeral(setp, numeral_id);
+				if (numeral_id != NULL) {
+					free(numeral_id);
+				}
+				ret = 1;
+				goto out;
+			} else {
+				/* Not last path component. Continue parsing */
+				*slash1 = '/';
+				*slash2 = '/';
+				path_left = slash1 + 1;
+				rsvstr = slash2 + 1;
+				vprint(RSRV_MID,
+				    "match and NOT last component\n");
+				continue;
+			}
+		} else {
+			/* No match */
+			ret = 0;
+			vprint(RSRV_MID, "No match: rule RE = %s, "
+			    "rstring = %s\n", path_left, rsvstr);
+			goto out;
+		}
+	}
+
+out:
+	if (slash1)
+		*slash1 = '/';
+	if (slash2)
+		*slash2 = '/';
+
+	if (ret == 1) {
+		vprint(RSRV_MID, "match: rule RE: %s, rstring: %s\n",
+		    path_left_save, rsvstr_save);
+	} else {
+		vprint(RSRV_MID, "NO match: rule RE: %s, rstring: %s\n",
+		    path_left_save, rsvstr_save);
+	}
+
+	return (ret);
 }
 
 /*
@@ -5314,6 +5485,45 @@ match_path_component(char *file_re,  char *file,  char **id, int subexp)
 	return (match);
 }
 
+static void
+create_reserved_numeral(numeral_set_t *setp, char *numeral_id)
+{
+	numeral_t *np;
+
+	vprint(RSRV_MID, "Attempting to create reserved numeral: %s\n",
+	    numeral_id);
+
+	/*
+	 * We found a numeral_id from an entry in the enumerate_reserved file
+	 * which matched the re passed in from devfsadm_enumerate.  We only
+	 * need to make sure ONE copy of numeral_id exists on the numeral list.
+	 * We only need to store /dev/dsk/cNtod0s0 and no other entries
+	 * hanging off of controller N.
+	 */
+	for (np = setp->headnumeral; np != NULL; np = np->next) {
+		if (strcmp(numeral_id, np->id) == 0) {
+			vprint(RSRV_MID, "ID: %s, already reserved\n", np->id);
+			assert(np->flags == NUMERAL_RESERVED);
+			return;
+		} else {
+			assert(np->flags == 0 ||
+			    np->flags == NUMERAL_RESERVED);
+		}
+	}
+
+	/* NOT on list, so add it */
+	np = s_malloc(sizeof (numeral_t));
+	np->id = s_strdup(numeral_id);
+	np->full_path = NULL;
+	np->rule_index = 0;
+	np->cmp_str = NULL;
+	np->flags = NUMERAL_RESERVED;
+	np->next = setp->headnumeral;
+	setp->headnumeral = np;
+
+	vprint(RSRV_MID, "Reserved numeral ID: %s\n", np->id);
+}
+
 /*
  * This function is called for every file which matched the leaf
  * component of the RE.  If the "numeral_id" is not already on the
@@ -5342,7 +5552,20 @@ create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
 	 *  of controller N.
 	 */
 	for (np = setp->headnumeral; np != NULL; np = np->next) {
+		assert(np->flags == 0 || np->flags == NUMERAL_RESERVED);
 		if (strcmp(numeral_id, np->id) == 0) {
+			/*
+			 * Note that we can't assert that the flags field
+			 * of the numeral is 0, since both reserved and
+			 * unreserved links in /dev come here
+			 */
+			if (np->flags == NUMERAL_RESERVED) {
+				vprint(RSRV_MID, "ID derived from /dev link is"
+				    " reserved: %s\n", np->id);
+			} else {
+				vprint(RSRV_MID, "ID derived from /dev link is"
+				    " NOT reserved: %s\n", np->id);
+			}
 			return;
 		}
 	}
@@ -5386,6 +5609,7 @@ create_cached_numeral(char *path, numeral_set_t *setp, char *numeral_id,
 	np->full_path = s_strdup(linkptr);
 	np->rule_index = index;
 	np->cmp_str = cmp_str;
+	np->flags = 0;
 
 	np->next = setp->headnumeral;
 	setp->headnumeral = np;
@@ -5656,6 +5880,114 @@ load_n2m_table(char *file)
 		err_print(FCLOSE_FAILED, file, strerror(errno));
 	}
 	return (DEVFSADM_SUCCESS);
+}
+
+/*
+ * Called at devfsadm startup to read the file /etc/dev/enumerate_reserved
+ * Creates a linked list of devlinks from which reserved IDs can be derived
+ */
+static void
+read_enumerate_file(void)
+{
+	FILE *fp;
+	int linenum;
+	char line[PATH_MAX+1];
+	enumerate_file_t *entry;
+	struct stat current_sb;
+	static struct stat cached_sb;
+	static int cached = FALSE;
+
+	assert(enumerate_file);
+
+	if (stat(enumerate_file, &current_sb) == -1) {
+		vprint(RSRV_MID, "No reserved file: %s\n", enumerate_file);
+		cached = FALSE;
+		if (enumerate_reserved != NULL) {
+			vprint(RSRV_MID, "invalidating %s cache\n",
+			    enumerate_file);
+		}
+		while (enumerate_reserved != NULL) {
+			entry = enumerate_reserved;
+			enumerate_reserved = entry->er_next;
+			free(entry->er_file);
+			free(entry->er_id);
+			free(entry);
+		}
+		return;
+	}
+
+	/* if already cached, check to see if it is still valid */
+	if (cached == TRUE) {
+
+		if (current_sb.st_mtime == cached_sb.st_mtime) {
+			vprint(RSRV_MID, "%s cache valid\n", enumerate_file);
+			vprint(FILES_MID, "%s cache valid\n", enumerate_file);
+			return;
+		}
+
+		vprint(RSRV_MID, "invalidating %s cache\n", enumerate_file);
+		vprint(FILES_MID, "invalidating %s cache\n", enumerate_file);
+
+		while (enumerate_reserved != NULL) {
+			entry = enumerate_reserved;
+			enumerate_reserved = entry->er_next;
+			free(entry->er_file);
+			free(entry->er_id);
+			free(entry);
+		}
+		vprint(RSRV_MID, "Recaching file: %s\n", enumerate_file);
+	} else {
+		vprint(RSRV_MID, "Caching file (first time): %s\n",
+		    enumerate_file);
+		cached = TRUE;
+	}
+
+	(void) stat(enumerate_file, &cached_sb);
+
+	if ((fp = fopen(enumerate_file, "r")) == NULL) {
+		err_print(FOPEN_FAILED, enumerate_file, strerror(errno));
+		return;
+	}
+
+	vprint(RSRV_MID, "Reading reserve file: %s\n", enumerate_file);
+	linenum = 0;
+	while (fgets(line, sizeof (line), fp) != NULL) {
+		char	*cp, *ncp;
+
+		linenum++;
+
+		/* remove newline */
+		cp = strchr(line, '\n');
+		if (cp)
+			*cp = '\0';
+
+		vprint(RSRV_MID, "Reserve file: line %d: %s\n",
+			linenum, line);
+
+		/* skip over space and tab */
+		for (cp = line; *cp == ' ' || *cp == '\t'; cp++);
+
+		if (*cp == '\0' || *cp == '#') {
+			vprint(RSRV_MID, "Skipping line: '%s'\n", line);
+			continue; /* blank line or comment line */
+		}
+
+		ncp = cp;
+
+		/* delete trailing blanks */
+		for (; *cp != ' ' && *cp != '\t' && *cp != '\0'; cp++);
+		*cp = '\0';
+
+		entry = s_zalloc(sizeof (enumerate_file_t));
+		entry->er_file = s_strdup(ncp);
+		entry->er_id = NULL;
+		entry->er_next = enumerate_reserved;
+		enumerate_reserved = entry;
+	}
+
+	if (fclose(fp) == EOF) {
+		err_print(FCLOSE_FAILED, enumerate_file, strerror(errno));
+	}
 }
 
 /*
@@ -8511,4 +8843,150 @@ done:
 	res.devfsadm_error = error;
 	(void) door_return((char *)&res, sizeof (struct sdev_door_res),
 	    NULL, 0);
+}
+
+
+di_devlink_handle_t
+devfsadm_devlink_cache(void)
+{
+	return (devlink_cache);
+}
+
+int
+devfsadm_reserve_id_cache(devlink_re_t re_array[], enumerate_file_t *head)
+{
+	enumerate_file_t *entry;
+	int nelem;
+	int i;
+	int subex;
+	char *re;
+	size_t size;
+	regmatch_t *pmch;
+
+	/*
+	 * Check the <RE, subexp> array passed in and compile it.
+	 */
+	for (i = 0; re_array[i].d_re; i++) {
+		if (re_array[i].d_subexp == 0) {
+			err_print("bad subexp value in RE: %s\n",
+			    re_array[i].d_re);
+			goto bad_re;
+		}
+
+		re = re_array[i].d_re;
+		if (regcomp(&re_array[i].d_rcomp, re, REG_EXTENDED) != 0) {
+			err_print("reg. exp. failed to compile: %s\n", re);
+			goto bad_re;
+		}
+		subex = re_array[i].d_subexp;
+		nelem = subex + 1;
+		re_array[i].d_pmatch = s_malloc(sizeof (regmatch_t) * nelem);
+	}
+
+	entry = head ? head : enumerate_reserved;
+	for (; entry; entry = entry->er_next) {
+		if (entry->er_id) {
+			vprint(RSBY_MID, "entry %s already has ID %s\n",
+			    entry->er_file, entry->er_id);
+			continue;
+		}
+		for (i = 0; re_array[i].d_re; i++) {
+			subex = re_array[i].d_subexp;
+			pmch = re_array[i].d_pmatch;
+			if (regexec(&re_array[i].d_rcomp, entry->er_file,
+			    subex + 1, pmch, 0) != 0) {
+				/* No match */
+				continue;
+			}
+			size = pmch[subex].rm_eo - pmch[subex].rm_so;
+			entry->er_id = s_malloc(size + 1);
+			(void) strncpy(entry->er_id,
+			    &entry->er_file[pmch[subex].rm_so], size);
+			entry->er_id[size] = '\0';
+			if (head) {
+				vprint(RSBY_MID, "devlink(%s) matches RE(%s). "
+				    "ID is %s\n", entry->er_file,
+				    re_array[i].d_re, entry->er_id);
+			} else {
+				vprint(RSBY_MID, "rsrv entry(%s) matches "
+				    "RE(%s) ID is %s\n", entry->er_file,
+				    re_array[i].d_re, entry->er_id);
+			}
+			break;
+		}
+	}
+
+	for (i = 0; re_array[i].d_re; i++) {
+		regfree(&re_array[i].d_rcomp);
+		assert(re_array[i].d_pmatch);
+		free(re_array[i].d_pmatch);
+	}
+
+	entry = head ? head : enumerate_reserved;
+	for (; entry; entry = entry->er_next) {
+		if (entry->er_id == NULL)
+			continue;
+		if (head) {
+			vprint(RSBY_MID, "devlink: %s\n", entry->er_file);
+			vprint(RSBY_MID, "ID: %s\n", entry->er_id);
+		} else {
+			vprint(RSBY_MID, "reserve file entry: %s\n",
+			    entry->er_file);
+			vprint(RSBY_MID, "reserve file id: %s\n",
+			    entry->er_id);
+		}
+	}
+
+	return (DEVFSADM_SUCCESS);
+
+bad_re:
+	for (i = i-1; i >= 0; i--) {
+		regfree(&re_array[i].d_rcomp);
+		assert(re_array[i].d_pmatch);
+		free(re_array[i].d_pmatch);
+	}
+	return (DEVFSADM_FAILURE);
+}
+
+/*
+ * This functions errs on the side of caution. If there is any error
+ * we assume that the devlink is  *not* reserved
+ */
+int
+devfsadm_is_reserved(devlink_re_t re_array[], char *devlink)
+{
+	int match;
+	enumerate_file_t estruct = {NULL};
+	enumerate_file_t *entry;
+
+	match = 0;
+	estruct.er_file = devlink;
+	estruct.er_id = NULL;
+	estruct.er_next = NULL;
+
+	if (devfsadm_reserve_id_cache(re_array, &estruct) != DEVFSADM_SUCCESS) {
+		err_print("devfsadm_is_reserved: devlink (%s) does not "
+		    "match RE\n", devlink);
+		return (0);
+	}
+	if (estruct.er_id == NULL) {
+		err_print("devfsadm_is_reserved: ID derived from devlink %s "
+		    "is NULL\n", devlink);
+		return (0);
+	}
+
+	entry = enumerate_reserved;
+	for (; entry; entry = entry->er_next) {
+		if (entry->er_id == NULL)
+			continue;
+		if (strcmp(entry->er_id, estruct.er_id) != 0)
+			continue;
+		match = 1;
+		vprint(RSBY_MID, "reserve file entry (%s) and devlink (%s) "
+		    "match\n", entry->er_file, devlink);
+		break;
+	}
+
+	free(estruct.er_id);
+	return (match);
 }

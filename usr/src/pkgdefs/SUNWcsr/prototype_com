@@ -133,6 +133,8 @@ e preserve etc/default/tar 644 root sys
 e preserve etc/default/utmpd 644 root sys
 e preserve etc/device.tab 444 root root
 d none etc/devices 755 root sys
+d none etc/dev 755 root sys
+e preserve etc/dev/reserved_devnames 644 root sys
 d none etc/dfs 755 root sys
 e preserve etc/dfs/dfstab 644 root sys
 v preserve etc/dfs/sharetab 444 root root

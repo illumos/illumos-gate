@@ -85,6 +85,8 @@ static	void sata_save_atapi_trace(sata_pkt_txlate_t *, int);
 static void
 sata_test_atapi_packet_command(sata_hba_inst_t *, int);
 #endif
+#define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
+
 
 /*
  * SATA cb_ops functions
@@ -264,6 +266,9 @@ static	int sata_atapi_err_ret_cmd_setup(sata_pkt_txlate_t *,
     sata_drive_info_t *);
 static	void sata_atapi_packet_cmd_setup(sata_cmd_t *, sata_drive_info_t *);
 static	void sata_fixed_sense_data_preset(struct scsi_extended_sense *);
+static  void sata_target_devid_register(dev_info_t *, sata_drive_info_t *);
+static  int sata_check_modser(char *, int);
+
 
 
 /*
@@ -2695,6 +2700,24 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	    sata_device.satadev_addr.cport)));
 
 	/*
+	 * Check if we need to create a legacy devid (i.e cmdk style) for
+	 * the target disks.
+	 *
+	 * HBA devinfo node will have the property "use-cmdk-devid-format"
+	 * if we need to create cmdk-style devid for all the disk devices
+	 * attached to this controller. This property may have been set
+	 * from HBA driver's .conf file or by the HBA driver in its
+	 * attach(9F) function.
+	 */
+	if ((sdinfo->satadrv_type == SATA_DTYPE_ATADISK) &&
+	    (ddi_getprop(DDI_DEV_T_ANY, hba_dip, DDI_PROP_DONTPASS,
+	    "use-cmdk-devid-format", 0) == 1)) {
+		/* register a legacy devid for this target node */
+		sata_target_devid_register(tgt_dip, sdinfo);
+	}
+
+
+	/*
 	 * 'Identify Device Data' does not always fit in standard SCSI
 	 * INQUIRY data, so establish INQUIRY_* properties with full-form
 	 * of information.
@@ -2780,6 +2803,7 @@ sata_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	sata_device_t		sata_device;
 	sata_drive_info_t	*sdinfo;
 	sata_hba_inst_t		*sata_hba_inst;
+	ddi_devid_t		devid;
 
 	sata_hba_inst = (sata_hba_inst_t *)(hba_tran->tran_hba_private);
 
@@ -2810,6 +2834,18 @@ sata_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "sata_scsi_tgt_free: pm-capable "
 		    "property could not be removed"));
+
+	/*
+	 * If devid was previously created but not freed up from
+	 * sd(7D) driver (i.e during detach(9F)) then do it here.
+	 */
+	if ((sdinfo->satadrv_type == SATA_DTYPE_ATADISK) &&
+	    (ddi_getprop(DDI_DEV_T_ANY, hba_dip, DDI_PROP_DONTPASS,
+	    "use-cmdk-devid-format", 0) == 1) &&
+	    (ddi_devid_get(tgt_dip, &devid) == DDI_SUCCESS)) {
+		ddi_devid_unregister(tgt_dip);
+		ddi_devid_free(devid);
+	}
 }
 
 /*
@@ -3561,12 +3597,14 @@ sata_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 		/*
 		 * Free DMA resources - cookies and handles
 		 */
-		ASSERT(spx->txlt_dma_cookie_list != NULL);
-		if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
-			(void) kmem_free(spx->txlt_dma_cookie_list,
-			    spx->txlt_dma_cookie_list_len *
-			    sizeof (ddi_dma_cookie_t));
-			spx->txlt_dma_cookie_list = NULL;
+		if (spx->txlt_dma_cookie_list != NULL) {
+			if (spx->txlt_dma_cookie_list !=
+			    &spx->txlt_dma_cookie) {
+				(void) kmem_free(spx->txlt_dma_cookie_list,
+				    spx->txlt_dma_cookie_list_len *
+				    sizeof (ddi_dma_cookie_t));
+				spx->txlt_dma_cookie_list = NULL;
+			}
 		}
 		(void) ddi_dma_unbind_handle(spx->txlt_buf_dma_handle);
 		(void) ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
@@ -3594,18 +3632,30 @@ sata_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 	spx = (sata_pkt_txlate_t *)pkt->pkt_ha_private;
 
 	if (spx->txlt_buf_dma_handle != NULL) {
+		if (spx->txlt_tmp_buf != NULL)  {
+			/*
+			 * Intermediate DMA buffer was allocated.
+			 * Free allocated buffer and associated access handle.
+			 */
+			ddi_dma_mem_free(&spx->txlt_tmp_buf_handle);
+			spx->txlt_tmp_buf = NULL;
+		}
 		/*
 		 * Free DMA resources - cookies and handles
 		 */
-		ASSERT(spx->txlt_dma_cookie_list != NULL);
-		if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
-			(void) kmem_free(spx->txlt_dma_cookie_list,
-			    spx->txlt_dma_cookie_list_len *
-			    sizeof (ddi_dma_cookie_t));
-			spx->txlt_dma_cookie_list = NULL;
+		/* ASSERT(spx->txlt_dma_cookie_list != NULL); */
+		if (spx->txlt_dma_cookie_list != NULL) {
+			if (spx->txlt_dma_cookie_list !=
+			    &spx->txlt_dma_cookie) {
+				(void) kmem_free(spx->txlt_dma_cookie_list,
+				    spx->txlt_dma_cookie_list_len *
+				    sizeof (ddi_dma_cookie_t));
+				spx->txlt_dma_cookie_list = NULL;
+			}
 		}
 		(void) ddi_dma_unbind_handle(spx->txlt_buf_dma_handle);
 		(void) ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
+		spx->txlt_buf_dma_handle = NULL;
 	}
 }
 
@@ -4033,8 +4083,16 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
 
+		/*
+		 * Because it is fully emulated command storing data
+		 * programatically in the specified buffer, release
+		 * preallocated DMA resources before storing data in the buffer,
+		 * so no unwanted DMA sync would take place.
+		 */
+		sata_scsi_dmafree(NULL, scsipkt);
+
 		if (!(scsipkt->pkt_cdbp[1] & EVPD)) {
-		/* Standard Inquiry Data request */
+			/* Standard Inquiry Data request */
 			struct scsi_inquiry inq;
 			unsigned int bufsize;
 
@@ -4190,8 +4248,15 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
+		/*
+		 * Because it is fully emulated command storing data
+		 * programatically in the specified buffer, release
+		 * preallocated DMA resources before storing data in the buffer,
+		 * so no unwanted DMA sync would take place.
+		 */
 		int count = MIN(bp->b_bcount,
 		    sizeof (struct scsi_extended_sense));
+		sata_scsi_dmafree(NULL, scsipkt);
 		bzero(&sense, sizeof (struct scsi_extended_sense));
 		sense.es_valid = 0;	/* Valid LBA */
 		sense.es_class = 7;	/* Response code 0x70 - current err */
@@ -4425,6 +4490,14 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 	*scsipkt->pkt_scbp = STATUS_GOOD;
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
+		/*
+		 * Because it is fully emulated command storing data
+		 * programatically in the specified buffer, release
+		 * preallocated DMA resources before storing data in the buffer,
+		 * so no unwanted DMA sync would take place.
+		 */
+		sata_scsi_dmafree(NULL, scsipkt);
+
 		sdinfo = sata_get_device_info(
 		    spx->txlt_sata_hba_inst,
 		    &spx->txlt_sata_pkt->satapkt_device);
@@ -4512,6 +4585,14 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	pc = scsipkt->pkt_cdbp[2] >> 6;
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
+		/*
+		 * Because it is fully emulated command storing data
+		 * programatically in the specified buffer, release
+		 * preallocated DMA resources before storing data in the buffer,
+		 * so no unwanted DMA sync would take place.
+		 */
+		sata_scsi_dmafree(NULL, scsipkt);
+
 		len = 0;
 		bdlen = 0;
 		if (!(scsipkt->pkt_cdbp[1] & 8)) {
@@ -5081,7 +5162,17 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	}
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
+		/*
+		 * Because log sense uses local buffers for data retrieval from
+		 * the devices and sets the data programatically in the
+		 * original specified buffer, release preallocated DMA
+		 * resources before storing data in the original buffer,
+		 * so no unwanted DMA sync would take place.
+		 */
 		sata_id_t *sata_id;
+
+		sata_scsi_dmafree(NULL, scsipkt);
+
 		len = 0;
 
 		/* Build log parameter header */
@@ -11664,6 +11755,86 @@ sata_fixed_sense_data_preset(struct scsi_extended_sense *sense)
 	sense->es_qual_code = 0;
 }
 
+/*
+ * Register a legacy cmdk-style devid for the target (disk) device.
+ *
+ * Note: This function is called only when the HBA devinfo node has the
+ * property "use-cmdk-devid-format" set. This property indicates that
+ * devid compatible with old cmdk (target) driver is to be generated
+ * for any target device attached to this controller. This will take
+ * precedence over the devid generated by sd (target) driver.
+ * This function is derived from cmdk_devid_setup() function in cmdk.c.
+ */
+static void
+sata_target_devid_register(dev_info_t *dip, sata_drive_info_t *sdinfo)
+{
+	char	*hwid;
+	int	modlen;
+	int	serlen;
+	int	rval;
+	ddi_devid_t	devid;
+
+	/*
+	 * device ID is a concatanation of model number, "=", serial number.
+	 */
+	hwid = kmem_zalloc(LEGACY_HWID_LEN, KM_SLEEP);
+	bcopy(&sdinfo->satadrv_id.ai_model, hwid,
+	    sizeof (sdinfo->satadrv_id.ai_model));
+	swab(hwid, hwid, sizeof (sdinfo->satadrv_id.ai_model));
+	modlen = sata_check_modser(hwid, sizeof (sdinfo->satadrv_id.ai_model));
+	if (modlen == 0)
+		goto err;
+	hwid[modlen++] = '=';
+	bcopy(&sdinfo->satadrv_id.ai_drvser, &hwid[modlen],
+	    sizeof (sdinfo->satadrv_id.ai_drvser));
+	swab(&hwid[modlen], &hwid[modlen],
+		sizeof (sdinfo->satadrv_id.ai_drvser));
+	serlen = sata_check_modser(&hwid[modlen],
+		sizeof (sdinfo->satadrv_id.ai_drvser));
+	if (serlen == 0)
+		goto err;
+	hwid[modlen + serlen] = 0; /* terminate the hwid string */
+
+	/* initialize/register devid */
+	if ((rval = ddi_devid_init(dip, DEVID_ATA_SERIAL,
+		(ushort_t)(modlen + serlen), hwid, &devid)) == DDI_SUCCESS)
+		rval = ddi_devid_register(dip, devid);
+
+	if (rval != DDI_SUCCESS)
+		cmn_err(CE_WARN, "sata: failed to create devid for the disk"
+			" on port %d", sdinfo->satadrv_addr.cport);
+err:
+	kmem_free(hwid, LEGACY_HWID_LEN);
+}
+
+/*
+ * valid model/serial string must contain a non-zero non-space characters.
+ * trim trailing spaces/NULLs.
+ */
+static int
+sata_check_modser(char *buf, int buf_len)
+{
+	boolean_t ret;
+	char *s;
+	int i;
+	int tb;
+	char ch;
+
+	ret = B_FALSE;
+	s = buf;
+	for (i = 0; i < buf_len; i++) {
+		ch = *s++;
+		if (ch != ' ' && ch != '\0')
+			tb = i + 1;
+		if (ch != ' ' && ch != '\0' && ch != '0')
+			ret = B_TRUE;
+	}
+
+	if (ret == B_FALSE)
+		return (0); /* invalid string */
+
+	return (tb); /* return length */
+}
 
 /*
  * sata_set_drive_features function compares current device features setting

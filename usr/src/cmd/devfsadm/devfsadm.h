@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,15 @@
 #include <libdevinfo.h>
 #include <sys/devinfo_impl.h>
 #include <regex.h>
+
+#undef	DEBUG
+#ifndef DEBUG
+#define	NDEBUG 1
+#else
+#undef	NDEBUG
+#endif
+
+#include <assert.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -89,6 +98,9 @@ extern "C" {
 
 /* /dev device name binding rule locations */
 #define	DEVNAME_MASTER_MAP	"/etc/dev/devname_master"
+
+/* File of reserved devnames */
+#define	ENUMERATE_RESERVED "/etc/dev/reserved_devnames"
 
 /* flags for devfsadm_mklink */
 #define	DEV_SYNC 0x02	/* synchronous mklink */
@@ -189,6 +201,20 @@ typedef struct devfsadm_enumerate {
 	(sizeof (tbl) / sizeof (devfsadm_remove_V1_t)), \
 	((devfsadm_remove_V1_t *)(tbl)) }
 
+/* reserved devname support */
+typedef struct devlink_re {
+	char *d_re;
+	int d_subexp;
+	regex_t d_rcomp;
+	regmatch_t *d_pmatch;
+} devlink_re_t;
+
+typedef struct enumerate_file {
+	char *er_file;
+	char *er_id;
+	struct enumerate_file *er_next;
+} enumerate_file_t;
+
 int devfsadm_noupdate(void);
 const char *devfsadm_root_path(void);
 int devfsadm_link_valid(char *link);
@@ -207,6 +233,9 @@ int devfsadm_enumerate_char(char *devfs_path, int index, char **buf,
 char **devfsadm_lookup_dev_names(char *phys_path, char *re, int *lenp);
 void devfsadm_free_dev_names(char **dev_names, int len);
 
+/* devlink cache related */
+di_devlink_handle_t devfsadm_devlink_cache(void);
+
 /*
  * Private enumerate interface for disks and sgen modules
  */
@@ -219,6 +248,10 @@ int devfsadm_enumerate_char_start(char *devfs_path, int index,
     char **buf, devfsadm_enumerate_t rules[], int nrules, char *start);
 int devfsadm_read_link(char *link, char **devfs_path);
 char *s_strdup(const char *ptr);
+
+/* Private interface between reserve subsystm and disks link generator */
+int devfsadm_is_reserved(devlink_re_t re_array[], char *devlink);
+int devfsadm_reserve_id_cache(devlink_re_t re_array[], enumerate_file_t *head);
 
 #ifdef	__cplusplus
 }

@@ -1997,6 +1997,9 @@ int
 ddi_devid_init(dev_info_t *dip, ushort_t devid_type, ushort_t nbytes,
     void *id, ddi_devid_t *ret_devid);
 
+int
+ddi_devid_get(dev_info_t *dip, ddi_devid_t *ret_devid);
+
 size_t
 ddi_devid_sizeof(ddi_devid_t devid);
 

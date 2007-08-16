@@ -622,6 +622,109 @@ struct mode_acoustic_management {
 
 #define	MODEPAGE_ACOUSTIC_MANAG 0x30
 
+/*
+ * sstatus field definitions
+ */
+#define	SSTATUS_DET_SHIFT	0
+#define	SSTATUS_SPD_SHIFT	4
+#define	SSTATUS_IPM_SHIFT	8
+
+#define	SSTATUS_DET	(0xf << SSTATUS_DET_SHIFT)
+#define	SSTATUS_SPD	(0xf << SSTATUS_SPD_SHIFT)
+#define	SSTATUS_IPM	(0xf << SSTATUS_IPM_SHIFT)
+
+/*
+ * sstatus DET values
+ */
+#define	SSTATUS_DET_NODEV		0	/* No dev detected */
+#define	SSTATUS_DET_DEVPRE_NOPHYCOM	1	/* dev detected */
+#define	SSTATUS_DET_DEVPRE_PHYCOM	3	/* dev detected */
+#define	SSTATUS_DET_PHYOFFLINE		4	/* PHY is in offline */
+
+#define	SSTATUS_GET_DET(x) \
+	(x & SSTATUS_DET)
+
+#define	SSTATUS_SET_DET(x, new_val) \
+	(x = (x & ~SSTATUS_DET) | (new_val & SSTATUS_DET))
+
+#define	SSTATUS_SPD_NOLIMIT	0 /* No speed limit */
+#define	SSTATUS_SPD_GEN1	1 /* Limit Gen 1 rate */
+#define	SSTATUS_SPD_GEN2	2 /* Limit Gen 2 rate */
+
+/*
+ * sstatus IPM values
+ */
+#define	SSTATUS_IPM_NODEV_NOPHYCOM	0x0 /* No dev, no PHY */
+#define	SSTATUS_IPM_ACTIVE		0x1 /* Interface active */
+#define	SSTATUS_IPM_POWERPARTIAL	0x2 /* partial power mgmnt */
+#define	SSTATUS_IPM_POWERSLUMBER	0x6 /* slumber power mgmt */
+
+#define	SSTATUS_GET_IPM(x) \
+	((x & SSTATUS_IPM) >> SSTATUS_IPM_SHIFT)
+
+#define	SSTATUS_SET_IPM(x, new_val) \
+	(x = (x & ~SSTATUS_IPM) | \
+	((new_val << SSTATUS_IPM_SHIFT) & SSTATUS_IPM))
+
+
+/*
+ * serror register fields
+ */
+#define	SERROR_DATA_ERR_FIXED	(1 << 0) /* D integrity err */
+#define	SERROR_COMM_ERR_FIXED	(1 << 1) /* comm err recov */
+#define	SERROR_DATA_ERR		(1 << 8) /* D integrity err */
+#define	SERROR_PERSISTENT_ERR	(1 << 9)  /* norecov com err */
+#define	SERROR_PROTOCOL_ERR	(1 << 10) /* protocol err */
+#define	SERROR_INT_ERR		(1 << 11) /* internal err */
+#define	SERROR_PHY_RDY_CHG	(1 << 16) /* PHY state change */
+#define	SERROR_PHY_INT_ERR	(1 << 17) /* PHY internal err */
+#define	SERROR_COMM_WAKE	(1 << 18) /* COM wake */
+#define	SERROR_10B_TO_8B_ERR	(1 << 19) /* 10B-to-8B decode */
+#define	SERROR_DISPARITY_ERR	(1 << 20) /* disparity err */
+#define	SERROR_CRC_ERR		(1 << 21) /* CRC err */
+#define	SERROR_HANDSHAKE_ERR	(1 << 22) /* Handshake err */
+#define	SERROR_LINK_SEQ_ERR	(1 << 23) /* Link seq err */
+#define	SERROR_TRANS_ERR	(1 << 24) /* Tran state err */
+#define	SERROR_FIS_TYPE		(1 << 25) /* FIS type err */
+#define	SERROR_EXCHANGED_ERR	(1 << 26) /* Device exchanged */
+
+/*
+ * S-Control Bridge port x register fields
+ */
+#define	SCONTROL_DET_SHIFT	0
+#define	SCONTROL_SPD_SHIFT	4
+#define	SCONTROL_IPM_SHIFT	8
+#define	SCONTROL_SPM_SHIFT	12
+
+#define	SCONTROL_DET		(0xf << SSTATUS_DET_SHIFT)
+#define	SCONTROL_SPD		(0xf << SSTATUS_SPD_SHIFT)
+#define	SCONTROL_IPM		(0xf << SSTATUS_IPM_SHIFT)
+#define	SCONTROL_SPM		(0xf << SSTATUS_SPM_SHIFT)
+
+#define	SCONTROL_GET_DET(x)	\
+	(x & SCONTROL_DET)
+
+#define	SCONTROL_SET_DET(x, new_val)    \
+	(x = (x & ~SCONTROL_DET) | (new_val & SCONTROL_DET))
+
+#define	SCONTROL_DET_NOACTION	0 /* Do nothing to port */
+#define	SCONTROL_DET_COMRESET	1 /* Re-initialize port */
+#define	SCONTROL_DET_DISABLE	4 /* Disable port */
+
+#define	SCONTROL_SPD_NOLIMIT	0 /* No speed limit */
+#define	SCONTROL_SPD_GEN1	1 /* Limit Gen 1 rate */
+#define	SCONTROL_SPD_GEN2	2 /* Limit Gen 2 rate */
+
+#define	SCONTROL_IPM_NORESTRICT		0 /* No PM limit */
+#define	SCONTROL_IPM_DISABLE_PARTIAL	1 /* Disable partial */
+#define	SCONTROL_IPM_DISABLE_SLUMBER	2 /* Disable slumber */
+#define	SCONTROL_IPM_DISABLE_BOTH	3 /* Disable both */
+
+#define	SCONTROL_SPM_NORESTRICT		0 /* No PM limits */
+#define	SCONTROL_SPM_DO_PARTIAL		1 /* Go to partial */
+#define	SCONTROL_SPM_DO_SLUMBER		2 /* Go to slumber */
+#define	SCONTROL_SPM_DO_ACTIVE		4 /* Go to active */
+
 #ifdef	__cplusplus
 }
 #endif

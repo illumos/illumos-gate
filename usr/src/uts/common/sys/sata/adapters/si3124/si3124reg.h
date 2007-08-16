@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -338,23 +338,10 @@ typedef struct si_prb {
 #define	SSTATUS_IPM_MASK	0x00000f00
 #define	SSTATUS_IPM_SHIFT	8
 
-#define	SSTATUS_GET_DET(x)		\
-	(x & SSTATUS_DET_MASK)
-
-#define	SSTATUS_SET_DET(x, new_val)	\
-	(x = (x & ~SSTATUS_DET_MASK) | (new_val & SSTATUS_DET_MASK))
 
 #define	SSTATUS_DET_NODEV_NOPHY		 0x0 /* No device, no PHY */
 #define	SSTATUS_DET_DEVPRESENT_NOPHY	 0x1 /* Dev present, no PHY */
 #define	SSTATUS_DET_DEVPRESENT_PHYONLINE 0x3 /* Dev present, PHY online */
-#define	SSTATUS_DET_PHYOFFLINE		 0x4 /* PHY offline */
-
-#define	SSTATUS_GET_IPM(x)	\
-	((x & SSTATUS_IPM_MASK) >> SSTATUS_IPM_SHIFT)
-
-#define	SSTATUS_SET_IPM(x, new_val)					\
-	(x = (x & ~SSTATUS_IPM_MASK) | 					\
-		((new_val << SSTATUS_IPM_SHIFT) & SSTATUS_IPM_MASK))
 
 #define	SSTATUS_IPM_NODEV_NOPHY			0x0 /* No dev, no PHY */
 #define	SSTATUS_IPM_INTERFACE_ACTIVE		0x1 /* Interface active */
@@ -364,14 +351,8 @@ typedef struct si_prb {
 /* SControl bit fields */
 #define	SCONTROL_DET_MASK	0x0000000f
 
-#define	SCONTROL_GET_DET(x)		\
-	(x & SCONTROL_DET_MASK)
 
-#define	SCONTROL_SET_DET(x, new_val)	\
-	(x = (x & ~SCONTROL_DET_MASK) | (new_val & SCONTROL_DET_MASK))
 
-#define	SCONTROL_DET_NOACTION		0x0 /* No action requested */
-#define	SCONTROL_DET_COMRESET		0x1 /* Send COMRESET */
 
 /* Command Error codes */
 #define	CMD_ERR_DEVICEERRROR		1

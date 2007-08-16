@@ -776,6 +776,8 @@ EMUL64_OBJS += emul64.o emul64_bsd.o
 
 ZCONS_OBJS += zcons.o
 
+NV_SATA_OBJS += nv_sata.o
+
 SI3124_OBJS += si3124.o
 
 NSCONFIG_DEVNAME_OBJS += sdev_nsconfig_mod.o

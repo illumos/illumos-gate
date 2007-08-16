@@ -80,6 +80,7 @@ ROOT.SYS= \
 	/etc/crypto/crls \
 	/etc/default \
 	/etc/devices  \
+	/etc/dev  \
 	/etc/dfs  \
 	/etc/fs  \
 	/etc/fs/nfs  \

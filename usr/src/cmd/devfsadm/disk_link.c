@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ static int disk_callback_fabric(di_minor_t minor, di_node_t node);
 static void disk_common(di_minor_t minor, di_node_t node, char *disk,
 				int flags);
 static char *diskctrl(di_node_t node, di_minor_t minor);
-extern void rm_link_from_cache(char *devlink, char *physpath);
+static int reserved_links_exist(di_node_t node, di_minor_t minor, int nflags);
 
 
 static devfsadm_create_t disk_cbt[] = {
@@ -91,6 +91,25 @@ static devfsadm_remove_t disk_remove_cbt[] = {
 };
 
 DEVFSADM_REMOVE_INIT_V0(disk_remove_cbt);
+
+static devlink_re_t disks_re_array[] = {
+	{"^r?dsk/c([0-9]+)", 1},
+	{"^cfg/c([0-9]+)$", 1},
+	{"^scsi/.+/c([0-9]+)", 1},
+	{NULL}
+};
+
+static char *disk_mid = "disk_mid";
+static char *modname = "disk_link";
+
+int
+minor_init()
+{
+	devfsadm_print(disk_mid,
+	    "%s: minor_init(): Creating disks reserved ID cache\n",
+	    modname);
+	return (devfsadm_reserve_id_cache(disks_re_array, NULL));
+}
 
 static int
 disk_callback_chan(di_minor_t minor, di_node_t node)
@@ -231,6 +250,23 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 		(void) sprintf(slice, SLICE_EFI);
 	}
 
+	nflags = 0;
+	if (system_labeled) {
+		nt = di_minor_nodetype(minor);
+		if ((nt != NULL) &&
+		    ((strcmp(nt, DDI_NT_CD) == 0) ||
+		    (strcmp(nt, DDI_NT_CD_CHAN) == 0) ||
+		    (strcmp(nt, DDI_NT_BLOCK_CHAN) == 0))) {
+			nflags = DA_ADD|DA_CD;
+		}
+	}
+
+	if (reserved_links_exist(node, minor, nflags) == DEVFSADM_SUCCESS) {
+		devfsadm_print(disk_mid, "Reserved link exists. Not "
+		    "creating links for slice %s\n", slice);
+		return;
+	}
+
 	if (NULL == (ctrl = diskctrl(node, minor)))
 		return;
 
@@ -260,16 +296,6 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 		*s = '\0';
 	}
 	(void) strcat(l_path, slice);
-
-	if (system_labeled) {
-		nt = di_minor_nodetype(minor);
-		if ((nt != NULL) &&
-		    ((strcmp(nt, DDI_NT_CD) == 0) ||
-		    (strcmp(nt, DDI_NT_CD_CHAN) == 0) ||
-		    (strcmp(nt, DDI_NT_BLOCK_CHAN) == 0))) {
-			nflags = DA_ADD|DA_CD;
-		}
-	}
 
 	(void) devfsadm_mklink(l_path, node, minor, nflags);
 
@@ -357,4 +383,210 @@ diskctrl(di_node_t node, di_minor_t minor)
 	}
 
 	return (buf);
+}
+
+typedef struct dvlist {
+	char *dv_link;
+	struct dvlist *dv_next;
+} dvlist_t;
+
+static void
+free_dvlist(dvlist_t **pp)
+{
+	dvlist_t *entry;
+
+	while (*pp) {
+		entry = *pp;
+		*pp = entry->dv_next;
+		assert(entry->dv_link);
+		free(entry->dv_link);
+		free(entry);
+	}
+}
+static int
+dvlink_cb(di_devlink_t devlink, void *arg)
+{
+	char *path;
+	char *can_path;
+	dvlist_t **pp = (dvlist_t **)arg;
+	dvlist_t *entry = NULL;
+
+	entry = calloc(1, sizeof (dvlist_t));
+	if (entry == NULL) {
+		devfsadm_errprint("%s: calloc failed\n", modname);
+		goto error;
+	}
+
+	path = (char *)di_devlink_path(devlink);
+	assert(path);
+	if (path == NULL) {
+		devfsadm_errprint("%s: di_devlink_path() returned NULL\n",
+		    modname);
+		goto error;
+	}
+
+	devfsadm_print(disk_mid, "%s: found link %s in reverse link cache\n",
+	    modname, path);
+
+	/*
+	 * Return linkname in canonical form i.e. without the
+	 * "/dev/" prefix
+	 */
+	can_path = strstr(path, "/dev/");
+	if (can_path == NULL) {
+		devfsadm_errprint("%s: devlink path %s has no /dev/\n",
+		    modname, path);
+		goto error;
+	}
+
+	entry->dv_link = s_strdup(can_path + strlen("/dev/"));
+	entry->dv_next = *pp;
+	*pp = entry;
+
+	return (DI_WALK_CONTINUE);
+
+error:
+	free(entry);
+	free_dvlist(pp);
+	*pp = NULL;
+	return (DI_WALK_TERMINATE);
+}
+
+/*
+ * Returns success only if all goes well. If there is no matching reserved link
+ * or if there is an error, we assume no match. It is better to err on the side
+ * of caution by creating extra links than to miss out creating a required link.
+ */
+static int
+reserved_links_exist(di_node_t node, di_minor_t minor, int nflags)
+{
+	di_devlink_handle_t dvlink_cache = devfsadm_devlink_cache();
+	char phys_path[PATH_MAX];
+	char *minor_path;
+	dvlist_t *head;
+	dvlist_t *entry;
+	char *s;
+	char l[PATH_MAX];
+	int switch_link = 0;
+	struct stat sb;
+	char *mn = di_minor_name(minor);
+
+	if (dvlink_cache == NULL || mn == NULL) {
+		devfsadm_errprint("%s: No minor or devlink cache\n", modname);
+		return (DEVFSADM_FAILURE);
+	}
+
+	if (stat(ENUMERATE_RESERVED, &sb) == -1) {
+		devfsadm_print(disk_mid, "%s: No reserved file: %s. Will "
+		    "not bypass new link creation\n",
+		    modname, ENUMERATE_RESERVED);
+		return (DEVFSADM_FAILURE);
+	}
+
+	minor_path = di_devfs_minor_path(minor);
+	if (minor_path == NULL) {
+		devfsadm_errprint("%s: di_devfs_minor_path failed\n", modname);
+		return (DEVFSADM_FAILURE);
+	}
+
+	(void) strlcpy(phys_path, minor_path, sizeof (phys_path));
+
+	di_devfs_path_free(minor_path);
+
+	head = NULL;
+	(void) di_devlink_cache_walk(dvlink_cache, DISK_LINK_RE, phys_path,
+	    DI_PRIMARY_LINK, &head, dvlink_cb);
+
+	/*
+	 * We may be switching between EFI label and SMI label in which case
+	 * we only have minors of the other type.
+	 */
+	if (head == NULL && (*mn == *(MN_SMI) ||
+	    (strncmp(mn, MN_EFI, 2) == 0))) {
+		devfsadm_print(disk_mid, "%s: No links for minor %s in /dev. "
+		    "Trying another label\n", modname, mn);
+		s = strrchr(phys_path, ':');
+		if (s == NULL) {
+			devfsadm_errprint("%s: invalid minor path: %s\n",
+			    modname, phys_path);
+			return (DEVFSADM_FAILURE);
+		}
+		(void) snprintf(s+1, sizeof (phys_path) - (s + 1 - phys_path),
+			"%s%s", *mn == *(MN_SMI) ? MN_EFI : MN_SMI,
+			strstr(s, ",raw") ? ",raw" : "");
+		(void) di_devlink_cache_walk(dvlink_cache, DISK_LINK_RE,
+		    phys_path, DI_PRIMARY_LINK, &head, dvlink_cb);
+	}
+
+	if (head == NULL) {
+		devfsadm_print(disk_mid, "%s: minor %s has no links in /dev\n",
+		    modname, phys_path);
+		/* no links on disk */
+		return (DEVFSADM_FAILURE);
+	}
+
+	/*
+	 * It suffices to use 1 link to this minor, since
+	 * we are matching with reserved IDs on the basis of
+	 * the controller number which will be the same for
+	 * all links to this minor.
+	 */
+	if (!devfsadm_is_reserved(disks_re_array, head->dv_link)) {
+		/* not reserved links */
+		devfsadm_print(disk_mid, "%s: devlink %s and its minor "
+		    "are NOT reserved\n", modname, head->dv_link);
+		free_dvlist(&head);
+		return (DEVFSADM_FAILURE);
+	}
+
+	devfsadm_print(disk_mid, "%s: devlink %s and its minor are on "
+	    "reserved list\n", modname, head->dv_link);
+
+	/*
+	 * Switch between SMI and EFI labels if required
+	 */
+	switch_link = 0;
+	if (*mn == *(MN_SMI) || (strncmp(mn, MN_EFI, 2) == 0)) {
+		for (entry = head; entry; entry = entry->dv_next) {
+			s = strrchr(entry->dv_link, '/');
+			assert(s);
+			if (s == NULL) {
+				devfsadm_errprint("%s: disk link %s has no "
+				    "directory\n", modname, entry->dv_link);
+				continue;
+			}
+			if (*mn == *(MN_SMI) && strchr(s, 's') == NULL) {
+				(void) snprintf(l, sizeof (l), "%s%s",
+				    entry->dv_link, SLICE_SMI);
+				switch_link = 1;
+				devfsadm_print(disk_mid, "%s: switching "
+				    "reserved link from EFI to SMI label. "
+				    "New link is %s\n", modname, l);
+			} else if (strncmp(mn, MN_EFI, 2) == 0 &&
+			    (s = strchr(s, 's'))) {
+				*s = '\0';
+				(void) snprintf(l, sizeof (l), "%s",
+				    entry->dv_link);
+				*s = 's';
+				switch_link = 1;
+				devfsadm_print(disk_mid, "%s: switching "
+				    "reserved link from SMI to EFI label. "
+				    "New link is %s\n", modname, l);
+			}
+			if (switch_link) {
+				devfsadm_print(disk_mid, "%s: switching "
+				    "link: deleting %s and creating %s\n",
+				    modname, entry->dv_link, l);
+				devfsadm_rm_link(entry->dv_link);
+				(void) devfsadm_mklink(l, node, minor, nflags);
+			}
+		}
+	}
+	free_dvlist(&head);
+
+	/*
+	 * return SUCCESS to indicate that new links to this minor should not
+	 * be created so that only compatibility links to this minor remain.
+	 */
+	return (DEVFSADM_SUCCESS);
 }

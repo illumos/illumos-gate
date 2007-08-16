@@ -79,16 +79,6 @@ extern "C" {
 #include <rpcsvc/ypclnt.h>
 #include <sys/sysevent/eventdefs.h>
 
-#undef	DEBUG
-#ifndef DEBUG
-#define	NDEBUG 1
-#else
-#undef	NDEBUG
-#endif
-
-#include <assert.h>
-
-
 #define	DEV_LOCK_FILE ".devfsadm_dev.lock"
 #define	DAEMON_LOCK_FILE ".devfsadm_daemon.lock"
 
@@ -163,6 +153,9 @@ extern "C" {
 
 #define	MODULE_ACTIVE 0x01
 
+/* Possible flag values for flag member of numeral_t */
+#define	NUMERAL_RESERVED 0x01
+
 #define	MAX_SLEEP 120
 
 #define	DEVLINKTAB_FILE "/etc/devlink.tab"
@@ -193,6 +186,8 @@ extern "C" {
 #define	INSTSYNC_MID		"devfsadm:instsync"
 #define	FILES_MID		"devfsadm:files"
 #define	ENUM_MID		"devfsadm:enum"
+#define	RSRV_MID		"devfsadm:rsrv"	/* enum interface reserve  */
+#define	RSBY_MID		"devfsadm:rsby"	/* enum reserve bypass */
 #define	LINKCACHE_MID		"devfsadm:linkcache"
 #define	ADDREMCACHE_MID		"devfsadm:addremcache"
 #define	MALLOC_MID		"devfsadm:malloc"
@@ -305,6 +300,7 @@ typedef struct numeral {
 	int rule_index;
 	char *cmp_str;
 	struct numeral *next;
+	int flags;
 } numeral_t;
 
 typedef struct numeral_set {
@@ -514,11 +510,18 @@ static void reset_node_permissions(di_node_t, di_minor_t);
 static void devname_lookup_handler(void *, char *, size_t,
     door_desc_t *, uint_t);		/* /dev name lookup server */
 static int devname_kcall(int, void *);	/* syscall into the devname fs */
+
 static void nfphash_create(void);
 static int nfphash_fcn(char *key);
 static item_t *nfphash_lookup(char *key);
 static void nfphash_insert(char *key);
 static void nfphash_destroy(void);
+
+/* Enumerate reserve related */
+static void read_enumerate_file(void);
+static int enumerate_parse(char *rsvstr, char *path_left, numeral_set_t *setp,
+    devfsadm_enumerate_t rules[], int index);
+static void create_reserved_numeral(numeral_set_t *setp, char *numeral_id);
 
 /* convenient short hands */
 #define	vprint		devfsadm_print

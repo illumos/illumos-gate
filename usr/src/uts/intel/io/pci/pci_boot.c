@@ -914,7 +914,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	ushort_t subvenid, subdevid, status;
 	ushort_t slot_num;
 	uint_t classcode, revclass;
-	int reprogram = 0, pciide;
+	int reprogram = 0, pciide = 0;
 	int power[2] = {1, 1};
 	int pciex = 0;
 	ushort_t is_pci_bridge = 0;
@@ -952,12 +952,9 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	basecl = classcode >> 16;
 	subcl = (classcode >> 8) & 0xff;
 	progcl = classcode & 0xff;
-	pciide = is_pciide(basecl, subcl, revid, vendorid, deviceid,
-	    subvenid, subdevid);
 
-	if (pciide)
-		(void) snprintf(nodename, sizeof (nodename), "pci-ide");
-	else if (is_display(classcode))
+
+	if (is_display(classcode))
 		(void) snprintf(nodename, sizeof (nodename), "display");
 	else if (subvenid != 0)
 		(void) snprintf(nodename, sizeof (nodename),
@@ -1066,6 +1063,29 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	add_compatible(dip, subvenid, subdevid, vendorid, deviceid,
 	    revid, classcode, pciex);
+
+	/*
+	 * See if this device is a controller that advertises
+	 * itself to be a standard ATA task file controller, or one that
+	 * has been hard coded.
+	 *
+	 * If it is, check if any other higher precedence driver listed in
+	 * driver_aliases will claim the node by calling
+	 * ddi_compatibile_driver_major.  If so, clear pciide and do not
+	 * create a pci-ide node or any other special handling.
+	 *
+	 * If another driver does not bind, set the node name to pci-ide
+	 * and then let the special pci-ide handling for registers and
+	 * child pci-ide nodes proceed below.
+	 */
+	if (is_pciide(basecl, subcl, revid, vendorid, deviceid,
+	    subvenid, subdevid) == 1) {
+		if (ddi_compatible_driver_major(dip, NULL) == (major_t)-1) {
+			(void) ndi_devi_set_nodename(dip, "pci-ide", 0);
+			pciide = 1;
+		}
+	}
+
 	reprogram = add_reg_props(dip, bus, dev, func, config_op, pciide);
 	(void) ndi_devi_bind_driver(dip, 0);
 
