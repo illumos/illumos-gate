@@ -1635,15 +1635,22 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	size_t size;
 	uchar_t *buffer = NULL;
 	int ref_cnt;
+	boolean_t free_state = B_FALSE;
 
 	NXGE_DEBUG_MSG((NULL, MEM2_CTL, "==> nxge_freeb"));
 	NXGE_DEBUG_MSG((NULL, MEM2_CTL,
 		"nxge_freeb:rx_msg_p = $%p (block pending %d)",
 		rx_msg_p, nxge_mblks_pending));
 
-
-	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
 	atomic_dec_32(&nxge_mblks_pending);
+	/*
+	 * First we need to get the free state, then
+	 * atomic decrement the reference count to prevent
+	 * the race condition with the interrupt thread that
+	 * is processing a loaned up buffer block.
+	 */
+	free_state = rx_msg_p->free;
+	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
 	if (!ref_cnt) {
 		buffer = rx_msg_p->buffer;
 		size = rx_msg_p->block_size;
@@ -1662,7 +1669,7 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	/*
 	 * Repost buffer.
 	 */
-	if ((ref_cnt == 1) && (rx_msg_p->free == B_TRUE)) {
+	if (free_state && (ref_cnt == 1)) {
 		NXGE_DEBUG_MSG((NULL, RX_CTL,
 		    "nxge_freeb: post page $%p:", rx_msg_p));
 		nxge_post_page(rx_msg_p->nxgep, rx_msg_p->rx_rbr_p,
@@ -2387,11 +2394,12 @@ nxge_receive_packet(p_nxge_t nxgep,
 		 * count is reached.
 		 */
 		if (error_send_up == B_FALSE) {
+			atomic_inc_32(&rx_msg_p->ref_cnt);
+			atomic_inc_32(&nxge_mblks_pending);
 			if (buffer_free == B_TRUE) {
 				rx_msg_p->free = B_TRUE;
 			}
 
-			atomic_inc_32(&rx_msg_p->ref_cnt);
 			MUTEX_EXIT(&rx_rbr_p->lock);
 			MUTEX_EXIT(&rcr_p->lock);
 			nxge_freeb(rx_msg_p);
@@ -2404,6 +2412,10 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	skip_len = sw_offset_bytes + hdr_size;
 	if (!rx_msg_p->rx_use_bcopy) {
+		/*
+		 * For loaned up buffers, the driver reference count
+		 * will be incremented first and then the free state.
+		 */
 		nmp = nxge_dupb(rx_msg_p, buf_offset, bsize);
 	} else {
 		nmp = nxge_dupb_bcopy(rx_msg_p, buf_offset + skip_len, l2_len);

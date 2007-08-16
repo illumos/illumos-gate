@@ -999,14 +999,31 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 			}
 			tcp_port += sizeof (ether_header_t);
 			if (!(tcp_port[6] & 0x3f) && !(tcp_port[7] & 0xff)) {
-				if ((tcp_port[9] == IPPROTO_TCP) ||
-						(tcp_port[9] == IPPROTO_UDP)) {
+				switch (tcp_port[9]) {
+				case IPPROTO_TCP:
+				case IPPROTO_UDP:
+				case IPPROTO_ESP:
 					tcp_port += ((*tcp_port) & 0x0f) << 2;
 					ring_index =
-						((tcp_port[1] ^ tcp_port[3])
-						% maxtdcs);
-				} else {
+					    ((tcp_port[0] ^
+					    tcp_port[1] ^
+					    tcp_port[2] ^
+					    tcp_port[3]) % maxtdcs);
+					break;
+
+				case IPPROTO_AH:
+					/* SPI starts at the 4th byte */
+					tcp_port += ((*tcp_port) & 0x0f) << 2;
+					ring_index =
+					    ((tcp_port[4] ^
+					    tcp_port[5] ^
+					    tcp_port[6] ^
+					    tcp_port[7]) % maxtdcs);
+					break;
+
+				default:
 					ring_index = tcp_port[19] % maxtdcs;
+					break;
 				}
 			} else { /* fragmented packet */
 				ring_index = tcp_port[19] % maxtdcs;

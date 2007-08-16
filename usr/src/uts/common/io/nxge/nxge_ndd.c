@@ -2397,7 +2397,7 @@ nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 
 		if (!err) {
 			size_t	size_out = 0;
-			size_t	excess;
+			ssize_t	excess;
 
 			iocp->ioc_rval = 0;
 
