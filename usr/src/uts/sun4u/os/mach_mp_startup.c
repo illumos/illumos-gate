@@ -59,6 +59,11 @@ init_cpu_info(struct cpu *cp)
 	 */
 	cp->cpu_curr_clock = cpunode->clock_freq;
 
+	/*
+	 * Supported frequencies.
+	 */
+	cpu_set_supp_freqs(cp, NULL);
+
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
 

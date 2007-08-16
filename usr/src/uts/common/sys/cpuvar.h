@@ -643,6 +643,10 @@ void	cpu_set_state(cpu_t *);		/* record/timestamp current state */
 int	cpu_get_state(cpu_t *);		/* get current cpu state */
 const char *cpu_get_state_str(cpu_t *);	/* get current cpu state as string */
 
+
+void	cpu_set_supp_freqs(cpu_t *, const char *); /* set the CPU supported */
+						/* frequencies */
+
 int	cpu_configure(int);
 int	cpu_unconfigure(int);
 void	cpu_destroy_bound_threads(cpu_t *cp);

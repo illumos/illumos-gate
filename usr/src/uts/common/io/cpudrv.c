@@ -311,6 +311,7 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_enter(&cpudsp->lock);
 		cpudsp->cpudrv_pm.cur_spd = NULL;
 		cpudsp->cpudrv_pm.targ_spd = cpudsp->cpudrv_pm.head_spd;
+		cpudsp->cpudrv_pm.pm_started = B_FALSE;
 		/*
 		 * We don't call pm_raise_power() directly from attach because
 		 * driver attach for a slave CPU node can happen before the
@@ -590,7 +591,8 @@ set_supp_freqs(cpu_t *cp, cpudrv_pm_t *cpupm)
 			sfptr = supp_freqs + strlen(supp_freqs);
 		}
 	}
-	cp->cpu_supp_freqs = supp_freqs;
+	cpu_set_supp_freqs(cp, supp_freqs);
+	kmem_free(supp_freqs, (UINT64_MAX_STRING * cpupm->num_spd));
 	kmem_free(speeds, cpupm->num_spd * sizeof (uint64_t));
 }
 
@@ -1012,8 +1014,11 @@ cpudrv_pm_monitor(void *arg)
 		    "cpu_t", ddi_get_instance(dip));
 		goto do_return;
 	}
-	if (cp->cpu_supp_freqs == NULL)
+
+	if (!cpupm->pm_started) {
+		cpupm->pm_started = B_TRUE;
 		set_supp_freqs(cp, cpupm);
+	}
 
 	cpudrv_get_cpu_mstate(cp, msnsecs);
 	GET_CPU_MSTATE_CNT(CMS_IDLE, idle_cnt);

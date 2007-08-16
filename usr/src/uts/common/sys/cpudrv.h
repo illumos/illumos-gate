@@ -90,6 +90,7 @@ typedef struct cpudrv_pm {
 #if defined(__x86)
 	kthread_t	*pm_throttle_thread; /* throttling thread */
 #endif
+	boolean_t	pm_started;	/* PM really started */
 } cpudrv_pm_t;
 
 /*

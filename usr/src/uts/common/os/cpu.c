@@ -2163,15 +2163,8 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_core_id.value.l = pg_plat_get_core_id(cp);
 	cpu_info_template.ci_curr_clock_Hz.value.ui64 =
 	    cp->cpu_curr_clock;
-	if (cp->cpu_supp_freqs == NULL) {
-		char clkstr[sizeof ("18446744073709551615") + 1]; /* ui64 MAX */
-		(void) snprintf(clkstr, sizeof (clkstr), "%"PRIu64,
-		    cpu_info_template.ci_curr_clock_Hz.value.ui64);
-		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz, clkstr);
-	} else {
-		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz,
-		    cp->cpu_supp_freqs);
-	}
+	kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz,
+	    cp->cpu_supp_freqs);
 #if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
 	    cpunodes[cp->cpu_id].device_id;
@@ -2781,6 +2774,49 @@ cpu_destroy_bound_threads(cpu_t *cp)
 			thread_free(t);
 		}
 	}
+}
+
+/*
+ * Update the cpu_supp_freqs of this cpu. This information is returned
+ * as part of cpu_info kstats.
+ */
+void
+cpu_set_supp_freqs(cpu_t *cp, const char *freqs)
+{
+	char clkstr[sizeof ("18446744073709551615") + 1]; /* ui64 MAX */
+	const char *lfreqs = clkstr;
+
+	/*
+	 * A NULL pointer means we only support one speed.
+	 */
+	if (freqs == NULL)
+		(void) snprintf(clkstr, sizeof (clkstr), "%"PRIu64,
+		    cp->cpu_curr_clock);
+	else
+		lfreqs = freqs;
+
+	/*
+	 * Make sure the frequency doesn't change while a snapshot is
+	 * going on.
+	 */
+	mutex_enter(cp->cpu_info_kstat->ks_lock);
+
+	/*
+	 * Free any previously allocated string.
+	 */
+	if (cp->cpu_supp_freqs != NULL)
+		kmem_free(cp->cpu_supp_freqs, strlen(cp->cpu_supp_freqs) + 1);
+
+	/*
+	 * Allocate the new string and set the pointer.
+	 */
+	cp->cpu_supp_freqs = kmem_alloc(strlen(lfreqs) + 1, KM_SLEEP);
+	(void) strcpy(cp->cpu_supp_freqs, lfreqs);
+
+	/*
+	 * kstat is free to take a snapshot once again.
+	 */
+	mutex_exit(cp->cpu_info_kstat->ks_lock);
 }
 
 /*
