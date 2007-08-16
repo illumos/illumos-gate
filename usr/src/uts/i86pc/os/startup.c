@@ -1188,7 +1188,9 @@ startup_kmem(void)
 
 	*(uintptr_t *)&_kernelbase = kernelbase;
 	*(uintptr_t *)&_userlimit = kernelbase;
-#if !defined(__amd64)
+#if defined(__amd64)
+	*(uintptr_t *)&_userlimit -= KERNELBASE - USERLIMIT;
+#else
 	*(uintptr_t *)&_userlimit32 = _userlimit;
 #endif
 	PRM_DEBUG(_kernelbase);
