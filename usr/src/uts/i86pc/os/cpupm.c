@@ -85,7 +85,7 @@ static boolean_t cpupm_dependencies_valid = B_TRUE;
 static boolean_t cpupm_enabled = B_TRUE;
 
 /*
- * Until all CPUs have succesfully attached, we do no allow
+ * Until all CPUs have succesfully attached, we do not allow
  * power management.
  */
 static boolean_t cpupm_ready = B_FALSE;
@@ -132,10 +132,9 @@ cpupm_add_cpu2dependency(dev_info_t *dip, int cpu_dependency)
 	cpupm_cpu_node_t *nptr;
 
 	if (!cpupm_dependencies_valid)
-	    return;
+		return;
 
 	if (cpu_dependency == -1) {
-		cpupm_dependencies_valid = B_FALSE;
 		cpupm_free_cpu_dependencies();
 		return;
 	}
@@ -170,6 +169,7 @@ cpupm_free_cpu_dependencies()
 	cpupm_cpu_dependency_t *this_dependency, *next_dependency;
 	cpupm_cpu_node_t *this_node, *next_node;
 
+	cpupm_dependencies_valid = B_FALSE;
 	this_dependency = cpupm_cpu_dependencies;
 	while (this_dependency != NULL) {
 		next_dependency = this_dependency->cd_next;
@@ -186,6 +186,7 @@ cpupm_free_cpu_dependencies()
 		    sizeof (cpupm_cpu_dependency_t));
 		this_dependency = next_dependency;
 	}
+	cpupm_cpu_dependencies = NULL;
 }
 
 /*
@@ -207,6 +208,8 @@ cpupm_is_ready()
 void
 cpupm_enable(boolean_t enable)
 {
+	if (!enable)
+		cpupm_free_cpu_dependencies();
 	cpupm_enabled = enable;
 }
 
@@ -217,8 +220,20 @@ cpupm_enable(boolean_t enable)
 void
 cpupm_post_startup()
 {
+	/*
+	 * The CPU domain built by the PPM during CPUs attaching
+	 * should be rebuilt with the information retrieved from
+	 * ACPI.
+	 */
 	if (cpupm_rebuild_cpu_domains != NULL)
 		(*cpupm_rebuild_cpu_domains)();
+
+	/*
+	 * If CPU power management was disabled, then there
+	 * is nothing to do.
+	 */
+	if (!cpupm_enabled)
+		return;
 
 	cpupm_ready = B_TRUE;
 

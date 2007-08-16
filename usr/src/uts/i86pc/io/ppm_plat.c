@@ -97,13 +97,12 @@ ppm_rebuild_cpu_domains(void)
 	/*
 	 * Get the CPU dependencies as determined by the CPU driver. If
 	 * the CPU driver didn't create a valid set of dependencies, then
-	 * default to all CPUs in one domain.
+	 * leave the domain as it is (which is unmanageable since
+	 * PPM_CPU_READY is off).
 	 */
 	dep = cpupm_get_cpu_dependencies();
 	if (dep == NULL) {
-		cmn_err(CE_WARN, "%s: Could not retrieve CPU dependency info!",
-		    str);
-		domp_old->dflags |= PPMD_CPU_READY;
+		PPMD(D_CPU, ("%s: No CPU dependency info!\n", str));
 		return;
 	}
 
@@ -117,7 +116,7 @@ ppm_rebuild_cpu_domains(void)
 		domp = kmem_zalloc(sizeof (*domp), KM_SLEEP);
 		domp->name =  kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 		(void) snprintf(domp->name, MAXNAMELEN, "acpi_cpu_domain_%d",
-			dep_next->cd_dependency_id);
+		    dep_next->cd_dependency_id);
 		mutex_init(&domp->lock, NULL, MUTEX_DRIVER, NULL);
 		mutex_enter(&domp->lock);
 		domp->dflags = domit_p->dflags | PPMD_CPU_READY;

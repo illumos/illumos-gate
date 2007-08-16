@@ -58,7 +58,7 @@ cpu_acpi_fini(cpu_acpi_handle_t handle)
 		if (CPU_ACPI_PSTATES(handle) != NULL)
 			kmem_free(CPU_ACPI_PSTATES(handle),
 			    CPU_ACPI_PSTATES_SIZE(
-				CPU_ACPI_PSTATES_COUNT(handle)));
+			    CPU_ACPI_PSTATES_COUNT(handle)));
 		kmem_free(handle->cs_pstates, sizeof (cpu_acpi_pstates_t));
 	}
 	kmem_free(handle, sizeof (cpu_acpi_state_t));
@@ -98,7 +98,7 @@ cpu_acpi_cache_pct(cpu_acpi_handle_t handle)
 
 	obj = abuf.Pointer;
 	if (obj->Package.Count != 2) {
-		cmn_err(CE_NOTE, "cpu_acpi: _PCT package bad count %d.",
+		cmn_err(CE_NOTE, "!cpu_acpi: _PCT package bad count %d.",
 		    obj->Package.Count);
 		goto out;
 	}
@@ -108,7 +108,7 @@ cpu_acpi_cache_pct(cpu_acpi_handle_t handle)
 	 */
 	for (i = 0; i < obj->Package.Count; i++) {
 		if (obj->Package.Elements[i].Type != ACPI_TYPE_BUFFER) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "Unexpected data in _PCT package.");
 			goto out;
 		}
@@ -117,20 +117,20 @@ cpu_acpi_cache_pct(cpu_acpi_handle_t handle)
 		    obj->Package.Elements[i].Buffer.Pointer;
 		if (greg->DescriptorType !=
 		    ACPI_RESOURCE_NAME_GENERIC_REGISTER) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "_PCT package has format error.");
 			goto out;
 		}
 		if (greg->ResourceLength !=
 		    ACPI_AML_SIZE_LARGE(AML_RESOURCE_GENERIC_REGISTER)) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "_PCT package not right size.");
 			goto out;
 		}
 		if (greg->AddressSpaceId != ACPI_ADR_SPACE_FIXED_HARDWARE &&
 		    greg->AddressSpaceId != ACPI_ADR_SPACE_SYSTEM_IO) {
-			cmn_err(CE_NOTE, "cpu_apci: _PCT contains unsupported "
-				"address space type %x", greg->AddressSpaceId);
+			cmn_err(CE_NOTE, "!cpu_apci: _PCT contains unsupported "
+			    "address space type %x", greg->AddressSpaceId);
 			goto out;
 		}
 	}
@@ -182,19 +182,19 @@ cpu_acpi_cache_psd(cpu_acpi_handle_t handle)
 
 	pkg = abuf.Pointer;
 	if (pkg->Package.Count != 1) {
-		cmn_err(CE_NOTE, "cpu_acpi: _PSD unsupported package "
+		cmn_err(CE_NOTE, "!cpu_acpi: _PSD unsupported package "
 		    "count %d.", pkg->Package.Count);
 		goto out;
 	}
 
 	if (pkg->Package.Elements[0].Type != ACPI_TYPE_PACKAGE ||
 	    pkg->Package.Elements[0].Package.Count != 5) {
-		cmn_err(CE_NOTE, "cpu_acpi: Unexpected data in _PSD package.");
+		cmn_err(CE_NOTE, "!cpu_acpi: Unexpected data in _PSD package.");
 		goto out;
 	}
 	elements = pkg->Package.Elements[0].Package.Elements;
 	if (elements[0].Integer.Value != 5 || elements[1].Integer.Value != 0) {
-		cmn_err(CE_NOTE, "cpu_acpi: Unexpected _PSD revision.");
+		cmn_err(CE_NOTE, "!cpu_acpi: Unexpected _PSD revision.");
 		goto out;
 	}
 	psd = &CPU_ACPI_PSD(handle);
@@ -238,12 +238,12 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 	abuf.Pointer = NULL;
 	if (ACPI_FAILURE(AcpiEvaluateObjectTyped(handle->cs_handle, "_PSS",
 	    NULL, &abuf, ACPI_TYPE_PACKAGE))) {
-		cmn_err(CE_NOTE, "cpu_acpi: _PSS package not found.");
+		cmn_err(CE_NOTE, "!cpu_acpi: _PSS package not found.");
 		return (1);
 	}
 	obj = abuf.Pointer;
 	if (obj->Package.Count < 2) {
-		cmn_err(CE_NOTE, "cpu_acpi: _PSS package bad count %d.",
+		cmn_err(CE_NOTE, "!cpu_acpi: _PSS package bad count %d.",
 		    obj->Package.Count);
 		goto out;
 	}
@@ -256,8 +256,8 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 	for (i = 0; i < obj->Package.Count; i++) {
 		if (obj->Package.Elements[i].Type != ACPI_TYPE_PACKAGE ||
 		    obj->Package.Elements[i].Package.Count !=
-			CPU_ACPI_PSS_SIZE) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+		    CPU_ACPI_PSS_SIZE) {
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "Unexpected data in _PSS package.");
 			goto out;
 		}
@@ -265,7 +265,7 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 		q = obj->Package.Elements[i].Package.Elements;
 		for (j = 0; j < CPU_ACPI_PSS_SIZE; j++) {
 			if (q[j].Type != ACPI_TYPE_INTEGER) {
-				cmn_err(CE_NOTE, "cpu_acpi: "
+				cmn_err(CE_NOTE, "!cpu_acpi: "
 				    "_PSS element invalid (type)");
 				goto out;
 			}
@@ -290,7 +290,7 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 		 * of the end-of-table entries above.
 		 */
 		if (eot) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "Unexpected data in _PSS package after eot.");
 			goto out;
 		}
@@ -299,7 +299,7 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 		 * pstates must be defined in order from highest to lowest.
 		 */
 		if (l != NULL && l[0].Integer.Value < q[0].Integer.Value) {
-			cmn_err(CE_NOTE, "cpu_acpi: "
+			cmn_err(CE_NOTE, "!cpu_acpi: "
 			    "_PSS package pstate definitions out of order.");
 			goto out;
 		}
@@ -375,19 +375,19 @@ int
 cpu_acpi_cache_data(cpu_acpi_handle_t handle)
 {
 	if (cpu_acpi_cache_pct(handle) < 0) {
-		cmn_err(CE_WARN, "cpu_acpi: error parsing _PCT for "
+		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PCT for "
 		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_pstates(handle) != 0) {
-		cmn_err(CE_WARN, "cpu_acpi: error parsing _PSS for "
+		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PSS for "
 		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
 		return (-1);
 	}
 
 	if (cpu_acpi_cache_psd(handle) < 0) {
-		cmn_err(CE_WARN, "cpu_acpi: error parsing _PSD for "
+		cmn_err(CE_WARN, "!cpu_acpi: error parsing _PSD for "
 		    "CPU instance %d", ddi_get_instance(handle->cs_dip));
 		return (-1);
 	}
@@ -408,7 +408,7 @@ cpu_acpi_install_ppc_handler(cpu_acpi_handle_t handle,
 	char path[MAXNAMELEN];
 	if (ACPI_FAILURE(AcpiInstallNotifyHandler(handle->cs_handle,
 	    ACPI_DEVICE_NOTIFY, handler, dip)))
-		cmn_err(CE_NOTE, "cpu_acpi: Unable to register _PPC "
+		cmn_err(CE_NOTE, "!cpu_acpi: Unable to register _PPC "
 		    "notify handler for %s", ddi_pathname(dip, path));
 }
 
@@ -459,7 +459,7 @@ cpu_acpi_write_port(ACPI_IO_ADDRESS address, uint32_t value, uint32_t width)
 {
 	if (ACPI_FAILURE(AcpiOsWritePort(address, value, width))) {
 		cmn_err(CE_NOTE, "cpu_acpi: error writing system IO port "
-			"%lx.", (long)address);
+		    "%lx.", (long)address);
 		return (-1);
 	}
 	return (0);
@@ -473,7 +473,7 @@ cpu_acpi_read_port(ACPI_IO_ADDRESS address, uint32_t *value, uint32_t width)
 {
 	if (ACPI_FAILURE(AcpiOsReadPort(address, value, width))) {
 		cmn_err(CE_NOTE, "cpu_acpi: error reading system IO port "
-			"%lx.", (long)address);
+		    "%lx.", (long)address);
 		return (-1);
 	}
 	return (0);
