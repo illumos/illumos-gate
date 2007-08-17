@@ -1624,6 +1624,12 @@ vhci_commoncap(struct scsi_address *ap, char *cap,
 		return (rval);
 	}
 
+	if (vlun == NULL) {
+		VHCI_DEBUG(3, (CE_WARN, vhci->vhci_dip,
+		    "!vhci_commoncap: vlun is null"));
+		return (rval);
+	}
+
 	if ((cidx = scsi_hba_lookup_capstr(cap)) == -1) {
 		return (UNDEFINED);
 	}
@@ -7070,6 +7076,13 @@ vhci_lun_free(dev_info_t *tgt_dip)
 {
 	struct scsi_vhci_lun *dvlp;
 	char *guid;
+	struct scsi_device *sd;
+
+	/*
+	 * The scsi_device was set to driver private during child node
+	 * initialization in the scsi_hba_bus_ctl().
+	 */
+	sd = (struct scsi_device *)ddi_get_driver_private(tgt_dip);
 
 	dvlp = (struct scsi_vhci_lun *)
 	    mdi_client_get_vhci_private(tgt_dip);
@@ -7106,6 +7119,8 @@ vhci_lun_free(dev_info_t *tgt_dip)
 	cv_destroy(&dvlp->svl_cv);
 	sema_destroy(&dvlp->svl_pgr_sema);
 	kmem_free(dvlp, sizeof (*dvlp));
+
+	sd->sd_address.a_hba_tran->tran_tgt_private = NULL;
 }
 
 
