@@ -122,6 +122,8 @@ extern void progressbar_init(void);
 extern void progressbar_start(void);
 extern void brand_init(void);
 
+extern int size_pse_array(pgcnt_t, int);
+
 /*
  * XXX make declaration below "static" when drivers no longer use this
  * interface.
@@ -250,6 +252,9 @@ int segzio_fromheap = 1;
 long page_hashsz;		/* Size of page hash table (power of two) */
 struct page *pp_base;		/* Base of initial system page struct array */
 struct page **page_hash;	/* Page hash table */
+pad_mutex_t *pse_mutex;		/* Locks protecting pp->p_selock */
+size_t pse_table_size;		/* Number of mutexes in pse_mutex[] */
+int pse_shift;			/* log2(pse_table_size) */
 struct seg ktextseg;		/* Segment used for kernel executable image */
 struct seg kvalloc;		/* Segment used for "valloc" mapping */
 struct seg kpseg;		/* Segment used for pageable kernel virt mem */
@@ -844,6 +849,7 @@ startup_memlist(void)
 	size_t pagecolor_memsz;
 	caddr_t page_ctrs_mem;
 	size_t page_ctrs_size;
+	size_t pse_table_alloc_size;
 	struct memlist *current;
 	extern void startup_build_mem_nodes(struct memlist *);
 
@@ -1019,6 +1025,14 @@ startup_memlist(void)
 	page_ctrs_size = page_ctrs_sz();
 	ADD_TO_ALLOCATIONS(page_ctrs_mem, page_ctrs_size);
 	PRM_DEBUG(page_ctrs_size);
+
+	/*
+	 * Allocate the array that protects pp->p_selock.
+	 */
+	pse_shift = size_pse_array(physmem, max_ncpus);
+	pse_table_size = 1 << pse_shift;
+	pse_table_alloc_size = pse_table_size * sizeof (pad_mutex_t);
+	ADD_TO_ALLOCATIONS(pse_mutex, pse_table_alloc_size);
 
 #if defined(__amd64)
 	valloc_sz = ROUND_UP_LPAGE(valloc_sz);

@@ -94,6 +94,7 @@ extern void mem_config_init(void);
 extern void memseg_remap_init(void);
 
 extern void mach_kpm_init(void);
+extern int size_pse_array(pgcnt_t, int);
 
 /*
  * External Data:
@@ -181,6 +182,9 @@ long page_hashsz;		/* Size of page hash table (power of two) */
 struct page *pp_base;		/* Base of system page struct array */
 size_t pp_sz;			/* Size in bytes of page struct array */
 struct page **page_hash;	/* Page hash table */
+pad_mutex_t *pse_mutex;		/* Locks protecting pp->p_selock */
+size_t pse_table_size;		/* Number of mutexes in pse_mutex[] */
+int pse_shift;			/* log2(pse_table_size) */
 struct seg ktextseg;		/* Segment used for kernel executable image */
 struct seg kvalloc;		/* Segment used for "valloc" mapping */
 struct seg kpseg;		/* Segment used for pageable kernel virt mem */
@@ -1355,6 +1359,17 @@ startup_memlist(void)
 			    kpm_pp_sz;
 	}
 
+	/*
+	 * Allocate the array that protects pp->p_selock.
+	 */
+	pse_shift = size_pse_array(physmem, max_ncpus);
+	pse_table_size = 1 << pse_shift;
+	pse_mutex = ndata_alloc(&ndata, pse_table_size * sizeof (pad_mutex_t),
+	    ecache_alignsize);
+	if (pse_mutex == NULL)
+		alloc_sz = roundup(alloc_sz, ecache_alignsize) +
+		    pse_table_size * sizeof (pad_mutex_t);
+
 	if (alloc_sz > 0) {
 		uintptr_t bop_base;
 
@@ -1391,6 +1406,13 @@ startup_memlist(void)
 		if (kpm_enable && kpm_pp_base == NULL) {
 			kpm_pp_base = (uintptr_t)bop_base;
 			bop_base = roundup(bop_base + kpm_pp_sz,
+			    ecache_alignsize);
+		}
+
+		if (pse_mutex == NULL) {
+			pse_mutex = (pad_mutex_t *)bop_base;
+			bop_base = roundup(bop_base +
+			    pse_table_size * sizeof (pad_mutex_t),
 			    ecache_alignsize);
 		}
 

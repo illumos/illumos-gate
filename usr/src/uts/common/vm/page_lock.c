@@ -36,6 +36,7 @@
 #include <sys/vnode.h>
 #include <sys/bitmap.h>
 #include <sys/lockstat.h>
+#include <sys/sysmacros.h>
 #include <sys/condvar_impl.h>
 #include <vm/page.h>
 #include <vm/seg_enum.h>
@@ -74,33 +75,33 @@ kmutex_t  page_freelock;
  * PAGE_SE_MUTEX(pp) returns the address of the appropriate mutex
  * when given a pointer to a page_t.
  *
- * PSE_TABLE_SIZE must be a power of two.  One could argue that we
+ * PIO_TABLE_SIZE must be a power of two.  One could argue that we
  * should go to the trouble of setting it up at run time and base it
  * on memory size rather than the number of compile time CPUs.
  *
- * XX64	We should be using physmem size to calculate PSE_TABLE_SIZE,
- *	PSE_SHIFT, PIO_SHIFT.
+ * XX64	We should be using physmem size to calculate PIO_SHIFT.
  *
  *	These might break in 64 bit world.
  */
-#define	PSE_SHIFT	7		/* log2(PSE_TABLE_SIZE) */
-
-#define	PSE_TABLE_SIZE	128		/* number of mutexes to have */
-
-#define	PIO_SHIFT	PSE_SHIFT	/* next power of 2 bigger than page_t */
-#define	PIO_TABLE_SIZE	PSE_TABLE_SIZE	/* number of io mutexes to have */
+#define	PIO_SHIFT	7	/* log2(sizeof(page_t)) */
+#define	PIO_TABLE_SIZE	128	/* number of io mutexes to have */
 
 pad_mutex_t	ph_mutex[PH_TABLE_SIZE];
-pad_mutex_t	pse_mutex[PSE_TABLE_SIZE];
 kmutex_t	pio_mutex[PIO_TABLE_SIZE];
-
-#define	PAGE_SE_MUTEX(pp) \
-	    &pse_mutex[((((uintptr_t)(pp) >> PSE_SHIFT) ^ \
-		((uintptr_t)(pp) >> (PSE_SHIFT << 1))) & \
-		(PSE_TABLE_SIZE - 1))].pad_mutex
 
 #define	PAGE_IO_MUTEX(pp) \
 	    &pio_mutex[(((uintptr_t)pp) >> PIO_SHIFT) & (PIO_TABLE_SIZE - 1)]
+
+/*
+ * The pse_mutex[] array is allocated in the platform startup code
+ * based on the size of the machine at startup.
+ */
+extern pad_mutex_t *pse_mutex;		/* Locks protecting pp->p_selock */
+extern size_t pse_table_size;		/* Number of mutexes in pse_mutex[] */
+extern int pse_shift;			/* log2(pse_table_size) */
+#define	PAGE_SE_MUTEX(pp)	&pse_mutex[				\
+	((((uintptr_t)(pp) >> pse_shift) ^ ((uintptr_t)(pp))) >> 7) &	\
+	(pse_table_size - 1)].pad_mutex
 
 #define	PSZC_MTX_TABLE_SIZE	128
 #define	PSZC_MTX_TABLE_SHIFT	7
@@ -160,6 +161,31 @@ kmutex_t	vph_mutex[VPH_TABLE_SIZE + 2];
 void
 page_lock_init()
 {
+}
+
+/*
+ * Return a value for pse_shift based on npg (the number of physical pages)
+ * and ncpu (the maximum number of CPUs).  This is called by platform startup
+ * code.
+ *
+ * Lockstat data from TPC-H runs showed that contention on the pse_mutex[]
+ * locks grew approximately as the square of the number of threads executing.
+ * So the primary scaling factor used is NCPU^2.  The size of the machine in
+ * megabytes is used as an upper bound, particularly for sun4v machines which
+ * all claim to have 256 CPUs maximum, and the old value of PSE_TABLE_SIZE
+ * (128) is used as a minimum.  Since the size of the table has to be a power
+ * of two, the calculated size is rounded up to the next power of two.
+ */
+/*ARGSUSED*/
+int
+size_pse_array(pgcnt_t npg, int ncpu)
+{
+	size_t size;
+	pgcnt_t pp_per_mb = (1024 * 1024) / PAGESIZE;
+
+	size = MAX(128, MIN(npg / pp_per_mb, 2 * ncpu * ncpu));
+	size += (1 << (highbit(size) - 1)) - 1;
+	return (highbit(size) - 1);
 }
 
 /*
