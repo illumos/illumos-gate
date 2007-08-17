@@ -860,6 +860,36 @@ lib/llib-ltsol				sparc
 #
 usr/include/nss.h			sparc
 #
+# AT&T AST (ksh93) files which are currently needed only to build OS/Net
+# (msgcc&co.)
+# libast
+usr/lib/libast.so			      sparc
+usr/lib/llib-last			      sparc
+usr/lib/llib-last.ln			      sparc
+usr/lib/sparcv9/libast.so		      sparc
+usr/lib/sparcv9/llib-last.ln		      sparc
+# libcmd
+usr/lib/llib-lcmd			      sparc
+usr/lib/llib-lcmd.ln			      sparc
+usr/lib/sparcv9/llib-lcmd.ln		      sparc
+# libdll
+usr/lib/libdll.so			      sparc
+usr/lib/llib-ldll			      sparc
+usr/lib/llib-ldll.ln			      sparc
+usr/lib/sparcv9/libdll.so		      sparc
+usr/lib/sparcv9/llib-ldll.ln		      sparc
+# libpp (a helper library needed by AST's msgcc)
+usr/lib/libpp.so			      sparc
+usr/lib/llib-lpp			      sparc
+usr/lib/llib-lpp.ln			      sparc
+usr/lib/locale/C/LC_MESSAGES/libpp	      sparc
+# libshell
+usr/lib/libshell.so			      sparc
+usr/lib/llib-lshell			      sparc
+usr/lib/llib-lshell.ln  		      sparc
+usr/lib/sparcv9/libshell.so		      sparc
+usr/lib/sparcv9/llib-lshell.ln  	      sparc
+#
 # bmc (IPMI) interfaces shared within ON.
 #
 usr/include/sys/bmc_intf.h		sparc

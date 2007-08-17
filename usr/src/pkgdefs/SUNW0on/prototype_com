@@ -73,6 +73,16 @@ f none usr/lib/locale/C/LC_MESSAGES/uxlibc.src           644 root sys
 f none usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po        644 root sys
 f none usr/lib/locale/C/LC_TIME/SUNW_OST_OSLIB.po        644 root sys
 #
+# AT&T AST locale files
+# (file names and locations must be in sync with upstream definitions
+# to ensure compatibility between our version of AST/ksh93 and the
+# native one)
+#
+f none usr/lib/locale/C/LC_MESSAGES/libast               644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/libcmd               644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/libdll               644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/libshell             644 root sys
+#
 # Java locale directories
 #
 d none usr/share				755 root sys

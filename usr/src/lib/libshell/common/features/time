@@ -1,0 +1,35 @@
+hdr	utime
+lib	gettimeofday,setitimer
+mem	timeval.tv_usec sys/time.h
+tst	lib_2_timeofday note{ 2 arg gettimeofday() }end link{
+	#include <sys/types.h>
+	#include <sys/time.h>
+	int main()
+	{
+		struct timeval tv;
+		struct timezone tz;
+		return gettimeofday(&tv, &tz);
+	}
+}end
+tst	lib_1_timeofday note{ 1 arg gettimeofday() }end link{
+	#include <sys/types.h>
+	#include <sys/time.h>
+	int main()
+	{
+		struct timeval tv;
+		return gettimeofday(&tv);
+	}
+}end
+cat{
+	#undef _def_time
+	#include	<times.h>
+	#define _def_time	1
+	#undef timeofday
+	#if _lib_2_timeofday
+	#define timeofday(p)	gettimeofday(p,(struct timezone*)0)
+	#else
+	#if _lib_1_timeofday
+	#define timeofday(p)	gettimeofday(p)
+	#endif
+	#endif
+}end

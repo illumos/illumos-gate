@@ -122,6 +122,16 @@ $(ROOTMAN3FILES) := FILEMODE= 444
 $(ROOTMAN3FILES) := OWNER= root
 $(ROOTMAN3FILES) := GROUP= bin
 
+# Demo rules
+DEMOFILES=
+DEMOFILESRCDIR=		common
+ROOTDEMODIRBASE=	__nonexistent_directory__
+ROOTDEMODIRS=
+ROOTDEMOFILES=	$(DEMOFILES:%=$(ROOTDEMODIRBASE)/%)
+$(ROOTDEMODIRS) :=	OWNER =		root
+$(ROOTDEMODIRS) :=	GROUP =		bin
+$(ROOTDEMODIRS) :=	DIRMODE =	755
+
 #
 # Begin /usr/sfw freeware rules for freeware that has "External"
 # taxonomy stability level.

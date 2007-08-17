@@ -924,6 +924,11 @@ CPPFLAGS=	-D_REENTRANT -D$(MACH64) -D__$(MACH64) \
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) \
 		$(amd64_AS_XARCH)
 
+# Conditionally add support for making |wordexp()| check whether
+# /usr/bin/ksh is ksh93 or not
+include ../../../Makefile.ksh93switch
+CPPFLAGS += -DWORDEXP_KSH93=$(ON_BUILD_KSH93_AS_BINKSH)
+
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
 DYNFLAGS +=	$(RTLDINFO)

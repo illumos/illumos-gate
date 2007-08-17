@@ -1,0 +1,62 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH IBLOCKS 3
+.SH NAME
+iblocks \- compute number file blocks used
+.SH SYNOPSIS
+.EX
+#include <ls.h>
+
+long     _iblocks(struct stat* \fIst\fP);
+.EE
+.SH DESCRIPTION
+.L _iblocks
+returns the number of blocks used by the file whose
+.IR stat (2)
+information is pointed to by
+.IR st .
+The count includes both data and indirect blocks.
+.PP
+This routine is used by
+.B <ls.h>
+on system without the
+.LI "struct stat" st_blocks
+field.
+.SH "SEE ALSO"
+ls(1), stat(2)

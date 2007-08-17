@@ -971,6 +971,11 @@ CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
 
+# Conditionally add support for making |wordexp()| check whether
+# /usr/bin/ksh is ksh93 or not
+include ../../../Makefile.ksh93switch
+CPPFLAGS += -DWORDEXP_KSH93=$(ON_BUILD_KSH93_AS_BINKSH)
+
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
 DYNFLAGS +=	$(RTLDINFO)

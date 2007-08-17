@@ -1,0 +1,18 @@
+lib	sigsetjmp,_setjmp,_longjmp
+typ	sigjmp_buf	setjmp.h
+cat{
+	#undef sigsetjmp
+	#undef siglongjmp
+	#undef sigjmp_buf
+	#define sigjmp_buf		jmp_buf
+	#ifdef	_lib__setjmp
+	#   define sigsetjmp(a,b)	_setjmp(a)
+	#else
+	#   define sigsetjmp(a,b)	setjmp(a)
+	#endif 	/* _lib__setjmp */
+	#ifdef	_lib__longjmp
+	#   define siglongjmp(a,b)	_longjmp(a,b)
+	#else
+	#   define siglongjmp(a,b)	longjmp(a,b)
+	#endif 	/* _lib__longjmp */
+}end

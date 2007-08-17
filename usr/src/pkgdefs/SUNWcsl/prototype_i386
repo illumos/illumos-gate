@@ -226,6 +226,7 @@ s none usr/lib/amd64/libadm.so.1=../../../lib/amd64/libadm.so.1
 s none usr/lib/amd64/libadm.so=../../../lib/amd64/libadm.so.1
 s none usr/lib/amd64/libaio.so.1=../../../lib/amd64/libaio.so.1
 s none usr/lib/amd64/libaio.so=../../../lib/amd64/libaio.so.1
+f none usr/lib/amd64/libast.so.1 755 root bin
 s none usr/lib/amd64/libavl.so.1=../../../lib/amd64/libavl.so.1
 s none usr/lib/amd64/libc.so.1=../../../lib/amd64/libc.so.1
 s none usr/lib/amd64/libc.so=../../../lib/amd64/libc.so.1
@@ -241,6 +242,7 @@ f none usr/lib/amd64/libdisasm.so.1 755 root bin
 s none usr/lib/amd64/libdisasm.so=libdisasm.so.1
 s none usr/lib/amd64/libdl.so.1=../../../lib/amd64/libdl.so.1
 s none usr/lib/amd64/libdl.so=../../../lib/amd64/libdl.so.1
+f none usr/lib/amd64/libdll.so.1 755 root bin
 s none usr/lib/amd64/libdlpi.so.1=../../../lib/amd64/libdlpi.so.1
 s none usr/lib/amd64/libdlpi.so=../../../lib/amd64/libdlpi.so.1
 s none usr/lib/amd64/libdoor.so.1=../../../lib/amd64/libdoor.so.1
@@ -306,6 +308,7 @@ s none usr/lib/amd64/libsecdb.so.1=../../../lib/amd64/libsecdb.so.1
 s none usr/lib/amd64/libsecdb.so=../../../lib/amd64/libsecdb.so.1
 s none usr/lib/amd64/libsendfile.so.1=../../../lib/amd64/libsendfile.so.1
 s none usr/lib/amd64/libsendfile.so=../../../lib/amd64/libsendfile.so.1
+f none usr/lib/amd64/libshell.so.1 755 root bin
 f none usr/lib/amd64/libsip.so.1 755 root bin
 s none usr/lib/amd64/libsip.so=./libsip.so.1
 s none usr/lib/amd64/libsldap.so=libsldap.so.1

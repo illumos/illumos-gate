@@ -18,9 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,11 +40,17 @@
  * wordexp, wordfree -- POSIX.2 D11.2 word expansion routines.
  *
  * Copyright 1985, 1992 by Mortice Kern Systems Inc.  All rights reserved.
+ * Modified by Roland Mainz <roland.mainz@nrubsig.org> to support ksh93.
  *
  */
 
 #pragma	weak wordexp = _wordexp
 #pragma	weak wordfree = _wordfree
+
+/* Safeguard against mistakes in the Makefiles */
+#ifndef WORDEXP_KSH93
+#error "WORDEXP_KSH93 not set. Please check the Makefile flags."
+#endif
 
 #include "synonyms.h"
 #include <stdio.h>
@@ -54,6 +59,9 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
+#if WORDEXP_KSH93
+#include <alloca.h>
+#endif /* WORDEXP_KSH93 */
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -65,7 +73,250 @@
 #define	INITIAL	8		/* initial pathv allocation */
 #define	BUFSZ	256		/* allocation unit of the line buffer */
 
-static int	append(wordexp_t *, char *);
+/* Local prototypes */
+static int append(wordexp_t *, char *);
+
+#if WORDEXP_KSH93
+/*
+ * |mystpcpy| - like |strcpy()| but returns the end of the buffer
+ * We'll add this later (and a matching multibyte/widechar version)
+ * as normal libc function.
+ *
+ * Copy string s2 to s1.  s1 must be large enough.
+ * return s1-1 (position of string terminator ('\0') in destination buffer).
+ */
+static char *
+mystpcpy(char *s1, const char *s2)
+{
+	while (*s1++ = *s2++)
+		;
+	return (s1-1);
+}
+
+/*
+ * Do word expansion.
+ * We built a mini-script in |buff| which takes care of all details,
+ * including stdin/stdout/stderr redirection, WRDE_NOCMD mode and
+ * the word expansion itself.
+ */
+int
+wordexp(const char *word, wordexp_t *wp, int flags)
+{
+	char *args[10];
+	wordexp_t wptmp;
+	size_t si;
+	int i;
+	pid_t pid;
+	char *line, *eob, *cp;	/* word from shell */
+	int rv = WRDE_ERRNO;
+	int status;
+	int pv[2];		/* pipe from shell stdout */
+	FILE *fp;		/* pipe read stream */
+	int serrno, tmpalloc;
+
+	/*
+	 * Do absolute minimum necessary for the REUSE flag. Eventually
+	 * want to be able to actually avoid excessive malloc calls.
+	 */
+	if (flags & WRDE_REUSE)
+		wordfree(wp);
+
+	/*
+	 * Initialize wordexp_t
+	 *
+	 * XPG requires that the struct pointed to by wp not be modified
+	 * unless wordexp() either succeeds, or fails on WRDE_NOSPACE.
+	 * So we work with wptmp, and only copy wptmp to wp if one of the
+	 * previously mentioned conditions is satisfied.
+	 */
+	wptmp = *wp;
+
+	/*
+	 * Man page says:
+	 * 2. All of the calls must set WRDE_DOOFFS, or all must not
+	 * set it.
+	 * Therefore, if it's not set, we_offs will always be reset.
+	 */
+	if ((flags & WRDE_DOOFFS) == 0)
+		wptmp.we_offs = 0;
+
+	/*
+	 * If we get APPEND|REUSE, how should we do?
+	 * We allocate the buffer anyway to avoid segfault.
+	 */
+	tmpalloc = 0;
+	if ((flags & WRDE_APPEND) == 0 || (flags & WRDE_REUSE)) {
+		wptmp.we_wordc = 0;
+		wptmp.we_wordn = wptmp.we_offs + INITIAL;
+		wptmp.we_wordv = (char **)malloc(
+		    sizeof (char *) * wptmp.we_wordn);
+		if (wptmp.we_wordv == NULL)
+			return (WRDE_NOSPACE);
+		wptmp.we_wordp = wptmp.we_wordv + wptmp.we_offs;
+		for (si = 0; si < wptmp.we_offs; si++)
+			wptmp.we_wordv[si] = NULL;
+		tmpalloc = 1;
+	}
+
+	/*
+	 * Set up pipe from shell stdout to "fp" for us
+	 */
+	if (pipe(pv) < 0)
+		goto cleanup;
+
+	/*
+	 * Fork/exec shell
+	 */
+
+	if ((pid = fork()) == -1) {
+		serrno = errno;
+		(void) close(pv[0]);
+		(void) close(pv[1]);
+		errno = serrno;
+		goto cleanup;
+	}
+
+	if (pid == 0) {	 /* child */
+		/*
+		 * Calculate size of required buffer (which is size of the
+		 * input string (|word|) plus all string literals below;
+		 * this value MUST be adjusted each time the literals are
+		 * changed!!!!).
+		 */
+		size_t bufflen = 124+strlen(word); /* Length of |buff| */
+		char *buff = alloca(bufflen);
+		char *currbuffp; /* Current position of '\0' in |buff| */
+		int i;
+		const char *path;
+
+		(void) dup2(pv[1], 1);
+		(void) close(pv[0]);
+		(void) close(pv[1]);
+
+		path = "/usr/bin/ksh93";
+		i = 0;
+
+		/* Start filling the buffer */
+		buff[0] = '\0';
+		currbuffp = buff;
+
+		if (flags & WRDE_UNDEF)
+			currbuffp = mystpcpy(currbuffp, "set -o nounset ; ");
+		if ((flags & WRDE_SHOWERR) == 0) {
+			/*
+			 * The newline ('\n') is neccesary to make sure that
+			 * the redirection to /dev/null is already active in
+			 * the case the printf below contains a syntax
+			 * error...
+			 */
+			currbuffp = mystpcpy(currbuffp, "exec 2>/dev/null\n");
+		}
+		/* Squish stdin */
+		currbuffp = mystpcpy(currbuffp, "exec 0</dev/null\n");
+
+		if (flags & WRDE_NOCMD) {
+			/*
+			 * Switch to restricted shell (rksh) mode here to
+			 * put the word expansion into a "cage" which
+			 * prevents users from executing external commands
+			 * (outside those listed by ${PATH} (which we set
+			 * explicitly to /usr/no/such/path/element/)).
+			 */
+			currbuffp = mystpcpy(currbuffp, "set -o restricted\n");
+
+			(void) putenv("PATH=/usr/no/such/path/element/");
+
+		}
+
+		(void) snprintf(currbuffp, bufflen,
+		    "print -f \"%%s\\000\" %s", word);
+
+		args[i++] = strrchr(path, '/') + 1;
+		args[i++] = "-c";
+		args[i++] = buff;
+		args[i++] = NULL;
+
+		(void) execv(path, args);
+		_exit(127);
+	}
+
+	(void) close(pv[1]);
+
+	if ((fp = fdopen(pv[0], "rF")) == NULL) {
+		serrno = errno;
+		(void) close(pv[0]);
+		errno = serrno;
+		goto wait_cleanup;
+	}
+
+	/*
+	 * Read words from shell, separated with '\0'.
+	 * Since there is no way to disable IFS splitting,
+	 * it would be possible to separate the output with '\n'.
+	 */
+	cp = line = malloc(BUFSZ);
+	if (line == NULL) {
+		(void) fclose(fp);
+		rv = WRDE_NOSPACE;
+		goto wait_cleanup;
+	}
+	eob = line + BUFSZ;
+
+	rv = 0;
+	while ((i = getc(fp)) != EOF) {
+		*cp++ = (char)i;
+		if (i == '\0') {
+			cp = line;
+			if ((rv = append(&wptmp, cp)) != 0) {
+				break;
+			}
+		}
+		if (cp == eob) {
+			size_t bs = (eob - line);
+			char *nl;
+
+			if ((nl = realloc(line, bs + BUFSZ)) == NULL) {
+				rv = WRDE_NOSPACE;
+				break;
+			}
+			line = nl;
+			cp = line + bs;
+			eob = cp + BUFSZ;
+		}
+	}
+
+	wptmp.we_wordp[wptmp.we_wordc] = NULL;
+
+	free(line);
+	(void) fclose(fp);	/* kill shell if still writing */
+
+wait_cleanup:
+	if (waitpid(pid, &status, 0) == -1)
+		rv = WRDE_ERRNO;
+	else if (rv == 0)
+		rv = WEXITSTATUS(status); /* shell WRDE_* status */
+
+cleanup:
+	if (rv == 0)
+		*wp = wptmp;
+	else {
+		if (tmpalloc)
+			wordfree(&wptmp);
+	}
+
+	/*
+	 * Map ksh errors to wordexp() errors
+	 */
+	if (rv == 4)
+		rv = WRDE_CMDSUB;
+	else if (rv == 5)
+		rv = WRDE_BADVAL;
+	else if (rv == 6)
+		rv = WRDE_SYNTAX;
+	return (rv);
+}
+
+#else /* WORDEXP_KSH93 */
 
 extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
 
@@ -325,8 +576,10 @@ cleanup:
 	return (rv);
 }
 
+#endif /* WORDEXP_KSH93 */
+
 /*
- * Append a word to the wordexp_t structure, growing it as neccessary.
+ * Append a word to the wordexp_t structure, growing it as necessary.
  */
 static int
 append(wordexp_t *wp, char *str)
@@ -339,9 +592,9 @@ append(wordexp_t *wp, char *str)
 	 * one more NULL. So we need 2 more free slots.
 	 */
 	if ((wp->we_wordp + wp->we_wordc) ==
-		(wp->we_wordv + wp->we_wordn - 1)) {
+	    (wp->we_wordv + wp->we_wordn - 1)) {
 		nwp = realloc(wp->we_wordv,
-			(wp->we_wordn + INITIAL) * sizeof (char *));
+		    (wp->we_wordn + INITIAL) * sizeof (char *));
 		if (nwp == NULL)
 			return (WRDE_NOSPACE);
 		wp->we_wordn += INITIAL;

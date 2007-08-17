@@ -73,6 +73,7 @@ s none usr/lib/libadm.so=../../lib/libadm.so.1
 s none usr/lib/libadm.so.1=../../lib/libadm.so.1
 s none usr/lib/libaio.so=../../lib/libaio.so.1
 s none usr/lib/libaio.so.1=../../lib/libaio.so.1
+f none usr/lib/libast.so.1 755 root bin
 s none usr/lib/libavl.so.1=../../lib/libavl.so.1
 s none usr/lib/libbsdmalloc.so=./libbsdmalloc.so.1
 f none usr/lib/libbsdmalloc.so.1 755 root bin
@@ -115,6 +116,7 @@ f none usr/lib/libdisasm.so.1 755 root bin
 s none usr/lib/libdisasm.so=./libdisasm.so.1
 s none usr/lib/libdl.so=../../lib/libdl.so.1
 s none usr/lib/libdl.so.1=../../lib/libdl.so.1
+f none usr/lib/libdll.so.1 755 root bin
 s none usr/lib/libdlpi.so=../../lib/libdlpi.so.1
 s none usr/lib/libdlpi.so.1=../../lib/libdlpi.so.1
 s none usr/lib/libdoor.so=../../lib/libdoor.so.1
@@ -243,6 +245,7 @@ s none usr/lib/libsecdb.so=../../lib/libsecdb.so.1
 s none usr/lib/libsecdb.so.1=../../lib/libsecdb.so.1
 s none usr/lib/libsendfile.so=../../lib/libsendfile.so.1
 s none usr/lib/libsendfile.so.1=../../lib/libsendfile.so.1
+f none usr/lib/libshell.so.1 755 root bin
 s none usr/lib/libsip.so=./libsip.so.1
 f none usr/lib/libsip.so.1 755 root bin
 s none usr/lib/libsldap.so=libsldap.so.1

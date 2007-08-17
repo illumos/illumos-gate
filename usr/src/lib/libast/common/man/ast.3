@@ -1,0 +1,283 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH AST 3
+.SH NAME
+ast \- miscellaneous libast support
+.SH SYNOPSIS
+.EX
+#include <ast.h>
+
+char*          astconf(const char* \fIname\fP, const char* \fIpath\fP, const char* \fIvalue\fP);
+Ast_confdisc_t astconfdisc(Ast_confdisc_t new_notify);
+void           astconflist(Sfio_t* stream, const char* path, int flags);
+off_t          astcopy(int \fIrfd\fP, int \fIwfd\fP, off_t \fIn\fP);
+int            astquery(int \fIfd\fP, const char* \fIformat\fP , ...);
+.EE
+.SH DESCRIPTION
+.L astconf
+is a string interface to the
+.IR confstr (2),
+.IR pathconf (2),
+and
+.IR sysconf (2)
+calls.
+If
+.I value
+is
+.L 0
+then the configuration parameter value for
+.I name
+is returned.
+Some
+.I name
+configuration parameters may consult the
+.I path
+argument.
+In this case if
+.I path
+is
+.L 0
+then
+\f5"/"\fP
+is used.
+Otherwise if 
+.I path
+is not
+.L 0
+then it must exist.
+The string return value for
+.I name
+remains unchanged until the next
+.L astconf
+call on
+.IR name .
+If
+.I value
+is
+.L 0
+then a valid string is always returned;
+\f5""\fP
+is returned if
+.I name
+has no configuration value.
+This simplifies the programming interface:
+.EX
+if (!strcmp(astconf("PATH_RESOLVE", NiL, NiL), "logical"))
+	/* the logical way ... */
+.EE
+If
+.I value
+is not
+.L 0
+then the configuration parameter value for
+.I name
+is set to
+.IR value .
+.L 0
+is returned if the value cannot be set.
+The paradigm is:
+.EX
+universe = astconf("UNIVERSE", 0, "att");
+\|.\|.\|.
+astconf("UNIVERSE", 0, universe);
+.EE
+The settable configuration names are:
+.TP
+.L FS_3D
+.L 1
+if
+.IR 3d (1)
+viewpathing is enabled,
+.L 0
+otherwise.
+This is an alternative to the
+.IR fs3d (3)
+interface.
+.TP
+.L PATH_RESOLVE
+.L logical
+if symbolic links are followed during file tree traversal,
+.L physical
+if symbolic links are not followed during file tree traversal,
+and
+.L metaphysical
+if symbolic links are followed at the top level during file tree traversal.
+These correspond to the generic
+.LR \-L ,
+.LR \-P ,
+and
+.L \-H
+command options.
+.TP
+.L UNIVERSE
+.L ucb
+for 
+.I Berkeley
+style and
+.L att
+otherwise.
+This configuration parameter controls the
+.I universe
+setting on machines that support it (e.g., Pyramid).
+.L UNIVERSE
+also controls the behavior of some commands like
+.IR cat (1)
+and
+.IR echo (1).
+.PP
+User defined
+.I name
+values may also be set and queried, but these should probably have
+some form of vendor prefix to avoid being stomped by future standards.
+.PP
+.L astconfdisc
+registers a discipline function
+.EX
+int (*notify)(const char* \fIname\fP, const char* \fIpath\fP, const char* \fIvalue\fP);
+.EE
+that is called just before the configuration parameter
+.I name
+is set to
+.I value
+relative to
+.IR path .
+If
+.I notify
+returns 
+.L 0
+then the configuration parameter value is not changed.
+.PP
+.L astconflist
+lists the current configuration names and values of
+.IR stream .
+If
+.I path
+is
+.L 0
+then \f5"/"\fP is used where appropriate.
+If
+.I flags
+is
+.L 0
+or
+.L R_OK|W_OK
+then all configuration parameters are listed.
+.L R_OK
+lists the readonly configuration parameters and 
+.L W_OK
+lists the settable configuration parameters.
+.L X_OK
+lists the settable configuration parameters in a form that can be
+snarfed for input to the
+.IR getconf (1)
+command.
+.PP
+.L astcopy
+efficiently copies up to
+.I n
+bytes from the file descriptor
+.I rfd
+to the file descriptor
+.IR wfd .
+The actual number of bytes copied is returned; \-1 is returned on error.
+If
+.I n
+is  0 then an optimal number of bytes (with respect to both
+.I rfd
+and
+.IR wfd )
+is copied.
+.PP
+If possible
+.IR mmap (2)
+is used to do the transfer.
+Some implementations may bypass user buffer copies usually required by the
+.IR read (2)- write (2)
+paradigm.
+.PP
+.L astquery
+outputs an
+.IR sfprintf (3)
+prompt specified by
+.I "format, .\|.\|."
+to the controlling terminal and reads a response from the controlling terminal.
+Offirmative response returns
+.LR 0 ,
+.L EOF
+or quit response returns
+.LR \-1 ,
+otherwise
+.L 1
+is returned.
+If
+.I quit
+is greater than
+.L 0
+then
+.I exit(quit)
+is called on a quit response.
+The responses will eventually be locale specific.
+.PP
+.L astwinsize
+returns the number of rows in
+.I *rows
+and the number of columns
+.I *col
+for the terminal file descriptor
+.IR fd .
+If the number of rows or columns cannot be determined or if
+.I fd
+is not a terminal then
+.I *rows
+and
+.I *cols
+are set to
+.LR 0 .
+If
+.I ioctl (2)
+methods fail then the environment variable
+.L LINES
+is used to set
+.I *rows
+and the environment variable
+.L COLUMNS
+is used to set
+.IR *cols .
+.SH "SEE ALSO"
+getconf(1), confstr(2), mmap(2), pathconf(2), read(2), sysconf(2), write(2)

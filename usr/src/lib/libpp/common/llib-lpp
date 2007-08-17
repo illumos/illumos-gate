@@ -1,0 +1,53 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * lib/libpp/common/llib-lpp
+ *
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*LINTLIBRARY*/
+/*PROTOLIB1*/
+
+#include "pp.h"
+
+/* automatically generated data start here */
+extern struct ppglobals pp;
+extern char ppctype[];
+extern int ppargs(char**, int);
+extern void ppcpp(void);
+extern void ppcomment(char*, char*, char*, int);
+extern void* ppcontext(void*, int);
+extern void pperror(int, ...);
+extern void ppincref(char*, char*, int, int);
+extern void ppinput(char*, char*, int);
+extern int pplex(void);
+extern void ppline(int, char*);
+extern void ppmacref(struct ppsymbol*, char*, int, int, unsigned long);
+extern void ppop(int, ...);
+extern void pppragma(char*, char*, char*, char*, int);
+extern int ppprintf(char*, ...);
+extern int ppsync(void);
+/* end of automatically generated data */

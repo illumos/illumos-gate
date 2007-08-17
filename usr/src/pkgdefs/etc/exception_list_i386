@@ -792,6 +792,36 @@ lib/llib-ltsol				i386
 #
 usr/include/nss.h			i386
 #
+# AT&T AST (ksh93) files which are currently needed only to build OS/Net
+# (msgcc&co.)
+# libast
+usr/lib/libast.so			      i386
+usr/lib/llib-last			      i386
+usr/lib/llib-last.ln			      i386
+usr/lib/amd64/libast.so 		      i386
+usr/lib/amd64/llib-last.ln		      i386
+# libcmd
+usr/lib/llib-lcmd			      i386
+usr/lib/llib-lcmd.ln			      i386
+usr/lib/amd64/llib-lcmd.ln		      i386
+# libdll
+usr/lib/libdll.so			      i386
+usr/lib/llib-ldll			      i386
+usr/lib/llib-ldll.ln			      i386
+usr/lib/amd64/libdll.so 		      i386
+usr/lib/amd64/llib-ldll.ln		      i386
+# libpp (a helper library needed by AST's msgcc)
+usr/lib/libpp.so			      i386
+usr/lib/llib-lpp			      i386
+usr/lib/llib-lpp.ln			      i386
+usr/lib/locale/C/LC_MESSAGES/libpp	      i386
+# libshell
+usr/lib/libshell.so			      i386
+usr/lib/llib-lshell			      i386
+usr/lib/llib-lshell.ln  		      i386
+usr/lib/amd64/libshell.so		      i386
+usr/lib/amd64/llib-lshell.ln		      i386
+#
 # bmc (IPMI) interfaces shared within ON.
 #
 usr/include/sys/bmc_intf.h		i386

@@ -1,0 +1,63 @@
+# This program runs ksh regression tests
+# shtests [ name=value ... ] a.sh b.sh ...
+
+unset DISPLAY ENV FIGNORE
+LANG=C
+LC_ALL=C
+time=1
+while	:
+do	case $1 in
+	*=*)	n=${1%%=*}
+		v=${1#*=}
+		eval $n=\'$v\'
+		export $n
+		;;
+	-t|--t*)time=
+		;;
+	*)	break
+		;;
+	esac
+	shift
+done
+export LANG LC_ALL PATH PWD SHELL
+PWD=`pwd`
+SHELL=${SHELL-ksh}
+case $0 in
+/*)	d=`dirname $0`;;
+*/*)	d=$PWD/`dirname $0`;;
+*)	d=$PWD;;
+esac
+case $SHELL in
+/*)	;;
+*/*)	SHELL=$d/$SHELL;;
+*)	SHELL=$(whence $SHELL);;
+esac
+PATH=/bin:/usr/bin
+if	[[ -d /usr/ucb ]]
+then	PATH=$PATH:/usr/ucb
+fi
+PATH=$PATH:$d
+if [[ $INSTALLROOT && -r $INSTALLROOT/bin/.paths ]]
+then	PATH=$INSTALLROOT/bin:$PATH
+fi
+for i in ${*-*.sh}
+do	echo test $i begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
+	t=$(grep -c err_exit $i)
+	if	(( $t ))
+	then	(( t = $t - 1 ))
+	fi
+	T=test
+	if	(( $t != 1 ))
+	then	T=${T}s
+	fi
+	E=error
+	if	$SHELL $i
+	then	echo test $i passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
+	else	e=$?
+		E=error
+		if	(( $e != 1 ))
+		then	E=${E}s
+		fi
+		echo test $i failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
+	fi
+done

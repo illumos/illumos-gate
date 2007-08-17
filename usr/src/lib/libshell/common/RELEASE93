@@ -1,0 +1,455 @@
+This is a list of changes that have been made since the 12/28/93 version
+of ksh. 
+
+1.	New features in 12/28/93b
+	a.  If IFS contains two consecutive identical characters belonging
+	    to the [:space:] class, then this character is treated as
+	    a non-space delimiter so that each instance will delimit
+	    a field.  For example, IFS=$'\t\t' will cause two consecutive
+	    tabs to delimit a null field.
+	b.  The getopts command has a -a name option that specifies a
+	    name that will be used for usage messages.
+
+2.	New features in 12/28/93e
+	a.  The math functions, atan2, hypot, fmod, and pow were added.
+	b.  When a shared library is loaded, if the function lib_init()
+	    is defined in the library, it is invoked the first time that
+	    the library is loaded with builtin -f library.
+
+3.	New features in 12/28/93f
+	a.  Hostnames in addition to host addresses can be given in
+	    /dev/tcp/host/port virtual file names.
+	b.  File name completion and expansion now quotes special
+	    characters in file names from both emacs and vi edit modes.
+
+4.	New features in 12/28/93g
+	a.  The pipefail option has been added.  With pipefail
+	    enabled, a pipeline will not complete until all
+	    commands are complete, and the return value will
+	    be that of the last command to fail, or zero if
+	    all complete successfully.
+	b.  When an executable is found on a given path,
+	    the appropriate library path variable is prepended
+	    with a corresponding library directory.
+5.	New features in 12/28/93h
+	a.  The PATH search algorithm has been modified to look
+	    for a file named .fpath in each bin directory and if
+	    found, to search for functions in this directory if
+	    it cannot find the command in that directory.
+	b.  When performing pathname expansion, the shell checks
+	    to see whether each directory it reads is case sensitive
+	    or not, and performs the matching accordingly.
+	c.  The %T format for printing formatted date/time.
+6.	New features in 12/28/93i
+	a.  Most of the built-in commands and ksh itself are now
+            self documenting.  Running command --man will produce
+            screen output.  Running command --html produces the
+            man page in html format.
+	b.  The getopts builtin can process command description
+            strings to produce man pages.
+
+7.	Bugs fixed in 12/28/93a for default OPTIONS
+	a.  An expansion bug which causes portions of a word after
+	    a $((...)) expansion that contains a nested $var expansion
+	    to be lost has been fixed.
+	b.  A bug that caused a core dump when a script that did not
+	    have PWD set and did a cd inside command substitution
+	    has been fixed.
+	c.  A bug which caused a core dump on some machines when
+	    the LANG variable was assigned to has been fixed.
+	d.  A bug which incorrectly handled set disciplines that
+	    performed arithmetic evaluation when the discipline
+	    was called from the arithmetic evaluator has been fixed.
+	e.  A bug caused by an EXIT trap inside a function that
+	    was executed in a subshell was fixed.
+	f.  If foo is a function, and not a program, then command foo
+	    now reports that foo isn't found rather than invoking foo.
+	g.  The previous version incorrectly listed -A as an
+	    invocation option.  The -A option is only for set. 
+	h.  A bug was fixed which caused ksh to loop when execution trace
+	    was enabled and the PS4 prompt required command substitution.
+	i.  A bug which could cause the job control switch character
+	    to be disabled when a script that enabled monitor mode
+	    terminated was fixed.
+	j.  A bug in the macro expansion global replacement operator //,
+	    when the pattern began with a [ or +( has been fixed.
+	k.  A bug which prevented ~ expansion from occurring when
+	    it was terminated with a colon inside an assignment
+	    has been fixed.
+	l.  A bug in the dot command which prevented autoload functions
+	    from working has been fixed.
+	m.  A bug which caused a variable to be unset if the
+	    its value were expanded inside a set discipline has
+	    been fixed.
+	n.  Whence -a now longer reports that a defined function
+	    is undefined.
+	o.  A bug on some systems in which $0 would be incorrect
+	    in scripts invoked by name has been fixed.
+	p.  Here documents with an empty body now work.
+	1.  A bug which disabled argument passing and resetting
+	    of options for a script invoked by name inside a
+	    function has been fixed.
+	r.  A bug in which an EXIT trap set the caller of a function
+	    would be executed if a command called inside a function
+	    was not found has been fixed.
+	s.  A bug which allowed a script to trap signals that are
+	    ignored at the time that the shell was invoked has
+	    been fixed.
+	t.  A bug which caused 2<&1- when applied to a shell built-in
+	    to leave standard input closed has been fixed.
+	u.  A bug which caused the shell to incorrectly parse
+	    $() command substitutions with nested case statements
+	    has been fixed.
+
+8.	Bugs fixed in 12/28/93b for default OPTIONS
+	a.  A bug which caused unset RANDOM to dump core has been
+	    fixed.
+	b.  A bug which prevented return for terminating a profile
+	    or ENV file has been fixed.
+	c.  A bug which prevented standard input from being
+	    directed to /dev/null for background jobs when
+	    monitor mode was turned off has been fixed.
+	d.  Statements of the form typeset -options var[expr]=value
+	    did not perform substitutions on expr as expected.
+	e.  A bug which prevented the shell from sending a HUP
+	    signal to some background jobs that were not disowned
+	    has been fixed.
+	f.  A bug which allowed a script to trap signals that are
+	    ignored at the time that the shell was invoked by exec
+	    has been fixed.
+	g.  A bug which could cause a core dump when a discipline
+	    function was unset within a discipline was fixed.
+	h.  The typeset builtin now accepts a first argument of
+	    + or - for compatibility with ksh88.
+	i.  For compatibility with ksh88, the results of expansions
+	    of command arguments will treat the extended character
+	    match characters ()|& as ordinary characters.
+	j.  A bug which caused read to fail on a file that was
+	    open for read/write with <> when the first operation
+	    was print or printf has been fixed.
+	k.  When a job is suspended, it is put on the top of
+	    the job list as required by the POSIX standard.
+	l.  The value of OPTARG when an option that required
+	    an argument but didn't have one was incorrect in the
+	    case the the option string began with a :.
+	m.  A bug which caused the terminal to get into a bad
+	    state with some KEYBD traps in vi-mode has been fixed.
+	n.  A bug which caused an invalid trap to cause a script
+	    to terminate, rather than just return an error, has
+	    been fixed.
+	o.  Backreferencing sub-expressions in patterns and replacement
+	    strings now works.
+	p.  A bug in chmod which caused the -R option to fail has
+	    been fixed.
+
+9.	Bugs fixed in 12/28/93c for default OPTIONS
+	a.  The expansion of "$@" was incorrect when $1 was the null
+	    string.
+	b.  A bug which could incorrectly report a syntax error in
+	    a backquoted expression when a $ was preceded by \\
+	    has been fixed.
+	c.  A bug which prevented the shell from exiting after
+	    reporting an error when failing to open a script
+	    has been fixed.
+	d.  A bug that could lead to memory corruption when a
+	    large here document that required parameter or command
+	    substitution was expanded has been fixed.
+	e.  A bug that could cause a core dump on some systems
+	    after ksh detected an error when reading a function
+	    has been fixed.
+	f.  A bug which could cause a coprocess to hang when
+	    reading from a process that has terminated has been fixed.
+	g.  A bug which caused a script to terminate when set -e
+	    was on and the first command of and && or || list
+	    failed has been fixed.
+	h.  A bug with here documents inside $(...) when the delimiter
+	    word is an identifier has been fixed.
+	i.  A bug which caused $0 to display the wrong value when
+	    a script was invoked as an argument to the . command
+	    and the eval command has been fixed.
+	j.  A bug that could cause the built-in sleep to hang
+	    has been fixed.
+	k.  A bug introduces in 12/28/93b which caused the backslash
+	    to be removed when it was followed by digit inside double
+	    quotes in some instances has been fixed.
+	l.  A bug which could cause a core dump if ksh was invoked with
+	    standard input closed has been fixed.
+	m.  A bug which could cause a core dump if typeset -A was
+	    specified for an existing variable has been fixed.
+	n.  Variables that were unset but had attributes such as readonly
+	    and export were not listed with readonly, export and typeset.
+	o.  Several problems with signals have been fixed.
+	p.  A bug which prevented ulimit -t from working has been fixed. 
+	    Also, a bug in which failed ulimits could cause a core dump
+	    has also been fixed.
+	q.  A bug in expansion of the form ${name/#pattern/string} and
+	    ${name/%pattern/string} has been fixed.
+	r.  A bug which caused read -r on a line that contained only
+	    blanks to get a non-null value has been fixed.
+	s.  A bug introduced in the 'a' point release in which
+	    ${x='\\'} expanded to \ when x was unset has been fixed.
+	t.  A bug which prevented a trap on EXIT from being executed
+	    when the last command in a script was a function invocation
+	    has been fixed.
+	u.  A bug which caused an interactive shell ignore input when
+	    standard error was redirected to a file with exec,
+	    and then restored with exec 2>&1 has been fixed.
+	v.  An interactive shell turns on monitor mode even when
+	    standard error has been redirected to a file.
+	w.  A bug which could cause standard input to be incorrectly
+	    positioned for the last command of a script has been fixed.
+	y.  A bug in the edit modes which allowed walking back in
+	    the history file for more than HISTSIZE commands has
+	    beed fixed.
+	z.  A bug which could cause a core dump if variable TMPDIR was
+	    changed between two command substitutions has been fixed.
+	aa. A bug which prevented a trap on EXIT from being cleared
+	    has been fixed.
+
+10.	Bugs fixed in 12/28/93d for default OPTIONS
+	a.  The \ character was not handled correctly in replacement
+	    patterns with ${x/pattern/replace}.
+	b.  A bug with read in which the line did not end with
+	    a new-line has been fixed.
+	c.  A bug in file name generation which sometimes
+	    appended a . for filenames that ended in / has
+	    been fixed.
+	d.  If a process is waited for after a status has
+	    been returned by a previous wait, wait now
+	    returns 127.
+	e.  A bug with hist (fc) -e which prevented a command
+	    to re-executed after it had been edited has been fixed.
+	f.  A bug which prevented quoting from removing the meaning
+	    of unary test operators has been fixed.
+
+11.	Bugs fixed in 12/28/93e for default OPTIONS
+	a.  Empty command substitutions of the form $() now work.
+	b.  whence -v foo now gives the correct result after calling
+	    builtin -d foo. 
+	c.  A bug in right to left arithmetic assignment for which
+	    the arithmetic expression (( y = x = 1.5 )) did not
+	    yield 1 for y when x was declared typeset -i was fixed.
+	d.  printf has been fixed to handle format  containing \0
+	    and/or \0145 correctly.  In addition, characters following
+	    %b in the format string are no longer displayed when
+	    the operand contains \c.
+	e.  A bug in printf that could cause the %E format to
+	    produce unnormalized results has been fixed.
+	f.  A bug which causes some arithmetic expressions to be
+	    incorrectly evaluated as integer expressions rather
+	    that floating point has been fixed.
+	g.  Functions defined inside a subshell no longer remain
+	    defined when the subshell completes.
+	h.  The error message from sh -c ';echo foo' has been
+	    corrected.
+	i.  The format for umask -S has been changed to agree
+	    with the specification in the POSIX standard.
+	j.  A bug that caused side effects in subscript evaluation
+	    when tracing was enabled for subscripts using ++ or --
+	    has been fixed.
+	k.  To conform to the Posix standard getopts has been changed
+	    so that the option char is set to ? when it returns with
+	    a non-zero exit status.
+	l.  The handling of \} inside ${name...} has been fixed so
+	    that the \ quotes the }.
+	m.  A bug that caused the read builtin to resume execution
+	    after processing a trap has been fixed.
+	n.  [[ -s file ]] has been fixed so that if file is open
+	    by ksh, it is flushed first.
+	o.  In some cases attributes and sizes for non exported
+	    variables weren't being reset before running a script.
+	p.  The value of TMOUT was affected by changes make to
+	    it in a subshell.
+	q.  The jobs command did not reflect changes make by
+	    sending the CONT signal to a command.
+	r.  The error message for ksh -o unknown was incorrect.
+	s.  Functions invoked as name=value name, did not use
+	    values from the calling scope when evaluating value.
+	t.  A bug in which the shell would reexecute previously
+	    executed code when a shell script or coprocess was
+	    run in the background has been fixed.
+	u.  A bug in which an empty here-document would leave
+	    a file descriptor open has been fixed.
+	v.  A bug in which $(set -A array ...) would leave a
+	    side effect has been fixed.
+	w.  A discipline function for a global variable defined
+	    within a function defined with the function keyword,
+	    incorrectly created a local variable of the same name
+	    and applied the discipline to it.
+
+12.	Bugs fixed in 12/28/93f for default OPTIONS
+	a.  A bug which would cause the secondary prompt to be
+	    displayed when a user entered a literal carriage
+	    return has been fixed.
+	b.  I bug which caused ksh read -s name to core dump was
+	    fixed.
+	c.  I bug with the expansion of \} and \] inside double
+	    quoted strings that also contained variable expansions
+	    has been fixed
+	d.  Changes in the 'e' point release caused autoload
+	    functions invoked from within command substitution
+	    to fail.  This has been fixed.
+	e.  A bug in the processing of here-documents that could
+	    prevent variable substitution to occur after $(...) command
+	    substitution for long here documents has been fixed.
+	f.  A bug caused by a race condition that could cause SIGTERM
+	    to be ignored by a child process has been fixed.
+	g.  A bug which prevented the startup of a coprocess immediately
+	    after killing a running coprocess has been fixed.
+	h.  ulimit foobar, where foobar is not an arithmetic
+	    expression, now gives an error message as it did with ksh88
+	    instead of setting the file size limit to 0.
+	i.  A bug which could cause an interactive shell to terminate when
+	    the last process of a pipeline was a POSIX function was fixed.
+	j.  A bug which could cause command substitution of a shell script
+	    to core dump has been fixed.
+	k.  A security hole was fixed in suid_exec.
+	l.  Arithmetic functions such as pow() that take more than
+	    one argument, did not work if arguments other than the
+	    first contained parenthesized sub-expression.
+	m.  The error message from a script containing an incomplete
+	    arithmetic expression has been corrected.
+	n.  A bug which caused a core dump on some machines when
+	    the value of a name reference contained a positional
+	    parameter and the name reference was not defined inside
+	    a function has been fixed.
+	o.  Arithmetic expressions now correctly handle hexidecimal
+	    constants.
+	p.  A bug in which integer variables could be expanded
+	    with a leading 10# when declared with typeset -i
+	    multiple times has been corrected.
+	q.  A bug in which IFS wasn't correctly restored when
+	    set within command substitution has been fixed.
+	r.  The _ character is now considered as part of a word
+	    with the M-f and M-b emacs directives as it was in ksh88.
+
+13.	Bugs fixed in 12/28/93g for default OPTIONS
+	a.  A bug in which a name reference could be created to
+	    itself and later cause the shell to get into an infinite
+	    loop has been fixed.
+	b.  A bug in shcomp relating to compound variables was fixed.
+	c.  A bug introduced in 'e' in which leading 0's in -Z
+	    fields caused the value to be treated as octal for arithmetic
+	    evaluation has been fixed.
+	d.  A bug when a name reference with a shorter name than
+            the variable it references was the subject of a compound
+	    assignment has been fixed. 
+	e.  A bug which in which assignment to array variables in
+	    a subshell could effect the parent shell has been
+	    fixed.
+	f.  read name?prompt was putting a 0 byte at the end of the
+	    prompt on standard error.
+	g.  A bug in [[ string1 > string2 ]] when ksh was run with -x
+	    has been fixed.
+	k.  A bug in which the escape character was not processed
+	    correctly inside {...} when brace expansion is enabled
+	    has been fixed, for example {\$foo}.
+	l.  A bug in line continuation in here-documents has been
+	    fixed.
+	m.  The default base when not specified with typeset -i is
+	    10 in accordance with the documentation.  Previously,
+	    the value was determined by the first assignment.   
+	n.  A parsing bug in which a # preceded alphanumeric
+	    characters inside a command substitution caused
+	    a syntax error to be reported has been fixed.
+	o.  A bug in which a decimal constant represented as 10#ddd
+	    where ddd was more than five digits generated a syntax
+	    error has been fixed.
+	p.  A bug in here document expansion in which ${...} expansions
+	    were split across buffer boundaries has been fixed.
+
+14.	Bugs fixed in 12/28/93h for default OPTIONS
+	a.  I bug in shcomp for compilation of unary operators with [[...]]
+	    has been fixed.
+	b.  A bug in which the value of $? was changed when executing
+	    a keyboard trap has been fixed. 
+	c.  The handling of SIGCHLD has been changed so that the
+	    trap is not triggered while executing trap commands
+	    to avoid recursive trap calls.
+	d.  I bug in which a local variable in a function declared readonly
+	    would generated an error when the function went out of
+	    scope has been fixed.
+	e.  I bug in which \<new_line> entered from the keyboard
+	    with the KEYBD trap enabled has been fixed.
+	f.  The error message for a misplaced ((, for example print ((3),
+	    was often garbled and has been fixed.
+	g.  I bug in the KEYBD trap in which escape sequences of the form
+	    <ESC>[#~ were not being handled as a unit has been fixed.
+	h.  A bug in which ksh would consider expressions like [[ (a) ]]
+	    as syntax errors has been fixed.
+	i.  A function defined as foo() without a function body
+	    was not reported as a syntax error.
+	j.  A bug in which ksh could run out of file descriptors when
+	    a stream was repeatedly opened with exec and read from
+	    has been fixed.
+	k.  A bug introduced when fixing item n from the 'g' point
+	    release has been fixed.
+
+15.	Bugs fixed in 12/28/93i for default OPTIONS
+        a.  A bug in which a script could terminate when getopts
+            encountered an error when invoked inside a function
+            has been fixed.
+        b.  When a symbolic link was specified as the name of
+            the script to invoke by name, the value of $0 was
+            set to the real file name rather than the link name
+            in some cases and this has been fixed.
+
+16.	Bug fixes for specific non-default option combinations.
+	a.  More signal names have been added for Solaris
+	b.  A bug fixed for the v directive in vi MULTIBYTE has been
+	    fixed.
+	c.  Code to for IFS handling of multibyte characters has
+	    been added.
+	d.  The displaying of multibyte strings in export, readonly,
+	    typeset, and execution traces has been fixed.
+	e.  A bug with type ahead and KEYBOARD traps with the
+	    MULTIBYTE option set has been fixed.
+	f.  The k-shell information abstraction database option, KIA,
+	    has been revamped for the 'e' point release.
+	g.  A bug in brace pattern expansions that caused expressions
+	    such as {foo\,bar,bam} to expand incorrectly have been fixed.
+	h.  On the U/WIN version for Window 95 and Windows NT,
+	    when a directory beginning with a letter followed by
+	    a colon is given to cd, it is assumed to be an absolute
+	    directory.
+	i.  There was a bug in the compile option that does not
+	    use fork() in which the current option settings where
+	    not propagated to sub-shells.
+	j.  A bug in setting .sh.editchar during the KEYBD trap
+	    for the MULTIBYTE option was fixed in release 'h'.
+	k.  A bug in which the precision given as an argument
+	    to printf was not working has been fixed.
+
+17.	Other changes to 12/28/93[abcdefghi]
+	a.  A couple of minor changes to make adding built-ins easier.
+	b.  Variables inside functions are now statically scoped.
+	    The previous behavior was never documented.
+	c.  A few changes have been made to the name-value library
+	    that affect built-ins that use disciplines.  The
+	    changes allow disciplines to be shared by variables
+	    and should make it possible to add new disciplines
+	    without recompilation.
+	d.  The name-value library interface has undergone significant
+	    change for this revision.  See the new nval.3 man page.
+	e.  Builtin functions can take a third argument which is
+	    a void*.
+	f.  The nv_scan() function can restrict the scope of a walk
+	    to the top scope.  Starting in 'f', nv_scan() has an
+	    additional pointer argument that is passed to each invoked
+	    function.
+	g.  Starting with release 'f', an empty for list behave like
+	    a for list with null expansions.  It produces a warning
+	    message with sh -n.
+	h.  Starting with release 'f' the code has been modified to
+	    work with EBCDIC as well as ASCII.
+	i.  Starting with the release 'g', the name-value pair library
+	    uses the cdt library rather than the hash library.
+	j.  The sh_fun() function now takes third argument which
+	    is an argument list for the invoked discipline function
+	    or built-in.
+	k.  A callback function can be installed which will give
+	    notification of file duplications and file closes.
+	    
+18.	Incompatibilities with 12/28/93 version.
+	None intentional.
+

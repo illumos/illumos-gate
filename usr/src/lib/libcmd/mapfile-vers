@@ -1,0 +1,82 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# functions by AST/ksh93's version of libcmd
+SUNWprivate_1.1 {
+    global:
+	b_basename;
+	b_cat;
+	b_chgrp;
+	b_chmod;
+	b_chown;
+	b_cmp;
+	b_comm;
+	b_cp;
+	b_cut;
+	b_date;
+	b_dirname;
+	b_expr;
+	b_fds;
+	b_fmt;
+	b_fold;
+	b_getconf;
+	b_head;
+	b_id;
+	b_join;
+	b_ln;
+	b_logname;
+	b_mkdir;
+	b_mkfifo;
+	b_mv;
+	b_paste;
+	b_pathchk;
+	b_rev;
+	b_rm;
+	b_rmdir;
+	b_stty;
+	b_sync;
+	b_tail;
+	b_tee;
+	b_tty;
+	b_uname;
+	b_uniq;
+	b_wc;
+    local:
+	*;
+};
+
+# functions exported by the old Solaris version of libcmd
+# (the code has been moved to libc starting with Solaris 11/B51)
+SUNWprivate_1.1 {
+    global:
+	defcntl = FUNCTION FILTER libc.so.1;
+	defopen = FUNCTION FILTER libc.so.1;
+	defread = FUNCTION FILTER libc.so.1;
+    local:
+	*;
+};

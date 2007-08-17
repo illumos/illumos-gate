@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,10 +50,14 @@ MISCOBJS64=	nlist.o
 
 OBJECTS=	$(BLTOBJS)  $(MACHOBJS)  $(COMOBJS)  $(CLASSOBJS) $(MISCOBJS)
 
+include $(SRC)/lib/Makefile.lib
+
 DEMOFILES=	Makefile	README		acom.c		dcom.c \
 		pcom.c		tpcom.c		dispsyms.c
+DEMOFILESRCDIR=	../demo
+ROOTDEMODIRBASE=$(ROOT)/usr/demo/ELF
+ROOTDEMODIRS=   $(ROOTDEMODIRBASE)
 
-include $(SRC)/lib/Makefile.lib
 include $(SRC)/cmd/sgs/Makefile.com
 
 #
@@ -107,15 +111,8 @@ ROOTFS_LINTLIB64=	$(LINTLIB:%=$(ROOTFS_LIBDIR64)/%)
 $(ROOTFS_DYNLIB) :=	FILEMODE= 755
 $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
-ROOTDEMODIR=	$(ROOT)/usr/demo/ELF
-ROOTDEMOFILES=	$(DEMOFILES:%=$(ROOTDEMODIR)/%)
-
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 CLEANFILES +=	$(LINTOUTS) $(BLTSRCS) $(BLTFILES) $(WARLOCKFILES)
 
-$(ROOTDEMODIR) :=	OWNER =		root
-$(ROOTDEMODIR) :=	GROUP =		bin
-$(ROOTDEMODIR) :=	DIRMODE =	$(VAR_LIBELF_ROOTDEMODIR_DIRMODE)
-
-.PARALLEL:	$(LIBS) $(ROOTDEMOFILES)
+.PARALLEL:	$(LIBS)

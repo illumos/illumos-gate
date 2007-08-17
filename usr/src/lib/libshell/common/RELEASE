@@ -1,0 +1,1455 @@
+07-04-18  --- Release ksh93s+  ---
+07-04-18  A small memory leak with each redirection of a non-builtin has
+	  been fixed.
+07-03-08  A bug in which set +o output command line options has been fixed.
+07-03-08  A bug in which an error in read (for example, an invalid variable
+	  name), could leave the terminal in raw mode has been fixed.
+07-03-06  A bug in which read could core dump when specified with an array
+	  variable with a subscript that is an arithmetic expression has
+	  been fixed.
+07-03-06  Several serious bugs with the restricted shell were reported and
+	  fixed.
+07-03-02  If a job is stopped, and subsequently restarted with a CONT
+	  signal and exits normally, ksh93 was incorrectly exiting with
+	  the exit status of the stop signal number.
+07-02-26  M-^L added to emacs mode to clear the screen.
+07-02-26  A bug in which setting a variable readonly in a subshell would
+	  cause an unset error when the subshell completed has been fixed. 
+07-02-19  The format with printf uses the new = flag to center the output.
+07-02-19  A bug in which ksh93 did not allow multibyte characters in
+	  identifier names has been fixed.
+07-02-19  A bug introduced in ksh93 that causes global compound variable
+	  definitions inside functions to exit with "no parent" has been fixed.
+07-02-19  A bug in which using compound commands in process redirection
+	  arguments would give syntax errors <(...) and >(...) has been fixed.
+07-01-29  A bug which caused the shell to core dump which can occur when a
+	  built-in exits without closing files that it opens has been fixed.
+07-01-26  A bug in which ~(E) in patterns containing \ that are not inside ()
+	  has been fixed.
+
+06-12-29  --- Release ksh93s  ---
+06-12-29  A bug in which the value of IFS could be changed after a command
+	  substitution has been fixed. 
+06-12-22  /dev/(tcp|udp|sctp)/HOST/SEVRICE now handles IPv6 addresses on
+	  systems that provide getaddrinfo(3).
+06-12-19  A -v option was added to read.  With this option the value of
+	  the first variable name argument will become the default value
+	  when read from a terminal device. 
+06-11-20  A bug in which "${foo[@]:1}}" expands a null argument (instead of
+	  no argument), when foo[0] is not empty has been fixed. 
+06-11-16  The discipline functions have been modified to allow each subscript
+	  to act independently.  Currently the discipline function will not
+	  be called when called from a discipline function of the same variable.
+06-11-14  A bug which could cause a core dump if a file descriptor for
+	  an internal file was closed from with a subshell has been fixed.
+06-10-30  The redirections <# pattern, and <## pattern have been added.
+	  Both seek forward to the beginning of the next line that contains
+	  the pattern.  The <## form copies the skipped portion to standard
+	  output.
+06-10-26  On systems that support stream control transport, the virtual file
+	  name /dev/sctp/host/port can now be used to establish connections.
+06-10-26  The printf modifier # when used with d produces units in thousands
+	  with a single letter suffix added.  The modifier # when used with
+	  the i specification provides units of 1024 with a two letter suffix.
+06-10-24  The value of $! is now set to the process id of a job put
+	  into the background with the bg command as required by POSIX.
+06-10-23  A bug in which the value of $! was affected by a background
+	  job started from a subshell has been fixed.
+06-10-23  A bug in ${var:offset:len} in multibyte locales has been fixed.
+06-10-15  The remaining math functions from C99 were added for any system
+	  that supports them.
+06-10-13  The klockwork.com software detected a few coding errors that
+	  have been fixed.
+06-10-12  A bug when skipping over `...` with ${x:=`...`} when x is set
+	  has been fixed.
+06-10-11  A bug in process floating constants produced by the %a format
+	  of printf has been fixed.
+06-10-06  A bug in which IFS was not being restored correctly in some
+	  cases after a subshell has been fixed.
+06-10-06  A bug in which pipefail was not detecting some failures in
+	  pipelines with 3 or more states has been fixed.
+06-10-03  A bug in the processing of >(...) with builtins which could
+	  cause the builtin to hang has been fixed.
+06-10-03  A bug in the for loop optimizer which causes >(...) process
+	  substitution to be ignored has been fixed.
+06-09-17  The -a option was added to typeset for indexed arrays.  This
+	  is only needed when using the ([subscript]=value ...) form.
+06-09-06  The showme option was added.  Each simple command not beginning
+	  with a redirection and not occurring with in the while, until, if,
+	  select condition can be preceded by a semi-colon which will
+	  be ignored when showme is off.  When showme is on, any command
+	  preceded by a colon will be traced but not executed.
+06-08-16  As a new feature, a leading ~(N) on a pattern has no effect 
+	  except when used for file expansion.  In this case if not
+	  matches are found, the pattern is replaced by nothing rather
+	  than itself.
+06-08-11  A bug in the expansion of ${.sh.match[i]:${#.shmatch[i]}} has
+	  been fixed.
+06-08-10  The read builtin options -n and -N have been modified to treat
+          the size as characters rather than bytes unless storing into a
+	  binary (typeset -B) variable.
+06-07-27  When the here document operator << is followed directly by a #
+	  rather than a -, the first line of the here-document determines
+	  how much whitespace is removed for each line.
+06-07-26  A bug in the C-shell history (enabled with set -H) in which the
+	  history event !$ was not processed has been fixed.
+06-07-21  A bug on some systems in which assigning PATH on a command line
+	  would not take effect has been fixed.
+06-07-20  Add ksh93 and rksh93 as allowable names for ksh binaries.
+06-07-20  Removed the SHOPT_OO compilation option which was only partially
+	  implemented.
+06-07-20  The ability to use egrep, grep, and fgrep expressions within
+	  shell patterns has been documented.
+06-07-17  A bug with arithmetic command expressions for locales in which
+	  the comma is a thousands separator has been fixed. 
+06-07-13  The default HISTSIZE was increased from 128 to 512.
+06-07-13  A multibyte problem with locales that use shift codes has been fixed.
+06-06-23  A number of bug fixes for command, file, and variable completion
+	  have been mode.
+06-06-20  Floating point division by zero now yields the constant Inf or -Inf
+	  and floating functions with invalid arguments yield NaN. 
+06-06-20  The floating point constants Inf and NaN can be used in arithmetic
+	  expressions.
+06-06-20  The functions isinf(), isnan(), tanhl() have been added for
+	  arithmetic expressions.
+06-06-13  Internal change to use ordering for variables instead of hashing
+	  to speed up prefix matching.
+06-06-13  A window between fork/exec in which a signal could get lost
+	  and cause a program to hang has been eliminated
+06-06-13  A bug in edit completion with quoted strings has been fixed.
+06-06-07  The restricted options can now be enabled by set as well as on
+	  the command line.  Once set, it can not be disabled.
+06-06-04  Modified built-in binding so that for systems for which /bin
+          and /usr/bin are the same, a builtin bound to /bin will get
+	  selected when either /bin or /usr/bin is scanned.
+06-06-04  Added literal-next character processing for emacs/gmacs mode. 
+	  This change is not compatible with earlier versions of ksh93
+          and ksh88 when the stty lnext is control-v.  The sequence
+	  escape-control-v will display the shell version.
+06-05-31  Modified emacs and vi mode so that entering a TAB after a partial
+	  TAB completion, generates a listing of possible completions.
+	  After the second TAB, a number followed by a TAB will perform
+	  the completion with the corresponding item.
+06-05-19  Modified arithmetic so that conversions to strings default to
+	  the maximum number of precision digits.
+06-05-16  Bug fixes for multibyte locales. 
+06-05-10  The =~ operator was added to [[...]] and  [[ string ~= ERE ]]
+	  is equivalent to [[ string == ~(E)ERE ]].
+06-04-25  A bug in the vi edit mode which could cause the shell to core dump
+	  when switching from emacs mode.
+06-04-17  A bug in which using LANG or LC_ in assignment lists with builtins
+	  did not restore the localed correctly has been fixed.
+06-04-04  A bug in which discipline functions could not be added to variables
+	  whose names started with .sh has been fixed.
+06-03-28  The -s option to typeset was added to modify -i to indicate short
+	  integers.
+06-03-28  A bug in which variables assignment lists before functions
+	  defined with function name were not passed on the functions
+	  invoked by this function has been fixed. 
+06-03-28  A bug in which name references defined within a function defined
+	  with function  name could not be used with compound variables has
+	  been fixed.
+06-03-27  A bug in which read <&p (print >&p) would cause the coprocess input
+	  (output) pipe to close before reading from (after writing to)
+          it has been fixed.
+06-02-28  A bug in which stopping a job created with the hist builtin command
+	  would create a job that could not be restarted has been fixed.  
+
+06-01-24  --- Release ksh93r  ---
+06-01-24  A bug in which running commands with standard output closed would
+	  not work as expected has been fixed.
+06-01-23  A bug in which print -u<n> could fail when file descriptor <n> was
+	  open for writing has been fixed.
+06-01-19  The ?: arithmetic operator fixed to work when the operation after
+	  the colon was an assignment.
+05-12-24  A bug which could lead to a core dump when elements of a compound
+	  variable were array elements, i.e. foo=(bar=(1 2)), has been fixed.
+05-12-13  An arithmetic bug in which x+=y+=z was not working has been fixed. 
+05-12-13  An arithmetic bug in which x||y was returning x when x was non-zero
+	  rather than 1 has been fixed.
+05-12-07  The aliases for integer and float have been changed to use attributes
+	  -li and -lE to handle long long and long double types.
+05-12-07  The histexpand (-H) option has been added which allows C-shell
+	  style history expansions using the history character !.
+05-12-07  The multiline option was added which changes that way the edit
+	  modes handle lines longer than the window width.  Instead of
+	  horizontal scrolling, multiple lines on the screen are used.
+05-12-05  The whence builtin now returns an absolute pathname when the
+          command is found in the current directory.
+05-11-29  A bug which caused ksh -c '[[ ! ((' to core dump rather than
+	  report a syntax error has been fixed.
+05-11-29  A bug when reading fixed length records into typeset -b variables
+	  which caused a zero byte to terminate the value has been fixed.
+05-11-22  The ability to seek to an offset within a file has been added
+	  with the new I/O redirection operators, <#  and >#.  Currently,
+	  these redirection operators must be followed by ((expr))
+	  but in a future release, it should be able to used to seek forward
+	  to the specified shell pattern.  In addition $(n<#) expands to the
+	  current byte offset for file descriptor n.
+05-11-22  The .sh.match array variable is now set after each [[ ... ]]
+	  pattern match.  Previously it was only set for substring matches.
+05-10-17  A bug in which the library path variable could be prefixed
+          with a directory when a .path file was not encountered in
+	  the directory of the executable has been fixed.
+05-09-15  A for/while loop optimizer bug in which $OPTIND was not
+	  correctly expanded has been fixed.
+05-09-05  A bug in which a history command that invoked a history
+	  command could go into an infinite loop has been fixed.
+05-08-31  In the case that IFS contains to adjacent new-lines so that
+	  new-line is not treated as a space delimiter, only a single
+	  new-line is deleted at the end of a command substitution.
+05-08-19  When a tilde substitution expands to the / directory and is
+	  followed by a /, it is replaced by the empty string.
+05-08-16  A bug in which n<&m did not synchronize m has been fixed.
+05-08-16  A bug in which process substitution  ( <() and >() ) was not
+	  working within for and while loops has been fixed.
+05-07-24  A bug in which the pattern ~(E)(foo|bar) was treated as a syntax
+	  error has been fixed.
+05-07-24  A bug in completion with <n>=, where n was the one of the
+	  previous selection choices has been fixed.
+05-07-21  A bug with multibyte input when no edit mode was specified which
+	  caused the input line to shift left/right has been fixed.
+05-06-24  A race condition which could cause the exit status to get lost
+	  on some fast systems has been fixed.
+05-06-21  A bug in which nested patterns of the form {m,n}(pat) would cause
+	  syntax errors has been fixed.
+05-06-21  A bug in the macro expander has been fixed which could cause a
+          syntax error for an expansion of the form ${x-$(...)} when
+	  x is set and the command substitution contained certain strings.
+05-06-08  On systems for which echo does not do System V style \ expansions,
+	  the -e option was added to enable these expansion.
+05-06-08  A bug in which ${var op pattern} to not work when inside an
+	  arithmetic expression has been fixed.
+05-05-23  An extension to shell patterns that allows matching of nested
+	  groups while skipping over quoted strings has been added.
+05-05-18  A bug in which the line number for errors was not correct for
+          functions loaded from FPATH has been fixed.
+05-04-18  A bug in which the exit status $? is not set when a trap triggered
+	  by the [[...]] command is executed has been fixed.
+05-04-08  Redirection operators can be directly preceded with {varname}
+	  with no intervening space, where varname is a variable name which
+	  allows the shell to select a file descriptor > 10 and store it
+	  into varname.
+05-04-08  SHOPT_CMDLIB_BLTIN=1 now includes <cmdlist.h> generated table.
+05-04-07  [[ -o ?option ]] is true if "option" is a supported option.
+05-04-05  A bug in handling file completion with spaces in the names
+          has been fixed.
+05-03-25  The SIGWINCH signal is caught by default to keeps the LINES and
+	  COLUMNS variables in sync with the actual window size.
+05-03-25  Building ksh with SHOPT_REMOTE=1 causes ksh to set --rc if stdin is
+	  a socket (presumably part of a remote shell invocation.)
+05-03-25  Building ksh with SHOPT_SYSRC=1 causes interactive ksh to source
+	  /etc/ksh.kshrc (if it exists) before sourcing the $ENV file.
+05-03-25  {first..last[..incr][%fmt]} sequences added to brace expansions
+	  when braceexpand is enabled.
+05-03-03  A bug where a SIGCHLD interrupt could cause a fifo open to fail has
+	  been fixed.
+05-02-25  A bug in which a builtin command run in the background could
+	  keep a file descriptor open which could cause a foreground
+	  process to hang has been fixed.
+05-02-24  A bug where builtin library commands (e.g., date and TZ) failed to
+	  detect environment variable changes has been fixed.
+05-02-22  The read builtin and word splitting are now consistent with respect
+	  to IFS -- both treat IFS as field delimiters.
+05-02-22  The read builtin no longer strips off trailing delimiters that
+	  are not space characters when there are fewer variables than fields.
+05-02-17  A builtin bug on systems where dlsym(libcmd) returns link-time
+	  bindings has been fixed.
+05-02-12  A bug in which the lib_init() function for .paths BUILTIN_LIB
+	  libraries was not called has been fixed.
+05-02-06  A bug on some systems in which moving the write end of a co-process
+	  to a numbered file descriptor could cause it to close has been fixed. 
+05-02-06  A bug in the vi-edit mode in which the character under the cursor
+	  was not deleted in some cases with the d% directive has been fixed.
+05-02-06  A bug where external builtin stdout/stderr redirection corrupted
+          stdout has been fixed.
+05-02-04  A bug where times formatting assumed CLK_TCK==60 has been fixed.
+
+05-01-11  --- Release ksh93q  ---
+05-01-11  A bug in the integral divide by zero check has been fixed.
+05-01-11  The -l option has been added to read /etc/profile and
+	  $HOME/.profile, if they exist, before the first command.
+05-01-11  An argument parsing bug that caused `kill -s x -- n' to fail has
+	  been fixed.
+05-01-11  The .paths file, introduced in ksh93m, which can appear in
+	  any directory in PATH, now allows a line of the form 'BUILTIN_LIB=.'
+	  When a command is searched for this directory, and the full path
+	  matches the path of the built-in version of the command (listed
+	  by the 'builtin' command) then the built-in version of the command
+	  is used.  When ksh is built with SHOPT_CMDLIB_DIR=1 then all libcmd
+	  functions become builtins with the '/opt/ast/bin/' directory prefix.
+05-01-10  A bug in which a nameref to a compound name caused a core dump has
+	  been fixed.
+05-01-09  A bug in which some SIGCHLD interrupts (from child processes exiting)
+	  caused a fatal print/echo error diagnostic has been fixed.
+04-12-24  A bug in which some SIGCHLD interrupts (from child processes exiting)
+          corrupted the internal process/job list, sometimes causing the shell
+	  to hang, has been fixed.
+04-12-01  A bug in which typeset -Fn truncated less than n digits for large
+	  numbers has been fixed.
+04-11-25  A bug in which standard error could be closed after a redirection
+	  to /dev/stderr has been fixed.
+04-11-17  A bug in which an expansion of the form ${array[@]:3} could expand
+          to ${array[0]} when ${array[3]} was not set has been fixed.
+04-10-22  The -E or -orc command line option reads ${ENV-$HOME/.kshrc} file.
+04-10-22  `-o foo' equivalent to `+o nofoo', `-o nobar' equivalent to `+o bar'.
+          `--foo' equivalent to `-o foo', `--nofoo' equivalent to `+o foo'
+04-10-05  The .paths file, introduced in ksh93m, which can appear in
+	  any directory in PATH, now allows a line of the form
+	  'BUILTIN_LIB=libname'.  When a command is searched for this directory,
+	  the shared library named by libname will first be searched for a
+	  built-in version of the command.
+04-09-03  <<< here documents now handle quotes in the word token correctly. 
+04-08-08  The maximum size for read -n and and read -N was increased from
+	  4095 to 32M.
+04-08-04  printf %q was modified so that if an no operand was supplied, no
+	  no output would be generated rather than a quoted empty string.
+04-08-01  The -n and -N options of the read builtin has been modified
+	  when reading variables with the binary attribute so that the
+	  data is stored directly rather than through assignment.
+04-08-01  The shcomp command has been modified to process alias commands
+	  under some conditions.
+04-07-31  The .sh.match variable added in ksh93l, now works like other
+	  indexed arrays.
+04-07-08  A loop optimizer bug which occurs when typeset is used in
+	  a for or while loop inside a function has been fixed.
+04-06-24  The number of subexpressions in a pattern was increased to 64
+	  from the current number of 20.
+04-06-17  The -t option to read was modified to allow seconds to be
+	  specified as any arithmetic expression rather than just
+	  an integral number of seconds, for example even -t 'sin(.5)'
+	  is now valid.
+04-06-16  Two small memory leak problems were fixed.
+04-06-15  A bug in ${var/pattern/"string"} which occurred when string
+	  contained pattern matching characters has been fixed.
+04-05-08  printf $'%d\n' produced an erroneous error message and has
+	  been fixed.
+04-05-24  A bug in which an associative array without any elements could
+	  cause a core dump when a script with an associative array with
+	  the same name was declared in a script invoked by name has
+	  been fixed.
+04-05-11  A bug in which an exec statement could close the script that
+	  is being processed in a script that is run by name causing
+	  a failure has been fixed.
+04-04-28  If the first character of assignment to an integer variable was 0,
+          the variable had been treated as unsigned.  This behavior was
+          undocumented and has been removed.
+04-04-05  A bug in which the positioning of standard input could be incorrect
+	  after reading from standard input from a subshell has been fixed.
+04-03-30  A bug in the for loop optimizer which in rare cases could cause
+	  memory corruption has been fixed.
+04-03-29  The preset alias source='command .' has been added.
+04-03-29  A bug introduced in ksh93p on some systems in which invoked by
+	  name with #! on the first line would not get the signals handling
+	  initialized correctly has been fixed. 
+04-03-29  A bug introduced in ksh93p in which a HUP signal received by
+	  a shell that is a session group leader was not passed down to
+	  its children has been fixed.
+
+04-02-28  --- Release ksh93p  ---
+04-02-28  The ability to apply an append discipline to any variable has
+	  been added.
+04-02-14  A bug in which the exportall option (set -a) would cause incorrect
+	  results for arrays has been fixed.
+04-02-02  A bug in which an exported array would pass more than
+	  the first element to a script invoked by name has been fixed.
+04-02-02  A bug on some systems in which name=value pairs preceding a script
+	  invoked by name was not getting passed to the script has been fixed.
+04-01-20  A bug in which an unset discipline function could cause a core
+	  dump on some systems has been fixed.
+04-01-12  A bug in which a continue or break called outside a loop from
+	  inside a function defined with name() syntax could affect 
+	  the invoking function has been fixed.
+04-01-08  If a command name begins with ~, only filename completion will be
+	  attempted rather than pathname completion using the builtin editors. 
+04-01-08  A bug in the vi edit mode in which the wrong repeat count on
+	  multiple word replacements with the . directive has been fixed.
+04-01-06  Backspace characters are now handled correctly in prompt strings.
+04-01-06  The getopts builtin has been modified to accept numerical
+	  arguments of size long long on systems that support this.
+04-01-06  A bug in which unsetting all elements of an associative array
+	  would cause it to be treated as an indexed array has been fixed.
+03-12-15  A bug in which a quoted string ending with an unescaped $ would
+	  delete the ending $ in certain cases has been fixed.
+03-12-05  A bug in which the shell could hang when set -x tracing a command
+	  when an invalid multibyte character is encountered has been fixed. 
+03-12-05  On some systems, if the KEYBD trap is set, then commands that use
+	  the meta key were not processed until return was hit.  This
+	  has been fixed.
+03-12-05  A problem which occurred when the login shell was not a group
+	  leader that could cause it to fail has been fixed.
+03-12-05  A problem in which a shell could core dump after receiving a signal
+	  that should cause it to terminate while it was in the process
+	  of acquiring more space has been fixed.
+03-12-05  If ENV is not specified, the shell will default to $HOME/.kshrc
+	  for interactive shells.
+03-11-21  A bug introduced in ksh93o in which the DEBUG trap could get
+	  disabled after it triggered has been fixed. 
+03-11-04  A bug in which using arithmetic prefix operators ++ or -- on a
+	  non-lvalue could cause a core dump has been fixed.
+03-11-04  A bug in which leading zeros were stripped from variable
+	  expansions within arithmetic computation to avoid being treated
+	  as octal constants when they should not have, has been fixed.
+03-10-08  A bug introduced in ksh93o in which a large here document inside
+	  a function definition could get corrupted has been fixed.
+03-09-22  A bug in which the .get discipline function was not being
+	  called when a string variable was implicitly referenced from
+	  within a numerical expression has been fixed.
+03-09-22  A bug in which a script without a leading #! could get executed
+	  by /bin/sh rather than the current shell on some systems has
+	  been fixed.
+03-09-12  To improve conformance with ksh88, leading zeros will be ignored
+	  when getting the numerical value of a string variable so that
+	  they will not be treated as octal constants.
+03-09-03  The builtin kill command now processes obsolete invocations
+	  such as kill -1 -pid.
+03-09-02  The restriction on modifying FPATH in a restricted shell (sh -r)
+	  has been documented.
+03-09-02  The restricted shell (sh -r) has been modified to disallow
+	  executing command -p.
+03-08-07  A bug in which the KEYBD trap was not being invoked when
+	  characters with the 8th bit set has been fixed.
+03-08-02  A parser bug introduced in ksh93o which caused the character
+	  after () in a Posix function definition to be skipped 
+	  when reading from standard input has been fixed.
+03-08-01  A bug in which "${foo#pattern}(x)" treated (x) as if it were
+	  part of the pattern has been fixed.
+03-08-01  The command -x option has been modified so that any trailing
+	  arguments that do expand to a single word will be included
+	  on each invocation, so that commands like command -x mv * dir
+	  work as expected.
+
+03-07-20  --- Release ksh93o+  ---
+03-07-20  A bug in which could cause memory corruption when a posix
+	  function invoked another one has been fixed.
+03-07-15  A bug in which a file descriptor>2 could be closed before
+	  executing a script has been fixed.
+03-07-15  A parsing error for <() and >() process substitutions inside
+	  command substitution has been fixed.
+03-07-15  A parsing error for patterns of the form {...}(...) when
+	  used inside ${...} has been fixed.
+03-07-15  An error in which expanding an indexed array inside a compound
+	  variable could cause a core dump has been fixed.
+03-07-15  A bug in which under on rare occassions a job completion interrupt
+	  could cause to core dump has been fixed.
+03-06-26  A bug in which process substitution embedded within command
+	  substitution would generate a syntax error has been fixed.
+03-96-23  A bug in which ${@:offset:len} could core dump when there
+	  were no arguments has been fixed.
+03-96-23  A bug in which ${X[@]:offset:len} could core dump when X
+	  was unset has been fixed.
+03-06-22  The -x option was added to the command builtin.  If this
+	  option is on, and the number of arguments would exceed ARG_MAX,
+	  the command will be invoked multiple times with a subset of
+	  the arguments.  For example, with alias grep='command -x grep,
+	  any number of arguments can be specified.
+03-06-14  A bug in which could cause a core dump on some systems with
+	  vi and emacs editors with the MULTIBYTE option has been fixed.
+03-06-06  A bug in which the shell could core dump when a script was
+	  run from its directory, and the script name a symlink to a file
+	  beginning with .., has been fixed.
+03-06-05  A bug in which the shell could core dump when a child process
+	  that it is unaware of terminates while it is calling malloc()
+	  has been fixed.
+03-06-02  An option named globstar (set -G) has been added.  When enabled,
+	  during pathname expansion, any component that consists only of ** is
+	  matches all files and any number of directory levels.
+03-05-30  A bug in which the PATH search could give incorrect results when
+	  run from directory foo and PATH contained .:foo:xxx has been fixed.
+03-05-29  Some changes were made to the code that displays the prompt in edit 
+	  mode to better handle escape sequences in the prompt.
+03-05-27  I added = to the list of characters that mark the beginning of
+	  a word for edit completion so that filenames in assignments
+	  can be completed.
+03-05-20  A bug in which read -N could hang on some systems when reading
+	  from a terminal or a pipe has been fixed.
+03-05-19  A bug in which the output of uname from a command substitution
+	  would go to the standard output of the invoking command when
+	  uname was invoked with a non-standard option has been fixed.
+03-05-19  A job control bug which would cause the shell to exit because 
+	  it hadn't take back the terminal has been fixed.  The bug
+	  could occur when running a function that contained a pipeline
+	  whose last element was a function.
+03-05-19  A job control timing bug introduced in ksh93o on some systems
+	  which could cause a pipeline to hang if the first component
+	  completed quickly has been fixed.
+03-05-13  The read builtin has been modified so that the builtin editors
+	  will not overwrite output from a previous incomplete line. 
+03-05-13  A bug in which the name of an identifier could have the string
+	  .sh. prefixed to it after expanding a variable whose name begins
+	  with .sh. has been fixed.
+03-05-13  A bug in the expansion of $var for compound variables in which
+	  some elements would not be output when the name was a prefix
+	  of another name in the compound variable has been fixed.
+03-05-08  The last item in the ksh93o release on 03-01-02 has been
+	  altered slightly to preserve the leading 0's when the
+	  preceding character is a digit.  Thus, with typeset -LZ3 x=10,
+	  $(( 1$x)) will be 1010 whereas $(( $x) will be 10.
+03-04-25  A bug in which if x is a name reference, then nameref y=x.foo
+	  did not follow x has been fixed.
+
+03-03-18  --- Release ksh93o  ---
+03-03-18  A -N unary operator was added to test and [[...]] which returns
+	  true if the file exists and the file has been modified since it
+	  was last read.
+03-03-18  The TIMEFORMAT variable was added to control the format for
+	  the time compound command.  The formatting description is
+	  described in the man page.
+03-03-06  A -N n option was added to read which causes exactly n bytes
+	  to be read unlike -n n which causes at most n bytes to be read.
+03-03-03  Three new shell variables were added.  The variable .sh.file
+	  stores the full pathname of the file that the current command
+	  was found in.  The variable .sh.fun names the current function
+	  that is running.  The variable .sh.subshell contains the depth
+	  of the current subshell or command substitution.
+03-03-03  When the DEBUG trap is executed, the current command line after
+	  expansions is placed in the variable .sh.command.  The trap
+	  is also now triggered before each iteration of a for, select,
+	  and case command and before each assignment and redirection.
+03-02-28  Function definitions are no longer stored in the history file so
+	  that set -o nolog no longer has any meaning.
+03-02-28  All function definitions can be displayed with typeset -f not
+	  just those stored in the history file.  In addition, typeset +f
+	  displays the function name followed by a comment containing the
+	  line number and the path name for the file that defined this function.
+03-02-28  A bug in which the value of $LINENO was not correct when executing
+	  command contained inside mult-line command substitutions has been
+	  fixed.
+03-02-19  Since some existing ksh88 scripts use the undocumented and
+	  unintended ability to insert a : in front of the % and # parameter
+	  expansion operators, ksh93 was modified to accept :% as equivalent
+	  to % and :# as equivalent to # with ${name op word}.
+03-02-14  A bug which could cause a core dump when reading from standard
+	  error when standard error was a pty has been fixed.
+03-02-14  The shell arithmetic was modified to use long double on systems
+	  that provide this data type.
+03-02-09  A bug in which a function located in the first directory in FPATH
+	  would not be found when the last component of PATH was . and the
+	  current directory was one of the directories in PATH has been fixed.
+03-02-07  The trap and kill builtin commands now accept a leading SIG prefix
+	  on the signal names as documented.
+03-02-05  A bug in the expansion of ${var/$pattern}, when pattern contained
+	  \[ has been fixed.
+03-02-05  A bug in which .sh.match[n], n>0, was not being set for substring
+	  matches with % and %% has been fixed.
+03-01-15  A bug in which getopts did not work for numerical arguments specified
+	  as n#var in the getopts string has been fixed.
+03-01-09  A bug in which using ${.sh.match} multiple times could lead to
+	  a memory exception has been fixed.
+03-01-06  A bug in the expansion of ${var/pattern/$string} in the case that
+	  $string contains \digit has been fixed. 
+03-01-02  A -P option was added for systems such as Solaris 8 that support
+	  profile shell.
+03-01-02  For backward compatibility with ksh88, arithmetic expansion
+	  with ((...)) and let has been modified so that if x is a zero-filled
+	  variable, $x will not be treated as an octal constant.
+
+02-12-05  --- Release ksh93n+  ---
+02-11-30  A bug that can show up in evaluating arithmetic statements that
+	  are in an autoloaded function when the function is autoload from
+	  another function has been fixed.
+02-11-30  An optimization bug in which an expansion of the form ${!name.@},
+	  which occurred inside a for or a while loop, when name is a name
+	  reference, has been fixed.
+02-11-18  A bug in which modifying array variables in a subshell could leave
+	  side effects in the parent shell environment has been fixed.
+02-11-18  A memory leak when unsetting an associative array has been fixed.
+02-11-14  The code to display compound objects was rewritten to make
+	  it easier for runtime extensions to reuse this code.
+02-11-14  A change was made to allow runtime builtins to be notified when
+	  a signal is received so that cleanup can be performed.
+02-10-31  User applications can now trap the ALRM signal.  Previously,
+	  the ALRM signal was used internally and could not be used
+	  by applications. 
+02-10-31  A bug in which signals received while reading from a coprocess
+	  for which traps were set was not handled correctly has been fixed.
+02-10-31  A bug in which a file opened with exec inside a subshell could
+	  be closed before the subshell completed has been fixed.
+02-10-21  A bug in which setting PATH or FPATH inside a function might not
+	  take effect has been fixed.
+02-10-21  A bug which could cause a core dump when a local SECONDS variable
+	  is defined in a function has been fixed.
+02-10-15  A bug in which the associate array name operator ${!array[@]}
+	  could return the same name multiple times has been fixed.
+02-10-15  A bug in which the zero'th element of an associative array was
+	  not getting set when an assignment was made without a subscript
+	  specified has been fixed.
+
+02-09-30  --- Release ksh93n  ---
+02-09-30  The maximum indexed array size was increased to 16Megs.
+02-09-30  A bug which could cause a core dump when changing attributes
+	  of associative array has been fixed.
+02-09-30  A bug in which exporting an array variable would not export the
+	  0-th element has been fixed.
+02-09-30  A bug in which an array assignment of the form a=($a ...) would unset
+	  'a' before the right hand side was evaluated has been fixed.
+02-09-27  A bug in which the error message for ${var?message} when var was
+	  null or unset did not contain the variable name var has been fixed.
+02-09-27  A bug in which closing file descriptors 0 through 2 could
+	  cause a subsequent here document to fail has been fixed. 
+02-09-14  A bug in whence which occurs when the specified name contained
+	  a / has been fixed.
+02-09-14  A bug in the parser for strings of the form name$((expr))=value
+	  has been fixed.
+02-09-14  A for loop optimization bug in which the number of elements in
+	  an array was treated as an invariant has been fixed.
+02-09-09  A bug in which redirection or closing of a file descriptor between
+	  3 and 9 could cause a subsequent here document to fail has been
+	  fixed. 
+02-09-09  A bug in which a background job was not removed from the job list
+	  when a subshell completed has been fixed, for example (prog&). 
+02-09-03  A bug in which an assignment of the form name=(integer x=3)
+	  could be interpretted as an array assignment rather than a
+	  compound variable assignment has been fixed.
+02-08-19  A command completion bug which occurred on file systems that
+	  are case insensitive has been fixed.
+02-08-19  A bug which could lead to an exception on some systems (for
+	  example FREEBSD) which occurred when setting PATH has been fixed.
+02-08-11  A bug in arithmetic rounding in which a value input as a decimal
+	  string would output as a rounded version of the string has
+	  been fixed.
+02-08-11  A bug in which the last character could be deleted from shell
+	  traces and from whence when called from a multibyte locale
+	  has been fixed.
+02-08-01  A bug which could cause a core dump to occur when a shell script
+	  is executed while a coprocess is running that has closed the
+	  output pipe has been fixed.
+02-08-01  A bug in which command completion in multibyte mode could
+	  corrupt memory for long command lines has been fixed.
+
+02-06-17  --- Release ksh93n-  ---
+02-06-17  A bug in which user defined macros could cause a core dump in
+	  with MULTIBYE mode has been fixed.
+02-06-17  A bug in which printf format specifiers of the form %2$s were causing
+	  a core dump has been fixed.
+02-06-17  A bug in which setting stty to noecho mode did not prevent the
+	  echoing of characters by ksh when emacs or viraw mode
+	  was enabled has been fixed.
+02-06-17  A bug in which background job completion could cause the sleep
+	  builtin to terminate prematurely has been fixed.
+02-06-17  A bug in which the shell could core dump if getopts was called
+	  when the OPTIND variable contained a negative value has been fixed. 
+02-06-10  The edit mode prompt has been modified to handle escape sequences.  
+02-06-10  A bug which occurred for interactive shells in which the builtin
+	  cat command was used in command substitution on a file whose
+	  size was larger than PIPE_BUF has been fixed.
+02-06-10  A bug in which the trap on ERR was not being processed when
+	  set inside a function has been fixed.
+02-06-07  A bug in which function definitions could cause the history count
+	  to be decremented by one (and even become negative) has been fixed.
+02-06-05  A bug in read in which share mode could be enabled has been fixed.
+02-05-28  A bug which could occur when the last command of a script was
+	  a case statement and the action selected ended in ;& instead of ;;
+	  has been fixed.
+02-05-23  A bug with unary + introduced in ksh93k has been fixed.
+02-05-07  A bug in substitutions of the form ${var/pattern/string} in which
+	  a backslash was inserted in the replacement string when it contained
+	  a special pattern character has been fixed.
+02-05-01  A bug in the emacs edit mode which occurred in versions compiled
+	  for multibyte character sets which occurred when a repeated search
+	  was requested after a long line had been returned for the previous
+	  search has been fixed.
+02-04-02  vi and emacs edit modes were modified so that tab completion is
+	  disabled when invoked from the read built-in.
+
+02-03-26  --- Release ksh93m+  ---
+02-03-26  A bug in which \ was not handled correctly when used in file
+	  expansion has been fixed.
+02-02-18  A bug in which lines beginning with a # were deleted from here
+	  documents when the here-document delimiter was followed by
+	  a comment has been fixed.
+02-12-06  An optimization bug in which ${!x[@]) was treated as invariant in
+	  a for loop has been fixed.
+02-02-06  A bug in which the ERR trap is not cleared for a script invoked
+	  by name from within a function has been fixed.
+02-01-08  A bug in which a shell script executed from within a subshell
+	  could cause this script to have an invalid pointer leading
+	  to a memory fault has been fixed. 
+02-01-07  Added here documents of the form <<< word (as per zsh) which
+	  is equivalent to << delim\nword\ndelim.
+02-01-07  A bug in which the first word of a compound assignment,
+	  x=(word ...), was treated as a reserved word has been fixed.
+02-01-07  A bug in the handling of \ when noglob was enabled and a
+	  substitution of the form ${word op pattern} occurred in the
+	  same word has been fixed.
+02-01-07  A compilation option, CMDLIB_BLTIN in the file OPTION, has
+	  been added.  When this options is set, all commands implemented
+	  in libcmd become shell builtin commands by default.
+02-01-07  A bug in which builtin foo, where foo is already a builtin
+	  would result in the builtin foo getting removed has been fixed. 
+02-01-07  A bug which the shell executed a command found in the current
+	  directory when PATH have no valid directories has been fixed.
+01-11-28  The value of $? was not being set when called with exit.
+01-11-28  If the last command was of the form (...) and a trap on EXIT or
+	  ERR was set, and the command inside () modified the trap, then
+	  the original trap wasn't executed.
+01-11-26  The value for 0 is now preceded by the base number when
+	  the base was not 10.
+01-11-26  The default has compilation mode has been changes so that
+	  viraw mode will always be on.
+
+01-10-31  --- Release ksh93m  ---
+01-10-31  A for loop optimizer bug for subshells contained withing for
+	  loops has been fixed.
+01-10-16  typeset without arguments no longer outputs variable names
+	  that do not have any attributes that are set.
+01-10-16  A bug introduced in ksh93l in which assignments specified with
+	  the exec built-in were not being expanded properly has been
+	  fixed.
+01-10-11  An optimization bug in which ${!x) was treated as invariant in
+	  a for loop has been fixed.
+01-10-11  Unsigned integer variables in bases other than 10 are printed now
+	  expand in that base with the base prefix.
+01-10-10  A number of typos in the self generating man pages for shell
+	  built-ins have been fixed.
+01-10-04  The self generated man pages for hist and fc were not working
+	  correctly and have been fixed.
+01-10-03  Yet another optimizer bug in which shell patterns were
+	  treated as invariants has been fixed.
+01-09-27  Two bugs relating to multibyte history searches and to find
+	  have been fixed.
+01-09-27  A bug introduced in ksh93k in which the PATH searching was
+	  not restored after running a command with an assignment list 
+	  has been fixed.
+01-09-26  A bug in which a zero filled field was treated as octal when
+	  converted to integer has been fixed.
+01-09-26  Yet another bug in the optimization of for loops related to
+	  recursive functions with break or continue statements has been fixed.
+01-09-25  The exponentiation operator ** was added to the shell arithmetic
+	  evaluation.  It has higher precedence than * and is left
+	  associative.
+01-09-25  The code was modified to use the ast multibyte macros
+	  and functions for handing multibyte locales.
+01-09-25  The expansion ${parameter:offset:length} now handles negative
+	  offsets which cause offsets to be measured from the end.
+01-09-25  Some spelling errors in the documentation were corrected.
+01-09-24  The /dev/tcp/host/port and /dev/udp/host/port now allow
+	  the ports to be specified by service name. 
+01-09-24  The change staring with ksh93g in which the the appropriate
+	  library path variable is prepended with a corresponding library
+	  directory has been modified.  With the new method, only the
+	  library path defined in the file named .paths in the directory
+	  where the executable is found will be modified.  See the
+	  man page for more details.
+01-09-23  The .fpath file (see ksh93h) is no longer looked for in each
+	  directory on the path to locate function directories.  The
+	  file named .paths is used instead.
+01-09-23  A bug in which IFS was not being restored after being changed in
+	  a subshell has been fixed.
+01-09-16  With the vi and emacs edit modes, after a list of command
+	  or functions is generated with = or M-= respectively,
+	  any element from the list can be pasted on the command line
+	  by preceding the = or M-= with a numeric parameter specifying
+	  the position on the list.
+01-09-16  A bug in ksh93l caused command completion not to find aliases
+	  and functions.  Command listing from the edit mode was presented
+	  in reverse order.  This has been fixed.
+01-09-13  Another bug in the optimization of for loops related to subshells
+	  when traps were set has been fixed.
+01-09-07  A change in ksh93l caused brace expansion to stop working
+	  and this has been fixed.
+01-09-04  A bug introduced in ksh93k in which an arithmetic statement
+	  within a function that used name references did not follow the
+	  reference has been fixed.
+01-09-04  A bug introduced in ksh93l in which export -p did not prefix
+	  each export with the word export has been fixed.
+01-08-29  A bug in multibyte input which occurred when a partial multibyte
+	  character was received has been fixed.
+01-08-29  A bug introduced in ksh93l which could cause a core dump
+	  when an assignment list containing PATH is specified inside
+	  command substitution has been fixed.
+01-08-09  Another bug in the optimization of for loops in ksh93l caused
+	  errors in recursive functions using local variables that
+	  contained for loops has been fixed.
+01-07-27  A bug in which IFS would be unset after a command substitution
+	  inside a here document has been fixed.
+01-07-26  To conform to the POSIX standard, if you invoked ksh name,
+	  and name does not contain a /,  it will first try to run
+	  one in the current directory whether it is executable or not
+	  before doing a path search for an executable script.  Earlier
+	  versions first checked for an executable script using the
+	  PATH variable.
+01-07-23  A bug in which unset -f invoked in a subshell could unset a
+	  function defined in the parent has been fixed.
+01-07-16  A bug in the optimization of for loops in ksh93l caused
+	  name references to be treated as invariants has been fixed.
+01-07-09  A bug in which a discipline function applied to a local variable
+	  could cause a shell exception has been fixed.  Discipline
+	  functions can only be specified for global variables. 
+
+01-06-18  --- Release ksh93l  ---
+01-06-18  A bug in assigning integers larger than can be represented as
+	  long integers to floating point variables has been fixed.
+01-06-18  A bug in the handling of unsigned integers (typeset -ui) has
+	  been fixed.
+01-06-04  The evaluation of the PS1 prompt no longer effects the value
+	  of the $? variable.
+01-06-01  A small memory leak from subshells has been fixed.
+01-05-22  A bug in which attributes for variables that did not have
+	  values would be lost after a subshell has been fixed.
+01-05-22  The %R format has been added to convert a shell pattern into
+	  an extended regular expression.
+01-05-22  The escape sequences \e, \cX, \C[.collating-element.], and
+	  \x{hex} have been added to ASCII-C strings and to printf format
+	  strings.
+01-05-20  Patterns of the form {n}(pattern) and {m,n}(pattern) are now
+	  recognized.  The first form matches exactly n of pattern whereas,
+	  the second form matches from m to n instances of pattern.
+01-05-20  The shell allows *-(pattern), +-(pattern),  ?-(pattern),
+	  {m,n}-(pattern}, and @-(pattern) to cause the minimal
+	  match of pattern to be selected whenever possible rather
+	  than the maximal (greedy) match. 
+01-05-20  The character class [:word:] has been added to patterns.
+	  The word class is the union of [:alnum:] and the character _.
+01-05-20  Inside (...) pattern groups, the \ character is now treated
+	  specially even when in an enclosing character class.  The
+	  sequences, \w, \d, \s are equivalent to the character classes
+	  word, digit, and space respectively.  The sequences \W, \D,
+	  and \S are their complement sets. 
+01-05-20  The shell now recognizes pattern groups of the form
+	  ~(options:pattern) where options or :pattern can be omitted.
+	  Options use the letters + and - to enable and disable options
+	  respectively.  The option letters g (greedy), i (ignore case)
+	  are used to cause maximal matching and to cause case
+	  insensitive matching respectively.  If :pattern is also
+	  specified, these options are only in effect while this
+	  pattern is being processed.  Otherwise, these options remain
+	  in effect until the end of the pattern group that they are contained
+	  in or until another ~(...) is encountered.  These pattern groups
+	  are not counted with respect to group numbering.
+01-05-14  When edit completion, expansion, or listing occurs in the
+	  middle of a quoted string, the leading quote is ignored when
+	  performing the completion, expansion, or listing.
+01-05-14  A small memory leak from subshells has been fixed.
+01-05-10  A bug in which open files were not restored after a subshell
+	  that had used exec to replace a file has been fixed. 
+01-05-10  Redirection to a null file name now generates an error message. 
+01-05-09  The shell now rejects some invalid parameter substitutions that
+	  were previously processed in undefined ways.
+01-05-09  A bug in which the output of select was not flushed before the
+	  read when input did not come from the terminal has been fixed. 
+01-05-08  A bug in which job ids would not be freed for interactive shells
+	  when subshells ran built-ins in the background has been fixed.
+01-05-08  The FPATH variable now requires an explicit . to cause the
+	  current directory to be treated as a function directory. 
+01-05-08  A bug in read -n when echo mode was disabled has been fixed.
+01-05-07  A bug in which function definitions could be listed as part
+	  of the history has been fixed.
+01-04-30  This release uses a new and often much faster pattern matcher than
+	  earlier releases.
+01-04-30  An optimizer now eliminates invariant parameter expansions from
+	  for while and until loops.
+01-04-30  The variable .sh.match is set after each pattern match (# % or /)
+	  in a variable substitution.  The variable .sh.match is an
+	  indexed array with element 0 being the complete match. 
+	  The array is only valid until the next subsequent pattern
+	  match or until the value of the variable changes which ever
+	  comes first.
+01-04-30  A self generating man page has been added to shcomp.  Also,
+	  shcomp now stops compiling when it finds an exit or exec
+	  command and copies the remainder so that it can be used
+	  for standard input.
+01-04-30  The shcomp command was modified so that it can work in an
+	  EBCIDIC environment and that binary scripts are portable
+	  across environments.
+01-04-30  A bug in the handling of a trailing : in PATH has been fixed.
+01-04-30  A bug in which the builtin version of a command would get invoked
+	  even though the full pathname for the command was specified
+	  has been fixed.
+01-04-30  A bug in which read would loose the last character when
+	  reading the last line of a file that did not contain a new-line
+	  character has been fixed.
+01-04-23  A bug on some systems in which in vi mode the end of file
+	  character and end of line character could be swapped has
+	  been fixed.
+01-04-23  A bug on some systems in which invoking a shell script that
+	  did not have execute permission could set the exit value to
+	  127 rather than 126 has been fixed.
+01-04-20  A bug in which read -n from a pipe would block if fewer than
+	  n characters was received has been fixed.
+01-04-09  A bug in which invalid patterns, for example, ) by itself,
+	  was not treated as a string has been fixed so that if i=')',
+	  then [[ $i == $i ]] is true.
+01-04-09  The shell arithmetic now interprets C character constants.
+01-04-09  A bug in which a non-zero return from a function defined
+	  with the function reserved word did not trigger the ERR
+	  trap or exit with set -e has been fixed.
+01-04-02  A bug on some systems, in which characters above 127 were
+	  not displayed correctly in vi or emacs edit mode has been fixed.
+01-04-02  A bug on some systems, introduced in the 'k' point release, in
+	  which the erase character in viraw mode was moving the cursor
+	  to the left without erasing the character has been fixed.
+01-04-02  On some systems the wcwith() function was returning a wrong
+	  value for characters and caused characters to be displayed
+	  incorrectly from the shell edit modes.  A work around for
+	  this problem has been added. 
+01-03-26  A bug in which valid scripts could produce syntax errors
+	  when run with locales that considered characters such as "'"
+	  to be space characters has been fixed.
+01-03-20  A bug in which an syntax error in an arithmetic expression
+	  entered interactively could cause the shell to go into
+	  an infinite loop outputting the error message has been fixed.
+01-03-10  ksh93 accepts -l as a synonym for -L in test on systems for
+	  which /bin/test -l tests for symbolic links.
+01-03-10  A bug in parsing scripts in which { and } are used in place of
+	  in and esac in case statements embedded in compound commands
+	  has been fixed.  Use of { and } for in and esac is obsolete.
+01-03-06  A bug in which an argument of the form foo=bar was not
+	  being passed correctly to a traced function whose name
+	  was foo has been fixed.
+01-03-02  Using $(trap -p name) did not print the name of the current
+	  trap setting for trap name.
+01-02-26  Exported floating point variables gave incorrect results
+	  when passing them to ksh88.  This has been fixed.
+01-02-25  A race condition in which a coprocess which completed too quickly
+	  would not allow subsequent coprocesses to start has been fixed.
+01-02-25  The 'g' format specifier is now handled by printf.  It had
+	  inadvertently been omitted.
+01-02-20  The + was not being displayed during an execution trace
+	  with the += assignment operator.
+01-02-19  The error message which occurs when the interpreter name
+	  defined on the #! line does not exist is more informative.
+01-02-19  A bug in which $0 would not be set correctly when a
+	  script with #! was invoked by full pathname from the
+	  directory of the script has been fixed.
+01-02-19  A shell script did not always pick up tty mode changes
+	  made by external commands such as stty which could
+	  effect the behavior of read.
+01-02-19  The -u, -g, and -k unary tests did not give the correct
+	  results when used with negation and this has been fixed.
+
+01-02-05  --- Release ksh93k+  ---
+01-02-05  The sequence \<newline> inside $'...' was not incrementing
+	  the line count and this has been fixed.
+01-02-05  Modified expansion of "${@-}" so that if no arguments are set
+	  it results in null string rather than nothing.
+01-02-02  memory leak problem with local variables in functions fixed.
+01-01-25  allow arithmetic expressions with float%int and treat them
+	  as ((int)float)%int rather than as an error. 
+01-01-19  read -n1 was not working and has been fixed.
+01-01-17  ksh now handles the case in which a here document in command
+	  substitution $() is terminated by the trailing ).  Previously,
+	  a new-line was needed at the end of the delimiter word. 
+01-01-02  A bug in which a KEYBD trap would cause a multi-line token
+	  to be processed incorrectly has been fixed.
+00-12-10  Arithmetic integer constants can now have L and U suffices. 
+00-12-10  A bug in the processing of arithmetic expressions with compound
+	  variables when the -n option is on has been fixed.
+00-12-08  A bug in M-f and M-b from emacs mode has been fixed.  This
+	  bug only occurs when ksh93 is compiled without MULTIBYTE enabled.
+00-11-29  A bug in which jobs -p would yield 0 for background
+	  jobs run in a script has been fixed.
+00-11-21  A bug in integer arrays in which the number of elements is
+	  incorrect when the ++ operator is applied to a non-existing
+	  element has been fixed.  For example, integer x; ((x[3]++)).
+00-11-20  A timing bug in which the shell could reset the terminal
+	  group to the wrong value in the case that the a new process
+	  changes the terminal group during startup has been fixed.
+
+00-10-27  --- Release ksh93k  ---
+00-10-27  Using tab for completion now works only when applied
+	  after a non-blank character at the end of the current line.
+	  In other case a tab is inserted.
+00-10-27  A bug in the emacs edit mode for ^X^E has been fixed.
+	  The ^X^E sequence is supposed to invoke the full editor
+	  on the current command.
+00-10-18  A bug in which expansions of the form ${var//pattern/string}
+	  did not work correctly when pattern was '/' or "/" has
+	  been fixed.
+00-10-18  The output format for indexed arrays in compound variables
+	  has been modified so that it can be used as input.
+00-10-18  Assignments with name references (typeset -n) will now
+	  implicitly unreference an existing name reference.
+00-10-17  A bug the += append operator when a single array element
+	  is appended to a variable that is not an array has been fixed.
+00-10-16  A bug in which the SIGCONT signal was being sent to
+	  each process will kill -0 or kill -n 0 has been fixed.
+00-10-12  The arithmetic evaluation portion has been rewritten to
+	  perform a number of optimizations.
+00-10-10  A bug in which name prefix matching ${!name.*} was not
+	  checking name to see if it was a name reference has been fixed.
+00-09-26  A bug in the multibyte version in which the width of for
+	  non-printing characters was not correct has been fixed.
+00-09-12  Made changes to get multibyte editing work on UWIN for windows
+00-09-12  A bug in which multibyte characters would be displayed incorrectly
+	  has been fixed.
+00-08-08  Removed build dependency on iswprint() and iswalph().
+00-07-20  In some cases the read builtin would read more than a single
+	  line from a pipe on standard input and therefore leave the seek
+	  position in the wrong location.
+00-07-05  If the directory / is on the path, a / will not be inserted
+	  between the directory and the file name during path searching
+	  to avoid searching // for systems that treat this specially.
+00-06-26  A bug in which on rare occasions wait could return before all
+	  jobs have completed has been fixed.
+00-06-21  A bug in which backspace did not work correctly during the
+	  R replace directive in vi-mode has been fixed.
+00-06-12  Added variable name completion/expansion/listing  to the set of
+	  completions.  Variable name completions begin with $ or "$ followed
+	  by a letter. 
+00-05-09  --- Release ksh93j  ---
+00-05-09  Modified command substitution to avoid using /tmp files when
+          run on read-only file systems. 
+00-04-17  Modified printf to handle '%..Xc' and '%..Xs' options where X
+	  is not an alpha character.  Previous versions core dumped with this.
+00-04-10  Changes to multibyte editing code were made to use standard
+	  ISO C functions rather than methods devised before the standard.
+00-04-09  Add %H options to printf to output strings with <"'&\t> properly
+	  converted for use in HTML and XML documents.
+00-04-07  Modified getopts builtin to handle \f...\f in usage string
+	  by invoking specified function.
+00-04-04  Added self generating man pages for bg, fc, fg, disown, jobs,
+	  hist, let, ., and ulimit.
+00-03-30  The append operator += has been added and can be used
+	  for all assignments, strings, arrays, and compound variables.
+00-03-30  Code was modified in several places to support automatic
+	  generation of C locale dictionaries.
+00-03-28  A bug in which the set and trap commands invoked with --name
+	  type arguments would terminate the invoking script  has
+	  been fixed.
+00-03-27  A bug in which the library path variable was not updated  
+	  correctly on some systems as described in the 'g' point
+	  release has been fixed. 
+00-03-07  printf now returns a non-zero exit status when one of
+          its arguments cannot be converted to the given type. 
+00-03-05  The return value and error message for a command that
+          was found on the path but was not executable was set
+          incorrectly.
+00-03-05  A prototype for ioctl() was removed from the vi edit mode.
+
+00-01-28  --- Release ksh93i  ---
+00-01-28  Most of the built-in commands and ksh itself are now
+          self documenting.  Running command --man will produce
+          screen output.  Running command --html produces the
+          man page in html format.
+00-01-28  The getopts builtin can process command description
+          strings to produce man pages.
+00-01-28  A bug in which a script could terminate when getopts
+          encountered an error when invoked inside a function
+          has been fixed.
+00-01-28  When a symbolic link was specified as the name of
+          the script to invoke by name, the value of $0 was
+          set to the real file name rather than the link name
+          in some cases and this has been fixed.
+00-01-28  A bug in which the precision given as an argument
+	  to printf was not working has been fixed.
+
+99-03-31  --- Release ksh93h  ---
+99-03-31  The PATH search algorithm has been modified to look
+	  for a file named .fpath in each bin directory and if
+	  found, to search for functions in this directory if
+	  it cannot find the command in that directory.
+99-03-31  When performing pathname expansion, the shell checks
+	  to see whether each directory it reads is case sensitive
+	  or not, and performs the matching accordingly.
+99-03-31  The %T format for printing formatted date/time.
+99-03-31  The emacs and vi modes now handle arrow keys when
+          they use standard ANSI escape sequences.
+99-03-31  The TAB key can be used for completion in emacs and viraw mode.
+99-03-31  A bug in setting .sh.editchar during the KEYBD trap
+	  for the MULTIBYTE option was fixed in release ksh93h.
+99-03-31  A bug in shcomp for compilation of unary operators with [[...]]
+	  has been fixed.
+99-03-31  A bug in which the value of $? was changed when executing
+	  a keyboard trap has been fixed. 
+99-03-31  The handling of SIGCHLD has been changed so that the
+	  trap is not triggered while executing trap commands
+	  to avoid recursive trap calls.
+99-03-31  A bug in which a local variable in a function declared readonly
+	  would generated an error when the function went out of
+	  scope has been fixed.
+99-03-31  A bug in which \<new_line> entered from the keyboard
+	  with the KEYBD trap enabled has been fixed.
+99-03-31  The error message for a misplaced ((, for example print ((3),
+	  was often garbled and has been fixed.
+99-03-31  A bug in the KEYBD trap in which escape sequences of the form
+	  <ESC>[#~ were not being handled as a unit has been fixed.
+99-03-31  A bug in which ksh would consider expressions like [[ (a) ]]
+	  as syntax errors has been fixed.
+99-03-31  A function defined as foo() without a function body
+	  was not reported as a syntax error.
+99-03-31  A bug in which ksh could run out of file descriptors when
+	  a stream was repeatedly opened with exec and read from
+	  has been fixed.
+
+98-04-30  --- Release ksh93g  ---
+98-04-30  The pipefail option has been added.  With pipefail
+	  enabled, a pipeline will not complete until all
+	  commands are complete, and the return value will
+	  be that of the last command to fail, or zero if
+	  all complete successfully.
+98-04-30  The name-value pair library uses the cdt library rather
+	  than the hash library.  This change should be transparent
+	  to applications.
+98-04-30  On the U/WIN version for Window 95 and Windows NT,
+          when a directory beginning with a letter followed by
+          a colon is given to cd, it is assumed to be an absolute
+          directory
+98-04-30  When an executable is found on a given path,
+	  the appropriate library path variable is prepended
+	  with a corresponding library directory.
+98-04-30  A bug in which a name reference could be created to
+	  itself and later cause the shell to get into an infinite
+	  loop has been fixed.
+98-04-30  A bug in shcomp relating to compound variables was fixed.
+98-04-30  A bug introduced in ksh93e in which leading 0's in -Z
+	  fields caused the value to be treated as octal for arithmetic
+	  evaluation has been fixed.
+98-04-30  A bug when a name reference with a shorter name than
+          the variable it references was the subject of a compound
+	  assignment has been fixed. 
+98-04-30  A bug which in which assignment to array variables in
+	  a subshell could effect the parent shell has been
+	  fixed.
+98-04-30  read name?prompt was putting a 0 byte at the end of the
+	  prompt on standard error.
+98-04-30  A bug in [[ string1 > string2 ]] when ksh was run with -x
+	  has been fixed.
+98-04-30  A bug in which the escape character was not processed
+	  correctly inside {...} when brace expansion is enabled
+	  has been fixed, for example {\$foo}.
+98-04-30  A bug in line continuation in here-documents has been
+	  fixed.
+98-04-30  The default base when not specified with typeset -i is
+	  10 in accordance with the documentation.  Previously,
+	  the value was determined by the first assignment.   
+98-04-30  A parsing bug in which a # preceded alphanumeric
+	  characters inside a command substitution caused
+	  a syntax error to be reported has been fixed.
+98-04-30  A bug in which a decimal constant represented as 10#ddd
+	  where ddd was more than five digits generated a syntax
+	  error has been fixed.
+98-04-30  A bug in here document expansion in which ${...} expansions
+	  were split across buffer boundaries has been fixed.
+98-04-30  The sh_fun() function now takes third argument which
+	  is an argument list for the invoked discipline function
+	  or built-in.
+98-04-30  A callback function can be installed which will give
+          notification of file duplications and file closes.
+98-04-30  When ksh is compiled on systems that do not use fork()
+	  current option settings where not propagated to sub-shells.
+
+97-06-30  --- Release ksh93f  ---
+97-06-30  Hostnames in addition to host addresses can be given in
+	  /dev/tcp/host/port virtual file names.
+97-06-30  File name completion and expansion now quotes special
+	  characters in file names from both emacs and vi edit modes.
+97-06-30  An empty for list behave like a for list with null expansions.
+	  It produces a warning message with sh -n.
+97-06-30  The code has been modified to work with EBCDIC as well as ASCII.
+97-06-30  A bug which would cause the secondary prompt to be
+	  displayed when a user entered a literal carriage
+	  return has been fixed.
+97-06-30  A bug which caused ksh read -s name to core dump was
+	  fixed.
+97-06-30  A bug with the expansion of \} and \] inside double
+	  quoted strings that also contained variable expansions
+	  has been fixed
+97-06-30  Changes in the ksh93e point release caused autoload
+	  functions invoked from within command substitution
+	  to fail.  This has been fixed.
+97-06-30  A bug in the processing of here-documents that could
+	  prevent variable substitution to occur after $(...) command
+	  substitution for long here documents has been fixed.
+97-06-30  A bug caused by a race condition that could cause SIGTERM
+	  to be ignored by a child process has been fixed.
+97-06-30  A bug which prevented the startup of a coprocess immediately
+	  after killing a running coprocess has been fixed.
+97-06-30  ulimit foobar, where foobar is not an arithmetic
+	  expression, now gives an error message as it did with ksh88
+	  instead of setting the file size limit to 0.
+97-06-30  A bug which could cause an interactive shell to terminate when
+	  the last process of a pipeline was a POSIX function was fixed.
+97-06-30  A bug which could cause command substitution of a shell script
+	  to core dump has been fixed.
+97-06-30  A security hole was fixed in suid_exec.
+97-06-30  Arithmetic functions such as pow() that take more than
+	  one argument, did not work if arguments other than the
+	  first contained parenthesized sub-expression.
+97-06-30  The error message from a script containing an incomplete
+	  arithmetic expression has been corrected.
+97-06-30  A bug which caused a core dump on some machines when
+	  the value of a name reference contained a positional
+	  parameter and the name reference was not defined inside
+	  a function has been fixed.
+97-06-30  Arithmetic expressions now correctly handle hexadecimal
+	  constants.
+97-06-30  A bug in which integer variables could be expanded
+	  with a leading 10# when declared with typeset -i
+	  multiple times has been corrected.
+97-06-30  A bug in which IFS wasn't correctly restored when
+	  set within command substitution has been fixed.
+97-06-30  The _ character is now considered as part of a word
+	  with the M-f and M-b emacs directives as it was in ksh88.
+97-06-30  A bug in brace pattern expansions that caused expressions
+          such as {foo\,bar,bam} to expand incorrectly have been fixed.
+
+
+96-07-31  --- Release ksh93e  ---
+96-07-31  The math functions, atan2, hypot, fmod, and pow were added.
+96-07-31  When a shared library is loaded, if the function lib_init()
+	  is defined in the library, it is invoked the first time that
+	  the library is loaded with builtin -f library.
+96-07-31  The k-shell information abstraction database option, KIA,
+          has been revamped.
+96-07-31  Empty command substitutions of the form $() now work.
+	  whence -v foo now gives the correct result after calling
+	  builtin -d foo. 
+96-07-31  A bug in right to left arithmetic assignment for which
+	  the arithmetic expression (( y = x = 1.5 )) did not
+	  yield 1 for y when x was declared typeset -i was fixed.
+96-07-31  printf has been fixed to handle format  containing \0
+	  and/or \0145 correctly.  In addition, characters following
+	  %b in the format string are no longer displayed when
+	  the operand contains \c.
+96-07-31  A bug in printf that could cause the %E format to
+	  produce unnormalized results has been fixed.
+96-07-31  A bug which causes some arithmetic expressions to be
+	  incorrectly evaluated as integer expressions rather
+	  that floating point has been fixed.
+96-07-31  Functions defined inside a subshell no longer remain
+	  defined when the subshell completes.
+96-07-31  The error message from sh -c ';echo foo' has been
+	  corrected.
+96-07-31  The format for umask -S has been changed to agree
+	  with the specification in the POSIX standard.
+96-07-31  A bug that caused side effects in subscript evaluation
+	  when tracing was enabled for subscripts using ++ or --
+	  has been fixed.
+96-07-31  To conform to the Posix standard getopts has been changed
+	  so that the option char is set to ? when it returns with
+	  a non-zero exit status.
+96-07-31  The handling of \} inside ${name...} has been fixed so
+	  that the \ quotes the }.
+96-07-31  A bug that caused the read builtin to resume execution
+	  after processing a trap has been fixed.
+96-07-31  [[ -s file ]] has been fixed so that if file is open
+	  by ksh, it is flushed first.
+96-07-31  In some cases attributes and sizes for non exported
+	  variables weren't being reset before running a script.
+96-07-31  The value of TMOUT was affected by changes make to
+	  it in a subshell.
+96-07-31  The jobs command did not reflect changes make by
+	  sending the CONT signal to a command.
+96-07-31  The error message for ksh -o unknown was incorrect.
+96-07-31  Functions invoked as name=value name, did not use
+	  values from the calling scope when evaluating value.
+96-07-31  A bug in which the shell would reexecute previously
+	  executed code when a shell script or coprocess was
+	  run in the background has been fixed.
+96-07-31  A bug in which an empty here-document would leave
+	  a file descriptor open has been fixed.
+96-07-31  A bug in which $(set -A array ...) would leave a
+	  side effect has been fixed.
+96-07-31  A discipline function for a global variable defined
+	  within a function defined with the function keyword,
+	  incorrectly created a local variable of the same name
+	  and applied the discipline to it.
+
+95-08-28  --- Release ksh93d  ---
+95-08-28  The \ character was not handled correctly in replacement
+	  patterns with ${x/pattern/replace}.
+95-08-28  A bug with read in which the line did not end with
+	  a new-line has been fixed.
+95-08-28  A bug in file name generation which sometimes
+	  appended a . for filenames that ended in / has
+	  been fixed.
+95-08-28  If a process is waited for after a status has
+	  been returned by a previous wait, wait now
+	  returns 127.
+95-08-28  A bug with hist (fc) -e which prevented a command
+	  to re-executed after it had been edited has been fixed.
+95-08-28  A bug which prevented quoting from removing the meaning
+	  of unary test operators has been fixed.
+95-08-28  A bug with typeahead and KEYBOARD traps with the
+          MULTIBYTE option set has been fixed.
+95-08-28  Builtin functions can take a third argument which is
+          a void*.
+95-08-28  The nv_scan() function can restrict the scope of a walk
+          to the top scope.
+
+95-04-31  --- Release ksh93c  ---
+95-04-31  The expansion of "$@" was incorrect when $1 was the null
+	  string.
+95-04-31  A bug which could incorrectly report a syntax error in
+	  a backquoted expression when a $ was preceded by \\
+	  has been fixed.
+95-04-31  A bug which prevented the shell from exiting after
+	  reporting an error when failing to open a script
+	  has been fixed.
+95-04-31  A bug that could lead to memory corruption when a
+	  large here document that required parameter or command
+	  substitution was expanded has been fixed.
+95-04-31  A bug that could cause a core dump on some systems
+	  after ksh detected an error when reading a function
+	  has been fixed.
+95-04-31  A bug which could cause a coprocess to hang when
+	  reading from a process that has terminated has been fixed.
+95-04-31  A bug which caused a script to terminate when set -e
+	  was on and the first command of and && or || list
+	  failed has been fixed.
+95-04-31  A bug with here documents inside $(...) when the delimiter
+	  word is an identifier has been fixed.
+95-04-31  A bug which caused $0 to display the wrong value when
+	  a script was invoked as an argument to the . command
+	  and the eval command has been fixed.
+95-04-31  A bug that could cause the built-in sleep to hang
+	  has been fixed.
+95-04-31  A bug introduces in 12/28/93b which caused the backslash
+	  to be removed when it was followed by digit inside double
+	  quotes in some instances has been fixed.
+95-04-31  A bug which could cause a core dump if ksh was invoked with
+	  standard input closed has been fixed.
+95-04-31  A bug which could cause a core dump if typeset -A was
+	  specified for an existing variable has been fixed.
+95-04-31  Variables that were unset but had attributes such as readonly
+	  and export were not listed with readonly, export and typeset.
+95-04-31  Several problems with signals have been fixed.
+95-04-31  A bug which prevented ulimit -t from working has been fixed. 
+	  Also, a bug in which failed ulimits could cause a core dump
+	  has also been fixed.
+95-04-31  A bug in expansion of the form ${name/#pattern/string} and
+	  ${name/%pattern/string} has been fixed.
+95-04-31  A bug which caused read -r on a line that contained only
+	  blanks to get a non-null value has been fixed.
+95-04-31  A bug introduced in the 'a' point release in which
+	  ${x='\\'} expanded to \ when x was unset has been fixed.
+95-04-31  A bug which prevented a trap on EXIT from being executed
+	  when the last command in a script was a function invocation
+	  has been fixed.
+95-04-31  A bug which caused an interactive shell ignore input when
+	  standard error was redirected to a file with exec,
+	  and then restored with exec 2>&1 has been fixed.
+95-04-31  An interactive shell turns on monitor mode even when
+	  standard error has been redirected to a file.
+95-04-31  A bug which could cause standard input to be incorrectly
+	  positioned for the last command of a script has been fixed.
+95-04-31  A bug in the edit modes which allowed walking back in
+	  the history file for more than HISTSIZE commands has
+	  beed fixed.
+95-04-31  A bug which could cause a core dump if variable TMPDIR was
+	  changed between two command substitutions has been fixed.
+95-04-31. A bug which prevented a trap on EXIT from being cleared
+	  has been fixed.
+95-04-31  A bug fixed for the v directive in vi MULTIBYTE has been
+          fixed.
+95-04-31  Code to for IFS handling of multibyte characters has
+          been added.
+95-04-31  The displaying of multibyte strings in export, readonly,
+          typeset, and execution traces has been fixed.
+95-04-31  Variables inside functions are now statically scoped.
+	  The previous behavior was never documented.
+95-04-31  Variables inside functions are now statically scoped.
+          The previous behavior was never documented.
+95-04-31  A few changes have been made to the name-value library
+          that affect built-ins that use disciplines.  The
+          changes allow disciplines to be shared by variables
+          and should make it possible to add new disciplines
+          without recompilation.
+95-04-31  The name-value library interface has undergone significant
+          change for this revision.  See the new nval.3 man page.
+
+94-12-31  --- Release ksh93b  ---
+94-12-31  Variables inside functions are now statically scoped.
+          The previous behavior was never documented.
+94-12-31  If IFS contains two consecutive identical characters belonging
+	  to the [:space:] class, then this character is treated as
+	  a non-space delimiter so that each instance will delimit
+	  a field.  For example, IFS=$'\t\t' will cause two consecutive
+	  tabs to delimit a null field.
+94-12-31  The getopts command has a -a name option that specifies a
+	  name that will be used for usage messages.
+94-12-31  A bug which caused unset RANDOM to dump core has been
+	  fixed.
+94-12-31  A bug which prevented return for terminating a profile
+	  or ENV file has been fixed.
+94-12-31  A bug which prevented standard input from being
+	  directed to /dev/null for background jobs when
+	  monitor mode was turned off has been fixed.
+94-12-31  Statements of the form typeset -options var[expr]=value
+	  did not perform substitutions on expr as expected.
+94-12-31  A bug which prevented the shell from sending a HUP
+	  signal to some background jobs that were not disowned
+	  has been fixed.
+94-12-31  A bug which allowed a script to trap signals that are
+	  ignored at the time that the shell was invoked by exec
+	  has been fixed.
+94-12-31  A bug which could cause a core dump when a discipline
+	  function was unset within a discipline was fixed.
+94-12-31  The typeset builtin now accepts a first argument of
+	  + or - for compatibility with ksh88.
+94-12-31  For compatibility with ksh88, the results of expansions
+	  of command arguments will treat the extended character
+	  match characters ()|& as ordinary characters.
+94-12-31  A bug which caused read to fail on a file that was
+	  open for read/write with <> when the first operation
+	  was print or printf has been fixed.
+94-12-31  When a job is suspended, it is put on the top of
+	  the job list as required by the POSIX standard.
+94-12-31  The value of OPTARG when an option that required
+	  an argument but didn't have one was incorrect in the
+	  case the the option string began with a :.
+94-12-31  A bug which caused the terminal to get into a bad
+	  state with some KEYBD traps in vi-mode has been fixed.
+94-12-31  A bug which caused an invalid trap to cause a script
+	  to terminate, rather than just return an error, has
+	  been fixed.
+94-12-31  Backreferencing sub-expressions in patterns and replacement
+	  strings now works.
+94-12-31  A bug in chmod which caused the -R option to fail has
+	  been fixed.
+94-12-31  More signal names have been added for Solaris
+
+94-06-30  --- Release ksh93a  ---
+94-06-30  An expansion bug which causes portions of a word after
+	  a $((...)) expansion that contains a nested $var expansion
+	  to be lost has been fixed.
+94-06-30  A bug that caused a core dump when a script that did not
+	  have PWD set and did a cd inside command substitution
+	  has been fixed.
+94-06-30  A bug which caused a core dump on some machines when
+	  the LANG variable was assigned to has been fixed.
+94-06-30  A bug which incorrectly handled set disciplines that
+	  performed arithmetic evaluation when the discipline
+	  was called from the arithmetic evaluator has been fixed.
+94-06-30  A bug caused by an EXIT trap inside a function that
+	  was executed in a subshell was fixed.
+94-06-30  If foo is a function, and not a program, then command foo
+	  now reports that foo isn't found rather than invoking foo.
+94-06-30  The previous version incorrectly listed -A as an
+	  invocation option.  The -A option is only for set. 
+94-06-30  A bug was fixed which caused ksh to loop when execution trace
+	  was enabled and the PS4 prompt required command substitution.
+94-06-30  A bug which could cause the job control switch character
+	  to be disabled when a script that enabled monitor mode
+	  terminated was fixed.
+94-06-30  A bug in the macro expansion global replacement operator //,
+	  when the pattern began with a [ or +( has been fixed.
+94-06-30  A bug which prevented ~ expansion from occurring when
+	  it was terminated with a colon inside an assignment
+	  has been fixed.
+94-06-30  A bug in the dot command which prevented autoload functions
+	  from working has been fixed.
+94-06-30  A bug which caused a variable to be unset if the
+	  its value were expanded inside a set discipline has
+	  been fixed.
+94-06-30  Whence -a now longer reports that a defined function
+	  is undefined.
+94-06-30  A bug on some systems in which $0 would be incorrect
+	  in scripts invoked by name has been fixed.
+94-06-30  Here documents with an empty body now work.
+94-06-30  A bug which disabled argument passing and resetting
+	  of options for a script invoked by name inside a
+	  function has been fixed.
+94-06-30  A bug in which an EXIT trap set the caller of a function
+	  would be executed if a command called inside a function
+	  was not found has been fixed.
+94-06-30  A bug which allowed a script to trap signals that are
+	  ignored at the time that the shell was invoked has
+	  been fixed.
+94-06-30  A bug which caused 2<&1- when applied to a shell built-in
+	  to leave standard input closed has been fixed.
+94-06-30  A bug which caused the shell to incorrectly parse
+	  $() command substitutions with nested case statements
+	  has been fixed.
+

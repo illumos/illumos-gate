@@ -1,0 +1,19 @@
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/src/cmd/ksh93/features/ttys by iffe version 2007-04-04 : : */
+#ifndef _def_ttys_ksh93
+#define _def_ttys_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _LIB_dll	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libdll.a is a library */
+#define _LIB_ast	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libast.a is a library */
+#define _LIB_m	1	/* -lm is a library */
+#define _LIB_cmd	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libcmd.a is a library */
+#define _LIB_nsl	1	/* -lnsl is a library */
+#define _hdr_termios	1	/* #include <termios.h> ok */
+#define _hdr_termio	1	/* #include <termio.h> ok */
+#define _hdr_sgtty	1	/* #include <sgtty.h> ok */
+#define _sys_termios	1	/* #include <sys/termios.h> ok */
+#define _sys_termio	1	/* #include <sys/termio.h> ok */
+#define _sys_ioctl	1	/* #include <sys/ioctl.h> ok */
+#define _sys_filio	1	/* #include <sys/filio.h> ok */
+#define _lib_tcgetattr	1	/* tcgetattr() in default lib(s) */
+#define _lib_tcgetpgrp	1	/* tcgetpgrp() in default lib(s) */
+#endif

@@ -1,0 +1,152 @@
+.sp 3
+.tl ''Ksh Features That Are Obsolete in Ksh93''
+.sp 2
+.AL 1
+.LI
+Using a pair of grave accents \^\fB\(ga\fR ... \fB\(ga\fR\^
+for command substition.  Use \fB$(\fR ... \fB)\fR instead.
+.LI
+.B FCEDIT
+is an obsolete name for
+the default editor name for the
+.B hist
+command.
+.B FCEDIT
+is not used when
+.B HISTEDIT
+is set.  Use
+.B HISTEDIT
+instead.
+.LI
+The newtest (\fB[[\fR ... \fB]]\fR) operator
+\fB\-a\fP \fIfile\fP
+is obsolete.  Use
+\fB\-e\fP instead.
+.LI
+The newtest (\fB[[\fR ... \fB]]\fR) operator
+.BR = ,
+as used in
+\fIstring\fP \fB=\fP \fIpattern\fP
+is obsolete.  Use
+\fB==\fP instead.
+.LI
+The following obsolete arithmetic comparisons are also permitted:
+.in +5
+.VL 20
+.LI "\fIexp1\fP \fB\-eq\fP \fIexp2\fP"
+True, if
+.I exp1
+is equal to
+.IR exp2 .
+.LI "\fIexp1\fP \fB\-ne\fP \fIexp2\fP"
+True, if
+.I exp1
+is not equal to
+.IR exp2 .
+.LI "\fIexp1\fP \fB\-lt\fP \fIexp2\fP"
+True, if
+.I exp1
+is less than
+.IR exp2 .
+.LI "\fIexp1\fP \fB\-gt\fP \fIexp2\fP"
+True, if
+.I exp1
+is greater than
+.IR exp2 .
+.LI "\fIexp1\fP \fB\-le\fP \fIexp2\fP"
+True, if
+.I exp1
+is less than or equal to
+.IR exp2 .
+.LI "\fIexp1\fP \fB\-ge\fP \fIexp2\fP"
+True, if
+.I exp1
+is greater than or equal to
+.IR exp2 .
+.LE		\"	End .VL
+.in -5
+.LI
+Using test -t or [ -t ] without specifying the file unit number.
+.LI
+The
+.B \-k
+option to the \fBset\fR builtin is obsolete.  It causes
+.I all\^
+variable assignment arguments are placed in the environment,
+even if they occur after the command name.
+The following
+first prints
+.B "a=b c"
+and then
+.BR c :
+There is no alternative.
+.LI
+The obsolete
+.B \-xf
+option of the
+.B typeset
+command allows a function to be exported
+to scripts that are executed without a separate
+invocation of the shell.
+Functions that need to be defined across separate
+invocations of the shell should
+be placed in a directory and the
+.B FPATH
+variable should contains the name of this directory.
+They may also
+be specified in the
+.B ENV
+file with the 
+.B \-xf
+option of
+.BR typeset .
+.LI
+The shell environment variable
+.B FCEDIT
+is obsolete.  Use
+.B HISTEDIT
+instead.
+.LI
+In the
+.B \-s
+option
+(to \fBfc\fR or \fBhist\fR command???)
+(
+and in obsolete versions, the editor name
+.B \-
+)
+is used to skip the editing phase and
+to re-execute the command.
+.LI
+The
+.B \-t
+option to \fBalias\fR builtin is is obsolete.  It
+is used to set and list tracked aliases.
+There is no replacement.
+.LI
+The shell command line option
+.B \-t
+is obsolete.  This option cause the shell to exit after reading
+and executing one command.  The is no replacement (although ending
+\&"command" with the exit builtin should have the same effect).
+.LI
+As an obsolete feature of the "set" builtin,
+if the first
+.I arg\^
+is
+.B \-
+then the
+.B \-x
+and
+.B \-v
+options are turned off and the next
+.I arg
+is treated as the first argument.
+Using
+.B \+
+rather than
+.B \-
+causes these options to be turned off.
+These options can also be used upon invocation of the shell.
+.LE
+

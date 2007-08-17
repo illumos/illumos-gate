@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,15 +31,26 @@
 
 /*
  * Do not add local shells here.  They should be added in /etc/shells
+ *
+ * Do not add restricted shells:
+ * Shells returned by getusershell traditionally allow:
+ * - users to change away from (i.e., if you have an rksh in
+ *   getusershell(), then users can change their shell to ksh)
+ * - by default, ftp in is allowed only for shells returned by
+ *   getusershell(); since FTP has no restrictions on directory
+ *   movement, adding rksh to getusershell() would defeat that
+ *   protection.
  */
 const char *okshells[] = {
 	"/usr/bin/sh",
 	"/usr/bin/csh",
 	"/usr/bin/ksh",
+	"/usr/bin/ksh93",
 	"/usr/bin/jsh",
 	"/bin/sh",
 	"/bin/csh",
 	"/bin/ksh",
+	"/bin/ksh93",
 	"/bin/jsh",
 	"/sbin/sh",
 	"/sbin/jsh",

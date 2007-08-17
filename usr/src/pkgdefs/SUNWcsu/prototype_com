@@ -165,6 +165,7 @@ f none usr/bin/keylogout 555 root bin
 l none usr/bin/kill=../../usr/bin/alias
 f none usr/bin/kmfcfg 555 root bin
 f none usr/bin/ksh 555 root bin
+l none usr/bin/ksh93=../../usr/lib/isaexec
 f none usr/bin/line 555 root bin
 f none usr/bin/listdgrp 555 root bin
 f none usr/bin/listusers 555 root bin
@@ -232,6 +233,7 @@ l none usr/bin/read=../../usr/bin/alias
 l none usr/bin/red=../../usr/bin/ed
 f none usr/bin/renice 555 root bin
 l none usr/bin/rksh=../../usr/bin/ksh
+l none usr/bin/rksh93=../../usr/lib/isaexec
 f none usr/bin/rm 555 root bin
 s none usr/bin/rmail=./mail
 f none usr/bin/rmdir 555 root bin

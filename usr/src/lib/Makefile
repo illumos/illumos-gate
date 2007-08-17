@@ -79,6 +79,10 @@ SUBDIRS += \
 	libintl			.WAIT	\
 	../cmd/sgs/librtld_db	\
 	libaio			\
+	libast			\
+	libdll			\
+	libcmd			\
+	libshell		\
 	librt			\
 	libadm			\
 	libctf			\
@@ -93,7 +97,6 @@ SUBDIRS += \
 	libpthread	.WAIT	\
 	libslp		\
 	libbsdmalloc	\
-	libcmd		\
 	libdoor		\
 	libdevinfo	\
 	libdladm	\
@@ -132,6 +135,7 @@ SUBDIRS += \
 	libsysevent	\
 	libnisdb	\
 	libpool		\
+	libpp		\
 	libproc		\
 	libproject	\
 	libsendfile	\
@@ -266,9 +270,11 @@ MSGSUBDIRS=		\
 	gss_mechs/mech_dh	\
 	gss_mechs/mech_krb5	\
 	krb5		\
+	libast		\
 	libbsm		\
 	libc		\
 	libcfgadm	\
+	libcmd		\
 	libcontract	\
 	libcurses	\
 	libdhcpsvc 	\
@@ -276,6 +282,7 @@ MSGSUBDIRS=		\
 	libipsecutil	\
 	libdiskmgt	\
 	libdladm	\
+	libdll		\
 	libgss		\
 	libidmap	\
 	libinetcfg	\
@@ -284,11 +291,13 @@ MSGSUBDIRS=		\
 	libpam		\
 	libpicl		\
 	libpool		\
+	libpp		\
 	libscf		\
 	libsasl		\
 	libldap5	\
 	libsecdb	\
 	libshare	\
+	libshell	\
 	libsldap	\
 	libslp		\
 	libsmedia	\
@@ -314,9 +323,11 @@ sparc_MSGSUBDIRS=	\
 
 HDRSUBDIRS=		\
 	auditd_plugins	\
+	libast		\
 	libbrand	\
 	libbsm		\
 	libc		\
+	libcmd		\
 	libcmdutils	\
 	libcontract	\
 	libcpc		\
@@ -328,6 +339,7 @@ HDRSUBDIRS=		\
 	libdevinfo	\
 	libdiskmgt	\
 	libdladm	\
+	libdll		\
 	libdlpi		\
 	libdhcpagent	\
 	libdhcpsvc	\
@@ -361,6 +373,7 @@ HDRSUBDIRS=		\
 	libpicltree	\
 	libplot		\
 	libpool		\
+	libpp		\
 	libproc		\
 	libraidcfg	\
 	librcm		\
@@ -372,6 +385,7 @@ HDRSUBDIRS=		\
 	librsm		\
 	libsasl		\
 	libsec		\
+	libshell	\
 	libslp		\
 	libsmedia	\
 	libsqlite	\
@@ -465,7 +479,9 @@ auditd_plugins: libbsm libnsl libsecdb
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
+libast: 	libsocket
 libbsm:		libtsol
+libcmd: 	libast libsocket libnsl
 libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
@@ -474,6 +490,7 @@ libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdlpi libdevinfo libinetutil libsocket
+libdll: 	libast
 libdlpi:	libinetutil
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
@@ -492,11 +509,13 @@ libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
+libshell:	libast libcmd libdll libsocket libsecdb
 libsip:		libmd5
 libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol
 libpool:	libnvpair libexacct
+libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand libpool libscf
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf

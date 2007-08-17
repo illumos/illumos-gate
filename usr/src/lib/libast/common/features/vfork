@@ -1,0 +1,13 @@
+set	prototyped
+hdr	vfork
+sys	vfork
+
+tst	run{
+	if	test "$_hdr_vfork" = 1
+	then	echo "#include <vfork.h>"
+	elif	test "$_sys_vfork" = 1
+	then	echo "#include <sys/vfork.h>"
+	else	echo '#include <unistd.h>' > $tmp.c
+		$cc -E $tmp.c | grep vfork
+	fi
+}end

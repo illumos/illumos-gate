@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -50,11 +50,13 @@ f none usr/bin/addbadsec 555 root bin
 f none usr/bin/i86/amt 555 root bin
 f none usr/bin/diskscan 555 root bin
 d none usr/bin/i86 755 root bin
+f none usr/bin/i86/ksh93 555 root bin
 f none usr/bin/i86/newtask 4555 root sys
 f none usr/bin/i86/nohup 555 root bin
 f none usr/bin/i86/prctl 555 root bin
 f none usr/bin/i86/prstat 555 root bin
 f none usr/bin/i86/ps 555 root bin
+l none usr/bin/i86/rksh93=ksh93
 f none usr/bin/i86/savecore 555 root bin
 f none usr/bin/i86/setuname 555 root bin
 f none usr/bin/i86/uptime 4555 root bin
@@ -102,6 +104,7 @@ f none usr/sbin/i86/whodo 4555 root bin
 d none usr/bin/amd64 755 root bin
 f none usr/bin/amd64/amt 555 root bin
 f none usr/bin/amd64/crle 555 root bin
+f none usr/bin/amd64/ksh93 555 root bin
 f none usr/bin/amd64/ls 555 root bin
 f none usr/bin/amd64/moe 555 root bin
 f none usr/bin/amd64/newtask 4555 root sys
@@ -109,6 +112,7 @@ f none usr/bin/amd64/nohup 555 root bin
 f none usr/bin/amd64/prctl 555 root bin
 f none usr/bin/amd64/prstat 555 root bin
 f none usr/bin/amd64/ps 555 root bin
+l none usr/bin/amd64/rksh93=ksh93
 f none usr/bin/amd64/savecore 555 root bin
 f none usr/bin/amd64/setuname 555 root bin
 f none usr/bin/amd64/uptime 4555 root bin

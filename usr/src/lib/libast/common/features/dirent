@@ -1,0 +1,275 @@
+set	prototyped
+
+set	nodefine
+lib	stat64 -D_LARGEFILE64_SOURCE
+typ	off64_t -D_LARGEFILE64_SOURCE
+set	define
+
+lib	opendir
+hdr	dirent,ndir
+sys	dir
+nxt	dirent
+
+tst	botch_d_ino_dirent64 -D_LARGEFILE64_SOURCE note{ dirent64.d_ino vs. readdir64 mismatch }end compile{
+	#if !__arm__
+	)
+	#endif
+	#include <dirent.h>
+	int
+	main()
+	{
+		struct dirent64	ent;
+		char		aha[5-((int)sizeof(ent.d_ino))];
+		return sizeof(aha);
+	}
+}end
+
+if ( ! _lib_opendir ) {
+	/*
+	 * <dirent.h> for systems with no opendir()
+	 */
+
+	#ifndef _DIRENT_H
+	#define _DIRENT_H
+
+	typedef struct
+	{
+		int		dd_fd;		/* file descriptor		*/
+	#ifdef _DIR_PRIVATE_
+		_DIR_PRIVATE_
+	#endif
+	} DIR;
+
+	struct dirent
+	{
+		long		d_fileno;	/* entry serial number		*/
+		int		d_reclen;	/* entry length			*/
+		int		d_namlen;	/* entry name length		*/
+		char		d_name[1];	/* entry name			*/
+	};
+
+	#ifndef _DIR_PRIVATE_
+
+	#ifdef	rewinddir
+	#undef	rewinddir
+	#define rewinddir(p)	seekdir(p,0L)
+	#endif
+
+	extern DIR*		opendir(const char*);
+	extern void		closedir(DIR*);
+	extern struct dirent*	readdir(DIR*);
+	extern void		seekdir(DIR*, long);
+	extern long		telldir(DIR*);
+
+	#endif
+
+	#endif
+}
+elif ( _nxt_dirent && _lib_stat64 && _typ_off64_t && _botch_d_ino_dirent64 ) pass{
+cat <<!
+	/*
+	 * <dirent.h> for [fl]stat64 and off64_t with sizeof(ino64_t)==4
+	 */
+
+	#ifndef _AST_STD_H
+
+	#include $_nxt_dirent	/* the native <dirent.h> */
+
+	#else
+
+	#ifndef _DIR64_H
+	#define _DIR64_H
+
+	#include <ast_std.h>
+
+	#if _typ_off64_t
+	#undef	off_t
+	#endif
+
+	#undef	__ino64_t
+	#define __ino64_t	int64_t
+
+	#include $_nxt_dirent	/* the native <dirent.h> */
+
+	#undef	__ino64_t
+	#define __ino64_t	__ino64_t
+
+	#if _typ_off64_t
+	#define	off_t		off64_t
+	#endif
+
+	#if _lib_readdir64 && _typ_struct_dirent64
+	#ifndef	dirent
+	#define dirent		dirent64
+	#endif
+	#ifndef	readdir
+	#define readdir		readdir64
+	#endif
+	#endif
+
+	#endif
+
+	#endif
+!
+}end
+elif ( _nxt_dirent && _lib_stat64 && _typ_off64_t ) pass{
+cat <<!
+	/*
+	 * <dirent.h> for [fl]stat64 and off64_t
+	 */
+
+	#ifndef _AST_STD_H
+
+	#include $_nxt_dirent	/* the native <dirent.h> */
+
+	#else
+
+	#ifndef _DIR64_H
+	#define _DIR64_H
+
+	#include <ast_std.h>
+
+	#if _typ_off64_t
+	#undef	off_t
+	#endif
+
+	#include $_nxt_dirent	/* the native <dirent.h> */
+
+	#if _typ_off64_t
+	#define	off_t		off64_t
+	#endif
+
+	#if _lib_readdir64 && _typ_struct_dirent64
+	#ifndef	dirent
+	#define dirent		dirent64
+	#endif
+	#ifndef	readdir
+	#define readdir		readdir64
+	#endif
+	#endif
+
+	#endif
+
+	#endif
+!
+}end
+elif ( _nxt_dirent && _hdr_dirent ) pass{
+cat <<!
+	/*
+	 * <dirent.h> for systems with ok <dirent.h>
+	 */
+
+	#ifndef _DIRENT_H
+
+	#include $_nxt_dirent	/* the native <dirent.h> */
+
+	#ifndef _DIRENT_H
+	#define _DIRENT_H
+	#endif
+
+	#endif
+!
+}end
+elif ( _hdr_ndir ) {
+	/*
+	 * <dirent.h> for systems with opendir() and <ndir.h>
+	 */
+
+	#ifndef _DIRENT_H
+	#define _DIRENT_H
+
+	#if defined(__STDPP__directive) && defined(__STDPP__hide)
+	__STDPP__directive pragma pp:hide closedir opendir readdir seekdir telldir
+	#else
+	#define closedir	______closedir
+	#define opendir		______opendir
+	#define readdir		______readdir
+	#define seekdir		______seekdir
+	#define telldir		______telldir
+	#endif
+
+	#include <ndir.h>
+
+	#if defined(__STDPP__directive) && defined(__STDPP__hide)
+	__STDPP__directive pragma pp:nohide closedir opendir readdir seekdir telldir
+	#else
+	#undef	closedir
+	#undef	opendir
+	#undef	readdir
+	#undef	seekdir
+	#undef	telldir
+	#endif
+
+	#ifndef dirent
+	#define dirent	direct
+	#endif
+
+	#if !defined(d_fileno) && !defined(d_ino)
+	#define d_fileno	d_ino
+	#endif
+
+	#ifdef	rewinddir
+	#undef	rewinddir
+	#define rewinddir(p)	seekdir(p,0L)
+	#endif
+
+	extern DIR*		opendir(const char*);
+	extern void		closedir(DIR*);
+	extern struct dirent*	readdir(DIR*);
+	extern void		seekdir(DIR*, long);
+	extern long		telldir(DIR*);
+
+	#endif
+}
+elif ( _sys_dir ) {
+	/*
+	 * <dirent.h> for systems with opendir() and no <ndir.h>
+	 */
+
+	#ifndef _DIRENT_H
+	#define _DIRENT_H
+
+	#if defined(__STDPP__directive) && defined(__STDPP__hide)
+	__STDPP__directive pragma pp:hide closedir opendir readdir seekdir telldir
+	#else
+	#define closedir	______closedir
+	#define opendir		______opendir
+	#define readdir		______readdir
+	#define seekdir		______seekdir
+	#define telldir		______telldir
+	#endif
+
+	#include <sys/dir.h>
+
+	#if defined(__STDPP__directive) && defined(__STDPP__hide)
+	__STDPP__directive pragma pp:nohide closedir opendir readdir seekdir telldir
+	#else
+	#undef	closedir
+	#undef	opendir
+	#undef	readdir
+	#undef	seekdir
+	#undef	telldir
+	#endif
+
+	#ifndef dirent
+	#define dirent	direct
+	#endif
+
+	#if !defined(d_fileno) && !defined(d_ino)
+	#define d_fileno	d_ino
+	#endif
+
+	#ifdef	rewinddir
+	#undef	rewinddir
+	#define rewinddir(p)	seekdir(p,0L)
+	#endif
+
+	extern DIR*		opendir(const char*);
+	extern void		closedir(DIR*);
+	extern struct dirent*	readdir(DIR*);
+	extern void		seekdir(DIR*, long);
+	extern long		telldir(DIR*);
+
+	#endif
+}
+endif

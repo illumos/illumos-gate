@@ -1,0 +1,275 @@
+#
+# language_territory.charset@attribute tables
+#
+
+:charset:
+
+	iso8859-1	latin1|west-europe		1252
+	iso8859-2	latin2|east-europe		1250
+	iso8859-3	latin3|south-europe		1257
+	iso8859-4	latin4|north-europe
+	iso8859-5	cyrillic			1251
+	iso8859-6	arabic				1256
+	iso8859-7	greek				1253
+	iso8859-8	hebrew				1255
+	iso8859-9	latin5|turkish			1254
+	iso8859-10	latin6|nordic
+	iso8859-13	latin7
+	iso8859-14	latin8|celtic
+	iso8859-15	latin0
+	iso2022		japanese|korean
+	iso4873		japanese-ascii|korean-ascii
+	koi8-r		russian
+	utf8		plan9
+
+:language:
+
+	aa	afar
+	ab	abkhazian
+	af	afrikaans		afr
+	am	amharic
+	ar	arabic			ara	iso8859-6
+	as	assamese
+	ay	aymara
+	az	azerbaijani
+	ba	bashkir
+	be	belarusian		bel
+	bg	bulgarian		bul	iso8859-5
+	bh	bihari
+	bi	bislama
+	bn	bengali-bangla
+	bo	tibetan
+	br	breton
+	ca	catalan			cat
+	co	corsican
+	cs	czech			ces|cze	iso8859-2
+	cy	welsh
+	da	danish			dan
+	de	german			deu|ger
+	dz	bhutani
+	el	greek			ell|gre	iso8859-7
+	en	english			eng
+	eo	esperanto
+	es	spanish			spa	-	traditional:default|modern
+	et	estonian		est	iso8859-3
+	eu	basque			eus|baq
+	fa	persian
+	fi	finnish			fin
+	fj	fiji
+	fo	faeroese
+	fr	french			fra|fre
+	fy	frisian
+	ga	irish			-	iso8859-14
+	gd	scots-gaelic		-	iso8859-14
+	gl	galician
+	gn	guarani
+	gu	gujarati
+	ha	hausa
+	he	hebrew			heb	iso8859-8
+	hi	hindi
+	hr	croatian		hrv|scr	iso8859-2
+	hu	hungarian		hun	iso8859-2
+	hy	armenian
+	ia	interlingua
+	id	indonesian		ind
+	ie	interlingue
+	ik	inupiak
+	in	indonesian
+	is	icelandic		isl|ice
+	it	italian			ita
+	iw	hebrew
+	ja	japanese		jpn
+	ji	yiddish
+	jw	javanese
+	ka	georgian
+	kk	kazakh			kaz
+	kl	greenlandic
+	km	cambodian
+	kn	kannada
+	ko	korean			kor
+	ks	kashmiri
+	ku	kurdish
+	ky	kirghiz
+	la	latin
+	ln	lingala
+	lo	laothian
+	lt	lithuanian		lit	iso8859-13
+	lv	latvian			lav	iso8859-13
+	mg	malagasy
+	mi	maori
+	mk	macedonian		mkd|mac
+	ml	malayalam		mal
+	mn	mongolian
+	mo	moldavian
+	mr	marathi
+	ms	malay			msa|may
+	mt	maltese
+	my	burmese
+	na	nauru
+	nb	norwegian-bokmal	nob
+	ne	nepali
+	nl	dutch			nld|dut
+	nn	norwegian-nynorsk	nno|non
+	no	norwegian		nor
+	oc	occitan
+	om	oromo
+	or	oriya
+	pa	punjabi
+	pl	polish			pol	iso8859-2
+	ps	pushto
+	pt	portuguese		por
+	qu	quechua
+	rm	rhaeto-romance
+	rn	kirundi
+	ro	romanian		ron|rum	iso8859-2
+	ru	russian			rus	iso8859-5
+	rw	kinyarwanda
+	sa	sanskrit
+	sd	sindhi
+	sg	sangro
+	sh	serbo-croatian
+	si	singhalese
+	sk	slovak			slk|slo	iso8859-2
+	sl	slovenian		slv	iso8859-2
+	sm	samoan
+	sn	shona
+	so	somali
+	sq	albanian		sqi|alb
+	sr	serbian			srp	iso8859-2
+	ss	siswati
+	st	sesotho
+	su	sudanese
+	sv	swedish			swe
+	sw	swahili			swa
+	ta	tamil
+	te	telugu
+	tg	tajik
+	th	thai			tha
+	ti	tigrinya
+	tk	turkmen
+	tl	tagalog
+	tn	setswana
+	to	tonga
+	tr	turkish			tur	iso8859-9
+	ts	tsonga
+	tt	tatar			tat
+	tw	chinese-traditional	cht
+	uk	ukrainian		ukr	iso8859-5
+	ur	urdu
+	uz	uzbek			uzb
+	vi	vietnamese
+	vo	volapuk
+	wo	wolof
+	xh	xhosa
+	yo	yoruba
+	zh	chinese-simplified	zho|chi|chs
+	zu	zulu
+
+:territory:
+
+	al	albania
+	an	netherlands-antilles	nl
+	ar	argentina		es
+	at	austria			de
+	au	australia		en
+	az	azerbaijan
+	be	belgium			nl|fr|de
+	bg	bulgaria		bg
+	bn	brunei-darussalam	ar
+	bo	bolivia			es
+	br	brazil			pt
+	bw	botswana		en
+	by	belarus			ru
+	bz	belize			en
+	ca	canada			en|fr
+	ch	switzerland		fr|de|it
+	cl	chile			es
+	cn	china			zh:primary
+	co	colombia		es
+	cr	costa-rica		es
+	cz	czech-republic		cs
+	de	germany			de
+	dk	denmark			da|en
+	do	dominican-republic	es
+	dz	algeria
+	ec	ecuador			es
+	ee	estonia			et
+	eg	egypt			ar
+	es	spain			es|ca|eu|gl
+	fi	finland			sv
+	fo	faroe-islands		fo
+	fr	france			fr
+	gb	united-kingdom|great-britain|england	en:primary
+	gl	greenland		kl
+	gr	greece			el
+	gt	guatemala		es
+	hk	hong-kong		zh
+	hn	honduras		es
+	hr	croatia			hr
+	hu	hungary			hu
+	id	indonesia		id
+	ie	ireland			en|ga
+	il	israel			he
+	iq	iraq			ar
+	is	iceland			is
+	it	italy			it
+	jm	jamaica			en
+	jo	jordan			ar
+	jp	japan			ja
+	ke	kenya
+	kr	south-korea		ko
+	kw	kuwait			ar
+	lb	lebanon			ar
+	li	liechtenstein		de|fr
+	lt	lithuania		lt
+	lu	luxembourg		de|fr
+	lv	latvia			lv
+	ly	libya			ar
+	ma	morocco			ar
+	mk	macedonia		mk
+	mo	macau			zh
+	mx	mexico			es
+	my	malaysia
+	ni	nicaragua		es
+	nl	netherlands		nl
+	no	norway			nb|no|nn
+	nz	new-zealand		en
+	om	oman			ar
+	pa	panama			es
+	pe	peru			es
+	pl	poland			pl
+	pr	puerto-rico		es
+	pt	portugal		pt
+	py	paraguay		es
+	ro	romania			ro
+	ru	russia			ru
+	sa	saudi-arabia		ar
+	se	sweden			sv:primary
+	sg	singapore		zh
+	si	slovenia		sl
+	sk	slovakia		sk
+	sp	serbia			sr
+	sv	el-salvador		es
+	sy	syria			ar
+	th	thailand		th
+	tn	tunisia			ar
+	tr	turkey			tr
+	tt	trinidad&tobago		en
+	tw	taiwan			tw
+	ua	ukraine			uk|ru
+	uk	united-kingdom		en:primary
+	us	united-states|usa	en
+	uy	uruguay			es
+	ve	venezuela		es
+	yu	yugoslavia		sr
+	za	south-africa		af
+	zw	zimbabwe		en
+
+:map:
+
+	enu	en	us
+	enz	en	nz
+	esm	es	mx
+	esn	es	es	-	modern
+	esp	es	es	-	traditional
+	usa	en	us

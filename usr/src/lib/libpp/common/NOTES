@@ -1,0 +1,83 @@
+C preprocessor features:
+
+(1)	The preprocessor is centered around the libpp.a  library.  This
+	library provides a tokenizing implementation of the preprocessing
+	stages of ANSI standard C.  The same library is used to construct
+	a standalone prepreprocessor as well as a C compiler front end
+	that, compiled with the library, eliminates the need for a
+	separate preprocessing pass.  Other C tools requiring C tokenizing
+	can use this library, providing a common interface to C language
+	tokens.
+
+(2)	The #pragma interface is exploited to allow the addition of new
+	directives and #pragma's without changing the preprocessor
+	executable.  Most implementation details can be specified by
+	directives in the file "ppdefault.h" that is automatically included
+	(by the standalone cpp library wrapper) as an initialization step.
+
+(3)	#assert, #unassert and corresponding #if predicate tests have been
+	added to relieve the conflicts introduced by predefined #define
+	macros (e.g., unix, vax, u3b, ...).  This is the same feature
+	present in the extended Reiser cpp that has been included in the
+	nmake distribution. (NOTE: #assert is a failed experiment)
+
+(4)	The implementation is sensitive to the incompatible differences
+	between the Reiser cpp (used by AT&T and BSD compilers) and the new
+	ANSI standard C.  A compatibility dialect implements Reiser
+	features, allowing for a smooth transition to the ANSI standard.
+
+(5)	To aid in the transition to ANSI, the preprocessor can do some
+	operations that would normally be done by the lexical analysis
+	stage of a compiler front end:
+	
+	(a)	convert new-style character constants to a form
+		recognized by all current compilers
+
+	(b)	concatenate adjacent string literals
+
+(6)	The preprocessor can also warn about obsolete constructs used
+	in the compatibility dialect and on non-standard constructs
+	used in the ANSI dialect.  The latter is useful in writing
+	C code that is made to run through other implementations of
+	ANSI standard C.
+
+(7)	The preprocessor allows a C language implementor to take
+	advantage of local extensions without invalidating the
+	conformance of the C language implementation.
+
+C9X additions:
+
+(1)	#pragma STDC ...
+		special forms always accecpted
+
+(2)	_Pragma unary operator for pragmas via macro expansion
+		_Pragma(string-literal)
+			#pragma a b c
+			_Pragma("a b c")
+
+(3)	keywords
+		restrict inline _Bool _Complex _Imaginary
+
+(4)	macros
+		__STDC_VERSION__ 		199901L
+		__STDC_IEC_559__		1 or undef
+		__STDC_IEC_559_COMPLEX__	1 or udef
+		__STDC_ISO_10646__		yyyymmL
+
+(5)	empty arguments allowed in function-like macros
+
+(6)	variable arguments via ...
+		__VA_ARGS__ in replacement list only, expands to var args
+		only var args is ok (shall only appear in ...)
+
+(7)	hex floating constant with binary exponents
+		xxxxxx[pP]dddd
+
+(8)	// style comments
+
+(9)	universal characters, even in identifiers!
+		\uxxxx \Uxxxxxxxx
+
+(10)	LL ll ULL ull suffix for long long literals
+
+(11)	<stdarg.h> has va_copy()

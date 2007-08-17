@@ -219,6 +219,8 @@ ROOT.BIN= \
 	/lib/svc/seed \
 	/lib/svc/share \
 	/usr/4lib \
+	/usr/ast \
+	/usr/ast/bin \
 	/usr/bin \
 	/usr/bin/$(MACH32) \
 	/usr/ccs \
@@ -229,6 +231,7 @@ ROOT.BIN= \
 	/usr/games \
 	/usr/include \
 	/usr/kvm \
+	/usr/include/ast \
 	/usr/include/sys/crypto \
 	/usr/include/fm \
 	/usr/include/gssapi \

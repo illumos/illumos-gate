@@ -19,11 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+SHELL=/usr/bin/ksh
 
 include		../Makefile.lib
 
@@ -35,12 +37,28 @@ clean :=        TARGET= clean
 clobber :=      TARGET= clobber
 install :=      TARGET= install
 lint :=         TARGET= lint
+_msg := 	TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install lint _msg: $(SUBDIRS)
+
+HDRS=	\
+	cmd.h \
+	cmdext.h
+
+HDRDIR32= $(MACH)/include/ast
+HDRDIR64= $(MACH64)/include/ast
+include ../Makefile.asthdr
+
+install_h: $(ROOTHDRS)
+
+# We don't check these header files because they're owned by AT&T/AST
+check:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include ../Makefile.targ

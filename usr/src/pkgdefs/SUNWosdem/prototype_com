@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +53,47 @@ f none usr/demo/ELF/dispsyms.c 644 root bin
 f none usr/demo/ELF/pcom.c 644 root bin
 f none usr/demo/ELF/dcom.c 644 root bin
 f none usr/demo/ELF/tpcom.c 644 root bin
+d none usr/demo/ksh 755 root bin
+d none usr/demo/ksh/fun 755 root bin
+f none usr/demo/ksh/fun/dirs 644 root bin
+f none usr/demo/ksh/fun/mandelbrotset1 644 root bin
+f none usr/demo/ksh/fun/gnaw 644 root bin
+f none usr/demo/ksh/fun/rssread 644 root bin
+f none usr/demo/ksh/fun/popd 644 root bin
+f none usr/demo/ksh/fun/pushd 644 root bin
+f none usr/demo/ksh/fun/termclock 644 root bin
+f none usr/demo/ksh/fun/title 644 root bin
+d none usr/demo/ksh/tests 755 root bin
+f none usr/demo/ksh/tests/alias.sh 644 root bin
+f none usr/demo/ksh/tests/append.sh 644 root bin
+f none usr/demo/ksh/tests/arith.sh 644 root bin
+f none usr/demo/ksh/tests/arrays.sh 644 root bin
+f none usr/demo/ksh/tests/attributes.sh 644 root bin
+f none usr/demo/ksh/tests/basic.sh 644 root bin
+f none usr/demo/ksh/tests/bracket.sh 644 root bin
+f none usr/demo/ksh/tests/builtins.sh 644 root bin
+f none usr/demo/ksh/tests/case.sh 644 root bin
+f none usr/demo/ksh/tests/comvar.sh 644 root bin
+f none usr/demo/ksh/tests/coprocess.sh 644 root bin
+f none usr/demo/ksh/tests/exit.sh 644 root bin
+f none usr/demo/ksh/tests/expand.sh 644 root bin
+f none usr/demo/ksh/tests/functions.sh 644 root bin
+f none usr/demo/ksh/tests/glob.sh 644 root bin
+f none usr/demo/ksh/tests/grep.sh 644 root bin
+f none usr/demo/ksh/tests/heredoc.sh 644 root bin
+f none usr/demo/ksh/tests/io.sh 644 root bin
+f none usr/demo/ksh/tests/nameref.sh 644 root bin
+f none usr/demo/ksh/tests/options.sh 644 root bin
+f none usr/demo/ksh/tests/path.sh 644 root bin
+f none usr/demo/ksh/tests/quoting.sh 644 root bin
+f none usr/demo/ksh/tests/quoting2.sh 644 root bin
+f none usr/demo/ksh/tests/return.sh 644 root bin
+f none usr/demo/ksh/tests/select.sh 644 root bin
+f none usr/demo/ksh/tests/shtests 644 root bin
+f none usr/demo/ksh/tests/substring.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_getconf.sh 644 root bin
+f none usr/demo/ksh/tests/tilde.sh 644 root bin
+f none usr/demo/ksh/tests/variables.sh 644 root bin
 d none usr/demo/libexacct 755 root bin
 f none usr/demo/libexacct/README 644 root bin
 f none usr/demo/libexacct/Makefile 644 root bin

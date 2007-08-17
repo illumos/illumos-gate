@@ -1,0 +1,25 @@
+hdr	locale,wchar
+lib	locale,localeconv,wctype,iswctype,iswblank
+cat{
+	#if _PACKAGE_ast
+	#   undef  _hdr_locale
+	#   define _hdr_locale 1
+	#else
+	#   ifdef _hdr_locale
+	#	include <locale.h>
+	#	ifndef LC_MESSAGES
+	#	    define LC_MESSAGES  LC_ALL
+	#	endif /* LC_MESSAGES */
+	#   endif /* _hdr_locale */
+	#endif /* _PACKAGE_ast */
+	#ifdef _hdr_locale
+	#   ifdef _lib_localeconv
+		static struct lconv *lp;
+	#	define GETDECIMAL(x)  (((lp=localeconv()) && lp->decimal_point && *lp->decimal_point) ?  *lp->decimal_point : '.' )
+	#   else
+	#	define GETDECIMAL(x)	('.')
+	#   endif /* _lib_localeconv */
+	#else
+	#   define GETDECIMAL(x)	('.')
+	#endif /* _hdr_locale */
+}end

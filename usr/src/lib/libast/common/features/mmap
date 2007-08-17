@@ -1,0 +1,342 @@
+ref	-D_def_map_ast=1
+
+sys	mman
+
+tst	lib_mmap note{ standard mmap interface that works }end execute{
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/mman.h>
+	#include <sys/stat.h>
+	#include <sys/times.h>
+	
+	#define MAPSIZE (64*1024)
+	#define BUFSIZE	(8*1024)
+	#define WRITE   (64)
+
+	#define Failed(file)	(remove(file),1)
+
+	int
+	#if _STD_
+	main(int argc, char** argv)
+	#else
+	main(argc,argv)
+	int     argc;
+	char**  argv;
+	#endif
+	{
+		caddr_t		mm;
+		char		*t, *u, *f;
+		int		i, fd, okfixed;
+		char		file[1024], buf[MAPSIZE];
+		struct tms	stm, etm;
+		clock_t		rdtm, mmtm;
+
+		/* create data file in a local fs if possible */
+		t = file;
+		if (access(f = "/tmp", 0) == 0 ||
+		    access(f = "/usr/tmp", 0) == 0)
+		{
+			while (*t = *f++)
+				t++;
+			*t++ = '/';
+		}
+		u = t;
+		f = argv[0];
+		while (*t = *f++)
+			if (*t == '/')
+				t = u;
+			else if (*t != '.')
+				t++;
+		*t++ = '.'; *t++ = 'D'; *t = 0;
+		if ((fd = open(file, O_CREAT|O_TRUNC|O_WRONLY, 0666)) < 0)
+			return 1;
+
+		for (i = 0; i < sizeof(buf); ++i)
+			buf[i] = '0' + (i%10);
+		for (i = 0; i < WRITE; ++i)
+			if (write(fd,buf,sizeof(buf)) != sizeof(buf))
+				return Failed(file);
+		close(fd);
+
+		/* see if can overwrite fixed map */
+	#ifndef MAP_VARIABLE
+	#define MAP_VARIABLE	0
+	#endif
+		if ((fd = open(file, O_RDWR)) < 0)
+			return Failed(file);
+
+		mm = mmap((caddr_t)0, sizeof(buf), (PROT_READ|PROT_WRITE),
+			  (MAP_PRIVATE|MAP_VARIABLE), fd, 0);
+		if(mm == (caddr_t)0 || mm == (caddr_t)(-1))
+			return Failed(file);
+		mm = mmap(mm, sizeof(buf), (PROT_READ|PROT_WRITE),
+			  (MAP_PRIVATE|MAP_FIXED), fd, 0);
+		okfixed = (mm == (caddr_t)0 || mm == (caddr_t)(-1)) ? 0 : 1;
+		munmap(mm, sizeof(buf));
+		close(fd);
+
+		/* read time */
+		if((fd = open(file,  O_RDWR)) < 0)
+			return Failed(file);
+		times(&stm);
+		for (i = 0; i < WRITE; ++i)
+			if (read(fd,buf,BUFSIZE) != BUFSIZE)
+				return Failed(file);
+		times(&etm);
+		close(fd);
+		rdtm = (etm.tms_utime-stm.tms_utime) + (etm.tms_stime-stm.tms_stime);
+
+		/* mmap time */
+		if ((fd = open(file, O_RDWR)) < 0)
+			return Failed(file);
+		times(&stm);
+		for(i = 0, mm = (caddr_t)0; i < WRITE; ++i)
+		{	if(okfixed)
+			{	mm = (caddr_t)mmap(mm, MAPSIZE,
+					(PROT_READ|PROT_WRITE),
+					(MAP_PRIVATE | (mm ? MAP_FIXED : MAP_VARIABLE)),
+					fd, i*MAPSIZE );
+			}
+			else
+			{	if(mm)
+					munmap(mm, MAPSIZE);
+				mm = (caddr_t)mmap((caddr_t)0, MAPSIZE,
+					(PROT_READ|PROT_WRITE),
+					(MAP_PRIVATE|MAP_VARIABLE),
+					fd, i*MAPSIZE );
+			}
+			if(mm == (caddr_t)(-1) || mm == (caddr_t)0)
+				return Failed(file);
+		}
+		times(&etm);
+		close(fd);
+		remove(file);
+		mmtm = (etm.tms_utime-stm.tms_utime) + (etm.tms_stime-stm.tms_stime);
+
+		return rdtm+60 < mmtm ? 1 : 0;
+	}
+}end
+
+tst	lib_mmap64 -D_LARGEFILE64_SOURCE note{ mmap64 interface and implementation work }end execute{
+	#if !_lib_mmap
+	(
+	#endif
+	
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/mman.h>
+	#include <sys/stat.h>
+	
+	int
+	main()
+	{
+	        off64_t         off;
+	        int             fd;
+	        int             n;
+	        char*           s;
+		struct stat64	st;
+	        char            file[32] = {'/','t','m','p','/','m','m','X','X','X','X','X','X'};
+	
+		/* hey, stubs are supposed to fail! */
+		if (stat64(".", &st) || !st.st_mode || !st.st_mtime)
+			return 1;
+	        if (!mktemp(file) || (fd = open64(file, O_CREAT|O_WRONLY, 0600)) < 0)
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        off = (1<<8);
+	        off *= off;
+	        if (lseek64(fd, off, SEEK_SET) != off)
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        n = strlen(file) + 1;
+	        if (write(fd, file, n) != n)
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        if (close(fd) < 0 || (fd = open64(file, O_RDWR)) < 0)
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        if (!(s = mmap64((caddr_t)0, (size_t)n, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, off)))
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        if (strcmp(s, file))
+	        {
+	                remove(file);
+	                return 1;
+	        }
+	        close(fd);
+	        remove(file);
+	        return 0;
+	}
+}end
+
+tst	mmap_anon note{ use mmap MAP_ANON to get raw memory }end execute{
+	#if !_lib_mmap
+	(
+	#endif
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/mman.h>
+	#if defined(MAP_ANONYMOUS) && !defined(MAP_ANON)
+	#define MAP_ANON	MAP_ANONYMOUS
+	#endif
+	int
+	main()
+	{	void	*addr;
+		addr = mmap(0,1024*1024,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0);
+		return (addr && addr != (void*)(-1)) ? 0 : 1;
+	}
+}end
+
+tst	mmap_devzero note{ use mmap on /dev/zero to get raw memory }end execute{
+	#if !_lib_mmap
+	(
+	#endif
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/mman.h>
+	int
+	main()
+	{	int	fd;
+		void	*addr;
+		if((fd = open("/dev/zero", O_RDWR)) < 0)
+			return 1;
+		addr = mmap(0,1024*1024,PROT_READ|PROT_WRITE,MAP_PRIVATE,fd,0);
+		return (addr && addr != (void*)(-1)) ? 0 : 1;
+	}
+}end
+
+tst	note{ mmap is worth using }end output{
+	#if !_lib_mmap
+	(
+	#endif
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/mman.h>
+	#include <sys/stat.h>
+	#include <sys/times.h>
+	
+	#define MAPSIZE (64*1024)
+	#define BUFSIZE	(MAPSIZE/8)
+	#define WRITE   (64)
+	#define RUN	(64)
+	
+	#define Failed(file)	(remove(file),1)
+	
+	int
+	#if _STD_
+	main(int argc, char** argv)
+	#else
+	main(argc,argv)
+	int     argc;
+	char**  argv;
+	#endif
+	{
+		caddr_t		mm;
+		char		*t, *f;
+		int		i, fd, k, run;
+		char		file[1024], buf[MAPSIZE];
+		struct tms	stm, etm;
+		clock_t		rdtm, mmtm;
+	
+		/* create data file */
+		f = argv[0]; t = file;
+		while (*t = *f++)
+			t++;
+		*t++ = '.'; *t++ = 'D'; *t = 0;
+		if ((fd = open(file, O_CREAT|O_TRUNC|O_WRONLY, 0666)) < 0)
+			return 1;
+	
+		for (i = 0; i < sizeof(buf); ++i)
+			buf[i] = '0' + (i%10);
+		for (i = 0; i < WRITE; ++i)
+			if (write(fd,buf,sizeof(buf)) != sizeof(buf))
+				return Failed(file);
+		close(fd);
+	
+		/* read time */
+		times(&stm);
+		for(run = 0; run < RUN; ++run)
+		{	if((fd = open(file, O_RDWR)) < 0)
+				return Failed(file);
+			for (i = 0; i < WRITE; ++i)
+			{	for(k = 0; k < MAPSIZE; k += BUFSIZE)
+					if (read(fd,buf,BUFSIZE) != BUFSIZE)
+						return Failed(file);
+			}
+			close(fd);
+		}
+		times(&etm);
+		rdtm = (etm.tms_utime-stm.tms_utime) + (etm.tms_stime-stm.tms_stime);
+	
+		/* mmap time */
+		times(&stm);
+		for(run = 0; run < RUN; ++run)
+		{	if ((fd = open(file, O_RDWR)) < 0)
+				return Failed(file);
+			for(i = 0, mm = (caddr_t)0; i < WRITE; ++i)
+			{	if(mm)
+					munmap(mm, MAPSIZE);
+				mm = (caddr_t)mmap((caddr_t)0, MAPSIZE,
+						   (PROT_READ|PROT_WRITE),
+						   MAP_PRIVATE, fd, i*MAPSIZE );
+				if(mm == (caddr_t)(-1) || mm == (caddr_t)0)
+					return Failed(file);
+	
+				/* the memcpy is < BUFSIZE to simulate the
+				   fact that functions like sfreserve/sfgetr do
+				   not do buffer copying.
+				*/
+				t = (char*)mm;
+				for(k = 0; k < MAPSIZE; k += BUFSIZE, t += BUFSIZE)
+					memcpy(buf,t,(3*BUFSIZE)/4);
+			}
+			close(fd);
+		}
+		times(&etm);
+		mmtm = (etm.tms_utime-stm.tms_utime) + (etm.tms_stime-stm.tms_stime);
+
+		remove(file);
+	
+		if(4*mmtm <= 3*rdtm)
+			printf("#define _mmap_worthy	2	/* mmap is great */\n");
+		else if(4*mmtm <= 5*rdtm)
+			printf("#define _mmap_worthy	1	/* mmap is good */\n");
+	
+		else
+			return 1;
+		return 0;
+	}
+}end
+
+cat{
+
+	/* some systems get it wrong but escape concise detection */
+	#ifndef _NO_MMAP
+	#if __CYGWIN__
+	#define _NO_MMAP	1
+	#endif
+	#endif
+
+	#if _NO_MMAP
+	#undef	_lib_mmap
+	#undef	_lib_mmap64
+	#undef	_mmap_anon
+	#undef	_mmap_devzero
+	#undef	_mmap_worthy
+	#endif
+}end

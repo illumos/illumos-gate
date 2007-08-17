@@ -215,6 +215,7 @@ s none usr/lib/sparcv9/libadm.so.1=../../../lib/sparcv9/libadm.so.1
 s none usr/lib/sparcv9/libadm.so=../../../lib/sparcv9/libadm.so.1
 s none usr/lib/sparcv9/libaio.so.1=../../../lib/sparcv9/libaio.so.1
 s none usr/lib/sparcv9/libaio.so=../../../lib/sparcv9/libaio.so.1
+f none usr/lib/sparcv9/libast.so.1 755 root bin
 s none usr/lib/sparcv9/libavl.so.1=../../../lib/sparcv9/libavl.so.1
 s none usr/lib/sparcv9/libc.so.1=../../../lib/sparcv9/libc.so.1
 s none usr/lib/sparcv9/libc.so=../../../lib/sparcv9/libc.so.1
@@ -230,6 +231,7 @@ s none usr/lib/sparcv9/libdevinfo.so.1=../../../lib/sparcv9/libdevinfo.so.1
 s none usr/lib/sparcv9/libdevinfo.so=../../../lib/sparcv9/libdevinfo.so.1
 s none usr/lib/sparcv9/libdl.so.1=../../../lib/sparcv9/libdl.so.1
 s none usr/lib/sparcv9/libdl.so=../../../lib/sparcv9/libdl.so.1
+f none usr/lib/sparcv9/libdll.so.1 755 root bin
 s none usr/lib/sparcv9/libdlpi.so.1=../../../lib/sparcv9/libdlpi.so.1
 s none usr/lib/sparcv9/libdlpi.so=../../../lib/sparcv9/libdlpi.so.1
 s none usr/lib/sparcv9/libdoor.so.1=../../../lib/sparcv9/libdoor.so.1
@@ -294,6 +296,7 @@ s none usr/lib/sparcv9/libsecdb.so.1=../../../lib/sparcv9/libsecdb.so.1
 s none usr/lib/sparcv9/libsecdb.so=../../../lib/sparcv9/libsecdb.so.1
 s none usr/lib/sparcv9/libsendfile.so.1=../../../lib/sparcv9/libsendfile.so.1
 s none usr/lib/sparcv9/libsendfile.so=../../../lib/sparcv9/libsendfile.so.1
+f none usr/lib/sparcv9/libshell.so.1 755 root bin
 f none usr/lib/sparcv9/libsip.so.1 755 root bin
 s none usr/lib/sparcv9/libsip.so=./libsip.so.1
 f none usr/lib/sparcv9/libsldap.so.1 755 root bin

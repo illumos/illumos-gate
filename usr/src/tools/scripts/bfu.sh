@@ -107,6 +107,7 @@ all_zones_files="
 	etc/krb5/kpropd.acl
 	etc/krb5/krb5.conf
 	etc/krb5/warn.conf
+	etc/ksh.kshrc
 	etc/logadm.conf
 	etc/logindevperm
 	etc/lp/Systems

@@ -27,6 +27,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.master
+include ../Makefile.ksh93switch
 
 #
 #	Note that the commands 'agents', 'lp', 'perl', and 'man' are first in
@@ -61,6 +62,7 @@ COMMON_SUBDIRS=		\
 	acctadm		\
 	arch		\
 	asa		\
+	ast		\
 	audio		\
 	auths		\
 	autopush	\
@@ -210,6 +212,7 @@ COMMON_SUBDIRS=		\
 	keyserv		\
 	killall		\
 	krb5		\
+	ksh		\
 	kstat		\
 	last		\
 	lastcomm	\
@@ -574,6 +577,7 @@ MSGSUBDIRS=		\
 	join		\
 	kbd		\
 	krb5		\
+	ksh		\
 	kstat		\
 	last		\
 	ldap		\

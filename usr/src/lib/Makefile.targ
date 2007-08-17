@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,6 +69,11 @@ $(ROOTLIBDIR64)/$(LIBLINKSCCC): $(ROOTLIBDIR64)/$(LIBLINKSCCC)$(VERS)
 $(ROOTLINTDIR)/%: $(SRCDIR)/%
 	$(INS.file)
 $(ROOTFS_LINTDIR)/%: $(SRCDIR)/%
+	$(INS.file)
+
+$(ROOTDEMODIRS):
+	$(INS.dir)
+$(ROOTDEMODIRBASE)/%: $(DEMOFILESRCDIR)/%
 	$(INS.file)
 
 objs/%.o pics/%.o: $(SRCDIR)/%.c

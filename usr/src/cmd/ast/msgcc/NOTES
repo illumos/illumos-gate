@@ -1,0 +1,65 @@
+2000-04-01 ast message catalog plan
+
+(1) error_info.dictionary should be error_info.catalog
+    to match xopen and the internal naming in our implementation
+    and also to more closely match the webster definition
+    (catalog == enumerated list)
+
+    DONE
+
+(2) nmake by default will
+	CATALOG = $(ID:N=+([A-Za-z0-9_]):?$(PWD:N=*/lib/*:Y,lib,,)$(ID)?$(PWD:B)?)
+	ERROR_CATALOG == "$(CATALOG)"
+    e.g., commands in src/cmd/std will use the "std" catalog; all of the
+    commands in src/lib/libcmd will use the "libcmd" catalog
+
+    nmake will add "[--catalog?$(CATALOG)]" to USAGE_LICENSE
+    optget() will set error_info.catalog if not defined on the first call
+    commands that don't emit messages before optget() need not change
+    otherwise the command should
+
+	error_info.id = "foo";
+	error_info.catalog = ERROR_CATALOG;
+
+    undefined references to { USAGE_LICENSE ERROR_CATALOG } are hard
+    compile time errors
+
+    DONE
+
+(3) add catalog argument to libcmd <cmd.h> cmdinit(argv, context, catalog)
+
+    DONE
+
+(4) msgcat global target build msgs/*.mso and $(CATALOG).msg
+    each Makefile will generate one catalog $(CATALOG).msg where
+
+    the *.msg files are weird -- we need to build them viewed over an
+    architecture specific tree, even though they will be eventually used
+    as architecture independent source
+
+    $(CATALOG).msg will be the "C" locale
+
+    debug will be a debugging locale that will translate each message to
+	(CATALOG-NAME:MESSAGE-INDEX)\n
+    this will make it easy to locate text that escaped translation (in what
+    should be translated output); it will also be a way for us to do
+    regression tests in the face of typo fixes -- presumably typos can be
+    fixed without changing the message index
+
+    see msgadmin(1)
+
+    DONE
+
+(5) once all this is working I'll do catopen(3) and msggen(1)
+
+    DONE
+
+(6) the makerules "all" action will
+	catgen $(CATALOG).cat
+	catgen $(CATALOG)-*.cat
+    and the makerules "install" action will copy the catgen output to
+	$(LOCALEDIR)/$(LOCALE)/LC_MESSAGES/$(CATALOG)*
+    where
+	LOCALEDIR = $(INSTALLROOT)/lib/locale
+
+    NOTE: still under consideration

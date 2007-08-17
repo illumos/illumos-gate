@@ -1,0 +1,81 @@
+tst output{
+	int main()
+	{
+		printf("\n");
+		printf("#define CC_ASCII	1		/* ISO-8859-1			*/\n");
+		printf("#define CC_EBCDIC_E	2		/* Xopen dd(1) EBCDIC		*/\n");
+		printf("#define CC_EBCDIC_I	3		/* Xopen dd(1) IBM		*/\n");
+		printf("#define CC_EBCDIC_O	4		/* IBM-1047 mvs OpenEdition	*/\n");
+		printf("#define CC_EBCDIC_S	5		/* Siemens posix-bc		*/\n");
+		printf("#define CC_EBCDIC_H	6		/* IBM-37 AS/400		*/\n");
+		printf("#define CC_EBCDIC_M	7		/* IBM mvs cobol		*/\n");
+		printf("#define CC_EBCDIC_U	8		/* microfocus cobol		*/\n");
+		printf("\n");
+		printf("#define CC_MAPS		8		/* number of code maps		*/\n");
+		printf("\n");
+		printf("#define CC_EBCDIC	CC_EBCDIC_E\n");
+		printf("#define CC_EBCDIC1	CC_EBCDIC_E\n");
+		printf("#define CC_EBCDIC2	CC_EBCDIC_I\n");
+		printf("#define CC_EBCDIC3	CC_EBCDIC_O\n");
+		printf("\n");
+		switch ('~')
+		{
+		case 0137:
+			printf("#define CC_NATIVE	CC_EBCDIC_E	/* native character code	*/\n");
+			break;
+		case 0176:
+			printf("#define CC_NATIVE	CC_ASCII	/* native character code	*/\n");
+			break;
+		case 0241:
+			switch ('\n')
+			{
+			case 0025:
+				printf("#define CC_NATIVE	CC_EBCDIC_O	/* native character code	*/\n");
+				break;
+			default:
+				switch ('[')
+				{
+				case 0272:
+					printf("#define CC_NATIVE	CC_EBCDIC_H	/* native character code	*/\n");
+					break;
+				default:
+					printf("#define CC_NATIVE	CC_EBCDIC_I	/* native character code	*/\n");
+					break;
+				}
+				break;
+			}
+			break;
+		case 0377:
+			printf("#define CC_NATIVE	CC_EBCDIC_S	/* native character code	*/\n");
+			break;
+		default:
+			switch ('A')
+			{
+			case 0301:
+				printf("#define CC_NATIVE	CC_EBCDIC_O	/* native character code	*/\n");
+				break;
+			default:
+				printf("#define CC_NATIVE	CC_ASCII	/* native character code	*/\n");
+				break;
+			}
+			break;
+		}
+		if ('A' == 0101)
+		{
+			printf("#define CC_ALIEN	CC_EBCDIC	/* alien character code		*/\n\n");
+			printf("#define CC_bel		0007		/* bel character		*/\n");
+			printf("#define CC_esc		0033		/* esc character		*/\n");
+			printf("#define CC_sub		0032		/* sub character		*/\n");
+			printf("#define CC_vt		0013		/* vt character			*/\n");
+		}
+		else
+		{
+			printf("#define CC_ALIEN	CC_ASCII	/* alien character code		*/\n\n");
+			printf("#define CC_bel		0057		/* bel character		*/\n");
+			printf("#define CC_esc		0047		/* esc character		*/\n");
+			printf("#define CC_sub		0077		/* sub character		*/\n");
+			printf("#define CC_vt		0013		/* vt character			*/\n");
+		}
+		return 0;
+	}
+}end

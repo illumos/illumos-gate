@@ -1,0 +1,32 @@
+set	prototyped
+
+tst	tzset_environ note{ tzset() bypasses user getenv() }end execute{
+	#include <time.h>
+	extern char**	environ;
+	extern char*	tzname[2];
+	#if _STD_
+	extern char* getenv(char* s)
+	#else
+	extern char* getenv(s)
+	char*	s;
+	#endif
+	{
+		return "foo0bar";
+	}
+	int main()
+	{
+		tzset();
+		return tzname[0] && !strcmp(tzname[0], "foo") &&
+		       tzname[1] && !strcmp(tzname[1], "bar");
+	}
+}end
+
+if ( _tzset_environ ) {
+	#define tmlocaltime(p)		_tm_localtime(p)
+
+	extern struct tm*		_tm_localtime(const time_t*);
+}
+else {
+	#define tmlocaltime(p)		localtime(p)
+}
+endif

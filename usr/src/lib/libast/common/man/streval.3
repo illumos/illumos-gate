@@ -1,0 +1,83 @@
+.fp 5 CW
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH STREVAL 3
+.SH NAME
+streval \- long integer arithmetic expression evaluator
+.SH SYNOPSIS
+.L "long streval(char* s, char** e, long (*conv)(char* cs, char** ce))"
+.SH DESCRIPTION
+.I streval
+evaluates the long integer arithmetic expression in the nul-terminated string
+.I s
+and returns the result.
+If
+.I e
+is not 0 then
+.I *e
+is set to point to the first unknown character in the expression.
+.PP
+If
+.I conv
+is not 0 then it is called when an unknown token is encountered in
+.IR s .
+.I cs
+points to the beginning of the unknown token.
+The return value is the long integer value of the unknown token and
+.I ce
+must be set to point to the first character after the unknown token.
+If an expression syntax error is encountered the
+.I conv
+is called with
+.I cs
+set to 0 and
+.I *ce
+pointing to the error message text.
+.PP
+In addition to the normal C expressions and integer constant styles,
+numbers in any base
+.I b
+<= 2 <=36
+may be represented as
+.IR b # nnnn ,
+where the extra digits in
+.I nnnn
+are taken from
+.BR [A-Z] .
+.SH "SEE ALSO"
+strtol(3)

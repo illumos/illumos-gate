@@ -1,0 +1,38 @@
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/src/cmd/ksh93/features/locale by iffe version 2007-04-04 : : */
+#ifndef _def_locale_ksh93
+#define _def_locale_ksh93	1
+#define _sys_types	1	/* #include <sys/types.h> ok */
+#define _LIB_dll	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/arch/sol11.sun4/lib/libdll.a is a library */
+#define _LIB_ast	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/arch/sol11.sun4/lib/libast.a is a library */
+#define _LIB_m	1	/* -lm is a library */
+#define _LIB_cmd	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/arch/sol11.sun4/lib/libcmd.a is a library */
+#define _LIB_nsl	1	/* -lnsl is a library */
+#define _hdr_locale	1	/* #include <locale.h> ok */
+#define _hdr_wchar	1	/* #include <wchar.h> ok */
+#define _lib_localeconv	1	/* localeconv() in default lib(s) */
+#define _lib_wctype	1	/* wctype() in default lib(s) */
+#define _lib_iswctype	1	/* iswctype() in default lib(s) */
+#define _lib_iswblank	1	/* iswblank() in default lib(s) */
+#if _PACKAGE_ast
+#   undef  _hdr_locale
+#   define _hdr_locale 1
+#else
+#   ifdef _hdr_locale
+#	include <locale.h>
+#	ifndef LC_MESSAGES
+#	    define LC_MESSAGES  LC_ALL
+#	endif /* LC_MESSAGES */
+#   endif /* _hdr_locale */
+#endif /* _PACKAGE_ast */
+#ifdef _hdr_locale
+#   ifdef _lib_localeconv
+	static struct lconv *lp;
+#	define GETDECIMAL(x)  (((lp=localeconv()) && lp->decimal_point && *lp->decimal_point) ?  *lp->decimal_point : '.' )
+#   else
+#	define GETDECIMAL(x)	('.')
+#   endif /* _lib_localeconv */
+#else
+#   define GETDECIMAL(x)	('.')
+#endif /* _hdr_locale */
+
+#endif

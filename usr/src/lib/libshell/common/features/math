@@ -1,0 +1,4 @@
+lib,npt	absl,acosl,acoshl,asinl,asinhl,atanl,atan2l,expl,cosl,coshl	math.h
+lib,npt	fabsl,powl,hypotl,fmodl,logl,sinl,sinhl,sqrtl,tanl,tanhl	math.h
+lib,npt	strtold,isinf,isinfl,isnan,isnanl,isnormal,isnormall		math.h
+lib,npt	finite,finitel,isfinite						math.h

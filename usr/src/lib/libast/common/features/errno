@@ -1,0 +1,31 @@
+tst	dat_sys_nerr note{ sys_nerr in default libs }end compile{
+	extern int sys_nerr;
+	int f()
+	{
+		return sys_nerr > 0;
+	}
+}end
+
+tst	def_errno_sys_nerr note{ sys_nerr declared in errno.h }end compile{
+	#include <errno.h>
+	int f()
+	{
+		return sys_nerr > 0;
+	}
+}end
+
+tst	dat_sys_errlist note{ sys_errlist in default libs }end compile{
+	extern char* sys_errlist[];
+	int f()
+	{
+		return *sys_errlist[1] != 0;
+	}
+}end
+
+tst	def_errno_sys_errlist note{ sys_errlist declared in errno.h }end compile{
+	#include <errno.h>
+	int f()
+	{
+		return *sys_errlist[1] != 0;
+	}
+}end

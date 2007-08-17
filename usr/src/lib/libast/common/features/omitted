@@ -1,0 +1,110 @@
+tst	note{ check for win32 .exe botches }end output{
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	static int
+	cp(const char* from, const char* to)
+	{
+		ssize_t		n;
+		int		fd;
+		int		td;
+		struct stat	fs;
+		char		buf[1024];
+
+		if ((fd = _open(from, O_RDONLY|O_BINARY)) < 0)
+			return -1;
+		if (_fstat(fd, &fs) || (td = _open(to, O_CREAT|O_WRONLY|O_TRUNC|O_BINARY, fs.st_mode & 0777)) < 0)
+		{
+			_close(fd);
+			return -1;
+		}
+		while ((n = _read(fd, buf, sizeof(buf))) > 0 && _write(td, buf, n) == n);
+		_close(fd);
+		_close(td);
+		return n ? -1 : 0;
+	}
+	int
+	main(int argc, char** argv)
+	{
+		int		fd;
+		int		fix;
+		struct stat	st;
+		char		buf[256];
+
+		snprintf(buf, sizeof(buf), "rm -rf /tmp/iff-%d", getpid());
+		if (_mkdir(buf+7, 0755))
+			return 1;
+		if (_chdir(buf+7))
+			return 1;
+		if (cp("/bin/cat.exe", "foo.exe"))
+			return 1;
+		fix = 0;
+		if (_access("foo", X_OK))
+			fix++,printf("#define _win32_botch_access	1\n");
+		if (_chmod("foo", 0755))
+			fix++,printf("#define _win32_botch_chmod	1\n");
+		if (cp("/bin/cat", "bam") || _access("bam.exe", X_OK))
+			fix++,printf("#define _win32_botch_copy	1\n");
+		if (_getpagesize() != 64 * 1024)
+			fix++,printf("#define _win32_botch_getpagesize	1\n");
+	#if !__EMX__
+		if (_link("foo", "bar") || _access("bar.exe", X_OK))
+			fix++,printf("#define _win32_botch_link	1\n");
+		else
+	#endif
+			cp("foo.exe", "bar.exe");
+		if ((fd = _open("foo", O_RDONLY)) < 0)
+			fix++,printf("#define _win32_botch_open	1\n");
+		else
+			_close(fd);
+		if (_pathconf("huh", _PC_NAME_MAX) >= 0)
+			fix++,printf("#define _win32_botch_pathconf	1\n");
+		if (_rename("foo", "aha") || _access("aha.exe", X_OK))
+			fix++,printf("#define _win32_botch_rename	1\n");
+		else
+			_rename("foo.exe", "aha.exe");
+		if (_stat("bar", &st))
+		{
+			fix++,printf("#define _win32_botch_stat	1\n");
+			if (sizeof(st.st_ino) == 8)
+				printf("#define _stat			_stat64\n");
+		}
+		if (_truncate("aha", 0))
+			fix++,printf("#define _win32_botch_truncate	1\n");
+		if (_unlink("bar"))
+			fix++,printf("#define _win32_botch_unlink	1\n");
+		if (_utime("aha", 0))
+			fix++,printf("#define _win32_botch_utime	1\n");
+		if (fix)
+		{
+			printf("#define _win32_botch_execve	1\n");
+			printf("#define _win32_botch	1\n");
+		}
+		_chdir("/tmp");
+		system(buf);
+		return 0;
+	}
+}end
+
+tst	win32_botch_alarm note{ win32 alarm(2) return botched }end noexecute{
+	#include <signal.h>
+	#include <unistd.h>
+	#include <time.h>
+
+	static int	sigalrm = 0;
+
+	static void
+	handler(int sig)
+	{
+		sigalrm++;
+	}
+	int
+	main(int argc, char** argv)
+	{
+		signal(SIGALRM, handler);
+		alarm(2);
+		pause();
+		return sigalrm != 1 || alarm(0) != 0;
+	}
+}end

@@ -34,12 +34,22 @@
 #
 # Ignore text files.
 #
+*.[1-9]
+*.memo
+*.mm
 *.txt
 */*[Rr][Ee][Aa][Dd][Mm][Ee]*
-*/ChangeLog
-*/READ_ME
-*/TODO
+*/BUGS
+*/COMPATIBILITY
 */COPYRIGHT
+*/ChangeLog
+*/DESIGN
+*/HISTORY
+*/NOTES
+*/OBSOLETE
+*/READ_ME
+*/RELEASE*
+*/TODO
 
 #
 # Ignore oddly-named text files scattered about -- someday these should be
@@ -60,6 +70,53 @@
 ./src/common/openssl
 ./src/grub
 ./src/uts/intel/sys/acpi
+
+#
+# Ignore ksh93/ast-related files that are only used to resync our build
+# configuration with upstream.
+#
+./src/lib/libast/*/src/lib/libast/FEATURE/*
+./src/lib/libast/common/comp/conf.*
+./src/lib/libast/common/features/*
+./src/lib/libast/common/include/ast_windows.h
+./src/lib/libast/common/port/lc.tab
+./src/lib/libast/common/port/lcgen.c
+./src/lib/libcmd/*/src/lib/libcmd/FEATURE/*
+./src/lib/libcmd/common/features/*
+./src/lib/libdll/*/src/lib/libdll/FEATURE/*
+./src/lib/libdll/common/features/*
+./src/lib/libpp/*/pp.*
+./src/lib/libpp/common/gentab.sh
+./src/lib/libpp/common/ppsym.c
+./src/lib/libpp/i386/ppdebug.h
+./src/lib/libpp/sparc/ppdebug.h
+./src/lib/libshell/*/src/cmd/ksh93/FEATURE/*
+./src/lib/libshell/common/data/math.tab
+./src/lib/libshell/common/features/*
+./src/lib/libshell/misc/buildksh93.ksh
+./src/lib/libshell/misc/buildksh93.readme
+
+#
+# Ignore ksh93/ast-related test programs.
+#
+./src/cmd/ast/msgcc/msgcc.tst
+./src/lib/libast/common/port/astmath.c
+
+#
+# Ignore ksh93/ast-related source components that are not currently
+# used but may be useful later.
+#
+./src/lib/libcmd/common/cksum.c
+./src/lib/libcmd/common/md5sum.c
+./src/lib/libcmd/common/sum.c
+./src/lib/libshell/common/bltins/mkservice.c
+./src/lib/libshell/common/bltins/shopen.c
+./src/lib/libshell/common/data/bash_pre_rc.sh
+./src/lib/libshell/common/include/env.h
+./src/lib/libshell/common/sh/bash.c
+./src/lib/libshell/common/sh/env.c
+./src/lib/libshell/common/sh/shcomp.c
+./src/lib/libshell/common/sh/suid_exec.c
 
 #
 # Ignore any files built as part of the nightly program itself.

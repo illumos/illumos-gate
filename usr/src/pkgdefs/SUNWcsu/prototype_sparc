@@ -47,10 +47,13 @@
 # SUNWcsu
 #
 d none usr/bin/sparcv7 755 root bin
+f none usr/bin/sparcv7/ksh93 555 root bin
+l none usr/bin/sparcv7/rksh93=ksh93
 f none usr/bin/sparcv7/savecore 555 root bin
 d none usr/bin/sparcv9 755 root bin
 f none usr/bin/sparcv9/amt 555 root bin
 f none usr/bin/sparcv9/crle 555 root bin
+f none usr/bin/sparcv9/ksh93 555 root bin
 f none usr/bin/sparcv9/ls 555 root bin
 f none usr/bin/sparcv9/moe 555 root bin
 f none usr/bin/sparcv9/newtask 4555 root sys
@@ -58,6 +61,7 @@ f none usr/bin/sparcv9/nohup 555 root bin
 f none usr/bin/sparcv9/prctl 555 root bin
 f none usr/bin/sparcv9/prstat 555 root bin
 f none usr/bin/sparcv9/ps 555 root bin
+l none usr/bin/sparcv9/rksh93=ksh93
 f none usr/bin/sparcv9/savecore 555 root bin
 f none usr/bin/sparcv9/setuname 555 root bin
 f none usr/bin/sparcv9/uptime 4555 root bin

@@ -1,0 +1,64 @@
+set	prototyped
+lib	catopen,nl_langinfo
+hdr	nl_types,langinfo
+nxt	nl_types
+
+tst	output{
+	#if !_lib_catopen
+	#undef	_hdr_nl_types
+	#endif
+	#include "FEATURE/limits"
+	#if _hdr_nl_types
+	#include <nl_types.h>
+	#endif
+
+	int
+	main()
+	{
+		printf("#include <limits.h>\n");
+	#if _hdr_nl_types && defined(_nxt_nl_types_str)
+		printf("#include <%s>	/* the native nl_types.h */\n", _nxt_nl_types_str);
+	#endif
+		printf("\n");
+	#ifndef NL_SETMAX
+		printf("#undef	NL_SETMAX\n");
+		printf("#define NL_SETMAX	1023\n");
+	#endif
+	#ifndef NL_MSGMAX
+		printf("#undef	NL_MSGMAX\n");
+		printf("#define NL_MSGMAX	32767\n");
+	#endif
+	#ifndef NL_SETD
+		printf("#undef	NL_SETD\n");
+		printf("#define NL_SETD		1\n");
+	#endif
+	#ifndef NL_CAT_LOCALE
+		printf("#undef	NL_CAT_LOCALE\n");
+		printf("#define NL_CAT_LOCALE	1\n");
+	#endif
+	#if _lib_catopen
+		printf("#undef	nl_catd\n");
+		printf("#define	nl_catd		_ast_nl_catd\n");
+		printf("#undef	catopen\n");
+		printf("#define catopen		_ast_catopen\n");
+		printf("#undef	catgets\n");
+		printf("#define	catgets		_ast_catgets\n");
+		printf("#undef	catclose\n");
+		printf("#define catclose	_ast_catclose\n");
+	#endif
+		printf("\n");
+		printf("typedef void* nl_catd;\n");
+		printf("\n");
+		printf("#if _BLD_ast && defined(__EXPORT__)\n");
+		printf("#define extern		__EXPORT__\n");
+		printf("#endif\n");
+		printf("\n");
+		printf("extern nl_catd		catopen(const char*, int);\n");
+		printf("extern char*		catgets(nl_catd, int, int, const char*);\n");
+		printf("extern int		catclose(nl_catd);\n");
+		printf("\n");
+		printf("#undef	extern\n");
+		printf("\n");
+		return 0;
+	}
+}end
