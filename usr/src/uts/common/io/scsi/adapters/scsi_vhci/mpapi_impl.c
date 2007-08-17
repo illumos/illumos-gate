@@ -4048,8 +4048,9 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 		path_list = lu_data->path_list->head;
 		while (path_list != NULL) {
 			path_data = path_list->item->idata;
-			if (strncmp(path_data->pclass, tpg_data->pclass,
-			    strlen(tpg_data->pclass)) == 0) {
+			if ((path_data->valid == 1) &&
+			    (strncmp(path_data->pclass, tpg_data->pclass,
+			    strlen(tpg_data->pclass)) == 0)) {
 				VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_mpapi_"
 				    "update_tpg_acc_state_for_lu: Operating on "
 				    "LUN(%s), PATH(%p), TPG(%x: %s)\n",

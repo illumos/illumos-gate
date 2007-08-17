@@ -2871,7 +2871,7 @@ i_mdi_client_add_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 int
 mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 {
-	int		rv = MDI_SUCCESS;
+	int		rv = MDI_FAILURE;
 	mdi_vhci_t	*vh;
 	mdi_phci_t	*ph;
 	mdi_client_t	*ct;
