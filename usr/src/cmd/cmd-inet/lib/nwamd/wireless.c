@@ -1518,12 +1518,12 @@ get_user_preference(char *const *zargv, const char *compare_other,
 		free(wlp);
 		return (-1);
 	}
-	if (strcmp(response, compare_other) == 0) {
+	if (compare_other != NULL && strcmp(response, compare_other) == 0) {
 		free(response);
 		free(wlp);
 		return (1);
 	}
-	if (strcmp(response, compare_rescan) == 0) {
+	if (compare_rescan != NULL && strcmp(response, compare_rescan) == 0) {
 		free(response);
 		free(wlp);
 		return (2);
