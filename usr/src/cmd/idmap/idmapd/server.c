@@ -257,10 +257,6 @@ out:
 		result->ids.ids_len = 0;
 		result->ids.ids_val = NULL;
 	}
-	if (cache)
-		(void) sqlite_close(cache);
-	if (db)
-		(void) sqlite_close(db);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }
@@ -386,8 +382,6 @@ out:
 		sqlite_freemem(sql);
 	if (IDMAP_ERROR(result->retcode))
 		(void) xdr_free(xdr_idmap_mappings_res, (caddr_t)result);
-	if (cache)
-		(void) sqlite_close(cache);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }
@@ -559,8 +553,6 @@ out:
 		sqlite_freemem(sql);
 	if (IDMAP_ERROR(result->retcode))
 		(void) xdr_free(xdr_idmap_namerules_res, (caddr_t)result);
-	if (db)
-		(void) sqlite_close(db);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }
@@ -617,6 +609,7 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_retcode *result,
 	sqlite		*db = NULL;
 	idmap_update_op	*up;
 	int		i;
+	int		trans = FALSE;
 
 	if (verify_rules_auth(rqstp) < 0) {
 		*result = IDMAP_ERR_PERMISSION_DENIED;
@@ -637,6 +630,7 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_retcode *result,
 	*result = sql_exec_no_cb(db, "BEGIN TRANSACTION;");
 	if (*result != IDMAP_SUCCESS)
 		goto out;
+	trans = TRUE;
 
 	for (i = 0; i < batch.idmap_update_batch_len; i++) {
 		up = &batch.idmap_update_batch_val[i];
@@ -666,12 +660,12 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_retcode *result,
 	}
 
 out:
-	if (*result == IDMAP_SUCCESS && db) {
-		*result = sql_exec_no_cb(db, "COMMIT TRANSACTION;");
+	if (trans) {
+		if (*result == IDMAP_SUCCESS)
+			*result = sql_exec_no_cb(db, "COMMIT TRANSACTION;");
+		else
+			(void) sql_exec_no_cb(db, "ROLLBACK TRANSACTION;");
 	}
-
-	if (db)
-		(void) sqlite_close(db);
 	*result = idmap_stat4prot(*result);
 	return (TRUE);
 }
@@ -735,10 +729,6 @@ out:
 		result->mappings.mappings_len = 0;
 		result->mappings.mappings_val = NULL;
 	}
-	if (cache)
-		(void) sqlite_close(cache);
-	if (db)
-		(void) sqlite_close(db);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }

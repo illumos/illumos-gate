@@ -243,6 +243,8 @@ main(int argc, char **argv)
 	} else
 		(void) umask(0077);
 
+	idmap_init_tsd_key();
+
 	init_idmapd();
 
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,

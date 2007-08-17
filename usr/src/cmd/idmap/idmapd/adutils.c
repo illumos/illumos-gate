@@ -139,6 +139,8 @@ typedef struct idmap_q {
 struct idmap_query_state {
 	idmap_query_state_t	*next;
 	int			qcount;		/* how many queries */
+	int			ref_cnt;	/* reference count */
+	pthread_cond_t		cv;		/* Condition wait variable */
 	uint32_t		qlastsent;
 	uint32_t		qinflight;	/* how many queries in flight */
 	uint16_t		qdead;		/* oops, lost LDAP connection */
@@ -161,6 +163,12 @@ static pthread_mutex_t		qstatelock = PTHREAD_MUTEX_INITIALIZER;
 static ad_host_t	*host_head = NULL;
 static pthread_t	reaperid = 0;
 static pthread_mutex_t	adhostlock = PTHREAD_MUTEX_INITIALIZER;
+
+
+static void
+idmap_lookup_unlock_batch(idmap_query_state_t **state);
+
+
 
 /*ARGSUSED*/
 static int
@@ -943,11 +951,13 @@ idmap_lookup_batch_start(ad_t *ad, int nqueries, idmap_query_state_t **state)
 	if (new_state == NULL)
 		return (IDMAP_ERR_MEMORY);
 
+	new_state->ref_cnt = 1;
 	new_state->qadh = adh;
 	new_state->qcount = nqueries;
 	new_state->qadh_gen = adh->generation;
 	/* should be -1, but the atomic routines want unsigned */
 	new_state->qlastsent = 0;
+	(void) pthread_cond_init(&new_state->cv, NULL);
 
 	(void) pthread_mutex_lock(&qstatelock);
 	new_state->next = qstatehead;
@@ -961,7 +971,9 @@ idmap_lookup_batch_start(ad_t *ad, int nqueries, idmap_query_state_t **state)
 
 /*
  * Find the idmap_query_state_t to which a given LDAP result msgid on a
- * given connection belongs
+ * given connection belongs. This routine increaments the reference count
+ * so that the object can not be freed. idmap_lookup_unlock_batch()
+ * must be called to decreament the reference count.
  */
 static
 int
@@ -977,6 +989,7 @@ idmap_msgid2query(ad_host_t *adh, int msgid,
 			continue;
 		for (i = 0; i < p->qcount; i++) {
 			if ((p->queries[i]).msgid == msgid) {
+				p->ref_cnt++;
 				*state = p;
 				*qid = i;
 				(void) pthread_mutex_unlock(&qstatelock);
@@ -1215,6 +1228,7 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 			atomic_dec_32(&query_state->qinflight);
 			/* we saw at least one reply */
 			query_state->queries[qid].got_reply = 1;
+			idmap_lookup_unlock_batch(&query_state);
 		}
 		(void) ldap_msgfree(res);
 		ret = 0;
@@ -1238,6 +1252,7 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 			/* we saw at least one result */
 			query_state->queries[qid].got_reply = 1;
 			query_state->queries[qid].got_results = 1;
+			idmap_lookup_unlock_batch(&query_state);
 		}
 		(void) ldap_msgfree(res);
 		ret = 0;
@@ -1251,15 +1266,48 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 	return (ret);
 }
 
+/*
+ * This routine decreament the reference count of the
+ * idmap_query_state_t
+ */
+static void
+idmap_lookup_unlock_batch(idmap_query_state_t **state)
+{
+	/*
+	 * Decrement reference count with qstatelock locked
+	 */
+	(void) pthread_mutex_lock(&qstatelock);
+	(*state)->ref_cnt--;
+	/*
+	 * If there are no references wakup the allocating thread
+	 */
+	if ((*state)->ref_cnt == 0)
+		(void) pthread_cond_signal(&(*state)->cv);
+	(void) pthread_mutex_unlock(&qstatelock);
+	*state = NULL;
+}
+
+/*
+ * This routine frees the idmap_query_state_t structure
+ * If the reference count is greater than 1 it waits
+ * for the other threads to finish using it.
+ */
 void
-idmap_lookup_free_batch(idmap_query_state_t **state)
+idmap_lookup_release_batch(idmap_query_state_t **state)
 {
 	idmap_query_state_t **p;
 
-	idmap_release_conn((*state)->qadh);
+	/*
+	 * Decrement reference count with qstatelock locked
+	 * and wait for reference count to get to zero
+	 */
+	(void) pthread_mutex_lock(&qstatelock);
+	(*state)->ref_cnt--;
+	while ((*state)->ref_cnt > 0) {
+		(void) pthread_cond_wait(&(*state)->cv, &qstatelock);
+	}
 
 	/* Remove this state struct from the list of state structs */
-	(void) pthread_mutex_lock(&qstatelock);
 	for (p = &qstatehead; *p != NULL; p = &(*p)->next) {
 		if (*p == (*state)) {
 			*p = (*state)->next;
@@ -1267,6 +1315,10 @@ idmap_lookup_free_batch(idmap_query_state_t **state)
 		}
 	}
 	(void) pthread_mutex_unlock(&qstatelock);
+
+	(void) pthread_cond_destroy(&(*state)->cv);
+
+	idmap_release_conn((*state)->qadh);
 
 	free(*state);
 	*state = NULL;
@@ -1307,7 +1359,7 @@ idmap_lookup_batch_end(idmap_query_state_t **state,
 		}
 	}
 
-	idmap_lookup_free_batch(state);
+	idmap_lookup_release_batch(state);
 
 	return (retcode);
 }

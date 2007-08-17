@@ -139,7 +139,7 @@ idmap_retcode idmap_lookup_batch_end(idmap_query_state_t **state,
 		struct timeval *timeout);
 
 /* Abandon a batch and release its idmap_query_state_t object */
-void idmap_lookup_free_batch(idmap_query_state_t **state);
+void idmap_lookup_release_batch(idmap_query_state_t **state);
 
 /*
  * Add a name->SID lookup

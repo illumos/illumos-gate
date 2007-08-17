@@ -40,11 +40,14 @@
 #include <time.h>
 #include <pwd.h>
 #include <grp.h>
+#include <pthread.h>
+#include <assert.h>
 
 #include "idmapd.h"
 #include "adutils.h"
 #include "string.h"
 #include "idmap_priv.h"
+
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 		sqlite_vm **, int *, int, const char ***);
@@ -65,18 +68,93 @@ static idmap_retcode lookup_wksids_name2sid(const char *, char **,
 
 #define	LOCALRID_MIN	1000
 
-#define	SLEEP_TIME	20
-
-#define	NANO_SLEEP(rqtp, nsec)\
-	rqtp.tv_sec = 0;\
-	rqtp.tv_nsec = nsec * (NANOSEC / MILLISEC);\
-	(void) nanosleep(&rqtp, NULL);
 
 
 typedef enum init_db_option {
 	FAIL_IF_CORRUPT = 0,
 	REMOVE_IF_CORRUPT = 1
 } init_db_option_t;
+
+/*
+ * Thread specfic data to hold the database handles so that the
+ * databaes are not opened and closed for every request. It also
+ * contains the sqlite busy handler structure.
+ */
+
+struct idmap_busy {
+	const char *name;
+	const int *delays;
+	int delay_size;
+	int total;
+	int sec;
+};
+
+
+typedef struct idmap_tsd {
+	sqlite *db_db;
+	sqlite *cache_db;
+	struct idmap_busy cache_busy;
+	struct idmap_busy db_busy;
+} idmap_tsd_t;
+
+
+
+static const int cache_delay_table[] =
+		{ 1, 2, 5, 10, 15, 20, 25, 30,  35,  40,
+		50,  50, 60, 70, 80, 90, 100};
+
+static const int db_delay_table[] =
+		{ 5, 10, 15, 20, 30,  40,  55,  70, 100};
+
+
+static pthread_key_t	idmap_tsd_key;
+
+void
+idmap_tsd_destroy(void *key)
+{
+
+	idmap_tsd_t	*tsd = (idmap_tsd_t *)key;
+	if (tsd) {
+		if (tsd->db_db)
+			(void) sqlite_close(tsd->db_db);
+		if (tsd->cache_db)
+			(void) sqlite_close(tsd->cache_db);
+		free(tsd);
+	}
+}
+
+int
+idmap_init_tsd_key(void) {
+
+	return (pthread_key_create(&idmap_tsd_key, idmap_tsd_destroy));
+}
+
+
+
+idmap_tsd_t *
+idmap_get_tsd(void)
+{
+	idmap_tsd_t	*tsd;
+
+	if ((tsd = pthread_getspecific(idmap_tsd_key)) == NULL) {
+		/* No thread specific data so create it */
+		if ((tsd = malloc(sizeof (*tsd))) != NULL) {
+			/* Initialize thread specific data */
+			(void) memset(tsd, 0, sizeof (*tsd));
+			/* save the trhread specific data */
+			if (pthread_setspecific(idmap_tsd_key, tsd) != 0) {
+				/* Can't store key */
+				free(tsd);
+				tsd = NULL;
+			}
+		} else {
+			tsd = NULL;
+		}
+	}
+
+	return (tsd);
+}
+
 
 
 /*
@@ -160,26 +238,79 @@ init_db_instance(const char *dbname, const char *sql, init_db_option_t opt,
 	return (rc);
 }
 
+
+/*
+ * This is the SQLite database busy handler that retries the SQL
+ * operation until it is successful.
+ */
+int
+/* LINTED E_FUNC_ARG_UNUSED */
+idmap_sqlite_busy_handler(void *arg, const char *table_name, int count)
+{
+	struct idmap_busy	*busy = arg;
+	int			delay;
+	struct timespec		rqtp;
+
+	if (count == 1)  {
+		busy->total = 0;
+		busy->sec = 2;
+	}
+	if (busy->total > 1000 * busy->sec) {
+		idmapdlog(LOG_ERR,
+		    "Thread %d waited %d sec for the %s database",
+		    pthread_self(), busy->sec, busy->name);
+		busy->sec++;
+	}
+
+	if (count <= busy->delay_size) {
+		delay = busy->delays[count-1];
+	} else {
+		delay = busy->delays[busy->delay_size - 1];
+	}
+	busy->total += delay;
+	rqtp.tv_sec = 0;
+	rqtp.tv_nsec = delay * (NANOSEC / MILLISEC);
+	(void) nanosleep(&rqtp, NULL);
+	return (1);
+}
+
+
 /*
  * Get the database handle
  */
 idmap_retcode
 get_db_handle(sqlite **db) {
 	char	*errmsg;
+	idmap_tsd_t *tsd;
 
 	/*
-	 * TBD RFE: Retrieve the db handle from thread-specific storage
+	 * Retrieve the db handle from thread-specific storage
 	 * If none exists, open and store in thread-specific storage.
 	 */
-
-	*db = sqlite_open(IDMAP_DBNAME, 0, &errmsg);
-	if (*db == NULL) {
+	if ((tsd = idmap_get_tsd()) == NULL) {
 		idmapdlog(LOG_ERR,
-			"Error opening database %s (%s)",
-			IDMAP_DBNAME, CHECK_NULL(errmsg));
-		sqlite_freemem(errmsg);
-		return (IDMAP_ERR_INTERNAL);
+			"Error getting thread specific data for %s",
+			IDMAP_DBNAME);
+		return (IDMAP_ERR_MEMORY);
 	}
+
+	if (tsd->db_db == NULL) {
+		tsd->db_db = sqlite_open(IDMAP_DBNAME, 0, &errmsg);
+		if (tsd->db_db == NULL) {
+			idmapdlog(LOG_ERR,
+				"Error opening database %s (%s)",
+				IDMAP_DBNAME, CHECK_NULL(errmsg));
+			sqlite_freemem(errmsg);
+			return (IDMAP_ERR_INTERNAL);
+		}
+		tsd->db_busy.name = IDMAP_DBNAME;
+		tsd->db_busy.delays = db_delay_table;
+		tsd->db_busy.delay_size = sizeof (db_delay_table) /
+		    sizeof (int);
+		sqlite_busy_handler(tsd->db_db, idmap_sqlite_busy_handler,
+		    &tsd->db_busy);
+	}
+	*db = tsd->db_db;
 	return (IDMAP_SUCCESS);
 }
 
@@ -187,22 +318,38 @@ get_db_handle(sqlite **db) {
  * Get the cache handle
  */
 idmap_retcode
-get_cache_handle(sqlite **db) {
+get_cache_handle(sqlite **cache) {
 	char	*errmsg;
+	idmap_tsd_t *tsd;
 
 	/*
-	 * TBD RFE: Retrieve the db handle from thread-specific storage
+	 * Retrieve the db handle from thread-specific storage
 	 * If none exists, open and store in thread-specific storage.
 	 */
-
-	*db = sqlite_open(IDMAP_CACHENAME, 0, &errmsg);
-	if (*db == NULL) {
+	if ((tsd = idmap_get_tsd()) == NULL) {
 		idmapdlog(LOG_ERR,
-			"Error opening database %s (%s)",
-			IDMAP_CACHENAME, CHECK_NULL(errmsg));
-		sqlite_freemem(errmsg);
-		return (IDMAP_ERR_INTERNAL);
+			"Error getting thread specific data for %s",
+			IDMAP_DBNAME);
+		return (IDMAP_ERR_MEMORY);
 	}
+
+	if (tsd->cache_db == NULL) {
+		tsd->cache_db = sqlite_open(IDMAP_CACHENAME, 0, &errmsg);
+		if (tsd->cache_db == NULL) {
+			idmapdlog(LOG_ERR,
+				"Error opening database %s (%s)",
+				IDMAP_CACHENAME, CHECK_NULL(errmsg));
+			sqlite_freemem(errmsg);
+			return (IDMAP_ERR_INTERNAL);
+		}
+		tsd->cache_busy.name = IDMAP_CACHENAME;
+		tsd->cache_busy.delays = cache_delay_table;
+		tsd->cache_busy.delay_size = sizeof (cache_delay_table) /
+		    sizeof (int);
+		sqlite_busy_handler(tsd->cache_db, idmap_sqlite_busy_handler,
+		    &tsd->cache_busy);
+	}
+	*cache = tsd->cache_db;
 	return (IDMAP_SUCCESS);
 }
 
@@ -305,31 +452,16 @@ idmapd_string2stat(const char *msg) {
 idmap_retcode
 sql_exec_no_cb(sqlite *db, char *sql) {
 	char		*errmsg = NULL;
-	int		r, i, s;
-	struct timespec	rqtp;
+	int		r;
 	idmap_retcode	retcode;
 
-	for (i = 0, s = SLEEP_TIME; i < MAX_TRIES; i++, s *= 2) {
-		if (errmsg != NULL) {
-			sqlite_freemem(errmsg);
-			errmsg = NULL;
-		}
-		r = sqlite_exec(db, sql, NULL, NULL, &errmsg);
-		if (r != SQLITE_BUSY)
-			break;
-		NANO_SLEEP(rqtp, s);
-	}
+	r = sqlite_exec(db, sql, NULL, NULL, &errmsg);
+	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 
 	if (r != SQLITE_OK) {
 		idmapdlog(LOG_ERR, "Database error during %s (%s)",
 			sql, CHECK_NULL(errmsg));
-		if (r == SQLITE_BUSY) {
-			retcode = IDMAP_ERR_BUSY;
-		} else {
-			retcode = idmap_string2stat(errmsg);
-			if (retcode == IDMAP_ERR_OTHER)
-				retcode = idmapd_string2stat(errmsg);
-		}
+		retcode = idmapd_string2stat(errmsg);
 		if (errmsg != NULL)
 			sqlite_freemem(errmsg);
 		return (retcode);
@@ -382,40 +514,28 @@ process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
 		list_svc_cb cb, void *result) {
 	list_cb_data_t	cb_data;
 	char		*errmsg = NULL;
-	int		r, i, s;
-	struct timespec	rqtp;
+	int		r;
 	idmap_retcode	retcode = IDMAP_ERR_INTERNAL;
 
 	(void) memset(&cb_data, 0, sizeof (cb_data));
 	cb_data.result = result;
 	cb_data.limit = limit;
 
-	for (i = 0, s = SLEEP_TIME; i < MAX_TRIES; i++, s *= 2) {
-		r = sqlite_exec(db, sql, cb, &cb_data, &errmsg);
-		switch (r) {
-		case SQLITE_OK:
-			retcode = IDMAP_SUCCESS;
-			goto out;
-		case SQLITE_BUSY:
-			if (errmsg != NULL) {
-				sqlite_freemem(errmsg);
-				errmsg = NULL;
-			}
-			retcode = IDMAP_ERR_BUSY;
-			idmapdlog(LOG_DEBUG,
-			"Database busy, %d retries remaining",
-				MAX_TRIES - i - 1);
-			NANO_SLEEP(rqtp, s);
-			continue;
-		default:
-			retcode = IDMAP_ERR_INTERNAL;
-			idmapdlog(LOG_ERR,
-				"Database error during %s (%s)",
-				sql, CHECK_NULL(errmsg));
-			goto out;
-		};
+
+	r = sqlite_exec(db, sql, cb, &cb_data, &errmsg);
+	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
+	switch (r) {
+	case SQLITE_OK:
+		retcode = IDMAP_SUCCESS;
+		break;
+
+	default:
+		retcode = IDMAP_ERR_INTERNAL;
+		idmapdlog(LOG_ERR,
+			"Database error during %s (%s)",
+			sql, CHECK_NULL(errmsg));
+		break;
 	}
-out:
 	if (errmsg != NULL)
 		sqlite_freemem(errmsg);
 	return (retcode);
@@ -611,7 +731,7 @@ add_namerule(sqlite *db, idmap_namerule *rule) {
 		else
 			dom = "";
 	}
-	sql = sqlite_mprintf("INSERT OR ROLLBACK into namerules "
+	sql = sqlite_mprintf("INSERT into namerules "
 		"(is_user, windomain, winname, is_nt4, "
 		"unixname, w2u_order, u2w_order) "
 		"VALUES(%d, %Q, %Q, %d, %Q, %q, %q);",
@@ -762,7 +882,6 @@ out:
  *
  * Return values:
  * IDMAP_SUCCESS
- * IDMAP_ERR_BUSY
  * IDMAP_ERR_NOTFOUND
  * IDMAP_ERR_INTERNAL
  */
@@ -771,10 +890,9 @@ static idmap_retcode
 sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
 		int reqcol, const char ***values) {
 	char		*errmsg = NULL;
-	struct timespec	rqtp;
-	int		i, r, s;
+	int		r;
 
-	if (sqlite_compile(db, sql, NULL, vm, &errmsg) != SQLITE_OK) {
+	if ((r = sqlite_compile(db, sql, NULL, vm, &errmsg)) != SQLITE_OK) {
 		idmapdlog(LOG_ERR,
 			"Database error during %s (%s)",
 			sql, CHECK_NULL(errmsg));
@@ -782,18 +900,10 @@ sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
 		return (IDMAP_ERR_INTERNAL);
 	}
 
-	for (i = 0, s = SLEEP_TIME; i < MAX_TRIES; i++, s *= 2) {
-		r = sqlite_step(*vm, ncol, values, NULL);
-		if (r != SQLITE_BUSY)
-			break;
-		NANO_SLEEP(rqtp, s);
-	}
+	r = sqlite_step(*vm, ncol, values, NULL);
+	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 
-	if (r == SQLITE_BUSY) {
-		(void) sqlite_finalize(*vm, NULL);
-		*vm = NULL;
-		return (IDMAP_ERR_BUSY);
-	} else if (r == SQLITE_ROW) {
+	if (r == SQLITE_ROW) {
 		if (ncol != NULL && *ncol < reqcol) {
 			(void) sqlite_finalize(*vm, NULL);
 			*vm = NULL;
@@ -810,7 +920,7 @@ sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
 	(void) sqlite_finalize(*vm, &errmsg);
 	*vm = NULL;
 	idmapdlog(LOG_ERR, "Database error during %s (%s)",
-		sql, CHECK_NULL(errmsg));
+	    sql, CHECK_NULL(errmsg));
 	sqlite_freemem(errmsg);
 	return (IDMAP_ERR_INTERNAL);
 }
@@ -1297,7 +1407,7 @@ retry:
 	}
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		idmap_lookup_free_batch(&state->ad_lookup);
+		idmap_lookup_release_batch(&state->ad_lookup);
 	else
 		retcode = idmap_lookup_batch_end(&state->ad_lookup, NULL);
 
@@ -1308,7 +1418,7 @@ retry:
 
 out:
 	idmapdlog(LOG_NOTICE, "Windows SID to user/group name lookup failed");
-	idmap_lookup_free_batch(&state->ad_lookup);
+	idmap_lookup_release_batch(&state->ad_lookup);
 	return (retcode);
 }
 
@@ -1567,9 +1677,8 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 	char		*end;
 	const char	**values;
 	sqlite_vm	*vm = NULL;
-	struct timespec rqtp;
 	idmap_utf8str	*str;
-	int		ncol, r, i, s, is_user;
+	int		ncol, r, i, is_user;
 	const char	*me = "name_based_mapping_sid2pid";
 
 	winname = req->id1name.idmap_utf8str_val;
@@ -1613,18 +1722,11 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 		goto out;
 	}
 
-	for (i = 0, s = SLEEP_TIME; ; ) {
+	for (; ; ) {
 		r = sqlite_step(vm, &ncol, &values, NULL);
+		assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 
-		if (r == SQLITE_BUSY) {
-			if (++i < MAX_TRIES) {
-				NANO_SLEEP(rqtp, s);
-				s *= 2;
-				continue;
-			}
-			retcode = IDMAP_ERR_BUSY;
-			goto out;
-		} else if (r == SQLITE_ROW) {
+		if (r == SQLITE_ROW) {
 			if (ncol < 2) {
 				retcode = IDMAP_ERR_INTERNAL;
 				goto out;
@@ -2262,13 +2364,13 @@ retry:
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_ERR,
 		"Failed to batch name2sid for AD lookup");
-		idmap_lookup_free_batch(&qs);
+		idmap_lookup_release_batch(&qs);
 		return (IDMAP_ERR_INTERNAL);
 	}
 
 out:
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		idmap_lookup_free_batch(&qs);
+		idmap_lookup_release_batch(&qs);
 	else
 		retcode = idmap_lookup_batch_end(&qs, NULL);
 
@@ -2352,8 +2454,7 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 	const char	**values;
 	sqlite_vm	*vm = NULL;
 	idmap_utf8str	*str;
-	struct timespec	rqtp;
-	int		ncol, r, i, s;
+	int		ncol, r;
 	const char	*me = "name_based_mapping_pid2sid";
 
 	RDLOCK_CONFIG();
@@ -2390,17 +2491,10 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 		goto out;
 	}
 
-	for (i = 0, s = SLEEP_TIME; ; ) {
+	for (;;) {
 		r = sqlite_step(vm, &ncol, &values, NULL);
-		if (r == SQLITE_BUSY) {
-			if (++i < MAX_TRIES) {
-				NANO_SLEEP(rqtp, s);
-				s *= 2;
-				continue;
-			}
-			retcode = IDMAP_ERR_BUSY;
-			goto out;
-		} else if (r == SQLITE_ROW) {
+		assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
+		if (r == SQLITE_ROW) {
 			if (ncol < 3) {
 				retcode = IDMAP_ERR_INTERNAL;
 				goto out;
