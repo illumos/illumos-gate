@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,8 +344,6 @@ extern "C" {
 #define	AHCI_SIGNATURE_PORT_MULTIPLIER	0x96690101
 #define	AHCI_SIGNATURE_ATAPI		0xeb140101
 #define	AHCI_SIGNATURE_DISK		0x00000101
-#define	AHCI_SIGNATURE_NONE		0xffffffff
-
 
 /*
  * The address of the control port for the port multiplier, which is
@@ -357,6 +355,7 @@ extern "C" {
 #define	AHCI_H2D_REGISTER_FIS_TYPE	0x27
 #define	AHCI_H2D_REGISTER_FIS_LENGTH	5
 
+#define	AHCI_CMDHEAD_ATAPI	0x1 /* set to 1 for ATAPI command */
 #define	AHCI_CMDHEAD_DATA_WRITE	0x1 /* From system memory to device */
 #define	AHCI_CMDHEAD_DATA_READ	0x0 /* From device to system memory */
 #define	AHCI_CMDHEAD_PREFETCHABLE	0x1 /* if set, HBA prefetch PRDs */
@@ -527,6 +526,9 @@ typedef struct ahci_fis_set_device_bits {
 	/* offset 0x00 */
 	uint32_t	ahcifsdb_type_rsvd_intr_status_error;
 
+#define	GET_N_BIT_OF_SET_DEV_BITS(fis)				\
+	((fis->ahcifsdb_type_rsvd_intr_status_error >> 15) & 0x1)
+
 	/* offset 0x04 */
 	uint32_t	ahcifsdb_rsvd;
 } ahci_fis_set_device_bits_t;
@@ -629,16 +631,6 @@ typedef struct ahci_rcvd_fis {
 	uint32_t			ahcirf_fis_rsvd4[15];
 } ahci_rcvd_fis_t;
 
-/*
- * XXX to be supported in second phase
- *
- * ATAPI command structure - 12 or 16 bytes
- */
-typedef struct atapi_cmd {
-	uint32_t	atapi_cmd_head;
-	uint32_t	atapi_pad[3];
-} atapi_cmd_t;
-
 /* physical region description table (PRDT) item structure */
 typedef struct ahci_prdt_item {
 	/* DW 0 - Data Base Address */
@@ -667,7 +659,7 @@ typedef struct ahci_cmd_table {
 	ahci_fis_command_t	ahcict_command_fis;
 
 	/* offset 0x40 - ATAPI Command */
-	atapi_cmd_t		ahcict_atapi_cmd;
+	uint8_t			ahcict_atapi_cmd[SATA_ATAPI_MAX_CDB_LEN];
 
 	/* offset 0x50 - Reserved */
 	uint32_t		ahcict_rsvd[12];

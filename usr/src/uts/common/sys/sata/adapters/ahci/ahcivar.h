@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,14 +34,62 @@
 extern "C" {
 #endif
 
+/* Type for argument of event handler */
+typedef	struct ahci_event_arg {
+	void		*ahciea_ctlp;
+	void		*ahciea_portp;
+	uint32_t	ahciea_event;
+	uint32_t	ahciea_retrierr_slot;
+} ahci_event_arg_t;
+
+/* Warlock annotation */
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_ctlp))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_portp))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_event))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_retrierr_slot))
+
+/*
+ * flags for ahciport_flags
+ *
+ * AHCI_PORT_FLAG_SPINUP: this flag will be set when a HBA which supports
+ * staggered spin-up needs to do a spin-up.
+ *
+ * AHCI_PORT_FLAG_MOPPING: this flag will be set when the HBA is stopped,
+ * and all the outstanding commands need to be aborted and sent to upper
+ * layers.
+ *
+ * AHCI_PORT_FLAG_POLLING: this flag will be set when the interrupt is
+ * disabled, and the command is executed in POLLING mode.
+ *
+ * AHCI_PORT_FLAG_RQSENSE: this flag will be set when a REQUEST SENSE which
+ * is used to retrieve sense data is being executed.
+ *
+ * AHCI_PORT_FLAG_STARTED: this flag will be set when the port is started,
+ * that is PxCMD.ST is set with '1', and be cleared when the port is put into
+ * idle, that is PxCMD.ST is changed from '1' to '0'.
+ */
+#define	AHCI_PORT_FLAG_SPINUP	0x01
+#define	AHCI_PORT_FLAG_MOPPING	0x02
+#define	AHCI_PORT_FLAG_POLLING	0x04
+#define	AHCI_PORT_FLAG_RQSENSE	0x08
+#define	AHCI_PORT_FLAG_STARTED	0x10
+
 typedef struct ahci_port {
-	/* The physical port number - for debug message */
+	/* The physical port number */
 	uint8_t			ahciport_port_num;
+
 	/* Type of the device attached to the port */
 	uint8_t			ahciport_device_type;
 	/* State of the port */
 	uint32_t		ahciport_port_state;
-	/* Only used for staggered spin-up */
+
+	/*
+	 * AHCI_PORT_FLAG_SPINUP
+	 * AHCI_PORT_FLAG_MOPPING
+	 * AHCI_PORT_FLAG_POLLING
+	 * AHCI_PORT_FLAG_RQSENSE
+	 * AHCI_PORT_FLAG_STARTED
+	 */
 	int			ahciport_flags;
 
 	/* Pointer to received FIS structure */
@@ -62,8 +110,16 @@ typedef struct ahci_port {
 	ddi_acc_handle_t	\
 			ahciport_cmd_tables_acc_handle[AHCI_PORT_MAX_CMD_SLOTS];
 
+	/* Condition variable used for sync mode commands */
+	kcondvar_t		ahciport_cv;
+
+	/* The whole mutex for the port structure */
 	kmutex_t		ahciport_mutex;
+
+	/* Keep the tags of all the pending commands */
 	uint32_t		ahciport_pending_tags;
+
+	/* Keep all the pending sata packets */
 	sata_pkt_t		*ahciport_slot_pkts[AHCI_PORT_MAX_CMD_SLOTS];
 
 	/*
@@ -74,6 +130,11 @@ typedef struct ahci_port {
 	 */
 	int			ahciport_reset_in_progress;
 
+	/* This is for error recovery handler */
+	ahci_event_arg_t	*ahciport_event_args;
+
+	/* This is to calculate how many mops are in progress */
+	int			ahciport_mop_in_progress;
 } ahci_port_t;
 
 /* Warlock annotation */
@@ -92,6 +153,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_slot_pkts))
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_reset_in_progress))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_mop_in_progress))
 
 typedef struct ahci_ctl {
 	dev_info_t		*ahcictl_dip;
@@ -113,6 +176,12 @@ typedef struct ahci_ctl {
 	int			ahcictl_flags;
 	int			ahcictl_power_level;
 	off_t			ahcictl_pmcsr_offset;
+
+	/*
+	 * AHCI_CAP_PIO_MDRQ
+	 * AHCI_CAP_MCMDLIST_NONQUEUE
+	 */
+	int			ahcictl_cap;
 
 	/* Pci configuration space handle */
 	ddi_acc_handle_t	ahcictl_pci_conf_handle;
@@ -146,6 +215,9 @@ typedef struct ahci_ctl {
 	size_t			ahcictl_intr_size; /* Size of intr array */
 	uint_t			ahcictl_intr_pri;  /* Intr priority */
 	int			ahcictl_intr_cap;  /* Intr capabilities */
+
+	/* Taskq for handling event */
+	ddi_taskq_t		*ahcictl_event_taskq;
 } ahci_ctl_t;
 
 /* Warlock annotation */
@@ -164,48 +236,49 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_TIMEOUT	(1)  /* Timed out */
 #define	AHCI_FAILURE	(-1) /* Unsuccessful return */
 
-/* Port flags */
-#define	AHCI_PORT_STATE_SPINUP	0x1
-#define	AHCI_PORT_STATE_MOPPING	0x2
-
 /* Flags for ahcictl_flags */
 #define	AHCI_PM			0x1
 #define	AHCI_ATTACH		0x2
 #define	AHCI_DETACH		0x4
+
+/* Values for ahcictl_cap */
 /* PIO Multiple DRQ Block */
-#define	AHCI_PMD		0x8
+#define	AHCI_CAP_PIO_MDRQ		0x1
+/* Multiple command lists cannot be used for non queued commands */
+#define	AHCI_CAP_NO_MCMDLIST_NONQUEUE	0x2
 
-
-/* Flags controlling the reset behavior */
+/* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
 #define	AHCI_PORT_INIT		0x0002	/* Initialize port */
 #define	AHCI_RESET_NO_EVENTS_UP	0x0004	/* Don't send reset events up */
-
 
 /* State values for ahci_attach */
 #define	AHCI_ATTACH_STATE_NONE			(0x1 << 0)
 #define	AHCI_ATTACH_STATE_STATEP_ALLOC		(0x1 << 1)
 #define	AHCI_ATTACH_STATE_REG_MAP		(0x1 << 2)
-#define	AHCI_ATTACH_STATE_INTR_ADDED		(0x1 << 3)
-#define	AHCI_ATTACH_STATE_MUTEX_INIT		(0x1 << 4)
-#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 5)
-#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 6)
+#define	AHCI_ATTACH_STATE_PCICFG_SETUP		(0x1 << 3)
+#define	AHCI_ATTACH_STATE_INTR_ADDED		(0x1 << 4)
+#define	AHCI_ATTACH_STATE_MUTEX_INIT		(0x1 << 5)
+#define	AHCI_ATTACH_STATE_PORT_ALLOC		(0x1 << 6)
+#define	AHCI_ATTACH_STATE_ERR_RECV_TASKQ	(0x1 << 7)
+#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 8)
+#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 9)
 
 /* Interval used for delay */
 #define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 millisec */
 #define	AHCI_1MS_TICKS	(drv_usectohz(1000))	/* ticks in 1 millisec */
+#define	AHCI_100US_TICKS	(drv_usectohz(100))	/* ticks in 100  */
 #define	AHCI_1MS_USECS	(1000)			/* usecs in 1 millisec */
 
 /*
  * The following values are the numbers of times to retry polled requests.
  */
 #define	AHCI_POLLRATE_HBA_RESET		100
-#define	AHCI_POLLRATE_PORT_COMRESET	10
 #define	AHCI_POLLRATE_PORT_SSTATUS	10
-#define	AHCI_POLLRATE_PORT_TFD_BSY	1100
-#define	AHCI_POLLRATE_PORT_TFD_ERROR	10
+#define	AHCI_POLLRATE_PORT_TFD_ERROR	1100
 #define	AHCI_POLLRATE_PORT_IDLE		50
 #define	AHCI_POLLRATE_PORT_SOFTRESET	100
+#define	AHCI_POLLRATE_GET_SPKT		100
 
 
 /* Clearing & setting the n'th bit in a given tag */
@@ -230,6 +303,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_ERRS		0x0400
 #define	AHCIDBG_COOKIES		0x0800
 #define	AHCIDBG_POWER		0x1000
+#define	AHCIDBG_COMMAND		0x2000
+#define	AHCIDBG_SENSEDATA	0x4000
 
 extern int ahci_debug_flag;
 
@@ -258,6 +333,11 @@ extern int ahci_debug_flag;
 		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2, arg3, arg4); \
 	}
 
+#define	AHCIDBG5(flag, ahci_ctlp, format, arg1, arg2, arg3, arg4, arg5)	\
+	if (ahci_debug_flags & (flag)) {				\
+		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2,	\
+		    arg3, arg4, arg5); 					\
+	}
 #else
 
 #define	AHCIDBG0(flag, dip, frmt)
@@ -265,6 +345,7 @@ extern int ahci_debug_flag;
 #define	AHCIDBG2(flag, dip, frmt, arg1, arg2)
 #define	AHCIDBG3(flag, dip, frmt, arg1, arg2, arg3)
 #define	AHCIDBG4(flag, dip, frmt, arg1, arg2, arg3, arg4)
+#define	AHCIDBG5(flag, dip, frmt, arg1, arg2, arg3, arg4, arg5)
 
 #endif /* DEBUG */
 

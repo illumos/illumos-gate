@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI" 
@@ -38,6 +38,7 @@ one     sd_resv_reclaim_request
 
 root	ahci_intr
 root	ahci_watchdog_handler
+root	ahci_events_handler
 
 add     sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
 root    sd.c:sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
@@ -106,6 +107,6 @@ add scsi_pkt::pkt_comp targets \
 add     __ddi_xbuf_attr::xa_strategy targets sd_xbuf_strategy
 
 ignore  sd.c:sd_mhd_reset_notify_cb
-ignore  ahci_mop_commands
+ignore	delay
 
 assert order    ahci_ctl::ahcictl_mutex ahci_port::ahciport_mutex
