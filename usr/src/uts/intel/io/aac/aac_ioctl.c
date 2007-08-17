@@ -56,7 +56,9 @@
  */
 extern int aac_sync_mbcommand(struct aac_softstate *, uint32_t, uint32_t,
     uint32_t, uint32_t, uint32_t, uint32_t *);
-extern int aac_do_async_io(struct aac_softstate *, struct aac_cmd *);
+extern int aac_do_io(struct aac_softstate *, struct aac_cmd *);
+extern void aac_free_dmamap(struct aac_cmd *);
+extern void aac_ioctl_complete(struct aac_softstate *, struct aac_cmd *);
 
 extern ddi_device_acc_attr_t aac_acc_attr;
 
@@ -159,44 +161,74 @@ aac_check_revision(struct aac_softstate *softs, intptr_t arg, int mode)
 }
 
 static int
+aac_send_fib(struct aac_softstate *softs, struct aac_cmd *acp)
+{
+	int rval;
+
+	acp->flags |= AAC_CMD_NO_INTR | AAC_CMD_SYNC;
+	acp->ac_comp = aac_ioctl_complete;
+	acp->timeout = AAC_IOCTL_TIMEOUT;
+	acp->dvp = NULL;
+
+	if (softs->state == AAC_STATE_DEAD)
+		return (ENXIO);
+
+	rw_enter(&softs->errlock, RW_READER);
+	rval = aac_do_io(softs, acp);
+	if (rval == TRAN_ACCEPT) {
+		rval = 0;
+	} else if (rval == TRAN_BADPKT) {
+		AACDB_PRINT(softs, CE_CONT, "User SendFib failed ENXIO");
+		rval = ENXIO;
+	} else if (rval == TRAN_BUSY) {
+		AACDB_PRINT(softs, CE_CONT, "User SendFib failed EBUSY");
+		rval = EBUSY;
+	}
+	rw_exit(&softs->errlock);
+
+	return (rval);
+}
+
+static int
 aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	int hbalen;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
-	unsigned size;
+	unsigned fib_size;
 	int rval = 0;
 
 	DBCALLED(softs, 2);
 
-	if (softs->state == AAC_STATE_DEAD)
-		return (ENXIO);
-
 	/* Copy in FIB header */
-	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
-	    softs->aac_max_fib_size;
+	hbalen = sizeof (struct aac_cmd) + softs->aac_max_fib_size;
 	if ((acp = kmem_zalloc(hbalen, KM_NOSLEEP)) == NULL)
 		return (ENOMEM);
 
-	fibp = &acp->fib;
+	fibp = (struct aac_fib *)(acp + 1);
+	acp->fibp = fibp;
 	if (ddi_copyin((void *)arg, fibp,
 	    sizeof (struct aac_fib_header), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
-	size = fibp->Header.Size + sizeof (struct aac_fib_header);
-	if (size < fibp->Header.SenderSize)
-		size = fibp->Header.SenderSize;
-	if (size > softs->aac_max_fib_size) {
+
+	fib_size = fibp->Header.Size + sizeof (struct aac_fib_header);
+	if (fib_size < fibp->Header.SenderSize)
+		fib_size = fibp->Header.SenderSize;
+	if (fib_size > softs->aac_max_fib_size) {
 		rval = EFAULT;
 		goto finish;
 	}
 
 	/* Copy in FIB data */
-	if (ddi_copyin((void *)arg, fibp, size, mode) != 0) {
+	if (ddi_copyin(((struct aac_fib *)arg)->data, fibp->data,
+	    fibp->Header.Size, mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
+	acp->fib_size = fib_size;
+	fibp->Header.Size = fib_size;
 
 	AACDB_PRINT_FIB(softs, fibp);
 
@@ -209,38 +241,18 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 		ASSERT(!(fibp->Header.XferState & AAC_FIBSTATE_ASYNC));
 		fibp->Header.XferState |=
 		    (AAC_FIBSTATE_FROMHOST | AAC_FIBSTATE_REXPECTED);
-		fibp->Header.Size = size;
 
-		acp->flags = AAC_CMD_HARD_INTR;
-		acp->state = AAC_CMD_INCMPLT;
-
-		/* Send FIB */
-		rw_enter(&softs->errlock, RW_READER);
-		if (aac_do_async_io(softs, acp) != AACOK) {
-			AACDB_PRINT(softs, CE_CONT, "User SendFib failed");
-			rval = ENXIO;
-		}
-		rw_exit(&softs->errlock);
-		if (rval != 0)
+		if ((rval = aac_send_fib(softs, acp)) != 0)
 			goto finish;
-
-		/* Wait FIB to complete */
-		mutex_enter(&softs->event_mutex);
-		while (acp->state == AAC_CMD_INCMPLT)
-			cv_wait(&softs->event, &softs->event_mutex);
-		if (acp->state == AAC_CMD_ABORT)
-			rval = EBUSY;
-		mutex_exit(&softs->event_mutex);
 	}
 
-	if (rval == 0) {
-		if (ddi_copyout(fibp, (void *)arg,
-		    fibp->Header.Size, mode) != 0) {
-			rval = EFAULT;
-			goto finish;
-		}
+	if (ddi_copyout(fibp, (void *)arg, acp->fib_size, mode) != 0) {
+		AACDB_PRINT(softs, CE_CONT, "FIB copyout failed");
+		rval = EFAULT;
+		goto finish;
 	}
 
+	rval = 0;
 finish:
 	kmem_free(acp, hbalen);
 	return (rval);
@@ -372,69 +384,74 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	int hbalen;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
-	struct aac_srb *srbcmd;
-	struct aac_srb *user_srb = (struct aac_srb *)arg;
-	struct aac_srb_reply *srbreply;
-	void *user_reply;
-	uint32_t byte_count = 0, fibsize = 0;
-	uint_t i, dma_flags = DDI_DMA_CONSISTENT;
-	ddi_dma_cookie_t *cookiep = NULL;
-	int err, rval = 0;
+	struct aac_srb *srb;
+	uint32_t usr_fib_size;
+	uint_t dma_flags = DDI_DMA_CONSISTENT;
+	struct aac_sg_entry *sgp;
+	struct aac_sg_entry64 *sg64p;
+	uint32_t fib_size;
+	uint32_t srb_sg_bytecount;
+	uint64_t srb_sg_address;
+	int rval;
 
 	DBCALLED(softs, 2);
 
-	if (softs->state == AAC_STATE_DEAD)
-		return (ENXIO);
-
-	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
-	    softs->aac_max_fib_size;
+	hbalen = sizeof (struct aac_cmd) + softs->aac_max_fib_size;
 	if ((acp = kmem_zalloc(hbalen, KM_NOSLEEP)) == NULL)
 		return (ENOMEM);
 
-	fibp = &acp->fib;
-	srbcmd = (struct aac_srb *)fibp->data;
+	fibp = (struct aac_fib *)(acp + 1);
+	acp->fibp = fibp;
+	srb = (struct aac_srb *)fibp->data;
 
 	/* Read srb size */
-	if (ddi_copyin((void *)&user_srb->count, &fibsize,
+	if (ddi_copyin(&((struct aac_srb *)arg)->count, &usr_fib_size,
 	    sizeof (uint32_t), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
-	if (fibsize > (softs->aac_max_fib_size - \
+	if (usr_fib_size > (softs->aac_max_fib_size - \
 	    sizeof (struct aac_fib_header))) {
 		rval = EINVAL;
 		goto finish;
 	}
 
 	/* Copy in srb */
-	if (ddi_copyin((void *)user_srb, srbcmd, fibsize, mode) != 0) {
+	if (ddi_copyin((void *)arg, srb, usr_fib_size, mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
-	srbcmd->function = 0;		/* SRBF_ExecuteScsi */
-	srbcmd->retry_limit = 0;	/* obsolete */
+
+	srb->function = 0;	/* SRBF_ExecuteScsi */
+	srb->retry_limit = 0;	/* obsolete */
 
 	/* Only one sg element from userspace supported */
-	if (srbcmd->sg.SgCount > 1) {
+	if (srb->sg.SgCount > 1) {
 		rval = EINVAL;
+		AACDB_PRINT(softs, CE_NOTE, "srb->sg.SgCount %d >1",
+		    srb->sg.SgCount);
 		goto finish;
 	}
+
 	/* Check FIB size */
-	if (fibsize != (sizeof (struct aac_srb) + \
-	    (srbcmd->sg.SgCount - 1) * sizeof (struct aac_sg_entry))) {
+	sgp = srb->sg.SgEntry;
+	sg64p = (struct aac_sg_entry64 *)sgp;
+	if (usr_fib_size != (sizeof (struct aac_srb) + \
+	    (srb->sg.SgCount - 1) * sizeof (struct aac_sg_entry))) {
 		rval = EINVAL;
 		goto finish;
 	}
-	user_reply = (char *)arg + fibsize;
+	srb_sg_bytecount = sgp->SgByteCount;
+	srb_sg_address = (uint64_t)sgp->SgAddress;
 
 	/* Allocate and bind DMA memory space */
 	acp->buf_dma_handle = NULL;
 	acp->abh = NULL;
 	acp->left_cookien = 0;
 
-	err = ddi_dma_alloc_handle(softs->devinfo_p, &softs->buf_dma_attr,
+	rval = ddi_dma_alloc_handle(softs->devinfo_p, &softs->buf_dma_attr,
 	    DDI_DMA_DONTWAIT, NULL, &acp->buf_dma_handle);
-	if (err != DDI_SUCCESS) {
+	if (rval != DDI_SUCCESS) {
 		AACDB_PRINT(softs, CE_WARN,
 		    "Can't allocate DMA handle, errno=%d", rval);
 		rval = EFAULT;
@@ -442,94 +459,63 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	}
 
 	/* TODO: remove duplicate code with aac_tran_init_pkt() */
-	if (srbcmd->sg.SgCount == 1) {
+	if (srb->sg.SgCount == 1 && srb_sg_bytecount != 0) {
 		size_t bufsz;
 
-		err = ddi_dma_mem_alloc(acp->buf_dma_handle,
-		    AAC_ROUNDUP(srbcmd->sg.SgEntry[0].SgByteCount,
-		    AAC_DMA_ALIGN),
+		/* Allocate DMA buffer */
+		rval = ddi_dma_mem_alloc(acp->buf_dma_handle,
+		    AAC_ROUNDUP(srb_sg_bytecount, AAC_DMA_ALIGN),
 		    &aac_acc_attr, DDI_DMA_STREAMING, DDI_DMA_DONTWAIT,
 		    NULL, &acp->abp, &bufsz, &acp->abh);
-		if (err != DDI_SUCCESS) {
+		if (rval != DDI_SUCCESS) {
 			AACDB_PRINT(softs, CE_NOTE,
 			    "Cannot alloc DMA to non-aligned buf");
 			rval = ENOMEM;
 			goto finish;
 		}
 
-		if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		if ((srb->flags & (SRB_DataIn | SRB_DataOut)) ==
 		    (SRB_DataIn | SRB_DataOut))
 			dma_flags |= DDI_DMA_RDWR;
-		else if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		else if ((srb->flags & (SRB_DataIn | SRB_DataOut)) ==
 		    SRB_DataIn)
 			dma_flags |= DDI_DMA_READ;
-		else if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		else if ((srb->flags & (SRB_DataIn | SRB_DataOut)) ==
 		    SRB_DataOut)
 			dma_flags |= DDI_DMA_WRITE;
-		err = ddi_dma_addr_bind_handle(acp->buf_dma_handle, NULL,
+
+		rval = ddi_dma_addr_bind_handle(acp->buf_dma_handle, NULL,
 		    acp->abp, bufsz, dma_flags, DDI_DMA_DONTWAIT, 0,
 		    &acp->cookie, &acp->left_cookien);
-		if (err != DDI_DMA_MAPPED) {
+		if (rval != DDI_DMA_MAPPED) {
 			AACDB_PRINT(softs, CE_NOTE, "Cannot bind buf for DMA");
 			rval = EFAULT;
 			goto finish;
 		}
-		cookiep = &acp->cookie;
+		acp->flags |= AAC_CMD_DMA_VALID;
 
-		if (srbcmd->flags & SRB_DataOut) {
-			if (ddi_copyin(
+		/* Copy in user srb buf content */
+		if ((srb->flags & SRB_DataOut) &&
+		    (ddi_copyin(
 #ifdef _LP64
-			    (void *)(uint64_t)user_srb-> \
-			    sg.SgEntry[0].SgAddress,
+		    (void *)srb_sg_address,
 #else
-			    (void *)user_srb->sg.SgEntry[0].SgAddress,
+		    (void *)(uint32_t)srb_sg_address,
 #endif
-			    acp->abp, user_srb->sg.SgEntry[0].SgByteCount,
-			    mode) != 0) {
-				rval = EFAULT;
-				goto finish;
-			}
+		    acp->abp, srb_sg_bytecount, mode) != 0)) {
+			rval = EFAULT;
+			goto finish;
 		}
 	}
 
-	/* Fill in command, sg elements */
-	if (softs->flags & AAC_FLAGS_SG_64BIT) {
-		struct aac_sg_entry64 *sgp = (struct aac_sg_entry64 *)
-		    srbcmd->sg.SgEntry;
-
-		fibp->Header.Command = ScsiPortCommandU64;
-		for (i = 0; i < acp->left_cookien &&
-		    i < softs->aac_sg_tablesize; i++) {
-			sgp[i].SgAddress = cookiep->dmac_laddress;
-			sgp[i].SgByteCount = cookiep->dmac_size;
-			if ((i + 1) < acp->left_cookien)
-				ddi_dma_nextcookie(acp->buf_dma_handle,
-				    cookiep);
-			byte_count += sgp[i].SgByteCount;
-		}
-		fibsize = sizeof (struct aac_srb) - \
-		    sizeof (struct aac_sg_entry) + \
-		    i * sizeof (struct aac_sg_entry64);
-	} else {
-		struct aac_sg_entry *sgp = srbcmd->sg.SgEntry;
-
-		fibp->Header.Command = ScsiPortCommand;
-		for (i = 0; i < acp->left_cookien &&
-		    i < softs->aac_sg_tablesize; i++) {
-			sgp[i].SgAddress = cookiep->dmac_laddress;
-			sgp[i].SgByteCount = cookiep->dmac_size;
-			if ((i + 1) < acp->left_cookien)
-				ddi_dma_nextcookie(acp->buf_dma_handle,
-				    cookiep);
-			byte_count += sgp[i].SgByteCount;
-		}
-		fibsize = sizeof (struct aac_srb) + \
-		    (i - 1) * sizeof (struct aac_sg_entry);
+	if (acp->left_cookien > softs->aac_sg_tablesize) {
+		AACDB_PRINT(softs, CE_NOTE, "large cookiec received %d\n",
+		    acp->left_cookien);
+		rval = EFAULT;
+		goto finish;
 	}
-	srbcmd->count = byte_count;
-	srbcmd->sg.SgCount = i;
 
-	/* Fill fib header */
+	/* Init FIB header */
 	fibp->Header.XferState =
 	    AAC_FIBSTATE_HOSTOWNED |
 	    AAC_FIBSTATE_INITIALISED |
@@ -537,64 +523,76 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	    AAC_FIBSTATE_FROMHOST |
 	    AAC_FIBSTATE_REXPECTED |
 	    AAC_FIBSTATE_NORM;
-	fibp->Header.Size = sizeof (struct aac_fib_header) + fibsize;
 	fibp->Header.StructType = AAC_FIBTYPE_TFIB;
 	fibp->Header.SenderSize = softs->aac_max_fib_size;
 
-	/* TODO: remove duplicate code with aac_ioctl_send_fib() */
-	AACDB_PRINT_FIB(softs, fibp);
+	fib_size = sizeof (struct aac_fib_header) + \
+	    sizeof (struct aac_srb) - sizeof (struct aac_sg_entry);
 
-	/* Send command */
-	acp->flags = AAC_CMD_HARD_INTR;
-	acp->state = AAC_CMD_INCMPLT;
-
-	rw_enter(&softs->errlock, RW_READER);
-	if (aac_do_async_io(softs, acp) != AACOK) {
-		AACDB_PRINT(softs, CE_CONT, "User SendFib failed");
-		rval = ENXIO;
+	/* Calculate FIB data size */
+	if (softs->flags & AAC_FLAGS_SG_64BIT) {
+		fibp->Header.Command = ScsiPortCommandU64;
+		fib_size += acp->left_cookien * sizeof (struct aac_sg_entry64);
+	} else {
+		fibp->Header.Command = ScsiPortCommand;
+		fib_size += acp->left_cookien * sizeof (struct aac_sg_entry);
 	}
-	rw_exit(&softs->errlock);
-	if (rval != 0)
-		goto finish;
+	fibp->Header.Size = fib_size;
 
-	mutex_enter(&softs->event_mutex);
-	while (acp->state == AAC_CMD_INCMPLT)
-		cv_wait(&softs->event, &softs->event_mutex);
-	if (acp->state == AAC_CMD_ABORT)
-		rval = EBUSY;
-	mutex_exit(&softs->event_mutex);
 
-	if (rval != 0)
-		goto finish;
-
-	if ((srbcmd->sg.SgCount == 1) && (srbcmd->flags & SRB_DataIn)) {
-		if (ddi_copyout(acp->abp,
-#ifdef _LP64
-		    (void *)(uint64_t)user_srb->sg.SgEntry[0].SgAddress,
-#else
-		    (void *)user_srb->sg.SgEntry[0].SgAddress,
-#endif
-		    user_srb->sg.SgEntry[0].SgByteCount, mode) != 0) {
-			rval = EFAULT;
-			goto finish;
+	/* Fill in sg elements */
+	srb->sg.SgCount = acp->left_cookien;
+	acp->bcount = 0;
+	do {
+		if (softs->flags & AAC_FLAGS_SG_64BIT) {
+			sg64p->SgAddress = acp->cookie.dmac_laddress;
+			sg64p->SgByteCount = acp->cookie.dmac_size;
+			sg64p++;
+		} else {
+			sgp->SgAddress = acp->cookie.dmac_laddress;
+			sgp->SgByteCount = acp->cookie.dmac_size;
+			sgp++;
 		}
+
+		acp->bcount += acp->cookie.dmac_size;
+		acp->left_cookien--;
+		if (acp->left_cookien > 0)
+			ddi_dma_nextcookie(acp->buf_dma_handle,
+			    &acp->cookie);
+		else
+			break;
+	/*CONSTCOND*/
+	} while (1);
+
+	/* Send FIB command */
+	AACDB_PRINT_FIB(softs, fibp);
+	acp->fib_size = fib_size;
+	if ((rval = aac_send_fib(softs, acp)) != 0)
+		goto finish;
+
+	if ((srb->sg.SgCount == 1) && (srb->flags & SRB_DataIn) &&
+	    (ddi_copyout(acp->abp,
+#ifdef _LP64
+	    (void *)srb_sg_address,
+#else
+	    (void *)(uint32_t)srb_sg_address,
+#endif
+	    srb_sg_bytecount, mode) != 0)) {
+		rval = EFAULT;
+		goto finish;
 	}
 
 	/* Status struct */
-	srbreply = (struct aac_srb_reply *)fibp->data;
-	if (ddi_copyout(srbreply, user_reply,
+	if (ddi_copyout((struct aac_srb_reply *)fibp->data,
+	    ((uint8_t *)arg + usr_fib_size),
 	    sizeof (struct aac_srb_reply), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
 
+	rval = 0;
 finish:
-	if (cookiep)
-		(void) ddi_dma_unbind_handle(acp->buf_dma_handle);
-	if (acp->abh)
-		ddi_dma_mem_free(&acp->abh);
-	if (acp->buf_dma_handle)
-		ddi_dma_free_handle(&acp->buf_dma_handle);
+	aac_free_dmamap(acp);
 	kmem_free(acp, hbalen);
 	return (rval);
 }

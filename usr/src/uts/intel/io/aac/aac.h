@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		14
+#define	AAC_DRIVER_BUGFIX_LEVEL		15
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -202,6 +202,8 @@ struct aac_fib_context {
 	struct aac_fib_context *next, *prev;
 };
 
+typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *, int);
+
 #define	AAC_VENDOR_LEN		8
 #define	AAC_PRODUCT_LEN		16
 
@@ -218,6 +220,7 @@ struct aac_softstate {
 	int flags;		/* firmware features enabled */
 	int instance;
 	dev_info_t *devinfo_p;
+	int slen;
 
 	/* DMA attributes */
 	ddi_dma_attr_t buf_dma_attr;
@@ -247,6 +250,8 @@ struct aac_softstate {
 	uint32_t aac_max_fib_size;	/* max. FIB size */
 	uint32_t aac_sg_tablesize;	/* max. sg count from host */
 	uint32_t aac_max_sectors;	/* max. I/O size from host (blocks) */
+
+	aac_cmd_fib_t aac_cmd_fib;	/* IO cmd FIB construct function */
 
 	ddi_iblock_cookie_t iblock_cookie;
 	ddi_softintr_t softint_id;	/* soft intr */
@@ -305,25 +310,20 @@ struct aac_softstate {
 /* aac_cmd flags */
 #define	AAC_CMD_CONSISTENT		(1 << 0)
 #define	AAC_CMD_DMA_PARTIAL		(1 << 1)
-#define	AAC_CMD_DMA_VALID		(1 << 3)
-#define	AAC_CMD_BUF_READ		(1 << 4)
-#define	AAC_CMD_BUF_WRITE		(1 << 5)
-#define	AAC_CMD_SOFT_INTR		(1 << 6) /* poll IO */
-#define	AAC_CMD_NO_INTR			(1 << 7) /* no interrupt to sd */
-#define	AAC_CMD_HARD_INTR		(1 << 8) /* interrupt IO */
+#define	AAC_CMD_DMA_VALID		(1 << 2)
+#define	AAC_CMD_BUF_READ		(1 << 3)
+#define	AAC_CMD_BUF_WRITE		(1 << 4)
+#define	AAC_CMD_SYNC			(1 << 5) /* use sync FIB */
+#define	AAC_CMD_NO_INTR			(1 << 6) /* poll IO, no intr to sd */
+#define	AAC_CMD_CMPLT			(1 << 7)
+#define	AAC_CMD_ABORT			(1 << 8)
 #define	AAC_CMD_TIMEOUT			(1 << 9)
-
-/* aac_cmd states */
-#define	AAC_CMD_INCMPLT			0
-#define	AAC_CMD_CMPLT			1
-#define	AAC_CMD_ABORT			2
 
 struct aac_cmd {
 	struct aac_cmd *next;
 	struct scsi_pkt *pkt;
 	int cmdlen;
 	int flags;
-	int state;
 	time_t start_time;	/* time when the cmd is sent to the adapter */
 	time_t timeout;		/* max time in seconds for cmd to complete */
 	struct buf *bp;
@@ -339,13 +339,19 @@ struct aac_cmd {
 	uint_t cur_win;
 	uint_t total_nwin;
 	size_t total_xfer;
-	struct aac_slot *slotp;	/* slot used by this command */
+	uint64_t blkno;
+	uint32_t bcount;	/* buffer size in byte */
 
-	/*
-	 * NOTE: should be the last field, because New Comm. FIBs may
-	 * take more space than sizeof (struct aac_fib).
-	 */
-	struct aac_fib fib;	/* FIB for this IO command */
+	/* Call back function for completed command */
+	void (*ac_comp)(struct aac_softstate *, struct aac_cmd *);
+
+	struct aac_slot *slotp;	/* slot used by this command */
+	struct aac_container *dvp;	/* target device */
+
+	/* FIB for this IO command */
+	int fib_kmsz; /* size of kmem_alloc'ed FIB */
+	int fib_size; /* size of the FIB xferred to/from the card */
+	struct aac_fib *fibp;
 };
 
 #ifdef DEBUG

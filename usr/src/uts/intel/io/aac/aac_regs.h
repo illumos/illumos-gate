@@ -649,7 +649,7 @@ typedef enum {
 	CT_SET_CACHE_SYNC_MODE,		/* 211 */
 
 	CT_LAST_COMMAND			/* last command */
-} AAC_CtCommand;
+} AAC_CTCommand;
 
 /* General return status */
 #define	CT_OK				218
@@ -711,6 +711,46 @@ struct aac_pause_command {
 };
 
 /*
+ * Command status values
+ */
+typedef enum {
+	ST_OK = 0,
+	ST_PERM = 1,
+	ST_NOENT = 2,
+	ST_IO = 5,
+	ST_NXIO = 6,
+	ST_E2BIG = 7,
+	ST_ACCES = 13,
+	ST_EXIST = 17,
+	ST_XDEV = 18,
+	ST_NODEV = 19,
+	ST_NOTDIR = 20,
+	ST_ISDIR = 21,
+	ST_INVAL = 22,
+	ST_FBIG = 27,
+	ST_NOSPC = 28,
+	ST_ROFS = 30,
+	ST_MLINK = 31,
+	ST_WOULDBLOCK = 35,
+	ST_NAMETOOLONG = 63,
+	ST_NOTEMPTY = 66,
+	ST_DQUOT = 69,
+	ST_STALE = 70,
+	ST_REMOTE = 71,
+	ST_BADHANDLE = 10001,
+	ST_NOT_SYNC = 10002,
+	ST_BAD_COOKIE = 10003,
+	ST_NOTSUPP = 10004,
+	ST_TOOSMALL = 10005,
+	ST_SERVERFAULT = 10006,
+	ST_BADTYPE = 10007,
+	ST_JUKEBOX = 10008,
+	ST_NOTMOUNTED = 10009,
+	ST_MAINTMODE = 10010,
+	ST_STALEACL = 10011
+} AAC_FSAStatus;
+
+/*
  * Object-Server / Volume-Manager Dispatch Classes
  */
 typedef enum {
@@ -737,7 +777,7 @@ typedef enum {
 	VM_CtHostWrite64,
 	VM_NameServe64 = 22,
 	MAX_VMCOMMAND_NUM	/* used for sizing stats array - leave last */
-} AAC_VmCommand;
+} AAC_VMCommand;
 
 /*
  * Host-addressable object types
@@ -819,6 +859,11 @@ struct aac_blockread64 {
 	struct aac_sg_table64	SgMap64;
 };
 
+struct aac_blockread_response {
+	uint32_t		Status;
+	uint32_t		ByteCount;
+};
+
 struct aac_blockwrite {
 	uint32_t		Command;
 	uint32_t		ContainerId;
@@ -836,6 +881,12 @@ struct aac_blockwrite64 {
 	uint16_t		Pad;
 	uint16_t		Flags;
 	struct aac_sg_table64	SgMap64;
+};
+
+struct aac_blockwrite_response {
+	uint32_t		Status;
+	uint32_t		ByteCount;
+	uint32_t		Committed;
 };
 
 struct aac_raw_io {
@@ -1294,7 +1345,7 @@ typedef enum {
 
 	/* last command */
 	CL_LAST_COMMAND		/* used for bounds checking */
-} AAC_ClCommand;
+} AAC_CLCommand;
 
 /*
  * Disk IOCTL Functions
