@@ -329,12 +329,12 @@ lwp_load(klwp_t *lwp, gregset_t grp, uintptr_t thrptr)
 		 * that means an extra system call and could hurt performance.
 		 */
 		if (grp[REG_FS] == 0x1bb) /* hard code legacy LWPFS_SEL */
-		    (void) lwp_setprivate(lwp, _LWP_FSBASE,
-		    (uintptr_t)grp[REG_FSBASE]);
+			(void) lwp_setprivate(lwp, _LWP_FSBASE,
+			    (uintptr_t)grp[REG_FSBASE]);
 
 		if (grp[REG_GS] == 0x1c3) /* hard code legacy LWPGS_SEL */
-		    (void) lwp_setprivate(lwp, _LWP_GSBASE,
-		    (uintptr_t)grp[REG_GSBASE]);
+			(void) lwp_setprivate(lwp, _LWP_GSBASE,
+			    (uintptr_t)grp[REG_GSBASE]);
 	}
 #else
 	if (grp[GS] == LWPGS_SEL)
@@ -646,10 +646,12 @@ lwp_attach_brand_hdlrs(klwp_t *lwp)
 
 	ASSERT(PROC_IS_BRANDED(lwptoproc(lwp)));
 	ASSERT(removectx(t, NULL, brand_interpositioning_disable,
-	    brand_interpositioning_enable, NULL, NULL, NULL, NULL) == 0);
+	    brand_interpositioning_enable, NULL, NULL,
+	    brand_interpositioning_disable, NULL) == 0);
 
 	installctx(t, NULL, brand_interpositioning_disable,
-	    brand_interpositioning_enable, NULL, NULL, NULL, NULL);
+	    brand_interpositioning_enable, NULL, NULL,
+	    brand_interpositioning_disable, NULL);
 
 	if (t == curthread) {
 		kpreempt_disable();
