@@ -66,6 +66,308 @@ cleanup()
 	rm -f "$TMR" "$TMR.gz"
 }
 
+archive_Gnome()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
+		mkdir -p "$CPIO_DIR"
+	else
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+	fi
+	
+
+	# Create the gnome archive
+	#
+	(
+		# Prepopulate the gconf database. This needs to be done and
+		# done first for several reasons. 1) Archiving out the gnome
+		# libraries and binaries causes the gconftool-2 to not run
+		# appropriately at boot time. 2) The binaries and libraries
+		# needed to run this are big and thus we want to archive
+		# them separately. 3) Having schemas prepopluated in the
+		# miniroot means faster boot times.
+		#
+
+		cd "$MINIROOT"
+		HOME="./tmp/root"
+		export HOME
+		umask 0022
+		GCONF_CONFIG_SOURCE="xml:merged:"$MINIROOT"/.tmp_proto/root/etc/gconf/gconf.xml.defaults"
+		export GCONF_CONFIG_SOURCE
+		SCHEMADIR="$MINIROOT/.tmp_proto/root/etc/gconf/schemas"
+		export SCHEMADIR
+		/usr/bin/gconftool-2 --makefile-install-rule $SCHEMADIR/*.schemas >/dev/null 2>&1
+		# usr/share gnome stuff
+		cd "$MINIROOT"
+		find usr/share/GConf usr/share/application-registry \
+		    usr/share/autostart usr/share/dbus-1 usr/share/dtds \
+		    usr/share/emacs usr/share/gnome usr/share/gnome-2.0 \
+		    usr/share/gnome-background-properties \
+		    usr/share/gtk-engines usr/share/gui-install \
+		    usr/share/icon-naming-utils usr/share/control-center \
+		    usr/share/icons usr/share/locale usr/share/metacity \
+		    usr/share/mime usr/share/mime-info usr/share/pixmaps \
+		    usr/share/scrollkeeper usr/share/sgml usr/share/themes \
+		    usr/share/xml \
+		    -print > /tmp/gnome_share.$$ 2>/dev/null
+
+		if [ ! -f /tmp/gnome_share.$$ ] ; then
+			echo "/tmp/gnome_share.$$ file list not found."
+			return 
+		fi
+
+		# usr/lib gnome stuff
+
+		find usr/lib/libgnome*\.so\.* \
+		    usr/lib/libgst*\.so\.* usr/lib/libgconf*\.so\.* \
+		    usr/lib/libgdk*\.so\.* usr/lib/libgtk*\.so\.* \
+		    usr/lib/libglade*\.so\.* usr/lib/libmetacity*\.so\.* \
+		    usr/lib/libfontconfig*\.so\.* usr/lib/libgmodule*\.so\.* \
+		    usr/lib/libgobject*\.so\.* usr/lib/libgthread*\.so\.* \
+		    usr/lib/libpopt*\.so\.* usr/lib/libstartup*\.so\.* \
+		    usr/lib/libexif*\.so\.* usr/lib/libtiff*\.so\.* \
+		    usr/lib/libdbus*\.so\.* usr/lib/libstartup*\.so\.* \
+		    usr/lib/libexif*\.so\.* usr/lib/libORBit*\.so\.* \
+	 	    usr/lib/libmlib*\.so\.* usr/lib/libxsl*\.so\.* \
+		    usr/lib/libpango*\.so\.* usr/lib/libpng*\.so\.* \
+		    usr/lib/liboil*\.so\.* usr/lib/libbonobo*\.so\.* \
+		    usr/lib/libart*\.so\.* usr/lib/libcairo*\.so\.* \
+		    usr/lib/libjpeg*\.so\.* \
+		    usr/lib/libpolkit*\.so\.* \
+			-print | egrep -v '\.so\.[0]$' > \
+		       /tmp/gnome_lib.$$ 2>/dev/null
+
+		find usr/lib/nautilus usr/lib/pango usr/lib/iconv \
+		    usr/lib/metacity-dialog usr/lib/window-manager-settings \
+		    usr/lib/bonobo-2.0 usr/lib/bononbo usr/lib/gtk-2.0 \
+		    usr/lib/GConf usr/lib/bonobo-activation-server \
+		    usr/lib/python2.4 usr/lib/gstreamer-0.10 \
+		    usr/lib/gconf-sanity-check-2 usr/lib/gconfd \
+		    usr/lib/gnome-vfs-2.0 usr/lib/dbus-daemon \
+		    usr/lib/gnome-vfs-daemon usr/lib/gnome-settings-daemon \
+		    usr/lib/gnome_segv2 usr/lib/orbit-2.0 \
+		    usr/lib/libmlib \
+		    print > /tmp/gnome_libdir.$$ 2>/dev/null
+
+		if [ ! -f /tmp/gnome_lib.$$  -a ! -f gnome_libdir.$$ ] ; then
+			echo "/tmp/gnome_lib.$$ file list not found."
+			return
+		fi
+
+		# /usr/sfw gnome stuff
+		find usr/sfw/bin usr/sfw/include usr/sfw/share usr/sfw/src \
+		    -print > /tmp/gnome_sfw.$$ 2>/dev/null
+
+		if [ ! -f /tmp/gnome_sfw.$$ ] ; then
+			echo "/tmp/gnome_sfw.$$ file list not found."
+			return
+		fi
+
+		# gnome app binaries usr/bin
+		find usr/bin/gnome* usr/bin/gui-install usr/bin/bonobo* \
+		    usr/bin/gtk-* usr/bin/fax* usr/bin/gdk* usr/bin/gif2tiff \
+		    usr/bin/install-lan \
+		    usr/bin/metacity* usr/bin/gst-* usr/bin/gconftool-2 \
+		    usr/bin/pango* usr/bin/desktop* usr/bin/djpeg \
+		    usr/bin/notify-send usr/bin/oil-bugreport \
+		    usr/bin/bmp2tiff usr/bin/thembus-theme-applier \
+		    usr/bin/thumbnail usr/lib/update-* \
+		    usr/bin/ras2tiff usr/bin/raw2tiff usr/bin/rdjpgcom \
+		    usr/bin/thumbnail usr/bin/dbus* \
+		    usr/bin/tiff* usr/bin/rgb2ycbcr \
+		    usr/bin/fc-cache usr/bin/fc-list \
+			-print > /tmp/gnome_bin.$$ 2>/dev/null
+
+		if [ ! -f /tmp/gnome_bin.$$ ] ; then
+			echo "/tmp/gnome_bin.$$ file list not found."
+			return 
+		fi
+
+		# Cat all the files together and create the gnome archive
+		#
+
+		cat /tmp/gnome_libdir.$$ /tmp/gnome_lib.$$ \
+		     /tmp/gnome_share.$$ /tmp/gnome_sfw.$$ /tmp/gnome_bin.$$ \
+		    > /tmp/gnome.$$
+
+		if [ ! -f /tmp/gnome.$$ ] ; then
+			echo "/tmp/gnome.$$ file not found."
+			return
+		fi
+		# Save off this file in the miniroot for use later
+		# when unpacking. Clean up old cruft if there.
+		#
+
+		if [ -f .tmp_proto/gnome_saved ]; then
+			rm -f .tmp_proto/gnome_saved
+		fi
+
+		cp /tmp/gnome.$$ .tmp_proto/gnome_saved
+
+		# Create gnome archive
+		#
+
+		cpio -ocmPuB < /tmp/gnome.$$ 2>/dev/null | bzip2 > \
+		    "$CPIO_DIR/gnome.cpio.bz2"
+
+		# Remove files from miniroot that are in archive. 
+		# Create symlinks for files in archive
+		
+		rm -rf `cat /tmp/gnome_share.$$`
+
+		for i in `cat /tmp/gnome_share.$$`
+		do 
+			ln -s /tmp/root/$i $i 2>/dev/null
+		done
+
+		rm -rf `cat /tmp/gnome_lib.$$`
+		for i in `cat /tmp/gnome_lib.$$`
+		do	
+			ln -s /tmp/root/$i $i 2>/dev/null
+		done
+
+		rm -rf `cat /tmp/gnome_libdir.$$`
+		for i in `cat /tmp/gnome_libdir.$$`
+		do 
+			ln -s /tmp/root/$i $i 2>/dev/null
+		done
+
+		rm -rf `cat /tmp/gnome_sfw.$$`
+		for i in `cat /tmp/gnome_sfw.$$`
+		do 
+			ln -s /tmp/root/$i $i 2>/dev/null
+		done
+
+		rm -rf `cat /tmp/gnome_bin.$$`
+		for i in `cat /tmp/gnome_bin.$$`
+		do 
+			ln -s /tmp/root/$i $i 2>/dev/null
+		done
+		rm -f /tmp/gnome_share.$$
+		rm -f /tmp/gnome_lib.$$
+		rm -f /tmp/gnome_libdir.$$
+		rm -f /tmp/gnome_bin.$$
+	)
+}
+
+archive_JavaGUI()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
+		mkdir -p "$CPIO_DIR"
+	else
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+	fi
+	
+	# Archive the java wizard components that are only used in the
+	# non developer express path.
+	#
+	(
+		# path is usr/lib/install/data
+		cd "$MINIROOT"
+		find usr/lib/install/data/wizards \
+		    -print > /tmp/java_ui.$$ 2>/dev/null
+
+		if [ ! -f /tmp/java_ui.$$ ] ; then
+			echo "/tmp/java_ui.$$ file list not found."
+			return 
+		fi
+
+		cpio -ocmPuB < /tmp/java_ui.$$ 2>/dev/null | bzip2 > \
+		    "$CPIO_DIR/javaui.cpio.bz2"
+
+		rm -rf `cat /tmp/java_ui.$$`
+		ln -s /tmp/root/usr/lib/install/data/wizards usr/lib/install/data/wizards 2>/dev/null
+
+		rm -f /tmp/java_ui.$$
+	
+	)
+}
+
+archive_Misc()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
+		mkdir -p "$CPIO_DIR"
+	else
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+	fi
+
+	# Archive misc stuff that is needed by non devex installer
+	#
+	(
+		# usr/lib stuff
+		cd "$MINIROOT"
+		find usr/lib/lp -print > /tmp/lp.$$ 2>/dev/null
+		if [ ! -f /tmp/lp.$$ ] ; then
+			echo "/tmp/lp.$$ file list not found."
+			return 
+		fi
+
+		cpio -ocmPuB < /tmp/lp.$$ 2>/dev/null | bzip2 > \
+		    "$CPIO_DIR/lpmisc.cpio.bz2"
+
+		rm -rf `cat /tmp/lp.$$`
+		ln -s /tmp/root/usr/lib/lp usr/lib/lp 2>/dev/null
+		
+		rm -f /tmp/lp.$$
+	)
+
+}
+
+archive_Perl()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
+		mkdir -p "$CPIO_DIR"
+	else
+		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+	fi
+
+	# Archive perl, it is only needed by gnome gui.
+	#
+	(
+		# in usr
+		cd "$MINIROOT"
+		find usr/perl5 -print > /tmp/perl.$$ 2>/dev/null
+
+		if [ ! -f /tmp/perl.$$ ] ; then
+			echo "/tmp/perl.$$ file list not found."
+			return 
+		fi
+		cpio -ocmPuB < /tmp/perl.$$ 2>/dev/null | bzip2 > \
+		    "$CPIO_DIR/perl.cpio.bz2"
+
+		rm -rf `cat /tmp/perl.$$` 2>/dev/null
+		ln -s /tmp/root/perl5 usr/perl5 2>/dev/null
+
+		rm -f /tmp/perl.$$
+	)
+}
 archive_X()
 {
 	MEDIA="$1"
@@ -84,21 +386,21 @@ archive_X()
 	# create the graphics and non-graphics X archive
 	#
 	(
-		cd "$MINIROOT/usr"
-		find openwin dt X11 -print 2> /dev/null |\
+		cd "$MINIROOT"
+		find usr/openwin usr/dt usr/X11 -print 2> /dev/null |\
 		    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR/X.cpio.bz2"
 
-		find openwin/bin/mkfontdir \
-		     openwin/lib/installalias \
-		     openwin/server/lib/libfont.so.1 \
-		     openwin/server/lib/libtypesclr.so.0 \
+		find usr/openwin/bin/mkfontdir \
+		     usr/openwin/lib/installalias \
+		     usr/openwin/server/lib/libfont.so.1 \
+		     usr/openwin/server/lib/libtypesclr.so.0 \
 			 -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
 			 "$CPIO_DIR/X_small.cpio.bz2"
 
-		rm -rf dt openwin X11
-		ln -s ../tmp/root/usr/dt
-		ln -s ../tmp/root/usr/openwin
-		ln -s ../tmp/root/usr/X11
+		rm -rf usr/dt usr/openwin usr/X11
+		ln -s /tmp/root/usr/dt usr/dt
+		ln -s /tmp/root/usr/openwin usr/openwin
+		ln -s /tmp/root/usr/X11 usr/X11
 	)
 }
 
@@ -132,6 +434,15 @@ packmedia()
 	fi
 
 	archive_X "$MEDIA" "$MINIROOT"
+
+	# Take out the gnome and java parts of the installer from
+	# the miniroot. These are not required to boot the system
+	# and start the installers.
+	
+	archive_Gnome "$MEDIA" "$MINIROOT"
+	archive_JavaGUI "$MEDIA" "$MINIROOT"
+	archive_Perl "$MEDIA" "$MINIROOT"
+	archive_Misc "$MEDIA" "$MINIROOT"
 
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
 	cp "$MINIROOT/platform/i86pc/kernel/unix" \
@@ -170,8 +481,8 @@ unarchive_X()
 	# unpack X
 	#
 	(
-		cd "$UNPACKED_ROOT/usr"
-		rm -rf dt openwin X11
+		cd "$UNPACKED_ROOT"
+		rm -rf usr/dt usr/openwin usr/X11
 		bzcat "$CPIO_DIR/X.cpio.bz2" | cpio -icdmu 2> /dev/null
 	)
 }
@@ -192,6 +503,29 @@ unpackmedia()
 		cd "$UNPACKED_ROOT"
 		bzcat "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2" |
 		    cpio -icdmu 2> /dev/null
+
+		# unpack gnome, perl, java and misc
+		# Remove symlinks left from unpacking x86.miniroot so that
+		# unpacking subsequent archives will populate appropriately.
+		#
+		rm -rf usr/perl5
+		rm -rf usr/lib/install/data/wizards
+		rm -rf usr/lib/lp
+
+		# Gnome list saved off from packmedia
+		for i in `cat .tmp_proto/gnome_saved`
+		do 
+			rm -rf $i
+		done
+		
+		bzcat "$MEDIA/$RELEASE/Tools/Boot/gnome.cpio.bz2" |
+		    cpio -icdmu 2>/dev/null
+		bzcat "$MEDIA/$RELEASE/Tools/Boot/javaui.cpio.bz2" |
+		    cpio -icdmu 2>/dev/null
+		bzcat "$MEDIA/$RELEASE/Tools/Boot/lpmisc.cpio.bz2" |
+		    cpio -icdmu 2>/dev/null
+		bzcat "$MEDIA/$RELEASE/Tools/Boot/perl.cpio.bz2" |
+		    cpio -icdmu 2>/dev/null
 	)
 }
 
