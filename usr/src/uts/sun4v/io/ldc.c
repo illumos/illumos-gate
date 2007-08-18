@@ -3689,8 +3689,9 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 			break;
 		}
 
-		/* advance head if it is a DATA ACK */
-		if ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK)) {
+		/* advance head if it is a CTRL packet or a DATA ACK packet */
+		if ((msg->type & LDC_CTRL) ||
+		    ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK))) {
 
 			/* set the queue head */
 			if (rv = i_ldc_set_rx_head(ldcp, curr_head)) {
