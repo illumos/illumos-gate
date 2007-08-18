@@ -417,6 +417,7 @@ PORTGEN=			\
 	drand48.o		\
 	dup2.o			\
 	env_data.o		\
+	err.o			\
 	errno.o			\
 	euclen.o		\
 	event_port.o		\

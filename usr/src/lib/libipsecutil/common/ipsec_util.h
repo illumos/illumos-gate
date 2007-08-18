@@ -45,6 +45,7 @@ extern "C" {
 #include <setjmp.h>
 #include <stdio.h>
 #include <err.h>
+#include <errfp.h>
 #include <net/pfpolicy.h>
 
 #ifndef A_CNT

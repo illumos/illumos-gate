@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@
 
 static int ipv4 = -1;
 static char *cmd;
-int warn = 0;
+int warning = 0;
 
 static void verify_and_output(const char *key, char *value, int lineno);
 
@@ -91,7 +91,7 @@ main(argc, argv)
 	while ((c = getopt(argc, argv, "v:wn")) != -1) {
 		switch (c) {
 		case 'w':	/* Send warning messages to stderr */
-			warn = 1;
+			warning = 1;
 			break;
 		case 'n':
 			ipv4 = 0;
@@ -143,7 +143,7 @@ main(argc, argv)
 			 * Catch long lines but not if this is a short
 			 * line with no '\n' at the end of the input.
 			 */
-			if (warn)
+			if (warning)
 				fprintf(stderr,
 				    "%s: Warning: more than %d "
 				    "bytes on line %d, ignored\n",
@@ -166,7 +166,7 @@ main(argc, argv)
 		}
 
 		if ((trailer = strpbrk(line, " \t")) == NULL) {
-			if (warn)
+			if (warning)
 				fprintf(stderr,
 				    "%s: Warning: no host names on line %d, "
 				    "ignored\n", cmd, lineno);
@@ -201,7 +201,7 @@ main(argc, argv)
 				    nadr, sizeof (nadr));
 			}
 			if (nadrp == NULL) { /* Invalid IPv6 too */
-				if (warn)
+				if (warning)
 					fprintf(stderr,
 					    "%s: Warning: malformed"
 					    " address on"
@@ -245,7 +245,7 @@ verify_and_output(const char *key, char *value, int lineno)
 	if (key) {		/* Just in case key is NULL */
 		n = strlen(key);
 		if (n > OUTPUTSIZ) {
-			if (warn)
+			if (warning)
 				fprintf(stderr,
 				    "%s: address too long on "
 				    "line %d, line discarded\n",
@@ -274,7 +274,7 @@ verify_and_output(const char *key, char *value, int lineno)
 
 			names++;
 			if (names > (MAXALIASES+1)) { /* cname + MAXALIASES */
-				if (warn)
+				if (warning)
 					fprintf(stderr,
 					    "%s: Warning: too many "
 					    "host names on line %d, "
@@ -291,7 +291,7 @@ verify_and_output(const char *key, char *value, int lineno)
 			n += namelen + 1; /* single white space + name */
 			*p = '\0';	   /* Terminate the name string */
 			if (n > OUTPUTSIZ) {
-				if (warn)
+				if (warning)
 					fprintf(stderr,
 					    "%s: Warning: %d byte ndbm limit "
 					    "reached on line %d, truncating\n",
@@ -317,7 +317,7 @@ verify_and_output(const char *key, char *value, int lineno)
 		fputs(tmpbuf, stdout);
 		fputc('\n', stdout);
 	} else {
-		if (warn)
+		if (warning)
 			fprintf(stderr,
 			    "%s: Warning: no host names on line %d, "
 			    "ignored\n", cmd, lineno);

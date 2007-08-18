@@ -27,7 +27,7 @@
 
 include ../Makefile.lib
 
-HDRS =		ipsec_util.h ikedoor.h err.h
+HDRS =		ipsec_util.h ikedoor.h errfp.h
 HDRDIR =	common
 SUBDIRS	=	$(MACH)
 

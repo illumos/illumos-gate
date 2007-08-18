@@ -23,28 +23,30 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_UTILS_H
-#define	_UTILS_H
+#ifndef	_ERR_H
+#define	_ERR_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <libintl.h>
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	E_SUCCESS	0		/* Exit status for success */
-#define	E_ERROR		1		/* Exit status for error */
-#define	E_USAGE		2		/* Exit status for usage error */
+#include <stdio.h>
+#include <stdarg.h>
 
-extern void warn(const char *, ...);
-extern void die(char *, ...);
-extern char *setprogname(char *);
-extern int valid_abspath(char *);
+/* Program exit and warning calls */
+void err(int, const char *, ...);
+void verr(int, const char *, va_list);
+void errx(int, const char *, ...);
+void verrx(int, const char *, va_list);
+void warn(const char *, ...);
+void vwarn(const char *, va_list);
+void warnx(const char *, ...);
+void vwarnx(const char *, va_list);
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _UTILS_H */
+#endif	/* _ERR_H */

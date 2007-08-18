@@ -60,6 +60,8 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	door_setparam;
 	door_ucred;
 	door_unbind;
+	err;
+	errx;
 	fdatasync;
 	forkallx;
 	forkx;
@@ -124,6 +126,12 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	uucopy;
 	uucopystr;
 	vforkx;
+	verr;
+	verrx;
+	vwarn;
+	vwarnx;
+	warn;
+	warnx;
 } SUNW_1.22.2;
 
 SUNW_1.22.2 {
@@ -1492,6 +1500,10 @@ SUNWprivate_1.1 {
 	_endutxent;
 	__environ_lock = NODIRECT;
 	_erand48;
+	_err;
+	_errfp;
+	_errx;
+	_errxfp;
 	__eucpctowc_gen;
 	exportfs;
 	_exportfs;
@@ -2190,12 +2202,24 @@ SUNWprivate_1.1 {
 	_utmpxname;
 	utssys;
 	_utssys;
+	_verr;
+	_verrfp;
+	_verrx;
+	_verrxfp;
 	_vfork;
 	_vforkx;
 	_vhangup;
 	_vsyslog;
+	_vwarn;
+	_vwarnfp;
+	_vwarnx;
+	_vwarnxfp;
 	_wait3;
 	_walkcontext;
+	_warn;
+	_warnfp;
+	_warnx;
+	_warnxfp;
 	__wcrtomb_dense;
 	__wcrtomb_euc;
 	__wcrtomb_sb;

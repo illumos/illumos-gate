@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_ERR_H
-#define	_ERR_H
+#ifndef	_ERRFP_H
+#define	_ERRFP_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -37,28 +37,45 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
 #include <stdarg.h>
 
 /*
  * Function Prototypes
  */
 
-/* Program exit and warning calls.   Thank you NetBSD. */
-void err(int, const char *, ...);
-void verr(int, const char *, va_list);
-void errx(int, const char *, ...);
-void verrx(int, const char *, va_list);
-void warn(const char *, ...);
-void warnfp(FILE *, const char *, ...);
-void vwarn(const char *, va_list);
-void vwarnfp(FILE *, const char *, va_list);
-void warnx(const char *, ...);
-void warnxfp(FILE *, const char *, ...);
-void vwarnx(const char *, va_list);
-void vwarnxfp(FILE *, const char *, va_list);
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname	errfp		_errfp
+#pragma	redefine_extname	verrfp		_verrfp
+#pragma	redefine_extname	errxfp		_errxfp
+#pragma	redefine_extname	verrxfp		_verrxfp
+#pragma	redefine_extname	warnfp		_warnfp
+#pragma	redefine_extname	vwarnfp		_vwarnfp
+#pragma	redefine_extname	warnxfp		_warnxfp
+#pragma	redefine_extname	vwarnxfp	_vwarnxfp
+#else
+#define	errfp		_errfp
+#define	verrfp		_verrfp
+#define	errxfp		_errxfp
+#define	verrxfp		_verrxfp
+#define	warnfp		_warnfp
+#define	vwarnfp		_vwarnfp
+#define	warnxfp		_warnxfp
+#define	vwarnxfp	_vwarnxfp
+#endif
+
+/* Program exit and warning calls */
+extern void errfp(FILE *, int, const char *, ...);
+extern void verrfp(FILE *, int, const char *, va_list);
+extern void errxfp(FILE *, int, const char *, ...);
+extern void verrxfp(FILE *, int, const char *, va_list);
+extern void warnfp(FILE *, const char *, ...);
+extern void vwarnfp(FILE *, const char *, va_list);
+extern void warnxfp(FILE *, const char *, ...);
+extern void vwarnxfp(FILE *, const char *, va_list);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _ERR_H */
+#endif	/* _ERRFP_H */

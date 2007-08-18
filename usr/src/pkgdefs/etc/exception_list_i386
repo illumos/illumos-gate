@@ -119,7 +119,7 @@ usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties	i386
 #
 usr/include/ikedoor.h			i386
 usr/include/ipsec_util.h		i386
-usr/include/err.h			i386
+usr/include/errfp.h			i386
 usr/include/ike				i386
 usr/include/ike/certlib.h		i386
 usr/include/ike/pkcs11-glue.h		i386

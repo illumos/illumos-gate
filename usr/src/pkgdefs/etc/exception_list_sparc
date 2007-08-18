@@ -99,7 +99,7 @@ lib/llib-ldladm			sparc
 #
 usr/include/ikedoor.h			sparc
 usr/include/ipsec_util.h		sparc
-usr/include/err.h			sparc
+usr/include/errfp.h			sparc
 usr/include/ike				sparc
 usr/include/ike/certlib.h		sparc
 usr/include/ike/pkcs11-glue.h		sparc

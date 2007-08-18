@@ -25,15 +25,23 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#pragma weak err = _err
+#pragma weak errx = _errx
+#pragma weak verr = _verr
+#pragma weak verrx = _verrx
+#pragma weak warn = _warn
+#pragma weak warnx = _warnx
+#pragma weak vwarn = _vwarn
+#pragma weak vwarnx = _vwarnx
+
+#include "synonyms.h"
+#include <sys/types.h>
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <libgen.h>
-#include <libintl.h>
 #include <errno.h>
-
-#include "ipsec_util.h"
 
 /* Function exit/warning functions and global variables. */
 
@@ -46,6 +54,7 @@ static const char *progname;
 static void
 warncore(FILE *fp, const char *fmt, va_list args)
 {
+	flockfile(fp);
 	if (progname == NULL) {
 		progname = strrchr(getexecname(), '/');
 		if (progname == NULL)
@@ -54,11 +63,9 @@ warncore(FILE *fp, const char *fmt, va_list args)
 			progname++;
 	}
 
-	(void) fputs(progname, fp);
+	(void) fprintf(fp, "%s: ", progname);
 
 	if (fmt != NULL) {
-		(void) fputc(':', fp);
-		(void) fputc(' ', fp);
 		(void) vfprintf(fp, fmt, args);
 	}
 }
@@ -69,37 +76,40 @@ warnfinish(FILE *fp)
 {
 	(void) fputc('\n', fp);
 	(void) fflush(fp);
+	funlockfile(fp);
 }
 
 void
-vwarnxfp(FILE *fp, const char *fmt, va_list args)
+_vwarnxfp(FILE *fp, const char *fmt, va_list args)
 {
 	warncore(fp, fmt, args);
-	warnfinish(fp);
-}
-
-void
-vwarnfp(FILE *fp, const char *fmt, va_list args)
-{
-	int tmperr = errno;	/* Capture errno now. */
-
-	warncore(fp, fmt, args);
-	(void) fputc(':', fp);
-	(void) fputc(' ', fp);
-	(void) fputs(strerror(tmperr), fp);
 	warnfinish(fp);
 }
 
 void
 vwarnx(const char *fmt, va_list args)
 {
-	vwarnxfp(stderr, fmt, args);
+	_vwarnxfp(stderr, fmt, args);
+}
+
+void
+_vwarnfp(FILE *fp, const char *fmt, va_list args)
+{
+	int tmperr = errno;	/* Capture errno now. */
+
+	warncore(fp, fmt, args);
+	if (fmt != NULL) {
+		(void) fputc(':', fp);
+		(void) fputc(' ', fp);
+	}
+	(void) fputs(strerror(tmperr), fp);
+	warnfinish(fp);
 }
 
 void
 vwarn(const char *fmt, va_list args)
 {
-	vwarnfp(stderr, fmt, args);
+	_vwarnfp(stderr, fmt, args);
 }
 
 /* PRINTFLIKE1 */
@@ -113,6 +123,26 @@ warnx(const char *fmt, ...)
 	va_end(args);
 }
 
+void
+_warnfp(FILE *fp, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	_vwarnfp(fp, fmt, args);
+	va_end(args);
+}
+
+void
+_warnxfp(FILE *fp, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	_vwarnxfp(fp, fmt, args);
+	va_end(args);
+}
+
 /* PRINTFLIKE1 */
 void
 warn(const char *fmt, ...)
@@ -121,26 +151,6 @@ warn(const char *fmt, ...)
 
 	va_start(args, fmt);
 	vwarn(fmt, args);
-	va_end(args);
-}
-
-void
-warnxfp(FILE *fp, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarnxfp(fp, fmt, args);
-	va_end(args);
-}
-
-void
-warnfp(FILE *fp, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vwarnfp(fp, fmt, args);
 	va_end(args);
 }
 
@@ -157,9 +167,27 @@ err(int status, const char *fmt, ...)
 }
 
 void
+_errfp(FILE *fp, int status, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	_vwarnfp(fp, fmt, args);
+	va_end(args);
+	exit(status);
+}
+
+void
 verr(int status, const char *fmt, va_list args)
 {
 	vwarn(fmt, args);
+	exit(status);
+}
+
+void
+_verrfp(FILE *fp, int status, const char *fmt, va_list args)
+{
+	_vwarnfp(fp, fmt, args);
 	exit(status);
 }
 
@@ -176,8 +204,26 @@ errx(int status, const char *fmt, ...)
 }
 
 void
+_errxfp(FILE *fp, int status, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	_vwarnxfp(fp, fmt, args);
+	va_end(args);
+	exit(status);
+}
+
+void
 verrx(int status, const char *fmt, va_list args)
 {
 	vwarnx(fmt, args);
+	exit(status);
+}
+
+void
+_verrxfp(FILE *fp, int status, const char *fmt, va_list args)
+{
+	_vwarnxfp(fp, fmt, args);
 	exit(status);
 }

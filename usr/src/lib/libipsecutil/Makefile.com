@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,14 +27,13 @@
 
 LIBRARY =	libipsecutil.a
 VERS =		.1
-OBJECTS =	ipsec_util.o algs.o err.o
+OBJECTS =	ipsec_util.o algs.o
 
 include ../../Makefile.lib
 
 LIBS +=		$(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
-SRCS = 		$(SRCDIR)/ipsec_util.c $(SRCDIR)/algs.c $(SRCDIR)/err.c
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lnsl -lc
@@ -47,9 +46,5 @@ CPPFLAGS +=	-I$(SRCDIR)
 all: $(LIBS)
 
 lint: lintcheck
-
-objs/%.o pics/%.o: $(SRCDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

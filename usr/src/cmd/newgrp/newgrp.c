@@ -73,7 +73,7 @@ char *path = PATH;
 char *supath = SUPATH;
 
 void error(char *s) __NORETURN;
-void warn(char *s);
+static void warn(char *s);
 void usage(void);
 
 int
@@ -190,7 +190,7 @@ main(int argc, char *argv[])
 	return (1);
 }
 
-void
+static void
 warn(char *s)
 {
 	(void) fprintf(stderr, "%s\n", gettext(s));
@@ -273,6 +273,6 @@ void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"usage: newgrp [-l | -] [group]\n"));
+	    "usage: newgrp [-l | -] [group]\n"));
 	exit(2);
 }

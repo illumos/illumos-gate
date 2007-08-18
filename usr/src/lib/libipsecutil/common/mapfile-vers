@@ -44,8 +44,8 @@ SUNWprivate_1.1 {
 	dump_sadb_idtype;
 	dump_sockaddr;
 	env;
-	err;
-	errx;
+	_errfp = FUNCTION FILTER libc.so.1;
+	_errxfp = FUNCTION FILTER libc.so.1;
 	getipsecalgs;
 	getipsecprotos;
 	in_masktoprefix;
@@ -94,12 +94,12 @@ SUNWprivate_1.1 {
 	save_lifetime;
 	spdsock_diag;
 	spdsock_get_ext;
-	verr;
-	verrx;
-	vwarn;
-	vwarnx;
-	warn;
-	warnx;
+	_verrfp = FUNCTION FILTER libc.so.1;
+	_verrxfp = FUNCTION FILTER libc.so.1;
+	_vwarnfp = FUNCTION FILTER libc.so.1;
+	_vwarnxfp = FUNCTION FILTER libc.so.1;
+	_warnfp = FUNCTION FILTER libc.so.1;
+	_warnxfp = FUNCTION FILTER libc.so.1;
     local:
 	*;
 };

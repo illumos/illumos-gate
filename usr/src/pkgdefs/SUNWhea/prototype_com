@@ -206,6 +206,7 @@ f none usr/include/dirent.h 644 root bin
 f none usr/include/dlfcn.h 644 root bin
 f none usr/include/door.h 644 root bin
 f none usr/include/elf.h 644 root bin
+f none usr/include/err.h 644 root bin
 f none usr/include/errno.h 644 root bin
 f none usr/include/eti.h 644 root bin
 f none usr/include/euc.h 644 root bin

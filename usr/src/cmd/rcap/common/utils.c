@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ dprintfe(int level, char *format, ...)
 
 /*PRINTFLIKE2*/
 void
-vdprintfe(int level, char *format, va_list alist)
+vdprintfe(int level, const char *format, va_list alist)
 {
 	char buf[LINELEN];
 	char *c;
@@ -111,7 +111,7 @@ debug_high(char *format, ...)
 
 /*PRINTFLIKE1*/
 void
-warn(char *format, ...)
+warn(const char *format, ...)
 {
 	va_list alist;
 

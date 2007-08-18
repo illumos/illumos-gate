@@ -37,6 +37,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <door.h>
+#include <err.h>
 #include <sys/errno.h>
 #include <euc.h>
 #include <fcntl.h>
@@ -373,6 +374,16 @@ char *ecvt(double value, int ndigit, int *_RESTRICT_KYWD decpt,
 	int *_RESTRICT_KYWDsign);
 char *fcvt(double value, int ndigit, int *_RESTRICT_KYWD decpt,
 	int *_RESTRICT_KYWD sign);
+
+/* err.c */
+void _errfp(FILE *, int, const char *, ...);
+void _verrfp(FILE *, int, const char *, va_list);
+void _errxfp(FILE *, int, const char *, ...);
+void _verrxfp(FILE *, int, const char *, va_list);
+void _warnfp(FILE *, const char *, ...);
+void _vwarnfp(FILE *, const char *, va_list);
+void _warnxfp(FILE *, const char *, ...);
+void _vwarnxfp(FILE *, const char *, va_list);
 
 /* errlst.c */
 

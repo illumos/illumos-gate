@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,9 +94,9 @@ extern rcm_level_t get_message_priority(void);
 extern rcm_level_t set_message_priority(rcm_level_t);
 extern rcm_dst_t set_message_destination(rcm_dst_t);
 extern char *setprogname(char *);
-extern void warn(char *, ...);
+extern void warn(const char *, ...);
 extern int valid_abspath(char *);
-extern void vdprintfe(int, char *, va_list);
+extern void vdprintfe(int, const char *, va_list);
 extern void dprintfe(int, char *, ...);
 extern void hrt2ts(hrtime_t, timestruc_t *);
 extern int xatoi(char *);

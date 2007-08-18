@@ -265,6 +265,8 @@ extern "C" {
 #define	endutxent			_endutxent
 #define	environ				_environ
 #define	erand48				_erand48
+#define	err				_err
+#define	errx				_errx
 #define	execle				_execle
 #define	execl				_execl
 #define	execlp				_execlp
@@ -985,6 +987,8 @@ extern "C" {
 #define	utmpname			_utmpname
 #define	utmpxname			_utmpxname
 #define	utssys				_utssys
+#define	verr				_verr
+#define	verrx				_verrx
 #define	vfork				_vfork
 #define	vforkx				_vforkx
 #define	vfscanf				_vfscanf
@@ -992,11 +996,15 @@ extern "C" {
 #define	vscanf				_vscanf
 #define	vsscanf				_vsscanf
 #define	vsyslog				_vsyslog
+#define	vwarn				_vwarn
+#define	vwarnx				_vwarnx
 #define	wait3				_wait3
 #define	waitid				_waitid
 #define	waitpid				_waitpid
 #define	wait				_wait
 #define	walkcontext			_walkcontext
+#define	warn				_warn
+#define	warnx				_warnx
 #define	wctomb				_wctomb
 #define	wracct				_wracct
 #define	writev				_writev

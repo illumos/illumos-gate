@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,13 +125,13 @@ static int nonopt_end = -1;   /* first option after non options (for permute) */
  * Generalized error message output.
  *
  * NOTE ON ERROR MESSAGES: All the error messages in this file
- * use %s (not %c) because they are all routed through warnx(),
+ * use %s (not %c) because they are all routed through warnx_getopt(),
  * which takes a string argument. Character arguments passed
  * to warnxchar() are converted to strings automatically before
- * being passed to warnx().
+ * being passed to warnx_getopt().
  */
 static void
-warnx(const char *argv0, const char *msg, const char *arg) {
+warnx_getopt(const char *argv0, const char *msg, const char *arg) {
 	char errbuf[256];
 	(void) snprintf(errbuf, sizeof (errbuf), msg, argv0, arg);
 	(void) write(2, errbuf, strlen(errbuf));
@@ -146,7 +146,7 @@ warnxchar(const char *argv0, const char *msg, const char c) {
 	char charbuf[2];
 	charbuf[0] = c;
 	charbuf[1] = '\0';
-	warnx(argv0, msg, charbuf);
+	warnx_getopt(argv0, msg, charbuf);
 }
 
 /*
@@ -157,7 +157,7 @@ warnxlen(const char *argv0, const char *msg, int argLen, const char *arg) {
 	char argbuf[256];
 	(void) strncpy(argbuf, arg, argLen);
 	argbuf[argLen < (sizeof (argbuf)-1)? argLen:(sizeof (argbuf)-1)] = '\0';
-	warnx(argv0, msg, argbuf);
+	warnx_getopt(argv0, msg, argbuf);
 }
 
 /*
@@ -290,7 +290,7 @@ verify_short_long_equivalents(int nargc,
 								!= NULL));
 
 			if ((!equivFound) && (PRINT_ERROR)) {
-				warnx(nargv[0],
+				warnx_getopt(nargv[0],
 					_libc_gettext(
 				"%s: equivalent short option required -- %s"),
 					long_options[long_i].name);
@@ -335,7 +335,7 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 
 		/* find matching long option */
 		if (strncmp(current_argv, long_options[i].name,
-						current_argv_len) != 0) {
+		    current_argv_len) != 0) {
 			continue;	/* no match  */
 		}
 		long_option_len = strlen(long_options[i].name);
@@ -363,7 +363,7 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 			if (PRINT_ERROR) {
 				warnxlen(nargv[0],
 				    _libc_gettext(
-					"%s: ambiguous option -- %s"),
+				    "%s: ambiguous option -- %s"),
 				    (int)current_argv_len,
 				    current_argv);
 			}
@@ -376,10 +376,10 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 		    (argv_equal_ptr != NULL)) {
 			if (PRINT_ERROR) {
 				warnxlen(nargv[0],
-					_libc_gettext(
+				    _libc_gettext(
 				"%s: option doesn't take an argument -- %s"),
-					(int)current_argv_len,
-					current_argv);
+				    (int)current_argv_len,
+				    current_argv);
 			}
 			/*
 			 * XXX: GNU sets optopt to val regardless of flag
@@ -397,7 +397,7 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 			} else if (LONGOPT_REQUIRES_ARG(long_options[match])) {
 				/* The next argv must be the option argument */
 				if (optind < nargc) {
-				    optarg = nargv[optind];
+					optarg = nargv[optind];
 				}
 				++optind; /* code below depends on this */
 			}
@@ -409,10 +409,10 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 			 * should be generated.
 			 */
 			if (PRINT_ERROR) {
-				warnx(nargv[0],
-					_libc_gettext(
+				warnx_getopt(nargv[0],
+				    _libc_gettext(
 				"%s: option requires an argument -- %s"),
-					current_argv);
+				    current_argv);
 			}
 			/*
 			 * XXX: GNU sets optopt to val regardless of flag
@@ -430,9 +430,9 @@ parse_long_options(int nargc, char * const *nargv, const char *options,
 			return (-1);
 		}
 		if (PRINT_ERROR) {
-			warnx(nargv[0],
-				_libc_gettext("%s: illegal option -- %s"),
-				current_argv);
+			warnx_getopt(nargv[0],
+			    _libc_gettext("%s: illegal option -- %s"),
+			    current_argv);
 		}
 		optopt = 0;
 		return (BADCH);
@@ -494,9 +494,9 @@ getopt_internal(int nargc, char * const *nargv, const char *options,
 	} /* if FLAG_PLUS_DASH_START */
 
 	if (posixly_correct) {
-	    flags &= ~FLAG_PERMUTE;
-	    flags &= ~FLAG_ALLARGS;
-	    flags &= ~FLAG_OPTIONAL_ARGS;
+		flags &= ~FLAG_PERMUTE;
+		flags &= ~FLAG_ALLARGS;
+		flags &= ~FLAG_OPTIONAL_ARGS;
 	}
 
 	/*
@@ -523,12 +523,12 @@ getopt_internal(int nargc, char * const *nargv, const char *options,
 	 * Sun's CLIP specification (11/12/02).
 	 */
 	if ((optind == 1) && FLAG_IS_SET(FLAG_REQUIRE_EQUIVALENTS)) {
-	    if (verify_short_long_equivalents(
-			nargc, nargv, options, long_options, flags) < 0) {
-		/* function printed any necessary messages */
-		errno = EINVAL;		/* invalid argument */
-		return (-1);
-	    }
+		if (verify_short_long_equivalents(
+		    nargc, nargv, options, long_options, flags) < 0) {
+			/* function printed any necessary messages */
+			errno = EINVAL;		/* invalid argument */
+			return (-1);
+		}
 	}
 
 start:
@@ -623,7 +623,7 @@ start:
 			short_too = 1;		/* could be short option too */
 
 		optchar = parse_long_options(nargc, nargv, options,
-				long_options, idx, short_too, flags);
+		    long_options, idx, short_too, flags);
 		if (optchar != -1) {
 			place = EMSG;
 			return (optchar);
@@ -643,8 +643,8 @@ start:
 			++optind;
 		if (PRINT_ERROR)
 			warnxchar(nargv[0],
-				_libc_gettext("%s: illegal option -- %s"),
-				optchar);
+			    _libc_gettext("%s: illegal option -- %s"),
+			    optchar);
 		optopt = optchar;
 		return (BADCH);
 	}
@@ -658,16 +658,16 @@ start:
 			place = EMSG;
 			if (PRINT_ERROR)
 				warnxchar(nargv[0],
-					_libc_gettext(
+				    _libc_gettext(
 				"%s: option requires an argument -- %s"),
-					optchar);
+				    optchar);
 			optopt = optchar;
 			return (BADARG);
 		} else {			/* white space */
 			place = nargv[optind];
 		}
 		optchar = parse_long_options(
-				nargc, nargv, options, long_options,
+		    nargc, nargv, options, long_options,
 		    idx, 0, flags);
 
 		/*
@@ -689,16 +689,16 @@ start:
 			optarg = place;
 		/* XXX: disable test for :: if PC? (GNU doesn't) */
 		} else if (!(FLAG_IS_SET(FLAG_OPTIONAL_ARGS) &&
-			    (oli[1] == ':'))) {
+		    (oli[1] == ':'))) {
 			/* arg is required (not optional) */
 
 			if (++optind >= nargc) {	/* no arg */
 				place = EMSG;
 				if (PRINT_ERROR) {
 					warnxchar(nargv[0],
-						_libc_gettext(
+					    _libc_gettext(
 				"%s: option requires an argument -- %s"),
-						optchar);
+					    optchar);
 				}
 				optopt = optchar;
 				return (BADARG);
@@ -727,12 +727,12 @@ getopt_long(int nargc, char *const *nargv,
 {
 
 	return (getopt_internal(
-		nargc, nargv, optstring, long_options, long_index,
-		FLAG_PERMUTE
-		| FLAG_OPTIONAL_ARGS
-		| FLAG_ABBREV
-		| FLAG_W_SEMICOLON
-		| FLAG_PLUS_DASH_START));
+	    nargc, nargv, optstring, long_options, long_index,
+	    FLAG_PERMUTE
+	    | FLAG_OPTIONAL_ARGS
+	    | FLAG_ABBREV
+	    | FLAG_W_SEMICOLON
+	    | FLAG_PLUS_DASH_START));
 } /* getopt_long() */
 
 /*
@@ -748,13 +748,13 @@ getopt_long_only(int nargc, char *const *nargv,
 {
 
 	return (getopt_internal(
-		nargc, nargv, optstring, long_options, long_index,
-		FLAG_PERMUTE
-		| FLAG_OPTIONAL_ARGS
-		| FLAG_ABBREV
-		| FLAG_W_SEMICOLON
-		| FLAG_PLUS_DASH_START
-		| FLAG_LONGONLY));
+	    nargc, nargv, optstring, long_options, long_index,
+	    FLAG_PERMUTE
+	    | FLAG_OPTIONAL_ARGS
+	    | FLAG_ABBREV
+	    | FLAG_W_SEMICOLON
+	    | FLAG_PLUS_DASH_START
+	    | FLAG_LONGONLY));
 } /* getopt_long_only() */
 
 /*
@@ -787,7 +787,7 @@ getopt_clip(int nargc, char *const *nargv,
 		const struct option *long_options, int *long_index)
 {
 	return getopt_internal(
-		nargc, nargv, optstring, long_options, long_index,
+	    nargc, nargv, optstring, long_options, long_index,
 		/*
 		 * no permutation,
 		 * no optional args,
@@ -796,6 +796,6 @@ getopt_clip(int nargc, char *const *nargv,
 		 * no support for +- at start of optstring
 		 * yes support for "W;" in optstring
 		 */
-		FLAG_W_SEMICOLON
-		| FLAG_REQUIRE_EQUIVALENTS);
+	    FLAG_W_SEMICOLON
+	    | FLAG_REQUIRE_EQUIVALENTS);
 } /* getopt_clip() */
