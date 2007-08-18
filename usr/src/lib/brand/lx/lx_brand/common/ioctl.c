@@ -536,7 +536,7 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	int			cmd = (int)p2;
 	intptr_t		arg = (uintptr_t)p3;
 	struct stat		stat;
-	ioc_cmd_translator_t	*ict;
+	ioc_cmd_translator_t	*ict = NULL;
 	ioc_errno_translator_t	*iet = NULL;
 	major_t			fd_major;
 	int			i, ret;
@@ -561,7 +561,6 @@ lx_ioctl(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 
 	switch (stat.st_mode & S_IFMT) {
 	default:
-		ict = NULL;
 		break;
 	case S_IFREG:
 		/* Use file translators. */

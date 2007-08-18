@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -349,6 +349,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	volatile int clone_res;
 	int sig;
 	int rval;
+	int pid;
 	lx_regs_t *rp;
 	sigset_t sigmask;
 
@@ -367,14 +368,37 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		return (-EINVAL);
 
 	/*
-	 * CLONE_THREAD require CLONE_SIGHAND.  CLONE_THREAD and
-	 * CLONE_DETACHED must both be either set or cleared.
+	 * CLONE_THREAD requires CLONE_SIGHAND.
+	 *
+	 * CLONE_THREAD and CLONE_DETACHED must both be either set or cleared
+	 * in kernel 2.4 and prior.
+	 * In kernel 2.6 CLONE_DETACHED was dropped completely, so we no
+	 * longer have this requirement.
 	 */
-	if ((flags & CLONE_TD) &&
-	    (!(flags & LX_CLONE_SIGHAND) || ((flags & CLONE_TD) != CLONE_TD)))
-		return (-EINVAL);
+
+	if (flags & CLONE_TD) {
+		if (!(flags & LX_CLONE_SIGHAND))
+			return (-EINVAL);
+		if ((lx_get_kern_version() <= LX_KERN_2_4) &&
+		    (flags & CLONE_TD) != CLONE_TD)
+			return (-EINVAL);
+	}
 
 	rp = lx_syscall_regs();
+
+	/* test if pointer passed by user are writable */
+	if (flags & LX_CLONE_PARENT_SETTID) {
+		if (uucopy(ptidp, &pid, sizeof (int)) != 0)
+			return (-EFAULT);
+		if (uucopy(&pid, ptidp, sizeof (int)) != 0)
+			return (-EFAULT);
+	}
+	if (flags & LX_CLONE_CHILD_SETTID) {
+		if (uucopy(ctidp, &pid, sizeof (int)) != 0)
+			return (-EFAULT);
+		if (uucopy(&pid, ctidp, sizeof (int)) != 0)
+			return (-EFAULT);
+	}
 
 	/* See if this is a fork() operation or a thr_create().  */
 	if (IS_FORK(flags) || IS_VFORK(flags)) {
@@ -399,8 +423,26 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 				(void) sleep(lx_rpm_delay);
 		}
 
-		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID))
-			*((int *)ptidp) = rval;
+		/*
+		 * Since we've already forked, we can't do much if uucopy fails,
+		 * so we just ignore failure. Failure is unlikely since we've
+		 * tested the memory before we did the fork.
+		 */
+		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID)) {
+			(void) uucopy(&rval, ptidp, sizeof (int));
+		}
+
+		if (rval == 0 && (flags & LX_CLONE_CHILD_SETTID)) {
+			/*
+			 * lx_getpid should not fail, and if it does, there's
+			 * not much we can do about it since we've already
+			 * forked, so on failure, we just don't copy the
+			 * memory.
+			 */
+			pid = lx_getpid();
+			if (pid >= 0)
+				(void) uucopy(&pid, ctidp, sizeof (int));
+		}
 
 		/* Parent just returns */
 		if (rval != 0)

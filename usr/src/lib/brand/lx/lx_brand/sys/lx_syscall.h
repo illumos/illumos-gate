@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #if !defined(_ASM)
 
 #include <sys/types.h>
+#include <sys/procset.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +83,7 @@ extern int lx_setgroups(uintptr_t, uintptr_t);
 
 
 extern int lx_waitpid(uintptr_t, uintptr_t, uintptr_t);
+extern int lx_waitid(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern int lx_wait4(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_getuid16(void);
@@ -193,6 +195,9 @@ extern int lx_rt_sigtimedwait(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 extern int lx_sync(void);
 
+extern int lx_futex(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t);
+
 extern int lx_tkill(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 extern int lx_tgkill(uintptr_t, uintptr_t, uintptr_t);
@@ -222,12 +227,13 @@ extern int lx_sched_setscheduler(uintptr_t, uintptr_t, uintptr_t);
 extern int lx_sched_get_priority_min(uintptr_t);
 extern int lx_sched_get_priority_max(uintptr_t);
 
+extern int lx_keyctl(void);
+
 extern int lx_ipc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 #endif	/* !defined(_ASM) */
 
 #define	EBP_HAS_ARG6		0x01
-#define	LINUX_MAX_SYSCALL	270
 
 /*
  * Linux syscall numbers
@@ -481,6 +487,54 @@ extern int lx_ipc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 #define	LX_SYS_clock_getres	266
 #define	LX_SYS_clock_nanosleep	267
 #define	LX_SYS_tgkill		270
+/* the following syscalls are for 2.6 and later kernels */
+#define	LX_SYS_utimes		271
+#define	LX_SYS_fadvise64_64	272
+#define	LX_SYS_vserver		273
+#define	LX_SYS_mbind		274
+#define	LX_SYS_get_mempolicyd	275
+#define	LX_SYS_set_mempolicy	276
+#define	LX_SYS_mq_open		277
+#define	LX_SYS_mq_unlink	278
+#define	LX_SYS_mq_timedsend	279
+#define	LX_SYS_mq_timedreceive	280
+#define	LX_SYS_mq_notify	281
+#define	LX_SYS_mq_getsetattr	282
+#define	LX_SYS_kexec_load	283
+#define	LX_SYS_waitid		284
+#define	LX_SYS_setaltroot	285
+#define	LX_SYS_add_key		286
+#define	LX_SYS_request_key	287
+#define	LX_SYS_keyctl		288
+#define	LX_SYS_ioprio_set	289
+#define	LX_SYS_ioprio_get	290
+#define	LX_SYS_inotify_init	291
+#define	LX_SYS_inotify_add_watch	292
+#define	LX_SYS_inotify_rm_watch	293
+#define	LX_SYS_migrate_pages	294
+#define	LX_SYS_openat		295
+#define	LX_SYS_mkdirat		296
+#define	LX_SYS_mknodat		297
+#define	LX_SYS_fchownat		298
+#define	LX_SYS_futimesat	299
+#define	LX_SYS_fstatat64	300
+#define	LX_SYS_unlinkat		301
+#define	LX_SYS_renameat		302
+#define	LX_SYS_linkat		303
+#define	LX_SYS_symlinkat	304
+#define	LX_SYS_readlinkat	305
+#define	LX_SYS_fchmodat		306
+#define	LX_SYS_faccessat	307
+#define	LX_SYS_pselect6		308
+#define	LX_SYS_ppoll		309
+#define	LX_SYS_unshare		310
+#define	LX_SYS_set_robust_list	311
+#define	LX_SYS_get_robust_list	312
+#define	LX_SYS_splice		313
+#define	LX_SYS_sync_file_range	314
+#define	LX_SYS_tee		315
+#define	LX_SYS_vmsplice		316
+#define	LX_SYS_move_pages	317
 
 #ifdef	__cplusplus
 }
