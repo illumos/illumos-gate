@@ -2785,6 +2785,7 @@ cpu_set_supp_freqs(cpu_t *cp, const char *freqs)
 {
 	char clkstr[sizeof ("18446744073709551615") + 1]; /* ui64 MAX */
 	const char *lfreqs = clkstr;
+	boolean_t locked = B_FALSE;
 
 	/*
 	 * A NULL pointer means we only support one speed.
@@ -2797,9 +2798,13 @@ cpu_set_supp_freqs(cpu_t *cp, const char *freqs)
 
 	/*
 	 * Make sure the frequency doesn't change while a snapshot is
-	 * going on.
+	 * going on. Of course, we only need to worry about this if
+	 * the kstat exists.
 	 */
-	mutex_enter(cp->cpu_info_kstat->ks_lock);
+	if (cp->cpu_info_kstat != NULL) {
+		mutex_enter(cp->cpu_info_kstat->ks_lock);
+		locked = B_TRUE;
+	}
 
 	/*
 	 * Free any previously allocated string.
@@ -2816,7 +2821,8 @@ cpu_set_supp_freqs(cpu_t *cp, const char *freqs)
 	/*
 	 * kstat is free to take a snapshot once again.
 	 */
-	mutex_exit(cp->cpu_info_kstat->ks_lock);
+	if (locked)
+		mutex_exit(cp->cpu_info_kstat->ks_lock);
 }
 
 /*
