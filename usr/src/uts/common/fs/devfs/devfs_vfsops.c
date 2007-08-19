@@ -358,11 +358,11 @@ devfs_clean_vhci(dev_info_t *dip, void *args)
 
 	(void) tsd_set(devfs_clean_key, (void *)1);
 	dvp = devfs_dip_to_dvnode(dip);
-	(void) tsd_set(devfs_clean_key, NULL);
 	if (dvp) {
 		(void) dv_cleandir(dvp, NULL, flags);
 		VN_RELE(DVTOV(dvp));
 	}
+	(void) tsd_set(devfs_clean_key, NULL);
 	return (DDI_WALK_CONTINUE);
 }
 
@@ -379,6 +379,11 @@ devfs_clean_vhci(dev_info_t *dip, void *args)
  * correct to fail an offline just because devfs_clean finds
  * referenced dv_nodes. To enforce this, devfs_clean() always
  * returns success i.e. 0.
+ *
+ * devfs_clean() may return before removing all possible nodes if
+ * we cannot acquire locks in areas of the code where potential for
+ * deadlock exists (see comments in dv_find() and dv_cleandir() for
+ * examples of this).
  *
  * devfs caches unreferenced dv_node to speed by the performance
  * of ls, find, etc. devfs_clean() is invoked to cleanup cached
@@ -404,11 +409,13 @@ devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 	/* avoid recursion back into the device tree */
 	(void) tsd_set(devfs_clean_key, (void *)1);
 	dvp = devfs_dip_to_dvnode(dip);
-	(void) tsd_set(devfs_clean_key, NULL);
-	if (dvp == NULL)
+	if (dvp == NULL) {
+		(void) tsd_set(devfs_clean_key, NULL);
 		return (0);
+	}
 
 	(void) dv_cleandir(dvp, devnm, flags);
+	(void) tsd_set(devfs_clean_key, NULL);
 	VN_RELE(DVTOV(dvp));
 
 	/*

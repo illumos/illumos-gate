@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,13 @@ int devfs_debug = 0x0;
 
 const char	dvnm[] = "devfs";
 kmem_cache_t	*dv_node_cache;	/* dv_node cache */
+
+/*
+ * The devfs_clean_key is taken during a devfs_clean operation: it is used to
+ * prevent unnecessary code execution and for detection of potential deadlocks.
+ */
 uint_t		devfs_clean_key;
+
 struct dv_node *dvroot;
 
 /* prototype memory vattrs */
@@ -893,7 +899,7 @@ dv_find(struct dv_node *ddv, char *nm, struct vnode **vpp, struct pathname *pnp,
 {
 	extern int isminiroot;	/* see modctl.c */
 
-	int rv = 0, was_busy = 0, nmlen;
+	int rv = 0, was_busy = 0, nmlen, write_held = 0;
 	struct vnode *vp;
 	struct dv_node *dv, *dup;
 	dev_info_t *pdevi, *devi = NULL;
@@ -947,7 +953,16 @@ start:
 	if ((dv = dv_findbyname(ddv, nm)) != NULL) {
 founddv:
 		ASSERT(RW_LOCK_HELD(&ddv->dv_contents));
-		rw_enter(&dv->dv_contents, RW_READER);
+
+		if (!rw_tryenter(&dv->dv_contents, RW_READER)) {
+			if (tsd_get(devfs_clean_key)) {
+				VN_RELE(DVTOV(dv));
+				rw_exit(&ddv->dv_contents);
+				return (EBUSY);
+			}
+			rw_enter(&dv->dv_contents, RW_READER);
+		}
+
 		vp = DVTOV(dv);
 		if ((dv->dv_attrvp != NULLVP) ||
 		    (vp->v_type != VDIR && dv->dv_attr != NULL)) {
@@ -961,8 +976,30 @@ founddv:
 
 		/*
 		 * No attribute vp, try and build one.
+		 *
+		 * dv_shadow_node() can briefly drop &dv->dv_contents lock
+		 * if it is unable to upgrade it to a write lock. If the
+		 * current thread has come in through the bottom-up device
+		 * configuration devfs_clean() path, we may deadlock against
+		 * a thread performing top-down device configuration if it
+		 * grabs the contents lock. To avoid this, when we are on the
+		 * devfs_clean() path we attempt to upgrade the dv_contents
+		 * lock before we call dv_shadow_node().
 		 */
-		dv_shadow_node(DVTOV(ddv), nm, vp, pnp, rdir, cred, 0);
+		if (tsd_get(devfs_clean_key)) {
+			if (!rw_tryupgrade(&dv->dv_contents)) {
+				VN_RELE(DVTOV(dv));
+				rw_exit(&dv->dv_contents);
+				rw_exit(&ddv->dv_contents);
+				return (EBUSY);
+			}
+
+			write_held = DV_SHADOW_WRITE_HELD;
+		}
+
+		dv_shadow_node(DVTOV(ddv), nm, vp, pnp, rdir, cred,
+		    write_held);
+
 		rw_exit(&dv->dv_contents);
 		rw_exit(&ddv->dv_contents);
 		goto found;
@@ -1242,10 +1279,24 @@ dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 	struct vnode *vp;
 	int busy = 0;
 
+	/*
+	 * We should always be holding the tsd_clean_key here: dv_cleandir()
+	 * will be called as a result of a devfs_clean request and the
+	 * tsd_clean_key will be set in either in devfs_clean() itself or in
+	 * devfs_clean_vhci().
+	 *
+	 * Since we are on the devfs_clean path, we return EBUSY if we cannot
+	 * get the contents lock: if we blocked here we might deadlock against
+	 * a thread performing top-down device configuration.
+	 */
+	ASSERT(tsd_get(devfs_clean_key));
+
 	dcmn_err3(("dv_cleandir: %s\n", ddv->dv_name));
 
-	if (!(flags & DV_CLEANDIR_LCK))
-		rw_enter(&ddv->dv_contents, RW_WRITER);
+	if (!(flags & DV_CLEANDIR_LCK) &&
+	    !rw_tryenter(&ddv->dv_contents, RW_WRITER))
+		return (EBUSY);
+
 	for (pprev = &ddv->dv_dot, dv = *pprev; dv;
 	    pprev = npprev, dv = *pprev) {
 		npprev = &dv->dv_next;
