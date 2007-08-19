@@ -53,9 +53,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.1.10";
+static char ident[] = "Intel PRO/1000 Ethernet 5.1.11";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.1.10";
+static char e1000g_version[] = "Driver Ver. 5.1.11";
 
 /*
  * Proto types for DDI entry points
@@ -216,9 +216,9 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
-boolean_t e1000g_force_detach = B_TRUE;
 uint32_t e1000g_mblks_pending = 0;
 /*
+ * Workaround for Dynamic Reconfiguration support, for x86 platform only.
  * Here we maintain a private dev_info list if e1000g_force_detach is
  * enabled. If we force the driver to detach while there are still some
  * rx buffers retained in the upper layer, we have to keep a copy of the
@@ -226,9 +226,18 @@ uint32_t e1000g_mblks_pending = 0;
  * structure will be freed after the driver is detached. However when we
  * finally free those rx buffers released by the upper layer, we need to
  * refer to the dev_info to free the dma buffers. So we save a copy of
- * the dev_info for this purpose.
+ * the dev_info for this purpose. On x86 platform, we assume this copy
+ * of dev_info is always valid, but on SPARC platform, it could be invalid
+ * after the system board level DR operation. For this reason, the global
+ * variable e1000g_force_detach must be B_FALSE on SPARC platform.
  */
+#ifdef __sparc
+boolean_t e1000g_force_detach = B_FALSE;
+#else
+boolean_t e1000g_force_detach = B_TRUE;
+#endif
 private_devi_list_t *e1000g_private_devi_list = NULL;
+
 /*
  * The rwlock is defined to protect the whole processing of rx recycling
  * and the rx packets release in detach processing to make them mutually
@@ -450,36 +459,21 @@ e1000gattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	if (e1000g_force_detach) {
 		private_devi_list_t *devi_node;
-		boolean_t devi_existed;
 
-		devi_existed = B_FALSE;
-		devi_node = e1000g_private_devi_list;
-		while (devi_node != NULL) {
-			if (devi_node->dip == devinfo) {
-				devi_existed = B_TRUE;
-				break;
-			}
-			devi_node = devi_node->next;
-		}
+		Adapter->priv_dip =
+		    kmem_zalloc(sizeof (struct dev_info), KM_SLEEP);
+		bcopy(DEVI(devinfo), DEVI(Adapter->priv_dip),
+		    sizeof (struct dev_info));
 
-		if (devi_existed) {
-			Adapter->priv_dip = devi_node->priv_dip;
-		} else {
-			Adapter->priv_dip =
-			    kmem_zalloc(sizeof (struct dev_info), KM_SLEEP);
-			bcopy(DEVI(devinfo), DEVI(Adapter->priv_dip),
-			    sizeof (struct dev_info));
+		devi_node =
+		    kmem_zalloc(sizeof (private_devi_list_t), KM_SLEEP);
 
-			devi_node =
-			    kmem_zalloc(sizeof (private_devi_list_t), KM_SLEEP);
-
-			rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
-			devi_node->dip = devinfo;
-			devi_node->priv_dip = Adapter->priv_dip;
-			devi_node->next = e1000g_private_devi_list;
-			e1000g_private_devi_list = devi_node;
-			rw_exit(&e1000g_rx_detach_lock);
-		}
+		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+		devi_node->dip = devinfo;
+		devi_node->priv_dip = Adapter->priv_dip;
+		devi_node->next = e1000g_private_devi_list;
+		e1000g_private_devi_list = devi_node;
+		rw_exit(&e1000g_rx_detach_lock);
 	}
 
 	hw = &Adapter->Shared;

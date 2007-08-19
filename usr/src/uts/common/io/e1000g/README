@@ -515,3 +515,8 @@ Notes on packaging:
    6490623 Some networking problems with Solaris_b44_64 domU(using solaris_b44_64 dom0)
    6510396 system panicked in e1000g_82547_timeout
    6554976 e1000g driver does not support 10D5 device - Sun Pentwater PEM quad port
+
+5.1.11
+======
+  This version has the following fix:
+   6552853 system panics in e1000g_alloc_dvma_buffer during hotplug testing
