@@ -421,6 +421,18 @@ PSARC 2005/204: RULE W3: usr/lib/sparcv9/libraidcfg.so.1
 PSARC 2006/315: RULE W3: usr/lib/libidmap.so.1
 PSARC 2006/315: RULE W3: usr/lib/amd64/libidmap.so.1
 PSARC 2006/315: RULE W3: usr/lib/sparcv9/libidmap.so.1
+PSARC 2006/550: RULE W3: usr/lib/libast.so.1
+PSARC 2006/550: RULE W3: usr/lib/amd64/libast.so.1
+PSARC 2006/550: RULE W3: usr/lib/sparcv9/libast.so.1
+PSARC 2006/550: RULE W3: usr/lib/libdll.so.1
+PSARC 2006/550: RULE W3: usr/lib/amd64/libdll.so.1
+PSARC 2006/550: RULE W3: usr/lib/sparcv9/libdll.so.1
+PSARC 2006/550: RULE W3: usr/lib/libshell.so.1
+PSARC 2006/550: RULE W3: usr/lib/amd64/libshell.so.1
+PSARC 2006/550: RULE W3: usr/lib/sparcv9/libshell.so.1
+PSARC 2007/035: RULE W3: usr/lib/libpp.so.1
+PSARC 2007/035: RULE W3: usr/lib/amd64/libpp.so.1
+PSARC 2007/035: RULE W3: usr/lib/sparcv9/libpp.so.1
  
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 
