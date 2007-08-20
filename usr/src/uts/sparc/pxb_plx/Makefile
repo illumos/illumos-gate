@@ -21,7 +21,7 @@
 #
 # uts/sparc/pxb_plx/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,7 @@ MODULE		= pxb_plx
 OBJECTS		= $(PX_PCI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PX_PCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/sun4/io/px/
 
 #
 #	Include common rules.
@@ -52,9 +53,9 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Include sun4 specific headers files
