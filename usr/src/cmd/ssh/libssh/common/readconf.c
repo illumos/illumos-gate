@@ -97,7 +97,8 @@ RCSID("$OpenBSD: readconf.c,v 1.100 2002/06/19 00:27:55 deraadt Exp $");
 
 typedef enum {
 	oBadOption,
-	oForwardAgent, oForwardX11, oGatewayPorts, oRhostsAuthentication,
+	oForwardAgent, oForwardX11, oForwardX11Trusted, oGatewayPorts,
+	oRhostsAuthentication,
 	oPasswordAuthentication, oRSAAuthentication,
 	oChallengeResponseAuthentication, oXAuthLocation,
 #if defined(KRB4) || defined(KRB5)
@@ -139,6 +140,7 @@ static struct {
 } keywords[] = {
 	{ "forwardagent", oForwardAgent },
 	{ "forwardx11", oForwardX11 },
+	{ "forwardx11trusted", oForwardX11Trusted },
 	{ "xauthlocation", oXAuthLocation },
 	{ "gatewayports", oGatewayPorts },
 	{ "useprivilegedport", oUsePrivilegedPort },
@@ -356,6 +358,10 @@ parse_flag:
 
 	case oForwardX11:
 		intptr = &options->forward_x11;
+		goto parse_flag;
+
+	case oForwardX11Trusted:
+		intptr = &options->forward_x11_trusted;
 		goto parse_flag;
 
 	case oGatewayPorts:
@@ -821,6 +827,7 @@ initialize_options(Options * options)
 	memset(options, 'X', sizeof(*options));
 	options->forward_agent = -1;
 	options->forward_x11 = -1;
+	options->forward_x11_trusted = -1;
 	options->xauth_location = NULL;
 	options->gateway_ports = -1;
 	options->use_privileged_port = -1;
@@ -904,6 +911,12 @@ fill_default_options(Options * options)
 		options->forward_agent = 0;
 	if (options->forward_x11 == -1)
 		options->forward_x11 = 0;
+	/*
+	 * Unlike OpenSSH, we keep backward compatibility for '-X' option
+	 * which means that X11 forwarding is trusted by default.
+	 */
+	if (options->forward_x11_trusted == -1)
+		options->forward_x11_trusted = 1;
 	if (options->xauth_location == NULL)
 		options->xauth_location = _PATH_XAUTH;
 	if (options->gateway_ports == -1)

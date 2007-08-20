@@ -788,71 +788,6 @@ again:
 }
 
 static void
-x11_get_proto(char **_proto, char **_data)
-{
-	char line[512];
-	static char proto[512], data[512];
-	FILE *f;
-	int got_data = 0, i;
-	char *display;
-	struct stat st;
-
-	*_proto = proto;
-	*_data = data;
-	proto[0] = data[0] = '\0';
-	if (!options.xauth_location ||
-	    (stat(options.xauth_location, &st) == -1)) {
-		debug("No xauth program.");
-	} else {
-		if ((display = getenv("DISPLAY")) == NULL) {
-			debug("x11_get_proto: DISPLAY not set");
-			return;
-		}
-		/* Try to get Xauthority information for the display. */
-		if (strncmp(display, "localhost:", 10) == 0)
-			/*
-			 * Handle FamilyLocal case where $DISPLAY does
-			 * not match an authorization entry.  For this we
-			 * just try "xauth list unix:displaynum.screennum".
-			 * XXX: "localhost" match to determine FamilyLocal
-			 *      is not perfect.
-			 */
-			snprintf(line, sizeof line, "%s list unix:%s 2>"
-			    _PATH_DEVNULL, options.xauth_location, display+10);
-		else
-			snprintf(line, sizeof line, "%s list %.200s 2>"
-			    _PATH_DEVNULL, options.xauth_location, display);
-		debug2("x11_get_proto: %s", line);
-		f = popen(line, "r");
-		if (f && fgets(line, sizeof(line), f) &&
-		    sscanf(line, "%*s %511s %511s", proto, data) == 2)
-			got_data = 1;
-		if (f)
-			pclose(f);
-	}
-	/*
-	 * If we didn't get authentication data, just make up some
-	 * data.  The forwarding code will check the validity of the
-	 * response anyway, and substitute this data.  The X11
-	 * server, however, will ignore this fake data and use
-	 * whatever authentication mechanisms it was using otherwise
-	 * for the local connection.
-	 */
-	if (!got_data) {
-		u_int32_t rand = 0;
-
-		log("Warning: No xauth data; using fake authentication data for X11 forwarding.");
-		strlcpy(proto, "MIT-MAGIC-COOKIE-1", sizeof proto);
-		for (i = 0; i < 16; i++) {
-			if (i % 4 == 0)
-				rand = arc4random();
-			snprintf(data + 2 * i, sizeof data - 2 * i, "%02x", rand & 0xff);
-			rand >>= 8;
-		}
-	}
-}
-
-static void
 ssh_init_forwarding(void)
 {
 	int success = 0;
@@ -904,6 +839,7 @@ ssh_session(void)
 	int have_tty = 0;
 	struct winsize ws;
 	char *cp;
+	const char *display;
 
 	/* Enable compression if requested. */
 	if (options.compression) {
@@ -965,13 +901,15 @@ ssh_session(void)
 			packet_disconnect("Protocol error waiting for pty request response.");
 	}
 	/* Request X11 forwarding if enabled and DISPLAY is set. */
-	if (options.forward_x11 && getenv("DISPLAY") != NULL) {
+	display = getenv("DISPLAY");
+	if (options.forward_x11 && display != NULL) {
 		char *proto, *data;
 		/* Get reasonable local authentication information. */
-		x11_get_proto(&proto, &data);
+		client_x11_get_proto(display, options.xauth_location,
+		    options.forward_x11_trusted, &proto, &data);
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication spoofing.");
-		x11_request_forwarding_with_spoofing(0, proto, data);
+		x11_request_forwarding_with_spoofing(0, display, proto, data);
 
 		/* Read response from the server. */
 		type = packet_read();
@@ -1099,6 +1037,7 @@ static void
 ssh_session2_setup(int id, void *arg)
 {
 	int len;
+	const char *display;
 	int interactive = 0;
 	struct termios tio;
 
@@ -1128,14 +1067,16 @@ ssh_session2_setup(int id, void *arg)
 		interactive = 1;
 		/* XXX wait for reply */
 	}
-	if (options.forward_x11 &&
-	    getenv("DISPLAY") != NULL) {
+
+	display = getenv("DISPLAY");
+	if (options.forward_x11 && display != NULL) {
 		char *proto, *data;
 		/* Get reasonable local authentication information. */
-		x11_get_proto(&proto, &data);
+		client_x11_get_proto(display, options.xauth_location,
+		    options.forward_x11_trusted, &proto, &data);
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication spoofing.");
-		x11_request_forwarding_with_spoofing(id, proto, data);
+		x11_request_forwarding_with_spoofing(id, display, proto, data);
 		interactive = 1;
 		/* XXX wait for reply */
 	}

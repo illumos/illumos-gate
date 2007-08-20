@@ -127,7 +127,7 @@ static u_int x11_saved_data_len = 0;
  * Fake X11 authentication data.  This is what the server will be sending us;
  * we should replace any occurrences of this by the real data.
  */
-static char *x11_fake_data = NULL;
+static u_char *x11_fake_data = NULL;
 static u_int x11_fake_data_len;
 
 
@@ -2791,19 +2791,19 @@ deny_input_open(int type, u_int32_t seq, void *ctxt)
  * This should be called in the client only.
  */
 void
-x11_request_forwarding_with_spoofing(int client_session_id,
+x11_request_forwarding_with_spoofing(int client_session_id, const char *disp,
     const char *proto, const char *data)
 {
 	u_int data_len = (u_int) strlen(data) / 2;
-	u_int i, value, len;
+	u_int i, value;
 	char *new_data;
 	int screen_number;
 	const char *cp;
 	u_int32_t rand = 0;
 
-	cp = getenv("DISPLAY");
-	if (cp)
-		cp = strchr(cp, ':');
+	cp = disp;
+	if (disp)
+		cp = strchr(disp, ':');
 	if (cp)
 		cp = strchr(cp, '.');
 	if (cp)
@@ -2833,11 +2833,7 @@ x11_request_forwarding_with_spoofing(int client_session_id,
 	x11_fake_data_len = data_len;
 
 	/* Convert the fake data into hex. */
-	len = 2 * data_len + 1;
-	new_data = xmalloc(len);
-	for (i = 0; i < data_len; i++)
-		snprintf(new_data + 2 * i, len - 2 * i,
-		    "%02x", (u_char) x11_fake_data[i]);
+	new_data = tohex(x11_fake_data, data_len);
 
 	/* Send the request packet. */
 	if (compat20) {

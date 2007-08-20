@@ -225,7 +225,8 @@ int	 channel_setup_remote_fwd_listener(const char *, u_short, int);
 int	 x11_connect_display(void);
 int	 x11_create_display_inet(int, int, int, u_int *);
 void     x11_input_open(int, u_int32_t, void *);
-void	 x11_request_forwarding_with_spoofing(int, const char *, const char *);
+void	 x11_request_forwarding_with_spoofing(int, const char *, const char *,
+	     const char *);
 void	 deny_input_open(int, u_int32_t, void *);
 
 /* agent forwarding */

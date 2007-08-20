@@ -47,6 +47,8 @@ extern "C" {
 
 /* Client side main loop for the interactive session. */
 int	 client_loop(int, int, int);
+void	 client_x11_get_proto(const char *, const char *, u_int,
+	     char **, char **);
 void	 client_global_request_reply_fwd(int type, u_int32_t seq, void *ctxt);
 
 #ifdef __cplusplus

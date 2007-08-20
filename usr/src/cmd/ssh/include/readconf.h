@@ -41,6 +41,7 @@ typedef struct {
 typedef struct {
 	int     forward_agent;	/* Forward authentication agent. */
 	int     forward_x11;	/* Forward X11 display. */
+	int     forward_x11_trusted;	/* Trust Forward X11 display. */
 	char   *xauth_location;	/* Location for xauth program */
 	int     gateway_ports;	/* Allow remote connects to forwarded ports. */
 	int     use_privileged_port;	/* Don't use privileged port if false. */

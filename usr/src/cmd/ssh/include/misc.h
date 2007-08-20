@@ -22,7 +22,7 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@ int	 a2port(const char *);
 char	*cleanhostname(char *);
 char	*colon(char *);
 long	 convtime(const char *);
+char	*tohex(const void *, size_t);
 
 struct passwd	*pwcopy(struct passwd *);
 void		 pwfree(struct passwd **);
