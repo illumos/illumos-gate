@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1897,8 +1897,7 @@ build_did_list(
 		 * read in then just use it.  Otherwise free
 		 * the previous one and alloc a new one
 		 */
-		if (dbtob(did_info->info_blkcnt) != did_info_length &&
-		    did_info->info_firstblk != did_info_firstblk) {
+		if (did_info->info_firstblk != did_info_firstblk) {
 
 			did_info_length = dbtob(did_info->info_blkcnt);
 			did_info_firstblk = did_info->info_firstblk;
