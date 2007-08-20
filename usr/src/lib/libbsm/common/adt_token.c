@@ -21,7 +21,7 @@
 /*
  * adt_token.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file does not provide any user callable functions.  See adt.c
@@ -573,9 +573,9 @@ adt_to_subject(datadef *def, void *p_data, int required,
 
 	(void) au_write(event->ae_event_handle,
 	    au_to_subject_ex(sp->as_info.ai_auid,
-		sp->as_euid, sp->as_egid, sp->as_ruid, sp->as_rgid,
-		sp->as_pid, sp->as_info.ai_asid,
-		&(sp->as_info.ai_termid)));
+	    sp->as_euid, sp->as_egid, sp->as_ruid, sp->as_rgid,
+	    sp->as_pid, sp->as_info.ai_asid,
+	    &(sp->as_info.ai_termid)));
 	if (is_system_labeled()) {
 		(void) au_write(event->ae_event_handle,
 		    au_to_label(sp->as_label));
@@ -689,8 +689,24 @@ adt_to_text(datadef *def, void *p_data, int required,
 	case ADT_UID:
 	case ADT_GID:
 	case ADT_UINT:
-		(void) snprintf(buffer, TEXT_LENGTH, "%d",
+	case ADT_UINT32:
+		(void) snprintf(buffer, TEXT_LENGTH, "%u",
 		    ((union convert *)p_data)->tuint);
+
+		DPRINTF(("  text=%s\n", buffer));
+		adt_write_text(event->ae_event_handle, buffer, format);
+		break;
+	case ADT_INT:
+	case ADT_INT32:
+		(void) snprintf(buffer, TEXT_LENGTH, "%d",
+		    ((union convert *)p_data)->tint);
+
+		DPRINTF(("  text=%s\n", buffer));
+		adt_write_text(event->ae_event_handle, buffer, format);
+		break;
+	case ADT_LONG:
+		(void) snprintf(buffer, TEXT_LENGTH, "%ld",
+		    ((union convert *)p_data)->tlong);
 
 		DPRINTF(("  text=%s\n", buffer));
 		adt_write_text(event->ae_event_handle, buffer, format);
@@ -726,8 +742,15 @@ adt_to_text(datadef *def, void *p_data, int required,
 		adt_write_text(event->ae_event_handle, buffer, format);
 		break;
 	case ADT_ULONG:
-		(void) snprintf(buffer, TEXT_LENGTH, "%ld",
+		(void) snprintf(buffer, TEXT_LENGTH, "%lu",
 		    ((union convert *)p_data)->tulong);
+
+		DPRINTF(("  text=%s\n", buffer));
+		adt_write_text(event->ae_event_handle, buffer, format);
+		break;
+	case ADT_UINT64:
+		(void) snprintf(buffer, TEXT_LENGTH, "%llu",
+		    ((union convert *)p_data)->tuint64);
 
 		DPRINTF(("  text=%s\n", buffer));
 		adt_write_text(event->ae_event_handle, buffer, format);
