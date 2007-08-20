@@ -6263,7 +6263,6 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 	vsw_private_desc_t	*priv_addr = NULL;
 	vsw_t			*vswp = ldcp->ldc_vswp;
 	mblk_t			*mp = NULL;
-	mblk_t			*nmp;
 	size_t			nbytes = 0;
 	size_t			off = 0;
 	uint64_t		idx = 0;
@@ -6327,25 +6326,8 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		D2(vswp, "%s(%d): copied in %ld bytes using %d cookies",
 		    __func__, ldcp->ldc_id, nbytes, ncookies);
 
-		/*
-		 * Upper layer is expecting the IP header in the packet to
-		 * be 4-bytes aligned, but the OBP is sending packets that
-		 * are not aligned.  So, copy the data to another message
-		 * such that the alignment requirement is met.
-		 */
-		nmp = allocb(datalen + VNET_IPALIGN, BPRI_MED);
-		if (nmp == NULL) {
-			DERR(vswp, "%s(%lld): allocb failed",
-			    __func__, ldcp->ldc_id);
-			freemsg(mp);
-			return;
-		}
-		nmp->b_rptr += VNET_IPALIGN;
-		bcopy(mp->b_rptr, nmp->b_rptr, datalen);
-		freemsg(mp);
-
 		/* point to the actual end of data */
-		nmp->b_wptr = nmp->b_rptr + datalen;
+		mp->b_wptr = mp->b_rptr + datalen;
 
 		/*
 		 * We ACK back every in-band descriptor message we process
@@ -6356,7 +6338,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		    sizeof (vnet_ibnd_desc_t), B_TRUE);
 
 		/* send the packet to be switched */
-		vswp->vsw_switch_frame(vswp, nmp, VSW_VNETPORT,
+		vswp->vsw_switch_frame(vswp, mp, VSW_VNETPORT,
 		    ldcp->ldc_port, NULL);
 
 		break;
