@@ -1690,12 +1690,12 @@ find_node_by_name(di_prom_handle_t promh, di_node_t parent,
 	di_node_t next_node;
 	uchar_t *prop_valp;
 
-	next_node = di_child_node(parent);
-	while (next_node != DI_NODE_NIL) {
-		next_node = di_sibling_node(next_node);
-		(void) get_propval_by_name(promh, next_node, "name",
-		    &prop_valp);
-		if (strcmp((char *)prop_valp, node_name) == 0)
+	for (next_node = di_child_node(parent); next_node != DI_NODE_NIL;
+	    next_node = di_sibling_node(next_node)) {
+		int len;
+
+		len = get_propval_by_name(promh, next_node, "name", &prop_valp);
+		if ((len != -1) && (strcmp((char *)prop_valp, node_name) == 0))
 			return (next_node);
 	}
 	return (DI_NODE_NIL);
