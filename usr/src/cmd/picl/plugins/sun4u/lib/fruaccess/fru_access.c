@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -829,9 +828,18 @@ fru_open_container(picl_nodehdl_t fruhdl)
 		first_byte = 0x00;
 
 		retval = pread(device_fd, &first_byte, sizeof (first_byte), 0);
-		close(device_fd);
-		if (first_byte == 0x08)
-			(void) strcpy(bname, "i2c-at34cps");
+		(void) close(device_fd);
+		switch (first_byte) {
+			case 0x08:
+				(void) strcpy(bname, "i2c-at34cps");
+				break;
+			case 0x80:
+				(void) strcpy(bname, "i2c-at34c02");
+				break;
+			default:
+				(void) strcpy(bname, "i2c-at34cuk");
+				break;
+		}
 	}
 
 	/* if there's a platform-specific conf file, use that */
@@ -2134,7 +2142,7 @@ fru_get_num_packets(segment_hdl_t segment, door_cred_t *cred)
 		spd_seg_len =
 		    fru_read_segment(segment, seg_buf, nbytes, cred);
 		if (spd_seg_len < 0)
-		    return (-1);
+			return (-1);
 		pktcnt = get_buffered_packets(seg_hash, seg_buf,
 		    spd_seg_len);
 		break;
@@ -2686,7 +2694,7 @@ fru_delete_packet(packet_hdl_t packet, segment_hdl_t *newsegment,
 		free_packet_object(packet, seg_hash);
 	} else {
 		for (tmp_obj = prev_obj;
-			tmp_obj != NULL; tmp_obj = tmp_obj->u.pkt_obj->next) {
+		    tmp_obj != NULL; tmp_obj = tmp_obj->u.pkt_obj->next) {
 			/* found the object */
 			if (tmp_obj->obj_hdl == packet) {
 				adjust_packets(fd, tmp_obj,

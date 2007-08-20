@@ -62,8 +62,8 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-		gettext("Usage:  %s [ -l ] | [ [ -r ] frupath [ text ] ]\n"),
-		command);
+	    gettext("Usage:  %s [ -l ] | [ [ -r ] frupath [ text ] ]\n"),
+	    command);
 }
 
 static int
@@ -88,7 +88,7 @@ validate_fieldnames(int argc, char *argv[])
 		match = 0;
 		for (j = 0; j < num; j++) {
 			if (strncmp(fieldname, serv_data_list[j],
-				strlen(serv_data_list[j])) == 0) {
+			    strlen(serv_data_list[j])) == 0) {
 				match = 1;
 			}
 		}
@@ -304,16 +304,16 @@ print_node_data(fru_nodehdl_t cont_hdl)
 				continue;
 			}
 			if ((fru_get_num_iterations(cont_hdl,
-				&segment_name[numseg], 0, *ptr,
-					&iter_cnt, NULL)) != FRU_SUCCESS) {
+			    &segment_name[numseg], 0, *ptr,
+			    &iter_cnt, NULL)) != FRU_SUCCESS) {
 				iter_cnt = 0;
 			}
 			iter = 0;
 			do {
 				for (count = 0; count < def.enum_count;
-								count++) {
+				    count++) {
 					if (def.iteration_type !=
-							FRU_NOT_ITERATED) {
+					    FRU_NOT_ITERATED) {
 						(void) snprintf(elem_name,
 						    sizeof (elem_name),
 			"/%s[%d]/%s", *ptr, iter, def.enum_table[count].text);
@@ -324,8 +324,9 @@ print_node_data(fru_nodehdl_t cont_hdl)
 					}
 
 					if ((fru_read_field(cont_hdl,
-		&segment_name[numseg], instance, elem_name, (void**)&data,
-				&dataLen, &found_path)) != FRU_SUCCESS) {
+					    &segment_name[numseg], instance,
+					    elem_name, (void**)&data, &dataLen,
+					    &found_path)) != FRU_SUCCESS) {
 						break;
 					}
 
@@ -334,7 +335,7 @@ print_node_data(fru_nodehdl_t cont_hdl)
 						break;
 					}
 					(void) printf("	%s:  ",\
-								elem_name);
+					    elem_name);
 					display_data(data, dataLen, &def1);
 					(void) printf("\n");
 				}
@@ -404,7 +405,8 @@ convert_update(fru_nodehdl_t nodehdl, char *segment, char *field_name,
 			if (def.disp_type != FDISP_Time) {
 				if (field_value[0] == 'b') {
 					field_value =
-					convertBinaryToDecimal((field_value+1));
+					    convertBinaryToDecimal((field_value
+					    +1));
 				}
 				num = strtoll(field_value, (char **)NULL, 0);
 				if ((num == 0) && (errno == 0)) {
@@ -428,9 +430,9 @@ convert_update(fru_nodehdl_t nodehdl, char *segment, char *field_name,
 		case    FDTYPE_Enumeration:
 			for (i = 0; i < def.enum_count; i++) {
 				if (strcmp(def.enum_table[i].text,
-							field_value) == 0) {
+				    field_value) == 0) {
 					data = (void *)(uintptr_t)
-							def.enum_table[i].value;
+					    def.enum_table[i].value;
 					dataLen = sizeof (uint64_t);
 					break;
 				}
@@ -448,9 +450,9 @@ convert_update(fru_nodehdl_t nodehdl, char *segment, char *field_name,
 	}
 
 	if ((err = fru_update_field(nodehdl, segment, 0, field_name, data,
-						dataLen)) != FRU_SUCCESS) {
+	    dataLen)) != FRU_SUCCESS) {
 		(void) fprintf(stderr, gettext("fru_update_field():  %s\n"),
-						fru_strerror(err));
+		    fru_strerror(err));
 		return (1);
 	}
 	return (0);
@@ -480,9 +482,9 @@ update_unixtimestamp(fru_nodehdl_t nodehdl, char *segment, char **ptr)
 	time_data = (uint64_t)mktime(sp_tm);
 
 	if ((err = fru_update_field(nodehdl, segment, 0, field_name,
-		(void *)&time_data, sizeof (time_data))) != FRU_SUCCESS) {
+	    (void *)&time_data, sizeof (time_data))) != FRU_SUCCESS) {
 		(void) fprintf(stderr, gettext("fru_update_field():  %s\n"),
-						fru_strerror(err));
+		    fru_strerror(err));
 		return (1);
 	}
 	return (0);
@@ -517,14 +519,14 @@ create_segment(fru_nodehdl_t nodehdl)
 			def.size = FD_SEGMENT_SIZE;
 		}
 		if ((status = fru_create_segment(nodehdl, &def))
-					!= FRU_SUCCESS) {
+		    != FRU_SUCCESS) {
 			continue;
 		}
 		return (cnt);
 	}
 	if (status != FRU_SUCCESS)
 		(void) fprintf(stderr, gettext("fru_create_segment():  %s\n"),
-				fru_strerror(status));
+		    fru_strerror(status));
 	return (1);
 }
 
@@ -578,7 +580,7 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 	}
 
 	if ((fru_get_num_iterations(nodehdl, &segment_name[cnt], 0,
-			*ptr, &iter_cnt, NULL)) != FRU_SUCCESS) {
+	    *ptr, &iter_cnt, NULL)) != FRU_SUCCESS) {
 		return (1);
 	}
 
@@ -586,10 +588,10 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 	if (iter_cnt == 0) {
 		(void) snprintf(rec_name, sizeof (rec_name), "/%s[+]", *ptr);
 		if ((err = fru_update_field(nodehdl, segment_name[cnt], 0,
-			rec_name, data, dataLen)) != FRU_SUCCESS) {
+		    rec_name, data, dataLen)) != FRU_SUCCESS) {
 			(void) fprintf(stderr,
 			gettext("fru_update_field():  %s\n"),
-			fru_strerror(err));
+			    fru_strerror(err));
 		return (1);
 		}
 
@@ -600,7 +602,7 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 	    *ptr, iter_cnt-1, strrchr(field_name, '/'));
 
 	if ((convert_update(nodehdl, segment_name[cnt], rec_name,
-				field_value)) != 0) {
+	    field_value)) != 0) {
 		return (1);
 	}
 
@@ -612,7 +614,7 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 
 	/* update UNIX_Timestamp32 with creation time */
 	if ((update_unixtimestamp(nodehdl, segment_name[cnt],
-				&tmpptr)) != 0) {
+	    &tmpptr)) != 0) {
 		return (1);
 	}
 
@@ -640,8 +642,8 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 
 		for (cnt = 0; cnt < total_cnt; cnt++) {
 			if ((strncmp(*ptr, &field_name[1], strlen(*ptr)) \
-				!= 0) && (strncmp(*ptr, &field_name[0],
-						strlen(*ptr)) != 0)) {
+			    != 0) && (strncmp(*ptr, &field_name[0],
+			    strlen(*ptr)) != 0)) {
 				ptr++;
 				add_flag = 0;
 				continue;
@@ -656,13 +658,13 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 	/* look for the field in either of the segment if found update it */
 	for (cnt = 0; cnt < NUM_OF_SEGMENT; cnt++) {
 		if ((fru_read_field(nodehdl, &segment_name[cnt], 0, field_name,
-		(void **) &data, &dataLen, &found_path)) != FRU_SUCCESS) {
+		    (void **) &data, &dataLen, &found_path)) != FRU_SUCCESS) {
 			continue;
 		}
 		if ((fru_get_definition(*ptr, &def)) == FRU_SUCCESS) {
 			if (def.iteration_count != 0) {
 				if ((updateiter_record(nodehdl, cnt, ptr,
-					field_name, field_value)) != 0) {
+				    field_name, field_value)) != 0) {
 					return (1);
 				}
 				return (0);
@@ -670,13 +672,13 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 		}
 
 		if ((convert_update(nodehdl, segment_name[cnt],
-				field_name, field_value)) != 0) {
+		    field_name, field_value)) != 0) {
 			return (1);
 		}
 
 		/* update UNIX_Timestamp32 with update time */
 		if ((update_unixtimestamp(nodehdl, segment_name[cnt],
-						ptr)) != 0) {
+		    ptr)) != 0) {
 			return (1);
 		}
 		return (0);
@@ -695,7 +697,7 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 
 		if (add_flag) {
 			if ((fru_add_element(nodehdl, segment_name[cnt],
-							*ptr)) != FRU_SUCCESS) {
+			    *ptr)) != FRU_SUCCESS) {
 				continue;
 			}
 		}
@@ -703,7 +705,7 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 		if ((fru_get_definition(*ptr, &def)) == FRU_SUCCESS) {
 			if (def.iteration_count != 0) {
 				if ((updateiter_record(nodehdl, cnt, ptr,
-					field_name, field_value)) != 0) {
+				    field_name, field_value)) != 0) {
 					return (1);
 				}
 				return (0);
@@ -712,13 +714,13 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 
 		/* update UNIX_Timestamp32 with creation time */
 		if ((update_unixtimestamp(nodehdl, segment_name[cnt],
-							ptr)) != 0) {
+		    ptr)) != 0) {
 			return (1);
 		}
 
 		/* record added update the field with the value */
 		if ((convert_update(nodehdl, segment_name[cnt], field_name,
-						field_value)) != 0) {
+		    field_value)) != 0) {
 			return (1);
 		}
 		return (0);
@@ -731,16 +733,16 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 	}
 
 	if ((status = fru_add_element(nodehdl, segment_name[cnt], *ptr))
-						!= FRU_SUCCESS) {
+	    != FRU_SUCCESS) {
 		(void) fprintf(stderr, gettext("fru_add_element():  %s\n"),
-					fru_strerror(status));
+		    fru_strerror(status));
 		return (1);
 	}
 
 	if ((fru_get_definition(*ptr, &def)) == FRU_SUCCESS) {
 		if (def.iteration_count != 0) {
 			if ((updateiter_record(nodehdl,  cnt, ptr,
-				field_name, field_value)) != 0) {
+			    field_name, field_value)) != 0) {
 				return (1);
 			}
 			return (0);
@@ -749,12 +751,12 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 
 	/* update UNIX_Timestamp32 with creation time */
 	if ((update_unixtimestamp(nodehdl, segment_name[cnt],
-					ptr)) != 0) {
+	    ptr)) != 0) {
 		return (1);
 	}
 
 	if ((convert_update(nodehdl, segment_name[cnt], field_name,
-					field_value)) != 0) {
+	    field_value)) != 0) {
 		return (1);
 	}
 	return (0);
@@ -764,7 +766,7 @@ static int
 update_node_data(fru_nodehdl_t node)
 {
 	int	i;
-	int	status;
+	int	status = 0;
 
 	if (service_mode) {
 		for (i = 0; i < svcargc; i += 2)
@@ -773,7 +775,7 @@ update_node_data(fru_nodehdl_t node)
 			}
 	} else {
 		status = update_field(node, "/Customer_DataR/Cust_Data",
-							customer_data);
+		    customer_data);
 	}
 	return (status);
 }
@@ -807,7 +809,7 @@ walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 	if (snprintf(path, sizeof (path), "%s/%s", prior_path, name)
 	    >= sizeof (path)) {
 		(void) fprintf(stderr,
-			gettext("FRU tree path would overflow buffer\n"));
+		    gettext("FRU tree path would overflow buffer\n"));
 		exit(1);
 	}
 
@@ -818,10 +820,10 @@ walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 	 */
 	if (list_only) {
 		(void) printf("%s%s\n", path, ((type == FRU_NODE_FRU) ?
-			" (fru)" : ((type == FRU_NODE_CONTAINER) ?
-			" (container)" : "")));
+		    " (fru)" : ((type == FRU_NODE_CONTAINER) ?
+		    " (container)" : "")));
 	} else if ((process_tree || (process_self = pathmatch(path))) &&
-			(type == FRU_NODE_CONTAINER)) {
+	    (type == FRU_NODE_CONTAINER)) {
 		(void) printf("%s\n", path);
 		if (update) {
 			status = update_node_data(node);
@@ -862,11 +864,11 @@ has_system_controller()
 	int size;
 
 	if (((size = sysinfo(SI_PLATFORM, platform, sizeof (platform)))
-		< 0) || (size > sizeof (platform)))
+	    < 0) || (size > sizeof (platform)))
 		return (-1);
 
 	if ((strcmp("SUNW,Sun-Fire", platform) == 0) ||
-		(strcmp("SUNW,Sun-Fire-15000", platform) == 0)) {
+	    (strcmp("SUNW,Sun-Fire-15000", platform) == 0)) {
 		return (1);
 	}
 
@@ -930,8 +932,8 @@ main(int argc, char *argv[])
 				if ((argc % 2) != 0) {
 					(void) fprintf(stderr,
 					    gettext("Must specify "
-						"field-value pairs "
-						"for update\n"));
+					    "field-value pairs "
+					    "for update\n"));
 					return (1);
 				}
 
@@ -960,19 +962,19 @@ main(int argc, char *argv[])
 	if ((status = fru_get_root(&root)) == FRU_NODENOTFOUND) {
 		if (has_system_controller() == 1) {
 			(void) fprintf(stderr,
-				gettext("Access FRUs from the "
-					"System Controller\n"));
+			    gettext("Access FRUs from the "
+			    "System Controller\n"));
 		} else {
 			(void) fprintf(stderr,
-				gettext("This system does not provide "
-					"FRU ID data\n"));
+			    gettext("This system does not provide "
+			    "FRU ID data\n"));
 
 		}
 		return (1);
 	} else if (status != FRU_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("Unable to access FRU ID data "
-			"due to data source error\n"));
+		    "due to data source error\n"));
 		return (1);
 	}
 
