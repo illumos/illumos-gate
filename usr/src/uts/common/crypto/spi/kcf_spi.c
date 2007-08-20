@@ -392,12 +392,10 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 
 	if (saved_state == KCF_PROV_BUSY) {
 		/*
-		 * The per-provider taskq thread may be waiting. We
-		 * signal it so that it can start failing requests.
-		 * Note that we do not need a cv_broadcast() as we keep
-		 * only a single thread per taskq.
+		 * The per-provider taskq threads may be waiting. We
+		 * signal them so that they can start failing requests.
 		 */
-		cv_signal(&desc->pd_resume_cv);
+		cv_broadcast(&desc->pd_resume_cv);
 	}
 
 	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
@@ -528,12 +526,10 @@ crypto_provider_notification(crypto_kcf_provider_handle_t handle, uint_t state)
 		case KCF_PROV_BUSY:
 			pd->pd_state = KCF_PROV_READY;
 			/*
-			 * Signal the per-provider taskq thread that it
-			 * can start submitting requests. Note that we do
-			 * not need a cv_broadcast() as we keep only a
-			 * single thread per taskq.
+			 * Signal the per-provider taskq threads that they
+			 * can start submitting requests.
 			 */
-			cv_signal(&pd->pd_resume_cv);
+			cv_broadcast(&pd->pd_resume_cv);
 			break;
 
 		case KCF_PROV_FAILED:
@@ -557,7 +553,7 @@ crypto_provider_notification(crypto_kcf_provider_handle_t handle, uint_t state)
 	case CRYPTO_PROVIDER_FAILED:
 		/*
 		 * We note the failure and return. The per-provider taskq
-		 * thread checks this flag and starts failing the
+		 * threads check this flag and start failing the
 		 * requests, if it is set. See process_req_hwp() for details.
 		 */
 		switch (pd->pd_state) {
@@ -568,10 +564,10 @@ crypto_provider_notification(crypto_kcf_provider_handle_t handle, uint_t state)
 		case KCF_PROV_BUSY:
 			pd->pd_state = KCF_PROV_FAILED;
 			/*
-			 * The per-provider taskq thread may be waiting. We
-			 * signal it so that it can start failing requests.
+			 * The per-provider taskq threads may be waiting. We
+			 * signal them so that they can start failing requests.
 			 */
-			cv_signal(&pd->pd_resume_cv);
+			cv_broadcast(&pd->pd_resume_cv);
 			break;
 		}
 		break;
