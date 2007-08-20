@@ -29,6 +29,7 @@
 
 #include <sys/archsystm.h>	/* for {in,out}{b,w,l}() */
 #include <sys/cmn_err.h>
+#include <sys/controlregs.h>
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
 #include <sys/lgrp.h>
@@ -67,63 +68,61 @@
 /*
  * Multiprocessor Opteron machines have Non Uniform Memory Access (NUMA).
  *
- * Until System Affinity Resource Table (SRAT) becomes part of ACPI standard,
+ * Until this code supports reading System Resource Affinity Table (SRAT),
  * we need to examine registers in PCI configuration space to determine how
  * many nodes are in the system and which CPUs and memory are in each node.
  * This could be determined by probing all memory from each CPU, but that is
  * too expensive to do while booting the kernel.
  *
  * NOTE: Using these PCI configuration space registers to determine this
- *       locality info is Opteron K8 specific and not guaranteed to work on
- *       the next generation Opteron processor.  Furthermore, we assume that
- *	 there is one CPU per node and CPU 0 is in node 0, CPU 1 is in node 1,
- *	 etc. which should be true for Opteron K8....
+ *       locality info is not guaranteed to work on future generations of
+ *	 Opteron processor.
  */
 
 /*
  * Opteron DRAM Address Map in PCI configuration space gives base and limit
- * of physical memory in each node for Opteron K8.  The following constants
- * and macros define their contents, structure, and access.
+ * of physical memory in each node.  The following constants and macros define
+ * their contents, structure, and access.
  */
 
 /*
  * How many bits to shift Opteron DRAM Address Map base and limit registers
  * to get actual value
  */
-#define	OPT_DRAMADDR_LSHIFT_ADDR	8	/* shift left for address */
+#define	OPT_DRAMADDR_HI_LSHIFT_ADDR	40	/* shift left for address */
+#define	OPT_DRAMADDR_LO_LSHIFT_ADDR	8	/* shift left for address */
 
-#define	OPT_DRAMADDR_MASK_OFF	0xFFFFFF	/* offset for address */
+#define	OPT_DRAMADDR_HI_MASK_ADDR	0x000000FF /* address bits 47-40 */
+#define	OPT_DRAMADDR_LO_MASK_ADDR	0xFFFF0000 /* address bits 39-24 */
+
+#define	OPT_DRAMADDR_LO_MASK_OFF	0xFFFFFF /* offset for address */
+
+/*
+ * Macros to derive addresses from Opteron DRAM Address Map registers
+ */
+#define	OPT_DRAMADDR_HI(reg) \
+	(((u_longlong_t)reg & OPT_DRAMADDR_HI_MASK_ADDR) << \
+	    OPT_DRAMADDR_HI_LSHIFT_ADDR)
+
+#define	OPT_DRAMADDR_LO(reg) \
+	(((u_longlong_t)reg & OPT_DRAMADDR_LO_MASK_ADDR) << \
+	    OPT_DRAMADDR_LO_LSHIFT_ADDR)
+
+#define	OPT_DRAMADDR(high, low) \
+	(OPT_DRAMADDR_HI(high) | OPT_DRAMADDR_LO(low))
 
 /*
  * Bit masks defining what's in Opteron DRAM Address Map base register
  */
-#define	OPT_DRAMBASE_MASK_RE		0x1	/* read enable */
-#define	OPT_DRAMBASE_MASK_WE		0x2	/* write enable */
-#define	OPT_DRAMBASE_MASK_INTRLVEN	0x700	/* interleave */
-
-#define	OPT_DRAMBASE_MASK_ADDR	0xFFFF0000	/* address bits 39-24 */
-
-/*
- * Macros to get values from Opteron DRAM Address Map base register
- */
-#define	OPT_DRAMBASE(reg) \
-	(((u_longlong_t)reg & OPT_DRAMBASE_MASK_ADDR) << \
-	    OPT_DRAMADDR_LSHIFT_ADDR)
-
+#define	OPT_DRAMBASE_LO_MASK_RE		0x1	/* read enable */
+#define	OPT_DRAMBASE_LO_MASK_WE		0x2	/* write enable */
+#define	OPT_DRAMBASE_LO_MASK_INTRLVEN	0x700	/* interleave */
 
 /*
  * Bit masks defining what's in Opteron DRAM Address Map limit register
  */
-#define	OPT_DRAMLIMIT_MASK_DSTNODE	0x7		/* destination node */
-#define	OPT_DRAMLIMIT_MASK_INTRLVSEL	0x70		/* interleave select */
-#define	OPT_DRAMLIMIT_MASK_ADDR		0xFFFF0000	/* addr bits 39-24 */
-
-/*
- * Macros to get values from Opteron DRAM Address Map limit register
- */
-#define	OPT_DRAMLIMIT(reg) \
-	(((u_longlong_t)reg & OPT_DRAMLIMIT_MASK_ADDR) << \
-	    OPT_DRAMADDR_LSHIFT_ADDR)
+#define	OPT_DRAMLIMIT_LO_MASK_DSTNODE	0x7		/* destination node */
+#define	OPT_DRAMLIMIT_LO_MASK_INTRLVSEL	0x700		/* interleave select */
 
 
 /*
@@ -152,6 +151,21 @@
 #define	OPT_NODE_CNT(reg) \
 	((reg & OPT_NODE_MASK_CNT) >> OPT_NODE_RSHIFT_CNT)
 
+/*
+ * Macro to setup PCI Extended Configuration Space (ECS) address to give to
+ * "in/out" instructions
+ *
+ * NOTE: Should only be used in lgrp_plat_init() before MMIO setup because any
+ *	 other uses should just do MMIO to access PCI ECS.
+ *	 Must enable special bit in Northbridge Configuration Register on
+ *	 Greyhound for extended CF8 space access to be able to access PCI ECS
+ *	 using "in/out" instructions and restore special bit after done
+ *	 accessing PCI ECS.
+ */
+#define	OPT_PCI_ECS_ADDR(bus, device, function, reg) \
+	(PCI_CONE | (((bus) & 0xff) << 16) | (((device & 0x1f)) << 11)  | \
+	    (((function) & 0x7) << 8) | ((reg) & 0xfc) | \
+	    ((((reg) >> 8) & 0xf) << 24))
 
 /*
  * PCI configuration space registers accessed by specifying
@@ -174,7 +188,8 @@
  * PCI Configuration Space register offsets
  */
 #define	OPT_PCS_OFF_VENDOR	0x0	/* device/vendor ID register */
-#define	OPT_PCS_OFF_DRAMBASE	0x40	/* DRAM Base register (node 0) */
+#define	OPT_PCS_OFF_DRAMBASE_HI	0x140	/* DRAM Base register (node 0) */
+#define	OPT_PCS_OFF_DRAMBASE_LO	0x40	/* DRAM Base register (node 0) */
 #define	OPT_PCS_OFF_NODEID	0x60	/* Node ID register */
 
 /*
@@ -205,8 +220,10 @@ typedef	enum lgrp_plat_probe_op {
  * Opteron DRAM address map gives base and limit for physical memory in a node
  */
 typedef	struct opt_dram_addr_map {
-	uint32_t	base;
-	uint32_t	limit;
+	uint32_t	base_hi;
+	uint32_t	base_lo;
+	uint32_t	limit_hi;
+	uint32_t	limit_lo;
 } opt_dram_addr_map_t;
 
 
@@ -335,23 +352,41 @@ static int	nlgrps_alloc;
 
 struct lgrp_stats lgrp_stats[NLGRP];
 
-#define	CPUID_FAMILY_OPTERON	15
+/*
+ * Supported AMD processor families
+ */
+#define	AMD_FAMILY_HAMMER	15
+#define	AMD_FAMILY_GREYHOUND	16
 
+/*
+ * Whether to have is_opteron() return 1 even when processor isn't
+ * supported
+ */
+uint_t	is_opteron_override = 0;
+
+/*
+ * AMD processor family for current CPU
+ */
 uint_t	opt_family = 0;
-uint_t	opt_model = 0;
+
 uint_t	opt_probe_func = OPT_PCS_FUNC_DRAM;
 
 
 /*
- * Determine whether we're running on an AMD Opteron K8 machine
+ * Determine whether we're running on a supported AMD Opteron since reading
+ * node count and DRAM address map registers may have different format or
+ * may not be supported in future processor families
  */
 int
 is_opteron(void)
 {
+
 	if (x86_vendor != X86_VENDOR_AMD)
 		return (0);
 
-	if (cpuid_getfamily(CPU) == CPUID_FAMILY_OPTERON)
+	opt_family = cpuid_getfamily(CPU);
+	if (opt_family == AMD_FAMILY_HAMMER ||
+	    opt_family == AMD_FAMILY_GREYHOUND || is_opteron_override)
 		return (1);
 	else
 		return (0);
@@ -494,7 +529,9 @@ lgrp_plat_init(void)
 	uint_t		bus;
 	uint_t		dev;
 	uint_t		node;
-	uint_t		off;
+	uint_t		off_hi;
+	uint_t		off_lo;
+	uint64_t	nb_cfg_reg;
 
 	extern lgrp_load_t	lgrp_expand_proc_thresh;
 	extern lgrp_load_t	lgrp_expand_proc_diff;
@@ -517,7 +554,8 @@ lgrp_plat_init(void)
 	 */
 	bus = OPT_PCS_BUS_CONFIG;
 	dev = OPT_PCS_DEV_NODE0;
-	off = OPT_PCS_OFF_DRAMBASE;
+	off_hi = OPT_PCS_OFF_DRAMBASE_HI;
+	off_lo = OPT_PCS_OFF_DRAMBASE_LO;
 
 	/*
 	 * Read node ID register for node 0 to get node count
@@ -526,7 +564,23 @@ lgrp_plat_init(void)
 	    OPT_PCS_OFF_NODEID);
 	lgrp_plat_node_cnt = OPT_NODE_CNT(opt_node_info[0]) + 1;
 
+	/*
+	 * For Greyhound, PCI Extended Configuration Space must be enabled to
+	 * read high DRAM address map base and limit registers
+	 */
+	if (opt_family == AMD_FAMILY_GREYHOUND) {
+		nb_cfg_reg = rdmsr(MSR_AMD_NB_CFG);
+		if ((nb_cfg_reg & AMD_GH_NB_CFG_EN_ECS) == 0)
+			wrmsr(MSR_AMD_NB_CFG,
+			    nb_cfg_reg | AMD_GH_NB_CFG_EN_ECS);
+	}
+
 	for (node = 0; node < lgrp_plat_node_cnt; node++) {
+		uint32_t	base_hi;
+		uint32_t	base_lo;
+		uint32_t	limit_hi;
+		uint32_t	limit_lo;
+
 		/*
 		 * Read node ID register (except for node 0 which we just read)
 		 */
@@ -539,20 +593,40 @@ lgrp_plat_init(void)
 		 * Read DRAM base and limit registers which specify
 		 * physical memory range of each node
 		 */
-		opt_dram_map[node].base = pci_getl_func(bus, dev,
-		    OPT_PCS_FUNC_ADDRMAP, off);
-		if (opt_dram_map[node].base & OPT_DRAMBASE_MASK_INTRLVEN)
+		if (opt_family != AMD_FAMILY_GREYHOUND)
+			base_hi = 0;
+		else {
+			outl(PCI_CONFADD, OPT_PCI_ECS_ADDR(bus, dev,
+			    OPT_PCS_FUNC_ADDRMAP, off_hi));
+			base_hi = opt_dram_map[node].base_hi =
+			    inl(PCI_CONFDATA);
+		}
+		base_lo = opt_dram_map[node].base_lo = pci_getl_func(bus, dev,
+		    OPT_PCS_FUNC_ADDRMAP, off_lo);
+
+		if (opt_dram_map[node].base_lo & OPT_DRAMBASE_LO_MASK_INTRLVEN)
 			lgrp_plat_mem_intrlv++;
 
-		off += 4;	/* limit register offset */
-		opt_dram_map[node].limit = pci_getl_func(bus, dev,
-		    OPT_PCS_FUNC_ADDRMAP, off);
+		off_hi += 4;	/* high limit register offset */
+		if (opt_family != AMD_FAMILY_GREYHOUND)
+			limit_hi = 0;
+		else {
+			outl(PCI_CONFADD, OPT_PCI_ECS_ADDR(bus, dev,
+			    OPT_PCS_FUNC_ADDRMAP, off_hi));
+			limit_hi = opt_dram_map[node].limit_hi =
+			    inl(PCI_CONFDATA);
+		}
+
+		off_lo += 4;	/* low limit register offset */
+		limit_lo = opt_dram_map[node].limit_lo = pci_getl_func(bus,
+		    dev, OPT_PCS_FUNC_ADDRMAP, off_lo);
 
 		/*
-		 * Increment device number to next node and register offset for
-		 * DRAM base register of next node
+		 * Increment device number to next node and register offsets
+		 * for DRAM base register of next node
 		 */
-		off += 4;
+		off_hi += 4;
+		off_lo += 4;
 		dev++;
 
 		/*
@@ -560,8 +634,8 @@ lgrp_plat_init(void)
 		 * address map base register for physical memory to exist in
 		 * node
 		 */
-		if ((opt_dram_map[node].base & OPT_DRAMBASE_MASK_RE) == 0 ||
-		    (opt_dram_map[node].base & OPT_DRAMBASE_MASK_WE) == 0) {
+		if ((base_lo & OPT_DRAMBASE_LO_MASK_RE) == 0 ||
+		    (base_lo & OPT_DRAMBASE_LO_MASK_WE) == 0) {
 			/*
 			 * Mark node memory as non-existent and set start and
 			 * end addresses to be same in lgrp_plat_node_memory[]
@@ -577,18 +651,28 @@ lgrp_plat_init(void)
 		 * so we can probe memory to determine latency topology
 		 */
 		lgrp_plat_probe_pfn[node] =
-		    btop(OPT_DRAMBASE(opt_dram_map[node].base));
+		    btop(OPT_DRAMADDR(base_hi, base_lo));
 
 		/*
 		 * Mark node memory as existing and remember physical address
 		 * range of each node for use later
 		 */
 		lgrp_plat_node_memory[node].exists = 1;
+
 		lgrp_plat_node_memory[node].start =
-		    btop(OPT_DRAMBASE(opt_dram_map[node].base));
+		    btop(OPT_DRAMADDR(base_hi, base_lo));
+
 		lgrp_plat_node_memory[node].end =
-		    btop(OPT_DRAMLIMIT(opt_dram_map[node].limit) |
-		    OPT_DRAMADDR_MASK_OFF);
+		    btop(OPT_DRAMADDR(limit_hi, limit_lo) |
+		    OPT_DRAMADDR_LO_MASK_OFF);
+	}
+
+	/*
+	 * Restore PCI Extended Configuration Space enable bit
+	 */
+	if (opt_family == AMD_FAMILY_GREYHOUND) {
+		if ((nb_cfg_reg & AMD_GH_NB_CFG_EN_ECS) == 0)
+			wrmsr(MSR_AMD_NB_CFG, nb_cfg_reg);
 	}
 
 	/*

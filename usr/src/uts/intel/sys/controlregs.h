@@ -208,6 +208,11 @@ extern "C" {
 #define	AMD_NB_CFG_SRQ_HEARTBEAT	(UINT64_C(1) << 20)
 #define	AMD_NB_CFG_SRQ_SPR		(UINT64_C(1) << 32)
 
+/*
+ * Enable PCI Extended Configuration Space (ECS) on Greyhound
+ */
+#define	AMD_GH_NB_CFG_EN_ECS		(UINT64_C(1) << 46)
+
 /* AMD */
 #define	MSR_AMD_PATCHLEVEL	0x8b
 
