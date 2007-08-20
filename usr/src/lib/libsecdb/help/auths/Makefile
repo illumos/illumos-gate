@@ -71,6 +71,7 @@ HTMLENTS = \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
 	SmfManageHeader.html \
+	SmfMDNSStates.html \
 	SmfModifyAppl.html \
 	SmfModifyDepend.html \
 	SmfModifyFramework.html \
@@ -86,6 +87,7 @@ HTMLENTS = \
 	SmfValueHeader.html \
 	SmfValueInetd.html \
 	SmfValueIPsec.html \
+	SmfValueMDNS.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \
 	SmfWpaStates.html \

@@ -201,6 +201,7 @@ typedef struct {
 	int	errnum; /* errno from the backend */
 	int	noarg; /* if set, backend does not use the arg structure */
 	int	fallback; /* if set, may need to fall back to main nscd */
+	int	datalen; /* pbuf->data_len (backend may change it) */
 } nscd_sw_return_t;
 
 /*

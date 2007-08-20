@@ -19,13 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG=		finger rdate ruptime rwho whois
+PROG=		dns-sd finger rdate ruptime rwho whois
 SUIDPROG=	rcp rlogin rsh
 ALL=		$(PROG) $(SUIDPROG)
 SRCS=		$(ALL:%=%.c)
@@ -72,10 +72,12 @@ CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP -I$(CMDINETCOMMONDIR)
 # PROGS are lint clean.
 $(LINTCLEAN)	:=	CFLAGS += $(CCVERBOSE)
 
+dns-sd :=	CFLAGS += $(C99_ENABLE)
 finger :=	CFLAGS += $(CCVERBOSE)
 # Enable large file support for reading the lastlog file.
 finger :=	CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
+dns-sd :=		LDLIBS += -lsocket -ldns_sd
 finger :=		LDLIBS += -lnsl -lcurses -lsocket
 rcp lint-rcp :=		LDLIBS += -lsocket -lsec -lsendfile
 rdate lint-rdate:=	LDLIBS += -lsocket

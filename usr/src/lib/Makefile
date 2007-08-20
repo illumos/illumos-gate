@@ -103,6 +103,7 @@ SUBDIRS += \
 	libdlpi		\
 	libeti		\
 	libcrypt	\
+	libdns_sd	\
 	libefi		\
 	libfstyp	\
 	libwanboot	\
@@ -345,6 +346,7 @@ HDRSUBDIRS=		\
 	libdhcpsvc	\
 	libdhcputil	\
 	libdisasm	\
+	libdns_sd	\
 	libdtrace	\
 	libdtrace_jni	\
 	libeti		\

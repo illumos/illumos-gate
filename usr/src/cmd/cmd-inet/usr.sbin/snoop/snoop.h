@@ -204,7 +204,7 @@ extern char *getportname(int, in_port_t);
 
 extern void interpret_arp(int, struct arphdr *, int);
 extern void interpret_bparam(int, int, int, int, int, char *, int);
-extern void interpret_dns(int, int, const uchar_t *, int);
+extern void interpret_dns(int, int, const uchar_t *, int, int);
 extern void interpret_mount(int, int, int, int, int, char *, int);
 extern void interpret_nfs(int, int, int, int, int, char *, int);
 extern void interpret_nfs3(int, int, int, int, int, char *, int);

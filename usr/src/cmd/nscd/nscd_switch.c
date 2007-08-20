@@ -494,80 +494,112 @@ get_gss_func(void **func_p)
 	return (NSCD_SUCCESS);
 }
 
+/*
+ * get_dns_funcs returns pointers to gethostbyname functions in the
+ * dynamically loaded nss_dns & nss_mdns modules that return host
+ * lookup results along with the TTL value in the DNS resource
+ * records. The dnsi parameter indicates whether the lookup database
+ * is hosts(0) or ipnodes(1). The srcname parameter identifies the DNS
+ * module: dns/mdns and the function returns the address of the specific
+ * gethostbyname function in func_p variable.
+ */
 static nscd_rc_t
-get_dns_funcs(int dnsi, void **func_p)
+get_dns_funcs(int dnsi, nss_status_t (**func_p)(), const char *srcname)
 {
 	char		*me = "get_dns_funcs";
-	static void	*handle = NULL;
-	static mutex_t	func_lock = DEFAULTMUTEX;
-	void		*sym;
-	char		*func_name[2] = { "_nss_get_dns_hosts_name",
-				"_nss_get_dns_ipnodes_name" };
-	static void	*func[2] = {NULL, NULL};
+	int		si;
+	static void	*handle[2] = { NULL, NULL };
+	static mutex_t	func_lock[2] = { DEFAULTMUTEX, DEFAULTMUTEX };
+	void		*sym[2];
+	static void 	*func[2][2] = {{NULL, NULL}, {NULL, NULL}};
+	static const char	*lib[2] = { "nss_dns.so.1", "nss_mdns.so.1" };
+	static const char 	*func_name[2][2] =
+		{{ "_nss_get_dns_hosts_name", "_nss_get_dns_ipnodes_name" },
+		{ "_nss_get_mdns_hosts_name", "_nss_get_mdns_ipnodes_name" }};
 
-	if (handle != NULL && dnsi > 0 && func[dnsi] != NULL) {
-		(void) memcpy(func_p, &func[dnsi], sizeof (void *));
+	/* source index: 0 = dns, 1 = mdns */
+	if (strcmp(srcname, "dns") == 0)
+		si = 0;
+	else
+		si = 1;
+
+	/*
+	 * function index (func[si][dnsi]):
+	 * [0,0] = dns/hosts, [0,1] = dns/ipnodes,
+	 * [1,0] = mdns/hosts, [1,1] = mdns/ipnodes
+	 */
+
+	if (handle[si] != NULL && dnsi >= 0 && func[si][dnsi] != NULL) {
+		*func_p = (nss_status_t (*)()) func[si][dnsi];
 		return (NSCD_SUCCESS);
 	}
 
-	(void) mutex_lock(&func_lock);
+	(void) mutex_lock(&func_lock[si]);
 
 	/* close the handle if requested */
 	if (dnsi < 0) {
-		if (handle != NULL) {
-			(void) dlclose(handle);
-			func[0] = NULL;
-			func[1] = NULL;
+		if (handle[si] != NULL) {
+			(void) dlclose(handle[si]);
+			func[si][0] = NULL;
+			func[si][1] = NULL;
 		}
-		(void) mutex_unlock(&func_lock);
+		(void) mutex_unlock(&func_lock[si]);
 		return (NSCD_SUCCESS);
 	}
 
-	if (handle != NULL && func[dnsi] != NULL) {
-		(void) memcpy(func_p, &func[dnsi], sizeof (void *));
-		(void) mutex_unlock(&func_lock);
+	if (handle[si] != NULL && func[si][dnsi] != NULL) {
+		*func_p = (nss_status_t (*)()) func[si][dnsi];
+		(void) mutex_unlock(&func_lock[si]);
 		return (NSCD_SUCCESS);
 	}
 
-	if (handle == NULL) {
-		handle = dlopen("nss_dns.so.1", RTLD_LAZY);
-		if (handle == NULL) {
+	if (handle[si] == NULL) {
+		handle[si] = dlopen(lib[si], RTLD_LAZY);
+		if (handle[si] == NULL) {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to dlopen nss_dns.so.1\n");
-			(void) mutex_unlock(&func_lock);
+			(me, "unable to dlopen %s\n", lib[si]);
+			(void) mutex_unlock(&func_lock[si]);
 			return (NSCD_CFG_DLOPEN_ERROR);
 		}
 	}
 
-	if ((sym = dlsym(handle, func_name[dnsi])) == NULL) {
+	if ((sym[si] = dlsym(handle[si], func_name[si][dnsi])) == NULL) {
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to find symbol %s\n", func_name[dnsi]);
-		(void) mutex_unlock(&func_lock);
+		(me, "unable to find symbol %s\n", func_name[si][dnsi]);
+		(void) mutex_unlock(&func_lock[si]);
 		return (NSCD_CFG_DLSYM_ERROR);
 	} else {
-		(void) memcpy(func_p, &sym, sizeof (void *));
-		(void) memcpy(&func[dnsi], &sym, sizeof (void *));
+		*func_p = (nss_status_t (*)()) sym[si];
+		func[si][dnsi] = sym[si];
 	}
 
-	(void) mutex_unlock(&func_lock);
+	(void) mutex_unlock(&func_lock[si]);
 	return (NSCD_SUCCESS);
 }
 
 static nss_status_t
-search_dns_withttl(nscd_sw_return_t *swret, char *srcname, int dnsi)
+search_dns_withttl(nscd_sw_return_t *swret, const char *srcname, int dnsi)
 {
 	nss_status_t	(*func)();
 	nss_status_t	res = NSS_UNAVAIL;
 	nscd_rc_t	rc;
 
 	swret->noarg = 0;
-	if (strcmp(srcname, "dns") != 0)
+	if (strcmp(srcname, "dns") != 0 && strcmp(srcname, "mdns") != 0)
 		return (NSS_ERROR);
 
-	rc = get_dns_funcs(dnsi, (void **)&func);
-	if (rc == NSCD_SUCCESS)
+	rc = get_dns_funcs(dnsi, &func, srcname);
+	if (rc == NSCD_SUCCESS) {
+		/*
+		 * data_len in the packed buf header may be changed
+		 * by the dns or mdns backend, reset it just in
+		 * case
+		 */
+		((nss_pheader_t *)swret->pbuf)->data_len =
+		    swret->datalen;
 		res = (func)(NULL, &swret->pbuf, &swret->pbufsiz);
+	}
 	return (res);
 }
 
@@ -1279,6 +1311,7 @@ nss_psearch(void *buffer, size_t length)
 	(void) memcpy(&pbuf->nscdpriv, &swrp, sizeof (swrp));
 	swret.pbuf = buffer;
 	swret.pbufsiz = length;
+	swret.datalen = pbuf->data_len;
 
 	/*
 	 * use the generic nscd_initf for all database lookups

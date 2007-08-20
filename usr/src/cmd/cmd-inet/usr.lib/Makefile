@@ -27,7 +27,8 @@
 
 SUBDIRS=	dhcp dsvclockd in.chargend in.daytimed \
 		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
-		in.ripngd in.timed inetd ncaconfd pppoe slpd wanboot wpad
+		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
+		slpd wanboot wpad
 
 MSGSUBDIRS=	dsvclockd in.dhcpd inetd ncaconfd wanboot
 

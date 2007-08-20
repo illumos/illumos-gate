@@ -67,7 +67,7 @@ static size_t print_domain_name(char *line, const uchar_t *header,
     const uchar_t *data, const uchar_t *data_end);
 
 void
-interpret_dns(int flags, int proto, const uchar_t *data, int len)
+interpret_dns(int flags, int proto, const uchar_t *data, int len, int port)
 {
 	typedef HEADER dns_header;
 	dns_header header;
@@ -76,10 +76,23 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 	ushort_t count;
 	const uchar_t *rrp;	/* Resource Record Pointer. */
 	const uchar_t *data_end;
+	const char *protostr;
+	char *protopfxstr;
+	char *protohdrstr;
 
 	if (proto == IPPROTO_TCP) {
 		/* not supported now */
 		return;
+	}
+
+	if (port == IPPORT_DOMAIN) {
+		protostr = "DNS";
+		protopfxstr = "DNS:  ";
+		protohdrstr = "DNS Header";
+	} else {
+		protostr = "MDNS";
+		protopfxstr = "MDNS:  ";
+		protohdrstr = "MDNS Header";
 	}
 
 	/* We need at least the header in order to parse a packet. */
@@ -100,7 +113,8 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 
 	if (flags & F_SUM) {
 		line = get_sum_line();
-		line += sprintf(line, "DNS %c ", header.qr ? 'R' : 'C');
+		line += sprintf(line, "%s %c ",
+		    protostr, header.qr ? 'R' : 'C');
 
 		if (header.qr) {
 			/* answer */
@@ -135,7 +149,7 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 		}
 	}
 	if (flags & F_DTAIL) {
-		show_header("DNS:  ", "DNS Header", sizeof (dns_header));
+		show_header(protopfxstr, protohdrstr, sizeof (dns_header));
 		show_space();
 		if (header.qr) {
 			/* answer */
@@ -348,6 +362,15 @@ print_question(char *line, const uchar_t *header, const uchar_t *data,
 	GETINT16(type, data);
 	GETINT16(cls, data);
 
+	/*
+	 * Multicast DNS re-uses the top bit of the class field
+	 * in the question and answer sections. Unicast DNS only
+	 * uses 1 (Internet), 3 and 4. Hence it is safe. The top
+	 * order bit is always cleared here to display the rrclass in case
+	 * of Multicast DNS packets.
+	 */
+	cls = cls & 0x7fff;
+
 	if (detail) {
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    DNS_INDENT "Class: %u (%s)",
@@ -470,10 +493,10 @@ print_answer(char *line, const uchar_t *header, const uchar_t *data,
 		 */
 		if ((data_end - data) <
 		    ((ptrdiff_t)(sizeof (size)
-			+ sizeof (xrcode)
-			+ sizeof (ver)
-			+ sizeof (cls)	/* zero */
-			+ sizeof (rdlen)))) {
+		    + sizeof (xrcode)
+		    + sizeof (ver)
+		    + sizeof (cls)	/* zero */
+		    + sizeof (rdlen)))) {
 			return (data_end - data_bak);
 		}
 
@@ -533,12 +556,21 @@ print_answer(char *line, const uchar_t *header, const uchar_t *data,
 	 */
 	if ((data_end - data) <
 	    ((ptrdiff_t)(sizeof (cls)
-		+ sizeof (ttl)
-		+ sizeof (rdlen)))) {
+	    + sizeof (ttl)
+	    + sizeof (rdlen)))) {
 		return (data_end - data_bak);
 	}
 
 	GETINT16(cls, data);
+
+	/*
+	 * Multicast DNS re-uses the top bit of the class field
+	 * in the question and answer sections. Unicast DNS only
+	 * uses 1 (Internet), 3 and 4. Hence it is safe. The top
+	 * order bit is always cleared here to display the rrclass in case
+	 * of Multicast DNS packets.
+	 */
+	cls = cls & 0x7fff;
 
 	if (detail) {
 		(void) snprintf(get_line(0, 0), get_line_remain(),

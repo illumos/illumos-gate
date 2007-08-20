@@ -195,6 +195,8 @@ COMMON_SUBDIRS= \
 	SUNWdhcsu  \
 	SUNWdmgtr \
 	SUNWdmgtu \
+	SUNWdsdr  \
+	SUNWdsdu  \
 	SUNWdoc  \
 	SUNWdpl  \
 	SUNWdtrc \

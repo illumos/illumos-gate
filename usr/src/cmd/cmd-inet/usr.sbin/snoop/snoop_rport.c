@@ -55,6 +55,7 @@ static const struct porttable pt_udp[] = {
 	{ IPPORT_TIMESERVER,	"TIME" },
 	{ IPPORT_NAMESERVER,	"NAME" },
 	{ IPPORT_DOMAIN,	"DNS" },
+	{ IPPORT_MDNS,		"MDNS" },
 	{ IPPORT_BOOTPS,	"BOOTPS" },
 	{ IPPORT_BOOTPC,	"BOOTPC" },
 	{ IPPORT_TFTP,		"TFTP" },
@@ -307,8 +308,8 @@ interpret_syslog(int flags, char dir, int port, const char *syslogstr,
 		    priostrlen, syslogstr, bogus ? "" : " ",
 		    facilstr, pristr);
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-			"\"%s\"",
-			show_string(syslogstr, dlen, 60));
+		    "\"%s\"",
+		    show_string(syslogstr, dlen, 60));
 		show_trailer();
 	}
 }
@@ -354,9 +355,10 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		which = dst;
 	}
 
-	if ((dst == IPPORT_DOMAIN || src == IPPORT_DOMAIN) &&
+	if ((dst == IPPORT_DOMAIN || src == IPPORT_DOMAIN ||
+	    dst == IPPORT_MDNS || src == IPPORT_MDNS) &&
 	    proto != IPPROTO_TCP) {
-		interpret_dns(flags, proto, (uchar_t *)data, dlen);
+		interpret_dns(flags, proto, (uchar_t *)data, dlen, which);
 		return (1);
 	}
 
@@ -435,9 +437,9 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 
 	if (flags & F_SUM) {
 		(void) snprintf(get_sum_line(), MAXLINE,
-			"%s %c port=%d %s",
-			pn, dir, port,
-			show_string(data, dlen, 20));
+		    "%s %c port=%d %s",
+		    pn, dir, port,
+		    show_string(data, dlen, 20));
 	}
 
 	if (flags & F_DTAIL) {
@@ -446,8 +448,8 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		show_header(pbuff, hbuff, dlen);
 		show_space();
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-			"\"%s\"",
-			show_string(data, dlen, 60));
+		    "\"%s\"",
+		    show_string(data, dlen, 60));
 		show_trailer();
 	}
 	return (1);

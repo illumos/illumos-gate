@@ -122,23 +122,25 @@ nscd_cfg_id_t _nscd_cfg_nsw_src[] = {
 	{	1,	"ldap"			},
 	{	2,	"nis"			},
 	{	3,	"nisplus"		},
-	{	4,	"dns"			},
-	{	5,	"compat"		},
-	{	6,	"user"			},
+	{	4,	"mdns"			},
+	{	5,	"dns"			},
+	{	6,	"compat"		},
+	{	7,	"user"			},
 	{	-1,	NULL			}
 };
 
 /*
  * name service related smf service table
  * (the order of the services should match the order of the source
- *  listed above, 0: files, 1: ldap, 2: nis, 3: nisplus. dns is
- *  not needed)
+ *  listed above, 0: files, 1: ldap, 2: nis, 3: nisplus, 4: mdns.
+ *  dns is not needed)
  */
 nscd_cfg_id_t _nscd_cfg_smf_services[] = {
 	{	0,	"svc:/system/name-service-cache:default"},
 	{	1,	"svc:/network/ldap/client:default"	},
 	{	2,	"svc:/network/nis/client:default"	},
 	{	3,	"svc:/network/rpc/bind:default"		},
+	{	4,	"svc:/network/dns/multicast:default"	},
 	{	-1,	NULL					}
 };
 

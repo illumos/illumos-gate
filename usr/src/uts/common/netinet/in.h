@@ -197,6 +197,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_NAMESERVER	42
 #define	IPPORT_WHOIS		43
 #define	IPPORT_DOMAIN		53
+#define	IPPORT_MDNS		5353
 #define	IPPORT_MTP		57
 
 /*
