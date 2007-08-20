@@ -788,6 +788,7 @@ SCSIGENHDRS=		\
 	inquiry.h	\
 	message.h	\
 	mode.h		\
+	persist.h	\
 	sense.h		\
 	status.h
 

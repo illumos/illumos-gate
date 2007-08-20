@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,8 +120,7 @@ typedef struct disk_params {
 
 	Boolean_t	d_fast_write;
 	t10_lu_state_t	d_state;
-
-	t10_lu_impl_t	*d_reserve_owner;
+	sbc_reserve_t	d_sbc_reserve;
 } disk_params_t;
 
 typedef struct disk_io {

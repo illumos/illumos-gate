@@ -41,29 +41,39 @@ extern "C" {
 
 #include <iscsitgt_impl.h>
 
-#define	Q_CONN_ERRS	0x00001
-#define	Q_CONN_LOGIN	0x00002
-#define	Q_CONN_NONIO	0x00004
-#define	Q_CONN_IO	0x00008
+/* Connections */
+#define	Q_CONN_ERRS	0x00000001
+#define	Q_CONN_LOGIN	0x00000002
+#define	Q_CONN_NONIO	0x00000004
+#define	Q_CONN_IO	0x00000008
 
-#define	Q_SESS_ERRS	0x00010
-#define	Q_SESS_LOGIN	0x00020
-#define	Q_SESS_NONIO	0x00040
-#define	Q_SESS_IO	0x00080
+/* Sessions */
+#define	Q_SESS_ERRS	0x00000010
+#define	Q_SESS_LOGIN	0x00000020
+#define	Q_SESS_NONIO	0x00000040
+#define	Q_SESS_IO	0x00000080
 
-#define	Q_STE_ERRS	0x00100
-#define	Q_STE_NONIO	0x00200
-#define	Q_STE_IO	0x00400
+/* SCSI Target Emulation */
+#define	Q_STE_ERRS	0x00000100
+#define	Q_STE_NONIO	0x00000200
+#define	Q_STE_IO	0x00000400
 
-#define	Q_GEN_ERRS	0x01000
-#define	Q_GEN_DETAILS	0x02000
+/* General Errors */
+#define	Q_GEN_ERRS	0x00001000
+#define	Q_GEN_DETAILS	0x00002000
 
-#define	Q_ISNS_DBG	0x10000
+/* ISCSI Debugging */
+#define	Q_ISNS_DBG	0x00004000
+
+/* Persistent Reservations */
+#define	Q_PR_ERRS	0x00010000
+#define	Q_PR_NONIO	0x00020000
+#define	Q_PR_IO		0x00040000
 
 /*
  * When used the queue request will be place at the head of the queue.
  */
-#define	Q_HIGH		0x10000
+#define	Q_HIGH		0x80000000
 
 extern int qlog_lvl;
 

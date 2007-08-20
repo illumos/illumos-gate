@@ -51,7 +51,7 @@
 #include "t10_spc.h"
 #include "target.h"
 
-static void spc_free(emul_handle_t id);
+void spc_free(emul_handle_t id);
 
 /*
  * []----
@@ -134,13 +134,13 @@ spc_request_sense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 void
 spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
-	uint8_t			*rsp_buf,
-				*rbp;		/* temporary var */
+	uint8_t			*rsp_buf;
+	uint8_t			*rbp;		/* temporary var */
 	struct scsi_inquiry	*inq;
-	uint32_t		len,
-				page83_len,
-				rqst_len,
-				rtn_len;
+	uint32_t		len;
+	uint32_t		page83_len;
+	uint32_t		rqst_len;
+	uint32_t		rtn_len;
 	struct vpd_hdr		*vhp;
 	struct vpd_desc		vd;
 	size_t			scsi_len;
@@ -188,7 +188,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 */
 	scsi_len = ((strlen(cmd->c_lu->l_targ->s_targ_base) + 1) + 3) & ~3;
 	page83_len = (sizeof (struct vpd_desc) * 6) + scsi_len +
-		(lu->l_guid_len * 3) + (sizeof (uint32_t) * 2);
+	    (lu->l_guid_len * 3) + (sizeof (uint32_t) * 2);
 
 	/*
 	 * We always allocate enough space so that the code can create
@@ -396,8 +396,8 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			bcopy(&vd, rbp, sizeof (vd));
 			rbp		+= sizeof (vd);
 
-			rbp[2]	= hibyte(loword(cmd->c_lu->l_targ->s_tp_grp));
-			rbp[3]	= lobyte(loword(cmd->c_lu->l_targ->s_tp_grp));
+			rbp[2]	= hibyte(loword(cmd->c_lu->l_targ->s_tpgt));
+			rbp[3]	= lobyte(loword(cmd->c_lu->l_targ->s_tpgt));
 			rbp	+= vd.len;
 
 			/* ---- VPD descriptor ---- */
@@ -588,16 +588,16 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	int		expected_data;
 	uint8_t		*buf			= NULL;
-	int		entries			= 0,
-			len,
-			len_network,
-			select,
-			lun_idx,
-			lun_val;
+	int		entries			= 0;
+	int		len;
+	int		len_network;
+	int		select;
+	int		lun_idx;
+	int		lun_val;
 	char		*str;
-	tgt_node_t	*targ,
-			*lun_list,
-			*lun;
+	tgt_node_t	*targ;
+	tgt_node_t	*lun_list;
+	tgt_node_t	*lun;
 
 	/*
 	 * SPC-3 Revision 21c section 6.21
@@ -702,9 +702,9 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	rtpg_hdr_t		*r;
 	rtpg_desc_t		*dp;
 	rtpg_targ_desc_t	*tp;
-	int			rqst_len,
-				alloc_len,
-				i;
+	int			rqst_len;
+	int			alloc_len;
+	int			i;
 	t10_lu_common_t		*lu	= cmd->c_lu->l_common;
 	t10_lu_impl_t		*lu_per;
 
@@ -778,8 +778,8 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	tp		= &dp->targ_list[0];
 	lu_per		= avl_first(&lu->l_all_open);
 	do {
-		tp->rel_tpi[0] = hibyte(loword(lu_per->l_targ->s_tp_grp));
-		tp->rel_tpi[1] = lobyte(loword(lu_per->l_targ->s_tp_grp));
+		tp->rel_tpi[0] = hibyte(loword(lu_per->l_targ->s_tpgt));
+		tp->rel_tpi[1] = lobyte(loword(lu_per->l_targ->s_tpgt));
 		lu_per = AVL_NEXT(&lu->l_all_open, lu_per);
 		tp++;
 	} while (lu_per != NULL);
@@ -815,7 +815,7 @@ spc_send_diag(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 
-static void
+void
 spc_free(emul_handle_t id)
 {
 	free(id);
@@ -1139,14 +1139,13 @@ spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun)
 		 * SAM-3 revision 14, Section 4.9.7.
 		 * 14-bit flat address space.
 		 */
-		buf[0] = SCSI_REPORTLUNS_ADDRESS_FLAT_SPACE |
-			(lun >> 8 & 0x3f);
+		buf[0] = SCSI_REPORTLUNS_ADDRESS_FLAT_SPACE | (lun >> 8 & 0x3f);
 		buf[1] = lun & 0xff;
 
 	} else if (select_field == SCSI_REPORTLUNS_SELECT_ALL) {
 
 		buf[0] = SCSI_REPORTLUNS_ADDRESS_EXTENDED_UNIT |
-			SCSI_REPORTLUNS_ADDRESS_EXTENDED_6B;
+		    SCSI_REPORTLUNS_ADDRESS_EXTENDED_6B;
 		/*
 		 * 32-bit limitation. This format should be able to
 		 * handle a 40-bit LUN.

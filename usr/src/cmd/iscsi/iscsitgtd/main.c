@@ -89,7 +89,8 @@ tgt_node_t	*main_config,
 Boolean_t	enforce_strict_guid	= True,
 		thin_provisioning	= False,
 		disable_tpgs		= False,
-		dbg_timestamps		= False;
+		dbg_timestamps		= False,
+		pgr_persist		= True;
 int		targets_vers_maj,
 		targets_vers_min,
 		main_vers_maj,
@@ -370,6 +371,8 @@ process_config(char *file)
 		    &disable_tpgs);
 		(void) tgt_find_value_boolean(node, XML_ELEMENT_TIMESTAMPS,
 		    &dbg_timestamps);
+		(void) tgt_find_value_boolean(node, XML_ELEMENT_PGR_PERSIST,
+		    &pgr_persist);
 		if (tgt_find_value_int(node, XML_ELEMENT_LOGLVL,
 		    &qlog_lvl) == True)
 			queue_log(True);

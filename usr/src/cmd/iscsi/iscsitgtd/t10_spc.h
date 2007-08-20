@@ -20,14 +20,18 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SPC_H
-#define	_SPC_H
+#ifndef _T10_SPC_H
+#define	_T10_SPC_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * []------------------------------------------------------------------[]
@@ -98,32 +102,59 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
  * | by the code.							|
  * []------------------------------------------------------------------[]
  */
-#define	SPC_ASC_INVALID_CDB	0x24
-#define	SPC_ASCQ_INVALID_CDB	0x00
-#define	SPC_ASC_PWR_RESET	0x29
-#define	SPC_ASCQ_PWR_RESET	0x00
-#define	SPC_ASC_PWR_ON		0x29
-#define	SPC_ASCQ_PWR_ON		0x01
-#define	SPC_ASC_BUS_RESET	0x29
-#define	SPC_ASCQ_BUS_RESET	0x02
 #define	SPC_ASC_FM_DETECTED	0x00 /* file-mark detected */
 #define	SPC_ASCQ_FM_DETECTED	0x01
+
 #define	SPC_ASC_EOP		0x00 /* end-of-partition/medium detected */
 #define	SPC_ASCQ_EOP		0x02
-#define	SPC_ASC_WRITE_ERROR	0x0c
-#define	SPC_ASCQ_WRITE_ERROR	0x00
-#define	SPC_ASC_CAP_CHANGE	0x2a
-#define	SPC_ASCQ_CAP_CHANGE	0x09
+
 #define	SPC_ASC_IN_PROG		0x04
 #define	SPC_ASCQ_IN_PROG	0x07
-#define	SPC_ASC_DATA_PATH	0x41
-#define	SPC_ASCQ_DATA_PATH	0x00
+
+#define	SPC_ASC_WRITE_ERROR	0x0c
+#define	SPC_ASCQ_WRITE_ERROR	0x00
+
+#define	SPC_ASC_PARAM_LIST_LEN	0x1a /* Parameter List Length Error */
+#define	SPC_ASCQ_PARAM_LIST_LEN	0x00
+
 #define	SPC_ASC_MISCOMPARE	0x1d
 #define	SPC_ASCQ_MISCOMPARE	0x00
+
 #define	SPC_ASC_INVALID_LU	0x20
 #define	SPC_ASCQ_INVALID_LU	0x09
+
 #define	SPC_ASC_BLOCK_RANGE	0x21
 #define	SPC_ASCQ_BLOCK_RANGE	0x00
+
+#define	SPC_ASC_INVALID_FIELD_IN_PARAMETER_LIST		0x26
+#define	SPC_ASCQ_INVALID_FIELD_IN_PARAMETER_LIST	0x00
+
+#define	SPC_ASC_INVALID_CDB	0x24
+#define	SPC_ASCQ_INVALID_CDB	0x00
+
+#define	SPC_ASC_PARAMETERS_CHANGED	0x2a
+#define	SPC_ASCQ_RES_PREEMPTED	0x03
+#define	SPC_ASCQ_RES_RELEASED	0x04
+
+#define	SPC_ASC_PWR_RESET	0x29
+#define	SPC_ASCQ_PWR_RESET	0x00
+
+#define	SPC_ASC_PWR_ON		0x29
+#define	SPC_ASCQ_PWR_ON		0x01
+
+#define	SPC_ASC_BUS_RESET	0x29
+#define	SPC_ASCQ_BUS_RESET	0x02
+
+#define	SPC_ASC_CAP_CHANGE	0x2a
+#define	SPC_ASCQ_CAP_CHANGE	0x09
+
+#define	SPC_ASC_DATA_PATH	0x41
+#define	SPC_ASCQ_DATA_PATH	0x00
+
+#define	SPC_ASC_MEMORY_OUT_OF	0x55 /* Auxillary Memory Out Of Space */
+#define	SPC_ASCQ_MEMORY_OUT_OF	0x00
+#define	SPC_ASCQ_RESERVATION_FAIL 0x02
+
 
 /*
  * []------------------------------------------------------------------[]
@@ -417,4 +448,8 @@ struct mode_info_ctrl {
 #define	SCSI_REPORTLUNS_ADDRESS_EXTENDED_MASK		0x30
 #define	SCSI_REPORTLUNS_SELECT_ALL			0x02
 
-#endif /* _SPC_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _T10_SPC_H */
