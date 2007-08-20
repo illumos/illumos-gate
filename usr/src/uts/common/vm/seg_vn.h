@@ -184,6 +184,7 @@ typedef struct svntr {
 	int		tr_valid;	/* entry validity state */
 	struct svntr	*tr_next;	/* next svntr in this hash bucket */
 	timestruc_t	tr_mtime;	/* tr_vp modification time */
+	timestruc_t	tr_ctime;	/* time of last change to attributes */
 	ulong_t		tr_refcnt;	/* number of segs sharing this entry */
 	segvn_data_t	*tr_svnhead;	/* list of segs sharing this entry */
 	struct anon_map	*tr_amp[NLGRPS_MAX]; /* per lgrp anon maps */

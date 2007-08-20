@@ -358,7 +358,7 @@ static struct kmem_cache	*svntr_cache;
 static svntr_stats_t		*segvn_textrepl_stats;
 static ksema_t 			segvn_trasync_sem;
 
-int				segvn_disable_textrepl = 0;
+int				segvn_disable_textrepl = 1;
 size_t				textrepl_size_thresh = (size_t)-1;
 size_t				segvn_textrepl_bytes = 0;
 size_t				segvn_textrepl_max_bytes = 0;
@@ -390,27 +390,26 @@ segvn_init(void)
 		segvn_cache_constructor, segvn_cache_destructor, NULL,
 		NULL, NULL, 0);
 
-	if (segvn_lpg_disable != 0)
-		return;
-	szc = maxszc = page_num_pagesizes() - 1;
-	if (szc == 0) {
-		segvn_lpg_disable = 1;
-		return;
-	}
-	if (page_get_pagesize(0) != PAGESIZE) {
-		panic("segvn_init: bad szc 0");
-		/*NOTREACHED*/
-	}
-	while (szc != 0) {
-		pgsz = page_get_pagesize(szc);
-		if (pgsz <= PAGESIZE || !IS_P2ALIGNED(pgsz, pgsz)) {
-			panic("segvn_init: bad szc %d", szc);
+	if (segvn_lpg_disable == 0) {
+		szc = maxszc = page_num_pagesizes() - 1;
+		if (szc == 0) {
+			segvn_lpg_disable = 1;
+		}
+		if (page_get_pagesize(0) != PAGESIZE) {
+			panic("segvn_init: bad szc 0");
 			/*NOTREACHED*/
 		}
-		szc--;
+		while (szc != 0) {
+			pgsz = page_get_pagesize(szc);
+			if (pgsz <= PAGESIZE || !IS_P2ALIGNED(pgsz, pgsz)) {
+				panic("segvn_init: bad szc %d", szc);
+				/*NOTREACHED*/
+			}
+			szc--;
+		}
+		if (segvn_maxpgszc == 0 || segvn_maxpgszc > maxszc)
+			segvn_maxpgszc = maxszc;
 	}
-	if (segvn_maxpgszc == 0 || segvn_maxpgszc > maxszc)
-		segvn_maxpgszc = maxszc;
 
 	if (segvn_use_regions && !hat_supported(HAT_SHARED_REGIONS, NULL))
 		segvn_use_regions = 0;
@@ -9003,7 +9002,7 @@ segvn_textrepl(struct seg *seg)
 	 * Avoid creating anon maps with size bigger than the file size.
 	 * If VOP_GETATTR() call fails bail out.
 	 */
-	va.va_mask = AT_SIZE | AT_MTIME;
+	va.va_mask = AT_SIZE | AT_MTIME | AT_CTIME;
 	if (VOP_GETATTR(vp, &va, 0, svd->cred) != 0) {
 		svd->tr_state = SEGVN_TR_OFF;
 		SEGVN_TR_ADDSTAT(gaerr);
@@ -9045,13 +9044,24 @@ segvn_textrepl(struct seg *seg)
 		if (svntrp->tr_vp != vp) {
 			continue;
 		}
+
 		/*
-		 * Bail out if file was changed after this replication entry
-		 * was created since we need to use the latest file contents.
+		 * Bail out if the file or its attributes were changed after
+		 * this replication entry was created since we need to use the
+		 * latest file contents. Note that mtime test alone is not
+		 * sufficient because a user can explicitly change mtime via
+		 * utimes(2) interfaces back to the old value after modifiying
+		 * the file contents. To detect this case we also have to test
+		 * ctime which among other things records the time of the last
+		 * mtime change by utimes(2). ctime is not changed when the file
+		 * is only read or executed so we expect that typically existing
+		 * replication amp's can be used most of the time.
 		 */
 		if (!svntrp->tr_valid ||
 		    svntrp->tr_mtime.tv_sec != va.va_mtime.tv_sec ||
-		    svntrp->tr_mtime.tv_nsec != va.va_mtime.tv_nsec) {
+		    svntrp->tr_mtime.tv_nsec != va.va_mtime.tv_nsec ||
+		    svntrp->tr_ctime.tv_sec != va.va_ctime.tv_sec ||
+		    svntrp->tr_ctime.tv_nsec != va.va_ctime.tv_nsec) {
 			mutex_exit(&svntr_hashtab[hash].tr_lock);
 			svd->tr_state = SEGVN_TR_OFF;
 			SEGVN_TR_ADDSTAT(stale);
@@ -9103,6 +9113,7 @@ segvn_textrepl(struct seg *seg)
 		svntrp->tr_szc = szc;
 		svntrp->tr_valid = 1;
 		svntrp->tr_mtime = va.va_mtime;
+		svntrp->tr_ctime = va.va_ctime;
 		svntrp->tr_refcnt = 0;
 		svntrp->tr_next = svntr_hashtab[hash].tr_head;
 		svntr_hashtab[hash].tr_head = svntrp;
