@@ -184,15 +184,19 @@ delete="$delete
 "
 # encumbered binaries and associated files
 delete="$delete
-	etc/dmi/
 	etc/smartcard/
 	kernel/drv/amd64/audioens
+	kernel/drv/amd64/bmc
 	kernel/drv/amd64/pcn
 	kernel/drv/audioens
 	kernel/drv/audioens.conf
+	kernel/drv/bmc
+	kernel/drv/bmc.conf
 	kernel/drv/ifp.conf
 	kernel/drv/pcn
 	kernel/drv/pcn.conf
+	kernel/drv/sbpro
+	kernel/drv/sbpro.conf
 	kernel/drv/sparcv9/audioens
 	kernel/drv/sparcv9/ifp
 	kernel/drv/sparcv9/isp
@@ -205,12 +209,6 @@ delete="$delete
 	platform/SUNW,Sun-Blade-100/kernel/drv/grppm.conf
 	platform/SUNW,Sun-Blade-100/kernel/drv/sparcv9/grfans
 	platform/SUNW,Sun-Blade-100/kernel/drv/sparcv9/grppm
-	platform/i86pc/kernel/drv/amd64/bmc
-	platform/i86pc/kernel/drv/bmc
-	platform/i86pc/kernel/drv/bmc.conf
-	platform/i86pc/kernel/drv/sbpro
-	platform/i86pc/kernel/drv/sbpro.conf
-	platform/sun4u/kernel/drv/sparcv9/scmi2c
 	platform/sun4u/kernel/misc/sparcv9/i2c_svc
 	usr/bin/ksh
 	usr/bin/pfksh
@@ -230,12 +228,28 @@ delete="$delete
 	usr/include/sys/scsi/adapters/ispmail.h
 	usr/include/sys/scsi/adapters/ispreg.h
 	usr/include/sys/scsi/adapters/ispvar.h
+	usr/lib/amd64/libsmartcard.so.1
+	usr/lib/amd64/libsmartcard.so
+	usr/lib/amd64/llib-lsmartcard.ln
+	usr/lib/libsmartcard.so.1
+	usr/lib/libsmartcard.so
+	usr/lib/llib-lsmartcard.ln
+	usr/lib/llib-lsmartcard
+	usr/lib/locale/C/LC_MESSAGES/libsmartcard.msg
 	usr/lib/mdb/disasm/sparc.so
 	usr/lib/mdb/disasm/sparcv9/sparc.so
 	usr/lib/mdb/kvm/sparcv9/isp.so
+	usr/lib/security/amd64/pam_smartcard.so.1
+	usr/lib/security/amd64/pam_smartcard.so
+	usr/lib/security/pam_smartcard.so.1
+	usr/lib/security/pam_smartcard.so
+	usr/lib/security/sparcv9/pam_smartcard.so.1
+	usr/lib/security/sparcv9/pam_smartcard.so
 	usr/lib/smartcard/
+	usr/lib/sparcv9/libsmartcard.so.1
+	usr/lib/sparcv9/libsmartcard.so
+	usr/lib/sparcv9/llib-lsmartcard.ln
 	usr/platform/SUNW,Netra-T12/
-	usr/platform/sun4u/include/sys/i2c/clients/scmi2c.h
 	usr/platform/sun4u/include/sys/i2c/misc/i2c_svc.h
 	usr/platform/sun4u/include/sys/memtestio.h
 	usr/platform/sun4u/include/sys/memtestio_ch.h
@@ -249,8 +263,14 @@ delete="$delete
 	usr/platform/sun4v/include/sys/memtestio.h
 	usr/platform/sun4v/include/sys/memtestio_ni.h
 	usr/platform/sun4v/include/sys/memtestio_v.h
+	usr/sbin/ocfserv
 	usr/share/javadoc/smartcard/
 	usr/share/lib/smartcard/
+	usr/share/lib/sgml/locale/C/dtds/docbook/docbook.dtd
+	usr/share/lib/sgml/locale/C/dtds/docbook/
+	usr/share/lib/sgml/locale/C/dtds/solbookv1/solbook.dtd
+	usr/share/lib/sgml/locale/C/dtds/solbookv1/
+	var/svc/manifest/network/rpc/ocfserv.xml
 "
 # memory fault injector test framework
 delete="$delete
