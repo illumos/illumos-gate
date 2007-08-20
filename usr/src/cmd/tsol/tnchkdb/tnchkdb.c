@@ -287,7 +287,7 @@ check_tnrhtp(const char *file)
 	if ((fp = fopen(file, "r")) == NULL) {
 		err = errno;
 		(void) fprintf(stderr,
-		    gettext("tnchkdb: cannot open %1$s: %2$s\n"), file,
+		    gettext("tnchkdb: failed to open %1$s: %2$s\n"), file,
 		    strerror(err));
 		exitval = 2;
 		tnrhtp_bad = B_TRUE;

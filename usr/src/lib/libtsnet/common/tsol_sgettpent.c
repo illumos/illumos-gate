@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From	"tsol_tndb_parser.c	7.24	01/09/05 SMI; TSOL 2.x"
@@ -268,8 +268,10 @@ tpstr_to_ent(tsol_tpstr_t *tpstrp, int *errp, char **errstrp)
 		return (NULL);
 	}
 	if (strlcpy(tpentp->name, template, sizeof (tpentp->name)) >=
-	    sizeof (tpentp->name))
+	    sizeof (tpentp->name)) {
+		*errp = LTSNET_ILL_NAME;
 		goto err_ret;
+	}
 	kv = _str2kva(attrs, KV_ASSIGN, KV_DELIMITER);
 	*errp = parse_remainder(tpentp, kv);
 	_kva_free(kv);
