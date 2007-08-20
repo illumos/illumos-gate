@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,7 +185,7 @@ ibt_alloc_qp(ibt_hca_hdl_t hca_hdl, ibt_qp_type_t type,
 	hca_hdl->ha_qp_cnt++;
 	mutex_exit(&hca_hdl->ha_mutex);
 
-	IBTF_DPRINTF_L3(ibtf_qp, "ibt_alloc_qp: SUCCESS: qp %p owned by '%s'",
+	IBTF_DPRINTF_L2(ibtf_qp, "ibt_alloc_qp: SUCCESS: qp %p owned by '%s'",
 	    chanp, hca_hdl->ha_clnt_devp->clnt_name);
 
 	*ibt_qp_p = chanp;

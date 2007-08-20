@@ -2205,7 +2205,7 @@ ibcm_process_rej_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		return;
 	}
 
-	IBTF_DPRINTF_L2(cmlog, "ibcm_process_rej_msg: statep 0x%p",
+	IBTF_DPRINTF_L2(cmlog, "ibcm_process_rej_msg: statep 0x%p INCOMING_REJ",
 	    statep);
 	ibcm_insert_trace(statep, IBCM_TRACE_INCOMING_REJ);
 	if (ibcm_enable_trace & 2)
@@ -2916,6 +2916,9 @@ ibcm_resend_rej_mad(ibcm_state_data_t *statep)
 		ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REJ);
 		if (ibcm_enable_trace & 2)
 			ibcm_dump_conn_trace(statep);
+		else
+			IBTF_DPRINTF_L2(cmlog, "ibcm_resend_rej_mad statep %p "
+			    "OUTGOING_REJ", statep);
 
 		ibcm_post_rc_mad(statep, statep->stored_msg,
 		    ibcm_post_rej_complete, statep);
@@ -3051,6 +3054,9 @@ ibcm_post_rej_mad(ibcm_state_data_t *statep, ibt_cm_reason_t reject_reason,
 	ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REJ);
 	if (ibcm_enable_trace & 2)
 		ibcm_dump_conn_trace(statep);
+	else
+		IBTF_DPRINTF_L2(cmlog, "ibcm_post_rej_mad statep %p "
+		    "OUTGOING_REJ", statep);
 
 	ibcm_post_rc_mad(statep, statep->stored_msg, ibcm_post_rej_complete,
 	    statep);
@@ -7020,6 +7026,9 @@ ibcm_cep_state_rtu(ibcm_state_data_t *statep, ibcm_rtu_msg_t *cm_rtu_msgp)
 	ibcm_insert_trace(statep, IBCM_TRACE_RET_CONN_EST_EVENT);
 	if (ibcm_enable_trace & 4)
 		ibcm_dump_conn_trace(statep);
+	else
+		IBTF_DPRINTF_L2(cmlog, "ibcm_cep_state_rtu CONN_EST Channel %p",
+		    statep->channel);
 
 	/* unblock any pending DREQ threads */
 	mutex_enter(&statep->state_mutex);
@@ -7065,6 +7074,9 @@ ibcm_cep_send_rtu(ibcm_state_data_t *statep)
 	}
 	if (ibcm_enable_trace & 4)
 		ibcm_dump_conn_trace(statep);
+	else
+		IBTF_DPRINTF_L2(cmlog, "ibcm_cep_send_rtu CONN_EST Channel %p",
+		    statep->channel);
 
 	/* unblock any pending DREQ threads */
 	mutex_enter(&statep->state_mutex);

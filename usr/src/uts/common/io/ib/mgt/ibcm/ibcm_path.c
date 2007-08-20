@@ -2000,7 +2000,8 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 		if (retval != IBT_SUCCESS) {
 			/* Failed to get pkey_index from pkey */
 			IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: "
-			    "Pkey2Index conversion failed: %d", retval);
+			    "Pkey2Index (PKey = %X) conversion failed: %d",
+			    prec_resp->P_Key, retval);
 			return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
 		}
 		cep_p->cep_adds_vect.av_sgid_ix = hport->hp_sgid_ix;
@@ -2019,7 +2020,8 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 					/* Failed to get pkey_index from pkey */
 					IBTF_DPRINTF_L2(cmlog,
 					    "ibcm_update_cep_info: Pkey2Index "
-					    "conversion failed: %d", retval);
+					    "(PKey = %X) conversion failed: %d",
+					    prec_resp->P_Key, retval);
 					return (ibt_get_module_failure(
 					    IBT_FAILURE_IBSM, 0));
 				}
@@ -2073,9 +2075,9 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 	/* CEP Timeout is NOT filled in by PATH routines. */
 	cep_p->cep_timeout = 0;
 
-	IBTF_DPRINTF_L3(cmlog, "ibcm_update_cep_info: Done.  Port[%d]\n"
-	    "SGID=%llX:%llX DGID=%llX:%llX",
-	    cep_p->cep_adds_vect.av_port_num,
+	IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: Done. Port=%d, PKey=%X\n"
+	    "SGID=%llX:%llX DGID=%llX:%llX", cep_p->cep_adds_vect.av_port_num,
+	    prec_resp->P_Key,
 	    prec_resp->SGID.gid_prefix, prec_resp->SGID.gid_guid,
 	    prec_resp->DGID.gid_prefix, prec_resp->DGID.gid_guid);
 
