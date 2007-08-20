@@ -7119,8 +7119,12 @@ vhci_lun_free(dev_info_t *tgt_dip)
 	cv_destroy(&dvlp->svl_cv);
 	sema_destroy(&dvlp->svl_pgr_sema);
 	kmem_free(dvlp, sizeof (*dvlp));
-
-	sd->sd_address.a_hba_tran->tran_tgt_private = NULL;
+	/*
+	 * vhci_lun_free may be called before the tgt_dip
+	 * initialization so check if the sd is NULL.
+	 */
+	if (sd != NULL)
+		sd->sd_address.a_hba_tran->tran_tgt_private = NULL;
 }
 
 
