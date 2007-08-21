@@ -732,7 +732,7 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* remove mac layer callback */
 	mutex_enter(&vswp->mac_lock);
 	if ((vswp->mh != NULL) && (vswp->mrh != NULL)) {
-		mac_rx_remove(vswp->mh, vswp->mrh);
+		mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
 		vswp->mrh = NULL;
 	}
 	mutex_exit(&vswp->mac_lock);
@@ -1297,7 +1297,7 @@ vsw_mac_detach(vsw_t *vswp)
 		if (vswp->mstarted)
 			mac_stop(vswp->mh);
 		if (vswp->mrh != NULL)
-			mac_rx_remove(vswp->mh, vswp->mrh);
+			mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
 		if (vswp->mresources)
 			mac_resource_set(vswp->mh, NULL, NULL);
 		mac_close(vswp->mh);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,7 +278,7 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return (B_FALSE);
 
-	mac_rx_remove(port->lp_mh, port->lp_mrh);
+	mac_rx_remove(port->lp_mh, port->lp_mrh, B_FALSE);
 	port->lp_state = AGGR_PORT_STATE_STANDBY;
 
 	aggr_grp_multicst_port(port, B_FALSE);
@@ -890,7 +890,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	for (i = 0; i < ETHER_NSTAT && !grp->lg_closing; i++) {
 		stat = i + MACTYPE_STAT_MIN;
 		if (!ETHER_STAT_ISACOUNTER(stat))
-		    continue;
+			continue;
 		val = aggr_port_stat(port, stat);
 		val -= port->lp_ether_stat[i];
 		grp->lg_ether_stat[i] += val;

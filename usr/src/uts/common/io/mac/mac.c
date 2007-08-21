@@ -44,6 +44,7 @@
 #include <sys/modctl.h>
 #include <sys/fs/dv_node.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -86,6 +87,8 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 	mutex_init(&mip->mi_activelink_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&mip->mi_notify_ref_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&mip->mi_notify_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&mip->mi_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&mip->mi_rx_cv, NULL, CV_DRIVER, NULL);
 	return (0);
 }
 
@@ -115,6 +118,8 @@ i_mac_destructor(void *buf, void *arg)
 	mutex_destroy(&mip->mi_activelink_lock);
 	mutex_destroy(&mip->mi_notify_ref_lock);
 	cv_destroy(&mip->mi_notify_cv);
+	mutex_destroy(&mip->mi_lock);
+	cv_destroy(&mip->mi_rx_cv);
 }
 
 static void
@@ -943,6 +948,11 @@ mac_notify(mac_handle_t mh)
 		i_mac_notify(mip, type);
 }
 
+/*
+ * Register a receive function for this mac.
+ * More information on this function's interaction with mac_rx()
+ * can be found atop mac_rx().
+ */
 mac_rx_handle_t
 mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
 {
@@ -957,7 +967,19 @@ mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
 	 * Add it to the head of the 'rx' callback list.
 	 */
 	rw_enter(&(mip->mi_rx_lock), RW_WRITER);
+
+	/*
+	 * mac_rx() will only call callbacks that are marked inuse.
+	 */
+	mrfp->mrf_inuse = B_TRUE;
 	mrfp->mrf_nextp = mip->mi_mrfp;
+
+	/*
+	 * mac_rx() could be traversing the remainder of the list
+	 * and miss the new callback we're adding here. This is not a problem
+	 * because we do not guarantee the callback to take effect immediately
+	 * after mac_rx_add() returns.
+	 */
 	mip->mi_mrfp = mrfp;
 	rw_exit(&(mip->mi_rx_lock));
 
@@ -965,11 +987,14 @@ mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
 }
 
 /*
- * Unregister a receive function for this mac.  This removes the function
- * from the list of receive functions for this mac.
+ * Unregister a receive function for this mac.
+ * This function does not block if wait is B_FALSE. This is useful
+ * for clients who call mac_rx_remove() from a non-blockable context.
+ * More information on this function's interaction with mac_rx()
+ * can be found atop mac_rx().
  */
 void
-mac_rx_remove(mac_handle_t mh, mac_rx_handle_t mrh)
+mac_rx_remove(mac_handle_t mh, mac_rx_handle_t mrh, boolean_t wait)
 {
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_rx_fn_t		*mrfp = (mac_rx_fn_t *)mrh;
@@ -979,17 +1004,55 @@ mac_rx_remove(mac_handle_t mh, mac_rx_handle_t mrh)
 	/*
 	 * Search the 'rx' callback list for the function closure.
 	 */
-	rw_enter(&(mip->mi_rx_lock), RW_WRITER);
+	rw_enter(&mip->mi_rx_lock, RW_WRITER);
 	for (pp = &(mip->mi_mrfp); (p = *pp) != NULL; pp = &(p->mrf_nextp)) {
 		if (p == mrfp)
 			break;
 	}
 	ASSERT(p != NULL);
 
+	/*
+	 * If mac_rx() is running, mark callback for deletion
+	 * and return (if wait is false), or wait until mac_rx()
+	 * exits (if wait is true).
+	 */
+	if (mip->mi_rx_ref > 0) {
+		DTRACE_PROBE1(defer_delete, mac_impl_t *, mip);
+		p->mrf_inuse = B_FALSE;
+		mutex_enter(&mip->mi_lock);
+		mip->mi_rx_removed++;
+		mutex_exit(&mip->mi_lock);
+
+		rw_exit(&mip->mi_rx_lock);
+		if (wait)
+			mac_rx_remove_wait(mh);
+		return;
+	}
+
 	/* Remove it from the list. */
 	*pp = p->mrf_nextp;
 	kmem_free(mrfp, sizeof (mac_rx_fn_t));
-	rw_exit(&(mip->mi_rx_lock));
+	rw_exit(&mip->mi_rx_lock);
+}
+
+/*
+ * Wait for all pending callback removals to be completed by mac_rx().
+ * Note that if we call mac_rx_remove() immediately before this, there is no
+ * guarantee we would wait *only* on the callback that we specified.
+ * mac_rx_remove() could have been called by other threads and we would have
+ * to wait for other marked callbacks to be removed as well.
+ */
+void
+mac_rx_remove_wait(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	mutex_enter(&mip->mi_lock);
+	while (mip->mi_rx_removed > 0) {
+		DTRACE_PROBE1(need_wait, mac_impl_t *, mip);
+		cv_wait(&mip->mi_rx_cv, &mip->mi_lock);
+	}
+	mutex_exit(&mip->mi_lock);
 }
 
 mac_txloop_handle_t
@@ -1385,36 +1448,119 @@ mac_unregister(mac_handle_t mh)
 	return (0);
 }
 
+/*
+ * To avoid potential deadlocks, mac_rx() releases mi_rx_lock
+ * before invoking its list of upcalls. This introduces races with
+ * mac_rx_remove() and mac_rx_add(), who can potentially modify the
+ * upcall list while mi_rx_lock is not being held. The race with
+ * mac_rx_remove() is handled by incrementing mi_rx_ref upon entering
+ * mac_rx(); a non-zero mi_rx_ref would tell mac_rx_remove()
+ * to not modify the list but instead mark an upcall for deletion.
+ * before mac_rx() exits, mi_rx_ref is decremented and if it
+ * is 0, the marked upcalls will be removed from the list and freed.
+ * The race with mac_rx_add() is harmless because mac_rx_add() only
+ * prepends to the list and since mac_rx() saves the list head
+ * before releasing mi_rx_lock, any prepended upcall won't be seen
+ * until the next packet chain arrives.
+ *
+ * To minimize lock contention between multiple parallel invocations
+ * of mac_rx(), mi_rx_lock is acquired as a READER lock. The
+ * use of atomic operations ensures the sanity of mi_rx_ref. mi_rx_lock
+ * will be upgraded to WRITER mode when there are marked upcalls to be
+ * cleaned.
+ */
 void
-mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *bp)
+mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
+	mblk_t		*bp = mp_chain;
 	mac_rx_fn_t	*mrfp;
 
 	/*
 	 * Call all registered receive functions.
 	 */
 	rw_enter(&mip->mi_rx_lock, RW_READER);
-	mrfp = mip->mi_mrfp;
-	if (mrfp == NULL) {
+	if ((mrfp = mip->mi_mrfp) == NULL) {
 		/* There are no registered receive functions. */
 		freemsgchain(bp);
 		rw_exit(&mip->mi_rx_lock);
 		return;
 	}
+	atomic_inc_32(&mip->mi_rx_ref);
+	rw_exit(&mip->mi_rx_lock);
+
+	/*
+	 * Call registered receive functions.
+	 */
 	do {
 		mblk_t *recv_bp;
 
-		if (mrfp->mrf_nextp != NULL) {
-			/* XXX Do we bump a counter if copymsgchain() fails? */
-			recv_bp = copymsgchain(bp);
-		} else {
-			recv_bp = bp;
+		recv_bp = (mrfp->mrf_nextp != NULL) ? copymsgchain(bp) : bp;
+		if (recv_bp != NULL) {
+			if (mrfp->mrf_inuse) {
+				/*
+				 * Send bp itself and keep the copy.
+				 * If there's only one active receiver,
+				 * it should get the original message,
+				 * tagged with the hardware checksum flags.
+				 */
+				mrfp->mrf_fn(mrfp->mrf_arg, mrh, bp);
+				bp = recv_bp;
+			} else {
+				freemsgchain(recv_bp);
+			}
 		}
-		if (recv_bp != NULL)
-			mrfp->mrf_fn(mrfp->mrf_arg, mrh, recv_bp);
 		mrfp = mrfp->mrf_nextp;
 	} while (mrfp != NULL);
+
+	rw_enter(&mip->mi_rx_lock, RW_READER);
+	if (atomic_dec_32_nv(&mip->mi_rx_ref) == 0 && mip->mi_rx_removed > 0) {
+		mac_rx_fn_t	**pp, *p;
+		uint32_t	cnt = 0;
+
+		DTRACE_PROBE1(delete_callbacks, mac_impl_t *, mip);
+
+		/*
+		 * Need to become exclusive before doing cleanup
+		 */
+		if (rw_tryupgrade(&mip->mi_rx_lock) == 0) {
+			rw_exit(&mip->mi_rx_lock);
+			rw_enter(&mip->mi_rx_lock, RW_WRITER);
+		}
+
+		/*
+		 * We return if another thread has already entered and cleaned
+		 * up the list.
+		 */
+		if (mip->mi_rx_ref > 0 || mip->mi_rx_removed == 0) {
+			rw_exit(&mip->mi_rx_lock);
+			return;
+		}
+
+		/*
+		 * Free removed callbacks.
+		 */
+		pp = &mip->mi_mrfp;
+		while (*pp != NULL) {
+			if (!(*pp)->mrf_inuse) {
+				p = *pp;
+				*pp = (*pp)->mrf_nextp;
+				kmem_free(p, sizeof (*p));
+				cnt++;
+				continue;
+			}
+			pp = &(*pp)->mrf_nextp;
+		}
+
+		/*
+		 * Wake up mac_rx_remove_wait()
+		 */
+		mutex_enter(&mip->mi_lock);
+		ASSERT(mip->mi_rx_removed == cnt);
+		mip->mi_rx_removed = 0;
+		cv_broadcast(&mip->mi_rx_cv);
+		mutex_exit(&mip->mi_lock);
+	}
 	rw_exit(&mip->mi_rx_lock);
 }
 

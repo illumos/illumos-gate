@@ -66,6 +66,7 @@ struct mac_rx_fn_s {
 	mac_rx_fn_t		*mrf_nextp;
 	mac_rx_t		mrf_fn;
 	void			*mrf_arg;
+	boolean_t		mrf_inuse;
 };
 
 typedef struct mac_txloop_fn_s		mac_txloop_fn_t;
@@ -132,6 +133,11 @@ typedef struct mac_impl_s {
 	boolean_t		mi_activelink;
 	mac_txinfo_t		mi_txinfo;
 	mac_txinfo_t		mi_txloopinfo;
+	uint32_t		mi_rx_ref;	/* #threads in mac_rx() */
+	uint32_t		mi_rx_removed;	/* #callbacks marked */
+						/* for removal */
+	kmutex_t		mi_lock;
+	kcondvar_t		mi_rx_cv;
 } mac_impl_t;
 
 #define	mi_getstat	mi_callbacks->mc_getstat

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,6 +192,7 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 void
 aggr_port_delete(aggr_port_t *port)
 {
+	mac_rx_remove_wait(port->lp_mh);
 	mac_resource_set(port->lp_mh, NULL, NULL);
 	mac_notify_remove(port->lp_mh, port->lp_mnh);
 	mac_active_clear(port->lp_mh);

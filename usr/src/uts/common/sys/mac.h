@@ -520,7 +520,9 @@ extern void			mac_notify_remove(mac_handle_t,
     mac_notify_handle_t);
 extern void			mac_notify(mac_handle_t);
 extern mac_rx_handle_t		mac_rx_add(mac_handle_t, mac_rx_t, void *);
-extern void			mac_rx_remove(mac_handle_t, mac_rx_handle_t);
+extern void			mac_rx_remove(mac_handle_t, mac_rx_handle_t,
+    boolean_t);
+extern void			mac_rx_remove_wait(mac_handle_t);
 extern mblk_t			*mac_txloop(void *, mblk_t *);
 extern mac_txloop_handle_t	mac_txloop_add(mac_handle_t, mac_txloop_t,
     void *);

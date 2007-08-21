@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -918,6 +918,7 @@ dls_mac_rele(dls_link_t *dlp)
 	ASSERT(dlp->dl_mh != NULL);
 
 	if (--dlp->dl_macref == 0) {
+		mac_rx_remove_wait(dlp->dl_mh);
 		mac_close(dlp->dl_mh);
 		dlp->dl_mh = NULL;
 		dlp->dl_mip = NULL;
@@ -999,7 +1000,7 @@ dls_link_add(dls_link_t *dlp, uint32_t sap, dls_impl_t *dip)
 
 	/* Replace the existing receive function if there is one. */
 	if (dlp->dl_mrh != NULL)
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
 	dlp->dl_mrh = mac_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	mutex_exit(&dlp->dl_lock);
 }
@@ -1075,7 +1076,7 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 	 */
 	if (dlp->dl_impl_count == 0) {
 		rw_exit(&dlp->dl_impl_lock);
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
 		dlp->dl_mrh = NULL;
 	} else {
 		boolean_t promisc = B_FALSE;
@@ -1097,7 +1098,7 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 		else
 			rx = i_dls_link_rx;
 
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
 		dlp->dl_mrh = mac_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	}
 	mutex_exit(&dlp->dl_lock);
