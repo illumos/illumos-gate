@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,16 +197,16 @@ main(int argc, char **argv)
 	}
 
 	(void) __init_daemon_priv(
-		PU_LIMITPRIVS,
-		uid_nobody, gid_nobody,
-		PRIV_PROC_FORK, PRIV_PROC_CHROOT, NULL);
+	    PU_LIMITPRIVS,
+	    uid_nobody, gid_nobody,
+	    PRIV_PROC_FORK, PRIV_PROC_CHROOT, PRIV_NET_PRIVADDR, NULL);
 
 	/*
 	 *  Limit set is still "all."  Trim it down to just what we need:
 	 *  fork and chroot.
 	 */
-	(void) priv_set(PRIV_SET,
-	    PRIV_ALLSETS, PRIV_PROC_FORK, PRIV_PROC_CHROOT, NULL);
+	(void) priv_set(PRIV_SET, PRIV_ALLSETS,
+	    PRIV_PROC_FORK, PRIV_PROC_CHROOT, PRIV_NET_PRIVADDR, NULL);
 	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
 	(void) priv_set(PRIV_SET, PRIV_INHERITABLE, NULL);
 
@@ -261,11 +261,17 @@ usage:
 		(void) memset(&client, 0, clientlen);
 		sin6_ptr->sin6_family = AF_INET6;
 		sin6_ptr->sin6_port = htons(IPPORT_TFTP);
+
+		/* Enable privilege as tftp port is < 1024 */
+		(void) priv_set(PRIV_SET,
+		    PRIV_EFFECTIVE, PRIV_NET_PRIVADDR, NULL);
 		if (bind(reqsock, (struct sockaddr *)&client,
 		    clientlen) == -1) {
 			perror("bind");
 			exit(1);
 		}
+		(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
+
 		if (debug)
 			(void) puts("running in standalone mode...");
 	} else {
@@ -352,7 +358,7 @@ usage:
 		}
 
 		n = recvfrom(reqsock, &buf, sizeof (buf), 0,
-			(struct sockaddr *)&from, &fromlen);
+		    (struct sockaddr *)&from, &fromlen);
 		if (n < 0) {
 			if (errno == EINTR)
 				continue;
@@ -1135,8 +1141,8 @@ tftpd_sendfile(struct formats *pf, int oacklen)
 			if (ackbuf.tb_hdr.th_opcode == ACK) {
 				if (debug && standalone)
 					(void) fprintf(stderr,
-						"received ACK for block %d\n",
-						ackbuf.tb_hdr.th_block);
+					    "received ACK for block %d\n",
+					    ackbuf.tb_hdr.th_block);
 				if (ackbuf.tb_hdr.th_block == block) {
 					break;
 				}
@@ -1254,8 +1260,8 @@ send_ack:
 			if (dp->th_opcode == DATA) {
 				if (debug && standalone)
 					(void) fprintf(stderr,
-						"Received DATA block %d\n",
-						dp->th_block);
+					    "Received DATA block %d\n",
+					    dp->th_block);
 				if (dp->th_block == block) {
 					break;   /* normal */
 				}
