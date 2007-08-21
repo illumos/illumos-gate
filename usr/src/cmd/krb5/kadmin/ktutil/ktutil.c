@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,10 +318,15 @@ void ktutil_list(argc, argv)
 	    static char buf[256];
 		if ((retval = krb5_enctype_to_string(
 		    lp->entry->key.enctype, buf, 256))) {
-		    com_err(argv[0], retval,
-		    gettext("While converting "
-		    "enctype to string"));
-		    return;
+		    if (retval == EINVAL)
+			snprintf(buf, sizeof(buf), gettext("unsupported encryption type %d"),
+			    lp->entry->key.enctype);
+		    else {
+			com_err(argv[0], retval,
+			    gettext("While converting "
+			    "enctype to string"));
+			return;
+		    }
 		}
 	    printf(" (%s) ", buf);
 	}

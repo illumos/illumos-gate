@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -526,12 +526,12 @@ char *
 etype_string(enctype)
     krb5_enctype enctype;
 {
-    static char buf[100];
+    static char buf[256];
     krb5_error_code retval;
     
     if ((retval = krb5_enctype_to_string(enctype, buf, sizeof(buf)))) {
 	/* XXX if there's an error != EINVAL, I should probably report it */
-	sprintf(buf, gettext("etype %d"), enctype);
+	snprintf(buf, sizeof(buf), gettext("unsupported encryption type %d"), enctype);
     }
 
     return buf;
