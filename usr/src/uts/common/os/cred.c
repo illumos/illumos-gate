@@ -178,7 +178,7 @@ cred_init(void)
 	 */
 	ephemeral_data.nobody = crdup(kcred);
 	(void) crsetugid(ephemeral_data.nobody, UID_NOBODY, GID_NOBODY);
-	CR_FLAGS(kcred) = 0;
+	CR_FLAGS(ephemeral_data.nobody) = 0;
 
 	ucredsize = UCRED_SIZE;
 }
@@ -1089,6 +1089,6 @@ ksidlist_t *
 crgetsidlist(const cred_t *cr)
 {
 	if (cr->cr_ksid != NULL && cr->cr_ksid->kr_sidlist != NULL)
-		return ((ksidlist_t *)&cr->cr_ksid->kr_sidlist);
+		return (cr->cr_ksid->kr_sidlist);
 	return (NULL);
 }
