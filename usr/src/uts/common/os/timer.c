@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/policy.h>
-#include <sys/port.h>
+#include <sys/port_impl.h>
 #include <sys/port_kernel.h>
 #include <sys/contract/process_impl.h>
 
@@ -138,15 +138,20 @@ timer_delete_locked(proc_t *p, timer_t tid, itimer_t *it)
 	if (it->it_portev) {
 		mutex_enter(&it->it_mutex);
 		if (it->it_portev) {
+			port_kevent_t	*pev;
 			/* dissociate timer from the event port */
 			(void) port_dissociate_ksource(it->it_portfd,
 			    PORT_SOURCE_TIMER, (port_source_t *)it->it_portsrc);
-			port_free_event((port_kevent_t *)it->it_portev);
+			pev = (port_kevent_t *)it->it_portev;
 			it->it_portev = NULL;
 			it->it_flags &= ~IT_PORT;
 			it->it_pending = 0;
+			mutex_exit(&it->it_mutex);
+			(void) port_remove_done_event(pev);
+			port_free_event(pev);
+		} else {
+			mutex_exit(&it->it_mutex);
 		}
-		mutex_exit(&it->it_mutex);
 	}
 
 	mutex_enter(&p->p_lock);
@@ -984,11 +989,16 @@ timer_close_port(void *arg, int port, pid_t pid, int lastclose)
 		if (it->it_portev) {
 			mutex_enter(&it->it_mutex);
 			if (it->it_portfd == port) {
-				port_free_event((port_kevent_t *)it->it_portev);
+				port_kevent_t *pev;
+				pev = (port_kevent_t *)it->it_portev;
 				it->it_portev = NULL;
 				it->it_flags &= ~IT_PORT;
+				mutex_exit(&it->it_mutex);
+				(void) port_remove_done_event(pev);
+				port_free_event(pev);
+			} else {
+				mutex_exit(&it->it_mutex);
 			}
-			mutex_exit(&it->it_mutex);
 		}
 		timer_release(p, it);
 	}
