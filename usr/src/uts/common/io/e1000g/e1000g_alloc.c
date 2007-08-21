@@ -28,18 +28,11 @@
 /*
  * **********************************************************************
  * Module Name:								*
- *   e1000galloc.c							*
+ *   e1000g_alloc.c							*
  *									*
  * Abstract:								*
- *   This file contains some routines that take care of init,		*
- *   uninit, and memory allocation.					*
- *									*
- *									*
- *   This driver runs on the following hardware:			*
- *   - Wiseman based PCI gigabit ethernet adapters			*
- *									*
- * Environment:								*
- *   Kernel Mode -							*
+ *   This file contains some routines that take care of			*
+ *   memory allocation for descriptors and buffers.			*
  *									*
  * **********************************************************************
  */
@@ -48,7 +41,7 @@
 #include "e1000g_debug.h"
 
 #define	TX_SW_PKT_AREA_SZ \
-	(sizeof (TX_SW_PACKET) * Adapter->NumTxSwPacket)
+	(sizeof (tx_sw_packet_t) * Adapter->tx_freelist_num)
 
 static int e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *);
 static int e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *);
@@ -58,15 +51,89 @@ static int e1000g_alloc_tx_packets(e1000g_tx_ring_t *);
 static int e1000g_alloc_rx_packets(e1000g_rx_ring_t *);
 static void e1000g_free_tx_packets(e1000g_tx_ring_t *);
 static void e1000g_free_rx_packets(e1000g_rx_ring_t *);
-static int e1000g_alloc_dma_buffer(struct e1000g *, dma_buffer_t *, size_t);
+static int e1000g_alloc_dma_buffer(struct e1000g *,
+    dma_buffer_t *, size_t, ddi_dma_attr_t *p_dma_attr);
 static void e1000g_free_dma_buffer(dma_buffer_t *);
 #ifdef __sparc
 static int e1000g_alloc_dvma_buffer(struct e1000g *, dma_buffer_t *, size_t);
 static void e1000g_free_dvma_buffer(dma_buffer_t *);
 #endif
 static int e1000g_alloc_descriptors(struct e1000g *Adapter);
+static void e1000g_free_descriptors(struct e1000g *Adapter);
 static int e1000g_alloc_packets(struct e1000g *Adapter);
-static PRX_SW_PACKET e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *);
+static void e1000g_free_packets(struct e1000g *Adapter);
+static p_rx_sw_packet_t e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *,
+    ddi_dma_attr_t *p_dma_attr);
+
+/* DMA access attributes for descriptors <Little Endian> */
+static ddi_device_acc_attr_t e1000g_desc_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC,
+	DDI_STRICTORDER_ACC,
+};
+
+/* DMA access attributes for DMA buffers */
+#ifdef __sparc
+static ddi_device_acc_attr_t e1000g_buf_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_BE_ACC,
+	DDI_STRICTORDER_ACC,
+};
+#else
+static ddi_device_acc_attr_t e1000g_buf_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC,
+	DDI_STRICTORDER_ACC,
+};
+#endif
+
+/* DMA attributes for tx mblk buffers */
+static ddi_dma_attr_t e1000g_tx_dma_attr = {
+	DMA_ATTR_V0,		/* version of this structure */
+	0,			/* lowest usable address */
+	0xffffffffffffffffULL,	/* highest usable address */
+	0x7fffffff,		/* maximum DMAable byte count */
+	1,			/* alignment in bytes */
+	0x7ff,			/* burst sizes (any?) */
+	1,			/* minimum transfer */
+	0xffffffffU,		/* maximum transfer */
+	0xffffffffffffffffULL,	/* maximum segment length */
+	16,			/* maximum number of segments */
+	1,			/* granularity */
+	0,			/* flags (reserved) */
+};
+
+/* DMA attributes for pre-allocated rx/tx buffers */
+static ddi_dma_attr_t e1000g_buf_dma_attr = {
+	DMA_ATTR_V0,		/* version of this structure */
+	0,			/* lowest usable address */
+	0xffffffffffffffffULL,	/* highest usable address */
+	0x7fffffff,		/* maximum DMAable byte count */
+	1,			/* alignment in bytes */
+	0x7ff,			/* burst sizes (any?) */
+	1,			/* minimum transfer */
+	0xffffffffU,		/* maximum transfer */
+	0xffffffffffffffffULL,	/* maximum segment length */
+	1,			/* maximum number of segments */
+	1,			/* granularity */
+	0,			/* flags (reserved) */
+};
+
+/* DMA attributes for rx/tx descriptors */
+static ddi_dma_attr_t e1000g_desc_dma_attr = {
+	DMA_ATTR_V0,		/* version of this structure */
+	0,			/* lowest usable address */
+	0xffffffffffffffffULL,	/* highest usable address */
+	0x7fffffff,		/* maximum DMAable byte count */
+	E1000_MDALIGN,		/* alignment in bytes 4K! */
+	0x7ff,			/* burst sizes (any?) */
+	1,			/* minimum transfer */
+	0xffffffffU,		/* maximum transfer */
+	0xffffffffffffffffULL,	/* maximum segment length */
+	1,			/* maximum number of segments */
+	1,			/* granularity */
+	0,			/* flags (reserved) */
+};
 
 #ifdef __sparc
 static ddi_dma_lim_t e1000g_dma_limits = {
@@ -87,93 +154,58 @@ static dma_type_t e1000g_dma_type = USE_DMA;
 
 extern krwlock_t e1000g_dma_type_lock;
 
+
 int
 e1000g_alloc_dma_resources(struct e1000g *Adapter)
 {
-	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
+	int result;
 
-	tx_ring = Adapter->tx_ring;
-	rx_ring = Adapter->rx_ring;
+	result = DDI_FAILURE;
 
-	if (e1000g_alloc_descriptors(Adapter) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	while ((result != DDI_SUCCESS) &&
+	    (Adapter->tx_desc_num >= MIN_NUM_TX_DESCRIPTOR) &&
+	    (Adapter->rx_desc_num >= MIN_NUM_RX_DESCRIPTOR) &&
+	    (Adapter->tx_freelist_num >= MIN_NUM_TX_FREELIST) &&
+	    (Adapter->rx_freelist_num >= MIN_NUM_RX_FREELIST)) {
 
-	if (e1000g_alloc_packets(Adapter) != DDI_SUCCESS) {
-		e1000g_free_tx_descriptors(tx_ring);
-		e1000g_free_rx_descriptors(rx_ring);
-		return (DDI_FAILURE);
+		result = e1000g_alloc_descriptors(Adapter);
+
+		if (result == DDI_SUCCESS) {
+			result = e1000g_alloc_packets(Adapter);
+
+			if (result != DDI_SUCCESS)
+				e1000g_free_descriptors(Adapter);
+		}
+
+		/*
+		 * If the allocation fails due to resource shortage,
+		 * we'll reduce the numbers of descriptors/buffers by
+		 * half, and try the allocation again.
+		 */
+		if (result != DDI_SUCCESS) {
+			/*
+			 * We must ensure the number of descriptors
+			 * is always a multiple of 8.
+			 */
+			Adapter->tx_desc_num =
+			    (Adapter->tx_desc_num >> 4) << 3;
+			Adapter->rx_desc_num =
+			    (Adapter->rx_desc_num >> 4) << 3;
+
+			Adapter->tx_freelist_num >>= 1;
+			Adapter->rx_freelist_num >>= 1;
+		}
 	}
 
-	return (DDI_SUCCESS);
+	return (result);
 }
 
 /*
- * **********************************************************************
- * Name:	e1000g_alloc_descriptors				*
- *									*
- * Description:								*
- *     This routine Allocates Neccesary Buffers for the device		*
- *     It allocates memory for						*
- *	 Transmit Descriptor Area					*
- *	 Receive Descrpitor Area					*
- *									*
- *     NOTE -- The device must have been reset before this routine	*
- *		      is called.					*
- *									*
- * Author:	       Hari Seshadri					*
- * Functions Called :							*
- *		       DDI mem functions called				*
- *     ddi_dma_alloc_handle() allocates a new  DMA  handle.  A  DMA	*
- *     handle  is  an  opaque  object used as a reference to subse-	*
- *     quently  allocated  DMA  resources.   ddi_dma_alloc_handle()	*
- *     accepts  as parameters the device information referred to by	*
- *     dip  and  the  device's  DMA  attributes  described   by   a	*
- *     ddi_dma_attr(9S)    structure.    A   successful   call   to	*
- *     ddi_dma_alloc_handle() fills in  the  value  pointed  to  by	*
- *     handlep.   A  DMA handle must only be used by the device for	*
- *     which it was allocated and is only valid for one  I/O  tran-	*
- *     saction at a time.						*
- *									*
- *     ddi_dma_mem_alloc() allocates memory for DMA transfers to or	*
- *     from a device.  The allocation will obey the alignment, pad-	*
- *     ding constraints and device granularity as specified by  the	*
- *     DMA    attributes    (see    ddi_dma_attr(9S))   passed   to	*
- *     ddi_dma_alloc_handle(9F) and the more restrictive attributes	*
- *     imposed by the system.Flags should be set to DDI_DMA_STREAMING	*
- *     if  the  device  is  doing  sequential,  unidirectional,		*
- *     block-sized, and block- aligned transfers to or from memory.	*
- *									*
- *									*
- *     ddi_dma_addr_bind_handle() allocates  DMA  resources  for  a	*
- *     memory  object such that a device can perform DMA to or from	*
- *     the object.  DMA resources  are  allocated  considering  the	*
- *     device's  DMA  attributes  as  expressed by ddi_dma_attr(9S)	*
- *     (see ddi_dma_alloc_handle(9F)).					*
- *     ddi_dma_addr_bind_handle() fills in  the  first  DMA  cookie	*
- *     pointed  to by cookiep with the appropriate address, length,	*
- *     and bus type.	*ccountp is set to the number of DMA  cookies	*
- *     representing this DMA object. Subsequent DMA cookies must be	*
- *     retrieved by calling ddi_dma_nextcookie(9F)  the  number  of	*
- *     times specified by *countp - 1.					*
- *									*
- * Arguments:								*
- *      Adapter - A pointer to context sensitive "Adapter" structure.	*
- *									*
- *									*
- * Returns:								*
- *      DDI_SUCCESS on success						*
- *	  DDI_FAILURE on error						*
- *									*
- * Modification log:							*
- * Date      Who  Description						*
- * --------  ---  -----------------------------------------------------	*
- * 11/11/98  Vinay  Cleaned the entire function to prevents panics and	*
- *		   memory corruption					*
- * 17/11/98  Vinay  Optimized it for proper usages of function calls	*
- * 30/04/99  Vinay  Resolved some more memory problems related to race	*
- *		  conditions						*
- * **********************************************************************
+ * e1000g_alloc_descriptors - allocate DMA buffers for descriptors
+ *
+ * This routine allocates neccesary DMA buffers for
+ *	Transmit Descriptor Area
+ *	Receive Descrpitor Area
  */
 static int
 e1000g_alloc_descriptors(struct e1000g *Adapter)
@@ -199,6 +231,19 @@ e1000g_alloc_descriptors(struct e1000g *Adapter)
 	return (DDI_SUCCESS);
 }
 
+static void
+e1000g_free_descriptors(struct e1000g *Adapter)
+{
+	e1000g_tx_ring_t *tx_ring;
+	e1000g_rx_ring_t *rx_ring;
+
+	tx_ring = Adapter->tx_ring;
+	rx_ring = Adapter->rx_ring;
+
+	e1000g_free_tx_descriptors(tx_ring);
+	e1000g_free_rx_descriptors(rx_ring);
+}
+
 static int
 e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 {
@@ -211,12 +256,13 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	dev_info_t *devinfo;
 	ddi_dma_cookie_t cookie;
 	struct e1000g *Adapter;
+	ddi_dma_attr_t dma_attr;
 
 	Adapter = tx_ring->adapter;
+	devinfo = Adapter->dip;
 
 	alloc_flag = B_FALSE;
-
-	devinfo = Adapter->dip;
+	dma_attr = e1000g_desc_dma_attr;
 
 	/*
 	 * Solaris 7 has a problem with allocating physically contiguous memory
@@ -231,29 +277,23 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	 * 4K, ie more than 256 descriptors, we allocate 4k extra memory and
 	 * and then align the memory at a 4k boundary.
 	 */
-	size = sizeof (struct e1000_tx_desc) * Adapter->NumTxDescriptors;
+	size = sizeof (struct e1000_tx_desc) * Adapter->tx_desc_num;
 
 	/*
 	 * Memory allocation for the transmit buffer descriptors.
 	 */
-	/*
-	 * DMA attributes set to asking for 4k alignment and no
-	 * scatter/gather specified.
-	 * This typically does not succeed for Solaris 7, but
-	 * might work for Solaris 2.6
-	 */
-	tbd_dma_attr.dma_attr_sgllen = 1;
+	dma_attr.dma_attr_sgllen = 1;
 
 	/*
 	 * Allocate a new DMA handle for the transmit descriptor
 	 * memory area.
 	 */
-	mystat = ddi_dma_alloc_handle(devinfo, &tbd_dma_attr,
+	mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 	    DDI_DMA_DONTWAIT, 0,
 	    &tx_ring->tbd_dma_handle);
 
 	if (mystat != DDI_SUCCESS) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate tbd dma handle: %d", mystat);
 		tx_ring->tbd_dma_handle = NULL;
 		return (DDI_FAILURE);
@@ -265,7 +305,7 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	 */
 	mystat = ddi_dma_mem_alloc(tx_ring->tbd_dma_handle,
 	    size,
-	    &accattr, DDI_DMA_CONSISTENT,
+	    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, 0,
 	    (caddr_t *)&tx_ring->tbd_area,
 	    &len, &tx_ring->tbd_acc_handle);
@@ -302,19 +342,19 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 		/*
 		 * DMA attributes set to no scatter/gather and 16 bit alignment
 		 */
-		tbd_dma_attr.dma_attr_align = 1;
-		tbd_dma_attr.dma_attr_sgllen = 1;
+		dma_attr.dma_attr_align = 1;
+		dma_attr.dma_attr_sgllen = 1;
 
 		/*
 		 * Allocate a new DMA handle for the transmit descriptor memory
 		 * area.
 		 */
-		mystat = ddi_dma_alloc_handle(devinfo, &tbd_dma_attr,
+		mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 		    DDI_DMA_DONTWAIT, 0,
 		    &tx_ring->tbd_dma_handle);
 
 		if (mystat != DDI_SUCCESS) {
-			e1000g_log(Adapter, CE_WARN,
+			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not re-allocate tbd dma handle: %d", mystat);
 			tx_ring->tbd_dma_handle = NULL;
 			return (DDI_FAILURE);
@@ -326,13 +366,13 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 		 */
 		mystat = ddi_dma_mem_alloc(tx_ring->tbd_dma_handle,
 		    size,
-		    &accattr, DDI_DMA_CONSISTENT,
+		    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 		    DDI_DMA_DONTWAIT, 0,
 		    (caddr_t *)&tx_ring->tbd_area,
 		    &len, &tx_ring->tbd_acc_handle);
 
 		if (mystat != DDI_SUCCESS) {
-			e1000g_log(Adapter, CE_WARN,
+			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not allocate tbd dma memory: %d", mystat);
 			tx_ring->tbd_acc_handle = NULL;
 			tx_ring->tbd_area = NULL;
@@ -371,10 +411,10 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	mystat = ddi_dma_addr_bind_handle(tx_ring->tbd_dma_handle,
 	    (struct as *)NULL, (caddr_t)tx_ring->tbd_area,
 	    len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-	    DDI_DMA_SLEEP, 0, &cookie, &cookie_count);
+	    DDI_DMA_DONTWAIT, 0, &cookie, &cookie_count);
 
 	if (mystat != DDI_SUCCESS) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind tbd dma resource: %d", mystat);
 		if (tx_ring->tbd_acc_handle != NULL) {
 			ddi_dma_mem_free(&tx_ring->tbd_acc_handle);
@@ -391,21 +431,17 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	ASSERT(cookie_count == 1);	/* 1 cookie */
 
 	if (cookie_count != 1) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_2(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind tbd dma resource in a single frag. "
 		    "Count - %d Len - %d", cookie_count, len);
 		e1000g_free_tx_descriptors(tx_ring);
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * The FirstTxDescriptor is initialized to the physical address that
-	 * is obtained from the ddi_dma_addr_bind_handle call
-	 */
 	tx_ring->tbd_dma_addr = cookie.dmac_laddress;
 	tx_ring->tbd_first = tx_ring->tbd_area;
 	tx_ring->tbd_last = tx_ring->tbd_first +
-	    (Adapter->NumTxDescriptors - 1);
+	    (Adapter->tx_desc_num - 1);
 
 	return (DDI_SUCCESS);
 }
@@ -422,35 +458,34 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	dev_info_t *devinfo;
 	ddi_dma_cookie_t cookie;
 	struct e1000g *Adapter;
+	ddi_dma_attr_t dma_attr;
 
 	Adapter = rx_ring->adapter;
+	devinfo = Adapter->dip;
 
 	alloc_flag = B_FALSE;
-
-	devinfo = Adapter->dip;
+	dma_attr = e1000g_desc_dma_attr;
 
 	/*
 	 * Memory allocation for the receive buffer descriptors.
 	 */
-	size = (sizeof (struct e1000_rx_desc)) * Adapter->NumRxDescriptors;
+	size = (sizeof (struct e1000_rx_desc)) * Adapter->rx_desc_num;
 
 	/*
 	 * Asking for aligned memory with DMA attributes set for 4k alignment
 	 */
-	tbd_dma_attr.dma_attr_sgllen = 1;
-	tbd_dma_attr.dma_attr_align = E1000_MDALIGN;
+	dma_attr.dma_attr_sgllen = 1;
+	dma_attr.dma_attr_align = E1000_MDALIGN;
 
 	/*
-	 * Allocate a new DMA handle for the receive descriptor
-	 * memory area. re-use the tbd_dma_attr since rbd has
-	 * same attributes.
+	 * Allocate a new DMA handle for the receive descriptors
 	 */
-	mystat = ddi_dma_alloc_handle(devinfo, &tbd_dma_attr,
+	mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 	    DDI_DMA_DONTWAIT, 0,
 	    &rx_ring->rbd_dma_handle);
 
 	if (mystat != DDI_SUCCESS) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate rbd dma handle: %d", mystat);
 		rx_ring->rbd_dma_handle = NULL;
 		return (DDI_FAILURE);
@@ -461,7 +496,7 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 */
 	mystat = ddi_dma_mem_alloc(rx_ring->rbd_dma_handle,
 	    size,
-	    &accattr, DDI_DMA_CONSISTENT,
+	    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, 0,
 	    (caddr_t *)&rx_ring->rbd_area,
 	    &len, &rx_ring->rbd_acc_handle);
@@ -492,24 +527,21 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		bzero((caddr_t)rx_ring->rbd_area, len);
 
 	/*
-	 * If memory allocation did not succeed or if number of descriptors is
-	 * greater than a page size ( more than 256 descriptors ), do the
-	 * alignment yourself
+	 * If memory allocation did not succeed, do the alignment ourselves
 	 */
 	if (!alloc_flag) {
-		tbd_dma_attr.dma_attr_align = 1;
-		tbd_dma_attr.dma_attr_sgllen = 1;
+		dma_attr.dma_attr_align = 1;
+		dma_attr.dma_attr_sgllen = 1;
 		size = size + ROUNDOFF;
 		/*
-		 * Allocate a new DMA handle for the receive descriptor memory
-		 * area. re-use the tbd_dma_attr since rbd has same attributes.
+		 * Allocate a new DMA handle for the receive descriptor.
 		 */
-		mystat = ddi_dma_alloc_handle(devinfo, &tbd_dma_attr,
+		mystat = ddi_dma_alloc_handle(devinfo, &dma_attr,
 		    DDI_DMA_DONTWAIT, 0,
 		    &rx_ring->rbd_dma_handle);
 
 		if (mystat != DDI_SUCCESS) {
-			e1000g_log(Adapter, CE_WARN,
+			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not re-allocate rbd dma handle: %d", mystat);
 			rx_ring->rbd_dma_handle = NULL;
 			return (DDI_FAILURE);
@@ -520,13 +552,13 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		 */
 		mystat = ddi_dma_mem_alloc(rx_ring->rbd_dma_handle,
 		    size,
-		    &accattr, DDI_DMA_CONSISTENT,
+		    &e1000g_desc_acc_attr, DDI_DMA_CONSISTENT,
 		    DDI_DMA_DONTWAIT, 0,
 		    (caddr_t *)&rx_ring->rbd_area,
 		    &len, &rx_ring->rbd_acc_handle);
 
 		if (mystat != DDI_SUCCESS) {
-			e1000g_log(Adapter, CE_WARN,
+			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not allocate rbd dma memory: %d", mystat);
 			rx_ring->rbd_acc_handle = NULL;
 			rx_ring->rbd_area = NULL;
@@ -560,10 +592,10 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	mystat = ddi_dma_addr_bind_handle(rx_ring->rbd_dma_handle,
 	    (struct as *)NULL, (caddr_t)rx_ring->rbd_area,
 	    len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-	    DDI_DMA_SLEEP, 0, &cookie, &cookie_count);
+	    DDI_DMA_DONTWAIT, 0, &cookie, &cookie_count);
 
 	if (mystat != DDI_SUCCESS) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind rbd dma resource: %d", mystat);
 		if (rx_ring->rbd_acc_handle != NULL) {
 			ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
@@ -579,20 +611,17 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 
 	ASSERT(cookie_count == 1);
 	if (cookie_count != 1) {
-		e1000g_log(Adapter, CE_WARN,
+		E1000G_DEBUGLOG_2(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind rbd dma resource in a single frag. "
 		    "Count - %d Len - %d", cookie_count, len);
 		e1000g_free_rx_descriptors(rx_ring);
 		return (DDI_FAILURE);
 	}
-	/*
-	 * Initialize the FirstRxDescriptor to the cookie address obtained
-	 * from the ddi_dma_addr_bind_handle call.
-	 */
+
 	rx_ring->rbd_dma_addr = cookie.dmac_laddress;
 	rx_ring->rbd_first = rx_ring->rbd_area;
 	rx_ring->rbd_last = rx_ring->rbd_first +
-	    (Adapter->NumRxDescriptors - 1);
+	    (Adapter->rx_desc_num - 1);
 
 	return (DDI_SUCCESS);
 }
@@ -639,44 +668,14 @@ e1000g_free_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 
 
 /*
- * **********************************************************************
- * Name:	e1000g_alloc_packets					*
- *									*
- * Description: This routine Allocates Neccesary Buffers for the device	*
- *      It allocates memory for						*
- *									*
- *	 Transmit packet Structure					*
- *	 Handle for Transmit buffers					*
- *	 Receive packet structure					*
- *	 Buffer for Receive packet					*
- *									*
- *									*
- *       For ddi memory alloc routine see e1000g_Txalloc description	*
- *       NOTE -- The device must have been reset before this routine	*
- *	       is called.						*
- *									*
- * Author:		   Hari Seshadri				*
- * Functions Called :							*
- *									*
- *									*
- *									*
- * Arguments:								*
- *      Adapter - A pointer to our context sensitive "Adapter"		*
- *		structure.						*
- *									*
- *									*
- * Returns:								*
- *      DDI_SUCCESS on sucess						*
- *	  DDI_FAILURE on error						*
- *									*
- *									*
- *									*
- * Modification log:							*
- * Date      Who  Description						*
- * --------  ---  -----------------------------------------------------	*
- * 30/04/99  VA   Cleaned code for memory corruptions, invalid DMA	*
- *		attributes and prevent panics				*
- * **********************************************************************
+ * e1000g_alloc_packets - allocate DMA buffers for rx/tx
+ *
+ * This routine allocates neccesary buffers for
+ *	 Transmit sw packet structure
+ *	 DMA handle for Transmit
+ *	 DMA buffer for Transmit
+ *	 Receive sw packet structure
+ *	 DMA buffer for Receive
  */
 static int
 e1000g_alloc_packets(struct e1000g *Adapter)
@@ -700,14 +699,14 @@ again:
 			e1000g_dma_type = USE_DMA;
 			rw_exit(&e1000g_dma_type_lock);
 
-			e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 			    "No enough dvma resource for Tx packets, "
 			    "trying to allocate dma buffers...\n");
 			goto again;
 		}
 		rw_exit(&e1000g_dma_type_lock);
 
-		e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
+		E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 		    "Failed to allocate dma buffers for Tx packets\n");
 		return (DDI_FAILURE);
 	}
@@ -722,14 +721,14 @@ again:
 			e1000g_dma_type = USE_DMA;
 			rw_exit(&e1000g_dma_type_lock);
 
-			e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 			    "No enough dvma resource for Rx packets, "
 			    "trying to allocate dma buffers...\n");
 			goto again;
 		}
 		rw_exit(&e1000g_dma_type_lock);
 
-		e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
+		E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 		    "Failed to allocate dma buffers for Rx packets\n");
 		return (DDI_FAILURE);
 	}
@@ -737,6 +736,19 @@ again:
 	rw_exit(&e1000g_dma_type_lock);
 
 	return (DDI_SUCCESS);
+}
+
+static void
+e1000g_free_packets(struct e1000g *Adapter)
+{
+	e1000g_tx_ring_t *tx_ring;
+	e1000g_rx_ring_t *rx_ring;
+
+	tx_ring = Adapter->tx_ring;
+	rx_ring = Adapter->rx_ring;
+
+	e1000g_free_tx_packets(tx_ring);
+	e1000g_free_rx_packets(rx_ring);
 }
 
 #ifdef __sparc
@@ -760,7 +772,7 @@ e1000g_alloc_dvma_buffer(struct e1000g *Adapter,
 
 	if (mystat != DDI_SUCCESS) {
 		buf->dma_handle = NULL;
-		e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate dvma buffer handle: %d\n", mystat);
 		return (DDI_FAILURE);
 	}
@@ -772,7 +784,7 @@ e1000g_alloc_dvma_buffer(struct e1000g *Adapter,
 			dvma_release(buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate dvma buffer memory\n");
 		return (DDI_FAILURE);
 	}
@@ -815,7 +827,7 @@ e1000g_free_dvma_buffer(dma_buffer_t *buf)
 
 static int
 e1000g_alloc_dma_buffer(struct e1000g *Adapter,
-    dma_buffer_t *buf, size_t size)
+    dma_buffer_t *buf, size_t size, ddi_dma_attr_t *p_dma_attr)
 {
 	int mystat;
 	dev_info_t *devinfo;
@@ -829,19 +841,19 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 		devinfo = Adapter->dip;
 
 	mystat = ddi_dma_alloc_handle(devinfo,
-	    &buf_dma_attr,
+	    p_dma_attr,
 	    DDI_DMA_DONTWAIT, 0,
 	    &buf->dma_handle);
 
 	if (mystat != DDI_SUCCESS) {
 		buf->dma_handle = NULL;
-		e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate dma buffer handle: %d\n", mystat);
 		return (DDI_FAILURE);
 	}
 
 	mystat = ddi_dma_mem_alloc(buf->dma_handle,
-	    size, &accattr2, DDI_DMA_STREAMING,
+	    size, &e1000g_buf_acc_attr, DDI_DMA_STREAMING,
 	    DDI_DMA_DONTWAIT, 0,
 	    &buf->address,
 	    &len, &buf->acc_handle);
@@ -853,7 +865,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 			ddi_dma_free_handle(&buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not allocate dma buffer memory: %d\n", mystat);
 		return (DDI_FAILURE);
 	}
@@ -862,7 +874,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 	    (struct as *)NULL,
 	    buf->address,
 	    len, DDI_DMA_READ | DDI_DMA_STREAMING,
-	    DDI_DMA_SLEEP, 0, &cookie, &count);
+	    DDI_DMA_DONTWAIT, 0, &cookie, &count);
 
 	if (mystat != DDI_SUCCESS) {
 		if (buf->acc_handle != NULL) {
@@ -874,7 +886,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 			ddi_dma_free_handle(&buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind buffer dma handle: %d\n", mystat);
 		return (DDI_FAILURE);
 	}
@@ -893,7 +905,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 			ddi_dma_free_handle(&buf->dma_handle);
 			buf->dma_handle = NULL;
 		}
-		e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Could not bind buffer as a single frag. "
 		    "Count = %d\n", count);
 		return (DDI_FAILURE);
@@ -936,11 +948,16 @@ static int
 e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 {
 	int j;
-	PTX_SW_PACKET packet;
+	p_tx_sw_packet_t packet;
 	int mystat;
 	dma_buffer_t *tx_buf;
-	struct e1000g *Adapter = tx_ring->adapter;
-	dev_info_t *devinfo = Adapter->dip;
+	struct e1000g *Adapter;
+	dev_info_t *devinfo;
+	ddi_dma_attr_t dma_attr;
+
+	Adapter = tx_ring->adapter;
+	devinfo = Adapter->dip;
+	dma_attr = e1000g_buf_dma_attr;
 
 	/*
 	 * Memory allocation for the Transmit software structure, the transmit
@@ -954,7 +971,7 @@ e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 		return (DDI_FAILURE);
 
 	for (j = 0, packet = tx_ring->packet_area;
-	    j < Adapter->NumTxSwPacket; j++, packet++) {
+	    j < Adapter->tx_freelist_num; j++, packet++) {
 
 		ASSERT(packet != NULL);
 
@@ -976,7 +993,7 @@ e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 #endif
 		case USE_DMA:
 			mystat = ddi_dma_alloc_handle(devinfo,
-			    &tx_dma_attr,
+			    &e1000g_tx_dma_attr,
 			    DDI_DMA_DONTWAIT, 0,
 			    &packet->tx_dma_handle);
 			break;
@@ -986,7 +1003,7 @@ e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 		}
 		if (mystat != DDI_SUCCESS) {
 			packet->tx_dma_handle = NULL;
-			e1000g_DEBUGLOG_1(Adapter, e1000g_CALLTRACE_LEVEL,
+			E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 			    "Could not allocate tx dma handle: %d\n", mystat);
 			goto tx_pkt_fail;
 		}
@@ -1004,12 +1021,12 @@ e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 #ifdef __sparc
 		case USE_DVMA:
 			mystat = e1000g_alloc_dvma_buffer(Adapter,
-			    tx_buf, Adapter->TxBufferSize);
+			    tx_buf, Adapter->tx_buffer_size);
 			break;
 #endif
 		case USE_DMA:
 			mystat = e1000g_alloc_dma_buffer(Adapter,
-			    tx_buf, Adapter->TxBufferSize);
+			    tx_buf, Adapter->tx_buffer_size, &dma_attr);
 			break;
 		default:
 			ASSERT(B_FALSE);
@@ -1031,7 +1048,7 @@ e1000g_alloc_tx_packets(e1000g_tx_ring_t *tx_ring)
 				break;
 			}
 			packet->tx_dma_handle = NULL;
-			e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+			E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 			    "Allocate Tx buffer fail\n");
 			goto tx_pkt_fail;
 		}
@@ -1051,32 +1068,30 @@ static int
 e1000g_alloc_rx_packets(e1000g_rx_ring_t *rx_ring)
 {
 	int i;
-	PRX_SW_PACKET packet;
+	p_rx_sw_packet_t packet;
 	struct e1000g *Adapter;
 	uint32_t packet_num;
+	ddi_dma_attr_t dma_attr;
 
 	Adapter = rx_ring->adapter;
+	dma_attr = e1000g_buf_dma_attr;
 
+#ifndef NO_82542_SUPPORT
+	dma_attr.dma_attr_align = Adapter->rx_buf_align;
+#endif
 	/*
-	 * Allocate memory for the RX_SW_PACKET structures. Each one of these
+	 * Allocate memory for the rx_sw_packet structures. Each one of these
 	 * structures will contain a virtual and physical address to an actual
-	 * receive buffer in host memory. Since we use one RX_SW_PACKET per
-	 * received packet, the maximum number of RX_SW_PACKETs that we'll
+	 * receive buffer in host memory. Since we use one rx_sw_packet per
+	 * received packet, the maximum number of rx_sw_packet that we'll
 	 * need is equal to the number of receive descriptors that we've
 	 * allocated.
-	 *
-	 * Pre allocation for recv packet buffer. The Recv intr constructs
-	 * a new mp using this buffer
-	 *
-	 * On Wiseman these Receive buffers must be aligned with 256 byte
-	 * boundary
-	 * Vinay, Apr19,2000
 	 */
-	packet_num = Adapter->NumRxDescriptors + Adapter->NumRxFreeList;
+	packet_num = Adapter->rx_desc_num + Adapter->rx_freelist_num;
 	rx_ring->packet_area = NULL;
 
 	for (i = 0; i < packet_num; i++) {
-		packet = e1000g_alloc_rx_sw_packet(rx_ring);
+		packet = e1000g_alloc_rx_sw_packet(rx_ring, &dma_attr);
 		if (packet == NULL)
 			goto rx_pkt_fail;
 
@@ -1092,40 +1107,35 @@ rx_pkt_fail:
 	return (DDI_FAILURE);
 }
 
-static PRX_SW_PACKET
-e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring)
+static p_rx_sw_packet_t
+e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
 {
 	int mystat;
-	PRX_SW_PACKET packet;
+	p_rx_sw_packet_t packet;
 	dma_buffer_t *rx_buf;
 	struct e1000g *Adapter;
 
 	Adapter = rx_ring->adapter;
 
-	packet = kmem_zalloc(sizeof (RX_SW_PACKET), KM_NOSLEEP);
+	packet = kmem_zalloc(sizeof (rx_sw_packet_t), KM_NOSLEEP);
 	if (packet == NULL) {
-		e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 		    "Cound not allocate memory for Rx SwPacket\n");
 		return (NULL);
 	}
 
 	rx_buf = packet->rx_buf;
 
-	/*
-	 * Make sure that receive buffers are 256 byte aligned
-	 */
-	buf_dma_attr.dma_attr_align = Adapter->RcvBufferAlignment;
-
 	switch (e1000g_dma_type) {
 #ifdef __sparc
 	case USE_DVMA:
 		mystat = e1000g_alloc_dvma_buffer(Adapter,
-		    rx_buf, Adapter->RxBufferSize);
+		    rx_buf, Adapter->rx_buffer_size);
 		break;
 #endif
 	case USE_DMA:
 		mystat = e1000g_alloc_dma_buffer(Adapter,
-		    rx_buf, Adapter->RxBufferSize);
+		    rx_buf, Adapter->rx_buffer_size, p_dma_attr);
 		break;
 	default:
 		ASSERT(B_FALSE);
@@ -1134,9 +1144,9 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring)
 
 	if (mystat != DDI_SUCCESS) {
 		if (packet != NULL)
-			kmem_free(packet, sizeof (RX_SW_PACKET));
+			kmem_free(packet, sizeof (rx_sw_packet_t));
 
-		e1000g_DEBUGLOG_0(Adapter, e1000g_CALLTRACE_LEVEL,
+		E1000G_DEBUGLOG_0(Adapter, E1000G_WARN_LEVEL,
 		    "Failed to allocate Rx buffer\n");
 		return (NULL);
 	}
@@ -1169,7 +1179,7 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring)
 }
 
 void
-e1000g_free_rx_sw_packet(PRX_SW_PACKET packet)
+e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet)
 {
 	dma_buffer_t *rx_buf;
 
@@ -1200,13 +1210,13 @@ e1000g_free_rx_sw_packet(PRX_SW_PACKET packet)
 
 	packet->dma_type = USE_NONE;
 
-	kmem_free(packet, sizeof (RX_SW_PACKET));
+	kmem_free(packet, sizeof (rx_sw_packet_t));
 }
 
 static void
 e1000g_free_rx_packets(e1000g_rx_ring_t *rx_ring)
 {
-	PRX_SW_PACKET packet, next_packet, free_list;
+	p_rx_sw_packet_t packet, next_packet, free_list;
 
 	rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
 
@@ -1215,10 +1225,12 @@ e1000g_free_rx_packets(e1000g_rx_ring_t *rx_ring)
 	for (; packet != NULL; packet = next_packet) {
 		next_packet = packet->next;
 
-		if (packet->flag & E1000G_RX_SW_SENDUP) {
+		if (packet->flag == E1000G_RX_SW_SENDUP) {
+			rx_ring->pending_count++;
 			e1000g_mblks_pending++;
-			packet->flag |= E1000G_RX_SW_DETACHED;
-			packet->next = NULL;
+			packet->flag = E1000G_RX_SW_STOP;
+			packet->next = rx_ring->pending_list;
+			rx_ring->pending_list = packet;
 		} else {
 			packet->next = free_list;
 			free_list = packet;
@@ -1242,13 +1254,13 @@ e1000g_free_tx_packets(e1000g_tx_ring_t *tx_ring)
 {
 	int j;
 	struct e1000g *Adapter;
-	PTX_SW_PACKET packet;
+	p_tx_sw_packet_t packet;
 	dma_buffer_t *tx_buf;
 
 	Adapter = tx_ring->adapter;
 
 	for (j = 0, packet = tx_ring->packet_area;
-	    j < Adapter->NumTxSwPacket; j++, packet++) {
+	    j < Adapter->tx_freelist_num; j++, packet++) {
 
 		if (packet == NULL)
 			break;
@@ -1303,50 +1315,14 @@ e1000g_free_tx_packets(e1000g_tx_ring_t *tx_ring)
 }
 
 /*
- * **********************************************************************
- * Name:      e1000g_release_dma_resources				*
- *									*
- * Description:								*
- *     This function release any pending buffers. that has been		*
- *     previously allocated						*
- *									*
- * Parameter Passed:							*
- *									*
- * Return Value:							*
- *									*
- * Functions called:							*
- *									*
- *									*
- * **********************************************************************
+ * e1000g_release_dma_resources - release allocated DMA resources
+ *
+ * This function releases any pending buffers that has been
+ * previously allocated
  */
 void
-e1000g_release_dma_resources(register struct e1000g *Adapter)
+e1000g_release_dma_resources(struct e1000g *Adapter)
 {
-	e1000g_tx_ring_t *tx_ring;
-	e1000g_rx_ring_t *rx_ring;
-
-	tx_ring = Adapter->tx_ring;
-	rx_ring = Adapter->rx_ring;
-
-	/*
-	 * Release all the handles, memory and DMA resources that are
-	 * allocated for the transmit buffer descriptors.
-	 */
-	e1000g_free_tx_descriptors(tx_ring);
-
-	/*
-	 * Release all the handles, memory and DMA resources that are
-	 * allocated for the receive buffer descriptors.
-	 */
-	e1000g_free_rx_descriptors(rx_ring);
-
-	/*
-	 * Free Tx packet resources
-	 */
-	e1000g_free_tx_packets(tx_ring);
-
-	/*
-	 * TX resources done, now free RX resources
-	 */
-	e1000g_free_rx_packets(rx_ring);
+	e1000g_free_descriptors(Adapter);
+	e1000g_free_packets(Adapter);
 }

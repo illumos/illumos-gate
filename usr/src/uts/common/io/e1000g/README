@@ -520,3 +520,11 @@ Notes on packaging:
 ======
   This version has the following fix:
    6552853 system panics in e1000g_alloc_dvma_buffer during hotplug testing
+
+5.2.0
+======
+  This version has the following fix:
+   6535620 e1000g needs to support ICH9 devices
+   6572330 e1000g: integrate the latest Intel refactored shared code
+   6573381 e1000g receiving VLAN tagged frames does not do hardware checksumming
+

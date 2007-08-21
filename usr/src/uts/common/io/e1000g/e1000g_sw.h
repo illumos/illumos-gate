@@ -41,21 +41,7 @@ extern "C" {
  *   This header file contains Software-related data structures		*
  *   definitions.							*
  *									*
- *   This driver runs on the following hardware:			*
- *   - Wisemane based PCI gigabit ethernet adapters			*
- *									*
- * Environment:								*
- *   Kernel Mode -							*
- *									*
  * **********************************************************************
- */
-
-#ifdef DEBUG
-#define	e1000g_DEBUG
-#endif
-
-/*
- *  Solaris Multithreaded GLD wiseman PCI Ethernet Driver
  */
 
 #include <sys/types.h>
@@ -85,36 +71,8 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
-#include "e1000_hw.h"
+#include "e1000_api.h"
 
-/*
- * PCI Command Register Bit Definitions
- * Configuration Space Header
- */
-#define	CMD_IO_SPACE			0x0001	/* BIT_0 */
-#define	CMD_MEMORY_SPACE		0x0002	/* BIT_1 */
-#define	CMD_BUS_MASTER			0x0004	/* BIT_2 */
-#define	CMD_SPECIAL_CYCLES		0x0008	/* BIT_3 */
-
-#define	CMD_VGA_PALLETTE_SNOOP		0x0020	/* BIT_5 */
-#define	CMD_PARITY_RESPONSE		0x0040	/* BIT_6 */
-#define	CMD_WAIT_CYCLE_CONTROL		0x0080	/* BIT_7 */
-#define	CMD_SERR_ENABLE			0x0100	/* BIT_8 */
-#define	CMD_BACK_TO_BACK		0x0200	/* BIT_9 */
-
-#define	WSDRAINTIME		(200)	/* # milliseconds xmit drain */
-
-#ifdef __sparc
-#ifdef _LP64
-#define	DWORD_SWAP(value)	(value)
-#else
-#define	DWORD_SWAP(value)	\
-	(uint64_t)((((uint64_t)value & 0x00000000FFFFFFFF) << 32) | \
-	(((uint64_t)value & 0xFFFFFFFF00000000) >> 32))
-#endif
-#else
-#define	DWORD_SWAP(value)	(value)
-#endif
 
 #define	JUMBO_FRAG_LENGTH		4096
 
@@ -133,55 +91,55 @@ extern "C" {
 #define	E1000_FC_LOW_DIFF	0x1640 /* Low: 5696 bytes below Rx FIFO size */
 #define	E1000_FC_PAUSE_TIME	0x0680 /* 858 usec */
 
-#define	MAXNUMTXDESCRIPTOR		4096
-#define	MAXNUMRXDESCRIPTOR		4096
-#define	MAXNUMRXFREELIST		4096
-#define	MAXNUMTXSWPACKET		4096
-#define	MAXNUMRCVPKTONINTR		4096
-#define	MAXTXFRAGSLIMIT			1024
-#define	MAXTXINTERRUPTDELAYVAL		65535
-#define	MAXINTERRUPTTHROTTLINGVAL	65535
-#define	MAXRXBCOPYTHRESHOLD		E1000_RX_BUFFER_SIZE_2K
-#define	MAXTXBCOPYTHRESHOLD		E1000_TX_BUFFER_SIZE_2K
-#define	MAXTXRECYCLELOWWATER		\
-	(DEFAULTNUMTXDESCRIPTOR - MAX_TX_DESC_PER_PACKET)
-#define	MAXTXRECYCLENUM			DEFAULTNUMTXDESCRIPTOR
+#define	MAX_NUM_TX_DESCRIPTOR		4096
+#define	MAX_NUM_RX_DESCRIPTOR		4096
+#define	MAX_NUM_RX_FREELIST		4096
+#define	MAX_NUM_TX_FREELIST		4096
+#define	MAX_RX_LIMIT_ON_INTR		4096
+#define	MAX_RX_INTR_DELAY		65535
+#define	MAX_RX_INTR_ABS_DELAY		65535
+#define	MAX_TX_INTR_DELAY		65535
+#define	MAX_TX_INTR_ABS_DELAY		65535
+#define	MAX_INTR_THROTTLING		65535
+#define	MAX_RX_BCOPY_THRESHOLD		E1000_RX_BUFFER_SIZE_2K
+#define	MAX_TX_BCOPY_THRESHOLD		E1000_TX_BUFFER_SIZE_2K
 
-#define	MINNUMTXDESCRIPTOR		80
-#define	MINNUMRXDESCRIPTOR		80
-#define	MINNUMRXFREELIST		64
-#define	MINNUMTXSWPACKET		80
-#define	MINNUMRCVPKTONINTR		16
-#define	MINTXFRAGSLIMIT			2
-#define	MINTXINTERRUPTDELAYVAL		0
-#define	MININTERRUPTTHROTTLINGVAL	0
-#define	MINRXBCOPYTHRESHOLD		0
-#define	MINTXBCOPYTHRESHOLD		MINIMUM_ETHERNET_PACKET_SIZE
-#define	MINTXRECYCLELOWWATER		MAX_TX_DESC_PER_PACKET
-#define	MINTXRECYCLENUM			MAX_TX_DESC_PER_PACKET
+#define	MIN_NUM_TX_DESCRIPTOR		80
+#define	MIN_NUM_RX_DESCRIPTOR		80
+#define	MIN_NUM_RX_FREELIST		64
+#define	MIN_NUM_TX_FREELIST		80
+#define	MIN_RX_LIMIT_ON_INTR		16
+#define	MIN_RX_INTR_DELAY		0
+#define	MIN_RX_INTR_ABS_DELAY		0
+#define	MIN_TX_INTR_DELAY		0
+#define	MIN_TX_INTR_ABS_DELAY		0
+#define	MIN_INTR_THROTTLING		0
+#define	MIN_RX_BCOPY_THRESHOLD		0
+#define	MIN_TX_BCOPY_THRESHOLD		MINIMUM_ETHERNET_PACKET_SIZE
 
-#define	DEFAULTNUMTXDESCRIPTOR		2048
-#define	DEFAULTNUMRXDESCRIPTOR		2048
-#define	DEFAULTNUMRXFREELIST		4096
-#define	DEFAULTNUMTXSWPACKET		2048
-#define	DEFAULTMAXNUMRCVPKTONINTR	256
-#define	DEFAULTTXFRAGSLIMIT		4
-#define	DEFAULTFLOWCONTROLVAL		3
-#define	DEFAULTTXINTERRUPTDELAYVAL	300
-#define	DEFAULTINTERRUPTTHROTTLINGVAL	0x225
-#define	DEFAULTMWIENABLEVAL		1	/* Only PCI 450NX chipset */
-						/* needs this value to be 0 */
-#define	DEFAULTMASTERLATENCYTIMERVAL	0	/* BIOS should decide */
+#define	DEFAULT_NUM_RX_DESCRIPTOR	2048
+#define	DEFAULT_NUM_TX_DESCRIPTOR	2048
+#define	DEFAULT_NUM_RX_FREELIST		4096
+#define	DEFAULT_NUM_TX_FREELIST		2048
+#define	DEFAULT_RX_LIMIT_ON_INTR	256
+#define	DEFAULT_RX_INTR_DELAY		0
+#define	DEFAULT_RX_INTR_ABS_DELAY	0
+#define	DEFAULT_TX_INTR_DELAY		300
+#define	DEFAULT_TX_INTR_ABS_DELAY	0
+#define	DEFAULT_INTR_THROTTLING		0x225
+#define	DEFAULT_RX_BCOPY_THRESHOLD	0
+#define	DEFAULT_TX_BCOPY_THRESHOLD	512
+
+#define	DEFAULT_TX_RECYCLE_LOW_WATER	64
+#define	DEFAULT_TX_RECYCLE_NUM		128
+#define	DEFAULT_TX_INTR_ENABLE		1
+#define	DEFAULT_FLOW_CONTROL		3
+#define	DEFAULT_MASTER_LATENCY_TIMER	0	/* BIOS should decide */
 						/* which is normally 0x040 */
-#define	DEFAULTRXPCIPRIORITYVAL		1	/* Boolean value */
-#define	DEFAULTPROFILEJUMBOTRAFFIC	1	/* Profile Jumbo Traffic */
-#define	DEFAULTTBICOMPATIBILITYENABLE	1	/* Enable SBP workaround */
-#define	DEFAULTMSIENABLE		1	/* MSI Enable */
+#define	DEFAULT_TBI_COMPAT_ENABLE	1	/* Enable SBP workaround */
+#define	DEFAULT_MSI_ENABLE		1	/* MSI Enable */
 
-#define	DEFAULTRXBCOPYTHRESHOLD		0
-#define	DEFAULTTXBCOPYTHRESHOLD		512
-#define	DEFAULTTXRECYCLELOWWATER	64
-#define	DEFAULTTXRECYCLENUM		128
+#define	TX_DRAIN_TIME		(200)	/* # milliseconds xmit drain */
 
 /*
  * The size of the receive/transmite buffers
@@ -201,14 +159,8 @@ extern "C" {
 
 #define	E1000G_RX_SW_FREE		0x0
 #define	E1000G_RX_SW_SENDUP		0x1
-#define	E1000G_RX_SW_DETACHED		0x2
-
-/*
- * By default it will print only to log
- */
-#define	DEFAULTDEBUGLEVEL		0x004
-#define	DEFAULTDISPLAYONLY		0
-#define	DEFAULTPRINTONLY		1
+#define	E1000G_RX_SW_STOP		0x2
+#define	E1000G_RX_SW_DETACH		0x3
 
 /*
  * definitions for smartspeed workaround
@@ -231,24 +183,23 @@ extern "C" {
 #define	E1000G_IPALIGNPRESERVEROOM	64
 
 #define	E1000G_IMS_TX_INTR	(E1000_IMS_TXDW | E1000_IMS_TXQE)
-#define	E1000G_IMC_TX_INTR	(E1000_IMC_TXDW | E1000_IMC_TXQE)
 #define	E1000G_ICR_TX_INTR	(E1000_ICR_TXDW | E1000_ICR_TXQE)
 
 /*
  * bit flags for 'attach_progress' which is a member variable in struct e1000g
  */
-#define	ATTACH_PROGRESS_SOFTINTR	0x0001	/* Soft interrupt added */
-#define	ATTACH_PROGRESS_REGSMAPPED	0x0002	/* registers mapped */
-#define	ATTACH_PROGRESS_LOCKS		0x0004	/* locks initialized */
-#define	ATTACH_PROGRESS_PCICONFIG	0x0008	/* PCI config set up */
-#define	ATTACH_PROGRESS_KSTATS		0x0010	/* kstats created */
-#define	ATTACH_PROGRESS_INIT		0x0020	/* reset */
-#define	ATTACH_PROGRESS_INTRADDED	0x0040	/* interrupts added */
-#define	ATTACH_PROGRESS_MACREGISTERED	0x0080	/* MAC registered */
-#define	ATTACH_PROGRESS_PROP		0x0100	/* properties initialized */
+#define	ATTACH_PROGRESS_PCI_CONFIG	0x0001	/* PCI config setup */
+#define	ATTACH_PROGRESS_REGS_MAP	0x0002	/* Registers mapped */
+#define	ATTACH_PROGRESS_SETUP		0x0004	/* Setup driver parameters */
+#define	ATTACH_PROGRESS_ADD_INTR	0x0008	/* Interrupt added */
+#define	ATTACH_PROGRESS_LOCKS		0x0010	/* Locks initialized */
+#define	ATTACH_PROGRESS_SOFT_INTR	0x0020	/* Soft interrupt added */
+#define	ATTACH_PROGRESS_KSTATS		0x0040	/* Kstats created */
+#define	ATTACH_PROGRESS_ALLOC		0x0080	/* DMA resources allocated */
+#define	ATTACH_PROGRESS_INIT		0x0100	/* Driver initialization */
 #define	ATTACH_PROGRESS_NDD		0x0200	/* NDD initialized */
-#define	ATTACH_PROGRESS_INTRENABLED	0x0400	/* DDI interrupts enabled */
-#define	ATTACH_PROGRESS_ALLOC		0x0800	/* DMA resources allocated */
+#define	ATTACH_PROGRESS_MAC		0x0400	/* MAC registered */
+#define	ATTACH_PROGRESS_ENABLE_INTR	0x0800	/* DDI interrupts enabled */
 
 /*
  * Speed and Duplex Settings
@@ -259,7 +210,6 @@ extern "C" {
 #define	GDIAG_100_FULL		4
 #define	GDIAG_1000_FULL		6
 #define	GDIAG_ANY		7
-#define	MAX_DEVICES		256
 
 /*
  * Coexist Workaround RP: 07/04/03
@@ -276,12 +226,17 @@ extern "C" {
 #define	FRAME_SIZE_UPTO_4K	4096
 #define	FRAME_SIZE_UPTO_8K	8192
 #define	FRAME_SIZE_UPTO_16K	16384
-#define	FRAME_SIZE_UPTO_10K	10500
+#define	FRAME_SIZE_UPTO_9K	9234
 
-/*
- * Max microsecond for ITR (Interrupt Throttling Register)
- */
-#define	E1000_ITR_MAX_MICROSECOND	0x3fff
+/* The sizes (in bytes) of a ethernet packet */
+#define	MAXIMUM_ETHERNET_FRAME_SIZE	1518 /* With FCS */
+#define	MINIMUM_ETHERNET_FRAME_SIZE	64   /* With FCS */
+#define	ETHERNET_FCS_SIZE		4
+#define	MAXIMUM_ETHERNET_PACKET_SIZE	\
+	(MAXIMUM_ETHERNET_FRAME_SIZE - ETHERNET_FCS_SIZE)
+#define	MINIMUM_ETHERNET_PACKET_SIZE	\
+	(MINIMUM_ETHERNET_FRAME_SIZE - ETHERNET_FCS_SIZE)
+#define	CRC_LENGTH			ETHERNET_FCS_SIZE
 
 /* Defines for Tx stall check */
 #define	E1000G_STALL_WATCHDOG_COUNT	8
@@ -302,10 +257,6 @@ extern "C" {
 #define	E1000G_LB_EXTERNAL_10		3
 #define	E1000G_LB_INTERNAL_PHY		4
 
-
-#define	GET_ETHER_TYPE(ptr)	(\
-	(((uint8_t *)&((struct ether_header *)ptr)->ether_type)[0] << 8) | \
-	(((uint8_t *)&((struct ether_header *)ptr)->ether_type)[1]))
 
 /*
  * QUEUE_INIT_LIST -- Macro which will init ialize a queue to NULL.
@@ -430,14 +381,9 @@ extern "C" {
 #define	param_adv_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
 #define	param_adv_10fdx		nd_params[PARAM_ADV_10FDX_CAP].ndp_val
 #define	param_adv_10hdx		nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-
 #define	param_force_speed_duplex nd_params[PARAM_FORCE_SPEED_DUPLEX].ndp_val
 
-#define	param_link_up		nd_params[PARAM_LINK_STATUS].ndp_val
-#define	param_link_speed	nd_params[PARAM_LINK_SPEED].ndp_val
-#define	param_link_duplex	nd_params[PARAM_LINK_DUPLEX].ndp_val
-#define	param_link_autoneg	nd_params[PARAM_LINK_AUTONEG].ndp_val
-
+#ifdef E1000G_DEBUG
 /*
  * E1000G-specific ioctls ...
  */
@@ -461,6 +407,7 @@ typedef struct {
 	uint64_t pp_acc_data;	/* output for peek	*/
 				/* input for poke	*/
 } e1000g_peekpoke_t;
+#endif	/* E1000G_DEBUG */
 
 /*
  * (Internal) return values from ioctl subroutines
@@ -541,11 +488,9 @@ enum {
 	PARAM_INTR_TYPE,
 
 	PARAM_TX_BCOPY_THRESHOLD,
-	PARAM_TX_FRAGS_LIMIT,
-	PARAM_TX_RECYCLE_LOW_WATER,
-	PARAM_TX_RECYCLE_NUM,
 	PARAM_TX_INTR_ENABLE,
-	PARAM_TX_INTR_DELAY,
+	PARAM_TX_TIDV,
+	PARAM_TX_TADV,
 	PARAM_RX_BCOPY_THRESHOLD,
 	PARAM_RX_PKT_ON_INTR,
 	PARAM_RX_RDTR,
@@ -553,36 +498,6 @@ enum {
 
 	PARAM_COUNT
 };
-
-static struct ether_addr etherbroadcastaddr = {
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-};
-
-/*
- * DMA access attributes <Little Endian Card>
- */
-static ddi_device_acc_attr_t accattr = {
-	DDI_DEVICE_ATTR_V0,
-	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-};
-
-/*
- * DMA access attributes for receive buffer <Big Endian> for Sparc
- */
-#ifdef __sparc
-static ddi_device_acc_attr_t accattr2 = {
-	DDI_DEVICE_ATTR_V0,
-	DDI_STRUCTURE_BE_ACC,
-	DDI_STRICTORDER_ACC,
-};
-#else
-static ddi_device_acc_attr_t accattr2 = {
-	DDI_DEVICE_ATTR_V0,
-	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC,
-};
-#endif
 
 typedef struct _private_devi_list {
 	dev_info_t *dip;
@@ -608,15 +523,15 @@ typedef struct _LIST_DESCRIBER {
 /*
  * Address-Length pair structure that stores descriptor info
  */
-typedef struct _ADDRESS_LENGTH_PAIR {
-	uint64_t Address;
-	uint32_t Length;
-} ADDRESS_LENGTH_PAIR, *PADDRESS_LENGTH_PAIR;
+typedef struct _sw_desc {
+	uint64_t address;
+	uint32_t length;
+} sw_desc_t, *p_sw_desc_t;
 
-typedef struct _DESCRIPTOR_PAIR {
-	ADDRESS_LENGTH_PAIR Descriptor[4];
-	uint32_t Elements;
-} DESC_ARRAY, *PDESC_ARRAY;
+typedef struct _desc_array {
+	sw_desc_t descriptor[4];
+	uint32_t elements;
+} desc_array_t, *p_desc_array_t;
 
 typedef enum {
 	USE_NONE,
@@ -632,7 +547,7 @@ typedef struct _dma_buffer {
 	ddi_dma_handle_t dma_handle;
 	size_t size;
 	size_t len;
-} dma_buffer_t, *pdma_buffer_t;
+} dma_buffer_t, *p_dma_buffer_t;
 
 /*
  * Transmit Control Block (TCB), Ndis equiv of SWPacket This
@@ -641,43 +556,42 @@ typedef struct _dma_buffer {
  * message block pointer and the TBD addresses associated with
  * the m_blk and also the link to the next tcb in the chain
  */
-typedef struct _TX_SW_PACKET_ {
-	/* Link to the next TX_SW_PACKET in the list */
+typedef struct _tx_sw_packet {
+	/* Link to the next tx_sw_packet in the list */
 	SINGLE_LIST_LINK Link;
 	mblk_t *mp;
-	UINT num_desc;
-	UINT num_mblk_frag;
+	uint32_t num_desc;
+	uint32_t num_mblk_frag;
 	dma_type_t dma_type;
 	dma_type_t data_transfer_type;
 	ddi_dma_handle_t tx_dma_handle;
 	dma_buffer_t tx_buf[1];
-	ADDRESS_LENGTH_PAIR desc[MAX_TX_DESC_PER_PACKET + 1];
-} TX_SW_PACKET, *PTX_SW_PACKET;
+	sw_desc_t desc[MAX_TX_DESC_PER_PACKET];
+} tx_sw_packet_t, *p_tx_sw_packet_t;
 
 /*
- * This structure is similar to the RX_SW_PACKET structure used
+ * This structure is similar to the rx_sw_packet structure used
  * for Ndis. This structure stores information about the 2k
  * aligned receive buffer into which the FX1000 DMA's frames.
  * This structure is maintained as a linked list of many
  * receiver buffer pointers.
  */
-typedef struct _RX_SW_PACKET {
-	/* Link to the next RX_SW_PACKET in the list */
+typedef struct _rx_sw_apcket {
+	/* Link to the next rx_sw_packet_t in the list */
 	SINGLE_LIST_LINK Link;
-	struct _RX_SW_PACKET *next;
+	struct _rx_sw_apcket *next;
 	uint16_t flag;
 	mblk_t *mp;
 	caddr_t rx_ring;
 	dma_type_t dma_type;
 	frtn_t free_rtn;
 	dma_buffer_t rx_buf[1];
-} RX_SW_PACKET, *PRX_SW_PACKET;
+} rx_sw_packet_t, *p_rx_sw_packet_t;
 
-typedef struct _e1000g_msg_chain {
+typedef struct _mblk_list {
 	mblk_t *head;
 	mblk_t *tail;
-	kmutex_t lock;
-} e1000g_msg_chain_t;
+} mblk_list_t, *p_mblk_list_t;
 
 typedef struct _cksum_data {
 	uint32_t ether_header_size;
@@ -685,17 +599,6 @@ typedef struct _cksum_data {
 	uint32_t cksum_start;
 	uint32_t cksum_stuff;
 } cksum_data_t;
-
-/*
- * MultiCast Command Block (MULTICAST_CB) The multicast
- * structure contains an array of multicast addresses and
- * also a count of the total number of addresses.
- */
-typedef struct _multicast_cb_t {
-	ushort_t mc_count;	/* Number of multicast addresses */
-	uchar_t MulticastBuffer[(ETH_LENGTH_OF_ADDRESS *
-		MAX_NUM_MULTICAST_ADDRESSES)];
-} mltcst_cb_t, *pmltcst_cb_t;
 
 typedef union _e1000g_ether_addr {
 	struct {
@@ -705,42 +608,46 @@ typedef union _e1000g_ether_addr {
 	struct {
 		uint8_t set;
 		uint8_t redundant;
-		uint8_t addr[NODE_ADDRESS_SIZE];
+		uint8_t addr[ETHERADDRL];
 	} mac;
 } e1000g_ether_addr_t;
 
-typedef struct _e1000gstat {
+typedef struct _e1000g_stat {
 
 	kstat_named_t link_speed;	/* Link Speed */
-	kstat_named_t rx_none;		/* Rx No Incoming Data */
+	kstat_named_t reset_count;	/* Reset Count */
+
 	kstat_named_t rx_error;		/* Rx Error in Packet */
 	kstat_named_t rx_exceed_pkt;	/* Rx Exceed Max Pkt Count */
-	kstat_named_t rx_multi_desc;	/* Rx Multi Spanned Pkt */
-	kstat_named_t rx_no_freepkt;	/* Rx No Free Pkt */
-	kstat_named_t rx_avail_freepkt;	/* Rx Freelist Avail Buffers */
 	kstat_named_t rx_esballoc_fail;	/* Rx Desballoc Failure */
 	kstat_named_t rx_allocb_fail;	/* Rx Allocb Failure */
-	kstat_named_t rx_seq_intr;	/* Rx Sequencing Errors Intr */
-	kstat_named_t tx_lack_desc;	/* Tx Lack of Desc */
+
 	kstat_named_t tx_no_desc;	/* Tx No Desc */
 	kstat_named_t tx_no_swpkt;	/* Tx No Pkt Buffer */
 	kstat_named_t tx_send_fail;	/* Tx SendPkt Failure */
-	kstat_named_t tx_multi_cookie;	/* Tx Pkt Span Multi Cookies */
 	kstat_named_t tx_over_size;	/* Tx Pkt Too Long */
-	kstat_named_t tx_under_size;	/* Tx Allocb Failure */
 	kstat_named_t tx_reschedule;	/* Tx Reschedule */
+
+#ifdef E1000G_DEBUG
+	kstat_named_t rx_none;		/* Rx No Incoming Data */
+	kstat_named_t rx_multi_desc;	/* Rx Multi Spanned Pkt */
+	kstat_named_t rx_no_freepkt;	/* Rx No Free Pkt */
+	kstat_named_t rx_avail_freepkt;	/* Rx Freelist Avail Buffers */
+
+	kstat_named_t tx_under_size;	/* Tx Packet Under Size */
 	kstat_named_t tx_empty_frags;	/* Tx Empty Frags */
 	kstat_named_t tx_exceed_frags;	/* Tx Exceed Max Frags */
 	kstat_named_t tx_recycle;	/* Tx Recycle */
-	kstat_named_t tx_recycle_retry;	/* Tx Recycle Retry */
 	kstat_named_t tx_recycle_intr;	/* Tx Recycle in Intr */
+	kstat_named_t tx_recycle_retry;	/* Tx Recycle Retry */
 	kstat_named_t tx_recycle_none;	/* Tx No Desc Recycled */
 	kstat_named_t tx_copy;		/* Tx Send Copy */
 	kstat_named_t tx_bind;		/* Tx Send Bind */
 	kstat_named_t tx_multi_copy;	/* Tx Copy Multi Fragments */
-	kstat_named_t StallWatchdog;	/* Tx Stall Watchdog */
-	kstat_named_t reset_count;	/* Reset Count */
-	kstat_named_t intr_type;	/* Interrupt Type */
+	kstat_named_t tx_multi_cookie;	/* Tx Pkt Span Multi Cookies */
+	kstat_named_t tx_lack_desc;	/* Tx Lack of Desc */
+#endif
+
 	kstat_named_t Crcerrs;	/* CRC Error Count */
 	kstat_named_t Symerrs;	/* Symbol Error Count */
 	kstat_named_t Mpc;	/* Missed Packet Count */
@@ -790,9 +697,6 @@ typedef struct _e1000gstat {
 	kstat_named_t Ptc1522;	/* Packets Xmitted (1024-1522b */
 	kstat_named_t Mptc;	/* Multicast Packets Xmited Count */
 	kstat_named_t Bptc;	/* Broadcast Packets Xmited Count */
-	/*
-	 * New Livengood Stat Counters
-	 */
 	kstat_named_t Algnerrc;	/* Alignment Error count */
 	kstat_named_t Tuc;	/* Transmit Underrun count */
 	kstat_named_t Rxerrc;	/* Rx Error Count */
@@ -801,22 +705,13 @@ typedef struct _e1000gstat {
 	kstat_named_t Rutec;	/* Receive DMA too Early count */
 	kstat_named_t Tsctc;	/* TCP seg contexts xmit count */
 	kstat_named_t Tsctfc;	/* TCP seg contexts xmit fail count */
-	/*
-	 * Jumbo Frame Counters
-	 */
-	kstat_named_t JumboTx_4K;	/* 4k Jumbo Frames Transmitted */
-	kstat_named_t JumboRx_4K;	/* 4k Jumbo Frames Received */
-	kstat_named_t JumboTx_8K;	/* 8k Jumbo Frames Transmitted */
-	kstat_named_t JumboRx_8K;	/* 8k Jumbo Frames Received */
-	kstat_named_t JumboTx_16K;	/* 16k Jumbo Frames Transmitted */
-	kstat_named_t JumboRx_16K;	/* 16k Jumbo Frames Received */
-
-} e1000gstat, *e1000gstatp;
+} e1000g_stat_t, *p_e1000g_stat_t;
 
 typedef struct _e1000g_tx_ring {
 	kmutex_t tx_lock;
 	kmutex_t freelist_lock;
 	kmutex_t usedlist_lock;
+	kmutex_t mblks_lock;
 	/*
 	 * Descriptor queue definitions
 	 */
@@ -828,10 +723,11 @@ typedef struct _e1000g_tx_ring {
 	struct e1000_tx_desc *tbd_last;
 	struct e1000_tx_desc *tbd_oldest;
 	struct e1000_tx_desc *tbd_next;
+	uint32_t tbd_avail;
 	/*
 	 * Software packet structures definitions
 	 */
-	PTX_SW_PACKET packet_area;
+	p_tx_sw_packet_t packet_area;
 	LIST_DESCRIBER used_list;
 	LIST_DESCRIBER free_list;
 	/*
@@ -843,6 +739,38 @@ typedef struct _e1000g_tx_ring {
 	 */
 	timeout_id_t timer_id_82547;
 	boolean_t timer_enable_82547;
+	/*
+	 * reschedule when tx resource is available
+	 */
+	boolean_t resched_needed;
+	uint32_t recycle_low_water;
+	uint32_t recycle_num;
+	uint32_t frags_limit;
+	uint32_t stall_watchdog;
+	uint32_t recycle_fail;
+	mblk_list_t mblks;
+	/*
+	 * Statistics
+	 */
+	uint32_t stat_no_swpkt;
+	uint32_t stat_no_desc;
+	uint32_t stat_send_fail;
+	uint32_t stat_reschedule;
+	uint32_t stat_over_size;
+#ifdef E1000G_DEBUG
+	uint32_t stat_under_size;
+	uint32_t stat_exceed_frags;
+	uint32_t stat_empty_frags;
+	uint32_t stat_recycle;
+	uint32_t stat_recycle_intr;
+	uint32_t stat_recycle_retry;
+	uint32_t stat_recycle_none;
+	uint32_t stat_copy;
+	uint32_t stat_bind;
+	uint32_t stat_multi_copy;
+	uint32_t stat_multi_cookie;
+	uint32_t stat_lack_desc;
+#endif
 	/*
 	 * Pointer to the adapter
 	 */
@@ -865,9 +793,28 @@ typedef struct _e1000g_rx_ring {
 	/*
 	 * Software packet structures definitions
 	 */
-	PRX_SW_PACKET packet_area;
+	p_rx_sw_packet_t packet_area;
 	LIST_DESCRIBER recv_list;
 	LIST_DESCRIBER free_list;
+
+	p_rx_sw_packet_t pending_list;
+	uint32_t pending_count;
+	uint32_t avail_freepkt;
+	uint32_t rx_mblk_len;
+	mblk_t *rx_mblk;
+	mblk_t *rx_mblk_tail;
+	/*
+	 * Statistics
+	 */
+	uint32_t stat_error;
+	uint32_t stat_esballoc_fail;
+	uint32_t stat_allocb_fail;
+	uint32_t stat_exceed_pkt;
+#ifdef E1000G_DEBUG
+	uint32_t stat_none;
+	uint32_t stat_multi_desc;
+	uint32_t stat_no_freepkt;
+#endif
 	/*
 	 * Pointer to the adapter
 	 */
@@ -875,56 +822,72 @@ typedef struct _e1000g_rx_ring {
 } e1000g_rx_ring_t, *pe1000g_rx_ring_t;
 
 typedef struct e1000g {
-	mac_handle_t mh;
+	int instance;
 	dev_info_t *dip;
 	dev_info_t *priv_dip;
-	ddi_acc_handle_t handle;
-	ddi_acc_handle_t E1000_handle;		/* Ws-PCI handle to regs */
-	int AdapterInstance;
-	struct e1000_hw Shared;
+	mac_handle_t mh;
+	mac_resource_handle_t mrh;
+	struct e1000_hw shared;
 	struct e1000g_osdep osdep;
 
-	link_state_t link_state;
-	UINT link_speed;
-	UINT link_duplex;
-	UINT NumRxDescriptors;
-	UINT NumRxFreeList;
-	UINT NumTxDescriptors;
-	UINT NumTxSwPacket;
-	UINT MaxNumReceivePackets;
-	UINT bar64;
-	USHORT TxInterruptDelay;
-	USHORT MWIEnable;
-	UINT MasterLatencyTimer;
-#ifdef e1000g_DEBUG
-	UINT DebugLevel;
-	UINT DisplayOnly;
-	UINT PrintOnly;
-#endif
-	UINT smartspeed;	/* smartspeed w/a counter */
-	uint32_t init_count;
-	size_t TxBufferSize;
-	size_t RxBufferSize;
-	boolean_t intr_adaptive;
-	uint32_t intr_throttling_rate;
-	timeout_id_t WatchDogTimer_id;
-	timeout_id_t link_tid;
-	boolean_t link_complete;
+	boolean_t started;
+	boolean_t e1000g_promisc;
 	boolean_t strip_crc;
+	boolean_t rx_buffer_setup;
+	link_state_t link_state;
+	uint32_t link_speed;
+	uint32_t link_duplex;
+	uint32_t master_latency_timer;
+	uint32_t smartspeed;	/* smartspeed w/a counter */
+	uint32_t init_count;
+	uint32_t reset_count;
+	uint32_t attach_progress;	/* attach tracking */
+	uint32_t loopback_mode;
+
+	uint32_t tx_desc_num;
+	uint32_t tx_freelist_num;
+	uint32_t rx_desc_num;
+	uint32_t rx_freelist_num;
+	uint32_t tx_buffer_size;
+	uint32_t rx_buffer_size;
+
+	uint32_t tx_link_down_timeout;
+	uint32_t tx_bcopy_thresh;
+	uint32_t rx_limit_onintr;
+	uint32_t rx_bcopy_thresh;
+#ifndef NO_82542_SUPPORT
+	uint32_t rx_buf_align;
+#endif
+
+	boolean_t intr_adaptive;
+	boolean_t tx_intr_enable;
+	uint32_t tx_intr_delay;
+	uint32_t tx_intr_abs_delay;
+	uint32_t rx_intr_delay;
+	uint32_t rx_intr_abs_delay;
+	uint32_t intr_throttling_rate;
+
+	boolean_t watchdog_timer_enabled;
+	boolean_t watchdog_timer_started;
+	timeout_id_t watchdog_tid;
+	boolean_t link_complete;
+	timeout_id_t link_tid;
+
+	e1000g_rx_ring_t rx_ring[1];
+	e1000g_tx_ring_t tx_ring[1];
 
 	/*
-	 * The e1000g_timeout_lock must be held when updateing the
+	 * The watchdog_lock must be held when updateing the
 	 * timeout fields in struct e1000g, that is,
-	 * WatchDogTimer_id, timeout_enabled, timeout_started.
+	 * watchdog_tid, watchdog_timer_started.
 	 */
-	kmutex_t e1000g_timeout_lock;
+	kmutex_t watchdog_lock;
 	/*
-	 * The e1000g_linklock protects the link fields in struct e1000g,
+	 * The link_lock protects the link fields in struct e1000g,
 	 * such as link_state, link_speed, link_duplex, link_complete, and
 	 * link_tid.
 	 */
-	kmutex_t e1000g_linklock;
-	kmutex_t TbiCntrMutex;
+	kmutex_t link_lock;
 	/*
 	 * The chip_lock assures that the Rx/Tx process must be
 	 * stopped while other functions change the hardware
@@ -933,92 +896,12 @@ typedef struct e1000g {
 	 */
 	krwlock_t chip_lock;
 
-	e1000g_rx_ring_t rx_ring[1];
-	e1000g_tx_ring_t tx_ring[1];
-
-	uint32_t rx_bcopy_thresh;
-	uint32_t tx_bcopy_thresh;
-	uint32_t tx_recycle_low_water;
-	uint32_t tx_recycle_num;
-	uint32_t tx_frags_limit;
-	uint32_t tx_link_down_timeout;
-
-	boolean_t tx_intr_enable;
-	ddi_softint_handle_t tx_softint_handle;
-	int tx_softint_pri;
-	/*
-	 * Message chain that needs to be freed
-	 */
-	e1000g_msg_chain_t tx_msg_chain[1];
-
-	mblk_t *rx_mblk;
-	mblk_t *rx_mblk_tail;
-	USHORT rx_packet_len;
-
-	kstat_t *e1000g_ksp;
-
-	uint32_t rx_none;
-	uint32_t rx_error;
-	uint32_t rx_exceed_pkt;
-	uint32_t rx_multi_desc;
-	uint32_t rx_no_freepkt;
-	uint32_t rx_esballoc_fail;
-	uint32_t rx_avail_freepkt;
-	uint32_t rx_allocb_fail;
-	uint32_t rx_seq_intr;
-	uint32_t tx_lack_desc;
-	uint32_t tx_no_desc;
-	uint32_t tx_no_swpkt;
-	uint32_t tx_send_fail;
-	uint32_t tx_multi_cookie;
-	uint32_t tx_over_size;
-	uint32_t tx_under_size;
-	uint32_t tx_reschedule;
-	uint32_t tx_empty_frags;
-	uint32_t tx_exceed_frags;
-	uint32_t tx_recycle;
-	uint32_t tx_recycle_retry;
-	uint32_t tx_recycle_intr;
-	uint32_t tx_recycle_none;
-	uint32_t tx_copy;
-	uint32_t tx_bind;
-	uint32_t tx_multi_copy;
-
-	uint32_t JumboTx_4K;
-	uint32_t JumboRx_4K;
-	uint32_t JumboTx_8K;
-	uint32_t JumboRx_8K;
-	uint32_t JumboTx_16K;
-	uint32_t JumboRx_16K;
-
-	uint32_t StallWatchdog;
-	uint32_t tx_recycle_fail;
-	uint32_t reset_count;
-
 	uint32_t unicst_avail;
 	uint32_t unicst_total;
 	e1000g_ether_addr_t unicst_addr[MAX_NUM_UNICAST_ADDRESSES];
 
 	uint32_t mcast_count;
 	struct ether_addr mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
-
-	uint32_t loopback_mode;
-
-	UINT ProfileJumboTraffic;
-	UINT RcvBufferAlignment;
-
-	boolean_t timeout_enabled;
-	boolean_t timeout_started;
-
-	boolean_t e1000g_promisc;
-	boolean_t started;
-	mac_resource_handle_t mrh;
-
-	uint32_t attach_progress;	/* attach tracking */
-	/*
-	 * reschedule when tx resource is available
-	 */
-	boolean_t resched_needed;
 
 #ifdef __sparc
 	ulong_t sys_page_sz;
@@ -1033,94 +916,57 @@ typedef struct e1000g {
 	uint_t intr_pri;
 	ddi_intr_handle_t *htable;
 
+	int tx_softint_pri;
+	ddi_softint_handle_t tx_softint_handle;
+
+	kstat_t *e1000g_ksp;
+
 	/*
 	 * NDD parameters
 	 */
 	caddr_t nd_data;
 	nd_param_t nd_params[PARAM_COUNT];
 
-} e1000g, *Pe1000g, ADAPTER_STRUCT, *PADAPTER_STRUCT;
+} e1000g_t;
 
-
-static ddi_dma_attr_t tx_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	1,			/* alignment in bytes */
-	0x7ff,			/* burst sizes (any?) */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	16,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
-};
-
-static ddi_dma_attr_t buf_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	1,			/* alignment in bytes */
-	0x7ff,			/* burst sizes (any?) */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	1,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
-};
-
-static ddi_dma_attr_t tbd_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	E1000_MDALIGN,		/* alignment in bytes 4K! */
-	0x7ff,			/* burst sizes (any?) */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	1,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
-};
 
 /*
  * Function prototypes
  */
 int e1000g_alloc_dma_resources(struct e1000g *Adapter);
 void e1000g_release_dma_resources(struct e1000g *Adapter);
-void e1000g_free_rx_sw_packet(PRX_SW_PACKET packet);
-void SetupTransmitStructures(struct e1000g *Adapter);
-void SetupReceiveStructures(struct e1000g *Adapter);
-void SetupMulticastTable(struct e1000g *Adapter);
+void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet);
+void e1000g_tx_setup(struct e1000g *Adapter);
+void e1000g_rx_setup(struct e1000g *Adapter);
+void e1000g_setup_multicast(struct e1000g *Adapter);
 boolean_t e1000g_reset(struct e1000g *Adapter);
 
 int e1000g_recycle(e1000g_tx_ring_t *tx_ring);
-void FreeTxSwPacket(PTX_SW_PACKET packet);
-uint_t e1000g_tx_freemsg(caddr_t arg1, caddr_t arg2);
+void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);
+void e1000g_tx_freemsg(e1000g_tx_ring_t *tx_ring);
+uint_t e1000g_tx_softint_worker(caddr_t arg1, caddr_t arg2);
 mblk_t *e1000g_m_tx(void *arg, mblk_t *mp);
 mblk_t *e1000g_receive(struct e1000g *Adapter);
-void e1000g_rxfree_func(PRX_SW_PACKET packet);
+void e1000g_rxfree_func(p_rx_sw_packet_t packet);
 
 int e1000g_m_stat(void *arg, uint_t stat, uint64_t *val);
-int InitStatsCounters(struct e1000g *Adapter);
-void AdjustTbiAcceptedStats(struct e1000g *Adapter, UINT32 FrameLength,
-    PUCHAR MacAddress);
+int e1000g_init_stats(struct e1000g *Adapter);
+void e1000_tbi_adjust_stats(struct e1000g *Adapter,
+    uint32_t frame_len, uint8_t *mac_addr);
 enum ioc_reply e1000g_nd_ioctl(struct e1000g *Adapter,
     queue_t *wq, mblk_t *mp, struct iocblk *iocp);
 void e1000g_nd_cleanup(struct e1000g *Adapter);
 int e1000g_nd_init(struct e1000g *Adapter);
 
-void e1000g_DisableInterrupt(struct e1000g *Adapter);
-void e1000g_EnableInterrupt(struct e1000g *Adapter);
-void e1000g_DisableAllInterrupts(struct e1000g *Adapter);
-void e1000g_DisableTxInterrupt(struct e1000g *Adapter);
-void e1000g_EnableTxInterrupt(struct e1000g *Adapter);
+void e1000g_clear_interrupt(struct e1000g *Adapter);
+void e1000g_mask_interrupt(struct e1000g *Adapter);
+void e1000g_clear_all_interrupts(struct e1000g *Adapter);
+void e1000g_clear_tx_interrupt(struct e1000g *Adapter);
+void e1000g_mask_tx_interrupt(struct e1000g *Adapter);
 void phy_spd_state(struct e1000_hw *hw, boolean_t enable);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
+
+#pragma inline(e1000_rar_set)
 
 /*
  * Global variables

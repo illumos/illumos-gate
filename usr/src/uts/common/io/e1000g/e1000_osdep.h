@@ -46,79 +46,118 @@ extern "C" {
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/pci.h>
+#include <sys/atomic.h>
+#include "e1000g_debug.h"
 
 /*
  * === BEGIN CONTENT FORMERLY IN FXHW.H ===
  */
-#define	DelayInMicroseconds(x)	drv_usecwait(x)
-#define	DelayInMilliseconds(x)	drv_usecwait(x * 1000)
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
 
-#ifdef e1000g_DEBUG
-#define	DEBUGOUT(S)		cmn_err(CE_CONT, S)
-#define	DEBUGOUT1(S, A)		cmn_err(CE_CONT, S, A)
-#define	DEBUGOUT2(S, A, B)	cmn_err(CE_CONT, S, A, B)
-#define	DEBUGOUT3(S, A, B, C)	cmn_err(CE_CONT, S, A, B, C)
-#define	DEBUGOUT7(S, A, B, C, D, E, F, G)	\
-				cmn_err(CE_CONT, S, A, B, C, D, E, F, G)
+#ifdef E1000G_DEBUG
+#define	DEBUGOUT(S)		\
+	E1000G_DEBUGLOG_0(NULL, E1000G_INFO_LEVEL, S)
+#define	DEBUGOUT1(S, A)		\
+	E1000G_DEBUGLOG_1(NULL, E1000G_INFO_LEVEL, S, A)
+#define	DEBUGOUT2(S, A, B)	\
+	E1000G_DEBUGLOG_2(NULL, E1000G_INFO_LEVEL, S, A, B)
+#define	DEBUGOUT3(S, A, B, C)	\
+	E1000G_DEBUGLOG_3(NULL, E1000G_INFO_LEVEL, S, A, B, C)
+#define	DEBUGFUNC(F)		\
+	E1000G_DEBUGLOG_0(NULL, E1000G_TRACE_LEVEL, F)
 #else
 #define	DEBUGOUT(S)
 #define	DEBUGOUT1(S, A)
 #define	DEBUGOUT2(S, A, B)
 #define	DEBUGOUT3(S, A, B, C)
-#define	DEBUGOUT7(S, A, B, C, D, E, F, G)
+#define	DEBUGFUNC(F)
 #endif
 
-#define	DEBUGFUNC(F)		DEBUGOUT(F)
+#define	OS_DEP(hw)		((struct e1000g_osdep *)((hw)->back))
 
-#define	IN
-#define	OUT
 #define	FALSE		0
 #define	TRUE		1
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
+#define	PCI_EX_CONF_CAP		0xE0
+#define	ICH_FLASH_REG_SET	2	/* solaris mapping of flash memory */
 
-#define	E1000_WRITE_FLUSH(a)	/* NOOP */
+#define	RECEIVE_BUFFER_ALIGN_SIZE	256
+#define	E1000_MDALIGN			4096
+#define	E1000_ERT_2048			0x100
 
-#define	E1000_WRITE_REG(a, reg, value)	\
+/* PHY Extended Status Register */
+#define	IEEE_ESR_1000T_HD_CAPS	0x1000	/* 1000T HD capable */
+#define	IEEE_ESR_1000T_FD_CAPS	0x2000	/* 1000T FD capable */
+#define	IEEE_ESR_1000X_HD_CAPS	0x4000	/* 1000X HD capable */
+#define	IEEE_ESR_1000X_FD_CAPS	0x8000	/* 1000X FD capable */
+
+#define	E1000_WRITE_FLUSH(a)	E1000_READ_REG(a, E1000_STATUS)
+
+#ifdef NO_82542_SUPPORT
+#define	E1000_WRITE_REG(hw, reg, value)	\
+	ddi_put32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((hw)->hw_addr + reg), (value))
+
+#define	E1000_READ_REG(hw, reg)	\
+	ddi_get32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((hw)->hw_addr + reg))
+
+#define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value)	\
+	ddi_put32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)), \
+	    (value))
+
+#define	E1000_READ_REG_ARRAY(hw, reg, offset)	\
+	ddi_get32((OS_DEP(hw))->reg_handle, \
+	    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)))
+
+#else	/* NO_82542_SUPPORT */
+
+#define	E1000_WRITE_REG(hw, reg, value)	\
 {\
-	if ((a)->mac_type >= e1000_82543) \
-		ddi_put32(((struct e1000g_osdep *)((a)->back))->E1000_handle, \
-		    (uint32_t *)((a)->hw_addr + E1000_##reg), \
+	if ((hw)->mac.type != e1000_82542) \
+		ddi_put32((OS_DEP(hw))->reg_handle, \
+		    (uint32_t *)((hw)->hw_addr + reg), \
 		    value); \
 	else \
-		ddi_put32(((struct e1000g_osdep *)((a)->back))->E1000_handle, \
-		    (uint32_t *)((a)->hw_addr + E1000_82542_##reg), \
+		ddi_put32((OS_DEP(hw))->reg_handle, \
+		    (uint32_t *)((hw)->hw_addr + \
+		    e1000_translate_register_82542(reg)), \
 		    value); \
 }
 
-#define	E1000_READ_REG(a, reg) (\
-	((a)->mac_type >= e1000_82543) ? \
-	    ddi_get32(((struct e1000g_osdep *)(a)->back)->E1000_handle, \
-		(uint32_t *)((a)->hw_addr + E1000_##reg)) : \
-	    ddi_get32(((struct e1000g_osdep *)(a)->back)->E1000_handle, \
-		(uint32_t *)((a)->hw_addr + E1000_82542_##reg)))
+#define	E1000_READ_REG(hw, reg) (\
+	((hw)->mac.type != e1000_82542) ? \
+	    ddi_get32((OS_DEP(hw))->reg_handle, \
+		(uint32_t *)((hw)->hw_addr + reg)) : \
+	    ddi_get32((OS_DEP(hw))->reg_handle, \
+		(uint32_t *)((hw)->hw_addr + \
+		e1000_translate_register_82542(reg))))
 
-#define	E1000_WRITE_REG_ARRAY(a, reg, offset, value) \
+#define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value) \
 {\
-	if ((a)->mac_type >= e1000_82543) \
-		ddi_put32(((struct e1000g_osdep *)((a)->back))->E1000_handle, \
-		    (uint32_t *)((a)->hw_addr + E1000_##reg + ((offset) << 2)),\
+	if ((hw)->mac.type != e1000_82542) \
+		ddi_put32((OS_DEP(hw))->reg_handle, \
+		    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)),\
 		    value); \
 	else \
-		ddi_put32(((struct e1000g_osdep *)((a)->back))->E1000_handle, \
-		    (uint32_t *)((a)->hw_addr + E1000_82542_##reg + \
+		ddi_put32((OS_DEP(hw))->reg_handle, \
+		    (uint32_t *)((hw)->hw_addr + \
+		    e1000_translate_register_82542(reg) + \
 		    ((offset) << 2)), value); \
 }
 
-#define	E1000_READ_REG_ARRAY(a, reg, offset) (\
-	((a)->mac_type >= e1000_82543) ? \
-	    ddi_get32(((struct e1000g_osdep *)(a)->back)->E1000_handle, \
-		(uint32_t *)((a)->hw_addr + E1000_##reg + ((offset) << 2))) : \
-	    ddi_get32(((struct e1000g_osdep *)(a)->back)->E1000_handle, \
-		(uint32_t *)((a)->hw_addr + E1000_82542_##reg + \
+#define	E1000_READ_REG_ARRAY(hw, reg, offset) (\
+	((hw)->mac.type != e1000_82542) ? \
+	    ddi_get32((OS_DEP(hw))->reg_handle, \
+		(uint32_t *)((hw)->hw_addr + reg + ((offset) << 2))) : \
+	    ddi_get32((OS_DEP(hw))->reg_handle, \
+		(uint32_t *)((hw)->hw_addr + \
+		e1000_translate_register_82542(reg) + \
 		((offset) << 2))))
+#endif	/* NO_82542_SUPPORT */
 
 
 #define	E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value)	NULL
@@ -129,42 +168,36 @@ extern "C" {
 #define	E1000_READ_REG_ARRAY_DWORD(a, reg, offset)		NULL
 
 
-#define	ICH_FLASH_REG_SET	2	/* solaris mapping of flash memory */
-#define	OS_DEP(hw)		((struct e1000g_osdep *)((hw)->back))
-
-#define	E1000_READ_ICH_FLASH_REG(hw, reg)	\
+#define	E1000_READ_FLASH_REG(hw, reg)	\
 	ddi_get32((OS_DEP(hw))->ich_flash_handle, \
-		(uint32_t *)((OS_DEP(hw))->ich_flash_base + (reg)))
+		(uint32_t *)((hw)->flash_address + (reg)))
 
-#define	E1000_READ_ICH_FLASH_REG16(hw, reg)	\
+#define	E1000_READ_FLASH_REG16(hw, reg)	\
 	ddi_get16((OS_DEP(hw))->ich_flash_handle, \
-		(uint16_t *)((OS_DEP(hw))->ich_flash_base + (reg)))
+		(uint16_t *)((hw)->flash_address + (reg)))
 
-#define	E1000_WRITE_ICH_FLASH_REG(hw, reg, value)	\
+#define	E1000_WRITE_FLASH_REG(hw, reg, value)	\
 	ddi_put32((OS_DEP(hw))->ich_flash_handle, \
-		(uint32_t *)((OS_DEP(hw))->ich_flash_base + (reg)), (value))
+		(uint32_t *)((hw)->flash_address + (reg)), (value))
 
-#define	E1000_WRITE_ICH_FLASH_REG16(hw, reg, value)	\
+#define	E1000_WRITE_FLASH_REG16(hw, reg, value)	\
 	ddi_put16((OS_DEP(hw))->ich_flash_handle, \
-		(uint16_t *)((OS_DEP(hw))->ich_flash_base + (reg)), (value))
-
-/*
- * The size of the receive buffers we allocate,
- */
-#define	E1000_SIZE_OF_RECEIVE_BUFFERS	(2048)
-
-/*
- * Use this define refer to the size of a recieve buffer plus its
- * align size
- */
-#define	E1000_SIZE_OF_UNALIGNED_RECEIVE_BUFFERS	\
-	E1000_SIZE_OF_RECEIVE_BUFFERS + RECEIVE_BUFFER_ALIGN_SIZE
+		(uint16_t *)((hw)->flash_address + (reg)), (value))
 
 /*
  * === END CONTENT FORMERLY IN FXHW.H ===
  */
 
 #define	msec_delay_irq	msec_delay
+
+typedef	int8_t		s8;
+typedef	int16_t		s16;
+typedef	int32_t		s32;
+typedef	int64_t		s64;
+typedef	uint8_t		u8;
+typedef	uint16_t	u16;
+typedef	uint32_t	u32;
+typedef	uint64_t	u64;
 
 typedef uint8_t		UCHAR;	/* 8-bit unsigned */
 typedef UCHAR		UINT8;	/* 8-bit unsigned */
@@ -186,26 +219,18 @@ typedef uint64_t	E1000_64_BIT_PHYSICAL_ADDRESS,
 	*PFX_64_BIT_PHYSICAL_ADDRESS;
 
 struct e1000g_osdep {
-	ddi_acc_handle_t E1000_handle;
-	ddi_acc_handle_t handle;
-	/* flash access */
+	ddi_acc_handle_t reg_handle;
+	ddi_acc_handle_t cfg_handle;
 	ddi_acc_handle_t ich_flash_handle;
-	caddr_t ich_flash_base;
-	off_t ich_flash_size;
+	struct e1000g *adapter;
 };
 
 #ifdef __sparc	/* on SPARC, use only memory-mapped routines */
-
-#define	E1000_READ_REG_IO	E1000_READ_REG
 #define	E1000_WRITE_REG_IO	E1000_WRITE_REG
-
 #else	/* on x86, use port io routines */
-
-#define	E1000_READ_REG_IO(a, reg)	\
-	e1000_read_reg_io((a), E1000_##reg)
-#define	E1000_WRITE_REG_IO(a, reg, val)	\
-	e1000_write_reg_io((a), E1000_##reg, val)
-
+#define	E1000_WRITE_REG_IO(a, reg, val)	{ \
+	outl(((a)->io_base), reg); \
+	outl(((a)->io_base + 4), val); }
 #endif	/* __sparc */
 
 #ifdef __cplusplus

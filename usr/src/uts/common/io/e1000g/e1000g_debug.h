@@ -33,23 +33,6 @@ extern "C" {
 #endif
 
 /*
- * **********************************************************************
- *									*
- * Module Name:								*
- *   e1000g_debug.h							*
- *									*
- * Abstract:								*
- *									*
- *   This driver runs on the following hardware:			*
- *   - Wiseman based PCI gigabit ethernet adapters			*
- *									*
- * Environment:								*
- *   Kernel Mode -							*
- *									*
- * **********************************************************************
- */
-
-/*
  * Debug message control
  * Debug Levels:
  *	0x000 - (0)   no messages
@@ -58,19 +41,9 @@ extern "C" {
  *	0x004 - (4)   Information
  *	0x008 - (8)   Subroutine calls and control flow
  *	0x010 - (16)  I/O Data (verbose!)
- * Speacialised Debug Levels:
- *	0x020 - (32)  Receive Debug Info
- *	0x040 - (64)  Send Debug Info
- *	0x080 - (128) Interrupt Debug Info
- *	0x100 - (256) DDI Debug Info
  * Variables can be set with entries in the /etc/system file with
- * "set e1000g:e1000g_debug=<value>"
- * "set e1000g:e1000g_debug_hw=<value>"
- * "set e1000g:e1000g_display_only=<value>"
- * "set e1000g:e1000g_print_only=<value>"
- * Alternatively, you can use adb to set variables and debug as
- * follows:
- * # adb -kw /dev/ksyms /dev/mem
+ *	"set e1000g:e1000g_debug=<value>"
+ *	"set e1000g:e1000g_log_mode=<value>"
  * The /etc/system file is read only once at boot time, if you change
  * it you must reboot for the change to take effect.
  *
@@ -78,68 +51,74 @@ extern "C" {
  * enables other debugging code as ASSERT statements...
  */
 
-#ifdef e1000g_DEBUG
+#ifdef DEBUG
+#define	E1000G_DEBUG
+#endif
 
-static int e1000g_debug = DEFAULTDEBUGLEVEL;
-static int e1000g_debug_hw = 1;
+/*
+ * By default it will print only to log
+ */
+#define	E1000G_LOG_DISPLAY	0x1
+#define	E1000G_LOG_PRINT	0x2
+#define	E1000G_LOG_ALL		0x3
 
-#define	e1000g_ERRS_LEVEL	0x001	/* (1)	Errors */
-#define	e1000g_WARN_LEVEL	0x002	/* (2)	Warnings */
-#define	e1000g_INFO_LEVEL	0x004	/* (4)	Information */
-#define	e1000g_CALLTRACE_LEVEL	0x008	/* (8)	Subroutine calls and */
-					/*	control flow */
-#define	e1000g_VERBOSE_LEVEL	0x010	/* (16)	I/O Data (verbose!) */
-#define	e1000g_RECV_LEVEL	0x020	/* (32)	Receive Debug Info */
-#define	e1000g_SEND_LEVEL	0x040	/* (64)	Send Debug Info */
-#define	e1000g_INT_LEVEL	0x080	/* (128) Interrupt Debug Info */
-#define	e1000g_DDI_LEVEL	0x100	/* (256) DDI Debug Info */
+#ifdef E1000G_DEBUG
 
-#define	e1000g_DEBUGLOG_0(Adapter, Level, fmt)	\
+#define	E1000G_ERRS_LEVEL	0x001	/* (1)	Errors */
+#define	E1000G_WARN_LEVEL	0x002	/* (2)	Warnings */
+#define	E1000G_INFO_LEVEL	0x004	/* (4)	Information */
+#define	E1000G_TRACE_LEVEL	0x008	/* (8)	Subroutine calls */
+#define	E1000G_VERBOSE_LEVEL	0x010	/* (16)	I/O Data (verbose!) */
+
+#define	E1000G_DEBUGLOG_0(Adapter, Level, fmt)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt))
 
-#define	e1000g_DEBUGLOG_1(Adapter, Level, fmt, d1)	\
+#define	E1000G_DEBUGLOG_1(Adapter, Level, fmt, d1)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt), (d1))
 
-#define	e1000g_DEBUGLOG_2(Adapter, Level, fmt, d1, d2)	\
+#define	E1000G_DEBUGLOG_2(Adapter, Level, fmt, d1, d2)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt), (d1), (d2))
 
-#define	e1000g_DEBUGLOG_3(Adapter, Level, fmt, d1, d2, d3)	\
+#define	E1000G_DEBUGLOG_3(Adapter, Level, fmt, d1, d2, d3)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt), (d1),\
 		(d2), (d3))
 
-#define	e1000g_DEBUGLOG_4(Adapter, Level, fmt, d1, d2, d3, d4)	\
+#define	E1000G_DEBUGLOG_4(Adapter, Level, fmt, d1, d2, d3, d4)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt), (d1),\
 		(d2), (d3), (d4))
 
-#define	e1000g_DEBUGLOG_5(Adapter, Level, fmt, d1, d2, d3, d4, d5)	\
+#define	E1000G_DEBUGLOG_5(Adapter, Level, fmt, d1, d2, d3, d4, d5)	\
 	if (e1000g_debug) e1000g_log((Adapter), (Level), (fmt), (d1),\
 		(d2), (d3), (d4), (d5))
 
-#define	e1000g_HW_DEBUGLOG	if (e1000g_debug_hw) e1000g_log_hw
+#define	E1000G_DEBUG_STAT_COND(val, cond)	if (cond) (val)++;
+#define	E1000G_DEBUG_STAT(val)			(val)++;
 
 #else
 
-static int e1000g_debug = 0;
-static int e1000g_debug_hw = 0;
+#define	E1000G_DEBUGLOG_0(Adapter, Level, fmt)
+#define	E1000G_DEBUGLOG_1(Adapter, Level, fmt, d1)
+#define	E1000G_DEBUGLOG_2(Adapter, Level, fmt, d1, d2)
+#define	E1000G_DEBUGLOG_3(Adapter, Level, fmt, d1, d2, d3)
+#define	E1000G_DEBUGLOG_4(Adapter, Level, fmt, d1, d2, d3, d4)
+#define	E1000G_DEBUGLOG_5(Adapter, Level, fmt, d1, d2, d3, d4, d5)
 
-#define	e1000g_DEBUGLOG_0(Adapter, Level, fmt)
-#define	e1000g_DEBUGLOG_1(Adapter, Level, fmt, d1)
-#define	e1000g_DEBUGLOG_2(Adapter, Level, fmt, d1, d2)
-#define	e1000g_DEBUGLOG_3(Adapter, Level, fmt, d1, d2, d3)
-#define	e1000g_DEBUGLOG_4(Adapter, Level, fmt, d1, d2, d3, d4)
-#define	e1000g_DEBUGLOG_5(Adapter, Level, fmt, d1, d2, d3, d4, d5)
-#define	e1000g_HW_DEBUGLOG
+#define	E1000G_DEBUG_STAT_COND(val, cond)
+#define	E1000G_DEBUG_STAT(val)
 
-#endif	/* e1000g_DEBUG */
+#endif	/* E1000G_DEBUG */
 
 #define	NAMELEN		31
 #define	BUFSZ		256
 
-void e1000g_log(struct e1000g *Adapter, int level, char *fmt, ...);
-void e1000g_log_hw(char *msg, void *cptr, int length);
+#define	E1000G_STAT(val)	(val)++;
 
-static int e1000g_display_only = DEFAULTDISPLAYONLY;
-static int e1000g_print_only = DEFAULTPRINTONLY;
+void e1000g_log(void *instance, int level, char *fmt, ...);
+
+#ifdef E1000G_DEBUG
+extern int e1000g_debug;
+#endif
+extern int e1000g_log_mode;
 
 #ifdef __cplusplus
 }

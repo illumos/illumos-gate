@@ -32,22 +32,9 @@
  *   e1000g_tx.c							*
  *									*
  * Abstract:								*
- *   This file contains some routines that takes care of Transmit	*
- *   interrupt and also makes the hardware to send the data pointed	*
- *   by the packet out on   to the physical medium.			*
- *									*
- *									*
- * Environment:								*
- *   Kernel Mode -							*
- *									*
- * Source History:							*
- *   The code in this file is based somewhat on the "send" code		*
- *   developed for the Intel Pro/100 family(Speedo1 and Speedo3) by	*
- *   Steve Lindsay, and partly on some sample DDK code			*
- *   of solaris.							*
- *									*
- *   March 12, 1997 Steve Lindsay					*
- *   1st created - Ported from E100B send.c file			*
+ *   This file contains some routines that take care of Transmit,	*
+ *   make the hardware to send the data pointed by the packet out	*
+ *   on to the physical medium.						*
  *									*
  * **********************************************************************
  */
@@ -56,27 +43,26 @@
 #include "e1000g_debug.h"
 
 static boolean_t e1000g_send(struct e1000g *, mblk_t *);
-static int e1000g_tx_copy(struct e1000g *, PTX_SW_PACKET, mblk_t *, uint32_t);
-static int e1000g_tx_bind(struct e1000g *, PTX_SW_PACKET, mblk_t *);
+static int e1000g_tx_copy(e1000g_tx_ring_t *,
+    p_tx_sw_packet_t, mblk_t *, uint32_t);
+static int e1000g_tx_bind(e1000g_tx_ring_t *,
+    p_tx_sw_packet_t, mblk_t *);
 static boolean_t check_cksum_context(e1000g_tx_ring_t *, cksum_data_t *);
 static int e1000g_fill_tx_ring(e1000g_tx_ring_t *, LIST_DESCRIBER *,
     cksum_data_t *);
 static void e1000g_fill_context_descriptor(cksum_data_t *,
     struct e1000_context_desc *);
-static int e1000g_fill_tx_desc(struct e1000g *,
-    PTX_SW_PACKET, uint64_t, size_t);
+static int e1000g_fill_tx_desc(e1000g_tx_ring_t *,
+    p_tx_sw_packet_t, uint64_t, size_t);
 static uint32_t e1000g_fill_82544_desc(uint64_t Address, size_t Length,
-    PDESC_ARRAY desc_array);
-static int e1000g_tx_workaround_PCIX_82544(struct e1000g *,
-    PTX_SW_PACKET, uint64_t, size_t);
-static int e1000g_tx_workaround_jumbo_82544(struct e1000g *,
-    PTX_SW_PACKET, uint64_t, size_t);
-static uint32_t e1000g_tx_free_desc_num(e1000g_tx_ring_t *);
+    p_desc_array_t desc_array);
+static int e1000g_tx_workaround_PCIX_82544(p_tx_sw_packet_t, uint64_t, size_t);
+static int e1000g_tx_workaround_jumbo_82544(p_tx_sw_packet_t, uint64_t, size_t);
 static void e1000g_82547_timeout(void *);
 static void e1000g_82547_tx_move_tail(e1000g_tx_ring_t *);
 static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 
-#ifndef e1000g_DEBUG
+#ifndef E1000G_DEBUG
 #pragma inline(e1000g_tx_copy)
 #pragma inline(e1000g_tx_bind)
 #pragma inline(check_cksum_context)
@@ -86,28 +72,17 @@ static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 #pragma inline(e1000g_fill_82544_desc)
 #pragma inline(e1000g_tx_workaround_PCIX_82544)
 #pragma inline(e1000g_tx_workaround_jumbo_82544)
-#pragma inline(FreeTxSwPacket)
-#pragma inline(e1000g_tx_free_desc_num)
+#pragma inline(e1000g_free_tx_swpkt)
 #endif
 
 /*
- * **********************************************************************
- * Name:      FreeTxSwPacket						*
- *									*
- * Description:								*
- *	       Frees up the previusly allocated Dma handle for given	*
- *	       transmit sw packet.					*
- *									*
- * Parameter Passed:							*
- *									*
- * Return Value:							*
- *									*
- * Functions called:							*
- *									*
- * **********************************************************************
+ * e1000g_free_tx_swpkt	- free up the tx sw packet
+ *
+ * Unbind the previously bound DMA handle for a given
+ * transmit sw packet. And reset the sw packet data.
  */
 void
-FreeTxSwPacket(register PTX_SW_PACKET packet)
+e1000g_free_tx_swpkt(register p_tx_sw_packet_t packet)
 {
 	switch (packet->data_transfer_type) {
 	case USE_BCOPY:
@@ -136,44 +111,41 @@ FreeTxSwPacket(register PTX_SW_PACKET packet)
 	packet->num_desc = 0;
 }
 
+#pragma inline(e1000g_tx_freemsg)
+
+void
+e1000g_tx_freemsg(e1000g_tx_ring_t *tx_ring)
+{
+	mblk_t *mp;
+
+	if (mutex_tryenter(&tx_ring->mblks_lock) == 0)
+		return;
+
+	mp = tx_ring->mblks.head;
+
+	tx_ring->mblks.head = NULL;
+	tx_ring->mblks.tail = NULL;
+
+	mutex_exit(&tx_ring->mblks_lock);
+
+	if (mp != NULL)
+		freemsgchain(mp);
+}
+
 uint_t
-e1000g_tx_freemsg(caddr_t arg1, caddr_t arg2)
+e1000g_tx_softint_worker(caddr_t arg1, caddr_t arg2)
 {
 	struct e1000g *Adapter;
 	mblk_t *mp;
 
 	Adapter = (struct e1000g *)arg1;
 
-	if ((Adapter == NULL) || (arg2 != NULL))
+	if (Adapter == NULL)
 		return (DDI_INTR_UNCLAIMED);
 
-	if (!mutex_tryenter(&Adapter->tx_msg_chain->lock))
-		return (DDI_INTR_CLAIMED);
-
-	mp = Adapter->tx_msg_chain->head;
-	Adapter->tx_msg_chain->head = NULL;
-	Adapter->tx_msg_chain->tail = NULL;
-
-	mutex_exit(&Adapter->tx_msg_chain->lock);
-
-	freemsgchain(mp);
+	e1000g_tx_freemsg(Adapter->tx_ring);
 
 	return (DDI_INTR_CLAIMED);
-}
-
-static uint32_t
-e1000g_tx_free_desc_num(e1000g_tx_ring_t *tx_ring)
-{
-	struct e1000g *Adapter;
-	int num;
-
-	Adapter = tx_ring->adapter;
-
-	num = tx_ring->tbd_oldest - tx_ring->tbd_next;
-	if (num <= 0)
-		num += Adapter->NumTxDescriptors;
-
-	return (num);
 }
 
 mblk_t *
@@ -206,30 +178,18 @@ e1000g_m_tx(void *arg, mblk_t *mp)
 }
 
 /*
- * **********************************************************************
- * Name:	e1000g_send						*
- *									*
- * Description:								*
- *	Called from e1000g_m_tx with an mp ready to send. this		*
- *	routine sets up the transmit descriptors and sends to		*
- *	the wire. It also pushes the just transmitted packet to		*
- *	the used tx sw packet list					*
- *									*
- * Arguments:								*
- *	Pointer to the mblk to be sent, pointer to this adapter		*
- *									*
- * Returns:								*
- *	B_TRUE, B_FALSE							*
- *									*
- * Modification log:							*
- * Date      Who  Description						*
- * --------  ---  -----------------------------------------------------	*
- * **********************************************************************
+ * e1000g_send -  send packets onto the wire
+ *
+ * Called from e1000g_m_tx with an mblk ready to send. this
+ * routine sets up the transmit descriptors and sends data to
+ * the wire. It also pushes the just transmitted packet to
+ * the used tx sw packet list.
  */
 static boolean_t
 e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 {
-	PTX_SW_PACKET packet;
+	struct e1000_hw *hw;
+	p_tx_sw_packet_t packet;
 	LIST_DESCRIBER pending_list;
 	size_t len;
 	size_t msg_size;
@@ -241,6 +201,9 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	mblk_t *tmp;
 	e1000g_tx_ring_t *tx_ring;
 	cksum_data_t cksum;
+
+	hw = &Adapter->shared;
+	tx_ring = Adapter->tx_ring;
 
 	/* Get the total size and frags number of the message */
 	force_bcopy = 0;
@@ -258,19 +221,17 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	}
 
 	/* Make sure packet is less than the max frame size */
-	if (msg_size > Adapter->Shared.max_frame_size + VLAN_TAGSZ) {
+	if (msg_size > hw->mac.max_frame_size + VLAN_TAGSZ) {
 		/*
 		 * For the over size packet, we'll just drop it.
 		 * So we return B_TRUE here.
 		 */
-		e1000g_DEBUGLOG_1(Adapter, e1000g_INFO_LEVEL,
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
 		    "Tx packet out of bound. length = %d \n", msg_size);
+		E1000G_STAT(tx_ring->stat_over_size);
 		freemsg(mp);
-		Adapter->tx_over_size++;
 		return (B_TRUE);
 	}
-
-	tx_ring = Adapter->tx_ring;
 
 	/*
 	 * Check and reclaim tx descriptors.
@@ -280,19 +241,14 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * Descriptors... As you may run short of them before getting any
 	 * transmit interrupt...
 	 */
-	if ((Adapter->NumTxDescriptors - e1000g_tx_free_desc_num(tx_ring)) >
-	    Adapter->tx_recycle_low_water) {
-		if (Adapter->Shared.mac_type == e1000_82547) {
-			mutex_enter(&tx_ring->tx_lock);
-			e1000g_82547_tx_move_tail(tx_ring);
-			mutex_exit(&tx_ring->tx_lock);
-		}
-		Adapter->tx_recycle++;
+	if ((Adapter->tx_desc_num - tx_ring->tbd_avail) >
+	    tx_ring->recycle_low_water) {
+		E1000G_DEBUG_STAT(tx_ring->stat_recycle);
 		(void) e1000g_recycle(tx_ring);
 	}
 
-	if (e1000g_tx_free_desc_num(tx_ring) < MAX_TX_DESC_PER_PACKET) {
-		Adapter->tx_lack_desc++;
+	if (tx_ring->tbd_avail < MAX_TX_DESC_PER_PACKET) {
+		E1000G_DEBUG_STAT(tx_ring->stat_lack_desc);
 		goto tx_no_resource;
 	}
 
@@ -300,9 +256,9 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * If there are many frags of the message, then bcopy them
 	 * into one tx descriptor buffer will get better performance.
 	 */
-	if ((frag_count >= Adapter->tx_frags_limit) &&
-	    (msg_size <= Adapter->TxBufferSize)) {
-		Adapter->tx_exceed_frags++;
+	if ((frag_count >= tx_ring->frags_limit) &&
+	    (msg_size <= Adapter->tx_buffer_size)) {
+		E1000G_DEBUG_STAT(tx_ring->stat_exceed_frags);
 		force_bcopy |= FORCE_BCOPY_EXCEED_FRAGS;
 	}
 
@@ -311,7 +267,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * we'll use bcopy to send it, and padd it to 60 bytes later.
 	 */
 	if (msg_size < MINIMUM_ETHERNET_PACKET_SIZE) {
-		Adapter->tx_under_size++;
+		E1000G_DEBUG_STAT(tx_ring->stat_under_size);
 		force_bcopy |= FORCE_BCOPY_UNDER_SIZE;
 	}
 
@@ -339,7 +295,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		len = MBLKL(nmp);
 		/* Check zero length mblks */
 		if (len == 0) {
-			Adapter->tx_empty_frags++;
+			E1000G_DEBUG_STAT(tx_ring->stat_empty_frags);
 			/*
 			 * If there're no packet buffers have been used,
 			 * or we just completed processing a buffer, then
@@ -359,14 +315,14 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		if (desc_count > 0) {
 
 			mutex_enter(&tx_ring->freelist_lock);
-			packet = (PTX_SW_PACKET)
+			packet = (p_tx_sw_packet_t)
 			    QUEUE_POP_HEAD(&tx_ring->free_list);
 			mutex_exit(&tx_ring->freelist_lock);
 
 			if (packet == NULL) {
-				e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
+				E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 				    "No Tx SwPacket available\n");
-				Adapter->tx_no_swpkt++;
+				E1000G_STAT(tx_ring->stat_no_swpkt);
 				goto tx_send_failed;
 			}
 			QUEUE_PUSH_TAIL(&pending_list, &packet->Link);
@@ -379,19 +335,18 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		 */
 		if ((len <= Adapter->tx_bcopy_thresh) || force_bcopy) {
 			desc_count =
-			    e1000g_tx_copy(Adapter, packet, nmp, force_bcopy);
-			Adapter->tx_copy++;
+			    e1000g_tx_copy(tx_ring, packet, nmp, force_bcopy);
+			E1000G_DEBUG_STAT(tx_ring->stat_copy);
 		} else {
 			desc_count =
-			    e1000g_tx_bind(Adapter, packet, nmp);
-			Adapter->tx_bind++;
+			    e1000g_tx_bind(tx_ring, packet, nmp);
+			E1000G_DEBUG_STAT(tx_ring->stat_bind);
 		}
-
-		if (desc_count < 0)
-			goto tx_send_failed;
 
 		if (desc_count > 0)
 			desc_total += desc_count;
+		else if (desc_count < 0)
+			goto tx_send_failed;
 
 		nmp = tmp;
 	}
@@ -402,8 +357,8 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	packet->mp = mp;
 
 	/* Try to recycle the tx descriptors again */
-	if (e1000g_tx_free_desc_num(tx_ring) < MAX_TX_DESC_PER_PACKET) {
-		Adapter->tx_recycle_retry++;
+	if (tx_ring->tbd_avail < (desc_total + 2)) {
+		E1000G_DEBUG_STAT(tx_ring->stat_recycle_retry);
 		(void) e1000g_recycle(tx_ring);
 	}
 
@@ -414,10 +369,10 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * (one redundant descriptor and one hw checksum context descriptor are
 	 * included), then return failure.
 	 */
-	if (e1000g_tx_free_desc_num(tx_ring) < (desc_total + 2)) {
-		e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
+	if (tx_ring->tbd_avail < (desc_total + 2)) {
+		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 		    "No Enough Tx descriptors\n");
-		Adapter->tx_no_desc++;
+		E1000G_STAT(tx_ring->stat_no_desc);
 		mutex_exit(&tx_ring->tx_lock);
 		goto tx_send_failed;
 	}
@@ -428,31 +383,16 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 
 	ASSERT(desc_count > 0);
 
-	/* Update statistic counters */
-	if (Adapter->ProfileJumboTraffic) {
-		if ((msg_size > ETHERMAX) &&
-		    (msg_size <= FRAME_SIZE_UPTO_4K))
-			Adapter->JumboTx_4K++;
-
-		if ((msg_size > FRAME_SIZE_UPTO_4K) &&
-		    (msg_size <= FRAME_SIZE_UPTO_8K))
-			Adapter->JumboTx_8K++;
-
-		if ((msg_size > FRAME_SIZE_UPTO_8K) &&
-		    (msg_size <= FRAME_SIZE_UPTO_16K))
-			Adapter->JumboTx_16K++;
-	}
-
 	/* Send successful */
 	return (B_TRUE);
 
 tx_send_failed:
 	/* Free pending TxSwPackets */
-	packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(&pending_list);
+	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(&pending_list);
 	while (packet) {
 		packet->mp = NULL;
-		FreeTxSwPacket(packet);
-		packet = (PTX_SW_PACKET)
+		e1000g_free_tx_swpkt(packet);
+		packet = (p_tx_sw_packet_t)
 		    QUEUE_GET_NEXT(&pending_list, &packet->Link);
 	}
 
@@ -461,7 +401,7 @@ tx_send_failed:
 	QUEUE_APPEND(&tx_ring->free_list, &pending_list);
 	mutex_exit(&tx_ring->freelist_lock);
 
-	Adapter->tx_send_fail++;
+	E1000G_STAT(tx_ring->stat_send_fail);
 
 	freemsg(mp);
 
@@ -473,9 +413,9 @@ tx_no_resource:
 	 * Enable Transmit interrupts, so that the interrupt routine can
 	 * call mac_tx_update() when transmit descriptors become available.
 	 */
-	Adapter->resched_needed = B_TRUE;
+	tx_ring->resched_needed = B_TRUE;
 	if (!Adapter->tx_intr_enable)
-		e1000g_EnableTxInterrupt(Adapter);
+		e1000g_mask_tx_interrupt(Adapter);
 
 	/* Message will be scheduled for re-transmit */
 	return (B_FALSE);
@@ -508,18 +448,18 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
     cksum_data_t *cksum)
 {
 	struct e1000g *Adapter;
-	PTX_SW_PACKET first_packet;
-	PTX_SW_PACKET packet;
+	struct e1000_hw *hw;
+	p_tx_sw_packet_t first_packet;
+	p_tx_sw_packet_t packet;
 	boolean_t cksum_load;
 	struct e1000_tx_desc *first_data_desc;
 	struct e1000_tx_desc *next_desc;
 	struct e1000_tx_desc *descriptor;
-	uint32_t sync_offset;
-	int sync_len;
 	int desc_count;
 	int i;
 
 	Adapter = tx_ring->adapter;
+	hw = &Adapter->shared;
 
 	desc_count = 0;
 	first_packet = NULL;
@@ -532,7 +472,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	cksum_load = check_cksum_context(tx_ring, cksum);
 
 	if (cksum_load) {
-		first_packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(pending_list);
+		first_packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(pending_list);
 
 		descriptor = next_desc;
 
@@ -550,23 +490,18 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 	first_data_desc = next_desc;
 
-	packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(pending_list);
+	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(pending_list);
 	while (packet) {
 		ASSERT(packet->num_desc);
 
 		for (i = 0; i < packet->num_desc; i++) {
-			ASSERT(e1000g_tx_free_desc_num(tx_ring) > 0);
+			ASSERT(tx_ring->tbd_avail > 0);
 
 			descriptor = next_desc;
-#ifdef __sparc
 			descriptor->buffer_addr =
-			    DWORD_SWAP(packet->desc[i].Address);
-#else
-			descriptor->buffer_addr =
-			    packet->desc[i].Address;
-#endif
+			    packet->desc[i].address;
 			descriptor->lower.data =
-			    packet->desc[i].Length;
+			    packet->desc[i].length;
 
 			/* Zero out status */
 			descriptor->upper.data = 0;
@@ -595,7 +530,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 			first_packet = NULL;
 		}
 
-		packet = (PTX_SW_PACKET)
+		packet = (p_tx_sw_packet_t)
 		    QUEUE_GET_NEXT(pending_list, &packet->Link);
 	}
 
@@ -614,7 +549,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	 * Last Descriptor of Packet needs End Of Packet (EOP), Report
 	 * Status (RS) and append Ethernet CRC (IFCS) bits set.
 	 */
-	if (Adapter->TxInterruptDelay) {
+	if (Adapter->tx_intr_delay) {
 		descriptor->lower.data |= E1000_TXD_CMD_IDE |
 		    E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS;
 	} else {
@@ -625,25 +560,8 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	/*
 	 * Sync the Tx descriptors DMA buffer
 	 */
-	sync_offset = tx_ring->tbd_next - tx_ring->tbd_first;
-	sync_len = descriptor - tx_ring->tbd_next + 1;
-	/* Check the wrap-around case */
-	if (sync_len > 0) {
-		(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
-		    sync_offset * sizeof (struct e1000_tx_desc),
-		    sync_len * sizeof (struct e1000_tx_desc),
-		    DDI_DMA_SYNC_FORDEV);
-	} else {
-		(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
-		    sync_offset * sizeof (struct e1000_tx_desc),
-		    0,
-		    DDI_DMA_SYNC_FORDEV);
-		sync_len = descriptor - tx_ring->tbd_first + 1;
-		(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
-		    0,
-		    sync_len * sizeof (struct e1000_tx_desc),
-		    DDI_DMA_SYNC_FORDEV);
-	}
+	(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
+	    0, 0, DDI_DMA_SYNC_FORDEV);
 
 	tx_ring->tbd_next = next_desc;
 
@@ -651,15 +569,16 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	 * Advance the Transmit Descriptor Tail (Tdt), this tells the
 	 * FX1000 that this frame is available to transmit.
 	 */
-	if (Adapter->Shared.mac_type == e1000_82547)
+	if (hw->mac.type == e1000_82547)
 		e1000g_82547_tx_move_tail(tx_ring);
 	else
-		E1000_WRITE_REG(&Adapter->Shared, TDT,
+		E1000_WRITE_REG(hw, E1000_TDT,
 		    (uint32_t)(next_desc - tx_ring->tbd_first));
 
 	/* Put the pending SwPackets to the "Used" list */
 	mutex_enter(&tx_ring->usedlist_lock);
 	QUEUE_APPEND(&tx_ring->used_list, pending_list);
+	tx_ring->tbd_avail -= desc_count;
 	mutex_exit(&tx_ring->usedlist_lock);
 
 	/* Store the cksum data */
@@ -671,39 +590,17 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 
 /*
- * **********************************************************************
- * Name:	SetupTransmitStructures					*
- *									*
- * Description: This routine initializes all of the transmit related	*
- *	structures.  This includes the Transmit descriptors, the	*
- *	coalesce buffers, and the TX_SW_PACKETs structures.		*
- *									*
- *	NOTE -- The device must have been reset before this		*
- *		routine is called.					*
- *									*
- * Author:	Hari Seshadri						*
- * Functions Called : get_32bit_value					*
- *									*
- *									*
- *									*
- * Arguments:								*
- *	Adapter - A pointer to our context sensitive "Adapter"		*
- *	structure.							*
- *									*
- * Returns:								*
- *      (none)								*
- *									*
- * Modification log:							*
- * Date      Who  Description						*
- * --------  ---  -----------------------------------------------------	*
- *									*
- * **********************************************************************
+ * e1000g_tx_setup - setup tx data structures
+ *
+ * This routine initializes all of the transmit related
+ * structures. This includes the Transmit descriptors,
+ * and the tx_sw_packet structures.
  */
 void
-SetupTransmitStructures(struct e1000g *Adapter)
+e1000g_tx_setup(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw;
-	PTX_SW_PACKET packet;
+	p_tx_sw_packet_t packet;
 	UINT i;
 	uint32_t buf_high;
 	uint32_t buf_low;
@@ -714,13 +611,13 @@ SetupTransmitStructures(struct e1000g *Adapter)
 	int size;
 	e1000g_tx_ring_t *tx_ring;
 
-	hw = &Adapter->Shared;
+	hw = &Adapter->shared;
 	tx_ring = Adapter->tx_ring;
 
 	/* init the lists */
 	/*
 	 * Here we don't need to protect the lists using the
-	 * tx_usedlist_lock and tx_freelist_lock, for they have
+	 * usedlist_lock and freelist_lock, for they have
 	 * been protected by the chip_lock.
 	 */
 	QUEUE_INIT_LIST(&tx_ring->used_list);
@@ -728,10 +625,10 @@ SetupTransmitStructures(struct e1000g *Adapter)
 
 	/* Go through and set up each SW_Packet */
 	packet = tx_ring->packet_area;
-	for (i = 0; i < Adapter->NumTxSwPacket; i++, packet++) {
-		/* Initialize this TX_SW_PACKET area */
-		FreeTxSwPacket(packet);
-		/* Add this TX_SW_PACKET to the free list */
+	for (i = 0; i < Adapter->tx_freelist_num; i++, packet++) {
+		/* Initialize this tx_sw_apcket area */
+		e1000g_free_tx_swpkt(packet);
+		/* Add this tx_sw_packet to the free list */
 		QUEUE_PUSH_TAIL(&tx_ring->free_list,
 		    &packet->Link);
 	}
@@ -746,69 +643,69 @@ SetupTransmitStructures(struct e1000g *Adapter)
 	/* Setup the Transmit Control Register (TCTL). */
 	reg_tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
 	    (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT) |
-	    (E1000_FDX_COLLISION_DISTANCE << E1000_COLD_SHIFT);
+	    (E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT) |
+	    E1000_TCTL_RTLC;
 
 	/* Enable the MULR bit */
-	if (hw->bus_type == e1000_bus_type_pci_express)
+	if (hw->bus.type == e1000_bus_type_pci_express)
 		reg_tctl |= E1000_TCTL_MULR;
 
-	E1000_WRITE_REG(hw, TCTL, reg_tctl);
+	E1000_WRITE_REG(hw, E1000_TCTL, reg_tctl);
 
-	if ((hw->mac_type == e1000_82571) || (hw->mac_type == e1000_82572)) {
+	if ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572)) {
 		e1000_get_speed_and_duplex(hw, &speed, &duplex);
 
-		reg_tarc = E1000_READ_REG(hw, TARC0);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC0);
 		reg_tarc |= (1 << 25);
 		if (speed == SPEED_1000)
 			reg_tarc |= (1 << 21);
-		E1000_WRITE_REG(hw, TARC0, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC0, reg_tarc);
 
-		reg_tarc = E1000_READ_REG(hw, TARC1);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC1);
 		reg_tarc |= (1 << 25);
 		if (reg_tctl & E1000_TCTL_MULR)
 			reg_tarc &= ~(1 << 28);
 		else
 			reg_tarc |= (1 << 28);
-		E1000_WRITE_REG(hw, TARC1, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC1, reg_tarc);
 
-	} else if (hw->mac_type == e1000_80003es2lan) {
-		reg_tarc = E1000_READ_REG(hw, TARC0);
+	} else if (hw->mac.type == e1000_80003es2lan) {
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC0);
 		reg_tarc |= 1;
 		if (hw->media_type == e1000_media_type_internal_serdes)
 			reg_tarc |= (1 << 20);
-		E1000_WRITE_REG(hw, TARC0, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC0, reg_tarc);
 
-		reg_tarc = E1000_READ_REG(hw, TARC1);
+		reg_tarc = E1000_READ_REG(hw, E1000_TARC1);
 		reg_tarc |= 1;
-		E1000_WRITE_REG(hw, TARC1, reg_tarc);
+		E1000_WRITE_REG(hw, E1000_TARC1, reg_tarc);
 	}
 
 	/* Setup HW Base and Length of Tx descriptor area */
-	size = (Adapter->NumTxDescriptors * sizeof (struct e1000_tx_desc));
-	E1000_WRITE_REG(hw, TDLEN, size);
-	size = E1000_READ_REG(hw, TDLEN);
+	size = (Adapter->tx_desc_num * sizeof (struct e1000_tx_desc));
+	E1000_WRITE_REG(hw, E1000_TDLEN, size);
+	size = E1000_READ_REG(hw, E1000_TDLEN);
 
 	buf_low = (uint32_t)tx_ring->tbd_dma_addr;
 	buf_high = (uint32_t)(tx_ring->tbd_dma_addr >> 32);
 
-	E1000_WRITE_REG(hw, TDBAL, buf_low);
-	E1000_WRITE_REG(hw, TDBAH, buf_high);
+	E1000_WRITE_REG(hw, E1000_TDBAL, buf_low);
+	E1000_WRITE_REG(hw, E1000_TDBAH, buf_high);
 
 	/* Setup our HW Tx Head & Tail descriptor pointers */
-	E1000_WRITE_REG(hw, TDH, 0);
-	E1000_WRITE_REG(hw, TDT, 0);
+	E1000_WRITE_REG(hw, E1000_TDH, 0);
+	E1000_WRITE_REG(hw, E1000_TDT, 0);
 
 	/* Set the default values for the Tx Inter Packet Gap timer */
-	switch (hw->mac_type) {
-	case e1000_82542_rev2_0:
-	case e1000_82542_rev2_1:
+	if ((hw->mac.type == e1000_82542) &&
+	    ((hw->revision_id == E1000_REVISION_2) ||
+	    (hw->revision_id == E1000_REVISION_3))) {
 		reg_tipg = DEFAULT_82542_TIPG_IPGT;
 		reg_tipg |=
 		    DEFAULT_82542_TIPG_IPGR1 << E1000_TIPG_IPGR1_SHIFT;
 		reg_tipg |=
 		    DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
-		break;
-	default:
+	} else {
 		if (hw->media_type == e1000_media_type_fiber)
 			reg_tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
 		else
@@ -817,62 +714,32 @@ SetupTransmitStructures(struct e1000g *Adapter)
 		    DEFAULT_82543_TIPG_IPGR1 << E1000_TIPG_IPGR1_SHIFT;
 		reg_tipg |=
 		    DEFAULT_82543_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
-		break;
 	}
-	E1000_WRITE_REG(hw, TIPG, reg_tipg);
+	E1000_WRITE_REG(hw, E1000_TIPG, reg_tipg);
 
 	/* Setup Transmit Interrupt Delay Value */
-	if (Adapter->TxInterruptDelay) {
-		E1000_WRITE_REG(hw, TIDV, Adapter->TxInterruptDelay);
+	if (Adapter->tx_intr_delay) {
+		E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
 	}
+
+	tx_ring->tbd_avail = Adapter->tx_desc_num;
 
 	/* For TCP/UDP checksum offload */
 	tx_ring->cksum_data.cksum_stuff = 0;
 	tx_ring->cksum_data.cksum_start = 0;
 	tx_ring->cksum_data.cksum_flags = 0;
 	tx_ring->cksum_data.ether_header_size = 0;
-
-	/* Initialize tx parameters */
-	Adapter->tx_bcopy_thresh = DEFAULTTXBCOPYTHRESHOLD;
-	Adapter->tx_recycle_low_water = DEFAULTTXRECYCLELOWWATER;
-	Adapter->tx_recycle_num = DEFAULTTXRECYCLENUM;
-	Adapter->tx_intr_enable = B_TRUE;
-	Adapter->tx_frags_limit =
-	    (Adapter->Shared.max_frame_size / Adapter->tx_bcopy_thresh) + 2;
-	if (Adapter->tx_frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
-		Adapter->tx_frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
 }
 
 /*
- * **********************************************************************
- * Name:	e1000g_recycle						*
- *									*
- * Description: This routine cleans transmit packets.			*
- *									*
- *									*
- *									*
- * Arguments:								*
- *      Adapter - A pointer to our context sensitive "Adapter"		*
- *      structure.							*
- *									*
- * Returns:								*
- *      (none)								*
- * Functions Called:							*
- *	  None								*
- *									*
- * Modification log:							*
- * Date      Who  Description						*
- * --------  ---  -----------------------------------------------------	*
- *									*
- * **********************************************************************
+ * e1000g_recycle - recycle the tx descriptors and tx sw packets
  */
 int
 e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 {
 	struct e1000g *Adapter;
 	LIST_DESCRIBER pending_list;
-	PTX_SW_PACKET packet;
-	e1000g_msg_chain_t *msg_chain;
+	p_tx_sw_packet_t packet;
 	mblk_t *mp;
 	mblk_t *nmp;
 	struct e1000_tx_desc *descriptor;
@@ -891,42 +758,38 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 
 	mutex_enter(&tx_ring->usedlist_lock);
 
-	packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(&tx_ring->used_list);
+	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list);
 	if (packet == NULL) {
 		mutex_exit(&tx_ring->usedlist_lock);
-		Adapter->tx_recycle_fail = 0;
-		Adapter->StallWatchdog = 0;
+		tx_ring->recycle_fail = 0;
+		tx_ring->stall_watchdog = 0;
 		return (0);
 	}
+
+	/* Sync the Tx descriptor DMA buffer */
+	(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
+	    0, 0, DDI_DMA_SYNC_FORKERNEL);
 
 	/*
 	 * While there are still TxSwPackets in the used queue check them
 	 */
 	while (packet =
-	    (PTX_SW_PACKET) QUEUE_GET_HEAD(&tx_ring->used_list)) {
+	    (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list)) {
 
 		/*
 		 * Get hold of the next descriptor that the e1000g will
 		 * report status back to (this will be the last descriptor
-		 * of a given TxSwPacket). We only want to free the
-		 * TxSwPacket (and it resources) if the e1000g is done
+		 * of a given sw packet). We only want to free the
+		 * sw packet (and it resources) if the e1000g is done
 		 * with ALL of the descriptors.  If the e1000g is done
 		 * with the last one then it is done with all of them.
 		 */
 		ASSERT(packet->num_desc);
-		descriptor = tx_ring->tbd_oldest +
-		    (packet->num_desc - 1);
+		descriptor = tx_ring->tbd_oldest + (packet->num_desc - 1);
 
 		/* Check for wrap case */
 		if (descriptor > tx_ring->tbd_last)
-			descriptor -= Adapter->NumTxDescriptors;
-
-		/* Sync the Tx descriptor DMA buffer */
-		(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
-		    (descriptor - tx_ring->tbd_first) *
-		    sizeof (struct e1000_tx_desc),
-		    sizeof (struct e1000_tx_desc),
-		    DDI_DMA_SYNC_FORCPU);
+			descriptor -= Adapter->tx_desc_num;
 
 		/*
 		 * If the descriptor done bit is set free TxSwPacket and
@@ -945,11 +808,11 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 
 			desc_count += packet->num_desc;
 
-			if (desc_count >= Adapter->tx_recycle_num)
+			if (desc_count >= tx_ring->recycle_num)
 				break;
 		} else {
 			/*
-			 * Found a TxSwPacket that the e1000g is not done
+			 * Found a sw packet that the e1000g is not done
 			 * with then there is no reason to check the rest
 			 * of the queue.
 			 */
@@ -957,20 +820,22 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 		}
 	}
 
+	tx_ring->tbd_avail += desc_count;
+
 	mutex_exit(&tx_ring->usedlist_lock);
 
 	if (desc_count == 0) {
-		Adapter->tx_recycle_fail++;
-		Adapter->tx_recycle_none++;
+		tx_ring->recycle_fail++;
+		E1000G_DEBUG_STAT(tx_ring->stat_recycle_none);
 		return (0);
 	}
 
-	Adapter->tx_recycle_fail = 0;
-	Adapter->StallWatchdog = 0;
+	tx_ring->recycle_fail = 0;
+	tx_ring->stall_watchdog = 0;
 
 	mp = NULL;
 	nmp = NULL;
-	packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(&pending_list);
+	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(&pending_list);
 	ASSERT(packet != NULL);
 	while (packet != NULL) {
 		if (packet->mp != NULL) {
@@ -988,24 +853,23 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 		}
 
 		/* Free the TxSwPackets */
-		FreeTxSwPacket(packet);
+		e1000g_free_tx_swpkt(packet);
 
-		packet = (PTX_SW_PACKET)
+		packet = (p_tx_sw_packet_t)
 		    QUEUE_GET_NEXT(&pending_list, &packet->Link);
 	}
 
 	/* Save the message chain */
 	if (mp != NULL) {
-		msg_chain = Adapter->tx_msg_chain;
-		mutex_enter(&msg_chain->lock);
-		if (msg_chain->head == NULL) {
-			msg_chain->head = mp;
-			msg_chain->tail = nmp;
+		mutex_enter(&tx_ring->mblks_lock);
+		if (tx_ring->mblks.head == NULL) {
+			tx_ring->mblks.head = mp;
+			tx_ring->mblks.tail = nmp;
 		} else {
-			msg_chain->tail->b_next = mp;
-			msg_chain->tail = nmp;
+			tx_ring->mblks.tail->b_next = mp;
+			tx_ring->mblks.tail = nmp;
 		}
-		mutex_exit(&msg_chain->lock);
+		mutex_exit(&tx_ring->mblks_lock);
 
 		/*
 		 * If the tx interrupt is enabled, the messages will be freed
@@ -1078,8 +942,8 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
  *	Make sure we do not have ending address as 1,2,3,4(Hang) or 9,a,b,c(DAC)
  */
 static uint32_t
-e1000g_fill_82544_desc(uint64_t Address,
-    size_t Length, PDESC_ARRAY desc_array)
+e1000g_fill_82544_desc(uint64_t address,
+    size_t length, p_desc_array_t desc_array)
 {
 	/*
 	 * Since issue is sensitive to length and address.
@@ -1087,39 +951,38 @@ e1000g_fill_82544_desc(uint64_t Address,
 	 */
 	uint32_t safe_terminator;
 
-	if (Length <= 4) {
-		desc_array->Descriptor[0].Address = Address;
-		desc_array->Descriptor[0].Length = Length;
-		desc_array->Elements = 1;
-		return (desc_array->Elements);
+	if (length <= 4) {
+		desc_array->descriptor[0].address = address;
+		desc_array->descriptor[0].length = length;
+		desc_array->elements = 1;
+		return (desc_array->elements);
 	}
 	safe_terminator =
-	    (uint32_t)((((uint32_t)Address & 0x7) +
-	    (Length & 0xF)) & 0xF);
+	    (uint32_t)((((uint32_t)address & 0x7) +
+	    (length & 0xF)) & 0xF);
 	/*
 	 * if it does not fall between 0x1 to 0x4 and 0x9 to 0xC then
 	 * return
 	 */
 	if (safe_terminator == 0 ||
-	    (safe_terminator > 4 &&
-	    safe_terminator < 9) ||
+	    (safe_terminator > 4 && safe_terminator < 9) ||
 	    (safe_terminator > 0xC && safe_terminator <= 0xF)) {
-		desc_array->Descriptor[0].Address = Address;
-		desc_array->Descriptor[0].Length = Length;
-		desc_array->Elements = 1;
-		return (desc_array->Elements);
+		desc_array->descriptor[0].address = address;
+		desc_array->descriptor[0].length = length;
+		desc_array->elements = 1;
+		return (desc_array->elements);
 	}
 
-	desc_array->Descriptor[0].Address = Address;
-	desc_array->Descriptor[0].Length = Length - 4;
-	desc_array->Descriptor[1].Address = Address + (Length - 4);
-	desc_array->Descriptor[1].Length = 4;
-	desc_array->Elements = 2;
-	return (desc_array->Elements);
+	desc_array->descriptor[0].address = address;
+	desc_array->descriptor[0].length = length - 4;
+	desc_array->descriptor[1].address = address + (length - 4);
+	desc_array->descriptor[1].length = 4;
+	desc_array->elements = 2;
+	return (desc_array->elements);
 }
 
 static int
-e1000g_tx_copy(struct e1000g *Adapter, PTX_SW_PACKET packet,
+e1000g_tx_copy(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet,
     mblk_t *mp, uint32_t force_bcopy)
 {
 	size_t len;
@@ -1153,15 +1016,15 @@ e1000g_tx_copy(struct e1000g *Adapter, PTX_SW_PACKET packet,
 			finished = B_TRUE;
 		else if (force_bcopy)
 			finished = B_FALSE;
-		else if (len1 > Adapter->tx_bcopy_thresh)
+		else if (len1 > tx_ring->adapter->tx_bcopy_thresh)
 			finished = B_TRUE;
 		else
 			finished = B_FALSE;
 	}
 
 	if (finished) {
-		if (tx_buf->len > len)
-			Adapter->tx_multi_copy++;
+		E1000G_DEBUG_STAT_COND(tx_ring->stat_multi_copy,
+		    (tx_buf->len > len));
 
 		/*
 		 * If the packet is smaller than 64 bytes, which is the
@@ -1177,24 +1040,20 @@ e1000g_tx_copy(struct e1000g *Adapter, PTX_SW_PACKET packet,
 			tx_buf->len = MINIMUM_ETHERNET_PACKET_SIZE;
 		}
 
-		switch (packet->dma_type) {
 #ifdef __sparc
-		case USE_DVMA:
+		if (packet->dma_type == USE_DVMA)
 			dvma_sync(tx_buf->dma_handle, 0, DDI_DMA_SYNC_FORDEV);
-			break;
-#endif
-		case USE_DMA:
+		else
 			(void) ddi_dma_sync(tx_buf->dma_handle, 0,
 			    tx_buf->len, DDI_DMA_SYNC_FORDEV);
-			break;
-		default:
-			ASSERT(B_FALSE);
-			break;
-		}
+#else
+		(void) ddi_dma_sync(tx_buf->dma_handle, 0,
+		    tx_buf->len, DDI_DMA_SYNC_FORDEV);
+#endif
 
 		packet->data_transfer_type = USE_BCOPY;
 
-		desc_count = e1000g_fill_tx_desc(Adapter,
+		desc_count = e1000g_fill_tx_desc(tx_ring,
 		    packet,
 		    tx_buf->dma_address,
 		    tx_buf->len);
@@ -1207,7 +1066,7 @@ e1000g_tx_copy(struct e1000g *Adapter, PTX_SW_PACKET packet,
 }
 
 static int
-e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
+e1000g_tx_bind(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet, mblk_t *mp)
 {
 	int j;
 	int mystat;
@@ -1255,7 +1114,7 @@ e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
 		    DDI_DMA_DONTWAIT, 0, &dma_cookie,
 		    &ncookies)) != DDI_DMA_MAPPED) {
 
-			e1000g_log(Adapter, CE_WARN,
+			e1000g_log(tx_ring->adapter, CE_WARN,
 			    "Couldn't bind mblk buffer to Tx DMA handle: "
 			    "return: %X, Pkt: %X\n",
 			    mystat, packet);
@@ -1269,12 +1128,12 @@ e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
 		 * here any more.
 		 */
 		ASSERT(ncookies);
-		if (ncookies > 1)
-			Adapter->tx_multi_cookie++;
+		E1000G_DEBUG_STAT_COND(tx_ring->stat_multi_cookie,
+		    (ncookies > 1));
 
 		/*
 		 * The data_transfer_type value must be set after the handle
-		 * has been bound, for it will be used in FreeTxSwPacket()
+		 * has been bound, for it will be used in e1000g_free_tx_swpkt()
 		 * to decide whether we need to unbind the handle.
 		 */
 		packet->data_transfer_type = USE_DMA;
@@ -1292,7 +1151,7 @@ e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
 	 */
 	for (j = ncookies; j != 0; j--) {
 
-		desc_count = e1000g_fill_tx_desc(Adapter,
+		desc_count = e1000g_fill_tx_desc(tx_ring,
 		    packet,
 		    dma_cookie.dmac_laddress,
 		    dma_cookie.dmac_size);
@@ -1372,52 +1231,44 @@ e1000g_fill_context_descriptor(cksum_data_t *cksum,
 }
 
 static int
-e1000g_fill_tx_desc(struct e1000g *Adapter,
-    PTX_SW_PACKET packet, uint64_t address, size_t size)
+e1000g_fill_tx_desc(e1000g_tx_ring_t *tx_ring,
+    p_tx_sw_packet_t packet, uint64_t address, size_t size)
 {
-	PADDRESS_LENGTH_PAIR desc;
-	int desc_count;
+	struct e1000_hw *hw = &tx_ring->adapter->shared;
+	p_sw_desc_t desc;
 
-	desc_count = 0;
+	if (hw->mac.type == e1000_82544) {
+		if (hw->bus.type == e1000_bus_type_pcix)
+			return (e1000g_tx_workaround_PCIX_82544(packet,
+			    address, size));
 
-	if ((Adapter->Shared.bus_type == e1000_bus_type_pcix) &&
-	    (Adapter->Shared.mac_type == e1000_82544)) {
-
-		desc_count = e1000g_tx_workaround_PCIX_82544(Adapter,
-		    packet, address, size);
-
-	} else if ((Adapter->Shared.mac_type == e1000_82544) &&
-	    (size > JUMBO_FRAG_LENGTH)) {
-
-		desc_count = e1000g_tx_workaround_jumbo_82544(Adapter,
-		    packet, address, size);
-
-	} else {
-		ASSERT(packet->num_desc < MAX_TX_DESC_PER_PACKET);
-
-		desc = &packet->desc[packet->num_desc];
-
-		desc->Address = address;
-		desc->Length = size;
-
-		packet->num_desc++;
-		desc_count++;
+		if (size > JUMBO_FRAG_LENGTH)
+			return (e1000g_tx_workaround_jumbo_82544(packet,
+			    address, size));
 	}
 
-	return (desc_count);
+	ASSERT(packet->num_desc < MAX_TX_DESC_PER_PACKET);
+
+	desc = &packet->desc[packet->num_desc];
+	desc->address = address;
+	desc->length = size;
+
+	packet->num_desc++;
+
+	return (1);
 }
 
 static int
-e1000g_tx_workaround_PCIX_82544(struct e1000g *Adapter,
-    PTX_SW_PACKET packet, uint64_t address, size_t size)
+e1000g_tx_workaround_PCIX_82544(p_tx_sw_packet_t packet,
+    uint64_t address, size_t size)
 {
-	PADDRESS_LENGTH_PAIR desc;
+	p_sw_desc_t desc;
 	int desc_count;
 	long size_left;
 	size_t len;
 	uint32_t counter;
 	uint32_t array_elements;
-	DESC_ARRAY desc_array;
+	desc_array_t desc_array;
 
 	/*
 	 * Coexist Workaround for cordova: RP: 07/04/03
@@ -1441,20 +1292,15 @@ e1000g_tx_workaround_PCIX_82544(struct e1000g *Adapter,
 
 		for (counter = 0; counter < array_elements; counter++) {
 			ASSERT(packet->num_desc < MAX_TX_DESC_PER_PACKET);
-			if (packet->num_desc >= MAX_TX_DESC_PER_PACKET) {
-				e1000g_log(Adapter, CE_WARN,
-				    "No enough preparing tx descriptors");
-				return (-1);
-			}
 			/*
 			 * Put in the buffer address
 			 */
 			desc = &packet->desc[packet->num_desc];
 
-			desc->Address =
-			    desc_array.Descriptor[counter].Address;
-			desc->Length =
-			    desc_array.Descriptor[counter].Length;
+			desc->address =
+			    desc_array.descriptor[counter].address;
+			desc->length =
+			    desc_array.descriptor[counter].length;
 
 			packet->num_desc++;
 			desc_count++;
@@ -1471,10 +1317,10 @@ e1000g_tx_workaround_PCIX_82544(struct e1000g *Adapter,
 }
 
 static int
-e1000g_tx_workaround_jumbo_82544(struct e1000g *Adapter,
-    PTX_SW_PACKET packet, uint64_t address, size_t size)
+e1000g_tx_workaround_jumbo_82544(p_tx_sw_packet_t packet,
+    uint64_t address, size_t size)
 {
-	PADDRESS_LENGTH_PAIR desc;
+	p_sw_desc_t desc;
 	int desc_count;
 	long size_left;
 	uint32_t offset;
@@ -1488,34 +1334,32 @@ e1000g_tx_workaround_jumbo_82544(struct e1000g *Adapter,
 	offset = 0;
 	while (size_left > 0) {
 		ASSERT(packet->num_desc < MAX_TX_DESC_PER_PACKET);
-		if (packet->num_desc >= MAX_TX_DESC_PER_PACKET) {
-			e1000g_log(Adapter, CE_WARN,
-			    "No enough preparing tx descriptors");
-			return (-1);
-		}
 
 		desc = &packet->desc[packet->num_desc];
 
-		desc->Address = address + offset;
+		desc->address = address + offset;
 
 		if (size_left > JUMBO_FRAG_LENGTH)
-			desc->Length = JUMBO_FRAG_LENGTH;
+			desc->length = JUMBO_FRAG_LENGTH;
 		else
-			desc->Length = size_left;
+			desc->length = size_left;
 
 		packet->num_desc++;
 		desc_count++;
 
-		offset += desc->Length;
+		offset += desc->length;
 		size_left -= JUMBO_FRAG_LENGTH;
 	}
 
 	return (desc_count);
 }
 
+#pragma inline(e1000g_82547_tx_move_tail_work)
+
 static void
 e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 {
+	struct e1000_hw *hw;
 	uint16_t hw_tdt;
 	uint16_t sw_tdt;
 	struct e1000_tx_desc *tx_desc;
@@ -1524,21 +1368,22 @@ e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 	struct e1000g *Adapter;
 
 	Adapter = tx_ring->adapter;
+	hw = &Adapter->shared;
 
-	hw_tdt = E1000_READ_REG(&Adapter->Shared, TDT);
+	hw_tdt = E1000_READ_REG(hw, E1000_TDT);
 	sw_tdt = tx_ring->tbd_next - tx_ring->tbd_first;
 
 	while (hw_tdt != sw_tdt) {
 		tx_desc = &(tx_ring->tbd_first[hw_tdt]);
 		length += tx_desc->lower.flags.length;
 		eop = tx_desc->lower.data & E1000_TXD_CMD_EOP;
-		if (++hw_tdt == Adapter->NumTxDescriptors)
+		if (++hw_tdt == Adapter->tx_desc_num)
 			hw_tdt = 0;
 
 		if (eop) {
 			if ((Adapter->link_duplex == HALF_DUPLEX) &&
-			    e1000_82547_fifo_workaround(&Adapter->Shared,
-			    length) != E1000_SUCCESS) {
+			    (e1000_fifo_workaround_82547(hw, length)
+			    != E1000_SUCCESS)) {
 				if (tx_ring->timer_enable_82547) {
 					ASSERT(tx_ring->timer_id_82547 == 0);
 					tx_ring->timer_id_82547 =
@@ -1549,10 +1394,8 @@ e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 				return;
 
 			} else {
-				E1000_WRITE_REG(&Adapter->Shared, TDT,
-				    hw_tdt);
-				e1000_update_tx_fifo_head(&Adapter->Shared,
-				    length);
+				E1000_WRITE_REG(hw, E1000_TDT, hw_tdt);
+				e1000_update_tx_fifo_head_82547(hw, length);
 				length = 0;
 			}
 		}

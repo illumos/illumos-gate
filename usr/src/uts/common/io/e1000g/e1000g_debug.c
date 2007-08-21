@@ -29,15 +29,10 @@
  * **********************************************************************
  *									*
  * Module Name:								*
- *   e1000g_debug.c							*
+ * 	e1000g_debug.c							*
  *									*
  * Abstract:								*
- *									*
- *   This driver runs on the following hardware:			*
- *   - Wiseman based PCI gigabit ethernet adapters			*
- *									*
- * Environment:								*
- *   Kernel Mode -							*
+ *	This module includes the debug routines				*
  *									*
  * **********************************************************************
  */
@@ -50,15 +45,62 @@
 #define	_SYS_VARARGS_H
 #endif
 
-#include "e1000g_sw.h"
 #include "e1000g_debug.h"
+#include "e1000g_sw.h"
+
+#ifdef E1000G_DEBUG
+int e1000g_debug = E1000G_WARN_LEVEL;
+#endif
+int e1000g_log_mode = E1000G_LOG_PRINT;
 
 void
-e1000g_log(struct e1000g *Adapter, int level, char *fmt, ...)
+e1000g_log(void *instance, int level, char *fmt, ...)
 {
+	struct e1000g *Adapter = (struct e1000g *)instance;
 	auto char name[NAMELEN];
 	auto char buf[BUFSZ];
 	va_list ap;
+
+	switch (level) {
+#ifdef E1000G_DEBUG
+	case E1000G_VERBOSE_LEVEL:	/* 16 or 0x010 */
+		if (e1000g_debug < E1000G_VERBOSE_LEVEL)
+			return;
+		level = CE_CONT;
+		break;
+
+	case E1000G_TRACE_LEVEL:	/* 8 or 0x008 */
+		if (e1000g_debug < E1000G_TRACE_LEVEL)
+			return;
+		level = CE_CONT;
+		break;
+
+	case E1000G_INFO_LEVEL:		/* 4 or 0x004 */
+		if (e1000g_debug < E1000G_INFO_LEVEL)
+			return;
+		level = CE_CONT;
+		break;
+
+	case E1000G_WARN_LEVEL:		/* 2 or 0x002 */
+		if (e1000g_debug < E1000G_WARN_LEVEL)
+			return;
+		level = CE_CONT;
+		break;
+
+	case E1000G_ERRS_LEVEL:		/* 1 or 0x001 */
+		level = CE_CONT;
+		break;
+#else
+	case CE_CONT:
+	case CE_NOTE:
+	case CE_WARN:
+	case CE_PANIC:
+		break;
+#endif
+	default:
+		level = CE_CONT;
+		break;
+	}
 
 	if (Adapter != NULL) {
 		(void) sprintf(name, "%s - e1000g[%d] ",
@@ -66,7 +108,6 @@ e1000g_log(struct e1000g *Adapter, int level, char *fmt, ...)
 	} else {
 		(void) sprintf(name, "e1000g");
 	}
-#ifdef GCC
 	/*
 	 * va_start uses built in macro __builtin_va_alist from the
 	 * compiler libs which requires compiler system to have
@@ -92,111 +133,15 @@ e1000g_log(struct e1000g *Adapter, int level, char *fmt, ...)
 	 * Using GNU gcc compiler it doesn't expand to va_start....
 	 */
 	va_start(ap, fmt);
-#else
-	va_start(ap, fmt);
-#endif	/* GCC */
 	(void) vsprintf(buf, fmt, ap);
 	va_end(ap);
 
-	switch (level) {
-	case CE_CONT:
-	case CE_NOTE:
-	case CE_WARN:
-	case CE_PANIC:
-		if (e1000g_display_only == 1 && e1000g_print_only == 1) {
-			cmn_err(level, "%s: %s", name, buf);
-			break;
-		}
-		if (e1000g_display_only == 1) {
-			cmn_err(level, "^%s: %s", name, buf);
-			break;
-		}
-		if (e1000g_print_only == 1) {
-			cmn_err(level, "!%s: %s", name, buf);
-			break;
-		}
-		/*
-		 * if they are not set properly then do both
-		 */
+	if ((e1000g_log_mode & E1000G_LOG_ALL) == E1000G_LOG_ALL)
 		cmn_err(level, "%s: %s", name, buf);
-		break;
-
-#ifdef e1000g_DEBUG
-	case e1000g_DDI_LEVEL:	/* 256 or 0x100 */
-		if (e1000g_debug != e1000g_DDI_LEVEL)
-			break;
-
-	case e1000g_INT_LEVEL:	/* 128 or 0x080 */
-		if ((e1000g_debug != e1000g_INT_LEVEL) &&
-		    (e1000g_debug < e1000g_INT_LEVEL))
-			break;
-
-	case e1000g_SEND_LEVEL:	/* 64 or 0x040 */
-		if ((e1000g_debug != e1000g_SEND_LEVEL) &&
-		    (e1000g_debug < e1000g_SEND_LEVEL))
-			break;
-
-	case e1000g_RECV_LEVEL:	/* 32 or 0x020 */
-		if ((e1000g_debug != e1000g_RECV_LEVEL) &&
-		    (e1000g_debug < e1000g_RECV_LEVEL))
-			break;
-
-	case e1000g_CALLTRACE_LEVEL:	/* 8 or 0x008 */
-		if ((e1000g_debug != e1000g_CALLTRACE_LEVEL) &&
-		    (e1000g_debug < e1000g_CALLTRACE_LEVEL))
-			break;
-
-	case e1000g_INFO_LEVEL:	/* 4 or 0x004 */
-		if ((e1000g_debug != e1000g_INFO_LEVEL) &&
-		    (e1000g_debug < e1000g_INFO_LEVEL))
-			break;
-
-	case e1000g_VERBOSE_LEVEL:	/* 16 or 0x010 */
-#endif
-	default:
-		if (e1000g_display_only == 1 && e1000g_print_only == 1) {
-			cmn_err(CE_CONT, "%s:\t%s", name, buf);
-			break;
-		}
-
-		if (e1000g_display_only == 1) {
-			cmn_err(CE_CONT, "^%s:\t%s", name, buf);
-			break;
-		}
-
-		if (e1000g_print_only == 1) {
-			cmn_err(CE_CONT, "!%s:\t%s", name, buf);
-			break;
-		}
-
-		/*
-		 * if they are not set properly then do both
-		 */
-		cmn_err(CE_CONT, "%s:\t%s", name, buf);
-		break;
-	}
-}
-
-void
-e1000g_log_hw(char *msg, void *cptr, int length)
-{
-	int i = 0, j;
-	char buf[BUFSZ];
-	char *cp = cptr;
-
-	bzero(buf, BUFSZ);
-	for (i = 0; i < length; i++) {
-		/*
-		 * make sure there is room for longest %x (i.e. 8 for a
-		 * negative number) plus space (1) plus zero (1)
-		 */
-		if ((j = strlen(buf)) >= (BUFSZ - 10)) {
-			buf[BUFSZ - 2] = '>';
-			buf[BUFSZ - 1] = 0;
-			break;
-		}
-
-		(void) sprintf(&buf[j], "%x ", cp[i]);
-	}
-	cmn_err(CE_CONT, "^%s: %s\n", msg, buf);
+	else if (e1000g_log_mode & E1000G_LOG_DISPLAY)
+		cmn_err(level, "^%s: %s", name, buf);
+	else if (e1000g_log_mode & E1000G_LOG_PRINT)
+		cmn_err(level, "!%s: %s", name, buf);
+	else /* if they are not set properly then do both */
+		cmn_err(level, "%s: %s", name, buf);
 }

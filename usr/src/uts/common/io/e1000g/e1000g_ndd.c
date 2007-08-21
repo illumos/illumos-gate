@@ -109,55 +109,44 @@ static const nd_param_t nd_template[] = {
 { PARAM_LINK_DUPLEX,	    0, 2, 0,	NULL,	"-link_duplex"		},
 { PARAM_LINK_AUTONEG,	    0, 1, 0,	NULL,	"-link_autoneg"		},
 
-/* Max Frame Size */
-{ PARAM_MAX_FRAME_SIZE,	    ETHERMAX, FRAME_SIZE_UPTO_16K, ETHERMAX,
-					NULL,	"-max_frame_size"	},
-/* Loopback mode */
-{ PARAM_LOOP_MODE,	    0, 4, 0,	NULL,	"-loopback_mode"	},
-/* Interrupt Type */
-{ PARAM_INTR_TYPE,	    0, 4, 0,	NULL,	"-interrupt_type"	},
-
 /* Tx Bcopy Threshold */
-{ PARAM_TX_BCOPY_THRESHOLD, MINTXBCOPYTHRESHOLD,
-			    MAXTXBCOPYTHRESHOLD,
-			    DEFAULTTXBCOPYTHRESHOLD,
+{ PARAM_TX_BCOPY_THRESHOLD, MIN_TX_BCOPY_THRESHOLD,
+			    MAX_TX_BCOPY_THRESHOLD,
+			    DEFAULT_TX_BCOPY_THRESHOLD,
 					NULL,	"+tx_bcopy_threshold"	},
-/* Tx Bcopy Fragments Limit */
-{ PARAM_TX_FRAGS_LIMIT,	    MINTXFRAGSLIMIT,
-			    MAXTXFRAGSLIMIT,
-			    DEFAULTTXFRAGSLIMIT,
-					NULL,	"-tx_bcopy_frags_limit"	},
-/* Tx Recycle Low-Water */
-{ PARAM_TX_RECYCLE_LOW_WATER, MINTXRECYCLELOWWATER,
-			    MAXTXRECYCLELOWWATER,
-			    DEFAULTTXRECYCLELOWWATER,
-					NULL,	"+tx_recycle_low_water"	},
-/* Tx Recycle Number */
-{ PARAM_TX_RECYCLE_NUM,	    MINTXRECYCLENUM,
-			    MAXTXRECYCLENUM,
-			    DEFAULTTXRECYCLENUM,
-					NULL,	"+tx_recycle_num"	},
 /* Tx Interrupt Enable */
-{ PARAM_TX_INTR_ENABLE,	    0, 1, 1,	NULL,	"+tx_interrupt_enable"	},
+{ PARAM_TX_INTR_ENABLE,	    0, 1, DEFAULT_TX_INTR_ENABLE,
+					NULL,	"+tx_interrupt_enable"	},
 /* Tx Interrupt Delay */
-{ PARAM_TX_INTR_DELAY,	    MINTXINTERRUPTDELAYVAL,
-			    MAXTXINTERRUPTDELAYVAL,
-			    DEFAULTTXINTERRUPTDELAYVAL,
-					NULL,	"+tx_interrupt_delay"	},
+{ PARAM_TX_TIDV,	    MIN_TX_INTR_DELAY,
+			    MAX_TX_INTR_DELAY,
+			    DEFAULT_TX_INTR_DELAY,
+					NULL,	"+tx_intr_delay"	},
+/* Tx Interrupt Delay */
+{ PARAM_TX_TADV,	    MIN_TX_INTR_ABS_DELAY,
+			    MAX_TX_INTR_ABS_DELAY,
+			    DEFAULT_TX_INTR_ABS_DELAY,
+					NULL,	"+tx_intr_abs_delay"	},
 /* Rx Bcopy Threshold */
-{ PARAM_RX_BCOPY_THRESHOLD, MINRXBCOPYTHRESHOLD,
-			    MAXRXBCOPYTHRESHOLD,
-			    DEFAULTRXBCOPYTHRESHOLD,
+{ PARAM_RX_BCOPY_THRESHOLD, MIN_RX_BCOPY_THRESHOLD,
+			    MAX_RX_BCOPY_THRESHOLD,
+			    DEFAULT_RX_BCOPY_THRESHOLD,
 					NULL,	"+rx_bcopy_threshold"	},
 /* Rx Max Receive Packets Per Interrupt */
-{ PARAM_RX_PKT_ON_INTR,	    MINNUMRCVPKTONINTR,
-			    MAXNUMRCVPKTONINTR,
-			    DEFAULTMAXNUMRCVPKTONINTR,
+{ PARAM_RX_PKT_ON_INTR,	    MIN_RX_LIMIT_ON_INTR,
+			    MAX_RX_LIMIT_ON_INTR,
+			    DEFAULT_RX_LIMIT_ON_INTR,
 					NULL,	"+max_num_rcv_packets"	},
 /* Receive Delay Timer Register */
-{ PARAM_RX_RDTR,	    0, 65535, 0, NULL,	"+rx_intr_delay"	},
+{ PARAM_RX_RDTR,	    MIN_RX_INTR_DELAY,
+			    MAX_RX_INTR_DELAY,
+			    DEFAULT_RX_INTR_DELAY,
+					NULL,	"+rx_intr_delay"	},
 /* Receive Interrupt Absolute Delay Register */
-{ PARAM_RX_RADV,	    0, 65535, 0, NULL,	"+rx_intr_abs_delay"	},
+{ PARAM_RX_RADV,	    MIN_RX_INTR_ABS_DELAY,
+			    MAX_RX_INTR_ABS_DELAY,
+			    DEFAULT_RX_INTR_ABS_DELAY,
+					NULL,	"+rx_intr_abs_delay"	},
 
 /* Terminator */
 { PARAM_COUNT,		    0, 0, 0,	NULL,	NULL			}
@@ -224,7 +213,7 @@ e1000g_nd_param_load(struct e1000g *Adapter)
 		nm = &ndp->ndp_name[0];
 		setfn = e1000g_nd_set;
 
-		if (Adapter->Shared.media_type != e1000_media_type_copper) {
+		if (Adapter->shared.media_type != e1000_media_type_copper) {
 			switch (*nm) {
 			default:
 				break;
@@ -268,9 +257,9 @@ e1000g_nd_param_load(struct e1000g *Adapter)
 	return (DDI_SUCCESS);
 
 nd_fail:
-	e1000g_DEBUGLOG_2(Adapter, e1000g_INFO_LEVEL,
-		"e1000g_nd_param_load: FAILED at index %d [info %d]",
-		tmplp-nd_template, tmplp->ndp_info);
+	E1000G_DEBUGLOG_2(Adapter, E1000G_INFO_LEVEL,
+	    "e1000g_nd_param_load: FAILED at index %d [info %d]",
+	    tmplp-nd_template, tmplp->ndp_info);
 	nd_free(nddpp);
 	return (DDI_FAILURE);
 }
@@ -279,183 +268,156 @@ static void
 e1000g_nd_get_param_val(nd_param_t *ndp)
 {
 	struct e1000g *Adapter;
+	struct e1000_hw *hw;
 	uint16_t phy_reg;
 
 	Adapter = ndp->ndp_instance;
 	ASSERT(Adapter);
+	hw = &Adapter->shared;
 
 	switch (ndp->ndp_info) {
 	/* Hardware Capabilities */
 	case PARAM_AUTONEG_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & MII_SR_AUTONEG_CAPS) ? 1 : 0;
 		break;
 	case PARAM_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_1000FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_EXT_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_reg);
 		ndp->ndp_val = ((phy_reg & IEEE_ESR_1000T_FD_CAPS) ||
 		    (phy_reg & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_1000HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_EXT_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_reg);
 		ndp->ndp_val = ((phy_reg & IEEE_ESR_1000T_HD_CAPS) ||
 		    (phy_reg & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_100T4_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & MII_SR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_100FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = ((phy_reg & MII_SR_100X_FD_CAPS) ||
 		    (phy_reg & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_100HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = ((phy_reg & MII_SR_100X_HD_CAPS) ||
 		    (phy_reg & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_10FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & MII_SR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_10HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & MII_SR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Auto-Negotiation Advertisement Capabilities */
 	case PARAM_ADV_AUTONEG_CAP:
-		ndp->ndp_val = Adapter->Shared.autoneg;
+		ndp->ndp_val = hw->mac.autoneg;
 		break;
 	case PARAM_ADV_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_ADV_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_ADV_1000FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_1000T_CTRL,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_reg);
 		ndp->ndp_val = (phy_reg & CR_1000T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_1000HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_1000T_CTRL,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_reg);
 		ndp->ndp_val = (phy_reg & CR_1000T_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100T4_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_10FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_10HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_ADV,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Link-Partner's Advertisement Capabilities */
 	case PARAM_LP_AUTONEG_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_AUTONEG_EXP,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_LP_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_LP_1000FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_1000T_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & SR_1000T_LP_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_1000HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_1000T_STATUS,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_reg);
 		ndp->ndp_val = (phy_reg & SR_1000T_LP_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100T4_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_10FDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_10HDX_CAP:
-		e1000_read_phy_reg(&Adapter->Shared, PHY_LP_ABILITY,
-		    &phy_reg);
+		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
 		ndp->ndp_val = (phy_reg & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Force Speed and Duplex Parameter */
 	case PARAM_FORCE_SPEED_DUPLEX:
-		switch (Adapter->Shared.forced_speed_duplex) {
-		case e1000_10_half:
+		switch (hw->mac.forced_speed_duplex) {
+		case ADVERTISE_10_HALF:
 			ndp->ndp_val = GDIAG_10_HALF;
 			break;
-		case e1000_10_full:
+		case ADVERTISE_10_FULL:
 			ndp->ndp_val = GDIAG_10_FULL;
 			break;
-		case e1000_100_half:
+		case ADVERTISE_100_HALF:
 			ndp->ndp_val = GDIAG_100_HALF;
 			break;
-		case e1000_100_full:
+		case ADVERTISE_100_FULL:
 			ndp->ndp_val = GDIAG_100_FULL;
 			break;
 		}
@@ -471,12 +433,12 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 		ndp->ndp_val = Adapter->link_duplex;
 		break;
 	case PARAM_LINK_AUTONEG:
-		ndp->ndp_val = Adapter->Shared.autoneg;
+		ndp->ndp_val = hw->mac.autoneg;
 		break;
 
 	/* Driver Properties */
 	case PARAM_MAX_FRAME_SIZE:
-		ndp->ndp_val = Adapter->Shared.max_frame_size;
+		ndp->ndp_val = hw->mac.max_frame_size;
 		break;
 	case PARAM_LOOP_MODE:
 		ndp->ndp_val = Adapter->loopback_mode;
@@ -489,32 +451,26 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 	case PARAM_TX_BCOPY_THRESHOLD:
 		ndp->ndp_val = Adapter->tx_bcopy_thresh;
 		break;
-	case PARAM_TX_FRAGS_LIMIT:
-		ndp->ndp_val = Adapter->tx_frags_limit;
-		break;
-	case PARAM_TX_RECYCLE_LOW_WATER:
-		ndp->ndp_val = Adapter->tx_recycle_low_water;
-		break;
-	case PARAM_TX_RECYCLE_NUM:
-		ndp->ndp_val = Adapter->tx_recycle_num;
-		break;
 	case PARAM_TX_INTR_ENABLE:
 		ndp->ndp_val = Adapter->tx_intr_enable;
 		break;
-	case PARAM_TX_INTR_DELAY:
-		ndp->ndp_val = Adapter->TxInterruptDelay;
+	case PARAM_TX_TIDV:
+		ndp->ndp_val = Adapter->tx_intr_delay;
+		break;
+	case PARAM_TX_TADV:
+		ndp->ndp_val = Adapter->tx_intr_abs_delay;
 		break;
 	case PARAM_RX_BCOPY_THRESHOLD:
 		ndp->ndp_val = Adapter->rx_bcopy_thresh;
 		break;
 	case PARAM_RX_PKT_ON_INTR:
-		ndp->ndp_val = Adapter->MaxNumReceivePackets;
+		ndp->ndp_val = Adapter->rx_limit_onintr;
 		break;
 	case PARAM_RX_RDTR:
-		ndp->ndp_val = E1000_READ_REG(&Adapter->Shared, RDTR);
+		ndp->ndp_val = Adapter->rx_intr_delay;
 		break;
 	case PARAM_RX_RADV:
-		ndp->ndp_val = E1000_READ_REG(&Adapter->Shared, RADV);
+		ndp->ndp_val = Adapter->rx_intr_abs_delay;
 		break;
 	default:
 		break;
@@ -525,6 +481,8 @@ static void
 e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 {
 	struct e1000g *Adapter;
+	struct e1000_hw *hw;
+	e1000g_tx_ring_t *tx_ring;
 	uint16_t autoneg_advertised;
 	uint8_t forced_speed_duplex;
 	boolean_t autoneg_enable;
@@ -532,6 +490,8 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 
 	Adapter = ndp->ndp_instance;
 	ASSERT(Adapter);
+	hw = &Adapter->shared;
+	tx_ring = Adapter->tx_ring;
 
 	autoneg_advertised = 0;
 	forced_speed_duplex = 0;
@@ -544,37 +504,31 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	case PARAM_TX_BCOPY_THRESHOLD:
 		ndp->ndp_val = value;
 		Adapter->tx_bcopy_thresh = value;
-		Adapter->tx_frags_limit = (Adapter->Shared.max_frame_size /
+		tx_ring->frags_limit = (hw->mac.max_frame_size /
 		    Adapter->tx_bcopy_thresh) + 2;
-		if (Adapter->tx_frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
-			Adapter->tx_frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
-		goto finished;
-	case PARAM_TX_RECYCLE_LOW_WATER:
-		ndp->ndp_val = value;
-		Adapter->tx_recycle_low_water = value;
-		goto finished;
-	case PARAM_TX_RECYCLE_NUM:
-		ndp->ndp_val = value;
-		Adapter->tx_recycle_num = value;
+		if (tx_ring->frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
+			tx_ring->frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
 		goto finished;
 	case PARAM_TX_INTR_ENABLE:
 		ndp->ndp_val = value;
 		Adapter->tx_intr_enable = (value == 1) ? B_TRUE : B_FALSE;
 		if (Adapter->tx_intr_enable)
-			e1000g_EnableTxInterrupt(Adapter);
+			e1000g_mask_tx_interrupt(Adapter);
 		else
-			e1000g_DisableTxInterrupt(Adapter);
+			e1000g_clear_tx_interrupt(Adapter);
 		goto finished;
-	case PARAM_TX_INTR_DELAY:
+	case PARAM_TX_TIDV:
 		ndp->ndp_val = value;
-		Adapter->TxInterruptDelay = value;
-		/*
-		 * Setup Transmit Interrupt Delay Value
-		 */
-		if (Adapter->TxInterruptDelay) {
-			E1000_WRITE_REG(&Adapter->Shared, TIDV,
-			    Adapter->TxInterruptDelay);
+		Adapter->tx_intr_delay = value;
+		/* A value of zero is not allowed for TIDV */
+		if (Adapter->tx_intr_delay) {
+			E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
 		}
+		goto finished;
+	case PARAM_TX_TADV:
+		ndp->ndp_val = value;
+		Adapter->tx_intr_abs_delay = value;
+		E1000_WRITE_REG(hw, E1000_TADV, Adapter->tx_intr_abs_delay);
 		goto finished;
 	case PARAM_RX_BCOPY_THRESHOLD:
 		ndp->ndp_val = value;
@@ -582,15 +536,17 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 		goto finished;
 	case PARAM_RX_PKT_ON_INTR:
 		ndp->ndp_val = value;
-		Adapter->MaxNumReceivePackets = value;
+		Adapter->rx_limit_onintr = value;
 		goto finished;
 	case PARAM_RX_RDTR:
 		ndp->ndp_val = value;
-		E1000_WRITE_REG(&Adapter->Shared, RDTR, value);
+		Adapter->rx_intr_delay = value;
+		E1000_WRITE_REG(hw, E1000_RDTR, value);
 		goto finished;
 	case PARAM_RX_RADV:
 		ndp->ndp_val = value;
-		E1000_WRITE_REG(&Adapter->Shared, RADV, value);
+		Adapter->rx_intr_abs_delay = value;
+		E1000_WRITE_REG(hw, E1000_RADV, value);
 		goto finished;
 	default:
 		break;
@@ -617,16 +573,16 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 
 	switch (Adapter->param_force_speed_duplex) {
 	case GDIAG_10_HALF:
-		forced_speed_duplex = e1000_10_half;
+		forced_speed_duplex = ADVERTISE_10_HALF;
 		break;
 	case GDIAG_10_FULL:
-		forced_speed_duplex = e1000_10_full;
+		forced_speed_duplex = ADVERTISE_10_FULL;
 		break;
 	case GDIAG_100_HALF:
-		forced_speed_duplex = e1000_100_half;
+		forced_speed_duplex = ADVERTISE_100_HALF;
 		break;
 	case GDIAG_100_FULL:
-		forced_speed_duplex = e1000_100_full;
+		forced_speed_duplex = ADVERTISE_100_FULL;
 		break;
 	default:
 		ASSERT(B_FALSE);
@@ -738,16 +694,16 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 			link_change = B_TRUE;
 			switch (value) {
 			case GDIAG_10_HALF:
-				forced_speed_duplex = e1000_10_half;
+				forced_speed_duplex = ADVERTISE_10_HALF;
 				break;
 			case GDIAG_10_FULL:
-				forced_speed_duplex = e1000_10_full;
+				forced_speed_duplex = ADVERTISE_10_FULL;
 				break;
 			case GDIAG_100_HALF:
-				forced_speed_duplex = e1000_100_half;
+				forced_speed_duplex = ADVERTISE_100_HALF;
 				break;
 			case GDIAG_100_FULL:
-				forced_speed_duplex = e1000_100_full;
+				forced_speed_duplex = ADVERTISE_100_FULL;
 				break;
 			default:
 				ASSERT(B_FALSE);
@@ -768,20 +724,16 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				goto finished;
 			}
 
-			Adapter->Shared.autoneg = B_TRUE;
-			Adapter->Shared.autoneg_advertised =
-				autoneg_advertised;
+			hw->mac.autoneg = B_TRUE;
+			hw->phy.autoneg_advertised = autoneg_advertised;
 		} else {
-			Adapter->Shared.autoneg = B_FALSE;
-			Adapter->Shared.forced_speed_duplex =
-				forced_speed_duplex;
+			hw->mac.autoneg = B_FALSE;
+			hw->mac.forced_speed_duplex = forced_speed_duplex;
 		}
 
 		ndp->ndp_val = value;
 
-		rw_exit(&Adapter->chip_lock);
-		(void) e1000g_reset(Adapter);
-		return;
+		e1000_setup_link(hw);
 	}
 
 finished:
