@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,8 @@ session_init()
 Boolean_t
 session_alloc(iscsi_conn_t *c, uint8_t *isid)
 {
-	iscsi_sess_t	*s, *n;
+	iscsi_sess_t	*s,
+			*n;
 
 	if (c->c_sess != NULL)
 		return (True);
@@ -93,7 +94,7 @@ session_alloc(iscsi_conn_t *c, uint8_t *isid)
 	}
 	(void) pthread_mutex_unlock(&sess_mutex);
 
-	bcopy(isid, &s->s_isid, 6);
+	bcopy(isid, s->s_isid, 6);
 
 	(void) pthread_mutex_init(&s->s_mutex, NULL);
 	c->c_sess	= s;
@@ -170,7 +171,7 @@ session_free(iscsi_sess_t *s)
 static Boolean_t
 session_remove_connection(iscsi_sess_t *s, iscsi_conn_t *c)
 {
-	s->s_isid = 0;
+	bzero(s->s_isid, 6);
 	return (True);
 }
 
@@ -186,8 +187,8 @@ Boolean_t
 convert_i_local(char *ip, char **rtn)
 {
 	tgt_node_t	*inode = NULL;
-	char		*iname;
-	char		*name;
+	char		*iname,
+			*name;
 
 	while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT, inode)) !=
 	    NULL) {
@@ -297,8 +298,8 @@ sess_process(void *v)
 	mgmt_request_t	*mgmt;
 	name_request_t	*nr;
 	t10_cmd_t	*t10_cmd;
-	char		**buf;
-	char		local_buf[16];
+	char		**buf,
+			local_buf[16];
 	int		lun;
 	extern void dataout_callback(t10_cmd_t *t, char *data, size_t *xfer);
 
@@ -313,12 +314,6 @@ sess_process(void *v)
 			if (s->s_t10 == NULL) {
 
 				/*
-				 * Persistent Reservervation Support requires
-				 * access to both the transportID and iSCSI
-				 * Session ID
-				 */
-
-				/*
 				 * The value of 0x960 comes from T10.
 				 * See SPC-4, revision 1a, section 6.4.2,
 				 * table 87
@@ -328,12 +323,9 @@ sess_process(void *v)
 				 */
 				s->s_t10 = t10_handle_create(s->s_t_name,
 				    T10_TRANS_ISCSI, s->s_conn_head->c_tpgt,
-				    s->s_conn_head->c_sess->s_i_name,
-				    s->s_conn_head->c_sess->s_isid,
 				    s->s_conn_head->c_max_burst_len,
 				    s->s_t10q, dataout_callback);
 			}
-
 			if (t10_cmd_create(s->s_t10, cmd->c_lun, cmd->c_scb,
 			    cmd->c_scb_len, (transport_t)cmd,
 			    &t10_cmd) == False) {
@@ -561,8 +553,12 @@ session_validate(iscsi_sess_t *s)
 {
 	iscsi_sess_t	*check;
 
-	queue_prt(s->s_mgmtq, Q_SESS_NONIO, "SES%x  %s ISID[%016x]\n", s->s_num,
-	    s->s_i_alias == NULL ? s->s_i_name : s->s_i_alias, s->s_isid);
+	queue_prt(s->s_mgmtq, Q_SESS_NONIO,
+	    "SES%x  %s ISID[%02x%02x%02x%02x%02x%02x]\n",
+	    s->s_num, s->s_i_alias == NULL ? s->s_i_name : s->s_i_alias,
+	    s->s_isid[0], s->s_isid[1], s->s_isid[2],
+	    s->s_isid[3], s->s_isid[4], s->s_isid[5]);
+
 
 	/*
 	 * SessionType=Discovery which means no target name and therefore
@@ -594,7 +590,7 @@ session_validate(iscsi_sess_t *s)
 		 * reinstating a new iSCSI session in its place (with the
 		 * same ISID).
 		 */
-		if (check->s_isid == s->s_isid) {
+		if (bcmp(check->s_isid, s->s_isid, 6) == 0) {
 			queue_prt(s->s_mgmtq, Q_SESS_NONIO,
 			    "SES%x  Implicit shutdown\n", check->s_num);
 			if (check->s_conn_head->c_state == S5_LOGGED_IN)
@@ -685,7 +681,7 @@ sess_set_auth(iscsi_sess_t *isp)
 		}
 
 		if (iscsiAuthClientSetVersion(auth_client,
-		    iscsiAuthVersionRfc) != iscsiAuthStatusNoError) {
+			iscsiAuthVersionRfc) != iscsiAuthStatusNoError) {
 			syslog(LOG_ERR, "iscsi connection login failed - "
 			    "unable to set version\n");
 			return;
@@ -720,7 +716,8 @@ sess_set_auth(iscsi_sess_t *isp)
 		}
 
 		if (iscsiAuthClientSetAuthRemote(auth_client,
-		    isp->sess_auth.auth_enabled) != iscsiAuthStatusNoError) {
+			isp->sess_auth.auth_enabled) !=
+		    iscsiAuthStatusNoError) {
 			syslog(LOG_ERR, "iscsi connection login failed - "
 			    "unable to set remote authentication\n");
 			return;

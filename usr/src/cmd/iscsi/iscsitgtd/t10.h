@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,8 +126,6 @@ typedef enum {
 #define	T10_CMD_RESID(cmd)	(cmd->c_resid)
 #define	T10_SENSE_LEN(cmd)	(cmd->c_cmd_sense_len)
 #define	T10_SENSE_DATA(cmd)	(cmd->c_cmd_sense)
-#define	T10_PGR_TID(cmd)	(cmd->c_lu->l_targ->s_transportID)
-#define	T10_PGR_ISID(cmd)	(cmd->c_lu->l_targ->s_isid)
 
 #define	T10_DEFAULT_TPG	1
 
@@ -343,7 +341,7 @@ typedef struct t10_lu_common {
 	Boolean_t		l_fast_write_ack;
 
 	/*
-	 * AVL tree containing all I_T_L nexus' which are actively using
+	 * AVL tree containing all I_T_Q nexus' which are actively using
 	 * this LUN.
 	 */
 	avl_tree_t		l_all_open;
@@ -429,7 +427,6 @@ typedef struct t10_lu_impl {
 	int			l_targ_lun;
 
 	Boolean_t		l_dsense_enabled;
-	Boolean_t		l_pgr_read;
 
 	/*
 	 * Statistics on a per ITL basis
@@ -466,14 +463,7 @@ typedef struct t10_targ_impl {
 	/*
 	 * Target Port Set
 	 */
-	int			s_tpgt;
-
-	/*
-	 * PERSISTENT RESERVATION support, the transportID & ISID
-	 * SPC-3 revision 23, Section 7.5.4.5, Table 290
-	 */
-	char			*s_transportID;
-	uint64_t		s_isid;
+	int			s_tp_grp;
 
 	/*
 	 * transport version number to use in standard inquiry data
@@ -538,9 +528,8 @@ void lu_buserr_handler(int sig, siginfo_t *sip, void *v);
  * t10_handle_create -- create target handle to be used by transports
  */
 t10_targ_handle_t
-t10_handle_create(char *targ, int trans_vers, int tpg, char *tid, uint64_t isid,
-    int max_out, target_queue_t *tq,
-    void (*datain_cb)(t10_cmd_t *, char *, size_t *));
+t10_handle_create(char *targ_name, int trans_version, int tpg, int max_out,
+    target_queue_t *transq, void (*datain_cb)(t10_cmd_t *, char *, size_t *));
 
 /*
  * t10_handle_disable -- drains commands from emulation queues

@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_ISCSI_SESS_H
-#define	_ISCSI_SESS_H
+#ifndef	_SESSION_H
+#define	_SESSION_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -92,8 +92,7 @@ typedef struct iscsi_sess {
 	char			*s_i_name,
 				*s_i_alias,
 				*s_t_name;
-	uint64_t		s_isid;
-
+	uint8_t			s_isid[6];
 	/*
 	 * This is the highest packet number we've seen and is
 	 * used during replies.
@@ -140,4 +139,4 @@ Boolean_t session_validate(struct iscsi_sess *s);
 }
 #endif
 
-#endif /* _ISCSI_SESS_H */
+#endif /* _SESSION_H */
