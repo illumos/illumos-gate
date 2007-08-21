@@ -35,28 +35,56 @@
 #include <sys/uio.h>
 
 /*
- * fork_lock_enter() does triple-duty.  Not only does it (and atfork_lock)
- * serialize calls to fork() and forkall(), but it also serializes calls to
- * thr_suspend() and thr_continue() (fork() and forkall() also suspend other
- * threads), and furthermore it serializes I18N calls to functions in other
- * dlopen()ed L10N objects that might be calling malloc()/free().
+ * fork_lock does double-duty.  Not only does it (and atfork_lock)
+ * serialize calls to fork() and forkall(), but it also serializes calls
+ * to thr_suspend() and thr_continue() (because fork() and forkall() also
+ * suspend and continue other threads and they want no competition).
+ *
+ * atfork_lock also does double-duty.  Not only does it protect the
+ * pthread_atfork() data structures, but it also serializes I18N calls
+ * to functions in dlopen()ed L10N objects.  These functions can do
+ * anything, including call malloc() and free().  Such calls are not
+ * fork-safe when protected by an ordinary mutex because, with an
+ * interposed malloc library present, there would be a lock ordering
+ * violation due to the pthread_atfork() prefork function in the
+ * interposition library acquiring its malloc lock(s) before the
+ * ordinary mutex in libc being acquired by libc's prefork functions.
+ *
+ * Within libc, calls to malloc() and free() are fork-safe only if the
+ * calls are made while holding no other libc locks.  This covers almost
+ * all of libc's malloc() and free() calls.  For those libc code paths,
+ * such as the above-mentioned I18N calls, that require serialization and
+ * that may call malloc() or free(), libc uses atfork_lock_enter() to perform
+ * the serialization.  This works because atfork_lock is acquired by fork()
+ * before any of the pthread_atfork() prefork functions are called.
  */
+
 void
 fork_lock_enter(void)
 {
-	ulwp_t *self = curthread;
-
-	ASSERT(self->ul_critical == 0);
-	(void) _private_mutex_lock(&self->ul_uberdata->fork_lock);
+	ASSERT(curthread->ul_critical == 0);
+	(void) _private_mutex_lock(&curthread->ul_uberdata->fork_lock);
 }
 
 void
 fork_lock_exit(void)
 {
-	ulwp_t *self = curthread;
+	ASSERT(curthread->ul_critical == 0);
+	(void) _private_mutex_unlock(&curthread->ul_uberdata->fork_lock);
+}
 
-	ASSERT(self->ul_critical == 0);
-	(void) _private_mutex_unlock(&self->ul_uberdata->fork_lock);
+void
+atfork_lock_enter(void)
+{
+	ASSERT(curthread->ul_critical == 0);
+	(void) _private_mutex_lock(&curthread->ul_uberdata->atfork_lock);
+}
+
+void
+atfork_lock_exit(void)
+{
+	ASSERT(curthread->ul_critical == 0);
+	(void) _private_mutex_unlock(&curthread->ul_uberdata->atfork_lock);
 }
 
 #pragma weak forkx = _private_forkx
@@ -97,7 +125,6 @@ _private_forkx(int flags)
 		return (-1);
 	}
 	self->ul_fork = 1;
-	(void) _private_mutex_lock(&udp->atfork_lock);
 
 	/*
 	 * The functions registered by pthread_atfork() are defined by
@@ -105,20 +132,18 @@ _private_forkx(int flags)
 	 * internal lmutex_lock()-acquired locks while invoking them.
 	 * We hold only udp->atfork_lock to protect the atfork linkages.
 	 * If one of these pthread_atfork() functions attempts to fork
-	 * or to call pthread_atfork(), it will detect the error and
-	 * fail with EDEADLK.  Otherwise, the pthread_atfork() functions
-	 * are free to do anything they please (except they will not
-	 * receive any signals).
+	 * or to call pthread_atfork(), libc will detect the error and
+	 * fail the call with EDEADLK.  Otherwise, the pthread_atfork()
+	 * functions are free to do anything they please (except they
+	 * will not receive any signals).
 	 */
+	(void) _private_mutex_lock(&udp->atfork_lock);
 	_prefork_handler();
 
 	/*
 	 * Block every other thread attempting thr_suspend() or thr_continue().
-	 * This also blocks every other thread attempting calls to I18N
-	 * functions in dlopen()ed L10N objects, but this is benign;
-	 * the other threads will soon be suspended anyway.
 	 */
-	fork_lock_enter();
+	(void) _private_mutex_lock(&udp->fork_lock);
 
 	/*
 	 * Block all signals.
@@ -131,8 +156,8 @@ _private_forkx(int flags)
 	/*
 	 * This suspends all threads but this one, leaving them
 	 * suspended outside of any critical regions in the library.
-	 * Thus, we are assured that no library locks are held
-	 * while we invoke fork() from the current thread.
+	 * Thus, we are assured that no lmutex_lock()-acquired library
+	 * locks are held while we invoke fork() from the current thread.
 	 */
 	suspend_fork();
 
@@ -154,13 +179,13 @@ _private_forkx(int flags)
 		unregister_locks();
 		postfork1_child();
 		restore_signals(self);
-		fork_lock_exit();
+		(void) _private_mutex_unlock(&udp->fork_lock);
 		_postfork_child_handler();
 	} else {
 		/* restart all threads that were suspended for fork() */
 		continue_fork(0);
 		restore_signals(self);
-		fork_lock_exit();
+		(void) _private_mutex_unlock(&udp->fork_lock);
 		_postfork_parent_handler();
 	}
 
@@ -218,8 +243,8 @@ _private_forkallx(int flags)
 		return (-1);
 	}
 	self->ul_fork = 1;
-
-	fork_lock_enter();
+	(void) _private_mutex_lock(&udp->atfork_lock);
+	(void) _private_mutex_lock(&udp->fork_lock);
 	block_all_signals(self);
 	suspend_fork();
 
@@ -237,7 +262,8 @@ _private_forkallx(int flags)
 		continue_fork(0);
 	}
 	restore_signals(self);
-	fork_lock_exit();
+	(void) _private_mutex_unlock(&udp->fork_lock);
+	(void) _private_mutex_unlock(&udp->atfork_lock);
 	self->ul_fork = 0;
 	sigon(self);
 

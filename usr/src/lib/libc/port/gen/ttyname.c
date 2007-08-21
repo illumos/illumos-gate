@@ -213,9 +213,9 @@ _ttyname_common(struct stat64 *fsp, char *buffer, uint_t match_mask)
 
 	/*
 	 * We can't use lmutex_lock() here because we call malloc()/free()
-	 * and _libc_gettext().  Use the brute-force fork_lock_enter().
+	 * and _libc_gettext().  Use the brute-force atfork_lock_enter().
 	 */
-	fork_lock_enter();
+	atfork_lock_enter();
 
 	/*
 	 * match special cases
@@ -320,7 +320,7 @@ _ttyname_common(struct stat64 *fsp, char *buffer, uint_t match_mask)
 	else
 		retval = NULL;
 out:	retval = (retval ? strcpy(buffer, retval) : NULL);
-	fork_lock_exit();
+	atfork_lock_exit();
 	return (retval);
 }
 

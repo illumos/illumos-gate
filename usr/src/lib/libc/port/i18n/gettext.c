@@ -59,7 +59,7 @@
 		if (global_gt) \
 			global_gt->cur_domain = (char *)default_domain; \
 		else { \
-			fork_lock_exit(); \
+			atfork_lock_exit(); \
 			return ((def)); \
 		} \
 	}
@@ -73,10 +73,10 @@ _bindtextdomain(const char *domain, const char *binding)
 {
 	char	*res;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT(NULL);
 	res = _real_bindtextdomain_u(domain, binding, TP_BINDING);
-	fork_lock_exit();
+	atfork_lock_exit();
 	return (res);
 }
 
@@ -85,10 +85,10 @@ _bind_textdomain_codeset(const char *domain, const char *codeset)
 {
 	char	*res;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT(NULL);
 	res = _real_bindtextdomain_u(domain, codeset, TP_CODESET);
-	fork_lock_exit();
+	atfork_lock_exit();
 	return (res);
 }
 
@@ -102,14 +102,14 @@ _textdomain(const char *domain)
 	char	*res;
 	char	tmp_domain[TEXTDOMAINMAX + 1];
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT(NULL);
 	res = _textdomain_u(domain, tmp_domain);
 	if (res == NULL) {
-		fork_lock_exit();
+		atfork_lock_exit();
 		return (NULL);
 	}
-	fork_lock_exit();
+	atfork_lock_exit();
 	return (CURRENT_DOMAIN(global_gt));
 }
 
@@ -123,10 +123,10 @@ _gettext(const char *msg_id)
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(NULL, msg_id, NULL, 0, LC_MESSAGES, 0);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
@@ -141,10 +141,10 @@ _dgettext(const char *domain, const char *msg_id)
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(domain, msg_id, NULL, 0, LC_MESSAGES, 0);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
@@ -155,10 +155,10 @@ _dcgettext(const char *domain, const char *msg_id, const int category)
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msg_id);
 	res = _real_gettext_u(domain, msg_id, NULL, 0, category, 0);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
@@ -169,10 +169,10 @@ _ngettext(const char *msgid1, const char *msgid2, unsigned long int n)
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(NULL, msgid1, msgid2, n, LC_MESSAGES, 1);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
@@ -184,10 +184,10 @@ _dngettext(const char *domain, const char *msgid1, const char *msgid2,
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(domain, msgid1, msgid2, n, LC_MESSAGES, 1);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
@@ -199,10 +199,10 @@ _dcngettext(const char *domain, const char *msgid1, const char *msgid2,
 	char	*res;
 	int	errno_save = errno;
 
-	fork_lock_enter();
+	atfork_lock_enter();
 	INIT_GT((char *)msgid1);
 	res = _real_gettext_u(domain, msgid1, msgid2, n, category, 1);
-	fork_lock_exit();
+	atfork_lock_exit();
 	errno = errno_save;
 	return (res);
 }
