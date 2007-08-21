@@ -231,13 +231,19 @@ sysconf(int name)
 
 		/* XPG4/POSIX.1-1990/POSIX.2-1992 names */
 		case _SC_2_C_BIND:
-			return ((long)_POSIX2_C_BIND);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_CHAR_TERM:
 			return ((long)_POSIX2_CHAR_TERM);
 
 		case _SC_2_C_DEV:
-			return ((long)_POSIX2_C_DEV);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_C_VERSION:
 			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
@@ -249,16 +255,28 @@ sysconf(int name)
 			return (-1L);
 
 		case _SC_2_FORT_RUN:
-			return ((long)_POSIX2_FORT_RUN);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_LOCALEDEF:
-			return ((long)_POSIX2_LOCALEDEF);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_SW_DEV:
-			return ((long)_POSIX2_SW_DEV);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_UPE:
-			return ((long)_POSIX2_UPE);
+			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
+				return (200112L);
+			else
+				return (1L);
 
 		case _SC_2_VERSION:
 			if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)

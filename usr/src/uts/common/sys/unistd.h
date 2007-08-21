@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  *	  All Rights Reserved
@@ -362,7 +363,7 @@ extern "C" {
 
 #define	_XOPEN_XPG3			/* Supports XPG, Issue 3 */
 #define	_XOPEN_XPG4			/* Supports XPG, Issue 4 */
-#define	_XOPEN_UNIX			/* Supports XPG, Issue 4, Version 2 */
+#define	_XOPEN_UNIX		0	/* Supports X/Open System Interfaces */
 
 #ifndef	_XOPEN_XCU_VERSION
 #define	_XOPEN_XCU_VERSION	4	/* Supports XCU4 */
@@ -371,13 +372,23 @@ extern "C" {
 #define	_XOPEN_REALTIME		1	/* Supports Realtime */
 #define	_XOPEN_ENH_I18N		1	/* Supports Enhanced International */
 #define	_XOPEN_SHM		1	/* Supports Shared Memory Feature */
-#define	_POSIX2_C_BIND	  200112L	/* Supports C Language Bindings */
-#define	_POSIX2_C_DEV		1	/* Supports C language dev utility */
 #define	_POSIX2_CHAR_TERM	1	/* Supports at least 1 terminal type */
+
+#ifdef _XPG6
+#define	_POSIX2_C_BIND	  200112L	/* Supports C Language Bindings */
+#define	_POSIX2_C_DEV	  200112L	/* Supports C language dev utility */
 #define	_POSIX2_FORT_RUN  200112L	/* Supports FORTRAN runtime */
+#define	_POSIX2_LOCALEDEF 200112L	/* Supports creation of locales */
+#define	_POSIX2_SW_DEV	  200112L	/* Supports S/W Development Utility */
+#define	_POSIX2_UPE	  200112L 	/* Supports User Portability Utility */
+#else
+#define	_POSIX2_C_BIND		1	/* Supports C Language Bindings */
+#define	_POSIX2_C_DEV		1	/* Supports C language dev utility */
+#define	_POSIX2_FORT_RUN	1	/* Supports FORTRAN runtime */
 #define	_POSIX2_LOCALEDEF	1	/* Supports creation of locales */
-#define	_POSIX2_SW_DEV		1 	/* Supports S/W Devlopement Utility */
+#define	_POSIX2_SW_DEV		1	/* Supports S/W Development Utility */
 #define	_POSIX2_UPE		1 	/* Supports User Portability Utility */
+#endif /* _XPG6 */
 
 /* UNIX 03 names */
 #define	_POSIX_REGEXP		1	/* Supports POSIX Regular Expressions */
