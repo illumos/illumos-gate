@@ -768,17 +768,17 @@ conskbduwsrv(queue_t *q)
 			switch (csp->cp_cmd) {
 			case KIOCSETFREQ:
 				frqp = (struct freq_request *)mp->
-					    b_cont->b_rptr;
+				    b_cont->b_rptr;
 
 				switch (frqp->type) {
 				case CONSOLE_BEEP:
 					error = beeper_freq(BEEP_CONSOLE,
-						    (int)frqp->freq);
+					    (int)frqp->freq);
 						break;
 
 				case KBD_BEEP:
 					error = beeper_freq(BEEP_TYPE4,
-						    (int)frqp->freq);
+					    (int)frqp->freq);
 						break;
 
 				default:
@@ -923,7 +923,21 @@ conskbd_virtual_kbd_ioctl(queue_t *q, mblk_t *mp)
 			miocnak(q, mp, 0, EINVAL);
 			break;
 		}
+		kbd_layout_bak = conskbd.conskbd_layout;
 		conskbd.conskbd_layout = *(intptr_t *)(mp->b_cont->b_rptr);
+		if (conskbd.conskbd_layout != kbd_layout_bak) {
+
+			/* notify the upper of the change event */
+			if ((datap = conskbd_alloc_firm_event(
+			    KEYBOARD_LAYOUT_CHANGE,
+			    conskbd.conskbd_layout)) != NULL) {
+				if (conskbd.conskbd_directio) {
+					putnext(conskbd_regqueue, datap);
+				} else {
+					freemsg(datap);
+				}
+			}
+		}
 		miocack(q, mp, 0, 0);
 		break;
 
@@ -1701,17 +1715,20 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 						break;
 					}
 					if ((req = conskbd_alloc_firm_event(
-						KEYBOARD_LAYOUT_CHANGE,
-						layout)) != NULL) {
-						if (conskbd.conskbd_directio)
+					    KEYBOARD_LAYOUT_CHANGE,
+					    layout)) != NULL) {
+						if (conskbd.conskbd_directio) {
 							putnext(
 							    conskbd_regqueue,
 							    req);
-						else if (conskbd_consqueue
-							    != NULL)
+						} else if (conskbd_consqueue
+						    != NULL) {
 							putnext(
 							    conskbd_consqueue,
 							    req);
+						} else {
+							freemsg(req);
+						}
 					}
 				}
 			}
@@ -2050,11 +2067,11 @@ conskbd_legacy_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	iocp = (struct iocblk *)mp->b_rptr;
 
 	if ((iocp->ioc_cmd == CONSOPENPOLLEDIO) ||
-			(iocp->ioc_cmd == CONSCLOSEPOLLEDIO)) {
+	    (iocp->ioc_cmd == CONSCLOSEPOLLEDIO)) {
 
 		DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-			("conskbd_legacy_upstream_msg: "
-			"CONSOPEN/CLOSEPOLLEDIO ACK/NAK\n"));
+		    ("conskbd_legacy_upstream_msg: "
+		    "CONSOPEN/CLOSEPOLLEDIO ACK/NAK\n"));
 		putnext(conskbd_consqueue, mp);
 
 	} else if (conskbd_regqueue != NULL) {
