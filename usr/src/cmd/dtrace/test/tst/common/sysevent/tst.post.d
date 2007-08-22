@@ -31,10 +31,10 @@ BEGIN
 {
 	$1 + 0;	/* make sure pid is referenced */
 
-        /*
-         * Wait no more than a five seconds for the sysevent to be posted
-         */
-        timeout = timestamp + 5000000000;
+	/*
+	 * Wait no more than a five seconds for the sysevent to be posted
+	 */
+	timeout = timestamp + 5000000000;
 }
 
 sysevent:::post
@@ -83,6 +83,6 @@ sysevent:::post
 profile:::tick-8
 /timestamp > timeout/
 {
-        printf("timed out\n");
-        exit(1);
+	printf("timed out\n");
+	exit(1);
 }

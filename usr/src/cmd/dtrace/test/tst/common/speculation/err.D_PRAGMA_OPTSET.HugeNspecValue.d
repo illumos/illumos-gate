@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
  */
 
 #pragma D option quiet
-#pragma D option cleanrate=3000
+#pragma D option cleanrate=3000hz
 #pragma D option nspec=245566729809009887663
 
 BEGIN

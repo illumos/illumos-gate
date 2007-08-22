@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@
  *	Options and Tunables/cleanrate
  */
 #pragma D option quiet
-#pragma D option cleanrate=4000
+#pragma D option cleanrate=4000hz
 
 BEGIN
 {

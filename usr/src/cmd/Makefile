@@ -861,6 +861,9 @@ MANIFEST_SUBDIRS=			\
 	ypcmd/ypupdated			\
 	xntpd/xntpd
 
+DTEST_SUBDIRS= \
+	dtrace/test/tst
+
 all :=		TARGET = all
 install :=	TARGET = install
 clean :=	TARGET = clean
@@ -875,15 +878,19 @@ _dc :=		TARGET = _dc
 SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
 .PARALLEL:	$(BWOSDIRS) $(SUBDIRS) $(MSGSUBDIRS) $(BSMSUBDIRS) \
-		$(MANIFEST_SUBDIRS)
+		$(MANIFEST_SUBDIRS) $(DTEST_SUBDIRS)
 
 all install clean clobber lint: $(FIRST_SUBDIRS) .WAIT $(SUBDIRS) $(BSMSUBDIRS)
 
-check: svccfg_check .WAIT $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS)
+check: svccfg_check .WAIT $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) \
+	$(DTEST_SUBDIRS)
 
 svccfg_check:
 	@$(ECHO) "building requirements for svccfg check ..."; \
 	(cd $(SRC)/cmd/svc/svccfg && pwd && $(MAKE) $(MFLAGS) native)
+
+$(DTEST_SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 #
 # The .WAIT directive works around an apparent bug in parallel make.

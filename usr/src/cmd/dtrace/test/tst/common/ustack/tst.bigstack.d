@@ -29,17 +29,17 @@
 syscall::getpid:entry
 /pid == $1/
 {
-        @[ustackdepth] = count();
+	@[ustackdepth] = count();
 }
 
 ERROR
 /arg4 == DTRACEFLT_BADSTACK/
 {
-        exit(0);
+	exit(0);
 }
 
 profile:::tick-1s
 /++n  == 10/
 {
-        exit(1)
+	exit(1)
 }
