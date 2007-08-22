@@ -285,8 +285,8 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 		mutex_exit(&so->so_lock);
 	}
 	TRACE_4(TR_FAC_SOCKFS, TR_SOCKFS_OPEN,
-		"sockfs open:maj %d vp %p so %p error %d", maj,
-		vp, so, error);
+	    "sockfs open:maj %d vp %p so %p error %d", maj,
+	    vp, so, error);
 	return (error);
 }
 
@@ -306,7 +306,7 @@ socktpi_close(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("socktpi_close(%p, %x, %d) %s\n",
-			vp, flag, count, pr_state(so->so_state, so->so_mode)));
+	    vp, flag, count, pr_state(so->so_state, so->so_mode)));
 
 	cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
@@ -408,7 +408,7 @@ socktpi_read(
 	struct nmsghdr lmsg;
 
 	dprintso(so, 1, ("socktpi_read(%p) %s\n",
-			so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(vp->v_type == VSOCK);
 	so_update_attrs(so, SOACC);
@@ -440,7 +440,7 @@ socktpi_write(
 	int error;
 
 	dprintso(so, 1, ("socktpi_write(%p) %s\n",
-			so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(vp->v_type == VSOCK);
 
@@ -949,7 +949,7 @@ socktpi_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
 	so = VTOSO(vp);
 
 	dprintso(so, 0, ("socktpi_setfl: oflags 0x%x, nflags 0x%x, state %s\n",
-		oflags, nflags, pr_state(so->so_state, so->so_mode)));
+	    oflags, nflags, pr_state(so->so_state, so->so_mode)));
 	mutex_enter(&so->so_lock);
 	if (nflags & FNDELAY)
 		so->so_state |= SS_NDELAY;
@@ -1030,7 +1030,7 @@ socktpi_getattr(
 	} else {
 		vap->va_type = vp->v_type;
 		vap->va_mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|
-				S_IROTH|S_IWOTH;
+		    S_IROTH|S_IWOTH;
 	}
 	vap->va_uid = vap->va_gid = 0;
 	vap->va_fsid = fsid;
@@ -1175,23 +1175,32 @@ socktpi_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
 /*
  * Wrapper around the streams poll routine that implements socket poll
  * semantics.
- * The sockfs never calls pollwakeup itself - the stream head take care
+ * Sockfs never calls pollwakeup() itself - the stream head takes care
  * of all pollwakeups. Since sockfs never holds so_lock when calling the
  * stream head there can never be a deadlock due to holding so_lock across
  * pollwakeup and acquiring so_lock in this routine.
  *
  * However, since the performance of VOP_POLL is critical we avoid
- * acquiring so_lock here. This is based on two assumptions:
+ * acquiring so_lock here. This is based on the following assumptions:
  *  - The poll implementation holds locks to serialize the VOP_POLL call
- *    and a pollwakeup for the same pollhead. This ensures that should
- *    e.g. so_state change during a socktpi_poll call the pollwakeup
- *    (which strsock_* and strrput conspire to issue) is issued after
- *    the state change. Thus the pollwakeup will block until VOP_POLL has
- *    returned and then wake up poll and have it call VOP_POLL again.
+ *	and a pollwakeup for the same pollhead. This ensures that should
+ *	so_state etc change during a socktpi_poll() call, the pollwakeup()
+ *	(which strsock_* and strrput() conspire to issue) is issued after
+ *	the state change. Thus the pollwakeup will block until VOP_POLL has
+ *	returned, and then wake up poll and have it call VOP_POLL again.
+ *
  *  - The reading of so_state without holding so_lock does not result in
- *    stale data that is older than the latest state change that has dropped
- *    so_lock. This is ensured by the mutex_exit issuing the appropriate
- *    memory barrier to force the data into the coherency domain.
+ *	stale data (older than the latest state change that has dropped
+ *	so_lock). This is ensured as mutex_exit() issues the appropriate
+ *	memory barrier to force the data into the coherency domain.
+ *
+ *  - Whilst so_state may change during the VOP_POLL call, (SS_HASCONNIND
+ *	may have been set by an arriving connection), the above two factors
+ *	guarantee validity of SS_ISCONNECTED/SM_CONNREQUIRED in the entry
+ *	time snapshot. In order to capture the arrival of a connection while
+ *	VOP_POLL was in progress, we then check real so_state, (so->so_state)
+ *	for SS_HASCONNIND and set appropriate events to ensure poll_common()
+ *	will not sleep.
  */
 static int
 socktpi_poll(
@@ -1207,7 +1216,7 @@ socktpi_poll(
 	int so_state = so->so_state;	/* snapshot */
 
 	dprintso(so, 0, ("socktpi_poll(%p): state %s err %d\n",
-			vp, pr_state(so_state, so->so_mode), so->so_error));
+	    vp, pr_state(so_state, so->so_mode), so->so_error));
 
 	ASSERT(vp->v_type == VSOCK);
 	ASSERT(vp->v_stream != NULL);
@@ -1215,7 +1224,7 @@ socktpi_poll(
 	if (so->so_version == SOV_STREAM) {
 		/* The imaginary "sockmod" has been popped - act as a stream */
 		return (strpoll(vp->v_stream, events, anyyet,
-			reventsp, phpp));
+		    reventsp, phpp));
 	}
 
 	if (!(so_state & SS_ISCONNECTED) &&
@@ -1248,16 +1257,48 @@ socktpi_poll(
 	 */
 	events |= POLLNOERR;
 	error = strpoll(vp->v_stream, events, anyyet,
-			reventsp, phpp);
+	    reventsp, phpp);
 	if (error)
 		return (error);
 
 	ASSERT(!(*reventsp & POLLERR));
 
-	if (so_state & (SS_HASCONNIND|SS_OOBPEND)) {
-		if (so_state & SS_HASCONNIND)
+	/*
+	 * Notes on T_CONN_IND handling for sockets.
+	 *
+	 * If strpoll() returned without events, SR_POLLIN is guaranteed
+	 * to be set, ensuring any subsequent strrput() runs pollwakeup().
+	 *
+	 * Since the so_lock is not held, soqueueconnind() may have run
+	 * and a T_CONN_IND may be waiting. We now check for SS_HASCONNIND
+	 * in the current so_state and set appropriate events to ensure poll
+	 * returns.
+	 *
+	 * However:
+	 * If the T_CONN_IND hasn't arrived by the time strpoll() returns,
+	 * when strrput() does run for an arriving M_PROTO with T_CONN_IND
+	 * the following actions will occur; taken together they ensure the
+	 * syscall will return.
+	 *
+	 * 1. If a socket, soqueueconnind() will set SS_HASCONNIND but if
+	 *	the accept() was run on a non-blocking socket sowaitconnind()
+	 *	may have already returned EWOULDBLOCK, so not be waiting to
+	 *	process the message. Additionally socktpi_poll() has probably
+	 *	proceeded past the SS_HASCONNIND check below.
+	 * 2. strrput() runs pollwakeup()->pollnotify()->cv_signal() to wake
+	 *	this thread,  however that could occur before poll_common()
+	 *	has entered cv_wait.
+	 * 3. pollnotify() sets T_POLLWAKE, while holding the pc_lock.
+	 *
+	 * Before proceeding to cv_wait() in poll_common() for an event,
+	 * poll_common() atomically checks for T_POLLWAKE under the pc_lock,
+	 * and if set, re-calls strpoll() to ensure the late arriving
+	 * T_CONN_IND is recognized, and pollsys() returns.
+	 */
+	if (so->so_state & (SS_HASCONNIND|SS_OOBPEND)) {
+		if (so->so_state & SS_HASCONNIND)
 			*reventsp |= (POLLIN|POLLRDNORM) & events;
-		if (so_state & SS_OOBPEND)
+		if (so->so_state & SS_OOBPEND)
 			*reventsp |= POLLRDBAND & events;
 	}
 
@@ -1304,7 +1345,7 @@ sock_getmsg(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_getmsg(%p) %s\n",
-		so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_version == SOV_STREAM) {
 		/* The imaginary "sockmod" has been popped - act as a stream */
@@ -1349,7 +1390,7 @@ sock_putmsg(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_putmsg(%p) %s\n",
-		so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_version == SOV_STREAM) {
 		/* The imaginary "sockmod" has been popped - act as a stream */
