@@ -50,8 +50,15 @@
 #define	ESS_MAX_LATENCY_MICROSECS	10000
 #define	ESS_LATENCY_WAIT		100
 
+/*
+ * The SpeedStep related Processor Driver Capabilities (_PDC).
+ * See Intel Processor Vendor-Specific ACPI Interface Specification
+ * for details.
+ */
 #define	ESS_PDC_REVISION		0x1
 #define	ESS_PDC_PS_MSR			(1<<0)
+#define	ESS_PDC_MP			(1<<3)
+#define	ESS_PDC_PSD			(1<<5)
 
 /*
  * MSR registers for changing and reading processor power state.
@@ -77,7 +84,7 @@ typedef struct speedstep_state {
 	uint32_t ss_state;
 } speedstep_state_t;
 
-volatile int ess_pdccap = 1;
+uint32_t ess_pdccap = ESS_PDC_PS_MSR | ESS_PDC_MP | ESS_PDC_PSD;
 
 /*
  * Read the status register. How it is read, depends upon the _PCT
@@ -289,18 +296,13 @@ speedstep_init(cpudrv_devstate_t *cpudsp)
 		return (ESS_RET_NO_PM);
 	}
 
-	if (ess_pdccap) {
-		uint32_t pdccap = ESS_PDC_PS_MSR;
-
-		/*
-		 * _PDC support is optional and the driver should
-		 * function even if the _PDC write fails.
-		 */
-		if (cpu_acpi_write_pdc(handle, ESS_PDC_REVISION, 1,
-		    &pdccap) != 0) {
-			ESSDEBUG(("Failed to write PDC\n"));
-		}
-	}
+	/*
+	 * _PDC support is optional and the driver should
+	 * function even if the _PDC write fails.
+	 */
+	if (cpu_acpi_write_pdc(handle, ESS_PDC_REVISION, 1,
+	    &ess_pdccap) != 0)
+		ESSDEBUG(("Failed to write PDC\n"));
 
 	if (cpu_acpi_cache_data(handle) != 0) {
 		ESSDEBUG(("Failed to cache ACPI data\n"));

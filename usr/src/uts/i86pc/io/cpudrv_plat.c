@@ -225,7 +225,7 @@ cpudrv_pm_set_topspeed(void *ctx, int plat_level)
 	mutex_exit(&cpudsp->lock);
 
 	if (pm_update_maxpower(dip, 0, top_spd->pm_level) == DDI_SUCCESS)
-		cmn_err(CE_WARN, "!cpudrv_pm_set_topspeed: instance %d: has "
+		cmn_err(CE_NOTE, "!cpudrv_pm_set_topspeed: instance %d: has "
 		    "new max power of %d MHz", instance, top_spd->speed);
 }
 
