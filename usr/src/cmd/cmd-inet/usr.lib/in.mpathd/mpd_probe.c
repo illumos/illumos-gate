@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1127,7 +1127,7 @@ check_exception_target(struct phyint_instance *pii, struct target *target)
 		logdebug("check_exception_target(%s %s target %s)\n",
 		    AF_STR(pii->pii_af), pii->pii_name,
 		    pr_addr(pii->pii_af, target->tg_address,
-			abuf, sizeof (abuf)));
+		    abuf, sizeof (abuf)));
 	}
 
 	/*
@@ -2078,7 +2078,7 @@ failure_state(struct phyint_instance *pii)
 	pg = pi->pi_group;
 
 	if (LINK_UP(pi) && phyint_inst_probe_failure_state(pii, &pi_tff) ==
-		PHYINT_OK)
+	    PHYINT_OK)
 		return (PHYINT_OK);
 
 	/*
@@ -2807,6 +2807,7 @@ change_lif_flags(struct phyint *pi, uint64_t flags, boolean_t setfl)
 {
 	int ifsock;
 	struct lifreq lifr;
+	uint64_t old_flags;
 
 	if (debug & D_FAILOVER) {
 		logdebug("change_lif_flags(%s): flags %llx setfl %d\n",
@@ -2831,10 +2832,18 @@ change_lif_flags(struct phyint *pi, uint64_t flags, boolean_t setfl)
 			logperror("change_lif_flags: ioctl (get flags)");
 		return (_B_FALSE);
 	}
+
+	old_flags = lifr.lifr_flags;
 	if (setfl)
 		lifr.lifr_flags |= flags;
 	else
 		lifr.lifr_flags &= ~flags;
+
+	if (old_flags == lifr.lifr_flags) {
+		/* No change in the flags. No need to send ioctl */
+		return (_B_TRUE);
+	}
+
 	if (ioctl(ifsock, SIOCSLIFFLAGS, (char *)&lifr) < 0) {
 		if (errno != ENXIO)
 			logperror("change_lif_flags: ioctl (set flags)");
