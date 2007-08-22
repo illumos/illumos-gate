@@ -945,29 +945,79 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	int32_t current_val;
 	int32_t exponent;
 	double display_val;
+	typedef enum {SENSOR_OK, SENSOR_WARN, SENSOR_FAILED,
+	    SENSOR_DISABLED, SENSOR_UNKNOWN} sensor_status_t;
+	sensor_status_t sensor_status = SENSOR_OK;
 
 	if (class_node_found == 0) {
 		class_node_found = 1;
 		return (PICL_WALK_TERMINATE);
 	}
 
-	if (syserrlog == 0) {
+	prop = (char *)args;
+	if (!prop) {
+		sensor_status = SENSOR_UNKNOWN;
+		all_status_ok = 0;
+	} else {
 		err = picl_get_propval_by_name(nodeh,
 		    PICL_PROP_OPERATIONAL_STATUS, val,
 		    sizeof (val));
 		if (err == PICL_SUCCESS) {
 			if (strcmp(val, "disabled") == 0) {
-				if (all_status_ok) {
-					all_status_ok = 0;
-					return (PICL_WALK_TERMINATE);
-				}
-			} else
-				return (PICL_WALK_CONTINUE);
+				sensor_status = SENSOR_DISABLED;
+			}
+		}
+	}
+
+	if (sensor_status != SENSOR_DISABLED &&
+	    sensor_status != SENSOR_UNKNOWN) {
+		if (picl_get_propval_by_name(nodeh, prop, &current_val,
+		    sizeof (current_val)) != PICL_SUCCESS) {
+			sensor_status = SENSOR_UNKNOWN;
+		}
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_WARNING,
+		    &lo_warning, sizeof (lo_warning)) != PICL_SUCCESS)
+			lo_warning = INVALID_THRESHOLD;
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_SHUTDOWN,
+		    &lo_shutdown, sizeof (lo_shutdown)) != PICL_SUCCESS)
+			lo_shutdown = INVALID_THRESHOLD;
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_WARNING,
+		    &hi_warning, sizeof (hi_warning)) != PICL_SUCCESS)
+			hi_warning = INVALID_THRESHOLD;
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_SHUTDOWN,
+		    &hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
+			hi_shutdown = INVALID_THRESHOLD;
+
+		if ((lo_shutdown != INVALID_THRESHOLD &&
+		    current_val <= lo_shutdown) ||
+		    (hi_shutdown != INVALID_THRESHOLD &&
+		    current_val >= hi_shutdown)) {
+			sensor_status = SENSOR_FAILED;
+		} else if ((lo_warning != INVALID_THRESHOLD &&
+		    current_val <= lo_warning) ||
+		    (hi_warning != INVALID_THRESHOLD &&
+		    current_val >= hi_warning)) {
+			sensor_status = SENSOR_WARN;
 		} else {
+			sensor_status = SENSOR_OK;
+		}
+	}
+
+	if (syserrlog == 0) {
+		if (sensor_status != SENSOR_OK && all_status_ok == 1) {
 			all_status_ok = 0;
 			return (PICL_WALK_TERMINATE);
 		}
+		if (sensor_status == SENSOR_OK) {
+			return (PICL_WALK_CONTINUE);
+		}
 	}
+
+	/*
+	 * If we're here then prtdiag was invoked with "-v" or we have
+	 * a sensor that is beyond a threshold, so give them a book to
+	 * read instead of the Cliff Notes.
+	 */
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
 	    sizeof (parenth));
 	if (err != PICL_SUCCESS) {
@@ -975,71 +1025,62 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		return (PICL_WALK_CONTINUE);
 	}
 
-	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
-		return (PICL_WALK_TERMINATE);
-	for (i = 0; i < PARENT_NAMES; i++)
-		if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) == NULL) {
-			while (--i > -1)
-				free(names[i]);
-			free(loc);
-			return (PICL_WALK_TERMINATE);
+	/* gather up the path name for the sensor */
+	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) != NULL) {
+		for (i = 0; i < PARENT_NAMES; i++) {
+			if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) ==
+			    NULL) {
+				while (--i > -1)
+					free(names[i]);
+				free(loc);
+				loc = NULL;
+			}
 		}
+	}
 	i = 0;
-	while (err == PICL_SUCCESS) {
-		if (parenth == phyplatformh)
-			break;
-		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
-		    names[i++], PICL_PROPNAMELEN_MAX);
-		if (err != PICL_SUCCESS) {
-			i--;
-			break;
+	if (loc != 0) {
+		while (err == PICL_SUCCESS) {
+			if (parenth == phyplatformh)
+				break;
+			err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
+			    names[i++], PICL_PROPNAMELEN_MAX);
+			if (err != PICL_SUCCESS) {
+				i--;
+				break;
+			}
+			if (i == PARENT_NAMES)
+				break;
+			err = picl_get_propval_by_name(parenth,
+			    PICL_PROP_PARENT, &parenth, sizeof (parenth));
 		}
-		if (i == PARENT_NAMES)
-			break;
-		err = picl_get_propval_by_name(parenth, PICL_PROP_PARENT,
-		    &parenth, sizeof (parenth));
+		loc[0] = '\0';
+		if (--i > -1) {
+			(void) strlcat(loc, names[i],
+			    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		}
+		while (--i > -1) {
+			(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX *
+			    PARENT_NAMES);
+			(void) strlcat(loc, names[i],
+			    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		}
+		log_printf("%-31s", loc);
+		for (i = 0; i < PARENT_NAMES; i++)
+			free(names[i]);
+		free(loc);
+	} else {
+		log_printf("%-31s", " ");
 	}
-	loc[0] = '\0';
-	if (--i > -1) {
-		(void) strlcat(loc, names[i],
-		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
-	}
-	while (--i > -1) {
-		(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX*PARENT_NAMES);
-		(void) strlcat(loc, names[i],
-		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
-	}
-	log_printf("%-31s", loc);
-	for (i = 0; i < PARENT_NAMES; i++)
-		free(names[i]);
-	free(loc);
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
 	    sizeof (val));
 	if (err == PICL_SUCCESS)
 		log_printf("%-15s", val);
 
-	prop = (char *)args;
-	if (!prop) {
-		log_printf("\n");
-		return (PICL_WALK_CONTINUE);
-	}
-	if (picl_get_propval_by_name(nodeh, prop, &current_val,
-	    sizeof (current_val)) != PICL_SUCCESS) {
-		log_printf("\n");
-		return (PICL_WALK_CONTINUE);
-	}
-	if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_WARNING,
-	    &lo_warning, sizeof (lo_warning)) != PICL_SUCCESS)
-		lo_warning = INVALID_THRESHOLD;
-	if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_SHUTDOWN,
-	    &lo_shutdown, sizeof (lo_shutdown)) != PICL_SUCCESS)
-		lo_shutdown = INVALID_THRESHOLD;
-	if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_WARNING,
-	    &hi_warning, sizeof (hi_warning)) != PICL_SUCCESS)
-		hi_warning = INVALID_THRESHOLD;
-	if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_SHUTDOWN,
-	    &hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
-		hi_shutdown = INVALID_THRESHOLD;
+	/*
+	 * Get the exponent if present, and do a little math so that
+	 * if we need to we can print a normalized value for the
+	 * sensor reading.
+	 */
 	if (picl_get_propval_by_name(nodeh, PICL_PROP_EXPONENT,
 	    &exponent, sizeof (exponent)) != PICL_SUCCESS)
 		exponent = 0;
@@ -1048,28 +1089,32 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	else
 		display_val = (double)current_val *
 		    pow((double)10, (double)exponent);
-	err = picl_get_propval_by_name(nodeh,
-	    PICL_PROP_BASE_UNITS, base_units,
-	    sizeof (base_units));
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_BASE_UNITS,
+	    base_units, sizeof (base_units));
 	if (err != PICL_SUCCESS)
 		base_units[0] = '\0';
 
-	if ((lo_shutdown != INVALID_THRESHOLD &&
-	    current_val <= lo_shutdown) ||
-	    (hi_shutdown != INVALID_THRESHOLD &&
-	    current_val >= hi_shutdown)) {
+	switch (sensor_status) {
+	case SENSOR_FAILED:
 		log_printf("%-s", "failed (");
 		log_printf("%-.*f", abs(exponent), display_val);
 		log_printf("%-s %s", base_units, ")");
-	} else if ((lo_warning != INVALID_THRESHOLD &&
-	    current_val <= lo_warning) ||
-	    (hi_warning != INVALID_THRESHOLD &&
-	    current_val >= hi_warning)) {
+		break;
+	case SENSOR_WARN:
 		log_printf("%-s", "warning (");
 		log_printf("%-.*f", abs(exponent), display_val);
 		log_printf("%-s %s", base_units, ")");
-	} else
+		break;
+	case SENSOR_DISABLED:
+		log_printf("%-s", "disabled");
+		break;
+	case SENSOR_OK:
 		log_printf("%-s", "ok");
+		break;
+	default:
+		log_printf("%-s", "unknown");
+		break;
+	}
 
 	log_printf("\n");
 	return (PICL_WALK_CONTINUE);
@@ -1079,91 +1124,137 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 static int
 sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 {
-	char val[PICL_PROPNAMELEN_MAX];
-	char status[PICL_PROPNAMELEN_MAX];
+	char current_val[PICL_PROPNAMELEN_MAX];
+	char expected_val[PICL_PROPNAMELEN_MAX];
+	char label[PICL_PROPNAMELEN_MAX];
 	picl_nodehdl_t parenth;
 	char *names[PARENT_NAMES];
 	char *loc;
 	int i = 0;
 	char *prop = (char *)args;
 	picl_errno_t err = PICL_SUCCESS;
+	typedef enum {SENSOR_OK, SENSOR_WARN, SENSOR_FAILED,
+	    SENSOR_DISABLED, SENSOR_UNKNOWN} sensor_status_t;
+	sensor_status_t sensor_status = SENSOR_OK;
 
 	if (class_node_found == 0) {
 		class_node_found = 1;
 		return (PICL_WALK_TERMINATE);
 	}
-	if (syserrlog == 0) {
+
+	prop = (char *)args;
+	if (!prop) {
+		sensor_status = SENSOR_UNKNOWN;
+		all_status_ok = 0;
+	} else {
 		err = picl_get_propval_by_name(nodeh,
-		    PICL_PROP_OPERATIONAL_STATUS, status,
-		    sizeof (status));
+		    PICL_PROP_OPERATIONAL_STATUS, current_val,
+		    sizeof (current_val));
 		if (err == PICL_SUCCESS) {
-			if (strcmp(status, "disabled") == 0) {
-				if (all_status_ok) {
-					all_status_ok = 0;
-					return (PICL_WALK_TERMINATE);
-				}
-			} else
-				return (PICL_WALK_CONTINUE);
+			if (strcmp(current_val, "disabled") == 0) {
+				sensor_status = SENSOR_DISABLED;
+			}
+		}
+	}
+
+	if (sensor_status != SENSOR_DISABLED &&
+	    sensor_status != SENSOR_UNKNOWN) {
+		if (picl_get_propval_by_name(nodeh, prop, &current_val,
+		    sizeof (current_val)) != PICL_SUCCESS) {
+			(void) strlcpy(current_val, "unknown",
+			    sizeof (current_val));
+			sensor_status = SENSOR_UNKNOWN;
 		} else {
+			if (picl_get_propval_by_name(nodeh, PICL_PROP_EXPECTED,
+			    &expected_val, sizeof (expected_val)) !=
+			    PICL_SUCCESS) {
+				sensor_status = SENSOR_UNKNOWN;
+			} else {
+				if (strncmp(current_val, expected_val,
+				    sizeof (current_val)) == 0) {
+					sensor_status = SENSOR_OK;
+				} else {
+					sensor_status = SENSOR_FAILED;
+				}
+			}
+		}
+	}
+
+	if (syserrlog == 0) {
+		if (sensor_status != SENSOR_OK && all_status_ok == 1) {
 			all_status_ok = 0;
 			return (PICL_WALK_TERMINATE);
 		}
+		if (sensor_status == SENSOR_OK) {
+			return (PICL_WALK_CONTINUE);
+		}
 	}
+
+	/*
+	 * If we're here then prtdiag was invoked with "-v" or we have
+	 * a sensor that is beyond a threshold, so give them a book to
+	 * read instead of the Cliff Notes.
+	 */
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
 	    sizeof (parenth));
 	if (err != PICL_SUCCESS) {
 		log_printf("\n");
 		return (PICL_WALK_CONTINUE);
 	}
-	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
-		return (PICL_WALK_TERMINATE);
-	for (i = 0; i < PARENT_NAMES; i++)
-		if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) == NULL) {
-			while (--i > -1)
-				free(names[i]);
-			free(loc);
-			return (PICL_WALK_TERMINATE);
+	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) != NULL) {
+		for (i = 0; i < PARENT_NAMES; i++) {
+			if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) ==
+			    NULL) {
+				while (--i > -1)
+					free(names[i]);
+				free(loc);
+				loc = NULL;
+			}
 		}
+	}
 	i = 0;
-	while (err == PICL_SUCCESS) {
-		if (parenth == phyplatformh)
-			break;
-		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
-		    names[i++], PICL_PROPNAMELEN_MAX);
-		if (err != PICL_SUCCESS) {
-			i--;
-			break;
+	if (loc) {
+		while (err == PICL_SUCCESS) {
+			if (parenth == phyplatformh)
+				break;
+			err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
+			    names[i++], PICL_PROPNAMELEN_MAX);
+			if (err != PICL_SUCCESS) {
+				i--;
+				break;
+			}
+			if (i == PARENT_NAMES)
+				break;
+			err = picl_get_propval_by_name(parenth,
+			    PICL_PROP_PARENT, &parenth, sizeof (parenth));
 		}
-		if (i == PARENT_NAMES)
-			break;
-		err = picl_get_propval_by_name(parenth, PICL_PROP_PARENT,
-		    &parenth, sizeof (parenth));
+		loc[0] = '\0';
+		if (--i > -1) {
+			(void) strlcat(loc, names[i],
+			    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		}
+		while (--i > -1) {
+			(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX *
+			    PARENT_NAMES);
+			(void) strlcat(loc, names[i],
+			    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		}
+		log_printf("%-31s", loc);
+		for (i = 0; i < PARENT_NAMES; i++)
+			free(names[i]);
+		free(loc);
+	} else {
+		log_printf("%-31s", "");
 	}
-	loc[0] = '\0';
-	if (--i > -1) {
-		(void) strlcat(loc, names[i],
-		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
-	}
-	while (--i > -1) {
-		(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX * PARENT_NAMES);
-		(void) strlcat(loc, names[i],
-		    PICL_PROPNAMELEN_MAX * PARENT_NAMES);
-	}
-	log_printf("%-31s", loc);
-	for (i = 0; i < PARENT_NAMES; i++)
-		free(names[i]);
-	free(loc);
-	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
-	    sizeof (val));
-	if (err == PICL_SUCCESS)
-		log_printf("%-15s", val);
-	if (syserrlog == 0) {
-		log_printf("%-8s", status);
-		return (PICL_WALK_CONTINUE);
-	}
-	err = picl_get_propval_by_name(nodeh, prop, val, sizeof (val));
-	if (err == PICL_SUCCESS)
-		log_printf("%-8s", val);
+
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, label,
+	    sizeof (label));
+	if (err != PICL_SUCCESS)
+		(void) strlcpy(label, "", sizeof (label));
+	log_printf("%-15s", label);
+
+	log_printf("%-8s", current_val);
+
 	log_printf("\n");
 	return (PICL_WALK_CONTINUE);
 }
@@ -1176,7 +1267,7 @@ sun4v_env_print_fan_sensors()
 	 * If there isn't any fan sensor node, return now.
 	 */
 	(void) picl_walk_tree_by_class(phyplatformh,
-	    PICL_CLASS_RPM_SENSOR, (void *)PICL_CLASS_RPM_SENSOR,
+	    PICL_CLASS_RPM_SENSOR, (void *)PICL_PROP_SPEED,
 	    sun4v_env_print_sensor_callback);
 	if (!class_node_found)
 		return;
@@ -1184,7 +1275,7 @@ sun4v_env_print_fan_sensors()
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
 		    PICL_CLASS_RPM_SENSOR,
-		    NULL, sun4v_env_print_sensor_callback);
+		    PICL_PROP_SPEED, sun4v_env_print_sensor_callback);
 		if (all_status_ok) {
 			log_printf("All fan sensors are OK.\n");
 			return;
@@ -1202,7 +1293,7 @@ sun4v_env_print_fan_indicators()
 {
 	char *fmt = "%-30s %-14s %-10s\n";
 	(void) picl_walk_tree_by_class(phyplatformh,
-	    PICL_CLASS_RPM_INDICATOR, (void *)PICL_CLASS_RPM_INDICATOR,
+	    PICL_CLASS_RPM_INDICATOR, (void *)PICL_PROP_CONDITION,
 	    sun4v_env_print_indicator_callback);
 	if (!class_node_found)
 		return;
@@ -1210,7 +1301,8 @@ sun4v_env_print_fan_indicators()
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
 		    PICL_CLASS_RPM_INDICATOR,
-		    NULL, sun4v_env_print_indicator_callback);
+		    (void *)PICL_PROP_CONDITION,
+		    sun4v_env_print_indicator_callback);
 		if (all_status_ok) {
 			log_printf("All fan indicators are OK.\n");
 			return;
@@ -1238,7 +1330,7 @@ sun4v_env_print_temp_sensors()
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
 		    PICL_CLASS_TEMPERATURE_SENSOR,
-		    NULL, sun4v_env_print_sensor_callback);
+		    PICL_PROP_TEMPERATURE, sun4v_env_print_sensor_callback);
 		if (all_status_ok) {
 			log_printf("All temperature sensors are OK.\n");
 			return;
@@ -1264,7 +1356,8 @@ sun4v_env_print_temp_indicators()
 	log_printf("\nTemperature indicators:\n");
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
-		    PICL_CLASS_TEMPERATURE_INDICATOR, NULL,
+		    PICL_CLASS_TEMPERATURE_INDICATOR,
+		    (void *)PICL_PROP_CONDITION,
 		    sun4v_env_print_indicator_callback);
 		if (all_status_ok) {
 			log_printf("All temperature indicators are OK.\n");
@@ -1292,7 +1385,7 @@ sun4v_env_print_current_sensors()
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
 		    PICL_CLASS_CURRENT_SENSOR,
-		    NULL, sun4v_env_print_sensor_callback);
+		    PICL_PROP_CURRENT, sun4v_env_print_sensor_callback);
 		if (all_status_ok) {
 			log_printf("All current sensors are OK.\n");
 			return;
@@ -1319,7 +1412,7 @@ sun4v_env_print_current_indicators()
 	log_printf("\nCurrent indicators:\n");
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
-		    PICL_CLASS_CURRENT_INDICATOR, NULL,
+		    PICL_CLASS_CURRENT_INDICATOR, (void *)PICL_PROP_CONDITION,
 		    sun4v_env_print_indicator_callback);
 		if (all_status_ok) {
 			log_printf("All current indicators are OK.\n");
@@ -1349,7 +1442,7 @@ sun4v_env_print_voltage_sensors()
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
 		    PICL_CLASS_VOLTAGE_SENSOR,
-		    NULL, sun4v_env_print_sensor_callback);
+		    PICL_PROP_VOLTAGE, sun4v_env_print_sensor_callback);
 		if (all_status_ok) {
 			log_printf("All voltage sensors are OK.\n");
 			return;
@@ -1377,7 +1470,7 @@ sun4v_env_print_voltage_indicators()
 	log_printf("\nVoltage indicators:\n");
 	if (syserrlog == 0) {
 		(void) picl_walk_tree_by_class(phyplatformh,
-		    PICL_CLASS_VOLTAGE_INDICATOR, NULL,
+		    PICL_CLASS_VOLTAGE_INDICATOR, (void *)PICL_PROP_CONDITION,
 		    sun4v_env_print_indicator_callback);
 		if (all_status_ok) {
 			log_printf("All voltage indicators are OK.\n");
