@@ -1274,7 +1274,7 @@ integrity_fail:
 				    "%s\n", db_file, fname);
 			else
 				configd_critical(
-				    "%s: integrity check failed: %s\n",
+				    "%s: integrity check failed.\n",
 				    db_file);
 		} else {
 			(void) fprintf(stderr,

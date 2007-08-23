@@ -18,8 +18,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,10 +189,25 @@ extract_cmd: SCC_EXTRACT terminator	{ lscf_profile_extract(NULL); }
 	}
 	| SCC_EXTRACT error terminator	{ synerr(SCC_EXTRACT); return(0); }
 
-repository_cmd : SCC_REPOSITORY SCV_WORD terminator
+repository_cmd: SCC_REPOSITORY SCV_WORD terminator
 	{
-		lscf_set_repository($2);
+		if (strcmp($2, "-f") == 0) {
+			synerr(SCC_REPOSITORY);
+			return(0);
+		}
+		lscf_set_repository($2, 0);
 		free($2);
+	}
+	| SCC_REPOSITORY SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-f") == 0) {
+			lscf_set_repository($3, 1);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_REPOSITORY);
+			return(0);
+		}
 	}
 	| SCC_REPOSITORY error terminator   { synerr(SCC_REPOSITORY); return(0); }
 

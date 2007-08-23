@@ -796,14 +796,25 @@ repository_teardown(void)
 }
 
 void
-lscf_set_repository(const char *repfile)
+lscf_set_repository(const char *repfile, int force)
 {
 	repository_teardown();
 
-	if (est->sc_repo_filename != NULL)
+	if (est->sc_repo_filename != NULL) {
 		free((void *)est->sc_repo_filename);
+		est->sc_repo_filename = NULL;
+	}
 
-	est->sc_repo_filename = safe_strdup(repfile);
+	if ((force == 0) && (access(repfile, R_OK) != 0)) {
+		/*
+		 * Repository file does not exist
+		 * or has no read permission.
+		 */
+		warn(gettext("Cannot access \"%s\": %s\n"),
+		    repfile, strerror(errno));
+	} else {
+		est->sc_repo_filename = safe_strdup(repfile);
+	}
 
 	lscf_prep_hndl();
 }
