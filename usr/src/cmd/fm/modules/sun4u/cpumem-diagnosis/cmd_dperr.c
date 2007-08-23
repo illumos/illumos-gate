@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +103,7 @@ cmd_dp_add_suspects(fmd_hdl_t *hdl, cmd_dp_t *dp)
 	/* build ASRU, fault event class */
 	asru = cmd_dp_setasru(hdl, dp);
 	(void) snprintf(class, DP_MAX_CLASS, "fault.asic.%s.%s",
-		dperrtype[dp->dp_err], FM_ERROR_DATAPATH);
+	    dperrtype[dp->dp_err], FM_ERROR_DATAPATH);
 
 	cpuid = dp->dp_cpuid_list[0];
 
@@ -160,7 +159,7 @@ cmd_dp_add_suspects(fmd_hdl_t *hdl, cmd_dp_t *dp)
 
 	default:
 		fmd_hdl_debug(hdl, "%s: invalid DP error type %d", funcname,
-			dp->dp_err);
+		    dp->dp_err);
 		nvlist_free(asru);
 		return;
 	}
@@ -173,7 +172,7 @@ cmd_dp_add_suspects(fmd_hdl_t *hdl, cmd_dp_t *dp)
 			return;
 		}
 		err = nvlist_add_string(hcel, FM_FMRI_HC_NAME,
-			FM_FMRI_LEGACY_HC);
+		    FM_FMRI_LEGACY_HC);
 		err |= nvlist_add_string(hcel, FM_FMRI_HC_ID, frustr[i]);
 		if (err != 0) {
 			nvlist_free(hcel);
@@ -189,7 +188,7 @@ cmd_dp_add_suspects(fmd_hdl_t *hdl, cmd_dp_t *dp)
 		}
 		err = nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION);
 		err |= nvlist_add_string(fru, FM_FMRI_SCHEME,
-			FM_FMRI_SCHEME_HC);
+		    FM_FMRI_SCHEME_HC);
 		err |= nvlist_add_string(fru, FM_FMRI_HC_ROOT, "");
 		err |= nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1);
 		err |= nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcel, 1);
@@ -201,8 +200,8 @@ cmd_dp_add_suspects(fmd_hdl_t *hdl, cmd_dp_t *dp)
 		}
 
 		/* create the fault, add to case. */
-		flt = fmd_nvl_create_fault(hdl, class, 100/numfru,
-				asru, fru, NULL);
+		flt = cmd_nvl_create_fault(hdl, class, 100/numfru,
+		    asru, fru, NULL);
 		fmd_case_add_suspect(hdl, dp->dp_case, flt);
 
 		/* free up memory */
@@ -233,24 +232,24 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	dpt->dp_version = CMD_DP_VERSION;
 	dpt->dp_err = dperr;
 	err = nvlist_lookup_pairs(nvl, 0,
-		DP_EREPORT_TYPE, DATA_TYPE_UINT16, &dpt->dp_erpt_type,
-		DP_TVALUE, DATA_TYPE_UINT32, &dpt->dp_t_value,
-		DP_LIST_SIZE, DATA_TYPE_UINT32, &ncpuids, NULL);
+	    DP_EREPORT_TYPE, DATA_TYPE_UINT16, &dpt->dp_erpt_type,
+	    DP_TVALUE, DATA_TYPE_UINT32, &dpt->dp_t_value,
+	    DP_LIST_SIZE, DATA_TYPE_UINT32, &ncpuids, NULL);
 	if (err != 0) {
 		fmd_hdl_debug(hdl, "%s: unable to verify ereport contents "
-			"(erptype, ena, t_value, dp_list_sz)", funcname);
+		    "(erptype, ena, t_value, dp_list_sz)", funcname);
 		fmd_hdl_free(hdl, dpt, sizeof (cmd_dp_t));
 		return (CMD_EVD_UNUSED);
 	}
 
 	/* extract cpuid list from ereport */
 	err = nvlist_lookup_uint16_array(nvl, DP_LIST, &cpuid_list,
-		&ncpuids);
+	    &ncpuids);
 	err |= nvlist_lookup_uint64_array(nvl, SN_LIST, &serid_list,
-		&ncpuids);
+	    &ncpuids);
 	if (err != 0) {
 		fmd_hdl_debug(hdl, "%s: unable to verify ereport contents "
-			"(dp_list, sn_list)", funcname);
+		    "(dp_list, sn_list)", funcname);
 		fmd_hdl_free(hdl, dpt, sizeof (cmd_dp_t));
 		return (CMD_EVD_UNUSED);
 	}
@@ -277,7 +276,7 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 				fltflg++;
 		if (fltflg == ncpuids) {
 			fmd_hdl_debug(hdl, "%s: datapath fault(s) already "
-				"experienced, event uninteresting\n", funcname);
+			    "experienced, event uninteresting\n", funcname);
 			fmd_hdl_free(hdl, dpt, sizeof (cmd_dp_t));
 			return (CMD_EVD_UNUSED);
 		}
@@ -289,7 +288,7 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		ept = cmd_dp_lookup_error(dpt);
 		if (ept != NULL && !fmd_case_closed(hdl, ept->dp_case)) {
 			fmd_hdl_debug(hdl, "%s: found existing datapath error, "
-				"adding event to case\n", funcname);
+			    "adding event to case\n", funcname);
 			fmd_case_add_ereport(hdl, ept->dp_case, ep);
 			/* check for t-value change */
 			if (dpt->dp_t_value != ept->dp_t_value) {
@@ -298,9 +297,9 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 				fmd_timer_remove(hdl, ept->dp_id);
 				ep = fmd_case_getprincipal(hdl, ept->dp_case);
 				ept->dp_id = fmd_timer_install(hdl,
-					(void *)CMD_TIMERTYPE_DP, ep,
-					(hrtime_t)NANOSEC *
-					(dpt->dp_t_value + 120));
+				    (void *)CMD_TIMERTYPE_DP, ep,
+				    (hrtime_t)NANOSEC *
+				    (dpt->dp_t_value + 120));
 			}
 			fmd_hdl_free(hdl, dpt, sizeof (cmd_dp_t));
 			return (CMD_EVD_OK);
@@ -312,7 +311,7 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		 * cmd.cmd_datapaths list
 		 */
 		fmd_hdl_debug(hdl, "%s: new datapath error, create case and "
-			"add to cmd.cmd_datapaths\n", funcname);
+		    "add to cmd.cmd_datapaths\n", funcname);
 		++cmd.cmd_dp_flag;
 
 		cmd_bufname(dpt->dp_bufname, sizeof (dpt->dp_bufname),
@@ -322,7 +321,7 @@ cmd_dp_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		dp_buf_write(hdl, dpt);
 
 		dpt->dp_case = cmd_case_create(hdl, &dpt->dp_header,
-			CMD_PTR_DP_CASE, &uuidp);
+		    CMD_PTR_DP_CASE, &uuidp);
 		fmd_case_setprincipal(hdl, dpt->dp_case, ep);
 		dpt->dp_id = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_DP,
 		    ep, (hrtime_t)NANOSEC * (dpt->dp_t_value + 120));
@@ -385,10 +384,10 @@ cmd_dp_cds(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	if (fmd_nvl_class_match(hdl, nvl, "ereport.asic.starcat.*")) {
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SC_DP_CDS_TYPE));
+		    SC_DP_CDS_TYPE));
 	} else
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SG_DP_CDS_TYPE));
+		    SG_DP_CDS_TYPE));
 }
 
 cmd_evdisp_t
@@ -397,11 +396,11 @@ cmd_dp_dx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	if (fmd_nvl_class_match(hdl, nvl, "ereport.asic.starcat.*")) {
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SC_DP_DX_TYPE));
+		    SC_DP_DX_TYPE));
 
 	} else
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SG_DP_DX_TYPE));
+		    SG_DP_DX_TYPE));
 }
 
 cmd_evdisp_t
@@ -409,7 +408,7 @@ cmd_dp_ex(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
 	return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SC_DP_EX_TYPE));
+	    SC_DP_EX_TYPE));
 }
 
 cmd_evdisp_t
@@ -418,8 +417,8 @@ cmd_dp_cp(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	if (fmd_nvl_class_match(hdl, nvl, "ereport.asic.starcat.*")) {
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SC_DP_CP_TYPE));
+		    SC_DP_CP_TYPE));
 	} else
 		return (cmd_dp_common(hdl, ep, nvl, class, clcode,
-			SG_DP_RP_TYPE));
+		    SG_DP_RP_TYPE));
 }

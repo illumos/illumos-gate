@@ -27,6 +27,7 @@
 
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
+#include <cmd.h>
 
 nvlist_t *
 cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
@@ -90,7 +91,7 @@ cmd_motherboard_create_fault(fmd_hdl_t *hdl, nvlist_t *asru, const char *fltnm,
 	nvlist_t *mb_fru, *flt;
 
 	mb_fru = cmd_motherboard_fru_create(hdl, asru);
-	flt = fmd_nvl_create_fault(hdl, fltnm, cert, mb_fru, mb_fru, NULL);
+	flt = cmd_nvl_create_fault(hdl, fltnm, cert, mb_fru, mb_fru, NULL);
 	flt = cmd_fault_add_location(hdl, flt, "MB");
 	if (mb_fru != NULL)
 		nvlist_free(mb_fru);

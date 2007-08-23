@@ -112,7 +112,7 @@ nvlist_t *
 cmd_bank_create_fault(fmd_hdl_t *hdl, cmd_bank_t *bank, const char *fltnm,
     uint_t cert)
 {
-	return (fmd_nvl_create_fault(hdl, fltnm, cert, bank->bank_asru_nvl,
+	return (cmd_nvl_create_fault(hdl, fltnm, cert, bank->bank_asru_nvl,
 	    bank->bank_asru_nvl, NULL));
 }
 

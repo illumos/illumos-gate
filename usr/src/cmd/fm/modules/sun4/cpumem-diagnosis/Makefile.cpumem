@@ -57,7 +57,7 @@ INCDIRS += \
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMD_VERSION='$(CMD_VERSION)' -D$(ARCH)
 
-LDFLAGS += -lkstat
+LDLIBS += -lkstat -L$(ROOTLIB)/fm -ltopo
 
 %.o: $(SUN4DIR)/%.c
 	$(COMPILE.c) -o $@ $<

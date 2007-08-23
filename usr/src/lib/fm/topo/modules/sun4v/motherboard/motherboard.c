@@ -92,7 +92,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 
 	if (topo_mod_register(mod, &mb_info, TOPO_VERSION) < 0) {
 		topo_mod_dprintf(mod, "motherboard registration failed: %s\n",
-			topo_mod_errmsg(mod));
+		    topo_mod_errmsg(mod));
 		return; /* mod errno already set */
 	}
 	topo_mod_dprintf(mod, "MB enumr initd\n");
@@ -140,14 +140,14 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	(void) sysinfo(SI_MACHINE, isa, MAXNAMELEN);
 	if (strcmp(isa, "sun4v") != 0) {
 		topo_mod_dprintf(mod, "not sun4v architecture%s\n",
-			isa);
+		    isa);
 		ldom_fini(lhp);
 		return (-1);
 	}
 
 	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1) {
 		topo_mod_dprintf(mod, "ldom_get_core_md error, bufsize=%d\n",
-			bufsize);
+		    bufsize);
 		ldom_fini(lhp);
 		return (-1);
 	}
@@ -163,7 +163,7 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	topo_mod_dprintf(mod, "num_nodes=%d\n", num_nodes);
 
 	if ((listp = (mde_cookie_t *)mb_topo_alloc(
-		sizeof (mde_cookie_t) * num_nodes)) == NULL) {
+	    sizeof (mde_cookie_t) * num_nodes)) == NULL) {
 		topo_mod_dprintf(mod, "alloc listp error\n");
 		mb_topo_free(bufp, (size_t)bufsize);
 		(void) md_fini(mdp);
@@ -172,8 +172,8 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	}
 
 	nfrus = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-			md_find_name(mdp, "component"),
-			md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, "component"),
+	    md_find_name(mdp, "fwd"), listp);
 	if (nfrus <= 0) {
 		topo_mod_dprintf(mod, "error: nfrus=%d\n", nfrus);
 		mb_topo_free(listp, sizeof (mde_cookie_t) * num_nodes);
@@ -197,8 +197,10 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 				    "dash_number", &dn) < 0)
 					dn = NULL;
 			}
-			/* chassis component */
-			if (strcmp("chassis", pstr) == 0) {
+		}
+		/* redefined access method for chassis serial number */
+		if (md_get_prop_str(mdp, listp[i], "nac", &pstr) == 0) {
+			if (strcmp("SYS", pstr) == 0) {
 				if (md_get_prop_str(mdp, listp[i],
 				    "serial_number", &csn) < 0)
 					csn = NULL;
@@ -337,7 +339,7 @@ mb_declare(tnode_t *parent, const char *name, topo_instance_t i,
 
 	/* Label is MB */
 	if (topo_prop_set_string(ntn, TOPO_PGROUP_PROTOCOL,
-		TOPO_PROP_LABEL,  TOPO_PROP_IMMUTABLE, label, &err) < 0) {
+	    TOPO_PROP_LABEL,  TOPO_PROP_IMMUTABLE, label, &err) < 0) {
 		(void) topo_mod_seterrno(mp, err);
 	}
 
@@ -364,8 +366,8 @@ mb_enum(topo_mod_t *mod, tnode_t *pn, const char *name,
 
 	if (mbn == NULL) {
 		topo_mod_dprintf(mod, "Enumeration of motherboard "
-			"failed: %s\n",
-			topo_strerror(topo_mod_errno(mod)));
+		    "failed: %s\n",
+		    topo_strerror(topo_mod_errno(mod)));
 		return (-1); /* mod_errno already set */
 	}
 

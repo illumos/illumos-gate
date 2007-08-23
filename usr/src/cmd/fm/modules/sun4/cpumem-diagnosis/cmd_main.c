@@ -52,6 +52,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
 
@@ -568,6 +569,7 @@ _fmd_fini(fmd_hdl_t *hdl)
 
 	fmd_hdl_free(hdl, cmd.cmd_xxcu_trw,
 	    sizeof (cmd_xxcu_trw_t) * cmd.cmd_xxcu_ntrw);
+	nvlist_free(cmd.cmd_auth);
 }
 
 #ifdef	sun4v
@@ -583,6 +585,51 @@ cpumem_diagnosis_init_free(void *addr, size_t size)
 	fmd_hdl_free(init_hdl, addr, size);
 }
 #endif
+
+/* find_auth -- find hardware platform authority within libtopo */
+
+/* ARGSUSED */
+static int
+find_auth(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *rsrc, *auth;
+
+	if (cmd.cmd_auth != NULL)
+		return (TOPO_WALK_TERMINATE); /* don't overwrite previous */
+
+	if (topo_node_resource(node, &rsrc, &err) < 0)
+		return (TOPO_WALK_NEXT);	/* no resource, try next */
+	if (nvlist_lookup_nvlist(rsrc, FM_FMRI_AUTHORITY, &auth) < 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);	/* no authority, try next */
+	}
+	(void) nvlist_dup(auth, &cmd.cmd_auth, NV_UNIQUE_NAME);
+	nvlist_free(rsrc);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+/* init_auth -- read hardware platform authority from libtopo */
+
+void
+init_auth(fmd_hdl_t *hdl)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return;
+	if ((twp = topo_walk_init(thp,
+	    FM_FMRI_SCHEME_HC, find_auth, NULL, &err))
+	    == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return;
+	}
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+}
 
 void
 _fmd_init(fmd_hdl_t *hdl)
@@ -764,4 +811,6 @@ _fmd_init(fmd_hdl_t *hdl)
 	cpumem_diagnosis_lhp = ldom_init(cpumem_diagnosis_init_alloc,
 	    cpumem_diagnosis_init_free);
 #endif
+
+	init_auth(hdl);
 }

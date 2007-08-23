@@ -1463,7 +1463,7 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 			}
 			cpui->cpu_faulting = FMD_B_TRUE;
 			cpu_buf_write(hdl, cpui);
-			flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+			flt = cmd_nvl_create_fault(hdl, fltnm, cert,
 			    cpui->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
 #ifdef sun4v
 			flt = cmd_fault_add_location(hdl, flt, "MB");
@@ -1471,7 +1471,7 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 			fmd_case_add_suspect(hdl, casep, flt);
 		}
 	} else {
-		flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+		flt = cmd_nvl_create_fault(hdl, fltnm, cert,
 		    cpu->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
 #ifdef sun4v
 		flt = cmd_fault_add_location(hdl, flt, "MB");

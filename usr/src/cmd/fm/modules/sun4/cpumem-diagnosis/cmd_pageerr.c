@@ -65,18 +65,18 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	}
 
 	if (page->page_case.cc_cp == NULL)
-	    page->page_case.cc_cp = cmd_case_create(hdl, &page->page_header,
-	    CMD_PTR_PAGE_CASE, &uuid);
+		page->page_case.cc_cp = cmd_case_create(hdl,
+		    &page->page_header, CMD_PTR_PAGE_CASE, &uuid);
 
 #ifdef sun4v
 	nvlfru = cmd_mem2hc(hdl, modfru);
-	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
+	flt = cmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, nvlfru, NULL);
 	flt = cmd_fault_add_location(hdl, flt, cmd_fmri_get_unum(modfru));
 	if (nvlfru != NULL)
 		nvlist_free(nvlfru);
 #else /* sun4v */
-	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
+	flt = cmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, modfru, NULL);
 #endif /* sun4v */
 

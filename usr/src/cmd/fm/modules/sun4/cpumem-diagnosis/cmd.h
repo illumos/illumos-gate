@@ -201,6 +201,7 @@ typedef struct cmd {
 #ifdef sun4v
 	cmd_list_t cmd_branches;	/* List of branches state structures */
 #endif
+	nvlist_t *cmd_auth;		/* DE's fault authority value */
 } cmd_t;
 
 extern cmd_t cmd;
@@ -210,6 +211,8 @@ extern int cmd_set_errno(int);
 extern void *cmd_buf_read(fmd_hdl_t *, fmd_case_t *, const char *, size_t);
 extern void cmd_bufname(char *, size_t, const char *, ...);
 extern void cmd_vbufname(char *, size_t, const char *, va_list);
+extern nvlist_t *cmd_nvl_create_fault(fmd_hdl_t *,
+    const char *, uint8_t, nvlist_t *, nvlist_t *, nvlist_t *);
 
 #ifdef __cplusplus
 }
