@@ -27,8 +27,7 @@
 
 include ../Makefile.com
 
-DATAFILES += i.devallocdefs i.initd i.renamenew r.renamenew
-CHKINSTALLSRC=checkinstall.initd
+DATAFILES += i.devallocdefs i.renamenew r.renamenew
 
 .KEEP_STATE:
 

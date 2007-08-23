@@ -37,11 +37,10 @@
 # packaging files
 i pkginfo
 i copyright
-i checkinstall
+i depend
 i postinstall
 i i.devallocdefs
 i i.renamenew
-i i.initd
 i r.renamenew
 
 #

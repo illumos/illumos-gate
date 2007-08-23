@@ -126,6 +126,8 @@ f none usr/lib/security/sparcv9/pam_passwd_auth.so.1 755 root bin
 s none usr/lib/security/sparcv9/pam_passwd_auth.so=./pam_passwd_auth.so.1
 f none usr/lib/security/sparcv9/pam_list.so.1 755 root bin
 s none usr/lib/security/sparcv9/pam_list.so=./pam_list.so.1
+f none usr/lib/security/sparcv9/pam_tsol_account.so.1 755 root bin
+s none usr/lib/security/sparcv9/pam_tsol_account.so=./pam_tsol_account.so.1
 f none usr/lib/security/sparcv9/pkcs11_kernel.so.1 755 root bin
 s none usr/lib/security/sparcv9/pkcs11_kernel.so=./pkcs11_kernel.so.1
 f none usr/lib/security/sparcv9/pkcs11_softtoken.so.1 755 root bin

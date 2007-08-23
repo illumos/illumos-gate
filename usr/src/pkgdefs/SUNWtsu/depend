@@ -42,3 +42,6 @@
 #
 
 P SUNWtsg       Trusted Extensions global
+P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
+P SUNWcsr	Core Solaris, (Root)

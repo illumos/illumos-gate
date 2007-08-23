@@ -70,9 +70,6 @@ f none usr/lib/lp/postscript/tsol_banner.ps 555 root lp
 e renamenew usr/lib/lp/postscript/tsol_separator.ps 555 root lp
 f none usr/lib/lp/postscript/tsol_trailer.ps 555 root lp
 f none usr/lib/lslabels 555 root sys
-d none usr/lib/security 755 root bin
-f none usr/lib/security/pam_tsol_account.so.1 755 root bin
-s none usr/lib/security/pam_tsol_account.so=./pam_tsol_account.so.1
 d none usr/sbin 755 root bin
 f none usr/sbin/add_allocatable 555 root bin
 f none usr/sbin/atohexlabel 555 root sys

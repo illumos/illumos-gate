@@ -347,6 +347,8 @@ f none usr/lib/security/pam_passwd_auth.so.1 755 root bin
 s none usr/lib/security/pam_passwd_auth.so=./pam_passwd_auth.so.1
 f none usr/lib/security/pam_list.so.1 755 root bin
 s none usr/lib/security/pam_list.so=./pam_list.so.1
+f none usr/lib/security/pam_tsol_account.so.1 755 root bin
+s none usr/lib/security/pam_tsol_account.so=./pam_tsol_account.so.1
 f none usr/lib/security/audit_binfile.so.1 755 root bin
 s none usr/lib/security/audit_binfile.so=./audit_binfile.so.1
 f none usr/lib/security/audit_syslog.so.1 755 root bin

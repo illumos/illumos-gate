@@ -45,3 +45,4 @@
 #
 P SUNWcsr       Core Solaris, (Root)
 P SUNWtsu       Trusted Extensions, (Usr)
+P SUNWcslr	Core Solaris Libraries (Root)
