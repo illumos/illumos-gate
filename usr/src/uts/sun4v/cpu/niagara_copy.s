@@ -673,7 +673,7 @@ fqtr:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_56_63
-	fmovd	%d30, %d14
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -694,14 +694,14 @@ off7:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_1_7
-	fmovd	%d16, %d0
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d16, %d0
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -728,13 +728,13 @@ off15:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_8_15
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -760,12 +760,12 @@ off23:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_16_23
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -790,11 +790,11 @@ off31:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_24_31
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -818,10 +818,10 @@ off39:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_32_39
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -844,9 +844,9 @@ off47:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_40_47
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -868,8 +868,8 @@ off55:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_48_55
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -2269,7 +2269,7 @@ co_fqtr:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_56_63
-	fmovd	%d30, %d14
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2289,14 +2289,14 @@ co_off7:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_1_7
-	fmovd	%d16, %d0
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d16, %d0
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2322,13 +2322,13 @@ co_off15:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_8_15
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2353,12 +2353,12 @@ co_off23:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_16_23
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2382,11 +2382,11 @@ co_off31:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_24_31
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2409,10 +2409,10 @@ co_off39:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_32_39
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2434,9 +2434,9 @@ co_off47:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_40_47
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -2457,8 +2457,8 @@ co_off55:
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_48_55
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_AIUS
 	subcc	%i3, 0x40, %i3
@@ -3340,7 +3340,7 @@ ci_fqtr:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_56_63
-	fmovd	%d30, %d14
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3360,14 +3360,14 @@ ci_off7:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_1_7
-	fmovd	%d16, %d0
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d16, %d0
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3393,13 +3393,13 @@ ci_off15:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_8_15
-	fmovd	%d18, %d2
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d18, %d2
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3424,12 +3424,12 @@ ci_off23:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_16_23
-	fmovd	%d20, %d4
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d20, %d4
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3453,11 +3453,11 @@ ci_off31:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_24_31
-	fmovd	%d22, %d6
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d22, %d6
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3480,10 +3480,10 @@ ci_off39:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_32_39
-	fmovd	%d24, %d8
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d24, %d8
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3505,9 +3505,9 @@ ci_off47:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_40_47
-	fmovd	%d26, %d10
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d26, %d10
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
@@ -3528,8 +3528,8 @@ ci_off55:
 
 	ldda	[%l0]ASI_BLK_AIUS, %d16
 	ALIGN_OFF_48_55
-	fmovd	%d28, %d12
-	fmovd	%d30, %d14
+	fsrc1	%d28, %d12
+	fsrc1	%d30, %d14
 
 	stda	%d48, [%i0]ASI_BLK_P
 	subcc	%i3, 0x40, %i3
