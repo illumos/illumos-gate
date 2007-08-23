@@ -604,16 +604,13 @@ dmu_objset_rollback(const char *name)
 
 	err = dmu_objset_open(name, DMU_OST_ANY,
 	    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT, &os);
-	if (err == 0) {
-		err = zil_suspend(dmu_objset_zil(os));
-		if (err == 0)
-			zil_resume(dmu_objset_zil(os));
-		if (err == 0) {
-			/* XXX uncache everything? */
-			err = dsl_dataset_rollback(os->os->os_dsl_dataset);
-		}
-		dmu_objset_close(os);
-	}
+	if (err)
+		return (err);
+
+	/* XXX uncache everything? */
+	err = dsl_dataset_rollback(os->os->os_dsl_dataset);
+
+	dmu_objset_close(os);
 	return (err);
 }
 

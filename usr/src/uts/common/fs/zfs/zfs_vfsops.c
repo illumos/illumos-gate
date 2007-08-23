@@ -583,11 +583,20 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		xattr_changed_cb(zfsvfs, xattr);
 		zfsvfs->z_issnap = B_TRUE;
 	} else {
+		uint_t readonly;
+
 		error = zfs_register_callbacks(vfsp);
 		if (error)
 			goto out;
 
-		if (!(zfsvfs->z_vfs->vfs_flag & VFS_RDONLY))
+		/*
+		 * During replay we remove the read only flag to
+		 * allow replays to succeed.
+		 */
+		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
+		if (readonly != 0)
+			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
+		else
 			zfs_unlinked_drain(zfsvfs);
 
 		/*
@@ -617,6 +626,8 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		 */
 		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
 		    zfs_replay_vector);
+
+		zfsvfs->z_vfs->vfs_flag |= readonly; /* restore readonly bit */
 
 		if (!zil_disable)
 			zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);

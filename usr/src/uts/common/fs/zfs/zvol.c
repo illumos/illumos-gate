@@ -837,7 +837,6 @@ zvol_strategy(buf_t *bp)
 	/*
 	 * There must be no buffer changes when doing a dmu_sync() because
 	 * we can't change the data whilst calculating the checksum.
-	 * A better approach than a per zvol rwlock would be to lock ranges.
 	 */
 	reading = bp->b_flags & B_READ;
 	rl = zfs_range_lock(&zv->zv_znode, off, resid,

@@ -251,6 +251,7 @@ extern void	zil_close(zilog_t *zilog);
 extern void	zil_replay(objset_t *os, void *arg, uint64_t *txgp,
     zil_replay_func_t *replay_func[TX_MAX_TYPE]);
 extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
+extern void	zil_rollback_destroy(zilog_t *zilog, dmu_tx_t *tx);
 
 extern itx_t	*zil_itx_create(int txtype, size_t lrsize);
 extern uint64_t zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx);
