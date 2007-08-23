@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,28 +66,29 @@ usage(
 	if ((string != NULL) && (*string != '\0'))
 		md_eprintf("%s\n", string);
 	(void) fprintf(stderr, gettext(
-"usage:	%s -s setname -a [-A enable | disable] -h hostname ...\n"
-"	%s -s setname -a [-M] -h hostname ...\n"
-"	%s -s setname -a [-M] [-l length] [-L] drivename ...\n"
-"	%s -s setname -d [-M] -h hostname ...\n"
-"	%s -s setname -d [-M] -f -h all-hostnames\n"
-"	%s -s setname -d [-M] [-f] drivename ...\n"
-"	%s -s setname -d [-M] [-f] hostname ...\n"
-"	%s -s setname -A enable | disable\n"
-"	%s -s setname -t [-f]\n"
-"	%s -s setname -r\n"
-"	%s [-s setname] -j [-M]\n"
-"	%s [-s setname] -w [-M]\n"
-"	%s -s setname -P [-M]\n"
-"	%s -s setname -b [-M]\n"
-"	%s -s setname -o [-M] [-h hostname]\n"
-"	%s [-s setname]\n"
-"\n"
-"		hostname = contents of /etc/nodename\n"
-"		drivename = cNtNdN no slice\n"
-"		[-M] for multi-owner set is optional except on set creation\n"),
-	myname, myname, myname, myname, myname, myname, myname, myname,
-	myname, myname, myname, myname, myname, myname, myname, myname);
+	    "usage:\t%s -s setname -a [-A enable | disable] -h hostname ...\n"
+	    "	%s -s setname -a [-M] -h hostname ...\n"
+	    "	%s -s setname -a [-M] [-l length] [-L] drivename ...\n"
+	    "	%s -s setname -d [-M] -h hostname ...\n"
+	    "	%s -s setname -d [-M] -f -h all-hostnames\n"
+	    "	%s -s setname -d [-M] [-f] drivename ...\n"
+	    "	%s -s setname -d [-M] [-f] hostname ...\n"
+	    "	%s -s setname -A enable | disable\n"
+	    "	%s -s setname -t [-f]\n"
+	    "	%s -s setname -r\n"
+	    "	%s [-s setname] -j [-M]\n"
+	    "	%s [-s setname] -w [-M]\n"
+	    "	%s -s setname -P [-M]\n"
+	    "	%s -s setname -b [-M]\n"
+	    "	%s -s setname -o [-M] [-h hostname]\n"
+	    "	%s [-s setname]\n"
+	    "\n"
+	    "		hostname = contents of /etc/nodename\n"
+	    "		drivename = cNtNdN no slice\n"
+	    "		[-M] for multi-owner set is optional except"
+	    " on set creation\n"),
+	    myname, myname, myname, myname, myname, myname, myname, myname,
+	    myname, myname, myname, myname, myname, myname, myname, myname);
 	md_exit(sp, (string == NULL) ? 0 : 1);
 }
 
@@ -130,8 +131,8 @@ printset(mdsetname_t *sp, md_error_t *ep)
 		if ((sd->sd_mn_master_nodeid == MD_MN_INVALID_NID) &&
 		    (dd != NULL)) {
 			(void) printf(gettext(
-				"Master and owner information unavailable "
-				"until joined (metaset -j)\n"));
+			    "Master and owner information unavailable "
+			    "until joined (metaset -j)\n"));
 		}
 	} else {
 		(void) printf(gettext(
@@ -141,7 +142,7 @@ printset(mdsetname_t *sp, md_error_t *ep)
 
 	if (MD_MNSET_DESC(sd)) {
 		(void) printf(gettext("\n%-19.19s %-14.14s %-6.6s\n"),
-			gettext("Host"), gettext("Owner"), gettext("Member"));
+		    gettext("Host"), gettext("Owner"), gettext("Member"));
 		nd = sd->sd_nodelist;
 		while (nd) {
 			/*
@@ -173,9 +174,9 @@ printset(mdsetname_t *sp, md_error_t *ep)
 				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
 				    nd->nd_nodename, gettext("multi-owner"),
 				    gettext("Yes"));
-			} else /* Should never be able to happen */
-			    if ((!(nd->nd_flags & MD_MN_NODE_ALIVE)) &&
+			} else if ((!(nd->nd_flags & MD_MN_NODE_ALIVE)) &&
 			    (nd->nd_flags & MD_MN_NODE_OWN)) {
+				/* Should never be able to happen */
 				(void) printf(
 				    gettext("  %-17.17s  %-12.12s  %-4.4s\n"),
 				    nd->nd_nodename, gettext("multi-owner"),
@@ -197,7 +198,7 @@ printset(mdsetname_t *sp, md_error_t *ep)
 		}
 	} else {
 		(void) printf("\n%-19.19s %-5.5s\n",
-			gettext("Host"), gettext("Owner"));
+		    gettext("Host"), gettext("Owner"));
 		for (i = 0; i < MD_MAXSIDES; i++) {
 			/* Skip empty slots */
 			if (sd->sd_nodes[i][0] == '\0')
@@ -209,9 +210,9 @@ printset(mdsetname_t *sp, md_error_t *ep)
 			 */
 			(void) printf("  %-17.*s  %s\n", MD_MAX_NODENAME,
 			    sd->sd_nodes[i], (sd->sd_flags & MD_SR_AUTO_TAKE ?
-				(sd->sd_isown[i] ? gettext("Yes (auto)") :
-				    gettext("No (auto)"))
-				: (sd->sd_isown[i] ? gettext("Yes") : "")));
+			    (sd->sd_isown[i] ? gettext("Yes (auto)") :
+			    gettext("No (auto)"))
+			    : (sd->sd_isown[i] ? gettext("Yes") : "")));
 		}
 	}
 
@@ -230,7 +231,7 @@ printset(mdsetname_t *sp, md_error_t *ep)
 		 * display up to MD_MAX_NODENAME, def in meta_basic.h
 		 */
 		(void) printf("  %-17.*s   ", MD_MAX_NODENAME,
-			sd->sd_med.n_lst[i].a_nm[0]);
+		    sd->sd_med.n_lst[i].a_nm[0]);
 		for (j = 1; j < sd->sd_med.n_lst[i].a_cnt; j++) {
 			(void) printf("%s", sd->sd_med.n_lst[i].a_nm[j]);
 			if (sd->sd_med.n_lst[i].a_cnt - j > 1)
@@ -401,21 +402,19 @@ parse_printset(int argc, char **argv)
 static void
 parse_add(int argc, char **argv)
 {
-	int			c,
-				created_set,
-				hosts = FALSE,
-				meds = FALSE,
-				auto_take = FALSE,
-				force_label = FALSE,
-				default_size = TRUE;
+	int			c, created_set;
+	int			hosts = FALSE;
+	int			meds = FALSE;
+	int			auto_take = FALSE;
+	int			force_label = FALSE;
+	int			default_size = TRUE;
 	mdsetname_t		*sp = NULL;
 	char			*sname = MD_LOCAL_NAME;
-	md_error_t		status = mdnullerror,
-				*ep = &status;
+	md_error_t		status = mdnullerror;
+	md_error_t		 *ep = &status;
 	mddrivenamelist_t	*dnlp = NULL;
 	mddrivenamelist_t	*p;
-	daddr_t			dbsize,
-				nblks;
+	daddr_t			dbsize, nblks;
 	mdsetname_t		*local_sp = NULL;
 	int			multi_node = 0;
 	md_set_desc		*sd;
@@ -548,7 +547,7 @@ parse_add(int argc, char **argv)
 				 * determine its own set number.
 				 */
 				sdssc_rval = sdssc_mo_create_begin(sname, argc,
-					argv, SDSSC_PICK_SETNO);
+				    argv, SDSSC_PICK_SETNO);
 				if (sdssc_rval == SDSSC_NOT_BOUND_ERROR) {
 					mderror(ep, MDE_NOT_MN, NULL);
 					mde_perror(ep,
@@ -561,7 +560,7 @@ parse_add(int argc, char **argv)
 				}
 			} else {
 				sdssc_rval = sdssc_create_begin(sname, argc,
-					argv, SDSSC_PICK_SETNO);
+				    argv, SDSSC_PICK_SETNO);
 				if (sdssc_rval == SDSSC_ERROR) {
 					mde_perror(ep, "");
 					md_exit(local_sp, 1);
@@ -1070,18 +1069,18 @@ parse_del(int argc, char **argv)
 			md_exit(local_sp, 1);
 		}
 		if (sdssc_delete_hosts(sname, argc, argv) == SDSSC_ERROR) {
-		    if (!metad_isautotakebyname(sname)) {
-			/*
-			 * SC could have been installed after the set was
-			 * created.  We still want to be able to delete these
-			 * sets.
-			 */
-			md_perror(gettext(
-			    "Failed to delete hosts from DCS service"));
-			if (!multi_node)
-				(void) meta_unlock(sp, ep);
-			md_exit(local_sp, 1);
-		    }
+			if (!metad_isautotakebyname(sname)) {
+				/*
+				 * SC could have been installed after the set
+				 * was created. We still want to be able to
+				 * delete these sets.
+				 */
+				md_perror(gettext(
+				    "Failed to delete hosts from DCS service"));
+				if (!multi_node)
+					(void) meta_unlock(sp, ep);
+				md_exit(local_sp, 1);
+			}
 		}
 		if (meta_set_deletehosts(sp, argc, argv, forceflg, ep)) {
 			if (sdssc_add_hosts(sname, argc, argv) == SDSSC_ERROR) {
@@ -1589,21 +1588,21 @@ parse_takeset(int argc, char **argv)
 		 * its position in the comma separated list.
 		 */
 		switch (pos) {
-		    case 0:
-			mhiargs.mh_ff = c;
-			break;
+			case 0:
+				mhiargs.mh_ff = c;
+				break;
 
-		    case 1:
-			mhiargs.mh_tk.reinstate_resv_delay = c;
-			break;
+			case 1:
+				mhiargs.mh_tk.reinstate_resv_delay = c;
+				break;
 
-		    case 2:
-			mhiargs.mh_tk.min_ownership_delay = c;
-			break;
+			case 2:
+				mhiargs.mh_tk.min_ownership_delay = c;
+				break;
 
-		    case 3:
-			mhiargs.mh_tk.max_ownership_delay = c;
-			break;
+			case 3:
+				mhiargs.mh_tk.max_ownership_delay = c;
+				break;
 		}
 	}
 
@@ -2082,23 +2081,17 @@ parse_withdrawset(int argc, char **argv)
 	md_exit(local_sp, 0);
 }
 
-/*
- * Should never be called with sname of a Multinode diskset.
- */
 static void
-parse_cluster(int argc, char **argv)
+parse_cluster(int argc, char **argv, int multi_node)
 {
-	int			c,
-				error,
-				new_argc,
-				x;
+	int			c, error, new_argc, x;
 	enum cluster_cmd	cmd = ccnotspecified;
-	char			*hostname = SDSSC_PROXY_PRIMARY,
-				*argument = NULL,
-				*sname = MD_LOCAL_NAME,
-				primary_node[SDSSC_NODE_NAME_LEN],
-				**new_argv = NULL,
-				**np = NULL;
+	char			*hostname = SDSSC_PROXY_PRIMARY;
+	char			*argument = NULL;
+	char			*sname = MD_LOCAL_NAME;
+	char			primary_node[SDSSC_NODE_NAME_LEN];
+	char			**new_argv = NULL;
+	char			**np = NULL;
 	mdsetname_t		*sp = NULL;
 	md_error_t		status = mdnullerror;
 	md_error_t		*ep = &status;
@@ -2155,25 +2148,37 @@ parse_cluster(int argc, char **argv)
 	/* Now call the appropriate command function. */
 	switch (cmd) {
 	case clusterversion:
-	    printclusterversion();
-	    break;
+		printclusterversion();
+		break;
 
 	case clusterdisksin:
-	    if (printdisksin(sname, ep)) {
-		md_exit(sp, -1);
-	    }
-	    break;
+		if (printdisksin(sname, ep)) {
+			md_exit(sp, -1);
+		}
+		break;
 
 	case clusterrelease:
-	    parse_releaseset(argc, argv);
-	    break;
+		if (multi_node) {
+			usage(sp, gettext(
+			    "-C release is not allowed on multi-owner"
+			    " disksets"));
+		}
+		parse_releaseset(argc, argv);
+		break;
 
 	case clustertake:
-	    parse_takeset(argc, argv);
-	    break;
+		if (multi_node) {
+			usage(sp, gettext(
+			    "-C take is not allowed on multi-owner disksets"));
+		}
+		parse_takeset(argc, argv);
+		break;
 
 	case clusterproxy:
-		/* Should never get here if sname is for MN diskset */
+		if (multi_node) {
+			usage(sp, gettext(
+			    "-C proxy is not allowed on multi-owner disksets"));
+		}
 
 		if ((new_argv = calloc(argc, sizeof (char *))) == NULL) {
 			printf(gettext("Out of memory\n"));
@@ -2229,7 +2234,7 @@ parse_cluster(int argc, char **argv)
 		break;
 
 	default:
-	    break;
+		break;
 	}
 
 	md_exit(sp, 0);
@@ -2245,14 +2250,12 @@ main(int argc, char *argv[])
 	md_error_t		status = mdnullerror;
 	md_error_t		*ep = &status;
 	mdsetname_t		*sp = NULL;
-	char			*hostname = SDSSC_PROXY_PRIMARY,
-				*sname = MD_LOCAL_NAME,
-				*auto_take_option = NULL,
-				primary_node[SDSSC_NODE_NAME_LEN];
-	int			error,
-				c,
-				auto_take = FALSE,
-				stat;
+	char			*hostname = SDSSC_PROXY_PRIMARY;
+	char			*sname = MD_LOCAL_NAME;
+	char			*auto_take_option = NULL;
+	char			primary_node[SDSSC_NODE_NAME_LEN];
+	int			error, c, stat;
+	int			auto_take = FALSE;
 	md_set_desc		*sd;
 	int			mflag = 0;
 	int			multi_node = 0;
@@ -2415,9 +2418,9 @@ main(int argc, char *argv[])
 	/* check if suncluster is installed and -A enable specified */
 	if (auto_take && sdssc_res != SDSSC_NOT_BOUND &&
 	    strcmp(auto_take_option, "enable") == 0) {
-	    md_eprintf(gettext(
-		"cannot enable auto-take when SunCluster is installed\n"));
-	    md_exit(sp, 1);
+		md_eprintf(gettext(
+		    "cannot enable auto-take when SunCluster is installed\n"));
+		md_exit(sp, 1);
 	}
 
 	/*
@@ -2529,7 +2532,7 @@ main(int argc, char *argv[])
 		 */
 		if (sdssc_cmd_proxy(argc, argv,
 		    primary_node[0] == '\0' ?
-			SDSSC_PROXY_PRIMARY : primary_node,
+		    SDSSC_PROXY_PRIMARY : primary_node,
 		    &error) == SDSSC_PROXY_DONE) {
 			exit(error);
 		}
@@ -2537,17 +2540,8 @@ main(int argc, char *argv[])
 
 	/* cluster-specific commands */
 	if (cmd == cluster) {
-		if (multi_node) {
-			/*
-			 * If a specific MN diskset is given, immediately
-			 * fail -C command.
-			 */
-			usage(sp, gettext(
-			    "-C option not allowed on multi-owner diskset"));
-		} else {
-			parse_cluster(argc, argv);
-			/*NOTREACHED*/
-		}
+		parse_cluster(argc, argv, multi_node);
+		/*NOTREACHED*/
 	}
 
 	/* join MultiNode diskset */

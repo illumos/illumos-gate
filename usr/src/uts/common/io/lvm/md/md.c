@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,7 +256,7 @@ static struct dev_ops md_devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* type of module -- a pseudodriver */
-	"Solaris Volume Manager base module %I%", /* name of the module */
+	"Solaris Volume Manager base module", /* name of the module */
 	&md_devops,			/* driver ops */
 };
 

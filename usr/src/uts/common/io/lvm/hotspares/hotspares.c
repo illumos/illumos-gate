@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1808,4 +1808,4 @@ fini_uninit()
 }
 
 /* define the module linkage */
-MD_PLUGIN_MISC_MODULE("hot spares module %I%", md_noop, fini_uninit())
+MD_PLUGIN_MISC_MODULE("hot spares module", md_noop, fini_uninit())

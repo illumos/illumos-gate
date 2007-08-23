@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1841,4 +1841,4 @@ fini_uninit()
 }
 
 /* define the module linkage */
-MD_PLUGIN_MISC_MODULE("soft partition module %I%", init_init(), fini_uninit())
+MD_PLUGIN_MISC_MODULE("soft partition module", init_init(), fini_uninit())

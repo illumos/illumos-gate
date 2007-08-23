@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -803,7 +803,7 @@ meta_getnextside_devinfo(
 	 * a block device ie /dev/dsk.
 	 */
 	(void) snprintf(devidstr, devidstrlen,
-		"%s/%s", dnp->devid, np->minor_name);
+	    "%s/%s", dnp->devid, np->minor_name);
 
 	ret = clnt_devinfo_by_devid(nodename, sp, devidstr, &retdev,
 	    np->bname, &ret_devname, &ret_driver, ep);
@@ -1137,7 +1137,7 @@ out:
 				continue;
 			}
 			if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_RESUME,
-				sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
+			    sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
 				/*
 				 * We are here because we failed to resume
 				 * rpc.mdcommd.  However we potentially have
@@ -1359,9 +1359,9 @@ meta_set_destroy(
 			dnp = p->dd_dnp;
 			if ((meta_replicaslice(dnp, &rep_slice, ep) != 0) ||
 			    (((np = metaslicename(dnp, rep_slice, ep))
-				== NULL) &&
-				((np = metaslicename(dnp, MD_SLICE0, ep))
-				    == NULL))) {
+			    == NULL) &&
+			    ((np = metaslicename(dnp, MD_SLICE0, ep))
+			    == NULL))) {
 				rval = -1;
 				goto out;
 			}
@@ -1543,12 +1543,20 @@ meta_set_purge(
 		 */
 		nd = sd->sd_nodelist;
 		while (nd) {
-			if (!(nd->nd_flags & MD_MN_NODE_ALIVE)) {
+			/*
+			 * Only deal with those nodes that are members of
+			 * the set (MD_MN_NODE_ALIVE) or the node on which
+			 * the purge is being run. We must lock the set
+			 * on the purging node because the delset call
+			 * requires the lock to be set.
+			 */
+			if (!(nd->nd_flags & MD_MN_NODE_ALIVE) &&
+			    nd->nd_nodeid != sd->sd_mn_mynode->nd_nodeid) {
 				nd = nd->nd_next;
 				continue;
 			}
 			has_set = nodehasset(sp, nd->nd_nodename,
-				NHS_NST_EQ, ep);
+			    NHS_NST_EQ, ep);
 
 			/*
 			 * The host is not aware of this set (has_set < 0) or
@@ -1600,7 +1608,7 @@ meta_set_purge(
 				continue;
 
 			has_set = nodehasset(sp, sd->sd_nodes[i],
-				NHS_NST_EQ, ep);
+			    NHS_NST_EQ, ep);
 
 			/*
 			 * The host is not aware of this set (has_set < 0) or
@@ -1663,43 +1671,52 @@ meta_set_purge(
 	}
 
 	if (MD_MNSET_DESC(sd)) {
-		/*
-		 * Get a count of the hosts in the set and also lock the set
-		 * on those hosts that know about it.
-		 */
 		nd = sd->sd_nodelist;
 		while (nd) {
-			if (!(nd->nd_flags & MD_MN_NODE_ALIVE)) {
-				nd = nd->nd_next;
-				continue;
-			}
-			if (nd->nd_nodeid != sd->sd_mn_mynode->nd_nodeid) {
+			if (nd->nd_nodeid == sd->sd_mn_mynode->nd_nodeid) {
 				/*
-				 * Tell the remote node to remove this node
+				 * This is the node on which the purge is
+				 * being run. We do not care if it is
+				 * alive or not, just want to get rid of
+				 * the set.
 				 */
-				if (clnt_delhosts(nd->nd_nodename, sp, 1,
-					&thishost, ep) == -1) {
-					/*
-					 * If we fail to delete ourselves
-					 * from the remote host it does not
-					 * really matter because the set is
-					 * being "purged" from this node. The
-					 * set can be purged from the other
-					 * node at a later time.
-					 */
+				if (clnt_delset(nd->nd_nodename, sp,
+				    ep) == -1) {
+					md_perror(dgettext(TEXT_DOMAIN,
+					    "delset"));
+					if (!bypass_cluster && num_hosts == 1)
+						(void) sdssc_delete_end(
+						    sp->setname, SDSSC_CLEANUP);
 					mdclrerror(ep);
+					goto out1;
 				}
 				nd = nd->nd_next;
 				continue;
 			}
-			/* remove the set from this host */
-			if (clnt_delset(nd->nd_nodename, sp, ep) == -1) {
-				md_perror(dgettext(TEXT_DOMAIN, "delset"));
-				if (!bypass_cluster && num_hosts == 1)
-					(void) sdssc_delete_end(sp->setname,
-					    SDSSC_CLEANUP);
+
+			/*
+			 * Only contact those nodes that are members of
+			 * the set.
+			 */
+			if (!(nd->nd_flags & MD_MN_NODE_ALIVE)) {
+				nd = nd->nd_next;
+				continue;
+			}
+
+			/*
+			 * Tell the remote node to remove this node
+			 */
+			if (clnt_delhosts(nd->nd_nodename, sp, 1, &thishost,
+			    ep) == -1) {
+				/*
+				 * If we fail to delete ourselves
+				 * from the remote host it does not
+				 * really matter because the set is
+				 * being "purged" from this node. The
+				 * set can be purged from the other
+				 * node at a later time.
+				 */
 				mdclrerror(ep);
-				goto out1;
 			}
 			nd = nd->nd_next;
 		}
@@ -2297,8 +2314,7 @@ meta_set_join(
 	/* Verify that the node is ALIVE (i.e. is in the API membership list) */
 	if (!(sd->sd_mn_mynode->nd_flags & MD_MN_NODE_ALIVE)) {
 		(void) mddserror(ep, MDE_DS_NOTINMEMBERLIST, sp->setno,
-			sd->sd_mn_mynode->nd_nodename, NULL,
-			sp->setname);
+		    sd->sd_mn_mynode->nd_nodename, NULL, sp->setname);
 		return (-1);
 	}
 
@@ -2335,7 +2351,7 @@ meta_set_join(
 			continue;
 		}
 		if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_SUSPEND,
-			    sp, MD_MSG_CLASS1, MD_MSCF_NO_FLAGS, ep)) {
+		    sp, MD_MSG_CLASS1, MD_MSCF_NO_FLAGS, ep)) {
 			rval = -1;
 			goto out;
 		}
@@ -2355,8 +2371,8 @@ meta_set_join(
 	}
 	if (!nd) {
 		(void) mddserror(ep, MDE_DS_NODENOTINSET, sp->setno,
-			sd->sd_mn_mynode->nd_nodename, NULL,
-			sp->setname);
+		    sd->sd_mn_mynode->nd_nodename, NULL,
+		    sp->setname);
 		rval = -1;
 		goto out;
 	}
@@ -2464,11 +2480,11 @@ meta_set_join(
 		sd->sd_mn_master_nodeid = mas_mnsr->sr_master_nodeid;
 		nd2 = sd->sd_nodelist;
 		while (nd2) {
-		    if (nd2->nd_nodeid == mas_mnsr->sr_master_nodeid) {
-			sd->sd_mn_masternode = nd2;
-			break;
-		    }
-		    nd2 = nd2->nd_next;
+			if (nd2->nd_nodeid == mas_mnsr->sr_master_nodeid) {
+				sd->sd_mn_masternode = nd2;
+				break;
+			}
+			nd2 = nd2->nd_next;
 		}
 		free_sr((md_set_record *)mas_mnsr);
 
@@ -2595,7 +2611,7 @@ meta_set_join(
 		if (mdisok(ep)) {
 			/* If snarf failed, but no error was set - set it */
 			(void) mdmddberror(ep, MDE_DB_NOTNOW, (minor_t)NODEV64,
-				sp->setno, 0, NULL);
+			    sp->setno, 0, NULL);
 		}
 		mde_perror(ep, dgettext(TEXT_DOMAIN,
 		    "Host not able to start diskset."));
@@ -2625,7 +2641,7 @@ meta_set_join(
 		 * situation.
 		 */
 		if (meta_mn_singlenode() &&
-			mdmn_reset_changelog(sp, ep,  MDMN_CLF_RESETLOG) != 0) {
+		    mdmn_reset_changelog(sp, ep,  MDMN_CLF_RESETLOG) != 0) {
 			mde_perror(ep, dgettext(TEXT_DOMAIN,
 			    "Unable to reset changelog."));
 			rval = -1;
@@ -2679,7 +2695,7 @@ out:
 		 * will set master on all nodes.
 		 */
 		(void) clnt_mnsetmaster(mynode(), sp, "",
-			MD_MN_INVALID_NID, &xep);
+		    MD_MN_INVALID_NID, &xep);
 		mdclrerror(&xep);
 		/* Reset master in my locally cached set descriptor */
 		sd->sd_mn_master_nodeid = MD_MN_INVALID_NID;
@@ -2696,7 +2712,7 @@ out:
 					continue;
 				}
 				(void) clnt_upd_nr_flags(nd->nd_nodename, sp,
-					&my_nd, MD_NR_WITHDRAW, NULL, &xep);
+				    &my_nd, MD_NR_WITHDRAW, NULL, &xep);
 				mdclrerror(&xep);
 				nd = nd->nd_next;
 			}
@@ -2721,7 +2737,7 @@ out:
 
 			/* Class is ignored for REINIT */
 			if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_REINIT,
-				sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
+			    sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
 				/*
 				 * We are here because we failed to resume
 				 * rpc.mdcommd.  However we potentially have
@@ -2760,7 +2776,7 @@ out2:
 				continue;
 			}
 			if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_RESUME,
-				sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
+			    sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
 				/*
 				 * We are here because we failed to resume
 				 * rpc.mdcommd.  However we potentially have
@@ -2956,7 +2972,7 @@ meta_set_withdraw(
 			continue;
 		}
 		if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_SUSPEND,
-			sp, MD_MSG_CLASS1, MD_MSCF_NO_FLAGS, ep)) {
+		    sp, MD_MSG_CLASS1, MD_MSCF_NO_FLAGS, ep)) {
 			rval = -1;
 			goto out;
 		}
@@ -2989,8 +3005,8 @@ meta_set_withdraw(
 	}
 	if (!nd) {
 		(void) mddserror(ep, MDE_DS_NODENOTINSET, sp->setno,
-			sd->sd_mn_mynode->nd_nodename, NULL,
-			sp->setname);
+		    sd->sd_mn_mynode->nd_nodename, NULL,
+		    sp->setname);
 		rval = -1;
 		goto out2;
 	}
@@ -3034,9 +3050,9 @@ meta_set_withdraw(
 			/* If another owner node if found, error */
 			if (nd->nd_flags & MD_MN_NODE_OWN) {
 				(void) mddserror(ep, MDE_DS_WITHDRAWMASTER,
-					sp->setno,
-					sd->sd_mn_mynode->nd_nodename, NULL,
-					sp->setname);
+				    sp->setno,
+				    sd->sd_mn_mynode->nd_nodename, NULL,
+				    sp->setname);
 				rval = -1;
 				goto out2;
 			}
@@ -3211,7 +3227,7 @@ out:
 
 			/* Class is ignored for REINIT */
 			if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_REINIT,
-				sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
+			    sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
 				/*
 				 * We are here because we failed to resume
 				 * rpc.mdcommd.  However we potentially have
@@ -3249,7 +3265,7 @@ out2:
 				continue;
 			}
 			if (clnt_mdcommdctl(nd->nd_nodename, COMMDCTL_RESUME,
-				sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
+			    sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
 				/*
 				 * We are here because we failed to resume
 				 * rpc.mdcommd.  However we potentially have
@@ -4272,8 +4288,8 @@ meta_reconfig_choose_master(
 				}
 				/* Can't get set information */
 				mde_perror(ep, dgettext(TEXT_DOMAIN,
-					"Unable to get information for "
-					"set number %d"), setno);
+				    "Unable to get information for "
+				    "set number %d"), setno);
 				mdclrerror(ep);
 				continue;
 			}
@@ -4290,8 +4306,8 @@ meta_reconfig_choose_master(
 				return (1);
 			}
 			mde_perror(ep, dgettext(TEXT_DOMAIN,
-				"Unable to get set %s desc information"),
-				sp->setname);
+			    "Unable to get set %s desc information"),
+			    sp->setname);
 			mdclrerror(ep);
 			continue;
 		}
@@ -4640,7 +4656,7 @@ meta_mnsync_user_records(
 			mnsr_node = Zalloc(sizeof (*mnsr_node));
 			mnsr_node->mmn_mnsr = mnsr;
 			(void) strncpy(mnsr_node->mmn_nodename,
-				nd->nd_nodename, MD_MAX_MNNODENAME_PLUS_1);
+			    nd->nd_nodename, MD_MAX_MNNODENAME_PLUS_1);
 			mnsr_node->mmn_next = master_mnsr_node;
 			master_mnsr_node = mnsr_node;
 		} else {
@@ -5104,27 +5120,28 @@ meta_mnsync_user_records(
 			mnsr_node = master_mnsr_node;
 			while (mnsr_node) {
 				if (mnsr_node->mmn_dd == NULL) {
-				    if (clnt_getdrivedesc(
-					mnsr_node->mmn_nodename, sp,
-					&other_dd, ep)) {
-					    /* RPC failure to !my node */
-					    if ((mdanyrpcerror(ep)) &&
-						(strcmp(mynode(),
-						mnsr_node->mmn_nodename)
-						!= 0)) {
-						    rval = 205;
-					    } else {
-						    /* Any other failure */
-						    rval = -1;
-					    }
-					    mde_perror(ep, dgettext(TEXT_DOMAIN,
-						"Master node %s unable "
-						"to retrieve drive list from "
-						"node %s"), mynode(),
-						mnsr_node->mmn_nodename);
-					    goto out;
-				    }
-				    mnsr_node->mmn_dd = other_dd;
+					if (clnt_getdrivedesc(
+					    mnsr_node->mmn_nodename, sp,
+					    &other_dd, ep)) {
+						/* RPC failure to !my node */
+						if ((mdanyrpcerror(ep)) &&
+						    (strcmp(mynode(),
+						    mnsr_node->mmn_nodename)
+						    != 0)) {
+							rval = 205;
+						} else {
+							/* Any other failure */
+							rval = -1;
+						}
+						mde_perror(ep,
+						    dgettext(TEXT_DOMAIN,
+						    "Master node %s unable "
+						    "to retrieve drive list "
+						    "from node %s"), mynode(),
+						    mnsr_node->mmn_nodename);
+						goto out;
+					}
+					mnsr_node->mmn_dd = other_dd;
 				}
 				other_dd = mnsr_node->mmn_dd;
 				while (other_dd) {
@@ -5135,7 +5152,7 @@ meta_mnsync_user_records(
 						/* Drive marked OK */
 						if (other_dd->dd_flags &
 						    MD_DR_OK) {
-						    dd->dd_flags = MD_DR_OK;
+							dd->dd_flags = MD_DR_OK;
 						}
 						break;
 					}
@@ -5599,7 +5616,7 @@ meta_mnsync_diskset_mddbs(
 					continue;
 				}
 				(void) (clnt_mn_susp_res_io(nd2->nd_nodename,
-					sp->setno, MN_RES_IO, &xep));
+				    sp->setno, MN_RES_IO, &xep));
 				nd2 = nd2->nd_next;
 			}
 
@@ -5675,7 +5692,7 @@ meta_mnsync_diskset_mddbs(
 					continue;
 				}
 				(void) (clnt_mn_susp_res_io(nd2->nd_nodename,
-					sp->setno, MN_RES_IO, &xep));
+				    sp->setno, MN_RES_IO, &xep));
 				if (mdanyrpcerror(&xep)) {
 					return (-1);
 				}
@@ -5712,15 +5729,15 @@ meta_mnsync_diskset_mddbs(
 		    MSGID_ELEMS(lr->lr_msg.msg_msgid));
 
 		ret = mdmn_send_message_with_msgid(
-			lr->lr_msg.msg_setno,
-			lr->lr_msg.msg_type,
-			lr->lr_msg.msg_flags |  MD_MSGF_REPLAY_MSG |
-						MD_MSGF_OVERRIDE_SUSPEND,
-			lr->lr_msg.msg_event_data,
-			lr->lr_msg.msg_event_size,
-			&resultp,
-			&lr->lr_msg.msg_msgid,
-			&xep);
+		    lr->lr_msg.msg_setno,
+		    lr->lr_msg.msg_type,
+		    lr->lr_msg.msg_flags | MD_MSGF_REPLAY_MSG |
+		    MD_MSGF_OVERRIDE_SUSPEND,
+		    lr->lr_msg.msg_event_data,
+		    lr->lr_msg.msg_event_size,
+		    &resultp,
+		    &lr->lr_msg.msg_msgid,
+		    &xep);
 
 		meta_mc_log(MC_LOG1, dgettext(TEXT_DOMAIN,
 		    "mdmn_send_message returned %d\n"), ret);
