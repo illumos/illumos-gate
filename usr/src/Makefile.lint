@@ -139,6 +139,7 @@ COMMON_SUBDIRS = \
 	cmd/fs.d/zfs/fstyp \
 	cmd/fuser \
 	cmd/gcore \
+	cmd/genmsg \
 	cmd/getconf \
 	cmd/getdevpolicy \
 	cmd/getfacl \

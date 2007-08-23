@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,24 +18,31 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright (c) 1995 by Sun Microsystems, Inc.
  */
- 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <libintl.h>
+#include <limits.h>	
 #include "genmsg.h"
 extern int is_cat_found;		/* from main.c */
 extern int lineno;			/* genmsg.l */
 extern int msg_line;			/* genmsg.l */
 extern int end_of_cat;			/* from genmsg.l */
 extern void set_linemsgid(int, int);	/* from genmsg.l */
-extern void add_msg(int, int, char *, char*, int, int);	/* from util.c */
+extern void add_msg(int, int, char *, char *, int, int); /* from util.c */
+extern void set_msgid(int, int);
+extern int get_msgid(char *, int, int, char *);
+extern void warning(char *);
+extern void yyerror(char *);
 
-static void do_catgets(int, int, char*);
-static char *add_qstring(char *, char*);
+static void do_catgets(int, int, char *);
+static char *add_qstring(char *, char *);
 %}
 
 %union {
@@ -53,7 +59,7 @@ static char *add_qstring(char *, char*);
 %token <str> QSTR
 
 %type <id> cast_setid, setid, cast_msgid, msgid, cast_digit, digit
-%type <str> catd, arg_list, arg_def, arg_func, arg_exp, str, 
+%type <str> catd, arg_list, arg_def, arg_func, arg_exp, str,
 	cast_qstr, paren_qstr, qstr_list
 
 %left '-' '+'
@@ -66,7 +72,7 @@ genmsg_list:	/* empty */
 		{
 			if (!IsActiveMode(ReplaceMode)) {
 				src_err(srcfile, (lineno - 1),
-					gettext("catgets not found"));
+				    gettext("catgets not found"));
 			}
 		}
 	|	genmsg			{ is_cat_found = TRUE; }
@@ -76,8 +82,8 @@ genmsg:		catgets			{ end_of_cat = TRUE; }
 	|	genmsg catgets		{ end_of_cat = TRUE; }
 	;
 
-catgets:       CATGETS '(' catd ',' cast_setid ',' cast_msgid ',' cast_qstr ')'
-		{ 
+catgets:	CATGETS '(' catd ',' cast_setid ',' cast_msgid ',' cast_qstr ')'
+		{
 			do_catgets($5, $7, $9); free($9);
 		}
 	|	error
@@ -90,7 +96,7 @@ catd:		'(' CATD ')' arg_list		{ $$ = $4; }
 
 arg_list:	arg_def
 	|	arg_list '-' '>' arg_def
-	|	'(' arg_list '-' '>' arg_def ')'{ $$ = $2; }
+	|	'(' arg_list '-' '>' arg_def ')' { $$ = $2; }
 	;
 
 arg_def:	arg_func
@@ -124,14 +130,14 @@ setid:		setid '+' setid		{ $$ = $1 + $3; }
 	|	setid '-' setid		{ $$ = $1 - $3; }
 	|	setid '*' setid		{ $$ = $1 * $3; }
 	|	setid '/' setid
-		{ 
+		{
 			if ($3 == 0) {
 				yyerror(gettext("zero divide"));
 			} else {
-				$$ = $1 / $3; 
+				$$ = $1 / $3;
 			}
 		}
-	|	'-' setid %prec UMINUS	{ $$ = -$2; }		
+	|	'-' setid %prec UMINUS	{ $$ = -$2; }
 	|	'(' setid ')'		{ $$ = $2; }
 	|	SETID
 	;
@@ -144,15 +150,15 @@ cast_msgid:	'(' INT ')' msgid	{ $$ = $4; }
 msgid:		msgid '+' msgid		{ $$ = $1 + $3; }
 	|	msgid '-' msgid		{ $$ = $1 - $3; }
 	|	msgid '*' msgid		{ $$ = $1 * $3; }
-	|	msgid '/' msgid		
-		{ 
+	|	msgid '/' msgid
+		{
 			if ($3 == 0) {
 				yyerror(gettext("zero devide"));
 			} else {
-				$$ = $1 / $3; 
+				$$ = $1 / $3;
 			}
 		}
-	|	'-' msgid %prec UMINUS	{ $$ = -$2; }		
+	|	'-' msgid %prec UMINUS	{ $$ = -$2; }
 	|	'(' msgid ')'		{ $$ = $2; }
 	|	MSGID
 	;
@@ -166,14 +172,14 @@ digit:		digit '+' digit		{ $$ = $1 + $3; }
 	|	digit '-' digit		{ $$ = $1 - $3; }
 	|	digit '*' digit		{ $$ = $1 * $3; }
 	|	digit '/' digit
-		{ 
+		{
 			if ($3 == 0) {
 				yyerror(gettext("zero divide"));
 			} else {
-				$$ = $1 / $3; 
+				$$ = $1 / $3;
 			}
 		}
-	|	'-' digit %prec UMINUS	{ $$ = -$2; }		
+	|	'-' digit %prec UMINUS	{ $$ = -$2; }
 	|	'(' digit ')'		{ $$ = $2; }
 	|	DIGIT
 	;
@@ -201,8 +207,8 @@ do_catgets(int setid, int msgid, char *str)
 		return;
 	}
 	if (setid == 0 || setid > NL_SETMAX) {
-		src_err(srcfile, lineno, 
-			gettext("improper set number: %d"), setid);
+		src_err(srcfile, lineno,
+		    gettext("improper set number: %d"), setid);
 		return;
 	}
 	if (IsActiveMode(ProjectMode)) {
@@ -214,7 +220,7 @@ do_catgets(int setid, int msgid, char *str)
 		if (id == NOMSGID) {
 			id = get_msgid(srcfile, msg_line, setid, str);
 			set_linemsgid(msg_line, id);
-		} 
+		}
 		if (id != NOMSGID) {
 			set_msgid(setid, id);
 			add_msg(setid, id, str, srcfile, lineno, FALSE);
@@ -229,16 +235,15 @@ do_catgets(int setid, int msgid, char *str)
 static char *
 add_qstring(char *str, char *add)
 {
-	int len1 = strlen(str);
-	int len2 = strlen(add);
+	int len = strlen(str) + strlen(add) + 3;
 	/* 3 includes '\', '\n' and '\0' */
-	char *tmp = malloc(len1 + len2 + 3);
-	if (!tmp) {
+	char *tmp = malloc(len);
+	if (tmp == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
-	sprintf(tmp, "%s\\\n%s", str, add);
+	(void) snprintf(tmp, len, "%s\\\n%s", str, add);
 	free(str);
 	free(add);
-	return tmp;
+	return (tmp);
 }

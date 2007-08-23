@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1995 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +55,8 @@ extern int is_writable(char *);		/* from util.c */
 extern int file_copy(char *, char *);	/* from util.c */
 extern void init_lex(void);		/* from genmsg.l */
 extern void init_linemsgid(void);	/* from genmsg.l */
+extern FILE *yyin;			/* from lex */
+extern int yyparse(void);		/* from genmsg.l */
 
 /* Program name. */
 char *program;
@@ -95,23 +96,22 @@ int
 main(int argc, char **argv)
 {
 	int c;
-	extern char *optarg;	/* from getopt */
-	extern int optind;	/* from getopt */
-	extern FILE *yyin;	/* from lex */
-	extern int yyparse(void);
 	char *msgfile = NULL;
 	char *projfile = NULL;
 	char *newprojfile = NULL;
 	char *cpppath = NULL;
 	int do_msgfile = FALSE;
 	int tmpfd = -1;
+	char	*cmd, *tmp;
+	char	tmpfile[32];
+	size_t	len;
 
 	program = basename(argv[0]);
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "arndfg:o:l:p:c:s:m:M:txvb")) != EOF) {
+	while ((c = getopt(argc, argv, "arndfg:o:l:p:c:s:m:M:txb")) != EOF) {
 		switch (c) {
 		case 'o':
 			SetActiveMode(MessageMode);
@@ -171,10 +171,6 @@ main(int argc, char **argv)
 			suppress_error = TRUE;
 			SetActiveMode(NoErrorMode);
 			break;
-		case 'v':
-			(void) printf("genmsg version %s\n", "%I%");
-			exit(EXIT_SUCCESS);
-			break;
 		default:
 			usage();
 			break;
@@ -188,43 +184,40 @@ main(int argc, char **argv)
 	validate_options();
 
 	if (IsActiveMode(AutoNumMode)) {
-		int len;
-		char *tmp;
 		if (read_projfile(projfile)) {
 			tmp = basename(projfile);
-			len = strlen(tmp);
-			if ((newprojfile = malloc(len + sizeof (NEW_SUFFIX)))
-				== NULL) {
+			len = strlen(tmp) + sizeof (NEW_SUFFIX);
+			if ((newprojfile = malloc(len)) == NULL) {
 				prg_err(gettext("fatal: out of memory"));
 				exit(EXIT_FAILURE);
 			}
-			(void) sprintf(newprojfile, "%s%s", tmp, NEW_SUFFIX);
+			(void) snprintf(newprojfile, len, "%s%s",
+			    tmp, NEW_SUFFIX);
 		} else {
 			newprojfile = basename(projfile);
 		}
 	}
 
 	if ((IsActiveMode(AutoNumMode) || IsActiveMode(ProjectMode)) &&
-		(is_writable(IsActiveMode(OverwriteMode) ?
-				projfile : newprojfile) == FALSE)) {
+	    (is_writable(IsActiveMode(OverwriteMode) ?
+	    projfile : newprojfile) == FALSE)) {
 		prg_err(gettext("cannot write \"%s\": permission denied"),
-			IsActiveMode(OverwriteMode) ? projfile : newprojfile);
+		    IsActiveMode(OverwriteMode) ? projfile : newprojfile);
 		exit(EXIT_FAILURE);
 	}
 
-	if (IsActiveMode(AppendMode) && msgfile) {
+	if (IsActiveMode(AppendMode) && msgfile != NULL) {
 		read_msgfile(msgfile);
 	}
 
-	if (!msgfile) {
-		char *tmp = basename(argv[optind]);
-		int len = strlen(tmp);
-		if ((msgfile = malloc(len + sizeof (MSG_SUFFIX)))
-			== NULL) {
+	if (msgfile == NULL) {
+		tmp = basename(argv[optind]);
+		len = strlen(tmp) + sizeof (MSG_SUFFIX);
+		if ((msgfile = malloc(len)) == NULL) {
 			prg_err(gettext("fatal: out of memory"));
 			exit(EXIT_FAILURE);
 		}
-		(void) sprintf(msgfile, "%s%s", tmp, MSG_SUFFIX);
+		(void) snprintf(msgfile, len, "%s%s", tmp, MSG_SUFFIX);
 	}
 
 	while (optind < argc) {
@@ -236,29 +229,34 @@ main(int argc, char **argv)
 		}
 
 		if (IsActiveMode(PreProcessMode)) {
-			char cmd[MAXPATHLEN];
-			(void) sprintf(cmd, "%s %s", cpppath, srcfile);
-			if ((yyin = (FILE *) popen(cmd, "r")) == NULL) {
-				prg_err(
-				gettext("fatal: cannot execute \"%s\""),
-				cpppath);
+			len = strlen(cpppath) + 1 + strlen(srcfile) + 1;
+			if ((cmd = malloc(len)) == NULL) {
+				prg_err(gettext("fatal: out of memory"));
 				exit(EXIT_FAILURE);
 			}
+			(void) snprintf(cmd, len, "%s %s", cpppath, srcfile);
+			if ((yyin = popen(cmd, "r")) == NULL) {
+				prg_err(
+				    gettext("fatal: cannot execute \"%s\""),
+				    cpppath);
+				exit(EXIT_FAILURE);
+			}
+			free(cmd);
 		} else {
 			if ((yyin = fopen(srcfile, "r")) == NULL) {
-				prg_err(/* stupid cstyle */
-				gettext("cannot open \"%s\""), srcfile);
+				prg_err(
+				    gettext("cannot open \"%s\""), srcfile);
 				goto end;
 			}
 		}
 
 		init_lex();
-		yyparse();
+		(void) yyparse();
 
 		if (IsActiveMode(PreProcessMode)) {
 			if (pclose(yyin) != 0) {
 				prg_err(gettext("\"%s\" failed for \"%s\""),
-					cpppath, srcfile);
+				    cpppath, srcfile);
 				goto end;
 			}
 		}
@@ -270,53 +268,61 @@ main(int argc, char **argv)
 			goto end;
 		}
 
-		if (!do_msgfile) {
+		if (do_msgfile == FALSE) {
 			do_msgfile = TRUE;
 		}
 
 		if (IsActiveMode(AutoNumMode) || IsActiveMode(ReverseMode)) {
-			char *tmp = basename(srcfile);
-			char newfile[MAXPATHLEN];
-			char tmpfile[32];
+			char	*newfile;
+
+			tmp = basename(srcfile);
 
 			if (IsActiveMode(OverwriteMode)) {
-				(void) sprintf(newfile, "%s", srcfile);
+				newfile = srcfile;
 			} else {
-				(void) sprintf(newfile, "%s%s",
-						tmp, NEW_SUFFIX);
+				len = strlen(tmp) + sizeof (NEW_SUFFIX);
+				if ((newfile = malloc(len)) == NULL) {
+					prg_err(
+					    gettext("fatal: out of memory"));
+					exit(EXIT_FAILURE);
+				}
+				(void) snprintf(newfile, len, "%s%s",
+				    tmp, NEW_SUFFIX);
 			}
 
 			if (is_writable(newfile) == FALSE) {
-				prg_err(
-			gettext("cannot create \"%s\": permission denied"),
-					newfile);
+				prg_err(gettext(
+			"cannot create \"%s\": permission denied"), newfile);
 				goto end;
 			}
 
-			(void) sprintf(tmpfile, "%s", "/tmp/gensmg.XXXXXX");
+			(void) strlcpy(tmpfile, "/tmp/gensmg.XXXXXX",
+			    sizeof (tmpfile));
+
 			if ((tmpfd = mkstemp(tmpfile)) == -1) {
-				prg_err(/* stupid cstyle */
-				gettext("cannot create \"%s\""), tmpfile);
+				prg_err(gettext(
+			"cannot create \"%s\""), tmpfile);
 				if (!IsActiveMode(PreProcessMode)) {
 					(void) fclose(yyin);
 				}
-					goto end;
+				goto end;
 			}
-			(void) close(tmpfd);
-			if ((newfp = fopen(tmpfile, "w")) == NULL) {
-				prg_err(/* stupid cstyle */
-				gettext("cannot create \"%s\""), tmpfile);
+			if ((newfp = fdopen(tmpfd, "w")) == NULL) {
+				prg_err(gettext(
+			"cannot create \"%s\""), tmpfile);
 				if (!IsActiveMode(PreProcessMode)) {
 					(void) fclose(yyin);
 				}
+				(void) close(tmpfd);
 				(void) unlink(tmpfile);
 				goto end;
 			}
 
 			if (IsActiveMode(PreProcessMode)) {
 				if ((yyin = fopen(srcfile, "r")) == NULL) {
-					prg_err(/* stupid cstyle */
-				gettext("cannot open \"%s\""), srcfile);
+					prg_err(gettext(
+			"cannot open \"%s\""), srcfile);
+					(void) fclose(newfp);
 					(void) unlink(tmpfile);
 					goto end;
 				}
@@ -326,7 +332,7 @@ main(int argc, char **argv)
 
 			SetActiveMode(ReplaceMode);
 			init_lex();
-			yyparse();
+			(void) yyparse();
 			ResetActiveMode(ReplaceMode);
 
 			(void) fclose(newfp);
@@ -359,7 +365,7 @@ end:
 
 	if (IsActiveMode(AutoNumMode) || IsActiveMode(ProjectMode)) {
 		write_projfile(IsActiveMode(OverwriteMode) ?
-				projfile : newprojfile);
+		    projfile : newprojfile);
 	}
 	return (EXIT_SUCCESS);
 }
@@ -369,24 +375,24 @@ validate_options(void)
 {
 	/* -r doesn't work with either -a or -l. */
 	if (IsActiveMode(ReverseMode) &&
-		(IsActiveMode(AutoNumMode) || IsActiveMode(AppendMode))) {
+	    (IsActiveMode(AutoNumMode) || IsActiveMode(AppendMode))) {
 		usage();
 	}
 	/* -b should be accompanied with -c, -s, -d, and -n. */
 	if (IsActiveMode(BackCommentMode) &&
-		(!IsActiveMode(MsgCommentMode) &&
-		!IsActiveMode(SetCommentMode) &&
-		!IsActiveMode(DoubleLineMode) &&
-		!IsActiveMode(LineInfoMode))) {
+	    (!IsActiveMode(MsgCommentMode) &&
+	    !IsActiveMode(SetCommentMode) &&
+	    !IsActiveMode(DoubleLineMode) &&
+	    !IsActiveMode(LineInfoMode))) {
 		usage();
 	}
 	if (IsActiveMode(ProjectMode) &&
-		(IsActiveMode(AutoNumMode) || IsActiveMode(ReverseMode) ||
-		IsActiveMode(AppendMode) || IsActiveMode(MsgCommentMode) ||
-		IsActiveMode(LineInfoMode) || IsActiveMode(OverwriteMode) ||
-		IsActiveMode(PrefixMode) || IsActiveMode(SuffixMode) ||
-		IsActiveMode(TripleMode) || IsActiveMode(DoubleLineMode) ||
-		IsActiveMode(MessageMode) || IsActiveMode(NoErrorMode))) {
+	    (IsActiveMode(AutoNumMode) || IsActiveMode(ReverseMode) ||
+	    IsActiveMode(AppendMode) || IsActiveMode(MsgCommentMode) ||
+	    IsActiveMode(LineInfoMode) || IsActiveMode(OverwriteMode) ||
+	    IsActiveMode(PrefixMode) || IsActiveMode(SuffixMode) ||
+	    IsActiveMode(TripleMode) || IsActiveMode(DoubleLineMode) ||
+	    IsActiveMode(MessageMode) || IsActiveMode(NoErrorMode))) {
 		usage();
 	}
 }
@@ -394,11 +400,11 @@ validate_options(void)
 static void
 usage(void)
 {
-	(void) fprintf(stderr,
-	gettext("Usage: %s [-o message-file] [-a] [-d] [-p preprocessor]\n"
-		"          [-s set-tag] [-c message-tag] [-b] [-n]\n"
-		"          [-l project-file] [-r] [-f] [-g project-file]\n"
-		"          [-m prefix] [-M suffix] [-t] [-x] files ...\n"),
-		program);
+	(void) fprintf(stderr, gettext(
+	    "Usage: %s [-o message-file] [-a] [-d] [-p preprocessor]\n"
+	    "          [-s set-tag] [-c message-tag] [-b] [-n]\n"
+	    "          [-l project-file] [-r] [-f] [-g project-file]\n"
+	    "          [-m prefix] [-M suffix] [-t] [-x] files ...\n"),
+	    program);
 	exit(EXIT_FAILURE);
 }

@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,12 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright (c) 1995 by Sun Microsystems, Inc.
  */
- 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
@@ -35,7 +36,7 @@
 #include "y.tab.h"
 
 extern int is_cat_found;	/* from main.c */
-extern void add_comment(Mode, char *);/* from util.c */
+extern void add_comment(Mode, char *);	/* from util.c */
 
 int lineno = 1;
 
@@ -47,16 +48,16 @@ int msg_line = 0;
 int end_of_cat = TRUE;
 
 /*
- * In preprocessor mode, genmsg has to parse both the original 
- * soruce code and the code which a preprocessor generates.  
- * While genmsg is parsing the original source code,  'pound_is_mine' 
- * is set to TRUE.  
+ * In preprocessor mode, genmsg has to parse both the original
+ * soruce code and the code which a preprocessor generates.
+ * While genmsg is parsing the original source code,  'pound_is_mine'
+ * is set to TRUE.
  */
 int pound_is_mine = FALSE;
 
 void warning(char *);
 
-#define NOLINEMSG	-2
+#define	NOLINEMSG	-2
 
 void set_linemsgid(int, int);
 int get_linemsgid(int);
@@ -67,13 +68,13 @@ int get_linemsgid(int);
 #define	CatdField	0
 #define	SetidField	1
 #define	MsgidField	2
-#define StrField	3
+#define	StrField	3
 
 static int cat_field;
 
 /*
- * This will be turned on when '-' is found in the catgets message 
- * number field. 
+ * This will be turned on when '-' is found in the catgets message
+ * number field.
  */
 static int save_minus = FALSE;
 
@@ -86,136 +87,136 @@ static void parse_cppline(char *);
 
 [0-9a-zA-Z\_\.]catgets	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			}
 		}
 
 catgets[0-9a-zA-Z\_\.]	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			}
 		}
 
 catgets		{
-			if (end_of_cat) { /* If the previous catgets
-					   * state is on, turn it off
-					   * first. 
-					   */ 
+			if (end_of_cat) {
+				/*
+				 * If the previous catgets
+				 * state is on, turn it off
+				 * first.
+				 */
 				BEGIN 0;
 			}
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			}
-			if (IsActiveMode(ReplaceMode) && 
-				IsActiveMode(PreProcessMode)) {
-				; /* Okay, do nothing in this mode. */
-			} else {
+			if (!IsActiveMode(ReplaceMode) ||
+			    !IsActiveMode(PreProcessMode)) {
 				BEGIN CAT;
 				end_of_cat = FALSE;
 				cat_field = CatdField;
-				return CATGETS;
+				return (CATGETS);
 			}
 		}
 
 <CAT>\,		{	/* punctuation */
 			cat_field++;
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%c", yytext[0]);
-			} 
+				(void) fprintf(newfp, "%c", yytext[0]);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return yytext[0];
+				return (yytext[0]);
 			}
 		}
 
 <CAT>[+*/();>]	{	/* punctuation */
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%c", yytext[0]);
-			} 
+				(void) fprintf(newfp, "%c", yytext[0]);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return yytext[0];
+				return (yytext[0]);
 			}
 		}
 
 <CAT>const	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return CONST;
+				return (CONST);
 			}
 		}
 
 <CAT>nl_catd	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return CATD;
+				return (CATD);
 			}
 		}
 
 <CAT>char	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return CHAR;
+				return (CHAR);
 			}
 		}
 
 <CAT>int	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return INT;
+				return (INT);
 			}
 		}
 
 <CAT>\+\+	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return INC;
+				return (INC);
 			}
 		}
 
 <CAT>\-\-	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
-			} 
+				(void) fprintf(newfp, "%s", yytext);
+			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return INC;
+				return (INC);
 			}
 		}
 
 <CAT>\"		{	/* extract quoted string */
 			yylval.str = skip_quoted('"');
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "\"%s\"", yylval.str);
-			} 
+				(void) fprintf(newfp, "\"%s\"", yylval.str);
+			}
 			if (end_of_cat) { /* just in case */
 				BEGIN 0;
 				free(yylval.str);
 			} else {
-				return QSTR;
+				return (QSTR);
 			}
 		}
 
@@ -225,13 +226,13 @@ catgets		{
 					get_linemsgid(lineno) != NOLINEMSG) {
 					save_minus = TRUE; /*  be replaced. */
 				} else {
-					fprintf(newfp, "%c", yytext[0]);
+					(void) fprintf(newfp, "%c", yytext[0]);
 				}
-                        }
+			}
 			if (end_of_cat) { /* just in case */
 				BEGIN 0;
 			} else {
-				return yytext[0];
+				return (yytext[0]);
 			}
 		}
 
@@ -240,27 +241,31 @@ catgets		{
 			case SetidField:
 				yylval.id = atoi(yytext);
 				if (IsActiveMode(ReplaceMode)) {
-					fprintf(newfp, "%s", yytext);
-				} 
+					(void) fprintf(newfp, "%s", yytext);
+				}
 				if (end_of_cat) {
 					BEGIN 0;
 				} else {
-					return SETID;
+					return (SETID);
 				}
+				break;
 			case MsgidField:
 				yylval.id = atoi(yytext);
 				if (IsActiveMode(ReplaceMode)) {
 					int id = get_linemsgid(lineno);
 					if (id == NOLINEMSG) {
-						fprintf(newfp, "%s", yytext);
+						(void) fprintf(newfp, "%s",
+						    yytext);
 					} else if (id == NOMSGID &&
 						IsActiveMode(ReverseMode)) {
-						fprintf(newfp, "%d", NOMSGID);
+						(void) fprintf(newfp, "%d",
+						    NOMSGID);
 					} else if (save_minus == TRUE &&
 						yylval.id == 1) {
-						fprintf(newfp, "%d",id);
+						(void) fprintf(newfp, "%d", id);
 					} else { /* just in case */
-						fprintf(newfp, "%s", yytext);
+						(void) fprintf(newfp, "%s",
+						    yytext);
 					}
 					save_minus = FALSE;
 				} else {
@@ -269,49 +274,50 @@ catgets		{
 				if (end_of_cat) {
 					BEGIN 0;
 				} else {
-					return MSGID;
+					return (MSGID);
 				}
+				break;
 			default:
 				yylval.id = atoi(yytext);
 				if (IsActiveMode(ReplaceMode)) {
-					fprintf(newfp, "%s", yytext);
+					(void) fprintf(newfp, "%s", yytext);
 				}
 				if (end_of_cat) {
 					BEGIN 0;
 				} else {
-					return DIGIT;
+					return (DIGIT);
 				}
 			}
 		}
 
 <CAT>[a-zA-Z0-9_\&][a-zA-Z0-9_\>\&\.]*	{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			}
 			if (end_of_cat) {
 				BEGIN 0;
 			} else {
-				return STR;
+				return (STR);
 			}
 		}
 
 <CAT>\n		{
 			lineno++;
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "\n");
+				(void) fprintf(newfp, "\n");
 			}
 			if (end_of_cat) {
 				BEGIN 0;
-			} 
+			}
 		}
 
 <CAT>.		{	/* not interested */
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%c", yytext[0]);
+				(void) fprintf(newfp, "%c", yytext[0]);
 			}
 			if (end_of_cat) {
 				BEGIN 0;
-			} 
+			}
 		}
 
 -((([ \t]+)1)|1) {	/* -1 */
@@ -321,12 +327,13 @@ catgets		{
 				if (IsActiveMode(PreProcessMode)) {
 					int id = get_linemsgid(lineno);
 					if (id == NOLINEMSG) {
-						fprintf(newfp, "%s", yytext);
+						(void) fprintf(newfp, "%s",
+						    yytext);
 					} else { /* could be -1. */
-						fprintf(newfp, "%d", id);
+						(void) fprintf(newfp, "%d", id);
 					}
 				} else {
-					fprintf(newfp, "%s", yytext);
+					(void) fprintf(newfp, "%s", yytext);
 				}
 			}
 		}
@@ -337,12 +344,13 @@ catgets		{
 					IsActiveMode(ReverseMode)) {
 					int id = get_linemsgid(lineno);
 					if (id == NOLINEMSG) {
-						fprintf(newfp, "%s", yytext);
+						(void) fprintf(newfp, "%s",
+						    yytext);
 					} else if (id == NOMSGID) {
-						fprintf(newfp, "%d", id);
+						(void) fprintf(newfp, "%d", id);
 					}
 				} else {
-					fprintf(newfp, "%s", yytext);
+					(void) fprintf(newfp, "%s", yytext);
 				}
 			}
 		}
@@ -350,12 +358,12 @@ catgets		{
 ^#[ \t]*[0-9]+.*\n	{	/* pound for c-preprocessor */
 			if (IsActiveMode(PreProcessMode)) {
 				if (IsActiveMode(ReplaceMode)) {
-					fprintf(newfp, "%s", yytext);
+					(void) fprintf(newfp, "%s", yytext);
 				} else {
 					parse_cppline(yytext);
 				}
 			} else if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			}
 			lineno++;
 		}
@@ -363,7 +371,7 @@ catgets		{
 "/*"		{	/* skip a comment block */
 			char *comment = skip_comment();
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", comment);
+				(void) fprintf(newfp, "%s", comment);
 			} else {
 				if (IsActiveMode(MsgCommentMode)) {
 					add_comment(MsgCommentMode, comment);
@@ -371,13 +379,13 @@ catgets		{
 				if (IsActiveMode(SetCommentMode)) {
 					add_comment(SetCommentMode, comment);
 				}
-			} 
+			}
 			free(comment);
 		}
 
 "//".*\n	{	/* skip a c++ comment */
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%s", yytext);
+				(void) fprintf(newfp, "%s", yytext);
 			} else {
 				if (IsActiveMode(MsgCommentMode)) {
 					add_comment(MsgCommentMode, yytext);
@@ -385,14 +393,14 @@ catgets		{
 				if (IsActiveMode(SetCommentMode)) {
 					add_comment(SetCommentMode, yytext);
 				}
-			} 
+			}
 			lineno++;
 		}
 
 \"		{	/* skip quoted string */
 			char *qstr = skip_quoted('"');
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "\"%s\"", qstr);
+				(void) fprintf(newfp, "\"%s\"", qstr);
 			}
 			free(qstr);
 		}
@@ -400,21 +408,21 @@ catgets		{
 \'		{	/* skip single-quoted character */
 			char *qchr = skip_quoted('\'');
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "\'%s\'", qchr);
+				(void) fprintf(newfp, "\'%s\'", qchr);
 			}
 			free(qchr);
 		}
 
 \n		{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "\n");
+				(void) fprintf(newfp, "\n");
 			}
 			lineno++;
 		}
 
 .		{
 			if (IsActiveMode(ReplaceMode)) {
-				fprintf(newfp, "%c", yytext[0]);
+				(void) fprintf(newfp, "%c", yytext[0]);
 			}
 		}
 
@@ -428,15 +436,14 @@ skip_quoted(int skip_ch)
 	int i = 0;		/* counter */
 	int c, old = 0;		/* input character */
 
-	if ((buf = ptr = (char *) malloc(bsize)) == NULL) {
+	if ((buf = ptr = malloc(bsize)) == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
-	for (;; i++) {
+	for (; ; i++) {
 		if (i == bsize) {
 			bsize += BUFSIZ;
-			if ((buf = (char *) realloc((void *) buf,
-				bsize)) == NULL) {
+			if ((buf = realloc(buf, bsize)) == NULL) {
 				prg_err(gettext("fatal: out of memory"));
 				exit(EXIT_FAILURE);
 			}
@@ -454,8 +461,8 @@ skip_quoted(int skip_ch)
 				warning(gettext("warning: unmatched '"));
 			} else {
 				/* Should not happen */
-				warning(gettext("warning: unmatched \
-character"));
+				warning(gettext(
+				    "warning: unmatched character"));
 			}
 			break;
 		}
@@ -467,7 +474,7 @@ character"));
 		}
 	}
 	*ptr = '\0';
-	return buf;
+	return (buf);
 }
 
 static char *
@@ -478,17 +485,16 @@ skip_comment(void)
 	int i = 0;		/* counter */
 	int c, old = 0;		/* input character */
 
-	if ((buf = ptr = (char *) malloc(bsize)) == NULL) {
+	if ((buf = ptr = malloc(bsize)) == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
 	*ptr++ = '/';	i++;
 	*ptr++ = '*';	i++;
-	for (;; i++) {
+	for (; ; i++) {
 		if (i == bsize) {
 			bsize += BUFSIZ;
-			if ((buf = (char *) realloc((void *) buf,
-				bsize)) == NULL) {
+			if ((buf = realloc(buf, bsize)) == NULL) {
 				prg_err(gettext("fatal: out of memory"));
 				exit(EXIT_FAILURE);
 			}
@@ -507,7 +513,7 @@ skip_comment(void)
 		*ptr++ = old = c;
 	}
 	*ptr = '\0';
-	return buf;
+	return (buf);
 }
 
 /*
@@ -520,13 +526,26 @@ parse_cppline(char *str)
 {
 	int n, line, len;
 	char ch;
-	char file[LINE_MAX];
-	char *pfile = &file[0];
+	char file[BUFSIZ];
+	char *altfile = NULL;
+	char *pfile;
 
-	n = sscanf(str, "%c%d%s", &ch, &line, file);
+	len = strlen(str);
+	if (len >= sizeof (file)) {
+		if ((altfile = malloc(len + 1)) == NULL) {
+			prg_err(gettext("fatal: out of memory"));
+			exit(EXIT_FAILURE);
+		}
+		pfile = altfile;
+	} else {
+		pfile = file;
+	}
+	/* LINTED: E_SEC_SCANF_UNBOUNDED_COPY */
+	n = sscanf(str, "%c%d%s", &ch, &line, pfile);
 
 	/* 'file' is a quoted string but 'srcfile' is not. */
-	len = strlen(file) - 2;
+	len = strlen(pfile) - 2;
+
 	pfile++;
 	if (n == 3 && (strncmp(pfile, srcfile, len) == 0)) {
 		pound_is_mine = TRUE;
@@ -536,6 +555,8 @@ parse_cppline(char *str)
 	} else {
 		pound_is_mine = FALSE;
 	}
+	if (altfile)
+		free(altfile);
 }
 
 typedef struct {
@@ -558,7 +579,7 @@ void
 init_linemsgid(void)
 {
 	line_msgcnt = 0;
-	memset(line_msgid, 0, sizeof(LineMsgID) * NL_MSGMAX);
+	(void) memset(line_msgid, 0, sizeof (LineMsgID) * NL_MSGMAX);
 }
 
 void
@@ -575,27 +596,27 @@ set_linemsgid(int line, int msgid)
 int
 get_linemsgid(int line)
 {
-	register int i, left, right;
+	int i, left, right;
 	left = 0;
 	right = line_msgcnt - 1;
 	while (left <= right) {
 		i = (left + right) >> 1;
-		if ( line < line_msgid[i].line) {
+		if (line < line_msgid[i].line) {
 			right = i - 1;
 		} else if (line > line_msgid[i].line) {
 			left = i + 1;
 		} else {
-			return line_msgid[i].msgid;
+			return (line_msgid[i].msgid);
 		}
 	}
-	return NOLINEMSG;
+	return (NOLINEMSG);
 }
 
 void
 yyerror(char *s)
 {
 	if ((IsActiveMode(PreProcessMode) && pound_is_mine == FALSE) ||
-		IsActiveMode(ReplaceMode)) {
+	    IsActiveMode(ReplaceMode)) {
 		return;
 	}
 	src_err(srcfile, lineno, gettext("%s before or at: %s"), s, yytext);
@@ -605,7 +626,7 @@ void
 warning(char *s)
 {
 	if ((IsActiveMode(PreProcessMode) && pound_is_mine == FALSE) ||
-		IsActiveMode(ReplaceMode)) {
+	    IsActiveMode(ReplaceMode)) {
 		return;
 	}
 	src_err(srcfile, lineno, "%s", s);

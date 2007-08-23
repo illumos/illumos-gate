@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995 by Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -101,7 +101,6 @@ static MsgID lookup_msgid(SetID, int, char *, char *, int);
 static void print_prefix(FILE *, char *, int, char *);
 static int is_bs_terminated(char *);
 static char *ustrdup(char *);
-static void cat_msg(char *, char *, int);
 static void makeup_msg(char **);
 
 void
@@ -144,7 +143,7 @@ write_msgfile(char *file)
 
 	if (is_writable(file) == FALSE) {
 		prg_err(gettext("cannot create \"%s\": permission denied"),
-			file);
+		    file);
 		return;
 	}
 
@@ -158,10 +157,11 @@ write_msgfile(char *file)
 	}
 
 	if (quote) {
-		(void) sprintf(pquote, "%c", quote);
+		pquote[0] = quote;
 	} else {
-		(void) sprintf(pquote, "");
+		pquote[0] = '\0';
 	}
+	pquote[1] = '\0';
 
 	/* AppendMode is already turned off if the file doesn't exist. */
 	if (!IsActiveMode(AppendMode)) {
@@ -180,20 +180,20 @@ write_msgfile(char *file)
 			}
 			if (is_set == FALSE) {
 				if (si->comment &&
-					!IsActiveMode(BackCommentMode)) {
+				    !IsActiveMode(BackCommentMode)) {
 					(void) fprintf(fp, "\n");
 					print_prefix(fp, "$ ", TRUE,
-							si->comment);
+					    si->comment);
 					(void) fprintf(fp, "$set\t%d\n",
-							si->id);
+					    si->id);
 				} else {
 					(void) fprintf(fp, "\n$set\t%d\n",
-							si->id);
+					    si->id);
 				}
 				if (si->comment &&
-					IsActiveMode(BackCommentMode)) {
+				    IsActiveMode(BackCommentMode)) {
 					print_prefix(fp, "$ ", TRUE,
-							si->comment);
+					    si->comment);
 				}
 				(void) fprintf(fp, "\n");
 				is_set = TRUE;
@@ -201,20 +201,20 @@ write_msgfile(char *file)
 
 			makeup_msg(&(mi->msg));
 
-			(void) sprintf(msg, "%d\t%s%s%s\n",
-				mi->id, pquote, mi->msg, pquote);
+			(void) snprintf(msg, sizeof (msg), "%d\t%s%s%s\n",
+			    mi->id, pquote, mi->msg, pquote);
 
 			if (!IsActiveMode(BackCommentMode)) {
 				if (mi->line && mi->file &&
-					IsActiveMode(LineInfoMode)) {
+				    IsActiveMode(LineInfoMode)) {
 					(void) fprintf(fp,
-						"$ File:%s, line:%d\n",
-						basename(mi->file), mi->line);
+					    "$ File:%s, line:%d\n",
+					    basename(mi->file), mi->line);
 				}
 
 				if (mi->comment) {
 					print_prefix(fp, "$ ", TRUE,
-						mi->comment);
+					    mi->comment);
 				}
 
 				if (IsActiveMode(DoubleLineMode)) {
@@ -226,15 +226,15 @@ write_msgfile(char *file)
 
 			if (IsActiveMode(BackCommentMode)) {
 				if (mi->line && mi->file &&
-					IsActiveMode(LineInfoMode)) {
+				    IsActiveMode(LineInfoMode)) {
 					(void) fprintf(fp,
-						"$ File:%s, line:%d\n",
-						basename(mi->file), mi->line);
+					    "$ File:%s, line:%d\n",
+					    basename(mi->file), mi->line);
 				}
 
 				if (mi->comment) {
 					print_prefix(fp, "$ ", TRUE,
-						mi->comment);
+					    mi->comment);
 				}
 
 				if (IsActiveMode(DoubleLineMode)) {
@@ -273,13 +273,13 @@ lookup_msgid(SetID si, int msgid, char *msg, char *file, int line)
 		if (mi->id == msgid) {
 			/* same setid & msgid, but different msg. */
 			if (strcmp(mi->msg, msg)) {
-			src_err(file, line,
-		gettext("multiple messages: set number %d, message number %d\n"
+				src_err(file, line, gettext(
+			"multiple messages: set number %d, message number %d\n"
 			"	current : \"%s\"\n"
 			"	previous: \"%s\" : \"%s\", line %d"),
-				si->id, mi->id,
-				msg,
-				mi->msg, mi->file, mi->line);
+				    si->id, mi->id,
+				    msg,
+				    mi->msg, mi->file, mi->line);
 			}
 			return (mi);
 		}
@@ -296,13 +296,13 @@ add_msgid(SetID si, int msgid, char *msg, char *file, int line, int no_write)
 
 	if (msgid == 0) {
 		src_err(file, line, gettext("improper message number: %d"),
-			msgid);
+		    msgid);
 		return;
 	}
 
 	if (msgid > NL_MSGMAX) {
 		src_err(file, line, gettext("too large message number: %d"),
-			msgid);
+		    msgid);
 		return;
 	}
 
@@ -319,20 +319,20 @@ add_msgid(SetID si, int msgid, char *msg, char *file, int line, int no_write)
 		mi = mi->next;
 	}
 
-	if ((newmi = (MsgID) malloc(sizeof (MsgIDRec))) == NULL) {
+	if ((newmi = malloc(sizeof (MsgIDRec))) == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
 
 	newmi->no_write = no_write;
 	newmi->id = msgid;
-	newmi->msg = (char *) ustrdup(msg);
-	newmi->file = (char *) ustrdup(file);
+	newmi->msg = ustrdup(msg);
+	newmi->file = ustrdup(file);
 	newmi->line = line;
 	newmi->next = mi;
 
 	if (msg_comment) {
-		newmi->comment = (char *) ustrdup(msg_comment);
+		newmi->comment = ustrdup(msg_comment);
 		free(msg_comment);
 		msg_comment = NULL;
 	} else {
@@ -359,7 +359,7 @@ add_setid(int setid, int msgid, char *msg, char *file, int line, int no_write)
 		si = si->next;
 	}
 
-	if ((newsi = (SetID) malloc(sizeof (SetIDRec))) == NULL) {
+	if ((newsi = malloc(sizeof (SetIDRec))) == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
@@ -369,7 +369,7 @@ add_setid(int setid, int msgid, char *msg, char *file, int line, int no_write)
 	newsi->next = si;
 
 	if (set_comment) {
-		newsi->comment = (char *) ustrdup(set_comment);
+		newsi->comment = ustrdup(set_comment);
 		free(set_comment);
 		set_comment = NULL;
 	} else {
@@ -412,7 +412,7 @@ read_projfile(char *file)
 	FILE *fp;
 	char line[LINE_MAX];
 
-	if (!file) {
+	if (file == NULL) {
 		return (0);
 	}
 
@@ -420,7 +420,7 @@ read_projfile(char *file)
 		return (0);
 	}
 
-	while (fgets(line, LINE_MAX, fp) != NULL) {
+	while (fgets(line, sizeof (line), fp) != NULL) {
 		char *p = line;
 		int n, setid, msgid;
 
@@ -434,16 +434,14 @@ read_projfile(char *file)
 
 		if (n == 2) {
 			if (setid > NL_SETMAX) {
-			prg_err(gettext("%s: too large set number: %d"),
-					file, setid);
+				prg_err(gettext("%s: too large set number: %d"),
+				    file, setid);
 				continue;
 			}
 			msgid_table[setid] = msgid;
 		} else {
-			prg_err(
-			/* for stupid cstyle */
-			gettext("warning: %s: missing or invalid entry"),
-				file);
+			prg_err(gettext(
+			    "warning: %s: missing or invalid entry"), file);
 		}
 	}
 
@@ -460,7 +458,7 @@ write_projfile(char *file)
 
 	if (is_writable(file) == FALSE) {
 		prg_err(gettext("cannot create \"%s\": permission denied"),
-			file);
+		    file);
 		return;
 	}
 
@@ -475,7 +473,7 @@ write_projfile(char *file)
 			char *com = NULL;
 
 			if (IsActiveMode(SetCommentMode) &&
-				(si = lookup_setid(i)) && si->comment) {
+			    (si = lookup_setid(i)) && si->comment) {
 				com = si->comment;
 			}
 
@@ -517,8 +515,8 @@ get_msgid(char *file, int line, int setid, char *str)
 
 	if (id > NL_MSGMAX) {
 		src_err(file, line,
-			gettext("run out of message number in set number: %d"),
-			setid);
+		    gettext("run out of message number in set number: %d"),
+		    setid);
 		return (NOMSGID);
 	}
 
@@ -538,9 +536,9 @@ add_comment(Mode mode, char *str)
 {
 	char *tag = (mode == MsgCommentMode) ? mctag : sctag;
 	char **comment = (mode == MsgCommentMode)
-				? &msg_comment : &set_comment;
+	    ? &msg_comment : &set_comment;
 
-	if (!strstr(str, tag)) {
+	if (strstr(str, tag) == NULL) {
 		return;
 	}
 
@@ -548,7 +546,7 @@ add_comment(Mode mode, char *str)
 		free(*comment);
 	}
 
-	*comment = (char *) ustrdup(str);
+	*comment = ustrdup(str);
 }
 
 void
@@ -591,7 +589,7 @@ read_msgfile(char *file)
 		SkipSpace(ptr);
 
 		if ((*ptr == '$' && (*(ptr+1) == ' ' || *(ptr+1) == '\t')) ||
-			((*ptr == '\n') && inmsg == FALSE)) {
+		    ((*ptr == '\n') && inmsg == FALSE)) {
 			inmsg = FALSE;
 			continue;
 		}
@@ -603,14 +601,14 @@ read_msgfile(char *file)
 			inmsg = FALSE;
 			continue;
 		} else if (strncmp(ptr, DELSET_TOKEN,
-			sizeof (DELSET_TOKEN) - 1) == 0) {
+		    sizeof (DELSET_TOKEN) - 1) == 0) {
 			if (sscanf(ptr, "%*s %d", &unsetid) != 1) {
 				unsetid = -1;
 			}
 			inmsg = FALSE;
 			continue;
 		} else if (strncmp(ptr, QUOTE_TOKEN,
-			sizeof (QUOTE_TOKEN) - 1) == 0) {
+		    sizeof (QUOTE_TOKEN) - 1) == 0) {
 			if (sscanf(ptr, "%*s %c", &c) != 1) {
 				c = 0;
 			}
@@ -625,7 +623,7 @@ read_msgfile(char *file)
 
 		if (inmsg) {
 			if (is_bs_terminated(ptr)) {
-				(void) strcat(msg, ptr);
+				(void) strlcat(msg, ptr, sizeof (msg));
 				inmsg = TRUE;
 			} else {
 				int len = strlen(ptr);
@@ -633,39 +631,35 @@ read_msgfile(char *file)
 				if (c && (*(ptr + len - 2) == c)) {
 					*(ptr + len - 2) = '\0';
 				}
-				(void) strcat(msg, ptr);
+				(void) strlcat(msg, ptr, sizeof (msg));
 				add_msg(setid, msgid, msg, file, line, TRUE);
 				inmsg = FALSE;
 			}
 			continue;
 		}
 
-		if (isdigit(*ptr)) {
-			char tmp[32];
-			int i = 0;
+		if (isdigit((unsigned char)*ptr)) {
+			char	*pptr;
 
 			SkipSpace(ptr);
 
-			while (isdigit(*ptr)) {
-				tmp[i++] = *ptr++;
-			}
-			tmp[i] = '\0';
-			msgid = atoi(tmp);
+			msgid = (int)strtol(ptr, &pptr, 10);
+			ptr = pptr;
 
 			SkipSpace(ptr);
 
 			if (is_bs_terminated(ptr)) {
-				(void) memset(msg, 0, NL_TEXTMAX);
+				(void) memset(msg, 0, sizeof (msg));
 				if (c && (*ptr == c)) {
 					ptr++;
 				}
-				(void) strcpy(msg, ptr);
+				(void) strlcpy(msg, ptr, sizeof (msg));
 				inmsg = TRUE;
 			} else {
 				int len = strlen(ptr);
 				*(ptr + len - 1) = '\0';
 				if (c && ((*ptr == c) &&
-					(*(ptr + len - 2) == c))) {
+				    (*(ptr + len - 2) == c))) {
 					*(ptr + len - 2) = '\0';
 					ptr++;
 				}
@@ -702,7 +696,7 @@ static char *
 ustrdup(char *str)
 {
 	char *tmp = strdup(str);
-	if (!tmp) {
+	if (tmp == NULL) {
 		prg_err(gettext("fatal: out of memory"));
 		exit(EXIT_FAILURE);
 	}
@@ -748,74 +742,60 @@ done:
 }
 
 static void
-cat_msg(char *out, char *msg, int max)
-{
-	if (strlen(out) > max) {
-		return;
-	}
-
-	(void) strncat(out, msg, max);
-
-	if (strlen(out) > max) {
-		out[max] = '\0';
-	}
-}
-
-static void
 makeup_msg(char **pmsg)
 {
 	char buf[NL_TEXTMAX];
 	char *msg;
 
 	msg = *pmsg;
-	(void) memset((void *) buf, 0, NL_TEXTMAX);
+	buf[0] = '\0';
 
-	if (IsActiveMode(TripleMode) &&	!strchr(msg, '%')) {
+	if (IsActiveMode(TripleMode) &&	strchr(msg, '%') == NULL) {
 		/* there is no '%' in message. */
 		int len = strlen(msg);
 
 		if (msg[len-2] == '\\' && msg[len-1] == 'n') {
 			msg[len-2] = '\0';
-			cat_msg(buf, msg, (NL_TEXTMAX - 2));
-			cat_msg(buf, msg, (NL_TEXTMAX - 2));
-			cat_msg(buf, msg, (NL_TEXTMAX - 2));
-			cat_msg(buf, "\\n", NL_TEXTMAX);
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, "\\n", sizeof (buf));
 		} else {
-			cat_msg(buf, msg, NL_TEXTMAX);
-			cat_msg(buf, msg, NL_TEXTMAX);
-			cat_msg(buf, msg, NL_TEXTMAX);
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, msg, sizeof (buf));
 		}
 		free(msg);
-		*pmsg = (char *) ustrdup(buf);
+		*pmsg = ustrdup(buf);
 	}
 
 	msg = *pmsg;
-	(void) memset((void *) buf, 0, NL_TEXTMAX);
+	buf[0] = '\0';
 
 	if (IsActiveMode(PrefixMode)) {
-		cat_msg(buf, premsg, NL_TEXTMAX);
-		cat_msg(buf, msg, NL_TEXTMAX);
+		(void) strlcat(buf, premsg, sizeof (buf));
+		(void) strlcat(buf, msg, sizeof (buf));
 		free(msg);
-		*pmsg = (char *) ustrdup(buf);
+		*pmsg = ustrdup(buf);
 	}
 
 	msg = *pmsg;
-	(void) memset((void *) buf, 0, NL_TEXTMAX);
+	buf[0] = '\0';
 
 	if (IsActiveMode(SuffixMode)) {
 		int len = strlen(msg);
 
 		if (msg[len-2] == '\\' && msg[len-1] == 'n') {
 			msg[len-2] = '\0';
-			cat_msg(buf, msg, (NL_TEXTMAX - 2));
-			cat_msg(buf, sufmsg, (NL_TEXTMAX - 2));
-			cat_msg(buf, "\\n", NL_TEXTMAX);
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, sufmsg, sizeof (buf));
+			(void) strlcat(buf, "\\n", sizeof (buf));
 		} else {
-			cat_msg(buf, msg, NL_TEXTMAX);
-			cat_msg(buf, sufmsg, NL_TEXTMAX);
+			(void) strlcat(buf, msg, sizeof (buf));
+			(void) strlcat(buf, sufmsg, sizeof (buf));
 		}
 		free(msg);
-		*pmsg = (char *) ustrdup(buf);
+		*pmsg = ustrdup(buf);
 	}
 }
 
@@ -823,13 +803,13 @@ void
 prg_err(char *fmt, ...)
 {
 	va_list ap;
-	char buf[BUFSIZ];
 
 	va_start(ap, fmt);
 
-	(void) vsprintf(buf, fmt, ap);
-
-	(void) fprintf(stderr, "%s: %s\n", program, buf);
+	(void) fprintf(stderr, "%s: ", program);
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) vfprintf(stderr, fmt, ap);
+	(void) fprintf(stderr, "\n");
 
 	va_end(ap);
 }
@@ -838,9 +818,6 @@ void
 src_err(char *file, int line, char *fmt, ...)
 {
 	va_list ap;
-	char buf[BUFSIZ];
-	char sbuf[BUFSIZ/2];
-	char vbuf[BUFSIZ/2];
 
 	if (suppress_error == TRUE) {
 		return;
@@ -848,11 +825,10 @@ src_err(char *file, int line, char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	(void) sprintf(sbuf, gettext("\"%s\", line %d: "), file, line);
-	(void) vsprintf(vbuf, fmt, ap);
-
-	(void) sprintf(buf, "%s%s\n", sbuf, vbuf);
-	(void) fputs(buf, stderr);
+	(void) fprintf(stderr, gettext("\"%s\", line %d: "), file, line);
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) vfprintf(stderr, fmt, ap);
+	(void) fprintf(stderr, "\n");
 
 	va_end(ap);
 }

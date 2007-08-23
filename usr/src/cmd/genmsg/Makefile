@@ -30,7 +30,7 @@ include ../Makefile.cmd
 
 PROG=		genmsg
 PSRC_Y=		genmsg.y
-C_OBJS=         main.o util.o lex.yy.o
+C_OBJS=         main.o util.o
 
 LEXARGS=
 LEXSRCS=	genmsg.l
@@ -41,16 +41,24 @@ LDLIBS += -ll
 YFLAGS = -d
 CPPFLAGS = -I../head $(CPPFLAGS.master)
 
-# genmsg has a name clash with main() and libl.so.1.  Localize all symbols.
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+# lex and yacc generates lint-unclean C code.
+LINTSUPPRESS=	\
+	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
+	-erroff=E_EQUALITY_NOT_ASSIGNMENT \
+	-erroff=E_BLOCK_DECL_UNUSED
 
-OBJS =          $(C_OBJS) $(PSRC_Y:%.y=%.o)
+LINTFLAGS +=	-um
+
+# genmsg has a name clash with main() and libl.so.1.  Localize all symbols.
+LDFLAGS +=	$(MAPFILE.INT:%=-M%)
+
+OBJS =          $(C_OBJS) $(PSRC_Y:%.y=%.o) $(LEXOBJS)
 PSRC_C =        $(PSRC_Y:%.y=%.c)
-SRCS =          $(C_OBJS:%.o=%.c) $(PSRC_C)
+SRCS =          $(C_OBJS:%.o=%.c) $(PSRC_C) $(LEXINTSRCS)
 
 .KEEP_STATE:
 
-all:    $(PROG) $(MAPFILE.NGB)
+all:    $(PROG) $(MAPFILE.INT)
 
 install: all $(ROOTPROG)
 
@@ -76,9 +84,11 @@ $(POFILE):      $(SRCS)
 	$(SED) "/^domain/d" messages.po > $@
 	$(RM) $(POFILE).i messages.po
 
-lint: $(SRCS) .WAIT lint_SRCS
+lint:	$(LEXINTSRCS) $(PSRC_C)
+	$(LINT.c) $(C_OBJS:%.o=%.c) $(LDLIBS)
+	$(LINT.c) $(LEXINTSRCS) $(PSRC_C) $(LINTSUPPRESS) $(LDLIBS)
 
 clean:
-	$(RM) $(OBJS) $(PSRC_C) y.tab.h lex.yy.c $(PSRC_C) *.po
+	$(RM) $(OBJS) $(PSRC_C) $(LEXINTSRCS) y.tab.h *.po
 
 include ../Makefile.targ

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995 by Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
+#ifndef	_GENMSG_H
+#define	_GENMSG_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /*
  * Boolean values.
@@ -40,25 +47,6 @@
  * Number to be updated by the auto message numbering.
  */
 #define	NOMSGID		-1
-
-/*
- * Just in case...
- */
-#ifndef MAXPATHLEN
-#define	MAXPATHLEN	1024
-#endif
-#ifndef LINE_MAX
-#define	LINE_MAX	2048
-#endif
-#ifndef NL_MSGMAX
-#define	NL_MSGMAX	32767
-#endif
-#ifndef NL_SETMAX
-#define	NL_SETMAX	255
-#endif
-#ifndef NL_TEXTMAX
-#define	NL_TEXTMAX	2048
-#endif
 
 /*
  * Genmsg action mode is for genmsg to identify its tasks.
@@ -96,3 +84,9 @@ extern FILE *newfp;		/* from main.c */
 
 extern void prg_err(char *fmt, ...);
 extern void src_err(char *file, int line, char *fmt, ...);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _GENMSG_H */
