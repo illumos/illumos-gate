@@ -32,7 +32,7 @@
 
 # Should we build AST l10n catalogs ?
 # This can be overridden at build time via:
-# $ export ON_BUILD_KSH93_AS_BINKSH=1
+# $ export ON_BUILD_AST_L10N_CATALOGS=1
 ON_BUILD_AST_L10N_CATALOGS=0
 
 DO_BUILD_AST_CATALOGS_1=	$(ON_BUILD_AST_L10N_CATALOGS:0=$(POUND_SIGN))
@@ -78,7 +78,8 @@ $(MSGLIBNAME).msg: $(ASTMSGS)
 
 $(ASTMSGCATALOG): $(MSGLIBNAME).msg
 	@$(RM) "$(ASTMSGCATALOG)" ; \
-	sed 's/^$$translation msgcc .*//' <"$(MSGLIBNAME).msg" | gencat "$@" -
+	sed 's/^$$translation msgcc .*//' <"$(MSGLIBNAME).msg" | gencat "$@" - ; \
+	$(CHMOD) 0644 $(ASTMSGCATALOG)
 
 # Main catalog target
 $(DO_BUILD_AST_CATALOGS)_msg: $(ASTMSGCATALOG)
@@ -87,7 +88,8 @@ $(DO_BUILD_AST_CATALOGS)_msg: $(ASTMSGCATALOG)
 # package database each time we toggle the switch)
 $(DONT_BUILD_AST_CATALOGS)_msg:
 $(DONT_BUILD_AST_CATALOGS)	$(RM) $(ASTMSGCATALOG) ; \
-	$(TOUCH) $(ASTMSGCATALOG)
+	$(TOUCH) $(ASTMSGCATALOG) ; \
+	$(CHMOD) 0644 $(ASTMSGCATALOG)
 
 # Add message catalogs to the list of files to "clobber"
 CLOBBERFILES += \
