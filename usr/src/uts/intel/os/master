@@ -19,7 +19,7 @@ version 1.0
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -274,12 +274,18 @@ pci14e4,167d pci14e4,167d net pci none "Broadcom 5751M Gigabit Ethernet"
 pci14e4,1659 pci14e4,1659 net pci none "Broadcom 5721 Gigabit Ethernet"
 pci14e4,1696 pci14e4,1696 net pci none "Broadcom 5782 Gigabit Ethernet"
 pci14e4,169c pci14e4,169c net pci none "Broadcom 5788 Gigabit Ethernet"
-pci10de,57 pci10de,cb84 net pci none "nvidia ck8-04 Gigabit Ethernet"
-pci10de,56 pci10de,cb84 net pci none "nvidia ck8-04 Gigabit Ethernet"
-pci10de,57 pci10f1,2865 net pci none "nvidia ck8-04 Gigabit Ethernet"
-pci10de,56 pci10f1,2865 net pci none "nvidia ck8-04 Gigabit Ethernet"
-pci10de,57 pci10f1,2895 net pci none "nvidia ck8-04 Gigabit Ethernet"
-pci10de,56 pci10f1,2895 net pci none "nvidia ck8-04 Gigabit Ethernet"
+pci10de,57 pci10de,cb84 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,56 pci10de,cb84 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,57 pci10f1,2865 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,56 pci10f1,2865 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,57 pci10f1,2895 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,56 pci10f1,2895 net pci none "NVIDIA CK8-04 Gigabit Ethernet"
+pci10de,268 pci10de,268 net pci none "NVIDIA MCP51 Gigabit Ethernet"
+pci10de,269 pci10de,269 net pci none "NVIDIA MCP51 Gigabit Ethernet"
+pci10de,372 pci10de,372 net pci none "NVIDIA MCP55 Gigabit Ethernet"
+pci10de,373 pci10de,373 net pci none "NVIDIA MCP55 Gigabit Ethernet"
+pci10de,37 pci10de,37 net pci none "NVIDIA MCP04 Gigabit Ethernet"
+pci10de,38 pci10de,38 net pci none "NVIDIA MCP04 Gigabit Ethernet"
 pci10ec,8139 pci10ec,8139 net pci none "Realtek 8139 Fast Ethernet"
 pci8086,1029 pci8086,1029 net pci iprb.bef "Intel Pro/100 Network Adapter"
 pci8086,1030 pci8086,1030 net pci iprb.bef "Intel InBusiness 10/100 Network Adapter"
