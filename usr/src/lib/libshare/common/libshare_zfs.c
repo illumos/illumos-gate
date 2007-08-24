@@ -879,7 +879,7 @@ sa_zfs_update(sa_group_t group)
 					    strlen(optstring) > 0) {
 						(void) snprintf(command,
 						    ZFS_MAXPROPLEN * 2,
-						    "%s set sharenfs=%s %s"
+						    "%s set sharenfs=%s %s",
 						    COMMAND,
 						    optstring, dataset);
 					} else {
