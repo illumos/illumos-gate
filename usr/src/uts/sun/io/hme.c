@@ -963,9 +963,7 @@ hme_stop_timer(struct hme *hmep)
 static void
 hme_start_timer(struct hme *hmep, fptrv_t func, int msec)
 {
-	if (!(hmep->hme_flags & HMENOTIMEOUTS))
-		hmep->hme_timerid = timeout(func, (caddr_t)hmep,
-		    drv_usectohz(1000 * msec));
+	hmep->hme_timerid = timeout(func, hmep, drv_usectohz(1000 * msec));
 
 	mutex_exit(&hmep->hme_linklock);
 }
@@ -2740,8 +2738,6 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		uint8_t j1;
 		uint16_t j2;
 	} *cfg_ptr;
-	boolean_t doinit;
-
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -2754,10 +2750,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		hmep->hme_flags &= ~HMESUSPENDED;
 		hmep->hme_linkcheck = 0;
 
-		mutex_enter(&hmep->hme_intrlock);
-		doinit = ((hmep->hme_flags & HMESTARTED) != 0);
-		mutex_exit(&hmep->hme_intrlock);
-		if (doinit)
+		if (hmep->hme_started)
 			(void) hmeinit(hmep);
 		return (DDI_SUCCESS);
 
@@ -3159,8 +3152,6 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * detach on failure.
 	 */
 	(void) hmestop(hmep);
-
-	ddi_remove_minor_node(dip, NULL);
 
 	/*
 	 * Remove instance of the intr
@@ -3779,12 +3770,13 @@ hme_m_start(void *arg)
 {
 	struct hme *hmep = arg;
 
-
-	mutex_enter(&hmep->hme_intrlock);
-	hmep->hme_flags |= HMESTARTED;
-	mutex_exit(&hmep->hme_intrlock);
-	(void) hmeinit(hmep);
-	return (0);
+	if (hmeinit(hmep) != 0) {
+		/* initialization failed -- really want DL_INITFAILED */
+		return (EIO);
+	} else {
+		hmep->hme_started = B_TRUE;
+		return (0);
+	}
 }
 
 static void
@@ -3792,9 +3784,7 @@ hme_m_stop(void *arg)
 {
 	struct hme *hmep = arg;
 
-	mutex_enter(&hmep->hme_intrlock);
-	hmep->hme_flags &= ~HMESTARTED;
-	mutex_exit(&hmep->hme_intrlock);
+	hmep->hme_started = B_FALSE;
 	hmeuninit(hmep);
 }
 
@@ -4126,7 +4116,7 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 			uint16_t sum;
 			sum = hme_cksum(mp->b_rptr + start_offset,
 			    len1 - start_offset);
-			bcopy(&sum, mp->b_rptr + stuff_offset, 20);
+			bcopy(&sum, mp->b_rptr + stuff_offset, sizeof (sum));
 			csflags = 0;
 		}
 
@@ -4413,7 +4403,8 @@ hmestart(struct hme *hmep, mblk_t *mp)
 				uint16_t sum;
 				sum = hme_cksum(bp->b_rptr + start_offset,
 				    len1 - start_offset);
-				bcopy(&sum, bp->b_rptr + stuff_offset, 2);
+				bcopy(&sum, bp->b_rptr + stuff_offset,
+				    sizeof (sum));
 				csflags = 0;
 			}
 
@@ -4650,12 +4641,6 @@ hmeinit(struct hme *hmep)
 	hmep->hme_tnextp = hmep->hme_tmdp;
 
 	/*
-	 * Determine if promiscuous mode.
-	 */
-	if (hmep->hme_promisc)
-		hmep->hme_flags |= HMEPROMISC;
-
-	/*
 	 * This is the right place to initialize MIF !!!
 	 */
 
@@ -4875,11 +4860,11 @@ hmeinit(struct hme *hmep)
 
 	if (hme_reject_own) {
 		PUT_MACREG(rxcfg,
-		    ((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0) |
+		    ((hmep->hme_promisc ? BMAC_RXCFG_PROMIS : 0) |
 		    BMAC_RXCFG_MYOWN | BMAC_RXCFG_HASH));
 	} else {
 		PUT_MACREG(rxcfg,
-		    ((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0) |
+		    ((hmep->hme_promisc ? BMAC_RXCFG_PROMIS : 0) |
 		    BMAC_RXCFG_HASH));
 	}
 
@@ -6082,7 +6067,7 @@ hme_debug_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
 #endif
 	if (hme_debug_level >= type) {
 		va_start(ap, fmt);
-		vsprintf(msg_buffer, fmt, ap);
+		vsnprintf(msg_buffer, sizeof (msg_buffer), fmt, ap);
 
 		cmn_err(CE_CONT, "D: %s (%d): %s\n",
 		    msg_string[type], line, msg_buffer);
@@ -6101,7 +6086,7 @@ hme_fault_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
 	va_list	ap;
 
 	va_start(ap, fmt);
-	(void) vsprintf(msg_buffer, fmt, ap);
+	(void) vsnprintf(msg_buffer, sizeof (msg_buffer), fmt, ap);
 
 	if (hmep == NULL) {
 		cmn_err(CE_NOTE, "hme : %s", msg_buffer);

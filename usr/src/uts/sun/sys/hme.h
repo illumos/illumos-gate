@@ -301,6 +301,7 @@ struct	hme {
 	uint32_t		hme_addrflags;	/* address flags */
 	uint32_t		hme_flags;	/* misc. flags */
 	boolean_t		hme_wantw;	/* xmit: out of resources */
+	boolean_t		hme_started;	/* mac layer started */
 
 	uint16_t		hme_ladrf[4];	/* 64 bit multicast filter */
 	uint32_t		hme_ladrf_refcnt[64];
@@ -451,11 +452,8 @@ struct	hme {
 
 /* flags */
 #define	HMERUNNING	0x01	/* chip is initialized */
-#define	HMEPROMISC	0x02	/* promiscuous mode enabled */
 #define	HMESUSPENDED	0x08	/* suspended interface */
 #define	HMEINITIALIZED	0x10	/* interface initialized */
-#define	HMENOTIMEOUTS	0x20	/* disallow timeout rescheduling */
-#define	HMESTARTED	0x40	/* upper layer initialized */
 
 /* Mac address flags */
 
