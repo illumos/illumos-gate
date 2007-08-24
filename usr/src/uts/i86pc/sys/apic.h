@@ -354,8 +354,8 @@ struct apic_io_intr {
 
 /* special or reserve vectors */
 #define	APIC_CHECK_RESERVE_VECTORS(v) \
-	((v == T_FASTTRAP) || (v == APIC_SPUR_INTR) || (v == T_SYSCALLINT) || \
-	(v == T_DTRACE_RET) || (v == T_INT80))
+	(((v) == T_FASTTRAP) || ((v) == APIC_SPUR_INTR) || \
+	((v) == T_SYSCALLINT) || ((v) == T_DTRACE_RET) || ((v) == T_INT80))
 
 /* cmos shutdown code for BIOS						*/
 #define	BIOS_SHUTDOWN		0x0a
@@ -704,8 +704,10 @@ extern int apic_check_msi_support();
 extern apic_irq_t *apic_find_irq(dev_info_t *dip, struct intrspec *ispec,
     int type);
 extern int apic_navail_vector(dev_info_t *dip, int pri);
-extern int apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri,
-    int type, int behavior);
+extern int apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count,
+    int pri, int behavior);
+extern int apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count,
+    int pri, int behavior);
 extern void  apic_free_vectors(dev_info_t *dip, int inum, int count, int pri,
     int type);
 extern uchar_t apic_find_multi_vectors(int pri, int count);
@@ -715,9 +717,11 @@ extern uint32_t *mapin_ioapic(uint32_t addr, size_t len, int flags);
 extern void mapout_apic(caddr_t addr, size_t len);
 extern void mapout_ioapic(caddr_t addr, size_t len);
 extern uchar_t apic_modify_vector(uchar_t vector, int irq);
-extern int apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum);
-extern int apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum);
-extern int apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
+extern void apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum);
+extern void apic_pci_msi_disable_mode(dev_info_t *rdip, int type);
+extern void apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
+extern void apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum,
+    int vector, int count, int target_apic_id);
 extern char *apic_get_apic_type();
 extern uint16_t	apic_get_apic_version();
 
@@ -755,6 +759,7 @@ extern int apic_next_bind_cpu;
 extern int apic_redistribute_sample_interval;
 extern int apic_multi_msi_enable;
 extern int apic_multi_msi_max;
+extern int apic_msix_max;
 extern int apic_sci_vect;
 extern uchar_t apic_ipls[];
 

@@ -329,10 +329,6 @@ static	int acpi_nmi_scnt = 0;
 static	MADT_LOCAL_APIC_NMI *acpi_nmi_cp = NULL;
 static	int acpi_nmi_ccnt = 0;
 
-extern int	apic_pci_msi_enable_vector(dev_info_t *, int, int,
-		    int, int, int);
-extern apic_irq_t *apic_find_irq(dev_info_t *, struct intrspec *, int);
-
 /*
  * The following added to identify a software poweroff method if available.
  */
@@ -1594,21 +1590,32 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);
 
-	/* Disable the MSI/X vector */
-	if (APIC_IS_MSI_OR_MSIX_INDEX(irqptr->airq_mps_intr_index)) {
-		int type = (irqptr->airq_mps_intr_index == MSI_INDEX) ?
-		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
-
+	if (irqptr->airq_mps_intr_index == MSI_INDEX) {
 		/*
+		 * Disable the MSI vector
 		 * Make sure we only disable on the last
 		 * of the multi-MSI support
 		 */
 		if (i_ddi_intr_get_current_nintrs(irqptr->airq_dip) == 1) {
-			(void) apic_pci_msi_unconfigure(irqptr->airq_dip,
-			    type, irqptr->airq_ioapicindex);
+			apic_pci_msi_unconfigure(irqptr->airq_dip,
+			    DDI_INTR_TYPE_MSI, irqptr->airq_ioapicindex);
 
-			(void) apic_pci_msi_disable_mode(irqptr->airq_dip,
-			    type, irqptr->airq_ioapicindex);
+			apic_pci_msi_disable_mode(irqptr->airq_dip,
+			    DDI_INTR_TYPE_MSI);
+		}
+	} else if (irqptr->airq_mps_intr_index == MSIX_INDEX) {
+		/*
+		 * Disable the MSI-X vector
+		 * needs to clear its mask and addr/data for each MSI-X
+		 */
+		apic_pci_msi_unconfigure(irqptr->airq_dip, DDI_INTR_TYPE_MSIX,
+		    irqptr->airq_origirq);
+		/*
+		 * Make sure we only disable on the last MSI-X
+		 */
+		if (i_ddi_intr_get_current_nintrs(irqptr->airq_dip) == 1) {
+			apic_pci_msi_disable_mode(irqptr->airq_dip,
+			    DDI_INTR_TYPE_MSIX);
 		}
 	} else {
 		/*
@@ -2860,30 +2867,31 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 	} else {
 		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
 		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
-		if (ioapicindex == irq_ptr->airq_origirq) {
-			/* first one */
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
-			    "apic_pci_msi_enable_vector\n"));
-			if (apic_pci_msi_enable_vector(irq_ptr->airq_dip, type,
-			    which_irq, irq_ptr->airq_vector,
-			    irq_ptr->airq_intin_no,
-			    cpu_infop->aci_local_id) != PSM_SUCCESS) {
-				cmn_err(CE_WARN, "pcplusmp: "
-				    "apic_pci_msi_enable_vector "
-				    "returned PSM_FAILURE");
+		if (type == DDI_INTR_TYPE_MSI) {
+			if (irq_ptr->airq_ioapicindex ==
+			    irq_ptr->airq_origirq) {
+				/* first one */
+				DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
+				    "apic_pci_msi_enable_vector\n"));
+				apic_pci_msi_enable_vector(irq_ptr->airq_dip,
+				    type, which_irq, irq_ptr->airq_vector,
+				    irq_ptr->airq_intin_no,
+				    cpu_infop->aci_local_id);
 			}
-		}
-		if ((ioapicindex + irq_ptr->airq_intin_no - 1) ==
-		    irq_ptr->airq_origirq) { /* last one */
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
-			    "pci_msi_enable_mode\n"));
-			if (apic_pci_msi_enable_mode(irq_ptr->airq_dip,
-			    type, which_irq) != PSM_SUCCESS) {
-				DDI_INTR_IMPLDBG((CE_CONT, "pcplusmp: "
-				    "pci_msi_enable failed\n"));
-				(void) apic_pci_msi_unconfigure(
-				    irq_ptr->airq_dip, type, which_irq);
+			if ((irq_ptr->airq_ioapicindex +
+			    irq_ptr->airq_intin_no - 1) ==
+			    irq_ptr->airq_origirq) { /* last one */
+				DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
+				    "apic_pci_msi_enable_mode\n"));
+				apic_pci_msi_enable_mode(irq_ptr->airq_dip,
+				    type, which_irq);
 			}
+		} else { /* MSI-X */
+			apic_pci_msi_enable_vector(irq_ptr->airq_dip, type,
+			    irq_ptr->airq_origirq, irq_ptr->airq_vector, 1,
+			    cpu_infop->aci_local_id);
+			apic_pci_msi_enable_mode(irq_ptr->airq_dip, type,
+			    irq_ptr->airq_origirq);
 		}
 	}
 	irq_ptr->airq_temp_cpu = (uchar_t)bind_cpu;

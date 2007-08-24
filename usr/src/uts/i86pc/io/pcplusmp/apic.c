@@ -1885,10 +1885,29 @@ mapout_ioapic(caddr_t addr, size_t len)
 }
 
 /*
- * This function allocate "count" vector(s) for the given "dip/pri/type"
+ * Check to make sure there are enough irq slots
  */
 int
-apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
+apic_check_free_irqs(int count)
+{
+	int i, avail;
+
+	avail = 0;
+	for (i = APIC_FIRST_FREE_IRQ; i < APIC_RESV_IRQ; i++) {
+		if ((apic_irq_table[i] == NULL) ||
+		    apic_irq_table[i]->airq_mps_intr_index == FREE_INDEX) {
+			if (++avail >= count)
+				return (PSM_SUCCESS);
+		}
+	}
+	return (PSM_FAILURE);
+}
+
+/*
+ * This function allocates "count" MSI vector(s) for the given "dip/pri/type"
+ */
+int
+apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
     int behavior)
 {
 	int	rcount, i;
@@ -1896,13 +1915,9 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 	major_t	major;
 	apic_irq_t	*irqptr;
 
-	/* only supports MSI at the moment, will add MSI-X support later */
-	if (type != DDI_INTR_TYPE_MSI)
-		return (0);
-
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: dip=0x%p type=%d "
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: dip=0x%p "
 	    "inum=0x%x  pri=0x%x count=0x%x behavior=%d\n",
-	    (void *)dip, type, inum, pri, count, behavior));
+	    (void *)dip, inum, pri, count, behavior));
 
 	if (count > 1) {
 		if (behavior == DDI_INTR_ALLOC_STRICT &&
@@ -1939,12 +1954,22 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 		return (0);
 	}
 
+	if (apic_check_free_irqs(rcount) == PSM_FAILURE) {
+		/* not enough free irq slots available */
+		mutex_exit(&airq_mutex);
+		return (0);
+	}
+
 	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
 	for (i = 0; i < rcount; i++) {
 		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
 		    (uchar_t)-1) {
+			/*
+			 * shouldn't happen because of the
+			 * apic_check_free_irqs() check earlier
+			 */
 			mutex_exit(&airq_mutex);
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
+			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: "
 			    "apic_allocate_irq failed\n"));
 			return (i);
 		}
@@ -1953,7 +1978,7 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 		irqptr = apic_irq_table[irqno];
 #ifdef	DEBUG
 		if (apic_vector_to_irq[start + i] != APIC_RESV_IRQ)
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
+			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: "
 			    "apic_vector_to_irq is not APIC_RESV_IRQ\n"));
 #endif
 		apic_vector_to_irq[start + i] = (uchar_t)irqno;
@@ -1973,11 +1998,88 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 			    0xff, 0xff);
 		else
 			irqptr->airq_cpu = cpu;
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: irq=0x%x "
+		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: irq=0x%x "
 		    "dip=0x%p vector=0x%x origirq=0x%x pri=0x%x\n", irqno,
 		    (void *)irqptr->airq_dip, irqptr->airq_vector,
 		    irqptr->airq_origirq, pri));
 	}
+	mutex_exit(&airq_mutex);
+	return (rcount);
+}
+
+/*
+ * This function allocates "count" MSI-X vector(s) for the given "dip/pri/type"
+ */
+int
+apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
+    int behavior)
+{
+	int	rcount, i;
+	major_t	major;
+
+	if (count > 1) {
+		if (behavior == DDI_INTR_ALLOC_STRICT) {
+			if (count > apic_msix_max)
+				return (0);
+		} else if (count > apic_msix_max)
+			count = apic_msix_max;
+	}
+
+	mutex_enter(&airq_mutex);
+
+	if ((rcount = apic_navail_vector(dip, pri)) > count)
+		rcount = count;
+	else if (rcount == 0 || (rcount < count &&
+	    behavior == DDI_INTR_ALLOC_STRICT)) {
+		rcount = 0;
+		goto out;
+	}
+
+	if (apic_check_free_irqs(rcount) == PSM_FAILURE) {
+		/* not enough free irq slots available */
+		rcount = 0;
+		goto out;
+	}
+
+	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	for (i = 0; i < rcount; i++) {
+		uchar_t	vector, irqno;
+		apic_irq_t	*irqptr;
+
+		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
+		    (uchar_t)-1) {
+			/*
+			 * shouldn't happen because of the
+			 * apic_check_free_irqs() check earlier
+			 */
+			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msix_vectors: "
+			    "apic_allocate_irq failed\n"));
+			rcount = i;
+			goto out;
+		}
+		if ((vector = apic_allocate_vector(pri, irqno, 1)) == 0) {
+			/*
+			 * shouldn't happen because of the
+			 * apic_navail_vector() call earlier
+			 */
+			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msix_vectors: "
+			    "apic_allocate_vector failed\n"));
+			rcount = i;
+			goto out;
+		}
+		apic_max_device_irq = max(irqno, apic_max_device_irq);
+		apic_min_device_irq = min(irqno, apic_min_device_irq);
+		irqptr = apic_irq_table[irqno];
+		irqptr->airq_vector = (uchar_t)vector;
+		irqptr->airq_ipl = pri;
+		irqptr->airq_origirq = (uchar_t)(inum + i);
+		irqptr->airq_share_id = 0;
+		irqptr->airq_mps_intr_index = MSIX_INDEX;
+		irqptr->airq_dip = dip;
+		irqptr->airq_major = major;
+		irqptr->airq_cpu = apic_bind_intr(dip, irqno, 0xff, 0xff);
+	}
+out:
 	mutex_exit(&airq_mutex);
 	return (rcount);
 }

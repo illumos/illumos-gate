@@ -47,8 +47,6 @@ extern struct av_head autovect[];
 /*
  *	Local Function Prototypes
  */
-int		apic_pci_msi_enable_vector(dev_info_t *, int, int,
-		    int, int, int);
 apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
 static int	apic_get_pending(apic_irq_t *, int);
 static void	apic_clear_mask(apic_irq_t *);
@@ -70,13 +68,17 @@ int	apic_support_msi = 0;
 int	apic_multi_msi_enable = 1;
 int	apic_multi_msi_max = 2;
 
+/* Maximum no. of MSI-X vectors supported */
+int	apic_msix_enable = 1;
+int	apic_msix_max = 2;
+
 /*
  * apic_pci_msi_enable_vector:
  *	Set the address/data fields in the MSI/X capability structure
  *	XXX: MSI-X support
  */
 /* ARGSUSED */
-int
+void
 apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
     int count, int target_apic_id)
 {
@@ -89,8 +91,7 @@ apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
 	    "\tdriver = %s, inum=0x%x vector=0x%x apicid=0x%x\n", (void *)dip,
 	    ddi_driver_name(dip), inum, vector, target_apic_id));
 
-	if (handle == NULL || cap_ptr == 0)
-		return (PSM_FAILURE);
+	ASSERT((handle != NULL) && (cap_ptr != 0));
 
 	/* MSI Address */
 	msi_addr = (MSI_ADDR_HDR | (target_apic_id << MSI_ADDR_DEST_SHIFT));
@@ -136,8 +137,6 @@ apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
 		ddi_put64(msix_p->msix_tbl_hdl,
 		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
 	}
-
-	return (PSM_SUCCESS);
 }
 
 
@@ -244,9 +243,11 @@ apic_find_irq(dev_info_t *dip, struct intrspec *ispec, int type)
 		if ((irqp->airq_dip == dip) &&
 		    (irqp->airq_origirq == ispec->intrspec_vec) &&
 		    (irqp->airq_ipl == ispec->intrspec_pri)) {
-			if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
-				if (APIC_IS_MSI_OR_MSIX_INDEX(irqp->
-				    airq_mps_intr_index))
+			if (type == DDI_INTR_TYPE_MSI) {
+				if (irqp->airq_mps_intr_index == MSI_INDEX)
+					return (irqp);
+			} else if (type == DDI_INTR_TYPE_MSIX) {
+				if (irqp->airq_mps_intr_index == MSIX_INDEX)
 					return (irqp);
 			} else
 				return (irqp);
@@ -445,15 +446,14 @@ apic_check_msi_support()
  * i) are called only for MSI/X interrupts.
  * ii) called with interrupts disabled, and must not block
  */
-int
+void
 apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 {
 	ushort_t		msi_ctrl;
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL || cap_ptr == 0)
-		return (PSM_FAILURE);
+	ASSERT((handle != NULL) && (cap_ptr != 0));
 
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
@@ -473,7 +473,16 @@ apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
+		uint32_t	mask;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into "inum"th entry in the MSI-X table & mask it */
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+
+		mask = ddi_get32(msix_p->msix_tbl_hdl, (uint32_t *)off);
+
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, (mask | 1));
 
 		/* Offset into the "inum"th entry in the MSI-X table */
 		off = (uintptr_t)msix_p->msix_tbl_addr +
@@ -484,96 +493,83 @@ apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
 		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
 	}
-
-	return (PSM_SUCCESS);
 }
 
 
 /*
  * apic_pci_msi_enable_mode:
  */
-int
+void
 apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 {
 	ushort_t		msi_ctrl;
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL || cap_ptr == 0)
-		return (PSM_FAILURE);
+	ASSERT((handle != NULL) && (cap_ptr != 0));
 
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
 		if ((msi_ctrl & PCI_MSI_ENABLE_BIT))
-			return (PSM_SUCCESS);
+			return;
 
 		msi_ctrl |= PCI_MSI_ENABLE_BIT;
 		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
+		uint32_t	mask;
 		ddi_intr_msix_t	*msix_p;
-
-		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
-
-		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
-			return (PSM_SUCCESS);
-
-		msi_ctrl |= PCI_MSIX_ENABLE_BIT;
-		pci_config_put16(handle, cap_ptr + PCI_MSIX_CTRL, msi_ctrl);
 
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into "inum"th entry in the MSI-X table & clear mask */
 		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
-		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0);
-	}
 
-	return (PSM_SUCCESS);
+		mask = ddi_get32(msix_p->msix_tbl_hdl, (uint32_t *)off);
+
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, (mask & ~1));
+
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
+
+		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT)) {
+			msi_ctrl |= PCI_MSIX_ENABLE_BIT;
+			pci_config_put16(handle, cap_ptr + PCI_MSIX_CTRL,
+			    msi_ctrl);
+		}
+	}
 }
 
 /*
  * apic_pci_msi_disable_mode:
  */
-int
-apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
+void
+apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 {
 	ushort_t		msi_ctrl;
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL || cap_ptr == 0)
-		return (PSM_FAILURE);
+	ASSERT((handle != NULL) && (cap_ptr != 0));
 
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
 		if (!(msi_ctrl & PCI_MSI_ENABLE_BIT))
-			return (PSM_SUCCESS);
+			return;
 
 		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;	/* MSI disable */
 		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uintptr_t	off;
-		ddi_intr_msix_t	*msix_p;
-
 		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
-
-		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
-			return (PSM_SUCCESS);
-
-		msix_p = i_ddi_get_msix(rdip);
-
-		/* Offset into "inum"th entry in the MSI-X table & mask it */
-		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
-		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
-		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x1);
+		if (msi_ctrl & PCI_MSIX_ENABLE_BIT) {
+			msi_ctrl &= ~PCI_MSIX_ENABLE_BIT;
+			pci_config_put16(handle, cap_ptr + PCI_MSIX_CTRL,
+			    msi_ctrl);
+		}
 	}
-
-	return (PSM_SUCCESS);
 }
-
 
 static int
 apic_set_cpu(uint32_t vector, int cpu, int *result)
@@ -908,16 +904,24 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			else
 				apic_support_msi = -1;
 		}
-		if (apic_support_msi == 1)
-			*result = hdlp->ih_type;
-		else
+		if (apic_support_msi == 1) {
+			if (apic_msix_enable)
+				*result = hdlp->ih_type;
+			else
+				*result = hdlp->ih_type & ~DDI_INTR_TYPE_MSIX;
+		} else
 			*result = hdlp->ih_type & ~(DDI_INTR_TYPE_MSI |
 			    DDI_INTR_TYPE_MSIX);
 		break;
 	case PSM_INTR_OP_ALLOC_VECTORS:
-		*result = apic_alloc_vectors(dip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, hdlp->ih_pri, hdlp->ih_type,
-		    (int)(uintptr_t)hdlp->ih_scratch2);
+		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+			*result = apic_alloc_msi_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, hdlp->ih_pri,
+			    (int)(uintptr_t)hdlp->ih_scratch2);
+		else
+			*result = apic_alloc_msix_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, hdlp->ih_pri,
+			    (int)(uintptr_t)hdlp->ih_scratch2);
 		break;
 	case PSM_INTR_OP_FREE_VECTORS:
 		apic_free_vectors(dip, hdlp->ih_inum, hdlp->ih_scratch1,
@@ -972,9 +976,14 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			return (PSM_FAILURE);
 
 		/* Now allocate the vectors */
-		count_vec = apic_alloc_vectors(dip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, new_priority, hdlp->ih_type,
-		    DDI_INTR_ALLOC_STRICT);
+		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+			count_vec = apic_alloc_msi_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, new_priority,
+			    DDI_INTR_ALLOC_STRICT);
+		else
+			count_vec = apic_alloc_msix_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, new_priority,
+			    DDI_INTR_ALLOC_STRICT);
 
 		/* Did we get new vectors? */
 		if (!count_vec)

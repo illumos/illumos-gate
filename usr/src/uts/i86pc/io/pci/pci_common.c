@@ -264,10 +264,6 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		/*
 		 * Filter device-level types through system-level support
 		 */
-
-		/* No official MSI-X support for now */
-		types &= ~DDI_INTR_TYPE_MSIX;
-
 		tmp_hdl.ih_type = types;
 		if ((*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_CHECK_MSI,
 		    &types) != PSM_SUCCESS)
