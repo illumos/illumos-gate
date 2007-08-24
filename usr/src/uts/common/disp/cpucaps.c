@@ -953,6 +953,9 @@ cpucaps_zone_get(zone_t *zone)
  *
  * Do not adjust for more than one tick worth of time.
  *
+ * It is possible that the project cap is being disabled while this routine is
+ * executed. This should not cause any issues since the association between the
+ * thread and its project is protected by thread lock.
  */
 static void
 caps_charge_adjust(kthread_id_t t, caps_sc_t *csc)
@@ -962,7 +965,7 @@ caps_charge_adjust(kthread_id_t t, caps_sc_t *csc)
 	hrtime_t	usage_delta;
 
 	ASSERT(THREAD_LOCK_HELD(t));
-	ASSERT(PROJECT_IS_CAPPED(kpj));
+	ASSERT(kpj->kpj_cpucap != NULL);
 
 	/* Get on-CPU time since birth of a thread */
 	new_usage = mstate_thread_onproc_time(t);
@@ -1006,6 +1009,13 @@ caps_charge_adjust(kthread_id_t t, caps_sc_t *csc)
  * Charge thread's project and return True if project or zone should be
  * penalized because its project or zone is exceeding its cap. Also sets
  * TS_PROJWAITQ or TS_ZONEWAITQ in this case.
+ *
+ * It is possible that the project cap is being disabled while this routine is
+ * executed. This should not cause any issues since the association between the
+ * thread and its project is protected by thread lock. It will still set
+ * TS_PROJECTWAITQ/TS_ZONEWAITQ in this case but cpucaps_enforce will not place
+ * anything on the blocked wait queue.
+ *
  */
 boolean_t
 cpucaps_charge(kthread_id_t t, caps_sc_t *csc, cpucaps_charge_t charge_type)
