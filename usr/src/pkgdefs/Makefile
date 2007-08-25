@@ -86,6 +86,7 @@ sparc_SUBDIRS= \
 	SUNWiopc.v \
 	SUNWpdu	  \
 	SUNWpstl.u \
+	SUNWqfed \
 	SUNWsckmr \
 	SUNWsckmu.u \
 	SUNWsckm.u \

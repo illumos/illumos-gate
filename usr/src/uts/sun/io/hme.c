@@ -400,8 +400,9 @@ static  char *autoneg_speed_bad_msg =
 /*
  * Function prototypes.
  */
-static	int hmeattach(dev_info_t *, ddi_attach_cmd_t);
-static	int hmedetach(dev_info_t *, ddi_detach_cmd_t);
+/* these two are global so that qfe can use them */
+int hmeattach(dev_info_t *, ddi_attach_cmd_t);
+int hmedetach(dev_info_t *, ddi_detach_cmd_t);
 static	boolean_t hmeinit_xfer_params(struct hme *);
 static	uint_t hmestop(struct hme *);
 static	void hmestatinit(struct hme *);
@@ -2720,7 +2721,7 @@ hmeget_hm_rev_property(struct hme *hmep)
  * record.  System will initialize the interface when it is ready
  * to accept packets.
  */
-static int
+int
 hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct hme *hmep;
@@ -3104,7 +3105,7 @@ error_state:
 	return (DDI_FAILURE);
 }
 
-static int
+int
 hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct hme *hmep;
@@ -3495,12 +3496,14 @@ hmestatinit(struct hme *hmep)
 {
 	struct	kstat	*ksp;
 	struct	hmekstat	*hkp;
+	const char *driver;
 	int	instance;
 	char	buf[16];
 
 	instance = hmep->instance;
+	driver = ddi_driver_name(hmep->dip);
 
-	if ((ksp = kstat_create("hme", instance,
+	if ((ksp = kstat_create(driver, instance,
 	    "driver_info", "net", KSTAT_TYPE_NAMED,
 	    sizeof (struct hmekstat) / sizeof (kstat_named_t), 0)) == NULL) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, INIT_MSG,
@@ -3508,8 +3511,8 @@ hmestatinit(struct hme *hmep)
 		return;
 	}
 
-	(void) sprintf(buf, "hmec%d", instance);
-	hmep->hme_intrstats = kstat_create("hme", instance, buf, "controller",
+	(void) snprintf(buf, sizeof (buf), "%sc%d", driver, instance);
+	hmep->hme_intrstats = kstat_create(driver, instance, buf, "controller",
 	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (hmep->hme_intrstats)
 		kstat_install(hmep->hme_intrstats);

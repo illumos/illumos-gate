@@ -70,6 +70,8 @@ HME_OBJS +=	hme.o
 
 ERI_OBJS +=	eri.o
 
+QFE_OBJS +=	qfe.o
+
 SBUSMEM_OBJS +=	sbusmem.o
 
 SD_OBJS +=	sd.o sd_xbuf.o
