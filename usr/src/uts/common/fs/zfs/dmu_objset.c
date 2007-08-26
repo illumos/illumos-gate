@@ -309,7 +309,7 @@ dmu_objset_close(objset_t *os)
 }
 
 int
-dmu_objset_evict_dbufs(objset_t *os, boolean_t try)
+dmu_objset_evict_dbufs(objset_t *os)
 {
 	objset_impl_t *osi = os->os;
 	dnode_t *dn;
@@ -327,34 +327,25 @@ dmu_objset_evict_dbufs(objset_t *os, boolean_t try)
 	 * skip.
 	 */
 	for (dn = list_head(&osi->os_dnodes);
-	    dn && refcount_is_zero(&dn->dn_holds);
+	    dn && !dnode_add_ref(dn, FTAG);
 	    dn = list_next(&osi->os_dnodes, dn))
 		continue;
-	if (dn)
-		dnode_add_ref(dn, FTAG);
 
 	while (dn) {
 		dnode_t *next_dn = dn;
 
 		do {
 			next_dn = list_next(&osi->os_dnodes, next_dn);
-		} while (next_dn && refcount_is_zero(&next_dn->dn_holds));
-		if (next_dn)
-			dnode_add_ref(next_dn, FTAG);
+		} while (next_dn && !dnode_add_ref(next_dn, FTAG));
 
 		mutex_exit(&osi->os_lock);
-		if (dnode_evict_dbufs(dn, try)) {
-			dnode_rele(dn, FTAG);
-			if (next_dn)
-				dnode_rele(next_dn, FTAG);
-			return (1);
-		}
+		dnode_evict_dbufs(dn);
 		dnode_rele(dn, FTAG);
 		mutex_enter(&osi->os_lock);
 		dn = next_dn;
 	}
 	mutex_exit(&osi->os_lock);
-	return (0);
+	return (list_head(&osi->os_dnodes) != osi->os_meta_dnode);
 }
 
 void
@@ -383,7 +374,7 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 	 * nothing can be added to the list at this point.
 	 */
 	os.os = osi;
-	(void) dmu_objset_evict_dbufs(&os, 0);
+	(void) dmu_objset_evict_dbufs(&os);
 
 	ASSERT3P(list_head(&osi->os_dnodes), ==, osi->os_meta_dnode);
 	ASSERT3P(list_tail(&osi->os_dnodes), ==, osi->os_meta_dnode);

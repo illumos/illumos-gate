@@ -610,13 +610,13 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 		VERIFY(0 == dmu_bonus_hold(os, drro->drr_object, FTAG, &db));
 		dmu_buf_will_dirty(db, tx);
 
-		ASSERT3U(db->db_size, ==, drro->drr_bonuslen);
-		data = restore_read(ra, P2ROUNDUP(db->db_size, 8));
+		ASSERT3U(db->db_size, >=, drro->drr_bonuslen);
+		data = restore_read(ra, P2ROUNDUP(drro->drr_bonuslen, 8));
 		if (data == NULL) {
 			dmu_tx_commit(tx);
 			return (ra->err);
 		}
-		bcopy(data, db->db_data, db->db_size);
+		bcopy(data, db->db_data, drro->drr_bonuslen);
 		if (ra->byteswap) {
 			dmu_ot[drro->drr_bonustype].ot_byteswap(db->db_data,
 			    drro->drr_bonuslen);

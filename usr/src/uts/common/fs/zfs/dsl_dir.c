@@ -691,14 +691,13 @@ struct tempreserve {
  * be canceled, using dsl_dir_tempreserve_clear().
  */
 static int
-dsl_dir_tempreserve_impl(dsl_dir_t *dd,
-    uint64_t asize, boolean_t netfree, list_t *tr_list, dmu_tx_t *tx)
+dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize,
+    boolean_t netfree, boolean_t noquota, list_t *tr_list, dmu_tx_t *tx)
 {
 	uint64_t txg = tx->tx_txg;
 	uint64_t est_used, quota, parent_rsrv;
 	int edquot = EDQUOT;
 	int txgidx = txg & TXG_MASK;
-	boolean_t ismos;
 	int i;
 	struct tempreserve *tr;
 
@@ -718,7 +717,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	 * If this transaction will result in a net free of space, we want
 	 * to let it through.
 	 */
-	if (netfree || dd->dd_phys->dd_quota == 0)
+	if (netfree || noquota || dd->dd_phys->dd_quota == 0)
 		quota = UINT64_MAX;
 	else
 		quota = dd->dd_phys->dd_quota;
@@ -732,8 +731,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	 * we're very close to full, this will allow a steady trickle of
 	 * removes to get through.
 	 */
-	ismos = (dd->dd_phys->dd_head_dataset_obj == 0);
-	if (dd->dd_parent == NULL || ismos) {
+	if (dd->dd_parent == NULL) {
 		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, netfree);
 		if (poolsize < quota) {
 			quota = poolsize;
@@ -773,9 +771,11 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	list_insert_tail(tr_list, tr);
 
 	/* see if it's OK with our parent */
-	if (dd->dd_parent && parent_rsrv && !ismos) {
+	if (dd->dd_parent && parent_rsrv) {
+		boolean_t ismos = (dd->dd_phys->dd_head_dataset_obj == 0);
+
 		return (dsl_dir_tempreserve_impl(dd->dd_parent,
-		    parent_rsrv, netfree, tr_list, tx));
+		    parent_rsrv, netfree, ismos, tr_list, tx));
 	} else {
 		return (0);
 	}
@@ -800,7 +800,7 @@ dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize,
 	ASSERT3S(asize, >=, 0);
 	ASSERT3S(fsize, >=, 0);
 
-	err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize,
+	err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize, FALSE,
 	    tr_list, tx);
 
 	if (err == 0) {

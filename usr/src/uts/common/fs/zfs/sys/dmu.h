@@ -157,7 +157,7 @@ void zfs_znode_byteswap(void *buf, size_t size);
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
 void dmu_objset_close(objset_t *os);
-int dmu_objset_evict_dbufs(objset_t *os, boolean_t try);
+int dmu_objset_evict_dbufs(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
     objset_t *clone_parent,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
@@ -294,6 +294,7 @@ int dmu_get_replication_level(struct objset_impl *, struct zbookmark *zb,
  */
 int dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **);
 int dmu_bonus_max(void);
+int dmu_set_bonus(dmu_buf_t *, int, dmu_tx_t *);
 
 /*
  * Obtain the DMU buffer from the specified object which contains the

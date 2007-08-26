@@ -534,8 +534,8 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 
 	VERIFY(0 == dmu_bonus_hold(mos, smo->smo_object, FTAG, &db));
 	dmu_buf_will_dirty(db, tx);
-	ASSERT3U(db->db_size, ==, sizeof (*smo));
-	bcopy(smo, db->db_data, db->db_size);
+	ASSERT3U(db->db_size, >=, sizeof (*smo));
+	bcopy(smo, db->db_data, sizeof (*smo));
 	dmu_buf_rele(db, FTAG);
 
 	dmu_tx_commit(tx);

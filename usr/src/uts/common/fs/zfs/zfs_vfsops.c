@@ -1132,12 +1132,9 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	}
 
 	/*
-	 * Evict all dbufs so that cached znodes will be freed
+	 * Evict cached data
 	 */
-	if (dmu_objset_evict_dbufs(os, B_TRUE)) {
-		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
-		(void) dmu_objset_evict_dbufs(os, B_FALSE);
-	}
+	(void) dmu_objset_evict_dbufs(os);
 
 	/*
 	 * Finally close the objset

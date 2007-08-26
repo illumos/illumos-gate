@@ -64,6 +64,7 @@ extern "C" {
 #define	DN_MAX_NBLKPTR	((DNODE_SIZE - DNODE_CORE_SIZE) >> SPA_BLKPTRSHIFT)
 #define	DN_MAX_BONUSLEN	(DNODE_SIZE - DNODE_CORE_SIZE - (1 << SPA_BLKPTRSHIFT))
 #define	DN_MAX_OBJECT	(1ULL << DN_MAX_OBJECT_SHIFT)
+#define	DN_ZERO_BONUSLEN	(DN_MAX_BONUSLEN + 1)
 
 #define	DNODES_PER_BLOCK_SHIFT	(DNODE_BLOCK_SHIFT - DNODE_SHIFT)
 #define	DNODES_PER_BLOCK	(1ULL << DNODES_PER_BLOCK_SHIFT)
@@ -156,6 +157,7 @@ typedef struct dnode {
 	uint64_t dn_maxblkid;
 	uint8_t dn_next_nlevels[TXG_SIZE];
 	uint8_t dn_next_indblkshift[TXG_SIZE];
+	uint16_t dn_next_bonuslen[TXG_SIZE];
 	uint32_t dn_next_blksz[TXG_SIZE];	/* next block size in bytes */
 
 	/* protected by os_lock: */
@@ -197,11 +199,12 @@ dnode_t *dnode_special_open(struct objset_impl *dd, dnode_phys_t *dnp,
     uint64_t object);
 void dnode_special_close(dnode_t *dn);
 
+void dnode_setbonuslen(dnode_t *dn, int newsize, dmu_tx_t *tx);
 int dnode_hold(struct objset_impl *dd, uint64_t object,
     void *ref, dnode_t **dnp);
 int dnode_hold_impl(struct objset_impl *dd, uint64_t object, int flag,
     void *ref, dnode_t **dnp);
-void dnode_add_ref(dnode_t *dn, void *ref);
+boolean_t dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);
 void dnode_setdirty(dnode_t *dn, dmu_tx_t *tx);
 void dnode_sync(dnode_t *dn, dmu_tx_t *tx);
@@ -226,7 +229,7 @@ void dnode_init(void);
 void dnode_fini(void);
 int dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *off, int minlvl,
     uint64_t blkfill, uint64_t txg);
-int dnode_evict_dbufs(dnode_t *dn, boolean_t try);
+void dnode_evict_dbufs(dnode_t *dn);
 
 #ifdef ZFS_DEBUG
 

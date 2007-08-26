@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,7 @@ list_remove(list_t *list, void *object)
 {
 	list_node_t *lold = list_d2l(list, object);
 	ASSERT(!list_empty(list));
+	ASSERT(lold->list_next != NULL);
 	lold->list_prev->list_next = lold->list_next;
 	lold->list_next->list_prev = lold->list_prev;
 	lold->list_next = lold->list_prev = NULL;

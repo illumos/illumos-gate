@@ -1016,12 +1016,15 @@ bp_get_dasize(spa_t *spa, const blkptr_t *bp)
 	if (!spa->spa_deflate)
 		return (BP_GET_ASIZE(bp));
 
+	spa_config_enter(spa, RW_READER, FTAG);
 	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
 		vdev_t *vd =
 		    vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[i]));
-		sz += (DVA_GET_ASIZE(&bp->blk_dva[i]) >> SPA_MINBLOCKSHIFT) *
-		    vd->vdev_deflate_ratio;
+		if (vd)
+			sz += (DVA_GET_ASIZE(&bp->blk_dva[i]) >>
+			    SPA_MINBLOCKSHIFT) * vd->vdev_deflate_ratio;
 	}
+	spa_config_exit(spa, FTAG);
 	return (sz);
 }
 

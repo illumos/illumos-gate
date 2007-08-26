@@ -1541,7 +1541,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 		ASSERT(doi.doi_bonus_type == DMU_OT_PLAIN_OTHER);
 		ASSERT3S(doi.doi_physical_blks, >=, 0);
 
-		bonuslen = db->db_size;
+		bonuslen = doi.doi_bonus_size;
 
 		for (c = 0; c < bonuslen; c++) {
 			if (((uint8_t *)db->db_data)[c] !=
@@ -1660,7 +1660,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 		 * Write to both the bonus buffer and the regular data.
 		 */
 		VERIFY(0 == dmu_bonus_hold(os, object, FTAG, &db));
-		ASSERT3U(bonuslen, ==, db->db_size);
+		ASSERT3U(bonuslen, <=, db->db_size);
 
 		dmu_object_size_from_db(db, &va_blksize, &va_nblocks);
 		ASSERT3S(va_nblocks, >=, 0);
@@ -1671,7 +1671,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 		 * See comments above regarding the contents of
 		 * the bonus buffer and the word at endoff.
 		 */
-		for (c = 0; c < db->db_size; c++)
+		for (c = 0; c < bonuslen; c++)
 			((uint8_t *)db->db_data)[c] = (uint8_t)(c + bonuslen);
 
 		dmu_buf_rele(db, FTAG);
@@ -1948,8 +1948,8 @@ ztest_dmu_check_future_leak(objset_t *os, uint64_t txg)
 	 */
 
 	VERIFY(0 == dmu_bonus_hold(os, ZTEST_DIROBJ, FTAG, &db));
-	ASSERT3U(db->db_size, ==, sizeof (rbt));
-	bcopy(db->db_data, &rbt, db->db_size);
+	ASSERT3U(db->db_size, >=, sizeof (rbt));
+	bcopy(db->db_data, &rbt, sizeof (rbt));
 	if (rbt.bt_objset != 0) {
 		ASSERT3U(rbt.bt_objset, ==, dmu_objset_id(os));
 		ASSERT3U(rbt.bt_object, ==, ZTEST_DIROBJ);
@@ -2041,19 +2041,37 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		wbt.bt_thread = za->za_instance;
 
 		if (off == -1ULL) {
+			dmu_object_info_t doi;
+			char *off;
+
 			wbt.bt_seq = 0;
 			VERIFY(0 == dmu_bonus_hold(os, ZTEST_DIROBJ,
 			    FTAG, &db));
-			ASSERT3U(db->db_size, ==, sizeof (wbt));
-			bcopy(db->db_data, &rbt, db->db_size);
+			dmu_object_info_from_db(db, &doi);
+			ASSERT3U(doi.doi_bonus_size, >=, sizeof (wbt));
+			off = (char *)db->db_data +
+			    doi.doi_bonus_size - sizeof (wbt);
+			bcopy(off, &rbt, sizeof (wbt));
 			if (rbt.bt_objset != 0) {
 				ASSERT3U(rbt.bt_objset, ==, wbt.bt_objset);
 				ASSERT3U(rbt.bt_object, ==, wbt.bt_object);
 				ASSERT3U(rbt.bt_offset, ==, wbt.bt_offset);
 				ASSERT3U(rbt.bt_txg, <=, wbt.bt_txg);
 			}
+			if (ztest_random(10) == 0) {
+				int newsize = (ztest_random(
+				    db->db_size / sizeof (wbt)) + 1) *
+				    sizeof (wbt);
+
+				ASSERT3U(newsize, >=, sizeof (wbt));
+				ASSERT3U(newsize, <=, db->db_size);
+				error = dmu_set_bonus(db, newsize, tx);
+				ASSERT3U(error, ==, 0);
+				off = (char *)db->db_data + newsize -
+				    sizeof (wbt);
+			}
 			dmu_buf_will_dirty(db, tx);
-			bcopy(&wbt, db->db_data, db->db_size);
+			bcopy(&wbt, off, db->db_size);
 			dmu_buf_rele(db, FTAG);
 			dmu_tx_commit(tx);
 			continue;

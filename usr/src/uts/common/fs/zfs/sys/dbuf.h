@@ -239,7 +239,7 @@ typedef struct dbuf_hash_table {
 uint64_t dbuf_whichblock(struct dnode *di, uint64_t offset);
 
 dmu_buf_impl_t *dbuf_create_tlib(struct dnode *dn, char *data);
-dmu_buf_impl_t *dbuf_create_bonus(struct dnode *dn);
+void dbuf_create_bonus(struct dnode *dn);
 
 dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid, void *tag);
 dmu_buf_impl_t *dbuf_hold_level(struct dnode *dn, int level, uint64_t blkid,

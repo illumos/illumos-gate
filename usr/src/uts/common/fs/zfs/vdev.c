@@ -765,8 +765,8 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 				error = dmu_bonus_hold(mos, object, FTAG, &db);
 				if (error)
 					return (error);
-				ASSERT3U(db->db_size, ==, sizeof (smo));
-				bcopy(db->db_data, &smo, db->db_size);
+				ASSERT3U(db->db_size, >=, sizeof (smo));
+				bcopy(db->db_data, &smo, sizeof (smo));
 				ASSERT3U(smo.smo_object, ==, object);
 				dmu_buf_rele(db, FTAG);
 			}
@@ -1234,8 +1234,8 @@ vdev_dtl_load(vdev_t *vd)
 	if ((error = dmu_bonus_hold(mos, smo->smo_object, FTAG, &db)) != 0)
 		return (error);
 
-	ASSERT3U(db->db_size, ==, sizeof (*smo));
-	bcopy(db->db_data, smo, db->db_size);
+	ASSERT3U(db->db_size, >=, sizeof (*smo));
+	bcopy(db->db_data, smo, sizeof (*smo));
 	dmu_buf_rele(db, FTAG);
 
 	mutex_enter(&vd->vdev_dtl_lock);
@@ -1305,8 +1305,8 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 
 	VERIFY(0 == dmu_bonus_hold(mos, smo->smo_object, FTAG, &db));
 	dmu_buf_will_dirty(db, tx);
-	ASSERT3U(db->db_size, ==, sizeof (*smo));
-	bcopy(smo, db->db_data, db->db_size);
+	ASSERT3U(db->db_size, >=, sizeof (*smo));
+	bcopy(smo, db->db_data, sizeof (*smo));
 	dmu_buf_rele(db, FTAG);
 
 	dmu_tx_commit(tx);

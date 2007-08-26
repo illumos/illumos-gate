@@ -349,8 +349,8 @@ dnode_sync_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 /*
  * Try to kick all the dnodes dbufs out of the cache...
  */
-int
-dnode_evict_dbufs(dnode_t *dn, boolean_t try)
+void
+dnode_evict_dbufs(dnode_t *dn)
 {
 	int progress;
 	int pass = 0;
@@ -397,21 +397,6 @@ dnode_evict_dbufs(dnode_t *dn, boolean_t try)
 		ASSERT(pass < 100); /* sanity check */
 	} while (progress);
 
-	/*
-	 * This function works fine even if it can't evict everything.
-	 * If were only asked to try to evict everything then
-	 * return an error if we can't. Otherwise panic as the caller
-	 * expects total eviction.
-	 */
-	if (list_head(&dn->dn_dbufs) != NULL) {
-		if (try) {
-			return (1);
-		} else {
-			panic("dangling dbufs (dn=%p, dbuf=%p)\n",
-			    dn, list_head(&dn->dn_dbufs));
-		}
-	}
-
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	if (dn->dn_bonus && refcount_is_zero(&dn->dn_bonus->db_holds)) {
 		mutex_enter(&dn->dn_bonus->db_mtx);
@@ -419,7 +404,6 @@ dnode_evict_dbufs(dnode_t *dn, boolean_t try)
 		dn->dn_bonus = NULL;
 	}
 	rw_exit(&dn->dn_struct_rwlock);
-	return (0);
 }
 
 static void
@@ -459,7 +443,7 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dnode_undirty_dbufs(&dn->dn_dirty_records[txgoff]);
-	(void) dnode_evict_dbufs(dn, 0);
+	dnode_evict_dbufs(dn);
 	ASSERT3P(list_head(&dn->dn_dbufs), ==, NULL);
 
 	/*
@@ -565,6 +549,15 @@ dnode_sync(dnode_t *dn, dmu_tx_t *tx)
 		dn->dn_next_blksz[txgoff] = 0;
 	}
 
+	if (dn->dn_next_bonuslen[txgoff]) {
+		if (dn->dn_next_bonuslen[txgoff] == DN_ZERO_BONUSLEN)
+			dnp->dn_bonuslen = 0;
+		else
+			dnp->dn_bonuslen = dn->dn_next_bonuslen[txgoff];
+		ASSERT(dnp->dn_bonuslen <= DN_MAX_BONUSLEN);
+		dn->dn_next_bonuslen[txgoff] = 0;
+	}
+
 	if (dn->dn_next_indblkshift[txgoff]) {
 		ASSERT(dnp->dn_nlevels == 1);
 		dnp->dn_indblkshift = dn->dn_next_indblkshift[txgoff];
@@ -588,15 +581,16 @@ dnode_sync(dnode_t *dn, dmu_tx_t *tx)
 			dnode_sync_free_range(dn,
 			    rp->fr_blkid, rp->fr_nblks, tx);
 	}
+	/* grab the mutex so we don't race with dnode_block_freed() */
 	mutex_enter(&dn->dn_mtx);
 	for (rp = avl_first(&dn->dn_ranges[txgoff]); rp; ) {
+
 		free_range_t *last = rp;
 		rp = AVL_NEXT(&dn->dn_ranges[txgoff], rp);
 		avl_remove(&dn->dn_ranges[txgoff], last);
 		kmem_free(last, sizeof (free_range_t));
 	}
 	mutex_exit(&dn->dn_mtx);
-
 	if (dn->dn_free_txg > 0 && dn->dn_free_txg <= tx->tx_txg) {
 		dnode_sync_free(dn, tx);
 		return;

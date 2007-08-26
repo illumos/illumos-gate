@@ -307,7 +307,7 @@ dbuf_verify(dmu_buf_impl_t *db)
 	}
 	if (db->db_blkid == DB_BONUS_BLKID) {
 		ASSERT(dn != NULL);
-		ASSERT3U(db->db.db_size, ==, dn->dn_bonuslen);
+		ASSERT3U(db->db.db_size, >=, dn->dn_bonuslen);
 		ASSERT3U(db->db.db_offset, ==, DB_BONUS_BLKID);
 	} else {
 		ASSERT3U(db->db.db_offset, ==, db->db_blkid * db->db.db_size);
@@ -468,13 +468,15 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 	ASSERT(db->db_buf == NULL);
 
 	if (db->db_blkid == DB_BONUS_BLKID) {
-		ASSERT3U(db->db_dnode->dn_bonuslen, ==, db->db.db_size);
+		int bonuslen = db->db_dnode->dn_bonuslen;
+
+		ASSERT3U(bonuslen, <=, db->db.db_size);
 		db->db.db_data = zio_buf_alloc(DN_MAX_BONUSLEN);
 		arc_space_consume(DN_MAX_BONUSLEN);
-		if (db->db.db_size < DN_MAX_BONUSLEN)
+		if (bonuslen < DN_MAX_BONUSLEN)
 			bzero(db->db.db_data, DN_MAX_BONUSLEN);
 		bcopy(DN_BONUS(db->db_dnode->dn_phys), db->db.db_data,
-		    db->db.db_size);
+		    bonuslen);
 		dbuf_update_data(db);
 		db->db_state = DB_CACHED;
 		mutex_exit(&db->db_mtx);
@@ -781,14 +783,10 @@ dbuf_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 }
 
 static int
-dbuf_new_block(dmu_buf_impl_t *db)
+dbuf_block_freeable(dmu_buf_impl_t *db)
 {
 	dsl_dataset_t *ds = db->db_objset->os_dsl_dataset;
 	uint64_t birth_txg = 0;
-
-	/* Don't count meta-objects */
-	if (ds == NULL)
-		return (FALSE);
 
 	/*
 	 * We don't need any locking to protect db_blkptr:
@@ -796,16 +794,17 @@ dbuf_new_block(dmu_buf_impl_t *db)
 	 * so we'll ignore db_blkptr.
 	 */
 	ASSERT(MUTEX_HELD(&db->db_mtx));
-	/* If we have been dirtied since the last snapshot, its not new */
 	if (db->db_last_dirty)
 		birth_txg = db->db_last_dirty->dr_txg;
 	else if (db->db_blkptr)
 		birth_txg = db->db_blkptr->blk_birth;
 
+	/* If we don't exist or are in a snapshot, we can't be freed */
 	if (birth_txg)
-		return (!dsl_dataset_block_freeable(ds, birth_txg));
+		return (ds == NULL ||
+		    dsl_dataset_block_freeable(ds, birth_txg));
 	else
-		return (TRUE);
+		return (FALSE);
 }
 
 void
@@ -964,6 +963,27 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	dprintf_dbuf(db, "size=%llx\n", (u_longlong_t)db->db.db_size);
 
+	if (db->db_blkid != DB_BONUS_BLKID) {
+		/*
+		 * Update the accounting.
+		 */
+		if (dbuf_block_freeable(db)) {
+			blkptr_t *bp = db->db_blkptr;
+			int64_t willfree = (bp && !BP_IS_HOLE(bp)) ?
+			    bp_get_dasize(os->os_spa, bp) : db->db.db_size;
+			/*
+			 * This is only a guess -- if the dbuf is dirty
+			 * in a previous txg, we don't know how much
+			 * space it will use on disk yet.  We should
+			 * really have the struct_rwlock to access
+			 * db_blkptr, but since this is just a guess,
+			 * it's OK if we get an odd answer.
+			 */
+			dnode_willuse_space(dn, -willfree, tx);
+		}
+		dnode_willuse_space(dn, db->db.db_size, tx);
+	}
+
 	/*
 	 * If this buffer is dirty in an old transaction group we need
 	 * to make a copy of it so that the changes we make in this
@@ -1011,25 +1031,6 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		dnode_clear_range(dn, db->db_blkid, 1, tx);
 		mutex_exit(&dn->dn_mtx);
 		db->db_freed_in_flight = FALSE;
-	}
-
-	if (db->db_blkid != DB_BONUS_BLKID) {
-		/*
-		 * Update the accounting.
-		 */
-		if (!dbuf_new_block(db) && db->db_blkptr) {
-			/*
-			 * This is only a guess -- if the dbuf is dirty
-			 * in a previous txg, we don't know how much
-			 * space it will use on disk yet.  We should
-			 * really have the struct_rwlock to access
-			 * db_blkptr, but since this is just a guess,
-			 * it's OK if we get an odd answer.
-			 */
-			dnode_willuse_space(dn,
-			    -bp_get_dasize(os->os_spa, db->db_blkptr), tx);
-		}
-		dnode_willuse_space(dn, db->db.db_size, tx);
 	}
 
 	/*
@@ -1297,6 +1298,7 @@ dbuf_clear(dmu_buf_impl_t *db)
 	if (db->db_blkid != DB_BONUS_BLKID && MUTEX_HELD(&dn->dn_dbufs_mtx)) {
 		list_remove(&dn->dn_dbufs, db);
 		dnode_rele(dn, db);
+		db->db_dnode = NULL;
 	}
 
 	if (db->db_buf)
@@ -1397,7 +1399,9 @@ dbuf_create(dnode_t *dn, uint8_t level, uint64_t blkid,
 
 	if (blkid == DB_BONUS_BLKID) {
 		ASSERT3P(parent, ==, dn->dn_dbuf);
-		db->db.db_size = dn->dn_bonuslen;
+		db->db.db_size = DN_MAX_BONUSLEN -
+		    (dn->dn_nblkptr-1) * sizeof (blkptr_t);
+		ASSERT3U(db->db.db_size, >=, dn->dn_bonuslen);
 		db->db.db_offset = DB_BONUS_BLKID;
 		db->db_state = DB_UNCACHED;
 		/* the bonus dbuf is not placed in the hash table */
@@ -1471,29 +1475,23 @@ dbuf_destroy(dmu_buf_impl_t *db)
 	ASSERT(refcount_is_zero(&db->db_holds));
 
 	if (db->db_blkid != DB_BONUS_BLKID) {
-		dnode_t *dn = db->db_dnode;
-		boolean_t need_mutex = !MUTEX_HELD(&dn->dn_dbufs_mtx);
-
-		if (need_mutex)
-			mutex_enter(&dn->dn_dbufs_mtx);
-
 		/*
 		 * If this dbuf is still on the dn_dbufs list,
 		 * remove it from that list.
 		 */
-		if (list_link_active(&db->db_link)) {
-			ASSERT(need_mutex);
+		if (db->db_dnode) {
+			dnode_t *dn = db->db_dnode;
+
+			mutex_enter(&dn->dn_dbufs_mtx);
 			list_remove(&dn->dn_dbufs, db);
 			mutex_exit(&dn->dn_dbufs_mtx);
 
 			dnode_rele(dn, db);
-		} else if (need_mutex) {
-			mutex_exit(&dn->dn_dbufs_mtx);
+			db->db_dnode = NULL;
 		}
 		dbuf_hash_remove(db);
 	}
 	db->db_parent = NULL;
-	db->db_dnode = NULL;
 	db->db_buf = NULL;
 
 	ASSERT(!list_link_active(&db->db_link));
@@ -1662,16 +1660,13 @@ dbuf_hold_level(dnode_t *dn, int level, uint64_t blkid, void *tag)
 	return (err ? NULL : db);
 }
 
-dmu_buf_impl_t *
+void
 dbuf_create_bonus(dnode_t *dn)
 {
-	dmu_buf_impl_t *db = dn->dn_bonus;
-
 	ASSERT(RW_WRITE_HELD(&dn->dn_struct_rwlock));
 
 	ASSERT(dn->dn_bonus == NULL);
-	db = dbuf_create(dn, 0, DB_BONUS_BLKID, dn->dn_dbuf, NULL);
-	return (db);
+	dn->dn_bonus = dbuf_create(dn, 0, DB_BONUS_BLKID, dn->dn_dbuf, NULL);
 }
 
 #pragma weak dmu_buf_add_ref = dbuf_add_ref
@@ -1919,11 +1914,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	 */
 	if (db->db_blkid == DB_BONUS_BLKID) {
 		dbuf_dirty_record_t **drp;
-		/*
-		 * Use dn_phys->dn_bonuslen since db.db_size is the length
-		 * of the bonus buffer in the open transaction rather than
-		 * the syncing transaction.
-		 */
+
 		ASSERT(*datap != NULL);
 		ASSERT3U(db->db_level, ==, 0);
 		ASSERT3U(dn->dn_phys->dn_bonuslen, <=, DN_MAX_BONUSLEN);
