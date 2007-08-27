@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,26 +70,41 @@ typedef struct pciehpc_acpi {
 /*
  * _OSC method Capabilities buffer bit definitions (from PCI FW 3.0)
  */
-/* first DWORD: errors from _OSC invocation (except bit 0) */
-#define	OSC_DWORD1_QUERY_ENABLE	0x1	/* Query Support Flag */
-#define	OSC_DWORD1_FAILED	0x2	/* _OSC failure */
-#define	OSC_DWORD1_INV_UUID	0x4	/* invalid UUID */
-#define	OSC_DWORD1_INV_REVID	0x8	/* invalid revision ID */
-#define	OSC_CAPS_MASKED		0x10	/* capabilities masked */
+/* first DWORD: status from _OSC invocation (except bit 0) */
+#define	OSC_STATUS_QUERY_ENABLE	0x1	/* Query Support Flag */
+#define	OSC_STATUS_FAILED	0x2	/* _OSC failure */
+#define	OSC_STATUS_INV_UUID	0x4	/* invalid UUID */
+#define	OSC_STATUS_INV_REVID	0x8	/* invalid revision ID */
+#define	OSC_STATUS_CAPS_MASKED	0x10	/* capabilities masked */
+
+#define	OSC_STATUS_ERRORS \
+	(OSC_STATUS_FAILED | OSC_STATUS_INV_UUID | OSC_STATUS_INV_REVID)
 
 /* second DWORD: Support Field (set by OS) */
-#define	OSC_DWORD2_EXT_PCI_CFG	0x1	/* Extended PCI Config Ops supported */
-#define	OSC_DWORD2_ACT_PM	0x2	/* Active State PM supported */
-#define	OSC_DWORD2_CLK_PM_CAP	0x4	/* Clock PM Capability supported */
-#define	OSC_DWORD2_PCI_SEGS	0x8	/* PCI Segment Groups supported */
-#define	OSC_DWORD2_MSI		0x10	/* MSI supported */
+#define	OSC_SUPPORT_EXT_PCI_CFG	0x1	/* Extended PCI Config Ops supported */
+#define	OSC_SUPPORT_ACT_PM	0x2	/* Active State PM supported */
+#define	OSC_SUPPORT_CLK_PM_CAP	0x4	/* Clock PM Capability supported */
+#define	OSC_SUPPORT_PCI_SEGS	0x8	/* PCI Segment Groups supported */
+#define	OSC_SUPPORT_MSI		0x10	/* MSI supported */
 
 /* third DWORD: Control Field (set by OS/BIOS) */
-#define	OSC_DWORD3_PCIE_NAT_HP	0x1	/* PCI Exp Native Hot Plug control */
-#define	OSC_DWORD3_SHPC_NAT_HP	0x2	/* SHPC Native Hot Plug control */
-#define	OSC_DWORD3_PCIE_NAT_PM	0x4	/* PCI Exp Native Power Mgmt. control */
-#define	OSC_DWORD3_PCIE_ADV_ERR	0x8	/* PCIE Advanced Err. rep. control */
-#define	OSC_DWORD3_PCE_CAPS	0x10	/* PCIE Caps Structure control */
+#define	OSC_CONTROL_PCIE_NAT_HP	0x1	/* PCI Exp Native Hot Plug control */
+#define	OSC_CONTROL_SHPC_NAT_HP	0x2	/* SHPC Native Hot Plug control */
+#define	OSC_CONTROL_PCIE_NAT_PM	0x4	/* PCI Exp Native Power Mgmt. control */
+#define	OSC_CONTROL_PCIE_ADV_ERR 0x8	/* PCIE Advanced Err. rep. control */
+#define	OSC_CONTROL_PCIE_CAPS	0x10	/* PCIE Caps Structure control */
+
+#define	OSC_CONTROL_FIELD_INIT \
+	(OSC_CONTROL_PCIE_NAT_PM | OSC_CONTROL_PCIE_NAT_HP | \
+	OSC_CONTROL_PCIE_CAPS | OSC_CONTROL_PCIE_ADV_ERR)
+
+#define	OSC_SUPPORT_FIELD_INIT \
+	(OSC_SUPPORT_EXT_PCI_CFG | \
+	OSC_SUPPORT_ACT_PM | OSC_SUPPORT_CLK_PM_CAP | \
+	OSC_SUPPORT_MSI | OSC_SUPPORT_PCI_SEGS)
+
+#define	ACPI_HP_MODE	1
+#define	NATIVE_HP_MODE	2
 
 /* Device status bit as returned by _STA method (see 6.3.7 of ACPI 3.0) */
 #define	DEV_STS_PRESENT		0x1	/* device is present */

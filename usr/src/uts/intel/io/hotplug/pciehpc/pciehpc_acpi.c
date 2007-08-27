@@ -62,10 +62,10 @@ static void pciehpc_acpi_notify_handler(ACPI_HANDLE device, uint32_t val,
 	void *context);
 static ACPI_STATUS pciehpc_acpi_ej0_present(ACPI_HANDLE pcibus_obj);
 static ACPI_STATUS pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp);
-static ACPI_STATUS pciehpc_acpi_query_osc(dev_info_t *dip, ACPI_HANDLE osc_hdl,
+static ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl,
 	uint32_t *hp_mode);
-static ACPI_STATUS pciehpc_acpi_set_native_hp(dev_info_t *dip,
-	ACPI_HANDLE osc_hdl);
+static ACPI_STATUS pciehpc_acpi_find_osc(ACPI_HANDLE busobj,
+	ACPI_HANDLE *osc_hdlp);
 
 #ifdef DEBUG
 static void pciehpc_dump_acpi_obj(ACPI_HANDLE pcibus_obj);
@@ -75,9 +75,6 @@ static ACPI_STATUS pciehpc_print_acpi_name(ACPI_HANDLE hdl, uint32_t nl,
 	void *context, void **ret);
 static void print_acpi_pathname(ACPI_HANDLE hdl);
 #endif
-
-#define	ACPI_HP_MODE	1
-#define	NATIVE_HP_MODE	2
 
 /* UUID for for PCI/PCI-X/PCI-Exp hierarchy as defined in PCI fw ver 3.0 */
 static uint8_t pcie_uuid[16] =
@@ -120,65 +117,69 @@ pciehpc_acpi_hotplug_enabled(dev_info_t *dip)
 		 */
 		PCIEHPC_DEBUG((CE_CONT, "No ACPI device found (dip %p)\n",
 		    (void *)dip));
+		PCIEHPC_DEBUG((CE_CONT, "Assuming native Hot-Plug mode\n"));
 		return (0);
 	}
 
-	/*
-	 * If "use-native-hotplug-mode" property exists then it will tell us
-	 * if we need to switch to or assume native hot plug mode on the
-	 * platform.
-	 */
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "use-native-hotplug-mode", &hotplug_mode, &count) ==
-	    DDI_PROP_SUCCESS) {
-		if (hotplug_mode[0] == 1)
-			use_native_hotplug = 1;
-		ddi_prop_free(hotplug_mode);
-	}
 
 	/*
 	 * NOTE: Without _OSC method there is no reliable way to know if the
 	 * platform implements ACPI hot plug or native hot plug. But, if it is
 	 * present then it may be possible to use either mode (i.e ACPI or
-	 * native-hotplug) if the platform supports.
+	 * native-hotplug) if the platform supports both.
 	 */
 
 	/*
-	 * (2)	Check if the node has _OSC method present.
+	 * (2)	Check if _OSC method is present.
 	 */
-	if (AcpiGetHandle(pcibus_obj, "_OSC", &osc_hdl) != AE_OK) {
+	if (pciehpc_acpi_find_osc(pcibus_obj, &osc_hdl) != AE_OK) {
 		/* no _OSC method present; we need to guess here! */
-		if (use_native_hotplug)
+		PCIEHPC_DEBUG((CE_NOTE, "no _OSC method present\n"));
+		/*
+		 * If "use-native-hotplug-mode" property set then it means
+		 * the platform supports only native hot-plug mode.
+		 */
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "use-native-hotplug-mode",
+		    &hotplug_mode, &count) == DDI_PROP_SUCCESS) {
+			if (hotplug_mode[0] == 1)
+				use_native_hotplug = 1;
+			ddi_prop_free(hotplug_mode);
+		}
+		if (use_native_hotplug) {
+			PCIEHPC_DEBUG((CE_NOTE,
+			    "Assuming native Hot-Plug mode\n"));
 			return (0); /* assume native hot plug mode */
-		else
+		} else {
+			PCIEHPC_DEBUG((CE_NOTE,
+			    "Assuming legacy ACPI Hot-Plug mode\n"));
 			return (1); /* assume ACPI hot plug mode */
+		}
 	}
 
 	/*
-	 * (3)	_OSC method exists; check if the current mode is ACPI hot plug.
+	 * (3)	_OSC method exists; evaluate _OSC to use native hot-plug mode.
+	 *
+	 * Note: The default policy is to use native hot-plug mode if the
+	 * platform supports it.
 	 */
-	if (pciehpc_acpi_query_osc(dip, osc_hdl, &hp_mode) != AE_OK) {
-		/* failed to query _OSC method; assume ACPI hot plug */
+	if (pciehpc_acpi_eval_osc(osc_hdl, &hp_mode) != AE_OK) {
+		/* failed to evaluate _OSC method; assume ACPI hot plug */
+		PCIEHPC_DEBUG((CE_NOTE, "Failed to evaluate _OSC; "
+		    "Assuming legacy ACPI Hot-Plug mode\n"));
 		return (1);
-	}
-	if (hp_mode == NATIVE_HP_MODE)
-		return (0); /* it is in native hp mode! */
-
-	if (use_native_hotplug) {
-		/* try to switch to native hot plug mode */
-		if (pciehpc_acpi_set_native_hp(dip, osc_hdl) == AE_OK) {
-		    PCIEHPC_DEBUG((CE_NOTE, "using native hot plug mode\n"));
-			return (0); /* switched to native hot plug mode */
-		}
-		/* failed to switch to native hp mode */
-		PCIEHPC_DEBUG((CE_NOTE, "failed to switch to native"
-		    " hot plug mode; using ACPI mode\n"));
 	}
 
 #ifdef DEBUG
 	if (pciehpc_debug > 1)
 		pciehpc_dump_acpi_obj(pcibus_obj);
 #endif
+	if (hp_mode == NATIVE_HP_MODE) {
+		PCIEHPC_DEBUG((CE_NOTE, "Native Hot-Plug mode enabled\n"));
+		return (0); /* it is in native hp mode! */
+	}
+
+	PCIEHPC_DEBUG((CE_NOTE, "ACPI Hot-Plug mode enabled\n"));
 	return (1); /* use ACPI mode */
 }
 
@@ -232,8 +233,8 @@ pciehpc_acpi_hpc_init(pciehpc_t *ctrl_p)
 		bus_methods |= PCIEHPC_ACPI_HPP_PRESENT;
 	if (AcpiGetHandle(pcibus_obj, "_DSM", &hdl) == AE_OK)
 		bus_methods |= PCIEHPC_ACPI_DSM_PRESENT;
-	if (AcpiGetHandle(pcibus_obj, "_SUN", &hdl) == AE_OK)
-		bus_methods |= PCIEHPC_ACPI_SUN_PRESENT;
+	if (AcpiGetHandle(slot_dev_obj, "_SUN", &hdl) == AE_OK)
+		slot_methods |= PCIEHPC_ACPI_SUN_PRESENT;
 	if (AcpiGetHandle(slot_dev_obj, "_PS0", &hdl) == AE_OK)
 		slot_methods |= PCIEHPC_ACPI_PS0_PRESENT;
 	if (AcpiGetHandle(slot_dev_obj, "_EJ0", &hdl) == AE_OK)
@@ -758,25 +759,88 @@ pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp)
 }
 
 /*
- * Query _OSC method to find out the current hot plug mode.
+ * Evaluate _OSC method to use native hot-plug mode if platform supports it.
+ * If platform doesn't support native hot-plug then hp_mode will be set
+ * to ACPI_HP_MODE.
  */
-/*ARGSUSED*/
 static ACPI_STATUS
-pciehpc_acpi_query_osc(dev_info_t *dip, ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
+pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 {
-	/* NOTE: This is currently not implemented */
-	return (AE_ERROR);
-}
+	ACPI_STATUS		status;
+	ACPI_OBJECT_LIST	arglist;
+	ACPI_OBJECT		args[4];
+	UINT32			caps_buffer[3];
+	ACPI_BUFFER		rb;
+	ACPI_OBJECT		*rv;
+	UINT32			*rbuf;
 
-/*
- * Switch to native hot plug mode if possible.
- */
-/*ARGSUSED*/
-static ACPI_STATUS
-pciehpc_acpi_set_native_hp(dev_info_t *dip, ACPI_HANDLE osc_hdl)
-{
-	/* NOTE: This is currently not implemented */
-	return (AE_ERROR);
+	/* construct argument list */
+	arglist.Count = 4;
+	arglist.Pointer = args;
+
+	/* arg0 - UUID */
+	args[0].Type = ACPI_TYPE_BUFFER;
+	args[0].Buffer.Length = 16; /* size of UUID string */
+	args[0].Buffer.Pointer = pcie_uuid;
+
+	/* arg1 - Revision ID */
+	args[1].Type = ACPI_TYPE_INTEGER;
+	args[1].Integer.Value = PCIE_OSC_REVISION_ID;
+
+	/* arg2 - Count */
+	args[2].Type = ACPI_TYPE_INTEGER;
+	args[2].Integer.Value = 3; /* no. of DWORDS in caps_buffer */
+
+	/* arg3 - Capabilities Buffer */
+	args[3].Type = ACPI_TYPE_BUFFER;
+	args[3].Buffer.Length = 12;
+	args[3].Buffer.Pointer = (void *)caps_buffer;
+
+	/* Initialize Capabilities Buffer */
+
+	/* DWORD1: no query flag set */
+	caps_buffer[0] = 0;
+	/* DWORD2: Support Field */
+	caps_buffer[1] = OSC_SUPPORT_FIELD_INIT;
+	/* DWORD3: Control Field */
+	caps_buffer[2] = OSC_CONTROL_FIELD_INIT;
+
+	rb.Length = ACPI_ALLOCATE_BUFFER;
+	rb.Pointer = NULL;
+
+	status = AcpiEvaluateObject(osc_hdl, NULL, &arglist, &rb);
+
+	if (status != AE_OK) {
+		PCIEHPC_DEBUG((CE_CONT,
+		    "Failed to execute _OSC method (status %d)\n", status));
+		return (status);
+	}
+
+	rv = rb.Pointer;
+	ASSERT(rv->Type == ACPI_TYPE_BUFFER);
+	rbuf = (UINT32 *)rv->Buffer.Pointer;
+
+	/* check the STATUS word in the capability buffer */
+	if (rbuf[0] & OSC_STATUS_ERRORS) {
+		PCIEHPC_DEBUG((CE_CONT, "_OSC method failed (STATUS %d)\n",
+		    rbuf[0]));
+		AcpiOsFree(rv);
+		return (AE_ERROR);
+	}
+
+	PCIEHPC_DEBUG((CE_CONT, "_OSC method evaluation completed: "
+	    "STATUS 0x%x SUPPORT 0x%x CONTROL 0x%x\n",
+	    rbuf[0], rbuf[1], rbuf[2]));
+
+	/* check if the Native Hot-Plug Control is granted */
+	if (rbuf[2] & OSC_CONTROL_PCIE_NAT_HP)
+		*hp_mode = NATIVE_HP_MODE;
+	else
+		*hp_mode = ACPI_HP_MODE;
+
+	AcpiOsFree(rv);
+
+	return (AE_OK);
 }
 
 #ifdef DEBUG
@@ -866,3 +930,26 @@ print_acpi_pathname(ACPI_HANDLE hdl)
 	}
 }
 #endif
+
+static ACPI_STATUS
+pciehpc_acpi_find_osc(ACPI_HANDLE busobj, ACPI_HANDLE *osc_hdlp)
+{
+	ACPI_HANDLE parentobj = busobj;
+	ACPI_STATUS status = AE_NOT_FOUND;
+
+	*osc_hdlp = NULL;
+
+	/*
+	 * Walk up the ACPI device tree looking for _OSC method.
+	 */
+	do {
+		busobj = parentobj;
+		if ((status = AcpiGetHandle(busobj, "_OSC", osc_hdlp)) == AE_OK)
+			break;
+	} while (AcpiGetParent(busobj, &parentobj) == AE_OK);
+
+	if (*osc_hdlp == NULL)
+		status = AE_NOT_FOUND;
+
+	return (status);
+}
