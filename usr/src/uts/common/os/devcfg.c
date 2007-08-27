@@ -828,7 +828,7 @@ init_node(dev_info_t *dip)
 		goto out;
 	}
 
-	ndi_hold_devi(pdip);
+	ndi_hold_devi(pdip);			/* initial hold of parent */
 
 	/* recompute path after initchild for @addr information */
 	(void) ddi_pathname(dip, path);
@@ -837,10 +837,10 @@ init_node(dev_info_t *dip)
 	if (find_duplicate_child(pdip, dip) != NULL) {
 		/*
 		 * uninit_node() the duplicate - a successful uninit_node()
-		 * does a ndi_rele_devi.
+		 * will release inital hold of parent using ndi_rele_devi().
 		 */
 		if ((error = uninit_node(dip)) != DDI_SUCCESS) {
-			ndi_rele_devi(pdip);
+			ndi_rele_devi(pdip);	/* release initial hold */
 			cmn_err(CE_WARN, "init_node: uninit of duplicate "
 			    "node %s failed", path);
 		}
@@ -879,11 +879,20 @@ init_node(dev_info_t *dip)
 		mutex_exit(&DEVI(dip)->devi_lock);
 
 		/*
+		 * Add an extra hold on the parent to prevent it from ever
+		 * having a zero devi_ref during the child rebind process.
+		 * This is necessary to ensure that the parent will never
+		 * detach(9E) during the rebind.
+		 */
+		ndi_hold_devi(pdip);		/* extra hold of parent */
+
+		/*
 		 * uninit_node() current binding - a successful uninit_node()
-		 * does a ndi_rele_devi.
+		 * will release extra hold of parent using ndi_rele_devi().
 		 */
 		if ((error = uninit_node(dip)) != DDI_SUCCESS) {
-			ndi_rele_devi(pdip);
+			ndi_rele_devi(pdip);	/* release extra hold */
+			ndi_rele_devi(pdip);	/* release initial hold */
 			cmn_err(CE_WARN, "init_node: uninit for rebind "
 			    "of node %s failed", path);
 			goto out;
@@ -891,6 +900,7 @@ init_node(dev_info_t *dip)
 
 		/* Unbind: demote the node back to DS_LINKED.  */
 		if ((error = ndi_devi_unbind_driver(dip)) != DDI_SUCCESS) {
+			ndi_rele_devi(pdip);	/* relrease initial hold */
 			cmn_err(CE_WARN, "init_node: unbind for rebind "
 			    "of node %s failed", path);
 			goto out;
@@ -910,6 +920,7 @@ init_node(dev_info_t *dip)
 		 * Start by rebinding node to the path-bound driver.
 		 */
 		if ((error = ndi_devi_bind_driver(dip, 0)) != DDI_SUCCESS) {
+			ndi_rele_devi(pdip);	/* relrease initial hold */
 			cmn_err(CE_WARN, "init_node: rebind "
 			    "of node %s failed", path);
 			goto out;
@@ -929,6 +940,12 @@ init_node(dev_info_t *dip)
 		error = ddi_initchild(pdip, dip);
 		NDI_CONFIG_DEBUG((CE_CONT, "init_node: rebind "
 		    "%s 0x%p\n", path, (void *)dip));
+
+		/*
+		 * Release our initial hold. If ddi_initchild() was
+		 * successfull then it will return with the active hold.
+		 */
+		ndi_rele_devi(pdip);
 		goto out;
 	}
 
@@ -937,7 +954,7 @@ init_node(dev_info_t *dip)
 	 */
 	DEVI(dip)->devi_instance = e_ddi_assign_instance(dip);
 	ddi_optimize_dtree(dip);
-	error = DDI_SUCCESS;
+	error = DDI_SUCCESS;		/* return with active hold */
 
 out:	if (error != DDI_SUCCESS) {
 		/* On failure ensure that DEVI_REBIND is cleared */
@@ -971,7 +988,7 @@ uninit_node(dev_info_t *dip)
 	 */
 	node_state_entry = i_ddi_node_state(dip);
 	ASSERT((node_state_entry == DS_BOUND) ||
-		(node_state_entry == DS_INITIALIZED));
+	    (node_state_entry == DS_INITIALIZED));
 	pdip = ddi_get_parent(dip);
 	ASSERT(pdip);
 
@@ -1384,9 +1401,9 @@ predetach_node(dev_info_t *dip, uint_t flag)
 		int pflag = DDI_PROP_NOTPROM | DDI_PROP_DONTPASS;
 
 		if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			pflag, DDI_FORCEATTACH, 0) == 1) ||
+		    pflag, DDI_FORCEATTACH, 0) == 1) ||
 		    (ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			pflag, DDI_NO_AUTODETACH, 0) == 1))
+		    pflag, DDI_NO_AUTODETACH, 0) == 1))
 			return (DDI_FAILURE);
 
 		/* check for driver global version of DDI_NO_AUTODETACH */
@@ -1500,7 +1517,7 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 int
 i_ndi_unconfig_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 {
-	int rv = DDI_SUCCESS;
+	int	rv = DDI_SUCCESS;
 
 	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 
@@ -3039,7 +3056,7 @@ ddi_optimize_dtree(dev_info_t *devi)
 	DEVI(devi)->devi_bus_dma_freehdl = pdevi;
 	DEVI(devi)->devi_bus_dma_bindhdl = pdevi;
 	DEVI(devi)->devi_bus_dma_bindfunc =
-	pdevi->devi_ops->devo_bus_ops->bus_dma_bindhdl;
+	    pdevi->devi_ops->devo_bus_ops->bus_dma_bindhdl;
 	DEVI(devi)->devi_bus_dma_unbindhdl = pdevi;
 	DEVI(devi)->devi_bus_dma_unbindfunc =
 	    pdevi->devi_ops->devo_bus_ops->bus_dma_unbindhdl;
@@ -3441,7 +3458,7 @@ ddi_walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg)
 {
 
 	ASSERT(dip == NULL || ddi_get_parent(dip) == NULL ||
-		DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 
 	(void) walk_devs(dip, f, arg, 1);
 }
@@ -3500,9 +3517,9 @@ i_find_devi(dev_info_t *dip, void *arg)
 	struct match_info *info = (struct match_info *)arg;
 
 	if (((info->nodename == NULL) ||
-		(strcmp(ddi_node_name(dip), info->nodename) == 0)) &&
+	    (strcmp(ddi_node_name(dip), info->nodename) == 0)) &&
 	    ((info->instance == -1) ||
-		(ddi_get_instance(dip) == info->instance)) &&
+	    (ddi_get_instance(dip) == info->instance)) &&
 	    ((info->attached == 0) || i_ddi_devi_attached(dip))) {
 		info->dip = dip;
 		ndi_hold_devi(dip);
@@ -3892,7 +3909,7 @@ reset_leaf_device(dev_info_t *dip, void *arg)
 	}
 
 	NDI_CONFIG_DEBUG((CE_NOTE, "resetting %s%d\n",
-		ddi_driver_name(dip), ddi_get_instance(dip)));
+	    ddi_driver_name(dip), ddi_get_instance(dip)));
 
 	(void) devi_reset(dip, DDI_RESET_FORCE);
 	return (DDI_WALK_CONTINUE);
@@ -4165,13 +4182,13 @@ i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
 	if (path == NULL) {
 		path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		cmn_err(CE_CONT, "?%s (%s%d) %s\n",
-			ddi_pathname(dip, path), ddi_driver_name(dip),
-			ddi_get_instance(dip), status);
+		    ddi_pathname(dip, path), ddi_driver_name(dip),
+		    ddi_get_instance(dip), status);
 		kmem_free(path, MAXPATHLEN);
 	} else {
 		cmn_err(CE_CONT, "?%s (%s%d) %s\n",
-			path, ddi_driver_name(dip),
-			ddi_get_instance(dip), status);
+		    path, ddi_driver_name(dip),
+		    ddi_get_instance(dip), status);
 	}
 
 	mutex_enter(&(DEVI(dip)->devi_lock));
@@ -5863,7 +5880,7 @@ ndi_devi_online(dev_info_t *dip, uint_t flags)
 	ASSERT(pdip);
 
 	NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_online: %s%d (%p)\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip));
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip));
 
 	ndi_devi_enter(pdip, &circ);
 	/* bind child before merging .conf nodes */
@@ -6748,8 +6765,8 @@ ndi_busop_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 	switch (op) {
 	case BUS_CONFIG_ONE:
 		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus config %s timeout=%ld\n",
-			ddi_driver_name(pdip), ddi_get_instance(pdip),
-			(char *)arg, timeout));
+		    ddi_driver_name(pdip), ddi_get_instance(pdip),
+		    (char *)arg, timeout));
 		return (devi_config_one(pdip, (char *)arg, child, flags,
 		    timeout));
 
@@ -6758,8 +6775,8 @@ ndi_busop_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 		/*FALLTHROUGH*/
 	case BUS_CONFIG_ALL:
 		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus config timeout=%ld\n",
-			ddi_driver_name(pdip), ddi_get_instance(pdip),
-			timeout));
+		    ddi_driver_name(pdip), ddi_get_instance(pdip),
+		    timeout));
 		if (timeout > 0) {
 			NDI_DEBUG(flags, (CE_CONT,
 			    "%s%d: bus config all timeout=%ld\n",
@@ -6898,9 +6915,9 @@ mt_config_fini(struct mt_config_handle *hdl)
 	if ((ddidebug & DDI_MTCONFIG) && hdl->mtc_pdip)
 		cmn_err(CE_NOTE,
 		    "config %s%d: total time %d msec, real time %d msec",
-			ddi_driver_name(hdl->mtc_pdip),
-			ddi_get_instance(hdl->mtc_pdip),
-			hdl->total_time, real_time);
+		    ddi_driver_name(hdl->mtc_pdip),
+		    ddi_get_instance(hdl->mtc_pdip),
+		    hdl->total_time, real_time);
 #endif /* DEBUG */
 
 	cv_destroy(&hdl->mtc_cv);
