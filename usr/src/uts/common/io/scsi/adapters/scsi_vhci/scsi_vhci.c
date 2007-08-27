@@ -438,6 +438,7 @@ vhci_failover_modopen(struct scsi_vhci *vhci)
 	if (scsi_nfailover == 0) {
 		cmn_err(CE_WARN, "scsi_vhci: "
 		    "scsi_vhci.conf has empty 'ddi-forceload'");
+		ddi_prop_free(module);
 		return;
 	}
 
@@ -513,6 +514,8 @@ vhci_failover_modopen(struct scsi_vhci *vhci)
 		if (sf->sf_sfo && sf->sf_sfo->sfo_init)
 			(*sf->sf_sfo->sfo_init)();
 	}
+
+	ddi_prop_free(module);
 }
 
 /*
