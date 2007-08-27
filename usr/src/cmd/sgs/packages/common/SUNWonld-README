@@ -1254,3 +1254,4 @@ Bugid   Risk Synopsis
 6583742 ELF string conversion library needs to lose static writable buffers
 6589819 ld generated reference to __tls_get_addr() fails when resolving to a
 	shared object reference
+6595139 various applications should export yy* global variables for libl

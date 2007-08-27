@@ -1390,6 +1390,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_WARN		0x0800000000ULL
 #define	ENV_FLG_NOFLTCONFIG	0x1000000000ULL
 #define	ENV_FLG_BIND_LAZY	0x2000000000ULL
+#define	ENV_FLG_NOUNRESWEAK	0x4000000000ULL
 
 #ifdef	SIEBEL_DISABLE
 #define	ENV_FLG_FIX_1		0x8000000000ULL
@@ -1693,6 +1694,15 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_RT;
 			val = RT_FL_NOVERSION;
 			variable = ENV_FLG_NOVERSION;
+		} else if ((len == MSG_LD_NOUNRESWEAK_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_NOUNRESWEAK),
+		    MSG_LD_NOUNRESWEAK_SIZE) == 0)) {
+			/*
+			 * LD_NOUNRESWEAK (internal, used by ldd(1)).
+			 */
+			select |= SEL_ACT_LML;
+			val = LML_FLG_TRC_NOUNRESWEAK;
+			variable = ENV_FLG_NOUNRESWEAK;
 		}
 	}
 	/*

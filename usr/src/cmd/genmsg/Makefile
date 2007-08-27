@@ -49,8 +49,13 @@ LINTSUPPRESS=	\
 
 LINTFLAGS +=	-um
 
-# genmsg has a name clash with main() and libl.so.1.  Localize all symbols.
-LDFLAGS +=	$(MAPFILE.INT:%=-M%)
+# genmsg has a name clash with main() and libl.so.1.  However, genmsg must
+# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
+# to local scope.
+MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
+
+LDFLAGS +=	$(MAPOPTS)
 
 OBJS =          $(C_OBJS) $(PSRC_Y:%.y=%.o) $(LEXOBJS)
 PSRC_C =        $(PSRC_Y:%.y=%.c)
@@ -58,11 +63,11 @@ SRCS =          $(C_OBJS:%.o=%.c) $(PSRC_C) $(LEXINTSRCS)
 
 .KEEP_STATE:
 
-all:    $(PROG) $(MAPFILE.INT)
+all:    $(PROG)
 
 install: all $(ROOTPROG)
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) $(MAPFILES)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS)
 

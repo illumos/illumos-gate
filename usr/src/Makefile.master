@@ -555,6 +555,7 @@ MAPFILE.NED =		$(MAPFILE.NED_$(MACH))
 MAPFILE.PGA =		$(SRC)/common/mapfiles/$(MACH)/map.pagealign
 MAPFILE.NES =		$(SRC)/common/mapfiles/common/map.noexstk
 MAPFILE.FLT =		$(SRC)/common/mapfiles/common/map.filter
+MAPFILE.LEX =		$(SRC)/common/mapfiles/common/map.lex.yy
 
 #
 # Generated mapfiles that are compiler specific, and used throughout the

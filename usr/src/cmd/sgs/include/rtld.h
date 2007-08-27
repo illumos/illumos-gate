@@ -355,7 +355,8 @@ struct lm_list32 {
 						/*	dependencies */
 #define	LML_FLG_TRC_UNUSED	0x04000000	/* trace unused dependencies */
 #define	LML_FLG_TRC_INIT	0x08000000	/* print .init order */
-
+#define	LML_FLG_TRC_NOUNRESWEAK	0x10000000	/* unresolved weak references */
+						/*	are not allowed */
 #define	LML_MSK_TRC		0xfff00000	/* tracing mask */
 
 /*

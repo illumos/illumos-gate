@@ -117,11 +117,15 @@ MYLINKLIBS += -L../agent/$(MACH) -lssagent -L../snmplib -lssasnmp
 
 LIBS=	-lsocket -lnsl -ll
 
-CPPFLAGS += -I. -I../agent -I../snmplib -I../../include/netmgt -I${BIN}
+# snmpdx has a name clash with main() and libl.so.1.  However, snmpdx must
+# still export a number of "yy*" (libl) interfaces, and interfaces for
+# libssagent.so.1.  Reduce all other symbols to local scope.
+MAPFILES +=	$(MAPFILE.INT) $(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
 
-CFLAGS += -c -D$(TARG_SYS)
-
-LDFLAGS += $(MAPFILE.INT:%=-M%) $(LDLIBS)
+CPPFLAGS +=	-I. -I../agent -I../snmplib -I../../include/netmgt -I${BIN}
+CFLAGS +=	-c -D$(TARG_SYS)
+LDFLAGS +=	$(MAPOPTS) $(LDLIBS)
 
 LINT=lint
 
@@ -154,7 +158,7 @@ all: $(SOURCES.h) $(BINPROG) $(CONFIG_FILES)
 
 install: all $(OPTPROG) $(CONFRULE) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-$(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS) $(MAPFILE.INT)
+$(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS) $(MAPFILES)
 	$(CC) -o $(BINPROG) $(LDFLAGS) $(OBJECTS) $(BIN)/config.o \
 	    $(MYLINKLIBS) $(LIBS)
 	$(POST_PROCESS)

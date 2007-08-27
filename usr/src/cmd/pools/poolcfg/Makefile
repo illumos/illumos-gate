@@ -35,10 +35,16 @@ POFILE =	poolcfg.po
 include ../../Makefile.cmd
 include ../Makefile.pools
 
+# poolcf has a name clash with main() and libl.so.1.  However, poolcfg must
+# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
+# to local scope.
+MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
+
 LFLAGS =	-t
 YFLAGS =	-d
 CFLAGS +=	-I$(POOLSCOMMONDIR)
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPOPTS)
 LDLIBS +=	-lpool -ll
 XGETFLAGS =	-a
 CLOBBERFILES +=	poolcfg_lex.c poolcfg_grammar.c poolcfg_grammar.h
@@ -47,7 +53,7 @@ CLOBBERFILES +=	poolcfg_lex.c poolcfg_grammar.c poolcfg_grammar.h
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(COMMON_OBJS) $(MAPFILE.NGB)
+$(PROG): $(OBJS) $(COMMON_OBJS) $(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(COMMON_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

@@ -60,9 +60,15 @@ $(NATIVE_BUILD)NOT_NATIVE=$(POUND_SIGN)
 $(NATIVE_BUILD)PROG = $(MYPROG:%=%-native)
 $(NATIVE_BUILD)OBJS = $(MYOBJS:%.o=%-native.o)
 
+# svccfg has a name clash with main() and libl.so.1.  However, svccfg must
+# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
+# to local scope.
+MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
+
 MYCPPFLAGS =	-I ../common -I/usr/include/libxml2
 CPPFLAGS +=	$(MYCPPFLAGS)
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPOPTS)
 
 LFLAGS = -t
 YFLAGS = -d
@@ -114,7 +120,7 @@ native: FRC
 	@cd $(LIBSCF)/native; pwd; $(MAKE) $(MFLAGS) install
 	@NATIVE_BUILD= $(MAKE) $(MFLAGS) all
 
-$(PROG): $(OBJS) $(MAPFILE.NGB)
+$(PROG): $(OBJS) $(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 

@@ -30,18 +30,24 @@ OBJS=	zonecfg.o zonecfg_lex.o zonecfg_grammar.tab.o
 
 include ../Makefile.cmd
 
+# zonecfg has a name clash with main() and libl.so.1.  However, zonecfg must
+# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
+# to local scope.
+MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
+
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
 LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand
 CPPFLAGS +=	-I.
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(MAPFILE.NGB)
+$(PROG): $(OBJS) $(MAPFILES)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

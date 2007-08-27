@@ -762,9 +762,21 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					if (rtype != R_386_JMP_SLOT)
 						sl.sl_flags |= LKUP_SPEC;
 
-					bind = ELF_ST_BIND(symref->st_info);
-					if (bind == STB_WEAK)
+					/*
+					 * Under ldd -w, any unresolved weak
+					 * references are diagnosed.  Set the
+					 * symbol binding as global to trigger
+					 * a relocation error if the symbol can
+					 * not be found.
+					 */
+					if (LIST(lmp)->lm_flags &
+					    LML_FLG_TRC_NOUNRESWEAK) {
+						bind = STB_GLOBAL;
+					} else if ((bind =
+					    ELF_ST_BIND(symref->st_info)) ==
+					    STB_WEAK) {
 						sl.sl_flags |= LKUP_WEAK;
+					}
 
 					symdef = lookup_sym(&sl, &_lmp, &binfo);
 

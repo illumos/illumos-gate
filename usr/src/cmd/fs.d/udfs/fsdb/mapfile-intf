@@ -26,16 +26,13 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# snmpdx provides a couple of libssagent.so.1 functions.
+# fsdb uses the -e option of lex, which generates additional lex interfaces
+# that are not defined in the generic $(MAPFILE.LEX).  These additional lex
+# interfaces are exported here.
 {
 	global:
-		default_config_file;
-		default_error_file;
-		default_sec_config_file;
-		node_table;
-		agent_end;
-		agent_select_info;
-		agent_select_callback;
-		agent_loop;
-		agent_init;
+		yywinput;
+		yywleng;
+		yywtext;
+		yywunput;
 };

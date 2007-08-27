@@ -26,16 +26,33 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# snmpdx provides a couple of libssagent.so.1 functions.
+# lex generates a lex.yy.c for use in building applications.  A number of
+# interfaces within this file are intended for libl.so to bind to, and thus
+# should remain exported from any application using lex.yy.c.
 {
 	global:
-		default_config_file;
-		default_error_file;
-		default_sec_config_file;
-		node_table;
-		agent_end;
-		agent_select_info;
-		agent_select_callback;
-		agent_loop;
-		agent_init;
+		yyback;
+		yyextra;
+		yyfnd;
+		yyinput;
+		yyleng;
+		yylex;
+		yylsp;
+		yylstate;
+		yyolsp;
+		yyout;
+		yyprevious;
+		yytext;
+		yyunput;
 };
+
+# Some applications use the -e option of lex, which generates additional lex
+# interfaces that are not defined in the generic $(MAPFILE.LEX).  Export the
+# following interfaces to satisfy -e use.
+#{
+#	global:
+#		yywinput;
+#		yywleng;
+#		yywtext;
+#		yywunput;
+#};

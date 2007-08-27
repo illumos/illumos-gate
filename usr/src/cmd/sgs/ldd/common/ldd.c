@@ -33,7 +33,7 @@
  * object.
  *
  * usage is: ldd [-d | -r] [-c] [-e envar] [-i] [-f] [-L] [-l] [-s]
- *		[-U | -u] [-v] file(s)
+ *		[-U | -u] [-v] [-w] file(s)
  *
  * ldd opens the file and verifies the information in the elf header.
  * If the file is a dynamic executable, we set up some environment variables
@@ -91,6 +91,12 @@
  * unreferenced objects, and unreferenced cyclic dependencies to be detected.
  * These options assert that at least -d is set as relocation references are
  * what determine an objects use.
+ *
+ * If -w is specified, no unresolved weak references are allowed.  -w causes
+ * LD_NOUNRESWEAK=1 to be set.  By default, an unresolved weak reference is
+ * allowed, and a "0" is written to the relocation offset.  The -w option
+ * disables this default.  Any weak references that can not be resolved result
+ * in relocation error messages.
  */
 #include	<fcntl.h>
 #include	<stdio.h>
@@ -114,21 +120,9 @@ static int	run(int, char *, char *, const char *, int);
 
 
 /*
- * The following size definitions provide for allocating space for the string,
- * or the string position at which any modifications to the variable will occur.
+ * Define all environment variable strings.  The character following the "="
+ * will be written to, to disable or enable the associated feature.
  */
-#define	LD_LOAD_SIZE		27
-#define	LD_PATH_SIZE		23
-#define	LD_BIND_SIZE		13
-#define	LD_VERB_SIZE		12
-#define	LD_WARN_SIZE		9
-#define	LD_CONF_SIZE		13
-#define	LD_FLTR_SIZE		13
-#define	LD_LAZY_SIZE		15
-#define	LD_INIT_SIZE		9
-#define	LD_UREF_SIZE		10
-#define	LD_USED_SIZE		11
-
 static char	bind[] =	"LD_BIND_NOW= ",
 		load_elf[] =	"LD_TRACE_LOADED_OBJECTS_E= ",
 		load_aout[] =	"LD_TRACE_LOADED_OBJECTS_A= ",
@@ -140,7 +134,8 @@ static char	bind[] =	"LD_BIND_NOW= ",
 		lazy[] =	"LD_NOLAZYLOAD=1",
 		init[] =	"LD_INIT= ",
 		uref[] =	"LD_UNREF= ",
-		used[] =	"LD_UNUSED= ";
+		used[] =	"LD_UNUSED= ",
+		weak[] =	"LD_NOUNRESWEAK= ";
 static char	*load;
 
 static const char	*prefile_32, *prefile_64, *prefile;
@@ -178,7 +173,7 @@ main(int argc, char **argv)
 	Elf	*elf;
 	int	cflag = 0, dflag = 0, fflag = 0, iflag = 0, Lflag = 0;
 	int	lflag = 0, rflag = 0, sflag = 0, Uflag = 0, uflag = 0;
-	int	vflag = 0, nfile, var, error = 0;
+	int	vflag = 0, wflag = 0, nfile, var, error = 0;
 
 	Listnode	*lnp;
 
@@ -242,6 +237,9 @@ main(int argc, char **argv)
 			break;
 		case 'v' :			/* enable verbose output */
 			vflag = 1;
+			break;
+		case 'w' :			/* disable unresolved weak */
+			wflag = 1;		/*	references */
 			break;
 		default :
 			error++;
@@ -307,17 +305,18 @@ main(int argc, char **argv)
 	 * has these in their environment ... sort of thing the test folks
 	 * would do :-)
 	 */
-	warn[LD_WARN_SIZE - 1] = (dflag || rflag || Uflag || uflag) ? '1' :
+	warn[sizeof (warn) - 2] = (dflag || rflag || Uflag || uflag) ? '1' :
 	    '\0';
-	bind[LD_BIND_SIZE - 1] = (rflag) ? '1' : '\0';
-	path[LD_PATH_SIZE - 1] = (sflag) ? '1' : '\0';
-	verb[LD_VERB_SIZE - 1] = (vflag) ? '1' : '\0';
-	fltr[LD_FLTR_SIZE - 1] = (Lflag) ? '\0' : (lflag) ? '2' : '1';
-	init[LD_INIT_SIZE - 1] = (iflag) ? '1' : '\0';
-	conf[LD_CONF_SIZE - 1] = (cflag) ? '1' : '\0';
-	lazy[LD_LAZY_SIZE - 1] = (Lflag) ? '\0' : '1';
-	uref[LD_UREF_SIZE - 1] = (Uflag) ? '1' : '\0';
-	used[LD_USED_SIZE - 1] = (uflag) ? '1' : '\0';
+	bind[sizeof (bind) - 2] = (rflag) ? '1' : '\0';
+	path[sizeof (path) - 2] = (sflag) ? '1' : '\0';
+	verb[sizeof (verb) - 2] = (vflag) ? '1' : '\0';
+	fltr[sizeof (fltr) - 2] = (Lflag) ? '\0' : (lflag) ? '2' : '1';
+	init[sizeof (init) - 2] = (iflag) ? '1' : '\0';
+	conf[sizeof (conf) - 2] = (cflag) ? '1' : '\0';
+	lazy[sizeof (lazy) - 2] = (Lflag) ? '\0' : '1';
+	uref[sizeof (uref) - 2] = (Uflag) ? '1' : '\0';
+	used[sizeof (used) - 2] = (uflag) ? '1' : '\0';
+	weak[sizeof (weak) - 2] = (wflag) ? '1' : '\0';
 
 	/*
 	 * coordinate libelf's version information
@@ -420,7 +419,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	 */
 	if (gelf_getehdr(elf, &ehdr) == NULL) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_GETEHDR),
-			cname, fname, elf_errmsg(-1));
+		    cname, fname, elf_errmsg(-1));
 		return (1);
 	}
 
@@ -429,7 +428,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	 */
 	if ((class = is_runnable(&ehdr)) == ELFCLASSNONE) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_CLASSDATA),
-			cname, fname);
+		    cname, fname);
 		return (1);
 	}
 
@@ -439,18 +438,18 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	if ((ehdr.e_type != ET_EXEC) && (ehdr.e_type != ET_DYN) &&
 	    (ehdr.e_type != ET_REL)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_BADMAGIC),
-			cname, fname);
+		    cname, fname);
 		return (1);
 	}
 	if ((class == ELFCLASS32) && (ehdr.e_machine != M_MACH)) {
 		if (ehdr.e_machine != M_MACHPLUS) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHTYPE),
-				cname, fname);
+			    cname, fname);
 			return (1);
 		}
 		if ((ehdr.e_flags & M_FLAGSPLUS) == 0) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_MACHFLAGS),
-				cname, fname);
+			    cname, fname);
 			return (1);
 		}
 	}
@@ -464,7 +463,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	if (access(fname, X_OK) != 0) {
 		if (ehdr.e_type == ET_EXEC) {
 			(void) fprintf(stderr, MSG_INTL(MSG_USP_NOTEXEC_1),
-				cname, fname);
+			    cname, fname);
 			return (1);
 		}
 		(void) fprintf(stderr, MSG_INTL(MSG_USP_NOTEXEC_2), cname,
@@ -480,7 +479,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 
 		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_GETPHDR),
-				cname, fname, elf_errmsg(-1));
+			    cname, fname, elf_errmsg(-1));
 			return (1);
 		}
 
@@ -518,7 +517,7 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 			    (strncmp(interpreter, MSG_ORIG(MSG_PTH_ETCLIB),
 			    MSG_PTH_ETCLIB_SIZE) != 0)) {
 				(void) fprintf(stderr, MSG_INTL(MSG_USP_ELFINS),
-					cname, fname, interpreter);
+				    cname, fname, interpreter);
 				return (1);
 			}
 		}
@@ -561,7 +560,6 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	else
 		return (run(nfile, cname, fname, conv_lddstub(class), class));
 }
-
 
 static int
 aout_check(int nfile, char *fname, char *cname, int fd, int fflag)
@@ -701,9 +699,15 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 				    cname);
 				exit(1);
 			}
-			load[LD_LOAD_SIZE - 1] = '2';
+
+			/*
+			 * The pointer "load" has be assigned to load_elf[] or
+			 * load_aout[].  Use the size of load_elf[] as the size
+			 * of load_aout[] is the same.
+			 */
+			load[sizeof (load_elf) - 2] = '2';
 		} else
-			load[LD_LOAD_SIZE - 1] = '1';
+			load[sizeof (load_elf) - 2] = '1';
 
 
 		/*
@@ -715,7 +719,7 @@ run(int nfile, char *cname, char *fname, const char *ename, int class)
 		    (putenv(fltr) != 0) || (putenv(conf) != 0) ||
 		    (putenv(init) != 0) || (putenv(lazy) != 0) ||
 		    (putenv(uref) != 0) || (putenv(used) != 0) ||
-		    (putenv(load) != 0)) {
+		    (putenv(weak) != 0) || (putenv(load) != 0)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ENV_FAILED), cname);
 			exit(1);
 		}

@@ -30,17 +30,23 @@ LIBPROG=	fsdb
 
 include		../../Makefile.fstype
 
-CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-LDLIBS += -lmalloc -ll -ladm
-LDFLAGS += $(MAPFILE.NGB:%=-M%)
-YFLAGS="-d"
+# fsdb has a name clash with main() and libl.so.1.  However, fsdb must
+# still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
+# to local scope.
+MAPFILES +=	$(MAPFILE.INT) $(MAPFILE.LEX) $(MAPFILE.NGB)
+MAPOPTS =	$(MAPFILES:%=-M%)
 
-LINTFLAGS += -erroff=E_STATIC_UNUSED
-LINTFLAGS64 += -erroff=E_STATIC_UNUSED
+CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+LDLIBS +=	-lmalloc -ll -ladm
+LDFLAGS +=	$(MAPOPTS)
+YFLAGS =	"-d"
+
+LINTFLAGS +=	-erroff=E_STATIC_UNUSED
+LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 
 SRCS=	fsdb.c ud_lib.c
 
-fsdb : fsdb_yacc.o fsdb_lex.o ud_lib.o fsdb.o $(MAPFILE.NGB)
+fsdb : fsdb_yacc.o fsdb_lex.o ud_lib.o fsdb.o $(MAPFILES)
 	$(LINK.c) -o $@ fsdb.o fsdb_yacc.o fsdb_lex.o \
 			ud_lib.o $(LDLIBS)
 	$(POST_PROCESS)
