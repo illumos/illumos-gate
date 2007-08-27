@@ -135,9 +135,16 @@ check_slice(const char *path, int force, boolean_t wholedisk, boolean_t isspare)
 {
 	char *msg;
 	int error = 0;
+	dm_who_type_t who;
 
-	if (dm_inuse((char *)path, &msg, isspare ? DM_WHO_ZPOOL_SPARE :
-	    (force ? DM_WHO_ZPOOL_FORCE : DM_WHO_ZPOOL), &error) || error) {
+	if (force)
+		who = DM_WHO_ZPOOL_FORCE;
+	else if (isspare)
+		who = DM_WHO_ZPOOL_SPARE;
+	else
+		who = DM_WHO_ZPOOL;
+
+	if (dm_inuse((char *)path, &msg, who, &error) || error) {
 		if (error != 0) {
 			libdiskmgt_error(error);
 			return (0);
