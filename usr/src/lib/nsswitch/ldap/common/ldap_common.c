@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,27 +86,27 @@ static struct gettablefilter {
 };
 
 
-static nss_status_t
+nss_status_t
 switch_err(int rc, ns_ldap_error_t *error)
 {
 	switch (rc) {
-	    case NS_LDAP_SUCCESS:
+	case NS_LDAP_SUCCESS:
 		return (NSS_SUCCESS);
 
-	    case NS_LDAP_NOTFOUND:
+	case NS_LDAP_NOTFOUND:
 		return (NSS_NOTFOUND);
 
-	    case NS_LDAP_PARTIAL:
+	case NS_LDAP_PARTIAL:
 		return (NSS_TRYAGAIN);
 
-	    case NS_LDAP_INTERNAL:
-		    if (error && (error->status == LDAP_SERVER_DOWN ||
-				error->status == LDAP_TIMEOUT))
-			    return (NSS_TRYAGAIN);
-		    else
-			    return (NSS_UNAVAIL);
+	case NS_LDAP_INTERNAL:
+		if (error && (error->status == LDAP_SERVER_DOWN ||
+		    error->status == LDAP_TIMEOUT))
+			return (NSS_TRYAGAIN);
+		else
+			return (NSS_UNAVAIL);
 
-	    default:
+	default:
 		return (NSS_UNAVAIL);
 	}
 }
@@ -126,15 +126,15 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 	(void) fprintf(stdout, "\n[ldap_common.c: _nss_ldap_lookup]\n");
 	(void) fprintf(stdout, "\tsearchfilter: %s\n", searchfilter);
 	(void) fprintf(stdout,
-		"\tuserdata: %s\n", userdata ? userdata : "NULL");
+	    "\tuserdata: %s\n", userdata ? userdata : "NULL");
 	(void) fprintf(stdout, "\tdatabase: %s\n", database);
 #endif	/* DEBUG */
 
 	(void) __ns_ldap_freeResult(&be->result);
 
 	if ((rc = __ns_ldap_list(database, searchfilter, init_filter_cb,
-		be->attrs, NULL, 0, &be->result, &error, NULL,
-		userdata)) != NS_LDAP_SUCCESS) {
+	    be->attrs, NULL, 0, &be->result, &error, NULL,
+	    userdata)) != NS_LDAP_SUCCESS) {
 		argp->returnval = 0;
 		rc = switch_err(rc, error);
 		(void) __ns_ldap_freeError(&error);
@@ -144,7 +144,7 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 		(void) __ns_ldap_freeError(&error);
 	/* callback function */
 	if ((callbackstat =
-		    be->ldapobj2str(be, argp)) != NSS_STR_PARSE_SUCCESS) {
+	    be->ldapobj2str(be, argp)) != NSS_STR_PARSE_SUCCESS) {
 		goto error_out;
 	}
 
@@ -168,7 +168,7 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 	 *  for different purpose so ethers has to be treated differently.
 	 */
 	if (argp->buf.result != NULL ||
-			be->db_type == NSS_LDAP_DB_ETHERS) {
+	    be->db_type == NSS_LDAP_DB_ETHERS) {
 		/* file format -> struct */
 		if (argp->str2ent == NULL) {
 			callbackstat = NSS_STR_PARSE_PARSE;
@@ -176,13 +176,13 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 		}
 
 		callbackstat = (*argp->str2ent)(be->buffer,
-					be->buflen,
-					argp->buf.result,
-					argp->buf.buffer,
-					argp->buf.buflen);
+		    be->buflen,
+		    argp->buf.result,
+		    argp->buf.buffer,
+		    argp->buf.buflen);
 		if (callbackstat == NSS_STR_PARSE_SUCCESS) {
 			if (be->db_type == NSS_LDAP_DB_ETHERS &&
-					argp->buf.buffer != NULL) {
+			    argp->buf.buffer != NULL) {
 				argp->returnval = argp->buf.buffer;
 				argp->returnlen = strlen(argp->buf.buffer);
 			} else {
@@ -249,14 +249,14 @@ _nss_ldap_nocb_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 	(void) fprintf(stdout, "\tsearchfilter: %s\n", searchfilter);
 	(void) fprintf(stdout, "\tdatabase: %s\n", database);
 	(void) fprintf(stdout,
-		"\tuserdata: %s\n", userdata ? userdata : "NULL");
+	    "\tuserdata: %s\n", userdata ? userdata : "NULL");
 #endif	/* DEBUG */
 
 	(void) __ns_ldap_freeResult(&be->result);
 
 	if ((rc = __ns_ldap_list(database, searchfilter, init_filter_cb,
-		be->attrs, NULL, 0, &be->result, &error, NULL,
-		userdata)) != NS_LDAP_SUCCESS) {
+	    be->attrs, NULL, 0, &be->result, &error, NULL,
+	    userdata)) != NS_LDAP_SUCCESS) {
 		argp->returnval = 0;
 		rc = switch_err(rc, error);
 		(void) __ns_ldap_freeError(&error);
@@ -412,13 +412,13 @@ _nss_ldap_getent(ldap_backend_ptr be, void *a)
 next_entry:
 	if (be->enumcookie == NULL) {
 		retcode = __ns_ldap_firstEntry(be->tablename,
-		be->filter, _merge_SSD_filter, be->attrs, NULL,
-		0, &be->enumcookie,
-		&be->result, &error, _F_GETENT_SSD);
+		    be->filter, _merge_SSD_filter, be->attrs, NULL,
+		    0, &be->enumcookie,
+		    &be->result, &error, _F_GETENT_SSD);
 	} else {
 		if (be->services_cookie == NULL) {
 			retcode = __ns_ldap_nextEntry(be->enumcookie,
-				&be->result, &error);
+			    &be->result, &error);
 		}
 	}
 	if (retcode != NS_LDAP_SUCCESS) {
@@ -429,7 +429,7 @@ next_entry:
 	} else {
 		/* ns_ldap_entry_t -> file format */
 		if ((parsestat = be->ldapobj2str(be, argp))
-			== NSS_STR_PARSE_SUCCESS) {
+		    == NSS_STR_PARSE_SUCCESS) {
 			if (argp->buf.result != NULL) {
 				/* file format -> struct */
 				if (argp->str2ent == NULL) {
@@ -437,10 +437,10 @@ next_entry:
 					goto error_out;
 				}
 				parsestat = (*argp->str2ent)(be->buffer,
-						be->buflen,
-						argp->buf.result,
-						argp->buf.buffer,
-						argp->buf.buflen);
+				    be->buflen,
+				    argp->buf.result,
+				    argp->buf.buffer,
+				    argp->buf.buflen);
 				if (parsestat == NSS_STR_PARSE_SUCCESS) {
 					if (be->buffer != NULL) {
 						free(be->buffer);
@@ -460,7 +460,7 @@ next_entry:
 				 */
 				argp->returnval = argp->buf.buffer;
 				argp->returnlen =
-					strlen(argp->buf.buffer) + 1;
+				    strlen(argp->buf.buffer) + 1;
 			}
 		}
 error_out:

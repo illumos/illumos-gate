@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,6 +156,7 @@ extern int _ldap_filter_name(char *filter_name, const char *name,
 	int filter_name_size);
 
 extern void _nss_services_cookie_free(void **cookieP);
+extern nss_status_t switch_err(int rc, ns_ldap_error_t *error);
 
 #ifdef DEBUG
 extern int printresult(ns_ldap_result_t *result);

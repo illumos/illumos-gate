@@ -63,7 +63,7 @@ _nscd_free_nsw_state(
 		if ((*s->nsw_cfg_p)->nobase != 1)
 			_nscd_release((nscd_acc_data_t *)s->nsw_cfg_p);
 		else
-			_nscd_free_nsw_config(*s->nsw_cfg_p);
+			(void) _nscd_set((nscd_acc_data_t *)s->nsw_cfg_p, NULL);
 
 	if (s->be_db_pp != NULL) {
 		for (i = 0; i < s->max_src; i++) {

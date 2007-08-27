@@ -1624,8 +1624,10 @@ get_next_session(ns_ldap_cookie_t *cookie)
 	int		rc;
 	int		fail_if_new_pwd_reqd = 1;
 
-	if (cookie->connectionId > -1)
+	if (cookie->connectionId > -1) {
 		DropConnection(cookie->connectionId, cookie->i_flags);
+		cookie->connectionId = -1;
+	}
 
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
 	    cookie->i_auth, &connectionId, &conp,
@@ -1663,8 +1665,10 @@ get_referral_session(ns_ldap_cookie_t *cookie)
 	int		rc;
 	int		fail_if_new_pwd_reqd = 1;
 
-	if (cookie->connectionId > -1)
+	if (cookie->connectionId > -1) {
 		DropConnection(cookie->connectionId, cookie->i_flags);
+		cookie->connectionId = -1;
+	}
 
 	rc = __s_api_getConnection(cookie->refpos->refHost, 0,
 	    cookie->i_auth, &connectionId, &conp,
@@ -2066,15 +2070,18 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	ns_ldap_error_t **errorp;
 
 	errorp = &error;
-	cookie->err_rc = 0;
 	cookie->state = state;
 	errstr[0] = '\0';
 
 	for (;;) {
 		switch (cookie->state) {
 		case CLEAR_RESULTS:
-			(void) ldap_abandon_ext(cookie->conn->ld,
-			    cookie->msgId, NULL, NULL);
+			if (cookie->conn != NULL && cookie->conn->ld != NULL &&
+			    cookie->connectionId != -1 && cookie->msgId != 0) {
+				(void) ldap_abandon_ext(cookie->conn->ld,
+				    cookie->msgId, NULL, NULL);
+				cookie->msgId = 0;
+			}
 			cookie->new_state = EXIT;
 			break;
 		case GET_ACCT_MGMT_INFO:
@@ -2967,8 +2974,12 @@ __ns_ldap_firstEntry(
 			cookie->result = NULL;
 			*vcookie = (void *)cookie;
 			return (NS_LDAP_SUCCESS);
-		case ERROR:
 		case LDAP_ERROR:
+			state = search_state_machine(cookie, state, ONE_STEP);
+			state = search_state_machine(cookie, CLEAR_RESULTS,
+			    ONE_STEP);
+			/* FALLTHROUGH */
+		case ERROR:
 			rc = cookie->err_rc;
 			*errorp = cookie->errorp;
 			cookie->errorp = NULL;
@@ -3026,8 +3037,12 @@ __ns_ldap_nextEntry(
 			*result = cookie->result;
 			cookie->result = NULL;
 			return (NS_LDAP_SUCCESS);
-		case ERROR:
 		case LDAP_ERROR:
+			state = search_state_machine(cookie, state, ONE_STEP);
+			state = search_state_machine(cookie, CLEAR_RESULTS,
+			    ONE_STEP);
+			/* FALLTHROUGH */
+		case ERROR:
 			rc = cookie->err_rc;
 			*errorp = cookie->errorp;
 			cookie->errorp = NULL;
