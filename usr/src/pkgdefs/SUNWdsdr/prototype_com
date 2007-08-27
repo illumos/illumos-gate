@@ -27,6 +27,7 @@
 # packaging files
 i depend
 i pkginfo
+i copyright
 i i.manifest
 i r.manifest
 
