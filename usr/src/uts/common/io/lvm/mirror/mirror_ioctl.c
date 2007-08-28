@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,7 +194,7 @@ mirror_set(
 		return (mdmderror(&msp->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		recid = mddb_createrec((size_t)msp->size, typ1, MIRROR_REC,
-			MD_CRO_64BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
+		    MD_CRO_64BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
 #endif
 	} else {
 		/*
@@ -202,11 +202,11 @@ mirror_set(
 		 */
 		msp->size = sizeof (mm_unit32_od_t);
 		recid = mddb_createrec((size_t)msp->size, typ1, MIRROR_REC,
-			MD_CRO_32BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
+		    MD_CRO_32BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
 	}
 	if (recid < 0)
 		return (mddbstatus2error(&msp->mde, (int)recid,
-			    mnum, setno));
+		    mnum, setno));
 
 	/* Resize to include incore fields */
 	un = (mm_unit_t *)mddb_getrecaddr_resize(recid, sizeof (*un), 0);
@@ -253,7 +253,7 @@ mirror_set(
 		MD_UNIT(mnum) = NULL;
 		mddb_deleterec_wrapper(recid);
 		return (mdmderror(&msp->mde, MDE_IN_USE,
-			    md_getminor(sm->sm_dev)));
+		    md_getminor(sm->sm_dev)));
 	}
 
 	if (err = mirror_build_incore(un, 0)) {
@@ -324,7 +324,7 @@ mirror_getdevs(
 	mdclrerror(&mgdph->mde);
 
 	if ((un = mirror_getun(mgdph->mnum,
-		&mgdph->mde, RD_LOCK, lock)) == NULL)
+	    &mgdph->mde, RD_LOCK, lock)) == NULL)
 		return (0);
 
 	udevs = (md_dev64_t *)(uintptr_t)mgdph->devs;
@@ -341,7 +341,7 @@ mirror_getdevs(
 			}
 
 			if (ddi_copyout((caddr_t)&unit_dev, (caddr_t)udevs,
-						sizeof (*udevs), mode) != 0)
+			    sizeof (*udevs), mode) != 0)
 				return (EFAULT);
 			++udevs;
 		}
@@ -496,7 +496,7 @@ mirror_getcomp_by_dev(mm_unit_t *un, replace_params_t *params,
 
 		get_dev =
 		    (void (*)())md_get_named_service(sm->sm_dev, 0,
-							"get device", 0);
+		    "get device", 0);
 		compcnt = (*(smic->sm_get_component_count))(sm->sm_dev, un);
 
 		/*
@@ -631,11 +631,11 @@ comp_replace(
 	}
 
 	get_dev = (void (*)())md_get_named_service(sm->sm_dev, 0,
-							"get device", 0);
+	    "get device", 0);
 	(void) (*get_dev)(sm->sm_dev, sm, ci, &cd);
 
 	repl_dev = (int (*)())md_get_named_service(sm->sm_dev, 0,
-							"replace device", 0);
+	    "replace device", 0);
 
 	smdev = sm->sm_dev;
 	ms_un = MD_UNIT(md_getminor(smdev));
@@ -646,7 +646,7 @@ comp_replace(
 		mdkey_t		this_key;
 
 		this_dev = ((cd.cd_orig_dev == 0) ? cd.cd_dev :
-							    cd.cd_orig_dev);
+		    cd.cd_orig_dev);
 		setno = MD_MIN2SET(md_getminor(smdev));
 		side = mddb_getsidenum(setno);
 		comp = (struct ms_comp *)
@@ -701,7 +701,7 @@ comp_replace(
 		}
 
 		if ((md_getmajor(this_dev) != md_major) &&
-			(md_devid_found(setno, side, this_key) == 1)) {
+		    (md_devid_found(setno, side, this_key) == 1)) {
 			if (md_update_namespace_did(setno, side,
 			    this_key, &params->mde) != 0) {
 				(void) mddeverror(&params->mde, MDE_NAME_SPACE,
@@ -730,7 +730,7 @@ comp_replace(
 		nd.nd_hs_id = 0;
 
 		err = (*repl_dev)(sm->sm_dev, 0, ci, &nd, recids, 6,
-					&repl_done, &repl_data);
+		    &repl_done, &repl_data);
 
 	}
 
@@ -891,14 +891,14 @@ mirror_attach(
 	}
 
 	indx = md_setshared_name(setno,
-				ddi_major_to_name(md_getmajor(sm_dev)), 0L);
+	    ddi_major_to_name(md_getmajor(sm_dev)), 0L);
 
 	/* Open the sm, only if the mirror is open */
 	if (md_unit_isopen(MDI_UNIT(mnum))) {
 		if (md_layered_open(mnum, &sm_dev, MD_OFLG_NULL)) {
 			(void) md_remshared_name(setno, indx);
 			(void) mdmderror(&att->mde, MDE_SM_OPEN_ERR,
-						md_getminor(att->submirror));
+			    md_getminor(att->submirror));
 			goto errexit;
 		}
 		/* in dryrun mode, don't leave the device open */
@@ -953,7 +953,7 @@ reset_comp_states(mm_submirror_t *sm, mm_submirror_ic_t *smic)
 	compcnt = (*(smic->sm_get_component_count)) (sm->sm_dev, sm);
 	for (i = 0; i < compcnt; i++) {
 		shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
-						(sm->sm_dev, sm, i);
+		    (sm->sm_dev, sm, i);
 
 		shared->ms_state = CS_OKAY;
 		shared->ms_flags &= ~MDM_S_NOWRITE;
@@ -986,6 +986,8 @@ mirror_detach(
 	mm_unit_t		*un;
 	mdi_unit_t		*ui;
 	mm_submirror_t		*sm;
+	mm_submirror_t		*old_sm;
+	mm_submirror_t		*new_sm;
 	mm_submirror_ic_t	*smic;
 	int			smi;
 	md_dev64_t		sm_dev;
@@ -993,6 +995,7 @@ mirror_detach(
 	sv_dev_t		sv;
 	mddb_recid_t		recids[2];
 	int			nsv = 0;
+	int			smi_remove;
 
 	mdclrerror(&det->mde);
 
@@ -1005,7 +1008,6 @@ mirror_detach(
 		mirror_resume_writes(un);
 		return (mdmderror(&det->mde, MDE_IN_UNAVAIL_STATE, mnum));
 	}
-
 	/*
 	 * detach cannot be done while a resync is active or we are
 	 * still waiting for an optimized resync to be started
@@ -1016,10 +1018,13 @@ mirror_detach(
 	}
 
 	for (smi = 0; smi < NMIRROR; smi++) {
-		if (!SMS_BY_INDEX_IS(un, smi, SMS_INUSE))
+		if (!SMS_BY_INDEX_IS(un, smi, SMS_INUSE)) {
 			continue;
-		if (un->un_sm[smi].sm_dev == det->submirror)
+		}
+		if (un->un_sm[smi].sm_dev == det->submirror) {
+			smi_remove = smi;
 			break;
+		}
 	}
 
 	if (smi == NMIRROR) {
@@ -1087,6 +1092,28 @@ mirror_detach(
 		SE_NOTIFY(EC_SVM_CONFIG, ESC_SVM_DETACH, SVM_TAG_METADEVICE,
 		    MD_UN2SET(un), MD_SID(un));
 	}
+
+	/*
+	 * Reshuffle the submirror devices in the array as we potentially
+	 * have a dead record in the middle of it.
+	 */
+	for (smi = 0; nsv && (smi < NMIRROR); smi++) {
+		if (smi < smi_remove) {
+			continue;
+		}
+		if (smi > smi_remove) {
+			old_sm = &un->un_sm[smi];
+			new_sm = &un->un_sm[smi - 1];
+			new_sm->sm_key = old_sm->sm_key;
+			new_sm->sm_dev = old_sm->sm_dev;
+			new_sm->sm_state = old_sm->sm_state;
+			new_sm->sm_flags = old_sm->sm_flags;
+			new_sm->sm_shared = old_sm->sm_shared;
+			new_sm->sm_hsp_id = old_sm->sm_hsp_id;
+			new_sm->sm_timestamp = old_sm->sm_timestamp;
+		}
+	}
+	mirror_commit(un, 0, NULL);
 	mirror_resume_writes(un);
 	return (0);
 }
@@ -1357,7 +1384,7 @@ mirror_grow_unit(
 		old_vtoc = un->c.un_vtoc_id;
 		if (old_vtoc != 0) {
 			un->c.un_vtoc_id =
-				md_vtoc_to_efi_record(old_vtoc, setno);
+			    md_vtoc_to_efi_record(old_vtoc, setno);
 		}
 		MD_RECID(un) = recid;
 		dep = mddb_getrecdep(recid);
@@ -1414,7 +1441,7 @@ mirror_grow(
 	mdclrerror(&mgph->mde);
 
 	if ((un = mirror_getun(mgph->mnum,
-		&mgph->mde, WR_LOCK, lock)) == NULL)
+	    &mgph->mde, WR_LOCK, lock)) == NULL)
 		return (0);
 
 	if (MD_STATUS(un) & MD_UN_GROW_PENDING)
@@ -1636,7 +1663,7 @@ mirror_owner_thread(md_mn_req_owner_t *ownp)
 			/* Sets node owner of un_rr_dirty record */
 			if (un->un_rr_dirty_recid)
 				(void) mddb_setowner(un->un_rr_dirty_recid,
-					md_mn_mynode_id);
+				    md_mn_mynode_id);
 			/*
 			 * Release the block on the current resync region if it
 			 * is blocked
@@ -1873,7 +1900,7 @@ mirror_set_owner(md_set_mmown_params_t *p, IOLOCK *lock)
 
 		mutex_exit(&un->un_owner_mx);
 	} else if ((un->un_mirror_owner == md_mn_mynode_id) ||
-		un->un_owner_state & MM_MN_BECOME_OWNER) {
+	    un->un_owner_state & MM_MN_BECOME_OWNER) {
 		mutex_exit(&un->un_owner_mx);
 
 		/*
@@ -2030,8 +2057,8 @@ mirror_set_state(md_set_state_params_t *p, IOLOCK *lockp)
 #ifdef DEBUG
 			if (mirror_debug_flag) {
 				printf("mirror_set_state: short circuit "
-					"hs_id=0x%x, ms_hs_id=0x%x\n",
-					p->hs_id, shared->ms_hs_id);
+				    "hs_id=0x%x, ms_hs_id=0x%x\n",
+				    p->hs_id, shared->ms_hs_id);
 			}
 #endif
 			/* release the block on writes to the mirror */
@@ -2306,8 +2333,8 @@ mirror_get_status(mm_unit_t *un, IOLOCK *lockp)
 
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_GET_MIRROR_STATE,
-		MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, (char *)&msg,
-		sizeof (msg), kres);
+	    MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, (char *)&msg,
+	    sizeof (msg), kres);
 
 	/* if the node hasn't yet joined, it's Ok. */
 	if ((!MDMN_KSEND_MSG_OK(rval, kres)) &&
@@ -2685,7 +2712,7 @@ mirror_admin_ioctl(int cmd, void *data, int mode, IOLOCK *lockp)
 		    sizeof (md_driver_t));
 
 		if ((p->probe.nmdevs < 1) ||
-			(strstr(p->probe.test_name, "probe") == NULL)) {
+		    (strstr(p->probe.test_name, "probe") == NULL)) {
 			err = EINVAL;
 			goto free_mem;
 		}
@@ -2715,7 +2742,8 @@ mirror_admin_ioctl(int cmd, void *data, int mode, IOLOCK *lockp)
 		for (i = 0; i < p->probe.nmdevs; i++) {
 			sema_p(PROBE_SEMA(p));
 		}
-		while (md_ioctl_lock_enter() == EINTR);
+		while (md_ioctl_lock_enter() == EINTR)
+		;
 
 		/*
 		 * clean up. The hdr list is freed in the probe routines
@@ -3061,7 +3089,7 @@ md_mirror_ioctl(
 
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 			if (ddi_copyout((caddr_t)&dmp, data, sizeof (dmp),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #ifdef _SYSCALL32
@@ -3072,7 +3100,7 @@ md_mirror_ioctl(
 			dmp32.dkl_nblk = dmp.dkl_nblk;
 
 			if (ddi_copyout((caddr_t)&dmp32, data, sizeof (dmp32),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #endif /* _SYSCALL32 */
@@ -3570,10 +3598,10 @@ mirror_rename_listkids(md_rendelta_t **dlpp, md_rentxn_t *rtxnp)
 		child_min = md_getminor(sm->sm_dev);
 
 		p = new = md_build_rendelta(MDRR_CHILD,
-				to_min == child_min? MDRR_SELF: MDRR_CHILD,
-				sm->sm_dev, p,
-				MD_UNIT(child_min), MDI_UNIT(child_min),
-				&rtxnp->mde);
+		    to_min == child_min? MDRR_SELF: MDRR_CHILD,
+		    sm->sm_dev, p,
+		    MD_UNIT(child_min), MDI_UNIT(child_min),
+		    &rtxnp->mde);
 
 		if (!new) {
 			if (mdisok(&rtxnp->mde)) {
@@ -3608,7 +3636,7 @@ mirror_may_renexch_self(
 
 	if (!un || !ui) {
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -3646,7 +3674,7 @@ mirror_may_renexch_self(
 		}
 		if (!related) {
 			(void) mdmderror(&rtxnp->mde,
-					MDE_RENAME_TARGET_UNRELATED, to_min);
+			    MDE_RENAME_TARGET_UNRELATED, to_min);
 			return (EINVAL);
 		}
 
@@ -3660,14 +3688,14 @@ mirror_may_renexch_self(
 
 		if (toplevel && md_unit_isopen(ui)) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_BUSY,
-								from_min);
+			    from_min);
 			return (EBUSY);
 		}
 		break;
 
 	default:
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -3714,7 +3742,7 @@ mirror_rename_check(
 		ASSERT(smic->sm_get_component_count);
 		if (!smic->sm_get_component_count) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (ENXIO);
 		}
 
@@ -3725,8 +3753,8 @@ mirror_rename_check(
 			ASSERT(smic->sm_shared_by_indx);
 			if (!smic->sm_shared_by_indx) {
 				(void) mdmderror(&rtxnp->mde,
-						MDE_RENAME_CONFIG_ERROR,
-						md_getminor(delta->dev));
+				    MDE_RENAME_CONFIG_ERROR,
+				    md_getminor(delta->dev));
 				return (ENXIO);
 			}
 
@@ -3736,15 +3764,15 @@ mirror_rename_check(
 			ASSERT(shared);
 			if (!shared) {
 				(void) mdmderror(&rtxnp->mde,
-						MDE_RENAME_CONFIG_ERROR,
-						md_getminor(delta->dev));
+				    MDE_RENAME_CONFIG_ERROR,
+				    md_getminor(delta->dev));
 				return (ENXIO);
 			}
 
 			if (shared->ms_hs_id != 0) {
 				(void) mdmderror(&rtxnp->mde,
-						MDE_SM_FAILED_COMPS,
-						md_getminor(delta->dev));
+				    MDE_SM_FAILED_COMPS,
+				    md_getminor(delta->dev));
 				return (EIO);
 			}
 
@@ -3754,14 +3782,14 @@ mirror_rename_check(
 
 			case CS_RESYNC:
 				(void) mdmderror(&rtxnp->mde,
-						MDE_RESYNC_ACTIVE,
-						md_getminor(delta->dev));
+				    MDE_RESYNC_ACTIVE,
+				    md_getminor(delta->dev));
 				return (EBUSY);
 
 			default:
 				(void) mdmderror(&rtxnp->mde,
-						MDE_SM_FAILED_COMPS,
-						md_getminor(delta->dev));
+				    MDE_SM_FAILED_COMPS,
+				    md_getminor(delta->dev));
 				return (EINVAL);
 			}
 
