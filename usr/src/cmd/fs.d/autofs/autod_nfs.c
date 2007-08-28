@@ -784,11 +784,7 @@ nfsmount(
 		}
 	}
 
-	/*
-	 * Have to workaround the fact that hasmntopt() returns true
-	 * when comparing "secure" (in &m) with "sec".
-	 */
-	if (hasmntopt(&m, "sec=") != NULL) {
+	if (hasmntopt(&m, MNTOPT_SEC) != NULL) {
 		if ((str_opt(&m, MNTOPT_SEC,
 		    &mfssnego_init.nfs_flavor)) == -1) {
 			syslog(LOG_ERR, "nfsmount: no memory");
@@ -1452,11 +1448,7 @@ retry:
 		}
 
 		nfs_flavor = NULL;
-		/*
-		 * Have to workaround the fact that hasmntopt() returns true
-		 * when comparing "secure" (in &m) with "sec".
-		 */
-		if (hasmntopt(&m, "sec=") != NULL) {
+		if (hasmntopt(&m, MNTOPT_SEC) != NULL) {
 			if ((str_opt(&m, MNTOPT_SEC, &nfs_flavor)) == -1) {
 				syslog(LOG_ERR, "nfsmount: no memory");
 				last_error = NFSERR_IO;

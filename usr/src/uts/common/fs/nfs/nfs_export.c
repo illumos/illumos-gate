@@ -2111,12 +2111,11 @@ nfs_vptoexi(vnode_t *dvp, vnode_t *vp, cred_t *cr, int *walk,
 	return (exi);
 }
 
-bool_t
+int
 chk_clnt_sec(exportinfo_t *exi, struct svc_req *req)
 {
 	int i, nfsflavor;
 	struct secinfo *sp;
-	bool_t sec_found = FALSE;
 
 	/*
 	 *  Get the nfs flavor number from xprt.
@@ -2125,12 +2124,11 @@ chk_clnt_sec(exportinfo_t *exi, struct svc_req *req)
 
 	sp = exi->exi_export.ex_secinfo;
 	for (i = 0; i < exi->exi_export.ex_seccnt; i++) {
-		if (nfsflavor == sp[i].s_secinfo.sc_nfsnum) {
-			sec_found = TRUE;
-			break;
-		}
+		if ((nfsflavor == sp[i].s_secinfo.sc_nfsnum) &&
+		    SEC_REF_EXPORTED(sp + i))
+			return (TRUE);
 	}
-	return (sec_found);
+	return (FALSE);
 }
 
 /*
@@ -2175,22 +2173,42 @@ makefh(fhandle_t *fh, vnode_t *vp, exportinfo_t *exi)
  *   the length octet l is the length describing the number of
  *   valid octets that follow.  (l = 4 * n, where n is the number
  *   of security flavors sent in the current overloaded filehandle.)
+ *
+ *   sec_index should always be in the inclusive range: [1 - ex_seccnt],
+ *   and it tells server where to start within the secinfo array.
+ *   Usually it will always be 1; however, if more flavors are used
+ *   for the public export than can be encoded in the overloaded FH
+ *   (7 for NFS2), subsequent SNEGO MCLs will have a larger index
+ *   so the server will pick up where it left off from the previous
+ *   MCL reply.
+ *
+ *   With NFS4 support, implicitly allowed flavors are also in
+ *   the secinfo array; however, they should not be returned in
+ *   SNEGO MCL replies.
  */
 int
 makefh_ol(fhandle_t *fh, exportinfo_t *exi, uint_t sec_index)
 {
-	static int max_cnt = (NFS_FHSIZE/sizeof (int)) - 1;
-	int totalcnt, i, *ipt, cnt;
+	secinfo_t sec[MAX_FLAVORS];
+	int totalcnt, i, *ipt, cnt, seccnt, secidx, fh_max_cnt;
 	char *c;
 
-	if (fh == (fhandle_t *)NULL ||
-	    exi == (struct exportinfo *)NULL ||
-	    sec_index > exi->exi_export.ex_seccnt ||
-	    sec_index < 1)
+	if (fh == NULL || exi == NULL || sec_index < 1)
 		return (EREMOTE);
 
-	totalcnt = exi->exi_export.ex_seccnt-sec_index+1;
-	cnt = totalcnt > max_cnt? max_cnt : totalcnt;
+	/*
+	 * WebNFS clients need to know the unique set of explicitly
+	 * shared flavors in used for the public export. When
+	 * "TRUE" is passed to build_seclist_nodups(), only explicitly
+	 * shared flavors are included in the list.
+	 */
+	seccnt = build_seclist_nodups(&exi->exi_export, sec, TRUE);
+	if (sec_index > seccnt)
+		return (EREMOTE);
+
+	fh_max_cnt = (NFS_FHSIZE / sizeof (int)) - 1;
+	totalcnt = seccnt - sec_index + 1;
+	cnt = totalcnt > fh_max_cnt ? fh_max_cnt : totalcnt;
 
 	c = (char *)fh;
 	/*
@@ -2203,15 +2221,15 @@ makefh_ol(fhandle_t *fh, exportinfo_t *exi, uint_t sec_index)
 	 * Encode the status octet that indicates whether there
 	 * are more security flavors the client needs to get.
 	 */
-	*(c+1) = totalcnt > max_cnt;
+	*(c + 1) = totalcnt > fh_max_cnt;
 
 	/*
 	 * put security flavors in the overloaded fh
 	 */
 	ipt = (int *)(c + sizeof (int32_t));
+	secidx = sec_index - 1;
 	for (i = 0; i < cnt; i++) {
-		*ipt++ = htonl(exi->exi_export.ex_secinfo[i+sec_index-1].
-		    s_secinfo.sc_nfsnum);
+		ipt[i] = htonl(sec[i + secidx].s_secinfo.sc_nfsnum);
 	}
 	return (0);
 }
@@ -2269,20 +2287,27 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 int
 makefh3_ol(nfs_fh3 *fh, struct exportinfo *exi, uint_t sec_index)
 {
-	static int max_cnt = NFS3_FHSIZE/sizeof (int) - 1;
-	int totalcnt, cnt, *ipt, i;
-	secinfo_t *sec = exi->exi_export.ex_secinfo;
+	secinfo_t sec[MAX_FLAVORS];
+	int totalcnt, cnt, *ipt, i, seccnt, fh_max_cnt, secidx;
 	char *c;
 
-	if (fh == (nfs_fh3 *)NULL ||
-	    exi == (struct exportinfo *)NULL ||
-	    sec_index > exi->exi_export.ex_seccnt ||
-	    sec_index < 1) {
+	if (fh == NULL || exi == NULL || sec_index < 1)
 		return (EREMOTE);
-	}
 
-	totalcnt = exi->exi_export.ex_seccnt-sec_index+1;
-	cnt = totalcnt > max_cnt? max_cnt : totalcnt;
+	/*
+	 * WebNFS clients need to know the unique set of explicitly
+	 * shared flavors in used for the public export. When
+	 * "TRUE" is passed to build_seclist_nodups(), only explicitly
+	 * shared flavors are included in the list.
+	 */
+	seccnt = build_seclist_nodups(&exi->exi_export, sec, TRUE);
+
+	if (sec_index > seccnt)
+		return (EREMOTE);
+
+	fh_max_cnt = (NFS3_FHSIZE / sizeof (int)) - 1;
+	totalcnt = seccnt - sec_index + 1;
+	cnt = totalcnt > fh_max_cnt ? fh_max_cnt : totalcnt;
 
 	/*
 	 * Place the length in fh3_length representing the number
@@ -2296,14 +2321,15 @@ makefh3_ol(nfs_fh3 *fh, struct exportinfo *exi, uint_t sec_index)
 	 * Encode the status octet that indicates whether there
 	 * are more security flavors the client needs to get.
 	 */
-	*c = totalcnt > max_cnt;
+	*c = totalcnt > fh_max_cnt;
 
 	/*
 	 * put security flavors in the overloaded fh
 	 */
+	secidx = sec_index - 1;
 	ipt = (int *)(c + sizeof (int32_t));
 	for (i = 0; i < cnt; i++) {
-		*(ipt+i) = htonl(sec[i+sec_index-1].s_secinfo.sc_nfsnum);
+		ipt[i] = htonl(sec[i + secidx].s_secinfo.sc_nfsnum);
 	}
 	return (0);
 }
