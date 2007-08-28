@@ -714,7 +714,7 @@ vn_rdwr(
 	}
 
 	(void) VOP_RWLOCK(vp,
-		rw == UIO_WRITE ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE, NULL);
+	    rw == UIO_WRITE ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE, NULL);
 	if (rw == UIO_WRITE) {
 		uio.uio_fmode = FWRITE;
 		uio.uio_extflg = UIO_COPY_DEFAULT;
@@ -725,7 +725,7 @@ vn_rdwr(
 		error = VOP_READ(vp, &uio, ioflag, cr, NULL);
 	}
 	VOP_RWUNLOCK(vp, rw == UIO_WRITE ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE,
-									NULL);
+	    NULL);
 	if (residp)
 		*residp = uio.uio_resid;
 	else if (uio.uio_resid)
@@ -797,7 +797,7 @@ vn_open(
 	mode_t umask)
 {
 	return (vn_openat(pnamep, seg, filemode,
-			createmode, vpp, crwhy, umask, NULL));
+	    createmode, vpp, crwhy, umask, NULL));
 }
 
 
@@ -859,8 +859,8 @@ top:
 
 		if (error =
 		    vn_createat(pnamep, seg, &vattr, excl, mode, &vp, crwhy,
-					(filemode & ~(FTRUNC|FEXCL)),
-						umask, startvp))
+		    (filemode & ~(FTRUNC|FEXCL)),
+		    umask, startvp))
 			return (error);
 	} else {
 		/*
@@ -1049,7 +1049,7 @@ vn_create(
 	mode_t umask)
 {
 	return (vn_createat(pnamep, seg, vap, excl, mode, vpp,
-			why, flag, umask, NULL));
+	    why, flag, umask, NULL));
 }
 
 /*
@@ -1222,12 +1222,12 @@ top:
 				ssize_t length;
 
 				offset = vap->va_size > vattr.va_size ?
-						vattr.va_size : vap->va_size;
+				    vattr.va_size : vap->va_size;
 				length = vap->va_size > vattr.va_size ?
-						vap->va_size - vattr.va_size :
-						vattr.va_size - vap->va_size;
+				    vap->va_size - vattr.va_size :
+				    vattr.va_size - vap->va_size;
 				if (nbl_conflict(vp, NBL_WRITE, offset,
-						length, 0)) {
+				    length, 0)) {
 					error = EACCES;
 					goto out;
 				}
@@ -1251,7 +1251,7 @@ top:
 			ASSERT(why != CRMKDIR);
 			error =
 			    VOP_CREATE(vp, "", vap, excl, mode, vpp, CRED(),
-				    flag);
+			    flag);
 			/*
 			 * If the create succeeded, it will have created
 			 * a new reference to the vnode.  Give up the
@@ -1565,37 +1565,70 @@ top:
 	 * to avoid file system corruption.)
 	 */
 	if (vp->v_flag & VROOT) {
-		if (vfsp->vfs_flag & VFS_UNLINKABLE) {
-			if (dirflag == RMDIRECTORY) {
-				/*
-				 * User called rmdir(2) on a file that has
-				 * been namefs mounted on top of.  Since
-				 * namefs doesn't allow directories to
-				 * be mounted on other files we know
-				 * vp is not of type VDIR so fail to operation.
-				 */
-				error = ENOTDIR;
-				goto out;
-			}
-			coveredvp = vfsp->vfs_vnodecovered;
-			VN_HOLD(coveredvp);
-			VN_RELE(vp);
-			vp = NULL;
-			if ((error = vn_vfswlock(coveredvp)) == 0)
-				error = dounmount(vfsp, 0, CRED());
-			/*
-			 * Unmounted the namefs file system; now get
-			 * the object it was mounted over.
-			 */
-			vp = coveredvp;
-			/*
-			 * If namefs was mounted over a directory, then
-			 * we want to use rmdir() instead of unlink().
-			 */
-			if (vp->v_type == VDIR)
-				dirflag = RMDIRECTORY;
-		} else
+		if ((vfsp->vfs_flag & VFS_UNLINKABLE) == 0) {
 			error = EBUSY;
+			goto out;
+		}
+
+		/*
+		 * Namefs specific code starts here.
+		 */
+
+		if (dirflag == RMDIRECTORY) {
+			/*
+			 * User called rmdir(2) on a file that has
+			 * been namefs mounted on top of.  Since
+			 * namefs doesn't allow directories to
+			 * be mounted on other files we know
+			 * vp is not of type VDIR so fail to operation.
+			 */
+			error = ENOTDIR;
+			goto out;
+		}
+
+		/*
+		 * If VROOT is still set after grabbing vp->v_lock,
+		 * noone has finished nm_unmount so far and coveredvp
+		 * is valid.
+		 * If we manage to grab vn_vfswlock(coveredvp) before releasing
+		 * vp->v_lock, any race window is eliminated.
+		 */
+
+		mutex_enter(&vp->v_lock);
+		if ((vp->v_flag & VROOT) == 0) {
+			/* Someone beat us to the unmount */
+			mutex_exit(&vp->v_lock);
+			error = EBUSY;
+			goto out;
+		}
+		vfsp = vp->v_vfsp;
+		coveredvp = vfsp->vfs_vnodecovered;
+		ASSERT(coveredvp);
+		/*
+		 * Note: Implementation of vn_vfswlock shows that ordering of
+		 * v_lock / vn_vfswlock is not an issue here.
+		 */
+		error = vn_vfswlock(coveredvp);
+		mutex_exit(&vp->v_lock);
+
+		if (error)
+			goto out;
+
+		VN_HOLD(coveredvp);
+		VN_RELE(vp);
+		error = dounmount(vfsp, 0, CRED());
+
+		/*
+		 * Unmounted the namefs file system; now get
+		 * the object it was mounted over.
+		 */
+		vp = coveredvp;
+		/*
+		 * If namefs was mounted over a directory, then
+		 * we want to use rmdir() instead of unlink().
+		 */
+		if (vp->v_type == VDIR)
+			dirflag = RMDIRECTORY;
 
 		if (error)
 			goto out;
@@ -2544,8 +2577,8 @@ vn_matchopval(vnode_t *vp, char *vopname, fs_generic_func_p funcp)
 
 	for (otdp = vn_ops_table; otdp->name != NULL; otdp++) {
 		if (MATCHNAME(otdp->name, vopname)) {
-			loc = (fs_generic_func_p *)((char *)(vop)
-							+ otdp->offset);
+			loc = (fs_generic_func_p *)
+			    ((char *)(vop) + otdp->offset);
 			break;
 		}
 	}
@@ -3011,7 +3044,7 @@ fop_create(
 	VOPXID_MAP_CR(dvp, cr);
 
 	ret = (*(dvp)->v_op->vop_create)
-				(dvp, name, vap, excl, mode, vpp, cr, flag);
+	    (dvp, name, vap, excl, mode, vpp, cr, flag);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, create);
 		if ((*vpp)->v_path == NULL) {
@@ -3263,7 +3296,7 @@ fop_frlock(
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_frlock)
-				(vp, cmd, bfp, flag, offset, flk_cbp, cr);
+	    (vp, cmd, bfp, flag, offset, flk_cbp, cr);
 	VOPSTATS_UPDATE(vp, frlock);
 	return (err);
 }
@@ -3317,7 +3350,7 @@ fop_getpage(
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_getpage)
-			(vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
+	    (vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
 	VOPSTATS_UPDATE(vp, getpage);
 	return (err);
 }
@@ -3356,7 +3389,7 @@ fop_map(
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_map)
-			(vp, off, as, addrp, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addrp, len, prot, maxprot, flags, cr);
 	VOPSTATS_UPDATE(vp, map);
 	return (err);
 }
@@ -3379,7 +3412,7 @@ fop_addmap(
 	VOPXID_MAP_CR(vp, cr);
 
 	error = (*(vp)->v_op->vop_addmap)
-			(vp, off, as, addr, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addr, len, prot, maxprot, flags, cr);
 
 	if ((!error) && (vp->v_type == VREG)) {
 		delta = (u_longlong_t)btopr(len);
@@ -3389,7 +3422,7 @@ fop_addmap(
 		 */
 		if (flags & MAP_PRIVATE) {
 			atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-				(int64_t)delta);
+			    (int64_t)delta);
 		} else {
 			/*
 			 * atomic_add_64 forces the fetch of a 64 bit value to
@@ -3397,13 +3430,13 @@ fop_addmap(
 			 */
 			if (maxprot & PROT_WRITE)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_write)),
-					(int64_t)delta);
+				    (int64_t)delta);
 			if (maxprot & PROT_READ)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-					(int64_t)delta);
+				    (int64_t)delta);
 			if (maxprot & PROT_EXEC)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-					(int64_t)delta);
+				    (int64_t)delta);
 		}
 	}
 	VOPSTATS_UPDATE(vp, addmap);
@@ -3428,7 +3461,7 @@ fop_delmap(
 	VOPXID_MAP_CR(vp, cr);
 
 	error = (*(vp)->v_op->vop_delmap)
-		(vp, off, as, addr, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addr, len, prot, maxprot, flags, cr);
 
 	/*
 	 * NFS calls into delmap twice, the first time
@@ -3443,7 +3476,7 @@ fop_delmap(
 
 		if (flags & MAP_PRIVATE) {
 			atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-				(int64_t)(-delta));
+			    (int64_t)(-delta));
 		} else {
 			/*
 			 * atomic_add_64 forces the fetch of a 64 bit value
@@ -3451,13 +3484,13 @@ fop_delmap(
 			 */
 			if (maxprot & PROT_WRITE)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_write)),
-					(int64_t)(-delta));
+				    (int64_t)(-delta));
 			if (maxprot & PROT_READ)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-					(int64_t)(-delta));
+				    (int64_t)(-delta));
 			if (maxprot & PROT_EXEC)
 				atomic_add_64((uint64_t *)(&(vp->v_mmap_read)),
-					(int64_t)(-delta));
+				    (int64_t)(-delta));
 		}
 	}
 	VOPSTATS_UPDATE(vp, delmap);
