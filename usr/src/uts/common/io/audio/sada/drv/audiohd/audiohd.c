@@ -165,6 +165,21 @@ static struct audiohd_codec_ops audiohd_stac9200_ops = {
 	audiohd_stac_max_gain			/* ac_get_max_gain */
 };
 
+
+static int audiohd_stac9872_init_codec(audiohd_state_t *);
+
+/* ops for STAC9872 (CXD9872RD, STAC9872AK, CXD9872AKD) */
+static struct audiohd_codec_ops audiohd_stac9872_ops = {
+	audiohd_stac9872_init_codec,	/* ac_init_codec */
+	audiohd_stac_set_pcm_fmt,		/* ac_set_pcm_fmt */
+	audiohd_stac_set_gain,			/* ac_set_out_gain */
+	audiohd_stac_set_port,			/* ac_set_port */
+	audiohd_stac_mute_outputs,		/* ac_mute_outputs */
+	audiohd_stac_set_monitor_gain,	/* ac_set_monitor_gain */
+	audiohd_stac_max_gain			/* ac_get_max_gain */
+};
+
+
 /*
  * operation routines for AD1986A codec
  */
@@ -1823,6 +1838,13 @@ audiohd_create_codec(audiohd_state_t *statep)
 			found = B_TRUE;
 			break;
 
+		case AUDIOHD_VID_CXD9872RD:
+		case AUDIOHD_VID_STAC9872AK:
+		case AUDIOHD_VID_CXD9872AKD:
+			codec->hc_ops = &audiohd_stac9872_ops;
+			found = B_TRUE;
+			break;
+
 		case AUDIOHD_VID_AD1986A:
 			codec->hc_ops = &audiohd_ad1986_ops;
 			found = B_TRUE;
@@ -3304,6 +3326,128 @@ audiohd_stac_init_codec(audiohd_state_t *statep)
 
 
 /*
+ * audiohd_stac9872_init_codec()
+ */
+static int
+audiohd_stac9872_init_codec(audiohd_state_t *statep)
+{
+	uint_t		inputs, outputs;
+	uint_t		caddr = statep->hda_codec->hc_addr;
+
+	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
+
+	/* power-up AFG node */
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x1), AUDIOHDC_VERB_SET_POWER_STATE, 0);
+
+	/* power-up DAC_0 */
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x2), AUDIOHDC_VERB_SET_POWER_STATE, 0);
+
+	AUDIOHD_NODE_INIT_DAC(statep, caddr, AUDIOHDC_NID(0x2));
+
+	/* power-up DAC_1 */
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x5), AUDIOHDC_VERB_SET_POWER_STATE, 0);
+
+	AUDIOHD_NODE_INIT_DAC(statep, caddr, AUDIOHDC_NID(0x5));
+
+	/* set master volume to max */
+
+	/* HP volume */
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x2), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_LOUT_MAX);
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x2), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_ROUT_MAX);
+
+	/* Speaker volume */
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x5), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_LOUT_MAX);
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x5), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_ROUT_MAX);
+
+	/* enable output ports */
+
+	/* HP */
+	AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, AUDIOHDC_NID(0xA));
+
+	/* Speaker */
+	AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, AUDIOHDC_NID(0xF));
+
+	outputs = AUDIO_HEADPHONE | AUDIO_LINE_OUT;
+
+	statep->hda_info_defaults.play.port = outputs;
+	statep->hda_info_defaults.play.avail_ports = outputs;
+	statep->hda_info_defaults.play.mod_ports = outputs;
+	statep->hda_out_ports = 0;
+
+	/*
+	 * Up to now, we initialized playback paths. we begin
+	 * to initialize record paths.
+	 */
+
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x6), AUDIOHDC_VERB_SET_POWER_STATE, 0); /* CD */
+
+	AUDIOHD_NODE_INIT_ADC(statep, caddr, AUDIOHDC_NID(0x6));
+
+	/* power-up ADC nodes */
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x8), AUDIOHDC_VERB_SET_POWER_STATE, 0);
+
+	AUDIOHD_NODE_INIT_ADC(statep, caddr, AUDIOHDC_NID(0x8));
+
+	/* unmte MUX */
+	AUDIOHD_NODE_UNMUTE_OUT(statep, caddr, AUDIOHDC_NID(0x15));
+
+	/* set MUX volume to max */
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x15), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_ROUT_MAX);
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x15), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_LOUT_MAX);
+
+	/* unmute CD */
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x7), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_LR_INPUT | (0 << AUDIOHDC_AMP_SET_INDEX_OFFSET));
+
+	/* unmute Capture */
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x9), AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_LR_INPUT | (0 << AUDIOHDC_AMP_SET_INDEX_OFFSET));
+
+	/* enable input ports */
+	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, AUDIOHDC_NID(0xD));
+	/* Ext. Mic1 */
+	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, AUDIOHDC_NID(0xE));
+	/* CD */
+	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, AUDIOHDC_NID(0x14));
+	/* Int. Mic2 */
+
+	/* Select: 0x0a (HP), 0x0d (Mic1), 0x14* (Mic2), 0x02 (Loopback) */
+	(void) audioha_codec_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x15), AUDIOHDC_VERB_SET_CONN_SEL, 2);
+
+	inputs = AUDIO_MICROPHONE | AUDIO_LINE_IN | AUDIO_CODEC_LOOPB_IN;
+	statep->hda_info_defaults.record.port = AUDIO_LINE_IN;
+	statep->hda_info_defaults.record.avail_ports = inputs;
+	statep->hda_info_defaults.record.mod_ports = inputs;
+	statep->hda_in_ports = 0;
+
+	return (AUDIO_SUCCESS);
+
+}	/* audiohd_stac9872_init_codec() */
+
+
+/*
  * audiohd_stac_set_pcm_fmt()
  */
 static int
@@ -3313,14 +3457,31 @@ audiohd_stac_set_pcm_fmt(audiohd_state_t *statep, int dir, uint_t format)
 	uint_t		caddr = statep->hda_codec->hc_addr;
 
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
 
 	if (dir == AUDIO_PLAY) {
 		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
 		    AUDIOHDC_NID(0x2), AUDIOHDC_VERB_SET_CONVERTER_FMT, format);
 	} else {
-		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0x3), AUDIOHDC_VERB_SET_CONVERTER_FMT, format);
+		switch (statep->hda_codec->hc_vid) {
+		case AUDIOHD_VID_STAC9200:
+		case AUDIOHD_VID_STAC9200D:
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0x3), AUDIOHDC_VERB_SET_CONVERTER_FMT,
+			    format);
+			break;
+
+		case AUDIOHD_VID_CXD9872RD:
+		case AUDIOHD_VID_STAC9872AK:
+		case AUDIOHD_VID_CXD9872AKD:
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0x8), AUDIOHDC_VERB_SET_CONVERTER_FMT,
+			    format);
+			break;
+		}
 	}
 
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
@@ -3338,13 +3499,41 @@ static int
 audiohd_stac_set_gain(audiohd_state_t *statep, int dir, int gain, int channel)
 {
 	uint_t		val, lTmp;
+	uint_t		nid_p[2], nid_r;
+	int		nid_p_num;
 	uint_t		caddr = statep->hda_codec->hc_addr;
 
+
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
+
+	switch (statep->hda_codec->hc_vid) {
+	case AUDIOHD_VID_STAC9200:
+	case AUDIOHD_VID_STAC9200D:
+		nid_p_num = 1;
+		nid_p[0] = 0xB;
+		nid_r = 0xA;
+		break;
+
+	case AUDIOHD_VID_CXD9872RD:
+	case AUDIOHD_VID_STAC9872AK:
+	case AUDIOHD_VID_CXD9872AKD:
+		nid_p_num = 2;
+		nid_p[0] = 0x2;
+		nid_p[1] = 0x5;
+		nid_r = 0x9;
+		break;
+
+	default:
+		return (AUDIO_FAILURE);
+	}
 
 	if (dir == AUDIO_PLAY) {
 
+		int i;
 		val = AUDIOHDC_AMP_SET_OUTPUT | gain;
 		if (channel == 0) {
 			/* left channel */
@@ -3356,8 +3545,12 @@ audiohd_stac_set_gain(audiohd_state_t *statep, int dir, int gain, int channel)
 			statep->hda_play_rgain = gain;
 		}
 
-		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+		for (i = 0; i < nid_p_num; i++) {
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    nid_p[i], AUDIOHDC_VERB_SET_AMP_MUTE, val);
+			if (lTmp == AUDIOHD_CODEC_FAILURE)
+				return (AUDIO_FAILURE);
+		}
 	} else {
 		ASSERT(dir == AUDIO_RECORD);
 		val = AUDIOHDC_AMP_SET_OUTPUT | gain;
@@ -3372,7 +3565,7 @@ audiohd_stac_set_gain(audiohd_state_t *statep, int dir, int gain, int channel)
 		}
 
 		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xA), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+		    nid_r, AUDIOHDC_VERB_SET_AMP_MUTE, val);
 	}
 
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
@@ -3394,24 +3587,48 @@ audiohd_stac_set_port(audiohd_state_t *statep, int dir, int port)
 	uint_t		caddr = statep->hda_codec->hc_addr;
 
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
 
 	if (dir == AUDIO_PLAY) {
+		uint_t	nid_hp = 0;
+		uint_t	nid_sp = 0;
+
 		if (port == AUDIOHD_PORT_UNMUTE)
 			port = statep->hda_out_ports;
 
+		switch (statep->hda_codec->hc_vid) {
+		case AUDIOHD_VID_STAC9200:
+		case AUDIOHD_VID_STAC9200D:
+			nid_hp = 0x0D;
+			nid_sp = 0x0E;
+			break;
+
+		case AUDIOHD_VID_CXD9872RD:
+		case AUDIOHD_VID_STAC9872AK:
+		case AUDIOHD_VID_CXD9872AKD:
+			nid_hp = 0x0A;
+			nid_sp = 0x0F;
+			break;
+
+		default:
+			break;
+		}
+
 		if (port & AUDIO_HEADPHONE) {
 			tmp_port |= AUDIO_HEADPHONE;
-			AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, 0x0D);
+			AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, nid_hp);
 		} else {
-			AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, 0x0D);
+			AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, nid_hp);
 		}
 
 		if (port & AUDIO_LINE_OUT) {
 			tmp_port |= AUDIO_LINE_OUT;
-			AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, 0x0E);
+			AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, nid_sp);
 		} else {
-			AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, 0x0E);
+			AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, nid_sp);
 		}
 
 		statep->hda_out_ports = tmp_port;
@@ -3424,32 +3641,73 @@ audiohd_stac_set_port(audiohd_state_t *statep, int dir, int port)
 	ASSERT(dir == AUDIO_RECORD);
 
 	nid = 0;
-	switch (port) {
-	case AUDIO_NONE:
-		nid = statep->hda_in_ports;
-		if (nid != 0) {
-			AUDIOHD_NODE_DISABLE_PIN_IN(statep, caddr, nid);
-			statep->hda_in_ports = 0;
+
+	switch (statep->hda_codec->hc_vid) {
+	case AUDIOHD_VID_STAC9200:
+	case AUDIOHD_VID_STAC9200D:
+		switch (port) {
+		case AUDIO_NONE:
+			nid = statep->hda_in_ports;
+			if (nid != 0) {
+				AUDIOHD_NODE_DISABLE_PIN_IN(statep, caddr, nid);
+				statep->hda_in_ports = 0;
+			}
+			return (AUDIO_SUCCESS);
+
+		case AUDIO_MICROPHONE:
+			index_port = 0;
+			nid = 0x10;
+			break;
+
+		case AUDIO_LINE_IN:
+			index_port = 1;
+			nid = 0x0F;
+			break;
+
+		case AUDIO_CD:
+			index_port = 4;
+			nid = 0x12;
+			break;
+
+		default:
+			return (AUDIO_FAILURE);
 		}
-		return (AUDIO_SUCCESS);
-
-	case AUDIO_MICROPHONE:
-		index_port = 0;
-		nid = 0x10;
 		break;
 
-	case AUDIO_LINE_IN:
-		index_port = 1;
-		nid = 0x0F;
-		break;
+	case AUDIOHD_VID_CXD9872RD:
+	case AUDIOHD_VID_STAC9872AK:
+	case AUDIOHD_VID_CXD9872AKD:
+		switch (port) {
+		case AUDIO_NONE:
+			nid = statep->hda_in_ports;
+			if (nid != 0) {
+				AUDIOHD_NODE_DISABLE_PIN_IN(statep, caddr, nid);
+				statep->hda_in_ports = 0;
+			}
+			return (AUDIO_SUCCESS);
 
-	case AUDIO_CD:
-		index_port = 4;
-		nid = 0x12;
+		case AUDIO_MICROPHONE:
+			index_port = 1;
+			nid = 0x0D;
+			break;
+
+		case AUDIO_LINE_IN:
+			index_port = 2;
+			nid = 0x14;
+			break;
+
+		case AUDIO_CODEC_LOOPB_IN:
+			index_port = 3;
+			nid = 0x02;
+			break;
+
+		default:
+			return (AUDIO_FAILURE);
+		}
 		break;
 
 	default:
-		return (AUDIO_FAILURE);
+		break;
 	}
 
 	if (nid != statep->hda_in_ports) {
@@ -3461,9 +3719,23 @@ audiohd_stac_set_port(audiohd_state_t *statep, int dir, int port)
 
 		/* enable currently selected input */
 		AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, nid);
-		(void) audioha_codec_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xC), AUDIOHDC_VERB_SET_CONN_SEL,
-		    index_port);
+		switch (statep->hda_codec->hc_vid) {
+		case AUDIOHD_VID_STAC9200:
+		case AUDIOHD_VID_STAC9200D:
+			(void) audioha_codec_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0xC), AUDIOHDC_VERB_SET_CONN_SEL,
+			    index_port);
+			break;
+		case AUDIOHD_VID_CXD9872RD:
+		case AUDIOHD_VID_STAC9872AK:
+		case AUDIOHD_VID_CXD9872AKD:
+			(void) audioha_codec_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0x15), AUDIOHDC_VERB_SET_CONN_SEL,
+			    index_port);
+			break;
+		default:
+			break;
+		}
 	}
 
 	return (AUDIO_SUCCESS);
@@ -3478,35 +3750,62 @@ audiohd_stac_mute_outputs(audiohd_state_t *statep, boolean_t mute)
 {
 	uint_t		caddr = statep->hda_codec->hc_addr;
 	uint32_t		lTmp;
+	uint_t			nid_p[2];
+	int			nid_p_num;
+	int			i;
 
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
 
 	if (statep->hda_outputs_muted == mute)
 		return (AUDIO_SUCCESS);
 
 	statep->hda_outputs_muted = mute;
 
-	if (mute) {
-		/* mute master volume */
-		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_MUTE | AUDIOHDC_AMP_SET_LR_OUTPUT);
-	} else {
-		/* resume left volume */
-		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_LEFT |
-		    statep->hda_play_lgain);
+	switch (statep->hda_codec->hc_vid) {
+	case AUDIOHD_VID_STAC9200:
+	case AUDIOHD_VID_STAC9200D:
+		nid_p[0] = 0x0B;
+		nid_p_num = 1;
+		break;
 
-		if (lTmp == AUDIOHD_CODEC_FAILURE)
-			return (AUDIO_FAILURE);
+	case AUDIOHD_VID_CXD9872RD:
+	case AUDIOHD_VID_STAC9872AK:
+	case AUDIOHD_VID_CXD9872AKD:
+		nid_p[0] = 0x02;
+		nid_p[1] = 0x05;
+		nid_p_num = 2;
+		break;
 
-		/* resume right volume */
-		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE,
-		    AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_RIGHT |
-		    statep->hda_play_rgain);
+	default:
+		break;
+	}
+
+	for (i = 0; i < nid_p_num; i++) {
+		if (mute) {
+			/* mute master volume */
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(nid_p[i]), AUDIOHDC_VERB_SET_AMP_MUTE,
+			    AUDIOHDC_AMP_SET_MUTE | AUDIOHDC_AMP_SET_LR_OUTPUT);
+		} else {
+			/* resume left volume */
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(nid_p[i]), AUDIOHDC_VERB_SET_AMP_MUTE,
+			    AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_LEFT |
+			    statep->hda_play_lgain);
+
+				if (lTmp == AUDIOHD_CODEC_FAILURE)
+					return (AUDIO_FAILURE);
+
+			/* resume right volume */
+			lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(nid_p[i]), AUDIOHDC_VERB_SET_AMP_MUTE,
+			    AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_RIGHT |
+			    statep->hda_play_rgain);
+		}
 	}
 
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
@@ -3523,7 +3822,10 @@ static int
 audiohd_stac_set_monitor_gain(audiohd_state_t *statep, int gain)
 {
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872RD) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9872AK) ||
+	    (statep->hda_codec->hc_vid == AUDIOHD_VID_CXD9872AKD));
 
 	/*
 	 * In STAC9200, there is a critical node (NID=7), which is
@@ -3545,13 +3847,27 @@ audiohd_stac_set_monitor_gain(audiohd_state_t *statep, int gain)
 static void audiohd_stac_max_gain(audiohd_state_t *statep, uint_t *pgain,
     uint_t *rgain, uint_t *mgain)
 {
-	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
-	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
+	switch (statep->hda_codec->hc_vid) {
+	case AUDIOHD_VID_STAC9200:
+	case AUDIOHD_VID_STAC9200D:
+		*pgain = 0x1f;
+		*rgain = 0x1f;
+		*mgain = 0x1f;
+		break;
 
-	*pgain = 0x1f;
-	*rgain = 0x1f;
-	*mgain = 0x1f;
+	case AUDIOHD_VID_CXD9872RD:
+	case AUDIOHD_VID_STAC9872AK:
+	case AUDIOHD_VID_CXD9872AKD:
+		*pgain = 0x7f;
+		*rgain = 0x0f;
+		*mgain = 0x7f;
+		break;
 
+	default:
+		audio_sup_log(statep->hda_ahandle, CE_WARN,
+		    "!stac_max_gain() unknown codec");
+		break;
+	}
 }	/* audiohd_stac_max_gain() */
 
 
