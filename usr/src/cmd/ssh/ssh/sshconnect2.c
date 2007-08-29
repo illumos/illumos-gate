@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@ extern Gssctxt *xxx_gssctxt;
 extern char *client_version_string;
 extern char *server_version_string;
 extern Options options;
+extern Buffer command;
 
 /*
  * SSH2 key exchange
@@ -406,7 +407,15 @@ input_userauth_banner(int type, u_int32_t seq, void *ctxt)
 	debug3("input_userauth_banner");
 	msg = packet_get_string(NULL);
 	lang = packet_get_string(NULL);
-	if (options.log_level > SYSLOG_LEVEL_QUIET)
+	/*
+	 * Banner is a warning message according to RFC 4252. So, never print
+	 * a banner in error log level or lower. If the log level is higher,
+	 * use DisableBanner option to decide whether to display it or not.
+	 */
+	if (options.log_level > SYSLOG_LEVEL_ERROR)
+		if (options.disable_banner == 0 ||
+		    (options.disable_banner == SSH_NO_BANNER_IN_EXEC_MODE &&
+		    buffer_len(&command) == 0))
 		fprintf(stderr, "%s", msg);
 	xfree(msg);
 	xfree(lang);

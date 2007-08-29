@@ -21,6 +21,10 @@ extern "C" {
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
  */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <netinet/in.h> /* For struct sockaddr_in */
 #include <pwd.h> /* For struct pw */
@@ -113,6 +117,13 @@ extern "C" {
 
 /* Minimum modulus size (n) for RSA keys. */
 #define SSH_RSA_MINIMUM_MODULUS_SIZE	768
+
+/*
+ * Do not display banner when in remote command mode only. Note that RFC 4254
+ * uses "exec" as a mode name for the channel opened for the execution of the
+ * given command.
+ */
+#define	SSH_NO_BANNER_IN_EXEC_MODE	2
 
 #ifdef __cplusplus
 }

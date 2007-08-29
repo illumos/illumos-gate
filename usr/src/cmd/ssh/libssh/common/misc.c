@@ -420,3 +420,28 @@ mysignal(int sig, mysig_t act)
 	return (signal(sig, act));
 #endif
 }
+
+/*
+ * Return true if argument is one of "yes", "true", "no" or "false". If
+ * 'active' is 0 than we are in a non-matching Host section of the
+ * configuration file so we check the syntax but will not set the value of
+ * '*option'. Otherwise we set its value if not already set.
+ */
+int
+get_yes_no_flag(int *option, const char *arg, const char *filename, int linenum,
+    int active)
+{
+	int value = -1;
+
+	if (arg == NULL || *arg == '\0')
+		fatal("%.200s line %d: Missing argument.", filename, linenum);
+	if (strcmp(arg, "yes") == 0 || strcmp(arg, "true") == 0)
+		value = 1;
+	else if (strcmp(arg, "no") == 0 || strcmp(arg, "false") == 0)
+		value = 0;
+
+	if (active && *option == -1 && value != -1)
+		*option = value;
+
+	return (value != -1);
+}

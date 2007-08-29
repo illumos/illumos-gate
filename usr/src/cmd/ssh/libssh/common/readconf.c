@@ -128,7 +128,7 @@ typedef enum {
 	oHostKeyAlgorithms, oBindAddress, oSmartcardDevice,
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oFallBackToRsh, oUseRsh, oConnectTimeout,
-	oServerAliveInterval, oServerAliveCountMax,
+	oServerAliveInterval, oServerAliveCountMax, oDisableBanner,
 	oDeprecated
 } OpCodes;
 
@@ -218,6 +218,7 @@ static struct {
 	{ "connecttimeout", oConnectTimeout },
 	{ "serveraliveinterval", oServerAliveInterval },
 	{ "serveralivecountmax", oServerAliveCountMax },
+	{ "disablebanner", oDisableBanner },
 	{ NULL, oBadOption }
 };
 
@@ -756,6 +757,19 @@ parse_int:
 		intptr = &options->server_alive_count_max;
 		goto parse_int;
 
+	case oDisableBanner:
+		arg = strdelim(&s);
+		if (get_yes_no_flag(&options->disable_banner, arg, filename,
+		    linenum, *activep) == 1)
+			break;
+
+		if (strcmp(arg, "in-exec-mode") == 0)
+			options->disable_banner = SSH_NO_BANNER_IN_EXEC_MODE;
+		else
+			fatal("%.200s line %d: Bad yes/no/in-exec-mode "
+			    "argument.", filename, linenum);
+		break;
+
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
 		    filename, linenum, keyword);
@@ -895,6 +909,7 @@ initialize_options(Options * options)
 	options->use_rsh = -1;
 	options->server_alive_interval = -1;
 	options->server_alive_count_max = -1;
+	options->disable_banner = -1;
 }
 
 /*
@@ -1035,6 +1050,8 @@ fill_default_options(Options * options)
 		options->server_alive_interval = 0;
 	if (options->server_alive_count_max == -1)
 		options->server_alive_count_max = 3;
+	if (options->disable_banner == -1)
+		options->disable_banner = 0;
 	/* options->proxy_command should not be set by default */
 	/* options->user will be set in the main program if appropriate */
 	/* options->hostname will be set in the main program if appropriate */

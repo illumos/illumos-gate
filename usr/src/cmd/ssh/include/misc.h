@@ -36,6 +36,8 @@ char	*cleanhostname(char *);
 char	*colon(char *);
 long	 convtime(const char *);
 char	*tohex(const void *, size_t);
+int	 get_yes_no_flag(int *option, const char *arg, const char *filename,
+		    int linenum, int active);
 
 struct passwd	*pwcopy(struct passwd *);
 void		 pwfree(struct passwd **);
