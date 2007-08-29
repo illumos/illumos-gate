@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,13 +42,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <kadm5/adb.h>
+#include <k5-int.h>
+#include <kdb.h>
 #include <kadm5/admin.h>
 #include <krb5/adm_proto.h>
 
 
 #include <krb5.h>
 #include <krb5/kdb.h>
+#include "kdb5_util.h"
 #include <libintl.h>
 
 int
@@ -89,7 +91,7 @@ int kadm5_create(kadm5_config_params *params)
 
      kadm5_config_params lparams;
 
-     if ((retval = krb5_init_context(&context)))
+     if ((retval = kadm5_init_krb5_context(&context)))
 	  exit(ERR);
 
      (void) memset(&lparams, 0, sizeof (kadm5_config_params));
@@ -101,11 +103,6 @@ int kadm5_create(kadm5_config_params *params)
      if ((retval = kadm5_get_config_params(context, NULL, NULL,
 					   params, &lparams))) {
 	com_err(progname, retval, gettext("while looking up the Kerberos configuration"));
-	  return 1;
-     }
-
-     if ((retval = osa_adb_create_policy_db(&lparams))) {
-	com_err(progname, retval, gettext(str_CREATING_POLICY_DB));
 	  return 1;
      }
 
@@ -129,6 +126,7 @@ int kadm5_create_magic_princs(kadm5_config_params *params,
      if ((retval = kadm5_init(progname, NULL, NULL, params,
 			      KADM5_STRUCT_VERSION,
 			      KADM5_API_VERSION_2,
+			      db5util_db_args,
 			      &handle))) {
 	com_err(progname, retval,  gettext("while initializing the Kerberos admin interface"));
 	  return retval;

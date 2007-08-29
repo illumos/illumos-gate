@@ -30,7 +30,7 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_policy.c,v
 
 #include	<sys/file.h>
 #include	<fcntl.h>
-#include	"adb.h"
+#include	"policy_db.h"
 #include	<stdlib.h>
 #include	<string.h>
 #include <errno.h>
@@ -56,42 +56,6 @@ extern	void xdralloc_create(XDR *xdrs, enum xdr_op op);
 	  return cl_ret; \
 }
 
-osa_adb_ret_t osa_adb_create_policy_db(kadm5_config_params *params)
-{
-     return osa_adb_create_db(params->admin_dbname,
-			      params->admin_lockfile,
-			      OSA_ADB_POLICY_DB_MAGIC);
-}
-
-osa_adb_ret_t osa_adb_rename_policy_db(kadm5_config_params *fromparams,
-				       kadm5_config_params *toparams)
-{
-     return osa_adb_rename_db(fromparams->admin_dbname,
-			      fromparams->admin_lockfile,
-			      toparams->admin_dbname,
-			      toparams->admin_lockfile,
-			      OSA_ADB_POLICY_DB_MAGIC);
-}
-
-osa_adb_ret_t osa_adb_destroy_policy_db(kadm5_config_params *params)
-{
-     return osa_adb_destroy_db(params->admin_dbname,
-			       params->admin_lockfile,
-			       OSA_ADB_POLICY_DB_MAGIC);
-}
-
-osa_adb_ret_t osa_adb_open_policy(osa_adb_princ_t *dbp,
-				  kadm5_config_params *rparams)
-{
-     return osa_adb_init_db(dbp, rparams->admin_dbname,
-			    rparams->admin_lockfile,
-			    OSA_ADB_POLICY_DB_MAGIC);
-}
-
-osa_adb_ret_t osa_adb_close_policy(osa_adb_princ_t db)
-{
-     return osa_adb_fini_db(db, OSA_ADB_POLICY_DB_MAGIC);
-}
 
 /*
  * Function: osa_adb_create_policy
@@ -112,7 +76,7 @@ osa_adb_ret_t osa_adb_close_policy(osa_adb_princ_t db)
  *	the policy db.
  * 
  */
-osa_adb_ret_t
+krb5_error_code
 osa_adb_create_policy(osa_adb_policy_t db, osa_policy_ent_t entry)
 {
     DBT			dbkey;
@@ -120,7 +84,7 @@ osa_adb_create_policy(osa_adb_policy_t db, osa_policy_ent_t entry)
     XDR			xdrs;
     int			ret;
 
-    OPENLOCK(db, OSA_ADB_EXCLUSIVE);
+    OPENLOCK(db, KRB5_DB_LOCKMODE_EXCLUSIVE);
 
     if(entry->name == NULL) {
 	 ret = EINVAL;
@@ -187,13 +151,13 @@ error:
  *	policy db.
  * 
  */
-osa_adb_ret_t
-osa_adb_destroy_policy(osa_adb_policy_t db, kadm5_policy_t name)
+krb5_error_code
+osa_adb_destroy_policy(osa_adb_policy_t db, char *name)
 {
     DBT	    dbkey;
     int	    status, ret;
 
-    OPENLOCK(db, OSA_ADB_EXCLUSIVE);
+    OPENLOCK(db, KRB5_DB_LOCKMODE_EXCLUSIVE);
     
     if(name == NULL) {
 	 ret = EINVAL;
@@ -233,15 +197,16 @@ error:
  *	db		(input) db handle
  *	name		(input) name of policy
  *	entry		(output) policy entry
+ *      cnt             (inout) Number of entries
  * 	<return value>	0 on success, error code on failure.
  *
  * Requires:
  * Effects:
  * Modifies:
  */
-osa_adb_ret_t
-osa_adb_get_policy(osa_adb_policy_t db, kadm5_policy_t name,
-		   osa_policy_ent_t *entry)
+krb5_error_code
+osa_adb_get_policy(osa_adb_policy_t db, char *name,
+		   osa_policy_ent_t *entry, int *cnt)
 {
     DBT			dbkey;
     DBT			dbdata;
@@ -249,7 +214,9 @@ osa_adb_get_policy(osa_adb_policy_t db, kadm5_policy_t name,
     int			ret;
     char		*aligned_data;
 
-    OPENLOCK(db, OSA_ADB_SHARED);
+    OPENLOCK(db, KRB5_DB_LOCKMODE_SHARED);
+
+    *cnt = 1;
 
     if(name == NULL) {
 	 ret = EINVAL;
@@ -261,7 +228,8 @@ osa_adb_get_policy(osa_adb_policy_t db, kadm5_policy_t name,
     dbdata.size = 0;
     switch((db->db->get(db->db, &dbkey, &dbdata, 0))) {
     case 1:
-	 ret = OSA_ADB_NOENT;
+	 ret = OSA_ADB_OK;
+	 *cnt = 0;
 	 goto error;
     case 0:
 	break;
@@ -311,7 +279,7 @@ error:
  *	[modifies]
  * 
  */
-osa_adb_ret_t
+krb5_error_code
 osa_adb_put_policy(osa_adb_policy_t db, osa_policy_ent_t entry)
 {
     DBT			dbkey;
@@ -320,7 +288,7 @@ osa_adb_put_policy(osa_adb_policy_t db, osa_policy_ent_t entry)
     XDR			xdrs;
     int			ret;
 
-    OPENLOCK(db, OSA_ADB_EXCLUSIVE);
+    OPENLOCK(db, KRB5_DB_LOCKMODE_EXCLUSIVE);
     
     if(entry->name == NULL) {
 	 ret = EINVAL;
@@ -378,7 +346,7 @@ error:
  * Effects:
  * Modifies:
  */
-osa_adb_ret_t
+krb5_error_code
 osa_adb_iter_policy(osa_adb_policy_t db, osa_adb_iter_policy_func func,
 		    void *data)
 {
@@ -389,7 +357,7 @@ osa_adb_iter_policy(osa_adb_policy_t db, osa_adb_iter_policy_func func,
     osa_policy_ent_t	    entry;
     char		    *aligned_data;
 
-    OPENLOCK(db, OSA_ADB_EXCLUSIVE); /* hmmm */
+    OPENLOCK(db, KRB5_DB_LOCKMODE_EXCLUSIVE); /* hmmm */
 
     if((ret = db->db->seq(db->db, &dbkey, &dbdata, R_FIRST)) == -1) {
 	 ret = errno;
@@ -429,4 +397,16 @@ osa_adb_iter_policy(osa_adb_policy_t db, osa_adb_iter_policy_func func,
 error:
     CLOSELOCK(db);
     return ret;
+}
+
+void
+osa_free_policy_ent(osa_policy_ent_t val)
+{
+  XDR xdrs;
+
+  xdrmem_create(&xdrs, NULL, 0, XDR_FREE);
+
+  xdr_osa_policy_ent_rec(&xdrs, val);
+
+  free(val);
 }

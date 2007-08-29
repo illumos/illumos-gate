@@ -649,7 +649,6 @@ krb5_error_code krb5_sync_disk_file
 
 krb5_error_code
 krb5_open_pkcs11_session(CK_SESSION_HANDLE *);
-#endif
 
 
 krb5_error_code krb5_read_message
@@ -658,7 +657,14 @@ krb5_error_code krb5_read_message
 krb5_error_code krb5_write_message
 	(krb5_context, krb5_pointer, krb5_data *);
 
+krb5_error_code
+krb5int_sendto (krb5_context context, const krb5_data *message,
+		const struct addrlist *addrs, krb5_data *reply,
+		struct sockaddr_storage *localaddr, socklen_t *localaddrlen,
+		int *addr_used);
+
 krb5_error_code krb5int_get_fq_local_hostname (char *, size_t);
+#endif
 
 /*
  * Solaris Kerberos
@@ -672,8 +678,10 @@ krb5_error_code krb5int_domain_get_realm(krb5_context, const char *,
 krb5_error_code krb5int_fqdn_get_realm(krb5_context, const char *,
     char **);
 
+krb5_error_code krb5int_init_context_kdc(krb5_context *);
+
 krb5_error_code krb5_os_init_context
-        (krb5_context);
+        (krb5_context, krb5_boolean);
 
 void krb5_os_free_context (krb5_context);
 
@@ -946,6 +954,11 @@ extern const struct krb5_hash_provider krb5int_hash_md5;
 krb5_error_code krb5_crypto_us_timeofday
     (krb5_int32  *, krb5_int32  *);
 
+#ifndef _KERNEL
+/* Solaris kerberos: for convenience */
+time_t gmt_mktime (struct tm *);
+#endif /* ! _KERNEL */
+
 /* #endif KRB5_OLD_CRYPTO */
 
 /* this helper fct is in libkrb5, but it makes sense declared here. */
@@ -959,12 +972,6 @@ krb5_error_code krb5_encrypt_helper
  * End "los-proto.h"
  */
 
-/*
- * Include the KDB definitions.
- */
-#ifndef _KERNEL
-#include <krb5/kdb.h>
-#endif /* !_KERNEL */
 /*
  * Begin "libos.h"
  */
@@ -1195,6 +1202,7 @@ void KRB5_CALLCONV krb5_free_pa_enc_ts
 /* #include "krb5/wordsize.h" -- comes in through base-defs.h. */
 #ifndef	_KERNEL
 #include "com_err.h"
+#include <krb5/k5-plugin.h>
 #endif /* _KERNEL */
 
 /*
@@ -1291,6 +1299,9 @@ struct _krb5_context {
 
 	/* arcfour_ctx: used only for rcmd stuff so no fork safety issues apply */
 	arcfour_ctx_rec arcfour_ctx;
+
+	/* error detail info */
+	struct errinfo err;
 #else /* ! KERNEL */
 	crypto_mech_type_t kef_cipher_mt;
 	crypto_mech_type_t kef_hash_mt;
@@ -1790,6 +1801,18 @@ krb5_error_code decode_krb5_enc_sam_response_enc_2
 krb5_error_code decode_krb5_sam_response_2
 	(const krb5_data *, krb5_sam_response_2 **);
 
+struct _krb5_key_data;		/* kdb.h */
+krb5_error_code
+krb5int_ldap_encode_sequence_of_keys (struct _krb5_key_data *key_data,
+				      krb5_int16 n_key_data,
+				      krb5_int32 mkvno,
+				      krb5_data **code);
+
+krb5_error_code
+krb5int_ldap_decode_sequence_of_keys (krb5_data *in,
+				      struct _krb5_key_data **out,
+				      krb5_int16 *n_key_data,
+				      int *mkvno);
 
 /*************************************************************************
  * End of prototypes for krb5_decode.c
@@ -2016,7 +2039,7 @@ typedef struct _krb5int_access {
     /* crypto stuff */
     const struct krb5_hash_provider *md5_hash_provider;
     const struct krb5_enc_provider *arcfour_enc_provider;
-    krb5_error_code (* krb5_hmac) (const struct krb5_hash_provider *hash,
+    krb5_error_code (* krb5_hmac) (krb5_context context, const struct krb5_hash_provider *hash,
                                    const krb5_keyblock *key,
                                    unsigned int icount, const krb5_data *input,
                                    krb5_data *output);
@@ -2028,7 +2051,7 @@ typedef struct _krb5int_access {
                                       int, int, int, int);
     krb5_error_code (*sendto_udp) (krb5_context, const krb5_data *msg,
                                    const struct addrlist *, krb5_data *reply,
-                                   struct sockaddr *, socklen_t *, int *);
+                                   struct sockaddr_storage *, socklen_t *, int *);
     krb5_error_code (*add_host_to_list)(struct addrlist *lp,
                                         const char *hostname,
                                         int port, int secport,
@@ -2054,6 +2077,19 @@ typedef struct _krb5int_access {
         (krb5_int64, krb5_octet **, size_t *);
     krb5_error_code (KRB5_CALLCONV *krb5_ser_unpack_int64)
         (krb5_int64 *, krb5_octet **, size_t *);
+
+    /* Used for KDB LDAP back end.  */
+    krb5_error_code
+    (*asn1_ldap_encode_sequence_of_keys) (struct _krb5_key_data *key_data,
+					  krb5_int16 n_key_data,
+					  krb5_int32 mkvno,
+					  krb5_data **code);
+
+    krb5_error_code
+    (*asn1_ldap_decode_sequence_of_keys) (krb5_data *in,
+					  struct _krb5_key_data **out,
+					  krb5_int16 *n_key_data,
+					  int *mkvno);
 } krb5int_access;
 
 #define KRB5INT_ACCESS_VERSION \

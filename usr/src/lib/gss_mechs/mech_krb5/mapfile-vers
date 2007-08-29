@@ -37,6 +37,7 @@ SUNW_1.1 {
 SUNWprivate_1.1 {
     global:
 	adb_error_table;
+	initialize_adb_error_table;
 	asn12krb5_buf;
 	asn1_decode_addrtype;
 	asn1_decode_ap_options;
@@ -411,6 +412,7 @@ SUNWprivate_1.1 {
 	krb5_cksumtype_to_string;
 	krb5_cksumtypes_length;
 	krb5_cksumtypes_list;
+	krb5_clear_error_message;
 	krb5_copy_addr;
 	krb5_copy_addresses;
 	krb5_copy_authdata;
@@ -469,6 +471,7 @@ SUNWprivate_1.1 {
 	krb5_free_enc_sam_response_enc_contents;
 	krb5_free_enc_tkt_part;
 	krb5_free_error;
+	krb5_free_error_message;
 	krb5_free_etype_info;
 	krb5_free_host_realm;
 	krb5_free_kdc_rep;
@@ -516,6 +519,7 @@ SUNWprivate_1.1 {
 	krb5_get_default_config_files;
 	krb5_get_default_in_tkt_ktypes;
 	krb5_get_default_realm;
+	krb5_get_error_message;
 	krb5_get_host_realm;
 	krb5_get_init_creds;
 	krb5_get_init_creds_keytab;
@@ -720,6 +724,7 @@ SUNWprivate_1.1 {
 	krb5_set_default_realm;
 	krb5_set_default_tgs_enctypes;
 	krb5_set_default_tgs_ktypes;
+	krb5_set_error_message;
 	krb5_set_key_data;
 	krb5_set_key_enctype;
 	krb5_set_key_length;
@@ -758,11 +763,23 @@ SUNWprivate_1.1 {
 	krb5_verify_init_creds_opt_set_ap_req_nofail;
 	krb5_walk_realm_tree;
 	krb5_write_message;
+	krb5int_accessor;
 	krb5int_aes_encrypt;
+	krb5int_clear_error;
+	krb5int_close_plugin_dirs;
 	krb5int_cm_call_select;
 	krb5int_foreach_localaddr;
+	krb5int_free_error;
+	krb5int_free_plugin_dir_data;
+	krb5int_get_error;
+	krb5int_get_plugin_dir_data;
+	krb5int_init_context_kdc;
+	krb5int_mutex_alloc;
+	krb5int_mutex_free;
+	krb5int_open_plugin_dirs;
 	krb5int_pbkdf2_hmac_sha1;
 	krb5int_sendtokdc_debug_handler;
+	krb5int_vset_error;
 	kv5m_error_table;
 	mit_des_check_key_parity;
 	mit_des_fixup_key_parity;
@@ -776,6 +793,7 @@ SUNWprivate_1.1 {
 	profile_find_node_relation;
 	profile_find_node_subsection;
 	profile_free_node;
+	profile_free_list;
 	profile_get_integer;
 	profile_get_node_parent;
 	profile_get_options_boolean;
@@ -787,6 +805,7 @@ SUNWprivate_1.1 {
 	profile_open_file;
 	profile_parse_file;
 	profile_release;
+	profile_release_string;
 	profile_ser_externalize;
 	profile_ser_internalize;
 	profile_ser_size;

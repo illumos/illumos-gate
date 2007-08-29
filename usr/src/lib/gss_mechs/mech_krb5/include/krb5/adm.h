@@ -187,10 +187,8 @@
 #define	KRB5_ADM_KT_KEY_KEY	4
 #define	KRB5_ADM_KT_NCOMPS	5
 
-typedef struct __krb5_key_salt_tuple {
-    krb5_enctype	ks_enctype;
-    krb5_int32		ks_salttype;
-} krb5_key_salt_tuple;
+/* for krb5_key_salt_tuple */
+#include "kdb.h"
 
 /*
  * Data structure returned by krb5_read_realm_params()

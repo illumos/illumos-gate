@@ -53,27 +53,7 @@
  * 
  */
 
-#define KDB5_DISPATCH
-#define KRB5_KDB5_DBM__
 #include <k5-int.h>
-/* #define these to avoid an indirection function; for future implementations,
-   these may be redirected from a dispatch table/routine */
-#define krb5_dbm_db_set_name krb5_db_set_name
-#define krb5_dbm_db_set_nonblocking krb5_db_set_nonblocking
-#define krb5_dbm_db_init krb5_db_init
-#define krb5_dbm_db_get_age krb5_db_get_age
-#define krb5_dbm_db_create krb5_db_create
-#define krb5_dbm_db_rename krb5_db_rename
-#define krb5_dbm_db_get_principal krb5_db_get_principal
-#define krb5_dbm_db_free_principal krb5_db_free_principal
-#define krb5_dbm_db_put_principal krb5_db_put_principal
-#define krb5_dbm_db_delete_principal krb5_db_delete_principal
-#define krb5_dbm_db_lock krb5_db_lock
-#define krb5_dbm_db_unlock krb5_db_unlock
-#define krb5_dbm_db_set_lockmode krb5_db_set_lockmode
-#define krb5_dbm_db_close_database krb5_db_close_database
-#define krb5_dbm_db_open_database krb5_db_open_database
-
 #include "./kdb5_edit.h"
 
 #ifndef HAVE_STRSTR

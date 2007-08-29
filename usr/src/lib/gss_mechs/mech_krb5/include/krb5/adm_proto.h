@@ -43,14 +43,14 @@ typedef struct _krb5_db_entry krb5_db_entry;
  * This really needs to be fixed!!!
  */
 #if !defined(KRB5_ADM_H__) && !defined(__KADM5_ADMIN_H__)
-#ifndef __KADM5_ADMIN_H__
 struct ___krb5_realm_params;
 typedef struct ___krb5_realm_params krb5_realm_params;
+#endif	/* KRB5_ADM_H__ */
 
+#ifndef KRB5_KDB5__
 struct ___krb5_key_salt_tuple;
 typedef struct ___krb5_key_salt_tuple krb5_key_salt_tuple;
-#endif	/* __KADM5_ADMIN_H__ */
-#endif	/* KRB5_ADM_H__ */
+#endif	/* KRB5_KDB5__ */
 
 /*
  * Function prototypes.

@@ -2670,6 +2670,30 @@ typedef krb5_int32 krb5_prompt_type;
 krb5_prompt_type* KRB5_CALLCONV krb5_get_prompt_types
 	(krb5_context context);
 
+/* Error reporting */
+void KRB5_CALLCONV_C
+krb5_set_error_message (krb5_context, krb5_error_code, const char *, ...);
+#ifdef va_start
+void KRB5_CALLCONV
+krb5_vset_error_message (krb5_context, krb5_error_code, const char *, va_list);
+#endif
+/*
+ * The behavior of krb5_get_error_message is only defined the first
+ * time it is called after a failed call to a krb5 function using the
+ * same context, and only when the error code passed in is the same as
+ * that returned by the krb5 function.  Future versions may return the
+ * same string for the second and following calls.
+ *
+ * The string returned by this function must be freed using
+ * krb5_free_error_message.
+ */
+const char * KRB5_CALLCONV
+krb5_get_error_message (krb5_context, krb5_error_code);
+void KRB5_CALLCONV
+krb5_free_error_message (krb5_context, const char *);
+void KRB5_CALLCONV
+krb5_clear_error_message (krb5_context);
+
 #if TARGET_OS_MAC 
 #    pragma options align=reset 
 #endif /* KRB5INT_END_DECLS */
@@ -2947,6 +2971,8 @@ krb5_prompt_type* KRB5_CALLCONV krb5_get_prompt_types
 #endif /* _KERNEL */
 
 #define KRB5_DELTAT_BADFORMAT			(-1765328133L)
+#define KRB5_PLUGIN_NO_HANDLE			(-1765328132L)
+#define KRB5_PLUGIN_OP_NOTSUPP			(-1765328131L)
 
 #define ERROR_TABLE_BASE_krb5 (-1765328384L)
 
@@ -2992,6 +3018,13 @@ krb5_prompt_type* KRB5_CALLCONV krb5_get_prompt_types
 #define	KRB5_LOG_UNSTABLE			(-1780008418L)
 #define	KRB5_LOG_CORRUPT			(-1780008417L)
 #define	KRB5_LOG_ERROR				(-1780008416L)
+#define KRB5_KDB_DBTYPE_NOTFOUND		(-1780008415L)
+#define KRB5_KDB_DBTYPE_NOSUP			(-1780008414L)
+#define KRB5_KDB_DBTYPE_INIT			(-1780008413L)
+#define KRB5_KDB_SERVER_INTERNAL_ERR		(-1780008412L)
+#define KRB5_KDB_ACCESS_ERROR			(-1780008411L)
+#define KRB5_KDB_INTERNAL_ERROR			(-1780008410L)
+#define KRB5_KDB_CONSTRAINT_VIOLATION		(-1780008409L)
 #define ERROR_TABLE_BASE_kdb5 (-1780008448L)
 
 /* for compatibility with older versions... */

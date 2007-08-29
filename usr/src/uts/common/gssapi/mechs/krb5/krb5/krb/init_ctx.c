@@ -101,23 +101,30 @@ extern krb5_error_code krb5_vercheck();
 extern void krb5_win_ccdll_load(krb5_context context);
 #endif
 
-static krb5_error_code init_common (krb5_context *, krb5_boolean);
+static krb5_error_code init_common (krb5_context *, krb5_boolean, krb5_boolean);
 
 krb5_error_code KRB5_CALLCONV
 krb5_init_context(context)
 	krb5_context *context;
 {
-	return init_common (context, FALSE);
+	return init_common (context, FALSE, FALSE);
 }
 
 krb5_error_code KRB5_CALLCONV
 krb5_init_secure_context(context)
 	krb5_context *context;
 {
-	return init_common (context, TRUE);
+	return init_common (context, TRUE, FALSE);
 }
 
 #ifndef _KERNEL
+
+krb5_error_code
+krb5int_init_context_kdc(krb5_context *context)
+{
+    return init_common (context, FALSE, TRUE);
+}
+
 krb5_error_code
 krb5_open_pkcs11_session(CK_SESSION_HANDLE *hSession)
 {
@@ -340,7 +347,7 @@ krb5_free_ef_handle(krb5_context ctx)
 #endif /* !_KERNEL */
 
 static krb5_error_code
-init_common (krb5_context *context, krb5_boolean secure)
+init_common (krb5_context *context, krb5_boolean secure, krb5_boolean kdc)
 {
 	krb5_context ctx = 0;
 	krb5_error_code retval;
@@ -386,7 +393,7 @@ init_common (krb5_context *context, krb5_boolean secure)
 
 	ctx->profile_secure = secure;
 
-	if ((retval = krb5_os_init_context(ctx)))
+	if ((retval = krb5_os_init_context(ctx, kdc)))
 		goto cleanup;
 
 	/*

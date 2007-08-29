@@ -1,12 +1,12 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * include/k5-thread.h
  *
- * Copyright 2004 by the Massachusetts Institute of Technology.
+ * Copyright 2004,2005,2006 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -39,6 +39,13 @@
 
 #ifndef _KERNEL   /* SUNW14resync, mimic k5-int.h ? */
 #include "autoconf.h"
+#endif
+
+#ifndef KRB5_CALLCONV
+# define KRB5_CALLCONV
+#endif
+#ifndef KRB5_CALLCONV_C
+# define KRB5_CALLCONV_C
 #endif
 
 /* Interface (tentative):
@@ -161,7 +168,7 @@
 #ifdef DEBUG_THREADS_LOC
 typedef struct {
     const char *filename;
-    short lineno;
+    int lineno;
 } k5_debug_loc;
 #define K5_DEBUG_LOC_INIT	{ __FILE__, __LINE__ }
 #if __GNUC__ >= 2
@@ -206,8 +213,11 @@ typedef char k5_debug_loc;
 #ifdef HAVE_STDINT_H
 # include <stdint.h>
 #endif
+/* for memset */
+#include <string.h>
+/* for uint64_t */
 #include <inttypes.h>
-typedef uint64_t k5_debug_timediff_t;
+typedef uint64_t k5_debug_timediff_t; /* or long double */
 typedef struct timeval k5_debug_time_t;
 static inline k5_debug_timediff_t
 timediff(k5_debug_time_t t2, k5_debug_time_t t1)
@@ -757,5 +767,26 @@ extern int k5_key_register(k5_key_t, void (*)(void *));
 extern void *k5_getspecific(k5_key_t);
 extern int k5_setspecific(k5_key_t, void *);
 extern int k5_key_delete(k5_key_t);
+
+extern int  KRB5_CALLCONV krb5int_mutex_alloc  (k5_mutex_t **);
+extern void KRB5_CALLCONV krb5int_mutex_free   (k5_mutex_t *);
+extern int  KRB5_CALLCONV krb5int_mutex_lock   (k5_mutex_t *);
+extern int  KRB5_CALLCONV krb5int_mutex_unlock (k5_mutex_t *);
+
+/* In time, many of the definitions above should move into the support
+   library, and this file should be greatly simplified.  For type
+   definitions, that'll take some work, since other data structures
+   incorporate mutexes directly, and our mutex type is dependent on
+   configuration options and system attributes.  For most functions,
+   though, it should be relatively easy.
+
+   For now, plugins should use the exported functions, and not the
+   above macros, and use krb5int_mutex_alloc for allocations.  */
+#ifdef PLUGIN
+#undef k5_mutex_lock
+#define k5_mutex_lock krb5int_mutex_lock
+#undef k5_mutex_unlock
+#define k5_mutex_unlock krb5int_mutex_unlock
+#endif
 
 #endif /* multiple inclusion? */

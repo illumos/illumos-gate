@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,9 @@ extern "C" {
 #define	DEFAULT_KEYTAB_NAME	"FILE:/etc/krb5/krb5.keytab"
 #define	DEFAULT_KEYTAB		"WRFILE:/etc/krb5/krb5.keytab"
 
+/* Solaris Kerberos: default for where ldap bind passwds stored */
+#define DEF_SERVICE_PASSWD_FILE "/var/krb5/service_passwd"
+
 
 #define	DEFAULT_KDB_FILE	"/var/krb5/principal"
 #define	DEFAULT_KEYFILE_STUB	"/var/krb5/.k5."
@@ -58,6 +61,8 @@ extern "C" {
 /* Location of KDC profile */
 #define	DEFAULT_KDC_PROFILE	"/etc/krb5/kdc.conf"
 #define	KDC_PROFILE_ENV		"KRB5_KDC_PROFILE"
+
+#define DEFAULT_KDB_LIB_PATH	{ "/usr/lib/krb5", NULL }
 
 /*
  * SUNW14resync

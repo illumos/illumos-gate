@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -415,7 +415,7 @@ krb5_ktfile_get_name(krb5_context context, krb5_keytab id, char *name, unsigned 
     name++;
     len -= strlen(id->ops->prefix)+1;
 
-    if (len < strlen(KTFILENAME(id)+1))
+    if (len < strlen(KTFILENAME(id))+1)
 	return(KRB5_KT_NAME_TOOLONG);
     strcpy(name, KTFILENAME(id));
     /* strcpy will NUL-terminate the destination */

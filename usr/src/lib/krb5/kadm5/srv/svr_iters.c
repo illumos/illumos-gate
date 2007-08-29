@@ -28,6 +28,7 @@
 static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 1.6 2003/01/12 18:17:02 epeisach Exp $";
 #endif
 
+#include "autoconf.h"
 #if defined(HAVE_COMPILE) && defined(HAVE_STEP)
 #define SOLARIS_REGEXPS
 #elif defined(HAVE_REGCOMP) && defined(HAVE_REGEXEC)
@@ -41,7 +42,6 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 
 #include	<sys/types.h>
 #include	<string.h>
 #include	<kadm5/admin.h>
-#include	"adb.h"
 #ifdef SOLARIS_REGEXPS
 #include	<regexpr.h>
 #endif
@@ -51,10 +51,6 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 
 #include <stdlib.h>
 
 #include	"server_internal.h"
-
-krb5_error_code
-kdb_iter_entry(kadm5_server_handle_t handle,
-	       void (*iter_fct)(void *, krb5_principal), void *data);
 
 struct iter_data {
      krb5_context context;
@@ -133,7 +129,7 @@ static kadm5_ret_t glob_to_regexp(char *glob, char *realm, char **regexp)
 	       break;
 	  case '\\':
 	       *p++ = '\\';
-	       *p++ = ++*glob;
+	       *p++ = *++glob;
 	       break;
 	  default:
 	       *p++ = *glob;
@@ -254,18 +250,18 @@ static kadm5_ret_t kadm5_get_either(int princ,
 
      if (princ) {
 	  data.context = handle->context;
-	  ret = kdb_iter_entry(handle, get_princs_iter, (void *) &data);
+	  ret = kdb_iter_entry(handle, exp, get_princs_iter, (void *) &data);
      } else {
-	  ret = osa_adb_iter_policy(handle->policy_db, get_pols_iter, (void *)&data);
+	  ret = krb5_db_iter_policy(handle->context, exp, get_pols_iter, (void *)&data);
      }
      
      free(regexp);
 #ifdef POSIX_REGEXPS
      regfree(&data.preg);
 #endif
-     if (ret == OSA_ADB_OK && data.malloc_failed)
+     if ( !ret && data.malloc_failed)
 	  ret = ENOMEM;
-     if (ret != OSA_ADB_OK) {
+     if ( ret ) {
 	  for (i = 0; i < data.n_names; i++)
 	       free(data.names[i]);
 	  free(data.names);

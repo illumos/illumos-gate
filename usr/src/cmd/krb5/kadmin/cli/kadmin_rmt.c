@@ -43,7 +43,8 @@ debugEnable(int displayMsgs)
 #endif
 }
 
-void kadmin_getprivs(argc, argv)
+void
+kadmin_getprivs(argc, argv)
     int argc;
     char *argv[];
 {
@@ -68,5 +69,4 @@ void kadmin_getprivs(argc, argv)
 	    printf(" %s", gettext(privs[i]));
     }
     printf("\n");
-    return;
 }

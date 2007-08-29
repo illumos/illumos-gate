@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,6 +16,7 @@
 #include <iprop_hdr.h>
 #include "iprop.h"
 #include <k5-int.h>
+#include <krb5/kdb.h>
 
 /* BEGIN CSTYLED */
 #define	ULOG_ENTRY_TYPE(upd, i)	((kdb_incr_update_t *)upd)->kdb_update.kdbe_t_val[i]
@@ -394,9 +395,14 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 			return (ENOMEM);
 		}
 
-		if ((ret = krb5_db_get_principal(context, ent->princ, &curr,
-						&nprincs, &more)))
+		/*
+		 * Solaris Kerberos: avoid a deadlock since ulog_conv_2logentry
+		 * is called by krb5_db2_db_put_principal which holds a lock.
+		 */
+		if ((ret = krb5_db_get_principal_nolock(context, ent->princ,
+						    &curr, &nprincs, &more))) {
 			return (ret);
+		}
 
 		if (nprincs == 0) {
 			/*

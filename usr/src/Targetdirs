@@ -426,6 +426,7 @@ OTHERS=  \
 	/usr/lib/sa  \
 	/usr/share/lib/ccs \
 	/usr/share/lib/tmac  \
+	/usr/share/lib/ldif  \
 	/var/adm/exacct \
 	/var/adm/log \
 	/var/adm/sa \

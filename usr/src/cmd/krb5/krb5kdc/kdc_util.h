@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,8 @@
 #define __KRB5_KDC_UTIL__
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "kdb.h"
 
 #ifdef	__cplusplus
 extern "C" {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@
 #define KRB5_KDB5__
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 
 /* Salt types */
 #define KRB5_KDB_SALTTYPE_NORMAL	0
@@ -137,6 +138,7 @@ typedef struct _krb5_keysalt {
 typedef struct _krb5_db_entry_new {
     krb5_magic 		  magic;		/* NOT saved */
     krb5_ui_2		  len;			
+    krb5_ui_4             mask;                 /* members currently changed/set */
     krb5_flags 		  attributes;
     krb5_deltat		  max_life;
     krb5_deltat		  max_renewable_life;
@@ -155,6 +157,11 @@ typedef struct _krb5_db_entry_new {
     krb5_key_data       * key_data;		/* Array */
 } krb5_db_entry;
 
+typedef struct __krb5_key_salt_tuple {
+    krb5_enctype	ks_enctype;
+    krb5_int32		ks_salttype;
+} krb5_key_salt_tuple;
+
 #define	KRB5_KDB_MAGIC_NUMBER		0xdbdbdbdb
 #define KRB5_KDB_V1_BASE_LENGTH		38
   
@@ -165,6 +172,7 @@ typedef struct _krb5_db_entry_new {
 #define KRB5_TL_RB1_CHALLENGE		0x0005
 #ifdef SECURID
 #define KRB5_TL_SECURID_STATE           0x0006
+#define KRB5_TL_DB_ARGS                 0x7fff
 #endif /* SECURID */
     
 /*
@@ -209,140 +217,321 @@ extern char *krb5_mkey_pwd_prompt2;
 	    (cp)[3] = (unsigned char) (((i32) >> 24) & 0xff);	\
 	}
 
+#define KRB5_KDB_OPEN_RW                0
+#define KRB5_KDB_OPEN_RO                1
+
+#ifndef KRB5_KDB_SRV_TYPE_KDC
+#define KRB5_KDB_SRV_TYPE_KDC           0x0100        
+#endif
+
+#ifndef KRB5_KDB_SRV_TYPE_ADMIN
+#define KRB5_KDB_SRV_TYPE_ADMIN         0x0200  
+#endif
+
+#ifndef KRB5_KDB_SRV_TYPE_PASSWD
+#define KRB5_KDB_SRV_TYPE_PASSWD        0x0300
+#endif
+
+#ifndef KRB5_KDB_SRV_TYPE_OTHER
+#define KRB5_KDB_SRV_TYPE_OTHER         0x0400  
+#endif
+
+#define KRB5_KDB_OPT_SET_DB_NAME        0
+#define KRB5_KDB_OPT_SET_LOCK_MODE      1
+
+#define KRB5_DB_LOCKMODE_SHARED       0x0001
+#define KRB5_DB_LOCKMODE_EXCLUSIVE    0x0002
+#define KRB5_DB_LOCKMODE_DONTBLOCK    0x0004
+#define KRB5_DB_LOCKMODE_PERMANENT    0x0008
+
 /* libkdb.spec */
-krb5_error_code krb5_db_set_name (krb5_context, char * );
-krb5_error_code krb5_db_init (krb5_context);
-krb5_error_code krb5_db_fini (krb5_context);
-krb5_error_code krb5_db_get_age (krb5_context, char *, time_t * );
-krb5_error_code krb5_db_create (krb5_context, char *, krb5_int32 );
-krb5_error_code krb5_db_rename (krb5_context, char *, char * );
-krb5_error_code krb5_db_get_principal (krb5_context, krb5_const_principal ,
-				       krb5_db_entry *, int *,
-				       krb5_boolean * );
-void krb5_db_free_principal (krb5_context, krb5_db_entry *, int  );
-krb5_error_code krb5_db_put_principal (krb5_context, krb5_db_entry *, int * );
-krb5_error_code krb5_db_delete_principal (krb5_context, krb5_const_principal,
-					  int * );
-krb5_error_code krb5_db_iterate (krb5_context,
-				 krb5_error_code (* ) (krb5_pointer,
-						       krb5_db_entry *),
-				 krb5_pointer);
-krb5_error_code krb5_db_iterate_ext (krb5_context,
-				     krb5_error_code (* ) (krb5_pointer,
-					  	           krb5_db_entry *),
-				     krb5_pointer, int, int);
-krb5_error_code krb5_db_verify_master_key (krb5_context, krb5_principal, 
-					   krb5_keyblock *);
-krb5_error_code krb5_db_store_mkey (krb5_context, char *, krb5_principal,
-				    krb5_keyblock *);
+krb5_error_code krb5_db_open( krb5_context kcontext, char **db_args, int mode );
+krb5_error_code krb5_db_init  ( krb5_context kcontext );
+krb5_error_code krb5_db_create ( krb5_context kcontext, char **db_args );
+krb5_error_code krb5_db_inited  ( krb5_context kcontext );
+krb5_error_code kdb5_db_create ( krb5_context kcontext, char **db_args );
+krb5_error_code krb5_db_fini ( krb5_context kcontext );
+const char * krb5_db_errcode2string ( krb5_context kcontext, long err_code );
+krb5_error_code krb5_db_destroy ( krb5_context kcontext, char **db_args );
+krb5_error_code krb5_db_promote ( krb5_context kcontext, char **db_args );
+krb5_error_code krb5_db_get_age ( krb5_context kcontext, char *db_name, time_t *t );
+krb5_error_code krb5_db_set_option ( krb5_context kcontext, int option, void *value );
+krb5_error_code krb5_db_lock ( krb5_context kcontext, int lock_mode );
+krb5_error_code krb5_db_unlock ( krb5_context kcontext );
+krb5_error_code krb5_db_get_principal ( krb5_context kcontext,
+					krb5_const_principal search_for,
+					krb5_db_entry *entries,
+					int *nentries,
+					krb5_boolean *more );
+krb5_error_code krb5_db_get_principal_nolock ( krb5_context kcontext,
+					krb5_const_principal search_for,
+					krb5_db_entry *entries,
+					int *nentries,
+					krb5_boolean *more );
+krb5_error_code krb5_db_free_principal ( krb5_context kcontext,
+					 krb5_db_entry *entry,
+					 int count );
+krb5_error_code krb5_db_put_principal ( krb5_context kcontext,
+					krb5_db_entry *entries,
+					int *nentries);
+krb5_error_code krb5_db_delete_principal ( krb5_context kcontext,
+					   krb5_principal search_for,
+					   int *nentries );
+krb5_error_code krb5_db_iterate ( krb5_context kcontext,
+				  char *match_entry,
+				  int (*func) (krb5_pointer, krb5_db_entry *),
+				  krb5_pointer func_arg );
+krb5_error_code krb5_supported_realms ( krb5_context kcontext,
+					char **realms );
+krb5_error_code krb5_free_supported_realms ( krb5_context kcontext,
+					     char **realms );
+krb5_error_code krb5_db_set_master_key_ext ( krb5_context kcontext,
+					     char *pwd,
+					     krb5_keyblock *key );
+krb5_error_code krb5_db_set_mkey ( krb5_context context, 
+				   krb5_keyblock *key);
+krb5_error_code krb5_db_get_mkey ( krb5_context kcontext,
+				   krb5_keyblock **key );
+krb5_error_code krb5_db_free_master_key ( krb5_context kcontext,
+					  krb5_keyblock *key );
+krb5_error_code krb5_db_store_master_key  ( krb5_context kcontext, 
+					    char *db_arg, 
+					    krb5_principal mname,
+					    krb5_keyblock *key,
+					    char *master_pwd);
+krb5_error_code krb5_db_fetch_mkey  ( krb5_context   context,
+				      krb5_principal mname,
+				      krb5_enctype   etype,
+				      krb5_boolean   fromkeyboard,
+				      krb5_boolean   twice,
+				      char          *db_args,
+				      krb5_data     *salt,
+				      krb5_keyblock *key);
+krb5_error_code krb5_db_verify_master_key ( krb5_context kcontext,
+					    krb5_principal mprinc,
+					    krb5_keyblock *mkey );
+krb5_error_code
+krb5_dbe_find_enctype( krb5_context	kcontext,
+		       krb5_db_entry	*dbentp,
+		       krb5_int32		ktype,
+		       krb5_int32		stype,
+		       krb5_int32		kvno,
+		       krb5_key_data	**kdatap);
 
-krb5_error_code krb5_db_setup_mkey_name (krb5_context, const char *, 
-					 const char *, char **,
-					 krb5_principal *);
 
-krb5_error_code krb5_db_set_mkey (krb5_context, krb5_keyblock *);
+krb5_error_code krb5_dbe_search_enctype ( krb5_context kcontext, 
+					  krb5_db_entry *dbentp, 
+					  krb5_int32 *start, 
+					  krb5_int32 ktype, 
+					  krb5_int32 stype, 
+					  krb5_int32 kvno, 
+					  krb5_key_data **kdatap);
 
-krb5_error_code krb5_db_get_mkey (krb5_context, krb5_keyblock **);
-krb5_error_code krb5_db_destroy (krb5_context, char * );
-krb5_error_code krb5_db_lock (krb5_context, int );
-krb5_error_code krb5_db_unlock (krb5_context);
-krb5_error_code krb5_db_set_nonblocking (krb5_context, krb5_boolean,
-					 krb5_boolean * );
-krb5_boolean krb5_db_set_lockmode (krb5_context, krb5_boolean);
-krb5_error_code	krb5_db_fetch_mkey (krb5_context, krb5_principal, krb5_enctype,
-				    krb5_boolean, krb5_boolean, char *,
-				    krb5_data *, 
-				    krb5_keyblock * );
+krb5_error_code
+krb5_db_setup_mkey_name ( krb5_context context,
+			  const char *keyname,
+			  const char *realm,
+			  char **fullname,
+			  krb5_principal *principal);
 
-krb5_error_code krb5_db_open_database (krb5_context);
-krb5_error_code krb5_db_close_database (krb5_context);
+krb5_error_code
+krb5_dbekd_decrypt_key_data( krb5_context 	  context,
+			     const krb5_keyblock	* mkey,
+			     const krb5_key_data	* key_data,
+			     krb5_keyblock 	* dbkey,
+			     krb5_keysalt 	* keysalt);
 
-krb5_error_code krb5_dbekd_encrypt_key_data (krb5_context,
-					     const krb5_keyblock *,
-					     const krb5_keyblock *,
-					     const krb5_keysalt *,
-					     int,
-					     krb5_key_data *);
-krb5_error_code krb5_dbekd_decrypt_key_data (krb5_context,
-					     const krb5_keyblock *,
-					     const krb5_key_data *,
-					     krb5_keyblock *,
-					     krb5_keysalt *);
-krb5_error_code krb5_dbe_create_key_data (krb5_context,
-					  krb5_db_entry *);
-krb5_error_code krb5_dbe_update_tl_data (krb5_context,
-					 krb5_db_entry *,
-					 krb5_tl_data *);
-krb5_error_code krb5_dbe_lookup_tl_data (krb5_context,
-					 krb5_db_entry *,
-					 krb5_tl_data *);
-krb5_error_code krb5_dbe_update_last_pwd_change (krb5_context,
-						 krb5_db_entry *,
-						 krb5_timestamp);
-krb5_error_code krb5_dbe_lookup_last_pwd_change (krb5_context,
-						 krb5_db_entry *,
-						 krb5_timestamp *);
-krb5_error_code krb5_dbe_update_mod_princ_data (krb5_context,
-						krb5_db_entry *,
-						krb5_timestamp,
-						krb5_const_principal);
-krb5_error_code krb5_dbe_lookup_mod_princ_data (krb5_context,
-						krb5_db_entry *,
-						krb5_timestamp *,
-						krb5_principal *);
-int krb5_encode_princ_dbkey (krb5_context, krb5_data  *, krb5_const_principal);
-void krb5_free_princ_dbkey (krb5_context, krb5_data *);
-krb5_error_code krb5_encode_princ_contents (krb5_context, krb5_data *,
-					    krb5_db_entry *);
-void krb5_free_princ_contents (krb5_context, krb5_data  *);
-krb5_error_code krb5_decode_princ_contents (krb5_context, krb5_data  *,
-					    krb5_db_entry *);
-void krb5_dbe_free_contents (krb5_context, krb5_db_entry *);
+krb5_error_code
+krb5_dbekd_encrypt_key_data( krb5_context 		  context,
+			     const krb5_keyblock	* mkey,
+			     const krb5_keyblock 	* dbkey,
+			     const krb5_keysalt		* keysalt,
+			     int			  keyver,
+			     krb5_key_data	        * key_data);
 
-krb5_error_code krb5_dbe_find_enctype (krb5_context, krb5_db_entry *,
-				       krb5_int32,
-				       krb5_int32,
-				       krb5_int32,
-				       krb5_key_data **);
-
-krb5_error_code krb5_dbe_search_enctype (krb5_context,
-					 krb5_db_entry *,
-					 krb5_int32 *,
-					 krb5_int32,
-					 krb5_int32,
-					 krb5_int32,
-					 krb5_key_data **);
-
-struct __krb5_key_salt_tuple;
-
-krb5_error_code krb5_dbe_cpw (krb5_context,
-			      krb5_keyblock  *,
-			      struct __krb5_key_salt_tuple *,
-			      int,
-			      char *,
-			      int,
-			      krb5_boolean,
-			      krb5_db_entry *);
-krb5_error_code krb5_dbe_apw (krb5_context,
-			      krb5_keyblock  *,
-			      struct __krb5_key_salt_tuple *,
-			      int,
-			      char *,
-			      krb5_db_entry *);
-krb5_error_code krb5_dbe_crk (krb5_context,
-			      krb5_keyblock  *,
-			      struct __krb5_key_salt_tuple *,
-			      int,
-			      krb5_boolean,
-			      krb5_db_entry *);
-krb5_error_code krb5_dbe_ark (krb5_context,
-			      krb5_keyblock  *,
-			      struct __krb5_key_salt_tuple *,
-			      int,
-			      krb5_db_entry *);
-
-krb5_error_code krb5_ser_db_context_init (krb5_context);
+krb5_error_code
+krb5_dbe_lookup_mod_princ_data( krb5_context          context,
+				krb5_db_entry       * entry,
+				krb5_timestamp      * mod_time,
+				krb5_principal      * mod_princ);
  
+
+krb5_error_code
+krb5_dbe_update_last_pwd_change( krb5_context          context,
+				 krb5_db_entry       * entry,
+				 krb5_timestamp	  stamp);
+
+krb5_error_code
+krb5_dbe_lookup_tl_data( krb5_context          context,
+			 krb5_db_entry       * entry,
+			 krb5_tl_data        * ret_tl_data);
+
+krb5_error_code
+krb5_dbe_create_key_data( krb5_context          context,
+			  krb5_db_entry       * entry);
+
+
+krb5_error_code
+krb5_dbe_update_mod_princ_data( krb5_context          context,
+				krb5_db_entry       * entry,
+				krb5_timestamp        mod_date,
+				krb5_const_principal  mod_princ);
+
+krb5_error_code
+krb5_dbe_update_last_pwd_change( krb5_context          context,
+				 krb5_db_entry       * entry,
+				 krb5_timestamp	  stamp);
+
+void *krb5_db_alloc( krb5_context kcontext,
+		     void *ptr,
+		     size_t size );
+
+void krb5_db_free( krb5_context kcontext,
+		   void *ptr);
+
+
+krb5_error_code
+krb5_dbe_lookup_last_pwd_change( krb5_context          context,
+				 krb5_db_entry       * entry,
+				 krb5_timestamp      * stamp);
+
+krb5_error_code
+krb5_dbe_update_tl_data( krb5_context          context,
+			 krb5_db_entry       * entry,
+			 krb5_tl_data        * new_tl_data);
+
+krb5_error_code
+krb5_dbe_cpw( krb5_context	  kcontext,
+	      krb5_keyblock       * master_key,
+	      krb5_key_salt_tuple	* ks_tuple,
+	      int			  ks_tuple_count,
+	      char 		* passwd,
+	      int			  new_kvno,
+	      krb5_boolean	  keepold,
+	      krb5_db_entry	* db_entry);
+
+
+krb5_error_code
+krb5_dbe_ark( krb5_context	  context,
+	      krb5_keyblock       * master_key,
+	      krb5_key_salt_tuple	* ks_tuple,
+	      int			  ks_tuple_count,
+	      krb5_db_entry	* db_entry);
+
+krb5_error_code
+krb5_dbe_crk( krb5_context	  context,
+	      krb5_keyblock       * master_key,
+	      krb5_key_salt_tuple	* ks_tuple,
+	      int			  ks_tuple_count,
+	      krb5_boolean	  keepold,
+	      krb5_db_entry	* db_entry);
+
+krb5_error_code
+krb5_dbe_apw( krb5_context	  context,
+	      krb5_keyblock       * master_key,
+	      krb5_key_salt_tuple	* ks_tuple,
+	      int			  ks_tuple_count,
+	      char 		* passwd,
+	      krb5_db_entry	* db_entry);
+
+/* default functions. Should not be directly called */
+/*
+ *   Default functions prototype
+ */
+
+krb5_error_code
+krb5_dbe_def_search_enctype( krb5_context kcontext, 
+			     krb5_db_entry *dbentp, 
+			     krb5_int32 *start, 
+			     krb5_int32 ktype, 
+			     krb5_int32 stype, 
+			     krb5_int32 kvno, 
+			     krb5_key_data **kdatap);
+
+krb5_error_code
+krb5_def_store_mkey( krb5_context context,
+		     char *keyfile,
+		     krb5_principal mname,
+		     krb5_keyblock *key,
+		     char *master_pwd);
+
+
+krb5_error_code
+krb5_db_def_fetch_mkey( krb5_context   context,
+			krb5_principal mname,
+			krb5_keyblock *key,
+			int           *kvno,
+			char          *db_args);
+
+krb5_error_code
+krb5_def_verify_master_key( krb5_context context,
+			    krb5_principal mprinc,
+			    krb5_keyblock *mkey);
+
+krb5_error_code kdb_def_set_mkey ( krb5_context kcontext,
+				   char *pwd,
+				   krb5_keyblock *key );
+
+krb5_error_code kdb_def_get_mkey ( krb5_context kcontext,
+				   krb5_keyblock **key );
+
+krb5_error_code
+krb5_dbe_def_cpw( krb5_context	  context,
+		  krb5_keyblock       * master_key,
+		  krb5_key_salt_tuple	* ks_tuple,
+		  int			  ks_tuple_count,
+		  char 		* passwd,
+		  int			  new_kvno,
+		  krb5_boolean	  keepold,
+		  krb5_db_entry	* db_entry);
+
+krb5_error_code
+krb5_db_supports_iprop(krb5_context kcontext, int *iprop_supported);
+
+krb5_error_code
+krb5_def_promote_db(krb5_context, char *, char **);
+
+typedef struct _osa_policy_ent_t {
+    int		version;
+    char	*name;
+    uint32_t	pw_min_life;
+    uint32_t	pw_max_life;
+    uint32_t	pw_min_length;
+    uint32_t	pw_min_classes;
+    uint32_t	pw_history_num;
+    uint32_t	policy_refcnt;
+} osa_policy_ent_rec, *osa_policy_ent_t;
+
+typedef	void	(*osa_adb_iter_policy_func) (void *, osa_policy_ent_t);
+
+krb5_error_code 
+krb5_db_create_policy( krb5_context kcontext, 
+		       osa_policy_ent_t policy);
+
+krb5_error_code 
+krb5_db_get_policy ( krb5_context kcontext, 
+		     char *name, 
+		     osa_policy_ent_t *policy,
+		     int *nentries);
+
+krb5_error_code 
+krb5_db_put_policy( krb5_context kcontext, 
+		    osa_policy_ent_t policy);
+
+krb5_error_code 
+krb5_db_iter_policy( krb5_context kcontext,
+		     char *match_entry,
+		     osa_adb_iter_policy_func func,
+		     void *data);
+
+krb5_error_code 
+krb5_db_delete_policy( krb5_context kcontext, 
+		       char *policy);
+
+void 
+krb5_db_free_policy( krb5_context kcontext, 
+		     osa_policy_ent_t policy);
+
 #define KRB5_KDB_DEF_FLAGS	0
 
 #endif /* !defined(_WIN32) */

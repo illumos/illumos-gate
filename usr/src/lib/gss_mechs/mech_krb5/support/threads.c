@@ -389,4 +389,41 @@ void krb5int_thread_support_fini (void)
 
     krb5int_fini_fac();
 }
+/* Mutex allocation functions, for use in plugins that may not know
+   what options a given set of libraries was compiled with.  */
+int KRB5_CALLCONV
+krb5int_mutex_alloc (k5_mutex_t **m)
+{
+    k5_mutex_t *ptr;
+    int err;
 
+    ptr = malloc (sizeof (k5_mutex_t));
+    if (ptr == NULL)
+	return errno;
+    err = k5_mutex_init (ptr);
+    if (err) {
+	free (ptr);
+	return err;
+    }
+    *m = ptr;
+    return 0;
+}
+
+void KRB5_CALLCONV
+krb5int_mutex_free (k5_mutex_t *m)
+{
+    (void) k5_mutex_destroy (m);
+    free (m);
+}
+
+/* Callable versions of the various macros.  */
+int KRB5_CALLCONV
+krb5int_mutex_lock (k5_mutex_t *m)
+{
+    return k5_mutex_lock (m);
+}
+int KRB5_CALLCONV
+krb5int_mutex_unlock (k5_mutex_t *m)
+{
+    return k5_mutex_unlock (m);
+}

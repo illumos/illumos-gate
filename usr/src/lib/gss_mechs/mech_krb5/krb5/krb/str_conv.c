@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ struct salttype_lookup_entry {
 /*
  * Lookup tables.
  */
-
+#include <krb5/kdb.h>
 static const struct salttype_lookup_entry salttype_table[] = {
 /* salt type			input specifier	output string  */
 /*-----------------------------	--------------- ---------------*/
@@ -195,6 +195,7 @@ krb5_string_to_timestamp(char *string, krb5_timestamp *timestampp)
 #else
 	memcpy(&timebuf, localtime(&now), sizeof(timebuf));
 #endif
+	/*LINTED*/
 	if ((s = strptime(string, atime_format_table[i], &timebuf))
 	    && (s != string)) {
  	    /* See if at end of buffer - otherwise partial processing */

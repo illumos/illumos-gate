@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -302,12 +302,40 @@ os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
     return 0;
 }
 
+static krb5_error_code
+add_kdc_config_file(profile_filespec_t **pfiles)
+{
+    char *file;
+    size_t count;
+    profile_filespec_t *newfiles;
+
+    file = getenv(KDC_PROFILE_ENV);
+    if (file == NULL)
+	file = DEFAULT_KDC_PROFILE;
+
+    for (count = 0; (*pfiles)[count]; count++)
+	;
+    count += 2;
+    newfiles = malloc(count * sizeof(*newfiles));
+    if (newfiles == NULL)
+	return errno;
+    memcpy(newfiles + 1, *pfiles, (count-1) * sizeof(*newfiles));
+    newfiles[0] = strdup(file);
+    if (newfiles[0] == NULL) {
+	int e = errno;
+	free(newfiles);
+	return e;
+    }
+    free(*pfiles);
+    *pfiles = newfiles;
+    return 0;
+}
 
 /* Set the profile paths in the context. If secure is set to TRUE then 
    do not include user paths (from environment variables, etc.)
 */
 static krb5_error_code
-os_init_paths(krb5_context ctx)
+os_init_paths(krb5_context ctx, krb5_boolean kdc)
 {
     krb5_error_code	retval = 0;
     profile_filespec_t *files = 0;
@@ -318,6 +346,9 @@ os_init_paths(krb5_context ctx)
 #endif /* KRB5_DNS_LOOKUP */
 
     retval = os_get_default_config_files(&files, secure);
+
+    if (retval == 0 && kdc == TRUE)
+	retval = add_kdc_config_file(&files);
 
     if (!retval) {
         retval = profile_init((const_profile_filespec_t *) files,
@@ -353,8 +384,9 @@ os_init_paths(krb5_context ctx)
 }
 #endif /* !_KERNEL */
 
+/*ARGSUSED1*/
 krb5_error_code
-krb5_os_init_context(krb5_context ctx)
+krb5_os_init_context(krb5_context ctx, krb5_boolean kdc)
 {
 	krb5_os_context os_ctx;
 	krb5_error_code	retval = 0;
@@ -370,7 +402,7 @@ krb5_os_init_context(krb5_context ctx)
 #ifndef _KERNEL
 	krb5_cc_set_default_name(ctx, NULL);
 
-	retval = os_init_paths(ctx);
+	retval = os_init_paths(ctx, kdc);
 #endif
 	/*
 	 * If there's an error in the profile, return an error.  Just
@@ -465,7 +497,7 @@ krb5_secure_config_files(krb5_context ctx)
 	}
 
 	ctx->profile_secure = TRUE;
-	retval = os_init_paths(ctx);
+	retval = os_init_paths(ctx, FALSE);
 	if (retval)
 		return retval;
 

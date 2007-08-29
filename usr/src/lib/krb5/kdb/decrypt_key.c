@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@
  */
 
 #include "k5-int.h"
+#include <krb5/kdb.h>
 
 /*
  * Decrypt a key from storage in the database.  "eblock" is used

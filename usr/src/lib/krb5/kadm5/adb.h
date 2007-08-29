@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <krb5/kdb.h>
 #include <db.h>
 #include <kadm5/admin.h>
-#include <kadm5/adb_err.h>
+#include <kdb/adb_err.h>
 #include <com_err.h>
 
 typedef	long		osa_adb_ret_t;
@@ -104,7 +104,6 @@ typedef struct _osa_policy_ent_t {
 
 typedef	void	(*osa_adb_iter_princ_func) (void *, osa_princ_ent_t);
 typedef	void	(*osa_adb_iter_policy_func) (void *, osa_policy_ent_t);
-  
 
 /*
  * Return Code (the rest are in adb_err.h)

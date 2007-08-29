@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <syslog.h>
-#include "kdb_db2.h"
 #include "kdb_log.h"
 
 /*
@@ -46,7 +45,7 @@ ulog_sync_update(kdb_hlog_t *ulog, kdb_ent_header_t *upd)
 	start = ((ulong_t)upd) & (~(pagesize-1));
 
 	end = (((ulong_t)upd) + ulog->kdb_block +
-		(pagesize-1)) & (~(pagesize-1));
+	    (pagesize-1)) & (~(pagesize-1));
 
 	size = end - start;
 	if (retval = msync((caddr_t)start, size, MS_SYNC)) {
@@ -318,14 +317,14 @@ ulog_replay(krb5_context context, kdb_incr_result_t *incr_ret)
 	fupd = upd;
 
 	/*
-	 * We reset last_sno and last_time to 0, if krb5_db2_db_put_principal
-	 * or krb5_db2_db_delete_principal fail.
+	 * We reset last_sno and last_time to 0, if krb5_db_put_principal
+	 * or krb5_db_delete_principal fail.
 	 */
 	errlast.last_sno = (unsigned int)0;
 	errlast.last_time.seconds = (unsigned int)0;
 	errlast.last_time.useconds = (unsigned int)0;
 
-	if ((retval = krb5_db_init(context)))
+	if ((retval = krb5_db_inited(context)))
 		goto cleanup;
 
 	for (i = 0; i < no_of_updates; i++) {
@@ -355,7 +354,7 @@ ulog_replay(krb5_context context, kdb_incr_result_t *incr_ret)
 			if (dbprincstr)
 				free(dbprincstr);
 
-			retval = krb5_db2_db_delete_principal(context,
+			retval = krb5_db_delete_principal(context,
 			    dbprinc, &nentry);
 
 			if (dbprinc)
@@ -376,7 +375,7 @@ ulog_replay(krb5_context context, kdb_incr_result_t *incr_ret)
 			if (retval = ulog_conv_2dbentry(context, entry, upd, 1))
 				goto cleanup;
 
-			retval = krb5_db2_db_put_principal(context, entry,
+			retval = krb5_db_put_principal(context, entry,
 			    &nentry);
 
 			if (entry) {
@@ -583,13 +582,13 @@ ulog_map(krb5_context context, kadm5_config_params *params, int caller)
 		ulog_filesize = st.st_size;
 
 		ulog = (kdb_hlog_t *)mmap(0, ulog_filesize,
-			PROT_READ+PROT_WRITE, MAP_PRIVATE, ulogfd, 0);
+		    PROT_READ+PROT_WRITE, MAP_PRIVATE, ulogfd, 0);
 	} else {
 		/*
 		 * else kadmind, kpropd, & kcommands should udpate stores
 		 */
 		ulog = (kdb_hlog_t *)mmap(0, MAXLOGLEN,
-			PROT_READ+PROT_WRITE, MAP_SHARED, ulogfd, 0);
+		    PROT_READ+PROT_WRITE, MAP_SHARED, ulogfd, 0);
 	}
 
 	if ((int)(ulog) == -1) {

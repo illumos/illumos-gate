@@ -194,6 +194,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 					&params,
 					KADM5_STRUCT_VERSION,
 					KADM5_API_VERSION_2,
+					NULL,
 					&handle);
 	if (retval) {
 		__pam_log(LOG_AUTH | LOG_ERR,

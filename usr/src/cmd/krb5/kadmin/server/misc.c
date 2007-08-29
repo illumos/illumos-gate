@@ -28,9 +28,9 @@
  *
  */
 
-#include    <kadm5/adb.h>
-#include    <kadm5/server_internal.h>
+#include    <k5-int.h>
 #include    <krb5/kdb.h>
+#include    <kadm5/server_internal.h>
 #include    "misc.h"
 
 /*
@@ -163,7 +163,7 @@ check_min_life(void *server_handle, krb5_principal principal)
 
     ret = kadm5_get_principal(handle->lhandle, principal, 
 			      &princ, KADM5_PRINCIPAL_NORMAL_MASK);
-    if(ret != OSA_ADB_OK) 
+    if(ret) 
 	 return ret;
     if(princ.aux_attributes & KADM5_POLICY) {
 	if((ret=kadm5_get_policy(handle->lhandle,

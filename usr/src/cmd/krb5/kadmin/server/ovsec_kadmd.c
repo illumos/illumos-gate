@@ -84,7 +84,7 @@
 #include    <locale.h>
 #include    <sys/resource.h>
 #include    <kdb/kdb_log.h>
-#include    <kdb/kdb_kt.h>
+#include    <kdb_kt.h>
 
 #include <rpc/rpcsec_gss.h>
 #include    "misc.h"
@@ -170,7 +170,7 @@ int nofork = 0; /* global; don't fork (debug mode) */
 
 static void usage()
 {
-	fprintf(stderr, gettext("Usage: kadmind [-r realm] [-m] [-d] "
+	fprintf(stderr, gettext("Usage: kadmind [-x db_args]* [-r realm] [-m] [-d] "
 	    "[-p port-number]\n"));
 	exit(1);
 }
@@ -434,12 +434,15 @@ main(int argc, char *argv[])
 	krb5_context ctx;
 
 	kadm5_config_params params;
+	char **db_args      = NULL;
+	int    db_args_size = 0;
 	auth_gssapi_name names[6];
      	gss_buffer_desc gssbuf;
      	gss_OID nt_krb5_name_oid;
 
 	char **dnames = NULL;
 	int retdn;
+	int iprop_supported;
 
 	/* This is OID value the Krb5_Name NameType */
      	gssbuf.value = "{1 2 840 113554 1 2 2 1}";
@@ -473,7 +476,7 @@ main(int argc, char *argv[])
 
 	memset((char *) &params, 0, sizeof (params));
 
-	while ((optchar = getopt(argc, argv, "r:mdp:")) != EOF) {
+	while ((optchar = getopt(argc, argv, "r:mdp:x:")) != EOF) {
 		switch (optchar) {
 		case 'r':
 			if (!optarg)
@@ -493,6 +496,24 @@ main(int argc, char *argv[])
 				usage();
 			params.kadmind_port = atoi(optarg);
 			params.mask |= KADM5_CONFIG_KADMIND_PORT;
+			break;
+		case 'x':
+			if (!optarg)
+				usage();
+			db_args_size++;
+			{
+			    char **temp = realloc( db_args,
+				sizeof(char*) * (db_args_size+1)); /* one for NULL */
+			    if( temp == NULL )
+			    {
+				fprintf(stderr, gettext("%s: cannot initialize. Not enough memory\n"),
+				    whoami);
+				exit(1);
+			    }
+			    db_args = temp;
+			}
+			db_args[db_args_size-1] = optarg;
+			db_args[db_args_size]   = NULL;
 			break;
 		case '?':
 		default:
@@ -866,6 +887,7 @@ main(int argc, char *argv[])
 		    NULL, &params,
 		    KADM5_STRUCT_VERSION,
 		    KADM5_API_VERSION_2,
+		    db_args,
 		    &global_server_handle)) != KADM5_OK) {
 		krb5_klog_syslog(LOG_ERR,
 		    gettext("%s while initializing, aborting"),
@@ -888,11 +910,41 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if( db_args )
+	{
+	    free(db_args), db_args=NULL;
+	}
+
 	handle = global_server_handle;
 	ctx = handle->context;
-	if (params.iprop_enabled == TRUE)
-		ulog_set_role(ctx, IPROP_MASTER);
-	else
+	if (params.iprop_enabled == TRUE) {
+		if (ret = krb5_db_supports_iprop(ctx, &iprop_supported)) {
+			fprintf(stderr,
+				gettext("%s: %s while trying to determine if KDB "
+				"plugin supports iprop\n"), whoami,
+				error_message(ret));
+			krb5_klog_syslog(LOG_ERR,
+				gettext("%s while trying to determine if KDB "
+				"plugin supports iprop"), error_message(ret));
+			krb5_klog_close(ctx);
+			exit(1);
+		}
+
+		if (!iprop_supported) {
+			fprintf(stderr,
+				gettext("%s: Warning, current KDB "
+				"plugin does not support iprop, continuing "
+				"with iprop disabled\n"), whoami);
+			krb5_klog_syslog(LOG_WARNING,
+				gettext("%s Warning, current KDB "
+				"plugin does not support iprop, continuing "
+				"with iprop disabled"));
+			krb5_klog_close(ctx);
+
+			ulog_set_role(ctx, IPROP_NULL);
+		} else
+			ulog_set_role(ctx, IPROP_MASTER);
+	} else
 		ulog_set_role(ctx, IPROP_NULL);
 
 	log_ctx = ctx->kdblog_context;

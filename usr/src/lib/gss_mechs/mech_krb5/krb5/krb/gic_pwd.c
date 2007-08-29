@@ -31,7 +31,8 @@
 extern kadm5_ret_t kadm5_get_cpw_host_srv_name(krb5_context, const char *,
 			char **);
 extern kadm5_ret_t kadm5_init_with_password(char *, char *, char *,
-			kadm5_config_params *, krb5_ui_4, krb5_ui_4, void **);
+			kadm5_config_params *, krb5_ui_4, krb5_ui_4, char **,
+			void **);
 extern kadm5_ret_t kadm5_chpass_principal_util(void *, krb5_principal,
 			char *, char **, char *, unsigned int);
 
@@ -306,7 +307,8 @@ __krb5_get_init_creds_password(
 	goto cleanup;
 
    ret = kadm5_init_with_password(princ_str, pw0array, cpw_service,
-	&params, KADM5_STRUCT_VERSION, KADM5_API_VERSION_2, &server_handle);
+	&params, KADM5_STRUCT_VERSION, KADM5_API_VERSION_2, NULL,
+	&server_handle);
 
    if (ret != 0) {
 	goto cleanup;

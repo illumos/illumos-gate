@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,18 +29,15 @@ LIBRARY= libkadm5srv.a
 VERS= .1
 
 SRV_OBJS = svr_policy.o \
-        svr_principal.o \
-        server_acl.o \
-        server_kdb.o \
-        server_misc.o \
-        server_init.o \
-        server_dict.o \
-        svr_iters.o \
-        svr_chpass_util.o \
-        adb_xdr.o \
-        adb_policy.o \
-        adb_free.o \
-        adb_openclose.o	\
+	svr_principal.o \
+	server_acl.o \
+	server_kdb.o \
+	server_misc.o \
+	server_init.o \
+	server_dict.o \
+	svr_iters.o \
+	svr_chpass_util.o \
+	adb_xdr.o \
 	xdr_alloc.o \
 	logger.o \
 	chgpwd.o

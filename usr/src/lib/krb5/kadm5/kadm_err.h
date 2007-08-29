@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@
 #define KADM5_MISSING_KRB5_CONF_PARAMS           (43787574L)
 #define KADM5_RPC_ERROR_CANTENCODEARGS           (43787575L)
 #define KADM5_RPC_ERROR_CANTDECODEARGS           (43787576L)
+#define KADM5_XDR_FAILURE                        (43787577L)
 
 #define ERROR_TABLE_BASE_ovk (43787520L)
 

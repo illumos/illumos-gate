@@ -42,6 +42,7 @@
 
 #include <stdio.h>
 #include <netdb.h>
+#include "autoconf.h"
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
@@ -50,8 +51,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <krb5.h>
 #include <k5-int.h> /* for KRB5_ADM_DEFAULT_PORT */
+#include <krb5.h>
 #ifdef __STDC__
 #include <stdlib.h>
 #endif
@@ -88,6 +89,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 				   kadm5_config_params *params,
 				   krb5_ui_4 struct_version,
 				   krb5_ui_4 api_version,
+				   char **db_args,
 				   void **server_handle);
 
 kadm5_ret_t kadm5_init_with_creds(char *client_name,
@@ -96,11 +98,12 @@ kadm5_ret_t kadm5_init_with_creds(char *client_name,
 				  kadm5_config_params *params,
 				  krb5_ui_4 struct_version,
 				  krb5_ui_4 api_version,
+				  char **db_args,
 				  void **server_handle)
 {
      return _kadm5_init_any(client_name, INIT_CREDS, NULL, ccache,
 			    service_name, params,
-			    struct_version, api_version,
+			    struct_version, api_version, db_args,
 			    server_handle);
 }
 
@@ -110,11 +113,12 @@ kadm5_ret_t kadm5_init_with_password(char *client_name, char *pass,
 				     kadm5_config_params *params,
 				     krb5_ui_4 struct_version,
 				     krb5_ui_4 api_version,
+				     char **db_args,
 				     void **server_handle)
 {
      return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
 			    service_name, params, struct_version,
-			    api_version, server_handle);
+			    api_version, db_args, server_handle);
 }
 
 kadm5_ret_t kadm5_init(char *client_name, char *pass,
@@ -122,11 +126,12 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 		       kadm5_config_params *params,
 		       krb5_ui_4 struct_version,
 		       krb5_ui_4 api_version,
+		       char **db_args,
 		       void **server_handle)
 {
      return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
 			    service_name, params, struct_version,
-			    api_version, server_handle);
+			    api_version, db_args, server_handle);
 }
 
 kadm5_ret_t kadm5_init_with_skey(char *client_name, char *keytab,
@@ -134,11 +139,12 @@ kadm5_ret_t kadm5_init_with_skey(char *client_name, char *keytab,
 				 kadm5_config_params *params,
 				 krb5_ui_4 struct_version,
 				 krb5_ui_4 api_version,
+				 char **db_args,
 				 void **server_handle)
 {
      return _kadm5_init_any(client_name, INIT_SKEY, keytab, NULL,
 			    service_name, params, struct_version,
-			    api_version, server_handle);
+			    api_version, db_args, server_handle);
 }
 
 krb5_error_code  kadm5_free_config_params();
@@ -582,6 +588,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 				   kadm5_config_params *params_in,
 				   krb5_ui_4 struct_version,
 				   krb5_ui_4 api_version,
+				   char **db_args,
 				   void **server_handle)
 {
      int i;
@@ -1056,6 +1063,11 @@ int _kadm5_check_handle(void *handle)
 {
      CHECK_HANDLE(handle);
      return 0;
+}
+
+krb5_error_code kadm5_init_krb5_context (krb5_context *ctx)
+{
+    return krb5_init_context(ctx);
 }
 
 /*

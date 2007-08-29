@@ -57,7 +57,7 @@ extern "C" {
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/admin.h,v 1.54 2004/08/21 02:31:09 tlyu Exp $
+ * $Header$
  */
 
 #include	<sys/types.h>
@@ -65,13 +65,20 @@ extern "C" {
 #include	<rpc/rpc.h>
 #include	<krb5.h>
 #include	<k5-int.h>
+#include	<krb5/kdb.h>
 #include	<com_err.h>
 #include	<kadm5/kadm_err.h>
-#include	<kadm5/adb_err.h>
 #include	<kadm5/chpass_util_strings.h>
 
 #define KADM5_ADMIN_SERVICE_P	"kadmin@admin"
-#define KADM5_ADMIN_SERVICE	"kadmin/admin"
+/*
+ * Solaris Kerberos:
+ * The kadmin/admin principal is unused on Solaris. This principal is used
+ * in AUTH_GSSAPI but Solaris doesn't support AUTH_GSSAPI. RPCSEC_GSS can only
+ * be used with host-based principals. 
+ *
+ */
+/* #define KADM5_ADMIN_SERVICE	"kadmin/admin" */
 #define KADM5_CHANGEPW_SERVICE_P	"kadmin@changepw"
 #define KADM5_CHANGEPW_SERVICE	"kadmin/changepw"
 #define KADM5_HIST_PRINCIPAL	"kadmin/history"
@@ -120,8 +127,15 @@ typedef unsigned int rpc_u_int32;
 #define KADM5_FAIL_AUTH_COUNT	0x010000
 #define KADM5_KEY_DATA		0x020000
 #define KADM5_TL_DATA		0x040000
+#ifdef notyet /* Novell */
+#define KADM5_CPW_FUNCTION      0x080000
+#define KADM5_RANDKEY_USED      0x100000
+#endif
+#define KADM5_LOAD		0x200000
+
 /* all but KEY_DATA and TL_DATA */
 #define KADM5_PRINCIPAL_NORMAL_MASK 0x01ffff
+
 
 /* kadm5_policy_ent_t */
 #define KADM5_PW_MAX_LIFE	0x004000
@@ -258,10 +272,12 @@ typedef struct _kadm5_policy_ent_t {
 	long		policy_refcnt;
 } kadm5_policy_ent_rec, *kadm5_policy_ent_t;
 
+#if 0 /************** Begin IFDEF'ed OUT *******************************/
 typedef struct __krb5_key_salt_tuple {
      krb5_enctype	ks_enctype;
      krb5_int32		ks_salttype;
 } krb5_key_salt_tuple;
+#endif /**************** END IFDEF'ed OUT *******************************/
 
 /*
  * New types to indicate which protocol to use when sending
@@ -283,6 +299,9 @@ typedef struct _kadm5_config_params {
      int		kpasswd_port;
 
      char *		admin_server;
+#ifdef notyet /* Novell */ /* ABI change? */
+     char *		kpasswd_server;
+#endif
 
      char *		dbname;
      char *		admin_dbname;
@@ -381,7 +400,9 @@ kadm5_ret_t    kadm5_init(char *client_name, char *pass,
 #endif
 			  krb5_ui_4 struct_version,
 			  krb5_ui_4 api_version,
+			  char **db_args,
 			  void **server_handle);
+
 kadm5_ret_t    kadm5_init_with_password(char *client_name,
 					char *pass, 
 					char *service_name,
@@ -392,6 +413,7 @@ kadm5_ret_t    kadm5_init_with_password(char *client_name,
 #endif
 					krb5_ui_4 struct_version,
 					krb5_ui_4 api_version,
+					char **db_args,
 					void **server_handle);
 kadm5_ret_t    kadm5_init_with_skey(char *client_name,
 				    char *keytab,
@@ -403,6 +425,7 @@ kadm5_ret_t    kadm5_init_with_skey(char *client_name,
 #endif
 				    krb5_ui_4 struct_version,
 				    krb5_ui_4 api_version,
+				    char **db_args,
 				    void **server_handle);
 #if USE_KADM5_API_VERSION > 1
 kadm5_ret_t    kadm5_init_with_creds(char *client_name,
@@ -411,6 +434,7 @@ kadm5_ret_t    kadm5_init_with_creds(char *client_name,
 				     kadm5_config_params *params,
 				     krb5_ui_4 struct_version,
 				     krb5_ui_4 api_version,
+				     char **db_args,
 				     void **server_handle);
 #endif
 kadm5_ret_t    kadm5_lock(void *server_handle);
@@ -570,6 +594,8 @@ kadm5_ret_t    kadm5_free_key_data(void *server_handle,
 kadm5_ret_t    kadm5_free_name_list(void *server_handle, char **names, 
 				    int count);
 
+krb5_error_code kadm5_init_krb5_context (krb5_context *);
+
 #if USE_KADM5_API_VERSION == 1
 /*
  * OVSEC_KADM_API_VERSION_1 should be, if possible, compile-time
@@ -681,6 +707,7 @@ ovsec_kadm_ret_t    ovsec_kadm_init(char *client_name, char *pass,
 				    char *service_name, char *realm,
 				    krb5_ui_4 struct_version,
 				    krb5_ui_4 api_version,
+				    char **db_args,
 				    void **server_handle);
 ovsec_kadm_ret_t    ovsec_kadm_init_with_password(char *client_name,
 						  char *pass, 
@@ -688,6 +715,7 @@ ovsec_kadm_ret_t    ovsec_kadm_init_with_password(char *client_name,
 						  char *realm, 
 						  krb5_ui_4 struct_version,
 						  krb5_ui_4 api_version,
+						  char ** db_args,
 						  void **server_handle);
 ovsec_kadm_ret_t    ovsec_kadm_init_with_skey(char *client_name,
 					      char *keytab,
@@ -695,6 +723,7 @@ ovsec_kadm_ret_t    ovsec_kadm_init_with_skey(char *client_name,
 					      char *realm,
 					      krb5_ui_4 struct_version,
 					      krb5_ui_4 api_version,
+					      char **db_args,
 					      void **server_handle);
 ovsec_kadm_ret_t    ovsec_kadm_flush(void *server_handle);
 ovsec_kadm_ret_t    ovsec_kadm_destroy(void *server_handle);

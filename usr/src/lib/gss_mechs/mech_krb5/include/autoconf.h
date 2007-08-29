@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,10 @@
 #define POSIX_TERMIOS 1
 #define POSIX_TYPES 1
 #define USE_DIRENT_H 1
+
+/* Define if dlopen should be used */
+#define USE_DLOPEN 1
+
 #define HAVE_STRING_H 1	
 #define WAIT_USES_INT 1
 #define krb5_sigtype void
@@ -69,6 +73,18 @@
 
 /* Define to 1 if you have the `inet_pton' function. */
 #define HAVE_INET_PTON 1
+
+/* Define to 1 if you have the <lber.h> header file. */
+#define HAVE_LBER_H 1
+
+/* Define to 1 if you have the `ldap_explode_dn' function. */
+#define HAVE_LDAP_EXPLODE_DN 1
+
+/* Define to 1 if you have the <ldap.h> header file. */
+#define HAVE_LDAP_H 1
+
+/* Define to 1 if you have the `ldap_url_parse_nodn' function. */
+#define HAVE_LDAP_URL_PARSE_NODN 1
 
 #define HAVE_STDARG_H 1
 /* #undef HAVE_VARARGS_H */

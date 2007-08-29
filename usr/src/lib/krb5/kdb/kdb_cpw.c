@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,7 +58,7 @@
  */
 
 #include "k5-int.h"
-#include "krb5/adm.h"
+#include <kdb.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -455,7 +455,7 @@ add_key_pwd(context, master_key, ks_tuple, ks_tuple_count, passwd,
  * As a side effect all old keys are nuked if keepold is false.
  */
 krb5_error_code
-krb5_dbe_cpw(context, master_key, ks_tuple, ks_tuple_count, passwd,
+krb5_dbe_def_cpw(context, master_key, ks_tuple, ks_tuple_count, passwd,
 	     new_kvno, keepold, db_entry)
     krb5_context	  context;
     krb5_keyblock       * master_key;
@@ -504,6 +504,7 @@ krb5_dbe_cpw(context, master_key, ks_tuple, ks_tuple_count, passwd,
 	    db_entry->key_data[i+n_new_key_data] = key_data[i];
 	    memset(&key_data[i], 0, sizeof(krb5_key_data));
 	}
+	krb5_db_free( context, key_data );
     } else {
 	cleanup_key_data(context, key_data_count, key_data);
     }

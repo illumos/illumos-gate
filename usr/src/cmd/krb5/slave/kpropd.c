@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * 
  * All rights reserved.
@@ -199,6 +199,7 @@ main(argc, argv)
 	krb5_error_code retval;
 	int ret = 0;
 	kdb_log_context	*log_ctx;
+	int iprop_supported;
 
 	PRS(argc, argv);
 
@@ -208,6 +209,21 @@ main(argc, argv)
 		/*
 		 * We wanna do iprop !
 		 */
+		retval = krb5_db_supports_iprop(kpropd_context,
+		    &iprop_supported);
+		if (retval) {
+			com_err(progname, retval,
+				gettext("Can not determine if dbmodule plugin "
+					    "supports iprop.\n"));
+			exit(1);
+		}
+		if (!iprop_supported) {
+			com_err(progname, retval,
+				gettext("Current dbmodule plugin does not support "
+				    "iprop.\n"));
+			exit(1);
+		}
+
 		retval = do_iprop(log_ctx);
 		if (retval) {
 			com_err(progname, retval,
@@ -619,6 +635,7 @@ reinit:
 				    &params,
 				    KADM5_STRUCT_VERSION,
 				    KADM5_API_VERSION_2,
+				    NULL,
  				    &server_handle);
 
 	if (retval) {

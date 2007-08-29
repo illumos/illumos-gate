@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.
 #include <sys/types.h>
 #include <krb5.h>
 #include <rpc/rpc.h> /* SUNWresync121 XXX */
-#include "adb.h"
+#include "server_internal.h"
 #include "admin_xdr.h"
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
@@ -123,38 +123,13 @@ xdr_osa_princ_ent_rec(XDR *xdrs, osa_princ_ent_t objp)
     return (TRUE);
 }
 
-bool_t
-xdr_osa_policy_ent_rec(XDR *xdrs, osa_policy_ent_t objp)
+void
+osa_free_princ_ent(osa_princ_ent_t val)
 {
-    switch (xdrs->x_op) {
-    case XDR_ENCODE:
-	 objp->version = OSA_ADB_POLICY_VERSION_1;
-	 /* fall through */
-    case XDR_FREE:
-	 if (!xdr_int(xdrs, &objp->version))
-	      return FALSE;
-	 break;
-    case XDR_DECODE:
-	 if (!xdr_int(xdrs, &objp->version))
-	      return FALSE;
-	 if (objp->version != OSA_ADB_POLICY_VERSION_1)
-	      return FALSE;
-	 break;
-    }
-    
-    if(!xdr_nullstring(xdrs, &objp->name))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->pw_min_life))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->pw_max_life))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->pw_min_length))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->pw_min_classes))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->pw_history_num))
-	return (FALSE);
-    if (!xdr_u_int(xdrs, &objp->policy_refcnt))
-	return (FALSE);
-    return (TRUE);
+    XDR xdrs;
+                                                                                                                            
+    xdrmem_create(&xdrs, NULL, 0, XDR_FREE);
+                                                                                                                            
+    xdr_osa_princ_ent_rec(&xdrs, val);
+    free(val);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,31 +54,11 @@
  * This version knows about DBM format databases.
  */
 
-#define KDB5_DISPATCH
-#define KRB5_KDB5_DBM__
-#include <k5-int.h>
-/* #define these to avoid an indirection function; for future implementations,
-   these may be redirected from a dispatch table/routine */
-#define krb5_dbm_db_set_name krb5_db_set_name
-#define krb5_dbm_db_set_nonblocking krb5_db_set_nonblocking
-#define krb5_dbm_db_init krb5_db_init
-#define krb5_dbm_db_get_age krb5_db_get_age
-#define krb5_dbm_db_create krb5_db_create
-#define krb5_dbm_db_rename krb5_db_rename
-#define krb5_dbm_db_get_principal krb5_db_get_principal
-#define krb5_dbm_db_free_principal krb5_db_free_principal
-#define krb5_dbm_db_put_principal krb5_db_put_principal
-#define krb5_dbm_db_delete_principal krb5_db_delete_principal
-#define krb5_dbm_db_lock krb5_db_lock
-#define krb5_dbm_db_unlock krb5_db_unlock
-#define krb5_dbm_db_set_lockmode krb5_db_set_lockmode
-#define krb5_dbm_db_close_database krb5_db_close_database
-#define krb5_dbm_db_open_database krb5_db_open_database
-
+#include "k5-int.h"
 #include <stdio.h>
 #include "com_err.h"
 #include <kadm5/admin.h>
-#include <kadm5/adb.h>
+#include <kdb.h>
 #include <libintl.h>
 #include "kdb5_util.h"
 
@@ -97,13 +77,24 @@ kdb5_destroy(argc, argv)
     int optchar;
     char *dbname;
     char buf[5];
-    krb5_error_code retval, retval1, retval2;
+    krb5_error_code retval1;
     krb5_context context;
     int force = 0;
     char ufilename[MAX_FILENAME];
 
-    krb5_init_context(&context);
+    retval1 = kadm5_init_krb5_context(&context);
+    if( retval1 )
+    {
+	com_err(argv[0], retval1, "while initializing krb5_context");
+	exit(1);
+    }
 
+    if ((retval1 = krb5_set_default_realm(context,
+					  util_context->default_realm))) {
+	com_err(argv[0], retval1, "while setting default realm name");
+	exit(1);
+    }
+    
     if (strrchr(argv[0], '/'))
 	argv[0] = strrchr(argv[0], '/')+1;
 
@@ -141,12 +132,7 @@ kdb5_destroy(argc, argv)
 	printf(gettext("OK, deleting database '%s'...\n"), dbname);
     }
 
-    retval = krb5_db_set_name(context, dbname);
-    if (retval) {
-	com_err(argv[0], retval, "'%s'",dbname);
-	exit_status++; return;
-    }
-    retval1 = krb5_db_destroy(context, dbname);
+    retval1 = krb5_db_destroy(context, db5util_db_args);
 
     /* check for a stash file and delete it if necessary */
     if (global_params.stash_file == NULL) {
@@ -168,16 +154,10 @@ kdb5_destroy(argc, argv)
     if (!access(global_params.stash_file, F_OK))
 	(void)unlink(global_params.stash_file);
 
-    retval2 = osa_adb_destroy_policy_db(&global_params);
     if (retval1) {
 		com_err(argv[0], retval1,
 			gettext("deleting database '%s'"), dbname);
 	exit_status++; return;
-    }
-    if (retval2) {
-		com_err(argv[0], retval2,
-			gettext("destroying policy database"));
-	 exit_status++; return;
     }
 
     if (global_params.iprop_enabled) {

@@ -86,31 +86,11 @@
 #define	_RPC_RPC_H
 
 #include <stdio.h>
-#define KDB5_DISPATCH
-#define KRB5_KDB5_DBM__
 #include <k5-int.h>
-/* #define these to avoid an indirection function; for future implementations,
-   these may be redirected from a dispatch table/routine */
-#define krb5_dbm_db_set_name krb5_db_set_name
-#define krb5_dbm_db_set_nonblocking krb5_db_set_nonblocking
-#define krb5_dbm_db_init krb5_db_init
-#define krb5_dbm_db_get_age krb5_db_get_age
-#define krb5_dbm_db_create krb5_db_create
-#define krb5_dbm_db_rename krb5_db_rename
-#define krb5_dbm_db_get_principal krb5_db_get_principal
-#define krb5_dbm_db_free_principal krb5_db_free_principal
-#define krb5_dbm_db_put_principal krb5_db_put_principal
-#define krb5_dbm_db_delete_principal krb5_db_delete_principal
-#define krb5_dbm_db_lock krb5_db_lock
-#define krb5_dbm_db_unlock krb5_db_unlock
-#define krb5_dbm_db_set_lockmode krb5_db_set_lockmode
-#define krb5_dbm_db_close_database krb5_db_close_database
-#define krb5_dbm_db_open_database krb5_db_open_database
-
 #include <kadm5/admin.h>
 #include <rpc/types.h>
+#include <krb5/adm_proto.h>
 #include <rpc/xdr.h>
-#include <kadm5/adb.h>
 #include <time.h>
 #include <libintl.h>
 #include <locale.h>
@@ -131,14 +111,13 @@ char *mkey_password = 0;
 
 int exit_status = 0;
 krb5_context util_context;
-osa_adb_policy_t policy_db;
 kadm5_config_params global_params;
 
 void usage()
 {
      fprintf(stderr, "%s: "
-	   "kdb5_util [-r realm] [-d dbname] [-k mkeytype] [-M mkeyname]\n"
-	     "\t         [-f | -sf stashfilename] [-P password] [-m] cmd [cmd_options]\n"
+	   "kdb5_util [-x db_args]* [-r realm] [-d dbname] [-k mkeytype] [-M mkeyname]\n"
+	     "\t        [-sf stashfilename] [-P password] [-m] cmd [cmd_options]\n"
 	     "\tcreate	[-s]\n"
 	     "\tdestroy	[-f]\n"
 	     "\tstash	[-f keyfile]\n"
@@ -146,11 +125,10 @@ void usage()
 	     "\t	[-mkey_convert] [-new_mkey_file mkey_file]\n"
 	     "\t	[-rev] [-recurse] [filename [princs...]]\n"
 	     "\tload	[-old] [-ov] [-b6] [-verbose] [-update] filename\n"
-#ifdef SUNWOFF
-	     "\tload_v4	[-t] [-n] [-v] [-K] [-s stashfile] inputfile\n"
-#endif
-	     "\tark	[-e etype_list] principal\n",
-	    gettext("Usage"));
+	     "\tark	[-e etype_list] principal\n"
+	     "\nwhere,\n\t[-x db_args]* - any number of database specific arguments.\n"
+	     "\t\t\tLook at each database documentation for supported arguments\n",
+		gettext("Usage"));
      exit(1);
 }
 
@@ -158,7 +136,6 @@ krb5_keyblock master_key;
 extern krb5_principal master_princ;
 krb5_db_entry master_entry;
 int	valid_master_key = 0;
-int     close_policy_db = 0;
 
 char *progname;
 krb5_boolean manual_mkey = FALSE;
@@ -199,17 +176,51 @@ static struct _cmd_table *cmd_lookup(name)
 }
 
 #define ARG_VAL (--argc > 0 ? (koptarg = *(++argv)) : (char *)(usage(), NULL))
+
+char **db5util_db_args = NULL;
+int    db5util_db_args_size = 0;
      
+static void extended_com_err_fn (const char *myprog, errcode_t code,
+				 const char *fmt, va_list args)
+{
+    const char *emsg;
+    if (code) {
+	emsg = krb5_get_error_message (util_context, code);
+	fprintf (stderr, "%s: %s ", myprog, emsg);
+	krb5_free_error_message (util_context, emsg);
+    } else {
+	fprintf (stderr, "%s: ", myprog);
+    }
+    vfprintf (stderr, fmt, args);
+    fprintf (stderr, "\n");
+}
+
+int add_db_arg(char *arg)
+{
+    char **temp;
+    db5util_db_args_size++;
+    temp = realloc(db5util_db_args,
+		   sizeof(char *) * (db5util_db_args_size + 1));
+    if (temp == NULL)
+	return 0;
+    db5util_db_args = temp;
+    db5util_db_args[db5util_db_args_size-1] = arg;
+    db5util_db_args[db5util_db_args_size]   = NULL;
+    return 1;
+}
+
 int main(argc, argv)
     int argc;
     char *argv[];
 {
     struct _cmd_table *cmd = NULL;
     char *koptarg, **cmd_argv;	
+    char *db_name_tmp = NULL;
     int cmd_argc;
     krb5_error_code retval;
 
 	(void) setlocale(LC_ALL, "");
+    set_com_err_hook(extended_com_err_fn);
 
 #if !defined(TEXT_DOMAIN)  /* Should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it weren't */
@@ -220,7 +231,7 @@ int main(argc, argv)
 	Err_no_master_msg = gettext("Master key not entered!\n");
 	Err_no_database = gettext("Database not currently opened!\n");
 
-    retval = krb5_init_context(&util_context);
+    retval = kadm5_init_krb5_context(&util_context);
     if (retval) {
 	    com_err (progname, retval, 
 		gettext("while initializing Kerberos code"));
@@ -246,6 +257,28 @@ int main(argc, argv)
        } else if (strcmp(*argv, "-d") == 0 && ARG_VAL) {
 	    global_params.dbname = koptarg;
 	    global_params.mask |= KADM5_CONFIG_DBNAME;
+
+	    db_name_tmp = malloc( strlen(global_params.dbname) + sizeof("dbname="));
+	    if( db_name_tmp == NULL )
+	    {
+		com_err(progname, ENOMEM, "while parsing command arguments");
+		exit(1);
+	    }
+
+	    strcpy( db_name_tmp, "dbname=");
+	    strcat( db_name_tmp, global_params.dbname );
+
+	    if (!add_db_arg(db_name_tmp)) {
+		com_err(progname, ENOMEM, "while parsing command arguments\n");
+		exit(1);
+	    }
+
+       } else if (strcmp(*argv, "-x") == 0 && ARG_VAL) {
+	   if (!add_db_arg(koptarg)) {
+		com_err(progname, ENOMEM, "while parsing command arguments\n");
+		exit(1);
+	   }
+
        } else if (strcmp(*argv, "-r") == 0 && ARG_VAL) {
 	    global_params.realm = koptarg;
 	    global_params.mask |= KADM5_CONFIG_REALM;
@@ -258,11 +291,8 @@ int main(argc, argv)
 		 exit(1);
 	    }
        } else if (strcmp(*argv, "-k") == 0 && ARG_VAL) {
-			if (krb5_string_to_enctype(koptarg,
-						    &global_params.enctype))
-				com_err(argv[0], 0,
-					gettext("%s is an invalid enctype"),
-					koptarg);
+	    if (krb5_string_to_enctype(koptarg, &global_params.enctype))
+		 com_err(argv[0], 0, gettext("%s is an invalid enctype"), koptarg);
 	    else
 		 global_params.mask |= KADM5_CONFIG_ENCTYPE;
        } else if (strcmp(*argv, "-M") == 0 && ARG_VAL) {
@@ -324,9 +354,12 @@ int main(argc, argv)
 
     (*cmd->func)(cmd_argc, cmd_argv);
 
-    if(close_policy_db) {
-         (void) osa_adb_close_policy(policy_db);
-    }      
+    if( db_name_tmp )
+	free( db_name_tmp );
+
+    if( db5util_db_args )
+	free(db5util_db_args);
+
     kadm5_free_config_params(util_context, &global_params);
     krb5_free_context(util_context);
     return exit_status;
@@ -351,15 +384,14 @@ void set_dbname(argc, argv)
 	return;
     }
     if (dbactive) {
-		if ((retval = krb5_db_fini(util_context)) &&
-				retval != KRB5_KDB_DBNOTINITED) {
-			com_err(argv[0], retval,
-				gettext("while closing previous database"));
+	if ((retval = krb5_db_fini(util_context)) && retval!= KRB5_KDB_DBNOTINITED) {
+	    com_err(argv[0], retval, gettext("while closing previous database"));
 	    exit_status++;
 	    return;
 	}
 	if (valid_master_key) {
 	    krb5_free_keyblock_contents(util_context, &master_key);
+	    master_key.contents = NULL;
 	    valid_master_key = 0;
 	}
 	krb5_free_principal(util_context, master_princ);
@@ -390,24 +422,11 @@ static int open_db_and_mkey()
     dbactive = FALSE;
     valid_master_key = 0;
 
-    if ((retval = krb5_db_set_name(util_context, global_params.dbname))) {
-		com_err(progname, retval,
-		    gettext("while setting active database to '%s'"),
-		global_params.dbname);
+    if ((retval = krb5_db_open(util_context, db5util_db_args, 
+			       KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN))) {
+	com_err(progname, retval, "while initializing database");
 	exit_status++;
 	return(1);
-    } 
-    if ((retval = krb5_db_init(util_context))) {
-		com_err(progname, retval,
-		    gettext("while initializing database"));
-	exit_status++;
-	return(1);
-    }
-    if ((retval = osa_adb_open_policy(&policy_db, &global_params))) {
-		com_err(progname, retval,
-		    gettext("opening policy database"));
-	 exit_status++;
-	return (1);
     }
 
    /* assemble & parse the master key name */
@@ -598,7 +617,7 @@ add_random_key(argc, argv)
     }
     if (more) {
 	fprintf(stderr, gettext("principal %s not unique\n"), pr_str);
-	krb5_dbe_free_contents(util_context, &dbent);
+	krb5_db_free_principal(util_context, &dbent, 1);
 	exit_status++;
 	return;
     }
@@ -624,7 +643,7 @@ add_random_key(argc, argv)
 	free(keysalts);
     if (ret) {
 	com_err(me, ret, gettext("while randomizing principal %s"), pr_str);
-	krb5_dbe_free_contents(util_context, &dbent);
+	krb5_db_free_principal(util_context, &dbent, 1);
 	exit_status++;
 	return;
     }
@@ -632,19 +651,19 @@ add_random_key(argc, argv)
     ret = krb5_timeofday(util_context, &now);
     if (ret) {
 	com_err(me, ret, gettext("while getting time"));
-	krb5_dbe_free_contents(util_context, &dbent);
+	krb5_db_free_principal(util_context, &dbent, 1);
 	exit_status++;
 	return;
     }
     ret = krb5_dbe_update_last_pwd_change(util_context, &dbent, now);
     if (ret) {
 	com_err(me, ret, gettext("while setting changetime"));
-	krb5_dbe_free_contents(util_context, &dbent);
+	krb5_db_free_principal(util_context, &dbent, 1);
 	exit_status++;
 	return;
     }
     ret = krb5_db_put_principal(util_context, &dbent, &n);
-    krb5_dbe_free_contents(util_context, &dbent);
+    krb5_db_free_principal(util_context, &dbent, 1);
     if (ret) {
 	com_err(me, ret, gettext("while saving principal %s"), pr_str);
 	exit_status++;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,7 +224,8 @@ kpasswd(context, argc, argv)
 
 	code = kadm5_init_with_password(princ_str, password, cpw_service,
 					&params, KADM5_STRUCT_VERSION,
-					KADM5_API_VERSION_2, &server_handle);
+					KADM5_API_VERSION_2, NULL,
+					&server_handle);
 	free(cpw_service);
 	if (code != 0) {
 		if (code == KADM5_BAD_PASSWORD)

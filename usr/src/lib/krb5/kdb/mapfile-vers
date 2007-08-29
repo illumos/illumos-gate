@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,34 +30,40 @@
 # Don't add any symbols to this version.
 
 SUNW_1.1 {
-    global:
+	global:
 	SUNW_1.1;
 };
 
 SUNWprivate_1.1 {
-    global:
-	krb5_db_close_database;
+	global:
+	krb5_db_alloc;
 	krb5_db_create;
+	krb5_db_create_policy;
+	krb5_db_delete_policy;
 	krb5_db_delete_principal;
 	krb5_db_destroy;
 	krb5_db_fetch_mkey;
 	krb5_db_fini;
+	krb5_db_free;
+	krb5_db_free_policy;
 	krb5_db_free_principal;
 	krb5_db_get_age;
 	krb5_db_get_mkey;
+	krb5_db_get_policy;
 	krb5_db_get_principal;
-	krb5_db_init;
+	krb5_db_get_principal_nolock;
+	krb5_db_inited;
 	krb5_db_iterate;
-	krb5_db_iterate_ext;
+	krb5_db_iter_policy;
 	krb5_db_lock;
-	krb5_db_open_database;
+	krb5_db_open;
+	krb5_db_promote;
 	krb5_db_put_principal;
-	krb5_db_rename;
-	krb5_db_set_lockmode;
+	krb5_db_put_policy;
 	krb5_db_set_mkey;
-	krb5_db_set_name;
 	krb5_db_setup_mkey_name;
-	krb5_db_store_mkey;
+	krb5_db_store_master_key;
+	krb5_db_supports_iprop;
 	krb5_db_unlock;
 	krb5_db_verify_master_key;
 	krb5_dbe_apw;
@@ -66,7 +72,6 @@ SUNWprivate_1.1 {
 	krb5_dbe_create_key_data;
 	krb5_dbe_crk;
 	krb5_dbe_find_enctype;
-	krb5_dbe_free_contents;
 	krb5_dbe_lookup_last_pwd_change;
 	krb5_dbe_lookup_mod_princ_data;
 	krb5_dbe_lookup_tl_data;
@@ -76,11 +81,7 @@ SUNWprivate_1.1 {
 	krb5_dbe_update_tl_data;
 	krb5_dbekd_decrypt_key_data;
 	krb5_dbekd_encrypt_key_data;
-	krb5_decode_princ_contents;
-	krb5_encode_princ_contents;
-	krb5_encode_princ_dbkey;
-	krb5_free_princ_contents;
-	krb5_free_princ_dbkey;
+	krb5_def_store_mkey;
 	krb5_kt_kdb_ops;
 	krb5_ktkdb_close;
 	krb5_ktkdb_get_entry;
@@ -88,12 +89,15 @@ SUNWprivate_1.1 {
 	krb5_ktkdb_set_context;
 	krb5_mkey_pwd_prompt1;
 	krb5_mkey_pwd_prompt2;
-	krb5_ser_db_context_init;
+	ulog_add_update;
+	ulog_conv_2logentry;
+	ulog_delete_update;
+	ulog_finish_update;
 	ulog_free_entries;
 	ulog_get_entries;
 	ulog_map;
 	ulog_replay;
 	ulog_set_role;
-    local:
+	local:
 	*;
 };

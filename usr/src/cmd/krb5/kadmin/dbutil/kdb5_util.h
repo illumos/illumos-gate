@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,12 +62,19 @@ extern "C" {
 
 extern char *progname;
 extern char *Err_no_database;
+#ifndef V4_DECLARES_STATIC
+extern krb5_keyblock master_keyblock;
+extern krb5_principal master_princ;
+#endif
 extern krb5_boolean dbactive;
 extern int exit_status;
 extern krb5_context util_context;
 extern kadm5_config_params global_params;
 extern int valid_master_key;
 extern krb5_db_entry master_db;
+extern char **db5util_db_args;
+extern int    db5util_db_args_size;
+extern int add_db_arg(char *arg);
 
 extern void usage(void);
 
@@ -95,8 +102,7 @@ extern int kadm5_create_magic_princs (kadm5_config_params *params,
 
 extern int process_ov_principal (char *fname, krb5_context kcontext, 
 					   FILE *filep, int verbose, 
-					   int *linenop,
-					   void *pol_db);
+					   int *linenop);
 
 extern void load_db (int argc, char **argv);
 extern void dump_db (int argc, char **argv);

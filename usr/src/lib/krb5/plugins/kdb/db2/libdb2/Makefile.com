@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,7 +75,7 @@ OBJECTS= \
 	$(BTREE_OBJS) $(DB_OBJS) $(HASH_OBJS) $(MPOOL_OBJS) $(RECNO_OBJS)
 
 # include library definitions
-include ../../Makefile.lib
+include $(SRC)/lib/krb5/Makefile.lib
 
 SRCS=	$(BTREE_OBJS:%.o=../btree/%.c) \
 	$(DB_OBJS:%.o=../db/%.c) \
@@ -94,12 +94,12 @@ POFILES = generic.po
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
 CPPFLAGS += 	-DHAVE_CONFIG_H \
-		-I$(SRC)/lib/krb5/db2/mpool \
-		-I$(SRC)/lib/krb5/db2/db \
-		-I$(SRC)/lib/krb5/db2/hash \
-		-I$(SRC)/lib/krb5/db2/btree \
-		-I$(SRC)/lib/krb5/db2/recno \
-		-I$(SRC)/lib/krb5/db2/include \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/mpool \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/db \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/hash \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/btree \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/recno \
+		-I$(SRC)/lib/krb5/plugins/kdb/db2/libdb2/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include  #for db-ndbm.h
 
 CFLAGS +=	$(CCVERBOSE) -I..
@@ -117,7 +117,7 @@ all:	$(LIBS)
 lint:	lintcheck
 
 # include library targets
-include ../../Makefile.targ
+include $(SRC)/lib/krb5/Makefile.targ
 
 pics/%.o: ../btree/%.c
 	$(COMPILE.c)  -o $@ $<

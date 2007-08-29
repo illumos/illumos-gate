@@ -110,7 +110,8 @@ fetch_princ_entry(
 
 	code = kadm5_init_with_password(kprinc, password, cpw_service,
 					&params, KADM5_STRUCT_VERSION,
-					KADM5_API_VERSION_2, &server_handle);
+					KADM5_API_VERSION_2, NULL,
+					&server_handle);
 	if (code != 0) {
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,

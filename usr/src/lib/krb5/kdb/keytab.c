@@ -143,18 +143,18 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
 
     /* Open database */
     /* krb5_db_init(context); */
-    if ((kerror = krb5_db_open_database(context)))
+    if ((kerror = krb5_db_inited(context)))
         return(kerror);
 
     /* get_principal */
     kerror = krb5_db_get_principal(context, principal, &
 				       db_entry, &n, &more);
     if (kerror) {
-        krb5_db_close_database(context);
+        /* krb5_db_close_database(context); */
         return(kerror);
     }
     if (n != 1) {
-	krb5_db_close_database(context);
+	/* krb5_db_close_database(context); */
 	return KRB5_KT_NOTFOUND;
     }
 
@@ -208,8 +208,8 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
 
     /* Close database */
   error:
-    krb5_dbe_free_contents(context, &db_entry);
-    krb5_db_close_database(context);
+    krb5_db_free_principal(context, &db_entry, 1);
+    /* krb5_db_close_database(context); */
     return(kerror);
 }
 

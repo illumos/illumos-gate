@@ -21,11 +21,15 @@
 #include    <unistd.h>
 #include    <string.h>
 #include    <stdlib.h>
+#include    "autoconf.h"
 #ifdef HAVE_MEMORY_H
 #include    <memory.h>
 #endif
 
-#include    <kadm5/adb.h>
+#include    <k5-int.h>
+#include <kadm5/admin.h>
+#include <kadm5/server_internal.h>
+#include    <kdb.h>
 #include    "import_err.h"
 #include    "kdb5_util.h"
 #include    "nstrtok.h"
@@ -112,17 +116,16 @@ done:
  *	[modifies]
  * 
  */
-int process_ov_principal(fname, kcontext, filep, verbose, linenop, pol_db)
+int process_ov_principal(fname, kcontext, filep, verbose, linenop)
     char		*fname;
     krb5_context	kcontext;
     FILE		*filep;
     int			verbose;
     int			*linenop;
-    void *pol_db;
 {
     XDR			    xdrs;
     osa_princ_ent_t	    rec;
-    osa_adb_ret_t	    ret;
+    krb5_error_code	    ret;
     krb5_tl_data	    tl_data;
     krb5_principal	    princ;
     krb5_db_entry	    kdb;
@@ -197,7 +200,7 @@ int process_ov_principal(fname, kcontext, filep, verbose, linenop, pol_db)
     xdralloc_create(&xdrs, XDR_ENCODE);
     if (! xdr_osa_princ_ent_rec(&xdrs, rec)) {
 	 xdr_destroy(&xdrs);
-	 ret = OSA_ADB_XDR_FAILURE;
+	 ret = KADM5_XDR_FAILURE;
 	 goto done;
     }
 

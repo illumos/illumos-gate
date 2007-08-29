@@ -60,31 +60,12 @@
 #define	_RPC_RPC_H
 
 #include <stdio.h>
-#define KDB5_DISPATCH
-#define KRB5_KDB5_DBM__
 #include <k5-int.h>
-/* #define these to avoid an indirection function; for future implementations,
-   these may be redirected from a dispatch table/routine */
-#define krb5_dbm_db_set_name krb5_db_set_name
-#define krb5_dbm_db_set_nonblocking krb5_db_set_nonblocking
-#define krb5_dbm_db_init krb5_db_init
-#define krb5_dbm_db_get_age krb5_db_get_age
-#define krb5_dbm_db_create krb5_db_create
-#define krb5_dbm_db_rename krb5_db_rename
-#define krb5_dbm_db_get_principal krb5_db_get_principal
-#define krb5_dbm_db_free_principal krb5_db_free_principal
-#define krb5_dbm_db_put_principal krb5_db_put_principal
-#define krb5_dbm_db_delete_principal krb5_db_delete_principal
-#define krb5_dbm_db_lock krb5_db_lock
-#define krb5_dbm_db_unlock krb5_db_unlock
-#define krb5_dbm_db_set_lockmode krb5_db_set_lockmode
-#define krb5_dbm_db_close_database krb5_db_close_database
-#define krb5_dbm_db_open_database krb5_db_open_database
-
+#include <krb5/kdb.h>
+#include <kadm5/server_internal.h>
 #include <kadm5/admin.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
-#include <kadm5/adb.h>
 #include <libintl.h>
 #include "kdb5_util.h"
 
@@ -172,7 +153,6 @@ extern char *mkey_password;
 
 extern char *progname;
 extern int exit_status;
-extern osa_adb_policy_t policy_db;
 extern kadm5_config_params global_params;
 extern krb5_context util_context;
 
@@ -187,7 +167,6 @@ void kdb5_create(argc, argv)
     char *pw_str = 0;
     unsigned int pw_size = 0;
     int do_stash = 0;
-    krb5_int32 crflags = KRB5_KDB_CREATE_BTREE;
     krb5_data pwd, seed;
     kdb_log_context *log_ctx;
     krb5_keyblock mkey;
@@ -202,7 +181,11 @@ void kdb5_create(argc, argv)
 	    do_stash++;
 	    break;
 	case 'h':
-	    crflags = KRB5_KDB_CREATE_HASH;
+	    if (!add_db_arg("hash=true")) {
+		com_err(progname, ENOMEM, "while parsing command arguments\n");
+		exit(1);
+	    }
+	    break;
 	case '?':
 	default:
 	    usage();
@@ -219,16 +202,6 @@ void kdb5_create(argc, argv)
 
     log_ctx = util_context->kdblog_context;
 
-    retval = krb5_db_set_name(util_context, global_params.dbname);
-    if (!retval) retval = EEXIST;
-
-    if (retval == EEXIST || retval == EACCES || retval == EPERM) {
-	/* it exists ! */
-		com_err(argv[0], 0,
-			gettext("The database '%s' appears to already exist"),
-		global_params.dbname);
-	exit_status++; return;
-    }
 /* SUNW14resync XXX */
 #if 0
     printf ("Loading random data\n");
@@ -317,14 +290,14 @@ void kdb5_create(argc, argv)
 	exit_status++; 
 	goto cleanup;
     }
-    if ((retval = krb5_db_create(util_context,
-				 global_params.dbname, crflags))) {
+    if ((retval = krb5_db_create(util_context, db5util_db_args))) {
 	com_err(argv[0], retval, 
 		gettext("while creating database '%s'"),
 		global_params.dbname);
 	exit_status++;
 	goto cleanup;
     }
+#if 0 /************** Begin IFDEF'ed OUT *******************************/
     if (retval = krb5_db_fini(util_context)) {
 	com_err(argv[0], retval,
 		gettext("while closing current database"));
@@ -345,7 +318,9 @@ void kdb5_create(argc, argv)
 	exit_status++;
 	goto cleanup;
     }
+#endif /**************** END IFDEF'ed OUT *******************************/	
 
+    /* Solaris Kerberos: for iprop */
     if (log_ctx && log_ctx->iproprole) {
 	if (retval = ulog_map(util_context, &global_params, FKCOMMAND)) {
 		com_err(argv[0], retval,
@@ -373,13 +348,10 @@ void kdb5_create(argc, argv)
 	log_ctx->iproprole = IPROP_NULL;
     }
 
-    if ((retval = add_principal(util_context,
-		    master_princ, MASTER_KEY, &rblock, &mkey)) ||
-	(retval = add_principal(util_context,
-			    &tgt_princ, TGT_KEY, &rblock, &mkey))) {
+    if ((retval = add_principal(util_context, master_princ, MASTER_KEY, &rblock, &mkey)) ||
+	(retval = add_principal(util_context, &tgt_princ, TGT_KEY, &rblock, &mkey))) {
 	(void) krb5_db_fini(util_context);
-	com_err(argv[0], retval,
-	    gettext("while adding entries to the database"));
+	com_err(argv[0], retval, gettext("while adding entries to the database"));
 	exit_status++;
 	goto cleanup;
     }
@@ -388,10 +360,12 @@ void kdb5_create(argc, argv)
      * it; delete the file below if it was not requested.  DO NOT EXIT
      * BEFORE DELETING THE KEYFILE if do_stash is not set.
      */
-    retval = krb5_db_store_mkey(util_context,
-			    global_params.stash_file,
-			    master_princ,
-			    &mkey);
+    retval = krb5_db_store_master_key(util_context,
+				      global_params.stash_file,
+				      master_princ,
+				      &mkey,
+				      mkey_password);
+
     if (retval) {
 	com_err(argv[0], errno, gettext("while storing key"));
 	printf(gettext("Warning: couldn't stash master key.\n"));
@@ -407,6 +381,7 @@ void kdb5_create(argc, argv)
     }
     if (!do_stash) unlink(global_params.stash_file);
 
+/* Solaris Kerberos: deal with master_keyblock in better way */
 cleanup:
     if (pw_str) {
 	if (mkey_password == pw_str)
@@ -534,9 +509,13 @@ add_principal(context, princ, op, pblock, mkey)
 	break;
     }
 
+    entry.mask = (KADM5_KEY_DATA | KADM5_PRINCIPAL | KADM5_ATTRIBUTES |
+	KADM5_MAX_LIFE | KADM5_MAX_RLIFE | KADM5_TL_DATA |
+	KADM5_PRINC_EXPIRE_TIME);
+
     retval = krb5_db_put_principal(context, &entry, &nentries);
 
 error_out:;
-    krb5_dbe_free_contents(context, &entry);
+    krb5_db_free_principal(context, &entry, 1);
     return retval;
 }

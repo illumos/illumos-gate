@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,18 +30,14 @@ VERS= .1
 
 # kdb
 KDBOBJS= \
-        keytab.o \
-        encrypt_key.o \
-        decrypt_key.o \
+	keytab.o \
+	encrypt_key.o \
+	decrypt_key.o \
 	kdb_convert.o \
-        kdb_cpw.o \
-        kdb_db2.o \
+	kdb_cpw.o \
+	kdb_default.o \
 	kdb_log.o \
-        kdb_xdr.o \
-        verify_mky.o \
-        fetch_mkey.o \
-        setup_mkey.o \
-        store_mkey.o
+	kdb5.o
 
 DERIVED_OBJS= \
 	iprop_xdr.o
@@ -88,7 +84,7 @@ CPPFLAGS +=	-DHAVE_CONFIG_H -DHAVE_BT_RSEQ \
 CFLAGS +=	$(CCVERBOSE) -I..
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB)
-LDLIBS +=	-L $(ROOTLIBDIR) -ldb2 -lc -lnsl
+LDLIBS +=	-lc -lnsl
 
 .KEEP_STATE:
 

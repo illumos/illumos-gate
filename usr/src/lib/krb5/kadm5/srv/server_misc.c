@@ -31,7 +31,6 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,
 #include    "k5-int.h"
 #include    <krb5/kdb.h>
 #include    <ctype.h>
-#include    "adb.h"
 #include    <pwd.h>
 
 /* for strcasecmp */
@@ -42,22 +41,18 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,
 kadm5_ret_t
 adb_policy_init(kadm5_server_handle_t handle)
 {
-    osa_adb_ret_t   ret;
-    if(handle->policy_db == (osa_adb_policy_t) NULL)
-	if((ret = osa_adb_open_policy(&handle->policy_db,
-				      &handle->params)) != OSA_ADB_OK)
-	     return ret;
-    return KADM5_OK;
+    /* now policy is initialized as part of database. No seperate call needed */
+    if( krb5_db_inited( handle->context ) )
+	return KADM5_OK;
+
+    return krb5_db_open( handle->context, NULL, 
+			 KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN );
 }
 
 kadm5_ret_t
 adb_policy_close(kadm5_server_handle_t handle)
 {
-    osa_adb_ret_t   ret;
-    if(handle->policy_db != (osa_adb_policy_t) NULL)
-	if((ret = osa_adb_close_policy(handle->policy_db)) != OSA_ADB_OK)
-	    return ret;
-    handle->policy_db = NULL;
+    /* will be taken care by database close */
     return KADM5_OK;
 }
 
@@ -159,17 +154,17 @@ passwd_check(kadm5_server_handle_t handle,
 	    return KADM5_PASS_Q_TOOSHORT;
 	s = password;
 	while ((c = *s++)) {
-	    if (islower((int) c)) {
+	    if (islower((unsigned char) c)) {
 		nlower = 1;
 		continue;
 	    }
-	    else if (isupper((int) c)) {
+	    else if (isupper((unsigned char) c)) {
 		nupper = 1;
 		continue;
-	    } else if (isdigit((int) c)) {
+	    } else if (isdigit((unsigned char) c)) {
 		ndigit = 1;
 		continue;
-	    } else if (ispunct((int) c)) {
+	    } else if (ispunct((unsigned char) c)) {
 		npunct = 1;
 		continue;
 	    } else {

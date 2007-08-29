@@ -115,7 +115,7 @@ ET=	adb_err.o adm_err.o asn1_err.o chpass_util_strings.o error_message.o \
 K5_ASN1= asn1_decode.o asn1_k_decode.o asn1_encode.o \
 	asn1_get.o asn1_make.o \
 	asn1buf.o krb5_decode.o krb5_encode.o \
-	asn1_k_encode.o asn1_misc.o
+	asn1_k_encode.o asn1_misc.o ldap_key_seq.o
 
 # krb5/ccache
 K5_CC= cc_file.o cc_memory.o ccbase.o ccfns.o ccdefault.o ccdefops.o ser_cc.o cc_retr.o cccopy.o
@@ -137,7 +137,8 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	tgtname.o  valid_times.o  walk_rtree.o appdefault.o deltat.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
 	vfy_increds.o vic_opt.o set_realm.o krb5_libinit.o chpw.o \
-	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o
+	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o kerrs.o \
+	getuid.o
 
 K5_KRB_UTS= copy_athctr.o copy_auth.o copy_cksum.o copy_key.o \
 	copy_princ.o init_ctx.o kfree.o parse.o ser_actx.o \
@@ -153,7 +154,7 @@ K5_OS=	an_to_ln.o def_realm.o ccdefname.o free_krbhs.o free_hstrl.o \
 	read_msg.o read_pwd.o realm_dom.o sendto_kdc.o sn2princ.o \
 	unlck_file.o ustime.o write_msg.o safechown.o \
 	prompter.o realm_iter.o foreachaddr.o \
-	dnsglue.o dnssrv.o thread_safe.o changepw.o getuid.o
+	dnsglue.o dnssrv.o thread_safe.o changepw.o accessor.o
 
 K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 
@@ -187,7 +188,7 @@ MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 	prof_set.o prof_get.o
 
-SUPPORT_OBJS= fake-addrinfo.o  threads.o
+SUPPORT_OBJS= fake-addrinfo.o  threads.o errors.o plugins.o
 
 OBJECTS= \
 	$(MECH)  $(MECH_UTS) \

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,11 +59,6 @@
 /* Solaris Kerberos: moved to k5-int.h */
 /* #define DEFAULT_UDP_PREF_LIMIT	 1465 */
 #define HARD_UDP_LIMIT		32700 /* could probably do 64K-epsilon ? */
-
-krb5_error_code krb5int_sendto(krb5_context, const krb5_data *,
-			    const struct addrlist *, krb5_data *,
-			    struct sockaddr_storage *,
-			    socklen_t *, int *);
 
 /* Solaris kerberos: leaving this here because other code depends on this. */
 static void default_debug_handler (const void *data, size_t len)
@@ -136,6 +131,7 @@ krb5int_debug_fprint (const char *fmt, ...)
 	case 0:
 	default:
 	    abort();
+	    break;
 	case 'E':
 	    /* %E => krb5_error_code */
 	    kerr = va_arg(args, krb5_error_code);
@@ -206,6 +202,7 @@ krb5int_debug_fprint (const char *fmt, ...)
 				  addrbuf, sizeof (addrbuf),
 				  portbuf, sizeof (portbuf),
 				  NI_NUMERICHOST | NI_NUMERICSERV))
+		/*LINTED*/
 		strcpy (addrbuf, "??"), strcpy (portbuf, "??");
 	    sprintf(tmpbuf, "%s %s.%s",
 		    (ai->ai_socktype == SOCK_DGRAM
