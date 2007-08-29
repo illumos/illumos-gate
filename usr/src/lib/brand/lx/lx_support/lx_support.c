@@ -62,6 +62,7 @@ static void usage(void) __NORETURN;
 
 #define	LXA_AUDIO_DEV		"/dev/brand/lx/audio_devctl"
 #define	INTSTRLEN		32
+#define	KVSTRLEN		10
 
 static char *bname = NULL;
 static char *zonename = NULL;
@@ -190,7 +191,7 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 
 	*idev = (char *)malloc(INTSTRLEN);
 	*odev = (char *)malloc(INTSTRLEN);
-	*kvers = (char *)malloc(INTSTRLEN);
+	*kvers = (char *)malloc(KVSTRLEN);
 	if (*idev == NULL || *odev == NULL || *kvers == NULL)
 		lxs_err(gettext("out of memory"));
 
@@ -198,7 +199,7 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 	*restart = B_FALSE;
 	bzero(*idev, INTSTRLEN);
 	bzero(*odev, INTSTRLEN);
-	bzero(*kvers, INTSTRLEN);
+	bzero(*kvers, KVSTRLEN);
 	while ((err = zonecfg_getattrent(zdh, &attrtab)) == Z_OK) {
 		if ((strcmp(attrtab.zone_attr_name, "init-restart") == 0) &&
 		    (zonecfg_get_attr_boolean(&attrtab, restart) != Z_OK))
@@ -220,9 +221,14 @@ lxs_getattrs(zone_dochandle_t zdh, boolean_t *restart, boolean_t *audio,
 			    attrtab.zone_attr_name);
 		if ((strcmp(attrtab.zone_attr_name, "kernel-version") == 0) &&
 		    (zonecfg_get_attr_string(&attrtab, *kvers,
-		    INTSTRLEN) != Z_OK))
+		    KVSTRLEN) != Z_OK))
 			lxs_err(gettext("invalid type for zone attribute: %s"),
 			    attrtab.zone_attr_name);
+	}
+
+	if (strlen(*kvers) == 0) {
+		free(*kvers);
+		*kvers = NULL;
 	}
 
 	/* some kind of error while looking up attributes */

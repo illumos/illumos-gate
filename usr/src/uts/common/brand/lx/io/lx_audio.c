@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -679,14 +679,14 @@ lxa_mmap_thread_top:
 		 * fragment we just wrote
 		 */
 		if ((rv = ldi_write(lxa_state->lxas_odev_lh,
-			    &uio, kcred)) != 0) {
+		    &uio, kcred)) != 0) {
 			cmn_err(CE_WARN, "lxa_mmap_thread: "
 			    "ldi_write() failed (%d), "
 			    "resetting audio output", rv);
 			goto lxa_mmap_thread_top;
 		}
 		if ((rv = ldi_write(lxa_state->lxas_odev_lh,
-			    &uio_null, kcred)) != 0) {
+		    &uio_null, kcred)) != 0) {
 			cmn_err(CE_WARN, "lxa_mmap_thread: "
 			    "ldi_write(eof) failed (%d), "
 			    "resetting audio output", rv);
@@ -1226,7 +1226,7 @@ lxa_mixer_set_common(lxa_state_t *lxa_state, int cmd, intptr_t arg, int mode)
 	 * that handles AUDIO_SETINFO ioctls.
 	 */
 	return (lxa_audio_setinfo(lxa_state, AUDIO_MIXERCTL_SETINFO,
-		(intptr_t)&ai, FKIOCTL));
+	    (intptr_t)&ai, FKIOCTL));
 }
 
 static int
@@ -1236,9 +1236,8 @@ lxa_mixer_get_pcm(lxa_state_t *lxa_state, intptr_t arg, int mode)
 
 	/* simply return the cached pcm mixer settings */
 	mutex_enter(&lxa_lock);
-	if (ddi_copyout(&lxa_state->lxas_zs->lxa_zs_pcm_levels,
-		(void *)arg,
-		sizeof (lxa_state->lxas_zs->lxa_zs_pcm_levels), mode) != 0) {
+	if (ddi_copyout(&lxa_state->lxas_zs->lxa_zs_pcm_levels, (void *)arg,
+	    sizeof (lxa_state->lxas_zs->lxa_zs_pcm_levels), mode) != 0) {
 		mutex_exit(&lxa_lock);
 		return (EFAULT);
 	}
@@ -1560,7 +1559,7 @@ lxa_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 
 	/* lookup the zone state structure */
 	if (mod_hash_find(lxa_zstate_hash, (mod_hash_key_t)getzonename(),
-		(mod_hash_val_t *)&lxa_zs) != 0) {
+	    (mod_hash_val_t *)&lxa_zs) != 0) {
 		return (EIO);
 	}
 
@@ -1669,8 +1668,8 @@ lxa_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 	/* get the handle for this device */
 	if (mod_hash_find(lxa_state_hash, (mod_hash_key_t)(uintptr_t)minor,
-	    (mod_hash_val_t *)&lxa_state) != 0) return
-		(EINVAL);
+	    (mod_hash_val_t *)&lxa_state) != 0)
+		return (EINVAL);
 
 	lxa_state_close(lxa_state);
 	return (0);
@@ -1780,7 +1779,7 @@ lxa_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (lxa_audio_drain(lxa_state));
 		case AUDIO_SETINFO:
 			return (lxa_audio_setinfo(lxa_state,
-				AUDIO_SETINFO, arg, mode));
+			    AUDIO_SETINFO, arg, mode));
 		case AUDIO_GETINFO:
 			return (lxa_audio_getinfo(lxa_state, arg, mode));
 		}
@@ -1791,16 +1790,16 @@ lxa_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		switch (cmd) {
 		case LXA_IOC_MIXER_GET_VOL:
 			return (lxa_mixer_get_common(lxa_state,
-				cmd, arg, mode));
+			    cmd, arg, mode));
 		case LXA_IOC_MIXER_SET_VOL:
 			return (lxa_mixer_set_common(lxa_state,
-				cmd, arg, mode));
+			    cmd, arg, mode));
 		case LXA_IOC_MIXER_GET_MIC:
 			return (lxa_mixer_get_common(lxa_state,
-				cmd, arg, mode));
+			    cmd, arg, mode));
 		case LXA_IOC_MIXER_SET_MIC:
 			return (lxa_mixer_set_common(lxa_state,
-				cmd, arg, mode));
+			    cmd, arg, mode));
 		case LXA_IOC_MIXER_GET_PCM:
 			return (lxa_mixer_get_pcm(lxa_state, arg, mode));
 		case LXA_IOC_MIXER_SET_PCM:
@@ -1994,7 +1993,7 @@ static struct dev_ops lxa_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module */
-	"linux audio driver 'lx_audio' %I%",
+	"linux audio driver",	/* description of module */
 	&lxa_ops		/* driver ops */
 };
 

@@ -1126,9 +1126,9 @@ static struct dev_ops lx_ptm_ops = {
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops,
-	"Linux master terminal driver 'lx_ptm' %I%",
-	&lx_ptm_ops
+	&mod_driverops,			/* type of module */
+	"Linux master terminal driver",	/* description of module */
+	&lx_ptm_ops			/* driver ops */
 };
 
 static struct modlinkage modlinkage = {

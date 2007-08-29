@@ -149,9 +149,9 @@ DDI_DEFINE_STREAM_OPS(zc_ops, nulldev, nulldev,	zc_attach, zc_detach, nodev, \
  */
 
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Zone console driver 'zcons' %I%",
-	&zc_ops		/* driver ops */
+	&mod_driverops, 	/* Type of module (this is a pseudo driver) */
+	"Zone console driver",	/* description of module */
+	&zc_ops			/* driver ops */
 };
 
 static struct modlinkage modlinkage = {

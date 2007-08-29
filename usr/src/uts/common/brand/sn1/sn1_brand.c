@@ -121,7 +121,9 @@ struct brand	sn1_brand = {
 };
 
 static struct modlbrand modlbrand = {
-	&mod_brandops, "Solaris N-1 Brand %I%", &sn1_brand
+	&mod_brandops,		/* type of module */
+	"Solaris N-1 Brand",	/* description of module */
+	&sn1_brand		/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
