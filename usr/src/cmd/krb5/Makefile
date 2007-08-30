@@ -35,10 +35,12 @@ _msg:	$(SUBDIRS)
 
 .KEEP_STATE:
 
-
 all clean clobber delete install lint catalog package: $(SUBDIRS)
 
 check: $(CHECKHDRS)
+
+# ldap_util has a dependency on kadmin/cli/getdate.o
+ldap_util: kadmin
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
