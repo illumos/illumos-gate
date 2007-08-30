@@ -130,7 +130,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 		len = 0;
 	}
 	if ((len = sctp_link_abort(mp, SCTP_ERR_USER_ABORT, cause, len, 0,
-		tbit)) < 0) {
+	    tbit)) < 0) {
 		freemsg(mp);
 		return;
 	}
@@ -335,8 +335,8 @@ sctp_make_err(sctp_t *sctp, uint16_t serror, void *details, size_t len)
 	sctp_parm_hdr_t *eph;
 	int pad;
 
-	if ((pad = len % 4) != 0) {
-		pad = 4 - pad;
+	if ((pad = len % SCTP_ALIGN) != 0) {
+		pad = SCTP_ALIGN - pad;
 	}
 
 	elen = sizeof (*ecp) + sizeof (*eph) + len;
@@ -368,28 +368,88 @@ sctp_make_err(sctp_t *sctp, uint16_t serror, void *details, size_t len)
 	return (emp);
 }
 
+/*
+ * Called from sctp_input_data() to add one error chunk to the error
+ * chunks list.  The error chunks list will be processed at the end
+ * of sctp_input_data() by calling sctp_process_err().
+ */
 void
-sctp_send_err(sctp_t *sctp, mblk_t *emp, sctp_faddr_t *dest)
+sctp_add_err(sctp_t *sctp, uint16_t serror, void *details, size_t len,
+    sctp_faddr_t *dest)
 {
-	mblk_t	*sendmp;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_stack_t *sctps = sctp->sctp_sctps;
+	mblk_t *emp;
+	uint32_t emp_len;
+	uint32_t mss;
+	mblk_t *sendmp;
+	sctp_faddr_t *fp;
 
-	sendmp = sctp_make_sack(sctp, dest, NULL);
-	if (sendmp != NULL) {
-		linkb(sendmp, emp);
+	emp = sctp_make_err(sctp, serror, details, len);
+	if (emp == NULL)
+		return;
+	emp_len = MBLKL(emp);
+	if (sctp->sctp_err_chunks != NULL) {
+		fp = SCTP_CHUNK_DEST(sctp->sctp_err_chunks);
 	} else {
-		sendmp = sctp_make_mp(sctp, dest, 0);
-		if (sendmp == NULL) {
+		fp = dest;
+		SCTP_SET_CHUNK_DEST(emp, dest);
+	}
+	mss = fp->sfa_pmss;
+
+	/*
+	 * If the current output packet cannot include the new error chunk,
+	 * send out the current packet and then add the new error chunk
+	 * to the new output packet.
+	 */
+	if (sctp->sctp_err_len + emp_len > mss) {
+		if ((sendmp = sctp_make_mp(sctp, fp, 0)) == NULL) {
 			SCTP_KSTAT(sctps, sctp_send_err_failed);
-			freemsg(emp);
+			/* Just free the latest error chunk. */
+			freeb(emp);
 			return;
 		}
-		sendmp->b_cont = emp;
-	}
-	BUMP_LOCAL(sctp->sctp_obchunks);
+		sendmp->b_cont = sctp->sctp_err_chunks;
+		sctp_set_iplen(sctp, sendmp);
+		sctp_add_sendq(sctp, sendmp);
 
+		sctp->sctp_err_chunks = emp;
+		sctp->sctp_err_len = emp_len;
+		SCTP_SET_CHUNK_DEST(emp, dest);
+	} else {
+		if (sctp->sctp_err_chunks != NULL)
+			linkb(sctp->sctp_err_chunks, emp);
+		else
+			sctp->sctp_err_chunks = emp;
+		sctp->sctp_err_len += emp_len;
+	}
+	/* Assume that we will send it out... */
+	BUMP_LOCAL(sctp->sctp_obchunks);
+}
+
+/*
+ * Called from sctp_input_data() to send out error chunks created during
+ * the processing of all the chunks in an incoming packet.
+ */
+void
+sctp_process_err(sctp_t *sctp)
+{
+	sctp_stack_t *sctps = sctp->sctp_sctps;
+	mblk_t *errmp;
+	mblk_t *sendmp;
+
+	ASSERT(sctp->sctp_err_chunks != NULL);
+	errmp = sctp->sctp_err_chunks;
+	if ((sendmp = sctp_make_mp(sctp, SCTP_CHUNK_DEST(errmp), 0)) == NULL) {
+		SCTP_KSTAT(sctps, sctp_send_err_failed);
+		freemsg(errmp);
+		goto done;
+	}
+	sendmp->b_cont = errmp;
 	sctp_set_iplen(sctp, sendmp);
 	sctp_add_sendq(sctp, sendmp);
+done:
+	sctp->sctp_err_chunks = NULL;
+	sctp->sctp_err_len = 0;
 }
 
 /*

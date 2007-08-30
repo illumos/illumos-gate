@@ -933,6 +933,8 @@ typedef struct sctp_s {
 	uint32_t	sctp_rxt_maxtsn;	/* Max TSN sent at time out */
 
 	int		sctp_pd_point;		/* Partial delivery point */
+	mblk_t		*sctp_err_chunks;	/* Error chunks */
+	uint32_t	sctp_err_len;		/* Total error chunks length */
 } sctp_t;
 
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
@@ -940,6 +942,8 @@ typedef struct sctp_s {
 extern void	sctp_ack_timer(sctp_t *);
 extern size_t	sctp_adaption_code_param(sctp_t *, uchar_t *);
 extern void	sctp_adaption_event(sctp_t *);
+extern void	sctp_add_err(sctp_t *, uint16_t, void *, size_t,
+		    sctp_faddr_t *);
 extern int	sctp_add_faddr(sctp_t *, in6_addr_t *, int, boolean_t);
 extern boolean_t sctp_add_ftsn_set(sctp_ftsn_set_t **, sctp_faddr_t *, mblk_t *,
 		    uint_t *, uint32_t *);
@@ -1073,6 +1077,7 @@ extern boolean_t sctp_param_register(IDP *, sctpparam_t *, int, sctp_stack_t *);
 extern void	sctp_partial_delivery_event(sctp_t *);
 extern int	sctp_process_cookie(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
 		    sctp_init_chunk_t **, sctp_hdr_t *, int *, in6_addr_t *);
+extern void	sctp_process_err(sctp_t *);
 extern void	sctp_process_heartbeat(sctp_t *, sctp_chunk_hdr_t *);
 extern void	sctp_process_sendq(sctp_t *);
 extern void	sctp_process_timer(sctp_t *);
@@ -1086,14 +1091,13 @@ extern mblk_t	*sctp_rexmit_packet(sctp_t *, mblk_t **, mblk_t **,
 extern void	sctp_rexmit_timer(sctp_t *, sctp_faddr_t *);
 extern sctp_faddr_t *sctp_rotate_faddr(sctp_t *, sctp_faddr_t *);
 
-extern void	sctp_sack(sctp_t *, mblk_t *);
+extern boolean_t sctp_sack(sctp_t *, mblk_t *);
 extern int	sctp_secure_restart_check(mblk_t *, sctp_chunk_hdr_t *,
 		    uint32_t, int, sctp_stack_t *);
 extern void	sctp_send_abort(sctp_t *, uint32_t, uint16_t, char *, size_t,
 		    mblk_t *, int, boolean_t);
 extern void	sctp_send_cookie_ack(sctp_t *);
 extern void	sctp_send_cookie_echo(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
-extern void	sctp_send_err(sctp_t *, mblk_t *, sctp_faddr_t *);
 extern void	sctp_send_initack(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    mblk_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);

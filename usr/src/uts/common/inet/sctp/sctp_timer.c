@@ -376,7 +376,7 @@ sctp_ack_timer(sctp_t *sctp)
 	sctp->sctp_ack_timer_running = 0;
 	sctp->sctp_sack_toggle = sctps->sctps_deferred_acks_max;
 	BUMP_MIB(&sctps->sctps_mib, sctpOutAckDelayed);
-	sctp_sack(sctp, NULL);
+	(void) sctp_sack(sctp, NULL);
 }
 
 /*

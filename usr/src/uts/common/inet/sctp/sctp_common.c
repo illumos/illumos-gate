@@ -1554,7 +1554,7 @@ int
 sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
     int sleep, sctp_stack_t *sctps)
 {
-	sctp_faddr_t *fp, *fpa, *fphead = NULL;
+	sctp_faddr_t *fp, *fphead = NULL;
 	sctp_parm_hdr_t *ph;
 	ssize_t remaining;
 	int isv4;
@@ -1589,6 +1589,8 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 	ph = (sctp_parm_hdr_t *)(init + 1);
 
 	while (ph != NULL) {
+		sctp_faddr_t *fpa = NULL;
+
 		/* params will have already been byteordered when validating */
 		if (ph->sph_type == htons(PARM_ADDR4)) {
 			if (remaining >= PARM_ADDR4_LEN) {
@@ -1597,7 +1599,7 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 				    (ph + 1), &addr);
 				fpa = kmem_cache_alloc(sctp_kmem_faddr_cache,
 				    sleep);
-				if (!fpa) {
+				if (fpa == NULL) {
 					goto done;
 				}
 				bzero(fpa, sizeof (*fpa));
@@ -1608,7 +1610,7 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 			if (remaining >= PARM_ADDR6_LEN) {
 				fpa = kmem_cache_alloc(sctp_kmem_faddr_cache,
 				    sleep);
-				if (!fpa) {
+				if (fpa == NULL) {
 					goto done;
 				}
 				bzero(fpa, sizeof (*fpa));
@@ -1616,18 +1618,14 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 				    sizeof (fpa->faddr));
 				fpa->next = NULL;
 			}
-		} else {
-			/* else not addr param; skip */
-			fpa = NULL;
 		}
 		/* link in the new addr, if it was an addr param */
-		if (fpa) {
-			if (!fphead) {
+		if (fpa != NULL) {
+			if (fphead == NULL) {
 				fphead = fpa;
-				fp = fphead;
 			} else {
-				fp->next = fpa;
-				fp = fpa;
+				fpa->next = fphead;
+				fphead = fpa;
 			}
 		}
 
@@ -1644,10 +1642,10 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 	 * in the list
 	 */
 	fp = sctp_lookup_faddr_nosctp(fphead, hdraddr);
-	if (!fp) {
+	if (fp == NULL) {
 		/* not included; add it now */
 		fp = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep);
-		if (!fp) {
+		if (fp == NULL) {
 			goto done;
 		}
 		bzero(fp, sizeof (*fp));

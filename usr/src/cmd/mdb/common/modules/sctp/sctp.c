@@ -785,7 +785,9 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    sctp.sctp_recovery_tsn, sctp.sctp_adv_pap);
 		mdb_printf("num_ostr\t%?hu\tostrcntrs\t%?p\n",
 		    sctp.sctp_num_ostr, sctp.sctp_ostrcntrs);
-		mdb_printf("pad_mp\t\t%?p\n", sctp.sctp_pad_mp);
+		mdb_printf("pad_mp\t\t%?p\terr_chunks\t%?p\n",
+		    sctp.sctp_pad_mp, sctp.sctp_err_chunks);
+		mdb_printf("err_len\t\t%?u\n", sctp.sctp_err_len);
 
 		mdb_printf("%<b>Default Send Parameters%</b>\n");
 		mdb_printf("def_stream\t%?u\tdef_flags\t%?x\n",

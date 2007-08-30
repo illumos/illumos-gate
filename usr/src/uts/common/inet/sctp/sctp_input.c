@@ -383,8 +383,8 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	/* If app asked for hopbyhop headers and it has changed ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVHOPOPTS) &&
 	    ip_cmpbuf(sctp->sctp_hopopts, sctp->sctp_hopoptslen,
-		(ipp->ipp_fields & IPPF_HOPOPTS),
-		ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
+	    (ipp->ipp_fields & IPPF_HOPOPTS),
+	    ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_hopoptslen -
 		    sctp->sctp_v6label_len;
 		if (hdrlen == 0)
@@ -399,8 +399,8 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	/* If app asked for dst headers before routing headers ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVRTDSTOPTS) &&
 	    ip_cmpbuf(sctp->sctp_rtdstopts, sctp->sctp_rtdstoptslen,
-		(ipp->ipp_fields & IPPF_RTDSTOPTS),
-		ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
+	    (ipp->ipp_fields & IPPF_RTDSTOPTS),
+	    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_rtdstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
@@ -430,8 +430,8 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	/* If app asked for dest headers and it has changed ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVDSTOPTS) &&
 	    ip_cmpbuf(sctp->sctp_dstopts, sctp->sctp_dstoptslen,
-		(ipp->ipp_fields & IPPF_DSTOPTS),
-		ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
+	    (ipp->ipp_fields & IPPF_DSTOPTS),
+	    ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_dstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
@@ -1181,7 +1181,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 {
 	sctp_data_hdr_t *dc;
 	mblk_t *dmp, *pmp;
-	mblk_t *errmp;
 	sctp_instr_t *instr;
 	int ubit;
 	int isfrag;
@@ -1209,7 +1208,6 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		sctp->sctp_force_sack = 1;				\
 	}
 
-	errmp = NULL;
 	dmp = NULL;
 
 	dc = (sctp_data_hdr_t *)ch;
@@ -1231,7 +1229,8 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		for (sp = sctp->sctp_sack_info; sp; sp = sp->next) {
 			if (SEQ_GEQ(tsn, sp->begin) && SEQ_LEQ(tsn, sp->end)) {
 				dprint(4,
-				("sctp_data_chunk: dropping dup > cumtsn\n"));
+				    ("sctp_data_chunk: dropping dup > "
+				    "cumtsn\n"));
 				sctp->sctp_force_sack = 1;
 				sctp_add_dup(dc->sdh_tsn, dups);
 				return;
@@ -1265,11 +1264,9 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		/* RESERVED to be ignored at the receiving end */
 		inval_parm[1] = 0;
 		/* ack and drop it */
-		errmp = sctp_make_err(sctp, SCTP_ERR_BAD_SID,
-		    (char *)inval_parm, sizeof (inval_parm));
+		sctp_add_err(sctp, SCTP_ERR_BAD_SID, inval_parm,
+		    sizeof (inval_parm), fp);
 		SCTP_ACK_IT(sctp, tsn);
-		if (errmp != NULL)
-			sctp_send_err(sctp, errmp, NULL);
 		return;
 	}
 
@@ -1364,7 +1361,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			for (;;) {
 				idc = (sctp_data_hdr_t *)imblk->b_rptr;
 				if (SSN_GT(ntohs(idc->sdh_ssn),
-					ntohs(dc->sdh_ssn))) {
+				    ntohs(dc->sdh_ssn))) {
 					if (instr->istr_msgs == imblk) {
 						instr->istr_msgs = dmp;
 						dmp->b_next = imblk;
@@ -1615,6 +1612,8 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 	sctp_sack_chunk_t *sc;
 	int32_t acks_max;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	uint32_t	dups_len;
+	sctp_faddr_t	*fp;
 
 	if (sctp->sctp_force_sack) {
 		sctp->sctp_force_sack = 0;
@@ -1642,8 +1641,36 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 checks_done:
 	dprint(2, ("sctp_make_sack: acking %x\n", sctp->sctp_ftsn - 1));
 
+	if (dups != NULL)
+		dups_len = MBLKL(dups);
+	else
+		dups_len = 0;
 	slen = sizeof (*sch) + sizeof (*sc) +
 	    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
+
+	/*
+	 * If there are error chunks, check and see if we can send the
+	 * SACK chunk and error chunks together in one packet.  If not,
+	 * send the error chunks out now.
+	 */
+	if (sctp->sctp_err_chunks != NULL) {
+		fp = SCTP_CHUNK_DEST(sctp->sctp_err_chunks);
+		if (sctp->sctp_err_len + slen + dups_len > fp->sfa_pmss) {
+			if ((smp = sctp_make_mp(sctp, fp, 0)) == NULL) {
+				SCTP_KSTAT(sctps, sctp_send_err_failed);
+				SCTP_KSTAT(sctps, sctp_send_sack_failed);
+				freemsg(sctp->sctp_err_chunks);
+				sctp->sctp_err_chunks = NULL;
+				sctp->sctp_err_len = 0;
+				return (NULL);
+			}
+			smp->b_cont = sctp->sctp_err_chunks;
+			sctp_set_iplen(sctp, smp);
+			sctp_add_sendq(sctp, smp);
+			sctp->sctp_err_chunks = NULL;
+			sctp->sctp_err_len = 0;
+		}
+	}
 	smp = sctp_make_mp(sctp, sendto, slen);
 	if (smp == NULL) {
 		SCTP_KSTAT(sctps, sctp_send_sack_failed);
@@ -1653,18 +1680,26 @@ checks_done:
 
 	sctp_fill_sack(sctp, smp->b_wptr, slen);
 	smp->b_wptr += slen;
-	if (dups) {
+	if (dups != NULL) {
 		sc = (sctp_sack_chunk_t *)(sch + 1);
-		sc->ssc_numdups = htons((dups->b_wptr - dups->b_rptr)
-		    / sizeof (uint32_t));
-		sch->sch_len = htons(slen + (dups->b_wptr - dups->b_rptr));
+		sc->ssc_numdups = htons(MBLKL(dups) / sizeof (uint32_t));
+		sch->sch_len = htons(slen + dups_len);
 		smp->b_cont = dups;
 	}
 
+	if (sctp->sctp_err_chunks != NULL) {
+		linkb(smp, sctp->sctp_err_chunks);
+		sctp->sctp_err_chunks = NULL;
+		sctp->sctp_err_len = 0;
+	}
 	return (smp);
 }
 
-void
+/*
+ * Check and see if we need to send a SACK chunk.  If it is needed,
+ * send it out.  Return true if a SACK chunk is sent, false otherwise.
+ */
+boolean_t
 sctp_sack(sctp_t *sctp, mblk_t *dups)
 {
 	mblk_t *smp;
@@ -1681,9 +1716,8 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 		/* The caller of sctp_sack() will not free the dups mblk. */
 		if (dups != NULL)
 			freeb(dups);
-		return;
+		return (B_FALSE);
 	}
-
 	sctp_set_iplen(sctp, smp);
 
 	dprint(2, ("sctp_sack: sending to %p %x:%x:%x:%x\n",
@@ -1694,6 +1728,7 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 
 	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
 	sctp_add_sendq(sctp, smp);
+	return (B_TRUE);
 }
 
 /*
@@ -2061,15 +2096,12 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 		ftsn_entry->ftsn_ssn = ntohs(ftsn_entry->ftsn_ssn);
 		if (ftsn_entry->ftsn_sid >= sctp->sctp_num_istr) {
 			uint16_t	inval_parm[2];
-			mblk_t		*errmp;
 
 			inval_parm[0] = htons(ftsn_entry->ftsn_sid);
 			/* RESERVED to be ignored at the receiving end */
 			inval_parm[1] = 0;
-			errmp = sctp_make_err(sctp, SCTP_ERR_BAD_SID,
-			    (char *)inval_parm, sizeof (inval_parm));
-			if (errmp != NULL)
-				sctp_send_err(sctp, errmp, NULL);
+			sctp_add_err(sctp, SCTP_ERR_BAD_SID, inval_parm,
+			    sizeof (inval_parm), fp);
 			ftsn_entry++;
 			remaining -= sizeof (*ftsn_entry);
 			continue;
@@ -2905,16 +2937,14 @@ check_ss_rxmit:
 static int
 sctp_strange_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 {
-	mblk_t *errmp;
 	size_t len;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	/* check top two bits for action required */
 	if (ch->sch_id & 0x40) {	/* also matches 0xc0 */
 		len = ntohs(ch->sch_len);
-		errmp = sctp_make_err(sctp, SCTP_ERR_UNREC_CHUNK, ch, len);
-		if (errmp != NULL)
-			sctp_send_err(sctp, errmp, fp);
+		sctp_add_err(sctp, SCTP_ERR_UNREC_CHUNK, ch, len, fp);
+
 		if ((ch->sch_id & 0xc0) == 0xc0) {
 			/* skip and continue */
 			return (1);
@@ -3473,6 +3503,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	int64_t			now;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 	ip_stack_t		*ipst = sctps->sctps_netstack->netstack_ip;
+	boolean_t		hb_already = B_FALSE;
 
 	if (DB_TYPE(mp) != M_DATA) {
 		ASSERT(DB_TYPE(mp) == M_CTL);
@@ -3669,7 +3700,16 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				}
 				break;
 			case CHUNK_HEARTBEAT:
-				sctp_return_heartbeat(sctp, ch, mp);
+				if (!hb_already) {
+					/*
+					 * In any one packet, there should
+					 * only be one heartbeat chunk.  So
+					 * we should not process more than
+					 * once.
+					 */
+					sctp_return_heartbeat(sctp, ch, mp);
+					hb_already = B_TRUE;
+				}
 				break;
 			case CHUNK_HEARTBEAT_ACK:
 				sctp_process_heartbeat(sctp, ch);
@@ -3901,8 +3941,9 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_send_cookie_ack(sctp);
 				sctp_stop_faddr_timers(sctp);
 				if (!SCTP_IS_DETACHED(sctp)) {
-				    sctp->sctp_ulp_connected(sctp->sctp_ulpd);
-				    sctp_set_ulp_prop(sctp);
+					sctp->sctp_ulp_connected(
+					    sctp->sctp_ulpd);
+					sctp_set_ulp_prop(sctp);
 				}
 				sctp->sctp_state = SCTPS_ESTABLISHED;
 				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
@@ -3936,8 +3977,9 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			switch (ch->sch_id) {
 			case CHUNK_COOKIE_ACK:
 				if (!SCTP_IS_DETACHED(sctp)) {
-				    sctp->sctp_ulp_connected(sctp->sctp_ulpd);
-				    sctp_set_ulp_prop(sctp);
+					sctp->sctp_ulp_connected(
+					    sctp->sctp_ulpd);
+					sctp_set_ulp_prop(sctp);
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
@@ -3972,8 +4014,9 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_send_cookie_ack(sctp);
 
 				if (!SCTP_IS_DETACHED(sctp)) {
-				    sctp->sctp_ulp_connected(sctp->sctp_ulpd);
-				    sctp_set_ulp_prop(sctp);
+					sctp->sctp_ulp_connected(
+					    sctp->sctp_ulpd);
+					sctp_set_ulp_prop(sctp);
 				}
 				if (sctp->sctp_unacked == 0)
 					sctp_stop_faddr_timers(sctp);
@@ -4024,7 +4067,10 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				break;
 			}
 			case CHUNK_HEARTBEAT:
-				sctp_return_heartbeat(sctp, ch, mp);
+				if (!hb_already) {
+					sctp_return_heartbeat(sctp, ch, mp);
+					hb_already = B_TRUE;
+				}
 				break;
 			default:
 				if (sctp_strange_chunk(sctp, ch, fp) == 0) {
@@ -4064,7 +4110,10 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				break;
 			case CHUNK_HEARTBEAT:
-				sctp_return_heartbeat(sctp, ch, mp);
+				if (!hb_already) {
+					sctp_return_heartbeat(sctp, ch, mp);
+					hb_already = B_TRUE;
+				}
 				break;
 			default:
 				if (sctp_strange_chunk(sctp, ch, fp) == 0) {
@@ -4096,7 +4145,10 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_process_abort(sctp, ch, ECONNRESET);
 				goto done;
 			case CHUNK_HEARTBEAT:
-				sctp_return_heartbeat(sctp, ch, mp);
+				if (!hb_already) {
+					sctp_return_heartbeat(sctp, ch, mp);
+					hb_already = B_TRUE;
+				}
 				break;
 			default:
 				if (sctp_strange_chunk(sctp, ch, fp) == 0) {
@@ -4125,11 +4177,14 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 nomorechunks:
 	/* SACK if necessary */
 	if (gotdata) {
+		boolean_t sack_sent;
+
 		(sctp->sctp_sack_toggle)++;
-		sctp_sack(sctp, dups);
+		sack_sent = sctp_sack(sctp, dups);
 		dups = NULL;
 
-		if (!sctp->sctp_ack_timer_running) {
+		/* If a SACK is sent, no need to restart the timer. */
+		if (!sack_sent && !sctp->sctp_ack_timer_running) {
 			sctp->sctp_ack_timer_running = B_TRUE;
 			sctp_timer(sctp, sctp->sctp_ack_mp,
 			    MSEC_TO_TICK(sctps->sctps_deferred_ack_interval));
@@ -4153,6 +4208,9 @@ done:
 	if (ipsec_mp != NULL)
 		freeb(ipsec_mp);
 	freemsg(mp);
+
+	if (sctp->sctp_err_chunks != NULL)
+		sctp_process_err(sctp);
 
 	if (wake_eager) {
 		/*
@@ -4199,7 +4257,7 @@ sctp_recvd(sctp_t *sctp, int len)
 	    ((old <= new >> 1) || (old < sctp->sctp_mss))) {
 		sctp->sctp_force_sack = 1;
 		BUMP_MIB(&sctps->sctps_mib, sctpOutWinUpdate);
-		sctp_sack(sctp, NULL);
+		(void) sctp_sack(sctp, NULL);
 		old = 1;
 	} else {
 		old = 0;

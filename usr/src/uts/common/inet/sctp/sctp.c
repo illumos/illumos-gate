@@ -753,6 +753,12 @@ sctp_free(conn_t *connp)
 
 	sctp->sctp_shutdown_faddr = NULL;
 
+	if (sctp->sctp_err_chunks != NULL) {
+		freemsg(sctp->sctp_err_chunks);
+		sctp->sctp_err_chunks = NULL;
+		sctp->sctp_err_len = 0;
+	}
+
 	/* Clear all the bitfields. */
 	bzero(&sctp->sctp_bits, sizeof (sctp->sctp_bits));
 
