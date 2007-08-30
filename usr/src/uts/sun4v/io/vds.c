@@ -398,7 +398,8 @@ static const size_t	vds_num_versions =
 static void vd_free_dring_task(vd_t *vdp);
 static int vd_setup_vd(vd_t *vd);
 static boolean_t vd_enabled(vd_t *vd);
-
+static ushort_t vd_lbl2cksum(struct dk_label *label);
+static int vd_file_validate_geometry(vd_t *vd);
 /*
  * Function:
  *	vd_file_rw
@@ -439,6 +440,14 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 		offset = blk * DEV_BSIZE;
 	} else {
 		ASSERT(slice >= 0 && slice < V_NUMPAR);
+
+		if (vd->vdisk_label == VD_DISK_LABEL_UNK &&
+		    vd_file_validate_geometry(vd) != 0) {
+			PR0("Unknown disk label, can't do I/O from slice %d",
+			    slice);
+			return (-1);
+		}
+
 		if (blk >= vd->vtoc.v_part[slice].p_size) {
 			/* address past the end of the slice */
 			PR0("req_addr (0x%lx) > psize (0x%lx)",
@@ -516,6 +525,116 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	} while (n > 0);
 
 	return (len);
+}
+
+/*
+ * Function:
+ *	vd_file_build_default_label
+ *
+ * Description:
+ *	Return a default label for the given disk. This is used when the disk
+ *	does not have a valid VTOC so that the user can get a valid default
+ *	configuration. The default label have all slices size set to 0 (except
+ *	slice 2 which is the entire disk) to force the user to write a valid
+ *	label onto the disk image.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	label		- the returned default label.
+ *
+ * Return Code:
+ *	none.
+ */
+static void
+vd_file_build_default_label(vd_t *vd, struct dk_label *label)
+{
+	size_t size;
+	char prefix;
+
+	ASSERT(vd->file);
+
+	/*
+	 * We must have a resonable number of cylinders and sectors so
+	 * that newfs can run using default values.
+	 *
+	 * if (disk_size < 2MB)
+	 * 	phys_cylinders = disk_size / 100K
+	 * else
+	 * 	phys_cylinders = disk_size / 300K
+	 *
+	 * phys_cylinders = (phys_cylinders == 0) ? 1 : phys_cylinders
+	 * alt_cylinders = (phys_cylinders > 2) ? 2 : 0;
+	 * data_cylinders = phys_cylinders - alt_cylinders
+	 *
+	 * sectors = disk_size / (phys_cylinders * blk_size)
+	 *
+	 * The file size test is an attempt to not have too few cylinders
+	 * for a small file, or so many on a big file that you waste space
+	 * for backup superblocks or cylinder group structures.
+	 */
+	if (vd->file_size < (2 * 1024 * 1024))
+		label->dkl_pcyl = vd->file_size / (100 * 1024);
+	else
+		label->dkl_pcyl = vd->file_size / (300 * 1024);
+
+	if (label->dkl_pcyl == 0)
+		label->dkl_pcyl = 1;
+
+	if (label->dkl_pcyl > 2)
+		label->dkl_acyl = 2;
+	else
+		label->dkl_acyl = 0;
+
+	label->dkl_nsect = vd->file_size /
+	    (DEV_BSIZE * label->dkl_pcyl);
+	label->dkl_ncyl = label->dkl_pcyl - label->dkl_acyl;
+	label->dkl_nhead = 1;
+	label->dkl_write_reinstruct = 0;
+	label->dkl_read_reinstruct = 0;
+	label->dkl_rpm = 7200;
+	label->dkl_apc = 0;
+	label->dkl_intrlv = 0;
+
+	PR0("requested disk size: %ld bytes\n", vd->file_size);
+	PR0("setup: ncyl=%d nhead=%d nsec=%d\n", label->dkl_pcyl,
+	    label->dkl_nhead, label->dkl_nsect);
+	PR0("provided disk size: %ld bytes\n", (uint64_t)
+	    (label->dkl_pcyl * label->dkl_nhead *
+	    label->dkl_nsect * DEV_BSIZE));
+
+	if (vd->file_size < (1ULL << 20)) {
+		size = vd->file_size >> 10;
+		prefix = 'K'; /* Kilobyte */
+	} else if (vd->file_size < (1ULL << 30)) {
+		size = vd->file_size >> 20;
+		prefix = 'M'; /* Megabyte */
+	} else if (vd->file_size < (1ULL << 40)) {
+		size = vd->file_size >> 30;
+		prefix = 'G'; /* Gigabyte */
+	} else {
+		size = vd->file_size >> 40;
+		prefix = 'T'; /* Terabyte */
+	}
+
+	/*
+	 * We must have a correct label name otherwise format(1m) will
+	 * not recognized the disk as labeled.
+	 */
+	(void) snprintf(label->dkl_asciilabel, LEN_DKL_ASCII,
+	    "SUN-DiskImage-%ld%cB cyl %d alt %d hd %d sec %d",
+	    size, prefix,
+	    label->dkl_ncyl, label->dkl_acyl, label->dkl_nhead,
+	    label->dkl_nsect);
+
+	/* default VTOC */
+	label->dkl_vtoc.v_version = V_VERSION;
+	label->dkl_vtoc.v_nparts = V_NUMPAR;
+	label->dkl_vtoc.v_sanity = VTOC_SANE;
+	label->dkl_vtoc.v_part[2].p_tag = V_BACKUP;
+	label->dkl_map[2].dkl_cylno = 0;
+	label->dkl_map[2].dkl_nblk = label->dkl_ncyl *
+	    label->dkl_nhead * label->dkl_nsect;
+	label->dkl_cksum = vd_lbl2cksum(label);
 }
 
 /*
@@ -1451,38 +1570,34 @@ vd_set_efi_out(void *ioctl_arg, void *vd_buf)
 	kmem_free(dk_efi->dki_data, vd_efi->length);
 }
 
-static int
-vd_read_vtoc(ldi_handle_t handle, struct vtoc *vtoc, vd_disk_label_t *label)
+static vd_disk_label_t
+vd_read_vtoc(ldi_handle_t handle, struct vtoc *vtoc)
 {
 	int status, rval;
 	struct dk_gpt *efi;
 	size_t efi_len;
 
-	*label = VD_DISK_LABEL_UNK;
-
 	status = ldi_ioctl(handle, DKIOCGVTOC, (intptr_t)vtoc,
 	    (vd_open_flags | FKIOCTL), kcred, &rval);
 
 	if (status == 0) {
-		*label = VD_DISK_LABEL_VTOC;
-		return (0);
+		return (VD_DISK_LABEL_VTOC);
 	} else if (status != ENOTSUP) {
 		PR0("ldi_ioctl(DKIOCGVTOC) returned error %d", status);
-		return (status);
+		return (VD_DISK_LABEL_UNK);
 	}
 
 	status = vds_efi_alloc_and_read(handle, &efi, &efi_len);
 
 	if (status) {
 		PR0("vds_efi_alloc_and_read returned error %d", status);
-		return (status);
+		return (VD_DISK_LABEL_UNK);
 	}
 
-	*label = VD_DISK_LABEL_EFI;
 	vd_efi_to_vtoc(efi, vtoc);
 	vd_efi_free(efi, efi_len);
 
-	return (0);
+	return (VD_DISK_LABEL_EFI);
 }
 
 static ushort_t
@@ -1556,6 +1671,102 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 }
 
 /*
+ * Function:
+ *	vd_file_validate_geometry
+ *
+ * Description:
+ *	Read the label and validate the geometry of a disk image. The driver
+ *	label, vtoc and geometry information are updated according to the
+ *	label read from the disk image.
+ *
+ *	If no valid label is found, the label is set to unknown and the
+ *	function returns EINVAL, but a default vtoc and geometry are provided
+ *	to the driver.
+ *
+ * Parameters:
+ *	vd	- disk on which the operation is performed.
+ *
+ * Return Code:
+ *	0	- success.
+ *	EIO	- error reading the label from the disk image.
+ *	EINVAL	- unknown disk label.
+ */
+static int
+vd_file_validate_geometry(vd_t *vd)
+{
+	struct dk_label label;
+	struct dk_geom *geom = &vd->dk_geom;
+	struct vtoc *vtoc = &vd->vtoc;
+	int i;
+	int status = 0;
+
+	ASSERT(vd->file);
+
+	if (VD_FILE_LABEL_READ(vd, &label) < 0)
+		return (EIO);
+
+	if (label.dkl_magic != DKL_MAGIC ||
+	    label.dkl_cksum != vd_lbl2cksum(&label) ||
+	    label.dkl_vtoc.v_sanity != VTOC_SANE ||
+	    label.dkl_vtoc.v_nparts != V_NUMPAR) {
+		vd->vdisk_label = VD_DISK_LABEL_UNK;
+		vd_file_build_default_label(vd, &label);
+		status = EINVAL;
+	} else {
+		vd->vdisk_label = VD_DISK_LABEL_VTOC;
+	}
+
+	/* Update the driver geometry */
+	bzero(geom, sizeof (struct dk_geom));
+
+	geom->dkg_ncyl = label.dkl_ncyl;
+	geom->dkg_acyl = label.dkl_acyl;
+	geom->dkg_nhead = label.dkl_nhead;
+	geom->dkg_nsect = label.dkl_nsect;
+	geom->dkg_intrlv = label.dkl_intrlv;
+	geom->dkg_apc = label.dkl_apc;
+	geom->dkg_rpm = label.dkl_rpm;
+	geom->dkg_pcyl = label.dkl_pcyl;
+	geom->dkg_write_reinstruct = label.dkl_write_reinstruct;
+	geom->dkg_read_reinstruct = label.dkl_read_reinstruct;
+
+	/* Update the driver vtoc */
+	bzero(vtoc, sizeof (struct vtoc));
+
+	vtoc->v_sanity = label.dkl_vtoc.v_sanity;
+	vtoc->v_version = label.dkl_vtoc.v_version;
+	vtoc->v_sectorsz = DEV_BSIZE;
+	vtoc->v_nparts = label.dkl_vtoc.v_nparts;
+
+	for (i = 0; i < vtoc->v_nparts; i++) {
+		vtoc->v_part[i].p_tag =
+		    label.dkl_vtoc.v_part[i].p_tag;
+		vtoc->v_part[i].p_flag =
+		    label.dkl_vtoc.v_part[i].p_flag;
+		vtoc->v_part[i].p_start =
+		    label.dkl_map[i].dkl_cylno *
+		    (label.dkl_nhead * label.dkl_nsect);
+		vtoc->v_part[i].p_size = label.dkl_map[i].dkl_nblk;
+		vtoc->timestamp[i] =
+		    label.dkl_vtoc.v_timestamp[i];
+	}
+	/*
+	 * The bootinfo array can not be copied with bcopy() because
+	 * elements are of type long in vtoc (so 64-bit) and of type
+	 * int in dk_vtoc (so 32-bit).
+	 */
+	vtoc->v_bootinfo[0] = label.dkl_vtoc.v_bootinfo[0];
+	vtoc->v_bootinfo[1] = label.dkl_vtoc.v_bootinfo[1];
+	vtoc->v_bootinfo[2] = label.dkl_vtoc.v_bootinfo[2];
+	bcopy(label.dkl_asciilabel, vtoc->v_asciilabel,
+	    LEN_DKL_ASCII);
+	bcopy(label.dkl_vtoc.v_volume, vtoc->v_volume,
+	    LEN_DKL_VVOL);
+
+	return (status);
+}
+
+/*
  * Handle ioctls to a disk image (file-based).
  *
  * Return Values
@@ -1571,7 +1782,6 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	int i, rc;
 
 	ASSERT(vd->file);
-	ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
 
 	switch (cmd) {
 
@@ -1579,70 +1789,22 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		ASSERT(ioctl_arg != NULL);
 		geom = (struct dk_geom *)ioctl_arg;
 
-		if (VD_FILE_LABEL_READ(vd, &label) < 0)
-			return (EIO);
+		rc = vd_file_validate_geometry(vd);
+		if (rc != 0 && rc != EINVAL)
+			return (rc);
 
-		if (label.dkl_magic != DKL_MAGIC ||
-		    label.dkl_cksum != vd_lbl2cksum(&label))
-			return (EINVAL);
-
-		bzero(geom, sizeof (struct dk_geom));
-		geom->dkg_ncyl = label.dkl_ncyl;
-		geom->dkg_acyl = label.dkl_acyl;
-		geom->dkg_nhead = label.dkl_nhead;
-		geom->dkg_nsect = label.dkl_nsect;
-		geom->dkg_intrlv = label.dkl_intrlv;
-		geom->dkg_apc = label.dkl_apc;
-		geom->dkg_rpm = label.dkl_rpm;
-		geom->dkg_pcyl = label.dkl_pcyl;
-		geom->dkg_write_reinstruct = label.dkl_write_reinstruct;
-		geom->dkg_read_reinstruct = label.dkl_read_reinstruct;
-
+		bcopy(&vd->dk_geom, geom, sizeof (struct dk_geom));
 		return (0);
 
 	case DKIOCGVTOC:
 		ASSERT(ioctl_arg != NULL);
 		vtoc = (struct vtoc *)ioctl_arg;
 
-		if (VD_FILE_LABEL_READ(vd, &label) < 0)
-			return (EIO);
+		rc = vd_file_validate_geometry(vd);
+		if (rc != 0 && rc != EINVAL)
+			return (rc);
 
-		if (label.dkl_magic != DKL_MAGIC ||
-		    label.dkl_cksum != vd_lbl2cksum(&label))
-			return (EINVAL);
-
-		bzero(vtoc, sizeof (struct vtoc));
-
-		vtoc->v_sanity = label.dkl_vtoc.v_sanity;
-		vtoc->v_version = label.dkl_vtoc.v_version;
-		vtoc->v_sectorsz = DEV_BSIZE;
-		vtoc->v_nparts = label.dkl_vtoc.v_nparts;
-
-		for (i = 0; i < vtoc->v_nparts; i++) {
-			vtoc->v_part[i].p_tag =
-			    label.dkl_vtoc.v_part[i].p_tag;
-			vtoc->v_part[i].p_flag =
-			    label.dkl_vtoc.v_part[i].p_flag;
-			vtoc->v_part[i].p_start =
-			    label.dkl_map[i].dkl_cylno *
-			    (label.dkl_nhead * label.dkl_nsect);
-			vtoc->v_part[i].p_size = label.dkl_map[i].dkl_nblk;
-			vtoc->timestamp[i] =
-			    label.dkl_vtoc.v_timestamp[i];
-		}
-		/*
-		 * The bootinfo array can not be copied with bcopy() because
-		 * elements are of type long in vtoc (so 64-bit) and of type
-		 * int in dk_vtoc (so 32-bit).
-		 */
-		vtoc->v_bootinfo[0] = label.dkl_vtoc.v_bootinfo[0];
-		vtoc->v_bootinfo[1] = label.dkl_vtoc.v_bootinfo[1];
-		vtoc->v_bootinfo[2] = label.dkl_vtoc.v_bootinfo[2];
-		bcopy(label.dkl_asciilabel, vtoc->v_asciilabel,
-		    LEN_DKL_ASCII);
-		bcopy(label.dkl_vtoc.v_volume, vtoc->v_volume,
-		    LEN_DKL_VVOL);
-
+		bcopy(&vd->vtoc, vtoc, sizeof (struct vtoc));
 		return (0);
 
 	case DKIOCSGEOM:
@@ -1721,8 +1883,9 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		if ((rc = vd_file_set_vtoc(vd, &label)) != 0)
 			return (rc);
 
-		/* update the cached vdisk VTOC */
-		bcopy(vtoc, &vd->vtoc, sizeof (vd->vtoc));
+		/* check the geometry and update the driver info */
+		if ((rc = vd_file_validate_geometry(vd)) != 0)
+			return (rc);
 
 		/*
 		 * The disk geometry may have changed, so we need to write
@@ -2006,6 +2169,8 @@ vd_get_devid(vd_task_t *task)
 	len = (devid_len > bufid_len)? bufid_len : devid_len;
 
 	bcopy(devid->did_id, vd_devid->id, len);
+
+	request->status = 0;
 
 	/* LDC memory operations require 8-byte multiples */
 	ASSERT(request->nbytes % sizeof (uint64_t) == 0);
@@ -3376,6 +3541,51 @@ vd_setup_full_disk(vd_t *vd)
 }
 
 static int
+vd_setup_partition_vtoc(vd_t *vd)
+{
+	int rval, status;
+	char *device_path = vd->device_path;
+
+	status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
+	    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL), kcred, &rval);
+
+	if (status != 0) {
+		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+
+	/* Initialize dk_geom structure for single-slice device */
+	if (vd->dk_geom.dkg_nsect == 0) {
+		PRN("%s geometry claims 0 sectors per track", device_path);
+		return (EIO);
+	}
+	if (vd->dk_geom.dkg_nhead == 0) {
+		PRN("%s geometry claims 0 heads", device_path);
+		return (EIO);
+	}
+	vd->dk_geom.dkg_ncyl = vd->vdisk_size / vd->dk_geom.dkg_nsect /
+	    vd->dk_geom.dkg_nhead;
+	vd->dk_geom.dkg_acyl = 0;
+	vd->dk_geom.dkg_pcyl = vd->dk_geom.dkg_ncyl + vd->dk_geom.dkg_acyl;
+
+
+	/* Initialize vtoc structure for single-slice device */
+	bcopy(VD_VOLUME_NAME, vd->vtoc.v_volume,
+	    MIN(sizeof (VD_VOLUME_NAME), sizeof (vd->vtoc.v_volume)));
+	bzero(vd->vtoc.v_part, sizeof (vd->vtoc.v_part));
+	vd->vtoc.v_nparts = 1;
+	vd->vtoc.v_part[0].p_tag = V_UNASSIGNED;
+	vd->vtoc.v_part[0].p_flag = 0;
+	vd->vtoc.v_part[0].p_start = 0;
+	vd->vtoc.v_part[0].p_size = vd->vdisk_size;
+	bcopy(VD_ASCIILABEL, vd->vtoc.v_asciilabel,
+	    MIN(sizeof (VD_ASCIILABEL), sizeof (vd->vtoc.v_asciilabel)));
+
+	return (0);
+}
+
+static int
 vd_setup_partition_efi(vd_t *vd)
 {
 	efi_gpt_t *gpt;
@@ -3417,17 +3627,13 @@ vd_setup_partition_efi(vd_t *vd)
 static int
 vd_setup_file(vd_t *vd)
 {
-	int 		i, rval, status;
-	ushort_t	sum;
+	int 		rval, status;
 	vattr_t		vattr;
 	dev_t		dev;
-	size_t		size;
 	char		*file_path = vd->device_path;
 	char		dev_path[MAXPATHLEN + 1];
-	char		prefix;
 	ldi_handle_t	lhandle;
 	struct dk_cinfo	dk_cinfo;
-	struct dk_label label;
 
 	/* make sure the file is valid */
 	if ((status = lookupname(file_path, UIO_SYSSPACE, FOLLOW,
@@ -3475,118 +3681,17 @@ vd_setup_file(vd_t *vd)
 		return (EIO);
 	}
 
-	/* read label from file */
-	if (VD_FILE_LABEL_READ(vd, &label) < 0) {
-		PRN("Can't read label from %s", file_path);
+	/* find and validate the geometry of the disk image */
+	status = vd_file_validate_geometry(vd);
+	if (status != 0 && status != EINVAL) {
+		PRN("Fail to read label from %s", file_path);
 		return (EIO);
 	}
 
-	/* label checksum */
-	sum = vd_lbl2cksum(&label);
-
-	if (label.dkl_magic != DKL_MAGIC || label.dkl_cksum != sum) {
-		PR0("%s has an invalid disk label "
-		    "(magic=%x cksum=%x (expect %x))",
-		    file_path, label.dkl_magic, label.dkl_cksum, sum);
-
-		/* default label */
-		bzero(&label, sizeof (struct dk_label));
-
-		/*
-		 * We must have a resonable number of cylinders and sectors so
-		 * that newfs can run using default values.
-		 *
-		 * if (disk_size < 2MB)
-		 * 	phys_cylinders = disk_size / 100K
-		 * else
-		 * 	phys_cylinders = disk_size / 300K
-		 *
-		 * phys_cylinders = (phys_cylinders == 0) ? 1 : phys_cylinders
-		 * alt_cylinders = (phys_cylinders > 2) ? 2 : 0;
-		 * data_cylinders = phys_cylinders - alt_cylinders
-		 *
-		 * sectors = disk_size / (phys_cylinders * blk_size)
-		 */
-		if (vd->file_size < (2 * 1024 * 1024))
-			label.dkl_pcyl = vd->file_size / (100 * 1024);
-		else
-			label.dkl_pcyl = vd->file_size / (300 * 1024);
-
-		if (label.dkl_pcyl == 0)
-			label.dkl_pcyl = 1;
-
-		if (label.dkl_pcyl > 2)
-			label.dkl_acyl = 2;
-		else
-			label.dkl_acyl = 0;
-
-		label.dkl_nsect = vd->file_size /
-		    (DEV_BSIZE * label.dkl_pcyl);
-		label.dkl_ncyl = label.dkl_pcyl - label.dkl_acyl;
-		label.dkl_nhead = 1;
-		label.dkl_write_reinstruct = 0;
-		label.dkl_read_reinstruct = 0;
-		label.dkl_rpm = 7200;
-		label.dkl_apc = 0;
-		label.dkl_intrlv = 0;
-		label.dkl_magic = DKL_MAGIC;
-
-		PR0("requested disk size: %ld bytes\n", vd->file_size);
-		PR0("setup: ncyl=%d nhead=%d nsec=%d\n", label.dkl_pcyl,
-		    label.dkl_nhead, label.dkl_nsect);
-		PR0("provided disk size: %ld bytes\n", (uint64_t)
-		    (label.dkl_pcyl *
-		    label.dkl_nhead * label.dkl_nsect * DEV_BSIZE));
-
-		if (vd->file_size < (1ULL << 20)) {
-			size = vd->file_size >> 10;
-			prefix = 'K'; /* Kilobyte */
-		} else if (vd->file_size < (1ULL << 30)) {
-			size = vd->file_size >> 20;
-			prefix = 'M'; /* Megabyte */
-		} else if (vd->file_size < (1ULL << 40)) {
-			size = vd->file_size >> 30;
-			prefix = 'G'; /* Gigabyte */
-		} else {
-			size = vd->file_size >> 40;
-			prefix = 'T'; /* Terabyte */
-		}
-
-		/*
-		 * We must have a correct label name otherwise format(1m) will
-		 * not recognized the disk as labeled.
-		 */
-		(void) snprintf(label.dkl_asciilabel, LEN_DKL_ASCII,
-		    "SUN-DiskImage-%ld%cB cyl %d alt %d hd %d sec %d",
-		    size, prefix,
-		    label.dkl_ncyl, label.dkl_acyl, label.dkl_nhead,
-		    label.dkl_nsect);
-
-		/* default VTOC */
-		label.dkl_vtoc.v_version = V_VERSION;
-		label.dkl_vtoc.v_nparts = V_NUMPAR;
-		label.dkl_vtoc.v_sanity = VTOC_SANE;
-		label.dkl_vtoc.v_part[2].p_tag = V_BACKUP;
-		label.dkl_map[2].dkl_cylno = 0;
-		label.dkl_map[2].dkl_nblk = label.dkl_ncyl *
-		    label.dkl_nhead * label.dkl_nsect;
-		label.dkl_map[0] = label.dkl_map[2];
-		label.dkl_map[0] = label.dkl_map[2];
-		label.dkl_cksum = vd_lbl2cksum(&label);
-
-		/* write default label to file */
-		if ((rval = vd_file_set_vtoc(vd, &label)) != 0) {
-			PRN("Can't write label to %s", file_path);
-			return (rval);
-		}
-	}
-
-	vd->nslices = label.dkl_vtoc.v_nparts;
-
+	vd->nslices = V_NUMPAR;
 	/* sector size = block size = DEV_BSIZE */
 	vd->vdisk_size = vd->file_size / DEV_BSIZE;
 	vd->vdisk_type = VD_DISK_TYPE_DISK;
-	vd->vdisk_label = VD_DISK_LABEL_VTOC;
 	vd->max_xfer_sz = maxphys / DEV_BSIZE; /* default transfer size */
 
 	/* Get max_xfer_sz from the device where the file is */
@@ -3621,55 +3726,27 @@ vd_setup_file(vd_t *vd)
 	PR0("using file %s, dev %s, max_xfer = %u blks",
 	    file_path, dev_path, vd->max_xfer_sz);
 
-	vd->dk_geom.dkg_ncyl = label.dkl_ncyl;
-	vd->dk_geom.dkg_acyl = label.dkl_acyl;
-	vd->dk_geom.dkg_pcyl = label.dkl_pcyl;
-	vd->dk_geom.dkg_nhead = label.dkl_nhead;
-	vd->dk_geom.dkg_nsect = label.dkl_nsect;
-	vd->dk_geom.dkg_intrlv = label.dkl_intrlv;
-	vd->dk_geom.dkg_apc = label.dkl_apc;
-	vd->dk_geom.dkg_rpm = label.dkl_rpm;
-	vd->dk_geom.dkg_write_reinstruct = label.dkl_write_reinstruct;
-	vd->dk_geom.dkg_read_reinstruct = label.dkl_read_reinstruct;
-
-	vd->vtoc.v_sanity = label.dkl_vtoc.v_sanity;
-	vd->vtoc.v_version = label.dkl_vtoc.v_version;
-	vd->vtoc.v_sectorsz = DEV_BSIZE;
-	vd->vtoc.v_nparts = label.dkl_vtoc.v_nparts;
-
-	bcopy(label.dkl_vtoc.v_volume, vd->vtoc.v_volume,
-	    LEN_DKL_VVOL);
-	bcopy(label.dkl_asciilabel, vd->vtoc.v_asciilabel,
-	    LEN_DKL_ASCII);
-
-	for (i = 0; i < vd->nslices; i++) {
-		vd->vtoc.timestamp[i] = label.dkl_vtoc.v_timestamp[i];
-		vd->vtoc.v_part[i].p_tag = label.dkl_vtoc.v_part[i].p_tag;
-		vd->vtoc.v_part[i].p_flag = label.dkl_vtoc.v_part[i].p_flag;
-		vd->vtoc.v_part[i].p_start = label.dkl_map[i].dkl_cylno *
-		    label.dkl_nhead * label.dkl_nsect;
-		vd->vtoc.v_part[i].p_size = label.dkl_map[i].dkl_nblk;
-		vd->ldi_handle[i] = NULL;
-		vd->dev[i] = NULL;
-	}
-
 	/* Setup devid for the disk image */
 
-	status = vd_file_read_devid(vd, &vd->file_devid);
+	if (vd->vdisk_label != VD_DISK_LABEL_UNK) {
 
-	if (status == 0) {
-		/* a valid devid was found */
-		return (0);
-	}
+		status = vd_file_read_devid(vd, &vd->file_devid);
 
-	if (status != EINVAL) {
-		/*
-		 * There was an error while trying to read the devid. So this
-		 * disk image may have a devid but we are unable to read it.
-		 */
-		PR0("can not read devid for %s", file_path);
-		vd->file_devid = NULL;
-		return (0);
+		if (status == 0) {
+			/* a valid devid was found */
+			return (0);
+		}
+
+		if (status != EINVAL) {
+			/*
+			 * There was an error while trying to read the devid.
+			 * So this disk image may have a devid but we are
+			 * unable to read it.
+			 */
+			PR0("can not read devid for %s", file_path);
+			vd->file_devid = NULL;
+			return (0);
+		}
 	}
 
 	/*
@@ -3686,11 +3763,17 @@ vd_setup_file(vd_t *vd)
 		return (0);
 	}
 
-	/* write devid to the disk image */
-	if (vd_file_write_devid(vd, vd->file_devid) != 0) {
-		PR0("fail to write devid for %s", file_path);
-		ddi_devid_free(vd->file_devid);
-		vd->file_devid = NULL;
+	/*
+	 * Write devid to the disk image. The devid is stored into the disk
+	 * image if we have a valid label; otherwise the devid will be stored
+	 * when the user writes a valid label.
+	 */
+	if (vd->vdisk_label != VD_DISK_LABEL_UNK) {
+		if (vd_file_write_devid(vd, vd->file_devid) != 0) {
+			PR0("fail to write devid for %s", file_path);
+			ddi_devid_free(vd->file_devid);
+			vd->file_devid = NULL;
+		}
 	}
 
 	return (0);
@@ -3720,7 +3803,7 @@ vd_setup_vd(vd_t *vd)
 			PRN("Cannot use device/file (%s), errno=%d\n",
 			    device_path, status);
 			if (status == ENXIO || status == ENODEV ||
-			    status == ENOENT) {
+			    status == ENOENT || status == EROFS) {
 				return (EAGAIN);
 			}
 		}
@@ -3746,7 +3829,7 @@ vd_setup_vd(vd_t *vd)
 	}
 	vd->vdisk_size = lbtodb(vd->vdisk_size);	/* convert to blocks */
 
-	/* Verify backing device supports dk_cinfo, dk_geom, and vtoc */
+	/* Verify backing device supports dk_cinfo */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
 	    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
 	    &rval)) != 0) {
@@ -3760,22 +3843,7 @@ vd_setup_vd(vd_t *vd)
 		return (EIO);
 	}
 
-	status = vd_read_vtoc(vd->ldi_handle[0], &vd->vtoc, &vd->vdisk_label);
-
-	if (status != 0) {
-		PRN("vd_read_vtoc returned errno %d for %s",
-		    status, device_path);
-		return (status);
-	}
-
-	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
-	    (status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
-	    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL),
-	    kcred, &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
-		    status, device_path);
-		return (status);
-	}
+	vd->vdisk_label = vd_read_vtoc(vd->ldi_handle[0], &vd->vtoc);
 
 	/* Store the device's max transfer size for return to the client */
 	vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
@@ -3789,6 +3857,15 @@ vd_setup_vd(vd_t *vd)
 	vd->pseudo = is_pseudo_device(dip);
 	ddi_release_devi(dip);
 	if (vd->pseudo) {
+		/*
+		 * Currently we only support exporting pseudo devices which
+		 * provide a valid disk label.
+		 */
+		if (vd->vdisk_label == VD_DISK_LABEL_UNK) {
+			PRN("%s is a pseudo device with an invalid disk "
+			    "label\n", device_path);
+			return (EINVAL);
+		}
 		vd->vdisk_type	= VD_DISK_TYPE_SLICE;
 		vd->nslices	= 1;
 		return (0);	/* ...and we're done */
@@ -3798,45 +3875,27 @@ vd_setup_vd(vd_t *vd)
 	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE)
 		return (vd_setup_full_disk(vd));
 
+	/* We can only export a slice if the disk has a valid label */
+	if (vd->vdisk_label == VD_DISK_LABEL_UNK) {
+		PRN("%s is a slice from a disk with an unknown disk label\n",
+		    device_path);
+		return (EINVAL);
+	}
 
 	/* Otherwise, we have a non-entire slice of a device */
 	vd->vdisk_type	= VD_DISK_TYPE_SLICE;
 	vd->nslices	= 1;
 
 	if (vd->vdisk_label == VD_DISK_LABEL_EFI) {
+		/* Slice from a disk with an EFI label */
 		status = vd_setup_partition_efi(vd);
-		return (status);
+	} else {
+		/* Slice from a disk with a VTOC label */
+		ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+		status = vd_setup_partition_vtoc(vd);
 	}
 
-	/* Initialize dk_geom structure for single-slice device */
-	if (vd->dk_geom.dkg_nsect == 0) {
-		PRN("%s geometry claims 0 sectors per track", device_path);
-		return (EIO);
-	}
-	if (vd->dk_geom.dkg_nhead == 0) {
-		PRN("%s geometry claims 0 heads", device_path);
-		return (EIO);
-	}
-	vd->dk_geom.dkg_ncyl =
-	    vd->vdisk_size/vd->dk_geom.dkg_nsect/vd->dk_geom.dkg_nhead;
-	vd->dk_geom.dkg_acyl = 0;
-	vd->dk_geom.dkg_pcyl = vd->dk_geom.dkg_ncyl + vd->dk_geom.dkg_acyl;
-
-
-	/* Initialize vtoc structure for single-slice device */
-	bcopy(VD_VOLUME_NAME, vd->vtoc.v_volume,
-	    MIN(sizeof (VD_VOLUME_NAME), sizeof (vd->vtoc.v_volume)));
-	bzero(vd->vtoc.v_part, sizeof (vd->vtoc.v_part));
-	vd->vtoc.v_nparts = 1;
-	vd->vtoc.v_part[0].p_tag = V_UNASSIGNED;
-	vd->vtoc.v_part[0].p_flag = 0;
-	vd->vtoc.v_part[0].p_start = 0;
-	vd->vtoc.v_part[0].p_size = vd->vdisk_size;
-	bcopy(VD_ASCIILABEL, vd->vtoc.v_asciilabel,
-	    MIN(sizeof (VD_ASCIILABEL), sizeof (vd->vtoc.v_asciilabel)));
-
-
-	return (0);
+	return (status);
 }
 
 static int

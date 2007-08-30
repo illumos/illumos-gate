@@ -132,7 +132,10 @@ static void	vdc_terminate_ldc(vdc_t *vdc);
 static int	vdc_init_descriptor_ring(vdc_t *vdc);
 static void	vdc_destroy_descriptor_ring(vdc_t *vdc);
 static int	vdc_setup_devid(vdc_t *vdc);
-static void	vdc_store_efi(vdc_t *vdc, struct dk_gpt *efi);
+static void	vdc_store_label_efi(vdc_t *vdc, struct dk_gpt *efi);
+static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *, struct vtoc *);
+static void	vdc_store_label_unk(vdc_t *vdc);
+static boolean_t vdc_is_opened(vdc_t *vdc);
 
 /* handshake with vds */
 static int		vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver);
@@ -174,8 +177,10 @@ static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
 
 /* dkio */
 static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
-static int	vdc_create_fake_geometry(vdc_t *vdc);
-static int	vdc_setup_disk_layout(vdc_t *vdc);
+static void	vdc_create_fake_geometry(vdc_t *vdc);
+static int	vdc_validate_geometry(vdc_t *vdc);
+static void	vdc_validate(vdc_t *vdc);
+static void	vdc_validate_task(void *arg);
 static int	vdc_null_copy_func(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_get_wce_convert(vdc_t *vdc, void *from, void *to,
@@ -385,8 +390,22 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (vdc->open_count) {
+	if (vdc_is_opened(vdc)) {
 		DMSG(vdc, 0, "[%d] Cannot detach: device is open", instance);
+		return (DDI_FAILURE);
+	}
+
+	if (vdc->dkio_flush_pending) {
+		DMSG(vdc, 0,
+		    "[%d] Cannot detach: %d outstanding DKIO flushes\n",
+		    instance, vdc->dkio_flush_pending);
+		return (DDI_FAILURE);
+	}
+
+	if (vdc->validate_pending) {
+		DMSG(vdc, 0,
+		    "[%d] Cannot detach: %d outstanding validate request\n",
+		    instance, vdc->validate_pending);
 		return (DDI_FAILURE);
 	}
 
@@ -465,8 +484,8 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->vtoc)
 		kmem_free(vdc->vtoc, sizeof (struct vtoc));
 
-	if (vdc->label)
-		kmem_free(vdc->label, DK_LABEL_SIZE);
+	if (vdc->geom)
+		kmem_free(vdc->geom, sizeof (struct dk_geom));
 
 	if (vdc->devid) {
 		ddi_devid_unregister(dip);
@@ -518,7 +537,6 @@ vdc_do_attach(dev_info_t *dip)
 
 	vdc->dip	= dip;
 	vdc->instance	= instance;
-	vdc->open_count	= 0;
 	vdc->vdisk_type	= VD_DISK_TYPE_UNK;
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
 	vdc->state	= VDC_STATE_INIT;
@@ -529,6 +547,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->max_xfer_sz = maxphys / DEV_BSIZE;
 
 	vdc->vtoc = NULL;
+	vdc->geom = NULL;
 	vdc->cinfo = NULL;
 	vdc->minfo = NULL;
 
@@ -588,16 +607,18 @@ vdc_do_attach(dev_info_t *dip)
 	atomic_inc_32(&vdc_instance_count);
 
 	/*
-	 * Once the handshake is complete, we can use the DRing to send
-	 * requests to the vDisk server to calculate the geometry and
-	 * VTOC of the "disk"
+	 * Check the disk label. This will send requests and do the handshake.
+	 * We don't really care about the disk label now. What we really need is
+	 * the handshake do be done so that we know the type of the disk (slice
+	 * or full disk) and the appropriate device nodes can be created.
 	 */
-	status = vdc_setup_disk_layout(vdc);
-	if (status != 0) {
-		DMSG(vdc, 0, "[%d] Failed to discover disk layout (err%d)",
-		    vdc->instance, status);
-		goto return_status;
-	}
+	vdc->vdisk_label = VD_DISK_LABEL_UNK;
+	vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
+	vdc->geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
+
+	mutex_enter(&vdc->lock);
+	(void) vdc_validate_geometry(vdc);
+	mutex_exit(&vdc->lock);
 
 	/*
 	 * Now that we have the device info we can create the
@@ -933,15 +954,10 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 	int		i;
 
 	ASSERT(vdc != NULL);
+	ASSERT(vdc->vtoc != NULL);
 
 	instance = vdc->instance;
 	dip = vdc->dip;
-
-	if ((vdc->vtoc == NULL) || (vdc->vtoc->v_sanity != VTOC_SANE)) {
-		DMSG(vdc, 0, "![%d] Could not create device node property."
-		    " No VTOC available", instance);
-		return (ENXIO);
-	}
 
 	switch (vdc->vdisk_type) {
 	case VD_DISK_TYPE_DISK:
@@ -953,6 +969,17 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 	case VD_DISK_TYPE_UNK:
 	default:
 		return (EINVAL);
+	}
+
+	if (vdc->vdisk_label == VD_DISK_LABEL_UNK) {
+		/* remove all properties */
+		for (i = 0; i < num_slices; i++) {
+			dev = makedevice(ddi_driver_major(dip),
+			    VD_MAKE_DEV(instance, i));
+			(void) ddi_prop_remove(dev, dip, VDC_SIZE_PROP_NAME);
+			(void) ddi_prop_remove(dev, dip, VDC_NBLOCKS_PROP_NAME);
+		}
+		return (0);
 	}
 
 	for (i = 0; i < num_slices; i++) {
@@ -983,18 +1010,125 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 	return (0);
 }
 
+/*
+ * Function:
+ *	vdc_is_opened
+ *
+ * Description:
+ *	This function checks if any slice of a given virtual disk is
+ *	currently opened.
+ *
+ * Parameters:
+ *	vdc 		- soft state pointer
+ *
+ * Return Values
+ *	B_TRUE		- at least one slice is opened.
+ *	B_FALSE		- no slice is opened.
+ */
+static boolean_t
+vdc_is_opened(vdc_t *vdc)
+{
+	int i, nslices;
+
+	switch (vdc->vdisk_type) {
+	case VD_DISK_TYPE_DISK:
+		nslices = V_NUMPAR;
+		break;
+	case VD_DISK_TYPE_SLICE:
+		nslices = 1;
+		break;
+	case VD_DISK_TYPE_UNK:
+	default:
+		ASSERT(0);
+	}
+
+	/* check if there's any layered open */
+	for (i = 0; i < nslices; i++) {
+		if (vdc->open_lyr[i] > 0)
+			return (B_TRUE);
+	}
+
+	/* check if there is any other kind of open */
+	for (i = 0; i < OTYPCNT; i++) {
+		if (vdc->open[i] != 0)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+static int
+vdc_mark_opened(vdc_t *vdc, int slice, int flag, int otyp)
+{
+	uint8_t slicemask;
+	int i;
+
+	ASSERT(otyp < OTYPCNT);
+	ASSERT(slice < V_NUMPAR);
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	slicemask = 1 << slice;
+
+	/* check if slice is already exclusively opened */
+	if (vdc->open_excl & slicemask)
+		return (EBUSY);
+
+	/* if open exclusive, check if slice is already opened */
+	if (flag & FEXCL) {
+		if (vdc->open_lyr[slice] > 0)
+			return (EBUSY);
+		for (i = 0; i < OTYPCNT; i++) {
+			if (vdc->open[i] & slicemask)
+				return (EBUSY);
+		}
+		vdc->open_excl |= slicemask;
+	}
+
+	/* mark slice as opened */
+	if (otyp == OTYP_LYR) {
+		vdc->open_lyr[slice]++;
+	} else {
+		vdc->open[otyp] |= slicemask;
+	}
+
+	return (0);
+}
+
+static void
+vdc_mark_closed(vdc_t *vdc, int slice, int flag, int otyp)
+{
+	uint8_t slicemask;
+
+	ASSERT(otyp < OTYPCNT);
+	ASSERT(slice < V_NUMPAR);
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	slicemask = 1 << slice;
+
+	if (otyp == OTYP_LYR) {
+		ASSERT(vdc->open_lyr[slice] > 0);
+		vdc->open_lyr[slice]--;
+	} else {
+		vdc->open[otyp] &= ~slicemask;
+	}
+
+	if (flag & FEXCL)
+		vdc->open_excl &= ~slicemask;
+}
+
 static int
 vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	int		instance;
-	vdc_t		*vdc;
+	int	instance;
+	int	slice, status = 0;
+	vdc_t	*vdc;
 
 	ASSERT(dev != NULL);
 	instance = VDCUNIT(*dev);
 
-	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
+	if (otyp >= OTYPCNT)
 		return (EINVAL);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
@@ -1005,11 +1139,53 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	DMSG(vdc, 0, "minor = %d flag = %x, otyp = %x\n",
 	    getminor(*dev), flag, otyp);
 
+	slice = VDCPART(*dev);
+
 	mutex_enter(&vdc->lock);
-	vdc->open_count++;
+
+	status = vdc_mark_opened(vdc, slice, flag, otyp);
+
+	if (status != 0) {
+		mutex_exit(&vdc->lock);
+		return (status);
+	}
+
+	if (flag & (FNDELAY | FNONBLOCK)) {
+
+		/* don't resubmit a validate request if there's already one */
+		if (vdc->validate_pending > 0) {
+			mutex_exit(&vdc->lock);
+			return (0);
+		}
+
+		/* call vdc_validate() asynchronously to avoid blocking */
+		if (taskq_dispatch(system_taskq, vdc_validate_task,
+		    (void *)vdc, TQ_NOSLEEP) == NULL) {
+			vdc_mark_closed(vdc, slice, flag, otyp);
+			mutex_exit(&vdc->lock);
+			return (ENXIO);
+		}
+
+		vdc->validate_pending++;
+		mutex_exit(&vdc->lock);
+		return (0);
+	}
+
 	mutex_exit(&vdc->lock);
 
-	return (0);
+	vdc_validate(vdc);
+
+	mutex_enter(&vdc->lock);
+
+	if (vdc->vdisk_label == VD_DISK_LABEL_UNK ||
+	    vdc->vtoc->v_part[slice].p_size == 0) {
+		vdc_mark_closed(vdc, slice, flag, otyp);
+		status = EIO;
+	}
+
+	mutex_exit(&vdc->lock);
+
+	return (status);
 }
 
 static int
@@ -1018,11 +1194,12 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	_NOTE(ARGUNUSED(cred))
 
 	int	instance;
+	int	slice;
 	vdc_t	*vdc;
 
 	instance = VDCUNIT(dev);
 
-	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
+	if (otyp >= OTYPCNT)
 		return (EINVAL);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
@@ -1031,19 +1208,11 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	}
 
 	DMSG(vdc, 0, "[%d] flag = %x, otyp = %x\n", instance, flag, otyp);
-	if (vdc->dkio_flush_pending) {
-		DMSG(vdc, 0,
-		    "[%d] Cannot detach: %d outstanding DKIO flushes\n",
-		    instance, vdc->dkio_flush_pending);
-		return (EBUSY);
-	}
 
-	/*
-	 * Should not need the mutex here, since the framework should protect
-	 * against more opens on this device, but just in case.
-	 */
+	slice = VDCPART(dev);
+
 	mutex_enter(&vdc->lock);
-	vdc->open_count--;
+	vdc_mark_closed(vdc, slice, flag, otyp);
 	mutex_exit(&vdc->lock);
 
 	return (0);
@@ -4072,6 +4241,32 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		/*
 		 * We now verify the attributes sent by vds.
 		 */
+		if (attr_msg->vdisk_size == 0) {
+			DMSG(vdc, 0, "[%d] Invalid disk size from vds",
+			    vdc->instance);
+			status = EINVAL;
+			break;
+		}
+
+		if (attr_msg->max_xfer_sz == 0) {
+			DMSG(vdc, 0, "[%d] Invalid transfer size from vds",
+			    vdc->instance);
+			status = EINVAL;
+			break;
+		}
+
+		/*
+		 * If the disk size is already set check that it hasn't changed.
+		 */
+		if ((vdc->vdisk_size != 0) &&
+		    (vdc->vdisk_size != attr_msg->vdisk_size)) {
+			DMSG(vdc, 0, "[%d] Different disk size from vds "
+			    "(old=0x%lx - new=0x%lx", vdc->instance,
+			    vdc->vdisk_size, attr_msg->vdisk_size)
+			status = EINVAL;
+			break;
+		}
+
 		vdc->vdisk_size = attr_msg->vdisk_size;
 		vdc->vdisk_type = attr_msg->vdisk_type;
 
@@ -4107,6 +4302,11 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 			break;
 		}
 
+		/*
+		 * Now that we have received all attributes we can create a
+		 * fake geometry for the disk.
+		 */
+		vdc_create_fake_geometry(vdc);
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -4394,52 +4594,52 @@ vdc_dkio_flush_cb(void *arg)
  *	This function implements the DKIOCGAPART ioctl.
  *
  * Arguments:
- *	dev	- device
+ *	vdc	- soft state pointer
  *	arg	- a pointer to a dk_map[NDKMAP] or dk_map32[NDKMAP] structure
  *	flag	- ioctl flags
  */
 static int
-vdc_dkio_get_partition(dev_t dev, caddr_t arg, int flag)
+vdc_dkio_get_partition(vdc_t *vdc, caddr_t arg, int flag)
 {
-	struct dk_geom geom;
-	struct vtoc vtoc;
+	struct dk_geom *geom;
+	struct vtoc *vtoc;
 	union {
 		struct dk_map map[NDKMAP];
 		struct dk_map32 map32[NDKMAP];
 	} data;
 	int i, rv, size;
 
-	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL);
-	if (rv != 0)
-		return (rv);
+	mutex_enter(&vdc->lock);
 
-	rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc, FKIOCTL);
-	if (rv != 0)
+	if ((rv = vdc_validate_geometry(vdc)) != 0) {
+		mutex_exit(&vdc->lock);
 		return (rv);
+	}
 
-	if (vtoc.v_nparts != NDKMAP ||
-	    geom.dkg_nhead == 0 || geom.dkg_nsect == 0)
-		return (EINVAL);
+	vtoc = vdc->vtoc;
+	geom = vdc->geom;
 
 	if (ddi_model_convert_from(flag & FMODELS) == DDI_MODEL_ILP32) {
 
-		for (i = 0; i < NDKMAP; i++) {
-			data.map32[i].dkl_cylno = vtoc.v_part[i].p_start /
-			    (geom.dkg_nhead * geom.dkg_nsect);
-			data.map32[i].dkl_nblk = vtoc.v_part[i].p_size;
+		for (i = 0; i < vtoc->v_nparts; i++) {
+			data.map32[i].dkl_cylno = vtoc->v_part[i].p_start /
+			    (geom->dkg_nhead * geom->dkg_nsect);
+			data.map32[i].dkl_nblk = vtoc->v_part[i].p_size;
 		}
 		size = NDKMAP * sizeof (struct dk_map32);
 
 	} else {
 
-		for (i = 0; i < NDKMAP; i++) {
-			data.map[i].dkl_cylno = vtoc.v_part[i].p_start /
-			    (geom.dkg_nhead * geom.dkg_nsect);
-			data.map[i].dkl_nblk = vtoc.v_part[i].p_size;
+		for (i = 0; i < vtoc->v_nparts; i++) {
+			data.map[i].dkl_cylno = vtoc->v_part[i].p_start /
+			    (geom->dkg_nhead * geom->dkg_nsect);
+			data.map[i].dkl_nblk = vtoc->v_part[i].p_size;
 		}
 		size = NDKMAP * sizeof (struct dk_map);
 
 	}
+
+	mutex_exit(&vdc->lock);
 
 	if (ddi_copyout(&data, arg, size, flag) != 0)
 		return (EFAULT);
@@ -4612,7 +4812,6 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	size_t		alloc_len = 0;		/* #bytes to allocate mem for */
 	caddr_t		mem_p = NULL;
 	size_t		nioctls = (sizeof (dk_ioctl)) / (sizeof (dk_ioctl[0]));
-	struct vtoc	vtoc_saved;
 	vdc_dk_ioctl_t	*iop;
 
 	vdc = ddi_get_soft_state(vdc_state, instance);
@@ -4669,6 +4868,9 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	case DIOCTL_RWCMD:
 		{
+			if (vdc->cinfo == NULL)
+				return (ENXIO);
+
 			if (vdc->cinfo->dki_ctype != DKC_DIRECT)
 				return (ENOTTY);
 
@@ -4677,10 +4879,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	case DKIOCGAPART:
 		{
-			if (vdc->vdisk_label != VD_DISK_LABEL_VTOC)
-				return (ENOTSUP);
-
-			return (vdc_dkio_get_partition(dev, arg, mode));
+			return (vdc_dkio_get_partition(vdc, arg, mode));
 		}
 
 	case DKIOCINFO:
@@ -4771,6 +4970,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 				/* clean up if dispatch fails */
 				mutex_enter(&vdc->lock);
 				vdc->dkio_flush_pending--;
+				mutex_exit(&vdc->lock);
 				kmem_free(dkarg, sizeof (vdc_dk_arg_t));
 			}
 
@@ -4789,14 +4989,6 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	ASSERT(alloc_len >= 0); /* sanity check */
 	if (alloc_len > 0)
 		mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
-
-	if (cmd == DKIOCSVTOC) {
-		/*
-		 * Save a copy of the current VTOC so that we can roll back
-		 * if the setting of the new VTOC fails.
-		 */
-		bcopy(vdc->vtoc, &vtoc_saved, sizeof (struct vtoc));
-	}
 
 	/*
 	 * Call the conversion function for this ioctl which, if necessary,
@@ -4820,6 +5012,15 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	    VDCPART(dev), 0, CB_SYNC, (void *)(uint64_t)mode,
 	    VIO_both_dir);
 
+	if (cmd == DKIOCSVTOC || cmd == DKIOCSETEFI) {
+		/*
+		 * The disk label may have changed. Revalidate the disk
+		 * geometry. This will also update the device nodes and
+		 * properties.
+		 */
+		vdc_validate(vdc);
+	}
+
 	if (rv != 0) {
 		/*
 		 * This is not necessarily an error. The ioctl could
@@ -4831,56 +5032,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 
-		if (cmd == DKIOCSVTOC) {
-			/* update of the VTOC has failed, roll back */
-			bcopy(&vtoc_saved, vdc->vtoc, sizeof (struct vtoc));
-		}
-
 		return (rv);
-	}
-
-	if (cmd == DKIOCSVTOC) {
-		/*
-		 * The VTOC has been changed. We need to update the device
-		 * nodes to handle the case where an EFI label has been
-		 * changed to a VTOC label. We also try and update the device
-		 * node properties. Failing to set the properties should
-		 * not cause an error to be return the caller though.
-		 */
-		vdc->vdisk_label = VD_DISK_LABEL_VTOC;
-		(void) vdc_create_device_nodes_vtoc(vdc);
-
-		if (vdc_create_device_nodes_props(vdc)) {
-			DMSG(vdc, 0, "![%d] Failed to update device nodes"
-			    " properties", vdc->instance);
-		}
-
-	} else if (cmd == DKIOCSETEFI) {
-		/*
-		 * The EFI has been changed. We need to update the device
-		 * nodes to handle the case where a VTOC label has been
-		 * changed to an EFI label. We also try and update the device
-		 * node properties. Failing to set the properties should
-		 * not cause an error to be return the caller though.
-		 */
-		struct dk_gpt *efi;
-		size_t efi_len;
-
-		vdc->vdisk_label = VD_DISK_LABEL_EFI;
-		(void) vdc_create_device_nodes_efi(vdc);
-
-		rv = vdc_efi_alloc_and_read(dev, &efi, &efi_len);
-
-		if (rv == 0) {
-			vdc_store_efi(vdc, efi);
-			rv = vdc_create_device_nodes_props(vdc);
-			vd_efi_free(efi, efi_len);
-		}
-
-		if (rv) {
-			DMSG(vdc, 0, "![%d] Failed to update device nodes"
-			    " properties", vdc->instance);
-		}
 	}
 
 	/*
@@ -5046,6 +5198,8 @@ vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 static int
 vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
+	_NOTE(ARGUNUSED(vdc))
+
 	void		*tmp_mem = NULL;
 	struct vtoc	vt;
 	struct vtoc	*vtp = &vt;
@@ -5077,12 +5231,6 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	} else {
 		vtp = tmp_mem;
 	}
-
-	/*
-	 * The VTOC is being changed, then vdc needs to update the copy
-	 * it saved in the soft state structure.
-	 */
-	bcopy(vtp, vdc->vtoc, sizeof (struct vtoc));
 
 	VTOC2VD_VTOC(vtp, &vtvd);
 	bcopy(&vtvd, to, sizeof (vd_vtoc_t));
@@ -5279,23 +5427,20 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
  *	vdc	- soft state pointer for this instance of the device driver.
  *
  * Return Code:
- *	0	- Success
+ *	none.
  */
-static int
+static void
 vdc_create_fake_geometry(vdc_t *vdc)
 {
 	ASSERT(vdc != NULL);
-
-	/*
-	 * Check if max_xfer_sz and vdisk_size are valid
-	 */
-	if (vdc->vdisk_size == 0 || vdc->max_xfer_sz == 0)
-		return (EIO);
+	ASSERT(vdc->vdisk_size != 0);
+	ASSERT(vdc->max_xfer_sz != 0);
 
 	/*
 	 * DKIOCINFO support
 	 */
-	vdc->cinfo = kmem_zalloc(sizeof (struct dk_cinfo), KM_SLEEP);
+	if (vdc->cinfo == NULL)
+		vdc->cinfo = kmem_zalloc(sizeof (struct dk_cinfo), KM_SLEEP);
 
 	(void) strcpy(vdc->cinfo->dki_cname, VDC_DRIVER_NAME);
 	(void) strcpy(vdc->cinfo->dki_dname, VDC_DRIVER_NAME);
@@ -5329,59 +5474,65 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	vdc->minfo->dki_media_type = DK_FIXED_DISK;
 	vdc->minfo->dki_capacity = vdc->vdisk_size;
 	vdc->minfo->dki_lbsize = DEV_BSIZE;
+}
 
-	return (0);
+static ushort_t
+vdc_lbl2cksum(struct dk_label *label)
+{
+	int	count;
+	ushort_t sum, *sp;
+
+	count =	(sizeof (struct dk_label)) / (sizeof (short)) - 1;
+	sp = (ushort_t *)label;
+	sum = 0;
+	while (count--) {
+		sum ^= *sp++;
+	}
+
+	return (sum);
 }
 
 /*
  * Function:
- *	vdc_setup_disk_layout()
+ *	vdc_validate_geometry
  *
  * Description:
- *	This routine discovers all the necessary details about the "disk"
- *	by requesting the data that is available from the vDisk server and by
- *	faking up the rest of the data.
+ *	This routine discovers the label and geometry of the disk. It stores
+ *	the disk label and related information in the vdc structure. If it
+ *	fails to validate the geometry or to discover the disk label then
+ *	the label is marked as unknown (VD_DISK_LABEL_UNK).
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
  *
  * Return Code:
- *	0	- Success
+ *	0	- success.
+ *	EINVAL	- unknown disk label.
+ *	ENOTSUP	- geometry not applicable (EFI label).
+ *	EIO	- error accessing the disk.
  */
 static int
-vdc_setup_disk_layout(vdc_t *vdc)
+vdc_validate_geometry(vdc_t *vdc)
 {
 	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
-	int	slice = 0;
-	int	rv, error;
+	int	rv;
+	struct dk_label label;
+	struct dk_geom geom;
+	struct vtoc vtoc;
 
 	ASSERT(vdc != NULL);
+	ASSERT(vdc->vtoc != NULL && vdc->geom != NULL);
+	ASSERT(MUTEX_HELD(&vdc->lock));
 
-	if (vdc->vtoc == NULL)
-		vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
+	mutex_exit(&vdc->lock);
 
 	dev = makedevice(ddi_driver_major(vdc->dip),
 	    VD_MAKE_DEV(vdc->instance, 0));
-	rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)vdc->vtoc, FKIOCTL);
 
-	if (rv && rv != ENOTSUP) {
-		DMSG(vdc, 0, "[%d] Failed to get VTOC (err=%d)",
-		    vdc->instance, rv);
-		return (rv);
-	}
-
-	/*
-	 * The process of attempting to read VTOC will initiate
-	 * the handshake and establish a connection. Following
-	 * handshake, go ahead and create geometry.
-	 */
-	error = vdc_create_fake_geometry(vdc);
-	if (error != 0) {
-		DMSG(vdc, 0, "[%d] Failed to create disk geometry (err%d)",
-		    vdc->instance, error);
-		return (error);
-	}
+	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL);
+	if (rv == 0)
+		rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc, FKIOCTL);
 
 	if (rv == ENOTSUP) {
 		/*
@@ -5396,58 +5547,171 @@ vdc_setup_disk_layout(vdc_t *vdc)
 		if (rv) {
 			DMSG(vdc, 0, "[%d] Failed to get EFI (err=%d)",
 			    vdc->instance, rv);
-			return (rv);
+			mutex_enter(&vdc->lock);
+			vdc_store_label_unk(vdc);
+			return (EIO);
 		}
 
-		vdc->vdisk_label = VD_DISK_LABEL_EFI;
-		vdc_store_efi(vdc, efi);
+		mutex_enter(&vdc->lock);
+		vdc_store_label_efi(vdc, efi);
 		vd_efi_free(efi, efi_len);
+		return (ENOTSUP);
+	}
 
+	if (rv != 0) {
+		DMSG(vdc, 0, "[%d] Failed to get VTOC (err=%d)",
+		    vdc->instance, rv);
+		mutex_enter(&vdc->lock);
+		vdc_store_label_unk(vdc);
+		if (rv != EINVAL)
+			rv = EIO;
+		return (rv);
+	}
+
+	/* check that geometry and vtoc are valid */
+	if (geom.dkg_nhead == 0 || geom.dkg_nsect == 0 ||
+	    vtoc.v_sanity != VTOC_SANE) {
+		mutex_enter(&vdc->lock);
+		vdc_store_label_unk(vdc);
+		return (EINVAL);
+	}
+
+	/*
+	 * We have a disk and a valid VTOC. However this does not mean
+	 * that the disk currently have a VTOC label. The returned VTOC may
+	 * be a default VTOC to be used for configuring the disk (this is
+	 * what is done for disk image). So we read the label from the
+	 * beginning of the disk to ensure we really have a VTOC label.
+	 *
+	 * FUTURE: This could be the default way for reading the VTOC
+	 * from the disk as opposed to sending the VD_OP_GET_VTOC
+	 * to the server. This will be the default if vdc is implemented
+	 * ontop of cmlb.
+	 */
+
+	/*
+	 * Single slice disk does not support read using an absolute disk
+	 * offset so we just rely on the DKIOCGVTOC ioctl in that case.
+	 */
+	if (vdc->vdisk_type == VD_DISK_TYPE_SLICE) {
+		mutex_enter(&vdc->lock);
+		if (vtoc.v_nparts != 1) {
+			vdc_store_label_unk(vdc);
+			return (EINVAL);
+		}
+		vdc_store_label_vtoc(vdc, &geom, &vtoc);
 		return (0);
 	}
 
-	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
-
-	/*
-	 * FUTURE: This could be default way for reading the VTOC
-	 * from the disk as supposed to sending the VD_OP_GET_VTOC
-	 * to the server. Currently this is a sanity check.
-	 *
-	 * find the slice that represents the entire "disk" and use that to
-	 * read the disk label. The convention in Solaris is that slice 2
-	 * represents the whole disk so we check that it is, otherwise we
-	 * default to slice 0
-	 */
-	if ((vdc->vdisk_type == VD_DISK_TYPE_DISK) &&
-	    (vdc->vtoc->v_part[2].p_tag == V_BACKUP)) {
-		slice = 2;
-	} else {
-		slice = 0;
+	if (vtoc.v_nparts != V_NUMPAR) {
+		mutex_enter(&vdc->lock);
+		vdc_store_label_unk(vdc);
+		return (EINVAL);
 	}
 
 	/*
 	 * Read disk label from start of disk
 	 */
-	vdc->label = kmem_zalloc(DK_LABEL_SIZE, KM_SLEEP);
 	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
 	bioinit(buf);
-	buf->b_un.b_addr = (caddr_t)vdc->label;
+	buf->b_un.b_addr = (caddr_t)&label;
 	buf->b_bcount = DK_LABEL_SIZE;
 	buf->b_flags = B_BUSY | B_READ;
 	buf->b_dev = dev;
-	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)vdc->label,
-	    DK_LABEL_SIZE, slice, 0, CB_STRATEGY, buf, VIO_read_dir);
+	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)&label,
+	    DK_LABEL_SIZE, VD_SLICE_NONE, 0, CB_STRATEGY, buf, VIO_read_dir);
 	if (rv) {
 		DMSG(vdc, 1, "[%d] Failed to read disk block 0\n",
 		    vdc->instance);
-		kmem_free(buf, sizeof (buf_t));
-		return (rv);
+	} else {
+		rv = biowait(buf);
+		biofini(buf);
 	}
-	rv = biowait(buf);
-	biofini(buf);
 	kmem_free(buf, sizeof (buf_t));
 
-	return (rv);
+	if (rv != 0 || label.dkl_magic != DKL_MAGIC ||
+	    label.dkl_cksum != vdc_lbl2cksum(&label)) {
+		DMSG(vdc, 1, "[%d] Got VTOC with invalid label\n",
+		    vdc->instance);
+		mutex_enter(&vdc->lock);
+		vdc_store_label_unk(vdc);
+		return (EINVAL);
+	}
+
+	mutex_enter(&vdc->lock);
+	vdc_store_label_vtoc(vdc, &geom, &vtoc);
+	return (0);
+}
+
+/*
+ * Function:
+ *	vdc_validate
+ *
+ * Description:
+ *	This routine discovers the label of the disk and create the
+ *	appropriate device nodes if the label has changed.
+ *
+ * Arguments:
+ *	vdc	- soft state pointer for this instance of the device driver.
+ *
+ * Return Code:
+ *	none.
+ */
+static void
+vdc_validate(vdc_t *vdc)
+{
+	vd_disk_label_t old_label;
+	struct vtoc old_vtoc;
+	int rv;
+
+	ASSERT(!MUTEX_HELD(&vdc->lock));
+
+	mutex_enter(&vdc->lock);
+
+	/* save the current label and vtoc */
+	old_label = vdc->vdisk_label;
+	bcopy(vdc->vtoc, &old_vtoc, sizeof (struct vtoc));
+
+	/* check the geometry */
+	(void) vdc_validate_geometry(vdc);
+
+	/* if the disk label has changed, update device nodes */
+	if (vdc->vdisk_label != old_label) {
+
+		if (vdc->vdisk_label == VD_DISK_LABEL_EFI)
+			rv = vdc_create_device_nodes_efi(vdc);
+		else
+			rv = vdc_create_device_nodes_vtoc(vdc);
+
+		if (rv != 0) {
+			DMSG(vdc, 0, "![%d] Failed to update device nodes",
+			    vdc->instance);
+		}
+	}
+
+	/* if the vtoc has changed, update device nodes properties */
+	if (bcmp(vdc->vtoc, &old_vtoc, sizeof (struct vtoc)) != 0) {
+
+		if (vdc_create_device_nodes_props(vdc) != 0) {
+			DMSG(vdc, 0, "![%d] Failed to update device nodes"
+			    " properties", vdc->instance);
+		}
+	}
+
+	mutex_exit(&vdc->lock);
+}
+
+static void
+vdc_validate_task(void *arg)
+{
+	vdc_t *vdc = (vdc_t *)arg;
+
+	vdc_validate(vdc);
+
+	mutex_enter(&vdc->lock);
+	ASSERT(vdc->validate_pending > 0);
+	vdc->validate_pending--;
+	mutex_exit(&vdc->lock);
 }
 
 /*
@@ -5553,10 +5817,14 @@ vdc_setup_devid(vdc_t *vdc)
 }
 
 static void
-vdc_store_efi(vdc_t *vdc, struct dk_gpt *efi)
+vdc_store_label_efi(vdc_t *vdc, struct dk_gpt *efi)
 {
 	struct vtoc *vtoc = vdc->vtoc;
 
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	vdc->vdisk_label = VD_DISK_LABEL_EFI;
+	bzero(vdc->geom, sizeof (struct dk_geom));
 	vd_efi_to_vtoc(efi, vtoc);
 	if (vdc->vdisk_type == VD_DISK_TYPE_SLICE) {
 		/*
@@ -5572,4 +5840,24 @@ vdc_store_efi(vdc_t *vdc, struct dk_gpt *efi)
 		vtoc->v_part[0].p_start = vtoc->v_part[VD_EFI_WD_SLICE].p_start;
 		vtoc->v_part[0].p_size =  vtoc->v_part[VD_EFI_WD_SLICE].p_size;
 	}
+}
+
+static void
+vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct vtoc *vtoc)
+{
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
+	bcopy(vtoc, vdc->vtoc, sizeof (struct vtoc));
+	bcopy(geom, vdc->geom, sizeof (struct dk_geom));
+}
+
+static void
+vdc_store_label_unk(vdc_t *vdc)
+{
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	vdc->vdisk_label = VD_DISK_LABEL_UNK;
+	bzero(vdc->vtoc, sizeof (struct vtoc));
+	bzero(vdc->geom, sizeof (struct dk_geom));
 }

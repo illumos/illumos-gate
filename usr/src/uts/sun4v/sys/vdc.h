@@ -245,8 +245,14 @@ typedef struct vdc {
 	vdc_lc_state_t	lifecycle;	/* Current state of the vdc instance */
 
 	int		hshake_cnt;	/* number of failed handshakes */
-	int		open_count;	/* count of outstanding opens */
+	uint8_t		open[OTYPCNT];	/* mask of opened slices */
+	uint8_t		open_excl;	/* mask of exclusively opened slices */
+	ulong_t		open_lyr[V_NUMPAR]; /* number of layered opens */
 	int		dkio_flush_pending; /* # outstanding DKIO flushes */
+	int		validate_pending; /* # outstanding validate request */
+	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
+	struct vtoc	*vtoc;		/* structure to store VTOC data */
+	struct dk_geom	*geom;		/* structure to store geometry data */
 
 	kthread_t	*msg_proc_thr;	/* main msg processing thread */
 
@@ -273,14 +279,11 @@ typedef struct vdc {
 
 	vio_ver_t	ver;		/* version number agreed with server */
 	vd_disk_type_t	vdisk_type;	/* type of device/disk being imported */
-	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
 	uint64_t	vdisk_size;	/* device size in blocks */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
 	uint64_t	block_size;	/* device block size used */
-	struct dk_label	*label;		/* structure to store disk label */
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
-	struct vtoc	*vtoc;		/* structure to store VTOC data */
 	ddi_devid_t	devid;		/* device id */
 	uint64_t	ctimeout;	/* connection timeout in seconds */
 	boolean_t	ctimeout_reached; /* connection timeout has expired */
