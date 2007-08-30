@@ -962,8 +962,14 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 
-	/* Before the roll back destroy the zil */
-	zil_rollback_destroy(((objset_impl_t *)ds->ds_user_ptr)->os_zil, tx);
+	/*
+	 * Before the roll back destroy the zil.
+	 * Note, ds_user_ptr can be null if we are doing a "zfs receive -F"
+	 */
+	if (ds->ds_user_ptr != NULL) {
+		zil_rollback_destroy(
+		    ((objset_impl_t *)ds->ds_user_ptr)->os_zil, tx);
+	}
 
 	/* Zero out the deadlist. */
 	bplist_close(&ds->ds_deadlist);
