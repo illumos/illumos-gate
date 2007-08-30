@@ -8167,16 +8167,18 @@ tcp_fanout:
 			 * duplicates must be discarded. Filtering is active
 			 * only if the the ip_cgtp_filter ndd variable is
 			 * non-zero.
-			 *
-			 * Only applies to the shared stack since the
-			 * filter_ops do not carry an ip_stack_t or zoneid.
 			 */
-			if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL) &&
-			    ipst->ips_netstack->netstack_stackid ==
-			    GLOBAL_NETSTACKID) {
-				int cgtp_flt_pkt =
-				    ip_cgtp_filter_ops->cfo_filter_v6(
-				    inill->ill_rq, ip6h, fraghdr);
+			if (ipst->ips_ip_cgtp_filter &&
+			    ipst->ips_ip_cgtp_filter_ops != NULL) {
+				int cgtp_flt_pkt;
+				netstackid_t stackid;
+
+				stackid = ipst->ips_netstack->netstack_stackid;
+
+				cgtp_flt_pkt =
+				    ipst->ips_ip_cgtp_filter_ops->cfo_filter_v6(
+				    stackid, inill->ill_phyint->phyint_ifindex,
+				    ip6h, fraghdr);
 				if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
 					freemsg(mp);
 					return;

@@ -3279,39 +3279,42 @@ extern void tnet_fini(void);
 /* Hooks for CGTP (multirt routes) filtering module */
 #define	CGTP_FILTER_REV_1	1
 #define	CGTP_FILTER_REV_2	2
-#define	CGTP_FILTER_REV		CGTP_FILTER_REV_2
+#define	CGTP_FILTER_REV_3	3
+#define	CGTP_FILTER_REV		CGTP_FILTER_REV_3
 
-/* cfo_filter, cfo_filter_fp, cfo_filter_v6 hooks return values */
+/* cfo_filter and cfo_filter_v6 hooks return values */
 #define	CGTP_IP_PKT_NOT_CGTP	0
 #define	CGTP_IP_PKT_PREMIUM	1
 #define	CGTP_IP_PKT_DUPLICATE	2
 
+/* Version 3 of the filter interface */
 typedef struct cgtp_filter_ops {
-	int	cfo_filter_rev;
-	int	(*cfo_change_state)(int);
-	int	(*cfo_add_dest_v4)(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t);
-	int	(*cfo_del_dest_v4)(ipaddr_t, ipaddr_t);
-	int	(*cfo_add_dest_v6)(in6_addr_t *, in6_addr_t *, in6_addr_t *,
-		    in6_addr_t *);
-	int	(*cfo_del_dest_v6)(in6_addr_t *, in6_addr_t *);
-	int	(*cfo_filter)(queue_t *, mblk_t *);
-	int	(*cfo_filter_fp)(queue_t *, mblk_t *);
-	int	(*cfo_filter_v6)(queue_t *, ip6_t *, ip6_frag_t *);
+	int	cfo_filter_rev;			/* CGTP_FILTER_REV_3 */
+	int	(*cfo_change_state)(netstackid_t, int);
+	int	(*cfo_add_dest_v4)(netstackid_t, ipaddr_t, ipaddr_t,
+		    ipaddr_t, ipaddr_t);
+	int	(*cfo_del_dest_v4)(netstackid_t, ipaddr_t, ipaddr_t);
+	int	(*cfo_add_dest_v6)(netstackid_t, in6_addr_t *, in6_addr_t *,
+		    in6_addr_t *, in6_addr_t *);
+	int	(*cfo_del_dest_v6)(netstackid_t, in6_addr_t *, in6_addr_t *);
+	int	(*cfo_filter)(netstackid_t, uint_t, mblk_t *);
+	int	(*cfo_filter_v6)(netstackid_t, uint_t, ip6_t *,
+		    ip6_frag_t *);
 } cgtp_filter_ops_t;
 
 #define	CGTP_MCAST_SUCCESS	1
 
 /*
- * The separate CGTP module needs these as globals. It uses the first
- * to unregister (since there is no ip_cgtp_filter_unregister() function)
- * and it uses the second one to verify that the filter has been
- * turned off (a ip_cgtp_filter_active() function would be good for that.)
+ * The separate CGTP module needs this global symbol so that it
+ * can check the version and determine whether to use the old or the new
+ * version of the filtering interface.
  */
-extern cgtp_filter_ops_t *ip_cgtp_filter_ops;
-extern boolean_t ip_cgtp_filter;
+extern int	ip_cgtp_filter_rev;
 
 extern int	ip_cgtp_filter_supported(void);
-extern int	ip_cgtp_filter_register(cgtp_filter_ops_t *);
+extern int	ip_cgtp_filter_register(netstackid_t, cgtp_filter_ops_t *);
+extern int	ip_cgtp_filter_unregister(netstackid_t);
+extern int	ip_cgtp_filter_is_registered(netstackid_t);
 
 /* Flags for ire_multirt_lookup() */
 

@@ -821,10 +821,12 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * when the dst address is a multicast, because an
 		 * IP source address cannot be a multicast.
 		 */
-		if ((ip_cgtp_filter_ops != NULL) &&
-		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID &&
+		if (ipst->ips_ip_cgtp_filter_ops != NULL &&
 		    !IN6_IS_ADDR_MULTICAST(&(ire->ire_addr_v6))) {
-			int res = ip_cgtp_filter_ops->cfo_add_dest_v6(
+			int res;
+
+			res = ipst->ips_ip_cgtp_filter_ops->cfo_add_dest_v6(
+			    ipst->ips_netstack->netstack_stackid,
 			    &ire->ire_addr_v6,
 			    &ire->ire_gateway_addr_v6,
 			    &ire->ire_src_addr_v6,
@@ -1022,9 +1024,9 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * Packets coming from that address will no longer be
 		 * filtered to remove duplicates.
 		 */
-		if (ip_cgtp_filter_ops != NULL &&
-		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
-			err = ip_cgtp_filter_ops->cfo_del_dest_v6(
+		if (ipst->ips_ip_cgtp_filter_ops != NULL) {
+			err = ipst->ips_ip_cgtp_filter_ops->cfo_del_dest_v6(
+			    ipst->ips_netstack->netstack_stackid,
 			    &ire->ire_addr_v6, &ire->ire_gateway_addr_v6);
 		}
 	}

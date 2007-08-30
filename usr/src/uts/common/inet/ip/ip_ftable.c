@@ -831,7 +831,7 @@ ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
 	 * This essentially prevents insertion of incomplete RTF_MULTIRT
 	 * ires in cachetable.
 	 */
-	if (ip_cgtp_filter &&
+	if (ipst->ips_ip_cgtp_filter &&
 	    ((ire->ire_flags & RTF_MULTIRT) ||
 	    ((sire != NULL) && (sire->ire_flags & RTF_MULTIRT)))) {
 		ip3dbg(("ire_forward: packet is to be multirouted- "
@@ -1363,7 +1363,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	}
 
 	/* IP Filter and CGTP dont mix. So bail out if CGTP is on */
-	if (ip_cgtp_filter &&
+	if (ipst->ips_ip_cgtp_filter &&
 	    ((ire->ire_flags & RTF_MULTIRT) ||
 	    ((sire != NULL) && (sire->ire_flags & RTF_MULTIRT)))) {
 		ip1dbg(("ipfil_sendpkt: IPFilter does not work with CGTP\n"));

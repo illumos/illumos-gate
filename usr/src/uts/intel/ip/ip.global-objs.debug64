@@ -88,8 +88,6 @@ ip_aroff_template
 ip_aron_template
 ip_aru_template
 ip_cache_table_size
-ip_cgtp_filter
-ip_cgtp_filter_ops
 ip_cgtp_filter_rev
 ip_debug
 ip_g_all_ones

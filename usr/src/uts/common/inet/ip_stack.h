@@ -308,6 +308,9 @@ struct ip_stack {
 	/* Time since last warning issued. */
 	hrtime_t	ips_multirt_bad_mtu_last_time;
 
+	struct cgtp_filter_ops *ips_ip_cgtp_filter_ops;	/* CGTP hooks */
+	boolean_t	ips_ip_cgtp_filter;	/* Enable/disable CGTP hooks */
+
 	kmutex_t	ips_ip_trash_timer_lock;
 	timeout_id_t	ips_ip_ire_expire_id;	/* IRE expiration timer. */
 	struct ipsq_s	*ips_ipsq_g_head;

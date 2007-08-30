@@ -7278,9 +7278,10 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			ire_refrele(ire_dst);
 			goto save_ire;
 		}
-		if ((ip_cgtp_filter_ops != NULL) && !CLASSD(ire->ire_addr) &&
-		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
-			int res = ip_cgtp_filter_ops->cfo_add_dest_v4(
+		if (ipst->ips_ip_cgtp_filter_ops != NULL &&
+		    !CLASSD(ire->ire_addr)) {
+			int res = ipst->ips_ip_cgtp_filter_ops->cfo_add_dest_v4(
+			    ipst->ips_netstack->netstack_stackid,
 			    ire->ire_addr,
 			    ire->ire_gateway_addr,
 			    ire->ire_src_addr,
@@ -7465,9 +7466,9 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 * Packets coming from that address will no longer be
 		 * filtered to remove duplicates.
 		 */
-		if (ip_cgtp_filter_ops != NULL &&
-		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
-			err = ip_cgtp_filter_ops->cfo_del_dest_v4(
+		if (ipst->ips_ip_cgtp_filter_ops != NULL) {
+			err = ipst->ips_ip_cgtp_filter_ops->cfo_del_dest_v4(
+			    ipst->ips_netstack->netstack_stackid,
 			    ire->ire_addr, ire->ire_gateway_addr);
 		}
 		ip_cgtp_bcast_delete(ire, ipst);

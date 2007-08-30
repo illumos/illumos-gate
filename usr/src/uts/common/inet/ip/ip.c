@@ -793,9 +793,7 @@ uint32_t ipsechw_debug = 0;
 /*
  * Multirouting/CGTP stuff
  */
-cgtp_filter_ops_t	*ip_cgtp_filter_ops;	/* CGTP hooks */
 int	ip_cgtp_filter_rev = CGTP_FILTER_REV;	/* CGTP hooks version */
-boolean_t	ip_cgtp_filter;		/* Enable/disable CGTP hooks */
 
 /*
  * XXX following really should only be in a header. Would need more
@@ -6014,7 +6012,7 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ASSERT(strcmp(ipst->ips_ndp_arr[IPNDP_CGTP_FILTER_OFFSET].ip_ndp_name,
 	    "ip_cgtp_filter") == 0);
 	ipst->ips_ndp_arr[IPNDP_CGTP_FILTER_OFFSET].ip_ndp_data =
-	    (caddr_t)&ip_cgtp_filter;
+	    (caddr_t)&ipst->ips_ip_cgtp_filter;
 	ASSERT(strcmp(ipst->ips_ndp_arr[IPNDP_IPMP_HOOK_OFFSET].ip_ndp_name,
 	    "ipmp_hook_emulation") == 0);
 	ipst->ips_ndp_arr[IPNDP_IPMP_HOOK_OFFSET].ip_ndp_data =
@@ -14856,7 +14854,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 * 	o not a multicast packet
 		 */
 		if (!is_system_labeled() &&
-		    !ip_cgtp_filter && ipp_action_count == 0 &&
+		    !ipst->ips_ip_cgtp_filter && ipp_action_count == 0 &&
 		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
 		    !ll_multicast && !CLASSD(dst)) {
 			if (ire == NULL)
@@ -14898,15 +14896,16 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 * the incoming packet. Packets identified as duplicates
 		 * must be discarded. Filtering is active only if the
 		 * the ip_cgtp_filter ndd variable is non-zero.
-		 *
-		 * Only applies to the shared stack since the filter_ops
-		 * do not carry an ip_stack_t or zoneid.
 		 */
 		cgtp_flt_pkt = CGTP_IP_PKT_NOT_CGTP;
-		if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL) &&
-		    ipst->ips_netstack->netstack_stackid == GLOBAL_NETSTACKID) {
+		if (ipst->ips_ip_cgtp_filter &&
+		    ipst->ips_ip_cgtp_filter_ops != NULL) {
+			netstackid_t stackid;
+
+			stackid = ipst->ips_netstack->netstack_stackid;
 			cgtp_flt_pkt =
-			    ip_cgtp_filter_ops->cfo_filter(q, mp);
+			    ipst->ips_ip_cgtp_filter_ops->cfo_filter(stackid,
+			    ill->ill_phyint->phyint_ifindex, mp);
 			if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
 				freemsg(first_mp);
 				continue;
@@ -28736,14 +28735,6 @@ static int
 ip_cgtp_filter_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
 {
 	boolean_t	*ip_cgtp_filter_value = (boolean_t *)cp;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
-
-	/*
-	 * Only applies to the shared stack since the filter_ops
-	 * do not carry an ip_stack_t or zoneid.
-	 */
-	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
-		return (ENOTSUP);
 
 	(void) mi_mpprintf(mp, "%d", (int)*ip_cgtp_filter_value);
 	return (0);
@@ -28765,50 +28756,32 @@ ip_cgtp_filter_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 	boolean_t	*ip_cgtp_filter_value = (boolean_t *)cp;
 	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
 
-	if (secpolicy_net_config(ioc_cr, B_FALSE) != 0)
+	if (secpolicy_ip_config(ioc_cr, B_FALSE) != 0)
 		return (EPERM);
-
-	/*
-	 * Only applies to the shared stack since the filter_ops
-	 * do not carry an ip_stack_t or zoneid.
-	 */
-	if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
-		return (ENOTSUP);
 
 	if (ddi_strtol(value, NULL, 10, &new_value) != 0 ||
 	    new_value < 0 || new_value > 1) {
 		return (EINVAL);
 	}
 
-	/*
-	 * Do not enable CGTP filtering - thus preventing the hooks
-	 * from being invoked - if the version number of the
-	 * filtering module hooks does not match.
-	 */
-	if ((ip_cgtp_filter_ops != NULL) &&
-	    (ip_cgtp_filter_ops->cfo_filter_rev != CGTP_FILTER_REV)) {
-		cmn_err(CE_WARN, "IP: CGTP filtering version mismatch "
-		    "(module hooks version %d, expecting %d)\n",
-		    ip_cgtp_filter_ops->cfo_filter_rev,
-		    CGTP_FILTER_REV);
-		return (ENOTSUP);
-	}
-
 	if ((!*ip_cgtp_filter_value) && new_value) {
 		cmn_err(CE_NOTE, "IP: enabling CGTP filtering%s",
-		    ip_cgtp_filter_ops == NULL ?
+		    ipst->ips_ip_cgtp_filter_ops == NULL ?
 		    " (module not loaded)" : "");
 	}
 	if (*ip_cgtp_filter_value && (!new_value)) {
 		cmn_err(CE_NOTE, "IP: disabling CGTP filtering%s",
-		    ip_cgtp_filter_ops == NULL ?
+		    ipst->ips_ip_cgtp_filter_ops == NULL ?
 		    " (module not loaded)" : "");
 	}
 
-	if (ip_cgtp_filter_ops != NULL) {
+	if (ipst->ips_ip_cgtp_filter_ops != NULL) {
 		int	res;
+		netstackid_t stackid;
 
-		res = ip_cgtp_filter_ops->cfo_change_state(new_value);
+		stackid = ipst->ips_netstack->netstack_stackid;
+		res = ipst->ips_ip_cgtp_filter_ops->cfo_change_state(stackid,
+		    new_value);
 		if (res)
 			return (res);
 	}
@@ -28825,42 +28798,95 @@ ip_cgtp_filter_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 int
 ip_cgtp_filter_supported(void)
 {
-	ip_stack_t *ipst;
-	int ret;
-
-	ipst = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_ip;
-	if (ipst == NULL)
-		return (-1);
-	ret = ip_cgtp_filter_rev;
-	netstack_rele(ipst->ips_netstack);
-	return (ret);
+	return (ip_cgtp_filter_rev);
 }
 
 
 /*
- * CGTP hooks can be registered by directly touching ip_cgtp_filter_ops
- * or by invoking this function. In the first case, the version number
- * of the registered structure is checked at hooks activation time
- * in ip_cgtp_filter_set().
- *
- * Only applies to the shared stack since the filter_ops
- * do not carry an ip_stack_t or zoneid.
+ * CGTP hooks can be registered by invoking this function.
+ * Checks that the version number matches.
  */
 int
-ip_cgtp_filter_register(cgtp_filter_ops_t *ops)
+ip_cgtp_filter_register(netstackid_t stackid, cgtp_filter_ops_t *ops)
 {
+	netstack_t *ns;
 	ip_stack_t *ipst;
 
 	if (ops->cfo_filter_rev != CGTP_FILTER_REV)
 		return (ENOTSUP);
 
-	ipst = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_ip;
-	if (ipst == NULL)
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
 		return (EINVAL);
+	ipst = ns->netstack_ip;
+	ASSERT(ipst != NULL);
 
-	ip_cgtp_filter_ops = ops;
-	netstack_rele(ipst->ips_netstack);
+	if (ipst->ips_ip_cgtp_filter_ops != NULL) {
+		netstack_rele(ns);
+		return (EALREADY);
+	}
+
+	ipst->ips_ip_cgtp_filter_ops = ops;
+	netstack_rele(ns);
 	return (0);
+}
+
+/*
+ * CGTP hooks can be unregistered by invoking this function.
+ * Returns ENXIO if there was no registration.
+ * Returns EBUSY if the ndd variable has not been turned off.
+ */
+int
+ip_cgtp_filter_unregister(netstackid_t stackid)
+{
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (EINVAL);
+	ipst = ns->netstack_ip;
+	ASSERT(ipst != NULL);
+
+	if (ipst->ips_ip_cgtp_filter) {
+		netstack_rele(ns);
+		return (EBUSY);
+	}
+
+	if (ipst->ips_ip_cgtp_filter_ops == NULL) {
+		netstack_rele(ns);
+		return (ENXIO);
+	}
+	ipst->ips_ip_cgtp_filter_ops = NULL;
+	netstack_rele(ns);
+	return (0);
+}
+
+/*
+ * Check whether there is a CGTP filter registration.
+ * Returns non-zero if there is a registration, otherwise returns zero.
+ * Note: returns zero if bad stackid.
+ */
+int
+ip_cgtp_filter_is_registered(netstackid_t stackid)
+{
+	netstack_t *ns;
+	ip_stack_t *ipst;
+	int ret;
+
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL)
+		return (0);
+	ipst = ns->netstack_ip;
+	ASSERT(ipst != NULL);
+
+	if (ipst->ips_ip_cgtp_filter_ops != NULL)
+		ret = 1;
+	else
+		ret = 0;
+
+	netstack_rele(ns);
+	return (ret);
 }
 
 static squeue_func_t
