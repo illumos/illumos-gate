@@ -52,9 +52,9 @@
 #include <sys/cmn_err.h>
 #include <sys/systm.h>
 #include <sys/modctl.h>
-#include <sys/priv_names.h>
 #include <sys/sysmacros.h>
 #include <sys/zone.h>
+#include <sys/policy.h>
 
 static int sadopen(queue_t *, dev_t *, int, int, cred_t *);
 static int sadclose(queue_t *, int, cred_t *);
@@ -95,7 +95,7 @@ DDI_DEFINE_STREAM_OPS(sad_ops, nulldev, nulldev, sad_attach,
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"STREAMS Administrative Driver 'sad' %I%",
+	"STREAMS Administrative Driver 'sad'",
 	&sad_ops,	/* driver ops */
 };
 
@@ -137,9 +137,8 @@ sad_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		return (DDI_FAILURE);
 	}
-	if (ddi_create_priv_minor_node(devi, "admin", S_IFCHR,
-	    1, DDI_PSEUDO, PRIVONLY_DEV, PRIV_SYS_CONFIG,
-	    PRIV_SYS_CONFIG, 0666) == DDI_FAILURE) {
+	if (ddi_create_minor_node(devi, "admin", S_IFCHR,
+	    1, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
@@ -193,6 +192,16 @@ sadopen(
 
 	if (sflag)		/* no longer called from clone driver */
 		return (EINVAL);
+
+	/* Only privileged process can access ADMINDEV */
+	if (getminor(*devp) == ADMMIN) {
+		int err;
+
+		err = secpolicy_sadopen(credp);
+
+		if (err != 0)
+			return (err);
+	}
 
 	ns = netstack_find_by_cred(credp);
 	ASSERT(ns != NULL);

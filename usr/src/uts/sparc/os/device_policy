@@ -40,8 +40,6 @@ mm:allkmem	read_priv_set=all		write_priv_set=all
 mm:kmem		read_priv_set=none		write_priv_set=all
 mm:mem		read_priv_set=none		write_priv_set=all
 
-sad:admin	read_priv_set=sys_config	write_priv_set=sys_config
-
 rtvc:rtvc*					write_priv_set=none
 rtvc:rtvcctl*					write_priv_set=sys_config
 #

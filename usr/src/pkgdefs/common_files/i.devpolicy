@@ -46,7 +46,8 @@ do
 	    -e '/^ipsecah[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
 	    -e '/^ipsecesp[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
 	    -e '/^spdsock[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
-	    -e '/^ipf[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d'
+	    -e '/^ipf[ 	]*read_priv_set=sys_net_config[ 	]*write_priv_set=sys_net_config$/d' \
+	    -e '/^sad:admin[ 	]*read_priv_set=sys_config[ 	]*write_priv_set=sys_config$/d'
 
 	rm -f $dest.$$
 

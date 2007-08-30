@@ -1514,7 +1514,7 @@ secpolicy_net_config(const cred_t *cr, boolean_t checkonly)
 
 
 /*
- * PRIV_SYS_NET_CONFIG has a superset of PRIV_SYS_IP_CONFIG.
+ * PRIV_SYS_NET_CONFIG is a superset of PRIV_SYS_IP_CONFIG.
  *
  * There are a few rare cases where the kernel generates ioctls() from
  * interrupt context with a credential of kcred rather than NULL.
@@ -1690,6 +1690,7 @@ secpolicy_spec_open(const cred_t *cr, struct vnode *vp, int oflag)
 	devplcy_t *plcy;
 	int err;
 	struct snode *csp = VTOS(common_specvp(vp));
+	priv_set_t pset;
 
 	mutex_enter(&csp->s_lock);
 
@@ -1711,8 +1712,25 @@ secpolicy_spec_open(const cred_t *cr, struct vnode *vp, int oflag)
 
 	mutex_exit(&csp->s_lock);
 
-	err = secpolicy_require_set(cr,
-	    (oflag & FWRITE) ? &plcy->dp_wrp : &plcy->dp_rdp, "devpolicy");
+	if (oflag & FWRITE)
+		pset = plcy->dp_wrp;
+	else
+		pset = plcy->dp_rdp;
+	/*
+	 * Special case:
+	 * PRIV_SYS_NET_CONFIG is a superset of PRIV_SYS_IP_CONFIG.
+	 * If PRIV_SYS_NET_CONFIG is present and PRIV_SYS_IP_CONFIG is
+	 * required, replace PRIV_SYS_IP_CONFIG with PRIV_SYS_NET_CONFIG
+	 * in the required privilege set before doing the check.
+	 */
+	if (priv_ismember(&pset, PRIV_SYS_IP_CONFIG) &&
+	    priv_ismember(&CR_OEPRIV(cr), PRIV_SYS_NET_CONFIG) &&
+	    !priv_ismember(&CR_OEPRIV(cr), PRIV_SYS_IP_CONFIG)) {
+		priv_delset(&pset, PRIV_SYS_IP_CONFIG);
+		priv_addset(&pset, PRIV_SYS_NET_CONFIG);
+	}
+
+	err = secpolicy_require_set(cr, &pset, "devpolicy");
 	dpfree(plcy);
 
 	return (err);
@@ -1914,4 +1932,28 @@ int
 secpolicy_ucode_update(const cred_t *scr)
 {
 	return (PRIV_POLICY(scr, PRIV_ALL, B_FALSE, EPERM, NULL));
+}
+
+/*
+ * secpolicy_sadopen
+ *
+ * Determine if the subject has sufficient privilege to access /dev/sad/admin.
+ * /dev/sad/admin appear in global zone and exclusive-IP zones only.
+ * In global zone, sys_config is required.
+ * In exclusive-IP zones, sys_ip_config is required.
+ * Note that sys_config is prohibited in non-global zones.
+ */
+int
+secpolicy_sadopen(const cred_t *credp)
+{
+	priv_set_t pset;
+
+	priv_emptyset(&pset);
+
+	if (crgetzoneid(credp) == GLOBAL_ZONEID)
+		priv_addset(&pset, PRIV_SYS_CONFIG);
+	else
+		priv_addset(&pset, PRIV_SYS_IP_CONFIG);
+
+	return (secpolicy_require_set(credp, &pset, "devpolicy"));
 }

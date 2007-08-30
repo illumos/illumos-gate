@@ -105,6 +105,7 @@
 	<device match="rawip" ip-type="exclusive" />
 	<device match="rawip6" ip-type="exclusive" />
 	<device match="rts" ip-type="exclusive" />
+	<device match="sad/admin" ip-type="exclusive" />
 	<device match="sctp" ip-type="exclusive" />
 	<device match="sctp6" ip-type="exclusive" />
 	<device match="spdsock" ip-type="exclusive" />
