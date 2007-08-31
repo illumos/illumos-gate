@@ -53,7 +53,7 @@ nxge_ipp_init(p_nxge_t nxgep)
 	/* Initialize ECC and parity in SRAM of DFIFO and PFIFO */
 	if (nxgep->niu_type == N2_NIU) {
 		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		if (portn < 2)
 			dfifo_entries = IPP_P0_P1_DFIFO_ENTRIES;
 		else
@@ -561,7 +561,7 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 
 	if (nxgep->niu_type == N2_NIU) {
 		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		if (portn < 2)
 			dfifo_entries = IPP_P0_P1_DFIFO_ENTRIES;
 		else

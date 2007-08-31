@@ -561,8 +561,10 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				size += sizeof (lb_external100);
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
-			else if (nxgep->mac.portmode == PORT_1G_FIBER)
+			else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
+			    (nxgep->mac.portmode == PORT_1G_SERDES))
 				size += sizeof (lb_serdes1000);
+
 			*(lb_info_sz_t *)mp->b_cont->b_rptr = size;
 
 			NXGE_DEBUG_MSG((nxgep, IOC_CTL,
@@ -592,7 +594,8 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				size += sizeof (lb_external100);
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
-			else if (nxgep->mac.portmode == PORT_1G_FIBER)
+			else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
+			    (nxgep->mac.portmode == PORT_1G_SERDES))
 				size += sizeof (lb_serdes1000);
 
 			NXGE_DEBUG_MSG((nxgep, IOC_CTL,
@@ -619,9 +622,11 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 					if (nxgep->statsp->mac_stats.
 						cap_1000fdx)
 						lb_props[i++] = lb_phy1000;
-				} else if (nxgep->mac.portmode ==
-					PORT_1G_FIBER)
+				} else if ((nxgep->mac.portmode ==
+				    PORT_1G_FIBER) ||
+				    (nxgep->mac.portmode == PORT_1G_SERDES)) {
 					lb_props[i++] = lb_serdes1000;
+				}
 				miocack(wq, mp, size, 0);
 			} else
 				miocnak(wq, mp, 0, EINVAL);
@@ -762,11 +767,13 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		(nxgep->mac.portmode == PORT_1G_COPPER))
 		lb_info = &lb_phy;
 	else if ((lb_mode == lb_serdes10g.value) &&
-			(nxgep->mac.portmode == PORT_10G_FIBER) ||
-		(nxgep->mac.portmode == PORT_10G_COPPER))
+	    ((nxgep->mac.portmode == PORT_10G_FIBER) ||
+	    (nxgep->mac.portmode == PORT_10G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_10G_SERDES)))
 		lb_info = &lb_serdes10g;
 	else if ((lb_mode == lb_serdes1000.value) &&
-		(nxgep->mac.portmode == PORT_1G_FIBER))
+	    (nxgep->mac.portmode == PORT_1G_FIBER ||
+	    (nxgep->mac.portmode == PORT_1G_SERDES)))
 		lb_info = &lb_serdes1000;
 	else if (lb_mode == lb_mac10g.value)
 		lb_info = &lb_mac10g;
@@ -831,7 +838,7 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy)) {
 
 		(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-		(void) nxge_setup_xcvr_table(nxgep);
+		(void) nxge_xcvr_find(nxgep);
 		(void) nxge_link_init(nxgep);
 		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	}
@@ -889,7 +896,7 @@ nxge_set_lb_normal(p_nxge_t nxgep)
 	nxge_global_reset(nxgep);
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-	(void) nxge_setup_xcvr_table(nxgep);
+	(void) nxge_xcvr_find(nxgep);
 	(void) nxge_link_init(nxgep);
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 

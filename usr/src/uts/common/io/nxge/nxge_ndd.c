@@ -109,6 +109,7 @@ static int nxge_param_hash_lookup_enable(p_nxge_t, queue_t *,
 static int nxge_param_tcam_enable(p_nxge_t, queue_t *,
 	mblk_t *, char *, caddr_t);
 static int nxge_param_get_fw_ver(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
+static int nxge_param_get_port_mode(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_get_rxdma_info(p_nxge_t, queue_t *q,
 	p_mblk_t, caddr_t);
 static int nxge_param_get_txdma_info(p_nxge_t, queue_t *q,
@@ -170,6 +171,9 @@ static nxge_param_t	nxge_param_arr[] = {
 
 	{ nxge_param_get_fw_ver, NULL, NXGE_PARAM_READ,
 		0, 32, 0, 0, "version",	"fw_version"},
+
+	{ nxge_param_get_port_mode, NULL, NXGE_PARAM_READ,
+		0, 32, 0, 0, "port-mode", "port_mode"},
 
 	/* hw cfg types */
 	/* control the DMA config of Neptune/NIU */
@@ -859,6 +863,51 @@ nxge_param_get_fw_ver(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	    nxgep->instance, nxgep->vpd_info.ver);
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_fw_ver"));
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
+{
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_port_mode"));
+
+	switch (nxgep->mac.portmode) {
+	case PORT_1G_COPPER:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Copper\n",
+		    nxgep->instance);
+		break;
+	case PORT_1G_FIBER:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Fiber\n",
+		    nxgep->instance);
+		break;
+	case PORT_10G_COPPER:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Copper\n",
+		    nxgep->instance);
+		break;
+	case PORT_10G_FIBER:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Fiber\n",
+		    nxgep->instance);
+		break;
+	case PORT_10G_SERDES:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Serdes\n",
+		    nxgep->instance);
+		break;
+	case PORT_1G_SERDES:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Serdes\n",
+		    nxgep->instance);
+		break;
+	case PORT_1G_RGMII_FIBER:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G RGMII "
+		    "Fiber\n", nxgep->instance);
+		break;
+	default:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Unknown\n",
+		    nxgep->instance);
+		break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_port_mode"));
 	return (0);
 }
 

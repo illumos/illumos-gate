@@ -46,7 +46,7 @@ nxge_zcp_init(p_nxge_t nxgep)
 
 	if (nxgep->niu_type == N2_NIU) {
 		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		if (portn < 2)
 			cfifo_depth = ZCP_P0_P1_CFIFO_DEPTH;
 		else
@@ -422,7 +422,7 @@ nxge_zcp_fatal_err_recover(p_nxge_t nxgep)
 	/* Clear up CFIFO */
 	if (nxgep->niu_type == N2_NIU) {
 		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		if (portn < 2)
 			cfifo_depth = ZCP_P0_P1_CFIFO_DEPTH;
 		else

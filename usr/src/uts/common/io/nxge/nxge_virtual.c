@@ -1613,7 +1613,7 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	/*
 	 * Get info on how many ports Neptune card has.
 	 */
-	nxgep->nports = nxge_nports_from_niu_type(nxgep->niu_type);
+	nxgep->nports = nxge_get_nports(nxgep);
 	if (nxgep->nports <= 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<==nxge_get_config_properties: Invalid Neptune type 0x%x",
@@ -1621,6 +1621,9 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 	nxgep->classifier.tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
+		nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
+	}
 	if (nxgep->function_num >= nxgep->nports) {
 		return (NXGE_ERROR);
 	}
@@ -1660,7 +1663,7 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		status = nxge_use_cfg_n2niu_properties(nxgep);
 		break;
 	default:
-		if (!NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+		if (!NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    " nxge_get_config_properties:"
 			    " unknown NIU type 0x%x", nxgep->niu_type));
@@ -3438,7 +3441,7 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 		nxgep->ouraddr = nxgep->factaddr;
 	}
 
-	if ((nxgep->nxge_hw_p->platform_type != P_NEPTUNE_ATLAS) ||
+	if ((!nxgep->vpd_info.present) ||
 	    (nxge_is_valid_local_mac(nxgep->factaddr)))
 		goto got_mac_addr;
 
@@ -3449,6 +3452,8 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	if (!nxgep->vpd_info.ver_valid) {
 		(void) nxge_espc_mac_addrs_get(nxgep);
 		if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Failed to get "
+			    "MAC address"));
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
 			    "[%s] invalid...please update",
 			    nxgep->vpd_info.ver));
@@ -3471,6 +3476,8 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 		    "...reading from NCR registers"));
 		(void) nxge_espc_mac_addrs_get(nxgep);
 		if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Failed to get "
+			    "MAC address"));
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
 			    "[%s] invalid...please update",
 			    nxgep->vpd_info.ver));

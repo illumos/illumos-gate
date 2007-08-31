@@ -2465,6 +2465,15 @@ nxge_receive_packet(p_nxge_t nxgep,
 	} else {
 		cmn_err(CE_WARN, "!nxge_receive_packet: "
 			"update stats (error)");
+		atomic_inc_32(&rx_msg_p->ref_cnt);
+		atomic_inc_32(&nxge_mblks_pending);
+		if (buffer_free == B_TRUE) {
+			rx_msg_p->free = B_TRUE;
+		}
+		MUTEX_EXIT(&rx_rbr_p->lock);
+		MUTEX_EXIT(&rcr_p->lock);
+		nxge_freeb(rx_msg_p);
+		return;
 	}
 	if (buffer_free == B_TRUE) {
 		rx_msg_p->free = B_TRUE;

@@ -119,7 +119,7 @@ nxge_fzc_intr_init(p_nxge_t nxgep)
 		return (status);
 	}
 
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		/*
 		 * Set up the logical device group's logical devices that
 		 * the group owns.
@@ -289,7 +289,7 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 			return (status);
 		}
 #endif
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_fzc_rxdma_channel_pages(nxgep,
 		    channel, rbr_p);
@@ -428,7 +428,7 @@ nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 		(void) nxge_init_fzc_txdma_channel_pages(nxgep, channel,
 		    tx_ring_p);
 #endif
-	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		/* Initialize the TXDMA logical pages */
 		(void) nxge_init_fzc_txdma_channel_pages(nxgep,
 		    channel, tx_ring_p);
@@ -572,15 +572,13 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 	 * npi_rxdma_cfg_port_ddr_weight();
 	 */
 
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
-		if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
-		    (nxgep->mac.portmode == PORT_1G_FIBER)) {
-			rs = npi_rxdma_cfg_port_ddr_weight(handle,
-			    nxgep->function_num,
-			    NXGE_RX_DRR_WT_1G);
-			if (rs != NPI_SUCCESS) {
-				return (NXGE_ERROR | rs);
-			}
+	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_1G_FIBER) ||
+	    (nxgep->mac.portmode == PORT_1G_SERDES)) {
+		rs = npi_rxdma_cfg_port_ddr_weight(handle,
+		    nxgep->function_num, NXGE_RX_DRR_WT_1G);
+		if (rs != NPI_SUCCESS) {
+			return (NXGE_ERROR | rs);
 		}
 	}
 

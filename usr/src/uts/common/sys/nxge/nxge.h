@@ -105,6 +105,7 @@ typedef enum {
 	param_partition_id,
 	param_read_write_mode,
 	param_fw_version,
+	param_port_mode,
 	param_niu_cfg_type,
 	param_tx_quick_cfg,
 	param_rx_quick_cfg,
@@ -545,6 +546,7 @@ struct _nxge_t {
 	p_nxge_param_t		param_arr;
 	nxge_hw_list_t		*nxge_hw_p; 	/* pointer to per Neptune */
 	niu_type_t		niu_type;
+	platform_type_t		platform_type;
 	boolean_t		os_addr_mode32;	/* set to 1 for 32 bit mode */
 	uint8_t			nrdc;
 	uint8_t			def_rdc;

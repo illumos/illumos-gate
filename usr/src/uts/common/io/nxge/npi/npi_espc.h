@@ -77,6 +77,7 @@ typedef struct _npi_vpd_info_t {
 	char		phy_type[NXGE_VPD_PHY_LEN];
 	char		ver[NXGE_VPD_VER_LEN];
 	boolean_t	ver_valid;
+	boolean_t	present;
 } npi_vpd_info_t, *p_npi_vpd_info_t;
 
 #define	NXGE_FCODE_ID_STR	"FCode "

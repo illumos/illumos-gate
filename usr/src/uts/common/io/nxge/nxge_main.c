@@ -434,7 +434,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	nxgep = ddi_get_soft_state(nxge_list, instance);
 	if (nxgep == NULL) {
-		goto nxge_attach_fail;
+		status = NXGE_ERROR;
+		goto nxge_attach_fail2;
 	}
 
 	nxgep->nxge_magic = NXGE_MAGIC;
@@ -452,14 +453,14 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	status = nxge_map_regs(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_map_regs failed"));
-		goto nxge_attach_fail;
+		goto nxge_attach_fail3;
 	}
 
 	status = nxge_init_common_dev(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_init_common_dev failed"));
-		goto nxge_attach_fail;
+		goto nxge_attach_fail4;
 	}
 
 	if (nxgep->niu_type == NEPTUNE_2_10GF) {
@@ -468,7 +469,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    " function %d. Only functions 0 and 1 are "
 			    "supported for this card.", nxgep->function_num));
 			status = NXGE_ERROR;
-			goto nxge_attach_fail;
+			goto nxge_attach_fail4;
 		}
 	}
 
@@ -504,21 +505,19 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* init stats ptr */
 	nxge_init_statsp(nxgep);
 
-	if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_ATLAS) {
-		/*
-		 * read the vpd info from the eeprom into local data
-		 * structure and check for the VPD info validity
-		 */
-		(void) nxge_vpd_info_get(nxgep);
-	}
+	/*
+	 * read the vpd info from the eeprom into local data
+	 * structure and check for the VPD info validity
+	 */
+	nxge_vpd_info_get(nxgep);
 
-	status = nxge_setup_xcvr_table(nxgep);
+	status = nxge_xcvr_find(nxgep);
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
 				    " Couldn't determine card type"
 				    " .... exit "));
-		goto nxge_attach_fail;
+		goto nxge_attach_fail5;
 	}
 
 	status = nxge_get_config_properties(nxgep);
@@ -603,7 +602,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nxge_intrs_enable(nxgep);
 
-	if ((status = nxge_mac_register(nxgep)) != DDI_SUCCESS) {
+	if ((status = nxge_mac_register(nxgep)) != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 			"unable to register to mac layer (%d)", status));
 		goto nxge_attach_fail;
@@ -620,6 +619,37 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 nxge_attach_fail:
 	nxge_unattach(nxgep);
+	goto nxge_attach_fail1;
+
+nxge_attach_fail5:
+	/*
+	 * Tear down the ndd parameters setup.
+	 */
+	nxge_destroy_param(nxgep);
+
+	/*
+	 * Tear down the kstat setup.
+	 */
+	nxge_destroy_kstats(nxgep);
+
+nxge_attach_fail4:
+	if (nxgep->nxge_hw_p) {
+		nxge_uninit_common_dev(nxgep);
+		nxgep->nxge_hw_p = NULL;
+	}
+
+nxge_attach_fail3:
+	/*
+	 * Unmap the register setup.
+	 */
+	nxge_unmap_regs(nxgep);
+
+	nxge_fm_fini(nxgep);
+
+nxge_attach_fail2:
+	ddi_soft_state_free(nxge_list, nxgep->instance);
+
+nxge_attach_fail1:
 	if (status != NXGE_OK)
 		status = (NXGE_ERROR | NXGE_DDI_FAILED);
 	nxgep = NULL;
@@ -1143,7 +1173,7 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 		 */
 	MUTEX_INIT(&classify_ptr->tcam_lock, NULL,
 	    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		MUTEX_INIT(&classify_ptr->fcram_lock, NULL,
 		    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 		for (partition = 0; partition < MAX_PARTITION; partition++) {
@@ -1182,7 +1212,7 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 	cv_destroy(&nxgep->poll_cv);
 
 	/* free data structures, based on HW type */
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		MUTEX_DESTROY(&classify_ptr->fcram_lock);
 		for (partition = 0; partition < MAX_PARTITION; partition++) {
 			MUTEX_DESTROY(&classify_ptr->hash_lock[partition]);
@@ -1544,7 +1574,7 @@ nxge_test_map_regs(p_nxge_t nxgep)
 	dev_handle = nxgep->dev_regs->nxge_regh;
 	dev_ptr = (char *)nxgep->dev_regs->nxge_regp;
 
-	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) {
 		cfg_handle = nxgep->dev_regs->nxge_pciregh;
 		cfg_ptr = (void *)nxgep->dev_regs->nxge_pciregp;
 
@@ -3780,7 +3810,7 @@ static struct dev_ops nxge_dev_ops = {
 
 extern	struct	mod_ops	mod_driverops;
 
-#define	NXGE_DESC_VER		"Sun NIU 10Gb Ethernet %I%"
+#define	NXGE_DESC_VER		"Sun NIU 10Gb Ethernet"
 
 /*
  * Module linkage information for the kernel.
@@ -4682,7 +4712,7 @@ nxge_init_common_dev(p_nxge_t nxgep)
 			hw_p->platform_type = P_NEPTUNE_NIU;
 		} else {
 			hw_p->niu_type = NIU_TYPE_NONE;
-			hw_p->platform_type = P_NEPTUNE_ATLAS;
+			hw_p->platform_type = P_NEPTUNE_NONE;
 		}
 
 		MUTEX_INIT(&hw_p->nxge_cfg_lock, NULL, MUTEX_DRIVER, NULL);
@@ -4698,14 +4728,9 @@ nxge_init_common_dev(p_nxge_t nxgep)
 
 	MUTEX_EXIT(&nxge_common_lock);
 
+	nxgep->platform_type = hw_p->platform_type;
 	if (nxgep->niu_type != N2_NIU) {
 		nxgep->niu_type = hw_p->niu_type;
-		if (!NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "<== nxge_init_common_device"
-			    " Invalid Neptune type [0x%x]", nxgep->niu_type));
-			return (NXGE_ERROR);
-		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL,
@@ -4809,19 +4834,17 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 }
 
 /*
- * Determines the number of ports from the given niu_type.
+ * Determines the number of ports from the niu_type or the platform type.
  * Returns the number of ports, or returns zero on failure.
  */
 
 int
-nxge_nports_from_niu_type(niu_type_t niu_type)
+nxge_get_nports(p_nxge_t nxgep)
 {
 	int	nports = 0;
 
-	switch (niu_type) {
+	switch (nxgep->niu_type) {
 	case N2_NIU:
-		nports = 2;
-		break;
 	case NEPTUNE_2_10GF:
 		nports = 2;
 		break;
@@ -4832,6 +4855,19 @@ nxge_nports_from_niu_type(niu_type_t niu_type)
 		nports = 4;
 		break;
 	default:
+		switch (nxgep->platform_type) {
+		case P_NEPTUNE_NIU:
+		case P_NEPTUNE_ATLAS_2PORT:
+			nports = 2;
+			break;
+		case P_NEPTUNE_ATLAS_4PORT:
+		case P_NEPTUNE_MARAMBA_P0:
+		case P_NEPTUNE_MARAMBA_P1:
+			nports = 4;
+			break;
+		default:
+			break;
+		}
 		break;
 	}
 

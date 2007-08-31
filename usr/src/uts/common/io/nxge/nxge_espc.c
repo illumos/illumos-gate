@@ -30,7 +30,7 @@
 #include <npi_espc.h>
 #include <nxge_espc.h>
 
-static nxge_status_t nxge_check_vpd_version(p_nxge_t nxgep);
+static void nxge_check_vpd_version(p_nxge_t nxgep);
 
 void
 nxge_espc_get_next_mac_addr(uint8_t *st_mac, uint8_t nxt_cnt,
@@ -209,32 +209,55 @@ nxge_espc_max_frame_sz_get(p_nxge_t nxgep)
 	return (status);
 }
 
-nxge_status_t
+void
 nxge_vpd_info_get(p_nxge_t nxgep)
 {
 	npi_status_t	status;
 	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
+	if ((nxgep->platform_type == P_NEPTUNE_NIU) ||
+	    (nxgep->platform_type == P_NEPTUNE_MARAMBA_P0) ||
+	    (nxgep->platform_type == P_NEPTUNE_MARAMBA_P1)) {
+		nxgep->vpd_info.present = B_FALSE;
+		return;
+	}
+
+	nxgep->vpd_info.present = B_TRUE;
+	nxgep->vpd_info.ver_valid = B_FALSE;
+
 	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_cfg_lock);
 	(void) npi_espc_pio_enable(handle);
 	status = npi_espc_vpd_info_get(handle, &nxgep->vpd_info,
-				NXGE_EROM_LEN);
+	    NXGE_EROM_LEN);
 	(void) npi_espc_pio_disable(handle);
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_cfg_lock);
 
-	nxgep->vpd_info.ver_valid = B_FALSE;
-	if (status == NPI_SUCCESS) {
-		(void) nxge_check_vpd_version(nxgep);
-		return (NXGE_OK);
-	} else
-		return (NXGE_ERROR);
+	if (status != NPI_SUCCESS)
+		return;
+
+	nxge_check_vpd_version(nxgep);
+	if (!nxgep->vpd_info.ver_valid)
+		return;
+
+	/* Determine the platform type */
+	if ((strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_LP_BM_STR,
+	    strlen(NXGE_QGC_LP_BM_STR)) == 0) ||
+	    (strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_PEM_BM_STR,
+	    strlen(NXGE_QGC_PEM_BM_STR)) == 0)) {
+		nxgep->platform_type = P_NEPTUNE_ATLAS_4PORT;
+	} else if ((strncmp(nxgep->vpd_info.bd_model,
+	    NXGE_2XGF_LP_BM_STR, strlen(NXGE_2XGF_LP_BM_STR)) == 0) ||
+	    (strncmp(nxgep->vpd_info.bd_model, NXGE_2XGF_PEM_BM_STR,
+	    strlen(NXGE_2XGF_PEM_BM_STR)) == 0)) {
+		nxgep->platform_type = P_NEPTUNE_ATLAS_2PORT;
+	}
+
 }
 
-static nxge_status_t
+static void
 nxge_check_vpd_version(p_nxge_t nxgep)
 {
 	int		i, j;
-	nxge_status_t	status = NXGE_OK;
 	const char	*fcode_str = NXGE_FCODE_ID_STR;
 	int		fcode_str_len = strlen(fcode_str);
 	char		ver_num_str[NXGE_FCODE_VER_STR_LEN];
@@ -293,5 +316,4 @@ nxge_check_vpd_version(p_nxge_t nxgep)
 	    (ver_w == NXGE_VPD_VALID_VER_W && ver_f >= NXGE_VPD_VALID_VER_F))
 		nxgep->vpd_info.ver_valid = B_TRUE;
 
-	return (status);
 }
