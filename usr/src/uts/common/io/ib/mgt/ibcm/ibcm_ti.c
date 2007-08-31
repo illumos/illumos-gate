@@ -729,7 +729,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	req_msgp->req_primary_traffic_class = (primary_grh == B_TRUE) ?
 	    IBCM_PRIM_ADDS_VECT(chan_args).av_tclass : 0;
 	req_msgp->req_primary_hop_limit = (primary_grh == B_TRUE) ?
-	    IBCM_PRIM_ADDS_VECT(chan_args).av_hop : 0xff;
+	    IBCM_PRIM_ADDS_VECT(chan_args).av_hop : 1;
 	req_msgp->req_primary_sl_plus =
 	    IBCM_PRIM_ADDS_VECT(chan_args).av_srvl << 4 |
 	    ((primary_grh == B_TRUE) ? 0 : 8);
@@ -791,7 +791,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		req_msgp->req_alt_traffic_class = (alternate_grh == B_TRUE) ?
 		    IBCM_ALT_ADDS_VECT(chan_args).av_tclass : 0;
 		req_msgp->req_alt_hop_limit = (alternate_grh == B_TRUE) ?
-		    IBCM_ALT_ADDS_VECT(chan_args).av_hop : 0xff;
+		    IBCM_ALT_ADDS_VECT(chan_args).av_hop : 1;
 		req_msgp->req_alt_sl_plus =
 		    IBCM_ALT_ADDS_VECT(chan_args).av_srvl << 4 |
 		    ((alternate_grh == B_TRUE) ? 0 : 8);
@@ -1037,7 +1037,7 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 			    redirect_info->rdi_flow;
 
 			/* Classportinfo doesn't have hoplimit field */
-			reply_addr->grh_hdr.ig_hop_limit = 0xff;
+			reply_addr->grh_hdr.ig_hop_limit = 1;
 			return (IBT_SUCCESS);
 
 		} else {
@@ -1094,7 +1094,7 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 	reply_addr->grh_hdr.ig_tclass =
 	    (cm_grh == B_TRUE) ? cm_adds->av_tclass : 0;
 	reply_addr->grh_hdr.ig_hop_limit =
-	    (cm_grh == B_TRUE) ? cm_adds->av_hop : 0xff;
+	    (cm_grh == B_TRUE) ? cm_adds->av_hop : 1;
 	reply_addr->rcvd_addr.ia_service_level =
 	    cm_adds->av_srvl;
 
@@ -4378,7 +4378,7 @@ ibt_set_alt_path(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 
 	/* Alternate hop limit, service level */
 	lap_msgp->lap_alt_hop_limit = (alt_grh == B_TRUE) ?
-	    alt_path->ap_alt_cep_path.cep_adds_vect.av_hop : 0xff;
+	    alt_path->ap_alt_cep_path.cep_adds_vect.av_hop : 1;
 	lap_msgp->lap_alt_sl_plus =
 	    alt_path->ap_alt_cep_path.cep_adds_vect.av_srvl << 4 |
 	    ((alt_grh == B_FALSE) ? 0x8 : 0);
