@@ -4626,21 +4626,22 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 	mutex_enter(&softs->aifq_mutex);
 	current = softs->aifq_idx;
 	next = (current + 1) % AAC_AIFQ_LENGTH;
-	if (next == 0) {
-		softs->aifq_filled = 1;
-		AACDB_PRINT(softs, CE_NOTE, "-- AIF queue overrun");
-	}
+	if (next == 0)
+		softs->aifq_wrap = 1;
 	bcopy(fibp, &softs->aifq[current], sizeof (struct aac_fib));
 
 	/* Modify AIF contexts */
-	if (softs->aifq_filled) {
+	if (softs->aifq_wrap) {
 		struct aac_fib_context *ctx;
 
 		for (ctx = softs->fibctx; ctx; ctx = ctx->next) {
-			if (next == ctx->ctx_idx)
-				ctx->ctx_wrap = 1;
-			else if (current == ctx->ctx_idx && ctx->ctx_wrap)
+			if (next == ctx->ctx_idx) {
+				ctx->ctx_filled = 1;
+			} else if (current == ctx->ctx_idx && ctx->ctx_filled) {
 				ctx->ctx_idx = next;
+				AACDB_PRINT(softs, CE_NOTE,
+				    "-- AIF queue(%x) overrun", ctx->unique);
+			}
 		}
 	}
 	softs->aifq_idx = next;

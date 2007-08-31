@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		15
+#define	AAC_DRIVER_BUGFIX_LEVEL		16
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -198,7 +198,7 @@ struct aac_interface {
 struct aac_fib_context {
 	uint32_t unique;
 	int ctx_idx;
-	int ctx_wrap;
+	int ctx_filled;		/* aifq is full for this fib context */
 	struct aac_fib_context *next, *prev;
 };
 
@@ -292,8 +292,8 @@ struct aac_softstate {
 	kmutex_t aifq_mutex;		/* for AIF queue aifq */
 	kcondvar_t aifv;
 	struct aac_fib aifq[AAC_AIFQ_LENGTH];
-	int aifq_idx;
-	int aifq_filled;
+	int aifq_idx;			/* slot for next new AIF */
+	int aifq_wrap;			/* AIF queue has ever been wrapped */
 	struct aac_fib_context *fibctx;
 	int devcfg_wait_on;		/* AIF event waited for rescan */
 

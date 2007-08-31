@@ -291,6 +291,12 @@ aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 			ctx = ctx->next;
 		}
 	}
+
+	/* Set ctx_idx to the oldest AIF */
+	if (softs->aifq_wrap) {
+		fibctx->ctx_idx = softs->aifq_idx;
+		fibctx->ctx_filled = 1;
+	}
 	mutex_exit(&softs->aifq_mutex);
 
 	if (ddi_copyout(&fibctx->unique, (void *)arg,
@@ -357,13 +363,12 @@ aac_close_getadapter_fib(struct aac_softstate *softs, intptr_t arg)
 		if (ctx->unique != (uint32_t)arg)
 			continue;
 
-		if (ctx == softs->fibctx) {
-			softs->fibctx = NULL;
-		} else {
+		if (ctx == softs->fibctx)
+			softs->fibctx = ctx->next;
+		else
 			ctx->prev->next = ctx->next;
-			if (ctx->next)
-				ctx->next->prev = ctx->prev;
-		}
+		if (ctx->next)
+			ctx->next->prev = ctx->prev;
 		break;
 	}
 	mutex_exit(&softs->aifq_mutex);
@@ -717,7 +722,7 @@ aac_return_aif(struct aac_softstate *softs,
 
 	mutex_enter(&softs->aifq_mutex);
 	current = ctx->ctx_idx;
-	if (current == softs->aifq_idx && !ctx->ctx_wrap) {
+	if (current == softs->aifq_idx && !ctx->ctx_filled) {
 		/* Empty */
 		mutex_exit(&softs->aifq_mutex);
 		return (EAGAIN);
@@ -728,7 +733,7 @@ aac_return_aif(struct aac_softstate *softs,
 		return (EFAULT);
 	}
 
-	ctx->ctx_wrap = 0;
+	ctx->ctx_filled = 0;
 	ctx->ctx_idx = (current + 1) % AAC_AIFQ_LENGTH;
 	mutex_exit(&softs->aifq_mutex);
 
