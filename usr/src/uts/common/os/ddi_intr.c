@@ -44,10 +44,12 @@
  */
 
 /*
- * MSI/X allocation limit.
- * This limit will change with Resource Management support.
+ * MSI-X allocation limit.
+ *
+ * This MSI-X limit or tunable may be obsolete or change with Interrupt
+ * Resource Management (IRM) support.
  */
-uint_t		ddi_msix_alloc_limit = DDI_INTR_DEFAULT_ALLOC;
+uint_t		ddi_msix_alloc_limit = DDI_DEFAULT_MSIX_ALLOC;
 
 /*
  * ddi_intr_get_supported_types:
@@ -264,20 +266,33 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	}
 
 	/*
-	 * Limit max MSI/X allocation to ddi_msix_alloc_limit.
-	 * This limit will change with Resource Management support.
+	 * NOTE:
+	 *
+	 * An intermediate solution is added here to allocate more MSI-X
+	 * interrupts to drivers to address some significant performance
+	 * issues discovered on various SPARC platforms. More MSI-X interrupts
+	 * will be allocated based on existence of "#msix-request" property.
+	 * The DDI framework will not honor this property after the Interrupt
+	 * Resource Management (IRM) project's integration.
+	 *
+	 * Hard limit for maximum MSI allocation is set to DDI_MAX_MSI_ALLOC,
+	 * however MSI-X's max allocation is controlled by
+	 * ddi_msix_alloc_limit().
 	 */
 	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
-		if (curr_nintrs == ddi_msix_alloc_limit) {
+		uint_t	alloc_limit = (type == DDI_INTR_TYPE_MSIX) ?
+		    i_ddi_get_msix_alloc_limit(dip) : DDI_MAX_MSI_ALLOC;
+
+		if (curr_nintrs == alloc_limit) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
 			    "max # of intrs %d already allocated\n",
 			    curr_nintrs));
 			return (DDI_EINVAL);
 		}
-		if ((count + curr_nintrs) > ddi_msix_alloc_limit) {
+		if ((count + curr_nintrs) > alloc_limit) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested "
 			    "MSI/Xs %d Max MSI/Xs limit %d\n", count,
-			    ddi_msix_alloc_limit));
+			    alloc_limit));
 
 			if (behavior == DDI_INTR_ALLOC_STRICT) {
 				DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
@@ -286,7 +301,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 				return (DDI_EAGAIN);
 			}
 
-			count = ddi_msix_alloc_limit - curr_nintrs;
+			count = alloc_limit - curr_nintrs;
 		}
 	}
 

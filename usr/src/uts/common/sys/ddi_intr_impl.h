@@ -132,8 +132,18 @@ typedef struct ddi_intr_handle_impl {
 /* values for ih_flags */
 #define	DDI_INTR_MSIX_DUP	0x01	/* MSI-X vector which has been dupped */
 
-/* Default number of MSI/X resources to allocate */
-#define	DDI_INTR_DEFAULT_ALLOC		2
+/* Maximum number of MSI resources to allocate */
+#define	DDI_MAX_MSI_ALLOC	2
+
+/*
+ * The following MSI-X limits will change with Interrupt Resource Management
+ * (IRM) support.
+ */
+/* Default number of MSI-X resources to allocate */
+#define	DDI_DEFAULT_MSIX_ALLOC	2
+
+/* Maximum number of MSI-X resources to allocate */
+#define	DDI_MAX_MSIX_ALLOC	8
 
 struct av_softinfo;
 
@@ -249,6 +259,8 @@ void	i_ddi_set_pci_config_handle(dev_info_t *dip, ddi_acc_handle_t handle);
 int	i_ddi_get_msi_msix_cap_ptr(dev_info_t *dip);
 void	i_ddi_set_msi_msix_cap_ptr(dev_info_t *dip, int cap_ptr);
 #endif
+
+uint_t	i_ddi_get_msix_alloc_limit(dev_info_t *dip);
 
 int32_t i_ddi_get_intr_weight(dev_info_t *);
 int32_t i_ddi_set_intr_weight(dev_info_t *, int32_t);

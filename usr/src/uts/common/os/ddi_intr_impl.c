@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,8 @@
 #include <sys/autoconf.h>
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
+
+extern uint_t		ddi_msix_alloc_limit;
 
 /*
  * New DDI interrupt framework
@@ -403,3 +405,20 @@ i_ddi_set_msi_msix_cap_ptr(dev_info_t *dip, int cap_ptr)
 		intr_p->devi_cap_ptr = cap_ptr;
 }
 #endif
+
+/* ARGSUSED */
+uint_t
+i_ddi_get_msix_alloc_limit(dev_info_t *dip)
+{
+	uint_t	msix_alloc_limit = ddi_msix_alloc_limit;
+
+#if defined(__sparc)
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_NOTPROM |
+	    DDI_PROP_DONTPASS, "#msix-request")) {
+		msix_alloc_limit = MAX(DDI_MAX_MSIX_ALLOC,
+		    ddi_msix_alloc_limit);
+	}
+#endif
+
+	return (msix_alloc_limit);
+}
