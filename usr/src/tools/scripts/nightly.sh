@@ -144,6 +144,36 @@ normal_build() {
 }
 
 #
+# usage: run_hook HOOKNAME ARGS...
+#
+# If variable "$HOOKNAME" is defined, insert a section header into 
+# our logs and then run the command with ARGS
+#
+run_hook() {
+	HOOKNAME=$1
+    	eval HOOKCMD=\$$HOOKNAME
+	shift
+
+	if [ -n "$HOOKCMD" ]; then 
+	    	(
+			echo "\n==== Running $HOOKNAME command: $HOOKCMD ====\n"
+		    	( $HOOKCMD "$@" 2>&1 )
+			if [ "$?" -ne 0 ]; then
+			    	# Let exit status propagate up
+			    	touch $TMPDIR/abort
+			fi
+		) | tee -a $mail_msg_file >> $LOGFILE
+
+		if [ -f $TMPDIR/abort ]; then
+			build_ok=n
+			echo "\nAborting at request of $HOOKNAME" |
+				tee -a $mail_msg_file >> $LOGFILE
+			exit 1
+		fi
+	fi
+}
+
+#
 # usage: filelist DESTDIR PATTERN
 #
 filelist() {
@@ -1137,6 +1167,10 @@ unset NAME
 #
 #	Setup environmental variables
 #
+if [ -f /etc/nightly.conf ]; then
+	. /etc/nightly.conf
+fi    
+
 if [ -f $1 ]; then
 	if [[ $1 = */* ]]; then
 		. $1
@@ -1578,11 +1612,8 @@ logshuffle() {
 	NIGHTLY_STATUS=$state
 	export NIGHTLY_STATUS
 
-	if [ -n "$POST_NIGHTLY" ]; then
-		echo "\n==== Running POST_NIGHTLY command:" \
-		    "$POST_NIGHTLY ====\n" | tee -a $mail_msg_file >> $LOGFILE
-		$POST_NIGHTLY $state 2>&1 | tee -a $mail_msg_file >> $LOGFILE
-	fi
+	run_hook POST_NIGHTLY $state
+	run_hook SYS_POST_NIGHTLY $state
 
 	cat $build_time_file $mail_msg_file > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
@@ -1732,6 +1763,9 @@ echo "\n==== Nightly $maketype build started:   $START_DATE ====" \
 # make sure we log only to the nightly build file
 build_noise_file="${TMPDIR}/build_noise"
 exec </dev/null >$build_noise_file 2>&1
+
+run_hook SYS_PRE_NIGHTLY
+run_hook PRE_NIGHTLY
 
 echo "\n==== list of environment variables ====\n" >> $LOGFILE
 env >> $LOGFILE
@@ -2013,6 +2047,8 @@ fi
 #	Decide whether to bringover to the codemgr workspace
 #
 if [ "$n_FLAG" = "n" ]; then
+	run_hook PRE_BRINGOVER
+
 	echo "\n==== bringover to $CODEMGR_WS at `date` ====\n" >> $LOGFILE
 	# sleep on the parent workspace's lock
 	while egrep -s write $BRINGOVER_WS/Codemgr_wsdata/locks
@@ -2042,6 +2078,8 @@ if [ "$n_FLAG" = "n" ]; then
 			tee -a $mail_msg_file >> $LOGFILE
 		exit 1
 	fi
+
+	run_hook POST_BRINGOVER
 
 	#
 	# Possible transition from pre-split workspace to split
