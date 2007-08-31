@@ -442,6 +442,7 @@ sparc_SUBDIRS= \
 	lib/libdscp \
 	lib/libpri \
 	lib/libpcp \
+	lib/libtsalarm \
 	stand
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/mtst

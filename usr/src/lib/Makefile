@@ -248,7 +248,8 @@ sparc_SUBDIRS= .WAIT	\
 	libfruutils	.WAIT	\
 	libfru		\
 	storage		\
-	libpcp
+	libpcp		\
+	libtsalarm
 
 FM_sparc_DEPLIBS= libpri
 
@@ -543,6 +544,7 @@ libsec:		libavl
 brand:		libc libsocket
 libshare:	libscf libzfs libuuid libfsmgt libsecdb
 libexacct/demo:	libexacct libproject libsocket libnsl
+libtsalarm:	libpcp
 
 #
 # The reason this rule checks for the existence of the
