@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <sys/flock.h>
 #include <sys/nbmlock.h>
 #include <sys/policy.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -56,6 +57,12 @@
 #include <nfs/export.h>
 
 #include <sys/strsubr.h>
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/tndb.h>
+
+#include <inet/ip.h>
+#include <inet/ip6.h>
 
 /*
  * These are the interface routines for the server side of the
@@ -147,6 +154,21 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	error = sattr3_to_vattr(&args->new_attributes, &ava);
 	if (error)
 		goto out;
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opsetattr__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
 
 	/*
 	 * We need to specially handle size changes because of
@@ -380,10 +402,62 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		error = rfs_publicfh_mclookup(args->what.name, dvp, cr, &vp,
 					&exi, &sec);
 		if (error && exi != NULL)
-			exi_rele(exi);  /* See the comment below */
+			exi_rele(exi); /* See comment below Re: publicfh_flag */
+		/*
+		 * Since WebNFS may bypass MOUNT, we need to ensure this
+		 * request didn't come from an unlabeled admin_low client.
+		 */
+		if (is_system_labeled() && error == 0) {
+			struct sockaddr *ca;
+			int		addr_type;
+			void		*ipaddr;
+			tsol_tpc_t	*tp;
+
+			ca = (struct sockaddr *)svc_getrpccaller(
+			    req->rq_xprt)->buf;
+			if (ca->sa_family == AF_INET) {
+				addr_type = IPV4_VERSION;
+				ipaddr = &((struct sockaddr_in *)ca)->sin_addr;
+			} else if (ca->sa_family == AF_INET6) {
+				addr_type = IPV6_VERSION;
+				ipaddr = &((struct sockaddr_in6 *)
+				    ca)->sin6_addr;
+			}
+			tp = find_tpc(ipaddr, addr_type, B_FALSE);
+			if (tp == NULL || tp->tpc_tp.tp_doi !=
+			    l_admin_low->tsl_doi || tp->tpc_tp.host_type !=
+			    SUN_CIPSO) {
+				if (exi != NULL)
+					exi_rele(exi);
+				VN_RELE(vp);
+				resp->status = NFS3ERR_ACCES;
+				error = 1;
+			}
+			if (tp != NULL)
+				TPC_RELE(tp);
+		}
 	} else {
 		error = VOP_LOOKUP(dvp, args->what.name, &vp,
 				NULL, 0, NULL, cr);
+	}
+
+	if (is_system_labeled() && error == 0) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__oplookup__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp,
+			    DOMINANCE_CHECK)) {
+				if (publicfh_flag && exi != NULL)
+					exi_rele(exi);
+				VN_RELE(vp);
+				resp->status = NFS3ERR_ACCES;
+				error = 1;
+			}
+		}
 	}
 
 #ifdef DEBUG
@@ -481,6 +555,9 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	struct vattr *vap;
 	struct vattr va;
 	int checkwriteperm;
+	boolean_t dominant_label = B_FALSE;
+	boolean_t equal_label = B_FALSE;
+	boolean_t admin_low_client;
 
 	vap = NULL;
 
@@ -521,12 +598,33 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 
 	resp->resok.access = 0;
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opaccess__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if ((equal_label = do_rfs_label_check(clabel, vp,
+			    EQUALITY_CHECK)) == B_FALSE) {
+				dominant_label = do_rfs_label_check(clabel,
+				    vp, DOMINANCE_CHECK);
+			} else
+				dominant_label = B_TRUE;
+			admin_low_client = B_FALSE;
+		} else
+			admin_low_client = B_TRUE;
+	}
+
 	if (args->access & ACCESS3_READ) {
 		error = VOP_ACCESS(vp, VREAD, 0, cr);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-		} else if (!MANDLOCK(vp, va.va_mode))
+		} else if (!MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client ||
+		    dominant_label))
 			resp->resok.access |= ACCESS3_READ;
 	}
 	if ((args->access & ACCESS3_LOOKUP) && vp->v_type == VDIR) {
@@ -534,7 +632,8 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-		} else
+		} else if (!is_system_labeled() || admin_low_client ||
+		    dominant_label)
 			resp->resok.access |= ACCESS3_LOOKUP;
 	}
 	if (checkwriteperm &&
@@ -543,7 +642,8 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-		} else if (!MANDLOCK(vp, va.va_mode)) {
+		} else if (!MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client || equal_label)) {
 			resp->resok.access |=
 			    (args->access & (ACCESS3_MODIFY|ACCESS3_EXTEND));
 		}
@@ -554,7 +654,8 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-		} else
+		} else if (!is_system_labeled() || admin_low_client ||
+		    equal_label)
 			resp->resok.access |= ACCESS3_DELETE;
 	}
 	if (args->access & ACCESS3_EXECUTE) {
@@ -562,7 +663,9 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-		} else if (!MANDLOCK(vp, va.va_mode))
+		} else if (!MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client ||
+		    dominant_label))
 			resp->resok.access |= ACCESS3_EXECUTE;
 	}
 
@@ -642,6 +745,21 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	if (MANDLOCK(vp, va.va_mode)) {
 		resp->status = NFS3ERR_ACCES;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opreadlink__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	data = kmem_alloc(MAXPATHLEN + 1, KM_SLEEP);
@@ -743,6 +861,21 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opread__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	/*
@@ -993,6 +1126,21 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opwrite__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	/*
@@ -1249,6 +1397,21 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opcreate__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	if (args->how.mode == EXCLUSIVE) {
@@ -1591,6 +1754,21 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opmkdir__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
+
 	error = sattr3_to_vattr(&args->attributes, &va);
 	if (error)
 		goto out;
@@ -1730,6 +1908,21 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opsymlink__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	error = sattr3_to_vattr(&args->symlink.symlink_attributes, &va);
@@ -1888,6 +2081,21 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opmknod__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	switch (args->what.type) {
@@ -2077,6 +2285,21 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opremove__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
+
 	/*
 	 * Check for a conflict with a non-blocking mandatory share
 	 * reservation and V4 delegations
@@ -2201,6 +2424,21 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opremovedir__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
+
 	error = VOP_RMDIR(vp, args->object.name, rootdir, cr);
 
 #ifdef DEBUG
@@ -2275,6 +2513,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	nfs_fh3 *fh3;
 	struct exportinfo *to_exi;
 	vnode_t *srcvp = NULL;
+	bslabel_t *clabel;
 
 	fbvap = NULL;
 	favap = NULL;
@@ -2286,6 +2525,20 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	if (fvp == NULL) {
 		error = ESTALE;
 		goto out;
+	}
+
+	if (is_system_labeled()) {
+		clabel = req->rq_label;
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__oprename__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, fvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 #ifdef DEBUG
@@ -2350,6 +2603,15 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, tvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	/*
@@ -2486,6 +2748,7 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 	struct vattr ava;
 	nfs_fh3	*fh3;
 	struct exportinfo *to_exi;
+	bslabel_t *clabel;
 
 	vap = NULL;
 	bvap = NULL;
@@ -2520,6 +2783,21 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 	if (to_exi != exi) {
 		resp->status = NFS3ERR_XDEV;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__oplink__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	dvp = nfs3_fhtovp(&args->link.dir, exi);
@@ -2557,6 +2835,18 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 	if (rdonly(exi, req)) {
 		resp->status = NFS3ERR_ROFS;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		DTRACE_PROBE2(tx__rfs3__log__info__oplinkdir__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	error = VOP_LINK(dvp, vp, args->link.name, cr);
@@ -2669,6 +2959,21 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opreaddir__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
@@ -2913,6 +3218,22 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opreaddirplus__clabel,
+		    char *, "got client label from request(1)",
+		    struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
@@ -3236,6 +3557,21 @@ rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opfsstat__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
+
 	error = VFS_STATVFS(vp->v_vfsp, &sb);
 
 #ifdef DEBUG
@@ -3250,6 +3586,7 @@ rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
 #endif
 
 	VN_RELE(vp);
+	vp = NULL;
 
 	if (error)
 		goto out;
@@ -3280,6 +3617,9 @@ out:
 		resp->status = NFS3ERR_JUKEBOX;
 	} else
 		resp->status = puterrno3(error);
+out1:
+	if (vp != NULL)
+		VN_RELE(vp);
 	vattr_to_post_op_attr(vap, &resp->resfail.obj_attributes);
 }
 
@@ -3311,6 +3651,23 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 			resp->status = NFS3ERR_STALE;
 		vattr_to_post_op_attr(NULL, &resp->resfail.obj_attributes);
 		return;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opfsinfo__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_STALE;
+				vattr_to_post_op_attr(NULL,
+				    &resp->resfail.obj_attributes);
+				return;
+			}
+		}
 	}
 
 #ifdef DEBUG
@@ -3380,6 +3737,21 @@ rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__oppathconf__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
+	}
+
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
@@ -3431,6 +3803,7 @@ out:
 		resp->status = NFS3ERR_JUKEBOX;
 	} else
 		resp->status = puterrno3(error);
+out1:
 	if (vp != NULL)
 		VN_RELE(vp);
 	vattr_to_post_op_attr(vap, &resp->resfail.obj_attributes);
@@ -3490,6 +3863,21 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 	if (vp->v_type != VREG) {
 		resp->status = NFS3ERR_INVAL;
 		goto out1;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel = req->rq_label;
+
+		ASSERT(clabel != NULL);
+		DTRACE_PROBE2(tx__rfs3__log__info__opcommit__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+				resp->status = NFS3ERR_ACCES;
+				goto out1;
+			}
+		}
 	}
 
 	if (crgetuid(cr) != bva.va_uid &&

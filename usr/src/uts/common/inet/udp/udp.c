@@ -6422,9 +6422,11 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ASSERT(mp1 != NULL && DB_TYPE(mp1) == M_DATA);
 
 	/*
-	 * Check if our saved options are valid; update if not
+	 * Check if our saved options are valid; update if not.
 	 * TSOL Note: Since we are not in WRITER mode, UDP packets
-	 * to different destination may require different labels.
+	 * to different destination may require different labels,
+	 * or worse, UDP packets to same IP address may require
+	 * different labels due to use of shared all-zones address.
 	 * We use conn_lock to ensure that lastdst, ip_snd_options,
 	 * and ip_snd_options_len are consistent for the current
 	 * destination and are updated atomically.
@@ -6442,8 +6444,14 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 			*error = ECONNREFUSED;
 			goto done;
 		}
+		/*
+		 * update label option for this UDP socket if
+		 * - the destination has changed, or
+		 * - the UDP socket is MLP
+		 */
 		if ((!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
-		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst) &&
+		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst ||
+		    connp->conn_mlp_type != mlptSingle) &&
 		    (*error = udp_update_label(q, mp, v4dst)) != 0) {
 			mutex_exit(&connp->conn_lock);
 			goto done;
@@ -7350,7 +7358,9 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 	 * avoid blowing up our stack here.
 	 *
 	 * TSOL Note: Since we are not in WRITER mode, UDP packets
-	 * to different destination may require different labels.
+	 * to different destination may require different labels,
+	 * or worse, UDP packets to same IP address may require
+	 * different labels due to use of shared all-zones address.
 	 * We use conn_lock to ensure that lastdst, sticky ipp_hopopts,
 	 * and sticky ipp_hopoptslen are consistent for the current
 	 * destination and are updated atomically.
@@ -7368,8 +7378,14 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 			mutex_exit(&connp->conn_lock);
 			goto done;
 		}
+		/*
+		 * update label option for this UDP socket if
+		 * - the destination has changed, or
+		 * - the UDP socket is MLP
+		 */
 		if ((opt_present ||
-		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst)) &&
+		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst) ||
+		    connp->conn_mlp_type != mlptSingle) &&
 		    (*error = udp_update_label_v6(q, mp, &ip6_dst)) != 0) {
 			mutex_exit(&connp->conn_lock);
 			goto done;

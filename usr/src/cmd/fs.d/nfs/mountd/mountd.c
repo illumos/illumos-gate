@@ -74,6 +74,9 @@
 #include <sharefs/sharetab.h>
 #include "../lib/sharetab.h"
 #include "mountd.h"
+#include <tsol/label.h>
+#include <sys/tsol/label_macro.h>
+#include <libtsnet.h>
 
 struct sh_list *share_list;
 
@@ -101,6 +104,7 @@ static void umountall(struct svc_req *);
 static int netmatch(struct netbuf *, char *);
 static void sigexit(int);
 static int newopts(char *);
+static tsol_tpent_t *get_client_template(struct sockaddr *);
 
 static int verbose;
 static int rejecting;
@@ -826,6 +830,7 @@ mount(struct svc_req *rqstp)
 	int flavor_list[MAX_FLAVORS];
 	int flavor_count;
 	struct netbuf *nb;
+	ucred_t	*uc = NULL;
 
 	transp = rqstp->rq_xprt;
 	version = rqstp->rq_vers;
@@ -862,16 +867,19 @@ mount(struct svc_req *rqstp)
 	}
 
 	/*
-	 * Trusted Extension doesn't support older versions of nfs(v2, v3).
-	 * To prevent circumventing TX label policy via using an older
-	 * version of nfs client, reject the mount request and log an
-	 * error.
+	 * Trusted Extension doesn't support nfsv2. nfsv2 client
+	 * uses MOUNT protocol v1 and v2. To prevent circumventing
+	 * TX label policy via using nfsv2 client, reject a mount
+	 * request with version less than 3 and log an error.
 	 */
 	if (is_system_labeled()) {
-		syslog(LOG_ERR,
-		    "mount rejected: Solaris TX only supports nfs4 clients");
-		error = EACCES;
-		goto reply;
+		if (version < 3) {
+			if (verbose)
+				syslog(LOG_ERR,
+				    "Rejected mount: TX doesn't support NFSv2");
+			error = EACCES;
+			goto reply;
+		}
 	}
 
 	/*
@@ -916,6 +924,74 @@ mount(struct svc_req *rqstp)
 	}
 
 	/*
+	 * Check MAC policy here. The server side policy should be
+	 * consistent with client side mount policy, i.e.
+	 * - we disallow an admin_low unlabeled client to mount
+	 * - we disallow mount from a lower labeled client.
+	 */
+	if (is_system_labeled()) {
+		m_label_t *clabel = NULL;
+		m_label_t *slabel = NULL;
+		m_label_t admin_low;
+
+		if (svc_getcallerucred(rqstp->rq_xprt, &uc) != 0) {
+			syslog(LOG_ERR,
+			    "mount request: Failed to get caller's ucred : %m");
+			error = EACCES;
+			goto reply;
+		}
+		if ((clabel = ucred_getlabel(uc)) == NULL) {
+			syslog(LOG_ERR,
+			    "mount request: can't get client label from ucred");
+			error = EACCES;
+			goto reply;
+		}
+
+		bsllow(&admin_low);
+		if (blequal(&admin_low, clabel)) {
+			struct sockaddr *ca;
+			tsol_tpent_t	*tp;
+
+			ca = (struct sockaddr *)(void *)svc_getrpccaller(
+			    rqstp->rq_xprt)->buf;
+			if (ca == NULL) {
+				error = EACCES;
+				goto reply;
+			}
+			/*
+			 * get trusted network template associated
+			 * with the client.
+			 */
+			tp = get_client_template(ca);
+			if (tp == NULL || tp->host_type != SUN_CIPSO) {
+				if (tp != NULL)
+					tsol_freetpent(tp);
+				error = EACCES;
+				goto reply;
+			}
+			tsol_freetpent(tp);
+		} else {
+			if ((slabel = m_label_alloc(MAC_LABEL)) == NULL) {
+				error = EACCES;
+				goto reply;
+			}
+
+			if (getlabel(rpath, slabel) != 0) {
+				m_label_free(slabel);
+				error = EACCES;
+				goto reply;
+			}
+
+			if (!bldominates(clabel, slabel)) {
+				m_label_free(slabel);
+				error = EACCES;
+				goto reply;
+			}
+			m_label_free(slabel);
+		}
+	}
+
+	/*
 	 * Now get the filehandle.
 	 *
 	 * NFS V2 clients get a 32 byte filehandle.
@@ -945,6 +1021,8 @@ mount(struct svc_req *rqstp)
 	}
 
 reply:
+	if (uc != NULL)
+		ucred_free(uc);
 	switch (version) {
 	case MOUNTVERS:
 	case MOUNTVERS_POSIX:
@@ -2138,4 +2216,45 @@ sigexit(int signum)
 	if (signum == SIGHUP)
 		_exit(0);
 	_exit(1);
+}
+
+static tsol_tpent_t *
+get_client_template(struct sockaddr *sock)
+{
+	in_addr_t	v4client;
+	in6_addr_t	v6client;
+	char		v4_addr[INET_ADDRSTRLEN];
+	char		v6_addr[INET6_ADDRSTRLEN];
+	tsol_rhent_t	*rh;
+	tsol_tpent_t	*tp;
+
+	switch (sock->sa_family) {
+	case AF_INET:
+		v4client = ((struct sockaddr_in *)(void *)sock)->
+		    sin_addr.s_addr;
+		if (inet_ntop(AF_INET, &v4client, v4_addr, INET_ADDRSTRLEN) ==
+		    NULL)
+			return (NULL);
+		rh = tsol_getrhbyaddr(v4_addr, sizeof (v4_addr), AF_INET);
+		if (rh == NULL)
+			return (NULL);
+		tp = tsol_gettpbyname(rh->rh_template);
+		tsol_freerhent(rh);
+		return (tp);
+		break;
+	case AF_INET6:
+		v6client = ((struct sockaddr_in6 *)(void *)sock)->sin6_addr;
+		if (inet_ntop(AF_INET6, &v6client, v6_addr, INET6_ADDRSTRLEN) ==
+		    NULL)
+			return (NULL);
+		rh = tsol_getrhbyaddr(v6_addr, sizeof (v6_addr), AF_INET6);
+		if (rh == NULL)
+			return (NULL);
+		tp = tsol_gettpbyname(rh->rh_template);
+		tsol_freerhent(rh);
+		return (tp);
+		break;
+	default:
+		return (NULL);
+	}
 }

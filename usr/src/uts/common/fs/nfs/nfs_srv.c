@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -368,6 +368,18 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 
 	TRACE_0(TR_FAC_NFS, TR_RFS_LOOKUP_START,
 		"rfs_lookup_start:");
+
+	/*
+	 * Trusted Extension doesn't support NFSv2. MOUNT
+	 * will reject v2 clients. Need to prevent v2 client
+	 * access via WebNFS here.
+	 */
+	if (is_system_labeled() && req->rq_vers == 2) {
+		dr->dr_status = NFSERR_ACCES;
+		TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
+			"rfs_lookup_end:(%S)", "access");
+		return;
+	}
 
 	/*
 	 * Disallow NULL paths

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,12 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * types of label comparison
+ */
+#define	EQUALITY_CHECK	0
+#define	DOMINANCE_CHECK	1
 
 /* Binary Label Structure Definitions */
 
@@ -123,7 +129,8 @@ extern int		getlabel(const char *, m_label_t *);
 extern int		fgetlabel(int, m_label_t *);
 extern int		_blinrange(const m_label_t *, const brange_t *);
 extern int		blinlset(const m_label_t *, const blset_t);
-extern ts_label_t	*nfs4_getflabel(vnode_t *);
+extern ts_label_t	*nfs_getflabel(vnode_t *);
+extern boolean_t	do_rfs_label_check(bslabel_t *, vnode_t *, int);
 
 /*
  * The use of '!!' here prevents users from referencing this function-like

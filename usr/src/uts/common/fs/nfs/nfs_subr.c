@@ -62,6 +62,7 @@
 #include <sys/list.h>
 #include <sys/tsol/tnet.h>
 #include <sys/priv.h>
+#include <sys/sdt.h>
 
 #include <inet/ip6.h>
 
@@ -75,6 +76,8 @@
 #include <nfs/nfs_clnt.h>
 #include <nfs/rnode.h>
 #include <nfs/nfs_acl.h>
+
+#include <sys/tsol/label.h>
 
 /*
  * The hash queues for the access to active and cached rnodes
@@ -5127,4 +5130,31 @@ nfs_has_ctty(void)
 	rv = (curproc->p_sessp->s_vp != NULL);
 	mutex_exit(&curproc->p_splock);
 	return (rv);
+}
+
+/*
+ * TX NFS routine used by NFSv3 and NFSv4 to do label check
+ * on client label and server's file object lable.
+ */
+boolean_t
+do_rfs_label_check(bslabel_t *clabel, vnode_t *vp, int flag)
+{
+	bslabel_t *slabel;
+	ts_label_t *tslabel;
+	boolean_t result;
+
+	if ((tslabel = nfs_getflabel(vp)) == NULL) {
+		return (B_FALSE);
+	}
+	slabel = label2bslabel(tslabel);
+	DTRACE_PROBE4(tx__rfs__log__info__labelcheck, char *,
+	    "comparing server's file label(1) with client label(2) (vp(3))",
+	    bslabel_t *, slabel, bslabel_t *, clabel, vnode_t *, vp);
+
+	if (flag == EQUALITY_CHECK)
+		result = blequal(clabel, slabel);
+	else
+		result = bldominates(clabel, slabel);
+	label_rele(tslabel);
+	return (result);
 }

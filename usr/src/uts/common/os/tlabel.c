@@ -528,11 +528,11 @@ fgetlabel(int fd, bslabel_t *label_p)
 }
 
 /*
- * Used by NFSv4 to query label of a pathname
- * component during lookup/access ops.
+ * Used by NFSv3 and NFSv4 server to query label of
+ * a pathname component during lookup/access ops.
  */
 ts_label_t *
-nfs4_getflabel(vnode_t *vp)
+nfs_getflabel(vnode_t *vp)
 {
 	zone_t *zone;
 	ts_label_t *zone_label;
