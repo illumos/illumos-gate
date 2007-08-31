@@ -1379,26 +1379,24 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 }
 
 /*
- * Get the resolver set up for a new interface address.  (Always called
- * as writer.)
+ * Get the resolver set up for a new ipif.  (Always called as writer.)
  */
 int
-ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
+ipif_ndp_up(ipif_t *ipif)
 {
 	ill_t		*ill = ipif->ipif_ill;
 	int		err = 0;
 	nce_t		*nce = NULL;
 	nce_t		*mnce = NULL;
 
-	ip1dbg(("ipif_ndp_up(%s:%u)\n",
-	    ipif->ipif_ill->ill_name, ipif->ipif_id));
+	ip1dbg(("ipif_ndp_up(%s:%u)\n", ill->ill_name, ipif->ipif_id));
 
 	/*
 	 * ND not supported on XRESOLV interfaces. If ND support (multicast)
 	 * added later, take out this check.
 	 */
 	if ((ill->ill_flags & ILLF_XRESOLV) ||
-	    IN6_IS_ADDR_UNSPECIFIED(addr) ||
+	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) ||
 	    (!(ill->ill_net_type & IRE_INTERFACE))) {
 		ipif->ipif_addr_ready = 1;
 		return (0);
@@ -1448,7 +1446,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
 		}
 		err = ndp_lookup_then_add_v6(ill,
 		    hw_addr,
-		    addr,
+		    &ipif->ipif_v6lcl_addr,
 		    &ipv6_all_ones,
 		    &ipv6_all_zeros,
 		    0,

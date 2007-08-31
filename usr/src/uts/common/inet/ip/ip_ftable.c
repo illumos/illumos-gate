@@ -147,7 +147,6 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	boolean_t found_incomplete = B_FALSE;
 
 	ASSERT(ipif == NULL || !ipif->ipif_isv6);
-	ASSERT(!(flags & MATCH_IRE_WQ));
 
 	/*
 	 * When we return NULL from this function, we should make

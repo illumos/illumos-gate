@@ -135,8 +135,6 @@ nce_advert_flags(const nce_t *nce)
 
 	if (nce->nce_flags & NCE_F_ISROUTER)
 		flag |= NDP_ISROUTER;
-	if (!(nce->nce_flags & NCE_F_PROXY))
-		flag |= NDP_ORIDE;
 	return (flag);
 }
 
@@ -1287,8 +1285,6 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 	    (uchar_t *)&lnr->lnr_hdw_addr, lnr->lnr_hdw_len);
 	if (nce->nce_flags & NCE_F_ISROUTER)
 		lnr->lnr_flags = NDF_ISROUTER_ON;
-	if (nce->nce_flags & NCE_F_PROXY)
-		lnr->lnr_flags |= NDF_PROXY_ON;
 	if (nce->nce_flags & NCE_F_ANYCAST)
 		lnr->lnr_flags |= NDF_ANYCAST_ON;
 done:
@@ -1498,7 +1494,7 @@ ip_ndp_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		mutex_exit(&ill->ill_lock);
 		ipif->ipif_was_dup = B_TRUE;
 
-		if (ipif_ndp_up(ipif, addr) != EINPROGRESS)
+		if (ipif_ndp_up(ipif) != EINPROGRESS)
 			(void) ipif_up_done_v6(ipif);
 	}
 	freeb(mp);
@@ -1681,7 +1677,7 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		 */
 		goto ignore_conflict;
 	}
-	(void) strlcpy(ibuf, ill->ill_name, sizeof (ibuf));
+
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 
 		if ((ipif->ipif_flags & IPIF_POINTOPOINT) ||
@@ -1699,11 +1695,7 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		 * complain.  It may take a long time to recover.
 		 */
 		if (!ipif->ipif_was_dup) {
-			if (ipif->ipif_id != 0) {
-				(void) snprintf(ibuf + ill->ill_name_length - 1,
-				    sizeof (ibuf) - ill->ill_name_length + 1,
-				    ":%d", ipif->ipif_id);
-			}
+			ipif_get_name(ipif, ibuf, sizeof (ibuf));
 			cmn_err(CE_WARN, "%s has duplicate address %s (in "
 			    "use by %s); disabled", ibuf, sbuf, hbuf);
 		}
@@ -2693,18 +2685,11 @@ ndp_timer(void *arg)
 					char sbuf[INET6_ADDRSTRLEN];
 
 					ipif->ipif_was_dup = B_FALSE;
-					(void) strlcpy(ibuf, ill->ill_name,
-					    sizeof (ibuf));
 					(void) inet_ntop(AF_INET6,
 					    &ipif->ipif_v6lcl_addr,
 					    sbuf, sizeof (sbuf));
-					if (ipif->ipif_id != 0) {
-						(void) snprintf(ibuf +
-						    ill->ill_name_length - 1,
-						    sizeof (ibuf) -
-						    ill->ill_name_length + 1,
-						    ":%d", ipif->ipif_id);
-					}
+					ipif_get_name(ipif, ibuf,
+					    sizeof (ibuf));
 					cmn_err(CE_NOTE, "recovered address "
 					    "%s on %s", sbuf, ibuf);
 				}
@@ -3171,20 +3156,6 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_ANYCAST;
 		break;
 	case (NDF_ANYCAST_OFF|NDF_ANYCAST_ON):
-		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
-		if (nce != NULL)
-			NCE_REFRELE(nce);
-		return (EINVAL);
-	}
-
-	switch (inflags & (NDF_PROXY_ON|NDF_PROXY_OFF)) {
-	case NDF_PROXY_ON:
-		new_flags |= NCE_F_PROXY;
-		break;
-	case NDF_PROXY_OFF:
-		new_flags &= ~NCE_F_PROXY;
-		break;
-	case (NDF_PROXY_OFF|NDF_PROXY_ON):
 		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);

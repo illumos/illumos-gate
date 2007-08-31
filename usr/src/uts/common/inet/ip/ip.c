@@ -979,7 +979,7 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 019 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 
 	/* copyin size cannot be coded for SIOCGIFCONF */
-	/* 020 */ { O_SIOCGIFCONF, 0, IPI_GET_CMD | IPI_REPL,
+	/* 020 */ { O_SIOCGIFCONF, 0, IPI_GET_CMD,
 			MISC_CMD, ip_sioctl_get_ifconf, NULL },
 
 	/* 021 */ { SIOCSIFMTU,	sizeof (struct ifreq), IPI_PRIV | IPI_WR,
@@ -1005,11 +1005,11 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 
 	/* See 166-168 below for extended SIOC*XARP ioctls */
 	/* 030 */ { SIOCSARP, sizeof (struct arpreq), IPI_PRIV,
-			MISC_CMD, ip_sioctl_arp, NULL },
+			ARP_CMD, ip_sioctl_arp, NULL },
 	/* 031 */ { SIOCGARP, sizeof (struct arpreq), IPI_GET_CMD | IPI_REPL,
-			MISC_CMD, ip_sioctl_arp, NULL },
+			ARP_CMD, ip_sioctl_arp, NULL },
 	/* 032 */ { SIOCDARP, sizeof (struct arpreq), IPI_PRIV,
-			MISC_CMD, ip_sioctl_arp, NULL },
+			ARP_CMD, ip_sioctl_arp, NULL },
 
 	/* 033 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* 034 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
@@ -1090,7 +1090,7 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			IF_CMD, ip_sioctl_slifindex, NULL },
 
 	/* copyin size cannot be coded for SIOCGIFCONF */
-	/* 092 */ { SIOCGIFCONF, 0, IPI_GET_CMD | IPI_REPL,
+	/* 092 */ { SIOCGIFCONF, 0, IPI_GET_CMD,
 			MISC_CMD, ip_sioctl_get_ifconf, NULL },
 	/* 093 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* 094 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
@@ -1138,7 +1138,7 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 118 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* 119 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 
-	/* 120 */ { O_SIOCGLIFCONF, 0, IPI_GET_CMD, MISC_CMD | IPI_REPL,
+	/* 120 */ { O_SIOCGLIFCONF, 0, IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_get_lifconf, NULL },
 	/* 121 */ { SIOCSLIFMTU, sizeof (struct lifreq), IPI_PRIV | IPI_WR,
 			LIF_CMD, ip_sioctl_mtu, NULL },
@@ -1249,15 +1249,15 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			MISC_CMD, NULL, NULL },
 	/* 164 */ { SIOCGDSTINFO, 0, IPI_GET_CMD, MISC_CMD, NULL, NULL },
 
-	/* 165 */ { SIOCGLIFCONF, 0, IPI_GET_CMD, MISC_CMD | IPI_REPL,
+	/* 165 */ { SIOCGLIFCONF, 0, IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_get_lifconf, NULL },
 
 	/* 166 */ { SIOCSXARP, sizeof (struct xarpreq), IPI_PRIV,
-			MISC_CMD, ip_sioctl_xarp, NULL },
+			XARP_CMD, ip_sioctl_arp, NULL },
 	/* 167 */ { SIOCGXARP, sizeof (struct xarpreq), IPI_GET_CMD | IPI_REPL,
-			MISC_CMD, ip_sioctl_xarp, NULL },
+			XARP_CMD, ip_sioctl_arp, NULL },
 	/* 168 */ { SIOCDXARP, sizeof (struct xarpreq), IPI_PRIV,
-			MISC_CMD, ip_sioctl_xarp, NULL },
+			XARP_CMD, ip_sioctl_arp, NULL },
 
 	/* SIOCPOPSOCKFS is not handled by IP */
 	/* 169 */ { IPI_DONTCARE /* SIOCPOPSOCKFS */, 0, 0, 0, NULL, NULL },
@@ -1283,13 +1283,13 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 177 */ { SIOCGLIFSRCOF, 0, IPI_GET_CMD, MISC_CMD,
 			ip_sioctl_get_lifsrcof, NULL },
 	/* 178 */ { SIOCGMSFILTER, sizeof (struct group_filter), IPI_GET_CMD,
-			MISC_CMD, ip_sioctl_msfilter, NULL },
+			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 179 */ { SIOCSMSFILTER, sizeof (struct group_filter), IPI_WR,
-			MISC_CMD, ip_sioctl_msfilter, NULL },
+			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 180 */ { SIOCGIPMSFILTER, sizeof (struct ip_msfilter), IPI_GET_CMD,
-			MISC_CMD, ip_sioctl_msfilter, NULL },
+			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 181 */ { SIOCSIPMSFILTER, sizeof (struct ip_msfilter), IPI_WR,
-			MISC_CMD, ip_sioctl_msfilter, NULL },
+			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 182 */ { SIOCSIPMPFAILBACK, sizeof (int), IPI_PRIV, MISC_CMD,
 			ip_sioctl_set_ipmpfailback, NULL }
 };
@@ -3776,7 +3776,6 @@ ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		    IP_ADDR_LEN);
 	}
 
-	(void) strlcpy(ibuf, ill->ill_name, sizeof (ibuf));
 	(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen, hbuf,
 	    sizeof (hbuf));
 	(void) ip_dot_addr(src, sbuf);
@@ -3809,11 +3808,8 @@ ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		if (bring_up == ((ipif->ipif_flags & IPIF_UP) != 0))
 			continue;
 
-		if (ipif->ipif_id != 0) {
-			(void) snprintf(ibuf + ill->ill_name_length - 1,
-			    sizeof (ibuf) - ill->ill_name_length + 1, ":%d",
-			    ipif->ipif_id);
-		}
+		ipif_get_name(ipif, ibuf, sizeof (ibuf));
+
 		if (failtype == NULL) {
 			cmn_err(CE_NOTE, "recovered address %s on %s", sbuf,
 			    ibuf);
@@ -9767,10 +9763,10 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	/*
 	 * Make the conn globally visible to walkers
 	 */
+	ASSERT(connp->conn_ref == 1);
 	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags &= ~CONN_INCIPIENT;
 	mutex_exit(&connp->conn_lock);
-	ASSERT(connp->conn_ref == 1);
 
 	qprocson(q);
 
@@ -15553,8 +15549,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * in ip_rput(). If there's an error, we
 			 * complete it here.
 			 */
-			err = ipif_ndp_up(ipif, &ipif->ipif_v6lcl_addr);
-			if (err == 0) {
+			if ((err = ipif_ndp_up(ipif)) == 0) {
 				if (ill->ill_flags & ILLF_XRESOLV) {
 					mutex_enter(&connp->conn_lock);
 					mutex_enter(&ill->ill_lock);
@@ -18143,8 +18138,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae.ipAdEntInfo.ae_obcnt = ipif->ipif_ob_pkt_count;
 			mae.ipAdEntInfo.ae_focnt = ipif->ipif_fo_pkt_count;
 
-			(void) ipif_get_name(ipif,
-			    mae.ipAdEntIfIndex.o_bytes,
+			ipif_get_name(ipif, mae.ipAdEntIfIndex.o_bytes,
 			    OCTET_LENGTH);
 			mae.ipAdEntIfIndex.o_length =
 			    mi_strlen(mae.ipAdEntIfIndex.o_bytes);
@@ -18225,8 +18219,7 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae6.ipv6AddrInfo.ae_obcnt = ipif->ipif_ob_pkt_count;
 			mae6.ipv6AddrInfo.ae_focnt = ipif->ipif_fo_pkt_count;
 
-			(void) ipif_get_name(ipif,
-			    mae6.ipv6AddrIfIndex.o_bytes,
+			ipif_get_name(ipif, mae6.ipv6AddrIfIndex.o_bytes,
 			    OCTET_LENGTH);
 			mae6.ipv6AddrIfIndex.o_length =
 			    mi_strlen(mae6.ipv6AddrIfIndex.o_bytes);
@@ -18324,8 +18317,7 @@ ip_snmp_get_mib2_ip_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			if (ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;	/* not this zone */
-			(void) ipif_get_name(ipif,
-			    ipm.ipGroupMemberIfIndex.o_bytes,
+			ipif_get_name(ipif, ipm.ipGroupMemberIfIndex.o_bytes,
 			    OCTET_LENGTH);
 			ipm.ipGroupMemberIfIndex.o_length =
 			    mi_strlen(ipm.ipGroupMemberIfIndex.o_bytes);
@@ -18447,8 +18439,7 @@ ip_snmp_get_mib2_ip_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 		    ipif = ipif->ipif_next) {
 			if (ipif->ipif_zoneid != zoneid)
 				continue;	/* not this zone */
-			(void) ipif_get_name(ipif,
-			    ips.ipGroupSourceIfIndex.o_bytes,
+			ipif_get_name(ipif, ips.ipGroupSourceIfIndex.o_bytes,
 			    OCTET_LENGTH);
 			ips.ipGroupSourceIfIndex.o_length =
 			    mi_strlen(ips.ipGroupSourceIfIndex.o_bytes);
@@ -18981,8 +18972,7 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 		bcopy(ill->ill_name, re->ipRouteIfIndex.o_bytes,
 		    re->ipRouteIfIndex.o_length);
 	} else if (ipif != NULL) {
-		(void) ipif_get_name(ipif, re->ipRouteIfIndex.o_bytes,
-		    OCTET_LENGTH);
+		ipif_get_name(ipif, re->ipRouteIfIndex.o_bytes, OCTET_LENGTH);
 		re->ipRouteIfIndex.o_length =
 		    mi_strlen(re->ipRouteIfIndex.o_bytes);
 	}
@@ -19125,8 +19115,7 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 		bcopy(ill->ill_name, re->ipv6RouteIfIndex.o_bytes,
 		    re->ipv6RouteIfIndex.o_length);
 	} else if (ipif != NULL) {
-		(void) ipif_get_name(ipif, re->ipv6RouteIfIndex.o_bytes,
-		    OCTET_LENGTH);
+		ipif_get_name(ipif, re->ipv6RouteIfIndex.o_bytes, OCTET_LENGTH);
 		re->ipv6RouteIfIndex.o_length =
 		    mi_strlen(re->ipv6RouteIfIndex.o_bytes);
 	}
@@ -26664,23 +26653,25 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 /*
  * ioctl processing
  *
- * ioctl processing starts with ip_sioctl_copyin_setup which looks up
- * the ioctl command in the ioctl tables and determines the copyin data size
- * from the ioctl property ipi_copyin_size, and does an mi_copyin() of that
- * size.
+ * ioctl processing starts with ip_sioctl_copyin_setup(), which looks up
+ * the ioctl command in the ioctl tables, determines the copyin data size
+ * from the ipi_copyin_size field, and does an mi_copyin() of that size.
  *
- * ioctl processing then continues when the M_IOCDATA makes its way down.
- * Now the ioctl is looked up again in the ioctl table, and its properties are
- * extracted. The associated 'conn' is then refheld till the end of the ioctl
- * and the general ioctl processing function ip_process_ioctl is called.
+ * ioctl processing then continues when the M_IOCDATA makes its way down to
+ * ip_wput_nondata().  The ioctl is looked up again in the ioctl table, its
+ * associated 'conn' is refheld till the end of the ioctl and the general
+ * ioctl processing function ip_process_ioctl() is called to extract the
+ * arguments and process the ioctl.  To simplify extraction, ioctl commands
+ * are "typed" based on the arguments they take (e.g., LIF_CMD which takes a
+ * `struct lifreq'), and a common extract function (e.g., ip_extract_lifreq())
+ * is used to extract the ioctl's arguments.
+ *
  * ip_process_ioctl determines if the ioctl needs to be serialized, and if
  * so goes thru the serialization primitive ipsq_try_enter. Then the
  * appropriate function to handle the ioctl is called based on the entry in
  * the ioctl table. ioctl completion is encapsulated in ip_ioctl_finish
  * which also refreleases the 'conn' that was refheld at the start of the
  * ioctl. Finally ipsq_exit is called if needed to exit the ipsq.
- * ip_extract_lifreq_cmn extracts the interface name from the lifreq/ifreq
- * struct and looks up the ipif. ip_extract_tunreq handles the case of tunnel.
  *
  * Many exclusive ioctls go thru an internal down up sequence as part of
  * the operation. For example an attempt to change the IP address of an
@@ -26692,7 +26683,8 @@ void
 ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 {
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	ip_ioctl_cmd_t *ipip = (ip_ioctl_cmd_t *)arg;
+	ip_ioctl_cmd_t *ipip = arg;
+	ip_extract_func_t *extract_funcp;
 	cmd_info_t ci;
 	int err;
 	boolean_t entered_ipsq = B_FALSE;
@@ -26714,64 +26706,53 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	}
 
 	ci.ci_ipif = NULL;
-	switch (ipip->ipi_cmd_type) {
-	case IF_CMD:
-	case LIF_CMD:
+	if (ipip->ipi_cmd_type == MISC_CMD) {
 		/*
-		 * ioctls that pass in a [l]ifreq appear here.
-		 * ip_extract_lifreq_cmn returns a refheld ipif in
-		 * ci.ci_ipif
+		 * All MISC_CMD ioctls come in here -- e.g. SIOCGLIFCONF.
 		 */
-		err = ip_extract_lifreq_cmn(q, mp, ipip->ipi_cmd_type,
-		    ipip->ipi_flags, &ci, ip_process_ioctl);
-		if (err != 0) {
-			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
-			return;
-		}
-		ASSERT(ci.ci_ipif != NULL);
-		break;
-
-	case TUN_CMD:
-		/*
-		 * SIOC[GS]TUNPARAM appear here. ip_extract_tunreq returns
-		 * a refheld ipif in ci.ci_ipif
-		 */
-		err = ip_extract_tunreq(q, mp, &ci.ci_ipif, ip_process_ioctl);
-		if (err != 0) {
-			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
-			return;
-		}
-		ASSERT(ci.ci_ipif != NULL);
-		break;
-
-	case MISC_CMD:
-		/*
-		 * ioctls that neither pass in [l]ifreq or iftun_req come here
-		 * For eg. SIOCGLIFCONF will appear here.
-		 */
-		switch (ipip->ipi_cmd) {
-		case IF_UNITSEL:
+		if (ipip->ipi_cmd == IF_UNITSEL) {
 			/* ioctl comes down the ill */
 			ci.ci_ipif = ((ill_t *)q->q_ptr)->ill_ipif;
 			ipif_refhold(ci.ci_ipif);
-			break;
-		case SIOCGMSFILTER:
-		case SIOCSMSFILTER:
-		case SIOCGIPMSFILTER:
-		case SIOCSIPMSFILTER:
-			err = ip_extract_msfilter(q, mp, &ci.ci_ipif,
-			    ip_process_ioctl);
-			if (err != 0) {
-				ip_ioctl_finish(q, mp, err, IPI2MODE(ipip),
-				    NULL);
-			}
-			break;
 		}
 		err = 0;
 		ci.ci_sin = NULL;
 		ci.ci_sin6 = NULL;
 		ci.ci_lifr = NULL;
-		break;
+	} else {
+		switch (ipip->ipi_cmd_type) {
+		case IF_CMD:
+		case LIF_CMD:
+			extract_funcp = ip_extract_lifreq;
+			break;
+
+		case ARP_CMD:
+		case XARP_CMD:
+			extract_funcp = ip_extract_arpreq;
+			break;
+
+		case TUN_CMD:
+			extract_funcp = ip_extract_tunreq;
+			break;
+
+		case MSFILT_CMD:
+			extract_funcp = ip_extract_msfilter;
+			break;
+
+		default:
+			ASSERT(0);
+		}
+
+		err = (*extract_funcp)(q, mp, ipip, &ci, ip_process_ioctl);
+		if (err != 0) {
+			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
+			return;
+		}
+
+		/*
+		 * All of the extraction functions return a refheld ipif.
+		 */
+		ASSERT(ci.ci_ipif != NULL);
 	}
 
 	/*
@@ -26921,7 +26902,7 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	ip_ioctl_cmd_t	*ipip;
 	cred_t		*cr;
 	conn_t		*connp;
-	int		cmd, err;
+	int		err;
 	nce_t		*nce;
 	ipif_t		*ipif;
 	ip_stack_t	*ipst;
@@ -26967,8 +26948,8 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				putnext(q, mp);
 			}
 			return;
-		} else if ((q->q_next != NULL) &&
-		    !(ipip->ipi_flags & IPI_MODOK)) {
+		}
+		if ((q->q_next != NULL) && !(ipip->ipi_flags & IPI_MODOK)) {
 			/*
 			 * the ioctl is one we recognise, but is not
 			 * consumed by IP as a module, pass M_IOCDATA
@@ -27008,9 +26989,7 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * so we return; a return value of 1 means no more
 			 * copying is needed, so we continue.
 			 */
-			cmd = iocp->ioc_cmd;
-			if ((cmd == SIOCGMSFILTER || cmd == SIOCSMSFILTER ||
-			    cmd == SIOCGIPMSFILTER || cmd == SIOCSIPMSFILTER) &&
+			if (ipip->ipi_cmd_type == MSFILT_CMD &&
 			    MI_COPY_COUNT(mp) == 1) {
 				if (ip_copyin_msfilter(q, mp) == 0)
 					return;

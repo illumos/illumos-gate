@@ -86,8 +86,6 @@ extern	void ire_delete_host_redirects(ipaddr_t, ip_stack_t *);
 extern	ire_t *ire_ihandle_lookup_onlink(ire_t *);
 extern	ire_t *ire_forward(ipaddr_t, boolean_t *, ire_t *, ire_t *,
     const struct ts_label_s *, ip_stack_t *);
-extern void	ire_ftable_walk(struct rt_entry *, uint_t, uint_t,
-    ill_t *, zoneid_t, pfv_t, char *, ip_stack_t *);
 extern irb_t	*ire_get_bucket(ire_t *);
 extern uint_t ifindex_lookup(const struct sockaddr *, zoneid_t);
 extern int ipfil_sendpkt(const struct sockaddr *, mblk_t *, uint_t, zoneid_t);

@@ -2516,14 +2516,14 @@ ip_sioctl_msfilter(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 /*
  * Finds the ipif based on information in the ioctl headers.  Needed to make
  * ip_process_ioctl() happy (it needs to know the ipif for IPI_WR-flagged
- * ioctls prior to calling the ioctl's handler function).  Somewhat analogous
- * to ip_extract_lifreq_cmn() and ip_extract_tunreq().
+ * ioctls prior to calling the ioctl's handler function).
  */
 int
-ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
+ip_extract_msfilter(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
+    cmd_info_t *ci, ipsq_func_t func)
 {
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	int cmd = iocp->ioc_cmd, err = 0;
+	int cmd = ipip->ipi_cmd;
+	int err = 0;
 	conn_t *connp;
 	ipif_t *ipif;
 	/* caller has verified this mblk exists */
@@ -2594,7 +2594,7 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 		}
 	}
 
-	*ipifpp = ipif;
+	ci->ci_ipif = ipif;
 	return (err);
 }
 

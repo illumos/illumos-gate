@@ -2158,13 +2158,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 
 	ASSERT(match_flags != 0 || zoneid != ALL_ZONES);
 	/*
-	 * 1) MATCH_IRE_WQ : Used specifically to match on ire_stq.
-	 *    The fast path update uses this to make sure it does not
-	 *    update the fast path header of interface X with the fast
-	 *    path updates it recieved on interface Y.  It is similar
-	 *    in handling DL_NOTE_FASTPATH_FLUSH.
-	 *
-	 * 2) MATCH_IRE_ILL/MATCH_IRE_ILL_GROUP : We match both on ill
+	 * MATCH_IRE_ILL/MATCH_IRE_ILL_GROUP : We match both on ill
 	 *    pointed by ire_stq and ire_ipif. Only in the case of
 	 *    IRE_CACHEs can ire_stq and ire_ipif be pointing to
 	 *    different ills. But we want to keep this function generic
@@ -2279,8 +2273,6 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 
 	if (((!(match_flags & MATCH_IRE_TYPE)) ||
 	    (ire->ire_type & ire_type)) &&
-	    ((!(match_flags & MATCH_IRE_WQ)) ||
-	    (ire->ire_stq == ill->ill_wq)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
 	    (ire_stq_ill == ill || ire_ipif_ill == ill)) &&
 	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
@@ -2334,7 +2326,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 	boolean_t ret;
 	struct rtfuncarg rtfarg;
 
-	ASSERT((!(match_flags & (MATCH_IRE_WQ | MATCH_IRE_ILL |
+	ASSERT((!(match_flags & (MATCH_IRE_ILL |
 	    MATCH_IRE_ILL_GROUP))) || (ill != NULL));
 	ASSERT(!(match_flags & MATCH_IRE_TYPE) || (ire_type != 0));
 	/*
@@ -3991,7 +3983,6 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	ASSERT((ire->ire_addr & ~ire->ire_mask) == 0);
 	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP))) ||
 	    (ipif != NULL && !ipif->ipif_isv6));
-	ASSERT(!(match_flags & MATCH_IRE_WQ));
 
 	/*
 	 * HIDDEN cache entries have to be looked up specifically with

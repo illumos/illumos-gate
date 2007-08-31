@@ -58,7 +58,6 @@ extern	void		igmp_joingroup(ilm_t *);
 extern	void		igmp_leavegroup(ilm_t *);
 extern	void		igmp_slowtimo(void *);
 extern	void		igmp_timeout_handler(void *);
-extern	void		igmp_timeout_start(int);
 extern	void		igmp_statechange(ilm_t *, mcast_record_t, slist_t *);
 
 extern	void		mld_joingroup(ilm_t *);
@@ -116,24 +115,23 @@ extern	void		ip_mrouter_stack_init(ip_stack_t *);
 extern	void		ip_mrouter_stack_destroy(ip_stack_t *);
 
 extern	int		ip_opt_add_group(conn_t *, boolean_t, ipaddr_t,
-    ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *first_mp);
+    ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *);
 extern	int		ip_opt_delete_group(conn_t *, boolean_t, ipaddr_t,
-    ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *first_mp);
+    ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *);
 extern	int		ip_opt_add_group_v6(conn_t *, boolean_t,
     const in6_addr_t *, int, mcast_record_t, const in6_addr_t *, mblk_t *);
 extern	int		ip_opt_delete_group_v6(conn_t *, boolean_t,
     const in6_addr_t *, int, mcast_record_t, const in6_addr_t *, mblk_t *);
 
+extern  int		mrt_ioctl(ipif_t *, sin_t *, queue_t *, mblk_t *,
+    ip_ioctl_cmd_t *, void *);
 extern	int		ip_sioctl_msfilter(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
-extern	int		ip_extract_msfilter(queue_t *, mblk_t *, ipif_t **,
-    ipsq_func_t);
+extern	int		ip_extract_msfilter(queue_t *, mblk_t *,
+    const ip_ioctl_cmd_t *, cmd_info_t *, ipsq_func_t);
 extern	int		ip_copyin_msfilter(queue_t *, mblk_t *);
 
 extern	void		ip_wput_ctl(queue_t *, mblk_t *);
-
-extern  int	mrt_ioctl(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
-    ip_ioctl_cmd_t *ipip, void *if_req);
 
 extern	int		pim_input(queue_t *, mblk_t *, ill_t *);
 extern	void		reset_conn_ipif(ipif_t *);
@@ -142,9 +140,6 @@ extern	void		reset_mrt_ill(ill_t *);
 extern	void		reset_mrt_vif_ipif(ipif_t *);
 extern	void		igmp_start_timers(unsigned, ip_stack_t *);
 extern	void		mld_start_timers(unsigned, ip_stack_t *);
-/*
- * Extern variables
- */
 
 #endif /* _KERNEL */
 

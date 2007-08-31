@@ -71,14 +71,13 @@ extern "C" {
 	((addr).s6_addr8[15] & (mask).s6_addr8[15])) & ((table_size) - 1))
 
 /*
- * match parameter definitions for
- * IRE lookup routines.
+ * match parameter definitions for IRE lookup routines.
  */
 #define	MATCH_IRE_DSTONLY	0x0000	/* Match just the address */
 #define	MATCH_IRE_TYPE		0x0001	/* Match IRE type */
 #define	MATCH_IRE_SRC		0x0002	/* Match IRE source address */
 #define	MATCH_IRE_MASK		0x0004	/* Match IRE mask */
-#define	MATCH_IRE_WQ		0x0008	/* Match IRE Write Q */
+/* unused			0x0008 */
 #define	MATCH_IRE_GW		0x0010	/* Match IRE gateway */
 #define	MATCH_IRE_IPIF		0x0020	/* Match IRE ipif */
 #define	MATCH_IRE_RECURSIVE	0x0040	/* Do recursive lookup if necessary */
@@ -230,9 +229,6 @@ extern	ire_t	*ire_cache_lookup(ipaddr_t, zoneid_t,
 extern	ire_t	*ire_cache_lookup_v6(const in6_addr_t *, zoneid_t,
     const struct ts_label_s *, ip_stack_t *);
 extern	void	ire_cache_reclaim(ire_t *, char *);
-
-extern	void	ire_check_bcast_present(ipif_t *, ipaddr_t, int, boolean_t *,
-    boolean_t *);
 
 extern	ire_t	*ire_create_mp(uchar_t *, uchar_t *, uchar_t *, uchar_t *,
     uint_t, struct nce_s *, queue_t *, queue_t *, ushort_t, ipif_t *, ipaddr_t,

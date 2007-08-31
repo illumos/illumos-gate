@@ -142,7 +142,7 @@ typedef	struct ndp_g_s {
 #define	NCE_F_PERMANENT		0x1
 #define	NCE_F_MAPPING		0x2
 #define	NCE_F_ISROUTER		0x4
-#define	NCE_F_PROXY		0x8
+/*	unused			0x8 */
 #define	NCE_F_NONUD		0x10
 #define	NCE_F_ANYCAST		0x20
 #define	NCE_F_CONDEMNED		0x40

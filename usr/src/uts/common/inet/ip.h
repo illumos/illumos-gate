@@ -1503,7 +1503,6 @@ typedef struct phyint {
 	struct ill_s	*phyint_illv4;
 	struct ill_s	*phyint_illv6;
 	uint_t		phyint_ifindex;		/* SIOCLSLIFINDEX */
-	uint_t		phyint_notify_delay;	/* SIOCSLIFNOTIFYDELAY */
 	char		*phyint_groupname;	/* SIOCSLIFGROUPNAME */
 	uint_t		phyint_groupname_len;
 	uint64_t	phyint_flags;
@@ -1548,7 +1547,7 @@ typedef union phyint_list_u {
  *
  * To remove an ipif from the linked list of ipifs of that ill ipif_free_tail
  * holds both ill_g_lock, and ill_lock. Similarly to remove an ill from the
- * global list of ills, ill_delete_glist holds ill_g_lock as writer.
+ * global list of ills, ill_glist_delete() holds ill_g_lock as writer.
  * This simplifies things for ipif_select_source, illgrp_scheduler etc.
  * that need to walk the members of an illgrp. They just hold ill_g_lock
  * as reader to do the walk.
@@ -1977,8 +1976,6 @@ typedef struct ill_s {
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 } ill_t;
 
-extern	void	ill_delete_glist(ill_t *);
-
 /*
  * The following table lists the protection levels of the various members
  * of the ill_t. Same notation as that used for ipif_t above is used.
@@ -2102,19 +2099,22 @@ typedef struct ip_ioctl_cmd_s {
  *
  * IF_CMD		1	old style ifreq cmd
  * LIF_CMD		2	new style lifreq cmd
- * MISC_CMD		3	Misc. (non [l]ifreq, tun) cmds
- * TUN_CMD		4	tunnel related
+ * TUN_CMD		3	tunnel related
+ * ARP_CMD		4	arpreq cmd
+ * XARP_CMD		5	xarpreq cmd
+ * MSFILT_CMD		6	multicast source filter cmd
+ * MISC_CMD		7	misc cmd (not a more specific one above)
  */
 
-enum { IF_CMD = 1, LIF_CMD, MISC_CMD, TUN_CMD };
+enum { IF_CMD = 1, LIF_CMD, TUN_CMD, ARP_CMD, XARP_CMD, MSFILT_CMD, MISC_CMD };
 
 #define	IPI_DONTCARE	0	/* For ioctl encoded values that don't matter */
 
 /* Flag values in ipi_flags */
-#define	IPI_PRIV	0x1		/* Root only command */
-#define	IPI_MODOK	0x2		/* Permitted on mod instance of IP */
-#define	IPI_WR		0x4		/* Need to grab writer access */
-#define	IPI_GET_CMD	0x8		/* branch to mi_copyout on success */
+#define	IPI_PRIV	0x1	/* Root only command */
+#define	IPI_MODOK	0x2	/* Permitted on mod instance of IP */
+#define	IPI_WR		0x4	/* Need to grab writer access */
+#define	IPI_GET_CMD	0x8	/* branch to mi_copyout on success */
 #define	IPI_REPL	0x10	/* valid for replacement ipif created in MOVE */
 #define	IPI_NULL_BCONT	0x20	/* ioctl has not data and hence no b_cont */
 #define	IPI_PASS_DOWN	0x40	/* pass this ioctl down when a module only */
@@ -2578,17 +2578,6 @@ typedef struct nv_s {
 	uint64_t nv_value;
 	char	*nv_name;
 } nv_t;
-
-/* IP Forwarding Ticket */
-typedef	struct ipftk_s {
-	queue_t	*ipftk_queue;
-	ipaddr_t ipftk_dst;
-} ipftk_t;
-
-typedef struct ipt_s {
-	pfv_t	func;		/* Routine to call */
-	uchar_t	*arg;		/* ire or nce passed in */
-} ipt_t;
 
 #define	ILL_FRAG_HASH(s, i) \
 	((ntohl(s) ^ ((i) ^ ((i) >> 8))) % ILL_FRAG_HASH_TBL_COUNT)
@@ -3166,7 +3155,6 @@ extern void	ip_wput(queue_t *, mblk_t *);
 extern void	ip_output(void *, mblk_t *, void *, int);
 extern void	ip_output_options(void *, mblk_t *, void *, int,
     ip_opt_info_t *);
-extern void	ip_wput_md(queue_t *, mblk_t *, conn_t *);
 
 extern void	ip_wput_ire(queue_t *, mblk_t *, ire_t *, conn_t *, int,
 		    zoneid_t);
@@ -3188,11 +3176,6 @@ extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);
 
 extern struct qinit rinit_ipv6;
 extern struct qinit winit_ipv6;
-extern struct qinit rinit_tcp;
-extern struct qinit rinit_tcp6;
-extern struct qinit winit_tcp;
-extern struct qinit rinit_acceptor_tcp;
-extern struct qinit winit_acceptor_tcp;
 
 extern void	conn_drain_insert(conn_t *connp);
 extern	int	conn_ipsec_length(conn_t *connp);

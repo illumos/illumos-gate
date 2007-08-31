@@ -366,7 +366,6 @@ extern int	ip_total_hdrs_len_v6(ip6_pkt_t *);
 extern int	ipsec_ah_get_hdr_size_v6(mblk_t *, boolean_t);
 extern void	ip_wput_local_v6(queue_t *, ill_t *, ip6_t *, mblk_t *,
     ire_t *, int);
-extern void	ip_wput_md_v6(queue_t *, mblk_t *, conn_t *);
 extern void	ip_output_v6(void *, mblk_t *, void *, int);
 extern void	ip_xmit_v6(mblk_t *, ire_t *, uint_t, conn_t *, int,
     struct ipsec_out_s *);
@@ -377,11 +376,8 @@ extern void	mld_input(queue_t *, mblk_t *, ill_t *);
 extern void	mld_joingroup(ilm_t *);
 extern void	mld_leavegroup(ilm_t *);
 extern void	mld_timeout_handler(void *);
-extern void	mld_timeout_start(int);
 
 extern void	pr_addr_dbg(char *, int, const void *);
-extern ipif_t	*ip_newroute_get_src_ipif_v6(ipif_t *, boolean_t,
-    const in6_addr_t *);
 extern int	ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
     const in6_addr_t *, int, mcast_record_t, const in6_addr_t *,
     mblk_t *), ire_t *, conn_t *, boolean_t, const in6_addr_t *,

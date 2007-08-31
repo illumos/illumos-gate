@@ -510,8 +510,6 @@ extern void ipcl_destroy(ip_stack_t *);
 extern conn_t *ipcl_conn_create(uint32_t, int, netstack_t *);
 extern void ipcl_conn_destroy(conn_t *);
 
-void ipcl_hash_insert_connected(connf_t *, conn_t *);
-void ipcl_hash_insert_bound(connf_t *, conn_t *);
 void ipcl_hash_insert_wildcard(connf_t *, conn_t *);
 void ipcl_hash_remove(conn_t *);
 void ipcl_hash_remove_locked(conn_t *connp, connf_t *connfp);

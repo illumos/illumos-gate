@@ -1407,7 +1407,6 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 	ASSERT((!(match_flags & MATCH_IRE_GW)) || gateway != NULL);
 	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP))) ||
 	    (ipif != NULL && ipif->ipif_isv6));
-	ASSERT(!(match_flags & MATCH_IRE_WQ));
 
 	/*
 	 * HIDDEN cache entries have to be looked up specifically with
@@ -1646,7 +1645,6 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 	ASSERT((!(flags & MATCH_IRE_MASK)) || mask != NULL);
 	ASSERT((!(flags & MATCH_IRE_GW)) || gateway != NULL);
 	ASSERT(ipif == NULL || ipif->ipif_isv6);
-	ASSERT(!(flags & MATCH_IRE_WQ));
 
 	/*
 	 * When we return NULL from this function, we should make

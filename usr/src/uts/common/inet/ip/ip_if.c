@@ -144,8 +144,6 @@ static int	ip_sioctl_netmask_tail(ipif_t *ipif, sin_t *sin, queue_t *q,
     mblk_t *mp);
 static int	ip_sioctl_subnet_tail(ipif_t *ipif, in6_addr_t, in6_addr_t,
     queue_t *q, mblk_t *mp, boolean_t need_up);
-static int	ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp,
-    sin_t *sin, boolean_t x_arp_ioctl, boolean_t if_arp_ioctl);
 static int	ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
     int ioccmd, struct linkblk *li, boolean_t doconsist);
 static ipaddr_t	ip_subnet_mask(ipaddr_t addr, ipif_t **, ip_stack_t *);
@@ -4797,7 +4795,7 @@ ill_dls_info(struct sockaddr_dl *sdl, const ipif_t *ipif)
 	sdl->sdl_family = AF_LINK;
 	sdl->sdl_index = ill->ill_phyint->phyint_ifindex;
 	sdl->sdl_type = ill->ill_type;
-	(void) ipif_get_name(ipif, sdl->sdl_data, sizeof (sdl->sdl_data));
+	ipif_get_name(ipif, sdl->sdl_data, sizeof (sdl->sdl_data));
 	len = strlen(sdl->sdl_data);
 	ASSERT(len < 256);
 	sdl->sdl_nlen = (uchar_t)len;
@@ -4819,8 +4817,7 @@ ill_xarp_info(struct sockaddr_dl *sdl, ill_t *ill)
 	sdl->sdl_family = AF_LINK;
 	sdl->sdl_index = ill->ill_phyint->phyint_ifindex;
 	sdl->sdl_type = ill->ill_type;
-	(void) ipif_get_name(ill->ill_ipif, sdl->sdl_data,
-	    sizeof (sdl->sdl_data));
+	ipif_get_name(ill->ill_ipif, sdl->sdl_data, sizeof (sdl->sdl_data));
 	sdl->sdl_nlen = (uchar_t)mi_strlen(sdl->sdl_data);
 	sdl->sdl_alen = ill->ill_phys_addr_length;
 	sdl->sdl_slen = 0;
@@ -5502,6 +5499,8 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 			    zoneid != ipif->ipif_zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
+
+			ipif_get_name(ipif, buf, sizeof (buf));
 			(void) mi_mpprintf(mp,
 			    MI_COL_PTRFMT_STR
 			    "%04u %05u %u/%u/%u %s %d",
@@ -5510,7 +5509,7 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 			    ipif->ipif_ib_pkt_count,
 			    ipif->ipif_ob_pkt_count,
 			    ipif->ipif_fo_pkt_count,
-			    ipif_get_name(ipif, buf, sizeof (buf)),
+			    buf,
 			    ipif->ipif_zoneid);
 
 		flags = ipif->ipif_flags | ipif->ipif_ill->ill_flags |
@@ -8225,8 +8224,10 @@ ip_sioctl_get_oindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
  * Parse an iftun_req structure coming down SIOC[GS]TUNPARAM ioctls,
  * refhold and return the associated ipif
  */
+/* ARGSUSED */
 int
-ip_extract_tunreq(queue_t *q, mblk_t *mp, ipif_t **ipifp, ipsq_func_t func)
+ip_extract_tunreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
+    cmd_info_t *ci, ipsq_func_t func)
 {
 	boolean_t exists;
 	struct iftun_req *ta;
@@ -8289,7 +8290,7 @@ ip_extract_tunreq(queue_t *q, mblk_t *mp, ipif_t **ipifp, ipsq_func_t func)
 	 */
 	if (ill->ill_isv6)
 		ta->ifta_flags |= 0x80000000;
-	*ipifp = ipif;
+	ci->ci_ipif = ipif;
 	return (0);
 }
 
@@ -8302,7 +8303,7 @@ ip_extract_tunreq(queue_t *q, mblk_t *mp, ipif_t **ipifp, ipsq_func_t func)
  *	a held ipif in ci.ci_ipif.
  */
 int
-ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
+ip_extract_lifreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
     cmd_info_t *ci, ipsq_func_t func)
 {
 	sin_t		*sin;
@@ -8314,7 +8315,6 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	ill_t		*ill;
 	conn_t		*connp;
 	boolean_t	isv6;
-	struct iocblk   *iocp = (struct iocblk *)mp->b_rptr;
 	boolean_t	exists;
 	int		err;
 	mblk_t		*mp1;
@@ -8342,8 +8342,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	/* Has been checked in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
 
-
-	if (cmd_type == IF_CMD) {
+	if (ipip->ipi_cmd_type == IF_CMD) {
 		/* This a old style SIOC[GS]IF* command */
 		ifr = (struct ifreq *)mp1->b_rptr;
 		/*
@@ -8359,7 +8358,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 		ci->ci_lifr = (struct lifreq *)ifr;
 	} else {
 		/* This a new style SIOC[GS]LIF* command */
-		ASSERT(cmd_type == LIF_CMD);
+		ASSERT(ipip->ipi_cmd_type == LIF_CMD);
 		lifr = (struct lifreq *)mp1->b_rptr;
 		/*
 		 * Null terminate the string to protect against buffer
@@ -8370,7 +8369,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 		name = lifr->lifr_name;
 		sin = (sin_t *)&lifr->lifr_addr;
 		sin6 = (sin6_t *)&lifr->lifr_addr;
-		if (iocp->ioc_cmd == SIOCSLIFGROUPNAME) {
+		if (ipip->ipi_cmd == SIOCSLIFGROUPNAME) {
 			(void) strncpy(ci->ci_groupname, lifr->lifr_groupname,
 			    LIFNAMSIZ);
 		}
@@ -8379,7 +8378,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 		ci->ci_lifr = lifr;
 	}
 
-	if (iocp->ioc_cmd == SIOCSLIFNAME) {
+	if (ipip->ipi_cmd == SIOCSLIFNAME) {
 		/*
 		 * The ioctl will be failed if the ioctl comes down
 		 * an conn stream
@@ -8401,8 +8400,8 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 		if (ipif == NULL) {
 			if (err == EINPROGRESS)
 				return (err);
-			if (iocp->ioc_cmd == SIOCLIFFAILOVER ||
-			    iocp->ioc_cmd == SIOCLIFFAILBACK) {
+			if (ipip->ipi_cmd == SIOCLIFFAILOVER ||
+			    ipip->ipi_cmd == SIOCLIFFAILBACK) {
 				/*
 				 * Need to try both v4 and v6 since this
 				 * ioctl can come down either v4 or v6
@@ -8423,7 +8422,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	/*
 	 * Old style [GS]IFCMD does not admit IPv6 ipif
 	 */
-	if (ipif != NULL && ipif->ipif_isv6 && cmd_type == IF_CMD) {
+	if (ipif != NULL && ipif->ipif_isv6 && ipip->ipi_cmd_type == IF_CMD) {
 		ipif_refrele(ipif);
 		return (ENXIO);
 	}
@@ -8445,7 +8444,7 @@ ip_extract_lifreq_cmn(queue_t *q, mblk_t *mp, int cmd_type, int flags,
 	 * Allow only GET operations if this ipif has been created
 	 * temporarily due to a MOVE operation.
 	 */
-	if (ipif->ipif_replace_zero && !(flags & IPI_REPL)) {
+	if (ipif->ipif_replace_zero && !(ipip->ipi_flags & IPI_REPL)) {
 		ipif_refrele(ipif);
 		return (EINVAL);
 	}
@@ -8725,8 +8724,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 					goto if_copydone;
 				}
 			}
-			(void) ipif_get_name(ipif,
-			    ifr->ifr_name,
+			ipif_get_name(ipif, ifr->ifr_name,
 			    sizeof (ifr->ifr_name));
 			sin = (sin_t *)&ifr->ifr_addr;
 			*sin = sin_null;
@@ -8841,8 +8839,7 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 			break;
 
 		ipif = ill->ill_ipif;
-		(void) ipif_get_name(ipif,
-		    lifr->lifr_name, sizeof (lifr->lifr_name));
+		ipif_get_name(ipif, lifr->lifr_name, sizeof (lifr->lifr_name));
 		if (ipif->ipif_isv6) {
 			sin6 = (sin6_t *)&lifr->lifr_addr;
 			*sin6 = sin6_null;
@@ -9016,7 +9013,7 @@ ip_sioctl_get_lifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 				}
 			}
 
-			(void) ipif_get_name(ipif, lifr->lifr_name,
+			ipif_get_name(ipif, lifr->lifr_name,
 			    sizeof (lifr->lifr_name));
 			if (ipif->ipif_isv6) {
 				sin6 = (sin6_t *)&lifr->lifr_addr;
@@ -9520,9 +9517,24 @@ ip_sioctl_tunparam(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	}
 }
 
-static int
-ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
-    boolean_t x_arp_ioctl, boolean_t if_arp_ioctl)
+/*
+ * ARP IOCTLs.
+ * How does IP get in the business of fronting ARP configuration/queries?
+ * Well it's like this, the Berkeley ARP IOCTLs (SIOCGARP, SIOCDARP, SIOCSARP)
+ * are by tradition passed in through a datagram socket.  That lands in IP.
+ * As it happens, this is just as well since the interface is quite crude in
+ * that it passes in no information about protocol or hardware types, or
+ * interface association.  After making the protocol assumption, IP is in
+ * the position to look up the name of the ILL, which ARP will need, and
+ * format a request that can be handled by ARP.  The request is passed up
+ * stream to ARP, and the original IOCTL is completed by IP when ARP passes
+ * back a response.  ARP supports its own set of more general IOCTLs, in
+ * case anyone is interested.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_arp(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
 {
 	mblk_t *mp1;
 	mblk_t *mp2;
@@ -9533,38 +9545,30 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 	conn_t *connp;
 	struct arpreq *ar;
 	struct xarpreq *xar;
-	boolean_t success;
 	int flags, alength;
 	char *lladdr;
 	ip_stack_t	*ipst;
+	ill_t *ill = ipif->ipif_ill;
+	boolean_t if_arp_ioctl = B_FALSE;
 
 	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
 	connp = Q_TO_CONN(q);
 	ipst = connp->conn_netstack->netstack_ip;
 
-	iocp = (struct iocblk *)mp->b_rptr;
-	/*
-	 * ill has already been set depending on whether
-	 * bsd style or interface style ioctl.
-	 */
-	ASSERT(ill != NULL);
-
-	/*
-	 * Is this one of the new SIOC*XARP ioctls?
-	 */
-	if (x_arp_ioctl) {
+	if (ipip->ipi_cmd_type == XARP_CMD) {
 		/* We have a chain - M_IOCTL-->MI_COPY_MBLK-->XARPREQ_MBLK */
 		xar = (struct xarpreq *)mp->b_cont->b_cont->b_rptr;
 		ar = NULL;
 
 		flags = xar->xarp_flags;
 		lladdr = LLADDR(&xar->xarp_ha);
+		if_arp_ioctl = (xar->xarp_ha.sdl_nlen != 0);
 		/*
 		 * Validate against user's link layer address length
 		 * input and name and addr length limits.
 		 */
 		alength = ill->ill_phys_addr_length;
-		if (iocp->ioc_cmd == SIOCSXARP) {
+		if (ipip->ipi_cmd == SIOCSXARP) {
 			if (alength != xar->xarp_ha.sdl_alen ||
 			    (alength + xar->xarp_ha.sdl_nlen >
 			    sizeof (xar->xarp_ha.sdl_data)))
@@ -9590,7 +9594,7 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 		 * operation will succeed.
 		 */
 		alength = 6;
-		if ((iocp->ioc_cmd != SIOCDARP) &&
+		if ((ipip->ipi_cmd != SIOCDARP) &&
 		    (alength != ill->ill_phys_addr_length)) {
 			return (EINVAL);
 		}
@@ -9664,14 +9668,13 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 		area->area_proto_mask_offset = 0;
 		break;
 	case SIOCSARP:
-	case SIOCSXARP: {
+	case SIOCSXARP:
 		/*
 		 * Delete the corresponding ire to make sure IP will
 		 * pick up any change from arp.
 		 */
 		if (!if_arp_ioctl) {
 			(void) ip_ire_clookup_and_delete(ipaddr, NULL, ipst);
-			break;
 		} else {
 			ipif_t *ipif = ipif_get_next_ipif(NULL, ill);
 			if (ipif != NULL) {
@@ -9679,11 +9682,24 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 				    ipst);
 				ipif_refrele(ipif);
 			}
-			break;
 		}
-	}
+		break;
 	}
 	iocp->ioc_cmd = area->area_cmd;
+
+	/*
+	 * Fill in the rest of the ARP operation fields.
+	 */
+	area->area_hw_addr_length = alength;
+	bcopy(lladdr, (char *)area + area->area_hw_addr_offset, alength);
+
+	/* Translate the flags. */
+	if (flags & ATF_PERM)
+		area->area_flags |= ACE_F_PERMANENT;
+	if (flags & ATF_PUBL)
+		area->area_flags |= ACE_F_PUBLISH;
+	if (flags & ATF_AUTHORITY)
+		area->area_flags |= ACE_F_AUTHORITY;
 
 	/*
 	 * Before sending 'mp' to ARP, we have to clear the b_next
@@ -9702,101 +9718,93 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 	mutex_enter(&connp->conn_lock);
 	mutex_enter(&ill->ill_lock);
 	/* conn has not yet started closing, hence this can't fail */
-	success = ill_pending_mp_add(ill, connp, pending_mp);
-	ASSERT(success);
+	VERIFY(ill_pending_mp_add(ill, connp, pending_mp) != 0);
 	mutex_exit(&ill->ill_lock);
 	mutex_exit(&connp->conn_lock);
 
 	/*
-	 * Fill in the rest of the ARP operation fields.
-	 */
-	area->area_hw_addr_length = alength;
-	bcopy(lladdr,
-	    (char *)area + area->area_hw_addr_offset,
-	    area->area_hw_addr_length);
-	/* Translate the flags. */
-	if (flags & ATF_PERM)
-		area->area_flags |= ACE_F_PERMANENT;
-	if (flags & ATF_PUBL)
-		area->area_flags |= ACE_F_PUBLISH;
-	if (flags & ATF_AUTHORITY)
-		area->area_flags |= ACE_F_AUTHORITY;
-
-	/*
-	 * Up to ARP it goes.  The response will come
-	 * back in ip_wput as an M_IOCACK message, and
-	 * will be handed to ip_sioctl_iocack for
-	 * completion.
+	 * Up to ARP it goes.  The response will come back in ip_wput() as an
+	 * M_IOCACK, and will be handed to ip_sioctl_iocack() for completion.
 	 */
 	putnext(ill->ill_rq, mp1);
 	return (EINPROGRESS);
 }
 
-/* ARGSUSED */
+/*
+ * Parse an [x]arpreq structure coming down SIOC[GSD][X]ARP ioctls, identify
+ * the associated sin and refhold and return the associated ipif via `ci'.
+ */
 int
-ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
-    ip_ioctl_cmd_t *ipip, void *ifreq)
+ip_extract_arpreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
+    cmd_info_t *ci, ipsq_func_t func)
 {
-	struct xarpreq *xar;
-	boolean_t isv6;
 	mblk_t	*mp1;
 	int	err;
+	sin_t	*sin;
 	conn_t	*connp;
-	int ifnamelen;
+	ipif_t	*ipif;
 	ire_t	*ire = NULL;
 	ill_t	*ill = NULL;
-	struct sockaddr_in *sin;
-	boolean_t if_arp_ioctl = B_FALSE;
-	ip_stack_t	*ipst;
+	boolean_t exists;
+	ip_stack_t *ipst;
+	struct arpreq *ar;
+	struct xarpreq *xar;
+	struct sockaddr_dl *sdl;
 
-	/* ioctl comes down on an conn */
+	/* ioctl comes down on a conn */
 	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
 	connp = Q_TO_CONN(q);
-	isv6 = connp->conn_af_isv6;
-	ipst = connp->conn_netstack->netstack_ip;
-
-	/* Existance verified in ip_wput_nondata */
-	mp1 = mp->b_cont->b_cont;
-
-	ASSERT(MBLKL(mp1) >= sizeof (*xar));
-	xar = (struct xarpreq *)mp1->b_rptr;
-	sin = (sin_t *)&xar->xarp_pa;
-
-	if (isv6 || (xar->xarp_ha.sdl_family != AF_LINK) ||
-	    (xar->xarp_pa.ss_family != AF_INET))
+	if (connp->conn_af_isv6)
 		return (ENXIO);
 
-	ifnamelen = xar->xarp_ha.sdl_nlen;
-	if (ifnamelen != 0) {
-		char	*cptr, cval;
+	ipst = connp->conn_netstack->netstack_ip;
 
-		if (ifnamelen >= LIFNAMSIZ)
+	/* Verified in ip_wput_nondata */
+	mp1 = mp->b_cont->b_cont;
+
+	if (ipip->ipi_cmd_type == XARP_CMD) {
+		ASSERT(MBLKL(mp1) >= sizeof (struct xarpreq));
+		xar = (struct xarpreq *)mp1->b_rptr;
+		sin = (sin_t *)&xar->xarp_pa;
+		sdl = &xar->xarp_ha;
+
+		if (sdl->sdl_family != AF_LINK || sin->sin_family != AF_INET)
+			return (ENXIO);
+		if (sdl->sdl_nlen >= LIFNAMSIZ)
 			return (EINVAL);
+	} else {
+		ASSERT(ipip->ipi_cmd_type == ARP_CMD);
+		ASSERT(MBLKL(mp1) >= sizeof (struct arpreq));
+		ar = (struct arpreq *)mp1->b_rptr;
+		sin = (sin_t *)&ar->arp_pa;
+	}
 
-		/*
-		 * Instead of bcopying a bunch of bytes,
-		 * null-terminate the string in-situ.
-		 */
-		cptr = xar->xarp_ha.sdl_data + ifnamelen;
-		cval = *cptr;
-		*cptr = '\0';
-		ill = ill_lookup_on_name(xar->xarp_ha.sdl_data,
-		    B_FALSE, isv6, CONNP_TO_WQ(connp), mp, ip_process_ioctl,
-		    &err, NULL, ipst);
-		*cptr = cval;
-		if (ill == NULL)
+	if (ipip->ipi_cmd_type == XARP_CMD && sdl->sdl_nlen != 0) {
+		ipif = ipif_lookup_on_name(sdl->sdl_data, sdl->sdl_nlen,
+		    B_FALSE, &exists, B_FALSE, ALL_ZONES, CONNP_TO_WQ(connp),
+		    mp, func, &err, ipst);
+		if (ipif == NULL)
 			return (err);
-		if (ill->ill_net_type != IRE_IF_RESOLVER) {
-			ill_refrele(ill);
+		if (ipif->ipif_id != 0 ||
+		    ipif->ipif_net_type != IRE_IF_RESOLVER) {
+			ipif_refrele(ipif);
 			return (ENXIO);
 		}
-
-		if_arp_ioctl = B_TRUE;
 	} else {
 		/*
-		 * PSARC 2003/088 states that if sdl_nlen == 0, it behaves
-		 * as an extended BSD ioctl. The kernel uses the IP address
-		 * to figure out the network interface.
+		 * Either an SIOC[DGS]ARP or an SIOC[DGS]XARP with sdl_nlen ==
+		 * 0: use the IP address to figure out the ill.	 In the IPMP
+		 * case, a simple forwarding table lookup will return the
+		 * IRE_IF_RESOLVER for the first interface in the group, which
+		 * might not be the interface on which the requested IP
+		 * address was resolved due to the ill selection algorithm
+		 * (see ip_newroute_get_dst_ill()).  So we do a cache table
+		 * lookup first: if the IRE cache entry for the IP address is
+		 * still there, it will contain the ill pointer for the right
+		 * interface, so we use that. If the cache entry has been
+		 * flushed, we fall back to the forwarding table lookup. This
+		 * should be rare enough since IRE cache entries have a longer
+		 * life expectancy than ARP cache entries.
 		 */
 		ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL,
 		    ipst);
@@ -9808,103 +9816,21 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 			ire = ire_ftable_lookup(sin->sin_addr.s_addr,
 			    0, 0, IRE_IF_RESOLVER, NULL, NULL, ALL_ZONES, 0,
 			    NULL, MATCH_IRE_TYPE, ipst);
-			if ((ire == NULL) ||
-			    ((ill = ire_to_ill(ire)) == NULL)) {
+			if (ire == NULL || ((ill = ire_to_ill(ire)) == NULL)) {
+
 				if (ire != NULL)
 					ire_refrele(ire);
 				return (ENXIO);
 			}
 		}
 		ASSERT(ire != NULL && ill != NULL);
-	}
-
-	err = ip_sioctl_arp_common(ill, q, mp, sin, B_TRUE, if_arp_ioctl);
-	if (if_arp_ioctl)
-		ill_refrele(ill);
-	if (ire != NULL)
+		ipif = ill->ill_ipif;
+		ipif_refhold(ipif);
 		ire_refrele(ire);
-
-	return (err);
-}
-
-/*
- * ARP IOCTLs.
- * How does IP get in the business of fronting ARP configuration/queries?
- * Well its like this, the Berkeley ARP IOCTLs (SIOCGARP, SIOCDARP, SIOCSARP)
- * are by tradition passed in through a datagram socket.  That lands in IP.
- * As it happens, this is just as well since the interface is quite crude in
- * that it passes in no information about protocol or hardware types, or
- * interface association.  After making the protocol assumption, IP is in
- * the position to look up the name of the ILL, which ARP will need, and
- * format a request that can be handled by ARP.	 The request is passed up
- * stream to ARP, and the original IOCTL is completed by IP when ARP passes
- * back a response.  ARP supports its own set of more general IOCTLs, in
- * case anyone is interested.
- */
-/* ARGSUSED */
-int
-ip_sioctl_arp(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
-    ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
-{
-	struct arpreq *ar;
-	struct sockaddr_in *sin;
-	ire_t	*ire;
-	boolean_t isv6;
-	mblk_t	*mp1;
-	int	err;
-	conn_t	*connp;
-	ill_t	*ill;
-	ip_stack_t	*ipst;
-
-	/* ioctl comes down on an conn */
-	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
-	connp = Q_TO_CONN(q);
-	ipst = CONNQ_TO_IPST(q);
-	isv6 = connp->conn_af_isv6;
-	if (isv6)
-		return (ENXIO);
-
-	/* Existance verified in ip_wput_nondata */
-	mp1 = mp->b_cont->b_cont;
-
-	ar = (struct arpreq *)mp1->b_rptr;
-	sin = (sin_t *)&ar->arp_pa;
-
-	/*
-	 * We need to let ARP know on which interface the IP
-	 * address has an ARP mapping. In the IPMP case, a
-	 * simple forwarding table lookup will return the
-	 * IRE_IF_RESOLVER for the first interface in the group,
-	 * which might not be the interface on which the
-	 * requested IP address was resolved due to the ill
-	 * selection algorithm (see ip_newroute_get_dst_ill()).
-	 * So we do a cache table lookup first: if the IRE cache
-	 * entry for the IP address is still there, it will
-	 * contain the ill pointer for the right interface, so
-	 * we use that. If the cache entry has been flushed, we
-	 * fall back to the forwarding table lookup. This should
-	 * be rare enough since IRE cache entries have a longer
-	 * life expectancy than ARP cache entries.
-	 */
-	ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES, NULL, ipst);
-	if ((ire == NULL) || (ire->ire_type == IRE_LOOPBACK) ||
-	    ((ill = ire_to_ill(ire)) == NULL)) {
-		if (ire != NULL)
-			ire_refrele(ire);
-		ire = ire_ftable_lookup(sin->sin_addr.s_addr,
-		    0, 0, IRE_IF_RESOLVER, NULL, NULL, ALL_ZONES, 0,
-		    NULL, MATCH_IRE_TYPE, ipst);
-		if ((ire == NULL) || ((ill = ire_to_ill(ire)) == NULL)) {
-			if (ire != NULL)
-				ire_refrele(ire);
-			return (ENXIO);
-		}
 	}
-	ASSERT(ire != NULL && ill != NULL);
-
-	err = ip_sioctl_arp_common(ill, q, mp, sin, B_FALSE, B_FALSE);
-	ire_refrele(ire);
-	return (err);
+	ci->ci_sin = sin;
+	ci->ci_ipif = ipif;
+	return (0);
 }
 
 /*
@@ -19213,19 +19139,17 @@ ipif_free_tail(ipif_t *ipif)
 }
 
 /*
- * Returns an ipif name in the form "ill_name/unit" if ipif_id is not zero,
- * "ill_name" otherwise.
+ * Sets `buf' to an ipif name of the form "ill_name:id", or "ill_name" if "id"
+ * is zero.
  */
-char *
+void
 ipif_get_name(const ipif_t *ipif, char *buf, int len)
 {
-	char	lbuf[32];
+	char	lbuf[LIFNAMSIZ];
 	char	*name;
 	size_t	name_len;
 
 	buf[0] = '\0';
-	if (!ipif)
-		return (buf);
 	name = ipif->ipif_ill->ill_name;
 	name_len = ipif->ipif_ill->ill_name_length;
 	if (ipif->ipif_id != 0) {
@@ -19238,7 +19162,6 @@ ipif_get_name(const ipif_t *ipif, char *buf, int len)
 	buf[len] = '\0';
 	len = MIN(len, name_len);
 	bcopy(name, buf, len);
-	return (buf);
 }
 
 /*
@@ -19981,7 +19904,7 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 		 * That ioctl will complete in ip_rput.
 		 */
 		if (isv6) {
-			err = ipif_ndp_up(ipif, &ipif->ipif_v6lcl_addr);
+			err = ipif_ndp_up(ipif);
 			if (err != 0) {
 				if (err != EINPROGRESS)
 					mp = ipsq_pending_mp_get(ipsq, &connp);
@@ -21668,7 +21591,7 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	ill = (ill_t *)q->q_ptr;
 	/*
 	 * If we are not writer on 'q' then this interface exists already
-	 * and previous lookups (ipif_extract_lifreq_cmn) found this ipif.
+	 * and previous lookups (ipif_extract_lifreq()) found this ipif.
 	 * So return EALREADY
 	 */
 	if (ill != ipif->ipif_ill)
