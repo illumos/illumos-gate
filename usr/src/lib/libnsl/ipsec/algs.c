@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,8 +139,10 @@ build_keysizes(int **sizep, char *input_string)
 		num_sizes = 0;
 
 		token = strtok_r(input_string, comma, &lasts);
-		if (token == NULL || key_sizes == NULL)
+		if (token == NULL) {
+			free(key_sizes);
 			return (-1);
+		}
 		*key_sizes = 0;
 		do {
 			int *nks;
@@ -218,7 +220,7 @@ build_list(FILE *f, int *num)
 				continue;
 			} else {
 				(void) snprintf(diag_buf, sizeof (diag_buf),
-					"non-recognized start of line");
+				    "non-recognized start of line");
 				goto bail;
 			}
 		}
@@ -467,9 +469,9 @@ build_list(FILE *f, int *num)
 					goto bail;
 
 				new_proto->proto_algs_pkgs[npkgs].alg_num =
-					curalg->a_alg_num;
+				    curalg->a_alg_num;
 				new_proto->proto_algs_pkgs[npkgs].pkg_name =
-					strdup(cur_pkg);
+				    strdup(cur_pkg);
 				if (new_proto->proto_algs_pkgs[npkgs].pkg_name
 				    == NULL)
 					goto bail;
@@ -565,8 +567,7 @@ _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 		 * surface check fails.
 		 */
 		if (stat(INET_IPSECALGSFILE, &statbuf) == -1 ||
-		    (statbuf.st_mtime < proto_last_update &&
-			protos != NULL))
+		    (statbuf.st_mtime < proto_last_update && protos != NULL))
 			return;
 		(void) rw_wrlock(&proto_rw);
 	}
@@ -658,7 +659,8 @@ duplicate_strarr(char **orig)
 		return (NULL);
 
 	/* count number of elements in source array */
-	for (swalker = orig; *swalker != NULL; swalker++);
+	for (swalker = orig; *swalker != NULL; swalker++)
+		;
 
 	/* use calloc() to get NULL-initialization */
 	newbie = calloc(swalker - orig + 1, sizeof (char *));
