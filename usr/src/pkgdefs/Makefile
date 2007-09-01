@@ -260,6 +260,7 @@ COMMON_SUBDIRS= \
 	SUNWmdr \
 	SUNWmdu \
 	SUNWmibii \
+	SUNWmxfe \
 	SUNWncar \
 	SUNWncau \
 	SUNWnfsckr \

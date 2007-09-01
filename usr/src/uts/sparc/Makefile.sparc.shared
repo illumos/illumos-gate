@@ -259,6 +259,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
 #
 
 DRV_KMODS	+= e1000g
+DRV_KMODS	+= mxfe
 DRV_KMODS	+= pcan
 DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
