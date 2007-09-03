@@ -40,7 +40,7 @@ CPPFLAGS +=	-I../../libpcp/common
 
 LIBS = $(DYNLIB)
 CFLAGS +=	$(CCVERBOSE)
-LDLIBS +=	-R$(USR_PLAT_DIR)/$(PLATFORM)/lib -L$(USR_PLAT_DIR)/$(PLATFORM)/lib -lc -lpcp
+LDLIBS +=	-L$(USR_PLAT_DIR)/$(PLATFORM)/lib -lpcp -lc
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib
 
 .KEEP_STATE:
