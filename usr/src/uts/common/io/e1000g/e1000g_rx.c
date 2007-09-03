@@ -46,6 +46,7 @@
 
 static p_rx_sw_packet_t e1000g_get_buf(e1000g_rx_ring_t *rx_ring);
 #pragma	inline(e1000g_get_buf)
+static void e1000g_priv_devi_list_clean();
 
 /*
  * e1000g_rxfree_func - the call-back function to reclaim rx buffer
@@ -93,6 +94,14 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 				e1000g_free_rx_sw_packet(packet);
 			}
 		}
+
+		/*
+		 * If e1000g_force_detach is enabled, we need to clean up
+		 * the idle priv_dip entries in the private dip list while
+		 * e1000g_mblks_pending is zero.
+		 */
+		if (e1000g_force_detach && (e1000g_mblks_pending == 0))
+			e1000g_priv_devi_list_clean();
 		rw_exit(&e1000g_rx_detach_lock);
 		return;
 	}
@@ -111,6 +120,14 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 		 */
 		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
 		e1000g_mblks_pending--;
+
+		/*
+		 * If e1000g_force_detach is enabled, we need to clean up
+		 * the idle priv_dip entries in the private dip list while
+		 * e1000g_mblks_pending is zero.
+		 */
+		if (e1000g_force_detach && (e1000g_mblks_pending == 0))
+			e1000g_priv_devi_list_clean();
 		rw_exit(&e1000g_rx_detach_lock);
 		return;
 	}
@@ -140,6 +157,46 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 	mutex_exit(&rx_ring->freelist_lock);
 
 	rw_exit(&e1000g_rx_detach_lock);
+}
+
+/*
+ * e1000g_priv_devi_list_clean - clean up e1000g_private_devi_list
+ *
+ * We will walk the e1000g_private_devi_list to free the entry marked
+ * with the E1000G_PRIV_DEVI_DETACH flag.
+ */
+static void
+e1000g_priv_devi_list_clean()
+{
+	private_devi_list_t *devi_node, *devi_del;
+
+	if (e1000g_private_devi_list == NULL)
+		return;
+
+	devi_node = e1000g_private_devi_list;
+	while ((devi_node != NULL) &&
+	    (devi_node->flag == E1000G_PRIV_DEVI_DETACH)) {
+		e1000g_private_devi_list = devi_node->next;
+		kmem_free(devi_node->priv_dip,
+		    sizeof (struct dev_info));
+		kmem_free(devi_node,
+		    sizeof (private_devi_list_t));
+		devi_node = e1000g_private_devi_list;
+	}
+	if (e1000g_private_devi_list == NULL)
+		return;
+	while (devi_node->next != NULL) {
+		if (devi_node->next->flag == E1000G_PRIV_DEVI_DETACH) {
+			devi_del = devi_node->next;
+			devi_node->next = devi_del->next;
+			kmem_free(devi_del->priv_dip,
+			    sizeof (struct dev_info));
+			kmem_free(devi_del,
+			    sizeof (private_devi_list_t));
+		} else {
+			devi_node = devi_node->next;
+		}
+	}
 }
 
 /*
@@ -550,7 +607,7 @@ e1000g_receive(struct e1000g *Adapter)
 				 */
 				nmp = packet->mp;
 				packet->mp = NULL;
-				packet->flag == E1000G_RX_SW_SENDUP;
+				packet->flag = E1000G_RX_SW_SENDUP;
 
 				/*
 				 * Now replace old buffer with the new

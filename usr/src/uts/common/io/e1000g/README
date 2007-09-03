@@ -528,3 +528,8 @@ Notes on packaging:
    6572330 e1000g: integrate the latest Intel refactored shared code
    6573381 e1000g receiving VLAN tagged frames does not do hardware checksumming
 
+5.2.1
+======
+  This version has the following fix:
+   6594676 e1000g should free private dips while no rx buffers are held by upper layer
+

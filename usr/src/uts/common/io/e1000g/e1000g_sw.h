@@ -257,6 +257,11 @@ extern "C" {
 #define	E1000G_LB_EXTERNAL_10		3
 #define	E1000G_LB_INTERNAL_PHY		4
 
+/*
+ * Private dip list definitions
+ */
+#define	E1000G_PRIV_DEVI_ATTACH	0x0
+#define	E1000G_PRIV_DEVI_DETACH	0x1
 
 /*
  * QUEUE_INIT_LIST -- Macro which will init ialize a queue to NULL.
@@ -499,9 +504,12 @@ enum {
 	PARAM_COUNT
 };
 
+/*
+ * The entry of the private dip list
+ */
 typedef struct _private_devi_list {
-	dev_info_t *dip;
 	dev_info_t *priv_dip;
+	uint16_t flag;
 	struct _private_devi_list *next;
 } private_devi_list_t;
 
@@ -576,10 +584,10 @@ typedef struct _tx_sw_packet {
  * This structure is maintained as a linked list of many
  * receiver buffer pointers.
  */
-typedef struct _rx_sw_apcket {
+typedef struct _rx_sw_packet {
 	/* Link to the next rx_sw_packet_t in the list */
 	SINGLE_LIST_LINK Link;
-	struct _rx_sw_apcket *next;
+	struct _rx_sw_packet *next;
 	uint16_t flag;
 	mblk_t *mp;
 	caddr_t rx_ring;
@@ -974,7 +982,7 @@ void e1000_enable_pciex_master(struct e1000_hw *hw);
 extern boolean_t e1000g_force_detach;
 extern uint32_t e1000g_mblks_pending;
 extern krwlock_t e1000g_rx_detach_lock;
-
+extern private_devi_list_t *e1000g_private_devi_list;
 
 #ifdef __cplusplus
 }

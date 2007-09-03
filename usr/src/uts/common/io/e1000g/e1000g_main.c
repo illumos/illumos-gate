@@ -49,9 +49,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.0";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.1";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.0";
+static char e1000g_version[] = "Driver Ver. 5.2.1";
 
 /*
  * Proto types for DDI entry points
@@ -142,6 +142,7 @@ static boolean_t e1000g_link_up(struct e1000g *);
 #ifdef __sparc
 static boolean_t e1000g_find_mac_address(struct e1000g *);
 #endif
+static void e1000g_free_priv_devi_node(struct e1000g *, boolean_t);
 
 static struct cb_ops cb_ws_ops = {
 	nulldev,		/* cb_open */
@@ -214,6 +215,7 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
+
 uint32_t e1000g_mblks_pending = 0;
 /*
  * Workaround for Dynamic Reconfiguration support, for x86 platform only.
@@ -393,25 +395,6 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	ddi_set_driver_private(devinfo, (caddr_t)Adapter);
 
-	if (e1000g_force_detach) {
-		private_devi_list_t *devi_node;
-
-		Adapter->priv_dip =
-		    kmem_zalloc(sizeof (struct dev_info), KM_SLEEP);
-		bcopy(DEVI(devinfo), DEVI(Adapter->priv_dip),
-		    sizeof (struct dev_info));
-
-		devi_node =
-		    kmem_zalloc(sizeof (private_devi_list_t), KM_SLEEP);
-
-		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
-		devi_node->dip = devinfo;
-		devi_node->priv_dip = Adapter->priv_dip;
-		devi_node->next = e1000g_private_devi_list;
-		e1000g_private_devi_list = devi_node;
-		rw_exit(&e1000g_rx_detach_lock);
-	}
-
 	/*
 	 * PCI Configure
 	 */
@@ -518,6 +501,30 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	Adapter->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
+
+	/*
+	 * If e1000g_force_detach is enabled, in global private dip list,
+	 * we will create a new entry, which maintains the priv_dip for DR
+	 * supports after driver detached.
+	 */
+	if (e1000g_force_detach) {
+		private_devi_list_t *devi_node;
+
+		Adapter->priv_dip =
+		    kmem_zalloc(sizeof (struct dev_info), KM_SLEEP);
+		bcopy(DEVI(devinfo), DEVI(Adapter->priv_dip),
+		    sizeof (struct dev_info));
+
+		devi_node =
+		    kmem_zalloc(sizeof (private_devi_list_t), KM_SLEEP);
+
+		rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+		devi_node->priv_dip = Adapter->priv_dip;
+		devi_node->flag = E1000G_PRIV_DEVI_ATTACH;
+		devi_node->next = e1000g_private_devi_list;
+		e1000g_private_devi_list = devi_node;
+		rw_exit(&e1000g_rx_detach_lock);
+	}
 
 	cmn_err(CE_CONT, "!%s, %s\n", e1000g_string, e1000g_version);
 
@@ -840,6 +847,7 @@ static int
 e1000g_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	struct e1000g *Adapter;
+	boolean_t rx_drain;
 
 	switch (cmd) {
 	default:
@@ -865,14 +873,84 @@ e1000g_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	if (Adapter->started)
 		e1000g_stop(Adapter, B_TRUE);
 
-	if (!e1000g_rx_drain(Adapter)) {
-		if (!e1000g_force_detach)
+	rx_drain = e1000g_rx_drain(Adapter);
+
+	/*
+	 * If e1000g_force_detach is enabled, driver detach is safe.
+	 * We will let e1000g_free_priv_devi_node routine determine
+	 * whether we need to free the priv_dip entry for current
+	 * driver instance.
+	 */
+	if (e1000g_force_detach) {
+		e1000g_free_priv_devi_node(Adapter, rx_drain);
+	} else {
+		if (!rx_drain)
 			return (DDI_FAILURE);
 	}
 
 	e1000g_unattach(devinfo, Adapter);
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * e1000g_free_priv_devi_node - free a priv_dip entry for driver instance
+ *
+ * If free_flag is true, that indicates the upper layer is not holding
+ * the rx buffers, we could free the priv_dip entry safely.
+ *
+ * Otherwise, we have to keep this entry even after driver detached,
+ * and we also need to mark this entry with E1000G_PRIV_DEVI_DETACH flag,
+ * so that driver could free it while all of rx buffers are returned
+ * by upper layer later.
+ */
+static void
+e1000g_free_priv_devi_node(struct e1000g *Adapter, boolean_t free_flag)
+{
+	private_devi_list_t *devi_node, *devi_del;
+
+	rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+	ASSERT(e1000g_private_devi_list != NULL);
+	ASSERT(Adapter->priv_dip != NULL);
+
+	devi_node = e1000g_private_devi_list;
+	if (devi_node->priv_dip == Adapter->priv_dip) {
+		if (free_flag) {
+			e1000g_private_devi_list =
+			    devi_node->next;
+			kmem_free(devi_node->priv_dip,
+			    sizeof (struct dev_info));
+			kmem_free(devi_node,
+			    sizeof (private_devi_list_t));
+		} else {
+			ASSERT(e1000g_mblks_pending != 0);
+			devi_node->flag =
+			    E1000G_PRIV_DEVI_DETACH;
+		}
+		rw_exit(&e1000g_rx_detach_lock);
+		return;
+	}
+
+	devi_node = e1000g_private_devi_list;
+	while (devi_node->next != NULL) {
+		if (devi_node->next->priv_dip == Adapter->priv_dip) {
+			if (free_flag) {
+				devi_del = devi_node->next;
+				devi_node->next = devi_del->next;
+				kmem_free(devi_del->priv_dip,
+				    sizeof (struct dev_info));
+				kmem_free(devi_del,
+				    sizeof (private_devi_list_t));
+			} else {
+				ASSERT(e1000g_mblks_pending != 0);
+				devi_node->next->flag =
+				    E1000G_PRIV_DEVI_DETACH;
+			}
+			break;
+		}
+		devi_node = devi_node->next;
+	}
+	rw_exit(&e1000g_rx_detach_lock);
 }
 
 static void
