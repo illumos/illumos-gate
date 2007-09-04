@@ -52,6 +52,7 @@
 #include <inet/mi.h>
 #include <inet/nd.h>
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
 #include <inet/ip6.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_info.h>
@@ -90,6 +91,7 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 	{ 0,	0xffffffffU,	0,	"ipsecesp_default_hard_usetime"},
 	{ 0,	1,		0,	"ipsecesp_log_unknown_spi"},
 	{ 0,	2,		1,	"ipsecesp_padding_check"},
+	{ 0,	600,		20,	"ipsecesp_nat_keepalive_interval"},
 };
 #define	ipsecesp_debug	ipsecesp_params[0].ipsecesp_param_value
 #define	ipsecesp_age_interval ipsecesp_params[1].ipsecesp_param_value
@@ -116,6 +118,7 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 	ipsecesp_params[12].ipsecesp_param_value
 #define	ipsecesp_padding_check	\
 	ipsecesp_params[13].ipsecesp_param_value
+/* For ipsecesp_nat_keepalive_interval, see ipsecesp.h. */
 
 #define	esp0dbg(a)	printf a
 /* NOTE:  != 0 instead of > 0 so lint doesn't complain. */
@@ -131,6 +134,7 @@ static void	*ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecesp_stack_fini(netstackid_t stackid, void *arg);
 static void esp_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
 
+static void esp_prepare_udp(netstack_t *, mblk_t *, ipha_t *);
 static ipsec_status_t esp_outbound_accelerated(mblk_t *, uint_t);
 static ipsec_status_t esp_inbound_accelerated(mblk_t *, mblk_t *,
     boolean_t, ipsa_t *);
@@ -142,7 +146,6 @@ static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
 static ipsec_status_t esp_submit_req_inbound(mblk_t *, ipsa_t *, uint_t);
 static ipsec_status_t esp_submit_req_outbound(mblk_t *, ipsa_t *, uchar_t *,
     uint_t);
-
 /* Setable in /etc/system */
 uint32_t esp_hash_size = IPSEC_DEFAULT_HASH_SIZE;
 
@@ -774,7 +777,7 @@ esp_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 			    &inassoc->ipsa_dstaddr));
 		} else {
 			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
-				&inassoc->ipsa_dstaddr));
+			    &inassoc->ipsa_dstaddr));
 		}
 		bucket = &sp->sdb_of[outhash];
 		mutex_enter(&bucket->isaf_lock);
@@ -938,7 +941,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 			    SL_ERROR | SL_WARN,
 			    "Corrupt ESP packet (padlen too big).\n");
 			esp1dbg(espstack, ("padlen (%d) is greater than:\n",
-				    padlen));
+			    padlen));
 			esp1dbg(espstack, ("pkt len(%d) - ip hdr - esp "
 			    "hdr - ivlen(%d) = %d.\n",
 			    ntohs(ipha->ipha_length), ivlen,
@@ -987,13 +990,13 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 			    SL_ERROR | SL_WARN,
 			    "Corrupt ESP packet (v6 padlen too big).\n");
 			esp1dbg(espstack, ("padlen (%d) is greater than:\n",
-				    padlen));
-			esp1dbg(espstack, ("pkt len(%u) - ip hdr - esp "
-				    "hdr - ivlen(%d) = %u.\n",
-				    (unsigned)(ntohs(ip6h->ip6_plen)
-					+ sizeof (ip6_t)), ivlen,
-				    (unsigned)(ntohs(ip6h->ip6_plen) - 2 -
-					sizeof (esph_t) - ivlen)));
+			    padlen));
+			esp1dbg(espstack,
+			    ("pkt len(%u) - ip hdr - esp hdr - ivlen(%d) = "
+			    "%u.\n", (unsigned)(ntohs(ip6h->ip6_plen)
+			    + sizeof (ip6_t)), ivlen,
+			    (unsigned)(ntohs(ip6h->ip6_plen) - 2 -
+			    sizeof (esph_t) - ivlen)));
 			*counter = DROPPER(ipss, ipds_esp_bad_padlen);
 			return (B_FALSE);
 		}
@@ -1167,7 +1170,7 @@ esp_set_usetime(ipsa_t *assoc, boolean_t inbound)
 			    &inassoc->ipsa_dstaddr));
 		} else {
 			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
-				&inassoc->ipsa_dstaddr));
+			    &inassoc->ipsa_dstaddr));
 		}
 		bucket = &sp->sdb_of[outhash];
 		mutex_enter(&bucket->isaf_lock);
@@ -1231,9 +1234,6 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
 	netstack_t	*ns = ii->ipsec_in_ns;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-
-	if (ipsa->ipsa_usetime == 0)
-		esp_set_usetime(ipsa, B_TRUE);
 
 	/*
 	 * We may wish to check replay in-range-only here as an optimization.
@@ -1549,7 +1549,7 @@ esp_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecesp_stack_t *espstack)
 		 * to EEXIST.
 		 */
 		rc = sadb_insertassoc(newbie, inbound);
-		(void) drv_getparm(TIME, &newbie->ipsa_hardexpiretime);
+		newbie->ipsa_hardexpiretime = gethrestime_sec();
 		newbie->ipsa_hardexpiretime +=
 		    espstack->ipsecesp_larval_timeout;
 	}
@@ -1681,9 +1681,9 @@ esp_in_done(mblk_t *ipsec_in_mp)
 		if (assoc->ipsa_auth_alg == SADB_AALG_NONE) {
 			/* encryption-only ESP */
 			espstart = ii->ipsec_in_crypto_data.cd_offset -
-				sizeof (esph_t) - assoc->ipsa_iv_len;
+			    sizeof (esph_t) - assoc->ipsa_iv_len;
 			processed_len = ii->ipsec_in_crypto_data.cd_length +
-				ivlen;
+			    ivlen;
 		} else {
 			/* encryption with authentication */
 			espstart = ii->ipsec_in_crypto_dual_data.dd_offset1;
@@ -1726,6 +1726,8 @@ esp_in_done(mblk_t *ipsec_in_mp)
 		}
 	}
 
+	esp_set_usetime(assoc, B_TRUE);
+
 	if (!esp_age_bytes(assoc, processed_len, B_TRUE)) {
 		/* The ipsa has hit hard expiration, LOG and AUDIT. */
 		ipsec_assocfailure(info.mi_idnum, 0, 0,
@@ -1744,7 +1746,7 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	 */
 
 	if (esp_strip_header(data_mp, ii->ipsec_in_v4, ivlen, &counter,
-		espstack)) {
+	    espstack)) {
 		if (is_natt)
 			return (esp_fix_natt_checksums(data_mp, assoc));
 		return (IPSEC_STATUS_SUCCESS);
@@ -1845,12 +1847,12 @@ esp_kcf_callback(void *arg, int status)
 {
 	mblk_t *ipsec_mp = (mblk_t *)arg;
 	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
+	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
 	boolean_t is_inbound = (ii->ipsec_in_type == IPSEC_IN);
 	netstackid_t	stackid;
 	netstack_t	*ns, *ns_arg;
 	ipsecesp_stack_t *espstack;
 	ipsec_stack_t	*ipss;
-	ipsec_out_t	*io = (ipsec_out_t *)ii;
 
 	ASSERT(ipsec_mp->b_cont != NULL);
 
@@ -1892,6 +1894,11 @@ esp_kcf_callback(void *arg, int status)
 			 * crypto framework at the end of the packet.
 			 */
 			ipha_t *ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
+
+			esp_set_usetime(io->ipsec_out_esp_sa, B_FALSE);
+			/* NAT-T packet. */
+			if (ipha->ipha_protocol == IPPROTO_UDP)
+				esp_prepare_udp(ns, ipsec_mp->b_cont, ipha);
 
 			/* do AH processing if needed */
 			if (!esp_do_outbound_ah(ipsec_mp)) {
@@ -2127,6 +2134,101 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	return (IPSEC_STATUS_FAILED);
 }
 
+/*
+ * Compute the IP and UDP checksums -- common code for both keepalives and
+ * actual ESP-in-UDP packets.  Be flexible with multiple mblks because ESP
+ * uses mblk-insertion to insert the UDP header.
+ * TODO - If there is an easy way to prep a packet for HW checksums, make
+ * it happen here.
+ */
+static void
+esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
+{
+	int offset;
+	uint32_t cksum;
+	uint16_t *arr;
+	mblk_t *udpmp = mp;
+
+	ASSERT(MBLKL(mp) >= sizeof (ipha_t));
+
+	ipha->ipha_hdr_checksum = 0;
+	ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
+
+	if (ns->netstack_udp->us_do_checksum) {
+		ASSERT(MBLKL(udpmp) >= sizeof (udpha_t));
+		/* arr points to the IP header. */
+		arr = (uint16_t *)ipha;
+		IP_STAT(ns->netstack_ip, ip_out_sw_cksum);
+		IP_STAT_UPDATE(ns->netstack_ip, ip_udp_out_sw_cksum_bytes,
+		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH));
+		/* arr[6-9] are the IP addresses. */
+		cksum = IP_UDP_CSUM_COMP + arr[6] + arr[7] + arr[8] + arr[9] +
+		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
+		cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH, cksum);
+		offset = IP_SIMPLE_HDR_LENGTH + UDP_CHECKSUM_OFFSET;
+		while (offset >= MBLKL(udpmp)) {
+			offset -= MBLKL(udpmp);
+			udpmp = udpmp->b_cont;
+		}
+		/* arr points to the UDP header's checksum field. */
+		arr = (uint16_t *)(udpmp->b_rptr + offset);
+		*arr = cksum;
+	}
+}
+
+/*
+ * Send a one-byte UDP NAT-T keepalive.  Construct an IPSEC_OUT too that'll
+ * get fed into esp_send_udp/ip_wput_ipsec_out.
+ */
+void
+ipsecesp_send_keepalive(ipsa_t *assoc)
+{
+	mblk_t *mp = NULL, *ipsec_mp = NULL;
+	ipha_t *ipha;
+	udpha_t *udpha;
+	ipsec_out_t *io;
+
+	ASSERT(!MUTEX_HELD(&assoc->ipsa_lock));
+
+	mp = allocb(sizeof (ipha_t) + sizeof (udpha_t) + 1, BPRI_HI);
+	if (mp == NULL)
+		return;
+	ipha = (ipha_t *)mp->b_rptr;
+	ipha->ipha_version_and_hdr_length = IP_SIMPLE_HDR_VERSION;
+	ipha->ipha_type_of_service = 0;
+	ipha->ipha_length = htons(sizeof (ipha_t) + sizeof (udpha_t) + 1);
+	/* Use the low-16 of the SPI so we have some clue where it came from. */
+	ipha->ipha_ident = *(((uint16_t *)(&assoc->ipsa_spi)) + 1);
+	ipha->ipha_fragment_offset_and_flags = 0;  /* Too small to fragment! */
+	ipha->ipha_ttl = 0xFF;
+	ipha->ipha_protocol = IPPROTO_UDP;
+	ipha->ipha_hdr_checksum = 0;
+	ipha->ipha_src = assoc->ipsa_srcaddr[0];
+	ipha->ipha_dst = assoc->ipsa_dstaddr[0];
+	udpha = (udpha_t *)(ipha + 1);
+	udpha->uha_src_port = (assoc->ipsa_local_nat_port != 0) ?
+	    assoc->ipsa_local_nat_port : htons(IPPORT_IKE_NATT);
+	udpha->uha_dst_port = (assoc->ipsa_remote_nat_port != 0) ?
+	    assoc->ipsa_remote_nat_port : htons(IPPORT_IKE_NATT);
+	udpha->uha_length = htons(sizeof (udpha_t) + 1);
+	udpha->uha_checksum = 0;
+	mp->b_wptr = (uint8_t *)(udpha + 1);
+	*(mp->b_wptr++) = 0xFF;
+
+	ipsec_mp = ipsec_alloc_ipsec_out(assoc->ipsa_netstack);
+	if (ipsec_mp == NULL) {
+		freeb(mp);
+		return;
+	}
+	ipsec_mp->b_cont = mp;
+	io = (ipsec_out_t *)ipsec_mp->b_rptr;
+	io->ipsec_out_zoneid =
+	    netstackid_to_zoneid(assoc->ipsa_netstack->netstack_stackid);
+
+	esp_prepare_udp(assoc->ipsa_netstack, mp, ipha);
+	ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL, NULL);
+}
+
 static ipsec_status_t
 esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
     uint_t payload_len)
@@ -2149,7 +2251,7 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	esp3dbg(espstack, ("esp_submit_req_outbound:%s",
-		is_natt ? "natt" : "not natt"));
+	    is_natt ? "natt" : "not natt"));
 
 	ASSERT(io->ipsec_out_type == IPSEC_OUT);
 
@@ -2263,6 +2365,10 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
 		ESP_BUMP_STAT(espstack, crypto_sync);
+		esp_set_usetime(assoc, B_FALSE);
+		if (is_natt)
+			esp_prepare_udp(ns, ipsec_mp->b_cont,
+			    (ipha_t *)ipsec_mp->b_cont->b_rptr);
 		return (IPSEC_STATUS_SUCCESS);
 	case CRYPTO_QUEUED:
 		/* esp_kcf_callback() will be invoked on completion */
@@ -2385,9 +2491,6 @@ esp_outbound(mblk_t *mp)
 	assoc = io->ipsec_out_esp_sa;
 	ASSERT(assoc != NULL);
 
-	if (assoc->ipsa_usetime == 0)
-		esp_set_usetime(assoc, B_FALSE);
-
 	if (assoc->ipsa_auth_alg != SADB_AALG_NONE)
 		mac_len = assoc->ipsa_mac_len;
 
@@ -2462,13 +2565,12 @@ esp_outbound(mblk_t *mp)
 		esp3dbg(espstack, ("esp_outbound: NATT"));
 
 		udpha = (udpha_t *)espmp->b_rptr;
-		udpha->uha_src_port = htons(IPPORT_IKE_NATT);
-		if (assoc->ipsa_remote_port != 0)
-			udpha->uha_dst_port = assoc->ipsa_remote_port;
-		else
-			udpha->uha_dst_port = htons(IPPORT_IKE_NATT);
+		udpha->uha_src_port = (assoc->ipsa_local_nat_port != 0) ?
+		    assoc->ipsa_local_nat_port : htons(IPPORT_IKE_NATT);
+		udpha->uha_dst_port = (assoc->ipsa_remote_nat_port != 0) ?
+		    assoc->ipsa_remote_nat_port : htons(IPPORT_IKE_NATT);
 		/*
-		 * Set the checksum to 0, so that the ip_wput_ipsec_out()
+		 * Set the checksum to 0, so that the esp_prepare_udp() call
 		 * can do the right thing.
 		 */
 		udpha->uha_checksum = 0;
@@ -2880,17 +2982,15 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	samsg->sadb_msg_pid = pid;
 
 	if (sasupp_auth != NULL) {
-		sasupp_auth->sadb_supported_len =
-		    SADB_8TO64(sizeof (*sasupp_auth) +
-			sizeof (*saalg) * current_aalgs);
+		sasupp_auth->sadb_supported_len = SADB_8TO64(
+		    sizeof (*sasupp_auth) + sizeof (*saalg) * current_aalgs);
 		sasupp_auth->sadb_supported_exttype = SADB_EXT_SUPPORTED_AUTH;
 		sasupp_auth->sadb_supported_reserved = 0;
 	}
 
 	if (sasupp_encr != NULL) {
-		sasupp_encr->sadb_supported_len =
-		    SADB_8TO64(sizeof (*sasupp_encr) +
-			sizeof (*saalg) * current_ealgs);
+		sasupp_encr->sadb_supported_len = SADB_8TO64(
+		    sizeof (*sasupp_encr) + sizeof (*saalg) * current_ealgs);
 		sasupp_encr->sadb_supported_exttype =
 		    SADB_EXT_SUPPORTED_ENCRYPT;
 		sasupp_encr->sadb_supported_reserved = 0;
@@ -3053,7 +3153,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 			 */
 			if (acqrec->ipsacq_seq == samsg->sadb_msg_seq &&
 			    IPSA_ARE_ADDR_EQUAL(dstaddr,
-				acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
+			    acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
 				break;
 			mutex_exit(&acqrec->ipsacq_lock);
 		}
@@ -3100,7 +3200,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 
 	if (rc == 0 && lpkt != NULL) {
 		rc = !taskq_dispatch(esp_taskq, inbound_task,
-			    (void *) lpkt, TQ_NOSLEEP);
+		    (void *) lpkt, TQ_NOSLEEP);
 	}
 
 	if (rc != 0) {
@@ -3238,7 +3338,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 
 	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
 	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM |
-		SADB_X_SAFLAGS_TUNNEL)) {
+	    SADB_X_SAFLAGS_TUNNEL)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
@@ -3364,7 +3464,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	mutex_exit(&ipss->ipsec_alg_lock);
 
 	return (esp_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
-		    diagnostic, espstack));
+	    diagnostic, espstack));
 }
 
 /*
@@ -3387,10 +3487,9 @@ esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 
 	sin = (struct sockaddr_in *)(dstext + 1);
 	return (sadb_update_sa(mp, ksi,
-		(sin->sin_family == AF_INET6) ? &espstack->esp_sadb.s_v6 :
-		&espstack->esp_sadb.s_v4,
-		diagnostic, espstack->esp_pfkey_q, esp_add_sa,
-		espstack->ipsecesp_netstack));
+	    (sin->sin_family == AF_INET6) ? &espstack->esp_sadb.s_v6 :
+	    &espstack->esp_sadb.s_v4, diagnostic, espstack->esp_pfkey_q,
+	    esp_add_sa, espstack->ipsecesp_netstack));
 }
 
 /*
@@ -3424,7 +3523,7 @@ esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 	}
 
 	return (sadb_del_sa(mp, ksi, &espstack->esp_sadb, diagnostic,
-		    espstack->esp_pfkey_q));
+	    espstack->esp_pfkey_q));
 }
 
 /*
@@ -3836,7 +3935,7 @@ esp_inbound_accelerated(mblk_t *ipsec_in, mblk_t *data_mp, boolean_t isv4,
 		icv_len = hada->da_icv_len;
 		if ((icv_len != assoc->ipsa_mac_len) ||
 		    (icv_len > DA_ICV_MAX_LEN) || (MBLKL(hada_mp) <
-			(sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
+		    (sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
 			esp0dbg(("esp_inbound_accelerated: "
 			    "ICV len (%u) incorrect or mblk too small (%u)\n",
 			    icv_len, (uint32_t)(MBLKL(hada_mp))));
@@ -3892,7 +3991,7 @@ esp_inbound_accelerated(mblk_t *ipsec_in, mblk_t *data_mp, boolean_t isv4,
 	}
 
 	esp3dbg(espstack, ("esp_inbound_accelerated: ESP authentication "
-		    "succeeded, checking replay\n"));
+	    "succeeded, checking replay\n"));
 
 	ipsec_in->b_cont = data_mp;
 
@@ -3900,7 +3999,7 @@ esp_inbound_accelerated(mblk_t *ipsec_in, mblk_t *data_mp, boolean_t isv4,
 	 * Remove ESP header and padding from packet.
 	 */
 	if (!esp_strip_header(data_mp, ii->ipsec_in_v4, assoc->ipsa_iv_len,
-		&counter, espstack)) {
+	    &counter, espstack)) {
 		esp1dbg(espstack, ("esp_inbound_accelerated: "
 		    "esp_strip_header() failed\n"));
 		goto esp_in_discard;

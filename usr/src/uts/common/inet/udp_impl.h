@@ -236,7 +236,7 @@ typedef	struct udp_s {
 		udp_timestamp : 1,	/* SO_TIMESTAMP "socket" option */
 		udp_anon_mlp : 1,		/* SO_ANON_MLP */
 		udp_mac_exempt : 1,		/* SO_MAC_EXEMPT */
-		udp_pad_to_bit_31 : 1;
+		udp_nat_t_endpoint : 1;	/* UDP_NAT_T_ENDPOINT option */
 
 	uint8_t		udp_type_of_service;	/* IP_TOS option */
 	uint8_t		udp_ttl;		/* TTL or hoplimit */
@@ -317,7 +317,6 @@ extern void	udp_ddi_init(void);
 extern void	udp_ddi_destroy(void);
 extern void	udp_resume_bind(conn_t *, mblk_t *);
 extern void	udp_conn_recv(conn_t *, mblk_t *);
-extern boolean_t udp_compute_checksum(netstack_t *);
 extern void	udp_wput_data(queue_t *, mblk_t *, struct sockaddr *,
 		    socklen_t);
 

@@ -77,6 +77,9 @@ struct ipsecesp_stack {
 };
 typedef struct ipsecesp_stack ipsecesp_stack_t;
 
+/* Define *this* NDD variable here because we use it outside ESP proper. */
+#define	ipsecesp_nat_keepalive_interval	\
+	ipsecesp_params[14].ipsecesp_param_value
 
 #endif	/* _KERNEL */
 

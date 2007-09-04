@@ -160,6 +160,10 @@ ip_drop_init(ipsec_stack_t *ipss)
 	    "esp_crypto_failed", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_esp_icmp,
 	    "esp_icmp", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_esp_nat_t_ipsec,
+	    "esp_nat_t_ipsec", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_esp_nat_t_ka,
+	    "esp_nat_t_ka", KSTAT_DATA_UINT64);
 
 	/* AH-specific drop statistics. */
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_ah_nomem,

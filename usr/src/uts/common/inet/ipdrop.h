@@ -104,6 +104,8 @@ struct ip_dropstats {
 	kstat_named_t ipds_esp_bad_auth;
 	kstat_named_t ipds_esp_crypto_failed;
 	kstat_named_t ipds_esp_icmp;
+	kstat_named_t ipds_esp_nat_t_ipsec;
+	kstat_named_t ipds_esp_nat_t_ka;
 
 	/* AH-specific drop statistics. */
 	kstat_named_t ipds_ah_nomem;

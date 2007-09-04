@@ -223,7 +223,6 @@ l none kernel/strmod/sparcv9/ipsecesp=../../../kernel/drv/sparcv9/ipsecesp
 l none kernel/strmod/sparcv9/keysock=../../../kernel/drv/sparcv9/keysock
 f none kernel/strmod/sparcv9/ldterm 755 root sys
 f none kernel/strmod/sparcv9/ms 755 root sys
-f none kernel/strmod/sparcv9/nattymod 755 root sys
 f none kernel/strmod/sparcv9/pckt 755 root sys
 f none kernel/strmod/sparcv9/pfmod 755 root sys
 f none kernel/strmod/sparcv9/pipemod 755 root sys

@@ -2438,7 +2438,7 @@ void
 save_assoc(uint64_t *buffer, FILE *ofile)
 {
 	int terrno;
-	int seen_proto = 0;
+	boolean_t seen_proto = B_FALSE, seen_iproto = B_FALSE;
 	uint64_t *current;
 	struct sadb_address *addr;
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
@@ -2463,6 +2463,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 		struct sadb_sa *assoc;
 
 		ext = (struct sadb_ext *)current;
+		addr = (struct sadb_address *)ext;  /* Just in case... */
 		switch (ext->sadb_ext_type) {
 		case SADB_EXT_SA:
 			assoc = (struct sadb_sa *)ext;
@@ -2523,19 +2524,28 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			}
 			savenl();
 			break;
-		case SADB_EXT_ADDRESS_SRC:
-		case SADB_EXT_ADDRESS_DST:
 		case SADB_X_EXT_ADDRESS_INNER_SRC:
 		case SADB_X_EXT_ADDRESS_INNER_DST:
-		case SADB_X_EXT_ADDRESS_NATT_REM:
-		case SADB_X_EXT_ADDRESS_NATT_LOC:
-			addr = (struct sadb_address *)ext;
+			if (!seen_iproto && addr->sadb_address_proto) {
+				(void) fprintf(ofile, "    iproto %d",
+				    addr->sadb_address_proto);
+				savenl();
+				seen_iproto = B_TRUE;
+			}
+			goto skip_srcdst;  /* Hack to avoid cases below... */
+			/* FALLTHRU */
+		case SADB_EXT_ADDRESS_SRC:
+		case SADB_EXT_ADDRESS_DST:
 			if (!seen_proto && addr->sadb_address_proto) {
 				(void) fprintf(ofile, "    proto %d",
 				    addr->sadb_address_proto);
 				savenl();
-				seen_proto = 1;
+				seen_proto = B_TRUE;
 			}
+			/* FALLTHRU */
+		case SADB_X_EXT_ADDRESS_NATT_REM:
+		case SADB_X_EXT_ADDRESS_NATT_LOC:
+skip_srcdst:
 			if (!save_address(addr, ofile)) {
 				tidyup();
 				bail(dgettext(TEXT_DOMAIN, "save_address"));

@@ -469,7 +469,6 @@ STRMOD_KMODS	+= usbkbm
 STRMOD_KMODS	+= usbms
 STRMOD_KMODS	+= usb_ah
 STRMOD_KMODS	+= drcompat
-STRMOD_KMODS	+= nattymod
 STRMOD_KMODS	+= cryptmod
 STRMOD_KMODS	+= vuid2ps2
 STRMOD_KMODS	+= vuid3ps2

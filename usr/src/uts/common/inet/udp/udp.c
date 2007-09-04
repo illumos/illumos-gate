@@ -254,15 +254,15 @@ static int	udp_rrw(queue_t *q, struiod_t *dp);
 static	void	udp_rput_bind_ack(queue_t *q, mblk_t *mp);
 static int	udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
-static void	udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha);
+static void	udp_send_data(udp_t *, queue_t *, mblk_t *, ipha_t *);
 static void	udp_ud_err(queue_t *q, mblk_t *mp, uchar_t *destaddr,
 		    t_scalar_t destlen, t_scalar_t err);
 static void	udp_unbind(queue_t *q, mblk_t *mp);
 static in_port_t udp_update_next_port(udp_t *udp, in_port_t port,
     boolean_t random);
 static void	udp_wput(queue_t *q, mblk_t *mp);
-static mblk_t	*udp_output_v4(conn_t *, mblk_t *mp, ipaddr_t v4dst,
-		    uint16_t port, uint_t srcid, int *error);
+static mblk_t	*udp_output_v4(conn_t *, mblk_t *, ipaddr_t, uint16_t, uint_t,
+		    int *, boolean_t);
 static mblk_t	*udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6,
 		    int *error);
 static void	udp_wput_other(queue_t *q, mblk_t *mp);
@@ -963,7 +963,7 @@ udp_bind_hash_remove(udp_t *udp, boolean_t caller_holds_lock)
 	ASSERT(udp->udp_port != 0);
 	if (!caller_holds_lock) {
 		lockp = &us->us_bind_fanout[UDP_BIND_HASH(udp->udp_port,
-					    us->us_bind_fanout_size)].uf_lock;
+		    us->us_bind_fanout_size)].uf_lock;
 		ASSERT(lockp != NULL);
 		mutex_enter(lockp);
 	}
@@ -3333,8 +3333,8 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			return (ipp->ipp_dstoptslen);
 		case IPV6_PATHMTU:
 			return (ip_fill_mtuinfo(&udp->udp_v6dst,
-				udp->udp_dstport, (struct ip6_mtuinfo *)ptr,
-				us->us_netstack));
+			    udp->udp_dstport, (struct ip6_mtuinfo *)ptr,
+			    us->us_netstack));
 		default:
 			return (-1);
 		}
@@ -3349,6 +3349,9 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			break;
 		case UDP_RCVHDR:
 			*i1 = udp->udp_rcvhdr ? 1 : 0;
+			break;
+		case UDP_NAT_T_ENDPOINT:
+			*i1 = udp->udp_nat_t_endpoint;
 			break;
 		default:
 			return (-1);
@@ -4206,6 +4209,37 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (!checkonly)
 				udp->udp_rcvhdr = onoff;
 			break;
+		case UDP_NAT_T_ENDPOINT:
+			if ((error = secpolicy_ip_config(cr, B_FALSE)) != 0) {
+				*outlenp = 0;
+				return (error);
+			}
+
+			/*
+			 * Use udp_family instead so we can avoid ambiguitites
+			 * with AF_INET6 sockets that may switch from IPv4
+			 * to IPv6.
+			 */
+			if (udp->udp_family != AF_INET) {
+				*outlenp = 0;
+				return (EAFNOSUPPORT);
+			}
+
+			if (!checkonly) {
+				udp->udp_nat_t_endpoint = onoff;
+
+				udp->udp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
+				    UDPH_SIZE + udp->udp_ip_snd_options_len;
+
+				/* Also, adjust wroff */
+				if (onoff) {
+					udp->udp_max_hdr_len +=
+					    sizeof (uint32_t);
+				}
+				(void) mi_set_sth_wroff(RD(q),
+				    udp->udp_max_hdr_len + us->us_wroff_extra);
+			}
+			break;
 		default:
 			*outlenp = 0;
 			return (EINVAL);
@@ -4574,7 +4608,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			 */
 			udp_icmp_error(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-				"udp_rput_end: q %p (%S)", q, "m_ctl");
+			    "udp_rput_end: q %p (%S)", q, "m_ctl");
 			return;
 		}
 	}
@@ -4626,7 +4660,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			udp_become_writer(connp, mp, udp_rput_other_wrapper,
 			    SQTAG_UDP_INPUT);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-				"udp_rput_end: q %p (%S)", q, "end");
+			    "udp_rput_end: q %p (%S)", q, "end");
 			return;
 		}
 
@@ -4792,7 +4826,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			if (options_mp != NULL)
 				freeb(options_mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-				"udp_rput_end: q %p (%S)", q, "allocbfail");
+			    "udp_rput_end: q %p (%S)", q, "allocbfail");
 			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			return;
 		}
@@ -4877,7 +4911,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->level = IPPROTO_IP;
 				toh->name = IP_RECVSLLA;
 				toh->len = sizeof (struct T_opthdr) +
-					sizeof (struct sockaddr_dl);
+				    sizeof (struct sockaddr_dl);
 				toh->status = 0;
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (struct sockaddr_dl *)dstopt;
@@ -4897,7 +4931,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->level = IPPROTO_IP;
 				toh->name = IP_RECVIF;
 				toh->len = sizeof (struct T_opthdr) +
-					sizeof (uint_t);
+				    sizeof (uint_t);
 				toh->status = 0;
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (uint_t *)dstopt;
@@ -4993,7 +5027,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				udi_size += hlen;
 			}
 			if ((udp->udp_ipv6_recvdstopts ||
-				udp->udp_old_ipv6_recvdstopts) &&
+			    udp->udp_old_ipv6_recvdstopts) &&
 			    (ipp.ipp_fields & IPPF_DSTOPTS)) {
 				udi_size += sizeof (struct T_opthdr) +
 				    ipp.ipp_dstoptslen;
@@ -5044,7 +5078,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			if (options_mp != NULL)
 				freeb(options_mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-				"udp_rput_end: q %p (%S)", q, "allocbfail");
+			    "udp_rput_end: q %p (%S)", q, "allocbfail");
 			BUMP_MIB(&udp->udp_mib, udpInErrors);
 			return;
 		}
@@ -5110,8 +5144,8 @@ udp_input(conn_t *connp, mblk_t *mp)
 					pkti->ipi6_addr = ip6h->ip6_dst;
 				else
 					IN6_IPADDR_TO_V4MAPPED(
-						((ipha_t *)rptr)->ipha_dst,
-						    &pkti->ipi6_addr);
+					    ((ipha_t *)rptr)->ipha_dst,
+					    &pkti->ipi6_addr);
 				pkti->ipi6_ifindex = ipp.ipp_ifindex;
 				dstopt += sizeof (*pkti);
 				udi_size -= toh->len;
@@ -5146,7 +5180,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstopt += sizeof (struct T_opthdr);
 				if (ipversion == IPV6_VERSION) {
 					*(uint_t *)dstopt =
-					IPV6_FLOW_TCLASS(ip6h->ip6_flow);
+					    IPV6_FLOW_TCLASS(ip6h->ip6_flow);
 				} else {
 					ipha_t *ipha = (ipha_t *)rptr;
 					*(uint_t *)dstopt =
@@ -5234,7 +5268,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 
 	BUMP_MIB(&udp->udp_mib, udpHCInDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-		"udp_rput_end: q %p (%S)", q, "end");
+	    "udp_rput_end: q %p (%S)", q, "end");
 	if (options_mp != NULL)
 		freeb(options_mp);
 
@@ -5357,9 +5391,8 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 				 */
 				udp_fanout_t	*udpf;
 
-				udpf = &us->us_bind_fanout[
-				    UDP_BIND_HASH(udp->udp_port,
-					us->us_bind_fanout_size)];
+				udpf = &us->us_bind_fanout[UDP_BIND_HASH(
+				    udp->udp_port, us->us_bind_fanout_size)];
 				mutex_enter(&udpf->uf_lock);
 				if (udp->udp_state == TS_DATA_XFER) {
 					/* Connect failed */
@@ -5518,7 +5551,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 		if (options_mp != NULL)
 			freeb(options_mp);
 		TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_END,
-			"udp_rput_other_end: q %p (%S)", q, "allocbfail");
+		    "udp_rput_other_end: q %p (%S)", q, "allocbfail");
 		BUMP_MIB(&udp->udp_mib, udpInErrors);
 		return;
 	}
@@ -5592,7 +5625,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			toh->level = IPPROTO_IP;
 			toh->name = IP_PKTINFO;
 			toh->len = sizeof (struct T_opthdr) +
-			sizeof (*pktinfop);
+			    sizeof (*pktinfop);
 			toh->status = 0;
 			dstopt += sizeof (struct T_opthdr);
 			pktinfop = (struct in_pktinfo *)dstopt;
@@ -6096,10 +6129,8 @@ udp_report_item(mblk_t *mp, udp_t *udp)
 	print_len = snprintf((char *)mp->b_wptr, buf_len,
 	    MI_COL_PTRFMT_STR "%4d %5u %s %s %5u %s\n",
 	    (void *)udp, udp->udp_connp->conn_zoneid, ntohs(udp->udp_port),
-	    inet_ntop(AF_INET6, &udp->udp_v6src,
-		addrbuf1, sizeof (addrbuf1)),
-	    inet_ntop(AF_INET6, &udp->udp_v6dst,
-		addrbuf2, sizeof (addrbuf2)),
+	    inet_ntop(AF_INET6, &udp->udp_v6src, addrbuf1, sizeof (addrbuf1)),
+	    inet_ntop(AF_INET6, &udp->udp_v6dst, addrbuf2, sizeof (addrbuf2)),
 	    ntohs(udp->udp_dstport), state);
 	if (print_len < buf_len) {
 		mp->b_wptr += print_len;
@@ -6367,7 +6398,7 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 
 static mblk_t *
 udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
-    uint_t srcid, int *error)
+    uint_t srcid, int *error, boolean_t insert_spi)
 {
 	udp_t	*udp = connp->conn_udp;
 	queue_t	*q = connp->conn_wq;
@@ -6464,7 +6495,8 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	mutex_exit(&connp->conn_lock);
 
 	/* Add an IP header */
-	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE + ip_snd_opt_len;
+	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE + ip_snd_opt_len +
+	    (insert_spi ? sizeof (uint32_t) : 0);
 	ipha = (ipha_t *)&mp1->b_rptr[-ip_hdr_length];
 	if (DB_REF(mp1) != 1 || (uchar_t *)ipha < DB_BASE(mp1) ||
 	    !OK_32PTR(ipha)) {
@@ -6485,19 +6517,19 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 
 		ipha = (ipha_t *)(mp1->b_wptr - ip_hdr_length);
 	}
-	ip_hdr_length -= UDPH_SIZE;
+	ip_hdr_length -= (UDPH_SIZE + (insert_spi ? sizeof (uint32_t) : 0));
 #ifdef	_BIG_ENDIAN
 	/* Set version, header length, and tos */
 	*(uint16_t *)&ipha->ipha_version_and_hdr_length =
 	    ((((IP_VERSION << 4) | (ip_hdr_length>>2)) << 8) |
-		udp->udp_type_of_service);
+	    udp->udp_type_of_service);
 	/* Set ttl and protocol */
 	*(uint16_t *)&ipha->ipha_ttl = (udp->udp_ttl << 8) | IPPROTO_UDP;
 #else
 	/* Set version, header length, and tos */
 	*(uint16_t *)&ipha->ipha_version_and_hdr_length =
-		((udp->udp_type_of_service << 8) |
-		    ((IP_VERSION << 4) | (ip_hdr_length>>2)));
+	    ((udp->udp_type_of_service << 8) |
+	    ((IP_VERSION << 4) | (ip_hdr_length>>2)));
 	/* Set ttl and protocol */
 	*(uint16_t *)&ipha->ipha_ttl = (IPPROTO_UDP << 8) | udp->udp_ttl;
 #endif
@@ -6557,6 +6589,10 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ip_len = htons((uint16_t)ip_len);
 	udpha = (udpha_t *)(((uchar_t *)ipha) + ip_hdr_length);
 
+	/* Insert all-0s SPI now. */
+	if (insert_spi)
+		*((uint32_t *)(udpha + 1)) = 0;
+
 	/*
 	 * Copy in the destination address
 	 */
@@ -6571,7 +6607,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	udpha->uha_dst_port = port;
 	udpha->uha_src_port = udp->udp_port;
 
-	if (ip_hdr_length > IP_SIMPLE_HDR_LENGTH) {
+	if (ip_snd_opt_len > 0) {
 		uint32_t	cksum;
 
 		bcopy(ip_snd_opt, &ipha[1], ip_snd_opt_len);
@@ -6636,7 +6672,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	/* We're done.  Pass the packet to ip. */
 	BUMP_MIB(&udp->udp_mib, udpHCOutDatagrams);
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
-		"udp_wput_end: q %p (%S)", q, "end");
+	    "udp_wput_end: q %p (%S)", q, "end");
 
 	if ((connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
 	    CONN_OUTBOUND_POLICY_PRESENT(connp, ipss) ||
@@ -6968,6 +7004,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 	int		error = 0;
 	struct sockaddr_storage ss;
 	udp_stack_t *us = udp->udp_us;
+	boolean_t	insert_spi = udp->udp_nat_t_endpoint;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_START,
 	    "udp_wput_start: connp %p mp %p", connp, mp);
@@ -7031,7 +7068,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			 * family of the socket.
 			 */
 			mp = udp_output_v4(connp, mp, v4dst,
-			    udp->udp_dstport, 0, &error);
+			    udp->udp_dstport, 0, &error, insert_spi);
 		} else {
 			mp = udp_output_v6(connp, mp, sin6, &error);
 		}
@@ -7152,7 +7189,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 		break;
 	}
 
-	mp = udp_output_v4(connp, mp, v4dst, port, srcid, &error);
+	mp = udp_output_v4(connp, mp, v4dst, port, srcid, &error, insert_spi);
 	if (error != 0) {
 ud_error:
 		UDP_STAT(us, udp_out_err_output);
@@ -7887,7 +7924,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	udp_stack_t *us;
 
 	TRACE_1(TR_FAC_UDP, TR_UDP_WPUT_OTHER_START,
-		"udp_wput_other_start: q %p", q);
+	    "udp_wput_other_start: q %p", q);
 
 	us = udp->udp_us;
 	db = mp->b_datap;
@@ -7900,36 +7937,35 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 		if (mp->b_wptr - rptr < sizeof (t_scalar_t)) {
 			freemsg(mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "protoshort");
+			    "udp_wput_other_end: q %p (%S)", q, "protoshort");
 			return;
 		}
 		switch (((t_primp_t)rptr)->type) {
 		case T_ADDR_REQ:
 			udp_addr_req(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)", q, "addrreq");
+			    "udp_wput_other_end: q %p (%S)", q, "addrreq");
 			return;
 		case O_T_BIND_REQ:
 		case T_BIND_REQ:
 			udp_bind(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)", q, "bindreq");
+			    "udp_wput_other_end: q %p (%S)", q, "bindreq");
 			return;
 		case T_CONN_REQ:
 			udp_connect(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)", q, "connreq");
+			    "udp_wput_other_end: q %p (%S)", q, "connreq");
 			return;
 		case T_CAPABILITY_REQ:
 			udp_capability_req(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)", q, "capabreq");
+			    "udp_wput_other_end: q %p (%S)", q, "capabreq");
 			return;
 		case T_INFO_REQ:
 			udp_info_req(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)", q, "inforeq");
+			    "udp_wput_other_end: q %p (%S)", q, "inforeq");
 			return;
 		case T_UNITDATA_REQ:
 			/*
@@ -7939,8 +7975,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			 */
 			udp_ud_err(q, mp, NULL, 0, EADDRNOTAVAIL);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "unitdatareq");
+			    "udp_wput_other_end: q %p (%S)", q, "unitdatareq");
 			return;
 		case T_UNBIND_REQ:
 			udp_unbind(q, mp);
@@ -7957,8 +7992,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 				(void) svr4_optcom_req(_WR(UDP_RD(q)),
 				    mp, cr, &udp_opt_obj);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-			    "udp_wput_other_end: q %p (%S)",
-			    q, "optmgmtreq");
+			    "udp_wput_other_end: q %p (%S)", q, "optmgmtreq");
 			return;
 
 		case T_OPTMGMT_REQ:
@@ -7970,15 +8004,13 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			(void) tpi_optcom_req(_WR(UDP_RD(q)),
 			    mp, cr, &udp_opt_obj);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "optmgmtreq");
+			    "udp_wput_other_end: q %p (%S)", q, "optmgmtreq");
 			return;
 
 		case T_DISCON_REQ:
 			udp_disconnect(q, mp);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "disconreq");
+			    "udp_wput_other_end: q %p (%S)", q, "disconreq");
 			return;
 
 		/* The following TPI message is not supported by udp. */
@@ -7986,8 +8018,8 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 		case T_CONN_RES:
 			udp_err_ack(q, mp, TNOTSUPPORT, 0);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "connres/disconreq");
+			    "udp_wput_other_end: q %p (%S)", q,
+			    "connres/disconreq");
 			return;
 
 		/* The following 3 TPI messages are illegal for udp. */
@@ -7996,8 +8028,8 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 		case T_ORDREL_REQ:
 			udp_err_ack(q, mp, TNOTSUPPORT, 0);
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "data/exdata/ordrel");
+			    "udp_wput_other_end: q %p (%S)", q,
+			    "data/exdata/ordrel");
 			return;
 		default:
 			break;
@@ -8022,8 +8054,8 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 				mp->b_datap->db_type = M_IOCACK;
 				putnext(UDP_RD(q), mp);
 				TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-					"udp_wput_other_end: q %p (%S)",
-					q, "getpeername");
+				    "udp_wput_other_end: q %p (%S)", q,
+				    "getpeername");
 				return;
 			}
 			/* FALLTHRU */
@@ -8037,8 +8069,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
 			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-				"udp_wput_other_end: q %p (%S)",
-				q, "getmyname");
+			    "udp_wput_other_end: q %p (%S)", q, "getmyname");
 			return;
 			}
 		case ND_SET:
@@ -8047,8 +8078,7 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			if (nd_getset(q, us->us_nd, mp)) {
 				putnext(UDP_RD(q), mp);
 				TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-					"udp_wput_other_end: q %p (%S)",
-					q, "get");
+				    "udp_wput_other_end: q %p (%S)", q, "get");
 				return;
 			}
 			break;
@@ -8091,14 +8121,14 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 	case M_IOCDATA:
 		udp_wput_iocdata(q, mp);
 		TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-			"udp_wput_other_end: q %p (%S)", q, "iocdata");
+		    "udp_wput_other_end: q %p (%S)", q, "iocdata");
 		return;
 	default:
 		/* Unrecognized messages are passed through without change. */
 		break;
 	}
 	TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_OTHER_END,
-		"udp_wput_other_end: q %p (%S)", q, "end");
+	    "udp_wput_other_end: q %p (%S)", q, "end");
 	ip_output(connp, mp, q, IP_WPUT);
 }
 
@@ -8814,15 +8844,4 @@ udp_set_rcv_hiwat(udp_t *udp, size_t size)
 
 	udp->udp_rcv_hiwat = size;
 	return (size);
-}
-
-/*
- * Little helper for IPsec's NAT-T processing.
- */
-boolean_t
-udp_compute_checksum(netstack_t *ns)
-{
-	udp_stack_t *us = ns->netstack_udp;
-
-	return (us->us_do_checksum);
 }

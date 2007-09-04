@@ -2505,14 +2505,14 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 	}
 
 	/*
-	 * Clear the capability flags for IPSec HA but retain the ill
+	 * Clear the capability flags for IPsec HA but retain the ill
 	 * capability structures since it's possible that another thread
 	 * is still referring to them.  The structures only get deallocated
 	 * when we destroy the ill.
 	 *
 	 * Various places check the flags to see if the ill is capable of
 	 * hardware acceleration, and by clearing them we ensure that new
-	 * outbound IPSec packets are sent down encrypted.
+	 * outbound IPsec packets are sent down encrypted.
 	 */
 	ill->ill_capabilities &= ~(ILL_CAPAB_AH | ILL_CAPAB_ESP);
 
@@ -18679,9 +18679,6 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	ipcl_walk(conn_cleanup_stale_ire, NULL, ipst);
 	/* Also, delete the ires cached in SCTP */
 	sctp_ire_cache_flush(ipif);
-
-	/* Resolve any IPsec/IKE NAT-T instances that depend on this ipif. */
-	nattymod_clean_ipif(ipif);
 
 	/*
 	 * Update any other ipifs which have used "our" local address as

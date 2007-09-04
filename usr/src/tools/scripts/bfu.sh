@@ -6350,6 +6350,13 @@ mondo_loop() {
         rm -f $rootprefix/kernel/strmod/sparcv9/authmd5h
         rm -f $rootprefix/kernel/strmod/sparcv9/authsha1
 
+	#
+	# Remove the now-obsolete "nattymod" STREAMS module.
+	#
+	rm -f $rootprefix/kernel/strmod/nattymod
+	rm -f $rootprefix/kernel/strmod/amd64/nattymod
+	rm -f $rootprefix/kernel/strmod/sparcv9/nattymod
+
         #
         # Remove obsolete SSA utility, firmware and fcode.
         # usr/lib/firmware/ssa contains ssafirmware 

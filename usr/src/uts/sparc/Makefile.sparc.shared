@@ -348,7 +348,6 @@ STRMOD_KMODS	+= spppasyn spppcomp
 STRMOD_KMODS	+= tirdwr ttcompat tun
 STRMOD_KMODS	+= usbkbm usbms usb_ah
 STRMOD_KMODS	+= drcompat
-STRMOD_KMODS	+= nattymod
 STRMOD_KMODS	+= cryptmod
 STRMOD_KMODS	+= vuid3ps2
 

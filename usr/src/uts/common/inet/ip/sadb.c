@@ -175,6 +175,10 @@ sadb_add_time(time_t base, uint64_t delta)
  *
  * Return 0 if success, EEXIST if collision.
  */
+#define	SA_UNIQUE_MATCH(sa1, sa2) \
+	(((sa1)->ipsa_unique_id & (sa1)->ipsa_unique_mask) == \
+	((sa2)->ipsa_unique_id & (sa2)->ipsa_unique_mask))
+
 int
 sadb_insertassoc(ipsa_t *ipsa, isaf_t *bucket)
 {
@@ -207,10 +211,7 @@ sadb_insertassoc(ipsa_t *ipsa, isaf_t *bucket)
 			mutex_enter(&walker->ipsa_lock);
 			if (ipsa->ipsa_state == IPSA_STATE_MATURE &&
 			    (walker->ipsa_flags & IPSA_F_USED) &&
-			    ((walker->ipsa_unique_id &
-				walker->ipsa_unique_mask) ==
-				(ipsa->ipsa_unique_id &
-				    ipsa->ipsa_unique_mask))) {
+			    SA_UNIQUE_MATCH(walker, ipsa)) {
 				walker->ipsa_flags |= IPSA_F_CINVALID;
 			}
 			mutex_exit(&walker->ipsa_lock);
@@ -238,6 +239,7 @@ sadb_insertassoc(ipsa_t *ipsa, isaf_t *bucket)
 
 	return (0);
 }
+#undef SA_UNIQUE_MATCH
 
 /*
  * Free a security association.  Its reference count is 0, which means
@@ -260,10 +262,6 @@ sadb_freeassoc(ipsa_t *ipsa)
 	    &ipss->ipsec_sadb_dropper);
 
 	mutex_enter(&ipsa->ipsa_lock);
-
-	if (ipsa->ipsa_natt_ka_timer != 0)
-		(void) quntimeout(ipsa->ipsa_natt_q, ipsa->ipsa_natt_ka_timer);
-
 	ipsec_destroy_ctx_tmpl(ipsa, IPSEC_ALG_AUTH);
 	ipsec_destroy_ctx_tmpl(ipsa, IPSEC_ALG_ENCR);
 	mutex_exit(&ipsa->ipsa_lock);
@@ -1370,9 +1368,9 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	 */
 	alloclen += addrsize * 2;
 	if (ipsa->ipsa_flags & IPSA_F_NATT_REM)
-	    alloclen += addrsize;
+		alloclen += addrsize;
 	if (ipsa->ipsa_flags & IPSA_F_NATT_LOC)
-	    alloclen += addrsize;
+		alloclen += addrsize;
 
 
 	/* How 'bout other lifetimes? */
@@ -1503,7 +1501,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	lt = (sadb_lifetime_t *)(assoc + 1);
 	lt->sadb_lifetime_len = SADB_8TO64(sizeof (*lt));
 	lt->sadb_lifetime_exttype = SADB_EXT_LIFETIME_CURRENT;
-	lt->sadb_lifetime_allocations = ipsa->ipsa_alloc;
+	/* We do not support the concept. */
+	lt->sadb_lifetime_allocations = 0;
 	lt->sadb_lifetime_bytes = ipsa->ipsa_bytes;
 	lt->sadb_lifetime_addtime = ipsa->ipsa_addtime;
 	lt->sadb_lifetime_usetime = ipsa->ipsa_usetime;
@@ -1551,7 +1550,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 
 	if (ipsa->ipsa_flags & IPSA_F_NATT_LOC) {
 		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_NATT_LOC,
-		    fam, ipsa->ipsa_natt_addr_loc, 0, 0, 0);
+		    fam, &ipsa->ipsa_natt_addr_loc, ipsa->ipsa_local_nat_port,
+		    IPPROTO_UDP, 0);
 		if (cur == NULL) {
 			freemsg(mp);
 			mp = NULL;
@@ -1561,7 +1561,7 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 
 	if (ipsa->ipsa_flags & IPSA_F_NATT_REM) {
 		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_NATT_REM,
-		    fam, ipsa->ipsa_natt_addr_rem, ipsa->ipsa_remote_port,
+		    fam, &ipsa->ipsa_natt_addr_rem, ipsa->ipsa_remote_nat_port,
 		    IPPROTO_UDP, 0);
 		if (cur == NULL) {
 			freemsg(mp);
@@ -1727,13 +1727,13 @@ sadb_strip(sadb_msg_t *samsg)
 				 */
 				copylen = ((uint8_t *)ext) - (target +
 				    SADB_64TO8(
-					((sadb_ext_t *)target)->sadb_ext_len));
+				    ((sadb_ext_t *)target)->sadb_ext_len));
 				ovbcopy(((uint8_t *)ext - copylen), target,
 				    copylen);
 				target += copylen;
 				((sadb_ext_t *)target)->sadb_ext_len =
 				    SADB_8TO64(((uint8_t *)ext) - target +
-					SADB_64TO8(ext->sadb_ext_len));
+				    SADB_64TO8(ext->sadb_ext_len));
 			} else {
 				target = (uint8_t *)ext;
 			}
@@ -2067,7 +2067,7 @@ bail:
 			 * question is out of range.
 			 */
 			if (ip_plen_to_mask_v6(addr->sadb_address_prefixlen,
-				&mask) == NULL)
+			    &mask) == NULL)
 				goto bail;
 			sin6->sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
 			sin6->sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
@@ -2186,16 +2186,14 @@ sadb_addrfix(keysock_in_t *ksi, queue_t *pfkey_q, mblk_t *mp, netstack_t *ns)
 		    extv[SADB_X_EXT_ADDRESS_NATT_LOC], ksi->ks_in_serial, ns);
 
 		/*
-		 * NATT addresses never use an IRE_LOCAL, so it should
-		 * always be NOTME, or UNSPEC if it's a tunnel-mode SA.
+		 * Local NAT-T addresses never use an IRE_LOCAL, so it should
+		 * always be NOTME, or UNSPEC (to handle both tunnel mode
+		 * AND local-port flexibility).
 		 */
-		if (rc != KS_IN_ADDR_NOTME &&
-		    !(extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL &&
-			rc == KS_IN_ADDR_UNSPEC)) {
-			if (rc != KS_IN_ADDR_UNKNOWN)
-				sadb_pfkey_error(pfkey_q, mp, EINVAL,
-				    SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC,
-				    ksi->ks_in_serial);
+		if (rc != KS_IN_ADDR_NOTME && rc != KS_IN_ADDR_UNSPEC) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC,
+			    ksi->ks_in_serial);
 			return (B_FALSE);
 		}
 		src = (struct sockaddr_in *)
@@ -2213,16 +2211,15 @@ sadb_addrfix(keysock_in_t *ksi, queue_t *pfkey_q, mblk_t *mp, netstack_t *ns)
 		    extv[SADB_X_EXT_ADDRESS_NATT_REM], ksi->ks_in_serial, ns);
 
 		/*
-		 * NATT addresses never use an IRE_LOCAL, so it should
+		 * Remote NAT-T addresses never use an IRE_LOCAL, so it should
 		 * always be NOTME, or UNSPEC if it's a tunnel-mode SA.
 		 */
 		if (rc != KS_IN_ADDR_NOTME &&
 		    !(extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL &&
-			rc == KS_IN_ADDR_UNSPEC)) {
-			if (rc != KS_IN_ADDR_UNKNOWN)
-				sadb_pfkey_error(pfkey_q, mp, EINVAL,
-				    SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM,
-				    ksi->ks_in_serial);
+		    rc == KS_IN_ADDR_UNSPEC)) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM,
+			    ksi->ks_in_serial);
 			return (B_FALSE);
 		}
 		src = (struct sockaddr_in *)
@@ -2253,10 +2250,10 @@ sadb_addrfix(keysock_in_t *ksi, queue_t *pfkey_q, mblk_t *mp, netstack_t *ns)
 
 		isrc = (struct sockaddr_in *)
 		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_SRC]) +
-			1);
+		    1);
 		idst = (struct sockaddr_in6 *)
 		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_DST]) +
-			1);
+		    1);
 		if (isrc->sin_family != idst->sin6_family) {
 			sadb_pfkey_error(pfkey_q, mp, EINVAL,
 			    SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH,
@@ -2341,7 +2338,7 @@ sadb_addrset(ire_t *ire)
 	if ((ire->ire_type & IRE_BROADCAST) ||
 	    (ire->ire_ipversion == IPV4_VERSION && CLASSD(ire->ire_addr)) ||
 	    (ire->ire_ipversion == IPV6_VERSION &&
-		IN6_IS_ADDR_MULTICAST(&(ire->ire_addr_v6))))
+	    IN6_IS_ADDR_MULTICAST(&(ire->ire_addr_v6))))
 		return (KS_IN_ADDR_MBCAST);
 	if (ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK))
 		return (KS_IN_ADDR_ME);
@@ -2381,17 +2378,15 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 
 	if ((entry->ipsa_state == IPSA_STATE_LARVAL) ||
 	    (ps->src != NULL &&
-		!IPSA_ARE_ADDR_EQUAL(entry->ipsa_srcaddr, ps->src, ps->af)) ||
+	    !IPSA_ARE_ADDR_EQUAL(entry->ipsa_srcaddr, ps->src, ps->af)) ||
 	    (ps->dst != NULL &&
-		!IPSA_ARE_ADDR_EQUAL(entry->ipsa_dstaddr, ps->dst, ps->af)) ||
-	    (ps->didstr != NULL &&
-		(entry->ipsa_dst_cid != NULL) &&
-		!(ps->didtype == entry->ipsa_dst_cid->ipsid_type &&
-		    strcmp(ps->didstr, entry->ipsa_dst_cid->ipsid_cid) == 0)) ||
-	    (ps->sidstr != NULL &&
-		(entry->ipsa_src_cid != NULL) &&
-		!(ps->sidtype == entry->ipsa_src_cid->ipsid_type &&
-		    strcmp(ps->sidstr, entry->ipsa_src_cid->ipsid_cid) == 0)) ||
+	    !IPSA_ARE_ADDR_EQUAL(entry->ipsa_dstaddr, ps->dst, ps->af)) ||
+	    (ps->didstr != NULL && (entry->ipsa_dst_cid != NULL) &&
+	    !(ps->didtype == entry->ipsa_dst_cid->ipsid_type &&
+	    strcmp(ps->didstr, entry->ipsa_dst_cid->ipsid_cid) == 0)) ||
+	    (ps->sidstr != NULL && (entry->ipsa_src_cid != NULL) &&
+	    !(ps->sidtype == entry->ipsa_src_cid->ipsid_type &&
+	    strcmp(ps->sidstr, entry->ipsa_src_cid->ipsid_cid) == 0)) ||
 	    (ps->kmproto <= SADB_X_KMP_MAX && ps->kmproto != entry->ipsa_kmp)) {
 		mutex_exit(&entry->ipsa_lock);
 		return;
@@ -2691,7 +2686,6 @@ sadb_nat_calculations(ipsa_t *newbie, sadb_address_t *natt_loc_ext,
 
 #define	DOWN_SUM(x) (x) = ((x) & 0xFFFF) +	 ((x) >> 16)
 
-
 	if (natt_rem_ext != NULL) {
 		uint32_t l_src;
 		uint32_t l_rem;
@@ -2702,12 +2696,12 @@ sadb_nat_calculations(ipsa_t *newbie, sadb_address_t *natt_loc_ext,
 		ASSERT(natt_rem->sin_family == AF_INET);
 
 		natt_rem_ptr = (uint32_t *)(&natt_rem->sin_addr);
-		newbie->ipsa_remote_port = natt_rem->sin_port;
+		newbie->ipsa_remote_nat_port = natt_rem->sin_port;
 		l_src = *src_addr_ptr;
 		l_rem = *natt_rem_ptr;
 
 		/* Instead of IPSA_COPY_ADDR(), just copy first 32 bits. */
-		newbie->ipsa_natt_addr_rem[0] = *natt_rem_ptr;
+		newbie->ipsa_natt_addr_rem = *natt_rem_ptr;
 
 		l_src = ntohl(l_src);
 		DOWN_SUM(l_src);
@@ -2730,39 +2724,41 @@ sadb_nat_calculations(ipsa_t *newbie, sadb_address_t *natt_loc_ext,
 	}
 
 	if (natt_loc_ext != NULL) {
-		uint32_t l_dst;
-		uint32_t l_loc;
-
 		natt_loc = (struct sockaddr_in *)(natt_loc_ext + 1);
 
 		/* Ensured by sadb_addrfix(). */
 		ASSERT(natt_loc->sin_family == AF_INET);
 
-		natt_loc_ptr = (uint32_t *)&natt_loc->sin_addr;
-		/* TODO - future port flexibility beyond 4500. */
-		l_dst = *dst_addr_ptr;
-		l_loc = *natt_loc_ptr;
+		natt_loc_ptr = (uint32_t *)(&natt_loc->sin_addr);
+		newbie->ipsa_local_nat_port = natt_loc->sin_port;
 
 		/* Instead of IPSA_COPY_ADDR(), just copy first 32 bits. */
-		newbie->ipsa_natt_addr_loc[0] = *natt_loc_ptr;
-
-		l_loc = ntohl(l_loc);
-		DOWN_SUM(l_loc);
-		DOWN_SUM(l_loc);
-		l_dst = ntohl(l_dst);
-		DOWN_SUM(l_dst);
-		DOWN_SUM(l_dst);
+		newbie->ipsa_natt_addr_loc = *natt_loc_ptr;
 
 		/*
-		 * We're 1's complement for checksums, so check for wraparound
-		 * here.
+		 * NAT-T port agility means we may have natt_loc_ext, but
+		 * only for a local-port change.
 		 */
-		if (l_loc > l_dst)
-			l_dst--;
+		if (natt_loc->sin_addr.s_addr != INADDR_ANY) {
+			uint32_t l_dst = ntohl(*dst_addr_ptr);
+			uint32_t l_loc = ntohl(*natt_loc_ptr);
 
-		running_sum += l_dst - l_loc;
-		DOWN_SUM(running_sum);
-		DOWN_SUM(running_sum);
+			DOWN_SUM(l_loc);
+			DOWN_SUM(l_loc);
+			DOWN_SUM(l_dst);
+			DOWN_SUM(l_dst);
+
+			/*
+			 * We're 1's complement for checksums, so check for
+			 * wraparound here.
+			 */
+			if (l_loc > l_dst)
+				l_dst--;
+
+			running_sum += l_dst - l_loc;
+			DOWN_SUM(running_sum);
+			DOWN_SUM(running_sum);
+		}
 	}
 
 	newbie->ipsa_inbound_cksum = running_sum;
@@ -2948,11 +2944,11 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	ASSERT((newbie->ipsa_flags & IPSA_F_UNIQUE) == newbie->ipsa_flags);
 	newbie->ipsa_flags |= assoc->sadb_sa_flags;
 	if ((newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_LOC &&
-		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC] == NULL) ||
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC] == NULL) ||
 	    (newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_REM &&
-		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM] == NULL) ||
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM] == NULL) ||
 	    (newbie->ipsa_flags & SADB_X_SAFLAGS_TUNNEL &&
-		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL)) {
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL)) {
 		mutex_exit(&newbie->ipsa_lock);
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		error = EINVAL;
@@ -2969,7 +2965,7 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	else
 		newbie->ipsa_replay_wsize = 0;
 
-	(void) drv_getparm(TIME, &newbie->ipsa_addtime);
+	newbie->ipsa_addtime = gethrestime_sec();
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
@@ -3302,7 +3298,10 @@ error:
 void
 sadb_set_usetime(ipsa_t *assoc)
 {
+	time_t snapshot = gethrestime_sec();
+
 	mutex_enter(&assoc->ipsa_lock);
+	assoc->ipsa_lastuse = snapshot;
 	/*
 	 * Caller does check usetime before calling me usually, and
 	 * double-checking is better than a mutex_enter/exit hit.
@@ -3314,8 +3313,7 @@ sadb_set_usetime(ipsa_t *assoc)
 		 * Inbound SAs, however, have no such protection.
 		 */
 		assoc->ipsa_flags |= IPSA_F_USED;
-
-		(void) drv_getparm(TIME, &assoc->ipsa_usetime);
+		assoc->ipsa_usetime = snapshot;
 
 		/*
 		 * After setting the use time, see if we have a use lifetime
@@ -3430,7 +3428,8 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	mp->b_wptr += sizeof (sadb_lifetime_t);
 	current->sadb_lifetime_len = SADB_8TO64(sizeof (*current));
 	current->sadb_lifetime_exttype = SADB_EXT_LIFETIME_CURRENT;
-	current->sadb_lifetime_allocations = assoc->ipsa_alloc;
+	/* We do not support the concept. */
+	current->sadb_lifetime_allocations = 0;
 	current->sadb_lifetime_bytes = assoc->ipsa_bytes;
 	current->sadb_lifetime_addtime = assoc->ipsa_addtime;
 	current->sadb_lifetime_usetime = assoc->ipsa_usetime;
@@ -3591,14 +3590,43 @@ sadb_torch_assoc(isaf_t *head, ipsa_t *sa, boolean_t inbnd, mblk_t **mq)
 }
 
 /*
+ * Do various SA-is-idle activities depending on delta (the number of idle
+ * seconds on the SA) and/or other properties of the SA.
+ *
+ * Return B_TRUE if I've sent a packet, because I have to drop the
+ * association's mutex before sending a packet out the wire.
+ */
+/* ARGSUSED */
+static boolean_t
+sadb_idle_activities(ipsa_t *assoc, time_t delta, boolean_t inbound)
+{
+	ipsecesp_stack_t *espstack = assoc->ipsa_netstack->netstack_ipsecesp;
+	int nat_t_interval = espstack->ipsecesp_nat_keepalive_interval;
+
+	ASSERT(MUTEX_HELD(&assoc->ipsa_lock));
+
+	if (!inbound && (assoc->ipsa_flags & IPSA_F_NATT_LOC) &&
+	    delta >= nat_t_interval &&
+	    gethrestime_sec() - assoc->ipsa_last_nat_t_ka >= nat_t_interval) {
+		ASSERT(assoc->ipsa_type == SADB_SATYPE_ESP);
+		assoc->ipsa_last_nat_t_ka = gethrestime_sec();
+		mutex_exit(&assoc->ipsa_lock);
+		ipsecesp_send_keepalive(assoc);
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
  * Return "assoc" iff haspeer is true and I send an expire.  This allows
  * the consumers' aging functions to tidy up an expired SA's peer.
  */
 static ipsa_t *
 sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
-    time_t current, int reap_delay, boolean_t inbnd, mblk_t **mq)
+    time_t current, int reap_delay, boolean_t inbound, mblk_t **mq)
 {
 	ipsa_t *retval = NULL;
+	boolean_t dropped_mutex = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&head->isaf_lock));
 
@@ -3607,7 +3635,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 	if ((assoc->ipsa_state == IPSA_STATE_LARVAL) &&
 	    (assoc->ipsa_hardexpiretime <= current)) {
 		assoc->ipsa_state = IPSA_STATE_DEAD;
-		return (sadb_torch_assoc(head, assoc, inbnd, mq));
+		return (sadb_torch_assoc(head, assoc, inbound, mq));
 	}
 
 	/*
@@ -3621,7 +3649,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 	if (assoc->ipsa_hardexpiretime != 0 &&
 	    assoc->ipsa_hardexpiretime <= current) {
 		if (assoc->ipsa_state == IPSA_STATE_DEAD)
-			return (sadb_torch_assoc(head, assoc, inbnd, mq));
+			return (sadb_torch_assoc(head, assoc, inbound, mq));
 
 		/*
 		 * Send SADB_EXPIRE with hard lifetime, delay for unlinking.
@@ -3656,9 +3684,14 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 			retval = assoc;
 		}
 		sadb_expire_assoc(pfkey_q, assoc);
+	} else {
+		/* Check idle time activities. */
+		dropped_mutex = sadb_idle_activities(assoc,
+		    current - assoc->ipsa_lastuse, inbound);
 	}
 
-	mutex_exit(&assoc->ipsa_lock);
+	if (!dropped_mutex)
+		mutex_exit(&assoc->ipsa_lock);
 	return (retval);
 }
 
@@ -3679,7 +3712,8 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 		ipsa_t *ipsa;
 		struct templist *next;
 	} *haspeerlist = NULL, *newbie;
-	time_t current;
+	/* Snapshot current time now. */
+	time_t current = gethrestime_sec();
 	int outhash;
 	mblk_t *mq = NULL;
 
@@ -3689,9 +3723,6 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 	 *
 	 * I hope I don't tie up resources for too long.
 	 */
-
-	/* Snapshot current time now. */
-	(void) drv_getparm(TIME, &current);
 
 	/* Age acquires. */
 
@@ -3877,7 +3908,7 @@ sadb_retimeout(hrtime_t begin, queue_t *pfkey_q, void (*ager)(void *),
 			interval = min(interval, intmax);
 		}
 	} else if ((end - begin) <= interval * 500000 &&
-		interval > SADB_AGE_INTERVAL_DEFAULT) {
+	    interval > SADB_AGE_INTERVAL_DEFAULT) {
 		/*
 		 * If I took less than half of the interval, then I should
 		 * ratchet the interval back down.  Never automatically
@@ -3892,7 +3923,7 @@ sadb_retimeout(hrtime_t begin, queue_t *pfkey_q, void (*ager)(void *),
 	}
 	*intp = interval;
 	return (qtimeout(pfkey_q, ager, agerarg,
-		    interval * drv_usectohz(1000)));
+	    interval * drv_usectohz(1000)));
 }
 
 
@@ -3929,8 +3960,8 @@ sadb_update_lifetimes(ipsa_t *assoc, sadb_lifetime_t *hard,
 			if (assoc->ipsa_hardexpiretime != 0) {
 				assoc->ipsa_hardexpiretime =
 				    min(assoc->ipsa_hardexpiretime,
-					assoc->ipsa_usetime +
-					assoc->ipsa_harduselt);
+				    assoc->ipsa_usetime +
+				    assoc->ipsa_harduselt);
 			} else {
 				assoc->ipsa_hardexpiretime =
 				    assoc->ipsa_usetime + assoc->ipsa_harduselt;
@@ -3956,8 +3987,8 @@ sadb_update_lifetimes(ipsa_t *assoc, sadb_lifetime_t *hard,
 			if (assoc->ipsa_softexpiretime != 0) {
 				assoc->ipsa_softexpiretime =
 				    min(assoc->ipsa_softexpiretime,
-					assoc->ipsa_usetime +
-					assoc->ipsa_softuselt);
+				    assoc->ipsa_usetime +
+				    assoc->ipsa_softuselt);
 			} else {
 				assoc->ipsa_softexpiretime =
 				    assoc->ipsa_usetime + assoc->ipsa_softuselt;
@@ -4078,7 +4109,7 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		goto bail;
 	}
 	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
-		SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)) {
+	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		error = EINVAL;
 		goto bail;
@@ -4110,14 +4141,14 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		}
 		if ((kmp != 0) &&
 		    ((outbound_target->ipsa_kmp != 0) ||
-			(outbound_target->ipsa_kmp != kmp))) {
+		    (outbound_target->ipsa_kmp != kmp))) {
 			*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMP;
 			error = EINVAL;
 			goto bail;
 		}
 		if ((kmc != 0) &&
 		    ((outbound_target->ipsa_kmc != 0) ||
-			(outbound_target->ipsa_kmc != kmc))) {
+		    (outbound_target->ipsa_kmc != kmc))) {
 			*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMC;
 			error = EINVAL;
 			goto bail;
@@ -4131,14 +4162,14 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		}
 		if ((kmp != 0) &&
 		    ((inbound_target->ipsa_kmp != 0) ||
-			(inbound_target->ipsa_kmp != kmp))) {
+		    (inbound_target->ipsa_kmp != kmp))) {
 			*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMP;
 			error = EINVAL;
 			goto bail;
 		}
 		if ((kmc != 0) &&
 		    ((inbound_target->ipsa_kmc != 0) ||
-			(inbound_target->ipsa_kmc != kmc))) {
+		    (inbound_target->ipsa_kmc != kmc))) {
 			*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMC;
 			error = EINVAL;
 			goto bail;
@@ -4219,9 +4250,9 @@ sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
 		if (IPSA_ARE_ADDR_EQUAL(dst, walker->ipsacq_dstaddr, fam) &&
 		    IPSA_ARE_ADDR_EQUAL(src, walker->ipsacq_srcaddr, fam) &&
 		    ip_addr_match((uint8_t *)isrc, walker->ipsacq_innersrcpfx,
-			(in6_addr_t *)walker->ipsacq_innersrc) &&
+		    (in6_addr_t *)walker->ipsacq_innersrc) &&
 		    ip_addr_match((uint8_t *)idst, walker->ipsacq_innerdstpfx,
-			(in6_addr_t *)walker->ipsacq_innerdst) &&
+		    (in6_addr_t *)walker->ipsacq_innerdst) &&
 		    (ap == walker->ipsacq_act) &&
 		    (pp == walker->ipsacq_policy) &&
 		    /* XXX do deep compares of ap/pp? */
@@ -4373,7 +4404,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		/* First one. */
 		newbie->ipsacq_mp = mp;
 		newbie->ipsacq_numpackets = 1;
-		(void) drv_getparm(TIME, &newbie->ipsacq_expire);
+		newbie->ipsacq_expire = gethrestime_sec();
 		/*
 		 * Extended ACQUIRE with both AH+ESP will use ESP's timeout
 		 * value.
@@ -5128,7 +5159,7 @@ sadb_getspi(keysock_in_t *ksi, uint32_t master_spi, int *diagnostic,
 	 * for the purposes of creating a new SA.
 	 */
 	return (sadb_makelarvalassoc(htonl(master_spi), srcaddr, dstaddr, af,
-		    ns));
+	    ns));
 }
 
 /*
@@ -5546,8 +5577,8 @@ ipsec_find_listen_conn(uint16_t *pptr, ipsec_selector_t *sel, ip_stack_t *ipst)
 	if (sel->ips_local_port == 0)
 		return (NULL);
 
-	connfp = &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(sel->ips_local_port,
-					    ipst)];
+	connfp = &ipst->ips_ipcl_bind_fanout[
+	    IPCL_BIND_HASH(sel->ips_local_port, ipst)];
 	mutex_enter(&connfp->connf_lock);
 
 	if (sel->ips_isv4) {
@@ -5872,7 +5903,7 @@ ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 		    &sel->ips_local_addr_v6)) &&
 		    (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6) ||
 		    IN6_ARE_ADDR_EQUAL(&connp->conn_remv6,
-			&sel->ips_remote_addr_v6)))))) {
+		    &sel->ips_remote_addr_v6)))))) {
 			break;
 		}
 	}
@@ -5949,14 +5980,14 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 			goto bail;
 		}
 		if (sadb_addrcheck(NULL, (mblk_t *)samsg,
-			(sadb_ext_t *)innsrcext, 0, ns) == KS_IN_ADDR_UNKNOWN) {
+		    (sadb_ext_t *)innsrcext, 0, ns) == KS_IN_ADDR_UNKNOWN) {
 			err = EINVAL;
 			diagnostic = SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC;
 			goto bail;
 		}
 		isrc = (struct sockaddr_in6 *)(innsrcext + 1);
 		if (sadb_addrcheck(NULL, (mblk_t *)samsg,
-			(sadb_ext_t *)inndstext, 0, ns) == KS_IN_ADDR_UNKNOWN) {
+		    (sadb_ext_t *)inndstext, 0, ns) == KS_IN_ADDR_UNKNOWN) {
 			err = EINVAL;
 			diagnostic = SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST;
 			goto bail;
@@ -5974,9 +6005,9 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 			goto bail;
 		}
 	} else if (inndstext != NULL) {
-			err = EINVAL;
-			diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_SRC;
-			goto bail;
+		err = EINVAL;
+		diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_SRC;
+		goto bail;
 	}
 
 	/* Get selectors first, based on outer addresses */
@@ -5987,10 +6018,9 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	/* Check for tunnel mode mismatches. */
 	if (innsrcext != NULL &&
 	    ((isrc->sin6_family == AF_INET &&
-		sel.ips_protocol != IPPROTO_ENCAP && sel.ips_protocol != 0) ||
-		(isrc->sin6_family == AF_INET6 &&
-		    sel.ips_protocol != IPPROTO_IPV6 &&
-		    sel.ips_protocol != 0))) {
+	    sel.ips_protocol != IPPROTO_ENCAP && sel.ips_protocol != 0) ||
+	    (isrc->sin6_family == AF_INET6 &&
+	    sel.ips_protocol != IPPROTO_IPV6 && sel.ips_protocol != 0))) {
 		err = EPROTOTYPE;
 		goto bail;
 	}
@@ -6102,9 +6132,9 @@ sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, netstack_t *ns)
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	membar_producer();
-	do
+	do {
 		opkt = ipsa->ipsa_lpkt;
-	while (casptr(&ipsa->ipsa_lpkt, opkt, npkt) != opkt);
+	} while (casptr(&ipsa->ipsa_lpkt, opkt, npkt) != opkt);
 
 	ip_drop_packet(opkt, B_TRUE, NULL, NULL,
 	    DROPPER(ipss, ipds_sadb_inlarval_replace),
@@ -6121,9 +6151,9 @@ sadb_clear_lpkt(ipsa_t *ipsa)
 {
 	mblk_t *opkt;
 
-	do
+	do {
 		opkt = ipsa->ipsa_lpkt;
-	while (casptr(&ipsa->ipsa_lpkt, opkt, NULL) != opkt);
+	} while (casptr(&ipsa->ipsa_lpkt, opkt, NULL) != opkt);
 
 	return (opkt);
 }
@@ -6370,37 +6400,4 @@ ipsec_check_key(crypto_mech_type_t mech_type, sadb_key_t *sadb_key,
 	}
 
 	return (-1);
-}
-
-/* ARGSUSED */
-static void
-sadb_clear_timeouts_walker(isaf_t *head, ipsa_t *ipsa, void *q)
-{
-	if (!(ipsa->ipsa_flags & IPSA_F_NATT))
-		return;
-
-	mutex_enter(&ipsa->ipsa_lock);
-	if (ipsa->ipsa_natt_q != q) {
-		mutex_exit(&ipsa->ipsa_lock);
-		return;
-	}
-
-	(void) quntimeout(ipsa->ipsa_natt_q, ipsa->ipsa_natt_ka_timer);
-
-	ipsa->ipsa_natt_ka_timer = 0;
-	ipsa->ipsa_natt_q = NULL;
-	mutex_exit(&ipsa->ipsa_lock);
-}
-
-/*
- * Is only to be used on a nattymod queue.
- */
-void
-sadb_clear_timeouts(queue_t *q, netstack_t *ns)
-{
-	ipsecesp_stack_t	*espstack = ns->netstack_ipsecesp;
-	sadb_t *sp = &espstack->esp_sadb.s_v4;
-
-	sadb_walker(sp->sdb_if, sp->sdb_hashsize,
-	    sadb_clear_timeouts_walker, q);
 }

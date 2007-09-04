@@ -221,7 +221,6 @@ l none kernel/strmod/ipsecah=../../kernel/drv/ipsecah
 l none kernel/strmod/ipsecesp=../../kernel/drv/ipsecesp
 l none kernel/strmod/keysock=../../kernel/drv/keysock
 f none kernel/strmod/ldterm 755 root sys
-f none kernel/strmod/nattymod 755 root sys
 f none kernel/strmod/pckt 755 root sys
 f none kernel/strmod/pfmod 755 root sys
 f none kernel/strmod/pipemod 755 root sys
@@ -421,7 +420,6 @@ l none kernel/strmod/amd64/ipsecah=../../../kernel/drv/amd64/ipsecah
 l none kernel/strmod/amd64/ipsecesp=../../../kernel/drv/amd64/ipsecesp
 l none kernel/strmod/amd64/keysock=../../../kernel/drv/amd64/keysock
 f none kernel/strmod/amd64/ldterm 755 root sys
-f none kernel/strmod/amd64/nattymod 755 root sys
 f none kernel/strmod/amd64/pckt 755 root sys
 f none kernel/strmod/amd64/pfmod 755 root sys
 f none kernel/strmod/amd64/pipemod 755 root sys

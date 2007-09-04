@@ -279,6 +279,8 @@ opdes_t	udp_opt_arr[] = {
 	},
 { UDP_RCVHDR, IPPROTO_UDP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0
 	},
+{ UDP_NAT_T_ENDPOINT, IPPROTO_UDP, OA_RW, OA_RW, OP_PRIVPORT, 0, sizeof (int),
+	0 },
 };
 
 /*

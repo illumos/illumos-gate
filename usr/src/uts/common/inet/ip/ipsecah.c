@@ -950,7 +950,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 			 */
 			if (acqrec->ipsacq_seq == samsg->sadb_msg_seq &&
 			    IPSA_ARE_ADDR_EQUAL(dstaddr,
-				acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
+			    acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
 				break;
 			mutex_exit(&acqrec->ipsacq_lock);
 		}
@@ -1005,7 +1005,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 
 	if (rc == 0 && lpkt != NULL)
 		rc = !taskq_dispatch(ah_taskq, inbound_task,
-			    (void *) lpkt, TQ_NOSLEEP);
+		    (void *) lpkt, TQ_NOSLEEP);
 
 	if (rc != 0) {
 		ip_drop_packet(lpkt, B_TRUE, NULL, NULL,
@@ -1115,8 +1115,8 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		*diagnostic = SADB_X_DIAGNOSTIC_ENCR_NOTSUPP;
 		return (EINVAL);
 	}
-	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
-		SADB_X_SAFLAGS_TUNNEL)) {
+	if (assoc->sadb_sa_flags &
+	    ~(SADB_SAFLAGS_NOREPLAY | SADB_X_SAFLAGS_TUNNEL)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
@@ -1143,7 +1143,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	if (aalg == NULL || !ALG_VALID(aalg)) {
 		mutex_exit(&ipss->ipsec_alg_lock);
 		ah1dbg(ahstack, ("Couldn't find auth alg #%d.\n",
-			assoc->sadb_sa_auth));
+		    assoc->sadb_sa_auth));
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_AALG;
 		return (EINVAL);
 	}
@@ -1166,7 +1166,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	mutex_exit(&ipss->ipsec_alg_lock);
 
 	return (ah_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
-		    diagnostic, ahstack));
+	    diagnostic, ahstack));
 }
 
 /*
@@ -1188,10 +1188,9 @@ ah_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 	}
 	sin = (struct sockaddr_in *)(dstext + 1);
 	return (sadb_update_sa(mp, ksi,
-		(sin->sin_family == AF_INET6) ? &ahstack->ah_sadb.s_v6 :
-		&ahstack->ah_sadb.s_v4,
-		diagnostic, ahstack->ah_pfkey_q, ah_add_sa,
-		ahstack->ipsecah_netstack));
+	    (sin->sin_family == AF_INET6) ? &ahstack->ah_sadb.s_v6 :
+	    &ahstack->ah_sadb.s_v4, diagnostic, ahstack->ah_pfkey_q, ah_add_sa,
+	    ahstack->ipsecah_netstack));
 }
 
 /*
@@ -1225,7 +1224,7 @@ ah_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 	}
 
 	return (sadb_del_sa(mp, ksi, &ahstack->ah_sadb, diagnostic,
-		    ahstack->ah_pfkey_q));
+	    ahstack->ah_pfkey_q));
 }
 
 /*
@@ -1582,11 +1581,11 @@ ah_set_usetime(ipsa_t *assoc, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6)
-			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
-			    &inassoc->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V6(sp,
+			    *((in6_addr_t *)&inassoc->ipsa_dstaddr));
 		else
-			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
-				&inassoc->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V4(sp,
+			    *((ipaddr_t *)&inassoc->ipsa_dstaddr));
 		bucket = &sp->sdb_of[outhash];
 
 		mutex_enter(&bucket->isaf_lock);
@@ -1681,11 +1680,11 @@ ah_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6)
-			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
-			    &inassoc->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V6(sp,
+			    *((in6_addr_t *)&inassoc->ipsa_dstaddr));
 		else
-			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
-				&inassoc->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V4(sp,
+			    *((ipaddr_t *)&inassoc->ipsa_dstaddr));
 		bucket = &sp->sdb_of[outhash];
 		mutex_enter(&bucket->isaf_lock);
 		outassoc = ipsec_getassocbyspi(bucket, inassoc->ipsa_spi,
@@ -1973,7 +1972,7 @@ ah_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecah_stack_t *ahstack)
 		 * to EEXIST.
 		 */
 		rc = sadb_insertassoc(newbie, inbound);
-		(void) drv_getparm(TIME, &newbie->ipsa_hardexpiretime);
+		newbie->ipsa_hardexpiretime = gethrestime_sec();
 		newbie->ipsa_hardexpiretime += ahstack->ipsecah_larval_timeout;
 	}
 
@@ -2050,7 +2049,7 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	 */
 	if (!pullupmsg(mp, -1) ||
 	    !ip_hdr_length_nexthdr_v6(mp, (ip6_t *)mp->b_rptr, &hdr_length,
-		&nexthdrp) ||
+	    &nexthdrp) ||
 	    mp->b_rptr + hdr_length + sizeof (icmp6_t) + sizeof (ip6_t) +
 	    sizeof (ah_t) > mp->b_wptr) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
@@ -2172,7 +2171,7 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	 */
 	if ((uchar_t *)ipha + hdr_length + 8 > mp->b_wptr) {
 		if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length + 8 -
-			    mp->b_rptr)) {
+		    mp->b_rptr)) {
 			ipsec_rl_strlog(ahstack->ipsecah_netstack,
 			    info.mi_idnum, 0, 0,
 			    SL_WARN | SL_ERROR,
@@ -2759,7 +2758,7 @@ ah_kcf_callback(void *arg, int status)
 		ah_log_bad_auth(ipsec_mp);
 	} else {
 		ah1dbg(ahstack, ("ah_kcf_callback: crypto failed with 0x%x\n",
-			    status));
+		    status));
 		AH_BUMP_STAT(ahstack, crypto_failures);
 		if (is_inbound)
 			IP_AH_BUMP_STAT(ipss, in_discards);
@@ -3318,8 +3317,6 @@ ah_outbound(mblk_t *ipsec_out)
 
 	assoc = oi->ipsec_out_ah_sa;
 	ASSERT(assoc != NULL);
-	if (assoc->ipsa_usetime == 0)
-		ah_set_usetime(assoc, B_FALSE);
 
 	/*
 	 * Age SA according to number of bytes that will be sent after
@@ -3337,7 +3334,7 @@ ah_outbound(mblk_t *ipsec_out)
 		ah_align_sz = P2ALIGN(assoc->ipsa_mac_len +
 		    IPV6_PADDING_ALIGN - 1, IPV6_PADDING_ALIGN);
 		age_bytes = sizeof (ip6_t) + ntohs(ip6h->ip6_plen) +
-			sizeof (ah_t) + ah_align_sz;
+		    sizeof (ah_t) + ah_align_sz;
 	}
 
 	if (!ah_age_bytes(assoc, age_bytes, B_FALSE)) {
@@ -3412,8 +3409,6 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT(assoc != NULL);
-	if (assoc->ipsa_usetime == 0)
-		ah_set_usetime(assoc, B_TRUE);
 
 	/*
 	 * We may wish to check replay in-range-only here as an optimization.
@@ -3584,7 +3579,7 @@ ah_inbound_accelerated(mblk_t *ipsec_in, boolean_t isv4, ipsa_t *assoc,
 	icv_len = hada->da_icv_len;
 	if ((icv_len != assoc->ipsa_mac_len) ||
 	    (icv_len > DA_ICV_MAX_LEN) || (MBLKL(hada_mp) <
-		(sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
+	    (sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
 		ah0dbg(("ah_inbound_accelerated: "
 		    "ICV len (%u) incorrect or mblk too small (%u)\n",
 		    icv_len, (uint32_t)(MBLKL(hada_mp))));
@@ -4014,6 +4009,8 @@ ah_auth_in_done(mblk_t *ipsec_in)
 	}
 	mp->b_rptr -= ii->ipsec_in_skip_len;
 
+	ah_set_usetime(assoc, B_TRUE);
+
 	if (isv4) {
 		ipha = (ipha_t *)mp->b_rptr;
 		ah_offset = ipha->ipha_version_and_hdr_length -
@@ -4236,6 +4233,9 @@ ah_auth_out_done(mblk_t *ipsec_out)
 		return (IPSEC_STATUS_FAILED);
 	}
 	mp->b_rptr -= io->ipsec_out_skip_len;
+
+	ASSERT(io->ipsec_out_ah_sa != NULL);
+	ah_set_usetime(io->ipsec_out_ah_sa, B_FALSE);
 
 	if (isv4) {
 		ipha_t *ipha;

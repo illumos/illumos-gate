@@ -68,7 +68,7 @@ extern "C" {
 #define	IPSEC_SHARED_SA		0x01
 #define	IPSEC_UNIQUE_SA		0x02
 
-/* IPSEC protocols and combinations */
+/* IPsec protocols and combinations */
 #define	IPSEC_AH_ONLY		0x01
 #define	IPSEC_ESP_ONLY		0x02
 #define	IPSEC_AH_ESP		0x03
@@ -640,7 +640,7 @@ typedef struct ipsif_s
 
 
 /*
- * IPSEC stack instances
+ * IPsec stack instances
  */
 struct ipsec_stack {
 	netstack_t		*ipsec_netstack;	/* Common netstack */
@@ -878,13 +878,14 @@ extern ipsec_tun_pol_t *itp_get_byaddr_dummy(uint32_t *, uint32_t *,
     int, netstack_t *);
 
 /*
- * IPsec AH/ESP functions called from IP.
+ * IPsec AH/ESP functions called from IP or the common SADB code in AH.
  */
 
 extern void ipsecah_in_assocfailure(mblk_t *, char, ushort_t, char *,
     uint32_t, void *, int, ipsecah_stack_t *);
 extern void ipsecesp_in_assocfailure(mblk_t *, char, ushort_t, char *,
     uint32_t, void *, int, ipsecesp_stack_t *);
+extern void ipsecesp_send_keepalive(ipsa_t *);
 
 /*
  * Algorithm management helper functions.
@@ -944,11 +945,6 @@ extern ipsec_policy_t *ipsec_find_policy_head(ipsec_policy_t *,
  */
 void ip_drop_init(ipsec_stack_t *);
 void ip_drop_destroy(ipsec_stack_t *);
-
-/*
- * NAT-Traversal cleanup
- */
-extern void nattymod_clean_ipif(ipif_t *);
 
 /*
  * Common functions

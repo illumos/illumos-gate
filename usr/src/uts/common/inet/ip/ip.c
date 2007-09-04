@@ -396,12 +396,12 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * Walker - Increment irb_refcnt before calling the walker callback. Hold the
  * global tree lock (read mode) for traversal.
  *
- * IPSEC notes :
+ * IPsec notes :
  *
- * IP interacts with the IPSEC code (AH/ESP) by tagging a M_CTL message
+ * IP interacts with the IPsec code (AH/ESP) by tagging a M_CTL message
  * in front of the actual packet. For outbound datagrams, the M_CTL
  * contains a ipsec_out_t (defined in ipsec_info.h), which has the
- * information used by the IPSEC code for applying the right level of
+ * information used by the IPsec code for applying the right level of
  * protection. The information initialized by IP in the ipsec_out_t
  * is determined by the per-socket policy or global policy in the system.
  * For inbound datagrams, the M_CTL contains a ipsec_in_t (defined in
@@ -1495,7 +1495,7 @@ icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid,
  * value etc. but delivery to the ULP/clients depends on their policy
  * dispositions.
  *
- * We handle the above 4 cases in the context of IPSEC in the
+ * We handle the above 4 cases in the context of IPsec in the
  * following way :
  *
  * 1) Send the reply back in the same way as the request came in.
@@ -2365,12 +2365,12 @@ icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
  * IP header of the packet that caused the error.
  *
  * We handle ICMP_FRAGMENTATION_NEEDED(IFN) message differently
- * in the context of IPSEC. Normally we tell the upper layer
- * whenever we send the ire (including ip_bind), the IPSEC header
+ * in the context of IPsec. Normally we tell the upper layer
+ * whenever we send the ire (including ip_bind), the IPsec header
  * length in ire_ipsec_overhead. TCP can deduce the MSS as it
  * has both the MTU (ire_max_frag) and the ire_ipsec_overhead.
  * Similarly, we pass the new MTU icmph_du_mtu and TCP does the
- * same thing. As TCP has the IPSEC options size that needs to be
+ * same thing. As TCP has the IPsec options size that needs to be
  * adjusted, we just pass the MTU unchanged.
  *
  * IFN could have been generated locally or by some router.
@@ -2381,16 +2381,16 @@ icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
  *	    the new adjusted value of MTU e.g. Packet was encrypted
  *	    or there was not enough information to fanout to upper
  *	    layers. Thus on the next outbound datagram, ip_wput_ire
- *	    generates the IFN, where IPSEC processing has *not* been
+ *	    generates the IFN, where IPsec processing has *not* been
  *	    done.
  *
  *	   *ip_wput_ire_fragmentit -> ip_wput_frag -> icmp_frag_needed
  *	    could have generated this. This happens because ire_max_frag
- *	    value in IP was set to a new value, while the IPSEC processing
+ *	    value in IP was set to a new value, while the IPsec processing
  *	    was being done and after we made the fragmentation check in
- *	    ip_wput_ire. Thus on return from IPSEC processing,
+ *	    ip_wput_ire. Thus on return from IPsec processing,
  *	    ip_wput_ipsec_out finds that the new length is > ire_max_frag
- *	    and generates the IFN. As IPSEC processing is over, we fanout
+ *	    and generates the IFN. As IPsec processing is over, we fanout
  *	    to AH/ESP to remove the header.
  *
  *	    In both these cases, ipsec_in_loopback will be set indicating
@@ -2575,7 +2575,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			 * this function, it would work. Convert it back
 			 * to M_CTL before we send up as this is a ICMP
 			 * error. This could have been generated locally or
-			 * by some router. Validate the inner IPSEC
+			 * by some router. Validate the inner IPsec
 			 * headers.
 			 *
 			 * NOTE : ill_index is used by ip_fanout_proto_again
@@ -2590,10 +2590,10 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		} else {
 			/*
 			 * IPSEC_IN is not present. We attach a ipsec_in
-			 * message and send up to IPSEC for validating
-			 * and removing the IPSEC headers. Clear
+			 * message and send up to IPsec for validating
+			 * and removing the IPsec headers. Clear
 			 * ipsec_in_secure so that when we return
-			 * from IPSEC, we don't mistakenly think that this
+			 * from IPsec, we don't mistakenly think that this
 			 * is a secure packet came from the network.
 			 *
 			 * NOTE : ill_index is used by ip_fanout_proto_again
@@ -3256,7 +3256,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		 * If it is :
 		 *
 		 * 1) a IPSEC_OUT, then this is caused by outbound
-		 *    datagram originating on this host. IPSEC processing
+		 *    datagram originating on this host. IPsec processing
 		 *    may or may not have been done. Refer to comments above
 		 *    icmp_inbound_error_fanout for details.
 		 *
@@ -4463,7 +4463,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	else if (error != 0)
 		goto bad_addr;
 	/*
-	 * Pass the IPSEC headers size in ire_ipsec_overhead.
+	 * Pass the IPsec headers size in ire_ipsec_overhead.
 	 * We can't do this in ip_bind_insert_ire because the policy
 	 * may not have been inherited at that point in time and hence
 	 * conn_out_enforce_policy may not be set.
@@ -6353,7 +6353,7 @@ ipsec_in_is_secure(mblk_t *ipsec_mp)
  * protocol.  When this is the case, normally each one gets a copy
  * of any incoming packets.
  *
- * IPSEC NOTE :
+ * IPsec NOTE :
  *
  * Don't allow a secure packet going up a non-secure connection.
  * We don't allow this because
@@ -6907,6 +6907,132 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 }
 
 /*
+ * If we have a IPsec NAT-Traversal packet, strip the zero-SPI or
+ * pass it along to ESP if the SPI is non-zero.
+ *
+ * One of three things can happen, all of which affect the passed-in mblk:
+ *
+ * 1.) The packet is stock UDP and has had its zero-SPI stripped.  Return TRUE.
+ *     (NOTE:  ICMP messages that go through here just get returned.)
+ *
+ * 2.) The packet is ESP-in-UDP, has been transformed into an equivalent
+ *     ESP packet, and is passed along to ESP.  Return FALSE.
+ *
+ * 3.) The packet is an ESP-in-UDP Keepalive.  Drop it and return FALSE.
+ */
+static boolean_t
+zero_spi_check(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
+    ill_t *recv_ill, ipsec_stack_t *ipss)
+{
+	int shift, plen, iph_len = IPH_HDR_LENGTH(ipha);
+	udpha_t *udpha;
+	uint32_t *spi;
+	uint8_t *orptr;
+	boolean_t udp_pkt, free_ire;
+
+	if (DB_TYPE(mp) == M_CTL) {
+		/*
+		 * ICMP message with UDP inside.  Don't bother stripping, just
+		 * send it up.
+		 *
+		 * NOTE: Any app with UDP_NAT_T_ENDPOINT set is probably going
+		 * to ignore errors set by ICMP anyway ('cause they might be
+		 * forged), but that's the app's decision, not ours.
+		 */
+
+		/* Bunch of reality checks for DEBUG kernels... */
+		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
+		ASSERT(((ipha_t *)mp->b_rptr)->ipha_protocol == IPPROTO_ICMP);
+		ASSERT((uint8_t *)ipha != mp->b_rptr);
+
+		return (B_TRUE);
+	}
+
+	ASSERT((uint8_t *)ipha == mp->b_rptr);
+	plen = ntohs(ipha->ipha_length);
+
+	if (plen - iph_len - sizeof (udpha_t) < sizeof (uint32_t)) {
+		/*
+		 * Most likely a keepalive for the benefit of an intervening
+		 * NAT.  These aren't for us, per se, so drop it.
+		 *
+		 * RFC 3947/8 doesn't say for sure what to do for 2-3
+		 * byte packets (keepalives are 1-byte), but we'll drop them
+		 * also.
+		 */
+		ip_drop_packet(mp, B_TRUE, recv_ill, NULL,
+		    DROPPER(ipss, ipds_esp_nat_t_ka), &ipss->ipsec_dropper);
+		return (B_FALSE);
+	}
+
+	if (MBLKL(mp) < iph_len + sizeof (udpha_t) + sizeof (*spi)) {
+		mblk_t *tmp = msgpullup(mp, -1);
+
+		/* might as well pull it all up - it might be ESP. */
+		if (tmp == NULL) {
+			ip_drop_packet(mp, B_TRUE, recv_ill, NULL,
+			    DROPPER(ipss, ipds_esp_nomem),
+			    &ipss->ipsec_dropper);
+			return (B_FALSE);
+		}
+		freemsg(mp);
+		mp = tmp;
+	}
+	spi = (uint32_t *)(mp->b_rptr + iph_len + sizeof (udpha_t));
+	if (*spi == 0) {
+		/* UDP packet - remove 0-spi. */
+		shift = sizeof (uint32_t);
+	} else {
+		/* ESP-in-UDP packet - reduce to ESP. */
+		ipha->ipha_protocol = IPPROTO_ESP;
+		shift = sizeof (udpha_t);
+	}
+
+	/* Fix IP header */
+	ipha->ipha_length = htons(plen - shift);
+	ipha->ipha_hdr_checksum = 0;
+
+	orptr = mp->b_rptr;
+	mp->b_rptr += shift;
+
+	if (*spi == 0) {
+		ASSERT((uint8_t *)ipha == orptr);
+		udpha = (udpha_t *)(orptr + iph_len);
+		udpha->uha_length = htons(plen - shift - iph_len);
+		iph_len += sizeof (udpha_t);	/* For the call to ovbcopy(). */
+		udp_pkt = B_TRUE;
+	} else {
+		udp_pkt = B_FALSE;
+	}
+	ovbcopy(orptr, orptr + shift, iph_len);
+	if (!udp_pkt) /* Punt up for ESP processing. */ {
+		ipha = (ipha_t *)(orptr + shift);
+
+		free_ire = (ire == NULL);
+		if (free_ire) {
+			/* Re-acquire ire. */
+			ire = ire_cache_lookup(ipha->ipha_dst, ALL_ZONES, NULL,
+			    ipss->ipsec_netstack->netstack_ip);
+			if (ire == NULL || !(ire->ire_type & IRE_LOCAL)) {
+				if (ire != NULL)
+					ire_refrele(ire);
+				/*
+				 * Do a regular freemsg(), as this is an IP
+				 * error (no local route) not an IPsec one.
+				 */
+				freemsg(mp);
+			}
+		}
+
+		ip_proto_input(q, mp, ipha, ire, recv_ill, B_TRUE);
+		if (free_ire)
+			ire_refrele(ire);
+	}
+
+	return (udp_pkt);
+}
+
+/*
  * Deliver a udp packet to the given conn, possibly applying ipsec policy.
  * We are responsible for disposing of mp, such as by freemsg() or putnext()
  * Caller is responsible for dropping references to the conn, and freeing
@@ -6952,6 +7078,22 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	}
 	if (mctl_present)
 		freeb(first_mp);
+
+	/* Let's hope the compilers utter "branch, predict-not-taken..." ;) */
+	if (connp->conn_udp->udp_nat_t_endpoint) {
+		if (mctl_present) {
+			/* mctl_present *shouldn't* happen. */
+			ip_drop_packet(mp, B_TRUE, NULL, NULL,
+			    DROPPER(ipss, ipds_esp_nat_t_ipsec),
+			    &ipss->ipsec_dropper);
+			return;
+		}
+
+		if (!zero_spi_check(ill->ill_rq, mp, ipha, NULL, recv_ill,
+		    ipss)) {
+			return;
+		}
+	}
 
 	/* Handle options. */
 	if (connp->conn_recvif)
@@ -10036,7 +10178,7 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 
 		/*
 		 * Test for valid requests. Invalid algorithms
-		 * need to be tested by IPSEC code because new
+		 * need to be tested by IPsec code because new
 		 * algorithms can be added dynamically.
 		 */
 		if ((ah_req & ~(REQ_MASK|IPSEC_PREF_UNIQUE)) != 0 ||
@@ -11960,15 +12102,19 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 
 /*
  * ipsec processing for the fast path, used for input UDP Packets
+ * Returns true if ready for passup to UDP.
+ * Return false if packet is not passable to UDP (e.g. it failed IPsec policy,
+ * was an ESP-in-UDP packet, etc.).
  */
 static boolean_t
 ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
-    mblk_t **mpp, mblk_t **first_mpp, boolean_t mctl_present)
+    mblk_t **mpp, mblk_t **first_mpp, boolean_t mctl_present, ire_t *ire)
 {
 	uint32_t	ill_index;
 	uint_t		in_flags;	/* IPF_RECVSLLA and/or IPF_RECVIF */
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	udp_t		*udp = connp->conn_udp;
 
 	ASSERT(ipha->ipha_protocol == IPPROTO_UDP);
 	/* The ill_index of the incoming ILL */
@@ -11992,6 +12138,28 @@ ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
 			return (B_FALSE);
 		}
 	}
+	/*
+	 * Remove 0-spi if it's 0, or move everything behind
+	 * the UDP header over it and forward to ESP via
+	 * ip_proto_input().
+	 */
+	if (udp->udp_nat_t_endpoint) {
+		if (mctl_present) {
+			/* mctl_present *shouldn't* happen. */
+			ip_drop_packet(*first_mpp, B_TRUE, NULL,
+			    NULL, DROPPER(ipss, ipds_esp_nat_t_ipsec),
+			    &ipss->ipsec_dropper);
+			*first_mpp = NULL;
+			return (B_FALSE);
+		}
+
+		/* "ill" is "recv_ill" in actuality. */
+		if (!zero_spi_check(q, *mpp, ipha, ire, ill, ipss))
+			return (B_FALSE);
+
+		/* Else continue like a normal UDP packet. */
+	}
+
 	/*
 	 * We make the checks as below since we are in the fast path
 	 * and want to minimize the number of checks if the IP_RECVIF and/or
@@ -12575,7 +12743,11 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 		/* Clear the IP header h/w cksum flag */
 		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
-	} else {
+	} else if (!mctl_present) {
+		/*
+		 * Don't verify header checksum if this packet is coming
+		 * back from AH/ESP as we already did it.
+		 */
 #define	uph	((uint16_t *)ipha)
 		sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] + uph[5] +
 		    uph[6] + uph[7] + uph[8] + uph[9];
@@ -12583,11 +12755,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		/* finish doing IP checksum */
 		sum = (sum & 0xFFFF) + (sum >> 16);
 		sum = ~(sum + (sum >> 16)) & 0xFFFF;
-		/*
-		 * Don't verify header checksum if this packet is coming
-		 * back from AH/ESP as we already did it.
-		 */
-		if (!mctl_present && sum != 0 && sum != 0xFFFF) {
+		if (sum != 0 && sum != 0xFFFF) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 			freemsg(first_mp);
 			return;
@@ -12681,7 +12849,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			 * mp and first_mp can change.
 			 */
 			if (ip_udp_check(q, connp, recv_ill,
-			    ipha, &mp, &first_mp, mctl_present)) {
+			    ipha, &mp, &first_mp, mctl_present, ire)) {
 				/* Send it upstream */
 				CONN_UDP_RECV(connp, mp);
 			}
@@ -12838,7 +13006,11 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 			/* Clear the IP header h/w cksum flag */
 			DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
-		} else {
+		} else if (!mctl_present) {
+			/*
+			 * Don't verify header checksum if this packet
+			 * is coming back from AH/ESP as we already did it.
+			 */
 #define	uph	((uint16_t *)ipha)
 			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
 			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
@@ -12846,11 +13018,7 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 			/* finish doing IP checksum */
 			sum = (sum & 0xFFFF) + (sum >> 16);
 			sum = ~(sum + (sum >> 16)) & 0xFFFF;
-			/*
-			 * Don't verify header checksum if this packet
-			 * is coming back from AH/ESP as we already did it.
-			 */
-			if (!mctl_present && (sum != 0) && sum != 0xFFFF) {
+			if (sum != 0 && sum != 0xFFFF) {
 				BUMP_MIB(ill->ill_ip_mib,
 				    ipIfStatsInCksumErrs);
 				goto error;
@@ -12960,7 +13128,7 @@ try_again:
 	 * does not have facility to receive extra information via
 	 * ip_process or ip_add_info. Also, when the connection was
 	 * established, we made a check if this connection is impacted
-	 * by any global IPSec policy or per connection policy (a
+	 * by any global IPsec policy or per connection policy (a
 	 * policy that comes in effect later will not apply to this
 	 * connection). Since all this can be determined at the
 	 * connection establishment time, a quick check of flags
@@ -13283,7 +13451,8 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 		goto ipoptions;
 	} else {
 		/* Check the IP header checksum.  */
-		if (!IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
+		if (!IS_IP_HDR_HWCKSUM(mctl_present, mp, ill) &&
+		    !mctl_present) {
 #define	uph	((uint16_t *)ipha)
 			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
 			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
@@ -13295,7 +13464,7 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 			 * Don't verify header checksum if this packet
 			 * is coming back from AH/ESP as we already did it.
 			 */
-			if (!mctl_present && (sum != 0) && sum != 0xFFFF) {
+			if (sum != 0 && sum != 0xFFFF) {
 				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
 				goto error;
 			}
@@ -14218,7 +14387,8 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 					ip_udp_input(q, mp1, ipha, ire, ill);
 					break;
 				default:
-					ip_proto_input(q, mp1, ipha, ire, ill);
+					ip_proto_input(q, mp1, ipha, ire, ill,
+					    B_FALSE);
 					break;
 				}
 			}
@@ -15052,7 +15222,7 @@ local:
 			ire = NULL;
 			continue;
 		default:
-			ip_proto_input(q, first_mp, ipha, ire, ill);
+			ip_proto_input(q, first_mp, ipha, ire, ill, B_FALSE);
 			continue;
 		}
 	}
@@ -16711,7 +16881,7 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 				break;
 			default:
 				ip_proto_input(ill->ill_rq, ipsec_mp, ipha, ire,
-				    recv_ill);
+				    recv_ill, B_FALSE);
 				if (ire_need_rele)
 					ire_refrele(ire);
 				break;
@@ -16815,13 +16985,13 @@ ill_frag_timer_start(ill_t *ill)
  * IPQoS Notes:
  * IPPF processing is done in fanout routines.
  * Policy processing is done only if IPP_lOCAL_IN is enabled. Further,
- * processing for IPSec packets is done when it comes back in clear.
+ * processing for IPsec packets is done when it comes back in clear.
  * NOTE : The callers of this function need to do the ire_refrele for the
  *	  ire that is being passed in.
  */
 void
 ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ill_t *recv_ill)
+    ill_t *recv_ill, boolean_t esp_in_udp_packet)
 {
 	ill_t	*ill = (ill_t *)q->q_ptr;
 	uint32_t	sum;
@@ -16850,8 +17020,8 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	/*
 	 * no UDP or TCP packet should come here anymore.
 	 */
-	ASSERT((ipha->ipha_protocol != IPPROTO_TCP) &&
-	    (ipha->ipha_protocol != IPPROTO_UDP));
+	ASSERT(ipha->ipha_protocol != IPPROTO_TCP &&
+	    ipha->ipha_protocol != IPPROTO_UDP);
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 	if (mctl_present &&
@@ -16881,40 +17051,44 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	 * IF M_CTL is not present, then ipsec_in_is_secure
 	 * should return B_TRUE. There is a case where loopback
 	 * packets has an M_CTL in the front with all the
-	 * IPSEC options set to IPSEC_PREF_NEVER - which means
+	 * IPsec options set to IPSEC_PREF_NEVER - which means
 	 * ipsec_in_is_secure will return B_FALSE. As loopback
 	 * packets never comes here, it is safe to ASSERT the
 	 * following.
 	 */
 	ASSERT(!mctl_present || ipsec_in_is_secure(first_mp));
 
+	/*
+	 * Also, we should never have an mctl_present if this is an
+	 * ESP-in-UDP packet.
+	 */
+	ASSERT(!mctl_present || !esp_in_udp_packet);
+
 
 	/* u1 is # words of IP options */
-	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4)
-	    + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
+	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4) +
+	    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
 
-	if (u1) {
-		if (!ip_options_cksum(q, ill, mp, ipha, ire, ipst)) {
-			if (hada_mp != NULL)
-				freemsg(hada_mp);
-			return;
-		}
-	} else {
-		/* Check the IP header checksum.  */
+	if (u1 || (!esp_in_udp_packet && !mctl_present)) {
+		if (u1) {
+			if (!ip_options_cksum(q, ill, mp, ipha, ire, ipst)) {
+				if (hada_mp != NULL)
+					freemsg(hada_mp);
+				return;
+			}
+		} else {
+			/* Check the IP header checksum.  */
 #define	uph	((uint16_t *)ipha)
-		sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] + uph[5] +
-		    uph[6] + uph[7] + uph[8] + uph[9];
+			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
+			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
 #undef  uph
-		/* finish doing IP checksum */
-		sum = (sum & 0xFFFF) + (sum >> 16);
-		sum = ~(sum + (sum >> 16)) & 0xFFFF;
-		/*
-		 * Don't verify header checksum if this packet is coming
-		 * back from AH/ESP as we already did it.
-		 */
-		if (!mctl_present && (sum && sum != 0xFFFF)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-			goto drop_pkt;
+			/* finish doing IP checksum */
+			sum = (sum & 0xFFFF) + (sum >> 16);
+			sum = ~(sum + (sum >> 16)) & 0xFFFF;
+			if (sum && sum != 0xFFFF) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
+				goto drop_pkt;
+			}
 		}
 	}
 
@@ -17193,13 +17367,13 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			}
 			/*
 			 * We generally store the ill_index if we need to
-			 * do IPSEC processing as we lose the ill queue when
+			 * do IPsec processing as we lose the ill queue when
 			 * we come back. But in this case, we never should
 			 * have to store the ill_index here as it should have
 			 * been stored previously when we processed the
 			 * AH/ESP header in this routine or for non-ipsec
 			 * cases, we still have the queue. But for some bad
-			 * packets from the wire, we can get to IPSEC after
+			 * packets from the wire, we can get to IPsec after
 			 * this and we better store the index for that case.
 			 */
 			ill = (ill_t *)q->q_ptr;
@@ -17253,7 +17427,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			}
 			/*
 			 * Store the ill_index so that when we come back
-			 * from IPSEC we ride on the same queue.
+			 * from IPsec we ride on the same queue.
 			 */
 			ill = (ill_t *)q->q_ptr;
 			ii = (ipsec_in_t *)first_mp->b_rptr;
@@ -17286,10 +17460,26 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		/* select inbound SA and have IPsec process the pkt */
 		if (ipha->ipha_protocol == IPPROTO_ESP) {
 			esph_t *esph = ipsec_inbound_esp_sa(first_mp, ns);
+			boolean_t esp_in_udp_sa;
 			if (esph == NULL)
 				return;
 			ASSERT(ii->ipsec_in_esp_sa != NULL);
 			ASSERT(ii->ipsec_in_esp_sa->ipsa_input_func != NULL);
+			esp_in_udp_sa = ((ii->ipsec_in_esp_sa->ipsa_flags &
+			    IPSA_F_NATT) != 0);
+			/*
+			 * The following is a fancy, but quick, way of saying:
+			 * ESP-in-UDP SA and Raw ESP packet --> drop
+			 *    OR
+			 * ESP SA and ESP-in-UDP packet --> drop
+			 */
+			if (esp_in_udp_sa != esp_in_udp_packet) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_packet(first_mp, B_TRUE, ill, NULL,
+				    DROPPER(ns->netstack_ipsec, ipds_esp_no_sa),
+				    &ns->netstack_ipsec->ipsec_dropper);
+				return;
+			}
 			ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(
 			    first_mp, esph);
 		} else {
@@ -20301,7 +20491,7 @@ notdata:
 			if (ii->ipsec_info_type == IPSEC_IN) {
 				/*
 				 * Either this message goes back to
-				 * IPSEC for further processing or to
+				 * IPsec for further processing or to
 				 * ULP after policy checks.
 				 */
 				ip_fanout_proto_again(mp, NULL, NULL, NULL);
@@ -20310,7 +20500,7 @@ notdata:
 				io = (ipsec_out_t *)ii;
 				if (io->ipsec_out_proc_begin) {
 					/*
-					 * IPSEC processing has already started.
+					 * IPsec processing has already started.
 					 * Complete it.
 					 * IPQoS notes: We don't care what is
 					 * in ipsec_out_ill_index since this
@@ -20765,8 +20955,8 @@ multicast:
 		 * need to make sure that the soruce address of
 		 * the packet matches the logical IP address used
 		 * in the option. We do it by initializing ipha_src
-		 * here. This should keep IPSEC also happy as
-		 * when we return from IPSEC processing, we don't
+		 * here. This should keep IPsec also happy as
+		 * when we return from IPsec processing, we don't
 		 * have to worry about getting the right address on
 		 * the packet. Thus it is sufficient to look for
 		 * IRE_CACHE using MATCH_IRE_ILL rathen than
@@ -21451,8 +21641,8 @@ conn_ipsec_length(conn_t *connp)
 }
 
 /*
- * Returns an estimate of the IPSEC headers size. This is used if
- * we don't want to call into IPSEC to get the exact size.
+ * Returns an estimate of the IPsec headers size. This is used if
+ * we don't want to call into IPsec to get the exact size.
  */
 int
 ipsec_out_extra_length(mblk_t *ipsec_mp)
@@ -21476,8 +21666,8 @@ ipsec_out_extra_length(mblk_t *ipsec_mp)
 }
 
 /*
- * Returns an estimate of the IPSEC headers size. This is used if
- * we don't want to call into IPSEC to get the exact size.
+ * Returns an estimate of the IPsec headers size. This is used if
+ * we don't want to call into IPsec to get the exact size.
  */
 int
 ipsec_in_extra_length(mblk_t *ipsec_mp)
@@ -21741,7 +21931,7 @@ conn_set_outgoing_ill(conn_t *connp, ire_t *ire, ill_t **conn_outgoing_ill)
  * REFRELE.
  * IPQoS Notes:
  * IP policy is invoked if IPP_LOCAL_OUT is enabled. Processing for
- * IPSec packets are done in ipsec_out_process.
+ * IPsec packets are done in ipsec_out_process.
  *
  */
 void
@@ -22242,7 +22432,7 @@ another:;
 	if (ipsec_len != 0) {
 		/*
 		 * We will do the rest of the processing after
-		 * we come back from IPSEC in ip_wput_ipsec_out().
+		 * we come back from IPsec in ip_wput_ipsec_out().
 		 */
 		ASSERT(MBLKL(first_mp) >= sizeof (ipsec_out_t));
 
@@ -22769,7 +22959,7 @@ multi_loopback:
 
 				/*
 				 * If this needs to go out secure, we need
-				 * to wait till we finish the IPSEC
+				 * to wait till we finish the IPsec
 				 * processing.
 				 */
 				if (ipsec_len == 0 &&
@@ -23003,8 +23193,8 @@ fragmentit:
 			offset = ntohs(ipha->ipha_fragment_offset_and_flags);
 			/*
 			 * If this would generate a icmp_frag_needed message,
-			 * we need to handle it before we do the IPSEC
-			 * processing. Otherwise, we need to strip the IPSEC
+			 * we need to handle it before we do the IPsec
+			 * processing. Otherwise, we need to strip the IPsec
 			 * headers before we send up the message to the ULPs
 			 * which becomes messy and difficult.
 			 */
@@ -23036,7 +23226,7 @@ fragmentit:
 					 * the wire. Note that this could still
 					 * cause fragmentation and all we
 					 * do is the generation of the message
-					 * to the ULP if needed before IPSEC.
+					 * to the ULP if needed before IPsec.
 					 */
 					if (!next_mp) {
 						ipsec_out_process(q, first_mp,
@@ -23255,7 +23445,7 @@ ip_mdinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
 			break;
 
 		/*
-		 * IPSEC outbound policy present?  Note that we get here
+		 * IPsec outbound policy present?  Note that we get here
 		 * after calling ipsec_conn_cache_policy() where the global
 		 * policy checking is performed.  conn_latch will be
 		 * non-NULL as long as there's a policy defined,
@@ -23840,7 +24030,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	}
 
 	/*
-	 * IPSEC does not allow hw accelerated packets to be fragmented
+	 * IPsec does not allow hw accelerated packets to be fragmented
 	 * This check is made in ip_wput_ipsec_out prior to coming here
 	 * via ip_wput_ire_fragmentit.
 	 *
@@ -25366,7 +25556,7 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 		if (ire != NULL) {
 			ipif_refrele(ipif);
 			/*
-			 * XXX Do the multicast forwarding now, as the IPSEC
+			 * XXX Do the multicast forwarding now, as the IPsec
 			 * processing has been done.
 			 */
 			goto send;
@@ -25420,10 +25610,10 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 		 * ire disappeared underneath.
 		 *
 		 * What we need to do here is the ip_newroute
-		 * logic to get the ire without doing the IPSEC
+		 * logic to get the ire without doing the IPsec
 		 * processing. Follow the same old path. But this
 		 * time, ip_wput or ire_add_then_send will call us
-		 * directly as all the IPSEC operations are done.
+		 * directly as all the IPsec operations are done.
 		 */
 		ip1dbg(("ip_wput_ipsec_out_v6: IRE disappeared\n"));
 		mp->b_prev = NULL;
@@ -25587,17 +25777,14 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 	uint32_t max_frag;
 	boolean_t multirt_send = B_FALSE;
 	mblk_t *mp;
-	mblk_t *mp1;
 	ipha_t *ipha1;
 	uint_t	ill_index;
 	ipsec_out_t *io;
 	boolean_t attach_if;
-	int match_flags, offset;
+	int match_flags;
 	irb_t *irb = NULL;
 	boolean_t ill_need_rele = B_FALSE, ire_need_rele = B_TRUE;
 	zoneid_t zoneid;
-	uint32_t cksum;
-	uint16_t *up;
 	ipxmit_state_t	pktxmit_state;
 	ip_stack_t	*ipst;
 
@@ -25677,7 +25864,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		if (ire != NULL) {
 			ill_t *ill1;
 			/*
-			 * Do the multicast forwarding now, as the IPSEC
+			 * Do the multicast forwarding now, as the IPsec
 			 * processing has been done.
 			 */
 			if (ipst->ips_ip_g_mrouter && !conn_dontroute &&
@@ -25737,10 +25924,10 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 * ire disappeared underneath.
 		 *
 		 * What we need to do here is the ip_newroute
-		 * logic to get the ire without doing the IPSEC
+		 * logic to get the ire without doing the IPsec
 		 * processing. Follow the same old path. But this
 		 * time, ip_wput or ire_add_then_put will call us
-		 * directly as all the IPSEC operations are done.
+		 * directly as all the IPsec operations are done.
 		 */
 		ip1dbg(("ip_wput_ipsec_out: IRE disappeared\n"));
 		mp->b_prev = NULL;
@@ -25773,41 +25960,12 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 	}
 	goto done;
 send:
-	if (ipha->ipha_protocol == IPPROTO_UDP &&
-	    udp_compute_checksum(ipst->ips_netstack)) {
-		/*
-		 * ESP NAT-Traversal packet.
-		 *
-		 * Just do software checksum for now.
-		 */
-
-		offset = IP_SIMPLE_HDR_LENGTH + UDP_CHECKSUM_OFFSET;
-		IP_STAT(ipst, ip_out_sw_cksum);
-		IP_STAT_UPDATE(ipst, ip_udp_out_sw_cksum_bytes,
-		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH));
-#define	iphs	((uint16_t *)ipha)
-		cksum = IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
-		    iphs[9] + ntohs(htons(ipha->ipha_length) -
-		    IP_SIMPLE_HDR_LENGTH);
-#undef iphs
-		cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH, cksum);
-		for (mp1 = mp; mp1 != NULL; mp1 = mp1->b_cont)
-			if (mp1->b_wptr - mp1->b_rptr >=
-			    offset + sizeof (uint16_t)) {
-				up = (uint16_t *)(mp1->b_rptr + offset);
-				*up = cksum;
-				break;	/* out of for loop */
-			} else {
-				offset -= (mp->b_wptr - mp->b_rptr);
-			}
-	} /* Otherwise, just keep the all-zero checksum. */
-
 	if (ire->ire_stq == NULL) {
 		ill_t	*out_ill;
 		/*
 		 * Loopbacks go through ip_wput_local except for one case.
 		 * We come here if we generate a icmp_frag_needed message
-		 * after IPSEC processing is over. When this function calls
+		 * after IPsec processing is over. When this function calls
 		 * ip_wput_ire_fragmentit, ip_wput_frag might end up calling
 		 * icmp_frag_needed. The message generated comes back here
 		 * through icmp_frag_needed -> icmp_pkt -> ip_wput ->
@@ -25815,7 +25973,7 @@ send:
 		 * source address as it is usually set in ip_wput_ire. As
 		 * ipsec_out_proc_begin is set, ip_wput calls ipsec_out_process
 		 * and we end up here. We can't enter ip_wput_ire once the
-		 * IPSEC processing is over and hence we need to do it here.
+		 * IPsec processing is over and hence we need to do it here.
 		 */
 		ASSERT(q != NULL);
 		UPDATE_OB_PKT_COUNT(ire);
@@ -25846,7 +26004,7 @@ send:
 
 	if (ire->ire_max_frag < (unsigned int)LENGTH) {
 		/*
-		 * We are through with IPSEC processing.
+		 * We are through with IPsec processing.
 		 * Fragment this and send it on the wire.
 		 */
 		if (io->ipsec_out_accelerated) {
@@ -26002,7 +26160,7 @@ send:
 			 * There is a slight risk here, in that, if we
 			 * have the forwarding path create an incomplete
 			 * IRE, then until the IRE is completed, any
-			 * transmitted IPSEC packets will be dropped
+			 * transmitted IPsec packets will be dropped
 			 * instead of being queued waiting for resolution.
 			 *
 			 * But the likelihood of a forwarding packet and a wput
@@ -26024,7 +26182,7 @@ send:
 			 * hw accel work. But it's too complex to get
 			 * the IPsec hw  acceleration approach to fit
 			 * well with ip_xmit_v4 doing ARP without
-			 * doing IPSEC simplification. For now, we just
+			 * doing IPsec simplification. For now, we just
 			 * poke ip_xmit_v4 to trigger the arp resolve, so
 			 * that we can continue with the send on the next
 			 * attempt.
@@ -26261,7 +26419,7 @@ ipsec_out_select_sa(mblk_t *ipsec_mp)
 	ASSERT(io->ipsec_out_failed == B_FALSE);
 
 	/*
-	 * IPSEC processing has started.
+	 * IPsec processing has started.
 	 */
 	io->ipsec_out_proc_begin = B_TRUE;
 	ap = io->ipsec_out_act;
@@ -26328,7 +26486,7 @@ ipsec_out_select_sa(mblk_t *ipsec_mp)
  * do with it.
  * IPQoS Notes:
  * We do IPPF processing if IPP_LOCAL_OUT is enabled before processing for
- * IPSec.
+ * IPsec.
  * XXX would like to nuke ire_t.
  * XXX ill_index better be "real"
  */
@@ -26401,7 +26559,7 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 	}
 
 	/*
-	 * IPSEC processing has started.
+	 * IPsec processing has started.
 	 */
 	io->ipsec_out_proc_begin = B_TRUE;
 	ap = io->ipsec_out_act;
@@ -26547,7 +26705,7 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		}
 	}
 	/*
-	 * We are done with IPSEC processing. Send it over
+	 * We are done with IPsec processing. Send it over
 	 * the wire.
 	 */
 done:
@@ -29544,7 +29702,7 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
  * the link-layer header to the packet, do ipsec hw acceleration
  * work if necessary, and send the packet out on the wire.
  *
- * NOTE: IPSEC will only call this function with fully resolved
+ * NOTE: IPsec will only call this function with fully resolved
  * ires if hw acceleration is involved.
  * TODO list :
  * 	a Handle M_MULTIDATA so that

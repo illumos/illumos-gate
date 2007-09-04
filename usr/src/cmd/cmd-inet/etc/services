@@ -136,6 +136,7 @@ nfsd		2049/tcp	nfs		# NFS server daemon (cots)
 eklogin		2105/tcp			# Kerberos encrypted rlogin
 lockd		4045/udp			# NFS lock daemon/manager
 lockd		4045/tcp
+ipsec-nat-t	4500/udp			# IPsec NAT-Traversal
 mdns		5353/udp			# Multicast DNS
 mdns		5353/tcp
 dtspc		6112/tcp			# CDE subprocess control

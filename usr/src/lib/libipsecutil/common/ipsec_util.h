@@ -56,7 +56,7 @@ extern "C" {
 
 /* used for file parsing */
 #define	NBUF_SIZE	16
-#define	IBUF_SIZE	512
+#define	IBUF_SIZE	2048
 #define	COMMENT_CHAR	'#'
 #define	CONT_CHAR	'\\'
 #define	QUOTE_CHAR	'"'

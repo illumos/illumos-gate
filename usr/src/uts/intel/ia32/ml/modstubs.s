@@ -528,6 +528,7 @@ fcnname/**/_info:							\
 	WSTUB(ipsecesp, ipsecesp_in_assocfailure,	nomod_zero);
 	WSTUB(ipsecesp, ipsecesp_init_funcs,	nomod_zero);
 	WSTUB(ipsecesp,	ipsecesp_icmp_error,	nomod_zero);
+	WSTUB(ipsecesp,	ipsecesp_send_keepalive,	nomod_zero);
 	END_MODULE(ipsecesp);
 #endif
 	
@@ -543,12 +544,6 @@ fcnname/**/_info:							\
 	MODULE(spdsock,drv);
 	WSTUB(spdsock,	spdsock_update_pending_algs,	nomod_zero);
 	END_MODULE(spdsock);
-#endif
-
-#ifndef NATTYMOD_MODULE
-	MODULE(nattymod, strmod);
-	WSTUB(nattymod, nattymod_clean_ipif, nomod_zero);
-	END_MODULE(nattymod);
 #endif
 
 /*

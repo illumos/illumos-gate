@@ -46,6 +46,7 @@
 #include <netdb.h>
 #include <libproc.h>
 #include <netinet/in.h>
+#include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -103,11 +104,11 @@ main(int argc, char **argv)
 
 	if (errflg || argc <= 0) {
 		(void) fprintf(stderr, "usage:\t%s [-F] pid ...\n",
-			command);
+		    command);
 		(void) fprintf(stderr,
-			"  (report open files of each process)\n");
+		    "  (report open files of each process)\n");
 		(void) fprintf(stderr,
-			"  -F: force grabbing of the target process\n");
+		    "  -F: force grabbing of the target process\n");
 		exit(2);
 	}
 
@@ -136,19 +137,19 @@ main(int argc, char **argv)
 		if ((pid = proc_arg_psinfo(arg = *argv++, PR_ARG_PIDS,
 		    &psinfo, &gret)) == -1) {
 			(void) fprintf(stderr, "%s: cannot examine %s: %s\n",
-				command, arg, Pgrab_error(gret));
+			    command, arg, Pgrab_error(gret));
 			retc++;
 		} else if ((Pr = Pgrab(pid, Fflag, &gret)) != NULL) {
 			if (Pcreate_agent(Pr) == 0) {
 				proc_unctrl_psinfo(&psinfo);
 				(void) printf("%d:\t%.70s\n",
-					(int)pid, psinfo.pr_psargs);
+				    (int)pid, psinfo.pr_psargs);
 				show_files(Pr);
 				Pdestroy_agent(Pr);
 			} else {
 				(void) fprintf(stderr,
-					"%s: cannot control process %d\n",
-					command, (int)pid);
+				    "%s: cannot control process %d\n",
+				    command, (int)pid);
 				retc++;
 			}
 			Prelease(Pr, 0);
@@ -159,7 +160,7 @@ main(int argc, char **argv)
 			case G_SELF:
 				proc_unctrl_psinfo(&psinfo);
 				(void) printf("%d:\t%.70s\n", (int)pid,
-					psinfo.pr_psargs);
+				    psinfo.pr_psargs);
 				if (gret == G_SYS)
 					(void) printf("  [system process]\n");
 				else
@@ -167,13 +168,11 @@ main(int argc, char **argv)
 				break;
 			default:
 				(void) fprintf(stderr, "%s: %s: %d\n",
-					command, Pgrab_error(gret), (int)pid);
+				    command, Pgrab_error(gret), (int)pid);
 				retc++;
 				break;
 			}
 		}
-
-
 	}
 
 	(void) proc_finistdio();
@@ -257,20 +256,18 @@ show_files(struct ps_prochandle *Pr)
 		default:
 			s = unknown;
 			(void) sprintf(s, "0x%.4x ",
-				(int)statb.st_mode & S_IFMT);
+			    (int)statb.st_mode & S_IFMT);
 			break;
 		}
 
-		(void) printf("%4d: %s mode:0%.3o",
-			fd,
-			s,
-			(int)statb.st_mode & ~S_IFMT);
+		(void) printf("%4d: %s mode:0%.3o", fd, s,
+		    (int)statb.st_mode & ~S_IFMT);
 
 		if (major(statb.st_dev) != (major_t)NODEV &&
 		    minor(statb.st_dev) != (minor_t)NODEV)
 			(void) printf(" dev:%lu,%lu",
-				(ulong_t)major(statb.st_dev),
-				(ulong_t)minor(statb.st_dev));
+			    (ulong_t)major(statb.st_dev),
+			    (ulong_t)minor(statb.st_dev));
 		else
 			(void) printf(" dev:0x%.8lX", (long)statb.st_dev);
 
@@ -284,26 +281,24 @@ show_files(struct ps_prochandle *Pr)
 		}
 
 		(void) printf(" ino:%llu uid:%d gid:%d",
-			(u_longlong_t)statb.st_ino,
-			(int)statb.st_uid,
-			(int)statb.st_gid);
+		    (u_longlong_t)statb.st_ino,
+		    (int)statb.st_uid, (int)statb.st_gid);
 
 		if (rdev == NODEV)
 			(void) printf(" size:%lld\n",
-				(longlong_t)statb.st_size);
+			    (longlong_t)statb.st_size);
 		else if (major(rdev) != (major_t)NODEV &&
 		    minor(rdev) != (minor_t)NODEV)
 			(void) printf(" rdev:%lu,%lu\n",
-				(ulong_t)major(rdev),
-				(ulong_t)minor(rdev));
+			    (ulong_t)major(rdev), (ulong_t)minor(rdev));
 		else
 			(void) printf(" rdev:0x%.8lX\n", (long)rdev);
 
 		if (!nflag) {
 			dofcntl(Pr, fd,
-				(statb.st_mode & (S_IFMT|S_ENFMT|S_IXGRP))
-				== (S_IFREG|S_ENFMT),
-				(statb.st_mode & S_IFMT) == S_IFDOOR);
+			    (statb.st_mode & (S_IFMT|S_ENFMT|S_IXGRP))
+			    == (S_IFREG|S_ENFMT),
+			    (statb.st_mode & S_IFMT) == S_IFDOOR);
 
 			if ((statb.st_mode & S_IFMT) == S_IFSOCK)
 				dosocket(Pr, fd);
@@ -341,7 +336,7 @@ getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
 
 /* examine open file with fcntl() */
 static void
-dofcntl(struct ps_prochandle *Pr, int fd, int manditory, int isdoor)
+dofcntl(struct ps_prochandle *Pr, int fd, int mandatory, int isdoor)
 {
 	struct flock flock;
 	int fileflags;
@@ -376,8 +371,8 @@ dofcntl(struct ps_prochandle *Pr, int fd, int manditory, int isdoor)
 			unsigned long sysid = flock.l_sysid;
 
 			(void) printf("      %s %s lock set by",
-				manditory? "manditory" : "advisory",
-				flock.l_type == F_RDLCK? "read" : "write");
+			    mandatory ? "mandatory" : "advisory",
+			    flock.l_type == F_RDLCK? "read" : "write");
 			if (sysid)
 				(void) printf(" system 0x%lX", sysid);
 			if (flock.l_pid)
@@ -448,7 +443,7 @@ show_fileflags(int flags)
 		(void) strcat(str, "|O_XATTR");
 	if (flags & ~(ALL_O_FLAGS))
 		(void) sprintf(str + strlen(str), "|0x%x",
-			flags & ~(ALL_O_FLAGS));
+		    flags & ~(ALL_O_FLAGS));
 
 	(void) printf("%s", str);
 }
@@ -469,7 +464,7 @@ show_door(struct ps_prochandle *Pr, int fd)
 	(void) printf("  door to ");
 	if (psinfo.pr_fname[0] != '\0')
 		(void) printf("%s[%d]", psinfo.pr_fname,
-			(int)door_info.di_target);
+		    (int)door_info.di_target);
 	else
 		(void) printf("pid %d", (int)door_info.di_target);
 }
@@ -507,7 +502,7 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 			len -= sizeof (so_un->sun_family);
 			so_un->sun_path[len] = NULL;
 			(void) printf("\t%s: AF_UNIX %s\n",
-				str, so_un->sun_path);
+			    str, so_un->sun_path);
 		}
 		return;
 	case AF_IMPLINK:	p = "AF_IMPLINK";	break;
@@ -562,19 +557,21 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	int i;
 	in_addr_t nexthop_val;
 	struct boolopt {
+		int		level;
 		int		opt;
 		const char	*name;
 	};
 	static struct boolopt boolopts[] = {
-	    { SO_DEBUG,		"SO_DEBUG,"	},
-	    { SO_REUSEADDR,	"SO_REUSEADDR,"	},
-	    { SO_KEEPALIVE,	"SO_KEEPALIVE,"	},
-	    { SO_DONTROUTE,	"SO_DONTROUTE,"	},
-	    { SO_BROADCAST,	"SO_BROADCAST,"	},
-	    { SO_OOBINLINE,	"SO_OOBINLINE,"	},
-	    { SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
-	    { SO_ALLZONES,	"SO_ALLZONES,"	},
-	    { SO_EXCLBIND,	"SO_EXCLBIND," },
+	    { SOL_SOCKET, SO_DEBUG,		"SO_DEBUG,"	},
+	    { SOL_SOCKET, SO_REUSEADDR,		"SO_REUSEADDR,"	},
+	    { SOL_SOCKET, SO_KEEPALIVE,		"SO_KEEPALIVE,"	},
+	    { SOL_SOCKET, SO_DONTROUTE,		"SO_DONTROUTE,"	},
+	    { SOL_SOCKET, SO_BROADCAST,		"SO_BROADCAST,"	},
+	    { SOL_SOCKET, SO_OOBINLINE,		"SO_OOBINLINE,"	},
+	    { SOL_SOCKET, SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
+	    { SOL_SOCKET, SO_ALLZONES,		"SO_ALLZONES,"	},
+	    { SOL_SOCKET, SO_EXCLBIND,		"SO_EXCLBIND," },
+	    { IPPROTO_UDP, UDP_NAT_T_ENDPOINT,	"UDP_NAT_T_ENDPOINT," },
 	};
 	struct linger l;
 
@@ -583,8 +580,8 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 
 	for (i = 0; i < sizeof (boolopts) / sizeof (boolopts[0]); i++) {
 		vlen = sizeof (val);
-		if (pr_getsockopt(Pr, fd, SOL_SOCKET, boolopts[i].opt, &val,
-		    &vlen) == 0 && val != 0)
+		if (pr_getsockopt(Pr, fd, boolopts[i].level, boolopts[i].opt,
+		    &val, &vlen) == 0 && val != 0)
 			(void) strlcat(buf, boolopts[i].name, sizeof (buf));
 	}
 
@@ -629,7 +626,7 @@ dosocket(struct ps_prochandle *Pr, int fd)
 {
 	/* A buffer large enough for PATH_MAX size AF_UNIX address */
 	long buf[(sizeof (short) + PATH_MAX + sizeof (long) - 1)
-		/ sizeof (long)];
+	    / sizeof (long)];
 	struct sockaddr *sa = (struct sockaddr *)buf;
 	socklen_t len;
 	int type, tlen;

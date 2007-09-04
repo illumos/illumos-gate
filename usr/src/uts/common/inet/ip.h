@@ -425,7 +425,7 @@ typedef enum {
 			ip_udp_input(q, mp, ipha, ire, recv_ill); \
 			break; \
 		default: \
-			ip_proto_input(q, mp, ipha, ire, recv_ill); \
+			ip_proto_input(q, mp, ipha, ire, recv_ill, B_FALSE); \
 			break; \
 	} \
 }
@@ -3145,7 +3145,8 @@ extern void	ip_mib2_add_ip_stats(mib2_ipIfStatsEntry_t *,
 extern void	ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *,
 		    mib2_ipv6IfIcmpEntry_t *);
 extern void	ip_udp_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
-extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
+extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *,
+    boolean_t);
 extern void	ip_rput_other(ipsq_t *, queue_t *, mblk_t *, void *);
 extern ire_t	*ip_check_multihome(void *, ire_t *, ill_t *);
 extern void	ip_setqinfo(queue_t *, minor_t, boolean_t, ip_stack_t *);

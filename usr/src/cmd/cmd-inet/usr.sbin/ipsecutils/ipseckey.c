@@ -1727,13 +1727,6 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				    "single NAT-T local port.\n"));
 				break;
 			}
-
-			if (natt_rport != 0) {
-				ERROR(ep, ebuf, gettext(
-				    "Can only specify "
-				    "one of NAT-T remote and local port.\n"));
-				break;
-			}
 			natt_lport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
@@ -1742,13 +1735,6 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				ERROR(ep, ebuf, gettext(
 				    "Can only specify "
 				    "single NAT-T remote port.\n"));
-				break;
-			}
-
-			if (natt_lport != 0) {
-				ERROR(ep, ebuf, gettext(
-				    "Can only specify "
-				    "one of NAT-T remote and local port.\n"));
 				break;
 			}
 			natt_rport = parsenum(*argv, B_TRUE, ebuf);
@@ -2371,38 +2357,58 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 
 	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
 
+#define	PORT_ONLY_ALLOCATE(af, socktype, exttype, extvar, port) {  \
+	alloclen = sizeof (sadb_address_t) + roundup(sizeof (socktype), 8); \
+	(extvar) = calloc(1, alloclen); \
+	if ((extvar) == NULL) { \
+		Bail("malloc(implicit port)"); \
+	} \
+	totallen += alloclen; \
+	(extvar)->sadb_address_len = SADB_8TO64(alloclen); \
+	(extvar)->sadb_address_exttype = (exttype); \
+	/* sin/sin6 has equivalent offsets for ports! */ \
+	sin6 = (struct sockaddr_in6 *)((extvar) + 1); \
+	sin6->sin6_family = (af); \
+	sin6->sin6_port = (port); \
+	}
+
 	/*
-	 * If we specify inner ports w/o addresses, we still need to
-	 * allocate.  Also, if we have one inner address, we need the
+	 * If we specify inner ports or NAT ports w/o addresses, we still need
+	 * to allocate.  Also, if we have one inner address, we need the
 	 * other, even if we don't specify anything.
 	 */
-	if (alloc_inner && idst == NULL) {
-		/* Allocate zeroed-out. */
-		alloclen = sizeof (*idst) + sizeof (struct sockaddr_in6);
-		idst = calloc(1, alloclen);
-		if (idst == NULL) {
-			Bail("malloc(implicit idst)");
+	if (use_natt) {
+		if (natt_lport != 0 && natt_local == NULL) {
+			PORT_ONLY_ALLOCATE(AF_INET, struct sockaddr_in,
+			    SADB_X_EXT_ADDRESS_NATT_LOC, natt_local,
+			    natt_lport);
 		}
-		totallen += alloclen;
-		idst->sadb_address_len = SADB_8TO64(alloclen);
-		idst->sadb_address_exttype = SADB_X_EXT_ADDRESS_INNER_DST;
-		sin6 = (struct sockaddr_in6 *)(idst + 1);
-		sin6->sin6_family = AF_INET6;
+
+		if (natt_rport != 0 && natt_remote == NULL) {
+			PORT_ONLY_ALLOCATE(AF_INET, struct sockaddr_in,
+			    SADB_X_EXT_ADDRESS_NATT_REM, natt_remote,
+			    natt_rport);
+		}
+	} else {
+		if (natt_lport != 0 || natt_rport != 0) {
+			ERROR(ep, ebuf, gettext("Must specify 'encap udp' "
+			    "with any NAT-T port.\n"));
+		} else if (natt_local != NULL || natt_remote != NULL) {
+			ERROR(ep, ebuf, gettext("Must specify 'encap udp' "
+			    "with any NAT-T address.\n"));
+		}
+	}
+
+	if (alloc_inner && idst == NULL) {
+		PORT_ONLY_ALLOCATE(AF_INET6, struct sockaddr_in6,
+		    SADB_X_EXT_ADDRESS_INNER_DST, idst, 0);
 	}
 
 	if (alloc_inner && isrc == NULL) {
-		/* Allocate zeroed-out. */
-		alloclen = sizeof (*isrc) + sizeof (struct sockaddr_in6);
-		isrc = calloc(1, alloclen);
-		if (isrc == NULL) {
-			Bail("malloc(implicit isrc)");
-		}
-		totallen += alloclen;
-		isrc->sadb_address_len = SADB_8TO64(alloclen);
-		isrc->sadb_address_exttype = SADB_X_EXT_ADDRESS_INNER_SRC;
-		sin6 = (struct sockaddr_in6 *)(isrc + 1);
-		sin6->sin6_family = AF_INET6;
+		PORT_ONLY_ALLOCATE(AF_INET6, struct sockaddr_in6,
+		    SADB_X_EXT_ADDRESS_INNER_SRC, isrc, 0);
 	}
+#undef PORT_ONLY_ALLOCATE
 
 	/*
 	 * Okay, so now I have all of the potential extensions!
@@ -2556,18 +2562,6 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			ERROR(ep, ebuf, gettext(
 			    "Must specify NAT-T remote or local address "
 			    "for UDP encapsulation.\n"));
-		}
-
-		if (natt_lport != 0 && natt_local == NULL) {
-			ERROR(ep, ebuf, gettext(
-			    "If NAT-T local port is specified, NAT-T "
-			    "local address must also be specified.\n"));
-		}
-
-		if (natt_rport != 0 && natt_remote == NULL) {
-			ERROR(ep, ebuf, gettext(
-			    "If NAT-T remote port is specified, NAT-T "
-			    "remote address must also be specified.\n"));
 		}
 
 		if (natt_remote != NULL) {

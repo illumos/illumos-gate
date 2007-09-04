@@ -136,6 +136,8 @@ typedef struct ipsa_s {
 	 */
 	time_t ipsa_addtime;	/* Time I was added. */
 	time_t ipsa_usetime;	/* Time of my first use. */
+	time_t ipsa_lastuse;	/* Time of my last use. */
+	time_t ipsa_last_nat_t_ka;	/* Time of my last NAT-T keepalive. */
 	time_t ipsa_softexpiretime;	/* Time of my first soft expire. */
 	time_t ipsa_hardexpiretime;	/* Time of my first hard expire. */
 
@@ -158,7 +160,6 @@ typedef struct ipsa_s {
 	 */
 	uint_t ipsa_softalloc;	/* Allocations allowed (soft). */
 	uint_t ipsa_hardalloc;	/* Allocations allowed (hard). */
-	uint_t ipsa_alloc;	/* Allocations made. */
 
 	uint_t ipsa_integlen;	/* Length of the integrity bitmap (bytes). */
 	uint_t ipsa_senslen;	/* Length of the sensitivity bitmap (bytes). */
@@ -195,15 +196,14 @@ typedef struct ipsa_s {
 	uint8_t ipsa_innersrcpfx;
 	uint8_t ipsa_innerdstpfx;
 
-	/* these can only be v4 */
-	uint32_t ipsa_natt_addr_loc[IPSA_MAX_ADDRLEN];
-	uint32_t ipsa_natt_addr_rem[IPSA_MAX_ADDRLEN];
-
 	uint16_t ipsa_inbound_cksum; /* cksum correction for inbound packets */
-	uint16_t ipsa_remote_port; /* the other port that isn't 4500 */
+	uint16_t ipsa_local_nat_port;	/* Local NAT-T port.  (0 --> 4500) */
+	uint16_t ipsa_remote_nat_port; /* The other port that isn't 4500 */
 
-	timeout_id_t ipsa_natt_ka_timer;
-	queue_t *ipsa_natt_q;
+	/* these can only be v4 */
+	uint32_t ipsa_natt_addr_loc;
+	uint32_t ipsa_natt_addr_rem;
+
 	/*
 	 * icmp type and code. *_end are to specify ranges. if only
 	 * a single value, * and *_end are the same value.
@@ -710,9 +710,6 @@ extern void ipsec_destroy_ctx_tmpl(ipsa_t *, ipsec_algtype_t);
 
 /* key checking */
 extern int ipsec_check_key(crypto_mech_type_t, sadb_key_t *, boolean_t, int *);
-
-/* natt cleanup */
-extern void sadb_clear_timeouts(queue_t *, netstack_t *);
 
 typedef struct ipsec_kstats_s {
 	kstat_named_t esp_stat_in_requests;
