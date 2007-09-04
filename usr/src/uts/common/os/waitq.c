@@ -266,10 +266,11 @@ waitq_dequeue(waitq_t *wq, kthread_t *t)
 	DTRACE_SCHED1(cpucaps__wakeup, kthread_t *, t);
 
 	/*
-	 * Change thread to transition state without dropping
-	 * the wait queue lock.
+	 * Change thread to transition state and drop the wait queue lock. The
+	 * thread will remain locked since its t_lockp points to the
+	 * transition_lock.
 	 */
-	THREAD_TRANSITION_NOLOCK(t);
+	THREAD_TRANSITION(t);
 }
 
 /*
@@ -297,8 +298,6 @@ waitq_setrun(kthread_t *t)
 	if (wq == NULL)
 		panic("waitq_setrun: thread %p is not on waitq", t);
 	waitq_dequeue(wq, t);
-
-	disp_lock_exit_high(&wq->wq_lock);
 	CL_SETRUN(t);
 }
 
@@ -311,9 +310,13 @@ waitq_takeone(waitq_t *wq)
 	kthread_t *t;
 
 	disp_lock_enter(&wq->wq_lock);
+	/*
+	 * waitq_dequeue drops wait queue lock but leaves the CPU at high PIL.
+	 */
 	if ((t = wq->wq_first) != NULL)
 		waitq_dequeue(wq, wq->wq_first);
-	disp_lock_exit(&wq->wq_lock);
+	else
+		disp_lock_exit(&wq->wq_lock);
 	return (t);
 }
 
@@ -328,8 +331,14 @@ waitq_runfirst(waitq_t *wq)
 
 	t = waitq_takeone(wq);
 	if (t != NULL) {
+		/*
+		 * t should have transition lock held.
+		 * CL_SETRUN() will replace it with dispq lock and keep it held.
+		 * thread_unlock() will drop dispq lock and restore PIL.
+		 */
+		ASSERT(THREAD_LOCK_HELD(t));
 		CL_SETRUN(t);
-		thread_unlock(t);	/* drops dispq lock */
+		thread_unlock(t);
 	}
 	return (t);
 }
