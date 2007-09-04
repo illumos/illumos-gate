@@ -1255,3 +1255,4 @@ Bugid   Risk Synopsis
 6589819 ld generated reference to __tls_get_addr() fails when resolving to a
 	shared object reference
 6595139 various applications should export yy* global variables for libl
+6597841 gelf_getdyn() reads one too many dynamic entries
