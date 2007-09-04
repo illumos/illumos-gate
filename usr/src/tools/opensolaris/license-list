@@ -109,8 +109,10 @@ usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
 usr/src/uts/common/inet/ip/THIRDPARTYLICENSE.rts
 usr/src/uts/common/inet/tcp/THIRDPARTYLICENSE
 usr/src/uts/common/io/THIRDPARTYLICENSE.etheraddr
+usr/src/uts/common/io/afe/THIRDPARTYLICENSE
 usr/src/uts/common/io/chxge/com/THIRDPARTYLICENSE
 usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE
+usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/wpi/fw-wpi/LICENSE
 usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart
 usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode

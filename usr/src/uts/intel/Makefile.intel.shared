@@ -345,6 +345,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS_32	+= sbpro
 # Common code drivers
 #
 
+DRV_KMODS	+= afe
 DRV_KMODS	+= e1000g
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= rge
