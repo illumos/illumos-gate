@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -16,3 +16,14 @@
 #!default <mode> <owner> <group>        # default used if not specified on entry
 #!<param>=<value>                       # puts parameter in pkg environment
 
+i pkginfo
+i copyright
+i depend
+i postinstall
+i postremove
+i i.preserve
+
+# RTL fast NIC driver
+d none kernel			0755	root	sys
+d none kernel/drv		0755	root	sys
+e preserve kernel/drv/rtls.conf	0644	root	sys

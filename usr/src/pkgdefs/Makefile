@@ -136,7 +136,6 @@ i386_SUBDIRS= \
 	SUNWralink \
 	SUNWrmodr \
 	SUNWrmodu \
-	SUNWrtls \
 	SUNWrtw \
 	SUNWsi3124 \
 	SUNWvia823x \
@@ -399,6 +398,7 @@ COMMON_SUBDIRS= \
 	SUNWucbt \
 	SUNWrsm	\
 	SUNWrsmo \
+	SUNWrtls \
 	SUNWqos \
 	SUNWqosu \
 	SUNWxge \
