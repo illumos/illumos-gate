@@ -39,7 +39,6 @@ find_files "s.*.h"	\
 	usr/src/uts/common/vm \
 	usr/src/uts/common/sys \
 	usr/src/uts/common/rpc \
-	usr/src/uts/common/rpcsvc \
 	usr/src/uts/common/gssapi \
 	usr/src/uts/common/netinet \
 	usr/src/uts/common/net \
