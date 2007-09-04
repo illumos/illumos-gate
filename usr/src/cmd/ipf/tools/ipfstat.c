@@ -1557,10 +1557,8 @@ int topclosed;
 
 out:
 	printw("\n");
-	curs_set(1);
-	nocbreak();
+	refresh();
 	endwin();
-
 	free(tstable);
 	if (ret != 0)
 		perror(errstr);

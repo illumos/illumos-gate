@@ -97,6 +97,13 @@
 		timeout_seconds='30' >
 	</exec_method>
 
+	<exec_method
+		type='method'
+		name='refresh'
+		exec='/lib/svc/method/ipfilter reload'
+		timeout_seconds='30' >
+	</exec_method>
+
 	<property_group
 		name='startd'
 		type='framework'>
