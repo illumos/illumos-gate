@@ -152,6 +152,7 @@ SUNWprivate_1.1 {
 	zpool_refresh_stats;
 	zpool_remove_zvol_links;
 	zpool_scrub;
+	zpool_set_history_str;
 	zpool_set_prop;
 	zpool_stage_history;
 	zpool_unmount_datasets;

@@ -57,8 +57,7 @@
 libzfs_handle_t *g_zfs;
 
 static FILE *mnttab_file;
-static int first_argc;
-static char **first_argv;
+static char history_str[HIS_MAX_RECORD_LEN];
 
 static int zfs_do_clone(int argc, char **argv);
 static int zfs_do_create(int argc, char **argv);
@@ -1299,7 +1298,7 @@ same_pool(zfs_handle_t *zhp, const char *name)
 
 	if (len1 != len2)
 		return (B_FALSE);
-	return (strncmp(name, zhname, len1) != 0);
+	return (strncmp(name, zhname, len1) == 0);
 }
 
 static int
@@ -1355,8 +1354,7 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 			 * be doing ioctls to different pools.  We need
 			 * to log this history once to each pool.
 			 */
-			zpool_stage_history(g_zfs, first_argc, first_argv,
-			    B_TRUE);
+			verify(zpool_stage_history(g_zfs, history_str) == 0);
 		}
 		if (zfs_prop_set(zhp, "version", verstr) == 0)
 			cb->cb_numupgraded++;
@@ -3816,16 +3814,14 @@ main(int argc, char **argv)
 
 	opterr = 0;
 
-	first_argc = argc;
-	first_argv = argv;
-
 	if ((g_zfs = libzfs_init()) == NULL) {
 		(void) fprintf(stderr, gettext("internal error: failed to "
 		    "initialize ZFS library\n"));
 		return (1);
 	}
 
-	zpool_stage_history(g_zfs, argc, argv, B_TRUE);
+	zpool_set_history_str("zfs", argc, argv, history_str);
+	verify(zpool_stage_history(g_zfs, history_str) == 0);
 
 	libzfs_print_on_error(g_zfs, B_TRUE);
 

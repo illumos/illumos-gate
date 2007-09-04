@@ -169,6 +169,7 @@ static zpool_command_t command_table[] = {
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
 
 zpool_command_t *current_command;
+static char history_str[HIS_MAX_RECORD_LEN];
 
 static const char *
 get_usage(zpool_help_t idx) {
@@ -3788,17 +3789,14 @@ main(int argc, char **argv)
 
 	cmdname = argv[1];
 
-	/* Handle special case of pool create for staging history */
-	if (strcmp(cmdname, "create") != 0)
-		zpool_stage_history(g_zfs, argc, argv, B_FALSE);
-	else
-		zpool_stage_history(g_zfs, argc, argv, B_FALSE);
-
 	/*
 	 * Special case '-?'
 	 */
 	if (strcmp(cmdname, "-?") == 0)
 		usage(B_TRUE);
+
+	zpool_set_history_str("zpool", argc, argv, history_str);
+	verify(zpool_stage_history(g_zfs, history_str) == 0);
 
 	/*
 	 * Run the appropriate command.

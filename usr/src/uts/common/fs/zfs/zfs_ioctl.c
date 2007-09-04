@@ -678,19 +678,17 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 	nvlist_t *config;
 	char *buf;
 
-	if ((buf = history_str_get(zc)) == NULL)
-		return (EINVAL);
-
-	if ((error = get_nvlist(zc, &config)) != 0) {
-		history_str_free(buf);
+	if ((error = get_nvlist(zc, &config)) != 0)
 		return (error);
-	}
+
+	buf = history_str_get(zc);
 
 	error = spa_create(zc->zc_name, config, zc->zc_value[0] == '\0' ?
 	    NULL : zc->zc_value, buf);
 
+	if (buf != NULL)
+		history_str_free(buf);
 	nvlist_free(config);
-	history_str_free(buf);
 
 	return (error);
 }
@@ -2113,9 +2111,9 @@ zfs_ioc_share(zfs_cmd_t *zc)
 }
 
 /*
- * pool destroy and pool export don't log the history as part of zfsdev_ioctl,
- * but rather zfs_ioc_pool_create, and zfs_ioc_pool_export do the loggin
- * of those commands.
+ * pool create, destroy, and export don't log the history as part of
+ * zfsdev_ioctl, but rather zfs_ioc_pool_create, and zfs_ioc_pool_export
+ * do the logging of those commands.
  */
 static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_create, zfs_secpolicy_config, POOL_NAME, B_FALSE },
