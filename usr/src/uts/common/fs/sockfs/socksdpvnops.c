@@ -353,7 +353,7 @@ socksdpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		return (0);
 
 
-	case SIOSYSENABLESDP: {
+	case SIOCSENABLESDP: {
 		int32_t enable;
 
 		/*

@@ -116,18 +116,18 @@ main(int argc, char *argv[])
 
 	if (argc == 2) {
 		/* Parse the on|off from the user */
-		if (strncasecmp(argv[1], "enable", 7) == 0) {
+		if (strcasecmp(argv[1], "enable") == 0) {
 			enable = 1;
-		} else if (strncasecmp(argv[1], "disable", 8) == 0) {
+		} else if (strcasecmp(argv[1], "disable") == 0) {
 			enable = 0;
-		} else if (strncasecmp(argv[1], "status", 7) == 0)
+		} else if (strcasecmp(argv[1], "status") == 0)
 			enable = -1;
 		else {
 			usage();
 		}
 	}
 
-	stri.ic_cmd = SIOSYSENABLESDP;
+	stri.ic_cmd = SIOCSENABLESDP;
 	stri.ic_timout = 0;
 	stri.ic_len = sizeof (int);
 	stri.ic_dp = (char *)&enable;

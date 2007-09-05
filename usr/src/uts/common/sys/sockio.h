@@ -316,7 +316,7 @@ extern "C" {
 #define	SIOCSIPMPFAILBACK	_IOW('i', 182, int)	/* enable/disable */
 							/* FAILBACK */
 
-#define	SIOSYSENABLESDP _IOWR('i', 183, int)    /*  Enable SDP */
+#define	SIOCSENABLESDP _IOWR('i', 183, int)    /*  Enable SDP */
 
 #ifdef	__cplusplus
 }

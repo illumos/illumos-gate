@@ -182,7 +182,7 @@ sdp_gen_ioctl(queue_t *q, mblk_t *mp)
 	/* LINTED */
 	iocp = (struct iocblk *)mp->b_rptr;
 	switch (iocp->ioc_cmd) {
-		case SIOSYSENABLESDP:
+		case SIOCSENABLESDP:
 			bcopy(mp->b_cont->b_rptr, &enable, sizeof (int));
 
 			/*
