@@ -152,6 +152,7 @@ COMMON_SUBDIRS= \
 	SUNW1394 \
 	SUNWaccr  \
 	SUNWaccu  \
+	SUNWafe \
 	SUNWapct \
 	SUNWauda  \
 	SUNWaudd  \
