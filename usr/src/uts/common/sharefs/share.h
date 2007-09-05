@@ -71,12 +71,12 @@ enum sharefs_sys_op { SHAREFS_ADD, SHAREFS_REMOVE, SHAREFS_REPLACE };
 
 #ifdef _KERNEL
 
-extern int	sharefs(enum sharefs_sys_op opcode, struct share *sh,
-			uint32_t iMaxLen);
+extern int sharefs(enum sharefs_sys_op opcode, struct share *sh,
+    uint32_t iMaxLen);
 
 #else
 
-extern int	sharefs(enum sharefs_sys_op opcode, struct share *sh);
+extern int _sharefs(enum sharefs_sys_op opcode, struct share *sh);
 
 #endif
 

@@ -170,7 +170,7 @@ sharefs_init(int fstype, char *name)
 
 	if ((sharefs_major = getudev()) == (major_t)-1) {
 		cmn_err(CE_WARN,
-			"sharefs_init: can't get unique device number");
+		    "sharefs_init: can't get unique device number");
 		sharefs_major = 0;
 	}
 

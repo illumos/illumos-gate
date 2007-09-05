@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak sharefs = _sharefs
+#pragma weak _sharefs = __sharefs
 
 #include "synonyms.h"
 #include <sys/types.h>
@@ -44,7 +44,7 @@
 	}
 
 int
-sharefs(enum sharefs_sys_op opcode, struct share *sh)
+_sharefs(enum sharefs_sys_op opcode, struct share *sh)
 {
 	uint32_t		i, j;
 

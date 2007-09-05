@@ -940,7 +940,7 @@ extern "C" {
 #define	s_fcntl			_s_fcntl
 #define	sfconvert		_sfconvert
 #define	sgconvert		_sgconvert
-#define	sharefs			_sharefs
+#define	_sharefs		__sharefs
 #define	shmat			_shmat
 #define	shmctl64		_shmctl64
 #define	shmctl			_shmctl

@@ -94,12 +94,12 @@ sharefs_snap_create(shnode_t *sft)
 
 		for (i = 0; i < SHARETAB_HASHES; i++) {
 			for (sh = sht->s_buckets[i].ssh_sh;
-					sh != NULL;
-					sh = sh->sh_next) {
+			    sh != NULL;
+			    sh = sh->sh_next) {
 				int	n;
 
 				if ((sWritten + sh->sh_size) >
-						sft->sharefs_size) {
+				    sft->sharefs_size) {
 					goto error_fault;
 				}
 
@@ -112,13 +112,13 @@ sharefs_snap_create(shnode_t *sft)
 				 * each share by the EOS marker.
 				 */
 				n = snprintf(&buf[sWritten],
-					sh->sh_size + 1,
-					"%s\t%s\t%s\t%s\t%s\n",
-					sh->sh_path,
-					sh->sh_res,
-					sh->sh_fstype,
-					sh->sh_opts,
-					sh->sh_descr);
+				    sh->sh_size + 1,
+				    "%s\t%s\t%s\t%s\t%s\n",
+				    sh->sh_path,
+				    sh->sh_res,
+				    sh->sh_fstype,
+				    sh->sh_opts,
+				    sh->sh_descr);
 
 				if (n != sh->sh_size) {
 					goto error_fault;
@@ -329,7 +329,7 @@ sharefs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr,
 
 	if (len != 0) {
 		error = uiomove(sft->sharefs_snap + off,
-				len, UIO_READ, uio);
+		    len, UIO_READ, uio);
 	}
 
 	rw_exit(&sharefs_lock);
@@ -362,7 +362,7 @@ sharefs_create_root_file(vfs_t *vfsp)
 	shnode_t	*sft;
 
 	vp = gfs_root_create_file(sizeof (shnode_t),
-			vfsp, sharefs_ops_data, SHAREFS_INO_FILE);
+	    vfsp, sharefs_ops_data, SHAREFS_INO_FILE);
 
 	sft = VTOSH(vp);
 

@@ -2006,7 +2006,7 @@ sa_update_sharetab(sa_share_t share, char *proto)
 		 * Fill in share structure and send it to the kernel.
 		 */
 		(void) sa_fillshare(share, proto, &sh);
-		(void) sharefs(SHAREFS_ADD, &sh);
+		(void) _sharefs(SHAREFS_ADD, &sh);
 		sa_emptyshare(&sh);
 		sa_free_attr_string(path);
 	}
@@ -2036,7 +2036,7 @@ sa_delete_sharetab(char *path, char *proto)
 		sh.sh_path = path;
 		sh.sh_fstype = proto;
 
-		ret = sharefs(SHAREFS_REMOVE, &sh);
+		ret = _sharefs(SHAREFS_REMOVE, &sh);
 	}
 
 	return (ret);
