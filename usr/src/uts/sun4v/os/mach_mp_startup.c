@@ -30,7 +30,6 @@
 #include <sys/cpu_module.h>
 #include <sys/dtrace.h>
 #include <sys/cpu_sgnblk_defs.h>
-#include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
 #include <sys/ldoms.h>
 #include <sys/hypervisor_api.h>
@@ -175,11 +174,6 @@ out:
 int
 mp_cpu_configure(int cpuid)
 {
-	extern void fill_cpu(md_t *, mde_cookie_t);
-	extern int setup_cpu_common(int);
-	extern int cleanup_cpu_common(int);
-	extern void setup_exec_unit_mappings(md_t *);
-
 	md_t		*mdp;
 	mde_cookie_t	rootnode, cpunode = MDE_INVAL_ELEM_COOKIE;
 	int		listsz, i;
@@ -237,6 +231,7 @@ mp_cpu_configure(int cpuid)
 	 * relationships to change. Update the mappings in
 	 * the cpunode structures.
 	 */
+	setup_chip_mappings(mdp);
 	setup_exec_unit_mappings(mdp);
 
 	/* propagate the updated mappings to the CPU structures */

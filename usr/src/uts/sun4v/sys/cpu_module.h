@@ -34,6 +34,7 @@
 #include <sys/x_call.h>
 #include <sys/conf.h>
 #include <sys/obpdefs.h>
+#include <sys/mdesc.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -159,6 +160,11 @@ void	cpu_trapstat_data(void *buf, uint_t pgszs);
 					    | (1 << TTE4M))
 
 void	cpu_setup_common(char **);
+void	fill_cpu(md_t *, mde_cookie_t);
+int	setup_cpu_common(int);
+int	cleanup_cpu_common(int);
+void	setup_exec_unit_mappings(md_t *);
+void	setup_chip_mappings(md_t *);
 
 boolean_t	broken_md_flag;
 int	va_bits;
