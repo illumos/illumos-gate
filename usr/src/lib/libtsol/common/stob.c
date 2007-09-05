@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,7 +231,7 @@ stobclear(const char *string, bclear_t *clearance, int flags, int *error)
 	labeld_data_t	call;
 	labeld_data_t	*callp = &call;
 	size_t	bufsize = sizeof (labeld_data_t);
-	size_t	datasize = CALL_SIZE(callp->param.acall, strlen(string) + 1);
+	size_t	datasize = CALL_SIZE(stobclear_call_t, strlen(string) + 1);
 	int	rval;
 
 	if (ISHEX(flags, string)) {
