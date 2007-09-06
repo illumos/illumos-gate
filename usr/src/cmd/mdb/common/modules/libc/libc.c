@@ -728,11 +728,11 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr((void *)(addr + OFFSET(fork_lock)), 1),
 		prt_addr((void *)(addr + OFFSET(atfork_lock)), 0));
 
-	HD("&tdb_hash_lock        &tdb_hash_lock_stats  &siguaction[0]");
+	HD("&callout_lock         &tdb_hash_lock        &siguaction[0]");
 	mdb_printf(OFFSTR "%s %s %s\n",
-		OFFSET(tdb_hash_lock),
+		OFFSET(callout_lock),
+		prt_addr((void *)(addr + OFFSET(callout_lock)), 1),
 		prt_addr((void *)(addr + OFFSET(tdb_hash_lock)), 1),
-		prt_addr((void *)(addr + OFFSET(tdb_hash_lock_stats)), 1),
 		prt_addr((void *)(addr + OFFSET(siguaction)), 0));
 
 	HD("&bucket               free_list             chunks");

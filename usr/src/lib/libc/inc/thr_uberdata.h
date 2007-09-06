@@ -776,7 +776,8 @@ typedef struct uberdata {
 	pad_lock_t	_link_lock;
 	pad32_lock_t	_fork_lock;
 	pad32_lock_t	_atfork_lock;
-	pad_lock_t	_tdb_hash_lock;
+	pad32_lock_t	_callout_lock;
+	pad32_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
 	siguaction_t	siguaction[NSIG];
 	bucket_t	bucket[NBUCKETS];
@@ -820,6 +821,7 @@ typedef struct uberdata {
 #define	link_lock	_link_lock.pad_lock
 #define	fork_lock	_fork_lock.pad_lock
 #define	atfork_lock	_atfork_lock.pad_lock
+#define	callout_lock	_callout_lock.pad_lock
 #define	tdb_hash_lock	_tdb_hash_lock.pad_lock
 
 #pragma align 64(__uberdata)
@@ -980,7 +982,8 @@ typedef struct uberdata32 {
 	pad_lock_t	_link_lock;
 	pad32_lock_t	_fork_lock;
 	pad32_lock_t	_atfork_lock;
-	pad_lock_t	_tdb_hash_lock;
+	pad32_lock_t	_callout_lock;
+	pad32_lock_t	_tdb_hash_lock;
 	tdb_sync_stats_t tdb_hash_lock_stats;
 	siguaction32_t	siguaction[NSIG];
 	bucket32_t	bucket[NBUCKETS];

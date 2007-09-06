@@ -35,28 +35,31 @@
 #include <sys/uio.h>
 
 /*
+ * atfork_lock protects the pthread_atfork() data structures.
+ *
  * fork_lock does double-duty.  Not only does it (and atfork_lock)
  * serialize calls to fork() and forkall(), but it also serializes calls
  * to thr_suspend() and thr_continue() (because fork() and forkall() also
  * suspend and continue other threads and they want no competition).
  *
- * atfork_lock also does double-duty.  Not only does it protect the
- * pthread_atfork() data structures, but it also serializes I18N calls
- * to functions in dlopen()ed L10N objects.  These functions can do
- * anything, including call malloc() and free().  Such calls are not
- * fork-safe when protected by an ordinary mutex because, with an
- * interposed malloc library present, there would be a lock ordering
- * violation due to the pthread_atfork() prefork function in the
- * interposition library acquiring its malloc lock(s) before the
+ * Functions called in dlopen()ed L10N objects can do anything, including
+ * call malloc() and free().  Such calls are not fork-safe when protected
+ * by an ordinary mutex that is acquired in libc's prefork processing
+ * because, with an interposed malloc library present, there would be a
+ * lock ordering violation due to the pthread_atfork() prefork function
+ * in the interposition library acquiring its malloc lock(s) before the
  * ordinary mutex in libc being acquired by libc's prefork functions.
  *
- * Within libc, calls to malloc() and free() are fork-safe only if the
- * calls are made while holding no other libc locks.  This covers almost
- * all of libc's malloc() and free() calls.  For those libc code paths,
- * such as the above-mentioned I18N calls, that require serialization and
- * that may call malloc() or free(), libc uses atfork_lock_enter() to perform
- * the serialization.  This works because atfork_lock is acquired by fork()
- * before any of the pthread_atfork() prefork functions are called.
+ * Within libc, calls to malloc() and free() are fork-safe if the calls
+ * are made while holding no other libc locks.  This covers almost all
+ * of libc's malloc() and free() calls.  For those libc code paths, such
+ * as the above-mentioned L10N calls, that require serialization and that
+ * may call malloc() or free(), libc uses callout_lock_enter() to perform
+ * the serialization.  This works because callout_lock is not acquired as
+ * part of running the pthread_atfork() prefork handlers (to avoid the
+ * lock ordering violation described above).  Rather, it is simply
+ * reinitialized in postfork1_child() to cover the case that some
+ * now-defunct thread might have been suspended while holding it.
  */
 
 void
@@ -74,17 +77,17 @@ fork_lock_exit(void)
 }
 
 void
-atfork_lock_enter(void)
+callout_lock_enter(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_lock(&curthread->ul_uberdata->atfork_lock);
+	(void) _private_mutex_lock(&curthread->ul_uberdata->callout_lock);
 }
 
 void
-atfork_lock_exit(void)
+callout_lock_exit(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_unlock(&curthread->ul_uberdata->atfork_lock);
+	(void) _private_mutex_unlock(&curthread->ul_uberdata->callout_lock);
 }
 
 #pragma weak forkx = _private_forkx

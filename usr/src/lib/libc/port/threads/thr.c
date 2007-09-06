@@ -76,6 +76,7 @@ uberdata_t __uberdata = {
 	{ DEFAULTMUTEX, NULL, 0 },	/* link_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* fork_lock */
 	{ RECURSIVEMUTEX, NULL, 0 },	/* atfork_lock */
+	{ RECURSIVEMUTEX, NULL, 0 },	/* callout_lock */
 	{ DEFAULTMUTEX, NULL, 0 },	/* tdb_hash_lock */
 	{ 0, },				/* tdb_hash_lock_stats */
 	{ { 0 }, },			/* siguaction[NSIG] */
@@ -1629,6 +1630,13 @@ postfork1_child()
 		udp->thr_hash_table[i].hash_bucket = NULL;
 	self->ul_lwpid = __lwp_self();
 	hash_in_unlocked(self, TIDHASH(self->ul_lwpid, udp), udp);
+
+	/*
+	 * Some thread in the parent might have been suspended while
+	 * holding udp->callout_lock.  Reinitialize the child's copy.
+	 */
+	_private_mutex_init(&udp->callout_lock,
+	    USYNC_THREAD | LOCK_RECURSIVE, NULL);
 
 	/* no one in the child is on a sleep queue; reinitialize */
 	if (udp->queue_head) {

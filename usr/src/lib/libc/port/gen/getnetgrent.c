@@ -137,7 +137,7 @@ innetgr(group, host, user, domain)
  * serialize them ourselves (anything to prevent a coredump)...
  * We can't use lmutex_lock() here because we don't know what the backends
  * that we call may call in turn.  They might call malloc()/free().
- * So we use the brute-force atfork_lock_enter() instead.
+ * So we use the brute-force callout_lock_enter() instead.
  */
 static nss_backend_t	*getnetgrent_backend;
 
@@ -151,7 +151,7 @@ setnetgrent(const char *netgroup)
 		netgroup = "";
 	}
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	be = getnetgrent_backend;
 	if (be != NULL && NSS_INVOKE_DBOP(be, NSS_DBOP_SETENT,
 	    (void *)netgroup) != NSS_SUCCESS) {
@@ -168,7 +168,7 @@ setnetgrent(const char *netgroup)
 		be = args.iterator;
 	}
 	getnetgrent_backend = be;
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (0);
 }
 
@@ -186,12 +186,12 @@ getnetgrent_r(machinep, namep, domainp, buffer, buflen)
 	args.buflen	= buflen;
 	args.status	= NSS_NETGR_NO;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (getnetgrent_backend != 0) {
 		(void) NSS_INVOKE_DBOP(getnetgrent_backend,
 			NSS_DBOP_GETENT, &args);
 	}
-	atfork_lock_exit();
+	callout_lock_exit();
 
 	if (args.status == NSS_NETGR_FOUND) {
 		*machinep = args.retp[NSS_NETGR_MACHINE];
@@ -219,13 +219,13 @@ getnetgrent(machinep, namep, domainp)
 int
 endnetgrent()
 {
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (getnetgrent_backend != 0) {
 		(void) NSS_INVOKE_DBOP(getnetgrent_backend,
 		    NSS_DBOP_DESTRUCTOR, 0);
 		getnetgrent_backend = 0;
 	}
-	atfork_lock_exit();
+	callout_lock_exit();
 	nss_delete(&db_root);	/* === ? */
 	NSS_XbyY_FREE(&buf);
 	return (0);

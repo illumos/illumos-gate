@@ -120,9 +120,9 @@ wdinit()
 {
 	int res;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	res = _wdinitialize();
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (res);
 }
 
@@ -135,11 +135,11 @@ wdchkind(wchar_t wc)
 {
 	int i;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	i = (*wdchknd)(wc);
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (i);
 }
 static int
@@ -170,15 +170,15 @@ wdbindf(wchar_t wc1, wchar_t wc2, int type)
 {
 	int i;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (!iswprint(wc1) || !iswprint(wc2)) {
-		atfork_lock_exit();
+		callout_lock_exit();
 		return (-1);
 	}
 	i = (*wdbdg)(wc1, wc2, type);
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (i);
 }
 /*ARGSUSED*/
@@ -203,15 +203,15 @@ wddelim(wchar_t wc1, wchar_t wc2, int type)
 {
 	wchar_t *i;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (!iswprint(wc1) || !iswprint(wc2)) {
-		atfork_lock_exit();
+		callout_lock_exit();
 		return ((wchar_t *)L"");
 	}
 	i = (*wddlm)(wc1, wc2, type);
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (i);
 }
 /*ARGSUSED*/
@@ -230,7 +230,7 @@ mcfiller(void)
 {
 	wchar_t fillerchar;
 
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (mcfllr) {
@@ -238,11 +238,11 @@ mcfiller(void)
 		if (!fillerchar)
 			fillerchar = (wchar_t)'~';
 		if (iswprint(fillerchar)) {
-			atfork_lock_exit();
+			callout_lock_exit();
 			return (fillerchar);
 		}
 	}
-	atfork_lock_exit();
+	callout_lock_exit();
 	return ((wchar_t)'~');
 }
 
@@ -254,14 +254,14 @@ mcfiller(void)
 int
 mcwrap(void)
 {
-	atfork_lock_enter();
+	callout_lock_enter();
 	if (!initialized)
 		(void) _wdinitialize();
 	if (mcwrp)
 		if ((*mcwrp)() == 0) {
-			atfork_lock_exit();
+			callout_lock_exit();
 			return (0);
 		}
-	atfork_lock_exit();
+	callout_lock_exit();
 	return (1);
 }
