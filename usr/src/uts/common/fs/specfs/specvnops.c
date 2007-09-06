@@ -219,25 +219,37 @@ extern vnode_t *rconsvp;
 #define	LOCKHOLD_CSP_SIG(csp)		spec_lockcsp(csp, 1, 1, 1)
 #define	SYNCHOLD_CSP_SIG(csp, intr)	spec_lockcsp(csp, intr, 0, 1)
 
+typedef enum {
+	LOOP,
+	INTR,
+	SUCCESS
+} slock_ret_t;
+
 /*
- * Synchronize with active SLOCKED, optionally checking for a signal and
+ * Synchronize with active SLOCKED snode, optionally checking for a signal and
  * optionally returning with SLOCKED set and SN_HOLD done.  The 'intr'
  * argument determines if the thread is interruptible by a signal while
- * waiting, the function returns 0 if interrupted.  When 1 is returned
- * the 'hold' argument determines if the open count (SN_HOLD) has been
- * incremented and the 'setlock' argument determines if the function
- * returns with SLOCKED set.
+ * waiting, the function returns INTR if interrupted while there is another
+ * thread closing this snonde and LOOP if interrupted otherwise.
+ * When SUCCESS is returned the 'hold' argument determines if the open
+ * count (SN_HOLD) has been incremented and the 'setlock' argument
+ * determines if the function returns with SLOCKED set.
  */
-static int
+static slock_ret_t
 spec_lockcsp(struct snode *csp, int intr, int setlock, int hold)
 {
+	slock_ret_t ret = SUCCESS;
 	mutex_enter(&csp->s_lock);
 	while (csp->s_flag & SLOCKED) {
 		csp->s_flag |= SWANT;
 		if (intr) {
 			if (!cv_wait_sig(&csp->s_cv, &csp->s_lock)) {
+				if (csp->s_flag & SCLOSING)
+					ret = INTR;
+				else
+					ret = LOOP;
 				mutex_exit(&csp->s_lock);
-				return (0);		/* interrupted */
+				return (ret);		/* interrupted */
 			}
 		} else {
 			cv_wait(&csp->s_cv, &csp->s_lock);
@@ -248,7 +260,7 @@ spec_lockcsp(struct snode *csp, int intr, int setlock, int hold)
 	if (hold)
 		csp->s_count++;		/* one more open reference : SN_HOLD */
 	mutex_exit(&csp->s_lock);
-	return (1);			/* serialized/locked */
+	return (ret);			/* serialized/locked */
 }
 
 /*
@@ -548,6 +560,8 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	int error, type;
 	contract_t *ct = NULL;
 	int open_returns_eintr;
+	slock_ret_t spec_locksp_ret;
+
 
 	flag &= ~FCREAT;		/* paranoia */
 
@@ -627,8 +641,9 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 		open_returns_eintr = 1;
 	else
 		open_returns_eintr = 0;
-	while (SYNCHOLD_CSP_SIG(csp, open_returns_eintr) == 0) {
-		if (csp->s_flag & SCLOSING)
+	while ((spec_locksp_ret = SYNCHOLD_CSP_SIG(csp, open_returns_eintr)) !=
+	    SUCCESS) {
+		if (spec_locksp_ret == INTR)
 			return (EINTR);
 	}
 
@@ -738,7 +753,7 @@ streams_open:
 	 * D_OPEN_RETURNS_EINTR. Open count already incremented (SN_HOLD)
 	 * on non-zero return.
 	 */
-	if (LOCKHOLD_CSP_SIG(csp) == 0)
+	if (LOCKHOLD_CSP_SIG(csp) != SUCCESS)
 		return (EINTR);
 
 	error = stropen(cvp, &newdev, flag, cr);
