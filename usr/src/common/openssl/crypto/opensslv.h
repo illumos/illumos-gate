@@ -29,7 +29,7 @@
 #ifdef OPENSSL_FIPS
 #define OPENSSL_VERSION_TEXT	"OpenSSL 0.9.8a-fips 11 Oct 2005"
 #else
-#define OPENSSL_VERSION_TEXT	"OpenSSL 0.9.8a 11 Oct 2005 (+ security patches to 2006-09-29)"
+#define OPENSSL_VERSION_TEXT	"OpenSSL 0.9.8a 11 Oct 2005 (+ security patches to 2007-09-01)"
 #endif
 #define OPENSSL_VERSION_PTEXT	" part of " OPENSSL_VERSION_TEXT
 
