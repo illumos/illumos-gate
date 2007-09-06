@@ -135,7 +135,7 @@ main(int argc, char *argv[])
 			aliases = optarg;
 			if (check_space_within_quote(aliases) == ERROR) {
 				(void) fprintf(stderr, gettext(ERR_NO_SPACE),
-					aliases);
+				    aliases);
 				exit(1);
 			}
 			break;
@@ -269,7 +269,7 @@ main(int argc, char *argv[])
 
 		if (priv != NULL) {
 			(void) append_to_file(driver_name, priv, extra_privs,
-					',', ":", 0);
+			    ',', ":", 0);
 			cleanup_flag |= CLEAN_DRV_PRIV;
 		}
 
@@ -320,17 +320,20 @@ main(int argc, char *argv[])
 			if ((error = update_driver_aliases(driver_name,
 			    aliases)) == ERROR) {
 				exit_unlock();
-
 				return (error);
 			}
 
 			/* paranoia - if we crash whilst configuring */
 			sync();
 
-			cleanup_flag |= CLEAN_DRV_ALIAS;
-			if (config_driver(driver_name, major_num, aliases, NULL,
-			    cleanup_flag, verbose_flag) == ERROR) {
-				err_exit();
+			/* optionally update the running system - not -b */
+			if (update_conf) {
+				cleanup_flag |= CLEAN_DRV_ALIAS;
+				if (config_driver(driver_name, major_num,
+				    aliases, NULL, cleanup_flag,
+				    verbose_flag) == ERROR) {
+					err_exit();
+				}
 			}
 
 		}
@@ -413,7 +416,7 @@ main(int argc, char *argv[])
 
 		if (policy != NULL) {
 			if ((error = delete_plcy_entry(device_policy,
-				policy)) != NOERR) {
+			    policy)) != NOERR) {
 				(void) fprintf(stderr, gettext(ERR_NO_ENTRY),
 				    driver_name, device_policy);
 				if (err != NOERR)
