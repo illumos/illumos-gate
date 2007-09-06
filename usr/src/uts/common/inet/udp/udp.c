@@ -1281,7 +1281,9 @@ udp_bind(queue_t *q, mblk_t *mp)
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (zoneid != udp1->udp_connp->conn_zoneid &&
+			if (!(IPCL_ZONE_MATCH(udp1->udp_connp, zoneid) ||
+			    IPCL_ZONE_MATCH(connp,
+			    udp1->udp_connp->conn_zoneid)) &&
 			    !udp->udp_mac_exempt && !udp1->udp_mac_exempt)
 				continue;
 
@@ -1804,7 +1806,10 @@ udp_connect(queue_t *q, mblk_t *mp)
 		    dstport != udp1->udp_dstport ||
 		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6src, &udp1->udp_v6src) ||
 		    !IN6_ARE_ADDR_EQUAL(&v6dst, &udp1->udp_v6dst) ||
-		    udp->udp_connp->conn_zoneid != udp1->udp_connp->conn_zoneid)
+		    !(IPCL_ZONE_MATCH(udp->udp_connp,
+		    udp1->udp_connp->conn_zoneid) ||
+		    IPCL_ZONE_MATCH(udp1->udp_connp,
+		    udp->udp_connp->conn_zoneid)))
 			continue;
 		mutex_exit(&udpf->uf_lock);
 		udp_err_ack(q, mp, TBADADDR, 0);

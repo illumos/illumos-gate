@@ -3557,7 +3557,9 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (!IPCL_ZONE_MATCH(ltcp->tcp_connp, zoneid) &&
+			if (!(IPCL_ZONE_MATCH(ltcp->tcp_connp, zoneid) ||
+			    IPCL_ZONE_MATCH(connp,
+			    ltcp->tcp_connp->conn_zoneid)) &&
 			    !lconnp->conn_mac_exempt &&
 			    !connp->conn_mac_exempt)
 				continue;
