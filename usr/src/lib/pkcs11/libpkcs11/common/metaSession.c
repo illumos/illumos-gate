@@ -313,6 +313,8 @@ meta_GetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 		opstate.state[0].op_slotnum = slot_session->slotnum;
 		opstate.state[0].op_state_len = *pulOperationStateLen -
 		    sizeof (meta_opstate_t);
+		opstate.state[0].op_init_app = session->init.app;
+		opstate.state[0].op_init_done = session->init.done;
 		rv = FUNCLIST(slot_session->fw_st_id)->C_GetOperationState(
 		    slot_session->hSession,
 		    pOperationState + sizeof (meta_opstate_t),
@@ -470,6 +472,8 @@ meta_SetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 
 		session->op1.type = opstate.state[0].op_type;
 		session->op1.session = slot_session;
+		session->init.app = opstate.state[0].op_init_app;
+		session->init.done = opstate.state[0].op_init_done;
 
 		rv = meta_set_opstate(slot_session, meta_enc_key,
 		    meta_auth_key, &(opstate.state[0]),

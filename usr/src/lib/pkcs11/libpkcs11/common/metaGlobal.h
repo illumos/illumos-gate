@@ -418,6 +418,8 @@ typedef struct opstate_data {
 	CK_FLAGS	op_type;
 	CK_ULONG	op_slotnum;
 	CK_ULONG	op_state_len;
+	boolean_t	op_init_app;
+	boolean_t	op_init_done;
 } opstate_data_t;
 
 struct metaopstate {
