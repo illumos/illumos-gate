@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,13 +50,13 @@ extern int _nfssys(int, void *);
 /*
  * simple list used to keep track of bad tag messages syslogged.
  */
-struct list {
+struct nfs_log_list {
 	char *l_name;
-	struct list *l_next;
+	struct nfs_log_list *l_next;
 };
 
 static void badtag_notify(char *tag);
-static struct list *badtag_list = NULL;
+static struct nfs_log_list *badtag_list = NULL;
 
 static void cleanup_elf_state(nfsl_config_t *);
 static void cleanup_trans_state(nfsl_config_t *);
@@ -104,22 +103,22 @@ process_buffer(
 		if (error == ENOENT) {
 			error = 0;
 			buffer_inprog_len = strlen(bufferpath) +
-				strlen(LOG_INPROG_STRING) + 1;
+			    strlen(LOG_INPROG_STRING) + 1;
 			buffer_inprog = (char *)malloc(buffer_inprog_len);
 			if (buffer_inprog == NULL) {
 				syslog(LOG_ERR, gettext(
-					"process_buffer: malloc failed"));
+				    "process_buffer: malloc failed"));
 				return (ENOMEM);
 			}
 			(void) sprintf(buffer_inprog, "%s%s", bufferpath,
-				LOG_INPROG_STRING);
+			    LOG_INPROG_STRING);
 
 			if (stat(buffer_inprog, &st) == -1) {
 				error = errno;
 				if (bep->be_error != error) {
 					syslog(LOG_ERR, gettext(
-						"Can not stat %s: %s"),
-						buffer_inprog, strerror(error));
+					    "Can not stat %s: %s"),
+					    buffer_inprog, strerror(error));
 				}
 				free(buffer_inprog);
 				return (error);
@@ -159,15 +158,15 @@ process_buffer(
 				error = errno;
 				if (bep->be_error != error) {
 					syslog(LOG_ERR, gettext(
-						"_nfssys(%s) failed: %s"),
-						nfa.buff, strerror(error));
+					    "_nfssys(%s) failed: %s"),
+					    nfa.buff, strerror(error));
 				}
 				return (error);
 			}
 		} else {
 			if (bep->be_error != error) {
 				syslog(LOG_ERR, gettext("Can not stat %s: %s"),
-					bufferpath, strerror(error));
+				    bufferpath, strerror(error));
 			}
 			return (error);
 		}
@@ -188,8 +187,8 @@ process_buffer(
 		nfsl_freeconfig_list(config_list);
 		if (error != bep->be_error) {
 			syslog(LOG_ERR, gettext(
-				"Could not search config list: %s"),
-			strerror(error));
+			    "Could not search config list: %s"),
+			    strerror(error));
 		}
 		goto done;
 	}
@@ -209,8 +208,8 @@ process_buffer(
 			if (error) {
 				if (error != bep->be_error) {
 					syslog(LOG_ERR, gettext(
-					"Could not search config list: %s"),
-					strerror(error));
+					    "Could not search config list: %s"),
+					    strerror(error));
 				}
 				nfsl_freeconfig_list(config_list);
 				goto done;
@@ -266,8 +265,7 @@ process_buffer(
 			if (ncp->nc_elfcookie == NULL) {
 				error = bep->be_error;
 				ncp->nc_elfcookie = nfslog_open_elf_file(
-					ncp->nc_rpclogpath,
-					&lbp->bh, &error);
+				    ncp->nc_rpclogpath, &lbp->bh, &error);
 				if (ncp->nc_elfcookie == NULL) {
 					bep->be_error = error;
 					goto done;
@@ -300,14 +298,12 @@ process_buffer(
 				int transtolog;
 
 				transtolog =
-				(ncp->nc_logformat == TRANSLOG_BASIC) ?
-					TRANSTOLOG_OPER_READWRITE :
-					TRANSTOLOG_ALL;
+				    (ncp->nc_logformat == TRANSLOG_BASIC) ?
+				    TRANSTOLOG_OPER_READWRITE : TRANSTOLOG_ALL;
 				error = bep->be_error;
 				ncp->nc_transcookie = nfslog_open_trans_file(
-					ncp->nc_logpath,
-					ncp->nc_logformat,
-					transtolog, &error);
+				    ncp->nc_logpath, ncp->nc_logformat,
+				    transtolog, &error);
 				if (ncp->nc_transcookie == NULL) {
 					bep->be_error = error;
 					goto done;
@@ -324,14 +320,14 @@ process_buffer(
 			 */
 			if (ncp->nc_elfcookie != NULL) {
 				(void) nfslog_process_elf_rec(ncp->nc_elfcookie,
-					&lrp->log_record, path1, path2);
+				    &lrp->log_record, path1, path2);
 			}
 
 			if (ncp->nc_transcookie != NULL) {
 				(void) nfslog_process_trans_rec(
-					ncp->nc_transcookie,
-					&lrp->log_record, ncp->nc_fhpath,
-					path1, path2);
+				    ncp->nc_transcookie,
+				    &lrp->log_record, ncp->nc_fhpath,
+				    path1, path2);
 			}
 		}
 
@@ -358,8 +354,8 @@ skip:		if (path1 != NULL)
 			 */
 			if (cycle_log(bufferpath, max_logs_preserve)) {
 				syslog(LOG_ERR, gettext(
-					"could not save copy of buffer \"%s\""),
-					bufferpath);
+				    "could not save copy of buffer \"%s\""),
+				    bufferpath);
 			}
 		} else {
 			/*
@@ -368,8 +364,8 @@ skip:		if (path1 != NULL)
 			if (unlink(bufferpath)) {
 				error = errno;
 				syslog(LOG_ERR, gettext(
-					"could not unlink %s: %s"),
-					bufferpath, strerror(error));
+				    "could not unlink %s: %s"),
+				    bufferpath, strerror(error));
 				/*
 				 * Buffer was processed correctly.
 				 */
@@ -415,7 +411,7 @@ cleanup_trans_state(nfsl_config_t *ncp)
 static void
 badtag_notify(char *tag)
 {
-	struct list *lp, *p;
+	struct nfs_log_list *lp, *p;
 	int error;
 
 	for (p = badtag_list; p != NULL; p = p->l_next) {
@@ -430,12 +426,11 @@ badtag_notify(char *tag)
 	/*
 	 * Not on the list, add it.
 	 */
-	syslog(LOG_ERR, gettext(
-		"tag \"%s\" not found in %s - "
-		"ignoring records referencing such tag."),
-		tag, NFSL_CONFIG_FILE_PATH);
+	syslog(LOG_ERR, gettext("tag \"%s\" not found in %s - "
+	    "ignoring records referencing such tag."),
+	    tag, NFSL_CONFIG_FILE_PATH);
 
-	if ((lp = (struct list *)malloc(sizeof (*lp))) != NULL) {
+	if ((lp = (struct nfs_log_list *)malloc(sizeof (*lp))) != NULL) {
 		if ((lp->l_name = strdup(tag)) != NULL) {
 			lp->l_next = badtag_list;
 			badtag_list = lp;

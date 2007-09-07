@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,9 @@
  * For source compatibility
  */
 #include <sys/isa_defs.h>
+#ifdef _KERNEL
 #include <sys/vnode.h>
+#endif
 #include <sys/poll.h>
 #include <sys/strmdep.h>
 #include <sys/cred.h>

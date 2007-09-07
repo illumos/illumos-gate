@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +30,6 @@
 #include <sys/loadavg.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/swap.h>
 #include <sys/utsname.h>
 
 #include <stdio.h>
@@ -294,13 +292,13 @@ list_update(list_t *list, lwp_info_t *lwp)
 
 	for (id = list->l_head; id; id = id->id_next) {
 		if ((list->l_type == LT_PROCESS) &&
-			(id->id_pid != lwp->li_psinfo->pr_pid))
+		    (id->id_pid != lwp->li_psinfo->pr_pid))
 			continue;
 		if ((list->l_type == LT_USERS) &&
-			(id->id_uid != lwp->li_psinfo->pr_uid))
+		    (id->id_uid != lwp->li_psinfo->pr_uid))
 			continue;
 		if ((list->l_type == LT_PROJECTS) &&
-			(id->id_projid != lwp->li_psinfo->pr_projid))
+		    (id->id_projid != lwp->li_psinfo->pr_projid))
 			continue;
 		id_update(id, lwp, list->l_type);
 		return;
@@ -326,8 +324,8 @@ list_refresh_id(list_t *list)
 	id_info_t *id, *id_next;
 
 	if (!(list->l_type & LT_PROCESS) && !(list->l_type & LT_USERS) &&
-		!(list->l_type & LT_TASKS) && !(list->l_type & LT_PROJECTS) &&
-		!(list->l_type & LT_PSETS)) {
+	    !(list->l_type & LT_TASKS) && !(list->l_type & LT_PROJECTS) &&
+	    !(list->l_type & LT_PSETS)) {
 		return;
 	}
 	id = list->l_head;
@@ -342,10 +340,10 @@ list_refresh_id(list_t *list)
 			/* normalize total mem and cpu across all processes. */
 			if (total_mem >= 100)
 				id->id_pctmem = (100 * id->id_pctmem) /
-						total_mem;
+				    total_mem;
 			if (total_cpu >= 100)
 				id->id_pctcpu = (100 * id->id_pctcpu) /
-						total_cpu;
+				    total_cpu;
 
 			id->id_alive = B_FALSE;
 			id = id->id_next;
@@ -385,25 +383,25 @@ static void
 lwp_update(lwp_info_t *lwp, struct prusage *usage_buf)
 {
 	lwp->li_usr	= (double)(TIME2NSEC(usage_buf->pr_utime) -
-			TIME2NSEC(lwp->li_usage.pr_utime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_utime)) / NANOSEC;
 	lwp->li_sys	= (double)(TIME2NSEC(usage_buf->pr_stime) -
-			TIME2NSEC(lwp->li_usage.pr_stime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_stime)) / NANOSEC;
 	lwp->li_ttime	= (double)(TIME2NSEC(usage_buf->pr_ttime) -
-			TIME2NSEC(lwp->li_usage.pr_ttime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_ttime)) / NANOSEC;
 	lwp->li_tpftime = (double)(TIME2NSEC(usage_buf->pr_tftime) -
-			TIME2NSEC(lwp->li_usage.pr_tftime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_tftime)) / NANOSEC;
 	lwp->li_dpftime = (double)(TIME2NSEC(usage_buf->pr_dftime) -
-			TIME2NSEC(lwp->li_usage.pr_dftime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_dftime)) / NANOSEC;
 	lwp->li_kpftime = (double)(TIME2NSEC(usage_buf->pr_kftime) -
-			TIME2NSEC(lwp->li_usage.pr_kftime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_kftime)) / NANOSEC;
 	lwp->li_lck	= (double)(TIME2NSEC(usage_buf->pr_ltime) -
-			TIME2NSEC(lwp->li_usage.pr_ltime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_ltime)) / NANOSEC;
 	lwp->li_slp	= (double)(TIME2NSEC(usage_buf->pr_slptime) -
-			TIME2NSEC(lwp->li_usage.pr_slptime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_slptime)) / NANOSEC;
 	lwp->li_lat	= (double)(TIME2NSEC(usage_buf->pr_wtime) -
-			TIME2NSEC(lwp->li_usage.pr_wtime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_wtime)) / NANOSEC;
 	lwp->li_stime	= (double)(TIME2NSEC(usage_buf->pr_stoptime) -
-			TIME2NSEC(lwp->li_usage.pr_stoptime)) / NANOSEC;
+	    TIME2NSEC(lwp->li_usage.pr_stoptime)) / NANOSEC;
 	lwp->li_minf = usage_buf->pr_minf - lwp->li_usage.pr_minf;
 	lwp->li_majf = usage_buf->pr_majf - lwp->li_usage.pr_majf;
 	lwp->li_nswap = usage_buf->pr_nswap - lwp->li_usage.pr_nswap;
@@ -465,9 +463,9 @@ collect_lwp_data()
 		 * read /proc/pid/lpsinfo for information about all lwps.
 		 */
 		(void) snprintf(pfile, MAX_PROCFS_PATH,
-			"/proc/%s/psinfo", pidstr);
+		    "/proc/%s/psinfo", pidstr);
 		if ((fds->fds_psinfo = fd_open(pfile, O_RDONLY,
-			fds->fds_psinfo)) == NULL)
+		    fds->fds_psinfo)) == NULL)
 			continue;
 		if (pread(fd_getfd(fds->fds_psinfo), &psinfo_buf,
 			sizeof (struct psinfo), 0) != sizeof (struct psinfo)) {
@@ -480,13 +478,13 @@ collect_lwp_data()
 		nlwps = psinfo_buf.pr_nlwp + psinfo_buf.pr_nzomb;
 		if (nlwps > 1) {
 			(void) snprintf(pfile, MAX_PROCFS_PATH,
-				"/proc/%s/lpsinfo", pidstr);
+			    "/proc/%s/lpsinfo", pidstr);
 			if ((fds->fds_lpsinfo = fd_open(pfile, O_RDONLY,
 			    fds->fds_lpsinfo)) == NULL)
 				continue;
 			entsz = sizeof (struct prheader);
 			if (pread(fd_getfd(fds->fds_lpsinfo), &header_buf,
-				entsz, 0) != entsz) {
+			    entsz, 0) != entsz) {
 				fd_close(fds->fds_lpsinfo);
 				continue;
 			}
@@ -503,7 +501,7 @@ collect_lwp_data()
 			fd_close(fds->fds_lpsinfo);
 
 			for (i = 0; i < nent;
-				i++, ptr += header_buf.pr_entsize) {
+			    i++, ptr += header_buf.pr_entsize) {
 				/*LINTED ALIGNMENT*/
 				lwpsinfo_buf = (lwpsinfo_t *)ptr;
 				lwpid = lwpsinfo_buf->pr_lwpid;
@@ -513,11 +511,10 @@ collect_lwp_data()
 				if (i == 0)
 					lwp->rlwpid = lwpid;
 				(void) memcpy(lwp->li_psinfo, &psinfo_buf,
-					sizeof (psinfo_t) -
-					sizeof (lwpsinfo_t));
+				    sizeof (psinfo_t) - sizeof (lwpsinfo_t));
 				lwp->li_alive = B_TRUE;
 				(void) memcpy(lwp->li_lwpsinfo,
-					lwpsinfo_buf, sizeof (lwpsinfo_t));
+				    lwpsinfo_buf, sizeof (lwpsinfo_t));
 			}
 			Free(buf);
 		} else {
@@ -527,13 +524,11 @@ collect_lwp_data()
 			}
 			lwp->rlwpid = lwpid;
 			(void) memcpy(lwp->li_psinfo, &psinfo_buf,
-					sizeof (psinfo_t) -
-					sizeof (lwpsinfo_t));
+			    sizeof (psinfo_t) - sizeof (lwpsinfo_t));
 			lwp->li_alive = B_TRUE;
 			(void) memcpy(lwp->li_lwpsinfo,
-				&psinfo_buf.pr_lwp, sizeof (lwpsinfo_t));
-			lwp->li_lwpsinfo->pr_pctcpu =
-					lwp->li_psinfo->pr_pctcpu;
+			    &psinfo_buf.pr_lwp, sizeof (lwpsinfo_t));
+			lwp->li_lwpsinfo->pr_pctcpu = lwp->li_psinfo->pr_pctcpu;
 		}
 
 		/*
@@ -545,13 +540,13 @@ collect_lwp_data()
 		 */
 		if (nlwps > 1) {
 			(void) snprintf(pfile, MAX_PROCFS_PATH,
-				"/proc/%s/lusage", pidstr);
+			    "/proc/%s/lusage", pidstr);
 			if ((fds->fds_lusage = fd_open(pfile, O_RDONLY,
-				fds->fds_lusage)) == NULL)
+			    fds->fds_lusage)) == NULL)
 				continue;
 			entsz = sizeof (struct prheader);
 			if (pread(fd_getfd(fds->fds_lusage), &header_buf,
-				entsz, 0) != entsz) {
+			    entsz, 0) != entsz) {
 				fd_close(fds->fds_lusage);
 				continue;
 			}
@@ -569,7 +564,7 @@ collect_lwp_data()
 			fd_close(fds->fds_lusage);
 
 			for (i = 1, ptr = buf + header_buf.pr_entsize; i < nent;
-				i++, ptr += header_buf.pr_entsize) {
+			    i++, ptr += header_buf.pr_entsize) {
 				/*LINTED ALIGNMENT*/
 				lwpusage_buf = (prusage_t *)ptr;
 				lwpid = lwpusage_buf->pr_lwpid;
@@ -580,13 +575,13 @@ collect_lwp_data()
 			Free(buf);
 		} else {
 			(void) snprintf(pfile, MAX_PROCFS_PATH,
-				"/proc/%s/usage", pidstr);
+			    "/proc/%s/usage", pidstr);
 			if ((fds->fds_usage = fd_open(pfile, O_RDONLY,
-				fds->fds_usage)) == NULL)
+			    fds->fds_usage)) == NULL)
 				continue;
 			entsz = sizeof (prusage_t);
 			if (pread(fd_getfd(fds->fds_usage), &usage_buf,
-				entsz, 0) != entsz) {
+			    entsz, 0) != entsz) {
 				fd_close(fds->fds_usage);
 				continue;
 			}
@@ -627,39 +622,38 @@ list_create()
 	log_msg("->list_create()\n");
 	t1 = gethrtime();
 	if ((rv = pthread_mutex_lock(&listLock)) == 0) {
-	    t2 = gethrtime();
-	    d = (double)(t2 - t1) / 1000000000.0;
-	    log_msg("Scanner process lock wait was %1.5f sec\n", d);
+		t2 = gethrtime();
+		d = (double)(t2 - t1) / 1000000000.0;
+		log_msg("Scanner process lock wait was %1.5f sec\n", d);
 
-	    while (lwp) {
+		while (lwp) {
 			list_update(&processes, lwp);
 			list_update(&users, lwp);
 			list_update(&projects, lwp);
 			lwp = lwp->li_next;
-	    }
-	    list_refresh_id(&processes);
-	    list_refresh_id(&users);
-	    list_refresh_id(&projects);
-	    /* release the mutex */
-	    if ((rv = pthread_mutex_unlock(&listLock)) != 0) {
+		}
+		list_refresh_id(&processes);
+		list_refresh_id(&users);
+		list_refresh_id(&projects);
+		/* release the mutex */
+		if ((rv = pthread_mutex_unlock(&listLock)) != 0)
 			log_msg("pthread_mutex_unlock failed with %d\n", rv);
-	    }
 
-	    t3 = gethrtime();
+		t3 = gethrtime();
 
-	    d = (double)(t3 - t2) / 1000000000.0;
-	    log_msg("Scanner process lock time was %1.5f sec\n", d);
+		d = (double)(t3 - t2) / 1000000000.0;
+		log_msg("Scanner process lock time was %1.5f sec\n", d);
 
 	} else {
-	    log_msg("pthread_mutex_lock failed with %d\n", rv);
+		log_msg("pthread_mutex_lock failed with %d\n", rv);
 	}
 
 	if (uname(&utsn) != -1) {
 		sys_info.name =
-			Realloc(sys_info.name, strlen(utsn.sysname) + 1);
+		    Realloc(sys_info.name, strlen(utsn.sysname) + 1);
 		(void) strcpy(sys_info.name, utsn.sysname);
 		sys_info.nodename =
-			Realloc(sys_info.nodename, strlen(utsn.nodename) + 1);
+		    Realloc(sys_info.nodename, strlen(utsn.nodename) + 1);
 		(void) strcpy(sys_info.nodename, utsn.nodename);
 	} else {
 		log_err("uname()\n");

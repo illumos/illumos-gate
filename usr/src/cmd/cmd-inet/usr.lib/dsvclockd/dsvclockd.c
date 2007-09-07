@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <signal.h>
 #include <locale.h>
 #include <synch.h>
+#include <sys/resource.h>
 
 #include "datastore.h"
 #include "dsvclockd.h"

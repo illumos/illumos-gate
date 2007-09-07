@@ -94,7 +94,6 @@
 #include <sys/exacct.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
-#include <sys/vnode.h>
 #include <sys/fs/namenode.h>
 #include <sys/instance.h>
 #include <sys/ipc.h>
