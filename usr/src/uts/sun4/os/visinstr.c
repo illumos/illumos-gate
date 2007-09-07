@@ -380,7 +380,6 @@ vis_edge(
 	uint64_t addrl, addrr, mask;
 	uint64_t ah61l, ah61r;		/* Higher 61 bits of address */
 	int al3l, al3r;			/* Lower 3 bits of address */
-	int am32;			/* Whether PSTATE.AM == 1 */
 	uint_t	ccr;
 
 	nrs1 = inst.rs1;
@@ -394,11 +393,10 @@ vis_edge(
 	if (ftt != ftt_none)
 		return (ftt);
 
-	/* Get PSTATE.AM to determine 32-bit vs 64-bit addressing */
-	am32 =  pregs->r_tstate & TSTATE_AM;
-	if (am32 == 1) {
-		ah61l = addrl & 0xffffffff8;
-		ah61r = addrr & 0xffffffff8;
+	/* Test PSTATE.AM to determine 32-bit vs 64-bit addressing */
+	if ((pregs->r_tstate & TSTATE_AM) != 0) {
+		ah61l = addrl & 0xfffffff8;
+		ah61r = addrr & 0xfffffff8;
 	} else {
 		ah61l = addrl & ~0x7;
 		ah61r = addrr & ~0x7;
@@ -1382,7 +1380,7 @@ vis_fldst(
 		case ASI_PST32_PL:
 		case ASI_PST32_SL:
 			return (vis_prtl_fst(pfpsd, i.inst, pregs,
-				prw, asi));
+			    prw, asi));
 		case ASI_FL8_P:
 		case ASI_FL8_S:
 		case ASI_FL8_PL:
@@ -1392,7 +1390,7 @@ vis_fldst(
 		case ASI_FL16_PL:
 		case ASI_FL16_SL:
 			return (vis_short_fls(pfpsd, i.inst, pregs,
-				prw, asi));
+			    prw, asi));
 		case ASI_BLK_AIUP:
 		case ASI_BLK_AIUS:
 		case ASI_BLK_AIUPL:
@@ -1404,7 +1402,7 @@ vis_fldst(
 		case ASI_BLK_COMMIT_P:
 		case ASI_BLK_COMMIT_S:
 			return (vis_blk_fldst(pfpsd, i.inst, pregs,
-				prw, asi));
+			    prw, asi));
 		default:
 			return (ftt_unimplemented);
 	}
@@ -1762,31 +1760,35 @@ vis_blk_fldst(
 	case ASI_BLK_COMMIT_P:
 	case ASI_BLK_COMMIT_S:
 		if ((inst.op3 & 7) == 3) {	/* lddf */
-		    for (i = 0; i < 8; i++, nrd += 2) {
-			ftt = _fp_read_extword((uint64_t *)ea, &k.ll, pfpsd);
-			if (ftt != ftt_none)
-				return (ftt);
-			if (little_endian) {
-				for (j = 0, h = 7; j < 8; j++, h--)
-					l.c[h] = k.c[j];
-				k.ll = l.ll;
+			for (i = 0; i < 8; i++, nrd += 2) {
+				ftt = _fp_read_extword((uint64_t *)ea, &k.ll,
+				    pfpsd);
+				if (ftt != ftt_none)
+					return (ftt);
+				if (little_endian) {
+					for (j = 0, h = 7; j < 8; j++, h--)
+						l.c[h] = k.c[j];
+					k.ll = l.ll;
+				}
+				_fp_pack_extword(pfpsd, &k.f.FPU_DREG_FIELD,
+				    nrd);
+				ea += 8;
 			}
-			_fp_pack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
-			ea += 8;
-		    }
 		} else {			/* stdf */
-		    for (i = 0; i < 8; i++, nrd += 2) {
-			_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
-			if (little_endian) {
-				for (j = 0, h = 7; j < 8; j++, h--)
-					l.c[h] = k.c[j];
-				k.ll = l.ll;
+			for (i = 0; i < 8; i++, nrd += 2) {
+				_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD,
+				    nrd);
+				if (little_endian) {
+					for (j = 0, h = 7; j < 8; j++, h--)
+						l.c[h] = k.c[j];
+					k.ll = l.ll;
+				}
+				ftt = _fp_write_extword((uint64_t *)ea, k.ll,
+				    pfpsd);
+				if (ftt != ftt_none)
+					return (ftt);
+				ea += 8;
 			}
-			ftt = _fp_write_extword((uint64_t *)ea, k.ll, pfpsd);
-			if (ftt != ftt_none)
-				return (ftt);
-			ea += 8;
-		    }
 		}
 		if ((asi == ASI_BLK_COMMIT_P) || (asi == ASI_BLK_COMMIT_S))
 			sync_data_memory((caddr_t)(ea - 64), 64);
