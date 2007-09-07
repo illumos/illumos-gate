@@ -225,10 +225,27 @@ take_deferred_signal(int sig)
 {
 	extern int __sigresend(int, siginfo_t *, sigset_t *);
 	ulwp_t *self = curthread;
+	siguaction_t *suap = &self->ul_uberdata->siguaction[sig];
 	siginfo_t *sip;
 	int error;
 
 	ASSERT((self->ul_critical | self->ul_sigdefer | self->ul_cursig) == 0);
+
+	/*
+	 * If the signal handler was established with SA_RESETHAND,
+	 * the kernel has reset the handler to SIG_DFL, so we have
+	 * to reestablish the handler now so that it will be entered
+	 * again when we call __sigresend(), below.
+	 */
+	lrw_wrlock(&suap->sig_lock);
+	if (suap->sig_uaction.sa_flags & SA_RESETHAND) {
+		struct sigaction tact = suap->sig_uaction;
+		tact.sa_flags &= ~SA_NODEFER;
+		tact.sa_sigaction = self->ul_uberdata->sigacthandler;
+		tact.sa_mask = maskset;
+		(void) __sigaction(sig, &tact, NULL);
+	}
+	lrw_unlock(&suap->sig_lock);
 
 	if (self->ul_siginfo.si_signo == 0)
 		sip = NULL;
