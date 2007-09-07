@@ -43,6 +43,10 @@
 #include <sys/dld.h>
 #include <sys/modctl.h>
 #include <sys/fs/dv_node.h>
+#include <sys/thread.h>
+#include <sys/proc.h>
+#include <sys/callb.h>
+#include <sys/cpuvar.h>
 #include <sys/atomic.h>
 #include <sys/sdt.h>
 
@@ -62,7 +66,7 @@ static mod_hash_t	*i_mactype_hash;
  */
 static kmutex_t		i_mactype_lock;
 
-static void i_mac_notify_task(void *);
+static void i_mac_notify_thread(void *);
 
 /*
  * Private functions.
@@ -85,7 +89,7 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 	rw_init(&mip->mi_txloop_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_resource_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&mip->mi_activelink_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&mip->mi_notify_ref_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&mip->mi_notify_bits_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&mip->mi_notify_cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&mip->mi_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&mip->mi_rx_cv, NULL, CV_DRIVER, NULL);
@@ -108,6 +112,8 @@ i_mac_destructor(void *buf, void *arg)
 	ASSERT(mip->mi_resource_add == NULL);
 	ASSERT(mip->mi_ksp == NULL);
 	ASSERT(mip->mi_kstat_count == 0);
+	ASSERT(mip->mi_notify_bits == 0);
+	ASSERT(mip->mi_notify_thread == NULL);
 
 	rw_destroy(&mip->mi_state_lock);
 	rw_destroy(&mip->mi_data_lock);
@@ -116,7 +122,7 @@ i_mac_destructor(void *buf, void *arg)
 	rw_destroy(&mip->mi_txloop_lock);
 	rw_destroy(&mip->mi_resource_lock);
 	mutex_destroy(&mip->mi_activelink_lock);
-	mutex_destroy(&mip->mi_notify_ref_lock);
+	mutex_destroy(&mip->mi_notify_bits_lock);
 	cv_destroy(&mip->mi_notify_cv);
 	mutex_destroy(&mip->mi_lock);
 	cv_destroy(&mip->mi_rx_cv);
@@ -125,40 +131,21 @@ i_mac_destructor(void *buf, void *arg)
 static void
 i_mac_notify(mac_impl_t *mip, mac_notify_type_t type)
 {
-	mac_notify_task_arg_t	*mnta;
-
 	rw_enter(&i_mac_impl_lock, RW_READER);
 	if (mip->mi_disabled)
 		goto exit;
 
-	if ((mnta = kmem_alloc(sizeof (*mnta), KM_NOSLEEP)) == NULL) {
-		cmn_err(CE_WARN, "i_mac_notify(%s, 0x%x): memory "
-		    "allocation failed", mip->mi_name, type);
+	/*
+	 * Guard against incorrect notifications.  (Running a newer
+	 * mac client against an older implementation?)
+	 */
+	if (type >= MAC_NNOTE)
 		goto exit;
-	}
 
-	mnta->mnt_mip = mip;
-	mnta->mnt_type = type;
-
-	mutex_enter(&mip->mi_notify_ref_lock);
-	mip->mi_notify_ref++;
-	mutex_exit(&mip->mi_notify_ref_lock);
-
-	rw_exit(&i_mac_impl_lock);
-
-	if (taskq_dispatch(system_taskq, i_mac_notify_task, mnta,
-	    TQ_NOSLEEP) == NULL) {
-		cmn_err(CE_WARN, "i_mac_notify(%s, 0x%x): taskq dispatch "
-		    "failed", mip->mi_name, type);
-
-		mutex_enter(&mip->mi_notify_ref_lock);
-		if (--mip->mi_notify_ref == 0)
-			cv_signal(&mip->mi_notify_cv);
-		mutex_exit(&mip->mi_notify_ref_lock);
-
-		kmem_free(mnta, sizeof (*mnta));
-	}
-	return;
+	mutex_enter(&mip->mi_notify_bits_lock);
+	mip->mi_notify_bits |= (1 << type);
+	cv_broadcast(&mip->mi_notify_cv);
+	mutex_exit(&mip->mi_notify_bits_lock);
 
 exit:
 	rw_exit(&i_mac_impl_lock);
@@ -205,41 +192,73 @@ i_mac_log_link_state(mac_impl_t *mip)
 }
 
 static void
-i_mac_notify_task(void *notify_arg)
+i_mac_notify_thread(void *arg)
 {
-	mac_notify_task_arg_t	*mnta = (mac_notify_task_arg_t *)notify_arg;
-	mac_impl_t		*mip;
-	mac_notify_type_t	type;
-	mac_notify_fn_t		*mnfp;
-	mac_notify_t		notify;
-	void			*arg;
+	mac_impl_t	*mip = arg;
+	callb_cpr_t	cprinfo;
 
-	mip = mnta->mnt_mip;
-	type = mnta->mnt_type;
-	kmem_free(mnta, sizeof (*mnta));
+	CALLB_CPR_INIT(&cprinfo, &mip->mi_notify_bits_lock, callb_generic_cpr,
+	    "i_mac_notify_thread");
 
-	/*
-	 * Log it.
-	 */
-	if (type == MAC_NOTE_LINK)
-		i_mac_log_link_state(mip);
+	mutex_enter(&mip->mi_notify_bits_lock);
+	for (;;) {
+		uint32_t	bits;
+		uint32_t	type;
 
-	/*
-	 * Walk the list of notifications.
-	 */
-	rw_enter(&mip->mi_notify_lock, RW_READER);
-	for (mnfp = mip->mi_mnfp; mnfp != NULL; mnfp = mnfp->mnf_nextp) {
-		notify = mnfp->mnf_fn;
-		arg = mnfp->mnf_arg;
+		bits = mip->mi_notify_bits;
+		if (bits == 0) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&mip->mi_notify_cv, &mip->mi_notify_bits_lock);
+			CALLB_CPR_SAFE_END(&cprinfo, &mip->mi_notify_bits_lock);
+			continue;
+		}
+		mip->mi_notify_bits = 0;
 
-		ASSERT(notify != NULL);
-		notify(arg, type);
+		if ((bits & (1 << MAC_NNOTE)) != 0) {
+			/* request to quit */
+			ASSERT(mip->mi_disabled);
+			break;
+		}
+
+		mutex_exit(&mip->mi_notify_bits_lock);
+
+		/*
+		 * Log link changes.
+		 */
+		if ((bits & (1 << MAC_NOTE_LINK)) != 0)
+			i_mac_log_link_state(mip);
+
+		/*
+		 * Do notification callbacks for each notification type.
+		 */
+		for (type = 0; type < MAC_NNOTE; type++) {
+			mac_notify_fn_t	*mnfp;
+
+			if ((bits & (1 << type)) == 0) {
+				continue;
+			}
+
+			/*
+			 * Walk the list of notifications.
+			 */
+			rw_enter(&mip->mi_notify_lock, RW_READER);
+			for (mnfp = mip->mi_mnfp; mnfp != NULL;
+			    mnfp = mnfp->mnf_nextp) {
+
+				mnfp->mnf_fn(mnfp->mnf_arg, type);
+			}
+			rw_exit(&mip->mi_notify_lock);
+		}
+
+		mutex_enter(&mip->mi_notify_bits_lock);
 	}
-	rw_exit(&mip->mi_notify_lock);
-	mutex_enter(&mip->mi_notify_ref_lock);
-	if (--mip->mi_notify_ref == 0)
-		cv_signal(&mip->mi_notify_cv);
-	mutex_exit(&mip->mi_notify_ref_lock);
+
+	mip->mi_notify_thread = NULL;
+	cv_broadcast(&mip->mi_notify_cv);
+
+	CALLB_CPR_EXIT(&cprinfo);
+
+	thread_exit();
 }
 
 static mactype_t *
@@ -1284,6 +1303,14 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_txloopinfo.mt_arg = mip;
 
 	/*
+	 * Allocate a notification thread.
+	 */
+	mip->mi_notify_thread = thread_create(NULL, 0, i_mac_notify_thread,
+	    mip, 0, &p0, TS_RUN, minclsyspri);
+	if (mip->mi_notify_thread == NULL)
+		goto fail;
+
+	/*
 	 * Initialize the kstats for this device.
 	 */
 	mac_stat_create(mip);
@@ -1340,6 +1367,16 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	return (0);
 
 fail:
+	/* clean up notification thread */
+	if (mip->mi_notify_thread != NULL) {
+		mutex_enter(&mip->mi_notify_bits_lock);
+		mip->mi_notify_bits = (1 << MAC_NNOTE);
+		cv_broadcast(&mip->mi_notify_cv);
+		while (mip->mi_notify_bits != 0)
+			cv_wait(&mip->mi_notify_cv, &mip->mi_notify_bits_lock);
+		mutex_exit(&mip->mi_notify_bits_lock);
+	}
+
 	if (mip->mi_info.mi_unicst_addr != NULL) {
 		kmem_free(mip->mi_info.mi_unicst_addr,
 		    mip->mi_type->mt_addr_length);
@@ -1388,20 +1425,22 @@ mac_unregister(mac_handle_t mh)
 	mip->mi_disabled = B_TRUE;
 	rw_exit(&i_mac_impl_lock);
 
-	/*
-	 * Wait for all taskqs which process the mac notifications to finish.
-	 */
-	mutex_enter(&mip->mi_notify_ref_lock);
-	while (mip->mi_notify_ref != 0)
-		cv_wait(&mip->mi_notify_cv, &mip->mi_notify_ref_lock);
-	mutex_exit(&mip->mi_notify_ref_lock);
-
 	if ((err = dls_destroy(mip->mi_name)) != 0) {
 		rw_enter(&i_mac_impl_lock, RW_WRITER);
 		mip->mi_disabled = B_FALSE;
 		rw_exit(&i_mac_impl_lock);
 		return (err);
 	}
+
+	/*
+	 * Clean up notification thread (wait for it to exit).
+	 */
+	mutex_enter(&mip->mi_notify_bits_lock);
+	mip->mi_notify_bits = (1 << MAC_NNOTE);
+	cv_broadcast(&mip->mi_notify_cv);
+	while (mip->mi_notify_bits != 0)
+		cv_wait(&mip->mi_notify_cv, &mip->mi_notify_bits_lock);
+	mutex_exit(&mip->mi_notify_bits_lock);
 
 	/*
 	 * Remove both style 1 and style 2 minor nodes

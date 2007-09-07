@@ -116,9 +116,10 @@ typedef struct mac_impl_s {
 	uint8_t			mi_dstaddr[MAXMACADDRLEN];
 	mac_multicst_addr_t	*mi_mmap;
 	krwlock_t		mi_notify_lock;
+	uint32_t		mi_notify_bits;
+	kmutex_t		mi_notify_bits_lock;
+	kthread_t		*mi_notify_thread;
 	mac_notify_fn_t		*mi_mnfp;
-	kmutex_t		mi_notify_ref_lock;
-	uint32_t		mi_notify_ref;
 	kcondvar_t		mi_notify_cv;
 	krwlock_t		mi_rx_lock;
 	mac_rx_fn_t		*mi_mrfp;
@@ -150,11 +151,6 @@ typedef struct mac_impl_s {
 #define	mi_tx		mi_callbacks->mc_tx
 #define	mi_ioctl	mi_callbacks->mc_ioctl
 #define	mi_getcapab	mi_callbacks->mc_getcapab
-
-typedef struct mac_notify_task_arg {
-	mac_impl_t		*mnt_mip;
-	mac_notify_type_t	mnt_type;
-} mac_notify_task_arg_t;
 
 extern void	mac_init(void);
 extern int	mac_fini(void);
