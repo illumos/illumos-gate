@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -217,7 +217,8 @@ is_audit_control_ok(char *filename) {
 	int		rc;
 	int		min;
 	kva_t		*kvlist;
-	char		*value;
+	char		*plugin_name;
+	char		*plugin_dir;
 	au_acinfo_t	*ach;
 
 	ach = _openac(filename);	/* open audit_control */
@@ -242,18 +243,29 @@ is_audit_control_ok(char *filename) {
 	 * _getacplug -- all that is of interest is the return code.
 	 */
 	_rewindac(ach);	/* rewind audit_control */
-	if ((rc = _getacplug(ach, &kvlist)) == 0) {
-		value = kva_match(kvlist, "name");
-		if (value == NULL) {
+	while ((rc = _getacplug(ach, &kvlist)) == 0) {
+		plugin_name = kva_match(kvlist, "name");
+		if (plugin_name == NULL) {
 			(void) fprintf(stderr, gettext("%s: audit_control "
 			    "\"plugin:\" missing name\n"), progname);
 			state = 0;	/* is_not_ok */
+		} else {
+			if (strcmp(plugin_name, "audit_binfile.so") == 0) {
+				plugin_dir = kva_match(kvlist, "p_dir");
+				if ((plugin_dir == NULL) && (outputs == 0)) {
+					(void) fprintf(stderr,
+					    gettext("%s: audit_control "
+					    "\"plugin:\" missing p_dir\n"),
+					    progname);
+					state = 0;	/* is_not_ok */
+				} else {
+					outputs++;
+				}
+			}
 		}
-		else
-			outputs++;
-
 		_kva_free(kvlist);
-	} else if (rc < -1) {
+	}
+	if (rc < -1) {
 		(void) fprintf(stderr,
 			gettext("%s: audit_control \"plugin:\" spec invalid\n"),
 				progname);
@@ -262,7 +274,8 @@ is_audit_control_ok(char *filename) {
 	if (outputs == 0) {
 		(void) fprintf(stderr,
 			gettext("%s: audit_control must have either a "
-				"\"dir:\" or a \"plugin:\" specified.\n"),
+				"valid \"dir:\" entry or a valid \"plugin:\" "
+				"entry with \"p_dir:\" specified.\n"),
 				progname);
 		state = 0;	/* is_not_ok */
 	}

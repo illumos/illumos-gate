@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -217,10 +217,14 @@ _getacdir(au_acinfo_t *context, char *dir, int len)
 	if (retstat >= SUCCESS) do {
 		if (getlongline(entry, REALLY_LONG_LINE, context->fp) != NULL) {
 			if (*entry == 'd') {
-				retstat = getvalue(dir, entry, DIRLABEL,
-				    len);
-				if (retstat == SUCCESS)
-					gotone = 1;
+				retstat = getvalue(dir, entry, DIRLABEL, len);
+				if (retstat == SUCCESS) {
+					if (strlen(dir) == 0) {
+						retstat = FORMAT_ERR;
+					} else {
+						gotone = 1;
+					}
+				}
 			}
 		} else if ((feof(context->fp)) == 0) {
 			retstat = ERROR;

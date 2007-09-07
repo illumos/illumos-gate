@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * write binary audit records directly to a file.
@@ -73,11 +72,12 @@
 #define	SOFT_SPACE	0	/* minfree or less space available	*/
 #define	PLENTY_SPACE	1	/* more than minfree available		*/
 #define	SPACE_FULL	2	/* out of space				*/
-#define	STAY_FULL	3	/* unusable file system			*/
 
 #define	AVAIL_MIN	50	/* If there are less that this number	*/
 				/* of blocks avail, the filesystem is	*/
 				/* presumed full.			*/
+
+#define	ALLHARD_DELAY	20	/* Call audit_warn(allhard) every 20 seconds */
 
 
 /*
@@ -114,9 +114,10 @@ static int		minfree = -1;
 static int		minfreeblocks;		/* minfree in blocks */
 
 static dirlist_t	*activeDir = NULL;	/* current directory */
+static dirlist_t	*startdir;		/* first dir in the ring */
 static int		activeCount = 0;	/* number of dirs in the ring */
 
-static int		openNewFile = 1;	/* need to open a new file */
+static int		openNewFile = 0;	/* need to open a new file */
 static int		hung_count = 0;		/* count of audit_warn hard */
 
 /* flag from audit_plugin_open to audit_plugin_close */
@@ -253,7 +254,7 @@ loadauditlist(char *dirstr, char *minfreestr)
 
 	/* at least one directory is needed */
 	while ((acresult = _getacdir(ach, buf, sizeof (buf))) == 0 ||
-		acresult == 2 || acresult == -3) {
+	    acresult == 2 || acresult == -3) {
 		/*
 		 * loop if the result is 0 (success), 2 (a warning
 		 * that the audit_data file has been rewound),
@@ -370,11 +371,14 @@ loadauditlist(char *dirstr, char *minfreestr)
 	if (rc == -2) {
 		(void) pthread_mutex_lock(&log_mutex);
 		DPRINT((dbfp, "loadauditlist:  close / open log\n"));
-		if (open_log(listhead) == 0)
+		if (open_log(listhead) == 0) {
 			openNewFile = 1;	/* try again later */
+		} else {
+			openNewFile = 0;
+		}
 		freedirlist(activeList);	/* old list */
 		activeList = listhead;		/* new list */
-		activeDir = thisdir;
+		activeDir = startdir = thisdir;
 		activeCount = node_count;
 		(void) pthread_mutex_unlock(&log_mutex);
 	} else
@@ -426,8 +430,8 @@ getauditdate(char *date)
 	 *	tzfile.h .
 	 */
 	(void) sprintf(date, "%.4d%.2d%.2d%.2d%.2d%.2d",
-		tm.tm_year + TM_YEAR_BASE, tm.tm_mon + 1, tm.tm_mday,
-		tm.tm_hour, tm.tm_min, tm.tm_sec);
+	    tm.tm_year + TM_YEAR_BASE, tm.tm_mon + 1, tm.tm_mday,
+	    tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
 
@@ -598,7 +602,7 @@ open_log(dirlist_t *current_dir)
 		name = (char *)strrchr(oldname, '/') + 1;
 
 		(void) memcpy(name + AUDIT_DATE_SZ + 1, auditdate,
-			AUDIT_DATE_SZ);
+		    AUDIT_DATE_SZ);
 
 		close_log(lastOpenDir, oldname, newname);
 	}
@@ -661,10 +665,7 @@ spacecheck(dirlist_t *thisdir, int test_limit, size_t next_buf_size)
 
 	assert(thisdir != NULL);
 
-	if (thisdir->dl_space == STAY_FULL) {
-		thisdir->dl_space = SPACE_FULL;
-		minfreeblocks = AVAIL_MIN;
-	} else if (statvfs(thisdir->dl_dirname, &sb) < 0) {
+	if (statvfs(thisdir->dl_dirname, &sb) < 0) {
 		thisdir->dl_space = SPACE_FULL;
 		minfreeblocks = AVAIL_MIN;
 		return (-1);
@@ -673,9 +674,10 @@ spacecheck(dirlist_t *thisdir, int test_limit, size_t next_buf_size)
 
 		if (sb.f_bavail < AVAIL_MIN)
 			thisdir->dl_space = SPACE_FULL;
-		else if (sb.f_bavail > minfreeblocks)
-			thisdir->dl_space = PLENTY_SPACE;
-		else
+		else if (sb.f_bavail > minfreeblocks) {
+			thisdir->dl_space = fullness_state = PLENTY_SPACE;
+			ignore_size = 0;
+		} else
 			thisdir->dl_space = SOFT_SPACE;
 	}
 	if (thisdir->dl_space == PLENTY_SPACE)
@@ -685,10 +687,12 @@ spacecheck(dirlist_t *thisdir, int test_limit, size_t next_buf_size)
 }
 
 /*
- * auditd_plugin() writes a buffer to the currently open file The
- * global "openNewFile" is used to force a new log file for the
- * initial open; for "audit -s" with changed audit_control data or
- * "audit -n" the new log file is opened immediately.
+ * auditd_plugin() writes a buffer to the currently open file. The
+ * global "openNewFile" is used to force a new log file for cases
+ * such as the initial open, when minfree is reached or the current
+ * file system fills up, and "audit -s" with changed audit_control
+ * data.  For "audit -n" a new log file is opened immediately in
+ * auditd_plugin_open().
  *
  * This function manages one or more audit directories as follows:
  *
@@ -713,14 +717,15 @@ auditd_rc_t
 auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 {
 	auditd_rc_t	rc = AUDITD_FAIL;
-	dirlist_t	*startdir;
 	int		open_status;
 	size_t		out_len;
 	/* LINTED */
 	int		statrc;
 	/* avoid excess audit_warnage */
-	static int	somesoftfull_warning = 0;
 	static int	allsoftfull_warning = 0;
+	static int	allhard_pause = 0;
+	static struct timeval	next_allhard;
+	struct timeval	now;
 #if DEBUG
 	static char	*last_file_written_to = NULL;
 	static uint32_t	last_sequence = 0;
@@ -728,18 +733,17 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 
 	if ((last_sequence > 0) && (sequence != last_sequence + 1))
 		fprintf(dbfp, "binfile: buffer sequence=%d but prev=%d=n",
-				sequence, last_sequence);
+		    sequence, last_sequence);
 	last_sequence = sequence;
 
 	fprintf(dbfp, "binfile: input seq=%d, len=%d\n",
-		sequence, in_len);
+	    sequence, in_len);
 #endif
 	*error = NULL;
 	/*
 	 * lock is for activeDir, referenced by open_log() and close_log()
 	 */
 	(void) pthread_mutex_lock(&log_mutex);
-	startdir = activeDir;
 	while (rc == AUDITD_FAIL) {
 		open_status = 1;
 		if (openNewFile) {
@@ -781,12 +785,11 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 				    " l=%u\n",
 				    ++write_count, sequence, out_len));
 				allsoftfull_warning = 0;
-				if (fullness_state == PLENTY_SPACE)
-					somesoftfull_warning = 0;
+				activeDir->dl_flags = 0;
 
 				rc = AUDITD_SUCCESS;
 				break;
-			} else if (!activeDir->dl_flags & HARD_WARNED) {
+			} else if (!(activeDir->dl_flags & HARD_WARNED)) {
 				DPRINT((dbfp,
 				    "binfile: write failed, sequence=%u, "
 				    "l=%u\n", sequence, out_len));
@@ -799,18 +802,18 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 		} else {
 			DPRINT((dbfp, "binfile: statrc=%d, fullness_state=%d\n",
 			    statrc, fullness_state));
-			somesoftfull_warning++;
-			if ((somesoftfull_warning <= activeCount) &&
-			    !(activeDir->dl_flags & SOFT_WARNED)) {
+			if (!(activeDir->dl_flags & SOFT_WARNED) &&
+			    (activeDir->dl_space == SOFT_SPACE)) {
 				DPRINT((dbfp, "soft warning sent\n"));
 				__audit_dowarn("soft",
 				    activeDir->dl_dirname, 0);
 				activeDir->dl_flags |= SOFT_WARNED;
 			}
-			if (!activeDir->dl_flags & HARD_WARNED) {
+			if (!(activeDir->dl_flags & HARD_WARNED) &&
+			    (activeDir->dl_space == SPACE_FULL)) {
 				DPRINT((dbfp, "hard warning sent.\n"));
 				__audit_dowarn("hard",
-				activeDir->dl_dirname, 0);
+				    activeDir->dl_dirname, 0);
 				activeDir->dl_flags |= HARD_WARNED;
 			}
 		}
@@ -818,6 +821,7 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 		    activeDir->dl_dirname, activeDir->dl_next->dl_dirname));
 
 		activeDir = activeDir->dl_next;
+		openNewFile = 1;
 
 		if (activeDir == startdir) {		/* full circle */
 			if (fullness_state == PLENTY_SPACE) {	/* once */
@@ -827,7 +831,24 @@ auditd_plugin(const char *input, size_t in_len, uint32_t sequence, char **error)
 					__audit_dowarn("allsoft", "", 0);
 				}
 			} else {			/* full circle twice */
-				__audit_dowarn("allhard", "", ++hung_count);
+				if ((hung_count > 0) && !allhard_pause) {
+					allhard_pause = 1;
+					(void) gettimeofday(&next_allhard,
+					    NULL);
+					next_allhard.tv_sec += ALLHARD_DELAY;
+				}
+
+				if (allhard_pause) {
+					(void) gettimeofday(&now, NULL);
+					if (now.tv_sec >= next_allhard.tv_sec) {
+						allhard_pause = 0;
+						__audit_dowarn("allhard", "",
+						    ++hung_count);
+					}
+				} else {
+					__audit_dowarn("allhard", "",
+					    ++hung_count);
+				}
 				minfreeblocks = AVAIL_MIN;
 				rc = AUDITD_RETRY;
 				*error = strdup(gettext(
@@ -913,7 +934,7 @@ auditd_plugin_open(const kva_t *kvlist, char **ret_list, char **error)
 		} else {	/* status is 0 or -2 (no change or changed) */
 			hung_count = 0;
 			DPRINT((dbfp, "binfile: loadauditlist returned %d\n",
-				status));
+			    status));
 		}
 		break;
 	case 1:			/* audit -n */

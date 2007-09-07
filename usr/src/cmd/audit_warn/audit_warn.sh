@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -246,12 +245,17 @@ Must reboot to start auditing!"
 				exit 1
 			else
 				COUNT=$2
+				if [ $COUNT -eq 1 ]; then
+					S=""
+				else
+					S="s"
+				fi
 			fi
 
 			# Set message
 			MESSAGE="There is a problem getting the directory\
- list from audit_control.  The audit daemon will hang until this file is\
- fixed.  This message has been displayed $COUNT times."
+ list or plugin list from audit_control(4).  The audit daemon will hang
+ until this file is fixed.  This message has been displayed $COUNT time$S."
 			send_msg
 			break
 			;;
@@ -292,6 +296,11 @@ Must reboot to start auditing!"
 				exit 1
 			else
 				COUNT=$5
+				if [ $COUNT -eq 1 ]; then
+					S=""
+				else
+					S="s"
+				fi
 			fi
 
 			# Set message
@@ -299,7 +308,7 @@ Must reboot to start auditing!"
  following problem with loading or executing plugins:\n\n\
 $PLUGNAME: $ERROR\n\
 $TEXT\n\
-This message has been displayed $COUNT times."
+This message has been displayed $COUNT time$S."
 			send_msg
 			break
 			;;

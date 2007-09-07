@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -588,7 +587,7 @@ qpool_init(plugin_t *p, int threshold)
 	audit_queue_init(&(p->plg_pool));
 
 	DPRINT((dbfp, "qpool_init(%d) max, min, threshhold = %d, %d, %d\n",
-		p->plg_tid, p->plg_qmax, p->plg_qmin, threshold));
+	    p->plg_tid, p->plg_qmax, p->plg_qmin, threshold));
 
 	if (p->plg_qmax > largest_queue)
 		largest_queue = p->plg_qmax;
@@ -707,8 +706,8 @@ bpool_withdraw(char *buffer, size_t buff_size, size_t request_size)
 	rc = audit_dequeue(&b_pool, (void *)&node);
 
 	DPRINT((dbfp, "bpool_withdraw buf length=%d,"
-		" requested size=%d, dequeue rc=%d\n",
-		new_length, request_size, rc));
+	    " requested size=%d, dequeue rc=%d\n",
+	    new_length, request_size, rc));
 
 	if (rc == 0) {
 		DPRINT((dbfp, "bpool_withdraw node=%X (pool=%d)\n", node,
@@ -911,8 +910,7 @@ queue_buffer(au_dbuf_t *kl)
 	audit_q_t	*q_copy;
 	boolean_t	referenced = 0;
 	static char	*invalid_msg = "invalid audit record discarded";
-	static char	*invalid_control =
-			    "invalid audit control discarded";
+	static char	*invalid_control = "invalid audit control discarded";
 
 	static audit_rec_t	*alt_b_copy = NULL;
 	static size_t		alt_length;
@@ -1196,6 +1194,7 @@ process(plugin_t *p)
 	int			sendsignal;
 	int			queue_len;
 	struct sched_param	param;
+	static boolean_t	once = B_FALSE;
 
 	DPRINT((dbfp, "%s is thread %d\n", p->plg_path, p->plg_tid));
 	p->plg_priority = param.sched_priority = BASE_PRIORITY;
@@ -1204,8 +1203,6 @@ process(plugin_t *p)
 	delay.tv_nsec = 0;
 
 	for (;;) {
-		retry_mode:
-
 		while (audit_dequeue(&(p->plg_queue), (void *)&q_node) != 0) {
 			DUMP("process", p, p->plg_last_seq_out, "blocked");
 			(void) pthread_cond_signal(&(in_thr.thd_cv));
@@ -1218,12 +1215,10 @@ process(plugin_t *p)
 			(void) pthread_mutex_unlock(&(p->plg_mutex));
 
 			if (p->plg_removed)
-				break;
+				goto plugin_removed;
 
 			DUMP("process", p, p->plg_last_seq_out, "unblocked");
 		}
-		if (p->plg_removed)
-			break;
 #if DEBUG
 		if (q_node->aqq_sequence != p->plg_last_seq_out + 1)
 			(void) fprintf(dbfp,
@@ -1234,15 +1229,21 @@ process(plugin_t *p)
 		error_string = NULL;
 
 		b_node = q_node->aqq_data;
+retry_mode:
 		plugrc = p->plg_fplugin(b_node->abq_buffer,
-			b_node->abq_data_len,
-			q_node->aqq_sequence, &error_string);
+		    b_node->abq_data_len, q_node->aqq_sequence, &error_string);
+
+		if (p->plg_removed)
+			goto plugin_removed;
 #if DEBUG
 		p->plg_last_seq_out = q_node->aqq_sequence;
 #endif
 		switch (plugrc) {
 		case AUDITD_RETRY:
-			report_error(plugrc, error_string, p->plg_path);
+			if (!once) {
+				report_error(plugrc, error_string, p->plg_path);
+				once = B_TRUE;
+			}
 			free(error_string);
 			error_string = NULL;
 
@@ -1257,7 +1258,7 @@ process(plugin_t *p)
 			(void) pthread_mutex_lock(&(p->plg_mutex));
 			p->plg_waiting++;
 			(void) pthread_cond_reltimedwait_np(&(p->plg_cv),
-				&(p->plg_mutex), &delay);
+			    &(p->plg_mutex), &delay);
 			p->plg_waiting--;
 			(void) pthread_mutex_unlock(&(p->plg_mutex));
 
@@ -1266,6 +1267,7 @@ process(plugin_t *p)
 
 		case AUDITD_SUCCESS:
 			p->plg_output++;
+			once = B_FALSE;
 			break;
 		default:
 			report_error(plugrc, error_string, p->plg_path);
@@ -1303,6 +1305,7 @@ process(plugin_t *p)
 			    &param);
 		}
 	}	/* end for (;;) */
+plugin_removed:
 	DUMP("process", p, p->plg_last_seq_out, "exit");
 	error_string = NULL;
 	if ((rc = p->plg_fplugin_close(&error_string)) !=
