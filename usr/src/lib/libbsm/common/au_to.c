@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -990,7 +990,7 @@ au_to_tid(au_generic_tid_t *tid)
 	case AU_IPADR:
 		ip = &(tid->gt_adr.at_ip);
 		token = get_token((int)(2 * sizeof (char) + 2 * sizeof (short) +
-			sizeof (uint32_t) + ip->at_type));
+		    sizeof (uint32_t) + ip->at_type));
 		if (token == NULL)
 			return (NULL);
 
@@ -1144,18 +1144,49 @@ au_to_uauth(char *text)
 }
 
 /*
+ * au_to_upriv
+ * return s:
+ *	pointer to a use of privilege token.
+ */
+token_t *
+au_to_upriv(char sorf, char *priv)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_UAUTH;	/* header for this token */
+	short bytes;			/* length of string */
+
+	bytes = strlen(priv) + 1;
+
+	token = get_token(sizeof (char) + sizeof (char) + sizeof (short) +
+	    bytes);
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_char(&adr, &sorf, 1);	/* success/failure */
+	adr_short(&adr, &bytes, 1);
+	adr_char(&adr, priv, bytes);
+
+	return (token);
+}
+
+/*
  * au_to_xatom
  * return s:
  *	pointer to a xatom token.
  */
 token_t *
-au_to_xatom(ushort_t len, char *atom)
+au_to_xatom(char *atom)
 {
 	token_t *token;			/* local token */
 	adr_t adr;			/* adr memory stream header */
 	char data_header = AUT_XATOM;	/* header for this token */
+	short len;
 
-	token = get_token((int)(sizeof (char) + sizeof (ushort_t) + len));
+	len = strlen(atom) + 1;
+
+	token = get_token(sizeof (char) + sizeof (short) + len);
 	if (token == NULL)
 		return (NULL);
 	adr_start(&adr, token->tt_data);
@@ -1167,79 +1198,185 @@ au_to_xatom(ushort_t len, char *atom)
 }
 
 /*
- * au_to_xproto
- * return s:
- *	pointer to a X protocol token.
- */
-token_t *
-au_to_xproto(pid_t pid)
-{
-	token_t *token;			/* local token */
-	adr_t adr;			/* adr memory stream header */
-	char data_header = AUT_XPROTO;	/* header for this token */
-	int32_t v = pid;
-
-	token = get_token(sizeof (char) + sizeof (int32_t));
-	if (token == NULL)
-		return (NULL);
-	adr_start(&adr, token->tt_data);
-	adr_char(&adr, &data_header, 1);
-	adr_int32(&adr, &v, 1);
-
-	return (token);
-}
-
-/*
- * au_to_xobj
- * return s:
- *	pointer to a X object token.
- */
-token_t *
-au_to_xobj(int oid, int xid, int cuid)
-{
-	token_t *token;			/* local token */
-	adr_t adr;			/* adr memory stream header */
-	char data_header = AUT_XOBJ;	/* header for this token */
-
-	token = get_token(sizeof (char) + 3 * sizeof (int32_t));
-	if (token == NULL)
-		return (NULL);
-	adr_start(&adr, token->tt_data);
-	adr_char(&adr, &data_header, 1);
-	adr_int32(&adr, (int32_t *)&oid, 1);
-	adr_int32(&adr, (int32_t *)&xid, 1);
-	adr_int32(&adr, (int32_t *)&cuid, 1);
-
-	return (token);
-}
-
-/*
  * au_to_xselect
  * return s:
  *	pointer to a X select token.
  */
 token_t *
-au_to_xselect(char *pstring, char *type, short dlen, char *data)
+au_to_xselect(char *propname, char *proptype, char *windata)
 {
 	token_t *token;			/* local token */
 	adr_t adr;			/* adr memory stream header */
 	char data_header = AUT_XSELECT;	/* header for this token */
-	short bytes;
+	short proplen;
+	short typelen;
+	short datalen;
 
-	bytes = strlen(pstring) + strlen(type) + 2 + dlen;
-	token = get_token((int)(sizeof (char) + sizeof (short) * 3 + bytes));
+	proplen = strlen(propname) + 1;
+	typelen = strlen(proptype) + 1;
+	datalen = strlen(windata) + 1;
+
+	token = get_token(sizeof (char) + (sizeof (short) * 3) +
+	    proplen + typelen + datalen);
 	if (token == NULL)
 		return (NULL);
 	adr_start(&adr, token->tt_data);
 	adr_char(&adr, &data_header, 1);
-	bytes = strlen(pstring) + 1;
-	adr_short(&adr, &bytes, 1);
-	adr_char(&adr, pstring, bytes);
-	bytes = strlen(type) + 1;
-	adr_short(&adr, &bytes, 1);
-	adr_char(&adr, type, bytes);
-	adr_short(&adr, &dlen, 1);
-	adr_char(&adr, data, dlen);
+	adr_short(&adr, &proplen, 1);
+	adr_char(&adr, propname, proplen);
+	adr_short(&adr, &typelen, 1);
+	adr_char(&adr, proptype, typelen);
+	adr_short(&adr, &datalen, 1);
+	adr_char(&adr, windata, datalen);
+
+	return (token);
+}
+
+/*
+ * x_common
+ * return s:
+ *	pointer to a common X token.
+ */
+
+static token_t *
+x_common(char data_header, int32_t xid, uid_t cuid)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+
+	token = get_token(sizeof (char) + sizeof (int32_t) + sizeof (uid_t));
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_int32(&adr, &xid, 1);
+	adr_uid(&adr, &cuid, 1);
+
+	return (token);
+}
+
+/*
+ * au_to_xcolormap
+ * return s:
+ *	pointer to a X Colormap token.
+ */
+
+token_t *
+au_to_xcolormap(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XCOLORMAP, xid, cuid));
+}
+
+/*
+ * au_to_xcursor
+ * return s:
+ *	pointer to a X Cursor token.
+ */
+
+token_t *
+au_to_xcursor(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XCURSOR, xid, cuid));
+}
+
+/*
+ * au_to_xfont
+ * return s:
+ *	pointer to a X Font token.
+ */
+
+token_t *
+au_to_xfont(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XFONT, xid, cuid));
+}
+
+/*
+ * au_to_xgc
+ * return s:
+ *	pointer to a X Graphic Context token.
+ */
+
+token_t *
+au_to_xgc(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XGC, xid, cuid));
+}
+
+/*
+ * au_to_xpixmap
+ * return s:
+ *	pointer to a X Pixal Map token.
+ */
+
+token_t *
+au_to_xpixmap(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XPIXMAP, xid, cuid));
+}
+
+/*
+ * au_to_xwindow
+ * return s:
+ *	pointer to a X Window token.
+ */
+
+token_t *
+au_to_xwindow(int32_t xid, uid_t cuid)
+{
+	return (x_common(AUT_XWINDOW, xid, cuid));
+}
+
+/*
+ * au_to_xproperty
+ * return s:
+ *	pointer to a X Property token.
+ */
+
+token_t *
+au_to_xproperty(int32_t xid, uid_t cuid, char *propname)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_XPROPERTY;	/* header for this token */
+	short proplen;
+
+	proplen = strlen(propname) + 1;
+
+	token = get_token(sizeof (char) + sizeof (int32_t) + sizeof (uid_t) +
+	    sizeof (short) + proplen);
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_int32(&adr, &xid, 1);
+	adr_uid(&adr, &cuid, 1);
+	adr_short(&adr, &proplen, 1);
+	adr_char(&adr, propname, proplen);
+
+	return (token);
+}
+
+/*
+ * au_to_xclient
+ * return s:
+ *	pointer to a X Client token
+ */
+
+token_t *
+au_to_xclient(uint32_t client)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_XCLIENT;	/* header for this token */
+
+	token = get_token(sizeof (char) + sizeof (uint32_t));
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_int32(&adr, (int32_t *)&client, 1);
+
 	return (token);
 }
 

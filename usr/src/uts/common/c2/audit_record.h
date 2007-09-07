@@ -746,10 +746,17 @@ extern token_t *au_to_text(char *);
 extern token_t *au_to_tid(au_generic_tid_t *);
 extern token_t *au_to_trailer(void);
 extern token_t *au_to_uauth(char *);
-extern token_t *au_to_xatom(ushort_t, char *);
-extern token_t *au_to_xobj(int, int, int);
-extern token_t *au_to_xproto(pid_t);
-extern token_t *au_to_xselect(char *, char *, short, char *);
+extern token_t *au_to_upriv(char, char *);
+extern token_t *au_to_xatom(char *);
+extern token_t *au_to_xselect(char *, char *, char *);
+extern token_t *au_to_xcolormap(int32_t, uid_t);
+extern token_t *au_to_xcursor(int32_t, uid_t);
+extern token_t *au_to_xfont(int32_t, uid_t);
+extern token_t *au_to_xgc(int32_t, uid_t);
+extern token_t *au_to_xpixmap(int32_t, uid_t);
+extern token_t *au_to_xwindow(int32_t, uid_t);
+extern token_t *au_to_xproperty(int32_t, uid_t, char *);
+extern token_t *au_to_xclient(uint32_t);
 extern token_t *au_to_zonename(char *);
 #endif /* _KERNEL */
 

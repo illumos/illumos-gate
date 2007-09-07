@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,7 @@ typedef struct adrf_s {
 extern void	adr_char(adr_t *, char *, int);
 extern int	adr_count(adr_t *);
 extern void	adr_int32(adr_t *, int32_t *, int);
+extern void	adr_uid(adr_t *, uid_t *, int);
 extern void	adr_int64(adr_t *, int64_t *, int);
 extern void	adr_short(adr_t *, short *, int);
 extern void	adr_start(adr_t *, char *);

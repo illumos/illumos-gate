@@ -128,6 +128,7 @@ SUNWprivate_1.1 {
 	adrf_u_int64;
 	adrf_u_short;
 	adr_int32;
+	adr_uid;
 	adr_int64;
 	adrm_char;
 	adrm_int32;
@@ -260,10 +261,17 @@ SUNWprivate_1.1 {
 	au_to_seq;
 	au_to_trailer;
 	au_to_uauth;
+	au_to_upriv;
 	au_to_xatom;
-	au_to_xobj;
-	au_to_xproto;
+	au_to_xcolormap;
+	au_to_xclient;
+	au_to_xcursor;
+	au_to_xfont;
+	au_to_xgc;
+	au_to_xpixmap;
+	au_to_xproperty;
 	au_to_xselect;
+	au_to_xwindow;
 	cacheauclass;
 	cacheauclassnam;
 	cacheauevent;
