@@ -260,6 +260,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
  * Upon completion of a command, SATA HBA driver has to update
  * satacmd_status_reg and satacmd_error_reg to reflect the contents of
  * the corresponding device status and error registers.
+ * If the command completed successfully, satacmd_flags.sata_copy_xxx flags
+ * specify what register fields should be updated in sata_cmd structure.
  * If the command completed with error, SATA HBA driver has to update
  * satacmd_sec_count_msb, satacmd_sec_count_lsb, satacmd_lba_low_msb,
  * satacmd_lba_low_lsb, satacmd_lba_mid_msb, satacmd_lba_mid_lsb,
@@ -273,6 +275,9 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
  * points to pre-set request sense cdb that may be used for issuing request
  * sense data from the device.
  *
+ * The sata_max_queue_depth field specifies the maximum allowable queue depth
+ * minus one, i.e. for maximum queue depth of 32, sata_max_queue_depth would
+ * be set to value 0x1f.
  * If FPDMA-type command was sent and command completed with error, the HBA
  * driver may use pre-set command READ LOG EXTENDED command pointed to
  * by satacmd_rle_sata_cmd field to retrieve error data from a device.
@@ -292,8 +297,9 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 #define	SATA_ATAPI_MAX_CDB_LEN	16	/* Covers both 12 and 16 byte cdbs */
 #define	SATA_ATAPI_RQSENSE_LEN	24	/* Allocated Request Sense data */
 #define	SATA_ATAPI_MIN_RQSENSE_LEN 18	/* Min Fixed size Request Sense data */
-
 #define	SATA_ATAPI_RQSENSE_CDB_LEN 6	/* Request Sense CDB length */
+
+#define	SATA_MAX_QUEUE_DEPTH	32	/* Default max queue depth */
 
 struct sata_cmd {
 	int		satacmd_rev;		/* version */

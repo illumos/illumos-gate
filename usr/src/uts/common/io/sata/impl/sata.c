@@ -63,6 +63,20 @@ int	sata_debug_flags = 0;
 int sata_func_enable =
 	SATA_ENABLE_PROCESS_EVENTS | SATA_ENABLE_QUEUING | SATA_ENABLE_NCQ;
 
+/*
+ * Global variable setting default maximum queue depth (NCQ or TCQ)
+ * Note:minimum queue depth is 1
+ */
+int sata_max_queue_depth = SATA_MAX_QUEUE_DEPTH; /* max NCQ/TCQ queue depth */
+
+/*
+ * Currently used default NCQ/TCQ queue depth. It is set-up during the driver
+ * initialization, using value from sata_max_queue_depth
+ * It is adjusted to minimum supported by the controller and by the device,
+ * if queueing is enabled.
+ */
+static	int sata_current_max_qdepth;
+
 #ifdef SATA_DEBUG
 
 #define	SATA_LOG_D(args)	sata_log args
@@ -711,6 +725,21 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 	 */
 	mutex_enter(&sata_mutex);
 
+	if (sata_hba_list == NULL) {
+		/*
+		 * The first instance of HBA is attached.
+		 * Set current/active default maximum NCQ/TCQ queue depth for
+		 * all SATA devices. It is done here and now, to eliminate the
+		 * possibility of the dynamic, programatic modification of the
+		 * queue depth via global (and public) sata_max_queue_depth
+		 * variable (this would require special handling in HBA drivers)
+		 */
+		sata_current_max_qdepth = sata_max_queue_depth;
+		if (sata_current_max_qdepth > 32)
+			sata_current_max_qdepth = 32;
+		else if (sata_current_max_qdepth < 1)
+			sata_current_max_qdepth = 1;
+	}
 
 	sata_hba_inst->satahba_next = NULL;
 	sata_hba_inst->satahba_prev = sata_hba_list_tail;
@@ -3010,7 +3039,9 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 /*
  * Implementation of scsi tran_start.
  * Translate scsi cmd into sata operation and return status.
- * Supported scsi commands:
+ * ATAPI CDBs are passed to ATAPI devices - the device determines what commands
+ * are supported.
+ * For SATA hard disks, supported scsi commands:
  * SCMD_INQUIRY
  * SCMD_TEST_UNIT_READY
  * SCMD_START_STOP
@@ -3452,7 +3483,9 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 		break;
 
 	case SCSI_CAP_TAGGED_QING:
-		if (sdinfo->satadrv_features_enabled & SATA_DEV_F_E_TAGGED_QING)
+		if ((sdinfo->satadrv_features_enabled &
+		    SATA_DEV_F_E_TAGGED_QING) &&
+		    (sdinfo->satadrv_max_queue_depth > 1))
 			rval = 1;	/* Tagged queuing available */
 		else
 			rval = -1;	/* Tagged queuing not available */
@@ -3551,7 +3584,8 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_QCMD) ||
 		    (sata_func_enable & SATA_ENABLE_NCQ &&
 		    sdinfo->satadrv_features_support & SATA_DEV_F_NCQ &&
-		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_NCQ))) {
+		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_NCQ)) &&
+		    (sdinfo->satadrv_max_queue_depth > 1)) {
 			rval = 1;
 			if (value == 1) {
 				sdinfo->satadrv_features_enabled |=
@@ -5349,6 +5383,11 @@ sata_txlt_log_select(sata_pkt_txlate_t *spx)
  * If SATA_ENABLE_NCQ flag is set in addition to SATA_ENABLE_QUEUING flag and
  * both the controller and device suport such functionality, the read
  * request will be translated to READ_FPDMA_QUEUED command.
+ * In both cases the maximum queue depth is derived as minimum of:
+ * HBA capability,device capability and sata_max_queue_depth variable setting.
+ * The value passed to HBA driver is decremented by 1, because only 5 bits are
+ * used to pass max queue depth value, and the maximum possible queue depth
+ * is 32.
  *
  * Returns TRAN_ACCEPT or code returned by sata_hba_start() and
  * appropriate values in scsi_pkt fields.
@@ -5520,7 +5559,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 				scmd->satacmd_cmd_reg =
 				    SATAC_READ_DMA_QUEUED;
 			}
-		} else	/* Queuing not supported */
+		} else	/* NCQ nor legacy queuing not supported */
 			using_queuing = B_FALSE;
 
 		/*
@@ -5532,8 +5571,33 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 			    scmd->satacmd_sec_count_lsb;
 			scmd->satacmd_sec_count_lsb = 0;
 			scmd->satacmd_flags.sata_queued = B_TRUE;
+
+			/* Set-up maximum queue depth */
+			scmd->satacmd_flags.sata_max_queue_depth =
+			    sdinfo->satadrv_max_queue_depth - 1;
+		} else if (sdinfo->satadrv_features_enabled &
+		    SATA_DEV_F_E_UNTAGGED_QING) {
+			/*
+			 * Although NCQ/TCQ is not enabled, untagged queuing
+			 * may be still used.
+			 * Set-up the maximum untagged queue depth.
+			 * Use controller's queue depth from sata_hba_tran.
+			 * SATA HBA drivers may ignore this value and rely on
+			 * the internal limits.For drivers that do not
+			 * ignore untaged queue depth, limit the value to
+			 * SATA_MAX_QUEUE_DEPTH (32), as this is the
+			 * largest value that can be passed via
+			 * satacmd_flags.sata_max_queue_depth.
+			 */
+			scmd->satacmd_flags.sata_max_queue_depth =
+			    SATA_QDEPTH(shi) <= SATA_MAX_QUEUE_DEPTH ?
+			    SATA_QDEPTH(shi) - 1: SATA_MAX_QUEUE_DEPTH - 1;
+
+		} else {
+			scmd->satacmd_flags.sata_max_queue_depth = 0;
 		}
-	}
+	} else
+		scmd->satacmd_flags.sata_max_queue_depth = 0;
 
 	SATADBG3(SATA_DBG_HBA_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_read cmd 0x%2x, lba %llx, sec count %x\n",
@@ -5579,6 +5643,20 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
  *
  * Following scsi cdb fields are ignored:
  * rwprotect, dpo, fua, fua_nv, group_number.
+ *
+ * If SATA_ENABLE_QUEUING flag is set (in the global SATA HBA framework
+ * enable variable sata_func_enable), the capability of the controller and
+ * capability of a device are checked and if both support queueing, write
+ * request will be translated to WRITE_DMA_QUEUEING or WRITE_DMA_QUEUEING_EXT
+ * command rather than plain WRITE_XXX command.
+ * If SATA_ENABLE_NCQ flag is set in addition to SATA_ENABLE_QUEUING flag and
+ * both the controller and device suport such functionality, the write
+ * request will be translated to WRITE_FPDMA_QUEUED command.
+ * In both cases the maximum queue depth is derived as minimum of:
+ * HBA capability,device capability and sata_max_queue_depth variable setting.
+ * The value passed to HBA driver is decremented by 1, because only 5 bits are
+ * used to pass max queue depth value, and the maximum possible queue depth
+ * is 32.
  *
  * Returns TRAN_ACCEPT or code returned by sata_hba_start() and
  * appropriate values in scsi_pkt fields.
@@ -5750,7 +5828,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 				scmd->satacmd_cmd_reg =
 				    SATAC_WRITE_DMA_QUEUED;
 			}
-		} else	/* Queuing not supported */
+		} else	/*  NCQ nor legacy queuing not supported */
 			using_queuing = B_FALSE;
 
 		if (using_queuing) {
@@ -5758,8 +5836,32 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 			    scmd->satacmd_sec_count_lsb;
 			scmd->satacmd_sec_count_lsb = 0;
 			scmd->satacmd_flags.sata_queued = B_TRUE;
+			/* Set-up maximum queue depth */
+			scmd->satacmd_flags.sata_max_queue_depth =
+			    sdinfo->satadrv_max_queue_depth - 1;
+		} else if (sdinfo->satadrv_features_enabled &
+		    SATA_DEV_F_E_UNTAGGED_QING) {
+			/*
+			 * Although NCQ/TCQ is not enabled, untagged queuing
+			 * may be still used.
+			 * Set-up the maximum untagged queue depth.
+			 * Use controller's queue depth from sata_hba_tran.
+			 * SATA HBA drivers may ignore this value and rely on
+			 * the internal limits. For drivera that do not
+			 * ignore untaged queue depth, limit the value to
+			 * SATA_MAX_QUEUE_DEPTH (32), as this is the
+			 * largest value that can be passed via
+			 * satacmd_flags.sata_max_queue_depth.
+			 */
+			scmd->satacmd_flags.sata_max_queue_depth =
+			    SATA_QDEPTH(shi) <= SATA_MAX_QUEUE_DEPTH ?
+			    SATA_QDEPTH(shi) - 1: SATA_MAX_QUEUE_DEPTH - 1;
+
+		} else {
+			scmd->satacmd_flags.sata_max_queue_depth = 0;
 		}
-	}
+	} else
+		scmd->satacmd_flags.sata_max_queue_depth = 0;
 
 	SATADBG3(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_write cmd 0x%2x, lba %llx, sec count %x\n",
@@ -8387,7 +8489,8 @@ sata_save_atapi_trace(sata_pkt_txlate_t *spx, int count)
  * Fetch inquiry data from ATAPI device
  * Returns SATA_SUCCESS if operation was successfull, SATA_FAILURE otherwise.
  *
- * inqb pointer does not points to a DMA-able buffer. It is a local buffer
+ * Note:
+ * inqb pointer does not point to a DMA-able buffer. It is a local buffer
  * where the caller expects to see the inquiry data.
  *
  */
@@ -8403,6 +8506,9 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 	sata_cmd_t *scmd;
 	int rval;
 	uint8_t *rqsp;
+#ifdef SATA_DEBUG
+	char msg_buf[MAXPATHLEN];
+#endif
 
 	ASSERT(sata_hba != NULL);
 
@@ -8510,44 +8616,51 @@ sata_get_atapi_inquiry_data(sata_hba_inst_t *sata_hba,
 			 * ARQ data hopefull show something other than NO SENSE
 			 */
 			rqsp = scmd->satacmd_rqsense;
-			sata_log(spx->txlt_sata_hba_inst, CE_WARN,
-			    "ATAPI packet completion reason: %02x\n"
-			    "RQSENSE:  %02x %02x %02x %02x %02x %02x "
-			    "          %02x %02x %02x %02x %02x %02x "
-			    "          %02x %02x %02x %02x %02x %02x\n",
-			    spkt->satapkt_reason,
-			    rqsp[0], rqsp[1], rqsp[2], rqsp[3],
-			    rqsp[4], rqsp[5], rqsp[6], rqsp[7],
-			    rqsp[8], rqsp[9], rqsp[10], rqsp[11],
-			    rqsp[12], rqsp[13], rqsp[14], rqsp[15],
-			    rqsp[16], rqsp[17]);
+#ifdef SATA_DEBUG
+			if (sata_debug_flags & SATA_DBG_ATAPI) {
+				msg_buf[0] = '\0';
+				(void) snprintf(msg_buf, MAXPATHLEN,
+				    "ATAPI packet completion reason: %02x\n"
+				    "RQSENSE:  %02x %02x %02x %02x %02x %02x\n"
+				    "          %02x %02x %02x %02x %02x %02x\n"
+				    "          %02x %02x %02x %02x %02x %02x",
+				    spkt->satapkt_reason,
+				    rqsp[0], rqsp[1], rqsp[2], rqsp[3],
+				    rqsp[4], rqsp[5], rqsp[6], rqsp[7],
+				    rqsp[8], rqsp[9], rqsp[10], rqsp[11],
+				    rqsp[12], rqsp[13], rqsp[14], rqsp[15],
+				    rqsp[16], rqsp[17]);
+				sata_log(spx->txlt_sata_hba_inst, CE_WARN,
+				    "%s", msg_buf);
+			}
+#endif
 		} else {
 			switch (spkt->satapkt_reason) {
 			case SATA_PKT_PORT_ERROR:
-				sata_log(sata_hba, CE_WARN,
+				SATADBG1(SATA_DBG_ATAPI, sata_hba,
 				    "sata_get_atapi_inquiry_data: "
-				    "packet reason: port error\n");
+				    "packet reason: port error", NULL);
 				break;
 
 			case SATA_PKT_TIMEOUT:
-				sata_log(sata_hba, CE_WARN,
+				SATADBG1(SATA_DBG_ATAPI, sata_hba,
 				    "sata_get_atapi_inquiry_data: "
-				    "packet reason: timeout\n");
+				    "packet reason: timeout", NULL);
 				break;
 
 			case SATA_PKT_ABORTED:
-				sata_log(sata_hba, CE_WARN,
+				SATADBG1(SATA_DBG_ATAPI, sata_hba,
 				    "sata_get_atapi_inquiry_data: "
-				    "packet reason: aborted\n");
+				    "packet reason: aborted", NULL);
 				break;
 
 			case SATA_PKT_RESET:
-				sata_log(sata_hba, CE_WARN,
+				SATADBG1(SATA_DBG_ATAPI, sata_hba,
 				    "sata_get_atapi_inquiry_data: "
-				    "packet reason: reset\n");
+				    "packet reason: reset\n", NULL);
 				break;
 			default:
-				sata_log(sata_hba, CE_WARN,
+				SATADBG1(SATA_DBG_ATAPI, sata_hba,
 				    "sata_get_atapi_inquiry_data: "
 				    "invalid packet reason: %02x\n",
 				    spkt->satapkt_reason);
@@ -8678,7 +8791,7 @@ sata_test_atapi_packet_command(sata_hba_inst_t *sata_hba_inst, int cport)
 	if (spkt->satapkt_reason == SATA_PKT_COMPLETED) {
 		sata_log(sata_hba_inst, CE_WARN,
 		    "sata_test_atapi_packet_command: "
-		    "Packet completed successfully\n");
+		    "Packet completed successfully");
 		/*
 		 * Normal completion - show inquiry data
 		 */
@@ -10306,8 +10419,21 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 		cmn_err(CE_CONT, "?\tSATA Gen1 signaling speed (1.5Gbps)\n");
 	if (sdinfo->satadrv_features_support &
 	    (SATA_DEV_F_TCQ | SATA_DEV_F_NCQ)) {
-		cmn_err(CE_CONT, "?\tQueue depth %d\n",
+		msg_buf[0] = '\0';
+		(void) snprintf(msg_buf, MAXPATHLEN,
+		    "Supported queue depth %d",
 		    sdinfo->satadrv_queue_depth);
+		if (!(sata_func_enable &
+		    (SATA_ENABLE_QUEUING | SATA_ENABLE_NCQ)))
+			(void) strlcat(msg_buf,
+			    " - queueing disabled globally", MAXPATHLEN);
+		else if (sdinfo->satadrv_queue_depth >
+		    sdinfo->satadrv_max_queue_depth) {
+			(void) snprintf(&msg_buf[strlen(msg_buf)],
+			    MAXPATHLEN - strlen(msg_buf), ", limited to %d",
+			    (int)sdinfo->satadrv_max_queue_depth);
+		}
+		cmn_err(CE_CONT, "?\t%s\n", msg_buf);
 	}
 
 	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
@@ -11152,8 +11278,21 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 
 		sdinfo->satadrv_queue_depth = sdinfo->satadrv_id.ai_qdepth;
 		if ((sdinfo->satadrv_features_support & SATA_DEV_F_NCQ) ||
-		    (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
+		    (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ)) {
 			++sdinfo->satadrv_queue_depth;
+			/* Adjust according to controller capabilities */
+			sdinfo->satadrv_max_queue_depth = MIN(
+			    sdinfo->satadrv_queue_depth,
+			    SATA_QDEPTH(sata_hba_inst));
+			/* Adjust according to global queue depth limit */
+			sdinfo->satadrv_max_queue_depth = MIN(
+			    sdinfo->satadrv_max_queue_depth,
+			    sata_current_max_qdepth);
+			if (sdinfo->satadrv_max_queue_depth == 0)
+				sdinfo->satadrv_max_queue_depth = 1;
+		} else
+			sdinfo->satadrv_max_queue_depth = 1;
+
 		rval = SATA_SUCCESS;
 	} else {
 		/*
@@ -11788,21 +11927,21 @@ sata_target_devid_register(dev_info_t *dip, sata_drive_info_t *sdinfo)
 	bcopy(&sdinfo->satadrv_id.ai_drvser, &hwid[modlen],
 	    sizeof (sdinfo->satadrv_id.ai_drvser));
 	swab(&hwid[modlen], &hwid[modlen],
-		sizeof (sdinfo->satadrv_id.ai_drvser));
+	    sizeof (sdinfo->satadrv_id.ai_drvser));
 	serlen = sata_check_modser(&hwid[modlen],
-		sizeof (sdinfo->satadrv_id.ai_drvser));
+	    sizeof (sdinfo->satadrv_id.ai_drvser));
 	if (serlen == 0)
 		goto err;
 	hwid[modlen + serlen] = 0; /* terminate the hwid string */
 
 	/* initialize/register devid */
 	if ((rval = ddi_devid_init(dip, DEVID_ATA_SERIAL,
-		(ushort_t)(modlen + serlen), hwid, &devid)) == DDI_SUCCESS)
+	    (ushort_t)(modlen + serlen), hwid, &devid)) == DDI_SUCCESS)
 		rval = ddi_devid_register(dip, devid);
 
 	if (rval != DDI_SUCCESS)
 		cmn_err(CE_WARN, "sata: failed to create devid for the disk"
-			" on port %d", sdinfo->satadrv_addr.cport);
+		    " on port %d", sdinfo->satadrv_addr.cport);
 err:
 	kmem_free(hwid, LEGACY_HWID_LEN);
 }
