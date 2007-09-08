@@ -35,9 +35,15 @@ uint32_t 	nxge_use_partition = 0;		/* debug partition flag */
 uint32_t 	nxge_dma_obp_props_only = 1;	/* use obp published props */
 uint32_t 	nxge_use_rdc_intr = 1;		/* debug to assign rdc intr */
 /*
- * until MSIX supported, assume msi, use 2 for msix
+ * PSARC/2007/453 MSI-X interrupt limit override
+ * (This PSARC case is limited to MSI-X vectors
+ *  and SPARC platforms only).
  */
-uint32_t	nxge_msi_enable = 1;		/* debug: turn msi off */
+#if defined(_BIG_ENDIAN)
+uint32_t	nxge_msi_enable = 2;
+#else
+uint32_t	nxge_msi_enable = 1;
+#endif
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -215,6 +221,11 @@ static mac_callbacks_t nxge_m_callbacks = {
 
 void
 nxge_err_inject(p_nxge_t, queue_t *, mblk_t *);
+
+/* PSARC/2007/453 MSI-X interrupt limit override. */
+#define	NXGE_MSIX_REQUEST_10G	8
+#define	NXGE_MSIX_REQUEST_1G	2
+static int nxge_create_msi_property(p_nxge_t);
 
 /*
  * These global variables control the message
@@ -4085,7 +4096,7 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 	uint_t			*inthandler;
 	void			*arg1, *arg2;
 	int			behavior;
-	int			nintrs, navail;
+	int			nintrs, navail, nrequest;
 	int			nactual, nrequired;
 	int			inum = 0;
 	int			x, y;
@@ -4115,6 +4126,18 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
 		"ddi_intr_get_navail() returned: nintrs %d, navail %d",
 		    nintrs, navail));
+
+	/* PSARC/2007/453 MSI-X interrupt limit override */
+	if (int_type == DDI_INTR_TYPE_MSIX) {
+		nrequest = nxge_create_msi_property(nxgep);
+		if (nrequest < navail) {
+			navail = nrequest;
+			NXGE_DEBUG_MSG((nxgep, INT_CTL,
+			    "nxge_add_intrs_adv_type: nintrs %d "
+			    "navail %d (nrequest %d)",
+			    nintrs, navail, nrequest));
+		}
+	}
 
 	if (int_type == DDI_INTR_TYPE_MSI && !ISP2(navail)) {
 		/* MSI must be power of 2 */
@@ -4459,6 +4482,9 @@ nxge_remove_intrs(p_nxge_t nxgep)
 	intrp->intr_added = 0;
 
 	(void) nxge_ldgv_uninit(nxgep);
+
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, nxgep->dip,
+	    "#msix-request");
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_remove_intrs"));
 }
@@ -4872,4 +4898,50 @@ nxge_get_nports(p_nxge_t nxgep)
 	}
 
 	return (nports);
+}
+
+/*
+ * The following two functions are to support
+ * PSARC/2007/453 MSI-X interrupt limit override.
+ */
+static int
+nxge_create_msi_property(p_nxge_t nxgep)
+{
+	int	nmsi;
+	extern	int ncpus;
+
+	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "==>nxge_create_msi_property"));
+
+	switch (nxgep->mac.portmode) {
+	case PORT_10G_COPPER:
+	case PORT_10G_FIBER:
+		(void) ddi_prop_create(DDI_DEV_T_NONE, nxgep->dip,
+		    DDI_PROP_CANSLEEP, "#msix-request", NULL, 0);
+		/*
+		 * The maximum MSI-X requested will be 8.
+		 * If the # of CPUs is less than 8, we will reqeust
+		 * # MSI-X based on the # of CPUs.
+		 */
+		if (ncpus >= NXGE_MSIX_REQUEST_10G) {
+			nmsi = NXGE_MSIX_REQUEST_10G;
+		} else {
+			nmsi = ncpus;
+		}
+		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
+		    "==>nxge_create_msi_property(10G): exists 0x%x (nmsi %d)",
+		    ddi_prop_exists(DDI_DEV_T_NONE, nxgep->dip,
+		    DDI_PROP_CANSLEEP, "#msix-request"), nmsi));
+		break;
+
+	default:
+		nmsi = NXGE_MSIX_REQUEST_1G;
+		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
+		    "==>nxge_create_msi_property(1G): exists 0x%x (nmsi %d)",
+		    ddi_prop_exists(DDI_DEV_T_NONE, nxgep->dip,
+		    DDI_PROP_CANSLEEP, "#msix-request"), nmsi));
+		break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<==nxge_create_msi_property"));
+	return (nmsi);
 }
