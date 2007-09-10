@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,11 +97,11 @@ display_cpu_devices(Sys_tree *tree)
 	Board_node *bnode;
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n========================= CPUs "
-		"===============================================\n\n"
-		"          Run   E$  CPU     CPU  \n"
-		"Brd  CPU  MHz   MB  Impl.   Mask \n"
-		"--- ----- ---- ---- ------- ---- \n"));
+	    "\n========================= CPUs "
+	    "===============================================\n\n"
+	    "          Run   E$  CPU     CPU  \n"
+	    "Brd  CPU  MHz   MB  Impl.   Mask \n"
+	    "--- ----- ---- ---- ------- ---- \n"));
 
 	bnode = tree->bd_list;
 	while (bnode != NULL) {
@@ -144,7 +143,7 @@ display_cpus(Board_node *board)
 		impl = (int *)get_prop_val(find_prop(cpu, "implementation#"));
 		mask = (int *)get_prop_val(find_prop(cpu, "mask#"));
 		l3_shares =
-			(int *)get_prop_val(find_prop(cpu, "l3-cache-sharing"));
+		    (int *)get_prop_val(find_prop(cpu, "l3-cache-sharing"));
 
 		/* Do not display a failed CPU node */
 		if ((impl == NULL) || (freq == 0) || (node_failed(cpu)))
@@ -157,8 +156,8 @@ display_cpus(Board_node *board)
 				continue;
 			}
 			if ((fru_prev == 'X') ||
-				((fru_prev != 'X') &&
-				(fru_name != fru_prev))) {
+			    ((fru_prev != 'X') &&
+			    (fru_name != fru_prev))) {
 				fru_prev = fru_name;
 				mid_prev = *mid;
 				ecache_size_prev = ecache_size;
@@ -175,8 +174,8 @@ display_cpus(Board_node *board)
 				 * total size is equal to the core size.
 				 */
 				if ((l3_shares == NULL) ||
-					((l3_shares != NULL) &&
-					MULTIPLE_BITS_SET(*l3_shares))) {
+				    ((l3_shares != NULL) &&
+				    MULTIPLE_BITS_SET(*l3_shares))) {
 					ecache_size += ecache_size_prev;
 				}
 				ecache_size_prev = 0;
@@ -199,23 +198,23 @@ display_cpus(Board_node *board)
 			log_printf(" N/A  ");
 		else
 			log_printf(" %4.1f ",
-				(float)ecache_size / (float)(1<<20));
+			    (float)ecache_size / (float)(1<<20));
 			/* Implementation */
 		if (impl == NULL) {
 			log_printf(dgettext(TEXT_DOMAIN, "  N/A   "));
 		} else {
 			if (IS_CHEETAH(*impl))
 				log_printf(dgettext(TEXT_DOMAIN,
-					"US-III  "));
+				    "US-III  "));
 			else if (IS_CHEETAH_PLUS(*impl))
 				log_printf(dgettext(TEXT_DOMAIN,
-					"US-III+ "));
+				    "US-III+ "));
 			else if (IS_JAGUAR(*impl))
 				log_printf(dgettext(TEXT_DOMAIN,
-					"US-IV   "));
+				    "US-IV   "));
 			else if (IS_PANTHER(*impl))
 				log_printf(dgettext(TEXT_DOMAIN,
-					"US-IV+  "));
+				    "US-IV+  "));
 			else
 				log_printf("%-6x  ", *impl);
 		}
@@ -241,11 +240,11 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	    " ===============================\n\n"
 	    "          Logical  Logical  Logical\n"
 	    "     MC   Bank     Bank     Bank         DIMM    "
-		"Interleave  Interleaved\n"
+	    "Interleave  Interleaved\n"
 	    "Brd  ID   num      size     Status       Size    "
-		"Factor      with\n"
+	    "Factor      with\n"
 	    "---  ---  ----     ------   -----------  ------  "
-		"----------  -----------"));
+	    "----------  -----------"));
 
 	while (bnode != NULL) {
 		if (get_us3_mem_regs(bnode)) {
@@ -308,7 +307,7 @@ display_pci(Board_node *board)
 	if (board == NULL)
 		return;
 
-	memset(&card, 0, sizeof (struct io_card));
+	(void) memset(&card, 0, sizeof (struct io_card));
 	/* Initialize all the common information */
 	card.display = TRUE;
 	card.board = board->board_num;
@@ -318,23 +317,23 @@ display_pci(Board_node *board)
 	 * each instance node found.
 	 */
 	for (pci = dev_find_node_by_compat(board->nodes, SCHIZO_COMPAT_PROP);
-		pci != NULL;
-		pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
+	    pci != NULL;
+	    pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
 		(void) snprintf(card.bus_type, MAXSTRLEN,
-			dgettext(TEXT_DOMAIN, "PCI"));
+		    dgettext(TEXT_DOMAIN, "PCI"));
 		/*
 		 * Get slot-name properties from parent node and
 		 * store them in an array.
 		 */
 		value = (char *)get_prop_val(
-			find_prop(pci, "slot-names"));
+		    find_prop(pci, "slot-names"));
 
 		if (value != NULL) {
 			/* array starts after first int */
 			slot_name_arr[0] = (char *)value + sizeof (int);
 			for (i = 1; i < NUM_PCI_SLOTS; i++) {
 				slot_name_arr[i] = (char *)slot_name_arr[i - 1]
-					+ strlen(slot_name_arr[i - 1]) +1;
+				    + strlen(slot_name_arr[i - 1]) +1;
 			}
 		}
 		/*
@@ -346,25 +345,25 @@ display_pci(Board_node *board)
 		card_node = pci->child;
 		/* Generate the list of pci cards on pci instance: pci */
 		fill_pci_card_list(pci, card_node, &card, &card_list,
-			slot_name_arr);
+		    slot_name_arr);
 	} /* end-for */
 
 	if (!banner && card_list != NULL) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"                    Bus  Max\n"
-			" IO  Port Bus       Freq Bus  Dev,\n"
-			"Type  ID  Side Slot MHz  Freq Func State "
-			"Name                              Model"
+		    "                    Bus  Max\n"
+		    " IO  Port Bus       Freq Bus  Dev,\n"
+		    "Type  ID  Side Slot MHz  Freq Func State "
+		    "Name                              Model"
 #ifdef DEBUG
-			"                   Notes"
+		    "                   Notes"
 #endif
-			"\n"
-			"---- ---- ---- ---- ---- ---- ---- ----- "
-			"--------------------------------  "
+		    "\n"
+		    "---- ---- ---- ---- ---- ---- ---- ----- "
+		    "--------------------------------  "
 #ifdef DEBUG
-			"----------------------  "
+		    "----------------------  "
 #endif
-			"----------------------\n"));
+		    "----------------------\n"));
 		banner = TRUE;
 	}
 
@@ -400,7 +399,7 @@ display_io_cards(struct io_card *list)
 		}
 
 		log_printf(dgettext(TEXT_DOMAIN,
-			"%-1d,%-1d  %-5s %-32.32s"),
+		    "%-1d,%-1d  %-5s %-32.32s"),
 		    p->dev_no, p->func_no, p->status, p->name);
 		if (strlen(p->name) > 32)
 			log_printf(dgettext(TEXT_DOMAIN, "+ "));
@@ -437,19 +436,25 @@ disp_envc_status()
 	picl_nodehdl_t system_node, root;
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n"
-		"=========================  Environmental Status "
-		"=========================\n\n"));
+	    "\n"
+	    "=========================  Environmental Status "
+	    "=========================\n\n"));
 
 	err = picl_initialize();
-	if (err != PICL_SUCCESS)
+	if (err != PICL_SUCCESS) {
+		exit_code = PD_INTERNAL_FAILURE;
 		goto err_out;
+	}
 	err = picl_get_root(&root);
-	if (err != PICL_SUCCESS)
+	if (err != PICL_SUCCESS) {
+		exit_code = PD_INTERNAL_FAILURE;
 		goto err_out;
+	}
 	err = find_child_device(root, system, &system_node);
-	if (err != PICL_SUCCESS)
+	if (err != PICL_SUCCESS) {
+		exit_code = PD_INTERNAL_FAILURE;
 		goto err_out;
+	}
 
 	err = print_temps(system_node);
 	err |= print_keyswitch(system_node);
@@ -465,8 +470,8 @@ disp_envc_status()
 
 err_out:
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\nEnvironmental reporting error: %s\n"),
-		picl_strerror(err));
+	    "\nEnvironmental reporting error: %s\n"),
+	    picl_strerror(err));
 }
 
 static int
@@ -480,11 +485,11 @@ print_ps(picl_nodehdl_t system_node)
 	char		fault_state[PICL_PROPNAMELEN_MAX];
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n\n"
-		"Power Supplies:\n"
-		"---------------\n"
-		"\n"
-		"Supply     Status        Fault     Fan Fail   Temp Fail\n"
-		"------    ------------   --------  ---------  ---------\n"));
+	    "Power Supplies:\n"
+	    "---------------\n"
+	    "\n"
+	    "Supply     Status        Fault     Fan Fail   Temp Fail\n"
+	    "------    ------------   --------  ---------  ---------\n"));
 
 	err = fill_device_array_from_id(system_node, "PSVC_PS", &number, &ps);
 	if (err != PICL_SUCCESS) {
@@ -499,7 +504,7 @@ print_ps(picl_nodehdl_t system_node)
 
 		log_printf(dgettext(TEXT_DOMAIN, "%6-s"), name);
 		err = picl_get_propval_by_name(ps[i], "FaultInformation",
-			fault_state, PICL_PROPNAMELEN_MAX);
+		    fault_state, PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			free(ps);
 			return (err);
@@ -511,7 +516,7 @@ print_ps(picl_nodehdl_t system_node)
 		}
 
 		err = fill_device_array_from_id(ps[i], "PSVC_DEV_FAULT_SENSOR",
-			&number, &ps_fail_sensor);
+		    &number, &ps_fail_sensor);
 
 		if (err != PICL_SUCCESS) {
 			free(ps);
@@ -520,7 +525,7 @@ print_ps(picl_nodehdl_t system_node)
 		log_printf("   ");
 		for (j = 0; j < MAX_PS_SENSORS; j++) {
 			err = picl_get_propval_by_name(ps_fail_sensor[j],
-				"State", fault_state, PICL_PROPNAMELEN_MAX);
+			    "State", fault_state, PICL_PROPNAMELEN_MAX);
 			if (err != PICL_SUCCESS) {
 				if (err == PICL_FAILURE) {
 					break;
@@ -536,7 +541,7 @@ print_ps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n=================================\n\n"));
+	    "\n=================================\n\n"));
 
 	free(ps);
 	return (PICL_SUCCESS);
@@ -554,21 +559,21 @@ print_fans(picl_nodehdl_t system_node)
 	int32_t		rpm;
 
 	err = fill_device_array_from_id(system_node, "PSVC_FAN", &number,
-		&fans);
+	    &fans);
 	if (err != PICL_SUCCESS) {
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n=================================\n\n"
-		"Fan Status:\n"
-		"-----------\n\n"
-		"Fan Tray        Fan              RPM    Status\n"
-		"-----------     ----            -----   ----------\n"));
+	    "\n=================================\n\n"
+	    "Fan Status:\n"
+	    "-----------\n\n"
+	    "Fan Tray        Fan              RPM    Status\n"
+	    "-----------     ----            -----   ----------\n"));
 
 	for (i = 0; i < MAX_FANS; i++) {
 		err = picl_get_propval_by_name(fans[i], PICL_PROP_NAME, prop,
-			PICL_PROPNAMELEN_MAX);
+		    PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS)
 			continue;
 
@@ -576,7 +581,7 @@ print_fans(picl_nodehdl_t system_node)
 		if (err != PICL_SUCCESS)
 			continue;
 		err = picl_get_propval_by_name(phdl, PICL_PROP_NAME, parent,
-			PICL_PROPNAMELEN_MAX);
+		    PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS)
 			continue;
 
@@ -602,7 +607,7 @@ print_fans(picl_nodehdl_t system_node)
 		log_printf(dgettext(TEXT_DOMAIN, "  [%s]\n"), prop);
 	}
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n=================================\n\n"));
+	    "\n=================================\n\n"));
 	free(fans);
 	return (PICL_SUCCESS);
 }
@@ -622,8 +627,8 @@ print_disk(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Disk Status:\n"
-		"------------\n"));
+	    "Disk Status:\n"
+	    "------------\n"));
 	for (i = 0; i < MAX_DISKS; i++) {
 		err = picl_get_propval_by_name(disks[i], "FaultInformation",
 		    state, PICL_PROPNAMELEN_MAX);
@@ -631,11 +636,11 @@ print_disk(picl_nodehdl_t system_node)
 		switch (err) {
 		case PICL_SUCCESS:
 			log_printf(dgettext(TEXT_DOMAIN,
-				"DISK %d: [%3s]\n"), i, state);
+			    "DISK %d: [%3s]\n"), i, state);
 			break;
 		case PICL_INVALIDHANDLE:
 			log_printf(dgettext(TEXT_DOMAIN,
-				"DISK %d: [ NOT PRESENT ]\n"), i);
+			    "DISK %d: [ NOT PRESENT ]\n"), i);
 			break;
 		default:
 			free(disks);
@@ -663,27 +668,31 @@ print_FSP_LEDS(picl_nodehdl_t system_node)
 
 	assert(number == 2);
 	err = picl_get_propval_by_name(fsp_led[0], "State", &fault_state,
-		PICL_PROPNAMELEN_MAX);
+	    PICL_PROPNAMELEN_MAX);
 	if (err != PICL_SUCCESS) {
 		free(fsp_led);
 		return (err);
 	}
+
+	if (strcmp(fault_state, PSVC_LED_ON) == 0)
+		exit_code = PD_SYSTEM_FAILURE;
+
 	err = picl_get_propval_by_name(fsp_led[1], "State", &locate_state,
-		PICL_PROPNAMELEN_MAX);
+	    PICL_PROPNAMELEN_MAX);
 	if (err != PICL_SUCCESS) {
 		free(fsp_led);
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System LED Status:\n\n"
-		"  LOCATOR   FAULT    POWER\n"
-		"  -------  -------  -------\n"
-		"   [%3s]    [%3s]    [ ON]"),
-			locate_state, fault_state);
+	    "System LED Status:\n\n"
+	    "  LOCATOR   FAULT    POWER\n"
+	    "  -------  -------  -------\n"
+	    "   [%3s]    [%3s]    [ ON]"),
+	    locate_state, fault_state);
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n\n=================================\n\n"));
+	    "\n\n=================================\n\n"));
 	free(fsp_led);
 	return (err);
 }
@@ -702,16 +711,16 @@ print_keyswitch(picl_nodehdl_t system_node)
 		return (err);
 	}
 	err = picl_get_propval_by_name(keyswitch[0], "State", ks_pos,
-		PICL_PROPNAMELEN_MAX);
+	    PICL_PROPNAMELEN_MAX);
 	if (err != PICL_SUCCESS) {
 		free(keyswitch);
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Front Status Panel:\n"
-		"-------------------\n"
-		"Keyswitch position: %s\n\n"), ks_pos);
+	    "Front Status Panel:\n"
+	    "-------------------\n"
+	    "Keyswitch position: %s\n\n"), ks_pos);
 	free(keyswitch);
 	return (err);
 }
@@ -735,17 +744,17 @@ print_temps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System Temperatures (Celsius):\n"
-		"-------------------------------\n"
-		"Device\t\tTemperature\tStatus\n"
-		"---------------------------------------\n"));
+	    "System Temperatures (Celsius):\n"
+	    "-------------------------------\n"
+	    "Device\t\tTemperature\tStatus\n"
+	    "---------------------------------------\n"));
 
 	for (i = 0; i < number; i++) {
 		err = picl_get_propval_by_name(system_ts_nodes[i],
 		    "State", state, sizeof (state));
 		if (err != PICL_SUCCESS) {
 			if (err == PICL_INVALIDHANDLE) {
-				strcpy(state, "n/a");
+				(void) strcpy(state, "n/a");
 			} else {
 				free(system_ts_nodes);
 				return (err);
@@ -770,7 +779,7 @@ print_temps(picl_nodehdl_t system_node)
 			*p = '\0';
 
 		err = picl_get_propval_by_name(system_ts_nodes[i],
-				"Temperature", &temp, sizeof (temp));
+		    "Temperature", &temp, sizeof (temp));
 		if (err != PICL_SUCCESS) {
 			free(system_ts_nodes);
 			return (err);
@@ -779,7 +788,7 @@ print_temps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n=================================\n\n"));
+	    "\n=================================\n\n"));
 
 	free(system_ts_nodes);
 	return (PICL_SUCCESS);
@@ -792,25 +801,25 @@ display_hw_revisions(Prom_node *root, Board_node *bdlist)
 	char		*value;
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n"
-		"========================= HW Revisions "
-		"=======================================\n\n"));
+	    "========================= HW Revisions "
+	    "=======================================\n\n"));
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System PROM revisions:\n"
-		"----------------------\n"));
+	    "System PROM revisions:\n"
+	    "----------------------\n"));
 
 	pnode = dev_find_node(root, "openprom");
 	if (pnode != NULL) {
-	    value = (char *)get_prop_val(find_prop(pnode, "version"));
-	    log_printf(value);
+		value = (char *)get_prop_val(find_prop(pnode, "version"));
+		log_printf(value);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n\n"
-		"IO ASIC revisions:\n"
-		"------------------\n"
-		"         Port\n"
-		"Model     ID  Status Version\n"
-		"-------- ---- ------ -------\n"));
+	    "IO ASIC revisions:\n"
+	    "------------------\n"
+	    "         Port\n"
+	    "Model     ID  Status Version\n"
+	    "-------- ---- ------ -------\n"));
 
 	display_schizo_revisions(bdlist);
 }
@@ -839,9 +848,9 @@ display_schizo_revisions(Board_node *bdlist)
 		 */
 
 		for (pnode = dev_find_node_by_compat(bnode->nodes,
-			SCHIZO_COMPAT_PROP); pnode != NULL;
-			pnode = dev_next_node_by_compat(pnode,
-			    SCHIZO_COMPAT_PROP)) {
+		    SCHIZO_COMPAT_PROP); pnode != NULL;
+		    pnode = dev_next_node_by_compat(pnode,
+		    SCHIZO_COMPAT_PROP)) {
 
 			/*
 			 * get the reg property to determine
@@ -849,7 +858,7 @@ display_schizo_revisions(Board_node *bdlist)
 			 */
 
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "reg"));
+			    (find_prop(pnode, "reg"));
 			if (int_val != NULL) {
 				int_val ++; /* second integer in array */
 				pci_bus = ((*int_val) & 0x7f0000);
@@ -857,7 +866,7 @@ display_schizo_revisions(Board_node *bdlist)
 
 			/* get portid */
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "portid"));
+			    (find_prop(pnode, "portid"));
 			if (int_val == NULL)
 				continue;
 
@@ -889,14 +898,14 @@ display_schizo_revisions(Board_node *bdlist)
 			prev_portid = portid;
 
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "version#"));
+			    (find_prop(pnode, "version#"));
 			if (int_val != NULL)
 				revision = *int_val;
 			else
 				revision = -1;
 
 			status_a = (char *)get_prop_val(find_prop
-				(pnode, "status"));
+			    (pnode, "status"));
 
 			log_printf(dgettext(TEXT_DOMAIN, "Schizo    "));
 
@@ -904,8 +913,8 @@ display_schizo_revisions(Board_node *bdlist)
 
 
 			log_printf((status_a == NULL && status_b == NULL) ?
-				dgettext(TEXT_DOMAIN, "  ok  ") :
-				dgettext(TEXT_DOMAIN, " fail "));
+			    dgettext(TEXT_DOMAIN, "  ok  ") :
+			    dgettext(TEXT_DOMAIN, " fail "));
 
 			log_printf(dgettext(TEXT_DOMAIN, " %4d   "),
 			    revision);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Cherrystone platform-specific functions that aren't platform specific
@@ -29,9 +28,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <psvc_objects.h>
 #include <libprtdiag.h>
 #include <sys/mc.h>
 
+/* prtdiag exit codes */
+#define	PD_SUCCESS		0
+#define	PD_SYSTEM_FAILURE	1
+#define	PD_INTERNAL_FAILURE	2
+
+static int exit_code = PD_SUCCESS;
 
 static Prom_node *dev_next_node_by_compat(Prom_node *root, char *model);
 static Prom_node *dev_find_node_by_compat(Prom_node *root, char *model);
@@ -77,15 +83,15 @@ dev_next_node_by_compat(Prom_node *root, char *compat)
 	Prom_node *node;
 
 	if (root == NULL)
-	    return (NULL);
+		return (NULL);
 
 	/* look at your children first */
 	if ((node = dev_find_node_by_compat(root->child, compat)) != NULL)
-	    return (node);
+		return (node);
 
 	/* now look at your siblings */
 	if ((node = dev_find_node_by_compat(root->sibling, compat)) != NULL)
-	    return (node);
+		return (node);
 
 	return (NULL);  /* not found */
 }
@@ -114,7 +120,7 @@ dev_find_node_by_compat(Prom_node *root, char *compat)
 	compatible = (char *)get_prop_val(find_prop(root, "compatible"));
 
 	if (compatible == NULL)
-	    return (NULL);
+		return (NULL);
 
 	if ((strcmp(name, "pci") == 0) && (compatible != NULL) &&
 	    (strcmp(compatible, compat) == 0)) {
@@ -123,11 +129,11 @@ dev_find_node_by_compat(Prom_node *root, char *compat)
 
 	/* look at your children first */
 	if ((node = dev_find_node_by_compat(root->child, compat)) != NULL)
-	    return (node);
+		return (node);
 
 	/* now look at your siblings */
 	if ((node = dev_find_node_by_compat(root->sibling, compat)) != NULL)
-	    return (node);
+		return (node);
 
 	return (NULL);  /* not found */
 }
@@ -140,7 +146,7 @@ find_child_device(picl_nodehdl_t parent, char *child_name,
 	char		name[PICL_PROPNAMELEN_MAX];
 
 	err = picl_get_propval_by_name(parent, PICL_PROP_CHILD, &(*child),
-		sizeof (picl_nodehdl_t));
+	    sizeof (picl_nodehdl_t));
 	switch (err) {
 	case PICL_SUCCESS:
 		break;
@@ -175,7 +181,7 @@ find_child_device(picl_nodehdl_t parent, char *child_name,
 		log_printf(dgettext(TEXT_DOMAIN, "child name is %s\n"), name);
 #endif
 		err = picl_get_propval_by_name(*child, PICL_PROP_PEER,
-			&(*child), sizeof (picl_nodehdl_t));
+		    &(*child), sizeof (picl_nodehdl_t));
 		switch (err) {
 		case PICL_SUCCESS:
 			err = picl_get_propval_by_name(*child, PICL_PROP_NAME,
@@ -207,7 +213,7 @@ fill_device_from_id(picl_nodehdl_t device_id, char *assoc_id,
 	picl_prophdl_t	reference_property;
 
 	err = picl_get_propval_by_name(device_id, assoc_id, &tbl_hdl,
-		sizeof (picl_prophdl_t));
+	    sizeof (picl_prophdl_t));
 	if (err != PICL_SUCCESS) {
 #ifdef WORKFILE_DEBUG
 		if (err != PICL_INVALIDHANDLE) {
@@ -232,7 +238,7 @@ fill_device_from_id(picl_nodehdl_t device_id, char *assoc_id,
 
 	/* get node associated with reference property */
 	err = picl_get_propval(reference_property, &(*device),
-		sizeof (picl_nodehdl_t));
+	    sizeof (picl_nodehdl_t));
 
 #ifdef WORKFILE_DEBUG
 	if (err != 0) {
@@ -256,14 +262,15 @@ fill_device_array_from_id(picl_nodehdl_t device_id, char *assoc_id,
 	int		devs = 0;
 
 	err = picl_get_propval_by_name(device_id, assoc_id, &tbl_hdl,
-		sizeof (picl_prophdl_t));
+	    sizeof (picl_prophdl_t));
 	if ((err != PICL_SUCCESS) && (err != PICL_INVALIDHANDLE)) {
 #ifdef WORKFILE_DEBUG
-	    log_printf(dgettext(TEXT_DOMAIN,
-	    "fill_device_array_from_id failure in "
-	    "picl_get_propval_by_name err is %s\n"), picl_strerror(err));
+		log_printf(dgettext(TEXT_DOMAIN,
+		    "fill_device_array_from_id failure in "
+		    "picl_get_propval_by_name err is %s\n"),
+		    picl_strerror(err));
 #endif
-	    return (err);
+		return (err);
 	}
 
 	entry = tbl_hdl;
@@ -296,7 +303,7 @@ fill_device_array_from_id(picl_nodehdl_t device_id, char *assoc_id,
 
 		/* get node associated with reference property */
 		err = picl_get_propval(entry, &((*device_array)[i]),
-			sizeof (picl_nodehdl_t));
+		    sizeof (picl_nodehdl_t));
 		if (err != 0) {
 #ifdef WORKFILE_DEBUG
 			log_printf(dgettext(TEXT_DOMAIN,
@@ -363,21 +370,27 @@ print_us3_memory_line(int portid, int bank_id, uint64_t bank_size,
 	char *bank_status, uint64_t dimm_size, uint32_t intlv, int seg_id)
 {
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n %-1c   %2d    %2d      %4lldMB   %11-s  %4lldMB "
-		"   %2d-way        %d"),
-			CHERRYSTONE_GETSLOT_LABEL(portid), portid,
-			(bank_id % 4), bank_size, bank_status, dimm_size,
-			intlv, seg_id, 0);
+	    "\n %-1c   %2d    %2d      %4lldMB   %11-s  %4lldMB "
+	    "   %2d-way        %d"),
+	    CHERRYSTONE_GETSLOT_LABEL(portid), portid,
+	    (bank_id % 4), bank_size, bank_status, dimm_size,
+	    intlv, seg_id, 0);
 }
 
 /*
- * We call do_devinfo() in order to use the libdevinfo device tree
- * instead of OBP's device tree.
+ * We call do_devinfo() in order to use the libdevinfo device tree instead of
+ * OBP's device tree. Ignore its return value and use our exit_code instead.
+ * Its return value comes from calling error_check() which is not implemented
+ * because the device tree does not keep track of the status property for the
+ * 480/490. The exit_code we return is set while do_devinfo() calls our local
+ * functions to gather/print data. That way we can report both internal and
+ * device failures.
  */
 int
 do_prominfo(int syserrlog, char *pgname, int log_flag, int prt_flag)
 {
-	return (do_devinfo(syserrlog, pgname, log_flag, prt_flag));
+	(void) do_devinfo(syserrlog, pgname, log_flag, prt_flag);
+	return (exit_code);
 }
 
 /*
@@ -496,7 +509,7 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		name = NULL;
 		/* If it doesn't have a name, skip it */
 		name = (char *)get_prop_val(
-				find_prop(pci_card_node, "name"));
+		    find_prop(pci_card_node, "name"));
 		if (name == NULL) {
 			pci_card_node = pci_card_node->sibling;
 			continue;
@@ -547,7 +560,7 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 * 'reg' property.
 		 */
 		int_val = (int *)get_prop_val(
-			find_prop(pci_card_node, "reg"));
+		    find_prop(pci_card_node, "reg"));
 		if (int_val != NULL) {
 			pci_card->dev_no = (((*int_val) & 0xF800) >> 11);
 			pci_card->func_no = (((*int_val) & 0x700) >> 8);
@@ -559,14 +572,14 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		switch (pci_card->pci_bus) {
 		case 'A':
 			if ((pci_card->dev_no < 1 || pci_card->dev_no > 2) &&
-			(!pci_bridge)) {
+			    (!pci_bridge)) {
 				pci_card_node = pci_card_node->sibling;
 				continue;
 			}
 			break;
 		case 'B':
 			if ((pci_card->dev_no < 2 || pci_card->dev_no > 5) &&
-			(!pci_bridge)) {
+			    (!pci_bridge)) {
 				pci_card_node = pci_card_node->sibling;
 				continue;
 			}
@@ -577,7 +590,7 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		}
 
 		type = (char *)get_prop_val(
-				find_prop(pci_card_node, "device_type"));
+		    find_prop(pci_card_node, "device_type"));
 		/*
 		 * If this is a pci-bridge, then store its dev#
 		 * as its children nodes need this to get their slot#.
@@ -627,10 +640,10 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 			} else {
 				if (pci_card->pci_bus == 'B') {
 				slot_name =
-					slot_name_arr[pci_card->dev_no-2];
+				    slot_name_arr[pci_card->dev_no-2];
 				} else {
 				slot_name =
-					slot_name_arr[pci_card->dev_no-1];
+				    slot_name_arr[pci_card->dev_no-1];
 				}
 			}
 
@@ -653,9 +666,9 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 * Check for failed status.
 		 */
 		if (node_failed(pci_card_node))
-			strcpy(pci_card->status, "fail");
+			(void) strcpy(pci_card->status, "fail");
 		else
-			strcpy(pci_card->status, "ok");
+			(void) strcpy(pci_card->status, "ok");
 
 		/* Get the model of this pci_card */
 		value = get_prop_val(find_prop(pci_card_node, "model"));
@@ -663,7 +676,7 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 			pci_card->model[0] = '\0';
 		else {
 			(void) snprintf(pci_card->model, MAXSTRLEN, "%s",
-				(char *)value);
+			    (char *)value);
 		}
 		/*
 		 * The card may have a "clock-frequency" but we
@@ -674,7 +687,7 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 * PCI-B always operates at 33Mhz.
 		 */
 		int_val = get_prop_val(find_prop(pci_instance,
-			"clock-frequency"));
+		    "clock-frequency"));
 		if (int_val != NULL) {
 			pci_card->freq = HZ_TO_MHZ(*int_val);
 		} else {
@@ -685,11 +698,11 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 * Figure out how we want to display the name
 		 */
 		value = get_prop_val(find_prop(pci_card_node,
-					"compatible"));
+		    "compatible"));
 		if (value != NULL) {
 			/* use 'name'-'compatible' */
 			(void) snprintf(buf, MAXSTRLEN, "%s-%s", name,
-				(char *)value);
+			    (char *)value);
 		} else {
 			/* just use 'name' */
 			(void) snprintf(buf, MAXSTRLEN, "%s", name);
@@ -702,14 +715,14 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 */
 		child_name = (char *)get_node_name(pci_card_node->child);
 		if ((pci_card_node->child != NULL) &&
-			(child_name != NULL)) {
+		    (child_name != NULL)) {
 			value = get_prop_val(find_prop(pci_card_node->child,
-				"device_type"));
+			    "device_type"));
 			if (value != NULL) {
 				/* add device_type of child to name */
 				(void) snprintf(pci_card->name, MAXSTRLEN,
 				    "%s/%s (%s)", name, child_name,
-					(char *)value);
+				    (char *)value);
 			} else {
 				/* just add childs name */
 				(void) snprintf(pci_card->name, MAXSTRLEN,
@@ -728,16 +741,19 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 */
 		if (pci_bridge) {
 			if (strlen(pci_card->model) == 0) {
-			    if (pci_card_node->parent == pci_bridge_node)
-				(void) snprintf(pci_card->model, MAXSTRLEN,
-				    "%s", "device on pci-bridge");
-			    else if (pci_card_node->parent
-					== pci_parent_bridge)
-				(void) snprintf(pci_card->model, MAXSTRLEN,
-					"%s", "pci-bridge/pci-bridge");
-			    else
-				(void) snprintf(pci_card->model, MAXSTRLEN,
-				    "%s", "PCI-BRIDGE");
+				if (pci_card_node->parent == pci_bridge_node)
+					(void) snprintf(pci_card->model,
+					    MAXSTRLEN,
+					    "%s", "device on pci-bridge");
+				else if (pci_card_node->parent
+				    == pci_parent_bridge)
+					(void) snprintf(pci_card->model,
+					    MAXSTRLEN,
+					    "%s", "pci-bridge/pci-bridge");
+				else
+					(void) snprintf(pci_card->model,
+					    MAXSTRLEN,
+					    "%s", "PCI-BRIDGE");
 			}
 			else
 				(void) snprintf(pci_card->model, MAXSTRLEN,
@@ -759,8 +775,8 @@ fill_pci_card_list(Prom_node * pci_instance, Prom_node * pci_card_node,
 		 * move onto the parents siblings).
 		 */
 		pci_card_node = next_pci_card(pci_card_node, &pci_bridge,
-			is_pci, pci_bridge_node,
-			pci_parent_bridge, pci_instance);
+		    is_pci, pci_bridge_node,
+		    pci_parent_bridge, pci_instance);
 	} /* end-while */
 }
 
@@ -806,10 +822,10 @@ next_pci_card(Prom_node *curr_card, int *is_bridge, int is_pcidev,
 			if (curr_node == NULL) {
 				curr_node = curr_bridge->sibling;
 				while (curr_node == NULL &&
-					curr_bridge != parent_bridge &&
-					curr_bridge != NULL) {
+				    curr_bridge != parent_bridge &&
+				    curr_bridge != NULL) {
 					curr_node =
-						curr_bridge->parent->sibling;
+					    curr_bridge->parent->sibling;
 					curr_bridge = curr_bridge->parent;
 					if (curr_node != NULL &&
 					    curr_node->parent == pci)
