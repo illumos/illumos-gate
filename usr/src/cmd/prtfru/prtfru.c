@@ -66,6 +66,8 @@ static FILE	*errlog;
 
 int iterglobal = 0;
 int FMAmessageR = -1;
+int Fault_Install_DataR_flag = 0;
+int Power_On_DataR_flag = 0;
 /*
  * Definition for data elements found in devices but not found in
  * the system's version of libfrureg
@@ -101,7 +103,7 @@ error(const char *format, ...)
 	/* make relevant output appear before error message */
 	if (fflush(stdout) == EOF) {
 		(void) fprintf(stderr, "Error flushing output:  %s\n",
-				strerror(errno));
+		    strerror(errno));
 		exit(1);
 	}
 
@@ -122,7 +124,7 @@ output(const char *format, ...)
 	va_start(args, format);
 	if (vfprintf(stdout, format, args) < 0) {
 		error(gettext("Error writing output:  %s\n"),
-			strerror(errno));
+		    strerror(errno));
 		exit(1);
 	}
 }
@@ -135,7 +137,7 @@ voidputchar(int c)
 {
 	if (putchar(c) == EOF) {
 		error(gettext("Error writing output:  %s\n"),
-			strerror(errno));
+		    strerror(errno));
 		exit(1);
 	}
 }
@@ -150,7 +152,7 @@ voidputs(const char *s)
 {
 	if (fputs(s, stdout) == EOF) {
 		error(gettext("Error writing output:  %s\n"),
-			strerror(errno));
+		    strerror(errno));
 		exit(1);
 	}
 }
@@ -183,7 +185,7 @@ xputchar(int c)
 
 	if (c == EOF) {
 		error(gettext("Error writing output:  %s\n"),
-			strerror(errno));
+		    strerror(errno));
 		exit(1);
 	}
 }
@@ -223,7 +225,7 @@ output_dtd(void)
 
 	if ((tagged = calloc(num_elements, sizeof (*tagged))) == NULL) {
 		error(gettext("Unable to get memory for tagged element list"),
-			strerror(errno));
+		    strerror(errno));
 		return (1);
 	}
 
@@ -275,8 +277,8 @@ output_dtd(void)
 		if ((strcmp("Location", element[i])) == 0) continue;
 		if ((def = fru_reg_lookup_def_by_name(element[i])) == NULL) {
 			error(gettext("Error looking up registry "
-					"definition for \"%s\"\n"),
-				element[i]);
+			    "definition for \"%s\"\n"),
+			    element[i]);
 			return (1);
 		}
 
@@ -407,22 +409,22 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 			value = 0;
 			valueint = 0;
 			(void) memcpy((((uint8_t *)&value) +
-					sizeof (value) - def->payloadLen),
-					field, def->payloadLen);
+			    sizeof (value) - def->payloadLen),
+			    field, def->payloadLen);
 			if ((value != 0) &&
-			(strcmp(def->name, "SPD_Manufacture_Week") == 0)) {
+			    (strcmp(def->name, "SPD_Manufacture_Week") == 0)) {
 				valueint = (int)value;
 				convertbcdtobinary(&valueint);
 				output("%d", valueint);
 				return;
 			}
 			if ((value != 0) &&
-				((strcmp(def->name, "Lowest") == 0) ||
-				(strcmp(def->name, "Highest") == 0) ||
-				(strcmp(def->name, "Latest") == 0)))
+			    ((strcmp(def->name, "Lowest") == 0) ||
+			    (strcmp(def->name, "Highest") == 0) ||
+			    (strcmp(def->name, "Latest") == 0)))
 				output((def->dispType == FDISP_Octal) ?
 				"%llo" : "%lld (%lld degrees C)",
-				value, (value - TEMPERATURE_OFFSET));
+				    value, (value - TEMPERATURE_OFFSET));
 			else
 				output((def->dispType == FDISP_Octal) ?
 				"%llo" : "%lld", value);
@@ -434,8 +436,8 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 			}
 			timefield = 0;
 			(void) memcpy((((uint8_t *)&timefield) +
-					sizeof (timefield) - def->payloadLen),
-					field, def->payloadLen);
+			    sizeof (timefield) - def->payloadLen),
+			    field, def->payloadLen);
 			if (timefield == 0) {
 				errmsg = "No Value Recorded";
 				break;
@@ -462,16 +464,17 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 					elem_name = "FMA_MessageR";
 				if (elem_name != NULL) {
 					(void) memcpy(data, field,
-					def->payloadLen);
+					    def->payloadLen);
 					new_def =
-					fru_reg_lookup_def_by_name(elem_name);
+					    fru_reg_lookup_def_by_name
+					    (elem_name);
 					(void) snprintf(path, sizeof (path),
 					"/Status_EventsR[%d]/Message(FMA)",
-					iterglobal);
+					    iterglobal);
 					parent_path = path;
 					output("\n");
 					print_element(data, new_def,
-parent_path, 2*INDENT);
+					    parent_path, 2*INDENT);
 					return;
 				}
 			}
@@ -482,8 +485,8 @@ parent_path, 2*INDENT);
 	case FDTYPE_Enumeration:
 		value = 0;
 		(void) memcpy((((uint8_t *)&value) + sizeof (value)
-					- def->payloadLen),
-					field, def->payloadLen);
+		    - def->payloadLen),
+		    field, def->payloadLen);
 		for (i = 0; i < def->enumCount; i++)
 			if (def->enumTable[i].value == value) {
 				if (strcmp(def->name, "Event_Code") == 0) {
@@ -509,14 +512,14 @@ parent_path, 2*INDENT);
 			(void) memcpy((uchar_t *)&first_byte, field, 1);
 			if (isprint(first_byte)) {
 				for (i = 0; i < def->payloadLen && field[i];
-i++)
+				    i++)
 					safeputchar(field[i]);
 			}
 			break;
 		case FDISP_UUID:
 			for (i = 0; i < def->payloadLen; i++) {
 				if ((i == 4) || (i == 6) ||
-(i == 8) || (i == 10))
+				    (i == 8) || (i == 10))
 				output("-");
 				output("%2.2x", field[i]);
 			}
@@ -551,6 +554,10 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 
 
 	indent = (xml) ? (indent + INDENT) : (2*INDENT);
+	if (strcmp(def->name, "Sun_SPD_DataR") == 0) {
+		Fault_Install_DataR_flag = indent;
+		Power_On_DataR_flag = indent;
+	}
 	/*
 	 * Construct the path, or, for XML, the name, for the current
 	 * data element
@@ -582,14 +589,160 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 		}
 	}
 
+	if ((Fault_Install_DataR_flag) &&
+	    (strcmp(path, "E_1_46") == 0) || (strcmp(path, "/E_1_46") == 0)) {
+		int cnt;
+		char timestring[128];
+		time_t timefield = 0;
+		struct tm *tm;
+		indent = Fault_Install_DataR_flag;
+		(void) memcpy((uint8_t *)&timefield, data, 4);
+		if (timefield == 0) {
+			(void) sprintf(timestring,
+			    "00000000 (No Value Recorded)\"");
+		} else {
+			if ((tm = localtime(&timefield)) == NULL)
+				(void) sprintf(timestring,
+				    "cannot convert time value");
+			if (strftime(timestring,
+			    sizeof (timestring), "%C", tm) == 0)
+				(void) sprintf(timestring,
+				    "formatted time would overflow buffer");
+		}
+		if (xml) {
+			(void) sprintf(path, "Fault_Install_DataR");
+			output("%*s<%s>\n", indent, "", path);
+			indent = Fault_Install_DataR_flag + INDENT;
+			(void) sprintf(path, "UNIX_Timestamp32");
+			output("%*s<%s value=\"", indent, "", path);
+			/*CSTYLED*/
+			output("%s\"/>\n", timestring);
+			(void) sprintf(path, "MACADDR");
+			output("%*s<%s value=\"", indent, "", path);
+			for (cnt = 4; cnt < 4 + 6; cnt++) {
+				output("%2.2x", data[cnt]);
+				if (cnt < 4 + 6 - 1)
+					output(":");
+			}
+			/*CSTYLED*/
+			output("\"/>\n");
+			(void) sprintf(path, "Status");
+			output("%*s<%s value=\"", indent, "", path);
+			/*CSTYLED*/
+			output("%2.2x\"/>\n", data[10]);
+			(void) sprintf(path, "Initiator");
+			output("%*s<%s value=\"", indent, "", path);
+			/*CSTYLED*/
+			output("%2.2x\"/>\n", data[11]);
+			(void) sprintf(path, "Message_Type");
+			output("%*s<%s value=\"", indent, "", path);
+			/*CSTYLED*/
+			output("%2.2x\"/>\n", data[12]);
+			(void) sprintf(path, "Message_32");
+			output("%*s<%s value=\"", indent, "", path);
+			for (cnt = 13; cnt < 13 + 32; cnt++)
+				output("%2.2x", data[cnt]);
+			/*CSTYLED*/
+			output("\"/>\n");
+			indent = Fault_Install_DataR_flag;
+			(void) sprintf(path, "Fault_Install_DataR");
+			output("%*s</%s>\n", indent, "", path);
+		} else {
+			(void) sprintf(path, "/Fault_Install_DataR");
+			output("%*s%s\n", indent, "", path);
+			(void) sprintf(path,
+			    "/Fault_Install_DataR/UNIX_Timestamp32");
+			output("%*s%s: ", indent, "", path);
+			output("%s\n", timestring);
+			(void) sprintf(path, "/Fault_Install_DataR/MACADDR");
+			output("%*s%s: ", indent, "", path);
+			for (cnt = 4; cnt < 4 + 6; cnt++) {
+				output("%2.2x", data[cnt]);
+				if (cnt < 4 + 6 - 1)
+					output(":");
+			}
+			output("\n");
+			(void) sprintf(path, "/Fault_Install_DataR/Status");
+			output("%*s%s: ", indent, "", path);
+			output("%2.2x\n", data[10]);
+			(void) sprintf(path, "/Fault_Install_DataR/Initiator");
+			output("%*s%s: ", indent, "", path);
+			output("%2.2x\n", data[11]);
+			(void) sprintf(path,
+			    "/Fault_Install_DataR/Message_Type");
+			output("%*s%s: ", indent, "", path);
+			output("%2.2x\n", data[12]);
+			(void) sprintf(path, "/Fault_Install_DataR/Message_32");
+			output("%*s%s: ", indent, "", path);
+			for (cnt = 13; cnt < 13 + 32; cnt++)
+				output("%2.2x", data[cnt]);
+			output("\n");
+		}
+		Fault_Install_DataR_flag = 0;
+		return;
+	} else if ((Power_On_DataR_flag) && (
+	    strcmp(path, "C_10_8") == 0 ||
+	    (strcmp(path, "/C_10_8") == 0))) {
+		int cnt;
+		char timestring[128];
+		time_t timefield = 0;
+		struct tm *tm;
+		indent = Power_On_DataR_flag;
+		(void) memcpy((uint8_t *)&timefield, data, 4);
+		if (timefield == 0) {
+			(void) sprintf(timestring,
+			    "00000000 (No Value Recorded)");
+		} else {
+			if ((tm = localtime(&timefield)) == NULL)
+				(void) sprintf(timestring,
+				    "cannot convert time value");
+			if (strftime(timestring,
+			    sizeof (timestring), "%C", tm) == 0)
+				(void) sprintf(timestring,
+				    "formatted time would overflow buffer");
+		}
+		if (xml) {
+			(void) sprintf(path, "Power_On_DataR");
+			output("%*s<%s>\n", indent, "", path);
+			indent = Power_On_DataR_flag + INDENT;
+			(void) sprintf(path, "UNIX_Timestamp32");
+			output("%*s<%s value=\"", indent, "", path);
+			/*CSTYLED*/
+			output("%s\"/>\n", timestring);
+			(void) sprintf(path, "Power_On_Minutes");
+			output("%*s<%s value=\"", indent, "", path);
+			for (cnt = 4; cnt < 4 + 4; cnt++)
+				output("%2.2x", data[cnt]);
+			/*CSTYLED*/
+			output("\"/>\n");
+			indent = Power_On_DataR_flag;
+			(void) sprintf(path, "Power_On_DataR");
+			output("%*s</%s>\n", indent, "", path);
+		} else {
+			(void) sprintf(path, "/Power_On_DataR");
+			output("%*s%s\n", indent, "", path);
+			(void) sprintf(path,
+			    "/Power_On_DataR/UNIX_Timestamp32");
+			output("%*s%s: ", indent, "", path);
+			output("%s\n", timestring);
+			(void) sprintf(path,
+			    "/Power_On_DataR/Power_On_Minutes");
+			output("%*s%s: ", indent, "", path);
+			for (cnt = 4; cnt < 4 + 4; cnt++)
+				output("%2.2x", data[cnt]);
+			output("\n");
+		}
+		Power_On_DataR_flag = 0;
+		return;
+	}
 	/*
 	 * Handle the various categories of data elements:  iteration,
 	 * record, and field
 	 */
 	if (def->iterationCount) {
 		int		iterlen = (def->payloadLen - NUM_ITER_BYTES)/
-						def->iterationCount,
-				n, valid = 1;
+		    def->iterationCount,
+		    n, valid = 1;
 
 		uint8_t		head, num;
 
@@ -641,18 +794,18 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 			output("%*s<%s>\n", indent, "", path);
 		else
 			output("%*s%s (%d iterations)\n", indent, "", path,
-				num);
+			    num);
 
 		/*
 		 * Print each component of the iteration
 		 */
 		for (i = head, n = 0, data += 4;
-				n < num;
-				i = ((i + 1) % def->iterationCount), n++) {
+		    n < num;
+		    i = ((i + 1) % def->iterationCount), n++) {
 			if (!xml) (void) sprintf((path + bytes), "[%d]", n);
 			iterglobal = n;
 			print_element((data + i*iterlen), &newdef, path,
-					indent);
+			    indent);
 		}
 
 		if (xml) output("%*s</%s>\n", indent, "", path);
@@ -669,9 +822,9 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 		 * Print each component of the record
 		 */
 		for (i = 0; i < def->enumCount;
-				i++, data += component->payloadLen) {
+		    i++, data += component->payloadLen) {
 			component = fru_reg_lookup_def_by_name(
-				def->enumTable[i].text);
+			    def->enumTable[i].text);
 			assert(component != NULL);
 			print_element(data, component, path, indent);
 		}
@@ -691,7 +844,7 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 		output("\"/>\n");	/* \" confuses cstyle */
 
 		if ((strcmp(def->name, "Message") == 0) &&
-			((FMAmessageR == 0) || (FMAmessageR == 1))) {
+		    ((FMAmessageR == 0) || (FMAmessageR == 1))) {
 			const char	*elem_name = NULL;
 			const char	*parent_path;
 			uchar_t		tmpdata[128];
@@ -709,7 +862,7 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 				"/Status_EventsR[%d]/Message(FMA)", iterglobal);
 				parent_path = path;
 				print_element(tmpdata, new_def,
-parent_path, 2*INDENT);
+				    parent_path, 2*INDENT);
 				FMAmessageR = -1;
 			}
 		}
@@ -806,7 +959,7 @@ print_packets_in_segment(fru_seghdl_t segment, void *args)
 	    != FRU_SUCCESS) {
 		saved_status = status;
 		error(gettext("Error processing data in segment \"%s\":  %s\n"),
-			name, fru_strerror(status));
+		    name, fru_strerror(status));
 	}
 
 	if (xml) output("%*s</Segment>\n", INDENT, "");
@@ -823,7 +976,7 @@ print_node_path(fru_node_t fru_type, const char *path, const char *name,
 {
 	output("%s%s\n", path,
 	    ((fru_type == FRU_NODE_CONTAINER) ? " (container)"
-		: ((fru_type == FRU_NODE_FRU) ? " (fru)" : "")));
+	    : ((fru_type == FRU_NODE_FRU) ? " (fru)" : "")));
 }
 
 /*
@@ -903,7 +1056,7 @@ process_node(fru_nodehdl_t node, const char *path, const char *name,
 	if ((status = fru_get_node_type(node, &fru_type)) != FRU_SUCCESS) {
 		saved_status = status;
 		error(gettext("Error getting node type:  %s\n"),
-			fru_strerror(status));
+		    fru_strerror(status));
 	}
 
 	if (containers_only) {
@@ -923,12 +1076,12 @@ process_node(fru_nodehdl_t node, const char *path, const char *name,
 	if (fru_type == FRU_NODE_CONTAINER) {
 		if (xml) output("<ContainerData>\n");
 		if ((status =
-			fru_for_each_segment(node, print_packets_in_segment,
-						NULL))
+		    fru_for_each_segment(node, print_packets_in_segment,
+		    NULL))
 		    != FRU_SUCCESS) {
 			saved_status = status;
 			error(gettext("Error  processing node \"%s\":  %s\n"),
-				name, fru_strerror(status));
+			    name, fru_strerror(status));
 		}
 		if (xml) output("</ContainerData>\n");
 	}
@@ -943,7 +1096,7 @@ process_node(fru_nodehdl_t node, const char *path, const char *name,
 static fru_errno_t
 process_matching_node(fru_nodehdl_t node, const char *path, const char *name,
     void *args, end_node_fp_t *end_node, void **end_args)
-{
+	{
 	int  status;
 
 
@@ -1032,7 +1185,7 @@ prtfru(const char *searchpath, int containers_only_flag, int list_only_flag,
 		/* Arrange to always properly terminate XML */
 		if (atexit(terminate_xml))
 			error(gettext("Warning:  XML will not be terminated:  "
-					"%s\n"), strerror(errno));
+			    "%s\n"), strerror(errno));
 	} else
 		print_node = print_node_path;
 
@@ -1043,7 +1196,7 @@ prtfru(const char *searchpath, int containers_only_flag, int list_only_flag,
 		return (1);
 	} else if (status != FRU_SUCCESS) {
 		error(gettext("Unable to access FRU ID data:  %s\n"),
-			fru_strerror(status));
+		    fru_strerror(status));
 		return (1);
 	}
 
@@ -1052,7 +1205,7 @@ prtfru(const char *searchpath, int containers_only_flag, int list_only_flag,
 		status = fru_walk_tree(frutree, "", process_node, NULL);
 	} else {
 		status = fru_walk_tree(frutree, "", process_matching_node,
-					(void *)searchpath);
+		    (void *)searchpath);
 		if (status == FRU_WALK_TERMINATE) {
 			status = FRU_SUCCESS;
 		} else if (status == FRU_SUCCESS) {
@@ -1063,7 +1216,7 @@ prtfru(const char *searchpath, int containers_only_flag, int list_only_flag,
 
 	if (status != FRU_SUCCESS)
 		error(gettext("Error processing FRU tree:  %s\n"),
-			fru_strerror(status));
+		    fru_strerror(status));
 
 	return (((status == FRU_SUCCESS) && (saved_status == 0)) ? 0 : 1);
 }
