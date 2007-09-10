@@ -293,7 +293,11 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 * from our parent node's private data.
 	 */
 
-	did_inherit(ppd, pd);
+	if (did_inherit(ppd, pd) != 0) {
+		topo_node_unbind(ntn);
+		return (NULL);
+	}
+
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
 		topo_node_unbind(ntn);
 		return (NULL);
@@ -507,7 +511,8 @@ pciexbus_enum(topo_mod_t *mp, tnode_t *ptn, char *pnm, topo_instance_t min,
 		    "Unable to proceed with %s enumeration.\n", pnm, PCIEX_BUS);
 		return (0);
 	}
-	did_hash_init(mp);
+	if (did_hash_init(mp) != 0)
+		return (-1);
 	if ((did_create(mp, pdn, 0, 0, rc, TRUST_BDF)) == NULL)
 		return (-1);	/* errno already set */
 

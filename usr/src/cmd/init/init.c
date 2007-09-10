@@ -457,8 +457,8 @@ struct init_state {
  * Useful file and device names.
  */
 static char *CONSOLE	  = "/dev/console";	/* Real system console */
-static char *INITPIPE_DIR = "/etc";
-static char *INITPIPE	  = "/etc/initpipe";
+static char *INITPIPE_DIR = "/var/run";
+static char *INITPIPE	  = "/var/run/initpipe";
 
 #define	INIT_STATE_DIR "/etc/svc/volatile"
 static const char * const init_state_file = INIT_STATE_DIR "/init.state";
@@ -486,6 +486,7 @@ static char *SH	= "/sbin/sh";		/* Standard shell */
 static int	prior_state;
 static int	prev_state;	/* State "init" was in last time it woke */
 static int	new_state;	/* State user wants "init" to go to. */
+static int	lvlq_received;	/* Explicit request to examine state */
 static int	op_modes = BOOT_MODES; /* Current state of "init" */
 static int	Gchild = 0;	/* Flag to indicate "godchild" died, set in */
 				/*   childeath() and cleared in cleanaux() */
@@ -725,12 +726,16 @@ main(int argc, char *argv[])
 
 	prev_state = prior_state = cur_state;
 
+	setup_pipe();
+
 	/*
 	 * Here is the beginning of the main process loop.
 	 */
 	for (;;) {
-		if (Pfd < 0)
+		if (lvlq_received) {
 			setup_pipe();
+			lvlq_received = B_FALSE;
+		}
 
 		/*
 		 * Clean up any accounting records for dead "godchildren".
@@ -2174,8 +2179,8 @@ init_signals(void)
 /*
  * Set up pipe for "godchildren". If the file exists and is a pipe just open
  * it. Else, if the file system is r/w create it.  Otherwise, defer its
- * creation and open until after the sysinit functions have had a chance to
- * make the root read/write.
+ * creation and open until after /var/run has been mounted.  This function is
+ * only called on startup and when explicitly requested via LVLQ.
  */
 void
 setup_pipe()
@@ -2183,6 +2188,13 @@ setup_pipe()
 	struct stat stat_buf;
 	struct statvfs statvfs_buf;
 	struct sigaction act;
+
+	/*
+	 * Always close the previous pipe descriptor as the mounted filesystems
+	 * may have changed.
+	 */
+	if (Pfd >= 0)
+		(void) close(Pfd);
 
 	if ((stat(INITPIPE, &stat_buf) == 0) &&
 	    ((stat_buf.st_mode & (S_IFMT|S_IRUSR)) == (S_IFIFO|S_IRUSR)))
@@ -2254,10 +2266,12 @@ siglvl(int sig, siginfo_t *sip, ucontext_t *ucp)
 	 * signal is not a LVLQ, set the new level to the signal
 	 * received.
 	 */
-	if (sig == LVLQ)
+	if (sig == LVLQ) {
 		new_state = cur_state;
-	else
+		lvlq_received = B_TRUE;
+	} else {
 		new_state = sig;
+	}
 
 	/*
 	 * Clear all times and repeat counts in the process table

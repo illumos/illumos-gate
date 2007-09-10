@@ -274,8 +274,14 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	(void) mb_get_pri_info(mod, &serial, &part, &csn);
 
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &pstr) != 0 &&
-	    csn != NULL)
-		nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS, csn);
+	    csn != NULL) {
+		if (nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS, csn) != 0) {
+			topo_mod_dprintf(mod,
+			    "failed to add chassis to auth");
+			nvlist_free(auth);
+			return (NULL);
+		}
+	}
 
 	fmri = topo_mod_hcfmri(mod, NULL, FM_HC_SCHEME_VERSION, name, i,
 	    NULL, auth, part, NULL, serial);

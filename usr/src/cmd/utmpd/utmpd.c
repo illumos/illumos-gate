@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,8 +134,8 @@ static pollfd_t *fdtable = NULL;
 
 static int	pidcnt = 0;		/* Number of procs being watched */
 static char	*prog_name;		/* To save the invocation name away */
-static char	*UTMPPIPE_DIR =	"/etc";
-static char	*UTMPPIPE = "/etc/utmppipe";
+static char	*UTMPPIPE_DIR =	"/var/run";
+static char	*UTMPPIPE = "/var/run/utmppipe";
 static int	Pfd = -1;		/* File descriptor of named pipe */
 static int 	Poll_timeout = POLL_TIMEOUT;
 static int	WTMPXfd = -1;		/* File descriptor of WTMPX_FILE */

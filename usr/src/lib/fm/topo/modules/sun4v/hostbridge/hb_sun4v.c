@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,8 @@ pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 		}
 		pnode = di_drv_next_node(pnode);
 	}
-	rcs_process(mod, rcs, ptn);
+	if (rcs_process(mod, rcs, ptn) != 0)
+		return (-1);
 	busorrc_free(mod, rcs);
 	return (0);
 }

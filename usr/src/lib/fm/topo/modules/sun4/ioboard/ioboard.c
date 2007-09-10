@@ -133,7 +133,8 @@ iob_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
 		return (-1);
 	}
 
-	did_hash_init(mp);
+	if (did_hash_init(mp) != 0)
+		return (-1);
 
 	rv = platform_iob_enum(mp, pn, imin, imax);
 

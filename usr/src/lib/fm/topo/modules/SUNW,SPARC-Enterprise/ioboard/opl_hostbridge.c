@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,7 +127,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst)
 		char fru_str[64];
 		nvlist_t *fru_fmri;
 		/* Add FRU fmri */
-		snprintf(fru_str, sizeof (fru_str), "hc:///component=%s",
+		(void) snprintf(fru_str, sizeof (fru_str), "hc:///component=%s",
 		    slot_name);
 		if (topo_mod_str2nvl(mp, fru_str, &fru_fmri) == 0) {
 			(void) topo_node_fru_set(rcn, fru_fmri, 0, &err);

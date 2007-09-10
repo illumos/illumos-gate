@@ -201,7 +201,7 @@ disk_set_proto_props(topo_mod_t *mod, tnode_t *dtn, int pinst)
 	}
 	nvlist_free(asru);
 
-	snprintf(label, sizeof (label), "HD_ID_%d", pinst);
+	(void) snprintf(label, sizeof (label), "HD_ID_%d", pinst);
 	if (topo_node_label_set(dtn, label, &err) != 0) {
 		topo_mod_dprintf(mod, "%s: label error %s\n", func,
 		    topo_strerror(err));
@@ -249,9 +249,6 @@ disk_set_props(tnode_t *dtn, tnode_t *parent, char *model, char *manuf,
 	int	inst = topo_node_instance(parent);
 	disk_di_node_t	*dnode;
 
-	topo_prop_get_string(parent, TOPO_BINDING_PGROUP, TOPO_BINDING_OCCUPANT,
-	    &device, err);
-
 	dnode = topo_node_getspecific(dtn);
 
 	/* set the protocol group properties */
@@ -269,10 +266,14 @@ disk_set_props(tnode_t *dtn, tnode_t *parent, char *model, char *manuf,
 
 	/* create/set the devfs-path in the io group */
 	(void) topo_pgroup_create(dtn, &io_pgroup, err);
-	(void) topo_prop_set_string(dtn, TOPO_PGROUP_IO,
-	    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE, device, err);
 
-	topo_mod_strfree(mod, device);
+	if (topo_prop_get_string(parent, TOPO_BINDING_PGROUP,
+	    TOPO_BINDING_OCCUPANT, &device, err) == 0) {
+		(void) topo_prop_set_string(dtn, TOPO_PGROUP_IO,
+		    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE, device, err);
+
+		topo_mod_strfree(mod, device);
+	}
 
 	/* create the storage group */
 	(void) topo_pgroup_create(dtn, &storage_pgroup, err);
@@ -449,8 +450,9 @@ disk_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		return (-1);
 	}
 
-	topo_prop_get_string(rnode, TOPO_BINDING_PGROUP, TOPO_BINDING_OCCUPANT,
-	    &device, &err);
+	if (topo_prop_get_string(rnode, TOPO_BINDING_PGROUP,
+	    TOPO_BINDING_OCCUPANT, &device, &err) != 0)
+		return (-1);
 
 	if ((dnode = disk_di_node_match_device(device)) == NULL) {
 		topo_mod_dprintf(mod,

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,12 +32,12 @@
 # If a utmppipe exists, check for a utmpd process and exit
 # if the daemon is already running.
 
-if [ -p /etc/utmppipe ]; then
+if [ -p /var/run/utmppipe ]; then
 	if /usr/bin/pgrep -x -u 0 -z `smf_zonename` utmpd >/dev/null 2>&1; then
 		echo "$0: utmpd is already running"
 		exit 1
 	fi
 fi
 
-/usr/bin/rm -f /etc/utmppipe
+/usr/bin/rm -f /var/run/utmppipe
 /usr/lib/utmpd &

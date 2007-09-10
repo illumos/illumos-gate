@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,7 @@ special_fsminimal_post_online()
 	case -1:
 	default:
 		log_error(LOG_WARNING, gettext("couldn't check status of "
-			"root filesystem: %s\n"), strerror(errno));
+		    "root filesystem: %s\n"), strerror(errno));
 		break;
 	}
 
@@ -130,7 +130,7 @@ special_fsminimal_post_online()
 			    "read-only after system/filesystem/minimal\n");
 			if (fs_remount("/var"))
 				log_framework(LOG_WARNING, "/var "
-					"filesystem remount failed\n");
+				    "filesystem remount failed\n");
 		}
 		break;
 	case 0:
@@ -154,7 +154,7 @@ special_fsminimal_post_online()
 	log_init();
 
 	/*
-	 * Poke init so it will create /etc/initpipe.
+	 * Poke init so it will create /var/run/initpipe.
 	 */
 	if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
 	    sizeof (init_pid)) != sizeof (init_pid)) {

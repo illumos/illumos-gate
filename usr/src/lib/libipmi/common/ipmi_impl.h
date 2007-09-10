@@ -83,6 +83,11 @@ extern void *impi_realloc(ipmi_handle_t *, void *, size_t);
  */
 extern ipmi_transport_t ipmi_transport_bmc;
 
+/*
+ * Miscellaneous routines
+ */
+extern void ipmi_sdr_clear(ipmi_handle_t *);
+
 #ifdef	__cplusplus
 }
 #endif

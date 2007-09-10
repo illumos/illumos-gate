@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,8 +91,8 @@
 #define	MAXFILE		79	/* Maximum pathname length for "utmpx" file */
 
 #define	MAXVAL		255		/* max value for an id `character' */
-#define	IPIPE		"/etc/initpipe"	/* FIFO to send pids to init */
-#define	UPIPE		"/etc/utmppipe"	/* FIFO to send pids to utmpd */
+#define	IPIPE		"/var/run/initpipe"	/* FIFO to send pids to init */
+#define	UPIPE		"/var/run/utmppipe"	/* FIFO to send pids to utmpd */
 
 #define	VAR_UTMPX_FILE	"/var/adm/utmpx" /* for sanity check only */
 

@@ -55,7 +55,7 @@ arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/plugins/$(CONF)
 plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(CONF))
 ROOTCONF = $($(CLASS)_ROOTCONF)
 
-LINTFLAGS += -mu
+LINTFLAGS = -msux
 LINTFILES = $(SRCS:%.c=%.ln)
 
 APIMAP = ../../../libtopo/common/topo_mod.map
@@ -67,7 +67,8 @@ CFLAGS += -G $(XREGSFLAG)
 CPPFLAGS += -I.
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += $(ZIGNORE) -M$(APIMAP)
-LDLIBS += -L$(ROOTLIBDIR)/fm -R/usr/lib/fm -ltopo -lnvpair -lc
+LDLIBS += -L$(ROOTLIBDIR)/fm -ltopo -lnvpair -lc
+DYNFLAGS += -R/usr/lib/fm
 
 all: $(PROG)
 

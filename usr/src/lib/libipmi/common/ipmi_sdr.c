@@ -78,16 +78,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	ipmi_sdr_generic_locator_t *gen_src, *gen_dst;
 	ipmi_sdr_fru_locator_t *fru_src, *fru_dst;
 
-	/*
-	 * Free any existing SDRs.
-	 */
-	while (ihp->ih_sdr_cache != NULL) {
-		ent = ihp->ih_sdr_cache->isc_next;
-		ipmi_free(ihp, ent->isc_generic);
-		ipmi_free(ihp, ent->isc_fru);
-		ipmi_free(ihp, ent);
-		ihp->ih_sdr_cache = ent;
-	}
+	ipmi_sdr_clear(ihp);
 
 	/*
 	 * Iterate over all existing SDRs and add them to the cache.
@@ -145,6 +136,20 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	}
 
 	return (0);
+}
+
+void
+ipmi_sdr_clear(ipmi_handle_t *ihp)
+{
+	ipmi_sdr_cache_ent_t *ent, *next;
+
+	while ((ent = ihp->ih_sdr_cache) != NULL) {
+		next = ent->isc_next;
+		ipmi_free(ihp, ent->isc_generic);
+		ipmi_free(ihp, ent->isc_fru);
+		ipmi_free(ihp, ent);
+		ihp->ih_sdr_cache = next;
+	}
 }
 
 ipmi_sdr_t *

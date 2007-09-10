@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,13 +182,13 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	}
 	nvlist_free(fmri);
 	/* Create and add FRU fmri for this ioboard */
-	snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
+	(void) snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
 	if (topo_mod_str2nvl(mp, fmri_str, &fmri) == 0) {
 		(void) topo_node_fru_set(ion, fmri, 0, &err);
 		nvlist_free(fmri);
 	}
 	/* Add label for this ioboard */
-	snprintf(label, sizeof (label), LABEL, inst);
+	(void) snprintf(label, sizeof (label), LABEL, inst);
 	(void) topo_node_label_set(ion, label, &err);
 
 	/* Create range of hostbridges on this ioboard */
