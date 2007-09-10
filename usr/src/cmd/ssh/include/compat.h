@@ -34,7 +34,7 @@ extern "C" {
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,6 @@ extern "C" {
 #define SSH_BUG_GSSAPI_BER	0x04000000
 #define SSH_BUG_FIRSTKEX	0x08000000
 
-#define SSH_BUG_DFLT_CLNT_EXIT_0	0x10000000
 #define SSH_BUG_GSSKEX_HOSTKEY	0x20000000
 
 void     enable_compat13(void);

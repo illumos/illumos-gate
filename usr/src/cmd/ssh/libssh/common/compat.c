@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,10 +101,8 @@ compat_datafellows(const char *version)
 		  "OpenSSH_3.8*",       SSH_BUG_GSSKEX_HOSTKEY},
 		{ "OpenSSH*",		0 },
 		{ "Sun_SSH_1.0.*",	SSH_BUG_NOREKEY|
-					SSH_BUG_DFLT_CLNT_EXIT_0|
 					SSH_BUG_LOCALES_NOT_LANGTAGS},
 		{ "Sun_SSH_1.0*",	SSH_BUG_NOREKEY|SSH_BUG_EXTEOF|
-					SSH_BUG_DFLT_CLNT_EXIT_0|
 					SSH_BUG_LOCALES_NOT_LANGTAGS},
 		{ "*MindTerm*",		0 },
 		{ "2.1.0*",		SSH_BUG_SIGBLOB|SSH_BUG_HMAC|

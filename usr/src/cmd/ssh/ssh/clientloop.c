@@ -1029,8 +1029,6 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 	escape_pending = 0;
 	last_was_cr = 1;
 	exit_status = -1;
-	if (datafellows & SSH_BUG_DFLT_CLNT_EXIT_0)
-		exit_status = 0;
 	stdin_eof = 0;
 	buffer_high = 64 * 1024;
 	connection_in = packet_get_connection_in();
