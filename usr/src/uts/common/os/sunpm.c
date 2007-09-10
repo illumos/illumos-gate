@@ -5513,10 +5513,10 @@ pm_register_watcher(int clone, dev_info_t *dip)
 			 * process is watching multiple devices)
 			 */
 			if (p->pscc_clone == clone) {
-				ASSERT(p->pscc_dip != dip);
 				pscc->pscc_entries = p->pscc_entries;
 				pscc->pscc_entries->psce_references++;
 				found++;
+				break;
 			}
 		}
 		if (!found) {		/* create a new one */
@@ -8516,7 +8516,7 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 {
 	_NOTE(ARGUNUSED(impl_arg))
 	PMD_FUNC(pmf, "bp_set_power")
-	pm_ppm_devlist_t *devl;
+	pm_ppm_devlist_t *devl = NULL;
 	int clevel, circ;
 #ifdef	DEBUG
 	int circ_db, ccirc_db;
@@ -8802,6 +8802,14 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 			    old, canblock);
 			pm_enqueue_notify_others(&devl, canblock);
 			mutex_exit(&pm_rsvp_lock);
+		} else {
+			pm_ppm_devlist_t *p;
+			pm_ppm_devlist_t *next;
+			for (p = devl; p != NULL; p = next) {
+				next = p->ppd_next;
+				kmem_free(p, sizeof (pm_ppm_devlist_t));
+			}
+			devl = NULL;
 		}
 
 		/*
