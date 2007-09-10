@@ -85,7 +85,7 @@ static int layout_count;
 static int default_layout_number = 0;
 
 static void reset(int);
-static void get_type(int);
+static int get_type(int);
 static void get_layout(int);
 static void kbd_defaults(int);
 static void usage(void);
@@ -224,7 +224,7 @@ main(int argc, char **argv)
 	}
 
 	if (tflag)
-		get_type(kbd);
+		(void) get_type(kbd);
 
 	if (lflag)
 		get_layout(kbd);
@@ -304,6 +304,14 @@ set_kbd_layout(int kbd, char *layout_name)
 {
 	int layout_num;
 	int error = 1;
+
+	/* layout setting is possible only for USB type keyboards */
+	if (get_type(kbd) != KB_USB) {
+		(void) fprintf(stderr, "The -s option does not apply for this"
+			" keyboard type.\n"
+			"Only USB/PS2 type keyboards support this option.\n");
+		return (error);
+	}
 
 	/* get the language info from the layouts file */
 	if (get_layouts() != 0)
@@ -424,7 +432,7 @@ reset(int kbd)
 /*
  * this routine gets the type of the keyboard being used
  */
-static void
+static int
 get_type(int kbd)
 {
 	int kbd_type;
@@ -460,6 +468,7 @@ get_type(int kbd)
 		(void) printf("Unknown keyboard type\n");
 		break;
 	}
+	return (kbd_type);
 }
 
 /*
