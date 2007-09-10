@@ -280,6 +280,8 @@ uint32_t vgen_ldcwr_retries = 10;	/* max # of ldc_write() retries */
 uint32_t vgen_ldcup_retries = 5;	/* max # of ldc_up() retries */
 uint32_t vgen_recv_delay = 1;		/* delay when rx descr not ready */
 uint32_t vgen_recv_retries = 10;	/* retry when rx descr not ready */
+uint32_t vgen_tx_retries = 0x4;		/* retry when tx descr not available */
+uint32_t vgen_tx_delay = 0x30;		/* delay when tx descr not available */
 
 int vgen_rcv_thread_enabled = 1;	/* Enable Recieve thread */
 
@@ -529,11 +531,26 @@ vgen_stop(void *arg)
 static mblk_t *
 vgen_tx(void *arg, mblk_t *mp)
 {
+	int i;
 	vgen_port_t *portp;
-	int status;
+	int status = VGEN_FAILURE;
 
 	portp = (vgen_port_t *)arg;
-	status = vgen_portsend(portp, mp);
+	/*
+	 * Retry so that we avoid reporting a failure
+	 * to the upper layer. Returning a failure may cause the
+	 * upper layer to go into single threaded mode there by
+	 * causing performance degradation, especially for a large
+	 * number of connections.
+	 */
+	for (i = 0; i < vgen_tx_retries; ) {
+		status = vgen_portsend(portp, mp);
+		if (status == VGEN_SUCCESS) {
+			break;
+		}
+		if (++i < vgen_tx_retries)
+			delay(drv_usectohz(vgen_tx_delay));
+	}
 	if (status != VGEN_SUCCESS) {
 		/* failure */
 		return (mp);
@@ -549,6 +566,7 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	vgen_ldclist_t	*ldclp;
 	vgen_ldc_t *ldcp;
 	int status;
+	int rv = VGEN_SUCCESS;
 
 	ldclp = &portp->ldclist;
 	READ_ENTER(&ldclp->rwlock);
@@ -561,23 +579,14 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	}
 	ldcp = ldclp->headp;
 
-	if (ldcp->need_resched) {
-		/* out of tx resources, see vgen_ldcsend() for details. */
-		mutex_enter(&ldcp->txlock);
-		ldcp->statsp->tx_no_desc++;
-		mutex_exit(&ldcp->txlock);
-
-		RW_EXIT(&ldclp->rwlock);
-		return (VGEN_FAILURE);
-	}
-
 	status  = vgen_ldcsend(ldcp, mp);
+
 	RW_EXIT(&ldclp->rwlock);
 
-	if (status != VGEN_TX_SUCCESS)
-		return (VGEN_FAILURE);
-
-	return (VGEN_SUCCESS);
+	if (status != VGEN_TX_SUCCESS) {
+		rv = VGEN_FAILURE;
+	}
+	return (rv);
 }
 
 /* channel transmit function */
@@ -4858,6 +4867,7 @@ vgen_reclaim(vgen_ldc_t *ldcp)
 static void
 vgen_reclaim_dring(vgen_ldc_t *ldcp)
 {
+	int count = 0;
 	vnet_public_desc_t *txdp;
 	vgen_private_desc_t *tbufp;
 	vio_dring_entry_hdr_t	*hdrp;
@@ -4881,6 +4891,7 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 		tbufp = NEXTTBUF(ldcp, tbufp);
 		txdp = tbufp->descp;
 		hdrp = &txdp->hdr;
+		count++;
 	}
 
 	ldcp->cur_tbufp = tbufp;
@@ -4888,7 +4899,7 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 	/*
 	 * Check if mac layer should be notified to restart transmissions
 	 */
-	if (ldcp->need_resched) {
+	if ((ldcp->need_resched) && (count > 0)) {
 		ldcp->need_resched = B_FALSE;
 		vnet_tx_update(vgenp->vnetp);
 	}
