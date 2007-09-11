@@ -271,7 +271,6 @@ typedef struct inode {
 	si_t *i_ufs_acl;	/* pointer to acl entry */
 	dcanchor_t i_danchor;	/* directory cache anchor */
 	kthread_t *i_writer;	/* thread which is in window in wrip() */
-	struct timeval32 i_mtime_last;	/* last explicit mtime modification */
 } inode_t;
 
 struct dinode {

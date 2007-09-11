@@ -2252,12 +2252,6 @@ again:
 		if (mask & AT_MTIME) {
 			ip->i_mtime.tv_sec = vap->va_mtime.tv_sec;
 			ip->i_mtime.tv_usec = vap->va_mtime.tv_nsec / 1000;
-			/*
-			 * Allow ufs_putapage() to distinguish manual mtime
-			 * update from one done on the fly by e.g. write().
-			 */
-			ip->i_mtime_last = ip->i_mtime;
-
 			gethrestime(&now);
 			if (now.tv_sec > TIME32_MAX) {
 				/*
@@ -5247,7 +5241,6 @@ ufs_putapage(
 	daddr_t bn;
 	int err;
 	int contig;
-	int dotrans;
 
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
@@ -5261,19 +5254,12 @@ ufs_putapage(
 
 	/*
 	 * If the modified time on the inode has not already been
-	 * set elsewhere (e.g. for write) we set the time now.
+	 * set elsewhere (e.g. for write/setattr) we set the time now.
 	 * This gives us approximate modified times for mmap'ed files
 	 * which are modified via stores in the user address space.
-	 * We _will_ override timestamps from setattr here, because
-	 * these can be arbitrary, not "approximate" (anywhere close
-	 * to "now"). So check whether the last timestamp update on
-	 * this file came from setattr.
 	 */
-	if ((ip->i_flag & IMODTIME) == 0 ||
-	    (ip->i_mtime.tv_sec == ip->i_mtime_last.tv_sec &&
-	    ip->i_mtime.tv_usec == ip->i_mtime_last.tv_usec)) {
+	if ((ip->i_flag & IMODTIME) == 0) {
 		mutex_enter(&ip->i_tlock);
-		ip->i_flag &= ~IMODTIME;
 		ip->i_flag |= IUPD;
 		ip->i_seq++;
 		ITIMES_NOLOCK(ip);
@@ -5381,25 +5367,6 @@ ufs_putapage(
 	bp->b_un.b_addr = (caddr_t)0;
 	bp->b_file = ip->i_vnode;
 
-	/*
-	 * File contents of shadow or quota inodes are metadata, and updates
-	 * to these need to be put into a logging transaction. All direct
-	 * callers in UFS do that, but fsflush can come here _before_ the
-	 * normal codepath, for example on updating ACL information that'd be
-	 * ufs_si_store()->ufs_rdwri()->wrip()->segmap_release()->VOP_PUTPAGE()
-	 * reaches this point.
-	 * We therefore need to test whether a transaction exists, and if not
-	 * create one - for fsflush.
-	 */
-	dotrans =
-	    (((ip->i_mode & IFMT) == IFSHAD || ufsvfsp->vfs_qinod == ip) &&
-	    ((curthread->t_flag & T_DONTBLOCK) == 0) &&
-	    (TRANS_ISTRANS(ufsvfsp)));
-
-	if (dotrans) {
-		curthread->t_flag |= T_DONTBLOCK;
-		TRANS_BEGIN_ASYNC(ufsvfsp, TOP_PUTPAGE, TOP_PUTPAGE_SIZE(ip));
-	}
 	if (TRANS_ISTRANS(ufsvfsp)) {
 		if ((ip->i_mode & IFMT) == IFSHAD) {
 			TRANS_BUF(ufsvfsp, 0, io_len, bp, DT_SHAD);
@@ -5407,10 +5374,6 @@ ufs_putapage(
 			TRANS_DELTA(ufsvfsp, ldbtob(bn), bp->b_bcount, DT_QR,
 			    0, 0);
 		}
-	}
-	if (dotrans) {
-		TRANS_END_ASYNC(ufsvfsp, TOP_PUTPAGE, TOP_PUTPAGE_SIZE(ip));
-		curthread->t_flag &= ~T_DONTBLOCK;
 	}
 
 	/* write throttle */
@@ -5602,21 +5565,8 @@ ufs_delmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
 	}
 
 	mutex_enter(&ip->i_tlock);
-
 	ip->i_mapcnt -= btopr(len); 	/* Count released mappings */
 	ASSERT(ip->i_mapcnt >= 0);
-
-	/*
-	 * If there are cached pages on this vnode, a timestamp update
-	 * on the next fsflush run might be required to preserve mmap
-	 * semantics for mtime/atime updates.
-	 * We have to force this by clearing the IMODTIME flag here.
-	 */
-	if ((flags & MAP_SHARED) && (prot & PROT_WRITE) &&
-	    vn_has_cached_data(vp)) {
-		ip->i_flag &= ~IMODTIME;
-	}
-
 	mutex_exit(&ip->i_tlock);
 	return (0);
 }
