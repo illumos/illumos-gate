@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mdescplugin.h"
+#include <limits.h>
 
 /* These 3 variable are defined and set in mdescplugin.c */
 extern picl_nodehdl_t	root_node;
@@ -84,7 +85,7 @@ add_tlb_props(picl_nodehdl_t node, mde_cookie_t *tlblistp, int ntlbs)
 
 	for (i = 0; i < ntlbs; i++) {
 		if (md_get_prop_data(mdp, tlblistp[i], "type", &type,
-			&type_size)) {
+		    &type_size)) {
 			return;
 		}
 
@@ -116,7 +117,7 @@ add_tlb_props(picl_nodehdl_t node, mde_cookie_t *tlblistp, int ntlbs)
 		}
 
 		if (!(md_get_prop_val(mdp, tlblistp[i], "entries",
-			&int_value))) {
+		    &int_value))) {
 			(void) snprintf(property, sizeof (property),
 			    "%s-entries", tlb_str);
 			add_md_prop(node, sizeof (int_value), property,
@@ -138,7 +139,7 @@ add_cache_props(picl_nodehdl_t node, mde_cookie_t *cachelistp, int ncaches)
 
 	for (i = 0; i < ncaches; i++) {
 		if (md_get_prop_data(mdp, cachelistp[i], "type", &type,
-			&type_size)) {
+		    &type_size)) {
 			return;
 		}
 
@@ -178,7 +179,7 @@ add_cache_props(picl_nodehdl_t node, mde_cookie_t *cachelistp, int ncaches)
 		}
 
 		if (!(md_get_prop_val(mdp, cachelistp[i], "associativity",
-			&int_value))) {
+		    &int_value))) {
 			(void) snprintf(property, sizeof (property),
 			    "%s-associativity", cache_str);
 			add_md_prop(node, sizeof (int_value), property,
@@ -186,7 +187,7 @@ add_cache_props(picl_nodehdl_t node, mde_cookie_t *cachelistp, int ncaches)
 		}
 
 		if (!(md_get_prop_val(mdp, cachelistp[i], "size",
-			&int_value))) {
+		    &int_value))) {
 			(void) snprintf(property, sizeof (property), "%s-size",
 			    cache_str);
 			add_md_prop(node, sizeof (int_value), property,
@@ -194,7 +195,7 @@ add_cache_props(picl_nodehdl_t node, mde_cookie_t *cachelistp, int ncaches)
 		}
 
 		if (!(md_get_prop_val(mdp, cachelistp[i], "line-size",
-			&int_value))) {
+		    &int_value))) {
 			(void) snprintf(property, sizeof (property),
 			    "%s-line-size", cache_str);
 			add_md_prop(node, sizeof (int_value), property,
@@ -213,7 +214,8 @@ add_cpu_prop(picl_nodehdl_t node, void *args)
 	int ncpus, ncaches, ntlbs;
 	int status;
 	int reg_prop[SUN4V_CPU_REGSIZE], cpuid;
-	uint64_t int_value;
+	uint64_t int64_value;
+	int int_value;
 
 	status = ptree_get_propval_by_name(node, OBP_REG, reg_prop,
 	    sizeof (reg_prop));
@@ -261,18 +263,20 @@ add_cpu_prop(picl_nodehdl_t node, void *args)
 	 */
 
 	for (x = 0; x < ncpus; x++) {
-		if (md_get_prop_val(mdp, cpulistp[x], "id", &int_value)) {
+		if (md_get_prop_val(mdp, cpulistp[x], "id", &int64_value)) {
 			continue;
 		}
 
-		if (int_value != cpuid)
+		if (int64_value != cpuid)
 			continue;
 
-		add_md_prop(node, sizeof (int_value), "cpuid", &int_value,
-			PICL_PTYPE_INT);
+		int_value = (int)(int64_value & INT32_MAX);
 
-		add_md_prop(node, sizeof (int_value), "portid", &int_value,
-		    PICL_PTYPE_INT);
+		add_md_prop(node, sizeof (int_value), OBP_PROP_CPUID,
+		    &int_value, PICL_PTYPE_INT);
+
+		add_md_prop(node, sizeof (int_value), OBP_PROP_PORTID,
+		    &int_value, PICL_PTYPE_INT);
 
 		/* get caches for CPU */
 		ncaches = md_scan_dag(mdp, cpulistp[x],

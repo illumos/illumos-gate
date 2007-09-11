@@ -744,8 +744,8 @@ find_node_by_string_prop(picl_nodehdl_t rooth, const char *pname,
 
 	for (err = ptree_get_propval_by_name(rooth, PICL_PROP_CHILD, &childh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(childh, PICL_PROP_PEER, &childh,
-		    sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(childh, PICL_PROP_PEER, &childh,
+	    sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			return (err);
 
@@ -891,7 +891,7 @@ add_openprom_props(picl_nodehdl_t nodeh, di_node_t di_node)
 
 	for (promp = di_prom_prop_next(ph, di_node, DI_PROM_PROP_NIL);
 	    promp != DI_PROM_PROP_NIL;
-		promp = di_prom_prop_next(ph, di_node, promp)) {
+	    promp = di_prom_prop_next(ph, di_node, promp)) {
 
 		pname = di_prom_prop_name(promp);
 
@@ -1073,7 +1073,7 @@ add_devinfo_props(picl_nodehdl_t nodeh, di_node_t di_node)
 
 	for (di_prop = di_prop_next(di_node, DI_PROP_NIL);
 	    di_prop != DI_PROP_NIL;
-		di_prop = di_prop_next(di_node, di_prop)) {
+	    di_prop = di_prop_next(di_node, di_prop)) {
 
 		di_val = di_prop_name(di_prop);
 		di_ptype = di_prop_type(di_prop);
@@ -1571,7 +1571,8 @@ get_cpu_portid(picl_nodehdl_t modh, int *id)
 {
 	int	err;
 
-	if (strcmp(mach_name, "sun4u") == 0) {
+	if (strcmp(mach_name, "sun4u") == 0 ||
+	    strcmp(mach_name, "sun4v") == 0) {
 		err = get_int_propval_by_name(modh, OBP_PROP_UPA_PORTID, id);
 		if (err == PICL_SUCCESS)
 			return (err);
@@ -1890,8 +1891,8 @@ add_ffb_config_info(picl_nodehdl_t rooth)
 
 	for (err = ptree_get_propval_by_name(rooth, PICL_PROP_CHILD, &nodeh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER,
-		    &nodeh, sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER,
+	    &nodeh, sizeof (picl_nodehdl_t))) {
 
 		if (err != PICL_SUCCESS)
 			return (err);
@@ -2183,14 +2184,14 @@ process_asrtree_conf_file(void)
 		(void) snprintf(pname, PATH_MAX, PICLD_PLAT_PLUGIN_DIRF, nmbuf);
 		(void) strlcat(pname, ASRTREE_CONFFILE_NAME, PATH_MAX);
 		conf_name_asr_map = read_asr_conf_file(pname,
-			conf_name_asr_map);
+		    conf_name_asr_map);
 	}
 
 	if (sysinfo(SI_MACHINE, nmbuf, sizeof (nmbuf)) != -1) {
 		(void) snprintf(pname, PATH_MAX, PICLD_PLAT_PLUGIN_DIRF, nmbuf);
 		(void) strlcat(pname, ASRTREE_CONFFILE_NAME, PATH_MAX);
 		conf_name_asr_map = read_asr_conf_file(pname,
-			conf_name_asr_map);
+		    conf_name_asr_map);
 	}
 
 	(void) snprintf(pname, PATH_MAX, "%s/%s", PICLD_COMMON_PLUGIN_DIR,
@@ -2322,7 +2323,7 @@ create_asr_node(char *parent, char *child, char *unitaddr, char *class,
 	for (err = ptree_get_propval_by_name(nodeh, PICL_PROP_CHILD, &chdh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
 	    err = ptree_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
-		    sizeof (picl_nodehdl_t))) {
+	    sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			break;
 		err = ptree_get_propval_by_name(chdh, PICL_PROP_NAME,
@@ -2481,7 +2482,7 @@ create_asr_node(char *parent, char *child, char *unitaddr, char *class,
 				    PTREE_PROPINFO_VERSION,
 				    PICL_PTYPE_CHARSTRING, PICL_READ,
 				    strlen(triple.propval) + 1,
-					triple.propname, NULL, NULL);
+				    triple.propname, NULL, NULL);
 				(void) ptree_create_and_add_prop(chdh,
 				    &propinfo, triple.propval, &proph);
 			}
@@ -2684,8 +2685,8 @@ add_sbus_slots(picl_nodehdl_t pcih, void *args)
 
 	for (err = ptree_get_propval_by_name(pcih, PICL_PROP_CHILD, &nodeh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
-		    sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
+	    sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			return (err);
 
@@ -2730,8 +2731,8 @@ add_pci_deviceids(picl_nodehdl_t pcih, void *args)
 
 	for (err = ptree_get_propval_by_name(pcih, PICL_PROP_CHILD, &nodeh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
-		    sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
+	    sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			return (err);
 
@@ -3121,7 +3122,7 @@ update_memory_size_prop(picl_nodehdl_t plafh)
 	 * check if the #size-cells of the platform node is 2
 	 */
 	err = ptree_get_propval_by_name(plafh, OBP_PROP_SIZE_CELLS, &pval,
-		sizeof (pval));
+	    sizeof (pval));
 
 	if (err == PICL_PROPNOTFOUND)
 		pval = SUPPORTED_NUM_CELL_SIZE;
@@ -3174,8 +3175,8 @@ update_memory_size_prop(picl_nodehdl_t plafh)
 	 * Add the size property
 	 */
 	(void) ptree_init_propinfo(&pinfo, PTREE_PROPINFO_VERSION,
-		PICL_PTYPE_UNSIGNED_INT, PICL_READ, sizeof (memsize),
-		PICL_PROP_SIZE, NULL, NULL);
+	    PICL_PTYPE_UNSIGNED_INT, PICL_READ, sizeof (memsize),
+	    PICL_PROP_SIZE, NULL, NULL);
 	err = ptree_create_and_add_prop(memh, &pinfo, &memsize, NULL);
 	return (err);
 }
@@ -3260,6 +3261,8 @@ picldevtree_init(void)
 	    picldevtree_evhandler, NULL);
 	(void) ptree_register_handler(PICLEVENT_SYSEVENT_DEVICE_REMOVED,
 	    picldevtree_evhandler, NULL);
+	(void) ptree_register_handler(PICLEVENT_CPU_STATE_CHANGE,
+	    picldevtree_evhandler, NULL);
 }
 
 /*
@@ -3273,6 +3276,8 @@ picldevtree_fini(void)
 	    picldevtree_evhandler, NULL);
 	(void) ptree_unregister_handler(PICLEVENT_SYSEVENT_DEVICE_REMOVED,
 	    picldevtree_evhandler, NULL);
+	(void) ptree_unregister_handler(PICLEVENT_CPU_STATE_CHANGE,
+	    picldevtree_evhandler, NULL);
 
 	conf_name_class_map = free_conf_entries(conf_name_class_map);
 }
@@ -3284,6 +3289,7 @@ picldevtree_fini(void)
  *
  *	PICLEVENT_SYSEVENT_DEVICE_ADDED
  *	PICLEVENT_SYSEVENT_DEVICE_REMOVED
+ *	PICLEVENT_CPU_STATE_CHANGE
  */
 /* ARGSUSED */
 static void
@@ -3320,6 +3326,9 @@ picldevtree_evhandler(const char *ename, const void *earg, size_t size,
 		syslog(LOG_INFO, "picldevtree: event handler invoked ename:%s "
 		    "ptreepath:%s\n", ename, ptreepath);
 
+	if (strcmp(ename, PICLEVENT_CPU_STATE_CHANGE) == 0) {
+		goto done;
+	}
 	if (strcmp(ename, PICLEVENT_SYSEVENT_DEVICE_ADDED) == 0) {
 		di_node_t		devnode;
 		char		*strp;

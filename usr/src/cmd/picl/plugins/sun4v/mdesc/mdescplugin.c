@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
  */
 
 #include "mdescplugin.h"
+#include <libnvpair.h>
 
 #pragma init(mdescplugin_register)	/* place in .init section */
 
@@ -196,6 +197,65 @@ dsc_handler(const char *ename, const void *earg, size_t size, void *cookie)
 	nvlist_free(nvlp);
 }
 
+/*ARGSUSED*/
+static void
+mdesc_ev_completion_handler(char *ename, void *earg, size_t size)
+{
+	free(earg);
+}
+
+static void
+signal_devtree(void)
+{
+	nvlist_t *nvl;
+	char *packed_nvl;
+	size_t nvl_size;
+	int status;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, NULL) != 0)
+		return;
+
+	/*
+	 * Right now (Aug. 2007) snowbird is the only other platform
+	 * which uses this event.  Since that's a sun4u platform and
+	 * this is sun4v we do not have to worry about possible confusion
+	 * or interference between the two by grabbing this event for
+	 * our own use here.  This event is consumed by the devtree
+	 * plug-in.  The event signals the plug-in to re-run its
+	 * cpu initialization function, which will cause it to add
+	 * additional information to the cpu devtree nodes (particularly,
+	 * the administrative state of the cpus.)
+	 */
+	if (nvlist_add_string(nvl, PICLEVENTARG_EVENT_NAME,
+	    PICLEVENT_CPU_STATE_CHANGE) != 0) {
+		free(nvl);
+		return;
+	}
+
+	/*
+	 * The devtree plug-in needs to see a devfs path argument for
+	 * any event it considers.  We supply one here which is essentially
+	 * a dummy since it is not processed by the devtree plug-in for
+	 * this event.
+	 */
+	if (nvlist_add_string(nvl, PICLEVENTARG_DEVFS_PATH, "/cpu") != 0) {
+		free(nvl);
+		return;
+	}
+	if (nvlist_pack(nvl, &packed_nvl, &nvl_size, NV_ENCODE_NATIVE,
+	    NULL) != 0) {
+		free(nvl);
+		return;
+	}
+	if ((status = ptree_post_event(PICLEVENT_CPU_STATE_CHANGE,
+	    packed_nvl, nvl_size, mdesc_ev_completion_handler)) !=
+	    PICL_SUCCESS) {
+		free(nvl);
+		syslog(LOG_WARNING,
+		    "signal_devtree: can't post cpu event: %d\n", status);
+	}
+}
+
 void
 mdescplugin_init(void)
 {
@@ -220,6 +280,8 @@ mdescplugin_init(void)
 	if (status != PICL_SUCCESS) {
 		return;
 	}
+
+	signal_devtree();
 
 	(void) disk_discovery();
 
