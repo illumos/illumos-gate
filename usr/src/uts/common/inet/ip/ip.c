@@ -154,6 +154,15 @@ int ip_poll_normal_ticks = 0;
 int ip_modclose_ackwait_ms = 3000;
 
 /*
+ * It would be nice to have these present only in DEBUG systems, but the
+ * current design of the global symbol checking logic requires them to be
+ * unconditionally present.
+ */
+uint_t ip_thread_data;			/* TSD key for debug support */
+krwlock_t ip_thread_rwlock;
+list_t	ip_thread_list;
+
+/*
  * Structure to represent a linked list of msgblks. Used by ip_snmp_ functions.
  */
 
@@ -5757,6 +5766,12 @@ ip_ddi_destroy(void)
 	ip_ire_g_fini();
 	inet_minor_destroy(ip_minor_arena);
 
+#ifdef DEBUG
+	list_destroy(&ip_thread_list);
+	rw_destroy(&ip_thread_rwlock);
+	tsd_destroy(&ip_thread_data);
+#endif
+
 	netstack_unregister(NS_IP);
 }
 
@@ -5888,6 +5903,23 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 }
 
 /*
+ * This function is called from the TSD destructor, and is used to debug
+ * reference count issues in IP. See block comment in <inet/ip_if.h> for
+ * details.
+ */
+static void
+ip_thread_exit(void *phash)
+{
+	th_hash_t *thh = phash;
+
+	rw_enter(&ip_thread_rwlock, RW_WRITER);
+	list_remove(&ip_thread_list, thh);
+	rw_exit(&ip_thread_rwlock);
+	mod_hash_destroy_hash(thh->thh_hash);
+	kmem_free(thh, sizeof (*thh));
+}
+
+/*
  * Called when the IP kernel module is loaded into the kernel
  */
 void
@@ -5916,9 +5948,11 @@ ip_ddi_init(void)
 	ip_ire_g_init();
 	ip_net_g_init();
 
-#ifdef ILL_DEBUG
-	/* Default cleanup function */
-	ip_cleanup_func = ip_thread_exit;
+#ifdef DEBUG
+	tsd_create(&ip_thread_data, ip_thread_exit);
+	rw_init(&ip_thread_rwlock, NULL, RW_DEFAULT, NULL);
+	list_create(&ip_thread_list, sizeof (th_hash_t),
+	    offsetof(th_hash_t, thh_link));
 #endif
 
 	/*

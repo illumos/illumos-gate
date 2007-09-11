@@ -45,6 +45,7 @@
 #include <sys/zone.h>
 #include <sys/sunldi.h>
 #include <sys/file.h>
+#include <sys/bitmap.h>
 
 #include <sys/kmem.h>
 #include <sys/systm.h>
@@ -254,6 +255,11 @@ static int	ill_relink_usesrc_ills(ill_t *, ill_t *, uint_t);
 static void	ill_disband_usesrc_group(ill_t *);
 
 static void	conn_cleanup_stale_ire(conn_t *, caddr_t);
+
+#ifdef DEBUG
+static	void	ill_trace_cleanup(const ill_t *);
+static	void	ipif_trace_cleanup(const ipif_t *);
+#endif
 
 /*
  * if we go over the memory footprint limit more than once in this msec
@@ -937,11 +943,14 @@ ill_delete_tail(ill_t *ill)
 	} while (mpp++ != &ill->ill_last_mp_to_free);
 
 	ill_free_mib(ill);
+
+#ifdef DEBUG
+	ill_trace_cleanup(ill);
+#endif
+
 	/* Drop refcnt here */
 	netstack_rele(ill->ill_ipst->ips_netstack);
 	ill->ill_ipst = NULL;
-
-	ILL_TRACE_CLEANUP(ill);
 }
 
 static void
@@ -4654,8 +4663,9 @@ ipsq_init(ill_t *ill)
 	ipsq->ipsq_writer = curthread;
 	ipsq->ipsq_reentry_cnt = 1;
 	ipsq->ipsq_ipst = ill->ill_ipst;	/* No netstack_hold */
-#ifdef ILL_DEBUG
-	ipsq->ipsq_depth = getpcstack((pc_t *)ipsq->ipsq_stack, IP_STACK_DEPTH);
+#ifdef DEBUG
+	ipsq->ipsq_depth = getpcstack((pc_t *)ipsq->ipsq_stack,
+	    IPSQ_STACK_DEPTH);
 #endif
 	(void) strcpy(ipsq->ipsq_name, ill->ill_name);
 	return (B_TRUE);
@@ -5035,7 +5045,7 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 	ill->ill_phyint->phyint_ipsq->ipsq_writer = NULL;
 	ill->ill_phyint->phyint_ipsq->ipsq_reentry_cnt--;
 	ASSERT(ill->ill_phyint->phyint_ipsq->ipsq_reentry_cnt == 0);
-#ifdef ILL_DEBUG
+#ifdef DEBUG
 	ill->ill_phyint->phyint_ipsq->ipsq_depth = 0;
 #endif
 	ipif = ipif_allocate(ill, 0L, IRE_LOOPBACK, B_TRUE);
@@ -6441,9 +6451,9 @@ ipif_ill_refrele_tail(ill_t *ill)
 	}
 }
 
-#ifdef ILL_DEBUG
+#ifdef DEBUG
 /* Reuse trace buffer from beginning (if reached the end) and record trace */
-void
+static void
 th_trace_rrecord(th_trace_t *th_trace)
 {
 	tr_buf_t *tr_buf;
@@ -6455,301 +6465,226 @@ th_trace_rrecord(th_trace_t *th_trace)
 		lastref = 0;
 	th_trace->th_trace_lastref = lastref;
 	tr_buf = &th_trace->th_trbuf[lastref];
-	tr_buf->tr_depth = getpcstack(tr_buf->tr_stack, IP_STACK_DEPTH);
+	tr_buf->tr_time = lbolt;
+	tr_buf->tr_depth = getpcstack(tr_buf->tr_stack, TR_STACK_DEPTH);
 }
 
-th_trace_t *
-th_trace_ipif_lookup(ipif_t *ipif)
+static void
+th_trace_free(void *value)
 {
-	int bucket_id;
-	th_trace_t *th_trace;
+	th_trace_t *th_trace = value;
 
-	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+	ASSERT(th_trace->th_refcnt == 0);
+	kmem_free(th_trace, sizeof (*th_trace));
+}
 
-	bucket_id = IP_TR_HASH(curthread);
-	ASSERT(bucket_id < IP_TR_HASH_MAX);
+/*
+ * Find or create the per-thread hash table used to track object references.
+ * The ipst argument is NULL if we shouldn't allocate.
+ *
+ * Accesses per-thread data, so there's no need to lock here.
+ */
+static mod_hash_t *
+th_trace_gethash(ip_stack_t *ipst)
+{
+	th_hash_t *thh;
 
-	for (th_trace = ipif->ipif_trace[bucket_id]; th_trace != NULL;
-	    th_trace = th_trace->th_next) {
-		if (th_trace->th_id == curthread)
-			return (th_trace);
+	if ((thh = tsd_get(ip_thread_data)) == NULL && ipst != NULL) {
+		mod_hash_t *mh;
+		char name[256];
+		size_t objsize, rshift;
+		int retv;
+
+		if ((thh = kmem_alloc(sizeof (*thh), KM_NOSLEEP)) == NULL)
+			return (NULL);
+		(void) snprintf(name, sizeof (name), "th_trace_%p", curthread);
+
+		/*
+		 * We use mod_hash_create_extended here rather than the more
+		 * obvious mod_hash_create_ptrhash because the latter has a
+		 * hard-coded KM_SLEEP, and we'd prefer to fail rather than
+		 * block.
+		 */
+		objsize = MAX(MAX(sizeof (ill_t), sizeof (ipif_t)),
+		    MAX(sizeof (ire_t), sizeof (nce_t)));
+		rshift = highbit(objsize);
+		mh = mod_hash_create_extended(name, 64, mod_hash_null_keydtor,
+		    th_trace_free, mod_hash_byptr, (void *)rshift,
+		    mod_hash_ptrkey_cmp, KM_NOSLEEP);
+		if (mh == NULL) {
+			kmem_free(thh, sizeof (*thh));
+			return (NULL);
+		}
+		thh->thh_hash = mh;
+		thh->thh_ipst = ipst;
+		/*
+		 * We trace ills, ipifs, ires, and nces.  All of these are
+		 * per-IP-stack, so the lock on the thread list is as well.
+		 */
+		rw_enter(&ip_thread_rwlock, RW_WRITER);
+		list_insert_tail(&ip_thread_list, thh);
+		rw_exit(&ip_thread_rwlock);
+		retv = tsd_set(ip_thread_data, thh);
+		ASSERT(retv == 0);
 	}
-	return (NULL);
+	return (thh != NULL ? thh->thh_hash : NULL);
 }
 
-void
-ipif_trace_ref(ipif_t *ipif)
+boolean_t
+th_trace_ref(const void *obj, ip_stack_t *ipst)
 {
-	int bucket_id;
 	th_trace_t *th_trace;
+	mod_hash_t *mh;
+	mod_hash_val_t val;
 
-	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
-
-	if (ipif->ipif_trace_disable)
-		return;
+	if ((mh = th_trace_gethash(ipst)) == NULL)
+		return (B_FALSE);
 
 	/*
-	 * Attempt to locate the trace buffer for the curthread.
-	 * If it does not exist, then allocate a new trace buffer
-	 * and link it in list of trace bufs for this ipif, at the head
+	 * Attempt to locate the trace buffer for this obj and thread.
+	 * If it does not exist, then allocate a new trace buffer and
+	 * insert into the hash.
 	 */
-	th_trace = th_trace_ipif_lookup(ipif);
-	if (th_trace == NULL) {
-		bucket_id = IP_TR_HASH(curthread);
-		th_trace = (th_trace_t *)kmem_zalloc(sizeof (th_trace_t),
-		    KM_NOSLEEP);
-		if (th_trace == NULL) {
-			ipif->ipif_trace_disable = B_TRUE;
-			ipif_trace_cleanup(ipif);
-			return;
-		}
+	if (mod_hash_find(mh, (mod_hash_key_t)obj, &val) == MH_ERR_NOTFOUND) {
+		th_trace = kmem_zalloc(sizeof (th_trace_t), KM_NOSLEEP);
+		if (th_trace == NULL)
+			return (B_FALSE);
+
 		th_trace->th_id = curthread;
-		th_trace->th_next = ipif->ipif_trace[bucket_id];
-		th_trace->th_prev = &ipif->ipif_trace[bucket_id];
-		if (th_trace->th_next != NULL)
-			th_trace->th_next->th_prev = &th_trace->th_next;
-		ipif->ipif_trace[bucket_id] = th_trace;
-	}
-	ASSERT(th_trace->th_refcnt >= 0 &&
-	    th_trace->th_refcnt < TR_BUF_MAX -1);
-	th_trace->th_refcnt++;
-	th_trace_rrecord(th_trace);
-}
-
-void
-ipif_untrace_ref(ipif_t *ipif)
-{
-	th_trace_t *th_trace;
-
-	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
-
-	if (ipif->ipif_trace_disable)
-		return;
-	th_trace = th_trace_ipif_lookup(ipif);
-	ASSERT(th_trace != NULL);
-	ASSERT(th_trace->th_refcnt > 0);
-
-	th_trace->th_refcnt--;
-	th_trace_rrecord(th_trace);
-}
-
-th_trace_t *
-th_trace_ill_lookup(ill_t *ill)
-{
-	th_trace_t *th_trace;
-	int bucket_id;
-
-	ASSERT(MUTEX_HELD(&ill->ill_lock));
-
-	bucket_id = IP_TR_HASH(curthread);
-	ASSERT(bucket_id < IP_TR_HASH_MAX);
-
-	for (th_trace = ill->ill_trace[bucket_id]; th_trace != NULL;
-	    th_trace = th_trace->th_next) {
-		if (th_trace->th_id == curthread)
-			return (th_trace);
-	}
-	return (NULL);
-}
-
-void
-ill_trace_ref(ill_t *ill)
-{
-	int bucket_id;
-	th_trace_t *th_trace;
-
-	ASSERT(MUTEX_HELD(&ill->ill_lock));
-	if (ill->ill_trace_disable)
-		return;
-	/*
-	 * Attempt to locate the trace buffer for the curthread.
-	 * If it does not exist, then allocate a new trace buffer
-	 * and link it in list of trace bufs for this ill, at the head
-	 */
-	th_trace = th_trace_ill_lookup(ill);
-	if (th_trace == NULL) {
-		bucket_id = IP_TR_HASH(curthread);
-		th_trace = (th_trace_t *)kmem_zalloc(sizeof (th_trace_t),
-		    KM_NOSLEEP);
-		if (th_trace == NULL) {
-			ill->ill_trace_disable = B_TRUE;
-			ill_trace_cleanup(ill);
-			return;
+		if (mod_hash_insert(mh, (mod_hash_key_t)obj,
+		    (mod_hash_val_t)th_trace) != 0) {
+			kmem_free(th_trace, sizeof (th_trace_t));
+			return (B_FALSE);
 		}
-		th_trace->th_id = curthread;
-		th_trace->th_next = ill->ill_trace[bucket_id];
-		th_trace->th_prev = &ill->ill_trace[bucket_id];
-		if (th_trace->th_next != NULL)
-			th_trace->th_next->th_prev = &th_trace->th_next;
-		ill->ill_trace[bucket_id] = th_trace;
+	} else {
+		th_trace = (th_trace_t *)val;
 	}
+
 	ASSERT(th_trace->th_refcnt >= 0 &&
 	    th_trace->th_refcnt < TR_BUF_MAX - 1);
 
 	th_trace->th_refcnt++;
 	th_trace_rrecord(th_trace);
+	return (B_TRUE);
 }
 
+/*
+ * For the purpose of tracing a reference release, we assume that global
+ * tracing is always on and that the same thread initiated the reference hold
+ * is releasing.
+ */
 void
-ill_untrace_ref(ill_t *ill)
+th_trace_unref(const void *obj)
 {
+	int retv;
+	mod_hash_t *mh;
 	th_trace_t *th_trace;
+	mod_hash_val_t val;
 
-	ASSERT(MUTEX_HELD(&ill->ill_lock));
+	mh = th_trace_gethash(NULL);
+	retv = mod_hash_find(mh, (mod_hash_key_t)obj, &val);
+	ASSERT(retv == 0);
+	th_trace = (th_trace_t *)val;
 
-	if (ill->ill_trace_disable)
-		return;
-	th_trace = th_trace_ill_lookup(ill);
-	ASSERT(th_trace != NULL);
 	ASSERT(th_trace->th_refcnt > 0);
-
 	th_trace->th_refcnt--;
 	th_trace_rrecord(th_trace);
 }
 
 /*
- * Verify that this thread has no refs to the ipif and free
- * the trace buffers
- */
-/* ARGSUSED */
-void
-ipif_thread_exit(ipif_t *ipif, void *dummy)
-{
-	th_trace_t *th_trace;
-
-	mutex_enter(&ipif->ipif_ill->ill_lock);
-
-	th_trace = th_trace_ipif_lookup(ipif);
-	if (th_trace == NULL) {
-		mutex_exit(&ipif->ipif_ill->ill_lock);
-		return;
-	}
-	ASSERT(th_trace->th_refcnt == 0);
-	/* unlink th_trace and free it */
-	*th_trace->th_prev = th_trace->th_next;
-	if (th_trace->th_next != NULL)
-		th_trace->th_next->th_prev = th_trace->th_prev;
-	th_trace->th_next = NULL;
-	th_trace->th_prev = NULL;
-	kmem_free(th_trace, sizeof (th_trace_t));
-
-	mutex_exit(&ipif->ipif_ill->ill_lock);
-}
-
-/*
- * Verify that this thread has no refs to the ill and free
- * the trace buffers
- */
-/* ARGSUSED */
-void
-ill_thread_exit(ill_t *ill, void *dummy)
-{
-	th_trace_t *th_trace;
-
-	mutex_enter(&ill->ill_lock);
-
-	th_trace = th_trace_ill_lookup(ill);
-	if (th_trace == NULL) {
-		mutex_exit(&ill->ill_lock);
-		return;
-	}
-	ASSERT(th_trace->th_refcnt == 0);
-	/* unlink th_trace and free it */
-	*th_trace->th_prev = th_trace->th_next;
-	if (th_trace->th_next != NULL)
-		th_trace->th_next->th_prev = th_trace->th_prev;
-	th_trace->th_next = NULL;
-	th_trace->th_prev = NULL;
-	kmem_free(th_trace, sizeof (th_trace_t));
-
-	mutex_exit(&ill->ill_lock);
-}
-#endif
-
-#ifdef ILL_DEBUG
-void
-ip_thread_exit_stack(ip_stack_t *ipst)
-{
-	ill_t	*ill;
-	ipif_t	*ipif;
-	ill_walk_context_t	ctx;
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	ill = ILL_START_WALK_ALL(&ctx, ipst);
-	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		for (ipif = ill->ill_ipif; ipif != NULL;
-		    ipif = ipif->ipif_next) {
-			ipif_thread_exit(ipif, NULL);
-		}
-		ill_thread_exit(ill, NULL);
-	}
-	rw_exit(&ipst->ips_ill_g_lock);
-
-	ire_walk(ire_thread_exit, NULL, ipst);
-	ndp_walk_common(ipst->ips_ndp4, NULL, nce_thread_exit, NULL, B_FALSE);
-	ndp_walk_common(ipst->ips_ndp6, NULL, nce_thread_exit, NULL, B_FALSE);
-}
-
-/*
- * This is a function which is called from thread_exit
- * that can be used to debug reference count issues in IP. See comment in
- * <inet/ip.h> on how it is used.
+ * If tracing has been disabled, then we assume that the reference counts are
+ * now useless, and we clear them out before destroying the entries.
  */
 void
-ip_thread_exit(void)
+th_trace_cleanup(const void *obj, boolean_t trace_disable)
 {
-	netstack_t *ns;
-
-	ns = netstack_get_current();
-	if (ns != NULL) {
-		ip_thread_exit_stack(ns->netstack_ip);
-		netstack_rele(ns);
-	}
-}
-
-/*
- * Called when ipif is unplumbed or when memory alloc fails
- */
-void
-ipif_trace_cleanup(ipif_t *ipif)
-{
-	int	i;
+	th_hash_t	*thh;
+	mod_hash_t	*mh;
+	mod_hash_val_t	val;
 	th_trace_t	*th_trace;
-	th_trace_t	*th_trace_next;
+	int		retv;
 
-	for (i = 0; i < IP_TR_HASH_MAX; i++) {
-		for (th_trace = ipif->ipif_trace[i]; th_trace != NULL;
-		    th_trace = th_trace_next) {
-			th_trace_next = th_trace->th_next;
-			kmem_free(th_trace, sizeof (th_trace_t));
+	rw_enter(&ip_thread_rwlock, RW_READER);
+	for (thh = list_head(&ip_thread_list); thh != NULL;
+	    thh = list_next(&ip_thread_list, thh)) {
+		if (mod_hash_find(mh = thh->thh_hash, (mod_hash_key_t)obj,
+		    &val) == 0) {
+			th_trace = (th_trace_t *)val;
+			if (trace_disable)
+				th_trace->th_refcnt = 0;
+			retv = mod_hash_destroy(mh, (mod_hash_key_t)obj);
+			ASSERT(retv == 0);
 		}
-		ipif->ipif_trace[i] = NULL;
 	}
+	rw_exit(&ip_thread_rwlock);
+}
+
+void
+ipif_trace_ref(ipif_t *ipif)
+{
+	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+
+	if (ipif->ipif_trace_disable)
+		return;
+
+	if (!th_trace_ref(ipif, ipif->ipif_ill->ill_ipst)) {
+		ipif->ipif_trace_disable = B_TRUE;
+		ipif_trace_cleanup(ipif);
+	}
+}
+
+void
+ipif_untrace_ref(ipif_t *ipif)
+{
+	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+
+	if (!ipif->ipif_trace_disable)
+		th_trace_unref(ipif);
+}
+
+void
+ill_trace_ref(ill_t *ill)
+{
+	ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	if (ill->ill_trace_disable)
+		return;
+
+	if (!th_trace_ref(ill, ill->ill_ipst)) {
+		ill->ill_trace_disable = B_TRUE;
+		ill_trace_cleanup(ill);
+	}
+}
+
+void
+ill_untrace_ref(ill_t *ill)
+{
+	ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	if (!ill->ill_trace_disable)
+		th_trace_unref(ill);
 }
 
 /*
- * Called when ill is unplumbed or when memory alloc fails
+ * Called when ipif is unplumbed or when memory alloc fails.  Note that on
+ * failure, ipif_trace_disable is set.
  */
-void
-ill_trace_cleanup(ill_t *ill)
+static void
+ipif_trace_cleanup(const ipif_t *ipif)
 {
-	int	i;
-	th_trace_t	*th_trace;
-	th_trace_t	*th_trace_next;
-
-	for (i = 0; i < IP_TR_HASH_MAX; i++) {
-		for (th_trace = ill->ill_trace[i]; th_trace != NULL;
-		    th_trace = th_trace_next) {
-			th_trace_next = th_trace->th_next;
-			kmem_free(th_trace, sizeof (th_trace_t));
-		}
-		ill->ill_trace[i] = NULL;
-	}
+	th_trace_cleanup(ipif, ipif->ipif_trace_disable);
 }
 
-#else
-void ip_thread_exit(void) {}
-#endif
+/*
+ * Called when ill is unplumbed or when memory alloc fails.  Note that on
+ * failure, ill_trace_disable is set.
+ */
+static void
+ill_trace_cleanup(const ill_t *ill)
+{
+	th_trace_cleanup(ill, ill->ill_trace_disable);
+}
+#endif /* DEBUG */
 
 void
 ipif_refhold_locked(ipif_t *ipif)
@@ -7732,8 +7667,8 @@ ipsq_enter(ill_t *ill, boolean_t force)
 	ASSERT(ipsq->ipsq_reentry_cnt == 0);
 	ipsq->ipsq_writer = curthread;
 	ipsq->ipsq_reentry_cnt++;
-#ifdef ILL_DEBUG
-	ipsq->ipsq_depth = getpcstack(ipsq->ipsq_stack, IP_STACK_DEPTH);
+#ifdef DEBUG
+	ipsq->ipsq_depth = getpcstack(ipsq->ipsq_stack, IPSQ_STACK_DEPTH);
 #endif
 	mutex_exit(&ipsq->ipsq_lock);
 	mutex_exit(&ill->ill_lock);
@@ -7816,8 +7751,9 @@ ipsq_try_enter(ipif_t *ipif, ill_t *ill, queue_t *q, mblk_t *mp,
 		mutex_exit(&ipsq->ipsq_lock);
 		mutex_exit(&ill->ill_lock);
 		RELEASE_CONN_LOCK(q);
-#ifdef ILL_DEBUG
-		ipsq->ipsq_depth = getpcstack(ipsq->ipsq_stack, IP_STACK_DEPTH);
+#ifdef DEBUG
+		ipsq->ipsq_depth = getpcstack(ipsq->ipsq_stack,
+		    IPSQ_STACK_DEPTH);
 #endif
 		return (ipsq);
 	}
@@ -7977,7 +7913,7 @@ again:
 	ipsq->ipsq_writer = NULL;
 	ipsq->ipsq_reentry_cnt--;
 	ASSERT(ipsq->ipsq_reentry_cnt == 0);
-#ifdef ILL_DEBUG
+#ifdef DEBUG
 	ipsq->ipsq_depth = 0;
 #endif
 	mutex_exit(&ipsq->ipsq_lock);
@@ -14681,7 +14617,7 @@ ill_split_to_own_ipsq(phyint_t *phyint, ipsq_t *cur_ipsq, ip_stack_t *ipst)
 	newipsq->ipsq_writer = NULL;
 	newipsq->ipsq_reentry_cnt--;
 	ASSERT(newipsq->ipsq_reentry_cnt == 0);
-#ifdef ILL_DEBUG
+#ifdef DEBUG
 	newipsq->ipsq_depth = 0;
 #endif
 
@@ -17811,7 +17747,9 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 		}
 		ip_rts_ifmsg(rep_ipif_ptr);
 		ip_rts_newaddrmsg(RTM_DELETE, 0, rep_ipif_ptr);
-		IPIF_TRACE_CLEANUP(rep_ipif_ptr);
+#ifdef DEBUG
+		ipif_trace_cleanup(rep_ipif_ptr);
+#endif
 		mi_free(rep_ipif_ptr);
 	}
 
@@ -19117,7 +19055,9 @@ ipif_free_tail(ipif_t *ipif)
 	 */
 	ASSERT(ilm_walk_ipif(ipif) == 0);
 
-	IPIF_TRACE_CLEANUP(ipif);
+#ifdef DEBUG
+	ipif_trace_cleanup(ipif);
+#endif
 
 	/* Ask SCTP to take it out of it list */
 	sctp_update_ipif(ipif, SCTP_IPIF_REMOVE);

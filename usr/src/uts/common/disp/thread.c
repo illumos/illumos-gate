@@ -34,7 +34,6 @@
 #include <sys/user.h>
 #include <sys/systm.h>
 #include <sys/sysinfo.h>
-#include <sys/var.h>
 #include <sys/errno.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
@@ -43,7 +42,6 @@
 #include <sys/project.h>
 #include <sys/proc.h>
 #include <sys/debug.h>
-#include <sys/inline.h>
 #include <sys/disp.h>
 #include <sys/class.h>
 #include <vm/seg_kmem.h>
@@ -75,8 +73,6 @@
 #include <sys/kdi.h>
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
-#include <inet/ip.h>
-#include <inet/ip_if.h>
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -561,22 +557,13 @@ thread_rele(kthread_t *t)
 	}
 }
 
-/*
- * This is a function which is called from thread_exit
- * that can be used to debug reference count issues in IP.
- */
-void (*ip_cleanup_func)(void);
-
 void
-thread_exit()
+thread_exit(void)
 {
 	kthread_t *t = curthread;
 
 	if ((t->t_proc_flag & TP_ZTHREAD) != 0)
 		cmn_err(CE_PANIC, "thread_exit: zthread_exit() not called");
-
-	if (ip_cleanup_func != NULL)
-		(*ip_cleanup_func)();
 
 	tsd_exit();		/* Clean up this thread's TSD */
 

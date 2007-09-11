@@ -2425,7 +2425,7 @@ conn_trace_ref(conn_t *connp)
 		last = 0;
 
 	ctb = &connp->conn_trace_buf[last];
-	ctb->ctb_depth = getpcstack(ctb->ctb_stack, IP_STACK_DEPTH);
+	ctb->ctb_depth = getpcstack(ctb->ctb_stack, CONN_STACK_DEPTH);
 	connp->conn_trace_last = last;
 	return (1);
 }
@@ -2443,7 +2443,7 @@ conn_untrace_ref(conn_t *connp)
 		last = 0;
 
 	ctb = &connp->conn_trace_buf[last];
-	ctb->ctb_depth = getpcstack(ctb->ctb_stack, IP_STACK_DEPTH);
+	ctb->ctb_depth = getpcstack(ctb->ctb_stack, CONN_STACK_DEPTH);
 	connp->conn_trace_last = last;
 	return (1);
 }

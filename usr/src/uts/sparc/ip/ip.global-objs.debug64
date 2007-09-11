@@ -126,6 +126,9 @@ ip_squeue_fanout
 ip_squeue_profile
 ip_squeue_worker_wait
 ip_squeues_per_cpu
+ip_thread_data
+ip_thread_list
+ip_thread_rwlock
 ip_wput_frag_mdt_min
 ipcl_bind_fanout_size
 ipcl_conn_cache

@@ -99,7 +99,6 @@ static	uint32_t	nce_solicit(nce_t *nce, mblk_t *mp);
 static	boolean_t	nce_xmit(ill_t *ill, uint32_t operation,
     ill_t *hwaddr_ill, boolean_t use_lla_addr, const in6_addr_t *sender,
     const in6_addr_t *target, int flag);
-extern void	th_trace_rrecord(th_trace_t *);
 static int	ndp_add_v4(ill_t *, const in_addr_t *, uint16_t,
     nce_t **, nce_t *);
 
@@ -107,15 +106,13 @@ static int	ndp_add_v4(ill_t *, const in_addr_t *, uint16_t,
  * We track the time of creation of the nce in the  nce_init_time field
  * of IPv4 nce_t entries. If an nce is stuck in the ND_INITIAL state for
  * more than NCE_STUCK_TIMEOUT milliseconds, trigger the nce-stuck dtrace
- * probe to assist in debugging. This probe will be fired from
- * nce_thread_exit() for debug kernels, and from nce_report1() when
- * 'ndd -get /dev/ip ip_ndp_cache_report' is invoked on both debug and
- * non-debug kernels.
+ * probe to assist in debugging. This probe is fired from from nce_report1()
+ * when 'ndd -get /dev/ip ip_ndp_cache_report' is invoked.
  */
 #define	NCE_STUCK_TIMEOUT	120000
 
-#ifdef NCE_DEBUG
-void	nce_trace_inactive(nce_t *);
+#ifdef DEBUG
+static void	nce_trace_cleanup(const nce_t *);
 #endif
 
 #define	NCE_HASH_PTR_V4(ipst, addr)					\
@@ -241,9 +238,8 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		ncep = ((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
 	}
 
-#ifdef NCE_DEBUG
-	bzero(nce->nce_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
-#endif
+	nce->nce_trace_disable = B_FALSE;
+
 	/*
 	 * Atomically ensure that the ill is not CONDEMNED, before
 	 * adding the NCE.
@@ -497,8 +493,8 @@ ndp_inactive(nce_t *nce)
 		}
 	} while (mpp++ != &nce->nce_last_mp_to_free);
 
-#ifdef NCE_DEBUG
-	nce_trace_inactive(nce);
+#ifdef DEBUG
+	nce_trace_cleanup(nce);
 #endif
 
 	ill = nce->nce_ill;
@@ -3517,140 +3513,34 @@ ndp_cache_count(nce_t *nce, char *arg)
 		ncc->ncc_host++;
 }
 
-#ifdef NCE_DEBUG
-th_trace_t *
-th_trace_nce_lookup(nce_t *nce)
-{
-	int bucket_id;
-	th_trace_t *th_trace;
-
-	ASSERT(MUTEX_HELD(&nce->nce_lock));
-
-	bucket_id = IP_TR_HASH(curthread);
-	ASSERT(bucket_id < IP_TR_HASH_MAX);
-
-	for (th_trace = nce->nce_trace[bucket_id]; th_trace != NULL;
-	    th_trace = th_trace->th_next) {
-		if (th_trace->th_id == curthread)
-			return (th_trace);
-	}
-	return (NULL);
-}
-
+#ifdef DEBUG
 void
 nce_trace_ref(nce_t *nce)
 {
-	int bucket_id;
-	th_trace_t *th_trace;
-
-	/*
-	 * Attempt to locate the trace buffer for the curthread.
-	 * If it does not exist, then allocate a new trace buffer
-	 * and link it in list of trace bufs for this ipif, at the head
-	 */
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 
-	if (nce->nce_trace_disable == B_TRUE)
+	if (nce->nce_trace_disable)
 		return;
 
-	th_trace = th_trace_nce_lookup(nce);
-	if (th_trace == NULL) {
-		bucket_id = IP_TR_HASH(curthread);
-		th_trace = (th_trace_t *)kmem_zalloc(sizeof (th_trace_t),
-		    KM_NOSLEEP);
-		if (th_trace == NULL) {
-			nce->nce_trace_disable = B_TRUE;
-			nce_trace_inactive(nce);
-			return;
-		}
-		th_trace->th_id = curthread;
-		th_trace->th_next = nce->nce_trace[bucket_id];
-		th_trace->th_prev = &nce->nce_trace[bucket_id];
-		if (th_trace->th_next != NULL)
-			th_trace->th_next->th_prev = &th_trace->th_next;
-		nce->nce_trace[bucket_id] = th_trace;
+	if (!th_trace_ref(nce, nce->nce_ill->ill_ipst)) {
+		nce->nce_trace_disable = B_TRUE;
+		nce_trace_cleanup(nce);
 	}
-	ASSERT(th_trace->th_refcnt < TR_BUF_MAX - 1);
-	th_trace->th_refcnt++;
-	th_trace_rrecord(th_trace);
 }
 
 void
 nce_untrace_ref(nce_t *nce)
 {
-	th_trace_t *th_trace;
-
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 
-	if (nce->nce_trace_disable == B_TRUE)
-		return;
-
-	th_trace = th_trace_nce_lookup(nce);
-	ASSERT(th_trace != NULL && th_trace->th_refcnt > 0);
-
-	th_trace_rrecord(th_trace);
-	th_trace->th_refcnt--;
+	if (!nce->nce_trace_disable)
+		th_trace_unref(nce);
 }
 
-void
-nce_trace_inactive(nce_t *nce)
+static void
+nce_trace_cleanup(const nce_t *nce)
 {
-	th_trace_t *th_trace;
-	int i;
-
-	ASSERT(MUTEX_HELD(&nce->nce_lock));
-
-	for (i = 0; i < IP_TR_HASH_MAX; i++) {
-		while (nce->nce_trace[i] != NULL) {
-			th_trace = nce->nce_trace[i];
-
-			/* unlink th_trace and free it */
-			nce->nce_trace[i] = th_trace->th_next;
-			if (th_trace->th_next != NULL)
-				th_trace->th_next->th_prev =
-				    &nce->nce_trace[i];
-
-			th_trace->th_next = NULL;
-			th_trace->th_prev = NULL;
-			kmem_free(th_trace, sizeof (th_trace_t));
-		}
-	}
-
-}
-
-/* ARGSUSED */
-int
-nce_thread_exit(nce_t *nce, caddr_t arg)
-{
-	th_trace_t	*th_trace;
-	uint64_t	now;
-
-	mutex_enter(&nce->nce_lock);
-	if (nce->nce_state == ND_INITIAL) {
-
-		now = TICK_TO_MSEC(lbolt64);
-		if (now - nce->nce_init_time > NCE_STUCK_TIMEOUT) {
-			DTRACE_PROBE1(nce__stuck, nce_t *, nce);
-		}
-	}
-	th_trace = th_trace_nce_lookup(nce);
-
-	if (th_trace == NULL) {
-		mutex_exit(&nce->nce_lock);
-		return (0);
-	}
-
-	ASSERT(th_trace->th_refcnt == 0);
-
-	/* unlink th_trace and free it */
-	*th_trace->th_prev = th_trace->th_next;
-	if (th_trace->th_next != NULL)
-		th_trace->th_next->th_prev = th_trace->th_prev;
-	th_trace->th_next = NULL;
-	th_trace->th_prev = NULL;
-	kmem_free(th_trace, sizeof (th_trace_t));
-	mutex_exit(&nce->nce_lock);
-	return (0);
+	th_trace_cleanup(nce, nce->nce_trace_disable);
 }
 #endif
 
@@ -3767,9 +3657,8 @@ ndp_add_v4(ill_t *ill, const in_addr_t *addr, uint16_t flags,
 	mutex_init(&nce->nce_lock, NULL, MUTEX_DEFAULT, NULL);
 	ncep = ((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 
-#ifdef NCE_DEBUG
-	bzero(nce->nce_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
-#endif
+	nce->nce_trace_disable = B_FALSE;
+
 	if (src_nce != NULL) {
 		/*
 		 * src_nce has been provided by the caller. The only

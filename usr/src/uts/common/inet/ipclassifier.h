@@ -125,8 +125,8 @@ typedef struct connf_s connf_t;
 typedef struct
 {
 	int	ctb_depth;
-#define	IP_STACK_DEPTH	15
-	pc_t	ctb_stack[IP_STACK_DEPTH];
+#define	CONN_STACK_DEPTH	15
+	pc_t	ctb_stack[CONN_STACK_DEPTH];
 } conn_trace_t;
 
 struct conn_s {

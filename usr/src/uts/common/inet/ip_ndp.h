@@ -78,10 +78,7 @@ typedef struct nce_s {
 	uint_t		nce_defense_count;	/* number of NDP conflicts */
 	uint_t		nce_defense_time;	/* last time defended (secs) */
 	uint64_t	nce_init_time;  /* time when it was set to ND_INITIAL */
-#ifdef NCE_DEBUG
-	th_trace_t	*nce_trace[IP_TR_HASH_MAX];
 	boolean_t	nce_trace_disable;	/* True when alloc fails */
-#endif
 } nce_t;
 
 /*
@@ -169,7 +166,7 @@ typedef	struct ndp_g_s {
 #define	ND_MAX_Q		4
 
 
-#ifdef NCE_DEBUG
+#ifdef DEBUG
 #define	NCE_TRACE_REF(nce)		nce_trace_ref(nce)
 #define	NCE_UNTRACE_REF(nce)		nce_untrace_ref(nce)
 #else
@@ -357,11 +354,9 @@ extern	int	ndp_lookup_then_add_v6(ill_t *, uchar_t *,
 extern	int	ndp_lookup_then_add_v4(ill_t *,
     const in_addr_t *, uint16_t, nce_t **, nce_t *);
 
-#ifdef NCE_DEBUG
-extern	void	nce_trace_inactive(nce_t *);
+#ifdef DEBUG
 extern	void	nce_trace_ref(nce_t *);
 extern	void	nce_untrace_ref(nce_t *);
-extern	int	nce_thread_exit(nce_t *, caddr_t);
 #endif
 
 #endif	/* _KERNEL */

@@ -44,6 +44,7 @@
 #include <inet/ipclassifier.h>
 #include <inet/mi.h>
 #include <sys/squeue_impl.h>
+#include <sys/modhash_impl.h>
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -72,6 +73,14 @@ typedef struct illif_walk_data {
 	int ill_list;
 	ill_if_t ill_if;
 } illif_walk_data_t;
+
+typedef struct th_walk_data {
+	uint_t		thw_non_zero_only;
+	boolean_t	thw_match;
+	uintptr_t	thw_matchkey;
+	uintptr_t	thw_ipst;
+	clock_t		thw_lbolt;
+} th_walk_data_t;
 
 static int iphdr(uintptr_t, uint_t, int, const mdb_arg_t *);
 static int ip6hdr(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -128,6 +137,44 @@ ip_stacks_walk_step(mdb_walk_state_t *wsp)
 	mdb_printf("DEBUG: ip_stacks_walk_step: ip_stack_t at %p\n", kaddr);
 #endif
 	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+int
+th_hash_walk_init(mdb_walk_state_t *wsp)
+{
+	GElf_Sym sym;
+	list_node_t *next;
+
+	if (wsp->walk_addr == NULL) {
+		if (mdb_lookup_by_obj("ip", "ip_thread_list", &sym) == 0) {
+			wsp->walk_addr = sym.st_value;
+		} else {
+			mdb_warn("unable to locate ip_thread_list\n");
+			return (WALK_ERR);
+		}
+	}
+
+	if (mdb_vread(&next, sizeof (next),
+	    wsp->walk_addr + offsetof(list_t, list_head) +
+	    offsetof(list_node_t, list_next)) == -1 ||
+	    next == NULL) {
+		mdb_warn("non-DEBUG image; cannot walk th_hash list\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_layered_walk("list", wsp) == -1) {
+		mdb_warn("can't walk 'list'");
+		return (WALK_ERR);
+	} else {
+		return (WALK_NEXT);
+	}
+}
+
+int
+th_hash_walk_step(mdb_walk_state_t *wsp)
+{
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+	    wsp->walk_cbdata));
 }
 
 /*
@@ -266,7 +313,7 @@ illif_walk_step(mdb_walk_state_t *wsp)
 #endif
 
 	if (mdb_pwalk("illif_stack", wsp->walk_callback,
-		wsp->walk_cbdata, kaddr) == -1) {
+	    wsp->walk_cbdata, kaddr) == -1) {
 		mdb_warn("couldn't walk 'illif_stack' for ips_ill_g_heads %p",
 		    kaddr);
 		return (WALK_ERR);
@@ -396,7 +443,7 @@ ire_ctable_walk_step(mdb_walk_state_t *wsp)
 	}
 #ifdef DEBUG
 	mdb_printf("DEBUG: ire_ctable_walk_step: ips_ip_cache_table_size %u\n",
-		cache_table_size);
+	    cache_table_size);
 #endif
 
 	kaddr = wsp->walk_addr + OFFSETOF(ip_stack_t, ips_ip_cache_table);
@@ -422,7 +469,7 @@ ire_ctable_walk_step(mdb_walk_state_t *wsp)
 #endif
 
 		if (mdb_pwalk("ire_next", (mdb_walk_cb_t)ire_format, &verbose,
-			kaddr) == -1) {
+		    kaddr) == -1) {
 			mdb_warn("can't walk 'ire_next' for ire %p", kaddr);
 			return (WALK_ERR);
 		}
@@ -1048,6 +1095,120 @@ ip_squeue_help(void)
 	mdb_printf("\t-v\tbe verbose (more descriptive)\n");
 }
 
+/*
+ * This is called by ::th_trace (via a callback) when walking the th_hash
+ * list.  It calls modent to find the entries.
+ */
+/* ARGSUSED */
+static int
+modent_summary(uintptr_t addr, const void *data, void *private)
+{
+	th_walk_data_t *thw = private;
+	const struct mod_hash_entry *mhe = data;
+	th_trace_t th;
+
+	if (mdb_vread(&th, sizeof (th), (uintptr_t)mhe->mhe_val) == -1) {
+		mdb_warn("failed to read th_trace_t %p", mhe->mhe_val);
+		return (WALK_ERR);
+	}
+
+	if (th.th_refcnt == 0 && thw->thw_non_zero_only)
+		return (WALK_NEXT);
+
+	if (!thw->thw_match) {
+		mdb_printf("%?p %?p %?p %8d %?p\n", thw->thw_ipst, mhe->mhe_key,
+		    mhe->mhe_val, th.th_refcnt, th.th_id);
+	} else if (thw->thw_matchkey == (uintptr_t)mhe->mhe_key) {
+		int i, j, k;
+		tr_buf_t *tr;
+
+		mdb_printf("Object %p in IP stack %p:\n", mhe->mhe_key,
+		    thw->thw_ipst);
+		i = th.th_trace_lastref;
+		mdb_printf("\tThread %p refcnt %d:\n", th.th_id,
+		    th.th_refcnt);
+		for (j = TR_BUF_MAX; j > 0; j--) {
+			tr = th.th_trbuf + i;
+			if (tr->tr_depth == 0 || tr->tr_depth > TR_STACK_DEPTH)
+				break;
+			mdb_printf("\t  T%+ld:\n", tr->tr_time -
+			    thw->thw_lbolt);
+			for (k = 0; k < tr->tr_depth; k++)
+				mdb_printf("\t\t%a\n", tr->tr_stack[k]);
+			if (--i < 0)
+				i = TR_BUF_MAX - 1;
+		}
+	}
+	return (WALK_NEXT);
+}
+
+/*
+ * This is called by ::th_trace (via a callback) when walking the th_hash
+ * list.  It calls modent to find the entries.
+ */
+/* ARGSUSED */
+static int
+th_hash_summary(uintptr_t addr, const void *data, void *private)
+{
+	const th_hash_t *thh = data;
+	th_walk_data_t *thw = private;
+
+	thw->thw_ipst = (uintptr_t)thh->thh_ipst;
+	return (mdb_pwalk("modent", modent_summary, private,
+	    (uintptr_t)thh->thh_hash));
+}
+
+/*
+ * Print or summarize the th_trace_t structures.
+ */
+static int
+th_trace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	th_walk_data_t thw;
+
+	(void) memset(&thw, 0, sizeof (thw));
+
+	if (mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, TRUE, &thw.thw_non_zero_only,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		/*
+		 * No address specified.  Walk all of the th_hash_t in the
+		 * system, and summarize the th_trace_t entries in each.
+		 */
+		mdb_printf("%?s %?s %?s %8s %?s\n",
+		    "IPSTACK", "OBJECT", "TRACE", "REFCNT", "THREAD");
+		thw.thw_match = B_FALSE;
+	} else {
+		thw.thw_match = B_TRUE;
+		thw.thw_matchkey = addr;
+		if (mdb_readvar(&thw.thw_lbolt,
+		    mdb_prop_postmortem ? "panic_lbolt" : "lbolt") == -1) {
+			mdb_warn("failed to read lbolt");
+			return (DCMD_ERR);
+		}
+	}
+	if (mdb_pwalk("th_hash", th_hash_summary, &thw, NULL) == -1) {
+		mdb_warn("can't walk th_hash entries");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+static void
+th_trace_help(void)
+{
+	mdb_printf("If given an address of an ill_t, ipif_t, ire_t, or nce_t, "
+	    "print the\n"
+	    "corresponding th_trace_t structure in detail.  Otherwise, if no "
+	    "address is\n"
+	    "given, then summarize all th_trace_t structures.\n\n");
+	mdb_printf("Options:\n"
+	    "\t-n\tdisplay only entries with non-zero th_refcnt\n");
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "illif", "?[-P v4 | v6]",
 	    "display or filter IP Lower Level InterFace structures", illif,
@@ -1060,6 +1221,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "tcphdr", ":", "display a TCP header", tcphdr },
 	{ "udphdr", ":", "display an UDP header", udphdr },
 	{ "sctphdr", ":", "display an SCTP header", sctphdr },
+	{ "th_trace", "?[-n]", "display th_trace_t structures", th_trace,
+	    th_trace_help },
 	{ NULL }
 };
 
@@ -1077,6 +1240,8 @@ static const mdb_walker_t walkers[] = {
 		ire_next_walk_init, ire_next_walk_step, NULL },
 	{ "ip_stacks", "walk all the ip_stack_t",
 		ip_stacks_walk_init, ip_stacks_walk_step, NULL },
+	{ "th_hash", "walk all the th_hash_t entries",
+		th_hash_walk_init, th_hash_walk_step, NULL },
 	{ NULL }
 };
 

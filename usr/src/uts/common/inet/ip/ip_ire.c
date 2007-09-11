@@ -34,7 +34,6 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
-#include <sys/strsun.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
@@ -73,7 +72,6 @@
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
-#include <sys/dlpi.h>
 
 struct kmem_cache *rt_entry_cache;
 
@@ -355,11 +353,9 @@ static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
     pfv_t func, void *arg, uchar_t vers, ill_t *ill);
 static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt);
-extern void	ill_unlock_ills(ill_t **list, int cnt);
 static	void	ip_nce_clookup_and_delete(nce_t *nce, void *arg);
-extern void	th_trace_rrecord(th_trace_t *);
-#ifdef IRE_DEBUG
-static void	ire_trace_inactive(ire_t *);
+#ifdef DEBUG
+static void	ire_trace_cleanup(const ire_t *);
 #endif
 
 /*
@@ -1759,10 +1755,7 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, nce_t *src_nce, queue_t *rfq,
 	}
 	ire->ire_refcnt = 1;
 	ire->ire_ipst = ipst;	/* No netstack_hold */
-
-#ifdef IRE_DEBUG
-	bzero(ire->ire_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
-#endif
+	ire->ire_trace_disable = B_FALSE;
 
 	return (B_TRUE);
 }
@@ -3792,8 +3785,8 @@ end:
 	}
 	ire->ire_ipif = NULL;
 
-#ifdef IRE_DEBUG
-	ire_trace_inactive(ire);
+#ifdef DEBUG
+	ire_trace_cleanup(ire);
 #endif
 	mutex_destroy(&ire->ire_lock);
 	if (ire->ire_ipversion == IPV6_VERSION) {
@@ -5431,147 +5424,40 @@ ire_get_next_bcast_ire(ire_t *curr, ire_t *ire)
 	return (NULL);
 }
 
-#ifdef IRE_DEBUG
-th_trace_t *
-th_trace_ire_lookup(ire_t *ire)
-{
-	int bucket_id;
-	th_trace_t *th_trace;
-
-	ASSERT(MUTEX_HELD(&ire->ire_lock));
-
-	bucket_id = IP_TR_HASH(curthread);
-	ASSERT(bucket_id < IP_TR_HASH_MAX);
-
-	for (th_trace = ire->ire_trace[bucket_id]; th_trace != NULL;
-	    th_trace = th_trace->th_next) {
-		if (th_trace->th_id == curthread)
-			return (th_trace);
-	}
-	return (NULL);
-}
-
+#ifdef DEBUG
 void
 ire_trace_ref(ire_t *ire)
 {
-	int bucket_id;
-	th_trace_t *th_trace;
-
-	/*
-	 * Attempt to locate the trace buffer for the curthread.
-	 * If it does not exist, then allocate a new trace buffer
-	 * and link it in list of trace bufs for this ipif, at the head
-	 */
 	mutex_enter(&ire->ire_lock);
-	if (ire->ire_trace_disable == B_TRUE) {
+	if (ire->ire_trace_disable) {
 		mutex_exit(&ire->ire_lock);
 		return;
 	}
-	th_trace = th_trace_ire_lookup(ire);
-	if (th_trace == NULL) {
-		bucket_id = IP_TR_HASH(curthread);
-		th_trace = (th_trace_t *)kmem_zalloc(sizeof (th_trace_t),
-		    KM_NOSLEEP);
-		if (th_trace == NULL) {
-			ire->ire_trace_disable = B_TRUE;
-			mutex_exit(&ire->ire_lock);
-			ire_trace_inactive(ire);
-			return;
-		}
 
-		th_trace->th_id = curthread;
-		th_trace->th_next = ire->ire_trace[bucket_id];
-		th_trace->th_prev = &ire->ire_trace[bucket_id];
-		if (th_trace->th_next != NULL)
-			th_trace->th_next->th_prev = &th_trace->th_next;
-		ire->ire_trace[bucket_id] = th_trace;
+	if (th_trace_ref(ire, ire->ire_ipst)) {
+		mutex_exit(&ire->ire_lock);
+	} else {
+		ire->ire_trace_disable = B_TRUE;
+		mutex_exit(&ire->ire_lock);
+		ire_trace_cleanup(ire);
 	}
-	ASSERT(th_trace->th_refcnt < TR_BUF_MAX - 1);
-	th_trace->th_refcnt++;
-	th_trace_rrecord(th_trace);
-	mutex_exit(&ire->ire_lock);
-}
-
-void
-ire_trace_free(th_trace_t *th_trace)
-{
-	/* unlink th_trace and free it */
-	*th_trace->th_prev = th_trace->th_next;
-	if (th_trace->th_next != NULL)
-		th_trace->th_next->th_prev = th_trace->th_prev;
-	th_trace->th_next = NULL;
-	th_trace->th_prev = NULL;
-	kmem_free(th_trace, sizeof (th_trace_t));
 }
 
 void
 ire_untrace_ref(ire_t *ire)
 {
-	th_trace_t *th_trace;
-
 	mutex_enter(&ire->ire_lock);
-
-	if (ire->ire_trace_disable == B_TRUE) {
-		mutex_exit(&ire->ire_lock);
-		return;
-	}
-
-	th_trace = th_trace_ire_lookup(ire);
-	ASSERT(th_trace != NULL && th_trace->th_refcnt > 0);
-	th_trace_rrecord(th_trace);
-	th_trace->th_refcnt--;
-
-	if (th_trace->th_refcnt == 0)
-		ire_trace_free(th_trace);
-
+	if (!ire->ire_trace_disable)
+		th_trace_unref(ire);
 	mutex_exit(&ire->ire_lock);
 }
 
 static void
-ire_trace_inactive(ire_t *ire)
+ire_trace_cleanup(const ire_t *ire)
 {
-	th_trace_t *th_trace;
-	int i;
-
-	mutex_enter(&ire->ire_lock);
-	for (i = 0; i < IP_TR_HASH_MAX; i++) {
-		while (ire->ire_trace[i] != NULL) {
-			th_trace = ire->ire_trace[i];
-
-			/* unlink th_trace and free it */
-			ire->ire_trace[i] = th_trace->th_next;
-			if (th_trace->th_next != NULL)
-				th_trace->th_next->th_prev =
-				    &ire->ire_trace[i];
-
-			th_trace->th_next = NULL;
-			th_trace->th_prev = NULL;
-			kmem_free(th_trace, sizeof (th_trace_t));
-		}
-	}
-
-	mutex_exit(&ire->ire_lock);
+	th_trace_cleanup(ire, ire->ire_trace_disable);
 }
-
-/* ARGSUSED */
-void
-ire_thread_exit(ire_t *ire, caddr_t arg)
-{
-	th_trace_t	*th_trace;
-
-	mutex_enter(&ire->ire_lock);
-	th_trace = th_trace_ire_lookup(ire);
-	if (th_trace == NULL) {
-		mutex_exit(&ire->ire_lock);
-		return;
-	}
-	ASSERT(th_trace->th_refcnt == 0);
-
-	ire_trace_free(th_trace);
-	mutex_exit(&ire->ire_lock);
-}
-
-#endif
+#endif /* DEBUG */
 
 /*
  * Generate a message chain with an arp request to resolve the in_ire.

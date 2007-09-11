@@ -102,8 +102,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
-	pwd;
-	echo "abc me";
 
 $(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@

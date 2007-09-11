@@ -58,11 +58,9 @@ extern "C" {
 #include <sys/systm.h>
 #include <sys/multidata.h>
 #include <net/radix.h>
+#include <sys/modhash.h>
 
 #ifdef DEBUG
-#define	ILL_DEBUG
-#define	IRE_DEBUG
-#define	NCE_DEBUG
 #define	CONN_DEBUG
 #endif
 
@@ -1235,21 +1233,26 @@ typedef struct ifrt_s {
  * do not allow the granularity need to trace refrences to ipif/ill/ire's. This
  * mechanism should be revisited once dtrace is available.
  */
-#define	IP_STACK_DEPTH	15
+#define	TR_STACK_DEPTH	14
 typedef struct tr_buf_s {
 	int	tr_depth;
-	pc_t	tr_stack[IP_STACK_DEPTH];
+	clock_t	tr_time;
+	pc_t	tr_stack[TR_STACK_DEPTH];
 } tr_buf_t;
 
 typedef struct th_trace_s {
-	struct	th_trace_s *th_next;
-	struct	th_trace_s **th_prev;
+	int		th_refcnt;
+	uint_t		th_trace_lastref;
 	kthread_t	*th_id;
-	int	th_refcnt;
-	uint_t	th_trace_lastref;
 #define	TR_BUF_MAX	38
-	tr_buf_t th_trbuf[TR_BUF_MAX];
+	tr_buf_t	th_trbuf[TR_BUF_MAX];
 } th_trace_t;
+
+typedef struct th_hash_s {
+	list_node_t	thh_link;
+	mod_hash_t	*thh_hash;
+	ip_stack_t	*thh_ipst;
+} th_hash_t;
 #endif
 
 /* The following are ipif_state_flags */
@@ -1316,11 +1319,7 @@ typedef struct ipif_s {
 	zoneid_t
 		ipif_zoneid;		/* zone ID number */
 	timeout_id_t ipif_recovery_id;	/* Timer for DAD recovery */
-#ifdef ILL_DEBUG
-#define	IP_TR_HASH_MAX	64
-	th_trace_t *ipif_trace[IP_TR_HASH_MAX];
-	boolean_t	ipif_trace_disable;	/* True when alloc fails */
-#endif
+	boolean_t ipif_trace_disable;	/* True when alloc fails */
 } ipif_t;
 
 /*
@@ -1380,20 +1379,16 @@ typedef struct ipif_s {
 
 #define	IP_TR_HASH(tid)	((((uintptr_t)tid) >> 6) & (IP_TR_HASH_MAX - 1))
 
-#ifdef ILL_DEBUG
+#ifdef DEBUG
 #define	IPIF_TRACE_REF(ipif)	ipif_trace_ref(ipif)
 #define	ILL_TRACE_REF(ill)	ill_trace_ref(ill)
 #define	IPIF_UNTRACE_REF(ipif)	ipif_untrace_ref(ipif)
 #define	ILL_UNTRACE_REF(ill)	ill_untrace_ref(ill)
-#define	ILL_TRACE_CLEANUP(ill)	ill_trace_cleanup(ill)
-#define	IPIF_TRACE_CLEANUP(ipif)	ipif_trace_cleanup(ipif)
 #else
 #define	IPIF_TRACE_REF(ipif)
 #define	ILL_TRACE_REF(ill)
 #define	IPIF_UNTRACE_REF(ipif)
 #define	ILL_UNTRACE_REF(ill)
-#define	ILL_TRACE_CLEANUP(ill)
-#define	IPIF_TRACE_CLEANUP(ipif)
 #endif
 
 /* IPv4 compatability macros */
@@ -1462,12 +1457,13 @@ typedef struct ipsq_s {
 	boolean_t	ipsq_split;	/* ipsq may need to be split */
 	int		ipsq_waitfor;	/* Values encoded below */
 	char		ipsq_name[LIFNAMSIZ+1];	/* same as phyint_groupname */
-
-#ifdef ILL_DEBUG
-	int		ipsq_depth;	/* debugging aid */
-	pc_t		ipsq_stack[IP_STACK_DEPTH];	/* debugging aid */
-#endif
 	ip_stack_t	*ipsq_ipst;	/* Does not have a netstack_hold */
+
+#ifdef DEBUG
+	int		ipsq_depth;	/* debugging aid */
+#define	IPSQ_STACK_DEPTH	15
+	pc_t		ipsq_stack[IPSQ_STACK_DEPTH];	/* debugging aid */
+#endif
 } ipsq_t;
 
 /* ipsq_flags */
@@ -1968,10 +1964,7 @@ typedef struct ill_s {
 	t_uscalar_t	ill_dlpi_pending; /* Last DLPI primitive issued */
 	uint_t		ill_usesrc_ifindex; /* use src addr from this ILL */
 	struct ill_s	*ill_usesrc_grp_next; /* Next ILL in the usesrc group */
-#ifdef ILL_DEBUG
-	th_trace_t	*ill_trace[IP_TR_HASH_MAX];
 	boolean_t	ill_trace_disable;	/* True when alloc fails */
-#endif
 	zoneid_t	ill_zoneid;
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 } ill_t;
@@ -2319,26 +2312,21 @@ typedef struct tsol_ire_gw_secattr_s {
  * holding the lock. Currently ip_wput does this for caching IRE_CACHEs.
  */
 
-#ifndef IRE_DEBUG
-
-#define	IRE_REFHOLD_NOTR(ire)	IRE_REFHOLD(ire)
+#ifdef DEBUG
+#define	IRE_UNTRACE_REF(ire)	ire_untrace_ref(ire);
+#define	IRE_TRACE_REF(ire)	ire_trace_ref(ire);
+#else
 #define	IRE_UNTRACE_REF(ire)
 #define	IRE_TRACE_REF(ire)
-
-#else
+#endif
 
 #define	IRE_REFHOLD_NOTR(ire) {				\
 	atomic_add_32(&(ire)->ire_refcnt, 1);		\
 	ASSERT((ire)->ire_refcnt != 0);			\
 }
 
-#define	IRE_UNTRACE_REF(ire)	ire_untrace_ref(ire);
-#define	IRE_TRACE_REF(ire)	ire_trace_ref(ire);
-#endif
-
 #define	IRE_REFHOLD(ire) {				\
-	atomic_add_32(&(ire)->ire_refcnt, 1);		\
-	ASSERT((ire)->ire_refcnt != 0);			\
+	IRE_REFHOLD_NOTR(ire);				\
 	IRE_TRACE_REF(ire);				\
 }
 
@@ -2358,30 +2346,19 @@ typedef struct tsol_ire_gw_secattr_s {
  *	  To avoid bloating the code, we use the function "ire_refrele"
  *	  which essentially calls the macro.
  */
-#ifndef IRE_DEBUG
+#define	IRE_REFRELE_NOTR(ire) {					\
+	ASSERT((ire)->ire_refcnt != 0);				\
+	membar_exit();						\
+	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
+		ire_inactive(ire);				\
+}
+
 #define	IRE_REFRELE(ire) {					\
-	ASSERT((ire)->ire_refcnt != 0);				\
-	membar_exit();						\
-	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
-		ire_inactive(ire);				\
+	if (ire->ire_bucket != NULL) {				\
+		IRE_UNTRACE_REF(ire);				\
+	}							\
+	IRE_REFRELE_NOTR(ire);					\
 }
-#define	IRE_REFRELE_NOTR(ire)	IRE_REFRELE(ire)
-#else
-#define	IRE_REFRELE(ire) {					\
-	if (ire->ire_bucket != NULL)				\
-		ire_untrace_ref(ire);				\
-	ASSERT((ire)->ire_refcnt != 0);				\
-	membar_exit();						\
-	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
-		ire_inactive(ire);				\
-}
-#define	IRE_REFRELE_NOTR(ire) {				\
-	ASSERT((ire)->ire_refcnt != 0);				\
-	membar_exit();						\
-	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)	\
-		ire_inactive(ire);				\
-}
-#endif
 
 /*
  * Bump up the reference count on the hash bucket - IRB to
@@ -2517,11 +2494,8 @@ typedef struct ire_s {
 	uint_t	ire_stq_ifindex;
 	uint_t		ire_defense_count;	/* number of ARP conflicts */
 	uint_t		ire_defense_time;	/* last time defended (secs) */
-	ip_stack_t	*ire_ipst;	/* Does not have a netstack_hold */
-#ifdef IRE_DEBUG
-	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
-#endif
+	ip_stack_t	*ire_ipst;	/* Does not have a netstack_hold */
 } ire_t;
 
 /* IPv4 compatiblity macros */
@@ -3067,6 +3041,9 @@ extern uint32_t ipsechw_debug;
 #endif
 
 extern int	ip_debug;
+extern uint_t	ip_thread_data;
+extern krwlock_t ip_thread_rwlock;
+extern list_t	ip_thread_list;
 
 #ifdef IP_DEBUG
 #include <sys/debug.h>
@@ -3195,14 +3172,13 @@ extern void	ire_cleanup(ire_t *);
 extern void	ire_inactive(ire_t *);
 extern boolean_t irb_inactive(irb_t *);
 extern ire_t	*ire_unlink(irb_t *);
-#ifdef IRE_DEBUG
-extern	void	ire_trace_ref(ire_t *ire);
-extern	void	ire_untrace_ref(ire_t *ire);
-extern	void	ire_thread_exit(ire_t *ire, caddr_t);
-#endif
-#ifdef ILL_DEBUG
-extern	void	ill_trace_cleanup(ill_t *);
-extern	void	ipif_trace_cleanup(ipif_t *);
+
+#ifdef DEBUG
+extern	boolean_t th_trace_ref(const void *, ip_stack_t *);
+extern	void	th_trace_unref(const void *);
+extern	void	th_trace_cleanup(const void *, boolean_t);
+extern	void	ire_trace_ref(ire_t *);
+extern	void	ire_untrace_ref(ire_t *);
 #endif
 
 extern int	ip_srcid_insert(const in6_addr_t *, zoneid_t, ip_stack_t *);
