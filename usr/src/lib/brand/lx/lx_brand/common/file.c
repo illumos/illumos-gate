@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,12 +177,26 @@ lx_unlink(uintptr_t p)
 int
 lx_fsync(uintptr_t fd)
 {
+	int fildes = (int)fd;
+	struct stat64 statbuf;
+
+	if ((fstat64(fildes, &statbuf) == 0) &&
+	    (S_ISCHR(statbuf.st_mode) || S_ISFIFO(statbuf.st_mode)))
+		return (-EINVAL);
+
 	return (fsync((int)fd) ? -errno : 0);
 }
 
 int
 lx_fdatasync(uintptr_t fd)
 {
+	int fildes = (int)fd;
+	struct stat64 statbuf;
+
+	if ((fstat64(fildes, &statbuf) == 0) &&
+	    (S_ISCHR(statbuf.st_mode) || S_ISFIFO(statbuf.st_mode)))
+		return (-EINVAL);
+
 	return (fdatasync((int)fd) ? -errno : 0);
 }
 
