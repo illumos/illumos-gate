@@ -96,6 +96,8 @@ static int		change_time = 0;
 static mutex_t		rebuild_tree_lock;
 static cond_t		rebuild_tree_cv;
 static boolean_t	rebuild_tree = B_TRUE;
+static boolean_t	tree_builder_thr_exit = B_FALSE;
+static thread_t		tree_builder_thr_id;
 
 /*
  * These two should really not be global
@@ -270,6 +272,8 @@ snmpplugin_init(void)
 	(void) mutex_init(&rebuild_tree_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&rebuild_tree_cv, USYNC_THREAD, NULL);
 	(void) rwlock_init(&stale_tree_rwlp, USYNC_THREAD, NULL);
+	tree_builder_thr_exit = B_FALSE;
+
 	LOGINIT();
 
 	/*
@@ -277,18 +281,57 @@ snmpplugin_init(void)
 	 */
 	LOGPRINTF("Tree-builder thread being created.\n");
 	if ((ret = thr_create(NULL, NULL, tree_builder, NULL,
-	    THR_BOUND, NULL)) < 0) {
+	    THR_BOUND, &tree_builder_thr_id)) < 0) {
 		log_msg(LOG_ERR, SNMPP_CANT_CREATE_TREE_BUILDER, ret);
 		snmp_fini(hdl);
-		return;
+		hdl = NULL;
+		(void) rwlock_destroy(&stale_tree_rwlp);
+		(void) cond_destroy(&rebuild_tree_cv);
+		(void) mutex_destroy(&rebuild_tree_lock);
+		tree_builder_thr_exit = B_TRUE;
 	}
 }
 
 void
 snmpplugin_fini(void)
 {
-	snmp_fini(hdl);
 
+	if (tree_builder_thr_exit == B_TRUE)
+		return;
+
+	/*
+	 * Make reads of volatile properties return PICL_PROPUNAVAILABLE
+	 * since we're about to recycle the plug-in.  No need to worry
+	 * about removing /physical-platform since tree_builder() will
+	 * take care of recycling it for us.
+	 */
+	(void) rw_wrlock(&stale_tree_rwlp);
+	stale_tree = B_TRUE;
+	if (vol_props) {
+		free(vol_props);
+	}
+	vol_props = NULL;
+	volprop_ndx = 0;
+	n_vol_props = 0;
+	(void) rw_unlock(&stale_tree_rwlp);
+
+	/* wake up the tree_builder thread, tell it to exit */
+	(void) mutex_lock(&rebuild_tree_lock);
+	rebuild_tree = B_TRUE;
+	tree_builder_thr_exit = B_TRUE;
+	cond_signal(&rebuild_tree_cv);
+	(void) mutex_unlock(&rebuild_tree_lock);
+
+	/* reap the thread */
+	(void) thr_join(tree_builder_thr_id, NULL, NULL);
+
+	/* close the channel */
+	if (hdl != NULL) {
+		snmp_fini(hdl);
+		hdl = NULL;
+	}
+
+	/* finish cleanup... */
 	(void) rwlock_destroy(&stale_tree_rwlp);
 	(void) cond_destroy(&rebuild_tree_cv);
 	(void) mutex_destroy(&rebuild_tree_lock);
@@ -330,11 +373,18 @@ tree_builder(void *arg)
 
 		LOGPRINTF("tree_builder: woke up\n");
 
+		if (tree_builder_thr_exit == B_TRUE) {
+			(void) mutex_unlock(&rebuild_tree_lock);
+			LOGPRINTF("tree_builder: time to exit\n");
+			return (NULL);
+		}
+
 		old_physplat_root = NULL;
 		physplat_root = NULL;
 
 		LOGPRINTF("tree_builder: getting root node\n");
 		if ((ret = ptree_get_root(&root_node)) != PICL_SUCCESS) {
+			(void) mutex_unlock(&rebuild_tree_lock);
 			log_msg(LOG_ERR, SNMPP_NO_ROOT, ret);
 			return ((void *)-2);
 		}
@@ -346,8 +396,10 @@ tree_builder(void *arg)
 
 		LOGPRINTF("tree_builder: building physical-platform\n");
 		if ((ret = build_physplat(&physplat_root)) < 0) {
+			(void) mutex_unlock(&rebuild_tree_lock);
 			log_msg(LOG_ERR, SNMPP_CANT_CREATE_PHYSPLAT, ret);
 			snmp_fini(hdl);
+			hdl = NULL;
 			return ((void *)-3);
 		}
 
@@ -359,9 +411,11 @@ tree_builder(void *arg)
 
 		LOGPRINTF("tree_builder: attaching new subtree\n");
 		if ((ret = ptree_add_node(root_node, physplat_root)) < 0) {
+			(void) mutex_unlock(&rebuild_tree_lock);
 			free_resources(physplat_root);
 			log_msg(LOG_ERR, SNMPP_CANT_CREATE_PHYSPLAT, ret);
 			snmp_fini(hdl);
+			hdl = NULL;
 			return ((void *)-4);
 		}
 

@@ -60,6 +60,12 @@
 
 	<exec_method
 		type='method'
+		name='refresh'
+		exec=':kill -1'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
 		name='start'
 		exec='/usr/lib/picl/picld'
 		timeout_seconds='60' />

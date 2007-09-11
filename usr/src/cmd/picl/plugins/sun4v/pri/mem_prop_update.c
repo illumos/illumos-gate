@@ -36,12 +36,6 @@
 #include "priplugin.h"
 #include "../../common/memcfg/piclmemcfg.h"
 
-/*
- * These 3 variable are defined and set in mdescplugin.c
- */
-extern picl_nodehdl_t	root_node;
-extern mde_cookie_t	rootnode;
-
 static void
 add_memory_props(picl_nodehdl_t node, mde_cookie_t memorylistp, md_t *mdp,
 	uint64_t size);
@@ -65,7 +59,7 @@ add_mem_prop(picl_nodehdl_t node, void *args)
 {
 	mde_cookie_t *memorylistp, *segmentlistp, *banklistp;
 	picl_prophdl_t memh, segmenth, bankh;
-	mde_cookie_t *buf;
+	mde_cookie_t *buf, md_rootnode;
 	int j, k, num_nodes, interleave, err;
 	int nsegments, nbanks, nmemory;
 	uint64_t memsize, segsize, segbase;
@@ -74,6 +68,8 @@ add_mem_prop(picl_nodehdl_t node, void *args)
 
 	if (mdp == NULL)
 		return (PICL_WALK_CONTINUE);
+
+	md_rootnode = md_root_node(mdp);
 
 	/*
 	 * An absence of nodes or failure to obtain memory for searches
@@ -108,7 +104,7 @@ add_mem_prop(picl_nodehdl_t node, void *args)
 	 * return PICL_PROPNOTFOUND to get the caller to re-try with
 	 * a different property name.
 	 */
-	nmemory = md_scan_dag(mdp, rootnode, md_find_name(mdp,
+	nmemory = md_scan_dag(mdp, md_rootnode, md_find_name(mdp,
 	    "memory-segments"), md_find_name(mdp, "fwd"), memorylistp);
 	if (nmemory != 1) {
 		pri_debug(LOG_NOTICE,

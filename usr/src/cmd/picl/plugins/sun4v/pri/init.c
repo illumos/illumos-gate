@@ -35,29 +35,40 @@
 
 static void pri_free(void *bufp, size_t size);
 static uint64_t *md_bufp = NULL;
+static uint64_t *new_md_bufp;
 
-md_t *
-pri_devinit(uint64_t *tok, md_t *mdp)
+int
+pri_devinit(uint64_t *tok)
 {
-	uint64_t *new_md_bufp;
+	int status;
 
-
+	new_md_bufp = NULL;
+	status = 0;
 	if (pri_get(PRI_WAITGET, tok, &new_md_bufp, malloc, pri_free) ==
 	    (ssize_t)-1) {
 		pri_debug(LOG_NOTICE, "pri_devinit: can'r read from "
 		    "the PRI: %d\n", errno);
+		status = -1;
 	}
 	if (new_md_bufp == NULL) {
-		pri_debug(LOG_NOTICE, "pri_devinit: pri_get returned"
+		pri_debug(LOG_NOTICE, "pri_devinit: pri_get returned "
 		    "NULL buffer!\n");
+		status = -1;
 	}
+	return (status);
+}
+
+md_t *
+pri_bufinit(md_t *mdp)
+{
+
 	if (mdp)
 		md_fini(mdp);
 	if (md_bufp)
 		free(md_bufp);
 	md_bufp = new_md_bufp;
 
-	pri_debug(LOG_NOTICE, "pri_devinit: done reading PRI\n");
+	pri_debug(LOG_NOTICE, "pri_bufinit: done reading PRI\n");
 
 	/*
 	 * The PRI and the MD use the same data format so they can be
@@ -66,18 +77,18 @@ pri_devinit(uint64_t *tok, md_t *mdp)
 	if (md_bufp) {
 		mdp = md_init_intern(md_bufp, malloc, pri_free);
 		if (mdp == NULL) {
-			pri_debug(LOG_NOTICE, "pri_devinit: md_init_intern "
+			pri_debug(LOG_NOTICE, "pri_bufinit: md_init_intern "
 			"failed\n");
 			free(md_bufp);
 			md_bufp = NULL;
 		} else {
-			pri_debug(LOG_NOTICE, "pri_devinit: mdi_init_intern "
+			pri_debug(LOG_NOTICE, "pri_bufinit: mdi_init_intern "
 			    "completed successfully\n");
 		}
 	} else
 		mdp = NULL;
 
-	pri_debug(LOG_NOTICE, "pri_devinit: returning\n");
+	pri_debug(LOG_NOTICE, "pri_bufinit: returning\n");
 
 	return (mdp);
 }
@@ -99,5 +110,4 @@ pri_devfini(md_t *mdp)
 	if (md_bufp)
 		free(md_bufp);
 	md_bufp = NULL;
-	pri_fini();
 }

@@ -28,12 +28,6 @@
 
 #include "priplugin.h"
 
-/*
- * These 3 variable are defined and set in mdescplugin.c
- */
-extern picl_nodehdl_t	root_node;
-extern mde_cookie_t	rootnode;
-
 static int
 find_node_by_string_prop(picl_nodehdl_t rooth, const char *pname,
     const char *pval, picl_nodehdl_t *nodeh);
@@ -55,11 +49,13 @@ io_dev_addlabel(md_t *mdp)
 	picl_nodehdl_t platnode, tpn;
 	char busaddr[PICL_PROPNAMELEN_MAX], *p, *q;
 	char path[PICL_PROPNAMELEN_MAX];
-	mde_cookie_t *components;
+	mde_cookie_t *components, md_rootnode;
 	char *type, *nac, *pri_path, *saved_path;
 
 	if (mdp == NULL)
 		return;
+
+	md_rootnode = md_root_node(mdp);
 
 	/*
 	 * Find and remember the roots of the /frutree and /platform trees.
@@ -86,7 +82,7 @@ io_dev_addlabel(md_t *mdp)
 		return;
 	}
 
-	component_count = md_scan_dag(mdp, rootnode,
+	component_count = md_scan_dag(mdp, md_rootnode,
 	    md_find_name(mdp, "component"),
 	    md_find_name(mdp, "fwd"), components);
 

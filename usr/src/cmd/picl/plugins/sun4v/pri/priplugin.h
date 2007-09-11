@@ -65,12 +65,9 @@ extern "C" {
 #define	PRI_DEBUG 0
 #endif
 
-/* These 3 variable are defined and set in mdescplugin.c */
-extern picl_nodehdl_t	root_node;
-extern mde_cookie_t	rootnode;
-
 int add_mem_prop(picl_nodehdl_t node, void *args);
-md_t *pri_devinit(uint64_t *, md_t *);
+int pri_devinit(uint64_t *);
+md_t *pri_bufinit(md_t *mdp);
 void pri_devfini(md_t *mdp);
 void pri_debug(int level, char *fmt, ...);
 void add_md_prop(picl_nodehdl_t node, int size, char *name, void* value,
