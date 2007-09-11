@@ -2032,7 +2032,7 @@ validate_iso_distros()
 			# ISO set to the distro list.
 			#
 			unset redhat_pers
-			add_distro_list "CD Set"
+			add_to_distro_list "CD Set"
 		else
 			#
 			# If a valid CD-based distro was found and there are
