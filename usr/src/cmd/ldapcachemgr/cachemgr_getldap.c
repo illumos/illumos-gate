@@ -2212,19 +2212,15 @@ getldap_serverInfo_refresh()
 }
 
 void
-getldap_getserver(ldap_return_t *out, ldap_call_t *in)
+getldap_getserver(LineBuf *config_info, ldap_call_t *in)
 {
-	char 		*outstr = NULL;
 	char 		req[] = "0";
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_getserver()...\n");
 	}
 
-	/* assume no server found */
-	out->ldap_errno = -1;
-	out->ldap_return_code = NOTFOUND;
-	out->ldap_bufferbytesused = sizeof (*out);
+	config_info->len = 0;
 
 	/* make sure the request is valid */
 	req[0] = (in->ldap_u.servername)[0];
@@ -2237,45 +2233,42 @@ getldap_getserver(ldap_return_t *out, ldap_call_t *in)
 	}
 
 	(void) getldap_serverInfo_op(INFO_OP_GETSERVER,
-	    in->ldap_u.domainname, &outstr);
+	    in->ldap_u.domainname, &config_info->str);
 
-	if (outstr == NULL)
+	if (config_info->str == NULL)
 		return;
 
-	out->ldap_bufferbytesused = sizeof (ldap_return_t);
-	(void) strncpy(out->ldap_u.config, outstr, strlen(outstr)+1);
+	config_info->len = strlen(config_info->str) + 1;
 
 	if (current_admin.debug_level >= DBG_PROFILE_REFRESH) {
 		/* Log server IP */
-		char *ptr;
-		ptr = strstr(outstr, DOORLINESEP);
+		char	*ptr,
+		    separator;
+		ptr = strstr(config_info->str, DOORLINESEP);
 		if (ptr) {
+			separator = *ptr;
 			*ptr = '\0';
-			logit("getldap_getserver: got server %s\n", outstr);
+			logit("getldap_getserver: got server %s\n",
+			    config_info->str);
+			*ptr = separator;
 		} else
 			logit("getldap_getserver: Missing %s."
 			    " Internal error\n", DOORLINESEP);
 	}
-	free(outstr);
-	out->ldap_return_code = SUCCESS;
-	out->ldap_errno = 0;
-
 }
 
 void
-getldap_get_cacheData(ldap_return_t *out, ldap_call_t *in)
+getldap_get_cacheData(LineBuf *config_info, ldap_call_t *in)
 {
-	char	*outstr = NULL, *instr = NULL;
+	char	*instr = NULL;
 	int	datatype = CACHE_MAP_UNKNOWN;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_cacheData()...\n");
 	}
 
-	/* assume no cache data found */
-	out->ldap_errno = -1;
-	out->ldap_return_code = NOTFOUND;
-	out->ldap_bufferbytesused = sizeof (*out);
+	config_info->len = 0;
+	config_info->str = NULL;
 
 	/* make sure the request is valid */
 	if (strncmp(in->ldap_u.servername,
@@ -2293,20 +2286,15 @@ getldap_get_cacheData(ldap_return_t *out, ldap_call_t *in)
 		return;
 
 	(void) getldap_cache_op(CACHE_OP_FIND, datatype,
-	    instr, &outstr);
+	    instr, &config_info->str);
 
-	if (outstr == NULL)
-		return;
-
-	out->ldap_bufferbytesused = sizeof (ldap_return_t);
-	(void) strncpy(out->ldap_u.config, outstr, strlen(outstr)+1);
-	free(outstr);
-	out->ldap_return_code = SUCCESS;
-	out->ldap_errno = 0;
+	if (config_info->str != NULL) {
+		config_info->len = strlen(config_info->str) + 1;
+	}
 }
 
-void
-getldap_set_cacheData(ldap_return_t *out, ldap_call_t *in)
+int
+getldap_set_cacheData(ldap_call_t *in)
 {
 	char	*instr1 = NULL;
 	char	*instr2 = NULL;
@@ -2317,59 +2305,51 @@ getldap_set_cacheData(ldap_return_t *out, ldap_call_t *in)
 		logit("getldap_set_cacheData()...\n");
 	}
 
-	/* assume error */
-	out->ldap_errno = -1;
-	out->ldap_return_code = NOTFOUND;
-	out->ldap_bufferbytesused = sizeof (*out);
-
 	/* make sure the request is valid */
 	if (strncmp(in->ldap_u.servername,
 	    NS_CACHE_DN2DOMAIN, strlen(NS_CACHE_DN2DOMAIN)) == 0)
 		datatype = CACHE_MAP_DN2DOMAIN;
 
 	if (datatype == CACHE_MAP_UNKNOWN)
-		return;
+		return (-1);
 
 	instr1 = strstr(in->ldap_u.servername, DOORLINESEP);
 	if (instr1 == NULL)
-		return;
+		return (-1);
 	*instr1 = '\0';
 	instr1 += strlen(DOORLINESEP);
 	if (*instr1 == '\0')
-		return;
+		return (-1);
 	instr2 = strstr(instr1, DOORLINESEP);
 	if (instr2 == NULL)
-		return;
+		return (-1);
 	*instr2 = '\0';
 	instr2 += strlen(DOORLINESEP);
 	if (*instr2 == '\0')
-		return;
+		return (-1);
 
 	rc = getldap_cache_op(CACHE_OP_ADD, datatype,
 	    instr1, &instr2);
 	if (rc != NS_LDAP_SUCCESS)
-		return;
+		return (-1);
 
-	out->ldap_bufferbytesused = sizeof (ldap_return_t);
-	out->ldap_return_code = SUCCESS;
-	out->ldap_errno = 0;
+	return (0);
 }
 
 void
-getldap_get_cacheStat(ldap_return_t *out)
+getldap_get_cacheStat(LineBuf *stat_info)
 {
 	char	*foutstr = NULL;
 	char	*soutstr = NULL;
 	char	*coutstr = NULL;
+	int	infoSize;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_cacheStat()...\n");
 	}
 
-	/* setup for error return */
-	out->ldap_errno = -1;
-	out->ldap_return_code = NOTFOUND;
-	out->ldap_bufferbytesused = sizeof (*out);
+	stat_info->str = NULL;
+	stat_info->len = 0;
 
 	/* get refersh statisitcs */
 	(void) getldap_get_refresh_stat(&foutstr);
@@ -2390,17 +2370,24 @@ getldap_get_cacheStat(ldap_return_t *out)
 		return;
 	}
 
-	out->ldap_bufferbytesused = sizeof (ldap_return_t);
-	(void) strncpy(out->ldap_u.config, foutstr, strlen(foutstr) + 1);
-	(void) strncat(out->ldap_u.config, soutstr, strlen(soutstr) + 1);
-	(void) strncat(out->ldap_u.config, coutstr, strlen(coutstr) + 1);
+	infoSize = strlen(foutstr) + strlen(soutstr) + strlen(coutstr) + 3;
+	stat_info->str = calloc(infoSize, sizeof (char));
+	if (stat_info->str != NULL) {
+		(void) strncpy(stat_info->str,
+		    foutstr,
+		    strlen(foutstr) + 1);
+		(void) strncat(stat_info->str,
+		    soutstr,
+		    strlen(soutstr) + 1);
+		(void) strncat(stat_info->str,
+		    coutstr,
+		    strlen(coutstr) + 1);
+		stat_info->len = infoSize;
+	}
 
 	free(foutstr);
 	free(soutstr);
 	free(coutstr);
-
-	out->ldap_return_code = SUCCESS;
-	out->ldap_errno = 0;
 }
 
 static int
@@ -2864,9 +2851,8 @@ getldap_revalidate()
 }
 
 void
-getldap_lookup(ldap_return_t *out, ldap_call_t *in)
+getldap_lookup(LineBuf *config_info, ldap_call_t *in)
 {
-	LineBuf		configinfo;
 	ns_ldap_error_t	*error;
 
 	if (current_admin.debug_level >= DBG_ALL) {
@@ -2874,28 +2860,14 @@ getldap_lookup(ldap_return_t *out, ldap_call_t *in)
 	}
 
 	(void) rw_rdlock(&ldap_lock);
-	if ((error = __ns_ldap_LoadDoorInfo(&configinfo, in->ldap_u.domainname))
-	    != NULL) {
+	if ((error = __ns_ldap_LoadDoorInfo(config_info,
+	    in->ldap_u.domainname)) != NULL) {
 		if (error != NULL && error->message != NULL)
 			logit("Error: ldap_lookup: %s\n", error->message);
 		(void) __ns_ldap_freeError(&error);
-		out->ldap_errno = -1;
-		out->ldap_return_code = NOTFOUND;
-		out->ldap_bufferbytesused = sizeof (*out);
 
-	} else {
-		out->ldap_bufferbytesused = sizeof (ldap_return_t);
-		(void) strncpy(out->ldap_u.config,
-		    configinfo.str, configinfo.len);
-		out->ldap_return_code = SUCCESS;
-		out->ldap_errno = 0;
-	}
-
-	if (configinfo.str != NULL) {
-		free(configinfo.str);
-		configinfo.str = NULL;
-		configinfo.alloc = 0;
-		configinfo.len = 0;
+		config_info->str = NULL;
+		config_info->len = 0;
 	}
 
 	(void) rw_unlock(&ldap_lock);

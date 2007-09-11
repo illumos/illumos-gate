@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -567,7 +567,8 @@ __s_get_enum_value(ns_config_t *ptr, char *value, ParamIndexType i)
 		pstart++;
 	/* skip trailing spaces */
 	pend = pstart + strlen(pstart) - 1;
-	for (; pend >= pstart && *pend == SPACETOK; pend--);
+	for (; pend >= pstart && *pend == SPACETOK; pend--)
+		;
 	len = pend - pstart + 1;
 	if (len == 0)
 		return (-1);
@@ -614,7 +615,7 @@ __s_get_enum_value(ns_config_t *ptr, char *value, ParamIndexType i)
 
 	for (; mapp->name != NULL; mapp++) {
 		if (strncasecmp(pstart, mapp->name, len) == 0 &&
-			(strlen(mapp->name) == len)) {
+		    (strlen(mapp->name) == len)) {
 			return (mapp->value);
 		}
 	}
@@ -949,7 +950,8 @@ stripdup(const char *instr)
 		pstart++;
 	/* remove trailing spaces */
 	pend = pstart + strlen(pstart) - 1;
-	for (; pend >= pstart && *pend == SPACETOK; pend--);
+	for (; pend >= pstart && *pend == SPACETOK; pend--)
+		;
 	len = pend - pstart + 1;
 	if ((ret = malloc(len + 1)) == NULL)
 		return (NULL);
@@ -1015,92 +1017,92 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 	if (ptr->paramList[NS_LDAP_SERVERS_P].ns_ppc == NULL) {
 		if (ptr->version == NS_LDAP_V1) {
 			str = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_SERVERS_P));
+			    NS_LDAP_SERVERS_P));
 			(void) snprintf(errstr, MAXERROR,
-				gettext("Configuration Error: No entry for "
-				"'%s' found"), str);
+			    gettext("Configuration Error: No entry for "
+			    "'%s' found"), str);
 			return (NS_PARSE_ERR);
 		} else if (ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc ==
-			NULL) {
+		    NULL) {
 			str = NULL_OR_STR(__s_api_get_configname(
-				NS_LDAP_SERVERS_P));
+			    NS_LDAP_SERVERS_P));
 			str1 = NULL_OR_STR(__s_api_get_configname(
-				NS_LDAP_SERVER_PREF_P));
+			    NS_LDAP_SERVER_PREF_P));
 			(void) snprintf(errstr, MAXERROR,
-				gettext("Configuration Error: "
-				"Neither '%s' nor '%s' is defined"), str, str1);
+			    gettext("Configuration Error: "
+			    "Neither '%s' nor '%s' is defined"), str, str1);
 			return (NS_PARSE_ERR);
 		}
 	}
 	if (ptr->paramList[NS_LDAP_CERT_PASS_P].ns_pc != NULL &&
-		ptr->paramList[NS_LDAP_CERT_PATH_P].ns_pc == NULL) {
+	    ptr->paramList[NS_LDAP_CERT_PATH_P].ns_pc == NULL) {
 			str = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_CERT_PASS_P));
+			    NS_LDAP_CERT_PASS_P));
 			str1 = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_CERT_PATH_P));
+			    NS_LDAP_CERT_PATH_P));
 			(void) snprintf(errstr, MAXERROR,
 			gettext("Configuration Error: %s specified "
-				"but no value for '%s' found"), str, str1);
+			    "but no value for '%s' found"), str, str1);
 		return (NS_PARSE_ERR);
 	}
 	if (ptr->paramList[NS_LDAP_CERT_PASS_P].ns_pc == NULL &&
-		ptr->paramList[NS_LDAP_CERT_PATH_P].ns_pc != NULL) {
+	    ptr->paramList[NS_LDAP_CERT_PATH_P].ns_pc != NULL) {
 			str = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_CERT_PATH_P));
+			    NS_LDAP_CERT_PATH_P));
 			str1 = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_CERT_PASS_P));
+			    NS_LDAP_CERT_PASS_P));
 			(void) snprintf(errstr, MAXERROR,
 			gettext("Configuration Error: %s specified "
-				"but no value for '%s' found"), str, str1);
+			    "but no value for '%s' found"), str, str1);
 		return (NS_PARSE_ERR);
 	}
 	/* check if search basedn has been specified */
 	if (ptr->paramList[NS_LDAP_SEARCH_BASEDN_P].ns_ppc == NULL) {
 		str = NULL_OR_STR(__s_api_get_configname(
-				NS_LDAP_SEARCH_BASEDN_P));
+		    NS_LDAP_SEARCH_BASEDN_P));
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Configuration Error: No entry for "
-			    "'%s' found"), str);
+		    gettext("Configuration Error: No entry for "
+		    "'%s' found"), str);
 		return (NS_PARSE_ERR);
 	}
 
 	if (check_dn) {
 	    /* check for auth value....passwd/bindn if necessary */
 
-	    for (j = 0; ptr->paramList[NS_LDAP_AUTH_P].ns_pi != NULL &&
+		for (j = 0; ptr->paramList[NS_LDAP_AUTH_P].ns_pi != NULL &&
 		    ptr->paramList[NS_LDAP_AUTH_P].ns_pi[j] != NULL; j++) {
 		value = ptr->paramList[NS_LDAP_AUTH_P].ns_pi[j];
 		switch (value) {
-		    case NS_LDAP_EA_SIMPLE:
-		    case NS_LDAP_EA_SASL_CRAM_MD5:
-		    case NS_LDAP_EA_SASL_DIGEST_MD5:
-		    case NS_LDAP_EA_SASL_DIGEST_MD5_INT:
-		    case NS_LDAP_EA_SASL_DIGEST_MD5_CONF:
-		    case NS_LDAP_EA_TLS_SIMPLE:
-		    case NS_LDAP_EA_TLS_SASL_CRAM_MD5:
-		    case NS_LDAP_EA_TLS_SASL_DIGEST_MD5:
-		    case NS_LDAP_EA_TLS_SASL_DIGEST_MD5_INT:
-		    case NS_LDAP_EA_TLS_SASL_DIGEST_MD5_CONF:
+		case NS_LDAP_EA_SIMPLE:
+		case NS_LDAP_EA_SASL_CRAM_MD5:
+		case NS_LDAP_EA_SASL_DIGEST_MD5:
+		case NS_LDAP_EA_SASL_DIGEST_MD5_INT:
+		case NS_LDAP_EA_SASL_DIGEST_MD5_CONF:
+		case NS_LDAP_EA_TLS_SIMPLE:
+		case NS_LDAP_EA_TLS_SASL_CRAM_MD5:
+		case NS_LDAP_EA_TLS_SASL_DIGEST_MD5:
+		case NS_LDAP_EA_TLS_SASL_DIGEST_MD5_INT:
+		case NS_LDAP_EA_TLS_SASL_DIGEST_MD5_CONF:
 			if (ptr->paramList[NS_LDAP_BINDDN_P].ns_ppc == NULL) {
 				str = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_BINDDN_P));
+				    NS_LDAP_BINDDN_P));
 				(void) snprintf(errstr, MAXERROR,
 				gettext("Configuration Error: No entry for "
 				    "'%s' found"), str);
 				return (NS_PARSE_ERR);
 			}
 			if (ptr->paramList[NS_LDAP_BINDPASSWD_P].ns_ppc
-				== NULL) {
+			    == NULL) {
 				str = NULL_OR_STR(__s_api_get_configname(
-					NS_LDAP_BINDPASSWD_P));
+				    NS_LDAP_BINDPASSWD_P));
 				(void) snprintf(errstr, MAXERROR,
 				gettext("Configuration Error: No entry for "
-					"'%s' found"), str);
+				    "'%s' found"), str);
 				return (NS_PARSE_ERR);
 			}
 			break;
 		}
-	    }
+		}
 	}
 
 	/*
@@ -1110,16 +1112,16 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 
 	pi = ptr->paramList[NS_LDAP_AUTH_P].ns_pi;
 	if (pi != NULL) {
-	    cnt = ptr->paramList[NS_LDAP_AUTH_P].ns_acnt;
-	    for (j = 0; j < cnt && !has_tls; j++) {
-		has_tls = (pi[j] == NS_LDAP_EA_TLS_NONE) ||
-			(pi[j] == NS_LDAP_EA_TLS_SIMPLE) ||
-			(pi[j] == NS_LDAP_EA_TLS_SASL_CRAM_MD5) ||
-			(pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5) ||
-			(pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_INT) ||
-			(pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_CONF) ||
-			(pi[j] == NS_LDAP_EA_TLS_SASL_EXTERNAL);
-	    }
+		cnt = ptr->paramList[NS_LDAP_AUTH_P].ns_acnt;
+		for (j = 0; j < cnt && !has_tls; j++) {
+			has_tls = (pi[j] == NS_LDAP_EA_TLS_NONE) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SIMPLE) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SASL_CRAM_MD5) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_INT) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_CONF) ||
+			    (pi[j] == NS_LDAP_EA_TLS_SASL_EXTERNAL);
+		}
 	}
 
 	ppc = ptr->paramList[NS_LDAP_SERVICE_AUTH_METHOD_P].ns_ppc;
@@ -1131,27 +1133,29 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 			if (begin != NULL)
 				begin = strchr(begin, ':');
 			if (!has_tls && begin != NULL) {
-			    len = strlen(begin) - 3;
-			    for (i = 0; i < len; i++)
-				if (strncasecmp(begin + i, "tls:", 4) == 0)
-					break;
-			    has_tls = i < len;
+				len = strlen(begin) - 3;
+				for (i = 0; i < len; i++)
+					if (strncasecmp(begin + i,
+					    "tls:", 4) == 0)
+						break;
+				has_tls = i < len;
 			}
 		}
 	}
 
 	if (has_tls) {
-	    is_ok = !has_port(ptr->paramList[NS_LDAP_SERVERS_P].ns_ppc,
-		ptr->paramList[NS_LDAP_SERVERS_P].ns_acnt);
-	    ppc = ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc;
-	    if (is_ok)
-		is_ok = !has_port(ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc,
-			ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_acnt);
+		is_ok = !has_port(ptr->paramList[NS_LDAP_SERVERS_P].ns_ppc,
+		    ptr->paramList[NS_LDAP_SERVERS_P].ns_acnt);
+		ppc = ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc;
+		if (is_ok)
+			is_ok = !has_port(
+			    ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc,
+			    ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_acnt);
 	}
 	if (!is_ok) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Configuration Error: "
-				"Cannot specify LDAP port with tls"));
+		    gettext("Configuration Error: "
+		    "Cannot specify LDAP port with tls"));
 		return (NS_PARSE_ERR);
 	}
 
@@ -1164,7 +1168,7 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 	 */
 	if (ptr->paramList[NS_LDAP_CACHETTL_P].ns_pc == NULL) {
 		tm = conv_time(
-			defconfig[NS_LDAP_CACHETTL_P].defval.ns_pc);
+		    defconfig[NS_LDAP_CACHETTL_P].defval.ns_pc);
 		ptr->paramList[NS_LDAP_EXP_P].ns_ptype = TIMET;
 		if (tm != 0) {
 			tm += time(NULL);
@@ -1179,28 +1183,28 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 	cnt = ptr->paramList[NS_LDAP_CREDENTIAL_LEVEL_P].ns_acnt;
 	for (i = 0; i < cnt; i++) {
 		if (ptr->paramList[NS_LDAP_CREDENTIAL_LEVEL_P].ns_pi[i] ==
-				NS_LDAP_CRED_SELF)
+		    NS_LDAP_CRED_SELF)
 			self++;
 	}
 	gssapi = 0;
 	cnt = ptr->paramList[NS_LDAP_AUTH_P].ns_acnt;
 	for (i = 0; i < cnt; i++) {
 		if (ptr->paramList[NS_LDAP_AUTH_P].ns_pi[i] ==
-			NS_LDAP_EA_SASL_GSSAPI)
+		    NS_LDAP_EA_SASL_GSSAPI)
 			gssapi++;
 	}
 	if (gssapi == 0 && self > 0) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Configuration Error: "
-				"Credential level self requires "
-				"authentication method sasl/GSSAPI"));
+		    gettext("Configuration Error: "
+		    "Credential level self requires "
+		    "authentication method sasl/GSSAPI"));
 		return (NS_PARSE_ERR);
 	}
 	if (gssapi > 0 && self == 0) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Configuration Error: "
-				"Authentication method sasl/GSSAPI "
-				"requires credential level self"));
+		    gettext("Configuration Error: "
+		    "Authentication method sasl/GSSAPI "
+		    "requires credential level self"));
 		return (NS_PARSE_ERR);
 	}
 	return (NS_SUCCESS);
@@ -1328,18 +1332,18 @@ set_default_value(ns_config_t *configptr, char *name,
 
 	if (__s_api_get_type(name, &i) < 0) {
 		(void) snprintf(errstr, sizeof (errstr), gettext(
-			"Illegal type name (%s).\n"), name);
+		    "Illegal type name (%s).\n"), name);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
 	if (i != NS_LDAP_SERVERS_P &&
-		i != NS_LDAP_SERVICE_AUTH_METHOD_P &&
-		i != NS_LDAP_SERVICE_CRED_LEVEL_P &&
-		i != NS_LDAP_SERVICE_SEARCH_DESC_P &&
-		i != NS_LDAP_SERVER_PREF_P &&
-		i != NS_LDAP_SEARCH_DN_P) {
+	    i != NS_LDAP_SERVICE_AUTH_METHOD_P &&
+	    i != NS_LDAP_SERVICE_CRED_LEVEL_P &&
+	    i != NS_LDAP_SERVICE_SEARCH_DESC_P &&
+	    i != NS_LDAP_SERVER_PREF_P &&
+	    i != NS_LDAP_SEARCH_DN_P) {
 		if (configptr->paramList[i].ns_ptype != NS_UNKNOWN) {
 			destroy_param(configptr, i);
 		}
@@ -1418,7 +1422,7 @@ verify_value(ns_config_t *cfg, char *name, char *value, char *errstr)
 
 	if (__s_api_get_type(name, &index) != 0) {
 		(void) snprintf(errstr, MAXERROR,
-			gettext("Unknown keyword encountered '%s'."), name);
+		    gettext("Unknown keyword encountered '%s'."), name);
 		return (NS_PARSE_ERR);
 	}
 
@@ -1466,14 +1470,14 @@ verify_value(ns_config_t *cfg, char *name, char *value, char *errstr)
 		break;
 	case NS_LDAP_FILE_VERSION_P:
 		if (value != NULL &&
-			strcasecmp(value, NS_LDAP_VERSION_1) != 0 &&
-			strcasecmp(value, NS_LDAP_VERSION_2) != 0) {
+		    strcasecmp(value, NS_LDAP_VERSION_1) != 0 &&
+		    strcasecmp(value, NS_LDAP_VERSION_2) != 0) {
 			(void) snprintf(errstr, MAXERROR,
-				gettext("Version mismatch, expected "
-				    "cache version '%s' or '%s' but "
-				    "encountered version '%s'."),
-				    NS_LDAP_VERSION_1,
-				    NS_LDAP_VERSION_2, value);
+			    gettext("Version mismatch, expected "
+			    "cache version '%s' or '%s' but "
+			    "encountered version '%s'."),
+			    NS_LDAP_VERSION_1,
+			    NS_LDAP_VERSION_2, value);
 				return (NS_PARSE_ERR);
 		}
 		break;
@@ -1499,7 +1503,7 @@ verify_value(ns_config_t *cfg, char *name, char *value, char *errstr)
 	default:
 		found = 0; j = 0;
 		while (def->allowed != NULL &&
-			def->allowed[j].name != NULL && j < DEFMAX) {
+		    def->allowed[j].name != NULL && j < DEFMAX) {
 			if (strcmp(def->allowed[j].name,
 			    value) == 0) {
 				found = 1;
@@ -1508,7 +1512,7 @@ verify_value(ns_config_t *cfg, char *name, char *value, char *errstr)
 			j++;
 		}
 		if (!found) {
-			    (void) snprintf(errstr, MAXERROR,
+			(void) snprintf(errstr, MAXERROR,
 			    gettext("Invalid option specified for "
 			    "'%s' keyword. '%s' is not a recognized "
 			    "keyword value."), name, value);
@@ -1566,10 +1570,10 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 	def = get_defconfig(ptr, type);
 	if (def == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-					"invalid ParamIndexType (%d)"), type);
+		    gettext("Unable to set value: "
+		    "invalid ParamIndexType (%d)"), type);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -1610,11 +1614,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			i = __s_get_enum_value(ptr, cp, def->index);
 			if (i < 0) {
 				(void) snprintf(errstr, sizeof (errstr),
-					gettext("Unable to set value: "
-					"invalid %s (%d)"), def->name,
-					def->index);
+				    gettext("Unable to set value: "
+				    "invalid %s (%d)"), def->name,
+				    def->index);
 				MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				if (tcp != NULL)
 					free(tcp);
 				return (NS_LDAP_CONFIG);
@@ -1632,11 +1636,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 					continue;
 
 				(void) snprintf(errstr, sizeof (errstr),
-					gettext("Unable to set value: "
-					"invalid %s (%d)"), def->name,
-					def->index);
+				    gettext("Unable to set value: "
+				    "invalid %s (%d)"), def->name,
+				    def->index);
 				MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-						strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 				if (tcp != NULL)
 					free(tcp);
 				return (NS_LDAP_CONFIG);
@@ -1661,11 +1665,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		/* first check to see if colon (:) is there */
 		if ((strchr(cp, COLONTOK)) == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-				"invalid serviceAuthenticationMethod (%s)"),
-				cp);
+			    gettext("Unable to set value: "
+			    "invalid serviceAuthenticationMethod (%s)"),
+			    cp);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (tcp != NULL)
 				free(tcp);
 			return (NS_LDAP_CONFIG);
@@ -1703,25 +1707,25 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			fnd = 0;
 			for (j = 0; j < ptr->paramList[type].ns_acnt; j++) {
 				dpend = strchr(ptr->paramList[type].ns_ppc[j],
-						COLONTOK);
+				    COLONTOK);
 				if (dpend == NULL)
 					continue;
 				i = dpend - ptr->paramList[type].ns_ppc[j];
 				if (i != len)
 					continue;
 				if (strncmp(ptr->paramList[type].ns_ppc[j],
-					    dp, len) == 0) {
+				    dp, len) == 0) {
 					conf.ns_acnt =
-						ptr->paramList[type].ns_acnt;
+					    ptr->paramList[type].ns_acnt;
 					conf.ns_ppc =
-						ptr->paramList[type].ns_ppc;
+					    ptr->paramList[type].ns_ppc;
 					ptr->paramList[type].ns_ppc = NULL;
 					free(conf.ns_ppc[j]);
 					conf.ns_ppc[j] = (char *)strdup(cp);
 					if (conf.ns_ppc[j] == NULL) {
 						free(dp);
 						__s_api_free2dArray
-							(conf.ns_ppc);
+						    (conf.ns_ppc);
 						if (tcp != NULL)
 							free(tcp);
 						return (NS_LDAP_MEMORY);
@@ -1747,7 +1751,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			} else
 				p = NULL;
 			conf.ns_ppc =
-				(char **)realloc(p, (len+1) * sizeof (char *));
+			    (char **)realloc(p, (len+1) * sizeof (char *));
 			if (conf.ns_ppc == NULL) {
 				__s_api_free2dArray(p);
 				if (tcp != NULL)
@@ -1769,11 +1773,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		/* first check to see if colon (:) is there */
 		if ((strchr(cp, COLONTOK)) == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-				"invalid serviceCredentialLevel (%s)"),
-				cp);
+			    gettext("Unable to set value: "
+			    "invalid serviceCredentialLevel (%s)"),
+			    cp);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (tcp != NULL)
 				free(tcp);
 			return (NS_LDAP_CONFIG);
@@ -1811,25 +1815,25 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			fnd = 0;
 			for (j = 0; j < ptr->paramList[type].ns_acnt; j++) {
 				dpend = strchr(ptr->paramList[type].ns_ppc[j],
-						COLONTOK);
+				    COLONTOK);
 				if (dpend == NULL)
 					continue;
 				i = dpend - ptr->paramList[type].ns_ppc[j];
 				if (i != len)
 					continue;
 				if (strncmp(ptr->paramList[type].ns_ppc[j],
-					    dp, len) == 0) {
+				    dp, len) == 0) {
 					conf.ns_acnt =
-						ptr->paramList[type].ns_acnt;
+					    ptr->paramList[type].ns_acnt;
 					conf.ns_ppc =
-						ptr->paramList[type].ns_ppc;
+					    ptr->paramList[type].ns_ppc;
 					ptr->paramList[type].ns_ppc = NULL;
 					free(conf.ns_ppc[j]);
 					conf.ns_ppc[j] = (char *)strdup(cp);
 					if (conf.ns_ppc[j] == NULL) {
 						free(dp);
 						__s_api_free2dArray
-							(conf.ns_ppc);
+						    (conf.ns_ppc);
 						if (tcp != NULL)
 							free(tcp);
 						return (NS_LDAP_MEMORY);
@@ -1855,7 +1859,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			} else
 				p = NULL;
 			conf.ns_ppc =
-				(char **)realloc(p, (len+1) * sizeof (char *));
+			    (char **)realloc(p, (len+1) * sizeof (char *));
 			if (conf.ns_ppc == NULL) {
 				__s_api_free2dArray(p);
 				if (tcp != NULL)
@@ -1881,11 +1885,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		 */
 		if ((strchr(cp, COLONTOK)) == NULL || *cp == COLONTOK) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-				"invalid serviceSearchDescriptor (%s)"),
-				cp);
+			    gettext("Unable to set value: "
+			    "invalid serviceSearchDescriptor (%s)"),
+			    cp);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (tcp != NULL)
 				free(tcp);
 			return (NS_LDAP_CONFIG);
@@ -1923,25 +1927,25 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			fnd = 0;
 			for (j = 0; j < ptr->paramList[type].ns_acnt; j++) {
 				dpend = strchr(ptr->paramList[type].ns_ppc[j],
-						COLONTOK);
+				    COLONTOK);
 				if (dpend == NULL)
 					continue;
 				i = dpend - ptr->paramList[type].ns_ppc[j];
 				if (i != len)
 					continue;
 				if (strncmp(ptr->paramList[type].ns_ppc[j],
-					    dp, len) == 0) {
+				    dp, len) == 0) {
 					conf.ns_acnt =
-						ptr->paramList[type].ns_acnt;
+					    ptr->paramList[type].ns_acnt;
 					conf.ns_ppc =
-						ptr->paramList[type].ns_ppc;
+					    ptr->paramList[type].ns_ppc;
 					ptr->paramList[type].ns_ppc = NULL;
 					free(conf.ns_ppc[j]);
 					conf.ns_ppc[j] = (char *)strdup(cp);
 					if (conf.ns_ppc[j] == NULL) {
 						free(dp);
 						__s_api_free2dArray
-							(conf.ns_ppc);
+						    (conf.ns_ppc);
 						if (tcp != NULL)
 							free(tcp);
 						return (NS_LDAP_MEMORY);
@@ -1967,7 +1971,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			} else
 				p = NULL;
 			conf.ns_ppc =
-				(char **)realloc(p, (len+1) * sizeof (char *));
+			    (char **)realloc(p, (len+1) * sizeof (char *));
 			if (conf.ns_ppc == NULL) {
 				__s_api_free2dArray(p);
 				if (tcp != NULL)
@@ -2040,7 +2044,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			if (*cp2 == SPACETOK || *cp2 == COMMATOK) {
 				len++;
 				for (; *(cp2 + 1) == SPACETOK ||
-					    *(cp2 +1) == COMMATOK; cp2++)
+				    *(cp2 +1) == COMMATOK; cp2++)
 					;
 			}
 		}
@@ -2117,17 +2121,18 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 				} else {
 					(void) strlcpy(tbuf, cp, j);
 					j = __s_get_enum_value(ptr, tbuf,
-						def->index);
+					    def->index);
 					ptbuf = tbuf;
 				}
 				if (j < 0) {
 					(void) snprintf(errstr, sizeof (errstr),
-					gettext("Unable to set value: "
-					"invalid authenticationMethod (%s)"),
-					ptbuf);
+					    gettext("Unable to set value: "
+					    "invalid "
+					    "authenticationMethod (%s)"),
+					    ptbuf);
 					MKERROR(LOG_ERR, *error,
-						NS_CONFIG_SYNTAX,
-						strdup(errstr), NULL);
+					    NS_CONFIG_SYNTAX,
+					    strdup(errstr), NULL);
 					free(conf.ns_pi);
 					if (tcp != NULL)
 						free(tcp);
@@ -2149,10 +2154,10 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		}
 		if (j < 0) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-				"invalid authenticationMethod (%s)"), ptbuf);
+			    gettext("Unable to set value: "
+			    "invalid authenticationMethod (%s)"), ptbuf);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (tcp != NULL)
 				free(tcp);
 			return (NS_LDAP_CONFIG);
@@ -2189,17 +2194,17 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 				} else {
 					(void) strlcpy(tbuf, cp, j);
 					j = __s_get_enum_value(ptr, tbuf,
-						def->index);
+					    def->index);
 					ptbuf = tbuf;
 				}
 				if (j < 0) {
 					(void) snprintf(errstr, sizeof (errstr),
-					gettext("Unable to set value: "
-					"invalid credentialLevel (%s)"),
-					ptbuf);
+					    gettext("Unable to set value: "
+					    "invalid credentialLevel (%s)"),
+					    ptbuf);
 					MKERROR(LOG_ERR, *error,
-						NS_CONFIG_SYNTAX,
-						strdup(errstr), NULL);
+					    NS_CONFIG_SYNTAX,
+					    strdup(errstr), NULL);
 					free(conf.ns_pi);
 					if (tcp != NULL)
 						free(tcp);
@@ -2221,10 +2226,10 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		}
 		if (j < 0) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to set value: "
-				"invalid credentialLevel (%s)"), ptbuf);
+			    gettext("Unable to set value: "
+			    "invalid credentialLevel (%s)"), ptbuf);
 			MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (tcp != NULL)
 				free(tcp);
 			return (NS_LDAP_CONFIG);
@@ -2243,7 +2248,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 				"invalid schema mapping (%s)"), cp);
 				exitrc = NS_LDAP_CONFIG;
 				MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 			}
 			if (tcp)
 				free(tcp);
@@ -2260,17 +2265,17 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			exitrc = NS_LDAP_MEMORY;
 
 			rmap = (ns_mapping_t *)calloc(1,
-				sizeof (ns_mapping_t));
+			    sizeof (ns_mapping_t));
 			if (rmap) {
 				rmap->service = strdup(sid);
 				if (rmap->service) {
 					rmap->orig = strdup(*attr);
 					if (rmap->orig) {
 						rmap->map = (char **)calloc(2,
-							sizeof (char *));
+						    sizeof (char *));
 						if (rmap->map) {
 							(rmap->map)[0] =
-								strdup(origA);
+							    strdup(origA);
 							if ((rmap->map)[0])
 								free_memory = 0;
 						}
@@ -2282,11 +2287,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 				if (def->data_type == ATTRMAP) {
 					rmap->type = NS_ATTR_MAP;
 					i = __s_api_add_map2hash(ptr,
-						NS_HASH_RAMAP, rmap);
+					    NS_HASH_RAMAP, rmap);
 				} else {
 					rmap->type = NS_OBJ_MAP;
 					i = __s_api_add_map2hash(ptr,
-						NS_HASH_ROMAP, rmap);
+					    NS_HASH_ROMAP, rmap);
 				}
 
 				if (i != NS_HASH_RC_SUCCESS) {
@@ -2294,31 +2299,31 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 					case NS_HASH_RC_CONFIG_ERROR:
 						exitrc = NS_LDAP_INTERNAL;
 						(void) snprintf(errstr,
-							sizeof (errstr),
-							gettext(
-							"Unable to set value: "
-							"no configuration info "
-							"for schema map "
-							"update (%s)"), cp);
+						    sizeof (errstr),
+						    gettext(
+						    "Unable to set value: "
+						    "no configuration info "
+						    "for schema map "
+						    "update (%s)"), cp);
 						MKERROR(LOG_ERR, *error,
-							NS_LDAP_INTERNAL,
-							strdup(errstr),
-							NULL);
+						    NS_LDAP_INTERNAL,
+						    strdup(errstr),
+						    NULL);
 						break;
 					case NS_HASH_RC_EXISTED:
 						exitrc = NS_LDAP_CONFIG;
 						(void) snprintf(errstr,
-							sizeof (errstr),
-							gettext(
-							"Unable to set value: "
-							"schema map "
-							"already existed for "
-							"(%s, %s)."),
-							*attr, origA);
+						    sizeof (errstr),
+						    gettext(
+						    "Unable to set value: "
+						    "schema map "
+						    "already existed for "
+						    "(%s, %s)."),
+						    *attr, origA);
 						MKERROR(LOG_ERR, *error,
-							NS_CONFIG_SYNTAX,
-							strdup(errstr),
-							NULL);
+						    NS_CONFIG_SYNTAX,
+						    strdup(errstr),
+						    NULL);
 						break;
 					case NS_HASH_RC_NO_MEMORY:
 						exitrc = NS_LDAP_MEMORY;
@@ -2363,18 +2368,18 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 		exitrc = NS_LDAP_MEMORY;
 
 		map = (ns_mapping_t *)calloc(1,
-			sizeof (ns_mapping_t));
+		    sizeof (ns_mapping_t));
 		if (map) {
 			map->service = strdup(sid);
 			if (map->service) {
 				map->orig = strdup(
-				NS_HASH_SCHEMA_MAPPING_EXISTED);
+				    NS_HASH_SCHEMA_MAPPING_EXISTED);
 				if (map->orig) {
 					map->map = (char **)calloc(2,
-						sizeof (char *));
+					    sizeof (char *));
 					if (map->map) {
 						(map->map)[0] =
-							strdup(sid);
+						    strdup(sid);
 						if ((map->map)[0])
 							free_memory = 0;
 					}
@@ -2390,7 +2395,7 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			 * would not show it
 			 */
 			i = __s_api_add_map2hash(ptr,
-				NS_HASH_RAMAP, map);
+			    NS_HASH_RAMAP, map);
 
 			/*
 			 * ignore "map already existed" error,
@@ -2399,21 +2404,21 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			 * for map.
 			 */
 			if (i != NS_HASH_RC_SUCCESS &&
-				i != NS_HASH_RC_EXISTED) {
+			    i != NS_HASH_RC_EXISTED) {
 				switch (i) {
 				case NS_HASH_RC_CONFIG_ERROR:
 					exitrc = NS_LDAP_INTERNAL;
 					(void) snprintf(errstr,
-						sizeof (errstr),
-						gettext(
-						"Unable to set value: "
-						"no configuration info "
-						"for schema map "
-						"update (%s)"), cp);
+					    sizeof (errstr),
+					    gettext(
+					    "Unable to set value: "
+					    "no configuration info "
+					    "for schema map "
+					    "update (%s)"), cp);
 					MKERROR(LOG_ERR, *error,
-						NS_LDAP_INTERNAL,
-						strdup(errstr),
-						NULL);
+					    NS_LDAP_INTERNAL,
+					    strdup(errstr),
+					    NULL);
 					break;
 				case NS_HASH_RC_NO_MEMORY:
 					exitrc = NS_LDAP_MEMORY;
@@ -2470,11 +2475,11 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			if (def->data_type == ATTRMAP) {
 				map->type = NS_ATTR_MAP;
 				i = __s_api_add_map2hash(ptr,
-					NS_HASH_AMAP, map);
+				    NS_HASH_AMAP, map);
 			} else {
 				map->type = NS_OBJ_MAP;
 				i = __s_api_add_map2hash(ptr,
-					NS_HASH_OMAP, map);
+				    NS_HASH_OMAP, map);
 			}
 
 			if (i != NS_HASH_RC_SUCCESS) {
@@ -2482,30 +2487,30 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 				case NS_HASH_RC_CONFIG_ERROR:
 					exitrc = NS_LDAP_INTERNAL;
 					(void) snprintf(errstr,
-						sizeof (errstr),
-						gettext(
-						"Unable to set value: "
-						"no configuration info "
-						"for schema map "
-						"update (%s)"), cp);
+					    sizeof (errstr),
+					    gettext(
+					    "Unable to set value: "
+					    "no configuration info "
+					    "for schema map "
+					    "update (%s)"), cp);
 					MKERROR(LOG_ERR, *error,
-						NS_LDAP_INTERNAL,
-						strdup(errstr),
-						NULL);
+					    NS_LDAP_INTERNAL,
+					    strdup(errstr),
+					    NULL);
 					break;
 				case NS_HASH_RC_EXISTED:
 					exitrc = NS_LDAP_CONFIG;
 					(void) snprintf(errstr,
-						sizeof (errstr),
-						gettext(
-						"Unable to set value: "
-						"schema map "
-						"already existed for "
-						"'%s'."), origA);
+					    sizeof (errstr),
+					    gettext(
+					    "Unable to set value: "
+					    "schema map "
+					    "already existed for "
+					    "'%s'."), origA);
 					MKERROR(LOG_ERR, *error,
-						NS_CONFIG_SYNTAX,
-						strdup(errstr),
-						NULL);
+					    NS_CONFIG_SYNTAX,
+					    strdup(errstr),
+					    NULL);
 					break;
 				case NS_HASH_RC_NO_MEMORY:
 					exitrc = NS_LDAP_MEMORY;
@@ -2531,10 +2536,10 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 	default:
 		/* This should never happen. */
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Unable to set value: invalid configuration "
-			"type (%d)"), def->data_type);
+		    gettext("Unable to set value: invalid configuration "
+		    "type (%d)"), def->data_type);
 		MKERROR(LOG_ERR, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		if (tcp != NULL)
 			free(tcp);
 		return (NS_LDAP_CONFIG);
@@ -2550,9 +2555,9 @@ __ns_ldap_setParamValue(ns_config_t *ptr, const ParamIndexType type,
 			ns_param_t sav_conf;
 
 			(void) snprintf(errstr, sizeof (errstr),
-					gettext("%s"), errstr);
+			    gettext("%s"), errstr);
 			MKERROR(LOG_WARNING, *error, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 
 			sav_conf = ptr->paramList[type];
 			ptr->paramList[type] = conf;
@@ -2623,14 +2628,14 @@ __ns_ldap_setParam(const ParamIndexType type,
 	cfg = __s_api_get_default_config();
 
 	if (cache_server == TRUE) {
-	    if (cfg == NULL) {
-		__ns_ldap_default_config();
-		cfg = __s_api_get_default_config();
 		if (cfg == NULL) {
-			(void) mutex_unlock(&ns_loadrefresh_lock);
-			return (NS_LDAP_MEMORY);
+			__ns_ldap_default_config();
+			cfg = __s_api_get_default_config();
+			if (cfg == NULL) {
+				(void) mutex_unlock(&ns_loadrefresh_lock);
+				return (NS_LDAP_MEMORY);
+			}
 		}
-	    }
 	} else {
 		/*
 		 * This code always return error here on client side,
@@ -2638,10 +2643,10 @@ __ns_ldap_setParam(const ParamIndexType type,
 		 * applications that need to set parameters.
 		 */
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Unable to set parameter from a client in "
-			"__ns_ldap_setParam()"));
+		    gettext("Unable to set parameter from a client in "
+		    "__ns_ldap_setParam()"));
 		MKERROR(LOG_WARNING, *error, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		if (cfg != NULL)
 			__s_api_release_config(cfg);
 		(void) mutex_unlock(&ns_loadrefresh_lock);
@@ -2654,12 +2659,12 @@ __ns_ldap_setParam(const ParamIndexType type,
 		__s_api_release_config(cfg);
 		if (new_cfg == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to load configuration '%s' "
-				"('%s')."), NSCONFIGFILE,
-				errorp != NULL && errorp->message != NULL ?
-				errorp->message : "");
+			    gettext("Unable to load configuration '%s' "
+			    "('%s')."), NSCONFIGFILE,
+			    errorp != NULL && errorp->message != NULL ?
+			    errorp->message : "");
 			MKERROR(LOG_WARNING, *error, NS_CONFIG_NOTLOADED,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (errorp != NULL)
 				(void) __ns_ldap_freeError(&errorp);
 			(void) mutex_unlock(&ns_loadrefresh_lock);
@@ -2719,7 +2724,7 @@ dupParam(ns_param_t *ptr)
 	case ARRAYAUTH:
 		for (i = 0; i < count; i++) {
 			ap = __s_api_AuthEnumtoStruct(
-				(EnumAuthType_t)ptr->ns_pi[i]);
+			    (EnumAuthType_t)ptr->ns_pi[i]);
 			if (ap == NULL) {
 				free(dupdata);
 				return (NULL);
@@ -2838,13 +2843,13 @@ __ns_ldap_getParam(const ParamIndexType Param,
 		__s_api_release_config(cfg);
 		if (new_cfg == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("Unable to load configuration "
-					"'%s' ('%s')."),
-				NSCONFIGFILE,
-				errorp != NULL && errorp->message != NULL ?
-				errorp->message : "");
+			    gettext("Unable to load configuration "
+			    "'%s' ('%s')."),
+			    NSCONFIGFILE,
+			    errorp != NULL && errorp->message != NULL ?
+			    errorp->message : "");
 			MKERROR(LOG_WARNING, *error, NS_CONFIG_NOTLOADED,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 			if (errorp != NULL)
 				(void) __ns_ldap_freeError(&errorp);
 			(void) mutex_unlock(&ns_loadrefresh_lock);
@@ -2859,7 +2864,7 @@ __ns_ldap_getParam(const ParamIndexType Param,
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, *error, NS_CONFIG_NOTLOADED,
-			strdup(errstr), NULL);
+		    strdup(errstr), NULL);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -2963,7 +2968,7 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		sz = 0;
 		for (i = 0; i < count; i++) {
 			sz += strlen(__s_get_auth_name(cfg,
-				(AuthType_t)(ptr->ns_pi[i]))) + seplen;
+			    (AuthType_t)(ptr->ns_pi[i]))) + seplen;
 		}
 		sz = sz + alen + 1;
 		if (sz <= bufsz) {
@@ -2976,8 +2981,8 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		}
 		for (i = 0; i < count; i++) {
 			(void) strcat(buf,
-				__s_get_auth_name(cfg,
-				(AuthType_t)(ptr->ns_pi[i])));
+			    __s_get_auth_name(cfg,
+			    (AuthType_t)(ptr->ns_pi[i])));
 			if (i != count-1) {
 				if (cfg->version == NS_LDAP_V1)
 					(void) strcat(buf, COMMASEP);
@@ -2991,7 +2996,7 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		sz = 0;
 		for (i = 0; i < count; i++) {
 			sz += strlen(__s_get_credlvl_name(cfg,
-				(CredLevel_t)ptr->ns_pi[i])) + seplen;
+			    (CredLevel_t)ptr->ns_pi[i])) + seplen;
 		}
 		sz = sz + alen + 1;
 		if (sz <= bufsz) {
@@ -3004,8 +3009,8 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		}
 		for (i = 0; i < count; i++) {
 			(void) strcat(buf,
-				__s_get_credlvl_name(cfg,
-				(CredLevel_t)ptr->ns_pi[i]));
+			    __s_get_credlvl_name(cfg,
+			    (CredLevel_t)ptr->ns_pi[i]));
 			if (i != count-1) {
 				(void) strcat(buf, SPACESEP);
 			}
@@ -3029,15 +3034,15 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		switch (fmt) {
 		case NS_LDIF_FMT:
 			sz += count * (strlen(def->profile_name)
-				+ strlen(COLSPSEP) + strlen("\n"));
+			    + strlen(COLSPSEP) + strlen("\n"));
 			break;
 		case NS_FILE_FMT:
 			sz += count * (strlen(def->name)
-				+ strlen(EQUALSEP) + strlen("\n"));
+			    + strlen(EQUALSEP) + strlen("\n"));
 			break;
 		case NS_DOOR_FMT:
 			sz += count * (strlen(def->name)
-				+ strlen(EQUALSEP) + strlen(DOORLINESEP));
+			    + strlen(EQUALSEP) + strlen(DOORLINESEP));
 			break;
 		}
 		if (sz <= bufsz) {
@@ -3135,21 +3140,21 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 		switch (def->index) {
 		case NS_LDAP_PREF_ONLY_P:
 			(void) strcat(buf,
-				__s_get_pref_name((PrefOnly_t)ptr->ns_i));
+			    __s_get_pref_name((PrefOnly_t)ptr->ns_i));
 			break;
 		case NS_LDAP_SEARCH_REF_P:
 			(void) strcat(buf,
-				__s_get_searchref_name(cfg,
-				(SearchRef_t)ptr->ns_i));
+			    __s_get_searchref_name(cfg,
+			    (SearchRef_t)ptr->ns_i));
 			break;
 		case NS_LDAP_SEARCH_SCOPE_P:
 			(void) strcat(buf,
-				__s_get_scope_name(cfg,
-				(ScopeType_t)ptr->ns_i));
+			    __s_get_scope_name(cfg,
+			    (ScopeType_t)ptr->ns_i));
 			break;
 		default:
 			(void) snprintf(ibuf, sizeof (ibuf),
-				"%d", ptr->ns_i);
+			    "%d", ptr->ns_i);
 			(void) strcat(buf, ibuf);
 			break;
 		}
@@ -3219,24 +3224,27 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 		ldap_data_t	s_d;
 		char		s_b[DOORBUFFERSIZE];
 	} space_t;
-	space_t	*space;
+	space_t			*space;
 
-	ldap_data_t	*sptr;
-	int		ndata;
-	int		adata;
-	char		errstr[MAXERROR];
-	char		*domainname;
+	ldap_data_t		*sptr;
+	int			ndata;
+	int			adata;
+	char			errstr[MAXERROR];
+	char			*domainname;
+	ns_ldap_return_code	retCode;
+
+	*error = NULL;
 
 	domainname = __getdomainname();
 	if (domainname == NULL || buffer == NULL || buflen == NULL ||
 	    (strlen(domainname) >= (sizeof (space_t)
-		- sizeof (space->s_d.ldap_call.ldap_callnumber)))) {
+	    - sizeof (space->s_d.ldap_call.ldap_callnumber)))) {
 		return (NS_LDAP_OP_FAILED);
 	}
 
 	space = (space_t *)calloc(1, sizeof (space_t));
 	if (space == NULL)
-		return (NS_LDAP_OP_FAILED);
+		return (NS_LDAP_MEMORY);
 
 	adata = (sizeof (ldap_call_t) + strlen(domainname) +1);
 	ndata = sizeof (space_t);
@@ -3251,11 +3259,11 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 		break;
 	case NOTFOUND:
 		(void) snprintf(errstr, sizeof (errstr),
-			gettext("Door call to "
-			"ldap_cachemgr failed - error: %d."),
-			space->s_d.ldap_ret.ldap_errno);
+		    gettext("Door call to "
+		    "ldap_cachemgr failed - error: %d."),
+		    space->s_d.ldap_ret.ldap_errno);
 		MKERROR(LOG_WARNING, *error, NS_CONFIG_CACHEMGR,
-			strdup(errstr), NULL);
+		    strdup(errstr), NULL);
 		free(space);
 		return (NS_LDAP_OP_FAILED);
 	default:
@@ -3263,24 +3271,23 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 		return (NS_LDAP_OP_FAILED);
 	}
 
+	retCode = NS_LDAP_SUCCESS;
+
 	/* copy info from door call to buffer here */
-	*buflen = strlen(space->s_d.ldap_ret.ldap_u.config) + 1;
+	*buflen = strlen(sptr->ldap_ret.ldap_u.config) + 1;
 	*buffer = calloc(*buflen, sizeof (char));
 	if (*buffer == NULL) {
-		free(space);
-		return (NS_LDAP_MEMORY);
+		retCode = NS_LDAP_MEMORY;
+	} else {
+		(void) strcpy(*buffer, sptr->ldap_ret.ldap_u.config);
 	}
-	(void) strcpy(*buffer, space->s_d.ldap_ret.ldap_u.config);
 
 	if (sptr != &space->s_d) {
 		(void) munmap((char *)sptr, ndata);
-	} else {
-		free(space);
-		space = NULL;
 	}
-	*error = NULL;
+	free(space);
 
-	return (NS_LDAP_SUCCESS);
+	return (retCode);
 }
 
 /*
@@ -3321,26 +3328,26 @@ SetDoorInfo(char *buffer, ns_ldap_error_t **errorp)
 		/* Use get_versiontype and check for V1 vs V2 prototypes */
 		if (__s_api_get_versiontype(ptr, name, &i) < 0) {
 			(void) snprintf(errstr, sizeof (errstr),
-					"%s (%s)\n",
-					gettext("Illegal profile entry "
-					"line in configuration."),
-					name);
+			    "%s (%s)\n",
+			    gettext("Illegal profile entry "
+			    "line in configuration."),
+			    name);
 			errfnd++;
 		/* Write verify routines and get rid of verify_value here */
 		} else if (verify_value(ptr, name,
-					value, errbuf) != NS_SUCCESS) {
+		    value, errbuf) != NS_SUCCESS) {
 			(void) snprintf(errstr, sizeof (errstr),
-				gettext("%s\n"), errbuf);
+			    gettext("%s\n"), errbuf);
 			errfnd++;
 		} else if (!first && i == NS_LDAP_FILE_VERSION_P) {
 			(void) snprintf(errstr, sizeof (errstr),
-					gettext("Illegal NS_LDAP_FILE_VERSION "
-					"line in configuration.\n"));
+			    gettext("Illegal NS_LDAP_FILE_VERSION "
+			    "line in configuration.\n"));
 			errfnd++;
 		}
 		if (errfnd) {
 			MKERROR(LOG_ERR, *errorp, NS_CONFIG_SYNTAX,
-				strdup(errstr), NULL);
+			    strdup(errstr), NULL);
 		} else {
 			ret = set_default_value(ptr, name, value, errorp);
 		}
@@ -3356,7 +3363,7 @@ SetDoorInfo(char *buffer, ns_ldap_error_t **errorp)
 	if (__s_api_crosscheck(ptr, errstr, B_TRUE) != NS_SUCCESS) {
 		__s_api_destroy_config(ptr);
 		MKERROR(LOG_WARNING, *errorp, NS_CONFIG_SYNTAX, strdup(errstr),
-			NULL);
+		    NULL);
 		return (NULL);
 	}
 
@@ -3488,7 +3495,7 @@ __s_api_AuthEnumtoStruct(const EnumAuthType_t i)
 			ap->type = NS_LDAP_AUTH_SASL;
 			ap->saslmech = NS_LDAP_SASL_GSSAPI;
 			ap->saslopt = NS_LDAP_SASLOPT_INT |
-					NS_LDAP_SASLOPT_PRIV;
+			    NS_LDAP_SASLOPT_PRIV;
 			break;
 		case NS_LDAP_EA_TLS_NONE:
 			ap->type = NS_LDAP_AUTH_TLS;
@@ -3572,7 +3579,7 @@ __s_val_postime(ParamIndexType i, ns_default_config *def,
 			return (NS_SUCCESS);
 	}
 	(void) snprintf(errbuf, MAXERROR,
-			gettext("Illegal time value in %s"), def->name);
+	    gettext("Illegal time value in %s"), def->name);
 	return (NS_PARSE_ERR);
 }
 
@@ -3587,15 +3594,15 @@ __s_val_basedn(ParamIndexType i, ns_default_config *def,
 {
 	if (param && param->ns_ptype == CHARPTR &&
 	    i == NS_LDAP_SEARCH_BASEDN_P &&
-		((param->ns_pc == NULL) || 		/* empty */
-		(*(param->ns_pc) == '\0') ||		/* empty */
-		(strchr(param->ns_pc, '=') != NULL)))	/* '=' */
+	    ((param->ns_pc == NULL) || 		/* empty */
+	    (*(param->ns_pc) == '\0') ||		/* empty */
+	    (strchr(param->ns_pc, '=') != NULL)))	/* '=' */
 	{
 		return (NS_SUCCESS);
 	}
 	(void) snprintf(errbuf, MAXERROR,
-		gettext("Non-existent or invalid DN in %s"),
-		def->name);
+	    gettext("Non-existent or invalid DN in %s"),
+	    def->name);
 	return (NS_PARSE_ERR);
 }
 
@@ -3610,14 +3617,14 @@ __s_val_serverList(ParamIndexType i, ns_default_config *def,
 {
 	for (i = 0; i < param->ns_acnt; i++) {
 		if ((__s_api_isipv4(param->ns_ppc[i])) ||
-			(__s_api_isipv6(param->ns_ppc[i])) ||
-			(__s_api_ishost(param->ns_ppc[i]))) {
+		    (__s_api_isipv6(param->ns_ppc[i])) ||
+		    (__s_api_ishost(param->ns_ppc[i]))) {
 			continue;
 		}
 		/* err */
 		(void) snprintf(errbuf, MAXERROR,
-			gettext("Invalid server (%s) in %s"),
-			param->ns_ppc[i], def->name);
+		    gettext("Invalid server (%s) in %s"),
+		    param->ns_ppc[i], def->name);
 		return (NS_PARSE_ERR);
 	}
 
@@ -3635,13 +3642,13 @@ __s_val_binddn(ParamIndexType i, ns_default_config *def,
 {
 	if (param && param->ns_ptype == CHARPTR &&
 	    i == NS_LDAP_BINDDN_P &&
-		((param->ns_pc == NULL) ||
-		((*(param->ns_pc) != '\0') &&
-		(strchr(param->ns_pc, '=') != NULL)))) {
+	    ((param->ns_pc == NULL) ||
+	    ((*(param->ns_pc) != '\0') &&
+	    (strchr(param->ns_pc, '=') != NULL)))) {
 		return (NS_SUCCESS);
 	}
 	(void) snprintf(errbuf, MAXERROR,
-		gettext("NULL or invalid proxy bind DN"));
+	    gettext("NULL or invalid proxy bind DN"));
 	return (NS_PARSE_ERR);
 }
 
@@ -3656,12 +3663,12 @@ __s_val_bindpw(ParamIndexType i, ns_default_config *def,
 {
 	if (param && param->ns_ptype == CHARPTR &&
 	    i == NS_LDAP_BINDPASSWD_P &&
-		((param->ns_pc == NULL) ||
-		(*(param->ns_pc) != '\0'))) {
+	    ((param->ns_pc == NULL) ||
+	    (*(param->ns_pc) != '\0'))) {
 		return (NS_SUCCESS);
 	}
 	(void) snprintf(errbuf, MAXERROR,
-		gettext("NULL proxy bind password"));
+	    gettext("NULL proxy bind password"));
 	return (NS_PARSE_ERR);
 }
 

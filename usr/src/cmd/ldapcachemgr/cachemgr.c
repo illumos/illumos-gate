@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <door.h>
 #include <time.h>
 #include <string.h>
+#include <strings.h>
 #include <libintl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -51,6 +52,10 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <locale.h>	/* LC_ALL */
+
+#include <alloca.h>
+#include <ucontext.h>
+
 #include "cachemgr.h"
 
 static void	detachfromtty();
@@ -62,8 +67,7 @@ static void switcher(void *cookie, char *argp, size_t arg_size,
 static void usage(char *s);
 static int cachemgr_set_lf(admin_t *ptr, char *logfile);
 static int client_getadmin(admin_t *ptr);
-static int getadmin(ldap_return_t *out);
-static int setadmin(ldap_return_t *out, ldap_call_t *ptr);
+static int setadmin(ldap_call_t *ptr);
 static  int client_setadmin(admin_t *ptr);
 static int client_showstats(admin_t *ptr);
 
@@ -106,9 +110,9 @@ sig_ok_to_exit(int signo)
 		exit(0);
 	} else {
 		logit("sig_ok_to_exit(): invalid signal(%d) received.\n",
-			signo);
+		    signo);
 		syslog(LOG_ERR, gettext("ldap_cachemgr: "
-			"invalid signal(%d) received."), signo);
+		    "invalid signal(%d) received."), signo);
 		exit(1);
 	}
 }
@@ -234,7 +238,7 @@ server_create(door_info_t *dip)
 	}
 	(void) mutex_unlock(&create_lock);
 	(void) thr_create(NULL, 0, server_tsd_bind, NULL,
-		THR_BOUND|THR_DETACHED, NULL);
+	    THR_BOUND|THR_DETACHED, NULL);
 }
 
 /*
@@ -273,7 +277,7 @@ main(int argc, char ** argv)
 
 	if (chdir(NSLDAPDIRECTORY) < 0) {
 		(void) fprintf(stderr, gettext("chdir(\"%s\") failed: %s\n"),
-			NSLDAPDIRECTORY, strerror(errno));
+		    NSLDAPDIRECTORY, strerror(errno));
 		exit(1);
 	}
 
@@ -299,8 +303,8 @@ main(int argc, char ** argv)
 		if ((__ns_ldap_cache_ping() != SUCCESS) ||
 		    (client_getadmin(&current_admin) != 0)) {
 			(void) fprintf(stderr,
-				gettext("%s doesn't appear to be running.\n"),
-				argv[0]);
+			    gettext("%s doesn't appear to be running.\n"),
+			    argv[0]);
 			exit(1);
 		}
 		(void) client_showstats(&current_admin);
@@ -329,7 +333,7 @@ main(int argc, char ** argv)
 	} else {
 		if (client_getadmin(&current_admin)) {
 			(void) fprintf(stderr, gettext("Cannot contact %s "
-				"properly(?)\n"), argv[0]);
+			    "properly(?)\n"), argv[0]);
 			exit(1);
 		}
 	}
@@ -364,7 +368,7 @@ main(int argc, char ** argv)
 		case 'l':
 			doset++;
 			(void) strlcpy(current_admin.logfile,
-				optarg, sizeof (current_admin.logfile));
+			    optarg, sizeof (current_admin.logfile));
 			break;
 		case 'd':
 			doset++;
@@ -382,15 +386,15 @@ main(int argc, char ** argv)
 	}
 
 	if (errflg)
-	    usage(argv[0]);
+		usage(argv[0]);
 
 	/*
 	 * will not show statistics if no daemon running
 	 */
 	if (will_become_server && showstats) {
 		(void) fprintf(stderr,
-			gettext("%s doesn't appear to be running.\n"),
-				argv[0]);
+		    gettext("%s doesn't appear to be running.\n"),
+		    argv[0]);
 		exit(1);
 	}
 
@@ -402,14 +406,14 @@ main(int argc, char ** argv)
 			current_admin.debug_level = debug_level;
 			if (client_setadmin(&current_admin) < 0) {
 				(void) fprintf(stderr,
-					gettext("Error during admin call\n"));
+				    gettext("Error during admin call\n"));
 				exit(1);
 			}
 		}
 		if (!showstats && !doset) {
 			(void) fprintf(stderr,
 			gettext("%s already running....use '%s "
-				"-K' to stop\n"), argv[0], argv[0]);
+			    "-K' to stop\n"), argv[0], argv[0]);
 		}
 		exit(0);
 	}
@@ -429,7 +433,7 @@ main(int argc, char ** argv)
 			(void) strcpy(current_admin.logfile, LOGFILE);
 		else
 			(void) cachemgr_set_lf(&current_admin,
-				current_admin.logfile);
+			    current_admin.logfile);
 		/*
 		 * validate the range of debug level number
 		 * and set the number to current_admin.debug_level
@@ -443,14 +447,14 @@ main(int argc, char ** argv)
 				(void) fprintf(stderr,
 				gettext("Incorrect Debug Level: %d\n"
 				"It should be between %d and %d\n"),
-				debug_level, DBG_OFF, MAXDEBUG);
+				    debug_level, DBG_OFF, MAXDEBUG);
 			exit(-1);
 		}
 	} else {
 		if (strlen(current_admin.logfile) == 0)
 			(void) strcpy(current_admin.logfile, "/dev/null");
 			(void) cachemgr_set_lf(&current_admin,
-				current_admin.logfile);
+			    current_admin.logfile);
 	}
 
 	if (dofg == 0)
@@ -473,7 +477,7 @@ main(int argc, char ** argv)
 	if (thr_keycreate(&server_key, server_destroy) != 0) {
 		logit("thr_keycreate() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: thr_keycreate() call failed"));
+		    gettext("ldap_cachemgr: thr_keycreate() call failed"));
 		perror("thr_keycreate");
 		exit(-1);
 	}
@@ -486,7 +490,7 @@ main(int argc, char ** argv)
 	    DOOR_UNREF | DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) < 0) {
 		logit("door_create() call failed\n");
 		syslog(LOG_ERR, gettext(
-			"ldap_cachemgr: door_create() call failed"));
+		    "ldap_cachemgr: door_create() call failed"));
 		perror("door_create");
 		exit(-1);
 	}
@@ -500,8 +504,8 @@ main(int argc, char ** argv)
 
 		if ((newfd = creat(LDAP_CACHE_DOOR, 0444)) < 0) {
 			logit("Cannot create %s:%s\n",
-				LDAP_CACHE_DOOR,
-				strerror(errno));
+			    LDAP_CACHE_DOOR,
+			    strerror(errno));
 			exit(1);
 		}
 		(void) close(newfd);
@@ -513,7 +517,7 @@ main(int argc, char ** argv)
 		    (fattach(did, LDAP_CACHE_DOOR) < 0)) {
 			logit("fattach() call failed\n");
 			syslog(LOG_ERR, gettext(
-				"ldap_cachemgr: fattach() call failed"));
+			    "ldap_cachemgr: fattach() call failed"));
 			perror("fattach");
 			exit(2);
 		}
@@ -529,7 +533,7 @@ main(int argc, char ** argv)
 	if (sigaction(SIGHUP, &sighupaction, NULL) < 0) {
 		logit("sigaction() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: sigaction() call failed"));
+		    gettext("ldap_cachemgr: sigaction() call failed"));
 		perror("sigaction");
 		exit(1);
 	}
@@ -537,7 +541,7 @@ main(int argc, char ** argv)
 	if (thr_sigsetmask(SIG_BLOCK, &myset, NULL) < 0) {
 		logit("thr_sigsetmask() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: thr_sigsetmask() call failed"));
+		    gettext("ldap_cachemgr: thr_sigsetmask() call failed"));
 		perror("thr_sigsetmask");
 		exit(1);
 	}
@@ -547,10 +551,10 @@ main(int argc, char ** argv)
 	 */
 
 	if (thr_create(NULL, NULL, (void *(*)(void*))getldap_refresh,
-		0, 0, NULL) != 0) {
+	    0, 0, NULL) != 0) {
 		logit("thr_create() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: thr_create() call failed"));
+		    gettext("ldap_cachemgr: thr_create() call failed"));
 		perror("thr_create");
 		exit(1);
 	}
@@ -560,10 +564,10 @@ main(int argc, char ** argv)
 	 */
 
 	if (thr_create(NULL, NULL, (void *(*)(void*))getldap_serverInfo_refresh,
-		0, 0, NULL) != 0) {
+	    0, 0, NULL) != 0) {
 		logit("thr_create() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: thr_create() call failed"));
+		    gettext("ldap_cachemgr: thr_create() call failed"));
 		perror("thr_create");
 		exit(1);
 	}
@@ -572,10 +576,10 @@ main(int argc, char ** argv)
 	if (use_slp) {
 		/* kick off SLP discovery thread */
 		if (thr_create(NULL, NULL, (void *(*)(void *))discover,
-			(void *)&refresh, 0, NULL) != 0) {
+		    (void *)&refresh, 0, NULL) != 0) {
 			logit("thr_create() call failed\n");
 			syslog(LOG_ERR, gettext("ldap_cachemgr: thr_create() "
-				"call failed"));
+			    "call failed"));
 			perror("thr_create");
 			exit(1);
 		}
@@ -585,7 +589,7 @@ main(int argc, char ** argv)
 	if (thr_sigsetmask(SIG_UNBLOCK, &myset, NULL) < 0) {
 		logit("thr_sigsetmask() call failed\n");
 		syslog(LOG_ERR,
-			gettext("ldap_cachemgr: the_sigsetmask() call failed"));
+		    gettext("ldap_cachemgr: the_sigsetmask() call failed"));
 		perror("thr_sigsetmask");
 		exit(1);
 	}
@@ -599,19 +603,84 @@ main(int argc, char ** argv)
 }
 
 
+/*
+ * Before calling the alloca() function we have to be sure that we won't get
+ * beyond the stack. Since we don't know the precise layout of the stack,
+ * the address of an automatic of the function gives us a rough idea, plus/minus
+ * a bit. We also need a bit more of stackspace after the call to be able
+ * to call further functions. Even something as simple as making a system call
+ * from within this function can take ~100 Bytes of stackspace.
+ */
+#define	SAFETY_BUFFER 32 * 1024 /* 32KB */
+
+static
+size_t
+get_data_size(LineBuf *config_info, int *err_code)
+{
+	size_t		configSize = sizeof (ldap_return_t);
+	dataunion	*buf = NULL; /* For the 'sizeof' purpose */
+
+	if (config_info->str != NULL &&
+	    config_info->len >= sizeof (buf->data.ldap_ret.ldap_u.config)) {
+		configSize = sizeof (buf->space) +
+		    config_info->len -
+		    sizeof (buf->data.ldap_ret.ldap_u.config);
+
+		if (!stack_inbounds((char *)&buf -
+		    (configSize + SAFETY_BUFFER))) {
+			/*
+			 * We do not have enough space on the stack
+			 * to accomodate the whole DUAProfile
+			 */
+			logit("The DUAProfile is too big. There is not enough "
+			    "space to process it. Ignoring it.\n");
+			syslog(LOG_ERR, gettext("ldap_cachemgr: The DUAProfile "
+			    "is too big. There is not enough space "
+			    "to process it. Ignoring it."));
+
+			*err_code = SERVERERROR;
+
+			free(config_info->str);
+			config_info->str = NULL;
+			config_info->len = 0;
+			configSize = sizeof (ldap_return_t);
+		}
+	}
+
+	return (configSize);
+}
+
 /*ARGSUSED*/
 static void
 switcher(void *cookie, char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc)
 {
-	dataunion		u;
+#define	GETSIZE 1000
+#define	ALLOCATE 1001
+#define	PREPARE  1002
+
 	ldap_call_t	*ptr = (ldap_call_t *)argp;
 	door_cred_t	dc;
+
+	LineBuf		configInfo;
+	dataunion	*buf = NULL;
+	/*
+	 * By default the size of  a buffer to be passed down to a client
+	 * is equal to the size of the ldap_return_t structure. We need
+	 * a bigger buffer in a few cases.
+	 */
+	size_t		configSize = sizeof (ldap_return_t);
+	int		ldapErrno = 0, state, leave = 0;
+	struct {
+		void	*begin;
+		size_t	size;
+		uint8_t	destroy;
+	} dataSource;
 
 	if (argp == DOOR_UNREF_DATA) {
 		logit("Door Slam... invalid door param\n");
 		syslog(LOG_ERR, gettext("ldap_cachemgr: Door Slam... "
-			"invalid door param"));
+		    "invalid door param"));
 		(void) printf(gettext("Door Slam... invalid door param\n"));
 		exit(0);
 	}
@@ -620,77 +689,248 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		(void) door_return(NULL, 0, 0, 0); /* return the favor */
 	}
 
-	switch (ptr->ldap_callnumber) {
-	case NULLCALL:
-		u.data.ldap_ret.ldap_return_code = SUCCESS;
-		u.data.ldap_ret.ldap_bufferbytesused = sizeof (ldap_return_t);
-		break;
-	case GETLDAPCONFIG:
-		getldap_lookup(&u.data.ldap_ret, ptr);
-		current_admin.ldap_stat.ldap_numbercalls++;
-		break;
-	case GETADMIN:
-		(void) getadmin(&u.data.ldap_ret);
-		break;
-	case SETADMIN:
-	case KILLSERVER:
-		if (door_cred(&dc) < 0) {
-			logit("door_cred() call failed\n");
-			syslog(LOG_ERR, gettext("ldap_cachemgr: door_cred() "
-				"call failed"));
-			perror("door_cred");
+	bzero(&dataSource, sizeof (dataSource));
+
+	/*
+	 * We presume that sizeof (ldap_return_t) bytes are always available
+	 * on the stack
+	 */
+	state = ptr->ldap_callnumber;
+
+	/*
+	 * The common behavior of the state machine below is as follows:
+	 *
+	 * Each incoming request is processed in several steps.
+	 *
+	 * First stage is specific for a particular request. It can be
+	 * an error check or gathering data or empty. See the actual comments
+	 * for the requests. For the GETLDAPCONFIG, GETLDAPSERVER, GETCACHESTAT,
+	 * and GETCACHE there is an additional substage calculating the size of
+	 * the data being passed to a door client.
+	 * The next step is obligatory. It allocates a buffer which will be
+	 * passed down to the door_return() routine.
+	 * The last (also obligatory) step sets the return code and, if a data
+	 * is available for the transfer and no errors have occurred, copies
+	 * the data to the buffer.
+	 *
+	 * After the state machine has finished, the door_return() function
+	 * is called unconditionally
+	 */
+	while (!leave) {
+		switch (state) {
+		case NULLCALL:
+			/*
+			 * Just a 'ping'. Use the default size
+			 * of the buffer and set the
+			 * 'OK' error code.
+			 */
+			state = ALLOCATE;
+			break;
+		case GETLDAPCONFIG:
+			/*
+			 * Get the current LDAP configuration.
+			 * Since this is dynamic data and its size can exceed
+			 * the size of ldap_return_t, the next step will
+			 * calculate who much space exactly is required.
+			 */
+			getldap_lookup(&configInfo, ptr);
+
+			state = GETSIZE;
+			break;
+		case GETLDAPSERVER:
+			/*
+			 * Get the root DSE for a next server in the list.
+			 * Since this is dynamic data and its size can exceed
+			 * the size of ldap_return_t, the next step will
+			 * calculate who much space exactly is required.
+			 */
+			getldap_getserver(&configInfo, ptr);
+
+			state = GETSIZE;
+			break;
+		case GETCACHESTAT:
+			/*
+			 * Get the cache stattistics.
+			 * Since this is dynamic data and its size can exceed
+			 * the size of ldap_return_t, the next step will
+			 * calculate how much space exactly is required.
+			 */
+			getldap_get_cacheStat(&configInfo);
+
+			state = GETSIZE;
+			break;
+		case GETADMIN:
+			/*
+			 * Get current configuration and statistics.
+			 * The size of the statistics structure is less then
+			 * sizeof (ldap_return_t). So specify the source
+			 * where to take the info and proceed with the memory
+			 * allocation.
+			 */
+			state = ALLOCATE;
+
+			if (ldapErrno == 0) {
+				dataSource.begin = &current_admin;
+				dataSource.size = sizeof (current_admin);
+				dataSource.destroy = 0;
+			}
+
+			break;
+		case SETADMIN:
+		case KILLSERVER:
+			/*
+			 * Process the request and proceed with the default
+			 * buffer allocation.
+			 */
+			if (door_cred(&dc) == 0) {
+				switch (ptr->ldap_callnumber) {
+				case KILLSERVER:
+					logit("ldap_cachemgr received "
+					    "KILLSERVER cmd from pid %ld, "
+					    "uid %ld, euid %ld\n",
+					    dc.dc_pid, dc.dc_ruid, dc.dc_euid);
+					exit(0);
+					break;
+				case SETADMIN:
+					if (dc.dc_euid != 0) {
+						logit("SETADMIN call failed "
+						    "(cred): "
+						    "caller pid %ld, uid %ld, "
+						    "euid %ld\n",
+						    dc.dc_pid,
+						    dc.dc_ruid,
+						    dc.dc_euid);
+						ldapErrno = -1;
+						break;
+					}
+					/* Yes, if a client's effective uid */
+					/* is noty defined, continue */
+					/* with setadmin() */
+				default:
+					ldapErrno = setadmin(ptr);
+					break;
+				}
+			} else {
+				logit("door_cred() call failed\n");
+				syslog(LOG_ERR, gettext("ldap_cachemgr: "
+				    "door_cred() call failed"));
+				perror("door_cred");
+				ldapErrno = -1;
+			}
+
+			state = ALLOCATE;
+			break;
+		case GETCACHE:
+			/*
+			 * Get the cache stattistics.
+			 * Since this is dynamic data and its size can exceed
+			 * the size of ldap_return_t, the next step will
+			 * calculate how much space exactly is required.
+			 */
+			getldap_get_cacheData(&configInfo, ptr);
+
+			state = GETSIZE;
+			break;
+		case SETCACHE:
+			/*
+			 * Process the request and proceed with the default
+			 * buffer allocation.
+			 */
+			ldapErrno = getldap_set_cacheData(ptr);
+
+			current_admin.ldap_stat.ldap_numbercalls++;
+
+			state = ALLOCATE;
+			break;
+		default:
+			/*
+			 * This means an unknown request type. Proceed with
+			 * the default buffer allocation.
+			 */
+			logit("Unknown ldap service door call op %d\n",
+			    ptr->ldap_callnumber);
+			ldapErrno = -99;
+
+			state = ALLOCATE;
+			break;
+		case GETSIZE:
+			/*
+			 * This stage calculates how much data will be
+			 * passed down to the client, checks if there is
+			 * enough space on the stack to accommodate the data,
+			 * increases the value of the configSize variable
+			 * if necessary and specifies the data source.
+			 * In case of any error occurred ldapErrno will be set
+			 * appropriately.
+			 */
+			if (configInfo.str == NULL) {
+				ldapErrno = -1;
+			}
+
+			configSize = get_data_size(&configInfo, &ldapErrno);
+
+			if (ldapErrno == 0) {
+				dataSource.begin = configInfo.str;
+				dataSource.size = configInfo.len;
+				dataSource.destroy = 1;
+			}
+
+			current_admin.ldap_stat.ldap_numbercalls++;
+
+			state = ALLOCATE;
+			break;
+		case ALLOCATE:
+			/*
+			 * Allocate a buffer of the calculated (or default) size
+			 * and proceed with populating it with data.
+			 */
+			buf = (dataunion *) alloca(configSize);
+
+			state = PREPARE;
+			break;
+		case PREPARE:
+			/*
+			 * Set a return code and, if a data source is specified,
+			 * copy data from the source to the buffer.
+			 */
+			buf->data.ldap_ret.ldap_errno = ldapErrno;
+			buf->data.ldap_ret.ldap_return_code = ldapErrno;
+			buf->data.ldap_ret.ldap_bufferbytesused = configSize;
+
+			if (dataSource.begin != NULL) {
+				(void) memcpy(buf->data.ldap_ret.ldap_u.config,
+				    dataSource.begin,
+				    dataSource.size);
+				if (dataSource.destroy) {
+					free(dataSource.begin);
+				}
+			}
+
+			/*
+			 * Leave the state machine and send the data
+			 * to the client.
+			 */
+			leave = 1;
 			break;
 		}
-		if (dc.dc_euid != 0 && ptr->ldap_callnumber == SETADMIN) {
-			logit("SETADMIN call failed (cred): caller "
-			    "pid %ld, uid %ld, euid %ld\n",
-			    dc.dc_pid, dc.dc_ruid, dc.dc_euid);
-			u.data.ldap_ret.ldap_return_code = NOTFOUND;
-			break;
-		}
-		if (ptr->ldap_callnumber == KILLSERVER) {
-			logit("ldap_cachemgr received KILLSERVER cmd from "
-			    "pid %ld, uid %ld, euid %ld\n",
-			    dc.dc_pid, dc.dc_ruid, dc.dc_euid);
-			exit(0);
-		} else {
-			(void) setadmin(&u.data.ldap_ret, ptr);
-		}
-		break;
-	case GETLDAPSERVER:
-		getldap_getserver(&u.data.ldap_ret, ptr);
-		current_admin.ldap_stat.ldap_numbercalls++;
-		break;
-	case GETCACHE:
-		getldap_get_cacheData(&u.data.ldap_ret, ptr);
-		current_admin.ldap_stat.ldap_numbercalls++;
-		break;
-	case SETCACHE:
-		getldap_set_cacheData(&u.data.ldap_ret, ptr);
-		current_admin.ldap_stat.ldap_numbercalls++;
-		break;
-	case GETCACHESTAT:
-		getldap_get_cacheStat(&u.data.ldap_ret);
-		current_admin.ldap_stat.ldap_numbercalls++;
-		break;
-	default:
-		logit("Unknown ldap service door call op %d\n",
-		    ptr->ldap_callnumber);
-		u.data.ldap_ret.ldap_return_code = -99;
-		u.data.ldap_ret.ldap_bufferbytesused = sizeof (ldap_return_t);
-		break;
 	}
-	(void) door_return((char *)&u.data,
-		u.data.ldap_ret.ldap_bufferbytesused, NULL, 0);
+
+	(void) door_return((char *)&buf->data,
+	    buf->data.ldap_ret.ldap_bufferbytesused,
+	    NULL,
+	    0);
+#undef	GETSIZE
+#undef	ALLOCATE
+#undef	PREPARE
 }
 
 static void
 usage(char *s)
 {
 	(void) fprintf(stderr,
-		gettext("Usage: %s [-d debug_level] [-l logfilename]\n"), s);
+	    gettext("Usage: %s [-d debug_level] [-l logfilename]\n"), s);
 	(void) fprintf(stderr, gettext("	[-K] "
-					"[-r revalidate_interval] "));
+	    "[-r revalidate_interval] "));
 #ifndef SLP
 	(void) fprintf(stderr, gettext("	[-g]\n"));
 #else
@@ -720,7 +960,7 @@ cachemgr_set_lf(admin_t *ptr, char *logfile)
 		logfd = -1;
 	} else {
 		if ((newlogfd =
-			open(logfile, O_EXCL|O_WRONLY|O_CREAT, 0644)) < 0) {
+		    open(logfile, O_EXCL|O_WRONLY|O_CREAT, 0644)) < 0) {
 			/*
 			 * File already exists... now we need to get cute
 			 * since opening a file in a world-writeable directory
@@ -732,7 +972,7 @@ cachemgr_set_lf(admin_t *ptr, char *logfile)
 
 			if (lstat(logfile, &before) < 0) {
 				logit("Cannot open new logfile \"%s\": %sn",
-					logfile, strerror(errno));
+				    logfile, strerror(errno));
 				return (-1);
 			}
 			if (S_ISREG(before.st_mode) &&	/* no symbolic links */
@@ -742,8 +982,8 @@ cachemgr_set_lf(admin_t *ptr, char *logfile)
 				    open(logfile,
 				    O_APPEND|O_WRONLY, 0644)) < 0) {
 					logit("Cannot open new logfile "
-						"\"%s\": %s\n",
-						logfile, strerror(errno));
+					    "\"%s\": %s\n",
+					    logfile, strerror(errno));
 					return (-1);
 				}
 			} else {
@@ -778,7 +1018,7 @@ logit(char *format, ...)
 		(void) gettimeofday(&tv, NULL);
 		(void) ctime_r(&tv.tv_sec, buffer, BUFSIZ);
 		(void) snprintf(buffer+19, BUFSIZE, ".%.4ld	",
-			tv.tv_usec/100);
+		    tv.tv_usec/100);
 		safechars = sizeof (buffer) - 30;
 		if (vsnprintf(buffer+25, safechars, format, ap) > safechars)
 			(void) strcat(buffer, "...\n");
@@ -787,24 +1027,6 @@ logit(char *format, ...)
 		(void) mutex_unlock(&loglock);
 	}
 	va_end(ap);
-}
-
-
-void
-do_update(ldap_call_t *in)
-{
-	dataunion		u;
-
-	switch (in->ldap_callnumber) {
-	case GETLDAPCONFIG:
-		getldap_lookup(&u.data.ldap_ret, in);
-		break;
-	default:
-		assert(0);
-		break;
-	}
-
-	free(in);
 }
 
 
@@ -829,24 +1051,12 @@ client_getadmin(admin_t *ptr)
 	return (0);
 }
 
-static int
-getadmin(ldap_return_t *out)
-{
-	out->ldap_return_code = SUCCESS;
-	out->ldap_bufferbytesused = sizeof (current_admin);
-	(void) memcpy(out->ldap_u.buff, &current_admin, sizeof (current_admin));
-
-	return (0);
-}
-
 
 static int
-setadmin(ldap_return_t *out, ldap_call_t *ptr)
+setadmin(ldap_call_t *ptr)
 {
 	admin_t	*new;
 
-	out->ldap_return_code = SUCCESS;
-	out->ldap_bufferbytesused = sizeof (ldap_return_t);
 	new = (admin_t *)ptr->ldap_u.domainname;
 
 	/*
@@ -855,17 +1065,14 @@ setadmin(ldap_return_t *out, ldap_call_t *ptr)
 
 	if ((cachemgr_set_lf(&current_admin, new->logfile) < 0) ||
 	    cachemgr_set_dl(&current_admin, new->debug_level) < 0) {
-		out->ldap_return_code = NOTFOUND;
 		return (-1);
 	}
 
 	if (cachemgr_set_ttl(&current_admin.ldap_stat,
-			"ldap",
-			new->ldap_stat.ldap_ttl) < 0) {
-		out->ldap_return_code = NOTFOUND;
+	    "ldap",
+	    new->ldap_stat.ldap_ttl) < 0) {
 		return (-1);
 	}
-	out->ldap_return_code = SUCCESS;
 
 	return (0);
 }
@@ -925,7 +1132,7 @@ client_showstats(admin_t *ptr)
 	(void) printf(gettext("server debug level %10d\n"), ptr->debug_level);
 	(void) printf(gettext("server log file\t\"%s\"\n"), ptr->logfile);
 	(void) printf(gettext("number of calls to ldapcachemgr %10d\n"),
-		ptr->ldap_stat.ldap_numbercalls);
+	    ptr->ldap_stat.ldap_numbercalls);
 
 	/*
 	 * get cache data statistics
@@ -937,7 +1144,7 @@ client_showstats(admin_t *ptr)
 
 	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != SUCCESS) {
 		(void) printf(
-			gettext("\nCache data statistics not available!\n"));
+		    gettext("\nCache data statistics not available!\n"));
 		return (0);
 	}
 
@@ -986,10 +1193,10 @@ detachfromtty(char *pgm)
 		case (pid_t)-1:
 			logit("detachfromtty(): fork1() call failed\n");
 			(void) fprintf(stderr,
-					gettext("%s: fork1() call failed.\n"),
-					pgm);
+			    gettext("%s: fork1() call failed.\n"),
+			    pgm);
 			syslog(LOG_ERR,
-				gettext("ldap_cachemgr: fork1() call failed."));
+			    gettext("ldap_cachemgr: fork1() call failed."));
 			exit(1);
 			break;
 		case 0:
@@ -1010,14 +1217,14 @@ detachfromtty(char *pgm)
 			 */
 			if (signal(SIGUSR1, sig_ok_to_exit) == SIG_ERR) {
 				logit("detachfromtty(): "
-					"can't set up signal handler to "
-					" catch SIGUSR1.\n");
+				    "can't set up signal handler to "
+				    " catch SIGUSR1.\n");
 				(void) fprintf(stderr,
-					gettext("%s: signal() call failed.\n"),
-					pgm);
+				    gettext("%s: signal() call failed.\n"),
+				    pgm);
 				syslog(LOG_ERR, gettext("ldap_cachemgr: "
-					"can't set up signal handler to "
-					" catch SIGUSR1."));
+				    "can't set up signal handler to "
+				    " catch SIGUSR1."));
 				exit(1);
 			}
 
@@ -1031,29 +1238,29 @@ detachfromtty(char *pgm)
 
 			if (wret == -1) {
 				logit("detachfromtty(): "
-					"waitpid() call failed\n");
+				    "waitpid() call failed\n");
 				(void) fprintf(stderr,
-					gettext("%s: waitpid() call failed.\n"),
-					pgm);
+				    gettext("%s: waitpid() call failed.\n"),
+				    pgm);
 				syslog(LOG_ERR,
-					gettext("ldap_cachemgr: waitpid() "
-						"call failed."));
+				    gettext("ldap_cachemgr: waitpid() "
+				    "call failed."));
 				exit(1);
 			}
 			if (wret != pid) {
 				logit("detachfromtty(): "
-					"waitpid() returned %ld when "
-					"child pid was %ld\n",
-					wret, pid);
+				    "waitpid() returned %ld when "
+				    "child pid was %ld\n",
+				    wret, pid);
 				(void) fprintf(stderr,
-					gettext(
-					"%s: waitpid() returned %ld when "
-					"child pid was %ld.\n"),
-					pgm, wret, pid);
+				    gettext(
+				    "%s: waitpid() returned %ld when "
+				    "child pid was %ld.\n"),
+				    pgm, wret, pid);
 				syslog(LOG_ERR,
-					gettext("ldap_cachemgr: waitpid() "
-						"returned different "
-						"child pid."));
+				    gettext("ldap_cachemgr: waitpid() "
+				    "returned different "
+				    "child pid."));
 				exit(1);
 			}
 
@@ -1063,35 +1270,35 @@ detachfromtty(char *pgm)
 					exit(0);
 				}
 				logit("detachfromtty(): "
-					"child failed (rc = %d).\n",
-					WEXITSTATUS(status));
+				    "child failed (rc = %d).\n",
+				    WEXITSTATUS(status));
 				(void) fprintf(stderr,
-					gettext("%s: failed. Please see "
-					"syslog for details.\n"),
-					pgm);
+				    gettext("%s: failed. Please see "
+				    "syslog for details.\n"),
+				    pgm);
 				syslog(LOG_ERR,
-					gettext("ldap_cachemgr: failed "
-					"(rc = %d)."),
-					WEXITSTATUS(status));
+				    gettext("ldap_cachemgr: failed "
+				    "(rc = %d)."),
+				    WEXITSTATUS(status));
 			} else if (WIFSIGNALED(status)) {
 				logit("detachfromtty(): "
-					"child terminated by signal %d.\n",
-					WTERMSIG(status));
+				    "child terminated by signal %d.\n",
+				    WTERMSIG(status));
 				(void) fprintf(stderr,
 				gettext("%s: terminated by signal %d.\n"),
-					pgm, WTERMSIG(status));
+				    pgm, WTERMSIG(status));
 				syslog(LOG_ERR,
-					gettext("ldap_cachemgr: terminated by "
-					"signal %d.\n"),
-					WTERMSIG(status));
+				    gettext("ldap_cachemgr: terminated by "
+				    "signal %d.\n"),
+				    WTERMSIG(status));
 			} else if (WCOREDUMP(status)) {
 				logit("detachfromtty(): child core dumped.\n"),
-				(void) fprintf(stderr,
-					gettext("%s: core dumped.\n"),
-					pgm);
+				    (void) fprintf(stderr,
+				    gettext("%s: core dumped.\n"),
+				    pgm);
 				syslog(LOG_ERR,
-					gettext("ldap_cachemgr: "
-						"core dumped.\n"));
+				    gettext("ldap_cachemgr: "
+				    "core dumped.\n"));
 			}
 
 			exit(1);
