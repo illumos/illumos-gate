@@ -42,6 +42,8 @@
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
 #include <utime.h>
+#include <sys/param.h>
+#include <bsm/libbsm.h>
 #include "devfsadm_impl.h"
 
 /* externs from devalloc.c */
@@ -63,6 +65,9 @@ int system_labeled = FALSE;
 
 /* flag to enable/disable device allocation with -e/-d */
 static int devalloc_flag = 0;
+
+/* flag that indicates if device allocation is on or not */
+static int devalloc_is_on = 0;
 
 /* flag to update device allocation database for this device type */
 static int update_devdb = 0;
@@ -262,6 +267,7 @@ main(int argc, char *argv[])
 	struct passwd *pw;
 	struct group *gp;
 	pid_t pid;
+	int cond = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -315,6 +321,23 @@ main(int argc, char *argv[])
 			/* close defaults file */
 			(void) defopen(NULL);
 		}
+	}
+	/*
+	 * Check if device allocation is enabled.
+	 */
+	if (system_labeled) {
+		/*
+		 * In TX, the first line in /etc/security/device_allocate has
+		 * DEVICE_ALLOCATION=ON if the feature is enabled.
+		 */
+		devalloc_is_on = da_is_on();
+	} else if (auditon(A_GETCOND, (caddr_t)&cond, sizeof (cond)) == 0) {
+		/*
+		 * Device allocation (and auditing) is enabled if BSM is
+		 * enabled. auditon returns -1 and sets errno to EINVAL if BSM
+		 * is not enabled.
+		 */
+		devalloc_is_on = 1;
 	}
 
 #ifdef DEBUG
@@ -2879,7 +2902,6 @@ set_logindev_perms(char *devlink)
 static void
 reset_node_permissions(di_node_t node, di_minor_t minor)
 {
-	int devalloc_is_on = 0;
 	int spectype;
 	char phy_path[PATH_MAX + 1];
 	mode_t mode;
@@ -2952,7 +2974,6 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 	 *
 	 * devfs indicates a new device by faking access time to be zero.
 	 */
-	devalloc_is_on = da_is_on();
 	if (sb.st_atime != 0) {
 		int  i;
 		char *nt;
