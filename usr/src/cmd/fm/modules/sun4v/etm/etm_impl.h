@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,8 @@ extern "C" {
 #define	ETM_PROP_NM_CONSOLE		"etm_alert_console"
 #define	ETM_PROP_NM_SYSLOGD		"etm_alert_syslog"
 #define	ETM_PROP_NM_FACILITY		"etm_alert_facility"
+
+#define	ETM_PROP_NM_MAX_RESP_Q_LEN	"etm_resp_q_max_len"
 
 /*
  * --------------------------------- prolog ----------------------------------

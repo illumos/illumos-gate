@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
 
@@ -218,28 +217,6 @@ static size_t	etm_xport_irb_mtu_sz = 0;	/* MTU size (in bytes) */
  * -------------------------- private variables ------------------------------
  */
 
-/*
- * Design_Note:
- *
- * Access to the transport for receiving is serialized so that if two threads
- * exist, one for accepting new connections and one for reading on an
- * accepted connection, they don't race with each other. A pingpong access
- * pattern is enforced/ensured using a mutex etm_xport_ser_lock. To avoid
- * deadlocks caused by locking the mutex inside accept() and open(), only
- * accept() is covered with an approrpriate unlock inside close() using
- * etm_xport_ser_conn to notice the proper connection and when to unlock.
- *
- * This could've been done within ETM [inside the pertinent threads]
- * more easily; but because it's platform specific it's being done here
- * within the ETM-to-Transport API.
- */
-
-static pthread_mutex_t
-etm_xport_ser_lock;		/* xport access serialization lock */
-
-static _etm_xport_conn_t *
-etm_xport_ser_conn = NULL;	/* serialization connection handle */
-
 static _etm_xport_conn_t *
 etm_xport_vldc_conn = NULL;	/* single connection handle for VLDC */
 
@@ -301,7 +278,7 @@ etm_fake_ioctl(int fd, int op, void *buf)
 			}
 			if (stat_buf.st_size > 0) {
 				n = MIN(peek_ctl_ptr->pk_buflen,
-					stat_buf.st_size);
+				    stat_buf.st_size);
 				peek_ctl_ptr->pk_buflen = n;
 				/* return bogus data assuming content unused */
 				(void) memset(peek_ctl_ptr->pk_buf, 0xA5, n);
@@ -356,7 +333,7 @@ etm_xport_get_fn(fmd_hdl_t *hdl, int io_op)
 		return (fn_wr);
 	}
 	if (((io_op == ETM_IO_OP_RD) || (io_op == ETM_IO_OP_PK)) &&
-						(fn_rd[0] != '\0')) {
+	    (fn_rd[0] != '\0')) {
 		return (fn_rd);
 	}
 
@@ -365,7 +342,7 @@ etm_xport_get_fn(fmd_hdl_t *hdl, int io_op)
 	prop_str = fmd_prop_get_string(hdl, ETM_PROP_NM_XPORT_ADDRS);
 	if (etm_xport_debug_lvl >= 2) {
 		fmd_hdl_debug(hdl, "info: etm_xport_get_fn prop_str %s\n",
-								prop_str);
+		    prop_str);
 	}
 
 	if (strlen(prop_str) == 0) {
@@ -411,7 +388,7 @@ func_ret:
 
 	if (etm_xport_debug_lvl >= 2) {
 		fmd_hdl_debug(hdl, "info: etm_xport_get_fn fn_wr %s fn_rd %s\n",
-								fn_wr, fn_rd);
+		    fn_wr, fn_rd);
 	}
 	fmd_prop_free_string(hdl, prop_str);
 	return (rv);
@@ -521,7 +498,6 @@ etm_xport_dup_addr(fmd_hdl_t *hdl, etm_xport_addr_t addr)
  *			into the caller's given buffer,
  *			return how many bytes actually peeked
  *			or -errno value
- *
  * caveats:
  *		peeked data is NOT guaranteed by all platform transports
  *		to remain enqueued if this process/thread crashes;
@@ -561,7 +537,7 @@ etm_xport_raw_peek(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 
 	if (etm_xport_should_fake_dd) {
 		n = etm_fake_ioctl(_conn->fd, ETM_XPORT_IOCTL_DATA_PEEK,
-								&peek_ctl);
+		    &peek_ctl);
 	} else {
 		n = ioctl(_conn->fd, ETM_XPORT_IOCTL_DATA_PEEK, &peek_ctl);
 	}
@@ -575,7 +551,7 @@ etm_xport_raw_peek(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 
 	if (etm_xport_debug_lvl >= 3) {
 		fmd_hdl_debug(hdl, "info: [fake] ioctl(_PEEK) ~= %d bytes\n",
-									rv);
+		    rv);
 	}
 	return (rv);
 
@@ -633,7 +609,7 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 
 	if (etm_xport_irb_mtu_sz == 0) {
 		if ((n = etm_xport_get_opt(hdl, _conn,
-					ETM_XPORT_OPT_MTU_SZ)) < 0) {
+		    ETM_XPORT_OPT_MTU_SZ)) < 0) {
 			etm_xport_irb_mtu_sz = ETM_XPORT_MTU_SZ_DEF;
 		} else {
 			etm_xport_irb_mtu_sz = n;
@@ -641,7 +617,7 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 	}
 	if (etm_xport_irb_area == NULL) {
 		etm_xport_irb_area = fmd_hdl_zalloc(hdl,
-					2 * etm_xport_irb_mtu_sz, FMD_SLEEP);
+		    2 * etm_xport_irb_mtu_sz, FMD_SLEEP);
 		etm_xport_irb_head = etm_xport_irb_area;
 		etm_xport_irb_tail = etm_xport_irb_head;
 	}
@@ -660,7 +636,7 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 		etm_xport_irb_head += byte_cnt;
 		if (etm_xport_debug_lvl >= 2) {
 			fmd_hdl_debug(hdl, "info: quik buffered read == %d\n",
-								byte_cnt);
+			    byte_cnt);
 		}
 		return (byte_cnt);
 	}
@@ -694,7 +670,7 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 		i = etm_xport_irb_mtu_sz;
 	} else {
 		if ((i = etm_xport_raw_peek(hdl, _conn, etm_xport_irb_tail,
-					    etm_xport_irb_mtu_sz)) < 0) {
+		    etm_xport_irb_mtu_sz)) < 0) {
 			return (i);
 		}
 	}
@@ -751,13 +727,13 @@ etm_xport_init(fmd_hdl_t *hdl)
 	/* setup statistics and properties from FMD */
 
 	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC,
-				sizeof (etm_xport_stats) / sizeof (fmd_stat_t),
-				(fmd_stat_t *)&etm_xport_stats);
+	    sizeof (etm_xport_stats) / sizeof (fmd_stat_t),
+	    (fmd_stat_t *)&etm_xport_stats);
 
 	etm_xport_debug_lvl = fmd_prop_get_int32(hdl, ETM_PROP_NM_DEBUG_LVL);
 	etm_xport_addrs = fmd_prop_get_string(hdl, ETM_PROP_NM_XPORT_ADDRS);
 	fmd_hdl_debug(hdl, "info: etm_xport_debug_lvl %d\n",
-				etm_xport_debug_lvl);
+	    etm_xport_debug_lvl);
 	fmd_hdl_debug(hdl, "info: etm_xport_addrs %s\n", etm_xport_addrs);
 
 	/* decide whether to fake [some of] the device driver behavior */
@@ -768,7 +744,7 @@ etm_xport_init(fmd_hdl_t *hdl)
 	if (stat(fn, &stat_buf) < 0) {
 		/* errno assumed set by above call */
 		fmd_hdl_error(hdl, "error: bad device node %s errno %d\n",
-								fn, errno);
+		    fn, errno);
 		rv = (-errno);
 		goto func_ret;
 	}
@@ -776,7 +752,7 @@ etm_xport_init(fmd_hdl_t *hdl)
 		etm_xport_should_fake_dd = 1;	/* not a char driver */
 	}
 	fmd_hdl_debug(hdl, "info: etm_xport_should_fake_dd %d\n",
-					etm_xport_should_fake_dd);
+	    etm_xport_should_fake_dd);
 
 	/* validate each default dst transport address */
 
@@ -789,16 +765,11 @@ etm_xport_init(fmd_hdl_t *hdl)
 	for (i = 0; _addrv[i] != NULL; i++) {
 		if ((n = etm_xport_valid_addr(_addrv[i])) < 0) {
 			fmd_hdl_error(hdl, "error: bad xport addr %p\n",
-							_addrv[i]);
+			    _addrv[i]);
 			rv = n;
 			goto func_ret;
 		}
 	} /* foreach dst addr */
-
-	/* create mutex for xport access serialization */
-
-	(void) pthread_mutex_init(&etm_xport_ser_lock, NULL);
-	etm_xport_ser_conn = NULL;
 
 	if (use_vldc) {
 		etm_xport_vldc_conn = etm_xport_open(hdl, _addrv[0]);
@@ -852,11 +823,12 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_addr_t addr)
 
 	if (use_vldc == 0 || etm_xport_vldc_conn == NULL) {
 		if ((_conn->fd = open(_addr->fn,
-				    ETM_XPORT_OPEN_FLAGS, 0)) == -1) {
+		    ETM_XPORT_OPEN_FLAGS, 0)) == -1) {
 			/* errno assumed set by above call */
 			etm_xport_free_addr(hdl, _addr);
 			fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
 			etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
+			(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
 			return (NULL);
 		}
 	}
@@ -875,6 +847,7 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_addr_t addr)
 			etm_xport_free_addr(hdl, _addr);
 			fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
 			etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
+			(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
 			return (NULL);
 		}
 
@@ -965,15 +938,6 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 		goto func_ret;
 	}
 
-	/*
-	 * lock mutex to avoid race condition between handler for a new
-	 * connection and the top level connection acceptance server;
-	 * remember the connection handle for close
-	 */
-
-	(void) pthread_mutex_lock(&etm_xport_ser_lock);
-	etm_xport_ser_conn = _conn;
-
 	if (etm_xport_should_fake_dd) {
 		(void) nanosleep(&tms, NULL);	/* delay [for resp capture] */
 		(void) ftruncate(_conn->fd, 0); /* act like socket/queue/pipe */
@@ -984,6 +948,7 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 	 * behavior; this will pend until some ETM message is written
 	 * from the other end
 	 */
+
 	if (use_vldc) {
 		pollfd_t pollfd;
 
@@ -1009,10 +974,6 @@ func_ret:
 	/* cleanup the connection if failed */
 
 	if (rv == NULL) {
-		if (etm_xport_ser_conn != NULL) {
-			(void) pthread_mutex_unlock(&etm_xport_ser_lock);
-			etm_xport_ser_conn = NULL;
-		}
 		if (_conn != NULL) {
 			(void) etm_xport_close(hdl, _conn);
 		}
@@ -1030,7 +991,7 @@ func_ret:
 
 	if (etm_xport_debug_lvl >= 2) {
 		fmd_hdl_debug(hdl, "info: accept conn %p w/ *addrp %p\n",
-				rv, (addrp != NULL ? *addrp : NULL));
+		    rv, (addrp != NULL ? *addrp : NULL));
 	}
 
 	return (rv);
@@ -1076,16 +1037,6 @@ etm_xport_close(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	}
 
 	(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
-
-	/*
-	 * unlock the mutex after the device node is closed
-	 * if this is the appropriate connection handle
-	 */
-
-	if (_conn == etm_xport_ser_conn) {
-		etm_xport_ser_conn = NULL;
-		(void) pthread_mutex_unlock(&etm_xport_ser_lock);
-	}
 
 func_ret:
 
@@ -1135,7 +1086,7 @@ etm_xport_get_ev_addrv(fmd_hdl_t *hdl, nvlist_t *evp)
 		 */
 
 		_addr = fmd_hdl_zalloc(hdl, sizeof (_etm_xport_addr_t),
-							FMD_SLEEP);
+		    FMD_SLEEP);
 	} else {
 
 		/*
@@ -1145,13 +1096,13 @@ etm_xport_get_ev_addrv(fmd_hdl_t *hdl, nvlist_t *evp)
 		 */
 
 		_addr = fmd_hdl_zalloc(hdl, sizeof (_etm_xport_addr_t),
-							FMD_SLEEP);
+		    FMD_SLEEP);
 	} /* whether caller passed in a FMA event */
 
 	/* allocate vector with 1 non-NULL transport addr */
 
 	_addrv = fmd_hdl_zalloc(hdl, 2 * sizeof (_etm_xport_addr_t *),
-							FMD_SLEEP);
+	    FMD_SLEEP);
 
 	_addr->fn = etm_xport_get_fn(hdl, ETM_IO_OP_WR);
 	_addr->magic_num = ETM_XPORT_DD_MAGIC_ADDR;
@@ -1222,19 +1173,19 @@ etm_xport_get_addr_conn(fmd_hdl_t *hdl, etm_xport_conn_t *connv,
 	n = 0;
 	for (i = 0; _connv[i] != NULL; i++) {
 		if ((_connv[i]->addr == _addr) ||
-				((_connv[i]->addr != NULL) &&
-				(_connv[i]->addr->fn == _addr->fn))) {
+		    ((_connv[i]->addr != NULL) &&
+		    (_connv[i]->addr->fn == _addr->fn))) {
 			n++;
 		}
 	} /* for counting how many addresses match */
 
 	_mcv = fmd_hdl_zalloc(hdl, (n + 1) * sizeof (_etm_xport_conn_t *),
-								FMD_SLEEP);
+	    FMD_SLEEP);
 	n = 0;
 	for (i = 0; _connv[i] != NULL; i++) {
 		if ((_connv[i]->addr == _addr) ||
-				((_connv[i]->addr != NULL) &&
-				(_connv[i]->addr->fn == _addr->fn))) {
+		    ((_connv[i]->addr != NULL) &&
+		    (_connv[i]->addr->fn == _addr->fn))) {
 			_mcv[n] = _connv[i];
 			n++;
 		}
@@ -1291,11 +1242,6 @@ etm_xport_fini(fmd_hdl_t *hdl)
 {
 	fmd_hdl_debug(hdl, "info: xport finalizing\n");
 
-	/* destroy the xport access serialization lock */
-
-	(void) pthread_mutex_destroy(&etm_xport_ser_lock);
-	etm_xport_ser_conn = NULL;
-
 	if (use_vldc && (etm_xport_vldc_conn != NULL)) {
 		(void) etm_xport_close(hdl, etm_xport_vldc_conn);
 		etm_xport_vldc_conn = NULL;
@@ -1309,7 +1255,7 @@ etm_xport_fini(fmd_hdl_t *hdl)
 
 	if (etm_xport_irb_tail != etm_xport_irb_head) {
 		fmd_hdl_debug(hdl, "warning: xport %d bytes stale data\n",
-			(int)(etm_xport_irb_tail - etm_xport_irb_head));
+		    (int)(etm_xport_irb_tail - etm_xport_irb_head));
 	}
 	fmd_hdl_free(hdl, etm_xport_irb_area, 2 * etm_xport_irb_mtu_sz);
 	etm_xport_irb_area = NULL;
@@ -1408,8 +1354,7 @@ etm_xport_get_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_xport_opt_t opt)
 	op_ctl.oo_opt = opt;
 
 	if (etm_xport_should_fake_dd) {
-		n = etm_fake_ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP,
-								&op_ctl);
+		n = etm_fake_ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP, &op_ctl);
 	} else if (use_vldc) {
 		if (opt == ETM_XPORT_OPT_MTU_SZ) {
 			vldc_opt_op_t operation;
