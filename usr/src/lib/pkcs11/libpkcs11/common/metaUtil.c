@@ -682,6 +682,7 @@ free_session_mechanism(meta_session_t *session)
 		if (session->init.pMech->pParameter != NULL) {
 			free(session->init.pMech->pParameter);
 			session->init.pMech->pParameter = NULL;
+			session->init.pMech->ulParameterLen = 0;
 		}
 		free(session->init.pMech);
 		session->init.pMech = NULL;
