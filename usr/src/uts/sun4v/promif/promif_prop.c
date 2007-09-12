@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,6 +191,12 @@ promif_ldom_setprop(char *name, void *value, int valuelen)
 	else
 		return (-1);
 
+	/*
+	 * Since we are emulating OBP, we must comply with the promif
+	 * infrastructure and execute only on the originating cpu.
+	 */
+	thread_affinity_set(curthread, CPU_CURRENT);
+
 	req = kmem_zalloc(sizeof (var_config_hdr_t) + paylen, KM_SLEEP);
 	req->var_config_cmd = VAR_CONFIG_SET_REQ;
 	setp = &req->var_config_set;
@@ -201,16 +207,11 @@ promif_ldom_setprop(char *name, void *value, int valuelen)
 	    sizeof (var_config_hdr_t) + paylen)) != 0) {
 		cmn_err(CE_WARN, "%s: ds_cap_send failed: %d", me, rv);
 		kmem_free(req, sizeof (var_config_hdr_t) + paylen);
+		thread_affinity_clear(curthread);
 		return (-1);
 	}
 
 	kmem_free(req, sizeof (var_config_hdr_t) + paylen);
-
-	/*
-	 * Since we are emulating OBP, we must comply with the promif
-	 * infrastructure and execute only on the originating cpu.
-	 */
-	thread_affinity_set(curthread, CPU_CURRENT);
 
 	mutex_enter(&promif_prop_lock);
 	if (cv_timedwait(&promif_prop_cv,
