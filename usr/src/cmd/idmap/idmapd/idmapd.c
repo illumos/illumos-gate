@@ -80,7 +80,17 @@ static int dfd = -1;		/* our door server fildes, for unregistration */
 
 /*
  * This is needed for mech_krb5 -- we run as daemon, yes, but we want
- * mech_krb5 to think we're root.
+ * mech_krb5 to think we're root so it can get host/nodename.fqdn
+ * tickets for us so we can authenticate to AD as the machine account
+ * that we are.  For more details look at the entry point in mech_krb5
+ * corresponding to gss_init_sec_context().
+ *
+ * As a side effect of faking our effective UID to mech_krb5 we will use
+ * root's default ccache (/tmp/krb5cc_0).  But if that's created by
+ * another process then we won't have access to it: we run as daemon and
+ * keep PRIV_FILE_DAC_READ, which is insufficient to share the ccache
+ * with others.  We putenv("KRB5CCNAME=/var/run/idmap/ccache") in main()
+ * to avoid this issue; see main().
  *
  * Someday we'll have gss/mech_krb5 extensions for acquiring initiator
  * creds with keytabs/raw keys, and someday we'll have extensions to
@@ -96,13 +106,6 @@ uid_t
 app_krb5_user_uid(void)
 {
 	return (0);
-}
-
-static void
-set_signal_handlers() {
-	(void) sigset(SIGPIPE, SIG_IGN);
-	(void) sigset(SIGHUP, hup_handler);
-	(void) sigset(SIGTERM, term_handler);
 }
 
 /*ARGSUSED*/
@@ -150,6 +153,7 @@ daemonize_start(void) {
 	int	filedes[2];
 	pid_t	pid;
 
+	(void) sigset(SIGPIPE, SIG_IGN);
 	devnull = open("/dev/null", O_RDONLY);
 	if (devnull < 0)
 		return (-1);
@@ -163,11 +167,6 @@ daemonize_start(void) {
 		/*
 		 * parent
 		 */
-		struct sigaction act;
-		act.sa_sigaction = SIG_DFL;
-		(void) sigemptyset(&act.sa_mask);
-		act.sa_flags = 0;
-		(void) sigaction(SIGPIPE, &act, NULL); /* ignore SIGPIPE */
 		(void) close(filedes[1]);
 		if (read(filedes[0], &data, 1) == 1) {
 			/* presume success */
@@ -218,22 +217,13 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (is_system_labeled() && (getzoneid() != GLOBAL_ZONEID)) {
+	if (getzoneid() != GLOBAL_ZONEID) {
 		(void) idmapdlog(LOG_ERR,
-		    "idmapd: With TX, idmapd runs only in the global zone");
+		    "idmapd: idmapd runs only in the global zone");
 		exit(1);
 	}
 
-	/* create directories as root and chown to daemon uid */
-	if (create_directory(IDMAP_DBDIR, DAEMON_UID, DAEMON_GID) < 0)
-		exit(1);
-	if (create_directory(IDMAP_CACHEDIR, DAEMON_UID, DAEMON_GID) < 0)
-		exit(1);
-
-	INIT_IDMAPD_STATE();
-
 	(void) mutex_init(&_svcstate_lock, USYNC_THREAD, NULL);
-	set_signal_handlers();
 
 	if (daemonize == TRUE) {
 		if (daemonize_start() < 0) {
@@ -246,6 +236,10 @@ main(int argc, char **argv)
 	idmap_init_tsd_key();
 
 	init_idmapd();
+
+	/* signal handlers that should run only after we're initialized */
+	(void) sigset(SIGTERM, term_handler);
+	(void) sigset(SIGHUP, hup_handler);
 
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
 	    DAEMON_UID, DAEMON_GID,
@@ -269,6 +263,18 @@ main(int argc, char **argv)
 static void
 init_idmapd() {
 	int	error;
+
+	/* create directories as root and chown to daemon uid */
+	if (create_directory(IDMAP_DBDIR, DAEMON_UID, DAEMON_GID) < 0)
+		exit(1);
+	if (create_directory(IDMAP_CACHEDIR, DAEMON_UID, DAEMON_GID) < 0)
+		exit(1);
+
+	/*
+	 * Set KRB5CCNAME in the environment.  See app_krb5_user_uid()
+	 * for more details.
+	 */
+	putenv("KRB5CCNAME=" IDMAP_CACHEDIR "/ccache");
 
 	memset(&_idmapdstate, 0, sizeof (_idmapdstate));
 

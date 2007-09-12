@@ -78,9 +78,6 @@ typedef struct idmapd_state {
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
 
-#define	INIT_IDMAPD_STATE() \
-	(void) memset(&_idmapdstate, 0, sizeof (_idmapdstate));
-
 #define	RDLOCK_CONFIG() \
 	(void) rw_rdlock(&_idmapdstate.rwlk_cfg);
 #define	WRLOCK_CONFIG() \
