@@ -3556,7 +3556,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		}
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 		tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
-		    ipst->ips_netstack->netstack_tcp);
+		    ipst->ips_netstack->netstack_tcp, connp);
 		if (connp != NULL)
 			CONN_DEC_REF(connp);
 		return;
@@ -3604,7 +3604,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		}
 		if (flags & TH_ACK) {
 			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp);
+			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return;
 		}

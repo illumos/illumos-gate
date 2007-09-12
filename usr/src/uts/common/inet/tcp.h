@@ -646,7 +646,7 @@ extern void	tcp_ddi_g_init(void);
 extern void	tcp_ddi_g_destroy(void);
 extern void	tcp_g_q_inactive(tcp_stack_t *);
 extern void	tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len,
-    zoneid_t zoneid, tcp_stack_t *);
+    zoneid_t zoneid, tcp_stack_t *, conn_t *connp);
 extern void	tcp_conn_request(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2);
 extern void 	tcp_input(void *arg, mblk_t *mp, void *arg2);

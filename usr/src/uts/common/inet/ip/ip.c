@@ -6788,7 +6788,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		ip2dbg(("ip_fanout_tcp: no listener; send reset to zone %d\n",
 		    zoneid));
 		tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
-		    ipst->ips_netstack->netstack_tcp);
+		    ipst->ips_netstack->netstack_tcp, NULL);
 		return;
 	}
 
@@ -6835,7 +6835,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		}
 		if (flags & TH_ACK) {
 			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp);
+			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -13214,7 +13214,7 @@ try_again:
 		}
 		if (flags & TH_ACK) {
 			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp);
+			    ipst->ips_netstack->netstack_tcp, connp);
 			CONN_DEC_REF(connp);
 			return (NULL);
 		}
@@ -13329,7 +13329,7 @@ no_conn:
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 	tcp_xmit_listeners_reset(first_mp, IPH_HDR_LENGTH(mp->b_rptr), zoneid,
-	    ipst->ips_netstack->netstack_tcp);
+	    ipst->ips_netstack->netstack_tcp, NULL);
 	return (NULL);
 ipoptions:
 	if (!ip_options_cksum(q, ill, first_mp, ipha, ire, ipst)) {
