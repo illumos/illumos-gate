@@ -145,6 +145,7 @@ typedef enum {
 #define	XML_ELEMENT_VALIDATE	"validate"
 #define	XML_ELEMENT_MORESPACE	"more-space-required"
 #define	XML_VALUE_TRUE		"true"
+#define	XML_ELEMENT_PGR_PERSIST	"PGR-persist"
 
 typedef enum {
 	NodeFree,

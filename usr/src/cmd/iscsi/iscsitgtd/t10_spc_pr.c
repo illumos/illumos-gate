@@ -58,160 +58,49 @@
 /*
  * External declarations
  */
+extern target_queue_t *mgmtq;
 void spc_free(emul_handle_t id);
 void sbc_cmd(t10_cmd_t *, uint8_t *, size_t);
 void sbc_cmd_reserved(t10_cmd_t *, uint8_t *, size_t);
 
-extern target_queue_t *mgmtq;
-
 /*
  * Forward declarations
  */
-static
-    spc_pr_rsrv_t *spc_pr_rsrv_find(scsi3_pgr_t *, uint64_t, uint64_t, char *);
-static
-    spc_pr_rsrv_t *spc_pr_rsrv_alloc(scsi3_pgr_t *, uint64_t, uint64_t, char *,
+static spc_pr_key_t *spc_pr_key_find(scsi3_pgr_t *, uint64_t, char *, char *);
+static spc_pr_key_t *spc_pr_key_alloc(scsi3_pgr_t *, uint64_t, char *, char *);
+static spc_pr_rsrv_t *spc_pr_rsrv_find(scsi3_pgr_t *, uint64_t, char *, char *);
+static spc_pr_rsrv_t *spc_pr_rsrv_alloc(scsi3_pgr_t *, uint64_t, char *, char *,
     uint8_t, uint8_t);
-static
-    spc_pr_key_t *spc_pr_key_find(scsi3_pgr_t *, uint64_t, uint64_t, char *);
-static
-    spc_pr_key_t *spc_pr_key_alloc(scsi3_pgr_t *, uint64_t, uint64_t, char *);
 
-static void spc_pr_rsrv_release(t10_cmd_t *, scsi3_pgr_t *, spc_pr_rsrv_t *);
 static void spc_pr_key_free(scsi3_pgr_t *, spc_pr_key_t *);
 static void spc_pr_rsrv_free(scsi3_pgr_t *, spc_pr_rsrv_t *);
-static void spc_pr_erase(scsi3_pgr_t *);
-static void spc_pr_key_rsrv_init(scsi3_pgr_t *);
+static void spc_pr_rsrv_release(t10_cmd_t *, scsi3_pgr_t *, spc_pr_rsrv_t *);
 
-static int spc_pr_register(t10_cmd_t *, void *, size_t);
-static int spc_pr_reserve(t10_cmd_t *, void *, size_t);
-static int spc_pr_release(t10_cmd_t *, void *, size_t);
-static int spc_pr_clear(t10_cmd_t *, void *, size_t);
-static int spc_pr_preempt(t10_cmd_t *, void *, size_t);
-static int spc_pr_register_and_move(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_register(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_reserve(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_release(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_clear(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_preempt(t10_cmd_t *, void *, size_t);
+static int spc_pr_out_register_and_move(t10_cmd_t *, void *, size_t);
 
 static int spc_pr_in_readkeys(char *, scsi3_pgr_t *, void *, uint16_t);
 static int spc_pr_in_readrsrv(char *, scsi3_pgr_t *, void *, uint16_t);
 static int spc_pr_in_repcap(char *, scsi3_pgr_t *, void *, uint16_t);
 static int spc_pr_in_fullstat(char *, scsi3_pgr_t *, void *, uint16_t);
 
-static int spc_pgr_isconflict(uint8_t *, uint_t);
 Boolean_t spc_pr_write(t10_cmd_t *);
+static void spc_pr_erase(scsi3_pgr_t *);
+static void spc_pr_initialize(scsi3_pgr_t *);
 
 /*
  * []----
- * | spc_pgr_check --  PERSISTENT_RESERVE {IN|OUT} check of I_T_L
- * |	Refer to SPC-3, Section ?.?, Tables ?? and ??
- * []----
- */
-Boolean_t
-spc_pgr_check(t10_cmd_t *cmd, uint8_t *cdb)
-{
-	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
-	sbc_reserve_t		*res = &p->d_sbc_reserve;
-	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
-	spc_pr_rsrv_t		*rsrv;
-	Boolean_t		conflict = False;
-
-	/*
-	 * Check reservation commands.
-	 */
-	switch (cdb[0]) {
-		/*
-		 * Always dis-allow these commands.
-		 */
-		case SCMD_RESERVE:
-		case SCMD_RESERVE_G1:
-		case SCMD_RELEASE:
-		case SCMD_RELEASE_G1:
-			conflict = True;
-			goto done;
-
-		/*
-		 * Always allow these commands.
-		 */
-		case SCMD_PERSISTENT_RESERVE_IN:
-		case SCMD_PERSISTENT_RESERVE_OUT:
-			conflict = False;
-			goto done;
-	}
-
-	/*
-	 * If no reservations exist, allow all remaining command types.
-	 */
-	assert(res->res_type == RT_PGR);
-	if (pgr->pgr_numrsrv == 0) {
-		conflict = False;
-		goto done;
-	}
-
-	/*
-	 * At this point we know there is at least one reservation.
-	 * If there is no reservation set on this service delivery
-	 * port then conflict all remaining command types.
-	 */
-	if (!(rsrv = spc_pr_rsrv_find(pgr, 0, 0, T10_PGR_TID(cmd)))) {
-		queue_prt(mgmtq, Q_PR_IO, "PGR Reserved on other port\n",
-		    "\t%016x:%s\n", T10_PGR_ISID(cmd), T10_PGR_TID(cmd));
-		conflict = True;
-		goto done;
-	}
-
-	/*
-	 * Check the command against the reservation type for this port.
-	 */
-	switch (rsrv->r_type) {
-		case PGR_TYPE_WR_EX:
-		case PGR_TYPE_EX_AC:
-			if (T10_PGR_ISID(cmd) == rsrv->r_isid)
-				conflict = False;
-			else
-				conflict = spc_pgr_isconflict(cdb,
-				    rsrv->r_type);
-			break;
-		case PGR_TYPE_WR_EX_RO:
-		case PGR_TYPE_EX_AC_RO:
-			if (spc_pr_key_find(
-			    pgr, 0, T10_PGR_ISID(cmd), T10_PGR_TID(cmd)))
-				conflict = False;
-			else
-				conflict = spc_pgr_isconflict(cdb,
-				    rsrv->r_type);
-			break;
-		case PGR_TYPE_WR_EX_AR:
-		case PGR_TYPE_EX_AC_AR:
-			if (spc_pr_key_find(pgr, 0, 0, T10_PGR_TID(cmd)))
-				conflict = False;
-			else
-				conflict = spc_pgr_isconflict(cdb,
-				    rsrv->r_type);
-			break;
-		default:
-			conflict = True;
-			break;
-	}
-
-done:
-	queue_prt(mgmtq, Q_PR_IO, "PGR%d LUN%d CDB:%s - spc_pgr_check(%s)\n",
-	    cmd->c_lu->l_targ->s_targ_num,
-	    cmd->c_lu->l_common->l_num,
-	    cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name == NULL
-	    ? "(no name)"
-	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
-	    (conflict) ? "Conflict" : "Allowed");
-
-	return (conflict);
-}
-
-/*
- * []----
- * | spc_pgr_isconflict
+ * | spc_pgr_is_conflicting
  * |	PGR reservation conflict checking.
  * |	SPC-3, Revision 23, Table 31
  * []----
  */
 static int
-spc_pgr_isconflict(uint8_t *cdb, uint_t type)
+spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 {
 	Boolean_t		conflict = False;
 
@@ -272,6 +161,9 @@ spc_pgr_isconflict(uint8_t *cdb, uint_t type)
 		case SCMD_READ:
 		case SCMD_READ_G1:
 		case SCMD_READ_G4:
+			/*
+			 * Exclusive Access, and EA Registrants Only
+			 */
 			if (type == PGR_TYPE_EX_AC || type == PGR_TYPE_EX_AC_RO)
 				conflict = True;
 			break;
@@ -280,6 +172,105 @@ spc_pgr_isconflict(uint8_t *cdb, uint_t type)
 	return (conflict);
 }
 
+/*
+ * []----
+ * | spc_pgr_check --  PERSISTENT_RESERVE {IN|OUT} check of I_T_L
+ * |	Refer to SPC-3, Section ?.?, Tables ?? and ??
+ * []----
+ */
+Boolean_t
+spc_pgr_check(t10_cmd_t *cmd, uint8_t *cdb)
+{
+	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
+	sbc_reserve_t		*res = &p->d_sbc_reserve;
+	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
+	spc_pr_rsrv_t		*rsrv = NULL;
+	Boolean_t		conflict = False;
+
+	/*
+	 * If no reservations exist, allow all remaining command types.
+	 */
+	assert(res->res_type == RT_PGR);
+	if (pgr->pgr_numrsrv == 0) {
+		conflict = False;
+		goto done;
+	}
+
+	/*
+	 * At this point we know there is at least one reservation.
+	 * If there is no reservation set on this service delivery
+	 * port then conflict all remaining command types.
+	 */
+	if (!(rsrv = spc_pr_rsrv_find(pgr, 0, "", T10_PGR_TNAME(cmd)))) {
+		queue_prt(mgmtq, Q_PR_ERRS, "PGR%x Reserved on other port\n",
+		    "\t%s:%s\n", cmd->c_lu->l_targ->s_targ_num,
+		    T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd));
+		conflict = True;
+		goto done;
+	}
+
+	/*
+	 * Check the command against the reservation type for this port.
+	 */
+	switch (rsrv->r_type) {
+		case PGR_TYPE_WR_EX:	/* Write Exclusive */
+		case PGR_TYPE_EX_AC:	/* Exclusive Access */
+			if (strcmp(T10_PGR_INAME(cmd), rsrv->r_i_name) == 0)
+				conflict = False;
+			else
+				conflict = spc_pgr_is_conflicting(cdb,
+				    rsrv->r_type);
+			break;
+		case PGR_TYPE_WR_EX_RO:	/* Write Exclusive, Registrants Only */
+		case PGR_TYPE_EX_AC_RO:	/* Exclusive Access, Registrants Only */
+			if (spc_pr_key_find(
+			    pgr, 0, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd)))
+				conflict = False;
+			else
+				conflict = spc_pgr_is_conflicting(cdb,
+				    rsrv->r_type);
+			break;
+		case PGR_TYPE_WR_EX_AR:	/* Write Exclusive, All Registrants */
+		case PGR_TYPE_EX_AC_AR:	/* Exclusive Access, All Registrants */
+			if (spc_pr_key_find(pgr, 0, "", T10_PGR_TNAME(cmd)))
+				conflict = False;
+			else
+				conflict = spc_pgr_is_conflicting(cdb,
+				    rsrv->r_type);
+			break;
+		default:
+			conflict = True;
+			break;
+	}
+
+done:
+	queue_prt(mgmtq, Q_PR_IO, "PGR%x LUN%d CDB:%s - spc_pgr_check(%s:%s)\n",
+	    cmd->c_lu->l_targ->s_targ_num,
+	    cmd->c_lu->l_common->l_num,
+	    cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name == NULL
+	    ? "(no name)"
+	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
+	    (rsrv == NULL)
+	    ? "<none>"
+	    : (rsrv->r_type == PR_IN_READ_KEYS)
+	    ? "Write Exclusive"
+	    : (rsrv->r_type == PGR_TYPE_WR_EX)
+	    ? "Exclusive Access"
+	    : (rsrv->r_type == PGR_TYPE_EX_AC)
+	    ? "Report capabilties"
+	    : (rsrv->r_type == PGR_TYPE_WR_EX_RO)
+	    ? "Write Exclusive, Registrants Only"
+	    : (rsrv->r_type == PGR_TYPE_EX_AC_RO)
+	    ? "Exclusive Access, Registrants Only"
+	    : (rsrv->r_type == PGR_TYPE_WR_EX_AR)
+	    ? "Write Exclusive, All Registrants"
+	    : (rsrv->r_type == PGR_TYPE_EX_AC_AR)
+	    ? "Exclusive Access, All Registrants"
+	    : "Uknown reservation type",
+	    (conflict) ? "Conflict" : "Allowed");
+
+	return (conflict);
+}
 
 /*
  * []----
@@ -296,9 +287,8 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	sbc_reserve_t		*res = &p->d_sbc_reserve;
 	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
 	uint16_t		alen;
-	size_t			len;
+	size_t			len = 0;
 	void			*buf;
-	Boolean_t		status;
 
 	/*
 	 * Information obtained from:
@@ -330,10 +320,9 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 * acknowledge the operation.
 	 */
 	if ((alen = SCSI_READ16(p_prin->alloc_len)) == 0) {
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGR:%d LUN:%d CDB:%s - spc_cmd_pr_in, len = 0\n",
-		    cmd->c_lu->l_targ->s_targ_num,
-		    cmd->c_lu->l_common->l_num,
+		queue_prt(mgmtq, Q_PR_ERRS,
+		    "PGR%x LUN%d CDB:%s - spc_cmd_pr_in, len = 0\n",
+		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
 		    cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name == NULL
 		    ? "(no name)"
 		    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name);
@@ -360,37 +349,38 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 */
 	pthread_rwlock_rdlock(&res->res_rwlock);
 
+	queue_prt(mgmtq, Q_PR_NONIO, "PGR%x LUN%d action:%s\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+	    (p_prin->action == PR_IN_READ_KEYS)
+	    ? "Read keys"
+	    : (p_prin->action == PR_IN_READ_RESERVATION)
+	    ? "Read reservation"
+	    : (p_prin->action == PR_IN_REPORT_CAPABILITIES)
+	    ? "Report capabilties"
+	    : (p_prin->action == PR_IN_READ_FULL_STATUS)
+	    ? "Read full status"
+	    : "Uknown");
+
 	/*
 	 * Per SPC-3, Revision 23, Table 102, validate ranget of service actions
 	 */
 	switch (p_prin->action) {
 		case PR_IN_READ_KEYS:
 			len = spc_pr_in_readkeys(
-			    T10_PGR_TID(cmd), pgr, buf, alen);
+			    T10_PGR_TNAME(cmd), pgr, buf, alen);
 			break;
 		case PR_IN_READ_RESERVATION:
 			len = spc_pr_in_readrsrv(
-			    T10_PGR_TID(cmd), pgr, buf, alen);
+			    T10_PGR_TNAME(cmd), pgr, buf, alen);
 			break;
 		case PR_IN_REPORT_CAPABILITIES:
 			len = spc_pr_in_repcap(
-			    T10_PGR_TID(cmd), pgr, buf, alen);
+			    T10_PGR_TNAME(cmd), pgr, buf, alen);
 			break;
 		case PR_IN_READ_FULL_STATUS:
 			len = spc_pr_in_fullstat(
-			    T10_PGR_TID(cmd), pgr, buf, alen);
+			    T10_PGR_TNAME(cmd), pgr, buf, alen);
 			break;
-		default:
-			pthread_rwlock_unlock(&res->res_rwlock);
-			spc_free(buf);
-
-			/*
-			 * Fail command
-			 */
-			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
-			spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
-			trans_send_complete(cmd, STATUS_CHECK);
-			return;
 	}
 
 	/*
@@ -401,7 +391,7 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	/*
 	 * Now send the selected Persistent Reservation response back
 	 */
-	if (trans_send_datain(cmd, buf, alen, 0, spc_free, True, buf) == False)
+	if (trans_send_datain(cmd, buf, len, 0, spc_free, True, buf) == False)
 		trans_send_complete(cmd, STATUS_BUSY);
 }
 
@@ -422,7 +412,7 @@ spc_pr_in_readkeys(char *transportID, scsi3_pgr_t *pgr, void *bp,
 	hsize = sizeof (buf->PRgeneration) + sizeof (buf->add_len);
 	max_buf_keys = ((int)alloc_len - hsize) / sizeof (key->k_key);
 
-	queue_prt(mgmtq, Q_PR_IO,
+	queue_prt(mgmtq, Q_PR_NONIO,
 	    "PGRIN readkeys - transportID=%s\n", transportID);
 
 	if (pgr->pgr_numkeys)
@@ -433,22 +423,21 @@ spc_pr_in_readkeys(char *transportID, scsi3_pgr_t *pgr, void *bp,
 		if (strcmp(key->k_transportID, transportID))
 			continue;
 
-		if (i < max_buf_keys)
-			SCSI_WRITE64(buf->res_key_list[i].reservation_key,
-			    key->k_key);
-
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGRIN readkeys - key:%016x, isid:%016x\n",
-		    key->k_key, key->k_isid);
-
-		i++;
+		if (i < max_buf_keys) {
+			SCSI_WRITE64(&buf->key_list.service_key[i], key->k_key);
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGRIN readkeys - key:%016lx, i_name:%s\n",
+			    key->k_key, key->k_i_name);
+			i++;
+		}
+		else
+			break;		/* No room left, leave now */
 	}
 
-	SCSI_WRITE32(buf->add_len, i * sizeof (key->k_key));
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_generation);
+	SCSI_WRITE32(buf->add_len, i * sizeof (key->k_key));
 
-	return (hsize + min(SCSI_READ32(buf->add_len),
-	    (int)(max_buf_keys * sizeof (key->k_key))));
+	return (hsize + min(i, max_buf_keys) * sizeof (key->k_key));
 }
 
 /*
@@ -462,13 +451,14 @@ spc_pr_in_readrsrv(
     char *transportID, scsi3_pgr_t *pgr, void *bp, uint16_t alloc_len)
 {
 	int			i = 0, max_buf_rsrv, hsize;
-	spc_pr_rsrv_t		*rsrv;
 	scsi_prin_readrsrv_t	*buf = (scsi_prin_readrsrv_t *)bp;
+	scsi_prin_rsrvdesc_t	*desc;
+	spc_pr_rsrv_t		*rsrv;
 
 	hsize = sizeof (buf->PRgeneration) + sizeof (buf->add_len);
 	max_buf_rsrv = ((int)alloc_len - hsize) / sizeof (scsi_prin_rsrvdesc_t);
 
-	queue_prt(mgmtq, Q_PR_IO,
+	queue_prt(mgmtq, Q_PR_NONIO,
 	    "PGRIN readrsrv - transportID=%s\n", transportID);
 
 	if (pgr->pgr_numrsrv)
@@ -480,25 +470,27 @@ spc_pr_in_readrsrv(
 			continue;
 
 		if (i < max_buf_rsrv) {
-			SCSI_WRITE64(buf->res_key_list[i].reservation_key,
-			    rsrv->r_key);
-			buf->res_key_list[i].scope = rsrv->r_scope;
-			buf->res_key_list[i].type = rsrv->r_type;
+			desc = &buf->key_list.res_key_list[i];
+			SCSI_WRITE64(desc->reservation_key, rsrv->r_key);
+			desc->scope = rsrv->r_scope;
+			desc->type = rsrv->r_type;
+
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGRIN readrsrv - "
+			    "key:%016lx i_name:%s scope:%d type:%d \n",
+			    rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
+
+			i++;
 		}
-
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGRIN readrsrv - "
-		    "key:%016x isid:%016x scope:%d type:%d \n",
-		    rsrv->r_key, rsrv->r_isid, rsrv->r_scope, rsrv->r_type);
-
-		i++;
+		else
+			break;		/* No room left, leave now */
 	}
 
-	SCSI_WRITE32(buf->add_len, i * sizeof (scsi_prin_rsrvdesc_t));
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_generation);
+	SCSI_WRITE32(buf->add_len, i * sizeof (scsi_prin_rsrvdesc_t));
 
-	return (hsize + min(SCSI_READ32(buf->add_len),
-	    (int)(max_buf_rsrv * sizeof (scsi_prin_rsrvdesc_t))));
+	return (hsize + min(i, max_buf_rsrv)* sizeof (scsi_prin_rsrvdesc_t));
 }
 
 /*
@@ -575,16 +567,18 @@ spc_pr_in_fullstat(
 			    WW_UID_DEVICE_NAME;
 			SCSI_WRITE16(buf->full_desc[i].trans_id.add_len, 0);
 			sprintf(buf->full_desc[i].trans_id.iscsi_name, "");
-		}
 
-		i++;
+			i++;
+		}
+		else
+			break;		/* No room left, leave now */
+
 	}
 
-	SCSI_WRITE32(buf->add_len, i * sizeof (scsi_prin_rsrvdesc_t));
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_generation);
+	SCSI_WRITE32(buf->add_len, i * sizeof (scsi_prin_rsrvdesc_t));
 
-	return (hsize + min(SCSI_READ32(buf->add_len),
-	    (int)(max_buf_rsrv * sizeof (scsi_prin_rsrvdesc_t))));
+	return (hsize + min(i, max_buf_rsrv) * sizeof (scsi_prin_rsrvdesc_t));
 
 }
 
@@ -599,8 +593,6 @@ void
 spc_cmd_pr_out(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cdb;
-	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
-	sbc_reserve_t		*res = &p->d_sbc_reserve;
 	size_t			len;
 	void			*buf;
 
@@ -653,7 +645,6 @@ spc_cmd_pr_out(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 * SCOPE field shall be set to LU_SCOPE
 	 */
 	if (p_prout->scope != PR_LU_SCOPE) {
-		pthread_rwlock_unlock(&res->res_rwlock);
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
 		trans_send_complete(cmd, STATUS_CHECK);
@@ -690,9 +681,9 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
-	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	sbc_reserve_t		*res = &p->d_sbc_reserve;
 	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
+	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	t10_lu_impl_t		*lu;
 	int			status;
 
@@ -702,8 +693,29 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	 */
 	pthread_rwlock_wrlock(&res->res_rwlock);
 	if (pgr->pgr_rsrvlist.lnk_fwd == NULL) {
-		spc_pr_key_rsrv_init(pgr);
+		spc_pr_initialize(pgr);
 	}
+
+	queue_prt(mgmtq, Q_PR_NONIO, "PGR%x LUN%d action:%s\n",
+	    cmd->c_lu->l_targ->s_targ_num,
+	    cmd->c_lu->l_common->l_num,
+	    (p_prout->action == PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY)
+	    ? "Register & ignore existing key"
+	    : (p_prout->action == PR_OUT_REGISTER)
+	    ? "Register"
+	    : (p_prout->action == PR_OUT_RESERVE)
+	    ? "Reserve"
+	    : (p_prout->action == PR_OUT_RELEASE)
+	    ? "Release"
+	    : (p_prout->action == PR_OUT_CLEAR)
+	    ? "Clear"
+	    : (p_prout->action == PR_OUT_PREEMPT_ABORT)
+	    ? "Preempt & abort"
+	    : (p_prout->action == PR_OUT_PREEMPT)
+	    ? "Preempt"
+	    : (p_prout->action == PR_OUT_REGISTER_MOVE)
+	    ? "Register & move"
+	    : "Uknown");
 
 	/*
 	 * Now process the action.
@@ -715,19 +727,19 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		 * PR_OUT_REGISTER_IGNORE differs from PR_OUT_REGISTER
 		 * in that the reservation_key is ignored.
 		 */
-		status = spc_pr_register(cmd, data, data_len);
+		status = spc_pr_out_register(cmd, data, data_len);
 		break;
 
 	case PR_OUT_RESERVE:
-		status = spc_pr_reserve(cmd, data, data_len);
+		status = spc_pr_out_reserve(cmd, data, data_len);
 		break;
 
 	case PR_OUT_RELEASE:
-		status = spc_pr_release(cmd, data, data_len);
+		status = spc_pr_out_release(cmd, data, data_len);
 		break;
 
 	case PR_OUT_CLEAR:
-		status = spc_pr_clear(cmd, data, data_len);
+		status = spc_pr_out_clear(cmd, data, data_len);
 		break;
 
 	case PR_OUT_PREEMPT_ABORT:
@@ -737,14 +749,14 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		 * in that all current acitivy for the preempted
 		 * Initiators will be terminated.
 		 */
-		status = spc_pr_preempt(cmd, data, data_len);
+		status = spc_pr_out_preempt(cmd, data, data_len);
 		break;
 
 	case PR_OUT_REGISTER_MOVE:
 		/*
 		 * PR_OUT_REGISTER_MOVE registers a key for another I_T
 		 */
-		status = spc_pr_register_and_move(cmd, data, data_len);
+		status = spc_pr_out_register_and_move(cmd, data, data_len);
 		break;
 	}
 
@@ -789,7 +801,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	 * When the last registration is removed, PGR is no longer
 	 * active and we must reset the reservation type.
 	 */
-	if (pgr->pgr_numkeys == 0 && pgr->pgr_numrsrv == 0) {
+	if ((pgr->pgr_numkeys == 0) && (pgr->pgr_numrsrv == 0)) {
 		res->res_type = RT_NONE;
 		pgr->pgr_aptpl = 0;
 	} else {
@@ -799,34 +811,14 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	/*
 	 * Set the command dispatcher according to the reservation type
 	 */
+	(void) pthread_mutex_lock(&cmd->c_lu->l_common->l_common_mutex);
 	lu = avl_first(&cmd->c_lu->l_common->l_all_open);
 	do {
 		lu->l_cmd = (res->res_type == RT_NONE)
-		    ? sbc_cmd
-		    : sbc_cmd_reserved;
+		    ? sbc_cmd : sbc_cmd_reserved;
 		lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
 	} while (lu != NULL);
-
-	queue_prt(mgmtq, Q_PR_IO, "PGROUT:%d LUN:%d action:%s\n",
-	    cmd->c_lu->l_targ->s_targ_num,
-	    cmd->c_lu->l_common->l_num,
-	    (p_prout->action == PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY)
-	    ? "Register & ignore existing key"
-	    : (p_prout->action == PR_OUT_REGISTER)
-	    ? "Register"
-	    : (p_prout->action == PR_OUT_RESERVE)
-	    ? "Reserve"
-	    : (p_prout->action == PR_OUT_RELEASE)
-	    ? "Release"
-	    : (p_prout->action == PR_OUT_CLEAR)
-	    ? "Clear"
-	    : (p_prout->action == PR_OUT_PREEMPT_ABORT)
-	    ? "Preempt & abort"
-	    : (p_prout->action == PR_OUT_PREEMPT)
-	    ? "Preempt"
-	    : (p_prout->action == PR_OUT_REGISTER_MOVE)
-	    ? "Register & move"
-	    : "Uknown");
+	(void) pthread_mutex_unlock(&cmd->c_lu->l_common->l_common_mutex);
 
 	/*
 	 * Processing is complete, release mutex
@@ -841,12 +833,12 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 
 /*
  * []----
- * | spc_pr_register
+ * | spc_pr_out_register
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 static int
-spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_register(t10_cmd_t *cmd, void *data, size_t data_len)
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
 	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
@@ -891,8 +883,9 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 	reservation_key = SCSI_READ64(plist->reservation_key);
 	service_key = SCSI_READ64(plist->service_key);
 
-	queue_prt(mgmtq, Q_PR_IO,
-	    "PGROUT: register reservation:%016x, key:%016x\n",
+	queue_prt(mgmtq, Q_PR_NONIO,
+	    "PGR%x LUN%d register reservation:%016lx, key:%016lx\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
 	    reservation_key, service_key);
 
 	/*
@@ -904,13 +897,13 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 		 * Find specified key
 		 */
 		ti = lu->l_targ;
-		key = spc_pr_key_find(pgr, 0, ti->s_isid, ti->s_transportID);
+		key = spc_pr_key_find(pgr, 0, ti->s_i_name, ti->s_targ_base);
 		if (key) {
 			/*
 			 * What about ALL_TG_TP?
 			 */
 			if (plist->all_tg_pt ||
-			    (key->k_isid == T10_PGR_ISID(cmd))) {
+			    (strcmp(key->k_i_name, T10_PGR_INAME(cmd)) == 0)) {
 
 				if (p_prout->action == PR_OUT_REGISTER &&
 				    key->k_key != reservation_key) {
@@ -924,9 +917,9 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 				 * Change existing key ?
 				 */
 				if (service_key) {
-					queue_prt(mgmtq, Q_PR_IO,
+					queue_prt(mgmtq, Q_PR_NONIO,
 					    "PGROUT: change "
-					    "old:%016x = new:%016x\n",
+					    "old:%016lx = new:%016lx\n",
 					    key->k_key, service_key);
 
 					/*
@@ -940,18 +933,18 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 					 * NOTE: If we own the reservation then
 					 * we must release it.
 					 */
-					queue_prt(mgmtq, Q_PR_IO,
+					queue_prt(mgmtq, Q_PR_NONIO,
 					    "PGROUT: delete "
-					    "old:%016x = new:%016x\n",
+					    "old:%016lx = new:%016lx\n",
 					    key->k_key, service_key);
 
 					rsrv = spc_pr_rsrv_find(pgr, 0,
-					    ti->s_isid, ti->s_transportID);
+					    ti->s_i_name, ti->s_targ_base);
 					if (rsrv) {
 						spc_pr_rsrv_release(
 						    cmd, pgr, rsrv);
-						spc_pr_key_free(pgr, key);
 					}
+					spc_pr_key_free(pgr, key);
 				}
 			}
 		} else {
@@ -959,7 +952,7 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 			 * What about ALL_TG_TP?
 			 */
 			if (plist->all_tg_pt ||
-			    (ti->s_isid == T10_PGR_ISID(cmd))) {
+			    (strcmp(ti->s_i_name, T10_PGR_INAME(cmd)) == 0)) {
 				/*
 				 * Process request from un-registered Initiator.
 				 */
@@ -972,14 +965,8 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 					return (STATUS_RESERVATION_CONFLICT);
 				}
 
-				/*
-				 * Allocate new key.
-				 */
-				queue_prt(mgmtq, Q_PR_IO,
-				    "PGROUT: new:%016x\n", service_key);
-
 				key = spc_pr_key_alloc(pgr, service_key,
-				    ti->s_isid, ti->s_transportID);
+				    ti->s_i_name, ti->s_targ_base);
 				if (key == NULL) {
 					/* pgr - define SCSI-3 error codes */
 					cmd->c_lu->l_status =
@@ -1008,13 +995,13 @@ spc_pr_register(t10_cmd_t *cmd, void *data, size_t data_len)
 
 /*
  * []----
- * | spc_pr_reserve
+ * | spc_pr_out_reserve
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 /* ARGSUSED */
 static int
-spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
@@ -1023,6 +1010,7 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 	spc_pr_rsrv_t		*rsrv;
 	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	uint64_t		reservation_key;
+	uint64_t		service_key;
 	int			status;
 
 	/*
@@ -1030,19 +1018,21 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 	 * make a reservation.
 	 */
 	reservation_key = SCSI_READ64(plist->reservation_key);
-	if (!spc_pr_key_find(
-	    pgr, reservation_key, T10_PGR_ISID(cmd), T10_PGR_TID(cmd))) {
+	service_key = SCSI_READ64(plist->service_key);
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: reserve reservation:%016x not found\n",
+	queue_prt(mgmtq, Q_PR_NONIO,
+	    "PGR%x LUN%d reserve reservation:%016lx, key:%016lx\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+	    reservation_key, service_key);
+
+	if (!spc_pr_key_find(
+	    pgr, reservation_key, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd))) {
+
+		queue_prt(mgmtq, Q_PR_ERRS,
+		    "PGROUT: reserve service:%016lx not found\n",
 		    reservation_key);
 
 		return (STATUS_RESERVATION_CONFLICT);
-	} else {
-
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: reserve reservation:%016x\n", reservation_key);
-
 	}
 
 	/*
@@ -1050,13 +1040,12 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 	 * another Initiator.  There can be only one LU_SCOPE
 	 * reservation per ITL.  We do not support extents.
 	 */
-	if (rsrv = spc_pr_rsrv_find(pgr, 0, 0, T10_PGR_TID(cmd))) {
-		if (rsrv->r_isid != T10_PGR_ISID(cmd)) {
+	if (rsrv = spc_pr_rsrv_find(pgr, 0, "", T10_PGR_TNAME(cmd))) {
+		if (strcmp(rsrv->r_i_name, T10_PGR_INAME(cmd)) != 0) {
 
-			queue_prt(mgmtq, Q_PR_IO,
-			    "PGROUT: reserve %016x != %016x:%s\n",
-			    rsrv->r_isid, T10_PGR_ISID(cmd),
-			    T10_PGR_TID(cmd));
+			queue_prt(mgmtq, Q_PR_ERRS,
+			    "PGROUT: reserve %s != %s:%s\n", rsrv->r_i_name,
+			    T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd));
 
 			return (STATUS_RESERVATION_CONFLICT);
 		}
@@ -1068,12 +1057,6 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 	 */
 	if (rsrv != NULL) {
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT reserve(+) - transportID=%s\n"
-		    "\tkey:%016x isid:%016x scope:%d type:%d \n",
-		    rsrv->r_transportID, rsrv->r_key, rsrv->r_isid,
-		    rsrv->r_scope, rsrv->r_type);
-
 		/*
 		 * An Initiator cannot re-reserve.  It must first
 		 * release.  But if its' type and scope match then
@@ -1081,22 +1064,32 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 		 */
 		if (rsrv->r_type == p_prout->type &&
 		    rsrv->r_scope == p_prout->scope) {
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGROUT reserve - transportID=%s\n"
+			    "\tkey:%016lx i_name:%s scope:%d type:%d \n",
+			    rsrv->r_transportID, rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
 			status = STATUS_GOOD;
 		} else {
+			queue_prt(mgmtq, Q_PR_ERRS,
+			    "PGROUT reserve failed - transportID=%s\n"
+			    "\tkey:%016lx i_name:%s scope:%d type:%d \n",
+			    rsrv->r_transportID, rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
 			status = STATUS_RESERVATION_CONFLICT;
 		}
 	} else {
 		/*
 		 * No reservation exists.  Establish a new one.
 		 */
-		queue_prt(mgmtq, Q_PR_IO,
+		queue_prt(mgmtq, Q_PR_NONIO,
 		    "PGROUT reserve - transportID=%s\n"
-		    "\tkey:%016x isid:%016x scope:%d type:%d \n",
-		    T10_PGR_TID(cmd), reservation_key, T10_PGR_ISID(cmd),
+		    "\tkey:%016lx i_name:%s scope:%d type:%d \n",
+		    T10_PGR_TNAME(cmd), reservation_key, T10_PGR_INAME(cmd),
 		    p_prout->scope, p_prout->type);
 
 		rsrv = spc_pr_rsrv_alloc(pgr, reservation_key,
-		    T10_PGR_ISID(cmd), T10_PGR_TID(cmd),
+		    T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd),
 		    p_prout->scope, p_prout->type);
 		if (rsrv == NULL) {
 			cmd->c_lu->l_status = KEY_ABORTED_COMMAND;
@@ -1113,12 +1106,12 @@ spc_pr_reserve(t10_cmd_t *cmd, void *data, size_t data_len)
 
 /*
  * []----
- * | spc_pr_release
+ * | spc_pr_out_release
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 static int
-spc_pr_release(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_release(t10_cmd_t *cmd, void *data, size_t data_len)
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
@@ -1127,41 +1120,50 @@ spc_pr_release(t10_cmd_t *cmd, void *data, size_t data_len)
 	spc_pr_rsrv_t		*rsrv;
 	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	uint64_t		reservation_key;
+	uint64_t		service_key;
 	int			status;
 
 	/*
-	 * Do not allow an unregistered initiator to attempting to
-	 * release a reservation.
+	 * Do not allow an unregistered initiator to
+	 * make a reservation.
 	 */
 	reservation_key = SCSI_READ64(plist->reservation_key);
-	if (!spc_pr_key_find(
-	    pgr, reservation_key, T10_PGR_ISID(cmd), T10_PGR_TID(cmd))) {
+	service_key = SCSI_READ64(plist->service_key);
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: release reservation:%016x not found\n",
+	queue_prt(mgmtq, Q_PR_NONIO,
+	    "PGR%x LUN%d release reservation:%016lx, key:%016lx\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+	    reservation_key, service_key);
+
+	if (!spc_pr_key_find(
+	    pgr, reservation_key, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd))) {
+
+		queue_prt(mgmtq, Q_PR_ERRS,
+		    "PGROUT: release service:%016lx not found\n",
 		    reservation_key);
 
 		return (STATUS_RESERVATION_CONFLICT);
 	} else {
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: release reservation:%016x\n", reservation_key);
+		queue_prt(mgmtq, Q_PR_NONIO,
+		    "PGROUT: release service:%016lx\n", service_key);
 	}
 
+	/*
+	 * Releasing a non-existent reservation is allowed.
+	 */
 	if (!(rsrv = spc_pr_rsrv_find(
-	    pgr, 0, T10_PGR_ISID(cmd), T10_PGR_TID(cmd)))) {
-		/*
-		 * Releasing a non-existent reservation is allowed.
-		 */
+	    pgr, 0, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd)))) {
+
 		status = STATUS_GOOD;
 
 	} else if (p_prout->scope != rsrv->r_scope ||
 	    p_prout->type != rsrv->r_type ||
 	    reservation_key != rsrv->r_key) {
-		queue_prt(mgmtq, Q_PR_IO,
+		queue_prt(mgmtq, Q_PR_ERRS,
 		    "PGROUT release failed - transportID=%s\n"
-		    "\tkey:%016x isid:%016x scope:%d type:%d \n",
-		    T10_PGR_TID(cmd), reservation_key, T10_PGR_ISID(cmd),
+		    "\tkey:%016lx i_name:%s scope:%d type:%d \n",
+		    T10_PGR_TNAME(cmd), reservation_key, T10_PGR_INAME(cmd),
 		    p_prout->scope, p_prout->type);
 
 		/*
@@ -1175,10 +1177,10 @@ spc_pr_release(t10_cmd_t *cmd, void *data, size_t data_len)
 		/*
 		 * Now release the reservation.
 		 */
-		queue_prt(mgmtq, Q_PR_IO,
+		queue_prt(mgmtq, Q_PR_NONIO,
 		    "PGROUT release - transportID=%s\n"
-		    "\tkey:%016x isid:%016x scope:%d type:%d \n",
-		    rsrv->r_transportID, rsrv->r_key, rsrv->r_isid,
+		    "\tkey:%016lx i_name:s scope:%d type:%d \n",
+		    rsrv->r_transportID, rsrv->r_key, rsrv->r_i_name,
 		    rsrv->r_scope, rsrv->r_type);
 
 		spc_pr_rsrv_release(cmd, pgr, rsrv);
@@ -1190,24 +1192,24 @@ spc_pr_release(t10_cmd_t *cmd, void *data, size_t data_len)
 
 /*
  * []----
- * | spc_pr_preempt
+ * | spc_pr_out_preempt
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 /* ARGSUSED */
 static int
-spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 {
 	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
-	t10_lu_impl_t		*lu;
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
 	sbc_reserve_t		*res = &p->d_sbc_reserve;
 	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
 	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	uint64_t		reservation_key;
 	uint64_t		service_key;
-	spc_pr_key_t		*key;
-	spc_pr_rsrv_t		*rsrv;
+	spc_pr_key_t		*key, *key_next;
+	spc_pr_rsrv_t		*rsrv, *rsrv_next;
+	t10_lu_impl_t		*lu;
 	int			status = STATUS_GOOD;
 
 	/*
@@ -1216,25 +1218,24 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 	reservation_key = SCSI_READ64(plist->reservation_key);
 	service_key = SCSI_READ64(plist->service_key);
 
+	queue_prt(mgmtq, Q_PR_NONIO,
+	    "PGR%x LUN%d preempt reservation:%016lx, key:%016lx\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+	    reservation_key, service_key);
 
 	/*
-	 * Initiator must be registered and service key (preempt key)
-	 * must exist.
+	 * Service key (preempt key) must exist, and
+	 * Initiator must be registered
 	 */
-	if ((!(key = spc_pr_key_find(pgr, service_key, 0, ""))) ||
-	    (!(rsrv = spc_pr_rsrv_find(pgr, reservation_key,
-	    T10_PGR_ISID(cmd), "")))) {
+	if (spc_pr_key_find(pgr, service_key, "", "") == NULL ||
+	    spc_pr_key_find(pgr, reservation_key, T10_PGR_INAME(cmd), "") ==
+	    NULL) {
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: preempt failed reservation:%016x, key:%016x\n",
+		queue_prt(mgmtq, Q_PR_ERRS,
+		    "PGROUT: preempt failed reservation:%016lx, key:%016lx\n",
 		    reservation_key, service_key);
 
 		return (STATUS_RESERVATION_CONFLICT);
-	} else {
-
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: preempt reservation:%016x, key:%016x\n",
-		    reservation_key, service_key);
 	}
 
 	/*
@@ -1248,30 +1249,44 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 	 */
 	for (key = (spc_pr_key_t *)pgr->pgr_keylist.lnk_fwd;
 	    key != (spc_pr_key_t *)&pgr->pgr_keylist;
-	    key = (spc_pr_key_t *)key->k_link.lnk_fwd) {
+	    key = (spc_pr_key_t *)key_next) {
 
-		/* Skip non-matching keys */
-		if (key->k_key != service_key)
-			continue;
-
-		/* Remove the registration key. */
-		spc_pr_key_free(pgr, key);
-
-		/* Do not set UNIT ATTN for calling Initiator */
-		if (key->k_isid == T10_PGR_ISID(cmd))
-			continue;
+		Boolean_t	unit_attn;
 
 		/*
-		 * Find associated I_T Nexuses
+		 * Get next pointer in case the key gets deallocated
 		 */
-		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
-		do {
-			lu->l_cmd	= sbc_cmd;
-			lu->l_status	= KEY_UNIT_ATTENTION;
-			lu->l_asc	= SPC_ASC_PARAMETERS_CHANGED;
-			lu->l_ascq	= SPC_ASCQ_RES_PREEMPTED;
-			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
-		} while (lu != NULL);
+		key_next = (spc_pr_key_t *)key->k_link.lnk_fwd;
+
+		/* Skip non-matching keys */
+		if (key->k_key != service_key) {
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGROUT preempt key:%016lx != key:%016lx "
+			    "i_name:%s transportID:%s\n", service_key,
+			    key->k_key, key->k_i_name, key->k_transportID);
+			continue;
+		}
+
+		/*
+		 * Determine if UNIT ATTN needed
+		 */
+		unit_attn = strcmp(key->k_i_name, T10_PGR_INAME(cmd));
+
+		/*
+		 * Remove the registration key
+		 */
+		queue_prt(mgmtq, Q_PR_NONIO,
+		    "PGROUT preempt delete key:%016lx "
+		    "i_name:%s transportID:%s\n",
+		    key->k_key, key->k_i_name, key->k_transportID);
+		spc_pr_key_free(pgr, key);
+
+		/*
+		 * UNIT ATTN needed ?
+		 * Do not set UNIT ATTN for calling Initiator
+		 */
+		if (unit_attn == False)
+			continue;
 
 		/*
 		 * Is this the preempt and abort?
@@ -1281,20 +1296,40 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 			    cmd->c_lu->l_common->l_from_transports,
 			    Q_HIGH, msg_reset_lu, (void *)cmd->c_lu);
 		}
+
+		/*
+		 * Find associated I_T Nexuses
+		 */
+		(void) pthread_mutex_lock(&cmd->c_lu->l_common->l_common_mutex);
+		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
+		do {
+			lu->l_status	= KEY_UNIT_ATTENTION;
+			lu->l_asc	= SPC_ASC_PARAMETERS_CHANGED;
+			lu->l_ascq	= SPC_ASCQ_RES_PREEMPTED;
+			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
+		} while (lu != NULL);
+		(void) pthread_mutex_unlock(
+		    &cmd->c_lu->l_common->l_common_mutex);
 	}
 
 	/*
-	 * Re-establish our registration key if we preempted it.
+	 * Re-establish our service key if we preempted it.
 	 */
 	if (!(key = spc_pr_key_find(
-	    pgr, reservation_key, T10_PGR_ISID(cmd), T10_PGR_TID(cmd)))) {
+	    pgr, reservation_key, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd)))) {
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: preempt - register:%016x, isid:%016x:%s\n",
-		    reservation_key, T10_PGR_ISID(cmd), T10_PGR_TID(cmd));
+		queue_prt(mgmtq, Q_PR_NONIO,
+		    "PGROUT: preempt - register:%016lx, i_name:%s:%s\n",
+		    reservation_key, T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd));
 
 		key = spc_pr_key_alloc(pgr, reservation_key,
-		    T10_PGR_ISID(cmd), T10_PGR_TID(cmd));
+		    T10_PGR_INAME(cmd), T10_PGR_TNAME(cmd));
+		if (key == NULL) {
+			cmd->c_lu->l_status = KEY_ABORTED_COMMAND;
+			cmd->c_lu->l_asc = SPC_ASC_MEMORY_OUT_OF;
+			cmd->c_lu->l_ascq = SPC_ASCQ_RESERVATION_FAIL;
+			return (STATUS_CHECK);
+		}
 	}
 
 	/*
@@ -1302,11 +1337,22 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 	 */
 	for (rsrv = (spc_pr_rsrv_t *)pgr->pgr_rsrvlist.lnk_fwd;
 	    rsrv != (spc_pr_rsrv_t *)&pgr->pgr_rsrvlist;
-	    rsrv = (spc_pr_rsrv_t *)rsrv->r_link.lnk_fwd) {
+	    rsrv = (spc_pr_rsrv_t *)rsrv_next) {
+
+		/*
+		 * Get next pointer in case the reservation gets deallocated
+		 */
+		rsrv_next = (spc_pr_rsrv_t *)rsrv->r_link.lnk_fwd;
 
 		/* Skip non-matching keys */
-		if (rsrv->r_key != service_key)
+		if (rsrv->r_key != service_key) {
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGROUT preempt rsrv:%016lx != rsrv:%016lx"
+			    "i_name:%s scope:%d type:%d \n", service_key,
+			    rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
 			continue;
+		}
 
 		/*
 		 * Remove matching reservations on other ports
@@ -1315,21 +1361,30 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 		 * delete the reservations on other ports just remove
 		 * the following block of code.
 		 */
-		if (strcmp(rsrv->r_transportID, T10_PGR_TID(cmd))) {
+		if (strcmp(rsrv->r_transportID, T10_PGR_TNAME(cmd))) {
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGROUT preempt(-) rsrv:%016lx "
+			    "i_name:%s scope:%d type:%d \n",
+			    rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
+
 			spc_pr_rsrv_free(pgr, rsrv);
 			continue;
+		} else {
+			/*
+			 * We have a matching reservation so preempt it.
+			 */
+			rsrv->r_key = reservation_key;
+			rsrv->r_i_name = strdup(T10_PGR_INAME(cmd));
+			rsrv->r_scope = p_prout->scope;
+			rsrv->r_type = p_prout->type;
+
+			queue_prt(mgmtq, Q_PR_NONIO,
+			    "PGROUT preempt(+) rsrv:%016lx "
+			    "i_name:%s scope:%d type:%d \n",
+			    rsrv->r_key, rsrv->r_i_name,
+			    rsrv->r_scope, rsrv->r_type);
 		}
-
-		rsrv->r_key = reservation_key;
-		rsrv->r_isid = T10_PGR_ISID(cmd);
-		rsrv->r_scope = p_prout->scope;
-		rsrv->r_type = p_prout->type;
-
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT preempt - transportID=%s\n"
-		    "\tkey:%016x isid:%016x scope:%d type:%d \n",
-		    rsrv->r_transportID, rsrv->r_key, rsrv->r_isid,
-		    rsrv->r_scope, rsrv->r_type);
 	}
 
 	return (status);
@@ -1337,22 +1392,21 @@ spc_pr_preempt(t10_cmd_t *cmd, void *data, size_t data_len)
 
 /*
  * []----
- * | spc_pr_clear
+ * | spc_pr_out_clear
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 /* ARGSUSED */
 static int
-spc_pr_clear(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_clear(t10_cmd_t *cmd, void *data, size_t data_len)
 {
-	scsi_cdb_prout_t	*p_prout = (scsi_cdb_prout_t *)cmd->c_cdb;
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
 	sbc_reserve_t		*res = &p->d_sbc_reserve;
 	scsi3_pgr_t		*pgr = &res->res_scsi_3_pgr;
 	scsi_prout_plist_t	*plist = (scsi_prout_plist_t *)data;
 	uint64_t		reservation_key;
+	uint64_t		service_key;
 	spc_pr_key_t		*key;
-	t10_targ_impl_t		*tp;
 	t10_lu_impl_t		*lu;
 
 	/*
@@ -1360,15 +1414,20 @@ spc_pr_clear(t10_cmd_t *cmd, void *data, size_t data_len)
 	 * clear the PGR.
 	 */
 	reservation_key = SCSI_READ64(plist->reservation_key);
-	if (!spc_pr_key_find(pgr, reservation_key, T10_PGR_ISID(cmd), "")) {
+	service_key = SCSI_READ64(plist->service_key);
 
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: clear pgr:%016x not found\n", reservation_key);
+	queue_prt(mgmtq, Q_PR_NONIO,
+	    "PGR%x LUN%d clear reservation:%016lx, key:%016lx\n",
+	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+	    reservation_key, service_key);
+
+	if (!spc_pr_key_find(pgr, reservation_key, T10_PGR_INAME(cmd), "")) {
+
+		queue_prt(mgmtq, Q_PR_ERRS,
+		    "PGROUT: clear service:%016lx not found\n",
+		    reservation_key);
 
 		return (STATUS_RESERVATION_CONFLICT);
-	} else {
-		queue_prt(mgmtq, Q_PR_IO,
-		    "PGROUT: clear pgr:%016x\n", reservation_key);
 	}
 
 	/*
@@ -1379,12 +1438,13 @@ spc_pr_clear(t10_cmd_t *cmd, void *data, size_t data_len)
 	    key = (spc_pr_key_t *)key->k_link.lnk_fwd) {
 
 		/* Do not set UNIT ATTN for calling Initiator */
-		if (key->k_isid == T10_PGR_ISID(cmd))
+		if (!(strcmp(key->k_i_name, T10_PGR_INAME(cmd))))
 			continue;
 		/*
 		 * At this point the only way to get in here is to be the owner
 		 * of the reservation.
 		 */
+		(void) pthread_mutex_lock(&cmd->c_lu->l_common->l_common_mutex);
 		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
 		do {
 			lu->l_status = KEY_UNIT_ATTENTION;
@@ -1392,6 +1452,8 @@ spc_pr_clear(t10_cmd_t *cmd, void *data, size_t data_len)
 			lu->l_ascq = SPC_ASCQ_RES_PREEMPTED;
 			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
 		} while (lu != NULL);
+		(void) pthread_mutex_unlock(
+		    &cmd->c_lu->l_common->l_common_mutex);
 	}
 
 	/*
@@ -1404,12 +1466,12 @@ spc_pr_clear(t10_cmd_t *cmd, void *data, size_t data_len)
 
 /*
  * []----
- * | spc_pr_register_and_move
+ * | spc_pr_out_register_and_move
  * |	Refer to SPC-3, Section 6.1, Tables ?? and ??
  * []----
  */
 static int
-spc_pr_register_and_move(t10_cmd_t *cmd, void *data, size_t data_len)
+spc_pr_out_register_and_move(t10_cmd_t *cmd, void *data, size_t data_len)
 {
 	return (STATUS_RESERVATION_CONFLICT);
 }
@@ -1422,7 +1484,7 @@ spc_pr_register_and_move(t10_cmd_t *cmd, void *data, size_t data_len)
  * []----
  */
 static spc_pr_key_t *
-spc_pr_key_alloc(scsi3_pgr_t *pgr, uint64_t service_key, uint64_t isid,
+spc_pr_key_alloc(scsi3_pgr_t *pgr, uint64_t service_key, char *i_name,
     char *transportID)
 {
 	spc_pr_key_t	*key = (spc_pr_key_t *)
@@ -1430,7 +1492,7 @@ spc_pr_key_alloc(scsi3_pgr_t *pgr, uint64_t service_key, uint64_t isid,
 
 	if (key != NULL) {
 		key->k_key = service_key;
-		key->k_isid = isid;
+		key->k_i_name = strdup(i_name);
 		key->k_transportID = strdup(transportID);
 
 		insque(&key->k_link, pgr->pgr_keylist.lnk_bwd);
@@ -1444,12 +1506,12 @@ spc_pr_key_alloc(scsi3_pgr_t *pgr, uint64_t service_key, uint64_t isid,
 
 /*
  * []----
- * | spc_pr_key_rsrv_init -
+ * | spc_pr_initialize -
  * |	Initialize registration & reservervation queues
  * []----
  */
 static void
-spc_pr_key_rsrv_init(scsi3_pgr_t *pgr)
+spc_pr_initialize(scsi3_pgr_t *pgr)
 {
 	assert(pgr->pgr_numrsrv == 0);
 	assert(pgr->pgr_numkeys == 0);
@@ -1475,6 +1537,7 @@ static void
 spc_pr_key_free(scsi3_pgr_t *pgr, spc_pr_key_t *key)
 {
 	remque(&key->k_link);
+	free(key->k_i_name);
 	free(key->k_transportID);
 	free(key);
 
@@ -1489,18 +1552,17 @@ spc_pr_key_free(scsi3_pgr_t *pgr, spc_pr_key_t *key)
  * []----
  */
 static spc_pr_key_t *
-spc_pr_key_find(scsi3_pgr_t *pgr, uint64_t key, uint64_t isid,
-    char *transportID)
+spc_pr_key_find(scsi3_pgr_t *pgr, uint64_t key, char *i_name, char *transportID)
 {
 	spc_pr_key_t	*kp;
 	spc_pr_key_t	*rval = NULL;
-
 
 	for (kp = (spc_pr_key_t *)pgr->pgr_keylist.lnk_fwd;
 	    kp != (spc_pr_key_t *)&pgr->pgr_keylist;
 	    kp = (spc_pr_key_t *)kp->k_link.lnk_fwd) {
 		if ((key == 0 || kp->k_key == key) &&
-		    (isid == 0 || kp->k_isid == isid) &&
+		    (strlen(i_name) == 0 ||
+		    (strcmp(kp->k_i_name, i_name) == 0)) &&
 		    (strlen(transportID) == 0 ||
 		    (strcmp(kp->k_transportID, transportID) == 0))) {
 			rval = kp;
@@ -1519,7 +1581,7 @@ spc_pr_key_find(scsi3_pgr_t *pgr, uint64_t key, uint64_t isid,
  * []----
  */
 static spc_pr_rsrv_t *
-spc_pr_rsrv_alloc(scsi3_pgr_t *pgr, uint64_t service_key, uint64_t isid,
+spc_pr_rsrv_alloc(scsi3_pgr_t *pgr, uint64_t service_key, char *i_name,
     char *transportID, uint8_t scope, uint8_t type)
 {
 	spc_pr_rsrv_t	*rsrv = (spc_pr_rsrv_t *)
@@ -1527,7 +1589,7 @@ spc_pr_rsrv_alloc(scsi3_pgr_t *pgr, uint64_t service_key, uint64_t isid,
 
 	if (rsrv != NULL) {
 		rsrv->r_key = service_key;
-		rsrv->r_isid = isid;
+		rsrv->r_i_name = strdup(i_name);
 		rsrv->r_transportID = strdup(transportID);
 		rsrv->r_scope = scope;
 		rsrv->r_type = type;
@@ -1552,6 +1614,7 @@ static void
 spc_pr_rsrv_free(scsi3_pgr_t *pgr, spc_pr_rsrv_t *rsrv)
 {
 	remque(&rsrv->r_link);
+	free(rsrv->r_i_name);
 	free(rsrv->r_transportID);
 	free(rsrv);
 
@@ -1566,7 +1629,7 @@ spc_pr_rsrv_free(scsi3_pgr_t *pgr, spc_pr_rsrv_t *rsrv)
  * []----
  */
 static spc_pr_rsrv_t *
-spc_pr_rsrv_find(scsi3_pgr_t *pgr, uint64_t key, uint64_t isid,
+spc_pr_rsrv_find(scsi3_pgr_t *pgr, uint64_t key, char *i_name,
     char *transportID)
 {
 	spc_pr_rsrv_t	*rp, *rval = NULL;
@@ -1575,7 +1638,8 @@ spc_pr_rsrv_find(scsi3_pgr_t *pgr, uint64_t key, uint64_t isid,
 	    rp != (spc_pr_rsrv_t *)&pgr->pgr_rsrvlist;
 	    rp = (spc_pr_rsrv_t *)rp->r_link.lnk_fwd) {
 		if ((key == 0 || rp->r_key == key) &&
-		    (isid == 0 || rp->r_isid == isid) &&
+		    (strlen(i_name) == 0 ||
+		    (strcmp(rp->r_i_name, i_name) == 0)) &&
 		    (strlen(transportID) == 0 ||
 		    (strcmp(rp->r_transportID, transportID) == 0))) {
 			rval = rp;
@@ -1628,7 +1692,6 @@ spc_pr_erase(scsi3_pgr_t *pgr)
 static void
 spc_pr_rsrv_release(t10_cmd_t *cmd, scsi3_pgr_t *pgr, spc_pr_rsrv_t *rsrv)
 {
-	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
 	t10_lu_impl_t		*lu;
 	spc_pr_key_t		*key;
 
@@ -1645,21 +1708,24 @@ spc_pr_rsrv_release(t10_cmd_t *cmd, scsi3_pgr_t *pgr, spc_pr_rsrv_t *rsrv)
 			/*
 			 * No UNIT ATTN for the requesting Initiator.
 			 */
-			if (key->k_isid == T10_PGR_ISID(cmd))
+			if (!(strcmp(key->k_i_name, T10_PGR_INAME(cmd))))
 				continue;
 
 			/*
 			 * Find associated I_T Nexuses
 			 */
+			(void) pthread_mutex_lock(
+			    &cmd->c_lu->l_common->l_common_mutex);
 			lu = avl_first(&cmd->c_lu->l_common->l_all_open);
 			do {
-				lu->l_cmd	= sbc_cmd;
 				lu->l_status	= KEY_UNIT_ATTENTION;
 				lu->l_asc	= SPC_ASC_PARAMETERS_CHANGED;
 				lu->l_ascq	= SPC_ASCQ_RES_RELEASED;
 				lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open,
 				    lu);
 			} while (lu != NULL);
+			(void) pthread_mutex_unlock(
+			    &cmd->c_lu->l_common->l_common_mutex);
 		}
 	}
 
@@ -1676,7 +1742,7 @@ spc_pr_rsrv_release(t10_cmd_t *cmd, scsi3_pgr_t *pgr, spc_pr_rsrv_t *rsrv)
  * |	At least the local pgr write lock must be held.
  * []----
  */
-Boolean_t
+void
 spc_pr_read(t10_cmd_t *cmd)
 {
 	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
@@ -1693,15 +1759,7 @@ spc_pr_read(t10_cmd_t *cmd)
 	char			path[MAXPATHLEN];
 
 	/*
-	 * If the pre-processor supported "#if .. sizeof", these would
-	 * not be required here
-	 */
-	assert(sizeof (spc_pr_diskkey_t) == 256);
-	assert(sizeof (spc_pr_diskrsrv_t) == 256);
-	assert(sizeof (spc_pr_persist_disk_t) == 512);
-
-	/*
-	 * Open/create the PERSISTANCE file specification
+	 * Open the PERSISTANCE file specification if one exists
 	 */
 	(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
 	    target_basedir, cmd->c_lu->l_targ->s_targ_base,
@@ -1724,7 +1782,7 @@ spc_pr_read(t10_cmd_t *cmd)
 			close(pfd);
 		if (buf)
 			free(buf);
-		return (status);
+		return;
 	}
 
 	/*
@@ -1732,50 +1790,50 @@ spc_pr_read(t10_cmd_t *cmd)
 	 * initialize the reservation and resource key queues
 	 */
 	if (pgr->pgr_rsrvlist.lnk_fwd == NULL) {
-		spc_pr_key_rsrv_init(pgr);
+		(void) spc_pr_initialize(pgr);
 	}
 
 	/*
-	 * Perform some vailidation
+	 * Perform some vailidation on what we are looking at
 	 */
-	if ((buf->magic != PGRMAGIC) ||
-	    (buf->revision != SPC_PGR_PERSIST_DATA_REVISION)) {
-		status = False;
-		goto done;
-	}
+	assert(buf->magic == PGRMAGIC);
+	assert(buf->revision == SPC_PGR_PERSIST_DATA_REVISION);
 
 	/*
-	 * Get the registration keys.
+	 * Get the PGR keys
 	 */
-	klist = buf->keylist;
+	klist = (spc_pr_diskkey_t *)&buf->keylist[0];
 	for (i = 0; i < buf->numkeys; i++) {
-		if (klist[i].rectype != PGRDISKKEY) {
-			status = False;
-			goto done;
-		}
-		key = spc_pr_key_alloc(pgr, klist[i].key, klist[i].isid,
-		    klist[i].transportID);
-		if (key == NULL) {
-			status = False;
-			goto done;
-		}
+		assert(klist[i].rectype == PGRDISKKEY);
+
+		/*
+		 * Was the key previously read, if not restore it
+		 */
+		key = spc_pr_key_find(pgr, 0, T10_PGR_INAME(cmd),
+		    T10_PGR_TNAME(cmd));
+		if (key == NULL)
+			key = spc_pr_key_alloc(pgr, klist[i].key,
+			    klist[i].i_name, klist[i].transportID);
+		assert(key);
 	}
 
 	/*
-	 * Get the reservations.
+	 * Get the PGR reservations
 	 */
 	rlist = (spc_pr_diskrsrv_t *)&buf->keylist[buf->numkeys];
 	for (i = 0; i < buf->numrsrv; i++) {
-		if (rlist[i].rectype != PGRDISKRSRV) {
-			status = False;
-			goto done;
-		}
-		rsrv = spc_pr_rsrv_alloc(pgr, rlist[i].key, rlist[i].isid,
-		    rlist[i].transportID, rlist[i].scope, rlist[i].type);
-		if (rsrv == NULL) {
-			status = False;
-			goto done;
-		}
+		assert(rlist[i].rectype == PGRDISKRSRV);
+
+		/*
+		 * Was the reservation previously read, if not restore it
+		 */
+		rsrv = spc_pr_rsrv_find(pgr, 0, T10_PGR_INAME(cmd),
+		    T10_PGR_TNAME(cmd));
+		if (rsrv == NULL)
+			rsrv = spc_pr_rsrv_alloc(pgr, rlist[i].key,
+			    rlist[i].i_name, rlist[i].transportID,
+			    rlist[i].scope, rlist[i].type);
+		assert(rsrv);
 	}
 
 	/*
@@ -1788,16 +1846,17 @@ spc_pr_read(t10_cmd_t *cmd)
 		/*
 		 * Set the command dispatcher according to the reservation type
 		 */
+		(void) pthread_mutex_lock(&cmd->c_lu->l_common->l_common_mutex);
 		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
 		do {
 			lu->l_cmd = sbc_cmd_reserved;
 			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
 		} while (lu != NULL);
+		(void) pthread_mutex_unlock(
+		    &cmd->c_lu->l_common->l_common_mutex);
 	}
 
-done:	pthread_rwlock_unlock(&res->res_rwlock);
 	free(buf);
-	return (status);
 }
 
 /*
@@ -1822,14 +1881,6 @@ spc_pr_write(t10_cmd_t *cmd)
 	int			i, pfd = -1;
 	char			path[MAXPATHLEN];
 	Boolean_t		status = True;
-
-	/*
-	 * If the pre-processor supported "#if .. sizeof", these would
-	 * not be required here
-	 */
-	assert(sizeof (spc_pr_diskkey_t) == 256);
-	assert(sizeof (spc_pr_diskrsrv_t) == 256);
-	assert(sizeof (spc_pr_persist_disk_t) == 512);
 
 	/*
 	 * Verify space requirements and allocate buffer memory.
@@ -1865,9 +1916,9 @@ spc_pr_write(t10_cmd_t *cmd)
 	    key = (spc_pr_key_t *)key->k_link.lnk_fwd, i++) {
 
 		klist[i].rectype = PGRDISKKEY;
-		klist[i].reserved = 0;
 		klist[i].key = key->k_key;
-		klist[i].isid = key->k_isid;
+		strncpy(klist[i].i_name, key->k_i_name,
+		    sizeof (klist[i].i_name));
 		strncpy(klist[i].transportID, key->k_transportID,
 		    sizeof (klist[i].transportID));
 	}
@@ -1882,11 +1933,11 @@ spc_pr_write(t10_cmd_t *cmd)
 	    rsrv = (spc_pr_rsrv_t *)rsrv->r_link.lnk_fwd, i++) {
 
 		rlist[i].rectype = PGRDISKRSRV;
-		rlist[i].reserved = 0;
+		rlist[i].key = rsrv->r_key;
 		rlist[i].scope = rsrv->r_scope;
 		rlist[i].type = rsrv->r_type;
-		rlist[i].key = rsrv->r_key;
-		rlist[i].isid = rsrv->r_isid;
+		strncpy(rlist[i].i_name, rsrv->r_i_name,
+		    sizeof (rlist[i].i_name));
 		strncpy(rlist[i].transportID, rsrv->r_transportID,
 		    sizeof (rlist[i].transportID));
 	}
@@ -1897,7 +1948,7 @@ spc_pr_write(t10_cmd_t *cmd)
 	(void) snprintf(path, MAXPATHLEN, "%s/%s/%s%d",
 	    target_basedir, cmd->c_lu->l_targ->s_targ_base,
 	    PERSISTANCEBASE, cmd->c_lu->l_common->l_num);
-	if ((pfd = open(path, O_WRONLY|O_CREAT)) >= 0) {
+	if ((pfd = open(path, O_WRONLY|O_CREAT, 0600)) >= 0) {
 		length = write(pfd, buf, bufsize);
 		close(pfd);
 	} else {

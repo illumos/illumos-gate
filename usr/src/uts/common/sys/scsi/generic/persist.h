@@ -112,7 +112,10 @@ typedef struct scsi_prin_rsrvdesc {
 typedef struct scsi_prin_readrsrv {
 	uint8_t			PRgeneration[4];
 	uint8_t			add_len[4];
-	scsi_prin_rsrvdesc_t	res_key_list[1];
+	union {
+		uint64_t		service_key[1];
+		scsi_prin_rsrvdesc_t	res_key_list[1];
+	} key_list;
 } scsi_prin_readrsrv_t;
 
 /*
@@ -246,12 +249,15 @@ typedef struct scsi_prin_rsrvdesc {
 	uint8_t			resbytes;
 	uint8_t			scope : 4,
 				type : 4;
-	uint8_t			obsolete2[8];
+	uint8_t			obsolete2[2];
 } scsi_prin_rsrvdesc_t;
 typedef struct scsi_prin_readrsrv {
 	uint8_t			PRgeneration[4];
 	uint8_t			add_len[4];
-	scsi_prin_rsrvdesc_t	res_key_list[1];
+	union {
+		uint64_t		service_key[1];
+		scsi_prin_rsrvdesc_t	res_key_list[1];
+	} key_list;
 } scsi_prin_readrsrv_t;
 
 /*

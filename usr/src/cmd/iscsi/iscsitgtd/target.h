@@ -76,8 +76,16 @@ extern "C" {
 #define	PARAMBASE		"params."
 #define	LUNBASE			"lun."
 #define	OSDBASE			"osd_root."
-
+#define	PERSISTANCEBASE		"pgr."
 #define	ISCSI_TARGET_ALIAS	"TargetAlias"
+
+/*
+ * Base file name for persistent reservation data (PR). The format used is pr.
+ * This name is used both to build the PR name and when searching the target
+ * directory for persistent reservation data. Don't change these names unless
+ * the upgrade path has been thought about.
+ */
+#define	PRBASE			"persistent_reservations"
 
 /*
  * The IQN names that are created use libuuid + the local target name
@@ -201,7 +209,8 @@ extern int		main_vers_maj,
 extern Boolean_t	enforce_strict_guid,
 			thin_provisioning,
 			disable_tpgs,
-			dbg_timestamps;
+			dbg_timestamps,
+			pgr_persist;
 extern pthread_mutex_t	targ_config_mutex;
 extern umem_cache_t	*iscsi_cmd_cache,
 			*t10_cmd_cache,

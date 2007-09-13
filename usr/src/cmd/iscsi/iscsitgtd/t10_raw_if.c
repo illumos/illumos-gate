@@ -234,8 +234,8 @@ raw_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 static void
 raw_read_tape(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
-	size_t		req_len,
-			xfer;
+	size_t		req_len;
+	size_t		xfer;
 	off_t		offset		= 0;
 	raw_io_t	*io;
 	Boolean_t	last;
@@ -285,8 +285,8 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	union scsi_cdb	*u		= (union scsi_cdb *)cdb;
 	diskaddr_t	addr;
 	off_t		offset		= 0;
-	uint32_t	cnt,
-			min;
+	uint32_t	cnt;
+	uint32_t	min;
 	raw_io_t	*io;
 	uint64_t	err_blkno;
 	int		sense_len;
@@ -499,8 +499,8 @@ raw_read_cmplt(emul_handle_t id)
 static void
 raw_write_tape(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
-	size_t		request_len,
-			xfer;
+	size_t		request_len;
+	size_t		xfer;
 	raw_io_t	*io;
 
 	request_len	= (cdb[2] << 16) | (cdb[3] << 8) | cdb[4];
@@ -821,6 +821,37 @@ raw_release(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		trans_send_complete(cmd, io->r_status);
 		raw_free_io(io);
 	}
+}
+
+static void
+raw_persist_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
+{
+	raw_io_t	*io;
+
+	if ((io = do_datain(cmd, cdb, CDB_GROUP1, 0)) == NULL) {
+		trans_send_complete(cmd, STATUS_CHECK);
+	} else {
+		trans_send_complete(cmd, io->r_status);
+		raw_free_io(io);
+	}
+}
+
+static void
+raw_persist_out(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
+{
+	size_t		len;
+
+	len = (cdb[5] << 24) | (cdb[6] << 16) | (cdb[7] << 8) | cdb[8];
+	do_dataout(cmd, cdb, cdb_len, len);
+}
+
+/*ARGSUSED*/
+static void
+raw_persist_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
+    size_t data_len)
+{
+	raw_io_t	*io = (raw_io_t *)id;
+	trans_send_complete(cmd, do_uscsi(cmd, io, RawDataToDevice));
 }
 
 static void
@@ -1351,8 +1382,8 @@ static scsi_cmd_table_t raw_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ raw_persist_in,	NULL,	NULL,	"PERSISTENT_RESERVE_IN" },
+	{ raw_persist_out, raw_persist_data, NULL, "PERSISTENT_RESERVE_OUT" },
 
 	/* 0x60 -- 0x6f */
 	{ spc_unsupported,	NULL,	NULL,	NULL },

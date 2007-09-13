@@ -1141,6 +1141,7 @@ f none usr/include/sys/scsi/generic/dad_mode.h 644 root bin
 f none usr/include/sys/scsi/generic/inquiry.h 644 root bin
 f none usr/include/sys/scsi/generic/message.h 644 root bin
 f none usr/include/sys/scsi/generic/mode.h 644 root bin
+f none usr/include/sys/scsi/generic/persist.h 644 root bin
 f none usr/include/sys/scsi/generic/sense.h 644 root bin
 f none usr/include/sys/scsi/generic/status.h 644 root bin
 d none usr/include/sys/scsi/impl 755 root bin

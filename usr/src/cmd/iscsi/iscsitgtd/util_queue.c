@@ -196,8 +196,8 @@ void
 queue_walker_free(target_queue_t *q, Boolean_t (*func)(msg_t *m, void *v),
     void *v1)
 {
-	msg_t	*m,		/* current working message */
-		*n;		/* next message */
+	msg_t	*m;		/* current working message */
+	msg_t	*n;		/* next message */
 
 	(void) pthread_mutex_lock(&q->q_mutex);
 	m = q->q_head;
@@ -234,8 +234,8 @@ queue_walker_free(target_queue_t *q, Boolean_t (*func)(msg_t *m, void *v),
 void
 queue_reset(target_queue_t *q)
 {
-	msg_t	*m,
-		*n;
+	msg_t	*m;
+	msg_t	*n;
 
 	(void) pthread_mutex_lock(&q->q_mutex);
 	m = q->q_head;
@@ -301,8 +301,8 @@ queue_message_free(msg_t *m)
 void
 queue_free(target_queue_t *q, void (*free_func)(msg_t *))
 {
-	msg_t	*m,
-		*n;
+	msg_t	*m;
+	msg_t	*n;
 
 	(void) pthread_mutex_lock(&q->q_mutex);
 	m = q->q_head;
@@ -343,8 +343,8 @@ queue_str(target_queue_t *q, uint32_t lvl, msg_type_t type, char *fmt)
 {
 	int		len;
 	char		*m;
-	hrtime_t	h	= gethrtime(),
-			delta;
+	hrtime_t	h	= gethrtime();
+	hrtime_t	delta;
 	static hrtime_t	last_h	= 0;
 
 	(void) pthread_mutex_lock(&q_mutex);

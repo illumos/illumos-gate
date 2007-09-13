@@ -49,8 +49,19 @@
 
 #include "t10.h"
 #include "t10_spc.h"
+#include "t10_spc_pr.h"
 #include "t10_sbc.h"
 #include "utility.h"
+
+/*
+ * External declarations
+ */
+void sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len);
+void spc_cmd_pr_in(t10_cmd_t *, uint8_t *, size_t);
+void spc_cmd_pr_out(t10_cmd_t *, uint8_t *, size_t);
+void spc_cmd_pr_out_data(t10_cmd_t *, emul_handle_t, size_t, char *, size_t);
+void spc_pr_read(t10_cmd_t *);
+Boolean_t spc_pgr_check(t10_cmd_t *, uint8_t *);
 
 /*
  * Forward declarations
@@ -60,7 +71,6 @@ static void sbc_overlap_store(disk_io_t *io);
 static void sbc_overlap_free(disk_io_t *io);
 static void sbc_overlap_check(disk_io_t *io);
 static void sbc_overlap_flush(disk_params_t *d);
-static void sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len);
 static void sbc_data(t10_cmd_t *cmd, emul_handle_t e, size_t offset,
     char *data, size_t data_len);
 static disk_io_t *sbc_io_alloc(t10_cmd_t *c);
@@ -160,8 +170,10 @@ sbc_per_init(t10_lu_impl_t *itl)
 {
 	disk_params_t	*d = (disk_params_t *)itl->l_common->l_dtype_params;
 
-	if (d->d_state == lu_online)
+	if (d->d_state == lu_online) {
 		itl->l_cmd	= sbc_cmd;
+		itl->l_pgr_read = False;	/* Look for PGR data */
+	}
 	else
 		itl->l_cmd	= spc_cmd_offline;
 	itl->l_data	= sbc_data;
@@ -171,22 +183,6 @@ sbc_per_init(t10_lu_impl_t *itl)
 void
 sbc_per_fini(t10_lu_impl_t *itl)
 {
-	disk_params_t	*d = (disk_params_t *)itl->l_common->l_dtype_params;
-	t10_lu_impl_t	*lu;
-
-	if (d->d_reserve_owner == itl) {
-
-		/*
-		 * Since we currently own the reservation, drop it,
-		 * and restore everyone elses command pointer.
-		 */
-		lu = avl_first(&itl->l_common->l_all_open);
-		do {
-			lu->l_cmd = sbc_cmd;
-			lu = AVL_NEXT(&itl->l_common->l_all_open, lu);
-		} while (lu != NULL);
-		d->d_reserve_owner = NULL;
-	}
 }
 
 /*
@@ -196,10 +192,18 @@ sbc_per_fini(t10_lu_impl_t *itl)
  * | This routine is called from within the SAM-3 Task router.
  * []----
  */
-static void
+void
 sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	scsi_cmd_table_t	*e;
+
+	/*
+	 * Determine if there is persistent data for this I_T_L Nexus
+	 */
+	if (cmd->c_lu->l_pgr_read == False) {
+		spc_pr_read(cmd);
+		cmd->c_lu->l_pgr_read = True;
+	}
 
 	e = &cmd->c_lu->l_cmd_table[cdb[0]];
 #ifdef FULL_DEBUG
@@ -215,34 +219,60 @@ sbc_cmd(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
  * | sbc_cmd_reserve -- Run commands when another I_T_L has a reservation
  * []----
  */
-static void
+void
 sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
-	scsi_cmd_table_t	*e;
+	disk_params_t		*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
+	sbc_reserve_t		*res = &p->d_sbc_reserve;
+	Boolean_t		conflict = False;
 
+	/*
+	 * SPC-3, revision 23, Table 31
+	 * SPC commands that are allowed in the presence of various reservations
+	 */
 	switch (cdb[0]) {
-	case SCMD_TEST_UNIT_READY:
 	case SCMD_INQUIRY:
-	case SCMD_REPORT_LUNS:
 	case SCMD_LOG_SENSE_G1:
+	case SCMD_PERSISTENT_RESERVE_IN:
 	case SCMD_READ_MEDIA_SERIAL:
+	case SCMD_REPORT_LUNS:
 	case SCMD_REPORT_TARGET_PORT_GROUPS:
 	case SCMD_REQUEST_SENSE:
-		/*
-		 * SPC-2, revision 20, Section 5.5.1 table 10
-		 * The specification allows these three commands
-		 * to run even through there's a reservation in place.
-		 */
-		e = &cmd->c_lu->l_cmd_table[cdb[0]];
-#ifdef FULL_DEBUG
-		queue_prt(mgmtq, Q_STE_IO, "RESERVED: SBC%x  LUN%d Cmd %s\n",
-		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
-		    e->cmd_name == NULL ? "(no name)" : e->cmd_name);
-#endif
-		(*e->cmd_start)(cmd, cdb, cdb_len);
+	case SCMD_TEST_UNIT_READY:
 		break;
-
 	default:
+		pthread_rwlock_rdlock(&res->res_rwlock);
+		switch (res->res_type) {
+		case RT_NONE:
+			/* conflict = False; */
+			break;
+		case RT_PGR:
+			conflict = spc_pgr_check(cmd, cdb);
+			break;
+		default:
+			conflict = True;
+			break;
+		}
+		pthread_rwlock_unlock(&res->res_rwlock);
+	}
+
+	queue_prt(mgmtq, Q_PR_IO,
+	    "PGR%x LUN%d CDB:%s - sbc_cmd_reserved(%s:%s)\n",
+	    cmd->c_lu->l_targ->s_targ_num,
+	    cmd->c_lu->l_common->l_num,
+	    cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name == NULL
+	    ? "(no name)"
+	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
+	    res->res_type == RT_PGR ? "PGR" :
+	    res->res_type == RT_NONE ? "" : "unknown",
+	    conflict ? "Conflict" : "Allowed");
+
+	/*
+	 * If no conflict at this point, allow command
+	 */
+	if (conflict == False) {
+		sbc_cmd(cmd, cdb, cdb_len);
+	} else {
 		trans_send_complete(cmd, STATUS_RESERVATION_CONFLICT);
 	}
 }
@@ -295,8 +325,8 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	union scsi_cdb	*u		= (union scsi_cdb *)cdb;
 	diskaddr_t	addr;
 	off_t		offset		= 0;
-	uint32_t	cnt,
-			min;
+	uint32_t	cnt;
+	uint32_t	min;
 	disk_io_t	*io;
 	void		*mmap_data	= T10_MMAP_AREA(cmd);
 	uint64_t	err_blkno;
@@ -984,7 +1014,7 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 * to contain it's size.
 	 */
 	mode_hdr->length = sizeof (struct mode_header) - 1 +
-		MODE_BLK_DESC_LENGTH;
+	    MODE_BLK_DESC_LENGTH;
 	mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
 
 	/*
@@ -1057,7 +1087,7 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			    sizeof (struct mode_geometry);
 
 		np = io->da_data + sizeof (*mode_hdr) +
-			mode_hdr->bdesc_length;
+		    mode_hdr->bdesc_length;
 		if (io->da_data_len < (sizeof (struct mode_format) +
 		    sizeof (struct mode_geometry) +
 		    sizeof (struct mode_cache_scsi3) +
@@ -1207,8 +1237,8 @@ sbc_service_actiong4(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 static void
 sbc_read_capacity16(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
-	uint64_t		capacity,
-				lba;
+	uint64_t		capacity;
+	uint64_t		lba;
 	int			rep_size;	/* response data size */
 	struct scsi_capacity_16	*cap16;
 	disk_params_t		*d;
@@ -1245,9 +1275,9 @@ sbc_read_capacity16(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	lba = (uint64_t)cdb[2] << 56 | (uint64_t)cdb[3] << 48 |
-		(uint64_t)cdb[4] << 40 | (uint64_t)cdb[5] << 32 |
-		(uint64_t)cdb[6] << 24 | (uint64_t)cdb[7] << 16 |
-		(uint64_t)cdb[8] << 8 | (uint64_t)cdb[9];
+	    (uint64_t)cdb[4] << 40 | (uint64_t)cdb[5] << 32 |
+	    (uint64_t)cdb[6] << 24 | (uint64_t)cdb[7] << 16 |
+	    (uint64_t)cdb[8] << 8 | (uint64_t)cdb[9];
 
 	io = sbc_io_alloc(cmd);
 
@@ -1286,100 +1316,15 @@ sbc_read_capacity16(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 /*ARGSUSED*/
 static void
-sbc_reserve(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
-{
-	disk_params_t	*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
-	t10_lu_impl_t	*lu;
-
-	if (p == NULL)
-		return;
-
-	if (cdb[1] & 0xe0 || SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
-		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
-		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
-		trans_send_complete(cmd, STATUS_CHECK);
-		return;
-	}
-
-	if ((p->d_reserve_owner != NULL) &&
-	    (p->d_reserve_owner != cmd->c_lu)) {
-
-		trans_send_complete(cmd, STATUS_RESERVATION_CONFLICT);
-		return;
-
-	} else if (p->d_reserve_owner == cmd->c_lu) {
-
-		/*
-		 * According SPC-2 revision 20, section 7.21.2
-		 * It shall be permissible for an initiator to
-		 * reserve a logic unit that is currently reserved
-		 * by that initiator
-		 */
-		trans_send_complete(cmd, STATUS_GOOD);
-	} else {
-
-		lu = avl_first(&cmd->c_lu->l_common->l_all_open);
-		do {
-			if (lu != cmd->c_lu)
-				lu->l_cmd = sbc_cmd_reserved;
-			lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
-		} while (lu != NULL);
-		p->d_reserve_owner = cmd->c_lu;
-		trans_send_complete(cmd, STATUS_GOOD);
-	}
-}
-
-/*ARGSUSED*/
-static void
-sbc_release(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
-{
-	disk_params_t	*p = (disk_params_t *)T10_PARAMS_AREA(cmd);
-	t10_lu_impl_t	*lu;
-
-	if (p == NULL)
-		return;
-
-	if (cdb[1] & 0xe0 || cdb[3] || cdb[4] ||
-	    SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
-		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
-		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
-		trans_send_complete(cmd, STATUS_CHECK);
-		return;
-	}
-
-	if (p->d_reserve_owner == NULL) {
-
-		/*
-		 * If nobody is the owner this command is successful.
-		 */
-		trans_send_complete(cmd, STATUS_GOOD);
-		return;
-	}
-
-	/*
-	 * At this point the only way to get in here is to be the owner
-	 * of the reservation.
-	 */
-	lu = avl_first(&cmd->c_lu->l_common->l_all_open);
-	do {
-		lu->l_cmd = sbc_cmd;
-		lu = AVL_NEXT(&cmd->c_lu->l_common->l_all_open, lu);
-	} while (lu != NULL);
-	p->d_reserve_owner = NULL;
-	trans_send_complete(cmd, STATUS_GOOD);
-}
-
-/*ARGSUSED*/
-static void
 sbc_verify(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	/*LINTED*/
 	union scsi_cdb	*u		= (union scsi_cdb *)cdb;
 	diskaddr_t	addr;
-	uint32_t	cnt,
-			chk_size;
-	uint64_t	sz,
-			err_blkno;
+	uint32_t	cnt;
+	uint32_t	chk_size;
+	uint64_t	sz;
+	uint64_t	err_blkno;
 	Boolean_t	bytchk;
 	char		*chk_block;
 	disk_io_t	*io;
@@ -1572,6 +1517,7 @@ sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		spc_sense_create(cmd, KEY_MISCOMPARE, 0);
 		spc_sense_ascq(cmd, SPC_ASC_DATA_PATH, SPC_ASCQ_DATA_PATH);
 		trans_send_complete(cmd, STATUS_CHECK);
+		free(on_disk_buf);
 		sbc_io_free(io);
 		return;
 	}
@@ -1579,6 +1525,7 @@ sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		spc_sense_create(cmd, KEY_MISCOMPARE, 0);
 		spc_sense_ascq(cmd, SPC_ASC_MISCOMPARE, SPC_ASCQ_MISCOMPARE);
 		trans_send_complete(cmd, STATUS_CHECK);
+		free(on_disk_buf);
 		sbc_io_free(io);
 		return;
 	}
@@ -1776,8 +1723,8 @@ sbc_io_free(emul_handle_t e)
 static int
 sbc_mmap_overlap(const void *v1, const void *v2)
 {
-	disk_io_t	*d1	= (disk_io_t *)v1,
-			*d2	= (disk_io_t *)v2;
+	disk_io_t	*d1	= (disk_io_t *)v1;
+	disk_io_t	*d2	= (disk_io_t *)v2;
 
 	if ((d1->da_data + d1->da_data_len) < d2->da_data)
 		return (-1);
@@ -1904,8 +1851,8 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_mselect, spc_mselect_data, NULL,		"MODE_SELECT" },
-	{ sbc_reserve,		NULL,	NULL,		"RESERVE" },
-	{ sbc_release,		NULL,	NULL,		"RELEASE" },
+	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ sbc_msense,		NULL,	NULL,		"MODE_SENSE" },
@@ -1984,8 +1931,8 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	"PERSISTENT_IN" },
-	{ spc_unsupported,	NULL,	NULL,	"PERSISTENT_OUT" },
+	{ spc_cmd_pr_in,	NULL,	NULL,	"PERSISTENT_RESERVE_IN" },
+	{ spc_cmd_pr_out, spc_cmd_pr_out_data, NULL, "PERSISTENT_RESERVE_OUT" },
 
 	/* 0x60 -- 0x6f */
 	{ spc_unsupported,	NULL,	NULL,	NULL },

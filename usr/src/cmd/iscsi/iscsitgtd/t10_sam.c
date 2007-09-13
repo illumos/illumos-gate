@@ -99,7 +99,7 @@ static int find_cmd_by_addr(const void *v1, const void *v2);
 static sam_device_table_t sam_emul_table[];
 
 /*
- * Global variables
+ * Local variables
  */
 static avl_tree_t	lu_list;
 static pthread_mutex_t	lu_list_mutex;
@@ -205,7 +205,7 @@ t10_aio_done(void *v)
  * []----
  */
 t10_targ_handle_t
-t10_handle_create(char *targ, int trans_version, int tpg, int max_out,
+t10_handle_create(char *targ, char *init, int trans_vers, int tpg, int max_out,
     target_queue_t *tq, void (*datain_cb)(t10_cmd_t *, char *, size_t *))
 {
 	t10_targ_impl_t	*t = calloc(1, sizeof (t10_targ_impl_t));
@@ -217,7 +217,8 @@ t10_handle_create(char *targ, int trans_version, int tpg, int max_out,
 	t->s_targ_num		= t10_num++;
 	(void) pthread_mutex_unlock(&t10_mutex);
 	t->s_targ_base		= strdup(targ);
-	t->s_trans_vers		= trans_version;
+	t->s_i_name		= strdup(init);
+	t->s_trans_vers		= trans_vers;
 	t->s_maxout		= max_out;
 	t->s_to_transport	= tq;
 	t->s_dataout_cb		= datain_cb;
@@ -234,13 +235,13 @@ t10_handle_create(char *targ, int trans_version, int tpg, int max_out,
 	 * to determine relative path numbering there's no issue with changing
 	 * this later if need be.
 	 */
-	switch (trans_version) {
+	switch (trans_vers) {
 	case T10_TRANS_ISCSI:
-		t->s_tp_grp	= 0x0000 | tpg;
+		t->s_tpgt	= 0x0000 | tpg;
 		break;
 
 	case T10_TRANS_FC:
-		t->s_tp_grp	= 0x8000 | tpg;
+		t->s_tpgt	= 0x8000 | tpg;
 		break;
 	}
 
@@ -286,8 +287,8 @@ t10_handle_destroy(t10_targ_handle_t tp)
 {
 	t10_targ_impl_t	*t		= (t10_targ_impl_t *)tp;
 	t10_lu_impl_t	*l;
-	t10_cmd_t	*c,
-			*c2free;
+	t10_cmd_t	*c;
+	t10_cmd_t	*c2free;
 	int		fast_free	= 0;
 
 	(void) pthread_mutex_lock(&t->s_mutex);
@@ -348,6 +349,7 @@ t10_handle_destroy(t10_targ_handle_t tp)
 	(void) pthread_mutex_unlock(&t->s_mutex);
 
 	free(t->s_targ_base);
+	free(t->s_i_name);
 	free(t);
 }
 
@@ -689,8 +691,8 @@ Boolean_t
 t10_task_mgmt(t10_targ_handle_t t1, TaskOp_t op, int opt_lun, void *tag)
 {
 	t10_targ_impl_t	*t = (t10_targ_impl_t *)t1;
-	t10_lu_impl_t	search,
-			*lu;
+	t10_lu_impl_t	search;
+	t10_lu_impl_t	*lu;
 
 	switch (op) {
 	case InventoryChange:
@@ -753,8 +755,8 @@ t10_targ_stat(t10_targ_handle_t t1, char **buf)
 {
 	t10_targ_impl_t	*t = (t10_targ_impl_t *)t1;
 	t10_lu_impl_t	*itl;
-	char		lb[32],
-			*p;
+	char		lb[32];
+	char		*p;
 
 	/*
 	 * It's possible for the management interfaces to request stats
@@ -819,8 +821,8 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 	t10_cmd_t		*cmd		= NULL;
 	uint8_t			cdb[16];	/* ---- fake buffer ---- */
 	diskaddr_t		offset		= 0;
-	size_t			size,
-				sync_size;
+	size_t			size;
+	size_t			sync_size;
 	msg_t			*m		= NULL;
 	target_queue_t		*rq		= NULL;
 	char			path[MAXPATHLEN];
@@ -835,7 +837,7 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 	 * having something fixed/change in one location that isn't
 	 * in another. Obvious right?
 	 */
-	if ((t = t10_handle_create(target, 0, 0, 0, q, NULL)) == NULL) {
+	if ((t = t10_handle_create(target, "", 0, 0, 0, q, NULL)) == NULL) {
 		queue_prt(mgmtq, Q_STE_ERRS, "STE%x  Failed to create handle\n",
 		    lun);
 		return (False);
@@ -1311,19 +1313,19 @@ trans_params_area(t10_cmd_t *cmd)
 static Boolean_t
 t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 {
-	t10_lu_impl_t		*l		= NULL,
-				search;
-	avl_index_t		wc		= 0, /* where common */
-				wt		= 0; /* where target */
-	char			*guid		= NULL,
-				*str,
-				*dataset	= NULL;
-	t10_lu_common_t		lc,
-				*common		= NULL;
-	tgt_node_t		*n		= NULL,
-				*n1,
-				*targ,
-				*ll;
+	t10_lu_impl_t		*l		= NULL;
+	t10_lu_impl_t		search;
+	avl_index_t		wc		= 0; /* where common */
+	avl_index_t		wt		= 0; /* where target */
+	char			*guid		= NULL;
+	char			*str;
+	char			*dataset	= NULL;
+	t10_lu_common_t		lc;
+	t10_lu_common_t		*common		= NULL;
+	tgt_node_t		*n		= NULL;
+	tgt_node_t		*n1;
+	tgt_node_t		*targ;
+	tgt_node_t		*ll;
 	xmlTextReaderPtr	r		= NULL;
 	char			path[MAXPATHLEN];
 	int			xml_fd		= -1;
@@ -1702,11 +1704,11 @@ lu_runner(void *v)
 	msg_t		*m;
 	t10_lu_impl_t	*itl;
 	t10_cmd_t	*cmd;
-	char		*data,
-			*path;
-	size_t		data_len,
-			new_size,
-			offset;
+	char		*data;
+	char		*path;
+	size_t		data_len;
+	size_t		new_size;
+	size_t		offset;
 	ssize_t		cc;
 	void		*provo_err;
 	t10_shutdown_t	*s;
@@ -1736,8 +1738,8 @@ lu_runner(void *v)
 				trans_send_complete(cmd, STATUS_CHECK);
 			} else {
 				lu->l_curr		= cmd;
-				(*cmd->c_lu->l_cmd)(cmd, cmd->c_cdb,
-						    cmd->c_cdb_len);
+				(*cmd->c_lu->l_cmd)
+				    (cmd, cmd->c_cdb, cmd->c_cdb_len);
 				lu->l_curr		= NULL;
 			}
 			break;
@@ -1896,13 +1898,13 @@ lu_runner(void *v)
 				    cmd->c_data, cmd->c_data_len);
 				cmd->c_lu->l_cmds_read++;
 				cmd->c_lu->l_sects_read +=
-					cmd->c_data_len / 512;
+				    cmd->c_data_len / 512;
 				bcopy(cmd->c_data,
 				    (char *)lu->l_mmap + cmd->c_offset,
 				    cmd->c_data_len);
 				cmd->c_lu->l_cmds_write++;
 				cmd->c_lu->l_sects_write +=
-					cmd->c_data_len / 512;
+				    cmd->c_data_len / 512;
 				lu->l_curr		= NULL;
 				lu->l_curr_provo	= False;
 				provo_err		= 0;
@@ -1920,7 +1922,7 @@ lu_runner(void *v)
 					    lu->l_num, errno);
 				}
 				provo_err = (cc == cmd->c_data_len) ?
-					(void *)0 : (void *)1;
+				    (void *)0 : (void *)1;
 			}
 			/*
 			 * acknowledge this op and wait for next
@@ -2119,13 +2121,13 @@ lu_remove_cmds(msg_t *m, void *v)
 static Boolean_t
 load_params(t10_lu_common_t *lu, char *basedir)
 {
-	char		file[MAXPATHLEN],
-			*str;
+	char		file[MAXPATHLEN];
+	char		*str;
 	int		oflags		= O_RDWR|O_LARGEFILE|O_NDELAY;
 	Boolean_t	mmap_lun	= True;
 	tgt_node_t	*node		= NULL;
-	int		version_maj	= XML_VERS_LUN_MAJ,
-			version_min	= XML_VERS_LUN_MIN;
+	int		version_maj	= XML_VERS_LUN_MAJ;
+	int		version_min	= XML_VERS_LUN_MIN;
 
 	/*
 	 * Clean up from previous call to this function. This occurs if
@@ -2398,8 +2400,8 @@ fallocate(int fd, off64_t len)
 static int
 find_lu_by_num(const void *v1, const void *v2)
 {
-	t10_lu_impl_t	*l1	= (t10_lu_impl_t *)v1,
-			*l2	= (t10_lu_impl_t *)v2;
+	t10_lu_impl_t	*l1	= (t10_lu_impl_t *)v1;
+	t10_lu_impl_t	*l2	= (t10_lu_impl_t *)v2;
 
 	if (l1->l_targ_lun < l2->l_targ_lun)
 		return (-1);
@@ -2416,8 +2418,8 @@ find_lu_by_num(const void *v1, const void *v2)
 static int
 find_lu_by_guid(const void *v1, const void *v2)
 {
-	t10_lu_common_t	*l1	= (t10_lu_common_t *)v1,
-			*l2	= (t10_lu_common_t *)v2;
+	t10_lu_common_t	*l1	= (t10_lu_common_t *)v1;
+	t10_lu_common_t	*l2	= (t10_lu_common_t *)v2;
 	int		i;
 
 	if (l1->l_guid_len != l2->l_guid_len) {
@@ -2445,8 +2447,8 @@ find_lu_by_guid(const void *v1, const void *v2)
 static int
 find_lu_by_targ(const void *v1, const void *v2)
 {
-	t10_lu_impl_t	*l1	= (t10_lu_impl_t *)v1,
-			*l2	= (t10_lu_impl_t *)v2;
+	t10_lu_impl_t	*l1	= (t10_lu_impl_t *)v1;
+	t10_lu_impl_t	*l2	= (t10_lu_impl_t *)v2;
 
 	if ((uint64_t)(uintptr_t)l1->l_targ < (uint64_t)(uintptr_t)l2->l_targ)
 		return (-1);
@@ -2465,8 +2467,8 @@ find_lu_by_targ(const void *v1, const void *v2)
 static int
 find_cmd_by_addr(const void *v1, const void *v2)
 {
-	uint64_t	cmd1	= (uint64_t)(uintptr_t)v1,
-			cmd2	= (uint64_t)(uintptr_t)v2;
+	uint64_t	cmd1	= (uint64_t)(uintptr_t)v1;
+	uint64_t	cmd2	= (uint64_t)(uintptr_t)v2;
 
 	if (cmd1 < cmd2)
 		return (-1);
