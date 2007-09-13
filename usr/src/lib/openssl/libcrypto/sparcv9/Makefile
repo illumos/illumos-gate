@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,18 @@ include ../../../Makefile.lib.64
 
 # Override the default specified in ../Makefile.com
 MD5_OBJ_ASM=	md5/asm/md5-sparcv9.o
+
+# suppress this specific warning triggered by SS12 compiler. We do it here so
+# that we don't have to change the source code using pragma directives. The
+# issue is that acomp is not equipped to perform control flow checks on demand
+# so warning can be issued on an invalid construct even when the construct is
+# not reachable, like this:
+#
+#	char c, buf[10];
+#	if (0 != 0)
+#		c = buf[-1];
+#
+$(__SSNEXT)CFLAGS64 += -erroff=E_BAD_VAR_ADDRESS_ARITH
 
 # lint doesn't like asm files
 lint :=	MD5_OBJ_ASM =
