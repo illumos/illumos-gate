@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -409,9 +410,9 @@ engine_source(const char *name, boolean_t dont_exit)
 			goto fail;
 		}
 
-		do
+		do {
 			ret = fstat(fileno(est->sc_cmd_file), &st);
-		while (ret != 0 && errno == EINTR);
+		} while (ret != 0 && errno == EINTR);
 		if (ret != 0) {
 			(void) fclose(est->sc_cmd_file);
 			est->sc_cmd_file = NULL;	/* for semerr() */
@@ -570,7 +571,7 @@ engine_import(uu_list_t *args)
 	/* Load */
 	b = internal_bundle_new();
 
-	if (lxml_get_bundle_file(b, file, 0) != 0) {
+	if (lxml_get_bundle_file(b, file, SVCCFG_OP_IMPORT) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}
@@ -594,7 +595,7 @@ engine_import(uu_list_t *args)
 				semerr(errstr);
 			else
 				semerr(gettext("Unknown error from "
-					"mhash_store_entry()\n"));
+				    "mhash_store_entry()\n"));
 		}
 
 		free(pname);
@@ -623,7 +624,7 @@ engine_apply(const char *file)
 
 	b = internal_bundle_new();
 
-	if (lxml_get_bundle_file(b, file, 1) != 0) {
+	if (lxml_get_bundle_file(b, file, SVCCFG_OP_APPLY) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}
@@ -642,6 +643,30 @@ engine_apply(const char *file)
 
 		free(pname);
 	}
+
+	return (0);
+}
+
+int
+engine_restore(const char *file)
+{
+	bundle_t *b;
+
+	lscf_prep_hndl();
+
+	b = internal_bundle_new();
+
+	if (lxml_get_bundle_file(b, file, SVCCFG_OP_RESTORE) != 0) {
+		internal_bundle_free(b);
+		return (-1);
+	}
+
+	if (lscf_bundle_import(b, file, SCI_NOSNAP) != 0) {
+		internal_bundle_free(b);
+		return (-1);
+	}
+
+	internal_bundle_free(b);
 
 	return (0);
 }

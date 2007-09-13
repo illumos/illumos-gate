@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -630,6 +631,7 @@ depgroup_read_restart(scf_handle_t *h, scf_propertygroup_t *pg)
  *     ENOENT - the property doesn't exist or has no values
  *     EINVAL - the property has the wrong type
  *		the property is not single-valued
+ *     EACCES - the current user does not have permission to read the value
  */
 static int
 get_boolean(scf_propertygroup_t *pg, const char *propname, uint8_t *valuep)
@@ -703,6 +705,10 @@ get_boolean(scf_propertygroup_t *pg, const char *propname, uint8_t *valuep)
 			ret = EINVAL;
 			goto out;
 
+		case SCF_ERROR_PERMISSION_DENIED:
+			ret = EACCES;
+			goto out;
+
 		case SCF_ERROR_NOT_SET:
 			bad_error("scf_property_get_value", scf_error());
 		}
@@ -728,6 +734,7 @@ out:
  *     ENOENT - the property doesn't exist or has no values
  *     EINVAL - the property has the wrong type
  *              the property is not single-valued
+ *     EACCES - the current user does not have permission to read the value
  */
 static int
 get_count(scf_propertygroup_t *pg, const char *propname, uint64_t *valuep)
@@ -802,6 +809,10 @@ get_count(scf_propertygroup_t *pg, const char *propname, uint64_t *valuep)
 
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
 			ret = EINVAL;
+			goto out;
+
+		case SCF_ERROR_PERMISSION_DENIED:
+			ret = EACCES;
 			goto out;
 
 		case SCF_ERROR_NOT_SET:
@@ -978,6 +989,7 @@ libscf_get_basic_instance_data(scf_handle_t *h, scf_instance_t *inst,
 			*enabled_ovrp = -1;
 			break;
 
+		case EACCES:
 		default:
 			bad_error("get_boolean", r);
 		}
@@ -1035,6 +1047,7 @@ enabled:
 		*enabledp = -1;
 		break;
 
+	case EACCES:
 	default:
 		bad_error("get_boolean", r);
 	}
@@ -1693,6 +1706,7 @@ pg_get_milestone(scf_propertygroup_t *pg, scf_property_t *prop,
 			return (EINVAL);
 
 		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_PERMISSION_DENIED:
 			bad_error("scf_property_get_value", scf_error());
 		}
 	}
@@ -1829,6 +1843,7 @@ libscf_extract_runlevel(scf_property_t *prop, char *rlp)
 
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_PERMISSION_DENIED:
 		default:
 			bad_error("scf_property_get_value", scf_error());
 		}
@@ -2335,6 +2350,7 @@ libscf_read_method_ids(scf_handle_t *h, scf_instance_t *inst, const char *fmri,
 	case ECANCELED:
 		goto read_id_err;
 
+	case EACCES:
 	default:
 		bad_error("get_count", ret);
 	}
@@ -2361,6 +2377,7 @@ read_trans:
 	case ECANCELED:
 		goto read_id_err;
 
+	case EACCES:
 	default:
 		bad_error("get_count", ret);
 	}
@@ -2386,6 +2403,7 @@ read_pid_only:
 	case ECANCELED:
 		goto read_id_err;
 
+	case EACCES:
 	default:
 		bad_error("get_count", ret);
 	}
@@ -2897,6 +2915,7 @@ libscf_get_method(scf_handle_t *h, int type, restarter_inst_t *inst,
 		*timeout = METHOD_TIMEOUT_INFINITE;
 		break;
 
+	case EACCES:
 	default:
 		bad_error("get_count", r);
 	}
@@ -2969,6 +2988,7 @@ libscf_get_method(scf_handle_t *h, int type, restarter_inst_t *inst,
 			*need_sessionp = 0;
 			break;
 
+		case EACCES:
 		default:
 			bad_error("get_boolean", r);
 		}
@@ -2994,6 +3014,7 @@ libscf_get_method(scf_handle_t *h, int type, restarter_inst_t *inst,
 			*timeout_retry = 1;
 			break;
 
+		case EACCES:
 		default:
 			bad_error("get_boolean", r);
 		}
@@ -3177,6 +3198,7 @@ libscf_unset_action(scf_handle_t *h, scf_propertygroup_t *pg,
 				rep_ts = ts;
 				break;
 
+			case SCF_ERROR_PERMISSION_DENIED:
 			case SCF_ERROR_NOT_SET:
 				assert(0);
 				abort();
@@ -3494,6 +3516,7 @@ walk_property_astrings(scf_property_t *prop, callback_t cb, void *arg)
 			case SCF_ERROR_INVALID_ARGUMENT:
 			case SCF_ERROR_NOT_BOUND:
 			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_PERMISSION_DENIED:
 			default:
 				bad_error("scf_iter_next_value", scf_error());
 			}

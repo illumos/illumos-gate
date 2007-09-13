@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -43,7 +44,7 @@ uu_list_pool_t *string_pool;
 %start commands
 
 %token SCC_VALIDATE SCC_IMPORT SCC_EXPORT SCC_ARCHIVE SCC_APPLY SCC_EXTRACT
-%token SCC_REPOSITORY SCC_INVENTORY SCC_SET SCC_END SCC_HELP
+%token SCC_REPOSITORY SCC_INVENTORY SCC_SET SCC_END SCC_HELP SCC_RESTORE
 %token SCC_LIST SCC_ADD SCC_DELETE SCC_SELECT SCC_UNSELECT
 %token SCC_LISTPG SCC_ADDPG SCC_DELPG
 %token SCC_LISTPROP SCC_SETPROP SCC_DELPROP SCC_EDITPROP
@@ -75,6 +76,7 @@ command : terminator
 	| import_cmd
 	| export_cmd
 	| archive_cmd
+	| restore_cmd
 	| apply_cmd
 	| extract_cmd
 	| repository_cmd
@@ -128,7 +130,7 @@ unknown_cmd : SCV_WORD terminator
 validate_cmd : SCC_VALIDATE SCV_WORD terminator
 	{
 		bundle_t *b = internal_bundle_new();
-		lxml_get_bundle_file(b, $2, 0);
+		lxml_get_bundle_file(b, $2, SVCCFG_OP_IMPORT);
 		(void) internal_bundle_free(b);
 		free($2);
 	}
@@ -155,27 +157,86 @@ import_cmd : SCC_IMPORT string_list terminator
 
 export_cmd : SCC_EXPORT SCV_WORD terminator
 	{
-		lscf_service_export($2, NULL);
+		lscf_service_export($2, NULL, 0);
 		free($2);
 	}
 	| SCC_EXPORT SCV_WORD SCS_REDIRECT SCV_WORD terminator
 	{
-		lscf_service_export($2, $4);
+		lscf_service_export($2, $4, 0);
 		free($2);
 		free($4);
+	}
+	| SCC_EXPORT SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-a") == 0) {
+			lscf_service_export($3, NULL, SCE_ALL_VALUES);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_EXPORT);
+			free($2);
+			free($3);
+			return (0);
+		}
+	}
+	| SCC_EXPORT SCV_WORD SCV_WORD SCS_REDIRECT SCV_WORD terminator
+	{
+		if (strcmp($2, "-a") == 0) {
+			lscf_service_export($3, $5, SCE_ALL_VALUES);
+			free($2);
+			free($3);
+			free($5);
+		} else {
+			synerr(SCC_EXPORT);
+			free($2);
+			free($3);
+			free($5);
+			return (0);
+		}
 	}
 	| SCC_EXPORT error terminator	{ synerr(SCC_EXPORT); return(0); }
 
 archive_cmd : SCC_ARCHIVE terminator
 	{
-		lscf_archive(NULL);
+		lscf_archive(NULL, 0);
+	}
+	| SCC_ARCHIVE SCV_WORD terminator
+	{
+		if (strcmp($2, "-a") == 0) {
+			lscf_archive(NULL, SCE_ALL_VALUES);
+			free($2);
+		} else {
+			synerr(SCC_ARCHIVE);
+			free($2);
+			return (0);
+		}
 	}
 	| SCC_ARCHIVE SCS_REDIRECT SCV_WORD terminator
 	{
-		lscf_archive($3);
+		lscf_archive($3, 0);
 		free($3);
 	}
+	| SCC_ARCHIVE SCV_WORD SCS_REDIRECT SCV_WORD terminator
+	{
+		if (strcmp($2, "-a") == 0) {
+			lscf_archive($4, SCE_ALL_VALUES);
+			free($2);
+			free($4);
+		} else {
+			synerr(SCC_ARCHIVE);
+			free($2);
+			free($4);
+			return (0);
+		}
+	}
 	| SCC_ARCHIVE error terminator	{ synerr(SCC_ARCHIVE); return(0); }
+
+restore_cmd : SCC_RESTORE SCV_WORD terminator
+	{
+		(void) engine_restore($2);
+		free($2);
+	}
+	| SCC_RESTORE error terminator	{ synerr(SCC_RESTORE); return(0); }
 
 apply_cmd : SCC_APPLY SCV_WORD terminator
 					{ (void) engine_apply($2); free($2); }
@@ -254,6 +315,8 @@ delete_cmd : SCC_DELETE SCV_WORD terminator
 			free($3);
 		} else {
 			synerr(SCC_DELETE);
+			free($2);
+			free($3);
 			return(0);
 		}
 	}

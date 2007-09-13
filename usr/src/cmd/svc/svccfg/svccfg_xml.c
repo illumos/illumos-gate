@@ -500,6 +500,18 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 		    "property \'%s/%s\'\n"), pgrp->sc_pgroup_name,
 		    p->sc_property_name);
 
+	for (r = 0; r < sizeof (lxml_prop_types) / sizeof (char *); r++) {
+		if (xmlStrcmp(type, (const xmlChar *)lxml_prop_types[r]) == 0)
+			break;
+	}
+
+	if (r >= sizeof (lxml_prop_types) / sizeof (char *)) {
+		uu_die(gettext("property type invalid for property '%s/%s'\n"),
+		    pgrp->sc_pgroup_name, p->sc_property_name);
+	}
+
+	p->sc_value_type = lxml_element_to_type(r);
+
 	for (cursor = property->xmlChildrenNode; cursor != NULL;
 	    cursor = cursor->next) {
 		if (lxml_ignorable_block(cursor))
@@ -524,7 +536,6 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 				    "type-to-list mismatch\n"),
 				    p->sc_property_name);
 
-			p->sc_value_type = lxml_element_to_type(r);
 			(void) lxml_get_value(p, r, cursor);
 			break;
 		default:
@@ -1487,11 +1498,11 @@ lxml_get_default_instance(entity_t *service, xmlNodePtr definst)
 
 /*
  * Translate an instance element into an internal property tree, added to
- * service.  If apply is true, forbid subelements and set the enabled property
- * to override.
+ * service.  If op is SVCCFG_OP_APPLY (i.e., apply a profile), forbid
+ * subelements and set the enabled property to override.
  */
 static int
-lxml_get_instance(entity_t *service, xmlNodePtr inst, int apply)
+lxml_get_instance(entity_t *service, xmlNodePtr inst, svccfg_op_t op)
 {
 	entity_t *i;
 	pgroup_t *pg;
@@ -1529,7 +1540,7 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, int apply)
 	p = internal_property_create(SCF_PROPERTY_ENABLED, SCF_TYPE_BOOLEAN, 1,
 	    (uint64_t)(strcmp(true, (const char *)enabled) == 0 ? 1 : 0));
 
-	p->sc_property_override = apply;
+	p->sc_property_override = (op == SVCCFG_OP_APPLY);
 
 	(void) internal_attach_property(pg, p);
 
@@ -1543,7 +1554,7 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, int apply)
 		if (lxml_ignorable_block(cursor))
 			continue;
 
-		if (apply) {
+		if (op == SVCCFG_OP_APPLY) {
 			semerr(gettext("Instance \"%s\" may not contain "
 			    "elements in profiles.\n"), i->sc_name,
 			    cursor->name);
@@ -1608,10 +1619,10 @@ lxml_get_single_instance(entity_t *entity, xmlNodePtr si)
 
 /*
  * Translate a service element into an internal instance/property tree, added
- * to bundle.  If apply is true, allow only instance subelements.
+ * to bundle.  If op is SVCCFG_OP_APPLY, allow only instance subelements.
  */
 static int
-lxml_get_service(bundle_t *bundle, xmlNodePtr svc, int apply)
+lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 {
 	entity_t *s;
 	xmlNodePtr cursor;
@@ -1643,7 +1654,7 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, int apply)
 
 		e = lxml_xlate_element(cursor->name);
 
-		if (apply && e != SC_INSTANCE) {
+		if (op == SVCCFG_OP_APPLY && e != SC_INSTANCE) {
 			semerr(gettext("Service \"%s\" may not contain the "
 			    "non-instance element \"%s\" in a profile.\n"),
 			    s->sc_name, cursor->name);
@@ -1653,7 +1664,7 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, int apply)
 
 		switch (e) {
 		case SC_INSTANCE:
-			(void) lxml_get_instance(s, cursor, apply);
+			(void) lxml_get_instance(s, cursor, op);
 			break;
 		case SC_TEMPLATE:
 			(void) lxml_get_template(s, cursor);
@@ -1721,7 +1732,7 @@ lxml_is_known_dtd(const xmlChar *dtdname)
 
 static int
 lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
-    xmlNodePtr subbundle, int apply)
+    xmlNodePtr subbundle, svccfg_op_t op)
 {
 	xmlNodePtr cursor;
 	xmlChar *type;
@@ -1740,16 +1751,25 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 
 	xmlFree(type);
 
-	if (!apply) {
+	switch (op) {
+	case SVCCFG_OP_IMPORT:
 		if (bundle->sc_bundle_type != SVCCFG_MANIFEST) {
 			semerr(gettext("document is not a manifest.\n"));
 			return (-1);
 		}
-	} else {
+		break;
+	case SVCCFG_OP_APPLY:
 		if (bundle->sc_bundle_type != SVCCFG_PROFILE) {
 			semerr(gettext("document is not a profile.\n"));
 			return (-1);
 		}
+		break;
+	case SVCCFG_OP_RESTORE:
+		if (bundle->sc_bundle_type != SVCCFG_ARCHIVE) {
+			semerr(gettext("document is not an archive.\n"));
+			return (-1);
+		}
+		break;
 	}
 
 	if ((bundle->sc_bundle_name = xmlGetProp(subbundle,
@@ -1773,11 +1793,11 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 			continue;
 
 		case SC_SERVICE_BUNDLE:
-			if (lxml_get_bundle(bundle, bundle_type, cursor, apply))
+			if (lxml_get_bundle(bundle, bundle_type, cursor, op))
 				return (-1);
 			break;
 		case SC_SERVICE:
-			(void) lxml_get_service(bundle, cursor, apply);
+			(void) lxml_get_service(bundle, cursor, op);
 			break;
 		}
 	}
@@ -1787,11 +1807,11 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 
 /*
  * Load an XML tree from filename and translate it into an internal service
- * tree bundle.  If apply is false, require that the the bundle be of type
- * manifest, or type profile otherwise.
+ * tree bundle.  Require that the bundle be of appropriate type for the
+ * operation: archive for RESTORE, manifest for IMPORT, profile for APPLY.
  */
 int
-lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
+lxml_get_bundle_file(bundle_t *bundle, const char *filename, svccfg_op_t op)
 {
 	xmlDocPtr document;
 	xmlNodePtr cursor;
@@ -1813,7 +1833,8 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 	 * Until libxml2 addresses DTD-based validation with XInclude, we don't
 	 * validate service profiles (i.e. the apply path).
 	 */
-	do_validate = (apply == 0) && (getenv("SVCCFG_NOVALIDATE") == NULL);
+	do_validate = (op != SVCCFG_OP_APPLY) &&
+	    (getenv("SVCCFG_NOVALIDATE") == NULL);
 	if (do_validate)
 		dtdpath = getenv("SVCCFG_DTD");
 
@@ -1894,7 +1915,7 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 	lxml_dump(0, cursor);
 #endif /* DEBUG */
 
-	r = lxml_get_bundle(bundle, SVCCFG_UNKNOWN_BUNDLE, cursor, apply);
+	r = lxml_get_bundle(bundle, SVCCFG_UNKNOWN_BUNDLE, cursor, op);
 
 	xmlFreeDoc(document);
 
@@ -1910,7 +1931,7 @@ lxml_inventory(const char *filename)
 
 	b = internal_bundle_new();
 
-	if (lxml_get_bundle_file(b, filename, 0) != 0) {
+	if (lxml_get_bundle_file(b, filename, SVCCFG_OP_IMPORT) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}

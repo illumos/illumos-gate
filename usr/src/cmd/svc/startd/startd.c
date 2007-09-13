@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -517,6 +518,12 @@ timestamp:
 			case SCF_ERROR_CONSTRAINT_VIOLATED:
 				uu_warn("property \"options/%s\" has multiple "
 				    "values; ignored.\n", buf);
+				continue;
+
+			case SCF_ERROR_PERMISSION_DENIED:
+				uu_warn("property \"options/%s\" cannot be "
+				    "read because startd has insufficient "
+				    "permission; ignored.\n", buf);
 				continue;
 
 			case SCF_ERROR_HANDLE_MISMATCH:

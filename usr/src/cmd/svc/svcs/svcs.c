@@ -17,8 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -376,6 +378,7 @@ pg_get_single_val(scf_propertygroup_t *pg, const char *propname, scf_type_t ty,
 			}
 			goto misconfigured;
 
+		case SCF_ERROR_PERMISSION_DENIED:
 		default:
 			scfdie();
 		}
@@ -1092,7 +1095,7 @@ sprint_desc(char **buf, scf_walkinfo_t *wip)
 		newsize = (*buf ? strlen(*buf) : 0) + DESC_COLUMN_WIDTH + 1;
 	newbuf = safe_malloc(newsize);
 	(void) snprintf(newbuf, newsize, "%s%-*s ", *buf ? *buf : "",
-			DESC_COLUMN_WIDTH, common_name_buf);
+	    DESC_COLUMN_WIDTH, common_name_buf);
 	if (*buf)
 		free(*buf);
 	*buf = newbuf;
@@ -1629,13 +1632,13 @@ sprint_stime(char **buf, scf_walkinfo_t *wip)
 	 */
 	if (now - then < 24 * 60 * 60)
 		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_TIME),
-				tm);
+		    tm);
 	else if (now - then < 12 * 30 * 24 * 60 * 60)
 		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_DATE),
-				tm);
+		    tm);
 	else
 		(void) strftime(st_buf, sizeof (st_buf), gettext(FORMAT_YEAR),
-				tm);
+		    tm);
 
 	(void) snprintf(newbuf, newsize, "%s%-*s ", *buf ? *buf : "",
 	    STIME_COLUMN_WIDTH + 1, st_buf);
@@ -2455,14 +2458,14 @@ add_processes(scf_walkinfo_t *wip, char *line, scf_propertygroup_t *lpg)
 		 * than 12 months ago.
 		 */
 		if (now - psi.pr_start.tv_sec < 24 * 60 * 60)
-		    (void) strftime(stime, sizeof (stime), gettext(FORMAT_TIME),
-			tm);
+			(void) strftime(stime, sizeof (stime),
+			    gettext(FORMAT_TIME), tm);
 		else if (now - psi.pr_start.tv_sec < 12 * 30 * 24 * 60 * 60)
-		    (void) strftime(stime, sizeof (stime), gettext(FORMAT_DATE),
-			tm);
+			(void) strftime(stime, sizeof (stime),
+			    gettext(FORMAT_DATE), tm);
 		else
-		    (void) strftime(stime, sizeof (stime), gettext(FORMAT_YEAR),
-			tm);
+			(void) strftime(stime, sizeof (stime),
+			    gettext(FORMAT_YEAR), tm);
 
 		(void) snprintf(cp, len, "\n               %-8s   %6ld %.*s",
 		    stime, pids[i], PRFNSZ, psi.pr_fname);

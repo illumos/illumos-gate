@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -66,6 +67,10 @@
  * RC_NODE_DEAD before you can use it.  This is usually done with the
  * rc_node_{wait,hold}_flag() functions (often via the rc_node_check_*()
  * functions & RC_NODE_*() macros), which fail if the object has died.
+ *
+ * Because name service lookups may take a long time and, more importantly
+ * may trigger additional accesses to the repository, perm_granted() must be
+ * called without holding any locks.
  *
  * An ITER_START for a non-ENTITY_VALUE induces an rc_node_fill_children()
  * call via rc_node_setup_iter() to populate the rn_children uu_list of the
@@ -186,6 +191,7 @@
 #define	AUTH_PROP_ENABLED	"enabled"
 #define	AUTH_PROP_MODIFY	"modify_authorization"
 #define	AUTH_PROP_VALUE		"value_authorization"
+#define	AUTH_PROP_READ		"read_authorization"
 /* libsecdb should take care of this. */
 #define	RBAC_AUTH_SEP		","
 
@@ -1829,9 +1835,44 @@ rc_node_find_named_child(rc_node_t *np, const char *name, uint32_t type,
 	return (REP_PROTOCOL_SUCCESS);
 }
 
-#ifndef NATIVE_BUILD
 static int rc_node_parent(rc_node_t *, rc_node_t **);
 
+/*
+ * Returns
+ *   _INVALID_TYPE - type is invalid
+ *   _DELETED - np or an ancestor has been deleted
+ *   _NOT_FOUND - no ancestor of specified type exists
+ *   _SUCCESS - *app is held
+ */
+static int
+rc_node_find_ancestor(rc_node_t *np, uint32_t type, rc_node_t **app)
+{
+	int ret;
+	rc_node_t *parent, *np_orig;
+
+	if (type >= REP_PROTOCOL_ENTITY_MAX)
+		return (REP_PROTOCOL_FAIL_INVALID_TYPE);
+
+	np_orig = np;
+
+	while (np->rn_id.rl_type > type) {
+		ret = rc_node_parent(np, &parent);
+		if (np != np_orig)
+			rc_node_rele(np);
+		if (ret != REP_PROTOCOL_SUCCESS)
+			return (ret);
+		np = parent;
+	}
+
+	if (np->rn_id.rl_type == type) {
+		*app = parent;
+		return (REP_PROTOCOL_SUCCESS);
+	}
+
+	return (REP_PROTOCOL_FAIL_NOT_FOUND);
+}
+
+#ifndef NATIVE_BUILD
 /*
  * If the propname property exists in pg, and it is of type string, add its
  * values as authorizations to pcp.  pg must not be locked on entry, and it is
@@ -1852,7 +1893,6 @@ perm_add_pg_prop_values(permcheck_t *pcp, rc_node_t *pg, const char *propname)
 
 	assert(!MUTEX_HELD(&pg->rn_lock));
 	assert(pg->rn_id.rl_type == REP_PROTOCOL_ENTITY_PROPERTYGRP);
-	assert(pg->rn_id.rl_ids[ID_SNAPSHOT] == 0);
 
 	(void) pthread_mutex_lock(&pg->rn_lock);
 	result = rc_node_find_named_child(pg, propname,
@@ -1958,7 +1998,7 @@ perm_add_ent_prop_values(permcheck_t *pcp, rc_node_t *ent, const char *pgname,
 }
 
 /*
- * If pg has a property named propname, and it string typed, add its values as
+ * If pg has a property named propname, and is string typed, add its values as
  * authorizations to pcp.  If pg has no such property, and its parent is an
  * instance, walk up to the service and try doing the same with the property
  * of the same name from the property group of the same name.  Returns
@@ -1970,50 +2010,42 @@ static int
 perm_add_enabling_values(permcheck_t *pcp, rc_node_t *pg, const char *propname)
 {
 	int r;
+	char pgname[REP_PROTOCOL_NAME_LEN + 1];
+	rc_node_t *svc;
+	size_t sz;
 
 	r = perm_add_pg_prop_values(pcp, pg, propname);
 
-	if (r == REP_PROTOCOL_FAIL_NOT_FOUND) {
-		char pgname[REP_PROTOCOL_NAME_LEN + 1];
-		rc_node_t *inst, *svc;
-		size_t sz;
+	if (r != REP_PROTOCOL_FAIL_NOT_FOUND)
+		return (r);
 
-		assert(!MUTEX_HELD(&pg->rn_lock));
+	assert(!MUTEX_HELD(&pg->rn_lock));
 
-		if (pg->rn_id.rl_ids[ID_INSTANCE] == 0) {
-			/* not an instance pg */
-			return (REP_PROTOCOL_SUCCESS);
-		}
+	if (pg->rn_id.rl_ids[ID_INSTANCE] == 0)
+		return (REP_PROTOCOL_SUCCESS);
 
-		sz = strlcpy(pgname, pg->rn_name, sizeof (pgname));
-		assert(sz < sizeof (pgname));
+	sz = strlcpy(pgname, pg->rn_name, sizeof (pgname));
+	assert(sz < sizeof (pgname));
 
-		/* get pg's parent */
-		r = rc_node_parent(pg, &inst);
-		if (r != REP_PROTOCOL_SUCCESS) {
-			assert(r == REP_PROTOCOL_FAIL_DELETED);
-			return (r);
-		}
-
-		assert(inst->rn_id.rl_type == REP_PROTOCOL_ENTITY_INSTANCE);
-
-		/* get instance's parent */
-		r = rc_node_parent(inst, &svc);
-		rc_node_rele(inst);
-		if (r != REP_PROTOCOL_SUCCESS) {
-			assert(r == REP_PROTOCOL_FAIL_DELETED);
-			return (r);
-		}
-
-		assert(svc->rn_id.rl_type == REP_PROTOCOL_ENTITY_SERVICE);
-
-		r = perm_add_ent_prop_values(pcp, svc, pgname, NULL, propname);
-
-		rc_node_rele(svc);
-
-		if (r == REP_PROTOCOL_FAIL_NOT_FOUND)
-			r = REP_PROTOCOL_SUCCESS;
+	/*
+	 * If pg is a child of an instance or snapshot, we want to compose the
+	 * authorization property with the service's (if it exists).  The
+	 * snapshot case applies only to read_authorization.  In all other
+	 * cases, the pg's parent will be the instance.
+	 */
+	r = rc_node_find_ancestor(pg, REP_PROTOCOL_ENTITY_SERVICE, &svc);
+	if (r != REP_PROTOCOL_SUCCESS) {
+		assert(r == REP_PROTOCOL_FAIL_DELETED);
+		return (r);
 	}
+	assert(svc->rn_id.rl_type == REP_PROTOCOL_ENTITY_SERVICE);
+
+	r = perm_add_ent_prop_values(pcp, svc, pgname, NULL, propname);
+
+	rc_node_rele(svc);
+
+	if (r == REP_PROTOCOL_FAIL_NOT_FOUND)
+		r = REP_PROTOCOL_SUCCESS;
 
 	return (r);
 }
@@ -2229,6 +2261,8 @@ rc_scope_parent_scope(rc_node_ptr_t *npp, uint32_t type, rc_node_ptr_t *out)
 	return (REP_PROTOCOL_FAIL_NOT_FOUND);
 }
 
+static int rc_node_pg_check_read_protect(rc_node_t *);
+
 /*
  * Fails with
  *   _NOT_SET
@@ -2237,6 +2271,7 @@ rc_scope_parent_scope(rc_node_ptr_t *npp, uint32_t type, rc_node_ptr_t *out)
  *   _NOT_FOUND
  *   _BAD_REQUEST
  *   _TRUNCATED
+ *   _NO_RESOURCES
  */
 int
 rc_node_name(rc_node_ptr_t *npp, char *buf, size_t sz, uint32_t answertype,
@@ -2287,6 +2322,26 @@ rc_node_name(rc_node_ptr_t *npp, char *buf, size_t sz, uint32_t answertype,
 			return (REP_PROTOCOL_FAIL_NOT_FOUND);
 		actual = strlcpy(buf, np->rn_snaplevel->rsl_instance, sz);
 		break;
+	case RP_ENTITY_NAME_PGREADPROT:
+	{
+		int ret;
+
+		if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_PROPERTYGRP)
+			return (REP_PROTOCOL_FAIL_NOT_APPLICABLE);
+		ret = rc_node_pg_check_read_protect(np);
+		assert(ret != REP_PROTOCOL_FAIL_TYPE_MISMATCH);
+		switch (ret) {
+		case REP_PROTOCOL_FAIL_PERMISSION_DENIED:
+			actual = snprintf(buf, sz, "1");
+			break;
+		case REP_PROTOCOL_SUCCESS:
+			actual = snprintf(buf, sz, "0");
+			break;
+		default:
+			return (ret);
+		}
+		break;
+	}
 	default:
 		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
 	}
@@ -2639,9 +2694,11 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 {
 	rc_node_t *np;
 	rc_node_t *cp = NULL;
-	int rc;
+	int rc, perm_rc;
 
 	rc_node_clear(cpp, 0);
+
+	perm_rc = rc_node_modify_permission_check();
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 
@@ -2669,9 +2726,9 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 		return (rc);
 	}
 
-	if ((rc = rc_node_modify_permission_check()) != REP_PROTOCOL_SUCCESS) {
+	if (perm_rc != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		return (rc);
+		return (perm_rc);
 	}
 
 	HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_CREATING_CHILD);
@@ -3551,13 +3608,13 @@ rc_attach_snapshot(rc_node_t *np, uint32_t snapid, rc_node_t *parentp)
 
 	assert(MUTEX_HELD(&np->rn_lock));
 
-	if ((rc = rc_node_modify_permission_check()) != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		return (rc);
-	}
-
 	np_orig = np;
 	rc_node_hold_locked(np);		/* simplifies the remainder */
+
+	(void) pthread_mutex_unlock(&np->rn_lock);
+	if ((rc = rc_node_modify_permission_check()) != REP_PROTOCOL_SUCCESS)
+		return (rc);
+	(void) pthread_mutex_lock(&np->rn_lock);
 
 	/*
 	 * get the latest node, holding RC_NODE_IN_TX to keep the rn_former
@@ -3710,9 +3767,11 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 {
 	rc_node_t *np;
 	rc_node_t *outp = NULL;
-	int rc;
+	int rc, perm_rc;
 
 	rc_node_clear(outpp, 0);
+
+	perm_rc = rc_node_modify_permission_check();
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_INSTANCE) {
@@ -3740,9 +3799,9 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 		return (rc);
 	}
 
-	if ((rc = rc_node_modify_permission_check()) != REP_PROTOCOL_SUCCESS) {
+	if (perm_rc != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		return (rc);
+		return (perm_rc);
 	}
 
 	HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_CREATING_CHILD);
@@ -3803,6 +3862,314 @@ rc_snapshot_attach(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
 	}
 
 	return (rc_attach_snapshot(cp, snapid, NULL));	/* drops cp's lock */
+}
+
+/*
+ * If the pgname property group under ent has type pgtype, and it has a
+ * propname property with type ptype, return _SUCCESS.  If pgtype is NULL,
+ * it is not checked.  If ent is not a service node, we will return _SUCCESS if
+ * a property meeting the requirements exists in either the instance or its
+ * parent.
+ *
+ * Returns
+ *   _SUCCESS - see above
+ *   _DELETED - ent or one of its ancestors was deleted
+ *   _NO_RESOURCES - no resources
+ *   _NOT_FOUND - no matching property was found
+ */
+static int
+rc_svc_prop_exists(rc_node_t *ent, const char *pgname, const char *pgtype,
+    const char *propname, rep_protocol_value_type_t ptype)
+{
+	int ret;
+	rc_node_t *pg = NULL, *spg = NULL, *svc, *prop;
+
+	assert(!MUTEX_HELD(&ent->rn_lock));
+
+	(void) pthread_mutex_lock(&ent->rn_lock);
+	ret = rc_node_find_named_child(ent, pgname,
+	    REP_PROTOCOL_ENTITY_PROPERTYGRP, &pg);
+	(void) pthread_mutex_unlock(&ent->rn_lock);
+
+	switch (ret) {
+	case REP_PROTOCOL_SUCCESS:
+		break;
+
+	case REP_PROTOCOL_FAIL_DELETED:
+	case REP_PROTOCOL_FAIL_NO_RESOURCES:
+		return (ret);
+
+	default:
+		bad_error("rc_node_find_named_child", ret);
+	}
+
+	if (ent->rn_id.rl_type != REP_PROTOCOL_ENTITY_SERVICE) {
+		ret = rc_node_find_ancestor(ent, REP_PROTOCOL_ENTITY_SERVICE,
+		    &svc);
+		if (ret != REP_PROTOCOL_SUCCESS) {
+			assert(ret == REP_PROTOCOL_FAIL_DELETED);
+			if (pg != NULL)
+				rc_node_rele(pg);
+			return (ret);
+		}
+		assert(svc->rn_id.rl_type == REP_PROTOCOL_ENTITY_SERVICE);
+
+		(void) pthread_mutex_lock(&svc->rn_lock);
+		ret = rc_node_find_named_child(svc, pgname,
+		    REP_PROTOCOL_ENTITY_PROPERTYGRP, &spg);
+		(void) pthread_mutex_unlock(&svc->rn_lock);
+
+		rc_node_rele(svc);
+
+		switch (ret) {
+		case REP_PROTOCOL_SUCCESS:
+			break;
+
+		case REP_PROTOCOL_FAIL_DELETED:
+		case REP_PROTOCOL_FAIL_NO_RESOURCES:
+			if (pg != NULL)
+				rc_node_rele(pg);
+			return (ret);
+
+		default:
+			bad_error("rc_node_find_named_child", ret);
+		}
+	}
+
+	if (pg != NULL &&
+	    pgtype != NULL && strcmp(pg->rn_type, pgtype) != 0) {
+		rc_node_rele(pg);
+		pg = NULL;
+	}
+
+	if (spg != NULL &&
+	    pgtype != NULL && strcmp(spg->rn_type, pgtype) != 0) {
+		rc_node_rele(spg);
+		spg = NULL;
+	}
+
+	if (pg == NULL) {
+		if (spg == NULL)
+			return (REP_PROTOCOL_FAIL_NOT_FOUND);
+		pg = spg;
+		spg = NULL;
+	}
+
+	/*
+	 * At this point, pg is non-NULL, and is a property group node of the
+	 * correct type.  spg, if non-NULL, is also a property group node of
+	 * the correct type.  Check for the property in pg first, then spg
+	 * (if applicable).
+	 */
+	(void) pthread_mutex_lock(&pg->rn_lock);
+	ret = rc_node_find_named_child(pg, propname,
+	    REP_PROTOCOL_ENTITY_PROPERTY, &prop);
+	(void) pthread_mutex_unlock(&pg->rn_lock);
+	rc_node_rele(pg);
+	switch (ret) {
+	case REP_PROTOCOL_SUCCESS:
+		if (prop != NULL) {
+			if (prop->rn_valtype == ptype) {
+				rc_node_rele(prop);
+				if (spg != NULL)
+					rc_node_rele(spg);
+				return (REP_PROTOCOL_SUCCESS);
+			}
+			rc_node_rele(prop);
+		}
+		break;
+
+	case REP_PROTOCOL_FAIL_NO_RESOURCES:
+		if (spg != NULL)
+			rc_node_rele(spg);
+		return (ret);
+
+	case REP_PROTOCOL_FAIL_DELETED:
+		break;
+
+	default:
+		bad_error("rc_node_find_named_child", ret);
+	}
+
+	if (spg == NULL)
+		return (REP_PROTOCOL_FAIL_NOT_FOUND);
+
+	pg = spg;
+
+	(void) pthread_mutex_lock(&pg->rn_lock);
+	ret = rc_node_find_named_child(pg, propname,
+	    REP_PROTOCOL_ENTITY_PROPERTY, &prop);
+	(void) pthread_mutex_unlock(&pg->rn_lock);
+	rc_node_rele(pg);
+	switch (ret) {
+	case REP_PROTOCOL_SUCCESS:
+		if (prop != NULL) {
+			if (prop->rn_valtype == ptype) {
+				rc_node_rele(prop);
+				return (REP_PROTOCOL_SUCCESS);
+			}
+			rc_node_rele(prop);
+		}
+		return (REP_PROTOCOL_FAIL_NOT_FOUND);
+
+	case REP_PROTOCOL_FAIL_NO_RESOURCES:
+		return (ret);
+
+	case REP_PROTOCOL_FAIL_DELETED:
+		return (REP_PROTOCOL_FAIL_NOT_FOUND);
+
+	default:
+		bad_error("rc_node_find_named_child", ret);
+	}
+
+	return (REP_PROTOCOL_SUCCESS);
+}
+
+/*
+ * Given a property group node, returns _SUCCESS if the property group may
+ * be read without any special authorization.
+ *
+ * Fails with:
+ *   _DELETED - np or an ancestor node was deleted
+ *   _TYPE_MISMATCH - np does not refer to a property group
+ *   _NO_RESOURCES - no resources
+ *   _PERMISSION_DENIED - authorization is required
+ */
+static int
+rc_node_pg_check_read_protect(rc_node_t *np)
+{
+	int ret;
+	rc_node_t *ent;
+
+	assert(!MUTEX_HELD(&np->rn_lock));
+
+	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_PROPERTYGRP)
+		return (REP_PROTOCOL_FAIL_TYPE_MISMATCH);
+
+	if (strcmp(np->rn_type, SCF_GROUP_FRAMEWORK) == 0 ||
+	    strcmp(np->rn_type, SCF_GROUP_DEPENDENCY) == 0 ||
+	    strcmp(np->rn_type, SCF_GROUP_METHOD) == 0)
+		return (REP_PROTOCOL_SUCCESS);
+
+	ret = rc_node_parent(np, &ent);
+
+	if (ret != REP_PROTOCOL_SUCCESS)
+		return (ret);
+
+	ret = rc_svc_prop_exists(ent, np->rn_name, np->rn_type,
+	    AUTH_PROP_READ, REP_PROTOCOL_TYPE_STRING);
+
+	rc_node_rele(ent);
+
+	switch (ret) {
+	case REP_PROTOCOL_FAIL_NOT_FOUND:
+		return (REP_PROTOCOL_SUCCESS);
+	case REP_PROTOCOL_SUCCESS:
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
+	case REP_PROTOCOL_FAIL_DELETED:
+	case REP_PROTOCOL_FAIL_NO_RESOURCES:
+		return (ret);
+	default:
+		bad_error("rc_svc_prop_exists", ret);
+	}
+
+	return (REP_PROTOCOL_SUCCESS);
+}
+
+/*
+ * Fails with
+ *   _DELETED - np's node or parent has been deleted
+ *   _TYPE_MISMATCH - np's node is not a property
+ *   _NO_RESOURCES - out of memory
+ *   _PERMISSION_DENIED - no authorization to read this property's value(s)
+ *   _BAD_REQUEST - np's parent is not a property group
+ */
+static int
+rc_node_property_may_read(rc_node_t *np)
+{
+	int ret, granted = 0;
+	rc_node_t *pgp;
+	permcheck_t *pcp;
+
+	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_PROPERTY)
+		return (REP_PROTOCOL_FAIL_TYPE_MISMATCH);
+
+	if (client_is_privileged())
+		return (REP_PROTOCOL_SUCCESS);
+
+#ifdef NATIVE_BUILD
+	return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
+#else
+	ret = rc_node_parent(np, &pgp);
+
+	if (ret != REP_PROTOCOL_SUCCESS)
+		return (ret);
+
+	if (pgp->rn_id.rl_type != REP_PROTOCOL_ENTITY_PROPERTYGRP) {
+		rc_node_rele(pgp);
+		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
+	}
+
+	ret = rc_node_pg_check_read_protect(pgp);
+
+	if (ret != REP_PROTOCOL_FAIL_PERMISSION_DENIED) {
+		rc_node_rele(pgp);
+		return (ret);
+	}
+
+	pcp = pc_create();
+
+	if (pcp == NULL) {
+		rc_node_rele(pgp);
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+	}
+
+	ret = perm_add_enabling(pcp, AUTH_MODIFY);
+
+	if (ret == REP_PROTOCOL_SUCCESS) {
+		const char * const auth =
+		    perm_auth_for_pgtype(pgp->rn_type);
+
+		if (auth != NULL)
+			ret = perm_add_enabling(pcp, auth);
+	}
+
+	/*
+	 * If you are permitted to modify the value, you may also
+	 * read it.  This means that both the MODIFY and VALUE
+	 * authorizations are acceptable.  We don't allow requests
+	 * for AUTH_PROP_MODIFY if all you have is $AUTH_PROP_VALUE,
+	 * however, to avoid leaking possibly valuable information
+	 * since such a user can't change the property anyway.
+	 */
+	if (ret == REP_PROTOCOL_SUCCESS)
+		ret = perm_add_enabling_values(pcp, pgp,
+		    AUTH_PROP_MODIFY);
+
+	if (ret == REP_PROTOCOL_SUCCESS &&
+	    strcmp(np->rn_name, AUTH_PROP_MODIFY) != 0)
+		ret = perm_add_enabling_values(pcp, pgp,
+		    AUTH_PROP_VALUE);
+
+	if (ret == REP_PROTOCOL_SUCCESS)
+		ret = perm_add_enabling_values(pcp, pgp,
+		    AUTH_PROP_READ);
+
+	rc_node_rele(pgp);
+
+	if (ret == REP_PROTOCOL_SUCCESS) {
+		granted = perm_granted(pcp);
+		if (granted < 0)
+			ret = REP_PROTOCOL_FAIL_NO_RESOURCES;
+	}
+
+	pc_free(pcp);
+
+	if (ret == REP_PROTOCOL_SUCCESS && !granted)
+		ret = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+
+	return (ret);
+#endif	/* NATIVE_BUILD */
 }
 
 /*
@@ -4023,12 +4390,14 @@ rc_node_setup_value_iter(rc_node_ptr_t *npp, rc_node_iter_t **iterp)
 
 /*
  * Returns:
+ *   _NO_RESOURCES - out of memory
  *   _NOT_SET - npp is reset
  *   _DELETED - npp's node has been deleted
  *   _TYPE_MISMATCH - npp's node is not a property
  *   _NOT_FOUND - property has no values
  *   _TRUNCATED - property has >1 values (first is written into out)
  *   _SUCCESS - property has 1 value (which is written into out)
+ *   _PERMISSION_DENIED - no authorization to read property value(s)
  *
  * We shorten *sz_out to not include anything after the final '\0'.
  */
@@ -4041,6 +4410,13 @@ rc_node_get_property_value(rc_node_ptr_t *npp,
 	int ret;
 
 	assert(*sz_out == sizeof (*out));
+
+	RC_NODE_PTR_GET_CHECK_AND_HOLD(np, npp);
+	ret = rc_node_property_may_read(np);
+	rc_node_rele(np);
+
+	if (ret != REP_PROTOCOL_SUCCESS)
+		return (ret);
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 
@@ -4079,6 +4455,7 @@ rc_iter_next_value(rc_node_iter_t *iter,
 
 	size_t start;
 	size_t w;
+	int ret;
 
 	rep_protocol_responseid_t result;
 
@@ -4088,6 +4465,12 @@ rc_iter_next_value(rc_node_iter_t *iter,
 
 	if (iter->rni_type != REP_PROTOCOL_ENTITY_VALUE)
 		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
+
+	RC_NODE_CHECK(np);
+	ret = rc_node_property_may_read(np);
+
+	if (ret != REP_PROTOCOL_SUCCESS)
+		return (ret);
 
 	RC_NODE_CHECK_AND_LOCK(np);
 
@@ -4320,7 +4703,7 @@ rc_iter_next(rc_node_iter_t *iter, rc_node_ptr_t *out, uint32_t type)
 			if (rc == REP_PROTOCOL_SUCCESS) {
 				iter->rni_iter =
 				    uu_list_walk_start(np->rn_children,
-					UU_WALK_ROBUST);
+				    UU_WALK_ROBUST);
 
 				if (iter->rni_iter == NULL)
 					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;

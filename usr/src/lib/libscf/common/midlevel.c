@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -303,7 +304,9 @@ fill_prop(scf_property_t *prop, const char *pgname, const char *propname,
 	}
 
 	if (iterret == -1) {
-		if (scf_error() != SCF_ERROR_CONNECTION_BROKEN)
+		int err = scf_error();
+		if (err != SCF_ERROR_CONNECTION_BROKEN &&
+		    err != SCF_ERROR_PERMISSION_DENIED)
 			(void) scf_set_error(SCF_ERROR_INTERNAL);
 		goto error1;
 	}
@@ -1804,7 +1807,12 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 			return (NULL);
 		}
 	} else {
-		sys_fmri = strdup(inst_fmri);
+		if ((sys_fmri = strdup(inst_fmri)) == NULL) {
+			if (local_h)
+				scf_handle_destroy(h);
+			(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+			return (NULL);
+		}
 	}
 
 	if ((namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH)) == -1) {
@@ -1856,6 +1864,9 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 				(void) scf_set_error(SCF_ERROR_NO_MEMORY);
 				goto error1;
 			}
+			nextpg->pg_name = NULL;
+			nextpg->pg_next = NULL;
+			nextpg->pg_proplist = NULL;
 			thispg->pg_next = nextpg;
 			thispg = nextpg;
 		} else {
@@ -1874,8 +1885,6 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 			goto error1;
 		}
 
-		nextpg->pg_next = NULL;
-		nextpg->pg_proplist = NULL;
 		thisprop = NULL;
 
 		scf_iter_reset(propiter);
@@ -2005,6 +2014,7 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 			thisprop = NULL;
 
 			if ((nextpg->pg_name = strdup(pgname)) == NULL) {
+				(void) scf_set_error(SCF_ERROR_NO_MEMORY);
 				free(nextpg);
 				goto error1;
 			}

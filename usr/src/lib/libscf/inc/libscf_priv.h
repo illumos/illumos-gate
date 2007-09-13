@@ -292,6 +292,18 @@ scf_error_t scf_walk_fmri(scf_handle_t *, int, char **, int,
 int _scf_request_backup(scf_handle_t *, const char *);
 
 /*
+ * Determines whether a property group requires authorization to read; this
+ * does not in any way reflect whether the caller has that authorization.
+ * To determine that, the caller must attempt to read the value of one of the
+ * group's properties.
+ *
+ * Can fail with:
+ *	_NOT_BOUND, _CONNECTION_BROKEN, _INVALID_ARGUMENT, _INTERNAL,
+ *	_NO_RESOURCES, _CONSTRAINT_VIOLATED, _DELETED.
+ */
+int _scf_pg_is_read_protected(const scf_propertygroup_t *, boolean_t *);
+
+/*
  * scf_pattern_t
  */
 typedef struct scf_pattern {

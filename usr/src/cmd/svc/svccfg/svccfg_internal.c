@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,6 +738,7 @@ load_fini(void)
  *   ECANCELED - prop's pg was deleted
  *   ECONNABORTED - repository disconnected
  *   ENOMEM - out of memory
+ *   EACCES - permission denied when reading property
  */
 static int
 load_property(scf_property_t *prop, property_t **ipp)
@@ -820,6 +821,10 @@ load_property(scf_property_t *prop, property_t **ipp)
 
 			case SCF_ERROR_CONNECTION_BROKEN:
 				r = ECONNABORTED;
+				goto out;
+
+			case SCF_ERROR_PERMISSION_DENIED:
+				r = EACCES;
 				goto out;
 
 			case SCF_ERROR_HANDLE_MISMATCH:
@@ -978,6 +983,7 @@ load_pg_attrs(const scf_propertygroup_t *pg, pgroup_t **ipgp)
  *   ECONNABORTED - repository disconnected
  *   EBADF - pg is corrupt (error printed if fmri is given)
  *   ENOMEM - out of memory
+ *   EACCES - permission denied when reading property
  */
 int
 load_pg(const scf_propertygroup_t *pg, pgroup_t **ipgp, const char *fmri,
@@ -1050,6 +1056,7 @@ load_pg(const scf_propertygroup_t *pg, pgroup_t **ipgp, const char *fmri,
 		case ECANCELED:
 		case ECONNABORTED:
 		case ENOMEM:
+		case EACCES:
 			goto out;
 
 		default:

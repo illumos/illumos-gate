@@ -1069,6 +1069,7 @@ next_val:
 
 					case SCF_ERROR_HANDLE_MISMATCH:
 					case SCF_ERROR_INVALID_ARGUMENT:
+					case SCF_ERROR_PERMISSION_DENIED:
 					default:
 						bad_fail("scf_iter_next_value",
 						    scf_error());
@@ -1367,6 +1368,7 @@ next_val:
 
 					case SCF_ERROR_HANDLE_MISMATCH:
 					case SCF_ERROR_INVALID_ARGUMENT:
+					case SCF_ERROR_PERMISSION_DENIED:
 						bad_fail(
 						    "scf_iter_next_value",
 						    scf_error());
@@ -2532,7 +2534,7 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 
 		/* get resource pool */
 		if (get_astring_val(pg, SCF_PROPERTY_RESOURCE_POOL, cip->vbuf,
-			cip->vbuf_sz, prop, val) != 0) {
+		    cip->vbuf_sz, prop, val) != 0) {
 			errstr = "Could not get value of resource pool.";
 			goto out;
 		}
@@ -2839,9 +2841,9 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 	 * have access to the specified directory.
 	 */
 	if (cip->working_dir != NULL) {
-		do
+		do {
 			r = chdir(cip->working_dir);
-		while (r != 0 && errno == EINTR);
+		} while (r != 0 && errno == EINTR);
 		if (r != 0) {
 			*fp = "chdir";
 			ret = errno;

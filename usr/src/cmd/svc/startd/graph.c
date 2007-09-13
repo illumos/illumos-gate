@@ -1953,7 +1953,7 @@ rebound:
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_NOT_BOUND:
 		case SCF_ERROR_NOT_SET:
-			bad_error("scf_iter_service_instances", scf_error())
+			bad_error("scf_iter_service_instances", scf_error());
 		}
 	}
 
@@ -3381,9 +3381,9 @@ sulogin_thread(void *unused)
 
 	assert(sulogin_thread_running);
 
-	do
+	do {
 		(void) run_sulogin("Console login service(s) cannot run\n");
-	while (!can_come_up());
+	} while (!can_come_up());
 
 	sulogin_thread_running = B_FALSE;
 	MUTEX_UNLOCK(&dgraph_lock);
@@ -5595,6 +5595,7 @@ process_actions(scf_handle_t *h, scf_propertygroup_t *pg, scf_instance_t *inst)
 				continue;
 
 			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_PERMISSION_DENIED:
 				bad_error("scf_property_get_value",
 				    scf_error());
 			}

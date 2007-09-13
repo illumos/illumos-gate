@@ -524,7 +524,8 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 		}
 	}
 
-	nenv = set_smf_env(mcp->env, mcp->env_sz, NULL, inst, method);
+	nenv = set_smf_env(mcp->env, mcp->env_sz, NULL, inst,
+	    method_names[type]);
 
 	log_preexec();
 

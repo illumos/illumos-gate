@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -40,6 +41,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <wait.h>
 
@@ -107,6 +109,14 @@ struct snaplevel {
 	scf_snaplevel_t	*sl;
 };
 
+/*
+ * This is used for communication between lscf_service_export and
+ * export_callback.
+ */
+struct export_args {
+	const char	*filename;
+	int 		flags;
+};
 
 const char * const scf_pg_general = SCF_PG_GENERAL;
 const char * const scf_group_framework = SCF_GROUP_FRAMEWORK;
@@ -1057,7 +1067,9 @@ prop_get_val(scf_property_t *prop, scf_value_t *val)
 
 	err = scf_error();
 
-	if (err != SCF_ERROR_NOT_FOUND && err != SCF_ERROR_CONSTRAINT_VIOLATED)
+	if (err != SCF_ERROR_NOT_FOUND &&
+	    err != SCF_ERROR_CONSTRAINT_VIOLATED &&
+	    err != SCF_ERROR_PERMISSION_DENIED)
 		scfdie();
 
 	if (g_verbose) {
@@ -1076,9 +1088,11 @@ prop_get_val(scf_property_t *prop, scf_value_t *val)
 		if (err == SCF_ERROR_NOT_FOUND)
 			emsg = gettext("Property %s has no values; expected "
 			    "one.\n");
-		else
+		else if (err == SCF_ERROR_CONSTRAINT_VIOLATED)
 			emsg = gettext("Property %s has multiple values; "
 			    "expected one.\n");
+		else
+			emsg = gettext("No permission to read property %s.\n");
 
 		warn(emsg, fmri);
 
@@ -3057,6 +3071,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 			case SCF_ERROR_HANDLE_MISMATCH:
 			case SCF_ERROR_NOT_BOUND:
 			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_PERMISSION_DENIED:
 			default:
 				bad_error("scf_property_get_value",
 				    scf_error());
@@ -3103,6 +3118,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 			case SCF_ERROR_HANDLE_MISMATCH:
 			case SCF_ERROR_NOT_BOUND:
 			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_PERMISSION_DENIED:
 			default:
 				bad_error("scf_property_get_value",
 				    scf_error());
@@ -3169,6 +3185,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 		case EBADF:
 			return (r);
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -3233,6 +3250,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 			internal_pgroup_free(old_dpt_pgroup);
 			return (r);
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -3366,6 +3384,7 @@ delprop:
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_NOT_BOUND:
 		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_PERMISSION_DENIED:
 		default:
 			bad_error("scf_property_get_value", scf_error());
 		}
@@ -3413,6 +3432,7 @@ delprop:
 		case EBADF:
 			return (r);
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -3494,6 +3514,7 @@ delprop:
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_NOT_BOUND:
 		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_PERMISSION_DENIED:
 		default:
 			bad_error("scf_property_get_value", scf_error());
 		}
@@ -3601,6 +3622,7 @@ delprop:
 		case EBADF:
 			goto out;
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -3653,6 +3675,7 @@ nocust:
 		case EBADF:
 			return (r);
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -3716,6 +3739,7 @@ nocust:
 	case EBADF:
 		goto out;
 
+	case EACCES:
 	default:
 		bad_error("load_pg", r);
 	}
@@ -3821,6 +3845,7 @@ nocust:
 		case EBADF:
 			goto out;
 
+		case EACCES:
 		default:
 			bad_error("load_pg", r);
 		}
@@ -4073,6 +4098,7 @@ handle_dependent_conflict(const entity_t * const ient,
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_NOT_BOUND:
 		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_PERMISSION_DENIED:
 		default:
 			bad_error("scf_property_get_value",
 			    scf_error());
@@ -4201,6 +4227,7 @@ handle_dependent_conflict(const entity_t * const ient,
 		internal_pgroup_free(pgroup);
 		return (0);
 
+	case EACCES:
 	default:
 		bad_error("load_pg", r);
 	}
@@ -4239,6 +4266,7 @@ handle_dependent_conflict(const entity_t * const ient,
  *	    - couldn't upgrade dependents (backend access denied)
  *	    - couldn't import pg (backend access denied)
  *	    - couldn't upgrade pg (backend access denied)
+ *	    - couldn't read property (backend access denied)
  *   EBUSY - property group was added (error printed)
  *	   - property group was deleted (error printed)
  *	   - property group changed (error printed)
@@ -4385,6 +4413,7 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 		case ECONNABORTED:
 		case ENOMEM:
 		case EBADF:
+		case EACCES:
 			return (r);
 
 		default:
@@ -4400,6 +4429,7 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 		case ECONNABORTED:
 		case ENOMEM:
 		case EBADF:
+		case EACCES:
 			internal_pgroup_free(lipg_i);
 			return (r);
 
@@ -4454,6 +4484,7 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 	case ECONNABORTED:
 	case EBADF:
 	case ENOMEM:
+	case EACCES:
 		return (r);
 
 	default:
@@ -4541,6 +4572,7 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 	case ECONNABORTED:
 	case EBADF:
 	case ENOMEM:
+	case EACCES:
 		goto out;
 
 	default:
@@ -4936,6 +4968,7 @@ upgrade_props(void *ent, scf_snaplevel_t *running, scf_snaplevel_t *snpl,
 		case ECONNABORTED:
 		case EBADF:
 		case ENOMEM:
+		case EACCES:
 			return (r);
 
 		default:
@@ -5591,6 +5624,9 @@ nosnap:
 	}
 
 lionly:
+	if (lcbdata->sc_flags & SCI_NOSNAP)
+		goto deltemp;
+
 	/* transfer snapshot from temporary instance */
 	if (g_verbose)
 		warn(gettext("Taking \"%s\" snapshot for %s.\n"),
@@ -7245,10 +7281,10 @@ write_service_bundle(xmlDocPtr doc, FILE *f)
  */
 static void
 export_property(scf_property_t *prop, const char *name_arg,
-    struct pg_elts *elts)
+    struct pg_elts *elts, int flags)
 {
 	const char *type;
-	scf_error_t err;
+	scf_error_t err = 0;
 	xmlNodePtr pnode, lnode;
 	char *lnname;
 	int ret;
@@ -7267,7 +7303,10 @@ export_property(scf_property_t *prop, const char *name_arg,
 		uu_die(gettext("Can't export property %s: unknown type.\n"),
 		    exp_str);
 
-	/* Is there a single value? */
+	/* If we're exporting values, and there's just one, export it here. */
+	if (!(flags & SCE_ALL_VALUES))
+		goto empty;
+
 	if (scf_property_get_value(prop, exp_val) == SCF_SUCCESS) {
 		xmlNodePtr n;
 
@@ -7292,9 +7331,18 @@ export_property(scf_property_t *prop, const char *name_arg,
 	}
 
 	err = scf_error();
-	if (err != SCF_ERROR_CONSTRAINT_VIOLATED && err != SCF_ERROR_NOT_FOUND)
+
+	if (err == SCF_ERROR_PERMISSION_DENIED) {
+		semerr(emsg_permission_denied);
+		return;
+	}
+
+	if (err != SCF_ERROR_CONSTRAINT_VIOLATED &&
+	    err != SCF_ERROR_NOT_FOUND &&
+	    err != SCF_ERROR_PERMISSION_DENIED)
 		scfdie();
 
+empty:
 	/* Multiple (or no) values, so use property */
 	pnode = xmlNewNode(NULL, (xmlChar *)"property");
 	if (pnode == NULL)
@@ -7345,11 +7393,12 @@ export_property(scf_property_t *prop, const char *name_arg,
  * Add a property_group element for this property group to elts.
  */
 static void
-export_pg(scf_propertygroup_t *pg, struct entity_elts *eelts)
+export_pg(scf_propertygroup_t *pg, struct entity_elts *eelts, int flags)
 {
 	xmlNodePtr n;
 	struct pg_elts elts;
 	int ret;
+	boolean_t read_protected;
 
 	n = xmlNewNode(NULL, (xmlChar *)"property_group");
 
@@ -7368,6 +7417,17 @@ export_pg(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		scfdie();
 
 	(void) memset(&elts, 0, sizeof (elts));
+
+	/*
+	 * If this property group is not read protected, we always want to
+	 * output all the values.  Otherwise, we only output the values if the
+	 * caller set SCE_ALL_VALUES (i.e., the user gave us export/archive -a).
+	 */
+	if (_scf_pg_is_read_protected(pg, &read_protected) != SCF_SUCCESS)
+		scfdie();
+
+	if (!read_protected)
+		flags |= SCE_ALL_VALUES;
 
 	while ((ret = scf_iter_next_property(exp_prop_iter, exp_prop)) == 1) {
 		if (scf_property_get_name(exp_prop, exp_str, exp_str_sz) < 0)
@@ -7388,7 +7448,7 @@ export_pg(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			xmlFreeNode(m);
 		}
 
-		export_property(exp_prop, NULL, &elts);
+		export_property(exp_prop, NULL, &elts, flags);
 	}
 	if (ret == -1)
 		scfdie();
@@ -7504,7 +7564,7 @@ export_dependency(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	if (err) {
 		xmlFreeNode(n);
 
-		export_pg(pg, eelts);
+		export_pg(pg, eelts, 0);
 
 		return;
 	}
@@ -7539,7 +7599,7 @@ export_dependency(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			xmlFreeNode(m);
 		}
 
-		export_property(exp_prop, exp_str, &elts);
+		export_property(exp_prop, exp_str, &elts, 0);
 	}
 	if (ret == -1)
 		scfdie();
@@ -7667,7 +7727,7 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 	if (err) {
 		xmlFreeNode(n);
 
-		export_pg(pg, eelts);
+		export_pg(pg, eelts, 0);
 
 		return;
 	}
@@ -7842,7 +7902,7 @@ export_method(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				continue;
 		}
 
-		export_property(exp_prop, exp_str, &elts);
+		export_property(exp_prop, exp_str, &elts, 0);
 	}
 	if (ret == -1)
 		scfdie();
@@ -7958,7 +8018,7 @@ export_svc_general(scf_propertygroup_t *pg, struct entity_elts *selts)
 			xmlFreeNode(s);
 		}
 
-		export_property(exp_prop, exp_str, &elts);
+		export_property(exp_prop, exp_str, &elts, 0);
 	}
 	if (ret == -1)
 		scfdie();
@@ -7988,7 +8048,7 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 			elts->method_context = n;
 		} else {
 			xmlFreeNode(n);
-			export_pg(pg, elts);
+			export_pg(pg, elts, 0);
 		}
 		return;
 	}
@@ -8060,7 +8120,7 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 
 	if (err && env == NULL) {
 		xmlFreeNode(n);
-		export_pg(pg, elts);
+		export_pg(pg, elts, 0);
 		return;
 	}
 
@@ -8174,7 +8234,7 @@ export_dependent(scf_propertygroup_t *pg, const char *name, const char *tfmri)
 			xmlFreeNode(s);
 		}
 
-		export_property(exp_prop, exp_str, &pgelts);
+		export_property(exp_prop, exp_str, &pgelts, 0);
 	}
 	if (ret == -1)
 		scfdie();
@@ -8223,7 +8283,7 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 		if ((ty != SCF_TYPE_ASTRING &&
 		    prop_check_type(exp_prop, SCF_TYPE_FMRI) != 0) ||
 		    prop_get_val(exp_prop, exp_val) != 0) {
-			export_property(exp_prop, NULL, &pgelts);
+			export_property(exp_prop, NULL, &pgelts, 0);
 			continue;
 		}
 
@@ -8254,7 +8314,7 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "FMRI.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts);
+			export_property(exp_prop, exp_str, &pgelts, 0);
 			continue;
 
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
@@ -8267,7 +8327,7 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "a service or an instance.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts);
+			export_property(exp_prop, exp_str, &pgelts, 0);
 			continue;
 
 		case SCF_ERROR_NOT_FOUND:
@@ -8280,7 +8340,7 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 				    "not exist.\n"), fmri);
 			}
 
-			export_property(exp_prop, exp_str, &pgelts);
+			export_property(exp_prop, exp_str, &pgelts, 0);
 			continue;
 
 		default:
@@ -8299,7 +8359,7 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			warn(gettext("Entity %s is missing dependency property "
 			    "group %s.\n"), fmri, exp_str);
 
-			export_property(exp_prop, NULL, &pgelts);
+			export_property(exp_prop, NULL, &pgelts, 0);
 			continue;
 		}
 
@@ -8313,13 +8373,13 @@ export_dependents(scf_propertygroup_t *pg, struct entity_elts *eelts)
 			warn(gettext("Property group %s is not of "
 			    "expected type %s.\n"), fmri, SCF_GROUP_DEPENDENCY);
 
-			export_property(exp_prop, NULL, &pgelts);
+			export_property(exp_prop, NULL, &pgelts, 0);
 			continue;
 		}
 
 		n = export_dependent(opg, exp_str, fmri);
 		if (n == NULL)
-			export_property(exp_prop, exp_str, &pgelts);
+			export_property(exp_prop, exp_str, &pgelts, 0);
 		else {
 			if (eelts->dependents == NULL)
 				eelts->dependents = n;
@@ -8444,12 +8504,12 @@ export_template(scf_propertygroup_t *pg, struct entity_elts *elts,
 	if (strcmp(exp_str, SCF_PG_TM_COMMON_NAME) == 0) {
 		telts->common_name = export_tm_loctext(pg, "common_name");
 		if (telts->common_name == NULL)
-			export_pg(pg, elts);
+			export_pg(pg, elts, 0);
 		return;
 	} else if (strcmp(exp_str, SCF_PG_TM_DESCRIPTION) == 0) {
 		telts->description = export_tm_loctext(pg, "description");
 		if (telts->description == NULL)
-			export_pg(pg, elts);
+			export_pg(pg, elts, 0);
 		return;
 	}
 
@@ -8463,7 +8523,7 @@ export_template(scf_propertygroup_t *pg, struct entity_elts *elts,
 		make_node(&telts->documentation, "documentation");
 		(void) xmlAddChild(telts->documentation, child);
 	} else {
-		export_pg(pg, elts);
+		export_pg(pg, elts, 0);
 	}
 }
 
@@ -8522,7 +8582,7 @@ export_inst_general(scf_propertygroup_t *pg, xmlNodePtr inode,
 			xmlFreeNode(rnode);
 		}
 
-		export_property(exp_prop, exp_str, &pgelts);
+		export_property(exp_prop, exp_str, &pgelts, 0);
 	}
 	if (ret == -1)
 		scfdie();
@@ -8536,7 +8596,7 @@ export_inst_general(scf_propertygroup_t *pg, xmlNodePtr inode,
  * Put an instance element for the given instance into selts.
  */
 static void
-export_instance(scf_instance_t *inst, struct entity_elts *selts)
+export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 {
 	xmlNodePtr n;
 	boolean_t isdefault;
@@ -8590,12 +8650,12 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts)
 	(void) memset(&template_elts, 0, sizeof (template_elts));
 
 	while ((ret = scf_iter_next_pg(exp_pg_iter, exp_pg)) == 1) {
-		uint32_t flags;
+		uint32_t pgflags;
 
-		if (scf_pg_get_flags(exp_pg, &flags) != 0)
+		if (scf_pg_get_flags(exp_pg, &pgflags) != 0)
 			scfdie();
 
-		if (flags & SCF_PG_FLAG_NONPERSISTENT)
+		if (pgflags & SCF_PG_FLAG_NONPERSISTENT)
 			continue;
 
 		if (scf_pg_get_type(exp_pg, exp_str, exp_str_sz) < 0)
@@ -8629,7 +8689,7 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts)
 		}
 
 		/* Ordinary pg. */
-		export_pg(exp_pg, &elts);
+		export_pg(exp_pg, &elts, flags);
 	}
 	if (ret == -1)
 		scfdie();
@@ -8684,7 +8744,7 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts)
  * Return a service element for the given service.
  */
 static xmlNodePtr
-export_service(scf_service_t *svc)
+export_service(scf_service_t *svc, int flags)
 {
 	xmlNodePtr snode;
 	struct entity_elts elts;
@@ -8711,12 +8771,12 @@ export_service(scf_service_t *svc)
 	(void) memset(&template_elts, 0, sizeof (template_elts));
 
 	while ((ret = scf_iter_next_pg(exp_pg_iter, exp_pg)) == 1) {
-		uint32_t flags;
+		uint32_t pgflags;
 
-		if (scf_pg_get_flags(exp_pg, &flags) != 0)
+		if (scf_pg_get_flags(exp_pg, &pgflags) != 0)
 			scfdie();
 
-		if (flags & SCF_PG_FLAG_NONPERSISTENT)
+		if (pgflags & SCF_PG_FLAG_NONPERSISTENT)
 			continue;
 
 		if (scf_pg_get_type(exp_pg, exp_str, exp_str_sz) < 0)
@@ -8749,7 +8809,7 @@ export_service(scf_service_t *svc)
 			continue;
 		}
 
-		export_pg(exp_pg, &elts);
+		export_pg(exp_pg, &elts, flags);
 	}
 	if (ret == -1)
 		scfdie();
@@ -8769,7 +8829,7 @@ export_service(scf_service_t *svc)
 		scfdie();
 
 	while ((ret = scf_iter_next_instance(exp_inst_iter, exp_inst)) == 1)
-		export_instance(exp_inst, &elts);
+		export_instance(exp_inst, &elts, flags);
 	if (ret == -1)
 		scfdie();
 
@@ -8796,7 +8856,7 @@ export_callback(void *data, scf_walkinfo_t *wip)
 	xmlDocPtr doc;
 	xmlNodePtr sb;
 	int result;
-	char *filename = data;
+	struct export_args *argsp = (struct export_args *)data;
 
 	if ((exp_inst = scf_instance_create(g_hndl)) == NULL ||
 	    (exp_pg = scf_pg_create(g_hndl)) == NULL ||
@@ -8811,16 +8871,16 @@ export_callback(void *data, scf_walkinfo_t *wip)
 	exp_str_sz = max_scf_len + 1;
 	exp_str = safe_malloc(exp_str_sz);
 
-	if (filename != NULL) {
+	if (argsp->filename != NULL) {
 		errno = 0;
-		f = fopen(filename, "wb");
+		f = fopen(argsp->filename, "wb");
 		if (f == NULL) {
 			if (errno == 0)
 				uu_die(gettext("Could not open \"%s\": no free "
-				    "stdio streams.\n"), filename);
+				    "stdio streams.\n"), argsp->filename);
 			else
 				uu_die(gettext("Could not open \"%s\""),
-				    filename);
+				    argsp->filename);
 		}
 	} else
 		f = stdout;
@@ -8840,7 +8900,7 @@ export_callback(void *data, scf_walkinfo_t *wip)
 	safe_setprop(sb, name_attr, "export");
 	(void) xmlAddSibling(doc->children, sb);
 
-	(void) xmlAddChild(sb, export_service(wip->svc));
+	(void) xmlAddChild(sb, export_service(wip->svc, argsp->flags));
 
 	result = write_service_bundle(doc, f);
 
@@ -8867,16 +8927,21 @@ export_callback(void *data, scf_walkinfo_t *wip)
  * dump it into filename (or stdout if filename is NULL).
  */
 int
-lscf_service_export(char *fmri, const char *filename)
+lscf_service_export(char *fmri, const char *filename, int flags)
 {
+	struct export_args args;
 	int ret, err;
 
 	lscf_prep_hndl();
 
+	bzero(&args, sizeof (args));
+	args.filename = filename;
+	args.flags = flags;
+
 	err = 0;
 	if ((ret = scf_walk_fmri(g_hndl, 1, (char **)&fmri,
 	    SCF_WALK_SERVICE | SCF_WALK_NOINSTANCE, export_callback,
-	    (void *)filename, &err, semerr)) != 0) {
+	    &args, &err, semerr)) != 0) {
 		if (ret != -1)
 			semerr(gettext("Failed to walk instances: %s\n"),
 			    scf_strerror(ret));
@@ -8898,7 +8963,7 @@ lscf_service_export(char *fmri, const char *filename)
  */
 
 static xmlNodePtr
-make_archive()
+make_archive(int flags)
 {
 	xmlNodePtr sb;
 	scf_scope_t *scope;
@@ -8947,7 +9012,7 @@ make_archive()
 		if (strcmp(exp_str, SCF_LEGACY_SERVICE) == 0)
 			continue;
 
-		xmlAddChild(sb, export_service(svc));
+		xmlAddChild(sb, export_service(svc, flags));
 	}
 
 	free(exp_str);
@@ -8968,7 +9033,7 @@ make_archive()
 }
 
 int
-lscf_archive(const char *filename)
+lscf_archive(const char *filename, int flags)
 {
 	FILE *f;
 	xmlDocPtr doc;
@@ -8998,7 +9063,7 @@ lscf_archive(const char *filename)
 	    (xmlChar *)MANIFEST_DTD_PATH) == NULL)
 		uu_die(emsg_create_xml);
 
-	(void) xmlAddSibling(doc->children, make_archive());
+	(void) xmlAddSibling(doc->children, make_archive(flags));
 
 	result = write_service_bundle(doc, f);
 
@@ -10169,6 +10234,7 @@ prop_has_multiple_values(const scf_property_t *prop, scf_value_t *val)
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
 			return (B_FALSE);
+		case SCF_ERROR_PERMISSION_DENIED:
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
 			return (B_TRUE);
 		default:
@@ -10234,7 +10300,7 @@ list_prop_info(const scf_property_t *prop, const char *name, size_t len)
 
 		free(buf);
 	}
-	if (ret != 0)
+	if (ret != 0 && scf_error() != SCF_ERROR_PERMISSION_DENIED)
 		scfdie();
 
 	if (putchar('\n') != '\n')
@@ -11003,7 +11069,8 @@ write_edit_script(FILE *strm)
 
 				free(buf);
 			}
-			if (ret3 < 0)
+			if (ret3 < 0 &&
+			    scf_error() != SCF_ERROR_PERMISSION_DENIED)
 				scfdie();
 
 			/* Write closing paren if mult-value property */

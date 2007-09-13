@@ -6854,3 +6854,20 @@ _scf_request_backup(scf_handle_t *h, const char *name)
 		return (scf_set_error(proto_error(response.rpr_response)));
 	return (SCF_SUCCESS);
 }
+
+int
+_scf_pg_is_read_protected(const scf_propertygroup_t *pg, boolean_t *out)
+{
+	char buf[REP_PROTOCOL_NAME_LEN];
+	ssize_t res;
+
+	res = datael_get_name(&pg->rd_d, buf, sizeof (buf),
+	    RP_ENTITY_NAME_PGREADPROT);
+
+	if (res == -1)
+		return (-1);
+
+	if (uu_strtouint(buf, out, sizeof (*out), 0, 0, 1) == -1)
+		return (scf_set_error(SCF_ERROR_INTERNAL));
+	return (SCF_SUCCESS);
+}

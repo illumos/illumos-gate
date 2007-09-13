@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,10 @@ extern "C" {
 #define	SCI_FRESH	0x10		/* Freshly imported service */
 #define	SCI_FORCE	0x20		/* Override-import. */
 #define	SCI_KEEP	0x40		/* Don't delete when SCI_FORCEing */
+#define	SCI_NOSNAP	0x80		/* Don't take last-import snapshot */
+
+/* Flags for lscf_service_export() */
+#define	SCE_ALL_VALUES	0x01		/* Include all property values */
 
 #ifdef lint
 extern int yyerror(const char *);
@@ -110,6 +114,12 @@ enum import_state {
 	IMPORT_COMPLETE,
 	IMPORT_REFRESHED
 };
+
+typedef enum svccfg_op {
+	SVCCFG_OP_IMPORT = 0,
+	SVCCFG_OP_APPLY,
+	SVCCFG_OP_RESTORE
+} svccfg_op_t;
 
 typedef struct entity {
 	uu_list_node_t	sc_node;
@@ -340,7 +350,7 @@ CPL_MATCH_FN(complete_select);
 CPL_MATCH_FN(complete_command);
 
 int lxml_init(void);
-int lxml_get_bundle_file(bundle_t *, const char *, int);
+int lxml_get_bundle_file(bundle_t *, const char *, svccfg_op_t);
 
 void engine_init(void);
 int engine_exec_cmd(void);

@@ -232,6 +232,7 @@ SUNWprivate_1.1 {
 	scf_set_count_property;
 	scf_simple_handle_destroy;
 	gen_filenms_from_fmri;
+	_scf_pg_is_read_protected;
     local:
 	*;
 };
