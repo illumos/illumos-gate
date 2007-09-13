@@ -68,6 +68,10 @@ SUNWprivate {
 	idmap_udt_commit;
 	idmap_udt_create;
 	idmap_udt_flush_namerules;
+	idmap_getwinnamebyuid;
+	idmap_getwinnamebygid;
+	idmap_getuidbywinname;
+	idmap_getgidbywinname;
     local:
 	*;
 };

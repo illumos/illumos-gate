@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,18 +52,8 @@
 #include <nfs/nfsid_map.h>
 #include <nfs/mapid.h>
 #include <sys/sdt.h>
-
-/*
- * We cannot use the backend nscd as it may make syscalls that may
- * cause further nfsmapid upcalls introducing deadlock.
- * Use the internal uncached versions of get*_r.
- */
-extern struct group *_uncached_getgrgid_r(gid_t, struct group *, char *, int);
-extern struct group *_uncached_getgrnam_r(const char *, struct group *,
-    char *, int);
-extern struct passwd *_uncached_getpwuid_r(uid_t, struct passwd *, char *, int);
-extern struct passwd *_uncached_getpwnam_r(const char *, struct passwd *,
-    char *, int);
+#include <sys/idmap.h>
+#include <idmap.h>
 
 #define		UID_MAX_STR_LEN		11	/* Digits in UID_MAX + 1 */
 #define		DIAG_FILE		"/var/run/nfs4_domain"
@@ -100,9 +90,12 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res result;
 	struct passwd	 pwd;
+	struct passwd	*pwd_ptr;
+	int		 pwd_rc;
 	char		*pwd_buf;
 	char		*user;
 	char		*domain;
+	idmap_stat	 rc;
 
 	if (argp->u_arg.len <= 0 || arg_size < MAPID_ARG_LEN(argp->u_arg.len)) {
 		result.status = NFSMAPID_INVALID;
@@ -111,10 +104,10 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 	}
 
 	if (!extract_domain(argp->str, &user, &domain)) {
-		long id;
+		unsigned long id;
 
 		/*
-		 * Invalid "user@dns_domain" string. Still, the user
+		 * Invalid "user@domain" string. Still, the user
 		 * part might be an encoded uid, so do a final check.
 		 * Remember, domain part of string was not set since
 		 * not a valid string.
@@ -125,14 +118,13 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 			goto done;
 		}
 
-		/*
-		 * Since atoi() does not return proper errors for
-		 * invalid translation, use strtol() instead.
-		 */
 		errno = 0;
-		id = strtol(user, (char **)NULL, 10);
+		id = strtoul(user, (char **)NULL, 10);
 
-		if (errno || id < 0 || id > UID_MAX) {
+		/*
+		 * We don't accept ephemeral ids from the wire.
+		 */
+		if (errno || id > UID_MAX) {
 			result.status = NFSMAPID_UNMAPPABLE;
 			result.u_res.uid = UID_NOBODY;
 			goto done;
@@ -145,19 +137,29 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 
 	/*
 	 * String properly constructed. Now we check for domain and
-	 * group validity. Note that we only look at the domain iff
-	 * the local domain is configured.
+	 * group validity.
 	 */
 	if (!cur_domain_null() && !valid_domain(domain)) {
-		result.status = NFSMAPID_BADDOMAIN;
-		result.u_res.uid = UID_NOBODY;
+		/*
+		 * If the domain part of the string does not
+		 * match the NFS domain, try to map it using
+		 * idmap service.
+		 */
+		rc = idmap_getuidbywinname(user, domain, &result.u_res.uid);
+		if (rc != IDMAP_SUCCESS) {
+			result.status = NFSMAPID_BADDOMAIN;
+			result.u_res.uid = UID_NOBODY;
+			goto done;
+		}
+		result.status = NFSMAPID_OK;
 		goto done;
 	}
 
 	if ((pwd_buf = malloc(pwd_buflen)) == NULL ||
-	    _uncached_getpwnam_r(user, &pwd, pwd_buf, pwd_buflen) == NULL) {
+	    (pwd_rc = getpwnam_r(user, &pwd, pwd_buf, pwd_buflen, &pwd_ptr))
+	    != 0 || pwd_ptr == NULL) {
 
-		if (pwd_buf == NULL)
+		if (pwd_buf == NULL || pwd_rc != 0)
 			result.status = NFSMAPID_INTERNAL;
 		else {
 			/*
@@ -187,8 +189,9 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	struct mapid_res	 result;
 	struct mapid_res	*resp;
 	struct passwd		 pwd;
-	int			 pwd_len;
-	char			*pwd_buf;
+	struct passwd		 *pwd_ptr;
+	char			*pwd_buf = NULL;
+	char			*idmap_buf = NULL;
 	uid_t			 uid = argp->u_arg.uid;
 	size_t			 uid_str_len;
 	char			*pw_str;
@@ -197,10 +200,11 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	size_t			 at_str_len;
 	char			 dom_str[DNAMEMAX];
 	size_t			 dom_str_len;
+	idmap_stat		 rc;
 
-	if (uid < 0 || uid > UID_MAX) {
+	if (uid == (uid_t)-1) {
 		/*
-		 * Negative uid or greater than UID_MAX
+		 * Sentinel uid is not a valid id
 		 */
 		resp = &result;
 		resp->status = NFSMAPID_BADID;
@@ -220,6 +224,35 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	}
 
 	/*
+	 * If uid is ephemeral then resolve it using idmap service
+	 */
+	if (uid > UID_MAX) {
+		rc = idmap_getwinnamebyuid(uid, &idmap_buf, NULL);
+		if (rc != IDMAP_SUCCESS) {
+			/*
+			 * We don't put stringified ephemeral uids on
+			 * the wire.
+			 */
+			resp = &result;
+			resp->status = NFSMAPID_UNMAPPABLE;
+			resp->u_res.len = 0;
+			goto done;
+		}
+
+		/*
+		 * idmap_buf is already in the desired form i.e. name@domain
+		 */
+		pw_str = idmap_buf;
+		pw_str_len = strlen(pw_str);
+		at_str_len = dom_str_len = 0;
+		at_str = "";
+		dom_str[0] = '\0';
+		goto gen_result;
+	}
+
+	/*
+	 * Handling non-ephemeral uids
+	 *
 	 * We want to encode the uid into a literal string... :
 	 *
 	 *	- upon failure to allocate space from the heap
@@ -227,7 +260,8 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	 *	- if there is no such uid in the passwd DB's
 	 */
 	if ((pwd_buf = malloc(pwd_buflen)) == NULL || dom_str_len == 0 ||
-	    _uncached_getpwuid_r(uid, &pwd, pwd_buf, pwd_buflen) == NULL) {
+	    getpwuid_r(uid, &pwd, pwd_buf, pwd_buflen, &pwd_ptr) != 0 ||
+	    pwd_ptr == NULL) {
 
 		/*
 		 * If we could not allocate from the heap, try
@@ -244,27 +278,34 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 		/*
 		 * Constructing literal string without '@' so that
 		 * we'll know that it's not a user, but rather a
-		 * uid encoded string. Can't overflow because we
-		 * already checked UID_MAX.
+		 * uid encoded string.
 		 */
 		pw_str = pwd_buf;
-		(void) sprintf(pw_str, "%d", (int)uid);
+		(void) sprintf(pw_str, "%u", uid);
 		pw_str_len = strlen(pw_str);
 		at_str_len = dom_str_len = 0;
 		at_str = "";
 		dom_str[0] = '\0';
 	} else {
 		/*
-		 * Otherwise, we construct the "user@domain" string
+		 * Otherwise, we construct the "user@domain" string if
+		 * it's not already in that form.
 		 */
 		pw_str = pwd.pw_name;
 		pw_str_len = strlen(pw_str);
-		at_str = "@";
-		at_str_len = 1;
+		if (strchr(pw_str, '@') == NULL) {
+			at_str = "@";
+			at_str_len = 1;
+		} else {
+			at_str_len = dom_str_len = 0;
+			at_str = "";
+			dom_str[0] = '\0';
+		}
 	}
 
+gen_result:
 	uid_str_len = pw_str_len + at_str_len + dom_str_len;
-	if ((resp = alloca(MAPID_RES_LEN(UID_MAX_STR_LEN))) == NULL) {
+	if ((resp = alloca(MAPID_RES_LEN(uid_str_len))) == NULL) {
 		resp = &result;
 		resp->status = NFSMAPID_INTERNAL;
 		resp->u_res.len = 0;
@@ -273,7 +314,10 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	/* LINTED format argument to sprintf */
 	(void) sprintf(resp->str, "%s%s%s", pw_str, at_str, dom_str);
 	resp->u_res.len = uid_str_len;
-	free(pwd_buf);
+	if (pwd_buf)
+		free(pwd_buf);
+	if (idmap_buf)
+		idmap_free(idmap_buf);
 	resp->status = NFSMAPID_OK;
 
 done:
@@ -286,7 +330,7 @@ done:
 		resp->status = NFSMAPID_INTERNAL;
 		resp->u_res.len = 0;
 		(void) door_return((char *)&result, sizeof (struct mapid_res),
-							NULL, 0);
+		    NULL, 0);
 	}
 }
 
@@ -295,22 +339,25 @@ nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res	result;
 	struct group		grp;
+	struct group		*grp_ptr;
+	int			grp_rc;
 	char			*grp_buf;
 	char			*group;
 	char			*domain;
+	idmap_stat		rc;
 
 	if (argp->u_arg.len <= 0 ||
-				arg_size < MAPID_ARG_LEN(argp->u_arg.len)) {
+	    arg_size < MAPID_ARG_LEN(argp->u_arg.len)) {
 		result.status = NFSMAPID_INVALID;
 		result.u_res.gid = GID_NOBODY;
 		goto done;
 	}
 
 	if (!extract_domain(argp->str, &group, &domain)) {
-		long id;
+		unsigned long id;
 
 		/*
-		 * Invalid "group@dns_domain" string. Still, the
+		 * Invalid "group@domain" string. Still, the
 		 * group part might be an encoded gid, so do a
 		 * final check. Remember, domain part of string
 		 * was not set since not a valid string.
@@ -321,14 +368,13 @@ nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 			goto done;
 		}
 
-		/*
-		 * Since atoi() does not return proper errors for
-		 * invalid translation, use strtol() instead.
-		 */
 		errno = 0;
-		id = strtol(group, (char **)NULL, 10);
+		id = strtoul(group, (char **)NULL, 10);
 
-		if (errno || id < 0 || id > UID_MAX) {
+		/*
+		 * We don't accept ephemeral ids from the wire.
+		 */
+		if (errno || id > UID_MAX) {
 			result.status = NFSMAPID_UNMAPPABLE;
 			result.u_res.gid = GID_NOBODY;
 			goto done;
@@ -341,19 +387,29 @@ nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 
 	/*
 	 * String properly constructed. Now we check for domain and
-	 * group validity. Note that we only look at the domain iff
-	 * the local domain is configured.
+	 * group validity.
 	 */
 	if (!cur_domain_null() && !valid_domain(domain)) {
-		result.status = NFSMAPID_BADDOMAIN;
-		result.u_res.gid = GID_NOBODY;
+		/*
+		 * If the domain part of the string does not
+		 * match the NFS domain, try to map it using
+		 * idmap service.
+		 */
+		rc = idmap_getgidbywinname(group, domain, &result.u_res.gid);
+		if (rc != IDMAP_SUCCESS) {
+			result.status = NFSMAPID_BADDOMAIN;
+			result.u_res.gid = GID_NOBODY;
+			goto done;
+		}
+		result.status = NFSMAPID_OK;
 		goto done;
 	}
 
 	if ((grp_buf = malloc(grp_buflen)) == NULL ||
-	    _uncached_getgrnam_r(group, &grp, grp_buf, grp_buflen) == NULL) {
+	    (grp_rc = getgrnam_r(group, &grp, grp_buf, grp_buflen, &grp_ptr))
+	    != 0 || grp_ptr == NULL) {
 
-		if (grp_buf == NULL)
+		if (grp_buf == NULL || grp_rc != 0)
 			result.status = NFSMAPID_INTERNAL;
 		else {
 			/*
@@ -383,7 +439,10 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	struct mapid_res	 result;
 	struct mapid_res	*resp;
 	struct group		 grp;
-	char			*grp_buf;
+	struct group		*grp_ptr;
+	char			*grp_buf = NULL;
+	char			*idmap_buf = NULL;
+	idmap_stat		 rc;
 	gid_t			 gid = argp->u_arg.gid;
 	size_t			 gid_str_len;
 	char			*gr_str;
@@ -393,9 +452,9 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	char			 dom_str[DNAMEMAX];
 	size_t			 dom_str_len;
 
-	if (gid < 0 || gid > UID_MAX) {
+	if (gid == (gid_t)-1) {
 		/*
-		 * Negative gid or greater than UID_MAX
+		 * Sentinel gid is not a valid id
 		 */
 		resp = &result;
 		resp->status = NFSMAPID_BADID;
@@ -417,6 +476,35 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	}
 
 	/*
+	 * If gid is ephemeral then resolve it using idmap service
+	 */
+	if (gid > UID_MAX) {
+		rc = idmap_getwinnamebygid(gid, &idmap_buf, NULL);
+		if (rc != IDMAP_SUCCESS) {
+			/*
+			 * We don't put stringified ephemeral gids on
+			 * the wire.
+			 */
+			resp = &result;
+			resp->status = NFSMAPID_UNMAPPABLE;
+			resp->u_res.len = 0;
+			goto done;
+		}
+
+		/*
+		 * idmap_buf is already in the desired form i.e. name@domain
+		 */
+		gr_str = idmap_buf;
+		gr_str_len = strlen(gr_str);
+		at_str_len = dom_str_len = 0;
+		at_str = "";
+		dom_str[0] = '\0';
+		goto gen_result;
+	}
+
+	/*
+	 * Handling non-ephemeral gids
+	 *
 	 * We want to encode the gid into a literal string... :
 	 *
 	 *	- upon failure to allocate space from the heap
@@ -424,7 +512,8 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	 *	- if there is no such gid in the group DB's
 	 */
 	if ((grp_buf = malloc(grp_buflen)) == NULL || dom_str_len == 0 ||
-	    _uncached_getgrgid_r(gid, &grp, grp_buf, grp_buflen) == NULL) {
+	    getgrgid_r(gid, &grp, grp_buf, grp_buflen, &grp_ptr) != 0 ||
+	    grp_ptr == NULL) {
 
 		/*
 		 * If we could not allocate from the heap, try
@@ -441,27 +530,34 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 		/*
 		 * Constructing literal string without '@' so that
 		 * we'll know that it's not a group, but rather a
-		 * gid encoded string. Can't overflow because we
-		 * already checked UID_MAX.
+		 * gid encoded string.
 		 */
 		gr_str = grp_buf;
-		(void) sprintf(gr_str, "%d", (int)gid);
+		(void) sprintf(gr_str, "%u", gid);
 		gr_str_len = strlen(gr_str);
 		at_str_len = dom_str_len = 0;
 		at_str = "";
 		dom_str[0] = '\0';
 	} else {
 		/*
-		 * Otherwise, we construct the "group@domain" string
+		 * Otherwise, we construct the "group@domain" string if
+		 * it's not already in that form.
 		 */
 		gr_str = grp.gr_name;
 		gr_str_len = strlen(gr_str);
-		at_str = "@";
-		at_str_len = 1;
+		if (strchr(gr_str, '@') == NULL) {
+			at_str = "@";
+			at_str_len = 1;
+		} else {
+			at_str_len = dom_str_len = 0;
+			at_str = "";
+			dom_str[0] = '\0';
+		}
 	}
 
+gen_result:
 	gid_str_len = gr_str_len + at_str_len + dom_str_len;
-	if ((resp = alloca(MAPID_RES_LEN(UID_MAX_STR_LEN))) == NULL) {
+	if ((resp = alloca(MAPID_RES_LEN(gid_str_len))) == NULL) {
 		resp = &result;
 		resp->status = NFSMAPID_INTERNAL;
 		resp->u_res.len = 0;
@@ -470,7 +566,10 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	/* LINTED format argument to sprintf */
 	(void) sprintf(resp->str, "%s%s%s", gr_str, at_str, dom_str);
 	resp->u_res.len = gid_str_len;
-	free(grp_buf);
+	if (grp_buf)
+		free(grp_buf);
+	if (idmap_buf)
+		idmap_free(idmap_buf);
 	resp->status = NFSMAPID_OK;
 
 done:
@@ -483,7 +582,7 @@ done:
 		resp->status = NFSMAPID_INTERNAL;
 		resp->u_res.len = 0;
 		(void) door_return((char *)&result, sizeof (struct mapid_res),
-							NULL, 0);
+		    NULL, 0);
 	}
 }
 
@@ -502,7 +601,7 @@ nfsmapid_func(void *cookie, char *argp, size_t arg_size,
 		mapres.status = NFSMAPID_INVALID;
 		mapres.u_res.len = 0;
 		(void) door_return((char *)&mapres, sizeof (struct mapid_res),
-								NULL, 0);
+		    NULL, 0);
 		return;
 	}
 
@@ -566,7 +665,7 @@ valid_domain(const char *dom)
 
 	if (!mapid_stdchk_domain(dom)) {
 		syslog(LOG_ERR, gettext("%s: Invalid inbound domain name %s."),
-			whoami, dom);
+		    whoami, dom);
 		return (0);
 	}
 
@@ -655,7 +754,7 @@ open_diag_file()
 		return;
 
 	syslog(LOG_ERR, "Failed to create %s. Enable syslog "
-			"daemon.debug for more info", DIAG_FILE);
+	    "daemon.debug for more info", DIAG_FILE);
 	msg_done = 1;
 }
 
@@ -678,7 +777,7 @@ update_diag_file(char *new)
 	n = write(n4_fd, buf, len);
 	if (n < 0 || n < len)
 		syslog(LOG_DEBUG, "Could not write %s to diag file", new);
-	fsync(n4_fd);
+	(void) fsync(n4_fd);
 
 	syslog(LOG_DEBUG, "nfsmapid domain = %s", new);
 }

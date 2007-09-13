@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,12 +59,12 @@ static void
 usage()
 {
 	fprintf(stderr, gettext(
-		"\nUsage:\tstr2uid string\n"
-		"\tstr2gid string\n"
-		"\tuid2str uid\n"
-		"\tgid2str gid\n"
-		"\techo string\n"
-		"\texit|quit\n"));
+	    "\nUsage:\tstr2uid string\n"
+	    "\tstr2gid string\n"
+	    "\tuid2str uid\n"
+	    "\tgid2str gid\n"
+	    "\techo string\n"
+	    "\texit|quit\n"));
 }
 
 static int read_line(char *buf, int size)
@@ -205,7 +204,7 @@ do_test(char *input_buf)
 		str.utf8string_val = argv[1];
 		str.utf8string_len = strlen(argv[1]);
 		stat = nfs_idmap_str_uid(&str, &uid);
-		printf(gettext("%d stat=%s \n"), uid, mapstat(stat));
+		printf(gettext("%u stat=%s \n"), uid, mapstat(stat));
 
 	} else if (strcmp(cmd, "str2gid") == 0) {
 		if (argc < 2) {
@@ -216,7 +215,7 @@ do_test(char *input_buf)
 		str.utf8string_val = argv[1];
 		str.utf8string_len = strlen(argv[1]);
 		stat = nfs_idmap_str_gid(&str, &gid);
-		printf(gettext("%d stat=%s \n"), gid, mapstat(stat));
+		printf(gettext("%u stat=%s \n"), gid, mapstat(stat));
 
 	} else if (strcmp(cmd, "uid2str") == 0) {
 		if (argc < 2) {
@@ -229,7 +228,7 @@ do_test(char *input_buf)
 		str.utf8string_val = str_buf;
 		stat = nfs_idmap_uid_str(uid, &str);
 		printf(gettext("%s stat=%s\n"), str.utf8string_val,
-					mapstat(stat));
+		    mapstat(stat));
 
 	} else if (strcmp(cmd, "gid2str") == 0) {
 		if (argc < 2) {
@@ -242,14 +241,14 @@ do_test(char *input_buf)
 		str.utf8string_val = str_buf;
 		stat = nfs_idmap_gid_str(gid, &str);
 		printf(gettext("%s stat=%s\n"), str.utf8string_val,
-					mapstat(stat));
+		    mapstat(stat));
 
 	} else if (strcmp(cmd, "echo") == 0) {
 		for (i = 1; i < argc; i++)
 			printf("%s ", argv[i]);
 		printf("\n");
 	} else if (strcmp(cmd, "exit") == 0 ||
-		    strcmp(cmd, "quit") == 0) {
+	    strcmp(cmd, "quit") == 0) {
 		printf(gettext("\n"));
 		free(argv_array);
 		return (1);
@@ -329,7 +328,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid)
 	static int	msg_done = 0;
 
 	if (!u8s || !u8s->utf8string_val || !u8s->utf8string_len ||
-			(u8s->utf8string_val[0] == '\0')) {
+	    (u8s->utf8string_val[0] == '\0')) {
 		error = EINVAL;
 		goto s2u_done;
 	}
@@ -345,7 +344,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid)
 
 	if ((mapargp = malloc(MAPID_ARG_LEN(u8s->utf8string_len))) == NULL) {
 		(void) fprintf(stderr, "Unable to malloc %d bytes\n",
-				MAPID_ARG_LEN(u8s->utf8string_len));
+		    MAPID_ARG_LEN(u8s->utf8string_len));
 		error = ENOMEM;
 		goto s2u_done;
 	}
@@ -367,7 +366,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid)
 	if ((doorfd = nfs_idmap_doorget()) == -1) {
 		if (!msg_done) {
 			fprintf(stderr, "nfs_idmap_str_uid: Can't communicate"
-				" with mapping daemon nfsmapid\n");
+			    " with mapping daemon nfsmapid\n");
 			msg_done = 1;
 		}
 		error = ECOMM;
@@ -453,7 +452,7 @@ nfs_idmap_uid_str(uid_t uid,		/* uid to map */
 	if ((doorfd = nfs_idmap_doorget()) == -1) {
 		if (!msg_done) {
 			fprintf(stderr, "nfs_idmap_uid_str: Can't "
-				"communicate with mapping daemon nfsmapid\n");
+			    "communicate with mapping daemon nfsmapid\n");
 			msg_done = 1;
 		}
 		error = ECOMM;
@@ -474,7 +473,7 @@ nfs_idmap_uid_str(uid_t uid,		/* uid to map */
 
 	if (resp->u_res.len != strlen(resp->str)) {
 		(void) fprintf(stderr, "Incorrect length %d expected %d\n",
-			resp->u_res.len, strlen(resp->str));
+		    resp->u_res.len, strlen(resp->str));
 		error = NFSMAPID_INVALID;
 		goto u2s_done;
 	}
@@ -503,7 +502,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid)
 	static int	msg_done = 0;
 
 	if (!u8s || !u8s->utf8string_val || !u8s->utf8string_len ||
-		(u8s->utf8string_val[0] == '\0')) {
+	    (u8s->utf8string_val[0] == '\0')) {
 		error = EINVAL;
 		goto s2g_done;
 	}
@@ -519,7 +518,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid)
 
 	if ((mapargp = malloc(MAPID_ARG_LEN(u8s->utf8string_len))) == NULL) {
 		(void) fprintf(stderr, "Unable to malloc %d bytes\n",
-				MAPID_ARG_LEN(u8s->utf8string_len));
+		    MAPID_ARG_LEN(u8s->utf8string_len));
 		error = ENOMEM;
 		goto s2g_done;
 	}
@@ -541,7 +540,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid)
 	if ((doorfd = nfs_idmap_doorget()) == -1) {
 		if (!msg_done) {
 			fprintf(stderr, "nfs_idmap_str_uid: Can't communicate"
-				" with mapping daemon nfsmapid\n");
+			    " with mapping daemon nfsmapid\n");
 			msg_done = 1;
 		}
 		error = ECOMM;
@@ -628,7 +627,7 @@ nfs_idmap_gid_str(gid_t gid,		/* gid to map */
 	if ((doorfd = nfs_idmap_doorget()) == -1) {
 		if (!msg_done) {
 			fprintf(stderr, "nfs_idmap_uid_str: Can't "
-				"communicate with mapping daemon nfsmapid\n");
+			    "communicate with mapping daemon nfsmapid\n");
 			msg_done = 1;
 		}
 		error = ECOMM;
@@ -649,7 +648,7 @@ nfs_idmap_gid_str(gid_t gid,		/* gid to map */
 
 	if (resp->u_res.len != strlen(resp->str)) {
 		(void) fprintf(stderr, "Incorrect length %d expected %d\n",
-			resp->u_res.len, strlen(resp->str));
+		    resp->u_res.len, strlen(resp->str));
 		error = NFSMAPID_INVALID;
 		goto g2s_done;
 	}

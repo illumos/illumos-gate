@@ -103,6 +103,23 @@ extern idmap_stat idmap_get_mappings(idmap_get_handle_t *);
 /* Destroy the handle */
 extern void idmap_get_destroy(idmap_get_handle_t *);
 
+
+/*
+ * API to get Windows name by UID/GID and vice-versa
+ */
+/* Given UID, get Windows name */
+extern idmap_stat idmap_getwinnamebyuid(uid_t, char **, char **);
+
+/* Given GID, get Windows name */
+extern idmap_stat idmap_getwinnamebygid(gid_t, char **, char **);
+
+/* Given Windows name, get UID */
+extern idmap_stat idmap_getuidbywinname(const char *, const char *, uid_t *);
+
+/* Given Windows name, get GID */
+extern idmap_stat idmap_getgidbywinname(const char *, const char *, gid_t *);
+
+
 #ifdef __cplusplus
 }
 #endif

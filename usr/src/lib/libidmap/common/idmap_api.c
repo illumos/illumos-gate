@@ -1639,3 +1639,131 @@ idmap_stat4prot(idmap_stat status) {
 	}
 	return (status);
 }
+
+
+/*
+ * Get uid given Windows name
+ */
+idmap_stat
+idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid) {
+	idmap_handle_t	*ih;
+	idmap_retcode	rc;
+	int		is_user;
+
+	if (uid == NULL)
+		return (IDMAP_ERR_ARG);
+
+	/* Get mapping */
+	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
+		return (rc);
+	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
+	    &is_user, uid, NULL, NULL);
+	(void) idmap_fini(ih);
+
+	/*
+	 * XXX Until we have diagonal mapping support, check if
+	 * the given name belongs to a user
+	 */
+	if (rc == IDMAP_SUCCESS && !is_user)
+		return (IDMAP_ERR_NOTUSER);
+	return (rc);
+}
+
+
+/*
+ * Get gid given Windows name
+ */
+idmap_stat
+idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid) {
+	idmap_handle_t	*ih;
+	idmap_retcode	rc;
+	int		is_user;
+
+	if (gid == NULL)
+		return (IDMAP_ERR_ARG);
+
+	/* Get mapping */
+	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
+		return (rc);
+	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
+	    &is_user, gid, NULL, NULL);
+	(void) idmap_fini(ih);
+
+	/*
+	 * XXX Until we have diagonal mapping support, check if
+	 * the given name belongs to a group
+	 */
+	if (rc == IDMAP_SUCCESS && is_user)
+		return (IDMAP_ERR_NOTGROUP);
+	return (rc);
+}
+
+
+/*
+ * Get winname given pid
+ */
+static idmap_retcode
+idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain) {
+	idmap_handle_t	*ih;
+	idmap_retcode	rc;
+	int		len;
+	char		*winname, *windomain;
+
+	if (name == NULL)
+		return (IDMAP_ERR_ARG);
+
+	/* Get mapping */
+	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
+		return (rc);
+	rc = idmap_get_u2w_mapping(ih, &pid, NULL, 0, is_user, NULL,
+	    NULL, &winname, &windomain, NULL);
+	(void) idmap_fini(ih);
+
+	/* Return on error */
+	if (rc != IDMAP_SUCCESS)
+		return (rc);
+
+	/*
+	 * The given PID may have been mapped to a locally
+	 * generated SID in which case there isn't any
+	 * Windows name
+	 */
+	if (winname == NULL || windomain == NULL) {
+		idmap_free(winname);
+		idmap_free(windomain);
+		return (IDMAP_ERR_NORESULT);
+	}
+
+	if (domain != NULL) {
+		*name = winname;
+		*domain = windomain;
+	} else {
+		len = strlen(winname) + strlen(windomain) + 2;
+		if ((*name = malloc(len)) != NULL)
+			(void) snprintf(*name, len, "%s@%s", winname,
+			    windomain);
+		else
+			rc = IDMAP_ERR_MEMORY;
+		idmap_free(winname);
+		idmap_free(windomain);
+	}
+	return (rc);
+}
+
+
+/*
+ * Get winname given uid
+ */
+idmap_stat
+idmap_getwinnamebyuid(uid_t uid, char **name, char **domain) {
+	return (idmap_getwinnamebypid(uid, 1, name, domain));
+}
+
+
+/*
+ * Get winname given gid
+ */
+idmap_stat
+idmap_getwinnamebygid(gid_t gid, char **name, char **domain) {
+	return (idmap_getwinnamebypid(gid, 0, name, domain));
+}

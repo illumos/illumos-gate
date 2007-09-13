@@ -2786,6 +2786,7 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	idmap_id_res	idres;
 	lookup_state_t	state;
 	idmap_utf8str	*str;
+	char		*cp;
 	int		is_user;
 	idmap_retcode	retcode;
 	const char	*winname, *windomain;
@@ -2820,18 +2821,28 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 
 	if (winname != NULL && windomain == NULL) {
 		str = &mapping->id1domain;
-		RDLOCK_CONFIG();
-		if (_idmapdstate.cfg->pgcfg.mapping_domain != NULL) {
+
+		if ((cp = strchr(winname, '@')) != NULL) {
+			/*
+			 * if winname is qualified with a domain, use it.
+			 */
+			*cp = '\0';
+			retcode = idmap_str2utf8(&str, cp + 1, 0);
+		} else if (_idmapdstate.cfg->pgcfg.mapping_domain != NULL) {
+			/*
+			 * otherwise use the mapping domain
+			 */
+			RDLOCK_CONFIG();
 			retcode = idmap_str2utf8(&str,
 				_idmapdstate.cfg->pgcfg.mapping_domain, 0);
-			if (retcode != IDMAP_SUCCESS) {
-				UNLOCK_CONFIG();
-				idmapdlog(LOG_ERR, "Out of memory");
-				retcode = IDMAP_ERR_MEMORY;
-				goto out;
-			}
+			UNLOCK_CONFIG();
+		} else
+			retcode = IDMAP_SUCCESS;
+
+		if (retcode != IDMAP_SUCCESS) {
+			idmapdlog(LOG_ERR, "Out of memory");
+			goto out;
 		}
-		UNLOCK_CONFIG();
 		windomain = mapping->id1domain.idmap_utf8str_val;
 	}
 
