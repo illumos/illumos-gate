@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -54,5 +54,4 @@ SUNW_1.1 {
 	ps_plog = PARENT;
 	ps_pread = PARENT;
 	ps_pwrite = PARENT;
-	ps_pbrandname = PARENT;
 };

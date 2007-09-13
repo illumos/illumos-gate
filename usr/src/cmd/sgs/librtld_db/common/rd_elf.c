@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,15 @@
 #define	TList			List
 #define	TListnode		Listnode
 #endif	/* _LP64 */
+
+/*
+ * BrandZ added ps_pbrandname().  Many debuggers that link directly
+ * against librtld_db.so may not implement this interface.  Hence
+ * we won't call the function directly, instead we'll try to look it
+ * up using the linker first and only invoke it if we find it.
+ */
+typedef ps_err_e (*ps_pbrandname_fp_t)(struct ps_prochandle *,
+    char *, size_t);
 
 static rd_err_e
 validate_rdebug(struct rd_agent *rap)
@@ -177,6 +186,7 @@ _rd_reset32(struct rd_agent *rap)
 	rd_err_e		rc = RD_OK;
 	char			brandname[MAXPATHLEN];
 	char			brandlib[MAXPATHLEN];
+	ps_pbrandname_fp_t	ps_pbrandname;
 
 	/*
 	 * librtld_db attempts three different methods to find
@@ -281,7 +291,9 @@ _rd_reset32(struct rd_agent *rap)
 	 * If we are debugging a branded executable, load the appropriate helper
 	 * library, and call its initialization routine.
 	 */
-	if (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK) {
+	ps_pbrandname = (ps_pbrandname_fp_t)dlsym(RTLD_PROBE, "ps_pbrandname");
+	if ((ps_pbrandname != NULL) &&
+	    (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK)) {
 		const char *isa = "";
 
 #ifdef __amd64

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@ Pbrandname(struct ps_prochandle *P, char *buf, size_t buflen)
 	if ((addr = Pgetauxval(P, AT_SUN_BRANDNAME)) == -1)
 		return (NULL);
 
-	if (ps_pread(P, addr, buf, buflen) != PS_OK)
+	if (Pread_string(P, buf, buflen, addr) == -1)
 		return (NULL);
 
 	return (buf);
