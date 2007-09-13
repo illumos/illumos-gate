@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,6 @@ extern nvlist_t *opl_mem_fru_create(fmd_hdl_t *, nvlist_t *);
 
 extern cmd_list_t opl_cpu_list;
 
-#define	CPU_EREPORT_STRING	"ereport.cpu.SPARC64-VI."
 #define	OPL_CHASSIS_DEFAULT	"0"
 #define	OPL_CPU_FRU_FMRI_DC	FM_FMRI_SCHEME_HC":///" \
     FM_FMRI_LEGACY_HC"=/CMU"
@@ -141,7 +140,7 @@ extern cmd_list_t opl_cpu_list;
 #define	IS_CORE			1
 #define	IS_CHIP			2
 #define	STRAND_UPPER_BOUND	1
-#define	CORE_UPPER_BOUND	1
+#define	CORE_UPPER_BOUND	3
 
 #define	COREID_SHIFT		1
 #define	CHIPID_SHIFT		3

@@ -102,6 +102,7 @@ d none platform/SUNW,SPARC-Enterprise/kernel 755 root sys
 d none platform/SUNW,SPARC-Enterprise/kernel/cpu 755 root sys
 d none platform/SUNW,SPARC-Enterprise/kernel/cpu/sparcv9 755 root sys
 f none platform/SUNW,SPARC-Enterprise/kernel/cpu/sparcv9/FJSV,SPARC64-VI 755 root sys
+s none platform/SUNW,SPARC-Enterprise/kernel/cpu/sparcv9/FJSV,SPARC64-VII=FJSV,SPARC64-VI
 d none platform/SUNW,SPARC-Enterprise/kernel/crypto 755 root sys
 d none platform/SUNW,SPARC-Enterprise/kernel/crypto/sparcv9 755 root sys
 s none platform/SUNW,SPARC-Enterprise/kernel/crypto/sparcv9/aes=../../../../sun4u-us3/kernel/crypto/sparcv9/aes

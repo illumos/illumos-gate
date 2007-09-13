@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,8 @@ extern "C" {
 #define	ASI_DTLB_ACCESS		0x5D	/* dmmu tlb data access */
 #define	ASI_DTLB_TAGREAD	0x5E	/* dmmu tlb tag read */
 #define	ASI_DTLB_DEMAP		0x5F	/* dmmu tlb demap */
+#define	ASI_ITSB_PREFETCH	0x61	/* IMMU tsb prefetch */
+#define	ASI_DTSB_PREFETCH	0x62	/* DMMU tsb prefetch */
 
 #define	ASI_IC_DATA		0x66	/* i$ data */
 #define	ASI_IC_TAG		0x67	/* i$ tag */

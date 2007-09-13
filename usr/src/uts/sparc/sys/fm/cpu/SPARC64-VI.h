@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ extern "C" {
 
 /* ereport class subcategories for SPARC64-VI */
 #define	FM_EREPORT_CPU_SPARC64_VI	"SPARC64-VI"
+#define	FM_EREPORT_CPU_SPARC64_VII	"SPARC64-VII"
 #define	FM_EREPORT_CPU_UNSUPPORTED	"unsupported"
 
 /*
@@ -109,7 +110,7 @@ extern "C" {
 #define	FM_EREPORT_CPU_DAE 	"dae"
 #define	FM_EREPORT_CPU_IAE 	"iae"
 #define	FM_EREPORT_CPU_UGE 	"uge"
-#define	FM_EREPORT_CPU_INV_URG	"inv-urg"
+#define	FM_EREPORT_CPU_INV_URG	"inv-uge"
 
 #ifdef	__cplusplus
 }

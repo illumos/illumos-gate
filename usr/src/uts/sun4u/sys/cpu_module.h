@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,8 @@ void	cpu_kdi_init(struct kdi *);
 void	cpu_fiximp(pnode_t dnode);
 #pragma weak cpu_fix_allpanther
 void	cpu_fix_allpanther(void);
+#pragma weak cpu_fix_alljupiter
+void	cpu_fix_alljupiter(void);
 #pragma weak mmu_init_mmu_page_sizes
 int	mmu_init_mmu_page_sizes(int cinfo);
 

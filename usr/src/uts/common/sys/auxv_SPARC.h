@@ -48,10 +48,11 @@ extern "C" {
 #define	AV_SPARC_ASI_BLK_INIT	0x0080	/* ASI_BLK_INIT_xxx ASI */
 #define	AV_SPARC_FMAF	0x0100	/* Fused Multiply-Add */
 #define	AV_SPARC_FJFMAU	0x4000	/* Fujitsu Unfused Multiply-Add */
+#define	AV_SPARC_IMA	0x8000	/* Integer Multiply-add */
 
 #define	FMT_AV_SPARC	\
-	"\20"		\
-	"\17fjfmau\11fmaf"  \
+	"\20" \
+	"\20ima\17fjfmau\16-\15-\14-\13-\12-\11fmaf" \
 	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 
 /*

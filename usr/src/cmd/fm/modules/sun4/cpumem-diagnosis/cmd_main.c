@@ -26,8 +26,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * CPU/Memory error diagnosis engine for the UltraSPARC III, IV, T1
- * and SPARC64 VI families of processors.
+ * CPU/Memory error diagnosis engine for the UltraSPARC III, IV, T1,
+ * SPARC64 VI and SPARC64 VII families of processors.
  */
 
 #include <cmd_state.h>
@@ -181,7 +181,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.bto",				cmd_nop },
 	{ "ereport.cpu.*.mtlb",				cmd_oplmtlb },
 	{ "ereport.cpu.*.tlbp",				cmd_opltlbp },
-	{ "ereport.cpu.*.inv-urg",			cmd_oplinv_urg },
+	{ "ereport.cpu.*.inv-uge",			cmd_oplinv_urg },
 	{ "ereport.cpu.*.cre",				cmd_oplcre },
 	{ "ereport.cpu.*.tsb-ctx",			cmd_opltsb_ctx },
 	{ "ereport.cpu.*.tsbp",				cmd_opltsbp },
@@ -703,6 +703,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	 * OPL platform specific subscriptions.
 	 */
 	fmd_hdl_subscribe(hdl, "ereport.cpu.SPARC64-VI.*");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.SPARC64-VII.*");
 	fmd_hdl_subscribe(hdl, "ereport.asic.mac.*");
 	fmd_hdl_subscribe(hdl, "ereport.io.oberon.ubc.dmarduea-mem");
 	fmd_hdl_subscribe(hdl, "ereport.io.oberon.ubc.dmarduea-channel");

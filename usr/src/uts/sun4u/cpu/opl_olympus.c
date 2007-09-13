@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Support for Olympus-C (SPARC64-VI) and Jupiter (SPARC64-VII).
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -90,6 +94,11 @@ uint_t	root_phys_addr_lo_mask = 0x7fffffu;
  * set in /etc/system to control logging of user BERR/TO's
  */
 int cpu_berr_to_verbose = 0;
+
+/*
+ * Set to 1 if booted with all Jupiter cpus (all-Jupiter features enabled).
+ */
+int cpu_alljupiter = 0;
 
 static int min_ecache_size;
 static uint_t priv_hcl_1;
@@ -261,6 +270,22 @@ cpu_fiximp(pnode_t dnode)
 	vac = 1;
 }
 
+/*
+ * Enable features for Jupiter-only domains.
+ */
+void
+cpu_fix_alljupiter(void)
+{
+	cpu_alljupiter = 1;
+
+	/*
+	 * Enable ima hwcap for Jupiter-only domains.  DR will prevent
+	 * addition of Olympus-C to all-Jupiter domains to preserve ima
+	 * hwcap semantics.
+	 */
+	cpu_hwcap_flags |= AV_SPARC_IMA;
+}
+
 #ifdef	OLYMPUS_C_REV_B_ERRATA_XCALL
 /*
  * Quick and dirty way to redefine locally in
@@ -297,7 +322,7 @@ send_mondo_set(cpuset_t set)
 #ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 	ver = ultra_getver();
 	if (((ULTRA_VER_IMPL(ver)) == OLYMPUS_C_IMPL) &&
-		((OLYMPUS_REV_MASK(ver)) == OLYMPUS_C_A))
+	    ((OLYMPUS_REV_MASK(ver)) == OLYMPUS_C_A))
 		bn_sets = 1;
 #endif
 
@@ -365,9 +390,9 @@ send_mondo_set(cpuset_t set)
 		if (tick > endtick) {
 			if (panic_quiesce)
 				return;
-			cmn_err(CE_CONT, "send mondo timeout "
-				"[%d NACK %d BUSY]\nIDSR 0x%"
-				"" PRIx64 "  cpuids:", nack, busy, idsr);
+			cmn_err(CE_CONT, "send mondo timeout [%d NACK %d "
+			    "BUSY]\nIDSR 0x%" PRIx64 "  cpuids:",
+			    nack, busy, idsr);
 #ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 			for (i = 0; i < bn_sets; i++) {
 #else
@@ -375,8 +400,7 @@ send_mondo_set(cpuset_t set)
 #endif
 				if (idsr & (IDSR_NACK_BIT(i) |
 				    IDSR_BUSY_BIT(i))) {
-					cmn_err(CE_CONT, " 0x%x",
-						cpuids[i]);
+					cmn_err(CE_CONT, " 0x%x", cpuids[i]);
 				}
 			}
 			cmn_err(CE_CONT, "\n");
@@ -427,7 +451,7 @@ send_mondo_set(cpuset_t set)
 						break;
 
 					for ((index = ((int)next - 1));
-						index >= 0; index--)
+					    index >= 0; index--)
 						if (CPU_IN_SET(set, index)) {
 							next = (uint16_t)index;
 							break;
@@ -481,9 +505,11 @@ send_mondo_set(cpuset_t set)
 void
 cpu_init_private(struct cpu *cp)
 {
-	if (!(IS_OLYMPUS_C(cpunodes[cp->cpu_id].implementation))) {
-		cmn_err(CE_PANIC, "CPU%d Impl %d: Only SPARC64-VI is supported",
-			cp->cpu_id, cpunodes[cp->cpu_id].implementation);
+	if (!((IS_OLYMPUS_C(cpunodes[cp->cpu_id].implementation)) ||
+	    (IS_JUPITER(cpunodes[cp->cpu_id].implementation)))) {
+		cmn_err(CE_PANIC, "CPU%d Impl %d: Only SPARC64-VI(I) is "
+		    "supported", cp->cpu_id,
+		    cpunodes[cp->cpu_id].implementation);
 	}
 
 	adjust_hw_copy_limits(cpunodes[cp->cpu_id].ecache_size);
@@ -644,9 +670,8 @@ send_one_mondo(int cpuid)
 		if (tick > endtick) {
 			if (panic_quiesce)
 				return;
-			cmn_err(CE_PANIC, "send mondo timeout "
-				"(target 0x%x) [%d NACK %d BUSY]",
-					cpuid, nack, busy);
+			cmn_err(CE_PANIC, "send mondo timeout (target 0x%x) "
+			    "[%d NACK %d BUSY]", cpuid, nack, busy);
 		}
 
 		if (idsr & busymask) {
@@ -1036,16 +1061,16 @@ cpu_sync_log_err(void *flt)
 			opl_flt->flt_eid_mod = OPL_ERRID_CHANNEL;
 		}
 		if (opl_flt->flt_bit & (SFSR_TLB_MUL|SFSR_TLB_PRT)) {
-			    opl_flt->flt_eid_mod = OPL_ERRID_CPU;
-			    opl_flt->flt_eid_sid = aflt->flt_inst;
+			opl_flt->flt_eid_mod = OPL_ERRID_CPU;
+			opl_flt->flt_eid_sid = aflt->flt_inst;
 		}
 
 		/*
 		 * In case of no effective error bit
 		 */
 		if ((opl_flt->flt_bit & SFSR_ERRS) == 0) {
-			    opl_flt->flt_eid_mod = OPL_ERRID_CPU;
-			    opl_flt->flt_eid_sid = aflt->flt_inst;
+			opl_flt->flt_eid_mod = OPL_ERRID_CPU;
+			opl_flt->flt_eid_sid = aflt->flt_inst;
 		}
 		break;
 
@@ -1146,7 +1171,7 @@ cpu_get_mem_unum(int synd_status, ushort_t flt_synd, uint64_t flt_stat,
 
 	if (&plat_get_mem_unum) {
 		if ((ret = plat_get_mem_unum(synd_code, flt_addr, flt_bus_id,
-			flt_in_memory, flt_status, buf, buflen, lenp)) != 0) {
+		    flt_in_memory, flt_status, buf, buflen, lenp)) != 0) {
 			buf[0] = '\0';
 			*lenp = 0;
 		}
@@ -1200,11 +1225,10 @@ cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
 		synd_status = AFLT_STAT_VALID;
 
 	flt_in_memory = (*afsr & SFSR_MEMORY) &&
-		pf_is_memory(afar >> MMU_PAGESHIFT);
+	    pf_is_memory(afar >> MMU_PAGESHIFT);
 
 	ret = cpu_get_mem_unum(synd_status, (ushort_t)synd, *afsr, afar,
-		CPU->cpu_id, flt_in_memory, flt_status, unum,
-		UNUM_NAMLEN, lenp);
+	    CPU->cpu_id, flt_in_memory, flt_status, unum, UNUM_NAMLEN, lenp);
 	if (ret != 0)
 		return (ret);
 
@@ -1232,9 +1256,8 @@ cpu_get_mem_info(uint64_t synd, uint64_t afar,
 		return (ENXIO);
 
 	if (p2get_mem_info != NULL)
-		return ((p2get_mem_info)(synd_code, afar,
-			mem_sizep, seg_sizep, bank_sizep,
-			segsp, banksp, mcidp));
+		return ((p2get_mem_info)(synd_code, afar, mem_sizep, seg_sizep,
+		    bank_sizep, segsp, banksp, mcidp));
 	else
 		return (ENOTSUP);
 }
@@ -1250,8 +1273,8 @@ cpu_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 	char unum[UNUM_NAMLEN];
 
 	if (&plat_get_cpu_unum) {
-		if ((ret = plat_get_cpu_unum(cpuid, unum, UNUM_NAMLEN, lenp))
-			!= 0)
+		if ((ret = plat_get_cpu_unum(cpuid, unum, UNUM_NAMLEN,
+		    lenp)) != 0)
 			return (ret);
 	} else {
 		return (ENOTSUP);
@@ -1313,15 +1336,15 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_SFSR) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SFSR,
-			DATA_TYPE_UINT64, aflt->flt_stat, NULL);
+		    DATA_TYPE_UINT64, aflt->flt_stat, NULL);
 	}
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_SFAR) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SFAR,
-			DATA_TYPE_UINT64, aflt->flt_addr, NULL);
+		    DATA_TYPE_UINT64, aflt->flt_addr, NULL);
 	}
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_UGESR) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_UGESR,
-			DATA_TYPE_UINT64, aflt->flt_stat, NULL);
+		    DATA_TYPE_UINT64, aflt->flt_stat, NULL);
 	}
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_PC) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_PC,
@@ -1342,20 +1365,18 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 	}
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_FLT_STATUS) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_FLT_STATUS,
-			DATA_TYPE_UINT64, (uint64_t)aflt->flt_status, NULL);
+		    DATA_TYPE_UINT64, (uint64_t)aflt->flt_status, NULL);
 	}
 
 	switch (opl_flt->flt_eid_mod) {
 	case OPL_ERRID_CPU:
 		(void) snprintf(sbuf, sizeof (sbuf), "%llX",
-			(u_longlong_t)cpunodes[opl_flt->flt_eid_sid].device_id);
+		    (u_longlong_t)cpunodes[opl_flt->flt_eid_sid].device_id);
 		(void) fm_fmri_cpu_set(resource, FM_CPU_SCHEME_VERSION,
-			NULL, opl_flt->flt_eid_sid,
-			(uint8_t *)&cpunodes[opl_flt->flt_eid_sid].version,
-			sbuf);
-		fm_payload_set(payload,
-			FM_EREPORT_PAYLOAD_NAME_RESOURCE,
-			DATA_TYPE_NVLIST, resource, NULL);
+		    NULL, opl_flt->flt_eid_sid,
+		    (uint8_t *)&cpunodes[opl_flt->flt_eid_sid].version, sbuf);
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
+		    DATA_TYPE_NVLIST, resource, NULL);
 		break;
 
 	case OPL_ERRID_CHANNEL:
@@ -1368,10 +1389,10 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 
 	case OPL_ERRID_MEM:
 		(void) cpu_get_mem_unum_aflt(0, aflt, unum, UNUM_NAMLEN, &len);
-		(void) fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
-			NULL, unum, NULL, (uint64_t)-1);
+		(void) fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION, NULL,
+		    unum, NULL, (uint64_t)-1);
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
-			DATA_TYPE_NVLIST, resource, NULL);
+		    DATA_TYPE_NVLIST, resource, NULL);
 		break;
 
 	case OPL_ERRID_PATH:
@@ -1462,6 +1483,9 @@ cpu_ereport_post(struct async_flt *aflt)
 	switch (cpunodes[aflt->flt_inst].implementation) {
 	case OLYMPUS_C_IMPL:
 		cpu_type = FM_EREPORT_CPU_SPARC64_VI;
+		break;
+	case JUPITER_IMPL:
+		cpu_type = FM_EREPORT_CPU_SPARC64_VII;
 		break;
 	default:
 		cpu_type = FM_EREPORT_CPU_UNSUPPORTED;
@@ -1685,7 +1709,7 @@ opl_cpu_reg_init()
 	 */
 
 	this_cpu_log = va_to_pa((void*)(((uint64_t)opl_err_log) +
-		ERRLOG_BUFSZ * (getprocessorid())));
+	    ERRLOG_BUFSZ * (getprocessorid())));
 	opl_error_setup(this_cpu_log);
 
 	/*
@@ -1715,10 +1739,8 @@ cpu_queue_one_event(opl_async_flt_t *opl_flt, char *reason,
 	aflt->flt_payload = eccp->ec_err_payload;
 
 	ASSERT(aflt->flt_status & (OPL_ECC_SYNC_TRAP|OPL_ECC_URGENT_TRAP));
-	cpu_errorq_dispatch(eccp->ec_err_class,
-		(void *)opl_flt, sizeof (opl_async_flt_t),
-		ue_queue,
-		aflt->flt_panic);
+	cpu_errorq_dispatch(eccp->ec_err_class, (void *)opl_flt,
+	    sizeof (opl_async_flt_t), ue_queue, aflt->flt_panic);
 }
 
 /*
@@ -1737,7 +1759,7 @@ cpu_queue_events(opl_async_flt_t *opl_flt, char *reason, uint64_t t_afsr_errs)
 	 * in the ecc_type_to_info table.
 	 */
 	for (eccp = ecc_type_to_info; t_afsr_errs != 0 && eccp->ec_desc != NULL;
-		eccp++) {
+	    eccp++) {
 		if ((eccp->ec_afsr_bit & t_afsr_errs) != 0 &&
 		    (eccp->ec_flags & aflt->flt_status) != 0) {
 			/*
@@ -1749,12 +1771,10 @@ cpu_queue_events(opl_async_flt_t *opl_flt, char *reason, uint64_t t_afsr_errs)
 			 * ue_channel, ue_cpu or ue_path.
 			 */
 			if (eccp->ec_flt_type == OPL_CPU_SYNC_UE) {
-				opl_flt->flt_eid_mod =
-					(aflt->flt_stat & SFSR_EID_MOD)
-					>> SFSR_EID_MOD_SHIFT;
-				opl_flt->flt_eid_sid =
-					(aflt->flt_stat & SFSR_EID_SID)
-					>> SFSR_EID_SID_SHIFT;
+				opl_flt->flt_eid_mod = (aflt->flt_stat &
+				    SFSR_EID_MOD) >> SFSR_EID_MOD_SHIFT;
+				opl_flt->flt_eid_sid = (aflt->flt_stat &
+				    SFSR_EID_SID) >> SFSR_EID_SID_SHIFT;
 				/*
 				 * Need to advance eccp pointer by flt_eid_mod
 				 * so that we get an appropriate ecc pointer
@@ -1873,8 +1893,8 @@ opl_cpu_sync_error(struct regs *rp, ulong_t t_sfar, ulong_t t_sfsr,
 	aflt->flt_pc = (caddr_t)rp->r_pc;
 	aflt->flt_prot = (uchar_t)AFLT_PROT_NONE;
 	aflt->flt_class = (uchar_t)CPU_FAULT;
-	aflt->flt_priv = (uchar_t)
-		(tl == 1 ? 1 : ((rp->r_tstate & TSTATE_PRIV) ?  1 : 0));
+	aflt->flt_priv = (uchar_t)(tl == 1 ? 1 : ((rp->r_tstate &
+	    TSTATE_PRIV) ? 1 : 0));
 	aflt->flt_tl = (uchar_t)tl;
 	aflt->flt_panic = (uchar_t)(tl != 0 || aft_testfatal != 0 ||
 	    (t_sfsr & (SFSR_TLB_MUL|SFSR_TLB_PRT)) != 0);
@@ -1891,9 +1911,8 @@ opl_cpu_sync_error(struct regs *rp, ulong_t t_sfar, ulong_t t_sfsr,
 		opl_flt.flt_type = OPL_CPU_INV_SFSR;
 		aflt->flt_panic = 1;
 		aflt->flt_payload = FM_EREPORT_PAYLOAD_SYNC;
-		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_SFSR,
-			(void *)&opl_flt, sizeof (opl_async_flt_t), ue_queue,
-			aflt->flt_panic);
+		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_SFSR, (void *)&opl_flt,
+		    sizeof (opl_async_flt_t), ue_queue, aflt->flt_panic);
 		fm_panic("%sErrors(s)", "invalid SFSR");
 	}
 
@@ -1987,14 +2006,12 @@ opl_cpu_sync_error(struct regs *rp, ulong_t t_sfar, ulong_t t_sfsr,
 			log_sfsr &= ~(SFSR_TO | SFSR_BERR);
 	}
 
-	if (((log_sfsr & SFSR_ERRS) &&
-		(cpu_queue_events(&opl_flt, pr_reason, t_sfsr) == 0)) ||
-	    ((t_sfsr & SFSR_ERRS) == 0)) {
+	if (((log_sfsr & SFSR_ERRS) && (cpu_queue_events(&opl_flt, pr_reason,
+	    t_sfsr) == 0)) || ((t_sfsr & SFSR_ERRS) == 0)) {
 		opl_flt.flt_type = OPL_CPU_INV_SFSR;
 		aflt->flt_payload = FM_EREPORT_PAYLOAD_SYNC;
-		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_SFSR,
-			(void *)&opl_flt, sizeof (opl_async_flt_t), ue_queue,
-			aflt->flt_panic);
+		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_SFSR, (void *)&opl_flt,
+		    sizeof (opl_async_flt_t), ue_queue, aflt->flt_panic);
 	}
 
 	if (t_sfsr & (SFSR_UE|SFSR_TO|SFSR_BERR)) {
@@ -2021,8 +2038,7 @@ opl_cpu_sync_error(struct regs *rp, ulong_t t_sfar, ulong_t t_sfsr,
 	if (!aflt->flt_priv || aflt->flt_prot == AFLT_PROT_COPY) {
 		int pcb_flag = 0;
 
-		if (t_sfsr & (SFSR_ERRS &
-			~(SFSR_BERR | SFSR_TO)))
+		if (t_sfsr & (SFSR_ERRS & ~(SFSR_BERR | SFSR_TO)))
 			pcb_flag |= ASYNC_HWERR;
 
 		if (t_sfsr & SFSR_BERR)
@@ -2057,8 +2073,8 @@ opl_cpu_urgent_error(struct regs *rp, ulong_t p_ugesr, ulong_t tl)
 	aflt->flt_pc = (caddr_t)rp->r_pc;
 	aflt->flt_class = (uchar_t)CPU_FAULT;
 	aflt->flt_tl = tl;
-	aflt->flt_priv = (uchar_t)
-		(tl == 1 ? 1 : ((rp->r_tstate & TSTATE_PRIV) ?  1 : 0));
+	aflt->flt_priv = (uchar_t)(tl == 1 ? 1 : ((rp->r_tstate & TSTATE_PRIV) ?
+	    1 : 0));
 	aflt->flt_status = OPL_ECC_URGENT_TRAP;
 	aflt->flt_panic = 1;
 	/*
@@ -2071,9 +2087,8 @@ opl_cpu_urgent_error(struct regs *rp, ulong_t p_ugesr, ulong_t tl)
 	if (cpu_queue_events(&opl_flt, pr_reason, p_ugesr) == 0) {
 		opl_flt.flt_type = OPL_CPU_INV_UGESR;
 		aflt->flt_payload = FM_EREPORT_PAYLOAD_URGENT;
-		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_URG,
-			(void *)&opl_flt, sizeof (opl_async_flt_t),
-			ue_queue, aflt->flt_panic);
+		cpu_errorq_dispatch(FM_EREPORT_CPU_INV_URG, (void *)&opl_flt,
+		    sizeof (opl_async_flt_t), ue_queue, aflt->flt_panic);
 	}
 
 	fm_panic("Urgent Error");
@@ -2125,7 +2140,7 @@ mmu_init_kernel_pgsz(struct hat *hat)
 
 	hat->sfmmu_cext = new_cext_primary;
 	kcontextreg = ((uint64_t)new_cext_nucleus << CTXREG_NEXT_SHIFT) |
-		((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
+	    ((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
 }
 
 size_t

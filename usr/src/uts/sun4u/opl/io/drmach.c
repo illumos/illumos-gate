@@ -70,6 +70,7 @@
 #include <sys/ontrap.h>
 #include <sys/cpu_sgnblk_defs.h>
 #include <sys/opl.h>
+#include <sys/cpu_impl.h>
 
 
 #include <sys/promimpl.h>
@@ -377,9 +378,9 @@ drmach_setup_mc_info(dev_info_t *dip, drmach_mem_t *mp)
 	hwd_memory_t *pm;
 
 	len = sizeof (memory_ranges);
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sb-mem-ranges",
-	    (caddr_t)&memory_ranges[0], &len) != DDI_PROP_SUCCESS) {
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "sb-mem-ranges", (caddr_t)&memory_ranges[0], &len) !=
+	    DDI_PROP_SUCCESS) {
 		mp->slice_base = 0;
 		mp->slice_size = 0;
 		return (-1);
@@ -401,8 +402,8 @@ drmach_setup_mc_info(dev_info_t *dip, drmach_mem_t *mp)
 		for (i = 0; i < HWD_MAX_MEM_CHUNKS; i++) {
 			if (pm->mem_chunks[i].chnk_size > 0) {
 				ml = memlist_add_span(ml,
-					pm->mem_chunks[i].chnk_start_address,
-					pm->mem_chunks[i].chnk_size);
+				    pm->mem_chunks[i].chnk_start_address,
+				    pm->mem_chunks[i].chnk_size);
 			}
 		}
 	} else {
@@ -628,8 +629,8 @@ drmach_setup_core_info(drmach_board_t *obj)
 	for (i = 0; i < OPL_MAX_COREID_PER_BOARD; i++) {
 		if (obj->boot_board) {
 			obj->cores[i].core_hotadded =
-				obj->cores[i].core_started =
-				obj->cores[i].core_present;
+			    obj->cores[i].core_started =
+			    obj->cores[i].core_present;
 		}
 	}
 }
@@ -695,8 +696,7 @@ drmach_node_ddi_walk(drmach_node_t *np, void *data,
 	/*
 	 * Root node doesn't have to be held in any way.
 	 */
-	ddi_walk_devs(ddi_root_node(), drmach_node_ddi_walk_cb,
-		(void *)&nargs);
+	ddi_walk_devs(ddi_root_node(), drmach_node_ddi_walk_cb, (void *)&nargs);
 
 	return (nargs.err);
 }
@@ -797,8 +797,8 @@ drmach_node_ddi_get_proplen(drmach_node_t *np, char *name, int *len)
 	ndip = np->n_getdip(np);
 	if (ndip == NULL) {
 		rv = -1;
-	} else if (ddi_getproplen(DDI_DEV_T_ANY, ndip, DDI_PROP_DONTPASS,
-		name, len) != DDI_PROP_SUCCESS) {
+	} else if (ddi_getproplen(DDI_DEV_T_ANY, ndip, DDI_PROP_DONTPASS, name,
+	    len) != DDI_PROP_SUCCESS) {
 		rv = -1;
 	}
 
@@ -981,9 +981,8 @@ drmach_device_new(drmach_node_t *node,
 	rv = node->n_getprop(node, "name", name, OBP_MAXDRVNAME);
 	if (rv) {
 		/* every node is expected to have a name */
-		err = drerr_new(1, EOPL_GETPROP,
-			"device node %s: property %s",
-			ddi_node_name(node->n_getdip(node)), "name");
+		err = drerr_new(1, EOPL_GETPROP, "device node %s: property %s",
+		    ddi_node_name(node->n_getdip(node)), "name");
 		return (err);
 	}
 
@@ -1142,13 +1141,13 @@ drmach_init(void)
 	rdip = ddi_root_node();
 
 	if (ddi_getproplen(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-		"floating-boards", &len) != DDI_PROP_SUCCESS) {
+	    "floating-boards", &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "Cannot get floating-boards proplen\n");
 	} else {
 		floating = (int *)kmem_alloc(len, KM_SLEEP);
-		rv = ddi_prop_op(DDI_DEV_T_ANY, rdip,
-			PROP_LEN_AND_VAL_BUF, DDI_PROP_DONTPASS,
-			"floating-boards", (caddr_t)floating, &len);
+		rv = ddi_prop_op(DDI_DEV_T_ANY, rdip, PROP_LEN_AND_VAL_BUF,
+		    DDI_PROP_DONTPASS, "floating-boards", (caddr_t)floating,
+		    &len);
 		if (rv != DDI_PROP_SUCCESS) {
 			cmn_err(CE_WARN, "Cannot get floating-boards prop\n");
 		} else {
@@ -1167,15 +1166,14 @@ drmach_init(void)
 		drmachid_t	 id;
 
 		bnum = -1;
-		bnum = ddi_getprop(DDI_DEV_T_ANY, rdip,
-			DDI_PROP_DONTPASS, OBP_BOARDNUM, -1);
+		bnum = ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+		    OBP_BOARDNUM, -1);
 		if (bnum == -1)
 			continue;
 
 		if (drmach_array_get(drmach_boards, bnum, &id) == -1) {
-			cmn_err(CE_WARN, "Device node 0x%p has"
-				" invalid property value, %s=%d",
-					rdip, OBP_BOARDNUM, bnum);
+			cmn_err(CE_WARN, "Device node 0x%p has invalid "
+			    "property value, %s=%d", rdip, OBP_BOARDNUM, bnum);
 			goto error;
 		} else if (id == NULL) {
 			(void) drmach_board_new(bnum, 1);
@@ -1274,7 +1272,7 @@ drmach_io_new(drmach_device_t *proto, drmachid_t *idp)
 	ip->leaf = (portid & 0x1);
 
 	snprintf(ip->dev.cm.name, sizeof (ip->dev.cm.name), "%s%d",
-		ip->dev.type, ip->dev.unum);
+	    ip->dev.type, ip->dev.unum);
 
 	*idp = (drmachid_t)ip;
 	return (NULL);
@@ -1330,20 +1328,17 @@ drmach_pre_op(int cmd, drmachid_t id, drmach_opts_t *opts)
 				if (bp->connected)
 					err = drerr_new(0, ESBD_STATE, NULL);
 				else if (!drmach_domain.allow_dr)
-					err = drerr_new(1, EOPL_SUPPORT,
-						NULL);
+					err = drerr_new(1, EOPL_SUPPORT, NULL);
 				break;
 			case SBD_CMD_DISCONNECT:
 				if (!bp->connected)
 					err = drerr_new(0, ESBD_STATE, NULL);
 				else if (!drmach_domain.allow_dr)
-					err = drerr_new(1, EOPL_SUPPORT,
-						NULL);
+					err = drerr_new(1, EOPL_SUPPORT, NULL);
 				break;
 			default:
 				if (!drmach_domain.allow_dr)
-					err = drerr_new(1, EOPL_SUPPORT,
-						NULL);
+					err = drerr_new(1, EOPL_SUPPORT, NULL);
 				break;
 
 		}
@@ -1377,7 +1372,7 @@ drmach_board_assign(int bnum, drmachid_t *id)
 		bp = *id;
 		if (!(*id))
 			bp = *id  =
-				(drmachid_t)drmach_board_new(bnum, 0);
+			    (drmachid_t)drmach_board_new(bnum, 0);
 		bp->assigned = 1;
 	}
 
@@ -1390,13 +1385,20 @@ drmach_board_assign(int bnum, drmachid_t *id)
 sbd_error_t *
 drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 {
+	extern int	cpu_alljupiter;
 	drmach_board_t	*obj = (drmach_board_t *)id;
+	unsigned	cpu_impl;
 
 	if (!DRMACH_IS_BOARD_ID(id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
-	if (opl_probe_sb(obj->bnum) != 0)
+	if (opl_probe_sb(obj->bnum, &cpu_impl) != 0)
 		return (drerr_new(1, EOPL_PROBE, NULL));
+
+	if (cpu_alljupiter) {
+		if (cpu_impl & (1 << OLYMPUS_C_IMPL))
+			return (drerr_new(1, EOPL_MIXED_CPU, NULL));
+	}
 
 	(void) prom_attach_notice(obj->bnum);
 
@@ -1445,18 +1447,18 @@ drmach_disconnect_cpus(drmach_board_t *bp)
 	bnum = bp->bnum;
 
 	for (i = 0; i < OPL_MAX_COREID_PER_BOARD; i++) {
-	    if (bp->cores[i].core_present) {
-		if (bp->cores[i].core_started)
-		    return (-1);
-		if (bp->cores[i].core_hotadded) {
-		    if (drmach_add_remove_cpu(bnum, i, HOTREMOVE_CPU)) {
-			cmn_err(CE_WARN,
-			    "Failed to remove CMP %d on board %d\n",
-			    i, bnum);
-			return (-1);
-		    }
+		if (bp->cores[i].core_present) {
+			if (bp->cores[i].core_started)
+				return (-1);
+			if (bp->cores[i].core_hotadded) {
+				if (drmach_add_remove_cpu(bnum, i,
+				    HOTREMOVE_CPU)) {
+					cmn_err(CE_WARN, "Failed to remove "
+					    "CMP %d on board %d\n", i, bnum);
+					return (-1);
+				}
+			}
 		}
-	    }
 	}
 	return (0);
 }
@@ -1821,9 +1823,9 @@ drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 
 	/* unum = (CMP/CHIP ID) + (ON_BOARD_CORE_NUM * MAX_CMPID_PER_BOARD) */
 	proto->unum = ((portid/OPL_MAX_CPUID_PER_CMP) &
-		(OPL_MAX_CMPID_PER_BOARD - 1)) +
-		((portid & (OPL_MAX_CPUID_PER_CMP - 1)) *
-		(OPL_MAX_CMPID_PER_BOARD));
+	    (OPL_MAX_CMPID_PER_BOARD - 1)) +
+	    ((portid & (OPL_MAX_CPUID_PER_CMP - 1)) *
+	    (OPL_MAX_CMPID_PER_BOARD));
 
 	cp = kmem_zalloc(sizeof (drmach_cpu_t), KM_SLEEP);
 	bcopy(proto, &cp->dev, sizeof (cp->dev));
@@ -1834,7 +1836,7 @@ drmach_cpu_new(drmach_device_t *proto, drmachid_t *idp)
 	cp->dev.cm.status = drmach_cpu_status;
 
 	snprintf(cp->dev.cm.name, sizeof (cp->dev.cm.name), "%s%d",
-		cp->dev.type, cp->dev.unum);
+	    cp->dev.type, cp->dev.unum);
 
 /*
  *	CPU ID representation
@@ -1979,8 +1981,8 @@ drmach_cpu_get_impl(drmachid_t id, int *ip)
 	}
 
 	if (strcmp(type, OPL_CORE_NODE) == 0) {
-		if (pp.n_getprop(&pp, "implementation#",
-			&impl, sizeof (impl)) != 0) {
+		if (pp.n_getprop(&pp, "implementation#", &impl,
+		    sizeof (impl)) != 0) {
 			return (drerr_new(0, EOPL_GETPROP, NULL));
 		}
 	} else {
@@ -2046,8 +2048,7 @@ drmach_io_cb_check(dev_info_t *dip, void *arg)
 	char name[OBP_MAXDRVNAME];
 	int len = OBP_MAXDRVNAME;
 
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "name",
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "name",
 	    (caddr_t)name, &len) != DDI_PROP_SUCCESS) {
 		return (DDI_WALK_PRUNECHILD);
 	}
@@ -2217,7 +2218,7 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	rv = 0;
 
 	if ((proto->node->n_getproplen(proto->node, "mc-addr", &rv) < 0) ||
-		(rv <= 0)) {
+	    (rv <= 0)) {
 		*idp = (drmachid_t)0;
 		return (NULL);
 	}
@@ -2232,8 +2233,7 @@ drmach_mem_new(drmach_device_t *proto, drmachid_t *idp)
 	mp->dev.cm.release = drmach_mem_release;
 	mp->dev.cm.status = drmach_mem_status;
 
-	snprintf(mp->dev.cm.name,
-		sizeof (mp->dev.cm.name), "%s", mp->dev.type);
+	snprintf(mp->dev.cm.name, sizeof (mp->dev.cm.name), "%s", mp->dev.type);
 
 	dip = mp->dev.node->n_getdip(mp->dev.node);
 	if (drmach_setup_mc_info(dip, mp) != 0) {
@@ -2286,13 +2286,13 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
 		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
-			(size == 0 ? 0 : size / MBYTE));
+		    (size == 0 ? 0 : size / MBYTE));
 	} else if (rv != 0) {
 		/* catch this in debug kernels */
 		ASSERT(0);
 
-		cmn_err(CE_WARN, "unexpected kcage_range_add"
-			" return value %d", rv);
+		cmn_err(CE_WARN, "unexpected kcage_range_add return value %d",
+		    rv);
 	}
 
 	if (rv) {
@@ -2406,8 +2406,7 @@ drmach_mem_get_memlist(drmachid_t id, struct memlist **ml)
 	rv = memlist_intersect(phys_install, mlist);
 	memlist_read_unlock();
 	if (rv) {
-		DRMACH_PR("Derived memlist intersects"
-			" with phys_install\n");
+		DRMACH_PR("Derived memlist intersects with phys_install\n");
 		memlist_dump(mlist);
 
 		DRMACH_PR("phys_install memlist:\n");
@@ -2524,12 +2523,13 @@ drmach_pt_ikprobe(drmachid_t id, drmach_opts_t *opts)
 	drmach_board_t		*bp = (drmach_board_t *)id;
 	sbd_error_t		*err = NULL;
 	int	rv;
+	unsigned cpu_impl;
 
 	if (!DRMACH_IS_BOARD_ID(id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
 	DRMACH_PR("calling opl_probe_board for bnum=%d\n", bp->bnum);
-	rv = opl_probe_sb(bp->bnum);
+	rv = opl_probe_sb(bp->bnum, &cpu_impl);
 	if (rv != 0) {
 		err = drerr_new(1, EOPL_PROBE, bp->cm.name);
 		return (err);
@@ -2749,9 +2749,9 @@ drmach_cpu_poweron(struct cpu *cp)
 	ASSERT(bp);
 	if (bp->cores[onb_core_num].core_hotadded == 0) {
 		if (drmach_add_remove_cpu(bnum, onb_core_num,
-			HOTADD_CPU) != 0) {
+		    HOTADD_CPU) != 0) {
 			cmn_err(CE_WARN, "Failed to add CMP %d on board %d\n",
-				onb_core_num, bnum);
+			    onb_core_num, bnum);
 			return (EIO);
 		}
 	}
@@ -2766,10 +2766,9 @@ drmach_cpu_poweron(struct cpu *cp)
 			 * drmach_board_disconnect.
 			 */
 			if (drmach_add_remove_cpu(bnum, onb_core_num,
-				HOTREMOVE_CPU) != 0) {
+			    HOTREMOVE_CPU) != 0) {
 				cmn_err(CE_WARN, "Failed to remove CMP %d "
-					"on board %d\n",
-					onb_core_num, bnum);
+				    "on board %d\n", onb_core_num, bnum);
 			}
 		}
 		return (EBUSY);
@@ -2830,10 +2829,9 @@ drmach_cpu_poweroff(struct cpu *cp)
 		bp->cores[onb_core_num].core_started &= ~(1 << strand_id);
 		if (bp->cores[onb_core_num].core_started == 0) {
 			if (drmach_add_remove_cpu(bnum, onb_core_num,
-				HOTREMOVE_CPU) != 0) {
-				cmn_err(CE_WARN,
-					"Failed to remove CMP %d LSB %d\n",
-					onb_core_num, bnum);
+			    HOTREMOVE_CPU) != 0) {
+				cmn_err(CE_WARN, "Failed to remove CMP %d LSB "
+				    "%d\n", onb_core_num, bnum);
 				return (EIO);
 			}
 		}
@@ -2881,24 +2879,24 @@ drmach_log_sysevent(int board, char *hint, int flag, int verbose)
 	}
 	if (verbose) {
 		DRMACH_PR("drmach_log_sysevent: %s %s, flag: %d, verbose: %d\n",
-			attach_pnt, hint, flag, verbose);
+		    attach_pnt, hint, flag, verbose);
 	}
 
 	if ((ev = sysevent_alloc(EC_DR, ESC_DR_AP_STATE_CHANGE,
-		SUNW_KERN_PUB"dr", km_flag)) == NULL) {
+	    SUNW_KERN_PUB"dr", km_flag)) == NULL) {
 		rv = -2;
 		goto logexit;
 	}
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = attach_pnt;
-	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_AP_ID,
-		&evnt_val, km_flag)) != 0)
+	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_AP_ID, &evnt_val,
+	    km_flag)) != 0)
 		goto logexit;
 
 	evnt_val.value_type = SE_DATA_TYPE_STRING;
 	evnt_val.value.sv_string = hint;
-	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_HINT,
-		&evnt_val, km_flag)) != 0) {
+	if ((rv = sysevent_add_attr(&evnt_attr_list, DR_HINT, &evnt_val,
+	    km_flag)) != 0) {
 		sysevent_free_attr(evnt_attr_list);
 		goto logexit;
 	}
@@ -2915,9 +2913,8 @@ logexit:
 	if (ev)
 		sysevent_free(ev);
 	if ((rv != 0) && verbose)
-		cmn_err(CE_WARN,
-			"drmach_log_sysevent failed (rv %d) for %s  %s\n",
-			rv, attach_pnt, hint);
+		cmn_err(CE_WARN, "drmach_log_sysevent failed (rv %d) for %s "
+		    " %s\n", rv, attach_pnt, hint);
 
 	return (rv);
 }
@@ -2994,17 +2991,15 @@ drmach_memlist_add_span(drmach_copy_rename_program_t *p,
 				if (mlist == ml)
 					mlist = nl;
 			} else {
-				ml->size = MAX((base + len),
-					(ml->address + ml->size)) -
-					base;
+				ml->size = MAX((base + len), (ml->address +
+				    ml->size)) - base;
 				ml->address = base;
 			}
 			break;
 
 		} else if (base <= (ml->address + ml->size)) {
-			ml->size = MAX((base + len),
-				(ml->address + ml->size)) -
-				MIN(ml->address, base);
+			ml->size = MAX((base + len), (ml->address + ml->size)) -
+			    MIN(ml->address, base);
 			ml->address = MIN(ml->address, base);
 			break;
 		}
@@ -3147,20 +3142,20 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 		limit += cpu_xcall_delay * system_clock_freq;
 		for (i = 0; i < NCPU; i++) {
 			if (CPU_IN_SET(prog->data->cpu_slave_set, i)) {
-			/* wait for all CPU's to be ready */
-			    for (;;) {
-				if (prog->critical->stat[i] ==
-					FMEM_LOOP_COPY_READY) {
-					break;
+				/* wait for all CPU's to be ready */
+				for (;;) {
+					if (prog->critical->stat[i] ==
+					    FMEM_LOOP_COPY_READY) {
+						break;
+					}
+					DR_DELAY_IL(1, prog->data->stick_freq);
 				}
-				DR_DELAY_IL(1, prog->data->stick_freq);
-			    }
-			    curr = drmach_get_stick_il();
-			    if (curr > limit) {
-				prog->data->fmem_status.error =
-					EOPL_FMEM_XC_TIMEOUT;
-				return (EOPL_FMEM_XC_TIMEOUT);
-			    }
+				curr = drmach_get_stick_il();
+				if (curr > limit) {
+					prog->data->fmem_status.error =
+					    EOPL_FMEM_XC_TIMEOUT;
+					return (EOPL_FMEM_XC_TIMEOUT);
+				}
 			}
 		}
 		prog->data->fmem_status.stat = FMEM_LOOP_COPY_READY;
@@ -3169,12 +3164,11 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	} else {
 		for (;;) {
 			if (prog->data->fmem_status.stat ==
-				FMEM_LOOP_COPY_READY) {
+			    FMEM_LOOP_COPY_READY) {
 				break;
 			}
 			if (prog->data->fmem_status.error) {
-				prog->data->error[cpuid] =
-					EOPL_FMEM_TERMINATE;
+				prog->data->error[cpuid] = EOPL_FMEM_TERMINATE;
 				return (EOPL_FMEM_TERMINATE);
 			}
 			DR_DELAY_IL(1, prog->data->stick_freq);
@@ -3185,51 +3179,58 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 	 * DO COPY.
 	 */
 	if (CPU_IN_SET(prog->data->cpu_copy_set, cpuid)) {
-	    for (ml = prog->data->cpu_ml[cpuid]; ml; ml = ml->next) {
-		uint64_t	s_pa, t_pa;
-		uint64_t	nbytes;
+		for (ml = prog->data->cpu_ml[cpuid]; ml; ml = ml->next) {
+			uint64_t	s_pa, t_pa;
+			uint64_t	nbytes;
 
-		s_pa = prog->data->s_copybasepa + ml->address;
-		t_pa = prog->data->t_copybasepa + ml->address;
-		nbytes = ml->size;
+			s_pa = prog->data->s_copybasepa + ml->address;
+			t_pa = prog->data->t_copybasepa + ml->address;
+			nbytes = ml->size;
 
-		while (nbytes != 0ull) {
-			/* If the master has detected error, we just bail out */
-			if (prog->data->fmem_status.error != ESBD_NOERROR) {
-				prog->data->error[cpuid] =
-					EOPL_FMEM_TERMINATE;
-				return (EOPL_FMEM_TERMINATE);
+			while (nbytes != 0ull) {
+				/*
+				 * If the master has detected error, we just
+				 * bail out
+				 */
+				if (prog->data->fmem_status.error !=
+				    ESBD_NOERROR) {
+					prog->data->error[cpuid] =
+					    EOPL_FMEM_TERMINATE;
+					return (EOPL_FMEM_TERMINATE);
+				}
+				/*
+				 * This copy does NOT use an ASI
+				 * that avoids the Ecache, therefore
+				 * the dst_pa addresses may remain
+				 * in our Ecache after the dst_pa
+				 * has been removed from the system.
+				 * A subsequent write-back to memory
+				 * will cause an ARB-stop because the
+				 * physical address no longer exists
+				 * in the system. Therefore we must
+				 * flush out local Ecache after we
+				 * finish the copy.
+				 */
+
+				/* copy 32 bytes at src_pa to dst_pa */
+				bcopy32_il(s_pa, t_pa);
+
+				/*
+				 * increment the counter to signal that we are
+				 * alive
+				 */
+				prog->stat->nbytes[cpuid] += 32;
+
+				/* increment by 32 bytes */
+				s_pa += (4 * sizeof (uint64_t));
+				t_pa += (4 * sizeof (uint64_t));
+
+				/* decrement by 32 bytes */
+				nbytes -= (4 * sizeof (uint64_t));
 			}
-			/*
-			 * This copy does NOT use an ASI
-			 * that avoids the Ecache, therefore
-			 * the dst_pa addresses may remain
-			 * in our Ecache after the dst_pa
-			 * has been removed from the system.
-			 * A subsequent write-back to memory
-			 * will cause an ARB-stop because the
-			 * physical address no longer exists
-			 * in the system. Therefore we must
-			 * flush out local Ecache after we
-			 * finish the copy.
-			 */
-
-			/* copy 32 bytes at src_pa to dst_pa */
-			bcopy32_il(s_pa, t_pa);
-
-			/* increment the counter to signal that we are alive */
-			prog->stat->nbytes[cpuid] += 32;
-
-			/* increment by 32 bytes */
-			s_pa += (4 * sizeof (uint64_t));
-			t_pa += (4 * sizeof (uint64_t));
-
-			/* decrement by 32 bytes */
-			nbytes -= (4 * sizeof (uint64_t));
 		}
-	    }
-	    prog->critical->stat[cpuid] = FMEM_LOOP_COPY_DONE;
-	    membar_sync_il();
+		prog->critical->stat[cpuid] = FMEM_LOOP_COPY_DONE;
+		membar_sync_il();
 	}
 
 	/*
@@ -3247,28 +3248,35 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 
 		limit = copy_start + prog->data->copy_delay;
 		for (i = 0; i < NCPU; i++) {
-			if (CPU_IN_SET(prog->data->cpu_slave_set, i)) {
-			    for (;;) {
-				/* we get FMEM_LOOP_FMEM_READY in normal case */
+			if (!CPU_IN_SET(prog->data->cpu_slave_set, i))
+				continue;
+
+			for (;;) {
+				/*
+				 * we get FMEM_LOOP_FMEM_READY in
+				 * normal case
+				 */
 				if (prog->critical->stat[i] ==
-					FMEM_LOOP_FMEM_READY) {
+				    FMEM_LOOP_FMEM_READY) {
 					break;
 				}
 				/* got error traps */
 				if (prog->data->error[i] ==
-					EOPL_FMEM_COPY_ERROR) {
+				    EOPL_FMEM_COPY_ERROR) {
 					prog->data->fmem_status.error =
-						EOPL_FMEM_COPY_ERROR;
+					    EOPL_FMEM_COPY_ERROR;
 					return (EOPL_FMEM_COPY_ERROR);
 				}
-				/* if we have not reached limit, wait more */
+				/*
+				 * if we have not reached limit, wait
+				 * more
+				 */
 				curr = drmach_get_stick_il();
 				if (curr <= limit)
 					continue;
 
 				prog->data->slowest_cpuid = i;
-				prog->data->copy_wait_time =
-					curr - copy_start;
+				prog->data->copy_wait_time = curr - copy_start;
 
 				/* now check if slave is alive */
 				last = prog->stat->nbytes[i];
@@ -3277,23 +3285,25 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 
 				now = prog->stat->nbytes[i];
 				if (now <= last) {
-					/* no progress, perhaps just finished */
+					/*
+					 * no progress, perhaps just
+					 * finished
+					 */
 					DR_DELAY_IL(1, prog->data->stick_freq);
 					if (prog->critical->stat[i] ==
-						FMEM_LOOP_FMEM_READY)
+					    FMEM_LOOP_FMEM_READY)
 						break;
 					/* copy error */
 					if (prog->data->error[i] ==
-						EOPL_FMEM_COPY_ERROR) {
-						prog->data->fmem_status.error =
-							EOPL_FMEM_COPY_ERROR;
+					    EOPL_FMEM_COPY_ERROR) {
+						prog->data-> fmem_status.error =
+						    EOPL_FMEM_COPY_ERROR;
 						return (EOPL_FMEM_COPY_ERROR);
 					}
 					prog->data->fmem_status.error =
 					    EOPL_FMEM_COPY_TIMEOUT;
 					return (EOPL_FMEM_COPY_TIMEOUT);
 				}
-			    }
 			}
 		}
 
@@ -3312,8 +3322,8 @@ drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
 		/*
 		 * drmach_fmem_loop_script()
 		 */
-		rtn = prog->critical->loop((void *)(prog->critical),
-			PAGESIZE, (void *)&(prog->critical->stat[cpuid]));
+		rtn = prog->critical->loop((void *)(prog->critical), PAGESIZE,
+		    (void *)&(prog->critical->stat[cpuid]));
 		prog->data->error[cpuid] = rtn;
 		/* slave thread does not care the rv */
 		return (0);
@@ -3363,8 +3373,7 @@ drmach_lock_critical(caddr_t va, caddr_t new_va)
 
 	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
 		vtag_flushpage(new_va, (uint64_t)ksfmmup);
-		sfmmu_memtte(&tte, va_to_pfn(va),
-			PROC_DATA|HAT_NOSYNC, TTE8K);
+		sfmmu_memtte(&tte, va_to_pfn(va), PROC_DATA|HAT_NOSYNC, TTE8K);
 		tte.tte_intlo |= TTE_LCK_INT;
 		sfmmu_dtlb_ld_kva(new_va, &tte);
 		sfmmu_itlb_ld_kva(new_va, &tte);
@@ -3441,10 +3450,10 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 			continue;
 		if (bp->cores[onb_core_num].core_hotadded &
 		    (1 << strand_id)) {
-		    if (!(bp->cores[onb_core_num].core_started &
-			(1 << strand_id))) {
-			return (drerr_new(1, EOPL_CPU_STATE, NULL));
-		    }
+			if (!(bp->cores[onb_core_num].core_started &
+			    (1 << strand_id))) {
+				return (drerr_new(1, EOPL_CPU_STATE, NULL));
+			}
 		}
 	}
 
@@ -3501,7 +3510,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	 */
 
 	prog_kmem = (drmach_copy_rename_program_t *)kmem_zalloc(
-		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, KM_SLEEP);
+	    DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, KM_SLEEP);
 
 	prog_kmem->prog = prog_kmem;
 
@@ -3522,7 +3531,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	 */
 
 	prog = prog_kmem->locked_prog = vmem_alloc(heap_arena,
-		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, VM_SLEEP);
+	    DRMACH_FMEM_LOCKED_PAGES * PAGESIZE, VM_SLEEP);
 	wp = bp = (caddr_t)prog;
 
 	/* Now remap prog_kmem to prog */
@@ -3530,24 +3539,23 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	/* All pointers in prog are based on the alternate mapping */
 	prog->data = (drmach_copy_rename_data_t *)roundup(((uint64_t)prog +
-		sizeof (drmach_copy_rename_program_t)), sizeof (void *));
+	    sizeof (drmach_copy_rename_program_t)), sizeof (void *));
 
 	ASSERT(((uint64_t)prog->data + sizeof (drmach_copy_rename_data_t))
-		<= ((uint64_t)prog + PAGESIZE));
+	    <= ((uint64_t)prog + PAGESIZE));
 
 	prog->critical = (drmach_copy_rename_critical_t *)
-		(wp + DRMACH_FMEM_CRITICAL_PAGE * PAGESIZE);
+	    (wp + DRMACH_FMEM_CRITICAL_PAGE * PAGESIZE);
 
-	prog->memlist_buffer = (caddr_t)(wp +
-		DRMACH_FMEM_MLIST_PAGE * PAGESIZE);
+	prog->memlist_buffer = (caddr_t)(wp + DRMACH_FMEM_MLIST_PAGE *
+	    PAGESIZE);
 
-	prog->stat = (drmach_cr_stat_t *)(wp +
-		DRMACH_FMEM_STAT_PAGE * PAGESIZE);
+	prog->stat = (drmach_cr_stat_t *)(wp + DRMACH_FMEM_STAT_PAGE *
+	    PAGESIZE);
 
 	/* LINTED */
-	ASSERT(sizeof (drmach_cr_stat_t)
-		<= ((DRMACH_FMEM_LOCKED_PAGES - DRMACH_FMEM_STAT_PAGE)
-		* PAGESIZE));
+	ASSERT(sizeof (drmach_cr_stat_t) <= ((DRMACH_FMEM_LOCKED_PAGES -
+	    DRMACH_FMEM_STAT_PAGE) * PAGESIZE));
 
 	prog->critical->scf_reg_base = (uint64_t)-1;
 	prog->critical->scf_td[0] = (s_bd & 0xff);
@@ -3562,7 +3570,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	wp = (caddr_t)roundup((uint64_t)bp + len, sizeof (void *));
 
 	len = (uint_t)((ulong_t)drmach_copy_rename_end -
-		(ulong_t)drmach_copy_rename_prog__relocatable);
+	    (ulong_t)drmach_copy_rename_prog__relocatable);
 
 	/*
 	 * We always leave 1K nop's to prevent the processor from
@@ -3571,12 +3579,12 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	wp = wp + len + 1024;
 
 	len = (uint_t)((ulong_t)drmach_fmem_exec_script_end -
-		(ulong_t)drmach_fmem_exec_script);
+	    (ulong_t)drmach_fmem_exec_script);
 	/* this is the entry point of the loop script */
 	wp = wp + len + 1024;
 
 	len = (uint_t)((ulong_t)drmach_fmem_exec_script -
-		(ulong_t)drmach_fmem_loop_script);
+	    (ulong_t)drmach_fmem_loop_script);
 	wp = wp + len + 1024;
 
 	/* now we make sure there is 1K extra */
@@ -3592,7 +3600,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	prog->critical->run = (int (*)())(wp);
 	len = (uint_t)((ulong_t)drmach_copy_rename_end -
-		(ulong_t)drmach_copy_rename_prog__relocatable);
+	    (ulong_t)drmach_copy_rename_prog__relocatable);
 
 	bcopy((caddr_t)drmach_copy_rename_prog__relocatable, wp, len);
 
@@ -3600,19 +3608,19 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	prog->critical->fmem = (int (*)())(wp);
 	len = (int)((ulong_t)drmach_fmem_exec_script_end -
-		(ulong_t)drmach_fmem_exec_script);
+	    (ulong_t)drmach_fmem_exec_script);
 	bcopy((caddr_t)drmach_fmem_exec_script, wp, len);
 
 	len = (int)((ulong_t)drmach_fmem_exec_script_end -
-		(ulong_t)drmach_fmem_exec_script);
+	    (ulong_t)drmach_fmem_exec_script);
 	wp = (caddr_t)roundup((uint64_t)wp + len, 1024);
 
 	prog->critical->loop = (int (*)())(wp);
 	len = (int)((ulong_t)drmach_fmem_exec_script -
-		(ulong_t)drmach_fmem_loop_script);
+	    (ulong_t)drmach_fmem_loop_script);
 	bcopy((caddr_t)drmach_fmem_loop_script, (void *)wp, len);
 	len = (int)((ulong_t)drmach_fmem_loop_script_rtn-
-		(ulong_t)drmach_fmem_loop_script);
+	    (ulong_t)drmach_fmem_loop_script);
 	prog->critical->loop_rtn = (void (*)()) (wp+len);
 
 	prog->data->fmem_status.error = ESBD_NOERROR;
@@ -3633,7 +3641,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	prog->data->mc_resume = mc_resume;
 
 	prog->critical->inst_loop_ret  =
-		*(uint64_t *)(prog->critical->loop_rtn);
+	    *(uint64_t *)(prog->critical->loop_rtn);
 
 	/*
 	 * 0x30800000 is op code "ba,a	+0"
@@ -3668,7 +3676,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 	} else {
 		for (i = 0; i < NCPU; i++) {
 			if (CPU_IN_SET(cpu_ready_set, i) &&
-				CPU_ACTIVE(cpu[i])) {
+			    CPU_ACTIVE(cpu[i])) {
 				CPUSET_ADD(prog->data->cpu_copy_set, i);
 				active_cpus++;
 			}
@@ -3693,7 +3701,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	prog->data->stick_freq = system_clock_freq;
 	prog->data->copy_delay = ((copy_sz / min_copy_size_per_sec) + 2) *
-		system_clock_freq;
+	    system_clock_freq;
 
 	x_ml = c_ml;
 	c_addr = x_ml->address;
@@ -3709,17 +3717,16 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 		while (sz) {
 			if (c_size > sz) {
 				prog->data->cpu_ml[i] =
-					drmach_memlist_add_span(prog,
-					prog->data->cpu_ml[i],
-					c_addr, sz);
+				    drmach_memlist_add_span(prog,
+				    prog->data->cpu_ml[i], c_addr, sz);
 				c_addr += sz;
 				c_size -= sz;
 				break;
 			} else {
 				sz -= c_size;
-				prog->data->cpu_ml[i] = drmach_memlist_add_span(
-					prog, prog->data->cpu_ml[i],
-						c_addr, c_size);
+				prog->data->cpu_ml[i] =
+				    drmach_memlist_add_span(prog,
+				    prog->data->cpu_ml[i], c_addr, c_size);
 				x_ml = x_ml->next;
 				if (x_ml != NULL) {
 					c_addr = x_ml->address;
@@ -3742,8 +3749,8 @@ end:
 out:
 	if (prog != NULL) {
 		drmach_unlock_critical((caddr_t)prog);
-		vmem_free(heap_arena, prog,
-			DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
+		vmem_free(heap_arena, prog, DRMACH_FMEM_LOCKED_PAGES *
+		    PAGESIZE);
 	}
 	if (prog_kmem != NULL) {
 		kmem_free(prog_kmem, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
@@ -3779,11 +3786,10 @@ drmach_copy_rename_fini(drmachid_t id)
 		memlist_delete(prog->data->c_ml);
 
 	if ((prog->data->fmem_status.op &
-		(OPL_FMEM_SCF_START| OPL_FMEM_MC_SUSPEND)) !=
-		(OPL_FMEM_SCF_START | OPL_FMEM_MC_SUSPEND)) {
-		cmn_err(CE_PANIC, "drmach_copy_rename_fini: "
-			"invalid op code %x\n",
-				prog->data->fmem_status.op);
+	    (OPL_FMEM_SCF_START | OPL_FMEM_MC_SUSPEND)) !=
+	    (OPL_FMEM_SCF_START | OPL_FMEM_MC_SUSPEND)) {
+		cmn_err(CE_PANIC, "drmach_copy_rename_fini: invalid op "
+		    "code %x\n", prog->data->fmem_status.op);
 	}
 
 	fmem_error = prog->data->fmem_status.error;
@@ -3794,8 +3800,8 @@ drmach_copy_rename_fini(drmachid_t id)
 	/* possible ops are SCF_START, MC_SUSPEND */
 	if (prog->critical->fmem_issued) {
 		if (fmem_error != ESBD_NOERROR) {
-		    cmn_err(CE_PANIC, "Irrecoverable FMEM error %d\n",
-			fmem_error);
+			cmn_err(CE_PANIC, "Irrecoverable FMEM error %d\n",
+			    fmem_error);
 		}
 		rv = (*prog->data->scf_fmem_end)();
 		if (rv) {
@@ -3806,14 +3812,16 @@ drmach_copy_rename_fini(drmachid_t id)
 		 * Do all the copy rename post processing.
 		 */
 		drmach_swap_pa((drmach_mem_t *)prog->data->s_mem,
-			(drmach_mem_t *)prog->data->t_mem);
+		    (drmach_mem_t *)prog->data->t_mem);
 	} else {
 		rv = (*prog->data->scf_fmem_cancel)();
 		if (rv) {
-		    cmn_err(CE_WARN, "scf_fmem_cancel() failed rv=0x%x", rv);
-		    if (!err)
-			err = drerr_new(1, EOPL_SCF_FMEM_CANCEL,
-			    "scf_fmem_cancel() failed. rv = 0x%x", rv);
+			cmn_err(CE_WARN, "scf_fmem_cancel() failed rv=0x%x",
+			    rv);
+			if (!err) {
+				err = drerr_new(1, EOPL_SCF_FMEM_CANCEL,
+				    "scf_fmem_cancel() failed. rv = 0x%x", rv);
+			}
 		}
 	}
 	/* soft resume mac patrol */
@@ -3822,7 +3830,7 @@ drmach_copy_rename_fini(drmachid_t id)
 	drmach_unlock_critical((caddr_t)prog->locked_prog);
 
 	vmem_free(heap_arena, prog->locked_prog,
-		DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
+	    DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
 	kmem_free(prog, DRMACH_FMEM_LOCKED_PAGES * PAGESIZE);
 	return (err);
 }
@@ -3832,7 +3840,7 @@ static void
 drmach_copy_rename_slave(struct regs *rp, drmachid_t id)
 {
 	drmach_copy_rename_program_t	*prog =
-		(drmach_copy_rename_program_t *)id;
+	    (drmach_copy_rename_program_t *)id;
 	register int			cpuid;
 	extern void			drmach_flush();
 	extern void			membar_sync_il();
@@ -3942,7 +3950,7 @@ drmach_copy_rename(drmachid_t id)
 	prog->critical->scf_reg_base = (*prog->data->scf_get_base_addr)();
 
 	if (prog->critical->scf_reg_base == (uint64_t)-1 ||
-		prog->critical->scf_reg_base == NULL) {
+	    prog->critical->scf_reg_base == NULL) {
 		prog->data->fmem_status.error = EOPL_FMEM_SCF_ERR;
 		drmach_unlock_critical((caddr_t)prog);
 		return;
@@ -3966,15 +3974,14 @@ drmach_copy_rename(drmachid_t id)
 	for (cpuid = 0; cpuid < NCPU; cpuid++) {
 		if (CPU_IN_SET(cpuset, cpuid)) {
 			xc_one(cpuid, (xcfunc_t *)drmach_lock_critical,
-				(uint64_t)prog_kmem, (uint64_t)prog);
+			    (uint64_t)prog_kmem, (uint64_t)prog);
 		}
 	}
 
 	cpuid = CPU->cpu_id;
 
 	xt_some(cpuset, (xcfunc_t *)drmach_sys_trap,
-				(uint64_t)drmach_copy_rename_slave,
-				(uint64_t)prog);
+	    (uint64_t)drmach_copy_rename_slave, (uint64_t)prog);
 	xt_sync(cpuset);
 
 	if (on_trap(&otd, OT_DATA_EC)) {
@@ -3989,6 +3996,7 @@ drmach_copy_rename(drmachid_t id)
 
 	drmach_flush(prog->critical, PAGESIZE);
 	rtn = prog->critical->run(prog, cpuid);
+
 	drmach_flush_icache();
 
 
@@ -3996,8 +4004,7 @@ done:
 	no_trap();
 	if (rtn == EOPL_FMEM_HW_ERROR) {
 		kpreempt_enable();
-		prom_panic("URGENT_ERROR_TRAP is "
-			"detected during FMEM.\n");
+		prom_panic("URGENT_ERROR_TRAP is detected during FMEM.\n");
 	}
 
 	/*
@@ -4013,7 +4020,7 @@ done:
 
 	for (;;) {
 		inst = patch_inst((uint64_t *)prog->critical->loop_rtn,
-			prog->critical->inst_loop_ret);
+		    prog->critical->inst_loop_ret);
 		if (prog->critical->inst_loop_ret == inst) {
 			break;
 		}
@@ -4044,17 +4051,18 @@ done:
 			drv_usecwait(1000);
 			now = prog->stat->nbytes[cpuid];
 			if (now <= last) {
-			    drv_usecwait(1000);
-			    if (prog->critical->stat[cpuid] == FMEM_LOOP_EXIT)
-				break;
-			    cmn_err(CE_PANIC,
-				"CPU %d hang during Copy Rename", cpuid);
+				drv_usecwait(1000);
+				if (prog->critical->stat[cpuid] ==
+				    FMEM_LOOP_EXIT)
+					break;
+				cmn_err(CE_PANIC, "CPU %d hang during Copy "
+				    "Rename", cpuid);
 			}
 			last = now;
 		}
 		if (prog->data->error[cpuid] == EOPL_FMEM_HW_ERROR) {
-			prom_panic("URGENT_ERROR_TRAP is "
-				"detected during FMEM.\n");
+			prom_panic("URGENT_ERROR_TRAP is detected during "
+			    "FMEM.\n");
 		}
 	}
 
@@ -4067,7 +4075,7 @@ done:
 	for (cpuid = 0; cpuid < NCPU; cpuid++) {
 		if (CPU_IN_SET(cpuset, cpuid)) {
 			xc_one(cpuid, (xcfunc_t *)drmach_unlock_critical,
-				(uint64_t)prog, 0);
+			    (uint64_t)prog, 0);
 		}
 	}
 
@@ -4090,9 +4098,9 @@ done:
 
 	if (prog->data->copy_wait_time > 0) {
 		DRMACH_PR("Unexpected long wait time %ld seconds "
-			"during copy rename on CPU %d\n",
-			prog->data->copy_wait_time/prog->data->stick_freq,
-			prog->data->slowest_cpuid);
+		    "during copy rename on CPU %d\n",
+		    prog->data->copy_wait_time/prog->data->stick_freq,
+		    prog->data->slowest_cpuid);
 	}
 	drmach_unlock_critical((caddr_t)prog);
 }

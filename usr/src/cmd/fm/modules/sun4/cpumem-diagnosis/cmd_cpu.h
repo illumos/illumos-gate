@@ -100,6 +100,7 @@ typedef enum cmd_cpu_type {
 	CPU_ULTRASPARC_IIIiplus,
 	CPU_ULTRASPARC_T1,
 	CPU_SPARC64_VI,
+	CPU_SPARC64_VII,
 	CPU_ULTRASPARC_T2,
 	CPU_ULTRASPARC_T2plus
 } cmd_cpu_type_t;

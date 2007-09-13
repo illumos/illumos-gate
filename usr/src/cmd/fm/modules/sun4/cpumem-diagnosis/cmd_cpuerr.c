@@ -176,7 +176,7 @@ cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
 		    FM_EREPORT_PAYLOAD_NAME_RESOURCE, &rsrc) != 0)	\
 			return (CMD_EVD_BAD);				\
 									\
-		if ((cpu = cmd_cpu_lookup(hdl, rsrc, CPU_EREPORT_STRING,\
+		if ((cpu = cmd_cpu_lookup(hdl, rsrc, class,		\
 		    CMD_CPU_LEVEL_THREAD)) == NULL ||			\
 		    cpu->cpu_faulting)					\
 			return (CMD_EVD_UNUSED);			\

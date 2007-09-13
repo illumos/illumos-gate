@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,8 +170,8 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 				continue;
 			}
 
-			sib_cpu = cmd_cpu_lookup(hdl, fmri,
-			    CPU_EREPORT_STRING, CMD_CPU_LEVEL_THREAD);
+			sib_cpu = cmd_cpu_lookup(hdl, fmri, class,
+			    CMD_CPU_LEVEL_THREAD);
 			if (sib_cpu == NULL || sib_cpu->cpu_faulting) {
 				if (fmri != NULL)
 					nvlist_free(fmri);

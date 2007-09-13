@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,6 +198,7 @@ typedef struct {
 	dev_info_t		*pr_parent;
 	dev_info_t		*pr_node;
 	int			pr_hold;
+	unsigned		pr_cpu_impl;
 } opl_probe_t;
 
 #define	OPL_STR_LEN	256
@@ -288,7 +289,7 @@ typedef struct {
 /*
  * Functions used by drmach
  */
-extern int	opl_probe_sb(int);
+extern int	opl_probe_sb(int, unsigned *);
 extern int	opl_unprobe_sb(int);
 extern int	opl_read_hwd(int, hwd_header_t **, hwd_sb_status_t **,
 				hwd_domain_info_t **, hwd_sb_t **);

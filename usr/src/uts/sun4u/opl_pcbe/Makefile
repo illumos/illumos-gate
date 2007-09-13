@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,7 @@ MODULE		= pcbe.4.6
 OBJECTS		= $(OPL_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OPL_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTLINK        = $(USR_PCBE_DIR)/pcbe.4.7
 
 #
 #	Include common rules.
@@ -50,7 +51,7 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 ALL_TARGET	= $(BINARY)
 LINT_MODULE	= opl_pcbe
 LINT_TARGET	= $(LINT_MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
 # lint pass one enforcement
@@ -85,6 +86,9 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(ROOTLINK):	$(ROOTMODULE)
+	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #
 #	Include common targets.

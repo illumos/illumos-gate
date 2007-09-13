@@ -24,7 +24,7 @@
  */
 
 /*
- * SPARC64 VI Performance Counter Backend
+ * SPARC64 VI & VII Performance Counter Backend
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -110,7 +110,7 @@ struct nametable {
  *
  *
  * Performance Instrumentation Counter (PIC)
- * Four PICs are implemented in SPARC64 VI,
+ * Four PICs are implemented in SPARC64 VI and VII,
  * each PIC is accessed using PCR.SC as a select field.
  *
  * +------------------------+--------------------------+
@@ -199,15 +199,20 @@ static const uint64_t   allstopped = SPARC64_VI_PCR_PRIVPIC |
 
 static const struct nametable SPARC64_VI_names_l0[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"only_this_thread_active"},
+	{0x3,	"w_cse_window_empty"},
+	{0x4,	"w_op_stv_wait_nc_pend"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x12,	"flush_rs"},
 	{0x13,	"2iid_use"},
 	{0x15,	"toq_rsbr_phantom"},
 	{0x16,	"trap_int_vector"},
 	{0x18,	"ts_by_sxmiss"},
+	{0x18,	"both_threads_active"},
 	SPARC64_VI_EVENTS_comm_2,
 	{0x1d,	"op_stv_wait_sxmiss"},
 	{0x1e,	"eu_comp_wait"},
+	{0x23,	"op_l1_thrashing"},
 	{0x24,	"swpf_fail_all"},
 	{0x30,	"sx_miss_wait_pf"},
 	{0x31,	"jbus_cpi_count"},
@@ -224,10 +229,12 @@ static const struct nametable SPARC64_VI_names_u0[] = {
 	{0x13,	"1iid_use"},
 	{0x16,	"trap_all"},
 	{0x18,	"thread_switch_all"},
+	{0x18,	"only_this_thread_active"},
 	SPARC64_VI_EVENTS_comm_2,
 	{0x1d,	"act_thread_suspend"},
 	{0x1e,	"cse_window_empty"},
 	{0x1f,	"inh_cmit_gpr_2write"},
+	{0x23,	"if_l1_thrashing"},
 	{0x24,	"swpf_success_all"},
 	{0x30,	"sx_miss_wait_dm"},
 	{0x31,	"jbus_bi_count"},
@@ -238,6 +245,9 @@ static const struct nametable SPARC64_VI_names_u0[] = {
 
 static const struct nametable SPARC64_VI_names_l1[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"single_mode_instructions"},
+	{0x3,	"w_branch_comp_wait"},
+	{0x4,	"w_op_stv_wait_sxmiss_ex"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x13,	"4iid_use"},
 	{0x15,	"flush_rs"},
@@ -257,10 +267,14 @@ static const struct nametable SPARC64_VI_names_l1[] = {
 
 static const struct nametable SPARC64_VI_names_u1[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"single_mode_cycle_counts"},
+	{0x3,	"w_eu_comp_wait"},
+	{0x4,	"w_op_stv_wait_sxmiss"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x13,	"3iid_use"},
 	{0x16,	"trap_int_level"},
 	{0x18,	"ts_by_data_arrive"},
+	{0x18,	"both_threads_empty"},
 	SPARC64_VI_EVENTS_comm_2,
 	{0x1b,	"op_stv_wait_nc_pend"},
 	{0x1d,	"op_stv_wait_sxmiss_ex"},
@@ -276,6 +290,9 @@ static const struct nametable SPARC64_VI_names_u1[] = {
 
 static const struct nametable SPARC64_VI_names_l2[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"d_move_wait"},
+	{0x3,	"w_op_stv_wait"},
+	{0x4,	"w_fl_comp_wait"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x13,	"sync_intlk"},
 	{0x16,	"trap_trap_inst"},
@@ -313,6 +330,9 @@ static const struct nametable SPARC64_VI_names_u2[] = {
 
 static const struct nametable SPARC64_VI_names_l3[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"xma_inst"},
+	{0x3,	"w_0endop"},
+	{0x4,	"w_op_stv_wait_ex"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x16,	"trap_DMMU_miss"},
 	{0x18,	"ts_by_suspend"},
@@ -330,11 +350,15 @@ static const struct nametable SPARC64_VI_names_l3[] = {
 
 static const struct nametable SPARC64_VI_names_u3[] = {
 	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"cse_priority_wait"},
+	{0x3,	"w_d_move"},
+	{0x4,	"w_cse_window_empty_sp_full"},
 	SPARC64_VI_EVENTS_comm_1,
 	{0x13,	"regwin_intlk"},
 	{0x15,	"rs1"},
 	{0x16,	"trap_IMMU_miss"},
 	SPARC64_VI_EVENTS_comm_2,
+	{0x1d,	"both_threads_suspended"},
 	{0x1e,	"1endop"},
 	{0x1f,	"op_stv_wait_sxmiss_ex"},
 	{0x20,	"if_wait_all"},
@@ -375,8 +399,8 @@ static const char *opl_impl_name;
 static const char *opl_cpuref;
 static char *pic_events[CPC_SPARC64_VI_NPIC];
 
-static const char *sp_6_ref = "See the \"SPARC64 VI extensions\" "
-			"for descriptions of these events.";
+static const char *sp_6_ref = "See the \"SPARC64 VI extensions\" and "
+	"\"SPARC64 VII extensions\" for descriptions of these events.";
 
 static int
 opl_pcbe_init(void)
@@ -392,8 +416,9 @@ opl_pcbe_init(void)
 	 */
 	switch (ULTRA_VER_IMPL(ultra_getver())) {
 	case OLYMPUS_C_IMPL:
+	case JUPITER_IMPL:
 		events = SPARC64_VI_names;
-		opl_impl_name = "SPARC64 VI";
+		opl_impl_name = "SPARC64 VI & VII";
 		opl_cpuref = sp_6_ref;
 		break;
 	default:
@@ -733,7 +758,7 @@ opl_pcbe_free(void *config)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
-	"SPARC64 VI Performance Counters v%I%",
+	"SPARC64 VI&VII Perf Cntrs v%I%",
 	&opl_pcbe_ops
 };
 

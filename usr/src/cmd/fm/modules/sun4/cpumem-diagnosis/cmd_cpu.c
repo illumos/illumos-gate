@@ -70,6 +70,7 @@ static const char *const cpu_names[] = {
 	"ultraSPARC-IIIiplus",
 	"ultraSPARC-T1",
 	"SPARC64-VI",
+	"SPARC64-VII",
 	"ultraSPARC-T2",
 	"ultraSPARC-T2plus"
 };
@@ -2266,7 +2267,8 @@ static famdata_t famdata_tbl[] = {
 	{"UltraSPARC-III",	CMD_CPU_FAM_CHEETAH},
 	{"UltraSPARC-IV",	CMD_CPU_FAM_CHEETAH},
 	{"UltraSPARC-T",	CMD_CPU_FAM_NIAGARA},
-	{"SPARC64-VI",		CMD_CPU_FAM_SPARC64}
+	{"SPARC64-VI",		CMD_CPU_FAM_SPARC64},
+	{"SPARC64-VII",		CMD_CPU_FAM_SPARC64}
 };
 
 cpu_family_t

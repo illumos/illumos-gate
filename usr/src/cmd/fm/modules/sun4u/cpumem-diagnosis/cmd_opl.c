@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@ opl_cpulist_insert(fmd_hdl_t *hdl, uint32_t cpuid, int flt_type)
 {
 	opl_cpu_t *opl_cpu = NULL;
 	cmd_list_t *list_head = NULL;
-	uint32_t c, s, sib_cpuid, cur_cpuid;
+	uint32_t c, s, sib_cpuid, base_cpuid;
 
 	switch (flt_type) {
 	case IS_STRAND:
@@ -54,8 +54,8 @@ opl_cpulist_insert(fmd_hdl_t *hdl, uint32_t cpuid, int flt_type)
 
 	case IS_CORE:
 		/*
-		 * Based on the Olympus-C CPUID definition in multi-strands
-		 * mode to flip the bits to get the sibling strands
+		 * Currently there are only two strands per core.
+		 * Xor the least significant bit to get the sibling strand
 		 */
 		sib_cpuid = cpuid ^ 1;
 		for (s = 0; s <= STRAND_UPPER_BOUND; s++) {
@@ -75,28 +75,23 @@ opl_cpulist_insert(fmd_hdl_t *hdl, uint32_t cpuid, int flt_type)
 
 	case IS_CHIP:
 		/*
-		 * Based on the Olympus-C CPUID definition in multi-strand
-		 * mode to flip the bits in CPUID for getting the sibling
-		 * strand IDs
+		 * Enumerate all the cpus/strands based on the max # of cores
+		 * within a chip and max # of strands within a core.
 		 */
-		cur_cpuid = cpuid;
+		base_cpuid = (cpuid >> CHIPID_SHIFT) << CHIPID_SHIFT;
 		for (c = 0; c <= CORE_UPPER_BOUND; c++) {
-			sib_cpuid = cur_cpuid;
 			for (s = 0; s <= STRAND_UPPER_BOUND; s++) {
 				opl_cpu = fmd_hdl_alloc(hdl,
 				    sizeof (opl_cpu_t), FMD_SLEEP);
+				opl_cpu->oc_cpuid = base_cpuid |
+				    c << COREID_SHIFT | s;
 				if (c == 0 && s == 0) {
-					opl_cpu->oc_cpuid = cpuid;
 					cmd_list_append(&opl_cpu_list, opl_cpu);
 					list_head = &opl_cpu_list;
-				} else {
-					opl_cpu->oc_cpuid = sib_cpuid;
+				} else
 					cmd_list_insert_after(&opl_cpu_list,
 					    list_head, opl_cpu);
-				}
-				sib_cpuid = cur_cpuid ^ 1;
 			}
-			cur_cpuid = cur_cpuid ^ 2;
 		}
 		break;
 

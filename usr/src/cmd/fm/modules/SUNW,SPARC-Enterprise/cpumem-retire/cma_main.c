@@ -68,6 +68,8 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.cpu.SPARC64-VI.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
+	{ "fault.cpu.SPARC64-VII.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se-offlinereq",
@@ -75,6 +77,14 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.ce-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce-offlinereq",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ NULL, NULL, 0, NULL }
 };

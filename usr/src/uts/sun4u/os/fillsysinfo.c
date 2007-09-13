@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -462,8 +462,8 @@ fill_cpu(pnode_t node)
 	}
 
 	if (cpuid < 0 || cpuid >= NCPU) {
-		cmn_err(CE_PANIC, "cpu node %x: cpuid %d out of range",
-			node, cpuid);
+		cmn_err(CE_PANIC, "cpu node %x: cpuid %d out of range", node,
+		    cpuid);
 		return;
 	}
 
@@ -677,7 +677,7 @@ fill_cpu_ddi(dev_info_t *dip)
 
 	if (cpuid < 0 || cpuid >= NCPU) {
 		cmn_err(CE_PANIC, "cpu dip %p: cpuid %d out of range",
-			(void *) dip, cpuid);
+		    (void *)dip, cpuid);
 		return;
 	}
 
@@ -794,10 +794,10 @@ fill_cpu_ddi(dev_info_t *dip)
 	cpunode->msram = ECACHE_CPU_NON_MIRROR;
 
 	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "msram")) {
-			cpunode->msram = ECACHE_CPU_MIRROR;
+		cpunode->msram = ECACHE_CPU_MIRROR;
 	} else if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"msram-observed")) {
-				cpunode->msram = ECACHE_CPU_MIRROR;
+	    "msram-observed")) {
+		cpunode->msram = ECACHE_CPU_MIRROR;
 	}
 
 	ASSERT(ncpunode > 0);	/* fiximp not req'd */
@@ -862,11 +862,12 @@ check_cpus_ver(void)
 
 		if (IS_SPITFIRE(impl)) {
 			if (cpunodes[i].version < min_supported_rev) {
-				cmn_err(CE_PANIC,
-				"UltraSPARC versions older than %d.%d"
-				" are no longer supported (cpu #%d)",
-				SPITFIRE_MAJOR_VERSION(min_supported_rev),
-				SPITFIRE_MINOR_VERSION(min_supported_rev), i);
+				cmn_err(CE_PANIC, "UltraSPARC versions older "
+				    "than %d.%d are no longer supported "
+				    "(cpu #%d)",
+				    SPITFIRE_MAJOR_VERSION(min_supported_rev),
+				    SPITFIRE_MINOR_VERSION(min_supported_rev),
+				    i);
 			}
 
 			/*
@@ -891,11 +892,12 @@ check_cpus_ver(void)
 
 		if (IS_CHEETAH(impl)) {
 			if (cpunodes[i].version < min_supported_rev) {
-				cmn_err(CE_PANIC,
-				"UltraSPARC-III versions older than %d.%d"
-				" are no longer supported (cpu #%d)",
-				CHEETAH_MAJOR_VERSION(min_supported_rev),
-				CHEETAH_MINOR_VERSION(min_supported_rev), i);
+				cmn_err(CE_PANIC, "UltraSPARC-III versions "
+				    "older than %d.%d are no longer supported "
+				    "(cpu #%d)",
+				    CHEETAH_MAJOR_VERSION(min_supported_rev),
+				    CHEETAH_MINOR_VERSION(min_supported_rev),
+				    i);
 			}
 
 		}
@@ -918,6 +920,7 @@ check_cpus_set(void)
 	int i;
 	int impl;
 	int npanther = 0;
+	int njupiter = 0;
 
 	impl = cpunodes[getprocessorid()].implementation;
 
@@ -939,6 +942,26 @@ check_cpus_set(void)
 			if (!(IS_CHEETAH_PLUS(cpunodes[i].implementation) ||
 			    IS_JAGUAR(cpunodes[i].implementation) ||
 			    IS_PANTHER(cpunodes[i].implementation))) {
+				use_mp = 0;
+				break;
+			}
+		}
+		break;
+	case OLYMPUS_C_IMPL:
+	case JUPITER_IMPL:
+		/*
+		 * Check for a legal heterogeneous set of CPUs on the
+		 * OPL platform.
+		 */
+		for (i = 0; i < NCPU; i++) {
+			if (cpunodes[i].nodeid == 0)
+				continue;
+
+			if (IS_JUPITER(cpunodes[i].implementation)) {
+				njupiter += 1;
+			}
+			if (!(IS_OLYMPUS_C(cpunodes[i].implementation) ||
+			    IS_JUPITER(cpunodes[i].implementation))) {
 				use_mp = 0;
 				break;
 			}
@@ -973,13 +996,21 @@ check_cpus_set(void)
 	}
 
 	/*
+	 * For all-Jupiter domains the cpu module will update the hwcap features
+	 * for integer multiply-add instruction support.
+	 */
+	if ((njupiter == ncpunode) && (&cpu_fix_alljupiter)) {
+		cpu_fix_alljupiter();
+	}
+
+	/*
 	 * Set max cpus we can have based on ncpunode and use_mp
 	 */
 	if (use_mp) {
 		int (*set_max_ncpus)(void);
 
 		set_max_ncpus = (int (*)(void))
-			kobj_getsymvalue("set_platform_max_ncpus", 0);
+		    kobj_getsymvalue("set_platform_max_ncpus", 0);
 
 		if (set_max_ncpus) {
 			max_ncpus = set_max_ncpus();
@@ -1148,9 +1179,9 @@ have_rtc(pnode_t node)
 		if (GETPROP(node, "model", buf) != -1) {
 			if ((strcmp(buf, "m5819p") == 0) ||
 			    (strcmp(buf, "m5823") == 0))
-			    tod_module_name = "todm5823";
+				tod_module_name = "todm5823";
 			else if (strcmp(buf, "ds1287") == 0)
-			    tod_module_name = "todds1287";
+				tod_module_name = "todds1287";
 		}
 	}
 

@@ -146,7 +146,7 @@ _init()
 	 * Put the allocated memory into the pool.
 	 */
 	(void) ndi_ra_free(ddi_root_node(), (uint64_t)efcode_vaddr,
-		(uint64_t)efcode_size, "opl-fcodemem", 0);
+	    (uint64_t)efcode_size, "opl-fcodemem", 0);
 
 	if ((err = mod_install(&modlinkage)) != 0) {
 		cmn_err(CE_WARN, "opl_cfg failed to load, error=%d", err);
@@ -597,8 +597,8 @@ opl_hold_node(char *name)
 	 * represent separate branches that must be managed.
 	 */
 	return ((strcmp(name, OPL_CPU_CHIP_NODE) == 0) ||
-		(strcmp(name, OPL_PSEUDO_MC_NODE) == 0) ||
-		(strcmp(name, OPL_PCI_LEAF_NODE) == 0));
+	    (strcmp(name, OPL_PSEUDO_MC_NODE) == 0) ||
+	    (strcmp(name, OPL_PCI_LEAF_NODE) == 0));
 }
 
 static int
@@ -724,8 +724,8 @@ opl_destroy_node(dev_info_t *node)
 	if (e_ddi_branch_destroy(node, NULL, 0) != 0) {
 		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		(void) ddi_pathname(node, path);
-		cmn_err(CE_WARN, "OPL node removal failed: %s (%p)",
-			    path, (void *)node);
+		cmn_err(CE_WARN, "OPL node removal failed: %s (%p)", path,
+		    (void *)node);
 		kmem_free(path, MAXPATHLEN);
 		return (-1);
 	}
@@ -792,8 +792,8 @@ opl_probe_cpus(opl_probe_t *probe)
 		if (opl_create_node(probe) == NULL) {
 
 			cmn_err(CE_WARN, "IKP: create cpu (%d-%d-%d-%d) failed",
-				probe->pr_board, probe->pr_cpu_chip,
-				probe->pr_core, probe->pr_cpu);
+			    probe->pr_board, probe->pr_cpu_chip, probe->pr_core,
+			    probe->pr_cpu);
 			return (-1);
 		}
 	}
@@ -890,8 +890,8 @@ opl_probe_cores(opl_probe_t *probe)
 		if (node == NULL) {
 
 			cmn_err(CE_WARN, "IKP: create core (%d-%d-%d) failed",
-				probe->pr_board, probe->pr_cpu_chip,
-				probe->pr_core);
+			    probe->pr_board, probe->pr_cpu_chip,
+			    probe->pr_core);
 			return (-1);
 		}
 
@@ -901,6 +901,7 @@ opl_probe_cores(opl_probe_t *probe)
 		probe->pr_parent = node;
 		if (opl_probe_cpus(probe) != 0)
 			return (-1);
+		probe->pr_cpu_impl |= (1 << cores[i].core_implementation);
 	}
 
 	return (0);
@@ -973,7 +974,7 @@ opl_probe_cpu_chips(opl_probe_t *probe)
 		if (node == NULL) {
 
 			cmn_err(CE_WARN, "IKP: create chip (%d-%d) failed",
-				probe->pr_board, probe->pr_cpu_chip);
+			    probe->pr_board, probe->pr_cpu_chip);
 			return (-1);
 		}
 
@@ -1074,7 +1075,7 @@ opl_create_pseudo_mc(dev_info_t *node, void *arg, uint_t flags)
 
 	for (i = 0, j = 0; i < CS_PER_MEM; i++) {
 		if (HWD_STATUS_OK(mem->mem_cs[i].cs_status) ||
-			HWD_STATUS_FAILED(mem->mem_cs[i].cs_status)) {
+		    HWD_STATUS_FAILED(mem->mem_cs[i].cs_status)) {
 			status[j][0] = i;
 			if (HWD_STATUS_OK(mem->mem_cs[i].cs_status))
 				status[j][1] = 0;
@@ -1426,8 +1427,8 @@ opl_register_fetch(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 			    ((caddr_t)resp->fc_map_virt + resp->fc_map_len)))
 				break;
 		} else if (resp->type == RT_CONTIGIOUS) {
-		    if ((virt >= (caddr_t)resp->fc_contig_virt) && ((virt + len)
-			<= ((caddr_t)resp->fc_contig_virt +
+			if ((virt >= (caddr_t)resp->fc_contig_virt) &&
+			    ((virt + len) <= ((caddr_t)resp->fc_contig_virt +
 			    resp->fc_contig_len)))
 				break;
 		}
@@ -1442,32 +1443,32 @@ opl_register_fetch(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	switch (len) {
 	case sizeof (x):
 		if (resp->type == RT_MAP)
-			error = ddi_peek64(rp->child,
-			(int64_t *)virt, (int64_t *)&x);
+			error = ddi_peek64(rp->child, (int64_t *)virt,
+			    (int64_t *)&x);
 		else /* RT_CONTIGIOUS */
 			x = *(int64_t *)virt;
 		v = x;
 		break;
 	case sizeof (l):
 		if (resp->type == RT_MAP)
-			error = ddi_peek32(rp->child,
-			(int32_t *)virt, (int32_t *)&l);
+			error = ddi_peek32(rp->child, (int32_t *)virt,
+			    (int32_t *)&l);
 		else /* RT_CONTIGIOUS */
 			l = *(int32_t *)virt;
 		v = l;
 		break;
 	case sizeof (w):
 		if (resp->type == RT_MAP)
-			error = ddi_peek16(rp->child,
-			(int16_t *)virt, (int16_t *)&w);
+			error = ddi_peek16(rp->child, (int16_t *)virt,
+			    (int16_t *)&w);
 		else /* RT_CONTIGIOUS */
 			w = *(int16_t *)virt;
 		v = w;
 		break;
 	case sizeof (b):
 		if (resp->type == RT_MAP)
-			error = ddi_peek8(rp->child,
-			(int8_t *)virt, (int8_t *)&b);
+			error = ddi_peek8(rp->child, (int8_t *)virt,
+			    (int8_t *)&b);
 		else /* RT_CONTIGIOUS */
 			b = *(int8_t *)virt;
 		v = b;
@@ -1559,8 +1560,8 @@ opl_register_store(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 			    ((caddr_t)resp->fc_map_virt + resp->fc_map_len)))
 				break;
 		} else if (resp->type == RT_CONTIGIOUS) {
-		    if ((virt >= (caddr_t)resp->fc_contig_virt) && ((virt + len)
-			<= ((caddr_t)resp->fc_contig_virt +
+			if ((virt >= (caddr_t)resp->fc_contig_virt) &&
+			    ((virt + len) <= ((caddr_t)resp->fc_contig_virt +
 			    resp->fc_contig_len)))
 				break;
 		}
@@ -2422,7 +2423,7 @@ opl_probe_leaf(opl_probe_t *probe)
 	if (leaf_node == NULL) {
 
 		cmn_err(CE_WARN, "IKP: create leaf (%d-%d-%d) failed",
-			probe->pr_board, probe->pr_channel, probe->pr_leaf);
+		    probe->pr_board, probe->pr_channel, probe->pr_leaf);
 		ndi_devi_exit(parent, circ);
 		return (-1);
 	}
@@ -2468,7 +2469,7 @@ opl_probe_leaf(opl_probe_t *probe)
 
 	if (error != 0) {
 		cmn_err(CE_WARN, "IKP: Unable to probe PCI leaf (%d-%d-%d)",
-			probe->pr_board, probe->pr_channel, probe->pr_leaf);
+		    probe->pr_board, probe->pr_channel, probe->pr_leaf);
 
 		opl_fc_ops_free_handle(fco_handle);
 
@@ -2498,12 +2499,10 @@ opl_probe_leaf(opl_probe_t *probe)
 
 		ndi_devi_exit(parent, circ);
 
-		if (ndi_devi_bind_driver(leaf_node, 0) !=
-			DDI_SUCCESS) {
-			cmn_err(CE_WARN,
-				"IKP: Unable to bind PCI leaf (%d-%d-%d)",
-				probe->pr_board, probe->pr_channel,
-				probe->pr_leaf);
+		if (ndi_devi_bind_driver(leaf_node, 0) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "IKP: Unable to bind PCI leaf "
+			    "(%d-%d-%d)", probe->pr_board, probe->pr_channel,
+			    probe->pr_leaf);
 		}
 	}
 
@@ -2529,9 +2528,8 @@ opl_init_leaves(int myboard)
 	 */
 	ndi_devi_enter(parent, &circ);
 
-	for (node = ddi_get_child(parent);
-		(node != NULL);
-		node = ddi_get_next_sibling(node)) {
+	for (node = ddi_get_child(parent); (node != NULL); node =
+	    ddi_get_next_sibling(node)) {
 
 		ret = OPL_GET_PROP(string, node, "name", &name, &len);
 		if (ret != DDI_PROP_SUCCESS) {
@@ -2564,10 +2562,10 @@ opl_init_leaves(int myboard)
 				} else {
 
 					leaf = OPL_PORTID_TO_LEAF(portid);
-					if (cfg->cfg_pcich_handle
-						[channel][leaf] != NULL)
-						cfg->cfg_pcich_leaf
-							[channel][leaf] = node;
+					if (cfg->cfg_pcich_handle[
+					    channel][leaf] != NULL)
+						cfg->cfg_pcich_leaf[
+						    channel][leaf] = node;
 				}
 			}
 		}
@@ -2618,7 +2616,7 @@ opl_probe_io(opl_probe_t *probe)
 
 			probe->pr_leaf = j;
 			probe->pr_leaf_status =
-				channels[i].pci_leaf[j].leaf_status;
+			    channels[i].pci_leaf[j].leaf_status;
 
 			if (!HWD_STATUS_OK(probe->pr_leaf_status))
 				continue;
@@ -2646,7 +2644,7 @@ opl_probe_io(opl_probe_t *probe)
  * the whole probe operation to fail.
  */
 int
-opl_probe_sb(int board)
+opl_probe_sb(int board, unsigned *cpu_impl)
 {
 	opl_probe_t	*probe;
 	int		ret;
@@ -2683,6 +2681,8 @@ opl_probe_sb(int board)
 		(void) opl_unprobe_sb(board);
 		ret = -1;
 	}
+
+	*cpu_impl = probe->pr_cpu_impl;
 
 	kmem_free(probe, sizeof (opl_probe_t));
 
@@ -2728,9 +2728,8 @@ opl_unprobe_io(int board)
 			ret = opl_destroy_node(*node);
 			if (ret != 0) {
 
-				cmn_err(CE_WARN,
-					"IKP: destroy pci (%d-%d-%d) failed",
-					board, i, j);
+				cmn_err(CE_WARN, "IKP: destroy pci (%d-%d-%d) "
+				    "failed", board, i, j);
 				return (-1);
 			}
 
@@ -2758,8 +2757,8 @@ opl_unprobe_io(int board)
 
 	if (opl_destroy_node(*node) != 0) {
 
-		cmn_err(CE_WARN, "IKP: destroy pci (%d-%d-%d) failed",
-			board, OPL_CMU_CHANNEL, 0);
+		cmn_err(CE_WARN, "IKP: destroy pci (%d-%d-%d) failed", board,
+		    OPL_CMU_CHANNEL, 0);
 		return (-1);
 	}
 
@@ -2811,8 +2810,8 @@ opl_unprobe_processors(int board)
 
 		if (opl_destroy_node(cfg_cpu_chips[i]) != 0) {
 
-			cmn_err(CE_WARN,
-				"IKP: destroy chip (%d-%d) failed", board, i);
+			cmn_err(CE_WARN, "IKP: destroy chip (%d-%d) failed",
+			    board, i);
 			return (-1);
 		}
 

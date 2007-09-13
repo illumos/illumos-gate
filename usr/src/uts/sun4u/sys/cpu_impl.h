@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,8 +100,16 @@ extern "C" {
 #define	OLYMPUS_REV_MASK(x)		(((x) >> 28) & 0x7)
 #define	OLYMPUS_C_A			0
 
+/*
+ * Definitions for Jupiter cpu.
+ */
+#define	JUPITER_IMPL			0x7
+#define	IS_JUPITER(impl)		((impl) == JUPITER_IMPL)
+
 #define	CPU_IMPL_IS_CMP(impl)		(IS_JAGUAR(impl) || \
-					IS_PANTHER(impl) || IS_OLYMPUS_C(impl))
+					IS_PANTHER(impl) || \
+					IS_OLYMPUS_C(impl) || \
+					IS_JUPITER(impl))
 
 #ifdef	__cplusplus
 }

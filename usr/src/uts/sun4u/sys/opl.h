@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#define	OPL_MAX_CPU_PER_CMP		4
+#define	OPL_MAX_CPU_PER_CMP		8
 #define	OPL_MAX_CORES_PER_CMP		4
 #define	OPL_MAX_STRANDS_PER_CORE	2
 #define	OPL_MAX_CMP_UNITS_PER_BOARD	4

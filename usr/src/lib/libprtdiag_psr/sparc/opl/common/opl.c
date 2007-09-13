@@ -204,7 +204,7 @@ display_pci(Board_node *board)
 
 				/* Get reg property of the node */
 				int_val = (int *)get_prop_val(find_prop
-					    (card_node, "reg"));
+				    (card_node, "reg"));
 
 				/*
 				 * If no "reg" property check to see
@@ -217,17 +217,17 @@ display_pci(Board_node *board)
 						break;
 
 					name = (char *)get_prop_val(find_prop
-						    (cparent, "name"));
+					    (cparent, "name"));
 
 					type = (char *)get_prop_val(find_prop
-						    (cparent, "device_type"));
+					    (cparent, "device_type"));
 
 					/* check if parent is a bridge */
 					if (IS_PCI_BRIDGE(name, type))
 						pci_parent_bridge = 1;
 
 					int_val = (int *)get_prop_val(
-						find_prop(cparent, "reg"));
+					    find_prop(cparent, "reg"));
 
 					if (int_val != NULL)
 						/* Switch to parent */
@@ -240,7 +240,7 @@ display_pci(Board_node *board)
 				if (!pci_parent_bridge) {
 
 					name = (char *)get_prop_val(find_prop
-						    (card_node, "name"));
+					    (card_node, "name"));
 
 					if (name == NULL)
 						card.name[0] = '\0';
@@ -251,7 +251,7 @@ display_pci(Board_node *board)
 
 					/* Get the model of this card */
 					name = (char *)get_prop_val(find_prop
-						    (card_node, "model"));
+					    (card_node, "model"));
 
 					if (name == NULL) {
 						(void) snprintf(card.model,
@@ -262,8 +262,8 @@ display_pci(Board_node *board)
 					}
 
 					/* insert card to the list */
-					card_list = insert_io_card
-						    (card_list, &card);
+					card_list = insert_io_card(card_list,
+					    &card);
 
 				}
 
@@ -368,7 +368,7 @@ display_cpu_devices(Sys_tree *tree)
 {
 	Board_node *bnode;
 	char *hdrfmt =
-	    "%-5.5s  %-8.8s  %-20.20s  %-8.8s  %-8.8s  %-8.8s %-8.8s\n";
+	    "%-4.4s  %-4.4s  %-40.40s  %-5.5s  %-5.5s  %-5.5s %-4.4s\n";
 
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -385,7 +385,7 @@ display_cpu_devices(Sys_tree *tree)
 	log_printf(hdrfmt,
 	    "",
 	    gettext("CPU"),
-	    gettext("       CPU         "),
+	    gettext("              CPU                  "),
 	    gettext("Run"),
 	    gettext("L2$"),
 	    gettext("CPU"),
@@ -394,15 +394,15 @@ display_cpu_devices(Sys_tree *tree)
 	log_printf(hdrfmt,
 	    gettext("LSB"),
 	    gettext("Chip"),
-	    gettext("        ID         "),
+	    gettext("               ID                 "),
 	    gettext("MHz"),
 	    gettext(" MB"),
 	    gettext("Impl."),
 	    gettext("Mask"), 0);
 
 	log_printf(hdrfmt,
-	    "---", "----", "--------------------", "----",
-	    "---",  "-----", "----", 0);
+	"---", "----", "----------------------------------------", "----",
+	"---",  "-----", "----", 0);
 
 	/* Now display all of the cpus on each board */
 	for (bnode = tree->bd_list; bnode != NULL; bnode = bnode->next) {
@@ -438,31 +438,43 @@ display_cpus(Board_node *board)
 
 		portid = (int *)get_prop_val(find_prop(pnode, "portid"));
 		freq = (HZ_TO_MHZ(get_cpu_freq(pnode->child)));
-		l2cache_size =
-		    (int *)get_prop_val
-			(find_prop(pnode->child, "l2-cache-size"));
-		impl =
-		    (int *)get_prop_val
-			(find_prop(pnode->child, "implementation#"));
+		l2cache_size = (int *)get_prop_val(find_prop(pnode->child,
+		    "l2-cache-size"));
+		impl = (int *)get_prop_val(find_prop(pnode->child,
+		    "implementation#"));
 		mask = (int *)get_prop_val(find_prop(pnode->child, "mask#"));
 
 		/* Lsb id */
-		log_printf(" %02d    ", board->board_num, 0);
+		log_printf(" %02d   ", board->board_num, 0);
 
 		if (portid != NULL)
-			log_printf("%3d       ", (((*portid)>>3)&0x3), 0);
+			log_printf("%3d   ", (((*portid)>>3)&0x3), 0);
 
 		/*
+		 * OPL
 		 * Specific parsing of the CMP/CORE/CPU chain.
 		 * The internal cpu tree built by walk_di_tree()
 		 * in common code can be illustrated by the diagram
 		 * below:
 		 *
+		 * Olympus:
+		 *
 		 *   cmp->cpu->cpu->cpu->cpu->(next board nodes)
 		 *   / \
 		 * core core
+		 *
+		 * Jupiter:
+		 *
+		 * cmp->cpu->cpu->cpu->cpu->cpu->cpu->cpu->cpu->(board nodes)
+		 *   |
+		 *  _____________
+		 * /   \    \    \
+		 * core core core core
+		 *
+		 *
 		 * where "/" or "\" are children
 		 *    and "->" are siblings
+		 *
 		 */
 		for (cpu = pnode->sibling; cpu != NULL; ) {
 			Prom_node	*cpu_next = NULL;
@@ -490,48 +502,52 @@ display_cpus(Board_node *board)
 				(void) sprintf(cpu_str, "%4d", *cpuid);
 				(void) strlcat(fcpu_str, cpu_str, MAXSTRLEN);
 
-				if (cpu_next != NULL)
-				    (void) strlcat(fcpu_str, ",", MAXSTRLEN);
+				if (cpu_next != NULL) {
+					(void) strlcat(fcpu_str, ",",
+					    MAXSTRLEN);
+				}
 			} else {
 				(void) sprintf(cpu_str, "%4s", "N/A");
 				(void) strlcat(fcpu_str, cpu_str, MAXSTRLEN);
 
-				if (cpu_next != NULL)
-				    (void) strlcat(fcpu_str, ",", MAXSTRLEN);
+				if (cpu_next != NULL) {
+					(void) strlcat(fcpu_str, ",",
+					    MAXSTRLEN);
+				}
 			}
 			cpu = cpu_next;
 		}
 
-		log_printf("%-20.20s", fcpu_str, 0);
+		log_printf("%-40.40s", fcpu_str, 0);
 
 		/* Running frequency */
 		if (freq != 0)
-			log_printf("  %4ld     ", freq, 0);
+			log_printf("  %4ld  ", freq, 0);
 		else
-			log_printf("  %4s     ", "N/A", 0);
+			log_printf("  %4s  ", "N/A", 0);
 
 		/* L2 cache size */
 		if (l2cache_size == NULL)
 			log_printf(" %3s    ", "N/A", 0);
 		else {
-			log_printf("%4.1f       ",
+			log_printf("%4.1f   ",
 			    (float)(*l2cache_size) / (float)(1<<20), 0);
 		}
 
 
 		/* Implementation number of processor */
 		if (impl != NULL)
-			log_printf("%4d     ", *impl, 0);
+			log_printf("  %4d  ", *impl, 0);
 		else
-			log_printf("%4s     ", "N/A", 0);
+			log_printf(" %4s     ", "N/A", 0);
 
 		/* Mask Set version */
 		/* Bits 31:24 of VER register is mask. */
 		/* Mask value : Non MTP mode - 00-7f, MTP mode - 80-ff */
 		if (mask == NULL)
-			log_printf("%4s", "N/A", 0);
+			log_printf("%3s", "N/A", 0);
 		else
-			log_printf("%4d", (*mask)&0xff, 0);
+			log_printf("%-3d", (*mask)&0xff, 0);
 
 		log_printf("\n", 0);
 
@@ -582,9 +598,8 @@ get_opl_mem_regs(Board_node *bnode)
 			}
 
 			if (cs_stat != NULL) {
-				total_mem +=
-				    print_opl_memory_line(bnode->board_num,
-					cs_stat, ngrps);
+				total_mem += print_opl_memory_line(
+				    bnode->board_num, cs_stat, ngrps);
 			}
 		}
 
@@ -602,8 +617,7 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 {
 	Board_node	*bnode = tree->bd_list;
 	uint64_t	total_mem = 0, total_sys_mem = 0;
-	char *hdrfmt =	"\n%-5.5s  %-6.6s  %-18.18s  %-10.10s"
-			    " %-8.8s  %-10.10s";
+	char *hdrfmt =	"\n%-5.5s  %-6.6s  %-18.18s  %-10.10s %-8.8s  %-10.10s";
 
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -612,8 +626,7 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	log_printf("======================", 0);
 	log_printf("\n", 0);
 
-	log_printf(hdrfmt,
-		"",
+	log_printf(hdrfmt, "",
 	    gettext("Memory"),
 	    gettext("Available"),
 	    gettext("Memory"),
@@ -648,10 +661,9 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	    (_SC_PHYS_PAGES)) / MBYTE);
 
 	if (total_mem != total_sys_mem) {
-		log_printf(dgettext(TEXT_DOMAIN,
-		    "\nError:total available size [%lldMB] does not match"
-			" total system memory [%lldMB]\n"),
-			    total_mem, total_sys_mem, 0);
+		log_printf(dgettext(TEXT_DOMAIN, "\nError:total available "
+		    "size [%lldMB] does not match total system memory "
+		    "[%lldMB]\n"), total_mem, total_sys_mem, 0);
 	}
 
 }
@@ -878,9 +890,9 @@ add_node(Sys_tree *root, Prom_node *pnode)
 	char *type;
 
 	if ((board = get_board_num(pnode)) == -1) {
-	    type = get_node_type(pnode);
-	    if ((type != NULL) && (strcmp(type, "cpu") == 0))
-		board = get_board_num((pnode->parent)->parent);
+		type = get_node_type(pnode);
+		if ((type != NULL) && (strcmp(type, "cpu") == 0))
+			board = get_board_num((pnode->parent)->parent);
 	}
 
 	/* find the node with the same board number */

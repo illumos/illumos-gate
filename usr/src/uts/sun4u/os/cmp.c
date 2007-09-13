@@ -151,15 +151,16 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 
 	switch (hw) {
 	case PGHW_IPIPE:
-		if (IS_OLYMPUS_C(impl))
+		if ((IS_OLYMPUS_C(impl)) || (IS_JUPITER(impl)))
 			return (1);
 		break;
 	case PGHW_CHIP:
-		if (IS_JAGUAR(impl) || IS_PANTHER(impl) || IS_OLYMPUS_C(impl))
+		if (IS_JAGUAR(impl) || IS_PANTHER(impl) ||
+		    IS_OLYMPUS_C(impl) || IS_JUPITER(impl))
 			return (1);
 		break;
 	case PGHW_CACHE:
-		if (IS_PANTHER(impl) || IS_OLYMPUS_C(impl))
+		if (IS_PANTHER(impl) || IS_OLYMPUS_C(impl) || IS_JUPITER(impl))
 			return (1);
 		break;
 	}
@@ -179,8 +180,9 @@ pg_plat_cpus_share(cpu_t *cpu_a, cpu_t *cpu_b, pghw_type_t hw)
 		return (pg_plat_hw_instance_id(cpu_a, hw) ==
 		    pg_plat_hw_instance_id(cpu_b, hw));
 	case PGHW_CACHE:
-		if ((IS_PANTHER(impl) || IS_OLYMPUS_C(impl)) &&
-		    pg_plat_cpus_share(cpu_a, cpu_b, PGHW_CHIP)) {
+		if ((IS_PANTHER(impl) || IS_OLYMPUS_C(impl) ||
+		    IS_JUPITER(impl)) && pg_plat_cpus_share(cpu_a,
+		    cpu_b, PGHW_CHIP)) {
 			return (1);
 		} else {
 			return (0);
@@ -198,11 +200,12 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 
 	switch (hw) {
 	case PGHW_IPIPE:
-		if (IS_OLYMPUS_C(impl)) {
+		if (IS_OLYMPUS_C(impl) || IS_JUPITER(impl)) {
 			/*
-			 * Currently only Fujitsu Olympus-c processor supports
-			 * multi-stranded cores. Return the cpu_id with
-			 * the strand bit masked out.
+			 * Currently only Fujitsu Olympus-C (SPARC64-VI) and
+			 * Jupiter (SPARC64-VII) processors support
+			 * multi-stranded cores. Return the cpu_id with the
+			 * strand bit masked out.
 			 */
 			return ((id_t)((uint_t)cpu->cpu_id & ~(0x1)));
 		} else {
@@ -211,7 +214,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	case PGHW_CHIP:
 		return (cmp_cpu_to_chip(cpu->cpu_id));
 	case PGHW_CACHE:
-		if (IS_PANTHER(impl) || IS_OLYMPUS_C(impl))
+		if (IS_PANTHER(impl) ||
+		    IS_OLYMPUS_C(impl) || IS_JUPITER(impl))
 			return (pg_plat_hw_instance_id(cpu, PGHW_CHIP));
 		else
 			return (cpu->cpu_id);

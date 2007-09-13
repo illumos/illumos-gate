@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for the Olympus-C module
@@ -1019,6 +1019,44 @@ label/**/1:
 #endif /* lint */
 
 /*
+ * In case of errors in the MMU_TSB_PREFETCH registers we have to
+ * reset them. We can use "0" as the reset value, this way we set
+ * the "V" bit of the registers to 0, which will disable the prefetch
+ * so the values of the other fields are irrelevant.
+ */
+#if !defined(lint)
+#define	RESET_TSB_PREFETCH(tmp)			\
+	set	VA_UTSBPREF_8K, tmp 		;\
+	stxa	%g0, [tmp]ASI_ITSB_PREFETCH	;\
+	set	VA_UTSBPREF_4M, tmp 		;\
+	stxa	%g0, [tmp]ASI_ITSB_PREFETCH	;\
+	set	VA_KTSBPREF_8K, tmp 		;\
+	stxa	%g0, [tmp]ASI_ITSB_PREFETCH	;\
+	set	VA_KTSBPREF_4M, tmp 		;\
+	stxa	%g0, [tmp]ASI_ITSB_PREFETCH	;\
+	set	VA_UTSBPREF_8K, tmp 		;\
+	stxa	%g0, [tmp]ASI_DTSB_PREFETCH	;\
+	set	VA_UTSBPREF_4M, tmp 		;\
+	stxa	%g0, [tmp]ASI_DTSB_PREFETCH	;\
+	set	VA_KTSBPREF_8K, tmp 		;\
+	stxa	%g0, [tmp]ASI_DTSB_PREFETCH	;\
+	set	VA_KTSBPREF_4M, tmp 		;\
+	stxa	%g0, [tmp]ASI_DTSB_PREFETCH
+#endif /* lint */
+
+/*
+ * In case of errors in the MMU_SHARED_CONTEXT register we have to
+ * reset its value. We can use "0" as the reset value, it will put
+ * 0 in the IV field disabling the shared context support, and
+ * making values of all the other fields of the register irrelevant.
+ */
+#if !defined(lint)
+#define	RESET_SHARED_CTXT(tmp)			\
+	set	MMU_SHARED_CONTEXT, tmp		;\
+	stxa	%g0, [tmp]ASI_DMMU
+#endif /* lint */
+
+/*
  * RESET_TO_PRIV()
  *
  * In many cases, we need to force the thread into privilege mode because
@@ -1486,6 +1524,12 @@ opl_uger_ctxt:
 	andcc	%g1, %g2, %g0
 	bz,pt	%xcc, opl_uger_tsbp
 	 nop
+	GET_CPU_IMPL(%g2)
+	cmp	%g2, JUPITER_IMPL
+	bne	%xcc, 1f
+	  nop
+	RESET_SHARED_CTXT(%g2)
+1:
 	RESET_MMU_REGS(%g2, %g3, %g4)
 	ba	%xcc, opl_uger_panic
 	 nop
@@ -1495,6 +1539,12 @@ opl_uger_tsbp:
 	andcc	%g1, %g2, %g0
 	bz,pt	%xcc, opl_uger_pstate
 	 nop
+	GET_CPU_IMPL(%g2)
+	cmp	%g2, JUPITER_IMPL
+	bne	%xcc, 1f
+	  nop
+	RESET_TSB_PREFETCH(%g2)
+1:
 	RESET_TSB_TAGPTR(%g2)
 
 	/*

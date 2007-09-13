@@ -582,7 +582,7 @@ typedef struct {
 #define	ESGT_NOT_SUPP		4027	/* Operation not supported */
 #define	ESGT_NO_MEM		4028	/* No Memory */
 
-/* opl error codes */
+/* OPL error codes */
 
 #define	EOPL_GETPROP		5001	/* Cannot read property value */
 #define	EOPL_BNUM		5002	/* Invalid board number */
@@ -615,6 +615,8 @@ typedef struct {
 #define	EOPL_FMEM_TERMINATE	5027	/* FMEM operation Terminated */
 #define	EOPL_FMEM_COPY_ERROR	5028	/* Memory copy error */
 #define	EOPL_FMEM_SCF_ERR	5029	/* SCF error */
+#define	EOPL_MIXED_CPU		5030
+	/* Cannot add SPARC64-VI to domain booted with all SPARC64-VII CPUs */
 
 #ifdef	__cplusplus
 }

@@ -146,7 +146,7 @@ set_model_info()
 		halt("No valid OPL model is found!");
 
 	if ((opl_cur_model->model_cmds & EXT_DISPATCH_TABLE) &&
-				(ts_dispatch_extended == -1)) {
+	    (ts_dispatch_extended == -1)) {
 		/*
 		 * Based on a platform model, select a dispatch table.
 		 * Only DC2 and DC3 systems uses the alternate/extended
@@ -341,8 +341,8 @@ set_platform_cage_params(void)
 	if (kernel_cage_enable) {
 		pgcnt_t preferred_cage_size;
 
-		preferred_cage_size =
-			MAX(opl_startup_cage_size, total_pages / 256);
+		preferred_cage_size = MAX(opl_startup_cage_size,
+		    total_pages / 256);
 
 		ml = opl_memlist_per_board(phys_avail);
 
@@ -495,7 +495,7 @@ plat_fill_mc(pnode_t nodeid)
 	}
 	if (prom_getprop(nodeid, "sb-mem-ranges", (caddr_t)&mem_range) < 0) {
 		panic("Can not find sb-mem-ranges property in mc node %x",
-			nodeid);
+		    nodeid);
 	}
 	memnode = mem_range.addr >> OPL_MC_MEMBOARD_SHIFT;
 	plat_assign_lgrphand_to_mem_node(board, memnode);
@@ -760,10 +760,10 @@ cpu_sgn_update(ushort_t sgn, uchar_t state, uchar_t sub_state, int cpuid)
 		 */
 		if (scf_panic_callback == NULL)
 			scf_panic_callback = (void (*)(int))
-				modgetsymvalue("scf_panic_callb", 0);
+			    modgetsymvalue("scf_panic_callb", 0);
 		if (scf_shutdown_callback == NULL)
 			scf_shutdown_callback = (void (*)(int))
-				modgetsymvalue("scf_shutdown_callb", 0);
+			    modgetsymvalue("scf_shutdown_callb", 0);
 
 		switch (sub_state) {
 		case SIGSUBST_PANIC:
@@ -816,8 +816,8 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 	 */
 	if (flt_in_memory) {
 		if (opl_get_mem_unum != NULL) {
-			return (opl_get_mem_unum(synd_code, flt_addr,
-				buf, buflen, lenp));
+			return (opl_get_mem_unum(synd_code, flt_addr, buf,
+			    buflen, lenp));
 		} else {
 			return (ENOTSUP);
 		}
@@ -894,9 +894,8 @@ plat_nodename_set(void)
 	 * find the symbol for the SCF put routine in driver
 	 */
 	if (scf_service_function == NULL)
-		scf_service_function =
-			(int (*)(uint32_t, uint8_t, uint32_t, uint32_t, void *))
-			modgetsymvalue("scf_service_putinfo", 0);
+		scf_service_function = (int (*)(uint32_t, uint8_t, uint32_t,
+		    uint32_t, void *)) modgetsymvalue("scf_service_putinfo", 0);
 
 	/*
 	 * If the symbol was found, call it.  Otherwise, log a note (but not to
@@ -924,9 +923,8 @@ plat_nodename_set(void)
 		delay(10 * drv_usectohz(1000000));
 	}
 	if (counter == 0)
-		cmn_err(CE_NOTE,
-			"!plat_nodename_set: "
-			"scf_service_putinfo not responding\n");
+		cmn_err(CE_NOTE, "!plat_nodename_set: scf_service_putinfo not "
+		    "responding\n");
 
 	kmem_free(datap, sizeof (struct utsname));
 }
@@ -978,7 +976,7 @@ plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
 	int	impl;
 
 	impl = cpunodes[cpuid].implementation;
-	if (IS_OLYMPUS_C(impl)) {
+	if (IS_OLYMPUS_C(impl) || IS_JUPITER(impl)) {
 		info->mmu_idx = MMU_ID(cpuid);
 		info->mmu_nctxs = 8192;
 	} else {
@@ -1038,9 +1036,8 @@ plat_lock_delay(int *backoff)
 		 * If desired backoff is long enough,
 		 * use sleep for most of it
 		 */
-		for (cnt = *backoff;
-			cnt >= OPL_BOFF_SLEEP;
-			cnt -= OPL_BOFF_SLEEP) {
+		for (cnt = *backoff; cnt >= OPL_BOFF_SLEEP;
+		    cnt -= OPL_BOFF_SLEEP) {
 			cpu_smt_pause();
 		}
 		/*

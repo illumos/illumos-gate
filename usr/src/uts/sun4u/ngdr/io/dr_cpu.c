@@ -163,8 +163,8 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 	 * If the property is not found in the CPU node, it has to be
 	 * kept in the core or cmp node so we just keep looking.
 	 */
-	clock_freq = (unsigned int)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dip, 0, "clock-frequency", 0);
+	clock_freq = (unsigned int)ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+	    "clock-frequency", 0);
 
 	ASSERT(clock_freq != 0);
 
@@ -181,6 +181,7 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 		break;
 	case JAGUAR_IMPL:
 	case OLYMPUS_C_IMPL:
+	case JUPITER_IMPL:
 		cache_str = "l2-cache-size";
 		break;
 	case PANTHER_IMPL:
@@ -201,8 +202,8 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 		 * we just keep looking.
 		 */
 
-		ecache_size = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dip, 0, cache_str, 0);
+		ecache_size = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
+		    cache_str, 0);
 	}
 
 	ASSERT(ecache_size != 0);
@@ -293,7 +294,7 @@ dr_pre_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * many cores are actually present.
 		 */
 		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum,
-			SBD_COMP_CPU);
+		    SBD_COMP_CPU);
 		if (curr_cpu >= next_cpu) {
 			cmn_err(CE_CONT, "OS configure %s",
 			    up->sbc_cm.sbdev_path);
@@ -307,8 +308,8 @@ dr_pre_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 			 * still be mapped in.  Need to unmap it
 			 * before continuing with attachment.
 			 */
-			PR_CPU("%s: unmapping sigblk for cpu %d\n",
-				f, up->sbc_cpu_id);
+			PR_CPU("%s: unmapping sigblk for cpu %d\n", f,
+			    up->sbc_cpu_id);
 
 			CPU_SGN_MAPOUT(up->sbc_cpu_id);
 		}
@@ -434,7 +435,7 @@ dr_pre_release_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 	/* allocate status struct storage. */
 	ds = (sbd_dev_stat_t *) kmem_zalloc(sizeof (sbd_dev_stat_t) *
-		MAX_CPU_UNITS_PER_BOARD, KM_SLEEP);
+	    MAX_CPU_UNITS_PER_BOARD, KM_SLEEP);
 
 	cix = dr_cpu_status(hp, devset, ds);
 
@@ -455,8 +456,8 @@ dr_pre_release_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		for (c = 0; c < cix; c++) {
 			if (ds[c].d_cpu.cs_unit == up->sbc_cm.sbdev_unum) {
 				if (ds[c].d_cpu.cs_busy) {
-					dr_dev_err(CE_WARN,
-						&up->sbc_cm, ESBD_BUSY);
+					dr_dev_err(CE_WARN, &up->sbc_cm,
+					    ESBD_BUSY);
 					rv = -1;
 					break;
 				}
@@ -480,13 +481,12 @@ dr_pre_release_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 			PR_CPU("%s: offlining cpu %d\n", f, cpuid);
 			if (cpu_offline(cp, cpu_flags)) {
-				PR_CPU("%s: failed to offline cpu %d\n",
-					f, cpuid);
+				PR_CPU("%s: failed to offline cpu %d\n", f,
+				    cpuid);
 				dr_dev_err(CE_WARN, &up->sbc_cm, ESBD_OFFLINE);
 				if (disp_bound_threads(cp, 0)) {
-					cmn_err(CE_WARN, "%s: thread(s) "
-						"bound to cpu %d",
-							f, cp->cpu_id);
+					cmn_err(CE_WARN, "%s: thread(s) bound "
+					    "to cpu %d", f, cp->cpu_id);
 				}
 				rv = -1;
 				break;
@@ -567,7 +567,7 @@ dr_pre_detach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * many cores are actually present.
 		 */
 		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum,
-			SBD_COMP_CPU);
+		    SBD_COMP_CPU);
 		if (curr_cpu >= next_cpu) {
 			cmn_err(CE_CONT, "OS unconfigure %s\n",
 			    up->sbc_cm.sbdev_path);
@@ -593,9 +593,8 @@ dr_pre_detach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 				    f, up->sbc_cpu_id);
 				dr_dev_err(CE_WARN, &up->sbc_cm, ESBD_OFFLINE);
 				if (disp_bound_threads(cp, 0)) {
-					cmn_err(CE_WARN, "%s: thread(s) "
-						"bound to cpu %d",
-							f, cp->cpu_id);
+					cmn_err(CE_WARN, "%s: thread(s) bound "
+					    "to cpu %d", f, cp->cpu_id);
 				}
 				goto err;
 			}
@@ -735,8 +734,8 @@ dr_fill_cmp_stat(sbd_cpu_stat_t *csp, int ncores, int impl, sbd_cmp_stat_t *psp)
 		 * The following properties should be the same
 		 * for all the cores of the CMP.
 		 */
-		ASSERT(psp->ps_unit == DR_UNUM2SBD_UNUM(
-			csp[core].cs_unit, SBD_COMP_CMP));
+		ASSERT(psp->ps_unit == DR_UNUM2SBD_UNUM(csp[core].cs_unit,
+		    SBD_COMP_CMP));
 		ASSERT(psp->ps_speed == csp[core].cs_speed);
 
 		psp->ps_cpuid[core] = csp[core].cs_cpuid;
@@ -884,8 +883,7 @@ dr_cancel_cpu(dr_cpu_unit_t *up)
 		 * CPU had been online, go ahead
 		 * bring it back online.
 		 */
-		PR_CPU("%s: bringing cpu %d back ONLINE\n",
-			f, up->sbc_cpu_id);
+		PR_CPU("%s: bringing cpu %d back ONLINE\n", f, up->sbc_cpu_id);
 
 		mutex_enter(&cpu_lock);
 		cp = cpu[up->sbc_cpu_id];
@@ -910,8 +908,8 @@ dr_cancel_cpu(dr_cpu_unit_t *up)
 			if (cpu_flagged_nointr(up->sbc_cpu_flags)) {
 				if (cpu_intr_disable(cp) != 0) {
 					cmn_err(CE_WARN, "%s: failed to "
-					"disable interrupts on cpu %d",
-						f, up->sbc_cpu_id);
+					    "disable interrupts on cpu %d", f,
+					    up->sbc_cpu_id);
 				}
 			}
 		}
@@ -931,7 +929,7 @@ dr_disconnect_cpu(dr_cpu_unit_t *up)
 	PR_CPU("%s...\n", f);
 
 	ASSERT((up->sbc_cm.sbdev_state == DR_STATE_CONNECTED) ||
-		(up->sbc_cm.sbdev_state == DR_STATE_UNCONFIGURED));
+	    (up->sbc_cm.sbdev_state == DR_STATE_UNCONFIGURED));
 
 	ASSERT(dr_cpu_unit_is_sane(up->sbc_cm.sbdev_bp, up));
 
@@ -940,8 +938,7 @@ dr_disconnect_cpu(dr_cpu_unit_t *up)
 		 * Cpus were never brought in and so are still
 		 * effectively disconnected, so nothing to do here.
 		 */
-		PR_CPU("%s: cpu %d never brought in\n",
-			f, up->sbc_cpu_id);
+		PR_CPU("%s: cpu %d never brought in\n", f, up->sbc_cpu_id);
 		return (0);
 	}
 

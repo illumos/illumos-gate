@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +42,8 @@ MODULE		= FJSV,SPARC64-VI
 OBJECTS		= $(OLYMPUS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OLYMPUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_OPL_CPU_DIR)/$(MODULE)
+SOFTLINKS	= FJSV,SPARC64-VII
+ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_OPL_CPU_DIR)/%)
 
 CPU_DIR		= .
 HERE		= ../olympus_c
