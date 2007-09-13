@@ -364,6 +364,8 @@ void freeL(char *msg, void *x)
 // For convenience when using the "strings" command, this is the last thing in the file
 #if mDNSResponderVersion > 1
 mDNSexport const char mDNSResponderVersionString[] = "mDNSResponder-" STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ") ";
+#elif MDNS_VERSIONSTR_NODTS
+mDNSexport const char mDNSResponderVersionString[] = "mDNSResponder (Engineering Build) ";
 #else
 mDNSexport const char mDNSResponderVersionString[] = "mDNSResponder (Engineering Build) (" __DATE__ " " __TIME__ ") ";
 #endif

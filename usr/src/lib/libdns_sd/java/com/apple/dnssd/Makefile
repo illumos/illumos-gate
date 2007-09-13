@@ -140,11 +140,11 @@ $(DOCEXAMPLESDESTDIR)/%: %
 install_doc: $(CLASSES) $(DOCAPIDESTDIR)
 	-$(RM) -r $(DOCAPIDESTDIR)/*
 	cd $(TOP); umask 022; \
-	$(JAVADOC) $(JAVASRCDIR)/*.java -classpath $(CLASSPATH) -d \
-	$(DOCAPIDESTDIR) -public $(DNSSD_PKG)
+	$(JAVADOC) $(JAVASRCDIR)/*.java -notimestamp -classpath \
+	$(CLASSPATH) -d $(DOCAPIDESTDIR) -public $(DNSSD_PKG)
 
 doc:
 	-@mkdir -p $(DOCAPIDIR)
 	cd $(TOP); umask 022; \
-	$(JAVADOC) $(JAVASRCDIR)/*.java -classpath $(CLASSPATH) -d \
-	$(DOCAPIDIR) -public $(DNSSD_PKG)
+	$(JAVADOC) $(JAVASRCDIR)/*.java -notimestamp -classpath \
+     	$(CLASSPATH) -d $(DOCAPIDIR) -public $(DNSSD_PKG)
