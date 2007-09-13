@@ -832,7 +832,8 @@ rctl_val_list_delete(rctl_val_t **root, rctl_val_t *rval)
 	prev = *root;
 	if (rctl_val_cmp(rval, prev, 0) == 0) {
 		*root = prev->rcv_next;
-		(*root)->rcv_prev = NULL;
+		if (*root != NULL)
+			(*root)->rcv_prev = NULL;
 
 		kmem_cache_free(rctl_val_cache, prev);
 
