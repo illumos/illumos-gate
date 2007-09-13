@@ -54,6 +54,18 @@ typedef struct agp_target_softstate {
 	kmutex_t		tsoft_lock;
 }agp_target_softstate_t;
 
+/*
+ * To get the pre-allocated graphics mem size using Graphics Mode Select
+ * (GMS) value.
+ */
+typedef struct gms_mode {
+	uint32_t	gm_devid;	/* bridge vendor + device id */
+	off_t		gm_regoff;	/* mode selection register offset */
+	uint32_t	gm_mask;	/* GMS mask */
+	uint32_t	gm_num;		/* number of modes in gm_vec */
+	int 		*gm_vec;	/* modes array */
+} gms_mode_t;
+
 static void *agptarget_glob_soft_handle;
 
 #define	GETSOFTC(instance)	((agp_target_softstate_t *)	\
@@ -269,114 +281,111 @@ agp_target_set_gartaddr(agp_target_softstate_t *softstate, uint32_t gartaddr)
 	    gartaddr & AGP_ATTBASE_MASK);
 }
 
+/*
+ * Pre-allocated graphics memory for every type of Intel north bridge, mem size
+ * are specified in kbytes.
+ */
+#define	GMS_MB(n) 	((n) * 1024)
+#define	GMS_SHIFT 	4
+#define	GMS_SIZE(a)	(sizeof (a) / sizeof (int))
+
+/*
+ * Since value zero always means "No memory pre-allocated", value of (GMS - 1)
+ * is used to index these arrays, i.e. gms_xxx[1] contains the mem size (in kb)
+ * that GMS value 0x1 corresponding to.
+ *
+ * Assuming all "reserved" GMS value as zero bytes of pre-allocated graphics
+ * memory, unless some special BIOS settings exist.
+ */
+static int gms_810[12] = {0, 0, 0, 0, 0, 0, 0, 512, 0, 0, 0, GMS_MB(1)};
+static int gms_830_845[4] = {0, 512, GMS_MB(1), GMS_MB(8)};
+static int gms_855GM[5] = {GMS_MB(1), GMS_MB(4), GMS_MB(8), GMS_MB(16),
+	GMS_MB(32)};
+/* There is no modes for 16M in datasheet, but some BIOS add it. */
+static int gms_865_915GM[4] = {GMS_MB(1), 0, GMS_MB(8), GMS_MB(16)};
+static int gms_915_945_965[3] = {GMS_MB(1), 0, GMS_MB(8)};
+static int gms_965GM[7] = {GMS_MB(1), GMS_MB(4), GMS_MB(8), GMS_MB(16),
+	GMS_MB(32), GMS_MB(48), GMS_MB(64)};
+static int gms_X33[9] = {GMS_MB(1), GMS_MB(4), GMS_MB(8), GMS_MB(16),
+	GMS_MB(32), GMS_MB(48), GMS_MB(64), GMS_MB(128), GMS_MB(256)};
+
+static gms_mode_t gms_modes[] = {
+	{INTEL_BR_810, I810_CONF_SMRAM, I810_GMS_MASK,
+		GMS_SIZE(gms_810), gms_810},
+	{INTEL_BR_810DC, I810_CONF_SMRAM, I810_GMS_MASK,
+		GMS_SIZE(gms_810), gms_810},
+	{INTEL_BR_810E, I810_CONF_SMRAM, I810_GMS_MASK,
+		GMS_SIZE(gms_810), gms_810},
+	{INTEL_BR_830M, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_830_845), gms_830_845},
+	{INTEL_BR_845, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_830_845), gms_830_845},
+	{INTEL_BR_855GM, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_855GM), gms_855GM},
+	{INTEL_BR_865, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_865_915GM), gms_865_915GM},
+	{INTEL_BR_915GM, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_865_915GM), gms_865_915GM},
+	{INTEL_BR_915, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_945, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_945GM, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_946GZ, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_965G1, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_965G2, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_965Q, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_915_945_965), gms_915_945_965},
+	{INTEL_BR_965GM, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_965GM), gms_965GM},
+	{INTEL_BR_965GME, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
+		GMS_SIZE(gms_965GM), gms_965GM},
+	{INTEL_BR_Q35, I8XX_CONF_GC, IX33_GC_MODE_MASK,
+		GMS_SIZE(gms_X33), gms_X33},
+	{INTEL_BR_G33, I8XX_CONF_GC, IX33_GC_MODE_MASK,
+		GMS_SIZE(gms_X33), gms_X33},
+	{INTEL_BR_Q33, I8XX_CONF_GC, IX33_GC_MODE_MASK,
+		GMS_SIZE(gms_X33), gms_X33}
+};
+
+/* Returns the size (kbytes) of pre-allocated graphics memory */
 static size_t
 i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 {
 	uint8_t memval;
 	size_t kbytes;
+	int i;
+	int num_modes;
 
-	switch (softstate->tsoft_devid) {
-	case INTEL_BR_810:
-	case INTEL_BR_810DC:
-	case INTEL_BR_810E:
-		memval = pci_config_get8(softstate->tsoft_pcihdl,
-		    I810_CONF_SMRAM);
-		switch (memval & I810_GMS_MASK) {
-		case 0x80:
-			kbytes = 512; /* 512K preallocated memory */
+	kbytes = 0;
+	/* get GMS modes list entry */
+	num_modes = (sizeof (gms_modes) / sizeof (gms_mode_t));
+	for (i = 0; i < num_modes; i++) {
+		if (gms_modes[i].gm_devid == softstate->tsoft_devid)
 			break;
-		case 0xc0:
-			kbytes = 1024; /* 1024K preallocated memory */
-			break;
-		default:
-			kbytes = 0; /* an unexpected case */
-		}
-		break;
-	case INTEL_BR_830M:
-	case INTEL_BR_845:
-		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
-		switch (memval & I8XX_GC_MODE_MASK) {
-		case I8XX_GC_MODE2:
-			kbytes = 512; /* 512K preallocated memory */
-			break;
-		case I8XX_GC_MODE3:
-			kbytes = 1024; /* 1M preallocated memory */
-			break;
-		case I8XX_GC_MODE4:
-			kbytes = 8 * 1024; /* 8M preallocated memory */
-			break;
-		default:
-			kbytes = 0; /* an unexpected case */
-		}
-		break;
-	case INTEL_BR_855GM:
-		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
-		switch (memval & I8XX_GC_MODE_MASK) {
-		case I8XX_GC_MODE1:
-			kbytes = 1024; /* 1M preallocated memory */
-			break;
-		case I8XX_GC_MODE2:
-			kbytes = 4 * 1024; /* 4M preallocated memory */
-			break;
-		case I8XX_GC_MODE3:
-			kbytes = 8 * 1024; /* 8M preallocated memory */
-			break;
-		case I8XX_GC_MODE4:
-			kbytes = 16 * 1024; /* 16M preallocated memory */
-			break;
-		case I8XX_GC_MODE5:
-			kbytes = 32 * 1024; /* 32M preallocated memory */
-			break;
-		default:
-			kbytes = 0; /* an unexpected case */
-		}
-		break;
-	case INTEL_BR_865:
-	case INTEL_BR_915GM:
-		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
-		switch (memval & I8XX_GC_MODE_MASK) {
-		case I8XX_GC_MODE1:
-			kbytes = 1024; /* 1M preallocated memory */
-			break;
-		case I8XX_GC_MODE3:
-			kbytes = 8 * 1024; /* 8M preallocated memory */
-			break;
-		/*
-		 * There is no option for 16M in 915GM datasheet,
-		 * but some BIOS add this option for 16M support.
-		 */
-		case I8XX_GC_MODE4:
-			kbytes = 16 * 1024; /* 16M preallocated memory */
-			break;
-		default:
-			kbytes = 0; /* an unexpected case */
-		}
-		break;
-	case INTEL_BR_915:
-	case INTEL_BR_945:
-	case INTEL_BR_945GM:
-	case INTEL_BR_946GZ:
-	case INTEL_BR_965G1:
-	case INTEL_BR_965G2:
-	case INTEL_BR_965Q:
-	case INTEL_BR_965GM:
-	case INTEL_BR_965GME:
-		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
-		switch (memval & I8XX_GC_MODE_MASK) {
-		case I8XX_GC_MODE1:
-			kbytes = 1024; /* 1M preallocated memory */
-			break;
-		case I8XX_GC_MODE3:
-			kbytes = 8 * 1024; /* 8M preallocated memory */
-			break;
-		default:
-			kbytes = 0; /* an unexpected case */
-		}
-		break;
-	default:
-		kbytes = 0;
 	}
+	if (i ==  num_modes)
+		goto done;
+	/* fetch the GMS value from DRAM controller */
+	memval = pci_config_get8(softstate->tsoft_pcihdl,
+	    gms_modes[i].gm_regoff);
+	TARGETDB_PRINT2((CE_NOTE, "i8xx_biosmem_detect: memval = %x", memval));
+	memval = (memval & gms_modes[i].gm_mask) >> GMS_SHIFT;
+	/* assuming zero byte for 0 or "reserved" GMS values */
+	if (memval == 0 || memval > gms_modes[i].gm_num) {
+		TARGETDB_PRINT2((CE_WARN, "i8xx_biosmem_detect: "
+		    "devid = %x, GMS = %x. assuming zero byte of "
+		    "pre-allocated memory", gms_modes[i].gm_devid, memval));
+		goto done;
+	}
+	memval--;	/* use (GMS_value - 1) as index */
+	kbytes = (gms_modes[i].gm_vec)[memval];
 
+done:
 	TARGETDB_PRINT2((CE_NOTE,
 	    "i8xx_biosmem_detect: %ldKB BIOS pre-allocated memory detected",
 	    kbytes));

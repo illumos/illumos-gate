@@ -768,10 +768,17 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 		 * 	- scratch page size
 		 *
 		 * scratch page size = 4
-		 * GTT size = aperture size (in MBs)
+		 * GTT size (KB) = aperture size (MB)
 		 * this algorithm came from Xorg source code
 		 */
-		prealloc_size = prealloc_size - info->agpki_apersize - 4;
+		if (prealloc_size > (info->agpki_apersize + 4))
+			prealloc_size =
+			    prealloc_size - info->agpki_apersize - 4;
+		else {
+			AGPDB_PRINT2((CE_WARN, "lyr_get_info: "
+			    "pre-allocated memory too small, setting to zero"));
+			prealloc_size = 0;
+		}
 		info->agpki_presize = prealloc_size;
 		AGPDB_PRINT2((CE_NOTE,
 		    "lyr_get_info: prealloc_size = %ldKB, apersize = %dMB",

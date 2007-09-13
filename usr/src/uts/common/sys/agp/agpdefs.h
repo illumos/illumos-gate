@@ -96,6 +96,9 @@ extern "C" {
 #define	INTEL_BR_965G2			0x29a08086
 #define	INTEL_BR_965GM			0x2a008086
 #define	INTEL_BR_965GME			0x2a108086
+#define	INTEL_BR_Q35			0x29b08086
+#define	INTEL_BR_G33			0x29c08086
+#define	INTEL_BR_Q33			0x29d08086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -156,18 +159,25 @@ extern "C" {
 #define	INTEL_IGD_965G2			0x29a28086
 #define	INTEL_IGD_965GM			0x2a028086
 #define	INTEL_IGD_965GME		0x2a128086
-#define	I8XX_CONF_GMADR			0x10 /* offset in PCI config space */
-#define	I915_CONF_GMADR			0x18 /* offset in PCI config space */
-#define	I8XX_CONF_GC			0x52 /* offset in PCI config space */
+#define	INTEL_IGD_Q35			0x29b28086
+#define	INTEL_IGD_G33			0x29c28086
+#define	INTEL_IGD_Q33			0x29d28086
+/* register offsets in PCI config space */
+#define	I8XX_CONF_GMADR			0x10 /* GMADR of i8xx series */
+#define	I915_CONF_GMADR			0x18 /* GMADR of i915 series */
+#define	IX33_CONF_GMADR			0x10 /* GMADR of x33 series */
+/* (Mirror) GMCH Graphics Control Register (GGC, MGGC) */
+#define	I8XX_CONF_GC			0x52
 
 /* Intel integrated video card graphics mode mask */
 #define	I8XX_GC_MODE_MASK		0x70
-#define	I8XX_GC_MODE0			0x00
-#define	I8XX_GC_MODE1			0x10
-#define	I8XX_GC_MODE2			0x20
-#define	I8XX_GC_MODE3			0x30
-#define	I8XX_GC_MODE4			0x40
-#define	I8XX_GC_MODE5			0x50
+#define	IX33_GC_MODE_MASK		0xf0
+/* GTT Graphics Memory Size (9:8) in GMCH Graphics Control Register */
+#define	IX33_GGMS_MASK			0x300
+/* No VT mode, 1MB allocated for GTT */
+#define	IX33_GGMS_1M			0x100
+/* VT mode, 2MB allocated for GTT */
+#define	IX33_GGMS_2M			0x200
 
 /* Intel integrated video card GTT definition */
 #define	GTT_PAGE_SHIFT			12
