@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,25 +56,38 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
 
-	rv = KMF_ImportPK12(kmfhandle, outfile, cred,
-		&certs, &ncerts, &keys, &nkeys);
+	rv = kmf_import_objects(kmfhandle, outfile, cred,
+	    &certs, &ncerts, &keys, &nkeys);
 
 	if (rv == KMF_OK) {
 		(void) printf(gettext("Found %d certificate(s) and %d "
-			"key(s) in %s\n"), ncerts, nkeys, outfile);
+		    "key(s) in %s\n"), ncerts, nkeys, outfile);
 	}
 
 	if (rv == KMF_OK && ncerts > 0) {
-		KMF_STORECERT_PARAMS params;
 		char newcertfile[MAXPATHLEN];
 
-		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
-		params.kstype = KMF_KEYSTORE_OPENSSL;
-		params.sslparms.dirpath = dir;
-		params.sslparms.format = outformat;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
+
+		if (dir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, dir, strlen(dir));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_ENCODE_FORMAT_ATTR, &outformat, sizeof (outformat));
+		numattr++;
 
 		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
+			int num = numattr;
+
 			/*
 			 * If storing more than 1 cert, gotta change
 			 * the name so we don't overwrite the previous one.
@@ -82,40 +95,84 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 			 */
 			if (i > 0) {
 				(void) snprintf(newcertfile,
-					sizeof (newcertfile),
-					"%s_%d", certfile, i);
-				params.sslparms.certfile = newcertfile;
+				    sizeof (newcertfile), "%s_%d", certfile, i);
+
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_FILENAME_ATTR, newcertfile,
+				    strlen(newcertfile));
+				num++;
 			} else {
-				params.sslparms.certfile = certfile;
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_FILENAME_ATTR, certfile,
+				    strlen(certfile));
+				num++;
 			}
-			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			num++;
+			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
 	}
 	if (rv == KMF_OK && nkeys > 0) {
-		KMF_STOREKEY_PARAMS skparms;
 		char newkeyfile[MAXPATHLEN];
 
-		(void) memset(&skparms, 0, sizeof (skparms));
+		numattr = 0;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+		    sizeof (kstype));
+		numattr++;
+
+		if (keydir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, keydir,
+			    strlen(keydir));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_ENCODE_FORMAT_ATTR, &outformat,
+		    sizeof (outformat));
+		numattr++;
+
+		if (cred != NULL && cred->credlen > 0) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, cred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
 
 		/* The order of certificates and keys should match */
 		for (i = 0; rv == KMF_OK && i < nkeys; i++) {
-			skparms.kstype = KMF_KEYSTORE_OPENSSL;
-			skparms.sslparms.dirpath = keydir;
-			skparms.sslparms.format = outformat;
-			skparms.cred = *cred;
-			skparms.certificate = &certs[i];
+			int num = numattr;
 
 			if (i > 0) {
 				(void) snprintf(newkeyfile,
-					sizeof (newkeyfile),
-					"%s_%d", keyfile, i);
-				skparms.sslparms.keyfile = newkeyfile;
+				    sizeof (newkeyfile), "%s_%d", keyfile, i);
+
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_KEY_FILENAME_ATTR, newkeyfile,
+				    strlen(newkeyfile));
+				num++;
 			} else {
-				skparms.sslparms.keyfile = keyfile;
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_KEY_FILENAME_ATTR, keyfile,
+				    strlen(keyfile));
+				num++;
 			}
 
-			rv = KMF_StorePrivateKey(kmfhandle, &skparms,
-				&keys[i]);
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i],
+			    sizeof (KMF_DATA));
+			num++;
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_RAW_KEY_ATTR, &keys[i],
+			    sizeof (KMF_RAW_KEY_DATA));
+			num++;
+
+			rv = kmf_store_key(kmfhandle, num, attrlist);
 		}
 	}
 	/*
@@ -123,12 +180,12 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			KMF_FreeData(&certs[i]);
+			kmf_free_data(&certs[i]);
 		free(certs);
 	}
 	if (keys) {
 		for (i = 0; i < nkeys; i++)
-			KMF_FreeRawKey(&keys[i]);
+			kmf_free_raw_key(&keys[i]);
 		free(keys);
 	}
 
@@ -150,55 +207,105 @@ pk_import_pk12_nss(
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
 
 	rv = configure_nss(kmfhandle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	rv = KMF_ImportPK12(kmfhandle, filename, kmfcred,
-		&certs, &ncerts, &keys, &nkeys);
+	rv = kmf_import_objects(kmfhandle, filename, kmfcred,
+	    &certs, &ncerts, &keys, &nkeys);
 
 	if (rv == KMF_OK)
 		(void) printf(gettext("Found %d certificate(s) and %d "
-			"key(s) in %s\n"), ncerts, nkeys, filename);
+		    "key(s) in %s\n"), ncerts, nkeys, filename);
 
 	if (rv == KMF_OK) {
-		KMF_STORECERT_PARAMS params;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
 
-		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
-		params.kstype = KMF_KEYSTORE_NSS;
-		params.nssparms.slotlabel = token_spec;
-		params.nssparms.trustflag = trustflags;
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token_spec,
+			    strlen(token_spec));
+			numattr++;
+		}
+
+		if (trustflags != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TRUSTFLAG_ATTR, trustflags,
+			    strlen(trustflags));
+			numattr++;
+		}
 
 		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
-			if (i == 0)
-				params.certLabel = nickname;
-			else
-				params.certLabel = NULL;
+			int num = numattr;
 
-			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
+			if (i == 0 && nickname != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR, nickname,
+				    strlen(nickname));
+				num++;
+			}
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			num++;
+			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
 		if (rv != KMF_OK) {
 			display_error(kmfhandle, rv,
-				gettext("Error storing certificate "
-					"in PKCS11 token"));
+			    gettext("Error storing certificate in NSS token"));
 		}
 	}
 
 	if (rv == KMF_OK) {
-		KMF_STOREKEY_PARAMS skparms;
+		numattr = 0;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+		    sizeof (kstype));
+		numattr++;
+
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token_spec,
+			    strlen(token_spec));
+			numattr++;
+		}
+
+		if (nickname != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYLABEL_ATTR, nickname,
+			    strlen(nickname));
+			numattr++;
+		}
+
+		if (tokencred->credlen > 0) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, tokencred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
 
 		/* The order of certificates and keys should match */
 		for (i = 0; i < nkeys; i++) {
-			(void) memset(&skparms, 0,
-				sizeof (KMF_STOREKEY_PARAMS));
-			skparms.kstype = KMF_KEYSTORE_NSS;
-			skparms.cred = *tokencred;
-			skparms.label = nickname;
-			skparms.certificate = &certs[i];
-			skparms.nssparms.slotlabel = token_spec;
+			int num = numattr;
 
-			rv = KMF_StorePrivateKey(kmfhandle, &skparms, &keys[i]);
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i],
+			    sizeof (KMF_DATA));
+			num++;
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_RAW_KEY_ATTR, &keys[i],
+			    sizeof (KMF_RAW_KEY_DATA));
+			num++;
+
+			rv = kmf_store_key(kmfhandle, num, attrlist);
 		}
 	}
 
@@ -207,12 +314,12 @@ pk_import_pk12_nss(
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			KMF_FreeData(&certs[i]);
+			kmf_free_data(&certs[i]);
 		free(certs);
 	}
 	if (keys) {
 		for (i = 0; i < nkeys; i++)
-			KMF_FreeRawKey(&keys[i]);
+			kmf_free_raw_key(&keys[i]);
 		free(keys);
 	}
 
@@ -227,31 +334,47 @@ pk_import_cert(
 	char *dir, char *prefix, char *trustflags)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_IMPORTCERT_PARAMS params;
+	KMF_ATTRIBUTE attrlist[32];
+	int i = 0;
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = select_token(kmfhandle, token_spec, FALSE);
+	} else if (kstype == KMF_KEYSTORE_NSS) {
+		rv = configure_nss(kmfhandle, dir, prefix);
+	}
+	if (rv != KMF_OK)
+		return (rv);
 
-		if (rv != KMF_OK) {
-			return (rv);
+	kmf_set_attr_at_index(attrlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (KMF_KEYSTORE_TYPE));
+	i++;
+
+	kmf_set_attr_at_index(attrlist, i, KMF_CERT_FILENAME_ATTR,
+	    filename, strlen(filename));
+	i++;
+
+	if (label != NULL) {
+		kmf_set_attr_at_index(attrlist, i, KMF_CERT_LABEL_ATTR,
+		    label, strlen(label));
+		i++;
+	}
+
+	if (kstype == KMF_KEYSTORE_NSS) {
+		if (trustflags != NULL) {
+			kmf_set_attr_at_index(attrlist, i, KMF_TRUSTFLAG_ATTR,
+			    trustflags, strlen(trustflags));
+			i++;
+		}
+
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_TOKEN_LABEL_ATTR,
+			    token_spec, strlen(token_spec));
+			i++;
 		}
 	}
 
-	(void) memset(&params, 0, sizeof (params));
-	params.kstype = kstype;
-	params.certfile = filename;
-	params.certLabel = label;
-
-	if (kstype == KMF_KEYSTORE_NSS) {
-		rv = configure_nss(kmfhandle, dir, prefix);
-		if (rv != KMF_OK)
-			return (rv);
-		params.nssparms.trustflag = trustflags;
-		params.nssparms.slotlabel = token_spec;
-	}
-
-	rv = KMF_ImportCert(kmfhandle, &params);
-
+	rv = kmf_import_cert(kmfhandle, i, attrlist);
 	return (rv);
 }
 
@@ -262,20 +385,33 @@ pk_import_file_crl(void *kmfhandle,
 	char *outdir,
 	KMF_ENCODE_FORMAT outfmt)
 {
-	KMF_IMPORTCRL_PARAMS 	icrl_params;
-	KMF_OPENSSL_PARAMS sslparams;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[8];
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 
-	sslparams.crlfile = infile;
-	sslparams.dirpath = outdir;
-	sslparams.outcrlfile = outfile;
-	sslparams.format = outfmt;
-	sslparams.crl_check = B_FALSE;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+	if (infile) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CRL_FILENAME_ATTR, infile, strlen(infile));
+		numattr++;
+	}
+	if (outdir) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_DIRPATH_ATTR, outdir, strlen(outdir));
+		numattr++;
+	}
+	if (outfile) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CRL_OUTFILE_ATTR, outfile, strlen(outfile));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_ENCODE_FORMAT_ATTR, &outfmt, sizeof (outfmt));
+	numattr++;
 
-	icrl_params.kstype = KMF_KEYSTORE_OPENSSL;
-	icrl_params.sslparms = sslparams;
-
-	return (KMF_ImportCRL(kmfhandle, &icrl_params));
-
+	return (kmf_import_crl(kmfhandle, numattr, attrlist));
 }
 
 static KMF_RETURN
@@ -285,19 +421,28 @@ pk_import_nss_crl(void *kmfhandle,
 	char *outdir,
 	char *prefix)
 {
-	KMF_IMPORTCRL_PARAMS 	icrl_params;
 	KMF_RETURN rv;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[4];
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
 
 	rv = configure_nss(kmfhandle, outdir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	icrl_params.kstype = KMF_KEYSTORE_NSS;
-	icrl_params.nssparms.slotlabel = NULL;
-	icrl_params.nssparms.crlfile = infile;
-	icrl_params.nssparms.crl_check = verify_crl_flag;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+	if (infile) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_FILENAME_ATTR,
+		    infile, strlen(infile));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_CHECK_ATTR,
+	    &verify_crl_flag, sizeof (verify_crl_flag));
+	numattr++;
 
-	return (KMF_ImportCRL(kmfhandle, &icrl_params));
+	return (kmf_import_crl(kmfhandle, numattr, attrlist));
 
 }
 
@@ -315,6 +460,9 @@ pk_import_pk12_pk11(
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
 
 	rv = select_token(kmfhandle, token_spec, FALSE);
 
@@ -322,46 +470,72 @@ pk_import_pk12_pk11(
 		return (rv);
 	}
 
-	rv = KMF_ImportPK12(kmfhandle, filename, p12cred,
-		&certs, &ncerts, &keys, &nkeys);
+	rv = kmf_import_objects(kmfhandle, filename, p12cred,
+	    &certs, &ncerts, &keys, &nkeys);
 
 	if (rv == KMF_OK) {
-		KMF_STOREKEY_PARAMS skparms;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+		    sizeof (kstype));
+		numattr++;
+
+		if (label != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYLABEL_ATTR, label,
+			    strlen(label));
+			numattr++;
+		}
+
+		if (tokencred != NULL && tokencred->credlen > 0) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, tokencred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
 
 		/* The order of certificates and keys should match */
 		for (i = 0; i < nkeys; i++) {
-			(void) memset(&skparms, 0,
-				sizeof (KMF_STOREKEY_PARAMS));
-			skparms.kstype = KMF_KEYSTORE_PK11TOKEN;
-			skparms.certificate = &certs[i];
-			if (tokencred != NULL)
-				skparms.cred = *tokencred;
-			if (i == 0)
-				skparms.label = label;
-			else
-				skparms.label = NULL;
+			int num = numattr;
 
-			rv = KMF_StorePrivateKey(kmfhandle, &skparms,
-				&keys[i]);
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i],
+			    sizeof (KMF_DATA));
+			num++;
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_RAW_KEY_ATTR, &keys[i],
+			    sizeof (KMF_RAW_KEY_DATA));
+			num++;
+
+			rv = kmf_store_key(kmfhandle, num, attrlist);
+
 		}
 	}
 
 	if (rv == KMF_OK) {
-		KMF_STORECERT_PARAMS params;
 
 		(void) printf(gettext("Found %d certificate(s) and %d "
-			"key(s) in %s\n"), ncerts, nkeys, filename);
-		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
-
-		params.kstype = KMF_KEYSTORE_PK11TOKEN;
+		    "key(s) in %s\n"), ncerts, nkeys, filename);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
 
 		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
-			if (i == 0)
-				params.certLabel = label;
-			else
-				params.certLabel = NULL;
+			int num = numattr;
 
-			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
+			if (i == 0 && label != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR, label, strlen(label));
+				num++;
+			}
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			num++;
+
+			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
 	}
 
@@ -370,14 +544,195 @@ pk_import_pk12_pk11(
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			KMF_FreeData(&certs[i]);
+			kmf_free_data(&certs[i]);
 		free(certs);
 	}
 	if (keys) {
 		for (i = 0; i < nkeys; i++)
-			KMF_FreeRawKey(&keys[i]);
+			kmf_free_raw_key(&keys[i]);
 		free(keys);
 	}
+
+	return (rv);
+}
+
+static KMF_RETURN
+pk_import_keys(KMF_HANDLE_T kmfhandle,
+	KMF_KEYSTORE_TYPE kstype, char *token_spec,
+	KMF_CREDENTIAL *cred, char *filename,
+	char *label, char *senstr, char *extstr)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEYSTORE_TYPE fileks = KMF_KEYSTORE_OPENSSL;
+	int numattr = 0;
+	KMF_KEY_HANDLE key;
+	KMF_RAW_KEY_DATA rawkey;
+	KMF_KEY_CLASS class = KMF_ASYM_PRI;
+	int numkeys = 1;
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
+		rv = select_token(kmfhandle, token_spec, FALSE);
+	}
+	if (rv != KMF_OK)
+		return (rv);
+	/*
+	 * First, set up to read the keyfile using the FILE plugin
+	 * mechanisms.
+	 */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &fileks, sizeof (fileks));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_COUNT_ATTR,
+	    &numkeys, sizeof (numkeys));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_HANDLE_ATTR,
+	    &key, sizeof (key));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_RAW_KEY_ATTR,
+	    &rawkey, sizeof (rawkey));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYCLASS_ATTR,
+	    &class, sizeof (class));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_FILENAME_ATTR,
+	    filename, strlen(filename));
+	numattr++;
+
+	rv = kmf_find_key(kmfhandle, numattr, attrlist);
+	if (rv == KMF_OK) {
+		numattr = 0;
+
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
+
+		if (cred != NULL && cred->credlen > 0) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, cred, sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
+
+		if (label != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYLABEL_ATTR, label, strlen(label));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_RAW_KEY_ATTR, &rawkey, sizeof (rawkey));
+		numattr++;
+
+		rv = kmf_store_key(kmfhandle, numattr, attrlist);
+		if (rv == KMF_OK) {
+			printf(gettext("Importing %d keys\n"), numkeys);
+		}
+
+		kmf_free_kmf_key(kmfhandle, &key);
+		kmf_free_raw_key(&rawkey);
+	} else {
+		cryptoerror(LOG_STDERR,
+		    gettext("Failed to load key from file (%s)\n"),
+		    filename);
+	}
+	return (rv);
+}
+
+static KMF_RETURN
+pk_import_rawkey(KMF_HANDLE_T kmfhandle,
+	KMF_KEYSTORE_TYPE kstype, char *token,
+	KMF_CREDENTIAL *cred,
+	char *filename, char *label, KMF_KEY_ALG keyAlg,
+	char *senstr, char *extstr)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
+	uint32_t keylen;
+	boolean_t sensitive = B_FALSE;
+	boolean_t not_extractable = B_FALSE;
+	KMF_DATA keydata = {NULL, 0};
+	KMF_KEY_HANDLE rawkey;
+
+	rv = kmf_read_input_file(kmfhandle, filename, &keydata);
+	if (rv != KMF_OK)
+		return (rv);
+
+	rv = select_token(kmfhandle, token, FALSE);
+
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+	if (senstr != NULL) {
+		if (tolower(senstr[0]) == 'y')
+			sensitive = B_TRUE;
+		else if (tolower(senstr[0]) == 'n')
+			sensitive = B_FALSE;
+		else {
+			cryptoerror(LOG_STDERR,
+			    gettext("Incorrect sensitive option value.\n"));
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+	}
+
+	if (extstr != NULL) {
+		if (tolower(extstr[0]) == 'y')
+			not_extractable = B_FALSE;
+		else if (tolower(extstr[0]) == 'n')
+			not_extractable = B_TRUE;
+		else {
+			cryptoerror(LOG_STDERR,
+			    gettext("Incorrect extractable option value.\n"));
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+	}
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEY_HANDLE_ATTR, &rawkey, sizeof (rawkey));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYALG_ATTR, &keyAlg, sizeof (KMF_KEY_ALG));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEY_DATA_ATTR, keydata.Data, keydata.Length);
+	numattr++;
+
+	/* Key length is given in bits not bytes */
+	keylen = keydata.Length * 8;
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYLENGTH_ATTR, &keylen, sizeof (keydata.Length));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_SENSITIVE_BOOL_ATTR, &sensitive, sizeof (sensitive));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_NON_EXTRACTABLE_BOOL_ATTR, &not_extractable,
+	    sizeof (not_extractable));
+	numattr++;
+
+	if (label != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYLABEL_ATTR, label, strlen(label));
+		numattr++;
+	}
+	if (cred != NULL && cred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CREDENTIAL_ATTR, cred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+	rv = kmf_create_sym_key(kmfhandle, numattr, attrlist);
 
 	return (rv);
 }
@@ -396,12 +751,15 @@ pk_import(int argc, char *argv[])
 	char		*keyfile = NULL;
 	char		*certfile = NULL;
 	char		*crlfile = NULL;
-	char		*certlabel = NULL;
+	char		*label = NULL;
 	char		*dir = NULL;
 	char		*keydir = NULL;
 	char		*prefix = NULL;
 	char		*trustflags = NULL;
 	char		*verify_crl = NULL;
+	char		*keytype = "generic";
+	char		*senstr = NULL;
+	char		*extstr = NULL;
 	boolean_t	verify_crl_flag = B_FALSE;
 	int		oclass = 0;
 	KMF_KEYSTORE_TYPE	kstype = 0;
@@ -411,16 +769,18 @@ pk_import(int argc, char *argv[])
 	KMF_CREDENTIAL	pk12cred = { NULL, 0 };
 	KMF_CREDENTIAL	tokencred = { NULL, 0 };
 	KMF_HANDLE_T	kmfhandle = NULL;
+	KMF_KEY_ALG	keyAlg = KMF_GENERIC_SECRET;
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
-		"T:(token)i:(infile)"
-		"k:(keystore)y:(objtype)"
-		"d:(dir)p:(prefix)"
-		"n:(certlabel)N:(label)"
-		"K:(outkey)c:(outcert)"
-		"v:(verifycrl)l:(outcrl)"
-		"t:(trust)D:(keydir)F:(outformat)")) != EOF) {
+	    "T:(token)i:(infile)"
+	    "k:(keystore)y:(objtype)"
+	    "d:(dir)p:(prefix)"
+	    "n:(certlabel)N:(label)"
+	    "K:(outkey)c:(outcert)"
+	    "v:(verifycrl)l:(outcrl)"
+	    "E:(keytype)s:(sensitive)x:(extractable)"
+	    "t:(trust)D:(keydir)F:(outformat)")) != EOF) {
 		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
 		switch (opt) {
@@ -472,9 +832,9 @@ pk_import(int argc, char *argv[])
 			break;
 		case 'n':
 		case 'N':
-			if (certlabel)
+			if (label)
 				return (PK_ERR_USAGE);
-			certlabel = optarg_av;
+			label = optarg_av;
 			break;
 		case 'F':
 			okfmt = Str2Format(optarg_av);
@@ -495,6 +855,19 @@ pk_import(int argc, char *argv[])
 			else
 				return (PK_ERR_USAGE);
 			break;
+		case 'E':
+			keytype = optarg_av;
+			break;
+		case 's':
+			if (senstr)
+				return (PK_ERR_USAGE);
+			senstr = optarg_av;
+			break;
+		case 'x':
+			if (extstr)
+				return (PK_ERR_USAGE);
+			extstr = optarg_av;
+			break;
 		default:
 			return (PK_ERR_USAGE);
 			break;
@@ -508,7 +881,7 @@ pk_import(int argc, char *argv[])
 	/* Filename arg is required. */
 	if (EMPTYSTRING(filename)) {
 		cryptoerror(LOG_STDERR, gettext("The 'infile' parameter"
-			"is required for the import operation.\n"));
+		    "is required for the import operation.\n"));
 		return (PK_ERR_USAGE);
 	}
 
@@ -520,10 +893,10 @@ pk_import(int argc, char *argv[])
 
 	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
 	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
-		kstype != KMF_KEYSTORE_PK11TOKEN) {
+	    kstype != KMF_KEYSTORE_PK11TOKEN) {
 
 		(void) fprintf(stderr, gettext("The objtype parameter "
-			"is only relevant if keystore=pkcs11\n"));
+		    "is only relevant if keystore=pkcs11\n"));
 		return (PK_ERR_USAGE);
 	}
 
@@ -532,57 +905,85 @@ pk_import(int argc, char *argv[])
 	 * into NSS or PKCS#11.
 	 */
 	if (kstype == KMF_KEYSTORE_NSS &&
-		(oclass != PK_CRL_OBJ) && EMPTYSTRING(certlabel)) {
+	    (oclass != PK_CRL_OBJ) && EMPTYSTRING(label)) {
 		cryptoerror(LOG_STDERR, gettext("The 'label' argument "
-			"is required for this operation\n"));
+		    "is required for this operation\n"));
 		return (PK_ERR_USAGE);
 	}
 
-	/*
-	 * PKCS11 only imports PKCS#12 files or PEM/DER Cert files.
-	 */
-	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
-		/* we do not import private keys except in PKCS12 bundles */
-		if (oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)) {
-			cryptoerror(LOG_STDERR, gettext(
-				"The PKCS11 keystore only imports PKCS12 "
-				"files or raw certificate data files "
-				" or CRL file.\n"));
+	if ((rv = kmf_get_file_format(filename, &kfmt)) != KMF_OK) {
+		/*
+		 * Allow for raw key data to be imported.
+		 */
+		if (rv == KMF_ERR_ENCODING) {
+			rv = KMF_OK;
+			kfmt = KMF_FORMAT_RAWKEY;
+			/*
+			 * Set the object class only if it was not
+			 * given on the command line or if it was
+			 * specified as a symmetric key object.
+			 */
+			if (oclass == 0 || (oclass & PK_SYMKEY_OBJ)) {
+				oclass = PK_SYMKEY_OBJ;
+			} else {
+				cryptoerror(LOG_STDERR, gettext(
+				    "The input file does not contain the "
+				    "object type indicated on command "
+				    "line."));
+				return (KMF_ERR_BAD_PARAMETER);
+			}
+		} else {
+			cryptoerror(LOG_STDERR,
+			    gettext("File format not recognized."));
+			return (rv);
+		}
+	}
+
+	/* Check parameters for raw key import operation */
+	if (kfmt == KMF_FORMAT_RAWKEY) {
+		if (keytype != NULL &&
+		    Str2SymKeyType(keytype, &keyAlg) != 0) {
+			cryptoerror(LOG_STDERR,
+			    gettext("Unrecognized keytype(%s).\n"), keytype);
+			return (PK_ERR_USAGE);
+		}
+		if (senstr != NULL && extstr != NULL &&
+		    kstype != KMF_KEYSTORE_PK11TOKEN) {
+			cryptoerror(LOG_STDERR,
+			    gettext("The sensitive or extractable option "
+			    "applies only when importing a key from a file "
+			    "into a PKCS#11 keystore.\n"));
 			return (PK_ERR_USAGE);
 		}
 	}
 
-	if ((rv = KMF_GetFileFormat(filename, &kfmt)) != KMF_OK) {
-		cryptoerror(LOG_STDERR,
-			gettext("File format not recognized."));
-		return (rv);
-	}
+	/* If no objtype was given, treat it as a certificate */
 	if (oclass == 0 && (kfmt == KMF_FORMAT_ASN1 ||
-		kfmt == KMF_FORMAT_PEM))
+	    kfmt == KMF_FORMAT_PEM))
 		oclass = PK_CERT_OBJ;
 
 	if (kstype == KMF_KEYSTORE_NSS) {
 		if (oclass == PK_CRL_OBJ &&
-			(kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
+		    (kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
 			cryptoerror(LOG_STDERR, gettext(
-				"CRL data can only be imported as DER or "
-				"PEM format"));
+			    "CRL data can only be imported as DER or "
+			    "PEM format"));
 			return (PK_ERR_USAGE);
 		}
 
 		if (oclass == PK_CERT_OBJ &&
-			(kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
+		    (kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
 			cryptoerror(LOG_STDERR, gettext(
-				"Certificates can only be imported as DER or "
-				"PEM format"));
+			    "Certificates can only be imported as DER or "
+			    "PEM format"));
 			return (PK_ERR_USAGE);
 		}
 
 		/* we do not import private keys except in PKCS12 bundles */
 		if (oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)) {
 			cryptoerror(LOG_STDERR, gettext(
-				"Private key data can only be imported as part "
-				"of a PKCS12 file.\n"));
+			    "Private key data can only be imported as part "
+			    "of a PKCS12 file.\n"));
 			return (PK_ERR_USAGE);
 		}
 	}
@@ -590,9 +991,9 @@ pk_import(int argc, char *argv[])
 	if (kstype == KMF_KEYSTORE_OPENSSL && oclass != PK_CRL_OBJ) {
 		if (EMPTYSTRING(keyfile) || EMPTYSTRING(certfile)) {
 			cryptoerror(LOG_STDERR, gettext(
-				"The 'outkey' and 'outcert' parameters "
-				"are required for the import operation "
-				"when the 'file' keystore is used.\n"));
+			    "The 'outkey' and 'outcert' parameters "
+			    "are required for the import operation "
+			    "when the 'file' keystore is used.\n"));
 			return (PK_ERR_USAGE);
 		}
 	}
@@ -604,16 +1005,17 @@ pk_import(int argc, char *argv[])
 
 	if (kfmt == KMF_FORMAT_PKCS12) {
 		(void) get_pk12_password(&pk12cred);
-
-		if (kstype == KMF_KEYSTORE_PK11TOKEN ||
-			kstype == KMF_KEYSTORE_NSS)
-			(void) get_token_password(kstype, token_spec,
-				&tokencred);
 	}
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((kfmt == KMF_FORMAT_PKCS12 || kfmt == KMF_FORMAT_RAWKEY ||
+	    (kfmt == KMF_FORMAT_PEM && (oclass & PK_KEY_OBJ))) &&
+	    (kstype == KMF_KEYSTORE_PK11TOKEN || kstype == KMF_KEYSTORE_NSS)) {
+		(void) get_token_password(kstype, token_spec, &tokencred);
+	}
+
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext("Error initializing "
-				"KMF: 0x%02x\n"), rv);
+		    "KMF: 0x%02x\n"), rv);
 		goto end;
 	}
 
@@ -621,64 +1023,64 @@ pk_import(int argc, char *argv[])
 		case KMF_KEYSTORE_PK11TOKEN:
 			if (kfmt == KMF_FORMAT_PKCS12)
 				rv = pk_import_pk12_pk11(
-					kmfhandle,
-					&pk12cred,
-					&tokencred,
-					certlabel,
-					token_spec,
-					filename);
+				    kmfhandle, &pk12cred,
+				    &tokencred, label,
+				    token_spec, filename);
 			else if (oclass == PK_CERT_OBJ)
 				rv = pk_import_cert(
-					kmfhandle,
-					kstype,
-					certlabel,
-					token_spec,
-					filename,
-					NULL, NULL, NULL);
+				    kmfhandle, kstype,
+				    label, token_spec,
+				    filename,
+				    NULL, NULL, NULL);
 			else if (oclass == PK_CRL_OBJ)
 				rv = pk_import_file_crl(
-					kmfhandle,
-					filename,
-					crlfile,
-					dir,
-					okfmt);
+				    kmfhandle, filename,
+				    crlfile, dir, okfmt);
+			else if (kfmt == KMF_FORMAT_RAWKEY &&
+			    oclass == PK_SYMKEY_OBJ) {
+				rv = pk_import_rawkey(kmfhandle,
+				    kstype, token_spec, &tokencred,
+				    filename, label,
+				    keyAlg, senstr, extstr);
+			} else if (kfmt == KMF_FORMAT_PEM ||
+			    kfmt == KMF_FORMAT_PEM_KEYPAIR) {
+				rv = pk_import_keys(kmfhandle,
+				    kstype, token_spec, &tokencred,
+				    filename, label, senstr, extstr);
+			} else {
+				rv = PK_ERR_USAGE;
+			}
 			break;
 		case KMF_KEYSTORE_NSS:
 			if (dir == NULL)
 				dir = PK_DEFAULT_DIRECTORY;
 			if (kfmt == KMF_FORMAT_PKCS12)
 				rv = pk_import_pk12_nss(
-					kmfhandle, &pk12cred,
-					&tokencred,
-					token_spec, dir, prefix,
-					certlabel, trustflags, filename);
+				    kmfhandle, &pk12cred,
+				    &tokencred,
+				    token_spec, dir, prefix,
+				    label, trustflags, filename);
 			else if (oclass == PK_CERT_OBJ) {
 				rv = pk_import_cert(
-					kmfhandle, kstype,
-					certlabel, token_spec,
-					filename, dir, prefix, trustflags);
+				    kmfhandle, kstype,
+				    label, token_spec,
+				    filename, dir, prefix, trustflags);
 			} else if (oclass == PK_CRL_OBJ) {
 				rv = pk_import_nss_crl(
-					kmfhandle,
-					verify_crl_flag,
-					filename,
-					dir,
-					prefix);
+				    kmfhandle, verify_crl_flag,
+				    filename, dir, prefix);
 			}
 			break;
 		case KMF_KEYSTORE_OPENSSL:
 			if (kfmt == KMF_FORMAT_PKCS12)
 				rv = pk_import_pk12_files(
-					kmfhandle, &pk12cred,
-					filename, certfile, keyfile,
-					dir, keydir, okfmt);
+				    kmfhandle, &pk12cred,
+				    filename, certfile, keyfile,
+				    dir, keydir, okfmt);
 			else if (oclass == PK_CRL_OBJ) {
 				rv = pk_import_file_crl(
-					kmfhandle,
-					filename,
-					crlfile,
-					dir,
-					okfmt);
+				    kmfhandle, filename,
+				    crlfile, dir, okfmt);
 			} else
 				/*
 				 * It doesn't make sense to import anything
@@ -694,7 +1096,7 @@ pk_import(int argc, char *argv[])
 end:
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
-			gettext("Error importing objects"));
+		    gettext("Error importing objects"));
 
 	if (tokencred.cred != NULL)
 		free(tokencred.cred);
@@ -702,7 +1104,7 @@ end:
 	if (pk12cred.cred != NULL)
 		free(pk12cred.cred);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 
 	if (rv != KMF_OK)
 		return (PK_ERR_USAGE);

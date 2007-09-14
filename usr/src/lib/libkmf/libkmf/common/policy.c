@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,7 @@ parseOCSPValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo)
 	n = node->children;
 	while (n != NULL) {
 		if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_OCSP_BASIC_ELEMENT)) {
+		    (const xmlChar *)KMF_OCSP_BASIC_ELEMENT)) {
 
 			vinfo->ocsp_info.basic.responderURI =
 			    (char *)xmlGetProp(n,
@@ -111,8 +111,8 @@ parseOCSPValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo)
 			    (char *)xmlGetProp(n,
 			    (const xmlChar *)KMF_CERT_NAME_ATTR);
 			vinfo->ocsp_info.resp_cert.serial =
-				(char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CERT_SERIAL_ATTR);
+			    (char *)xmlGetProp(n,
+			    (const xmlChar *)KMF_CERT_SERIAL_ATTR);
 			vinfo->ocsp_info.has_resp_cert = 1;
 		}
 
@@ -133,23 +133,23 @@ parseValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo,
 	n = node->children;
 	while (n != NULL) {
 		if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_OCSP_ELEMENT)) {
+		    (const xmlChar *)KMF_OCSP_ELEMENT)) {
 
 			parseOCSPValidation(n, &policy->validation_info);
 			policy->revocation |= KMF_REVOCATION_METHOD_OCSP;
 
 
 		} else if (!xmlStrcmp((const xmlChar *)n->name,
-				(const xmlChar *)KMF_CRL_ELEMENT)) {
+		    (const xmlChar *)KMF_CRL_ELEMENT)) {
 
 			vinfo->crl_info.basefilename = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CRL_BASENAME_ATTR);
+			    (const xmlChar *)KMF_CRL_BASENAME_ATTR);
 
 			vinfo->crl_info.directory = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CRL_DIRECTORY_ATTR);
+			    (const xmlChar *)KMF_CRL_DIRECTORY_ATTR);
 
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CRL_GET_URI_ATTR);
+			    (const xmlChar *)KMF_CRL_GET_URI_ATTR);
 			if (c != NULL && !strcasecmp(c, "true")) {
 				vinfo->crl_info.get_crl_uri = 1;
 			} else {
@@ -161,7 +161,7 @@ parseValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo,
 			    (const xmlChar *)KMF_CRL_PROXY_ATTR);
 
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CRL_IGNORE_SIGN_ATTR);
+			    (const xmlChar *)KMF_CRL_IGNORE_SIGN_ATTR);
 			if (c != NULL && !strcasecmp(c, "true")) {
 				vinfo->crl_info.ignore_crl_sign = 1;
 			} else {
@@ -170,7 +170,7 @@ parseValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo,
 			xmlFree(c);
 
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_CRL_IGNORE_DATE_ATTR);
+			    (const xmlChar *)KMF_CRL_IGNORE_DATE_ATTR);
 			if (c != NULL && !strcasecmp(c, "true")) {
 				vinfo->crl_info.ignore_crl_date = 1;
 			} else {
@@ -186,7 +186,7 @@ parseValidation(xmlNodePtr node, KMF_VALIDATION_POLICY *vinfo,
 }
 
 char *
-ku2str(uint32_t bitfield)
+kmf_ku_to_string(uint32_t bitfield)
 {
 	if (bitfield & KMF_digitalSignature)
 		return ("digitalSignature");
@@ -218,8 +218,8 @@ ku2str(uint32_t bitfield)
 	return (NULL);
 }
 
-uint16_t
-KMF_StringToKeyUsage(char *kustring)
+uint32_t
+kmf_string_to_ku(char *kustring)
 {
 	if (kustring == NULL || !strlen(kustring))
 		return (0);
@@ -254,11 +254,11 @@ parseKeyUsageSet(xmlNodePtr node, uint32_t *kubits)
 	n = node->children;
 	while (n != NULL) {
 		if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_KEY_USAGE_ELEMENT)) {
+		    (const xmlChar *)KMF_KEY_USAGE_ELEMENT)) {
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_KEY_USAGE_USE_ATTR);
+			    (const xmlChar *)KMF_KEY_USAGE_USE_ATTR);
 			if (c) {
-				*kubits |= KMF_StringToKeyUsage(c);
+				*kubits |= kmf_string_to_ku(c);
 				xmlFree(c);
 			}
 		}
@@ -288,7 +288,7 @@ dup_oid(KMF_OID *oldoid)
 }
 
 KMF_OID *
-kmf_ekuname2oid(char *ekuname)
+kmf_ekuname_to_oid(char *ekuname)
 {
 	KMF_OID *oid;
 	int i;
@@ -307,129 +307,16 @@ kmf_ekuname2oid(char *ekuname)
 }
 
 char *
-KMF_OID2EKUString(KMF_OID *oid)
+kmf_oid_to_eku_string(KMF_OID *oid)
 {
 	int i;
 	for (i = 0; i < num_ekus; i++) {
 		if (oid->Length == EKUList[i].oid->Length &&
-			!memcmp(oid->Data, EKUList[i].oid->Data, oid->Length)) {
+		    !memcmp(oid->Data, EKUList[i].oid->Data, oid->Length)) {
 			return (EKUList[i].ekuname);
 		}
 	}
 	return (NULL);
-}
-
-/*
- * Convert a human-readable OID string of the form "1.2.3.4" or
- * "1 2 3 4" into a KMF_OID value.
- */
-KMF_OID *
-kmf_string2oid(char *oidstring)
-{
-	KMF_OID *oid = NULL;
-	char *cp, *bp, *startp;
-	int numbuf;
-	int onumbuf;
-	int nbytes, index;
-	int len;
-	unsigned char *op;
-
-	if (oidstring == NULL)
-		return (NULL);
-
-	len = strlen(oidstring);
-
-	bp = oidstring;
-	cp = bp;
-	/* Skip over leading space */
-	while ((bp < &cp[len]) && isspace(*bp))
-		bp++;
-
-	startp = bp;
-	nbytes = 0;
-
-	/*
-	 * The first two numbers are chewed up by the first octet.
-	 */
-	if (sscanf(bp, "%d", &numbuf) != 1)
-		return (NULL);
-	while ((bp < &cp[len]) && isdigit(*bp))
-		bp++;
-	while ((bp < &cp[len]) && (isspace(*bp) || *bp == '.'))
-		bp++;
-	if (sscanf(bp, "%d", &numbuf) != 1)
-		return (NULL);
-	while ((bp < &cp[len]) && isdigit(*bp))
-		bp++;
-	while ((bp < &cp[len]) && (isspace(*bp) || *bp == '.'))
-		bp++;
-	nbytes++;
-
-	while (isdigit(*bp)) {
-		if (sscanf(bp, "%d", &numbuf) != 1)
-			return (NULL);
-		while (numbuf) {
-			nbytes++;
-			numbuf >>= 7;
-		}
-		while ((bp < &cp[len]) && isdigit(*bp))
-			bp++;
-		while ((bp < &cp[len]) && (isspace(*bp) || *bp == '.'))
-			bp++;
-	}
-
-	oid = malloc(sizeof (KMF_OID));
-	if (oid == NULL)
-		return (NULL);
-
-	oid->Length = nbytes;
-	oid->Data = malloc(oid->Length);
-	if (oid->Data == NULL) {
-		free(oid);
-		return (NULL);
-	}
-	(void) memset(oid->Data, 0, oid->Length);
-
-	op = oid->Data;
-
-	bp = startp;
-	(void) sscanf(bp, "%d", &numbuf);
-
-	while (isdigit(*bp)) bp++;
-	while (isspace(*bp) || *bp == '.') bp++;
-
-	onumbuf = 40 * numbuf;
-	(void) sscanf(bp, "%d", &numbuf);
-	onumbuf += numbuf;
-	*op = (unsigned char) onumbuf;
-	op++;
-
-	while (isdigit(*bp)) bp++;
-	while (isspace(*bp) || *bp == '.') bp++;
-	while (isdigit(*bp)) {
-		(void) sscanf(bp, "%d", &numbuf);
-		nbytes = 0;
-		/* Have to fill in the bytes msb-first */
-		onumbuf = numbuf;
-		while (numbuf) {
-			nbytes++;
-			numbuf >>= 7;
-		}
-		numbuf = onumbuf;
-		op += nbytes;
-		index = -1;
-		while (numbuf) {
-			op[index] = (unsigned char)numbuf & 0x7f;
-			if (index != -1)
-				op[index] |= 0x80;
-			index--;
-			numbuf >>= 7;
-		}
-		while (isdigit(*bp)) bp++;
-		while (isspace(*bp) || *bp == '.') bp++;
-	}
-
-	return (oid);
 }
 
 static KMF_RETURN
@@ -442,23 +329,29 @@ parseExtKeyUsage(xmlNodePtr node, KMF_EKU_POLICY *ekus)
 
 	n = node->children;
 	while (n != NULL && ret == KMF_OK) {
-		KMF_OID *newoid = NULL;
+		KMF_OID newoid, *oidptr;
+
+		oidptr = NULL;
+		newoid.Data = NULL;
+		newoid.Length = 0;
 
 		if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_EKU_NAME_ELEMENT)) {
+		    (const xmlChar *)KMF_EKU_NAME_ELEMENT)) {
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_EKU_NAME_ATTR);
+			    (const xmlChar *)KMF_EKU_NAME_ATTR);
 			if (c != NULL) {
-				newoid = kmf_ekuname2oid(c);
+				oidptr = kmf_ekuname_to_oid(c);
 				xmlFree(c);
 				found = TRUE;
+				if (oidptr != NULL)
+					newoid = *oidptr;
 			}
 		} else if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_EKU_OID_ELEMENT)) {
+		    (const xmlChar *)KMF_EKU_OID_ELEMENT)) {
 			c = (char *)xmlGetProp(n,
-				(const xmlChar *)KMF_EKU_OID_ATTR);
+			    (const xmlChar *)KMF_EKU_OID_ATTR);
 			if (c != NULL) {
-				newoid = kmf_string2oid(c);
+				(void) kmf_string_to_oid(c, &newoid);
 				xmlFree(c);
 				found = TRUE;
 			}
@@ -469,29 +362,18 @@ parseExtKeyUsage(xmlNodePtr node, KMF_EKU_POLICY *ekus)
 			continue;
 		}
 
-		if (newoid != NULL) {
+		if (newoid.Data != NULL) {
 			ekus->eku_count++;
 			ekus->ekulist = realloc(ekus->ekulist,
-					ekus->eku_count * sizeof (KMF_OID));
+			    ekus->eku_count * sizeof (KMF_OID));
 			if (ekus->ekulist != NULL) {
 				ekus->ekulist[ekus->eku_count-1].Length =
-				    newoid->Length;
+				    newoid.Length;
 				ekus->ekulist[ekus->eku_count-1].Data =
-				    malloc(newoid->Length);
-				if (ekus->ekulist[ekus->eku_count-1].Data ==
-				    NULL) {
-					ret = KMF_ERR_MEMORY;
-				} else {
-					(void) memcpy(
-					    ekus->ekulist[ekus->eku_count-1].
-					    Data,
-					    newoid->Data, newoid->Length);
-				}
+				    newoid.Data;
 			} else {
 				ret = KMF_ERR_MEMORY;
 			}
-			KMF_FreeData(newoid);
-			free(newoid);
 		} else {
 			ret = KMF_ERR_POLICY_DB_FORMAT;
 		}
@@ -512,10 +394,10 @@ parsePolicyElement(xmlNodePtr node, KMF_POLICY_RECORD *policy)
 	if (node->type == XML_ELEMENT_NODE) {
 		if (node->properties != NULL) {
 			policy->name = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_NAME_ATTR);
+			    (const xmlChar *)KMF_POLICY_NAME_ATTR);
 
 			c = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_OPTIONS_IGNORE_DATE_ATTR);
+			    (const xmlChar *)KMF_OPTIONS_IGNORE_DATE_ATTR);
 			if (c && !strcasecmp(c, "true")) {
 				policy->ignore_date = 1;
 				xmlFree((xmlChar *)c);
@@ -544,20 +426,20 @@ parsePolicyElement(xmlNodePtr node, KMF_POLICY_RECORD *policy)
 			}
 
 			policy->ta_name = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_TA_NAME_ATTR);
+			    (const xmlChar *)KMF_POLICY_TA_NAME_ATTR);
 
 			policy->ta_serial = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_TA_SERIAL_ATTR);
+			    (const xmlChar *)KMF_POLICY_TA_SERIAL_ATTR);
 		}
 
 		n = node->children;
 		while (n != NULL) {
 			if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_VALIDATION_METHODS_ELEMENT))
+			    (const xmlChar *)KMF_VALIDATION_METHODS_ELEMENT))
 				parseValidation(n, &policy->validation_info,
 				    policy);
 			else if (!xmlStrcmp((const xmlChar *)n->name,
-			(const xmlChar *)KMF_KEY_USAGE_SET_ELEMENT))
+			    (const xmlChar *)KMF_KEY_USAGE_SET_ELEMENT))
 				parseKeyUsageSet(n, &policy->ku_bits);
 			else if (!xmlStrcmp((const xmlChar *)n->name,
 			    (const xmlChar *)KMF_EKU_ELEMENT)) {
@@ -580,7 +462,7 @@ newprop(xmlNodePtr node, char *attrname, char *src)
 
 	if (src != NULL && strlen(src)) {
 		newattr = xmlNewProp(node, (const xmlChar *)attrname,
-			(xmlChar *)src);
+		    (xmlChar *)src);
 		if (newattr == NULL) {
 			xmlUnlinkNode(node);
 			xmlFreeNode(node);
@@ -660,7 +542,7 @@ AddOCSPNodes(xmlNodePtr parent, KMF_OCSP_POLICY *ocsp)
 
 		/* basic node */
 		n_ocsp = xmlNewChild(parent, NULL,
-			(const xmlChar *)KMF_OCSP_ELEMENT, NULL);
+		    (const xmlChar *)KMF_OCSP_ELEMENT, NULL);
 		if (n_ocsp == NULL)
 			return (-1);
 		addFormatting(n_ocsp, "\n\t\t\t");
@@ -680,7 +562,7 @@ AddOCSPNodes(xmlNodePtr parent, KMF_OCSP_POLICY *ocsp)
 			return (-1);
 		if (basic->response_lifetime &&
 		    newprop(n_basic, KMF_OCSP_RESPONSE_LIFETIME_ATTR,
-			basic->response_lifetime))
+		    basic->response_lifetime))
 			return (-1);
 		if (basic->ignore_response_sign &&
 		    newprop(n_basic, KMF_OCSP_IGNORE_SIGN_ATTR, "TRUE"))
@@ -721,7 +603,7 @@ AddValidationNodes(xmlNodePtr parent, KMF_POLICY_RECORD *policy)
 
 	addFormatting(parent, "\t");
 	mnode = xmlNewChild(parent, NULL,
-		(const xmlChar *)KMF_VALIDATION_METHODS_ELEMENT, NULL);
+	    (const xmlChar *)KMF_VALIDATION_METHODS_ELEMENT, NULL);
 	if (mnode == NULL)
 		return (-1);
 
@@ -768,17 +650,17 @@ AddKeyUsageNodes(xmlNodePtr parent, uint32_t kubits)
 
 	addFormatting(parent, "\n\t");
 	kuset = xmlNewChild(parent, NULL,
-		(const xmlChar *)KMF_KEY_USAGE_SET_ELEMENT, NULL);
+	    (const xmlChar *)KMF_KEY_USAGE_SET_ELEMENT, NULL);
 	if (kuset == NULL)
 		return (KMF_ERR_POLICY_ENGINE);
 
 	for (i = KULOWBIT; i <= KUHIGHBIT && ret == KMF_OK; i++) {
-		char *s = ku2str((kubits & (1<<i)));
+		char *s = kmf_ku_to_string((kubits & (1<<i)));
 		if (s != NULL) {
 			addFormatting(kuset, "\n\t\t");
 
 			kunode = xmlNewChild(kuset, NULL,
-				(const xmlChar *)KMF_KEY_USAGE_ELEMENT, NULL);
+			    (const xmlChar *)KMF_KEY_USAGE_ELEMENT, NULL);
 			if (kunode == NULL)
 				ret = KMF_ERR_POLICY_ENGINE;
 
@@ -811,17 +693,17 @@ AddExtKeyUsageNodes(xmlNodePtr parent, KMF_EKU_POLICY *ekus)
 	if (ekus != NULL && ekus->eku_count > 0) {
 		addFormatting(parent, "\n\t");
 		n = xmlNewChild(parent, NULL,
-			(const xmlChar *)KMF_EKU_ELEMENT, NULL);
+		    (const xmlChar *)KMF_EKU_ELEMENT, NULL);
 		if (n == NULL)
 			return (KMF_ERR_POLICY_ENGINE);
 
 		for (i = 0; i < ekus->eku_count; i++) {
-			char *s = KMF_OID2String(&ekus->ekulist[i]);
+			char *s = kmf_oid_to_string(&ekus->ekulist[i]);
 			if (s != NULL) {
 				addFormatting(n, "\n\t\t");
 				kunode = xmlNewChild(n, NULL,
-					(const xmlChar *)KMF_EKU_OID_ELEMENT,
-					NULL);
+				    (const xmlChar *)KMF_EKU_OID_ELEMENT,
+				    NULL);
 				if (kunode == NULL)
 					ret = KMF_ERR_POLICY_ENGINE;
 
@@ -844,12 +726,12 @@ AddExtKeyUsageNodes(xmlNodePtr parent, KMF_EKU_POLICY *ekus)
 }
 
 void
-KMF_FreeEKUPolicy(KMF_EKU_POLICY *ekus)
+kmf_free_eku_policy(KMF_EKU_POLICY *ekus)
 {
 	if (ekus->eku_count > 0) {
 		int i;
 		for (i = 0; i < ekus->eku_count; i++) {
-			KMF_FreeData(&ekus->ekulist[i]);
+			kmf_free_data(&ekus->ekulist[i]);
 		}
 		free(ekus->ekulist);
 	}
@@ -858,7 +740,7 @@ KMF_FreeEKUPolicy(KMF_EKU_POLICY *ekus)
 #define	FREE_POLICY_STR(s) if (s != NULL) free(s);
 
 void
-KMF_FreePolicyRecord(KMF_POLICY_RECORD *policy)
+kmf_free_policy_record(KMF_POLICY_RECORD *policy)
 {
 	if (policy == NULL)
 		return;
@@ -876,18 +758,18 @@ KMF_FreePolicyRecord(KMF_POLICY_RECORD *policy)
 	FREE_POLICY_STR(policy->ta_name)
 	FREE_POLICY_STR(policy->ta_serial)
 
-	KMF_FreeEKUPolicy(&policy->eku_set);
+	kmf_free_eku_policy(&policy->eku_set);
 
 	(void) memset(policy, 0, sizeof (KMF_POLICY_RECORD));
 }
 
 /*
- * KMF_GetPolicy
+ * kmf_get_policy
  *
  * Find a policy record in the database.
  */
 KMF_RETURN
-KMF_GetPolicy(char *filename, char *policy_name, KMF_POLICY_RECORD *plc)
+kmf_get_policy(char *filename, char *policy_name, KMF_POLICY_RECORD *plc)
 {
 	KMF_RETURN ret = KMF_OK;
 	xmlParserCtxtPtr ctxt;
@@ -926,10 +808,10 @@ KMF_GetPolicy(char *filename, char *policy_name, KMF_POLICY_RECORD *plc)
 		 * Search for the policy that matches the given name.
 		 */
 		if (!xmlStrcmp((const xmlChar *)node->name,
-			(const xmlChar *)KMF_POLICY_ELEMENT)) {
+		    (const xmlChar *)KMF_POLICY_ELEMENT)) {
 			/* Check the name attribute */
 			c = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_NAME_ATTR);
+			    (const xmlChar *)KMF_POLICY_NAME_ATTR);
 
 			/* If a match, parse the rest of the data */
 			if (c != NULL) {
@@ -959,7 +841,7 @@ out:
 }
 
 /*
- * KMF_SetPolicy
+ * kmf_set_policy
  *
  * Set the policy record in the handle.  This searches
  * the policy DB for the named policy.  If it is not found
@@ -967,7 +849,7 @@ out:
  * is kept and an error code is returned.
  */
 KMF_RETURN
-KMF_SetPolicy(KMF_HANDLE_T handle, char *policyfile, char *policyname)
+kmf_set_policy(KMF_HANDLE_T handle, char *policyfile, char *policyname)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_POLICY_RECORD *newpolicy = NULL;
@@ -981,20 +863,20 @@ KMF_SetPolicy(KMF_HANDLE_T handle, char *policyfile, char *policyname)
 		return (KMF_ERR_MEMORY);
 	(void) memset(newpolicy, 0, sizeof (KMF_POLICY_RECORD));
 
-	ret = KMF_GetPolicy(
+	ret = kmf_get_policy(
 	    policyfile == NULL ? KMF_DEFAULT_POLICY_FILE : policyfile,
 	    policyname == NULL ? KMF_DEFAULT_POLICY_NAME : policyname,
 	    newpolicy);
 	if (ret != KMF_OK)
 		goto out;
 
-	ret = KMF_VerifyPolicy(newpolicy);
+	ret = kmf_verify_policy(newpolicy);
 	if (ret != KMF_OK)
 		goto out;
 
 	/* release the existing policy data (if any). */
 	if (handle->policy != NULL) {
-		KMF_FreePolicyRecord(handle->policy);
+		kmf_free_policy_record(handle->policy);
 		free(handle->policy);
 	}
 
@@ -1003,7 +885,7 @@ KMF_SetPolicy(KMF_HANDLE_T handle, char *policyfile, char *policyname)
 out:
 	/* Cleanup any data allocated before the error occurred */
 	if (ret != KMF_OK) {
-		KMF_FreePolicyRecord(newpolicy);
+		kmf_free_policy_record(newpolicy);
 		free(newpolicy);
 	}
 
@@ -1024,10 +906,10 @@ deletePolicyNode(xmlNodePtr node, char *policy_name)
 		 * Search for the policy that matches the given name.
 		 */
 		if (!xmlStrcmp((const xmlChar *)node->name,
-			(const xmlChar *)KMF_POLICY_ELEMENT)) {
+		    (const xmlChar *)KMF_POLICY_ELEMENT)) {
 			/* Check the name attribute */
 			c = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_NAME_ATTR);
+			    (const xmlChar *)KMF_POLICY_NAME_ATTR);
 
 			/* If a match, parse the rest of the data */
 			if (c != NULL) {
@@ -1139,8 +1021,7 @@ update_policyfile(xmlDocPtr doc, char *filename)
 
 	(void) fclose(pfile);
 
-	if (fchmod(tmpfd,
-		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+	if (fchmod(tmpfd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
 		(void) close(tmpfd);
 		(void) unlink(tmpfilename);
 		return (KMF_ERR_POLICY_DB_FILE);
@@ -1164,13 +1045,13 @@ update_policyfile(xmlDocPtr doc, char *filename)
 }
 
 /*
- * DeletePolicyFromDB
+ * kmf_delete_policy_from_db
  *
  * Find a policy by name and remove it from the policy DB file.
  * If the policy is not found, return an error.
  */
 KMF_RETURN
-KMF_DeletePolicyFromDB(char *policy_name, char *dbfilename)
+kmf_delete_policy_from_db(char *policy_name, char *dbfilename)
 {
 	KMF_RETURN ret;
 	xmlParserCtxtPtr ctxt = NULL;
@@ -1241,7 +1122,7 @@ addPolicyNode(xmlNodePtr pnode, KMF_POLICY_RECORD *policy)
 		}
 		if (policy->ignore_date) {
 			if (newprop(pnode, KMF_OPTIONS_IGNORE_DATE_ATTR,
-				"TRUE")) {
+			    "TRUE")) {
 				ret = KMF_ERR_POLICY_ENGINE;
 				goto out;
 			}
@@ -1249,7 +1130,7 @@ addPolicyNode(xmlNodePtr pnode, KMF_POLICY_RECORD *policy)
 
 		if (policy->ignore_unknown_ekus) {
 			if (newprop(pnode, KMF_OPTIONS_IGNORE_UNKNOWN_EKUS,
-				"TRUE")) {
+			    "TRUE")) {
 				ret = KMF_ERR_POLICY_ENGINE;
 				goto out;
 			}
@@ -1257,7 +1138,7 @@ addPolicyNode(xmlNodePtr pnode, KMF_POLICY_RECORD *policy)
 
 		if (policy->ignore_trust_anchor) {
 			if (newprop(pnode, KMF_OPTIONS_IGNORE_TRUST_ANCHOR,
-				"TRUE")) {
+			    "TRUE")) {
 				ret = KMF_ERR_POLICY_ENGINE;
 				goto out;
 			}
@@ -1265,7 +1146,7 @@ addPolicyNode(xmlNodePtr pnode, KMF_POLICY_RECORD *policy)
 
 		if (policy->validity_adjusttime) {
 			if (newprop(pnode, KMF_OPTIONS_VALIDITY_ADJUSTTIME,
-				policy->validity_adjusttime)) {
+			    policy->validity_adjusttime)) {
 				ret = KMF_ERR_POLICY_ENGINE;
 				goto out;
 			}
@@ -1311,7 +1192,7 @@ out:
 
 
 KMF_RETURN
-KMF_VerifyPolicy(KMF_POLICY_RECORD *policy)
+kmf_verify_policy(KMF_POLICY_RECORD *policy)
 {
 	KMF_RETURN ret = KMF_OK;
 	boolean_t has_ta;
@@ -1366,7 +1247,7 @@ KMF_VerifyPolicy(KMF_POLICY_RECORD *policy)
  * is true, then we check the policy sanity also.
  */
 KMF_RETURN
-KMF_AddPolicyToDB(KMF_POLICY_RECORD *policy, char *dbfilename,
+kmf_add_policy_to_db(KMF_POLICY_RECORD *policy, char *dbfilename,
     boolean_t check_policy)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -1378,8 +1259,8 @@ KMF_AddPolicyToDB(KMF_POLICY_RECORD *policy, char *dbfilename,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	if (check_policy == B_TRUE) {
-		if (ret = KMF_VerifyPolicy(policy))
-		    return (ret);
+		if (ret = kmf_verify_policy(policy))
+			return (ret);
 	}
 
 	/* If the policyDB exists, load it into memory */
@@ -1423,11 +1304,11 @@ KMF_AddPolicyToDB(KMF_POLICY_RECORD *policy, char *dbfilename,
 		 * DTD link is embedded
 		 */
 		doc->intSubset = xmlCreateIntSubset(doc,
-			(const xmlChar *)KMF_POLICY_ROOT,
-			NULL, (const xmlChar *)KMF_POLICY_DTD);
+		    (const xmlChar *)KMF_POLICY_ROOT,
+		    NULL, (const xmlChar *)KMF_POLICY_DTD);
 
 		root = xmlNewDocNode(doc, NULL,
-			(const xmlChar *)KMF_POLICY_ROOT, NULL);
+		    (const xmlChar *)KMF_POLICY_ROOT, NULL);
 		if (root != NULL) {
 			xmlDocSetRootElement(doc, root);
 		}
@@ -1438,7 +1319,7 @@ KMF_AddPolicyToDB(KMF_POLICY_RECORD *policy, char *dbfilename,
 		xmlNodePtr pnode;
 
 		pnode = xmlNewChild(root, NULL,
-			(const xmlChar *)KMF_POLICY_ELEMENT, NULL);
+		    (const xmlChar *)KMF_POLICY_ELEMENT, NULL);
 
 		ret = addPolicyNode(pnode, policy);
 		/* If that worked, update the DB file. */

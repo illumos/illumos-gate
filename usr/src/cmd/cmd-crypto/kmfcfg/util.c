@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,7 @@ free_policy_list(POLICY_LIST *plist)
 
 	while (n != NULL) {
 		old = n;
-		KMF_FreePolicyRecord(&n->plc);
+		kmf_free_policy_record(&n->plc);
 		n = n->next;
 		free(old);
 	}
@@ -104,10 +104,10 @@ load_policies(char *file, POLICY_LIST **policy_list)
 		 * Search for the policy that matches the given name.
 		 */
 		if (!xmlStrcmp((const xmlChar *)node->name,
-			(const xmlChar *)KMF_POLICY_ELEMENT)) {
+		    (const xmlChar *)KMF_POLICY_ELEMENT)) {
 			/* Check the name attribute */
 			c = (char *)xmlGetProp(node,
-				(const xmlChar *)KMF_POLICY_NAME_ATTR);
+			    (const xmlChar *)KMF_POLICY_NAME_ATTR);
 
 			/* If a match, parse the rest of the data */
 			if (c != NULL) {
@@ -115,9 +115,9 @@ load_policies(char *file, POLICY_LIST **policy_list)
 				newitem = malloc(sizeof (POLICY_LIST));
 				if (newitem != NULL) {
 					(void) memset(newitem, 0,
-						sizeof (POLICY_LIST));
+					    sizeof (POLICY_LIST));
 					kmfrv = parsePolicyElement(node,
-						&newitem->plc);
+					    &newitem->plc);
 				} else {
 					kmfrv = KMF_ERR_MEMORY;
 					goto end;
@@ -167,7 +167,7 @@ parseKUlist(char *kustring)
 
 	p = strtok(kustring, ",");
 	while (p != NULL) {
-		cur_bit = KMF_StringToKeyUsage(p);
+		cur_bit = kmf_string_to_ku(p);
 		if (cur_bit == 0) {
 			kubits = 0;
 			break;
@@ -185,8 +185,7 @@ addToEKUList(KMF_EKU_POLICY *ekus, KMF_OID *newoid)
 	if (newoid != NULL && ekus != NULL) {
 		ekus->eku_count++;
 		ekus->ekulist = realloc(
-			ekus->ekulist,
-			ekus->eku_count * sizeof (KMF_OID));
+		    ekus->ekulist, ekus->eku_count * sizeof (KMF_OID));
 		if (ekus->ekulist != NULL) {
 			ekus->ekulist[ekus->eku_count-1] = *newoid;
 		}
@@ -211,7 +210,7 @@ parseEKUNames(char *ekulist, KMF_POLICY_RECORD *plc)
 
 	/* If no tokens found, then maybe its just a single EKU value */
 	if (p == NULL) {
-		newoid = kmf_ekuname2oid(ekulist);
+		newoid = kmf_ekuname_to_oid(ekulist);
 		if (newoid != NULL) {
 			addToEKUList(ekus, newoid);
 			free(newoid);
@@ -221,7 +220,7 @@ parseEKUNames(char *ekulist, KMF_POLICY_RECORD *plc)
 	}
 
 	while (p != NULL) {
-		newoid = kmf_ekuname2oid(p);
+		newoid = kmf_ekuname_to_oid(p);
 		if (newoid != NULL) {
 			addToEKUList(ekus, newoid);
 			free(newoid);
@@ -233,7 +232,7 @@ parseEKUNames(char *ekulist, KMF_POLICY_RECORD *plc)
 	}
 
 	if (rv != KC_OK)
-		KMF_FreeEKUPolicy(ekus);
+		kmf_free_eku_policy(ekus);
 
 	return (rv);
 }
@@ -243,7 +242,7 @@ parseEKUOIDs(char *ekulist, KMF_POLICY_RECORD *plc)
 {
 	int rv = KC_OK;
 	char *p;
-	KMF_OID *newoid;
+	KMF_OID newoid = {NULL, 0};
 	KMF_EKU_POLICY *ekus = &plc->eku_set;
 
 	if (ekulist == NULL || !strlen(ekulist))
@@ -254,20 +253,16 @@ parseEKUOIDs(char *ekulist, KMF_POLICY_RECORD *plc)
 	 */
 	p = strtok(ekulist, ",");
 	if (p == NULL) {
-		newoid = kmf_string2oid(ekulist);
-		if (newoid != NULL) {
-			addToEKUList(ekus, newoid);
-			free(newoid);
+		if (kmf_string_to_oid(ekulist, &newoid) == KMF_OK) {
+			addToEKUList(ekus, &newoid);
 		} else {
 			rv = KC_ERR_USAGE;
 		}
 	}
 
 	while (p != NULL && rv == 0) {
-		newoid = kmf_string2oid(p);
-		if (newoid != NULL) {
-			addToEKUList(ekus, newoid);
-			free(newoid);
+		if (kmf_string_to_oid(p, &newoid) == KMF_OK) {
+			addToEKUList(ekus, &newoid);
 		} else {
 			rv = KC_ERR_USAGE;
 			break;
@@ -276,7 +271,7 @@ parseEKUOIDs(char *ekulist, KMF_POLICY_RECORD *plc)
 	}
 
 	if (rv != KC_OK)
-		KMF_FreeEKUPolicy(ekus);
+		kmf_free_eku_policy(ekus);
 
 	return (rv);
 }
@@ -438,7 +433,7 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 	/* First time or when optstring changes from previous one */
 	if (_save_optstr != optstring) {
 		if (opts_av != NULL)
-		    free(opts_av);
+			free(opts_av);
 		opts_av = NULL;
 		_save_optstr = optstring;
 		_save_numopts = populate_opts((char *)optstring);

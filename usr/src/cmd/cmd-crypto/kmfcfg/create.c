@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,30 +50,30 @@ kc_create(int argc, char *argv[])
 	(void) memset(&plc, 0, sizeof (KMF_POLICY_RECORD));
 
 	while ((opt = getopt_av(argc, argv,
-		"i:(dbfile)"
-		"p:(policy)"
-		"d:(ignore-date)"
-		"e:(ignore-unknown-eku)"
-		"a:(ignore-trust-anchor)"
-		"v:(validity-adjusttime)"
-		"t:(ta-name)"
-		"s:(ta-serial)"
-		"o:(ocsp-responder)"
-		"P:(ocsp-proxy)"
-		"r:(ocsp-use-cert-responder)"
-		"T:(ocsp-response-lifetime)"
-		"R:(ocsp-ignore-response-sign)"
-		"n:(ocsp-responder-cert-name)"
-		"A:(ocsp-responder-cert-serial)"
-		"c:(crl-basefilename)"
-		"I:(crl-directory)"
-		"g:(crl-get-crl-uri)"
-		"X:(crl-proxy)"
-		"S:(crl-ignore-crl-sign)"
-		"D:(crl-ignore-crl-date)"
-		"u:(keyusage)"
-		"E:(ekunames)"
-		"O:(ekuoids)")) != EOF) {
+	    "i:(dbfile)"
+	    "p:(policy)"
+	    "d:(ignore-date)"
+	    "e:(ignore-unknown-eku)"
+	    "a:(ignore-trust-anchor)"
+	    "v:(validity-adjusttime)"
+	    "t:(ta-name)"
+	    "s:(ta-serial)"
+	    "o:(ocsp-responder)"
+	    "P:(ocsp-proxy)"
+	    "r:(ocsp-use-cert-responder)"
+	    "T:(ocsp-response-lifetime)"
+	    "R:(ocsp-ignore-response-sign)"
+	    "n:(ocsp-responder-cert-name)"
+	    "A:(ocsp-responder-cert-serial)"
+	    "c:(crl-basefilename)"
+	    "I:(crl-directory)"
+	    "g:(crl-get-crl-uri)"
+	    "X:(crl-proxy)"
+	    "S:(crl-ignore-crl-sign)"
+	    "D:(crl-ignore-crl-date)"
+	    "u:(keyusage)"
+	    "E:(ekunames)"
+	    "O:(ekuoids)")) != EOF) {
 		switch (opt) {
 			case 'i':
 				filename = get_string(optarg_av, &rv);
@@ -142,14 +142,14 @@ kc_create(int argc, char *argv[])
 				} else {
 					KMF_X509_NAME taDN;
 					/* for syntax checking */
-					if (KMF_DNParser(plc.ta_name,
+					if (kmf_dn_parser(plc.ta_name,
 					    &taDN) != KMF_OK) {
 						(void) fprintf(stderr,
 						    gettext("Error name "
 						    "input.\n"));
 						rv = KC_ERR_USAGE;
 					} else {
-						KMF_FreeDN(&taDN);
+						kmf_free_dn(&taDN);
 					}
 				}
 				break;
@@ -162,7 +162,7 @@ kc_create(int argc, char *argv[])
 					uchar_t *bytes = NULL;
 					size_t bytelen;
 
-					ret = KMF_HexString2Bytes(
+					ret = kmf_hexstr_to_bytes(
 					    (uchar_t *)plc.ta_serial,
 					    &bytes, &bytelen);
 					if (ret != KMF_OK || bytes == NULL) {
@@ -250,7 +250,7 @@ kc_create(int argc, char *argv[])
 				} else {
 					KMF_X509_NAME respDN;
 					/* for syntax checking */
-					if (KMF_DNParser(
+					if (kmf_dn_parser(
 					    plc.VAL_OCSP_RESP_CERT_NAME,
 					    &respDN) != KMF_OK) {
 						(void) fprintf(stderr,
@@ -258,7 +258,7 @@ kc_create(int argc, char *argv[])
 						    "input.\n"));
 						rv = KC_ERR_USAGE;
 					} else {
-						KMF_FreeDN(&respDN);
+						kmf_free_dn(&respDN);
 						ocsp_set_attr++;
 					}
 				}
@@ -273,7 +273,7 @@ kc_create(int argc, char *argv[])
 					uchar_t *bytes = NULL;
 					size_t bytelen;
 
-					ret = KMF_HexString2Bytes((uchar_t *)
+					ret = kmf_hexstr_to_bytes((uchar_t *)
 					    plc.VAL_OCSP_RESP_CERT_SERIAL,
 					    &bytes, &bytelen);
 					if (ret != KMF_OK || bytes == NULL) {
@@ -343,7 +343,7 @@ kc_create(int argc, char *argv[])
 				break;
 			case 'D':
 				plc.VAL_CRL_IGNORE_DATE =
-					get_boolean(optarg_av);
+				    get_boolean(optarg_av);
 				if (plc.VAL_CRL_IGNORE_DATE == -1) {
 					(void) fprintf(stderr,
 					    gettext("Error boolean input.\n"));
@@ -471,7 +471,7 @@ kc_create(int argc, char *argv[])
 	/*
 	 * Does a sanity check on the new policy.
 	 */
-	ret = KMF_VerifyPolicy(&plc);
+	ret = kmf_verify_policy(&plc);
 	if (ret != KMF_OK) {
 		print_sanity_error(ret);
 		rv = KC_ERR_ADD_POLICY;
@@ -481,7 +481,7 @@ kc_create(int argc, char *argv[])
 	/*
 	 * Add to the DB.
 	 */
-	ret = KMF_AddPolicyToDB(&plc, filename, B_FALSE);
+	ret = kmf_add_policy_to_db(&plc, filename, B_FALSE);
 	if (ret != KMF_OK) {
 		(void) fprintf(stderr,
 		    gettext("Error adding policy to database: 0x%04x\n"), ret);
@@ -492,7 +492,7 @@ out:
 	if (filename != NULL)
 		free(filename);
 
-	KMF_FreePolicyRecord(&plc);
+	kmf_free_policy_record(&plc);
 
 	return (rv);
 }

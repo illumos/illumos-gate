@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ kc_export(int argc, char *argv[])
 	extern char	*optarg_av;
 
 	while ((opt = getopt_av(argc, argv,
-		"d:(dbfile)p:(policy)o:(outfile)")) != EOF) {
+	    "d:(dbfile)p:(policy)o:(outfile)")) != EOF) {
 		switch (opt) {
 			case 'd':
 				filename = get_string(optarg_av, &rv);
@@ -133,13 +133,14 @@ kc_export(int argc, char *argv[])
 			KMF_RETURN ret;
 
 			found++;
-			ret = KMF_VerifyPolicy(&pnode->plc);
+			ret = kmf_verify_policy(&pnode->plc);
 			if (ret != KMF_OK) {
 				print_sanity_error(ret);
 				rv = KC_ERR_VERIFY_POLICY;
 				break;
 			}
-			rv = KMF_AddPolicyToDB(&pnode->plc, outfile, B_FALSE);
+			rv = kmf_add_policy_to_db(&pnode->plc, outfile,
+			    B_FALSE);
 		}
 		pnode = pnode->next;
 	}

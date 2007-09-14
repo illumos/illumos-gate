@@ -51,7 +51,7 @@ PKCS12_get_rsa_key_certs(const char *filename, const char *password_file,
 	int ncerts, nkeys;
 	char *err = NULL;
 
-	rv = KMF_Initialize(&kmfh, NULL, NULL);
+	rv = kmf_initialize(&kmfh, NULL, NULL);
 	if (rv != KMF_OK) {
 		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
 		return (0);
@@ -63,15 +63,15 @@ PKCS12_get_rsa_key_certs(const char *filename, const char *password_file,
 	nkeys = 0;
 
 	if (get_passphrase(password_file, password_buf,
-		sizeof (password_buf)) <= 0) {
+	    sizeof (password_buf)) <= 0) {
 		perror("Unable to read passphrase");
 		goto done;
 	}
 	pk12cred.cred = password_buf;
 	pk12cred.credlen = strlen(password_buf);
 
-	rv = KMF_ImportPK12(kmfh, (char *)filename, &pk12cred, &tcerts, &ncerts,
-		&keys, &nkeys);
+	rv = kmf_import_objects(kmfh, (char *)filename, &pk12cred, &tcerts,
+	    &ncerts, &keys, &nkeys);
 	if (rv != KMF_OK) {
 		REPORT_KMF_ERROR(rv, "Error importing PKCS12 data", err);
 	}
@@ -81,14 +81,14 @@ done:
 		int i;
 		if (tcerts != NULL) {
 			for (i = 0; i < ncerts; i++)
-				KMF_FreeData(&tcerts[i]);
+				kmf_free_data(&tcerts[i]);
 			free(tcerts);
 		}
 		tcerts = NULL;
 		ncerts = 0;
 		if (keys != NULL) {
 			for (i = 0; i < nkeys; i++)
-				KMF_FreeRawKey(&keys[i]);
+				kmf_free_raw_key(&keys[i]);
 			free(keys);
 		}
 		keys = NULL;
@@ -96,7 +96,7 @@ done:
 	*certs = tcerts;
 	*rsa = keys;
 
-	(void) KMF_Finalize(kmfh);
+	(void) kmf_finalize(kmfh);
 
 	return (ncerts);
 }
@@ -119,7 +119,7 @@ PEM_get_rsa_key_certs(const char *filename, char *password_file,
 	char *err = NULL;
 	char password_buf[1024];
 
-	rv = KMF_Initialize(&kmfh, NULL, NULL);
+	rv = kmf_initialize(&kmfh, NULL, NULL);
 	if (rv != KMF_OK) {
 		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
 		return (0);
@@ -131,15 +131,15 @@ PEM_get_rsa_key_certs(const char *filename, char *password_file,
 	nkeys = 0;
 
 	if (get_passphrase(password_file, password_buf,
-		sizeof (password_buf)) <= 0) {
+	    sizeof (password_buf)) <= 0) {
 		perror("Unable to read passphrase");
 		goto done;
 	}
 	creds.cred = password_buf;
 	creds.credlen = strlen(password_buf);
 
-	rv = KMF_ImportKeypair(kmfh, (char *)filename, &creds, &tcerts, &ncerts,
-		&keys, &nkeys);
+	rv = kmf_import_objects(kmfh, (char *)filename, &creds, &tcerts,
+	    &ncerts, &keys, &nkeys);
 	if (rv != KMF_OK) {
 		REPORT_KMF_ERROR(rv, "Error importing key data", err);
 	}
@@ -149,14 +149,14 @@ done:
 		int i;
 		if (tcerts != NULL) {
 			for (i = 0; i < ncerts; i++)
-				KMF_FreeData(&tcerts[i]);
+				kmf_free_data(&tcerts[i]);
 			free(tcerts);
 		}
 		tcerts = NULL;
 		ncerts = 0;
 		if (keys != NULL) {
 			for (i = 0; i < nkeys; i++)
-				KMF_FreeRawKey(&keys[i]);
+				kmf_free_raw_key(&keys[i]);
 			free(keys);
 		}
 		keys = NULL;
@@ -166,7 +166,7 @@ done:
 	if (rsa != NULL)
 		*rsa = keys;
 
-	(void) KMF_Finalize(kmfh);
+	(void) kmf_finalize(kmfh);
 
 	return (ncerts);
 }

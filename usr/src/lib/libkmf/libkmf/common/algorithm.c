@@ -101,7 +101,7 @@ SUP(CKM_SHA_1, KMF_ALGID_SHA1, KMF_ALGCLASS_DIGEST, KMF_ALGMODE_NONE,
 #define	PKCS_ALGORITHM_NOT_FOUND    ((uint32_t)(~0))
 
 /*
- * Name: PKCS_GetAlgorithmMap
+ * Name: pkcs_get_alg_map
  *
  * Description:
  *  Searches the _PKCS2KMFMap table for a matching set of alg.
@@ -118,14 +118,14 @@ SUP(CKM_SHA_1, KMF_ALGID_SHA1, KMF_ALGCLASS_DIGEST, KMF_ALGMODE_NONE,
  *  Ptr->keylength will equal PKCS11CONVERT_NOT_FOUND if no match is found.
  */
 PKCS_ALGORITHM_MAP *
-PKCS_GetAlgorithmMap(KMF_ALGCLASS algType, uint32_t algID, uint32_t mode)
+pkcs_get_alg_map(KMF_ALGCLASS algType, uint32_t algID, uint32_t mode)
 {
 	uint32_t i = 0;
 
 	for (i = 0; i < _PKCS2KMFMapCount; i++) {
 		if ((_PKCS2KMFMap[i].context_type == algType) &&
-			(_PKCS2KMFMap[i].algorithm == algID) &&
-			(_PKCS2KMFMap[i].enc_mode == mode)) {
+		    (_PKCS2KMFMap[i].algorithm == algID) &&
+		    (_PKCS2KMFMap[i].enc_mode == mode)) {
 		return ((PKCS_ALGORITHM_MAP *)&(_PKCS2KMFMap[i]));
 		}
 	}
@@ -134,12 +134,12 @@ PKCS_GetAlgorithmMap(KMF_ALGCLASS algType, uint32_t algID, uint32_t mode)
 }
 
 KMF_BOOL
-PKCS_ConvertAlgorithmId2PKCSKeyType(KMF_ALGORITHM_INDEX AlgId,
+pkcs_algid_to_keytype(KMF_ALGORITHM_INDEX AlgId,
 	CK_KEY_TYPE *pckKeyType)
 {
 	uint32_t uIndex;
-	uint32_t uMapSize = sizeof (_PKCS2KMFKeyTypeMap) /
-		sizeof (PKCS_KEY_TYPE_MAP);
+	uint32_t uMapSize =
+	    sizeof (_PKCS2KMFKeyTypeMap) / sizeof (PKCS_KEY_TYPE_MAP);
 
 	for (uIndex = 0; uIndex < uMapSize; uIndex++) {
 		if (_PKCS2KMFKeyTypeMap[uIndex].kmfAlgorithmId == AlgId) {

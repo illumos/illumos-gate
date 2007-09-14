@@ -39,13 +39,13 @@ typedef struct {
 	ushort_t	version;
 	KMF_RETURN	(*ConfigureKeystore) (
 			KMF_HANDLE_T,
-			KMF_CONFIG_PARAMS *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*FindCert) (
 			KMF_HANDLE_T,
-			KMF_FINDCERT_PARAMS	*,
-			KMF_X509_DER_CERT *,
-			uint32_t *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	void		(*FreeKMFCert) (
 			KMF_HANDLE_T,
@@ -53,36 +53,33 @@ typedef struct {
 
 	KMF_RETURN	(*StoreCert) (
 			KMF_HANDLE_T,
-			KMF_STORECERT_PARAMS *,
-			KMF_DATA *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*ImportCert) (
 			KMF_HANDLE_T,
-			KMF_IMPORTCERT_PARAMS *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*ImportCRL) (
 			KMF_HANDLE_T,
-			KMF_IMPORTCRL_PARAMS *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*DeleteCert) (
 			KMF_HANDLE_T,
-			KMF_DELETECERT_PARAMS *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*DeleteCRL) (
 			KMF_HANDLE_T,
-			KMF_DELETECRL_PARAMS *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*CreateKeypair) (
 			KMF_HANDLE_T,
-			KMF_CREATEKEYPAIR_PARAMS *,
-			KMF_KEY_HANDLE *,
-			KMF_KEY_HANDLE *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*FindKey) (
 			KMF_HANDLE_T,
-			KMF_FINDKEY_PARAMS *,
-			KMF_KEY_HANDLE *,
-			uint32_t *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*EncodePubkeyData) (
 			KMF_HANDLE_T,
@@ -98,35 +95,29 @@ typedef struct {
 
 	KMF_RETURN	(*DeleteKey) (
 			KMF_HANDLE_T,
-			KMF_DELETEKEY_PARAMS *,
-			KMF_KEY_HANDLE *,
-			boolean_t);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*ListCRL) (
 			KMF_HANDLE_T,
-			KMF_LISTCRL_PARAMS *,
-			char **);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*FindCRL) (
 			KMF_HANDLE_T,
-			KMF_FINDCRL_PARAMS *,
-			char **,
-			int *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*FindCertInCRL) (
 			KMF_HANDLE_T,
-			KMF_FINDCERTINCRL_PARAMS *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*GetErrorString) (
 			KMF_HANDLE_T,
 			char **);
 
-	KMF_RETURN	(*GetPrikeyByCert) (
+	KMF_RETURN	(*FindPrikeyByCert) (
 			KMF_HANDLE_T,
-			KMF_CRYPTOWITHCERT_PARAMS *,
-			KMF_DATA *,
-			KMF_KEY_HANDLE *,
-			KMF_KEY_ALG);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*DecryptData) (
 			KMF_HANDLE_T,
@@ -135,22 +126,15 @@ typedef struct {
 			KMF_DATA *,
 			KMF_DATA *);
 
-	KMF_RETURN	(*ExportP12)(
+	KMF_RETURN	(*ExportPK12)(
 			KMF_HANDLE_T,
-			KMF_EXPORTP12_PARAMS *,
-			int, KMF_X509_DER_CERT *,
-			int, KMF_KEY_HANDLE *,
-			char *);
-
-	KMF_RETURN	(*StorePrivateKey)(
-			KMF_HANDLE_T,
-			KMF_STOREKEY_PARAMS *,
-			KMF_RAW_KEY_DATA *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*CreateSymKey) (
 			KMF_HANDLE_T,
-			KMF_CREATESYMKEY_PARAMS *,
-			KMF_KEY_HANDLE *);
+			int,
+			KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*GetSymKeyValue) (
 			KMF_HANDLE_T,
@@ -159,8 +143,7 @@ typedef struct {
 
 	KMF_RETURN	(*SetTokenPin) (
 			KMF_HANDLE_T,
-			KMF_SETPIN_PARAMS *,
-			KMF_CREDENTIAL *);
+			int, KMF_ATTRIBUTE *);
 
 	KMF_RETURN	(*VerifyDataWithCert) (
 			KMF_HANDLE_T,
@@ -169,9 +152,21 @@ typedef struct {
 			KMF_DATA *,
 			KMF_DATA *);
 
+	KMF_RETURN	(*StoreKey) (
+			KMF_HANDLE_T,
+			int,
+			KMF_ATTRIBUTE *);
+
 	void		(*Finalize) ();
 
 } KMF_PLUGIN_FUNCLIST;
+
+typedef struct {
+	KMF_ATTR_TYPE	type;
+	boolean_t	null_value_ok; /* Is the pValue required */
+	uint32_t	minlen;
+	uint32_t	maxlen;
+} KMF_ATTRIBUTE_TESTER;
 
 typedef struct {
 	KMF_KEYSTORE_TYPE	type;
@@ -188,7 +183,7 @@ typedef struct _KMF_PLUGIN_LIST {
 
 typedef struct _kmf_handle {
 	/*
-	 * session handle opened by KMF_SelectToken() to talk
+	 * session handle opened by kmf_select_token() to talk
 	 * to a specific slot in Crypto framework. It is used
 	 * by pkcs11 plugin module.
 	 */
@@ -228,11 +223,7 @@ KMF_RETURN
 VerifyDataWithKey(KMF_HANDLE_T, KMF_DATA *, KMF_ALGORITHM_INDEX, KMF_DATA *,
 	KMF_DATA *);
 
-KMF_RETURN
-SignCsr(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE *,
-		KMF_X509_ALGORITHM_IDENTIFIER *, KMF_DATA *);
-
-KMF_BOOL PKCS_ConvertAlgorithmId2PKCSKeyType(
+KMF_BOOL pkcs_algid_to_keytype(
 	KMF_ALGORITHM_INDEX, CK_KEY_TYPE *);
 
 KMF_RETURN PKCS_VerifyData(
@@ -252,15 +243,19 @@ KMF_PLUGIN *FindPlugin(KMF_HANDLE_T, KMF_KEYSTORE_TYPE);
 
 KMF_BOOL IsEqualOid(KMF_OID *, KMF_OID *);
 
-KMF_OID *X509_AlgIdToAlgorithmOid(KMF_ALGORITHM_INDEX);
-KMF_ALGORITHM_INDEX X509_AlgorithmOidToAlgId(KMF_OID *);
+KMF_RETURN copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
+	KMF_X509_ALGORITHM_IDENTIFIER *srcid);
+
+KMF_OID *x509_algid_to_algoid(KMF_ALGORITHM_INDEX);
+KMF_ALGORITHM_INDEX x509_algoid_to_algid(KMF_OID *);
+
 KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	const KMF_X509_SPKI *, CK_KEY_TYPE, CK_OBJECT_HANDLE *,
 	KMF_BOOL *);
 
 KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
 
-KMF_RETURN KMF_SetAltName(KMF_X509_EXTENSIONS *,
+KMF_RETURN kmf_set_altname(KMF_X509_EXTENSIONS *,
 	KMF_OID *, int, KMF_GENERALNAMECHOICES, char *);
 KMF_RETURN GetSequenceContents(char *, size_t, char **, size_t *);
 KMF_X509_EXTENSION *FindExtn(KMF_X509_EXTENSIONS *, KMF_OID *);
@@ -275,7 +270,10 @@ void free_dp(KMF_CRL_DIST_POINT *);
 KMF_RETURN set_key_usage_extension(KMF_X509_EXTENSIONS *,
 	int, uint32_t);
 KMF_RETURN init_pk11();
-KMF_RETURN KMF_SelectToken(KMF_HANDLE_T, char *, int);
+KMF_RETURN kmf_select_token(KMF_HANDLE_T, char *, int);
+
+KMF_RETURN test_attributes(int, KMF_ATTRIBUTE_TESTER *,
+	int, KMF_ATTRIBUTE_TESTER *, int, KMF_ATTRIBUTE *);
 
 
 /* Indexes into the key parts array for RSA keys */

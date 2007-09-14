@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,23 +45,30 @@ setpin_nss(KMF_HANDLE_T handle,
 	char *token_spec, char *dir, char *prefix)
 {
 	int rv = 0;
-	KMF_SETPIN_PARAMS	params;
-	KMF_CREDENTIAL		newpincred = { NULL, 0 };
+	KMF_CREDENTIAL		oldcred = {NULL, 0};
+	KMF_CREDENTIAL		newpincred = {NULL, 0};
 	CK_UTF8CHAR_PTR		old_pin = NULL, new_pin = NULL;
 	CK_ULONG		old_pinlen = 0, new_pinlen = 0;
+	KMF_ATTRIBUTE		setpinattrs[6];
+	KMF_KEYSTORE_TYPE	kstype = KMF_KEYSTORE_NSS;
+	int			numattrs = 0;
 
 	rv = configure_nss(handle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	(void) memset(&params, 0, sizeof (params));
-	params.kstype = KMF_KEYSTORE_NSS;
-	params.tokenname = token_spec;
-	params.nssparms.slotlabel = token_spec;
+	kmf_set_attr_at_index(setpinattrs, numattrs, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattrs++;
+	if (token_spec != NULL) {
+		kmf_set_attr_at_index(setpinattrs, numattrs,
+		    KMF_TOKEN_LABEL_ATTR,
+		    token_spec, strlen(token_spec));
+		numattrs++;
+	}
 
 	if ((rv = get_pin(gettext("Enter current token passphrase "
-		"(<CR> if not set):"), NULL, &old_pin, &old_pinlen)) !=
-		CKR_OK) {
+	    "(<CR> if not set):"), NULL, &old_pin, &old_pinlen)) != CKR_OK) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Unable to get token passphrase."));
 		return (PK_ERR_NSS);
@@ -80,13 +87,20 @@ setpin_nss(KMF_HANDLE_T handle,
 		return (PK_ERR_NSS);
 	}
 
-	params.cred.cred = (char *)old_pin;
-	params.cred.credlen = old_pinlen;
+	oldcred.cred = (char *)old_pin;
+	oldcred.credlen = old_pinlen;
+
+	kmf_set_attr_at_index(setpinattrs, numattrs, KMF_CREDENTIAL_ATTR,
+	    &oldcred, sizeof (oldcred));
+	numattrs++;
 
 	newpincred.cred = (char *)new_pin;
 	newpincred.credlen = new_pinlen;
+	kmf_set_attr_at_index(setpinattrs, numattrs, KMF_NEWPIN_ATTR,
+	    &newpincred, sizeof (newpincred));
+	numattrs++;
 
-	rv = KMF_SetTokenPin(handle, &params, &newpincred);
+	rv = kmf_set_token_pin(handle, numattrs, setpinattrs);
 
 	if (new_pin)
 		free(new_pin);
@@ -105,9 +119,12 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
 	CK_ULONG		old_pinlen = 0, new_pinlen = 0;
 	CK_RV			rv = CKR_OK;
 	char			*token_name = NULL;
-	KMF_SETPIN_PARAMS	params;
 	CK_TOKEN_INFO		token_info;
-	KMF_CREDENTIAL		newpincred = { NULL, 0 };
+	KMF_CREDENTIAL		newpincred = {NULL, 0};
+	KMF_CREDENTIAL		oldcred = {NULL, 0};
+	KMF_KEYSTORE_TYPE	kstype = KMF_KEYSTORE_PK11TOKEN;
+	KMF_ATTRIBUTE		attrlist[6];
+	int			numattr = 0;
 
 	/* If nothing is specified, default is to use softtoken. */
 	if (token_spec == NULL) {
@@ -115,7 +132,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
 		token_name = SOFT_TOKEN_LABEL;
 	}
 
-	rv = KMF_PK11TokenLookup(NULL, token_spec, &slot_id);
+	rv = kmf_pk11_token_lookup(NULL, token_spec, &slot_id);
 	if (rv == KMF_OK) {
 		/* find the pin state for the selected token */
 		if (C_GetTokenInfo(slot_id, &token_info) != CKR_OK)
@@ -167,17 +184,31 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec)
 		return (PK_ERR_PK11);
 	}
 
-	(void) memset(&params, 0, sizeof (params));
-	params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	params.tokenname = (char *)token_info.label;
-	params.cred.cred = (char *)old_pin;
-	params.cred.credlen = old_pinlen;
-	params.pkcs11parms.slot = slot_id;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+	if (token_name != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token_name, strlen(token_name));
+		numattr++;
+	}
+	oldcred.cred = (char *)old_pin;
+	oldcred.credlen = old_pinlen;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+	    &oldcred, sizeof (oldcred));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_SLOT_ID_ATTR,
+	    &slot_id, sizeof (slot_id));
+	numattr++;
 
 	newpincred.cred = (char *)new_pin;
 	newpincred.credlen = new_pinlen;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_NEWPIN_ATTR,
+	    &newpincred, sizeof (newpincred));
+	numattr++;
 
-	rv = KMF_SetTokenPin(handle, &params, &newpincred);
+	rv = kmf_set_token_pin(handle, numattr, attrlist);
 
 	/* Clean up. */
 	if (old_pin != NULL)
@@ -250,7 +281,7 @@ pk_setpin(int argc, char *argv[])
 		token_spec = DEFAULT_NSS_TOKEN;
 	}
 
-	if ((rv = KMF_Initialize(&handle, NULL, NULL)) != KMF_OK)
+	if ((rv = kmf_initialize(&handle, NULL, NULL)) != KMF_OK)
 		return (rv);
 
 	switch (kstype) {
@@ -262,11 +293,11 @@ pk_setpin(int argc, char *argv[])
 			break;
 		default:
 			cryptoerror(LOG_STDERR,
-				gettext("incorrect keystore."));
+			    gettext("incorrect keystore."));
 			return (PK_ERR_USAGE);
 	}
 
-	(void) KMF_Finalize(handle);
+	(void) kmf_finalize(handle);
 
 	if (rv == KMF_ERR_AUTH_FAILED) {
 		cryptoerror(LOG_STDERR,

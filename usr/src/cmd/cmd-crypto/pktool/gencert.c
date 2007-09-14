@@ -56,40 +56,38 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 	uint16_t kubits, int kucrit, KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv = KMF_OK;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
-	KMF_STORECERT_PARAMS sc_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_CERTIFICATE signedCert;
 	KMF_X509_NAME	certSubject;
 	KMF_X509_NAME	certIssuer;
 	KMF_DATA x509DER;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
 
 	(void) memset(&signedCert, 0, sizeof (signedCert));
 	(void) memset(&certSubject, 0, sizeof (certSubject));
 	(void) memset(&certIssuer, 0, sizeof (certIssuer));
 	(void) memset(&x509DER, 0, sizeof (x509DER));
-	(void) memset(&kp_params, 0, sizeof (kp_params));
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if (KMF_DNParser(subject, &certSubject) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certSubject) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed.\n"));
+		    gettext("Subject name cannot be parsed.\n"));
 		return (PK_ERR_USAGE);
 	}
 
 	/* For a self-signed cert, the issuser and subject are the same */
-	if (KMF_DNParser(subject, &certIssuer) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certIssuer) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed.\n"));
+		    gettext("Subject name cannot be parsed.\n"));
 		return (PK_ERR_USAGE);
 	}
 
-	kp_params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	kp_params.keylabel = certlabel;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
-	kp_params.cred.cred = tokencred->cred;
-	kp_params.cred.credlen = tokencred->credlen;
+	keylength = keylen; /* bits */
+	keytype = keyAlg;
 
 	/* Select a PKCS11 token */
 	kmfrv = select_token(kmfhandle, token, FALSE);
@@ -98,57 +96,129 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 		return (kmfrv);
 	}
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+	    sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYALG_ATTR, &keytype,
+	    sizeof (keytype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYLENGTH_ATTR, &keylength,
+	    sizeof (keylength));
+	numattr++;
+
+	if (certlabel != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYLABEL_ATTR, certlabel,
+		    strlen(certlabel));
+		numattr++;
+	}
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CREDENTIAL_ATTR, tokencred,
+		    sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		return (kmfrv);
 	}
 
-	SET_VALUE(KMF_SetCertPubKey(kmfhandle, &pubk, &signedCert),
-			"keypair");
+	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
+	    "keypair");
 
-	SET_VALUE(KMF_SetCertVersion(&signedCert, 2), "version number");
+	SET_VALUE(kmf_set_cert_version(&signedCert, 2), "version number");
 
-	SET_VALUE(KMF_SetCertSerialNumber(&signedCert, serial),
-			"serial number");
+	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
+	    "serial number");
 
-	SET_VALUE(KMF_SetCertValidityTimes(&signedCert, NULL, ltime),
-		"validity time");
+	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	    "validity time");
 
-	SET_VALUE(KMF_SetCertSignatureAlgorithm(&signedCert, sigAlg),
-		"signature algorithm");
+	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),
+	    "signature algorithm");
 
-	SET_VALUE(KMF_SetCertSubjectName(&signedCert, &certSubject),
-		"subject name");
+	SET_VALUE(kmf_set_cert_subject(&signedCert, &certSubject),
+	    "subject name");
 
-	SET_VALUE(KMF_SetCertIssuerName(&signedCert, &certIssuer),
-		"issuer name");
+	SET_VALUE(kmf_set_cert_issuer(&signedCert, &certIssuer),
+	    "issuer name");
 
 	if (altname != NULL)
-		SET_VALUE(KMF_SetCertSubjectAltName(&signedCert, altcrit,
-			alttype, altname), "subjectAltName");
+		SET_VALUE(kmf_set_cert_subject_altname(&signedCert, altcrit,
+		    alttype, altname), "subjectAltName");
 
 	if (kubits != 0)
-		SET_VALUE(KMF_SetCertKeyUsage(&signedCert, kucrit, kubits),
-			"KeyUsage");
+		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
+		    "KeyUsage");
 
-	if ((kmfrv = KMF_SignCertRecord(kmfhandle, &prik,
-		&signedCert, &x509DER)) != KMF_OK) {
+	/*
+	 * Construct attributes for the kmf_sign_cert operation.
+	 */
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE_ATTR));
+	numattr++;
+
+	/* cert data that is to be signed */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_X509_CERTIFICATE_ATTR,
+	    &signedCert, sizeof (KMF_X509_CERTIFICATE));
+	numattr++;
+
+	/* output buffer for the signed cert */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=
+	    KMF_OK) {
 		goto cleanup;
 	}
-
-	(void) memset(&sc_params, 0, sizeof (sc_params));
-	sc_params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	sc_params.certLabel = certlabel;
 
 	/*
 	 * Store the cert in the DB.
 	 */
-	kmfrv = KMF_StoreCert(kmfhandle, &sc_params, &x509DER);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	if (certlabel != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_LABEL_ATTR,
+		    certlabel, strlen(certlabel));
+		numattr++;
+	}
+
+	kmfrv = kmf_store_cert(kmfhandle, numattr, attrlist);
+
 
 cleanup:
-	KMF_FreeData(&x509DER);
-	KMF_FreeDN(&certSubject);
-	KMF_FreeDN(&certIssuer);
+	kmf_free_data(&x509DER);
+	kmf_free_dn(&certSubject);
+	kmf_free_dn(&certIssuer);
 	return (kmfrv);
 }
 
@@ -162,8 +232,6 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	char *dir, char *outcert, char *outkey)
 {
 	KMF_RETURN kmfrv;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
-	KMF_STORECERT_PARAMS sc_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_CERTIFICATE signedCert;
 	KMF_X509_NAME	certSubject;
@@ -171,26 +239,30 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	KMF_DATA x509DER;
 	char *fullcertpath = NULL;
 	char *fullkeypath = NULL;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	KMF_ATTRIBUTE attrlist[10];
+	int numattr = 0;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
+	KMF_ENCODE_FORMAT format;
 
 	(void) memset(&signedCert, 0, sizeof (signedCert));
 	(void) memset(&certSubject, 0, sizeof (certSubject));
 	(void) memset(&certIssuer, 0, sizeof (certIssuer));
 	(void) memset(&x509DER, 0, sizeof (x509DER));
-	(void) memset(&kp_params, 0, sizeof (kp_params));
-	(void) memset(&sc_params, 0, sizeof (sc_params));
 
 	if (EMPTYSTRING(outcert) || EMPTYSTRING(outkey)) {
 		cryptoerror(LOG_STDERR,
-			gettext("No output file was specified for "
-				"the cert or key\n"));
+		    gettext("No output file was specified for "
+		    "the cert or key\n"));
 		return (PK_ERR_USAGE);
 	}
 	if (dir != NULL) {
 		fullcertpath = get_fullpath(dir, outcert);
 		if (fullcertpath == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Cannot create file %s in "
-					"directory %s\n"), dir, outcert);
+			    gettext("Cannot create file %s in directory %s\n"),
+			    dir, outcert);
 			return (PK_ERR_USAGE);
 		}
 	} else {
@@ -198,9 +270,8 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	}
 	if (verify_file(fullcertpath)) {
 		cryptoerror(LOG_STDERR,
-			gettext("Cannot write the indicated output "
-				"certificate file (%s).\n"),
-				fullcertpath);
+		    gettext("Cannot write the indicated output "
+		    "certificate file (%s).\n"), fullcertpath);
 		free(fullcertpath);
 		return (PK_ERR_USAGE);
 	}
@@ -208,8 +279,8 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 		fullkeypath = get_fullpath(dir, outkey);
 		if (fullkeypath == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Cannot create file %s in "
-					"directory %s\n"), dir, outkey);
+			    gettext("Cannot create file %s in directory %s\n"),
+			    dir, outkey);
 			free(fullcertpath);
 			return (PK_ERR_USAGE);
 		}
@@ -218,83 +289,146 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	}
 	if (verify_file(fullkeypath)) {
 		cryptoerror(LOG_STDERR,
-			gettext("Cannot write the indicated output "
-				"key file (%s).\n"),
-				fullkeypath);
+		    gettext("Cannot write the indicated output "
+		    "key file (%s).\n"), fullkeypath);
 		free(fullkeypath);
 		free(fullcertpath);
 		return (PK_ERR_USAGE);
 	}
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if (KMF_DNParser(subject, &certSubject) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certSubject) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed (%s)\n"),
-			subject);
+		    gettext("Subject name cannot be parsed (%s)\n"), subject);
 		return (PK_ERR_USAGE);
 	}
 
 	/* For a self-signed cert, the issuser and subject are the same */
-	if (KMF_DNParser(subject, &certIssuer) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certIssuer) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed (%s)\n"),
-			subject);
-		KMF_FreeDN(&certSubject);
+		    gettext("Subject name cannot be parsed (%s)\n"), subject);
+		kmf_free_dn(&certSubject);
 		return (PK_ERR_USAGE);
 	}
 
-	kp_params.kstype = KMF_KEYSTORE_OPENSSL;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
+	keylength = keylen; /* bits */
+	keytype = keyAlg;
+	format = fmt;
 
-	kp_params.sslparms.keyfile = fullkeypath;
-	kp_params.sslparms.format = fmt;
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+	    sizeof (kstype));
+	numattr++;
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYALG_ATTR, &keytype,
+	    sizeof (keytype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYLENGTH_ATTR, &keylength,
+	    sizeof (keylength));
+	numattr++;
+
+	if (fullkeypath != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEY_FILENAME_ATTR, fullkeypath,
+		    strlen(fullkeypath));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_ENCODE_FORMAT_ATTR, &format,
+	    sizeof (format));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		goto cleanup;
 	}
-	SET_VALUE(KMF_SetCertPubKey(kmfhandle, &pubk, &signedCert),
-		"keypair");
 
-	SET_VALUE(KMF_SetCertVersion(&signedCert, 2), "version number");
+	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
+	    "keypair");
 
-	SET_VALUE(KMF_SetCertSerialNumber(&signedCert, serial),
-		"serial number");
+	SET_VALUE(kmf_set_cert_version(&signedCert, 2), "version number");
 
-	SET_VALUE(KMF_SetCertValidityTimes(&signedCert, NULL, ltime),
-		"validity time");
+	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
+	    "serial number");
 
-	SET_VALUE(KMF_SetCertSignatureAlgorithm(&signedCert, sigAlg),
-		"signature algorithm");
+	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	    "validity time");
 
-	SET_VALUE(KMF_SetCertSubjectName(&signedCert, &certSubject),
-		"subject name");
+	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),
+	    "signature algorithm");
 
-	SET_VALUE(KMF_SetCertIssuerName(&signedCert, &certIssuer),
-		"issuer name");
+	SET_VALUE(kmf_set_cert_subject(&signedCert, &certSubject),
+	    "subject name");
+
+	SET_VALUE(kmf_set_cert_issuer(&signedCert, &certIssuer),
+	    "issuer name");
 
 	if (altname != NULL)
-		SET_VALUE(KMF_SetCertSubjectAltName(&signedCert, altcrit,
-			alttype, altname), "subjectAltName");
+		SET_VALUE(kmf_set_cert_subject_altname(&signedCert, altcrit,
+		    alttype, altname), "subjectAltName");
 
 	if (kubits != 0)
-		SET_VALUE(KMF_SetCertKeyUsage(&signedCert, kucrit, kubits),
-			"KeyUsage");
+		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
+		    "KeyUsage");
+	/*
+	 * Construct attributes for the kmf_sign_cert operation.
+	 */
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	if ((kmfrv = KMF_SignCertRecord(kmfhandle, &prik,
-		&signedCert, &x509DER)) != KMF_OK) {
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE_ATTR));
+	numattr++;
+
+	/* cert data that is to be signed */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_X509_CERTIFICATE_ATTR,
+	    &signedCert, sizeof (KMF_X509_CERTIFICATE));
+	numattr++;
+
+	/* output buffer for the signed cert */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=
+	    KMF_OK) {
 		goto cleanup;
 	}
 
-	sc_params.kstype = KMF_KEYSTORE_OPENSSL;
-	sc_params.sslparms.certfile = fullcertpath;
-	sc_params.sslparms.keyfile = fullkeypath;
-	sc_params.sslparms.format = fmt;
 	/*
 	 * Store the cert in the DB.
 	 */
-	kmfrv = KMF_StoreCert(kmfhandle, &sc_params, &x509DER);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_FILENAME_ATTR,
+	    fullcertpath, strlen(fullcertpath));
+	numattr++;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ENCODE_FORMAT_ATTR,
+	    &fmt, sizeof (fmt));
+	numattr++;
+
+	kmfrv = kmf_store_cert(kmfhandle, numattr, attrlist);
 
 cleanup:
 	if (fullkeypath != NULL)
@@ -302,9 +436,9 @@ cleanup:
 	if (fullcertpath != NULL)
 		free(fullcertpath);
 
-	KMF_FreeData(&x509DER);
-	KMF_FreeDN(&certSubject);
-	KMF_FreeDN(&certIssuer);
+	kmf_free_data(&x509DER);
+	kmf_free_dn(&certSubject);
+	kmf_free_dn(&certIssuer);
 	return (kmfrv);
 }
 
@@ -320,13 +454,16 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	int kucrit, KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
-	KMF_STORECERT_PARAMS sc_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_CERTIFICATE signedCert;
 	KMF_X509_NAME	certSubject;
 	KMF_X509_NAME	certIssuer;
 	KMF_DATA x509DER;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
 
 	if (token == NULL)
 		token = DEFAULT_NSS_TOKEN;
@@ -341,81 +478,164 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	(void) memset(&x509DER, 0, sizeof (x509DER));
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if (KMF_DNParser(subject, &certSubject) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certSubject) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed.\n"));
+		    gettext("Subject name cannot be parsed.\n"));
 		return (PK_ERR_USAGE);
 	}
 
 	/* For a self-signed cert, the issuser and subject are the same */
-	if (KMF_DNParser(subject, &certIssuer) != KMF_OK) {
+	if (kmf_dn_parser(subject, &certIssuer) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("Subject name cannot be parsed.\n"));
+		    gettext("Subject name cannot be parsed.\n"));
 		return (PK_ERR_USAGE);
 	}
 
-	(void) memset(&kp_params, 0, sizeof (kp_params));
+	keylength = keylen; /* bits */
+	keytype = keyAlg;
 
-	kp_params.kstype = KMF_KEYSTORE_NSS;
-	kp_params.keylabel = nickname;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
-	kp_params.cred.cred = tokencred->cred;
-	kp_params.cred.credlen = tokencred->credlen;
-	kp_params.nssparms.slotlabel = token;
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+	    sizeof (kstype));
+	numattr++;
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYALG_ATTR, &keytype,
+	    sizeof (keytype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_KEYLENGTH_ATTR, &keylength,
+	    sizeof (keylength));
+	numattr++;
+
+	if (nickname != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYLABEL_ATTR, nickname,
+		    strlen(nickname));
+		numattr++;
+	}
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CREDENTIAL_ATTR, tokencred,
+		    sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	if (token != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_TOKEN_LABEL_ATTR, token,
+		    strlen(token));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PRIVKEY_HANDLE_ATTR, &prik,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_PUBKEY_HANDLE_ATTR, &pubk,
+	    sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		return (kmfrv);
 	}
 
-	SET_VALUE(KMF_SetCertPubKey(kmfhandle, &pubk, &signedCert),
-			"keypair");
+	SET_VALUE(kmf_set_cert_pubkey(kmfhandle, &pubk, &signedCert),
+	    "keypair");
 
-	SET_VALUE(KMF_SetCertVersion(&signedCert, 2), "version number");
+	SET_VALUE(kmf_set_cert_version(&signedCert, 2), "version number");
 
-	SET_VALUE(KMF_SetCertSerialNumber(&signedCert, serial),
-			"serial number");
+	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
+	    "serial number");
 
-	SET_VALUE(KMF_SetCertValidityTimes(&signedCert, NULL, ltime),
-		"validity time");
+	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	    "validity time");
 
-	SET_VALUE(KMF_SetCertSignatureAlgorithm(&signedCert, sigAlg),
-		"signature algorithm");
+	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),
+	    "signature algorithm");
 
-	SET_VALUE(KMF_SetCertSubjectName(&signedCert, &certSubject),
-		"subject name");
+	SET_VALUE(kmf_set_cert_subject(&signedCert, &certSubject),
+	    "subject name");
 
-	SET_VALUE(KMF_SetCertIssuerName(&signedCert, &certIssuer),
-		"issuer name");
+	SET_VALUE(kmf_set_cert_issuer(&signedCert, &certIssuer),
+	    "issuer name");
 
 	if (altname != NULL)
-		SET_VALUE(KMF_SetCertSubjectAltName(&signedCert, altcrit,
-			alttype, altname), "subjectAltName");
+		SET_VALUE(kmf_set_cert_subject_altname(&signedCert, altcrit,
+		    alttype, altname), "subjectAltName");
 
 	if (kubits)
-		SET_VALUE(KMF_SetCertKeyUsage(&signedCert, kucrit, kubits),
-			"subjectAltName");
+		SET_VALUE(kmf_set_cert_ku(&signedCert, kucrit, kubits),
+		    "subjectAltName");
 
-	if ((kmfrv = KMF_SignCertRecord(kmfhandle, &prik,
-		&signedCert, &x509DER)) != KMF_OK) {
+	/*
+	 * Construct attributes for the kmf_sign_cert operation.
+	 */
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE_ATTR));
+	numattr++;
+
+	/* cert data that is to be signed */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_X509_CERTIFICATE_ATTR,
+	    &signedCert, sizeof (KMF_X509_CERTIFICATE));
+	numattr++;
+
+	/* output buffer for the signed cert */
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	if ((kmfrv = kmf_sign_cert(kmfhandle, numattr, attrlist)) !=
+	    KMF_OK) {
 		goto cleanup;
 	}
-
-	sc_params.kstype = KMF_KEYSTORE_NSS;
-	sc_params.certLabel = nickname;
-	sc_params.nssparms.trustflag = trust;
-	sc_params.nssparms.slotlabel = token;
 
 	/*
 	 * Store the cert in the DB.
 	 */
-	kmfrv = KMF_StoreCert(kmfhandle, &sc_params, &x509DER);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_DATA_ATTR,
+	    &x509DER, sizeof (KMF_DATA));
+	numattr++;
+
+	if (nickname != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_LABEL_ATTR,
+		    nickname, strlen(nickname));
+		numattr++;
+	}
+
+	if (trust != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TRUSTFLAG_ATTR,
+		    trust, strlen(trust));
+		numattr++;
+	}
+
+	if (token != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
+
+	kmfrv = kmf_store_cert(kmfhandle, numattr, attrlist);
 
 cleanup:
-	KMF_FreeData(&x509DER);
-	KMF_FreeDN(&certSubject);
-	KMF_FreeDN(&certIssuer);
+	kmf_free_data(&x509DER);
+	kmf_free_dn(&certSubject);
+	kmf_free_dn(&certIssuer);
 	return (kmfrv);
 }
 
@@ -456,10 +676,10 @@ pk_gencert(int argc, char *argv[])
 	int altcrit = 0, kucrit = 0;
 
 	while ((opt = getopt_av(argc, argv,
-		"ik:(keystore)s:(subject)n:(nickname)A:(altname)"
-		"T:(token)d:(dir)p:(prefix)t:(keytype)y:(keylen)"
-		"r:(trust)L:(lifetime)l:(label)c:(outcert)"
-		"K:(outkey)S:(serial)F:(format)u:(keyusage)")) != EOF) {
+	    "ik:(keystore)s:(subject)n:(nickname)A:(altname)"
+	    "T:(token)d:(dir)p:(prefix)t:(keytype)y:(keylen)"
+	    "r:(trust)L:(lifetime)l:(label)c:(outcert)"
+	    "K:(outkey)S:(serial)F:(format)u:(keyusage)")) != EOF) {
 
 		if (opt != 'i' && EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
@@ -514,11 +734,11 @@ pk_gencert(int argc, char *argv[])
 				break;
 			case 'y':
 				if (sscanf(optarg_av, "%d",
-					&keylen) != 1) {
+				    &keylen) != 1) {
 					cryptoerror(LOG_STDERR,
-						gettext("key length must be"
-						"a numeric value (%s)\n"),
-						optarg_av);
+					    gettext("key length must be"
+					    "a numeric value (%s)\n"),
+					    optarg_av);
 					return (PK_ERR_USAGE);
 				}
 				break;
@@ -562,7 +782,7 @@ pk_gencert(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
 		return (PK_ERR_USAGE);
 	}
@@ -591,13 +811,13 @@ pk_gencert(int argc, char *argv[])
 
 	if (Str2Lifetime(lifetime, &ltime) != 0) {
 		cryptoerror(LOG_STDERR,
-			gettext("Error parsing lifetime string\n"));
+		    gettext("Error parsing lifetime string\n"));
 		return (PK_ERR_USAGE);
 	}
 
 	if (Str2KeyType(keytype, &keyAlg, &sigAlg) != 0) {
 		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype (%s).\n"),
-			keytype);
+		    keytype);
 		return (PK_ERR_USAGE);
 	}
 
@@ -630,20 +850,20 @@ pk_gencert(int argc, char *argv[])
 
 	if (serstr == NULL) {
 		(void) fprintf(stderr, gettext("A serial number "
-			"must be specified as a hex number when creating"
-			" a self-signed certificate "
-			"(ex: serial=0x0102030405feedface)\n"));
+		    "must be specified as a hex number when creating"
+		    " a self-signed certificate "
+		    "(ex: serial=0x0102030405feedface)\n"));
 		rv = PK_ERR_USAGE;
 		goto end;
 	} else {
 		uchar_t *bytes = NULL;
 		size_t bytelen;
 
-		rv = KMF_HexString2Bytes((uchar_t *)serstr, &bytes, &bytelen);
+		rv = kmf_hexstr_to_bytes((uchar_t *)serstr, &bytes, &bytelen);
 		if (rv != KMF_OK || bytes == NULL) {
 			(void) fprintf(stderr, gettext("serial number "
-				"must be specified as a hex number "
-				"(ex: 0x0102030405ffeeddee)\n"));
+			    "must be specified as a hex number "
+			    "(ex: 0x0102030405ffeeddee)\n"));
 			rv = PK_ERR_USAGE;
 			goto end;
 		}
@@ -655,8 +875,8 @@ pk_gencert(int argc, char *argv[])
 		rv = verify_altname(altname, &alttype, &altcrit);
 		if (rv != KMF_OK) {
 			(void) fprintf(stderr, gettext("Subject AltName "
-				"must be specified as a name=value pair. "
-				"See the man page for details.\n"));
+			    "must be specified as a name=value pair. "
+			    "See the man page for details.\n"));
 			rv = PK_ERR_USAGE;
 			goto end;
 		} else {
@@ -671,8 +891,8 @@ pk_gencert(int argc, char *argv[])
 		rv = verify_keyusage(keyusagestr, &kubits, &kucrit);
 		if (rv != KMF_OK) {
 			(void) fprintf(stderr, gettext("KeyUsage "
-				"must be specified as a comma-separated list. "
-				"See the man page for details.\n"));
+			    "must be specified as a comma-separated list. "
+			    "See the man page for details.\n"));
 			rv = PK_ERR_USAGE;
 			goto end;
 		}
@@ -695,26 +915,26 @@ pk_gencert(int argc, char *argv[])
 			dir = PK_DEFAULT_DIRECTORY;
 
 		rv = gencert_nss(kmfhandle,
-			tokenname, subname, altname, alttype, altcrit,
-			certlabel, dir, prefix, keyAlg, sigAlg, keylen,
-			trust, ltime, &serial, kubits, kucrit, &tokencred);
+		    tokenname, subname, altname, alttype, altcrit,
+		    certlabel, dir, prefix, keyAlg, sigAlg, keylen,
+		    trust, ltime, &serial, kubits, kucrit, &tokencred);
 
 	} else if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = gencert_pkcs11(kmfhandle,
-			tokenname, subname, altname, alttype, altcrit,
-			certlabel, keyAlg, sigAlg, keylen, ltime,
-			&serial, kubits, kucrit, &tokencred);
+		    tokenname, subname, altname, alttype, altcrit,
+		    certlabel, keyAlg, sigAlg, keylen, ltime,
+		    &serial, kubits, kucrit, &tokencred);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 		rv = gencert_file(kmfhandle,
-			keyAlg, sigAlg, keylen, fmt,
-			ltime, subname, altname, alttype, altcrit,
-			&serial, kubits, kucrit, dir, outcert, outkey);
+		    keyAlg, sigAlg, keylen, fmt,
+		    ltime, subname, altname, alttype, altcrit,
+		    &serial, kubits, kucrit, dir, outcert, outkey);
 	}
 
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
-			gettext("Error creating certificate and keypair"));
+		    gettext("Error creating certificate and keypair"));
 end:
 	if (subname)
 		free(subname);
@@ -724,6 +944,6 @@ end:
 	if (serial.val != NULL)
 		free(serial.val);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	return (rv);
 }

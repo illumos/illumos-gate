@@ -152,6 +152,8 @@ KMF_PLUGIN_ITEM plugin_list[] = {
 	{KMF_KEYSTORE_NSS,	KMF_PLUGIN_PATH "kmf_nss.so.1",  FALSE}
 };
 
+
+
 static void free_extensions(KMF_X509_EXTENSIONS *extns);
 
 KMF_RETURN
@@ -222,7 +224,7 @@ InitializePlugin(KMF_KEYSTORE_TYPE kstype, char *path, KMF_PLUGIN **plugin)
 	}
 
 	sym = (KMF_PLUGIN_FUNCLIST *(*)())dlsym(p->dldesc,
-		KMF_PLUGIN_INIT_SYMBOL);
+	    KMF_PLUGIN_INIT_SYMBOL);
 	if (sym == NULL) {
 		(void) dlclose(p->dldesc);
 		free(p->path);
@@ -254,7 +256,7 @@ AddPlugin(KMF_HANDLE_T handle, KMF_PLUGIN *plugin)
 	/* If the head is NULL, create it */
 	if (handle->plugins == NULL) {
 		handle->plugins = (KMF_PLUGIN_LIST *)malloc(
-			sizeof (KMF_PLUGIN_LIST));
+		    sizeof (KMF_PLUGIN_LIST));
 		if (handle->plugins == NULL)
 			return (KMF_ERR_MEMORY);
 		handle->plugins->plugin = plugin;
@@ -298,7 +300,7 @@ Cleanup_KMF_Handle(KMF_HANDLE_T handle)
 			handle->plugins = next;
 		}
 
-		KMF_FreePolicyRecord(handle->policy);
+		kmf_free_policy_record(handle->policy);
 		free(handle->policy);
 	}
 	free(handle);
@@ -317,7 +319,7 @@ Cleanup_PK11_Session(KMF_HANDLE_T handle)
 }
 
 KMF_RETURN
-KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
+kmf_initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *handle = NULL;
@@ -336,7 +338,7 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	handle->plugins = NULL;
 
 	/* Initialize the handle with the policy */
-	ret = KMF_SetPolicy((void *)handle,
+	ret = kmf_set_policy((void *)handle,
 	    policyfile == NULL ? KMF_DEFAULT_POLICY_FILE : policyfile,
 	    policyname == NULL ? KMF_DEFAULT_POLICY_NAME : policyname);
 	if (ret != KMF_OK)
@@ -345,7 +347,7 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	numitems = sizeof (plugin_list)/sizeof (KMF_PLUGIN_ITEM);
 	for (i = 0; i < numitems; i++) {
 		ret = InitializePlugin(plugin_list[i].kstype,
-			plugin_list[i].path, &pluginrec);
+		    plugin_list[i].path, &pluginrec);
 		if (ret != KMF_OK) {
 			cryptoerror(
 			    plugin_list[i].critical ? LOG_WARNING : LOG_DEBUG,
@@ -376,31 +378,51 @@ errout:
 }
 
 KMF_RETURN
-KMF_ConfigureKeystore(KMF_HANDLE_T handle, KMF_CONFIG_PARAMS *params)
+kmf_configure_keystore(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
 {
+	KMF_RETURN ret = KMF_OK;
 	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
 
-	plugin = FindPlugin(handle, params->kstype);
-	if (plugin == NULL)
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-
-	if (plugin->funclist->ConfigureKeystore != NULL)
-		return (plugin->funclist->ConfigureKeystore(handle, params));
-	else
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL && plugin->funclist->ConfigureKeystore != NULL) {
+		return (plugin->funclist->ConfigureKeystore(handle, num_args,
+		    attrlist));
+	} else {
 		/* return KMF_OK, if the plugin does not have an entry */
 		return (KMF_OK);
+	}
 }
 
 KMF_RETURN
-KMF_Finalize(KMF_HANDLE_T handle)
+kmf_finalize(KMF_HANDLE_T handle)
 {
 	KMF_RETURN ret = KMF_OK;
 
@@ -417,7 +439,7 @@ KMF_Finalize(KMF_HANDLE_T handle)
 }
 
 KMF_RETURN
-KMF_GetKMFErrorString(KMF_RETURN errcode, char **errmsg)
+kmf_get_kmf_error_str(KMF_RETURN errcode, char **errmsg)
 {
 	KMF_RETURN ret = KMF_OK;
 	int i, maxerr;
@@ -428,7 +450,9 @@ KMF_GetKMFErrorString(KMF_RETURN errcode, char **errmsg)
 	*errmsg = NULL;
 	maxerr = sizeof (kmf_errcodes) / sizeof (kmf_error_map);
 
-	for (i = 0; i < maxerr && errcode != kmf_errcodes[i].code; i++);
+	for (i = 0; i < maxerr && errcode != kmf_errcodes[i].code; i++)
+		/* empty body */
+		;
 
 	if (i == maxerr)
 		return (KMF_ERR_MISSING_ERRCODE);
@@ -441,7 +465,7 @@ KMF_GetKMFErrorString(KMF_RETURN errcode, char **errmsg)
 }
 
 KMF_RETURN
-KMF_GetPluginErrorString(KMF_HANDLE_T handle, char **msgstr)
+kmf_get_plugin_error_str(KMF_HANDLE_T handle, char **msgstr)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_PLUGIN *plugin;
@@ -478,29 +502,6 @@ KMF_GetPluginErrorString(KMF_HANDLE_T handle, char **msgstr)
 	return (ret);
 }
 
-KMF_RETURN
-KMF_DNParser(char *string, KMF_X509_NAME *name)
-{
-	KMF_RETURN err;
-
-	if (string == NULL || name == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	err = ParseDistinguishedName(string, (int)strlen(string), name);
-	return (err);
-}
-
-KMF_RETURN
-KMF_DN2Der(KMF_X509_NAME *dn, KMF_DATA *der)
-{
-	KMF_RETURN rv;
-
-	if (dn == NULL || der == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	rv = DerEncodeName(dn, der);
-	return (rv);
-}
 
 #define	SET_SYS_ERROR(h, c) if (h) {\
 	h->lasterr.kstype = -1;\
@@ -508,7 +509,7 @@ KMF_DN2Der(KMF_X509_NAME *dn, KMF_DATA *der)
 }
 
 KMF_RETURN
-KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
+kmf_read_input_file(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
 {
 	struct stat s;
 	long nread, total = 0;
@@ -561,7 +562,7 @@ KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
 
 /*
  *
- * Name: KMF_Der2Pem
+ * Name: kmf_der_to_pem
  *
  * Description:
  *   Function for converting DER encoded format to PEM encoded format
@@ -581,7 +582,7 @@ KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
  *
  */
 KMF_RETURN
-KMF_Der2Pem(KMF_OBJECT_TYPE type, unsigned char *data,
+kmf_der_to_pem(KMF_OBJECT_TYPE type, unsigned char *data,
 	int len, unsigned char **out, int *outlen)
 {
 
@@ -596,7 +597,7 @@ KMF_Der2Pem(KMF_OBJECT_TYPE type, unsigned char *data,
 
 /*
  *
- * Name: KMF_Pem2Der
+ * Name: kmf_pem_to_der
  *
  * Description:
  *   Function for converting PEM encoded format to DER encoded format
@@ -615,7 +616,7 @@ KMF_Der2Pem(KMF_OBJECT_TYPE type, unsigned char *data,
  *
  */
 KMF_RETURN
-KMF_Pem2Der(unsigned char *in, int inlen,
+kmf_pem_to_der(unsigned char *in, int inlen,
 	unsigned char **out, int *outlen)
 {
 	KMF_RETURN err;
@@ -627,7 +628,7 @@ KMF_Pem2Der(unsigned char *in, int inlen,
 }
 
 char *
-KMF_OID2String(KMF_OID *oid)
+kmf_oid_to_string(KMF_OID *oid)
 {
 	char numstr[128];
 	uint32_t number;
@@ -811,7 +812,7 @@ check_for_pkcs12(uchar_t *buf, int buf_len)
 }
 
 KMF_RETURN
-KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
+kmf_get_file_format(char *filename, KMF_ENCODE_FORMAT *fmt)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_DATA filebuf = {NULL, 0};
@@ -821,7 +822,7 @@ KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	*fmt = 0;
-	ret = KMF_ReadInputFile(NULL, filename, &filebuf);
+	ret = kmf_read_input_file(NULL, filename, &filebuf);
 	if (ret != KMF_OK)
 		return (ret);
 
@@ -845,12 +846,12 @@ KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 	}
 
 end:
-	KMF_FreeData(&filebuf);
+	kmf_free_data(&filebuf);
 	return (ret);
 }
 
 KMF_RETURN
-KMF_HexString2Bytes(unsigned char *hexstr, unsigned char **bytes,
+kmf_hexstr_to_bytes(unsigned char *hexstr, unsigned char **bytes,
 	size_t *outlen)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -863,11 +864,12 @@ KMF_HexString2Bytes(unsigned char *hexstr, unsigned char **bytes,
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
-	if (hexstr[0] == '0' &&
-		((hexstr[1] == 'x') || (hexstr[1] == 'X')))
+	if (hexstr[0] == '0' && ((hexstr[1] == 'x') || (hexstr[1] == 'X')))
 		hexstr += 2;
 
-	for (i = 0; i < strlen((char *)hexstr) && isxdigit(hexstr[i]); i++);
+	for (i = 0; i < strlen((char *)hexstr) && isxdigit(hexstr[i]); i++)
+		/* empty body */
+		;
 	/*
 	 * If all the characters are not legitimate hex chars,
 	 * return an error.
@@ -914,7 +916,7 @@ out:
 }
 
 void
-KMF_FreeDN(KMF_X509_NAME *name)
+kmf_free_dn(KMF_X509_NAME *name)
 {
 	KMF_X509_RDN 		*newrdn = NULL;
 	KMF_X509_TYPE_VALUE_PAIR *av = NULL;
@@ -925,8 +927,8 @@ KMF_FreeDN(KMF_X509_NAME *name)
 			newrdn = &name->RelativeDistinguishedName[i];
 			for (j = 0; j < newrdn->numberOfPairs; j++) {
 				av = &newrdn->AttributeTypeAndValue[j];
-				KMF_FreeData(&av->type);
-				KMF_FreeData(&av->value);
+				kmf_free_data(&av->type);
+				kmf_free_data(&av->value);
 			}
 			free(newrdn->AttributeTypeAndValue);
 			newrdn->numberOfPairs = 0;
@@ -939,7 +941,7 @@ KMF_FreeDN(KMF_X509_NAME *name)
 }
 
 void
-KMF_FreeKMFCert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
+kmf_free_kmf_cert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN ret;
@@ -959,7 +961,7 @@ KMF_FreeKMFCert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
 }
 
 void
-KMF_FreeData(KMF_DATA *datablock)
+kmf_free_data(KMF_DATA *datablock)
 {
 	if (datablock != NULL && datablock->Data != NULL) {
 		free(datablock->Data);
@@ -969,52 +971,52 @@ KMF_FreeData(KMF_DATA *datablock)
 }
 
 void
-KMF_FreeAlgOID(KMF_X509_ALGORITHM_IDENTIFIER *algoid)
+kmf_free_algoid(KMF_X509_ALGORITHM_IDENTIFIER *algoid)
 {
 	if (algoid == NULL)
 		return;
-	KMF_FreeData(&algoid->algorithm);
-	KMF_FreeData(&algoid->parameters);
+	kmf_free_data(&algoid->algorithm);
+	kmf_free_data(&algoid->parameters);
 }
 
 void
-KMF_FreeExtension(KMF_X509_EXTENSION *exptr)
+kmf_free_extn(KMF_X509_EXTENSION *exptr)
 {
 	if (exptr == NULL)
 		return;
 
-	KMF_FreeData((KMF_DATA *)&exptr->extnId);
-	KMF_FreeData(&exptr->BERvalue);
+	kmf_free_data((KMF_DATA *)&exptr->extnId);
+	kmf_free_data(&exptr->BERvalue);
 
 	if (exptr->value.tagAndValue) {
-		KMF_FreeData(&exptr->value.tagAndValue->value);
+		kmf_free_data(&exptr->value.tagAndValue->value);
 		free(exptr->value.tagAndValue);
 	}
 }
 
 void
-KMF_FreeTBSCSR(KMF_TBS_CSR *tbscsr)
+kmf_free_tbs_csr(KMF_TBS_CSR *tbscsr)
 {
 	if (tbscsr) {
-		KMF_FreeData(&tbscsr->version);
+		kmf_free_data(&tbscsr->version);
 
-		KMF_FreeDN(&tbscsr->subject);
+		kmf_free_dn(&tbscsr->subject);
 
-		KMF_FreeAlgOID(&tbscsr->subjectPublicKeyInfo.algorithm);
-		KMF_FreeData(&tbscsr->subjectPublicKeyInfo.subjectPublicKey);
+		kmf_free_algoid(&tbscsr->subjectPublicKeyInfo.algorithm);
+		kmf_free_data(&tbscsr->subjectPublicKeyInfo.subjectPublicKey);
 
 		free_extensions(&tbscsr->extensions);
 	}
 }
 
 void
-KMF_FreeSignedCSR(KMF_CSR_DATA *csr)
+kmf_free_signed_csr(KMF_CSR_DATA *csr)
 {
 	if (csr) {
-		KMF_FreeTBSCSR(&csr->csr);
+		kmf_free_tbs_csr(&csr->csr);
 
-		KMF_FreeAlgOID(&csr->signature.algorithmIdentifier);
-		KMF_FreeData(&csr->signature.encrypted);
+		kmf_free_algoid(&csr->signature.algorithmIdentifier);
+		kmf_free_data(&csr->signature.encrypted);
 	}
 }
 
@@ -1023,8 +1025,8 @@ free_validity(KMF_X509_VALIDITY *validity)
 {
 	if (validity == NULL)
 		return;
-	KMF_FreeData(&validity->notBefore.time);
-	KMF_FreeData(&validity->notAfter.time);
+	kmf_free_data(&validity->notBefore.time);
+	kmf_free_data(&validity->notAfter.time);
 }
 
 static void
@@ -1036,7 +1038,7 @@ free_extensions(KMF_X509_EXTENSIONS *extns)
 	if (extns && extns->numberOfExtensions > 0) {
 		for (i = 0; i < extns->numberOfExtensions; i++) {
 			exptr = &extns->extensions[i];
-			KMF_FreeExtension(exptr);
+			kmf_free_extn(exptr);
 		}
 		free(extns->extensions);
 		extns->numberOfExtensions = 0;
@@ -1045,45 +1047,45 @@ free_extensions(KMF_X509_EXTENSIONS *extns)
 }
 
 void
-KMF_FreeTBSCert(KMF_X509_TBS_CERT *tbscert)
+kmf_free_tbs_cert(KMF_X509_TBS_CERT *tbscert)
 {
 	if (tbscert) {
-		KMF_FreeData(&tbscert->version);
-		KMF_FreeBigint(&tbscert->serialNumber);
-		KMF_FreeAlgOID(&tbscert->signature);
+		kmf_free_data(&tbscert->version);
+		kmf_free_bigint(&tbscert->serialNumber);
+		kmf_free_algoid(&tbscert->signature);
 
-		KMF_FreeDN(&tbscert->issuer);
-		KMF_FreeDN(&tbscert->subject);
+		kmf_free_dn(&tbscert->issuer);
+		kmf_free_dn(&tbscert->subject);
 
 		free_validity(&tbscert->validity);
 
-		KMF_FreeData(&tbscert->issuerUniqueIdentifier);
-		KMF_FreeData(&tbscert->subjectUniqueIdentifier);
+		kmf_free_data(&tbscert->issuerUniqueIdentifier);
+		kmf_free_data(&tbscert->subjectUniqueIdentifier);
 
-		KMF_FreeAlgOID(&tbscert->subjectPublicKeyInfo.algorithm);
-		KMF_FreeData(&tbscert->subjectPublicKeyInfo.subjectPublicKey);
+		kmf_free_algoid(&tbscert->subjectPublicKeyInfo.algorithm);
+		kmf_free_data(&tbscert->subjectPublicKeyInfo.subjectPublicKey);
 
 		free_extensions(&tbscert->extensions);
 
-		KMF_FreeData(&tbscert->issuerUniqueIdentifier);
-		KMF_FreeData(&tbscert->subjectUniqueIdentifier);
+		kmf_free_data(&tbscert->issuerUniqueIdentifier);
+		kmf_free_data(&tbscert->subjectUniqueIdentifier);
 	}
 }
 
 void
-KMF_FreeSignedCert(KMF_X509_CERTIFICATE *certptr)
+kmf_free_signed_cert(KMF_X509_CERTIFICATE *certptr)
 {
 	if (!certptr)
 		return;
 
-	KMF_FreeTBSCert(&certptr->certificate);
+	kmf_free_tbs_cert(&certptr->certificate);
 
-	KMF_FreeAlgOID(&certptr->signature.algorithmIdentifier);
-	KMF_FreeData(&certptr->signature.encrypted);
+	kmf_free_algoid(&certptr->signature.algorithmIdentifier);
+	kmf_free_data(&certptr->signature.encrypted);
 }
 
 void
-KMF_FreeString(char *pstr)
+kmf_free_str(char *pstr)
 {
 	if (pstr != NULL)
 		free(pstr);
@@ -1094,54 +1096,61 @@ free_keyidlist(KMF_OID *oidlist, int len)
 {
 	int i;
 	for (i = 0; i < len; i++) {
-		KMF_FreeData((KMF_DATA *)&oidlist[i]);
+		kmf_free_data((KMF_DATA *)&oidlist[i]);
 	}
 	free(oidlist);
 }
 
 void
-KMF_FreeEKU(KMF_X509EXT_EKU *eptr)
+kmf_free_eku(KMF_X509EXT_EKU *eptr)
 {
-	if (eptr && eptr->nEKUs > 0 &&
-		eptr->keyPurposeIdList != NULL)
+	if (eptr && eptr->nEKUs > 0 && eptr->keyPurposeIdList != NULL)
 		free_keyidlist(eptr->keyPurposeIdList, eptr->nEKUs);
 }
 
 void
-KMF_FreeSPKI(KMF_X509_SPKI *spki)
+kmf_free_spki(KMF_X509_SPKI *spki)
 {
 	if (spki != NULL) {
-		KMF_FreeAlgOID(&spki->algorithm);
-		KMF_FreeData(&spki->subjectPublicKey);
+		kmf_free_algoid(&spki->algorithm);
+		kmf_free_data(&spki->subjectPublicKey);
 	}
 }
 
 void
-KMF_FreeKMFKey(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key)
+kmf_free_kmf_key(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key)
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN ret;
+	KMF_ATTRIBUTE attlist[2]; /* only 2 attributes for DeleteKey op */
+	int i = 0;
+	boolean_t token_destroy = B_FALSE;
+
+	if (key == NULL)
+		return;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return;
 
-	if (key == NULL)
-		return;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEY_HANDLE_ATTR, key, sizeof (KMF_KEY_HANDLE));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_DESTROY_BOOL_ATTR, &token_destroy, sizeof (boolean_t));
+	i++;
 
 	plugin = FindPlugin(handle, key->kstype);
 	if (plugin != NULL && plugin->funclist->DeleteKey != NULL) {
-		(void) plugin->funclist->DeleteKey(handle, NULL, key, FALSE);
+		(void) plugin->funclist->DeleteKey(handle, i, attlist);
 	}
-
-	if (key == NULL)
-		return;
 
 	if (key->keylabel)
 		free(key->keylabel);
 
 	if (key->israw) {
-		KMF_FreeRawKey(key->keyp);
+		kmf_free_raw_key(key->keyp);
 		free(key->keyp);
 	}
 
@@ -1149,7 +1158,7 @@ KMF_FreeKMFKey(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key)
 }
 
 void
-KMF_FreeBigint(KMF_BIGINT *big)
+kmf_free_bigint(KMF_BIGINT *big)
 {
 	if (big != NULL && big->val != NULL) {
 		/* Clear it out before returning it to the pool */
@@ -1165,14 +1174,14 @@ free_raw_rsa(KMF_RAW_RSA_KEY *key)
 {
 	if (key == NULL)
 		return;
-	KMF_FreeBigint(&key->mod);
-	KMF_FreeBigint(&key->pubexp);
-	KMF_FreeBigint(&key->priexp);
-	KMF_FreeBigint(&key->prime1);
-	KMF_FreeBigint(&key->prime2);
-	KMF_FreeBigint(&key->exp1);
-	KMF_FreeBigint(&key->exp2);
-	KMF_FreeBigint(&key->coef);
+	kmf_free_bigint(&key->mod);
+	kmf_free_bigint(&key->pubexp);
+	kmf_free_bigint(&key->priexp);
+	kmf_free_bigint(&key->prime1);
+	kmf_free_bigint(&key->prime2);
+	kmf_free_bigint(&key->exp1);
+	kmf_free_bigint(&key->exp2);
+	kmf_free_bigint(&key->coef);
 }
 
 static void
@@ -1180,10 +1189,10 @@ free_raw_dsa(KMF_RAW_DSA_KEY *key)
 {
 	if (key == NULL)
 		return;
-	KMF_FreeBigint(&key->prime);
-	KMF_FreeBigint(&key->subprime);
-	KMF_FreeBigint(&key->base);
-	KMF_FreeBigint(&key->value);
+	kmf_free_bigint(&key->prime);
+	kmf_free_bigint(&key->subprime);
+	kmf_free_bigint(&key->base);
+	kmf_free_bigint(&key->value);
 }
 
 static void
@@ -1191,11 +1200,11 @@ free_raw_sym(KMF_RAW_SYM_KEY *key)
 {
 	if (key == NULL)
 		return;
-	KMF_FreeBigint(&key->keydata);
+	kmf_free_bigint(&key->keydata);
 }
 
 void
-KMF_FreeRawKey(KMF_RAW_KEY_DATA *key)
+kmf_free_raw_key(KMF_RAW_KEY_DATA *key)
 {
 	if (key == NULL)
 		return;
@@ -1217,11 +1226,11 @@ KMF_FreeRawKey(KMF_RAW_KEY_DATA *key)
 }
 
 void
-KMF_FreeRawSymKey(KMF_RAW_SYM_KEY *key)
+kmf_free_raw_sym_key(KMF_RAW_SYM_KEY *key)
 {
 	if (key == NULL)
 		return;
-	KMF_FreeBigint(&key->keydata);
+	kmf_free_bigint(&key->keydata);
 	free(key);
 }
 
@@ -1246,7 +1255,7 @@ free_dp_name(KMF_CRL_DIST_POINT *dp)
 
 	for (i = 0; i < fullname->number; i++) {
 		urldata = &(fullname->namelist[fullname->number - 1].name);
-		KMF_FreeData(urldata);
+		kmf_free_data(urldata);
 	}
 
 	free(fullname->namelist);
@@ -1262,7 +1271,7 @@ free_dp(KMF_CRL_DIST_POINT *dp)
 		return;
 
 	free_dp_name(dp);
-	KMF_FreeData(&(dp->reasons));
+	kmf_free_data(&(dp->reasons));
 	/* Need not to free crl_issuer space at phase 1 */
 }
 
@@ -1270,7 +1279,7 @@ free_dp(KMF_CRL_DIST_POINT *dp)
  * This function frees space for a KMF_X509EXT_CRLDISTPOINTS internally.
  */
 void
-KMF_FreeCRLDistributionPoints(KMF_X509EXT_CRLDISTPOINTS *crl_dps)
+kmf_free_crl_dist_pts(KMF_X509EXT_CRLDISTPOINTS *crl_dps)
 {
 	int i;
 
@@ -1284,22 +1293,36 @@ KMF_FreeCRLDistributionPoints(KMF_X509EXT_CRLDISTPOINTS *crl_dps)
 }
 
 KMF_RETURN
-KMF_CreateOCSPRequest(KMF_HANDLE_T handle,  KMF_OCSPREQUEST_PARAMS *params,
-    char *reqfile)
+kmf_create_ocsp_request(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
 {
+	KMF_RETURN ret = KMF_OK;
 	KMF_PLUGIN *plugin;
-	KMF_RETURN (*createReqFn)(void *, KMF_OCSPREQUEST_PARAMS *params,
-	    char *reqfile);
-	KMF_RETURN ret;
+	KMF_RETURN (*createReqFn)(void *, int num_args,
+	    KMF_ATTRIBUTE *attrlist);
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_OCSP_REQUEST_FILENAME_ATTR, FALSE, 1, 0},
+		{KMF_USER_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+		{KMF_ISSUER_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
 	if (ret != KMF_OK)
 		return (ret);
-
-
-	if (params == NULL ||
-		reqfile == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
 
 	/*
 	 * This framework function is actually implemented in the openssl
@@ -1316,28 +1339,48 @@ KMF_CreateOCSPRequest(KMF_HANDLE_T handle,  KMF_OCSPREQUEST_PARAMS *params,
 		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
 
-	return (createReqFn(handle, params, reqfile));
+	return (createReqFn(handle, num_args, attrlist));
+
 }
 
 KMF_RETURN
-KMF_GetOCSPStatusForCert(KMF_HANDLE_T handle,
-    KMF_OCSPRESPONSE_PARAMS_INPUT *params_in,
-    KMF_OCSPRESPONSE_PARAMS_OUTPUT *params_out)
+kmf_get_ocsp_status_for_cert(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
 {
+	KMF_RETURN ret = KMF_OK;
 	KMF_PLUGIN *plugin;
-	KMF_RETURN (*getCertStatusFn)(void *,
-	    KMF_OCSPRESPONSE_PARAMS_INPUT *params_in,
-	    KMF_OCSPRESPONSE_PARAMS_OUTPUT *params_out);
-	KMF_RETURN ret;
+	KMF_RETURN (*getCertStatusFn)(void *, int num_args,
+	    KMF_ATTRIBUTE *attrlist);
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_USER_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+		{KMF_ISSUER_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+		{KMF_OCSP_RESPONSE_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+		{KMF_OCSP_RESPONSE_STATUS_ATTR, FALSE, sizeof (int),
+			sizeof (uint32_t)},
+		{KMF_OCSP_RESPONSE_REASON_ATTR, FALSE, sizeof (int),
+			sizeof (uint32_t)},
+		{KMF_OCSP_RESPONSE_CERT_STATUS_ATTR, FALSE, sizeof (int),
+			sizeof (uint32_t)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
 	if (ret != KMF_OK)
 		return (ret);
-
-
-	if (params_in == NULL ||
-		params_out == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
 
 	/*
 	 * This framework function is actually implemented in the openssl
@@ -1354,11 +1397,12 @@ KMF_GetOCSPStatusForCert(KMF_HANDLE_T handle,
 		return (KMF_ERR_INTERNAL);
 	}
 
-	return (getCertStatusFn(handle, params_in, params_out));
+	return (getCertStatusFn(handle, num_args, attrlist));
+
 }
 
 KMF_RETURN
-KMF_String2OID(char *oidstring, KMF_OID *oid)
+kmf_string_to_oid(char *oidstring, KMF_OID *oid)
 {
 	KMF_RETURN rv = KMF_OK;
 	char *cp, *bp, *startp;
@@ -1469,7 +1513,7 @@ encode_rid(char *name, KMF_DATA *derdata)
 	if (name == NULL || derdata == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	rv = KMF_String2OID(name, (KMF_OID *)derdata);
+	rv = kmf_string_to_oid(name, (KMF_OID *)derdata);
 
 	return (rv);
 }
@@ -1589,11 +1633,11 @@ encode_altname(char *namedata,
 			tagval = (0x80 | nametype);
 			break;
 		case GENNAME_DIRECTORYNAME:
-			ret = KMF_DNParser(namedata, &dnname);
+			ret = kmf_dn_parser(namedata, &dnname);
 			if (ret == KMF_OK) {
-				ret = KMF_DN2Der(&dnname, encodedname);
+				ret = DerEncodeName(&dnname, encodedname);
 			}
-			(void) KMF_FreeDN(&dnname);
+			(void) kmf_free_dn(&dnname);
 			tagval = (0xA0 | nametype);
 			break;
 		default:
@@ -1602,19 +1646,18 @@ encode_altname(char *namedata,
 
 	}
 	if (ret != KMF_OK) {
-		KMF_FreeData(encodedname);
+		kmf_free_data(encodedname);
 		return (ret);
 	}
 
 	if ((asn1 = kmfder_alloc()) == NULL)
 		return (KMF_ERR_MEMORY);
 
-	if (kmfber_printf(asn1, "Tl",
-		tagval, encodedname->Length) == -1)
+	if (kmfber_printf(asn1, "Tl", tagval, encodedname->Length) == -1)
 		goto cleanup;
 
 	if (kmfber_write(asn1, (char *)encodedname->Data,
-		encodedname->Length, 0) == -1) {
+	    encodedname->Length, 0) == -1) {
 		ret = KMF_ERR_ENCODING;
 		goto cleanup;
 	}
@@ -1623,7 +1666,7 @@ encode_altname(char *namedata,
 		goto cleanup;
 	}
 
-	KMF_FreeData(encodedname);
+	kmf_free_data(encodedname);
 	encodedname->Data = (uchar_t *)extdata->bv_val;
 	encodedname->Length = extdata->bv_len;
 
@@ -1634,7 +1677,7 @@ cleanup:
 		kmfber_free(asn1, 1);
 
 	if (ret != KMF_OK)
-		KMF_FreeData(encodedname);
+		kmf_free_data(encodedname);
 
 	return (ret);
 }
@@ -1690,7 +1733,7 @@ GetSequenceContents(char *data, size_t len,
 	 * then consume them ("{").
 	 */
 	if (kmfber_scanf(exasn1, "tl{", &tag, &oldsize) == KMFBER_DEFAULT ||
-		oldsize == 0) {
+	    oldsize == 0) {
 		ret = KMF_ERR_ENCODING;
 		goto out;
 	}
@@ -1735,7 +1778,7 @@ add_an_extension(KMF_X509_EXTENSIONS *exts, KMF_X509_EXTENSION *newextn)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	extlist = malloc(sizeof (KMF_X509_EXTENSION) *
-			(exts->numberOfExtensions + 1));
+	    (exts->numberOfExtensions + 1));
 	if (extlist == NULL)
 		return (KMF_ERR_MEMORY);
 
@@ -1743,7 +1786,7 @@ add_an_extension(KMF_X509_EXTENSIONS *exts, KMF_X509_EXTENSION *newextn)
 	    exts->numberOfExtensions * sizeof (KMF_X509_EXTENSION));
 
 	(void) memcpy(&extlist[exts->numberOfExtensions], newextn,
-		sizeof (KMF_X509_EXTENSION));
+	    sizeof (KMF_X509_EXTENSION));
 
 	free(exts->extensions);
 	exts->numberOfExtensions++;
@@ -1753,7 +1796,7 @@ add_an_extension(KMF_X509_EXTENSIONS *exts, KMF_X509_EXTENSION *newextn)
 }
 
 KMF_RETURN
-KMF_SetAltName(KMF_X509_EXTENSIONS *extensions,
+kmf_set_altname(KMF_X509_EXTENSIONS *extensions,
 	KMF_OID *oid,
 	int critical,
 	KMF_GENERALNAMECHOICES nametype,
@@ -1788,9 +1831,9 @@ KMF_SetAltName(KMF_X509_EXTENSIONS *extensions,
 
 	if (foundextn != NULL) {
 		ret = GetSequenceContents(
-				(char *)foundextn->BERvalue.Data,
-				foundextn->BERvalue.Length,
-				&olddata, &oldsize);
+		    (char *)foundextn->BERvalue.Data,
+		    foundextn->BERvalue.Length,
+		    &olddata, &oldsize);
 		if (ret != KMF_OK)
 			goto out;
 	}
@@ -1854,10 +1897,380 @@ out:
 	if (olddata != NULL)
 		free(olddata);
 
-	KMF_FreeData(&dername);
+	kmf_free_data(&dername);
 	if (ret != KMF_OK)
-		KMF_FreeData(&subjAltName.extnId);
+		kmf_free_data(&subjAltName.extnId);
 	if (asn1 != NULL)
 		kmfber_free(asn1, 1);
 	return (ret);
+}
+
+/*
+ * Search a list of attributes for one that matches the given type.
+ * Return a pointer into the attribute list.  This does not
+ * return a copy of the value, it returns a reference into the
+ * given list.
+ */
+int
+kmf_find_attr(KMF_ATTR_TYPE type, KMF_ATTRIBUTE *attlist, int numattrs)
+{
+	int i;
+	for (i = 0; i < numattrs; i++) {
+		if (attlist[i].type == type)
+			return (i);
+	}
+	return (-1);
+}
+
+/*
+ * Verify that a given attribute is consistent with the
+ * "test" attribute.
+ */
+static KMF_RETURN
+verify_attribute(KMF_ATTRIBUTE *givenattr,
+	KMF_ATTRIBUTE_TESTER *testattr)
+{
+	/* A NULL pValue was found where one is required */
+	if (testattr->null_value_ok == FALSE &&
+	    givenattr->pValue == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* If the given valueLen is too small, return error */
+	if (givenattr->pValue != NULL &&
+	    testattr->minlen > 0 &&
+	    (givenattr->valueLen < testattr->minlen))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* If the given valueLen is too big, return error */
+	if (givenattr->pValue != NULL &&
+	    testattr->maxlen > 0 &&
+	    (givenattr->valueLen > testattr->maxlen))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	return (KMF_OK);
+}
+
+/*
+ * Given a set of required attribute tests and optional
+ * attributes, make sure that the actual attributes
+ * being tested (attrlist below) are allowed and are
+ * properly specified.
+ */
+KMF_RETURN
+test_attributes(int reqnum, KMF_ATTRIBUTE_TESTER *reqattrs,
+	int optnum, KMF_ATTRIBUTE_TESTER *optattrs,
+	int numattrs, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	int i, idx;
+
+	/*
+	 * If the caller didn't supply enough attributes,
+	 * return an error.
+	 */
+	if (numattrs < reqnum || attrlist == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/*
+	 * Make sure all required attrs are present and
+	 * correct.
+	 */
+	for (i = 0; i < reqnum && ret == KMF_OK; i++) {
+		idx = kmf_find_attr(reqattrs[i].type, attrlist, numattrs);
+		/* If a required attr is not found, return error */
+		if (idx == -1) {
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+
+		ret = verify_attribute(&attrlist[idx], &reqattrs[i]);
+	}
+	/*
+	 * Now test the optional parameters.
+	 */
+	for (i = 0; i < optnum && ret == KMF_OK; i++) {
+		idx = kmf_find_attr(optattrs[i].type, attrlist, numattrs);
+		/* If a optional attr is not found, continue. */
+		if (idx == -1) {
+			continue;
+		}
+
+		ret = verify_attribute(&attrlist[idx], &optattrs[i]);
+	}
+
+	return (ret);
+}
+
+/*
+ * Given an already allocated attribute list, insert
+ * the given attribute information at a specific index
+ * in the list.
+ */
+void
+kmf_set_attr_at_index(KMF_ATTRIBUTE *attlist, int index,
+	KMF_ATTR_TYPE type,  void *pValue, uint32_t len)
+{
+	if (attlist == NULL)
+		return;
+
+	attlist[index].type = type;
+	attlist[index].pValue = pValue;
+	attlist[index].valueLen = len;
+}
+
+/*
+ * Find an attribute matching a particular type and set
+ * the pValue and length fields to the given values.
+ */
+KMF_RETURN
+kmf_set_attr(KMF_ATTRIBUTE *attlist, int numattr,
+	KMF_ATTR_TYPE type,  void *pValue, uint32_t len)
+{
+	int idx;
+	if (attlist == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	idx = kmf_find_attr(type, attlist, numattr);
+	if (idx == -1)
+		return (KMF_ERR_ATTR_NOT_FOUND);
+
+	attlist[idx].type = type;
+	/* Assumes the attribute pValue can hold the result */
+	if (attlist[idx].pValue != NULL) {
+		if (attlist[idx].valueLen >= len)
+			(void) memcpy(attlist[idx].pValue, pValue, len);
+		else
+			return (KMF_ERR_BUFFER_SIZE);
+	}
+	attlist[idx].valueLen = len;
+	return (KMF_OK);
+}
+
+/*
+ * Find a particular attribute in a list and return
+ * a pointer to its value.
+ */
+void *
+kmf_get_attr_ptr(KMF_ATTR_TYPE type, KMF_ATTRIBUTE *attlist,
+	int numattrs)
+{
+	int i;
+
+	i = kmf_find_attr(type, attlist, numattrs);
+	if (i == -1)
+		return (NULL);
+
+	return (attlist[i].pValue);
+}
+
+/*
+ * Find a particular attribute in a list and return
+ * the value and length values.  Value and length
+ * may be NULL if the caller doesn't want their values
+ * to be filled in.
+ */
+KMF_RETURN
+kmf_get_attr(KMF_ATTR_TYPE type, KMF_ATTRIBUTE *attlist,
+	int numattrs, void *outValue, uint32_t *outlen)
+{
+	int i;
+	uint32_t len = 0;
+	uint32_t *lenptr = outlen;
+
+	if (lenptr == NULL)
+		lenptr = &len;
+
+	i = kmf_find_attr(type, attlist, numattrs);
+	if (i == -1)
+		return (KMF_ERR_ATTR_NOT_FOUND);
+
+	/* This assumes that the ptr passed in is pre-allocated space */
+	if (attlist[i].pValue != NULL && outValue != NULL) {
+		/*
+		 * If the caller did not specify a length,
+		 * assume "outValue" is big enough.
+		 */
+		if (outlen != NULL) {
+			if (*outlen >= attlist[i].valueLen)
+				(void) memcpy(outValue, attlist[i].pValue,
+				    attlist[i].valueLen);
+			else
+				return (KMF_ERR_BUFFER_SIZE);
+		} else {
+			(void) memcpy(outValue, attlist[i].pValue,
+			    attlist[i].valueLen);
+		}
+	}
+
+	if (outlen != NULL)
+		*outlen = attlist[i].valueLen;
+	return (KMF_OK);
+}
+
+/*
+ * Utility routine to find a string type attribute, allocate it
+ * and return the value to the caller.  This simplifies the
+ * operation by doing both "kmf_get_attr" calls and avoids
+ * duplicating this block of code in lots of places.
+ */
+KMF_RETURN
+kmf_get_string_attr(KMF_ATTR_TYPE type, KMF_ATTRIBUTE *attrlist,
+	int numattrs, char **outstr)
+{
+	KMF_RETURN rv;
+	uint32_t len;
+
+	if (outstr == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if ((rv = kmf_get_attr(type, attrlist, numattrs, NULL, &len)) ==
+	    KMF_OK) {
+		*outstr = malloc(len + 1);
+		if ((*outstr) == NULL)
+			return (KMF_ERR_MEMORY);
+		(void) memset((*outstr), 0, len + 1);
+		rv = kmf_get_attr(type, attrlist, numattrs, (*outstr), &len);
+		if (rv != KMF_OK) {
+			free(*outstr);
+			*outstr = NULL;
+		}
+	}
+
+	return (rv);
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+KMF_RETURN
+KMF_ConfigureKeystore(KMF_HANDLE_T handle, KMF_CONFIG_PARAMS *params)
+{
+
+	KMF_ATTRIBUTE attlist[32];
+	int i = 0;
+
+	if (params == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &params->kstype, sizeof (params->kstype));
+	i++;
+
+	if (params->kstype == KMF_KEYSTORE_NSS) {
+		if (params->nssconfig.configdir != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_DIRPATH_ATTR,
+			    params->nssconfig.configdir,
+			    strlen(params->nssconfig.configdir));
+			i++;
+		}
+		if (params->nssconfig.certPrefix != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_CERTPREFIX_ATTR,
+			    params->nssconfig.certPrefix,
+			    strlen(params->nssconfig.certPrefix));
+			i++;
+		}
+		if (params->nssconfig.keyPrefix != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_KEYPREFIX_ATTR,
+			    params->nssconfig.keyPrefix,
+			    strlen(params->nssconfig.keyPrefix));
+			i++;
+		}
+		if (params->nssconfig.secModName != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_SECMODNAME_ATTR,
+			    params->nssconfig.secModName,
+			    strlen(params->nssconfig.secModName));
+			i++;
+		}
+	} else if (params->kstype == KMF_KEYSTORE_PK11TOKEN) {
+		if (params->pkcs11config.label != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_TOKEN_LABEL_ATTR,
+			    params->pkcs11config.label,
+			    strlen(params->pkcs11config.label));
+			i++;
+		}
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_READONLY_ATTR,
+		    &params->pkcs11config.readonly,
+		    sizeof (params->pkcs11config.readonly));
+		i++;
+	}
+
+	return (kmf_configure_keystore(handle, i, attlist));
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+KMF_RETURN
+KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
+{
+	return (kmf_initialize(outhandle, policyfile, policyname));
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+KMF_RETURN
+KMF_Finalize(KMF_HANDLE_T handle)
+{
+	return (kmf_finalize(handle));
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+KMF_RETURN
+KMF_GetKMFErrorString(KMF_RETURN errcode, char **errmsg)
+{
+	return (kmf_get_kmf_error_str(errcode, errmsg));
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+KMF_RETURN
+KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
+{
+	return (kmf_read_input_file(handle, filename, pdata));
+}
+
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+void
+KMF_FreeKMFCert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
+{
+	kmf_free_kmf_cert(handle, kmf_cert);
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+void
+KMF_FreeData(KMF_DATA *datablock)
+{
+	kmf_free_data(datablock);
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+void
+KMF_FreeKMFKey(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key)
+{
+	kmf_free_kmf_key(handle, key);
+}
+
+/*
+ * This API is used by elfsign. We must keep it in old API form.
+ */
+void
+KMF_FreeSignedCSR(KMF_CSR_DATA *csr)
+{
+	kmf_free_signed_csr(csr);
 }

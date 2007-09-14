@@ -366,7 +366,7 @@ ParseRdnAttribute(char **pbp, char *endptr, boolean_t singleAVA,
 					return (KMF_ERR_RDN_ATTR);
 				}
 			} else if ((n2k->kind == OID_PKCS9_EMAIL_ADDRESS) ||
-				(n2k->kind == OID_RFC1274_MAIL)) {
+			    (n2k->kind == OID_RFC1274_MAIL)) {
 				vt = BER_IA5STRING;
 			} else {
 				/*
@@ -381,8 +381,7 @@ ParseRdnAttribute(char **pbp, char *endptr, boolean_t singleAVA,
 					vt = BER_T61STRING;
 				}
 			}
-			rv = CreateAVA(n2k->OID,
-				vt, (char *)valBuf, a);
+			rv = CreateAVA(n2k->OID, vt, (char *)valBuf, a);
 			return (rv);
 		}
 	}
@@ -412,8 +411,8 @@ rdnavcompare(const void *a, const void *b)
 	 * the result.
 	 */
 	for (n2k = name2kinds, i = 0;
-		n2k->name && (p1 == MAXINT || p2 == MAXINT);
-		n2k++, i++) {
+	    n2k->name && (p1 == MAXINT || p2 == MAXINT);
+	    n2k++, i++) {
 		oidrec = n2k->OID;
 		if (oidrec != NULL) {
 			if (IsEqualOid(&av1->type, oidrec))
@@ -431,7 +430,7 @@ rdnavcompare(const void *a, const void *b)
 		return (1);
 }
 
-KMF_RETURN
+static KMF_RETURN
 ParseDistinguishedName(char *buf, int len, KMF_X509_NAME *name)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -458,15 +457,13 @@ ParseDistinguishedName(char *buf, int len, KMF_X509_NAME *name)
 	 * order (most significant component last)."
 	 */
 	qsort((void *)name->RelativeDistinguishedName,
-		name->numberOfRDNs,
-		sizeof (KMF_X509_RDN),
-		rdnavcompare);
+	    name->numberOfRDNs, sizeof (KMF_X509_RDN), rdnavcompare);
 
 	/* return result */
 	return (rv);
 
 loser:
-	KMF_FreeDN(name);
+	kmf_free_dn(name);
 	return (rv);
 }
 
@@ -486,7 +483,7 @@ IsEqualData(KMF_DATA *d1, KMF_DATA *d2)
  * Return 0 if equal, 1 if not.
  */
 int
-KMF_CompareRDNs(KMF_X509_NAME *name1, KMF_X509_NAME *name2)
+kmf_compare_rdns(KMF_X509_NAME *name1, KMF_X509_NAME *name2)
 {
 	int i, j;
 	boolean_t avfound;
@@ -506,12 +503,12 @@ KMF_CompareRDNs(KMF_X509_NAME *name1, KMF_X509_NAME *name2)
 		avfound = FALSE;
 		for (j = 0; j < name2->numberOfRDNs && !avfound; j++) {
 			r2 = (KMF_X509_RDN *)
-				&name2->RelativeDistinguishedName[j];
+			    &name2->RelativeDistinguishedName[j];
 			av2 = (KMF_X509_TYPE_VALUE_PAIR *)
-				r2->AttributeTypeAndValue;
+			    r2->AttributeTypeAndValue;
 
 			avfound = (IsEqualOid(&av1->type, &av2->type) &&
-				    IsEqualData(&av1->value, &av2->value));
+			    IsEqualData(&av1->value, &av2->value));
 		}
 		/*
 		 * If the current AV from name1 was not found in name2,
@@ -523,4 +520,28 @@ KMF_CompareRDNs(KMF_X509_NAME *name1, KMF_X509_NAME *name2)
 
 	/* If we got this far, it must be a match */
 	return (0);
+}
+
+/*
+ * kmf_dn_parser
+ *
+ * Public interface for parsing a Distinguished name in
+ * human-readable format into a binary KMF_X509_NAME.
+ */
+KMF_RETURN
+kmf_dn_parser(char *string, KMF_X509_NAME *name)
+{
+	KMF_RETURN err;
+
+	if (string == NULL || name == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	err = ParseDistinguishedName(string, (int)strlen(string), name);
+	return (err);
+}
+
+KMF_RETURN
+KMF_DNParser(char *string, KMF_X509_NAME *name)
+{
+	return (kmf_dn_parser(string, name));
 }

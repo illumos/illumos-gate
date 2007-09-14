@@ -105,6 +105,16 @@ kmf_get_token_slots(KMF_HANDLE *handle, CK_SLOT_ID_PTR *slot_list,
 	CK_SLOT_ID_PTR	tmp_list = NULL_PTR, tmp2_list = NULL_PTR;
 
 	ck_rv = C_GetSlotList(1, NULL_PTR, &tmp_count);
+	if (ck_rv == CKR_CRYPTOKI_NOT_INITIALIZED) {
+		ck_rv = C_Initialize(NULL);
+		if ((ck_rv != CKR_OK) &&
+		    (ck_rv != CKR_CRYPTOKI_ALREADY_INITIALIZED))
+			return (KMF_ERR_UNINITIALIZED);
+		if (ck_rv == CKR_CRYPTOKI_ALREADY_INITIALIZED)
+			ck_rv = CKR_OK;
+
+		ck_rv = C_GetSlotList(1, NULL_PTR, &tmp_count);
+	}
 	if (ck_rv != CKR_OK) {
 		if (handle != NULL) {
 			handle->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
@@ -281,7 +291,7 @@ parse_token_spec(char *token_spec, char **token_name, char **manuf_id,
  * are delimited by the colon ':' character.
  */
 KMF_RETURN
-KMF_PK11TokenLookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
+kmf_pk11_token_lookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
 {
 	KMF_RETURN	kmf_rv = KMF_OK;
 	CK_RV		rv;
@@ -298,9 +308,9 @@ KMF_PK11TokenLookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
 	char	*token_name = NULL;
 	char	*manuf_id = NULL;
 	char	*serial_no = NULL;
-	boolean_t	tok_match = B_FALSE,
-			man_match = B_FALSE,
-			ser_match = B_FALSE;
+	boolean_t	tok_match = B_FALSE;
+	boolean_t	man_match = B_FALSE;
+	boolean_t	ser_match = B_FALSE;
 
 	if (slot_id == NULL || label == NULL || !strlen(label))
 		return (KMF_ERR_BAD_PARAMETER);
@@ -322,7 +332,7 @@ KMF_PK11TokenLookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
 		return (KMF_ERR_MEMORY);
 
 	if (parse_token_spec(tmplabel, &token_name, &manuf_id,
-		&serial_no) < 0) {
+	    &serial_no) < 0) {
 		free(tmplabel);
 		return (KMF_ERR_BAD_PARAMETER);
 	}
@@ -350,7 +360,7 @@ KMF_PK11TokenLookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
 		len = strlen(token_name);
 		max_sz = sizeof (token_info.label);
 		if (memcmp_pad_max(&(token_info.label), max_sz, token_name,
-			len, max_sz) == 0)
+		    len, max_sz) == 0)
 			tok_match = B_TRUE;
 		/*
 		 * If manufacturer id was given, see if it actually matches.
@@ -424,43 +434,56 @@ KMF_PK11TokenLookup(KMF_HANDLE_T handle, char *label, CK_SLOT_ID *slot_id)
 }
 
 KMF_RETURN
-KMF_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
-	KMF_CREDENTIAL *newpin)
+kmf_set_token_pin(KMF_HANDLE_T handle,
+	int num_attr,
+	KMF_ATTRIBUTE *attrlist)
 {
-	KMF_RETURN rv = KMF_OK;
+	KMF_RETURN ret = KMF_OK;
 	KMF_PLUGIN *plugin;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_CREDENTIAL_ATTR, FALSE, sizeof (KMF_CREDENTIAL),
+			sizeof (KMF_CREDENTIAL)},
+		{KMF_NEWPIN_ATTR, FALSE, sizeof (KMF_CREDENTIAL),
+			sizeof (KMF_CREDENTIAL)},
+	};
 
-	CLEAR_ERROR(handle, rv);
-	if (rv != KMF_OK)
-		return (rv);
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+	uint32_t len;
+	KMF_KEYSTORE_TYPE kstype;
 
-	if (params == NULL || newpin == NULL)
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/*
-	 * If setting PKCS#11 token look for the slot.
-	 */
-	if (params->kstype == KMF_KEYSTORE_PK11TOKEN) {
-		rv = KMF_PK11TokenLookup(NULL, params->tokenname,
-			&params->pkcs11parms.slot);
-		if (rv != KMF_OK)
-			return (rv);
+	CLEAR_ERROR(handle, ret);
+	if (ret != KMF_OK)
+		return (ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_attr, attrlist);
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_attr,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL) {
+		if (plugin->funclist->SetTokenPin != NULL)
+			return (plugin->funclist->SetTokenPin(handle, num_attr,
+			    attrlist));
+		else
+			return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
-
-	plugin = FindPlugin(handle, params->kstype);
-	if (plugin == NULL)
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	if (plugin->funclist->SetTokenPin == NULL)
-		return (KMF_ERR_FUNCTION_NOT_FOUND);
-
-	rv = plugin->funclist->SetTokenPin(handle, params, newpin);
-
-	return (rv);
+	return (KMF_ERR_PLUGIN_NOTFOUND);
 }
 
 /*
- *
- * Name: KMF_SelectToken
+ * Name: kmf_select_token
  *
  * Description:
  *   This function enables the user of PKCS#11 plugin to select a
@@ -477,11 +500,9 @@ KMF_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
  *   error condition.
  *   The value KMF_OK indicates success. All other values represent
  *   an error condition.
- *
  */
 KMF_RETURN
-KMF_SelectToken(KMF_HANDLE_T handle, char *label,
-	int readonly)
+kmf_select_token(KMF_HANDLE_T handle, char *label, int readonly)
 {
 	KMF_RETURN kmf_rv = KMF_OK;
 	CK_RV ck_rv = CKR_OK;
@@ -508,7 +529,7 @@ KMF_SelectToken(KMF_HANDLE_T handle, char *label,
 	}
 
 	/* Find the token with matching label */
-	kmf_rv = KMF_PK11TokenLookup(handle, label, &slot_id);
+	kmf_rv = kmf_pk11_token_lookup(handle, label, &slot_id);
 	if (kmf_rv != KMF_OK) {
 		return (kmf_rv);
 	}
@@ -531,7 +552,7 @@ KMF_SelectToken(KMF_HANDLE_T handle, char *label,
 }
 
 CK_SESSION_HANDLE
-KMF_GetPK11Handle(KMF_HANDLE_T kmfh)
+kmf_get_pk11_handle(KMF_HANDLE_T kmfh)
 {
 	return (kmfh->pk11handle);
 }

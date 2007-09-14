@@ -88,10 +88,10 @@ copy_extension_data(KMF_X509_EXTENSION *dstext,
 		goto cleanup;
 	}
 	(void) memset(dstext->value.tagAndValue, 0,
-		sizeof (KMF_X509EXT_TAGandVALUE));
+	    sizeof (KMF_X509EXT_TAGandVALUE));
 
 	ret = copy_data(&dstext->value.tagAndValue->value,
-			&srcext->value.tagAndValue->value);
+	    &srcext->value.tagAndValue->value);
 	if (ret != KMF_OK)
 		goto cleanup;
 
@@ -100,13 +100,13 @@ copy_extension_data(KMF_X509_EXTENSION *dstext,
 cleanup:
 	if (ret != KMF_OK) {
 		if (dstext->extnId.Data != NULL)
-			KMF_FreeData(&dstext->extnId);
+			kmf_free_data(&dstext->extnId);
 
 		if (dstext->BERvalue.Data != NULL)
-			KMF_FreeData(&dstext->BERvalue);
+			kmf_free_data(&dstext->BERvalue);
 
 		if (dstext->value.tagAndValue->value.Data == NULL)
-			KMF_FreeData(&dstext->value.tagAndValue->value);
+			kmf_free_data(&dstext->value.tagAndValue->value);
 	}
 
 	return (ret);
@@ -124,7 +124,7 @@ cleanup:
  *   parsing and memory allocation errors are also possible.
  */
 KMF_RETURN
-KMF_GetCertExtensionData(const KMF_DATA *certdata,
+kmf_get_cert_extn(const KMF_DATA *certdata,
 	KMF_OID *extoid, KMF_X509_EXTENSION *extdata)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -156,7 +156,7 @@ KMF_GetCertExtensionData(const KMF_DATA *certdata,
 		ret = KMF_ERR_EXTENSION_NOT_FOUND;
 
 	if (cert != NULL) {
-		KMF_FreeSignedCert(cert);
+		kmf_free_signed_cert(cert);
 		free(cert);
 	}
 
@@ -164,10 +164,9 @@ KMF_GetCertExtensionData(const KMF_DATA *certdata,
 }
 
 /*
- * Given a block of DER encoded X.509 certificate data,
- * search the extensions and return the OIDs for all
- * extensions marked "critical".
- *
+ * Given a block of DER encoded X.509 certificate data and
+ * a "crit/non-crit/all" flag, search the extensions and
+ * return the OIDs for critical, non-critical or all extensions.
  *
  * RETURNS:
  *   KMF_OK - if extension found and copied OK.
@@ -178,7 +177,7 @@ KMF_GetCertExtensionData(const KMF_DATA *certdata,
  *   NumOIDs - number of critical extensions found.
  */
 KMF_RETURN
-KMF_GetCertCriticalExtensions(const KMF_DATA *certdata,
+kmf_get_cert_extns(const KMF_DATA *certdata, KMF_FLAG_CERT_EXTN flag,
 	KMF_X509_EXTENSION **extlist, int *nextns)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -187,6 +186,9 @@ KMF_GetCertCriticalExtensions(const KMF_DATA *certdata,
 	int i;
 
 	if (certdata == NULL || extlist == NULL || nextns == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (flag < KMF_ALL_EXTNS || flag > KMF_NONCRITICAL_EXTNS)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	*nextns = 0;
@@ -201,22 +203,27 @@ KMF_GetCertCriticalExtensions(const KMF_DATA *certdata,
 	for (i = 0; i < cert->certificate.extensions.numberOfExtensions;
 	    i++) {
 		eptr = &cert->certificate.extensions.extensions[i];
-		if (eptr->critical != 0) {
-			(*nextns)++;
-			elist = realloc(elist, sizeof (KMF_X509_EXTENSION) *
-					(*nextns));
-			if (elist == NULL) {
-				ret = KMF_ERR_MEMORY;
-				goto end;
-			}
-			ret = copy_extension_data(&elist[(*nextns) - 1],
-				eptr);
-			if (ret != KMF_OK)
-				goto end;
+
+		if (flag == KMF_CRITICAL_EXTNS && eptr->critical == 0)
+			continue;
+		else if (flag == KMF_NONCRITICAL_EXTNS && eptr->critical != 0)
+			continue;
+
+		(*nextns)++;
+		elist = realloc(elist, sizeof (KMF_X509_EXTENSION) *
+		    (*nextns));
+		if (elist == NULL) {
+			ret = KMF_ERR_MEMORY;
+			goto end;
 		}
+
+		ret = copy_extension_data(&elist[(*nextns) - 1], eptr);
+		if (ret != KMF_OK)
+			goto end;
 	}
+
 end:
-	KMF_FreeSignedCert(cert);
+	kmf_free_signed_cert(cert);
 	free(cert);
 	if (ret != KMF_OK) {
 		if (elist != NULL) {
@@ -225,75 +232,16 @@ end:
 		}
 		*nextns = 0;
 	}
+
+	/*
+	 * If the flag is not all, then it is possible that we did not find
+	 * any critical or non_critical extensions.  When that happened,
+	 * return KMF_ERR_EXTENSION_NOT_FOUND.
+	 */
+	if (flag != KMF_ALL_EXTNS && ret == KMF_OK && *nextns == 0)
+		ret = KMF_ERR_EXTENSION_NOT_FOUND;
+
 	*extlist = elist;
-
-	return (ret);
-}
-
-/*
- * Given a block of DER encoded X.509 certificate data,
- * search the extensions and return the OIDs for all
- * extensions NOT marked "critical".
- *
- *
- * RETURNS:
- *   KMF_OK - if extension found and copied OK.
- *   parsing and memory allocation errors are also possible.
- *
- *   OIDlist - array of KMF_OID records, allocated
- *             by this function.
- *   NumOIDs - number of critical extensions found.
- */
-KMF_RETURN
-KMF_GetCertNonCriticalExtensions(const KMF_DATA *certdata,
-	KMF_X509_EXTENSION **extlist, int *nextns)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_CERTIFICATE *cert;
-	KMF_X509_EXTENSION *eptr, *elist;
-	int i;
-
-	if (certdata == NULL || extlist == NULL || nextns == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	*nextns = 0;
-	*extlist = elist = NULL;
-	ret = DerDecodeSignedCertificate(certdata, &cert);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (cert->certificate.extensions.numberOfExtensions == 0)
-		return (KMF_ERR_EXTENSION_NOT_FOUND);
-
-	for (i = 0; i < cert->certificate.extensions.numberOfExtensions;
-	    i++) {
-		eptr = &cert->certificate.extensions.extensions[i];
-		if (eptr->critical == 0) {
-			(*nextns)++;
-			elist = realloc(elist, sizeof (KMF_X509_EXTENSION) *
-					(*nextns));
-			if (elist == NULL) {
-				ret = KMF_ERR_MEMORY;
-				goto end;
-			}
-			ret = copy_extension_data(&elist[(*nextns) - 1],
-				eptr);
-			if (ret != KMF_OK)
-				goto end;
-		}
-	}
-end:
-	KMF_FreeSignedCert(cert);
-	free(cert);
-	if (ret != KMF_OK) {
-		if (elist != NULL) {
-			free(elist);
-			elist = NULL;
-		}
-		*nextns = 0;
-	}
-	*extlist = elist;
-
 	return (ret);
 }
 
@@ -309,7 +257,7 @@ end:
  *  KMF_ERR_EXTENSION_NOT_FOUND - extension not found.
  */
 KMF_RETURN
-KMF_GetCertKeyUsageExt(const KMF_DATA *certdata,
+kmf_get_cert_ku(const KMF_DATA *certdata,
 	KMF_X509EXT_KEY_USAGE *keyusage)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -322,8 +270,7 @@ KMF_GetCertKeyUsageExt(const KMF_DATA *certdata,
 	/*
 	 * Check standard KeyUsage bits
 	 */
-	ret = KMF_GetCertExtensionData(certdata,
-		(KMF_OID *)&KMFOID_KeyUsage, &extn);
+	ret = kmf_get_cert_extn(certdata, (KMF_OID *)&KMFOID_KeyUsage, &extn);
 
 	if (ret != KMF_OK) {
 		goto end;
@@ -331,13 +278,12 @@ KMF_GetCertKeyUsageExt(const KMF_DATA *certdata,
 	keyusage->critical = (extn.critical != 0);
 	if (extn.value.tagAndValue->value.Length > 1) {
 		keyusage->KeyUsageBits =
-			extn.value.tagAndValue->value.Data[1] << 8;
+		    extn.value.tagAndValue->value.Data[1] << 8;
 	} else  {
-		keyusage->KeyUsageBits =
-			extn.value.tagAndValue->value.Data[0];
+		keyusage->KeyUsageBits = extn.value.tagAndValue->value.Data[0];
 	}
 end:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 	return (ret);
 }
 
@@ -380,8 +326,7 @@ parse_eku_data(const KMF_DATA *asn1data, KMF_X509EXT_EKU *ekuptr)
 	/*
 	 * certificatePolicies ::= SEQUENCE SIZE (1..MAX) OF PolicyInformation
 	 */
-	if (kmfber_first_element(asn1, &size, &end) !=
-		BER_OBJECT_IDENTIFIER) {
+	if (kmfber_first_element(asn1, &size, &end) != BER_OBJECT_IDENTIFIER) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto end;
 	}
@@ -391,7 +336,7 @@ parse_eku_data(const KMF_DATA *asn1data, KMF_X509EXT_EKU *ekuptr)
 	 * the array.
 	 */
 	while (kmfber_next_element(asn1, &size, end) ==
-		BER_OBJECT_IDENTIFIER) {
+	    BER_OBJECT_IDENTIFIER) {
 
 		/* Skip over the CONSTRUCTED SET tag */
 		if (kmfber_scanf(asn1, "D", &oid) == KMFBER_DEFAULT) {
@@ -400,7 +345,7 @@ parse_eku_data(const KMF_DATA *asn1data, KMF_X509EXT_EKU *ekuptr)
 		}
 		ekuptr->nEKUs++;
 		ekuptr->keyPurposeIdList = realloc(ekuptr->keyPurposeIdList,
-				ekuptr->nEKUs * sizeof (KMF_OID));
+		    ekuptr->nEKUs * sizeof (KMF_OID));
 		if (ekuptr->keyPurposeIdList == NULL) {
 			ret = KMF_ERR_MEMORY;
 			goto end;
@@ -424,7 +369,7 @@ end:
 }
 
 KMF_RETURN
-KMF_GetCertEKU(const KMF_DATA *certdata,
+kmf_get_cert_eku(const KMF_DATA *certdata,
 	KMF_X509EXT_EKU *ekuptr)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -439,8 +384,8 @@ KMF_GetCertEKU(const KMF_DATA *certdata,
 	ekuptr->keyPurposeIdList = NULL;
 	ekuptr->critical = 0;
 
-	ret = KMF_GetCertExtensionData(certdata,
-		(KMF_OID *)&KMFOID_ExtendedKeyUsage, &extn);
+	ret = kmf_get_cert_extn(certdata,
+	    (KMF_OID *)&KMFOID_ExtendedKeyUsage, &extn);
 
 	if (ret != KMF_OK) {
 		goto end;
@@ -449,7 +394,7 @@ KMF_GetCertEKU(const KMF_DATA *certdata,
 	ret = parse_eku_data(&extn.BERvalue, ekuptr);
 
 end:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 
 	return (ret);
 }
@@ -466,7 +411,7 @@ end:
  *  KMF_ERR_EXTENSION_NOT_FOUND - extension not found.
  */
 KMF_RETURN
-KMF_GetCertBasicConstraintExt(const KMF_DATA *certdata,
+kmf_get_cert_basic_constraint(const KMF_DATA *certdata,
 	KMF_BOOL *critical, KMF_X509EXT_BASICCONSTRAINTS *constraint)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -481,8 +426,8 @@ KMF_GetCertBasicConstraintExt(const KMF_DATA *certdata,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	(void) memset(&extn, 0, sizeof (KMF_X509_EXTENSION));
-	ret = KMF_GetCertExtensionData(certdata,
-		(KMF_OID *)&KMFOID_BasicConstraints, &extn);
+	ret = kmf_get_cert_extn(certdata,
+	    (KMF_OID *)&KMFOID_BasicConstraints, &extn);
 
 	if (ret != KMF_OK) {
 		goto end;
@@ -507,14 +452,14 @@ KMF_GetCertBasicConstraintExt(const KMF_DATA *certdata,
 	tag = kmfber_next_element(asn1, &size, end);
 	if (tag == BER_INTEGER) {
 		if (kmfber_scanf(asn1, "i",
-			&constraint->pathLenConstraint) == KMFBER_DEFAULT) {
+		    &constraint->pathLenConstraint) == KMFBER_DEFAULT) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto end;
 		}
 		constraint->pathLenConstraintPresent = KMF_TRUE;
 	}
 end:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 	if (asn1 != NULL)
 		kmfber_free(asn1, 1);
 
@@ -554,13 +499,13 @@ get_pqinfo(BerElement *asn1)
 	 * so the ber/der code knows when to stop looking.
 	 */
 	if ((tag = kmfber_first_element(asn1, &size, &end)) !=
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto end;
 	}
 	/* We found a sequence, loop until done */
 	while ((tag = kmfber_next_element(asn1, &size, end)) ==
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 
 		/* Skip over the CONSTRUCTED SET tag */
 		if (kmfber_scanf(asn1, "T", &tag) == KMFBER_DEFAULT) {
@@ -576,12 +521,12 @@ get_pqinfo(BerElement *asn1)
 			goto end;
 		}
 		(void) memset((void *)pqinfo, 0,
-			sizeof (KMF_X509EXT_POLICYQUALIFIERINFO));
+		    sizeof (KMF_X509EXT_POLICYQUALIFIERINFO));
 		/*
 		 * Read the PolicyQualifier OID
 		 */
 		if (kmfber_scanf(asn1, "D",
-			&pqinfo->policyQualifierId) == KMFBER_DEFAULT) {
+		    &pqinfo->policyQualifierId) == KMFBER_DEFAULT) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto end;
 		}
@@ -590,13 +535,13 @@ get_pqinfo(BerElement *asn1)
 		 * sort of data comes next.
 		 */
 		if (IsEqualOid(&pqinfo->policyQualifierId,
-			(KMF_OID *)&KMFOID_PKIX_PQ_CPSuri)) {
+		    (KMF_OID *)&KMFOID_PKIX_PQ_CPSuri)) {
 			/*
 			 * CPS uri must be an IA5STRING
 			 */
 			if (kmfber_scanf(asn1, "tl", &tag, &size) ==
-				KMFBER_DEFAULT || tag != BER_IA5STRING ||
-				size == 0) {
+			    KMFBER_DEFAULT || tag != BER_IA5STRING ||
+			    size == 0) {
 				ret = KMF_ERR_BAD_CERT_FORMAT;
 				goto end;
 			}
@@ -605,15 +550,15 @@ get_pqinfo(BerElement *asn1)
 				goto end;
 			}
 			if (kmfber_scanf(asn1, "s", pqinfo->value.Data,
-				&pqinfo->value.Length) == KMFBER_DEFAULT) {
+			    &pqinfo->value.Length) == KMFBER_DEFAULT) {
 				ret = KMF_ERR_BAD_CERT_FORMAT;
 				goto end;
 			}
 		} else if (IsEqualOid(&pqinfo->policyQualifierId,
-			(KMF_OID *)&KMFOID_PKIX_PQ_Unotice)) {
+		    (KMF_OID *)&KMFOID_PKIX_PQ_Unotice)) {
 			if (kmfber_scanf(asn1, "tl", &tag, &size) ==
-				KMFBER_DEFAULT ||
-				tag != BER_CONSTRUCTED_SEQUENCE) {
+			    KMFBER_DEFAULT ||
+			    tag != BER_CONSTRUCTED_SEQUENCE) {
 				ret = KMF_ERR_BAD_CERT_FORMAT;
 				goto end;
 			}
@@ -627,7 +572,7 @@ get_pqinfo(BerElement *asn1)
 				goto end;
 			}
 			if (kmfber_scanf(asn1, "s", pqinfo->value.Data,
-				&pqinfo->value.Length) == KMFBER_DEFAULT) {
+			    &pqinfo->value.Length) == KMFBER_DEFAULT) {
 				ret = KMF_ERR_BAD_CERT_FORMAT;
 				goto end;
 			}
@@ -639,8 +584,8 @@ get_pqinfo(BerElement *asn1)
 end:
 	if (ret != KMF_OK) {
 		if (pqinfo != NULL) {
-			KMF_FreeData(&pqinfo->value);
-			KMF_FreeData(&pqinfo->policyQualifierId);
+			kmf_free_data(&pqinfo->value);
+			kmf_free_data(&pqinfo->policyQualifierId);
 			free(pqinfo);
 			pqinfo = NULL;
 		}
@@ -661,7 +606,7 @@ end:
  *  parsing and memory allocation errors are also possible.
  */
 KMF_RETURN
-KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
+kmf_get_cert_policies(const KMF_DATA *certdata,
 	KMF_BOOL *critical, KMF_X509EXT_CERT_POLICIES *extptr)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -678,8 +623,8 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	(void) memset(&extn, 0, sizeof (extn));
-	ret = KMF_GetCertExtensionData(certdata,
-		(KMF_OID *)&KMFOID_CertificatePolicies, &extn);
+	ret = kmf_get_cert_extn(certdata,
+	    (KMF_OID *)&KMFOID_CertificatePolicies, &extn);
 
 	if (ret != KMF_OK) {
 		goto end;
@@ -704,7 +649,7 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 	 * certificatePolicies ::= SEQUENCE SIZE (1..MAX) OF PolicyInformation
 	 */
 	if ((tag = kmfber_first_element(asn1, &size, &end)) !=
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto end;
 	}
@@ -721,7 +666,7 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 	 * Loop over the SEQUENCES of PolicyInfo
 	 */
 	while ((tag = kmfber_next_element(asn1, &size, end)) ==
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 
 		/* Skip over the CONSTRUCTED SET tag */
 		if (kmfber_scanf(asn1, "T", &tag) == KMFBER_DEFAULT) {
@@ -735,12 +680,12 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 			goto end;
 		}
 		(void) memset((void *)pinfo, 0,
-			sizeof (KMF_X509EXT_POLICYINFO));
+		    sizeof (KMF_X509EXT_POLICYINFO));
 		/*
 		 * Decode the PolicyInformation SEQUENCE
 		 */
 		if ((tag = kmfber_scanf(asn1, "D",
-			&pinfo->policyIdentifier)) == KMFBER_DEFAULT) {
+		    &pinfo->policyIdentifier)) == KMFBER_DEFAULT) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto end;
 		}
@@ -753,23 +698,22 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 			    pinfo->policyQualifiers.numberOfPolicyQualifiers;
 			cnt++;
 			pinfo->policyQualifiers.policyQualifier = realloc(
-				pinfo->policyQualifiers.policyQualifier,
-				cnt * sizeof (KMF_X509EXT_POLICYQUALIFIERINFO));
+			    pinfo->policyQualifiers.policyQualifier,
+			    cnt * sizeof (KMF_X509EXT_POLICYQUALIFIERINFO));
 			if (pinfo->policyQualifiers.policyQualifier == NULL) {
 				ret = KMF_ERR_MEMORY;
 				goto end;
 			}
-			pinfo->policyQualifiers.numberOfPolicyQualifiers =
-				cnt;
+			pinfo->policyQualifiers.numberOfPolicyQualifiers = cnt;
 			pinfo->policyQualifiers.policyQualifier[cnt-1] =
-				*pqinfo;
+			    *pqinfo;
 
 			free(pqinfo);
 		}
 		extptr->numberOfPolicyInfo++;
 		extptr->policyInfo = realloc(extptr->policyInfo,
-			extptr->numberOfPolicyInfo *
-			sizeof (KMF_X509EXT_POLICYINFO));
+		    extptr->numberOfPolicyInfo *
+		    sizeof (KMF_X509EXT_POLICYINFO));
 		if (extptr->policyInfo == NULL) {
 			ret = KMF_ERR_MEMORY;
 			goto end;
@@ -780,7 +724,7 @@ KMF_GetCertPoliciesExt(const KMF_DATA *certdata,
 
 
 end:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 	if (asn1 != NULL)
 		kmfber_free(asn1, 1);
 	return (ret);
@@ -798,7 +742,7 @@ end:
  *  KMF_ERR_EXTENSION_NOT_FOUND - extension not found.
  */
 KMF_RETURN
-KMF_GetCertAuthInfoAccessExt(const KMF_DATA *certdata,
+kmf_get_cert_auth_info_access(const KMF_DATA *certdata,
 	KMF_X509EXT_AUTHINFOACCESS *aia)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -815,7 +759,7 @@ KMF_GetCertAuthInfoAccessExt(const KMF_DATA *certdata,
 	}
 
 	(void) memset(&extn, 0, sizeof (KMF_X509_EXTENSION));
-	ret = KMF_GetCertExtensionData(certdata,
+	ret = kmf_get_cert_extn(certdata,
 	    (KMF_OID *)&KMFOID_AuthorityInfoAccess, &extn);
 
 	if (ret != KMF_OK) {
@@ -908,12 +852,12 @@ KMF_GetCertAuthInfoAccessExt(const KMF_DATA *certdata,
 			if (kmfber_scanf(asn1, "s",
 			    access_info->AccessLocation.Data,
 			    &access_info->AccessLocation.Length) ==
-				KMFBER_DEFAULT) {
+			    KMFBER_DEFAULT) {
 				ret = KMF_ERR_BAD_CERT_FORMAT;
 				goto end;
 			}
 		} else if (IsEqualOid(&access_info->AccessMethod,
-			(KMF_OID *)&KMFOID_PkixAdCaIssuers)) {
+		    (KMF_OID *)&KMFOID_PkixAdCaIssuers)) {
 			/* will be supported later with PKIX */
 			free(access_info);
 			access_info = NULL;
@@ -940,7 +884,7 @@ KMF_GetCertAuthInfoAccessExt(const KMF_DATA *certdata,
 	}
 
 end:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 	if (access_info != NULL)
 		free(access_info);
 	if (asn1 != NULL)
@@ -1040,11 +984,11 @@ parse_dp_name(char *dp_der_code, int dp_der_size, KMF_CRL_DIST_POINT *dp)
 			}
 
 			fullname->namelist[fullname->number - 1].choice =
-				GENNAME_URI;
+			    GENNAME_URI;
 			fullname->namelist[fullname->number - 1].name.Length =
-				size;
+			    size;
 			fullname->namelist[fullname->number - 1].name.Data =
-				(unsigned char *)url;
+			    (unsigned char *)url;
 
 			/* next */
 			tag = kmfber_next_element(asn1, &size, end);
@@ -1079,7 +1023,7 @@ out:
  * extension data, and returns it in the KMF_X509EXT_CRLDISTPOINTS record.
  */
 KMF_RETURN
-KMF_GetCertCRLDistributionPointsExt(const KMF_DATA *certdata,
+kmf_get_cert_crl_dist_pts(const KMF_DATA *certdata,
 	KMF_X509EXT_CRLDISTPOINTS *crl_dps)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -1098,7 +1042,7 @@ KMF_GetCertCRLDistributionPointsExt(const KMF_DATA *certdata,
 
 	/* Get the ASN.1 data for this extension. */
 	(void) memset(&extn, 0, sizeof (KMF_X509_EXTENSION));
-	ret = KMF_GetCertExtensionData(certdata,
+	ret = kmf_get_cert_extn(certdata,
 	    (KMF_OID *)&KMFOID_CrlDistributionPoints, &extn);
 	if (ret != KMF_OK) {
 		return (ret);
@@ -1277,7 +1221,7 @@ KMF_GetCertCRLDistributionPointsExt(const KMF_DATA *certdata,
 	}
 
 out:
-	KMF_FreeExtension(&extn);
+	kmf_free_extn(&extn);
 
 	if (asn1 != NULL)
 		kmfber_free(asn1, 1);
@@ -1301,15 +1245,14 @@ KMF_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN (*getPrintableFn)(void *, const KMF_DATA *,
-		KMF_PRINTABLE_ITEM, char *);
+	    KMF_PRINTABLE_ITEM, char *);
 	KMF_RETURN ret;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (SignedCert == NULL ||
-		resultStr == NULL) {
+	if (SignedCert == NULL || resultStr == NULL) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
@@ -1332,7 +1275,7 @@ KMF_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertVersionString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_version_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1350,7 +1293,7 @@ KMF_GetCertVersionString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_VERSION,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1362,8 +1305,9 @@ KMF_GetCertVersionString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	return (ret);
 }
 
+
 KMF_RETURN
-KMF_GetCertSubjectNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_subject_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1381,7 +1325,7 @@ KMF_GetCertSubjectNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_SUBJECT,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1395,7 +1339,7 @@ KMF_GetCertSubjectNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertIssuerNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_issuer_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1414,7 +1358,7 @@ KMF_GetCertIssuerNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_ISSUER,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1427,7 +1371,7 @@ KMF_GetCertIssuerNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertSerialNumberString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_serial_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1445,7 +1389,7 @@ KMF_GetCertSerialNumberString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_SERIALNUM,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1458,7 +1402,7 @@ KMF_GetCertSerialNumberString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertStartDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_start_date_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1476,7 +1420,7 @@ KMF_GetCertStartDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_NOTBEFORE,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1489,7 +1433,7 @@ KMF_GetCertStartDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertEndDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_end_date_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	char **result)
 {
 	KMF_RETURN ret;
@@ -1507,7 +1451,7 @@ KMF_GetCertEndDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_NOTAFTER,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1520,7 +1464,7 @@ KMF_GetCertEndDateString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertPubKeyAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_pubkey_alg_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1538,7 +1482,7 @@ KMF_GetCertPubKeyAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_PUBKEY_ALG,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1551,7 +1495,7 @@ KMF_GetCertPubKeyAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertSignatureAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_sig_alg_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1569,7 +1513,7 @@ KMF_GetCertSignatureAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_SIGNATURE_ALG,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1582,7 +1526,7 @@ KMF_GetCertSignatureAlgString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertPubKeyDataString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_pubkey_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
     char **result)
 {
 	KMF_RETURN ret;
@@ -1600,7 +1544,7 @@ KMF_GetCertPubKeyDataString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
 	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_PUBKEY_DATA,
-		tmpstr);
+	    tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1613,7 +1557,7 @@ KMF_GetCertPubKeyDataString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 }
 
 KMF_RETURN
-KMF_GetCertEmailString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+kmf_get_cert_email_str(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 	char **result)
 {
 	KMF_RETURN ret;
@@ -1630,8 +1574,7 @@ KMF_GetCertEmailString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
 		return (KMF_ERR_MEMORY);
 	(void) memset(tmpstr, 0, KMF_CERT_PRINTABLE_LEN);
 
-	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_EMAIL,
-		tmpstr);
+	ret = KMF_CertGetPrintable(handle, SignedCert, KMF_CERT_EMAIL, tmpstr);
 
 	if (ret == KMF_OK) {
 		*result = tmpstr;
@@ -1654,7 +1597,7 @@ KMF_GetCertEmailString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
  * must be freed by the caller.
  */
 KMF_RETURN
-KMF_GetCertExtensionString(KMF_HANDLE_T handle, const KMF_DATA *cert,
+kmf_get_cert_extn_str(KMF_HANDLE_T handle, const KMF_DATA *cert,
 	KMF_PRINTABLE_ITEM extension, char **result)
 {
 	KMF_RETURN ret;
@@ -1685,7 +1628,7 @@ KMF_GetCertExtensionString(KMF_HANDLE_T handle, const KMF_DATA *cert,
 }
 
 KMF_RETURN
-KMF_GetCertIDData(const KMF_DATA *SignedCert, KMF_DATA *ID)
+kmf_get_cert_id_data(const KMF_DATA *SignedCert, KMF_DATA *ID)
 {
 	KMF_RETURN ret;
 	KMF_X509_CERTIFICATE *cert = NULL;
@@ -1699,14 +1642,13 @@ KMF_GetCertIDData(const KMF_DATA *SignedCert, KMF_DATA *ID)
 
 	ret = GetIDFromSPKI(&cert->certificate.subjectPublicKeyInfo, ID);
 
-	KMF_FreeSignedCert(cert);
+	kmf_free_signed_cert(cert);
 	free(cert);
 	return (ret);
 }
 
 KMF_RETURN
-KMF_GetCertIDString(const KMF_DATA *SignedCert,
-	char **idstr)
+kmf_get_cert_id_str(const KMF_DATA *SignedCert,	char **idstr)
 {
 	KMF_RETURN ret;
 	KMF_DATA ID = {NULL, 0};
@@ -1716,9 +1658,9 @@ KMF_GetCertIDString(const KMF_DATA *SignedCert,
 	if (SignedCert == NULL || idstr == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	ret = KMF_GetCertIDData(SignedCert, &ID);
+	ret = kmf_get_cert_id_data(SignedCert, &ID);
 	if (ret != KMF_OK) {
-		KMF_FreeData(&ID);
+		kmf_free_data(&ID);
 		return (ret);
 	}
 
@@ -1726,7 +1668,7 @@ KMF_GetCertIDString(const KMF_DATA *SignedCert,
 	for (i = 0; i < ID.Length; i++) {
 		int len = strlen(tmpstr);
 		(void) snprintf(&tmpstr[len], sizeof (tmpstr) -  len,
-			"%02x", (uchar_t)ID.Data[i]);
+		    "%02x", (uchar_t)ID.Data[i]);
 		if ((i+1) < ID.Length)
 			(void) strcat(tmpstr, ":");
 	}
@@ -1734,17 +1676,18 @@ KMF_GetCertIDString(const KMF_DATA *SignedCert,
 	if ((*idstr) == NULL)
 		ret = KMF_ERR_MEMORY;
 
-	KMF_FreeData(&ID);
+	kmf_free_data(&ID);
 
 	return (ret);
 }
+
 
 /*
  * This function gets the time_t values of the notbefore and notafter dates
  * from a der-encoded certificate.
  */
 KMF_RETURN
-KMF_GetCertValidity(const KMF_DATA *cert, time_t *not_before,
+kmf_get_cert_validity(const KMF_DATA *cert, time_t *not_before,
     time_t *not_after)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -1796,7 +1739,7 @@ KMF_GetCertValidity(const KMF_DATA *cert, time_t *not_before,
 
 out:
 	if (certData != NULL) {
-		KMF_FreeSignedCert(certData);
+		kmf_free_signed_cert(certData);
 		free(certData);
 	}
 
@@ -1804,7 +1747,7 @@ out:
 }
 
 KMF_RETURN
-KMF_SetCertPubKey(KMF_HANDLE_T handle,
+kmf_set_cert_pubkey(KMF_HANDLE_T handle,
 	KMF_KEY_HANDLE *KMFKey,
 	KMF_X509_CERTIFICATE *Cert)
 {
@@ -1825,7 +1768,7 @@ KMF_SetCertPubKey(KMF_HANDLE_T handle,
 	plugin = FindPlugin(handle, KMFKey->kstype);
 	if (plugin != NULL && plugin->funclist->EncodePubkeyData != NULL) {
 		ret = plugin->funclist->EncodePubkeyData(handle,
-			KMFKey, &KeyData);
+		    KMFKey, &KeyData);
 	} else {
 		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
@@ -1841,7 +1784,7 @@ KMF_SetCertPubKey(KMF_HANDLE_T handle,
 }
 
 KMF_RETURN
-KMF_SetCertSubjectName(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_subject(KMF_X509_CERTIFICATE *CertData,
 	KMF_X509_NAME *subject_name_ptr)
 {
 
@@ -1880,7 +1823,9 @@ set_key_usage_extension(KMF_X509_EXTENSIONS *extns,
 	extn.critical = critical;
 	extn.format = KMF_X509_DATAFORMAT_ENCODED;
 
-	for (i = 7; i <= 15 && !(kubits & (1 << i)); i++);
+	for (i = 7; i <= 15 && !(kubits & (1 << i)); i++)
+		/* empty body */
+		;
 
 	bitlen = 16 - i;
 
@@ -1914,7 +1859,7 @@ out:
 }
 
 KMF_RETURN
-KMF_SetCertKeyUsage(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_ku(KMF_X509_CERTIFICATE *CertData,
 	int critical, uint16_t kubits)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -1922,15 +1867,14 @@ KMF_SetCertKeyUsage(KMF_X509_CERTIFICATE *CertData,
 	if (CertData == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	ret = set_key_usage_extension(
-		&CertData->certificate.extensions,
-		critical, kubits);
+	ret = set_key_usage_extension(&CertData->certificate.extensions,
+	    critical, kubits);
 
 	return (ret);
 }
 
 KMF_RETURN
-KMF_SetCertIssuerName(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_issuer(KMF_X509_CERTIFICATE *CertData,
 	KMF_X509_NAME *issuer_name_ptr)
 {
 
@@ -1950,7 +1894,7 @@ KMF_SetCertIssuerName(KMF_X509_CERTIFICATE *CertData,
 }
 
 KMF_RETURN
-KMF_SetCertSignatureAlgorithm(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_sig_alg(KMF_X509_CERTIFICATE *CertData,
 	KMF_ALGORITHM_INDEX sigAlg)
 {
 	KMF_OID	*alg;
@@ -1958,7 +1902,7 @@ KMF_SetCertSignatureAlgorithm(KMF_X509_CERTIFICATE *CertData,
 	if (CertData == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	alg = X509_AlgIdToAlgorithmOid(sigAlg);
+	alg = x509_algid_to_algoid(sigAlg);
 
 	if (alg != NULL) {
 		(void) copy_data((KMF_DATA *)
@@ -1982,7 +1926,7 @@ KMF_SetCertSignatureAlgorithm(KMF_X509_CERTIFICATE *CertData,
 }
 
 KMF_RETURN
-KMF_SetCertValidityTimes(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_validity(KMF_X509_CERTIFICATE *CertData,
 	time_t notBefore, uint32_t delta)
 {
 	time_t		clock;
@@ -2003,26 +1947,26 @@ KMF_SetCertValidityTimes(KMF_X509_CERTIFICATE *CertData,
 
 	/* Build the format in 2 parts so SCCS doesn't get confused */
 	(void) strftime(szNotBefore, sizeof (szNotBefore),
-		"%y%m%d%H" "%M00Z", gmt);
+	    "%y%m%d%H" "%M00Z", gmt);
 
 	CertData->certificate.validity.notBefore.timeType = BER_UTCTIME;
 	CertData->certificate.validity.notBefore.time.Length =
-		strlen((char *)szNotBefore);
+	    strlen((char *)szNotBefore);
 	CertData->certificate.validity.notBefore.time.Data =
-		(uchar_t *)strdup(szNotBefore);
+	    (uchar_t *)strdup(szNotBefore);
 
 	clock += delta;
 	gmt = gmtime(&clock);
 
 	/* Build the format in 2 parts so SCCS doesn't get confused */
 	(void) strftime(szNotAfter, sizeof (szNotAfter),
-		"%y%m%d%H" "%M00Z", gmt);
+	    "%y%m%d%H" "%M00Z", gmt);
 
 	CertData->certificate.validity.notAfter.timeType = BER_UTCTIME;
 	CertData->certificate.validity.notAfter.time.Length =
-		strlen((char *)szNotAfter);
+	    strlen((char *)szNotAfter);
 	CertData->certificate.validity.notAfter.time.Data =
-		(uchar_t *)strdup(szNotAfter);
+	    (uchar_t *)strdup(szNotAfter);
 
 	return (KMF_OK);
 }
@@ -2069,7 +2013,7 @@ set_bigint(KMF_BIGINT *data, KMF_BIGINT *bigint)
 }
 
 KMF_RETURN
-KMF_SetCertSerialNumber(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_serial(KMF_X509_CERTIFICATE *CertData,
 	KMF_BIGINT *serno)
 {
 	if (CertData == NULL || serno == NULL || serno->len == 0)
@@ -2078,7 +2022,7 @@ KMF_SetCertSerialNumber(KMF_X509_CERTIFICATE *CertData,
 }
 
 KMF_RETURN
-KMF_SetCertVersion(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_version(KMF_X509_CERTIFICATE *CertData,
 	uint32_t version)
 {
 	if (CertData == NULL)
@@ -2090,11 +2034,11 @@ KMF_SetCertVersion(KMF_X509_CERTIFICATE *CertData,
 	if (version != 0 && version != 1 && version != 2)
 		return (KMF_ERR_BAD_PARAMETER);
 	return (set_integer(&CertData->certificate.version, (void *)&version,
-		sizeof (uint32_t)));
+	    sizeof (uint32_t)));
 }
 
 KMF_RETURN
-KMF_SetCertIssuerAltName(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_issuer_altname(KMF_X509_CERTIFICATE *CertData,
 	int critical,
 	KMF_GENERALNAMECHOICES nametype,
 	char *namedata)
@@ -2102,14 +2046,12 @@ KMF_SetCertIssuerAltName(KMF_X509_CERTIFICATE *CertData,
 	if (CertData == NULL || namedata == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	return (KMF_SetAltName(
-		&CertData->certificate.extensions,
-		(KMF_OID *)&KMFOID_IssuerAltName,
-		critical, nametype, namedata));
+	return (kmf_set_altname(&CertData->certificate.extensions,
+	    (KMF_OID *)&KMFOID_IssuerAltName, critical, nametype, namedata));
 }
 
 KMF_RETURN
-KMF_SetCertSubjectAltName(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_subject_altname(KMF_X509_CERTIFICATE *CertData,
 	int critical,
 	KMF_GENERALNAMECHOICES nametype,
 	char *namedata)
@@ -2117,13 +2059,12 @@ KMF_SetCertSubjectAltName(KMF_X509_CERTIFICATE *CertData,
 	if (CertData == NULL || namedata == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	return (KMF_SetAltName(&CertData->certificate.extensions,
-		(KMF_OID *)&KMFOID_SubjectAltName,
-		critical, nametype, namedata));
+	return (kmf_set_altname(&CertData->certificate.extensions,
+	    (KMF_OID *)&KMFOID_SubjectAltName, critical, nametype, namedata));
 }
 
 KMF_RETURN
-KMF_AddCertEKU(KMF_X509_CERTIFICATE *CertData, KMF_OID *ekuOID,
+kmf_add_cert_eku(KMF_X509_CERTIFICATE *CertData, KMF_OID *ekuOID,
 	int critical)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -2142,12 +2083,10 @@ KMF_AddCertEKU(KMF_X509_CERTIFICATE *CertData, KMF_OID *ekuOID,
 	(void) memset(&newextn, 0, sizeof (newextn));
 
 	foundextn = FindExtn(&CertData->certificate.extensions,
-		(KMF_OID *)&KMFOID_ExtendedKeyUsage);
+	    (KMF_OID *)&KMFOID_ExtendedKeyUsage);
 	if (foundextn != NULL) {
-		ret = GetSequenceContents(
-				(char *)foundextn->BERvalue.Data,
-				foundextn->BERvalue.Length,
-				&olddata, &oldsize);
+		ret = GetSequenceContents((char *)foundextn->BERvalue.Data,
+		    foundextn->BERvalue.Length,	&olddata, &oldsize);
 		if (ret != KMF_OK)
 			goto out;
 
@@ -2199,20 +2138,20 @@ KMF_AddCertEKU(KMF_X509_CERTIFICATE *CertData, KMF_OID *ekuOID,
 		foundextn->BERvalue.Length = extdata->bv_len;
 	} else {
 		ret = copy_data(&newextn.extnId,
-			(KMF_DATA *)&KMFOID_ExtendedKeyUsage);
+		    (KMF_DATA *)&KMFOID_ExtendedKeyUsage);
 		if (ret != KMF_OK)
 			goto out;
 		newextn.critical = critical;
 		newextn.format = KMF_X509_DATAFORMAT_ENCODED;
 		newextn.BERvalue.Data = (uchar_t *)extdata->bv_val;
 		newextn.BERvalue.Length = extdata->bv_len;
-		ret = KMF_SetCertExtension(CertData, &newextn);
+		ret = kmf_set_cert_extn(CertData, &newextn);
 		if (ret != KMF_OK)
 			free(newextn.BERvalue.Data);
 	}
 
 out:
-	KMF_FreeEKU(&ekudata);
+	kmf_free_eku(&ekudata);
 	if (extdata != NULL)
 		free(extdata);
 
@@ -2223,13 +2162,13 @@ out:
 		kmfber_free(asn1, 1);
 
 	if (ret != KMF_OK)
-		KMF_FreeData(&newextn.extnId);
+		kmf_free_data(&newextn.extnId);
 
 	return (ret);
 }
 
 KMF_RETURN
-KMF_SetCertExtension(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_extn(KMF_X509_CERTIFICATE *CertData,
 	KMF_X509_EXTENSION *extn)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -2246,7 +2185,7 @@ KMF_SetCertExtension(KMF_X509_CERTIFICATE *CertData,
 }
 
 KMF_RETURN
-KMF_SetCertBasicConstraintExt(KMF_X509_CERTIFICATE *CertData,
+kmf_set_cert_basic_constraint(KMF_X509_CERTIFICATE *CertData,
 	KMF_BOOL critical, KMF_X509EXT_BASICCONSTRAINTS *constraint)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -2280,7 +2219,7 @@ KMF_SetCertBasicConstraintExt(KMF_X509_CERTIFICATE *CertData,
 	if (constraint->pathLenConstraintPresent) {
 		/* Write the pathLenConstraint value */
 		if (kmfber_printf(asn1, "i",
-			constraint->pathLenConstraint) == -1) {
+		    constraint->pathLenConstraint) == -1) {
 			ret = KMF_ERR_ENCODING;
 			goto out;
 		}
@@ -2300,7 +2239,7 @@ KMF_SetCertBasicConstraintExt(KMF_X509_CERTIFICATE *CertData,
 	extn.BERvalue.Length = extdata->bv_len;
 
 	free(extdata);
-	ret = KMF_SetCertExtension(CertData, &extn);
+	ret = kmf_set_cert_extn(CertData, &extn);
 	if (ret != KMF_OK) {
 		free(extn.BERvalue.Data);
 	}
@@ -2310,4 +2249,28 @@ out:
 		kmfber_free(asn1, 1);
 
 	return (ret);
+}
+
+
+/*
+ * Phase 1 APIs still needed to maintain compat with elfsign.
+ */
+KMF_RETURN
+KMF_GetCertSubjectNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+    char **result)
+{
+	return (kmf_get_cert_subject_str(handle, SignedCert, result));
+}
+
+KMF_RETURN
+KMF_GetCertIssuerNameString(KMF_HANDLE_T handle, const KMF_DATA *SignedCert,
+    char **result)
+{
+	return (kmf_get_cert_issuer_str(handle, SignedCert, result));
+}
+
+KMF_RETURN
+KMF_GetCertIDString(const KMF_DATA *SignedCert,	char **idstr)
+{
+	return (kmf_get_cert_id_str(SignedCert, idstr));
 }

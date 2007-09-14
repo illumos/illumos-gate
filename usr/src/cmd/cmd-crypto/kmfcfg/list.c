@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,32 +44,32 @@ show_policy(KMF_POLICY_RECORD *plc)
 	(void) printf("Name: %s\n", plc->name);
 
 	(void) printf(gettext("Ignore Date: %s\n"),
-		plc->ignore_date ? gettext("true") : gettext("false"));
+	    plc->ignore_date ? gettext("true") : gettext("false"));
 
 	(void) printf(gettext("Ignore Unknown EKUs: %s\n"),
-		plc->ignore_unknown_ekus ? gettext("true") : gettext("false"));
+	    plc->ignore_unknown_ekus ? gettext("true") : gettext("false"));
 
 	(void) printf(gettext("Ignore TA: %s\n"),
-		plc->ignore_trust_anchor ? gettext("true") : gettext("false"));
+	    plc->ignore_trust_anchor ? gettext("true") : gettext("false"));
 
 	(void) printf(gettext("Validity Adjusted Time: %s\n"),
-		    plc->validity_adjusttime ?
-		    plc->validity_adjusttime : "<null>");
+	    plc->validity_adjusttime ? plc->validity_adjusttime : "<null>");
 
 	if (plc->ta_name == NULL && plc->ta_serial == NULL) {
 		(void) printf(gettext("Trust Anchor Certificate: <null>\n"));
 	} else {
 		(void) printf(gettext("Trust Anchor Certificate:\n"));
 		(void) printf(gettext("\tName: %s\n"),
-			plc->ta_name ? plc->ta_name : "<null>");
+		    plc->ta_name ? plc->ta_name : "<null>");
 		(void) printf(gettext("\tSerial Number: %s\n"),
-			plc->ta_serial ? plc->ta_serial : "<null>");
+		    plc->ta_serial ? plc->ta_serial : "<null>");
 	}
 
 	if (plc->ku_bits != 0) {
 		(void) printf(gettext("Key Usage Bits: "));
 		for (i = KULOWBIT; i <= KUHIGHBIT; i++) {
-			char *s = ku2str((plc->ku_bits & (1<<i)));
+			char *s = kmf_ku_to_string(
+			    (plc->ku_bits & (1<<i)));
 			if (s != NULL) {
 				(void) printf("%s ", s);
 			}
@@ -82,10 +82,11 @@ show_policy(KMF_POLICY_RECORD *plc)
 	if (plc->eku_set.eku_count > 0) {
 		(void) printf(gettext("Extended Key Usage Values:\n"));
 		for (i = 0; i < plc->eku_set.eku_count; i++) {
-			char *s = KMF_OID2EKUString(&plc->eku_set.ekulist[i]);
+			char *s = kmf_oid_to_eku_string(
+			    &plc->eku_set.ekulist[i]);
 			(void) printf("\t%s\t(%s)\n",
-				KMF_OID2String(&plc->eku_set.ekulist[i]),
-				s ? s : "unknown");
+			    kmf_oid_to_string(&plc->eku_set.ekulist[i]),
+			    s ? s : "unknown");
 		}
 	} else {
 		(void) printf(gettext("Extended Key Usage Values: <null>\n"));
@@ -142,20 +143,20 @@ show_policy(KMF_POLICY_RECORD *plc)
 		    plc->validation_info.crl_info.directory : "<null>");
 
 		(void) printf(gettext("\tDownload and cache CRL: %s\n"),
-			plc->validation_info.crl_info.get_crl_uri ?
-			gettext("true") : gettext("false"));
+		    plc->validation_info.crl_info.get_crl_uri ?
+		    gettext("true") : gettext("false"));
 
 		(void) printf(gettext("\tProxy: %s\n"),
 		    plc->validation_info.crl_info.proxy ?
 		    plc->validation_info.crl_info.proxy : "<null>");
 
 		(void) printf(gettext("\tIgnore CRL signature: %s\n"),
-			plc->validation_info.crl_info.ignore_crl_sign ?
-			gettext("true") : gettext("false"));
+		    plc->validation_info.crl_info.ignore_crl_sign ?
+		    gettext("true") : gettext("false"));
 
 		(void) printf(gettext("\tIgnore CRL validity date: %s\n"),
-			plc->validation_info.crl_info.ignore_crl_date ?
-			gettext("true") : gettext("false"));
+		    plc->validation_info.crl_info.ignore_crl_date ?
+		    gettext("true") : gettext("false"));
 	}
 
 	(void) printf("\n");
@@ -234,11 +235,11 @@ kc_list(int argc, char *argv[])
 	pnode = plclist;
 	while (pnode != NULL) {
 		if (policyname == NULL ||
-			strcmp(policyname, pnode->plc.name) == 0) {
+		    strcmp(policyname, pnode->plc.name) == 0) {
 			KMF_POLICY_RECORD *plc = &pnode->plc;
 
 			found++;
-			rv = KMF_VerifyPolicy(plc);
+			rv = kmf_verify_policy(plc);
 			if (rv != KMF_OK) {
 				(void) fprintf(stderr, gettext(
 				    "Policy Name: '%s' is invalid\n"),

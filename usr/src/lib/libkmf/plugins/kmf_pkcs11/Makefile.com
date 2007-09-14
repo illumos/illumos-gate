@@ -29,7 +29,10 @@
 
 LIBRARY=	kmf_pkcs11.a
 VERS=		.1
-OBJECTS=	pkcs11_spi.o
+
+PKCS11_COBJECTS = pkcs11_spi.o
+BIGNUM_COBJECTS = bignumimpl.o
+OBJECTS = $(PKCS11_COBJECTS) $(BIGNUM_COBJECTS)
 
 include	$(SRC)/lib/Makefile.lib
 
@@ -38,11 +41,18 @@ KMFINC=		-I../../../include -I../../../ber_der/inc
 
 PKCS11LIBS=	-lkmf -lkmfberder -lmd -lpkcs11 -lcryptoutil -lc
 
+BIGNUMDIR=      $(SRC)/common/bignum
+
 SRCDIR=		../common
 INCDIR=		../../include
 
+SRCS =  \
+        $(PKCS11_COBJECTS:%.o=$(SRCDIR)/%.c) \
+        $(BIGNUM_COBJECTS:%.o=$(BIGNUMDIR)/%.c)
+
+
 CFLAGS		+=	$(CCVERBOSE)
-CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR)  -I/usr/include/libxml2
+CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR)  -I/usr/include/libxml2 -I$(BIGNUMDIR)
 
 PICS=	$(OBJECTS:%=pics/%)
 SONAME=	$(PLUGIN)
@@ -61,5 +71,9 @@ all:	$(LIBS) $(LINTLIB)
 lint: lintcheck
 
 FRC:
+
+pics/%.o:	$(BIGNUMDIR)/%.c
+	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $<
+	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ

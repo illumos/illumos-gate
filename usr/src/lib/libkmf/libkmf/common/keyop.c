@@ -37,8 +37,284 @@
 #include <libgen.h>
 #include <cryptoutil.h>
 
+KMF_RETURN
+kmf_create_keypair(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_PRIVKEY_HANDLE_ATTR, FALSE, sizeof (KMF_KEY_HANDLE),
+			sizeof (KMF_KEY_HANDLE)},
+		{KMF_PUBKEY_HANDLE_ATTR, FALSE, sizeof (KMF_KEY_HANDLE),
+			sizeof (KMF_KEY_HANDLE)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL && plugin->funclist->CreateKeypair != NULL) {
+		return (plugin->funclist->CreateKeypair(handle, num_args,
+		    attrlist));
+	} else {
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	}
+}
+
+KMF_RETURN
+kmf_delete_key_from_keystore(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+	KMF_KEY_HANDLE *key;
+
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_KEY_HANDLE_ATTR, FALSE, sizeof (KMF_KEY_HANDLE),
+			sizeof (KMF_KEY_HANDLE)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL && plugin->funclist->DeleteKey != NULL) {
+		ret = plugin->funclist->DeleteKey(handle, num_args, attrlist);
+	} else {
+		ret = KMF_ERR_PLUGIN_NOTFOUND;
+	}
+
+	if (ret == KMF_OK) {
+		key = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, num_args);
+		if (key == NULL)
+			return (KMF_ERR_BAD_PARAMETER);
+		if (key->keylabel != NULL)
+			free(key->keylabel);
+
+		if (key->israw && key->keyp != NULL) {
+			if (key->keyclass ==  KMF_ASYM_PUB ||
+			    key->keyclass == KMF_ASYM_PRI) {
+				kmf_free_raw_key(key->keyp);
+				free(key->keyp);
+			} else if (key->keyclass == KMF_SYMMETRIC) {
+				kmf_free_raw_sym_key(key->keyp);
+			}
+			/* Else we don't know how to free the memory. */
+		}
+
+		(void) memset(key, 0, sizeof (KMF_KEY_HANDLE));
+	}
+
+	return (ret);
+}
+
+KMF_RETURN
+kmf_find_key(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_COUNT_ATTR, FALSE, sizeof (uint32_t),
+			sizeof (uint32_t)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL && plugin->funclist->FindKey != NULL) {
+		return (plugin->funclist->FindKey(handle, num_args, attrlist));
+	}
+
+	return (KMF_ERR_PLUGIN_NOTFOUND);
+}
+
+KMF_RETURN
+kmf_create_sym_key(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_KEY_HANDLE_ATTR, FALSE, sizeof (KMF_KEY_HANDLE),
+			sizeof (KMF_KEY_HANDLE)},
+		{KMF_KEYALG_ATTR, FALSE, 1, sizeof (KMF_KEY_ALG)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL && plugin->funclist->CreateSymKey != NULL) {
+		return (plugin->funclist->CreateSymKey(handle, num_args,
+		    attrlist));
+	} else {
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	}
+}
+
+KMF_RETURN
+kmf_get_sym_key_value(KMF_HANDLE_T handle, KMF_KEY_HANDLE *symkey,
+	KMF_RAW_SYM_KEY *rkey)
+{
+	KMF_PLUGIN *plugin;
+	KMF_RETURN ret;
+
+	CLEAR_ERROR(handle, ret);
+	if (ret != KMF_OK)
+		return (ret);
+
+	if (symkey == NULL || rkey == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	plugin = FindPlugin(handle, symkey->kstype);
+	if (plugin != NULL &&
+	    plugin->funclist->GetSymKeyValue != NULL) {
+		return (plugin->funclist->GetSymKeyValue(handle,
+		    symkey, rkey));
+	} else {
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	}
+}
+
+KMF_RETURN
+kmf_store_key(KMF_HANDLE_T handle,
+	int	numattr,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin != NULL) {
+		if (plugin->funclist->StoreKey != NULL)
+			return (plugin->funclist->StoreKey(handle,
+			    numattr, attrlist));
+		else
+			return (KMF_ERR_FUNCTION_NOT_FOUND);
+	}
+	return (KMF_ERR_PLUGIN_NOTFOUND);
+}
+
 /*
- *
+ * The following are Phase 1 APIs still needed to maintain compat with elfsign.
+ */
+
+/*
  * Name: KMF_SignDataWithKey
  *
  * Description:
@@ -68,117 +344,135 @@ KMF_SignDataWithKey(KMF_HANDLE_T handle,
 	KMF_DATA *tobesigned,
 	KMF_DATA *output)
 {
-	KMF_RETURN ret;
-	KMF_PLUGIN *plugin;
-	KMF_ALGORITHM_INDEX AlgId;
-	KMF_DATA	signature = {0, NULL};
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
+	KMF_ATTRIBUTE attlist[5]; /* only 5 attrs for SignData */
+	int i = 0;
 
 	if (key == NULL || AlgOID == NULL ||
-		tobesigned == NULL || output == NULL)
+	    tobesigned == NULL || output == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/*
-	 * The plugin must be based on the key since private keys
-	 * cannot be extracted.
-	 */
-	plugin = FindPlugin(handle, key->kstype);
-	if (plugin != NULL && plugin->funclist->SignData != NULL) {
-		ret = plugin->funclist->SignData(handle, key,
-		    AlgOID, tobesigned, output);
-		if (ret != KMF_OK)
-			goto cleanup;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &key->kstype, sizeof (key->kstype));
+	i++;
 
-		AlgId = X509_AlgorithmOidToAlgId(AlgOID);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEY_HANDLE_ATTR, key, sizeof (KMF_KEY_HANDLE));
+	i++;
 
-		/*
-		 * For DSA, NSS returns an encoded signature. Decode the
-		 * signature as DSA signature should be 40-byte long.
-		 */
-		if ((AlgId == KMF_ALGID_SHA1WithDSA) &&
-		    (plugin->type == KMF_KEYSTORE_NSS)) {
-			ret = DerDecodeDSASignature(output, &signature);
-			if (ret != KMF_OK) {
-				goto cleanup;
-			} else {
-				output->Length = signature.Length;
-				(void) memcpy(output->Data, signature.Data,
-				    signature.Length);
-			}
-		} else if (AlgId == KMF_ALGID_NONE) {
-			ret = KMF_ERR_BAD_ALGORITHM;
-		}
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_OID_ATTR, AlgOID, sizeof (KMF_OID));
+	i++;
 
-cleanup:
-	if (signature.Data)
-		free(signature.Data);
-	return (ret);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_DATA_ATTR, tobesigned, sizeof (KMF_DATA));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_OUT_DATA_ATTR, output, sizeof (KMF_DATA));
+	i++;
+
+	return (kmf_sign_data(handle, i, attlist));
 }
 
-/*
- *
- * Name: KMF_VerifyDataWithKey
- *
- * Description:
- *   This function verifies the signature of a block of data
- * using the input public key
- *
- * Parameters:
- *	handle(input) - opaque handle for KMF session
- *	KMFKey(input) - holds public key information for verification
- *	sigAlg(input) - algorithm to verify
- *	indata(input) - pointer to the block of data whose signature
- *		is to be verified
- *	insig(input) - pointer to the signature to be verified
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
- */
+
 KMF_RETURN
-KMF_VerifyDataWithKey(KMF_HANDLE_T handle,
-		KMF_KEY_HANDLE *KMFKey,
-		KMF_ALGORITHM_INDEX sigAlg,
-		KMF_DATA *indata,
-		KMF_DATA *insig)
+KMF_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
+	KMF_KEY_HANDLE *keys, uint32_t *numkeys)
 {
-	KMF_RETURN err;
-	KMF_DATA	derkey = {0, NULL};
-	KMF_PLUGIN	*plugin;
+	KMF_ATTRIBUTE attlist[16]; /* Max 16 attributes used here */
+	int i = 0;
 
-	CLEAR_ERROR(handle, err);
-	if (err != KMF_OK)
-		return (err);
-
-	if (KMFKey == NULL ||
-		indata == NULL || insig == NULL)
+	if (params == NULL || numkeys == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	plugin = FindPlugin(handle, KMFKey->kstype);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &params->kstype, sizeof (params->kstype));
+	i++;
 
-	/* Retrieve public key data from keystore */
-	if (plugin != NULL && plugin->funclist->EncodePubkeyData != NULL) {
-		err = plugin->funclist->EncodePubkeyData(handle,
-		    KMFKey, &derkey);
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
+	if (keys) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEY_HANDLE_ATTR, keys, sizeof (KMF_KEY_HANDLE));
+		i++;
 	}
 
-	err = VerifyDataWithKey(handle, &derkey, sigAlg, indata, insig);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_COUNT_ATTR, numkeys, sizeof (uint32_t));
+	i++;
 
-	if (derkey.Data != NULL)
-		free(derkey.Data);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYALG_ATTR, &params->keytype, sizeof (params->keytype));
+	i++;
 
-	return (err);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYCLASS_ATTR, &params->keyclass, sizeof (params->keyclass));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_ENCODE_FORMAT_ATTR, &params->format, sizeof (params->format));
+	i++;
+
+	if (params->findLabel != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEYLABEL_ATTR, params->findLabel,
+		    strlen(params->findLabel));
+		i++;
+	}
+
+	if (params->idstr != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_IDSTR_ATTR, params->idstr,
+		    strlen(params->idstr));
+		i++;
+	}
+
+	if (params->cred.credlen > 0) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_CREDENTIAL_ATTR, &params->cred,
+		    sizeof (KMF_CREDENTIAL));
+		i++;
+	}
+
+	if (params->kstype == KMF_KEYSTORE_NSS) {
+		if (params->nssparms.slotlabel != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_TOKEN_LABEL_ATTR,
+			    params->nssparms.slotlabel,
+			    strlen(params->nssparms.slotlabel));
+			i++;
+		}
+	} else if (params->kstype == KMF_KEYSTORE_OPENSSL) {
+		if (params->sslparms.dirpath != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_DIRPATH_ATTR,
+			    params->sslparms.dirpath,
+			    strlen(params->sslparms.dirpath));
+			i++;
+		}
+		if (params->sslparms.keyfile != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_KEY_FILENAME_ATTR,
+			    params->sslparms.keyfile,
+			    strlen(params->sslparms.keyfile));
+			i++;
+		}
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_ENCODE_FORMAT_ATTR,
+		    &params->sslparms.format,
+		    sizeof (params->sslparms.format));
+		i++;
+	} else if (params->kstype == KMF_KEYSTORE_PK11TOKEN) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_TOKEN_BOOL_ATTR,
+		    &params->pkcs11parms.token,
+		    sizeof (params->pkcs11parms.token));
+		i++;
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_PRIVATE_BOOL_ATTR,
+		    &params->pkcs11parms.private,
+		    sizeof (params->pkcs11parms.private));
+		i++;
+	}
+	return (kmf_find_key(handle, i, attlist));
 }
 
 KMF_RETURN
@@ -187,187 +481,79 @@ KMF_CreateKeypair(KMF_HANDLE_T handle,
 	KMF_KEY_HANDLE *privKey,
 	KMF_KEY_HANDLE *pubKey)
 {
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_ATTRIBUTE attlist[12]; /* max 12 attrs used here */
+	int i = 0;
 
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL ||
-		privKey == NULL || pubKey == NULL)
+	if (handle == NULL || params == NULL ||
+	    privKey == NULL || pubKey == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	(void) memset(privKey, 0, sizeof (KMF_KEY_HANDLE));
 	(void) memset(pubKey, 0, sizeof (KMF_KEY_HANDLE));
-	plugin = FindPlugin(handle, params->kstype);
 
-	if (plugin != NULL && plugin->funclist->CreateKeypair != NULL) {
-		return (plugin->funclist->CreateKeypair(handle, params,
-			privKey, pubKey));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &params->kstype, sizeof (params->kstype));
+	i++;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYALG_ATTR, &params->keytype, sizeof (params->keytype));
+	i++;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYLENGTH_ATTR, &params->keylength, sizeof (params->keylength));
+	i++;
+	if (params->keylabel != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEYLABEL_ATTR, params->keylabel,
+		    strlen(params->keylabel));
+		i++;
 	}
-}
-
-KMF_RETURN
-KMF_DeleteKeyFromKeystore(KMF_HANDLE_T handle, KMF_DELETEKEY_PARAMS *params,
-	KMF_KEY_HANDLE *key)
-{
-	KMF_RETURN rv = KMF_OK;
-	KMF_PLUGIN *plugin;
-
-	CLEAR_ERROR(handle, rv);
-	if (rv != KMF_OK)
-		return (rv);
-
-	if (key == NULL || params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	plugin = FindPlugin(handle, params->kstype);
-	if (plugin != NULL && plugin->funclist->DeleteKey != NULL) {
-		rv = plugin->funclist->DeleteKey(handle, params, key, TRUE);
-	} else {
-		rv = KMF_ERR_PLUGIN_NOTFOUND;
+	if (params->cred.credlen > 0) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_CREDENTIAL_ATTR, &params->cred,
+		    sizeof (KMF_CREDENTIAL));
+		i++;
 	}
 
-	if (rv == KMF_OK) {
-		if (key->keylabel != NULL)
-			free(key->keylabel);
+	if (params->rsa_exponent.len > 0) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_RSAEXP_ATTR, &params->cred,
+		    sizeof (KMF_BIGINT));
+		i++;
+	}
+	kmf_set_attr_at_index(attlist, i, KMF_PRIVKEY_HANDLE_ATTR, privKey,
+	    sizeof (KMF_KEY_HANDLE));
+	i++;
+	kmf_set_attr_at_index(attlist, i, KMF_PUBKEY_HANDLE_ATTR, pubKey,
+	    sizeof (KMF_KEY_HANDLE));
+	i++;
 
-		if (key->israw && key->keyp != NULL) {
-			if (key->keyclass ==  KMF_ASYM_PUB ||
-			    key->keyclass == KMF_ASYM_PRI) {
-				KMF_FreeRawKey(key->keyp);
-				free(key->keyp);
-			} else if (key->keyclass == KMF_SYMMETRIC) {
-				KMF_FreeRawSymKey(key->keyp);
-			}
-			/* Else we don't know how to free the memory. */
+	if (params->kstype == KMF_KEYSTORE_NSS) {
+		if (params->nssparms.slotlabel != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_TOKEN_LABEL_ATTR,
+			    params->nssparms.slotlabel,
+			    strlen(params->nssparms.slotlabel));
+			i++;
 		}
-
-		(void) memset(key, 0, sizeof (KMF_KEY_HANDLE));
+	} else if (params->kstype == KMF_KEYSTORE_OPENSSL) {
+		if (params->sslparms.dirpath != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_DIRPATH_ATTR,
+			    params->sslparms.dirpath,
+			    strlen(params->sslparms.dirpath));
+			i++;
+		}
+		if (params->sslparms.keyfile != NULL) {
+			kmf_set_attr_at_index(attlist, i,
+			    KMF_KEY_FILENAME_ATTR,
+			    params->sslparms.keyfile,
+			    strlen(params->sslparms.keyfile));
+			i++;
+		}
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_ENCODE_FORMAT_ATTR,
+		    &params->sslparms.format,
+		    sizeof (params->sslparms.format));
+		i++;
 	}
-
-	return (rv);
-}
-
-KMF_RETURN
-KMF_SignCertRecord(KMF_HANDLE_T handle, KMF_KEY_HANDLE *kmfprikey,
-	KMF_X509_CERTIFICATE *CertData, KMF_DATA *signedCert)
-{
-	KMF_RETURN ret;
-	KMF_DATA unsignedCert;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (kmfprikey == NULL ||
-		CertData == NULL || signedCert == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	ret = KMF_EncodeCertRecord(CertData, &unsignedCert);
-	if (ret == KMF_OK)
-		ret = KMF_SignCertWithKey(handle, &unsignedCert, kmfprikey,
-			signedCert);
-
-	KMF_FreeData(&unsignedCert);
-	return (ret);
-}
-
-KMF_RETURN
-KMF_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
-	KMF_KEY_HANDLE *keys, uint32_t *numkeys)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (parms == NULL || numkeys == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	plugin = FindPlugin(handle, parms->kstype);
-
-	if (plugin != NULL && plugin->funclist->FindKey != NULL) {
-		return (plugin->funclist->FindKey(handle, parms,
-			keys, numkeys));
-	}
-
-	return (KMF_ERR_PLUGIN_NOTFOUND);
-}
-
-KMF_RETURN
-KMF_StorePrivateKey(KMF_HANDLE_T handle, KMF_STOREKEY_PARAMS *params,
-	KMF_RAW_KEY_DATA *rawkey)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL || rawkey == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* Find the private key from the keystore */
-	plugin = FindPlugin(handle, params->kstype);
-
-	if (plugin != NULL && plugin->funclist->StorePrivateKey != NULL) {
-		return (plugin->funclist->StorePrivateKey(handle,
-		    params, rawkey));
-	}
-	return (KMF_ERR_PLUGIN_NOTFOUND);
-}
-
-KMF_RETURN
-KMF_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
-	KMF_KEY_HANDLE *symkey)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL ||
-		symkey == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	plugin = FindPlugin(handle, params->kstype);
-	if (plugin != NULL && plugin->funclist->CreateSymKey != NULL) {
-		return (plugin->funclist->CreateSymKey(handle, params,
-		    symkey));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
-}
-
-KMF_RETURN
-KMF_GetSymKeyValue(KMF_HANDLE_T handle, KMF_KEY_HANDLE *symkey,
-	KMF_RAW_SYM_KEY *rkey)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (symkey == NULL || rkey == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	plugin = FindPlugin(handle, symkey->kstype);
-	if (plugin != NULL &&
-	    plugin->funclist->GetSymKeyValue != NULL) {
-		return (plugin->funclist->GetSymKeyValue(handle,
-		    symkey, rkey));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+	return (kmf_create_keypair(handle, i, attlist));
 }

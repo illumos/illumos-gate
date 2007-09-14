@@ -61,7 +61,7 @@ create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
 	}
 	if (i < pulCount) {
 		rv = C_OpenSession(pSlotList[i], CKF_SERIAL_SESSION,
-			NULL, NULL, sessionp);
+		    NULL, NULL, sessionp);
 
 		if (rv != CKR_OK) {
 			kmf_rv = KMF_ERR_UNINITIALIZED;
@@ -148,8 +148,10 @@ PKCS_CreatePublicKey(
 	/* Parse the keyblob */
 	(void) memset(KeyParts, 0, sizeof (KeyParts));
 
-	AlgorithmId = X509_AlgorithmOidToAlgId((KMF_OID *)
-		&pKey->algorithm.algorithm);
+	AlgorithmId = x509_algoid_to_algid(
+	    (KMF_OID *)&pKey->algorithm.algorithm);
+	if (AlgorithmId == KMF_ALGID_NONE)
+		return (KMF_ERR_BAD_ALGORITHM);
 
 	mrReturn = ExtractSPKIData(pKey, AlgorithmId, KeyParts, &uNumKeyParts);
 
@@ -157,74 +159,46 @@ PKCS_CreatePublicKey(
 		return (mrReturn);
 
 	/* Fill in the common object attributes */
-	if (!PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_CLASS,
-		(CK_BYTE *)&ckObjClass,
-		sizeof (ckObjClass)) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_TOKEN,
-			(CK_BYTE *)&ckToken,
-			sizeof (ckToken)) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_PRIVATE,
-			(CK_BYTE *)&ckPrivate,
-			sizeof (ckPrivate))) {
+	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_CLASS, (CK_BYTE *)&ckObjClass,
+	    sizeof (ckObjClass)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_TOKEN, (CK_BYTE *)&ckToken,
+	    sizeof (ckToken)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_PRIVATE, (CK_BYTE *)&ckPrivate,
+	    sizeof (ckPrivate))) {
 		mrReturn = KMF_ERR_INTERNAL;
 		goto cleanup;
 	}
 
 	/* Fill in the common key attributes */
-	if (!PKCS_ConvertAlgorithmId2PKCSKeyType(AlgorithmId,
-		&ckKeyType)) {
+	if (!pkcs_algid_to_keytype(AlgorithmId,	&ckKeyType)) {
 		goto cleanup;
 	}
-	if (!PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_KEY_TYPE,
-		(CK_BYTE *)&ckKeyType,
-		sizeof (ckKeyType)) ||
-	    !PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_DERIVE,
-		(CK_BYTE *)&ckDerive,
-		sizeof (ckDerive))) {
+	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_KEY_TYPE, (CK_BYTE *)&ckKeyType,
+	    sizeof (ckKeyType)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_DERIVE, (CK_BYTE *)&ckDerive,
+	    sizeof (ckDerive))) {
 		mrReturn = KMF_ERR_INTERNAL;
 		goto cleanup;
 	}
 
 	/* Add common public key attributes */
-	if (!PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_ENCRYPT,
-		(CK_BYTE *)&ckEncrypt,
-		sizeof (ckEncrypt)) ||
-	    !PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_VERIFY,
-		(CK_BYTE *)&ckVerify,
-		sizeof (ckVerify)) ||
-	    !PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_VERIFY_RECOVER,
-		(CK_BYTE *)&ckVerifyRecover,
-		sizeof (ckVerifyRecover)) ||
-	    !PKCS_AddTemplate(ckTemplate,
-		&ckNumTemplates,
-		MAX_PUBLIC_KEY_TEMPLATES,
-		CKA_WRAP,
-		(CK_BYTE *)&ckWrap,
-		sizeof (ckWrap))) {
+	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_ENCRYPT, (CK_BYTE *)&ckEncrypt,
+	    sizeof (ckEncrypt)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_VERIFY, (CK_BYTE *)&ckVerify,
+	    sizeof (ckVerify)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_VERIFY_RECOVER,
+	    (CK_BYTE *)&ckVerifyRecover, sizeof (ckVerifyRecover)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    MAX_PUBLIC_KEY_TEMPLATES, CKA_WRAP, (CK_BYTE *)&ckWrap,
+	    sizeof (ckWrap))) {
 		mrReturn = KMF_ERR_INTERNAL;
 		goto cleanup;
 	}
@@ -232,47 +206,35 @@ PKCS_CreatePublicKey(
 	/* Add algorithm specific attributes */
 	switch (ckKeyType) {
 	case CKK_RSA:
-		if (!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_MODULUS,
-			(CK_BYTE *)KeyParts[KMF_RSA_MODULUS].Data,
-			(CK_ULONG)KeyParts[KMF_RSA_MODULUS].Length) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_PUBLIC_EXPONENT,
-			(CK_BYTE *)KeyParts[KMF_RSA_PUBLIC_EXPONENT].Data,
-			(CK_ULONG)KeyParts[KMF_RSA_PUBLIC_EXPONENT].Length)) {
-		mrReturn = KMF_ERR_INTERNAL;
-		goto cleanup;
+		if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_MODULUS,
+		    (CK_BYTE *)KeyParts[KMF_RSA_MODULUS].Data,
+		    (CK_ULONG)KeyParts[KMF_RSA_MODULUS].Length) ||
+		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_PUBLIC_EXPONENT,
+		    (CK_BYTE *)KeyParts[KMF_RSA_PUBLIC_EXPONENT].Data,
+		    (CK_ULONG)KeyParts[KMF_RSA_PUBLIC_EXPONENT].Length)) {
+			mrReturn = KMF_ERR_INTERNAL;
+			goto cleanup;
 		}
 		break;
 	case CKK_DSA:
-		if (!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_PRIME,
-			(CK_BYTE *)KeyParts[KMF_DSA_PRIME].Data,
-			(CK_ULONG)KeyParts[KMF_DSA_PRIME].Length) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_SUBPRIME,
-			(CK_BYTE *)KeyParts[KMF_DSA_SUB_PRIME].Data,
-			(CK_ULONG)KeyParts[KMF_DSA_SUB_PRIME].Length) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_BASE,
-			(CK_BYTE *)KeyParts[KMF_DSA_BASE].Data,
-			(CK_ULONG)KeyParts[KMF_DSA_BASE].Length) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			MAX_PUBLIC_KEY_TEMPLATES,
-			CKA_VALUE,
-			(CK_BYTE *)KeyParts[KMF_DSA_PUBLIC_VALUE].Data,
-			(CK_ULONG)KeyParts[KMF_DSA_PUBLIC_VALUE].Length)) {
+		if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_PRIME,
+		    (CK_BYTE *)KeyParts[KMF_DSA_PRIME].Data,
+		    (CK_ULONG)KeyParts[KMF_DSA_PRIME].Length) ||
+		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_SUBPRIME,
+		    (CK_BYTE *)KeyParts[KMF_DSA_SUB_PRIME].Data,
+		    (CK_ULONG)KeyParts[KMF_DSA_SUB_PRIME].Length) ||
+		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_BASE,
+		    (CK_BYTE *)KeyParts[KMF_DSA_BASE].Data,
+		    (CK_ULONG)KeyParts[KMF_DSA_BASE].Length) ||
+		    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+		    MAX_PUBLIC_KEY_TEMPLATES, CKA_VALUE,
+		    (CK_BYTE *)KeyParts[KMF_DSA_PUBLIC_VALUE].Data,
+		    (CK_ULONG)KeyParts[KMF_DSA_PUBLIC_VALUE].Length)) {
 		mrReturn = KMF_ERR_INTERNAL;
 		goto cleanup;
 		}
@@ -283,17 +245,15 @@ PKCS_CreatePublicKey(
 
 	if (mrReturn == KMF_OK) {
 		/* Instantiate the object */
-		ckRv = C_CreateObject(ckSession,
-				ckTemplate,
-				ckNumTemplates,
-				pckPublicKey);
+		ckRv = C_CreateObject(ckSession, ckTemplate,
+		    ckNumTemplates, pckPublicKey);
 		if (ckRv != CKR_OK)
 			mrReturn = KMF_ERR_INTERNAL;
 	}
 
 cleanup:
 	for (i = 0; i < uNumKeyParts; i++) {
-		KMF_FreeData(&KeyParts[i]);
+		kmf_free_data(&KeyParts[i]);
 	}
 
 	return (mrReturn);
@@ -331,7 +291,7 @@ PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	CK_ATTRIBUTE ckTemplate[3];
 	CK_ULONG ckNumTemplates;
 	static const CK_ULONG ckMaxTemplates = (sizeof (ckTemplate) /
-		sizeof (CK_ATTRIBUTE));
+	    sizeof (CK_ATTRIBUTE));
 	CK_RV ckRv;
 
 	/* Extract the data from the SPKI into individual fields */
@@ -343,31 +303,23 @@ PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 
 	/* Fetch the key class and algorithm from the object */
 	ckNumTemplates = 0;
-	if (!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			ckMaxTemplates,
-			CKA_CLASS,
-			(CK_BYTE *)&ckObjClass,
-			sizeof (ckObjClass)) ||
-		!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			ckMaxTemplates,
-			CKA_KEY_TYPE,
-			(CK_BYTE *)&ckKeyType,
-			sizeof (ckKeyType))) {
+	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    ckMaxTemplates, CKA_CLASS, (CK_BYTE *)&ckObjClass,
+	    sizeof (ckObjClass)) ||
+	    !PKCS_AddTemplate(ckTemplate, &ckNumTemplates,
+	    ckMaxTemplates, CKA_KEY_TYPE, (CK_BYTE *)&ckKeyType,
+	    sizeof (ckKeyType))) {
 		return (KMF_ERR_INTERNAL);
 	}
-	ckRv = C_GetAttributeValue(ckSession,
-				ckKeyHandle,
-				ckTemplate,
-				ckNumTemplates);
+	ckRv = C_GetAttributeValue(ckSession, ckKeyHandle,
+	    ckTemplate,	ckNumTemplates);
 	if (ckRv != CKR_OK) {
 		return (ckRv);
 	}
 
 	/* Make sure the results match the expected values */
 	if ((ckKeyType != ckRequestedKeyType) ||
-		(ckObjClass != CKO_PUBLIC_KEY)) {
+	    (ckObjClass != CKO_PUBLIC_KEY)) {
 		if (*pbTemporary == KMF_TRUE) {
 			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		}
@@ -419,21 +371,21 @@ PKCS_VerifyData(KMF_HANDLE_T kmfh,
 	if (AlgorithmId == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_ALGORITHM);
 
-	pAlgMap = PKCS_GetAlgorithmMap(KMF_ALGCLASS_SIGNATURE,
-		AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
+	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
+	    AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
 
 	if (!pAlgMap)
 		return (KMF_ERR_BAD_ALGORITHM);
 
 	rv = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
-		CKF_VERIFY);
+	    CKF_VERIFY);
 
 	if (rv != KMF_OK)
 		return (rv);
 
 	/* Fetch the verifying key */
 	rv = PKCS_AcquirePublicKeyHandle(ckSession, keyp,
-		pAlgMap->key_type, &ckKeyHandle, &bTempKey);
+	    pAlgMap->key_type, &ckKeyHandle, &bTempKey);
 
 	if (rv != KMF_OK) {
 		(void) C_CloseSession(ckSession);
@@ -454,11 +406,10 @@ PKCS_VerifyData(KMF_HANDLE_T kmfh,
 		return (KMF_ERR_INTERNAL);
 	}
 
-	ckRv = C_Verify(ckSession,
-		(CK_BYTE *)data->Data,
-			(CK_ULONG)data->Length,
-			(CK_BYTE *)signed_data->Data,
-			(CK_ULONG)signed_data->Length);
+	ckRv = C_Verify(ckSession, (CK_BYTE *)data->Data,
+	    (CK_ULONG)data->Length,
+	    (CK_BYTE *)signed_data->Data,
+	    (CK_ULONG)signed_data->Length);
 
 	if (ckRv != CKR_OK) {
 		kmfh->lasterr.kstype = KMF_KEYSTORE_PK11TOKEN;
@@ -493,16 +444,16 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	CK_ATTRIBUTE ckTemplate[2];
 	CK_ULONG ckNumTemplates;
 	CK_ULONG ckMaxTemplates = (sizeof (ckTemplate) /
-		sizeof (CK_ATTRIBUTE));
+	    sizeof (CK_ATTRIBUTE));
 
-	pAlgMap = PKCS_GetAlgorithmMap(KMF_ALGCLASS_SIGNATURE,
+	pAlgMap = pkcs_get_alg_map(KMF_ALGCLASS_SIGNATURE,
 	    AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
 
 	if (!pAlgMap)
 		return (KMF_ERR_BAD_ALGORITHM);
 
 	rv = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
-		CKF_ENCRYPT);
+	    CKF_ENCRYPT);
 
 	if (rv != KMF_OK)
 		return (rv);
@@ -518,22 +469,16 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 
 	/* Get the modulus length */
 	ckNumTemplates = 0;
-	if (!PKCS_AddTemplate(ckTemplate,
-			&ckNumTemplates,
-			ckMaxTemplates,
-			CKA_MODULUS,
-			(CK_BYTE *)NULL,
-			sizeof (CK_ULONG))) {
+	if (!PKCS_AddTemplate(ckTemplate, &ckNumTemplates, ckMaxTemplates,
+	    CKA_MODULUS, (CK_BYTE *)NULL, sizeof (CK_ULONG))) {
 		if (bTempKey)
 			(void) C_DestroyObject(ckSession, ckKeyHandle);
 		(void) C_CloseSession(ckSession);
 		return (KMF_ERR_INTERNAL);
 	}
 
-	ckRv = C_GetAttributeValue(ckSession,
-				ckKeyHandle,
-				ckTemplate,
-				ckNumTemplates);
+	ckRv = C_GetAttributeValue(ckSession, ckKeyHandle,
+	    ckTemplate, ckNumTemplates);
 
 	if (ckRv != CKR_OK) {
 		if (bTempKey)
@@ -661,7 +606,9 @@ GetIDFromSPKI(KMF_X509_SPKI *spki, KMF_DATA *ID)
 
 	ID->Length = SHA1_HASH_LENGTH;
 
-	algId = X509_AlgorithmOidToAlgId(&spki->algorithm.algorithm);
+	algId = x509_algoid_to_algid(&spki->algorithm.algorithm);
+	if (algId == KMF_ALGID_NONE)
+		return (KMF_ERR_BAD_ALGORITHM);
 
 	rv = ExtractSPKIData(spki, algId, KeyParts, &uNumKeyParts);
 	if (rv != KMF_OK)
@@ -676,7 +623,6 @@ GetIDFromSPKI(KMF_X509_SPKI *spki, KMF_DATA *ID)
 		/* We only support RSA and DSA keys for now */
 		rv = KMF_ERR_BAD_ALGORITHM;
 	}
-
 
 	for (i = 0; i < uNumKeyParts; i++) {
 		if (KeyParts[i].Data != NULL)

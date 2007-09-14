@@ -17,8 +17,7 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -41,10 +40,12 @@
 #include <libgen.h>
 #include <cryptoutil.h>
 
+static KMF_RETURN
+setup_crl_call(KMF_HANDLE_T, int, KMF_ATTRIBUTE *, KMF_PLUGIN **);
 
 /*
  *
- * Name: KMF_SetCSRPubKey
+ * Name: kmf_set_csr_pubkey
  *
  * Description:
  *   This function converts the specified plugin public key to SPKI form,
@@ -64,11 +65,11 @@
  *
  */
 KMF_RETURN
-KMF_SetCSRPubKey(KMF_HANDLE_T handle,
+kmf_set_csr_pubkey(KMF_HANDLE_T handle,
 	KMF_KEY_HANDLE *KMFKey,
 	KMF_CSR_DATA *Csr)
 {
-	KMF_RETURN ret = KMF_OK;
+	KMF_RETURN ret;
 	KMF_X509_SPKI *spki_ptr;
 	KMF_PLUGIN *plugin;
 	KMF_DATA KeyData = {NULL, 0};
@@ -94,13 +95,13 @@ KMF_SetCSRPubKey(KMF_HANDLE_T handle,
 
 	ret = DerDecodeSPKI(&KeyData, spki_ptr);
 
-	KMF_FreeData(&KeyData);
+	kmf_free_data(&KeyData);
 
 	return (ret);
 }
 
 KMF_RETURN
-KMF_SetCSRVersion(KMF_CSR_DATA *CsrData, uint32_t version)
+kmf_set_csr_version(KMF_CSR_DATA *CsrData, uint32_t version)
 {
 	if (CsrData == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -112,11 +113,11 @@ KMF_SetCSRVersion(KMF_CSR_DATA *CsrData, uint32_t version)
 	if (version != 0 && version != 1 && version != 2)
 		return (KMF_ERR_BAD_PARAMETER);
 	return (set_integer(&CsrData->csr.version, (void *)&version,
-		sizeof (uint32_t)));
+	    sizeof (uint32_t)));
 }
 
 KMF_RETURN
-KMF_SetCSRSubjectName(KMF_CSR_DATA *CsrData,
+kmf_set_csr_subject(KMF_CSR_DATA *CsrData,
 	KMF_X509_NAME *subject_name_ptr)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -132,9 +133,8 @@ KMF_SetCSRSubjectName(KMF_CSR_DATA *CsrData,
 	}
 	return (rv);
 }
-
 KMF_RETURN
-KMF_CreateCSRFile(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
+kmf_create_csr_file(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
 	char *csrfile)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -149,9 +149,9 @@ KMF_CreateCSRFile(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
 
 	if (format == KMF_FORMAT_PEM) {
 		int len;
-		rv = KMF_Der2Pem(KMF_CSR,
-			csrdata->Data, csrdata->Length,
-			&pemdata.Data, &len);
+		rv = kmf_der_to_pem(KMF_CSR,
+		    csrdata->Data, csrdata->Length,
+		    &pemdata.Data, &len);
 		if (rv != KMF_OK)
 			goto cleanup;
 		pemdata.Length = (size_t)len;
@@ -164,12 +164,12 @@ KMF_CreateCSRFile(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
 
 	if (format == KMF_FORMAT_PEM) {
 		if (write(fd, pemdata.Data, pemdata.Length) !=
-			pemdata.Length) {
+		    pemdata.Length) {
 			rv = KMF_ERR_WRITE_FILE;
 		}
 	} else {
 		if (write(fd, csrdata->Data, csrdata->Length) !=
-			csrdata->Length) {
+		    csrdata->Length) {
 			rv = KMF_ERR_WRITE_FILE;
 		}
 	}
@@ -178,14 +178,13 @@ cleanup:
 	if (fd != -1)
 		(void) close(fd);
 
-	KMF_FreeData(&pemdata);
+	kmf_free_data(&pemdata);
 
 	return (rv);
 }
 
 KMF_RETURN
-KMF_SetCSRExtension(KMF_CSR_DATA *Csr,
-	KMF_X509_EXTENSION *extn)
+kmf_set_csr_extn(KMF_CSR_DATA *Csr, KMF_X509_EXTENSION *extn)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509_EXTENSIONS *exts;
@@ -201,7 +200,7 @@ KMF_SetCSRExtension(KMF_CSR_DATA *Csr,
 }
 
 KMF_RETURN
-KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *CsrData,
+kmf_set_csr_sig_alg(KMF_CSR_DATA *CsrData,
 	KMF_ALGORITHM_INDEX sigAlg)
 {
 	KMF_OID	*alg;
@@ -209,12 +208,12 @@ KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *CsrData,
 	if (CsrData == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	alg = X509_AlgIdToAlgorithmOid(sigAlg);
+	alg = x509_algid_to_algoid(sigAlg);
 
 	if (alg != NULL) {
 		(void) copy_data((KMF_DATA *)
-			&CsrData->signature.algorithmIdentifier.algorithm,
-			(KMF_DATA *)alg);
+		    &CsrData->signature.algorithmIdentifier.algorithm,
+		    (KMF_DATA *)alg);
 		(void) copy_data(
 		    &CsrData->signature.algorithmIdentifier.parameters,
 		    &CsrData->csr.subjectPublicKeyInfo.algorithm.parameters);
@@ -225,7 +224,7 @@ KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *CsrData,
 }
 
 KMF_RETURN
-KMF_SetCSRSubjectAltName(KMF_CSR_DATA *Csr,
+kmf_set_csr_subject_altname(KMF_CSR_DATA *Csr,
 	char *altname, int critical,
 	KMF_GENERALNAMECHOICES alttype)
 {
@@ -234,15 +233,15 @@ KMF_SetCSRSubjectAltName(KMF_CSR_DATA *Csr,
 	if (Csr == NULL || altname == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	ret = KMF_SetAltName(&Csr->csr.extensions,
-		(KMF_OID *)&KMFOID_SubjectAltName, critical, alttype,
-		altname);
+	ret = kmf_set_altname(&Csr->csr.extensions,
+	    (KMF_OID *)&KMFOID_SubjectAltName, critical, alttype,
+	    altname);
 
 	return (ret);
 }
 
 KMF_RETURN
-KMF_SetCSRKeyUsage(KMF_CSR_DATA *CSRData,
+kmf_set_csr_ku(KMF_CSR_DATA *CSRData,
 	int critical, uint16_t kubits)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -251,15 +250,90 @@ KMF_SetCSRKeyUsage(KMF_CSR_DATA *CSRData,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	ret = set_key_usage_extension(
-		&CSRData->csr.extensions,
-		critical, kubits);
+	    &CSRData->csr.extensions, critical, kubits);
+
+	return (ret);
+}
+
+static KMF_RETURN
+SignCsr(KMF_HANDLE_T handle,
+	const KMF_DATA *SubjectCsr,
+	KMF_KEY_HANDLE	*Signkey,
+	KMF_X509_ALGORITHM_IDENTIFIER *algo,
+	KMF_DATA	*SignedCsr)
+{
+
+	KMF_CSR_DATA	subj_csr;
+	KMF_TBS_CSR	*tbs_csr = NULL;
+	KMF_DATA	signed_data = {0, NULL};
+	KMF_RETURN	ret = KMF_OK;
+
+	if (!SignedCsr)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	SignedCsr->Length = 0;
+	SignedCsr->Data = NULL;
+
+	if (!SubjectCsr)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (!SubjectCsr->Data || !SubjectCsr->Length)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	(void) memset(&subj_csr, 0, sizeof (subj_csr));
+	/* Estimate the signed data length generously */
+	signed_data.Length = SubjectCsr->Length*2;
+	signed_data.Data = calloc(1, signed_data.Length);
+	if (!signed_data.Data) {
+		ret = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+
+	/* Sign the data */
+	ret = KMF_SignDataWithKey(handle, Signkey, &algo->algorithm,
+	    (KMF_DATA *)SubjectCsr, &signed_data);
+
+	if (KMF_OK != ret)
+		goto cleanup;
+
+	/*
+	 * If we got here OK, decode into a structure and then re-encode
+	 * the complete CSR.
+	 */
+	ret = DerDecodeTbsCsr(SubjectCsr, &tbs_csr);
+	if (ret)
+		goto cleanup;
+
+	(void) memcpy(&subj_csr.csr, tbs_csr, sizeof (KMF_TBS_CSR));
+
+	ret = copy_algoid(&subj_csr.signature.algorithmIdentifier, algo);
+	if (ret)
+		goto cleanup;
+
+	subj_csr.signature.encrypted = signed_data;
+
+	/* Now, re-encode the CSR with the new signature */
+	ret = DerEncodeSignedCsr(&subj_csr, SignedCsr);
+	if (ret != KMF_OK) {
+		kmf_free_data(SignedCsr);
+		goto cleanup;
+	}
+
+	/* Cleanup & return */
+cleanup:
+	free(tbs_csr);
+
+	kmf_free_tbs_csr(&subj_csr.csr);
+
+	kmf_free_algoid(&subj_csr.signature.algorithmIdentifier);
+	kmf_free_data(&signed_data);
 
 	return (ret);
 }
 
 /*
  *
- * Name: KMF_SignCSR
+ * Name: kmf_sign_csr
  *
  * Description:
  *   This function signs a CSR and returns the result as a
@@ -282,7 +356,7 @@ KMF_SetCSRKeyUsage(KMF_CSR_DATA *CSRData,
  *
  */
 KMF_RETURN
-KMF_SignCSR(KMF_HANDLE_T handle,
+kmf_sign_csr(KMF_HANDLE_T handle,
 	const KMF_CSR_DATA *tbsCsr,
 	KMF_KEY_HANDLE	*Signkey,
 	KMF_DATA	*SignedCsr)
@@ -294,8 +368,7 @@ KMF_SignCSR(KMF_HANDLE_T handle,
 	if (err != KMF_OK)
 		return (err);
 
-	if (tbsCsr == NULL ||
-		Signkey == NULL || SignedCsr == NULL)
+	if (tbsCsr == NULL || Signkey == NULL || SignedCsr == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	SignedCsr->Data = NULL;
@@ -304,187 +377,199 @@ KMF_SignCSR(KMF_HANDLE_T handle,
 	err = DerEncodeTbsCsr((KMF_TBS_CSR *)&tbsCsr->csr, &csrdata);
 	if (err == KMF_OK) {
 		err = SignCsr(handle, &csrdata, Signkey,
-			(KMF_X509_ALGORITHM_IDENTIFIER *)
-				&tbsCsr->signature.algorithmIdentifier,
-			SignedCsr);
+		    (KMF_X509_ALGORITHM_IDENTIFIER *)
+		    &tbsCsr->signature.algorithmIdentifier,
+		    SignedCsr);
 	}
 
 	if (err != KMF_OK) {
-		KMF_FreeData(SignedCsr);
+		kmf_free_data(SignedCsr);
 	}
-	KMF_FreeData(&csrdata);
+	kmf_free_data(&csrdata);
 	return (err);
 }
 
-KMF_RETURN
-KMF_ImportCRL(KMF_HANDLE_T handle, KMF_IMPORTCRL_PARAMS *params)
+static KMF_RETURN
+setup_crl_call(KMF_HANDLE_T handle, int numattr,
+	KMF_ATTRIBUTE *attrlist, KMF_PLUGIN **plugin)
 {
-	KMF_PLUGIN *plugin;
 	KMF_RETURN ret;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len = sizeof (kstype);
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL || plugin == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
 
-	switch (params->kstype) {
+	switch (kstype) {
 	case KMF_KEYSTORE_NSS:
-		plugin = FindPlugin(handle, params->kstype);
+		*plugin = FindPlugin(handle, kstype);
 		break;
 
 	case KMF_KEYSTORE_OPENSSL:
 	case KMF_KEYSTORE_PK11TOKEN: /* PKCS#11 CRL is file-based */
-		plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
+		*plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
 		break;
 	default:
 		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
-
-	if (plugin != NULL && plugin->funclist->ImportCRL != NULL) {
-		return (plugin->funclist->ImportCRL(handle, params));
-	}
-	return (KMF_ERR_PLUGIN_NOTFOUND);
+	return (KMF_OK);
 }
 
 KMF_RETURN
-KMF_DeleteCRL(KMF_HANDLE_T handle, KMF_DELETECRL_PARAMS *params)
+kmf_import_crl(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret;
+	KMF_PLUGIN *plugin;
+
+	ret = setup_crl_call(handle, numattr, attrlist, &plugin);
+	if (ret != KMF_OK)
+		return (ret);
+
+	if (plugin == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	else if (plugin->funclist->ImportCRL != NULL)
+		return (plugin->funclist->ImportCRL(handle, numattr, attrlist));
+
+	return (KMF_ERR_FUNCTION_NOT_FOUND);
+}
+
+KMF_RETURN
+kmf_delete_crl(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret;
+	KMF_PLUGIN *plugin;
+
+	ret = setup_crl_call(handle, numattr, attrlist, &plugin);
+	if (ret != KMF_OK)
+		return (ret);
+
+	if (plugin == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	else if (plugin->funclist->DeleteCRL != NULL)
+		return (plugin->funclist->DeleteCRL(handle, numattr, attrlist));
+
+	return (KMF_ERR_FUNCTION_NOT_FOUND);
+}
+
+KMF_RETURN
+kmf_list_crl(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN ret;
 
-	CLEAR_ERROR(handle, ret);
+	ret = setup_crl_call(handle, numattr, attrlist, &plugin);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (params == NULL)
+	if (plugin == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+	else if (plugin->funclist->ListCRL != NULL)
+		return (plugin->funclist->ListCRL(handle, numattr, attrlist));
+	return (KMF_ERR_FUNCTION_NOT_FOUND);
+}
+
+KMF_RETURN
+kmf_find_crl(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_PLUGIN *plugin;
+	KMF_RETURN ret;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len = sizeof (kstype);
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1,
+	    sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CRL_COUNT_ATTR, FALSE,
+	    sizeof (char *), sizeof (char *)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	switch (params->kstype) {
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
+	if (ret != KMF_OK)
+		return (ret);
+
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	switch (kstype) {
 	case KMF_KEYSTORE_NSS:
-		plugin = FindPlugin(handle, params->kstype);
+		plugin = FindPlugin(handle, kstype);
 		break;
-
 	case KMF_KEYSTORE_OPENSSL:
-	case KMF_KEYSTORE_PK11TOKEN: /* PKCS#11 CRL is file-based */
-		plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
-		break;
+	case KMF_KEYSTORE_PK11TOKEN:
+		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	default:
+		/*
+		 * FindCRL is only implemented for NSS. PKCS#11
+		 * and file-based keystores just store in a file
+		 * and don't need a "Find" function.
+		 */
 		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
 
-	if (plugin != NULL && plugin->funclist->DeleteCRL != NULL) {
-		return (plugin->funclist->DeleteCRL(handle, params));
-	} else {
+	if (plugin == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
+	else if (plugin->funclist->FindCRL != NULL) {
+		return (plugin->funclist->FindCRL(handle, numattr,
+		    attrlist));
 	}
+	return (KMF_ERR_FUNCTION_NOT_FOUND);
 }
 
 KMF_RETURN
-KMF_ListCRL(KMF_HANDLE_T handle, KMF_LISTCRL_PARAMS *params, char **crldata)
+kmf_find_cert_in_crl(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
-	KMF_PLUGIN *plugin;
 	KMF_RETURN ret;
+	KMF_PLUGIN *plugin;
 
-	CLEAR_ERROR(handle, ret);
+	ret = setup_crl_call(handle, numattr, attrlist, &plugin);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (params == NULL || crldata == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	switch (params->kstype) {
-	case KMF_KEYSTORE_NSS:
-		plugin = FindPlugin(handle, params->kstype);
-		break;
-
-	case KMF_KEYSTORE_OPENSSL:
-	case KMF_KEYSTORE_PK11TOKEN: /* PKCS#11 CRL is file-based */
-		plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
-		break;
-	default:
+	if (plugin == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+	else if (plugin->funclist->FindCertInCRL != NULL)
+		return (plugin->funclist->FindCertInCRL(handle, numattr,
+		    attrlist));
 
-	if (plugin != NULL && plugin->funclist->ListCRL != NULL) {
-		return (plugin->funclist->ListCRL(handle, params, crldata));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+	return (KMF_ERR_FUNCTION_NOT_FOUND);
 }
 
 KMF_RETURN
-KMF_FindCRL(KMF_HANDLE_T handle, KMF_FINDCRL_PARAMS *params,
-	char **CRLNameList, int *CRLCount)
+kmf_verify_crl_file(KMF_HANDLE_T handle, char *crlfile, KMF_DATA *tacert)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_RETURN (*verifyCRLFile)(KMF_HANDLE_T, char *, KMF_DATA *);
 
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL ||
-		CRLCount == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	plugin = FindPlugin(handle, params->kstype);
-	if (plugin != NULL && plugin->funclist->FindCRL != NULL) {
-		return (plugin->funclist->FindCRL(handle, params,
-			CRLNameList, CRLCount));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
-}
-
-KMF_RETURN
-KMF_FindCertInCRL(KMF_HANDLE_T handle, KMF_FINDCERTINCRL_PARAMS *params)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	switch (params->kstype) {
-	case KMF_KEYSTORE_NSS:
-		plugin = FindPlugin(handle, params->kstype);
-		break;
-
-	case KMF_KEYSTORE_OPENSSL:
-	case KMF_KEYSTORE_PK11TOKEN: /* PKCS#11 CRL is file-based */
-		plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
-		break;
-	default:
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
-
-	if (plugin != NULL && plugin->funclist->FindCertInCRL != NULL) {
-		return (plugin->funclist->FindCertInCRL(handle, params));
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
-}
-
-KMF_RETURN
-KMF_VerifyCRLFile(KMF_HANDLE_T handle,
-	KMF_VERIFYCRL_PARAMS *params)
-{
-	KMF_PLUGIN *plugin;
-	KMF_RETURN (*verifyCRLFile)(KMF_HANDLE_T,
-		KMF_VERIFYCRL_PARAMS *);
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (params == NULL)
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
@@ -499,23 +584,22 @@ KMF_VerifyCRLFile(KMF_HANDLE_T handle,
 		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
 
-	return (verifyCRLFile(handle, params));
+	return (verifyCRLFile(handle, crlfile, tacert));
 }
 
 KMF_RETURN
-KMF_CheckCRLDate(KMF_HANDLE_T handle, KMF_CHECKCRLDATE_PARAMS *params)
+kmf_check_crl_date(KMF_HANDLE_T handle, char *crlname)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN (*checkCRLDate)(void *,
-	    KMF_CHECKCRLDATE_PARAMS *params);
-	KMF_RETURN ret;
+	KMF_RETURN (*checkCRLDate)(void *, char *);
+	KMF_RETURN ret = KMF_OK;
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return (ret);
-
-	if (params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
 
 	plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
 	if (plugin == NULL || plugin->dldesc == NULL) {
@@ -529,16 +613,15 @@ KMF_CheckCRLDate(KMF_HANDLE_T handle, KMF_CHECKCRLDATE_PARAMS *params)
 		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
 
-	return (checkCRLDate(handle, params));
-
+	return (checkCRLDate(handle, crlname));
 }
 
 KMF_RETURN
-KMF_IsCRLFile(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
+kmf_is_crl_file(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN (*IsCRLFileFn)(void *, char *, KMF_ENCODE_FORMAT *);
-	KMF_RETURN ret;
+	KMF_RETURN ret = KMF_OK;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
@@ -564,4 +647,51 @@ KMF_IsCRLFile(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
 	}
 
 	return (IsCRLFileFn(handle, filename, pformat));
+}
+
+/*
+ * Phase 1 APIs still needed to maintain compat with elfsign.
+ */
+KMF_RETURN
+KMF_CreateCSRFile(KMF_DATA *csrdata, KMF_ENCODE_FORMAT format,
+	char *csrfile)
+{
+	return (kmf_create_csr_file(csrdata, format, csrfile));
+}
+
+KMF_RETURN
+KMF_SetCSRPubKey(KMF_HANDLE_T handle,
+	KMF_KEY_HANDLE *KMFKey,
+	KMF_CSR_DATA *Csr)
+{
+	return (kmf_set_csr_pubkey(handle, KMFKey, Csr));
+}
+
+KMF_RETURN
+KMF_SetCSRVersion(KMF_CSR_DATA *CsrData, uint32_t version)
+{
+	return (kmf_set_csr_version(CsrData, version));
+}
+
+KMF_RETURN
+KMF_SetCSRSignatureAlgorithm(KMF_CSR_DATA *CsrData,
+	KMF_ALGORITHM_INDEX sigAlg)
+{
+	return (kmf_set_csr_sig_alg(CsrData, sigAlg));
+}
+
+KMF_RETURN
+KMF_SignCSR(KMF_HANDLE_T handle,
+	const KMF_CSR_DATA *tbsCsr,
+	KMF_KEY_HANDLE	*Signkey,
+	KMF_DATA	*SignedCsr)
+{
+	return (kmf_sign_csr(handle, tbsCsr, Signkey, SignedCsr));
+}
+
+KMF_RETURN
+KMF_SetCSRSubjectName(KMF_CSR_DATA *CsrData,
+	KMF_X509_NAME *subject_name_ptr)
+{
+	return (kmf_set_csr_subject(CsrData, subject_name_ptr));
 }

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,23 +28,24 @@
 SUNWprivate_1.1 {
     global:
 	KMF_Plugin_Initialize;
-	KMFPK11_FindCert;
-	KMFPK11_FreeKMFCert;
-	KMFPK11_StoreCert;
-	KMFPK11_ImportCert;
-	KMFPK11_DeleteCert;
-	KMFPK11_CreateKeypair;
-	KMFPK11_FindKey;
-	KMFPK11_EncodePubKeyData;
-	KMFPK11_SignData;
-	KMFPK11_DeleteKey;
-	KMFPK11_GetErrorString;
-	KMFPK11_GetPrikeyByCert;
-	KMFPK11_DecryptData;
-	KMFPK11_StorePrivateKey;
-	KMFPK11_CreateSymKey;
-	KMFPK11_GetSymKeyValue;
-	KMFPK11_SetTokenPin;
+        KMFPK11_CreateKeypair;
+        KMFPK11_CreateSymKey;
+        KMFPK11_DecryptData;
+        KMFPK11_DeleteCert;
+        KMFPK11_DeleteKey;
+        KMFPK11_EncodePubKeyData;
+        KMFPK11_ExportPK12;
+        KMFPK11_FindCert;
+        KMFPK11_FindKey;
+        KMFPK11_FindPrikeyByCert;
+        KMFPK11_FreeKMFCert;
+        KMFPK11_GetErrorString;
+        KMFPK11_GetSymKeyValue;
+        KMFPK11_ImportCert;
+        KMFPK11_SetTokenPin;
+        KMFPK11_SignData;
+        KMFPK11_StoreCert;
+        KMFPK11_StoreKey;
     local:
 	*;
 };

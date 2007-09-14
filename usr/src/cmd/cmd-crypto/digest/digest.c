@@ -171,7 +171,7 @@ main(int argc, char **argv)
 		mac_cmd = B_FALSE;
 	else {
 		cryptoerror(LOG_STDERR, gettext(
-			"command name must be either digest or mac\n"));
+		    "command name must be either digest or mac\n"));
 		exit(EXIT_USAGE);
 	}
 
@@ -256,7 +256,7 @@ algorithm_list(boolean_t mac_cmd)
 
 	if (mac_cmd)
 		(void) printf(gettext("Algorithm       Keysize:  Min   "
-				"Max (bits)\n"
+		    "Max (bits)\n"
 		    "------------------------------------------\n"));
 
 	for (mech = 0; mech < MECH_ALIASES_COUNT; mech++) {
@@ -271,9 +271,9 @@ algorithm_list(boolean_t mac_cmd)
 			    mech_aliases[mech].keysize_max != 0)
 				(void) printf("         %5lu %5lu\n",
 				    (mech_aliases[mech].keysize_min *
-					mech_aliases[mech].keysize_unit),
+				    mech_aliases[mech].keysize_unit),
 				    (mech_aliases[mech].keysize_max *
-					mech_aliases[mech].keysize_unit));
+				    mech_aliases[mech].keysize_unit));
 			else
 				(void) printf("\n");
 
@@ -337,8 +337,7 @@ generate_pkcs5_key(CK_SESSION_HANDLE hSession,
 	mechanism.pParameter = &params;
 	mechanism.ulParameterLen = sizeof (params);
 
-	rv = C_GenerateKey(hSession, &mechanism, tmpl,
-		attrs, hKey);
+	rv = C_GenerateKey(hSession, &mechanism, tmpl, attrs, hKey);
 
 	return (rv);
 }
@@ -461,7 +460,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 		 * Determine if algorithm/mechanism is valid
 		 */
 		for (mech_match = 0; mech_match < MECH_ALIASES_COUNT;
-			mech_match++) {
+		    mech_match++) {
 			if (strcmp(algo_str,
 			    mech_aliases[mech_match].alias) == 0) {
 				mech_type = mech_aliases[mech_match].type;
@@ -570,12 +569,12 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 				if (info.ulMinKeySize && (info.ulMinKeySize <
 				    mech_aliases[mek].keysize_min))
 					mech_aliases[mek].keysize_min =
-						    info.ulMinKeySize;
+					    info.ulMinKeySize;
 
 				if (info.ulMaxKeySize && (info.ulMaxKeySize >
 				    mech_aliases[mek].keysize_max))
 					mech_aliases[mek].keysize_max =
-						    info.ulMaxKeySize;
+					    info.ulMaxKeySize;
 
 				mech_aliases[mek].available = B_TRUE;
 			}
@@ -595,7 +594,8 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	 */
 	i = 0;
 	if (Kflag) {
-		kmfrv = KMF_PK11TokenLookup(NULL, token_label, &token_slot_id);
+		kmfrv = kmf_pk11_token_lookup(NULL, token_label,
+		    &token_slot_id);
 		if (kmfrv != KMF_OK) {
 			cryptoerror(LOG_STDERR,
 			    gettext("no matching PKCS#11 token"));
@@ -652,7 +652,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 
 	/* Mechanism is supported. Go ahead & open a session */
 	rv = C_OpenSession(slotID, CKF_SERIAL_SESSION,
-		NULL_PTR, NULL, &hSession);
+	    NULL_PTR, NULL, &hSession);
 
 	if (rv != CKR_OK) {
 		cryptoerror(LOG_STDERR,
@@ -705,8 +705,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 			template[nattr].ulValueLen = keylen;
 			nattr++;
 
-			rv = C_CreateObject(hSession, template,
-				nattr, &key);
+			rv = C_CreateObject(hSession, template, nattr, &key);
 
 		} else if (Kflag) {
 
@@ -739,10 +738,8 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 			 */
 			(void) memset(salt, 0x0a, sizeof (salt));
 			rv = generate_pkcs5_key(hSession,
-				salt, sizeof (salt),
-				iterations, pkeydata,
-				keytype, keylen, keysize,
-				&key);
+			    salt, sizeof (salt), iterations, pkeydata,
+			    keytype, keylen, keysize, &key);
 		}
 
 		if (rv != CKR_OK) {
@@ -783,8 +780,8 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	do {
 		if (filecount > 0 && filelist != NULL) {
 			filename = filelist[i];
-			if ((fd = open(filename, O_RDONLY
-					| O_NONBLOCK)) == -1) {
+			if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) ==
+			    -1) {
 				cryptoerror(LOG_STDERR, gettext(
 				    "can not open input file %s\n"), filename);
 				exitcode = EXIT_USAGE;
@@ -799,16 +796,16 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 		 */
 		if (mac_cmd) {
 			rv = do_mac(hSession, &mech, fd, key, &resultbuf,
-				&resultlen);
+			    &resultlen);
 		} else {
 			rv = do_digest(hSession, &mech, fd, &resultbuf,
-				&resultlen);
+			    &resultlen);
 		}
 
 		if (rv != CKR_OK) {
 			cryptoerror(LOG_STDERR,
 			    gettext("crypto operation failed for "
-				"file %s: %s\n"),
+			    "file %s: %s\n"),
 			    filename ? filename : "STDIN",
 			    pkcs11_strerror(rv));
 			exitcode = EXIT_FAILURE;
@@ -937,7 +934,7 @@ do_digest(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	/* There was a read error */
 	if (nread == -1) {
 		cryptoerror(LOG_STDERR, gettext(
-			"error reading file: %s"), strerror(saved_errno));
+		    "error reading file: %s"), strerror(saved_errno));
 		return (CKR_GENERAL_ERROR);
 	} else {
 		return (rv);
@@ -1003,7 +1000,7 @@ do_mac(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	/* There was a read error */
 	if (nread == -1) {
 		cryptoerror(LOG_STDERR, gettext("error reading file: %s"),
-			strerror(saved_errno));
+		    strerror(saved_errno));
 		return (CKR_GENERAL_ERROR);
 	} else {
 		return (rv);
@@ -1033,21 +1030,21 @@ getkey(char *filename, CK_BYTE_PTR *pkeydata)
 		/* read the key file into a buffer */
 		if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) == -1) {
 			cryptoerror(LOG_STDERR, gettext(
-				"can't open %s\n"), filename);
+			    "can't open %s\n"), filename);
 			return (-1);
 
 		}
 
 		if (fstat(fd, &statbuf) == -1) {
 			cryptoerror(LOG_STDERR, gettext(
-				"can't stat %s\n"), filename);
+			    "can't stat %s\n"), filename);
 			(void) close(fd);
 			return (-1);
 		}
 
 		if (!S_ISREG(statbuf.st_mode)) {
 			cryptoerror(LOG_STDERR, gettext(
-				"%s not a regular file\n"), filename);
+			    "%s not a regular file\n"), filename);
 			(void) close(fd);
 			return (-1);
 		}
@@ -1066,7 +1063,7 @@ getkey(char *filename, CK_BYTE_PTR *pkeydata)
 
 			if (read(fd, keybuf, keylen) != keylen) {
 				cryptoerror(LOG_STDERR, gettext(
-					"can't read %s\n"), filename);
+				    "can't read %s\n"), filename);
 				(void) close(fd);
 				return (-1);
 			}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,8 +121,8 @@ pk_download(int argc, char *argv[])
 	/* Check if the file exists and might be overwritten. */
 	if (access(fullpath, F_OK) == 0) {
 		cryptoerror(LOG_STDERR,
-			gettext("Warning: file \"%s\" exists, "
-				"will be overwritten."), fullpath);
+		    gettext("Warning: file \"%s\" exists, "
+		    "will be overwritten."), fullpath);
 		if (yesno(gettext("Continue with download? "),
 		    gettext("Respond with yes or no.\n"), B_FALSE) == B_FALSE) {
 			return (0);
@@ -131,7 +131,7 @@ pk_download(int argc, char *argv[])
 		rv = verify_file(fullpath);
 		if (rv != KMF_OK) {
 			cryptoerror(LOG_STDERR, gettext("The file (%s) "
-				"cannot be created.\n"), fullpath);
+			    "cannot be created.\n"), fullpath);
 			return (PK_ERR_USAGE);
 		}
 	}
@@ -171,7 +171,7 @@ pk_download(int argc, char *argv[])
 		oclass = PK_CRL_OBJ;
 	}
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
 		rv = PK_ERR_USAGE;
 		goto end;
@@ -179,10 +179,10 @@ pk_download(int argc, char *argv[])
 
 	/* Now we are ready to download */
 	if (oclass & PK_CRL_OBJ) {
-		rv = KMF_DownloadCRL(kmfhandle, url, proxy, proxy_port, 30,
+		rv = kmf_download_crl(kmfhandle, url, proxy, proxy_port, 30,
 		    fullpath, &format);
 	} else if (oclass & PK_CERT_OBJ) {
-		rv = KMF_DownloadCert(kmfhandle, url, proxy, proxy_port, 30,
+		rv = kmf_download_cert(kmfhandle, url, proxy, proxy_port, 30,
 		    fullpath, &format);
 	}
 
@@ -231,26 +231,22 @@ pk_download(int argc, char *argv[])
 	 * If the downloaded file is outdated, give a warning.
 	 */
 	if (oclass & PK_CRL_OBJ) {
-		KMF_CHECKCRLDATE_PARAMS params;
-
-		params.crl_name = fullpath;
-		ch_rv = KMF_CheckCRLDate(kmfhandle, &params);
-
+		ch_rv = kmf_check_crl_date(kmfhandle, fullpath);
 	} else { /* certificate */
-		ch_rv = KMF_ReadInputFile(kmfhandle, fullpath, &cert);
+		ch_rv = kmf_read_input_file(kmfhandle, fullpath, &cert);
 		if (ch_rv != KMF_OK)
 			goto end;
 
 		if (format == KMF_FORMAT_PEM) {
 			int len;
-			ch_rv = KMF_Pem2Der(cert.Data, cert.Length,
+			ch_rv = kmf_pem_to_der(cert.Data, cert.Length,
 			    &cert_der.Data, &len);
 			if (ch_rv != KMF_OK)
 				goto end;
 			cert_der.Length = (size_t)len;
 		}
 
-		ch_rv = KMF_CheckCertDate(kmfhandle,
+		ch_rv = kmf_check_cert_date(kmfhandle,
 		    format == KMF_FORMAT_ASN1 ? &cert : &cert_der);
 	}
 
@@ -266,9 +262,9 @@ end:
 	if (fullpath)
 		free(fullpath);
 
-	KMF_FreeData(&cert);
-	KMF_FreeData(&cert_der);
+	kmf_free_data(&cert);
+	kmf_free_data(&cert_der);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	return (rv);
 }

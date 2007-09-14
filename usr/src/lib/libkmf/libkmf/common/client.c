@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * File: CLIENT.C
@@ -72,7 +72,7 @@ static int init_socket(char *host, short port)
 	sin.sin_port = htons(port);
 	if ((sin.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE) {
 		if ((hp = gethostbyname_r(host, &hrec, hostbuf,
-			sizeof (hostbuf), &herrno)) == NULL) {
+		    sizeof (hostbuf), &herrno)) == NULL) {
 			return (-1);
 		}
 		(void) memcpy((char *)&sin.sin_addr, hp->h_addr,
@@ -478,7 +478,8 @@ out:
 }
 
 KMF_RETURN
-KMF_GetEncodedOCSPResponse(KMF_HANDLE_T handle, char *reqfile, char *hostname,
+kmf_get_encoded_ocsp_response(KMF_HANDLE_T handle,
+    char *reqfile, char *hostname,
     int port, char *proxy, int proxy_port, char *respfile,
     unsigned int maxsecs)
 {
@@ -532,7 +533,7 @@ KMF_GetEncodedOCSPResponse(KMF_HANDLE_T handle, char *reqfile, char *hostname,
 		ret = KMF_ERR_OPEN_FILE;
 	} else {
 		ret = get_encoded_response(sock, KMF_RESPONSE_OCSP,
-			respfd, maxsecs);
+		    respfd, maxsecs);
 		(void) close(respfd);
 	}
 
@@ -622,7 +623,7 @@ download_file(char *uri, char *proxy, int proxy_port,
 	/* Connect to server */
 	if (proxy != NULL) {
 		final_proxy_port = (proxy_port == 0 || proxy_port == -1) ?
-			80 : proxy_port;
+		    80 : proxy_port;
 		is_proxy = B_TRUE;
 		sock = connect_to_server(proxy, final_proxy_port);
 	} else {
@@ -659,7 +660,7 @@ out:
 
 
 KMF_RETURN
-KMF_DownloadCRL(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
+kmf_download_crl(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
     unsigned int maxsecs, char *crlfile, KMF_ENCODE_FORMAT *pformat)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -707,7 +708,7 @@ KMF_DownloadCRL(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
 	}
 
 	/* Check if it is a CRL file and get its format */
-	if (KMF_IsCRLFile(handle, tempfn, pformat) != KMF_OK) {
+	if (kmf_is_crl_file(handle, tempfn, pformat) != KMF_OK) {
 		ret = KMF_ERR_BAD_CRLFILE;
 		goto out;
 	}
@@ -733,7 +734,7 @@ out:
 
 
 KMF_RETURN
-KMF_DownloadCert(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
+kmf_download_cert(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
     unsigned int maxsecs, char *certfile, KMF_ENCODE_FORMAT *pformat)
 {
 	KMF_RETURN ret = KMF_OK;
@@ -782,7 +783,7 @@ KMF_DownloadCert(KMF_HANDLE_T handle, char *uri, char *proxy, int proxy_port,
 	}
 
 	/* Check if it is a Cert file and get its format */
-	if (KMF_IsCertFile(handle, tempfn, pformat) != KMF_OK) {
+	if (kmf_is_cert_file(handle, tempfn, pformat) != KMF_OK) {
 		ret = KMF_ERR_BAD_CERTFILE;
 		goto out;
 	}
@@ -807,14 +808,13 @@ out:
 }
 
 KMF_RETURN
-KMF_GetOCSPForCert(KMF_HANDLE_T handle,
+kmf_get_ocsp_for_cert(KMF_HANDLE_T handle,
 	KMF_DATA *user_cert,
 	KMF_DATA *ta_cert,
 	KMF_DATA *response)
 {
 	KMF_POLICY_RECORD *policy;
 	KMF_RETURN ret = KMF_OK;
-	KMF_OCSPREQUEST_PARAMS req_params;
 	char *hostname = NULL, *host_uri = NULL, *proxyname = NULL;
 	char *proxy_port_s = NULL;
 	int host_port = 0, proxy_port = 0;
@@ -825,20 +825,28 @@ KMF_GetOCSPForCert(KMF_HANDLE_T handle,
 	boolean_t found = B_FALSE;
 	KMF_X509EXT_ACCESSDESC *access_info;
 	xmlURIPtr   uriptr = NULL;
+	KMF_ATTRIBUTE attrlist[10];
+	int numattr = 0;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (user_cert == NULL ||
-		ta_cert == NULL || response == NULL)
+	if (user_cert == NULL || ta_cert == NULL || response == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	policy = handle->policy;
 
 	/* Create an OCSP request  */
-	req_params.issuer_cert = ta_cert;
-	req_params.user_cert = user_cert;
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_ISSUER_CERT_DATA_ATTR, ta_cert,
+	    sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_USER_CERT_DATA_ATTR, user_cert,
+	    sizeof (KMF_DATA));
+	numattr++;
 
 	/*
 	 * Create temporary files to hold the OCSP request & response data.
@@ -855,7 +863,12 @@ KMF_GetOCSPForCert(KMF_HANDLE_T handle,
 		return (KMF_ERR_INTERNAL);
 	}
 
-	ret = KMF_CreateOCSPRequest(handle, &req_params, ocsp_reqname);
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_OCSP_REQUEST_FILENAME_ATTR, ocsp_respname,
+	    strlen(ocsp_respname));
+	numattr++;
+
+	ret = kmf_create_ocsp_request(handle, numattr, attrlist);
 	if (ret != KMF_OK) {
 		goto out;
 	}
@@ -873,7 +886,7 @@ KMF_GetOCSPForCert(KMF_HANDLE_T handle,
 		 * Authority Information Access
 		 * thru OID_PKIX_AD_OCSP
 		 */
-		ret = KMF_GetCertAuthInfoAccessExt(user_cert, &aia);
+		ret = kmf_get_cert_auth_info_access(user_cert, &aia);
 		if (ret != KMF_OK) {
 			goto out;
 		}
@@ -934,14 +947,14 @@ KMF_GetOCSPForCert(KMF_HANDLE_T handle,
 	 * Send the request to an OCSP responder and receive an
 	 * OCSP response.
 	 */
-	ret = KMF_GetEncodedOCSPResponse(handle, ocsp_reqname,
+	ret = kmf_get_encoded_ocsp_response(handle, ocsp_reqname,
 	    hostname, host_port,  proxyname, proxy_port,
 	    ocsp_respname, 30);
 	if (ret != KMF_OK) {
 		goto out;
 	}
 
-	ret = KMF_ReadInputFile(handle, ocsp_respname, response);
+	ret = kmf_read_input_file(handle, ocsp_respname, response);
 
 out:
 	(void) unlink(ocsp_reqname);

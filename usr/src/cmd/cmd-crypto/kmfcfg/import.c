@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ kc_import(int argc, char *argv[])
 	extern char	*optarg_av;
 
 	while ((opt = getopt_av(argc, argv,
-		"d:(dbfile)p:(policy)i:(infile)")) != EOF) {
+	    "d:(dbfile)p:(policy)i:(infile)")) != EOF) {
 		switch (opt) {
 			case 'd':
 				filename = get_string(optarg_av, &rv);
@@ -135,21 +135,22 @@ kc_import(int argc, char *argv[])
 			KMF_RETURN ret;
 
 			found++;
-			ret = KMF_VerifyPolicy(&pnode->plc);
+			ret = kmf_verify_policy(&pnode->plc);
 			if (ret != KMF_OK) {
 				print_sanity_error(ret);
 				rv = KC_ERR_VERIFY_POLICY;
 				break;
 			}
-			rv = KMF_AddPolicyToDB(&pnode->plc, filename, B_FALSE);
+			rv = kmf_add_policy_to_db(&pnode->plc, filename,
+			    B_FALSE);
 		}
 		pnode = pnode->next;
 	}
 
 	if (!found) {
 		(void) fprintf(stderr,
-			gettext("Could not find policy \"%s\" in %s\n"),
-			policyname, infile);
+		    gettext("Could not find policy \"%s\" in %s\n"),
+		    policyname, infile);
 		rv = KC_ERR_FIND_POLICY;
 	}
 

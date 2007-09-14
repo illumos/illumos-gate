@@ -37,14 +37,14 @@ SUNWprivate_1.1 {
 	OpenSSL_DeleteCert;
 	OpenSSL_DeleteKey;
 	OpenSSL_EncodePubKeyData;
-	OpenSSL_ExportP12;
+	OpenSSL_ExportPK12;
 	OpenSSL_FindCert;
 	OpenSSL_FindCertInCRL;
 	OpenSSL_FindKey;
+	OpenSSL_FindPrikeyByCert;
 	OpenSSL_FreeKMFCert;
 	OpenSSL_GetErrorString;
 	OpenSSL_GetOCSPStatusForCert;
-	OpenSSL_GetPrikeyByCert;
 	OpenSSL_GetSymKeyValue;
 	OpenSSL_ImportCRL;
 	OpenSSL_IsCRLFile;
@@ -52,10 +52,10 @@ SUNWprivate_1.1 {
 	OpenSSL_ListCRL;
 	OpenSSL_SignData;
 	OpenSSL_StoreCert;
-	OpenSSL_StorePrivateKey;
+	OpenSSL_StoreKey;
 	OpenSSL_VerifyCRLFile;
-	openssl_read_pkcs12;
-	openssl_import_keypair;
+	openssl_import_objects;
+	openssl_build_pk12;
     local:
 	*;
 };

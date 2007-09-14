@@ -60,7 +60,7 @@ typedef struct kmf_x509_private {
 	char	*label;
 #define	KMF_FLAG_CERT_VALID	1	/* contains valid certificate */
 #define	KMF_FLAG_CERT_SIGNED	2	/* this is a signed certificate */
-} KMF_X509_PRIVATE, KMF_X509_PRIVATE_PTR;
+} KMF_X509_PRIVATE;
 
 /*
  * KMF_X509_DER_CERT
@@ -92,6 +92,7 @@ typedef enum {
 	KMF_FORMAT_RAWKEY =	4,	/* For FindKey operation */
 	KMF_FORMAT_PEM_KEYPAIR = 5
 } KMF_ENCODE_FORMAT;
+
 #define	KMF_FORMAT_NATIVE KMF_FORMAT_UNDEF
 
 typedef enum {
@@ -99,6 +100,14 @@ typedef enum {
 	KMF_NONEXPIRED_CERTS =	1,
 	KMF_EXPIRED_CERTS =	2
 } KMF_CERT_VALIDITY;
+
+
+typedef enum {
+	KMF_ALL_EXTNS =		0,
+	KMF_CRITICAL_EXTNS = 	1,
+	KMF_NONCRITICAL_EXTNS =	2
+} KMF_FLAG_CERT_EXTN;
+
 
 typedef enum {
 	KMF_KU_SIGN_CERT	= 0,
@@ -123,29 +132,6 @@ typedef enum {
 	KMF_ALGID_SHA1WithDSA
 } KMF_ALGORITHM_INDEX;
 
-/* Keystore Configuration */
-typedef struct {
-	char    *configdir;
-	char    *certPrefix;
-	char    *keyPrefix;
-	char    *secModName;
-} KMF_NSS_CONFIG;
-
-typedef struct {
-	char		*label;
-	boolean_t	readonly;
-} KMF_PKCS11_CONFIG;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_CONFIG		nss_conf;
-		KMF_PKCS11_CONFIG	pkcs11_conf;
-	} ks_config_u;
-} KMF_CONFIG_PARAMS;
-
-#define	nssconfig	ks_config_u.nss_conf
-#define	pkcs11config	ks_config_u.pkcs11_conf
 
 /*
  * Generic credential structure used by other structures below
@@ -156,78 +142,6 @@ typedef struct {
 	char *cred;
 	uint32_t credlen;
 } KMF_CREDENTIAL;
-
-typedef struct
-{
-	char    *trustflag;
-	char	*slotlabel;	/* "internal" by default */
-	int	issuerId;
-	int	subjectId;
-	char	*crlfile;	/* for ImportCRL */
-	boolean_t crl_check;	/* for ImportCRL */
-
-	/*
-	 * The following 2 variables are for FindCertInCRL. The caller can
-	 * either specify certLabel or provide the entire certificate in
-	 * DER format as input.
-	 */
-	char	*certLabel;	/* for FindCertInCRL */
-	KMF_DATA *certificate;  /* for FindCertInCRL */
-
-	/*
-	 * crl_subjName and crl_issuerName are used as the CRL deletion
-	 * criteria.  One should be non-NULL and the other one should be NULL.
-	 * If crl_subjName is not NULL, then delete CRL by the subject name.
-	 * Othewise, delete by the issuer name.
-	 */
-	char 	*crl_subjName;
-	char	*crl_issuerName;
-} KMF_NSS_PARAMS;
-
-typedef struct {
-	char	*dirpath;
-	char    *certfile;
-	char	*crlfile;
-	char    *keyfile;
-	char	*outcrlfile;
-	boolean_t crl_check;	/* CRL import check; default is true */
-	KMF_ENCODE_FORMAT	format; /* output file format */
-} KMF_OPENSSL_PARAMS;
-
-typedef struct {
-	boolean_t	private; /* for finding CKA_PRIVATE objects */
-	boolean_t	sensitive;
-	boolean_t	not_extractable;
-	boolean_t	token; /* true == token object, false == session */
-} KMF_PKCS11_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	char			*certLabel;
-	char			*issuer;
-	char			*subject;
-	char			*idstr;
-	KMF_BIGINT		*serial;
-	KMF_CERT_VALIDITY	find_cert_validity;
-
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-		KMF_PKCS11_PARAMS	pkcs11_opts;
-	} ks_opt_u;
-} KMF_FINDCERT_PARAMS, KMF_DELETECERT_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_DATA		*certificate;
-	KMF_DATA		*ocsp_response;
-
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-		KMF_PKCS11_PARAMS	pkcs11_opts;
-	} ks_opt_u;
-} KMF_VALIDATECERT_PARAMS;
 
 typedef enum {
 	KMF_KEYALG_NONE = 0,
@@ -247,59 +161,6 @@ typedef enum {
 	KMF_SYMMETRIC = 3	/* symmetric key */
 }KMF_KEY_CLASS;
 
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	KMF_KEY_CLASS		keyclass;
-	KMF_KEY_ALG		keytype;
-	KMF_ENCODE_FORMAT	format; /* for key */
-	char			*findLabel;
-	char			*idstr;
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-		KMF_PKCS11_PARAMS	pkcs11_opts;
-	} ks_opt_u;
-} KMF_FINDKEY_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;  /* all */
-	char			*certLabel;
-
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	} ks_opt_u;
-} KMF_STORECERT_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	KMF_DATA		*certificate;
-	char			*label;
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	} ks_opt_u;
-} KMF_STOREKEY_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-	} ks_opt_u;
-} KMF_DELETEKEY_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	char			*certfile;
-	char			*certLabel;
-
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-	} ks_opt_u;
-} KMF_IMPORTCERT_PARAMS;
 
 typedef enum {
 	KMF_CERT = 0,
@@ -307,93 +168,6 @@ typedef enum {
 	KMF_CRL = 2
 }KMF_OBJECT_TYPE;
 
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_KEY_ALG		keytype;
-	uint32_t		keylength;
-	char			*keylabel;
-	KMF_CREDENTIAL		cred;
-	KMF_BIGINT		rsa_exponent;
-	union {
-	    KMF_NSS_PARAMS	nss_opts;
-	    KMF_OPENSSL_PARAMS	openssl_opts;
-	}ks_opt_u;
-} KMF_CREATEKEYPAIR_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	} ks_opt_u;
-} KMF_IMPORTCRL_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	} ks_opt_u;
-} KMF_DELETECRL_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	} ks_opt_u;
-} KMF_LISTCRL_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-	} ks_opt_u;
-} KMF_FINDCRL_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-
-	union {
-		KMF_NSS_PARAMS	nss_opts;
-		KMF_OPENSSL_PARAMS  openssl_opts;
-	} ks_opt_u;
-} KMF_FINDCERTINCRL_PARAMS;
-
-typedef struct {
-	char			*crl_name;
-	KMF_DATA		*tacert;
-} KMF_VERIFYCRL_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_CREDENTIAL		cred;
-	KMF_ENCODE_FORMAT	format; /* for key  */
-	char			*certLabel;
-	KMF_ALGORITHM_INDEX	algid;
-	union {
-	    KMF_NSS_PARAMS	nss_opts;
-	    KMF_OPENSSL_PARAMS	openssl_opts;
-	}ks_opt_u;
-} KMF_CRYPTOWITHCERT_PARAMS;
-
-typedef struct {
-	char			*crl_name;
-} KMF_CHECKCRLDATE_PARAMS;
-
-typedef struct {
-	CK_SLOT_ID	slot;
-} pk11_setpin_opts;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	char			*tokenname;
-	KMF_CREDENTIAL		cred;	/* current token PIN */
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		pk11_setpin_opts	pkcs11_opts;
-	}ks_opt_u;
-} KMF_SETPIN_PARAMS;
 
 typedef struct {
 	KMF_BIGINT	mod;
@@ -411,6 +185,7 @@ typedef struct {
 	KMF_BIGINT	subprime;
 	KMF_BIGINT	base;
 	KMF_BIGINT	value;
+	KMF_BIGINT	pubvalue;
 } KMF_RAW_DSA_KEY;
 
 typedef struct {
@@ -418,7 +193,9 @@ typedef struct {
 } KMF_RAW_SYM_KEY;
 
 typedef struct {
-	KMF_KEY_ALG keytype;
+	KMF_KEY_ALG	keytype;
+	boolean_t	sensitive;
+	boolean_t	not_extractable;
 	union {
 		KMF_RAW_RSA_KEY	rsa;
 		KMF_RAW_DSA_KEY	dsa;
@@ -426,65 +203,6 @@ typedef struct {
 	}rawdata;
 } KMF_RAW_KEY_DATA;
 
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	char			*certLabel;
-	char			*issuer;
-	char			*subject;
-	char			*idstr;
-	KMF_BIGINT		*serial;
-	KMF_CREDENTIAL		cred;	/* cred for accessing the token */
-	KMF_CREDENTIAL		p12cred; /* cred used for securing the file */
-
-	union {
-		KMF_NSS_PARAMS		nss_opts;
-		KMF_OPENSSL_PARAMS	openssl_opts;
-	}ks_opt_u;
-} KMF_EXPORTP12_PARAMS;
-
-typedef struct {
-	KMF_KEYSTORE_TYPE	kstype;
-	KMF_KEY_ALG		keytype;
-	uint32_t		keylength;
-	char			*keylabel;
-	KMF_CREDENTIAL		cred;
-	union {
-	    KMF_NSS_PARAMS	nss_opts;
-	    KMF_OPENSSL_PARAMS	openssl_opts;
-	    KMF_PKCS11_PARAMS	pkcs11_opts;
-	}ks_opt_u;
-} KMF_CREATESYMKEY_PARAMS;
-
-/* Data structures for OCSP support */
-typedef struct {
-	KMF_DATA *issuer_cert;
-	KMF_DATA *user_cert;
-} KMF_OCSPREQUEST_PARAMS;
-
-typedef struct {
-	KMF_DATA *response;
-	KMF_DATA *issuer_cert;
-	KMF_DATA *user_cert;
-	KMF_DATA *signer_cert;  /* can be NULL */
-	boolean_t ignore_response_sign;	/* default is FALSE */
-	uint32_t response_lifetime;	/* in seconds */
-} KMF_OCSPRESPONSE_PARAMS_INPUT;
-
-typedef enum {
-	OCSP_GOOD	= 0,
-	OCSP_REVOKED	= 1,
-	OCSP_UNKNOWN	= 2
-} KMF_OCSP_CERT_STATUS;
-
-typedef struct {
-	int  			response_status;
-	int  			reason; /* if revoked */
-	KMF_OCSP_CERT_STATUS	cert_status;
-} KMF_OCSPRESPONSE_PARAMS_OUTPUT;
-
-#define	nssparms	ks_opt_u.nss_opts
-#define	sslparms	ks_opt_u.openssl_opts
-#define	pkcs11parms	ks_opt_u.pkcs11_opts
 
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;
@@ -605,8 +323,16 @@ typedef enum {
 	KMF_KEYSTORE_ALREADY_INITIALIZED = 0x50,
 	KMF_ERR_SENSITIVE_KEY		= 0x51,
 	KMF_ERR_UNEXTRACTABLE_KEY	= 0x52,
-	KMF_ERR_KEY_MISMATCH		= 0x53
+	KMF_ERR_KEY_MISMATCH		= 0x53,
+	KMF_ERR_ATTR_NOT_FOUND		= 0x54
 } KMF_RETURN;
+
+/* Data structures for OCSP support */
+typedef enum {
+	OCSP_GOOD	= 0,
+	OCSP_REVOKED	= 1,
+	OCSP_UNKNOWN	= 2
+} KMF_OCSP_CERT_STATUS;
 
 typedef enum {
 	OCSP_SUCCESS 		= 0,
@@ -984,6 +710,90 @@ typedef struct {
 	KMF_CRL_DIST_POINT *dplist;
 } KMF_X509EXT_CRLDISTPOINTS;
 
+typedef enum {
+	KMF_DATA_ATTR,
+	KMF_OID_ATTR,
+	KMF_BIGINT_ATTR,
+	KMF_X509_DER_CERT_ATTR,
+	KMF_KEYSTORE_TYPE_ATTR,
+	KMF_ENCODE_FORMAT_ATTR,
+	KMF_CERT_VALIDITY_ATTR,
+	KMF_KU_PURPOSE_ATTR,
+	KMF_ALGORITHM_INDEX_ATTR,
+	KMF_TOKEN_LABEL_ATTR,
+	KMF_READONLY_ATTR,
+	KMF_DIRPATH_ATTR,
+	KMF_CERTPREFIX_ATTR,
+	KMF_KEYPREFIX_ATTR,
+	KMF_SECMODNAME_ATTR,
+	KMF_CREDENTIAL_ATTR,
+	KMF_TRUSTFLAG_ATTR,
+	KMF_CRL_FILENAME_ATTR,
+	KMF_CRL_CHECK_ATTR,
+	KMF_CRL_DATA_ATTR,
+	KMF_CRL_SUBJECT_ATTR,
+	KMF_CRL_ISSUER_ATTR,
+	KMF_CRL_NAMELIST_ATTR,
+	KMF_CRL_COUNT_ATTR,
+	KMF_CRL_OUTFILE_ATTR,
+	KMF_CERT_LABEL_ATTR,
+	KMF_SUBJECT_NAME_ATTR,
+	KMF_ISSUER_NAME_ATTR,
+	KMF_CERT_FILENAME_ATTR,
+	KMF_KEY_FILENAME_ATTR,
+	KMF_OUTPUT_FILENAME_ATTR,
+	KMF_IDSTR_ATTR,
+	KMF_CERT_DATA_ATTR,
+	KMF_OCSP_RESPONSE_DATA_ATTR,
+	KMF_OCSP_RESPONSE_STATUS_ATTR,
+	KMF_OCSP_RESPONSE_REASON_ATTR,
+	KMF_OCSP_RESPONSE_CERT_STATUS_ATTR,
+	KMF_OCSP_REQUEST_FILENAME_ATTR,
+	KMF_KEYALG_ATTR,
+	KMF_KEYCLASS_ATTR,
+	KMF_KEYLABEL_ATTR,
+	KMF_KEYLENGTH_ATTR,
+	KMF_RSAEXP_ATTR,
+	KMF_TACERT_DATA_ATTR,
+	KMF_SLOT_ID_ATTR,
+	KMF_PK12CRED_ATTR,
+	KMF_ISSUER_CERT_DATA_ATTR,
+	KMF_USER_CERT_DATA_ATTR,
+	KMF_SIGNER_CERT_DATA_ATTR,
+	KMF_IGNORE_RESPONSE_SIGN_ATTR,
+	KMF_RESPONSE_LIFETIME_ATTR,
+	KMF_KEY_HANDLE_ATTR,
+	KMF_PRIVKEY_HANDLE_ATTR,
+	KMF_PUBKEY_HANDLE_ATTR,
+	KMF_ERROR_ATTR,
+	KMF_X509_NAME_ATTR,
+	KMF_X509_SPKI_ATTR,
+	KMF_X509_CERTIFICATE_ATTR,
+	KMF_RAW_KEY_ATTR,
+	KMF_CSR_DATA_ATTR,
+	KMF_GENERALNAMECHOICES_ATTR,
+	KMF_STOREKEY_BOOL_ATTR,
+	KMF_SENSITIVE_BOOL_ATTR,
+	KMF_NON_EXTRACTABLE_BOOL_ATTR,
+	KMF_TOKEN_BOOL_ATTR,
+	KMF_PRIVATE_BOOL_ATTR,
+	KMF_NEWPIN_ATTR,
+	KMF_IN_SIGN_ATTR,
+	KMF_OUT_DATA_ATTR,
+	KMF_COUNT_ATTR,
+	KMF_DESTROY_BOOL_ATTR,
+	KMF_TBS_CERT_DATA_ATTR,
+	KMF_PLAINTEXT_DATA_ATTR,
+	KMF_CIPHERTEXT_DATA_ATTR,
+	KMF_VALIDATE_RESULT_ATTR,
+	KMF_KEY_DATA_ATTR
+} KMF_ATTR_TYPE;
+
+typedef struct {
+	KMF_ATTR_TYPE	type;
+	void		*pValue;
+	uint32_t	valueLen;
+} KMF_ATTRIBUTE;
 
 /*
  * Definitions for common X.509v3 certificate attribute OIDs
@@ -1355,6 +1165,145 @@ KMFOID_X9CM_DSAWithSHA1;
 #define	KMF_EKU_TIMESTAMP			0x10
 #define	KMF_EKU_OCSPSIGNING			0x20
 
+
+/*
+ * Legacy support only - do not use these data structures - they can be
+ * removed at any time.
+ */
+
+/* Keystore Configuration */
+typedef struct {
+	char    *configdir;
+	char    *certPrefix;
+	char    *keyPrefix;
+	char    *secModName;
+} KMF_NSS_CONFIG;
+
+typedef struct {
+	char		*label;
+	boolean_t	readonly;
+} KMF_PKCS11_CONFIG;
+
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	union {
+		KMF_NSS_CONFIG		nss_conf;
+		KMF_PKCS11_CONFIG	pkcs11_conf;
+	} ks_config_u;
+} KMF_CONFIG_PARAMS;
+
+#define	nssconfig	ks_config_u.nss_conf
+#define	pkcs11config	ks_config_u.pkcs11_conf
+
+
+typedef struct
+{
+	char    *trustflag;
+	char	*slotlabel;	/* "internal" by default */
+	int	issuerId;
+	int	subjectId;
+	char	*crlfile;	/* for ImportCRL */
+	boolean_t crl_check;	/* for ImportCRL */
+
+	/*
+	 * The following 2 variables are for FindCertInCRL. The caller can
+	 * either specify certLabel or provide the entire certificate in
+	 * DER format as input.
+	 */
+	char	*certLabel;	/* for FindCertInCRL */
+	KMF_DATA *certificate;  /* for FindCertInCRL */
+
+	/*
+	 * crl_subjName and crl_issuerName are used as the CRL deletion
+	 * criteria.  One should be non-NULL and the other one should be NULL.
+	 * If crl_subjName is not NULL, then delete CRL by the subject name.
+	 * Othewise, delete by the issuer name.
+	 */
+	char 	*crl_subjName;
+	char	*crl_issuerName;
+} KMF_NSS_PARAMS;
+
+typedef struct {
+	char	*dirpath;
+	char    *certfile;
+	char	*crlfile;
+	char    *keyfile;
+	char	*outcrlfile;
+	boolean_t crl_check;	/* CRL import check; default is true */
+	KMF_ENCODE_FORMAT	format; /* output file format */
+} KMF_OPENSSL_PARAMS;
+
+typedef struct {
+	boolean_t	private; /* for finding CKA_PRIVATE objects */
+	boolean_t	sensitive;
+	boolean_t	not_extractable;
+	boolean_t	token; /* true == token object, false == session */
+} KMF_PKCS11_PARAMS;
+
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	char			*certLabel;
+	char			*issuer;
+	char			*subject;
+	char			*idstr;
+	KMF_BIGINT		*serial;
+	KMF_CERT_VALIDITY	find_cert_validity;
+
+	union {
+		KMF_NSS_PARAMS		nss_opts;
+		KMF_OPENSSL_PARAMS	openssl_opts;
+		KMF_PKCS11_PARAMS	pkcs11_opts;
+	} ks_opt_u;
+} KMF_FINDCERT_PARAMS, KMF_DELETECERT_PARAMS;
+
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_CREDENTIAL		cred;
+	KMF_KEY_CLASS		keyclass;
+	KMF_KEY_ALG		keytype;
+	KMF_ENCODE_FORMAT	format; /* for key */
+	char			*findLabel;
+	char			*idstr;
+	union {
+		KMF_NSS_PARAMS		nss_opts;
+		KMF_OPENSSL_PARAMS	openssl_opts;
+		KMF_PKCS11_PARAMS	pkcs11_opts;
+	} ks_opt_u;
+} KMF_FINDKEY_PARAMS;
+
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_KEY_ALG		keytype;
+	uint32_t		keylength;
+	char			*keylabel;
+	KMF_CREDENTIAL		cred;
+	KMF_BIGINT		rsa_exponent;
+	union {
+	    KMF_NSS_PARAMS	nss_opts;
+	    KMF_OPENSSL_PARAMS	openssl_opts;
+	}ks_opt_u;
+} KMF_CREATEKEYPAIR_PARAMS;
+
+
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_CREDENTIAL		cred;
+	KMF_ENCODE_FORMAT	format; /* for key  */
+	char			*certLabel;
+	KMF_ALGORITHM_INDEX	algid;
+	union {
+	    KMF_NSS_PARAMS	nss_opts;
+	    KMF_OPENSSL_PARAMS	openssl_opts;
+	}ks_opt_u;
+} KMF_CRYPTOWITHCERT_PARAMS;
+
+typedef struct {
+	char			*crl_name;
+} KMF_CHECKCRLDATE_PARAMS;
+
+#define	nssparms	ks_opt_u.nss_opts
+#define	sslparms	ks_opt_u.openssl_opts
+#define	pkcs11parms	ks_opt_u.pkcs11_opts
 
 #ifdef __cplusplus
 }

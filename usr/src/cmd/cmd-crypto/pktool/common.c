@@ -253,7 +253,7 @@ yesno(char *prompt, char *invalid, boolean_t dflt)
 
 		/* Indicate invalid input, and try again. */
 		if (invalid != NULL)
-		    (void) printf("%s", invalid);
+			(void) printf("%s", invalid);
 	}
 	return (dflt);
 }
@@ -401,7 +401,7 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 	/* First time or when optstring changes from previous one */
 	if (_save_optstr != optstring) {
 		if (opts_av != NULL)
-		    free(opts_av);
+			free(opts_av);
 		opts_av = NULL;
 		_save_optstr = optstring;
 		_save_numopts = populate_opts((char *)optstring);
@@ -521,10 +521,10 @@ Str2Lifetime(char *ltimestr, uint32_t *ltime)
 	    !strcasecmp(timetok, "days")) {
 		*ltime = num * SECSPERDAY;
 	} else if (!strcasecmp(timetok, "hour") ||
-		!strcasecmp(timetok, "hours")) {
+	    !strcasecmp(timetok, "hours")) {
 		*ltime = num * SECSPERHOUR;
 	} else if (!strcasecmp(timetok, "year") ||
-		!strcasecmp(timetok, "years")) {
+	    !strcasecmp(timetok, "years")) {
 		*ltime = num * SECSPERDAY * DAYSPERNYEAR;
 	} else {
 		*ltime = 0;
@@ -560,8 +560,7 @@ OT2Int(char *objclass)
 	if (!strcasecmp(objclass, "public")) {
 		if (retval)
 			return (-1);
-		return (retval | PK_PUBLIC_OBJ | PK_CERT_OBJ |
-			PK_PUBKEY_OBJ);
+		return (retval | PK_PUBLIC_OBJ | PK_CERT_OBJ | PK_PUBKEY_OBJ);
 	} else if (!strcasecmp(objclass, "private")) {
 		if (retval)
 			return (-1);
@@ -604,6 +603,8 @@ Str2Format(char *formstr)
 		return (KMF_FORMAT_PEM);
 	if (!strcasecmp(formstr, "pkcs12"))
 		return (KMF_FORMAT_PKCS12);
+	if (!strcasecmp(formstr, "raw"))
+		return (KMF_FORMAT_RAWKEY);
 
 	return (KMF_FORMAT_UNDEF);
 }
@@ -613,18 +614,32 @@ KMF_RETURN
 select_token(void *kmfhandle, char *token,
 	int readonly)
 {
+	KMF_ATTRIBUTE attlist[10];
+	int i = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
 	KMF_RETURN rv = KMF_OK;
-	KMF_CONFIG_PARAMS  config;
 
 	if (token == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	(void) memset(&config, 0, sizeof (config));
-	config.kstype = KMF_KEYSTORE_PK11TOKEN;
-	config.pkcs11config.label = token;
-	config.pkcs11config.readonly = readonly;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+	    sizeof (kstype));
+	i++;
 
-	rv = KMF_ConfigureKeystore(kmfhandle, &config);
+	if (token) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_TOKEN_LABEL_ATTR, token,
+		    strlen(token));
+		i++;
+	}
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_READONLY_ATTR, &readonly,
+	    sizeof (readonly));
+	i++;
+
+	rv = kmf_configure_keystore(kmfhandle, i, attlist);
 	if (rv == KMF_ERR_TOKEN_SELECTED)
 		rv = KMF_OK;
 	return (rv);
@@ -634,17 +649,37 @@ select_token(void *kmfhandle, char *token,
 KMF_RETURN
 configure_nss(void *kmfhandle, char *dir, char *prefix)
 {
+
+	KMF_ATTRIBUTE attlist[10];
+	int i = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
 	KMF_RETURN rv = KMF_OK;
-	KMF_CONFIG_PARAMS  config;
 
-	(void) memset(&config, 0, sizeof (config));
-	config.kstype = KMF_KEYSTORE_NSS;
-	config.nssconfig.configdir = dir;
-	config.nssconfig.certPrefix = prefix;
-	config.nssconfig.keyPrefix = prefix;
-	config.nssconfig.secModName = NULL;
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+	    sizeof (kstype));
+	i++;
 
-	rv = KMF_ConfigureKeystore(kmfhandle, &config);
+	if (dir) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_DIRPATH_ATTR, dir,
+		    strlen(dir));
+		i++;
+	}
+
+	if (prefix) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_CERTPREFIX_ATTR, prefix,
+		    strlen(prefix));
+		i++;
+
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEYPREFIX_ATTR, prefix,
+		    strlen(prefix));
+		i++;
+	}
+
+	rv = kmf_configure_keystore(kmfhandle, i, attlist);
 	if (rv == KMF_KEYSTORE_ALREADY_INITIALIZED)
 		rv = KMF_OK;
 
@@ -662,12 +697,11 @@ get_pk12_password(KMF_CREDENTIAL *cred)
 	 * Get the password to use for the PK12 encryption.
 	 */
 	(void) strlcpy(prompt,
-		gettext("Enter password to use for "
-			"accessing the PKCS12 file: "),
-		sizeof (prompt));
+	    gettext("Enter password to use for "
+	    "accessing the PKCS12 file: "), sizeof (prompt));
 
 	if (get_pin(prompt, NULL, (uchar_t **)&cred->cred,
-		(ulong_t *)&cred->credlen) != CKR_OK) {
+	    (ulong_t *)&cred->credlen) != CKR_OK) {
 		cred->cred = NULL;
 		cred->credlen = 0;
 	}
@@ -862,7 +896,7 @@ verify_keyusage(char *kustr, uint16_t *kubits, int *critical)
 
 	k = strtok(kustr, ",");
 	while (k != NULL) {
-		kuval = KMF_StringToKeyUsage(k);
+		kuval = kmf_string_to_ku(k);
 		if (kuval == 0) {
 			*kubits = 0;
 			return (KMF_ERR_BAD_PARAMETER);
@@ -938,11 +972,10 @@ get_token_password(KMF_KEYSTORE_TYPE kstype,
 	 * Login to the token first.
 	 */
 	(void) snprintf(prompt, sizeof (prompt),
-		gettext(DEFAULT_TOKEN_PROMPT),
-		token_spec);
+	    gettext(DEFAULT_TOKEN_PROMPT), token_spec);
 
 	if (get_pin(prompt, NULL, (uchar_t **)&cred->cred,
-		(ulong_t *)&cred->credlen) != CKR_OK) {
+	    (ulong_t *)&cred->credlen) != CKR_OK) {
 		cred->cred = NULL;
 		cred->credlen = 0;
 	}
@@ -983,22 +1016,20 @@ display_error(void *handle, KMF_RETURN errcode, char *prefix)
 	char *plugin_errmsg = NULL;
 	char *kmf_errmsg = NULL;
 
-	rv1 = KMF_GetPluginErrorString(handle, &plugin_errmsg);
-	rv2 = KMF_GetKMFErrorString(errcode, &kmf_errmsg);
+	rv1 = kmf_get_plugin_error_str(handle, &plugin_errmsg);
+	rv2 = kmf_get_kmf_error_str(errcode, &kmf_errmsg);
 
 	cryptoerror(LOG_STDERR, "%s:", prefix);
 	if (rv1 == KMF_OK && plugin_errmsg) {
-		cryptoerror(LOG_STDERR,
-			gettext("keystore error: %s"),
-			plugin_errmsg);
-		KMF_FreeString(plugin_errmsg);
+		cryptoerror(LOG_STDERR, gettext("keystore error: %s"),
+		    plugin_errmsg);
+		kmf_free_str(plugin_errmsg);
 	}
 
 	if (rv2 == KMF_OK && kmf_errmsg) {
-		cryptoerror(LOG_STDERR,
-			gettext("libkmf error: %s"),
-			kmf_errmsg);
-		KMF_FreeString(kmf_errmsg);
+		cryptoerror(LOG_STDERR, gettext("libkmf error: %s"),
+		    kmf_errmsg);
+		kmf_free_str(kmf_errmsg);
 	}
 
 	if (rv1 != KMF_OK && rv2 != KMF_OK)

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _KMFPOLICY_H
@@ -175,21 +175,18 @@ typedef struct {
 
 #define	TMPFILE_TEMPLATE	"policyXXXXXX"
 
-extern char *ku2str(uint32_t);
-extern uint32_t str2ku(char *);
 extern int parsePolicyElement(xmlNodePtr, KMF_POLICY_RECORD *);
 
-extern char *KMF_OID2EKUString(KMF_OID *);
-extern KMF_OID *kmf_ekuname2oid(char *);
-extern KMF_OID *kmf_string2oid(char *);
+extern char *kmf_oid_to_eku_string(KMF_OID *);
+extern KMF_OID *kmf_ekuname_to_oid(char *);
 
-extern KMF_RETURN KMF_GetPolicy(char *, char *, KMF_POLICY_RECORD *);
-extern KMF_RETURN KMF_AddPolicyToDB(KMF_POLICY_RECORD *, char *, boolean_t);
-extern KMF_RETURN KMF_DeletePolicyFromDB(char *, char *);
-extern KMF_RETURN KMF_VerifyPolicy(KMF_POLICY_RECORD *);
+extern KMF_RETURN kmf_get_policy(char *, char *, KMF_POLICY_RECORD *);
+extern KMF_RETURN kmf_add_policy_to_db(KMF_POLICY_RECORD *, char *, boolean_t);
+extern KMF_RETURN kmf_delete_policy_from_db(char *, char *);
+extern KMF_RETURN kmf_verify_policy(KMF_POLICY_RECORD *);
 
-extern void KMF_FreePolicyRecord(KMF_POLICY_RECORD *);
-extern void KMF_FreeEKUPolicy(KMF_EKU_POLICY *);
+extern void kmf_free_policy_record(KMF_POLICY_RECORD *);
+extern void kmf_free_eku_policy(KMF_EKU_POLICY *);
 
 #ifdef __cplusplus
 }

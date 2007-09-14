@@ -94,7 +94,7 @@ static verbcmd	cmds[] = {
 		"[ subject=subject-DN ]\n\t\t"
 		"[ keystore=pkcs11 ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
 		"[ label=cert-label ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ criteria=valid|expired|both ]\n\t"
@@ -112,7 +112,7 @@ static verbcmd	cmds[] = {
 	"list keystore=nss objtype=cert\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
 		"[ nickname=cert-nickname ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
@@ -128,7 +128,7 @@ static verbcmd	cmds[] = {
 	"list keystore=file objtype=cert\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
 		"[ infile=cert-fn ]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ criteria=valid|expired|both ]\n\t"
@@ -152,8 +152,8 @@ static verbcmd	cmds[] = {
 	"delete keystore=nss objtype=cert\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
-		"[ nickname=cert-nickname ]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
+		"[ label=cert-label ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ prefix=DBprefix ]\n\t\t"
@@ -175,7 +175,7 @@ static verbcmd	cmds[] = {
 	"delete keystore=pkcs11 objtype=cert[:[public | private | both]]\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
 		"[ label=cert-label ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ criteria=valid|expired|both ]\n\t"
@@ -192,7 +192,7 @@ static verbcmd	cmds[] = {
 	"delete keystore=file objtype=cert\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
 		"[ infile=cert-fn ]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ criteria=valid|expired|both ]\n\t"
@@ -228,7 +228,11 @@ static verbcmd	cmds[] = {
 
 	"import keystore=pkcs11\n\t\t"
 		"infile=input-fn\n\t\t"
-		"label=cert-label\n\t\t"
+		"label=label\n\t\t"
+		"[ objtype=cert|key ]\n\t\t"
+		"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t"
+		"[ sensitive=y|n ]\n\t\t"
+		"[ extractable=y|n ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t"
 
 	"import keystore=pkcs11 objtype=crl\n\t\t"
@@ -263,8 +267,8 @@ static verbcmd	cmds[] = {
 		"[ objtype=cert|key ]\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
-		"[ nickname=cert-nickname]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
+		"[ nickname=cert-nickname ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ prefix=DBPrefix ]\n\t\t"
@@ -272,11 +276,12 @@ static verbcmd	cmds[] = {
 
 	"export keystore=pkcs11\n\t\t"
 		"outfile=output-fn\n\t\t"
-		"[ label=cert-label]\n\t\t"
+		"[ objtype=cert|key ]\n\t\t"
+		"[ label=label ]\n\t\t"
 		"[ subject=subject-DN ]\n\t\t"
 		"[ issuer=issuer-DN ]\n\t\t"
-		"[ serial=serial number]\n\t\t"
-		"[ outformat=pem|der|pkcs12]\n\t\t"
+		"[ serial=serial number ]\n\t\t"
+		"[ outformat=pem|der|pkcs12|raw ]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t"
 
 	"export keystore=file\n\t\t"
@@ -341,7 +346,7 @@ static verbcmd	cmds[] = {
 		"[ prefix=DBprefix ]\n\t\t"
 		"[ keytype=rsa|dsa ]\n\t\t"
 		"[ keylen=key-size ]\n\t\t"
-		"[ format=pem|der]\n\t"
+		"[ format=pem|der ]\n\t"
 	"gencsr [-i] [ keystore=pkcs11 ]\n\t\t"
 		"label=key-label\n\t\t"
 		"outcsr=csr-fn\n\t\t"
@@ -351,7 +356,7 @@ static verbcmd	cmds[] = {
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ keytype=rsa|dsa ]\n\t\t"
 		"[ keylen=key-size ]\n\t\t"
-		"[ format=pem|der]\n\t"
+		"[ format=pem|der ]]\n\t"
 	"gencsr [-i] keystore=file\n\t\t"
 		"outcsr=csr-fn\n\t\t"
 		"outkey=key-fn\n\t\t"
@@ -361,7 +366,7 @@ static verbcmd	cmds[] = {
 		"[ keytype=rsa|dsa ]\n\t\t"
 		"[ keylen=key-size ]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
-		"[ format=pem|der]\n\t"
+		"[ format=pem|der ]\n\t"
 	},
 
 	{ "download",	pk_download,	0,
@@ -486,7 +491,8 @@ process_arg_file(char *argfile, char ***argv, int *argc)
 		if (!strlen(argline))
 			continue;
 
-		(*argv) = realloc((*argv), (nargs + 1) * sizeof (char *));
+		(*argv) = realloc((*argv),
+		    (nargs + 1) * sizeof (char *));
 		if ((*argv) == NULL) {
 			perror("memory error");
 			(void) fclose(fp);

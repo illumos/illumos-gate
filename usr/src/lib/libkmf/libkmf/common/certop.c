@@ -44,13 +44,14 @@
 #define	X509_FORMAT_VERSION 2
 
 static KMF_RETURN
-SignCert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE	*, KMF_DATA *);
+sign_cert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE *, KMF_DATA *);
 
 static KMF_RETURN
-VerifyCertWithKey(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
+verify_cert_with_key(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
 
 static KMF_RETURN
-VerifyCertWithCert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
+verify_cert_with_cert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
+
 
 static KMF_RETURN
 get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
@@ -65,7 +66,7 @@ get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
 		return (rv);
 
 	/* Get the algorithm info from the signer certificate */
-	AlgorithmId = X509_AlgorithmOidToAlgId(
+	AlgorithmId = x509_algoid_to_algid(
 	    &SignerCert->signature.algorithmIdentifier.algorithm);
 
 	switch (AlgorithmId) {
@@ -81,67 +82,81 @@ get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
 			rv = KMF_ERR_BAD_ALGORITHM;
 	}
 
-	KMF_FreeSignedCert(SignerCert);
+	kmf_free_signed_cert(SignerCert);
 	free(SignerCert);
 	return (rv);
 }
 
 /*
- *
- * Name: find_private_key_by_cert
+ * Name: kmf_find_prikey_by_cert
  *
  * Description:
  *   This function finds the corresponding private key in keystore
- * for a certificate
- *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   params(input) - contains parameters used to find the private key
- *   SignerCertData(input) - pointer to a KMF_DATA structure containing a
- *		signer certificate
- *   key(output) - contains the found private key handle
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
+ *   for a certificate
  */
-static KMF_RETURN
-find_private_key_by_cert(KMF_HANDLE_T handle,
-	KMF_CRYPTOWITHCERT_PARAMS *params,
-	KMF_DATA	*SignerCertData,
-	KMF_KEY_HANDLE	*key)
+KMF_RETURN
+kmf_find_prikey_by_cert(KMF_HANDLE_T handle, int numattr,
+    KMF_ATTRIBUTE *attrlist)
 {
-
-	KMF_RETURN ret;
-	KMF_KEY_ALG keytype;
 	KMF_PLUGIN *plugin;
+	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE kstype;
+	KMF_KEY_ALG keyalg;
+	KMF_KEY_HANDLE *key = NULL;
+	KMF_DATA *cert = NULL;
 
-	if (handle == NULL || params == NULL ||
-		SignerCertData == NULL || key == NULL)
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)},
+	    {KMF_KEY_HANDLE_ATTR, TRUE, sizeof (KMF_KEY_HANDLE),
+	    sizeof (KMF_KEY_HANDLE)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	(void) memset(key, 0, sizeof (KMF_KEY_HANDLE));
-	ret = get_keyalg_from_cert(SignerCertData, &keytype);
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	/* Find the private key from the keystore */
-	plugin = FindPlugin(handle, params->kstype);
+	/*
+	 * First, get the key algorithm info from the certificate and saves it
+	 * in the returned key handle.
+	 */
+	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
+	if (cert == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
-	if (plugin != NULL && plugin->funclist->GetPrikeyByCert != NULL) {
-		CLEAR_ERROR(handle, ret);
-		return (plugin->funclist->GetPrikeyByCert(handle,
-		    params, SignerCertData, key, keytype));
-	} else {
+	ret = get_keyalg_from_cert(cert, &keyalg);
+	if (ret != KMF_OK)
+		return (ret);
+
+	key = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	if (key == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+	key->keyalg = keyalg;
+
+	/* Call the plugin to do the work. */
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL || plugin->funclist->FindPrikeyByCert == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
 
+	return (plugin->funclist->FindPrikeyByCert(handle, numattr, attrlist));
 }
 
-static KMF_RETURN
+
+KMF_RETURN
 check_key_usage(void *handle,
 	const KMF_DATA *cert,
 	const KMF_KU_PURPOSE purpose)
@@ -157,7 +172,7 @@ check_key_usage(void *handle,
 	(void) memset(&constraint, 0, sizeof (KMF_X509EXT_BASICCONSTRAINTS));
 	(void) memset(&keyusage, 0, sizeof (KMF_X509EXT_KEY_USAGE));
 
-	ret = KMF_GetCertKeyUsageExt(cert, &keyusage);
+	ret = kmf_get_cert_ku(cert, &keyusage);
 	if (ret != KMF_OK)
 		/*
 		 * If absent or error, the cert is assumed to be invalid
@@ -180,7 +195,7 @@ check_key_usage(void *handle,
 		 * contain public keys used to validate digital
 		 * signatures on certificates.
 		 */
-		ret = KMF_GetCertBasicConstraintExt(cert, &critical,
+		ret = kmf_get_cert_basic_constraint(cert, &critical,
 		    &constraint);
 
 		if ((ret != KMF_ERR_EXTENSION_NOT_FOUND) && (ret != KMF_OK)) {
@@ -221,41 +236,47 @@ check_key_usage(void *handle,
 }
 
 KMF_RETURN
-KMF_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *target,
-		KMF_X509_DER_CERT *kmf_cert,
-		uint32_t *num_certs)
+kmf_find_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN rv = KMF_OK;
+	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE kstype;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_COUNT_ATTR, FALSE, sizeof (uint32_t), sizeof (uint32_t)}
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
-
-	CLEAR_ERROR(handle, rv);
-	if (rv != KMF_OK)
-		return (rv);
-
-	if (target == NULL || num_certs == NULL)
-		return (KMF_ERR_BAD_PARAMETER); /* ILLEGAL ARGS ERROR */
-
-	if ((target->find_cert_validity < KMF_ALL_CERTS) ||
-	    (target->find_cert_validity > KMF_EXPIRED_CERTS))
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	plugin = FindPlugin(handle, target->kstype);
+	CLEAR_ERROR(handle, ret);
 
-	if (plugin != NULL && plugin->funclist->FindCert != NULL) {
-		return (plugin->funclist->FindCert(handle, target,
-			kmf_cert, num_certs));
-	}
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
+	if (ret != KMF_OK)
+		return (ret);
 
-	return (KMF_ERR_PLUGIN_NOTFOUND);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL || plugin->funclist->FindCert == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+
+	return (plugin->funclist->FindCert(handle, numattr, attrlist));
 }
 
 #define	NODATA(d) (d.Data == NULL || d.Length == NULL)
 
 KMF_RETURN
-KMF_EncodeCertRecord(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)
+kmf_encode_cert_record(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)
 {
 	KMF_RETURN ret;
+	KMF_X509_TBS_CERT *tbs_cert;
 
 	if (CertData == NULL || encodedCert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -263,13 +284,14 @@ KMF_EncodeCertRecord(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)
 	/*
 	 * Validate that all required fields are present.
 	 */
-	if (NODATA(CertData->certificate.version) ||
-	    NODATA(CertData->certificate.signature.algorithm) ||
-	NODATA(CertData->certificate.subjectPublicKeyInfo.subjectPublicKey) ||
-	    CertData->certificate.serialNumber.val == NULL ||
-	    CertData->certificate.serialNumber.len == 0 ||
-	    CertData->certificate.subject.numberOfRDNs == 0 ||
-	    CertData->certificate.issuer.numberOfRDNs == 0) {
+	tbs_cert = &(CertData->certificate);
+	if (NODATA(tbs_cert->version) ||
+	    NODATA(tbs_cert->signature.algorithm) ||
+	    NODATA(tbs_cert->subjectPublicKeyInfo.subjectPublicKey) ||
+	    tbs_cert->serialNumber.val == NULL ||
+	    tbs_cert->serialNumber.len == 0 ||
+	    tbs_cert->subject.numberOfRDNs == 0 ||
+	    tbs_cert->issuer.numberOfRDNs == 0) {
 		return (KMF_ERR_INCOMPLETE_TBS_CERT);
 	}
 
@@ -282,262 +304,520 @@ KMF_EncodeCertRecord(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)
 	return (ret);
 }
 
-KMF_RETURN
-KMF_DecodeCertData(KMF_DATA *rawcert, KMF_X509_CERTIFICATE **certrec)
-{
-	KMF_RETURN ret = KMF_OK;
-
-	if (rawcert == NULL || rawcert->Data == NULL ||
-		rawcert->Length == 0 || certrec == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	ret = DerDecodeSignedCertificate(rawcert, certrec);
-
-	return (ret);
-}
-
 /*
+ * This function is used to setup the attribute list before calling
+ * kmf_find_prikey_by_cert().  This function is used by
+ *	kmf_decrypt_with_cert
+ *	kmf_sign_cert
+ *	kmf_sign_data
  *
- * Name: KMF_SignCertWithKey
+ * The attribute list in these callers contain all the attributes
+ * needed by kmf_find_prikey_by_cert(), except the
+ * KMF_KEY_HANDLE attribute and the KMF_CERT_DATA_ATTR attribute.
+ * These 2 attributes need to be added or reset.
  *
- * Description:
- *   This function signs a certificate using the private key and
- * returns the result as a signed, encoded certificate in SignedCert
- *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   CertToBeSigned(input) - pointer to a KMF_DATA structure containing a
- *		DER encoded certificate to be signed
- *   Signkey(input) - pointer to private key handle needed for signing
- *   SignedCert(output) - pointer to the KMF_DATA structure containing the
- *		signed certificate
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
+ * The caller should free the new_attrlist after use it.
  */
-KMF_RETURN
-KMF_SignCertWithKey(KMF_HANDLE_T handle,
-		const KMF_DATA	*CertToBeSigned,
-		KMF_KEY_HANDLE	*Signkey,
-		KMF_DATA	*SignedCert)
+static KMF_RETURN
+setup_findprikey_attrlist(KMF_ATTRIBUTE *src_attrlist, int src_num,
+    KMF_ATTRIBUTE **new_attrlist, int *new_num, KMF_KEY_HANDLE *key,
+    KMF_DATA *cert)
 {
-	KMF_RETURN err;
+	KMF_ATTRIBUTE *attrlist = NULL;
+	int cur_num = src_num;
+	int index;
+	int i;
 
-	CLEAR_ERROR(handle, err);
-	if (err != KMF_OK)
-		return (err);
-
-	if (CertToBeSigned == NULL ||
-		Signkey == NULL || SignedCert == NULL)
+	if (src_attrlist == NULL || new_num == NULL || key == NULL ||
+	    cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	err = SignCert(handle, CertToBeSigned, Signkey, SignedCert);
+	/* Create a new attribute list with 2 more elements */
+	attrlist = (KMF_ATTRIBUTE *) malloc(
+	    (src_num + 2) * sizeof (KMF_ATTRIBUTE));
+	if (attrlist == NULL)
+		return (KMF_ERR_MEMORY);
 
-	return (err);
+	/* Copy the src_attrlist to the new list */
+	for (i = 0; i < src_num; i++) {
+		attrlist[i].type = src_attrlist[i].type;
+		attrlist[i].pValue = src_attrlist[i].pValue;
+		attrlist[i].valueLen = src_attrlist[i].valueLen;
+	}
+
+	/* Add or reset the key handle attribute */
+	index = kmf_find_attr(KMF_KEY_HANDLE_ATTR, attrlist, cur_num);
+	if (index == -1) {
+		/* not found; add it */
+		kmf_set_attr_at_index(attrlist, cur_num,
+		    KMF_KEY_HANDLE_ATTR, key, sizeof (KMF_KEY_HANDLE));
+		cur_num++;
+	} else {
+		/* found; just reset it */
+		kmf_set_attr_at_index(attrlist, index,
+		    KMF_KEY_HANDLE_ATTR, key, sizeof (KMF_KEY_HANDLE));
+	}
+
+	/* add or reset the cert data attribute */
+	index = kmf_find_attr(KMF_CERT_DATA_ATTR, attrlist, cur_num);
+	if (index == -1) {
+		/* not found; add it */
+		kmf_set_attr_at_index(attrlist, cur_num,
+		    KMF_CERT_DATA_ATTR, cert, sizeof (KMF_DATA));
+		cur_num++;
+	} else {
+		/* found; just reset it */
+		kmf_set_attr_at_index(attrlist, index,
+		    KMF_CERT_DATA_ATTR, cert, sizeof (KMF_DATA));
+	}
+
+	*new_attrlist = attrlist;
+	*new_num = cur_num;
+	return (KMF_OK);
 }
 
+
 /*
- *
- * Name: KMF_SignCertWithCert
+ * Name: kmf_sign_cert
  *
  * Description:
  *   This function signs a certificate using the signer cert and
- * returns the result as a signed, encoded certificate in SignedCert
+ *   returns a signed and DER-encoded certificate.
  *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   params(input) - contains parameters to be used for signing
- *   CertToBeSigned(input) - pointer to a KMF_DATA structure containing a
- *		DER encoded certificate to be signed
- *   SignerCert(input) - pointer to a KMF_DATA structure containing a
- *		signer certificate
- *   SignedCert(output) - pointer to the KMF_DATA structure containing the
- *		DER encoded signed certificate
+ * The following types of certificate data can be submitted to be signed:
+ *	KMF_TBS_CERT_DATA_ATTR - a KMF_DATA ptr is provided in the attrlist
+ *		and is signed directly.
+ *	KMF_X509_CERTIFICATE_ATTR - a KMF_X509_CERTIFICATE record is provided
+ *		in the attribute list.  This is converted to raw KMF_DATA
+ *		prior to signing.
  *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
+ * The key for the signing operation can be provided as a KMF_KEY_HANDLE_ATTR
+ * or the caller may choose to provide a KMF_SIGNER_CERT_ATTR (KMF_DATA *).
+ * If the latter, this function will then attempt to find the private key
+ * associated with the certificate.  The private key must be stored in
+ * the same keystore as the signer certificate.
  */
 KMF_RETURN
-KMF_SignCertWithCert(KMF_HANDLE_T handle,
-		KMF_CRYPTOWITHCERT_PARAMS *params,
-		const KMF_DATA	*CertToBeSigned,
-		KMF_DATA	*SignerCert,
-		KMF_DATA	*SignedCert)
+kmf_sign_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret;
-	KMF_KEY_HANDLE Signkey;
+	int new_numattr = numattr + 1;
+	KMF_ATTRIBUTE *new_attrlist = NULL;
+	KMF_DATA *signer_cert = NULL;
+	KMF_DATA *tbs_cert = NULL;  /* to be signed cert */
+	KMF_DATA *signed_cert = NULL;
+	KMF_DATA unsignedCert = {NULL, 0};
+	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
+	int freethekey = 0;
+	KMF_X509_CERTIFICATE *x509cert;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)}
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (CertToBeSigned == NULL ||
-		SignerCert == NULL || SignedCert == NULL)
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/* check the keyUsage of signer's certificate */
-	ret = check_key_usage(handle, SignerCert, KMF_KU_SIGN_CERT);
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	/*
-	 * Retrieve the private key from the keystore for the
-	 * signer certificate.
-	 */
-	ret = find_private_key_by_cert(handle, params, SignerCert, &Signkey);
-	if (ret != KMF_OK)
-		return (ret);
+	/* Get the signer cert and check its keyUsage */
+	signer_cert = kmf_get_attr_ptr(KMF_SIGNER_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	sign_key_ptr = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist,
+	    numattr);
+	if (signer_cert == NULL && sign_key_ptr == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
-	ret = SignCert(handle, CertToBeSigned, &Signkey, SignedCert);
+	if (signer_cert != NULL) {
+		ret = check_key_usage(handle, signer_cert, KMF_KU_SIGN_CERT);
+		if (ret != KMF_OK)
+			return (ret);
 
-	KMF_FreeKMFKey(handle, &Signkey);
+		/*
+		 * Find the private key from the signer certificate by calling
+		 * kmf_find_prikey_by_cert().
+		 */
+		ret = setup_findprikey_attrlist(attrlist, numattr,
+		    &new_attrlist, &new_numattr, &sign_key, signer_cert);
+		if (ret != KMF_OK)
+			goto out;
 
+		ret = kmf_find_prikey_by_cert(handle, new_numattr,
+		    new_attrlist);
+		if (ret != KMF_OK) {
+			goto out;
+		}
+		sign_key_ptr = &sign_key;
+		freethekey = 1;
+	}
+
+	/* Now we are ready to sign */
+	tbs_cert = kmf_get_attr_ptr(KMF_TBS_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	if (tbs_cert == NULL) {
+		x509cert = kmf_get_attr_ptr(KMF_X509_CERTIFICATE_ATTR, attrlist,
+		    numattr);
+		if (x509cert == NULL) {
+			ret = KMF_ERR_BAD_PARAMETER;
+			goto out;
+		}
+		ret = kmf_encode_cert_record(x509cert, &unsignedCert);
+		if (ret == KMF_OK)
+			tbs_cert = &unsignedCert;
+		else
+			goto out;
+	}
+
+	signed_cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	if (signed_cert == NULL) {
+		ret = KMF_ERR_BAD_PARAMETER;
+		goto out;
+	}
+
+	ret = sign_cert(handle, tbs_cert, sign_key_ptr, signed_cert);
+
+out:
+	if (new_attrlist)
+		(void) free(new_attrlist);
+
+	/* If we had to find the key, free it here. */
+	if (freethekey)
+		kmf_free_kmf_key(handle, &sign_key);
+
+	kmf_free_data(&unsignedCert);
 	return (ret);
 }
 
 /*
- *
- * Name: KMF_SignDataWithCert
+ * Name: kmf_sign_data
  *
  * Description:
  *   This function signs a block of data using the signer cert and
- * returns the the signature in output
- *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   params(input) - contains parameters to be used for signing
- *   tobesigned(input) - pointer to a KMF_DATA structure containing a
- *		the data to be signed
- *   output(output) - pointer to the KMF_DATA structure containing the
- *		signed data
- *   SignerCertData(input) - pointer to a KMF_DATA structure containing a
- *		signer certificate
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
+ *   returns the the signature in output
  */
 KMF_RETURN
-KMF_SignDataWithCert(KMF_HANDLE_T handle,
-	KMF_CRYPTOWITHCERT_PARAMS *params,
-	KMF_DATA *tobesigned,
-	KMF_DATA *output,
-	KMF_DATA *SignerCertData)
+kmf_sign_data(KMF_HANDLE_T handle, int numattr,
+    KMF_ATTRIBUTE *attrlist)
 {
-
-	KMF_RETURN ret;
-	KMF_KEY_HANDLE Signkey;
-	KMF_X509_CERTIFICATE *SignerCert = NULL;
 	KMF_PLUGIN *plugin;
+	KMF_RETURN ret = KMF_OK;
+	KMF_ATTRIBUTE *new_attrlist = NULL;
+	int new_numattr = numattr;
+	KMF_DATA *signer_cert = NULL;
+	KMF_DATA *tbs_data = NULL;  /* to be signed data */
+	KMF_DATA *output = NULL;
+	KMF_KEY_HANDLE sign_key, *sign_key_ptr;
+	KMF_X509_CERTIFICATE *x509_cert = NULL;
 	KMF_ALGORITHM_INDEX AlgId;
 	KMF_DATA	signature = {0, NULL};
+	KMF_OID *oid;
 
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)},
+	    {KMF_OUT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)}
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
-	if (tobesigned == NULL ||
-		SignerCertData == NULL || output == NULL)
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/* check the keyUsage of signer's certificate */
-	ret = check_key_usage(handle, SignerCertData, KMF_KU_SIGN_DATA);
+	CLEAR_ERROR(handle, ret);
 
-	/* Signing generic data does not require the KeyUsage extension. */
-	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
-		ret = KMF_OK;
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
+	/* Get the signer cert and check its keyUsage. */
+	signer_cert = kmf_get_attr_ptr(KMF_SIGNER_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	sign_key_ptr = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist,
+	    numattr);
+
+	if (signer_cert == NULL && sign_key_ptr == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	/*
-	 * Retrieve the private key from the keystore based on
-	 * the signer certificate.
+	 * If a signer cert was given, use it to find the private key
+	 * to use for signing the data.
 	 */
-	ret = find_private_key_by_cert(handle, params, SignerCertData,
-	    &Signkey);
-	if (ret != KMF_OK) {
+	if (signer_cert != NULL) {
+		ret = check_key_usage(handle, signer_cert, KMF_KU_SIGN_DATA);
+
+		/*
+		 * Signing generic data does not require the
+		 * KeyUsage extension.
+		 */
+		if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
+			ret = KMF_OK;
+		if (ret != KMF_OK)
+			return (ret);
+
+		/*
+		 * Find the private key from the signer certificate.
+		 */
+		ret = setup_findprikey_attrlist(attrlist, numattr,
+		    &new_attrlist, &new_numattr, &sign_key, signer_cert);
+		if (ret != KMF_OK) {
+			goto cleanup;
+		}
+
+		ret = kmf_find_prikey_by_cert(handle, new_numattr,
+		    new_attrlist);
+		if (ret != KMF_OK) {
+			goto cleanup;
+		}
+		sign_key_ptr = &sign_key;
+	}
+
+	/* Get the tbs_data and signed_data attributes now */
+	tbs_data = kmf_get_attr_ptr(KMF_DATA_ATTR, attrlist, numattr);
+	if (tbs_data == NULL) {
+		ret = KMF_ERR_BAD_PARAMETER;
 		goto cleanup;
 	}
 
-	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
-	if (ret != KMF_OK)
+	output = kmf_get_attr_ptr(KMF_OUT_DATA_ATTR, attrlist, numattr);
+	if (output == NULL) {
+		ret = KMF_ERR_BAD_PARAMETER;
 		goto cleanup;
+	}
 
-	plugin = FindPlugin(handle, Signkey.kstype);
-	if (plugin != NULL && plugin->funclist->SignData != NULL) {
-		KMF_OID *oid;
-
-		if (params->algid != KMF_ALGID_NONE)
-			oid = X509_AlgIdToAlgorithmOid(params->algid);
-		else
-			oid = CERT_ALG_OID(SignerCert);
-
-		ret = plugin->funclist->SignData(handle, &Signkey,
-			oid, tobesigned, output);
+	/*
+	 * Get the algorithm index attribute and its oid. If this attribute
+	 * is not provided, then we use the algorithm in the signer cert.
+	 */
+	oid = kmf_get_attr_ptr(KMF_OID_ATTR, attrlist, numattr);
+	ret = kmf_get_attr(KMF_ALGORITHM_INDEX_ATTR, attrlist, numattr,
+	    &AlgId, NULL);
+	/*
+	 * We need to know the Algorithm ID, it can be found 3 ways:
+	 * 1. caller supplied OID in the attribute list.
+	 * 2. caller supplied Algorithm Index in the attribute list.
+	 * 3. caller supplied neither, but did supply a certificate, find
+	 *    the ALG OID from the certificate.
+	 */
+	/* If none of the above, return error. */
+	if (oid == NULL && ret != KMF_OK && signer_cert == NULL) {
+		ret = KMF_ERR_BAD_PARAMETER;
+		goto cleanup;
+	} else if (oid == NULL && ret != KMF_OK) {
+		/* if no OID and No AlgID, use the signer cert */
+		ret = DerDecodeSignedCertificate(signer_cert, &x509_cert);
 		if (ret != KMF_OK)
 			goto cleanup;
 
-		AlgId = X509_AlgorithmOidToAlgId(CERT_ALG_OID(SignerCert));
-
-		/*
-		 * For DSA, NSS returns an encoded signature. Decode the
-		 * signature as DSA signature should be 40-byte long.
-		 */
-		if ((AlgId == KMF_ALGID_SHA1WithDSA) &&
-		    (plugin->type == KMF_KEYSTORE_NSS)) {
-			ret = DerDecodeDSASignature(output, &signature);
-			if (ret != KMF_OK) {
-				goto cleanup;
-			} else {
-				output->Length = signature.Length;
-				(void) memcpy(output->Data, signature.Data,
-				    signature.Length);
-			}
-		} else if (AlgId == KMF_ALGID_NONE) {
-			ret = KMF_ERR_BAD_ALGORITHM;
+		oid = CERT_ALG_OID(x509_cert);
+		AlgId = x509_algoid_to_algid(oid);
+		if (AlgId == KMF_ALGID_NONE) {
+			ret = KMF_ERR_BAD_PARAMETER;
+			goto cleanup;
 		}
-	} else {
+	} else if (oid == NULL && ret == KMF_OK) {
+		/* AlgID was given by caller, convert it to OID */
+		oid = x509_algid_to_algoid(AlgId);
+	} else { /* Else, the OID must have been given */
+		ret = KMF_OK;
+	}
+
+	/* Now call the plugin function to sign it */
+	plugin = FindPlugin(handle, sign_key_ptr->kstype);
+	if (plugin == NULL || plugin->funclist->SignData == NULL) {
 		ret = KMF_ERR_PLUGIN_NOTFOUND;
+		goto cleanup;
+	}
+
+	ret = plugin->funclist->SignData(handle, sign_key_ptr, oid, tbs_data,
+	    output);
+	if (ret != KMF_OK)
+		goto cleanup;
+
+	/*
+	 * For DSA, NSS returns an encoded signature. Decode the
+	 * signature as DSA signature should be 40-byte long.
+	 */
+	if (plugin->type == KMF_KEYSTORE_NSS &&
+	    AlgId == KMF_ALGID_SHA1WithDSA) {
+		ret = DerDecodeDSASignature(output, &signature);
+		if (ret != KMF_OK)
+			goto cleanup;
+		output->Length = signature.Length;
+		(void) memcpy(output->Data, signature.Data, signature.Length);
 	}
 
 cleanup:
+	if (new_attrlist != NULL)
+		free(new_attrlist);
+
 	if (signature.Data)
 		free(signature.Data);
 
-	KMF_FreeKMFKey(handle, &Signkey);
-	if (SignerCert != NULL) {
-		KMF_FreeSignedCert(SignerCert);
-		free(SignerCert);
+	if (signer_cert != NULL && sign_key_ptr != NULL)
+		kmf_free_kmf_key(handle, sign_key_ptr);
+
+	if (x509_cert != NULL) {
+		kmf_free_signed_cert(x509_cert);
+		free(x509_cert);
 	}
 
 	return (ret);
 }
 
 /*
+ * kmf_verify_data
  *
- * Name: KMF_VerifyCertWithKey
+ * This routine will try to verify a block of data using
+ * either a public key or a certificate as the source
+ * of the verification (the key).
+ *
+ * The caller may provider either a KMF_KEY_HANDLE_ATTR or
+ * a KMF_SIGNER_CERT_DATA_ATTR (with a KMF_DATA record) to
+ * use for the key to the verification step.  If a certificate
+ * is used and that certificate has the KeyUsage extension,
+ * the SIGN-DATA bit must be set.  Also, if a certificate
+ * is used, the verification will be done in a specific
+ * keystore mechanism.
+ *
+ * If a KMF_KEY_HANDLE is given in the attribute list, the
+ * verification will occur in the framework itself using
+ * PKCS#11 C_Verify functions.
+ */
+KMF_RETURN
+kmf_verify_data(KMF_HANDLE_T handle,
+	int	num_args,
+	KMF_ATTRIBUTE	*attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *plugin;
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+	KMF_DATA	derkey = {0, NULL};
+	KMF_KEY_HANDLE *KMFKey;
+	KMF_ALGORITHM_INDEX sigAlg;
+	KMF_DATA *indata;
+	KMF_DATA *insig;
+	KMF_DATA *signer_cert;
+	KMF_X509_SPKI spki;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+		{KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+		{KMF_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)},
+		{KMF_IN_SIGN_ATTR, FALSE, sizeof (KMF_DATA),
+			sizeof (KMF_DATA)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, num_args, attrlist);
+
+	if (ret != KMF_OK)
+		return (ret);
+
+	len = sizeof (kstype);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, num_args,
+	    &kstype, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	KMFKey = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, num_args);
+	signer_cert = kmf_get_attr_ptr(KMF_SIGNER_CERT_DATA_ATTR, attrlist,
+	    num_args);
+	if (KMFKey == NULL && signer_cert == NULL) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	len = sizeof (sigAlg);
+	ret = kmf_get_attr(KMF_ALGORITHM_INDEX_ATTR, attrlist, num_args,
+	    &sigAlg, &len);
+	if (ret != KMF_OK)
+		return (ret);
+
+	indata = kmf_get_attr_ptr(KMF_DATA_ATTR, attrlist, num_args);
+	if (indata == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	insig = kmf_get_attr_ptr(KMF_IN_SIGN_ATTR, attrlist, num_args);
+	if (insig == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* If the caller passed a signer cert instead of a key use it. */
+	if (signer_cert != NULL) {
+		ret = check_key_usage(handle, signer_cert, KMF_KU_SIGN_DATA);
+		if (ret != KMF_OK)
+			return (ret);
+
+		if (kstype == KMF_KEYSTORE_NSS)
+			kstype = KMF_KEYSTORE_PK11TOKEN;
+		plugin = FindPlugin(handle, kstype);
+		if (plugin == NULL)
+			return (KMF_ERR_PLUGIN_NOTFOUND);
+		if (plugin->funclist->VerifyDataWithCert == NULL)
+			return (KMF_ERR_FUNCTION_NOT_FOUND);
+
+		CLEAR_ERROR(handle, ret);
+		ret = plugin->funclist->VerifyDataWithCert(handle,
+		    sigAlg, indata, insig, signer_cert);
+	} else {
+		/* Retrieve public key data from keystore */
+		plugin = FindPlugin(handle, kstype);
+		if (plugin != NULL &&
+		    plugin->funclist->EncodePubkeyData != NULL) {
+			ret = plugin->funclist->EncodePubkeyData(handle,
+			    KMFKey, &derkey);
+		} else {
+			return (KMF_ERR_PLUGIN_NOTFOUND);
+		}
+
+		ret = DerDecodeSPKI(&derkey, &spki);
+		if (ret == KMF_OK) {
+			ret = PKCS_VerifyData(handle, sigAlg, &spki,
+			    indata, insig);
+		}
+
+		if (derkey.Data != NULL)
+			free(derkey.Data);
+
+		kmf_free_algoid(&spki.algorithm);
+		kmf_free_data(&spki.subjectPublicKey);
+	}
+
+	return (ret);
+}
+/*
+ * Name: kmf_verify_cert
  *
  * Description:
- *   This function verifies that the CertToBeVerified was signed
+ *   This function verifies that the a certificate was signed
  * using a specific private key and that the certificate has not
  * been altered since it was signed using that private key
+ * The public key used for verification may be given in the
+ * attribute list as a KMF_KEY_HANDLE or the caller may give
+ * just the signing certificate (as KMF_SIGNER_CERT_DATA_ATTR)
+ * from which the public key needed for verification can be
+ * derived.
  *
  * Parameters:
  *	handle(input) - opaque handle for KMF session
- *	KMFKey(input) - holds public key information for verification
- *	CertToBeVerified(input) - A signed certificate whose signature
- *	is to be verified
+ *	numattr  - number of attributes in the list
+ *	attrlist - KMF_ATTRIBUTES
  *
  * Returns:
  *   A KMF_RETURN value indicating success or specifying a particular
@@ -545,83 +825,91 @@ cleanup:
  * values represent an error condition.
  */
 KMF_RETURN
-KMF_VerifyCertWithKey(KMF_HANDLE_T handle,
-		KMF_KEY_HANDLE *KMFKey,
-		const KMF_DATA *CertToBeVerified)
+kmf_verify_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
-	KMF_RETURN err;
+	KMF_RETURN	ret;
 	KMF_DATA	derkey = {0, NULL};
 	KMF_PLUGIN	*plugin;
+	KMF_KEY_HANDLE *KMFKey;
+	KMF_DATA *CertToBeVerified;
+	KMF_DATA *SignerCert;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)}
+	};
 
-	CLEAR_ERROR(handle, err);
-	if (err != KMF_OK)
-		return (err);
-
-	if (KMFKey == NULL ||
-		CertToBeVerified == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* The keystore must extract the pubkey data */
-	plugin = FindPlugin(handle, KMFKey->kstype);
-	if (plugin != NULL && plugin->funclist->EncodePubkeyData != NULL) {
-		err = plugin->funclist->EncodePubkeyData(handle,
-			KMFKey, &derkey);
-	} else {
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
-
-	if (err == KMF_OK && derkey.Length > 0) {
-		/* check the caller and do other setup for this SPI call */
-		err = VerifyCertWithKey(handle, &derkey, CertToBeVerified);
-
-		if (derkey.Data != NULL)
-			free(derkey.Data);
-	}
-
-	return (err);
-}
-
-/*
- *
- * Name: KMF_VerifyCertWithCert
- *
- * Description:
- *   Function to verify the signature of a signed certificate
- *
- * Parameters:
- *   handle	- pointer to KMF handle
- *   CertToBeVerified(input) - pointer to the signed certificate
- *   SignerCert(input) - pointer to certificate used in signing
- *
- * Returns:
- *   A KMF_RETURN value.
- *   The value KMF_OK indicates success.
- *   All other values represent an error condition.
- */
-KMF_RETURN
-KMF_VerifyCertWithCert(KMF_HANDLE_T handle,
-	const KMF_DATA *CertToBeVerified,
-	const KMF_DATA *SignerCert)
-{
-	KMF_RETURN ret;
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (CertToBeVerified == NULL ||
-		SignerCert == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* check the keyUsage of signer's certificate */
-	ret = check_key_usage(handle, SignerCert, KMF_KU_SIGN_CERT);
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	ret = VerifyCertWithCert(handle, CertToBeVerified, SignerCert);
+	KMFKey = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	SignerCert = kmf_get_attr_ptr(KMF_SIGNER_CERT_DATA_ATTR, attrlist,
+	    numattr);
+
+	/*
+	 * Caller must provide at least a key handle or a cert to use
+	 * as the "key" for verification.
+	 */
+	if (KMFKey == NULL && SignerCert == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CertToBeVerified = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	if (CertToBeVerified == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (SignerCert != NULL) {
+		ret = verify_cert_with_cert(handle, CertToBeVerified,
+		    SignerCert);
+	} else {
+		/*
+		 * The keystore must extract the pubkey data because
+		 * the framework doesn't have access to the raw key bytes
+		 * that are needed to construct the DER encoded public
+		 * key information needed for the verify operation.
+		 */
+		plugin = FindPlugin(handle, KMFKey->kstype);
+		if (plugin != NULL && plugin->funclist->EncodePubkeyData !=
+		    NULL) {
+			ret = plugin->funclist->EncodePubkeyData(handle,
+			    KMFKey, &derkey);
+		} else {
+			return (KMF_ERR_PLUGIN_NOTFOUND);
+		}
+
+		if (ret == KMF_OK && derkey.Length > 0) {
+			ret = verify_cert_with_key(handle, &derkey,
+			    CertToBeVerified);
+
+			if (derkey.Data != NULL)
+				free(derkey.Data);
+		}
+	}
+
 	return (ret);
 }
 
+/*
+ * Utility routine for verifying generic data using a
+ * certificate to derive the public key.  This is
+ * done in a specific plugin because there are situations
+ * where we want to force this operation to happen in
+ * a specific keystore.
+ * For example:
+ *    libelfsign verifies signatures on crypto libraries.
+ *    We cannot use libpkcs11 functions to verify the pkcs11
+ *    libraries because it results in a circular dependency.
+ *    So, when libelfsign is verifying library sigs, it
+ *    always forces the operation to happen in OpenSSL
+ *    to avoid the circular dependency.
+ */
 static KMF_RETURN
 plugin_verify_data_with_cert(KMF_HANDLE_T handle,
 	KMF_KEYSTORE_TYPE kstype,
@@ -651,69 +939,13 @@ plugin_verify_data_with_cert(KMF_HANDLE_T handle,
 
 	CLEAR_ERROR(handle, ret);
 	ret = (plugin->funclist->VerifyDataWithCert(handle,
-		algid, indata, insig, (KMF_DATA *)SignerCert));
+	    algid, indata, insig, (KMF_DATA *)SignerCert));
 
 	return (ret);
 }
 
 /*
- *
- * Name: KMF_VerifyDataWithCert
- *
- * Description:
- *   This function verifies the signature of a block of data using a signer
- *   certificate.
- *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   indata(input) - pointer to the block of data whose signature
- *		is to be verified
- *   insig(input) - pointer to the signature to be verified
- *   SignerCert(input) - pointer to signer cert for verification
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
- */
-KMF_RETURN
-KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
-	KMF_KEYSTORE_TYPE kstype,
-	KMF_ALGORITHM_INDEX algid,
-	KMF_DATA *indata,
-	KMF_DATA *insig,
-	const KMF_DATA *SignerCert)
-{
-	KMF_RETURN ret;
-
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
-	if (SignerCert == NULL ||
-		indata == NULL || insig == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* check the keyUsage of signer's certificate */
-	ret = check_key_usage(handle, SignerCert, KMF_KU_SIGN_DATA);
-
-	/* For this operation, it is OK if KeyUsage is not present */
-	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
-		ret = KMF_OK;
-
-	if (ret != KMF_OK)
-		return (ret);
-
-	ret = plugin_verify_data_with_cert(handle, kstype,
-		algid, indata, insig, SignerCert);
-
-	return (ret);
-}
-
-/*
- * Name: KMF_EncryptWithCert
+ * Name: kmf_encrypt
  *
  * Description:
  *   Uses the public key from the cert to encrypt the plaintext
@@ -735,23 +967,45 @@ KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
  *
  */
 KMF_RETURN
-KMF_EncryptWithCert(KMF_HANDLE_T handle,
-	KMF_DATA *cert,
-	KMF_DATA *plaintext,
-	KMF_DATA *ciphertext)
+kmf_encrypt(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret;
 	KMF_X509_CERTIFICATE *x509cert = NULL;
 	KMF_X509_SPKI *pubkey;
 	KMF_OID *alg;
 	KMF_ALGORITHM_INDEX algid;
+	KMF_DATA *cert;
+	KMF_DATA *plaintext;
+	KMF_DATA *ciphertext;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+		sizeof (KMF_DATA)},
+	    {KMF_PLAINTEXT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+		sizeof (KMF_DATA)},
+	    {KMF_CIPHERTEXT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+		sizeof (KMF_DATA)}
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (cert == NULL ||
-		plaintext == NULL || ciphertext == NULL)
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
+	if (ret != KMF_OK)
+		return (ret);
+
+	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	plaintext = kmf_get_attr_ptr(KMF_PLAINTEXT_DATA_ATTR, attrlist,
+	    numattr);
+	ciphertext = kmf_get_attr_ptr(KMF_CIPHERTEXT_DATA_ATTR, attrlist,
+	    numattr);
+
+	if (cert == NULL || plaintext == NULL || ciphertext == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* check the keyUsage of the certificate */
@@ -771,68 +1025,72 @@ KMF_EncryptWithCert(KMF_HANDLE_T handle,
 	/* Use the algorithm in SPKI to encrypt data */
 	alg = &pubkey->algorithm.algorithm;
 
-	algid = X509_AlgorithmOidToAlgId(alg);
+	algid = x509_algoid_to_algid(alg);
 
 	/* DSA does not support encrypt */
 	if (algid == KMF_ALGID_DSA || algid == KMF_ALGID_NONE) {
-		KMF_FreeSignedCert(x509cert);
+		kmf_free_signed_cert(x509cert);
 		free(x509cert);
 		return (KMF_ERR_BAD_ALGORITHM);
 	}
 
+	/*
+	 * Encrypt using the crypto framework (not the KMF plugin mechanism).
+	 */
 	ret = PKCS_EncryptData(handle, algid, pubkey, plaintext, ciphertext);
 
-	KMF_FreeSignedCert(x509cert);
+	kmf_free_signed_cert(x509cert);
 	free(x509cert);
 
 	return (ret);
 }
 
 /*
- * Name: KMF_DecryptWithCert
+ * Name: kmf_decrypt
  *
  * Description:
  *   Uses the private key associated with the cert to decrypt
  *   the ciphertext into the plaintext.
- *
- * Parameters:
- *   handle(input) - opaque handle for KMF session
- *   params(input) - contains parameters to be used to find the private
- *		key for decryption
- *   cert(input) - pointer to a DER encoded certificate for decryption
- *		by using its private key
- *   ciphertext(input) - pointer to the ciphertext contains to be
- *		decrypted data
- *   plaintext(output) - pointer to the plaintext after decryption
- *
- * Returns:
- *   A KMF_RETURN value indicating success or specifying a particular
- * error condition.
- *   The value KMF_OK indicates success. All other values represent
- * an error condition.
- *
  */
 KMF_RETURN
-KMF_DecryptWithCert(KMF_HANDLE_T handle,
-	KMF_CRYPTOWITHCERT_PARAMS *params,
-	KMF_DATA *cert,
-	KMF_DATA *ciphertext,
-	KMF_DATA *plaintext)
+kmf_decrypt(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret;
-	KMF_KEY_HANDLE Signkey;
 	KMF_X509_CERTIFICATE *x509cert = NULL;
 	KMF_X509_SPKI *spki_ptr;
 	KMF_PLUGIN *plugin;
 	KMF_ALGORITHM_INDEX AlgorithmId;
+	KMF_ATTRIBUTE *new_attrlist = NULL;
+	int new_numattr;
+	KMF_DATA *cert = NULL;
+	KMF_DATA *ciphertext = NULL;
+	KMF_DATA *plaintext = NULL;
+	KMF_KEY_HANDLE prikey;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)},
+	    {KMF_PLAINTEXT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+		sizeof (KMF_DATA)},
+	    {KMF_CIPHERTEXT_DATA_ATTR, FALSE, sizeof (KMF_DATA),
+		sizeof (KMF_DATA)},
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
 
-
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (cert == NULL ||
-		plaintext == NULL || ciphertext == NULL)
+
+	/* Get the cert and check its keyUsage */
+	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist,
+	    numattr);
+	if (cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* check the keyUsage of the certificate */
@@ -842,14 +1100,29 @@ KMF_DecryptWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
+	/* Get the ciphertext and plaintext attributes */
+	ciphertext = kmf_get_attr_ptr(KMF_CIPHERTEXT_DATA_ATTR, attrlist,
+	    numattr);
+	if (ciphertext == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	plaintext = kmf_get_attr_ptr(KMF_PLAINTEXT_DATA_ATTR, attrlist,
+	    numattr);
+	if (plaintext == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	/*
 	 * Retrieve the private key from the keystore based on
 	 * the certificate.
 	 */
-	ret = find_private_key_by_cert(handle, params, cert, &Signkey);
-	if (ret != KMF_OK) {
-		return (ret);
-	}
+	ret = setup_findprikey_attrlist(attrlist, numattr, &new_attrlist,
+	    &new_numattr, &prikey, cert);
+	if (ret != KMF_OK)
+		goto cleanup;
+
+	ret = kmf_find_prikey_by_cert(handle, new_numattr, new_attrlist);
+	if (ret != KMF_OK)
+		goto cleanup;
 
 	/* Decode the cert so we can get the alogorithm */
 	ret = DerDecodeSignedCertificate(cert, &x509cert);
@@ -857,7 +1130,7 @@ KMF_DecryptWithCert(KMF_HANDLE_T handle,
 		goto cleanup;
 
 	spki_ptr = &x509cert->certificate.subjectPublicKeyInfo;
-	AlgorithmId = X509_AlgorithmOidToAlgId((KMF_OID *)
+	AlgorithmId = x509_algoid_to_algid((KMF_OID *)
 	    &spki_ptr->algorithm.algorithm);
 
 	/* DSA does not support decrypt */
@@ -866,92 +1139,136 @@ KMF_DecryptWithCert(KMF_HANDLE_T handle,
 		goto cleanup;
 	}
 
-	plugin = FindPlugin(handle, Signkey.kstype);
+	plugin = FindPlugin(handle, prikey.kstype);
 
 	if (plugin != NULL && plugin->funclist->DecryptData != NULL) {
 		ret = plugin->funclist->DecryptData(handle,
-		    &Signkey, &spki_ptr->algorithm.algorithm,
+		    &prikey, &spki_ptr->algorithm.algorithm,
 		    ciphertext, plaintext);
 	} else {
 		ret = KMF_ERR_PLUGIN_NOTFOUND;
 	}
 
 cleanup:
-	KMF_FreeKMFKey(handle, &Signkey);
-	KMF_FreeSignedCert(x509cert);
+	if (new_attrlist != NULL)
+		free(new_attrlist);
+
+	kmf_free_kmf_key(handle, &prikey);
+	kmf_free_signed_cert(x509cert);
 	free(x509cert);
 
 	return (ret);
 }
 
 KMF_RETURN
-KMF_StoreCert(KMF_HANDLE_T handle, KMF_STORECERT_PARAMS *target,
-	KMF_DATA *pcert)
+kmf_store_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE kstype;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (target == NULL || pcert == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
 
-	plugin = FindPlugin(handle, target->kstype);
-
-	if (plugin != NULL && plugin->funclist->StoreCert != NULL) {
-		return (plugin->funclist->StoreCert(handle, target, pcert));
-	} else {
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL || plugin->funclist->StoreCert == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+
+	return (plugin->funclist->StoreCert(handle, numattr, attrlist));
 }
 
 KMF_RETURN
-KMF_ImportCert(KMF_HANDLE_T handle, KMF_IMPORTCERT_PARAMS *target)
+kmf_import_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE kstype;
+
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_FILENAME_ATTR, TRUE, 1, 0},
+	};
+
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs, 0, NULL,
+	    numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (target == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
 
-	plugin = FindPlugin(handle, target->kstype);
-
-	if (plugin != NULL && plugin->funclist->ImportCert != NULL) {
-		return (plugin->funclist->ImportCert(handle, target));
-	} else {
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL || plugin->funclist->ImportCert == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+
+	return (plugin->funclist->ImportCert(handle, numattr, attrlist));
 }
 
 KMF_RETURN
-KMF_DeleteCertFromKeystore(KMF_HANDLE_T handle, KMF_DELETECERT_PARAMS *target)
+kmf_delete_cert_from_keystore(KMF_HANDLE_T handle, int numattr,
+    KMF_ATTRIBUTE *attrlist)
 {
 	KMF_PLUGIN *plugin;
-	KMF_RETURN ret;
+	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE kstype;
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)}
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (target == NULL ||
-		(target->find_cert_validity < KMF_ALL_CERTS) ||
-		(target->find_cert_validity > KMF_EXPIRED_CERTS))
-		return (KMF_ERR_BAD_PARAMETER);
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
 
-	plugin = FindPlugin(handle, target->kstype);
-
-	if (plugin != NULL && plugin->funclist->DeleteCert != NULL) {
-		return (plugin->funclist->DeleteCert(handle, target));
-	} else {
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL || plugin->funclist->DeleteCert == NULL)
 		return (KMF_ERR_PLUGIN_NOTFOUND);
-	}
+
+	return (plugin->funclist->DeleteCert(handle, numattr, attrlist));
 }
+
 
 /*
  * This function gets the CRL URI entries from the certificate's Distribution
@@ -995,7 +1312,7 @@ cert_get_crl(KMF_HANDLE_T handle, const KMF_DATA *cert, char *proxy,
 	 * the process until a CRL file is sucessfully downloaded or we
 	 * are running out the CRL URI's.
 	 */
-	ret = KMF_GetCertCRLDistributionPointsExt((const KMF_DATA *)cert,
+	ret = kmf_get_cert_crl_dist_pts((const KMF_DATA *)cert,
 	    &crl_dps);
 	if (ret != KMF_OK)
 		goto out;
@@ -1011,7 +1328,7 @@ cert_get_crl(KMF_HANDLE_T handle, const KMF_DATA *cert, char *proxy,
 			data = &(fullname->namelist[j].name);
 			(void) memcpy(uri, data->Data, data->Length);
 			uri[data->Length] = '\0';
-			ret = KMF_DownloadCRL(handle, uri, proxyname,
+			ret = kmf_download_crl(handle, uri, proxyname,
 			    proxy_port, 30, filename, format);
 			if (ret == KMF_OK) {
 				done = B_TRUE;
@@ -1028,25 +1345,21 @@ cert_get_crl(KMF_HANDLE_T handle, const KMF_DATA *cert, char *proxy,
 	}
 
 out:
-	KMF_FreeCRLDistributionPoints(&crl_dps);
+	kmf_free_crl_dist_pts(&crl_dps);
 	return (ret);
 }
 
 static KMF_RETURN
-cert_crl_check(KMF_HANDLE_T handle,
-	KMF_VALIDATECERT_PARAMS *params,
-	KMF_DATA *user_cert,
-	KMF_DATA *issuer_cert)
+cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
+	KMF_DATA *user_cert, KMF_DATA *issuer_cert)
 {
 	KMF_POLICY_RECORD *policy;
 	KMF_RETURN ret = KMF_OK;
-	KMF_IMPORTCRL_PARAMS 	icrl_params;
-	KMF_FINDCERTINCRL_PARAMS fcrl_params;
-	KMF_OPENSSL_PARAMS ssl_params;
-	KMF_VERIFYCRL_PARAMS vcrl_params;
+	KMF_ATTRIBUTE attrlist[16];
+	int numattr = 0;
+	boolean_t crlchk;
 	char user_certfile[MAXPATHLEN];
 	char crlfile_tmp[MAXPATHLEN];
-	KMF_CHECKCRLDATE_PARAMS ccrldate_params;
 	char *basefilename = NULL;
 	char *dir = NULL;
 	char *crlfilename = NULL;
@@ -1054,17 +1367,14 @@ cert_crl_check(KMF_HANDLE_T handle,
 	char *uri = NULL;
 	KMF_ENCODE_FORMAT format;
 
-	if (handle == NULL || params == NULL ||
-		user_cert == NULL || issuer_cert == NULL)
+	if (handle == NULL || kstype == NULL || user_cert == NULL ||
+	    issuer_cert == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (!VALID_KEYSTORE_TYPE(*kstype))
 		return (KMF_ERR_BAD_PARAMETER);
 
 	policy = handle->policy;
-
-	(void) memset(&icrl_params, 0, sizeof (icrl_params));
-	(void) memset(&vcrl_params, 0, sizeof (vcrl_params));
-	(void) memset(&ccrldate_params, 0, sizeof (ccrldate_params));
-	(void) memset(&fcrl_params, 0, sizeof (fcrl_params));
-	(void) memset(&ssl_params, 0, sizeof (ssl_params));
 
 	/*
 	 * If the get-crl-uri policy is TRUE, then download the CRL
@@ -1104,16 +1414,27 @@ cert_crl_check(KMF_HANDLE_T handle,
 		}
 
 		/* Cache the CRL file. */
-		if (params->kstype == KMF_KEYSTORE_NSS) {
+		if (*kstype == KMF_KEYSTORE_NSS) {
 			/*
 			 * For NSS keystore, import this CRL file into th
 			 * internal database.
 			 */
-			icrl_params.kstype = KMF_KEYSTORE_NSS;
-			icrl_params.nssparms.slotlabel = NULL;
-			icrl_params.nssparms.crlfile = crlfile_tmp;
-			icrl_params.nssparms.crl_check = B_FALSE;
-			ret = KMF_ImportCRL(handle, &icrl_params);
+			numattr = 0;
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYSTORE_TYPE_ATTR, kstype, sizeof (kstype));
+			numattr++;
+
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CRL_FILENAME_ATTR, crlfile_tmp,
+			    strlen(crlfile_tmp));
+			numattr++;
+
+			crlchk = B_FALSE;
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CRL_CHECK_ATTR,	&crlchk, sizeof (boolean_t));
+			numattr++;
+
+			ret = kmf_import_crl(handle, numattr, attrlist);
 			(void) unlink(crlfile_tmp);
 			if (ret != KMF_OK)
 				goto cleanup;
@@ -1145,7 +1466,7 @@ cert_crl_check(KMF_HANDLE_T handle,
 		 * If the get_crl_uri policy is FALSE, for File-based CRL
 		 * plugins, get the input CRL file from the policy.
 		 */
-		if (params->kstype != KMF_KEYSTORE_NSS) {
+		if (*kstype != KMF_KEYSTORE_NSS) {
 			if (basefilename == NULL) {
 				ret = KMF_ERR_BAD_PARAMETER;
 				goto cleanup;
@@ -1168,11 +1489,9 @@ cert_crl_check(KMF_HANDLE_T handle,
 		 * NSS CRL is not file based, and its signature
 		 * has been verified during CRL import.
 		 */
-		if (params->kstype != KMF_KEYSTORE_NSS) {
-			vcrl_params.crl_name = crlfilename;
-			vcrl_params.tacert = issuer_cert;
-
-			ret = KMF_VerifyCRLFile(handle, &vcrl_params);
+		if (*kstype != KMF_KEYSTORE_NSS) {
+			ret = kmf_verify_crl_file(handle, crlfilename,
+			    issuer_cert);
 			if (ret != KMF_OK)  {
 				goto cleanup;
 			}
@@ -1186,10 +1505,8 @@ cert_crl_check(KMF_HANDLE_T handle,
 		/*
 		 * This is for file-based CRL, but not for NSS CRL.
 		 */
-		if (params->kstype != KMF_KEYSTORE_NSS) {
-			ccrldate_params.crl_name = crlfilename;
-
-			ret = KMF_CheckCRLDate(handle, &ccrldate_params);
+		if (*kstype != KMF_KEYSTORE_NSS) {
+			ret = kmf_check_crl_date(handle, crlfilename);
 			if (ret != KMF_OK)  {
 				goto cleanup;
 			}
@@ -1199,12 +1516,20 @@ cert_crl_check(KMF_HANDLE_T handle,
 	/*
 	 * Check the CRL revocation for the certificate.
 	 */
-	fcrl_params.kstype = params->kstype;
-	switch (params->kstype) {
+	numattr = 0;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    kstype, sizeof (kstype));
+	numattr++;
+
+	switch (*kstype) {
 	case KMF_KEYSTORE_NSS:
-		fcrl_params.nssparms.certificate = params->certificate;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CERT_DATA_ATTR, user_cert, sizeof (KMF_DATA));
+		numattr++;
 		break;
 	case KMF_KEYSTORE_PK11TOKEN:
+	case KMF_KEYSTORE_OPENSSL:
 		/*
 		 * Create temporary file to hold the user certificate.
 		 */
@@ -1215,27 +1540,28 @@ cert_crl_check(KMF_HANDLE_T handle,
 			goto cleanup;
 		}
 
-		ret = KMF_CreateCertFile(user_cert, KMF_FORMAT_ASN1,
+		ret = kmf_create_cert_file(user_cert, KMF_FORMAT_ASN1,
 		    user_certfile);
 		if (ret != KMF_OK)  {
 			goto cleanup;
 		}
 
-		ssl_params.certfile = user_certfile;
-		ssl_params.crlfile = crlfilename;
-		fcrl_params.sslparms = ssl_params;
-		break;
-	case KMF_KEYSTORE_OPENSSL:
-		ssl_params.certfile = params->ks_opt_u.openssl_opts.certfile;
-		ssl_params.crlfile = crlfilename;
-		fcrl_params.sslparms = ssl_params;
+		kmf_set_attr_at_index(attrlist,  numattr,
+		    KMF_CERT_FILENAME_ATTR,
+		    user_certfile, strlen(user_certfile));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist,  numattr,
+		    KMF_CRL_FILENAME_ATTR,
+		    crlfilename, strlen(crlfilename));
+		numattr++;
 		break;
 	default:
 		ret = KMF_ERR_PLUGIN_NOTFOUND;
 		goto cleanup;
 	}
 
-	ret = KMF_FindCertInCRL(handle, &fcrl_params);
+	ret = kmf_find_cert_in_crl(handle, numattr, attrlist);
 	if (ret == KMF_ERR_NOT_REVOKED)  {
 		ret = KMF_OK;
 	}
@@ -1253,24 +1579,24 @@ cleanup:
 }
 
 static KMF_RETURN
-cert_ocsp_check(KMF_HANDLE_T handle,
-	KMF_VALIDATECERT_PARAMS *params,
-	KMF_DATA *user_cert,
-	KMF_DATA *issuer_cert,
-	KMF_DATA *response)
+cert_ocsp_check(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
+	KMF_DATA *user_cert, KMF_DATA *issuer_cert, KMF_DATA *response,
+	char *slotlabel, char *dirpath)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_POLICY_RECORD *policy;
-	KMF_FINDCERT_PARAMS fc_target;
-	KMF_OCSPRESPONSE_PARAMS_INPUT resp_params_in;
-	KMF_OCSPRESPONSE_PARAMS_OUTPUT resp_params_out;
 	KMF_DATA *new_response = NULL;
 	boolean_t ignore_response_sign = B_FALSE;
-	uint32_t ltime;
+	uint32_t ltime = 0;
 	KMF_DATA *signer_cert = NULL;
 	KMF_BIGINT sernum = { NULL, 0 };
+	int response_status;
+	int reason;
+	int cert_status;
+	KMF_ATTRIBUTE attrlist[32];
+	int numattr;
 
-	if (handle == NULL || params == NULL || user_cert == NULL ||
+	if (handle == NULL || kstype == NULL || user_cert == NULL ||
 	    issuer_cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
@@ -1296,11 +1622,13 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 	if (ignore_response_sign == B_FALSE &&
 	    policy->VAL_OCSP.has_resp_cert == B_TRUE) {
 		char *signer_name;
-		KMF_OPENSSL_PARAMS ssl_params;
 		KMF_X509_DER_CERT signer_retrcert;
 		uchar_t *bytes = NULL;
 		size_t bytelen;
 		uint32_t num = 0;
+		KMF_ATTRIBUTE fc_attrlist[16];
+		int fc_numattr = 0;
+		char *dir = "./";
 
 		if (policy->VAL_OCSP_RESP_CERT.name == NULL ||
 		    policy->VAL_OCSP_RESP_CERT.serial == NULL)
@@ -1314,49 +1642,55 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 		(void) memset(signer_cert, 0, sizeof (KMF_DATA));
 
 		signer_name = policy->VAL_OCSP_RESP_CERT.name;
-		ret = KMF_HexString2Bytes(
+		ret = kmf_hexstr_to_bytes(
 		    (uchar_t *)policy->VAL_OCSP_RESP_CERT.serial,
 		    &bytes, &bytelen);
 		if (ret != KMF_OK || bytes == NULL) {
 			ret = KMF_ERR_OCSP_POLICY;
 			goto out;
 		}
-
 		sernum.val = bytes;
 		sernum.len = bytelen;
 
-		(void) memset(&fc_target, 0, sizeof (fc_target));
-		(void) memset(&ssl_params, 0, sizeof (ssl_params));
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, kstype,
+		    sizeof (KMF_KEYSTORE_TYPE));
+		fc_numattr++;
 
-		fc_target.subject = signer_name;
-		fc_target.serial = &sernum;
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_SUBJECT_NAME_ATTR, signer_name, strlen(signer_name));
+		fc_numattr++;
 
-		switch (params->kstype) {
-		case KMF_KEYSTORE_NSS:
-			fc_target.kstype = KMF_KEYSTORE_NSS;
-			params->nssparms.slotlabel =
-			    params->nssparms.slotlabel;
-			break;
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_BIGINT_ATTR,
+		    &sernum, sizeof (KMF_BIGINT));
+		fc_numattr++;
 
-		case KMF_KEYSTORE_OPENSSL:
-			fc_target.kstype = KMF_KEYSTORE_OPENSSL;
-			ssl_params.dirpath =
-			    params->sslparms.dirpath == NULL ?
-			    "./" : params->sslparms.dirpath;
-			fc_target.sslparms = ssl_params;
-			break;
+		if (*kstype == KMF_KEYSTORE_NSS && slotlabel != NULL) {
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			    KMF_TOKEN_LABEL_ATTR, slotlabel,
+			    strlen(slotlabel));
+			fc_numattr++;
+		}
 
-		case KMF_KEYSTORE_PK11TOKEN:
-			fc_target.kstype = KMF_KEYSTORE_PK11TOKEN;
-			break;
-		default:
-			ret = KMF_ERR_BAD_PARAMETER;
-			goto out;
-			break;
+		if (*kstype == KMF_KEYSTORE_OPENSSL) {
+			if (dirpath == NULL) {
+				kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+				    KMF_DIRPATH_ATTR, dir, strlen(dir));
+				fc_numattr++;
+			} else {
+				kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+				    KMF_DIRPATH_ATTR, dirpath,
+				    strlen(dirpath));
+				fc_numattr++;
+			}
 		}
 
 		num = 0;
-		ret = KMF_FindCert(handle, &fc_target, NULL, &num);
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_COUNT_ATTR, &num, sizeof (uint32_t));
+		fc_numattr++;
+
+		ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 		if (ret != KMF_OK || num != 1) {
 			if (num == 0)
 				ret = KMF_ERR_CERT_NOT_FOUND;
@@ -1366,7 +1700,12 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 		}
 
 		(void) memset(&signer_retrcert, 0, sizeof (KMF_X509_DER_CERT));
-		ret = KMF_FindCert(handle, &fc_target, &signer_retrcert, &num);
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_X509_DER_CERT_ATTR, &signer_retrcert,
+		    sizeof (KMF_X509_DER_CERT));
+		fc_numattr++;
+
+		ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 		if (ret == KMF_OK) {
 			signer_cert->Length =
 			    signer_retrcert.certificate.Length;
@@ -1390,7 +1729,7 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 		new_response->Data = NULL;
 		new_response->Length = 0;
 
-		ret = KMF_GetOCSPForCert(handle, user_cert, issuer_cert,
+		ret = kmf_get_ocsp_for_cert(handle, user_cert, issuer_cert,
 		    new_response);
 		if (ret != KMF_OK)
 			goto out;
@@ -1399,18 +1738,49 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 	/*
 	 * Process the OCSP response and retrieve the certificate status.
 	 */
-	resp_params_in.issuer_cert = issuer_cert;
-	resp_params_in.user_cert = user_cert;
-	resp_params_in.signer_cert = signer_cert;
-	resp_params_in.response =
-		response == NULL ? new_response : response;
-	resp_params_in.response_lifetime = ltime;
-	resp_params_in.ignore_response_sign = ignore_response_sign;
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ISSUER_CERT_DATA_ATTR,
+	    issuer_cert, sizeof (KMF_DATA));
+	numattr++;
 
-	ret = KMF_GetOCSPStatusForCert(handle, &resp_params_in,
-	    &resp_params_out);
+	kmf_set_attr_at_index(attrlist, numattr, KMF_USER_CERT_DATA_ATTR,
+	    user_cert, sizeof (KMF_DATA));
+	numattr++;
+
+	if (signer_cert != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_SIGNER_CERT_DATA_ATTR, user_cert, sizeof (KMF_DATA));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_OCSP_RESPONSE_DATA_ATTR,
+	    response == NULL ? new_response : response, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_RESPONSE_LIFETIME_ATTR,
+	    &ltime, sizeof (uint32_t));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_IGNORE_RESPONSE_SIGN_ATTR, &ignore_response_sign,
+	    sizeof (boolean_t));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_OCSP_RESPONSE_STATUS_ATTR, &response_status, sizeof (int));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_OCSP_RESPONSE_REASON_ATTR, &reason, sizeof (int));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_OCSP_RESPONSE_CERT_STATUS_ATTR, &cert_status, sizeof (int));
+	numattr++;
+
+	ret = kmf_get_ocsp_status_for_cert(handle, numattr, attrlist);
 	if (ret == KMF_OK) {
-		switch (resp_params_out.cert_status) {
+		switch (cert_status) {
 		case OCSP_GOOD:
 			break;
 		case OCSP_UNKNOWN:
@@ -1424,12 +1794,12 @@ cert_ocsp_check(KMF_HANDLE_T handle,
 
 out:
 	if (new_response) {
-		KMF_FreeData(new_response);
+		kmf_free_data(new_response);
 		free(new_response);
 	}
 
 	if (signer_cert) {
-		KMF_FreeData(signer_cert);
+		kmf_free_data(signer_cert);
 		free(signer_cert);
 	}
 
@@ -1453,7 +1823,7 @@ cert_ku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 
 	policy = handle->policy;
 	(void) memset(&keyusage, 0, sizeof (keyusage));
-	ret = KMF_GetCertKeyUsageExt(cert, &keyusage);
+	ret = kmf_get_cert_ku(cert, &keyusage);
 
 	if (ret == KMF_ERR_EXTENSION_NOT_FOUND) {
 		if (policy->ku_bits) {
@@ -1476,8 +1846,8 @@ cert_ku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 	 */
 	if ((keyusage.KeyUsageBits & KMF_keyCertSign)) {
 		(void) memset(&constraint, 0, sizeof (constraint));
-		ret = KMF_GetCertBasicConstraintExt(cert,
-			&critical, &constraint);
+		ret = kmf_get_cert_basic_constraint(cert,
+		    &critical, &constraint);
 
 		if (ret != KMF_OK) {
 			/* real error */
@@ -1519,7 +1889,7 @@ cert_eku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 	if (policy->eku_set.eku_count == 0)
 		return (KMF_OK);
 
-	ret = KMF_GetCertEKU(cert, &eku);
+	ret = kmf_get_cert_eku(cert, &eku);
 	if ((ret != KMF_ERR_EXTENSION_NOT_FOUND) && (ret != KMF_OK)) {
 		/* real error */
 		return (ret);
@@ -1596,58 +1966,61 @@ cert_eku_check(KMF_HANDLE_T handle, KMF_DATA *cert)
 }
 
 static KMF_RETURN
-kmf_find_issuer_cert(KMF_HANDLE_T handle,
-	KMF_VALIDATECERT_PARAMS *params,
-	char *user_issuer,
-	KMF_DATA *issuer_cert)
+find_issuer_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
+    char *user_issuer, KMF_DATA *issuer_cert,
+    char *slotlabel, char *dirpath)
 {
-
 	KMF_RETURN ret = KMF_OK;
-	KMF_FINDCERT_PARAMS fc_target;
-	KMF_OPENSSL_PARAMS ssl_params;
 	KMF_X509_DER_CERT *certlist = NULL;
 	uint32_t i, num = 0;
 	time_t t_notbefore;
 	time_t t_notafter;
 	time_t latest;
 	KMF_DATA tmp_cert = {0, NULL};
+	KMF_ATTRIBUTE fc_attrlist[16];
+	int fc_numattr = 0;
+	char *dir = "./";
 
-	if (handle == NULL || params == NULL ||
-		user_issuer == NULL || issuer_cert == NULL)
+	if (handle == NULL || kstype == NULL || user_issuer == NULL ||
+	    issuer_cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	(void) memset(&fc_target, 0, sizeof (fc_target));
-	(void) memset(&ssl_params, 0, sizeof (ssl_params));
+	if (!VALID_KEYSTORE_TYPE(*kstype))
+		return (KMF_ERR_BAD_PARAMETER);
 
-	fc_target.subject = user_issuer;
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    kstype, sizeof (KMF_KEYSTORE_TYPE));
+	fc_numattr++;
 
-	switch (params->kstype) {
-	case KMF_KEYSTORE_NSS:
-		fc_target.kstype = KMF_KEYSTORE_NSS;
-		fc_target.nssparms.slotlabel = params->nssparms.slotlabel;
-		break;
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_SUBJECT_NAME_ATTR,
+	    user_issuer, strlen(user_issuer));
+	fc_numattr++;
 
-	case KMF_KEYSTORE_OPENSSL:
-		fc_target.kstype = KMF_KEYSTORE_OPENSSL;
-		/* setup dirpath to search for TA in a directory */
-		if (params->sslparms.dirpath == NULL) {
-			ssl_params.dirpath = "./";
+	if (*kstype == KMF_KEYSTORE_NSS && slotlabel != NULL) {
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_TOKEN_LABEL_ATTR, slotlabel, strlen(slotlabel));
+		fc_numattr++;
+	}
+
+	if (*kstype == KMF_KEYSTORE_OPENSSL) {
+		if (dirpath == NULL) {
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			    KMF_DIRPATH_ATTR, dir, strlen(dir));
+			fc_numattr++;
 		} else {
-			ssl_params.dirpath = params->sslparms.dirpath;
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			    KMF_DIRPATH_ATTR, dirpath, strlen(dirpath));
+			fc_numattr++;
 		}
-		ssl_params.certfile = NULL;
-		fc_target.sslparms = ssl_params;
-		break;
-
-	case KMF_KEYSTORE_PK11TOKEN:
-		fc_target.kstype = KMF_KEYSTORE_PK11TOKEN;
-		break;
-	default:
-		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
 
 	num = 0;
-	ret = KMF_FindCert(handle, &fc_target, NULL, &num);
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+	    KMF_COUNT_ATTR, &num, sizeof (uint32_t));
+	fc_numattr++;
+
+	ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
+
 	if (ret == KMF_OK && num > 0) {
 		certlist = (KMF_X509_DER_CERT *)malloc(num *
 		    sizeof (KMF_X509_DER_CERT));
@@ -1657,10 +2030,12 @@ kmf_find_issuer_cert(KMF_HANDLE_T handle,
 			goto out;
 		}
 
-		(void) memset(certlist, 0, num *
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_X509_DER_CERT_ATTR, certlist,
 		    sizeof (KMF_X509_DER_CERT));
+		fc_numattr++;
 
-		ret = KMF_FindCert(handle, &fc_target, certlist, &num);
+		ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 		if (ret != KMF_OK) {
 			free(certlist);
 			certlist = NULL;
@@ -1681,7 +2056,7 @@ kmf_find_issuer_cert(KMF_HANDLE_T handle,
 		 */
 		latest = 0;
 		for (i = 0; i < num; i++) {
-			ret = KMF_GetCertValidity(&certlist[i].certificate,
+			ret = kmf_get_cert_validity(&certlist[i].certificate,
 			    &t_notbefore, &t_notafter);
 			if (ret != KMF_OK) {
 				ret = KMF_ERR_VALIDITY_PERIOD;
@@ -1711,7 +2086,7 @@ kmf_find_issuer_cert(KMF_HANDLE_T handle,
 out:
 	if (certlist != NULL) {
 		for (i = 0; i < num; i++)
-			KMF_FreeKMFCert(handle, &certlist[i]);
+			kmf_free_kmf_cert(handle, &certlist[i]);
 		free(certlist);
 	}
 
@@ -1720,16 +2095,12 @@ out:
 }
 
 static KMF_RETURN
-kmf_find_ta_cert(KMF_HANDLE_T handle,
-	KMF_VALIDATECERT_PARAMS *params,
-	KMF_DATA *ta_cert,
-	KMF_X509_NAME *user_issuerDN)
+find_ta_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
+	KMF_DATA *ta_cert, KMF_X509_NAME *user_issuerDN,
+	char *slotlabel, char *dirpath)
 {
-
 	KMF_POLICY_RECORD *policy;
 	KMF_RETURN ret = KMF_OK;
-	KMF_FINDCERT_PARAMS fc_target;
-	KMF_OPENSSL_PARAMS ssl_params;
 	uint32_t num = 0;
 	char *ta_name;
 	KMF_BIGINT serial = { NULL, 0 };
@@ -1738,57 +2109,66 @@ kmf_find_ta_cert(KMF_HANDLE_T handle,
 	KMF_X509_DER_CERT ta_retrCert;
 	char *ta_subject = NULL;
 	KMF_X509_NAME ta_subjectDN;
+	KMF_ATTRIBUTE fc_attrlist[16];
+	int fc_numattr = 0;
+	char *dir = "./";
 
-	if (handle == NULL || params == NULL ||
-		ta_cert == NULL || user_issuerDN == NULL)
+	if (handle == NULL || kstype == NULL || ta_cert == NULL ||
+	    user_issuerDN == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	if (!VALID_KEYSTORE_TYPE(*kstype))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Get the TA name and serial number from the policy */
 	policy = handle->policy;
 	ta_name = policy->ta_name;
-
-	ret = KMF_HexString2Bytes((uchar_t *)policy->ta_serial,
+	ret = kmf_hexstr_to_bytes((uchar_t *)policy->ta_serial,
 	    &bytes, &bytelen);
 	if (ret != KMF_OK || bytes == NULL) {
 		ret = KMF_ERR_TA_POLICY;
 		goto out;
 	}
-
-	(void) memset(&fc_target, 0, sizeof (fc_target));
-	(void) memset(&ssl_params, 0, sizeof (ssl_params));
-
 	serial.val = bytes;
 	serial.len = bytelen;
-	fc_target.serial = &serial;
-	fc_target.subject = ta_name;
 
-	switch (params->kstype) {
-	case KMF_KEYSTORE_NSS:
-		fc_target.kstype = KMF_KEYSTORE_NSS;
-		fc_target.nssparms.slotlabel = params->nssparms.slotlabel;
-		break;
+	/* set up fc_attrlist for kmf_find_cert */
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    kstype, sizeof (KMF_KEYSTORE_TYPE));
+	fc_numattr++;
 
-	case KMF_KEYSTORE_OPENSSL:
-		fc_target.kstype = KMF_KEYSTORE_OPENSSL;
-		/* setup dirpath to search for TA in a directory */
-		if (params->sslparms.dirpath == NULL) {
-			ssl_params.dirpath = "./";
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_SUBJECT_NAME_ATTR,
+	    ta_name, strlen(ta_name));
+	fc_numattr++;
+
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_BIGINT_ATTR,
+	    &serial, sizeof (KMF_BIGINT));
+	fc_numattr++;
+
+	if (*kstype == KMF_KEYSTORE_NSS && slotlabel != NULL) {
+		kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+		    KMF_TOKEN_LABEL_ATTR, slotlabel, strlen(slotlabel));
+		fc_numattr++;
+	}
+
+	if (*kstype == KMF_KEYSTORE_OPENSSL) {
+		if (dirpath == NULL) {
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			    KMF_DIRPATH_ATTR, dir, strlen(dir));
+			fc_numattr++;
 		} else {
-			ssl_params.dirpath = params->sslparms.dirpath;
+			kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+			    KMF_DIRPATH_ATTR, dirpath, strlen(dirpath));
+			fc_numattr++;
 		}
-		ssl_params.certfile = NULL;
-		fc_target.sslparms = ssl_params;
-		break;
-
-	case KMF_KEYSTORE_PK11TOKEN:
-		fc_target.kstype = KMF_KEYSTORE_PK11TOKEN;
-		break;
-	default:
-		ret = KMF_ERR_PLUGIN_NOTFOUND;
-		goto out;
 	}
 
 	num = 0;
-	ret = KMF_FindCert(handle, &fc_target, NULL, &num);
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+	    KMF_COUNT_ATTR, &num, sizeof (uint32_t));
+	fc_numattr++;
+
+	ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 	if (ret != KMF_OK || num != 1)  {
 		if (num == 0)
 			ret = KMF_ERR_CERT_NOT_FOUND;
@@ -1797,9 +2177,11 @@ kmf_find_ta_cert(KMF_HANDLE_T handle,
 		goto out;
 	}
 
-	(void) memset(&ta_retrCert, 0, sizeof (KMF_X509_DER_CERT));
+	kmf_set_attr_at_index(fc_attrlist, fc_numattr,
+	    KMF_X509_DER_CERT_ATTR, &ta_retrCert, sizeof (KMF_X509_DER_CERT));
+	fc_numattr++;
 
-	ret = KMF_FindCert(handle, &fc_target, &ta_retrCert, &num);
+	ret = kmf_find_cert(handle, fc_numattr, fc_attrlist);
 	if (ret == KMF_OK)  {
 		ta_cert->Length = ta_retrCert.certificate.Length;
 		ta_cert->Data = malloc(ta_retrCert.certificate.Length);
@@ -1819,25 +2201,25 @@ kmf_find_ta_cert(KMF_HANDLE_T handle,
 	 */
 	(void) memset(&ta_subjectDN, 0, sizeof (ta_subjectDN));
 
-	ret = KMF_GetCertSubjectNameString(handle, ta_cert, &ta_subject);
+	ret = kmf_get_cert_subject_str(handle, ta_cert, &ta_subject);
 	if (ret != KMF_OK)
 		goto out;
 
-	ret = KMF_DNParser(ta_subject,  &ta_subjectDN);
+	ret = kmf_dn_parser(ta_subject,  &ta_subjectDN);
 	if (ret != KMF_OK)
 		goto out;
 
-	if (KMF_CompareRDNs(user_issuerDN, &ta_subjectDN) != 0)
+	if (kmf_compare_rdns(user_issuerDN, &ta_subjectDN) != 0)
 		ret = KMF_ERR_CERT_NOT_FOUND;
 
-	KMF_FreeDN(&ta_subjectDN);
+	kmf_free_dn(&ta_subjectDN);
 
 	/* Make sure the TA cert has the correct extensions */
 	if (ret == KMF_OK)
 		ret = check_key_usage(handle, ta_cert, KMF_KU_SIGN_CERT);
 out:
 	if (ta_retrCert.certificate.Data)
-		KMF_FreeKMFCert(handle, &ta_retrCert);
+		kmf_free_kmf_cert(handle, &ta_retrCert);
 
 	if ((ret != KMF_OK) && (ta_cert->Data != NULL))
 		free(ta_cert->Data);
@@ -1852,12 +2234,15 @@ out:
 }
 
 KMF_RETURN
-KMF_ValidateCert(KMF_HANDLE_T handle,
-	KMF_VALIDATECERT_PARAMS *params,
-	int  *result)
+kmf_validate_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret = KMF_OK;
+	KMF_KEYSTORE_TYPE *kstype = NULL;
 	KMF_DATA *pcert = NULL;
+	int *result = NULL;
+	char *slotlabel = NULL;
+	char *dirpath = NULL;
+	KMF_DATA *ocsp_response = NULL;
 	KMF_DATA ta_cert = {0, NULL};
 	KMF_DATA issuer_cert = {0, NULL};
 	char *user_issuer = NULL, *user_subject = NULL;
@@ -1865,27 +2250,51 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	boolean_t	self_signed = B_FALSE;
 	KMF_POLICY_RECORD *policy;
 
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_CERT_DATA_ATTR, FALSE, sizeof (KMF_DATA), sizeof (KMF_DATA)},
+	    {KMF_VALIDATE_RESULT_ATTR, FALSE, 1, sizeof (int)}
+	};
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	CLEAR_ERROR(handle, ret);
+
+	ret = test_attributes(num_req_attrs, required_attrs,
+	    0, NULL, numattr, attrlist);
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (params == NULL || params->certificate == NULL || result == NULL)
+	policy = handle->policy;
+
+	/* Get the attribute values */
+	kstype = kmf_get_attr_ptr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr);
+	pcert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
+	result = kmf_get_attr_ptr(KMF_VALIDATE_RESULT_ATTR, attrlist, numattr);
+	if (kstype == NULL || pcert == NULL || result == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	policy = handle->policy;
+	slotlabel = kmf_get_attr_ptr(KMF_TOKEN_LABEL_ATTR, attrlist, numattr);
+	dirpath = kmf_get_attr_ptr(KMF_DIRPATH_ATTR, attrlist, numattr);
+	ocsp_response = kmf_get_attr_ptr(KMF_OCSP_RESPONSE_DATA_ATTR, attrlist,
+	    numattr);
+
+	/* Initialize the returned result */
 	*result = KMF_CERT_VALIDATE_OK;
-	pcert = params->certificate;
 
 	/*
 	 * Get the issuer information from the input certficate first.
 	 */
-	if ((ret = KMF_GetCertIssuerNameString(handle, pcert,
+	if ((ret = kmf_get_cert_issuer_str(handle, pcert,
 	    &user_issuer)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		goto out;
 	}
 
-	if ((ret = KMF_DNParser(user_issuer,  &user_issuerDN)) != KMF_OK) {
+	if ((ret = kmf_dn_parser(user_issuer,  &user_issuerDN)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		goto out;
 	}
@@ -1893,27 +2302,27 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	/*
 	 * Check if the certificate is a self-signed cert.
 	 */
-	if ((ret = KMF_GetCertSubjectNameString(handle, pcert,
+	if ((ret = kmf_get_cert_subject_str(handle, pcert,
 	    &user_subject)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		KMF_FreeDN(&user_issuerDN);
+		kmf_free_dn(&user_issuerDN);
 		goto out;
 	}
 
-	if ((ret = KMF_DNParser(user_subject,  &user_subjectDN)) != KMF_OK) {
+	if ((ret = kmf_dn_parser(user_subject,  &user_subjectDN)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
-		KMF_FreeDN(&user_issuerDN);
+		kmf_free_dn(&user_issuerDN);
 		goto out;
 	}
 
-	if ((KMF_CompareRDNs(&user_issuerDN, &user_subjectDN)) == 0) {
+	if ((kmf_compare_rdns(&user_issuerDN, &user_subjectDN)) == 0) {
 		/*
 		 * this is a self-signed cert
 		 */
 		self_signed = B_TRUE;
 	}
 
-	KMF_FreeDN(&user_subjectDN);
+	kmf_free_dn(&user_subjectDN);
 
 	/*
 	 * Check KeyUsage extension of the subscriber's certificate
@@ -1943,7 +2352,7 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 		/*
 		 * Validate expiration date
 		 */
-		ret = KMF_CheckCertDate(handle, pcert);
+		ret = kmf_check_cert_date(handle, pcert);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_TIME;
 			goto out;
@@ -1969,16 +2378,20 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	 * TA certificate.
 	 */
 	if (self_signed) {
-		ret = KMF_VerifyCertWithCert(handle, pcert, pcert);
+		ret = verify_cert_with_cert(handle, pcert, pcert);
 	} else {
-		ret = kmf_find_ta_cert(handle, params, &ta_cert,
-			&user_issuerDN);
+		ret = find_ta_cert(handle, kstype, &ta_cert,
+		    &user_issuerDN, slotlabel, dirpath);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_TA;
 			goto out;
 		}
 
-		ret = KMF_VerifyCertWithCert(handle, pcert, &ta_cert);
+		ret = check_key_usage(handle, &ta_cert, KMF_KU_SIGN_CERT);
+		if (ret != KMF_OK)
+			goto out;
+
+		ret = verify_cert_with_cert(handle, pcert, &ta_cert);
 	}
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
@@ -2006,16 +2419,15 @@ check_revocation:
 		goto out;
 	}
 
-	ret = kmf_find_issuer_cert(handle, params, user_issuer,
-	    &issuer_cert);
+	ret = find_issuer_cert(handle, kstype, user_issuer, &issuer_cert,
+	    slotlabel, dirpath);
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_ISSUER;
 		goto out;
 	}
 
 	if (policy->revocation & KMF_REVOCATION_METHOD_CRL) {
-		ret = cert_crl_check(handle, params,
-		    pcert, &issuer_cert);
+		ret = cert_crl_check(handle, kstype, pcert, &issuer_cert);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_CRL;
 			goto out;
@@ -2023,16 +2435,17 @@ check_revocation:
 	}
 
 	if (policy->revocation & KMF_REVOCATION_METHOD_OCSP) {
-		ret = cert_ocsp_check(handle, params,
-			pcert, &issuer_cert, params->ocsp_response);
+		ret = cert_ocsp_check(handle, kstype, pcert, &issuer_cert,
+		    ocsp_response, slotlabel, dirpath);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_OCSP;
 			goto out;
 		}
 	}
+
 out:
 	if (user_issuer) {
-		KMF_FreeDN(&user_issuerDN);
+		kmf_free_dn(&user_issuerDN);
 		free(user_issuer);
 	}
 
@@ -2050,7 +2463,7 @@ out:
 }
 
 KMF_RETURN
-KMF_CreateCertFile(KMF_DATA *certdata, KMF_ENCODE_FORMAT format,
+kmf_create_cert_file(const KMF_DATA *certdata, KMF_ENCODE_FORMAT format,
 	char *certfile)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -2065,27 +2478,27 @@ KMF_CreateCertFile(KMF_DATA *certdata, KMF_ENCODE_FORMAT format,
 
 	if (format == KMF_FORMAT_PEM) {
 		int len;
-		rv = KMF_Der2Pem(KMF_CERT,
-			certdata->Data, certdata->Length,
-			&pemdata.Data, &len);
+		rv = kmf_der_to_pem(KMF_CERT,
+		    certdata->Data, certdata->Length,
+		    &pemdata.Data, &len);
 		if (rv != KMF_OK)
 			goto cleanup;
 		pemdata.Length = (size_t)len;
 	}
 
-	if ((fd = open(certfile, O_CREAT |O_RDWR, 0644)) == -1) {
+	if ((fd = open(certfile, O_CREAT | O_RDWR | O_TRUNC, 0644)) == -1) {
 		rv = KMF_ERR_OPEN_FILE;
 		goto cleanup;
 	}
 
 	if (format == KMF_FORMAT_PEM) {
 		if (write(fd, pemdata.Data, pemdata.Length) !=
-			pemdata.Length) {
+		    pemdata.Length) {
 			rv = KMF_ERR_WRITE_FILE;
 		}
 	} else {
 		if (write(fd, certdata->Data, certdata->Length) !=
-			certdata->Length) {
+		    certdata->Length) {
 			rv = KMF_ERR_WRITE_FILE;
 		}
 	}
@@ -2094,13 +2507,14 @@ cleanup:
 	if (fd != -1)
 		(void) close(fd);
 
-	KMF_FreeData(&pemdata);
+	kmf_free_data(&pemdata);
 
 	return (rv);
 }
 
 KMF_RETURN
-KMF_IsCertFile(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
+kmf_is_cert_file(KMF_HANDLE_T handle, char *filename,
+	KMF_ENCODE_FORMAT *pformat)
 {
 	KMF_PLUGIN *plugin;
 	KMF_RETURN (*IsCertFileFn)(void *, char *, KMF_ENCODE_FORMAT *);
@@ -2137,7 +2551,7 @@ KMF_IsCertFile(KMF_HANDLE_T handle, char *filename, KMF_ENCODE_FORMAT *pformat)
  * This function checks the validity period of a der-encoded certificate.
  */
 KMF_RETURN
-KMF_CheckCertDate(KMF_HANDLE_T handle, KMF_DATA *cert)
+kmf_check_cert_date(KMF_HANDLE_T handle, const KMF_DATA *cert)
 {
 	KMF_RETURN rv;
 	struct tm *gmt;
@@ -2151,12 +2565,11 @@ KMF_CheckCertDate(KMF_HANDLE_T handle, KMF_DATA *cert)
 	if (rv != KMF_OK)
 		return (rv);
 
-	if (cert == NULL || cert->Data == NULL ||
-		cert->Length == 0)
+	if (cert == NULL || cert->Data == NULL || cert->Length == 0)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	policy = handle->policy;
-	rv = KMF_GetCertValidity(cert, &t_notbefore, &t_notafter);
+	rv = kmf_get_cert_validity(cert, &t_notbefore, &t_notafter);
 	if (rv != KMF_OK)
 		return (rv);
 
@@ -2191,187 +2604,96 @@ KMF_CheckCertDate(KMF_HANDLE_T handle, KMF_DATA *cert)
 }
 
 KMF_RETURN
-KMF_ExportPK12(KMF_HANDLE_T handle,
-	KMF_EXPORTP12_PARAMS *params,
-	char *filename)
+kmf_export_pk12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
-	KMF_RETURN rv;
 	KMF_PLUGIN *plugin;
+	KMF_RETURN ret = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype;
-	KMF_X509_DER_CERT *certlist = NULL;
-	KMF_KEY_HANDLE *keys = NULL;
-	uint32_t numkeys;
-	uint32_t numcerts;
-	int i;
 
-	CLEAR_ERROR(handle, rv);
-	if (rv != KMF_OK)
-		return (rv);
+	KMF_ATTRIBUTE_TESTER required_attrs[] = {
+	    {KMF_KEYSTORE_TYPE_ATTR, FALSE, 1, sizeof (KMF_KEYSTORE_TYPE)},
+	    {KMF_OUTPUT_FILENAME_ATTR, TRUE, 1, 0},
+	};
 
-	if (params == NULL || filename == NULL)
+	int num_req_attrs = sizeof (required_attrs) /
+	    sizeof (KMF_ATTRIBUTE_TESTER);
+
+	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
-	kstype = params->kstype;
-	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
-		KMF_FINDCERT_PARAMS fcargs;
 
-		(void) memset(&fcargs, 0, sizeof (fcargs));
+	CLEAR_ERROR(handle, ret);
 
-		fcargs.kstype = kstype;
-		fcargs.certLabel = params->certLabel;
-		fcargs.issuer = params->issuer;
-		fcargs.subject = params->subject;
-		fcargs.serial = params->serial;
-		fcargs.idstr = params->idstr;
+	ret = test_attributes(num_req_attrs, required_attrs, 0, NULL,
+	    numattr, attrlist);
+	if (ret != KMF_OK)
+		return (ret);
 
-		/*
-		 * Special processing because PKCS11 doesn't have
-		 * a native PKCS12 operation.
-		 */
-		rv = KMF_FindCert(handle, &fcargs,  NULL, &numcerts);
-		if (rv == KMF_OK && numcerts > 0) {
-			certlist = (KMF_X509_DER_CERT *)malloc(numcerts *
-				sizeof (KMF_X509_DER_CERT));
-			if (certlist == NULL)
-				return (KMF_ERR_MEMORY);
-			(void) memset(certlist, 0, numcerts *
-				sizeof (KMF_X509_DER_CERT));
-			rv = KMF_FindCert(handle, &fcargs,
-				certlist, &numcerts);
-			if (rv != KMF_OK) {
-				free(certlist);
-				return (rv);
-			}
-		} else {
-			return (rv);
-		}
+	ret = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (ret != KMF_OK)
+		return (ret);
 
-		numkeys = 0;
-		for (i = 0; i < numcerts; i++) {
-			KMF_CRYPTOWITHCERT_PARAMS fkparms;
-			KMF_KEY_HANDLE newkey;
-
-			fkparms.kstype = kstype;
-			fkparms.format = KMF_FORMAT_RAWKEY;
-			fkparms.cred = params->cred;
-			fkparms.certLabel = certlist[i].kmf_private.label;
-
-			rv = find_private_key_by_cert(handle, &fkparms,
-				&certlist[i].certificate, &newkey);
-			if (rv == KMF_OK) {
-				numkeys++;
-				keys = realloc(keys,
-					numkeys * sizeof (KMF_KEY_HANDLE));
-				if (keys == NULL) {
-					free(certlist);
-					rv = KMF_ERR_MEMORY;
-					goto out;
-				}
-				keys[numkeys - 1] = newkey;
-			} else if (rv == KMF_ERR_KEY_NOT_FOUND) {
-				/* it is OK if a key is not found */
-				rv = KMF_OK;
-			}
-		}
-		if (rv == KMF_OK) {
-			/*
-			 * Switch the keystore type to use OpenSSL for
-			 * exporting the raw cert and key data as PKCS12.
-			 */
-			kstype = KMF_KEYSTORE_OPENSSL;
-		} else {
-			rv = KMF_ERR_KEY_NOT_FOUND;
-			goto out;
-		}
-	}
 	plugin = FindPlugin(handle, kstype);
-	if (plugin != NULL && plugin->funclist->ExportP12 != NULL) {
-		rv = plugin->funclist->ExportP12(handle,
-			params, numcerts, certlist,
-			numkeys, keys, filename);
-	} else {
-		rv = KMF_ERR_PLUGIN_NOTFOUND;
-	}
+	if (plugin == NULL || plugin->funclist->ExportPK12 == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
 
-out:
-	if (certlist != NULL) {
-		for (i = 0; i < numcerts; i++)
-			KMF_FreeKMFCert(handle, &certlist[i]);
-		free(certlist);
-	}
-	if (keys != NULL) {
-		for (i = 0; i < numkeys; i++)
-			KMF_FreeKMFKey(handle, &keys[i]);
-		free(keys);
-	}
-
-	return (rv);
+	return (plugin->funclist->ExportPK12(handle, numattr, attrlist));
 }
 
+
 KMF_RETURN
-KMF_ImportPK12(KMF_HANDLE_T handle, char *filename,
-	KMF_CREDENTIAL *cred,
-	KMF_DATA **certs, int *ncerts,
-	KMF_RAW_KEY_DATA **rawkeys, int *nkeys)
+kmf_build_pk12(KMF_HANDLE_T handle, int numcerts,
+    KMF_X509_DER_CERT *certlist, int numkeys, KMF_KEY_HANDLE *keylist,
+    KMF_CREDENTIAL *p12cred, char *filename)
 {
 	KMF_RETURN rv;
 	KMF_PLUGIN *plugin;
-	KMF_RETURN (*openpkcs12)(KMF_HANDLE *,
-		char *, KMF_CREDENTIAL *,
-		KMF_DATA **, int *,
-		KMF_RAW_KEY_DATA **, int *);
+	KMF_RETURN (*buildpk12)(KMF_HANDLE *, int, KMF_X509_DER_CERT *,
+	    int, KMF_KEY_HANDLE *, KMF_CREDENTIAL *, char *);
 
 	CLEAR_ERROR(handle, rv);
 	if (rv != KMF_OK)
 		return (rv);
 
-	if (filename == NULL ||
-		cred == NULL ||
-		certs == NULL || ncerts == NULL ||
-		rawkeys == NULL || nkeys == NULL)
+	if (filename == NULL ||	p12cred == NULL ||
+	    (certlist == NULL && keylist == NULL))
 		return (KMF_ERR_BAD_PARAMETER);
 
-	/*
-	 * Use the pkcs12 reader from the OpenSSL plugin.
-	 */
 	plugin = FindPlugin(handle, KMF_KEYSTORE_OPENSSL);
 	if (plugin == NULL || plugin->dldesc == NULL) {
 		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
 
-	openpkcs12 = (KMF_RETURN(*)())dlsym(plugin->dldesc,
-	    "openssl_read_pkcs12");
-	if (openpkcs12 == NULL) {
+	buildpk12 = (KMF_RETURN(*)())dlsym(plugin->dldesc,
+	    "openssl_build_pk12");
+	if (buildpk12 == NULL) {
 		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
 
-	/* Use OpenSSL interfaces to get raw key and cert data */
-	rv = openpkcs12(handle, filename, cred, certs, ncerts,
-		rawkeys, nkeys);
+	rv = buildpk12(handle, numcerts, certlist, numkeys, keylist, p12cred,
+	    filename);
 
 	return (rv);
 }
 
+
 KMF_RETURN
-KMF_ImportKeypair(KMF_HANDLE_T handle, char *filename,
+kmf_import_objects(KMF_HANDLE_T handle, char *filename,
 	KMF_CREDENTIAL *cred,
 	KMF_DATA **certs, int *ncerts,
 	KMF_RAW_KEY_DATA **rawkeys, int *nkeys)
 {
 	KMF_RETURN rv;
 	KMF_PLUGIN *plugin;
-	KMF_RETURN (*import_keypair)(KMF_HANDLE *,
-		char *, KMF_CREDENTIAL *,
-		KMF_DATA **, int *,
-		KMF_RAW_KEY_DATA **, int *);
+	KMF_RETURN (*import_objects)(KMF_HANDLE *, char *, KMF_CREDENTIAL *,
+	    KMF_DATA **, int *, KMF_RAW_KEY_DATA **, int *);
 
 	CLEAR_ERROR(handle, rv);
 	if (rv != KMF_OK)
 		return (rv);
 
-	if (filename == NULL ||
-		cred == NULL ||
-		certs == NULL || ncerts == NULL ||
-		rawkeys == NULL || nkeys == NULL)
+	if (filename == NULL ||	cred == NULL ||	certs == NULL ||
+	    ncerts == NULL ||rawkeys == NULL || nkeys == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/*
@@ -2382,15 +2704,15 @@ KMF_ImportKeypair(KMF_HANDLE_T handle, char *filename,
 		return (KMF_ERR_PLUGIN_NOTFOUND);
 	}
 
-	import_keypair = (KMF_RETURN(*)())dlsym(plugin->dldesc,
-	    "openssl_import_keypair");
-	if (import_keypair == NULL) {
+	import_objects = (KMF_RETURN(*)())dlsym(plugin->dldesc,
+	    "openssl_import_objects");
+	if (import_objects == NULL) {
 		return (KMF_ERR_FUNCTION_NOT_FOUND);
 	}
 
 	/* Use OpenSSL interfaces to get raw key and cert data */
-	rv = import_keypair(handle, filename, cred, certs, ncerts,
-		rawkeys, nkeys);
+	rv = import_objects(handle, filename, cred, certs, ncerts,
+	    rawkeys, nkeys);
 
 	return (rv);
 }
@@ -2402,7 +2724,7 @@ IsEqualOid(KMF_OID *Oid1, KMF_OID *Oid2)
 	    !memcmp(Oid1->Data, Oid2->Data, Oid1->Length));
 }
 
-static KMF_RETURN
+KMF_RETURN
 copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 	KMF_X509_ALGORITHM_IDENTIFIER *srcid)
 {
@@ -2416,7 +2738,7 @@ copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 		return (KMF_ERR_MEMORY);
 
 	(void) memcpy(destid->algorithm.Data, srcid->algorithm.Data,
-			destid->algorithm.Length);
+	    destid->algorithm.Length);
 
 	destid->parameters.Length = srcid->parameters.Length;
 	if (destid->parameters.Length > 0) {
@@ -2425,7 +2747,7 @@ copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 			return (KMF_ERR_MEMORY);
 
 		(void) memcpy(destid->parameters.Data, srcid->parameters.Data,
-			destid->parameters.Length);
+		    destid->parameters.Length);
 	} else {
 		destid->parameters.Data = NULL;
 	}
@@ -2433,7 +2755,7 @@ copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 }
 
 static KMF_RETURN
-SignCert(KMF_HANDLE_T handle,
+sign_cert(KMF_HANDLE_T handle,
 	const KMF_DATA *SubjectCert,
 	KMF_KEY_HANDLE	*Signkey,
 	KMF_DATA	*SignedCert)
@@ -2443,6 +2765,9 @@ SignCert(KMF_HANDLE_T handle,
 	KMF_DATA		signed_data = {0, NULL};
 	KMF_RETURN		ret = KMF_OK;
 	KMF_ALGORITHM_INDEX	algid;
+	int i = 0;
+	KMF_ATTRIBUTE attrlist[8];
+	KMF_OID *oid;
 
 	if (!SignedCert)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2451,7 +2776,7 @@ SignCert(KMF_HANDLE_T handle,
 	SignedCert->Data = NULL;
 
 	if (!SubjectCert)
-	    return (KMF_ERR_BAD_PARAMETER);
+		return (KMF_ERR_BAD_PARAMETER);
 
 	if (!SubjectCert->Data || !SubjectCert->Length)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2462,7 +2787,7 @@ SignCert(KMF_HANDLE_T handle,
 	 * there is no need to re-encode it.
 	 */
 	ret = ExtractX509CertParts((KMF_DATA *)SubjectCert,
-		&data_to_sign, NULL);
+	    &data_to_sign, NULL);
 	if (ret != KMF_OK) {
 		goto cleanup;
 	}
@@ -2486,23 +2811,38 @@ SignCert(KMF_HANDLE_T handle,
 
 	/* We are re-signing this cert, so clear out old signature data */
 	if (subj_cert->signature.algorithmIdentifier.algorithm.Length == 0) {
-		KMF_FreeAlgOID(&subj_cert->signature.algorithmIdentifier);
+		kmf_free_algoid(&subj_cert->signature.algorithmIdentifier);
 		ret = copy_algoid(&subj_cert->signature.algorithmIdentifier,
-			&subj_cert->certificate.signature);
+		    &subj_cert->certificate.signature);
 	}
 
 	if (ret)
 		goto cleanup;
 
+	kmf_set_attr_at_index(attrlist, i, KMF_KEYSTORE_TYPE_ATTR,
+	    &Signkey->kstype, sizeof (KMF_KEYSTORE_TYPE));
+	i++;
+	kmf_set_attr_at_index(attrlist, i, KMF_KEY_HANDLE_ATTR,
+	    Signkey, sizeof (KMF_KEY_HANDLE));
+	i++;
+	kmf_set_attr_at_index(attrlist, i, KMF_DATA_ATTR,
+	    &data_to_sign, sizeof (KMF_DATA));
+	i++;
+	kmf_set_attr_at_index(attrlist, i, KMF_OUT_DATA_ATTR,
+	    &signed_data, sizeof (KMF_DATA));
+	i++;
+	oid = CERT_ALG_OID(subj_cert);
+	kmf_set_attr_at_index(attrlist, i, KMF_OID_ATTR,
+	    oid, sizeof (KMF_OID));
+	i++;
+
 	/* Sign the data */
-	ret = KMF_SignDataWithKey(handle, Signkey,
-		CERT_ALG_OID(subj_cert),
-		&data_to_sign, &signed_data);
+	ret = kmf_sign_data(handle, i, attrlist);
 
 	if (ret != KMF_OK)
 		goto cleanup;
 
-	algid = X509_AlgorithmOidToAlgId(CERT_SIG_OID(subj_cert));
+	algid = x509_algoid_to_algid(CERT_SIG_OID(subj_cert));
 
 	/*
 	 * For DSA, KMF_SignDataWithKey() returns a 40-bytes decoded
@@ -2513,7 +2853,7 @@ SignCert(KMF_HANDLE_T handle,
 		KMF_DATA signature;
 
 		ret = DerEncodeDSASignature(&signed_data, &signature);
-		KMF_FreeData(&signed_data);
+		kmf_free_data(&signed_data);
 
 		if (ret != KMF_OK)
 			goto cleanup;
@@ -2529,12 +2869,12 @@ SignCert(KMF_HANDLE_T handle,
 cleanup:
 	/* Cleanup & return */
 	if (ret != KMF_OK)
-		KMF_FreeData(SignedCert);
+		kmf_free_data(SignedCert);
 
-	KMF_FreeData(&data_to_sign);
+	kmf_free_data(&data_to_sign);
 
 	if (subj_cert != NULL) {
-		KMF_FreeSignedCert(subj_cert);
+		kmf_free_signed_cert(subj_cert);
 		free(subj_cert);
 	}
 
@@ -2542,7 +2882,7 @@ cleanup:
 }
 
 static KMF_RETURN
-VerifyCertWithKey(KMF_HANDLE_T handle,
+verify_cert_with_key(KMF_HANDLE_T handle,
 	KMF_DATA *derkey,
 	const KMF_DATA *CertToBeVerified)
 {
@@ -2556,13 +2896,13 @@ VerifyCertWithKey(KMF_HANDLE_T handle,
 
 	/* check the caller and do other setup for this SPI call */
 	if (handle == NULL || CertToBeVerified == NULL ||
-		derkey == NULL || derkey->Data == NULL)
+	    derkey == NULL || derkey->Data == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	(void) memset(&spki, 0, sizeof (KMF_X509_SPKI));
 
 	ret = ExtractX509CertParts((KMF_DATA *)CertToBeVerified,
-		&data_to_verify, &signed_data);
+	    &data_to_verify, &signed_data);
 
 	if (ret != KMF_OK)
 		goto cleanup;
@@ -2576,7 +2916,7 @@ VerifyCertWithKey(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
-	algid = X509_AlgorithmOidToAlgId(CERT_SIG_OID(signed_cert));
+	algid = x509_algoid_to_algid(CERT_SIG_OID(signed_cert));
 
 	if (algid == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_ALGORITHM);
@@ -2591,7 +2931,7 @@ VerifyCertWithKey(KMF_HANDLE_T handle,
 	}
 
 	ret = PKCS_VerifyData(handle, algid, &spki,
-		&data_to_verify, &signature);
+	    &data_to_verify, &signature);
 
 cleanup:
 	if (data_to_verify.Data != NULL)
@@ -2601,50 +2941,27 @@ cleanup:
 		free(signed_data.Data);
 
 	if (signed_cert) {
-		KMF_FreeSignedCert(signed_cert);
+		kmf_free_signed_cert(signed_cert);
 		free(signed_cert);
 	}
 	if (algid == KMF_ALGID_SHA1WithDSA) {
 		free(signature.Data);
 	}
 
-	KMF_FreeAlgOID(&spki.algorithm);
-	KMF_FreeData(&spki.subjectPublicKey);
+	kmf_free_algoid(&spki.algorithm);
+	kmf_free_data(&spki.subjectPublicKey);
 
 	return (ret);
 }
 
 /*
- * The key must be an ASN.1/DER encoded PKCS#1 key.
+ * Use a signer cert to verify another certificate's signature.
+ * This code forces the use of the OPENSSL mechanism
+ * for the verify operation to avoid a circular dependency
+ * with libelfsign when it attempts to verify the PKCS#11 libraries.
  */
-KMF_RETURN
-VerifyDataWithKey(KMF_HANDLE_T handle,
-	KMF_DATA *derkey,
-	KMF_ALGORITHM_INDEX sigAlg,
-	KMF_DATA *indata,
-	KMF_DATA *insig)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_SPKI spki;
-
-	if (!indata || !insig || !derkey || !derkey->Data)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	ret = DerDecodeSPKI(derkey, &spki);
-	if (ret != KMF_OK)
-		goto cleanup;
-
-	ret = PKCS_VerifyData(handle, sigAlg, &spki, indata, insig);
-
-cleanup:
-	KMF_FreeAlgOID(&spki.algorithm);
-	KMF_FreeData(&spki.subjectPublicKey);
-
-	return (ret);
-}
-
 static KMF_RETURN
-VerifyCertWithCert(KMF_HANDLE_T handle,
+verify_cert_with_cert(KMF_HANDLE_T handle,
 	const KMF_DATA *CertToBeVerifiedData,
 	const KMF_DATA *SignerCertData)
 {
@@ -2666,9 +2983,14 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 	    !SignerCertData->Length)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	/* Make sure the signer has proper key usage bits */
+	ret = check_key_usage(handle, SignerCertData, KMF_KU_SIGN_CERT);
+	if (ret != KMF_OK)
+		return (ret);
+
 	/* Decode the cert into parts for verification */
 	ret = ExtractX509CertParts((KMF_DATA *)CertToBeVerifiedData,
-		&data_to_verify, &signed_data);
+	    &data_to_verify, &signed_data);
 	if (ret != KMF_OK)
 		goto cleanup;
 
@@ -2679,7 +3001,7 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		goto cleanup;
 
-	algid = X509_AlgorithmOidToAlgId(CERT_SIG_OID(ToBeVerifiedCert));
+	algid = x509_algoid_to_algid(CERT_SIG_OID(ToBeVerifiedCert));
 
 	if (algid == KMF_ALGID_SHA1WithDSA) {
 		ret = DerDecodeDSASignature(&signed_data, &signature);
@@ -2690,32 +3012,25 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 		signature.Length = signed_data.Length;
 	}
 
-	/* Make sure the signer has proper key usage bits */
-	ret = check_key_usage(handle, SignerCertData, KMF_KU_SIGN_CERT);
-	if (ret != KMF_OK)
-		return (ret);
-
 	/*
 	 * To avoid recursion with kcfd consumer and libpkcs11,
-	 * do the data verification using the OpenSSL
+	 * do the certificate verification using the OpenSSL
 	 * plugin algorithms instead of the crypto framework.
 	 */
-	ret = plugin_verify_data_with_cert(handle,
-		KMF_KEYSTORE_OPENSSL,
-		algid, &data_to_verify, &signature,
-		SignerCertData);
+	ret = plugin_verify_data_with_cert(handle, KMF_KEYSTORE_OPENSSL,
+	    algid, &data_to_verify, &signature,	SignerCertData);
 
 cleanup:
-	KMF_FreeData(&data_to_verify);
-	KMF_FreeData(&signed_data);
+	kmf_free_data(&data_to_verify);
+	kmf_free_data(&signed_data);
 
 	if (SignerCert) {
-		KMF_FreeSignedCert(SignerCert);
+		kmf_free_signed_cert(SignerCert);
 		free(SignerCert);
 	}
 
 	if (ToBeVerifiedCert) {
-		KMF_FreeSignedCert(ToBeVerifiedCert);
+		kmf_free_signed_cert(ToBeVerifiedCert);
 		free(ToBeVerifiedCert);
 	}
 
@@ -2726,78 +3041,158 @@ cleanup:
 	return (ret);
 }
 
+/*
+ * Phase 1 APIs still needed to maintain compat with elfsign.
+ */
 KMF_RETURN
-SignCsr(KMF_HANDLE_T handle,
-	const KMF_DATA *SubjectCsr,
-	KMF_KEY_HANDLE	*Signkey,
-	KMF_X509_ALGORITHM_IDENTIFIER *algo,
-	KMF_DATA	*SignedCsr)
+KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
+	KMF_KEYSTORE_TYPE kstype,
+	KMF_ALGORITHM_INDEX algid,
+	KMF_DATA *indata,
+	KMF_DATA *insig,
+	const KMF_DATA *SignerCert)
 {
+	KMF_ATTRIBUTE attrlist[8];
+	int numattr = 0;
 
-	KMF_CSR_DATA	subj_csr;
-	KMF_TBS_CSR	*tbs_csr = NULL;
-	KMF_DATA	signed_data = {0, NULL};
-	KMF_RETURN	ret = KMF_OK;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype,  sizeof (kstype));
+	numattr++;
 
-	if (!SignedCsr)
+	kmf_set_attr_at_index(attrlist, numattr, KMF_DATA_ATTR,
+	    indata, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_IN_SIGN_ATTR,
+	    insig, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_SIGNER_CERT_DATA_ATTR,
+	    (KMF_DATA *)SignerCert, sizeof (KMF_DATA));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ALGORITHM_INDEX_ATTR,
+	    &algid, sizeof (algid));
+	numattr++;
+
+	return (kmf_verify_data(handle, numattr, attrlist));
+}
+
+KMF_RETURN
+KMF_VerifyCertWithCert(KMF_HANDLE_T handle,
+	const KMF_DATA *CertToBeVerified,
+	const KMF_DATA *SignerCert)
+{
+	KMF_RETURN ret;
+	if (CertToBeVerified == NULL || SignerCert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	SignedCsr->Length = 0;
-	SignedCsr->Data = NULL;
+	/* check the keyUsage of signer's certificate */
+	ret = check_key_usage(handle, SignerCert, KMF_KU_SIGN_CERT);
+	if (ret != KMF_OK)
+		return (ret);
 
-	if (!SubjectCsr)
-	    return (KMF_ERR_BAD_PARAMETER);
+	return (verify_cert_with_cert(handle, CertToBeVerified,
+	    SignerCert));
+}
 
-	if (!SubjectCsr->Data || !SubjectCsr->Length)
+KMF_RETURN
+KMF_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *target,
+		KMF_X509_DER_CERT *kmf_cert,
+		uint32_t *num_certs)
+{
+	KMF_ATTRIBUTE attrlist[32];
+	int i = 0;
+
+	if (target == NULL || num_certs == NULL)
+		return (KMF_ERR_BAD_PARAMETER); /* ILLEGAL ARGS ERROR */
+
+	if ((target->find_cert_validity < KMF_ALL_CERTS) ||
+	    (target->find_cert_validity > KMF_EXPIRED_CERTS))
 		return (KMF_ERR_BAD_PARAMETER);
 
-	(void) memset(&subj_csr, 0, sizeof (subj_csr));
-	/* Estimate the signed data length generously */
-	signed_data.Length = SubjectCsr->Length*2;
-	signed_data.Data = calloc(1, signed_data.Length);
-	if (!signed_data.Data) {
-		ret = KMF_ERR_MEMORY;
-		goto cleanup;
+	kmf_set_attr_at_index(attrlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &target->kstype, sizeof (target->kstype));
+	i++;
+
+	if (kmf_cert != NULL) {
+		kmf_set_attr_at_index(attrlist, i,
+		    KMF_X509_DER_CERT_ATTR, kmf_cert,
+		    sizeof (KMF_X509_DER_CERT));
+		i++;
 	}
 
-	/* Sign the data */
-	ret = KMF_SignDataWithKey(handle, Signkey, &algo->algorithm,
-			(KMF_DATA *)SubjectCsr, &signed_data);
+	kmf_set_attr_at_index(attrlist, i,
+	    KMF_COUNT_ATTR, num_certs, sizeof (uint32_t));
+	i++;
 
-	if (KMF_OK != ret)
-		goto cleanup;
-
-	/*
-	 * If we got here OK, decode into a structure and then re-encode
-	 * the complete CSR.
-	 */
-	ret = DerDecodeTbsCsr(SubjectCsr, &tbs_csr);
-	if (ret)
-		goto cleanup;
-
-	(void) memcpy(&subj_csr.csr, tbs_csr, sizeof (KMF_TBS_CSR));
-
-	ret = copy_algoid(&subj_csr.signature.algorithmIdentifier, algo);
-	if (ret)
-		goto cleanup;
-
-	subj_csr.signature.encrypted = signed_data;
-
-	/* Now, re-encode the CSR with the new signature */
-	ret = DerEncodeSignedCsr(&subj_csr, SignedCsr);
-	if (ret != KMF_OK) {
-		KMF_FreeData(SignedCsr);
-		goto cleanup;
+	/* Set the optional searching attributes for all 3 plugins. */
+	if (target->issuer != NULL) {
+		kmf_set_attr_at_index(attrlist, i, KMF_ISSUER_NAME_ATTR,
+		    target->issuer, strlen(target->issuer));
+		i++;
+	}
+	if (target->subject != NULL) {
+		kmf_set_attr_at_index(attrlist, i, KMF_SUBJECT_NAME_ATTR,
+		    target->subject, strlen(target->subject));
+		i++;
+	}
+	if (target->serial != NULL) {
+		kmf_set_attr_at_index(attrlist, i, KMF_BIGINT_ATTR,
+		    target->serial, sizeof (KMF_BIGINT));
+		i++;
 	}
 
-	/* Cleanup & return */
-cleanup:
-	free(tbs_csr);
+	kmf_set_attr_at_index(attrlist, i, KMF_CERT_VALIDITY_ATTR,
+	    &target->find_cert_validity, sizeof (KMF_CERT_VALIDITY));
+	i++;
 
-	KMF_FreeTBSCSR(&subj_csr.csr);
+	if (target->kstype == KMF_KEYSTORE_NSS) {
+		if (target->certLabel != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_CERT_LABEL_ATTR,
+			    target->certLabel, strlen(target->certLabel));
+			i++;
+		}
 
-	KMF_FreeAlgOID(&subj_csr.signature.algorithmIdentifier);
-	KMF_FreeData(&signed_data);
+		if (target->nssparms.slotlabel != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_TOKEN_LABEL_ATTR,
+			    target->nssparms.slotlabel,
+			    strlen(target->nssparms.slotlabel));
+			i++;
+		}
 
-	return (ret);
+	} else if (target->kstype == KMF_KEYSTORE_OPENSSL) {
+		if (target->sslparms.certfile != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_CERT_FILENAME_ATTR,
+			    target->sslparms.certfile,
+			    strlen(target->sslparms.certfile));
+			i++;
+		}
+
+		if (target->sslparms.dirpath != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_DIRPATH_ATTR,
+			    target->sslparms.dirpath,
+			    strlen(target->sslparms.dirpath));
+			i++;
+		}
+
+	} else if (target->kstype == KMF_KEYSTORE_PK11TOKEN) {
+		if (target->certLabel != NULL) {
+			kmf_set_attr_at_index(attrlist, i,
+			    KMF_CERT_LABEL_ATTR,
+			    target->certLabel, strlen(target->certLabel));
+			i++;
+		}
+
+		kmf_set_attr_at_index(attrlist, i, KMF_PRIVATE_BOOL_ATTR,
+		    &target->pkcs11parms.private,
+		    sizeof (target->pkcs11parms.private));
+		i++;
+	}
+
+	return (kmf_find_cert(handle, i, attrlist));
 }

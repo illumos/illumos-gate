@@ -98,8 +98,6 @@ struct NameToKind {
 	((c) == '?'))
 
 
-KMF_RETURN ParseDistinguishedName(char *, int, KMF_X509_NAME *);
-
 #ifdef __cplusplus
 }
 #endif

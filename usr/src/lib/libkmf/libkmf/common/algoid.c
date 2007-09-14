@@ -36,7 +36,7 @@ static KMF_OID_ID ALGOID_ID_Table[] = {
 #define	NUM_ALGOIDS ((sizeof (ALGOID_ID_Table))/(sizeof (ALGOID_ID_Table[0])))
 
 /*
- * Name: X509_AlgIdToAlgorithmOid
+ * Name: x509_algid_to_algoid
  *
  * Description:
  * This function maps the specified AlgID to the corresponding
@@ -50,7 +50,7 @@ static KMF_OID_ID ALGOID_ID_Table[] = {
  *
  */
 KMF_OID *
-X509_AlgIdToAlgorithmOid(KMF_ALGORITHM_INDEX alg_int)
+x509_algid_to_algoid(KMF_ALGORITHM_INDEX alg_int)
 {
 	int i;
 
@@ -70,7 +70,7 @@ X509_AlgIdToAlgorithmOid(KMF_ALGORITHM_INDEX alg_int)
 }
 
 /*
- * Name: X509_AlgorithmOidToAlgId
+ * Name: x509_algoid_to_algid
  *
  * Description:
  * This function maps the specified Algorithm OID to the corresponding
@@ -83,13 +83,11 @@ X509_AlgIdToAlgorithmOid(KMF_ALGORITHM_INDEX alg_int)
  * Algorithm ID and KMF_ALGID_NONE in case of failures.
  */
 KMF_ALGORITHM_INDEX
-X509_AlgorithmOidToAlgId(KMF_OID * Oid)
+x509_algoid_to_algid(KMF_OID * Oid)
 {
 	int i;
 
-	if ((Oid == NULL) ||
-		(Oid->Data == NULL) ||
-		(Oid->Length == 0)) {
+	if ((Oid == NULL) || (Oid->Data == NULL) || (Oid->Length == 0)) {
 		return (KMF_ALGID_NONE);
 	}
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,29 +28,28 @@
 SUNWprivate_1.1 {
     global:
 	KMF_Plugin_Initialize;
-	NSS_FindCert;
-	NSS_FreeKMFCert;
-	NSS_StoreCert;
-	NSS_ImportCert;
-	NSS_ImportCRL;
-	NSS_DeleteCert;
-	NSS_DeleteCRL;
-	NSS_CreateKeypair;
-	NSS_FindKey;
-	NSS_EncodePubKeyData;
-	NSS_SignData;
-	NSS_DeleteKey;
-	NSS_FindCRL;
-	NSS_FindCertInCRL;
-	NSS_GetErrorString;
-	NSS_GetPrikeyByCert;
-	NSS_DecryptData;
-	NSS_ExportP12;
-	NSS_StorePrivateKey;
-	NSS_CreateSymKey;
-	NSS_GetSymKeyValue;
-	NSS_SetTokenPin;
-
+        NSS_CreateKeypair;
+        NSS_CreateSymKey;
+        NSS_DecryptData;
+        NSS_DeleteCRL;
+        NSS_DeleteCert;
+        NSS_DeleteKey;
+        NSS_EncodePubKeyData;
+        NSS_ExportPK12;
+        NSS_FindCRL;
+        NSS_FindCert;
+        NSS_FindCertInCRL;
+        NSS_FindKey;
+	NSS_FindPrikeyByCert;
+        NSS_FreeKMFCert;
+        NSS_GetErrorString;
+        NSS_GetSymKeyValue;
+        NSS_ImportCRL;
+        NSS_ImportCert;
+        NSS_SetTokenPin;
+        NSS_SignData;
+        NSS_StoreCert;
+        NSS_StoreKey;
     local:
 	*;
 };

@@ -39,71 +39,143 @@
 #include <kmfapi.h>
 
 static KMF_RETURN
-pk_destroy_keys(void *handle, KMF_KEY_HANDLE *keys,
-	KMF_FINDKEY_PARAMS *fkparams, uint32_t numkeys)
+pk_destroy_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
 {
 	int i;
 	KMF_RETURN rv = KMF_OK;
-	KMF_DELETEKEY_PARAMS dkparams;
+	uint32_t *numkeys;
+	KMF_KEY_HANDLE *keys = NULL;
+	int del_num = 0;
+	KMF_ATTRIBUTE delete_attlist[16];
+	KMF_KEYSTORE_TYPE kstype;
+	uint32_t len;
+	boolean_t destroy = B_TRUE;
+	KMF_CREDENTIAL cred;
+	char *slotlabel = NULL;
 
-	(void) memset(&dkparams, 0, sizeof (dkparams));
-	dkparams.kstype = fkparams->kstype;
+	len = sizeof (kstype);
+	rv = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, &len);
+	if (rv != KMF_OK)
+		return (rv);
 
-	switch (fkparams->kstype) {
+	kmf_set_attr_at_index(delete_attlist, del_num,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	del_num++;
+
+	/* "destroy" is optional. Default is TRUE */
+	(void) kmf_get_attr(KMF_DESTROY_BOOL_ATTR, attrlist, numattr,
+	    (void *)&destroy, NULL);
+
+	kmf_set_attr_at_index(delete_attlist, del_num,
+	    KMF_DESTROY_BOOL_ATTR, &destroy, sizeof (boolean_t));
+	del_num++;
+
+	switch (kstype) {
 	case KMF_KEYSTORE_NSS:
-		dkparams.nssparms = fkparams->nssparms;
-		dkparams.cred = fkparams->cred;
+		rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+		    (void *)&cred, NULL);
+		if (rv == KMF_OK) {
+			if (cred.credlen > 0) {
+				kmf_set_attr_at_index(delete_attlist, del_num,
+				    KMF_CREDENTIAL_ATTR, &cred,
+				    sizeof (KMF_CREDENTIAL));
+				del_num++;
+			}
+		}
+
+		slotlabel = kmf_get_attr_ptr(KMF_TOKEN_LABEL_ATTR, attrlist,
+		    numattr);
+		if (slotlabel != NULL) {
+			kmf_set_attr_at_index(delete_attlist, del_num,
+			    KMF_TOKEN_LABEL_ATTR, slotlabel,
+			    strlen(slotlabel));
+			del_num++;
+		}
 		break;
 	case KMF_KEYSTORE_OPENSSL:
 		break;
 	case KMF_KEYSTORE_PK11TOKEN:
-		dkparams.cred = fkparams->cred;
+		rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+		    (void *)&cred, NULL);
+		if (rv == KMF_OK) {
+			if (cred.credlen > 0) {
+				kmf_set_attr_at_index(delete_attlist, del_num,
+				    KMF_CREDENTIAL_ATTR, &cred,
+				    sizeof (KMF_CREDENTIAL));
+				del_num++;
+			}
+		}
 		break;
 	default:
 		return (PK_ERR_USAGE);
 	}
 
-	for (i = 0; rv == KMF_OK && i < numkeys; i++) {
-		rv = KMF_DeleteKeyFromKeystore(handle, &dkparams, &keys[i]);
+	numkeys = kmf_get_attr_ptr(KMF_COUNT_ATTR, attrlist, numattr);
+	if (numkeys == NULL)
+		return (PK_ERR_USAGE);
+
+	keys = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	if (keys == NULL)
+		return (PK_ERR_USAGE);
+
+	for (i = 0; rv == KMF_OK && i < *numkeys; i++) {
+		int num = del_num;
+
+		kmf_set_attr_at_index(delete_attlist, num,
+		    KMF_KEY_HANDLE_ATTR, &keys[i], sizeof (KMF_KEY_HANDLE));
+		num++;
+
+		rv = kmf_delete_key_from_keystore(handle, num, delete_attlist);
 	}
 	return (rv);
 }
 
 static KMF_RETURN
-pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_FINDKEY_PARAMS *parms, char *desc,
-	int *keysdeleted)
+pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
+	char *desc, int *keysdeleted)
 {
 	KMF_RETURN rv = KMF_OK;
 	uint32_t numkeys = 0;
+	int num = numattr;
 
 	*keysdeleted = 0;
 	numkeys = 0;
-	rv = KMF_FindKey(kmfhandle, parms, NULL, &numkeys);
+
+	kmf_set_attr_at_index(attlist, num,
+	    KMF_COUNT_ATTR, &numkeys, sizeof (uint32_t));
+	num++;
+
+	rv = kmf_find_key(kmfhandle, num, attlist);
+
 	if (rv == KMF_OK && numkeys > 0) {
 		KMF_KEY_HANDLE *keys = NULL;
 		char prompt[1024];
 
 		(void) snprintf(prompt, sizeof (prompt),
-			gettext("%d %s key(s) found, do you want "
-			"to delete them (y/N) ?"), numkeys,
-			(desc != NULL ? desc : ""));
+		    gettext("%d %s key(s) found, do you want "
+		    "to delete them (y/N) ?"), numkeys,
+		    (desc != NULL ? desc : ""));
 
 		if (!yesno(prompt,
-			gettext("Respond with yes or no.\n"),
-			B_FALSE)) {
+		    gettext("Respond with yes or no.\n"),
+		    B_FALSE)) {
 			return (KMF_OK);
 		}
 		keys = (KMF_KEY_HANDLE *)malloc(numkeys *
-				sizeof (KMF_KEY_HANDLE));
+		    sizeof (KMF_KEY_HANDLE));
 		if (keys == NULL)
 			return (KMF_ERR_MEMORY);
 		(void) memset(keys, 0, numkeys *
-			sizeof (KMF_KEY_HANDLE));
+		    sizeof (KMF_KEY_HANDLE));
 
-		rv = KMF_FindKey(kmfhandle, parms, keys, &numkeys);
+		kmf_set_attr_at_index(attlist, num,
+		    KMF_KEY_HANDLE_ATTR, keys, sizeof (KMF_KEY_HANDLE));
+		num++;
+
+		rv = kmf_find_key(kmfhandle, num, attlist);
 		if (rv == KMF_OK) {
-			rv = pk_destroy_keys(kmfhandle, keys,
-				parms, numkeys);
+			rv = pk_destroy_keys(kmfhandle, attlist, num);
 		}
 
 		free(keys);
@@ -118,26 +190,34 @@ pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_FINDKEY_PARAMS *parms, char *desc,
 }
 
 static KMF_RETURN
-pk_delete_certs(KMF_HANDLE_T kmfhandle, KMF_FINDCERT_PARAMS *fcparms,
-	KMF_DELETECERT_PARAMS *dcparms)
+pk_delete_certs(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr)
 {
 	KMF_RETURN rv = KMF_OK;
 	uint32_t numcerts = 0;
+	int num = numattr;
 
-	rv = KMF_FindCert(kmfhandle, fcparms, NULL, &numcerts);
+	kmf_set_attr_at_index(attlist, num,
+	    KMF_COUNT_ATTR, &numcerts, sizeof (uint32_t));
+	num++;
+
+	rv = kmf_find_cert(kmfhandle, num, attlist);
 	if (rv == KMF_OK && numcerts > 0) {
 		char prompt[1024];
 		(void) snprintf(prompt, sizeof (prompt),
-			gettext("%d certificate(s) found, do you want "
-			"to delete them (y/N) ?"), numcerts);
+		    gettext("%d certificate(s) found, do you want "
+		    "to delete them (y/N) ?"), numcerts);
 
 		if (!yesno(prompt,
-			gettext("Respond with yes or no.\n"),
-			B_FALSE)) {
+		    gettext("Respond with yes or no.\n"),
+		    B_FALSE)) {
 			return (KMF_OK);
 		}
 
-		rv = KMF_DeleteCertFromKeystore(kmfhandle, dcparms);
+		/*
+		 * Use numattr because delete cert does not require
+		 * KMF_COUNT_ATTR attribute.
+		 */
+		rv = kmf_delete_cert_from_keystore(kmfhandle, numattr, attlist);
 
 	} else if (rv == KMF_ERR_CERT_NOT_FOUND) {
 		rv = KMF_OK;
@@ -152,36 +232,73 @@ delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
 	KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_FINDKEY_PARAMS parms;
 	char *keytype = NULL;
 	int nk, numkeys = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEY_CLASS keyclass;
 
 	rv = configure_nss(kmfhandle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	(void) memset(&parms, 0, sizeof (parms));
-	parms.kstype = KMF_KEYSTORE_NSS;
-	parms.findLabel = objlabel;
-	parms.cred = *tokencred;
-	parms.nssparms.slotlabel = token;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	if (objlabel != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLABEL_ATTR,
+		    objlabel, strlen(objlabel));
+		numattr++;
+	}
+
+	if (tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+		    tokencred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	if (token && strlen(token)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
 
 	if (oclass & PK_PRIKEY_OBJ) {
-		parms.keyclass = KMF_ASYM_PRI;
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PRI;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
 		keytype = "private";
-		rv = pk_delete_keys(kmfhandle, &parms, keytype, &nk);
+		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-		parms.keyclass = KMF_SYMMETRIC;
+		int num = numattr;
+
+		keyclass = KMF_SYMMETRIC;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
 		keytype = "symmetric";
-		rv = pk_delete_keys(kmfhandle, &parms, keytype, &nk);
+		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
-		parms.keyclass = KMF_ASYM_PUB;
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PUB;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
 		keytype = "public";
-		rv = pk_delete_keys(kmfhandle, &parms, keytype, &nk);
+		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && numkeys == 0)
@@ -199,32 +316,59 @@ delete_nss_certs(KMF_HANDLE_T kmfhandle,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DELETECERT_PARAMS dcparms;
-	KMF_FINDCERT_PARAMS fcargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
 
 	rv = configure_nss(kmfhandle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	(void) memset(&dcparms, 0, sizeof (dcparms));
-	dcparms.kstype = KMF_KEYSTORE_NSS;
-	dcparms.certLabel = objlabel;
-	dcparms.issuer = issuer;
-	dcparms.subject = subject;
-	dcparms.serial = serno;
-	dcparms.find_cert_validity = find_criteria_flag;
-	dcparms.nssparms.slotlabel = token;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-	(void) memset(&fcargs, 0, sizeof (fcargs));
-	fcargs.kstype = KMF_KEYSTORE_NSS;
-	fcargs.certLabel = objlabel;
-	fcargs.issuer = issuer;
-	fcargs.subject = subject;
-	fcargs.serial = serno;
-	fcargs.find_cert_validity = find_criteria_flag;
-	fcargs.nssparms.slotlabel = token;
+		if (objlabel != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CERT_LABEL_ATTR, objlabel,
+			    strlen(objlabel));
+			numattr++;
+		}
 
-	rv = pk_delete_certs(kmfhandle, &fcargs, &dcparms);
+		if (issuer != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_ISSUER_NAME_ATTR, issuer,
+			    strlen(issuer));
+			numattr++;
+		}
+
+		if (subject != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_SUBJECT_NAME_ATTR, subject,
+			    strlen(subject));
+			numattr++;
+		}
+
+		if (serno != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_BIGINT_ATTR, serno,
+			    sizeof (KMF_BIGINT));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
+		    sizeof (KMF_CERT_VALIDITY));
+		numattr++;
+
+		if (token != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token,
+			    strlen(token));
+			numattr++;
+		}
+
+	rv = pk_delete_certs(kmfhandle, attrlist, numattr);
 
 	return (rv);
 }
@@ -232,23 +376,38 @@ delete_nss_certs(KMF_HANDLE_T kmfhandle,
 static KMF_RETURN
 delete_nss_crl(void *kmfhandle,
 	char *dir, char *prefix, char *token,
-	char *issuernickname, char *subject)
+	char *issuer, char *subject)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DELETECRL_PARAMS dcrlparms;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[8];
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
 
 	rv = configure_nss(kmfhandle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
-	(void) memset(&dcrlparms, 0, sizeof (dcrlparms));
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	dcrlparms.kstype = KMF_KEYSTORE_NSS;
-	dcrlparms.nssparms.slotlabel = token;
-	dcrlparms.nssparms.crl_issuerName = issuernickname;
-	dcrlparms.nssparms.crl_subjName = subject;
+	if (token != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
+	if (issuer != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_ISSUER_NAME_ATTR,
+		    issuer, strlen(issuer));
+		numattr++;
+	}
+	if (subject != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_SUBJECT_NAME_ATTR,
+		    subject, strlen(subject));
+		numattr++;
+	}
 
-	rv = KMF_DeleteCRL(kmfhandle, &dcrlparms);
+	rv = kmf_delete_crl(kmfhandle, numattr, attrlist);
 
 	return (rv);
 }
@@ -259,9 +418,14 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 	KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_FINDKEY_PARAMS parms;
 	int nk, numkeys = 0;
-
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEY_CLASS keyclass;
+	boolean_t token_bool = B_TRUE;
+	KMF_KEY_ALG keytype = 0;
+	boolean_t private;
 	/*
 	 * Symmetric keys and RSA/DSA private keys are always
 	 * created with the "CKA_PRIVATE" field == TRUE, so
@@ -275,30 +439,69 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 		return (rv);
 	}
 
-	(void) memset(&parms, 0, sizeof (parms));
-	parms.kstype = KMF_KEYSTORE_PK11TOKEN;
-	parms.findLabel = (char *)objlabel;
-	parms.keytype = 0;
-	parms.pkcs11parms.private = ((oclass & PK_PRIVATE_OBJ) > 0);
-	parms.pkcs11parms.token = 1;
-	parms.cred.cred = tokencred->cred;
-	parms.cred.credlen = tokencred->credlen;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	if (objlabel != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLABEL_ATTR,
+		    objlabel, strlen(objlabel));
+		numattr++;
+	}
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+		    tokencred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	private = ((oclass & PK_PRIVATE_OBJ) > 0);
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PRIVATE_BOOL_ATTR,
+	    &private, sizeof (private));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYALG_ATTR,
+	    &keytype, sizeof (keytype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_BOOL_ATTR,
+	    &token_bool, sizeof (token_bool));
+	numattr++;
 
 	if (oclass & PK_PRIKEY_OBJ) {
-		parms.keyclass = KMF_ASYM_PRI;
-		rv = pk_delete_keys(kmfhandle, &parms, "private", &nk);
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PRI;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
+		rv = pk_delete_keys(kmfhandle, attrlist, num, "private", &nk);
 		numkeys += nk;
 	}
 
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-		parms.keyclass = KMF_SYMMETRIC;
-		rv = pk_delete_keys(kmfhandle, &parms, "symmetric", &nk);
+		int num = numattr;
+
+		keyclass = KMF_SYMMETRIC;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
+		rv = pk_delete_keys(kmfhandle, attrlist, num, "symmetric", &nk);
 		numkeys += nk;
 	}
 
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
-		parms.keyclass = KMF_ASYM_PUB;
-		rv = pk_delete_keys(kmfhandle, &parms, "public", &nk);
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PUB;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
+		rv = pk_delete_keys(kmfhandle, attrlist, num, "public", &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && numkeys == 0)
@@ -314,8 +517,9 @@ delete_pk11_certs(KMF_HANDLE_T kmfhandle,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN kmfrv;
-	KMF_DELETECERT_PARAMS dparms;
-	KMF_FINDCERT_PARAMS fcargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
 
 	kmfrv = select_token(kmfhandle, token, FALSE);
 
@@ -323,16 +527,39 @@ delete_pk11_certs(KMF_HANDLE_T kmfhandle,
 		return (kmfrv);
 	}
 
-	(void) memset(&dparms, 0, sizeof (dparms));
-	dparms.kstype = KMF_KEYSTORE_PK11TOKEN;
-	dparms.certLabel = objlabel;
-	dparms.issuer = issuer;
-	dparms.subject = subject;
-	dparms.serial = serno;
-	dparms.find_cert_validity = find_criteria_flag;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	fcargs = dparms;
-	kmfrv = pk_delete_certs(kmfhandle, &fcargs, &dparms);
+	if (objlabel != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_LABEL_ATTR,
+		    objlabel, strlen(objlabel));
+		numattr++;
+	}
+
+	if (issuer != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_ISSUER_NAME_ATTR,
+		    issuer, strlen(issuer));
+		numattr++;
+	}
+
+	if (subject != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_SUBJECT_NAME_ATTR,
+		    subject, strlen(subject));
+		numattr++;
+	}
+
+	if (serno != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_BIGINT_ATTR,
+		    serno, sizeof (KMF_BIGINT));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_VALIDITY_ATTR,
+	    &find_criteria_flag, sizeof (KMF_CERT_VALIDITY));
+	numattr++;
+
+	kmfrv = pk_delete_certs(kmfhandle, attrlist, numattr);
 
 	return (kmfrv);
 }
@@ -343,24 +570,49 @@ delete_file_certs(KMF_HANDLE_T kmfhandle,
 	char *subject, KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv;
-	KMF_DELETECERT_PARAMS dparms;
-	KMF_FINDCERT_PARAMS fcargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
 
-	(void *)memset(&dparms, 0, sizeof (dparms));
-	(void *)memset(&fcargs, 0, sizeof (fcargs));
-	fcargs.kstype = KMF_KEYSTORE_OPENSSL;
-	fcargs.certLabel = NULL;
-	fcargs.issuer = issuer;
-	fcargs.subject = subject;
-	fcargs.serial = serial;
-	fcargs.sslparms.dirpath = dir;
-	fcargs.sslparms.certfile = filename;
-	fcargs.find_cert_validity = find_criteria_flag;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	/* For now, delete parameters and find parameters are the same */
-	dparms = fcargs;
+	if (issuer != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_ISSUER_NAME_ATTR,
+		    issuer, strlen(issuer));
+		numattr++;
+	}
 
-	rv = pk_delete_certs(kmfhandle, &fcargs, &dparms);
+	if (subject != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_SUBJECT_NAME_ATTR,
+		    subject, strlen(subject));
+		numattr++;
+	}
+
+	if (serial != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_BIGINT_ATTR,
+		    serial, sizeof (KMF_BIGINT));
+		numattr++;
+	}
+
+	if (dir != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_DIRPATH_ATTR,
+		    dir, strlen(dir));
+		numattr++;
+	}
+
+	if (filename != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_FILENAME_ATTR,
+		    filename, strlen(filename));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CERT_VALIDITY_ATTR,
+	    &find_criteria_flag, sizeof (KMF_CERT_VALIDITY));
+	numattr++;
+
+	rv = pk_delete_certs(kmfhandle, attrlist, numattr);
 
 	return (rv);
 }
@@ -370,25 +622,51 @@ delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass,
 	char *dir, char *infile)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_FINDKEY_PARAMS parms;
 	char *keytype = "";
 	int nk, numkeys = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEY_CLASS keyclass;
 
-	(void) memset(&parms, 0, sizeof (parms));
-	parms.kstype = KMF_KEYSTORE_OPENSSL;
-	parms.sslparms.dirpath = dir;
-	parms.sslparms.keyfile = infile;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	if (dir != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_DIRPATH_ATTR,
+		    dir, strlen(dir));
+		numattr++;
+	}
+
+	if (infile != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_FILENAME_ATTR,
+		    infile, strlen(infile));
+		numattr++;
+	}
 
 	if (oclass & (PK_PUBKEY_OBJ | PK_PRIKEY_OBJ)) {
-		parms.keyclass = KMF_ASYM_PRI;
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PRI;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
 		keytype = "Asymmetric";
-		rv = pk_delete_keys(kmfhandle, &parms, keytype, &nk);
+		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-		parms.keyclass = KMF_SYMMETRIC;
+		int num = numattr;
+
+		keyclass = KMF_SYMMETRIC;
+		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
+		    &keyclass, sizeof (keyclass));
+		num++;
+
 		keytype = "symmetric";
-		rv = pk_delete_keys(kmfhandle, &parms, keytype, &nk);
+		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
 	if (rv == KMF_OK && numkeys == 0)
@@ -401,15 +679,26 @@ static KMF_RETURN
 delete_file_crl(void *kmfhandle, char *dir, char *filename)
 {
 	KMF_RETURN rv;
-	KMF_DELETECRL_PARAMS dcrlparms;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[4];
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 
-	(void) memset(&dcrlparms, 0, sizeof (dcrlparms));
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	dcrlparms.kstype = KMF_KEYSTORE_OPENSSL;
-	dcrlparms.sslparms.dirpath = dir;
-	dcrlparms.sslparms.crlfile = filename;
+	if (dir) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_DIRPATH_ATTR,
+		    dir, strlen(dir));
+		numattr++;
+	}
+	if (filename) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_FILENAME_ATTR,
+		    filename, strlen(filename));
+		numattr++;
+	}
 
-	rv = KMF_DeleteCRL(kmfhandle, &dcrlparms);
+	rv = kmf_delete_crl(kmfhandle, numattr, attrlist);
 
 	return (rv);
 }
@@ -444,11 +733,11 @@ pk_delete(int argc, char *argv[])
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
-		"T:(token)y:(objtype)l:(label)"
-		"k:(keystore)s:(subject)n:(nickname)"
-		"d:(dir)p:(prefix)S:(serial)i:(issuer)"
-		"c:(criteria)"
-		"f:(infile)")) != EOF) {
+	    "T:(token)y:(objtype)l:(label)"
+	    "k:(keystore)s:(subject)n:(nickname)"
+	    "d:(dir)p:(prefix)S:(serial)i:(issuer)"
+	    "c:(criteria)"
+	    "f:(infile)")) != EOF) {
 
 		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
@@ -498,7 +787,7 @@ pk_delete(int argc, char *argv[])
 			find_criteria = optarg_av;
 			if (!strcasecmp(find_criteria, "valid"))
 				find_criteria_flag =
-					KMF_NONEXPIRED_CERTS;
+				    KMF_NONEXPIRED_CERTS;
 			else if (!strcasecmp(find_criteria, "expired"))
 				find_criteria_flag = KMF_EXPIRED_CERTS;
 			else if (!strcasecmp(find_criteria, "both"))
@@ -518,17 +807,17 @@ pk_delete(int argc, char *argv[])
 
 	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
 	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
-		kstype != KMF_KEYSTORE_PK11TOKEN) {
+	    kstype != KMF_KEYSTORE_PK11TOKEN) {
 
 		(void) fprintf(stderr, gettext("The objtype parameter "
-			"is only relevant if keystore=pkcs11\n"));
+		    "is only relevant if keystore=pkcs11\n"));
 		return (PK_ERR_USAGE);
 	}
 
 	/* If no object class specified, delete everything but CRLs */
 	if (oclass == 0)
 		oclass = PK_CERT_OBJ | PK_PUBKEY_OBJ | PK_PRIKEY_OBJ |
-			PK_SYMKEY_OBJ;
+		    PK_SYMKEY_OBJ;
 
 	/* No additional args allowed. */
 	argc -= optind_av;
@@ -547,11 +836,11 @@ pk_delete(int argc, char *argv[])
 		uchar_t *bytes = NULL;
 		size_t bytelen;
 
-		rv = KMF_HexString2Bytes((uchar_t *)serstr, &bytes, &bytelen);
+		rv = kmf_hexstr_to_bytes((uchar_t *)serstr, &bytes, &bytelen);
 		if (rv != KMF_OK || bytes == NULL) {
 			(void) fprintf(stderr, gettext("serial number "
-				"must be specified as a hex number "
-				"(ex: 0x0102030405ffeeddee)\n"));
+			    "must be specified as a hex number "
+			    "(ex: 0x0102030405ffeeddee)\n"));
 			return (PK_ERR_USAGE);
 		}
 		serial.val = bytes;
@@ -559,94 +848,92 @@ pk_delete(int argc, char *argv[])
 	}
 
 	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
-		kstype == KMF_KEYSTORE_NSS) &&
-		(oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ))) {
+	    kstype == KMF_KEYSTORE_NSS) &&
+	    (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ))) {
 
 		(void) get_token_password(kstype, token_spec,
-			&tokencred);
+		    &tokencred);
 	}
 
-	if ((kmfrv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK)
+	if ((kmfrv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK)
 		return (kmfrv);
 
 	switch (kstype) {
 		case KMF_KEYSTORE_PK11TOKEN:
 			if (oclass & PK_KEY_OBJ) {
 				kmfrv = delete_pk11_keys(kmfhandle,
-						token_spec, oclass,
-						object_label,
-						&tokencred);
+				    token_spec, oclass,
+				    object_label, &tokencred);
 				/*
 				 * If deleting groups of objects, it is OK
 				 * to ignore the "key not found" case so that
 				 * we can continue to find other objects.
 				 */
 				if (kmfrv == KMF_ERR_KEY_NOT_FOUND &&
-					(oclass != PK_KEY_OBJ))
+				    (oclass != PK_KEY_OBJ))
 					kmfrv = KMF_OK;
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & (PK_CERT_OBJ | PK_PUBLIC_OBJ)) {
 				kmfrv = delete_pk11_certs(kmfhandle,
-						token_spec,
-						object_label,
-						&serial, issuer,
-						subject, find_criteria_flag);
+				    token_spec, object_label,
+				    &serial, issuer,
+				    subject, find_criteria_flag);
 				/*
 				 * If cert delete failed, but we are looking at
 				 * other objects, then it is OK.
 				 */
 				if (kmfrv == KMF_ERR_CERT_NOT_FOUND &&
-					(oclass & (PK_CRL_OBJ | PK_KEY_OBJ)))
+				    (oclass & (PK_CRL_OBJ | PK_KEY_OBJ)))
 					kmfrv = KMF_OK;
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
 				kmfrv = delete_file_crl(kmfhandle,
-						dir, infile);
+				    dir, infile);
 			break;
 		case KMF_KEYSTORE_NSS:
 			if (oclass & PK_KEY_OBJ) {
 				kmfrv = delete_nss_keys(kmfhandle,
-					dir, prefix, token_spec,
-					oclass, (char  *)object_label,
-					&tokencred);
+				    dir, prefix, token_spec,
+				    oclass, (char  *)object_label,
+				    &tokencred);
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & PK_CERT_OBJ) {
 				kmfrv = delete_nss_certs(kmfhandle,
-					dir, prefix, token_spec,
-					(char  *)object_label,
-					&serial, issuer, subject,
-					find_criteria_flag);
+				    dir, prefix, token_spec,
+				    (char  *)object_label,
+				    &serial, issuer, subject,
+				    find_criteria_flag);
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
 				kmfrv = delete_nss_crl(kmfhandle,
-					dir, prefix, token_spec,
-					(char  *)object_label, subject);
+				    dir, prefix, token_spec,
+				    (char  *)object_label, subject);
 			break;
 		case KMF_KEYSTORE_OPENSSL:
 			if (oclass & PK_KEY_OBJ) {
 				kmfrv = delete_file_keys(kmfhandle, oclass,
-					dir, infile);
+				    dir, infile);
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & (PK_CERT_OBJ)) {
 				kmfrv = delete_file_certs(kmfhandle,
-					dir, infile, &serial, issuer,
-					subject, find_criteria_flag);
+				    dir, infile, &serial, issuer,
+				    subject, find_criteria_flag);
 				if (kmfrv != KMF_OK)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
 				kmfrv = delete_file_crl(kmfhandle,
-					dir, infile);
+				    dir, infile);
 			break;
 		default:
 			rv = PK_ERR_USAGE;
@@ -655,11 +942,11 @@ pk_delete(int argc, char *argv[])
 
 	if (kmfrv != KMF_OK) {
 		display_error(kmfhandle, kmfrv,
-			gettext("Error deleting objects"));
+		    gettext("Error deleting objects"));
 	}
 
 	if (serial.val != NULL)
 		free(serial.val);
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	return (kmfrv);
 }

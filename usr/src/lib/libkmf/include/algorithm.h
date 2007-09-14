@@ -37,7 +37,7 @@ typedef struct pkcs_algorithm_map
 } PKCS_ALGORITHM_MAP;
 
 extern KMF_SIGNATURE_MODE PKCS_GetDefaultSignatureMode(KMF_ALGORITHM_INDEX);
-extern PKCS_ALGORITHM_MAP* PKCS_GetAlgorithmMap(KMF_ALGCLASS, uint32_t,
+extern PKCS_ALGORITHM_MAP* pkcs_get_alg_map(KMF_ALGCLASS, uint32_t,
 	uint32_t);
 
 #ifdef __cplusplus

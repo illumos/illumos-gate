@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,7 @@ kc_delete(int argc, char *argv[])
 		goto out;
 	}
 
-	kmfrv = KMF_DeletePolicyFromDB(policyname, filename);
+	kmfrv = kmf_delete_policy_from_db(policyname, filename);
 	if (kmfrv != KMF_OK)
 		rv = KC_ERR_DELETE_POLICY;
 

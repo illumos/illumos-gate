@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,17 +57,19 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 	KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv = KMF_OK;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
-	KMF_DELETEKEY_PARAMS dk_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_NAME	csrSubject;
 	KMF_CSR_DATA	csr;
 	KMF_ALGORITHM_INDEX sigAlg;
 	KMF_DATA signedCsr = {NULL, 0};
 
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	boolean_t storekey = TRUE;
+
 	(void) memset(&csr, 0, sizeof (csr));
 	(void) memset(&csrSubject, 0, sizeof (csrSubject));
-	(void) memset(&kp_params, 0, sizeof (kp_params));
 
 	if (keyAlg == KMF_DSA)
 		sigAlg = KMF_ALGID_SHA1WithDSA;
@@ -76,16 +78,9 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if ((kmfrv = KMF_DNParser(subject, &csrSubject)) != KMF_OK) {
+	if ((kmfrv = kmf_dn_parser(subject, &csrSubject)) != KMF_OK) {
 		return (kmfrv);
 	}
-
-	kp_params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	kp_params.keylabel = certlabel;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
-	kp_params.cred.cred = tokencred->cred;
-	kp_params.cred.credlen = tokencred->credlen;
 
 	/* Select a PKCS11 token */
 	kmfrv = select_token(kmfhandle, token, FALSE);
@@ -93,44 +88,89 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 		return (kmfrv);
 	}
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	if (certlabel != NULL && strlen(certlabel)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLABEL_ATTR,
+		    certlabel, strlen(certlabel));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLENGTH_ATTR,
+	    &keylen, sizeof (keylen));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYALG_ATTR,
+	    &keyAlg, sizeof (keyAlg));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+	    tokencred, sizeof (KMF_CREDENTIAL));
+	numattr++;
+
+	if (token && strlen(token)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PUBKEY_HANDLE_ATTR,
+	    &pubk, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PRIVKEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_STOREKEY_BOOL_ATTR,
+	    &storekey, sizeof (storekey));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		return (kmfrv);
 	}
 
-	SET_VALUE(KMF_SetCSRPubKey(kmfhandle, &pubk, &csr), "keypair");
+	SET_VALUE(kmf_set_csr_pubkey(kmfhandle, &pubk, &csr), "keypair");
 
-	SET_VALUE(KMF_SetCSRVersion(&csr, 2), "version number");
+	SET_VALUE(kmf_set_csr_version(&csr, 2), "version number");
 
-	SET_VALUE(KMF_SetCSRSubjectName(&csr, &csrSubject),
-		"subject name");
+	SET_VALUE(kmf_set_csr_subject(&csr, &csrSubject), "subject name");
 
-	SET_VALUE(KMF_SetCSRSignatureAlgorithm(&csr, sigAlg),
-		"SignatureAlgorithm");
+	SET_VALUE(kmf_set_csr_sig_alg(&csr, sigAlg),
+	    "SignatureAlgorithm");
 
 	if (altname != NULL) {
-		SET_VALUE(KMF_SetCSRSubjectAltName(&csr, altname, altcrit,
-			alttype), "SetCSRSubjectAltName");
+		SET_VALUE(kmf_set_csr_subject_altname(&csr, altname, altcrit,
+		    alttype), "SetCSRSubjectAltName");
 	}
 
 	if (kubits != 0) {
-		SET_VALUE(KMF_SetCSRKeyUsage(&csr, kucrit, kubits),
-			"SetCSRKeyUsage");
+		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
+		    "SetCSRKeyUsage");
 	}
 
-	if ((kmfrv = KMF_SignCSR(kmfhandle, &csr, &prik, &signedCsr)) ==
-		KMF_OK) {
-		kmfrv = KMF_CreateCSRFile(&signedCsr, fmt, csrfile);
+	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
+	    KMF_OK) {
+		kmfrv = kmf_create_csr_file(&signedCsr, fmt, csrfile);
 	}
 
 cleanup:
-	(void) KMF_FreeData(&signedCsr);
-	(void) KMF_FreeKMFKey(kmfhandle, &prik);
+	(void) kmf_free_data(&signedCsr);
+	(void) kmf_free_kmf_key(kmfhandle, &prik);
 	/* delete the key */
-	(void) memset(&dk_params, 0, sizeof (dk_params));
-	dk_params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	(void) KMF_DeleteKeyFromKeystore(kmfhandle, &dk_params, &pubk);
-	(void) KMF_FreeSignedCSR(&csr);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PUBKEY_HANDLE_ATTR,
+	    &pubk, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	(void) kmf_delete_key_from_keystore(kmfhandle, numattr, attrlist);
+
+	(void) kmf_free_signed_csr(&csr);
 
 	return (kmfrv);
 }
@@ -144,7 +184,6 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	char *dir, char *outcsr, char *outkey)
 {
 	KMF_RETURN kmfrv;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_NAME	csrSubject;
 	KMF_CSR_DATA	csr;
@@ -153,22 +192,26 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	char *fullcsrpath = NULL;
 	char *fullkeypath = NULL;
 
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	boolean_t	storekey = TRUE;
+
 	(void) memset(&csr, 0, sizeof (csr));
 	(void) memset(&csrSubject, 0, sizeof (csrSubject));
-	(void) memset(&kp_params, 0, sizeof (kp_params));
 
 	if (EMPTYSTRING(outcsr) || EMPTYSTRING(outkey)) {
 		cryptoerror(LOG_STDERR,
-			gettext("No output file was specified for "
-				"the csr or key\n"));
+		    gettext("No output file was specified for "
+		    "the csr or key\n"));
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 	if (dir != NULL) {
 		fullcsrpath = get_fullpath(dir, outcsr);
 		if (fullcsrpath == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Cannot create file %s in "
-					"directory %s\n"), dir, outcsr);
+			    gettext("Cannot create file %s in "
+			    "directory %s\n"), dir, outcsr);
 			return (PK_ERR_USAGE);
 		}
 	} else {
@@ -176,8 +219,8 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	}
 	if (verify_file(fullcsrpath)) {
 		cryptoerror(LOG_STDERR,
-			gettext("Cannot write the indicated output "
-				"certificate file (%s).\n"), fullcsrpath);
+		    gettext("Cannot write the indicated output "
+		    "certificate file (%s).\n"), fullcsrpath);
 		free(fullcsrpath);
 		return (PK_ERR_USAGE);
 	}
@@ -185,8 +228,8 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		fullkeypath = get_fullpath(dir, outkey);
 		if (fullkeypath == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Cannot create file %s in "
-					"directory %s\n"), dir, outkey);
+			    gettext("Cannot create file %s in "
+			    "directory %s\n"), dir, outkey);
 			free(fullcsrpath);
 			return (PK_ERR_USAGE);
 		}
@@ -195,8 +238,8 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	}
 	if (verify_file(fullcsrpath)) {
 		cryptoerror(LOG_STDERR,
-			gettext("Cannot write the indicated output "
-				"key file (%s).\n"), fullkeypath);
+		    gettext("Cannot write the indicated output "
+		    "key file (%s).\n"), fullkeypath);
 		free(fullcsrpath);
 		return (PK_ERR_USAGE);
 	}
@@ -207,43 +250,69 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		sigAlg = KMF_ALGID_MD5WithRSA;
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if ((kmfrv = KMF_DNParser(subject, &csrSubject)) != KMF_OK) {
+	if ((kmfrv = kmf_dn_parser(subject, &csrSubject)) != KMF_OK) {
 		return (kmfrv);
 	}
 
-	kp_params.kstype = KMF_KEYSTORE_OPENSSL;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	kp_params.sslparms.keyfile = fullkeypath;
-	kp_params.sslparms.format = fmt;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_FILENAME_ATTR,
+	    fullkeypath, strlen(fullkeypath));
+	numattr++;
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLENGTH_ATTR,
+	    &keylen, sizeof (keylen));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYALG_ATTR,
+	    &keyAlg, sizeof (keyAlg));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_ENCODE_FORMAT_ATTR,
+	    &fmt, sizeof (fmt));
+	numattr++;
+
+	(void) memset(&prik, 0, sizeof (prik));
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PRIVKEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	(void) memset(&pubk, 0, sizeof (pubk));
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PUBKEY_HANDLE_ATTR,
+	    &pubk, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_STOREKEY_BOOL_ATTR,
+	    &storekey, sizeof (storekey));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		goto cleanup;
 	}
-	SET_VALUE(KMF_SetCSRPubKey(kmfhandle, &pubk, &csr),
-		"SetCSRPubKey");
+	SET_VALUE(kmf_set_csr_pubkey(kmfhandle, &pubk, &csr),
+	    "SetCSRPubKey");
 
-	SET_VALUE(KMF_SetCSRVersion(&csr, 2), "SetCSRVersion");
+	SET_VALUE(kmf_set_csr_version(&csr, 2), "SetCSRVersion");
 
-	SET_VALUE(KMF_SetCSRSubjectName(&csr, &csrSubject),
-		"SetCSRSubjectName");
+	SET_VALUE(kmf_set_csr_subject(&csr, &csrSubject),
+	    "kmf_set_csr_subject");
 
-	SET_VALUE(KMF_SetCSRSignatureAlgorithm(&csr, sigAlg),
-		"SetCSRSignatureAlgorithm");
+	SET_VALUE(kmf_set_csr_sig_alg(&csr, sigAlg), "kmf_set_csr_sig_alg");
 
 	if (altname != NULL) {
-		SET_VALUE(KMF_SetCSRSubjectAltName(&csr, altname, altcrit,
-			alttype), "SetCSRSubjectAltName");
+		SET_VALUE(kmf_set_csr_subject_altname(&csr, altname, altcrit,
+		    alttype), "kmf_set_csr_subject_altname");
 	}
 	if (kubits != NULL) {
-		SET_VALUE(KMF_SetCSRKeyUsage(&csr, kucrit, kubits),
-			"SetCSRKeyUsage");
+		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
+		    "kmf_set_csr_ku");
 	}
-	if ((kmfrv = KMF_SignCSR(kmfhandle, &csr, &prik, &signedCsr)) ==
-		KMF_OK) {
-		kmfrv = KMF_CreateCSRFile(&signedCsr, fmt, fullcsrpath);
+	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
+	    KMF_OK) {
+		kmfrv = kmf_create_csr_file(&signedCsr, fmt, fullcsrpath);
 	}
 
 cleanup:
@@ -252,9 +321,9 @@ cleanup:
 	if (fullcsrpath)
 		free(fullcsrpath);
 
-	KMF_FreeData(&signedCsr);
-	KMF_FreeKMFKey(kmfhandle, &prik);
-	KMF_FreeSignedCSR(&csr);
+	kmf_free_data(&signedCsr);
+	kmf_free_kmf_key(kmfhandle, &prik);
+	kmf_free_signed_csr(&csr);
 
 	return (kmfrv);
 }
@@ -270,13 +339,16 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 	KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_NAME	csrSubject;
 	KMF_CSR_DATA	csr;
 	KMF_ALGORITHM_INDEX sigAlg;
 	KMF_DATA signedCsr = {NULL, 0};
-	KMF_DELETEKEY_PARAMS dk_params;
+
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	boolean_t storekey = TRUE;
 
 	if (token == NULL)
 		token = DEFAULT_NSS_TOKEN;
@@ -294,56 +366,104 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 	(void) memset(&csrSubject, 0, sizeof (csrSubject));
 
 	/* If the subject name cannot be parsed, flag it now and exit */
-	if ((kmfrv = KMF_DNParser(subject, &csrSubject)) != KMF_OK) {
+	if ((kmfrv = kmf_dn_parser(subject, &csrSubject)) != KMF_OK) {
 		return (kmfrv);
 	}
 
-	(void) memset(&kp_params, 0, sizeof (kp_params));
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-	kp_params.kstype = KMF_KEYSTORE_NSS;
-	kp_params.keylabel = nickname;
-	kp_params.keylength = keylen; /* bits */
-	kp_params.keytype = keyAlg;
-	kp_params.cred.cred = tokencred->cred;
-	kp_params.cred.credlen = tokencred->credlen;
-	kp_params.nssparms.slotlabel = token;
+	if (nickname != NULL && strlen(nickname)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLABEL_ATTR,
+		    nickname, strlen(nickname));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYLENGTH_ATTR,
+	    &keylen, sizeof (keylen));
+	numattr++;
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYALG_ATTR,
+	    &keyAlg, sizeof (keyAlg));
+	numattr++;
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+		    tokencred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	if (token && strlen(token)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PUBKEY_HANDLE_ATTR,
+	    &pubk, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PRIVKEY_HANDLE_ATTR,
+	    &prik, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_STOREKEY_BOOL_ATTR,
+	    &storekey, sizeof (storekey));
+	numattr++;
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
 		goto cleanup;
 	}
 
-	SET_VALUE(KMF_SetCSRPubKey(kmfhandle, &pubk, &csr), "SetCSRPubKey");
-	SET_VALUE(KMF_SetCSRVersion(&csr, 2), "SetCSRVersion");
-	SET_VALUE(KMF_SetCSRSubjectName(&csr, &csrSubject),
-		"SetCSRSubjectName");
-	SET_VALUE(KMF_SetCSRSignatureAlgorithm(&csr, sigAlg),
-		"SetCSRSignatureAlgorithm");
+	SET_VALUE(kmf_set_csr_pubkey(kmfhandle, &pubk, &csr),
+	    "kmf_set_csr_pubkey");
+	SET_VALUE(kmf_set_csr_version(&csr, 2), "kmf_set_csr_version");
+	SET_VALUE(kmf_set_csr_subject(&csr, &csrSubject),
+	    "kmf_set_csr_subject");
+	SET_VALUE(kmf_set_csr_sig_alg(&csr, sigAlg), "kmf_set_csr_sig_alg");
 
 	if (altname != NULL) {
-		SET_VALUE(KMF_SetCSRSubjectAltName(&csr, altname, altcrit,
-			alttype), "SetCSRSubjectAltName");
+		SET_VALUE(kmf_set_csr_subject_altname(&csr, altname, altcrit,
+		    alttype), "kmf_set_csr_subject_altname");
 	}
 	if (kubits != NULL) {
-		SET_VALUE(KMF_SetCSRKeyUsage(&csr, kucrit, kubits),
-			"SetCSRKeyUsage");
+		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
+		    "kmf_set_csr_ku");
 	}
-	if ((kmfrv = KMF_SignCSR(kmfhandle, &csr, &prik, &signedCsr)) ==
-		KMF_OK) {
-		kmfrv = KMF_CreateCSRFile(&signedCsr, fmt, csrfile);
+	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
+	    KMF_OK) {
+		kmfrv = kmf_create_csr_file(&signedCsr, fmt, csrfile);
 	}
 
 cleanup:
-	(void) KMF_FreeData(&signedCsr);
-	(void) KMF_FreeKMFKey(kmfhandle, &prik);
+	(void) kmf_free_data(&signedCsr);
+	(void) kmf_free_kmf_key(kmfhandle, &prik);
+
 	/* delete the key */
-	(void) memset(&dk_params, 0, sizeof (dk_params));
-	dk_params.kstype = KMF_KEYSTORE_NSS;
-	dk_params.cred.cred = tokencred->cred;
-	dk_params.cred.credlen = tokencred->credlen;
-	dk_params.nssparms.slotlabel = token;
-	(void) KMF_DeleteKeyFromKeystore(kmfhandle, &dk_params, &pubk);
-	(void) KMF_FreeSignedCSR(&csr);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_PUBKEY_HANDLE_ATTR,
+	    &pubk, sizeof (KMF_KEY_HANDLE));
+	numattr++;
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+		    tokencred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
+
+	if (token && strlen(token)) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_LABEL_ATTR,
+		    token, strlen(token));
+		numattr++;
+	}
+
+	(void) kmf_delete_key_from_keystore(kmfhandle, numattr, attrlist);
+
+	(void) kmf_free_signed_csr(&csr);
 
 	return (kmfrv);
 }
@@ -380,10 +500,10 @@ pk_gencsr(int argc, char *argv[])
 	int altcrit = 0, kucrit = 0;
 
 	while ((opt = getopt_av(argc, argv,
-		"ik:(keystore)s:(subject)n:(nickname)A:(altname)"
-		"u:(keyusage)T:(token)d:(dir)p:(prefix)t:(keytype)"
-		"y:(keylen)l:(label)c:(outcsr)"
-		"K:(outkey)F:(format)")) != EOF) {
+	    "ik:(keystore)s:(subject)n:(nickname)A:(altname)"
+	    "u:(keyusage)T:(token)d:(dir)p:(prefix)t:(keytype)"
+	    "y:(keylen)l:(label)c:(outcsr)"
+	    "K:(outkey)F:(format)")) != EOF) {
 
 		if (opt != 'i' && EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
@@ -436,11 +556,10 @@ pk_gencsr(int argc, char *argv[])
 				break;
 			case 'y':
 				if (sscanf(optarg_av, "%d",
-					&keylen) != 1) {
+				    &keylen) != 1) {
 					cryptoerror(LOG_STDERR,
-						gettext("Unrecognized "
-						"key length (%s)\n"),
-						optarg_av);
+					    gettext("Unrecognized "
+					    "key length (%s)\n"), optarg_av);
 					return (PK_ERR_USAGE);
 				}
 				break;
@@ -461,8 +580,8 @@ pk_gencsr(int argc, char *argv[])
 				break;
 			default:
 				cryptoerror(LOG_STDERR, gettext(
-					"unrecognized gencsr option '%s'\n"),
-					argv[optind_av]);
+				    "unrecognized gencsr option '%s'\n"),
+				    argv[optind_av]);
 				return (PK_ERR_USAGE);
 		}
 	}
@@ -473,7 +592,7 @@ pk_gencsr(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
 		return (PK_ERR_USAGE);
 	}
@@ -484,7 +603,7 @@ pk_gencsr(int argc, char *argv[])
 
 	if (EMPTYSTRING(outcsr)) {
 		(void) printf(gettext("A filename must be specified to hold"
-			"the final certificate request data.\n"));
+		    "the final certificate request data.\n"));
 		return (PK_ERR_USAGE);
 	} else {
 		/*
@@ -494,7 +613,7 @@ pk_gencsr(int argc, char *argv[])
 		rv = verify_file(outcsr);
 		if (rv != KMF_OK) {
 			cryptoerror(LOG_STDERR, gettext("output file (%s) "
-				"cannot be created.\n"), outcsr);
+			    "cannot be created.\n"), outcsr);
 			return (PK_ERR_USAGE);
 		}
 	}
@@ -512,13 +631,12 @@ pk_gencsr(int argc, char *argv[])
 
 	if (format && (fmt = Str2Format(format)) == KMF_FORMAT_UNDEF) {
 		cryptoerror(LOG_STDERR,
-			gettext("Error parsing format string (%s).\n"),
-			format);
+		    gettext("Error parsing format string (%s).\n"), format);
 		return (PK_ERR_USAGE);
 	}
 	if (format && fmt != KMF_FORMAT_ASN1 && fmt != KMF_FORMAT_PEM) {
 		cryptoerror(LOG_STDERR,
-			gettext("CSR must be DER or PEM format.\n"));
+		    gettext("CSR must be DER or PEM format.\n"));
 		return (PK_ERR_USAGE);
 	}
 
@@ -551,8 +669,8 @@ pk_gencsr(int argc, char *argv[])
 		rv = verify_altname(altname, &alttype, &altcrit);
 		if (rv != KMF_OK) {
 			cryptoerror(LOG_STDERR, gettext("Subject AltName "
-				"must be specified as a name=value pair. "
-				"See the man page for details."));
+			    "must be specified as a name=value pair. "
+			    "See the man page for details."));
 			goto end;
 		} else {
 			/* advance the altname past the '=' sign */
@@ -566,14 +684,14 @@ pk_gencsr(int argc, char *argv[])
 		rv = verify_keyusage(kustr, &kubits, &kucrit);
 		if (rv != KMF_OK) {
 			cryptoerror(LOG_STDERR, gettext("KeyUsage "
-				"must be specified as a comma-separated list. "
-				"See the man page for details."));
+			    "must be specified as a comma-separated list. "
+			    "See the man page for details."));
 			goto end;
 		}
 	}
 	if ((rv = Str2KeyType(keytype, &keyAlg, &sigAlg)) != 0) {
 		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype (%s).\n"),
-			keytype);
+		    keytype);
 		goto end;
 	}
 
@@ -594,28 +712,28 @@ pk_gencsr(int argc, char *argv[])
 			dir = PK_DEFAULT_DIRECTORY;
 
 		rv = gencsr_nss(kmfhandle,
-			tokenname, subname, altname, alttype, altcrit,
-			certlabel, dir, prefix,
-			keyAlg, keylen, kubits, kucrit,
-			fmt, outcsr, &tokencred);
+		    tokenname, subname, altname, alttype, altcrit,
+		    certlabel, dir, prefix,
+		    keyAlg, keylen, kubits, kucrit,
+		    fmt, outcsr, &tokencred);
 
 	} else if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = gencsr_pkcs11(kmfhandle,
-			tokenname, subname, altname, alttype, altcrit,
-			certlabel, keyAlg, keylen,
-			kubits, kucrit, fmt, outcsr, &tokencred);
+		    tokenname, subname, altname, alttype, altcrit,
+		    certlabel, keyAlg, keylen,
+		    kubits, kucrit, fmt, outcsr, &tokencred);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 		rv = gencsr_file(kmfhandle,
-			keyAlg, keylen, fmt, subname, altname,
-			alttype, altcrit, kubits, kucrit,
-			dir, outcsr, outkey);
+		    keyAlg, keylen, fmt, subname, altname,
+		    alttype, altcrit, kubits, kucrit,
+		    dir, outcsr, outkey);
 	}
 
 end:
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
-			gettext("Error creating CSR or keypair"));
+		    gettext("Error creating CSR or keypair"));
 
 	if (subname)
 		free(subname);
@@ -623,7 +741,7 @@ end:
 	if (tokencred.cred != NULL)
 		free(tokencred.cred);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	if (rv != KMF_OK)
 		return (PK_ERR_USAGE);
 

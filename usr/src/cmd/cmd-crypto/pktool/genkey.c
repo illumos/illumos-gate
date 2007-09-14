@@ -42,8 +42,12 @@ genkey_nss(KMF_HANDLE_T kmfhandle, char *token, char *dir, char *prefix,
     char *keylabel, KMF_KEY_ALG keyAlg, int keylen, KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv = KMF_OK;
-	KMF_CREATESYMKEY_PARAMS csk_params;
 	KMF_KEY_HANDLE key;
+	KMF_ATTRIBUTE attlist[20];
+	int i = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
 
 	if (keylabel == NULL) {
 		cryptoerror(LOG_STDERR,
@@ -56,14 +60,48 @@ genkey_nss(KMF_HANDLE_T kmfhandle, char *token, char *dir, char *prefix,
 		return (kmfrv);
 
 	(void) memset(&key, 0, sizeof (KMF_KEY_HANDLE));
-	csk_params.kstype = KMF_KEYSTORE_NSS;
-	csk_params.nssparms.slotlabel = token;
-	csk_params.keytype = keyAlg;
-	csk_params.keylength = keylen;
-	csk_params.keylabel = keylabel;
-	csk_params.cred.cred = tokencred->cred;
-	csk_params.cred.credlen = tokencred->credlen;
-	kmfrv = KMF_CreateSymKey(kmfhandle, &csk_params, &key);
+
+	keytype = keyAlg;
+	keylength = keylen;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEY_HANDLE_ATTR, &key, sizeof (KMF_KEY_HANDLE));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYALG_ATTR, &keytype, sizeof (keytype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYLENGTH_ATTR, &keylength, sizeof (keylength));
+	i++;
+
+	if (keylabel != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEYLABEL_ATTR, keylabel,
+		    strlen(keylabel));
+		i++;
+	}
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_CREDENTIAL_ATTR, tokencred,
+		    sizeof (KMF_CREDENTIAL));
+		i++;
+	}
+
+	if (token != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_TOKEN_LABEL_ATTR, token,
+		    strlen(token));
+		i++;
+	}
+
+	kmfrv = kmf_create_sym_key(kmfhandle, i, attlist);
 
 	return (kmfrv);
 }
@@ -75,13 +113,17 @@ genkey_pkcs11(KMF_HANDLE_T kmfhandle, char *token,
 	KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN kmfrv = KMF_OK;
-	KMF_CREATESYMKEY_PARAMS params;
 	KMF_KEY_HANDLE key;
 	KMF_RAW_SYM_KEY  *rkey = NULL;
 	boolean_t 	sensitive = B_FALSE;
 	boolean_t	not_extractable = B_FALSE;
 	char *hexstr = NULL;
 	int  hexstrlen;
+	KMF_ATTRIBUTE attlist[20];
+	int i = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
 
 	if (keylabel == NULL) {
 		cryptoerror(LOG_STDERR,
@@ -122,15 +164,51 @@ genkey_pkcs11(KMF_HANDLE_T kmfhandle, char *token,
 	}
 
 	(void) memset(&key, 0, sizeof (KMF_KEY_HANDLE));
-	params.kstype = KMF_KEYSTORE_PK11TOKEN;
-	params.keytype = keyAlg;
-	params.keylength = keylen; /* bits */
-	params.keylabel = keylabel;
-	params.pkcs11parms.sensitive = sensitive;
-	params.pkcs11parms.not_extractable = not_extractable;
-	params.cred.cred = tokencred->cred;
-	params.cred.credlen = tokencred->credlen;
-	kmfrv = KMF_CreateSymKey(kmfhandle, &params, &key);
+
+	keytype = keyAlg;
+	keylength = keylen; /* bits */
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEY_HANDLE_ATTR, &key, sizeof (KMF_KEY_HANDLE));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYALG_ATTR, &keytype, sizeof (keytype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYLENGTH_ATTR, &keylength, sizeof (keylength));
+	i++;
+
+	if (keylabel != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEYLABEL_ATTR, keylabel,
+		    strlen(keylabel));
+		i++;
+	}
+
+	if (tokencred != NULL && tokencred->credlen > 0) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_CREDENTIAL_ATTR, tokencred,
+		    sizeof (KMF_CREDENTIAL));
+		i++;
+	}
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_SENSITIVE_BOOL_ATTR, &sensitive,
+	    sizeof (sensitive));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_NON_EXTRACTABLE_BOOL_ATTR, &not_extractable,
+	    sizeof (not_extractable));
+	i++;
+
+	kmfrv = kmf_create_sym_key(kmfhandle, i, attlist);
 	if (kmfrv != KMF_OK) {
 		goto out;
 	}
@@ -148,7 +226,7 @@ genkey_pkcs11(KMF_HANDLE_T kmfhandle, char *token,
 				goto out;
 			}
 			(void) memset(rkey, 0, sizeof (KMF_RAW_SYM_KEY));
-			kmfrv = KMF_GetSymKeyValue(kmfhandle, &key, rkey);
+			kmfrv = kmf_get_sym_key_value(kmfhandle, &key, rkey);
 			if (kmfrv != KMF_OK) {
 				goto out;
 			}
@@ -166,7 +244,7 @@ genkey_pkcs11(KMF_HANDLE_T kmfhandle, char *token,
 	}
 
 out:
-	KMF_FreeRawSymKey(rkey);
+	kmf_free_raw_sym_key(rkey);
 
 	if (hexstr != NULL)
 		free(hexstr);
@@ -180,11 +258,16 @@ genkey_file(KMF_HANDLE_T kmfhandle, KMF_KEY_ALG keyAlg, int keylen, char *dir,
     char *outkey, boolean_t print_hex)
 {
 	KMF_RETURN kmfrv = KMF_OK;
-	KMF_CREATESYMKEY_PARAMS csk_params;
 	KMF_KEY_HANDLE key;
 	KMF_RAW_SYM_KEY *rkey = NULL;
 	char *hexstr = NULL;
 	int hexstrlen;
+	KMF_ATTRIBUTE attlist[20];
+	int i = 0;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	KMF_KEY_ALG keytype;
+	uint32_t keylength;
+	char *dirpath;
 
 	if (EMPTYSTRING(outkey)) {
 		cryptoerror(LOG_STDERR,
@@ -194,21 +277,50 @@ genkey_file(KMF_HANDLE_T kmfhandle, KMF_KEY_ALG keyAlg, int keylen, char *dir,
 
 	if (verify_file(outkey)) {
 		cryptoerror(LOG_STDERR,
-			gettext("Cannot write the indicated output "
-				"key file (%s).\n"), outkey);
+		    gettext("Cannot write the indicated output "
+		    "key file (%s).\n"), outkey);
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
 	(void) memset(&key, 0, sizeof (KMF_KEY_HANDLE));
-	csk_params.kstype = KMF_KEYSTORE_OPENSSL;
-	csk_params.keytype = keyAlg;
-	csk_params.keylength = keylen;
-	csk_params.cred.cred = NULL;
-	csk_params.cred.credlen = 0;
-	csk_params.sslparms.dirpath = (dir == NULL) ? "." : dir;
-	csk_params.sslparms.keyfile = outkey;
 
-	kmfrv = KMF_CreateSymKey(kmfhandle, &csk_params, &key);
+	keytype = keyAlg;
+	keylength = keylen;
+
+	dirpath = (dir == NULL) ? "." : dir;
+
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEY_HANDLE_ATTR, &key, sizeof (KMF_KEY_HANDLE));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYALG_ATTR, &keytype, sizeof (keytype));
+	i++;
+
+	kmf_set_attr_at_index(attlist, i,
+	    KMF_KEYLENGTH_ATTR, &keylength, sizeof (keylength));
+	i++;
+
+	if (dirpath != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_DIRPATH_ATTR, dirpath,
+		    strlen(dirpath));
+		i++;
+	}
+
+	if (outkey != NULL) {
+		kmf_set_attr_at_index(attlist, i,
+		    KMF_KEY_FILENAME_ATTR, outkey,
+		    strlen(outkey));
+		i++;
+	}
+
+	kmfrv = kmf_create_sym_key(kmfhandle, i, attlist);
 	if (kmfrv != KMF_OK) {
 		goto out;
 	}
@@ -220,7 +332,7 @@ genkey_file(KMF_HANDLE_T kmfhandle, KMF_KEY_ALG keyAlg, int keylen, char *dir,
 			goto out;
 		}
 		(void) memset(rkey, 0, sizeof (KMF_RAW_SYM_KEY));
-		kmfrv = KMF_GetSymKeyValue(kmfhandle, &key, rkey);
+		kmfrv = kmf_get_sym_key_value(kmfhandle, &key, rkey);
 		if (kmfrv != KMF_OK) {
 			goto out;
 		}
@@ -237,7 +349,7 @@ genkey_file(KMF_HANDLE_T kmfhandle, KMF_KEY_ALG keyAlg, int keylen, char *dir,
 	}
 
 out:
-	KMF_FreeRawSymKey(rkey);
+	kmf_free_raw_sym_key(rkey);
 
 	if (hexstr != NULL)
 		free(hexstr);
@@ -256,7 +368,7 @@ pk_genkey(int argc, char *argv[])
 	char *tokenname = NULL;
 	char *dir = NULL;
 	char *prefix = NULL;
-	char *keytype = "AES";
+	char *keytype = "generic";
 	char *keylenstr = NULL;
 	int keylen = 0;
 	char *keylabel = NULL;
@@ -265,14 +377,14 @@ pk_genkey(int argc, char *argv[])
 	char *extstr = NULL;
 	char *printstr = NULL;
 	KMF_HANDLE_T kmfhandle = NULL;
-	KMF_KEY_ALG keyAlg = KMF_AES;
+	KMF_KEY_ALG keyAlg = KMF_GENERIC_SECRET;
 	boolean_t print_hex = B_FALSE;
 	KMF_CREDENTIAL tokencred = {NULL, 0};
 
 	while ((opt = getopt_av(argc, argv,
-		"k:(keystore)l:(label)T:(token)d:(dir)p:(prefix)"
-		"t:(keytype)y:(keylen)K:(outkey)P:(print)"
-		"s:(sensitive)e:(extractable)")) != EOF) {
+	    "k:(keystore)l:(label)T:(token)d:(dir)p:(prefix)"
+	    "t:(keytype)y:(keylen)K:(outkey)P:(print)"
+	    "s:(sensitive)e:(extractable)")) != EOF) {
 		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
 		switch (opt) {
@@ -344,7 +456,7 @@ pk_genkey(int argc, char *argv[])
 	/* Check keytype. If not specified, default to AES */
 	if (keytype != NULL && Str2SymKeyType(keytype, &keyAlg) != 0) {
 		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype(%s).\n"),
-			keytype);
+		    keytype);
 		return (PK_ERR_USAGE);
 	}
 
@@ -362,20 +474,20 @@ pk_genkey(int argc, char *argv[])
 	else /* AES, ARCFOUR, or GENERIC SECRET */ {
 		if (keylenstr == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Key length must be specified for "
-				"AES, ARCFOUR or GENERIC symmetric keys.\n"));
+			    gettext("Key length must be specified for "
+			    "AES, ARCFOUR or GENERIC symmetric keys.\n"));
 			return (PK_ERR_USAGE);
 		}
 		if (sscanf(keylenstr, "%d", &keylen) != 1) {
 			cryptoerror(LOG_STDERR,
-				gettext("Unrecognized key length (%s).\n"),
-				keytype);
+			    gettext("Unrecognized key length (%s).\n"),
+			    keytype);
 			return (PK_ERR_USAGE);
 		}
 		if (keylen == 0 || (keylen % 8) != 0) {
 			cryptoerror(LOG_STDERR,
-				gettext("Key length bitlength must be a "
-					"multiple of 8.\n"));
+			    gettext("Key length bitlength must be a "
+			    "multiple of 8.\n"));
 			return (PK_ERR_USAGE);
 		}
 	}
@@ -418,7 +530,7 @@ pk_genkey(int argc, char *argv[])
 	if (kstype == KMF_KEYSTORE_PK11TOKEN || kstype == KMF_KEYSTORE_NSS)
 		(void) get_token_password(kstype, tokenname, &tokencred);
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
 		goto end;
 	}
@@ -437,12 +549,12 @@ pk_genkey(int argc, char *argv[])
 end:
 	if (rv != KMF_OK)
 		display_error(kmfhandle, rv,
-			gettext("Error generating key"));
+		    gettext("Error generating key"));
 
 	if (tokencred.cred != NULL)
 		free(tokencred.cred);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	if (rv != KMF_OK)
 		return (PK_ERR_USAGE);
 

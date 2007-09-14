@@ -326,9 +326,9 @@ algorithm_list()
 		    mech_aliases[mech].keysize_max != 0)
 			(void) printf("         %5lu %5lu\n",
 			    (mech_aliases[mech].keysize_min *
-				mech_aliases[mech].keysize_unit),
+			    mech_aliases[mech].keysize_unit),
 			    (mech_aliases[mech].keysize_max *
-				mech_aliases[mech].keysize_unit));
+			    mech_aliases[mech].keysize_unit));
 		else
 			(void) printf("\n");
 
@@ -395,7 +395,7 @@ generate_pkcs5_key(CK_SESSION_HANDLE hSession,
 	mechanism.ulParameterLen = sizeof (params);
 
 	rv = C_GenerateKey(hSession, &mechanism, tmpl,
-		attrs, hKey);
+	    attrs, hKey);
 
 	return (rv);
 }
@@ -522,7 +522,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	if (aflag) {
 		/* Determine if algorithm is valid */
 		for (mech_match = 0; mech_match < MECH_ALIASES_COUNT;
-			mech_match++) {
+		    mech_match++) {
 			if (strcmp(algo_str,
 			    mech_aliases[mech_match].alias) == 0) {
 				mech_type = mech_aliases[mech_match].type;
@@ -623,12 +623,12 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 				if (info.ulMinKeySize && (info.ulMinKeySize <
 				    mech_aliases[mek].keysize_min))
 					mech_aliases[mek].keysize_min =
-						    info.ulMinKeySize;
+					    info.ulMinKeySize;
 
 				if (info.ulMaxKeySize && (info.ulMaxKeySize >
 				    mech_aliases[mek].keysize_max))
 					mech_aliases[mek].keysize_max =
-						    info.ulMaxKeySize;
+					    info.ulMaxKeySize;
 
 				mech_aliases[mek].available = B_TRUE;
 			}
@@ -650,7 +650,8 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	 */
 	i = 0;
 	if (Kflag) {
-		kmfrv = KMF_PK11TokenLookup(NULL, token_label, &token_slot_id);
+		kmfrv = kmf_pk11_token_lookup(NULL, token_label,
+		    &token_slot_id);
 		if (kmfrv != KMF_OK) {
 			cryptoerror(LOG_STDERR,
 			    gettext("no matching PKCS#11 token"));
@@ -701,7 +702,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 
 	/* Open a session */
 	rv = C_OpenSession(slotID, CKF_SERIAL_SESSION,
-		NULL_PTR, NULL, &hSession);
+	    NULL_PTR, NULL, &hSession);
 
 	if (rv != CKR_OK) {
 		cryptoerror(LOG_STDERR,
@@ -725,8 +726,8 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		if ((get_random_data(pivbuf,
 		    mech_aliases[mech_match].ivlen)) != 0) {
 			cryptoerror(LOG_STDERR, gettext(
-				"Unable to generate random "
-				"data for initialization vector."));
+			    "Unable to generate random "
+			    "data for initialization vector."));
 			goto cleanup;
 		}
 	}
@@ -737,7 +738,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	rv = pkcs11_mech2keytype(mech_type, &keytype);
 	if (rv != CKR_OK) {
 		cryptoerror(LOG_STDERR,
-			gettext("unable to find key type for algorithm."));
+		    gettext("unable to find key type for algorithm."));
 		goto cleanup;
 	}
 
@@ -745,14 +746,14 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	if (iflag) {
 		if ((infd = open(inputfile, O_RDONLY | O_NONBLOCK)) == -1) {
 			cryptoerror(LOG_STDERR, gettext(
-				"can not open input file %s"), inputfile);
+			    "can not open input file %s"), inputfile);
 			goto cleanup;
 		}
 
 		/* Get info on input file */
 		if (fstat(infd, &insbuf) == -1) {
 			cryptoerror(LOG_STDERR, gettext(
-				"can not stat input file %s"), inputfile);
+			    "can not stat input file %s"), inputfile);
 			goto cleanup;
 		}
 	}
@@ -768,13 +769,13 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	if (oflag) {
 		outfilename = outputfile;
 		if ((stat(outputfile, &outsbuf) != -1) &&
-			(insbuf.st_ino == outsbuf.st_ino)) {
+		    (insbuf.st_ino == outsbuf.st_ino)) {
 			char *dir;
 
 			/* create temp file on same dir */
 			dir = dirname(outputfile);
 			(void) snprintf(tmpnam, sizeof (tmpnam),
-				"%s/encrXXXXXX", dir);
+			    "%s/encrXXXXXX", dir);
 			outfilename = tmpnam;
 			if ((outfd = mkstemp(tmpnam)) == -1) {
 				cryptoerror(LOG_STDERR, gettext(
@@ -785,8 +786,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		} else {
 			/* Create file for output */
 			if ((outfd = open(outfilename,
-			    O_CREAT|O_WRONLY|O_TRUNC,
-					0644)) == -1) {
+			    O_CREAT|O_WRONLY|O_TRUNC, 0644)) == -1) {
 				cryptoerror(LOG_STDERR, gettext(
 				    "cannot open output file %s"),
 				    outfilename);
@@ -801,7 +801,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	 */
 	if (cmd->type == CKA_DECRYPT) {
 		if (read(infd, &version, sizeof (version)) !=
-			sizeof (version)) {
+		    sizeof (version)) {
 			cryptoerror(LOG_STDERR, gettext(
 			    "failed to get format version from "
 			    "input file."));
@@ -827,11 +827,10 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			 * Read iteration count and salt data.
 			 */
 			if (read(infd, &iterations,
-				sizeof (iterations)) !=
-				sizeof (iterations)) {
+			    sizeof (iterations)) != sizeof (iterations)) {
 				cryptoerror(LOG_STDERR, gettext(
-					"failed to get iterations from "
-					"input file."));
+				    "failed to get iterations from "
+				    "input file."));
 				goto cleanup;
 			}
 			/* convert to host byte order */
@@ -844,18 +843,18 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 				goto cleanup;
 			}
 			if (read(infd, salt, sizeof (salt))
-				!= sizeof (salt)) {
+			    != sizeof (salt)) {
 				cryptoerror(LOG_STDERR, gettext(
-					"failed to get salt data from "
-					"input file."));
+				    "failed to get salt data from "
+				    "input file."));
 				goto cleanup;
 			}
 			break;
 		default:
 			cryptoerror(LOG_STDERR, gettext(
-			"Unrecognized format version read from "
-			"input file - expected %d, got %d."),
-			SUNW_ENCRYPT_FILE_VERSION, version);
+			    "Unrecognized format version read from "
+			    "input file - expected %d, got %d."),
+			    SUNW_ENCRYPT_FILE_VERSION, version);
 			goto cleanup;
 			break;
 		}
@@ -884,7 +883,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		if (rv != 0) {
 			cryptoerror(LOG_STDERR,
 			gettext("unable to generate random "
-				"data for key salt."));
+			    "data for key salt."));
 			goto cleanup;
 		}
 	}
@@ -926,8 +925,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		template[nattr].ulValueLen = keysize;
 		nattr++;
 
-		rv = C_CreateObject(hSession, template,
-			nattr, &key);
+		rv = C_CreateObject(hSession, template, nattr, &key);
 	} else {
 		/*
 		 * If the encryption type has a fixed key length,
@@ -945,10 +943,9 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		 * the passphrase entered by the user.
 		 */
 		rv = generate_pkcs5_key(hSession,
-			salt, sizeof (salt),
-			iterations,
-			pkeydata, keytype, keysize,
-			keylen, cmd->type, &key);
+		    salt, sizeof (salt), iterations,
+		    pkeydata, keytype, keysize,
+		    keylen, cmd->type, &key);
 	}
 
 	if (rv != CKR_OK) {
@@ -979,10 +976,10 @@ do_crypto:
 		CK_ULONG netiter;
 
 		if (write(outfd, &netversion, sizeof (netversion))
-			!= sizeof (netversion)) {
+		    != sizeof (netversion)) {
 			cryptoerror(LOG_STDERR, gettext(
-			"failed to write version number "
-			"to output file."));
+			    "failed to write version number "
+			    "to output file."));
 			goto cleanup;
 		}
 		/*
@@ -991,16 +988,15 @@ do_crypto:
 		 */
 		netiter = htonl(iterations);
 		if (write(outfd, &netiter,
-			sizeof (netiter)) != sizeof (netiter)) {
+		    sizeof (netiter)) != sizeof (netiter)) {
 			cryptoerror(LOG_STDERR, gettext(
 			    "failed to write iterations to output"));
 			goto cleanup;
 		}
-		if (ivlen > 0 &&
-			write(outfd, pivbuf, ivlen) != ivlen) {
+		if (ivlen > 0 && write(outfd, pivbuf, ivlen) != ivlen) {
 			cryptoerror(LOG_STDERR, gettext(
-				"failed to write initialization vector "
-				"to output"));
+			    "failed to write initialization vector "
+			    "to output"));
 			goto cleanup;
 		}
 		if (write(outfd, salt, sizeof (salt)) != sizeof (salt)) {
@@ -1142,7 +1138,7 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 		/* Start with the initial buffer */
 		resultlen = resultbuflen;
 		rv = cmd->Update(hSession, databuf, (CK_ULONG)nread,
-			resultbuf, &resultlen);
+		    resultbuf, &resultlen);
 
 		/* Need a bigger buffer? */
 		if (rv == CKR_BUFFER_TOO_SMALL) {
@@ -1164,7 +1160,7 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 
 			/* Try again with bigger buffer */
 			rv = cmd->Update(hSession, databuf, (CK_ULONG)nread,
-				resultbuf, &resultlen);
+			    resultbuf, &resultlen);
 		}
 
 		if (rv != CKR_OK) {
@@ -1300,21 +1296,21 @@ cryptoreadfile(char *filename, CK_BYTE_PTR *pdata, CK_ULONG_PTR pdatalen)
 	/* read the file into a buffer */
 	if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) == -1) {
 		cryptoerror(LOG_STDERR, gettext(
-			"cannot open %s"), filename);
+		    "cannot open %s"), filename);
 		return (-1);
 
 	}
 
 	if (fstat(fd, &statbuf) == -1) {
 		cryptoerror(LOG_STDERR, gettext(
-			"cannot stat %s"), filename);
+		    "cannot stat %s"), filename);
 		(void) close(fd);
 		return (-1);
 	}
 
 	if (!S_ISREG(statbuf.st_mode)) {
 		cryptoerror(LOG_STDERR, gettext(
-			"%s not a regular file"), filename);
+		    "%s not a regular file"), filename);
 		(void) close(fd);
 		return (-1);
 	}

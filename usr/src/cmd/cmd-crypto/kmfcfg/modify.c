@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,34 +82,34 @@ kc_modify(int argc, char *argv[])
 	(void) memset(&oplc, 0, sizeof (KMF_POLICY_RECORD));
 
 	while ((opt = getopt_av(argc, argv,
-		"i:(dbfile)"
-		"p:(policy)"
-		"d:(ignore-date)"
-		"e:(ignore-unknown-eku)"
-		"a:(ignore-trust-anchor)"
-		"v:(validity-adjusttime)"
-		"t:(ta-name)"
-		"s:(ta-serial)"
-		"o:(ocsp-responder)"
-		"P:(ocsp-proxy)"
-		"r:(ocsp-use-cert-responder)"
-		"T:(ocsp-response-lifetime)"
-		"R:(ocsp-ignore-response-sign)"
-		"n:(ocsp-responder-cert-name)"
-		"A:(ocsp-responder-cert-serial)"
-		"y:(ocsp-none)"
-		"c:(crl-basefilename)"
-		"I:(crl-directory)"
-		"g:(crl-get-crl-uri)"
-		"X:(crl-proxy)"
-		"S:(crl-ignore-crl-sign)"
-		"D:(crl-ignore-crl-date)"
-		"z:(crl-none)"
-		"u:(keyusage)"
-		"Y:(keyusage-none)"
-		"E:(ekunames)"
-		"O:(ekuoids)"
-		"Z:(eku-none)")) != EOF) {
+	    "i:(dbfile)"
+	    "p:(policy)"
+	    "d:(ignore-date)"
+	    "e:(ignore-unknown-eku)"
+	    "a:(ignore-trust-anchor)"
+	    "v:(validity-adjusttime)"
+	    "t:(ta-name)"
+	    "s:(ta-serial)"
+	    "o:(ocsp-responder)"
+	    "P:(ocsp-proxy)"
+	    "r:(ocsp-use-cert-responder)"
+	    "T:(ocsp-response-lifetime)"
+	    "R:(ocsp-ignore-response-sign)"
+	    "n:(ocsp-responder-cert-name)"
+	    "A:(ocsp-responder-cert-serial)"
+	    "y:(ocsp-none)"
+	    "c:(crl-basefilename)"
+	    "I:(crl-directory)"
+	    "g:(crl-get-crl-uri)"
+	    "X:(crl-proxy)"
+	    "S:(crl-ignore-crl-sign)"
+	    "D:(crl-ignore-crl-date)"
+	    "z:(crl-none)"
+	    "u:(keyusage)"
+	    "Y:(keyusage-none)"
+	    "E:(ekunames)"
+	    "O:(ekuoids)"
+	    "Z:(eku-none)")) != EOF) {
 		switch (opt) {
 			case 'i':
 				filename = get_string(optarg_av, &rv);
@@ -186,14 +186,14 @@ kc_modify(int argc, char *argv[])
 				} else {
 					KMF_X509_NAME taDN;
 					/* for syntax checking */
-					if (KMF_DNParser(plc.ta_name,
+					if (kmf_dn_parser(plc.ta_name,
 					    &taDN) != KMF_OK) {
 						(void) fprintf(stderr,
 						    gettext("Error name "
 						    "input.\n"));
 						rv = KC_ERR_USAGE;
 					} else {
-						KMF_FreeDN(&taDN);
+						kmf_free_dn(&taDN);
 						flags |= KC_TA_NAME;
 					}
 				}
@@ -207,7 +207,7 @@ kc_modify(int argc, char *argv[])
 					uchar_t *bytes = NULL;
 					size_t bytelen;
 
-					ret = KMF_HexString2Bytes(
+					ret = kmf_hexstr_to_bytes(
 					    (uchar_t *)plc.ta_serial,
 					    &bytes, &bytelen);
 					if (ret != KMF_OK || bytes == NULL) {
@@ -227,7 +227,7 @@ kc_modify(int argc, char *argv[])
 				break;
 			case 'o':
 				plc.VAL_OCSP_RESPONDER_URI =
-					get_string(optarg_av, &rv);
+				    get_string(optarg_av, &rv);
 				if (plc.VAL_OCSP_RESPONDER_URI == NULL) {
 					(void) fprintf(stderr,
 					    gettext("Error responder "
@@ -302,7 +302,7 @@ kc_modify(int argc, char *argv[])
 				} else {
 					KMF_X509_NAME respDN;
 					/* for syntax checking */
-					if (KMF_DNParser(
+					if (kmf_dn_parser(
 					    plc.VAL_OCSP_RESP_CERT_NAME,
 					    &respDN) != KMF_OK) {
 						(void) fprintf(stderr,
@@ -310,7 +310,7 @@ kc_modify(int argc, char *argv[])
 						    "input.\n"));
 						rv = KC_ERR_USAGE;
 					} else {
-						KMF_FreeDN(&respDN);
+						kmf_free_dn(&respDN);
 						flags |= KC_OCSP_RESP_CERT_NAME;
 						ocsp_set_attr++;
 					}
@@ -326,7 +326,7 @@ kc_modify(int argc, char *argv[])
 					uchar_t *bytes = NULL;
 					size_t bytelen;
 
-					ret = KMF_HexString2Bytes((uchar_t *)
+					ret = kmf_hexstr_to_bytes((uchar_t *)
 					    plc.VAL_OCSP_RESP_CERT_SERIAL,
 					    &bytes, &bytelen);
 					if (ret != KMF_OK || bytes == NULL) {
@@ -412,7 +412,7 @@ kc_modify(int argc, char *argv[])
 				break;
 			case 'D':
 				plc.VAL_CRL_IGNORE_DATE =
-					get_boolean(optarg_av);
+				    get_boolean(optarg_av);
 				if (plc.VAL_CRL_IGNORE_DATE == -1) {
 					(void) fprintf(stderr,
 					    gettext("Error boolean input.\n"));
@@ -536,7 +536,7 @@ kc_modify(int argc, char *argv[])
 	}
 
 	/* Try to load the named policy from the DB */
-	ret = KMF_GetPolicy(filename, plc.name, &oplc);
+	ret = kmf_get_policy(filename, plc.name, &oplc);
 	if (ret != KMF_OK) {
 		(void) fprintf(stderr,
 		    gettext("Error loading policy \"%s\" from %s\n"), filename,
@@ -558,7 +558,7 @@ kc_modify(int argc, char *argv[])
 		if (oplc.validity_adjusttime)
 			free(oplc.validity_adjusttime);
 		oplc.validity_adjusttime =
-			plc.validity_adjusttime;
+		    plc.validity_adjusttime;
 	}
 
 	if (flags & KC_TA_NAME) {
@@ -629,7 +629,7 @@ kc_modify(int argc, char *argv[])
 				if (oplc.VAL_OCSP_RESPONDER_URI)
 					free(oplc.VAL_OCSP_RESPONDER_URI);
 				oplc.VAL_OCSP_RESPONDER_URI =
-					plc.VAL_OCSP_RESPONDER_URI;
+				    plc.VAL_OCSP_RESPONDER_URI;
 			}
 
 			if (flags & KC_OCSP_PROXY) {
@@ -640,31 +640,31 @@ kc_modify(int argc, char *argv[])
 
 			if (flags & KC_OCSP_URI_FROM_CERT)
 				oplc.VAL_OCSP_URI_FROM_CERT =
-					plc.VAL_OCSP_URI_FROM_CERT;
+				    plc.VAL_OCSP_URI_FROM_CERT;
 
 			if (flags & KC_OCSP_RESP_LIFETIME) {
 				if (oplc.VAL_OCSP_RESP_LIFETIME)
 					free(oplc.VAL_OCSP_RESP_LIFETIME);
 				oplc.VAL_OCSP_RESP_LIFETIME =
-					plc.VAL_OCSP_RESP_LIFETIME;
+				    plc.VAL_OCSP_RESP_LIFETIME;
 			}
 
 			if (flags & KC_OCSP_IGNORE_RESP_SIGN)
 				oplc.VAL_OCSP_IGNORE_RESP_SIGN =
-					plc.VAL_OCSP_IGNORE_RESP_SIGN;
+				    plc.VAL_OCSP_IGNORE_RESP_SIGN;
 
 			if (flags & KC_OCSP_RESP_CERT_NAME) {
 				if (oplc.VAL_OCSP_RESP_CERT_NAME)
 					free(oplc.VAL_OCSP_RESP_CERT_NAME);
 				oplc.VAL_OCSP_RESP_CERT_NAME =
-					plc.VAL_OCSP_RESP_CERT_NAME;
+				    plc.VAL_OCSP_RESP_CERT_NAME;
 			}
 
 			if (flags & KC_OCSP_RESP_CERT_SERIAL) {
 				if (oplc.VAL_OCSP_RESP_CERT_SERIAL)
 					free(oplc.VAL_OCSP_RESP_CERT_SERIAL);
 				oplc.VAL_OCSP_RESP_CERT_SERIAL =
-					plc.VAL_OCSP_RESP_CERT_SERIAL;
+				    plc.VAL_OCSP_RESP_CERT_SERIAL;
 			}
 
 			if (oplc.VAL_OCSP_RESP_CERT_NAME != NULL &&
@@ -792,7 +792,7 @@ kc_modify(int argc, char *argv[])
 
 		/* Release current EKU list (if any) */
 		if (oplc.eku_set.eku_count > 0) {
-			KMF_FreeEKUPolicy(&oplc.eku_set);
+			kmf_free_eku_policy(&oplc.eku_set);
 			oplc.eku_set.eku_count = 0;
 			oplc.eku_set.ekulist = NULL;
 		}
@@ -804,13 +804,13 @@ kc_modify(int argc, char *argv[])
 		 */
 		if (flags & KC_EKUS) {
 			/* Release current EKU list (if any) */
-			KMF_FreeEKUPolicy(&oplc.eku_set);
+			kmf_free_eku_policy(&oplc.eku_set);
 			oplc.eku_set = plc.eku_set;
 		}
 	}
 
 	/* Do a sanity check on the modified policy */
-	ret = KMF_VerifyPolicy(&oplc);
+	ret = kmf_verify_policy(&oplc);
 	if (ret != KMF_OK) {
 		print_sanity_error(ret);
 		rv = KC_ERR_VERIFY_POLICY;
@@ -818,7 +818,7 @@ kc_modify(int argc, char *argv[])
 	}
 
 	/* The modify operation is a delete followed by an add */
-	ret = KMF_DeletePolicyFromDB(oplc.name, filename);
+	ret = kmf_delete_policy_from_db(oplc.name, filename);
 	if (ret != KMF_OK) {
 		rv = KC_ERR_DELETE_POLICY;
 		goto out;
@@ -827,7 +827,7 @@ kc_modify(int argc, char *argv[])
 	/*
 	 * Now add the modified policy back to the DB.
 	 */
-	ret = KMF_AddPolicyToDB(&oplc, filename, B_FALSE);
+	ret = kmf_add_policy_to_db(&oplc, filename, B_FALSE);
 	if (ret != KMF_OK) {
 		(void) fprintf(stderr,
 		    gettext("Error adding policy to database: 0x%04x\n"), ret);
@@ -839,7 +839,7 @@ out:
 	if (filename != NULL)
 		free(filename);
 
-	KMF_FreePolicyRecord(&oplc);
+	kmf_free_policy_record(&oplc);
 
 	return (rv);
 }

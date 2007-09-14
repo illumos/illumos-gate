@@ -46,6 +46,7 @@ pk_show_certs(KMF_HANDLE_T kmfhandle, KMF_X509_DER_CERT *certs, int num_certs)
 {
 	int i;
 	char *subject, *issuer, *serial, *id, *altname;
+	char *start, *end, *keyusage, *extkeyusage;
 
 	for (i = 0; i < num_certs; i++) {
 		subject = NULL;
@@ -53,42 +54,66 @@ pk_show_certs(KMF_HANDLE_T kmfhandle, KMF_X509_DER_CERT *certs, int num_certs)
 		serial = NULL;
 		id = NULL;
 		altname = NULL;
+		start = end = NULL;
+		keyusage = extkeyusage = NULL;
 
 		(void) fprintf(stdout,
-			gettext("%d. (X.509 certificate)\n"), i + 1);
+		    gettext("%d. (X.509 certificate)\n"), i + 1);
 		if (certs[i].kmf_private.label != NULL)
 			(void) fprintf(stdout, gettext("\t%s: %s\n"),
-				(certs[i].kmf_private.keystore_type ==
-				KMF_KEYSTORE_OPENSSL ?  "Filename" : "Label"),
-				certs[i].kmf_private.label);
-		if (KMF_GetCertIDString(&certs[i].certificate,
-				&id) == KMF_OK)
+			    (certs[i].kmf_private.keystore_type ==
+			    KMF_KEYSTORE_OPENSSL ?  "Filename" : "Label"),
+			    certs[i].kmf_private.label);
+		if (kmf_get_cert_id_str(&certs[i].certificate,
+		    &id) == KMF_OK)
 			(void) fprintf(stdout, gettext("\tID: %s\n"), id);
-		if (KMF_GetCertSubjectNameString(kmfhandle,
-			&certs[i].certificate, &subject) == KMF_OK)
+		if (kmf_get_cert_subject_str(kmfhandle,
+		    &certs[i].certificate, &subject) == KMF_OK)
 			(void) fprintf(stdout, gettext("\tSubject: %s\n"),
-				subject);
-		if (KMF_GetCertIssuerNameString(kmfhandle,
-			&certs[i].certificate, &issuer) == KMF_OK)
+			    subject);
+		if (kmf_get_cert_issuer_str(kmfhandle,
+		    &certs[i].certificate, &issuer) == KMF_OK)
 			(void) fprintf(stdout, gettext("\tIssuer: %s\n"),
-				issuer);
-		if (KMF_GetCertSerialNumberString(kmfhandle,
-			&certs[i].certificate, &serial) == KMF_OK)
+			    issuer);
+		if (kmf_get_cert_start_date_str(kmfhandle,
+		    &certs[i].certificate, &start) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tNot Before: %s\n"),
+			    start);
+		if (kmf_get_cert_end_date_str(kmfhandle,
+		    &certs[i].certificate, &end) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tNot After: %s\n"),
+			    end);
+		if (kmf_get_cert_serial_str(kmfhandle,
+		    &certs[i].certificate, &serial) == KMF_OK)
 			(void) fprintf(stdout, gettext("\tSerial: %s\n"),
-				serial);
-
-		if (KMF_GetCertExtensionString(kmfhandle,
-			&certs[i].certificate, KMF_X509_EXT_SUBJ_ALTNAME,
-			&altname) == KMF_OK)  {
+			    serial);
+		if (kmf_get_cert_extn_str(kmfhandle,
+		    &certs[i].certificate, KMF_X509_EXT_SUBJ_ALTNAME,
+		    &altname) == KMF_OK)  {
 			(void) fprintf(stdout, gettext("\t%s\n"),
-				altname);
+			    altname);
 		}
-
-		KMF_FreeString(subject);
-		KMF_FreeString(issuer);
-		KMF_FreeString(serial);
-		KMF_FreeString(id);
-		KMF_FreeString(altname);
+		if (kmf_get_cert_extn_str(kmfhandle,
+		    &certs[i].certificate, KMF_X509_EXT_KEY_USAGE,
+		    &keyusage) == KMF_OK)  {
+			(void) fprintf(stdout, gettext("\t%s\n"),
+			    keyusage);
+		}
+		if (kmf_get_cert_extn_str(kmfhandle,
+		    &certs[i].certificate, KMF_X509_EXT_EXT_KEY_USAGE,
+		    &extkeyusage) == KMF_OK)  {
+			(void) fprintf(stdout, gettext("\t%s\n"),
+			    extkeyusage);
+		}
+		kmf_free_str(subject);
+		kmf_free_str(issuer);
+		kmf_free_str(serial);
+		kmf_free_str(id);
+		kmf_free_str(altname);
+		kmf_free_str(keyusage);
+		kmf_free_str(extkeyusage);
+		kmf_free_str(start);
+		kmf_free_str(end);
 		(void) fprintf(stdout, "\n");
 	}
 }
@@ -140,20 +165,36 @@ pk_show_keys(void *handle, KMF_KEY_HANDLE *keys, int numkeys)
 
 	for (i = 0; i < numkeys; i++) {
 		(void) fprintf(stdout, gettext("Key #%d - %s:  %s"),
-			i+1, describeKey(&keys[i]),
-			keys[i].keylabel ? keys[i].keylabel :
-			gettext("No label"));
+		    i+1, describeKey(&keys[i]),
+		    keys[i].keylabel ? keys[i].keylabel :
+		    gettext("No label"));
 
 		if (keys[i].keyclass == KMF_SYMMETRIC) {
 			KMF_RETURN rv;
 			KMF_RAW_SYM_KEY rkey;
 
-			rv = KMF_GetSymKeyValue(handle, &keys[i],
-				&rkey);
+			(void) memset(&rkey, 0, sizeof (rkey));
+			rv = kmf_get_sym_key_value(handle, &keys[i],
+			    &rkey);
 			if (rv == KMF_OK) {
 				(void) fprintf(stdout, " (%d bits)",
-					rkey.keydata.len * 8);
-				KMF_FreeRawSymKey(&rkey);
+				    rkey.keydata.len * 8);
+				kmf_free_bigint(&rkey.keydata);
+			} else if (keys[i].kstype == KMF_KEYSTORE_PK11TOKEN) {
+				if (rv == KMF_ERR_SENSITIVE_KEY) {
+					(void) fprintf(stdout, " (sensitive)");
+				} else if (rv == KMF_ERR_UNEXTRACTABLE_KEY) {
+					(void) fprintf(stdout,
+					    " (non-extractable)");
+				} else {
+					char *err = NULL;
+					if (kmf_get_kmf_error_str(rv, &err) ==
+					    KMF_OK)
+						(void) fprintf(stdout,
+						    " (error: %s)", err);
+					if (err != NULL)
+						free(err);
+				}
 			}
 		}
 		(void) fprintf(stdout, "\n");
@@ -165,69 +206,97 @@ pk_show_keys(void *handle, KMF_KEY_HANDLE *keys, int numkeys)
  * all matching certificates.
  */
 static KMF_RETURN
-pk_find_certs(KMF_HANDLE_T kmfhandle, KMF_FINDCERT_PARAMS *params)
+pk_find_certs(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attrlist, int numattr)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_X509_DER_CERT *certlist = NULL;
 	uint32_t numcerts = 0;
+	KMF_KEYSTORE_TYPE kstype;
 
-	numcerts = 0;
-	rv = KMF_FindCert(kmfhandle, params, NULL, &numcerts);
+	rv = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (rv != KMF_OK)
+		return (rv);
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_COUNT_ATTR,
+	    &numcerts, sizeof (uint32_t));
+	numattr++;
+
+	rv = kmf_find_cert(kmfhandle, numattr, attrlist);
 	if (rv == KMF_OK && numcerts > 0) {
 		(void) printf(gettext("Found %d certificates.\n"),
-			numcerts);
+		    numcerts);
 		certlist = (KMF_X509_DER_CERT *)malloc(numcerts *
-				sizeof (KMF_X509_DER_CERT));
+		    sizeof (KMF_X509_DER_CERT));
 		if (certlist == NULL)
 			return (KMF_ERR_MEMORY);
 		(void) memset(certlist, 0, numcerts *
-			sizeof (KMF_X509_DER_CERT));
+		    sizeof (KMF_X509_DER_CERT));
 
-		rv = KMF_FindCert(kmfhandle, params, certlist, &numcerts);
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_X509_DER_CERT_ATTR, certlist,
+		    sizeof (KMF_X509_DER_CERT));
+		numattr++;
+
+		rv = kmf_find_cert(kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
 			int i;
 			(void) pk_show_certs(kmfhandle, certlist,
-				numcerts);
+			    numcerts);
 			for (i = 0; i < numcerts; i++)
-				KMF_FreeKMFCert(kmfhandle, &certlist[i]);
+				kmf_free_kmf_cert(kmfhandle, &certlist[i]);
 		}
 		free(certlist);
 	}
 	if (rv == KMF_ERR_CERT_NOT_FOUND &&
-		params->kstype != KMF_KEYSTORE_OPENSSL)
+	    kstype != KMF_KEYSTORE_OPENSSL)
 		rv = KMF_OK;
 
 	return (rv);
 }
 
 static KMF_RETURN
-pk_list_keys(void *handle, KMF_FINDKEY_PARAMS *parms)
+pk_list_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
 {
 	KMF_RETURN rv;
 	KMF_KEY_HANDLE *keys;
 	uint32_t numkeys = 0;
+	KMF_KEYSTORE_TYPE kstype;
 
-	numkeys = 0;
-	rv = KMF_FindKey(handle, parms, NULL, &numkeys);
+	rv = kmf_get_attr(KMF_KEYSTORE_TYPE_ATTR, attrlist, numattr,
+	    &kstype, NULL);
+	if (rv != KMF_OK)
+		return (rv);
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_COUNT_ATTR,
+	    &numkeys, sizeof (uint32_t));
+	numattr++;
+
+	rv = kmf_find_key(handle, numattr, attrlist);
 	if (rv == KMF_OK && numkeys > 0) {
 		int i;
 		(void) printf(gettext("Found %d keys.\n"), numkeys);
 		keys = (KMF_KEY_HANDLE *)malloc(numkeys *
-				sizeof (KMF_KEY_HANDLE));
+		    sizeof (KMF_KEY_HANDLE));
 		if (keys == NULL)
 			return (KMF_ERR_MEMORY);
 		(void) memset(keys, 0, numkeys *
-			sizeof (KMF_KEY_HANDLE));
+		    sizeof (KMF_KEY_HANDLE));
 
-		rv = KMF_FindKey(handle, parms, keys, &numkeys);
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEY_HANDLE_ATTR,
+		    keys, sizeof (KMF_KEY_HANDLE));
+		numattr++;
+
+		rv = kmf_find_key(handle, numattr, attrlist);
 		if (rv == KMF_OK)
 			pk_show_keys(handle, keys, numkeys);
 		for (i = 0; i < numkeys; i++)
-			KMF_FreeKMFKey(handle, &keys[i]);
+			kmf_free_kmf_key(handle, &keys[i]);
 		free(keys);
 	}
 	if (rv == KMF_ERR_KEY_NOT_FOUND &&
-		parms->kstype != KMF_KEYSTORE_OPENSSL)
+	    kstype != KMF_KEYSTORE_OPENSSL)
 		rv = KMF_OK;
 	return (rv);
 }
@@ -239,7 +308,13 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv;
-	KMF_LISTCRL_PARAMS lcrlargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	boolean_t token_bool = B_TRUE;
+	boolean_t private = B_FALSE;
+	KMF_KEY_CLASS keyclass;
+	KMF_ENCODE_FORMAT format;
 
 	/*
 	 * Symmetric keys and RSA/DSA private keys are always
@@ -250,85 +325,176 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 		oclass |= PK_PRIVATE_OBJ;
 
 	rv = select_token(kmfhandle, token,
-		!(oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)));
+	    !(oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)));
 
 	if (rv != KMF_OK) {
 		return (rv);
 	}
 
 	if (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ)) {
-		KMF_FINDKEY_PARAMS parms;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-		(void) memset(&parms, 0, sizeof (parms));
-		parms.kstype = KMF_KEYSTORE_PK11TOKEN;
+		if (objlabel != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYLABEL_ATTR, objlabel,
+			    strlen(objlabel));
+			numattr++;
+		}
+
+		private = ((oclass & PK_PRIVATE_OBJ) > 0);
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_PRIVATE_BOOL_ATTR, &private,
+		    sizeof (private));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_TOKEN_BOOL_ATTR, &token_bool,
+		    sizeof (token_bool));
+		numattr++;
 
 		if (oclass & PK_PRIKEY_OBJ) {
-			parms.keyclass = KMF_ASYM_PRI;
-			parms.findLabel = objlabel;
-			parms.cred = *tokencred;
-			parms.pkcs11parms.private =
-				((oclass & PK_PRIVATE_OBJ) > 0);
-			parms.pkcs11parms.token = 1;
+			int num = numattr;
+
+			keyclass = KMF_ASYM_PRI;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_KEYCLASS_ATTR, &keyclass,
+			    sizeof (keyclass));
+			num++;
+
+			if (tokencred != NULL &&
+			    tokencred->credlen > 0) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CREDENTIAL_ATTR, tokencred,
+				    sizeof (KMF_CREDENTIAL));
+				num++;
+			}
 
 			/* list asymmetric private keys */
-			rv = pk_list_keys(kmfhandle, &parms);
+			rv = pk_list_keys(kmfhandle, attrlist, num);
 		}
 
 		if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-			parms.keyclass = KMF_SYMMETRIC;
-			parms.findLabel = objlabel;
-			parms.cred = *tokencred;
-			parms.format = KMF_FORMAT_RAWKEY;
-			parms.pkcs11parms.private =
-				((oclass & PK_PRIVATE_OBJ) > 0);
-			parms.pkcs11parms.token = 1;
+			int num = numattr;
+
+			keyclass = KMF_SYMMETRIC;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_KEYCLASS_ATTR, &keyclass,
+			    sizeof (keyclass));
+			num++;
+
+			if (tokencred != NULL &&
+			    tokencred->credlen > 0) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CREDENTIAL_ATTR, tokencred,
+				    sizeof (KMF_CREDENTIAL));
+				num++;
+			}
+
+			format = KMF_FORMAT_RAWKEY;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_ENCODE_FORMAT_ATTR, &format,
+			    sizeof (format));
+			num++;
 
 			/* list symmetric keys */
-			rv = pk_list_keys(kmfhandle, &parms);
+			rv = pk_list_keys(kmfhandle, attrlist, num);
 		}
 
 		if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
-			parms.keyclass = KMF_ASYM_PUB;
-			parms.findLabel = objlabel;
-			parms.pkcs11parms.private =
-				((oclass & PK_PRIVATE_OBJ) > 0);
-			parms.pkcs11parms.token = 1;
+			int num = numattr;
+
+			keyclass = KMF_ASYM_PUB;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_KEYCLASS_ATTR, &keyclass,
+			    sizeof (keyclass));
+			num++;
 
 			/* list asymmetric public keys (if any) */
-			rv = pk_list_keys(kmfhandle, &parms);
+			rv = pk_list_keys(kmfhandle, attrlist, num);
 		}
 
 		if (rv != KMF_OK)
 			return (rv);
 	}
 
+	numattr = 0;
 	if (oclass & (PK_CERT_OBJ | PK_PUBLIC_OBJ)) {
-		KMF_FINDCERT_PARAMS parms;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-		(void) memset(&parms, 0, sizeof (parms));
-		parms.kstype = KMF_KEYSTORE_PK11TOKEN;
-		parms.certLabel = objlabel;
-		parms.issuer = issuer;
-		parms.subject = subject;
-		parms.serial = serial;
-		parms.pkcs11parms.private = FALSE;
-		parms.find_cert_validity = find_criteria_flag;
+		if (objlabel != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CERT_LABEL_ATTR, objlabel,
+			    strlen(objlabel));
+			numattr++;
+		}
 
-		rv = pk_find_certs(kmfhandle, &parms);
+		if (issuer != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_ISSUER_NAME_ATTR, issuer,
+			    strlen(issuer));
+			numattr++;
+		}
+
+		if (subject != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_SUBJECT_NAME_ATTR, subject,
+			    strlen(subject));
+			numattr++;
+		}
+
+		if (serial != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_BIGINT_ATTR, serial,
+			    sizeof (KMF_BIGINT));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_PRIVATE_BOOL_ATTR, &private,
+		    sizeof (private));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
+		    sizeof (KMF_CERT_VALIDITY));
+		numattr++;
+
+		rv = pk_find_certs(kmfhandle, attrlist, numattr);
 		if (rv != KMF_OK)
 			return (rv);
 	}
 
+	numattr = 0;
+	kstype = KMF_KEYSTORE_OPENSSL; /* CRL is file-based */
 	if (oclass & PK_CRL_OBJ) {
-		char *crldata;
+		char *crldata = NULL;
 
-		(void) memset(&lcrlargs, 0, sizeof (lcrlargs));
-		lcrlargs.kstype = KMF_KEYSTORE_OPENSSL;
-		lcrlargs.sslparms.dirpath = dir;
-		lcrlargs.sslparms.crlfile = filename;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-		rv = KMF_ListCRL(kmfhandle, &lcrlargs, &crldata);
-		if (rv == KMF_OK) {
+		if (dir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, dir, strlen(dir));
+			numattr++;
+		}
+		if (filename != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CRL_FILENAME_ATTR,
+			    filename, strlen(filename));
+			numattr++;
+		}
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_DATA_ATTR,
+		    &crldata, sizeof (char *));
+		numattr++;
+
+		rv = kmf_list_crl(kmfhandle, numattr, attrlist);
+		if (rv == KMF_OK && crldata != NULL) {
 			(void) printf("%s\n", crldata);
 			free(crldata);
 		}
@@ -344,28 +510,67 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
 	int rv;
-	KMF_FINDCERT_PARAMS fcargs;
-	KMF_FINDKEY_PARAMS fkargs;
-	KMF_LISTCRL_PARAMS lcrlargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEY_CLASS keyclass;
+	KMF_ENCODE_FORMAT format;
+	char *defaultdir = ".";
 
 	if (oclass & PK_KEY_OBJ) {
-		(void) memset(&fkargs, 0, sizeof (fkargs));
-		fkargs.kstype = KMF_KEYSTORE_OPENSSL;
-		fkargs.sslparms.dirpath = dir;
-		fkargs.sslparms.keyfile = filename;
-		if (oclass & PK_PRIKEY_OBJ) {
-			fkargs.keyclass = KMF_ASYM_PRI;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-			rv = pk_list_keys(kmfhandle, &fkargs);
+		if (dir == NULL && filename == NULL)
+			dir = defaultdir;
+
+		if (dir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, dir,
+			    strlen(dir));
+			numattr++;
+		}
+
+		if (filename != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEY_FILENAME_ATTR, filename,
+			    strlen(filename));
+			numattr++;
+		}
+
+		if (oclass & PK_PRIKEY_OBJ) {
+			int num = numattr;
+
+			keyclass = KMF_ASYM_PRI;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_KEYCLASS_ATTR, &keyclass,
+			    sizeof (keyclass));
+			num++;
+
+			/* list asymmetric private keys */
+			rv = pk_list_keys(kmfhandle, attrlist, num);
 		}
 		if (rv == KMF_ERR_KEY_NOT_FOUND)
 			rv = KMF_OK;
 
 		if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-			fkargs.keyclass = KMF_SYMMETRIC;
-			fkargs.format = KMF_FORMAT_RAWKEY;
+			int num = numattr;
 
-			rv = pk_list_keys(kmfhandle, &fkargs);
+			keyclass = KMF_SYMMETRIC;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_KEYCLASS_ATTR, &keyclass,
+			    sizeof (keyclass));
+			num++;
+
+			format = KMF_FORMAT_RAWKEY;
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_ENCODE_FORMAT_ATTR, &format,
+			    sizeof (format));
+			num++;
+
+			/* list symmetric keys */
+			rv = pk_list_keys(kmfhandle, attrlist, num);
 		}
 		if (rv == KMF_ERR_KEY_NOT_FOUND)
 			rv = KMF_OK;
@@ -373,32 +578,83 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 			return (rv);
 	}
 
+	numattr = 0;
 	if (oclass & PK_CERT_OBJ) {
-		(void) memset(&fcargs, 0, sizeof (fcargs));
-		fcargs.kstype = KMF_KEYSTORE_OPENSSL;
-		fcargs.certLabel = NULL;
-		fcargs.issuer = issuer;
-		fcargs.subject = subject;
-		fcargs.serial = serial;
-		fcargs.sslparms.dirpath = dir;
-		fcargs.sslparms.certfile = filename;
-		fcargs.find_cert_validity = find_criteria_flag;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+		    sizeof (kstype));
+		numattr++;
 
-		rv = pk_find_certs(kmfhandle, &fcargs);
+		if (issuer != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_ISSUER_NAME_ATTR, issuer,
+			    strlen(issuer));
+			numattr++;
+		}
+
+		if (subject != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_SUBJECT_NAME_ATTR, subject,
+			    strlen(subject));
+			numattr++;
+		}
+
+		if (serial != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_BIGINT_ATTR, serial,
+			    sizeof (KMF_BIGINT));
+			numattr++;
+		}
+
+		if (filename != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CERT_FILENAME_ATTR, filename,
+			    strlen(filename));
+			numattr++;
+		}
+
+		if (dir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, dir,
+			    strlen(dir));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
+		    sizeof (KMF_CERT_VALIDITY));
+		numattr++;
+
+		rv = pk_find_certs(kmfhandle, attrlist, numattr);
 		if (rv != KMF_OK)
 			return (rv);
 	}
 
+	numattr = 0;
 	if (oclass & PK_CRL_OBJ) {
-		char *crldata;
+		char *crldata = NULL;
 
-		(void) memset(&lcrlargs, 0, sizeof (lcrlargs));
-		lcrlargs.kstype = KMF_KEYSTORE_OPENSSL;
-		lcrlargs.sslparms.dirpath = dir;
-		lcrlargs.sslparms.crlfile = filename;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-		rv = KMF_ListCRL(kmfhandle, &lcrlargs, &crldata);
-		if (rv == KMF_OK) {
+		if (dir != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_DIRPATH_ATTR, dir, strlen(dir));
+			numattr++;
+		}
+		if (filename != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CRL_FILENAME_ATTR,
+			    filename, strlen(filename));
+			numattr++;
+		}
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_DATA_ATTR,
+		    &crldata, sizeof (char *));
+		numattr++;
+
+		rv = kmf_list_crl(kmfhandle, numattr, attrlist);
+		if (rv == KMF_OK && crldata != NULL) {
 			(void) printf("%s\n", crldata);
 			free(crldata);
 		}
@@ -415,64 +671,163 @@ list_nss_objects(KMF_HANDLE_T kmfhandle,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_FINDKEY_PARAMS fkargs;
+	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
+	int numattr = 0;
+	KMF_ATTRIBUTE attrlist[16];
+	KMF_KEY_CLASS keyclass;
+	KMF_ENCODE_FORMAT format;
 
 	rv = configure_nss(kmfhandle, dir, prefix);
 	if (rv != KMF_OK)
 		return (rv);
 
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
+
 	if (oclass & PK_KEY_OBJ) {
-		(void) memset(&fkargs, 0, sizeof (fkargs));
-		fkargs.kstype = KMF_KEYSTORE_NSS;
-		fkargs.findLabel = nickname;
-		fkargs.cred = *tokencred;
-		fkargs.nssparms.slotlabel = token_spec;
+		if (tokencred != NULL && tokencred->credlen > 0) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CREDENTIAL_ATTR, tokencred,
+			    sizeof (KMF_CREDENTIAL));
+			numattr++;
+		}
+
+		if (token_spec && strlen(token_spec)) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token_spec,
+			    strlen(token_spec));
+			numattr++;
+		}
+
+		if (nickname != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_KEYLABEL_ATTR, nickname,
+			    strlen(nickname));
+			numattr++;
+		}
 	}
 
 	if (oclass & PK_PRIKEY_OBJ) {
-		fkargs.keyclass = KMF_ASYM_PRI;
-		rv = pk_list_keys(kmfhandle, &fkargs);
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PRI;
+		kmf_set_attr_at_index(attrlist, num,
+		    KMF_KEYCLASS_ATTR, &keyclass,
+		    sizeof (keyclass));
+		num++;
+
+		/* list asymmetric private keys */
+		rv = pk_list_keys(kmfhandle, attrlist, num);
 	}
+
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
-		fkargs.keyclass = KMF_SYMMETRIC;
-		fkargs.format = KMF_FORMAT_RAWKEY;
-		rv = pk_list_keys(kmfhandle, &fkargs);
+		int num = numattr;
+
+		keyclass = KMF_SYMMETRIC;
+		kmf_set_attr_at_index(attrlist, num,
+		    KMF_KEYCLASS_ATTR, &keyclass,
+		    sizeof (keyclass));
+		num++;
+
+		format = KMF_FORMAT_RAWKEY;
+		kmf_set_attr_at_index(attrlist, num,
+		    KMF_ENCODE_FORMAT_ATTR, &format,
+		    sizeof (format));
+		num++;
+
+		/* list symmetric keys */
+		rv = pk_list_keys(kmfhandle, attrlist, num);
 	}
+
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
-		fkargs.keyclass = KMF_ASYM_PUB;
-		rv = pk_list_keys(kmfhandle, &fkargs);
+		int num = numattr;
+
+		keyclass = KMF_ASYM_PUB;
+		kmf_set_attr_at_index(attrlist, num,
+		    KMF_KEYCLASS_ATTR, &keyclass,
+		    sizeof (keyclass));
+		num++;
+
+		/* list asymmetric public keys */
+		rv = pk_list_keys(kmfhandle, attrlist, num);
 	}
 
 	/* If searching for public objects or certificates, find certs now */
+	numattr = 0;
 	if (rv == KMF_OK && (oclass & PK_CERT_OBJ)) {
-		KMF_FINDCERT_PARAMS fcargs;
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
+		    sizeof (kstype));
+		numattr++;
 
-		(void) memset(&fcargs, 0, sizeof (fcargs));
-		fcargs.kstype = KMF_KEYSTORE_NSS;
-		fcargs.certLabel = nickname;
-		fcargs.issuer = issuer;
-		fcargs.subject = subject;
-		fcargs.serial = serial;
-		fcargs.nssparms.slotlabel = token_spec;
-		fcargs.find_cert_validity = find_criteria_flag;
+		if (nickname != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CERT_LABEL_ATTR, nickname,
+			    strlen(nickname));
+			numattr++;
+		}
 
-		rv = pk_find_certs(kmfhandle, &fcargs);
+		if (issuer != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_ISSUER_NAME_ATTR, issuer,
+			    strlen(issuer));
+			numattr++;
+		}
+
+		if (subject != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_SUBJECT_NAME_ATTR, subject,
+			    strlen(subject));
+			numattr++;
+		}
+
+		if (serial != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_BIGINT_ATTR, serial,
+			    sizeof (KMF_BIGINT));
+			numattr++;
+		}
+
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token_spec,
+			    strlen(token_spec));
+			numattr++;
+		}
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
+		    sizeof (KMF_CERT_VALIDITY));
+		numattr++;
+
+		rv = pk_find_certs(kmfhandle, attrlist, numattr);
 	}
 
+	numattr = 0;
 	if (rv == KMF_OK && (oclass & PK_CRL_OBJ)) {
 		int numcrls;
-		KMF_FINDCRL_PARAMS fcrlargs;
 
-		(void) memset(&fcrlargs, 0, sizeof (fcrlargs));
-		fcrlargs.kstype = KMF_KEYSTORE_NSS;
-		fcrlargs.nssparms.slotlabel = token_spec;
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+		    &kstype, sizeof (kstype));
+		numattr++;
 
-		rv = KMF_FindCRL(kmfhandle, &fcrlargs, NULL, &numcrls);
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR,
+			    token_spec, strlen(token_spec));
+			numattr++;
+		}
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CRL_COUNT_ATTR,
+		    &numcrls, sizeof (int));
+		numattr++;
+
+		rv = kmf_find_crl(kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
 			char **p;
 			if (numcrls == 0) {
 				(void) printf(gettext("No CRLs found in "
-					"NSS keystore.\n"));
+				    "NSS keystore.\n"));
 
 				return (KMF_OK);
 			}
@@ -481,13 +836,16 @@ list_nss_objects(KMF_HANDLE_T kmfhandle,
 				return (KMF_ERR_MEMORY);
 			}
 			(void) memset(p, 0, numcrls * sizeof (char *));
-			rv = KMF_FindCRL(kmfhandle, &fcrlargs,
-				p, &numcrls);
+
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_CRL_NAMELIST_ATTR, p, sizeof (char *));
+			numattr++;
+			rv = kmf_find_crl(kmfhandle, numattr, attrlist);
 			if (rv == KMF_OK) {
 				int i;
 				for (i = 0; i < numcrls; i++) {
 					(void) printf("%d. Name = %s\n",
-						i + 1, p[i]);
+					    i + 1, p[i]);
 					free(p[i]);
 				}
 			}
@@ -526,10 +884,10 @@ pk_list(int argc, char *argv[])
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
-		"k:(keystore)t:(objtype)T:(token)d:(dir)"
-		"p:(prefix)n:(nickname)S:(serial)s:(subject)"
-		"c:(criteria)"
-		"i:(issuer)l:(label)f:(infile)")) != EOF) {
+	    "k:(keystore)t:(objtype)T:(token)d:(dir)"
+	    "p:(prefix)n:(nickname)S:(serial)s:(subject)"
+	    "c:(criteria)"
+	    "i:(issuer)l:(label)f:(infile)")) != EOF) {
 		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
 		switch (opt) {
@@ -608,7 +966,7 @@ pk_list(int argc, char *argv[])
 	if (argc)
 		return (PK_ERR_USAGE);
 
-	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
 		/* Error message ? */
 		return (rv);
 	}
@@ -619,10 +977,10 @@ pk_list(int argc, char *argv[])
 
 	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
 	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
-		kstype != KMF_KEYSTORE_PK11TOKEN) {
+	    kstype != KMF_KEYSTORE_PK11TOKEN) {
 
 		(void) fprintf(stderr, gettext("The objtype parameter "
-			"is only relevant if keystore=pkcs11\n"));
+		    "is only relevant if keystore=pkcs11\n"));
 		return (PK_ERR_USAGE);
 	}
 
@@ -640,11 +998,11 @@ pk_list(int argc, char *argv[])
 		uchar_t *bytes = NULL;
 		size_t bytelen;
 
-		rv = KMF_HexString2Bytes((uchar_t *)serstr, &bytes, &bytelen);
+		rv = kmf_hexstr_to_bytes((uchar_t *)serstr, &bytes, &bytelen);
 		if (rv != KMF_OK || bytes == NULL) {
 			(void) fprintf(stderr, gettext("serial number "
-				"must be specified as a hex number "
-				"(ex: 0x0102030405ffeeddee)\n"));
+			    "must be specified as a hex number "
+			    "(ex: 0x0102030405ffeeddee)\n"));
 			return (PK_ERR_USAGE);
 		}
 		serial.val = bytes;
@@ -652,36 +1010,36 @@ pk_list(int argc, char *argv[])
 	}
 
 	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
-		kstype == KMF_KEYSTORE_NSS) &&
-		(oclass & (PK_PRIKEY_OBJ | PK_PRIVATE_OBJ))) {
+	    kstype == KMF_KEYSTORE_NSS) &&
+	    (oclass & (PK_PRIKEY_OBJ | PK_PRIVATE_OBJ))) {
 
 		(void) get_token_password(kstype, token_spec,
-			&tokencred);
+		    &tokencred);
 	}
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		rv = list_pk11_objects(kmfhandle, token_spec,
-			oclass, list_label, &serial,
-			issuer, subject, dir, filename,
-			&tokencred, find_criteria_flag);
+		    oclass, list_label, &serial,
+		    issuer, subject, dir, filename,
+		    &tokencred, find_criteria_flag);
 
 	} else if (kstype == KMF_KEYSTORE_NSS) {
 		if (dir == NULL)
 			dir = PK_DEFAULT_DIRECTORY;
 		rv = list_nss_objects(kmfhandle,
-			oclass, token_spec, dir, prefix,
-			list_label, &serial, issuer, subject,
-			&tokencred, find_criteria_flag);
+		    oclass, token_spec, dir, prefix,
+		    list_label, &serial, issuer, subject,
+		    &tokencred, find_criteria_flag);
 
 	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
 
 		rv = list_file_objects(kmfhandle,
-			oclass, dir, filename,
-			&serial, issuer, subject, find_criteria_flag);
+		    oclass, dir, filename,
+		    &serial, issuer, subject, find_criteria_flag);
 	}
 
 	if (rv != KMF_OK) {
 		display_error(kmfhandle, rv,
-			gettext("Error listing objects"));
+		    gettext("Error listing objects"));
 	}
 
 	if (serial.val != NULL)
@@ -690,6 +1048,6 @@ pk_list(int argc, char *argv[])
 	if (tokencred.cred != NULL)
 		free(tokencred.cred);
 
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_finalize(kmfhandle);
 	return (rv);
 }

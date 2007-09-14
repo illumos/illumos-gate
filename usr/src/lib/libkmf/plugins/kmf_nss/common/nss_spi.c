@@ -58,30 +58,28 @@ mutex_t init_lock = DEFAULTMUTEX;
 static int nss_initialized = 0;
 
 KMF_RETURN
-NSS_ConfigureKeystore(KMF_HANDLE_T, KMF_CONFIG_PARAMS *);
+NSS_ConfigureKeystore(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_FindCert(KMF_HANDLE_T,
-	KMF_FINDCERT_PARAMS *params,
-	KMF_X509_DER_CERT *kmf_cert,
-	uint32_t *num_certs);
+NSS_FindCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 void
 NSS_FreeKMFCert(KMF_HANDLE_T, KMF_X509_DER_CERT *);
 
 KMF_RETURN
-NSS_StoreCert(KMF_HANDLE_T, KMF_STORECERT_PARAMS *params,
-		KMF_DATA * pcert);
+NSS_StoreCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_ImportCert(KMF_HANDLE_T, KMF_IMPORTCERT_PARAMS *params);
+NSS_ImportCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_DeleteCert(KMF_HANDLE_T, KMF_DELETECERT_PARAMS *params);
+NSS_DeleteCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_CreateKeypair(KMF_HANDLE_T, KMF_CREATEKEYPAIR_PARAMS *,
-	KMF_KEY_HANDLE *, KMF_KEY_HANDLE *);
+NSS_CreateKeypair(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+
+KMF_RETURN
+NSS_StoreKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
 NSS_EncodePubKeyData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_DATA *);
@@ -91,55 +89,44 @@ NSS_SignData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
 	KMF_DATA *, KMF_DATA *);
 
 KMF_RETURN
-NSS_ImportCRL(KMF_HANDLE_T, KMF_IMPORTCRL_PARAMS *params);
+NSS_ImportCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_DeleteCRL(KMF_HANDLE_T, KMF_DELETECRL_PARAMS *params);
+NSS_DeleteCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_FindCRL(KMF_HANDLE_T, KMF_FINDCRL_PARAMS *params,
-	char **CRLNameList, int *CRLCount);
+NSS_FindCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_FindKey(KMF_HANDLE_T, KMF_FINDKEY_PARAMS *,
-	KMF_KEY_HANDLE *, uint32_t *);
+NSS_FindKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_FindCertInCRL(KMF_HANDLE_T, KMF_FINDCERTINCRL_PARAMS *params);
+NSS_FindCertInCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
 NSS_GetErrorString(KMF_HANDLE_T, char **);
 
 KMF_RETURN
-NSS_DeleteKey(KMF_HANDLE_T, KMF_DELETEKEY_PARAMS *,
-	KMF_KEY_HANDLE *, boolean_t);
+NSS_DeleteKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_GetPrikeyByCert(KMF_HANDLE_T, KMF_CRYPTOWITHCERT_PARAMS *, KMF_DATA *,
-	KMF_KEY_HANDLE *, KMF_KEY_ALG);
+NSS_FindPrikeyByCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
 NSS_DecryptData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
 	KMF_DATA *, KMF_DATA *);
 
 KMF_RETURN
-NSS_ExportP12(KMF_HANDLE_T,
-	KMF_EXPORTP12_PARAMS *,
-	int, KMF_X509_DER_CERT *,
-	int, KMF_KEY_HANDLE *,
-	char *);
+NSS_ExportPK12(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
-NSS_StorePrivateKey(KMF_HANDLE_T, KMF_STOREKEY_PARAMS *, KMF_RAW_KEY_DATA *);
-
-KMF_RETURN
-NSS_CreateSymKey(KMF_HANDLE_T, KMF_CREATESYMKEY_PARAMS *, KMF_KEY_HANDLE *);
+NSS_CreateSymKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 KMF_RETURN
 NSS_GetSymKeyValue(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_RAW_SYM_KEY *);
 
 KMF_RETURN
-NSS_SetTokenPin(KMF_HANDLE_T, KMF_SETPIN_PARAMS *, KMF_CREDENTIAL *);
+NSS_SetTokenPin(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
 static
 KMF_PLUGIN_FUNCLIST nss_plugin_table =
@@ -162,14 +149,14 @@ KMF_PLUGIN_FUNCLIST nss_plugin_table =
 	NSS_FindCRL,
 	NSS_FindCertInCRL,
 	NSS_GetErrorString,
-	NSS_GetPrikeyByCert,
+	NSS_FindPrikeyByCert,
 	NSS_DecryptData,
-	NSS_ExportP12,
-	NSS_StorePrivateKey,
+	NSS_ExportPK12,
 	NSS_CreateSymKey,
 	NSS_GetSymKeyValue,
 	NSS_SetTokenPin,
 	NULL, /* VerifyData */
+	NSS_StoreKey,
 	NULL /* Finalize */
 };
 
@@ -220,7 +207,7 @@ nss_authenticate(KMF_HANDLE_T handle,
 
 	/* If a password was given, try to login to the slot */
 	if (cred == NULL || cred->cred == NULL || cred->credlen == 0 ||
-		nss_slot == NULL) {
+	    nss_slot == NULL) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
@@ -229,8 +216,7 @@ nss_authenticate(KMF_HANDLE_T handle,
 	}
 
 	PK11_SetPasswordFunc(nss_getpassword);
-	nssrv = PK11_Authenticate(nss_slot, PR_TRUE,
-		(void *)cred->cred);
+	nssrv = PK11_Authenticate(nss_slot, PR_TRUE, (void *)cred->cred);
 
 	if (nssrv != SECSuccess) {
 		SET_ERROR(kmfh, nssrv);
@@ -258,9 +244,8 @@ Init_NSS_DBs(const char *configdir,
 	}
 
 	rv = NSS_Initialize((configdir && strlen(configdir)) ?
-		configdir : "./", certPrefix,
-		keyPrefix, secmodName ? secmodName : "secmod.db",
-		NSS_INIT_COOPERATE);
+	    configdir : "./", certPrefix, keyPrefix,
+	    secmodName ? secmodName : "secmod.db", NSS_INIT_COOPERATE);
 	if (rv != SECSuccess) {
 		goto end;
 	}
@@ -277,23 +262,28 @@ end:
  * if it is called again.
  */
 KMF_RETURN
-NSS_ConfigureKeystore(KMF_HANDLE_T handle, KMF_CONFIG_PARAMS *params)
+NSS_ConfigureKeystore(KMF_HANDLE_T handle,
+	int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	char    *configdir;
+	char    *certPrefix;
+	char    *keyPrefix;
+	char    *secModName;
 
-	if (params == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	configdir = kmf_get_attr_ptr(KMF_DIRPATH_ATTR, attrlist, numattr);
+	certPrefix = kmf_get_attr_ptr(KMF_CERTPREFIX_ATTR, attrlist, numattr);
+	keyPrefix = kmf_get_attr_ptr(KMF_KEYPREFIX_ATTR, attrlist, numattr);
+	secModName = kmf_get_attr_ptr(KMF_SECMODNAME_ATTR, attrlist, numattr);
 
 	(void) mutex_lock(&init_lock);
 	if (nss_initialized == 0) {
 		SECStatus err;
 
 		(void) mutex_unlock(&init_lock);
-		err = Init_NSS_DBs(params->nssconfig.configdir,
-		    params->nssconfig.certPrefix,
-		    params->nssconfig.keyPrefix,
-		    params->nssconfig.secModName);
+		err = Init_NSS_DBs(configdir, certPrefix,
+		    keyPrefix, secModName);
 		if (err != SECSuccess) {
 			SET_ERROR(kmfh, err);
 			return (KMF_ERR_INTERNAL);
@@ -306,7 +296,6 @@ NSS_ConfigureKeystore(KMF_HANDLE_T handle, KMF_CONFIG_PARAMS *params)
 	return (rv);
 }
 
-
 /*
  * This function sets up the slot to be used for other operations.
  * This function is basically called by every NSS SPI function.
@@ -314,44 +303,49 @@ NSS_ConfigureKeystore(KMF_HANDLE_T handle, KMF_CONFIG_PARAMS *params)
  * boolean "internal_slot_only" argument needs to be TRUE.
  * A slot pointer will be returned when this function is executed successfully.
  */
-static KMF_RETURN
-Do_NSS_Init(
-	void *handle,
-	KMF_NSS_PARAMS nss_opts,
+KMF_RETURN
+do_nss_init(void *handle, int numattr,
+	KMF_ATTRIBUTE *attrlist,
 	boolean_t internal_slot_only,
 	PK11SlotInfo **nss_slot)
 {
+	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	char *slotlabel = NULL;
 
 	if (!nss_initialized)
 		return (KMF_ERR_PLUGIN_INIT);
 
+	slotlabel = kmf_get_attr_ptr(KMF_TOKEN_LABEL_ATTR, attrlist, numattr);
 	/*
 	 * NSS Is already initialized, but we need to find
 	 * the right slot.
 	 */
-	if (nss_opts.slotlabel == NULL ||
-	    strcmp(nss_opts.slotlabel, "internal") == 0) {
+	if (slotlabel == NULL ||
+	    strcmp(slotlabel, "internal") == 0) {
 		*nss_slot = PK11_GetInternalKeySlot();
 	} else if (internal_slot_only == TRUE)  {
-		return (KMF_ERR_SLOTNAME);
+		rv = KMF_ERR_SLOTNAME;
+		goto end;
 	} else {
-		*nss_slot = PK11_FindSlotByName(nss_opts.slotlabel);
+		*nss_slot = PK11_FindSlotByName(slotlabel);
 	}
 
 	if (*nss_slot == NULL) {
 		SET_ERROR(kmfh, PORT_GetError());
-		return (KMF_ERR_SLOTNAME);
+		rv = KMF_ERR_SLOTNAME;
+		goto end;
 	}
 
 	/*
 	 * If the token was not yet initialized, return an error.
 	 */
 	if (PK11_NeedUserInit(*nss_slot)) {
-		return (KMF_ERR_UNINITIALIZED_TOKEN);
+		rv = KMF_ERR_UNINITIALIZED_TOKEN;
 	}
 
-	return (KMF_OK);
+end:
+	return (rv);
 }
 
 static KMF_RETURN
@@ -363,15 +357,15 @@ nss2kmf_cert(CERTCertificate *nss_cert, KMF_X509_DER_CERT *kmf_cert)
 	kmf_cert->certificate.Length = nss_cert->derCert.len;
 
 	if ((kmf_cert->certificate.Data = malloc(nss_cert->derCert.len)) ==
-		NULL) {
+	    NULL) {
 		kmf_cert->certificate.Length = 0;
 		return (KMF_ERR_MEMORY);
 	}
 	(void) memcpy(kmf_cert->certificate.Data, nss_cert->derCert.data,
-		nss_cert->derCert.len);
+	    nss_cert->derCert.len);
 	if (nss_cert->nickname != NULL)
 		kmf_cert->kmf_private.label =
-			(char *)strdup(nss_cert->nickname);
+		    (char *)strdup(nss_cert->nickname);
 	return (KMF_OK);
 }
 
@@ -399,7 +393,7 @@ nss_getcert_by_label(KMF_HANDLE *kmfh,
 		break;
 	case KMF_NONEXPIRED_CERTS:
 		validity = CERT_CheckCertValidTimes(nss_cert, PR_Now(),
-			PR_FALSE);
+		    PR_FALSE);
 		if (validity != secCertTimeValid) {
 			/* this is an invalid cert, reject it */
 			*num_certs = 0;
@@ -409,7 +403,7 @@ nss_getcert_by_label(KMF_HANDLE *kmfh,
 		break;
 	case KMF_EXPIRED_CERTS:
 		validity = CERT_CheckCertValidTimes(nss_cert, PR_Now(),
-			PR_FALSE);
+		    PR_FALSE);
 		if (validity == secCertTimeValid) {
 			/* this is a valid cert, reject it in this case. */
 			*num_certs = 0;
@@ -448,13 +442,13 @@ nss_find_matching_certs(PK11SlotInfo *slot,
 	boolean_t findSerial = FALSE;
 
 	if (issuer != NULL && strlen(issuer)) {
-		rv = KMF_DNParser(issuer,  &issuerDN);
+		rv = kmf_dn_parser(issuer,  &issuerDN);
 		if (rv != KMF_OK)
 			return (rv);
 		findIssuer = TRUE;
 	}
 	if (subject != NULL && strlen(subject)) {
-		rv = KMF_DNParser(subject, &subjectDN);
+		rv = kmf_dn_parser(subject, &subjectDN);
 		if (rv != KMF_OK)
 			return (rv);
 		findSubject = TRUE;
@@ -477,8 +471,8 @@ nss_find_matching_certs(PK11SlotInfo *slot,
 				rv = DerDecodeName(&der, &cmpDN);
 				if (rv == KMF_OK) {
 					match = !KMF_CompareRDNs(&issuerDN,
-						&cmpDN);
-					KMF_FreeDN(&cmpDN);
+					    &cmpDN);
+					kmf_free_dn(&cmpDN);
 					if (!match)
 						goto delete_and_cont;
 				} else {
@@ -491,8 +485,8 @@ nss_find_matching_certs(PK11SlotInfo *slot,
 				rv = DerDecodeName(&der, &cmpDN);
 				if (rv == KMF_OK) {
 					match = !KMF_CompareRDNs(&subjectDN,
-						&cmpDN);
-					KMF_FreeDN(&cmpDN);
+					    &cmpDN);
+					kmf_free_dn(&cmpDN);
 					if (!match)
 						goto delete_and_cont;
 				} else {
@@ -508,7 +502,7 @@ nss_find_matching_certs(PK11SlotInfo *slot,
 					goto delete_and_cont;
 
 				if (memcmp(sernum->data, serial->val,
-					serial->len))
+				    serial->len))
 					goto delete_and_cont;
 			}
 
@@ -559,12 +553,19 @@ convertCertList(void *kmfhandle,
 	CERTCertListNode *node;
 	uint32_t maxcerts = *numcerts;
 
+	maxcerts = *numcerts;
+	if (maxcerts == 0)
+		maxcerts = 0xFFFFFFFF;
+
 	*numcerts = 0;
 
+	/*
+	 * Don't copy more certs than the caller wanted.
+	 */
 	for (node = CERT_LIST_HEAD(nsscerts);
-		!CERT_LIST_END(node, nsscerts) && rv == KMF_OK &&
-		(*numcerts) < maxcerts;
-		node = CERT_LIST_NEXT(node), (*numcerts)++) {
+	    !CERT_LIST_END(node, nsscerts) && rv == KMF_OK &&
+	    (*numcerts) < maxcerts;
+	    node = CERT_LIST_NEXT(node), (*numcerts)++) {
 		if (kmfcerts != NULL)
 			rv = nss2kmf_cert(node->cert, &kmfcerts[*numcerts]);
 	}
@@ -575,47 +576,71 @@ convertCertList(void *kmfhandle,
 	if (rv != KMF_OK) {
 		int i;
 		for (i = 0; i < *numcerts; i++)
-			KMF_FreeKMFCert(kmfhandle, &kmfcerts[i]);
+			kmf_free_kmf_cert(kmfhandle, &kmfcerts[i]);
+
 		*numcerts = 0;
 	}
 	return (rv);
 }
 
 KMF_RETURN
-NSS_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *params,
-	KMF_X509_DER_CERT *kmfcerts,
-	uint32_t *num_certs)
+NSS_FindCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	PK11SlotInfo *nss_slot = NULL;
 	CERTCertList *certlist = NULL;
 	uint32_t maxcerts;
+	uint32_t *num_certs;
+	KMF_X509_DER_CERT *kmfcerts = NULL;
+	char *certlabel = NULL;
+	char *issuer = NULL;
+	char *subject = NULL;
+	KMF_BIGINT *serial = NULL;
+	KMF_CERT_VALIDITY  validity;
 
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, FALSE, &nss_slot);
-	if (rv != KMF_OK) {
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK)
 		return (rv);
+
+	num_certs = kmf_get_attr_ptr(KMF_COUNT_ATTR, attrlist, numattr);
+	if (num_certs == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	maxcerts = *num_certs;
+	if (maxcerts == 0)
+		maxcerts = 0xFFFFFFFF;
+	*num_certs = 0;
+
+	/* Get the optional returned certificate list  */
+	kmfcerts = kmf_get_attr_ptr(KMF_X509_DER_CERT_ATTR, attrlist, numattr);
+
+	/* Get optional search criteria attributes */
+	certlabel = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+	issuer = kmf_get_attr_ptr(KMF_ISSUER_NAME_ATTR, attrlist, numattr);
+	subject = kmf_get_attr_ptr(KMF_SUBJECT_NAME_ATTR, attrlist, numattr);
+	serial = kmf_get_attr_ptr(KMF_BIGINT_ATTR, attrlist, numattr);
+
+	rv = kmf_get_attr(KMF_CERT_VALIDITY_ATTR, attrlist, numattr,
+	    &validity, NULL);
+	if (rv != KMF_OK) {
+		validity = KMF_ALL_CERTS;
+		rv = KMF_OK;
 	}
 
-	if (*num_certs == 0)
-		maxcerts = 0xFFFFFFFF;
-	else
-		maxcerts = *num_certs;
-
-	*num_certs = 0;
-	if (params->certLabel) {
+	if (certlabel != NULL) {
 		/* This will only find 1 certificate */
-		rv = nss_getcert_by_label(kmfh,
-			params->certLabel,
-			kmfcerts, num_certs, params->find_cert_validity);
+		rv = nss_getcert_by_label(kmfh,	certlabel, kmfcerts, num_certs,
+		    validity);
 	} else {
 		/*
 		 * Build a list of matching certs.
 		 */
-		rv = nss_find_matching_certs(nss_slot,
-			params->issuer, params->subject, params->serial,
-			&certlist, params->find_cert_validity);
+		rv = nss_find_matching_certs(nss_slot, issuer, subject, serial,
+		    &certlist, validity);
 
 		/*
 		 * If the caller supplied a pointer to storage for
@@ -623,8 +648,8 @@ NSS_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *params,
 		 * matching certs.
 		 */
 		if (rv == KMF_OK && certlist != NULL) {
-			rv = convertCertList(handle,
-				certlist, kmfcerts, &maxcerts);
+			rv = convertCertList(handle, certlist, kmfcerts,
+			    &maxcerts);
 			CERT_DestroyCertList(certlist);
 			if (rv == KMF_OK)
 				*num_certs = maxcerts;
@@ -659,177 +684,49 @@ NSS_FreeKMFCert(KMF_HANDLE_T handle,
 	}
 }
 
-KMF_RETURN
-NSS_StoreCert(KMF_HANDLE_T handle, KMF_STORECERT_PARAMS *params,
-	KMF_DATA *pcert)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	SECStatus nss_rv;
-	CERTCertificate *nss_cert = NULL;
-	CERTCertTrust *nss_trust = NULL;
-	PK11SlotInfo *nss_slot = NULL;
-	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
-
-	if (pcert == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	/* NSS only support DER format */
-	if (params == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	ret = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, FALSE, &nss_slot);
-	if (ret != KMF_OK) {
-		return (ret);
-	}
-
-	nss_cert = CERT_DecodeCertFromPackage((char *)pcert->Data,
-	    pcert->Length);
-	if (nss_cert == NULL) {
-		SET_ERROR(kmfh, PORT_GetError());
-		ret = KMF_ERR_BAD_CERT_FORMAT;
-		goto out;
-	}
-
-	nss_rv = PK11_ImportCert(nss_slot, nss_cert, CK_INVALID_HANDLE,
-	    params->certLabel, 0);
-	if (nss_rv) {
-		SET_ERROR(kmfh, nss_rv);
-		ret = KMF_ERR_BAD_CERT_FORMAT;
-		goto out;
-	}
-
-	if (params->ks_opt_u.nss_opts.trustflag != NULL &&
-		strlen(params->ks_opt_u.nss_opts.trustflag)) {
-		nss_trust = (CERTCertTrust *) malloc(sizeof (CERTCertTrust));
-		if (nss_trust == NULL) {
-			ret = KMF_ERR_MEMORY;
-				goto out;
-		}
-		nss_rv = CERT_DecodeTrustString(nss_trust,
-			params->ks_opt_u.nss_opts.trustflag);
-		if (nss_rv) {
-			SET_ERROR(kmfh, nss_rv);
-			ret = KMF_ERR_BAD_PARAMETER;
-			goto out;
-		}
-
-		nss_rv = CERT_ChangeCertTrust(certHandle, nss_cert, nss_trust);
-		if (nss_rv) {
-			SET_ERROR(kmfh, nss_rv);
-			ret = KMF_ERR_BAD_PARAMETER;
-		}
-	}
-
-out:
-	if (nss_trust != NULL) {
-		free(nss_trust);
-	}
-
-	if (nss_cert != NULL) {
-		CERT_DestroyCertificate(nss_cert);
-	}
-
-	if (nss_slot != NULL) {
-		PK11_FreeSlot(nss_slot);
-	}
-
-	return (ret);
-}
-
 
 KMF_RETURN
-NSS_ImportCert(KMF_HANDLE_T handle, KMF_IMPORTCERT_PARAMS *params)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_STORECERT_PARAMS scparams;
-	KMF_DATA cert = {NULL, 0};
-	KMF_DATA cert_der = {NULL, 0};
-	KMF_DATA *cptr = NULL;
-	KMF_ENCODE_FORMAT format;
-
-	if (params == NULL || params->certfile == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	/*
-	 * Check if the input cert file is a valid certificate and
-	 * auto-detect the file format of it.
-	 */
-	ret = KMF_IsCertFile(handle, params->certfile, &format);
-	if (ret != KMF_OK)
-		return (ret);
-
-	ret = KMF_ReadInputFile(handle, params->certfile, &cert);
-	if (ret != KMF_OK) {
-		return (ret);
-	}
-
-	/*
-	 * If the imported cert is in PEM format, convert it to
-	 * DER format in order to store it in NSS token.
-	 */
-	if (format == KMF_FORMAT_PEM) {
-		int derlen;
-		ret = KMF_Pem2Der(cert.Data, cert.Length,
-		    &cert_der.Data, &derlen);
-		if (ret != KMF_OK) {
-			goto cleanup;
-		}
-		cert_der.Length = (size_t)derlen;
-		cptr = &cert_der;
-	} else {
-		cptr = &cert;
-	}
-
-	(void) memset(&scparams, 0, sizeof (scparams));
-	scparams.kstype = params->kstype;
-	scparams.certLabel = params->certLabel;
-	scparams.nssparms = params->nssparms;
-
-	ret = NSS_StoreCert(handle, &scparams, cptr);
-
-	if (format == KMF_FORMAT_PEM) {
-		KMF_FreeData(&cert_der);
-	}
-
-cleanup:
-	KMF_FreeData(&cert);
-
-	return (ret);
-}
-
-KMF_RETURN
-NSS_DeleteCert(KMF_HANDLE_T handle, KMF_DELETECERT_PARAMS *params)
+NSS_DeleteCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	int nssrv;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	CERTCertificate *cert = NULL;
 	PK11SlotInfo *nss_slot = NULL;
+	char *certlabel = NULL;
+	char *issuer = NULL;
+	char *subject = NULL;
+	KMF_BIGINT *serial = NULL;
+	KMF_CERT_VALIDITY  validity;
 
-	/* check params */
-	if (params == NULL) {
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
-
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts,
-		FALSE, &nss_slot);
-	if (rv != KMF_OK) {
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK)
 		return (rv);
+
+	/* Get the search criteria attributes.  They are all optional. */
+	certlabel = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+	issuer = kmf_get_attr_ptr(KMF_ISSUER_NAME_ATTR, attrlist, numattr);
+	subject = kmf_get_attr_ptr(KMF_SUBJECT_NAME_ATTR, attrlist, numattr);
+	serial = kmf_get_attr_ptr(KMF_BIGINT_ATTR, attrlist, numattr);
+
+	rv = kmf_get_attr(KMF_CERT_VALIDITY_ATTR, attrlist, numattr,
+	    &validity, NULL);
+	if (rv != KMF_OK) {
+		validity = KMF_ALL_CERTS;
+		rv = KMF_OK;
 	}
 
-	if (params->certLabel) {
-		cert = PK11_FindCertFromNickname(params->certLabel, NULL);
+	/* Start finding the matched certificates and delete them. */
+	if (certlabel != NULL) {
+		cert = PK11_FindCertFromNickname(certlabel, NULL);
 		if (cert == NULL) {
 			return (KMF_ERR_CERT_NOT_FOUND);
 		}
 
-		switch (params->find_cert_validity) {
+		switch (validity) {
 		case KMF_ALL_CERTS:
 			break;
 		case KMF_NONEXPIRED_CERTS:
@@ -857,13 +754,12 @@ NSS_DeleteCert(KMF_HANDLE_T handle, KMF_DELETECERT_PARAMS *params)
 		CERTCertListNode *node;
 		CERTCertList *certlist = NULL;
 
-		rv = nss_find_matching_certs(nss_slot,
-			params->issuer, params->subject, params->serial,
-			&certlist, params->find_cert_validity);
+		rv = nss_find_matching_certs(nss_slot, issuer, subject, serial,
+		    &certlist, validity);
 
 		for (node = CERT_LIST_HEAD(certlist);
-			!CERT_LIST_END(node, certlist) && rv == KMF_OK;
-			node = CERT_LIST_NEXT(node)) {
+		    !CERT_LIST_END(node, certlist) && rv == KMF_OK;
+		    node = CERT_LIST_NEXT(node)) {
 
 			nssrv = SEC_DeletePermCertificate(node->cert);
 			if (nssrv) {
@@ -911,63 +807,114 @@ InitRandom(char *filename)
 
 KMF_RETURN
 NSS_CreateKeypair(KMF_HANDLE_T handle,
-	KMF_CREATEKEYPAIR_PARAMS *params,
-	KMF_KEY_HANDLE *privkey,
-	KMF_KEY_HANDLE *pubkey)
+	int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	PK11RSAGenParams	rsaparams;
-	void	*nssparams;
+	PK11RSAGenParams rsaparams;
+	void *nssparams;
 	CK_MECHANISM_TYPE mechanism;
 	ulong_t publicExponent = 0x010001;
 	PK11SlotInfo *nss_slot = NULL;
 	SECKEYPrivateKey *NSSprivkey = NULL;
 	SECKEYPublicKey *NSSpubkey = NULL;
 	PQGParams *pqgParams = NULL;
+	KMF_CREDENTIAL cred;
+	boolean_t storekey = TRUE;
+	uint32_t keylen = 1024, len;
+	uint32_t keylen_size = sizeof (uint32_t);
+	KMF_KEY_ALG keytype = KMF_RSA;
+	KMF_KEY_HANDLE *pubkey = NULL;
+	KMF_KEY_HANDLE *privkey = NULL;
+	char *keylabel = NULL;
 
-
-	if (params == NULL) {
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
-
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, FALSE, &nss_slot);
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
 
-	rv = nss_authenticate(handle, nss_slot, &params->cred);
+	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&cred, NULL);
+	if (rv != KMF_OK)
+		return (rv);
+
+	rv = nss_authenticate(handle, nss_slot, &cred);
 	if (rv != KMF_OK) {
 		return (rv);
+	}
+
+	/* "storekey" is optional. Default is TRUE */
+	(void) kmf_get_attr(KMF_STOREKEY_BOOL_ATTR, attrlist, numattr,
+	    &storekey, NULL);
+
+	/* keytype is optional.  KMF_RSA is default */
+	(void) kmf_get_attr(KMF_KEYALG_ATTR, attrlist, numattr,
+	    (void *)&keytype, NULL);
+
+	rv = kmf_get_attr(KMF_KEYLENGTH_ATTR, attrlist, numattr,
+	    &keylen, &keylen_size);
+	if (rv == KMF_ERR_ATTR_NOT_FOUND)
+		/* Default keylen = 1024 */
+		rv = KMF_OK;
+	else if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	pubkey = kmf_get_attr_ptr(KMF_PUBKEY_HANDLE_ATTR, attrlist, numattr);
+	privkey = kmf_get_attr_ptr(KMF_PRIVKEY_HANDLE_ATTR, attrlist, numattr);
+	if (pubkey == NULL || privkey == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	(void) memset(pubkey, 0, sizeof (KMF_KEY_HANDLE));
+	(void) memset(privkey, 0, sizeof (KMF_KEY_HANDLE));
+
+	rv = kmf_get_attr(KMF_KEYLABEL_ATTR, attrlist, numattr,	NULL, &len);
+	if (rv == KMF_OK && len > 0) {
+		keylabel = malloc(len + 1);
+		if (keylabel == NULL)
+			return (KMF_ERR_MEMORY);
+		/* Now fill in the label value */
+		(void) memset(keylabel, 0, len + 1);
+		rv = kmf_get_attr(KMF_KEYLABEL_ATTR, attrlist, numattr,
+		    keylabel, NULL);
+		if (rv != KMF_OK) {
+			free(keylabel);
+			goto cleanup;
+		}
 	}
 
 	/* Get some random bits */
 	InitRandom("/dev/urandom");
-	if (params->keytype == KMF_RSA) {
-		rsaparams.keySizeInBits = params->keylength;
+	if (keytype == KMF_RSA) {
+		KMF_BIGINT rsaexp;
+
+		rsaparams.keySizeInBits = keylen;
 		/*
 		 * NSS only allows for a 4 byte exponent.
 		 * Ignore the exponent parameter if it is too big.
 		 */
-		if (params->rsa_exponent.len > 0 &&
-		    params->rsa_exponent.len <= sizeof (publicExponent) &&
-		    params->rsa_exponent.val != NULL) {
-			(void) memcpy(&publicExponent,
-				params->rsa_exponent.val,
-				params->rsa_exponent.len);
+		if ((rv = kmf_get_attr(KMF_RSAEXP_ATTR, attrlist, numattr,
+		    &rsaexp, NULL)) == KMF_OK) {
+			if (rsaexp.len > 0 &&
+			    rsaexp.len <= sizeof (publicExponent) &&
+			    rsaexp.val != NULL) {
+				(void) memcpy(&publicExponent, rsaexp.val,
+				    rsaexp.len);
+			}
 		}
 		rsaparams.pe = publicExponent;
 		mechanism = CKM_RSA_PKCS_KEY_PAIR_GEN;
 		nssparams = &rsaparams;
-	} else if (params->keytype == KMF_DSA) {
+	} else if (keytype == KMF_DSA) {
 		PQGVerify *pqgVerify = NULL;
 		int ks;
 		SECStatus	nssrv, passed;
 
 		mechanism = CKM_DSA_KEY_PAIR_GEN;
 
-		ks = PQG_PBITS_TO_INDEX(params->keylength);
+		ks = PQG_PBITS_TO_INDEX(keylen);
 		nssrv = PK11_PQG_ParamGen(ks, &pqgParams, &pqgVerify);
 		if (nssrv != SECSuccess) {
 			SET_ERROR(kmfh, rv);
@@ -995,40 +942,34 @@ NSS_CreateKeypair(KMF_HANDLE_T handle,
 		goto cleanup;
 	}
 
-	NSSprivkey = PK11_GenerateKeyPair(nss_slot,
-		mechanism, nssparams, &NSSpubkey,
-		PR_TRUE, /* isPermanent */
-		PR_TRUE, /* isSensitive */
-		(void *)params->cred.cred);
+	NSSprivkey = PK11_GenerateKeyPair(nss_slot, mechanism, nssparams,
+	    &NSSpubkey,
+	    storekey, /* isPermanent */
+	    PR_TRUE, /* isSensitive */
+	    (void *)cred.cred);
 
 	if (NSSprivkey == NULL || NSSpubkey == NULL) {
 		SET_ERROR(kmfh, PORT_GetError());
 		rv = KMF_ERR_KEYGEN_FAILED;
 	} else {
-		if (params->keylabel != NULL &&
-			strlen(params->keylabel)) {
+		if (keylabel != NULL && strlen(keylabel)) {
 			(void) PK11_SetPrivateKeyNickname(NSSprivkey,
-				params->keylabel);
-			(void) PK11_SetPublicKeyNickname(NSSpubkey,
-				params->keylabel);
+			    keylabel);
+			(void) PK11_SetPublicKeyNickname(NSSpubkey, keylabel);
 		}
 		/* Now, convert it to a KMF_KEY object for the framework */
-		if (privkey != NULL) {
-			privkey->kstype = KMF_KEYSTORE_NSS;
-			privkey->keyalg = params->keytype;
-			privkey->keyclass = KMF_ASYM_PRI;
-			privkey->keylabel =
-				PK11_GetPrivateKeyNickname(NSSprivkey);
-			privkey->keyp = (void *)NSSprivkey;
-		}
-		if (pubkey != NULL) {
-			pubkey->kstype = KMF_KEYSTORE_NSS;
-			pubkey->keyalg = params->keytype;
-			pubkey->keyp = (void *)NSSpubkey;
-			pubkey->keyclass = KMF_ASYM_PUB;
-			pubkey->keylabel =
-				PK11_GetPublicKeyNickname(NSSpubkey);
-		}
+		privkey->kstype = KMF_KEYSTORE_NSS;
+		privkey->keyalg = keytype;
+		privkey->keyclass = KMF_ASYM_PRI;
+		privkey->keylabel = PK11_GetPrivateKeyNickname(NSSprivkey);
+		privkey->keyp = (void *)NSSprivkey;
+
+		pubkey->kstype = KMF_KEYSTORE_NSS;
+		pubkey->keyalg = keytype;
+		pubkey->keyp = (void *)NSSpubkey;
+		pubkey->keyclass = KMF_ASYM_PUB;
+		pubkey->keylabel = PK11_GetPublicKeyNickname(NSSpubkey);
+
 		rv = KMF_OK;
 	}
 cleanup:
@@ -1042,9 +983,11 @@ cleanup:
 		pubkey->keyp = NULL;
 	}
 
+	if (keylabel)
+		free(keylabel);
+
 	if (pqgParams != NULL)
 		PK11_PQG_DestroyParams(pqgParams);
-
 
 	if (nss_slot != NULL)
 		PK11_FreeSlot(nss_slot);
@@ -1054,11 +997,11 @@ cleanup:
 
 KMF_RETURN
 NSS_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
-	KMF_OID *AlgOID, KMF_DATA *tobesigned,
-	KMF_DATA *output)
+    KMF_OID *AlgOID, KMF_DATA *tobesigned,
+    KMF_DATA *output)
 {
 	KMF_RETURN		ret = KMF_OK;
-	KMF_ALGORITHM_INDEX		AlgId;
+	KMF_ALGORITHM_INDEX	AlgId;
 	SECOidTag		signAlgTag;
 	SECKEYPrivateKey	*NSSprivkey = NULL;
 	SECStatus		rv;
@@ -1073,7 +1016,7 @@ NSS_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* Map the OID to a NSS algorithm */
-	AlgId = X509_AlgorithmOidToAlgId(AlgOID);
+	AlgId = x509_algoid_to_algid(AlgOID);
 	if (AlgId == KMF_ALGID_NONE)
 		return (KMF_ERR_BAD_PARAMETER);
 
@@ -1129,8 +1072,7 @@ NSS_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *keyp,
 	}
 
 	rvitem = SEC_ASN1EncodeItem(NULL, NULL, spki,
-		CERT_SubjectPublicKeyInfoTemplate);
-
+	    CERT_SubjectPublicKeyInfoTemplate);
 	if (rvitem != NULL) {
 		encoded->Data = malloc(rvitem->len);
 		if (encoded->Data == NULL) {
@@ -1152,50 +1094,65 @@ NSS_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *keyp,
 }
 
 KMF_RETURN
-NSS_DeleteKey(KMF_HANDLE_T handle, KMF_DELETEKEY_PARAMS *params,
-	KMF_KEY_HANDLE *key, boolean_t delete_token)
+NSS_DeleteKey(KMF_HANDLE_T handle,
+	int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	PK11SlotInfo *nss_slot = NULL;
+	KMF_KEY_HANDLE *key;
+	KMF_CREDENTIAL cred;
+	boolean_t delete_token = B_TRUE;
 
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
 	/*
 	 * "delete_token" means to clear it from the token storage as well
 	 * as from memory.
 	 */
+	key = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
 	if (key == NULL || key->keyp == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = kmf_get_attr(KMF_DESTROY_BOOL_ATTR, attrlist, numattr,
+	    (void *)&delete_token, NULL);
+	if (rv != KMF_OK)
+		/* "delete_token" is optional. Default is TRUE */
+		rv = KMF_OK;
 
 	if (delete_token) {
 		SECStatus nssrv = SECSuccess;
 		if (key->keyclass != KMF_ASYM_PUB &&
-			key->keyclass != KMF_ASYM_PRI &&
-			key->keyclass != KMF_SYMMETRIC)
+		    key->keyclass != KMF_ASYM_PRI &&
+		    key->keyclass != KMF_SYMMETRIC)
 			return (KMF_ERR_BAD_KEY_CLASS);
 
-		if (params == NULL)
-			return (KMF_ERR_BAD_PARAMETER);
-		rv = Do_NSS_Init(handle,
-			params->ks_opt_u.nss_opts, FALSE, &nss_slot);
+		rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
 		if (rv != KMF_OK) {
 			return (rv);
 		}
-		rv = nss_authenticate(handle, nss_slot, &params->cred);
+
+		rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+		    (void *)&cred, NULL);
+		if (rv != KMF_OK)
+			return (KMF_ERR_BAD_PARAMETER);
+
+		rv = nss_authenticate(handle, nss_slot, &cred);
 		if (rv != KMF_OK) {
 			return (rv);
 		}
 
 		if (key->keyclass == KMF_ASYM_PUB) {
 			nssrv = PK11_DeleteTokenPublicKey(
-				(SECKEYPublicKey *)key->keyp);
+			    (SECKEYPublicKey *)key->keyp);
 		} else if (key->keyclass == KMF_ASYM_PRI) {
 			nssrv = PK11_DeleteTokenPrivateKey(
-				(SECKEYPrivateKey *)key->keyp, PR_TRUE);
+			    (SECKEYPrivateKey *)key->keyp, PR_TRUE);
 		} else if (key->keyclass == KMF_SYMMETRIC) {
 			nssrv = PK11_DeleteTokenSymKey(
-					(PK11SymKey *) key->keyp);
+			    (PK11SymKey *) key->keyp);
 			if (nssrv == SECSuccess)
-				PK11_FreeSymKey(
-					(PK11SymKey *) key->keyp);
+				PK11_FreeSymKey((PK11SymKey *) key->keyp);
 		}
 		if (nssrv != SECSuccess) {
 			SET_ERROR(handle, PORT_GetError());
@@ -1213,460 +1170,6 @@ NSS_DeleteKey(KMF_HANDLE_T handle, KMF_DELETEKEY_PARAMS *params,
 		}
 	}
 	key->keyp = NULL;
-
-	return (rv);
-}
-
-KMF_RETURN
-NSS_ImportCRL(KMF_HANDLE_T handle, KMF_IMPORTCRL_PARAMS *params)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	PK11SlotInfo *nss_slot = NULL;
-	CERTSignedCrl *nss_crl = NULL;
-	KMF_ENCODE_FORMAT format;
-	int importOptions;
-	SECItem crlDER;
-	KMF_DATA crl1;
-	KMF_DATA crl2;
-
-	if (params == NULL || params->ks_opt_u.nss_opts.crlfile == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	/*
-	 * Check if the input CRL file is a valid CRL file and auto-detect
-	 * the encoded format of the file.
-	 */
-	ret = KMF_IsCRLFile(handle, params->ks_opt_u.nss_opts.crlfile,
-	    &format);
-	if (ret != KMF_OK)
-		return (ret);
-
-	ret = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, TRUE, &nss_slot);
-	if (ret != KMF_OK) {
-		return (ret);
-	}
-
-	/* set importOptions */
-	if (params->ks_opt_u.nss_opts.crl_check == B_FALSE) {
-		importOptions = CRL_IMPORT_DEFAULT_OPTIONS |
-		    CRL_IMPORT_BYPASS_CHECKS;
-	} else {
-		importOptions = CRL_IMPORT_DEFAULT_OPTIONS;
-	}
-
-
-	/* Read in the CRL file */
-	crl1.Data = NULL;
-	crl2.Data = NULL;
-	ret = KMF_ReadInputFile(handle, params->ks_opt_u.nss_opts.crlfile,
-	    &crl1);
-	if (ret != KMF_OK) {
-		return (ret);
-	}
-
-	/* If the input CRL is in PEM format, convert it to DER first. */
-	if (format == KMF_FORMAT_PEM) {
-		int len;
-		ret = KMF_Pem2Der(crl1.Data, crl1.Length,
-		    &crl2.Data, &len);
-		if (ret != KMF_OK) {
-			goto out;
-		}
-		crl2.Length = (size_t)len;
-	}
-
-	crlDER.data = format == KMF_FORMAT_ASN1 ? crl1.Data : crl2.Data;
-	crlDER.len = format == KMF_FORMAT_ASN1 ? crl1.Length : crl2.Length;
-
-	nss_crl = PK11_ImportCRL(nss_slot, &crlDER, NULL, SEC_CRL_TYPE,
-	    NULL, importOptions, NULL, CRL_DECODE_DEFAULT_OPTIONS);
-
-	if (nss_crl == NULL) {
-		SET_ERROR(kmfh, PORT_GetError());
-		ret = KMF_ERR_BAD_CRLFILE;
-		goto out;
-	}
-
-out:
-	if (nss_slot != NULL) {
-		PK11_FreeSlot(nss_slot);
-	}
-
-	if (crl1.Data != NULL) {
-		free(crl1.Data);
-	}
-
-	if (crl2.Data != NULL) {
-		free(crl2.Data);
-	}
-
-	if (nss_crl != NULL) {
-		SEC_DestroyCrl(nss_crl);
-	}
-
-	return (ret);
-}
-
-KMF_RETURN
-NSS_DeleteCRL(KMF_HANDLE_T handle, KMF_DELETECRL_PARAMS *params)
-{
-	KMF_RETURN rv = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	CERTSignedCrl *crl = NULL;
-	CERTCertificate *cert = NULL;
-	PK11SlotInfo *nss_slot = NULL;
-	CERTCrlHeadNode *crlList = NULL;
-	CERTCrlNode *crlNode = NULL;
-	PRArenaPool *arena = NULL;
-	CERTName *name = NULL;
-	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
-
-	/* check params */
-	if (params == NULL ||
-	    (params->ks_opt_u.nss_opts.crl_issuerName == NULL &&
-	    params->ks_opt_u.nss_opts.crl_subjName == NULL) ||
-	    (params->ks_opt_u.nss_opts.crl_issuerName != NULL &&
-	    params->ks_opt_u.nss_opts.crl_subjName != NULL)) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, TRUE,
-		&nss_slot);
-	if (rv != KMF_OK) {
-		return (rv);
-	}
-
-	/* Find the CRL based on the deletion criteria. */
-	if (params->ks_opt_u.nss_opts.crl_issuerName != NULL) {
-		/*
-		 * If the deletion is based on the issuer's certificate
-		 * nickname, we will get the issuer's cert first, then
-		 * get the CRL from the cert.
-		 */
-		cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
-		    params->ks_opt_u.nss_opts.crl_issuerName);
-		if (!cert) {
-			SET_ERROR(kmfh, PORT_GetError());
-			rv = KMF_ERR_CERT_NOT_FOUND;
-			goto out;
-		}
-
-		crl = SEC_FindCrlByName(certHandle, &cert->derSubject,
-		    SEC_CRL_TYPE);
-		if (crl == NULL) {
-			SET_ERROR(kmfh, PORT_GetError());
-			rv = KMF_ERR_CRL_NOT_FOUND;
-			goto out;
-		}
-	} else {
-		/*
-		 * If the deletion is based on the CRL's subject name, we will
-		 * get all the CRLs from the internal database and search
-		 * for the CRL with the same subject name.
-		 */
-		boolean_t found = B_FALSE;
-		int nssrv;
-
-		nssrv = SEC_LookupCrls(certHandle, &crlList, SEC_CRL_TYPE);
-		if (nssrv) {
-			SET_ERROR(kmfh, nssrv);
-			rv = KMF_ERR_CRL_NOT_FOUND;
-			goto out;
-		}
-
-		if (crlList == NULL) {
-			SET_ERROR(kmfh, PORT_GetError());
-			rv = KMF_ERR_CRL_NOT_FOUND;
-			goto out;
-		}
-
-		/* Allocate space for name */
-		arena = PORT_NewArena(SEC_ASN1_DEFAULT_ARENA_SIZE);
-		if (arena == NULL) {
-			rv = KMF_ERR_MEMORY;
-			goto out;
-		}
-
-		name = PORT_ArenaZAlloc(arena, sizeof (*name));
-		if (name == NULL) {
-			rv = KMF_ERR_MEMORY;
-			goto out;
-		}
-		name->arena = arena;
-
-		crlNode  = crlList->first;
-		while (crlNode && !found) {
-			char *asciiname = NULL;
-			SECItem* issuer;
-
-			name = &crlNode->crl->crl.name;
-			if (!name) {
-				SET_ERROR(kmfh, PORT_GetError());
-				rv = KMF_ERR_CRL_NOT_FOUND;
-				break;
-			}
-
-			asciiname = CERT_NameToAscii(name);
-			if (asciiname == NULL) {
-				SET_ERROR(kmfh, PORT_GetError());
-				rv = KMF_ERR_CRL_NOT_FOUND;
-				break;
-			}
-
-			if (strcmp(params->ks_opt_u.nss_opts.crl_subjName,
-			    asciiname) == 0) {
-				found = B_TRUE;
-				issuer = &crlNode->crl->crl.derName;
-				crl = SEC_FindCrlByName(certHandle, issuer,
-				    SEC_CRL_TYPE);
-				if (crl == NULL) {
-					/* We found a cert but no CRL */
-					SET_ERROR(kmfh,  PORT_GetError());
-					rv = KMF_ERR_CRL_NOT_FOUND;
-				}
-			}
-			PORT_Free(asciiname);
-			crlNode = crlNode->next;
-		}
-
-		if (rv) {
-			goto out;
-		}
-	}
-
-	if (crl) {
-		(void) SEC_DeletePermCRL(crl);
-	}
-
-out:
-	if (nss_slot != NULL) {
-		PK11_FreeSlot(nss_slot);
-	}
-
-	if (crlList != NULL) {
-		PORT_FreeArena(crlList->arena, PR_FALSE);
-	}
-
-	if (arena != NULL) {
-		PORT_FreeArena(arena, PR_FALSE);
-	}
-
-	if (cert != NULL) {
-		CERT_DestroyCertificate(cert);
-	}
-
-	if (crl != NULL) {
-		SEC_DestroyCrl(crl);
-	}
-
-	return (rv);
-}
-
-
-KMF_RETURN
-NSS_FindCRL(KMF_HANDLE_T handle, KMF_FINDCRL_PARAMS *params,
-	char **CRLNameList, int *CRLCount)
-{
-	KMF_RETURN rv = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	PK11SlotInfo *nss_slot = NULL;
-	CERTCrlHeadNode *crlList = NULL;
-	CERTCrlNode *crlNode = NULL;
-	PRArenaPool *arena = NULL;
-	CERTName *name = NULL;
-	SECStatus nssrv;
-	char *asciiname = NULL;
-	int crl_num;
-	int i;
-	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
-
-	if (CRLCount == NULL || params == NULL) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	*CRLCount = 0;
-
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, TRUE, &nss_slot);
-	if (rv != KMF_OK) {
-		return (rv);
-	}
-
-	/* Look up Crls */
-	nssrv = SEC_LookupCrls(certHandle, &crlList, SEC_CRL_TYPE);
-	if (nssrv) {
-		SET_ERROR(kmfh, rv);
-		rv = KMF_ERR_CRL_NOT_FOUND;
-		goto out;
-	}
-
-	/* Allocate space for name first */
-	arena = PORT_NewArena(SEC_ASN1_DEFAULT_ARENA_SIZE);
-	if (arena == NULL) {
-	    rv = KMF_ERR_MEMORY;
-	    goto out;
-	}
-
-	name = PORT_ArenaZAlloc(arena, sizeof (*name));
-	if (name == NULL) {
-		rv = KMF_ERR_MEMORY;
-		goto out;
-	}
-	name->arena = arena;
-
-	/*
-	 * Loop thru the crlList and create a crl list with CRL's subject name.
-	 */
-	crlNode  = crlList->first;
-	crl_num = 0;
-	while (crlNode) {
-		char *subj_name;
-
-		/* Get the CRL subject name */
-		name = &crlNode->crl->crl.name;
-		if (!name) {
-			SET_ERROR(kmfh, PORT_GetError());
-			rv = KMF_ERR_CRL_NOT_FOUND;
-			break;
-		}
-
-
-		if (CRLNameList != NULL) {
-			asciiname = CERT_NameToAscii(name);
-			if (asciiname == NULL) {
-				SET_ERROR(kmfh, PORT_GetError());
-				rv = KMF_ERR_CRL_NOT_FOUND;
-				break;
-			}
-			subj_name = strdup(asciiname);
-			PORT_Free(asciiname);
-			if (subj_name == NULL) {
-				rv = KMF_ERR_MEMORY;
-				break;
-			}
-			CRLNameList[crl_num] = subj_name;
-		}
-
-		crl_num++;
-		crlNode = crlNode->next;
-	}
-
-	if (rv == KMF_OK) {
-		/* success */
-		*CRLCount = crl_num;
-	}
-
-out:
-	if (nss_slot != NULL) {
-		PK11_FreeSlot(nss_slot);
-	}
-
-	if (crlList != NULL) {
-		PORT_FreeArena(crlList->arena, PR_FALSE);
-	}
-
-	if (arena != NULL) {
-		PORT_FreeArena(arena, PR_FALSE);
-	}
-
-	/* If failed, free memory allocated for the returning rlist */
-	if (rv && (CRLNameList != NULL)) {
-		for (i = 0; i < crl_num; i++) {
-			free(CRLNameList[i]);
-		}
-	}
-
-	return (rv);
-}
-
-
-KMF_RETURN
-NSS_FindCertInCRL(KMF_HANDLE_T handle, KMF_FINDCERTINCRL_PARAMS *params)
-{
-	KMF_RETURN rv = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	PK11SlotInfo *nss_slot = NULL;
-	CERTCertificate *cert = NULL;
-	CERTSignedCrl *crl = NULL;
-	CERTCrlEntry *entry;
-	boolean_t match = B_FALSE;
-	int i;
-	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
-
-	/* check params */
-	if (params == NULL ||
-	    (params->ks_opt_u.nss_opts.certLabel == NULL &&
-	    params->ks_opt_u.nss_opts.certificate == NULL)) {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, TRUE, &nss_slot);
-	if (rv != KMF_OK) {
-		return (rv);
-	}
-
-	/* Find the certificate first */
-	if (params->ks_opt_u.nss_opts.certLabel != NULL) {
-		cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
-		    params->ks_opt_u.nss_opts.certLabel);
-	} else {
-		SECItem derCert = { NULL, 0};
-
-		derCert.data = params->ks_opt_u.nss_opts.certificate->Data;
-		derCert.len =  params->ks_opt_u.nss_opts.certificate->Length;
-		cert = CERT_FindCertByDERCert(certHandle, &derCert);
-	}
-
-	if (!cert) {
-		SET_ERROR(kmfh, PORT_GetError());
-		rv = KMF_ERR_CERT_NOT_FOUND;
-		goto out;
-	}
-
-	/* Find the CRL with the same issuer as the given certificate. */
-	crl = SEC_FindCrlByName(certHandle, &cert->derIssuer, SEC_CRL_TYPE);
-	if (crl == NULL) {
-		/*
-		 * Could not find the CRL issued by the same issuer. This
-		 * usually means that the CRL is not installed in the DB.
-		 */
-		SET_ERROR(kmfh, PORT_GetError());
-		rv = KMF_ERR_CRL_NOT_FOUND;
-		goto out;
-
-	}
-
-	/* Check if the certificate's serialNumber is revoked in the CRL */
-	i = 0;
-	while ((entry = (crl->crl).entries[i++]) != NULL) {
-		if (SECITEM_CompareItem(&(cert->serialNumber),
-		    &(entry->serialNumber)) == SECEqual) {
-			match = B_TRUE;
-			break;
-		}
-	}
-
-	if (!match) {
-		rv = KMF_ERR_NOT_REVOKED;
-	}
-
-out:
-	if (nss_slot != NULL) {
-		PK11_FreeSlot(nss_slot);
-	}
-
-	if (cert != NULL) {
-		CERT_DestroyCertificate(cert);
-	}
-
-	if (crl != NULL) {
-		SEC_DestroyCrl(crl);
-	}
 
 	return (rv);
 }
@@ -1693,30 +1196,46 @@ NSS_GetErrorString(KMF_HANDLE_T handle, char **msgstr)
 }
 
 KMF_RETURN
-NSS_GetPrikeyByCert(KMF_HANDLE_T handle, KMF_CRYPTOWITHCERT_PARAMS *params,
-	KMF_DATA *SignerCertData, KMF_KEY_HANDLE *key,
-	KMF_KEY_ALG keytype)
+NSS_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
-	CERTCertificate *nss_cert = NULL;
-	SECKEYPrivateKey* privkey = NULL;
-	PK11SlotInfo *nss_slot = NULL;
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	PK11SlotInfo *nss_slot = NULL;
+	KMF_CREDENTIAL cred;
+	KMF_KEY_HANDLE *key = NULL;
+	KMF_DATA *cert = NULL;
+	CERTCertificate *nss_cert = NULL;
+	SECKEYPrivateKey* privkey = NULL;
 
-	rv = Do_NSS_Init(handle,
-		params->nssparms, FALSE, &nss_slot);
-	if (rv != KMF_OK) {
-		return (rv);
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
 	}
 
-	rv = nss_authenticate(handle, nss_slot, &params->cred);
-	if (rv != KMF_OK) {
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK)
 		return (rv);
-	}
 
-	nss_cert = CERT_DecodeCertFromPackage((char *)SignerCertData->Data,
-	    SignerCertData->Length);
+	/* Get the credential */
+	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&cred, NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+	rv = nss_authenticate(handle, nss_slot, &cred);
+	if (rv != KMF_OK)
+		return (rv);
 
+	/* Get the key handle */
+	key = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	if (key == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Get the cert data and decode it */
+	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
+	if (cert == NULL || cert->Data == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	nss_cert = CERT_DecodeCertFromPackage((char *)cert->Data,
+	    cert->Length);
 	if (nss_cert == NULL) {
 		SET_ERROR(kmfh, PORT_GetError());
 		return (KMF_ERR_BAD_CERT_FORMAT);
@@ -1730,15 +1249,14 @@ NSS_GetPrikeyByCert(KMF_HANDLE_T handle, KMF_CRYPTOWITHCERT_PARAMS *params,
 
 	key->kstype = KMF_KEYSTORE_NSS;
 	key->keyclass = KMF_ASYM_PRI;
-	key->keyalg = keytype;
 	key->keyp = (void *)privkey;
 	key->keylabel = PK11_GetPrivateKeyNickname(privkey);
 
 	CERT_DestroyCertificate(nss_cert);
 
 	return (KMF_OK);
-
 }
+
 
 KMF_RETURN
 NSS_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
@@ -1753,7 +1271,6 @@ NSS_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	unsigned int total_decrypted = 0, modulus_len = 0;
 	uint8_t *in_data, *out_data;
 	int i, blocks;
-
 
 	if (key == NULL || AlgOID == NULL ||
 	    ciphertext == NULL || output == NULL ||
@@ -1812,8 +1329,8 @@ pk11keytype2kmf(CK_KEY_TYPE type)
 }
 
 KMF_RETURN
-NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
-	KMF_KEY_HANDLE *keys, uint32_t *numkeys)
+NSS_FindKey(KMF_HANDLE_T handle,
+	int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv;
 	SECKEYPrivateKeyList *prilist;
@@ -1824,14 +1341,32 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	PK11SymKey *symlist = NULL;
 	int count;
 	uint32_t maxkeys;
+	KMF_KEY_HANDLE *keys;
+	uint32_t *numkeys;
+	KMF_CREDENTIAL cred;
+	KMF_KEY_CLASS keyclass;
+	char *findLabel;
+	KMF_KEY_ALG keytype = KMF_KEYALG_NONE;
 
-	rv = Do_NSS_Init(handle,
-		parms->ks_opt_u.nss_opts, FALSE, &nss_slot);
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	numkeys = kmf_get_attr_ptr(KMF_COUNT_ATTR, attrlist, numattr);
+	if (numkeys == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
 
-	rv = nss_authenticate(handle, nss_slot, &parms->cred);
+	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&cred, NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = nss_authenticate(handle, nss_slot, &cred);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
@@ -1839,24 +1374,29 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	maxkeys = *numkeys;
 	if (maxkeys == 0)
 		maxkeys = 0xFFFFFFFF;
-
 	*numkeys = 0;
-	if (parms->keyclass == KMF_ASYM_PUB) {
-		publist = PK11_ListPublicKeysInSlot(nss_slot, parms->findLabel);
+
+	rv = kmf_get_attr(KMF_KEYCLASS_ATTR, attrlist, numattr,
+	    (void *)&keyclass, NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	findLabel = kmf_get_attr_ptr(KMF_KEYLABEL_ATTR, attrlist, numattr);
+
+	if (keyclass == KMF_ASYM_PUB) {
+		publist = PK11_ListPublicKeysInSlot(nss_slot, findLabel);
 		if (publist == NULL) {
 			rv = KMF_ERR_KEY_NOT_FOUND;
 			goto cleanup;
 		}
-	} else if (parms->keyclass == KMF_ASYM_PRI) {
-		prilist = PK11_ListPrivKeysInSlot(nss_slot,
-			parms->findLabel, NULL);
+	} else if (keyclass == KMF_ASYM_PRI) {
+		prilist = PK11_ListPrivKeysInSlot(nss_slot, findLabel, NULL);
 		if (prilist == NULL) {
 			rv = KMF_ERR_KEY_NOT_FOUND;
 			goto cleanup;
 		}
-	} else if (parms->keyclass == KMF_SYMMETRIC) {
-		symlist = PK11_ListFixedKeysInSlot(nss_slot, parms->findLabel,
-		    NULL);
+	} else if (keyclass == KMF_SYMMETRIC) {
+		symlist = PK11_ListFixedKeysInSlot(nss_slot, findLabel, NULL);
 		if (symlist == NULL) {
 			rv = KMF_ERR_KEY_NOT_FOUND;
 			goto cleanup;
@@ -1866,18 +1406,19 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		goto cleanup;
 	}
 
-	if (parms->keyclass == KMF_ASYM_PUB) {
+	keys = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	/* it is okay to have "keys" contains NULL */
+
+	if (keyclass == KMF_ASYM_PUB) {
 		for (count = 0, pubnode = PUBKEY_LIST_HEAD(publist);
-			!PUBKEY_LIST_END(pubnode, publist) &&
-			count < maxkeys;
-			pubnode = PUBKEY_LIST_NEXT(pubnode), count++) {
+		    !PUBKEY_LIST_END(pubnode, publist) && count < maxkeys;
+		    pubnode = PUBKEY_LIST_NEXT(pubnode), count++) {
 			if (keys != NULL) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
 				keys[count].keyclass = KMF_ASYM_PUB;
 				keys[count].keyp = (void *)pubnode->key;
 				keys[count].keylabel =
-					PK11_GetPublicKeyNickname(
-						pubnode->key);
+				    PK11_GetPublicKeyNickname(pubnode->key);
 
 				if (pubnode->key->keyType == rsaKey)
 					keys[count].keyalg = KMF_RSA;
@@ -1886,18 +1427,16 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 			}
 		}
 		*numkeys = count;
-	} else if (parms->keyclass == KMF_ASYM_PRI) {
+	} else if (keyclass == KMF_ASYM_PRI) {
 		for (count = 0, prinode = PRIVKEY_LIST_HEAD(prilist);
-			!PRIVKEY_LIST_END(prinode, prilist) &&
-			count < maxkeys;
-			prinode = PRIVKEY_LIST_NEXT(prinode), count++) {
+		    !PRIVKEY_LIST_END(prinode, prilist) && count < maxkeys;
+		    prinode = PRIVKEY_LIST_NEXT(prinode), count++) {
 			if (keys != NULL) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
 				keys[count].keyclass = KMF_ASYM_PRI;
 				keys[count].keyp = (void *)prinode->key;
 				keys[count].keylabel =
-					PK11_GetPrivateKeyNickname(
-						prinode->key);
+				    PK11_GetPrivateKeyNickname(prinode->key);
 
 				if (prinode->key->keyType == rsaKey)
 					keys[count].keyalg = KMF_RSA;
@@ -1906,8 +1445,12 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 			}
 		}
 		*numkeys = count;
-	} else if (parms->keyclass == KMF_SYMMETRIC) {
+	} else if (keyclass == KMF_SYMMETRIC) {
 		count = 0;
+		rv = kmf_get_attr(KMF_KEYALG_ATTR, attrlist, numattr,
+		    (void *)&keytype, NULL);
+		if (rv != KMF_OK)
+			rv = KMF_OK;
 		while (symlist && count < maxkeys) {
 			PK11SymKey *symkey = symlist;
 			CK_KEY_TYPE type;
@@ -1916,15 +1459,15 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 			type = PK11_GetSymKeyType(symkey);
 			keyalg = pk11keytype2kmf(type);
 
+			symlist = PK11_GetNextSymKey(symkey);
+
 			/*
 			 * If keytype is specified in the searching parameter,
 			 * check the keytype and skip the key if its keytype
 			 * doesn't match.
 			 */
-			symlist = PK11_GetNextSymKey(symkey);
-			if (parms->keytype != KMF_KEYALG_NONE &&
-			    parms->keytype != keyalg) {
-				/* free that key since we aren't using it */
+			if (keytype != KMF_KEYALG_NONE && keytype != keyalg) {
+				/* free that key since we arent using it */
 				PK11_FreeSymKey(symkey);
 				continue;
 			}
@@ -1946,12 +1489,13 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		 */
 		while (symlist != NULL) {
 			PK11SymKey *symkey = symlist;
+
 			PK11_FreeSymKey(symkey);
 			symlist = PK11_GetNextSymKey(symkey);
 		}
+		*numkeys = count;
 	}
 
-	*numkeys = count;
 cleanup:
 	if (nss_slot != NULL) {
 		PK11_FreeSlot(nss_slot);
@@ -2005,7 +1549,7 @@ p12u_ucs2_ascii_conversion_function(
 	}
 	/* Perform the conversion. */
 	ret = PORT_UCS2_UTF8Conversion(toUnicode, dup->data, dup->len,
-		outBuf, maxOutBufLen, outBufLen);
+	    outBuf, maxOutBufLen, outBufLen);
 	if (dup)
 		SECITEM_ZfreeItem(dup, PR_TRUE);
 
@@ -2020,11 +1564,10 @@ p12u_OpenFile(p12uContext *p12ctx, PRBool fileRead)
 	}
 
 	if (fileRead) {
-		p12ctx->file = PR_Open(p12ctx->filename,
-			PR_RDONLY, 0400);
+		p12ctx->file = PR_Open(p12ctx->filename, PR_RDONLY, 0400);
 	} else {
 		p12ctx->file = PR_Open(p12ctx->filename,
-			PR_CREATE_FILE | PR_RDWR | PR_TRUNCATE, 0600);
+		    PR_CREATE_FILE | PR_RDWR | PR_TRUNCATE, 0600);
 	}
 
 	if (!p12ctx->file) {
@@ -2124,7 +1667,7 @@ add_cert_to_bag(SEC_PKCS12ExportContext *p12ecx,
 		certSafe = keySafe;
 	} else {
 		certSafe = SEC_PKCS12CreatePasswordPrivSafe(p12ecx, pwitem,
-			SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_40_BIT_RC2_CBC);
+		    SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_40_BIT_RC2_CBC);
 	}
 
 	if (!certSafe || !keySafe) {
@@ -2133,22 +1676,17 @@ add_cert_to_bag(SEC_PKCS12ExportContext *p12ecx,
 	}
 
 	if (SEC_PKCS12AddCertAndKey(p12ecx, certSafe, NULL, cert,
-		CERT_GetDefaultCertDB(), keySafe, NULL, PR_TRUE, pwitem,
-		SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_3KEY_TRIPLE_DES_CBC)
-		!= SECSuccess) {
+	    CERT_GetDefaultCertDB(), keySafe, NULL, PR_TRUE, pwitem,
+	    SEC_OID_PKCS12_V2_PBE_WITH_SHA1_AND_3KEY_TRIPLE_DES_CBC)
+	    != SECSuccess) {
 		rv = KMF_ERR_INTERNAL;
 	}
 out:
 	return (rv);
 }
 
-/*ARGSUSED*/
 KMF_RETURN
-NSS_ExportP12(KMF_HANDLE_T handle,
-	KMF_EXPORTP12_PARAMS *params,
-	int numcerts, KMF_X509_DER_CERT *certs,
-	int numkeys, KMF_KEY_HANDLE *keylist,
-	char *filename)
+NSS_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv;
 	KMF_HANDLE *kmfh = (KMF_HANDLE  *)handle;
@@ -2159,33 +1697,56 @@ NSS_ExportP12(KMF_HANDLE_T handle,
 	CERTCertListNode* node = NULL;
 	PK11SlotInfo	*slot = NULL;
 	SECItem pwitem = {NULL, 0};
+	KMF_CREDENTIAL *cred = NULL;
+	KMF_CREDENTIAL *p12cred = NULL;
+	char *certlabel = NULL;
+	char *issuer = NULL;
+	char *subject = NULL;
+	KMF_BIGINT *serial = NULL;
+	char *filename = NULL;
 
-	rv = Do_NSS_Init(handle,
-		params->nssparms, FALSE, &slot);
-	if (rv != KMF_OK) {
-		return (rv);
+	if (kmfh == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
 	}
 
-	rv = nss_authenticate(handle, slot, &params->cred);
-	if (rv != KMF_OK) {
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &slot);
+	if (rv != KMF_OK)
 		return (rv);
-	}
+
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
+	if (cred == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = nss_authenticate(handle, slot, cred);
+	if (rv != KMF_OK)
+		return (rv);
+
+	p12cred = kmf_get_attr_ptr(KMF_PK12CRED_ATTR, attrlist, numattr);
+	if (p12cred  == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	filename = kmf_get_attr_ptr(KMF_OUTPUT_FILENAME_ATTR, attrlist,
+	    numattr);
+	if (filename == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Get optional search criteria attributes */
+	certlabel = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+	issuer = kmf_get_attr_ptr(KMF_ISSUER_NAME_ATTR, attrlist, numattr);
+	subject = kmf_get_attr_ptr(KMF_SUBJECT_NAME_ATTR, attrlist, numattr);
+	serial = kmf_get_attr_ptr(KMF_BIGINT_ATTR, attrlist, numattr);
 
 	/*
 	 * Find the certificate(s) first.
 	 */
-	if (params->certLabel) {
-		nsscert = PK11_FindCertFromNickname(params->certLabel,
-			NULL);
+	if (certlabel != NULL) {
+		nsscert = PK11_FindCertFromNickname(certlabel, NULL);
 		if (nsscert == NULL) {
 			HANDLE_NSS_ERROR(KMF_ERR_CERT_NOT_FOUND)
 		}
 	} else {
-		rv = nss_find_matching_certs(slot,
-			params->issuer,
-			params->subject,
-			params->serial,
-			&certlist, 0);
+		rv = nss_find_matching_certs(slot, issuer, subject, serial,
+		    &certlist, 0);
 
 		if (rv == KMF_OK && certlist == NULL) {
 			return (KMF_ERR_CERT_NOT_FOUND);
@@ -2198,8 +1759,8 @@ NSS_ExportP12(KMF_HANDLE_T handle,
 	 * The KMF_CREDENTIAL holds the password to use for
 	 * encrypting the PKCS12 key information.
 	 */
-	pwitem.data = (uchar_t *)params->p12cred.cred;
-	pwitem.len = params->p12cred.credlen;
+	pwitem.data = (uchar_t *)p12cred->cred;
+	pwitem.len = p12cred->credlen;
 
 	p12ctx = p12u_InitContext(PR_FALSE, filename);
 	if (!p12ctx) {
@@ -2207,16 +1768,15 @@ NSS_ExportP12(KMF_HANDLE_T handle,
 	}
 
 	PORT_SetUCS2_ASCIIConversionFunction(
-		p12u_ucs2_ascii_conversion_function);
+	    p12u_ucs2_ascii_conversion_function);
 
-	p12ecx = SEC_PKCS12CreateExportContext(NULL, NULL,
-		slot, NULL);
+	p12ecx = SEC_PKCS12CreateExportContext(NULL, NULL, slot, NULL);
 	if (!p12ecx) {
 		HANDLE_NSS_ERROR(KMF_ERR_OPEN_FILE)
 	}
 
 	if (SEC_PKCS12AddPasswordIntegrity(p12ecx, &pwitem, SEC_OID_SHA1)
-		!= SECSuccess) {
+	    != SECSuccess) {
 		HANDLE_NSS_ERROR(KMF_ERR_INTERNAL)
 	}
 
@@ -2226,9 +1786,8 @@ NSS_ExportP12(KMF_HANDLE_T handle,
 	 */
 	if (certlist != NULL) {
 		for (node = CERT_LIST_HEAD(certlist);
-			!CERT_LIST_END(node, certlist) && rv == KMF_OK;
-			node = CERT_LIST_NEXT(node)) {
-
+		    !CERT_LIST_END(node, certlist) && rv == KMF_OK;
+		    node = CERT_LIST_NEXT(node)) {
 			rv = add_cert_to_bag(p12ecx, node->cert, &pwitem);
 		}
 	} else if (nsscert != NULL) {
@@ -2236,7 +1795,7 @@ NSS_ExportP12(KMF_HANDLE_T handle,
 	}
 
 	if (SEC_PKCS12Encode(p12ecx, p12u_WriteToExportFile, p12ctx)
-		!= SECSuccess) {
+	    != SECSuccess) {
 		HANDLE_NSS_ERROR(KMF_ERR_ENCODING)
 	}
 out:
@@ -2261,105 +1820,8 @@ out:
 	t[n].ulValueLen = (CK_ULONG)size;
 
 KMF_RETURN
-NSS_StorePrivateKey(KMF_HANDLE_T handle, KMF_STOREKEY_PARAMS *params,
-	KMF_RAW_KEY_DATA *rawkey)
-{
-	KMF_RETURN rv = KMF_OK;
-	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
-	SECStatus	ckrv = SECSuccess;
-	PK11SlotInfo	*slot = NULL;
-	CERTCertificate *nss_cert = NULL;
-	SECKEYPrivateKeyInfo rpk;
-	SECItem		nickname;
-	KMF_DATA	derkey = { NULL, 0 };
-	uchar_t		ver = 0;
-
-	if (!kmfh)
-		return (KMF_ERR_UNINITIALIZED); /* Plugin Not Initialized */
-
-	if (params == NULL || params->certificate == NULL || rawkey == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	rv = Do_NSS_Init(handle,
-		params->nssparms, FALSE, &slot);
-
-	if (rv != KMF_OK)
-		return (rv);
-
-	rv = nss_authenticate(handle, slot, &params->cred);
-	if (rv != KMF_OK) {
-		return (rv);
-	}
-
-	/*
-	 * Decode the cert into an NSS CERT object so we can access the
-	 * SPKI and KeyUsage data later.
-	 */
-	nss_cert = CERT_DecodeCertFromPackage((char *)params->certificate->Data,
-		params->certificate->Length);
-
-	if (nss_cert == NULL) {
-		SET_ERROR(kmfh, PORT_GetError());
-		rv = KMF_ERR_BAD_CERT_FORMAT;
-		goto cleanup;
-	}
-
-	(void) memset(&rpk, 0, sizeof (rpk));
-
-	rpk.arena = NULL;
-	rpk.version.type = siUnsignedInteger;
-	rpk.version.data = &ver;
-	rpk.version.len = 1;
-	if (rawkey->keytype == KMF_RSA) {
-
-		rv = DerEncodeRSAPrivateKey(&derkey, &rawkey->rawdata.rsa);
-		if (rv != KMF_OK)
-			goto cleanup;
-
-		rpk.algorithm = nss_cert->subjectPublicKeyInfo.algorithm;
-		rpk.privateKey.data = derkey.Data;
-		rpk.privateKey.len = derkey.Length;
-		rpk.attributes = NULL;
-
-
-	} else if (rawkey->keytype == KMF_DSA) {
-		rv = DerEncodeDSAPrivateKey(&derkey, &rawkey->rawdata.dsa);
-		if (rv != KMF_OK)
-			goto cleanup;
-
-		rpk.algorithm = nss_cert->subjectPublicKeyInfo.algorithm;
-		rpk.privateKey.data = derkey.Data;
-		rpk.privateKey.len = derkey.Length;
-		rpk.attributes = NULL;
-
-	} else {
-		return (KMF_ERR_BAD_PARAMETER);
-	}
-
-	nickname.data = (uchar_t *)params->label;
-	nickname.len = (params->label ? strlen(params->label) : 0);
-
-	ckrv = PK11_ImportPrivateKeyInfo(slot, &rpk,
-		&nickname, &nss_cert->subjectPublicKeyInfo.subjectPublicKey,
-		TRUE, TRUE, nss_cert->keyUsage, NULL);
-
-	if (ckrv != CKR_OK) {
-		SET_ERROR(kmfh, PORT_GetError());
-		rv = KMF_ERR_INTERNAL;
-	}
-
-cleanup:
-	if (nss_cert != NULL) {
-		CERT_DestroyCertificate(nss_cert);
-	}
-	KMF_FreeData(&derkey);
-	return (rv);
-}
-
-KMF_RETURN
 NSS_CreateSymKey(KMF_HANDLE_T handle,
-	KMF_CREATESYMKEY_PARAMS *params,
-	KMF_KEY_HANDLE *symkey)
+	int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -2368,21 +1830,49 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 	CK_MECHANISM_TYPE keyType;
 	SECStatus nssrv;
 	int keySize;
+	KMF_KEY_HANDLE *symkey;
+	KMF_CREDENTIAL cred;
+	uint32_t keylen;
+	uint32_t keylen_size = sizeof (uint32_t);
+	KMF_KEY_ALG keytype;
+	char *keylabel = NULL;
 
-	if (params == NULL || symkey == NULL) {
+	if (kmfh == NULL || attrlist == NULL || numattr == 0) {
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
-	switch (params->keytype) {
+	symkey = kmf_get_attr_ptr(KMF_KEY_HANDLE_ATTR, attrlist, numattr);
+	if (symkey == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = kmf_get_attr(KMF_KEYALG_ATTR, attrlist, numattr, (void *)&keytype,
+	    NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = kmf_get_attr(KMF_KEYLENGTH_ATTR, attrlist, numattr, &keylen,
+	    &keylen_size);
+	if (rv == KMF_ERR_ATTR_NOT_FOUND &&
+	    (keytype == KMF_DES || keytype == KMF_DES3))
+		/* keylength is not required for DES and 3DES */
+		rv = KMF_OK;
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	keylabel = kmf_get_attr_ptr(KMF_KEYLABEL_ATTR, attrlist, numattr);
+	if (keylabel == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	switch (keytype) {
 	case KMF_AES:
 		keyType = CKM_AES_KEY_GEN;
-		keySize = params->keylength;
+		keySize = keylen;
 		if (keySize == 0 || (keySize % 8) != 0)
 			return (KMF_ERR_BAD_KEY_SIZE);
 		break;
 	case KMF_RC4:
 		keyType = CKM_RC4_KEY_GEN;
-		keySize = params->keylength;
+		keySize = keylen;
 		if (keySize == 0 || (keySize % 8) != 0)
 			return (KMF_ERR_BAD_KEY_SIZE);
 		break;
@@ -2396,7 +1886,7 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 		break;
 	case KMF_GENERIC_SECRET:
 		keyType = CKM_GENERIC_SECRET_KEY_GEN;
-		keySize = params->keylength;
+		keySize = keylen;
 		if (keySize == 0 || (keySize % 8) != 0)
 			return (KMF_ERR_BAD_KEY_SIZE);
 		break;
@@ -2405,26 +1895,30 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 		goto out;
 	}
 
-	rv = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts, FALSE, &nss_slot);
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
 
-	rv = nss_authenticate(handle, nss_slot, &params->cred);
+	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&cred, NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = nss_authenticate(handle, nss_slot, &cred);
 	if (rv != KMF_OK) {
 		return (rv);
 	}
 
 	nsskey = PK11_TokenKeyGen(nss_slot, keyType, NULL, keySize,  NULL,
-	    PR_TRUE, (void *)params->cred.cred);
+	    PR_TRUE, (void *)cred.cred);
 	if (nsskey == NULL) {
 		SET_ERROR(kmfh, PORT_GetError());
 		rv = KMF_ERR_KEYGEN_FAILED;
 		goto out;
 	}
 
-	nssrv = PK11_SetSymKeyNickname(nsskey, params->keylabel);
+	nssrv = PK11_SetSymKeyNickname(nsskey, keylabel);
 	if (nssrv != SECSuccess) {
 		SET_ERROR(kmfh, PORT_GetError());
 		rv = KMF_ERR_KEYGEN_FAILED;
@@ -2432,7 +1926,7 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 	}
 
 	symkey->kstype = KMF_KEYSTORE_NSS;
-	symkey->keyalg = params->keytype;
+	symkey->keyalg = keytype;
 	symkey->keyclass = KMF_SYMMETRIC;
 	symkey->israw = FALSE;
 	symkey->keyp = (void *)nsskey;
@@ -2478,7 +1972,7 @@ NSS_GetSymKeyValue(KMF_HANDLE_T handle, KMF_KEY_HANDLE *symkey,
 		if ((rkey->keydata.val = malloc(rkey->keydata.len)) == NULL)
 			return (KMF_ERR_MEMORY);
 		(void) memcpy(rkey->keydata.val,
-			rawkey->rawdata.sym.keydata.val, rkey->keydata.len);
+		    rawkey->rawdata.sym.keydata.val, rkey->keydata.len);
 	} else {
 		nsskey = (PK11SymKey *)(symkey->keyp);
 		if (nsskey == NULL)
@@ -2519,24 +2013,30 @@ out:
 }
 
 KMF_RETURN
-NSS_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
-	KMF_CREDENTIAL *newpin)
+NSS_SetTokenPin(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	int rv;
 	PK11SlotInfo *nss_slot = NULL;
+	KMF_CREDENTIAL oldcred, newcred;
 
-	if (handle == NULL || params == NULL || newpin == NULL) {
+	if (handle == NULL || attrlist == NULL || numattr == 0)
 		return (KMF_ERR_BAD_PARAMETER);
-	}
 
-	ret = Do_NSS_Init(handle,
-		params->ks_opt_u.nss_opts,
-		FALSE, &nss_slot);
+	ret = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&oldcred, NULL);
+	if (ret != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+	ret = kmf_get_attr(KMF_NEWPIN_ATTR, attrlist, numattr,
+	    (void *)&newcred, NULL);
+	if (ret != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	ret = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
 	/* If it was uninitialized, set it */
 	if (ret == KMF_ERR_UNINITIALIZED_TOKEN) {
-		rv = PK11_InitPin(nss_slot, NULL, newpin->cred);
+		rv = PK11_InitPin(nss_slot, NULL, newcred.cred);
 		if (rv != SECSuccess) {
 			SET_ERROR(kmfh, PORT_GetError());
 			ret = KMF_ERR_AUTH_FAILED;
@@ -2544,12 +2044,11 @@ NSS_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
 			ret = KMF_OK;
 		}
 	} else if (ret == KMF_OK) {
-		ret = nss_authenticate(handle, nss_slot, &params->cred);
+		ret = nss_authenticate(handle, nss_slot, &oldcred);
 		if (ret != KMF_OK) {
 			return (ret);
 		}
-		rv = PK11_ChangePW(nss_slot,
-			params->cred.cred, newpin->cred);
+		rv = PK11_ChangePW(nss_slot, oldcred.cred, newcred.cred);
 		if (rv != SECSuccess) {
 			SET_ERROR(kmfh, PORT_GetError());
 			ret = KMF_ERR_AUTH_FAILED;
@@ -2557,4 +2056,796 @@ NSS_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
 	}
 
 	return (ret);
+}
+
+KMF_RETURN
+NSS_StoreKey(KMF_HANDLE_T handle,
+	int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	PK11SlotInfo *nss_slot = NULL;
+	KMF_CREDENTIAL cred = {NULL, 0};
+	KMF_KEY_HANDLE *pubkey = NULL, *prikey = NULL;
+	KMF_RAW_KEY_DATA *rawkey = NULL;
+	char *keylabel = NULL;
+	SECStatus ckrv = SECSuccess;
+	SECItem nickname = {NULL, 0};
+	CERTCertificate *nss_cert = NULL;
+
+	if (kmfh == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+
+	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
+	    (void *)&cred, NULL);
+	if (rv != KMF_OK)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	rv = nss_authenticate(handle, nss_slot, &cred);
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+
+	pubkey = kmf_get_attr_ptr(KMF_PUBKEY_HANDLE_ATTR, attrlist, numattr);
+	if (pubkey == NULL) {
+		/* look for private key */
+		prikey = kmf_get_attr_ptr(KMF_PRIVKEY_HANDLE_ATTR, attrlist,
+		    numattr);
+		if (prikey == NULL)
+			/* look for raw key */
+			rawkey = kmf_get_attr_ptr(KMF_RAW_KEY_ATTR,
+			    attrlist, numattr);
+	}
+
+	/* If no keys were found, return error */
+	if (pubkey == NULL && prikey == NULL && rawkey == NULL)
+		return (KMF_ERR_ATTR_NOT_FOUND);
+
+	keylabel = kmf_get_attr_ptr(KMF_KEYLABEL_ATTR, attrlist, numattr);
+	if (keylabel != NULL) {
+		nickname.data = (uchar_t *)keylabel;
+		nickname.len = strlen(keylabel);
+	}
+
+	if (rawkey != NULL) {
+		uchar_t ver = 0;
+		SECKEYPrivateKeyInfo rpk;
+		KMF_DATA derkey = {NULL, 0};
+		KMF_DATA *cert;
+
+		cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
+		if (cert == NULL)
+			return (rv);
+		/*
+		 * Decode the cert into an NSS CERT object so we can access the
+		 * SPKI and KeyUsage data later.
+		 */
+		nss_cert = CERT_DecodeCertFromPackage((char *)cert->Data,
+		    cert->Length);
+
+		if (nss_cert == NULL) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_BAD_CERT_FORMAT;
+			goto cleanup;
+		}
+
+		(void) memset(&rpk, 0, sizeof (rpk));
+		rpk.arena = NULL;
+		rpk.version.type = siUnsignedInteger;
+		rpk.version.data = &ver;
+		rpk.version.len = 1;
+		if (rawkey->keytype == KMF_RSA) {
+			rv = DerEncodeRSAPrivateKey(&derkey,
+			    &rawkey->rawdata.rsa);
+			if (rv != KMF_OK)
+				goto cleanup;
+
+		} else if (rawkey->keytype == KMF_DSA) {
+			rv = DerEncodeDSAPrivateKey(&derkey,
+			    &rawkey->rawdata.dsa);
+			if (rv != KMF_OK)
+				goto cleanup;
+		}
+		rpk.algorithm = nss_cert->subjectPublicKeyInfo.algorithm;
+		rpk.privateKey.data = derkey.Data;
+		rpk.privateKey.len = derkey.Length;
+		rpk.attributes = NULL;
+
+		ckrv = PK11_ImportPrivateKeyInfo(nss_slot, &rpk, &nickname,
+		    &nss_cert->subjectPublicKeyInfo.subjectPublicKey, TRUE,
+		    TRUE, nss_cert->keyUsage, NULL);
+		if (ckrv != CKR_OK) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_INTERNAL;
+		}
+		kmf_free_data(&derkey);
+	} else if (pubkey != NULL && pubkey->kstype == KMF_KEYSTORE_NSS) {
+		CK_OBJECT_HANDLE pk;
+		SECKEYPublicKey *publicKey = (SECKEYPublicKey *) pubkey->keyp;
+
+		pk = PK11_ImportPublicKey(nss_slot, publicKey, PR_TRUE);
+		if (pk == CK_INVALID_HANDLE) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_INTERNAL;
+		}
+	} else if (prikey != NULL && prikey->kstype == KMF_KEYSTORE_NSS) {
+		SECKEYPrivateKey *pk;
+		SECKEYPrivateKey *privKey = (SECKEYPrivateKey *) prikey->keyp;
+
+		pk = PK11_LoadPrivKey(nss_slot, privKey, NULL, PR_TRUE,
+		    PR_TRUE);
+		if (pk == CK_INVALID_HANDLE) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_INTERNAL;
+		}
+		/* We stored it, but don't need the handle anymore */
+		SECKEY_DestroyPrivateKey(pk);
+	}
+
+cleanup:
+	if (nss_cert != NULL)
+		CERT_DestroyCertificate(nss_cert);
+	PK11_FreeSlot(nss_slot);
+	return (rv);
+}
+
+/*
+ * This function is called by NSS_StoreCert() and NSS_ImportCert().
+ * The "label" and "trust_flag" arguments can be NULL.
+ */
+static KMF_RETURN
+store_cert(KMF_HANDLE_T handle, PK11SlotInfo *nss_slot, KMF_DATA *cert,
+    char *label, char *trust_flag)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	SECStatus nss_rv;
+	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
+	CERTCertificate *nss_cert = NULL;
+	CERTCertTrust *nss_trust = NULL;
+
+	if (nss_slot == NULL || cert == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	nss_cert = CERT_DecodeCertFromPackage((char *)cert->Data,
+	    cert->Length);
+	if (nss_cert == NULL) {
+		SET_ERROR(kmfh, PORT_GetError());
+		ret = KMF_ERR_BAD_CERT_FORMAT;
+		goto out;
+	}
+
+	/* Store the cert into the NSS database */
+	nss_rv = PK11_ImportCert(nss_slot, nss_cert, CK_INVALID_HANDLE,
+	    label, 0);
+	if (nss_rv) {
+		SET_ERROR(kmfh, nss_rv);
+		ret = KMF_ERR_BAD_CERT_FORMAT;
+		goto out;
+	}
+
+	/* If trust_flag is NULL, then we are done */
+	if (trust_flag == NULL)
+		goto out;
+
+	nss_trust = (CERTCertTrust *) malloc(sizeof (CERTCertTrust));
+	if (nss_trust == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	nss_rv = CERT_DecodeTrustString(nss_trust, trust_flag);
+	if (nss_rv) {
+		SET_ERROR(kmfh, nss_rv);
+		ret = KMF_ERR_BAD_PARAMETER;
+		goto out;
+	}
+
+	nss_rv = CERT_ChangeCertTrust(certHandle, nss_cert, nss_trust);
+	if (nss_rv) {
+		SET_ERROR(kmfh, nss_rv);
+		ret = KMF_ERR_BAD_PARAMETER;
+	}
+
+out:
+	if (nss_cert != NULL) {
+		CERT_DestroyCertificate(nss_cert);
+	}
+
+	if (nss_trust != NULL) {
+		free(nss_trust);
+	}
+
+	return (ret);
+}
+
+
+KMF_RETURN
+NSS_StoreCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	PK11SlotInfo *nss_slot = NULL;
+	KMF_DATA *cert = NULL;
+	char *label = NULL;
+	char *trust_flag = NULL;
+
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	ret = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (ret != KMF_OK)
+		return (ret);
+
+	/* Get the cert data  */
+	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
+	if (cert == NULL || cert->Data == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* The label attribute is optional */
+	label = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+
+	/* The trustflag attriburte is optional */
+	trust_flag = kmf_get_attr_ptr(KMF_TRUSTFLAG_ATTR, attrlist, numattr);
+
+	ret = store_cert(handle, nss_slot, cert, label, trust_flag);
+
+out:
+	if (nss_slot != NULL) {
+		PK11_FreeSlot(nss_slot);
+	}
+
+	return (ret);
+}
+
+
+KMF_RETURN
+NSS_ImportCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	PK11SlotInfo *nss_slot = NULL;
+	KMF_DATA cert = {NULL, 0};
+	KMF_DATA cert_der = {NULL, 0};
+	KMF_DATA *cptr = NULL;
+	KMF_ENCODE_FORMAT format;
+	char *label = NULL;
+	char *trust_flag = NULL;
+	char *certfile = NULL;
+
+	if (handle == NULL || attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	ret = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (ret != KMF_OK)
+		return (ret);
+
+	/* Get the input cert filename attribute */
+	certfile = kmf_get_attr_ptr(KMF_CERT_FILENAME_ATTR, attrlist, numattr);
+	if (certfile == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Check the cert file and auto-detect the file format of it. */
+	ret = kmf_is_cert_file(handle, certfile, &format);
+	if (ret != KMF_OK)
+		return (ret);
+
+	ret = kmf_read_input_file(handle, certfile, &cert);
+	if (ret != KMF_OK) {
+		return (ret);
+	}
+
+	/*
+	 * If the imported cert is in PEM format, convert it to
+	 * DER format in order to store it in NSS token.
+	 */
+	if (format == KMF_FORMAT_PEM) {
+		int derlen;
+		ret = kmf_pem_to_der(cert.Data, cert.Length,
+		    &cert_der.Data, &derlen);
+		if (ret != KMF_OK) {
+			goto cleanup;
+		}
+		cert_der.Length = (size_t)derlen;
+		cptr = &cert_der;
+	} else {
+		cptr = &cert;
+	}
+
+	label = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+	trust_flag = kmf_get_attr_ptr(KMF_TRUSTFLAG_ATTR, attrlist, numattr);
+	ret = store_cert(handle, nss_slot, cptr, label, trust_flag);
+
+cleanup:
+	if (format == KMF_FORMAT_PEM) {
+		kmf_free_data(&cert_der);
+	}
+
+	kmf_free_data(&cert);
+
+	return (ret);
+}
+
+
+KMF_RETURN
+NSS_ImportCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	PK11SlotInfo *nss_slot = NULL;
+	CERTSignedCrl *nss_crl = NULL;
+	KMF_ENCODE_FORMAT format;
+	int importOptions;
+	SECItem crlDER;
+	KMF_DATA crl1;
+	KMF_DATA crl2;
+	char *crlfilename;
+	boolean_t crlcheck = FALSE;
+
+	if (attrlist == NULL || numattr == 0) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	ret = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (ret != KMF_OK) {
+		return (ret);
+	}
+
+	crlfilename = kmf_get_attr_ptr(KMF_CRL_FILENAME_ATTR, attrlist,
+	    numattr);
+	if (crlfilename == NULL)
+		return (KMF_ERR_BAD_CRLFILE);
+
+	/*
+	 * Check if the input CRL file is a valid CRL file and auto-detect
+	 * the encoded format of the file.
+	 */
+	ret = kmf_is_crl_file(handle, crlfilename, &format);
+	if (ret != KMF_OK)
+		return (ret);
+
+	ret = kmf_get_attr(KMF_CRL_CHECK_ATTR, attrlist, numattr,
+	    &crlcheck, NULL);
+	if (ret != KMF_OK)
+		ret = KMF_OK; /* CRL_CHECK is optional */
+
+	/* set importOptions */
+	if (crlcheck == B_FALSE) {
+		importOptions = CRL_IMPORT_DEFAULT_OPTIONS |
+		    CRL_IMPORT_BYPASS_CHECKS;
+	} else {
+		importOptions = CRL_IMPORT_DEFAULT_OPTIONS;
+	}
+
+
+	/* Read in the CRL file */
+	crl1.Data = NULL;
+	crl2.Data = NULL;
+	ret = kmf_read_input_file(handle, crlfilename, &crl1);
+	if (ret != KMF_OK) {
+		return (ret);
+	}
+
+	/* If the input CRL is in PEM format, convert it to DER first. */
+	if (format == KMF_FORMAT_PEM) {
+		int len;
+		ret = kmf_pem_to_der(crl1.Data, crl1.Length,
+		    &crl2.Data, &len);
+		if (ret != KMF_OK) {
+			goto out;
+		}
+		crl2.Length = (size_t)len;
+	}
+
+	crlDER.data = format == KMF_FORMAT_ASN1 ? crl1.Data : crl2.Data;
+	crlDER.len = format == KMF_FORMAT_ASN1 ? crl1.Length : crl2.Length;
+
+	nss_crl = PK11_ImportCRL(nss_slot, &crlDER, NULL, SEC_CRL_TYPE,
+	    NULL, importOptions, NULL, CRL_DECODE_DEFAULT_OPTIONS);
+
+	if (nss_crl == NULL) {
+		SET_ERROR(kmfh, PORT_GetError());
+		ret = KMF_ERR_BAD_CRLFILE;
+		goto out;
+	}
+
+out:
+	if (nss_slot != NULL) {
+		PK11_FreeSlot(nss_slot);
+	}
+
+	if (crl1.Data != NULL) {
+		free(crl1.Data);
+	}
+
+	if (crl2.Data != NULL) {
+		free(crl2.Data);
+	}
+
+	if (nss_crl != NULL) {
+		SEC_DestroyCrl(nss_crl);
+	}
+
+	return (ret);
+}
+
+KMF_RETURN
+NSS_DeleteCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	CERTSignedCrl *crl = NULL;
+	CERTCertificate *cert = NULL;
+	PK11SlotInfo *nss_slot = NULL;
+	CERTCrlHeadNode *crlList = NULL;
+	CERTCrlNode *crlNode = NULL;
+	PRArenaPool *arena = NULL;
+	CERTName *name = NULL;
+	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
+	char *issuername, *subjectname;
+
+	/* check params */
+	if (numattr == 0 || attrlist == NULL) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+
+	issuername = kmf_get_attr_ptr(KMF_ISSUER_NAME_ATTR, attrlist,
+	    numattr);
+	subjectname = kmf_get_attr_ptr(KMF_SUBJECT_NAME_ATTR, attrlist,
+	    numattr);
+
+	/* Caller must specify issuer or subject but not both */
+	if ((issuername == NULL && subjectname == NULL) ||
+	    (issuername != NULL && subjectname != NULL))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Find the CRL based on the deletion criteria. */
+	if (issuername != NULL) {
+		/*
+		 * If the deletion is based on the issuer's certificate
+		 * nickname, we will get the issuer's cert first, then
+		 * get the CRL from the cert.
+		 */
+		cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
+		    issuername);
+		if (!cert) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_CERT_NOT_FOUND;
+			goto out;
+		}
+
+		crl = SEC_FindCrlByName(certHandle, &cert->derSubject,
+		    SEC_CRL_TYPE);
+		if (crl == NULL) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_CRL_NOT_FOUND;
+			goto out;
+		}
+	} else {
+		/*
+		 * If the deletion is based on the CRL's subject name, we will
+		 * get all the CRLs from the internal database and search
+		 * for the CRL with the same subject name.
+		 */
+		boolean_t found = B_FALSE;
+		int nssrv;
+
+		nssrv = SEC_LookupCrls(certHandle, &crlList, SEC_CRL_TYPE);
+		if (nssrv) {
+			SET_ERROR(kmfh, nssrv);
+			rv = KMF_ERR_CRL_NOT_FOUND;
+			goto out;
+		}
+
+		if (crlList == NULL) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_CRL_NOT_FOUND;
+			goto out;
+		}
+
+		/* Allocate space for name */
+		arena = PORT_NewArena(SEC_ASN1_DEFAULT_ARENA_SIZE);
+		if (arena == NULL) {
+			rv = KMF_ERR_MEMORY;
+			goto out;
+		}
+
+		name = PORT_ArenaZAlloc(arena, sizeof (*name));
+		if (name == NULL) {
+			rv = KMF_ERR_MEMORY;
+			goto out;
+		}
+		name->arena = arena;
+
+		crlNode  = crlList->first;
+		while (crlNode && !found) {
+			char *asciiname = NULL;
+			SECItem* issuer;
+
+			name = &crlNode->crl->crl.name;
+			if (!name) {
+				SET_ERROR(kmfh, PORT_GetError());
+				rv = KMF_ERR_CRL_NOT_FOUND;
+				break;
+			}
+
+			asciiname = CERT_NameToAscii(name);
+			if (asciiname == NULL) {
+				SET_ERROR(kmfh, PORT_GetError());
+				rv = KMF_ERR_CRL_NOT_FOUND;
+				break;
+			}
+
+			if (strcmp(subjectname, asciiname) == 0) {
+				found = B_TRUE;
+				issuer = &crlNode->crl->crl.derName;
+				crl = SEC_FindCrlByName(certHandle, issuer,
+				    SEC_CRL_TYPE);
+				if (crl == NULL) {
+					/* We found a cert but no CRL */
+					SET_ERROR(kmfh,  PORT_GetError());
+					rv = KMF_ERR_CRL_NOT_FOUND;
+				}
+			}
+			PORT_Free(asciiname);
+			crlNode = crlNode->next;
+		}
+
+		if (rv) {
+			goto out;
+		}
+	}
+
+	if (crl) {
+		(void) SEC_DeletePermCRL(crl);
+	}
+
+out:
+	if (nss_slot != NULL) {
+		PK11_FreeSlot(nss_slot);
+	}
+
+	if (crlList != NULL) {
+		PORT_FreeArena(crlList->arena, PR_FALSE);
+	}
+
+	if (arena != NULL) {
+		PORT_FreeArena(arena, PR_FALSE);
+	}
+
+	if (cert != NULL) {
+		CERT_DestroyCertificate(cert);
+	}
+
+	if (crl != NULL) {
+		SEC_DestroyCrl(crl);
+	}
+
+	return (rv);
+}
+
+KMF_RETURN
+NSS_FindCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	PK11SlotInfo *nss_slot = NULL;
+	CERTCrlHeadNode *crlList = NULL;
+	CERTCrlNode *crlNode = NULL;
+	PRArenaPool *arena = NULL;
+	CERTName *name = NULL;
+	SECStatus nssrv;
+	char *asciiname = NULL;
+	int crl_num;
+	int i, *CRLCount;
+	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
+	char **CRLNameList;
+
+	if (numattr == 0 || attrlist == NULL) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+
+	CRLCount = kmf_get_attr_ptr(KMF_CRL_COUNT_ATTR,	attrlist, numattr);
+	if (CRLCount == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	CRLNameList = (char **)kmf_get_attr_ptr(KMF_CRL_NAMELIST_ATTR,
+	    attrlist, numattr);
+
+	/* Look up Crls */
+	nssrv = SEC_LookupCrls(certHandle, &crlList, SEC_CRL_TYPE);
+	if (nssrv) {
+		SET_ERROR(kmfh, rv);
+		rv = KMF_ERR_CRL_NOT_FOUND;
+		goto out;
+	}
+
+	/* Allocate space for name first */
+	arena = PORT_NewArena(SEC_ASN1_DEFAULT_ARENA_SIZE);
+	if (arena == NULL) {
+		rv = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	name = PORT_ArenaZAlloc(arena, sizeof (*name));
+	if (name == NULL) {
+		rv = KMF_ERR_MEMORY;
+		goto out;
+	}
+	name->arena = arena;
+
+	/*
+	 * Loop thru the crlList and create a crl list with CRL's subject name.
+	 */
+	crlNode  = crlList->first;
+	crl_num = 0;
+	while (crlNode) {
+		char *subj_name;
+
+		/* Get the CRL subject name */
+		name = &crlNode->crl->crl.name;
+		if (!name) {
+			SET_ERROR(kmfh, PORT_GetError());
+			rv = KMF_ERR_CRL_NOT_FOUND;
+			break;
+		}
+
+
+		if (CRLNameList != NULL) {
+			asciiname = CERT_NameToAscii(name);
+			if (asciiname == NULL) {
+				SET_ERROR(kmfh, PORT_GetError());
+				rv = KMF_ERR_CRL_NOT_FOUND;
+				break;
+			}
+			subj_name = strdup(asciiname);
+			PORT_Free(asciiname);
+			if (subj_name == NULL) {
+				rv = KMF_ERR_MEMORY;
+				break;
+			}
+			CRLNameList[crl_num] = subj_name;
+		}
+
+		crl_num++;
+		crlNode = crlNode->next;
+	}
+
+	if (rv == KMF_OK) {
+		/* success */
+		*CRLCount = crl_num;
+	}
+
+out:
+	if (nss_slot != NULL) {
+		PK11_FreeSlot(nss_slot);
+	}
+
+	if (crlList != NULL) {
+		PORT_FreeArena(crlList->arena, PR_FALSE);
+	}
+
+	if (arena != NULL) {
+		PORT_FreeArena(arena, PR_FALSE);
+	}
+
+	/* If failed, free memory allocated for the returning rlist */
+	if (rv && (CRLNameList != NULL)) {
+		for (i = 0; i < crl_num; i++) {
+			free(CRLNameList[i]);
+		}
+	}
+
+	return (rv);
+}
+
+KMF_RETURN
+NSS_FindCertInCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	PK11SlotInfo *nss_slot = NULL;
+	CERTCertificate *cert = NULL;
+	CERTSignedCrl *crl = NULL;
+	CERTCrlEntry *entry;
+	boolean_t match = B_FALSE;
+	int i;
+	CERTCertDBHandle *certHandle = CERT_GetDefaultCertDB();
+	char *certlabel;
+	KMF_DATA *certdata;
+
+	/* check params */
+	if (numattr == 0 || attrlist == NULL) {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	rv = do_nss_init(handle, numattr, attrlist, FALSE, &nss_slot);
+	if (rv != KMF_OK) {
+		return (rv);
+	}
+
+	certlabel = kmf_get_attr_ptr(KMF_CERT_LABEL_ATTR, attrlist, numattr);
+
+	/* Find the certificate first */
+	if (certlabel != NULL) {
+		cert = CERT_FindCertByNicknameOrEmailAddr(certHandle,
+		    certlabel);
+	} else {
+		SECItem derCert = { NULL, 0};
+
+		certdata = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR,
+		    attrlist, numattr);
+
+		if (certdata == NULL)
+			return (KMF_ERR_BAD_PARAMETER);
+
+		derCert.data = certdata->Data;
+		derCert.len = certdata->Length;
+
+		cert = CERT_FindCertByDERCert(certHandle, &derCert);
+	}
+
+	if (cert == NULL) {
+		SET_ERROR(kmfh, PORT_GetError());
+		rv = KMF_ERR_CERT_NOT_FOUND;
+		goto out;
+	}
+
+	/* Find the CRL with the same issuer as the given certificate. */
+	crl = SEC_FindCrlByName(certHandle, &cert->derIssuer, SEC_CRL_TYPE);
+	if (crl == NULL) {
+		/*
+		 * Could not find the CRL issued by the same issuer. This
+		 * usually means that the CRL is not installed in the DB.
+		 */
+		SET_ERROR(kmfh, PORT_GetError());
+		rv = KMF_ERR_CRL_NOT_FOUND;
+		goto out;
+
+	}
+
+	/* Check if the certificate's serialNumber is revoked in the CRL */
+	i = 0;
+	while ((entry = (crl->crl).entries[i++]) != NULL) {
+		if (SECITEM_CompareItem(&(cert->serialNumber),
+		    &(entry->serialNumber)) == SECEqual) {
+			match = B_TRUE;
+			break;
+		}
+	}
+
+	if (!match) {
+		rv = KMF_ERR_NOT_REVOKED;
+	}
+
+out:
+	if (nss_slot != NULL) {
+		PK11_FreeSlot(nss_slot);
+	}
+
+	if (cert != NULL) {
+		CERT_DestroyCertificate(cert);
+	}
+
+	if (crl != NULL) {
+		SEC_DestroyCrl(crl);
+	}
+
+	return (rv);
 }
