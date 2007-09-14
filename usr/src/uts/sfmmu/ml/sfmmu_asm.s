@@ -2089,10 +2089,11 @@ test_ptl1_panic:
 	! XXXQ AGS re-check out this one
 	done
 1:
-	CPU_ADDR(%g1, %g4)
-	ld	[%g1 + CPU_TL1_HDLR], %g4
+	CPU_PADDR(%g1, %g4)
+	add	%g1, CPU_TL1_HDLR, %g1
+	lda	[%g1]ASI_MEM, %g4
 	brnz,a,pt %g4, sfmmu_mmu_trap
-	  st	%g0, [%g1 + CPU_TL1_HDLR]
+	  sta	%g0, [%g1]ASI_MEM
 	ba,pt	%icc, ptl1_panic
 	  mov	PTL1_BAD_TRAP, %g1
 	SET_SIZE(sfmmu_window_trap)
