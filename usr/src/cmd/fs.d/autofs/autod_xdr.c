@@ -38,6 +38,8 @@
 #include <string.h>
 #include <rpcsvc/autofs_prot.h>
 #include <rpc/xdr.h>
+#include <stdlib.h>
+#include <strings.h>
 
 bool_t
 xdr_autofs_stat(register XDR *xdrs, autofs_stat *objp)
@@ -146,13 +148,55 @@ xdr_action_list_entry(register XDR *xdrs, action_list_entry *objp)
 }
 
 bool_t
-xdr_action_list(register XDR *xdrs, action_list *objp)
+xdr_action_list(XDR *xdrs, action_list *objp)
 {
-	if (!xdr_action_list_entry(xdrs, &objp->action))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->next, sizeof (action_list),
-			(xdrproc_t)xdr_action_list))
-		return (FALSE);
+	action_list *tmp_action_list;
+	bool_t more_data = TRUE;
+	bool_t first_objp = TRUE;
+
+	if (xdrs->x_op == XDR_DECODE) {
+		while (more_data) {
+			if (!xdr_action_list_entry(xdrs, &objp->action))
+				return (FALSE);
+			if (!xdr_bool(xdrs, &more_data))
+				return (FALSE);
+			if (!more_data) {
+				objp->next = NULL;
+				break;
+			}
+			if (objp->next == NULL) {
+				objp->next = (action_list *)
+				    mem_alloc(sizeof (action_list));
+				if (objp->next == NULL)
+					return (FALSE);
+				bzero(objp->next, sizeof (action_list));
+			}
+			objp = objp->next;
+		}
+	} else if (xdrs->x_op == XDR_ENCODE) {
+		while (more_data) {
+			if (!xdr_action_list_entry(xdrs, &objp->action))
+				return (FALSE);
+			objp = objp->next;
+			if (objp == NULL)
+				more_data = FALSE;
+			if (!xdr_bool(xdrs, &more_data))
+				return (FALSE);
+		}
+	} else {
+		while (more_data) {
+			if (!xdr_action_list_entry(xdrs, &objp->action))
+				return (FALSE);
+			tmp_action_list = objp;
+			objp = objp->next;
+			if (objp == NULL)
+				more_data = FALSE;
+			if (!first_objp)
+				mem_free(tmp_action_list, sizeof (action_list));
+			else
+				first_objp = FALSE;
+		}
+	}
 	return (TRUE);
 }
 
@@ -170,7 +214,7 @@ xdr_umntrequest(register XDR *xdrs, umntrequest *objp)
 	if (!xdr_string(xdrs, &objp->mntopts, AUTOFS_MAXOPTSLEN))
 		return (FALSE);
 	if (!xdr_pointer(xdrs, (char **)&objp->next, sizeof (umntrequest),
-			(xdrproc_t)xdr_umntrequest))
+	    (xdrproc_t)xdr_umntrequest))
 		return (FALSE);
 	return (TRUE);
 }
@@ -460,10 +504,10 @@ xdr_autofs_rddirres(register XDR *xdrs, autofs_rddirres *objp)
 		return (TRUE);
 	if (xdrs->x_op == XDR_ENCODE)
 		return (xdr_autofs_putrddirres(
-			xdrs, (struct autofsrddir *)&objp->rd_rddir,
-			objp->rd_bufsize));
+		    xdrs, (struct autofsrddir *)&objp->rd_rddir,
+		    objp->rd_bufsize));
 	else if (xdrs->x_op == XDR_DECODE)
 		return (xdr_autofs_getrddirres(xdrs,
-			(struct autofsrddir *)&objp->rd_rddir));
+		    (struct autofsrddir *)&objp->rd_rddir));
 	else return (FALSE);
 }
