@@ -53,6 +53,7 @@ d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise-T5120 755 root sys
 d none usr/platform/SUNW,T5140 755 root sys
+d none usr/platform/SUNW,Netra-T5220 755 root sys
 #
 # create links to sun4v platform
 #
@@ -61,10 +62,11 @@ s none usr/platform/SUNW,Sun-Blade-T6300/sbin=../sun4v/sbin
 s none usr/platform/SUNW,Sun-Blade-T6320/sbin=../sun4v/sbin
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/sbin=../sun4v/sbin
 s none usr/platform/SUNW,T5140/sbin=../sun4v/sbin
+s none usr/platform/SUNW,Netra-T5220/sbin=../sun4v/sbin
 #
 # create include directory
 #
-d none usr/platform/SUNW,Sun-Fire-T200/include 755 root bin
+d none usr/platform/SUNW,Netra-T5220/include 755 root bin
 #
 # create lib directory 
 #
@@ -75,6 +77,7 @@ d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
 d none usr/platform/SUNW,T5140/lib 755 root bin
+d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
 #
 # add binary and libraries for prtdiag
 #
@@ -92,6 +95,7 @@ s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,T5140/lib/libpcp.so=../../sun4v/lib/libpcp.so
+s none usr/platform/SUNW,Netra-T5220/lib/libpcp.so=../../sun4v/lib/libpcp.so
 
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
@@ -100,6 +104,7 @@ s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so.1=../../sun4v/lib/libpcp.
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,T5140/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+s none usr/platform/SUNW,Netra-T5220/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 
 #
 # platform-dependent boot object
@@ -111,6 +116,7 @@ s none usr/platform/SUNW,Sun-Blade-T6300/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Sun-Blade-T6320/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,T5140/lib/fs=../../sun4v/lib/fs
+s none usr/platform/SUNW,Netra-T5220/lib/fs=../../sun4v/lib/fs
 #
 # add erie link
 #
@@ -119,10 +125,6 @@ s none usr/platform/SUNW,Sun-Fire-T1000=SUNW,Sun-Fire-T200
 # add pelton link
 #
 s none usr/platform/SUNW,Netra-T2000=SUNW,Sun-Fire-T200
-#
-# add turgo link
-#
-s none usr/platform/SUNW,Netra-T5220=SUNW,Sun-Fire-T200
 #
 # add huron 2U link
 #
@@ -156,6 +158,6 @@ s none usr/platform/SUNW,Netra-CP3060/sbin/trapstat=../../sun4v/sbin/trapstat
 #
 # add library for tsalarm
 #
-f none usr/platform/SUNW,Sun-Fire-T200/lib/libtsalarm.so.1 644 root bin
-s none usr/platform/SUNW,Sun-Fire-T200/lib/libtsalarm.so=./libtsalarm.so.1
-f none usr/platform/SUNW,Sun-Fire-T200/include/tsalarm.h 644 root bin
+f none usr/platform/SUNW,Netra-T5220/lib/libtsalarm.so.1 644 root bin
+s none usr/platform/SUNW,Netra-T5220/lib/libtsalarm.so=./libtsalarm.so.1
+f none usr/platform/SUNW,Netra-T5220/include/tsalarm.h 644 root bin

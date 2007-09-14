@@ -33,9 +33,9 @@ PLATINCS += -I$(USR_PLAT_DIR)/sun4v/include -I$(UTSBASE)/sun4v
 PLATFORM_OBJECTS= tsalarm.o
 
 #
-# platform library directory (/usr/platform/SUNW,Sun-Fire-T200/lib)
+# platform library directory (/usr/platform/SUNW,Netra-T5220/lib)
 #
-PLATFORM=SUNW,Sun-Fire-T200
+PLATFORM=SUNW,Netra-T5220
 
 include ../Makefile.com
 

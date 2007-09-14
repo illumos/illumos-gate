@@ -42,7 +42,8 @@ LINKED_PLATFORMS = SUNW,Sun-Fire-T200 \
 		SUNW,Sun-Blade-T6320 \
 		SUNW,SPARC-Enterprise-T5120 \
 		SUNW,T5140 \
-		SUNW,Netra-CP3260
+		SUNW,Netra-CP3260 \
+		SUNW,Netra-T5220
 
 
 include ../Makefile.com

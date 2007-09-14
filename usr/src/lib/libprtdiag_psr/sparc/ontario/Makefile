@@ -28,7 +28,7 @@
 
 UTSBASE   = ../../../../uts
 
-PLATFORM_OBJECTS= ontario.o erie.o pelton.o stpaul.o huron.o glendale.o turgo.o
+PLATFORM_OBJECTS= ontario.o erie.o pelton.o stpaul.o huron.o glendale.o
 
 include ../Makefile.com
 

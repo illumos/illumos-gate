@@ -34,6 +34,7 @@ include Makefile.sun4v
 include Makefile.stpaul
 include Makefile.huron
 include Makefile.maramba
+include Makefile.turgo
 
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
@@ -197,7 +198,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_HURON_DIR) \
 			$(USR_HURON_SBIN_DIR) $(USR_HURON_LIB_DIR) \
 			$(USR_MARAMBA_DIR) $(USR_MARAMBA_SBIN_DIR) \
-			$(USR_MARAMBA_LIB_DIR)
+			$(USR_MARAMBA_LIB_DIR) \
+			$(USR_TURGO_DIR) $(USR_TURGO_SBIN_DIR) \
+			$(USR_TURGO_LIB_DIR)
 
 
 #
@@ -247,6 +250,15 @@ $(USR_MARAMBA_SBIN_DIR):	$(USR_MARAMBA_DIR)
 	$(INS.slink5)
 
 $(USR_MARAMBA_LIB_DIR):		$(USR_MARAMBA_DIR)
+	-$(INS.dir.root.bin)
+
+$(USR_TURGO_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_TURGO_SBIN_DIR):		$(USR_TURGO_DIR)
+	$(INS.slink5)
+
+$(USR_TURGO_LIB_DIR):		$(USR_TURGO_DIR)
 	-$(INS.dir.root.bin)
 
 #
