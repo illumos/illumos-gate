@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,17 +27,24 @@
 
 /*
  * Unicode encoding conversion functions among UTF-8, UTF-16, and UTF-32.
- * Man page: /shared/sac/PSARC/2005/446/materials/uconv_functions.9f
- * Interface stability: Consolidation Private
+ * (PSARC/2005/446, PSARC/2007/038, PSARC/2007/517)
+ * Man pages: uconv_u16tou32(9F), uconv_u16tou8(9F), uconv_u32tou16(9F),
+ * uconv_u32tou8(9F), uconv_u8tou16(9F), and uconv_u8tou32(9F). See also
+ * the section 3C man pages.
+ * Interface stability: Committed
  */
 
 #include <sys/types.h>
+#ifdef	_KERNEL
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
+#else
+#include <sys/u8_textprep.h>
+#endif	/* _KERNEL */
 #include <sys/byteorder.h>
 #include <sys/errno.h>
 
@@ -355,7 +361,7 @@ uconv_u16tou32(const uint16_t *u16s, size_t *utf16len,
 	 */
 	if (*utf16len > 0 && *utf32len > 0 && (flag & UCONV_OUT_EMIT_BOM))
 		u32s[u32l++] = (outendian) ? UCONV_BOM_NORMAL :
-			UCONV_BOM_SWAPPED_32;
+		    UCONV_BOM_SWAPPED_32;
 
 	/*
 	 * Do conversion; if encounter a surrogate pair, assemble high and
@@ -378,8 +384,8 @@ uconv_u16tou32(const uint16_t *u16s, size_t *utf16len,
 			if (! hi)
 				return (EILSEQ);
 			lo = (((hi - UCONV_U16_HI_MIN) * UCONV_U16_BIT_SHIFT +
-				lo - UCONV_U16_LO_MIN) & UCONV_U16_BIT_MASK)
-				+ UCONV_U16_START;
+			    lo - UCONV_U16_LO_MIN) & UCONV_U16_BIT_MASK)
+			    + UCONV_U16_START;
 			hi = 0;
 		} else if (hi) {
 			return (EILSEQ);
@@ -457,8 +463,8 @@ uconv_u16tou8(const uint16_t *u16s, size_t *utf16len,
 			if (! hi)
 				return (EILSEQ);
 			lo = (((hi - UCONV_U16_HI_MIN) * UCONV_U16_BIT_SHIFT +
-				lo - UCONV_U16_LO_MIN) & UCONV_U16_BIT_MASK)
-				+ UCONV_U16_START;
+			    lo - UCONV_U16_LO_MIN) & UCONV_U16_BIT_MASK)
+			    + UCONV_U16_START;
 			hi = 0;
 		} else if (hi) {
 			return (EILSEQ);
@@ -538,7 +544,7 @@ uconv_u32tou16(const uint32_t *u32s, size_t *utf32len,
 
 	if (*utf32len > 0 && *utf16len > 0 && (flag & UCONV_OUT_EMIT_BOM))
 		u16s[u16l++] = (outendian) ? UCONV_BOM_NORMAL :
-			UCONV_BOM_SWAPPED;
+		    UCONV_BOM_SWAPPED;
 
 	for (; u32l < *utf32len; u32l++) {
 		if (u32s[u32l] == 0 && do_not_ignore_null)
@@ -560,9 +566,9 @@ uconv_u32tou16(const uint32_t *u32s, size_t *utf32len,
 		 */
 		if (hi >= UCONV_U16_START) {
 			lo = ((hi - UCONV_U16_START) % UCONV_U16_BIT_SHIFT) +
-				UCONV_U16_LO_MIN;
+			    UCONV_U16_LO_MIN;
 			hi = ((hi - UCONV_U16_START) / UCONV_U16_BIT_SHIFT) +
-				UCONV_U16_HI_MIN;
+			    UCONV_U16_HI_MIN;
 
 			if ((u16l + 1) >= *utf16len)
 				return (E2BIG);
@@ -578,7 +584,7 @@ uconv_u32tou16(const uint32_t *u32s, size_t *utf32len,
 			if (u16l >= *utf16len)
 				return (E2BIG);
 			u16s[u16l++] = (outendian) ? (uint16_t)hi :
-				BSWAP_16(((uint16_t)hi));
+			    BSWAP_16(((uint16_t)hi));
 		}
 	}
 
@@ -686,7 +692,7 @@ uconv_u8tou16(const uchar_t *u8s, size_t *utf8len,
 
 	if (*utf8len > 0 && *utf16len > 0 && (flag & UCONV_OUT_EMIT_BOM))
 		u16s[u16l++] = (outendian) ? UCONV_BOM_NORMAL :
-			UCONV_BOM_SWAPPED;
+		    UCONV_BOM_SWAPPED;
 
 	for (; u8l < *utf8len; ) {
 		if (u8s[u8l] == 0 && do_not_ignore_null)
@@ -728,19 +734,19 @@ uconv_u8tou16(const uchar_t *u8s, size_t *utf8len,
 						return (EILSEQ);
 					first_b = 0;
 				} else if (lo < UCONV_U8_BYTE_MIN ||
-					lo > UCONV_U8_BYTE_MAX) {
+				    lo > UCONV_U8_BYTE_MAX) {
 					return (EILSEQ);
 				}
 				hi = (hi << UCONV_U8_BIT_SHIFT) |
-					(lo & UCONV_U8_BIT_MASK);
+				    (lo & UCONV_U8_BIT_MASK);
 			}
 		}
 
 		if (hi >= UCONV_U16_START) {
 			lo = ((hi - UCONV_U16_START) % UCONV_U16_BIT_SHIFT) +
-				UCONV_U16_LO_MIN;
+			    UCONV_U16_LO_MIN;
 			hi = ((hi - UCONV_U16_START) / UCONV_U16_BIT_SHIFT) +
-				UCONV_U16_HI_MIN;
+			    UCONV_U16_HI_MIN;
 
 			if ((u16l + 1) >= *utf16len)
 				return (E2BIG);
@@ -757,7 +763,7 @@ uconv_u8tou16(const uchar_t *u8s, size_t *utf8len,
 				return (E2BIG);
 
 			u16s[u16l++] = (outendian) ? (uint16_t)hi :
-				BSWAP_16(((uint16_t)hi));
+			    BSWAP_16(((uint16_t)hi));
 		}
 	}
 
@@ -797,7 +803,7 @@ uconv_u8tou32(const uchar_t *u8s, size_t *utf8len,
 
 	if (*utf8len > 0 && *utf32len > 0 && (flag & UCONV_OUT_EMIT_BOM))
 		u32s[u32l++] = (outendian) ? UCONV_BOM_NORMAL :
-			UCONV_BOM_SWAPPED_32;
+		    UCONV_BOM_SWAPPED_32;
 
 	for (; u8l < *utf8len; ) {
 		if (u8s[u8l] == 0 && do_not_ignore_null)
@@ -824,11 +830,11 @@ uconv_u8tou32(const uchar_t *u8s, size_t *utf8len,
 						return (EILSEQ);
 					first_b = 0;
 				} else if (c < UCONV_U8_BYTE_MIN ||
-					c > UCONV_U8_BYTE_MAX) {
+				    c > UCONV_U8_BYTE_MAX) {
 					return (EILSEQ);
 				}
 				hi = (hi << UCONV_U8_BIT_SHIFT) |
-					(c & UCONV_U8_BIT_MASK);
+				    (c & UCONV_U8_BIT_MASK);
 			}
 		}
 

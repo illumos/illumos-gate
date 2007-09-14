@@ -27,14 +27,16 @@
 
 
 /*
- * UTF-8 text preparation functions (PSARC/2007/149).
+ * UTF-8 text preparation functions (PSARC/2007/149, PSARC/2007/458).
  *
  * Man pages: u8_textprep_open(9F), u8_textprep_buf(9F), u8_textprep_close(9F),
- * u8_textprep_str(9F), u8_strcmp(9F), and u8_validate(9F).
+ * u8_textprep_str(9F), u8_strcmp(9F), and u8_validate(9F). See also
+ * the section 3C man pages.
  * Interface stability: Committed.
  */
 
 #include <sys/types.h>
+#ifdef	_KERNEL
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
@@ -42,6 +44,10 @@
 #include <sys/kmem.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#else
+#include <sys/u8_textprep.h>
+#include <strings.h>
+#endif	/* _KERNEL */
 #include <sys/byteorder.h>
 #include <sys/errno.h>
 #include <sys/u8_textprep_data.h>

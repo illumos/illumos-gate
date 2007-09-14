@@ -1293,6 +1293,7 @@ f none usr/include/sys/tuneable.h 644 root bin
 f none usr/include/sys/turnstile.h 644 root bin
 f none usr/include/sys/types.h 644 root bin
 f none usr/include/sys/types32.h 644 root bin
+f none usr/include/sys/u8_textprep.h 644 root bin
 f none usr/include/sys/uadmin.h 644 root bin
 f none usr/include/sys/ucontext.h 644 root bin
 f none usr/include/sys/uio.h 644 root bin

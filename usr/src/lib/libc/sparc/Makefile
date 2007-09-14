@@ -830,6 +830,10 @@ THREADSMACHOBJS=		\
 THREADSASMOBJS=			\
 	asm_subr.o
 
+UNICODEOBJS=			\
+	u8_textprep.o		\
+	uconv.o
+
 UNWINDMACHOBJS=			\
 	unwind.o
 
@@ -932,6 +936,7 @@ MOSTOBJS=			\
 	$(THREADSOBJS)		\
 	$(THREADSMACHOBJS)	\
 	$(THREADSASMOBJS)	\
+	$(UNICODEOBJS)		\
 	$(UNWINDMACHOBJS)	\
 	$(UNWINDASMOBJS)	\
 	$(COMSYSOBJS)		\
@@ -1053,6 +1058,7 @@ SRCS=							\
 	$(TPOOLOBJS:%.o=../port/tpool/%.c)		\
 	$(THREADSOBJS:%.o=../port/threads/%.c)		\
 	$(THREADSMACHOBJS:%.o=../$(MACH)/threads/%.c)	\
+	$(UNICODEOBJS:%.o=$(SRC)/common/unicode/%.c)	\
 	$(UNWINDMACHOBJS:%.o=../port/unwind/%.c)	\
 	$(FPOBJS:%.o=../$(MACH)/fp/%.c)			\
 	$(LIBCBASE)/crt/_ftou.c				\

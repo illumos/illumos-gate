@@ -123,6 +123,15 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	timer_getoverrun;
 	timer_gettime;
 	timer_settime;
+	u8_strcmp;
+	u8_textprep_str;
+	u8_validate;
+	uconv_u16tou32;
+	uconv_u16tou8;
+	uconv_u32tou16;
+	uconv_u32tou8;
+	uconv_u8tou16;
+	uconv_u8tou32;
 	uucopy;
 	uucopystr;
 	vforkx;
