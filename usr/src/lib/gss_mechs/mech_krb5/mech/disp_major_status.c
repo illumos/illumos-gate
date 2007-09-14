@@ -1,4 +1,5 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -21,19 +22,24 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_generic.h>
+#include "gssapiP_generic.h"
 #include <string.h>
 #include <stdio.h>
 
 /*
- * $Id: disp_major_status.c,v 1.6 1996/07/22 20:33:01 marc Exp $
+ * $Id: disp_major_status.c 13236 2001-05-08 17:10:18Z epeisach $
  */
 
-#define	GSS_CALLING_ERROR_FIELD(x) \
-	(((x) >> GSS_C_CALLING_ERROR_OFFSET) & GSS_C_CALLING_ERROR_MASK)
+/* XXXX these are not part of the GSSAPI C bindings!  (but should be) */
+/* SUNW15resync - MIT 1.5 has these in gssapi.h */
 
-#define	GSS_ROUTINE_ERROR_FIELD(x) \
-	(((x) >> GSS_C_ROUTINE_ERROR_OFFSET) & GSS_C_ROUTINE_ERROR_MASK)
+#define GSS_CALLING_ERROR_FIELD(x) \
+   (((x) >> GSS_C_CALLING_ERROR_OFFSET) & GSS_C_CALLING_ERROR_MASK)
+#define GSS_ROUTINE_ERROR_FIELD(x) \
+   (((x) >> GSS_C_ROUTINE_ERROR_OFFSET) & GSS_C_ROUTINE_ERROR_MASK)
+#define GSS_SUPPLEMENTARY_INFO_FIELD(x) \
+   (((x) >> GSS_C_SUPPLEMENTARY_OFFSET) & GSS_C_SUPPLEMENTARY_MASK)
+
 
 /* This code has knowledge of the min and max errors of each type
    within the gssapi major status */
@@ -114,16 +120,16 @@ static const char * const unknown_error = "Unknown %s (field = %d)";
 
 /**/
 
-int display_unknown(kind, value, buffer)
+static int 
+display_unknown(kind, value, buffer)
      const char *kind;
      OM_uint32 value;
      gss_buffer_t buffer;
 {
-   size_t len;
    char *str;
 
-   str = (char *) xmalloc(strlen(unknown_error)+strlen(kind)+7);
-   if (str == NULL)
+   if ((str =
+	(char *) xmalloc(strlen(unknown_error)+strlen(kind)+7)) == NULL)
       return(0);
 
    sprintf(str, unknown_error, kind, value);
@@ -143,7 +149,7 @@ static OM_uint32 display_calling(minor_status, code, status_string)
 {
    const char *str;
 
-   if ((str = GSS_CALLING_ERROR_STR(code)) != NULL) {
+   if ((str = GSS_CALLING_ERROR_STR(code))) {
       if (! g_make_string_buffer(str, status_string)) {
 	 *minor_status = ENOMEM;
 	 return(GSS_S_FAILURE);
@@ -168,7 +174,7 @@ static OM_uint32 display_routine(minor_status, code, status_string)
 {
    const char *str;
 
-   if ((str = GSS_ROUTINE_ERROR_STR(code)) != NULL) {
+   if ((str = GSS_ROUTINE_ERROR_STR(code))) {
       if (! g_make_string_buffer(str, status_string)) {
 	 *minor_status = ENOMEM;
 	 return(GSS_S_FAILURE);
@@ -193,7 +199,7 @@ static OM_uint32 display_bit(minor_status, code, status_string)
 {
    const char *str;
 
-   if ((str = GSS_SINFO_STR(code)) != NULL) {
+   if ((str = GSS_SINFO_STR(code))) {
       if (! g_make_string_buffer(str, status_string)) {
 	 *minor_status = ENOMEM;
 	 return(GSS_S_FAILURE);
@@ -242,7 +248,7 @@ OM_uint32 g_display_major_status(minor_status, status_value,
    /*** do routine error */
 
    if (*message_context == 0) {
-      if ((tmp = GSS_ROUTINE_ERROR(status_value)) != 0) {
+      if ((tmp = GSS_ROUTINE_ERROR(status_value))) {
 	 status_value -= tmp;
 	 if ((ret = display_routine(minor_status, tmp, status_string)))
 	    return(ret);
@@ -264,7 +270,7 @@ OM_uint32 g_display_major_status(minor_status, status_value,
    /*** do calling error */
 
    if (*message_context == 1) {
-      if ((tmp = GSS_CALLING_ERROR(status_value)) != 0) {
+      if ((tmp = GSS_CALLING_ERROR(status_value))) {
 	 status_value -= tmp;
 	 if ((ret = display_calling(minor_status, tmp, status_string)))
 	    return(ret);
@@ -285,7 +291,7 @@ OM_uint32 g_display_major_status(minor_status, status_value,
 
    /*** do sinfo bits (*message_context == 2 + number of bits done) */
 
-   tmp = ((GSS_SUPPLEMENTARY_INFO(status_value)) >> GSS_C_SUPPLEMENTARY_OFFSET);
+   tmp = GSS_SUPPLEMENTARY_INFO_FIELD(status_value);
    /* mask off the bits which have been done */
    if (*message_context > 2) {
       tmp &= ~LSBMASK(*message_context-3);

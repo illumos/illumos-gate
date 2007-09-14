@@ -6,14 +6,14 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2000 by the Massachusetts Institute of Technology.
+ * Copyright 2000,2002, 2003 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,11 +27,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- *
+ * 
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -41,7 +41,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- *
+ * 
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -53,14 +53,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -71,33 +71,32 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
+#include "k5-int.h"
+#include "gssapiP_krb5.h"
+#include "gss_libinit.h"
+#include "mglueP.h"
+#ifdef HAVE_MEMORY_H
 #include <memory.h>
+#endif
 #include <stdlib.h>
-#include <syslog.h>
 #include <assert.h>
-#define ROOT_UID 0
-#define KRB5_DEFAULT_LIFE 60*60*10
-#define CACHE_FILENAME_LEN 35
+
+/* Solaris Kerberos start */
+static OM_uint32 get_default_cred(OM_uint32 *, void *, gss_cred_id_t *);
+/* Solaris Kerberos end */
 
 /*
- * $Id: init_sec_context.c,v 1.51.2.7 2000/06/28 02:48:22 tlyu Exp $
+ * $Id: init_sec_context.c 18131 2006-06-14 22:27:54Z tlyu $
  */
 
-extern int
-safechown(const char *src, uid_t uid, gid_t gid, int mode);
-
-/*
- * XXX This is for debugging only!!!  Should become a real bitfield
- * at some point
- */
+/* XXX This is for debugging only!!!  Should become a real bitfield
+   at some point */
 int krb5_gss_dbg_client_expcreds = 0;
 
 /*
@@ -116,8 +115,7 @@ static krb5_error_code get_credentials(context, cred, server, now,
     krb5_error_code	code;
     krb5_creds 		in_creds;
 
-    KRB5_LOG0(KRB5_INFO, "get_credentials() start\n");
-
+    k5_mutex_assert_locked(&cred->lock);
     memset((char *) &in_creds, 0, sizeof(krb5_creds));
 
     if ((code = krb5_copy_principal(context, cred->princ, &in_creds.client)))
@@ -143,18 +141,14 @@ static krb5_error_code get_credentials(context, cred, server, now,
 	code = KRB5KRB_AP_ERR_TKT_EXPIRED;
 	goto cleanup;
     }
-
+    
 cleanup:
     if (in_creds.client)
 	    krb5_free_principal(context, in_creds.client);
     if (in_creds.server)
 	    krb5_free_principal(context, in_creds.server);
-
-    KRB5_LOG(KRB5_INFO, "get_credentials() end, code = %d\n", code);
-
     return code;
 }
-
 struct gss_checksum_data {
     krb5_gss_ctx_id_rec *ctx;
     krb5_gss_cred_id_t cred;
@@ -162,16 +156,19 @@ struct gss_checksum_data {
     krb5_data checksum_data;
 };
 
+#ifdef CFX_EXERCISE
+#include "../../krb5/krb/auth_con.h"
+#endif
 static krb5_error_code KRB5_CALLCONV
 make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
-                   void *cksum_data, krb5_data **out)
+		   void *cksum_data, krb5_data **out)
 {
     krb5_error_code code;
     krb5_int32 con_flags;
     unsigned char *ptr;
     struct gss_checksum_data *data = cksum_data;
     krb5_data credmsg;
-    int junk;
+    unsigned int junk;
 
     data->checksum_data.data = 0;
     credmsg.data = 0;
@@ -183,19 +180,19 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
 	/* clear the time check flag that was set in krb5_auth_con_init() */
 	krb5_auth_con_getflags(context, auth_context, &con_flags);
 	krb5_auth_con_setflags(context, auth_context,
-		con_flags & ~KRB5_AUTH_CONTEXT_DO_TIME);
+			       con_flags & ~KRB5_AUTH_CONTEXT_DO_TIME);
 
 	code = krb5_fwd_tgt_creds(context, auth_context, 0,
-		data->cred->princ, data->ctx->there,
-		data->cred->ccache, 1,
-		&credmsg);
+				  data->cred->princ, data->ctx->there,
+				  data->cred->ccache, 1,
+				  &credmsg);
 
 	/* turn KRB5_AUTH_CONTEXT_DO_TIME back on */
 	krb5_auth_con_setflags(context, auth_context, con_flags);
 
 	if (code) {
 	    /* don't fail here; just don't accept/do the delegation
-		request */
+               request */
 	    data->ctx->gss_flags &= ~GSS_C_DELEG_FLAG;
 
 	    data->checksum_data.length = 24;
@@ -203,22 +200,23 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
 	    if (credmsg.length+28 > KRB5_INT16_MAX) {
 		krb5_free_data_contents(context, &credmsg);
 		return(KRB5KRB_ERR_FIELD_TOOLONG);
-            }
+	    }
 
-            data->checksum_data.length = 28+credmsg.length;
+	    data->checksum_data.length = 28+credmsg.length;
 	}
     } else {
 	data->checksum_data.length = 24;
     }
 #ifdef CFX_EXERCISE
-    if (data->ctx->auth_context->keyblock->enctype == 18) {
+    if (data->ctx->auth_context->keyblock != NULL
+	&& data->ctx->auth_context->keyblock->enctype == 18) {
 	srand(time(0) ^ getpid());
 	/* Our ftp client code stupidly assumes a base64-encoded
 	   version of the token will fit in 10K, so don't make this
 	   too big.  */
 	junk = rand() & 0xff;
     } else
-        junk = 0;
+	junk = 0;
 #else
     junk = 0;
 #endif
@@ -226,16 +224,16 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
     data->checksum_data.length += junk;
 
     /* now allocate a buffer to hold the checksum data and
-	(maybe) KRB_CRED msg */
+       (maybe) KRB_CRED msg */
 
     if ((data->checksum_data.data =
 	 (char *) xmalloc(data->checksum_data.length)) == NULL) {
 	if (credmsg.data)
-            krb5_free_data_contents(context, &credmsg);
+	    krb5_free_data_contents(context, &credmsg);
 	return(ENOMEM);
     }
 
-    ptr = (uchar_t *)data->checksum_data.data;
+    ptr = (uchar_t *)data->checksum_data.data; /* SUNW15resync */
 
     TWRITE_INT(ptr, data->md5.length, 0);
     TWRITE_STR(ptr, (unsigned char *) data->md5.contents, data->md5.length);
@@ -257,7 +255,7 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
     *out = &data->checksum_data;
     return 0;
 }
-
+    
 static krb5_error_code
 make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
     krb5_context context;
@@ -276,12 +274,10 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
     krb5_data *checksum_data = NULL;
     unsigned char *ptr;
     unsigned char *t;
-    int tlen;
+    unsigned int tlen;
 
+    k5_mutex_assert_locked(&cred->lock);
     ap_req.data = 0;
-
-    /* build the checksum buffer */
-    KRB5_LOG0(KRB5_INFO, "make_ap_req_v1() start\n");
 
     /* compute the hash of the channel bindings */
 
@@ -290,7 +286,6 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
 
     krb5_auth_con_set_req_cksumtype(context, ctx->auth_context,
 				    CKSUMTYPE_KG_CB);
-
     cksum_struct.md5 = md5;
     cksum_struct.ctx = ctx;
     cksum_struct.cred = cred;
@@ -300,16 +295,17 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
     case ENCTYPE_DES_CBC_MD4:
     case ENCTYPE_DES_CBC_MD5:
     case ENCTYPE_DES3_CBC_SHA1:
-	code = make_gss_checksum(context, ctx->auth_context, &cksum_struct,
-		&checksum_data);
-	if (code)
+      code = make_gss_checksum(context, ctx->auth_context, &cksum_struct,
+				 &checksum_data);
+	    if (code)
 		goto cleanup;
-        break;
+	break;
     default:
 	krb5_auth_con_set_checksum_func(context, ctx->auth_context,
-		make_gss_checksum, &cksum_struct);
-	break;
+					make_gss_checksum, &cksum_struct);
+	    break;
     }
+
 
     /* call mk_req.  subkey and ap_req need to be used or destroyed */
 
@@ -318,8 +314,10 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
     if (ctx->gss_flags & GSS_C_MUTUAL_FLAG)
 	mk_req_flags |= AP_OPTS_MUTUAL_REQUIRED;
 
-    if ((code = krb5_mk_req_extended(context, &ctx->auth_context, mk_req_flags,
-				     checksum_data, k_cred, &ap_req)))
+    code = krb5_mk_req_extended(context, &ctx->auth_context, mk_req_flags,
+				checksum_data, k_cred, &ap_req);
+    krb5_free_data_contents(context, &cksum_struct.checksum_data);
+    if (code)
 	goto cleanup;
 
    /* store the interesting stuff from creds and authent */
@@ -340,7 +338,7 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
 
    ptr = t;
 
-   g_make_token_header((gss_OID) mech_type, ap_req.length,
+   g_make_token_header(mech_type, ap_req.length,
 		       &ptr, KG_TOK_CTX_AP_REQ);
 
    TWRITE_STR(ptr, (unsigned char *) ap_req.data, ap_req.length);
@@ -351,23 +349,712 @@ make_ap_req_v1(context, ctx, cred, k_cred, chan_bindings, mech_type, token)
    token->value = (void *) t;
 
    code = 0;
-
-cleanup:
-   /*
-    * We only free cksum_struct.checksum_data here, because checksum_data
-    * could point to cksum_struct.checksum_data or NULL.
-    */
-   if (cksum_struct.checksum_data.data)
-	krb5_free_data_contents(context, &cksum_struct.checksum_data);
+    
+ cleanup:
+   if (checksum_data && checksum_data->data)
+       krb5_free_data_contents(context, checksum_data);
    if (ap_req.data)
-       xfree(ap_req.data);
-
-   KRB5_LOG(KRB5_INFO, "make_ap_req_v1() end, code = %d\n", code);
+       krb5_free_data_contents(context, &ap_req);
 
    return (code);
 }
 
+/*
+ * setup_enc
+ *
+ * Fill in the encryption descriptors.  Called after AP-REQ is made.
+ */
+static OM_uint32
+setup_enc(
+   OM_uint32 *minor_status,
+   krb5_gss_ctx_id_rec *ctx,
+   krb5_context context)
+{
 
+   krb5_error_code code;
+   OM_uint32 ret = GSS_S_COMPLETE;
+   int i;
+   krb5int_access kaccess;
+
+   code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
+   if (code)
+       goto fail;
+
+   ctx->have_acceptor_subkey = 0;
+   ctx->proto = 0;
+   ctx->cksumtype = 0;
+   switch(ctx->subkey->enctype) {
+   case ENCTYPE_DES_CBC_MD5:
+   case ENCTYPE_DES_CBC_MD4:
+   case ENCTYPE_DES_CBC_CRC:
+      ctx->subkey->enctype = ENCTYPE_DES_CBC_RAW;
+      ctx->signalg = SGN_ALG_DES_MAC_MD5;
+      ctx->cksum_size = 8;
+      ctx->sealalg = SEAL_ALG_DES;
+
+      /* The encryption key is the session key XOR
+	 0xf0f0f0f0f0f0f0f0.  */
+      if ((code = krb5_copy_keyblock(context, ctx->subkey, &ctx->enc)))
+	 goto fail;
+
+      for (i=0; i<ctx->enc->length; i++)
+	 ctx->enc->contents[i] ^= 0xf0;
+
+      goto copy_subkey_to_seq;
+
+   case ENCTYPE_DES3_CBC_SHA1:
+       /* MIT extension */
+      ctx->subkey->enctype = ENCTYPE_DES3_CBC_RAW;
+      ctx->signalg = SGN_ALG_HMAC_SHA1_DES3_KD;
+      ctx->cksum_size = 20;
+      ctx->sealalg = SEAL_ALG_DES3KD;
+
+   copy_subkey:
+      code = krb5_copy_keyblock (context, ctx->subkey, &ctx->enc);
+      if (code)
+	 goto fail;
+   copy_subkey_to_seq:
+      code = krb5_copy_keyblock (context, ctx->subkey, &ctx->seq);
+      if (code) {
+	 krb5_free_keyblock (context, ctx->enc);
+	 goto fail;
+      }
+      goto success;
+
+   case ENCTYPE_ARCFOUR_HMAC:
+       /* Microsoft extension */
+      ctx->signalg = SGN_ALG_HMAC_MD5 ;
+      ctx->cksum_size = 8;
+      ctx->sealalg = SEAL_ALG_MICROSOFT_RC4 ;
+
+      goto copy_subkey;
+
+   default:
+       /* Fill some fields we shouldn't be using on this path
+	  with garbage.  */
+       ctx->signalg = -10;
+       ctx->sealalg = -10;
+
+       ctx->proto = 1;
+       code = (*kaccess.krb5int_c_mandatory_cksumtype)(context, ctx->subkey->enctype,
+					    &ctx->cksumtype);
+       if (code)
+	   goto fail;
+       code = krb5_c_checksum_length(context, ctx->cksumtype,
+				     &ctx->cksum_size);
+       if (code)
+	   goto fail;
+       goto copy_subkey;
+   }
+
+fail:
+   /* SUNW15resync - (as in prev snv code) add if-code and success label fix */
+  if (code) {
+      *minor_status = code;
+      return GSS_S_FAILURE;
+  }
+
+success:
+   return (ret);
+}
+
+/*
+ * new_connection
+ *
+ * Do the grunt work of setting up a new context.
+ */
+static OM_uint32
+new_connection(
+   OM_uint32 *minor_status,
+   krb5_gss_cred_id_t cred,
+   gss_ctx_id_t *context_handle,
+   gss_name_t target_name,
+   gss_OID mech_type,
+   OM_uint32 req_flags,
+   OM_uint32 time_req,
+   gss_channel_bindings_t input_chan_bindings,
+   gss_buffer_t input_token,
+   gss_OID *actual_mech_type,
+   gss_buffer_t output_token,
+   OM_uint32 *ret_flags,
+   OM_uint32 *time_rec,
+   krb5_context context,
+   int default_mech)
+{
+   OM_uint32 major_status;
+   krb5_error_code code;
+   krb5_creds *k_cred;
+   krb5_gss_ctx_id_rec *ctx, *ctx_free;
+   krb5_timestamp now;
+   gss_buffer_desc token;
+
+   k5_mutex_assert_locked(&cred->lock);
+   major_status = GSS_S_FAILURE;
+   token.length = 0;
+   token.value = NULL;
+
+   /* make sure the cred is usable for init */
+
+   if ((cred->usage != GSS_C_INITIATE) &&
+       (cred->usage != GSS_C_BOTH)) {
+      *minor_status = 0;
+      return(GSS_S_NO_CRED);
+   }
+
+   /* complain if the input token is non-null */
+
+   if (input_token != GSS_C_NO_BUFFER && input_token->length != 0) {
+       *minor_status = 0;
+       return(GSS_S_DEFECTIVE_TOKEN);
+   }
+
+   /* create the ctx */
+
+   if ((ctx = (krb5_gss_ctx_id_rec *) xmalloc(sizeof(krb5_gss_ctx_id_rec)))
+       == NULL) {
+      *minor_status = ENOMEM;
+      return(GSS_S_FAILURE);
+   }
+
+   /* fill in the ctx */
+   memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
+   ctx_free = ctx;
+   if ((code = krb5_auth_con_init(context, &ctx->auth_context)))
+      goto fail;
+   krb5_auth_con_setflags(context, ctx->auth_context,
+			  KRB5_AUTH_CONTEXT_DO_SEQUENCE);
+
+   /* limit the encryption types negotiated (if requested) */
+   if (cred->req_enctypes) {
+	if ((code = krb5_set_default_tgs_enctypes(context,
+						  cred->req_enctypes))) {
+	    goto fail;
+	}
+   }
+
+   ctx->initiate = 1;
+   ctx->gss_flags = (GSS_C_INTEG_FLAG | GSS_C_CONF_FLAG |
+                     GSS_C_TRANS_FLAG | 
+                     ((req_flags) & (GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
+                                     GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG)));
+   ctx->seed_init = 0;
+   ctx->big_endian = 0;  /* all initiators do little-endian, as per spec */
+   ctx->seqstate = 0;
+
+   if ((code = krb5_timeofday(context, &now)))
+      goto fail;
+
+   if (time_req == 0 || time_req == GSS_C_INDEFINITE) {
+      ctx->endtime = 0;
+   } else {
+      ctx->endtime = now + time_req;
+   }
+
+   if ((code = krb5_copy_principal(context, cred->princ, &ctx->here)))
+      goto fail;
+      
+   if ((code = krb5_copy_principal(context, (krb5_principal) target_name,
+				   &ctx->there)))
+      goto fail;
+
+   code = get_credentials(context, cred, ctx->there, now,
+			  ctx->endtime, &k_cred);
+   if (code)
+      goto fail;
+
+   if (default_mech) {
+      mech_type = (gss_OID) gss_mech_krb5;
+   }
+
+   if (generic_gss_copy_oid(minor_status, mech_type, &ctx->mech_used)
+       != GSS_S_COMPLETE) {
+      code = *minor_status;
+      goto fail;
+   }
+   /*
+    * Now try to make it static if at all possible....
+    */
+   ctx->mech_used = krb5_gss_convert_static_mech_oid(ctx->mech_used);
+
+   {
+      /* gsskrb5 v1 */
+      krb5_ui_4 seq_temp;
+      if ((code = make_ap_req_v1(context, ctx,
+				 cred, k_cred, input_chan_bindings, 
+				 mech_type, &token))) {
+	 if ((code == KRB5_FCC_NOFILE) || (code == KRB5_CC_NOTFOUND) ||
+	     (code == KG_EMPTY_CCACHE))
+	    major_status = GSS_S_NO_CRED;
+	 if (code == KRB5KRB_AP_ERR_TKT_EXPIRED)
+	    major_status = GSS_S_CREDENTIALS_EXPIRED;
+	 goto fail;
+      }
+
+      krb5_auth_con_getlocalseqnumber(context, ctx->auth_context,
+			    (krb5_int32 *)&seq_temp); /* SUNW15resync */
+      ctx->seq_send = seq_temp;
+      krb5_auth_con_getsendsubkey(context, ctx->auth_context,
+				  &ctx->subkey);
+   }
+
+   major_status = setup_enc(minor_status, ctx, context);
+
+   if (k_cred) {
+      krb5_free_creds(context, k_cred);
+      k_cred = 0;
+   }
+      
+   /* at this point, the context is constructed and valid,
+      hence, releaseable */
+
+   /* intern the context handle */
+
+   if (! kg_save_ctx_id((gss_ctx_id_t) ctx)) {
+      code = G_VALIDATE_FAILED;
+      goto fail;
+   }
+   *context_handle = (gss_ctx_id_t) ctx;
+   ctx_free = 0;
+
+   /* compute time_rec */
+   if (time_rec) {
+      if ((code = krb5_timeofday(context, &now)))
+	 goto fail;
+      *time_rec = ctx->endtime - now;
+   }
+
+   /* set the other returns */
+   *output_token = token;
+
+   if (ret_flags)
+      *ret_flags = ctx->gss_flags;
+
+   if (actual_mech_type)
+      *actual_mech_type = mech_type;
+
+   /* return successfully */
+
+   *minor_status = 0;
+   if (ctx->gss_flags & GSS_C_MUTUAL_FLAG) {
+      ctx->established = 0;
+      return(GSS_S_CONTINUE_NEEDED);
+   } else {
+      ctx->seq_recv = ctx->seq_send;
+      g_order_init(&(ctx->seqstate), ctx->seq_recv,
+		   (ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0, 
+		   (ctx->gss_flags & GSS_C_SEQUENCE_FLAG) != 0, ctx->proto);
+      ctx->gss_flags |= GSS_C_PROT_READY_FLAG;
+      ctx->established = 1;
+      return(GSS_S_COMPLETE);
+   }
+
+fail:
+   if (ctx_free) {
+       if (ctx_free->auth_context)
+	   krb5_auth_con_free(context, ctx_free->auth_context);
+       if (ctx_free->here)
+	   krb5_free_principal(context, ctx_free->here);
+       if (ctx_free->there)
+	   krb5_free_principal(context, ctx_free->there);
+       if (ctx_free->subkey)
+	   krb5_free_keyblock(context, ctx_free->subkey);
+       xfree(ctx_free);
+   } else
+	(void)krb5_gss_delete_sec_context(minor_status, context_handle, NULL);
+
+   *minor_status = code;
+   return (major_status);
+}
+
+/*
+ * mutual_auth
+ *
+ * Handle the reply from the acceptor, if we're doing mutual auth.
+ */
+static OM_uint32
+mutual_auth(
+   OM_uint32 *minor_status,
+   gss_ctx_id_t *context_handle,
+   gss_name_t target_name,
+   gss_OID mech_type,
+   OM_uint32 req_flags,
+   OM_uint32 time_req,
+   gss_channel_bindings_t input_chan_bindings,
+   gss_buffer_t input_token,
+   gss_OID *actual_mech_type,
+   gss_buffer_t output_token,
+   OM_uint32 *ret_flags,
+   OM_uint32 *time_rec,
+   krb5_context context)
+{
+   OM_uint32 major_status;
+   unsigned char *ptr;
+   char *sptr;
+   krb5_data ap_rep;
+   krb5_ap_rep_enc_part *ap_rep_data;
+   krb5_timestamp now;
+   krb5_gss_ctx_id_rec *ctx;
+   krb5_error *krb_error;
+   krb5_error_code code;
+   krb5int_access kaccess;
+
+   major_status = GSS_S_FAILURE;
+
+   code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
+   if (code)
+       goto fail;
+
+   /* validate the context handle */
+   /*SUPPRESS 29*/
+   if (! kg_validate_ctx_id(*context_handle)) {
+      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+      return(GSS_S_NO_CONTEXT);
+   }
+
+   ctx = (krb5_gss_ctx_id_rec *)*context_handle; /* SUNW15resync */
+
+   /* make sure the context is non-established, and that certain
+      arguments are unchanged */
+
+   if ((ctx->established) ||
+       ((ctx->gss_flags & GSS_C_MUTUAL_FLAG) == 0)) {
+      code = KG_CONTEXT_ESTABLISHED;
+      goto fail;
+   }
+
+   if (! krb5_principal_compare(context, ctx->there, 
+				(krb5_principal) target_name)) {
+      (void)krb5_gss_delete_sec_context(minor_status, 
+					context_handle, NULL);
+      code = 0;
+      major_status = GSS_S_BAD_NAME;
+      goto fail;
+   }
+
+   /* verify the token and leave the AP_REP message in ap_rep */
+
+   if (input_token == GSS_C_NO_BUFFER) {
+      (void)krb5_gss_delete_sec_context(minor_status, 
+					context_handle, NULL);
+      code = 0;
+      major_status = GSS_S_DEFECTIVE_TOKEN;
+      goto fail;
+   }
+
+   ptr = (unsigned char *) input_token->value;
+
+   if (g_verify_token_header(ctx->mech_used,
+			     &(ap_rep.length),
+			     &ptr, KG_TOK_CTX_AP_REP,
+			     input_token->length, 1)) {
+      if (g_verify_token_header((gss_OID) ctx->mech_used,
+				&(ap_rep.length),
+				&ptr, KG_TOK_CTX_ERROR,
+				input_token->length, 1) == 0) {
+
+	 /* Handle a KRB_ERROR message from the server */
+
+	 sptr = (char *) ptr;           /* PC compiler bug */
+	 TREAD_STR(sptr, ap_rep.data, ap_rep.length);
+		      
+	 code = krb5_rd_error(context, &ap_rep, &krb_error);
+	 if (code)
+	    goto fail;
+	 if (krb_error->error)
+	    code = krb_error->error + ERROR_TABLE_BASE_krb5;
+	 else
+	    code = 0;
+	 krb5_free_error(context, krb_error);
+	 goto fail;
+      } else {
+	 *minor_status = 0;
+	 return(GSS_S_DEFECTIVE_TOKEN);
+      }
+   }
+
+   sptr = (char *) ptr;                      /* PC compiler bug */
+   TREAD_STR(sptr, ap_rep.data, ap_rep.length);
+
+   /* decode the ap_rep */
+   if ((code = krb5_rd_rep(context, ctx->auth_context, &ap_rep,
+			   &ap_rep_data))) {
+      /*
+       * XXX A hack for backwards compatiblity.
+       * To be removed in 1999 -- proven 
+       */
+      krb5_auth_con_setuseruserkey(context, ctx->auth_context,
+				   ctx->subkey);
+      if ((krb5_rd_rep(context, ctx->auth_context, &ap_rep,
+		       &ap_rep_data)))
+	 goto fail;
+   }
+
+   /* store away the sequence number */
+   ctx->seq_recv = ap_rep_data->seq_number;
+   g_order_init(&(ctx->seqstate), ctx->seq_recv,
+		(ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0,
+		(ctx->gss_flags & GSS_C_SEQUENCE_FLAG) !=0, ctx->proto);
+
+   if (ctx->proto == 1 && ap_rep_data->subkey) {
+       /* Keep acceptor's subkey.  */
+       ctx->have_acceptor_subkey = 1;
+       code = krb5_copy_keyblock(context, ap_rep_data->subkey,
+				 &ctx->acceptor_subkey);
+       if (code)
+	   goto fail;
+       code = (*kaccess.krb5int_c_mandatory_cksumtype)(context,
+					    ctx->acceptor_subkey->enctype,
+					    &ctx->acceptor_subkey_cksumtype);
+       if (code)
+	   goto fail;
+   }
+
+   /* free the ap_rep_data */
+   krb5_free_ap_rep_enc_part(context, ap_rep_data);
+
+   /* set established */
+   ctx->established = 1;
+
+   /* set returns */
+
+   if (time_rec) {
+      if ((code = krb5_timeofday(context, &now)))
+	 goto fail;
+      *time_rec = ctx->endtime - now;
+   }
+
+   if (ret_flags)
+      *ret_flags = ctx->gss_flags;
+
+   if (actual_mech_type)
+      *actual_mech_type = mech_type;
+
+   /* success */
+
+   *minor_status = 0;
+   return GSS_S_COMPLETE;
+
+fail:
+   (void)krb5_gss_delete_sec_context(minor_status, context_handle, NULL);
+
+   *minor_status = code;
+   return (major_status);
+}
+
+OM_uint32
+krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
+			  context_handle, target_name, mech_type,
+			  req_flags, time_req, input_chan_bindings,
+			  input_token, actual_mech_type, output_token,
+			  ret_flags, time_rec)
+    OM_uint32 *minor_status;
+    gss_cred_id_t claimant_cred_handle;
+    gss_ctx_id_t *context_handle;
+    gss_name_t target_name;
+    gss_OID mech_type;
+    OM_uint32 req_flags;
+    OM_uint32 time_req;
+    gss_channel_bindings_t input_chan_bindings;
+    gss_buffer_t input_token;
+    gss_OID *actual_mech_type;
+    gss_buffer_t output_token;
+    OM_uint32 *ret_flags;
+    OM_uint32 *time_rec;
+{
+   krb5_context context;
+   krb5_gss_cred_id_t cred;
+   int err;
+   krb5_error_code kerr;
+   int default_mech = 0;
+   OM_uint32 major_status;
+   OM_uint32 tmp_min_stat;
+
+   if (*context_handle == GSS_C_NO_CONTEXT) {
+       kerr = krb5_gss_init_context(&context);
+       if (kerr) {
+	   *minor_status = kerr;
+	   return GSS_S_FAILURE;
+       }
+       if (GSS_ERROR(kg_sync_ccache_name(context, minor_status)))
+	   return GSS_S_FAILURE;
+   } else {
+       context = ((krb5_gss_ctx_id_rec *)*context_handle)->k5_context;
+   }
+
+   /* set up return values so they can be "freed" successfully */
+
+   major_status = GSS_S_FAILURE; /* Default major code */
+   output_token->length = 0;
+   output_token->value = NULL;
+   if (actual_mech_type)
+      *actual_mech_type = NULL;
+
+   /* verify that the target_name is valid and usable */
+
+   if (! kg_validate_name(target_name)) {
+      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+      if (*context_handle == GSS_C_NO_CONTEXT)
+	  krb5_free_context(context);
+      return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
+   }
+
+   /* verify the credential, or use the default */
+   /*SUPPRESS 29*/
+   if (claimant_cred_handle == GSS_C_NO_CREDENTIAL) {
+      /*
+       * Solaris Kerberos: here we are using the Solaris specific
+       * function get_default_cred() to handle the special case of a
+       * root principal
+       */
+      major_status = get_default_cred(minor_status, context,
+				    (gss_cred_id_t *)&cred);
+      if (major_status && GSS_ERROR(major_status)) {
+	 if (*context_handle == GSS_C_NO_CONTEXT)
+	    krb5_free_context(context);
+	 return(major_status);
+      }
+   } else {
+      major_status = krb5_gss_validate_cred(minor_status, claimant_cred_handle);
+      if (GSS_ERROR(major_status)) {
+	  if (*context_handle == GSS_C_NO_CONTEXT)
+	      krb5_free_context(context);
+	  return(major_status);
+      }
+      cred = (krb5_gss_cred_id_t) claimant_cred_handle;
+   }
+   kerr = k5_mutex_lock(&cred->lock);
+   if (kerr) {
+       krb5_free_context(context);
+       *minor_status = kerr;
+       return GSS_S_FAILURE;
+   }
+
+   /* verify the mech_type */
+
+   err = 0;
+   if (mech_type == GSS_C_NULL_OID) {
+       default_mech = 1;
+       if (cred->rfc_mech) {
+	   mech_type = (gss_OID) gss_mech_krb5;
+       } else if (cred->prerfc_mech) {
+	   mech_type = (gss_OID) gss_mech_krb5_old;
+       } else {
+	   err = 1;
+       }
+   } else if (g_OID_equal(mech_type, gss_mech_krb5)) {
+       if (!cred->rfc_mech)
+	   err = 1;
+   } else if (g_OID_equal(mech_type, gss_mech_krb5_old)) {
+       if (!cred->prerfc_mech)
+	   err = 1;
+   } else if (g_OID_equal(mech_type, gss_mech_krb5_wrong)) {
+       if (!cred->rfc_mech)
+	   err = 1;
+   } else {
+       err = 1;
+   }
+   
+   if (err) {
+      k5_mutex_unlock(&cred->lock);
+      if (claimant_cred_handle == GSS_C_NO_CREDENTIAL)
+	 krb5_gss_release_cred(minor_status, (gss_cred_id_t *)&cred);
+      *minor_status = 0;
+      if (*context_handle == GSS_C_NO_CONTEXT)
+	 krb5_free_context(context);
+      return(GSS_S_BAD_MECH);
+   }
+
+   /* is this a new connection or not? */
+
+   /*SUPPRESS 29*/
+   if (*context_handle == GSS_C_NO_CONTEXT) {
+      major_status = new_connection(minor_status, cred, context_handle,
+				    target_name, mech_type, req_flags,
+				    time_req, input_chan_bindings,
+				    input_token, actual_mech_type,
+				    output_token, ret_flags, time_rec,
+				    context, default_mech);
+      k5_mutex_unlock(&cred->lock);
+      if (*context_handle == GSS_C_NO_CONTEXT)
+	  krb5_free_context(context);
+      else
+	  ((krb5_gss_ctx_id_rec *) *context_handle)->k5_context = context;
+   } else {
+      /* mutual_auth doesn't care about the credentials */
+      k5_mutex_unlock(&cred->lock);
+      major_status = mutual_auth(minor_status, context_handle,
+				 target_name, mech_type, req_flags,
+				 time_req, input_chan_bindings,
+				 input_token, actual_mech_type,
+				 output_token, ret_flags, time_rec,
+				 context);
+      /* If context_handle is now NO_CONTEXT, mutual_auth called
+	 delete_sec_context, which would've zapped the krb5 context
+	 too.  */
+   }
+
+   if (claimant_cred_handle == GSS_C_NO_CREDENTIAL)
+      krb5_gss_release_cred(&tmp_min_stat, (gss_cred_id_t *)&cred);
+
+   return(major_status);
+}
+
+#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+k5_mutex_t kg_kdc_flag_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
+static int kdc_flag = 0;
+#endif
+
+krb5_error_code
+krb5_gss_init_context (krb5_context *ctxp)
+{
+    krb5_error_code err;
+    int is_kdc;
+
+    err = gssint_initialize_library();
+    if (err)
+	return err;
+#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+    err = k5_mutex_lock(&kg_kdc_flag_mutex);
+    if (err)
+	return err;
+    is_kdc = kdc_flag;
+    k5_mutex_unlock(&kg_kdc_flag_mutex);
+
+    if (is_kdc)
+	return krb5int_init_context_kdc(ctxp);
+    else
+	return krb5_init_context(ctxp);
+#endif
+    return krb5_init_context(ctxp);
+
+}
+
+#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+krb5_error_code
+krb5_gss_use_kdc_context()
+{
+    krb5_error_code err;
+
+    err = gssint_initialize_library();
+    if (err)
+	return err;
+    err = k5_mutex_lock(&kg_kdc_flag_mutex);
+    if (err)
+	return err;
+    kdc_flag = 1;
+    k5_mutex_unlock(&kg_kdc_flag_mutex);
+    return 0;
+}
+#endif
+
+/* Solaris Kerberos specific routines start */
+
+#define ROOT_UID 0
+#define KRB5_DEFAULT_LIFE 60*60*10
+#define CACHE_FILENAME_LEN 35
+
+extern int
+safechown(const char *src, uid_t uid, gid_t gid, int mode);
 
 static krb5_boolean
 principal_ignore_inst_compare(context, princ1, princ2)
@@ -709,7 +1396,6 @@ load_root_cred_using_keytab(
 		*minor_status = code;
 		return (GSS_S_FAILURE);
 	}
-
 	/*
 	 * Solaris Kerberos:
 	 * If the client's realm is empty (using a fallback method to determine
@@ -774,6 +1460,11 @@ load_root_cred_using_keytab(
 
 		return (GSS_S_FAILURE);
 	}
+	/*
+	 * Evidently (sigh), on success, krb5_get_init_creds_keytab
+	 * changes the my_creds princ ptrs so we need to free those
+	 * princs (me&server) as well as freeing all of my_creds contents.
+	 */
 	code = krb5_get_init_creds_keytab(context,
                                 &my_creds, me, keytab,
                                 0, svcname, &opt);
@@ -788,16 +1479,23 @@ load_root_cred_using_keytab(
 
 		return (GSS_S_FAILURE);
 	}
+
+	krb5_free_principal(context, server);
+	server = NULL;
+
 	code = krb5_cc_resolve (context,
 				krb5_cc_default_name(context),
 				&ccache);
 	if (code != 0) {
 		*minor_status = code;
 		krb5_free_cred_contents(context, &my_creds);
+		krb5_free_principal(context, me);
 
 		return (GSS_S_FAILURE);
 	}
 	code = krb5_cc_initialize (context, ccache, me);
+	krb5_free_principal(context, me);
+	me = NULL;
 	if (code != 0) {
 		*minor_status = code;
 		krb5_free_cred_contents(context, &my_creds);
@@ -981,13 +1679,13 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 	
 	/* If we can't get the time, assume the worst. */
 	if (krb5_timeofday(context, &now)) {
-		(void) krb5_gss_release_cred_no_lock(ct, &mntmp, cred_handle);
+		(void) krb5_gss_release_cred(&mntmp, cred_handle);
 		return (GSS_S_CREDENTIALS_EXPIRED);
 	}
 
 	/* If root's cred has expired re-get it */
 	if (cred->tgt_expire < now + MIN_REFRESH_TIME && uid == ROOT_UID) {
-		(void) krb5_gss_release_cred_no_lock(ct, &mntmp, cred_handle);
+		(void) krb5_gss_release_cred(&mntmp, cred_handle);
 
 		major = load_root_cred_using_keytab(minor_status,
 						    context, "root", 1);
@@ -1010,7 +1708,7 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 	/* Any body else is SOL unless we can renew their credential cache */
 	} else if ((cred->tgt_expire < now + MIN_RENEW_TIME) &&
 			(cred->tgt_expire > now)) {
-		(void) krb5_gss_release_cred_no_lock(ct, &mntmp, cred_handle);
+		(void) krb5_gss_release_cred(&mntmp, cred_handle);
 
 		major = renew_ccache(minor_status, context, uid);
 		if ((major != GSS_S_COMPLETE) &&
@@ -1030,617 +1728,4 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 	return (GSS_S_COMPLETE);
 }
 
-/*
- * setup_enc
- *
- * Fill in the encryption descriptors.	Called after AP-REQ is made.
- */
-static OM_uint32
-setup_enc(
-   OM_uint32 *minor_status,
-   krb5_gss_ctx_id_rec *ctx,
-   krb5_context context)
-{
-   krb5_error_code code;
-   OM_uint32 ret = GSS_S_COMPLETE;
-   int i;
-
-   ctx->have_acceptor_subkey = 0;
-   ctx->proto = 0;
-   ctx->cksumtype = 0;
-
-   KRB5_LOG(KRB5_ERR, "setup_enc() enctype = %d\n",
-	ctx->subkey->enctype);
-
-   switch(ctx->subkey->enctype) {
-   case ENCTYPE_DES_CBC_MD5:
-   case ENCTYPE_DES_CBC_MD4:
-   case ENCTYPE_DES_CBC_CRC:
-	ctx->subkey->enctype = ENCTYPE_DES_CBC_RAW;
-	ctx->signalg = SGN_ALG_DES_MAC_MD5;
-	ctx->cksum_size = 8;
-	ctx->sealalg = SEAL_ALG_DES;
-
-	/* The encryption key is the session key XOR
-	 0xf0f0f0f0f0f0f0f0.  */
-	if ((code = krb5_copy_keyblock(context, ctx->subkey, &ctx->enc)))
-	    goto fail;
-
-	for (i=0; i<ctx->enc->length; i++)
-	    ctx->enc->contents[i] ^= 0xf0;
-
-	goto copy_subkey_to_seq;
-
-   case ENCTYPE_DES3_CBC_SHA1:
-	/* MIT extension */
-	ctx->subkey->enctype = ENCTYPE_DES3_CBC_RAW;
-	ctx->signalg = SGN_ALG_HMAC_SHA1_DES3_KD;
-	ctx->cksum_size = 20;
-	ctx->sealalg = SEAL_ALG_DES3KD;
-
-   copy_subkey:
-	code = krb5_copy_keyblock (context, ctx->subkey, &ctx->enc);
-	if (code)
-	    goto fail;
-   copy_subkey_to_seq:
-	code = krb5_copy_keyblock (context, ctx->subkey, &ctx->seq);
-	if (code) {
-	    krb5_free_keyblock (context, ctx->enc);
-	    goto fail;
-	}
-	break;
-
-   case ENCTYPE_ARCFOUR_HMAC:
-	/* Microsoft extension */
-	ctx->signalg = SGN_ALG_HMAC_MD5 ;
-	ctx->cksum_size = 8;
-	ctx->sealalg = SEAL_ALG_MICROSOFT_RC4 ;
-
-	goto copy_subkey;
-
-   default:
-       /* Fill some fields we shouldn't be using on this path
-	  with garbage.	 */
-	ctx->signalg = -10;
-	ctx->sealalg = -10;
-
-	ctx->proto = 1;
-	code = krb5int_c_mandatory_cksumtype(context, ctx->subkey->enctype,
-		&ctx->cksumtype);
-	if (code)
-	    goto fail;
-	code = krb5_c_checksum_length(context, ctx->cksumtype,
-				(size_t *)&ctx->cksum_size);
-	if (code)
-	    goto fail;
-	goto copy_subkey;
-   }
-fail:
-   if (code) {
-	*minor_status = code;
-	ret = GSS_S_FAILURE;
-   }
-success:
-   return (ret);
-}
-
-/*
- * new_connection
- *
- * Do the grunt work of setting up a new context.
- */
-static OM_uint32
-new_connection(
-   OM_uint32 *minor_status,
-   krb5_gss_cred_id_t cred,
-   gss_ctx_id_t *context_handle,
-   gss_name_t target_name,
-   gss_OID mech_type,
-   OM_uint32 req_flags,
-   OM_uint32 time_req,
-   gss_channel_bindings_t input_chan_bindings,
-   gss_buffer_t input_token,
-   gss_OID *actual_mech_type,
-   gss_buffer_t output_token,
-   OM_uint32 *ret_flags,
-   OM_uint32 *time_rec,
-   krb5_context context,
-   int default_mech)
-{
-   OM_uint32 major_status;
-   krb5_error_code code;
-   krb5_creds *k_cred;
-   krb5_gss_ctx_id_rec *ctx, *ctx_free;
-   krb5_timestamp now;
-   gss_buffer_desc token;
-
-   major_status = GSS_S_FAILURE;
-   token.length = 0;
-   token.value = NULL;
-
-   /* make sure the cred is usable for init */
-
-   if ((cred->usage != GSS_C_INITIATE) &&
-	(cred->usage != GSS_C_BOTH)) {
-	*minor_status = 0;
-	return(GSS_S_NO_CRED);
-   }
-
-   /* complain if the input token is non-null */
-
-   if (input_token != GSS_C_NO_BUFFER && input_token->length != 0) {
-       *minor_status = 0;
-	return(GSS_S_DEFECTIVE_TOKEN);
-   }
-
-   /* create the ctx */
-
-   if ((ctx = (krb5_gss_ctx_id_rec *) xmalloc(sizeof(krb5_gss_ctx_id_rec)))
-	== NULL) {
-	*minor_status = ENOMEM;
-	return(GSS_S_FAILURE);
-   }
-
-   /* fill in the ctx */
-   memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
-   ctx_free = ctx;
-   if ((code = krb5_auth_con_init(context, &ctx->auth_context)))
-	goto fail;
-   krb5_auth_con_setflags(context, ctx->auth_context,
-                          KRB5_AUTH_CONTEXT_DO_SEQUENCE);
-   ctx->initiate = 1;
-   ctx->gss_flags = (GSS_C_INTEG_FLAG | GSS_C_CONF_FLAG |
-                      GSS_C_TRANS_FLAG |  GSS_C_PROT_READY_FLAG |
-                      ((req_flags) & (GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
-                                      GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG)));
-   ctx->seed_init = 0;
-   ctx->big_endian = 0;	 /* all initiators do little-endian, as per spec */
-   ctx->seqstate = 0;
-   if ((code = krb5_timeofday(context, &now)))
-	goto fail;
-
-   if (time_req == 0 || time_req == GSS_C_INDEFINITE) {
-	ctx->endtime = 0;
-   } else {
-      ctx->endtime = now + time_req;
-   }
-
-   if ((code = krb5_copy_principal(context, cred->princ, &ctx->here)))
-	goto fail;
-
-   if ((code = krb5_copy_principal(context, (krb5_principal) target_name,
-                                   &ctx->there)))
-	goto fail;
-
-   code = get_credentials(context, cred, ctx->there, now,
-                          ctx->endtime, &k_cred);
-   if (code)
-      goto fail;
-
-   if (default_mech) {
-	mech_type = (gss_OID) gss_mech_krb5;
-   }
-      /* Solaris Kerberos:  we allocate the memory for mech_used here
-       * because we store mech_used as a gss_OID and not a (gss_OID *)
-       */
-   ctx->mech_used.elements = malloc(mech_type->length);
-   if ( (ctx->mech_used.elements) == NULL ) {
-	code = ENOMEM;
-	major_status = GSS_S_FAILURE;
-	goto fail;
-   }
-   ctx->mech_used.length = mech_type->length;
-   memcpy(ctx->mech_used.elements, mech_type->elements, mech_type->length);
-
-   /*
-    * Now try to make it static if at all possible....
-    */
-   /* Solaris Kerberos:  our mech_used is part of the ctx structure */
-   /* ctx->mech_used = krb5_gss_convert_static_mech_oid(&(ctx->mech_used)); */
-   {
-      /* gsskrb5 v1 */
-	krb5_ui_4 seq_temp;
-	if ((code = make_ap_req_v1(context, ctx,
-                                 cred, k_cred, input_chan_bindings,
-                                 mech_type, &token))) {
-	 if ((code == KRB5_FCC_NOFILE) || (code == KRB5_CC_NOTFOUND) ||
-             (code == KG_EMPTY_CCACHE))
-            major_status = GSS_S_NO_CRED;
-	 if (code == KRB5KRB_AP_ERR_TKT_EXPIRED)
-            major_status = GSS_S_CREDENTIALS_EXPIRED;
-	 goto fail;
-	}
-
-	krb5_auth_con_getlocalseqnumber(context, ctx->auth_context, 
-		(krb5_int32 *)&seq_temp);
-	ctx->seq_send = seq_temp;
-	krb5_auth_con_getsendsubkey(context, ctx->auth_context,
-                                  &ctx->subkey);
-   }
-
-   major_status = setup_enc(minor_status, ctx, context);
-
-   if (k_cred) {
-	krb5_free_creds(context, k_cred);
-	k_cred = 0;
-   }
-
-   /* at this point, the context is constructed and valid,
-	hence, releaseable */
-
-   /* intern the context handle */
-
-   if (! kg_save_ctx_id((gss_ctx_id_t) ctx)) {
-	code = G_VALIDATE_FAILED;
-	goto fail;
-   }
-   *context_handle = (gss_ctx_id_t) ctx;
-   ctx_free = 0;
-   /* compute time_rec */
-   if (time_rec) {
-	if ((code = krb5_timeofday(context, &now)))
-	    goto fail;
-	*time_rec = ctx->endtime - now;
-   }
-
-   /* set the other returns */
-   *output_token = token;
-
-   if (ret_flags)
-	*ret_flags = ctx->gss_flags;
-
-   if (actual_mech_type)
-	*actual_mech_type = mech_type;
-
-   /* return successfully */
-
-   *minor_status = 0;
-   if (ctx->gss_flags & GSS_C_MUTUAL_FLAG) {
-	ctx->established = 0;
-	return(GSS_S_CONTINUE_NEEDED);
-   } else {
-      ctx->seq_recv = ctx->seq_send;
-	g_order_init(&(ctx->seqstate), ctx->seq_recv,
-                   (ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0,
-                   (ctx->gss_flags & GSS_C_SEQUENCE_FLAG) != 0, ctx->proto);
-	ctx->gss_flags |= GSS_C_PROT_READY_FLAG;
-	ctx->established = 1;
-	return(GSS_S_COMPLETE);
-   }
-
-fail:
-   if (ctx_free) {
-	if (ctx_free->auth_context)
-	   krb5_auth_con_free(context, ctx_free->auth_context);
-	if (ctx_free->here)
-	   krb5_free_principal(context, ctx_free->here);
-	if (ctx_free->there)
-	   krb5_free_principal(context, ctx_free->there);
-	if (ctx_free->subkey)
-	   krb5_free_keyblock(context, ctx_free->subkey);
-	xfree(ctx_free);
-   } else {
-        (void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
-	    context_handle, NULL);
-   }
-
-   *minor_status = code;
-   return (major_status);
-}
-
-/*
- * mutual_auth
- *
- * Handle the reply from the acceptor, if we're doing mutual auth.
- */
-static OM_uint32
-mutual_auth(
-   OM_uint32 *minor_status,
-   krb5_gss_cred_id_t cred,
-   gss_ctx_id_t *context_handle,
-   gss_name_t target_name,
-   gss_OID mech_type,
-   OM_uint32 req_flags,
-   OM_uint32 time_req,
-   gss_channel_bindings_t input_chan_bindings,
-   gss_buffer_t input_token,
-   gss_OID *actual_mech_type,
-   gss_buffer_t output_token,
-   OM_uint32 *ret_flags,
-   OM_uint32 *time_rec,
-   krb5_context context)
-{
-   OM_uint32 major_status;
-   unsigned char *ptr;
-   char *sptr;
-   krb5_data ap_rep;
-   krb5_ap_rep_enc_part *ap_rep_data;
-   krb5_timestamp now;
-   krb5_gss_ctx_id_rec *ctx;
-   krb5_error *krb_error;
-   krb5_error_code code;
-
-   major_status = GSS_S_FAILURE;
-
-   /* validate the context handle */
-   /*SUPPRESS 29*/
-   if (! kg_validate_ctx_id(*context_handle)) {
-	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
-	return(GSS_S_NO_CONTEXT);
-   }
-
-   ctx = (krb5_gss_ctx_id_rec *) *context_handle;
-
-   /* make sure the context is non-established, and that certain
-	arguments are unchanged */
-
-   if ((ctx->established) ||
-	((ctx->gss_flags & GSS_C_MUTUAL_FLAG) == 0)) {
-	code = KG_CONTEXT_ESTABLISHED;
-	goto fail;
-   }
-
-   if (! krb5_principal_compare(context, ctx->there,
-				(krb5_principal) target_name)) {
-	(void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
-                                        context_handle, NULL);
-	code = 0;
-	major_status = GSS_S_BAD_NAME;
-	goto fail;
-   }
-
-   /* verify the token and leave the AP_REP message in ap_rep */
-
-   if (input_token == GSS_C_NO_BUFFER) {
-	(void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
-                                        context_handle, NULL);
-	code = 0;
-	major_status = GSS_S_DEFECTIVE_TOKEN;
-	goto fail;
-   }
-
-   ptr = (unsigned char *) input_token->value;
-
-   if (g_verify_token_header(&ctx->mech_used,
-                             (uint32_t *)&(ap_rep.length),
-                             &ptr, KG_TOK_CTX_AP_REP,
-                             input_token->length, 1)) {
-	if (g_verify_token_header(&ctx->mech_used,
-				(uint32_t *)&(ap_rep.length),
-				&ptr, KG_TOK_CTX_ERROR,
-				input_token->length, 1) == 0) {
-
-	 /* Handle a KRB_ERROR message from the server */
-
-	 sptr = (char *) ptr;		/* PC compiler bug */
-	 TREAD_STR(sptr, ap_rep.data, ap_rep.length);
-
-	 code = krb5_rd_error(context, &ap_rep, &krb_error);
-	 if (code)
-            goto fail;
-	 if (krb_error->error)
-            code = krb_error->error + ERROR_TABLE_BASE_krb5;
-	 else
-            code = 0;
-	 krb5_free_error(context, krb_error);
-	 goto fail;
-	} else {
-	 *minor_status = 0;
-	 return(GSS_S_DEFECTIVE_TOKEN);
-	}
-   }
-
-   sptr = (char *) ptr;                      /* PC compiler bug */
-   TREAD_STR(sptr, ap_rep.data, ap_rep.length);
-
-   /* decode the ap_rep */
-   if ((code = krb5_rd_rep(context, ctx->auth_context, &ap_rep,
-                           &ap_rep_data))) {
-	/*
-       * XXX A hack for backwards compatiblity.
-	* To be removed in 1999 -- proven
-	*/
-      krb5_auth_con_setuseruserkey(context, ctx->auth_context,
-                                   ctx->subkey);
-	if ((krb5_rd_rep(context, ctx->auth_context, &ap_rep,
-			&ap_rep_data)))
-	 goto fail;
-   }
-
-   /* store away the sequence number */
-   ctx->seq_recv = ap_rep_data->seq_number;
-   g_order_init(&(ctx->seqstate), ctx->seq_recv,
-		(ctx->gss_flags & GSS_C_REPLAY_FLAG) != 0,
-		(ctx->gss_flags & GSS_C_SEQUENCE_FLAG) !=0, ctx->proto);
-
-   if (ctx->proto == 1 && ap_rep_data->subkey) {
-	/* Keep acceptor's subkey.  */
-	ctx->have_acceptor_subkey = 1;
-	code = krb5_copy_keyblock(context, ap_rep_data->subkey,
-                                 &ctx->acceptor_subkey);
-	if (code)
-           goto fail;
-	code = krb5int_c_mandatory_cksumtype(context,
-		ctx->acceptor_subkey->enctype,
-		&ctx->acceptor_subkey_cksumtype);
-	if (code)
-           goto fail;
-   }
-
-   /* free the ap_rep_data */
-   krb5_free_ap_rep_enc_part(context, ap_rep_data);
-
-   /* set established */
-   ctx->established = 1;
-
-   /* set returns */
-
-   if (time_rec) {
-	if ((code = krb5_timeofday(context, &now)))
-	 goto fail;
-	*time_rec = ctx->endtime - now;
-   }
-   if (ret_flags)
-	*ret_flags = ctx->gss_flags;
-
-   if (actual_mech_type)
-	*actual_mech_type = mech_type;
-
-   /* success */
-
-   *minor_status = 0;
-   return GSS_S_COMPLETE;
-
-fail:
-   (void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
-       context_handle, NULL);
-
-   *minor_status = code;
-   return (major_status);
-}
-
-/*
- * krb5_gss_init_sec_context
- * This has been broken up into smaller chunks for CFX support.
- * MIT KRB5 1.3.2
- */
-OM_uint32
-krb5_gss_init_sec_context(ct, minor_status, claimant_cred_handle,
-			  context_handle, target_name, mech_type,
-			  req_flags, time_req, input_chan_bindings,
-			  input_token, actual_mech_type, output_token,
-			  ret_flags, time_rec)
-    void      *ct;
-    OM_uint32 *minor_status;
-    gss_cred_id_t claimant_cred_handle;
-    gss_ctx_id_t *context_handle;
-    gss_name_t target_name;
-    gss_OID mech_type;
-    OM_uint32 req_flags;
-    OM_uint32 time_req;
-    gss_channel_bindings_t input_chan_bindings;
-    gss_buffer_t input_token;
-    gss_OID *actual_mech_type;
-    gss_buffer_t output_token;
-    OM_uint32 *ret_flags;
-    OM_uint32 *time_rec;
-{
-   krb5_context context;
-   krb5_gss_cred_id_t cred = NULL;
-   int err;
-   int default_mech = 0;
-   OM_uint32 major_status;
-   OM_uint32 tmp_min_stat;
-
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-   if (GSS_ERROR(kg_get_context(minor_status, &context)))
-      return(GSS_S_FAILURE);
-#endif
-
-   KRB5_LOG0(KRB5_INFO, "krb5_gss_init_sec_context() start\n");
-
-   mutex_lock(&krb5_mutex);
-   context = ct;
-
-   /* set up return values so they can be "freed" successfully */
-
-   major_status = GSS_S_FAILURE; /* Default major code */
-   output_token->length = 0;
-   output_token->value = NULL;
-   if (actual_mech_type)
-      *actual_mech_type = NULL;
-
-   /* verify that the target_name is valid and usable */
-
-   if (! kg_validate_name(target_name)) {
-      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      major_status = (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
-      goto unlock;
-   }
-
-   /* verify the credential, or use the default */
-   /*SUPPRESS 29*/
-   if (claimant_cred_handle == GSS_C_NO_CREDENTIAL) {
-      /*
-       * Solaris Kerberos: here we are using the Solaris specific
-       * function get_default_cred() to handle the special case of a
-       * root principal
-       */
-      major_status = get_default_cred(minor_status, ct, (gss_cred_id_t *)&cred);
-      if (major_status && GSS_ERROR(major_status)) {
-	    KRB5_LOG(KRB5_ERR, "krb5_gss_init_sec_context() end, error "
-		   "major_status = %d\n", major_status);
-	    goto unlock;
-      }
-   } else {
-      major_status = krb5_gss_validate_cred_no_lock(ct, minor_status,
-					     claimant_cred_handle);
-      if (GSS_ERROR(major_status)) {
-	  KRB5_LOG(KRB5_ERR, "krb5_gss_init_sec_context() end, error "
-		   "major_status = %d\n", major_status);
-	  goto unlock;
-      }
-      cred = (krb5_gss_cred_id_t) claimant_cred_handle;
-   }
-
-   /* verify the mech_type */
-
-   err = 0;
-   if (mech_type == GSS_C_NULL_OID) {
-       default_mech = 1;
-       if (cred->rfc_mech) {
-	   mech_type = (gss_OID) gss_mech_krb5;
-       } else if (cred->prerfc_mech) {
-	   mech_type = (gss_OID) gss_mech_krb5_old;
-       } else {
-	   err = 1;
-       }
-   } else if (g_OID_equal(mech_type, gss_mech_krb5)) {
-       if (!cred->rfc_mech)
-	   err = 1;
-   } else if (g_OID_equal(mech_type, gss_mech_krb5_old)) {
-       if (!cred->prerfc_mech)
-	   err = 1;
-   } else {
-       err = 1;
-   }
-
-   if (err) {
-      *minor_status = 0;
-      major_status = GSS_S_BAD_MECH;
-      goto unlock;
-   }
-
-   /* is this a new connection or not? */
-
-   /*SUPPRESS 29*/
-   if (*context_handle == GSS_C_NO_CONTEXT) {
-      major_status = new_connection(minor_status, cred, context_handle,
-                                    target_name, mech_type, req_flags,
-                                    time_req, input_chan_bindings,
-                                    input_token, actual_mech_type,
-                                    output_token, ret_flags, time_rec,
-                                    context, default_mech);
-   } else {
-      major_status = mutual_auth(minor_status, cred, context_handle,
-                                 target_name, mech_type, req_flags,
-                                 time_req, input_chan_bindings,
-                                 input_token, actual_mech_type,
-                                 output_token, ret_flags, time_rec,
-                                 context);
-   }
-
-unlock:
-   if (claimant_cred_handle == GSS_C_NO_CREDENTIAL && cred != NULL)
-	krb5_gss_release_cred_no_lock(context, &tmp_min_stat, (gss_cred_id_t *)cred);
-
-   mutex_unlock(&krb5_mutex);
-
-   KRB5_LOG1(KRB5_ERR, "krb5_gss_init_sec_context() end, error "
-	   "major_status = %d, minor_status = %d\n", 
-	   major_status, *minor_status);
-
-   return (major_status);
-}
+/* Solaris Kerberos specific routines end */

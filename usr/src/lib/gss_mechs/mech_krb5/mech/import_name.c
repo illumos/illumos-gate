@@ -1,13 +1,8 @@
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- *
+ * 
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +12,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- *
+ * 
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -28,14 +23,14 @@
  */
 
 /*
- * $Id: import_name.c,v 1.17 1998/10/30 02:54:21 marc Exp $
+ * $Id: import_name.c 18015 2006-05-17 05:26:12Z raeburn $
  */
 
-#include <gssapiP_krb5.h>
-#include <gssapi_generic.h>
+#include "gssapiP_krb5.h"
 
 #ifndef NO_PASSWORD
 #include <pwd.h>
+#include <stdio.h>
 #endif
 
 #ifdef HAVE_STRING_H
@@ -52,9 +47,8 @@
  */
 
 OM_uint32
-krb5_gss_import_name(ctx, minor_status, input_name_buffer,
+krb5_gss_import_name(minor_status, input_name_buffer, 
 		     input_name_type, output_name)
-     void	*ctx;
      OM_uint32 *minor_status;
      gss_buffer_t input_name_buffer;
      gss_OID input_name_type;
@@ -69,15 +63,11 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
    struct passwd *pw;
 #endif
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-   if (GSS_ERROR(kg_get_context(minor_status, &context)))
-      return(GSS_S_FAILURE);
-#endif
-
-   mutex_lock(&krb5_mutex);
-   context = ctx;
+   code = krb5_gss_init_context(&context);
+   if (code) {
+       *minor_status = code;
+       return GSS_S_FAILURE;
+   }
 
    /* set up default returns */
 
@@ -86,21 +76,15 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
    /* Go find the appropriate string rep to pass into parse_name */
 
-   /* We support both nametypes: new and official nametype
-   *  GSS_C_NT_HOSTBASED_SERVICE and
-   *  old and unofficial nametype gss_nt_service_name
-   */
-
    if ((input_name_type != GSS_C_NULL_OID) &&
-       (g_OID_equal(input_name_type, GSS_C_NT_HOSTBASED_SERVICE) ||
-	g_OID_equal(input_name_type, gss_nt_service_name) ||
+       (g_OID_equal(input_name_type, gss_nt_service_name) ||
 	g_OID_equal(input_name_type, gss_nt_service_name_v2))) {
       char *service, *host;
 
       if ((tmp =
 	   (char *) xmalloc(input_name_buffer->length + 1)) == NULL) {
 	 *minor_status = ENOMEM;
-	 mutex_unlock(&krb5_mutex);
+	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
 
@@ -108,7 +92,7 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
       tmp[input_name_buffer->length] = 0;
 
       service = tmp;
-      if (host = strchr(tmp, '@')) {
+      if ((host = strchr(tmp, '@'))) {
 	 *host = '\0';
 	 host++;
       }
@@ -123,7 +107,7 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
       if (input_name_buffer->length != sizeof(krb5_principal)) {
 	 *minor_status = (OM_uint32) G_WRONG_SIZE;
-	 mutex_unlock(&krb5_mutex);
+	 krb5_free_context(context);
 	 return(GSS_S_BAD_NAME);
       }
 
@@ -131,16 +115,22 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
       if ((code = krb5_copy_principal(context, input, &princ))) {
 	 *minor_status = code;
-	 mutex_unlock(&krb5_mutex);
+	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
    } else {
+#ifndef NO_PASSWORD
+      uid_t uid;
+      struct passwd pwx;
+      char pwbuf[BUFSIZ];
+#endif
+
       stringrep = NULL;
 
       if ((tmp =
 	   (char *) xmalloc(input_name_buffer->length + 1)) == NULL) {
 	 *minor_status = ENOMEM;
-	 mutex_unlock(&krb5_mutex);
+	 krb5_free_context(context);
 	 return(GSS_S_FAILURE);
       }
       tmp2 = 0;
@@ -150,19 +140,19 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
       if ((input_name_type == GSS_C_NULL_OID) ||
 	  g_OID_equal(input_name_type, gss_nt_krb5_name) ||
-	  g_OID_equal(input_name_type, GSS_C_NT_USER_NAME)) {
+	  g_OID_equal(input_name_type, gss_nt_user_name)) {
 	 stringrep = (char *) tmp;
 #ifndef NO_PASSWORD
-      } else if (g_OID_equal(input_name_type, GSS_C_NT_MACHINE_UID_NAME)) {
-	 if ((pw = getpwuid(*((uid_t *) input_name_buffer->value))))
-	    stringrep = pw->pw_name;
+      } else if (g_OID_equal(input_name_type, gss_nt_machine_uid_name)) {
+	 uid = *(uid_t *) input_name_buffer->value;
+      do_getpwuid:
+	 if (k5_getpwuid_r(uid, &pwx, pwbuf, sizeof(pwbuf), &pw) == 0)
+	     stringrep = pw->pw_name;
 	 else
 	    *minor_status = (OM_uint32) G_NOUSER;
-      } else if (g_OID_equal(input_name_type, GSS_C_NT_STRING_UID_NAME)) {
-	 if ((pw = getpwuid((uid_t) atoi(tmp))))
-	    stringrep = pw->pw_name;
-	 else
-	    *minor_status = (OM_uint32) G_NOUSER;
+      } else if (g_OID_equal(input_name_type, gss_nt_string_uid_name)) {
+	 uid = atoi(tmp);
+	 goto do_getpwuid;
 #endif
       } else if (g_OID_equal(input_name_type, gss_nt_exported_name)) {
 	 cp = tmp;
@@ -191,15 +181,16 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 	 if (tmp2 == NULL) {
 		 xfree(tmp);
 		 *minor_status = ENOMEM;
-		 mutex_unlock(&krb5_mutex);
+		 krb5_free_context(context);
 		 return GSS_S_FAILURE;
 	 }
 	 strncpy(tmp2, cp, length);
 	 tmp2[length] = 0;
-	
+	 
 	 stringrep = tmp2;
      } else {
-	 mutex_unlock(&krb5_mutex);
+	 xfree(tmp);
+	 krb5_free_context(context);
 	 return(GSS_S_BAD_NAMETYPE);
       }
 
@@ -212,10 +203,10 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 	 xfree(tmp);
 	 if (tmp2)
 		 xfree(tmp2);
-	 mutex_unlock(&krb5_mutex);
+	 krb5_free_context(context);
 	 return(GSS_S_BAD_NAME);
       }
-
+      
       if (tmp2)
 	      xfree(tmp2);
       xfree(tmp);
@@ -226,7 +217,7 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
    if (code) {
       *minor_status = (OM_uint32) code;
-      mutex_unlock(&krb5_mutex);
+      krb5_free_context(context);
       return(GSS_S_BAD_NAME);
    }
 
@@ -234,14 +225,15 @@ krb5_gss_import_name(ctx, minor_status, input_name_buffer,
 
    if (! kg_save_name((gss_name_t) princ)) {
       krb5_free_principal(context, princ);
+      krb5_free_context(context);
       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      mutex_unlock(&krb5_mutex);
       return(GSS_S_FAILURE);
    }
+
+   krb5_free_context(context);
 
    /* return it */
 
    *output_name = (gss_name_t) princ;
-   mutex_unlock(&krb5_mutex);
    return(GSS_S_COMPLETE);
 }

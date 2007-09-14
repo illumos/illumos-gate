@@ -169,13 +169,14 @@ MECH= 	accept_sec_context.o store_cred.o \
 	disp_name.o disp_status.o export_sec_context.o \
 	get_tkt_flags.o import_name.o indicate_mechs.o \
 	inq_context.o inq_cred.o inq_names.o \
-	k5mech.o \
+	krb5_gss_glue.o \
 	pname_to_uid.o process_context_token.o \
         rel_buffer.o rel_oid.o rel_oid_set.o \
 	rel_cred.o  rel_name.o util_buffer.o \
 	util_dup.o util_localhost.o \
 	util_cksum.o acquire_cred.o init_sec_context.o \
-	util_ctxsetup.o set_ccache.o acquire_cred_with_pw.o
+	set_ccache.o acquire_cred_with_pw.o lucid_context.o \
+	set_allowable_enctypes.o oid_ops.o export_name.o gss_libinit.o
 
 MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 	import_sec_context.o k5seal.o k5sealv3.o \
@@ -185,13 +186,15 @@ MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 	util_set.o  util_token.o util_validate.o \
 	val_cred.o verify.o wrap_size_limit.o
 
+GSSAPI_UTS= gen_oids.o
+
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 	prof_set.o prof_get.o
 
-SUPPORT_OBJS= fake-addrinfo.o  threads.o errors.o plugins.o
+SUPPORT_OBJS= fake-addrinfo.o threads.o errors.o plugins.o
 
 OBJECTS= \
-	$(MECH)  $(MECH_UTS) \
+	$(MECH) $(MECH_UTS) $(GSSAPI_UTS)\
 	$(SUPPORT_OBJS) \
 	$(PROFILE_OBJS) \
 	$(CRYPTO) $(CRYPTO_UTS) \
@@ -230,6 +233,7 @@ INS.liblink2=	-$(RM) $@; $(SYMLINK) gss/$(LIBLINKPATH)$(LIBLINKS) $@
 CPPFLAGS += -I$(REL_PATH)/libgss -I../include  \
 		-I$(SRC)/uts/common/gssapi \
 		-I$(SRC)/uts/common/gssapi/include \
+		-I$(SRC)/lib/gss_mechs/mech_krb5/mech \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include/krb5 \
 		-I../include/krb5 \
 		-I../krb5/keytab \
@@ -301,6 +305,10 @@ DYNFLAGS += $(ZIGNORE)
 
 # mech lib needs special initialization at load time
 DYNFLAGS += -zinitarray=krb5_ld_init
+
+objs/%.o pics/%.o: $(SRC)/uts/common/gssapi/%.c
+	$(COMPILE.c)  -o $@ $<
+	$(POST_PROCESS_O)
 
 objs/%.o pics/%.o: $(SRC)/uts/common/gssapi/mechs/krb5/mech/%.c
 	$(COMPILE.c)  -o $@ $<
@@ -481,8 +489,7 @@ OS_FLAGS = -DHAVE_LIBSOCKET -DHAVE_LIBNSL -DTIME_WITH_SYS_TIME \
 	-DHAVE_ERRNO -DHAVE_STRFTIME -DHAVE_STRPTIME -DHAVE_STRERROR \
 	-DHAVE_STAT -DSIZEOF_INT=4 -DPROVIDE_KERNEL_IMPORT \
 	-DHAVE_STDINT_H -DPOSIX_SIGNALS -DHAVE_GETENV -DHAVE_SETENV \
-	-DHAVE_UNSETENV -DHAVE_FCHMOD -DHAVE_STRUCT_LIFCONF \
-	-DHAVE_ACCESS
+	-DHAVE_UNSETENV -DHAVE_FCHMOD -DHAVE_STRUCT_LIFCONF
 
 CPPFLAGS += -I$(REL_PATH)krb5/ccache/file $(OS_FLAGS)
 
@@ -522,6 +529,7 @@ SOURCES= \
 	$(K5_RCACHE:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/rcache/%.c) \
 	$(MECH:%.o= $(SRC)/lib/gss_mechs/mech_krb5/mech/%.c) \
 	$(MECH_UTS:%.o= $(SRC)/uts/common/gssapi/mechs/krb5/mech/%.c) \
+	$(GSSAPI_UTS:%.o= $(SRC)/uts/common/gssapi/%.c) \
 	$(PROFILE_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/profile/%.c) \
 	$(SUPPORT_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/support/%.c)
 

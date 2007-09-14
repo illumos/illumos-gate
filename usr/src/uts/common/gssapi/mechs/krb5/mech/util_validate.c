@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,14 +28,17 @@
  */
 
 /*
- * $Id: util_validate.c,v 1.8 1996/08/28 21:50:37 tytso Exp $
+ * $Id: util_validate.c 16475 2004-06-17 02:23:21Z raeburn $
  */
 
 /*
  * functions to validate name, credential, and context handles
  */
 
-#include <gssapiP_generic.h>
+#include "gssapiP_generic.h"
+#ifndef	_KERNEL
+#include "gss_libinit.h"
+#endif
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -48,9 +51,11 @@
 #include <limits.h>
 #endif
 
+
 #ifdef HAVE_BSD_DB
 #include <sys/file.h>
 #include <db.h>
+
 
 static const int one = 1;
 static const DBT dbtone = { (void *) &one, sizeof(one) };
@@ -64,18 +69,35 @@ typedef struct _vkey {
 #define V_NAME		1
 #define V_CRED_ID	2
 #define V_CTX_ID	3
+#define V_LCTX_ID	4
+
+/* SUNW15resync
+   beware some of the uses below of type look dubious but seem
+   to have been working in Solaris for a long time */
 
 /* All these functions return 0 on failure, and non-zero on success */
 
 static int g_save(db, type, ptr)
-     void **db;
+     g_set *db;
      int type;
      void *ptr;
 {
+   int ret;
 #ifdef HAVE_BSD_DB
-   DB **vdb = (DB **) db;
+   DB **vdb;
    vkey vk;
    DBT key;
+
+#ifndef	_KERNEL
+   ret = gssint_initialize_library();
+   if (ret)
+       return 0;
+#endif
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
+
+   vdb = (DB **) &db->data;
 
    if (!*vdb)
       *vdb = dbopen(NULL, O_CREAT|O_RDWR, O_CREAT|O_RDWR, DB_HASH, NULL);
@@ -86,30 +108,57 @@ static int g_save(db, type, ptr)
    key.data = &vk;
    key.size = sizeof(vk);
 
-   return((*((*vdb)->put))(*vdb, &key, &dbtone, 0) == 0);
+   ret = ((*((*vdb)->put))(*vdb, &key, &dbtone, 0) == 0);
+   (void) k5_mutex_unlock(&db->mutex);
+   return ret;
 #else
-   g_set *gs = (g_set *) db;
+   g_set_elt *gs;
+
+#ifndef _KERNEL
+   ret = gssint_initialize_library();
+   if (ret)
+       return 0;
+#endif
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
+
+   gs = (g_set_elt *) &db->data;
 
    if (!*gs)
-      if (g_set_init(gs))
+      if (g_set_init(gs)) {
+	 (void) k5_mutex_unlock(&db->mutex);
 	 return(0);
+      }
 
-   return(g_set_entry_add(gs, ptr, (void *)(intptr_t)type) == 0);
+   /* SUNW15resync */
+   ret = (g_set_entry_add(gs, ptr, (void *)(intptr_t)type) == 0);
+
+   (void) k5_mutex_unlock(&db->mutex);
+   return ret;
 #endif
 }
 
 static int g_validate(db, type, ptr)
-     void **db;
+     g_set *db;
      int type;
      void *ptr;
 {
+   int ret;
 #ifdef HAVE_BSD_DB
-   DB **vdb = (DB **) db;
+   DB **vdb;
    vkey vk;
    DBT key, value;
 
-   if (!*vdb)
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
+
+   vdb = (DB **) &db->data;
+   if (!*vdb) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
+   }
 
    vk.type = type;
    vk.ptr = ptr;
@@ -117,38 +166,58 @@ static int g_validate(db, type, ptr)
    key.data = &vk;
    key.size = sizeof(vk);
 
-   if ((*((*vdb)->get))(*vdb, &key, &value, 0))
+   if ((*((*vdb)->get))(*vdb, &key, &value, 0)) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
+   }
 
+   (void) k5_mutex_unlock(&db->mutex);
    return((value.size == sizeof(one)) &&
 	  (*((int *) value.data) == one));
 #else
-   g_set *gs = (g_set *) db;
+   g_set_elt *gs;
    void *value;
 
-   if (!*gs)
-      return(0);
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
 
-   if (g_set_entry_get(gs, ptr, (void **) &value))
+   gs = (g_set_elt *) &db->data;
+   if (!*gs) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
+   }
 
-   return((intptr_t)value == (intptr_t)type);
+   if (g_set_entry_get(gs, ptr, (void **) &value)) {
+      (void) k5_mutex_unlock(&db->mutex);
+      return(0);
+   }
+   (void) k5_mutex_unlock(&db->mutex);
+   return((intptr_t)value == (intptr_t)type); /* SUNW15resync */
 #endif
 }
 
 /*ARGSUSED*/
 static int g_delete(db, type, ptr)
-     void **db;
+     g_set *db;
      int type;
      void *ptr;
 {
+   int ret;
 #ifdef HAVE_BSD_DB
-   DB **vdb = (DB **) db;
+   DB **vdb;
    vkey vk;
    DBT key;
 
-   if (!*vdb)
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
+
+   vdb = (DB **) &db->data;
+   if (!*vdb) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
+   }
 
    vk.type = type;
    vk.ptr = ptr;
@@ -156,16 +225,27 @@ static int g_delete(db, type, ptr)
    key.data = &vk;
    key.size = sizeof(vk);
 
-   return((*((*vdb)->del))(*vdb, &key, 0) == 0);
+   ret = ((*((*vdb)->del))(*vdb, &key, 0) == 0);
+   (void) k5_mutex_unlock(&db->mutex);
+   return ret;
 #else
-   g_set *gs = (g_set *) db;
+   g_set_elt *gs;
 
-   if (!*gs)
+   ret = k5_mutex_lock(&db->mutex);
+   if (ret)
+       return 0;
+
+   gs = (g_set_elt *) &db->data;
+   if (!*gs) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
+   }
 
-   if (g_set_entry_delete(gs, ptr))
+   if (g_set_entry_delete(gs, ptr)) {
+      (void) k5_mutex_unlock(&db->mutex);
       return(0);
-
+   }
+   (void) k5_mutex_unlock(&db->mutex);
    return(1);
 #endif
 }
@@ -175,63 +255,82 @@ static int g_delete(db, type, ptr)
 /* save */
 
 int g_save_name(vdb, name)
-     void **vdb;
+     g_set *vdb;
      gss_name_t name;
 {
    return(g_save(vdb, V_NAME, (void *) name));
 }
 int g_save_cred_id(vdb, cred)
-     void **vdb;
+     g_set *vdb;
      gss_cred_id_t cred;
 {
    return(g_save(vdb, V_CRED_ID, (void *) cred));
 }
 int g_save_ctx_id(vdb, ctx)
-     void **vdb;
+     g_set *vdb;
      gss_ctx_id_t ctx;
 {
    return(g_save(vdb, V_CTX_ID, (void *) ctx));
 }
+int g_save_lucidctx_id(vdb, lctx)
+     g_set *vdb;
+     void *lctx;
+{
+   return(g_save(vdb, V_LCTX_ID, (void *) lctx));
+}
+
 
 /* validate */
 
 int g_validate_name(vdb, name)
-     void **vdb;
+     g_set *vdb;
      gss_name_t name;
 {
    return(g_validate(vdb, V_NAME, (void *) name));
 }
 int g_validate_cred_id(vdb, cred)
-     void **vdb;
+     g_set *vdb;
      gss_cred_id_t cred;
 {
    return(g_validate(vdb, V_CRED_ID, (void *) cred));
 }
 int g_validate_ctx_id(vdb, ctx)
-     void **vdb;
+     g_set *vdb;
      gss_ctx_id_t ctx;
 {
    return(g_validate(vdb, V_CTX_ID, (void *) ctx));
+}
+int g_validate_lucidctx_id(vdb, lctx)
+     g_set *vdb;
+     void *lctx;
+{
+   return(g_validate(vdb, V_LCTX_ID, (void *) lctx));
 }
 
 /* delete */
 
 int g_delete_name(vdb, name)
-     void **vdb;
+     g_set *vdb;
      gss_name_t name;
 {
    return(g_delete(vdb, V_NAME, (void *) name));
 }
 int g_delete_cred_id(vdb, cred)
-     void **vdb;
+     g_set *vdb;
      gss_cred_id_t cred;
 {
    return(g_delete(vdb, V_CRED_ID, (void *) cred));
 }
 int g_delete_ctx_id(vdb, ctx)
-     void **vdb;
+     g_set *vdb;
      gss_ctx_id_t ctx;
 {
    return(g_delete(vdb, V_CTX_ID, (void *) ctx));
+}
+int g_delete_lucidctx_id(vdb, lctx)
+     g_set *vdb;
+     void *lctx;
+{
+   return(g_delete(vdb, V_LCTX_ID, (void *) lctx));
 }
 

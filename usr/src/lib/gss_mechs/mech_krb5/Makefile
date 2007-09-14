@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -99,7 +99,7 @@ EXPORT_SRC:
 	$(RM) Makefile+ Makefile.mech_krb5+\
 		crypto/des/afsstring2key.c+ \
 		crypto/des/string2key.c+ \
-		mech/k5mech.c+
+		mech/krb5_gss_glue.c+
 
 	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< crypto/des/afsstring2key.c > crypto/des/afsstring2key.c+
@@ -110,8 +110,8 @@ EXPORT_SRC:
 	$(MV) crypto/des/string2key.c+ crypto/des/string2key.c
 
 	$(SED) -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< mech/k5mech.c > mech/k5mech.c+
-	$(MV) mech/k5mech.c+ mech/k5mech.c
+		< mech/krb5_gss_glue.c > mech/krb5_gss_glue.c+
+	$(MV) mech/krb5_gss_glue.c+ mech/krb5_gss_glue.c
 
 	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile.mech_krb5 > Makefile.mech_krb5+
@@ -124,18 +124,18 @@ EXPORT_SRC:
 	$(CHMOD) 444 Makefile Makefile.mech_krb5 \
 		crypto/des/afsstring2key.c \
 		crypto/des/string2key.c \
-		mech/k5mech.c
+		mech/krb5_gss_glue.c
 
 
 # CRYPT DELETE START
 # Special target to clean up the source tree for domestic distribution
 # Warning: This target changes the source tree
 CRYPT_SRC:
-	$(RM) Makefile+ mech/k5mech.c+
+	$(RM) Makefile+ mech/krb5_gss_glue.c+
 
 	$(SED) -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		> mech/k5mech.c+ < mech/k5mech.c
-	$(MV) mech/k5mech.c+ mech/k5mech.c
+		> mech/krb5_gss_glue.c+ < mech/krb5_gss_glue.c
+	$(MV) mech/krb5_gss_glue.c+ mech/krb5_gss_glue.c
 
 	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d"	\
 			< Makefile 				\
@@ -143,7 +143,7 @@ CRYPT_SRC:
 			> Makefile+
 	$(MV) Makefile+ Makefile
 
-	$(CHMOD) 444 mech/k5mech.c Makefile
+	$(CHMOD) 444 mech/krb5_gss_glue.c Makefile
 
 # CRYPT DELETE END
 # EXPORT DELETE END

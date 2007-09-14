@@ -1,13 +1,8 @@
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- *
+ * 
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +12,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- *
+ * 
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -27,55 +22,44 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
+#include "gssapiP_krb5.h"
 
-OM_uint32
-krb5_gss_release_cred(ctx, minor_status, cred_handle)
-     void      *ctx;
+OM_uint32 
+krb5_gss_release_cred(minor_status, cred_handle)
      OM_uint32 *minor_status;
      gss_cred_id_t *cred_handle;
 {
-    OM_uint32 status;
-
-    mutex_lock(&krb5_mutex);
-    status = krb5_gss_release_cred_no_lock(ctx, minor_status, cred_handle);
-    mutex_unlock(&krb5_mutex);
-    return(status);
-}
-
-OM_uint32
-krb5_gss_release_cred_no_lock(ctx, minor_status, cred_handle)
-     void      *ctx;
-     OM_uint32 *minor_status;
-     gss_cred_id_t *cred_handle;
-{
-   krb5_context context = ctx;
+   krb5_context context;
    krb5_gss_cred_id_t cred;
    krb5_error_code code1, code2, code3;
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-   if (GSS_ERROR(kg_get_context(minor_status, &context)))
-      return(GSS_S_FAILURE);
-#endif
+   code1 = krb5_gss_init_context(&context);
+   if (code1) {
+       *minor_status = code1;
+       return GSS_S_FAILURE;
+   }
 
-   if (*cred_handle == GSS_C_NO_CREDENTIAL)
-   {
-      /* Solaris Kerberos:  the followin function does nothing */
-      return(kg_release_defcred(minor_status));
+   if (*cred_handle == GSS_C_NO_CREDENTIAL) {
+      *minor_status = 0;
+      krb5_free_context(context);
+      return(GSS_S_COMPLETE);
    }
 
    if (! kg_delete_cred_id(*cred_handle)) {
       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+      krb5_free_context(context);
       return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_NO_CRED);
    }
 
    cred = (krb5_gss_cred_id_t)*cred_handle;
 
+   k5_mutex_destroy(&cred->lock);
+   /* ignore error destroying mutex */
+
+
    if (cred->ccache) {
       /*
+       * Solaris Kerberos
        * If the ccache is a MEMORY ccache then this credential handle
        * should be the only way to get to it, at least until the advent
        * of a GSS_Duplicate_cred() (which is needed and may well be
@@ -101,7 +85,12 @@ krb5_gss_release_cred_no_lock(ctx, minor_status, cred_handle)
       code3 = 0;
    if (cred->princ)
       krb5_free_principal(context, cred->princ);
+
+   if (cred->req_enctypes)
+       free(cred->req_enctypes);
+
    xfree(cred);
+   krb5_free_context(context);
 
    *cred_handle = NULL;
 

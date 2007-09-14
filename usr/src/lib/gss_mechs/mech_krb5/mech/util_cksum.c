@@ -1,4 +1,10 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -21,15 +27,12 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * $Id: util_cksum.c,v 1.14.6.1 2000/04/22 03:01:36 raeburn Exp $
- */
-
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
+#ifdef HAVE_MEMORY_H
 #include <memory.h>
+#endif
 
 /* Checksumming the channel bindings always uses plain MD5.  */
-/*ARGSUSED*/
 krb5_error_code
 kg_checksum_channel_bindings(context, cb, cksum, bigend)
      krb5_context context;
@@ -37,14 +40,17 @@ kg_checksum_channel_bindings(context, cb, cksum, bigend)
      krb5_checksum *cksum;
      int bigend;
 {
-   int len;
-   char *buf, *ptr;
+   size_t len;
+   char *buf = 0;
+   char *ptr;
    size_t sumlen;
    krb5_data plaind;
    krb5_error_code code;
+   void *temp;
 
-   /* initialize the the cksum and allocate the contents buffer */
-   if (code = krb5_c_checksum_length(context, CKSUMTYPE_RSA_MD5, &sumlen))
+   /* initialize the the cksum */
+   code = krb5_c_checksum_length(context, CKSUMTYPE_RSA_MD5, &sumlen);
+   if (code)
        return(code);
 
    cksum->checksum_type = CKSUMTYPE_RSA_MD5;
@@ -86,15 +92,46 @@ kg_checksum_channel_bindings(context, cb, cksum, bigend)
    plaind.length = len;
    plaind.data = buf;
 
-   if (code = krb5_c_make_checksum(context, CKSUMTYPE_RSA_MD5, 0, 0,
-				   &plaind, cksum)) {
-      xfree(cksum->contents);
-      xfree(buf);
-      return(code);
+#if 0
+   /*
+    * SUNW15resync
+    * MIT 1.5-6 seems/is wrong here in 2 ways
+    *   - why free then alloc contents again?
+    *   - calling krb5_free_checksum_contents results in cksum->length
+    *     getting set to 0 which causes ftp to fail
+    * so lets stick w/oldey-but-goodey code.
+    */
+   code = krb5_c_make_checksum(context, CKSUMTYPE_RSA_MD5, 0, 0,
+			       &plaind, cksum);
+   if (code)
+       goto cleanup;
+
+   if ((temp = xmalloc(cksum->length)) == NULL) {
+       krb5_free_checksum_contents(context, cksum);
+       code = ENOMEM;
+       goto cleanup;
    }
 
-   /* success */
+   memcpy(temp, cksum->contents, cksum->length);
+   krb5_free_checksum_contents(context, cksum);
+   cksum->contents = (krb5_octet *)temp;
+   /* SUNW15resync - need to reset cksum->length here */
 
-   xfree(buf);
-   return(0);
+   /* success */
+ cleanup:
+   if (buf)
+       xfree(buf);
+#endif /* 0 */
+
+   if (code = krb5_c_make_checksum(context, CKSUMTYPE_RSA_MD5, 0, 0, 
+                                   &plaind, cksum)) { 
+      xfree(cksum->contents); /* SUNW15resync -just in case not already free */
+      xfree(buf); 
+      return(code); 
+   } 
+ 
+   /* success */ 
+ 
+   xfree(buf); 
+   return code;
 }

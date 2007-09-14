@@ -1,4 +1,11 @@
 /*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
  * Permission to use, copy, modify, distribute, and sell this software
@@ -20,57 +27,46 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef _GSSAPIP_GENERIC_H_
 #define _GSSAPIP_GENERIC_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * $Id: gssapiP_generic.h,v 1.24 1998/10/30 02:54:06 marc Exp $
+ * $Id: gssapiP_generic.h 18131 2006-06-14 22:27:54Z tlyu $
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if !defined(PROTOTYPE) 
-#define     PROTOTYPE(x) x 
-#endif 
-
-#if (defined(_MSDOS) || defined(_WIN32) || defined(macintosh))
-#include <k5-int.h>
+#if defined(_WIN32)
+#include "k5-int.h"
 #else
-#ifdef HAVE_STDLIB_H
+#include "autoconf.h"
 #ifndef _KERNEL
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif /* !_KERNEL */
-#endif /* HAVE_STDLIB_H */
+#endif
 #endif
 
-#include <mechglueP.h>
-#include <gssapi/gssapi_ext.h>
-#include <gssapi/gssapi.h>
+#include "k5-thread.h"
+
 #include "gssapi_generic.h"
+
 #include "gssapi_err_generic.h"
-#ifdef  _KERNEL
-#include <sys/errno.h>
-#else
+#ifndef _KERNEL
 #include <errno.h>
-#endif
+#else
+#include <sys/errno.h>
+#endif /* !_KERNEL */
+
+#include "k5-platform.h"
+typedef UINT64_TYPE gssint_uint64;
+
+#include "gssapi/gssapi_ext.h"
 
 /** helper macros **/
 
-typedef uint64_t gssint_uint64;
-
-#if 0 	/* this is defined in usr/src/uts/common/gssapi/gssapi_ext.h */
-#define g_OID_equal(o1,o2) \
-   (((o1)->length == (o2)->length) && \
-    (memcmp((o1)->elements,(o2)->elements,(int) (o1)->length) == 0))
+#if 0 /* SUNW15resync - on Solaris g_OID_equal is in gssapi_ext.h */
+#define	g_OID_equal(o1, o2) \
+	(((o1)->length == (o2)->length) && \
+	(memcmp((o1)->elements, (o2)->elements, (o1)->length) == 0))
 #endif
 
 /* this code knows that an int on the wire is 32 bits.  The type of
@@ -102,7 +98,7 @@ typedef uint64_t gssint_uint64;
    (ptr) += 2;
 
 #define TWRITE_STR(ptr, str, len) \
-   (void) memcpy((ptr), (char *) (str), (len)); \
+  (void) memcpy((ptr), (char *) (str), (len));	\
    (ptr) += (len);
 
 #define TREAD_STR(ptr, str, len) \
@@ -135,39 +131,80 @@ typedef uint64_t gssint_uint64;
 
 /** helper functions **/
 
-typedef struct _g_set *g_set;
+/* hide names from applications, especially glib applications */
+#define	g_set_init		gssint_g_set_init
+#define	g_set_destroy		gssint_g_set_destroy
+#define	g_set_entry_add		gssint_g_set_entry_add
+#define	g_set_entry_delete	gssint_g_set_entry_delete
+#define	g_set_entry_get		gssint_g_set_entry_get
+#define	g_save_name		gssint_g_save_name
+#define	g_save_cred_id		gssint_g_save_cred_id
+#define	g_save_ctx_id		gssint_g_save_ctx_id
+#define	g_save_lucidctx_id	gssint_g_save_lucidctx_id
+#define	g_validate_name		gssint_g_validate_name
+#define	g_validate_cred_id	gssint_g_validate_cred_id
+#define	g_validate_ctx_id	gssint_g_validate_ctx_id
+#define	g_validate_lucidctx_id	gssint_g_validate_lucidctx_id
+#define	g_delete_name		gssint_g_delete_name
+#define	g_delete_cred_id	gssint_g_delete_cred_id
+#define	g_delete_ctx_id		gssint_g_delete_ctx_id
+#define	g_delete_lucidctx_id	gssint_g_delete_lucidctx_id
+#define	g_make_string_buffer	gssint_g_make_string_buffer
+#define	g_token_size		gssint_g_token_size
+#define	g_make_token_header	gssint_g_make_token_header
+#define	g_verify_token_header	gssint_g_verify_token_header
+#define	g_display_major_status	gssint_g_display_major_status
+#define	g_display_com_err_status gssint_g_display_com_err_status
+#define	g_order_init		gssint_g_order_init
+#define	g_order_check		gssint_g_order_check
+#define	g_order_free		gssint_g_order_free
+#define	g_queue_size		gssint_g_queue_size
+#define	g_queue_externalize	gssint_g_queue_externalize
+#define	g_queue_internalize	gssint_g_queue_internalize
+#define	g_canonicalize_host	gssint_g_canonicalize_host
+#define	g_local_host_name	gssint_g_local_host_name
+#define	g_strdup		gssint_g_strdup
 
-int g_set_init (g_set *s);
-int g_set_destroy (g_set *s);
-int g_set_entry_add (g_set *s, void *key, void *value);
-int g_set_entry_delete (g_set *s, void *key);
-int g_set_entry_get (g_set *s, void *key, void **value);
+typedef struct _g_set_elt *g_set_elt;
+typedef struct {
+    k5_mutex_t mutex;
+    void *data;
+} g_set;
+#define G_SET_INIT { K5_MUTEX_PARTIAL_INITIALIZER, 0 }
 
-int g_save_name (void **vdb, gss_name_t name);
-int g_save_cred_id (void **vdb, gss_cred_id_t cred);
-int g_save_ctx_id (void **vdb, gss_ctx_id_t ctx);
+int g_set_init (g_set_elt *s);
+int g_set_destroy (g_set_elt *s);
+int g_set_entry_add (g_set_elt *s, void *key, void *value);
+int g_set_entry_delete (g_set_elt *s, void *key);
+int g_set_entry_get (g_set_elt *s, void *key, void **value);
 
-int g_validate_name (void **vdb, gss_name_t name);
-int g_validate_cred_id (void **vdb, gss_cred_id_t cred);
-int g_validate_ctx_id (void **vdb, gss_ctx_id_t ctx);
+int g_save_name (g_set *vdb, gss_name_t name);
+int g_save_cred_id (g_set *vdb, gss_cred_id_t cred);
+int g_save_ctx_id (g_set *vdb, gss_ctx_id_t ctx);
+int g_save_lucidctx_id (g_set *vdb, void *lctx);
 
-int g_delete_name (void **vdb, gss_name_t name);
-int g_delete_cred_id (void **vdb, gss_cred_id_t cred);
-int g_delete_ctx_id (void **vdb, gss_ctx_id_t ctx);
+int g_validate_name (g_set *vdb, gss_name_t name);
+int g_validate_cred_id (g_set *vdb, gss_cred_id_t cred);
+int g_validate_ctx_id (g_set *vdb, gss_ctx_id_t ctx);
+int g_validate_lucidctx_id (g_set *vdb, void *lctx);
+
+int g_delete_name (g_set *vdb, gss_name_t name);
+int g_delete_cred_id (g_set *vdb, gss_cred_id_t cred);
+int g_delete_ctx_id (g_set *vdb, gss_ctx_id_t ctx);
+int g_delete_lucidctx_id (g_set *vdb, void *lctx);
 
 int g_make_string_buffer (const char *str, gss_buffer_t buffer);
 
-int g_copy_OID_set (const gss_OID_set_desc * const in, gss_OID_set *out);
+unsigned int g_token_size (const gss_OID_desc * mech, unsigned int body_size);
 
-int g_token_size (gss_OID mech, unsigned int body_size);
-
-void g_make_token_header (gss_OID mech, int body_size,
+void g_make_token_header (const gss_OID_desc * mech, unsigned int body_size,
 			  unsigned char **buf, int tok_type);
 
-gss_int32 g_verify_token_header (gss_OID mech, unsigned int *body_size,
-                                 unsigned char **buf, int tok_type,
-                                 unsigned int toksize_in,
-                                 int wrapper_required);
+gss_int32 g_verify_token_header (const gss_OID_desc * mech, 
+				 unsigned int *body_size,
+				 unsigned char **buf, int tok_type, 
+				 unsigned int toksize_in,
+				 int wrapper_required);
 
 OM_uint32 g_display_major_status (OM_uint32 *minor_status,
 				 OM_uint32 status_value,
@@ -179,7 +216,7 @@ OM_uint32 g_display_com_err_status (OM_uint32 *minor_status,
 				   gss_buffer_t status_string);
 
 gss_int32 g_order_init (void **queue, gssint_uint64 seqnum,
-                                  int do_replay, int do_sequence, int wide);
+				  int do_replay, int do_sequence, int wide);
 
 gss_int32 g_order_check (void **queue, gssint_uint64 seqnum);
 
@@ -191,12 +228,61 @@ gss_uint32 g_queue_externalize(void *vqueue, unsigned char **buf,
 gss_uint32 g_queue_internalize(void **vqueue, unsigned char **buf,
 			       size_t *lenremain);
 
-char *g_local_host_name (void);
-
 char *g_strdup (char *str);
 
-#ifdef __cplusplus
-}
-#endif
+/** declarations of internal name mechanism functions **/
+
+#if 0 /* SUNW15resync - mved to mglueP.h for sake of non-krb5 mechs */
+OM_uint32 generic_gss_release_buffer
+(OM_uint32*,       /* minor_status */
+            gss_buffer_t      /* buffer */
+           );
+
+OM_uint32 generic_gss_release_oid_set
+(OM_uint32*,       /* minor_status */
+            gss_OID_set*      /* set */
+           );
+
+OM_uint32 generic_gss_release_oid
+(OM_uint32*,       /* minor_status */
+            gss_OID*         /* set */
+           );
+
+OM_uint32 generic_gss_copy_oid
+(OM_uint32 *,	/* minor_status */
+            gss_OID_desc * const,   /* oid */ /* SUNW15resync */
+	    gss_OID *		/* new_oid */
+	    );
+
+OM_uint32 generic_gss_create_empty_oid_set
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_set *	/* oid_set */
+	   );
+
+OM_uint32 generic_gss_add_oid_set_member
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* member_oid */
+	    gss_OID_set *	/* oid_set */
+	   );
+
+OM_uint32 generic_gss_test_oid_set_member
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* member */
+	    gss_OID_set,	/* set */
+	    int *		/* present */
+	   );
+
+OM_uint32 generic_gss_oid_to_str
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* oid */
+	    gss_buffer_t	/* oid_str */
+	   );
+
+OM_uint32 generic_gss_str_to_oid
+(OM_uint32 *,	/* minor_status */
+	    gss_buffer_t,	/* oid_str */
+	    gss_OID *		/* oid */
+	   );
+#endif /* 0 */
 
 #endif /* _GSSAPIP_GENERIC_H_ */

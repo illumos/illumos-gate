@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,12 @@
 
 /*
  * $Id: util_ordering.c,v 1.4 1996/10/21 20:17:11 tytso Exp $
+ */
+
+/*
+ * SUNW15resync
+ * Left this alone (MIT version causes STC gss_verify_mic(6) test failure)
+ * as it has bug fixes that MIT does not yet.
  */
 
 /*

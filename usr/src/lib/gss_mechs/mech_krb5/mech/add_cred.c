@@ -1,8 +1,3 @@
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -13,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -27,18 +22,18 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  */
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -49,15 +44,13 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <gssapiP_krb5.h>
-#include <gssapiP_generic.h>
-#include <k5-int.h>
+#include "gssapiP_krb5.h"
 #ifdef HAVE_STRING_H
 #include <string.h>
 #else
@@ -65,19 +58,16 @@
 #endif
 
 /*
- * $Id: add_cred.c,v 1.2.6.2 2000/05/03 20:00:26 raeburn Exp $
+ * $Id: add_cred.c 18015 2006-05-17 05:26:12Z raeburn $
  */
 
 /* V2 interface */
-/*ARGSUSED*/
 OM_uint32
-krb5_gss_add_cred(ct, minor_status, input_cred_handle,
+krb5_gss_add_cred(minor_status, input_cred_handle,
 		  desired_name, desired_mech, cred_usage,
 		  initiator_time_req, acceptor_time_req,
-		  output_cred_handle, actual_mechs,
+		  output_cred_handle, actual_mechs, 
 		  initiator_time_rec, acceptor_time_rec)
-
-    void *		ct;
     OM_uint32		*minor_status;
     gss_cred_id_t	input_cred_handle;
     gss_name_t		desired_name;
@@ -90,13 +80,10 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
     OM_uint32		*initiator_time_rec;
     OM_uint32		*acceptor_time_rec;
 {
-    krb5_context	context = ct;
-    OM_uint32		lifetime;
+    krb5_context	context;
+    OM_uint32		major_status, lifetime;
     krb5_gss_cred_id_t	cred;
     krb5_error_code	code;
-    OM_uint32 		major_status = GSS_S_FAILURE;
-
-    *minor_status = 0;
 
     /* this is pretty simple, since there's not really any difference
        between the underlying mechanisms.  The main hair is in copying
@@ -104,8 +91,7 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 
     /* check if the desired_mech is bogus */
 
-    if (!g_OID_equal(desired_mech, gss_mech_krb5_v2) &&
-	!g_OID_equal(desired_mech, gss_mech_krb5) &&
+    if (!g_OID_equal(desired_mech, gss_mech_krb5) &&
 	!g_OID_equal(desired_mech, gss_mech_krb5_old)) {
 	*minor_status = 0;
 	return(GSS_S_BAD_MECH);
@@ -129,22 +115,21 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	return(GSS_S_DUPLICATE_ELEMENT);
     }
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, (krb5_context*) &context)))
-	return(GSS_S_FAILURE);
-#endif
+    code = krb5_gss_init_context(&context);
+    if (code) {
+	*minor_status = code;
+	return GSS_S_FAILURE;
+    }
 
-    mutex_lock(&krb5_mutex);
-
-    /* verify the credential */
-    if (GSS_ERROR(major_status = krb5_gss_validate_cred_no_lock(&context,
-	minor_status, input_cred_handle))) {
-	goto unlock;
+    major_status = krb5_gss_validate_cred_1(minor_status, input_cred_handle,
+					    context);
+    if (GSS_ERROR(major_status)) {
+	krb5_free_context(context);
+	return major_status;
     }
 
     cred = (krb5_gss_cred_id_t) input_cred_handle;
+    k5_mutex_assert_locked(&cred->lock);
 
     /* check if the cred_usage is equal or "less" than the passed-in cred
        if copying */
@@ -152,9 +137,9 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
     if (!((cred->usage == cred_usage) ||
 	  ((cred->usage == GSS_C_BOTH) &&
 	   (output_cred_handle != NULL)))) {
-	*minor_status = (OM_uint32) G_BAD_USAGE;
-	major_status = GSS_S_FAILURE;
-	goto unlock;
+      *minor_status = (OM_uint32) G_BAD_USAGE;
+      krb5_free_context(context);
+      return(GSS_S_FAILURE);
     }
 
     /* check that desired_mech isn't already in the credential */
@@ -162,8 +147,13 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
     if ((g_OID_equal(desired_mech, gss_mech_krb5_old) && cred->prerfc_mech) ||
 	(g_OID_equal(desired_mech, gss_mech_krb5) && cred->rfc_mech)) {
 	*minor_status = 0;
-	major_status = GSS_S_DUPLICATE_ELEMENT;
-	goto unlock;
+	krb5_free_context(context);
+	return(GSS_S_DUPLICATE_ELEMENT);
+    }
+
+    if (GSS_ERROR(kg_sync_ccache_name(context, minor_status))) {
+	krb5_free_context(context);
+	return GSS_S_FAILURE;
     }
 
     /* verify the desired_name */
@@ -172,8 +162,8 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
     if ((desired_name != (gss_name_t) NULL) &&
 	(! kg_validate_name(desired_name))) {
 	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
-	major_status = (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
-	goto unlock;
+	krb5_free_context(context);
+	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
     }
 
     /* make sure the desired_name is the same as the existing one */
@@ -182,8 +172,8 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	!krb5_principal_compare(context, (krb5_principal) desired_name,
 				cred->princ)) {
 	*minor_status = 0;
-	major_status = GSS_S_BAD_NAME;
-	goto unlock;
+	krb5_free_context(context);
+	return(GSS_S_BAD_NAME);
     }
 
     /* copy the cred if necessary */
@@ -199,8 +189,8 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	     (krb5_gss_cred_id_t) xmalloc(sizeof(krb5_gss_cred_id_rec)))
 	    == NULL) {
 	    *minor_status = ENOMEM;
-	    major_status = GSS_S_FAILURE;
-	    goto unlock;
+	    krb5_free_context(context);
+	    return(GSS_S_FAILURE);
 	}
 	memset(new_cred, 0, sizeof(krb5_gss_cred_id_rec));
 	
@@ -209,48 +199,54 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	new_cred->rfc_mech = cred->rfc_mech;
 	new_cred->tgt_expire = cred->tgt_expire;
 
-	if (code = krb5_copy_principal(context, cred->princ,
-				       &new_cred->princ)) {
-	    free(new_cred);
+	if (cred->princ)
+	    code = krb5_copy_principal(context, cred->princ, &new_cred->princ);
+	if (code) {
+	    xfree(new_cred);
 
 	    *minor_status = code;
-	    major_status = GSS_S_FAILURE;
-	    goto unlock;
+	    krb5_free_context(context);
+	    return(GSS_S_FAILURE);
 	}
-	
+	    
 	if (cred->keytab) {
 	    kttype = krb5_kt_get_type(context, cred->keytab);
 	    if ((strlen(kttype)+2) > sizeof(ktboth)) {
-		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		if (new_cred->princ)
+		    krb5_free_principal(context, new_cred->princ);
+		xfree(new_cred);
 
 		*minor_status = ENOMEM;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		krb5_free_context(context);
+		return(GSS_S_FAILURE);
 	    }
 
 	    strncpy(ktboth, kttype, sizeof(ktboth) - 1);
 	    ktboth[sizeof(ktboth) - 1] = '\0';
 	    strncat(ktboth, ":", sizeof(ktboth) - 1 - strlen(ktboth));
 
-	    code = krb5_kt_get_name(context, cred->keytab,
-		ktboth+strlen(ktboth), sizeof(ktboth)-strlen(ktboth));
+	    code = krb5_kt_get_name(context, cred->keytab, 
+				    ktboth+strlen(ktboth),
+				    sizeof(ktboth)-strlen(ktboth));
 	    if (code) {
-		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		if(new_cred->princ)
+		    krb5_free_principal(context, new_cred->princ);
+		xfree(new_cred);
 
 		*minor_status = code;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		krb5_free_context(context);
+		return(GSS_S_FAILURE);
 	    }
 
-	    if (code = krb5_kt_resolve(context, ktboth, &new_cred->keytab)) {
+	    code = krb5_kt_resolve(context, ktboth, &new_cred->keytab);
+	    if (code) {
+		if (new_cred->princ)
 		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		xfree(new_cred);
 
 		*minor_status = code;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		krb5_free_context(context);
+		return(GSS_S_FAILURE);
 	    }
 	} else {
 	    new_cred->keytab = NULL;
@@ -263,12 +259,13 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 					       &new_cred->rcache))) {
 		if (new_cred->keytab)
 		    krb5_kt_close(context, new_cred->keytab);
-		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		if (new_cred->princ)
+		    krb5_free_principal(context, new_cred->princ);
+		xfree(new_cred);
 
+		krb5_free_context(context);
 		*minor_status = code;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		return(GSS_S_FAILURE);
 	    }
 	} else {
 	    new_cred->rcache = NULL;
@@ -283,12 +280,13 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 		    krb5_rc_close(context, new_cred->rcache);
 		if (new_cred->keytab)
 		    krb5_kt_close(context, new_cred->keytab);
+		if (new_cred->princ)
 		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		xfree(new_cred);
 
+		krb5_free_context(context);
 		*minor_status = ENOMEM;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		return(GSS_S_FAILURE);
 	    }
 
 	    strncpy(ccboth, cctype, sizeof(ccboth) - 1);
@@ -296,17 +294,19 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	    strncat(ccboth, ":", sizeof(ccboth) - 1 - strlen(ccboth));
 	    strncat(ccboth, ccname, sizeof(ccboth) - 1 - strlen(ccboth));
 
-	    if (code = krb5_cc_resolve(context, ccboth, &new_cred->ccache)) {
+	    code = krb5_cc_resolve(context, ccboth, &new_cred->ccache);
+	    if (code) {
 		if (new_cred->rcache)
 		    krb5_rc_close(context, new_cred->rcache);
 		if (new_cred->keytab)
 		    krb5_kt_close(context, new_cred->keytab);
-		krb5_free_principal(context, new_cred->princ);
-		free(new_cred);
+		if (new_cred->princ)
+		    krb5_free_principal(context, new_cred->princ);
+		xfree(new_cred);
+		krb5_free_context(context);
 
 		*minor_status = code;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
+		return(GSS_S_FAILURE);
 	    }
 	} else {
 	    new_cred->ccache = NULL;
@@ -321,12 +321,13 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 		krb5_rc_close(context, new_cred->rcache);
 	    if (new_cred->keytab)
 		krb5_kt_close(context, new_cred->keytab);
+	    if (new_cred->princ)
 	    krb5_free_principal(context, new_cred->princ);
-	    free(new_cred);
+	    xfree(new_cred);
+	    krb5_free_context(context);
 
 	    *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-	    major_status = GSS_S_FAILURE;
-	    goto unlock;
+	    return(GSS_S_FAILURE);
 	}
 
 	/* modify new_cred */
@@ -343,18 +344,17 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 
     /* set the outputs */
 
-    major_status = krb5_gss_inquire_cred_no_lock(&context, minor_status, 
-					    (gss_cred_id_t)cred,
-					   NULL, &lifetime,
-					   NULL, actual_mechs);
-
-    if (GSS_ERROR(major_status)) {
+    if (GSS_ERROR(major_status = krb5_gss_inquire_cred(minor_status, 
+						       (gss_cred_id_t) cred,
+						       NULL, &lifetime,
+						       NULL, actual_mechs))) {
 	OM_uint32 dummy;
 	
 	if (output_cred_handle)
-	    (void) krb5_gss_release_cred_no_lock(&context, &dummy, (gss_cred_id_t *) &cred);
+	    (void) krb5_gss_release_cred(&dummy, (gss_cred_id_t *) &cred);
+	krb5_free_context(context);
 
-		goto unlock;
+	return(major_status);
     }
 
     if (initiator_time_rec)
@@ -363,12 +363,9 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	*acceptor_time_rec = lifetime;
 
     if (output_cred_handle)
-	*output_cred_handle = (gss_cred_id_t)cred;
+      *output_cred_handle = (gss_cred_id_t) cred;
 
+    krb5_free_context(context);
     *minor_status = 0;
-    major_status = GSS_S_COMPLETE;
-
-unlock:
-    mutex_unlock(&krb5_mutex);
-    return(major_status);
+    return(GSS_S_COMPLETE);
 }

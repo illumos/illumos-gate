@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,19 +77,29 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
+#include "gssapiP_krb5.h"
 
-/*
- * $Id: wrap_size_limit.c,v 1.7.6.2 2000/04/19 00:33:42 raeburn Exp $
- */
+size_t KRB5_CALLCONV krb5_encrypt_size(size_t, krb5_enctype);
+
+ /* SUNW15resync - XXX find new home for this func */
+#ifdef _KERNEL
+size_t KRB5_CALLCONV
+krb5_encrypt_size(size_t length, krb5_enctype crypto)
+{
+    size_t ret;
+
+    if (krb5_c_encrypt_length(/* XXX */ 0, crypto, length, &ret))
+	/*LINTED*/
+        return(-1); /* XXX */
+
+    return(ret);
+}
+#endif
 
 /* V2 interface */
- /*ARGSUSED*/
 OM_uint32
-krb5_gss_wrap_size_limit(ct, minor_status, context_handle, conf_req_flag,
+krb5_gss_wrap_size_limit(minor_status, context_handle, conf_req_flag,
 			 qop_req, req_output_size, max_input_size)
-    void		*ct;
     OM_uint32		*minor_status;
     gss_ctx_id_t	context_handle;
     int			conf_req_flag;
@@ -97,118 +107,93 @@ krb5_gss_wrap_size_limit(ct, minor_status, context_handle, conf_req_flag,
     OM_uint32		req_output_size;
     OM_uint32		*max_input_size;
 {
-    krb5_context	context;
     krb5_gss_ctx_id_rec	*ctx;
-    OM_uint32		conflen;
+    OM_uint32		data_size, conflen;
     OM_uint32		ohlen;
-    OM_uint32		data_size;
+    int			overhead;
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, &context)))
-       return(GSS_S_FAILURE);
-#endif
-
-    KRB5_LOG0(KRB5_INFO, "krb5_gss_wrap_size_limit() start\n");
-
-    /* check to make sure we aren't writing to a NULL pointer */
+    /* Solaris Kerb - check to make sure we aren't writing to a NULL pointer */
     if (!max_input_size)
-	return(GSS_S_CALL_INACCESSIBLE_WRITE);
-
-    mutex_lock(&krb5_mutex);
-    context = ct;
+ 	return(GSS_S_CALL_INACCESSIBLE_WRITE);
 
     /* only default qop is allowed */
+    /*
+     * SUNW15resync
+     * mit 1.2-6: if (qop_req != GSS_C_QOP_DEFAULT) {
+     * Go with Solaris version here, though not sure which is
+     * correct and RFC 2743 does not make it clear.
+     */
     if ((qop_req & GSS_KRB5_CONF_C_QOP_MASK) != GSS_C_QOP_DEFAULT) {
 	*minor_status = (OM_uint32) G_UNKNOWN_QOP;
-	mutex_unlock(&krb5_mutex); 
-	return(GSS_S_BAD_QOP);
+	/* SUNW15resync - RFC 2743 is clear here but 
+          this is still GSS_S_FAILURE in MIT */
+	return(GSS_S_BAD_QOP); 
     }
-
+    
     /* validate the context handle */
     if (! kg_validate_ctx_id(context_handle)) {
 	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
-	mutex_unlock(&krb5_mutex);
 	return(GSS_S_NO_CONTEXT);
     }
-
+    
     ctx = (krb5_gss_ctx_id_rec *) context_handle;
     if (! ctx->established) {
 	*minor_status = KG_CTX_INCOMPLETE;
-	mutex_unlock(&krb5_mutex);
 	return(GSS_S_NO_CONTEXT);
     }
 
     if (ctx->proto == 1) {
-        /* No pseudo-ASN.1 wrapper overhead, so no sequence length and
-           OID.  */
-        OM_uint32 sz = req_output_size;
-        if (conf_req_flag) {
-	    size_t enclen;
-	    if ( (*minor_status = krb5_c_encrypt_length(context,
-				ctx->enc->enctype,
-				sz, &enclen))) {
-		mutex_unlock(&krb5_mutex);
-		return (GSS_S_FAILURE);
-	    }
-	    /*
-	     * The 16 byte token header is included 2 times,
-	     * once at the beginning of the token and once
-	     * encrypted with the plaintext data.
-	     */
-            while (sz > 0 && enclen + 32 > req_output_size) {
-                sz--;
-	        if ((*minor_status = krb5_c_encrypt_length(context,
-			ctx->enc->enctype, sz, &enclen))) {
-			mutex_unlock(&krb5_mutex);
-			return (GSS_S_FAILURE);
-		}
-	    }
-        } else {
-            if (sz < 16 + ctx->cksum_size)
-                sz = 0;
-            else
-                sz -= (16 + ctx->cksum_size);
-        }
+	/* No pseudo-ASN.1 wrapper overhead, so no sequence length and
+	   OID.  */
+	OM_uint32 sz = req_output_size;
+	/* Token header: 16 octets.  */
+	if (conf_req_flag) {
+	    while (sz > 0 && krb5_encrypt_size(sz, ctx->enc->enctype) + 16 > req_output_size)
+		sz--;
+	    /* Allow for encrypted copy of header.  */
+	    if (sz > 16)
+		sz -= 16;
+	    else
+		sz = 0;
+#ifdef CFX_EXERCISE
+	    /* Allow for EC padding.  In the MIT implementation, only
+	       added while testing.  */
+	    if (sz > 65535)
+		sz -= 65535;
+	    else
+		sz = 0;
+#endif
+	} else {
+	    /* Allow for token header and checksum.  */
+	    if (sz < 16 + ctx->cksum_size)
+		sz = 0;
+	    else
+		sz -= (16 + ctx->cksum_size);
+	}
 
-        *max_input_size = sz;
-        *minor_status = 0;
-	goto end;
+	*max_input_size = sz;
+	*minor_status = 0;
+	return GSS_S_COMPLETE;
     }
 
+    /* Calculate the token size and subtract that from the output size */
+    overhead = 7 + ctx->mech_used->length;
     data_size = req_output_size;
+    conflen = kg_confounder_size(ctx->k5_context, ctx->enc);
+    data_size = (conflen + data_size + 8) & (~(OM_uint32)7);
+    ohlen = g_token_size(ctx->mech_used,
+			 (unsigned int) (data_size + ctx->cksum_size + 14))
+      - req_output_size;
 
-    /* The confounder is always used */
-    conflen = kg_confounder_size(context, ctx->enc);
-    data_size = (conflen + data_size + 8) & (~7);
-
-    /*
-     * If we are encrypting, check the size, it may be larger than
-     * the input in some cases due to padding and byte-boundaries.
-     */
-    if (conf_req_flag) {
-	    data_size = kg_encrypt_size(context, ctx->enc, data_size);
-    }
-
-    /*
-     * Calculate the token size for a buffer that is 'req_output_size'
-     * long.
-     */
-    ohlen = g_token_size(&(ctx->mech_used),
-			(unsigned int)(data_size + ctx->cksum_size + 14)) -
-	    req_output_size;
-
-    KRB5_LOG1(KRB5_INFO, "ohlen = %u, req_output_size = %u.\n",
-	ohlen, req_output_size);
-
-    *max_input_size = (req_output_size > ohlen) ?
-	    ((req_output_size - ohlen) & (~7)) : 0;
+    if (ohlen+overhead < req_output_size)
+      /*
+       * Cannot have trailer length that will cause us to pad over our
+       * length.
+       */
+      *max_input_size = (req_output_size - ohlen - overhead) & (~(OM_uint32)7);
+    else
+      *max_input_size = 0;
 
     *minor_status = 0;
-end:
-    mutex_unlock(&krb5_mutex);
-    KRB5_LOG(KRB5_INFO, "krb5_gss_wrap_size_limit() end, "
-	"max_input_size = %u.\n", *max_input_size);
     return(GSS_S_COMPLETE);
 }

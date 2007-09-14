@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,71 +27,104 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
+#include "mglueP.h"  /* SUNW15resync - for KGSS_ macros */
 
 /*
- * $Id: delete_sec_context.c,v 1.15 1998/10/30 02:54:17 marc Exp $
+ * $Id: delete_sec_context.c 16465 2004-06-16 02:37:23Z tlyu $
  */
 
+
+#ifdef	 _KERNEL
+/* SUNW15resync - todo - unify these kernel rel oid funcs with user spc ones */
+
 OM_uint32
-krb5_gss_delete_sec_context(ct,
-			minor_status,
-			context_handle,
-			output_token
-#ifdef	 _KERNEL
-		, gssd_ctx_verifier
-#endif
-			)
-    void *ct;
-    OM_uint32 *minor_status;
-    gss_ctx_id_t *context_handle;
-    gss_buffer_t output_token;
-#ifdef	 _KERNEL
-    OM_uint32 gssd_ctx_verifier;
-#endif
+krb5_gss_internal_release_oid(minor_status, oid)
+    OM_uint32	*minor_status;
+    gss_OID	*oid;
 {
-   OM_uint32 major_status = GSS_S_FAILURE;
-
-   mutex_lock(&krb5_mutex);
-
-   major_status = krb5_gss_delete_sec_context_no_lock(ct, minor_status,
-	   context_handle, output_token
-#ifdef   _KERNEL
-           , gssd_ctx_verifier
-#endif
-	   );
-   mutex_unlock(&krb5_mutex);
-   return(major_status);
-
+    /*
+     * This function only knows how to release internal OIDs. It will
+     * return GSS_S_CONTINUE_NEEDED for any OIDs it does not recognize.
+     */
+   
+    if ((*oid != gss_mech_krb5) &&
+	(*oid != gss_mech_krb5_old) &&
+	(*oid != gss_mech_krb5_wrong) &&
+	(*oid != gss_nt_krb5_name) &&
+	(*oid != gss_nt_krb5_principal)) {
+	/* We don't know about this OID */
+	return(GSS_S_CONTINUE_NEEDED);
+    }
+    else {
+	*oid = GSS_C_NO_OID;
+	*minor_status = 0;
+	return(GSS_S_COMPLETE);
+    }
 }
+
+OM_uint32
+generic_gss_release_oid(minor_status, oid)
+    OM_uint32	*minor_status;
+    gss_OID	*oid;
+{
+    if (minor_status)
+	*minor_status = 0;
+
+    if (*oid == GSS_C_NO_OID)
+	return(GSS_S_COMPLETE);
+
+
+    if ((*oid != GSS_C_NT_USER_NAME) &&
+	(*oid != GSS_C_NT_MACHINE_UID_NAME) &&
+	(*oid != GSS_C_NT_STRING_UID_NAME) &&
+	(*oid != GSS_C_NT_HOSTBASED_SERVICE) &&
+	(*oid != GSS_C_NT_ANONYMOUS) &&
+	(*oid != GSS_C_NT_EXPORT_NAME) &&
+	(*oid != gss_nt_service_name)) {
+	FREE((*oid)->elements, (*oid)->length);
+	FREE(*oid, sizeof(gss_OID_desc));
+    }
+    *oid = GSS_C_NO_OID;
+    return(GSS_S_COMPLETE);
+}
+
+OM_uint32
+krb5_gss_release_oid(minor_status, oid)
+    OM_uint32	*minor_status;
+    gss_OID	*oid;
+{
+
+    if (krb5_gss_internal_release_oid(minor_status, oid) != GSS_S_COMPLETE) {
+	/* Pawn it off on the generic routine */
+	return(generic_gss_release_oid(minor_status, oid));
+    }
+    else {
+	*oid = GSS_C_NO_OID;
+	*minor_status = 0;
+	return(GSS_S_COMPLETE);
+    }
+}
+#endif
 
 /*ARGSUSED*/
 OM_uint32
-krb5_gss_delete_sec_context_no_lock(ct,
-			minor_status,
-			context_handle,
-			output_token
+krb5_gss_delete_sec_context(minor_status,
+			    context_handle,
+			    output_token
 #ifdef	 _KERNEL
-		, gssd_ctx_verifier
+			    , gssd_ctx_verifier
 #endif
-			)
-     void *ct;
+			    )
      OM_uint32 *minor_status;
      gss_ctx_id_t *context_handle;
      gss_buffer_t output_token;
 #ifdef	 _KERNEL
-	OM_uint32 gssd_ctx_verifier;
+     OM_uint32 gssd_ctx_verifier;
 #endif
 {
-   krb5_context context = ct;
+   krb5_context context;
    krb5_gss_ctx_id_rec *ctx;
-   OM_uint32 major_status = GSS_S_FAILURE;
-
-   /* Solaris Kerberos:  we use the global kg_context for MT safe */
-#if 0
-   if (GSS_ERROR(kg_get_context(minor_status, &context)))
-      return(GSS_S_FAILURE);
-#endif
 
    if (output_token) {
       output_token->length = 0;
@@ -101,28 +134,30 @@ krb5_gss_delete_sec_context_no_lock(ct,
    /*SUPPRESS 29*/
    if (*context_handle == GSS_C_NO_CONTEXT) {
       *minor_status = 0;
-      major_status = GSS_S_COMPLETE;
-      goto out;
+      return(GSS_S_COMPLETE);
    }
 
    /*SUPPRESS 29*/
    /* validate the context handle */
    if (! kg_validate_ctx_id(*context_handle)) {
       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      major_status = GSS_S_NO_CONTEXT;
-      goto out;
+      return(GSS_S_NO_CONTEXT);
    }
+
+   ctx = (krb5_gss_ctx_id_t) *context_handle;
+   context = ctx->k5_context;
 
    /* construct a delete context token if necessary */
 
    if (output_token) {
+      OM_uint32 major;
       gss_buffer_desc empty;
       empty.length = 0; empty.value = NULL;
 
-      if ((major_status = kg_seal(context, minor_status, *context_handle, 0,
+      if ((major = kg_seal(minor_status, *context_handle, 0,
 			   GSS_C_QOP_DEFAULT,
 			   &empty, NULL, output_token, KG_TOK_DEL_CTX)))
-	 goto out;
+	 return(major);
    }
 
    /* invalidate the context handle */
@@ -130,8 +165,6 @@ krb5_gss_delete_sec_context_no_lock(ct,
    (void)kg_delete_ctx_id(*context_handle);
 
    /* free all the context state */
-
-   ctx = (krb5_gss_ctx_id_rec *) *context_handle;
 
    if (ctx->seqstate)
       g_order_free(&(ctx->seqstate));
@@ -149,25 +182,23 @@ krb5_gss_delete_sec_context_no_lock(ct,
    if (ctx->subkey)
       krb5_free_keyblock(context, ctx->subkey);
    if (ctx->acceptor_subkey)
-      krb5_free_keyblock(context, ctx->acceptor_subkey);
+       krb5_free_keyblock(context, ctx->acceptor_subkey);
 
-/* We never import the auth_context into the kernel */
+   /* We never import the auth_context into the kernel */
 #ifndef _KERNEL
    if (ctx->auth_context) {
-       (void)krb5_auth_con_setrcache(context, ctx->auth_context, NULL);
+       if (ctx->cred_rcache)
+	   (void)krb5_auth_con_setrcache(context, ctx->auth_context, NULL);
+
        krb5_auth_con_free(context, ctx->auth_context);
    }
 #endif
 
-  /* Solaris Kerberos:  the mech_used element of this structure
-   * is the actual gss_OID_desc type in gssapiP_krb5.h, and not 
-   * a gss_OID_desc * type, in particular, the gss_release_oid
-   * is not needed, as the oid is memset to zero below, then freed.
-   */
-  if (ctx->mech_used.length) {
-	xfree_wrap(ctx->mech_used.elements, ctx->mech_used.length);
-        /* gss_release_oid(minor_status, &(ctx->mech_used)); */
-  }	 
+   if (ctx->mech_used)
+       (void) KGSS_RELEASE_OID(minor_status, &ctx->mech_used);
+
+   if (ctx->k5_context)
+       krb5_free_context(ctx->k5_context);
 
    /* Zero out context */
    (void) memset(ctx, 0, sizeof(*ctx));
@@ -178,7 +209,5 @@ krb5_gss_delete_sec_context_no_lock(ct,
    *context_handle = GSS_C_NO_CONTEXT;
 
    *minor_status = 0;
-   major_status = GSS_S_COMPLETE;
-out:
-   return(major_status);
+   return(GSS_S_COMPLETE);
 }

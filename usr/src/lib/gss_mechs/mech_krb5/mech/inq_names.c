@@ -1,8 +1,3 @@
-/*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -35,36 +30,24 @@
 /*
  * inq_names.c - Return set of nametypes supported by the KRB5 mechanism.
  */
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
+#include "mglueP.h"
 
-/*ARGSUSED*/
 OM_uint32
-krb5_gss_inquire_names_for_mech(ctx, minor_status, mechanism, name_types)
-    void	*ctx;
+krb5_gss_inquire_names_for_mech(minor_status, mechanism, name_types)
     OM_uint32	*minor_status;
     gss_OID	mechanism;
     gss_OID_set	*name_types;
 {
     OM_uint32	major, minor;
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, &context)))
-       return(GSS_S_FAILURE);
-#endif
-
-    mutex_lock(&krb5_mutex);
-
     /*
      * We only know how to handle our own mechanism.
      */
     if ((mechanism != GSS_C_NULL_OID) &&
-	!g_OID_equal(gss_mech_krb5_v2, mechanism) &&
 	!g_OID_equal(gss_mech_krb5, mechanism) &&
 	!g_OID_equal(gss_mech_krb5_old, mechanism)) {
 	*minor_status = 0;
-	mutex_unlock(&krb5_mutex);
 	return(GSS_S_BAD_MECH);
     }
 
@@ -73,40 +56,38 @@ krb5_gss_inquire_names_for_mech(ctx, minor_status, mechanism, name_types)
     if (major == GSS_S_COMPLETE) {
 	/* Now add our members. */
 	if (
-	    /* The following are GSS specified nametypes */
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) GSS_C_NT_USER_NAME,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_user_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) GSS_C_NT_MACHINE_UID_NAME,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_machine_uid_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) GSS_C_NT_STRING_UID_NAME,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_string_uid_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) GSS_C_NT_HOSTBASED_SERVICE,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_service_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-		/* The following are kerberos only nametypes */
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) gss_nt_service_name_v2,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_service_name_v2,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) gss_nt_exported_name,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						     gss_nt_exported_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE) &&
-	    ((major = gss_add_oid_set_member(minor_status,
-					     (gss_OID) gss_nt_krb5_name,
-					     name_types)
+	    ((major = generic_gss_add_oid_set_member(minor_status,
+						    (const gss_OID) gss_nt_krb5_name,
+						     name_types)
 	      ) == GSS_S_COMPLETE)
 	    ) {
-	    major = gss_add_oid_set_member(minor_status,
-					   (gss_OID) gss_nt_krb5_principal,
-					   name_types);
+	    major = generic_gss_add_oid_set_member(minor_status,
+						(const gss_OID) gss_nt_krb5_principal,
+						   name_types);
 	}
 
 	/*
@@ -117,6 +98,5 @@ krb5_gss_inquire_names_for_mech(ctx, minor_status, mechanism, name_types)
 	    (void) gss_release_oid_set(&minor,
 				       name_types);
     }
-    mutex_unlock(&krb5_mutex);
     return(major);
 }

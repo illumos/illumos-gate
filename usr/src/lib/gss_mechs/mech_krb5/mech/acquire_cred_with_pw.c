@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include "gss_libinit.h"
 #include <gssapiP_krb5.h>
 #include <k5-int.h>
 
@@ -203,12 +204,11 @@ out:
 
 /*ARGSUSED*/
 OM_uint32
-krb5_gss_acquire_cred_with_password_no_lock(ctx, minor_status,
+krb5_gss_acquire_cred_with_password(minor_status,
 				desired_name, password, time_req,
 				desired_mechs, cred_usage,
 				output_cred_handle, actual_mechs,
 				time_rec)
-void *ctx;
 OM_uint32 *minor_status;
 gss_name_t desired_name;
 const gss_buffer_t password;
@@ -228,15 +228,20 @@ OM_uint32 *time_rec;
 	OM_uint32 ret;
 	krb5_error_code code;
 
-#if 0
-	if (GSS_ERROR(kg_get_context(minor_status, &context)))
-		return (GSS_S_FAILURE);
-#endif
-
-	context = ctx;
-
 	if (desired_name == GSS_C_NO_NAME)
 		return (GSS_S_BAD_NAME);
+
+	code = gssint_initialize_library();
+	if (code) {
+		*minor_status = code;
+		return (GSS_S_FAILURE);
+	}
+
+	code = krb5_gss_init_context(&context);
+	if (code) {
+		*minor_status = code;
+		return (GSS_S_FAILURE);
+	}
 
 	/* make sure all outputs are valid */
 
@@ -249,6 +254,7 @@ OM_uint32 *time_rec;
 	/* validate the name */
 	if (!kg_validate_name(desired_name)) {
 		*minor_status = (OM_uint32) G_VALIDATE_FAILED;
+		krb5_free_context(context);
 		return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
 	}
 
@@ -276,6 +282,7 @@ OM_uint32 *time_rec;
 
 		if (!req_old && !req_new) {
 			*minor_status = 0;
+			krb5_free_context(context);
 			return (GSS_S_BAD_MECH);
 		}
 	}
@@ -284,13 +291,13 @@ OM_uint32 *time_rec;
 	if ((cred = (krb5_gss_cred_id_t)
 		    xmalloc(sizeof (krb5_gss_cred_id_rec))) == NULL) {
 		*minor_status = ENOMEM;
+		krb5_free_context(context);
 		return (GSS_S_FAILURE);
 	}
 	memset(cred, 0, sizeof (krb5_gss_cred_id_rec));
 
 	cred->usage = cred_usage;
 	cred->princ = NULL;
-	cred->actual_mechs = valid_mechs;
 	cred->prerfc_mech = req_old;
 	cred->rfc_mech = req_new;
 
@@ -302,6 +309,7 @@ OM_uint32 *time_rec;
 			(cred_usage != GSS_C_BOTH)) {
 		xfree(cred);
 		*minor_status = (OM_uint32) G_BAD_USAGE;
+		krb5_free_context(context);
 		return (GSS_S_FAILURE);
 	}
 
@@ -319,6 +327,7 @@ OM_uint32 *time_rec;
 			if (cred->princ)
 				krb5_free_principal(context, cred->princ);
 			xfree(cred);
+			krb5_free_context(context);
 			/* minor_status set by acquire_accept_cred() */
 			return (ret);
 		}
@@ -340,6 +349,7 @@ OM_uint32 *time_rec;
 			if (cred->princ)
 				krb5_free_principal(context, cred->princ);
 			xfree(cred);
+			krb5_free_context(context);
 			/* minor_status set by acquire_init_cred() */
 			return (ret);
 		}
@@ -355,6 +365,7 @@ OM_uint32 *time_rec;
 				(void) krb5_kt_close(context, cred->keytab);
 			xfree(cred);
 			*minor_status = code;
+			krb5_free_context(context);
 			return (GSS_S_FAILURE);
 		}
 
@@ -377,6 +388,7 @@ OM_uint32 *time_rec;
 				krb5_free_principal(context, cred->princ);
 			xfree(cred);
 			*minor_status = code;
+			krb5_free_context(context);
 			return (GSS_S_FAILURE);
 		}
 
@@ -405,6 +417,7 @@ OM_uint32 *time_rec;
 			if (cred->princ)
 				krb5_free_principal(context, cred->princ);
 			xfree(cred);
+			krb5_free_context(context);
 			/* (*minor_status) set above */
 			return (ret);
 		}
@@ -423,12 +436,14 @@ OM_uint32 *time_rec;
 		if (cred->princ)
 			krb5_free_principal(context, cred->princ);
 		xfree(cred);
+		krb5_free_context(context);
 		*minor_status = (OM_uint32) G_VALIDATE_FAILED;
 		return (GSS_S_FAILURE);
 	}
 
-	/* return success */
+	krb5_free_context(context);
 
+	/* return success */
 	*minor_status = 0;
 	*output_cred_handle = (gss_cred_id_t)cred;
 	if (actual_mechs)
@@ -436,6 +451,7 @@ OM_uint32 *time_rec;
 	return (GSS_S_COMPLETE);
 }
 
+/*ARGSUSED*/
 OM_uint32
 gssspi_acquire_cred_with_password(ctx, minor_status, desired_name,
 		password, time_req, desired_mechs, cred_usage,
@@ -453,10 +469,8 @@ OM_uint32 *time_rec;
 {
 	OM_uint32 ret;
 
-	mutex_lock(&krb5_mutex);
-	ret = krb5_gss_acquire_cred_with_password_no_lock(ctx, minor_status,
+	ret = krb5_gss_acquire_cred_with_password(minor_status,
 			desired_name, password, time_req, desired_mechs,
 			cred_usage, output_cred_handle, actual_mechs, time_rec);
-	mutex_unlock(&krb5_mutex);
 	return (ret);
 }

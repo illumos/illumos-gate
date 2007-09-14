@@ -1,4 +1,10 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Copyright 1995 by OpenVision Technologies, Inc.
  * 
@@ -22,26 +28,27 @@
  */
 
 /*
- * $Id: util_set.c,v 1.1 1996/04/12 00:39:41 marc Exp $
+ * $Id: util_set.c 16165 2004-03-14 05:31:43Z raeburn $
  */
 
-#include <mechglueP.h>
-#include <gssapiP_generic.h>
+#include <mechglueP.h>  /* SUNW15resync - for MALLOC/FREE */
+#include "gssapiP_generic.h"
 
-struct _g_set {
+struct _g_set_elt {
    void *key;
    void *value;
-   struct _g_set *next;
+   struct _g_set_elt *next;
 };
 
-int g_set_init(g_set *s)
+int g_set_init(g_set_elt *s)
 {
    *s = NULL;
 
    return(0);
 }
 
-int g_set_destroy(g_set *s)
+#if 0
+int g_set_destroy(g_set_elt *s)
 {
    g_set next;
 
@@ -53,12 +60,13 @@ int g_set_destroy(g_set *s)
 
    return(0);
 }
+#endif
 
-int g_set_entry_add(g_set *s, void *key, void *value)
+int g_set_entry_add(g_set_elt *s, void *key, void *value)
 {
-   g_set first;
+   g_set_elt first;
 
-   if ((first = (struct _g_set *) MALLOC(sizeof(struct _g_set))) == NULL)
+   if ((first = (struct _g_set_elt *) MALLOC(sizeof(struct _g_set_elt))) == NULL)
       return(ENOMEM);
 
    first->key = key;
@@ -70,14 +78,14 @@ int g_set_entry_add(g_set *s, void *key, void *value)
    return(0);
 }
 
-int g_set_entry_delete(g_set *s, void *key)
+int g_set_entry_delete(g_set_elt *s, void *key)
 {
-   g_set *p;
+   g_set_elt *p;
 
    for (p=s; *p; p = &((*p)->next)) {
       if ((*p)->key == key) {
-	 g_set next = (*p)->next;
-	 FREE(*p, sizeof(struct _g_set));
+	 g_set_elt next = (*p)->next;
+	 FREE(*p, sizeof(struct _g_set_elt));
 	 *p = next;
 
 	 return(0);
@@ -87,9 +95,9 @@ int g_set_entry_delete(g_set *s, void *key)
    return(-1);
 }
 
-int g_set_entry_get(g_set *s, void *key, void **value)
+int g_set_entry_get(g_set_elt *s, void *key, void **value)
 {
-   g_set p;
+   g_set_elt p;
 
    for (p = *s; p; p = p->next) {
       if (p->key == key) {

@@ -1,13 +1,8 @@
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- *
+ * 
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +12,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- *
+ * 
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -28,28 +23,28 @@
  */
 
 /*
- * $Id: disp_com_err_status.c,v 1.5 1996/07/22 20:32:59 marc Exp $
+ * $Id: disp_com_err_status.c 16391 2004-06-02 23:40:12Z raeburn $
  */
 
-#include <gssapiP_generic.h>
-#include <com_err.h>
+#include "gssapiP_generic.h"
+#include "com_err.h"
+#include "gss_libinit.h"
 
-/*
- * Solaris Kerberos does not dynamically load the error tables
- */
-#if 0
-static int init_et = 0;
-#endif
+/* XXXX internationalization!! */
+
+/**/
+
 static const char * const no_error = "No error";
 
-/*
- * if status_type == GSS_C_GSS_CODE, return up to three error messages,
- * for routine errors, call error, and status, in that order.
- * message_context == 0 : print the routine error
- * message_context == 1 : print the calling error
- * message_context > 2  : print supplementary info bit (message_context-2)
- * if status_type == GSS_C_MECH_CODE, return the output from error_message()
- */
+/**/
+
+/* if status_type == GSS_C_GSS_CODE, return up to three error messages,
+     for routine errors, call error, and status, in that order.
+     message_context == 0 : print the routine error
+     message_context == 1 : print the calling error
+     message_context > 2  : print supplementary info bit (message_context-2)
+   if status_type == GSS_C_MECH_CODE, return the output from error_message()
+   */
 
 OM_uint32
 g_display_com_err_status(minor_status, status_value, status_string)
@@ -60,13 +55,7 @@ g_display_com_err_status(minor_status, status_value, status_string)
    status_string->length = 0;
    status_string->value = NULL;
 
-/* Solaris Kerberos does not dynamically load the error tables */
-#if 0
-   if (!init_et) {
-      initialize_ggss_error_table();
-      init_et = 1;
-   }
-#endif
+   (void) gssint_initialize_library();
 
    if (! g_make_string_buffer(((status_value == 0)?no_error:
 			       error_message(status_value)),

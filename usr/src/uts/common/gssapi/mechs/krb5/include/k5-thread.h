@@ -37,9 +37,35 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifndef _KERNEL   /* SUNW14resync, mimic k5-int.h ? */
+#ifdef _KERNEL
+
+#include <sys/ksynch.h>
+
+typedef kmutex_t k5_mutex_t;
+
+#define K5_MUTEX_PARTIAL_INITIALIZER {0}
+
+/* ARGSUSED */
+static void k5_mutex_assert_locked(k5_mutex_t *m) { }
+
+static int
+k5_mutex_lock(k5_mutex_t *m)
+{
+  mutex_enter(m);
+  return (0);
+}
+
+static int
+k5_mutex_unlock(k5_mutex_t *m)
+{
+  mutex_exit(m);
+  return(0);
+}
+
+
+#else /* _KERNEL */
+
 #include "autoconf.h"
-#endif
 
 #ifndef KRB5_CALLCONV
 # define KRB5_CALLCONV
@@ -788,5 +814,8 @@ extern int  KRB5_CALLCONV krb5int_mutex_unlock (k5_mutex_t *);
 #undef k5_mutex_unlock
 #define k5_mutex_unlock krb5int_mutex_unlock
 #endif
+
+#endif /* _KERNEL */
+
 
 #endif /* multiple inclusion? */

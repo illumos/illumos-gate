@@ -1,5 +1,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
+  * Copyright2001 by the Massachusetts Institute of Technology.
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
  * Permission to use, copy, modify, distribute, and sell this software
@@ -21,10 +23,11 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
+#include "k5-int.h"
 
 /*
- * $Id: util_seqnum.c,v 1.9.6.1 2000/05/31 17:17:39 raeburn Exp $
+ * $Id: util_seqnum.c 15007 2002-11-15 16:12:20Z epeisach $
  */
 
 krb5_error_code
@@ -38,22 +41,23 @@ kg_make_seq_num(context, key, direction, seqnum, cksum, buf)
 {
    unsigned char plain[8];
 
-   plain[4] = (unsigned char) direction;
-   plain[5] = (unsigned char) direction;
-   plain[6] = (unsigned char) direction;
-   plain[7] = (unsigned char) direction;
+   plain[4] = direction;
+   plain[5] = direction;
+   plain[6] = direction;
+   plain[7] = direction;
    if (key->enctype == ENCTYPE_ARCFOUR_HMAC ) {
-	/* Yes, Microsoft used big-endian sequence number.*/
-	plain[0] = (seqnum>>24) & 0xff;
-	plain[1] = (seqnum>>16) & 0xff;
-	plain[2] = (seqnum>>8) & 0xff;
-	plain[3] = seqnum & 0xff;
-	return kg_arcfour_docrypt (context, key, 0,
+     /* Yes, Microsoft used big-endian sequence number.*/
+     plain[0] = (seqnum>>24) & 0xff;
+     plain[1] = (seqnum>>16) & 0xff;
+     plain[2] = (seqnum>>8) & 0xff;
+     plain[3] = seqnum & 0xff;
+     return kg_arcfour_docrypt (context, key, 0, 
 				cksum, 8,
 				&plain[0], 8,
 				buf);
-
+     
    }
+     
    plain[0] = (unsigned char) (seqnum&0xff);
    plain[1] = (unsigned char) ((seqnum>>8)&0xff);
    plain[2] = (unsigned char) ((seqnum>>16)&0xff);
@@ -73,13 +77,16 @@ krb5_error_code kg_get_seq_num(context, key, cksum, buf, direction, seqnum)
    krb5_error_code code;
    unsigned char plain[8];
 
-   if (key->enctype == ENCTYPE_ARCFOUR_HMAC)
-	code = kg_arcfour_docrypt (context, key, 0,
-			cksum, 8, buf, 8, plain);
-   else
-   	code = kg_decrypt(context, key, KG_USAGE_SEQ, cksum, buf, plain, 8);
+   if (key->enctype == ENCTYPE_ARCFOUR_HMAC) {
+     code = kg_arcfour_docrypt (context, key, 0,
+				cksum, 8,
+				buf, 8,
+				plain);
+   } else {
+     code = kg_decrypt(context, key, KG_USAGE_SEQ, cksum, buf, plain, 8);
+   }
    if (code)
-	return (code);
+      return(code);
 
    if ((plain[4] != plain[5]) ||
        (plain[4] != plain[6]) ||
@@ -87,14 +94,14 @@ krb5_error_code kg_get_seq_num(context, key, cksum, buf, direction, seqnum)
       return((krb5_error_code) KG_BAD_SEQ);
 
    *direction = plain[4];
-
-   if (key->enctype == ENCTYPE_ARCFOUR_HMAC)
-	*seqnum = (plain[3]|(plain[2]<<8) | (plain[1]<<16)| (plain[0]<<24));
-   else
-        *seqnum = ((plain[0]) |
+   if (key->enctype == ENCTYPE_ARCFOUR_HMAC) {
+     *seqnum = (plain[3]|(plain[2]<<8) | (plain[1]<<16)| (plain[0]<<24));
+   } else {
+     *seqnum = ((plain[0]) |
 	      (plain[1]<<8) |
 	      (plain[2]<<16) |
 	      (plain[3]<<24));
+   }
 
    return(0);
 }

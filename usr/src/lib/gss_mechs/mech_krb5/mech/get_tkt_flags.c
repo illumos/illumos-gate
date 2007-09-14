@@ -1,4 +1,5 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -21,14 +22,14 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
 
 /*
- * $Id: get_tkt_flags.c,v 1.7.4.1 1996/11/21 02:19:40 marc Exp $
+ * $Id: get_tkt_flags.c 18131 2006-06-14 22:27:54Z tlyu $
  */
 
-OM_uint32
-gss_krb5_get_tkt_flags(minor_status, context_handle, ticket_flags)
+OM_uint32 KRB5_CALLCONV 
+gss_krb5int_get_tkt_flags(minor_status, context_handle, ticket_flags)
      OM_uint32 *minor_status;
      gss_ctx_id_t context_handle;
      krb5_flags *ticket_flags;

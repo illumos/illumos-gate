@@ -25,7 +25,7 @@ usr/src/lib/gss_mechs/mech_dummy/mech/dmech.c
 usr/src/lib/gss_mechs/mech_krb5/Makefile
 usr/src/lib/gss_mechs/mech_krb5/crypto/des/afsstring2key.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/des/string2key.c
-usr/src/lib/gss_mechs/mech_krb5/mech/k5mech.c
+usr/src/lib/gss_mechs/mech_krb5/mech/krb5_gss_glue.c
 usr/src/lib/gss_mechs/mech_spnego/Makefile
 usr/src/lib/gss_mechs/mech_spnego/mech/spnego_mech.c
 usr/src/lib/libgss/Makefile

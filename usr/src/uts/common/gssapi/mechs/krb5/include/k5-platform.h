@@ -430,4 +430,18 @@ load_64_le (unsigned char *p)
     return ((UINT64_TYPE)load_32_le(p+4) << 32) | load_32_le(p);
 }
 
+
+/* Make the interfaces to getpwnam and getpwuid consistent.
+   Model the wrappers on the POSIX thread-safe versions, but
+   use the unsafe system versions if the safe ones don't exist
+   or we can't figure out their interfaces.  */
+/* SUNW15resync - just have Solaris relevant ones */
+
+#define k5_getpwnam_r(NAME, REC, BUF, BUFSIZE, OUT)  \
+         (*(OUT) = getpwnam_r(NAME,REC,BUF,BUFSIZE), *(OUT) == NULL ? -1 : 0)
+
+#define k5_getpwuid_r(UID, REC, BUF, BUFSIZE, OUT)  \
+        (*(OUT) = getpwuid_r(UID,REC,BUF,BUFSIZE), *(OUT) == NULL ? -1 : 0)
+
+
 #endif /* K5_PLATFORM_H */

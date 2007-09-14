@@ -1,4 +1,5 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -21,11 +22,10 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
-
-/*
- * $Id: util_seed.c,v 1.13.6.1 2000/05/31 17:17:39 raeburn Exp $
- */
+#include "gssapiP_krb5.h"
+#ifdef HAVE_MEMORY_H
+#include <memory.h>
+#endif
 
 static unsigned char zeros[16] = {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 
@@ -39,7 +39,8 @@ kg_make_seed(context, key, seed)
    krb5_keyblock *tmpkey;
    int i;
 
-   if (code = krb5_copy_keyblock(context, key, &tmpkey))
+   code = krb5_copy_keyblock(context, key, &tmpkey);
+   if (code)
       return(code);
 
    /* reverse the key bytes, as per spec */

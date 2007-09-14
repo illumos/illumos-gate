@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,7 +8,7 @@
 /*
  * lib/gssapi/krb5/import_sec_context.c
  *
- * Copyright 1995 by the Massachusetts Institute of Technology.
+ * Copyright 1995,2004 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -35,21 +35,22 @@
 /*
  * import_sec_context.c	- Internalize the security context.
  */
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
-#include <gssapi/gssapi.h>
+#include "gssapiP_krb5.h"
+/* for serialization initialization functions */
+#include "k5-int.h"
+#include "mglueP.h"  /* SUNW15resync - for KGSS_ macros */
+
+#ifdef	 _KERNEL
+extern OM_uint32 kgss_release_oid(OM_uint32 *, gss_OID *);
+#endif
+
 
 /*
  * Fix up the OID of the mechanism so that uses the static version of
  * the OID if possible.
- *
- * Solaris Kerberos: this is not necessary.  Our mech_used is allocated
- * as part of the context structure.  This function attempts to point to
- * the corresponding gss_OID in the array krb5_gss_oid_array.
  */
-#if 0
-gss_OID_desc krb5_gss_convert_static_mech_oid(oid)
-     gss_OID	FAR oid;
+gss_OID krb5_gss_convert_static_mech_oid(oid)
+     gss_OID	oid;
 {
 	const gss_OID_desc 	*p;
 	OM_uint32		minor_status;
@@ -57,17 +58,34 @@ gss_OID_desc krb5_gss_convert_static_mech_oid(oid)
 	for (p = krb5_gss_oid_array; p->length; p++) {
 		if ((oid->length == p->length) &&
 		    (memcmp(oid->elements, p->elements, p->length) == 0)) {
-			gss_release_oid(&minor_status, &oid);
-			return *p;
+		        (void) KGSS_RELEASE_OID(&minor_status, &oid);
+			return (gss_OID) p;
 		}
 	}
-	return *oid;
+	return oid;
 }
+
+krb5_error_code
+krb5_gss_ser_init (krb5_context context)
+{
+    krb5_error_code code;
+    static krb5_error_code (KRB5_CALLCONV *const fns[])(krb5_context) = {
+	krb5_ser_auth_context_init,
+#ifndef _KERNEL
+	krb5_ser_context_init,
+	krb5_ser_ccache_init, krb5_ser_rcache_init, krb5_ser_keytab_init,
 #endif
+    };
+    int i;
+
+    for (i = 0; i < sizeof(fns)/sizeof(fns[0]); i++)
+	if ((code = (fns[i])(context)) != 0)
+	    return code;
+    return 0;
+}
 
 OM_uint32
-krb5_gss_import_sec_context(ct, minor_status, interprocess_token, context_handle)
-    void		*ct;
+krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
     OM_uint32		*minor_status;
     gss_buffer_t	interprocess_token;
     gss_ctx_id_t	*context_handle;
@@ -78,16 +96,22 @@ krb5_gss_import_sec_context(ct, minor_status, interprocess_token, context_handle
     krb5_gss_ctx_id_t	ctx;
     krb5_octet		*ibp;
 
-   /* Solaris Kerberos:  we use the global kg_context for MT safe */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, &context)))
-       return(GSS_S_FAILURE);
-#endif
+    /* This is a bit screwy.  We create a krb5 context because we need
+       one when calling the serialization code.  However, one of the
+       objects we're unpacking is a krb5 context, so when we finish,
+       we can throw this one away.  */
+    kret = KGSS_INIT_CONTEXT(&context);
+    if (kret) {
+	*minor_status = kret;
+	return GSS_S_FAILURE;
+    }
 
-    KRB5_LOG0(KRB5_INFO, "krb5_gss_import_sec_context() start\n");
-
-    mutex_lock(&krb5_mutex);
-    context = ct;
+    kret = krb5_gss_ser_init(context);
+    if (kret) {
+	krb5_free_context(context);
+	*minor_status = kret;
+	return GSS_S_FAILURE;
+    }
 
     /* Assume a tragic failure */
     ctx = (krb5_gss_ctx_id_t) NULL;
@@ -96,56 +120,39 @@ krb5_gss_import_sec_context(ct, minor_status, interprocess_token, context_handle
     /* Internalize the context */
     ibp = (krb5_octet *) interprocess_token->value;
     blen = (size_t) interprocess_token->length;
-    if ((kret = kg_ctx_internalize(context,
-				   (krb5_pointer *) &ctx,
-				   &ibp, &blen))) {
+    kret = kg_ctx_internalize(context, (krb5_pointer *) &ctx, &ibp, &blen);
+    /*
+     * SUNW15resync
+     *
+     *    krb5_free_context(context);
+     * Previous versions of MIT(1.2ish)/Solaris did not serialize the
+     * k5_context but MIT 1.5 does.  But we don't need all the userspace
+     * junk in the kernel so we continue to not serialize it.
+     * So we keep this context live here (see it's use in kg_ctx_internalize)
+     * and it will get freed by delete_sec_context.
+     */
+    if (kret) {
+       krb5_free_context(context);
        *minor_status = (OM_uint32) kret;
-       mutex_unlock(&krb5_mutex);
-       
-       KRB5_LOG(KRB5_ERR, "krb5_gss_import_sec_context() end,"
-		"kg_ctx_internalize() error kret = %d\n", kret);
-
-       if (kret == ENOMEM)
-           return(GSS_S_FAILURE);
-       else
-           return(GSS_S_DEFECTIVE_TOKEN);
+       return(GSS_S_FAILURE);
     }
 
     /* intern the context handle */
     if (! kg_save_ctx_id((gss_ctx_id_t) ctx)) {
-       (void)krb5_gss_delete_sec_context_no_lock(context, minor_status, 
+       (void)krb5_gss_delete_sec_context(minor_status, 
 					 (gss_ctx_id_t *) &ctx, NULL
 #ifdef _KERNEL
-					,0  /* gssd_ctx_verifier */
+ 					,0  /* gssd_ctx_verifier */
 #endif
 					);
        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-       mutex_unlock(&krb5_mutex);
-
-       KRB5_LOG0(KRB5_ERR, "krb5_gss_import_sec_context() end,"
-		"kg_save_ctx_id() error\n");
-
        return(GSS_S_FAILURE);
     }
-    if (! kg_validate_ctx_id((gss_ctx_id_t) ctx)) {
-       *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-        mutex_unlock(&krb5_mutex);
 
-	KRB5_LOG0(KRB5_ERR, "krb5_gss_import_sec_context() end,"
-		"kg_validate_ctx_id() error\n");
-
-        return(GSS_S_FAILURE);
-    }
-
-    /* Solaris Kerberos:  our mech_used is part of the ctx structure */
-    /* ctx->mech_used = krb5_gss_convert_static_mech_oid(&(ctx->mech_used)); */
-
+    ctx->mech_used = krb5_gss_convert_static_mech_oid(ctx->mech_used);
+    
     *context_handle = (gss_ctx_id_t) ctx;
 
     *minor_status = 0;
-    mutex_unlock(&krb5_mutex);
-
-    KRB5_LOG0(KRB5_INFO, "krb5_gss_import_sec_context() end\n");
-
     return (GSS_S_COMPLETE);
 }

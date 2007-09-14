@@ -1,11 +1,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
  * Permission to use, copy, modify, distribute, and sell this software
@@ -28,10 +23,10 @@
  */
 
 /*
- * $Id: util_buffer.c,v 1.6 1996/07/22 20:33:19 marc Exp $
+ * $Id: util_buffer.c 11001 1998-10-30 02:56:35Z marc $
  */
 
-#include <gssapiP_generic.h>
+#include "gssapiP_generic.h"
 #include <string.h>
 
 /* return nonzero on success, 0 on failure

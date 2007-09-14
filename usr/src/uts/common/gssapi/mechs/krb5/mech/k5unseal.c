@@ -394,7 +394,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 	}
 
 	if ((code = kg_encrypt(context, ctx->seq, KG_USAGE_SEAL,
-			       (g_OID_equal(&ctx->mech_used, gss_mech_krb5_old) ?
+			       (g_OID_equal(ctx->mech_used, gss_mech_krb5_old) ?
 				ctx->seq->contents : NULL),
 			       md5cksum.contents, md5cksum.contents, 16))) {
 	    xfree_wrap(md5cksum.contents, md5cksum.length);
@@ -638,9 +638,8 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
    conf_state is only valid if SEAL. */
 
 OM_uint32
-kg_unseal(context, minor_status, context_handle, input_token_buffer,
+kg_unseal(minor_status, context_handle, input_token_buffer,
 	  message_buffer, conf_state, qop_state, toktype)
-    krb5_context context;
     OM_uint32 *minor_status;
     gss_ctx_id_t context_handle;
     gss_buffer_t input_token_buffer;
@@ -696,7 +695,7 @@ kg_unseal(context, minor_status, context_handle, input_token_buffer,
 	}
     else
         toktype2 = toktype;
-    err = g_verify_token_header(&ctx->mech_used,
+    err = g_verify_token_header(ctx->mech_used,
 				(uint32_t *)&bodysize, &ptr, toktype2,
 				input_token_buffer->length,
 				!ctx->proto);
@@ -708,12 +707,12 @@ kg_unseal(context, minor_status, context_handle, input_token_buffer,
 
 
     if (ctx->proto == 0) {
-	err = kg_unseal_v1(context, minor_status, ctx, ptr, bodysize,
+	err = kg_unseal_v1(ctx->k5_context, minor_status, ctx, ptr, bodysize,
 			    message_buffer, conf_state, qop_state,
 			    toktype);
 
     } else {
-	err = gss_krb5int_unseal_token_v3(context, minor_status, ctx,
+	err = gss_krb5int_unseal_token_v3(ctx->k5_context, minor_status, ctx,
                                            ptr, bodysize, message_buffer,
                                            conf_state, qop_state, toktype);
     }

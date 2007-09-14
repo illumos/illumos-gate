@@ -1,7 +1,7 @@
 /* EXPORT DELETE START */
 
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,21 +29,21 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
 
 /*
- * $Id: unseal.c,v 1.10 1996/07/22 20:34:37 marc Exp $
+ * $Id: unseal.c 16171 2004-03-15 17:45:01Z raeburn $
  */
+
 /*ARGSUSED*/
 OM_uint32
-krb5_gss_unseal(ctx, minor_status, context_handle,
+krb5_gss_unseal(minor_status, context_handle,
 		input_message_buffer, output_message_buffer,
 		conf_state, qop_state
 #ifdef	 _KERNEL
-		, gssd_ctx_verifier
+ 		, gssd_ctx_verifier
 #endif
-	)
-     void	*ctx;
+		)
      OM_uint32 *minor_status;
      gss_ctx_id_t context_handle;
      gss_buffer_t input_message_buffer;
@@ -51,45 +51,19 @@ krb5_gss_unseal(ctx, minor_status, context_handle,
      int *conf_state;
      int *qop_state;
 #ifdef	 _KERNEL
-	OM_uint32 gssd_ctx_verifier;
+     OM_uint32 gssd_ctx_verifier;
 #endif
 {
-   krb5_context context;
-   OM_uint32	status;
-
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-   if (GSS_ERROR(kg_get_context(minor_status, &context)))
-      return(GSS_S_FAILURE);
-#endif
-
-   mutex_lock(&krb5_mutex);
-   context = ctx;
-   status  = kg_unseal(context, minor_status, context_handle,
+     return(kg_unseal(minor_status, context_handle,
 		    input_message_buffer, output_message_buffer,
-		    conf_state, qop_state, KG_TOK_SEAL_MSG);
-   mutex_unlock(&krb5_mutex);
-#ifdef	KRB5_NO_PRIVACY
-	/*
-	 * Can't be paranoid enough;
-	 * if someone plugs in their version of kg_unseal
-	 * that does decryption we want to 
-	 * disallow that too.
-	*/
-	if (conf_state && *conf_state) 
-   		return (GSS_S_FAILURE);
-#endif
-   return(status);
+		    conf_state, qop_state, KG_TOK_SEAL_MSG));
 }
 
 /* V2 interface */
-/*ARGSUSED*/
 OM_uint32
-krb5_gss_unwrap(ctx, minor_status, context_handle,
+krb5_gss_unwrap(minor_status, context_handle,
 		input_message_buffer, output_message_buffer,
 		conf_state, qop_state)
-    void		*ctx;
     OM_uint32		*minor_status;
     gss_ctx_id_t	context_handle;
     gss_buffer_t	input_message_buffer;
@@ -98,29 +72,18 @@ krb5_gss_unwrap(ctx, minor_status, context_handle,
     gss_qop_t		*qop_state;
 {
 #ifdef	KRB5_NO_PRIVACY
-   return (GSS_S_FAILURE);
+    return (GSS_S_FAILURE);
 #else
-   OM_uint32		rstat;
-   int			qstate;
-   krb5_context context;
+    OM_uint32		rstat;
+    int			qstate;
 
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, &context)))
-       return(GSS_S_FAILURE);
-#endif
-
-   mutex_lock(&krb5_mutex);
-   context = ctx;
-
-   rstat = kg_unseal(context, minor_status, context_handle,
-		      input_message_buffer, output_message_buffer,
-		      conf_state, &qstate, KG_TOK_WRAP_MSG);
-   if (!rstat && qop_state)
+    rstat = kg_unseal(minor_status, context_handle,
+		    input_message_buffer, output_message_buffer,
+		    conf_state, &qstate, KG_TOK_WRAP_MSG);
+    if (!rstat && qop_state)
 	*qop_state = (gss_qop_t) qstate;
-   mutex_unlock(&krb5_mutex);
-   return(rstat);
+    return(rstat);
 #endif
 }
+
 /* EXPORT DELETE END */

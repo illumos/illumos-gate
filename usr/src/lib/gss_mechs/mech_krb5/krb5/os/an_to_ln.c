@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -721,14 +721,18 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
             if (strncmp(krb5_princ_component(context, aname, 1)->data,
 			def_realm, realm_length) ||
 		realm_length !=
-		    krb5_princ_component(context, aname, 1)->length)
+		    krb5_princ_component(context, aname, 1)->length) {
 		    /* XXX an_to_ln_realm_chk ? */
+		free(def_realm);
                 return KRB5_LNAME_NOTRANS;
+	    }
         }
-        else
+        else {
            /* no components or more than one component to non-realm part of name
            --no translation. */
+	    free(def_realm);
             return KRB5_LNAME_NOTRANS;
+	}
     }
 
     free(def_realm);

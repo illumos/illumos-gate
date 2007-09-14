@@ -36,6 +36,7 @@
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+
 /* local functions */
 static gss_OID_set create_actual_mechs(const gss_OID, int);
 

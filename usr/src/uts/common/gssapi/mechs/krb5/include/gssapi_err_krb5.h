@@ -1,5 +1,5 @@
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,6 +26,7 @@
 #define KG_BAD_SEQ                               (39756043L)
 #define KG_EMPTY_CCACHE                          (39756044L)
 #define KG_NO_CTYPES                             (39756045L)
+#define KG_LUCID_VERSION                         (39756046L)
 #define ERROR_TABLE_BASE_k5g (39756032L)
 
 /* for compatibility with older versions... */

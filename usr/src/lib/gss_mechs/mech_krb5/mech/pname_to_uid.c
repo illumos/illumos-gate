@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,29 +33,32 @@
  * GSS_S_FAILURE is returned on failure.
  */
 OM_uint32
-krb5_pname_to_uid(ctxt, minor,  pname, uidOut)
-void * ctxt;
+krb5_pname_to_uid(minor,  pname, uidOut)
 OM_uint32 *minor;
 const gss_name_t pname;
 uid_t *uidOut;
 {
-	krb5_context context = (krb5_context)ctxt;
+	krb5_context context;
 	char lname[256];
 	struct passwd	*pw;
 	krb5_error_code stat;
 
-	mutex_lock(&krb5_mutex);
 	if (! kg_validate_name(pname))
 	{
-		mutex_unlock(&krb5_mutex);
 		*minor = (OM_uint32) G_VALIDATE_FAILED;
 		return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
 	}
 
+	stat = krb5_init_context(&context);
+	if (stat) {
+		*minor = stat;
+		return GSS_S_FAILURE;
+	}
+
 	stat = krb5_aname_to_localname(context, (krb5_principal) pname,
 				    sizeof (lname), lname);
-	mutex_unlock(&krb5_mutex);
-
+	krb5_free_context(context);
+	context = NULL;
 	if (stat)
 		return (GSS_S_FAILURE);
 

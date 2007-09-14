@@ -57,7 +57,7 @@
 #include <k5-int.h>
 
 static krb5_error_code
-make_seal_token_v1 PROTOTYPE((krb5_context context,
+make_seal_token_v1 (krb5_context context,
 			      krb5_keyblock *enc,
 			      krb5_keyblock *seq,
 			      gssint_uint64 *seqnum,
@@ -70,7 +70,7 @@ make_seal_token_v1 PROTOTYPE((krb5_context context,
 			      int encrypt,
 			      int toktype,
 			      int bigend,
-			      gss_OID oid));
+			      gss_OID oid);
 
 static krb5_error_code
 make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
@@ -398,9 +398,8 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
    and do not encode the ENC_TYPE, MSG_LENGTH, or MSG_TEXT fields */
 
 OM_uint32
-kg_seal(context, minor_status, context_handle, conf_req_flag, qop_req,
+kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
 	input_message_buffer, conf_state, output_message_buffer, toktype)
-    krb5_context context;
     OM_uint32 *minor_status;
     gss_ctx_id_t context_handle;
     int conf_req_flag;
@@ -413,6 +412,7 @@ kg_seal(context, minor_status, context_handle, conf_req_flag, qop_req,
     krb5_gss_ctx_id_rec *ctx;
     krb5_error_code code;
     krb5_timestamp now;
+    krb5_context context;
 
     KRB5_LOG0(KRB5_INFO, "kg_seal() start");
 
@@ -446,6 +446,7 @@ kg_seal(context, minor_status, context_handle, conf_req_flag, qop_req,
 	return(GSS_S_NO_CONTEXT);
     }
 
+    context = ctx->k5_context;
     if ((code = krb5_timeofday(context, &now))) {
 	*minor_status = code;
 	KRB5_LOG(KRB5_ERR, "kg_seal() end, krb5_timeofday() error code=%d\n", code);
@@ -460,7 +461,7 @@ kg_seal(context, minor_status, context_handle, conf_req_flag, qop_req,
                                   input_message_buffer, output_message_buffer,
                                   ctx->signalg, ctx->cksum_size, ctx->sealalg,
                                   conf_req_flag, toktype, ctx->big_endian,
-                                  &ctx->mech_used);
+                                  ctx->mech_used);
 	break;
     case 1:
 	code = gss_krb5int_make_seal_token_v3(context, ctx,

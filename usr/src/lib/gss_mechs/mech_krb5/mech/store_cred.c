@@ -87,33 +87,9 @@ cleanup:
 }
 
 OM_uint32
-krb5_gss_store_cred(ct, minor_status, input_cred, cred_usage, desired_mech,
-			overwrite_cred, default_cred, elements_stored,
-			cred_usage_stored)
-void *ct;
-OM_uint32 *minor_status;
-const gss_cred_id_t input_cred;
-gss_cred_usage_t cred_usage;
-gss_OID desired_mech;
-OM_uint32 overwrite_cred;
-OM_uint32 default_cred;
-gss_OID_set *elements_stored;
-gss_cred_usage_t *cred_usage_stored;
-{
-	OM_uint32 ret;
-	mutex_lock(&krb5_mutex);
-	ret = krb5_gss_store_cred_no_lock(ct, minor_status, input_cred,
-			cred_usage, desired_mech, overwrite_cred, default_cred,
-			elements_stored, cred_usage_stored);
-	mutex_unlock(&krb5_mutex);
-	return (ret);
-}
-
-OM_uint32
-krb5_gss_store_cred_no_lock(ct, minor_status, input_cred, cred_usage,
+krb5_gss_store_cred(minor_status, input_cred, cred_usage,
 		desired_mech, overwrite_cred, default_cred, elements_stored,
 		cred_usage_stored)
-void *ct;
 OM_uint32 *minor_status;
 const gss_cred_id_t input_cred;
 gss_cred_usage_t cred_usage;
@@ -124,7 +100,7 @@ gss_OID_set *elements_stored;
 gss_cred_usage_t *cred_usage_stored;
 {
 	OM_uint32 maj, maj2, min;
-	krb5_context ctx = (krb5_context)ct;
+	krb5_context ctx = NULL;
 	krb5_gss_cred_id_t cred = (krb5_gss_cred_id_t)input_cred;
 	krb5_gss_cred_id_t cur_cred = (krb5_gss_cred_id_t)GSS_C_NO_CREDENTIAL;
 	gss_OID_set desired_mechs = GSS_C_NULL_OID_SET;
@@ -162,8 +138,14 @@ gss_cred_usage_t *cred_usage_stored;
 	if (cred_usage == GSS_C_BOTH)
 		cred_usage = GSS_C_INITIATE;
 
+	min = krb5_gss_init_context(&ctx);
+	if (min) {
+		*minor_status = min;
+		return (GSS_S_FAILURE);
+	}
+
 	/* * Find out the name, lifetime and cred usage of the input cred */
-	maj = krb5_gss_inquire_cred_no_lock(ctx, minor_status, input_cred,
+	maj = krb5_gss_inquire_cred(minor_status, input_cred,
 			&in_name, &in_time_rec, &in_usage, NULL);
 	if (GSS_ERROR(maj))
 		goto cleanup;
@@ -205,7 +187,7 @@ gss_cred_usage_t *cred_usage_stored;
 	 * then we must be careful not to overwrite an existing
 	 * unexpired credential.
 	 */
-	maj2 = krb5_gss_acquire_cred_no_lock(ctx, &min,
+	maj2 = krb5_gss_acquire_cred(&min,
 			(default_cred) ?  GSS_C_NO_NAME : in_name,
 			0, desired_mechs, cred_usage,
 			(gss_cred_id_t *)&cur_cred, NULL, &cur_time_rec);
@@ -245,10 +227,13 @@ cleanup:
 	if (desired_mechs != GSS_C_NULL_OID_SET)
 		(void) gss_release_oid_set(&min, &desired_mechs);
 	if (cur_cred != (krb5_gss_cred_id_t)GSS_C_NO_CREDENTIAL)
-		(void) krb5_gss_release_cred_no_lock(ctx, &min,
+		(void) krb5_gss_release_cred(&min,
 				    (gss_cred_id_t *)&cur_cred);
 	if (in_name != GSS_C_NO_NAME)
-		(void) krb5_gss_release_name_no_lock(ctx, &min, &in_name);
+		(void) krb5_gss_release_name(&min, &in_name);
+
+	if (ctx)
+		krb5_free_context(ctx);
 
 	return (maj);
 }

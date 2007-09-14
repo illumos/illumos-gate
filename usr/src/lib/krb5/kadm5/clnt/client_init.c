@@ -773,8 +773,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	} else {
 		input_name.value = service_name;
 		input_name.length = strlen((char *)input_name.value) + 1;
-		gssstat = krb5_gss_import_name(handle->context,
-				    &minor_stat,
+		gssstat = krb5_gss_import_name(&minor_stat,
 				    &input_name,
 				    (gss_OID)GSS_C_NT_HOSTBASED_SERVICE,
 				    (gss_name_t *)&creds.server);

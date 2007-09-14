@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,4 +65,15 @@ krb5_checksum_size(krb5_context context, krb5_cksumtype ctype)
     return(-1); /* XXX */
 
   return(ret);
+}
+
+size_t KRB5_CALLCONV
+krb5_encrypt_size(size_t length, krb5_enctype crypto)
+{
+    size_t ret;
+
+    if (krb5_c_encrypt_length(/* XXX */ 0, crypto, length, &ret))
+        return(-1); /* XXX */
+
+    return(ret);
 }

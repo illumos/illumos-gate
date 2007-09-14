@@ -1,8 +1,3 @@
-/*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -35,32 +30,20 @@
 /*
  * export_sec_context.c	- Externalize the security context.
  */
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
+#include "gssapiP_krb5.h"
 
 OM_uint32
-krb5_gss_export_sec_context(ct, minor_status, context_handle, interprocess_token)
-    void		*ct;
+krb5_gss_export_sec_context(minor_status, context_handle, interprocess_token)
     OM_uint32		*minor_status;
     gss_ctx_id_t	*context_handle;
     gss_buffer_t	interprocess_token;
 {
-    krb5_context	context = ct;
+    krb5_context	context;
     krb5_error_code	kret;
     OM_uint32		retval;
     size_t		bufsize, blen;
     krb5_gss_ctx_id_t	ctx;
     krb5_octet		*obuffer, *obp;
-
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, (krb5_context*) &context)))
-        return(GSS_S_FAILURE);
-#endif
-
-    mutex_lock(&krb5_mutex);
-    context = ct;
 
     /* Assume a tragic failure */
     obuffer = (krb5_octet *) NULL;
@@ -74,6 +57,14 @@ krb5_gss_export_sec_context(ct, minor_status, context_handle, interprocess_token
     }
 
     ctx = (krb5_gss_ctx_id_t) *context_handle;
+    context = ctx->k5_context;
+    kret = krb5_gss_ser_init(context);
+    if (kret)
+	goto error_out;
+
+    { gss_OID go = ctx->mech_used;
+    printf("export ctx len=%lu\n", go->length);
+    }
 
     /* Determine size needed for externalization of context */
     bufsize = 0;
@@ -101,20 +92,17 @@ krb5_gss_export_sec_context(ct, minor_status, context_handle, interprocess_token
     retval = GSS_S_COMPLETE;
 
     /* Now, clean up the context state */
-    /* Note, calling non-locking interface */
-    (void)krb5_gss_delete_sec_context_no_lock(context, minor_status, context_handle, NULL);
+    (void)krb5_gss_delete_sec_context(minor_status, context_handle, NULL);
     *context_handle = GSS_C_NO_CONTEXT;
 
-    mutex_unlock(&krb5_mutex);
     return (GSS_S_COMPLETE);
 
 error_out:
     if (obuffer && bufsize) {
 	    memset(obuffer, 0, bufsize);
-	    krb5_xfree(obuffer);
+	    xfree(obuffer);
     }
-    if (*minor_status == 0)
+    if (*minor_status == 0) 
 	    *minor_status = (OM_uint32) kret;
-    mutex_unlock(&krb5_mutex);
     return(retval);
 }

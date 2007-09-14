@@ -1,8 +1,3 @@
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -28,26 +23,22 @@
  */
 
 /*
- * $Id: indicate_mechs.c,v 1.11 1999/03/26 03:51:43 tytso Exp $
+ * $Id: indicate_mechs.c 18131 2006-06-14 22:27:54Z tlyu $
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
+#include "mglueP.h"
 
-/*ARGSUSED*/
 OM_uint32
-krb5_gss_indicate_mechs(ctx, minor_status, mech_set)
-     void	*ctx;
+krb5_gss_indicate_mechs(minor_status, mech_set)
      OM_uint32 *minor_status;
      gss_OID_set *mech_set;
 {
    *minor_status = 0;
 
-   /* Solaris Kerberos:  note that we use gss_copy_oid_set() here
-    * instead of g_copy_OID_set().  Ours is defined in oid_ops.c
-    */
-   if (gss_copy_oid_set(minor_status, gss_mech_set_krb5_v1v2, 
-	mech_set) == GSS_S_FAILURE) {
+   if (! gssint_copy_oid_set(minor_status, gss_mech_set_krb5_both, mech_set)) {
          *mech_set     = GSS_C_NO_OID_SET;
+         *minor_status = ENOMEM;
          return(GSS_S_FAILURE);
    }
 

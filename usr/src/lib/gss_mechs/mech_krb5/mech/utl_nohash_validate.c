@@ -1,4 +1,5 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *  Copyright 1990,1994 by the Massachusetts Institute of Technology.
  *  All Rights Reserved.
@@ -15,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -25,7 +29,7 @@
  * stub functions for those without the hash library.
  */
 
-#include <gssapiP_generic.h>
+#include "gssapiP_generic.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -56,6 +60,12 @@ int g_save_ctx_id(vdb, ctx)
 {
 	return 1;
 }
+int g_save_lucidctx_id(vdb, lctx)
+     void **vdb;
+     void *lctx;
+{
+	return 1;
+}
 
 /* validate */
 
@@ -77,6 +87,12 @@ int g_validate_ctx_id(vdb, ctx)
 {
 	return 1;
 }
+int g_validate_lucidctx_id(vdb, lctx)
+     void **vdb;
+     void *lctx;
+{
+	return 1;
+}
 
 /* delete */
 
@@ -95,6 +111,12 @@ int g_delete_cred_id(vdb, cred)
 int g_delete_ctx_id(vdb, ctx)
      void **vdb;
      gss_ctx_id_t *ctx;
+{
+	return 1;
+}
+int g_delete_lucidctx_id(vdb, lctx)
+     void **vdb;
+     void *lctx;
 {
 	return 1;
 }

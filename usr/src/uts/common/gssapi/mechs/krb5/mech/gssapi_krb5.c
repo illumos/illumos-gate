@@ -1,16 +1,9 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* 
- * Solaris Kerberos:  This is identical to MIT Release 1.2.1 except for 
- * changes to the call kg_get_context to get the context in release and 
- * getcred.  In order to be MT safe, we keep a global variable kg_context
- * and do not keep a defcred for default credentials.
- */
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -61,21 +54,24 @@
  */
 
 /*
- * $Id: gssapi_krb5.c,v 1.18 1999/03/26 03:51:42 tytso Exp $
+ * $Id: gssapi_krb5.c 18131 2006-06-14 22:27:54Z tlyu $
  */
 
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
+
+/* For declaration of krb5_ser_context_init */
+#include "k5-int.h"
+#include "gssapiP_krb5.h"
 
 /*
+ * Solaris Kerberos
  * Kernel kgssd module debugging aid. The global variable "krb5_log" is a bit
- * mask which allows various types of log messages to be printed out.  
+ * mask which allows various types of log messages to be printed out.
  *
  * The log levels are defined in:
  * usr/src/uts/common/gssapi/mechs/krb5/include/k5-int.h
  *
- * Note, KRB5_LOG_LVL can be assigned via the make invocation.  See KRB5_DEFS in
- * the various Makefiles.
+ * Note, KRB5_LOG_LVL can be assigned via the make invocation.
+ * See KRB5_DEFS in the various Makefiles.
  */
 
 #ifdef KRB5_LOG_LVL
@@ -94,15 +90,12 @@ u_int krb5_log = 0;
  * The OID of the draft krb5 mechanism, assigned by IETF, is:
  * 	iso(1) org(3) dod(5) internet(1) security(5)
  *	kerberosv5(2) = 1.3.5.1.5.2
- * The OID of the krb5_user_name type is:
- *      iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
- *      generic(1) user_name(1) = 1.2.840.113554.1.2.1.1
  * The OID of the krb5_name type is:
  * 	iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
  * 	krb5(2) krb5_name(1) = 1.2.840.113554.1.2.2.1
  * The OID of the krb5_principal type is:
- *      iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
- *      krb5(2) krb5_principal(2) = 1.2.840.113554.1.2.2.2
+ * 	iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
+ * 	krb5(2) krb5_principal(2) = 1.2.840.113554.1.2.2.2
  * The OID of the proposed standard krb5 mechanism is:
  * 	iso(1) member-body(2) US(840) mit(113554) infosys(1) gssapi(2)
  * 	krb5(2) = 1.2.840.113554.1.2.2
@@ -112,13 +105,6 @@ u_int krb5_log = 0;
  *	
  */
 
-/* gss_mech_krb5 = 1.2.840.113554.1.2.2 
- * gss_mech_krb5_old = 1.3.5.1.5.2
- * gss_mech_krb5_v2 = 1.2.840.113554.1.2.3
- * gss_nt_krb5_name = 1.2.840.113554.1.2.2.1
- * gss_nt_krb5_principal = 1.2.840.113554.1.2.2.2
- */
-
 /*
  * Encoding rules: The first two values are encoded in one byte as 40
  * * value1 + value2.  Subsequent values are encoded base 128, most
@@ -126,59 +112,40 @@ u_int krb5_log = 0;
  * except the last in each value's encoding.
  */
 
-/*  Global lock for krb5 mechanism  */
-#ifdef  _KERNEL
-kmutex_t	krb5_mutex;
-#else
-mutex_t		krb5_mutex;
-#endif
-
-/* krb5 mechanism oids */
-
 const gss_OID_desc krb5_gss_oid_array[] = {
    /* this is the official, rfc-specified OID */
-   {9, "\052\206\110\206\367\022\001\002\002"},
-   /* this is the unofficial, wrong OID */
-   {5, "\053\005\001\005\002"},   
+   {GSS_MECH_KRB5_OID_LENGTH, GSS_MECH_KRB5_OID},
+   /* this pre-RFC mech OID */
+   {GSS_MECH_KRB5_OLD_OID_LENGTH, GSS_MECH_KRB5_OLD_OID},
+   /* this is the unofficial, incorrect mech OID emitted by MS */
+   {GSS_MECH_KRB5_WRONG_OID_LENGTH, GSS_MECH_KRB5_WRONG_OID},
    /* this is the v2 assigned OID */
    {9, "\052\206\110\206\367\022\001\002\003"},
    /* these two are name type OID's */
+
+    /* 2.1.1. Kerberos Principal Name Form:  (rfc 1964)
+     * This name form shall be represented by the Object Identifier {iso(1)
+     * member-body(2) United States(840) mit(113554) infosys(1) gssapi(2)
+     * krb5(2) krb5_name(1)}.  The recommended symbolic name for this type
+     * is "GSS_KRB5_NT_PRINCIPAL_NAME". */
    {10, "\052\206\110\206\367\022\001\002\002\001"},
-   /* XXX this value isn't defined in an RFC */
+
+   /* gss_nt_krb5_principal.  Object identifier for a krb5_principal. Do not use. */
    {10, "\052\206\110\206\367\022\001\002\002\002"},
-   /* 
-    * Solaris Kerberos: the following element is the GSS_KRB5_NT_USER_NAME OID
-    * (1.2.840.113554.1.2.1.1, see RFC 1964) which is used for backward
-    * compatibility with earlier Solaris kerberos releases.
-    */
-   {10, "\052\206\110\206\367\022\001\002\001\001"},
    { 0, 0 }
 };
 
-const gss_OID_desc * const gss_mech_krb5 = krb5_gss_oid_array+0;
-const gss_OID_desc * const gss_mech_krb5_old = krb5_gss_oid_array+1;
-const gss_OID_desc * const gss_mech_krb5_v2 = krb5_gss_oid_array+2;
-
-/* 
- * Solaris Kerberos: gss_nt_krb5_name points to the GSS_KRB5_NT_USER_NAME OID
- * for backwards compat with earlier Solaris Kerberos releases.  In MIT this
- * points to the GSS_KRB5_NT_PRINCIPAL_NAME OID (1.2.840.113554.1.2.2.1).
- */
-
-const gss_OID_desc * const gss_nt_krb5_name = krb5_gss_oid_array+5;
-
-/* 
- * XXX gss_nt_krb5_principal points to an OID value that is specific to MIT
- * which is not described in any RFC at this point.  Be cautious about using
- * this.
- */ 
-
-const gss_OID_desc * const gss_nt_krb5_principal = krb5_gss_oid_array+4;
+const gss_OID_desc * const gss_mech_krb5              = krb5_gss_oid_array+0;
+const gss_OID_desc * const gss_mech_krb5_old          = krb5_gss_oid_array+1;
+const gss_OID_desc * const gss_mech_krb5_wrong        = krb5_gss_oid_array+2;
+const gss_OID_desc * const gss_nt_krb5_name           = krb5_gss_oid_array+4;
+const gss_OID_desc * const gss_nt_krb5_principal      = krb5_gss_oid_array+5;
+const gss_OID_desc * const GSS_KRB5_NT_PRINCIPAL_NAME = krb5_gss_oid_array+4;
 
 static const gss_OID_set_desc oidsets[] = {
    {1, (gss_OID) krb5_gss_oid_array+0},
    {1, (gss_OID) krb5_gss_oid_array+1},
-   {2, (gss_OID) krb5_gss_oid_array+0},
+   {3, (gss_OID) krb5_gss_oid_array+0},
    {1, (gss_OID) krb5_gss_oid_array+2},
    {3, (gss_OID) krb5_gss_oid_array+0},
 };
@@ -186,107 +153,132 @@ static const gss_OID_set_desc oidsets[] = {
 const gss_OID_set_desc * const gss_mech_set_krb5 = oidsets+0;
 const gss_OID_set_desc * const gss_mech_set_krb5_old = oidsets+1;
 const gss_OID_set_desc * const gss_mech_set_krb5_both = oidsets+2;
-const gss_OID_set_desc * const gss_mech_set_krb5_v2 = oidsets+3;
-const gss_OID_set_desc * const gss_mech_set_krb5_v1v2 = oidsets+4;
 
-void *kg_vdb = NULL;
+g_set kg_vdb = G_SET_INIT;
 
 /** default credential support */
 
-/* default credentials */
-
-/*
- * Solaris Kerberos:
- * We no longer store the defcred in a global variable since this will
- * prevent us from assuming different user ids by gss daemon.
- * This also makes gss_release_defcred a no-op. 
- */
-#if 0
-static gss_cred_id_t defcred = GSS_C_NO_CREDENTIAL;
-#endif
-
-krb5_context kg_context = NULL;
-
-/* XXX what happens when the default credentials expire or are invalidated? */
-
 #ifndef  _KERNEL
 
-/* Note, the krb5_mutex lock must be held prior to calling this function */
+/*
+ * init_sec_context() will explicitly re-acquire default credentials,
+ * so handling the expiration/invalidation condition here isn't needed.
+ */
 OM_uint32
 kg_get_defcred(minor_status, cred)
      OM_uint32 *minor_status;
      gss_cred_id_t *cred;
 {
-OM_uint32 major;
-	
-   KRB5_LOG0(KRB5_INFO, "kg_get_defcred() start\n");
-
-   if (!kg_context && GSS_ERROR(kg_get_context(minor_status,&kg_context))){
-	 KRB5_LOG(KRB5_ERR, "kg_get_defcred() end, error, kg_get_context() "
-		 "minor_status=%d\n", *minor_status);
-      return GSS_S_FAILURE;
+    OM_uint32 major;
+    
+    if ((major = krb5_gss_acquire_cred(minor_status, 
+				      (gss_name_t) NULL, GSS_C_INDEFINITE, 
+				      GSS_C_NULL_OID_SET, GSS_C_INITIATE, 
+				      cred, NULL, NULL)) && GSS_ERROR(major)) {
+      return(major);
    }
-
-      major = krb5_gss_acquire_cred_no_lock(kg_context,minor_status, 
-	(gss_name_t) NULL, GSS_C_INDEFINITE, GSS_C_NULL_OID_SET, GSS_C_INITIATE, 
-	 cred, NULL, NULL);
-      if (major && GSS_ERROR(major)) {
-	 *cred = GSS_C_NO_CREDENTIAL;
-	 KRB5_LOG(KRB5_ERR, "kg_get_defcred() end, error major=%d\n", major);
-	 return(major);
-      }
-
    *minor_status = 0;
-   KRB5_LOG0(KRB5_INFO, "kg_get_defcred() end\n");
    return(GSS_S_COMPLETE);
 }
 
 OM_uint32
-kg_release_defcred(minor_status)
-     OM_uint32 *minor_status;
+kg_sync_ccache_name (krb5_context context, OM_uint32 *minor_status)
 {
-      *minor_status = 0;
-      return(GSS_S_COMPLETE);
+    OM_uint32 err = 0;
+    
+    /* 
+     * Sync up the context ccache name with the GSSAPI ccache name.
+     * If kg_ccache_name is NULL -- normal unless someone has called 
+     * gss_krb5_ccache_name() -- then the system default ccache will 
+     * be picked up and used by resetting the context default ccache.
+     * This is needed for platforms which support multiple ccaches.
+     */
+    
+    if (!err) {
+        /* if NULL, resets the context default ccache */
+        err = krb5_cc_set_default_name(context,
+				       (char *) k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME));
+    }
+    
+    *minor_status = err;
+    return (*minor_status == 0) ? GSS_S_COMPLETE : GSS_S_FAILURE;
 }
 
 OM_uint32
-kg_get_context(minor_status, context)
-   OM_uint32 *minor_status;
-   krb5_context *context;
+kg_get_ccache_name (OM_uint32 *minor_status, const char **out_name)
 {
-   /*
-    * Solaris Kerberos:  the following is a global variable declared 
-    * above and initialized here below
-    */
-   /* static krb5_context kg_context = NULL; */
-   krb5_error_code code;
+    const char *name = NULL;
+    OM_uint32 err = 0;
+    char *kg_ccache_name;
 
-   KRB5_LOG0(KRB5_INFO, "kg_get_context() start\n");
+    kg_ccache_name = k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME);
+    
+    if (kg_ccache_name != NULL) {
+	name = strdup(kg_ccache_name);
+	if (name == NULL)
+	    err = errno;
+    } else {
+	krb5_context context = NULL;
 
-   if (!kg_context) {
-	   if ((code = krb5_init_context(&kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_context_init(kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_auth_context_init(kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_ccache_init(kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_rcache_init(kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_keytab_init(kg_context)))
-		   goto fail;
-	   if ((code = krb5_ser_auth_context_init(kg_context)))
-	       goto fail;
-   }
-   *context = kg_context;
-   *minor_status = 0;
-   KRB5_LOG0(KRB5_INFO, "kg_get_context() end\n");
-   return GSS_S_COMPLETE;
-   
-fail:
-   *minor_status = (OM_uint32) code;
-   KRB5_LOG(KRB5_ERR, "kg_get_context() end, error code=%d\n", code);
-   return GSS_S_FAILURE;
+	/* Reset the context default ccache (see text above), and then
+	   retrieve it.  */
+	err = krb5_gss_init_context(&context);
+	if (!err)
+	    err = krb5_cc_set_default_name (context, NULL);
+	if (!err) {
+	    name = krb5_cc_default_name(context);
+	    if (name) {
+		name = strdup(name);
+		if (name == NULL)
+		    err = errno;
+	    }
+	}
+	if (context)
+	    krb5_free_context(context);
+    }
+
+    if (!err) {
+        if (out_name) {
+            *out_name = name;
+        }
+    }
+    
+    *minor_status = err;
+    return (*minor_status == 0) ? GSS_S_COMPLETE : GSS_S_FAILURE;
+}
+
+OM_uint32
+kg_set_ccache_name (OM_uint32 *minor_status, const char *name)
+{
+    char *new_name = NULL;
+    char *swap = NULL;
+    char *kg_ccache_name;
+    krb5_error_code kerr;
+
+    if (name) {
+	new_name = malloc(strlen(name) + 1);
+	if (new_name == NULL) {
+	    *minor_status = ENOMEM;
+	    return GSS_S_FAILURE;
+	}
+	strcpy(new_name, name);
+    }
+
+    kg_ccache_name = k5_getspecific(K5_KEY_GSS_KRB5_CCACHE_NAME);
+    swap = kg_ccache_name;
+    kg_ccache_name = new_name;
+    new_name = swap;
+    kerr = k5_setspecific(K5_KEY_GSS_KRB5_CCACHE_NAME, kg_ccache_name);
+    if (kerr != 0) {
+	/* Can't store, so free up the storage.  */
+	free(kg_ccache_name);
+	/* ??? free(new_name); */
+	*minor_status = kerr;
+	return GSS_S_FAILURE;
+    }
+
+    free (new_name);
+    *minor_status = 0;
+    return GSS_S_COMPLETE;
 }
 #endif

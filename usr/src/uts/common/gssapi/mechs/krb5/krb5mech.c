@@ -20,13 +20,57 @@ char _depends_on[] = "misc/kgssapi crypto/md5";
 #include <sys/debug.h>
 #include <k5-int.h>
 
-OM_uint32 krb5_gss_get_context(void ** context);
+/** mechglue wrappers **/
 
-extern krb5_error_code krb5_ser_context_init
-	(krb5_context);
+static OM_uint32 k5glue_delete_sec_context
+    (void *, OM_uint32*,       /* minor_status */
+     gss_ctx_id_t*,    /* context_handle */
+     gss_buffer_t,     /* output_token */
+     OM_uint32);
 
-extern	krb5_error_code	krb5_ser_auth_context_init
-	(krb5_context);
+static OM_uint32 k5glue_sign
+    (void *, OM_uint32*,       /* minor_status */
+     gss_ctx_id_t,     /* context_handle */
+     int,              /* qop_req */
+     gss_buffer_t,     /* message_buffer */
+     gss_buffer_t,     /* message_token */
+     OM_uint32);
+
+static OM_uint32 k5glue_verify
+    (void *, OM_uint32*,       /* minor_status */
+     gss_ctx_id_t,     /* context_handle */
+     gss_buffer_t,     /* message_buffer */
+     gss_buffer_t,     /* token_buffer */
+     int*,              /* qop_state */
+     OM_uint32);
+
+/* EXPORT DELETE START */
+static OM_uint32 k5glue_seal
+    (void *, OM_uint32*,       /* minor_status */
+     gss_ctx_id_t,     /* context_handle */
+     int,              /* conf_req_flag */
+     int,              /* qop_req */
+     gss_buffer_t,     /* input_message_buffer */
+     int*,             /* conf_state */
+     gss_buffer_t,     /* output_message_buffer */
+     OM_uint32);
+
+static OM_uint32 k5glue_unseal
+    (void *, OM_uint32*,       /* minor_status */
+     gss_ctx_id_t,     /* context_handle */
+     gss_buffer_t,     /* input_message_buffer */
+     gss_buffer_t,     /* output_message_buffer */
+     int*,             /* conf_state */
+     int*,             /* qop_state */
+     OM_uint32);
+/* EXPORT DELETE END */
+
+static OM_uint32 k5glue_import_sec_context
+    (void *, OM_uint32 *,		/* minor_status */
+     gss_buffer_t,		/* interprocess_token */
+     gss_ctx_id_t *);		/* context_handle */
+
+
 
 static	struct	gss_config krb5_mechanism =
 	{{9, "\052\206\110\206\367\022\001\002\002"},
@@ -34,31 +78,30 @@ static	struct	gss_config krb5_mechanism =
 	NULL,	/* next */
 	TRUE,	/* uses_kmod */
 /* EXPORT DELETE START */ /* CRYPT DELETE START */
-	krb5_gss_unseal,
+	k5glue_unseal,
 /* EXPORT DELETE END */ /* CRYPT DELETE END */
-	krb5_gss_delete_sec_context,
+	k5glue_delete_sec_context,
 /* EXPORT DELETE START */ /* CRYPT DELETE START */
-	krb5_gss_seal,
+	k5glue_seal,
 /* EXPORT DELETE END */ /* CRYPT DELETE END */
-	krb5_gss_import_sec_context,
+	k5glue_import_sec_context,
 /* EXPORT DELETE START */
 /* CRYPT DELETE START */
 #if 0
 /* CRYPT DELETE END */
-	krb5_gss_seal,
-	krb5_gss_unseal,
+	k5glue_seal,
+	k5glue_unseal,
 /* CRYPT DELETE START */
 #endif
 /* CRYPT DELETE END */
 /* EXPORT DELETE END */
-	krb5_gss_sign,
-	krb5_gss_verify,
-};
+	k5glue_sign,
+	k5glue_verify,
+	};
 
 static gss_mechanism
 	gss_mech_initialize()
 {
-	(void) krb5_gss_get_context(&(krb5_mechanism.context));
 	return (&krb5_mechanism);
 }
 
@@ -134,38 +177,110 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-OM_uint32
-krb5_gss_get_context(context)
-void **	context;
+/* ARGSUSED */
+static OM_uint32
+k5glue_delete_sec_context(ctx, minor_status, context_handle, output_token,
+	gssd_ctx_verifier)
+    void *ctx;
+     OM_uint32 *minor_status;
+     gss_ctx_id_t *context_handle;
+     gss_buffer_t output_token;
+    OM_uint32 gssd_ctx_verifier;
 {
-	OM_uint32 major_status = 0;
+   return(krb5_gss_delete_sec_context(minor_status,
+				    context_handle, output_token,
+				    gssd_ctx_verifier));
+}
 
-	mutex_lock(&krb5_mutex);
-	if (context == NULL)
-	{
-		major_status = GSS_S_FAILURE;
-		goto unlock;
-	}
-	if (kg_context) {
-		*context = kg_context;
-		major_status = GSS_S_COMPLETE;
-		goto unlock;
-	}
+/* V2 */
+/* ARGSUSED */
+static OM_uint32
+k5glue_import_sec_context(ctx, minor_status, interprocess_token, context_handle)
+    void *ctx;
+     OM_uint32		 *minor_status;
+     gss_buffer_t	interprocess_token;
+     gss_ctx_id_t	 *context_handle;
+{
+   return(krb5_gss_import_sec_context(minor_status,
+				      interprocess_token,
+				    context_handle));
+}
 
-	if (krb5_init_context(&kg_context))
-	{
-		major_status = GSS_S_FAILURE;
-		goto unlock;
-	}
-	if (krb5_ser_auth_context_init(kg_context))
-	{
-		kg_context = 0;
-		major_status = GSS_S_FAILURE;
-		goto unlock;
-	}
+/* EXPORT DELETE START */
+/* V1 only */
+/* ARGSUSED */
+static OM_uint32
+k5glue_seal(ctx, minor_status, context_handle, conf_req_flag, qop_req,
+	    input_message_buffer, conf_state, output_message_buffer, gssd_ctx_verifier)
+    void *ctx;
+     OM_uint32 *minor_status;
+     gss_ctx_id_t context_handle;
+     int conf_req_flag;
+     int qop_req;
+     gss_buffer_t input_message_buffer;
+     int *conf_state;
+     gss_buffer_t output_message_buffer;
+    OM_uint32 gssd_ctx_verifier;
+{
+   return(krb5_gss_seal(minor_status, context_handle,
+			conf_req_flag, qop_req, input_message_buffer,
+			conf_state, output_message_buffer, gssd_ctx_verifier));
+}
+/* EXPORT DELETE END */
 
-	*context = kg_context;
-unlock:
-	mutex_unlock(&krb5_mutex);
-	return (major_status);
+/* ARGSUSED */
+static OM_uint32
+k5glue_sign(ctx, minor_status, context_handle,
+	      qop_req, message_buffer, 
+	    message_token, gssd_ctx_verifier)
+    void *ctx;
+     OM_uint32 *minor_status;
+     gss_ctx_id_t context_handle;
+     int qop_req;
+     gss_buffer_t message_buffer;
+     gss_buffer_t message_token;
+    OM_uint32 gssd_ctx_verifier;
+{
+   return(krb5_gss_sign(minor_status, context_handle,
+			qop_req, message_buffer, message_token, gssd_ctx_verifier));
+}
+
+/* EXPORT DELETE START */
+/* ARGSUSED */
+static OM_uint32
+k5glue_unseal(ctx, minor_status, context_handle, input_message_buffer,
+	    output_message_buffer, conf_state, qop_state, gssd_ctx_verifier)
+    void *ctx;
+     OM_uint32 *minor_status;
+     gss_ctx_id_t context_handle;
+     gss_buffer_t input_message_buffer;
+     gss_buffer_t output_message_buffer;
+     int *conf_state;
+     int *qop_state;
+    OM_uint32 gssd_ctx_verifier;
+{
+   return(krb5_gss_unseal(minor_status, context_handle,
+			  input_message_buffer, output_message_buffer,
+			conf_state, qop_state, gssd_ctx_verifier));
+}
+/* EXPORT DELETE END */
+
+/* V1 only */
+/* ARGSUSED */
+static OM_uint32
+k5glue_verify(ctx, minor_status, context_handle, message_buffer,
+	    token_buffer, qop_state, gssd_ctx_verifier)
+    void *ctx;
+     OM_uint32 *minor_status;
+     gss_ctx_id_t context_handle;
+     gss_buffer_t message_buffer;
+     gss_buffer_t token_buffer;
+     int *qop_state;
+    OM_uint32 gssd_ctx_verifier;
+{
+   return(krb5_gss_verify(minor_status,
+			  context_handle,
+			  message_buffer,
+			  token_buffer,
+			qop_state, gssd_ctx_verifier));
 }

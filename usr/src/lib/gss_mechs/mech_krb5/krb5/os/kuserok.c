@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -359,12 +359,14 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 }
 
 OM_uint32
-krb5_gss_userok(void *ctxt,
-		OM_uint32 *minor,
+krb5_gss_userok(OM_uint32 *minor,
 		const gss_name_t pname,
 		const char *user,
 		int *user_ok)
 {
+	krb5_context ctxt;
+	OM_uint32 kret;
+
 	if (pname == NULL || user == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
@@ -373,13 +375,22 @@ krb5_gss_userok(void *ctxt,
 
 	*user_ok = 0;
 
+	kret = krb5_gss_init_context(&ctxt); 
+	if (kret) { 
+		*minor = kret; 
+		return (GSS_S_FAILURE); 
+	}
+
 	if (! kg_validate_name(pname)) {
-                 *minor = (OM_uint32) G_VALIDATE_FAILED;
-                 return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
+		*minor = (OM_uint32) G_VALIDATE_FAILED;
+		krb5_free_context(ctxt);
+		return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
 	}
 
 	if (krb5_kuserok(ctxt, (krb5_principal) pname, user)) {
 		*user_ok = 1;
 	}
+
+	krb5_free_context(ctxt);
 	return (GSS_S_COMPLETE);
 }

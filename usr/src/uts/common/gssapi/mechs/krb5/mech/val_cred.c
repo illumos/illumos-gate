@@ -1,8 +1,3 @@
-/*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -30,72 +25,76 @@
  * 
  */
 
-#include <gssapiP_krb5.h>
-
-OM_uint32
-krb5_gss_validate_cred(ct, minor_status, cred_handle)
-     void *ct;
-     OM_uint32 *minor_status;
-     gss_cred_id_t cred_handle;
-{
-    OM_uint32 major_status; 
-
-    mutex_lock(&krb5_mutex);
-    major_status = krb5_gss_validate_cred_no_lock(ct, minor_status, 
-						  cred_handle);
-    mutex_unlock(&krb5_mutex);
-
-    return(major_status);
-}
+#include "gssapiP_krb5.h"
 
 /*
  * Check to see whether or not a GSSAPI krb5 credential is valid.  If
  * it is not, return an error.
  */
 
-/*ARGSUSED*/
 OM_uint32
-krb5_gss_validate_cred_no_lock(ct, minor_status, cred_handle)
-     void *ct;
-     OM_uint32 *minor_status;
-     gss_cred_id_t cred_handle;
+krb5_gss_validate_cred_1(OM_uint32 *minor_status, gss_cred_id_t cred_handle,
+			 krb5_context context)
 {
-    krb5_context context = ct;
     krb5_gss_cred_id_t cred;
     krb5_error_code code;
     krb5_principal princ;
-    OM_uint32 major_status = GSS_S_FAILURE;
-	
-   /* Solaris Kerberos:  for MT safety, we avoid the use of a default
-    * context via kg_get_context() */
-#if 0
-    if (GSS_ERROR(kg_get_context(minor_status, &context)))
-	return (major_status);
-#endif
 
     if (!kg_validate_cred_id(cred_handle)) {
 	*minor_status = (OM_uint32) G_VALIDATE_FAILED;
-	major_status = (GSS_S_CALL_BAD_STRUCTURE|GSS_S_DEFECTIVE_CREDENTIAL);
-	return (major_status);
+	return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_DEFECTIVE_CREDENTIAL);
     }
 
     cred = (krb5_gss_cred_id_t) cred_handle;
-	
+
+    code = k5_mutex_lock(&cred->lock);
+    if (code) {
+	*minor_status = code;
+	return GSS_S_FAILURE;
+    }
+
     if (cred->ccache) {
-	code = krb5_cc_get_principal(context, cred->ccache, &princ);
-	if (code) {
+	if ((code = krb5_cc_get_principal(context, cred->ccache, &princ))) {
+	    k5_mutex_unlock(&cred->lock);
 	    *minor_status = code;
-	    major_status = GSS_S_DEFECTIVE_CREDENTIAL;
-	    return (major_status);
+	    return(GSS_S_DEFECTIVE_CREDENTIAL);
 	}
 	if (!krb5_principal_compare(context, princ, cred->princ)) {
+	    k5_mutex_unlock(&cred->lock);
 	    *minor_status = KG_CCACHE_NOMATCH;
-	    major_status = GSS_S_DEFECTIVE_CREDENTIAL;
-	    return (major_status);
+	    return(GSS_S_DEFECTIVE_CREDENTIAL);
 	}
 	(void)krb5_free_principal(context, princ);
     }
     *minor_status = 0;
-    major_status = GSS_S_COMPLETE;
-    return (major_status);
+    return GSS_S_COMPLETE;
 }
+
+OM_uint32
+krb5_gss_validate_cred(minor_status, cred_handle)
+     OM_uint32 *minor_status;
+     gss_cred_id_t cred_handle;
+{
+    krb5_context context;
+    krb5_error_code code;
+    OM_uint32 maj;
+
+    code = krb5_gss_init_context(&context);
+    if (code) {
+	*minor_status = code;
+	return GSS_S_FAILURE;
+    }
+
+    maj = krb5_gss_validate_cred_1(minor_status, cred_handle, context);
+    if (maj == 0) {
+	krb5_gss_cred_id_t cred = (krb5_gss_cred_id_t) cred_handle;
+	k5_mutex_assert_locked(&cred->lock);
+	k5_mutex_unlock(&cred->lock);
+    }
+    krb5_free_context(context);
+    return maj;
+}
+
+		
+
+

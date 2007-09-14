@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,33 +19,47 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*
- * This header contains the private mechglue definitions.
- */
-
-#ifndef	_MECHGLUEP_H
-#define	_MECHGLUEP_H
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <gssapi/gssapi.h>
-#include <gssapi/gssapi_ext.h>
+/*
+ * This header contains the private mechglue definitions.
+ *
+ */
 
-#ifdef	__cplusplus
-extern "C" {
+#ifndef _GSS_MECHGLUEP_H
+#define _GSS_MECHGLUEP_H
+
+#if 0 /* SUNW15resync - disable for sake of non-krb5 mechs */
+#include "autoconf.h"
 #endif
 
-/*
- * derived types for passing context and credential handles
- * between gssd and kernel
- */
-typedef unsigned int gssd_ctx_id_t;
-typedef unsigned int gssd_cred_id_t;
+/* SUNW15resync */
+#ifndef GSS_DLLIMP
+#define GSS_DLLIMP
+#endif
+
+#include <gssapi/gssapi_ext.h>   /* SUNW15resync - mechglue.h in mit 1.5 */
+/* #include "gssapiP_generic.h" */
+
+#ifdef _KERNEL
+#include <rpc/rpc.h>
+#endif 
+
+#ifndef g_OID_copy /* SUNW15resync */
+#define	g_OID_copy(o1, o2)					\
+do {								\
+	memcpy((o1)->elements, (o2)->elements, (o2)->length);	\
+	(o1)->length = (o2)->length;				\
+} while (0)
+#endif
+
+#define	GSS_EMPTY_BUFFER(buf)	((buf) == NULL ||\
+	(buf)->value == NULL || (buf)->length == 0)
+
 /*
  * Array of context IDs typed by mechanism OID
  */
@@ -74,9 +87,9 @@ typedef struct gss_union_name_t {
  * Structure for holding list of mechanism-specific name types
  */
 typedef struct gss_mech_spec_name_t {
-	gss_OID	name_type;
-	gss_OID	mech;
-	struct gss_mech_spec_name_t	*next, *prev;
+    gss_OID	name_type;
+    gss_OID	mech;
+    struct gss_mech_spec_name_t	*next, *prev;
 } gss_mech_spec_name_desc, *gss_mech_spec_name;
 
 /*
@@ -96,11 +109,11 @@ typedef struct gss_union_cred_auxinfo {
 typedef struct gss_union_cred_t {
 	int			count;
 	gss_OID			mechs_array;
-	gss_cred_id_t 		*cred_array;
+	gss_cred_id_t		*cred_array;
 	gss_union_cred_auxinfo	auxinfo;
 } gss_union_cred_desc, *gss_union_cred_t;
 
-
+/* Solaris Kerberos */
 typedef	OM_uint32	    (*gss_acquire_cred_with_password_sfct)(
 		    void *,		/* context */
 		    OM_uint32 *,	/* minor_status */
@@ -114,23 +127,34 @@ typedef	OM_uint32	    (*gss_acquire_cred_with_password_sfct)(
 		    OM_uint32 *		/* time_rec */
 	/* */);
 
+
+
+/********************************************************/
+/* The Mechanism Dispatch Table -- a mechanism needs to */
+/* define one of these and provide a function to return */
+/* it to initialize the GSSAPI library                  */
+
 /*
  * This is the definition of the mechs_array struct, which is used to
  * define the mechs array table. This table is used to indirectly
  * access mechanism specific versions of the gssapi routines through
  * the routines in the glue module (gssd_mech_glue.c)
  *
- * This contains all of the functions defined in gssapi.h except for
+ * This contants all of the functions defined in gssapi.h except for
  * gss_release_buffer() and gss_release_oid_set(), which I am
- * assuming, for now, to be equal across mechanisms.
+ * assuming, for now, to be equal across mechanisms.  
  */
-
+ 
 typedef struct gss_config {
-	gss_OID_desc    mech_type;
-	void *	    context;
+#if 0 /* Solaris Kerberos */
+    OM_uint32	    priority;
+    char *	    mechNameStr;
+#endif
+    gss_OID_desc    mech_type;
+    void *	    context;
 #ifdef	_KERNEL
-	struct gss_config *next;
-	bool_t	    uses_kmod;
+    struct gss_config *next;
+    bool_t	    uses_kmod;
 #endif
 
 #ifndef	_KERNEL
@@ -495,12 +519,15 @@ typedef struct gss_config {
 #endif
 } *gss_mechanism;
 
+
+	
 #ifndef _KERNEL
 /* This structure MUST NOT be used by any code outside libgss */
 typedef struct gss_config_ext {
 	gss_acquire_cred_with_password_sfct	gss_acquire_cred_with_password;
 } *gss_mechanism_ext;
 #endif /* _KERNEL */
+
 
 /*
  * In the user space we use a wrapper structure to encompass the
@@ -509,7 +536,6 @@ typedef struct gss_config_ext {
  * layer.  In the kernel we use only the gss_config strucutre because
  * the kernal does not cantain any of the extra gss-api specific data.
  */
-#ifndef _KERNEL
 typedef struct gss_mech_config {
 	char *kmodName;			/* kernel module name */
 	char *uLibName;			/* user library name */
@@ -518,29 +544,30 @@ typedef struct gss_mech_config {
 	void *dl_handle;		/* RTLD object handle for the mech */
 	gss_OID mech_type;		/* mechanism oid */
 	gss_mechanism mech;		/* mechanism initialization struct */
-	gss_mechanism_ext mech_ext;	/* extensions */
+#ifndef _KERNEL
+	gss_mechanism_ext mech_ext;	/* Solaris extensions */
+#endif /* _KERNEL */
 	struct gss_mech_config *next;	/* next element in the list */
 } *gss_mech_info;
-#endif
 
-#ifndef	_KERNEL
-/*
- * Internal mechglue routines
- */
+/********************************************************/
+/* Internal mechglue routines */
 
+/* SUNW15resync - Solaris versions - replace w/mit ones? */
 gss_mechanism __gss_get_mechanism(const gss_OID);
+#ifndef _KERNEL
 gss_mechanism_ext __gss_get_mechanism_ext(const gss_OID);
+#endif /* _KERNEL */
 char *__gss_get_kmodName(const gss_OID);
 char *__gss_get_modOptions(const gss_OID);
 OM_uint32 __gss_import_internal_name(OM_uint32 *, const gss_OID,
-	gss_union_name_t, gss_name_t *);
+ 	gss_union_name_t, gss_name_t *);
 OM_uint32 __gss_export_internal_name(OM_uint32 *, const gss_OID,
 	const gss_name_t, gss_buffer_t);
 OM_uint32 __gss_display_internal_name(OM_uint32 *, const gss_OID,
 	const gss_name_t, gss_buffer_t, gss_OID *);
 OM_uint32 __gss_release_internal_name(OM_uint32 *, const gss_OID,
 	gss_name_t *);
-
 OM_uint32 __gss_convert_name_to_union_name(
 	OM_uint32 *,		/* minor_status */
 	gss_mechanism,	/* mech */
@@ -548,68 +575,132 @@ OM_uint32 __gss_convert_name_to_union_name(
 	gss_name_t *		/* external_name */
 );
 
-gss_cred_id_t __gss_get_mechanism_cred(
+ gss_cred_id_t __gss_get_mechanism_cred(
 	const gss_union_cred_t,	/* union_cred */
 	const gss_OID		/* mech_type */
 );
 
-OM_uint32 __gss_create_copy_buffer(
+
+
+
+
+int gssint_mechglue_init(void);
+void gssint_mechglue_fini(void);
+
+gss_mechanism gssint_get_mechanism (gss_OID);
+OM_uint32 gssint_get_mech_type (gss_OID, gss_buffer_t);
+char *gssint_get_kmodName(const gss_OID);
+char *gssint_get_modOptions(const gss_OID);
+OM_uint32 gssint_import_internal_name (OM_uint32 *, gss_OID, gss_union_name_t,
+				      gss_name_t *);
+OM_uint32 gssint_export_internal_name(OM_uint32 *, const gss_OID,
+	const gss_name_t, gss_buffer_t);
+OM_uint32 gssint_display_internal_name (OM_uint32 *, gss_OID, gss_name_t,
+				       gss_buffer_t, gss_OID *);
+OM_uint32 gssint_release_internal_name (OM_uint32 *, gss_OID, gss_name_t *);
+
+OM_uint32 gssint_convert_name_to_union_name
+	  (OM_uint32 *,		/* minor_status */
+	   gss_mechanism,	/* mech */
+	   gss_name_t,		/* internal_name */
+	   gss_name_t *		/* external_name */
+	   );
+gss_cred_id_t gssint_get_mechanism_cred
+	  (gss_union_cred_t,	/* union_cred */
+	   gss_OID		/* mech_type */
+	   );
+
+OM_uint32 gssint_create_copy_buffer(
 	const gss_buffer_t,	/* src buffer */
 	gss_buffer_t *,		/* destination buffer */
 	int			/* NULL terminate buffer ? */
 );
 
-OM_uint32 generic_gss_release_oid(
-	OM_uint32 *,	/* minor_status */
-	gss_OID *		/* oid */
+
+OM_uint32 gssint_copy_oid_set(
+	OM_uint32 *,			/* minor_status */
+	const gss_OID_set_desc *,	/* oid set */
+	gss_OID_set *			/* new oid set */
 );
 
-OM_uint32 generic_gss_copy_oid(
-	OM_uint32 *,	/* minor_status */
-	const gss_OID,		/* oid */
-	gss_OID *		/* new_oid */
-);
-
-OM_uint32 generic_gss_create_empty_oid_set(
-	OM_uint32 *,	/* minor_status */
-	gss_OID_set *	/* oid_set */
-);
-
-OM_uint32 generic_gss_add_oid_set_member(
-	OM_uint32 *,	/* minor_status */
-	const gss_OID,		/* member_oid */
-	gss_OID_set *	/* oid_set */
-);
-
-OM_uint32 generic_gss_test_oid_set_member(
-	OM_uint32 *,	/* minor_status */
-	const gss_OID,		/* member */
-	const gss_OID_set,	/* set */
-	int *		/* present */
-);
-
-OM_uint32 generic_gss_oid_to_str(
-	OM_uint32 *,	/* minor_status */
-	const gss_OID,		/* oid */
-	gss_buffer_t	/* oid_str */
-);
-
-OM_uint32 generic_gss_str_to_oid(
-	OM_uint32 *,	/* minor_status */
-	const gss_buffer_t,	/* oid_str */
-	gss_OID *		/* oid */
-);
-
+/* SUNW15resync - for old Solaris version in libgss */
 OM_uint32 gss_copy_oid_set(
 	OM_uint32 *,			/* minor_status */
 	const gss_OID_set_desc *,	/* oid set */
 	gss_OID_set *			/* new oid set */
 );
 
-#endif
+
+gss_OID gss_find_mechanism_from_name_type (gss_OID); /* name_type */
+
+OM_uint32 gss_add_mech_name_type
+	   (OM_uint32 *,	/* minor_status */
+	    gss_OID,		/* name_type */
+	    gss_OID		/* mech */
+	       );
+
+/*
+ * Sun extensions to GSS-API v2
+ */
+
+OM_uint32
+gssint_mech_to_oid(
+	const char *mech,		/* mechanism string name */
+	gss_OID *oid			/* mechanism oid */
+);
+
+const char *
+gssint_oid_to_mech(
+	const gss_OID oid		/* mechanism oid */
+);
+
+OM_uint32
+gssint_get_mechanisms(
+	char *mechArray[],		/* array to populate with mechs */
+	int arrayLen			/* length of passed in array */
+);
+
+OM_uint32
+gss_store_cred(
+	OM_uint32 *,		/* minor_status */
+	const gss_cred_id_t,	/* input_cred_handle */
+	gss_cred_usage_t,	/* cred_usage */
+	const gss_OID,		/* desired_mech */
+	OM_uint32,		/* overwrite_cred */
+	OM_uint32,		/* default_cred */
+	gss_OID_set *,		/* elements_stored */
+	gss_cred_usage_t *	/* cred_usage_stored */
+);
+
+int
+gssint_get_der_length(
+	unsigned char **,	/* buf */
+	unsigned int,		/* buf_len */
+	unsigned int *		/* bytes */
+);
+
+unsigned int
+gssint_der_length_size(unsigned int /* len */);
+
+int
+gssint_put_der_length(
+	unsigned int,		/* length */
+	unsigned char **,	/* buf */
+	unsigned int		/* max_len */
+);
+
+
+
+/* Solaris kernel and gssd support */
+
+/*
+ * derived types for passing context and credential handles
+ * between gssd and kernel
+ */
+typedef unsigned int gssd_ctx_id_t;
+typedef unsigned int gssd_cred_id_t;
 
 #ifdef	_KERNEL
-#include <rpc/rpc.h>
 
 #ifndef	_KRB5_H
 /* These macros are defined for Kerberos in krb5.h, and have priority */
@@ -693,7 +784,15 @@ struct	kgss_ctx {
 
 /* EXPORT DELETE END */
 
+#define KGSS_INIT_CONTEXT(ctx) krb5_init_context(ctx)
+#define KGSS_RELEASE_OID(minor_st, oid) krb5_gss_release_oid(minor_st, oid)
+extern OM_uint32 kgss_release_oid(OM_uint32 *, gss_OID *);
+
 #else /* !_KERNEL */
+
+#define KGSS_INIT_CONTEXT(ctx) krb5_gss_init_context(ctx)
+#define KGSS_RELEASE_OID(minor_st, oid) gss_release_oid(minor_st, oid)
+
 #define	KCTX_TO_CTX(ctx)  (KCTX_TO_KGSS_CTX(ctx)->gssd_ctx)
 #define	MALLOC(n) malloc(n)
 #define	FREE(x, n) free(x)
@@ -722,8 +821,57 @@ struct	kgss_ctx {
 		KCTX_TO_CTXV(ctx))
 #endif /* _KERNEL */
 
-#ifdef __cplusplus
-}
-#endif
+/* SUNW15resync - moved from gssapiP_generic.h for sake of non-krb5 mechs */
+OM_uint32 generic_gss_release_buffer
+(OM_uint32*,       /* minor_status */
+            gss_buffer_t      /* buffer */
+           );
 
-#endif	/* _MECHGLUEP_H */
+OM_uint32 generic_gss_release_oid_set
+(OM_uint32*,       /* minor_status */
+            gss_OID_set*      /* set */
+           );
+
+OM_uint32 generic_gss_release_oid
+(OM_uint32*,       /* minor_status */
+            gss_OID*         /* set */
+           );
+
+OM_uint32 generic_gss_copy_oid
+(OM_uint32 *,	/* minor_status */
+            gss_OID_desc * const,   /* oid */ /* SUNW15resync */
+	    gss_OID *		/* new_oid */
+	    );
+
+OM_uint32 generic_gss_create_empty_oid_set
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_set *	/* oid_set */
+	   );
+
+OM_uint32 generic_gss_add_oid_set_member
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* member_oid */
+	    gss_OID_set *	/* oid_set */
+	   );
+
+OM_uint32 generic_gss_test_oid_set_member
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* member */
+	    gss_OID_set,	/* set */
+	    int *		/* present */
+	   );
+
+OM_uint32 generic_gss_oid_to_str
+(OM_uint32 *,	/* minor_status */
+	    gss_OID_desc * const,		/* oid */
+	    gss_buffer_t	/* oid_str */
+	   );
+
+OM_uint32 generic_gss_str_to_oid
+(OM_uint32 *,	/* minor_status */
+	    gss_buffer_t,	/* oid_str */
+	    gss_OID *		/* oid */
+	   );
+
+
+#endif /* _GSS_MECHGLUEP_H */
