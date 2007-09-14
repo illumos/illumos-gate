@@ -589,7 +589,8 @@ extern void add_cpunode2devtree(processorid_t, struct cpuid_info *);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
-extern size_t cpuid_get_mwait_size(struct cpu *cpu);
+extern uint32_t *cpuid_mwait_alloc(struct cpu *);
+extern void cpuid_mwait_free(struct cpu *);
 
 struct cpu_ucode_info;
 

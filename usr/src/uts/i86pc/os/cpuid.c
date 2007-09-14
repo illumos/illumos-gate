@@ -40,6 +40,7 @@
 #include <sys/sunndi.h>
 #include <sys/cpuvar.h>
 #include <sys/processor.h>
+#include <sys/sysmacros.h>
 #include <sys/pg.h>
 #include <sys/fp.h>
 #include <sys/controlregs.h>
@@ -116,10 +117,17 @@ const char CyrixInstead[] = "CyrixInstead";
 
 /*
  * monitor/mwait info.
+ *
+ * size_actual and buf_actual are the real address and size allocated to get
+ * proper mwait_buf alignement.  buf_actual and size_actual should be passed
+ * to kmem_free().  Currently kmem_alloc() and mwait happen to both use
+ * processor cache-line alignment, but this is not guarantied in the furture.
  */
 struct mwait_info {
 	size_t		mon_min;	/* min size to avoid missed wakeups */
 	size_t		mon_max;	/* size to avoid false wakeups */
+	size_t		size_actual;	/* size actually allocated */
+	void		*buf_actual;	/* memory actually allocated */
 	uint32_t	support;	/* processor support of monitor/mwait */
 };
 
@@ -465,6 +473,7 @@ cpuid_pass1(cpu_t *cpu)
 	struct cpuid_info *cpi;
 	struct cpuid_regs *cp;
 	int xcpuid;
+	extern int idle_cpu_prefer_mwait;
 
 
 	/*
@@ -653,6 +662,16 @@ cpuid_pass1(cpu_t *cpu)
 		 */
 		if (cpi->cpi_maxeax < 5)
 			mask_ecx &= ~CPUID_INTC_ECX_MON;
+
+		/*
+		 * Do not use MONITOR/MWAIT to halt in the idle loop on any AMD
+		 * processors.  AMD does not intend MWAIT to be used in the cpu
+		 * idle loop on current and future processors.  10h and future
+		 * AMD processors use more power in MWAIT than HLT.
+		 * Pre-family-10h Opterons do not have the MWAIT instruction.
+		 */
+		idle_cpu_prefer_mwait = 0;
+
 		break;
 	case X86_VENDOR_TM:
 		/*
@@ -1197,6 +1216,8 @@ cpuid_pass2(cpu_t *cpu)
 			break;
 
 		case 5:	/* Monitor/Mwait parameters */
+		{
+			size_t mwait_size;
 
 			/*
 			 * check cpi_mwait.support which was set in cpuid_pass1
@@ -1204,8 +1225,23 @@ cpuid_pass2(cpu_t *cpu)
 			if (!(cpi->cpi_mwait.support & MWAIT_SUPPORT))
 				break;
 
+			/*
+			 * Protect ourself from insane mwait line size.
+			 * Workaround for incomplete hardware emulator(s).
+			 */
+			mwait_size = (size_t)MWAIT_SIZE_MAX(cpi);
+			if (mwait_size < sizeof (uint32_t) ||
+			    !ISP2(mwait_size)) {
+#if DEBUG
+				cmn_err(CE_NOTE, "Cannot handle cpu %d mwait "
+				    "size %ld",
+				    cpu->cpu_id, (long)mwait_size);
+#endif
+				break;
+			}
+
 			cpi->cpi_mwait.mon_min = (size_t)MWAIT_SIZE_MIN(cpi);
-			cpi->cpi_mwait.mon_max = (size_t)MWAIT_SIZE_MAX(cpi);
+			cpi->cpi_mwait.mon_max = mwait_size;
 			if (MWAIT_EXTENSION(cpi)) {
 				cpi->cpi_mwait.support |= MWAIT_EXTENSIONS;
 				if (MWAIT_INT_ENABLE(cpi))
@@ -1213,6 +1249,7 @@ cpuid_pass2(cpu_t *cpu)
 					    MWAIT_ECX_INT_ENABLE;
 			}
 			break;
+		}
 		default:
 			break;
 		}
@@ -3405,9 +3442,59 @@ getl2cacheinfo(cpu_t *cpu, int *csz, int *lsz, int *assoc)
 	return (l2i->l2i_ret);
 }
 
-size_t
-cpuid_get_mwait_size(cpu_t *cpu)
+uint32_t *
+cpuid_mwait_alloc(cpu_t *cpu)
+{
+	uint32_t	*ret;
+	size_t		mwait_size;
+
+	ASSERT(cpuid_checkpass(cpu, 2));
+
+	mwait_size = cpu->cpu_m.mcpu_cpi->cpi_mwait.mon_max;
+	if (mwait_size == 0)
+		return (NULL);
+
+	/*
+	 * kmem_alloc() returns cache line size aligned data for mwait_size
+	 * allocations.  mwait_size is currently cache line sized.  Neither
+	 * of these implementation details are guarantied to be true in the
+	 * future.
+	 *
+	 * First try allocating mwait_size as kmem_alloc() currently returns
+	 * correctly aligned memory.  If kmem_alloc() does not return
+	 * mwait_size aligned memory, then use mwait_size ROUNDUP.
+	 *
+	 * Set cpi_mwait.buf_actual and cpi_mwait.size_actual in case we
+	 * decide to free this memory.
+	 */
+	ret = kmem_zalloc(mwait_size, KM_SLEEP);
+	if (ret == (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size)) {
+		cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual = ret;
+		cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual = mwait_size;
+		*ret = MWAIT_RUNNING;
+		return (ret);
+	} else {
+		kmem_free(ret, mwait_size);
+		ret = kmem_zalloc(mwait_size * 2, KM_SLEEP);
+		cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual = ret;
+		cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual = mwait_size * 2;
+		ret = (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size);
+		*ret = MWAIT_RUNNING;
+		return (ret);
+	}
+}
+
+void
+cpuid_mwait_free(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 2));
-	return (cpu->cpu_m.mcpu_cpi->cpi_mwait.mon_max);
+
+	if (cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual != NULL &&
+	    cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual > 0) {
+		kmem_free(cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual,
+		    cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual);
+	}
+
+	cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual = NULL;
+	cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual = 0;
 }

@@ -822,55 +822,32 @@ mach_init()
 	/*
 	 * Initialize the dispatcher's function hooks
 	 * to enable CPU halting when idle.
-	 * Do not use monitor/mwait if idle_cpu_use_hlt is not set(spin idle).
+	 * Do not use monitor/mwait if idle_cpu_use_hlt is not set(spin idle)
+	 * or idle_cpu_prefer_mwait is not set.
 	 * Allocate monitor/mwait buffer for cpu0.
 	 */
 	if (idle_cpu_use_hlt) {
 		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
-			CPU->cpu_m.mcpu_mwait = mach_alloc_mwait(CPU);
-			idle_cpu = cpu_idle_mwait;
+			CPU->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
+			/*
+			 * Protect ourself from insane mwait size.
+			 */
+			if (CPU->cpu_m.mcpu_mwait == NULL) {
+#ifdef DEBUG
+				cmn_err(CE_NOTE, "Using hlt idle.  Cannot "
+				    "handle cpu 0 mwait size.");
+#endif
+				idle_cpu_prefer_mwait = 0;
+				idle_cpu = cpu_idle;
+			} else {
+				idle_cpu = cpu_idle_mwait;
+			}
 		} else {
 			idle_cpu = cpu_idle;
 		}
 	}
 
 	mach_smpinit();
-}
-
-/*
- * Return a pointer to memory suitable for monitor/mwait use.  Memory must be
- * aligned as specified by cpuid (a cache line size).
- */
-uint32_t *
-mach_alloc_mwait(cpu_t *cp)
-{
-	size_t		mwait_size = cpuid_get_mwait_size(cp);
-	uint32_t	*ret;
-
-	if (mwait_size < sizeof (uint32_t) || !ISP2(mwait_size))
-		panic("Can't handle mwait size %ld", (long)mwait_size);
-
-	/*
-	 * kmem_alloc() returns cache line size aligned data for mwait_size
-	 * allocations.  mwait_size is currently cache line sized.  Neither
-	 * of these implementation details are guarantied to be true in the
-	 * future.
-	 *
-	 * First try allocating mwait_size as kmem_alloc() currently returns
-	 * correctly aligned memory.  If kmem_alloc() does not return
-	 * mwait_size aligned memory, then use mwait_size ROUNDUP.
-	 */
-	ret = kmem_zalloc(mwait_size, KM_SLEEP);
-	if (ret == (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size)) {
-		*ret = MWAIT_RUNNING;
-		return (ret);
-	} else {
-		kmem_free(ret, mwait_size);
-		ret = kmem_zalloc(mwait_size * 2, KM_SLEEP);
-		ret = (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size);
-		*ret = MWAIT_RUNNING;
-		return (ret);
-	}
 }
 
 static void

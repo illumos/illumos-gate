@@ -238,6 +238,7 @@ mp_startup_init(int cpun)
 	kthread_id_t tp;
 	caddr_t	sp;
 	proc_t *procp;
+	extern int idle_cpu_prefer_mwait;
 	extern void idle();
 
 #ifdef TRAPTRACE
@@ -247,8 +248,8 @@ mp_startup_init(int cpun)
 	ASSERT(cpun < NCPU && cpu[cpun] == NULL);
 
 	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
-	if (x86_feature & X86_MWAIT)
-		cp->cpu_m.mcpu_mwait = mach_alloc_mwait(CPU);
+	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
+		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
 
 	procp = curthread->t_procp;
 
@@ -499,6 +500,8 @@ mp_startup_fini(struct cpu *cp, int error)
 	disp_cpu_fini(cp);
 	mutex_exit(&cpu_lock);
 
+	if (cp->cpu_m.mcpu_mwait != NULL)
+		cpuid_mwait_free(cp);
 	kmem_free(cp, sizeof (*cp));
 }
 
