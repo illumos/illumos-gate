@@ -51,6 +51,7 @@
 #include <vm/seg_enum.h>
 #include <sys/kstat.h>
 #include <sys/kmem.h>
+#include <sys/list.h>
 #ifdef	_KERNEL
 #include <sys/buf.h>
 #endif	/* _KERNEL */
@@ -169,6 +170,16 @@ typedef enum vtype {
 } vtype_t;
 
 /*
+ * VSD - Vnode Specific Data
+ * Used to associate additional private data with a vnode.
+ */
+struct vsd_node {
+	list_node_t vs_nodes;		/* list of all VSD nodes */
+	uint_t vs_nkeys;		/* entries in value array */
+	void **vs_value;		/* array of value/key */
+};
+
+/*
  * Many of the fields in the vnode are read-only once they are initialized
  * at vnode creation time.  Other fields are protected by locks.
  *
@@ -182,6 +193,7 @@ typedef enum vtype {
  *   v_count
  *   v_shrlocks
  *   v_path
+ *   v_vsd
  *
  * A special lock (implemented by vn_vfswlock in vnode.c) protects:
  *   v_vfsmountedhere
@@ -249,6 +261,7 @@ typedef struct vnode {
 	struct vnode	*v_msprev;	/* list of vnodes on an mset */
 	krwlock_t	v_mslock;	/* protects v_mset */
 	void		*v_fopdata;	/* list of file ops event watches */
+	struct vsd_node *v_vsd;		/* vnode specific data */
 } vnode_t;
 
 #define	IS_DEVVP(vp)	\
@@ -923,6 +936,13 @@ void	vnevent_link(vnode_t *);
 void	vnevent_rename_dest_dir(vnode_t *);
 void	vnevent_mountedover(vnode_t *);
 int	vnevent_support(vnode_t *);
+
+/* Vnode specific data */
+void vsd_create(uint_t *, void (*)(void *));
+void vsd_destroy(uint_t *);
+void *vsd_get(vnode_t *, uint_t);
+int vsd_set(vnode_t *, uint_t, void *);
+void vsd_free(vnode_t *);
 
 /* Context identification */
 u_longlong_t	fs_new_caller_id();

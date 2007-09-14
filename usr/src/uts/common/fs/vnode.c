@@ -103,6 +103,39 @@ kmutex_t	vskstat_tree_lock;
 int vopstats_enabled = 1;
 
 /*
+ * forward declarations for internal vnode specific data (vsd)
+ */
+static void *vsd_realloc(void *, size_t, size_t);
+
+/*
+ * VSD -- VNODE SPECIFIC DATA
+ * The v_data pointer is typically used by a file system to store a
+ * pointer to the file system's private node (e.g. ufs inode, nfs rnode).
+ * However, there are times when additional project private data needs
+ * to be stored separately from the data (node) pointed to by v_data.
+ * This additional data could be stored by the file system itself or
+ * by a completely different kernel entity.  VSD provides a way for
+ * callers to obtain a key and store a pointer to private data associated
+ * with a vnode.
+ *
+ * Callers are responsible for protecting the vsd by holding v_lock
+ * for calls to vsd_set() and vsd_get().
+ */
+
+/*
+ * vsd_lock protects:
+ *   vsd_nkeys - creation and deletion of vsd keys
+ *   vsd_list - insertion and deletion of vsd_node in the vsd_list
+ *   vsd_destructor - adding and removing destructors to the list
+ */
+static kmutex_t		vsd_lock;
+static uint_t		vsd_nkeys;	 /* size of destructor array */
+/* list of vsd_node's */
+static list_t *vsd_list = NULL;
+/* per-key destructor funcs */
+static void 		(**vsd_destructor)(void *);
+
+/*
  * The following is the common set of actions needed to update the
  * vopstats structure from a vnode op.  Both VOPSTATS_UPDATE() and
  * VOPSTATS_UPDATE_IO() do almost the same thing, except for the
@@ -859,8 +892,7 @@ top:
 
 		if (error =
 		    vn_createat(pnamep, seg, &vattr, excl, mode, &vp, crwhy,
-		    (filemode & ~(FTRUNC|FEXCL)),
-		    umask, startvp))
+		    (filemode & ~(FTRUNC|FEXCL)), umask, startvp))
 			return (error);
 	} else {
 		/*
@@ -2027,6 +2059,7 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
 	vp->v_path = NULL;
 	vp->v_mpssdata = NULL;
+	vp->v_vsd = NULL;
 	vp->v_fopdata = NULL;
 
 	return (0);
@@ -2099,6 +2132,7 @@ vn_recycle(vnode_t *vp)
 		free_fopdata(vp);
 	}
 	vp->v_mpssdata = NULL;
+	vsd_free(vp);
 }
 
 /*
@@ -2184,6 +2218,7 @@ vn_free(vnode_t *vp)
 		free_fopdata(vp);
 	}
 	vp->v_mpssdata = NULL;
+	vsd_free(vp);
 	kmem_cache_free(vn_cache, vp);
 }
 
@@ -3646,4 +3681,263 @@ fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm)
 	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent, dvp, fnm);
 	VOPSTATS_UPDATE(vp, vnevent);
 	return (err);
+}
+
+/*
+ * Default destructor
+ *	Needed because NULL destructor means that the key is unused
+ */
+/* ARGSUSED */
+void
+vsd_defaultdestructor(void *value)
+{}
+
+/*
+ * Create a key (index into per vnode array)
+ *	Locks out vsd_create, vsd_destroy, and vsd_free
+ *	May allocate memory with lock held
+ */
+void
+vsd_create(uint_t *keyp, void (*destructor)(void *))
+{
+	int	i;
+	uint_t	nkeys;
+
+	/*
+	 * if key is allocated, do nothing
+	 */
+	mutex_enter(&vsd_lock);
+	if (*keyp) {
+		mutex_exit(&vsd_lock);
+		return;
+	}
+	/*
+	 * find an unused key
+	 */
+	if (destructor == NULL)
+		destructor = vsd_defaultdestructor;
+
+	for (i = 0; i < vsd_nkeys; ++i)
+		if (vsd_destructor[i] == NULL)
+			break;
+
+	/*
+	 * if no unused keys, increase the size of the destructor array
+	 */
+	if (i == vsd_nkeys) {
+		if ((nkeys = (vsd_nkeys << 1)) == 0)
+			nkeys = 1;
+		vsd_destructor =
+		    (void (**)(void *))vsd_realloc((void *)vsd_destructor,
+		    (size_t)(vsd_nkeys * sizeof (void (*)(void *))),
+		    (size_t)(nkeys * sizeof (void (*)(void *))));
+		vsd_nkeys = nkeys;
+	}
+
+	/*
+	 * allocate the next available unused key
+	 */
+	vsd_destructor[i] = destructor;
+	*keyp = i + 1;
+
+	/* create vsd_list, if it doesn't exist */
+	if (vsd_list == NULL) {
+		vsd_list = kmem_alloc(sizeof (list_t), KM_SLEEP);
+		list_create(vsd_list, sizeof (struct vsd_node),
+		    offsetof(struct vsd_node, vs_nodes));
+	}
+
+	mutex_exit(&vsd_lock);
+}
+
+/*
+ * Destroy a key
+ *
+ * Assumes that the caller is preventing vsd_set and vsd_get
+ * Locks out vsd_create, vsd_destroy, and vsd_free
+ * May free memory with lock held
+ */
+void
+vsd_destroy(uint_t *keyp)
+{
+	uint_t key;
+	struct vsd_node *vsd;
+
+	/*
+	 * protect the key namespace and our destructor lists
+	 */
+	mutex_enter(&vsd_lock);
+	key = *keyp;
+	*keyp = 0;
+
+	ASSERT(key <= vsd_nkeys);
+
+	/*
+	 * if the key is valid
+	 */
+	if (key != 0) {
+		uint_t k = key - 1;
+		/*
+		 * for every vnode with VSD, call key's destructor
+		 */
+		for (vsd = list_head(vsd_list); vsd != NULL;
+		    vsd = list_next(vsd_list, vsd)) {
+			/*
+			 * no VSD for key in this vnode
+			 */
+			if (key > vsd->vs_nkeys)
+				continue;
+			/*
+			 * call destructor for key
+			 */
+			if (vsd->vs_value[k] && vsd_destructor[k])
+				(*vsd_destructor[k])(vsd->vs_value[k]);
+			/*
+			 * reset value for key
+			 */
+			vsd->vs_value[k] = NULL;
+		}
+		/*
+		 * actually free the key (NULL destructor == unused)
+		 */
+		vsd_destructor[k] = NULL;
+	}
+
+	mutex_exit(&vsd_lock);
+}
+
+/*
+ * Quickly return the per vnode value that was stored with the specified key
+ * Assumes the caller is protecting key from vsd_create and vsd_destroy
+ * Assumes the caller is holding v_lock to protect the vsd.
+ */
+void *
+vsd_get(vnode_t *vp, uint_t key)
+{
+	struct vsd_node *vsd;
+
+	/*
+	 * The caller needs to pass a valid vnode.
+	 */
+	ASSERT(vp != NULL);
+	if (vp == NULL)
+		return (NULL);
+
+	vsd = vp->v_vsd;
+
+	if (key && vsd != NULL && key <= vsd->vs_nkeys)
+		return (vsd->vs_value[key - 1]);
+	return (NULL);
+}
+
+/*
+ * Set a per vnode value indexed with the specified key
+ * Assumes the caller is holding v_lock to protect the vsd.
+ */
+int
+vsd_set(vnode_t *vp, uint_t key, void *value)
+{
+	struct vsd_node *vsd = vp->v_vsd;
+
+	if (key == 0)
+		return (EINVAL);
+	if (vsd == NULL)
+		vsd = vp->v_vsd = kmem_zalloc(sizeof (*vsd), KM_SLEEP);
+
+	/*
+	 * If the vsd was just allocated, vs_nkeys will be 0, so the following
+	 * code won't happen and we will continue down and allocate space for
+	 * the vs_value array.
+	 * If the caller is replacing one value with another, then it is up
+	 * to the caller to free/rele/destroy the previous value (if needed).
+	 */
+	if (key <= vsd->vs_nkeys) {
+		vsd->vs_value[key - 1] = value;
+		return (0);
+	}
+
+	ASSERT(key <= vsd_nkeys);
+
+	if (vsd->vs_nkeys == 0) {
+		mutex_enter(&vsd_lock);	/* lock out vsd_destroy() */
+		/*
+		 * Link onto list of all VSD nodes.
+		 */
+		list_insert_head(vsd_list, vsd);
+		mutex_exit(&vsd_lock);
+	}
+
+	/*
+	 * Allocate vnode local storage and set the value for key
+	 */
+	vsd->vs_value = vsd_realloc(vsd->vs_value,
+	    vsd->vs_nkeys * sizeof (void *),
+	    key * sizeof (void *));
+	vsd->vs_nkeys = key;
+	vsd->vs_value[key - 1] = value;
+
+	return (0);
+}
+
+/*
+ * Called from vn_free() to run the destructor function for each vsd
+ *	Locks out vsd_create and vsd_destroy
+ *	Assumes that the destructor *DOES NOT* use vsd
+ */
+void
+vsd_free(vnode_t *vp)
+{
+	int i;
+	struct vsd_node *vsd = vp->v_vsd;
+
+	if (vsd == NULL)
+		return;
+
+	if (vsd->vs_nkeys == 0) {
+		kmem_free(vsd, sizeof (*vsd));
+		vp->v_vsd = NULL;
+		return;
+	}
+
+	/*
+	 * lock out vsd_create and vsd_destroy, call
+	 * the destructor, and mark the value as destroyed.
+	 */
+	mutex_enter(&vsd_lock);
+
+	for (i = 0; i < vsd->vs_nkeys; i++) {
+		if (vsd->vs_value[i] && vsd_destructor[i])
+			(*vsd_destructor[i])(vsd->vs_value[i]);
+		vsd->vs_value[i] = NULL;
+	}
+
+	/*
+	 * remove from linked list of VSD nodes
+	 */
+	list_remove(vsd_list, vsd);
+
+	mutex_exit(&vsd_lock);
+
+	/*
+	 * free up the VSD
+	 */
+	kmem_free(vsd->vs_value, vsd->vs_nkeys * sizeof (void *));
+	kmem_free(vsd, sizeof (struct vsd_node));
+	vp->v_vsd = NULL;
+}
+
+/*
+ * realloc
+ */
+static void *
+vsd_realloc(void *old, size_t osize, size_t nsize)
+{
+	void *new;
+
+	new = kmem_zalloc(nsize, KM_SLEEP);
+	if (old) {
+		bcopy(old, new, osize);
+		kmem_free(old, osize);
+	}
+	return (new);
 }

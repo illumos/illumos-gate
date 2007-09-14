@@ -43,6 +43,7 @@
 
 
 extern time_t rfs4_start_time;
+extern uint_t nfs4_srv_vkey;
 
 stateid4 special0 = {
 	0,
@@ -2198,7 +2199,12 @@ rfs4_file_destroy(rfs4_entry_t u_entry)
 		    fp->filehandle.nfs_fh4_len);
 	cv_destroy(fp->dinfo->recall_cv);
 	if (fp->vp) {
-		VN_RELE(fp->vp);
+		vnode_t *vp = fp->vp;
+
+		mutex_enter(&vp->v_lock);
+		(void) vsd_set(vp, nfs4_srv_vkey, NULL);
+		mutex_exit(&vp->v_lock);
+		VN_RELE(vp);
 		fp->vp = NULL;
 	}
 	rw_destroy(&fp->file_rwlock);
@@ -2264,6 +2270,13 @@ rfs4_file_create(rfs4_entry_t u_entry, void *arg)
 
 	rw_init(&fp->file_rwlock, NULL, RW_DEFAULT, NULL);
 
+	mutex_enter(&vp->v_lock);
+	if (vsd_set(vp, nfs4_srv_vkey, (void *)fp)) {
+		ASSERT(FALSE);
+		cmn_err(CE_WARN, "rfs4_file_create: vsd_set failed.");
+	}
+	mutex_exit(&vp->v_lock);
+
 	return (TRUE);
 }
 
@@ -2276,8 +2289,24 @@ rfs4_findfile(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 	arg.vp = vp;
 	arg.fh = fh;
 
-	fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
-	    &arg, RFS4_DBS_VALID);
+	if (*create == TRUE)
+		fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
+		    &arg, RFS4_DBS_VALID);
+	else {
+		mutex_enter(&vp->v_lock);
+		fp = (rfs4_file_t *)vsd_get(vp, nfs4_srv_vkey);
+		mutex_exit(&vp->v_lock);
+		if (fp) {
+			rfs4_dbe_lock(fp->dbe);
+			if (rfs4_dbe_is_invalid(fp->dbe)) {
+				rfs4_dbe_unlock(fp->dbe);
+				fp = NULL;
+			} else {
+				rfs4_dbe_hold(fp->dbe);
+				rfs4_dbe_unlock(fp->dbe);
+			}
+		}
+	}
 	return (fp);
 }
 
@@ -2296,19 +2325,36 @@ rfs4_findfile_withlock(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 	rfs4_fcreate_arg arg;
 	bool_t screate = *create;
 
+	if (screate == FALSE) {
+		mutex_enter(&vp->v_lock);
+		fp = (rfs4_file_t *)vsd_get(vp, nfs4_srv_vkey);
+		mutex_exit(&vp->v_lock);
+		if (fp) {
+			rfs4_dbe_lock(fp->dbe);
+			if (rfs4_dbe_is_invalid(fp->dbe)) {
+				rfs4_dbe_unlock(fp->dbe);
+				fp = NULL;
+			} else {
+				rfs4_dbe_hold(fp->dbe);
+				rfs4_dbe_unlock(fp->dbe);
+				rw_enter(&fp->file_rwlock, RW_WRITER);
+			}
+		}
+	} else {
 retry:
-	arg.vp = vp;
-	arg.fh = fh;
+		arg.vp = vp;
+		arg.fh = fh;
 
-	fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
-	    &arg, RFS4_DBS_VALID);
-	if (fp != NULL) {
-		rw_enter(&fp->file_rwlock, RW_WRITER);
-		if (fp->vp == NULL) {
-			rw_exit(&fp->file_rwlock);
-			rfs4_file_rele(fp);
-			*create = screate;
-			goto retry;
+		fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
+		    &arg, RFS4_DBS_VALID);
+		if (fp != NULL) {
+			rw_enter(&fp->file_rwlock, RW_WRITER);
+			if (fp->vp == NULL) {
+				rw_exit(&fp->file_rwlock);
+				rfs4_file_rele(fp);
+				*create = screate;
+				goto retry;
+			}
 		}
 	}
 
@@ -3642,7 +3688,12 @@ rfs4_close_all_state(rfs4_file_t *fp)
 	 */
 	rfs4_dbe_lock(fp->dbe);
 	if (fp->vp) {
-		VN_RELE(fp->vp);
+		vnode_t *vp = fp->vp;
+
+		mutex_enter(&vp->v_lock);
+		(void) vsd_set(vp, nfs4_srv_vkey, NULL);
+		mutex_exit(&vp->v_lock);
+		VN_RELE(vp);
 		fp->vp = NULL;
 	}
 	rfs4_dbe_unlock(fp->dbe);
