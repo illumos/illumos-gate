@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,7 +267,7 @@ extern char *crypt(const char *, const char *);
 	defined(__EXTENSIONS__)
 extern char *ctermid(char *);
 #endif /* (!defined(_POSIX_C_SOURCE) ... */
-#if !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) || defined(__EXTENSIONS_)
+#if !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) || defined(__EXTENSIONS__)
 extern char *ctermid_r(char *);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) ... */
 /* Marked as LEGACY in SUSv2 and removed in SUSv3 */
@@ -597,7 +597,7 @@ extern char *crypt();
 #if !defined(_POSIX_C_SOURCE) || defined(_XPG3) || defined(__EXTENSIONS__)
 extern char *ctermid();
 #endif /* (!defined(_POSIX_C_SOURCE) || defined(_XPG3)... */
-#if !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) || defined(__EXTENSIONS_)
+#if !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) || defined(__EXTENSIONS__)
 extern char *ctermid_r();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(_REENTRANT) ... */
 #if !defined(_XPG6) || defined(__EXTENSIONS__)
