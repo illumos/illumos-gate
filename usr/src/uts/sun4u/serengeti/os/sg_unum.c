@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,8 @@
 #include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
+#include <sys/cheetahregs.h>
+#include <sys/cpuvar.h>
 
 /*
  * When an ECC error occurs on an E$ DIMM, the error handling code requests a
@@ -76,7 +77,7 @@ sg_get_ecacheunum(int cpuid, uint64_t physaddr, char *buf, uint_t buflen,
 	int node = SG_PORTID_TO_NODEID(cpuid);
 	int board = SG_CPU_BD_PORTID_TO_BD_NUM(cpuid);
 	int proc = SG_PORTID_TO_CPU_POSN(cpuid);
-	int dimm = (physaddr & SG_ECACHE_DIMM_MASK) >> SG_ECACHE_DIMM_SHIFT;
+	int dimm;
 
 	/*
 	 * node and dimm will always be valid.  board and proc may be -1 if
@@ -85,6 +86,13 @@ sg_get_ecacheunum(int cpuid, uint64_t physaddr, char *buf, uint_t buflen,
 	if ((board == -1) || (proc == -1)) {
 		return (EINVAL);
 	}
+
+	/* Find the DIMM number (0 or 1) based on the value of physaddr bit 4 */
+	if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation) ||
+	    IS_JAGUAR(cpunodes[CPU->cpu_id].implementation))
+		dimm = (physaddr & SG_ECACHE_DIMM_MASK) ? 0 : 1;
+	else
+		dimm = (physaddr & SG_ECACHE_DIMM_MASK) ? 1 : 0;
 
 	*lenp = snprintf(buf, buflen, "/N%d/SB%d/P%d/E%d J%d",
 	    node, board, proc, dimm, sg_j_number[proc][dimm]);

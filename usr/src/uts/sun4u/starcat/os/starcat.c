@@ -201,7 +201,7 @@ set_platform_cage_params(void)
 		pgcnt_t preferred_cage_size;
 
 		preferred_cage_size =
-			MAX(starcat_startup_cage_size, total_pages / 256);
+		    MAX(starcat_startup_cage_size, total_pages / 256);
 
 #ifdef DEBUG
 		if (starcat_cage_size_limit)
@@ -241,8 +241,7 @@ plat_cpu_poweron(struct cpu *cp)
 	int (*starcat_cpu_poweron)(struct cpu *) = NULL;
 
 	starcat_cpu_poweron =
-		(int (*)(struct cpu *))kobj_getsymvalue(
-			"drmach_cpu_poweron", 0);
+	    (int (*)(struct cpu *))kobj_getsymvalue("drmach_cpu_poweron", 0);
 
 	if (starcat_cpu_poweron == NULL)
 		return (ENOTSUP);
@@ -257,8 +256,7 @@ plat_cpu_poweroff(struct cpu *cp)
 	int (*starcat_cpu_poweroff)(struct cpu *) = NULL;
 
 	starcat_cpu_poweroff =
-		(int (*)(struct cpu *))kobj_getsymvalue(
-			"drmach_cpu_poweroff", 0);
+	    (int (*)(struct cpu *))kobj_getsymvalue("drmach_cpu_poweroff", 0);
 
 	if (starcat_cpu_poweroff == NULL)
 		return (ENOTSUP);
@@ -366,7 +364,7 @@ plat_fill_mc(pnode_t nodeid)
 	 * Starcat memory controller portid == global CPU id
 	 */
 	if ((prom_getprop(nodeid, "portid", (caddr_t)&portid) < 0) ||
-		(portid == -1))
+	    (portid == -1))
 		return;
 
 	expnum = STARCAT_CPUID_TO_EXPANDER(portid);
@@ -710,11 +708,11 @@ load_platform_drivers(void)
 	}
 
 	if (prom_phandle_to_path((phandle_t)tunnel, chosen_iosram,
-			sizeof (chosen_iosram)) < 0) {
+	    sizeof (chosen_iosram)) < 0) {
 		(void) prom_printf("prom_phandle_to_path(0x%x) failed\n",
-				tunnel);
+		    tunnel);
 		cmn_err(CE_PANIC, "prom_phandle_to_path(0x%x) failed\n",
-				tunnel);
+		    tunnel);
 	}
 
 	/*
@@ -726,9 +724,9 @@ load_platform_drivers(void)
 
 	if ((chosen_devi = e_ddi_hold_devi_by_path(chosen_iosram, 0)) == NULL) {
 		(void) prom_printf("e_ddi_hold_devi_by_path(%s) failed\n",
-			chosen_iosram);
+		    chosen_iosram);
 		cmn_err(CE_PANIC, "e_ddi_hold_devi_by_path(%s) failed\n",
-			chosen_iosram);
+		    chosen_iosram);
 	}
 	ndi_rele_devi(chosen_devi);
 
@@ -737,9 +735,9 @@ load_platform_drivers(void)
 	 * write pointers.
 	 */
 	iosram_rdp = (int (*)(uint32_t, uint32_t, uint32_t, caddr_t))
-			modgetsymvalue("iosram_rd", 0);
+	    modgetsymvalue("iosram_rd", 0);
 	iosram_wrp = (int (*)(uint32_t, uint32_t, uint32_t, caddr_t))
-			modgetsymvalue("iosram_wr", 0);
+	    modgetsymvalue("iosram_wr", 0);
 
 	/*
 	 * Need to check for null proc LPA after IOSRAM driver is loaded
@@ -925,8 +923,7 @@ plat_get_ecache_cpu(dev_info_t *dip, void *arg)
 	 */
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-						"device_type", &devtype)
-				!= DDI_PROP_SUCCESS)
+	    "device_type", &devtype) != DDI_PROP_SUCCESS)
 		return (DDI_WALK_CONTINUE);
 
 	if (strcmp(devtype, "cpu")) {
@@ -942,15 +939,15 @@ plat_get_ecache_cpu(dev_info_t *dip, void *arg)
 	 */
 
 	portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "cpuid", -1);
+	    DDI_PROP_DONTPASS, "cpuid", -1);
 
 	if (portid == -1)
 		portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "portid", -1);
+		    DDI_PROP_DONTPASS, "portid", -1);
 
 	if (portid == -1)
 		portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "upa-portid", -1);
+		    DDI_PROP_DONTPASS, "upa-portid", -1);
 
 	cpuarg = (plat_ecache_cpu_arg_t *)arg;
 
@@ -962,25 +959,24 @@ plat_get_ecache_cpu(dev_info_t *dip, void *arg)
 	 */
 
 	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-				"ecache-dimm-label", &dimm_labels, &numlabels)
-			!= DDI_PROP_SUCCESS) {
+	    "ecache-dimm-label", &dimm_labels, &numlabels)
+	    != DDI_PROP_SUCCESS) {
 #ifdef	DEBUG
 		cmn_err(CE_NOTE, "cpuid=%d missing ecache-dimm-label property",
-			portid);
+		    portid);
 #endif	/* DEBUG */
 		return (DDI_WALK_TERMINATE);
 	}
 
 	if (cpuarg->dimm < numlabels) {
-		cpuarg->jnum = kmem_alloc(
-					strlen(dimm_labels[cpuarg->dimm]) + 1,
-					KM_SLEEP);
+		cpuarg->jnum = kmem_alloc(strlen(dimm_labels[cpuarg->dimm]) + 1,
+		    KM_SLEEP);
 		if (cpuarg->jnum != (char *)NULL)
 			(void) strcpy(cpuarg->jnum, dimm_labels[cpuarg->dimm]);
 #ifdef	DEBUG
 		else
 			cmn_err(CE_WARN,
-				"cannot kmem_alloc for ecache dimm label");
+			    "cannot kmem_alloc for ecache dimm label");
 #endif	/* DEBUG */
 	}
 
@@ -993,7 +989,6 @@ plat_get_ecache_cpu(dev_info_t *dip, void *arg)
  * Bit 4 of physical address indicates ecache 0 or 1
  */
 
-#define	ECACHE_DIMM_SHIFT	4
 #define	ECACHE_DIMM_MASK	0x10
 
 /*
@@ -1011,7 +1006,16 @@ plat_get_ecacheunum(int cpuid, unsigned long long physaddr, char *buf,
 
 	findcpu.jnum = (char *)NULL;
 	findcpu.cpuid = cpuid;
-	findcpu.dimm = (physaddr & ECACHE_DIMM_MASK) >> ECACHE_DIMM_SHIFT;
+
+	/*
+	 * Bit 4 of physaddr equal 0 maps to E0 and 1 maps to E1
+	 * except for Panther and Jaguar where it indicates the reverse
+	 */
+	if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation) ||
+	    IS_JAGUAR(cpunodes[CPU->cpu_id].implementation))
+		findcpu.dimm =  (physaddr & ECACHE_DIMM_MASK) ? 0 : 1;
+	else
+		findcpu.dimm =  (physaddr & ECACHE_DIMM_MASK) ? 1 : 0;
 
 	/*
 	 * Walk the device tree, find this specific CPU, and get the label
@@ -1037,7 +1041,7 @@ plat_get_ecacheunum(int cpuid, unsigned long long physaddr, char *buf,
 	 * changing plat_log_fruid_error() as well!
 	 */
 	(void) snprintf(buf, buflen, "%s%u/P%u/E%u J%s", (slot ? "IO" : "SB"),
-			expander, proc, findcpu.dimm, findcpu.jnum);
+	    expander, proc, findcpu.dimm, findcpu.jnum);
 
 	*ustrlen = strlen(buf);
 
@@ -1059,7 +1063,7 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 	if (flt_in_memory) {
 		if (p2get_mem_unum != NULL) {
 			return (p2get_mem_unum(synd_code, P2ALIGN(flt_addr, 8),
-				buf, buflen, lenp));
+			    buf, buflen, lenp));
 		} else {
 			return (ENOTSUP);
 		}
@@ -1139,12 +1143,11 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 	 */
 	if (dimm == -1)
 		(void) snprintf(new_unum, UNUM_NAMLEN, "%s%u/P%u/B%d %s",
-			(slot ? "IO" : "SB"), expander,
-			proc, (bank & 0x1), unum);
+		    (slot ? "IO" : "SB"), expander, proc, (bank & 0x1), unum);
 	else
 		(void) snprintf(new_unum, UNUM_NAMLEN, "%s%u/P%u/B%d/D%d %s",
-			(slot ? "IO" : "SB"), expander,
-			proc, (bank & 0x1), (dimm & 0x3), unum);
+		    (slot ? "IO" : "SB"), expander,
+		    proc, (bank & 0x1), (dimm & 0x3), unum);
 
 	(void) strcpy(unum, new_unum);
 }
@@ -1236,7 +1239,7 @@ plat_startup_memlist(caddr_t alloc_base)
 
 	tmp_alloc_base = efcode_alloc(alloc_base);
 	tmp_alloc_base = (caddr_t)roundup((uintptr_t)tmp_alloc_base,
-					    ecache_alignsize);
+	    ecache_alignsize);
 	return (tmp_alloc_base);
 }
 
