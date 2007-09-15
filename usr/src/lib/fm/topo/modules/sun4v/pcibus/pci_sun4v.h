@@ -59,6 +59,16 @@ physnm_t t5220_pnms[] = {
 	{   5, "MB/RISER2/PCIE5" }
 };
 
+physnm_t netra_t5220_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/RISER0/PCIE0" },
+	{   1, "MB/RISER1/PCIE1" },
+	{   2, "MB/RISER2/PCIE2" },
+	{   3, "MB/PCI_MEZZ/PCIE3" },
+	{   4, "MB/PCI_MEZZ/PCIX1" },
+	{   5, "MB/PCI_MEZZ/PCIX2" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
@@ -78,7 +88,10 @@ pphysnm_t plat_pnames[] = {
 	    t5120_pnms },
 	{ "T5240",
 	    sizeof (t5220_pnms) / sizeof (physnm_t),
-	    t5220_pnms }
+	    t5220_pnms },
+	{ "Netra-T5220",
+	    sizeof (netra_t5220_pnms) / sizeof (physnm_t),
+	    netra_t5220_pnms }
 };
 
 physlot_names_t PhyslotNMs = {
@@ -106,6 +119,9 @@ pdevlabs_t plats_missing[] = {
 	    0,
 	    NULL },
 	{ "T5240",
+	    0,
+	    NULL },
+	{ "Netra-T5220",
 	    0,
 	    NULL }
 };
