@@ -13035,7 +13035,7 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	/* IP options present */
 	if (u1) {
 		goto ipoptions;
-	} else {
+	} else if (!mctl_present) {
 		/* Check the IP header checksum.  */
 		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 			/* Clear the IP header h/w cksum flag */
@@ -16435,9 +16435,8 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	}
 
 	/* Get the ill_index of the outgoing ILL */
-	ill_index = ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
-
-	out_ill = ire->ire_ipif->ipif_ill;
+	out_ill = ire_to_ill(ire);
+	ill_index = out_ill->ill_phyint->phyint_ifindex;
 
 	DTRACE_PROBE4(ip4__forwarding__start,
 	    ill_t *, in_ill, ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
@@ -23141,7 +23140,7 @@ checksumoptions:
 					}
 				}
 
-				out_ill = ire->ire_ipif->ipif_ill;
+				out_ill = ire_to_ill(ire);
 				DTRACE_PROBE4(ip4__physical__out__start,
 				    ill_t *, NULL,
 				    ill_t *, out_ill,
@@ -23341,7 +23340,7 @@ nullstq:
 			 * is considered to be the "output" side and
 			 * ip_wput_local to be the "input" side.
 			 */
-			out_ill = ire->ire_ipif->ipif_ill;
+			out_ill = ire_to_ill(ire);
 
 			DTRACE_PROBE4(ip4__loopback__out__start,
 			    ill_t *, NULL, ill_t *, out_ill,
@@ -23367,7 +23366,7 @@ nullstq:
 			return;
 		}
 
-		out_ill = ire->ire_ipif->ipif_ill;
+		out_ill = ire_to_ill(ire);
 
 		DTRACE_PROBE4(ip4__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -25680,7 +25679,7 @@ send:
 		ASSERT(q != NULL);
 
 		/* PFHooks: LOOPBACK_OUT */
-		out_ill = ire->ire_ipif->ipif_ill;
+		out_ill = ire_to_ill(ire);
 
 		DTRACE_PROBE4(ip6__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -26016,7 +26015,7 @@ send:
 			ipha->ipha_src = ire->ire_src_addr;
 
 		/* PFHooks: LOOPBACK_OUT */
-		out_ill = ire->ire_ipif->ipif_ill;
+		out_ill = ire_to_ill(ire);
 
 		DTRACE_PROBE4(ip4__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -29793,7 +29792,7 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 			mp->b_prev = NULL;
 
 			/* set up ill index for outbound qos processing */
-			out_ill = ire->ire_ipif->ipif_ill;
+			out_ill = ire_to_ill(ire);
 			ill_index = out_ill->ill_phyint->phyint_ifindex;
 			first_mp = ip_wput_attach_llhdr(mp, ire, proc,
 			    ill_index);

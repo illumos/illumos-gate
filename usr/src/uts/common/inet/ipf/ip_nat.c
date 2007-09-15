@@ -1587,8 +1587,6 @@ ipf_stack_t *ifs;
 	if (logtype != 0 && ifs->ifs_nat_logging != 0)
 		nat_log(nat, logtype, ifs);
 
-	MUTEX_ENTER(&ifs->ifs_ipf_nat_new);
-
 	/*
 	 * Take it as a general indication that all the pointers are set if
 	 * nat_pnext is set.
@@ -1629,11 +1627,18 @@ ipf_stack_t *ifs;
 
 	fr_deletequeueentry(&nat->nat_tqe);
 
-	nat->nat_ref--;
-	if (nat->nat_ref > 0) {
-		MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
+	MUTEX_ENTER(&nat->nat_lock);
+	if (nat->nat_ref > 1) {
+		nat->nat_ref--;
+		MUTEX_EXIT(&nat->nat_lock);
 		return;
 	}
+	MUTEX_EXIT(&nat->nat_lock);
+
+	/*
+	 * At this point, nat_ref is 1, doing "--" would make it 0..
+	 */
+	nat->nat_ref = 0;
 
 #ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
@@ -1667,7 +1672,6 @@ ipf_stack_t *ifs;
 
 	aps_free(nat->nat_aps, ifs);
 	ifs->ifs_nat_stats.ns_inuse--;
-	MUTEX_EXIT(&ifs->ifs_ipf_nat_new);
 
 	/*
 	 * If there's a fragment table entry too for this nat entry, then
@@ -4746,6 +4750,14 @@ ipf_stack_t *ifs;
 /*                                                                          */
 /* Decrement the reference counter for this NAT table entry and free it if  */
 /* there are no more things using it.                                       */
+/*                                                                          */
+/* IF nat_ref == 1 when this function is called, then we have an orphan nat */
+/* structure *because* it only gets called on paths _after_ nat_ref has been*/
+/* incremented.  If nat_ref == 1 then we shouldn't decrement it here        */
+/* because nat_delete() will do that and send nat_ref to -1.                */
+/*                                                                          */
+/* Holding the lock on nat_lock is required to serialise nat_delete() being */
+/* called from a NAT flush ioctl with a deref happening because of a packet.*/
 /* ------------------------------------------------------------------------ */
 void fr_natderef(natp, ifs)
 nat_t **natp;
@@ -4755,10 +4767,17 @@ ipf_stack_t *ifs;
 
 	nat = *natp;
 	*natp = NULL;
+
+	MUTEX_ENTER(&nat->nat_lock);
+	if (nat->nat_ref > 1) {
+		nat->nat_ref--;
+		MUTEX_EXIT(&nat->nat_lock);
+		return;
+	}
+	MUTEX_EXIT(&nat->nat_lock);
+
 	WRITE_ENTER(&ifs->ifs_ipf_nat);
-	nat->nat_ref--;
-	if (nat->nat_ref == 0)
-	    nat_delete(nat, NL_EXPIRE, ifs);
+	nat_delete(nat, NL_EXPIRE, ifs);
 	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 }
 

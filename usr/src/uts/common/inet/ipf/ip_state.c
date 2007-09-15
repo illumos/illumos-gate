@@ -2868,9 +2868,15 @@ ipf_stack_t *ifs;
 	 * If it is still in use by something else, do not go any further,
 	 * but note that at this point it is now an orphan.
 	 */
-	is->is_ref--;
-	if (is->is_ref > 0)
+	MUTEX_ENTER(&is->is_lock);
+	if (is->is_ref > 1) {
+		is->is_ref--;
+		MUTEX_EXIT(&is->is_lock);
 		return;
+	}
+	MUTEX_EXIT(&is->is_lock);
+
+	is->is_ref = 0;
 
 	if (is->is_tqehead[0] != NULL) {
 		if (fr_deletetimeoutqueue(is->is_tqehead[0]) == 0)
@@ -3823,24 +3829,23 @@ ipf_stack_t *ifs;
 	fin = fin;	/* LINT */
 	is = *isp;
 	*isp = NULL;
-	WRITE_ENTER(&ifs->ifs_ipf_state);
-	is->is_ref--;
-	if (is->is_ref == 0) {
-		is->is_ref++;		/* To counter ref-- in fr_delstate() */
-		fr_delstate(is, ISL_EXPIRE, ifs);
+
+	MUTEX_ENTER(&is->is_lock);
+	if (is->is_ref > 1) {
+		is->is_ref--;
+		MUTEX_EXIT(&is->is_lock);
 #ifndef	_KERNEL
-#if 0
-	} else if (((fin->fin_out == 1) || (eol == 1)) &&
-		   ((ostate == IPF_TCPS_LAST_ACK) &&
-		   (nstate == IPF_TCPS_TIME_WAIT))) {
-		;
-#else
-	} else if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
+		if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
 		   (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
+			fr_delstate(is, ISL_ORPHAN, ifs);
+		}
 #endif
-		fr_delstate(is, ISL_ORPHAN, ifs);
-#endif
+		return;
 	}
+	MUTEX_EXIT(&is->is_lock);
+
+	WRITE_ENTER(&ifs->ifs_ipf_state);
+	fr_delstate(is, ISL_EXPIRE, ifs);
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 }
 
