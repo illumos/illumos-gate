@@ -106,9 +106,8 @@ $(gettext "Attempt to determine Linux distribution from\n  %s FAILED.")
 mini_bootfail=$(gettext "Attempt to boot miniroot for zone '%s' FAILED.")
 mini_copyfail=$(gettext "Attempt to copy miniroot for zone '%s' FAILED.")
 mini_initfail=$(gettext "Attempt to initialize miniroot for zone '%s' FAILED.")
-mini_instfail=$(gettext "Attempt to install miniroot for zone '%s' FAILED.")
+mini_instfail=$(gettext "Attempt to install RPM '%s' to miniroot FAILED.")
 mini_mediafail=$(gettext "Install of zone '%s' miniroot from\n  %s FAILED.")
-mini_rpmfail=$(gettext "Miniroot install of RPM '%s' FAILED.")
 mini_setfail=$(gettext "Attempt to setup miniroot for zone '%s' FAILED.")
 
 mini_mntfsfail=\
@@ -175,8 +174,6 @@ install_defmkfail=$(gettext "Could not create the temporary directory '%s'")
 install_defcpfail=$(gettext "Could not make a local copy of deferred RPM '%s'")
 install_dist=$(gettext "Installing distribution '%s'...")
 install_zonefail=$(gettext "Attempt to install zone '%s' FAILED.")
-
-log_wrfail=$(gettext "Error: cannot write to log file '%s'.")
 
 no_distropath=$(gettext "ERROR: Distribution path '%s' doesn't exist.")
 
@@ -901,7 +898,7 @@ setup_miniroot()
 {
 	unset miniroot_booted
 
-	if ! "$cwd/lx_init_zone" "$rootdir" "$logfile" mini; then
+	if ! "$cwd/lx_init_zone" "$rootdir" mini; then
 		screenlog "$mini_initfail" "$zonename"
 		return 1
 	fi
@@ -1010,7 +1007,7 @@ finish_install()
 
 	rmdir -ps "$media_mntdir"
 
-	if ! "$cwd/lx_init_zone" "$rootdir" "$logfile"; then
+	if ! "$cwd/lx_init_zone" "$rootdir"; then
 		screenlog "$zone_initrootfail" "$zonename"
 		return 1
 	fi
@@ -2078,7 +2075,7 @@ lofi_add()
 	typeset filename="$1"
 
 	lofi_dev=$(lofiadm "$filename" 2>/dev/null) && return 0
-	lofi_dev=$(lofiadm -a "$filename" 2>/dev/null) && return 0
+	lofi_dev=$(lofiadm -a "$filename") && return 0
 
 	screenlog "$lofi_failed" "$filename"
 	return 1
@@ -2657,17 +2654,12 @@ fi
 
 media_mntdir="$rootdir/media"
 
-# Redirect stderr to the log file if it is specified and is writable
 if [[ -n $logfile ]]; then
-	if ! echo "\nInstallation started `date`" >> "$logfile" \
-	    2>/dev/null; then
-		screenlog "$log_wrfail" "$logfile"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
-	fi
-
-	exec 2>>"$logfile"
+	# If a log file was specified, log information regarding the install
+	log "\nInstallation started `date`" 
 	log "Installing from path \"$distro_path\""
 else
+	# Redirect stderr to /dev/null if silent mode is specified.
 	[[ -n $silent_mode ]] && exec 2>/dev/null
 fi
 

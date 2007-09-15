@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,11 +47,14 @@ PATH=/bin:/usr/bin
 export PATH
 
 #
-# Sends output to log file if "$logfile" is set
+# Sends output to a log file via redirection of stderr.
+#
+# This script assumes its caller has already performed the redirection to the
+# logfile.
 #
 log()
 {
-        [[ -n $logfile ]] && echo "$@" >&2
+        echo "$@" >&2
 }
 
 #
@@ -70,7 +73,7 @@ ln_fail=$(gettext "Unable to symlink '%s' to '%s'!")
 mkdir_fail=$(gettext "Unable to create the directory '%s'")
 mod_failed=$(gettext -n "Attempt to modify entries in '%s' failed!")
 
-usage=$(gettext "usage: %s <install_root> <logfile> [<mini>]")
+usage=$(gettext "usage: %s <install_root> [mini]")
 
 #
 # Output an internationalized string followed by a carriage return
@@ -144,7 +147,7 @@ install_ln()
 
 	log "    Installing \"$target\""
 
-	[[ -a "$target" ]] && mv -f "$target" "$target.$tag"
+	mv -f "$target" "$target.$tag" 2>/dev/null
 
 	if ! ln -s "$source" "$target"; then
 		log ""
@@ -238,35 +241,28 @@ enable_nfs_services()
 #
 # The syntax is:
 #
-#     lx_init_zone <rootdir> <logfile> [mini]
+#     lx_init_zone <rootdir> [mini]
 #
 # Where:
 #	<rootdir> is the root of the zone directory to be modified
 #
-#	<logfile> is the name of the log file to which error messages should
-#	          be appended
-#
-#	[mini]	is an optional third argument that signifies whether this is
+#	[mini]	is an optional second argument that signifies whether this is
 #		to be a miniroot install; if it is, NFS services are not enabled
 #		in the processed zone
 #
 unset is_miniroot
 unset install_root
-unset logfile
 
 install_root="$1"
-logfile="$2"
 
 tag="lxsave_$(date +%m.%d.%Y@%T)"
 
-if (($# < 2 || $# > 3)); then
+if (($# < 1 || $# > 2)); then
 	i18n_echo "$usage" "$0"
 	exit 1
 fi
 
-(($# == 3)) && is_miniroot=1
-
-exec 2>>"$logfile"
+(($# == 2)) && is_miniroot=1
 
 if [[ ! -d "$install_root" ]]; then
 	i18n_echo "$install_noroot" "$install_root"
@@ -351,7 +347,7 @@ fi
 log ""
 log "Modifying \"$install_root/etc/fstab\"..."
 
-[[ -a etc/fstab ]] && mv -f etc/fstab etc/fstab.$tag
+mv -f etc/fstab etc/fstab.$tag 2>/dev/null
 
 cat > etc/fstab <<- EOF
 	none		/			ufs	defaults	1 1
@@ -403,7 +399,7 @@ if ! egrep -s "Disabled by lx brand" etc/inittab; then
 				# Attempt to save off the original inittab
 				# before moving over the modified version.
 				#
-				mv -f etc/inittab etc/inittab.$tag
+				mv -f etc/inittab etc/inittab.$tag 2>/dev/null
 
 				mv -f $tmpfile etc/inittab
 
@@ -447,8 +443,7 @@ fi
 log ""
 log "Modifying: \"$install_root/etc/sysconfig/network\"..."
 
-[[ -a etc/sysconfig/network ]] &&
-    mv -f etc/sysconfig/network etc/sysconfig/network.$tag
+mv -f etc/sysconfig/network etc/sysconfig/network.$tag 2>/dev/null
 
 cat > etc/sysconfig/network <<- EOF
 	NETWORKING="no"
@@ -495,7 +490,7 @@ if [[ -a etc/sysconfig/syslog ]]; then
 		# Attempt to save off the original syslog before moving over
 		# the modified version.
 		#
-		mv -f etc/sysconfig/syslog etc/sysconfig/syslog.$tag
+		mv -f etc/sysconfig/syslog etc/sysconfig/syslog.$tag 2>/dev/null
 
 		if ! mv -f $tmpfile etc/sysconfig/syslog; then
 			log "mv of \"$tmpfile\" to" \
@@ -527,16 +522,14 @@ fi
 # /etc/rc.d/init.d/keytable tries to load a physical keyboard map, which won't
 # work in a zone. If we remove etc/sysconfig/keyboard, it won't try this at all.
 #
-[[ -a etc/sysconfig/keyboard ]] &&
-    mv -f etc/sysconfig/keyboard etc/sysconfig/keyboard.$tag
+mv -f etc/sysconfig/keyboard etc/sysconfig/keyboard.$tag 2>/dev/null
 
 #
 # /etc/rc.d/init.d/gpm tries to configure the console mouse for cut-and-paste
 # text operations, which we don't support.  Removing this file disables the
 # mouse configuration.
 #
-[[ -a etc/sysconfig/mouse ]] &&
-     mv -f etc/sysconfig/mouse etc/sysconfig/mouse.$tag
+mv -f etc/sysconfig/mouse etc/sysconfig/mouse.$tag 2>/dev/null
 
 #
 # The following scripts attempt to start services or otherwise configure
@@ -609,7 +602,7 @@ if ! egrep -s "Disabled by lx brand" etc/rc.d/init.d/halt; then
 	    /./ {print skip $0}' etc/rc.d/init.d/halt > /tmp/halt.$$
 
 	if [[ $? -eq 0 ]]; then
-		mv -f etc/rc.d/init.d/halt etc/rc.d/init.d/halt.$tag
+		mv -f etc/rc.d/init.d/halt etc/rc.d/init.d/halt.$tag 2>/dev/null
 		mv -f /tmp/halt.$$ etc/rc.d/init.d/halt
 		chmod 755 etc/rc.d/init.d/halt
 	else
@@ -661,7 +654,7 @@ if ! egrep -s "Disabled by lx brand" etc/rc.d/rc.sysinit; then
 		# Attempt to save off the original rc.sysinit
 		# before moving over the modified version.
 		#
-		mv -f etc/rc.d/rc.sysinit etc/rc.d/rc.sysinit.$tag
+		mv -f etc/rc.d/rc.sysinit etc/rc.d/rc.sysinit.$tag 2>/dev/null
 
 		if ! mv -f $tmpfile etc/rc.d/rc.sysinit; then
 			log "mv of \"$tmpfile\" to" \

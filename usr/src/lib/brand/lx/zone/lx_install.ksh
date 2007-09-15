@@ -84,6 +84,7 @@ not_readable=$(gettext "Cannot read file '%s'")
 
 no_install=$(gettext "Could not create install directory '%s'")
 no_log=$(gettext "Could not create log directory '%s'")
+no_logfile=$(gettext "Could not create log file '%s'")
 
 install_zone=$(gettext "Installing zone '%s' at root directory '%s'")
 install_from=$(gettext "from archive '%s'")
@@ -117,7 +118,7 @@ init_tarzone()
 {
 	typeset rootdir="$1"
 
-        if ! $branddir/lx_init_zone "$rootdir" "$logfile"; then
+        if ! $branddir/lx_init_zone "$rootdir"; then
                 screenlog "$zone_initfail" "$zonename"
                 return 1
         fi
@@ -467,7 +468,13 @@ fi
 
 logfile="${logdir}/$zonename.install.$$.log"
 
-exec 2>"$logfile"
+if ! > $logfile; then
+	screenlog "$no_logfile" "$logfile"
+	exit $int_code
+fi
+
+# Redirect stderr to the log file to automatically log any error messages
+exec 2>>"$logfile"
 
 #
 # From here on out, an unspecified exit or interrupt should exit with
@@ -488,15 +495,23 @@ if [[ -n $gtaropts ]]; then
 	echo $(gettext "This process may take several minutes.")
 	echo
 
-	( cd "$install_root" && gtar "$gtaropts" "$install_src" &&
-	    $branddir/lx_init_zone "$install_root" "$logfile" &&
-	    init_tarzone "$install_root" )
+	if ! ( cd "$install_root" && gtar "$gtaropts" "$install_src" ) ; then
+		log "Error: extraction from tar archive failed."
+	else
+		if ! [[ -d "${install_root}/bin" &&
+		    -d "${install_root}/sbin" ]]; then
+			log "Error: improper or incomplete tar archive."
+		else
+			$branddir/lx_init_zone "$install_root" &&
+			    init_tarzone "$install_root"
 
-	#
-	# Emit the same code from here whether we're interrupted or exiting
-	# normally.
-	#
-	int_code=$?
+			#
+			# Emit the same code from here whether we're
+			# interrupted or exiting normally.
+			#
+			int_code=$?
+		fi
+	fi
 
 	if [[ $int_code -eq ZONE_SUBPROC_OK ]]; then
 		log "Tar install completed for zone '$zonename' `date`."
