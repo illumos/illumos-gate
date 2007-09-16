@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992,1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,6 +171,16 @@ typedef struct ufs_fsd {
 #define	CHECK_ACL_ALLOWED(MODE) (((MODE) == IFDIR) || ((MODE) == IFREG) || \
 				((MODE) == IFIFO) || ((MODE) == IFCHR) || \
 				((MODE) == IFBLK) || ((MODE) == IFATTRDIR))
+
+/*
+ * Get ACL group permissions if the mask is not present, and the ACL
+ * group permission intersected with the mask if the mask is present
+ */
+#define	MASK2MODE(ACL)							\
+	((ACL)->aclass.acl_ismask ?					\
+		((((ACL)->aclass.acl_maskbits &				\
+			(ACL)->agroup->acl_ic_perm) & 07) << 3) :	\
+		(((ACL)->agroup->acl_ic_perm & 07) << 3))
 
 #define	MODE2ACL(P, MODE, CRED)					\
 	ASSERT((P));						\

@@ -137,8 +137,7 @@ ufs_si_store(struct inode *ip, si_t *sp, int puship, cred_t *cr)
 		ip->i_flag |= IMOD | IACC;
 		ip->i_mode = (ip->i_smode & ~0777) |
 		    ((sp->aowner->acl_ic_perm & 07) << 6) |
-		    (((sp->aclass.acl_ismask ? sp->aclass.acl_maskbits :
-		    sp->agroup->acl_ic_perm) & 07) << 3) |
+		    (MASK2MODE(sp)) |
 		    (sp->aother->acl_ic_perm & 07);
 		TRANS_INODE(ip->i_ufsvfs, ip);
 		ufs_iupdat(ip, 1);
@@ -318,7 +317,7 @@ switchshadows:
 
 	if (sp->agroup) {				/* Group */
 		ip->i_mode &= ~0070;			/* clear Group */
-		ip->i_mode |= (sp->agroup->acl_ic_perm & 07) << 3;
+		ip->i_mode |= MASK2MODE(sp);		/* apply mask */
 		ip->i_gid = sp->agroup->acl_ic_who;
 	}
 
