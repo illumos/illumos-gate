@@ -903,15 +903,17 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 		goto error;
 	}
 
-	/* 
+	/*
 	 * Solaris Kerberos:
 	 * If the server principal had an empty realm then store that in
 	 * the cred cache and not the server realm as returned by
-	 * krb5_get_init_creds(). This ensures that rpcsec_gss will find
-	 * the credential in the cred cache even if a "fallback" method is
-	 * being used to determine the realm.
+	 * krb5_get_init_creds_{keytab|password}(). This ensures that rpcsec_gss
+	 * will find the credential in the cred cache even if a "fallback"
+	 * method is being used to determine the realm.
 	 */
-	krb5_free_principal(handle->context, creds.server);
+	if (init_type != INIT_CREDS) {
+		krb5_free_principal(handle->context, creds.server);
+	}
 	creds.server = saved_server;
 
 	/*
@@ -933,8 +935,20 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	    cpw == FALSE) {
 		code = _kadm5_initialize_rpcsec_gss_handle(handle,
 					client_name, service_name);
-		if (code != 0)
+
+		/*
+		 * Solaris Kerberos:
+		 * If _kadm5_initialize_rpcsec_gss_handle() fails it will have
+		 * called krb5_gss_release_cred(). If the credential cache is a
+		 * MEMORY cred cache krb5_gss_release_cred() destroys the
+		 * cred cache data. Make sure that the cred-cache is closed 
+		 * to prevent a double free in the "error" code.
+		 */
+		if (code != 0) {
+			if (init_type != INIT_CREDS)
+				krb5_cc_close(handle->context, ccache);
 			goto error;
+		}
 	}
 
 	*server_handle = (void *) handle;
