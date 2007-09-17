@@ -222,10 +222,10 @@ topo_method_call(tnode_t *node, const char *method,
 			continue;
 
 		if (version < mp->tim_version) {
-			*err = ETOPO_METHOD_VERNEW;
+			*err = ETOPO_METHOD_VEROLD;
 			return (-1);
 		} else if (version > mp->tim_version) {
-			*err = ETOPO_METHOD_VEROLD;
+			*err = ETOPO_METHOD_VERNEW;
 			return (-1);
 		}
 

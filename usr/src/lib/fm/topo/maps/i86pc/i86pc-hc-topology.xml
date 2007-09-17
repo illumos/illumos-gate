@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -41,6 +41,7 @@
     <dependents grouping='children'>
       <range name='chip' min='0' max='100'>
         <enum-method name='chip' version='1' />
+	<propmap name='chip' />
       </range>
       <range name='hostbridge' min='0' max='254'>
         <enum-method name='hostbridge' version='1' />

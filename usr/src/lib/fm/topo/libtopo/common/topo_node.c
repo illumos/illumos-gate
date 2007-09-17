@@ -242,6 +242,12 @@ topo_node_instance(tnode_t *node)
 	return (node->tn_instance);
 }
 
+tnode_t *
+topo_node_parent(tnode_t *node)
+{
+	return (node->tn_parent);
+}
+
 void
 topo_node_setspecific(tnode_t *node, void *data)
 {

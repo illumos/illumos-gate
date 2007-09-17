@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,8 +110,9 @@ typedef struct tf_info {
 	tf_rdata_t *tf_rd;	/* data for forming topology nodes */
 } tf_info_t;
 
-#define	TF_LIVE	0x1	/* Parsing should create topology nodes */
-#define	TF_BIN	0x2	/* Parsing should create intermediate binary */
+#define	TF_LIVE		0x1	/* Parsing should create topology nodes */
+#define	TF_BIN		0x2	/* Parsing should create intermediate binary */
+#define	TF_PROPMAP	0x4	/* XML file loaded from a propmap element */
 
 /*
  * We store properties using nvlists as an intermediate form.  The
@@ -131,6 +132,7 @@ typedef struct tf_info {
 /*
  * Valid .xml element and attribute names
  */
+#define	Argval "argval"
 #define	Children "children"
 #define	Dependents "dependents"
 #define	FMRI "fmri"
@@ -141,8 +143,11 @@ typedef struct tf_info {
 #define	Int64 "int64"
 #define	Name "name"
 #define	Path "path"
+#define	Propname "propname"
+#define	Proptype "proptype"
 #define	Range "range"
 #define	Scheme "scheme"
+#define	Set "set"
 #define	Siblings "siblings"
 #define	Static "static"
 #define	String "string"
@@ -157,8 +162,11 @@ typedef struct tf_info {
 #define	Max "max"
 
 #define	Enum_meth "enum-method"
+#define	Prop_meth "propmethod"
 #define	Propgrp "propgroup"
 #define	Propval "propval"
+#define	Propset "propset"
+#define	Propmap "propmap"
 
 #define	Node "node"
 #define	Hc "hc"

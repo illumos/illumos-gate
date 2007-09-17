@@ -27,7 +27,7 @@
 ARCH = i86pc
 CLASS = arch
 DTDFILE = topology.dtd.1
-TOPOFILE = i86pc-hc-topology.xml
+TOPOFILE = i86pc-hc-topology.xml chip-hc-topology.xml
 SRCDIR = ../i86pc
 
 include ../Makefile.map

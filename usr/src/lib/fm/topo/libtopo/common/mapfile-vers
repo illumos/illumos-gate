@@ -101,6 +101,7 @@ SUNWprivate {
 	topo_node_label;
 	topo_node_label_set;
 	topo_node_name;
+	topo_node_parent;
 	topo_node_range_create;
 	topo_node_range_destroy;
 	topo_node_resource;

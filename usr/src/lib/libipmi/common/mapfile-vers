@@ -29,6 +29,9 @@ SUNWprivate_1.1 {
 	ipmi_close;
 	ipmi_errmsg;
 	ipmi_errno;
+	ipmi_fru_parse_board;
+	ipmi_fru_parse_product;
+	ipmi_fru_read;
 	ipmi_get_deviceid;
 	ipmi_get_sensor_reading;
 	ipmi_open;

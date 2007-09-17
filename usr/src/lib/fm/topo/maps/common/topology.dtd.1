@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -61,21 +61,18 @@
 <!-- Properties and property groups -->
 
 <!--
-   propval
+  propval
 
-     This element is for a singly valued property within a property
-     group.
+ 	This element is for a singly valued property within a property group.
 
-     Its attributes are
+	Its attributes are
 
-	name	The name of this property.
+		name	The name of this property.
 
-	type	The data type for this property.
+		type	The data type for this property.
 
-	value	The value for this property.  Must match type
-		restriction of type attribute.
-
-	immutable This value remains unchanged for the lifetime of a snapshot.
+		value	The value for this property.  Must match type
+			restriction of type attribute.
 -->
 
 <!ELEMENT propval EMPTY >
@@ -85,26 +82,26 @@
 	type		( int32 | uint32 | int64 | uint64 |
 			  string | fmri ) #REQUIRED
 	value		CDATA #REQUIRED
-	immutable	( true | false ) "true" >
 
 <!--
   propgroup
 
-    This element is for a set of related properties on a topo node
-    It contains an optional stability element, as well as
-    zero or more property-containing elements.
+	This element is for a set of related properties on a topo node
+	It contains an optional stability element, as well as
+	zero or more property-containing elements.
 
-    Its attributes are
+	Its attributes are
 
-	name		The name of this property group.
-	name-stability	Stability level of the property group name
-	data-stability	Stability level of the property names and content
-	version		Version of the propery group definition
+		name		The name of this property group.
+		name-stability	Stability level of the property group name
+		data-stability	Stability level of the property names and
+				content
+		version		Version of the propery group definition
 
 -->
 
 <!ELEMENT propgroup
-	( propval* ) >
+	( propval*, propmethod* ) >
 
 <!ATTLIST propgroup
 	name		CDATA #REQUIRED
@@ -114,24 +111,92 @@
 	data-stability	( Private | Standard | Stable | Evolving | Unstable |
                         External | Obsolete ) #REQUIRED >
 
+<!--
+  propset
+	This element is for associating property groups according to a set type.
+
+	Its attributes are
+
+		type	The type of this property group set.  'product' is the
+			only set type currently supported.
+		set	The list of set types.
+
+-->
+
+<!ELEMENT propset
+	 ( propgroup* ) >
+
+<!ATTLIST propset
+	type	( product ) #REQUIRED
+	set	CDATA #REQUIRED >
+
+<!--
+  propmap
+	This element is for specifying an additional topo map file for
+	properties assigned to a given range.
+
+	Its attributes are
+
+		name		Name of map file
+-->
+
+<!ELEMENT propmap EMPTY >
+
+<!ATTLIST propmap
+	name		CDATA #REQUIRED >
+
 <!-- Methods -->
 
 <!--
+  argval
+ 
+	A propmethod argument. It has two attributes:
+ 
+		name    The name of the argument.
+		type    The data type of the argument.
+		value	The value of the arg
+-->
+
+<!ELEMENT argval EMPTY>
+
+<!ATTLIST argval
+        name            CDATA #REQUIRED
+        type            CDATA #REQUIRED
+        value           CDATA #REQUIRED >
+
+<!--
+   propmethod
+
+	This element is for properties that can only be determined dynamically
+	from a plugin.
+
+	Its attributes are
+
+      		name		Name of the method
+      		version		Version of the method API
+      		propname	Name of the property to create
+		proptype	Type of the property to create
+
+<!ELEMENT propmethod
+	( argval* ) >
+
+<!ATTLIST propmethod
+	name		CDATA #REQUIRED
+	version		CDATA #REQUIRED
+	propname	CDATA #REQUIRED
+	proptype	CDATA #REQUIRED>
+<!--
   enum-method
 
-    This element describes the enumeration method used to
-    populate a composition of topo nodes.  Its interpretation is
-    left to the enumerator to which a particular topo node is
-    assigned.  It contains a set of attributes, context, and an optional
-    stability element for the optional args that can be included.
+	This element describes the enumeration method used to
+	populate a composition of topo nodes for a given range of topology
+	nodes. 
 
-    Its attributes are
+	Its attributes are
 
-	name	Name of this method.  The method names are
-		usually a defined interface of the enumerator to which a
-		topo instance assigned.
+		name	Name of the module exporting an enumeration method.
 
-	version Version of the enumeration API
+		version Version of the libtopo API
 
 -->
 
@@ -141,42 +206,39 @@
 	name		CDATA #REQUIRED
 	version		CDATA #REQUIRED >
 
+
 <!--
   node
 
-    This element identifies a known topology node.
+	This element identifies a topology node instance.
 
-    Its attributes are
+	Its attributes are
 
-	instance The instance number of the known node
-
-	static	Boolean to determine if node is statically created
-		by the XML parser or an enumerator
+		instance The instance number of the node
 
 -->
 
 <!ELEMENT node
-	( propgroup*, dependents* ) >
+	( propgroup*, dependents*, propset* ) >
 
 <!ATTLIST node
-	instance	CDATA #REQUIRED
-	static          ( true | false ) "false" >
+	instance	CDATA #REQUIRED >
 
 <!--
   dependents
 
 	Ranges may have a number of "dependent" ranges, linked to
-	the original range hierarchically as children or siblings. 
+	the original range hierarchically as children or as a list, siblings. 
 
 	Its attribute is:
-		grouping	"children", "siblings"
+		grouping	children | siblings
 -->
 
 <!ELEMENT dependents 
 	( range | xi:include )+ >
 
 <!ATTLIST dependents 
-	grouping ( children | siblings ) #REQUIRED >
+	grouping ( children | siblings ) "children" #REQUIRED >
 
 <!--
   range
@@ -196,7 +258,8 @@
 -->
 
 <!ELEMENT range
-	( enum-method?, node*, propgroup*, dependents* ) >
+	( enum-method?, propmap?, node*, propgroup*, dependents*,
+	    propset* ) >
 
 <!ATTLIST range
 	name		CDATA #REQUIRED
@@ -210,7 +273,7 @@
 
 	Its attributes are:
 		name	topology name
-		scheme  "hc", "dev"
+		scheme 	( hc | dev  ) 
 -->
 
 <!ELEMENT topology

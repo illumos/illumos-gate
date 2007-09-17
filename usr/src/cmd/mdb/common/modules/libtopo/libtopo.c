@@ -111,7 +111,8 @@ topo_handle(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<u>%-12s %-36s %-30s%</u>\n", "FIELD", "VALUE",
 		    "DESCR");
 	}
-	mdb_printf("%-12s 0x%-34p %-30s\n", "th_lock", th.th_lock,
+	mdb_printf("%-12s 0x%-34p %-30s\n", "th_lock",
+	    addr + offsetof(topo_hdl_t, th_lock),
 	    "Mutex lock protecting handle");
 	mdb_printf("%-12s %-36s %-30s\n", "th_uuid", uuid,
 	    "UUID of the topology snapshot");
@@ -180,9 +181,11 @@ topo_module(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<u>%-12s %-36s %-30s%</u>\n",
 		    "FIELD", "VALUE", "DESCR");
 	}
-	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_lock", tm.tm_lock,
+	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_lock",
+	    addr + offsetof(topo_mod_t, tm_lock),
 	    "Lock for tm_cv/owner/flags/refs");
-	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_cv", tm.tm_cv,
+	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_cv",
+	    addr + offsetof(topo_mod_t, tm_cv),
 	    "Module condition variable");
 	mdb_printf("%-12s %-36s %-30s\n", "tm_busy", tm.tm_busy,
 	    "Busy indicator");

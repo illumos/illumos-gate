@@ -1,0 +1,199 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<topology name='chip' scheme='hc'>
+
+    <range name='chip' min='0' max='100'>
+
+        <propset type='product'
+	    set='Sun-Fire-V20z|Sun-Fire-V40z|W1100z/2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </propset> 
+        <propset type='product'
+	    set='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </propset> 
+        <propset type='product'
+	    set='Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='1' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </propset> 
+        <propset type='product'
+	    set='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='g4_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %c' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </propset> 
+
+    <dependents grouping='children'>
+
+        <range name='memory-controller' min='0' max='16'>
+        <dependents grouping='children'>
+
+            <range name='dimm' min='0' max='16'>
+
+                <propset type='product' set='Sun-Ultra-20-Workstation|Sun-Fire(TM)-X2100'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='DIMM %d' />
+                            <argval name='offset' type='uint32' value='1' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </propset> 
+                <propset type='product' set='Sun-Fire-V20z|Sun-Fire-V40z|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='simple_dimm_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='CPU %d DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='forward' />
+                            <argval name='dimms_per_chip' type='uint32'
+			        value='4' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+                </propset>
+                <propset type='product'
+		    set='Sun-Ultra-40-M2-Workstation'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='seq_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='DIMM %d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='reverse' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+               </propset>
+                <propset type='product'
+		    set='X2100-M2'>
+		    
+                    <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                        <propmethod name='seq_dimm_label' version='0'
+			            propname='label' proptype='string' >
+              
+                            <argval name='format' type='string'
+			        value='B0D%d' />
+                            <argval name='offset' type='uint32' value='0' />
+                            <argval name='order' type='string'
+			        value='reverse' />
+
+                        </propmethod>
+
+                    </propgroup>
+
+               </propset>
+
+            </range>
+
+        </dependents>
+        </range>
+
+    </dependents>
+    </range>
+
+</topology>

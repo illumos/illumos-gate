@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,11 +63,35 @@ extern "C" {
 #define	CPU_CORE_ID	"core_id"
 #define	CPU_CLOG_ID	"clog_id"
 
+/*
+ * label property methods
+ */
+#define	SIMPLE_DIMM_LBL		"simple_dimm_label"
+#define	SIMPLE_DIMM_LBL_MP	"simple_dimm_label_mp"
+#define	SEQ_DIMM_LBL		"seq_dimm_label"
+#define	SIMPLE_CHIP_LBL		"simple_chip_label"
+#define	G4_CHIP_LBL		"g4_chip_label"
+
 typedef struct chip {
 	kstat_ctl_t *chip_kc;
 	kstat_t **chip_cpustats;
 	uint_t chip_ncpustats;
 } chip_t;
+
+extern int simple_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+extern int simple_dimm_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+extern int seq_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+extern int simple_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 #ifdef __cplusplus
 }

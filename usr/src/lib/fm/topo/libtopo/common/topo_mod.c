@@ -278,7 +278,7 @@ int
 topo_mod_enummap(topo_mod_t *mod, tnode_t *node, const char *name,
     const char *scheme)
 {
-	return (topo_file_load(mod, node, (char *)name, (char *)scheme));
+	return (topo_file_load(mod, node, (char *)name, (char *)scheme, 0));
 }
 
 static nvlist_t *

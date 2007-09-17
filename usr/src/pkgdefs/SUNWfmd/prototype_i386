@@ -74,5 +74,6 @@ f none usr/platform/i86pc/lib/fm/topo/plugins/chip.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 555 root bin
 d none usr/platform/i86pc/lib/fm/topo/maps 755 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4500-hc-topology.xml 444 root bin

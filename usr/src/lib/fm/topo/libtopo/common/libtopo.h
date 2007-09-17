@@ -97,6 +97,7 @@ extern int topo_fmri_compare(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
  */
 extern char *topo_node_name(tnode_t *);
 extern topo_instance_t topo_node_instance(tnode_t *);
+extern tnode_t *topo_node_parent(tnode_t *);
 extern void *topo_node_private(tnode_t *);
 extern int topo_node_asru(tnode_t *, nvlist_t **, nvlist_t *, int *);
 extern int topo_node_fru(tnode_t *, nvlist_t **, nvlist_t *, int *);

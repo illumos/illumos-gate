@@ -1036,7 +1036,7 @@ print_fmri(topo_hdl_t *thp, char *uuid)
 		nvlist_free(nvl);
 	}
 
-	if (pcnt > 0)
+	if (pargs && pcnt > 0)
 		print_fmri_props(thp, nvl);
 }
 

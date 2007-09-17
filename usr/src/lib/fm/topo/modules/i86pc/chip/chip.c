@@ -96,6 +96,24 @@ const topo_method_t rank_methods[] = {
 	{ NULL }
 };
 
+const topo_method_t dimm_methods[] = {
+	{ SIMPLE_DIMM_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, simple_dimm_label},
+	{ SIMPLE_DIMM_LBL_MP, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, simple_dimm_label_mp},
+	{ SEQ_DIMM_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, seq_dimm_label},
+	{ NULL }
+};
+
+const topo_method_t chip_methods[] = {
+	{ SIMPLE_CHIP_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, simple_chip_label},
+	{ G4_CHIP_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, g4_chip_label},
+	{ NULL }
+};
+
 static nvlist_t *cs_fmri[MC_CHIP_NCS];
 
 static void
@@ -576,7 +594,7 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
  *   also calls it directly to construct a "mem" scheme asru for a dimm node)
  * - if 'in' in addition includes an hc-specific member which specifies
  *   asru-physaddr or asru-offset then these are includes in the "mem" scheme
- *   asru as additional membersl physaddr and offset
+ *   asru as additional members physaddr and offset
  */
 static int
 mem_asru_create(topo_mod_t *mod, nvlist_t *fmri, nvlist_t **asru)
@@ -691,7 +709,7 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 	    &csnamearr, &ncsname) != 0 || ncs != ncsname) {
 		whinge(mod, &nerr, "rank_create: "
 		    "csnums/csnames extraction failed\n");
-		    return (nerr);
+		return (nerr);
 	}
 
 	if (topo_node_resource(pnode, &pfmri, &err) < 0) {
@@ -743,7 +761,7 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 			    "topo_method_register failed");
 
 		(void) topo_node_asru_set(ranknode, cs_fmri[csnumarr[i]],
-			    TOPO_ASRU_COMPUTE, &err);
+		    TOPO_ASRU_COMPUTE, &err);
 
 		(void) topo_pgroup_create(ranknode, &rank_pgroup, &err);
 
@@ -805,6 +823,10 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
 			    "failed\n");
 			continue;
 		}
+
+		if (topo_method_register(mod, dimmnode, dimm_methods) < 0)
+			whinge(mod, &nerr, "dimm_create: "
+			    "topo_method_register failed");
 
 		/*
 		 * Use the mem computation method directly to publish the asru
@@ -1053,6 +1075,10 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			continue;
 		}
 		BT_SET(chipmap, chipid);
+
+		if (topo_method_register(mod, cnode, chip_methods) < 0)
+			whinge(mod, &nerr, "chip_create: "
+			    "topo_method_register failed");
 
 		(void) topo_node_fru_set(cnode, fmri, 0, &err);
 

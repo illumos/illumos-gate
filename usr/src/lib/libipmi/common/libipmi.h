@@ -389,6 +389,62 @@ extern int ipmi_set_sensor_reading(ipmi_handle_t *,
     ipmi_set_sensor_reading_t *);
 
 /*
+ * These IPMI message id/opcodes are documented in Appendix G in the IPMI spec.
+ *
+ * Payloads for these two commands are described in Sections 34.1 and 34.2 of
+ * the spec, respectively.
+ */
+#define	IPMI_CMD_GET_FRU_INV_AREA	0x10
+#define	IPMI_CMD_READ_FRU_DATA		0x11
+
+/*
+ * Structs to hold the FRU Common Header and the FRU Product Info Area, as
+ * described in the IPMI Platform Management FRU Information Storage
+ * Definition (v1.1).
+ */
+typedef struct ipmi_fru_hdr
+{
+	uint8_t		ifh_format;
+	uint8_t		ifh_int_use_off;
+	uint8_t		ifh_chassis_info_off;
+	uint8_t		ifh_board_info_off;
+	uint8_t		ifh_product_info_off;
+	uint8_t		ifh_multi_rec_off;
+	uint8_t		ifh_pad;
+	uint8_t		ifh_chksum;
+} ipmi_fru_hdr_t;
+
+/*
+ * Because only 6 bits are used to specify the length of each field in the FRU
+ * product and board info areas, the biggest string we would ever need to hold
+ * would be 63 chars plus a NULL.
+ */
+#define	FRU_INFO_MAXLEN	64
+
+typedef struct ipmi_fru_brd_info
+{
+	char	ifbi_manuf_date[3];
+	char	ifbi_manuf_name[FRU_INFO_MAXLEN];
+	char	ifbi_board_name[FRU_INFO_MAXLEN];
+	char	ifbi_product_serial[FRU_INFO_MAXLEN];
+	char	ifbi_part_number[FRU_INFO_MAXLEN];
+} ipmi_fru_brd_info_t;
+
+typedef struct ipmi_fru_prod_info
+{
+	char	ifpi_manuf_name[FRU_INFO_MAXLEN];
+	char	ifpi_product_name[FRU_INFO_MAXLEN];
+	char	ifpi_part_number[FRU_INFO_MAXLEN];
+	char	ifpi_product_version[FRU_INFO_MAXLEN];
+	char	ifpi_product_serial[FRU_INFO_MAXLEN];
+	char	ifpi_asset_tag[FRU_INFO_MAXLEN];
+} ipmi_fru_prod_info_t;
+
+int ipmi_fru_read(ipmi_handle_t *, ipmi_sdr_fru_locator_t *, char **);
+int ipmi_fru_parse_board(ipmi_handle_t *, char *, ipmi_fru_brd_info_t *);
+int ipmi_fru_parse_product(ipmi_handle_t *, char *, ipmi_fru_prod_info_t *);
+
+/*
  * The remaining functions are private to the implementation of the Sun ILOM
  * service processor.  These function first check the manufacturer from the IPMI
  * device ID, and will return EIPMI_NOT_SUPPORTED if attempted for non-Sun

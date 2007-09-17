@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,8 @@ typedef struct topo_file {
 	topo_mod_t *tf_mod;		/* scheme-specific builtin mod */
 } topo_file_t;
 
-extern int topo_file_load(topo_mod_t *, tnode_t *, const char *, const char *);
+extern int topo_file_load(topo_mod_t *, tnode_t *, const char *, const char *,
+    int);
 
 #ifdef	__cplusplus
 }

@@ -174,19 +174,19 @@ topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 	else
 		pp++;
 	if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
-	    pp, tp->tt_scheme) < 0) {
+	    pp, tp->tt_scheme, 0) < 0) {
 		if ((pp = strchr(thp->th_platform, ',')) == NULL)
 			pp = thp->th_platform;
 		else
 			pp++;
 
 		if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
-		    pp, tp->tt_scheme) < 0) {
+		    pp, tp->tt_scheme, 0) < 0) {
 			if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
-			    thp->th_machine, tp->tt_scheme) < 0) {
+			    thp->th_machine, tp->tt_scheme, 0) < 0) {
 
 				if ((rv = topo_file_load(tp->tt_root->tn_enum,
-				    tp->tt_root, NULL, tp->tt_scheme)) < 0) {
+				    tp->tt_root, NULL, tp->tt_scheme, 0)) < 0) {
 					topo_dprintf(thp, TOPO_DBG_ERR, "no "
 					    "topology map found for the %s "
 					    "FMRI set\n", tp->tt_scheme);

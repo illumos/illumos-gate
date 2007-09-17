@@ -28,6 +28,7 @@ LIBRARY=	libipmi.a
 VERS=		.1
 
 OBJECTS=	ipmi_bmc.o	\
+		ipmi_fru.o	\
 		ipmi_misc.o	\
 		ipmi_sdr.o	\
 		ipmi_sensor.o	\

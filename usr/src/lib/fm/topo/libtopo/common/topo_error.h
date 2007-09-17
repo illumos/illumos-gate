@@ -90,6 +90,7 @@ typedef enum topo_errno {
     ETOPO_PRSR_NOMETH,	/* range missing enum-method */
     ETOPO_PRSR_NVPROP,	/* properties as nvlist missing crucial field */
     ETOPO_PRSR_OOR,	/* node instance out of declared range */
+    ETOPO_PRSR_REGMETH,	/* failed to register property method */
     ETOPO_WALK_EMPTY,	/* empty topology */
     ETOPO_WALK_NOTFOUND, /* scheme based topology not found */
     ETOPO_END		/* end of custom errno list (to ease auto-merge) */

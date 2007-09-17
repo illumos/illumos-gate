@@ -846,11 +846,9 @@ prop_method_register(tnode_t *node, const char *pgname, const char *pname,
 		return (register_methoderror(node, pm, err, 0, *err));
 	}
 
-	if (pv->tp_method != NULL) {
-		topo_node_unlock(node);
+	if (pv->tp_method != NULL)
 		return (register_methoderror(node, pm, err, 1,
 		    ETOPO_METHOD_DEFD));
-	}
 
 	pv->tp_val = NULL;
 	pv->tp_method = pm;
@@ -870,7 +868,9 @@ topo_prop_method_register(tnode_t *node, const char *pgname, const char *pname,
 
 	if ((mp = topo_method_lookup(node, mname)) == NULL)
 		return (register_methoderror(node, NULL, err, 1,
-		    ETOPO_METHOD_NOTSUP));
+		    ETOPO_METHOD_NOTSUP)); /* node unlocked */
+
+	topo_node_lock(node);
 
 	return (prop_method_register(node, pgname, pname, ptype, mname,
 	    mp->tim_version, args, err)); /* err set and node unlocked */
@@ -887,7 +887,9 @@ topo_prop_method_version_register(tnode_t *node, const char *pgname,
 
 	if ((mp = topo_method_lookup(node, mname)) == NULL)
 		return (register_methoderror(node, NULL, err, 1,
-		    ETOPO_METHOD_NOTSUP));
+		    ETOPO_METHOD_NOTSUP)); /* node unlocked */
+
+	topo_node_lock(node);
 
 	if (version < mp->tim_version)
 		return (register_methoderror(node, NULL, err, 1,
@@ -1236,13 +1238,11 @@ topo_prop_getprop(tnode_t *node, const char *pgname, const char *pname,
 
 	topo_node_lock(node);
 	if ((pv = prop_get(node, pgname, pname, args, err)) == NULL) {
-		topo_node_unlock(node);
 		(void) get_properror(node, err, *err);
 		return (-1);
 	}
 
 	if (topo_hdl_nvdup(thp, pv->tp_val, prop) != 0) {
-		topo_node_unlock(node);
 		(void) get_properror(node, err, ETOPO_NOMEM);
 		return (-1);
 	}

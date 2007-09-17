@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,7 @@ topo_file_unload(topo_file_t *tfp)
 
 int
 topo_file_load(topo_mod_t *mod, tnode_t *node, const char *name,
-    const char *scheme)
+    const char *scheme, int pmap)
 {
 	topo_file_t *tfp;
 	char fp[MAXNAMELEN];
@@ -93,6 +93,9 @@ topo_file_load(topo_mod_t *mod, tnode_t *node, const char *name,
 		topo_file_unload(tfp);
 		return (topo_mod_seterrno(mod, ETOPO_MOD_XRD));
 	}
+
+	if (pmap)
+		tfp->tf_tmap->tf_flags |= TF_PROPMAP;
 
 	if (topo_xml_enum(mod, tfp->tf_tmap, node) < 0) {
 		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
