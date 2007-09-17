@@ -461,7 +461,6 @@ pk_export_pk11_keys(KMF_HANDLE_T kmfhandle, char *token,
 	uint32_t numkeys = 1;
 	KMF_ATTRIBUTE attrlist[16];
 	KMF_KEY_HANDLE key;
-	KMF_KEY_CLASS keyclass = KMF_SYMMETRIC;
 	boolean_t is_token = B_TRUE;
 
 	if (EMPTYSTRING(label)) {
@@ -525,21 +524,21 @@ pk_export_pk11_keys(KMF_HANDLE_T kmfhandle, char *token,
 				if (n < 0) {
 					if (errno == EINTR)
 						continue;
-					close(fd);
+					(void) close(fd);
 					rv = KMF_ERR_WRITE_FILE;
 					goto done;
 				}
 				total += n;
 
 			} while (total < rkey.keydata.len);
-			close(fd);
+			(void) close(fd);
 		}
 done:
 		kmf_free_bigint(&rkey.keydata);
 		kmf_free_kmf_key(kmfhandle, &key);
 	} else if (rv == KMF_OK) {
 		KMF_KEYSTORE_TYPE sslks = KMF_KEYSTORE_OPENSSL;
-		printf(gettext("Found %d asymmetric keys\n"), numkeys);
+		(void) printf(gettext("Found %d asymmetric keys\n"), numkeys);
 
 		numattr = 0;
 		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,

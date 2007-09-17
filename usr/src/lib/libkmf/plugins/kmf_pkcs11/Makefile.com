@@ -53,6 +53,7 @@ SRCS =  \
 
 CFLAGS		+=	$(CCVERBOSE)
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR)  -I/usr/include/libxml2 -I$(BIGNUMDIR)
+LINTFLAGS64	+=	-errchk=longptr64
 
 PICS=	$(OBJECTS:%=pics/%)
 SONAME=	$(PLUGIN)

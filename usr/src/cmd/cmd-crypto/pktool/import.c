@@ -556,6 +556,7 @@ pk_import_pk12_pk11(
 	return (rv);
 }
 
+/*ARGSUSED*/
 static KMF_RETURN
 pk_import_keys(KMF_HANDLE_T kmfhandle,
 	KMF_KEYSTORE_TYPE kstype, char *token_spec,
@@ -630,7 +631,7 @@ pk_import_keys(KMF_HANDLE_T kmfhandle,
 
 		rv = kmf_store_key(kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
-			printf(gettext("Importing %d keys\n"), numkeys);
+			(void) printf(gettext("Importing %d keys\n"), numkeys);
 		}
 
 		kmf_free_kmf_key(kmfhandle, &key);
