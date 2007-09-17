@@ -65,9 +65,12 @@ static int xlatetom_nhdr(Elf_Nhdr *);
 static int get_phdr(Elf_Info *, int);
 static int get_shdr(Elf_Info *, int);
 
-static Elf_Ehdr	EI_Ehdr; /* Elf_Ehdr to be stored */
-static Elf_Shdr	EI_Shdr; /* recent Elf_Shdr to be stored */
-static Elf_Phdr	EI_Phdr; /* recent Elf_Phdr to be stored */
+static Elf_Ehdr	EI_Ehdr;		/* Elf_Ehdr to be stored */
+static Elf_Word	EI_Ehdr_shnum;		/* # section headers */
+static Elf_Word	EI_Ehdr_phnum;		/* # program headers */
+static Elf_Word	EI_Ehdr_shstrndx;	/* Index of section hdr string table */
+static Elf_Shdr	EI_Shdr;		/* recent Elf_Shdr to be stored */
+static Elf_Phdr	EI_Phdr;		/* recent Elf_Phdr to be stored */
 
 
 static int
@@ -161,11 +164,31 @@ elf_read(int fd, Elf_Info *EI)
 	if (pread64(EI->elffd, (void*)ehdr, size, 0) != size)
 		ret = 0;
 
+
 	if (file_xlatetom(ELF_T_EHDR, (char *)ehdr) == ELF_READ_FAIL)
 		ret = 0;
 
 	if (EI->file == NULL)
 		return (ELF_READ_FAIL);
+
+	/*
+	 * Extended section or program indexes in use? If so, special
+	 * values in the ELF header redirect us to get the real values
+	 * from shdr[0].
+	 */
+	EI_Ehdr_shnum = EI_Ehdr.e_shnum;
+	EI_Ehdr_phnum = EI_Ehdr.e_phnum;
+	EI_Ehdr_shstrndx = EI_Ehdr.e_shstrndx;
+	if (((EI_Ehdr_shnum == 0) || (EI_Ehdr_phnum == PN_XNUM)) &&
+	    (EI_Ehdr.e_shoff != 0)) {
+		get_shdr(EI, 0);
+		if (EI_Ehdr_shnum == 0)
+			EI_Ehdr_shnum = EI_Shdr.sh_size;
+		if ((EI_Ehdr_phnum == PN_XNUM) && (EI_Shdr.sh_info != 0))
+			EI_Ehdr_phnum = EI_Shdr.sh_info;
+		if (EI_Ehdr_shstrndx == SHN_XINDEX)
+			EI_Ehdr_shstrndx = EI_Shdr.sh_link;
+	}
 
 	EI->type = ehdr->e_type;
 	EI->machine = ehdr->e_machine;
@@ -195,13 +218,12 @@ get_phdr(Elf_Info *EI, int inx)
 {
 	off_t off = 0;
 	size_t size;
-	Elf_Ehdr *ehdr = &EI_Ehdr;
 
-	if (inx >= ehdr->e_phnum)
+	if (inx >= EI_Ehdr_phnum)
 		return (ELF_READ_FAIL);
 
 	size = sizeof (Elf_Phdr);
-	off = (off_t)ehdr->e_phoff + (inx * size);
+	off = (off_t)EI_Ehdr.e_phoff + (inx * size);
 	if (pread64(EI->elffd, (void *)&EI_Phdr, size, off) != size)
 		return (ELF_READ_FAIL);
 
@@ -219,13 +241,21 @@ get_shdr(Elf_Info *EI, int inx)
 {
 	off_t off = 0;
 	size_t size;
-	Elf_Ehdr *ehdr = &EI_Ehdr;
 
-	if (inx >= ehdr->e_shnum)
+	/*
+	 * Prevent access to non-existent section headers.
+	 *
+	 * A value of 0 for e_shoff means that there is no section header
+	 * array in the file. A value of 0 for e_shndx does not necessarily
+	 * mean this - there can still be a 1-element section header array
+	 * to support extended section or program header indexes that
+	 * exceed the 16-bit fields used in the ELF header to represent them.
+	 */
+	if ((EI_Ehdr.e_shoff == 0) || ((inx > 0) && (inx >= EI_Ehdr_shnum)))
 		return (ELF_READ_FAIL);
 
 	size = sizeof (Elf_Shdr);
-	off = (off_t)ehdr->e_shoff + (inx * size);
+	off = (off_t)EI_Ehdr.e_shoff + (inx * size);
 
 	if (pread64(EI->elffd, (void *)&EI_Shdr, size, off) != size)
 		return (ELF_READ_FAIL);
@@ -259,7 +289,7 @@ process_phdr(Elf_Info *EI)
 	nsz = sizeof (Elf_Nhdr);
 	nhdr = &Nhdr;
 	class = get_class();
-	for (inx = 0; inx < EI_Ehdr.e_phnum; inx++) {
+	for (inx = 0; inx < EI_Ehdr_phnum; inx++) {
 		if (get_phdr(EI, inx) == ELF_READ_FAIL)
 			return (ELF_READ_FAIL);
 
@@ -278,7 +308,7 @@ process_phdr(Elf_Info *EI)
 			}
 			offset = phdr->p_offset;
 			if (pread64(EI->elffd, (void *)nhdr, nsz, offset)
-				!= nsz)
+			    != nsz)
 				return (ELF_READ_FAIL);
 
 			/* Translate the ELF note header */
@@ -332,7 +362,7 @@ process_phdr(Elf_Info *EI)
 					fname = psinfo + 120;
 			}
 			EI->core_type = (ntype == NT_PRPSINFO)?
-					EC_OLDCORE : EC_NEWCORE;
+			    EC_OLDCORE : EC_NEWCORE;
 			(void) memcpy(EI->fname, fname, strlen(fname));
 			free(psinfo);
 		}
@@ -367,11 +397,11 @@ process_shdr(Elf_Info *EI)
 	mac = EI_Ehdr.e_machine;
 
 	/* if there are no sections, return success anyway */
-	if (EI_Ehdr.e_shoff == 0 && EI_Ehdr.e_shnum == 0)
+	if (EI_Ehdr.e_shoff == 0 && EI_Ehdr_shnum == 0)
 		return (ELF_READ_OKAY);
 
 	/* read section names from String Section */
-	if (get_shdr(EI, EI_Ehdr.e_shstrndx) == ELF_READ_FAIL)
+	if (get_shdr(EI, EI_Ehdr_shstrndx) == ELF_READ_FAIL)
 		return (ELF_READ_FAIL);
 
 	if ((section_name = malloc(shdr->sh_size)) == NULL)
@@ -382,7 +412,7 @@ process_shdr(Elf_Info *EI)
 		return (ELF_READ_FAIL);
 
 	/* read all the sections and process them */
-	for (idx = 1, i = 0; i < EI_Ehdr.e_shnum; idx++, i++) {
+	for (idx = 1, i = 0; i < EI_Ehdr_shnum; idx++, i++) {
 		char *str;
 
 		if (get_shdr(EI, i) == ELF_READ_FAIL)
@@ -406,9 +436,9 @@ process_shdr(Elf_Info *EI)
 				 * read cap and xlate the values
 				 */
 				if (pread64(EI->elffd, &Chdr, csize, cap_off)
-					!= csize ||
-					file_xlatetom(ELF_T_CAP, (char *)&Chdr)
-					    == 0) {
+				    != csize ||
+				    file_xlatetom(ELF_T_CAP, (char *)&Chdr)
+				    == 0) {
 					(void) fprintf(stderr, ELF_ERR_ELFCAP2,
 					    File, EI->file);
 					return (ELF_READ_FAIL);
@@ -416,10 +446,8 @@ process_shdr(Elf_Info *EI)
 
 				if (Chdr.c_tag != CA_SUNW_NULL) {
 					(void) cap_val2str(Chdr.c_tag,
-						    Chdr.c_un.c_val,
-						    EI->cap_str,
-						    sizeof (EI->cap_str),
-						    0, mac);
+					    Chdr.c_un.c_val, EI->cap_str,
+					    sizeof (EI->cap_str), 0, mac);
 				}
 				cap_off += csize;
 			}

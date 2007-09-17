@@ -71,6 +71,7 @@ extern int is_in_list(char *str);
 #define	Elf_Phdr	Elf64_Phdr
 #define	Elf_Cap		Elf64_Cap
 #define	Elf_Nhdr	Elf64_Nhdr
+#define	Elf_Word	Elf64_Word
 
 #define	elf_read	elf_read64
 #define	elf_xlatetom	elf64_xlatetom
@@ -86,6 +87,7 @@ extern int is_in_list(char *str);
 #define	Elf_Phdr	Elf32_Phdr
 #define	Elf_Cap		Elf32_Cap
 #define	Elf_Nhdr	Elf32_Nhdr
+#define	Elf_Word	Elf32_Word
 
 #define	elf_read	elf_read32
 #define	elf_xlatetom	elf32_xlatetom
