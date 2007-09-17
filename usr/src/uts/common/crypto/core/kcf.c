@@ -65,7 +65,7 @@ door_handle_t kcf_dh = NULL;
 
 
 static struct modlmisc modlmisc = {
-	&mod_miscops, "Kernel Crypto Framework %I%"
+	&mod_miscops, "Kernel Crypto Framework"
 };
 
 static struct modlinkage modlinkage = {

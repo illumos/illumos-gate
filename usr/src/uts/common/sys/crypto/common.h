@@ -66,6 +66,44 @@ typedef struct crypto_mechanism32 {
 
 #endif  /* _SYSCALL32 */
 
+/* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
+typedef struct CK_AES_CTR_PARAMS {
+	ulong_t	ulCounterBits;
+	uint8_t cb[16];
+} CK_AES_CTR_PARAMS;
+
+/* CK_AES_CCM_PARAMS provides parameters to the CKM_AES_CCM mechanism */
+typedef struct CK_AES_CCM_PARAMS {
+	ulong_t ulMACSize;
+	ulong_t ulNonceSize;
+	ulong_t ulAuthDataSize;
+	ulong_t ulDataSize; /* used for plaintext or ciphertext */
+	uchar_t *nonce;
+	uchar_t *authData;
+} CK_AES_CCM_PARAMS;
+
+#ifdef _KERNEL
+#ifdef  _SYSCALL32
+
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_CTR_PARAMS32 {
+	uint32_t ulCounterBits;
+	uint8_t cb[16];
+} CK_AES_CTR_PARAMS32;
+
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_CCM_PARAMS32 {
+	uint32_t ulMACSize;
+	uint32_t ulNonceSize;
+	uint32_t ulAuthDataSize;
+	uint32_t ulDataSize;
+	caddr32_t nonce;
+	caddr32_t authData;
+} CK_AES_CCM_PARAMS32;
+
+#endif  /* _SYSCALL32 */
+#endif /* _KERNEL */
+
 /*
  * The measurement unit bit flag for a mechanism's minimum or maximum key size.
  * The unit are mechanism dependant.  It can be in bits or in bytes.

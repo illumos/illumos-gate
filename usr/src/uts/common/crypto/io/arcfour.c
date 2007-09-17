@@ -47,7 +47,7 @@ extern struct mod_ops mod_cryptoops;
  */
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"RC4 Kernel SW Provider %I%"
+	"RC4 Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -355,7 +355,8 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 			 */
 			for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 			    offset >= uiop->uio_iov[vec_idx].iov_len;
-			    offset -= uiop->uio_iov[vec_idx++].iov_len);
+			    offset -= uiop->uio_iov[vec_idx++].iov_len)
+				;
 			if (vec_idx == uiop->uio_iovcnt) {
 				return (CRYPTO_DATA_LEN_RANGE);
 			}
@@ -471,7 +472,8 @@ rc4_crypt_update(crypto_ctx_t *ctx, crypto_data_t *input, crypto_data_t *output,
 		 */
 		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 		    offset >= uiop->uio_iov[vec_idx].iov_len;
-		    offset -= uiop->uio_iov[vec_idx++].iov_len);
+		    offset -= uiop->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == uiop->uio_iovcnt) {
 			return (CRYPTO_DATA_LEN_RANGE);
 		}
@@ -634,7 +636,8 @@ crypto_arcfour_crypt(ARCFour_key *key, uchar_t *in, crypto_data_t *out,
 			 */
 			for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 			    offset >= uiop->uio_iov[vec_idx].iov_len;
-			    offset -= uiop->uio_iov[vec_idx++].iov_len);
+			    offset -= uiop->uio_iov[vec_idx++].iov_len)
+				;
 			if (vec_idx == uiop->uio_iovcnt) {
 				return (CRYPTO_DATA_LEN_RANGE);
 			}

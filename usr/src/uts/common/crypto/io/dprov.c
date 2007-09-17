@@ -177,13 +177,13 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Pseudo KCF Prov (drv) %I%",
+	"Pseudo KCF Prov (drv)",
 	&devops
 };
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"Pseudo KCF Prov (crypto) %I%"
+	"Pseudo KCF Prov (crypto)"
 };
 
 static struct modlinkage modlinkage = {
@@ -4284,24 +4284,15 @@ copyin_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
 			goto out;
 		}
 		/* allocate param structure and counter block */
-		aes_ctr_params = kmem_alloc(sizeof (CK_AES_CTR_PARAMS) + 16,
+		aes_ctr_params = kmem_alloc(sizeof (CK_AES_CTR_PARAMS),
 		    KM_NOSLEEP);
 		if (aes_ctr_params == NULL) {
 			rv = CRYPTO_HOST_MEMORY;
 			goto out;
 		}
-		aes_ctr_params->cb = (uchar_t *)aes_ctr_params +
-		    sizeof (CK_AES_CTR_PARAMS);
 		aes_ctr_params->ulCounterBits = STRUCT_FGET(params,
 		    ulCounterBits);
-		if (copyin((char *)STRUCT_FGETP(params, cb),
-		    &aes_ctr_params->cb[0], 16) != 0) {
-			kmem_free(aes_ctr_params,
-			    sizeof (CK_AES_CTR_PARAMS) + 16);
-			out_mech->cm_param = NULL;
-			error = EFAULT;
-			goto out;
-		}
+		bcopy(STRUCT_FGETP(params, cb), aes_ctr_params->cb, 16);
 		out_mech->cm_param = (char *)aes_ctr_params;
 		out_mech->cm_param_len = sizeof (CK_AES_CTR_PARAMS);
 	}
@@ -4317,7 +4308,6 @@ copyout_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
 {
 	STRUCT_DECL(crypto_mechanism, mech);
 	STRUCT_DECL(CK_AES_CTR_PARAMS, params);
-	uint8_t cb[16];
 	caddr_t pp;
 	size_t param_len;
 	int error = 0;
@@ -4339,12 +4329,10 @@ copyout_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
 	}
 
 	/* for testing, overwrite the iv with 16 X 'A' */
-	if (pp != NULL) {
-		(void) memset(cb, 'A', 16);
-		if (copyout(cb, STRUCT_FGETP(params, cb),  16) != 0) {
-			error = EFAULT;
-			goto out;
-		}
+	(void) memset(STRUCT_FGETP(params, cb), 'A', 16);
+	if (copyout((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+		error = EFAULT;
+		goto out;
 	}
 out:
 	*out_error = error;
@@ -4461,7 +4449,7 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 
 	if (mech->cm_type == AES_CTR_MECH_INFO_TYPE ||
 	    mech->cm_type == SHA1_KEY_DERIVATION_MECH_INFO_TYPE) {
-		len = sizeof (CK_AES_CTR_PARAMS) + 16;
+		len = sizeof (CK_AES_CTR_PARAMS);
 	} else {
 		len = mech->cm_param_len;
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +49,7 @@ extern struct mod_ops mod_cryptoops;
  */
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"Blowfish Kernel SW Provider %I%"
+	"Blowfish Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -411,7 +410,8 @@ blowfish_cipher_update_uio(blowfish_ctx_t *blowfish_ctx, crypto_data_t *input,
 	 */
 	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len);
+	    offset -= uiop->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == uiop->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -477,7 +477,8 @@ blowfish_cipher_update_mp(blowfish_ctx_t *blowfish_ctx, crypto_data_t *input,
 	 * Jump to the first mblk_t containing data to be processed.
 	 */
 	for (mp = input->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the

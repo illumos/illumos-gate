@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"DES Kernel SW Provider %I%"
+	"DES Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -620,7 +620,8 @@ des_cipher_update_uio(des_ctx_t *des_ctx, crypto_data_t *input,
 	 */
 	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len);
+	    offset -= uiop->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == uiop->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -706,7 +707,8 @@ des_cipher_update_mp(des_ctx_t *des_ctx, crypto_data_t *input,
 	 * Jump to the first mblk_t containing data to be processed.
 	 */
 	for (mp = input->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the

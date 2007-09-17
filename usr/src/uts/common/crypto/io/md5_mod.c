@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"MD5 Kernel SW Provider %I%"
+	"MD5 Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -340,7 +340,8 @@ md5_digest_update_uio(MD5_CTX *md5_ctx, crypto_data_t *data)
 	 */
 	for (vec_idx = 0; vec_idx < data->cd_uio->uio_iovcnt &&
 	    offset >= data->cd_uio->uio_iov[vec_idx].iov_len;
-	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == data->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -400,7 +401,8 @@ md5_digest_final_uio(MD5_CTX *md5_ctx, crypto_data_t *digest,
 	 */
 	for (vec_idx = 0; offset >= digest->cd_uio->uio_iov[vec_idx].iov_len &&
 	    vec_idx < digest->cd_uio->uio_iovcnt;
-	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == digest->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is
@@ -487,7 +489,8 @@ md5_digest_update_mblk(MD5_CTX *md5_ctx, crypto_data_t *data)
 	 * Jump to the first mblk_t containing data to be digested.
 	 */
 	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -537,7 +540,8 @@ md5_digest_final_mblk(MD5_CTX *md5_ctx, crypto_data_t *digest,
 	 * Jump to the first mblk_t that will be used to store the digest.
 	 */
 	for (mp = digest->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -1014,7 +1018,7 @@ md5_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
 	ASSERT(ctx->cc_provider_private != NULL);
 
 	if (PROV_MD5_HMAC_CTX(ctx)->hc_mech_type == MD5_HMAC_GEN_MECH_INFO_TYPE)
-	    digest_len = PROV_MD5_HMAC_CTX(ctx)->hc_digest_len;
+		digest_len = PROV_MD5_HMAC_CTX(ctx)->hc_digest_len;
 
 	/*
 	 * We need to just return the length needed to store the output.
@@ -1337,7 +1341,8 @@ md5_mac_verify_atomic(crypto_provider_handle_t provider,
 		for (vec_idx = 0;
 		    offset >= mac->cd_uio->uio_iov[vec_idx].iov_len &&
 		    vec_idx < mac->cd_uio->uio_iovcnt;
-		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len);
+		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == mac->cd_uio->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is
@@ -1377,7 +1382,8 @@ md5_mac_verify_atomic(crypto_provider_handle_t provider,
 
 		/* jump to the first mblk_t containing the expected digest */
 		for (mp = mac->cd_mp; mp != NULL && offset >= MBLKL(mp);
-		    offset -= MBLKL(mp), mp = mp->b_cont);
+		    offset -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than

@@ -44,7 +44,7 @@ extern "C" {
 #define	RSA_PRI_ATTR_COUNT		7
 #define	RSA_PUB_ATTR_COUNT		3
 #define	DSA_ATTR_COUNT			4
-#define	EC_ATTR_COUNT			1
+#define	EC_ATTR_COUNT			2
 
 /*
  * Secret key Struct

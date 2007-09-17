@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,7 @@ extern struct mod_ops mod_cryptoops;
  */
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"RSA Kernel SW Provider %I%"
+	"RSA Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -546,7 +545,8 @@ process_uio_data(crypto_data_t *data, uchar_t *buf, int len,
 	 */
 	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len);
+	    offset -= uiop->uio_iov[vec_idx++].iov_len)
+		;
 
 	if (vec_idx == uiop->uio_iovcnt) {
 		/*
@@ -628,7 +628,8 @@ process_mblk_data(crypto_data_t *data, uchar_t *buf, int len,
 	 * Jump to the first mblk_t containing data to be processed.
 	 */
 	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger
@@ -1216,15 +1217,15 @@ core_rsa_decrypt(crypto_key_t *key, uchar_t *in, int in_len,
 	 * a required attribute for a RSA secret key.
 	 */
 	if ((get_key_attr(key, SUN_CKA_PRIME_1, &prime1, &prime1_len)
-		!= CRYPTO_SUCCESS) ||
+	    != CRYPTO_SUCCESS) ||
 	    (get_key_attr(key, SUN_CKA_PRIME_2, &prime2, &prime2_len)
-		!= CRYPTO_SUCCESS) ||
+	    != CRYPTO_SUCCESS) ||
 	    (get_key_attr(key, SUN_CKA_EXPONENT_1, &expo1, &expo1_len)
-		!= CRYPTO_SUCCESS) ||
+	    != CRYPTO_SUCCESS) ||
 	    (get_key_attr(key, SUN_CKA_EXPONENT_2, &expo2, &expo2_len)
-		!= CRYPTO_SUCCESS) ||
+	    != CRYPTO_SUCCESS) ||
 	    (get_key_attr(key, SUN_CKA_COEFFICIENT, &coef, &coef_len)
-		!= CRYPTO_SUCCESS)) {
+	    != CRYPTO_SUCCESS)) {
 		return (core_rsa_encrypt(key, in, in_len, out, kmflag, 0));
 	}
 

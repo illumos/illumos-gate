@@ -257,7 +257,7 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,					/* drv_modops */
-	"Cryptographic Library Interface v%I%",	/* drv_linkinfo */
+	"Cryptographic Library Interface",	/* drv_linkinfo */
 	&devops,
 };
 

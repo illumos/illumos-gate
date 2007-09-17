@@ -56,7 +56,7 @@ extern struct mod_ops mod_cryptoops;
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"MD4 Kernel SW Provider %I%"
+	"MD4 Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -263,7 +263,8 @@ md4_digest_update_uio(MD4_CTX *md4_ctx, crypto_data_t *data)
 	 */
 	for (vec_idx = 0; vec_idx < data->cd_uio->uio_iovcnt &&
 	    offset >= data->cd_uio->uio_iov[vec_idx].iov_len;
-	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == data->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -323,7 +324,8 @@ md4_digest_final_uio(MD4_CTX *md4_ctx, crypto_data_t *digest,
 	 */
 	for (vec_idx = 0; offset >= digest->cd_uio->uio_iov[vec_idx].iov_len &&
 	    vec_idx < digest->cd_uio->uio_iovcnt;
-	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == digest->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is
@@ -410,7 +412,8 @@ md4_digest_update_mblk(MD4_CTX *md4_ctx, crypto_data_t *data)
 	 * Jump to the first mblk_t containing data to be digested.
 	 */
 	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -460,7 +463,8 @@ md4_digest_final_mblk(MD4_CTX *md4_ctx, crypto_data_t *digest,
 	 * Jump to the first mblk_t that will be used to store the digest.
 	 */
 	for (mp = digest->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the

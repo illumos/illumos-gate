@@ -52,7 +52,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"SHA2 Kernel SW Provider %I%"
+	"SHA2 Kernel SW Provider"
 };
 
 static struct modlinkage modlinkage = {
@@ -323,7 +323,8 @@ sha2_digest_update_uio(SHA2_CTX *sha2_ctx, crypto_data_t *data)
 	 */
 	for (vec_idx = 0; vec_idx < data->cd_uio->uio_iovcnt &&
 	    offset >= data->cd_uio->uio_iov[vec_idx].iov_len;
-	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= data->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == data->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -382,7 +383,8 @@ sha2_digest_final_uio(SHA2_CTX *sha2_ctx, crypto_data_t *digest,
 	 */
 	for (vec_idx = 0; offset >= digest->cd_uio->uio_iov[vec_idx].iov_len &&
 	    vec_idx < digest->cd_uio->uio_iovcnt;
-	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len);
+	    offset -= digest->cd_uio->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == digest->cd_uio->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is
@@ -401,7 +403,7 @@ sha2_digest_final_uio(SHA2_CTX *sha2_ctx, crypto_data_t *digest,
 		if (((sha2_ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) &&
 		    (digest_len != SHA256_DIGEST_LENGTH)) ||
 		    ((sha2_ctx->algotype > SHA256_HMAC_GEN_MECH_INFO_TYPE) &&
-			(digest_len != SHA512_DIGEST_LENGTH))) {
+		    (digest_len != SHA512_DIGEST_LENGTH))) {
 			/*
 			 * The caller requested a short digest. Digest
 			 * into a scratch buffer and return to
@@ -435,7 +437,7 @@ sha2_digest_final_uio(SHA2_CTX *sha2_ctx, crypto_data_t *digest,
 		while (vec_idx < digest->cd_uio->uio_iovcnt && length > 0) {
 			cur_len =
 			    MIN(digest->cd_uio->uio_iov[vec_idx].iov_len -
-				    offset, length);
+			    offset, length);
 			bcopy(digest_tmp + scratch_offset,
 			    digest->cd_uio->uio_iov[vec_idx].iov_base + offset,
 			    cur_len);
@@ -475,7 +477,8 @@ sha2_digest_update_mblk(SHA2_CTX *sha2_ctx, crypto_data_t *data)
 	 * Jump to the first mblk_t containing data to be digested.
 	 */
 	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -525,7 +528,8 @@ sha2_digest_final_mblk(SHA2_CTX *sha2_ctx, crypto_data_t *digest,
 	 * Jump to the first mblk_t that will be used to store the digest.
 	 */
 	for (mp = digest->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -542,7 +546,7 @@ sha2_digest_final_mblk(SHA2_CTX *sha2_ctx, crypto_data_t *digest,
 		if (((sha2_ctx->algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) &&
 		    (digest_len != SHA256_DIGEST_LENGTH)) ||
 		    ((sha2_ctx->algotype > SHA256_HMAC_GEN_MECH_INFO_TYPE) &&
-			(digest_len != SHA512_DIGEST_LENGTH))) {
+		    (digest_len != SHA512_DIGEST_LENGTH))) {
 			/*
 			 * The caller requested a short digest. Digest
 			 * into a scratch buffer and return to
@@ -1441,7 +1445,8 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 		for (vec_idx = 0;
 		    offset >= mac->cd_uio->uio_iov[vec_idx].iov_len &&
 		    vec_idx < mac->cd_uio->uio_iovcnt;
-		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len);
+		    offset -= mac->cd_uio->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == mac->cd_uio->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is
@@ -1481,7 +1486,8 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 
 		/* jump to the first mblk_t containing the expected digest */
 		for (mp = mac->cd_mp; mp != NULL && offset >= MBLKL(mp);
-		    offset -= MBLKL(mp), mp = mp->b_cont);
+		    offset -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than

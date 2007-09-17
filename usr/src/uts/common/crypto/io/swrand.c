@@ -133,7 +133,7 @@ extern struct mod_ops mod_cryptoops;
  */
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"Kernel Random number Provider %I%"
+	"Kernel Random number Provider"
 };
 
 static struct modlinkage modlinkage = {

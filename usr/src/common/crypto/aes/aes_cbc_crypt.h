@@ -116,43 +116,6 @@ typedef struct aes_ctx {
 #define	AES_CTR_MODE			0x00000008
 #define	AES_CCM_MODE			0x00000010
 
-/* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
-typedef struct CK_AES_CTR_PARAMS {
-	ulong_t	ulCounterBits;
-	uchar_t *cb;
-} CK_AES_CTR_PARAMS;
-
-/* CK_AES_CCM_PARAMS provides parameters to the CKM_AES_CCM mechanism */
-typedef struct CK_AES_CCM_PARAMS {
-	ulong_t ulMACSize;
-	ulong_t ulNonceSize;
-	ulong_t ulAuthDataSize;
-	ulong_t ulDataSize; /* used for plaintext or ciphertext */
-	uchar_t *nonce;
-	uchar_t *authData;
-} CK_AES_CCM_PARAMS;
-
-
-#ifdef _KERNEL
-/* needed for 32-bit applications running on 64-bit kernels */
-typedef struct CK_AES_CTR_PARAMS32 {
-	uint32_t ulCounterBits;
-	caddr32_t cb;
-} CK_AES_CTR_PARAMS32;
-#endif /* _KERNEL */
-
-#ifdef _KERNEL
-/* needed for 32-bit applications running on 64-bit kernels */
-typedef struct CK_AES_CCM_PARAMS32 {
-	uint32_t ulMACSize;
-	uint32_t ulNonceSize;
-	uint32_t ulAuthDataSize;
-	uint32_t ulDataSize;
-	caddr32_t nonce;
-	caddr32_t authData;
-} CK_AES_CCM_PARAMS32;
-#endif /* _KERNEL */
-
 extern int aes_encrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
     crypto_data_t *);
 extern int aes_decrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
