@@ -308,6 +308,7 @@ vdev_disk_io_start(zio_t *zio)
 			}
 
 			zio->io_dk_callback.dkc_callback = vdev_disk_ioctl_done;
+			zio->io_dk_callback.dkc_flag = FLUSH_VOLATILE;
 			zio->io_dk_callback.dkc_cookie = zio;
 
 			error = ldi_ioctl(dvd->vd_lh, zio->io_cmd,

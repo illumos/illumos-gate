@@ -427,7 +427,11 @@ struct sd_lun {
 	    un_f_wcc_inprog		:1,	/* write cache change in */
 						/* progress */
 	    un_f_ejecting		:1,	/* media is ejecting */
-	    un_f_reserved		:16;
+	    un_f_suppress_cache_flush	:1,	/* supress flush on */
+						/* write cache */
+	    un_f_sync_nv_supported	:1,	/* SYNC_NV */
+						/* bit is supported */
+	    un_f_reserved		:14;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -1788,12 +1792,19 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_uscsi_info))
 #define	SD_CONF_BSET_LUN_RESET_ENABLED	(1 << SD_CONF_SET_LUN_RESET_ENABLED)
 
 /*
+ * Bit in flags telling driver that the write cache on the device is
+ * non-volatile.
+ */
+#define	SD_CONF_SET_CACHE_IS_NV	18
+#define	SD_CONF_BSET_CACHE_IS_NV	(1 << SD_CONF_SET_CACHE_IS_NV)
+
+/*
  * This is the number of items currently settable in the sd.conf
  * sd-config-list.  The mask value is defined for parameter checking. The
  * item count and mask should be updated when new properties are added.
  */
-#define	SD_CONF_MAX_ITEMS		18
-#define	SD_CONF_BIT_MASK		0x0003FFFF
+#define	SD_CONF_MAX_ITEMS		19
+#define	SD_CONF_BIT_MASK		0x0007FFFF
 
 typedef struct {
 	int sdt_throttle;
@@ -1805,6 +1816,7 @@ typedef struct {
 	int sdt_min_throttle;
 	int sdt_disk_sort_dis;
 	int sdt_lun_reset_enable;
+	int sdt_suppress_cache_flush;
 } sd_tunables;
 
 /* Type definition for static configuration table entries */
@@ -2018,6 +2030,24 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", mode_header_grp2))
 #define	SD_VPD_OPERATING_PG	0x04	/* 0x81 - Implemented Op Defs */
 #define	SD_VPD_ASCII_OP_PG	0x08	/* 0x82 - ASCII Op Defs */
 #define	SD_VPD_DEVID_WWN_PG	0x10	/* 0x83 - Device Identification */
+#define	SD_VPD_EXTENDED_DATA_PG	0x80	/* 0x86 - Extended data about the lun */
+
+/*
+ * Non-volatile cache support
+ *
+ * Bit 1 of the byte 6 in the Extended INQUIRY data VPD page
+ * is NV_SUP bit: An NV_SUP bit set to one indicates that
+ * the device server supports a non-volatile cache.  An
+ * NV_SUP bit set to zero indicates that the device
+ * server may or may not support a non-volatile cache.
+ *
+ * Bit 2 of the byte 1 in the SYNC CACHE command is SYNC_NV
+ * bit: The SYNC_NV bit specifies whether the device server
+ * is required to synchronize volatile and non-volatile
+ * caches.
+ */
+#define	SD_VPD_NV_SUP	0x02
+#define	SD_SYNC_NV_BIT 0x04
 
 /*
  * Addition from sddef.intel.h

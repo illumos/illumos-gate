@@ -512,7 +512,8 @@ static sd_tunables lsi_oem_properties = {
 	0,
 	0,
 	0,
-	0
+	0,
+	1
 };
 
 
@@ -617,8 +618,10 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "ENGENIO INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SGI     TP",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SGI     IS",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
-	{ "*CSM100_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
-	{ "*CSM200_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "*CSM100_*",		SD_CONF_BSET_NRR_COUNT |
+			SD_CONF_BSET_CACHE_IS_NV, &lsi_oem_properties },
+	{ "*CSM200_*",		SD_CONF_BSET_NRR_COUNT |
+			SD_CONF_BSET_CACHE_IS_NV, &lsi_oem_properties },
 	{ "Fujitsu SX300",	SD_CONF_BSET_THROTTLE,  &lsi_oem_properties },
 	{ "LSI",		SD_CONF_BSET_NRR_COUNT, &lsi_properties },
 	{ "SUN     T3", SD_CONF_BSET_THROTTLE |
@@ -862,6 +865,7 @@ static int sd_pm_idletime = 1;
 #define	sd_event_callback		ssd_event_callback
 #define	sd_cache_control		ssd_cache_control
 #define	sd_get_write_cache_enabled	ssd_get_write_cache_enabled
+#define	sd_get_nv_sup			ssd_get_nv_sup
 #define	sd_make_device			ssd_make_device
 #define	sdopen				ssdopen
 #define	sdclose				ssdclose
@@ -1173,6 +1177,7 @@ static void  sd_event_callback(dev_info_t *, ddi_eventcookie_t, void *, void *);
 
 static int   sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag);
 static int   sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled);
+static void  sd_get_nv_sup(struct sd_lun *un);
 static dev_t sd_make_device(dev_info_t *devi);
 
 static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
@@ -3694,6 +3699,13 @@ sd_get_tunables_from_conf(struct sd_lun *un, int flags, int *data_list,
 			    "sd_get_tunables_from_conf: lun_reset_enable = %d"
 			    "\n", values->sdt_lun_reset_enable);
 			break;
+		case SD_CONF_BSET_CACHE_IS_NV:
+			values->sdt_suppress_cache_flush = data_list[i];
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_get_tunables_from_conf: \
+			    suppress_cache_flush = %d"
+			    "\n", values->sdt_suppress_cache_flush);
+			break;
 		}
 	}
 }
@@ -3707,9 +3719,8 @@ sd_get_tunables_from_conf(struct sd_lun *un, int flags, int *data_list,
  *
  *		The form of a configuration table entry is:
  *		  <vid+pid>,<flags>,<property-data>
- *		  "SEAGATE ST42400N",1,63,0,0			(Fibre)
- *		  "SEAGATE ST42400N",1,63,0,0,0,0		(Sparc)
- *		  "SEAGATE ST42400N",1,63,0,0,0,0,0,0,0,0,0,0	(Intel)
+ *		  "SEAGATE ST42400N",1,0x40000,
+ *		  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1;
  *
  *   Arguments: un - driver soft state (unit) structure
  */
@@ -4164,6 +4175,16 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 		    "sd_set_vers1_properties: lun reset enabled "
 		    "flag set to %d\n",
 		    prop_list->sdt_lun_reset_enable);
+	}
+
+	if (flags & SD_CONF_BSET_CACHE_IS_NV) {
+		un->un_f_suppress_cache_flush =
+		    (prop_list->sdt_suppress_cache_flush != 0) ?
+		    TRUE : FALSE;
+		SD_INFO(SD_LOG_ATTACH_DETACH, un,
+		    "sd_set_vers1_properties: suppress_cache_flush "
+		    "flag set to %d\n",
+		    prop_list->sdt_suppress_cache_flush);
 	}
 
 	/*
@@ -5069,7 +5090,7 @@ sd_check_vpd_page_support(struct sd_lun *un)
 		 * Pages are returned in ascending order, and 0x83 is what we
 		 * are hoping for.
 		 */
-		while ((page_list[counter] <= 0x83) &&
+		while ((page_list[counter] <= 0x86) &&
 		    (counter <= (page_list[VPD_PAGE_LENGTH] +
 		    VPD_HEAD_OFFSET))) {
 			/*
@@ -5092,6 +5113,9 @@ sd_check_vpd_page_support(struct sd_lun *un)
 				break;
 			case 0x83:
 				un->un_vpd_page_mask |= SD_VPD_DEVID_WWN_PG;
+				break;
+			case 0x86:
+				un->un_vpd_page_mask |= SD_VPD_EXTENDED_DATA_PG;
 				break;
 			}
 			counter++;
@@ -7302,6 +7326,12 @@ sd_unit_attach(dev_info_t *devi)
 	mutex_exit(SD_MUTEX(un));
 
 	/*
+	 * Check the value of the NV_SUP bit and set
+	 * un_f_suppress_cache_flush accordingly.
+	 */
+	sd_get_nv_sup(un);
+
+	/*
 	 * Find out what type of reservation this disk supports.
 	 */
 	switch (sd_send_scsi_PERSISTENT_RESERVE_IN(un, SD_READ_KEYS, 0, NULL)) {
@@ -7499,13 +7529,10 @@ get_softstate_failed:
 
 probe_failed:
 	scsi_unprobe(devp);
-#ifdef SDDEBUG
-	if ((sd_component_mask & SD_LOG_ATTACH_DETACH) &&
-	    (sd_level_mask & SD_LOGMASK_TRACE)) {
-		cmn_err(CE_CONT, "sd_unit_attach: un:0x%p exit failure\n",
-		    (void *)un);
-	}
-#endif
+
+	SD_ERROR(SD_LOG_ATTACH_DETACH, un, "sd_unit_attach: \
+	    un:0x%p exit failure\n", (void *)un);
+
 	return (DDI_FAILURE);
 }
 
@@ -8575,6 +8602,128 @@ sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled)
 	return (0);
 }
 
+/*
+ *    Function: sd_get_nv_sup()
+ *
+ * Description: This routine is the driver entry point for
+ * determining whether non-volatile cache is supported. This
+ * determination process works as follows:
+ *
+ * 1. sd first queries sd.conf on whether
+ * suppress_cache_flush bit is set for this device.
+ *
+ * 2. if not there, then queries the internal disk table.
+ *
+ * 3. if either sd.conf or internal disk table specifies
+ * cache flush be suppressed, we don't bother checking
+ * NV_SUP bit.
+ *
+ * If SUPPRESS_CACHE_FLUSH bit is not set to 1, sd queries
+ * the optional INQUIRY VPD page 0x86. If the device
+ * supports VPD page 0x86, sd examines the NV_SUP
+ * (non-volatile cache support) bit in the INQUIRY VPD page
+ * 0x86:
+ *   o If NV_SUP bit is set, sd assumes the device has a
+ *   non-volatile cache and set the
+ *   un_f_sync_nv_supported to TRUE.
+ *   o Otherwise cache is not non-volatile,
+ *   un_f_sync_nv_supported is set to FALSE.
+ *
+ * Arguments: un - driver soft state (unit) structure
+ *
+ * Return Code:
+ *
+ *     Context: Kernel Thread
+ */
+
+static void
+sd_get_nv_sup(struct sd_lun *un)
+{
+	int		rval		= 0;
+	uchar_t		*inq86		= NULL;
+	size_t		inq86_len	= MAX_INQUIRY_SIZE;
+	size_t		inq86_resid	= 0;
+	struct		dk_callback *dkc;
+
+	ASSERT(un != NULL);
+
+	mutex_enter(SD_MUTEX(un));
+
+	/*
+	 * Be conservative on the device's support of
+	 * SYNC_NV bit: un_f_sync_nv_supported is
+	 * initialized to be false.
+	 */
+	un->un_f_sync_nv_supported = FALSE;
+
+	/*
+	 * If either sd.conf or internal disk table
+	 * specifies cache flush be suppressed, then
+	 * we don't bother checking NV_SUP bit.
+	 */
+	if (un->un_f_suppress_cache_flush == TRUE) {
+		mutex_exit(SD_MUTEX(un));
+		return;
+	}
+
+	if (sd_check_vpd_page_support(un) == 0 &&
+	    un->un_vpd_page_mask & SD_VPD_EXTENDED_DATA_PG) {
+		mutex_exit(SD_MUTEX(un));
+		/* collect page 86 data if available */
+		inq86 = kmem_zalloc(inq86_len, KM_SLEEP);
+		rval = sd_send_scsi_INQUIRY(un, inq86, inq86_len,
+		    0x01, 0x86, &inq86_resid);
+
+		if (rval == 0 && (inq86_len - inq86_resid > 6)) {
+			SD_TRACE(SD_LOG_COMMON, un,
+			    "sd_get_nv_sup: \
+			    successfully get VPD page: %x \
+			    PAGE LENGTH: %x BYTE 6: %x\n",
+			    inq86[1], inq86[3], inq86[6]);
+
+			mutex_enter(SD_MUTEX(un));
+			/*
+			 * check the value of NV_SUP bit: only if the device
+			 * reports NV_SUP bit to be 1, the
+			 * un_f_sync_nv_supported bit will be set to true.
+			 */
+			if (inq86[6] & SD_VPD_NV_SUP) {
+				un->un_f_sync_nv_supported = TRUE;
+			}
+			mutex_exit(SD_MUTEX(un));
+		}
+		kmem_free(inq86, inq86_len);
+	} else {
+		mutex_exit(SD_MUTEX(un));
+	}
+
+	/*
+	 * Send a SYNC CACHE command to check whether
+	 * SYNC_NV bit is supported. This command should have
+	 * un_f_sync_nv_supported set to correct value.
+	 */
+	mutex_enter(SD_MUTEX(un));
+	if (un->un_f_sync_nv_supported) {
+		mutex_exit(SD_MUTEX(un));
+		dkc = kmem_zalloc(sizeof (struct dk_callback), KM_SLEEP);
+		dkc->dkc_flag = FLUSH_VOLATILE;
+		(void) sd_send_scsi_SYNCHRONIZE_CACHE(un, dkc);
+
+		/*
+		 * Send a TEST UNIT READY command to the device. This should
+		 * clear any outstanding UNIT ATTENTION that may be present.
+		 */
+		(void) sd_send_scsi_TEST_UNIT_READY(un, SD_DONT_RETRY_TUR);
+
+		kmem_free(dkc, sizeof (struct dk_callback));
+	} else {
+		mutex_exit(SD_MUTEX(un));
+	}
+
+	SD_TRACE(SD_LOG_COMMON, un, "sd_get_nv_sup: \
+	    un_f_suppress_cache_flush is set to %d\n",
+	    un->un_f_suppress_cache_flush);
+}
 
 /*
  *    Function: sd_make_device
@@ -18450,11 +18599,34 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
  * Description: Issues a scsi SYNCHRONIZE CACHE command to the target
  *
  *   Arguments: un - pointer to the target's soft state struct
+ *              dkc - pointer to the callback structure
  *
  * Return Code: 0 - success
  *		errno-type error code
  *
  *     Context: kernel thread context only.
+ *
+ *  _______________________________________________________________
+ * | dkc_flag &   | dkc_callback | DKIOCFLUSHWRITECACHE            |
+ * |FLUSH_VOLATILE|              | operation                       |
+ * |______________|______________|_________________________________|
+ * | 0            | NULL         | Synchronous flush on both       |
+ * |              |              | volatile and non-volatile cache |
+ * |______________|______________|_________________________________|
+ * | 1            | NULL         | Synchronous flush on volatile   |
+ * |              |              | cache; disk drivers may suppress|
+ * |              |              | flush if disk table indicates   |
+ * |              |              | non-volatile cache              |
+ * |______________|______________|_________________________________|
+ * | 0            | !NULL        | Asynchronous flush on both      |
+ * |              |              | volatile and non-volatile cache;|
+ * |______________|______________|_________________________________|
+ * | 1            | !NULL        | Asynchronous flush on volatile  |
+ * |              |              | cache; disk drivers may suppress|
+ * |              |              | flush if disk table indicates   |
+ * |              |              | non-volatile cache              |
+ * |______________|______________|_________________________________|
+ *
  */
 
 static int
@@ -18465,6 +18637,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	union scsi_cdb		*cdb;
 	struct buf		*bp;
 	int			rval = 0;
+	int			is_async;
 
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_SYNCHRONIZE_CACHE: entry: un:0x%p\n", un);
@@ -18472,8 +18645,49 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	ASSERT(un != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
+	if (dkc == NULL || dkc->dkc_callback == NULL) {
+		is_async = FALSE;
+	} else {
+		is_async = TRUE;
+	}
+
+	mutex_enter(SD_MUTEX(un));
+	/* check whether cache flush should be suppressed */
+	if (un->un_f_suppress_cache_flush == TRUE) {
+		mutex_exit(SD_MUTEX(un));
+		/*
+		 * suppress the cache flush if the device is told to do
+		 * so by sd.conf or disk table
+		 */
+		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_SYNCHRONIZE_CACHE: \
+		    skip the cache flush since suppress_cache_flush is %d!\n",
+		    un->un_f_suppress_cache_flush);
+
+		if (is_async == TRUE) {
+			/* invoke callback for asynchronous flush */
+			(*dkc->dkc_callback)(dkc->dkc_cookie, 0);
+		}
+		return (rval);
+	}
+	mutex_exit(SD_MUTEX(un));
+
+	/*
+	 * check dkc_flag & FLUSH_VOLATILE so SYNC_NV bit can be
+	 * set properly
+	 */
 	cdb = kmem_zalloc(CDB_GROUP1, KM_SLEEP);
 	cdb->scc_cmd = SCMD_SYNCHRONIZE_CACHE;
+
+	mutex_enter(SD_MUTEX(un));
+	if (dkc != NULL && un->un_f_sync_nv_supported &&
+	    (dkc->dkc_flag & FLUSH_VOLATILE)) {
+		/*
+		 * if the device supports SYNC_NV bit, turn on
+		 * the SYNC_NV bit to only flush volatile cache
+		 */
+		cdb->cdb_un.tag |= SD_SYNC_NV_BIT;
+	}
+	mutex_exit(SD_MUTEX(un));
 
 	/*
 	 * First get some memory for the uscsi_cmd struct and cdb
@@ -18512,7 +18726,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	bp->b_bcount = 0;
 	bp->b_blkno  = 0;
 
-	if (dkc != NULL) {
+	if (is_async == TRUE) {
 		bp->b_iodone = sd_send_scsi_SYNCHRONIZE_CACHE_biodone;
 		uip->ui_dkc = *dkc;
 	}
@@ -18530,7 +18744,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	 * but it was also incremented in sd_uscsi_strategy(), so
 	 * we should be ok.
 	 */
-	if (dkc == NULL) {
+	if (is_async == FALSE) {
 		(void) biowait(bp);
 		rval = sd_send_scsi_SYNCHRONIZE_CACHE_biodone(bp);
 	}
@@ -18547,6 +18761,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 	uint8_t *sense_buf;
 	struct sd_lun *un;
 	int status;
+	union scsi_cdb *cdb;
 
 	uip = (struct sd_uscsi_info *)(bp->b_private);
 	ASSERT(uip != NULL);
@@ -18559,6 +18774,8 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 
 	un = ddi_get_soft_state(sd_state, SD_GET_INSTANCE_FROM_BUF(bp));
 	ASSERT(un != NULL);
+
+	cdb = (union scsi_cdb *)uscmd->uscsi_cdb;
 
 	status = geterror(bp);
 	switch (status) {
@@ -18576,9 +18793,26 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 			    (scsi_sense_key(sense_buf) ==
 			    KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
+				if (cdb->cdb_un.tag|SD_SYNC_NV_BIT) {
+					mutex_enter(SD_MUTEX(un));
+					un->un_f_sync_nv_supported = FALSE;
+					mutex_exit(SD_MUTEX(un));
+					status = 0;
+					SD_TRACE(SD_LOG_IO, un,
+					    "un_f_sync_nv_supported \
+					    is set to false.\n");
+					goto done;
+				}
+
 				mutex_enter(SD_MUTEX(un));
 				un->un_f_sync_cache_supported = FALSE;
 				mutex_exit(SD_MUTEX(un));
+				SD_TRACE(SD_LOG_IO, un,
+				    "sd_send_scsi_SYNCHRONIZE_CACHE_biodone: \
+				    un_f_sync_cache_supported set to false \
+				    with asc = %x, ascq = %x\n",
+				    scsi_sense_asc(sense_buf),
+				    scsi_sense_ascq(sense_buf));
 				status = ENOTSUP;
 				goto done;
 			}
@@ -20195,10 +20429,24 @@ skip_ready_valid:
 			 * the mode select and flush are complete.
 			 */
 			sync_supported = un->un_f_sync_cache_supported;
-			mutex_exit(SD_MUTEX(un));
-			if ((err = sd_cache_control(un, SD_CACHE_NOCHANGE,
-			    SD_CACHE_DISABLE)) == 0 && sync_supported) {
-				err = sd_send_scsi_SYNCHRONIZE_CACHE(un, NULL);
+
+			/*
+			 * If cache flush is suppressed, we assume that the
+			 * controller firmware will take care of managing the
+			 * write cache for us: no need to explicitly
+			 * disable it.
+			 */
+			if (!un->un_f_suppress_cache_flush) {
+				mutex_exit(SD_MUTEX(un));
+				if ((err = sd_cache_control(un,
+				    SD_CACHE_NOCHANGE,
+				    SD_CACHE_DISABLE)) == 0 &&
+				    sync_supported) {
+					err = sd_send_scsi_SYNCHRONIZE_CACHE(un,
+					    NULL);
+				}
+			} else {
+				mutex_exit(SD_MUTEX(un));
 			}
 
 			mutex_enter(SD_MUTEX(un));
@@ -20213,10 +20461,20 @@ skip_ready_valid:
 			 * bit says it isn't.
 			 */
 			un->un_f_write_cache_enabled = 1;
-			mutex_exit(SD_MUTEX(un));
 
-			err = sd_cache_control(un, SD_CACHE_NOCHANGE,
-			    SD_CACHE_ENABLE);
+			/*
+			 * If cache flush is suppressed, we assume that the
+			 * controller firmware will take care of managing the
+			 * write cache for us: no need to explicitly
+			 * enable it.
+			 */
+			if (!un->un_f_suppress_cache_flush) {
+				mutex_exit(SD_MUTEX(un));
+				err = sd_cache_control(un, SD_CACHE_NOCHANGE,
+				    SD_CACHE_ENABLE);
+			} else {
+				mutex_exit(SD_MUTEX(un));
+			}
 
 			mutex_enter(SD_MUTEX(un));
 

@@ -191,7 +191,13 @@ struct dk_geom {
 struct dk_callback {
 	void (*dkc_callback)(void *dkc_cookie, int error);
 	void *dkc_cookie;
+	int dkc_flag;
 };
+
+/* bit flag definitions for dkc_flag */
+#define	FLUSH_VOLATILE		0x1	/* Bit 0: if set, only flush */
+					/* volatile cache; otherwise, flush */
+					/* volatile and non-volatile cache */
 
 #define	DKIOCGETWCE		(DKIOC|36)	/* Get current write cache */
 						/* enablement status */

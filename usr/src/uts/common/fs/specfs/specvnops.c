@@ -1450,8 +1450,15 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 	if ((vp->v_type == VBLK || vp->v_type == VCHR) &&
 	    !(sp->s_flag & SNOFLUSH)) {
 		int rval, rc;
+		struct dk_callback spec_callback;
+
+		spec_callback.dkc_flag = FLUSH_VOLATILE;
+		spec_callback.dkc_callback = NULL;
+
+		/* synchronous flush on volatile cache */
 		rc = cdev_ioctl(vp->v_rdev, DKIOCFLUSHWRITECACHE,
-		    NULL, FNATIVE|FKIOCTL, cr, &rval);
+		    (intptr_t)&spec_callback, FNATIVE|FKIOCTL, cr, &rval);
+
 		if (rc == ENOTSUP || rc == ENOTTY) {
 			mutex_enter(&sp->s_lock);
 			sp->s_flag |= SNOFLUSH;
