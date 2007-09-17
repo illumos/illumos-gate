@@ -214,6 +214,12 @@ typedef struct cpu {
 	char		*cpu_supp_freqs;	/* supported freqs in Hz */
 
 	/*
+	 * Interrupt load factor used by dispatcher & softcall
+	 */
+	hrtime_t	cpu_intrlast;   /* total interrupt time (nsec) */
+	int		cpu_intrload;   /* interrupt load factor (0-99%) */
+
+	/*
 	 * New members must be added /before/ this member, as the CTF tools
 	 * rely on this being the last field before cpu_m, so they can
 	 * correctly calculate the offset when synthetically adding the cpu_m
@@ -438,6 +444,12 @@ extern	void	cpuset_bounds(cpuset_t *, uint_t *, uint_t *);
 		(set1).cpub[_i] |= (set2).cpub[_i];	\
 }
 
+#define	CPUSET_XOR(set1, set2)		{		\
+	int _i;						\
+	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
+		(set1).cpub[_i] ^= (set2).cpub[_i];	\
+}
+
 #define	CPUSET_AND(set1, set2)		{		\
 	int _i;						\
 	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
@@ -465,6 +477,7 @@ typedef	ulong_t	cpuset_t;	/* a set of CPUs */
 #define	CPUSET_ISNULL(set)		((set) == 0)
 #define	CPUSET_ISEQUAL(set1, set2)	((set1) == (set2))
 #define	CPUSET_OR(set1, set2)		((void)((set1) |= (set2)))
+#define	CPUSET_XOR(set1, set2)		((void)((set1) ^= (set2)))
 #define	CPUSET_AND(set1, set2)		((void)((set1) &= (set2)))
 #define	CPUSET_ZERO(set)		((void)((set) = 0))
 

@@ -56,8 +56,14 @@ static struct intr_dist *intr_dist_head = NULL;
 static struct intr_dist *intr_dist_whead = NULL;
 
 uint64_t siron_inum;
+uint64_t *siron_cpu_inum = NULL;
+uint64_t siron_poke_cpu_inum;
+static int siron_cpu_setup(cpu_setup_t, int, void *);
+extern uint_t softlevel1();
+
 uint64_t poke_cpu_inum;
 uint_t poke_cpu_intr(caddr_t arg1, caddr_t arg2);
+uint_t siron_poke_cpu_intr(caddr_t arg1, caddr_t arg2);
 
 /*
  * Note:-
@@ -99,8 +105,15 @@ intr_init(cpu_t *cp)
 	init_ivintr();
 	REGISTER_BBUS_INTR();
 
+	/*
+	 * We just allocate memory for per-cpu siron right now. Rest of
+	 * the work is done when CPU is configured.
+	 */
+	siron_cpu_inum = kmem_zalloc(sizeof (uint64_t) * NCPU, KM_SLEEP);
 	siron_inum = add_softintr(PIL_1, softlevel1, 0, SOFTINT_ST);
 	poke_cpu_inum = add_softintr(PIL_13, poke_cpu_intr, 0, SOFTINT_MT);
+	siron_poke_cpu_inum = add_softintr(PIL_13,
+	    siron_poke_cpu_intr, 0, SOFTINT_MT);
 	cp->cpu_m.poke_cpu_outstanding = B_FALSE;
 
 	mutex_init(&intr_dist_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -156,13 +169,101 @@ setsoftint(uint64_t inum)
 	kdi_setsoftint(inum);
 }
 
+/*
+ * Generates softlevel1 interrupt on current CPU if it
+ * is not pending already.
+ */
 void
 siron(void)
 {
-	if (siron_inum != 0)
-		setsoftint(siron_inum);
-	else
+	uint64_t inum;
+
+	if (siron_inum != 0) {
+		if (siron_cpu_inum[CPU->cpu_id] != 0)
+			inum = siron_cpu_inum[CPU->cpu_id];
+		else
+			inum = siron_inum;
+
+		setsoftint(inum);
+	} else
 		siron_pending = 1;
+}
+
+/*
+ * This routine creates per-CPU siron inum for CPUs which are
+ * configured during boot.
+ */
+void
+siron_mp_init()
+{
+	cpu_t *c;
+
+	mutex_enter(&cpu_lock);
+	c = cpu_list;
+	do {
+		(void) siron_cpu_setup(CPU_CONFIG, c->cpu_id, NULL);
+	} while ((c = c->cpu_next) != cpu_list);
+
+	register_cpu_setup_func(siron_cpu_setup, NULL);
+	mutex_exit(&cpu_lock);
+}
+
+/*
+ * siron_poke_cpu_intr - cross-call handler.
+ */
+/* ARGSUSED */
+uint_t
+siron_poke_cpu_intr(caddr_t arg1, caddr_t arg2)
+{
+	/* generate level1 softint */
+	siron();
+	return (1);
+}
+
+/*
+ * This routine generates a cross-call on target CPU(s).
+ */
+void
+siron_poke_cpu(cpuset_t poke)
+{
+	int cpuid = CPU->cpu_id;
+
+	if (CPU_IN_SET(poke, cpuid)) {
+		siron();
+		CPUSET_DEL(poke, cpuid);
+		if (CPUSET_ISNULL(poke))
+			return;
+	}
+
+	xt_some(poke, setsoftint_tl1, siron_poke_cpu_inum, 0);
+}
+
+/*
+ * This callback function allows us to create per-CPU siron inum.
+ */
+/* ARGSUSED */
+static int
+siron_cpu_setup(cpu_setup_t what, int id, void *arg)
+{
+	cpu_t *cp = cpu[id];
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	ASSERT(cp != NULL);
+
+	switch (what) {
+	case CPU_CONFIG:
+		siron_cpu_inum[cp->cpu_id] = add_softintr(PIL_1,
+		    (softintrfunc)softlevel1, 0, SOFTINT_ST);
+		break;
+	case CPU_UNCONFIG:
+		(void) rem_softintr(siron_cpu_inum[cp->cpu_id]);
+		siron_cpu_inum[cp->cpu_id] = 0;
+		break;
+	default:
+		break;
+	}
+
+	return (0);
 }
 
 /*

@@ -169,6 +169,8 @@ static struct cpu_sys_stats_ks_data {
 	kstat_named_t cpu_nsec_idle;
 	kstat_named_t cpu_nsec_user;
 	kstat_named_t cpu_nsec_kernel;
+	kstat_named_t cpu_nsec_intr;
+	kstat_named_t cpu_load_intr;
 	kstat_named_t wait_ticks_io;
 	kstat_named_t bread;
 	kstat_named_t bwrite;
@@ -224,6 +226,8 @@ static struct cpu_sys_stats_ks_data {
 	{ "cpu_nsec_idle",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_user",	KSTAT_DATA_UINT64 },
 	{ "cpu_nsec_kernel",	KSTAT_DATA_UINT64 },
+	{ "cpu_nsec_intr",	KSTAT_DATA_UINT64 },
+	{ "cpu_load_intr",	KSTAT_DATA_UINT64 },
 	{ "wait_ticks_io", 	KSTAT_DATA_UINT64 },
 	{ "bread", 		KSTAT_DATA_UINT64 },
 	{ "bwrite", 		KSTAT_DATA_UINT64 },
@@ -3012,6 +3016,8 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	    NSEC_TO_TICK(csskd->cpu_nsec_user.value.ui64);
 	csskd->cpu_ticks_kernel.value.ui64 =
 	    NSEC_TO_TICK(csskd->cpu_nsec_kernel.value.ui64);
+	csskd->cpu_nsec_intr.value.ui64 = cp->cpu_intrlast;
+	csskd->cpu_load_intr.value.ui64 = cp->cpu_intrload;
 	csskd->bread.value.ui64 = css->bread;
 	csskd->bwrite.value.ui64 = css->bwrite;
 	csskd->lread.value.ui64 = css->lread;

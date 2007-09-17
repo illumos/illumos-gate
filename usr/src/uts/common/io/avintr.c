@@ -572,6 +572,39 @@ siron(void)
 }
 
 /*
+ * The handler which is executed on the target CPU.
+ */
+/*ARGSUSED*/
+static int
+siron_poke_intr(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
+{
+	siron();
+	return (0);
+}
+
+/*
+ * May get called from softcall to poke CPUs.
+ */
+void
+siron_poke_cpu(cpuset_t poke)
+{
+	int cpuid = CPU->cpu_id;
+
+	/*
+	 * If we are poking to ourself then we can simply
+	 * generate level1 using siron()
+	 */
+	if (CPU_IN_SET(poke, cpuid)) {
+		siron();
+		CPUSET_DEL(poke, cpuid);
+		if (CPUSET_ISNULL(poke))
+			return;
+	}
+
+	xc_call(0, 0, 0, X_CALL_MEDPRI, poke, (xc_func_t)siron_poke_intr);
+}
+
+/*
  * Walk the autovector table for this vector, invoking each
  * interrupt handler as we go.
  */

@@ -451,8 +451,49 @@ clock(void)
 			 * going to perform one_second processing.
 			 */
 			w_io += CPU_STATS(cp, sys.iowait);
-
 		}
+
+		if (one_sec && (cp->cpu_flags & CPU_EXISTS)) {
+			int i, load, change;
+			hrtime_t intracct, intrused;
+			const hrtime_t maxnsec = 1000000000;
+			const int precision = 100;
+
+			/*
+			 * Estimate interrupt load on this cpu each second.
+			 * Computes cpu_intrload as %utilization (0-99).
+			 */
+
+			/* add up interrupt time from all micro states */
+			for (intracct = 0, i = 0; i < NCMSTATES; i++)
+				intracct += cp->cpu_intracct[i];
+			scalehrtime(&intracct);
+
+			/* compute nsec used in the past second */
+			intrused = intracct - cp->cpu_intrlast;
+			cp->cpu_intrlast = intracct;
+
+			/* limit the value for safety (and the first pass) */
+			if (intrused >= maxnsec)
+				intrused = maxnsec - 1;
+
+			/* calculate %time in interrupt */
+			load = (precision * intrused) / maxnsec;
+			ASSERT(load >= 0 && load < precision);
+			change = cp->cpu_intrload - load;
+
+			/* jump to new max, or decay the old max */
+			if (change < 0)
+				cp->cpu_intrload = load;
+			else if (change > 0)
+				cp->cpu_intrload -= (change + 3) / 4;
+
+			DTRACE_PROBE3(cpu_intrload,
+			    cpu_t *, cp,
+			    hrtime_t, intracct,
+			    hrtime_t, intrused);
+		}
+
 		if (do_lgrp_load &&
 		    (cp->cpu_flags & CPU_EXISTS)) {
 			/*
@@ -884,8 +925,8 @@ clock(void)
 			pgcnt_t avail =
 			    MAX((spgcnt_t)(availrmem - swapfs_minfree), 0);
 
-			maxswap = k_anoninfo.ani_mem_resv
-					+ k_anoninfo.ani_max +avail;
+			maxswap = k_anoninfo.ani_mem_resv +
+			    k_anoninfo.ani_max +avail;
 			free = k_anoninfo.ani_free + avail;
 			resv = k_anoninfo.ani_phys_resv +
 			    k_anoninfo.ani_mem_resv;
@@ -1940,7 +1981,7 @@ tod_fault(enum tod_fault_type ftype, int off)
 		case TOD_NOFAULT:
 			plat_tod_fault(TOD_NOFAULT);
 			cmn_err(CE_NOTE, "Restarted tracking "
-					"Time of Day clock.");
+			    "Time of Day clock.");
 			tod_faulted = ftype;
 			break;
 		case TOD_REVERSED:
@@ -2104,7 +2145,7 @@ tod_validate(time_t tod)
 		 * variation from reference freq in quartiles
 		 */
 		dtick_delta = (dtick_avg - TOD_REF_FREQ) /
-			(TOD_REF_FREQ >> 2);
+		    (TOD_REF_FREQ >> 2);
 
 		/*
 		 * Even with a perfectly functioning TOD device,

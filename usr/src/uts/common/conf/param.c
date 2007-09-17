@@ -224,14 +224,20 @@ void	(*init_tbl[])(void) = {
 };
 
 
+#if defined(__sparc)
+	extern void siron_mp_init();
+#endif
+
 /*
  * Any per cpu resources should be initialized via
  * an entry in mp_init_tbl().
  */
-
 void	(*mp_init_tbl[])(void) = {
 	ftrace_init,
 	cyclic_mp_init,
+#if defined(__sparc)
+	siron_mp_init,
+#endif
 	0
 };
 

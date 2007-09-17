@@ -61,6 +61,7 @@ COMMON_CORE_OBJS +=		\
 		rctl_proc.o	\
 		rwlock.o	\
 		seg_kmem.o	\
+		softint.o	\
 		string.o	\
 		thread_intr.o	\
 		vm_page.o	\
@@ -279,7 +280,6 @@ GENUNIX_OBJS +=	\
 		sigsuspend.o	\
 		sigtimedwait.o	\
 		sleepq.o	\
-		softint.o	\
 		space.o		\
 		sscanf.o	\
 		ssig.o		\
