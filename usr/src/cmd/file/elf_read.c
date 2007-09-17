@@ -181,7 +181,8 @@ elf_read(int fd, Elf_Info *EI)
 	EI_Ehdr_shstrndx = EI_Ehdr.e_shstrndx;
 	if (((EI_Ehdr_shnum == 0) || (EI_Ehdr_phnum == PN_XNUM)) &&
 	    (EI_Ehdr.e_shoff != 0)) {
-		get_shdr(EI, 0);
+		if (get_shdr(EI, 0) == ELF_READ_FAIL)
+			return (ELF_READ_FAIL);
 		if (EI_Ehdr_shnum == 0)
 			EI_Ehdr_shnum = EI_Shdr.sh_size;
 		if ((EI_Ehdr_phnum == PN_XNUM) && (EI_Shdr.sh_info != 0))
