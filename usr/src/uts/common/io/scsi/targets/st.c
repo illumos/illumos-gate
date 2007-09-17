@@ -475,7 +475,11 @@ static int st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt);
 static int st_handle_sense(struct scsi_tape *un, struct buf *bp);
 static int st_handle_autosense(struct scsi_tape *un, struct buf *bp);
 static int st_decode_sense(struct scsi_tape *un, struct buf *bp, int amt,
-	struct scsi_status *);
+    struct scsi_status *);
+static int st_get_error_entry(struct scsi_tape *un, intptr_t arg, int flag);
+static void st_update_error_stack(struct scsi_tape *un, struct scsi_pkt *pkt,
+    struct scsi_arq_status *cmd);
+static void st_empty_error_stack(struct scsi_tape *un);
 static int st_report_soft_errors(dev_t dev, int flag);
 static void st_delayed_cv_broadcast(void *arg);
 static int st_check_media(dev_t dev, enum mtio_state state);
@@ -938,7 +942,6 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		un->un_arq_enabled =
 		    ((scsi_ifsetcap(ROUTE, "auto-rqsense", 1, 1) == 1) ? 1 : 0);
 	}
-
 
 	ST_DEBUG(devi, st_label, SCSI_DEBUG, "auto request sense %s\n",
 	    (un->un_arq_enabled ? "enabled" : "disabled"));
@@ -2150,6 +2153,11 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		 */
 		un->un_state = ST_STATE_OPENING;
 
+		/*
+		 * Clear error entry stack
+		 */
+		st_empty_error_stack(un);
+
 		rval = st_tape_init(dev);
 		if ((rval == EACCES) && (un->un_read_only & WORM)) {
 			un->un_state = ST_STATE_OPEN_PENDING_IO;
@@ -3102,6 +3110,11 @@ st_rw(dev_t dev, struct uio *uio, int flag)
 	mutex_enter(ST_MUTEX);
 
 	/*
+	 * Clear error entry stack
+	 */
+	st_empty_error_stack(un);
+
+	/*
 	 * If in fixed block size mode and requested read or write
 	 * is not an even multiple of that block size.
 	 */
@@ -3987,6 +4000,15 @@ st_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	}
 
 	/*
+	 * We clear error entry stack except command
+	 * MTIOCGETERROR and MTIOCGET
+	 */
+	if ((cmd != MTIOCGETERROR) &&
+	    (cmd != MTIOCGET)) {
+		st_empty_error_stack(un);
+	}
+
+	/*
 	 * wait for all outstanding commands to complete, or be dequeued.
 	 * And because ioctl's are synchronous commands, any return value
 	 * after this,  will be in order
@@ -4157,6 +4179,17 @@ check_commands:
 
 		break;
 	}
+	case MTIOCGETERROR:
+			/*
+			 * get error entry from error stack
+			 */
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_ioctl: MTIOCGETERROR\n");
+
+			rval = st_get_error_entry(un, arg, flag);
+
+			break;
+
 	case MTIOCSTATE:
 		{
 			/*
@@ -8816,10 +8849,305 @@ exit:
 	return (rval);
 }
 
+/*
+ * To get one error entry from error stack
+ */
+static int
+st_get_error_entry(struct scsi_tape *un, intptr_t arg, int flag)
+{
+#ifdef _MULTI_DATAMODEL
+	/*
+	 * For use when a 32 bit app makes a call into a
+	 * 64 bit ioctl
+	 */
+	struct mterror_entry32 err_entry32;
+#endif /* _MULTI_DATAMODEL */
+
+	int rval = 0;
+	struct mterror_entry err_entry;
+	struct mterror_entry_stack *err_link_entry_p;
+	size_t arq_status_len_in, arq_status_len_kr;
+
+	ST_FUNC(ST_DEVINFO, st_get_error_entry);
+
+	ASSERT(mutex_owned(ST_MUTEX));
+
+	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
+	    "st_get_error_entry()\n");
+
+	/*
+	 * if error record stack empty, return ENXIO
+	 */
+	if (un->un_error_entry_stk == NULL) {
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_error_entry: Error Entry Stack Empty!\n");
+		rval = ENXIO;
+		goto ret;
+	}
+
+	/*
+	 * get the top entry from stack
+	 */
+	err_link_entry_p = un->un_error_entry_stk;
+	arq_status_len_kr =
+	    err_link_entry_p->mtees_entry.mtee_arq_status_len;
+
+#ifdef _MULTI_DATAMODEL
+	switch (ddi_model_convert_from(flag & FMODELS)) {
+	case DDI_MODEL_ILP32:
+		if (ddi_copyin((void *)arg, &err_entry32,
+		    MTERROR_ENTRY_SIZE_32, flag)) {
+			rval = EFAULT;
+			goto ret;
+		}
+
+		arq_status_len_in =
+		    (size_t)err_entry32.mtee_arq_status_len;
+
+		err_entry32.mtee_cdb_len =
+		    (size32_t)err_link_entry_p->mtees_entry.mtee_cdb_len;
+
+		if (arq_status_len_in > arq_status_len_kr)
+			err_entry32.mtee_arq_status_len =
+			    (size32_t)arq_status_len_kr;
+
+		if (ddi_copyout(
+		    err_link_entry_p->mtees_entry.mtee_cdb_buf,
+		    (void *)(uintptr_t)err_entry32.mtee_cdb_buf,
+		    err_entry32.mtee_cdb_len, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: Copy cdb buffer error!");
+			rval = EFAULT;
+		}
+
+		if (ddi_copyout(
+		    err_link_entry_p->mtees_entry.mtee_arq_status,
+		    (void *)(uintptr_t)err_entry32.mtee_arq_status,
+		    err_entry32.mtee_arq_status_len, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: copy arq status error!");
+			rval = EFAULT;
+		}
+
+		if (ddi_copyout(&err_entry32, (void *)arg,
+		    MTERROR_ENTRY_SIZE_32, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: copy arq status out error!");
+			rval = EFAULT;
+		}
+		break;
+
+	case DDI_MODEL_NONE:
+		if (ddi_copyin((void *)arg, &err_entry,
+		    MTERROR_ENTRY_SIZE_64, flag)) {
+			rval = EFAULT;
+			goto ret;
+		}
+		arq_status_len_in = err_entry.mtee_arq_status_len;
+
+		err_entry.mtee_cdb_len =
+		    err_link_entry_p->mtees_entry.mtee_cdb_len;
+
+		if (arq_status_len_in > arq_status_len_kr)
+			err_entry.mtee_arq_status_len =
+			    arq_status_len_kr;
+
+		if (ddi_copyout(
+		    err_link_entry_p->mtees_entry.mtee_cdb_buf,
+		    err_entry.mtee_cdb_buf,
+		    err_entry.mtee_cdb_len, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: Copy cdb buffer error!");
+			rval = EFAULT;
+		}
+
+		if (ddi_copyout(
+		    err_link_entry_p->mtees_entry.mtee_arq_status,
+		    err_entry.mtee_arq_status,
+		    err_entry.mtee_arq_status_len, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: copy arq status error!");
+			rval = EFAULT;
+		}
+
+		if (ddi_copyout(&err_entry, (void *)arg,
+		    MTERROR_ENTRY_SIZE_64, flag)) {
+			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_error_entry: copy arq status out error!");
+			rval = EFAULT;
+		}
+		break;
+	}
+#else /* _MULTI_DATAMODEL */
+	if (ddi_copyin((void *)arg, &err_entry,
+	    MTERROR_ENTRY_SIZE_64, flag)) {
+		rval = EFAULT;
+		goto ret;
+	}
+	arq_status_len_in = err_entry.mtee_arq_status_len;
+
+	err_entry.mtee_cdb_len =
+	    err_link_entry_p->mtees_entry.mtee_cdb_len;
+
+	if (arq_status_len_in > arq_status_len_kr)
+		err_entry.mtee_arq_status_len =
+		    arq_status_len_kr;
+
+	if (ddi_copyout(
+	    err_link_entry_p->mtees_entry.mtee_cdb_buf,
+	    err_entry.mtee_cdb_buf,
+	    err_entry.mtee_cdb_len, flag)) {
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_error_entry: Copy cdb buffer error!");
+		rval = EFAULT;
+	}
+
+	if (ddi_copyout(
+	    err_link_entry_p->mtees_entry.mtee_arq_status,
+	    err_entry.mtee_arq_status,
+	    err_entry.mtee_arq_status_len, flag)) {
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_error_entry: copy arq status buffer error!");
+		rval = EFAULT;
+	}
+
+	if (ddi_copyout(&err_entry, (void *)arg,
+	    MTERROR_ENTRY_SIZE_64, flag)) {
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_error_entry: copy arq status out error!");
+		rval = EFAULT;
+	}
+#endif /* _MULTI_DATAMODEL */
+
+	/*
+	 * update stack
+	 */
+	un->un_error_entry_stk = err_link_entry_p->mtees_nextp;
+
+	kmem_free(err_link_entry_p->mtees_entry.mtee_cdb_buf,
+	    err_link_entry_p->mtees_entry.mtee_cdb_len);
+	err_link_entry_p->mtees_entry.mtee_cdb_buf = NULL;
+
+	kmem_free(err_link_entry_p->mtees_entry.mtee_arq_status,
+	    SECMDS_STATUS_SIZE);
+	err_link_entry_p->mtees_entry.mtee_arq_status = NULL;
+
+	kmem_free(err_link_entry_p, MTERROR_LINK_ENTRY_SIZE);
+	err_link_entry_p = NULL;
+ret:
+	return (rval);
+}
+
+/*
+ * MTIOCGETERROR ioctl needs to retrieve the current sense data along with
+ * the scsi CDB command which causes the error and generates sense data and
+ * the scsi status.
+ *
+ *      error-record stack
+ *
+ *
+ *             TOP                                     BOTTOM
+ *              ------------------------------------------
+ *              |   0   |   1   |   2   |   ...  |   n   |
+ *              ------------------------------------------
+ *                  ^
+ *                  |
+ *       pointer to error entry
+ *
+ * when st driver generates one sense data record, it creates a error-entry
+ * and pushes it onto the stack.
+ *
+ */
+
+static void
+st_update_error_stack(struct scsi_tape *un,
+			struct scsi_pkt *pkt,
+			struct scsi_arq_status *cmd)
+{
+	struct mterror_entry_stack *err_entry_tmp;
+	uchar_t *cdbp = (uchar_t *)pkt->pkt_cdbp;
+	size_t cdblen = scsi_cdb_size[CDB_GROUPID(cdbp[0])];
+
+	ST_FUNC(ST_DEVINFO, st_update_error_stack);
+
+	ASSERT(mutex_owned(ST_MUTEX));
+
+	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
+	    "st_update_error_stack()\n");
+
+	ASSERT(cmd);
+	ASSERT(cdbp);
+	if (cdblen == 0) {
+		ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_update_error_stack: CDB length error!\n");
+		return;
+	}
+
+	err_entry_tmp = kmem_alloc(MTERROR_LINK_ENTRY_SIZE, KM_SLEEP);
+	ASSERT(err_entry_tmp != NULL);
+
+	err_entry_tmp->mtees_entry.mtee_cdb_buf =
+	    kmem_alloc(cdblen, KM_SLEEP);
+	ASSERT(err_entry_tmp->mtees_entry.mtee_cdb_buf != NULL);
+
+	err_entry_tmp->mtees_entry.mtee_arq_status =
+	    kmem_alloc(SECMDS_STATUS_SIZE, KM_SLEEP);
+	ASSERT(err_entry_tmp->mtees_entry.mtee_arq_status != NULL);
+
+	/*
+	 * copy cdb command & length to current error entry
+	 */
+	err_entry_tmp->mtees_entry.mtee_cdb_len = cdblen;
+	bcopy(cdbp, err_entry_tmp->mtees_entry.mtee_cdb_buf, cdblen);
+
+	/*
+	 * copy scsi status length to current error entry
+	 */
+	err_entry_tmp->mtees_entry.mtee_arq_status_len =
+	    SECMDS_STATUS_SIZE;
+
+	/*
+	 * copy sense data and scsi status to current error entry
+	 */
+	bcopy(cmd, err_entry_tmp->mtees_entry.mtee_arq_status,
+	    SECMDS_STATUS_SIZE);
+
+	err_entry_tmp->mtees_nextp = un->un_error_entry_stk;
+	un->un_error_entry_stk = err_entry_tmp;
+
+}
+
+/*
+ * Empty all the error entry in stack
+ */
+static void
+st_empty_error_stack(struct scsi_tape *un)
+{
+	struct mterror_entry_stack *linkp;
+
+	ST_FUNC(ST_DEVINFO, st_empty_error_stack);
+
+	ASSERT(mutex_owned(ST_MUTEX));
+
+	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
+	    "st_empty_entry_stack()\n");
+
+	while (un->un_error_entry_stk != NULL) {
+		linkp = un->un_error_entry_stk;
+		un->un_error_entry_stk =
+		    un->un_error_entry_stk->mtees_nextp;
+		kmem_free(linkp, MTERROR_LINK_ENTRY_SIZE);
+		linkp = NULL;
+	}
+}
+
 static int
 st_handle_sense(struct scsi_tape *un, struct buf *bp)
 {
+	struct scsi_pkt *pkt = BP_PKT(bp);
 	struct scsi_pkt *rqpkt = un->un_rqs;
+	struct scsi_arq_status arqstat;
+
 	int rval = COMMAND_DONE_ERROR;
 	int amt;
 
@@ -8851,6 +9179,21 @@ st_handle_sense(struct scsi_tape *un, struct buf *bp)
 		    "REQUEST SENSE couldn't get sense data\n");
 		return (rval);
 	}
+
+	bcopy(SCBP(pkt), &arqstat.sts_status,
+	    sizeof (struct scsi_status));
+	bcopy(SCBP(rqpkt), &arqstat.sts_rqpkt_status,
+	    sizeof (struct scsi_status));
+	arqstat.sts_rqpkt_reason = rqpkt->pkt_reason;
+	arqstat.sts_rqpkt_resid = rqpkt->pkt_resid;
+	arqstat.sts_rqpkt_state = rqpkt->pkt_state;
+	arqstat.sts_rqpkt_statistics = rqpkt->pkt_statistics;
+	bcopy(ST_RQSENSE, &arqstat.sts_sensedata, SENSE_LENGTH);
+
+	/*
+	 * copy one arqstat entry in the sense data buffer
+	 */
+	st_update_error_stack(un, pkt, &arqstat);
 	return (st_decode_sense(un, bp, amt, SCBP(rqpkt)));
 }
 
@@ -8916,6 +9259,11 @@ st_handle_autosense(struct scsi_tape *un, struct buf *bp)
 		    "REQUEST SENSE couldn't get sense data\n");
 		return (rval);
 	}
+
+	/*
+	 * copy one arqstat entry in the sense data buffer
+	 */
+	st_update_error_stack(un, pkt, arqstat);
 
 	bcopy(&arqstat->sts_sensedata, ST_RQSENSE, SENSE_LENGTH);
 

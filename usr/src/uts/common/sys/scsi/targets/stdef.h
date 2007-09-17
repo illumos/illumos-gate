@@ -875,6 +875,8 @@ struct scsi_tape {
 	int un_max_cdb_sz;		/* max cdb size to use */
 	read_p_types un_read_pos_type;
 	read_pos_data_t *un_read_pos_data;
+	struct mterror_entry_stack *un_error_entry_stk;
+					/* latest sense cmd buffer */
 
 #if defined(__i386) || defined(__amd64)
 	ddi_dma_handle_t un_contig_mem_hdl;

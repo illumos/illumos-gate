@@ -153,6 +153,41 @@ struct mtdrivetype {
 	ushort_t erase_timeout;		/* erase timeout. seconds */
 };
 
+/*
+ * struct for MTIOCGETERROR - get recent error entry command
+ */
+struct mterror_entry {
+	size_t mtee_cdb_len;			/* CDB length */
+	uchar_t *mtee_cdb_buf;			/* CDB sent to the device */
+	size_t mtee_arq_status_len;		/* length of scsi arq status */
+	struct scsi_arq_status *mtee_arq_status;
+						/* scsi arq status buffer */
+};
+
+#define	MTERROR_ENTRY_SIZE_64 (sizeof (struct mterror_entry))
+
+#if defined(_SYSCALL32)
+struct mterror_entry32 {
+	size32_t mtee_cdb_len;			/* CDB length */
+	caddr32_t mtee_cdb_buf;			/* CDB sent to the device */
+	size32_t mtee_arq_status_len;		/* length of scsi arq status */
+	caddr32_t mtee_arq_status;
+						/* scsi arq status buffer */
+};
+
+#define	MTERROR_ENTRY_SIZE_32 (sizeof (struct mterror_entry32))
+
+#endif /* _SYSCALL32 */
+
+/*
+ * error entry stack
+ */
+struct mterror_entry_stack {
+	struct mterror_entry mtees_entry;
+	struct mterror_entry_stack *mtees_nextp;
+};
+
+#define	MTERROR_LINK_ENTRY_SIZE (sizeof (struct mterror_entry_stack))
 
 struct mtdrivetype_request {
 	int	size;
@@ -267,7 +302,7 @@ struct mt_tape_info {
 #define	MTIOCRESERVE		(MTIOC|8)	/* preserve reserve */
 #define	MTIOCRELEASE		(MTIOC|9)	/* turnoff preserve reserve */
 #define	MTIOCFORCERESERVE	(MTIOC|10)	/* break reservation drive */
-
+#define	MTIOCGETERROR		(MTIOC|11)	/* Get recently error record */
 #define	MTIOCSTATE		(MTIOC|13)	/* Inquire insert/eject state */
 
 #define	MTIOCREADIGNOREILI  	(MTIOC|14)	/* Enable/Disable ILI */
