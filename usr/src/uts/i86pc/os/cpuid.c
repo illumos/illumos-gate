@@ -3389,21 +3389,37 @@ intel_l2cinfo(void *arg, const struct cachetab *ct)
 	return (1);		/* was an L2 -- terminate walk */
 }
 
+/*
+ * AMD L2/L3 Cache and TLB Associativity Field Definition:
+ *
+ *	Unlike the associativity for the L1 cache and tlb where the 8 bit
+ *	value is the associativity, the associativity for the L2 cache and
+ *	tlb is encoded in the following table. The 4 bit L2 value serves as
+ *	an index into the amd_afd[] array to determine the associativity.
+ *	-1 is undefined. 0 is fully associative.
+ */
+
+static int amd_afd[] =
+	{-1, 1, 2, -1, 4, -1, 8, -1, 16, -1, 32, 48, 64, 96, 128, 0};
+
 static void
 amd_l2cacheinfo(struct cpuid_info *cpi, struct l2info *l2i)
 {
 	struct cpuid_regs *cp;
 	uint_t size, assoc;
+	int i;
 	int *ip;
 
 	if (cpi->cpi_xmaxeax < 0x80000006)
 		return;
 	cp = &cpi->cpi_extd[6];
 
-	if ((assoc = BITX(cp->cp_ecx, 15, 12)) != 0 &&
+	if ((i = BITX(cp->cp_ecx, 15, 12)) != 0 &&
 	    (size = BITX(cp->cp_ecx, 31, 16)) != 0) {
 		uint_t cachesz = size * 1024;
+		assoc = amd_afd[i];
 
+		ASSERT(assoc != -1);
 
 		if ((ip = l2i->l2i_csz) != NULL)
 			*ip = cachesz;
