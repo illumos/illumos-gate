@@ -152,7 +152,7 @@ va_to_pa(void *vaddr)
 	if ((pfn = va_to_pfn(vaddr)) == PFN_INVALID)
 		return ((uint64_t)-1);
 	return (((uint64_t)pfn << MMU_PAGESHIFT) |
-		((uint64_t)vaddr & MMU_PAGEOFFSET));
+	    ((uint64_t)vaddr & MMU_PAGEOFFSET));
 }
 
 void
@@ -195,7 +195,7 @@ hat_kern_setup(void)
 		}
 	}
 
-	if (!shctx_on || disable_shctx) {
+	if (!shctx_on) {
 		sfmmu_patch_shctx();
 	}
 
@@ -891,7 +891,7 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	if (enable_bigktsb) {
 		ASSERT((max_nucuhme_buckets + max_nuckhme_buckets) *
 		    sizeof (struct hmehash_bucket) <=
-			TSB_BYTES(TSB_1M_SZCODE));
+		    TSB_BYTES(TSB_1M_SZCODE));
 
 		max_nucuhme_buckets *= 2;
 		max_nuckhme_buckets *= 2;
@@ -906,7 +906,7 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	 * physical memory only.
 	 */
 	hme_buckets = (npages * HMEHASH_FACTOR) /
-		(HMENT_HASHAVELEN * (HMEBLK_SPAN(TTE8K) >> MMU_PAGESHIFT));
+	    (HMENT_HASHAVELEN * (HMEBLK_SPAN(TTE8K) >> MMU_PAGESHIFT));
 
 	uhmehash_num = (int)MIN(hme_buckets, MAX_UHME_BUCKETS);
 
@@ -926,7 +926,7 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	khmehash_num = MAX(khmehash_num, MIN_KHME_BUCKETS);
 
 	if ((khmehash_num > max_nuckhme_buckets) ||
-		(uhmehash_num > max_nucuhme_buckets)) {
+	    (uhmehash_num > max_nucuhme_buckets)) {
 		khme_hash = NULL;
 		uhme_hash = NULL;
 	} else {

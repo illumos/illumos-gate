@@ -152,8 +152,8 @@ extern "C" {
 #define	MAX_NCTXS	(1ull << MAX_NCTXS_BITS)
 
 /*
- * MIN_NCONTEXTS and MIN_NTSBS are the minimum number of contexts and tsbs
- * necessary for shared context support.
+ * MIN_NSHCONTEXTS and MIN_NTSBS are the minimum number of shared contexts
+ * and tsbs necessary for shared context support.
  */
 #define	MIN_NSHCONTEXTS			1
 #define	MIN_NTSBS			4

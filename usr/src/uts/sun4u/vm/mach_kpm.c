@@ -1618,6 +1618,8 @@ sfmmu_kpm_vac_conflict(page_t *pp, caddr_t vaddr)
 	 */
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = tmphme) {
 		tmphme = sfhmep->hme_next;
+		if (IS_PAHME(sfhmep))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hmeblkp->hblk_xhat_bit)
 			continue;
@@ -1641,6 +1643,8 @@ sfmmu_kpm_vac_conflict(page_t *pp, caddr_t vaddr)
 
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = tmphme) {
 		tmphme = sfhmep->hme_next;
+		if (IS_PAHME(sfhmep))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hmeblkp->hblk_xhat_bit)
 			continue;

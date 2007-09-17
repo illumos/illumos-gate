@@ -521,9 +521,7 @@ get_mmu_tsbs(md_t *mdp, mde_cookie_t cpu_node_cookie)
 }
 
 /*
- * Get the number of shared contexts from MD. This property more accurately
- * describes the total number of contexts available, not just "shared contexts".
- * If absent the default value is 1,
+ * Get the number of shared contexts from MD. If absent the default value is 0.
  *
  */
 static uint64_t

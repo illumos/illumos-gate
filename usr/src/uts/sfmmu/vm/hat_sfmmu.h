@@ -426,9 +426,9 @@ typedef struct sf_shared_region_domain {
 	sf_region_t		*srd_hmergnfree;
 	/* pointer to the next free ism region */
 	sf_region_t		*srd_ismrgnfree;
-	/* id of next ism rgn created */
+	/* id of next ism region created */
 	uint16_t		srd_next_ismrid;
-	/* pointer of next hme region created */
+	/* id of next hme region created */
 	uint16_t		srd_next_hmerid;
 	uint16_t		srd_ismbusyrgns; /* # of ism rgns in use */
 	uint16_t		srd_hmebusyrgns; /* # of hme rgns in use */
@@ -468,6 +468,8 @@ typedef struct sf_srd_bucket {
  * This macro grabs hat lock and allocates level 2 hat chain
  * associated with a shme rgn. In the majority of cases, the macro
  * is called with alloc = 0, and lock = 0.
+ * A pointer to the level 2 sf_rgn_link_t structure is returned in the lnkp
+ * parameter.
  */
 #define	SFMMU_HMERID2RLINKP(sfmmup, rid, lnkp, alloc, lock)		\
 {									\
@@ -619,8 +621,23 @@ typedef struct sfmmu_ctx {
  * tte counts should be protected by cas.
  * cpuset is protected by cas.
  *
+ * ttecnt accounting for mappings which do not use shared hme is carried out
+ * during pagefault handling. In the shared hme case, only the first process
+ * to access a mapping generates a pagefault, subsequent processes simply
+ * find the shared hme entry during trap handling and therefore there is no
+ * corresponding event to initiate ttecnt accounting. Currently, as shared
+ * hmes are only used for text segments, when joining a region we assume the
+ * worst case and add the the number of ttes required to map the entire region
+ * to the ttecnt corresponding to the region pagesize. However, if the region
+ * has a 4M pagesize, and memory is low, the allocation of 4M pages may fail
+ * then 8K pages will be allocated instead and the first TSB which stores 8K
+ * mappings will potentially be undersized. To compensate for the potential
+ * underaccounting in this case we always add 1/4 of the region size to the 8K
+ * ttecnt.
+ *
  * Note that sfmmu_xhat_provider MUST be the first element.
  */
+
 struct hat {
 	void		*sfmmu_xhat_provider;	/* NULL for CPU hat */
 	cpuset_t	sfmmu_cpusran;	/* cpu bit mask for efficient xcalls */
@@ -700,9 +717,6 @@ struct sf_scd {
 	 */
 	ism_ment_t	scd_ism_links[SFMMU_MAX_ISM_REGIONS];
 };
-
-#define	scd_hmeregion_map	scd_region_map.h_rmap_s.hmeregion_map
-#define	scd_ismregion_map	scd_region_map.h_rmap_s.ismregion_map
 
 #define	scd_hmeregion_map	scd_region_map.h_rmap_s.hmeregion_map
 #define	scd_ismregion_map	scd_region_map.h_rmap_s.ismregion_map

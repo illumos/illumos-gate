@@ -823,10 +823,7 @@ sfmmu_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t size, int vmflag)
  * highbit() - 1) to get the size code for the smallest TSB that can represent
  * all of physical memory, while erring on the side of too much.
  *
- * If the computed size code is less than the current tsb_max_growsize, we set
- * tsb_max_growsize to the computed size code.  In the case where the computed
- * size code is greater than tsb_max_growsize, we have these restrictions that
- * apply to increasing tsb_max_growsize:
+ * Restrict tsb_max_growsize to make sure that:
  *	1) TSBs can't grow larger than the TSB slab size
  *	2) TSBs can't grow larger than UTSB_MAX_SZCODE.
  */
@@ -1381,25 +1378,33 @@ hat_init(void)
 	mutex_init(&kpr_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&kpr_suspendlock, NULL, MUTEX_SPIN, (void *)PIL_MAX);
 
-	srd_buckets = kmem_zalloc(SFMMU_MAX_SRD_BUCKETS *
-	    sizeof (srd_buckets[0]), KM_SLEEP);
-	for (i = 0; i < SFMMU_MAX_SRD_BUCKETS; i++) {
-		mutex_init(&srd_buckets[i].srdb_lock, NULL, MUTEX_DEFAULT,
-		    NULL);
-	}
 	/*
-	 * 64 byte alignment is required in order to isolate certain field
-	 * into its own cacheline.
+	 * If Shared context support is disabled via /etc/system
+	 * set shctx_on to 0 here if it was set to 1 earlier in boot
+	 * sequence by cpu module initialization code.
 	 */
-	srd_cache = kmem_cache_create("srd_cache", sizeof (sf_srd_t), 64,
-	    sfmmu_srdcache_constructor, sfmmu_srdcache_destructor,
-	    NULL, NULL, NULL, 0);
-	region_cache = kmem_cache_create("region_cache",
-	    sizeof (sf_region_t), 0, sfmmu_rgncache_constructor,
-	    sfmmu_rgncache_destructor, NULL, NULL, NULL, 0);
-	scd_cache = kmem_cache_create("scd_cache", sizeof (sf_scd_t), 0,
-	    sfmmu_scdcache_constructor,  sfmmu_scdcache_destructor,
-	    NULL, NULL, NULL, 0);
+	if (shctx_on && disable_shctx) {
+		shctx_on = 0;
+	}
+
+	if (shctx_on) {
+		srd_buckets = kmem_zalloc(SFMMU_MAX_SRD_BUCKETS *
+		    sizeof (srd_buckets[0]), KM_SLEEP);
+		for (i = 0; i < SFMMU_MAX_SRD_BUCKETS; i++) {
+			mutex_init(&srd_buckets[i].srdb_lock, NULL,
+			    MUTEX_DEFAULT, NULL);
+		}
+
+		srd_cache = kmem_cache_create("srd_cache", sizeof (sf_srd_t),
+		    0, sfmmu_srdcache_constructor, sfmmu_srdcache_destructor,
+		    NULL, NULL, NULL, 0);
+		region_cache = kmem_cache_create("region_cache",
+		    sizeof (sf_region_t), 0, sfmmu_rgncache_constructor,
+		    sfmmu_rgncache_destructor, NULL, NULL, NULL, 0);
+		scd_cache = kmem_cache_create("scd_cache", sizeof (sf_scd_t),
+		    0, sfmmu_scdcache_constructor,  sfmmu_scdcache_destructor,
+		    NULL, NULL, NULL, 0);
+	}
 
 	/*
 	 * Pre-allocate hrm_hashtab before enabling the collection of
@@ -3716,7 +3721,8 @@ sfmmu_rgn_cb_noop(caddr_t saddr, caddr_t eaddr, caddr_t r_saddr,
 }
 
 /*
- * update *eaddrp only if hmeblk was unloaded.
+ * Searches for an hmeblk which maps addr, then unloads this mapping
+ * and updates *eaddrp, if the hmeblk is found.
  */
 static void
 sfmmu_unload_hmeregion_va(sf_srd_t *srdp, uint_t rid, caddr_t addr,
@@ -3760,13 +3766,6 @@ sfmmu_unload_hmeregion_va(sf_srd_t *srdp, uint_t rid, caddr_t addr,
 	sfmmu_hblks_list_purge(&list);
 }
 
-/*
- * This routine can be optimized to eliminate scanning areas of smaller page
- * size bitmaps when a corresponding bit is set in the bitmap for a bigger
- * page size. For now assume the region will usually only have the primary
- * size mappings so we'll scan only one bitmap anyway by checking rgn_hmeflags
- * first.
- */
 static void
 sfmmu_unload_hmeregion(sf_srd_t *srdp, sf_region_t *rgnp)
 {
@@ -3972,6 +3971,7 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 			HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa,
 			    pr_hblk, prevpa, &list);
 			if (hmeblkp == NULL) {
+				SFMMU_HASH_UNLOCK(hmebp);
 				ttesz--;
 				continue;
 			}
@@ -7407,9 +7407,11 @@ retry:
 		 * from the list.
 		 */
 		tmphme = sfhme->hme_next;
+		if (IS_PAHME(sfhme))
+			continue;
 		/*
 		 * If we are looking for large mappings and this hme doesn't
-		 * reach the range we are seeking, just ignore its.
+		 * reach the range we are seeking, just ignore it.
 		 */
 		hmeblkp = sfmmu_hmetohblk(sfhme);
 		if (hmeblkp->hblk_xhat_bit)
@@ -7917,7 +7919,7 @@ hat_getkpfnum(caddr_t addr)
 }
 
 /*
- * This routine will return both pfn and tte for the addr.
+ * This routine will return both pfn and tte for the vaddr.
  */
 static pfn_t
 sfmmu_uvatopfn(caddr_t vaddr, struct hat *sfmmup, tte_t *ttep)
@@ -8129,7 +8131,7 @@ hat_page_getshare(page_t *pp)
 }
 
 /*
- * Return 1 the number of mappings exceeds sh_thresh. Return 0
+ * Return 1 if the number of mappings exceeds sh_thresh. Return 0
  * otherwise. Count shared hmeblks by region's refcnt.
  */
 int
@@ -8156,10 +8158,23 @@ hat_page_checkshare(page_t *pp, ulong_t sh_thresh)
 again:
 	for (sfhme = pp->p_mapping; sfhme; sfhme = tmphme) {
 		tmphme = sfhme->hme_next;
-		if (hme_size(sfhme) != sz) {
+		if (IS_PAHME(sfhme)) {
 			continue;
 		}
+
 		hmeblkp = sfmmu_hmetohblk(sfhme);
+		if (hmeblkp->hblk_xhat_bit) {
+		    cnt++;
+		    if (cnt > sh_thresh) {
+			sfmmu_mlist_exit(pml);
+			return (1);
+		    }
+		    continue;
+		}
+		if (hme_size(sfhme) != sz) {
+		    continue;
+		}
+
 		if (hmeblkp->hblk_shared) {
 			sf_srd_t *srdp = hblktosrd(hmeblkp);
 			uint_t rid = hmeblkp->hblk_tag.htag_rid;
@@ -8238,6 +8253,7 @@ hat_page_demote(page_t *pp)
 
 	ASSERT(PAGE_EXCL(pp));
 	ASSERT(!PP_ISFREE(pp));
+	ASSERT(!PP_ISKAS(pp));
 	ASSERT(page_szc_lock_assert(pp));
 	pml = sfmmu_mlist_enter(pp);
 
@@ -8264,6 +8280,7 @@ hat_page_demote(page_t *pp)
 		rootpp = PP_GROUPLEADER(pp, sz);
 		for (sfhme = rootpp->p_mapping; sfhme; sfhme = tmphme) {
 			tmphme = sfhme->hme_next;
+			ASSERT(!IS_PAHME(sfhme));
 			hmeblkp = sfmmu_hmetohblk(sfhme);
 			if (hme_size(sfhme) != sz) {
 				continue;
@@ -8649,10 +8666,7 @@ hat_share(struct hat *sfmmup, caddr_t addr,
 	 * sfmmu_check_page_sizes at the end of this routine.
 	 */
 	old_scdp = sfmmup->sfmmu_scdp;
-	/*
-	 * Call hat_join_region without the hat lock, because it's
-	 * used in hat_join_region.
-	 */
+
 	rcookie = hat_join_region(sfmmup, addr, len, (void *)ism_hatid, 0,
 	    PROT_ALL, ismszc, NULL, HAT_REGION_ISM);
 	if (rcookie != HAT_INVALID_REGION_COOKIE) {
@@ -8810,8 +8824,8 @@ hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 
 		/*
 		 * After hat_leave_region, the sfmmup may leave SCD,
-		 * in which case, we want to grow the private tsb size
-		 * when call sfmmu_check_page_sizes at the end of the routine.
+		 * in which case, we want to grow the private tsb size when
+		 * calling sfmmu_check_page_sizes at the end of the routine.
 		 */
 		old_scdp = sfmmup->sfmmu_scdp;
 		/*
@@ -9195,6 +9209,8 @@ sfmmu_vac_conflict(struct hat *hat, caddr_t addr, page_t *pp)
 	 */
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = tmphme) {
 		tmphme = sfhmep->hme_next;
+		if (IS_PAHME(sfhmep))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hmeblkp->hblk_xhat_bit)
 			continue;
@@ -9221,6 +9237,8 @@ sfmmu_vac_conflict(struct hat *hat, caddr_t addr, page_t *pp)
 
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = tmphme) {
 		tmphme = sfhmep->hme_next;
+		if (IS_PAHME(sfhmep))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hmeblkp->hblk_xhat_bit)
 			continue;
@@ -9368,6 +9386,8 @@ tst_tnc(page_t *pp, pgcnt_t npages)
 		}
 
 		for (sfhme = pp->p_mapping; sfhme; sfhme = sfhme->hme_next) {
+			if (IS_PAHME(sfhme))
+				continue;
 			hmeblkp = sfmmu_hmetohblk(sfhme);
 			if (hmeblkp->hblk_xhat_bit)
 				continue;
@@ -9514,6 +9534,8 @@ sfmmu_page_cache(page_t *pp, int flags, int cache_flush_flag, int bcolor)
 
 	for (sfhme = pp->p_mapping; sfhme; sfhme = sfhme->hme_next) {
 
+		if (IS_PAHME(sfhme))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhme);
 
 		if (hmeblkp->hblk_xhat_bit)
@@ -10064,7 +10086,10 @@ sfmmu_reprog_pgsz_arr(sfmmu_t *sfmmup, uint8_t *tmp_pgsz)
 	sfmmu_hat_exit(hatlockp);
 }
 
-/* Update scd_rttecnt for shme rgns in the SCD */
+/*
+ * The scd_rttecnt field in the SCD must be updated to take account of the
+ * regions which it contains.
+ */
 static void
 sfmmu_set_scd_rttecnt(sf_srd_t *srdp, sf_scd_t *scdp)
 {
@@ -11030,6 +11055,13 @@ sfmmu_hblk_alloc(sfmmu_t *sfmmup, caddr_t vaddr,
 				    size, flags);
 		}
 	} else if (SFMMU_IS_SHMERID_VALID(rid)) {
+		/*
+		 * Shared hmes use per region bitmaps in rgn_hmeflag
+		 * rather than shadow hmeblks to keep track of the
+		 * mapping sizes which have been allocated for the region.
+		 * Here we cleanup old invalid hmeblks with this rid,
+		 * which may be left around by pageunload().
+		 */
 		int ttesz;
 		caddr_t va;
 		caddr_t	eva = vaddr + TTEBYTES(size);
@@ -11317,11 +11349,6 @@ sfmmu_hblk_free(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 	hmeblkp->hblk_nextpa = hblkpa;
 	hmeblkp->hblk_shw_bit = 0;
 
-	/*
-	 * Clear ttebit map in the region this hmeblk belongs to. The region
-	 * must exist as long as any of its hmeblks exist. This invariant
-	 * holds because before region is freed all its hmeblks are removed.
-	 */
 	if (hmeblkp->hblk_shared) {
 		sf_srd_t	*srdp;
 		sf_region_t	*rgnp;
@@ -11334,7 +11361,6 @@ sfmmu_hblk_free(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 		ASSERT(rid < SFMMU_MAX_HME_REGIONS);
 		rgnp = srdp->srd_hmergnp[rid];
 		ASSERT(rgnp != NULL);
-		vaddr = (caddr_t)get_hblk_base(hmeblkp);
 		SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid);
 		hmeblkp->hblk_shared = 0;
 	}
@@ -11572,11 +11598,6 @@ sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 	 */
 	hmeblkp->hblk_shw_bit = 0;
 
-	/*
-	 * Clear ttebit map in the region this hmeblk belongs to. The region
-	 * must exist as long as any of its hmeblks exist. This invariant
-	 * holds because before region is freed all its hmeblks are removed.
-	 */
 	if (hmeblkp->hblk_shared) {
 		sf_srd_t	*srdp;
 		sf_region_t	*rgnp;
@@ -11589,7 +11610,6 @@ sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 		ASSERT(rid < SFMMU_MAX_HME_REGIONS);
 		rgnp = srdp->srd_hmergnp[rid];
 		ASSERT(rgnp != NULL);
-		vaddr = (caddr_t)get_hblk_base(hmeblkp);
 		SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid);
 		hmeblkp->hblk_shared = 0;
 	}
@@ -12087,6 +12107,12 @@ next:
 	return (rcpuset);
 }
 
+/*
+ * This routine takes an sfmmu pointer and the va for an adddress in an
+ * ISM region as input and returns the corresponding region id in ism_rid.
+ * The return value of 1 indicates that a region has been found and ism_rid
+ * is valid, otherwise 0 is returned.
+ */
 static int
 find_ism_rid(sfmmu_t *sfmmup, sfmmu_t *ism_sfmmup, caddr_t va, uint_t *ism_rid)
 {
@@ -13321,6 +13347,8 @@ sfmmu_rm_large_mappings(page_t *pp, int ttesz)
 	 */
 
 	for (sfhmep = pp->p_mapping; sfhmep; sfhmep = sfhmep->hme_next) {
+		if (IS_PAHME(sfhmep))
+			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
 		if (hmeblkp->hblk_xhat_bit)
 			continue;
@@ -13357,7 +13385,7 @@ hat_supported(enum hat_features feature, void *arg)
 	case	HAT_VMODSORT:
 		return (1);
 	case	HAT_SHARED_REGIONS:
-		if (!disable_shctx && shctx_on)
+		if (shctx_on)
 			return (1);
 		else
 			return (0);
@@ -13679,7 +13707,7 @@ hat_join_srd(struct hat *sfmmup, vnode_t *evp)
 	ASSERT(sfmmup != ksfmmup);
 	ASSERT(sfmmup->sfmmu_srdp == NULL);
 
-	if (disable_shctx || !shctx_on) {
+	if (!shctx_on) {
 		return;
 	}
 
@@ -13901,7 +13929,6 @@ hat_join_region(struct hat *sfmmup,
 	sf_region_t **rarrp;
 	uint16_t *busyrgnsp;
 	ulong_t rttecnt;
-	int rkmalloc = 0;
 	uchar_t tteflag;
 	uchar_t r_type = flags & HAT_REGION_TYPE_MASK;
 	int text = (r_type == HAT_REGION_TEXT);
@@ -14088,27 +14115,22 @@ rfound:
 
 	ASSERT(MUTEX_HELD(&srdp->srd_mutex));
 	if (*freelistp != NULL) {
-		new_rgnp = *freelistp;
-		*freelistp = new_rgnp->rgn_next;
-		ASSERT(new_rgnp->rgn_id < *nextidp);
-		ASSERT(new_rgnp->rgn_id < maxids);
-		ASSERT(new_rgnp->rgn_flags & SFMMU_REGION_FREE);
-		ASSERT((new_rgnp->rgn_flags & SFMMU_REGION_TYPE_MASK)
+		rgnp = *freelistp;
+		*freelistp = rgnp->rgn_next;
+		ASSERT(rgnp->rgn_id < *nextidp);
+		ASSERT(rgnp->rgn_id < maxids);
+		ASSERT(rgnp->rgn_flags & SFMMU_REGION_FREE);
+		ASSERT((rgnp->rgn_flags & SFMMU_REGION_TYPE_MASK)
 		    == r_type);
-		ASSERT(rarrp[new_rgnp->rgn_id] == new_rgnp);
-
-		ASSERT(new_rgnp->rgn_hmeflags == 0);
-	}
-
-	if (new_rgnp == NULL) {
+		ASSERT(rarrp[rgnp->rgn_id] == rgnp);
+		ASSERT(rgnp->rgn_hmeflags == 0);
+	} else {
 		/*
 		 * release local locks before memory allocation.
 		 */
 		mutex_exit(&srdp->srd_mutex);
-		if (new_rgnp == NULL) {
-			rkmalloc = 1;
-			new_rgnp = kmem_cache_alloc(region_cache, KM_SLEEP);
-		}
+
+		new_rgnp = kmem_cache_alloc(region_cache, KM_SLEEP);
 
 		mutex_enter(&srdp->srd_mutex);
 		for (rgnp = srdp->srd_rgnhash[rhash]; rgnp != NULL;
@@ -14123,34 +14145,19 @@ rfound:
 			}
 		}
 		if (rgnp != NULL) {
-			if (!rkmalloc) {
-				ASSERT(new_rgnp->rgn_flags &
-				    SFMMU_REGION_FREE);
-				new_rgnp->rgn_next = *freelistp;
-				*freelistp = new_rgnp;
-				new_rgnp = NULL;
-			}
 			goto rfound;
 		}
 
-		if (rkmalloc) {
-			if (*nextidp >= maxids) {
-				mutex_exit(&srdp->srd_mutex);
-				goto fail;
-			}
-			rgnp = new_rgnp;
-			new_rgnp = NULL;
-			rgnp->rgn_id = (*nextidp)++;
-			ASSERT(rgnp->rgn_id < maxids);
-			ASSERT(rarrp[rgnp->rgn_id] == NULL);
-			rarrp[rgnp->rgn_id] = rgnp;
-		} else {
-			rgnp = new_rgnp;
-			new_rgnp = NULL;
+		if (*nextidp >= maxids) {
+			mutex_exit(&srdp->srd_mutex);
+			goto fail;
 		}
-	} else {
 		rgnp = new_rgnp;
 		new_rgnp = NULL;
+		rgnp->rgn_id = (*nextidp)++;
+		ASSERT(rgnp->rgn_id < maxids);
+		ASSERT(rarrp[rgnp->rgn_id] == NULL);
+		rarrp[rgnp->rgn_id] = rgnp;
 	}
 
 	ASSERT(rgnp->rgn_sfmmu_head == NULL);
@@ -14177,14 +14184,7 @@ rfound:
 
 fail:
 	ASSERT(new_rgnp != NULL);
-	if (rkmalloc) {
-		kmem_cache_free(region_cache, new_rgnp);
-	} else {
-		/* put it back on the free list. */
-		ASSERT(new_rgnp->rgn_flags & SFMMU_REGION_FREE);
-		new_rgnp->rgn_next = *freelistp;
-		*freelistp = new_rgnp;
-	}
+	kmem_cache_free(region_cache, new_rgnp);
 	return (HAT_INVALID_REGION_COOKIE);
 }
 
@@ -14543,7 +14543,7 @@ check_scd_sfmmu_list(sfmmu_t **headp, sfmmu_t *sfmmup, int onlist)
 #endif /* DEBUG */
 
 /*
- * Removes an sfmmu from the start of the queue.
+ * Removes an sfmmu from the SCD sfmmu list.
  */
 static void
 sfmmu_from_scd_list(sfmmu_t **headp, sfmmu_t *sfmmup)

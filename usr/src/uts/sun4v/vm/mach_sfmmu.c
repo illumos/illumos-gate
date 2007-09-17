@@ -322,7 +322,31 @@ sfmmu_clear_utsbinfo()
 }
 
 /*
- * Set machine specific TSB information
+ * The tsbord[] array is set up to translate from the order of tsbs in the sfmmu
+ * list to the order of tsbs in the tsb descriptor array passed to the hv, which
+ * is the search order used during Hardware Table Walk.
+ * So, the tsb with index i in the sfmmu list will have search order tsbord[i].
+ *
+ * The order of tsbs in the sfmmu list will be as follows:
+ *
+ *              0 8K - 512K private TSB
+ *              1 4M - 256M private TSB
+ *              2 8K - 512K shared TSB
+ *              3 4M - 256M shared TSB
+ *
+ * Shared TSBs are only used if a process is part of an SCD.
+ *
+ * So, e.g. tsbord[3] = 1;
+ *         corresponds to searching the shared 4M TSB second.
+ *
+ * The search order is selected so that the 8K-512K private TSB is always first.
+ * Currently shared context is not expected to map many 8K-512K pages that cause
+ * TLB misses so we order the shared TSB for 4M-256M pages in front of the
+ * shared TSB for 8K-512K pages. We also expect more TLB misses against private
+ * context mappings than shared context mappings and place private TSBs ahead of
+ * shared TSBs in descriptor order. The shtsb4m_first /etc/system tuneable can
+ * be used to change the default ordering of private and shared TSBs for
+ * 4M-256M pages.
  */
 void
 sfmmu_setup_tsbinfo(sfmmu_t *sfmmup)

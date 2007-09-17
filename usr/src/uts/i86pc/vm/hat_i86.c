@@ -1722,7 +1722,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 
 /* ARGSUSED */
 void
-hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
+hat_unlock_region(struct hat *hat, caddr_t addr, size_t len,
     hat_region_cookie_t rcookie)
 {
 	panic("No shared region support on x86");
@@ -3877,13 +3877,13 @@ hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
 
 /* ARGSUSED */
 void
-hat_join_srd(struct hat *sfmmup, vnode_t *evp)
+hat_join_srd(struct hat *hat, vnode_t *evp)
 {
 }
 
 /* ARGSUSED */
 hat_region_cookie_t
-hat_join_region(struct hat *sfmmup,
+hat_join_region(struct hat *hat,
     caddr_t r_saddr,
     size_t r_size,
     void *r_obj,
@@ -3899,14 +3899,14 @@ hat_join_region(struct hat *sfmmup,
 
 /* ARGSUSED */
 void
-hat_leave_region(struct hat *sfmmup, hat_region_cookie_t rcookie, uint_t flags)
+hat_leave_region(struct hat *hat, hat_region_cookie_t rcookie, uint_t flags)
 {
 	panic("No shared region support on x86");
 }
 
 /* ARGSUSED */
 void
-hat_dup_region(struct hat *sfmmup, hat_region_cookie_t rcookie)
+hat_dup_region(struct hat *hat, hat_region_cookie_t rcookie)
 {
 	panic("No shared region support on x86");
 }

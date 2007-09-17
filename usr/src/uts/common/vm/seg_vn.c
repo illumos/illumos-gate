@@ -1628,8 +1628,8 @@ out:
 
 
 /*
- * callback function used by segvn_unmap to invoke free_vp_pages() for only
- * those pages actually processed by the HAT
+ * callback function to invoke free_vp_pages() for only those pages actually
+ * processed by the HAT when a shared region is destroyed.
  */
 extern int free_pages;
 
@@ -1657,6 +1657,10 @@ segvn_hat_rgn_unload_callback(caddr_t saddr, caddr_t eaddr, caddr_t r_saddr,
 	free_vp_pages(vp, off, len);
 }
 
+/*
+ * callback function used by segvn_unmap to invoke free_vp_pages() for only
+ * those pages actually processed by the HAT
+ */
 static void
 segvn_hat_unload_callback(hat_callback_t *cb)
 {
