@@ -3828,14 +3828,19 @@ rfs4_file_walk_callout(rfs4_entry_t u_entry, void *e)
 	    bcmp(&finfo_fhp->fh4_xdata, &exi_fhp->fh4_xdata,
 	    exi_fhp->fh4_xlen) == 0) {
 		if (fp->vp) {
+			vnode_t *vp = fp->vp;
+
 			/* don't leak monitors */
 			if (fp->dinfo->dtype == OPEN_DELEGATE_READ)
-				(void) fem_uninstall(fp->vp, deleg_rdops,
+				(void) fem_uninstall(vp, deleg_rdops,
 				    (void *)fp);
 			else if (fp->dinfo->dtype == OPEN_DELEGATE_WRITE)
-				(void) fem_uninstall(fp->vp, deleg_wrops,
+				(void) fem_uninstall(vp, deleg_wrops,
 				    (void *)fp);
-			VN_RELE(fp->vp);
+			mutex_enter(&vp->v_lock);
+			(void) vsd_set(vp, nfs4_srv_vkey, NULL);
+			mutex_exit(&vp->v_lock);
+			VN_RELE(vp);
 			fp->vp = NULL;
 		}
 		rfs4_dbe_invalidate(fp->dbe);
