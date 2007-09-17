@@ -10955,23 +10955,20 @@ int
 ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
     mblk_t *mp, ip_ioctl_cmd_t *ipip, void *dummy_if_req)
 {
-	ill_t *ill;
+	ill_t *ill = ipif->ipif_ill;
+
+	ASSERT(IAM_WRITER_IPIF(ipif));
+	ASSERT(ipif->ipif_state_flags & IPIF_CONDEMNED);
 
 	ip1dbg(("ip_sioctl_removeif_restart(%s:%u %p)\n",
-	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+	    ill->ill_name, ipif->ipif_id, (void *)ipif));
+
 	if (ipif->ipif_id == 0 && ipif->ipif_net_type == IRE_LOOPBACK) {
-		ill = ipif->ipif_ill;
-		ASSERT(IAM_WRITER_ILL(ill));
-		ASSERT((ipif->ipif_state_flags & IPIF_CONDEMNED) &&
-		    (ill->ill_state_flags & IPIF_CONDEMNED));
+		ASSERT(ill->ill_state_flags & ILL_CONDEMNED);
 		ill_delete_tail(ill);
 		mi_free(ill);
 		return (0);
 	}
-
-	ill = ipif->ipif_ill;
-	ASSERT(IAM_WRITER_IPIF(ipif));
-	ASSERT(ipif->ipif_state_flags & IPIF_CONDEMNED);
 
 	ipif_non_duplicate(ipif);
 	ipif_down_tail(ipif);
@@ -18320,31 +18317,35 @@ ill_dlpi_send_deferred(ill_t *ill)
 boolean_t
 ill_dlpi_pending(ill_t *ill, t_uscalar_t prim)
 {
-	t_uscalar_t prim_pending;
+	t_uscalar_t pending;
 
 	mutex_enter(&ill->ill_lock);
-	prim_pending = ill->ill_dlpi_pending;
-	mutex_exit(&ill->ill_lock);
+	if (ill->ill_dlpi_pending == prim) {
+		mutex_exit(&ill->ill_lock);
+		return (B_TRUE);
+	}
 
 	/*
-	 * During teardown, ill_dlpi_send_deferred() will send requests
-	 * without waiting; don't bother printing any warnings in that case.
+	 * During teardown, ill_dlpi_dispatch() will send DLPI requests
+	 * without waiting, so don't print any warnings in that case.
 	 */
-	if (!(ill->ill_flags & ILL_CONDEMNED) && prim_pending != prim) {
-		if (prim_pending == DL_PRIM_INVAL) {
-			(void) mi_strlog(ill->ill_rq, 1,
-			    SL_CONSOLE|SL_ERROR|SL_TRACE, "ip: received "
-			    "unsolicited ack for %s on %s\n",
-			    dlpi_prim_str(prim), ill->ill_name);
-		} else {
-			(void) mi_strlog(ill->ill_rq, 1,
-			    SL_CONSOLE|SL_ERROR|SL_TRACE, "ip: received "
-			    "unexpected ack for %s on %s (expecting %s)\n",
-			    dlpi_prim_str(prim), ill->ill_name,
-			    dlpi_prim_str(prim_pending));
-		}
+	if (ill->ill_state_flags & ILL_CONDEMNED) {
+		mutex_exit(&ill->ill_lock);
+		return (B_FALSE);
 	}
-	return (prim_pending == prim);
+	pending = ill->ill_dlpi_pending;
+	mutex_exit(&ill->ill_lock);
+
+	if (pending == DL_PRIM_INVAL) {
+		(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
+		    "received unsolicited ack for %s on %s\n",
+		    dlpi_prim_str(prim), ill->ill_name);
+	} else {
+		(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
+		    "received unexpected ack for %s on %s (expecting %s)\n",
+		    dlpi_prim_str(prim), ill->ill_name, dlpi_prim_str(pending));
+	}
+	return (B_FALSE);
 }
 
 /*
