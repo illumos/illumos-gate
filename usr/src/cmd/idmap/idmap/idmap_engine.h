@@ -48,12 +48,20 @@ typedef char *flag_t;
 #define	IDMAP_ENG_ERROR -1
 #define	IDMAP_ENG_ERROR_SILENT -2
 
+typedef struct cmd_pos {
+	int linenum;		/* line number */
+	char *line;		/* line content */
+} cmd_pos_t;
+
+
 typedef struct cmd_ops {
 	const char *cmd;	/* the subcommand */
 	const char *options;	/* getopt string for the subcommand params */
-	int (*p_do_func)(flag_t *f, int argc, char **argv); /* handle */
+	int (*p_do_func)(flag_t *f,
+	    int argc,
+	    char **argv,
+	    cmd_pos_t *pos); /* handle */
 } cmd_ops_t;
-
 
 extern int engine_init(int comc, cmd_ops_t *comv, int argc, char **argv,
     int *is_batch_mode);

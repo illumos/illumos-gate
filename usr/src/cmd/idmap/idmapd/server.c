@@ -63,6 +63,14 @@
 		res->retcode = IDMAP_ERR_NOTFOUND;
 
 
+#define	STRDUP_OR_FAIL(to, from) \
+	if ((from) == NULL) \
+		to = NULL; \
+	else { \
+		if ((to = strdup(from)) == NULL) \
+			return (1); \
+	}
+
 /* ARGSUSED */
 bool_t
 idmap_null_1_svc(void *result, struct svc_req *rqstp) {
@@ -268,7 +276,6 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames) {
 	list_cb_data_t		*cb_data;
 	char			*str;
 	idmap_mappings_res	*result;
-	idmap_utf8str		*ptr;
 	idmap_retcode		retcode;
 	int			w2u, u2w;
 	char			*end;
@@ -306,17 +313,15 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames) {
 		result->mappings.mappings_val[cb_data->next].direction =
 		    IDMAP_DIRECTION_BI;
 
-	ptr = &result->mappings.mappings_val[cb_data->next].id1domain;
-	if (idmap_str2utf8(&ptr, argv[6], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->mappings.mappings_val[cb_data->next].id1domain,
+	    argv[6]);
 
-	ptr = &result->mappings.mappings_val[cb_data->next].id1name;
-	if (idmap_str2utf8(&ptr, argv[7], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->mappings.mappings_val[cb_data->next].id1name,
+	    argv[7]);
 
-	ptr = &result->mappings.mappings_val[cb_data->next].id2name;
-	if (idmap_str2utf8(&ptr, argv[8], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->mappings.mappings_val[cb_data->next].id2name,
+	    argv[8]);
+
 
 	result->lastrowid = strtoll(argv[0], &end, 10);
 	cb_data->next++;
@@ -393,7 +398,6 @@ list_namerules_cb(void *parg, int argc, char **argv, char **colnames) {
 	list_cb_data_t		*cb_data;
 	idmap_namerules_res	*result;
 	idmap_retcode		retcode;
-	idmap_utf8str		*ptr;
 	int			w2u_order, u2w_order;
 	char			*end;
 
@@ -408,20 +412,17 @@ list_namerules_cb(void *parg, int argc, char **argv, char **colnames) {
 	result->rules.rules_val[cb_data->next].is_user =
 		strtol(argv[1], &end, 10);
 
-	ptr = &result->rules.rules_val[cb_data->next].windomain;
-	if (idmap_str2utf8(&ptr, argv[2], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].windomain,
+	    argv[2]);
 
-	ptr = &result->rules.rules_val[cb_data->next].winname;
-	if (idmap_str2utf8(&ptr, argv[3], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].winname,
+	    argv[3]);
 
 	result->rules.rules_val[cb_data->next].is_nt4 =
 		strtol(argv[4], &end, 10);
 
-	ptr = &result->rules.rules_val[cb_data->next].unixname;
-	if (idmap_str2utf8(&ptr, argv[5], 0) != IDMAP_SUCCESS)
-		return (1);
+	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].unixname,
+	    argv[5]);
 
 	w2u_order = argv[6]?strtol(argv[6], &end, 10):0;
 	u2w_order = argv[7]?strtol(argv[7], &end, 10):0;
@@ -488,25 +489,25 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	}
 
 	/* Create where statement for windomain */
-	if (rule.windomain.idmap_utf8str_len > 0) {
+	if (!EMPTY_STRING(rule.windomain)) {
 		if (gen_sql_expr_from_utf8str("AND", "windomain", "=",
-				&rule.windomain,
+				rule.windomain,
 				"", &s_windomain) != IDMAP_SUCCESS)
 			goto out;
 	}
 
 	/* Create where statement for winname */
-	if (rule.winname.idmap_utf8str_len > 0) {
+	if (!EMPTY_STRING(rule.winname)) {
 		if (gen_sql_expr_from_utf8str("AND", "winname", "=",
-				&rule.winname,
+				rule.winname,
 				"", &s_winname) != IDMAP_SUCCESS)
 			goto out;
 	}
 
 	/* Create where statement for unixname */
-	if (rule.unixname.idmap_utf8str_len > 0) {
+	if (!EMPTY_STRING(rule.unixname)) {
 		if (gen_sql_expr_from_utf8str("AND", "unixname", "=",
-				&rule.unixname,
+				rule.unixname,
 				"", &s_unixname) != IDMAP_SUCCESS)
 			goto out;
 	}
@@ -602,33 +603,45 @@ verify_rules_auth(struct svc_req *rqstp) {
 	return (1);
 }
 
+/*
+ * Meaning of the return values is the following: For retcode ==
+ * IDMAP_SUCCESS, everything went OK and error_index is
+ * undefined. Otherwise, error_index >=0 shows the failed batch
+ * element. errro_index == -1 indicates failure at the beginning,
+ * error_index == -2 at the end.
+ */
+
 /* ARGSUSED */
 bool_t
-idmap_update_1_svc(idmap_update_batch batch, idmap_retcode *result,
+idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 		struct svc_req *rqstp) {
 	sqlite		*db = NULL;
 	idmap_update_op	*up;
 	int		i;
 	int		trans = FALSE;
 
+	res->error_index = -1;
+	(void) memset(&res->error_rule, 0, sizeof (res->error_rule));
+	(void) memset(&res->conflict_rule, 0, sizeof (res->conflict_rule));
+
 	if (verify_rules_auth(rqstp) < 0) {
-		*result = IDMAP_ERR_PERMISSION_DENIED;
+		res->retcode = IDMAP_ERR_PERMISSION_DENIED;
 		goto out;
 	}
 
 	if (batch.idmap_update_batch_len == 0 ||
 			batch.idmap_update_batch_val == NULL) {
-		*result = IDMAP_SUCCESS;
+		res->retcode = IDMAP_SUCCESS;
 		goto out;
 	}
 
 	/* Get db handle */
-	*result = get_db_handle(&db);
-	if (*result != IDMAP_SUCCESS)
+	res->retcode = get_db_handle(&db);
+	if (res->retcode != IDMAP_SUCCESS)
 		goto out;
 
-	*result = sql_exec_no_cb(db, "BEGIN TRANSACTION;");
-	if (*result != IDMAP_SUCCESS)
+	res->retcode = sql_exec_no_cb(db, "BEGIN TRANSACTION;");
+	if (res->retcode != IDMAP_SUCCESS)
 		goto out;
 	trans = TRUE;
 
@@ -636,37 +649,53 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_retcode *result,
 		up = &batch.idmap_update_batch_val[i];
 		switch (up->opnum) {
 		case OP_NONE:
-			*result = IDMAP_SUCCESS;
+			res->retcode = IDMAP_SUCCESS;
 			break;
 		case OP_ADD_NAMERULE:
-			*result = add_namerule(db,
+			res->retcode = add_namerule(db,
 				&up->idmap_update_op_u.rule);
 			break;
 		case OP_RM_NAMERULE:
-			*result = rm_namerule(db,
+			res->retcode = rm_namerule(db,
 				&up->idmap_update_op_u.rule);
 			break;
 		case OP_FLUSH_NAMERULES:
-			*result = flush_namerules(db,
+			res->retcode = flush_namerules(db,
 				up->idmap_update_op_u.is_user);
 			break;
 		default:
-			*result = IDMAP_ERR_NOTSUPPORTED;
-			goto out;
+			res->retcode = IDMAP_ERR_NOTSUPPORTED;
+			break;
 		};
 
-		if (*result != IDMAP_SUCCESS)
+		if (res->retcode != IDMAP_SUCCESS) {
+			res->error_index = i;
+			if (up->opnum == OP_ADD_NAMERULE ||
+			    up->opnum == OP_RM_NAMERULE) {
+				idmap_stat r2 =
+				    idmap_namerule_cpy(&res->error_rule,
+					&up->idmap_update_op_u.rule);
+				if (r2 != IDMAP_SUCCESS)
+					res->retcode = r2;
+			}
 			goto out;
+		}
 	}
 
 out:
 	if (trans) {
-		if (*result == IDMAP_SUCCESS)
-			*result = sql_exec_no_cb(db, "COMMIT TRANSACTION;");
+		if (res->retcode == IDMAP_SUCCESS) {
+			res->retcode =
+			    sql_exec_no_cb(db, "COMMIT TRANSACTION;");
+			if (res->retcode !=  IDMAP_SUCCESS)
+				res->error_index = -2;
+		}
 		else
 			(void) sql_exec_no_cb(db, "ROLLBACK TRANSACTION;");
 	}
-	*result = idmap_stat4prot(*result);
+
+	res->retcode = idmap_stat4prot(res->retcode);
+
 	return (TRUE);
 }
 

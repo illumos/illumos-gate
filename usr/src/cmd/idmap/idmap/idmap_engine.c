@@ -112,7 +112,7 @@ options_clean()
 
 /* determine which subcommand is argv[0] and execute its handler */
 static int
-run_command(int argc, char **argv) {
+run_command(int argc, char **argv, cmd_pos_t *pos) {
 	int i;
 
 	if (argc == 0) {
@@ -134,7 +134,10 @@ run_command(int argc, char **argv) {
 			return (-1);
 		}
 
-		rc = my_comv[i].p_do_func(flags, argc - optind, argv + optind);
+		rc = my_comv[i].p_do_func(flags,
+		    argc - optind,
+		    argv + optind,
+		    pos);
 
 		return (rc);
 	}
@@ -402,7 +405,7 @@ continue_line:
 			}
 		}
 
-		rc = run_command(my_argc, my_argv);
+		rc = run_command(my_argc, my_argv, NULL);
 
 		if (strcmp(my_argv[0], "exit") == 0 && rc == 0) {
 			break;
@@ -425,6 +428,7 @@ source_interp(const char *name)
 	int is_stdin;
 	int rc = -1;
 	char line[MAX_CMD_LINE_SZ];
+	cmd_pos_t pos;
 
 	if (name == NULL || strcmp("-", name) == 0) {
 		f = stdin;
@@ -438,7 +442,11 @@ source_interp(const char *name)
 		}
 	}
 
+	pos.linenum = 0;
+	pos.line = line;
+
 	while (fgets(line, MAX_CMD_LINE_SZ, f)) {
+		pos.linenum ++;
 
 		if (line2array(line) < 0) {
 			(void) fprintf(stderr,
@@ -460,7 +468,7 @@ source_interp(const char *name)
 			break;
 		}
 
-		rc = run_command(my_argc, my_argv);
+		rc = run_command(my_argc, my_argv, &pos);
 		my_argv_clean();
 	}
 
@@ -569,7 +577,7 @@ run_engine(int argc, char **argv)
 		goto cleanup;
 	}
 
-	rc = run_command(argc, argv);
+	rc = run_command(argc, argv, NULL);
 
 cleanup:
 	return (rc);

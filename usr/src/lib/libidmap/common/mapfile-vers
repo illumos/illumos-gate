@@ -27,7 +27,6 @@
 
 SUNWprivate {
     global:
-	xdr_idmap_utf8str;
 	xdr_idmap_retcode;
 	xdr_idmap_namerule;
 	xdr_idmap_namerules_res;
@@ -39,14 +38,13 @@ SUNWprivate {
 	xdr_idmap_list_namerules_1_argument;
 	xdr_idmap_mapping;
 	xdr_idmap_id_res;
+	xdr_idmap_update_res;
 	idmap_init;
 	idmap_fini;
 	idmap_free;
 	idmap_stat2string;
 	idmap_string2stat;
 	idmap_stat4prot;
-	idmap_str2utf8;
-	idmap_utf82str;
 	idmap_iter_namerules;
 	idmap_iter_next_namerule;
 	idmap_iter_mappings;
@@ -67,11 +65,15 @@ SUNWprivate {
 	idmap_udt_destroy;
 	idmap_udt_commit;
 	idmap_udt_create;
+	idmap_udt_get_error_index;
+	idmap_udt_get_error_rule;
+	idmap_udt_get_conflict_rule;
 	idmap_udt_flush_namerules;
 	idmap_getwinnamebyuid;
 	idmap_getwinnamebygid;
 	idmap_getuidbywinname;
 	idmap_getgidbywinname;
+	idmap_namerule_cpy;
     local:
 	*;
 };

@@ -263,6 +263,7 @@ main(int argc, char **argv)
 static void
 init_idmapd() {
 	int	error;
+	int connmaxrec = RPC_MAX_SIZE;
 
 	/* create directories as root and chown to daemon uid */
 	if (create_directory(IDMAP_DBDIR, DAEMON_UID, DAEMON_GID) < 0)
@@ -306,6 +307,12 @@ init_idmapd() {
 	if (xprt == NULL) {
 		idmapdlog(LOG_ERR,
 		"idmapd: unable to create door RPC service");
+		goto errout;
+	}
+
+	if (!svc_control(xprt, SVCSET_CONNMAXREC, &connmaxrec)) {
+		idmapdlog(LOG_ERR,
+		    "idmapd: unable to limit RPC request size");
 		goto errout;
 	}
 

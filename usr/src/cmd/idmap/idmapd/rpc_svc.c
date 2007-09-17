@@ -69,9 +69,9 @@ _idmap_list_namerules_1(idmap_list_namerules_1_argument *argp,
 }
 
 int
-_idmap_update_1(idmap_update_batch  *argp, idmap_retcode *result,
+_idmap_update_1(idmap_update_batch  *argp, idmap_update_res *res,
 		struct svc_req *rqstp) {
-	return (idmap_update_1_svc(*argp, result, rqstp));
+	return (idmap_update_1_svc(*argp, res, rqstp));
 }
 
 int
@@ -95,7 +95,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 		idmap_ids_res idmap_get_mapped_ids_1_res;
 		idmap_mappings_res idmap_list_mappings_1_res;
 		idmap_namerules_res idmap_list_namerules_1_res;
-		idmap_retcode idmap_update_1_res;
+		idmap_update_res idmap_update_1_res;
 		idmap_mappings_res idmap_get_mapped_id_by_name_1_res;
 	} result;
 	bool_t retval;
@@ -136,7 +136,7 @@ idmap_prog_1(struct svc_req *rqstp, register SVCXPRT *transp)
 
 	case IDMAP_UPDATE:
 		_xdr_argument = (xdrproc_t)xdr_idmap_update_batch;
-		_xdr_result = (xdrproc_t)xdr_idmap_retcode;
+		_xdr_result = (xdrproc_t)xdr_idmap_update_res;
 		local = (bool_t (*) (char *,  void *,  struct svc_req *))
 		    _idmap_update_1;
 		break;

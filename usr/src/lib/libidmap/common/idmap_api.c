@@ -44,6 +44,7 @@
 static struct timeval TIMEOUT = { 25, 0 };
 
 static int idmap_stat2errno(idmap_stat);
+static idmap_stat idmap_strdupnull(char **, const char *);
 
 #define	__ITER_CREATE(itera, argu, handl, ityp)\
 	if (handl == NULL) {\
@@ -88,6 +89,7 @@ static int idmap_stat2errno(idmap_stat);
 		return (IDMAP_ERR_ARG);\
 	}
 
+#define	EMPTY_STRING(str)	(str == NULL || *str == '\0')
 
 /*
  * Free memory allocated by libidmap API
@@ -202,26 +204,217 @@ idmap_stat
 idmap_udt_commit(idmap_udt_handle_t *udthandle) {
 	CLIENT			*clnt;
 	enum clnt_stat		clntstat;
-	idmap_retcode		retcode;
+	idmap_update_res	res;
+	idmap_stat		retcode;
 
 	if (udthandle == NULL) {
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
+
+	(void) memset(&res, 0, sizeof (res));
+
 	_IDMAP_GET_CLIENT_HANDLE(udthandle->ih, clnt);
 	clntstat = clnt_call(clnt, IDMAP_UPDATE,
 		(xdrproc_t)xdr_idmap_update_batch, (caddr_t)&udthandle->batch,
-		(xdrproc_t)xdr_idmap_retcode, (caddr_t)&retcode,
+		(xdrproc_t)xdr_idmap_update_res, (caddr_t)&res,
 		TIMEOUT);
 
-	/* reset handle so that it can be used again */
-	_IDMAP_RESET_UDT_HANDLE(udthandle);
+	if (clntstat != RPC_SUCCESS) {
+		retcode = _idmap_rpc2stat(clnt);
+		goto out;
+	}
 
-	if (clntstat != RPC_SUCCESS)
-		return (_idmap_rpc2stat(clnt));
-	if (retcode != IDMAP_SUCCESS)
-		errno = idmap_stat2errno(retcode);
+	retcode = udthandle->commit_stat = res.retcode;
+	udthandle->error_index = res.error_index;
+
+	if (retcode != IDMAP_SUCCESS) {
+
+		if (udthandle->error_index < 0)
+			goto out;
+
+		retcode = idmap_namerule_cpy(&udthandle->error_rule,
+		    &res.error_rule);
+		if (retcode != IDMAP_SUCCESS) {
+			udthandle->error_index = -2;
+			goto out;
+		}
+
+		retcode = idmap_namerule_cpy(&udthandle->conflict_rule,
+		    &res.conflict_rule);
+		if (retcode != IDMAP_SUCCESS) {
+			udthandle->error_index = -2;
+			goto out;
+		}
+	}
+
+	retcode = res.retcode;
+
+
+out:
+	/* reset handle so that it can be used again */
+	if (retcode == IDMAP_SUCCESS) {
+		_IDMAP_RESET_UDT_HANDLE(udthandle);
+	}
+
+	(void) xdr_free(xdr_idmap_update_res, (caddr_t)&res);
+	errno = idmap_stat2errno(retcode);
 	return (retcode);
+}
+
+
+static void
+idmap_namerule_parts_clear(char **windomain, char **winname,
+    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
+    int *direction) {
+	if (windomain)
+		*windomain = NULL;
+	if (winname)
+		*winname = NULL;
+	if (unixname)
+		*unixname = NULL;
+
+	if (is_nt4)
+		*is_nt4 = 0;
+	if (is_user)
+		*is_user = -1;
+	if (direction)
+		*direction = IDMAP_DIRECTION_UNDEF;
+}
+
+static idmap_stat
+idmap_namerule2parts(idmap_namerule	*rule,
+    char **windomain, char **winname,
+    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
+    int *direction) {
+	idmap_stat retcode;
+
+	if (EMPTY_STRING(rule->winname) && EMPTY_STRING(rule->unixname))
+		return (IDMAP_ERR_NORESULT);
+
+
+	retcode = idmap_strdupnull(windomain, rule->windomain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(winname, rule->winname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(unixname, rule->unixname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+
+	if (is_user)
+		*is_user = rule->is_user;
+	if (is_nt4)
+		*is_nt4 = rule->is_nt4;
+	if (direction)
+		*direction = rule->direction;
+
+
+	return (IDMAP_SUCCESS);
+
+errout:
+	if (windomain && *windomain)
+		free(*windomain);
+	if (winname && *winname)
+		free(*winname);
+	if (unixname && *unixname)
+		free(*unixname);
+
+	idmap_namerule_parts_clear(windomain, winname,
+	    unixname, is_user, is_nt4, direction);
+
+	return (retcode);
+
+}
+
+/*
+ * Retrieve the index of the failed batch element. error_index == -1
+ * indicates failure at the beginning, -2 at the end.
+ *
+ * If idmap_udt_commit didn't return error, the returned value is undefined.
+ *
+ * Return value:
+ * IDMAP_SUCCESS
+ */
+
+idmap_stat
+idmap_udt_get_error_index(idmap_udt_handle_t *udthandle,
+    int64_t *error_index) {
+	if (error_index)
+		*error_index = udthandle->error_index;
+
+	return (IDMAP_SUCCESS);
+}
+
+
+/*
+ * Retrieve the rule which caused the batch to fail. If
+ * idmap_udt_commit didn't return error or if error_index is < 0, the
+ * retrieved rule is undefined.
+ *
+ * Return value:
+ * IDMAP_ERR_NORESULT if there is no error rule.
+ * IDMAP_SUCCESS if the rule was obtained OK.
+ * other error code (IDMAP_ERR_NOMEMORY etc)
+ */
+
+idmap_stat
+idmap_udt_get_error_rule(idmap_udt_handle_t *udthandle,
+    char **windomain, char **winname,
+    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
+    int *direction) {
+	idmap_namerule_parts_clear(windomain, winname,
+	    unixname, is_user, is_nt4, direction);
+
+	if (udthandle->commit_stat == IDMAP_SUCCESS ||
+	    udthandle->error_index < 0)
+		return (IDMAP_ERR_NORESULT);
+
+	return (idmap_namerule2parts(
+			&udthandle->error_rule,
+			    windomain,
+			    winname,
+			    unixname,
+			    is_user,
+			    is_nt4,
+			    direction));
+}
+
+/*
+ * Retrieve the rule with which there was a conflict. TODO: retrieve
+ * the value.
+ *
+ * Return value:
+ * IDMAP_ERR_NORESULT if there is no error rule.
+ * IDMAP_SUCCESS if the rule was obtained OK.
+ * other error code (IDMAP_ERR_NOMEMORY etc)
+ */
+
+idmap_stat
+idmap_udt_get_conflict_rule(idmap_udt_handle_t *udthandle,
+    char **windomain, char **winname,
+    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
+    int *direction) {
+	idmap_namerule_parts_clear(windomain, winname,
+	    unixname, is_user, is_nt4, direction);
+
+	if (udthandle->commit_stat != IDMAP_ERR_W2U_NAMERULE_CONFLICT &&
+	    udthandle->commit_stat != IDMAP_ERR_U2W_NAMERULE_CONFLICT) {
+		    return (IDMAP_ERR_NORESULT);
+	}
+
+	return (idmap_namerule2parts(
+			&udthandle->conflict_rule,
+			    windomain,
+			    winname,
+			    unixname,
+			    is_user,
+			    is_nt4,
+			    direction));
 }
 
 
@@ -233,6 +426,8 @@ idmap_udt_destroy(idmap_udt_handle_t *udthandle) {
 	if (udthandle == NULL)
 		return;
 	(void) xdr_free(xdr_idmap_update_batch, (caddr_t)&udthandle->batch);
+	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&udthandle->error_rule);
+	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&udthandle->conflict_rule);
 	free(udthandle);
 }
 
@@ -243,7 +438,6 @@ idmap_udt_add_namerule(idmap_udt_handle_t *udthandle, const char *windomain,
 		boolean_t is_nt4, int direction) {
 	idmap_retcode	retcode;
 	idmap_namerule	*rule = NULL;
-	idmap_utf8str	*str;
 
 	retcode = _udt_extend_batch(udthandle);
 	if (retcode != IDMAP_SUCCESS)
@@ -255,24 +449,18 @@ idmap_udt_add_namerule(idmap_udt_handle_t *udthandle, const char *windomain,
 	rule->is_user = is_user;
 	rule->direction = direction;
 	rule->is_nt4 = is_nt4;
-	if (windomain) {
-		str = &rule->windomain;
-		retcode = idmap_str2utf8(&str, windomain, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (winname) {
-		str = &rule->winname;
-		retcode = idmap_str2utf8(&str, winname, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (unixname) {
-		str = &rule->unixname;
-		retcode = idmap_str2utf8(&str, unixname, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
+
+	retcode = idmap_strdupnull(&rule->windomain, windomain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->winname, winname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->unixname, unixname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
 
 	udthandle->batch.idmap_update_batch_val[udthandle->next].opnum =
 	    OP_ADD_NAMERULE;
@@ -295,7 +483,6 @@ idmap_udt_rm_namerule(idmap_udt_handle_t *udthandle, boolean_t is_user,
 		const char *unixname, int direction) {
 	idmap_retcode	retcode;
 	idmap_namerule	*rule = NULL;
-	idmap_utf8str	*str;
 
 	retcode = _udt_extend_batch(udthandle);
 	if (retcode != IDMAP_SUCCESS)
@@ -306,24 +493,19 @@ idmap_udt_rm_namerule(idmap_udt_handle_t *udthandle, boolean_t is_user,
 		idmap_update_op_u.rule;
 	rule->is_user = is_user;
 	rule->direction = direction;
-	if (windomain) {
-		str = &rule->windomain;
-		retcode = idmap_str2utf8(&str, windomain, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (winname) {
-		str = &rule->winname;
-		retcode = idmap_str2utf8(&str, winname, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (unixname) {
-		str = &rule->unixname;
-		retcode = idmap_str2utf8(&str, unixname, 0);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
+
+	retcode = idmap_strdupnull(&rule->windomain, windomain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->winname, winname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->unixname, unixname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
 	udthandle->batch.idmap_update_batch_val[udthandle->next].opnum =
 	    OP_RM_NAMERULE;
 	udthandle->next++;
@@ -398,7 +580,6 @@ idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
 	idmap_iter_t			*tmpiter;
 	idmap_list_namerules_1_argument	*arg = NULL;
 	idmap_namerule			*rule;
-	idmap_utf8str			*str;
 	idmap_retcode			retcode;
 
 	__ITER_CREATE(tmpiter, arg, handle, IDMAP_LIST_NAMERULES);
@@ -406,30 +587,18 @@ idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
 	rule = &arg->rule;
 	rule->is_user = is_user;
 	rule->direction = IDMAP_DIRECTION_UNDEF;
-	if (windomain) {
-		str = &rule->windomain;
-		retcode = idmap_str2utf8(&str, windomain, 0);
-		if (retcode != IDMAP_SUCCESS) {
-			errno = ENOMEM;
-			goto errout;
-		}
-	}
-	if (winname) {
-		str = &rule->winname;
-		retcode = idmap_str2utf8(&str, winname, 0);
-		if (retcode != IDMAP_SUCCESS) {
-			errno = ENOMEM;
-			goto errout;
-		}
-	}
-	if (unixname) {
-		str = &rule->unixname;
-		retcode = idmap_str2utf8(&str, unixname, 0);
-		if (retcode != IDMAP_SUCCESS) {
-			errno = ENOMEM;
-			goto errout;
-		}
-	}
+
+	retcode = idmap_strdupnull(&rule->windomain, windomain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->winname, winname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(&rule->unixname, unixname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
 
 	*iter = tmpiter;
 	return (IDMAP_SUCCESS);
@@ -515,24 +684,21 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 		return (IDMAP_ERR_ARG);
 	}
 
-	if (windomain) {
-		retcode = idmap_utf82str(windomain, 0,
-			&namerules->rules.rules_val[iter->next].windomain);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (winname) {
-		retcode = idmap_utf82str(winname, 0,
-			&namerules->rules.rules_val[iter->next].winname);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (unixname) {
-		retcode = idmap_utf82str(unixname, 0,
-			&namerules->rules.rules_val[iter->next].unixname);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
+	retcode = idmap_strdupnull(windomain,
+	    namerules->rules.rules_val[iter->next].windomain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(winname,
+	    namerules->rules.rules_val[iter->next].winname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(unixname,
+	    namerules->rules.rules_val[iter->next].unixname);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
 	if (is_nt4)
 		*is_nt4 = namerules->rules.rules_val[iter->next].is_nt4;
 	if (direction)
@@ -669,24 +835,23 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 	if (rid)
 		*rid = mappings->mappings.mappings_val[iter->next].id1.
 			idmap_id_u.sid.rid;
-	if (winname) {
-		retcode = idmap_utf82str(winname, 0,
-		    &mappings->mappings.mappings_val[iter->next].id1name);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (windomain) {
-		retcode = idmap_utf82str(windomain, 0,
-		    &mappings->mappings.mappings_val[iter->next].id1domain);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
-	if (unixname) {
-		retcode = idmap_utf82str(unixname, 0,
-		    &mappings->mappings.mappings_val[iter->next].id2name);
-		if (retcode != IDMAP_SUCCESS)
-			goto errout;
-	}
+
+	retcode = idmap_strdupnull(windomain,
+	    mappings->mappings.mappings_val[iter->next].id1domain);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(winname,
+	    mappings->mappings.mappings_val[iter->next].id1name);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+	retcode = idmap_strdupnull(unixname,
+	    mappings->mappings.mappings_val[iter->next].id2name);
+	if (retcode != IDMAP_SUCCESS)
+		goto errout;
+
+
 	if (pid)
 		*pid = mappings->mappings.mappings_val[iter->next].id2.
 			idmap_id_u.uid;
@@ -1187,7 +1352,6 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	idmap_mapping		request, *mapping;
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
-	idmap_utf8str		*str;
 
 	if (handle == NULL) {
 		errno = EINVAL;
@@ -1214,16 +1378,14 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		request.id1.idmap_id_u.sid.prefix = (char *)sidprefix;
 		request.id1.idmap_id_u.sid.rid = *rid;
 	} else if (winname) {
-		str = &request.id1name;
-		retcode = idmap_str2utf8(&str, winname, 1);
-		if (retcode != IDMAP_SUCCESS)
+		retcode = idmap_strdupnull(&request.id1name, winname);
+		if (retcode != SUCCESS)
 			goto out;
-		if (windomain) {
-			str = &request.id1domain;
-			retcode = idmap_str2utf8(&str, windomain, 1);
-			if (retcode != IDMAP_SUCCESS)
-				return (retcode);
-		}
+
+		retcode = idmap_strdupnull(&request.id1domain, windomain);
+		if (retcode != SUCCESS)
+			goto out;
+
 		request.id1.idmap_id_u.sid.prefix = NULL;
 	} else {
 		errno = EINVAL;
@@ -1266,11 +1428,10 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		*direction = mapping->direction;
 	if (pid)
 		*pid = mapping->id2.idmap_id_u.uid;
-	if (unixname) {
-		rc = idmap_utf82str(unixname, 0, &mapping->id2name);
-		if (rc != IDMAP_SUCCESS)
-			retcode = rc;
-	}
+
+	rc = idmap_strdupnull(unixname, mapping->id2name);
+	if (rc != IDMAP_SUCCESS)
+		retcode = rc;
 
 out:
 	xdr_free(xdr_idmap_mappings_res, (caddr_t)&result);
@@ -1295,7 +1456,6 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 	idmap_mapping		request, *mapping;
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
-	idmap_utf8str		*str;
 
 	if (handle == NULL) {
 		errno = EINVAL;
@@ -1324,10 +1484,7 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 	if (pid && *pid != UINT32_MAX) {
 		request.id1.idmap_id_u.uid = *pid;
 	} else if (unixname) {
-		str = &request.id1name;
-		retcode = idmap_str2utf8(&str, unixname, 1);
-		if (retcode != IDMAP_SUCCESS)
-			goto out;
+		request.id1name = (char *)unixname;
 		request.id1.idmap_id_u.uid = UINT32_MAX;
 	} else {
 		errno = EINVAL;
@@ -1364,20 +1521,14 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 	}
 	if (rid)
 		*rid = mapping->id2.idmap_id_u.sid.rid;
-	if (winname) {
-		rc = idmap_utf82str(winname, 0, &mapping->id2name);
-		if (rc != IDMAP_SUCCESS) {
-			retcode = rc;
-			goto errout;
-		}
-	}
-	if (windomain) {
-		rc = idmap_utf82str(windomain, 0, &mapping->id2domain);
-		if (rc != IDMAP_SUCCESS) {
-			retcode = rc;
-			goto errout;
-		}
-	}
+
+	rc = idmap_strdupnull(winname, mapping->id2name);
+	if (rc != IDMAP_SUCCESS)
+		retcode = rc;
+
+	rc = idmap_strdupnull(windomain, mapping->id2domain);
+	if (rc != IDMAP_SUCCESS)
+		retcode = rc;
 
 	goto out;
 
@@ -1402,94 +1553,6 @@ out:
 	return (retcode);
 }
 
-
-/*
- * utf8str to string
- */
-idmap_stat
-idmap_utf82str(char **out, size_t outsize, idmap_utf8str *in) {
-	int len;
-
-	if (in == NULL || out == NULL)
-		return (IDMAP_ERR_ARG);
-
-	if (outsize == 0) {
-		*out = NULL;
-		if ((len = in->idmap_utf8str_len) == 0)
-			return (IDMAP_SUCCESS);
-		if (in->idmap_utf8str_val == NULL)
-			return (IDMAP_ERR_ARG);
-		if (in->idmap_utf8str_val[len - 1] != '\0')
-			len++;
-		*out = calloc(1, len);
-		if (*out == NULL)
-			return (IDMAP_ERR_MEMORY);
-	} else {
-		if (*out == NULL)
-			return (IDMAP_ERR_ARG);
-		(void) memset(*out, 0, outsize);
-		if ((len = in->idmap_utf8str_len) == 0)
-			return (IDMAP_SUCCESS);
-		if (in->idmap_utf8str_val == NULL)
-			return (IDMAP_ERR_ARG);
-		if (in->idmap_utf8str_val[len - 1] != '\0')
-			len++;
-		if (outsize < len)
-			return (IDMAP_ERR_ARG);
-	}
-	(void) memcpy(*out, in->idmap_utf8str_val, in->idmap_utf8str_len);
-	return (IDMAP_SUCCESS);
-}
-
-
-/*
- * string to utf8str
- */
-idmap_stat
-idmap_str2utf8(idmap_utf8str **out, const char *in, int flag) {
-	idmap_utf8str	*tmp;
-
-	if (out == NULL)
-		return (IDMAP_ERR_ARG);
-	else if (*out == NULL) {
-		tmp = malloc(sizeof (idmap_utf8str));
-		if (tmp == NULL)
-			return (IDMAP_ERR_MEMORY);
-	} else {
-		tmp = *out;
-	}
-
-	if (in == NULL) {
-		tmp->idmap_utf8str_len = 0;
-		tmp->idmap_utf8str_val = NULL;
-		if (*out == NULL)
-			*out = tmp;
-		return (IDMAP_SUCCESS);
-	}
-
-	/* include the null terminator */
-	tmp->idmap_utf8str_len = strlen(in) + 1;
-
-	if (flag == 1) {
-		/* Don't malloc, simply assign */
-		tmp->idmap_utf8str_val = (char *)in;
-		if (*out == NULL)
-			*out = tmp;
-		return (IDMAP_SUCCESS);
-	}
-
-	tmp->idmap_utf8str_val = malloc(tmp->idmap_utf8str_len);
-	if (tmp->idmap_utf8str_val == NULL) {
-		tmp->idmap_utf8str_len = 0;
-		if (*out == NULL)
-			free(tmp);
-		return (IDMAP_ERR_MEMORY);
-	}
-	(void) memcpy(tmp->idmap_utf8str_val, in, tmp->idmap_utf8str_len);
-	if (*out == NULL)
-		*out = tmp;
-	return (IDMAP_SUCCESS);
-}
 
 
 #define	gettext(s)	s
@@ -1638,6 +1701,42 @@ idmap_stat4prot(idmap_stat status) {
 		return (IDMAP_ERR_INTERNAL);
 	}
 	return (status);
+}
+
+
+/*
+ * duplicate a string, possibly null
+ */
+static idmap_stat
+idmap_strdupnull(char **to, const char *from) {
+	if (from == NULL || *from == '\0') {
+		*to = NULL;
+		return (IDMAP_SUCCESS);
+	}
+
+	*to = strdup(from);
+	if (*to == NULL)
+		return (IDMAP_ERR_MEMORY);
+	return (IDMAP_SUCCESS);
+}
+
+idmap_stat
+idmap_namerule_cpy(idmap_namerule *to, idmap_namerule *from) {
+	idmap_stat retval;
+
+	(void) memcpy(to, from, sizeof (idmap_namerule));
+
+	retval = idmap_strdupnull(&to->windomain, from->windomain);
+	if (retval != IDMAP_SUCCESS)
+		return (retval);
+
+	retval = idmap_strdupnull(&to->winname, from->winname);
+	if (retval != IDMAP_SUCCESS)
+		return (retval);
+
+	retval = idmap_strdupnull(&to->unixname, from->unixname);
+
+	return (retval);
 }
 
 

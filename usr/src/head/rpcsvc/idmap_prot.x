@@ -26,7 +26,7 @@
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* opaque type to support non-ASCII strings */
-typedef	opaque	idmap_utf8str<>;
+typedef	string	idmap_utf8str<>;
 
 /* Return status */
 typedef int idmap_retcode;
@@ -109,6 +109,13 @@ struct idmap_namerules_res {
 	idmap_namerule	rules<>;
 };
 
+struct idmap_update_res {
+	idmap_retcode	retcode;
+	int64_t	error_index;
+	idmap_namerule	error_rule;
+	idmap_namerule	conflict_rule;
+};
+
 
 /* Update requests */
 enum idmap_opnum {
@@ -149,7 +156,7 @@ program IDMAP_PROG {
 			uint64_t lastrowid, uint64_t limit) = 3;
 
 		/* Batch of update requests */
-		idmap_retcode
+		idmap_update_res
 		IDMAP_UPDATE(idmap_update_batch batch) = 4;
 
 		/* Get mapped identity by name */

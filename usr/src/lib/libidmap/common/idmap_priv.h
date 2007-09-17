@@ -69,6 +69,17 @@ extern idmap_stat idmap_udt_create(idmap_handle_t *,
 /* Commit */
 extern idmap_stat idmap_udt_commit(idmap_udt_handle_t *);
 
+/* Get index of the failed batch element */
+extern idmap_stat idmap_udt_get_error_index(idmap_udt_handle_t *, int64_t *);
+
+/* Get the rule which caused the batch to failed */
+extern idmap_stat idmap_udt_get_error_rule(idmap_udt_handle_t *, char **,
+    char **, char **, boolean_t *, boolean_t *, int *);
+
+/* Get the rule which caused a conflict */
+extern idmap_stat idmap_udt_get_conflict_rule(idmap_udt_handle_t *, char **,
+    char **, char **, boolean_t *, boolean_t *, int *);
+
 /* Destroy the update handle */
 extern void idmap_udt_destroy(idmap_udt_handle_t *);
 
@@ -127,17 +138,14 @@ extern idmap_stat idmap_get_u2w_mapping(idmap_handle_t *, uid_t *,
  * Miscellaneous
  */
 
-/* utf8 to string */
-extern idmap_stat idmap_utf82str(char **, size_t, idmap_utf8str *);
-
-/* string to utf8 */
-extern idmap_stat idmap_str2utf8(idmap_utf8str **, const char *, int);
-
 /* string to status */
 extern idmap_stat idmap_string2stat(const char *);
 
 /* internal status to protocol status */
 extern idmap_stat idmap_stat4prot(idmap_stat);
+
+/* copy idmap_namerule including strings */
+extern idmap_stat idmap_namerule_cpy(idmap_namerule *, idmap_namerule *);
 
 #ifdef __cplusplus
 }

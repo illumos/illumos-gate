@@ -140,6 +140,10 @@ typedef struct wksids_table {
 #define	IDMAP_CACHEDIR	"/var/run/idmap"
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
+#define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
+#define	RPC_MAX_SIZE	65536
+
+#define	EMPTY_STRING(str)	(str == NULL || *str == 0)
 
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
@@ -165,7 +169,7 @@ extern idmap_retcode	flush_namerules(sqlite *, bool_t);
 
 extern idmap_retcode	gen_sql_expr_from_utf8str(const char *,
 				const char *, const char *,
-				idmap_utf8str *, const char *,
+				char *, const char *,
 				char **);
 extern idmap_retcode	validate_list_cb_data(list_cb_data_t *, int,
 				char **, int, uchar_t **, size_t);

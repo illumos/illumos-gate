@@ -61,11 +61,18 @@ struct idmap_udt_handle {
 	struct idmap_handle	*ih;
 	idmap_update_batch	batch;
 	uint64_t		next;
+	int64_t			error_index;
+	idmap_stat		commit_stat;
+	idmap_namerule		error_rule;
+	idmap_namerule		conflict_rule;
 };
 
 #define	_IDMAP_RESET_UDT_HANDLE(uh) \
 	(void) xdr_free(xdr_idmap_update_batch, (caddr_t)&uh->batch);\
-	uh->next = 0;
+	uh->next = 0;\
+	uh->error_index = -1;\
+	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&uh->error_rule);\
+	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&uh->conflict_rule);
 
 typedef struct idmap_get_res {
 	idmap_id_type	idtype;
