@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -834,9 +834,9 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	crypto_prov_notify(WORKLIST(dca, MCR1)->dwl_prov,
-		CRYPTO_PROVIDER_READY);
+	    CRYPTO_PROVIDER_READY);
 	crypto_prov_notify(WORKLIST(dca, MCR2)->dwl_prov,
-		CRYPTO_PROVIDER_READY);
+	    CRYPTO_PROVIDER_READY);
 
 	/* Initialize the local random number pool for this instance */
 	if ((ret = dca_random_init(dca)) != CRYPTO_SUCCESS) {
@@ -861,10 +861,12 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 failed:
 	/* unregister from the crypto framework */
 	if (WORKLIST(dca, MCR1)->dwl_prov != NULL) {
-	    (void) crypto_unregister_provider(WORKLIST(dca, MCR1)->dwl_prov);
+		(void) crypto_unregister_provider(
+		    WORKLIST(dca, MCR1)->dwl_prov);
 	}
 	if (WORKLIST(dca, MCR2)->dwl_prov != NULL) {
-	    (void) crypto_unregister_provider(WORKLIST(dca, MCR2)->dwl_prov);
+		(void) crypto_unregister_provider(
+		    WORKLIST(dca, MCR2)->dwl_prov);
 	}
 	if (intr_added) {
 		CLRBIT(dca, CSR_DMACTL,
@@ -928,19 +930,19 @@ dca_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * This needs to be done at the beginning of detach.
 	 */
 	if (WORKLIST(dca, MCR1)->dwl_prov != NULL) {
-	    if (crypto_unregister_provider(WORKLIST(dca, MCR1)->dwl_prov) !=
-		CRYPTO_SUCCESS) {
-		    dca_error(dca, "unable to unregister MCR1 from kcf");
-		    return (DDI_FAILURE);
-	    }
+		if (crypto_unregister_provider(
+		    WORKLIST(dca, MCR1)->dwl_prov) != CRYPTO_SUCCESS) {
+			dca_error(dca, "unable to unregister MCR1 from kcf");
+			return (DDI_FAILURE);
+		}
 	}
 
 	if (WORKLIST(dca, MCR2)->dwl_prov != NULL) {
-	    if (crypto_unregister_provider(WORKLIST(dca, MCR2)->dwl_prov) !=
-		CRYPTO_SUCCESS) {
-		    dca_error(dca, "unable to unregister MCR2 from kcf");
-		    return (DDI_FAILURE);
-	    }
+		if (crypto_unregister_provider(
+		    WORKLIST(dca, MCR2)->dwl_prov) != CRYPTO_SUCCESS) {
+			dca_error(dca, "unable to unregister MCR2 from kcf");
+			return (DDI_FAILURE);
+		}
 	}
 
 	/*
@@ -1171,7 +1173,7 @@ dca_init(dca_t *dca)
 	 */
 	wlp = WORKLIST(dca, MCR1);
 	(void) sprintf(wlp->dwl_name, "dca%d:mcr1",
-		ddi_get_instance(dca->dca_dip));
+	    ddi_get_instance(dca->dca_dip));
 	wlp->dwl_lowater = ddi_getprop(DDI_DEV_T_ANY,
 	    dca->dca_dip, DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
 	    "mcr1_lowater", MCR1LOWATER);
@@ -1192,7 +1194,7 @@ dca_init(dca_t *dca)
 	 */
 	wlp = WORKLIST(dca, MCR2);
 	(void) sprintf(wlp->dwl_name, "dca%d:mcr2",
-		ddi_get_instance(dca->dca_dip));
+	    ddi_get_instance(dca->dca_dip));
 	wlp->dwl_lowater = ddi_getprop(DDI_DEV_T_ANY,
 	    dca->dca_dip, DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
 	    "mcr2_lowater", MCR2LOWATER);
@@ -1353,7 +1355,7 @@ dca_unqueue(dca_listnode_t *q)
 	 * unqueue takes from the "tail" of the list, i.e. just before
 	 * the sentinel.
 	 */
-	if ((node = q->dl_prev) == q) {;
+	if ((node = q->dl_prev) == q) {
 		/* queue is empty */
 		return (NULL);
 	}
@@ -1985,6 +1987,10 @@ dca_unbindchains(dca_request_t *reqp)
 		reqp->dr_chain_in_head.dc_buffer_paddr = 0;
 	}
 
+	if (reqp->dr_flags & DR_INPLACE) {
+		return (rv);
+	}
+
 	/* Clear the output chain */
 	if (reqp->dr_chain_out_head.dc_buffer_paddr != NULL) {
 		(void) ddi_dma_unbind_handle(reqp->dr_chain_out_dmah);
@@ -2175,7 +2181,7 @@ dca_schedule(dca_t *dca, int mcr)
 		/* if there isn't enough to do, don't bother now */
 		if ((wlp->dwl_count < wlp->dwl_reqspermcr) &&
 		    (ddi_get_lbolt() < (wlp->dwl_lastsubmit +
-			drv_usectohz(MSEC)))) {
+		    drv_usectohz(MSEC)))) {
 			/* wait a bit longer... */
 			if (wlp->dwl_schedtid == 0) {
 				wlp->dwl_schedtid = timeout(dca_schedtimeout,
@@ -2294,7 +2300,7 @@ dca_schedule(dca_t *dca, int mcr)
 		workp->dw_lbolt = ddi_get_lbolt();
 		/* Make sure MCR is synced out to device. */
 		(void) ddi_dma_sync(workp->dw_mcr_dmah, 0, 0,
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		if (dca_check_dma_handle(dca, workp->dw_mcr_dmah,
 		    DCA_FM_ECLASS_NONE) != DDI_SUCCESS) {
 			dca_destroywork(workp);
@@ -2343,7 +2349,7 @@ dca_reclaim(dca_t *dca, int mcr)
 
 		/* only sync the MCR flags, since that's all we need */
 		(void) ddi_dma_sync(workp->dw_mcr_dmah, 0, 4,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		if (dca_check_dma_handle(dca, workp->dw_mcr_dmah,
 		    DCA_FM_ECLASS_NONE) != DDI_SUCCESS) {
 			dca_rmqueue((dca_listnode_t *)workp);
@@ -2537,15 +2543,7 @@ dca_failure(dca_t *dca, ddi_fault_location_t loc, dca_fma_eclass_t index,
 			for (i = 0; i < wlp->dwl_reqspermcr; i++) {
 				dca_request_t *reqp = workp->dw_reqs[i];
 				if (reqp) {
-					if (reqp->dr_flags & DR_INPLACE) {
-						dca_done(reqp, errno);
-					} else {
-						/*
-						 * cause it to get retried
-						 * elsewhere (software)
-						 */
-						dca_done(reqp, CRYPTO_FAILED);
-					}
+					dca_done(reqp, errno);
 					workp->dw_reqs[i] = NULL;
 				}
 			}
@@ -2875,7 +2873,8 @@ dca_getbufbytes(crypto_data_t *data, size_t off, int count, uchar_t *dest)
 		uiop = data->cd_uio;
 		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 		    off >= uiop->uio_iov[vec_idx].iov_len;
-		    off -= uiop->uio_iov[vec_idx++].iov_len);
+		    off -= uiop->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == uiop->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -2913,7 +2912,8 @@ dca_getbufbytes(crypto_data_t *data, size_t off, int count, uchar_t *dest)
 		 * Jump to the first mblk_t containing data to be processed.
 		 */
 		for (mp = data->cd_mp; mp != NULL && off >= MBLKL(mp);
-		    off -= MBLKL(mp), mp = mp->b_cont);
+		    off -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3117,7 +3117,8 @@ dca_gather(crypto_data_t *in, char *dest, int count, int reverse)
 		uiop = in->cd_uio;
 		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 		    off >= uiop->uio_iov[vec_idx].iov_len;
-		    off -= uiop->uio_iov[vec_idx++].iov_len);
+		    off -= uiop->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == uiop->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3163,7 +3164,8 @@ dca_gather(crypto_data_t *in, char *dest, int count, int reverse)
 		 * Jump to the first mblk_t containing data to be processed.
 		 */
 		for (mp = in->cd_mp; mp != NULL && off >= MBLKL(mp);
-		    off -= MBLKL(mp), mp = mp->b_cont);
+		    off -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3266,7 +3268,8 @@ dca_resid_gather(crypto_data_t *in, char *resid, int *residlen, char *dest,
 		uiop = in->cd_uio;
 		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 		    off >= uiop->uio_iov[vec_idx].iov_len;
-		    off -= uiop->uio_iov[vec_idx++].iov_len);
+		    off -= uiop->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == uiop->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3306,7 +3309,8 @@ dca_resid_gather(crypto_data_t *in, char *resid, int *residlen, char *dest,
 		 * Jump to the first mblk_t containing data to be processed.
 		 */
 		for (mp = in->cd_mp; mp != NULL && off >= MBLKL(mp);
-		    off -= MBLKL(mp), mp = mp->b_cont);
+		    off -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3383,7 +3387,8 @@ dca_scatter(const char *src, crypto_data_t *out, int count, int reverse)
 		uiop = out->cd_uio;
 		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 		    offset >= uiop->uio_iov[vec_idx].iov_len;
-		    offset -= uiop->uio_iov[vec_idx++].iov_len);
+		    offset -= uiop->uio_iov[vec_idx++].iov_len)
+			;
 		if (vec_idx == uiop->uio_iovcnt) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3428,7 +3433,8 @@ dca_scatter(const char *src, crypto_data_t *out, int count, int reverse)
 		 * Jump to the first mblk_t that can be written to.
 		 */
 		for (mp = out->cd_mp; mp != NULL && offset >= MBLKL(mp);
-		    offset -= MBLKL(mp), mp = mp->b_cont);
+		    offset -= MBLKL(mp), mp = mp->b_cont)
+			;
 		if (mp == NULL) {
 			/*
 			 * The caller specified an offset that is larger than
@@ -3740,6 +3746,13 @@ dca_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	DCA_SOFTC_FROM_CTX(ctx, softc, instance);
 	DBG(softc, DENTRY, "dca_encrypt: started");
 
+	/* handle inplace ops */
+	if (!ciphertext) {
+		dca_request_t *reqp = ctx->cc_provider_private;
+		reqp->dr_flags |= DR_INPLACE;
+		ciphertext = plaintext;
+	}
+
 	/* check mechanism */
 	switch (DCA_MECH_FROM_CTX(ctx)) {
 	case DES_CBC_MECH_INFO_TYPE:
@@ -3787,6 +3800,13 @@ dca_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	/* extract softc and instance number from context */
 	DCA_SOFTC_FROM_CTX(ctx, softc, instance);
 	DBG(softc, DENTRY, "dca_encrypt_update: started");
+
+	/* handle inplace ops */
+	if (!ciphertext) {
+		dca_request_t *reqp = ctx->cc_provider_private;
+		reqp->dr_flags |= DR_INPLACE;
+		ciphertext = plaintext;
+	}
 
 	/* check mechanism */
 	switch (DCA_MECH_FROM_CTX(ctx)) {
@@ -3861,6 +3881,11 @@ dca_encrypt_atomic(crypto_provider_handle_t provider,
 
 	if (ctx_template != NULL)
 		return (CRYPTO_ARGUMENTS_BAD);
+
+	/* handle inplace ops */
+	if (!ciphertext) {
+		ciphertext = plaintext;
+	}
 
 	/* check mechanism */
 	switch (mechanism->cm_type) {
@@ -3955,6 +3980,13 @@ dca_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	DCA_SOFTC_FROM_CTX(ctx, softc, instance);
 	DBG(softc, DENTRY, "dca_decrypt: started");
 
+	/* handle inplace ops */
+	if (!plaintext) {
+		dca_request_t *reqp = ctx->cc_provider_private;
+		reqp->dr_flags |= DR_INPLACE;
+		plaintext = ciphertext;
+	}
+
 	/* check mechanism */
 	switch (DCA_MECH_FROM_CTX(ctx)) {
 	case DES_CBC_MECH_INFO_TYPE:
@@ -4003,6 +4035,13 @@ dca_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	/* extract softc and instance number from context */
 	DCA_SOFTC_FROM_CTX(ctx, softc, instance);
 	DBG(softc, DENTRY, "dca_decrypt_update: started");
+
+	/* handle inplace ops */
+	if (!plaintext) {
+		dca_request_t *reqp = ctx->cc_provider_private;
+		reqp->dr_flags |= DR_INPLACE;
+		plaintext = ciphertext;
+	}
 
 	/* check mechanism */
 	switch (DCA_MECH_FROM_CTX(ctx)) {
@@ -4077,6 +4116,11 @@ dca_decrypt_atomic(crypto_provider_handle_t provider,
 
 	if (ctx_template != NULL)
 		return (CRYPTO_ARGUMENTS_BAD);
+
+	/* handle inplace ops */
+	if (!plaintext) {
+		plaintext = ciphertext;
+	}
 
 	/* check mechanism */
 	switch (mechanism->cm_type) {
@@ -4794,7 +4838,7 @@ ext_info_base(crypto_provider_handle_t prov,
 
 	/* Manufacturer ID */
 	(void) sprintf((char *)ext_info->ei_manufacturerID, "%s",
-		DCA_MANUFACTURER_ID);
+	    DCA_MANUFACTURER_ID);
 	len = strlen((char *)ext_info->ei_manufacturerID);
 	(void) memset(ext_info->ei_manufacturerID + len, ' ',
 	    CRYPTO_EXT_SIZE_MANUF - len);
@@ -4806,7 +4850,7 @@ ext_info_base(crypto_provider_handle_t prov,
 
 	len = strlen((char *)ext_info->ei_model);
 	(void) memset(ext_info->ei_model + len, ' ',
-		CRYPTO_EXT_SIZE_MODEL - len);
+	    CRYPTO_EXT_SIZE_MODEL - len);
 
 	/* Serial Number. Blank for Deimos */
 	(void) memset(ext_info->ei_serial_number, ' ', CRYPTO_EXT_SIZE_SERIAL);
@@ -4836,8 +4880,8 @@ dca_fma_init(dca_t *dca)
 {
 	ddi_iblock_cookie_t fm_ibc;
 	int fm_capabilities = DDI_FM_EREPORT_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE |
-		DDI_FM_ERRCB_CAPABLE;
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE |
+	    DDI_FM_ERRCB_CAPABLE;
 
 	/* Read FMA capabilities from dca.conf file (if present) */
 	dca->fm_capabilities = ddi_getprop(DDI_DEV_T_ANY, dca->dca_dip,

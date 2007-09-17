@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,13 +79,6 @@ dca_3des(crypto_ctx_t *ctx, crypto_data_t *in,
 		des_ctx->dr_ctx.iv[1] = p[4]<<24 | p[5]<<16 | p[6]<<8 | p[7];
 	}
 
-	/*
-	 * In-place operations (input == out) are indicated by having a
-	 * NULL output. In this case set the output to point to the input.
-	 */
-	if (out == NULL) {
-		out = in;
-	}
 	if (len > dca_length(out)) {
 		DBG(dca, DWARN, "inadequate output space (need %d, got %d)",
 		    len, dca_length(out));
@@ -180,13 +173,6 @@ dca_3desupdate(crypto_ctx_t *ctx, crypto_data_t *in,
 		des_ctx->dr_ctx.iv[1] = p[4]<<24 | p[5]<<16 | p[6]<<8 | p[7];
 	}
 
-	/*
-	 * In-place operations (in == out) are indicated by having a
-	 * NULL output. In this case set the output to point to the input.
-	 */
-	if (out == NULL) {
-		out = in;
-	}
 	if (len > dca_length(out)) {
 		DBG(dca, DWARN, "not enough output space (need %d, got %d)",
 		    len, dca_length(out));
@@ -346,6 +332,12 @@ dca_3desatomic(crypto_provider_handle_t provider,
 	 */
 	((dca_request_t *)ctx.cc_provider_private)->dr_ctx.atomic = 1;
 
+	/* check for inplace ops */
+	if (input == output) {
+		((dca_request_t *)ctx.cc_provider_private)->dr_flags
+		    |= DR_INPLACE;
+	}
+
 	rv = dca_3des(&ctx, input, output, req, mode);
 	if ((rv != CRYPTO_QUEUED) && (rv != CRYPTO_SUCCESS)) {
 		DBG(NULL, DWARN, "dca_3desatomic: dca_3des() failed");
@@ -470,7 +462,7 @@ dca_3desstart(dca_t *dca, uint32_t flags, dca_request_t *reqp)
 		 * Use the actual length if the first entry is sufficient.
 		 */
 		(void) ddi_dma_sync(reqp->dr_ibuf_dmah, 0, len,
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		if (dca_check_dma_handle(dca, reqp->dr_ibuf_dmah,
 		    DCA_FM_ECLASS_NONE) != DDI_SUCCESS) {
 			reqp->destroy = TRUE;
@@ -529,7 +521,7 @@ dca_3desdone(dca_request_t *reqp, int errno)
 
 		if (reqp->dr_flags & DR_SCATTER) {
 			(void) ddi_dma_sync(reqp->dr_obuf_dmah, 0,
-				reqp->dr_out_len, DDI_DMA_SYNC_FORKERNEL);
+			    reqp->dr_out_len, DDI_DMA_SYNC_FORKERNEL);
 			if (dca_check_dma_handle(reqp->dr_dca,
 			    reqp->dr_obuf_dmah, DCA_FM_ECLASS_NONE) !=
 			    DDI_SUCCESS) {

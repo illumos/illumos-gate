@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,16 +68,6 @@ int dca_rsastart(crypto_ctx_t *ctx, crypto_data_t *in, crypto_data_t *out,
 	caddr_t			daddr;
 	int			rv = CRYPTO_QUEUED;
 	int			len;
-
-	/*
-	 * In-place operations (in == out) are indicated by having a
-	 * NULL output. In this case set the out to point to the in.
-	 * Note that this only works for CKM_RSA_X_509 without any padding
-	 */
-	if (!out) {
-		DBG(dca, DWARN, "Using inline since output buffer is NULL.");
-		out = in;
-	}
 
 	/* We don't support non-contiguous buffers for RSA */
 	if (dca_sgcheck(dca, in, DCA_SG_CONTIG) ||
@@ -660,6 +650,12 @@ dca_rsaatomic(crypto_provider_handle_t provider,
 	 * will free the context.
 	 */
 	((dca_request_t *)ctx.cc_provider_private)->dr_ctx.atomic = 1;
+
+	/* check for inplace ops */
+	if (input == output) {
+		((dca_request_t *)ctx.cc_provider_private)->dr_flags
+		    |= DR_INPLACE;
+	}
 
 	rv = dca_rsastart(&ctx, input, output, req, mode);
 
