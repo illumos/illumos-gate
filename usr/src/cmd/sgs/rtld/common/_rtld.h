@@ -552,7 +552,7 @@ extern int		enter(void);
 extern uint_t		expand(char **, size_t *, char **, uint_t, uint_t,
 			    Rt_map *);
 extern Pnode		*expand_paths(Rt_map *, const char *, uint_t, uint_t);
-extern void		free_hdl(Grp_hdl *);
+extern void		free_hdl(Grp_hdl *, Rt_map *, uint_t);
 extern void		file_notfound(Lm_list *, const char *, Rt_map *,
 			    uint_t, Rej_desc *);
 extern int		find_path(Lm_list *, const char *, Rt_map *, uint_t,
@@ -567,7 +567,8 @@ extern void		get_lcinterface(Rt_map *, Lc_interface *);
 extern Lmid_t		get_linkmap_id(Lm_list *);
 extern Pnode		*get_next_dir(Pnode **, Rt_map *, uint_t);
 extern int		hdl_add(Grp_hdl *, Rt_map *, uint_t);
-extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t);
+extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t,
+			    uint_t, uint_t);
 extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
 extern int		hwcap_check(Rej_desc *, Ehdr *);
 extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,

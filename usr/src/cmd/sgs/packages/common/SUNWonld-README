@@ -1256,3 +1256,6 @@ Bugid   Risk Synopsis
 	shared object reference
 6595139 various applications should export yy* global variables for libl
 6597841 gelf_getdyn() reads one too many dynamic entries
+6602294 ps_pbrandname breaks apps linked directly against librtld_db
+	(link-editor components only)
+6603313 dlclose() can fail to unload objects after fix for 6573641

@@ -268,7 +268,7 @@ struct lm_list {
 	 * END: Exposed to rtld_db - don't move, don't delete
 	 */
 	Alist		*lm_rti;	/* list of RTLDINFO tables */
-	Audit_list	*lm_alp;	/* audit list descripter */
+	Audit_list	*lm_alp;	/* audit list descriptor */
 	avl_tree_t	*lm_fpavl;	/* avl tree of objects loaded */
 	Alist		*lm_lists;	/* active and pending link-map lists */
 	char		***lm_environ;	/* pointer to environment array */
@@ -385,38 +385,76 @@ struct lm_list32 {
  */
 #define	LML_TFLG_AUD_MASK	0xfff00000	/* audit interfaces mask */
 
-
 /*
- * Information for dlopen(), dlsym(), and dlclose() on libraries linked by rtld.
- * Each shared object referred from a dlopen call has an associated group
- * handle structure returned that describes a group of one or more objects.
+ * Define a Group Handle.
+ *
+ * The capability of ld.so.1 to associate a group of objects, look for symbols
+ * within that group, ensure that groups are isolated from one another (with
+ * regard to relocations), and to unload a group, centers around a handle.  This
+ * data structure is tracked from the link-map HANDLE(), and is the structure
+ * returned from dlopen(), and similar object loading capabilities such as
+ * filter/filtee processing.
+ *
+ * A handle keeps track of all the dependencies of the associated object.
+ * These dependencies may be added as objects are lazily loaded.  The core
+ * dependencies on the handle are the ldd(1) list of the associated object.
+ * The object assigned the handle, and the parent (or caller) who requested the
+ * handle are also maintained as dependencies on the handle.
+ *
+ * Presently, an object may have two handles, one requested with RTLD_FIRST
+ * and one without.
+ *
+ * A handle may be referenced by any number of parents (callers).  A reference
+ * count tracks the number.  A dlclose() operation drops the reference count,
+ * and when the count is zero, the handle is used to determine the family of
+ * objects to unload.  As bindings may occur to objects on the handle from
+ * other handles, it may not be possible to remove a complete family of
+ * objects or that handle itself.  Handles in this state are moved to an orphan
+ * list.  A handle on the orphan list is taken off the orphan list if the
+ * associated object is reopened.  Otherwise, the handle remains on the orphan
+ * list for the duration of the process.  The orphan list is inspected any time
+ * objects are unloaded, to determine if the orphaned objects can also be
+ * unloaded.
+ *
+ * Objects can be dlopened using RTLD_NOW.  This attribute requires that all
+ * relocations of the object, and its dependencies are processed immediately,
+ * before return to the caller.  Typically, an object is loaded without
+ * RTLD_NOW, and procedure linkage relocations are satisfied when their
+ * associated function is first called.  If an object is already loaded, and an
+ * RTLD_NOW request is made, then the object, and its dependencies, most undergo
+ * additional relocation processing.   This promotion from lazy binding to
+ * immediate binding is carried out using handles, as the handle defines the
+ * dependencies that must be processed.  A temporary handle is created for this
+ * purpose, and is discarded immediately after the promotion operation has been
+ * completed.
  */
 typedef struct {
 	Alist		*gh_depends;	/* handle dependency list */
 	Rt_map		*gh_ownlmp;	/* handle owners link-map */
 	Lm_list		*gh_ownlml;	/* handle owners link-map list */
 	uint_t		gh_refcnt;	/* handle reference count */
-	uint_t		gh_flags;	/* handle flags */
+	uint_t		gh_flags;	/* handle flags (GPH_ values) */
 } Grp_hdl;
 
 #define	GPH_ZERO	0x0001		/* special handle for dlopen(0) */
 #define	GPH_LDSO	0x0002		/* special handle for ld.so.1 */
 #define	GPH_FIRST	0x0004		/* dlsym() can only use originating */
 					/*	dependency */
-#define	GPH_PARENT	0x0008		/* assign caller as a parent */
-#define	GPH_FILTEE	0x0010		/* handle used to specify a filtee */
-#define	GPH_INITIAL	0x0020		/* handle is initialized */
-#define	GPH_NOPENDLAZY	0x0040		/* no pending lazy dependencies */
+#define	GPH_FILTEE	0x0008		/* handle used to specify a filtee */
+#define	GPH_INITIAL	0x0010		/* handle is initialized */
+#define	GPH_NOPENDLAZY	0x0020		/* no pending lazy dependencies */
 					/*	remain for this handle */
 
 /*
- * A group descriptor.  A group handle (Grp_hdl) refers to a group of objects,
- * each object, and its relationship to the handle, is maintained within a
- * group descriptor.
+ * Define a Group Descriptor.
+ *
+ * Each dependency associated with a group handle is maintained by a group
+ * descriptor.  The descriptor defines the associated dependency together with
+ * flags that indicate how the dependency can be used.
  */
 typedef struct {
 	Rt_map *	gd_depend;	/* dependency */
-	uint_t		gd_flags;	/* dependency flags */
+	uint_t		gd_flags;	/* dependency flags (GPD_ values) */
 } Grp_desc;
 
 #define	GPD_DLSYM	0x0001		/* dependency available to dlsym() */
@@ -426,6 +464,8 @@ typedef struct {
 					/*	should be added to handle */
 #define	GPD_PARENT	0x0008		/* dependency is a parent */
 #define	GPD_FILTER	0x0010		/* dependency is our filter */
+#define	GPD_PROMOTE	0x0020		/* dependency is our RTLD_NOW */
+					/*	promoter */
 #define	GPD_REMOVE	0x1000		/* descriptor is a candidate for */
 					/*	removal from the group */
 
@@ -689,7 +729,7 @@ typedef struct rt_map32 {
 #define	FL1_RT_OBJAFLTR	0x00002000	/*	or auxiliary filter */
 #define	FL1_RT_SYMSFLTR	0x00004000	/* symbol is acting as a standard */
 #define	FL1_RT_SYMAFLTR	0x00008000	/*	or auxiliary filter */
-#define	MSK_RT_FILTER	0x0000f000	/* mask for all filter possibilites */
+#define	MSK_RT_FILTER	0x0000f000	/* mask for all filter possibilities */
 
 #define	FL1_RT_TLSADD	0x00010000	/* objects TLS has been registered */
 #define	FL1_RT_TLSSTAT	0x00020000	/* object requires static TLS */

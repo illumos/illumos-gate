@@ -1484,12 +1484,18 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			if (strcmp(filtee, MSG_ORIG(MSG_PTH_RTLD)) == 0) {
 #endif
 				/*
-				 * Create an association between ld.so.1 and
-				 * the filter.
+				 * Create an association between ld.so.1 and the
+				 * filter.  As an optimization, a handle for
+				 * ld.so.1 itself (required for the dlopen()
+				 * family filtering mechanism) shouldn't search
+				 * any dependencies of ld.so.1.  Omitting
+				 * GPD_ADDEPS prevents the addition of any
+				 * ld.so.1 dependencies to this handle.
 				 */
 				nlmp = lml_rtld.lm_head;
 				if ((ghp = hdl_create(&lml_rtld, nlmp, ilmp,
-				    (GPH_LDSO | GPH_FIRST | GPH_FILTEE))) == 0)
+				    (GPH_LDSO | GPH_FIRST | GPH_FILTEE),
+				    (GPD_DLSYM | GPD_RELOC), GPD_PARENT)) == 0)
 					nlmp = 0;
 
 				/*
@@ -1588,7 +1594,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 * to tear down the filter and filtee if
 				 * necessary.
 				 */
-				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 				if (nlmp && ghp &&
 				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
 					nlmp = 0;

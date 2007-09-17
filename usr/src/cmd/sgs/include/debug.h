@@ -57,7 +57,7 @@ extern "C" {
 /*
  * Define Dbg_*() interface flags.  These flags direct the debugging routine to
  * generate different diagnostics, thus the strings themselves are maintained
- * in this library.
+ * in the debugging library.
  */
 #define	DBG_SUP_ENVIRON		1
 #define	DBG_SUP_CMDLINE		2
@@ -98,13 +98,27 @@ extern "C" {
 #define	DBG_SYM_REDUCE_GLOBAL	1	/* reporting global symbols to local */
 #define	DBG_SYM_REDUCE_RETAIN	2	/* reporting non reduced local syms */
 
-#define	DBG_DEP_CREATE		1	/* Group handle operations */
-#define	DBG_DEP_ADD		2
-#define	DBG_DEP_DELETE		3
-#define	DBG_DEP_REMOVE		4
-#define	DBG_DEP_REMAIN		5
-#define	DBG_DEP_ORPHAN		6
-#define	DBG_DEP_REINST		7
+/*
+ * Group handle operations - passed to Dbg_file_hdl_title().  Indicate why
+ * handle dependencies are being manipulated.
+ */
+#define	DBG_HDL_CREATE		0	/* handle creation */
+#define	DBG_HDL_ADD		1	/* addition to existing handle */
+#define	DBG_HDL_DELETE		2	/* deletion from a handle */
+#define	DBG_HDL_ORPHAN		3	/* handle being moved to orphan list */
+#define	DBG_HDL_REINST		4	/* handle reinstated from orphan list */
+
+/*
+ * Group handle dependency operations - passed to Dbg_file_hdl_action().
+ * Indicates depdenencies assocation to handle.
+ */
+#define	DBG_DEP_ADD		0	/* dependency added */
+#define	DBG_DEP_UPDATE		1	/* dependency updated */
+#define	DBG_DEP_DELETE		2	/* dependency deleted */
+#define	DBG_DEP_REMOVE		3	/* dependency removed from handle */
+#define	DBG_DEP_REMAIN		4	/* dependency must remain on handle */
+#define	DBG_DEP_ORPHAN		5	/* dependency must remain an orphan */
+#define	DBG_DEP_REINST		6	/* dependency reinstated from orphan */
 
 #define	DBG_BINFO_FOUND		0x0001	/* information regarding binding */
 #define	DBG_BINFO_DIRECT	0x0002	/* bound directly */

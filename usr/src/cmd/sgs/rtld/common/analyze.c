@@ -1068,7 +1068,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 
 	/*
 	 * If this is an auditor, it will have been opened on a new link-map.
-	 * To prevent multiple occurrances of the same auditor on multiple
+	 * To prevent multiple occurrences of the same auditor on multiple
 	 * link-maps, search the head of each link-map list and see if this
 	 * object is already loaded as an auditor.
 	 */
@@ -1212,7 +1212,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		 * silent failure, where no rejection message is created, free
 		 * the original name to simplify the life of the caller.  For
 		 * any other reference that expands to a directory, fall through
-		 * to contruct a meaningful rejection message.
+		 * to construct a meaningful rejection message.
 		 */
 		if ((flags & FLG_RT_HWCAP) &&
 		    ((status.st_mode & S_IFMT) == S_IFDIR)) {
@@ -1717,7 +1717,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		return (lml_rtld.lm_head);
 
 	/*
-	 * If this isn't a hardware capabilites pathname, which is already a
+	 * If this isn't a hardware capabilities pathname, which is already a
 	 * full, duplicated pathname, determine whether the pathname contains
 	 * a slash, and if not determine the input filename (for max path
 	 * length verification).
@@ -1770,7 +1770,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 
 		/*
 		 * If the name and resolved pathname differ, duplicate the path
-		 * name once more to provide for genric cleanup by the caller.
+		 * name once more to provide for generic cleanup by the caller.
 		 */
 		if (nfdp->fd_pname && (nfdp->fd_nname != nfdp->fd_pname)) {
 			char	*pname;
@@ -2015,12 +2015,39 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 */
 	if (((FLAGS(nlmp) | flags) & FLG_RT_HANDLE) || (promote &&
 	    (FLAGS(nlmp) & FLG_RT_ANALYZED))) {
-		uint_t	oflags, hflags = 0;
+		uint_t	oflags, hflags = 0, cdflags;
 
-		if (nmode & RTLD_PARENT)
-			hflags |=  GPH_PARENT;
+		/*
+		 * Establish any flags for the handle (Grp_hdl).
+		 *
+		 *  .	Use of the RTLD_FIRST flag indicates that only the first
+		 *	dependency on the handle (the new object) can be used
+		 *	to satisfy dlsym() requests.
+		 */
 		if (nmode & RTLD_FIRST)
-			hflags |=  GPH_FIRST;
+			hflags = GPH_FIRST;
+
+		/*
+		 * Establish the flags for this callers dependency descriptor
+		 * (Grp_desc).
+		 *
+		 *  .	The creation of a handle associated a descriptor for the
+		 *	new object and descriptor for the parent (caller).
+		 *	Typically, the handle is created for dlopen() or for
+		 *	filtering.  A handle may also be created to promote
+		 *	the callers modes (RTLD_NOW) to the new object.  In this
+		 *	latter case, the handle/descriptor are torn down once
+		 *	the mode propagation has occurred.
+		 *
+		 *  .	Use of the RTLD_PARENT flag indicates that the parent
+		 *	can be relocated against.
+		 */
+		if (((FLAGS(nlmp) | flags) & FLG_RT_HANDLE) == 0)
+			cdflags = GPD_PROMOTE;
+		else
+			cdflags = GPD_PARENT;
+		if (nmode & RTLD_PARENT)
+			cdflags |= GPD_RELOC;
 
 		/*
 		 * Now that a handle is being created, remove this state from
@@ -2030,7 +2057,9 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		oflags = FLAGS(nlmp);
 		FLAGS(nlmp) &= ~FLG_RT_HANDLE;
 
-		if ((ghp = hdl_create(lml, nlmp, clmp, hflags)) == 0)
+		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
+		if ((ghp = hdl_create(lml, nlmp, clmp, hflags,
+		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), cdflags)) == 0)
 			return (0);
 
 		/*
@@ -2043,16 +2072,25 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			*hdl = ghp;
 
 		/*
-		 * If we were asked to create a handle, we're done.  Otherwise,
-		 * remove the handle. The handle was only used to establish this
-		 * objects dependencies and promote any modes, so we don't want
-		 * this handle preventing the objects deletion.  Fall through to
-		 * carry out any group processing.
+		 * If we were asked to create a handle, we're done.
 		 */
 		if ((oflags | flags) & FLG_RT_HANDLE)
 			return (1);
 
-		free_hdl(ghp);
+		/*
+		 * If the handle was created to promote modes from the parent
+		 * (caller) to the new object, then this relationship needs to
+		 * be removed to ensure the handle doesn't prevent the new
+		 * objects from being deleted if required.  If the parent is
+		 * the only dependency on the handle, then the handle can be
+		 * completely removed.  However, the handle may have already
+		 * existed, in which case only the parent descriptor can be
+		 * deleted from the handle, or at least the GPD_PROMOTE flag
+		 * removed from the descriptor.
+		 *
+		 * Fall through to carry out any group processing.
+		 */
+		free_hdl(ghp, clmp, GPD_PROMOTE);
 	}
 
 	/*
@@ -2067,7 +2105,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 * Traverse the list of groups our caller is a member of and add this
 	 * new link-map to those groups.
 	 */
-	DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 	for (ALIST_TRAVERSE(GROUPS(clmp), off, ghpp)) {
 		Aliste		off1;
 		Grp_desc	*gdp;

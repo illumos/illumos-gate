@@ -788,12 +788,13 @@ remove_collect(Alist *ghalp, Alist *lmalp)
  * by another user).
  */
 void
-free_hdl(Grp_hdl *ghp)
+free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
 {
+	Grp_desc	*gdp;
+	Aliste		off;
+
 	if (--(ghp->gh_refcnt) == 0) {
-		Grp_desc	*gdp;
 		uintptr_t	ndx;
-		Aliste		off;
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 			Rt_map	*lmp = gdp->gd_depend;
@@ -809,6 +810,25 @@ free_hdl(Grp_hdl *ghp)
 		list_delete(&hdl_list[ndx], ghp);
 
 		(void) free(ghp);
+
+	} else if (clmp) {
+		/*
+		 * It's possible that an RTLD_NOW promotion (via GPD_PROMOTE)
+		 * has associated a caller with a handle that is already in use.
+		 * In this case, find the caller and either remove the caller
+		 * from the handle, or if the caller is used for any other
+		 * reason, clear the promotion flag.
+		 */
+		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+			if (gdp->gd_depend != clmp)
+				continue;
+
+			if (gdp->gd_flags == cdflags)
+				(void) alist_delete(ghp->gh_depends, 0, &off);
+			else
+				gdp->gd_flags &= ~cdflags;
+			return;
+		}
 	}
 }
 
@@ -861,7 +881,8 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 		 * Establish a handle, and should anything fail, fall through
 		 * to remove the link-map control list.
 		 */
-		if (((ghp = hdl_create(lml, lmc->lc_head, 0, 0)) == 0) ||
+		if (((ghp =
+		    hdl_create(lml, lmc->lc_head, 0, 0, GPD_ADDEPS, 0)) == 0) ||
 		    (hdl_initialize(ghp, lmc->lc_head, 0, 0) == 0))
 			lmc->lc_flags &= ~LMC_FLG_RELOCATING;
 	} else {
@@ -877,7 +898,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 
 		if (ghp) {
 			ghp->gh_refcnt = 1;
-			free_hdl(ghp);
+			free_hdl(ghp, 0, 0);
 		}
 		return;
 	}
@@ -1012,7 +1033,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		return (0);
 	}
 
-	DBG_CALL(Dbg_file_hdl_title(DBG_DEP_DELETE));
+	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_DELETE));
 
 	/*
 	 * Traverse the groups we've collected to determine if any filtees are
@@ -1243,7 +1264,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
 		Grp_hdl	*ghp = *ghpp;
 
-		DBG_CALL(Dbg_file_hdl_title(DBG_DEP_DELETE));
+		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_DELETE));
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
 			int	flag;
@@ -1496,7 +1517,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			(void) list_append(&hdl_list[HDLIST_ORP], ghp);
 
 			if (DBG_ENABLED) {
-				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ORPHAN));
+				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ORPHAN));
 				for (ALIST_TRAVERSE(ghp->gh_depends, off1, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
 					    gdp->gd_depend, DBG_DEP_ORPHAN, 0));

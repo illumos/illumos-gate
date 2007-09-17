@@ -403,7 +403,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 		 * association provides sufficient information to tear down the
 		 * filter and filtee if necessary.
 		 */
-		DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 		if (nlmp && ghp && (hdl_add(ghp, flmp, GPD_FILTER) == 0))
 			nlmp = 0;
 

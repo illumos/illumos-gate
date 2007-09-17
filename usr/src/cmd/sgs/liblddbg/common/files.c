@@ -137,45 +137,28 @@ static Msg	hdl_str = 0;
 void
 Dbg_file_hdl_title(int type)
 {
+	static const Msg titles[] = {
+		MSG_FIL_HDL_CREATE,	/* MSG_INTL(MSG_FIL_HDL_CREATE) */
+		MSG_FIL_HDL_ADD,	/* MSG_INTL(MSG_FIL_HDL_ADD) */
+		MSG_FIL_HDL_DELETE,	/* MSG_INTL(MSG_FIL_HDL_DELETE) */
+		MSG_FIL_HDL_ORPHAN,	/* MSG_INTL(MSG_FIL_HDL_ORPHAN) */
+		MSG_FIL_HDL_REINST,	/* MSG_INTL(MSG_FIL_HDL_REINST) */
+	};
+
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	hdl_title = 1;
-
 	/*
-	 * Establish a binding title for later use in Dbg_file_bind_entry.
-	 * These are to be used with the MSG_INTL() macro.
-	 *
-	 * Note: The following are to convince chkmsg.sh that these
-	 * messages are actually used:
-	 *
-	 *	MSG_INTL(MSG_FIL_HDL_CREATE)
-	 *	MSG_INTL(MSG_FIL_HDL_ADD)
-	 *	MSG_INTL(MSG_FIL_HDL_DELETE)
-	 *	MSG_INTL(MSG_FIL_HDL_ORPHAN)
-	 *	MSG_INTL(MSG_FIL_HDL_REINST)
+	 * Establish a binding title for later use in Dbg_file_hdl_action.
 	 */
-	switch (type) {
-	case DBG_DEP_CREATE:
-		hdl_str = MSG_FIL_HDL_CREATE;
-		break;
-	case DBG_DEP_ADD:
-		hdl_str = MSG_FIL_HDL_ADD;
-		break;
-	case DBG_DEP_DELETE:
-		hdl_str = MSG_FIL_HDL_DELETE;
-		break;
-	case DBG_DEP_ORPHAN:
-		hdl_str = MSG_FIL_HDL_ORPHAN;
-		break;
-	case DBG_DEP_REINST:
-		hdl_str = MSG_FIL_HDL_REINST;
-		break;
-	default:
+	if (type <= DBG_HDL_REINST) {
+		hdl_str = titles[type];
+		hdl_title = 1;
+	} else {
 		hdl_str = 0;
-		break;
+		hdl_title = 0;
 	}
 }
 
@@ -215,6 +198,15 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 	Lm_list		*lml = LIST(lmp);
 	Msg		str;
 
+	static const Msg fmt[] = {
+		MSG_FIL_DEP_ADD,	/* MSG_INTL(MSG_FIL_DEP_ADD) */
+		MSG_FIL_DEP_UPDATE,	/* MSG_INTL(MSG_FIL_DEP_UPDATE) */
+		MSG_FIL_DEP_DELETE,	/* MSG_INTL(MSG_FIL_DEP_DELETE) */
+		MSG_FIL_DEP_REMOVE,	/* MSG_INTL(MSG_FIL_DEP_REMOVE) */
+		MSG_FIL_DEP_REMAIN,	/* MSG_INTL(MSG_FIL_DEP_REMAIN) */
+		MSG_FIL_DEP_ORPHAN,	/* MSG_INTL(MSG_FIL_DEP_ORPHAN) */
+		MSG_FIL_DEP_REINST,	/* MSG_INTL(MSG_FIL_DEP_REINST) */
+	};
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
@@ -240,40 +232,14 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 	}
 
 	/*
-	 * Note: The following are to convince chkmsg.sh that these
-	 * messages are actually used:
-	 *
-	 *	MSG_INTL(MSG_FIL_DEP_ADD)
-	 *	MSG_INTL(MSG_FIL_DEP_DELETE)
-	 *	MSG_INTL(MSG_FIL_DEP_REMOVE)
-	 *	MSG_INTL(MSG_FIL_DEP_REMAIN)
-	 *	MSG_INTL(MSG_FIL_DEP_ORPHAN)
-	 *	MSG_INTL(MSG_FIL_DEP_REINST)
+	 * Establish a binding descriptor format string.
 	 */
-	switch (type) {
-	case DBG_DEP_ADD:
-		str = MSG_FIL_DEP_ADD;
-		break;
-	case DBG_DEP_DELETE:
-		str = MSG_FIL_DEP_DELETE;
-		break;
-	case DBG_DEP_REMOVE:
-		str = MSG_FIL_DEP_REMOVE;
-		break;
-	case DBG_DEP_REMAIN:
-		str = MSG_FIL_DEP_REMAIN;
-		break;
-	case DBG_DEP_ORPHAN:
-		str = MSG_FIL_DEP_ORPHAN;
-		break;
-	case DBG_DEP_REINST:
-		str = MSG_FIL_DEP_REINST;
-		break;
-	default:
+	if (type > DBG_DEP_REINST)
 		return;
-	}
 
-	if ((type == DBG_DEP_ADD) && flags)
+	str = fmt[type];
+
+	if (((type == DBG_DEP_ADD) || (type == DBG_DEP_UPDATE)) && flags)
 		group = conv_grpdesc_flags(flags, &grpdesc_flags_buf);
 	else
 		group = MSG_ORIG(MSG_STR_EMPTY);
@@ -283,7 +249,6 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 		mode = MSG_ORIG(MSG_MODE_GLOBNODEL);
 	else if (MODE(lmp) & RTLD_GLOBAL)
 		mode = MSG_ORIG(MSG_MODE_GLOB);
-
 	else if (MODE(lmp) & RTLD_NODELETE)
 		mode = MSG_ORIG(MSG_MODE_NODEL);
 	else

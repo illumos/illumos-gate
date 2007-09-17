@@ -246,7 +246,7 @@ typedef union {
 
 
 /* conv_grphdl_flags() */
-#define	CONV_GRPHDL_FLAGS_BUFSIZE	80
+#define	CONV_GRPHDL_FLAGS_BUFSIZE	82
 
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
@@ -260,7 +260,7 @@ typedef union {
 
 
 /* conv_grpdesc_flags() */
-#define	CONV_GRPDESC_FLAGS_BUFSIZE	80
+#define	CONV_GRPDESC_FLAGS_BUFSIZE	92
 
 typedef union {
 	Conv32_inv_buf_t	inv_buf;

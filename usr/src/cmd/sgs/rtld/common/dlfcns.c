@@ -135,6 +135,7 @@ hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 	Grp_desc	*gdp;
 	Aliste		off;
 	int		found = ALE_CREATE;
+	uint_t		oflags;
 
 	/*
 	 * Make sure this dependency hasn't already been recorded.
@@ -170,11 +171,17 @@ hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 			return (0);
 	}
 
+	oflags = gdp->gd_flags;
 	gdp->gd_flags |= flags;
 
-	if (found == ALE_CREATE)
-		DBG_CALL(Dbg_file_hdl_action(ghp, lmp, DBG_DEP_ADD, flags));
-
+	if (DBG_ENABLED) {
+		if (found == ALE_CREATE)
+			DBG_CALL(Dbg_file_hdl_action(ghp, lmp, DBG_DEP_ADD,
+			    gdp->gd_flags));
+		else if (gdp->gd_flags != oflags)
+			DBG_CALL(Dbg_file_hdl_action(ghp, lmp, DBG_DEP_UPDATE,
+			    gdp->gd_flags));
+	}
 	return (found);
 }
 
@@ -205,10 +212,10 @@ hdl_alloc()
  * Create a handle.
  */
 Grp_hdl *
-hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
+hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
+    uint_t ndflags, uint_t cdflags)
 {
 	Grp_hdl	*ghp = 0, **ghpp;
-	uint_t	hflags;
 	Alist	**alpp;
 	Aliste	off;
 
@@ -216,29 +223,29 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 	 * For dlopen(0) the handle is maintained as part of the link-map list,
 	 * otherwise it is associated with the referenced link-map.
 	 */
-	if (flags & GPH_ZERO)
+	if (hflags & GPH_ZERO)
 		alpp = &(lml->lm_handle);
 	else
 		alpp = &(HANDLES(nlmp));
 
 	/*
-	 * Objects can contain multiple handles depending on the flags supplied.
-	 * Most RTLD flags pertain to the object itself and the bindings that it
-	 * can achieve.  Multiple handles for these flags don't make sense.  But
-	 * if the flag determines how the handle might be used, then multiple
-	 * handles may exist.  Presently this only makes sense for RTLD_FIRST.
-	 * Determine if an appropriate handle already exists.
+	 * Objects can contain multiple handles depending on the handle flags
+	 * supplied.  Most RTLD flags pertain to the object itself and the
+	 * bindings that it can achieve.  Multiple handles for these flags
+	 * don't make sense.  But if the flag determines how the handle might
+	 * be used, then multiple handles may exist.  Presently this only makes
+	 * sense for RTLD_FIRST.  Determine if an appropriate handle already
+	 * exists.
 	 */
-	hflags = flags & GPH_FIRST;
 	for (ALIST_TRAVERSE(*alpp, off, ghpp)) {
-		if (((*ghpp)->gh_flags & GPH_FIRST) == hflags) {
+		if (((*ghpp)->gh_flags & GPH_FIRST) == (hflags & GPH_FIRST)) {
 			ghp = *ghpp;
 			break;
 		}
 	}
 
 	if (ghp == 0) {
-		DBG_CALL(Dbg_file_hdl_title(DBG_DEP_CREATE));
+		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_CREATE));
 
 		/*
 		 * If this is the first dlopen() request for this handle
@@ -263,7 +270,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 			FLAGS1(nlmp) |= FL1_RT_USED;
 
 		ghp->gh_refcnt = 1;
-		ghp->gh_flags = flags;
+		ghp->gh_flags = hflags;
 
 		/*
 		 * A dlopen(0) handle is identified by the GPH_ZERO flag, the
@@ -273,25 +280,14 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 		 * entire link-map list provides for searching all objects with
 		 * GLOBAL visibility.
 		 */
-		if (flags & GPH_ZERO) {
+		if (hflags & GPH_ZERO) {
 			ghp->gh_ownlmp = lml->lm_head;
 			ghp->gh_ownlml = lml;
 		} else {
-			uint_t	hflags = (GPD_DLSYM | GPD_RELOC);
-
 			ghp->gh_ownlmp = nlmp;
 			ghp->gh_ownlml = LIST(nlmp);
 
-			/*
-			 * As an optimization, a handle for ld.so.1 itself
-			 * (required for libdl's filtering mechanism) shouldn't
-			 * search any dependencies of ld.so.1.  Omitting
-			 * GPD_ADDEPS prevents the addition of any ld.so.1
-			 * dependencies to this handle.
-			 */
-			if ((flags & GPH_LDSO) == 0)
-				hflags |= GPD_ADDEPS;
-			if (hdl_add(ghp, nlmp, hflags) == 0)
+			if (hdl_add(ghp, nlmp, ndflags) == 0)
 				return (0);
 		}
 	} else {
@@ -322,7 +318,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 				Aliste		off;
 				Grp_desc	*gdp;
 
-				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_REINST));
+				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_REINST));
 				for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
 					    gdp->gd_depend, DBG_DEP_REINST, 0));
@@ -331,26 +327,13 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 	}
 
 	/*
-	 * Keep track of the parent (caller).  If this request stems from a
-	 * dlopen(..., RTLD_PARENT) call, then the parent is made available to
-	 * satisfy relocation bindings.  Note, that individual, explicit,
-	 * direct bindings can also be made to the parent should this object
-	 * have been built defining PARENT symbol references.  Also note that a
-	 * parent doesn't provide symbols to dlsym() requests, so it isn't
-	 * necessary to add the parents dependencies to the handle.
-	 *
-	 * As this object could be opened by different parents, this test is
-	 * carried out every time a handle is requested.
+	 * Keep track of the parent (caller).  As this object could be opened
+	 * by different parents, this processing is carried out every time a
+	 * handle is requested.
 	 */
-	if (clmp) {
-		if (flags & GPH_PARENT)
-			flags = (GPD_PARENT | GPD_RELOC);
-		else
-			flags = GPD_PARENT;
+	if (clmp && (hdl_add(ghp, clmp, cdflags) == 0))
+		return (0);
 
-		if (hdl_add(ghp, clmp, flags) == 0)
-			return (0);
-	}
 	return (ghp);
 }
 
@@ -382,7 +365,7 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 		return (1);
 	}
 
-	DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 	for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 		Rt_map *	lmp = gdp->gd_depend;
 		Aliste		off1;
@@ -616,15 +599,37 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 */
 	if (path == 0) {
 		Grp_hdl *ghp;
-		uint_t	hflags = GPH_ZERO;
+		uint_t	hflags = GPH_ZERO, cdflags = GPD_PARENT;
 		int	promote = 0;
 
-		if (mode & RTLD_PARENT)
-			hflags |=  GPH_PARENT;
+		/*
+		 * Establish any flags for the handle (Grp_hdl).
+		 *
+		 *  .	This is a dummy handle (0) that provides for a dynamic
+		 *	search of all global objects within the process.
+		 *
+		 *  .   Use of the RTLD_FIRST flag indicates that only the first
+		 *	dependency on the handle (the new object) can be used
+		 *	to satisfy dlsym() requests.
+		 */
 		if (mode & RTLD_FIRST)
-			hflags |=  GPH_FIRST;
+			hflags |= GPH_FIRST;
 
-		if ((ghp = hdl_create(lml, 0, clmp, hflags)) == 0)
+		/*
+		 * Establish the flags for this callers dependency descriptor
+		 * (Grp_desc).
+		 *
+		 *  .	The explicit creation of a handle creates a descriptor
+		 *	for the new object and the parent (caller),
+		 *
+		 *  .	Use of the RTLD_PARENT flag indicates that the parent
+		 *	can be relocated against.
+		 */
+		if (mode & RTLD_PARENT)
+			cdflags |= GPD_RELOC;
+
+		if ((ghp = hdl_create(lml, 0, clmp, hflags,
+		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), cdflags)) == 0)
 			return (0);
 
 		/*

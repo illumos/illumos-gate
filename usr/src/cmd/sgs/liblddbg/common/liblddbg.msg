@@ -408,6 +408,7 @@
 @ MSG_FIL_DEP_ENT	"  file=%s;  depends on:"
 
 @ MSG_FIL_DEP_ADD	"    file=%s;  object added  %s  %s"
+@ MSG_FIL_DEP_UPDATE	"    file=%s;  object updated  %s  %s"
 @ MSG_FIL_DEP_DELETE	"    file=%s;  object deleting  %s"
 @ MSG_FIL_DEP_REMOVE	"    file=%s;  object removed from handle  %s"
 @ MSG_FIL_DEP_REMAIN	"    file=%s;  object must remain on handle  %s"
@@ -415,15 +416,15 @@
 @ MSG_FIL_DEP_REINST	"    file=%s;  object reinstated  %s"
 
 @ MSG_FIL_HDL_CREATE	"handle=%s;  creating:"
-@ MSG_FIL_HDL_COLLECT	"handle=%s;  collected for possible removal  %s"
-@ MSG_FIL_HDL_RETAIN	"handle=%s;  externally referenced from %s: handle \
-			 retained"
 @ MSG_FIL_HDL_ADD	"handle=%s;  adding dependent objects:"
 @ MSG_FIL_HDL_DELETE	"handle=%s;  inspecting for deletion:"
 @ MSG_FIL_HDL_ORPHAN	"handle=%s;  deletion cannot be completed: moving to \
 			 orphan list:"
 @ MSG_FIL_HDL_REINST	"handle=%s;  reinstating from orphan list:"
 
+@ MSG_FIL_HDL_COLLECT	"handle=%s;  collected for possible removal  %s"
+@ MSG_FIL_HDL_RETAIN	"handle=%s;  externally referenced from %s: handle \
+			 retained"
 @ MSG_FIL_DEL_RESCAN	"pending deletions; rescanning orphan list for \
 			 available deletions"
 
