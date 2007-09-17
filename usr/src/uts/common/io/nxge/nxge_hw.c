@@ -50,6 +50,7 @@ lb_property_t lb_mac = {internal, "mac10/100", nxge_lb_mac};
 uint32_t nxge_lb_dbg = 1;
 void nxge_get_mii(p_nxge_t nxgep, p_mblk_t mp);
 void nxge_put_mii(p_nxge_t nxgep, p_mblk_t mp);
+static nxge_status_t nxge_check_xaui_xfp(p_nxge_t nxgep);
 
 extern uint32_t nxge_rx_mode;
 extern uint32_t nxge_jumbo_mtu;
@@ -261,6 +262,55 @@ nxge_intr(void *arg1, void *arg2)
 }
 
 /* ARGSUSED */
+static nxge_status_t
+nxge_check_xaui_xfp(p_nxge_t nxgep)
+{
+	nxge_status_t	status = NXGE_OK;
+	uint8_t		phy_port_addr;
+	uint16_t	val;
+	uint16_t	val1;
+	uint8_t		portn;
+
+	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_check_xaui_xfp"));
+
+	portn = nxgep->mac.portnum;
+	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
+
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    BCM8704_USER_DEV3_ADDR,
+	    BCM8704_USER_ANALOG_STATUS0_REG, &val)) == NXGE_OK) {
+		status = nxge_mdio_read(nxgep, phy_port_addr,
+		    BCM8704_USER_DEV3_ADDR,
+		    BCM8704_USER_TX_ALARM_STATUS_REG, &val1);
+	}
+	if (status != NXGE_OK) {
+		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		    NXGE_FM_EREPORT_XAUI_ERR);
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "XAUI is bad or absent on port<%d>\n", portn));
+	} else if (nxgep->mac.portmode == PORT_10G_FIBER) {
+		/*
+		 * 0x03FC = 0000 0011 1111 1100
+		 * 0x639C = 0110 0011 1001 1100
+		 * bit14 = 1: PDM loss-of-light indicator
+		 * bit13 = 1: PDM Rx loss-of-signal
+		 * bit6  = 0: Light is NOT ok
+		 * bit5  = 0: PMD Rx signal is NOT ok
+		 */
+		if (val != 0x3FC && val == 0x639C) {
+			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			    NXGE_FM_EREPORT_XFP_ERR);
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "XFP is bad or absent on port<%d>\n", portn));
+			status = NXGE_ERROR;
+		}
+	}
+	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_check_xaui_xfp"));
+	return (status);
+}
+
+
+/* ARGSUSED */
 uint_t
 nxge_syserr_intr(void *arg1, void *arg2)
 {
@@ -358,6 +408,15 @@ nxge_syserr_intr(void *arg1, void *arg2)
 			"==> nxge_syserr_intr: device error - FFLP"));
 		(void) nxge_fflp_handle_sys_errors(nxgep);
 	}
+
+	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_COPPER) {
+		if (nxge_check_xaui_xfp(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_syserr_intr: device error - XAUI"));
+		}
+	}
+
 	serviced = DDI_INTR_CLAIMED;
 
 	if (ldgp != NULL && ldvp != NULL && ldgp->nldvs == 1 &&
@@ -526,8 +585,9 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			*(lb_info_sz_t *)mp->b_cont->b_rptr =
 				nxgep->statsp->port_stats.lb_mode;
 			miocack(wq, mp, sizeof (nxge_lb_t), 0);
-		} else
+		} else {
 			miocnak(wq, mp, 0, EINVAL);
+		}
 		break;
 	case LB_SET_MODE:
 		NXGE_DEBUG_MSG((nxgep, IOC_CTL, "NXGE_SET_LB_MODE command"));

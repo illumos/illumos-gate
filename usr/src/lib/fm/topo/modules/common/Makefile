@@ -25,7 +25,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = disk
+SUBDIRS = disk xfp
 
 .PARALLEL: $(SUBDIRS)
 

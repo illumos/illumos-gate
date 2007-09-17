@@ -1,0 +1,68 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma dictionary "NXGE"
+
+/*
+ * Eversholt rules for the XFP optical transceiver inserted into 
+ * a Neptune based NIC card.
+ */
+
+#define	XFP_FIT	100
+
+asru pciexbus/pciexdev/pciexfn;
+fru  pciexbus/pciexdev/pciexfn/xfp;
+
+event fault.io.n2.niu-xfp@pciexbus/pciexdev/pciexfn/xfp
+    FITrate=XFP_FIT,  FRU=pciexbus/pciexdev/pciexfn/xfp,
+    ASRU=pciexbus/pciexdev/pciexfn;
+
+/*
+ * Add 5 seconds constraint so that multiple identical ereports
+ * occuring within 10 seconds are considered symptoms of a single fault
+ */
+event   error.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn;
+event ereport.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn {within(10s)};
+event ereport.io.service.lost@pciexbus/pciexdev/pciexfn {within(10s)};
+
+/*
+ * Events ereport.io.device.nxge.xfp-err and ereport.io.service.lost are 
+ * related because the driver calls ddi_fm_service_impact right after
+ * generating the xfp-err ereport. A internal error.io.device.nxge.xfp-err
+ * is generated only after the FMD has received both ereport.io.device.
+ * nxge.xfp-err and ereport.io.service.lost, then the error event will
+ * trigger fault.io.n2.niu-xfp.  Based on the following rules, the diagnose
+ * engine will generate only one fault (fault.io.n2.niu-xfp) instead of two
+ * (associated with ereport.io.device.nxge.xfp-err and  ereport.io.service.lost
+ * respectively).
+ */
+prop fault.io.n2.niu-xfp@pciexbus/pciexdev/pciexfn/xfp (1) ->
+    error.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn;
+
+prop   error.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn (2) ->
+     ereport.io.device.nxge.xfp-err@pciexbus/pciexdev/pciexfn,
+     ereport.io.service.lost@pciexbus/pciexdev/pciexfn;

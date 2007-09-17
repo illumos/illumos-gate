@@ -2475,6 +2475,9 @@ nxge_receive_packet(p_nxge_t nxgep,
 		nxge_freeb(rx_msg_p);
 		return;
 	}
+
+	rcr_p->rcvd_pkt_bytes = bytes_read;
+
 	if (buffer_free == B_TRUE) {
 		rx_msg_p->free = B_TRUE;
 	}

@@ -384,6 +384,7 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	int dcnt = 0;
 	tnode_t *fn;
 	uint_t class, subclass;
+	uint_t vid, did;
 
 	if (*dev == NULL) {
 		if (rc >= 0)
@@ -419,9 +420,22 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	 * topology map file and kick off its enumeration of lower-level
 	 * devices.
 	 */
-	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI)
+	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI) {
 		(void) pci_bridge_declare(mod, fn, din, board, bridge, rc,
 		    depth);
+	}
+	/*
+	 * Use xfp-hc-topology.xml to expand topology to include the XFP optical
+	 * module, which is a FRU on the Neptune based 10giga fiber NICs.
+	 */
+	else if (class == PCI_CLASS_NET &&
+	    di_uintprop_get(mod, din, DI_VENDIDPROP, &vid) >= 0 &&
+	    di_uintprop_get(mod, din, DI_DEVIDPROP, &did) >= 0) {
+		if (vid == SUN_VENDOR_ID && did == NEPTUNE_DEVICE_ID) {
+			(void) topo_mod_enummap(mod, fn,
+			    "xfp", FM_FMRI_SCHEME_HC);
+		}
+	}
 }
 
 int

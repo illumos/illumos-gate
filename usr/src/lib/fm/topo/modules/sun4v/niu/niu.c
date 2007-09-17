@@ -35,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <assert.h>
+#include <stdlib.h>
 
 /*
  * niu.c
@@ -287,7 +288,7 @@ niufn_instantiate(tnode_t *parent, const char *name, di_node_t pnode,
 
 	sib = di_child_node(pnode);
 	while (sib != DI_NODE_NIL) {
-		inst = di_instance(sib);
+		inst = strtoul(di_bus_addr(sib), NULL, 10);
 		if ((ntn = niufn_declare(parent, NIUFN, inst, sib, mod))
 		    == NULL) {
 			topo_mod_dprintf(mod, "Enumeration of %s=%d "

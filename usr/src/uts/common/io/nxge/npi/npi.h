@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,8 @@ typedef	uint32_t			npi_status_t;
 #define	ETHER_SERDES_BLK_ID		0xd
 #define	PCIE_SERDES_BLK_ID		0xe
 #define	VIR_BLK_ID			0xf
+#define	XAUI_BLK_ID			0x10
+#define	XFP_BLK_ID			0x11
 
 /* Common HW error code */
 /* HW unable to exit from reset state. */

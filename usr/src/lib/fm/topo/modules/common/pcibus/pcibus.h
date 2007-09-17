@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,10 @@ extern "C" {
 #define	MAX_HB_BUSES	255
 #define	MAX_PCIBUS_DEVS	32
 #define	MAX_PCIDEV_FNS	8
+
+/* vendor/device ids for Neptune */
+#define	SUN_VENDOR_ID		0x108e
+#define	NEPTUNE_DEVICE_ID	0xabcd
 
 #define	GETCLASS(x) (((x) & 0xff0000) >> 16)
 #define	GETSUBCLASS(x) (((x) & 0xff00) >> 8)

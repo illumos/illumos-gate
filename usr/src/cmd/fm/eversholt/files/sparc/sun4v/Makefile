@@ -28,7 +28,7 @@
 include ../sun4/Makefile.sun4
 
 EFT_PLAT= sun4v
-SUN4VEFTFILES= n2piu.eft vfncx.eft
+SUN4VEFTFILES= n2piu.eft vfncx.eft n2niu_xaui.eft n2niu_xfp.eft
 EFT_PLAT_FILES= $(SUN4VEFTFILES) $(SUN4EFTFILES)
 
 include ../../Makefile.com

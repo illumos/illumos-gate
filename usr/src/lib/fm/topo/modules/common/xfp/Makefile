@@ -24,24 +24,11 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		sparc \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-CP3260 \
-		SUNW,Netra-T5220
+MODULE = xfp 
+CLASS = common
 
-i386_SUBDIRS = i86pc \
-		i386 \
-		SUNW,Sun-Fire-X4500
+MODULESRCS = xfp.c
 
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-include ../../Makefile.subdirs
+include ../../Makefile.plugin

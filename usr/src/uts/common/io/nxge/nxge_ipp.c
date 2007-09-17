@@ -615,7 +615,7 @@ fail:
 
 /* ARGSUSED */
 /*
- *    A hardware bug may cause a faked ECCUE(ECC Uncorrectable Error).
+ *    A hardware bug may cause faked ECCUEs (ECC Uncorrectable Error).
  * This function checks if a ECCUE is real(valid) or not.  It is not
  * real if rd_ptr == wr_ptr.
  *    The hardware module that has the bug is used not only by the IPP
@@ -651,6 +651,11 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 		*valid = B_FALSE; /* FIFO not stuck, so it's not a real ECCUE */
 	} else {
 		stall_cnt = 0;
+		/*
+		 * Check if the two pointers are moving, the ECCUE is invali
+		 * if either pointer is moving, which indicates that the FIFO
+		 * is functional.
+		 */
 		while (stall_cnt < 16) {
 			if ((rs = npi_ipp_get_dfifo_rd_ptr(handle,
 					portn, &curr_rd_ptr)) != NPI_SUCCESS)
@@ -659,19 +664,23 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 					portn, &curr_wr_ptr)) != NPI_SUCCESS)
 				goto fail;
 
-			if ((rd_ptr == curr_rd_ptr) && (wr_ptr == curr_wr_ptr))
+			if (rd_ptr == curr_rd_ptr && wr_ptr == curr_wr_ptr) {
 				stall_cnt++;
-			else {
+			} else {
 				*valid = B_FALSE;
 				break;
 			}
 		}
 
 		if (valid) {
-			/* futher check to see if ECC UE is valid */
-			if ((rs = npi_ipp_read_dfifo(handle, portn,
-					rd_ptr, &d0, &d1, &d2, &d3,
-					&d4)) != NPI_SUCCESS)
+			/*
+			 * Futher check to see if the ECCUE is valid. The
+			 * error is real if the LSB of d4 is 1, which
+			 * indicates that the data that has set the ECC
+			 * error flag is the 16-byte internal control word.
+			 */
+			if ((rs = npi_ipp_read_dfifo(handle, portn, rd_ptr,
+			    &d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
 				goto fail;
 			if ((d4 & 0x1) == 0)	/* Not the 1st line */
 				*valid = B_FALSE;

@@ -117,6 +117,8 @@ d none usr/platform/sun4v/lib 755 root bin
 d none usr/platform/sun4v/lib/fm 755 root bin
 d none usr/platform/sun4v/lib/fm/eft 755 root bin
 f none usr/platform/sun4v/lib/fm/eft/fire.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/n2niu_xaui.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/n2niu_xfp.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/n2piu.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/vfncx.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
@@ -138,7 +140,6 @@ f none usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/motherboard.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/niu.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/xaui.so 555 root bin
-f none usr/platform/sun4v/lib/fm/topo/plugins/xfp.so 555 root bin
 d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib/fm 755 root bin

@@ -25,7 +25,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS=i86pc
-EFT_COMMON_FILES= pci.eft pciex.eft sca500.eft sca1000.eft disk.eft
+EFT_COMMON_FILES= pci.eft pciex.eft sca500.eft sca1000.eft disk.eft neptune_xfp.eft neptune_xaui.eft
 
 include ../../../Makefile.subdirs
 

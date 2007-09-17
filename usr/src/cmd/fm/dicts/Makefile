@@ -29,6 +29,7 @@ include ../../Makefile.cmd
 common_DCNAMES = \
 	DISK \
 	FMD \
+	NXGE \
 	SUNOS \
 	PCI \
 	PCIEX \

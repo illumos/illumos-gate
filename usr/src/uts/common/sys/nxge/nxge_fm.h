@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,10 @@ extern "C" {
 #define	EREPORT_INDEX_MASK		0xFF
 #define	NXGE_FM_EREPORT_UNKNOWN		0
 
+/* xaui and xfp ereport definitions */
+#define	NXGE_FM_DEVICE_XAUI_ERR		"nxge.xaui-err"
+#define	NXGE_FM_DEVICE_XFP_ERR		"nxge.xfp-err"
+
 #define	FM_SW_ID			0xFF
 #define	FM_PCS_ID			MAC_BLK_ID
 #define	FM_TXMAC_ID			TXMAC_BLK_ID
@@ -97,6 +101,8 @@ extern "C" {
 #define	FM_ETHER_SERDES_ID		ETHER_SERDES_BLK_ID
 #define	FM_PCIE_SERDES_ID		PCIE_SERDES_BLK_ID
 #define	FM_VIR_ID			VIR_BLK_ID
+#define	FM_XAUI_ID			XAUI_BLK_ID
+#define	FM_XFP_ID			XFP_BLK_ID
 
 typedef	uint32_t nxge_fm_ereport_id_t;
 
@@ -238,6 +244,16 @@ typedef	enum {
 	NXGE_FM_EREPORT_SW_INVALID_CHAN_NUM,
 	NXGE_FM_EREPORT_SW_INVALID_PARAM
 } nxge_fm_ereport_sw_t;
+
+/* XAUI is broken or missing */
+typedef	enum {
+	NXGE_FM_EREPORT_XAUI_ERR = (FM_XAUI_ID << EREPORT_FM_ID_SHIFT)
+} nxge_fm_ereport_xaui_t;
+
+/* XFP optical module is broken or missing */
+typedef	enum {
+	NXGE_FM_EREPORT_XFP_ERR = (FM_XFP_ID << EREPORT_FM_ID_SHIFT)
+} nxge_fm_ereport_xfp_t;
 
 #define	NXGE_FM_EREPORT_UNKNOWN			0
 #define	NXGE_FM_EREPORT_UNKNOWN_NAME		""

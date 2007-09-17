@@ -55,7 +55,7 @@ install:= FILEMODE =	0444
 	$(RM) $@ 
 	$(PERL) $< -p $(PLATFORM) -i $(TOPOBASE) -o $@
 	
-.xml:
+%.xml: ../common/%.xml
 	$(RM) $@
 	$(CAT) $< > $@
 
@@ -65,6 +65,7 @@ all: $(TOPOFILE)
 
 clean:
 	$(RM) $(ROOTTOPOMAPS)
+	$(RM) $(TEMPTOPOFILE)
 
 clobber: clean
 
@@ -79,4 +80,3 @@ $(ROOTDTDTARG): $$(@D)
 	$(RM) $@; $(INS) -s -m 0444 -f $(@D) $(DTDSRC)
 
 install: all $(ROOTDTDTARG) $(ROOTTOPOROOT) $(ROOTTOPOMAPS)
-
