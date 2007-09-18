@@ -1,0 +1,230 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+#	This Makefile defines the build rules for the directory uts/i86xpv
+#	and its children. These are the source files which are i86xpv
+#	"implementation architecture" dependent.
+#
+#	The following two-level ordering must be maintained in this file.
+#
+#	- Lines are sorted first in order of decreasing specificity based on
+#	  the first directory component.  That is, sun4u rules come before
+#	  sparc rules come before common rules.
+#
+#	- Lines whose initial directory components are equal are sorted
+#	  alphabetically by the remaining components.
+#
+
+#
+#	We share many files with the i86pc implementation to reduce
+#	the amount of merge work
+#
+
+#
+#	Section 1a: C object build rules
+#
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/conf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pci/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pciex/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/io/psm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/vm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/boot/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xsvc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+#	We need this one to make sure we share dtrace_subr.c with i86pc
+#	Otherwise we pick up common/os/dtrace_subr.c instead :(
+#	Note that only the non-commented versions of this hack end up
+#	in the lint section below.
+
+$(OBJS_DIR)/dtrace_subr.o:	$(UTSBASE)/i86pc/os/dtrace_subr.c
+	$(COMPILE.c) -o $@ $(UTSBASE)/i86pc/os/dtrace_subr.c
+	$(CTFCONVERT_O)
+
+#
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/cpr/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+#
+#	Section 1b: Lint `object' build rules
+#
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/conf/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/io/psm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/ml/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/vm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/boot/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/boot/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+#	See note above.
+
+$(LINTS_DIR)/dtrace_subr.ln:	$(UTSBASE)/i86pc/os/dtrace_subr.c
+	@($(LHEAD) $(LINT.c) $(UTSBASE)/i86pc/os/dtrace_subr.c $(LTAIL))
+
+#
+# stuff for dboot
+#
+# This is different from i86pc - uses 64 bit compiler for 64 bit
+#
+# Note that we *don't* want to use the definitions that have been augmented
+# by various bits of the context of the kernel build environment; so we
+# start constructing flags and things afresh.
+
+DBOOT_OBJS_DIR= dboot/$(OBJS_DIR)
+
+DBOOT_XARCH_32 = $(i386_XARCH)
+DBOOT_XARCH_64 = $(amd64_XARCH)
+DBOOT_CFLAGS = $(DBOOT_XARCH_$(CLASS)) $(CERRWARN) -O
+
+DBOOT_AS_XARCH_32 = $(i386_AS_XARCH)
+DBOOT_AS_XARCH_64 = $(amd64_AS_XARCH)
+DBOOT_ASFLAGS = $(DBOOT_AS_XARCH_$(CLASS)) -P -D_ASM
+
+DBOOT_LINTFLAGS_i86xpv	= $(LINTFLAGS_i386_$(CLASS)) $(LINTTAGS_i386_$(CLASS))
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/boot/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
+	$(CC) $(DBOOT_CFLAGS)  $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/os/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/i386/%.s
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/ml/%.s
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.s
+	$(AS) $(DBOOT_ASFLAGS) $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
+
+include $(UTSBASE)/i86pc/Makefile.rules
+
+DBOOT_DEFS += -D__xpv
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/cpr/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pciex/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xsvc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/os/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/ml/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/boot/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))

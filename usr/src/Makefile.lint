@@ -101,6 +101,7 @@ COMMON_SUBDIRS = \
 	cmd/devfsadm \
 	cmd/devinfo \
 	cmd/devmgmt \
+	cmd/devprop \
 	cmd/dfs.cmds \
 	cmd/diff3 \
 	cmd/dis \
@@ -273,6 +274,7 @@ COMMON_SUBDIRS = \
 	cmd/utmp_update \
 	cmd/utmpd \
 	cmd/valtools \
+	cmd/vna \
 	cmd/wall \
 	cmd/wbem \
 	cmd/wc \

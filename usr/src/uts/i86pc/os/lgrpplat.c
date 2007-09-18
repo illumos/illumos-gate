@@ -526,6 +526,12 @@ plat_build_mem_nodes(struct memlist *list)
 void
 lgrp_plat_init(void)
 {
+#if defined(__xpv)
+	/*
+	 * XXPV	For now, the hypervisor treats all memory equally.
+	 */
+	lgrp_plat_node_cnt = max_mem_nodes = 1;
+#else	/* __xpv */
 	uint_t		bus;
 	uint_t		dev;
 	uint_t		node;
@@ -707,6 +713,7 @@ lgrp_plat_init(void)
 	 */
 	lgrp_expand_proc_thresh = LGRP_LOADAVG_THREAD_MAX / 2;
 	lgrp_expand_proc_diff = 0;
+#endif	/* __xpv */
 }
 
 

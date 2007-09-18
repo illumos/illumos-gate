@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,7 @@ lx_brand_int80_callback(void)
 	addq	%r15, %rax
 	movq	32(%rsp), %rsp		/* restore user stack pointer */
 	xchgq	(%rsp), %rax		/* swap %rax and return addr */
-	iretq
+	jmp	nopop_sys_rtt_syscall32
 
 .lx_brand_int80_trace:
 	/*
@@ -123,7 +123,7 @@ lx_brand_int80_callback(void)
 	SET_SIZE(lx_brand_int80_disable)
 
 
-#else
+#elif defined(__i386)
 	/*
 	 * %eax - syscall number
 	 *
@@ -137,7 +137,7 @@ lx_brand_int80_callback(void)
 	 *    | 40 | EFLAGS register			|
 	 *    | 36 | user's %cs				|
 	 *    | 32 | user's %eip			|
-	 *    | 28 | 'scatch space'			|
+	 *    | 28 | 'scratch space'			|
 	 *    | 24 | user's %ebx			|
 	 *    | 20 | user's %gs selector		|
 	 *    | 16 | kernel's %gs selector		|
@@ -169,7 +169,7 @@ lx_brand_int80_callback(void)
 	popl	%ebx				/* restore %ebx */
 	addl	$32, %esp
 	xchgl	(%esp), %eax			/* swap %eax and return addr */
-	iret
+	jmp	nopop_sys_rtt_syscall
 
 .lx_brand_int80_trace:
 	movl	L_TRACEHANDLER(%ebx), %ebx	/* load trace handler address */
@@ -201,5 +201,5 @@ lx_brand_int80_callback(void)
 	ret
 	SET_SIZE(lx_brand_int80_disable)
 
-#endif	/* __amd64 */
+#endif	/* __i386 */
 #endif	/* __lint */

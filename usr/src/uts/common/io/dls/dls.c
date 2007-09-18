@@ -96,9 +96,11 @@ i_dls_notify(void *arg, mac_notify_type_t type)
 		break;
 
 	case MAC_NOTE_PROMISC:
+	case MAC_NOTE_VNIC:
 		/*
-		 * Every time the MAC interface changes promiscuity we
-		 * need to reset our transmit information.
+		 * Every time the MAC interface changes promiscuity or
+		 * the VNIC characteristics change we need to reset
+		 * our transmit information.
 		 */
 		dip->di_txinfo = mac_tx_get(dip->di_mh);
 		break;
@@ -855,7 +857,7 @@ dls_active_set(dls_channel_t dc)
 	 * If this is the first active client on this link, notify
 	 * the mac that we're becoming an active client.
 	 */
-	if (dlp->dl_nactive == 0 && !mac_active_set(dlp->dl_mh)) {
+	if (dlp->dl_nactive == 0 && !mac_active_shareable_set(dlp->dl_mh)) {
 		rw_exit(&dip->di_lock);
 		return (B_FALSE);
 	}

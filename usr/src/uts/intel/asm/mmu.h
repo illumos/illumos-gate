@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,7 @@
 extern "C" {
 #endif
 
-#if !defined(__lint) && defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__xpv)
 
 #if defined(__amd64)
 
@@ -44,17 +43,17 @@ extern __inline__ ulong_t getcr3(void)
 	uint64_t value;
 
 	__asm__ __volatile__(
-		"movq %%cr3, %0"
-		: "=r" (value));
+	    "movq %%cr3, %0"
+	    : "=r" (value));
 	return (value);
 }
 
 extern __inline__ void setcr3(ulong_t value)
 {
 	__asm__ __volatile__(
-		"movq %0, %%cr3"
-		: /* no output */
-		: "r" (value));
+	    "movq %0, %%cr3"
+	    : /* no output */
+	    : "r" (value));
 }
 
 extern __inline__ void reload_cr3(void)
@@ -69,17 +68,17 @@ extern __inline__ ulong_t getcr3(void)
 	uint32_t value;
 
 	__asm__ __volatile__(
-		"movl %%cr3, %0"
-		: "=r" (value));
+	    "movl %%cr3, %0"
+	    : "=r" (value));
 	return (value);
 }
 
 extern __inline__ void setcr3(ulong_t value)
 {
 	__asm__ __volatile__(
-		"movl %0, %%cr3"
-		: /* no output */
-		: "r" (value));
+	    "movl %0, %%cr3"
+	    : /* no output */
+	    : "r" (value));
 }
 
 extern __inline__ void reload_cr3(void)
@@ -89,7 +88,7 @@ extern __inline__ void reload_cr3(void)
 
 #endif
 
-#endif /* !__lint && __GNUC__ */
+#endif /* __GNUC__ && !__xpv */
 
 #ifdef __cplusplus
 }

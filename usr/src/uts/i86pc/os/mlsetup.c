@@ -58,6 +58,9 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/pci_cfgspace.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * some globals for patching the result of cpuid
@@ -110,6 +113,13 @@ mlsetup(struct regs *rp)
 	 */
 	cpu[0]->cpu_self = cpu[0];
 
+#if defined(__xpv)
+	/*
+	 * Point at the hypervisor's virtual cpu structure
+	 */
+	cpu[0]->cpu_m.mcpu_vcpu_info = &HYPERVISOR_shared_info->vcpu_info[0];
+#endif
+
 	/*
 	 * Set up dummy cpu_pri_data values till psm spl code is
 	 * installed.  This allows splx() to work on amd64.
@@ -150,7 +160,7 @@ mlsetup(struct regs *rp)
 	init_desctbls();
 
 
-#if defined(__i386)
+#if defined(__i386) && !defined(__xpv)
 	/*
 	 * Some i386 processors do not implement the rdtsc instruction,
 	 * or at least they do not implement it correctly.
@@ -161,7 +171,10 @@ mlsetup(struct regs *rp)
 	 */
 	if (x86_feature & X86_TSC)
 		patch_tsc();
-#endif	/* __i386 */
+#endif	/* __i386 && !__xpv */
+
+#if !defined(__xpv)
+	/* XXPV	what, if anything, should be dorked with here under xen? */
 
 	/*
 	 * While we're thinking about the TSC, let's set up %cr4 so that
@@ -177,6 +190,7 @@ mlsetup(struct regs *rp)
 
 	if (x86_feature & X86_DE)
 		setcr4(getcr4() | CR4_DE);
+#endif /* __xpv */
 
 	/*
 	 * initialize t0
@@ -235,7 +249,7 @@ mlsetup(struct regs *rp)
 	/*
 	 * The kernel doesn't use LDTs unless a process explicitly requests one.
 	 */
-	p0.p_ldt_desc = zero_sdesc;
+	p0.p_ldt_desc = null_sdesc;
 
 	/*
 	 * Initialize thread/cpu microstate accounting
@@ -268,7 +282,12 @@ mlsetup(struct regs *rp)
 	cpu_vm_data_init(CPU);
 
 	/* lgrp_init() needs PCI config space access */
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		pci_cfgspace_init();
+#else
 	pci_cfgspace_init();
+#endif
 
 	/*
 	 * Initialize the lgrp framework
@@ -293,10 +312,12 @@ mlsetup(struct regs *rp)
 
 	ASSERT_STACK_ALIGNED();
 
+#if !defined(__xpv)
 	/*
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
 	ucode_check(CPU);
+#endif
 
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");

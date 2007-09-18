@@ -59,6 +59,10 @@
 #include <sys/bootinfo.h>
 #include <vm/kboot_mmu.h>
 
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
+
 caddr_t
 i86devmap(pfn_t pf, pgcnt_t pgcnt, uint_t prot)
 {
@@ -195,6 +199,8 @@ hat_kmap_init(uintptr_t base, size_t len)
 
 	/*
 	 * We have to map in an area that matches an entire page table.
+	 * The PTEs are large page aligned to avoid spurious pagefaults
+	 * on the hypervisor.
 	 */
 	map_addr = base & LEVEL_MASK(1);
 	map_eaddr = (base + len + LEVEL_SIZE(1) - 1) & LEVEL_MASK(1);
@@ -224,7 +230,11 @@ hat_kmap_init(uintptr_t base, size_t len)
 
 		hat_devload(kas.a_hat, ptes + i * MMU_PAGESIZE,
 		    MMU_PAGESIZE, ht->ht_pfn,
+#ifdef __xpv
+		    PROT_READ | HAT_NOSYNC | HAT_UNORDERED_OK,
+#else
 		    PROT_READ | PROT_WRITE | HAT_NOSYNC | HAT_UNORDERED_OK,
+#endif
 		    HAT_LOAD | HAT_LOAD_NOCONSIST);
 	}
 
@@ -238,6 +248,55 @@ hat_kmap_init(uintptr_t base, size_t len)
 
 extern caddr_t	kpm_vbase;
 extern size_t	kpm_size;
+
+#ifdef __xpv
+/*
+ * Create the initial segkpm mappings for the hypervisor. To avoid having
+ * to deal with page tables being read only, we make all mappings
+ * read only at first.
+ */
+static void
+xen_kpm_create(paddr_t paddr, level_t lvl)
+{
+	ulong_t pg_off;
+
+	for (pg_off = 0; pg_off < LEVEL_SIZE(lvl); pg_off += MMU_PAGESIZE) {
+		kbm_map((uintptr_t)kpm_vbase + paddr, (paddr_t)0, 0, 1);
+		kbm_read_only((uintptr_t)kpm_vbase + paddr + pg_off,
+		    paddr + pg_off);
+	}
+}
+
+/*
+ * Try to make all kpm mappings writable. Failures are ok, as those
+ * are just pagetable, GDT, etc. pages.
+ */
+static void
+xen_kpm_finish_init(void)
+{
+	pfn_t gdtpfn = mmu_btop(CPU->cpu_m.mcpu_gdtpa);
+	pfn_t pfn;
+	page_t *pp;
+
+	for (pfn = 0; pfn < mfn_count; ++pfn) {
+		/*
+		 * skip gdt
+		 */
+		if (pfn == gdtpfn)
+			continue;
+
+		/*
+		 * p_index is a hint that this is a pagetable
+		 */
+		pp = page_numtopp_nolock(pfn);
+		if (pp && pp->p_index) {
+			pp->p_index = 0;
+			continue;
+		}
+		(void) xen_kpm_page(pfn, PT_VALID | PT_WRITABLE);
+	}
+}
+#endif
 
 /*
  * Routine to pre-allocate data structures for hat_kern_setup(). It computes
@@ -263,11 +322,13 @@ hat_kern_alloc(
 	level_t		lpagel = mmu.max_page_level;
 	uint64_t	paddr;
 	int64_t		psize;
-
+	int		nwindows;
 
 	if (kpm_size > 0) {
 		/*
-		 * Create the kpm page tables.
+		 * Create the kpm page tables.  When running on the
+		 * hypervisor these are made read/only at first.
+		 * Later we'll add write permission where possible.
 		 */
 		for (pmem = phys_install; pmem; pmem = pmem->next) {
 			paddr = pmem->address;
@@ -278,20 +339,45 @@ hat_kern_alloc(
 					l = lpagel;
 				else
 					l = 0;
+#if defined(__xpv)
+				/*
+				 * Create read/only mappings to avoid
+				 * conflicting with pagetable usage
+				 */
+				xen_kpm_create(paddr, l);
+#else
 				kbm_map((uintptr_t)kpm_vbase + paddr, paddr,
 				    l, 1);
+#endif
 				paddr += LEVEL_SIZE(l);
 				psize -= LEVEL_SIZE(l);
 			}
 		}
-	} else {
+	}
+
+	/*
+	 * If this machine doesn't have a kpm segment, we need to allocate
+	 * a small number of 'windows' which can be used to map pagetables.
+	 */
+	nwindows = (kpm_size == 0) ? 2 * NCPU : 0;
+
+#if defined(__xpv)
+	/*
+	 * On a hypervisor, these windows are also used by the xpv_panic
+	 * code, where we need one window for each level of the pagetable
+	 * hierarchy.
+	 */
+	nwindows = MAX(nwindows, mmu.max_level);
+#endif
+
+	if (nwindows != 0) {
 		/*
 		 * Create the page windows and 1 page of VA in
 		 * which we map the PTEs of those windows.
 		 */
-		mmu.pwin_base = vmem_xalloc(heap_arena, 2 * NCPU * MMU_PAGESIZE,
+		mmu.pwin_base = vmem_xalloc(heap_arena, nwindows * MMU_PAGESIZE,
 		    LEVEL_SIZE(1), 0, 0, NULL, NULL, VM_SLEEP);
-		ASSERT(NCPU * 2 <= MMU_PAGESIZE / mmu.pte_size);
+		ASSERT(nwindows <= MMU_PAGESIZE / mmu.pte_size);
 		mmu.pwin_pte_va = vmem_xalloc(heap_arena, MMU_PAGESIZE,
 		    MMU_PAGESIZE, 0, 0, NULL, NULL, VM_SLEEP);
 
@@ -303,7 +389,12 @@ hat_kern_alloc(
 		ASSERT(paddr != 0);
 		ASSERT((paddr & MMU_PAGEOFFSET) == 0);
 		mmu.pwin_pte_pa = paddr;
+#ifdef __xpv
+		(void) find_pte((uintptr_t)mmu.pwin_pte_va, NULL, 0, 0);
+		kbm_read_only((uintptr_t)mmu.pwin_pte_va, mmu.pwin_pte_pa);
+#else
 		kbm_map((uintptr_t)mmu.pwin_pte_va, mmu.pwin_pte_pa, 0, 1);
+#endif
 	}
 
 	/*
@@ -391,12 +482,26 @@ hat_kern_setup(void)
 	/*
 	 * Attach htables to the existing pagetables
 	 */
+	/* BEGIN CSTYLED */
 	htable_attach(kas.a_hat, 0, mmu.max_level, NULL,
+#ifdef __xpv
+	    mmu_btop(xen_info->pt_base - ONE_GIG));
+#else
 	    mmu_btop(getcr3()));
+#endif
+	/* END CSTYLED */
 
-#if defined(__i386)
+#if defined(__i386) && !defined(__xpv)
 	CPU->cpu_tss->tss_cr3 = dftss0.tss_cr3 = getcr3();
 #endif /* __i386 */
+
+#if defined(__xpv) && defined(__amd64)
+	/*
+	 * Try to make the kpm mappings r/w. Failures here are OK, as
+	 * it's probably just a pagetable
+	 */
+	xen_kpm_finish_init();
+#endif
 
 	/*
 	 * The kernel HAT is now officially open for business.

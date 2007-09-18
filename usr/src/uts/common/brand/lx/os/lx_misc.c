@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,19 +286,13 @@ lx_forklwp(klwp_t *srclwp, klwp_t *dstlwp)
 static void
 lx_save(klwp_t *t)
 {
-	static user_desc_t null_desc;
-	static int inited;
-	user_desc_t *gdt;
 	int i;
 
-	if (inited == 0) {
-		bzero(&null_desc, sizeof (null_desc));
-		inited = 1;
-	}
-
-	gdt = cpu_get_gdt();
+#if defined(__amd64)
+	reset_sregs();
+#endif
 	for (i = 0; i < LX_TLSNUM; i++)
-		gdt[GDT_TLSMIN + i] = null_desc;
+		gdt_update_usegd(GDT_TLSMIN + i, &null_udesc);
 }
 
 /*
@@ -308,32 +302,27 @@ static void
 lx_restore(klwp_t *t)
 {
 	struct lx_lwp_data *lwpd = lwptolxlwp(t);
-	user_desc_t *gdt;
 	user_desc_t *tls;
 	int i;
 
 	ASSERT(lwpd);
 
-	gdt = cpu_get_gdt();
 	tls = lwpd->br_tls;
 	for (i = 0; i < LX_TLSNUM; i++)
-		gdt[GDT_TLSMIN + i] = tls[i];
+		gdt_update_usegd(GDT_TLSMIN + i, &tls[i]);
 }
 
 void
 lx_set_gdt(int entry, user_desc_t *descrp)
 {
-	user_desc_t *gdt = cpu_get_gdt();
 
-	gdt[entry] = *descrp;
+	gdt_update_usegd(entry, descrp);
 }
 
 void
 lx_clear_gdt(int entry)
 {
-	user_desc_t *gdt = cpu_get_gdt();
-
-	bzero(&gdt[entry], sizeof (user_desc_t));
+	gdt_update_usegd(entry, &null_udesc);
 }
 
 longlong_t
@@ -377,7 +366,7 @@ lx_fixsegreg(greg_t sr, model_t datamodel)
 #if defined(__amd64)
 	return (datamodel == DATAMODEL_ILP32 ? (sr | SEL_TI_LDT | SEL_UPL) : 0);
 #elif defined(__i386)
-	datamodel = datamodel;	/* datamodel currently unused for 32-bit */
+	datamodel = datamodel;  /* datamodel currently unused for 32-bit */
 	return (sr | SEL_TI_LDT | SEL_UPL);
 #endif	/* __amd64 */
 }

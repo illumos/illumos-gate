@@ -28,8 +28,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/machparam.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -37,9 +35,22 @@ extern "C" {
 #define	DEBUG_INFO_MAGIC 0xdeb116ed
 #define	DEBUG_INFO_VERSION 0x1
 
+/*
+ * We place this structure at a well-known DEBUG_INFO_VA to allow 'external'
+ * debuggers to bootstrap themselves; in particular libkvm when applied to
+ * hypervisor domains or their core files.
+ */
 typedef struct debug_info {
 	uint32_t di_magic;
 	uint32_t di_version;
+	/* address of 'modules' */
+	uintptr_t di_modules;
+	uintptr_t di_s_text;
+	uintptr_t di_e_text;
+	uintptr_t di_s_data;
+	uintptr_t di_e_data;
+	size_t di_hat_htable_off;
+	size_t di_ht_pfn_off;
 } debug_info_t;
 
 #ifdef	__cplusplus

@@ -465,14 +465,17 @@ callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	clock_t lbolt;
 	int i, j, k;
 	const char *lbolt_sym;
+	uintptr_t panicstr;
 
 	if ((flags & DCMD_ADDRSPEC) || argc != 0)
 		return (DCMD_USAGE);
 
-	if (mdb_prop_postmortem)
-		lbolt_sym = "panic_lbolt";
-	else
+	if (mdb_readvar(&panicstr, "panicstr") == -1 ||
+	    panicstr == NULL) {
 		lbolt_sym = "lbolt";
+	} else {
+		lbolt_sym = "panic_lbolt";
+	}
 
 	if (mdb_readvar(&lbolt, lbolt_sym) == -1) {
 		mdb_warn("failed to read '%s'", lbolt_sym);

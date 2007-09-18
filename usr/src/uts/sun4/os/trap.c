@@ -86,7 +86,7 @@ void	trap_rtt(void);
 static int
 die(unsigned type, struct regs *rp, caddr_t addr, uint_t mmu_fsr)
 {
-	struct trap_info ti;
+	struct panic_trap_info ti;
 
 #ifdef TRAPTRACE
 	TRAPTRACE_FREEZE;
@@ -157,7 +157,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 	int watchcode;
 	int watchpage;
 	extern faultcode_t pagefault(caddr_t, enum fault_type,
-		enum seg_rw, int);
+	    enum seg_rw, int);
 
 	CPU_STATS_ADDQ(CPU, sys, trap, 1);
 
@@ -194,8 +194,8 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		}
 		type |= T_USER;
 		ASSERT((type == (T_SYS_RTT_PAGE | T_USER)) ||
-			(type == (T_SYS_RTT_ALIGN | T_USER)) ||
-			lwp->lwp_regs == rp);
+		    (type == (T_SYS_RTT_ALIGN | T_USER)) ||
+		    lwp->lwp_regs == rp);
 		mpcb = lwptompcb(lwp);
 		switch (type) {
 		case T_WIN_OVERFLOW + T_USER:
@@ -225,7 +225,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 	}
 
 	TRACE_1(TR_FAC_TRAP, TR_C_TRAP_HANDLER_ENTER,
-		"C_trap_handler_enter:type %x", type);
+	    "C_trap_handler_enter:type %x", type);
 
 #ifdef	F_DEFERRED
 	/*
@@ -401,7 +401,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			on_trap_data_t *otp = curthread->t_ontrap;
 
 			TRACE_0(TR_FAC_TRAP, TR_C_TRAP_HANDLER_EXIT,
-				"C_trap_handler_exit");
+			    "C_trap_handler_exit");
 			TRACE_0(TR_FAC_TRAP, TR_TRAP_END, "trap_end");
 
 			if (otp->ot_prot & OT_DATA_ACCESS) {
@@ -562,10 +562,10 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 
 			ASSERT(!(curthread->t_flag & T_WATCHPT));
 			watchpage = (pr_watch_active(p) &&
-				type != T_WIN_OVERFLOW + T_USER &&
-				type != T_WIN_UNDERFLOW + T_USER &&
-				type != T_SYS_RTT_PAGE + T_USER &&
-				pr_is_watchpage(addr, rw));
+			    type != T_WIN_OVERFLOW + T_USER &&
+			    type != T_WIN_UNDERFLOW + T_USER &&
+			    type != T_SYS_RTT_PAGE + T_USER &&
+			    pr_is_watchpage(addr, rw));
 
 			if (!watchpage ||
 			    (sz = instr_size(rp, &vaddr, rw)) <= 0)
@@ -574,7 +574,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			    sz, NULL, rw)) != 0) {
 				if (ta) {
 					do_watch_step(vaddr, sz, rw,
-						watchcode, rp->r_pc);
+					    watchcode, rp->r_pc);
 					fault_type = F_INVAL;
 				} else {
 					bzero(&siginfo,	sizeof (siginfo));
@@ -702,7 +702,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		} else { /* FC_NOMAP || FC_PROT */
 			siginfo.si_signo = SIGSEGV;
 			siginfo.si_code = (res == FC_NOMAP) ?
-				SEGV_MAPERR : SEGV_ACCERR;
+			    SEGV_MAPERR : SEGV_ACCERR;
 			fault = FLTBOUNDS;
 		}
 		/*
@@ -871,8 +871,8 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			 * a controlled address.
 			 */
 			if (&fpras_chktrap) {
-			    if (fpras_chktrap(rp))
-				goto cleanup;
+				if (fpras_chktrap(rp))
+					goto cleanup;
 			}
 		}
 #if defined(SF_ERRATA_23) || defined(SF_ERRATA_30) /* call ... illegal-insn */
@@ -1082,7 +1082,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		 * not be saved on the user stack, either because it
 		 * wasn't resident or because it was misaligned.
 		 */
-	    {
+	{
 		int error;
 		caddr_t sp;
 
@@ -1121,7 +1121,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			fault = FLTILL;
 			break;
 		}
-	    }
+	}
 
 		/*
 		 * T_FLUSHW is used when handling a ta 0x3 -- the old flush
@@ -1376,7 +1376,7 @@ fpu_trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t code)
 	}
 
 	TRACE_1(TR_FAC_TRAP, TR_C_TRAP_HANDLER_ENTER,
-		"C_fpu_trap_handler_enter:type %x", type);
+	    "C_fpu_trap_handler_enter:type %x", type);
 
 	if (tudebug && tudebugfpe)
 		showregs(type, rp, addr, 0);

@@ -133,6 +133,7 @@ enum tod_fault_type {
 	TOD_STALLED,
 	TOD_JUMPED,
 	TOD_RATECHANGED,
+	TOD_RDONLY,
 	TOD_NOFAULT
 };
 

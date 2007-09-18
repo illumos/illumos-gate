@@ -2402,6 +2402,22 @@ boot_entry_addline(entry_t *ent, line_t *lp)
 }
 
 /*
+ * Check whether cmd matches the one indexed by which, and whether arg matches
+ * str.  which must be either KERNEL_CMD or MODULE_CMD, and a match to the
+ * respective *_DOLLAR_CMD is also acceptable.  The arg is searched using
+ * strstr(), so it can be a partial match.
+ */
+static int
+check_cmd(const char *cmd, const int which, const char *arg, const char *str)
+{
+	if ((strcmp(cmd, menu_cmds[which]) != 0) &&
+	    (strcmp(cmd, menu_cmds[which + 1]) != 0)) {
+		return (0);
+	}
+	return (strstr(arg, str) != NULL);
+}
+
+/*
  * A line in menu.lst looks like
  * [ ]*<cmd>[ \t=]*<arg>*
  */
@@ -2529,10 +2545,11 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 				 * We only compare for the length of "module"
 				 * so that "module$" will also match.
 				 */
-				if ((strncmp(cmd, menu_cmds[MODULE_CMD],
-				    strlen(menu_cmds[MODULE_CMD])) == 0) &&
-				    (strcmp(arg, MINIROOT) == 0))
+				if (check_cmd(cmd, MODULE_CMD, arg, MINIROOT))
 					curr_ent->flags |= BAM_ENTRY_MINIROOT;
+				else if (check_cmd(cmd, KERNEL_CMD, arg,
+				    "xen.gz"))
+					curr_ent->flags |= BAM_ENTRY_HV;
 				else if (strcmp(cmd, menu_cmds[ROOT_CMD]) == 0)
 					curr_ent->flags |= BAM_ENTRY_ROOT;
 				else if (strcmp(cmd,
@@ -2819,11 +2836,12 @@ list_entry(menu_t *mp, char *menu_path, char *opt)
 	return (BAM_SUCCESS);
 }
 
-static int
+int
 add_boot_entry(menu_t *mp,
 	char *title,
 	char *root,
 	char *kernel,
+	char *mod_kernel,
 	char *module)
 {
 	int lineNum, entryNum;
@@ -2901,6 +2919,12 @@ add_boot_entry(menu_t *mp,
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 	    menu_cmds[k_cmd], menu_cmds[SEP_CMD], kernel);
 	line_parser(mp, linebuf, &lineNum, &entryNum);
+
+	if (mod_kernel != NULL) {
+		(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+		    menu_cmds[m_cmd], menu_cmds[SEP_CMD], mod_kernel);
+		line_parser(mp, linebuf, &lineNum, &entryNum);
+	}
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 	    menu_cmds[m_cmd], menu_cmds[SEP_CMD], module);
@@ -3204,13 +3228,12 @@ menu_on_bootdev(char *menu_root, FILE *fp)
  * look for matching bootadm entry with specified parameters
  * Here are the rules (based on existing usage):
  * - If title is specified, match on title only
- * - Else, match on grubdisk and module (don't care about kernel line).
- *   note that, if root_opt is non-zero, the absence of root line is
- *   considered a match.
+ * - Else, match on kernel, grubdisk and module.  Note that, if root_opt is
+ *   non-zero, the absence of root line is considered a match.
  */
 static entry_t *
-find_boot_entry(menu_t *mp, char *title, char *root, char *module,
-    int root_opt, int *entry_num)
+find_boot_entry(menu_t *mp, char *title, char *kernel, char *root,
+    char *module, int root_opt, int *entry_num)
 {
 	int i;
 	line_t *lp;
@@ -3237,7 +3260,9 @@ find_boot_entry(menu_t *mp, char *title, char *root, char *module,
 		}
 
 		lp = lp->next;	/* advance to root line */
-		if (lp == NULL || strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
+		if (lp == NULL) {
+			continue;
+		} else if (strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
 			/* root command found, match grub disk */
 			if (strcmp(lp->arg, root) != 0) {
 				continue;
@@ -3254,28 +3279,35 @@ find_boot_entry(menu_t *mp, char *title, char *root, char *module,
 			continue;
 		}
 
-		/*
-		 * Check for matching module entry (failsafe or normal).  We
-		 * use a strncmp to match "module" or "module$", since we
-		 * don't know which one it should be.  If it fails to match,
-		 * we go around the loop again.
-		 */
-		lp = lp->next;	/* advance to module line */
-		if ((strncmp(lp->cmd, menu_cmds[MODULE_CMD],
-		    strlen(menu_cmds[MODULE_CMD])) != 0) ||
-		    (strcmp(lp->arg, module) != 0)) {
+		if (kernel &&
+		    (!check_cmd(lp->cmd, KERNEL_CMD, lp->arg, kernel))) {
 			continue;
 		}
-		break;	/* match found */
+
+		/*
+		 * Check for matching module entry (failsafe or normal).
+		 * If it fails to match, we go around the loop again.
+		 * For xpv entries, there are two module lines, so we
+		 * do the check twice.
+		 */
+		lp = lp->next;	/* advance to module line */
+		if (check_cmd(lp->cmd, MODULE_CMD, lp->arg, module) ||
+		    (((lp = lp->next) != NULL) &&
+		    check_cmd(lp->cmd, MODULE_CMD, lp->arg, module))) {
+			/* match found */
+			break;
+		}
 	}
 
-	*entry_num = i;
+	if (entry_num && ent) {
+		*entry_num = i;
+	}
 	return (ent);
 }
 
 static int
 update_boot_entry(menu_t *mp, char *title, char *root, char *kernel,
-    char *module, int root_opt)
+    char *mod_kernel, char *module, int root_opt)
 {
 	int i, change_kernel = 0;
 	entry_t *ent;
@@ -3283,21 +3315,21 @@ update_boot_entry(menu_t *mp, char *title, char *root, char *kernel,
 	char linebuf[BAM_MAXLINE];
 
 	/* note: don't match on title, it's updated on upgrade */
-	ent = find_boot_entry(mp, NULL, root, module, root_opt, &i);
+	ent = find_boot_entry(mp, NULL, kernel, root, module, root_opt, &i);
 	if ((ent == NULL) && (bam_direct == BAM_DIRECT_DBOOT)) {
 		/*
 		 * We may be upgrading a kernel from multiboot to
 		 * directboot.  Look for a multiboot entry.
 		 */
-		ent = find_boot_entry(mp, NULL, root, MULTI_BOOT_ARCHIVE,
-		    root_opt, &i);
+		ent = find_boot_entry(mp, NULL, "multiboot", root,
+		    MULTI_BOOT_ARCHIVE, root_opt, NULL);
 		if (ent != NULL) {
 			change_kernel = 1;
 		}
 	}
 	if (ent == NULL)
 		return (add_boot_entry(mp, title, root_opt ? NULL : root,
-		    kernel, module));
+		    kernel, mod_kernel, module));
 
 	/* replace title of exiting entry and delete root line */
 	lp = ent->start;
@@ -3383,15 +3415,22 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	/* add the entry for normal Solaris */
 	if (bam_direct == BAM_DIRECT_DBOOT) {
 		entry = update_boot_entry(mp, title, grubdisk,
-		    DIRECT_BOOT_KERNEL, DIRECT_BOOT_ARCHIVE,
+		    DIRECT_BOOT_KERNEL, NULL, DIRECT_BOOT_ARCHIVE,
 		    osroot == menu_root);
+		if ((entry != BAM_ERROR) && (bam_is_hv == BAM_HV_PRESENT)) {
+			(void) update_boot_entry(mp, NEW_HV_ENTRY, grubdisk,
+			    XEN_MENU, KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE,
+			    osroot == menu_root);
+		}
 	} else {
-		entry = update_boot_entry(mp, title, grubdisk,
-		    MULTI_BOOT, MULTI_BOOT_ARCHIVE,
-		    osroot == menu_root);
+		entry = update_boot_entry(mp, title, grubdisk, MULTI_BOOT,
+		    NULL, MULTI_BOOT_ARCHIVE, osroot == menu_root);
 	}
 
-	/* add the entry for failsafe archive */
+	/*
+	 * Add the entry for failsafe archive.  On a bfu'd system, the
+	 * failsafe may be different than the installed kernel.
+	 */
 	(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot, MINIROOT);
 	if (stat(failsafe, &sbuf) == 0) {
 
@@ -3409,9 +3448,8 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 		}
 		if (failsafe_kernel != NULL) {
 			(void) update_boot_entry(mp, FAILSAFE_TITLE, grubdisk,
-			    failsafe_kernel, MINIROOT, osroot == menu_root);
-		} else {
-			bam_error(NO_FAILSAFE_KERNEL);
+			    failsafe_kernel, NULL, MINIROOT,
+			    osroot == menu_root);
 		}
 	}
 	free(grubdisk);
@@ -3535,7 +3573,7 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 	/* If no option, delete exiting reboot menu entry */
 	if (opt == NULL) {
 		entry_t *ent = find_boot_entry(mp, REBOOT_TITLE, NULL, NULL,
-		    0, &entry);
+		    NULL, 0, &entry);
 		if (ent == NULL)	/* not found is ok */
 			return (BAM_SUCCESS);
 		(void) do_delete(mp, entry);
@@ -3665,12 +3703,12 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 			}
 		}
 		entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
-		    NULL);
+		    NULL, NULL);
 	} else {
 		(void) snprintf(kernbuf, sizeof (kernbuf), "%s %s",
 		    MULTI_BOOT, opt);
 		entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
-		    MULTI_BOOT_ARCHIVE);
+		    NULL, MULTI_BOOT_ARCHIVE);
 	}
 	free(grubdisk);
 
@@ -3918,7 +3956,7 @@ set_kernel(menu_t *mp, menu_cmd_t optnum, char *path, char *buf, size_t bufsize)
 	}
 
 	entryNum = -1;
-	entryp = find_boot_entry(mp, BOOTENV_RC_TITLE, NULL, NULL, 0,
+	entryp = find_boot_entry(mp, BOOTENV_RC_TITLE, NULL, NULL, NULL, 0,
 	    &entryNum);
 
 	if (entryp != NULL) {
@@ -4076,7 +4114,7 @@ set_kernel(menu_t *mp, menu_cmd_t optnum, char *path, char *buf, size_t bufsize)
 		}
 		if (optnum == KERNEL_CMD) {
 			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
-			    grubdisk, new_path, NULL);
+			    grubdisk, new_path, NULL, NULL);
 		} else {
 			new_str_len = strlen(DIRECT_BOOT_KERNEL) +
 			    strlen(path) + 8;
@@ -4085,7 +4123,7 @@ set_kernel(menu_t *mp, menu_cmd_t optnum, char *path, char *buf, size_t bufsize)
 			(void) snprintf(new_arg, new_str_len, "%s %s",
 			    DIRECT_BOOT_KERNEL, path);
 			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
-			    grubdisk, new_arg, DIRECT_BOOT_ARCHIVE);
+			    grubdisk, new_arg, NULL, DIRECT_BOOT_ARCHIVE);
 		}
 		save_default_entry(mp, BAM_OLD_RC_DEF);
 		(void) set_global(mp, menu_cmds[DEFAULT_CMD], entryNum);

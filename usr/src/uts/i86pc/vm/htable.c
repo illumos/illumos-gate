@@ -54,6 +54,12 @@
 #include <vm/hat.h>
 #include <vm/hat_i86.h>
 #include <sys/cmn_err.h>
+#include <sys/panic.h>
+
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#include <sys/xpv_panic.h>
+#endif
 
 #include <sys/bootinfo.h>
 #include <vm/kboot_mmu.h>
@@ -120,6 +126,139 @@ uint32_t htable_dont_cache = 0;
  * Track the number of active pagetables, so we can know how many to reap
  */
 static uint32_t active_ptables = 0;
+
+#ifdef __xpv
+/*
+ * Deal with hypervisor complications.
+ */
+void
+xen_flush_va(caddr_t va)
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	if (IN_XPV_PANIC()) {
+		mmu_tlbflush_entry((caddr_t)va);
+	} else {
+		t.cmd = MMUEXT_INVLPG_LOCAL;
+		t.arg1.linear_addr = (uintptr_t)va;
+		if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+			panic("HYPERVISOR_mmuext_op() failed");
+		ASSERT(count == 1);
+	}
+}
+
+void
+xen_gflush_va(caddr_t va, cpuset_t cpus)
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	if (IN_XPV_PANIC()) {
+		mmu_tlbflush_entry((caddr_t)va);
+		return;
+	}
+
+	t.cmd = MMUEXT_INVLPG_MULTI;
+	t.arg1.linear_addr = (uintptr_t)va;
+	/*LINTED: constant in conditional context*/
+	set_xen_guest_handle(t.arg2.vcpumask, &cpus);
+	if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+		panic("HYPERVISOR_mmuext_op() failed");
+	ASSERT(count == 1);
+}
+
+void
+xen_flush_tlb()
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	if (IN_XPV_PANIC()) {
+		xpv_panic_reload_cr3();
+	} else {
+		t.cmd = MMUEXT_TLB_FLUSH_LOCAL;
+		if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+			panic("HYPERVISOR_mmuext_op() failed");
+		ASSERT(count == 1);
+	}
+}
+
+void
+xen_gflush_tlb(cpuset_t cpus)
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	ASSERT(!IN_XPV_PANIC());
+	t.cmd = MMUEXT_TLB_FLUSH_MULTI;
+	/*LINTED: constant in conditional context*/
+	set_xen_guest_handle(t.arg2.vcpumask, &cpus);
+	if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+		panic("HYPERVISOR_mmuext_op() failed");
+	ASSERT(count == 1);
+}
+
+/*
+ * Install/Adjust a kpm mapping under the hypervisor.
+ * Value of "how" should be:
+ *	PT_WRITABLE | PT_VALID - regular kpm mapping
+ *	PT_VALID - make mapping read-only
+ *	0	- remove mapping
+ *
+ * returns 0 on success. non-zero for failure.
+ */
+int
+xen_kpm_page(pfn_t pfn, uint_t how)
+{
+	paddr_t pa = mmu_ptob((paddr_t)pfn);
+	x86pte_t pte = PT_NOCONSIST | PT_REF | PT_MOD;
+
+	if (kpm_vbase == NULL)
+		return (0);
+
+	if (how)
+		pte |= pa_to_ma(pa) | how;
+	else
+		pte = 0;
+	return (HYPERVISOR_update_va_mapping((uintptr_t)kpm_vbase + pa,
+	    pte, UVMF_INVLPG | UVMF_ALL));
+}
+
+void
+xen_pin(pfn_t pfn, level_t lvl)
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	t.cmd = MMUEXT_PIN_L1_TABLE + lvl;
+	t.arg1.mfn = pfn_to_mfn(pfn);
+	if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+		panic("HYPERVISOR_mmuext_op() failed");
+	ASSERT(count == 1);
+}
+
+void
+xen_unpin(pfn_t pfn)
+{
+	struct mmuext_op t;
+	uint_t count;
+
+	t.cmd = MMUEXT_UNPIN_TABLE;
+	t.arg1.mfn = pfn_to_mfn(pfn);
+	if (HYPERVISOR_mmuext_op(&t, 1, &count, DOMID_SELF) < 0)
+		panic("HYPERVISOR_mmuext_op() failed");
+	ASSERT(count == 1);
+}
+
+static void
+xen_map(uint64_t pte, caddr_t va)
+{
+	if (HYPERVISOR_update_va_mapping((uintptr_t)va, pte,
+	    UVMF_INVLPG | UVMF_LOCAL))
+		panic("HYPERVISOR_update_va_mapping() failed");
+}
+#endif /* __xpv */
 
 /*
  * Allocate a memory page for a hardware page table.
@@ -193,6 +332,7 @@ ptable_free(pfn_t pfn)
 		panic("ptable_free(): no page for pfn!");
 	ASSERT(PAGE_SHARED(pp));
 	ASSERT(pfn == pp->p_pagenum);
+	ASSERT(!IN_XPV_PANIC());
 
 	/*
 	 * Get an exclusive lock, might have to wait for a kmem reader.
@@ -207,6 +347,10 @@ ptable_free(pfn_t pfn)
 		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
 			continue;
 	}
+#ifdef __xpv
+	if (kpm_vbase && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
+		panic("failure making kpm r/w pfn=0x%lx", pfn);
+#endif
 	page_free(pp, 1);
 	page_unresv(1);
 }
@@ -562,7 +706,9 @@ htable_reap(void *handle)
 	/*
 	 * Let htable_steal() do the work, we just call htable_free()
 	 */
+	XPV_DISALLOW_MIGRATE();
 	list = htable_steal(reap_cnt);
+	XPV_ALLOW_MIGRATE();
 	while ((ht = list) != NULL) {
 		list = ht->ht_next;
 		HATSTAT_INC(hs_reaped);
@@ -673,6 +819,15 @@ htable_alloc(
 			if (is_bare) {
 				ptable_free(ht->ht_pfn);
 				ht->ht_pfn = PFN_INVALID;
+#if defined(__xpv) && defined(__amd64)
+			/*
+			 * make stolen page table writable again in kpm
+			 */
+			} else if (kpm_vbase && xen_kpm_page(ht->ht_pfn,
+			    PT_VALID | PT_WRITABLE) < 0) {
+				panic("failure making kpm r/w pfn=0x%lx",
+				    ht->ht_pfn);
+#endif
 			}
 		}
 	}
@@ -684,6 +839,30 @@ htable_alloc(
 	 */
 	if (ht == NULL)
 		panic("htable_alloc(): couldn't steal\n");
+
+#if defined(__amd64) && defined(__xpv)
+	/*
+	 * Under the 64-bit hypervisor, we have 2 top level page tables.
+	 * If this allocation fails, we'll resort to stealing.
+	 * We use the stolen page indirectly, by freeing the
+	 * stolen htable first.
+	 */
+	if (level == mmu.max_level) {
+		for (;;) {
+			htable_t *stolen;
+
+			hat->hat_user_ptable = ptable_alloc((uintptr_t)ht + 1);
+			if (hat->hat_user_ptable != PFN_INVALID)
+				break;
+			stolen = htable_steal(1);
+			if (stolen == NULL)
+				panic("2nd steal ptable failed\n");
+			htable_free(stolen);
+		}
+		block_zero_no_xmm(kpm_vbase + pfn_to_pa(hat->hat_user_ptable),
+		    MMU_PAGESIZE);
+	}
+#endif
 
 	/*
 	 * Shared page tables have all entries locked and entries may not
@@ -730,6 +909,14 @@ htable_alloc(
 	if (need_to_zero)
 		x86pte_zero(ht, 0, mmu.ptes_per_table);
 
+#if defined(__amd64) && defined(__xpv)
+	if (!is_bare && kpm_vbase) {
+		(void) xen_kpm_page(ht->ht_pfn, PT_VALID);
+		if (level == mmu.max_level)
+			(void) xen_kpm_page(hat->hat_user_ptable, PT_VALID);
+	}
+#endif
+
 	return (ht);
 }
 
@@ -744,7 +931,7 @@ htable_free(htable_t *ht)
 
 	/*
 	 * If the process isn't exiting, cache the free htable in the hat
-	 * structure. We always do this for the boot reserve. We don't
+	 * structure. We always do this for the boot time reserve. We don't
 	 * do this if the hat is exiting or we are stealing/reaping htables.
 	 */
 	if (hat != NULL &&
@@ -768,11 +955,17 @@ htable_free(htable_t *ht)
 		ASSERT(ht->ht_pfn != PFN_INVALID);
 	} else if (!(ht->ht_flags & HTABLE_VLP)) {
 		ptable_free(ht->ht_pfn);
+#if defined(__amd64) && defined(__xpv)
+		if (ht->ht_level == mmu.max_level) {
+			ptable_free(hat->hat_user_ptable);
+			hat->hat_user_ptable = PFN_INVALID;
+		}
+#endif
 	}
 	ht->ht_pfn = PFN_INVALID;
 
 	/*
-	 * Free htables or put into reserves.
+	 * Free it or put into reserves.
 	 */
 	if (USE_HAT_RESERVES() || htable_reserve_cnt < htable_reserve_amount) {
 		htable_put_reserve(ht);
@@ -859,7 +1052,15 @@ unlink_ptp(htable_t *higher, htable_t *old, uintptr_t vaddr)
 	ASSERT(higher->ht_valid_cnt > 0);
 	ASSERT(old->ht_valid_cnt == 0);
 	found = x86pte_cas(higher, entry, expect, 0);
+#ifdef __xpv
+	/*
+	 * This is weird, but Xen apparently automatically unlinks empty
+	 * pagetables from the upper page table. So allow PTP to be 0 already.
+	 */
+	if (found != expect && found != 0)
+#else
 	if (found != expect)
+#endif
 		panic("Bad PTP found=" FMT_PTE ", expected=" FMT_PTE,
 		    found, expect);
 
@@ -917,6 +1118,12 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
  * Release of hold on an htable. If this is the last use and the pagetable
  * is empty we may want to free it, then recursively look at the pagetable
  * above it. The recursion is handled by the outer while() loop.
+ *
+ * On the metal, during process exit, we don't bother unlinking the tables from
+ * upper level pagetables. They are instead handled in bulk by hat_free_end().
+ * We can't do this on the hypervisor as we need the page table to be
+ * implicitly unpinnned before it goes to the free page lists. This can't
+ * happen unless we fully unlink it from the page table hierarchy.
  */
 void
 htable_release(htable_t *ht)
@@ -949,6 +1156,7 @@ htable_release(htable_t *ht)
 			if (ht->ht_busy > 1)
 				break;
 
+#if !defined(__xpv)
 			/*
 			 * we always release empty shared htables
 			 */
@@ -968,6 +1176,7 @@ htable_release(htable_t *ht)
 				    (hat != kas.a_hat || va >= kernelbase))
 					break;
 			}
+#endif /* __xpv */
 
 			/*
 			 * Remember if we destroy an htable that shares its PFN
@@ -1220,7 +1429,9 @@ try_again:
 }
 
 /*
- * Inherit initial pagetables from the boot program.
+ * Inherit initial pagetables from the boot program. On the 64-bit
+ * hypervisor we also temporarily mark the p_index field of page table
+ * pages, so we know not to try making them writable in seg_kpm.
  */
 void
 htable_attach(
@@ -1273,11 +1484,13 @@ htable_attach(
 	pp = boot_claim_page(pfn);
 	ASSERT(pp != NULL);
 	page_downgrade(pp);
+#if defined(__xpv) && defined(__amd64)
 	/*
 	 * Record in the page_t that is a pagetable for segkpm setup.
 	 */
 	if (kpm_vbase)
 		pp->p_index = 1;
+#endif
 
 	/*
 	 * Count valid mappings and recursively attach lower level pagetables.
@@ -1711,14 +1924,31 @@ x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
 		pte = *(x86pte32_t *)pteptr;
 
 	newpte = MAKEPTE(pfn, 0) | mmu.pt_global | mmu.pt_nx;
-	newpte |= PT_WRITABLE;
+
+	/*
+	 * For hardware we can use a writable mapping.
+	 */
+#ifdef __xpv
+	if (IN_XPV_PANIC())
+#endif
+		newpte |= PT_WRITABLE;
 
 	if (!PTE_EQUIV(newpte, pte)) {
-		if (mmu.pae_hat)
-			*pteptr = newpte;
-		else
-			*(x86pte32_t *)pteptr = newpte;
-		mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
+
+#ifdef __xpv
+		if (!IN_XPV_PANIC()) {
+			xen_map(newpte, PWIN_VA(x));
+		} else
+#endif
+		{
+			XPV_ALLOW_PAGETABLE_UPDATES();
+			if (mmu.pae_hat)
+				*pteptr = newpte;
+			else
+				*(x86pte32_t *)pteptr = newpte;
+			XPV_DISALLOW_PAGETABLE_UPDATES();
+			mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
+		}
 	}
 	return (PT_INDEX_PTR(PWIN_VA(x), index));
 }
@@ -1741,7 +1971,7 @@ x86pte_release_pagetable(htable_t *ht)
 void
 x86pte_mapout(void)
 {
-	if (mmu.pwin_base == NULL || !khat_running)
+	if (kpm_vbase != NULL || !khat_running)
 		return;
 
 	/*
@@ -1815,7 +2045,12 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 		 */
 		if (prev == n) {
 			old = new;
-			mmu_tlbflush_entry((caddr_t)addr);
+#ifdef __xpv
+			if (!IN_XPV_PANIC())
+				xen_flush_va((caddr_t)addr);
+			else
+#endif
+				mmu_tlbflush_entry((caddr_t)addr);
 			goto done;
 		}
 
@@ -1828,7 +2063,9 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 			goto done;
 		}
 
+		XPV_ALLOW_PAGETABLE_UPDATES();
 		old = CAS_PTE(ptep, prev, n);
+		XPV_DISALLOW_PAGETABLE_UPDATES();
 	} while (old != prev);
 
 	/*
@@ -1862,9 +2099,45 @@ x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 {
 	x86pte_t	pte;
 	x86pte_t	*ptep;
+#ifdef __xpv
+	/*
+	 * We can't use writable pagetables for upper level tables, so fake it.
+	 */
+	mmu_update_t t[2];
+	int cnt = 1;
+	int count;
+	maddr_t ma;
 
+	if (!IN_XPV_PANIC()) {
+		ASSERT(!(ht->ht_flags & HTABLE_VLP));	/* no VLP yet */
+		ma = pa_to_ma(PT_INDEX_PHYSADDR(pfn_to_pa(ht->ht_pfn), entry));
+		t[0].ptr = ma | MMU_NORMAL_PT_UPDATE;
+		t[0].val = new;
+
+#if defined(__amd64)
+		/*
+		 * On the 64-bit hypervisor we need to maintain the user mode
+		 * top page table too.
+		 */
+		if (ht->ht_level == mmu.max_level && ht->ht_hat != kas.a_hat) {
+			ma = pa_to_ma(PT_INDEX_PHYSADDR(pfn_to_pa(
+			    ht->ht_hat->hat_user_ptable), entry));
+			t[1].ptr = ma | MMU_NORMAL_PT_UPDATE;
+			t[1].val = new;
+			++cnt;
+		}
+#endif	/* __amd64 */
+
+		if (HYPERVISOR_mmu_update(t, cnt, &count, DOMID_SELF))
+			panic("HYPERVISOR_mmu_update() failed");
+		ASSERT(count == cnt);
+		return (old);
+	}
+#endif
 	ptep = x86pte_access_pagetable(ht, entry);
+	XPV_ALLOW_PAGETABLE_UPDATES();
 	pte = CAS_PTE(ptep, old, new);
+	XPV_DISALLOW_PAGETABLE_UPDATES();
 	x86pte_release_pagetable(ht);
 	return (pte);
 }
@@ -1894,6 +2167,29 @@ x86pte_inval(
 	else
 		ptep = x86pte_access_pagetable(ht, entry);
 
+#if defined(__xpv)
+	/*
+	 * If exit()ing just use HYPERVISOR_mmu_update(), as we can't be racing
+	 * with anything else.
+	 */
+	if ((ht->ht_hat->hat_flags & HAT_FREEING) && !IN_XPV_PANIC()) {
+		int count;
+		mmu_update_t t[1];
+		maddr_t ma;
+
+		oldpte = GET_PTE(ptep);
+		if (expect != 0 && (oldpte & PT_PADDR) != (expect & PT_PADDR))
+			goto done;
+		ma = pa_to_ma(PT_INDEX_PHYSADDR(pfn_to_pa(ht->ht_pfn), entry));
+		t[0].ptr = ma | MMU_NORMAL_PT_UPDATE;
+		t[0].val = 0;
+		if (HYPERVISOR_mmu_update(t, 1, &count, DOMID_SELF))
+			panic("HYPERVISOR_mmu_update() failed");
+		ASSERT(count == 1);
+		goto done;
+	}
+#endif /* __xpv */
+
 	/*
 	 * Note that the loop is needed to handle changes due to h/w updating
 	 * of PT_MOD/PT_REF.
@@ -1902,7 +2198,9 @@ x86pte_inval(
 		oldpte = GET_PTE(ptep);
 		if (expect != 0 && (oldpte & PT_PADDR) != (expect & PT_PADDR))
 			goto done;
+		XPV_ALLOW_PAGETABLE_UPDATES();
 		found = CAS_PTE(ptep, oldpte, 0);
+		XPV_DISALLOW_PAGETABLE_UPDATES();
 	} while (found != oldpte);
 	if (oldpte & (PT_REF | PT_MOD))
 		hat_tlb_inval(ht->ht_hat, htable_e2va(ht, entry));
@@ -1931,7 +2229,9 @@ x86pte_update(
 	ASSERT(ht->ht_level != VLP_LEVEL);
 
 	ptep = x86pte_access_pagetable(ht, entry);
+	XPV_ALLOW_PAGETABLE_UPDATES();
 	found = CAS_PTE(ptep, expect, new);
+	XPV_DISALLOW_PAGETABLE_UPDATES();
 	if (found == expect) {
 		hat_tlb_inval(ht->ht_hat, htable_e2va(ht, entry));
 
@@ -1948,8 +2248,10 @@ x86pte_update(
 		    (GET_PTE(ptep) & PT_MOD) != 0) {
 			do {
 				found = GET_PTE(ptep);
+				XPV_ALLOW_PAGETABLE_UPDATES();
 				found =
 				    CAS_PTE(ptep, found, found | PT_WRITABLE);
+				XPV_DISALLOW_PAGETABLE_UPDATES();
 			} while ((found & PT_WRITABLE) == 0);
 		}
 	}
@@ -1957,6 +2259,7 @@ x86pte_update(
 	return (found);
 }
 
+#ifndef __xpv
 /*
  * Copy page tables - this is just a little more complicated than the
  * previous routines. Note that it's also not atomic! It also is never
@@ -2009,6 +2312,44 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 	x86pte_release_pagetable(dest);
 }
 
+#else /* __xpv */
+
+/*
+ * The hypervisor only supports writable pagetables at level 0, so we have
+ * to install these 1 by 1 the slow way.
+ */
+void
+x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
+{
+	caddr_t	src_va;
+	x86pte_t pte;
+
+	ASSERT(!IN_XPV_PANIC());
+	src_va = (caddr_t)x86pte_access_pagetable(src, entry);
+	while (count) {
+		if (mmu.pae_hat)
+			pte = *(x86pte_t *)src_va;
+		else
+			pte = *(x86pte32_t *)src_va;
+		if (pte != 0) {
+			set_pteval(pfn_to_pa(dest->ht_pfn), entry,
+			    dest->ht_level, pte);
+#ifdef __amd64
+			if (dest->ht_level == mmu.max_level &&
+			    htable_e2va(dest, entry) < HYPERVISOR_VIRT_END)
+				set_pteval(
+				    pfn_to_pa(dest->ht_hat->hat_user_ptable),
+				    entry, dest->ht_level, pte);
+#endif
+		}
+		--count;
+		++entry;
+		src_va += mmu.pte_size;
+	}
+	x86pte_release_pagetable(src);
+}
+#endif /* __xpv */
+
 /*
  * Zero page table entries - Note this doesn't use atomic stores!
  */
@@ -2017,6 +2358,10 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 {
 	caddr_t dst_va;
 	size_t size;
+#ifdef __xpv
+	int x;
+	x86pte_t newpte;
+#endif
 
 	/*
 	 * Map in the page table to be zeroed.
@@ -2024,7 +2369,22 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 	ASSERT(!(dest->ht_flags & HTABLE_SHARED_PFN));
 	ASSERT(!(dest->ht_flags & HTABLE_VLP));
 
-	dst_va = (caddr_t)x86pte_access_pagetable(dest, entry);
+	/*
+	 * On the hypervisor we don't use x86pte_access_pagetable() since
+	 * in this case the page is not pinned yet.
+	 */
+#ifdef __xpv
+	if (kpm_vbase == NULL) {
+		kpreempt_disable();
+		ASSERT(CPU->cpu_hat_info != NULL);
+		mutex_enter(&CPU->cpu_hat_info->hci_mutex);
+		x = PWIN_TABLE(CPU->cpu_id);
+		newpte = MAKEPTE(dest->ht_pfn, 0) | PT_WRITABLE;
+		xen_map(newpte, PWIN_VA(x));
+		dst_va = (caddr_t)PT_INDEX_PTR(PWIN_VA(x), entry);
+	} else
+#endif
+		dst_va = (caddr_t)x86pte_access_pagetable(dest, entry);
 
 	size = count << mmu.pte_size_shift;
 	ASSERT(size > BLOCKZEROALIGN);
@@ -2035,7 +2395,14 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 #endif
 		block_zero_no_xmm(dst_va, size);
 
-	x86pte_release_pagetable(dest);
+#ifdef __xpv
+	if (kpm_vbase == NULL) {
+		xen_map(0, PWIN_VA(x));
+		mutex_exit(&CPU->cpu_hat_info->hci_mutex);
+		kpreempt_enable();
+	} else
+#endif
+		x86pte_release_pagetable(dest);
 }
 
 /*

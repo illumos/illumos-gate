@@ -30,13 +30,15 @@
 #include <sys/param.h>
 #include <sys/machparam.h>
 #include <sys/archsystm.h>
-
 #include <sys/boot_console.h>
-
-#include "dboot_printf.h"
-
-#include "dboot_xboot.h"
 #include <sys/varargs.h>
+#include "dboot_asm.h"
+#include "dboot_printf.h"
+#include "dboot_xboot.h"
+
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * This file provides simple output formatting via dboot_printf()
@@ -61,7 +63,6 @@ dboot_panic(char *fmt, ...)
 		dboot_printf("Press any key to reboot\n");
 		(void) bcons_getchar();
 	}
-
 	outb(0x64, 0xfe);	/* this resets the system, see pc_reset() */
 	dboot_halt();		/* just in case */
 }

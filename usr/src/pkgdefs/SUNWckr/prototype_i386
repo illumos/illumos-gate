@@ -75,6 +75,7 @@ f none kernel/drv/cn 755 root sys
 f none kernel/drv/conskbd 755 root sys
 f none kernel/drv/consms 755 root sys
 f none kernel/drv/cpuid 755 root sys
+f none kernel/drv/cpunex 755 root sys
 f none kernel/drv/crypto 755 root sys
 f none kernel/drv/cryptoadm 755 root sys
 f none kernel/drv/devinfo 755 root sys
@@ -137,6 +138,7 @@ f none kernel/drv/udp 755 root sys
 f none kernel/drv/udp6 755 root sys
 f none kernel/drv/vgatext 755 root sys
 f none kernel/drv/vni 755 root sys
+f none kernel/drv/vnic 755 root sys
 f none kernel/drv/wc 755 root sys
 f none kernel/exec/elfexec 755 root sys
 f none kernel/exec/intpexec 755 root sys
@@ -274,6 +276,7 @@ f none kernel/drv/amd64/cn 755 root sys
 f none kernel/drv/amd64/conskbd 755 root sys
 f none kernel/drv/amd64/consms 755 root sys
 f none kernel/drv/amd64/cpuid 755 root sys
+f none kernel/drv/amd64/cpunex 755 root sys
 f none kernel/drv/amd64/crypto 755 root sys
 f none kernel/drv/amd64/cryptoadm 755 root sys
 f none kernel/drv/amd64/devinfo 755 root sys
@@ -331,6 +334,7 @@ f none kernel/drv/amd64/udp 755 root sys
 f none kernel/drv/amd64/udp6 755 root sys
 f none kernel/drv/amd64/vgatext 755 root sys
 f none kernel/drv/amd64/vni 755 root sys
+f none kernel/drv/amd64/vnic 755 root sys
 f none kernel/drv/amd64/wc 755 root sys
 d none kernel/exec/amd64 755 root sys
 f none kernel/exec/amd64/elfexec 755 root sys

@@ -67,7 +67,6 @@
 #ifdef SOL2
 #include <sys/cmn_err.h>
 #endif
-#undef u
 #define	HAVE_MEMCPY
 #define	memcmp		bcmp
 

@@ -106,7 +106,7 @@ static void vfs_createopttbl_extend(mntopts_t *, const char *,
     const mntopts_t *);
 static char **vfs_copycancelopt_extend(char **const, int);
 static void vfs_freecancelopt(char **);
-static char *getrootfs(void);
+static void getrootfs(char **, char **);
 static int getmacpath(dev_info_t *, void *);
 static void vfs_mnttabvp_setup(void);
 
@@ -4240,15 +4240,15 @@ rootconf()
 	int error;
 	struct vfssw *vsw;
 	extern void pm_init();
-	char *fstyp;
+	char *fstyp, *fsmod;
 
-	fstyp = getrootfs();
+	getrootfs(&fstyp, &fsmod);
 
 	if (error = clboot_rootconf())
 		return (error);
 
-	if (modload("fs", fstyp) == -1)
-		panic("Cannot _init %s module", fstyp);
+	if (modload("fs", fsmod) == -1)
+		panic("Cannot _init %s module", fsmod);
 
 	RLOCK_VFSSW();
 	vsw = vfs_getvfsswbyname(fstyp);
@@ -4292,8 +4292,8 @@ getfsname(char *askfor, char *name, size_t namelen)
  * client. Otherwise, we default to ufs. Zfs should perhaps be
  * another property.
  */
-static char *
-getrootfs(void)
+static void
+getrootfs(char **fstypp, char **fsmodp)
 {
 	extern char *strplumb_get_netdev_path(void);
 	char *propstr = NULL;
@@ -4316,12 +4316,21 @@ getrootfs(void)
 		ddi_prop_free(propstr);
 	}
 
-	if (strncmp(rootfs.bo_fstype, "nfs", 3) != 0)
-		return (rootfs.bo_fstype);
+	if (strncmp(rootfs.bo_fstype, "nfs", 3) != 0) {
+		*fstypp = *fsmodp = rootfs.bo_fstype;
+		return;
+	}
 
 	++netboot;
-	/* check if path to network interface is specified in bootpath */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	/*
+	 * check if path to network interface is specified in bootpath
+	 * or by a hypervisor domain configuration file.
+	 * XXPV - enable strlumb_get_netdev_path()
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), DDI_PROP_DONTPASS,
+	    "xpv-nfsroot")) {
+		(void) strcpy(rootfs.bo_name, "/xpvd/xnf@0");
+	} else if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "bootpath", &propstr)
 	    == DDI_SUCCESS) {
 		(void) strncpy(rootfs.bo_name, propstr, BO_MAXOBJNAME);
@@ -4333,6 +4342,7 @@ getrootfs(void)
 			panic("cannot find boot network interface");
 		(void) strncpy(rootfs.bo_name, netdev_path, BO_MAXOBJNAME);
 	}
-	return ("nfs");
+	*fstypp = rootfs.bo_fstype;
+	*fsmodp = "nfs";
 }
 #endif

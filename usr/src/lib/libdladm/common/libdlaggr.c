@@ -195,19 +195,6 @@ typedef struct add_db_state {
 
 static int i_dladm_aggr_fput_grp(FILE *, dladm_aggr_grp_attr_db_t *);
 
-static int
-i_dladm_aggr_strioctl(int fd, int cmd, void *ptr, int ilen)
-{
-	struct strioctl str;
-
-	str.ic_cmd = cmd;
-	str.ic_timout = 0;
-	str.ic_len = ilen;
-	str.ic_dp = ptr;
-
-	return (ioctl(fd, I_STR, &str));
-}
-
 /*
  * Open and lock the aggregation configuration file lock. The lock is
  * acquired as a reader (F_RDLCK) or writer (F_WRLCK).
@@ -286,7 +273,7 @@ dladm_aggr_walk(int (*fn)(void *, dladm_aggr_grp_attr_t *), void *arg)
 	}
 
 tryagain:
-	rc = i_dladm_aggr_strioctl(fd, LAIOC_INFO, ioc, bufsize);
+	rc = i_dladm_ioctl(fd, LAIOC_INFO, ioc, bufsize);
 
 	if (rc != 0) {
 		if (errno == ENOSPC) {
@@ -549,7 +536,7 @@ i_dladm_aggr_add_rem_sys(dladm_aggr_grp_attr_db_t *attr, int cmd)
 		goto done;
 	}
 
-	rc = i_dladm_aggr_strioctl(fd, cmd, iocp, len);
+	rc = i_dladm_ioctl(fd, cmd, iocp, len);
 	if (rc < 0) {
 		if (errno == EINVAL)
 			status = DLADM_STATUS_LINKINVAL;
@@ -596,7 +583,7 @@ i_dladm_aggr_modify_sys(uint32_t key, uint32_t mask,
 	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	rc = i_dladm_aggr_strioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
+	rc = i_dladm_ioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
 	if (rc < 0) {
 		if (errno == EINVAL)
 			status = DLADM_STATUS_MACADDRINVAL;
@@ -651,7 +638,7 @@ i_dladm_aggr_create_sys(int fd, dladm_aggr_grp_attr_db_t *attr)
 	bcopy(attr->lt_mac, iocp->lc_mac, ETHERADDRL);
 	iocp->lc_mac_fixed = attr->lt_mac_fixed;
 
-	rc = i_dladm_aggr_strioctl(fd, LAIOC_CREATE, iocp, len);
+	rc = i_dladm_ioctl(fd, LAIOC_CREATE, iocp, len);
 	if (rc < 0)
 		status = DLADM_STATUS_LINKINVAL;
 
@@ -722,7 +709,7 @@ i_dladm_aggr_delete_sys(int fd, dladm_aggr_grp_attr_t *attr)
 
 	ioc.ld_key = attr->lg_key;
 
-	return (i_dladm_aggr_strioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
+	return (i_dladm_ioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
 }
 
 /*

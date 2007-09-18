@@ -48,9 +48,6 @@ extern struct av_head autovect[];
  *	Local Function Prototypes
  */
 apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
-static int	apic_get_pending(apic_irq_t *, int);
-static void	apic_clear_mask(apic_irq_t *);
-static void	apic_set_mask(apic_irq_t *);
 
 /*
  * MSI support flag:
@@ -258,6 +255,8 @@ apic_find_irq(dev_info_t *dip, struct intrspec *ispec, int type)
 }
 
 
+#if !defined(__xpv)
+
 /*
  * This function will return the pending bit of the irqp.
  * It either comes from the IRR register of the APIC or the RDT
@@ -359,6 +358,7 @@ apic_set_mask(apic_irq_t *irqp)
 	intr_restore(iflag);
 }
 
+#endif	/* ! __xpv */
 
 void
 apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
@@ -571,6 +571,8 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 	}
 }
 
+#if !defined(__xpv)
+
 static int
 apic_set_cpu(uint32_t vector, int cpu, int *result)
 {
@@ -747,7 +749,9 @@ set_grp_intr_done:
 	return (PSM_SUCCESS);
 }
 
-static int
+#endif	/* !__xpv */
+
+int
 apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 {
 	struct autovec *av_dev;
@@ -846,6 +850,8 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	return (PSM_SUCCESS);
 }
 
+
+#if !defined(__xpv)
 
 /*
  * This function provides external interface to the nexus for all
@@ -1038,3 +1044,4 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	}
 	return (PSM_SUCCESS);
 }
+#endif	/* !__xpv */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,9 +279,9 @@ opt_pcbe_init(void)
 	} else if X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_D) {
 		opt_events = opt_events_rev_D;
 	} else if (X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_E) ||
-		X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_F) ||
-		X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_G)) {
-		    opt_events = opt_events_rev_E;
+	    X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_F) ||
+	    X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_G)) {
+			opt_events = opt_events_rev_E;
 	};
 
 	if (opt_events == NULL)
@@ -329,8 +329,8 @@ static const char *
 opt_pcbe_cpuref(void)
 {
 	return ("See Chapter 10 of the \"BIOS and Kernel Developer's Guide "
-		"for the AMD Athlon 64 and AMD Opteron Processors,\" "
-		"AMD publication #26094");
+	    "for the AMD Athlon 64 and AMD Opteron Processors,\" "
+	    "AMD publication #26094");
 }
 
 /*ARGSUSED*/
@@ -465,7 +465,7 @@ opt_pcbe_program(void *token)
 						&nullcfgs[2], &nullcfgs[3] };
 	opt_pcbe_config_t	*pcfg = NULL;
 	int			i;
-	uint32_t		curcr4 = getcr4();
+	ulong_t			curcr4 = getcr4();
 
 	/*
 	 * Allow nonprivileged code to read the performance counters if desired.
@@ -515,7 +515,7 @@ opt_pcbe_allstop(void)
 	/*
 	 * Disable non-privileged access to the counter registers.
 	 */
-	setcr4((uint32_t)getcr4() & ~CR4_PCE);
+	setcr4(getcr4() & ~CR4_PCE);
 }
 
 static void

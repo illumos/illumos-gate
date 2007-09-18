@@ -196,9 +196,13 @@ cpupm_free_cpu_dependencies()
 boolean_t
 cpupm_is_ready()
 {
+#ifndef	__xpv
 	if (!cpupm_enabled)
 		return (B_FALSE);
 	return (cpupm_ready);
+#else
+	return (B_FALSE);
+#endif
 }
 
 /*
@@ -220,6 +224,7 @@ cpupm_enable(boolean_t enable)
 void
 cpupm_post_startup()
 {
+#ifndef	__xpv
 	/*
 	 * The CPU domain built by the PPM during CPUs attaching
 	 * should be rebuilt with the information retrieved from
@@ -239,4 +244,7 @@ cpupm_post_startup()
 
 	if (cpupm_init_topspeed != NULL)
 		(*cpupm_init_topspeed)();
+#else
+	cpupm_ready = B_TRUE;
+#endif
 }

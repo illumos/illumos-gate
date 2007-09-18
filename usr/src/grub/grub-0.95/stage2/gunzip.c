@@ -174,6 +174,7 @@ static void
 reset_linalloc (void)
 {
   linalloc_topaddr = RAW_ADDR ((mbi.mem_upper << 10) + 0x100000);
+  linalloc_topaddr -= ZFS_SCRATCH_SIZE;
 }
 
 

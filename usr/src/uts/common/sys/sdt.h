@@ -159,6 +159,23 @@ extern "C" {
 #define	DTRACE_SYSEVENT2(name, type1, arg1, type2, arg2)		\
 	DTRACE_PROBE2(__sysevent_##name, type1, arg1, type2, arg2);
 
+#define	DTRACE_XPV(name)						\
+	DTRACE_PROBE(__xpv_##name);
+
+#define	DTRACE_XPV1(name, type1, arg1)					\
+	DTRACE_PROBE1(__xpv_##name, type1, arg1);
+
+#define	DTRACE_XPV2(name, type1, arg1, type2, arg2)			\
+	DTRACE_PROBE2(__xpv_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_XPV3(name, type1, arg1, type2, arg2, type3, arg3)	\
+	DTRACE_PROBE3(__xpv_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_XPV4(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4)						\
+	DTRACE_PROBE4(__xpv_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4);
+
 #endif /* _KERNEL */
 
 extern const char *sdt_prefix;

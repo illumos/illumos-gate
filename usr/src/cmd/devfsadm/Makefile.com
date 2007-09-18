@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,7 +66,7 @@ LINK_SRCS =			\
 	$(COMMON)/md_link.c	\
 	$(COMMON)/dtrace_link.c	\
 	$(COMMON)/zfs_link.c	\
-	$(LINK_SRCS_($MACH))
+	$(LINK_SRCS_$(MACH))
 
 LINT_MODULES = $(LINK_SRCS:.c=.ln)
 
@@ -87,7 +87,7 @@ LINK_OBJS =			\
 	md_link.o		\
 	dtrace_link.o		\
 	zfs_link.o		\
-	$(LINK_OBJS_($MACH))
+	$(LINK_OBJS_$(MACH))
 
 LINK_MODS =			\
 	SUNW_disk_link.so	\

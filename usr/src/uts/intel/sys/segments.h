@@ -80,8 +80,49 @@ extern "C" {
 #endif
 
 #define	SELTOIDX(s)	((s) >> 3)	/* selector to index */
-#define	SEL_KPL		0		/* kernel privilege level */
+
+/*
+ * SEL_(KPL,UPL,XPL) is the RPL or DPL value for code and data selectors
+ * and their descriptors respectively.
+ *
+ * TRP_(KPL,UPL,XPL) is used to indicate the DPL for system gates only.
+ *
+ * This distinction is important to support para-virt guests on the
+ * 64-bit hypervisor. Both guest kernel and user run in ring 3 and the
+ * hypervisor runs in ring 0. When the kernel creates its trap and
+ * interrupt gates it needs a way to prevent any arbitrary int $n
+ * instruction from entering a gate that is not expected. The hypervisor
+ * allows these gates to have a DPL from 1 to 3. By creating gates
+ * with a DPL below user (ring 3) the int $n will generate a #gp fault
+ * which the hypervisor catches and forwards to the guest.
+ */
+#if defined(__xpv)
+
+#if defined(__amd64)
+
+#define	SEL_XPL		0		/* hypervisor privilege level */
+#define	SEL_KPL		3		/* both kernel and user in ring 3 */
+#define	TRP_KPL		1		/* system gate priv (user blocked) */
+
+#elif defined(__i386)
+
+#define	SEL_XPL		0		/* hypervisor privilege level */
+#define	SEL_KPL		1		/* kernel privilege level */
+#define	TRP_KPL		SEL_KPL		/* system gate priv (user blocked) */
+
+#endif	/* __i386 */
+
+#define	TRP_XPL		0		/* system gate priv (hypervisor) */
+
+#else	/* __xpv */
+
+#define	SEL_KPL		0		/* kernel privilege level on metal */
+#define	TRP_KPL		SEL_KPL		/* system gate priv (user blocked) */
+
+#endif	/* __xpv */
+
 #define	SEL_UPL		3		/* user priority level */
+#define	TRP_UPL		3		/* system gate priv (user allowed) */
 #define	SEL_TI_LDT	4		/* local descriptor table */
 #define	SEL_LDT(s)	(IDXTOSEL(s) | SEL_TI_LDT | SEL_UPL)	/* local sel */
 #define	CPL_MASK	3		/* RPL mask for selector */
@@ -129,7 +170,6 @@ extern void wr_tsr(selector_t);
 extern void kmdb_enter(void);
 
 #if defined(__amd64)
-extern void clr_ldt_sregs(void);
 
 /*
  * inlines for update_segregs
@@ -148,6 +188,8 @@ extern void load_segment_registers(selector_t, selector_t, selector_t,
 extern void load_segment_registers(selector_t, selector_t, selector_t,
     selector_t, selector_t, selector_t);	/* (alphabetical) */
 #endif	/* __i386 */
+
+selector_t get_cs_register();
 
 #if !defined(__amd64)
 
@@ -289,6 +331,10 @@ typedef struct system_desc {
 
 #define	SYSSEGD_SETLIMIT(ssd, lim)	((ssd)->ssd_lolimit = lim,	\
 					(ssd)->ssd_hilimit = lim >> 16)
+
+#define	SYSSEGD_GETLIMIT(ssd)		(((ssd)->ssd_hilimit << 16) |   \
+					(ssd)->ssd_lolimit)
+
 #if !defined(__amd64)
 
 /*
@@ -358,7 +404,20 @@ extern void set_usegd(user_desc_t *, void *, size_t, uint_t, uint_t,
 extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t,
     uint_t, uint_t);
 
-void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
+extern void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
+
+extern void *get_ssd_base(system_desc_t *);
+
+extern void gdt_update_usegd(uint_t, user_desc_t *);
+
+extern int ldt_update_segd(user_desc_t *, user_desc_t *);
+
+#if defined(__xpv)
+
+extern int xen_idt_to_trap_info(uint_t, gate_desc_t *, void *);
+extern void xen_idt_write(gate_desc_t *, uint_t);
+
+#endif	/* __xen */
 
 void init_boot_gdt(user_desc_t *);
 
@@ -502,20 +561,45 @@ void init_boot_gdt(user_desc_t *);
 #define	GDT_LWPGS	56	/* lwp private %gs segment selector */
 #define	GDT_BRANDMIN	57	/* first entry in GDT for brand usage */
 #define	GDT_BRANDMAX	61	/* last entry in GDT for brand usage */
+#if !defined(__xpv)
 #define	NGDT		90	/* number of entries in GDT */
+#else
+#define	NGDT		512	/* single 4K page for the hypervisor */
+#endif
 
 #endif	/* __i386 */
 
 /*
  * Convenient selector definitions.
  */
+
+/*
+ * XXPV	64 bit Xen only allows the guest %cs/%ss be the private ones it
+ * provides, not the ones we create for ourselves.  See FLAT_RING3_CS64 in
+ * public/arch-x86_64.h
+ *
+ * 64-bit Xen runs paravirtual guests in ring 3 but emulates them running in
+ * ring 0 by clearing CPL in %cs value pushed on guest exception stacks.
+ * Therefore we will have KCS_SEL value indicate ring 0 and use that everywhere
+ * in the kernel. But in the few files where we initialize segment registers or
+ * create and update descriptors we will explicity OR in SEL_KPL (ring 3) for
+ * kernel %cs. See desctbls.c for an example.
+ */
+
+#if defined(__xpv) && defined(__amd64)
+#define	KCS_SEL		0xe030		/* FLAT_RING3_CS64 & 0xFFF0 */
+#define	KDS_SEL		0xe02b		/* FLAT_RING3_SS64 */
+#else
 #define	KCS_SEL		SEL_GDT(GDT_KCODE, SEL_KPL)
 #define	KDS_SEL		SEL_GDT(GDT_KDATA, SEL_KPL)
+#endif
+
 #define	UCS_SEL		SEL_GDT(GDT_UCODE, SEL_UPL)
 #if defined(__amd64)
 #define	TEMP_CS64_SEL	SEL_GDT(TEMPGDT_KCODE64, SEL_KPL)
 #define	U32CS_SEL	SEL_GDT(GDT_U32CODE, SEL_UPL)
-#endif	/* __amd64 */
+#endif
+
 #define	UDS_SEL		SEL_GDT(GDT_UDATA, SEL_UPL)
 #define	ULDT_SEL	SEL_GDT(GDT_LDT, SEL_KPL)
 #define	KTSS_SEL	SEL_GDT(GDT_KTSS, SEL_KPL)
@@ -558,8 +642,8 @@ void init_boot_gdt(user_desc_t *);
 #define	LDT_ALTSYSCALL	4	/* alternate call gate for system calls */
 #define	LDT_ALTSIGCALL	5	/* EOL me, alternate call gate for sigreturn */
 #define	LDT_UDBASE	6	/* user descriptor base index */
-#define	MINNLDT		64	/* Current min solaris ldt size */
-#define	MAXNLDT		8192	/* max solaris ldt size */
+#define	MINNLDT		512	/* Current min solaris ldt size (1 4K page) */
+#define	MAXNLDT		8192	/* max solaris ldt size (16 4K pages) */
 
 #ifndef	_ASM
 
@@ -569,11 +653,18 @@ extern	desctbr_t	idt0_default_reg;
 extern	user_desc_t	*gdt0;
 
 extern user_desc_t	zero_udesc;
-extern system_desc_t	zero_sdesc;
+extern user_desc_t	null_udesc;
+extern system_desc_t	null_sdesc;
 
 #if defined(__amd64)
 extern user_desc_t	zero_u32desc;
 #endif
+#if defined(__amd64)
+extern user_desc_t	ucs_on;
+extern user_desc_t	ucs_off;
+extern user_desc_t	ucs32_on;
+extern user_desc_t	ucs32_off;
+#endif  /* __amd64 */
 
 #pragma	align	16(ktss0)
 extern struct tss ktss0;
@@ -583,7 +674,10 @@ extern struct tss dftss0;
 #endif	/* __i386 */
 
 extern void div0trap(), dbgtrap(), nmiint(), brktrap(), ovflotrap();
-extern void boundstrap(), invoptrap(), ndptrap(), syserrtrap();
+extern void boundstrap(), invoptrap(), ndptrap();
+#if !defined(__xpv)
+extern void syserrtrap();
+#endif
 extern void invaltrap(), invtsstrap(), segnptrap(), stktrap();
 extern void gptrap(), pftrap(), ndperr();
 extern void overrun(), resvtrap();

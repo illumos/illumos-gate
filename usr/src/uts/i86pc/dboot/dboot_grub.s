@@ -162,10 +162,12 @@ newgdt:
 #endif
 
 	/*
-	 * enable paging
+	 * enable paging, write protection, alignment masking, but disable
+	 * the cache disable and write through only bits.
 	 */
 	movl	%cr0, %eax
-	orl	$CR0_PG, %eax
+	orl	$_CONST(CR0_PG | CR0_WP | CR0_AM), %eax
+	andl	$_BITNOT(CR0_NW | CR0_CD), %eax
 	movl	%eax, %cr0
 	jmp	paging_on
 paging_on:
@@ -206,26 +208,6 @@ longmode:
 	.code32
 
 	/*
-	 * uint8_t inb(int port)
-	 */
-	ENTRY_NP(inb)
-	movl	4(%esp), %edx
-	inb	(%dx)
-	andl	$0xff, %eax
-	ret
-	SET_SIZE(inb)
-
-	/*
-	 * void outb(int port, uint8_t value)
-	 */
-	ENTRY_NP(outb)
-	movl	4(%esp), %edx
-	movl	8(%esp), %eax
-	outb	(%dx)
-	ret
-	SET_SIZE(outb)
-
-	/*
 	 * if reset fails halt the system
 	 */
 	ENTRY_NP(dboot_halt)
@@ -240,21 +222,6 @@ longmode:
 	movl	%eax, %cr3
 	ret
 	SET_SIZE(reload_cr3)
-
-	/*
-	 * do a cpuid instruction, returning the eax/edx values
-	 */
-	ENTRY_NP(get_cpuid_edx)
-	movl	4(%esp), %ecx
-	movl	(%ecx), %eax
-	pushl	%ebx
-	cpuid
-	popl	%ebx
-	movl	4(%esp), %ecx
-	movl	%eax, (%ecx)
-	movl	%edx, %eax
-	ret
-	SET_SIZE(get_cpuid_edx)
 
 	/*
 	 * Detect if we can do cpuid, see if we can change bit 21 of eflags.

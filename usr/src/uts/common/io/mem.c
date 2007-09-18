@@ -262,26 +262,6 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 	return (error);
 }
 
-/*
- * Some platforms have permanently-mapped areas without PFNs, so we check
- * specially here.
- */
-static int
-mmplatio(struct uio *uio, enum uio_rw rw)
-{
-	uintptr_t pageaddr = (uintptr_t)uio->uio_loffset & PAGEMASK;
-	off_t pageoff = uio->uio_loffset & PAGEOFFSET;
-	size_t nbytes = MIN((size_t)(PAGESIZE - pageoff),
-	    (size_t)uio->uio_iov->iov_len);
-
-	if (!plat_mem_valid_page(pageaddr, rw))
-		return (ENOTSUP);
-
-	return (uiomove((void *)(pageaddr + pageoff), nbytes, rw, uio));
-}
-
-#ifdef	__sparc
-
 static int
 mmpagelock(struct as *as, caddr_t va)
 {
@@ -295,6 +275,8 @@ mmpagelock(struct as *as, caddr_t va)
 
 	return (i);
 }
+
+#ifdef	__sparc
 
 #define	NEED_LOCK_KVADDR(kva)	mmpagelock(&kas, kva)
 
@@ -349,7 +331,7 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 			int try_lock = NEED_LOCK_KVADDR(vaddr);
 			int locked = 0;
 
-			if ((error = mmplatio(uio, rw)) != ENOTSUP)
+			if ((error = plat_mem_do_mmio(uio, rw)) != ENOTSUP)
 				break;
 
 			/*

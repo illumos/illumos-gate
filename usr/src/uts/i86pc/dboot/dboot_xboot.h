@@ -67,12 +67,6 @@ extern void *mem_alloc(uint32_t size);
 
 #define	RNDUP(x, y)	((x) + ((y) - 1ul) & ~((y) - 1ul))
 
-/*
- * this is gross too, but archsystm.h is under a #ifdef _KERNEL
- */
-extern uint8_t inb(int port);
-extern void outb(int port, uint8_t value);
-
 #endif /* _ASM */
 
 

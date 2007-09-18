@@ -500,7 +500,7 @@ cpu_kstat_intrstat_update(kstat_t *ksp, int rw)
 	for (i = 0; i < PIL_MAX; i++) {
 		knp[i * 2].value.ui64 =
 		    (uint64_t)tick2ns((hrtime_t)knp[i * 2].value.ui64,
-			cpup->cpu_id);
+		    cpup->cpu_id);
 	}
 
 	return (0);
@@ -799,9 +799,9 @@ mach_cpu_pause(volatile char *safe)
 
 /*ARGSUSED*/
 int
-plat_mem_valid_page(uintptr_t pageaddr, uio_rw_t rw)
+plat_mem_do_mmio(struct uio *uio, enum uio_rw rw)
 {
-	return (0);
+	return (ENOTSUP);
 }
 
 int

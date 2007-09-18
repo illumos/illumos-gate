@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +38,8 @@
  *    where:
  *	<root fs type>		-	"nfs" or "ufs"
  *	<interface name>	-	"hme0" or "none"
- *	<net config strategy>	-	"dhcp", "rarp", or "none"
+ *	<net config strategy>	-	"dhcp", "rarp", "bootprops"
+ *					or "none"
  *
  *    Eg:
  *	# /sbin/netstrategy
@@ -50,11 +50,16 @@
  *    <interface name> is the 16 char name of the root interface, and is only
  *	set if rarp/dhcp was used to configure the interface.
  *
- *    <net config strategy> can be either "rarp", "dhcp", or "none" depending
- *	on which strategy was used to configure the interface. Is "none" if
- *	no interface was configured using a net-based strategy.
+ *    <net config strategy> can be either "rarp", "dhcp", "bootprops", or
+ *	"none" depending on which strategy was used to configure the
+ *	interface. Is "none" if no interface was configured using a
+ *	net-based strategy.
  *
  * CAVEATS: what about autoclient systems? XXX
+ *
+ * The logic here must match that in usr/src/uts/common/fs/nfs/nfs_dlinet.c,
+ * in particular that code (which implements diskless boot) imposes an
+ * ordering on possible ways of configuring network interfaces.
  */
 
 #include <stdio.h>
@@ -69,25 +74,203 @@
 #include <sys/sockio.h>
 #include <net/if.h>
 #include <sys/statvfs.h>
+#include <libdevinfo.h>
+
+static char *program;
+
+static char *
+get_root_fstype()
+{
+	static struct statvfs vfs;
+
+	/* root location */
+	if (statvfs("/", &vfs) < 0) {
+		return ("none");
+	} else {
+		if (strncmp(vfs.f_basetype, "nfs", sizeof ("nfs") - 1) == 0)
+			vfs.f_basetype[sizeof ("nfs") - 1] = '\0';
+		return (vfs.f_basetype);
+	}
+}
+
+/*
+ * The following boot properties can be used to configure a network
+ * interface in the case of a diskless boot.
+ *	host-ip, subnet-mask, server-path, server-name, server-ip.
+ *
+ * XXX non-diskless case requires "network-interface"?
+ */
+static boolean_t
+boot_properties_present()
+{
+	/* XXX should use sys/bootprops.h, but it's not delivered */
+	const char *required_properties[] = {
+		"host-ip",
+		"subnet-mask",
+		"server-path",
+		"server-name",
+		"server-ip",
+		NULL,
+	};
+	const char **prop = required_properties;
+	char *prop_value;
+	di_node_t dn;
+
+	if ((dn = di_init("/", DINFOPROP)) == DI_NODE_NIL) {
+		(void) fprintf(stderr, "%s: di_init: %s\n", program,
+		    strerror(errno));
+		di_fini(dn);
+		return (B_FALSE);
+	}
+
+	while (*prop != NULL) {
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY,
+		    dn, *prop, &prop_value) != 1) {
+			di_fini(dn);
+			return (B_FALSE);
+		}
+		prop++;
+	}
+	di_fini(dn);
+
+	return (B_TRUE);
+}
+
+static char *
+get_first_interface()
+{
+	int fd;
+	struct lifnum ifnum;
+	struct lifconf ifconf;
+	struct lifreq *ifr;
+	static char interface[IFNAMSIZ];
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		(void) fprintf(stderr, "%s: socket: %s\n", program,
+		    strerror(errno));
+		return (NULL);
+	}
+
+	ifnum.lifn_family = AF_UNSPEC;
+
+	if (ioctl(fd, SIOCGLIFNUM, &ifnum) < 0) {
+		(void) fprintf(stderr, "%s: SIOCGLIFNUM: %s\n", program,
+		    strerror(errno));
+		(void) close(fd);
+		return (NULL);
+	}
+
+	ifconf.lifc_family = AF_UNSPEC;
+	ifconf.lifc_len = ifnum.lifn_count * sizeof (struct lifreq);
+	ifconf.lifc_buf = alloca(ifconf.lifc_len);
+
+	if (ioctl(fd, SIOCGLIFCONF, &ifconf) < 0) {
+		(void) fprintf(stderr, "%s: SIOCGLIFCONF: %s\n", program,
+		    strerror(errno));
+		(void) close(fd);
+		return (NULL);
+	}
+
+	for (ifr = ifconf.lifc_req; ifr < &ifconf.lifc_req[ifconf.lifc_len /
+	    sizeof (ifconf.lifc_req[0])]; ifr++) {
+
+		if (strchr(ifr->lifr_name, ':') != NULL)
+			continue;	/* skip logical interfaces */
+
+		if (ioctl(fd, SIOCGLIFFLAGS, ifr) < 0) {
+			(void) fprintf(stderr, "%s: SIOCGIFFLAGS: %s\n",
+			    program, strerror(errno));
+			continue;
+		}
+
+		if (ifr->lifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT))
+			continue;
+
+		if (ifr->lifr_flags & IFF_UP) {
+			/*
+			 * For the "nfs rarp" and "nfs bootprops"
+			 * cases, we assume that the first non-virtual
+			 * IFF_UP interface is the one used.
+			 *
+			 * Since the order of the interfaces retrieved
+			 * via SIOCGLIFCONF is not deterministic, this
+			 * is largely silliness, but (a) "it's always
+			 * been this way", (b) machines booted this
+			 * way typically only have one interface, and
+			 * (c) no one consumes the interface name in
+			 * the RARP case anyway.
+			 */
+			(void) strncpy(interface, ifr->lifr_name, IFNAMSIZ);
+			(void) close(fd);
+			return (interface);
+		}
+	}
+
+	(void) close(fd);
+
+	return (NULL);
+}
+
+/*
+ * Is DHCP running on the specified interface?
+ */
+static boolean_t
+check_dhcp_running(char *interface)
+{
+	int fd;
+	struct ifreq ifr;
+
+	if (interface == NULL)
+		return (B_FALSE);
+
+	(void) strncpy(ifr.ifr_name, interface, IFNAMSIZ);
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		(void) fprintf(stderr, "%s: socket: %s\n", program,
+		    strerror(errno));
+		return (B_FALSE);
+	}
+
+	if (ioctl(fd, SIOCGIFFLAGS, &ifr) < 0) {
+		(void) fprintf(stderr, "%s: SIOCGIFFLAGS: %s\n",
+		    program, strerror(errno));
+		return (B_FALSE);
+	}
+
+	if (ifr.ifr_flags & IFF_DHCPRUNNING)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
 
 /* ARGSUSED */
 int
 main(int argc, char *argv[])
 {
-	struct statvfs	vfs;
-	char		*root, *interface, *strategy, dummy;
-	long		len;
-	int		fd, nifs, nlifr;
-	struct lifreq	*lifr;
-	struct lifconf	lifc;
+	char *root, *interface, *strategy, dummy;
+	long len;
 
-	/* root location */
-	if (statvfs("/", &vfs) < 0)
-		root = "none";
-	else {
-		if (strncmp(vfs.f_basetype, "nfs", sizeof ("nfs") - 1) == 0)
-			vfs.f_basetype[sizeof ("nfs") - 1] = '\0';
-		root = vfs.f_basetype;
+	root = interface = strategy = NULL;
+	program = argv[0];
+
+	root = get_root_fstype();
+
+	/*
+	 * If diskless, perhaps boot properties were used to configure
+	 * the interface.
+	 */
+	if ((strcmp(root, "nfs") == 0) && boot_properties_present()) {
+		strategy = "bootprops";
+
+		interface = get_first_interface();
+		if (interface == NULL) {
+			(void) fprintf(stderr,
+			    "%s: cannot identify root interface.\n", program);
+			return (2);
+		}
+
+		(void) printf("%s %s %s\n", root, interface, strategy);
+		return (0);
 	}
 
 	/*
@@ -124,79 +307,15 @@ main(int argc, char *argv[])
 	 *	   It's too bad there isn't an IFF_RARPRUNNING flag.
 	 */
 
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		(void) fprintf(stderr, "%s: socket: %s\n", argv[0],
-		    strerror(errno));
-		return (2);
-	}
+	interface = get_first_interface();
 
-	if (ioctl(fd, SIOCGIFNUM, &nifs) < 0) {
-		(void) fprintf(stderr, "%s: SIOCGIFNUM: %s\n", argv[0],
-		    strerror(errno));
-		(void) close(fd);
-		return (2);
-	}
-
-	lifc.lifc_len = nifs * sizeof (struct lifreq);
-	lifc.lifc_buf = alloca(lifc.lifc_len);
-	lifc.lifc_flags = 0;
-	lifc.lifc_family = AF_INET;
-
-	if (ioctl(fd, SIOCGLIFCONF, &lifc) < 0) {
-		(void) fprintf(stderr, "%s: SIOCGLIFCONF: %s\n", argv[0],
-		    strerror(errno));
-		(void) close(fd);
-		return (2);
-	}
-
-	strategy = NULL;
-	interface = NULL;
-
-	nlifr = lifc.lifc_len / sizeof (struct lifreq);
-	for (lifr = lifc.lifc_req; nlifr > 0; lifr++, nlifr--) {
-
-		if (strchr(lifr->lifr_name, ':') != NULL)
-			continue;	/* skip logical interfaces */
-
-		if (ioctl(fd, SIOCGLIFFLAGS, lifr) < 0) {
-			(void) fprintf(stderr, "%s: SIOCGLIFFLAGS: %s\n",
-			    argv[0], strerror(errno));
-			continue;
-		}
-
-		if (lifr->lifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT))
-			continue;
-
-		if (lifr->lifr_flags & IFF_UP) {
-			/*
-			 * For the "nfs rarp" case, we assume that the first
-			 * IFF_UP interface is the one using RARP, so stash
-			 * away the first interface in case we need it.
-			 *
-			 * Since the order of the interfaces retrieved via
-			 * SIOCGLIFCONF is not deterministic, this is largely
-			 * silliness, but (a) "it's always been this way", (b)
-			 * machines booted via diskless RARP typically only
-			 * have one interface, and (c) no one consumes the
-			 * interface name in the RARP case anyway.
-			 */
-			if (interface == NULL)
-				interface = lifr->lifr_name;
-
-			if (lifr->lifr_flags & IFF_DHCPRUNNING) {
-				interface = lifr->lifr_name;
-				strategy = "dhcp";
-				break;
-			}
-		}
-	}
-
-	(void) close(fd);
+	if (check_dhcp_running(interface))
+		strategy = "dhcp";
 
 	if (strcmp(root, "nfs") == 0 || strcmp(root, "cachefs") == 0) {
 		if (interface == NULL) {
 			(void) fprintf(stderr,
-			    "%s: cannot identify root interface.\n", argv[0]);
+			    "%s: cannot identify root interface.\n", program);
 			return (2);
 		}
 		if (strategy == NULL)

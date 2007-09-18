@@ -33,6 +33,9 @@
 #include <sys/param.h>
 #include <sys/machparam.h>
 #include <sys/mach_mmu.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 #ifdef _BOOT
 #include <dboot/dboot_printf.h>

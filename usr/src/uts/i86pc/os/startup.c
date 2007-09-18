@@ -67,7 +67,7 @@
 #include <sys/bootconf.h>
 #include <sys/varargs.h>
 #include <sys/promif.h>
-#include <sys/modctl.h>		/* for "procfs" hack */
+#include <sys/modctl.h>
 
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -108,12 +108,22 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/cpc_impl.h>
-#include <sys/pg.h>
 #include <sys/x86_archext.h>
 #include <sys/cpu_module.h>
 #include <sys/smbios.h>
 #include <sys/debug_info.h>
 
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#include <sys/xen_mmu.h>
+#include <sys/evtchn_impl.h>
+#include <sys/gnttab.h>
+#include <sys/xpv_panic.h>
+#include <xen/sys/xenbus_comms.h>
+#include <xen/public/physdev.h>
+extern void xen_late_startup(void);
+extern struct xen_evt_data cpu0_evt_data;
+#endif
 
 #include <sys/bootinfo.h>
 #include <vm/kboot_mmu.h>
@@ -337,7 +347,7 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  *		|      Kernel Data	|
  * 0xFEC00000  -|-----------------------|
  *              |      Kernel Text	|
- * 0xFE800000  -|-----------------------|- KERNEL_TEXT
+ * 0xFE800000  -|-----------------------|- KERNEL_TEXT (0xFB400000 on Xen)
  *		|---       GDT       ---|- GDT page (GDT_VA)
  *		|---    debug info   ---|- debug info (DEBUG_INFO_VA)
  *		|			|
@@ -628,21 +638,37 @@ perform_allocations(void)
 void
 startup(void)
 {
+#if !defined(__xpv)
 	extern void startup_bios_disk(void);
 	extern void startup_pci_bios(void);
+#endif
+	/*
+	 * Make sure that nobody tries to use sekpm until we have
+	 * initialized it properly.
+	 */
 #if defined(__amd64)
 	kpm_desired = 1;
 #endif
 	kpm_enable = 0;
 
+#if defined(__xpv)	/* XXPV fix me! */
+	{
+		extern int segvn_use_regions;
+		segvn_use_regions = 0;
+	}
+#endif
 	progressbar_init();
 	startup_init();
 	startup_memlist();
 	startup_kmem();
 	startup_vm();
+#if !defined(__xpv)
 	startup_pci_bios();
+#endif
 	startup_modules();
+#if !defined(__xpv)
 	startup_bios_disk();
+#endif
 	startup_end();
 	progressbar_start();
 }
@@ -827,6 +853,13 @@ init_debug_info(void)
 
 	di->di_magic = DEBUG_INFO_MAGIC;
 	di->di_version = DEBUG_INFO_VERSION;
+	di->di_modules = (uintptr_t)&modules;
+	di->di_s_text = (uintptr_t)s_text;
+	di->di_e_text = (uintptr_t)e_text;
+	di->di_s_data = (uintptr_t)s_data;
+	di->di_e_data = (uintptr_t)e_data;
+	di->di_hat_htable_off = offsetof(hat_t, hat_htable);
+	di->di_ht_pfn_off = offsetof(htable_t, ht_pfn);
 }
 
 /*
@@ -1231,6 +1264,12 @@ startup_kmem(void)
 	    kernelheap + MMU_PAGESIZE,
 	    (void *)core_base, (void *)(core_base + core_size));
 
+#if defined(__xpv)
+	/*
+	 * Link pending events struct into cpu struct
+	 */
+	CPU->cpu_m.mcpu_evt_pend = &cpu0_evt_data;
+#endif
 	/*
 	 * Initialize kernel memory allocator.
 	 */
@@ -1240,6 +1279,10 @@ startup_kmem(void)
 	 * Factor in colorequiv to check additional 'equivalent' bins
 	 */
 	page_set_colorequiv_arr();
+
+#if defined(__xpv)
+	xen_version();
+#endif
 
 	/*
 	 * print this out early so that we know what's going on
@@ -1274,6 +1317,23 @@ startup_kmem(void)
 	}
 #endif
 
+#ifdef __xpv
+	/*
+	 * Some of the xen start information has to be relocated up
+	 * into the kernel's permanent address space.
+	 */
+	PRM_POINT("calling xen_relocate_start_info()");
+	xen_relocate_start_info();
+	PRM_POINT("xen_relocate_start_info() done");
+
+	/*
+	 * (Update the vcpu pointer in our cpu structure to point into
+	 * the relocated shared info.)
+	 */
+	CPU->cpu_m.mcpu_vcpu_info =
+	    &HYPERVISOR_shared_info->vcpu_info[CPU->cpu_id];
+#endif
+
 	PRM_POINT("startup_kmem() done");
 }
 
@@ -1284,6 +1344,8 @@ startup_modules(void)
 	extern void prom_setup(void);
 
 	PRM_POINT("startup_modules() starting...");
+
+#ifndef __xpv
 	/*
 	 * Initialize ten-micro second timer so that drivers will
 	 * not get short changed in their init phase. This was
@@ -1291,6 +1353,7 @@ startup_modules(void)
 	 * caused the drv_usecwait to be way too short.
 	 */
 	microfind();
+#endif
 
 	/*
 	 * Read the GMT lag from /etc/rtc_config.
@@ -1348,6 +1411,12 @@ startup_modules(void)
 
 	/* Read cluster configuration data. */
 	clconf_init();
+
+#if defined(__xpv)
+	ec_init();
+	gnttab_init();
+	(void) xs_early_init();
+#endif /* __xpv */
 
 	/*
 	 * Create a kernel device tree. First, create rootnex and
@@ -1596,10 +1665,12 @@ startup_vm(void)
 	hat_kern_alloc((caddr_t)segmap_start, segmapsize, ekernelheap);
 	PRM_POINT("hat_kern_alloc() done");
 
+#ifndef __xpv
 	/*
 	 * Setup MTRR (Memory type range registers)
 	 */
 	setup_mtrr();
+#endif
 
 	/*
 	 * The next two loops are done in distinct steps in order
@@ -1623,6 +1694,7 @@ startup_vm(void)
 	 * pages that stay mapped until release_bootstrap().
 	 */
 	protect_boot_range(0, kernelbase, 1);
+
 
 	/*
 	 * Switch to running on regular HAT (not boot_mmu)
@@ -1652,6 +1724,19 @@ startup_vm(void)
 	if (boothowto & RB_DEBUG)
 		kdi_dvec_vmready();
 
+#if defined(__xpv)
+	/*
+	 * Populate the I/O pool on domain 0
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		extern long populate_io_pool(void);
+		long init_io_pool_cnt;
+
+		PRM_POINT("Populating reserve I/O page pool");
+		init_io_pool_cnt = populate_io_pool();
+		PRM_DEBUG(init_io_pool_cnt);
+	}
+#endif
 	/*
 	 * Mangle the brand string etc.
 	 */
@@ -1691,7 +1776,7 @@ startup_vm(void)
 	 * The following code installs a special page fault handler (#pf)
 	 * to work around a pentium bug.
 	 */
-#if !defined(__amd64)
+#if !defined(__amd64) && !defined(__xpv)
 	if (x86_type == X86_TYPE_P5) {
 		desctbr_t idtr;
 		gate_desc_t *newidt;
@@ -1702,7 +1787,7 @@ startup_vm(void)
 
 		bcopy(idt0, newidt, sizeof (idt0));
 		set_gatesegd(&newidt[T_PGFLT], &pentium_pftrap,
-		    KCS_SEL, SDT_SYSIGT, SEL_KPL);
+		    KCS_SEL, SDT_SYSIGT, TRP_KPL);
 
 		(void) as_setprot(&kas, (caddr_t)newidt, MMU_PAGESIZE,
 		    PROT_READ|PROT_EXEC);
@@ -1714,6 +1799,7 @@ startup_vm(void)
 	}
 #endif	/* !__amd64 */
 
+#if !defined(__xpv)
 	/*
 	 * Map page pfn=0 for drivers, such as kd, that need to pick up
 	 * parameters left there by controllers/BIOS.
@@ -1721,6 +1807,7 @@ startup_vm(void)
 	PRM_POINT("setup up p0_va");
 	p0_va = i86devmap(0, 1, PROT_READ);
 	PRM_DEBUG(p0_va);
+#endif
 
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
@@ -1801,7 +1888,10 @@ startup_vm(void)
 	setup_vaddr_for_ppcopy(CPU);
 
 	segdev_init();
-	pmem_init();
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+#endif
+		pmem_init();
 
 	PRM_POINT("startup_vm() done");
 }
@@ -1848,6 +1938,14 @@ startup_end(void)
 		load_tod_module(tod_module_name);
 	}
 
+#if defined(__xpv)
+	/*
+	 * Forceload interposing TOD module for the hypervisor.
+	 */
+	PRM_POINT("load_tod_module()");
+	load_tod_module("xpvtod");
+#endif
+
 	/*
 	 * Configure the system.
 	 */
@@ -1871,9 +1969,17 @@ startup_end(void)
 	*bootopsp = (struct bootops *)NULL;
 	bootops = (struct bootops *)NULL;
 
+#if defined(__xpv)
+	ec_init_debug_irq();
+	xs_domu_init();
+#endif
 	PRM_POINT("Enabling interrupts");
 	(*picinitf)();
 	sti();
+#if defined(__xpv)
+	ASSERT(CPU->cpu_m.mcpu_vcpu_info->evtchn_upcall_mask == 0);
+	xen_late_startup();
+#endif
 
 	(void) add_avsoftintr((void *)&softlevel1_hdl, 1, softlevel1,
 	    "softlevel1", NULL, NULL); /* XXX to be moved later */
@@ -1895,16 +2001,26 @@ post_startup(void)
 	 */
 	bind_hwcap();
 
-	/*
-	 * Load the System Management BIOS into the global ksmbios
-	 * handle, if an SMBIOS is present on this system.
-	 */
-	ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
+#ifdef __xpv
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+#endif
+	{
+		/*
+		 * Load the System Management BIOS into the global ksmbios
+		 * handle, if an SMBIOS is present on this system.
+		 */
+		ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
 
-	/*
-	 * Startup the memory scrubber.
-	 */
-	memscrub_init();
+#if defined(__xpv)
+		xpv_panic_init();
+#else
+		/*
+		 * Startup the memory scrubber.
+		 * XXPV	This should be running somewhere ..
+		 */
+		memscrub_init();
+#endif
+	}
 
 	/*
 	 * Complete CPU module initialization
@@ -1992,6 +2108,8 @@ release_bootstrap(void)
 	}
 	PRM_POINT("Boot pages released");
 
+#if !defined(__xpv)
+/* XXPV -- note this following bunch of code needs to be revisited in Xen 3.0 */
 	/*
 	 * Find 1 page below 1 MB so that other processors can boot up.
 	 * Make sure it has a kernel VA as well as a 1:1 mapping.
@@ -2016,7 +2134,7 @@ release_bootstrap(void)
 			panic("No page available for starting "
 			    "other processors");
 	}
-
+#endif	/* !__xpv */
 }
 
 /*
@@ -2211,6 +2329,7 @@ kvm_init(void)
 	    PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
+#ifndef __xpv
 /*
  * These are MTTR registers supported by P6
  */
@@ -2290,7 +2409,9 @@ mtrr_sync(void)
 	setcr0(crvalue);
 	invalidate_cache();
 
+#if !defined(__xpv)
 	reload_cr3();
+#endif
 	if (x86_feature & X86_PAT)
 		wrmsr(REG_MTRRPAT, pat_attr_reg);
 
@@ -2319,7 +2440,9 @@ mtrr_sync(void)
 	}
 	wrmsr(REG_MTRRDEF, mtrrdef);
 
+#if !defined(__xpv)
 	reload_cr3();
+#endif
 	invalidate_cache();
 	setcr0(cr0_orig);
 }
@@ -2339,6 +2462,7 @@ mtrr_resync(void)
 		mtrr_sync();
 	}
 }
+#endif
 
 void
 get_system_configuration(void)

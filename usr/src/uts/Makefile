@@ -36,6 +36,7 @@ include ../Makefile.master
 sparc_ARCHITECTURES = sun4v sun4u sparc
 
 i386_ARCHITECTURES = i86pc
+i386_ARCHITECTURES += i86xpv
 i386_ARCHITECTURES += intel
 
 def		:=	TARGET= def
@@ -102,7 +103,7 @@ COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 $(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 
 sparc_HDRDIRS= sun/sys
-i386_HDRDIRS= i86pc/vm
+i386_HDRDIRS= i86pc/vm i86xpv/vm
 
 HDRDIRS= $(COMMON_HDRDIRS) $($(MACH)_HDRDIRS)
 install_h check: $(HDRDIRS) $($(MACH)_ARCHITECTURES)
@@ -137,11 +138,15 @@ ONC_PLUS:	$(ONC_FILES:%=%_onc_plus)
 # the user will be interested in), it's historically been set to
 # mirror the $(XRDIRS) list, and that works kinda sorta okay.
 #
+# We need to manually prune usr/closed/uts/{i86xpv|sfmmu} since neither
+# of them exist.
+#
 SHARED_XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
 	sun common
 CLOSED_XRDIRS = $(SHARED_XRDIRS:%=% ../../closed/uts/%)
 XRDIRS = $(SHARED_XRDIRS)
-$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS:../../closed/uts/sfmmu=)
+CLOSED_XRDIRS_XEN = $(CLOSED_XRDIRS:../../closed/uts/i86xpv=)
+$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS_XEN:../../closed/uts/sfmmu=)
 
 XRINCDIRS = $(XRDIRS)
 

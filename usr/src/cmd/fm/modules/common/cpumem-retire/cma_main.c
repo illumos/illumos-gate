@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@
 #include <time.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
+#include <sys/systeminfo.h>
+#include <sys/utsname.h>
 
 cma_t cma;
 
@@ -255,6 +257,16 @@ void
 _fmd_init(fmd_hdl_t *hdl)
 {
 	hrtime_t nsec;
+	char buf[SYS_NMLN];
+	int ret;
+
+	/*
+	 * Abort the cpumem-retire module if Solaris is running under the Xen
+	 * hypervisor.
+	 */
+	ret = sysinfo(SI_PLATFORM, buf, sizeof (buf));
+	if (ret == -1 || (strncmp(buf, "i86xpv", sizeof (buf)) == 0))
+		return;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* invalid data in configuration file */

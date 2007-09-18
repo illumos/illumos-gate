@@ -39,9 +39,15 @@
  */
 #include <sys/bustypes.h>
 #include <sys/inttypes.h>
-#if defined(__GNUC__) && defined(_ASM_INLINES) && defined(_KERNEL)
+
+#if defined(_KERNEL)
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
+#if defined(__GNUC__) && defined(_ASM_INLINES)
 #include <asm/cpu.h>
 #endif
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,7 +65,19 @@ extern void i86_mwait(uint32_t data, uint32_t extensions);
 /*
  * Used to insert cpu-dependent instructions into spin loops
  */
+#if defined(__xpv)
+extern int xpv_panicking;
+#define	SMT_PAUSE()				\
+	{					\
+		if (IN_XPV_PANIC())		\
+			ht_pause();		\
+		else 				\
+			(void) HYPERVISOR_yield();	\
+	}
+
+#else
 #define	SMT_PAUSE()		ht_pause()
+#endif
 
 #endif	/* _KERNEL */
 

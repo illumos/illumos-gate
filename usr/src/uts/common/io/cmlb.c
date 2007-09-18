@@ -510,6 +510,12 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *
  *
  *
+ *			CMLB_FAKE_LABEL_ONE_PARTITION: create s0 and s2 covering
+ *			the entire disk, if there is no valid partition info.
+ *			If there is a valid Solaris partition, s0 and s2 will
+ *			only cover the entire Solaris partition.
+ *
+ *
  *	cmlbhandle	cmlb handle associated with device
  *
  *	tg_cookie	cookie from target driver to be passed back to target
@@ -2608,9 +2614,15 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 
 	ASSERT(phys_spc != 0);
 	cl->cl_g.dkg_pcyl = cl->cl_solaris_size / phys_spc;
-	cl->cl_g.dkg_acyl = DK_ACYL;
-	cl->cl_g.dkg_ncyl = cl->cl_g.dkg_pcyl - DK_ACYL;
-	disksize = cl->cl_g.dkg_ncyl * phys_spc;
+	if (cl->cl_alter_behavior & CMLB_FAKE_LABEL_ONE_PARTITION) {
+		/* disable devid */
+		cl->cl_g.dkg_ncyl = cl->cl_g.dkg_pcyl;
+		disksize = cl->cl_solaris_size;
+	} else {
+		cl->cl_g.dkg_acyl = DK_ACYL;
+		cl->cl_g.dkg_ncyl = cl->cl_g.dkg_pcyl - DK_ACYL;
+		disksize = cl->cl_g.dkg_ncyl * phys_spc;
+	}
 
 	if (ISCD(cl)) {
 		/*
@@ -2677,6 +2689,19 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 	cl->cl_map[2].dkl_cylno = 0;
 	cl->cl_map[2].dkl_nblk  = disksize;
 	cl->cl_offset[2] = 0;
+
+	/*
+	 * single slice (s0) covering the entire disk
+	 */
+	if (cl->cl_alter_behavior & CMLB_FAKE_LABEL_ONE_PARTITION) {
+		cl->cl_vtoc.v_part[0].p_start = 0;
+		cl->cl_vtoc.v_part[0].p_tag   = V_UNASSIGNED;
+		cl->cl_vtoc.v_part[0].p_flag  = 0;
+		cl->cl_vtoc.v_part[0].p_size  = disksize;
+		cl->cl_map[0].dkl_cylno = 0;
+		cl->cl_map[0].dkl_nblk  = disksize;
+		cl->cl_offset[0] = 0;
+	}
 
 	(void) sprintf(cl->cl_vtoc.v_asciilabel, "DEFAULT cyl %d alt %d"
 	    " hd %d sec %d", cl->cl_g.dkg_ncyl, cl->cl_g.dkg_acyl,

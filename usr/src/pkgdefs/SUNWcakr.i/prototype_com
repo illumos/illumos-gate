@@ -55,10 +55,6 @@ f none boot/solaris/bin/symdef 0555 root sys
 f none boot/solaris/bin/update_grub 0555 root sys
 f none boot/solaris/filelist.ramdisk 0644 root sys
 f none boot/solaris/filelist.safe 0644 root sys
-d none boot/platform 755 root sys
-d none boot/platform/i86pc 755 root sys
-d none boot/platform/i86pc/kernel 755 root sys
-f none boot/platform/i86pc/kernel/unix 755 root sys
 d none platform 755 root sys
 d none platform/i86pc 755 root sys
 d none platform/i86pc/amd64 755 root sys
@@ -83,7 +79,6 @@ f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
 f none platform/i86pc/kernel/drv/cpudrv 755 root sys
-f none platform/i86pc/kernel/drv/cpunex 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd.conf 644 root sys
@@ -109,5 +104,4 @@ f none platform/i86pc/multiboot 755 root sys
 d none platform/i86pc/ucode 755 root sys
 v none platform/i86pc/ucode/intel-ucode.txt 444 root sys
 f none platform/i86pc/kernel/drv/amd64/cpudrv 755 root sys
-f none platform/i86pc/kernel/drv/amd64/cpunex 755 root sys
 f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys

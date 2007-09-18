@@ -96,6 +96,9 @@
 #include <sys/bootinfo.h>
 #include <sys/promif.h>
 #include <sys/mach_mmu.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
 
 #define	USER	0x10000		/* user-mode flag added to trap type */
 
@@ -155,20 +158,13 @@ static void dump_ttrace(void);
 #endif	/* TRAPTRACE */
 static void dumpregs(struct regs *);
 static void showregs(uint_t, struct regs *, caddr_t);
-static void dump_tss(void);
 static int kern_gpfault(struct regs *);
-
-struct trap_info {
-	struct regs *trap_regs;
-	uint_t trap_type;
-	caddr_t trap_addr;
-};
 
 /*ARGSUSED*/
 static int
 die(uint_t type, struct regs *rp, caddr_t addr, processorid_t cpuid)
 {
-	struct trap_info ti;
+	struct panic_trap_info ti;
 	const char *trap_name, *trap_mnemonic;
 
 	if (type < TRAP_TYPES) {
@@ -493,9 +489,9 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				errcode &= ~PF_ERR_PROT;
 			} else {
 				priv_violation = (errcode & PF_ERR_USER) &&
-					!(attr & PROT_USER);
+				    !(attr & PROT_USER);
 				access_violation = (errcode & PF_ERR_WRITE) &&
-					!(attr & PROT_WRITE);
+				    !(attr & PROT_WRITE);
 				if (!priv_violation && !access_violation)
 					goto cleanup;
 			}
@@ -780,7 +776,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		    sz, NULL, rw)) != 0) {
 			if (ta) {
 				do_watch_step(vaddr, sz, rw,
-					watchcode, rp->r_pc);
+				    watchcode, rp->r_pc);
 				fault_type = F_INVAL;
 			} else {
 				bzero(&siginfo, sizeof (siginfo));
@@ -1089,24 +1085,32 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		break;
 
 	case T_GPFLT:	/* general protection violation */
-#if defined(__amd64)
+#if defined(__amd64) || defined(__xpv)
 		/*
 		 * On amd64, we can get a #gp from referencing addresses
-		 * in the virtual address hole e.g. from a copyin
-		 * or in update_sregs while updating user semgent registers.
+		 * in the virtual address hole e.g. from a copyin or in
+		 * update_sregs while updating user segment registers.
+		 *
+		 * On the 32-bit hypervisor we could also generate one in
+		 * mfn_to_pfn by reaching around or into where the hypervisor
+		 * lives which is protected by segmentation.
 		 */
 
 		/*
 		 * If we're under on_trap() protection (see <sys/ontrap.h>),
-		 * set ot_trap and longjmp back to the on_trap() call site.
+		 * set ot_trap and longjmp back to the on_trap() call site
+		 * for OT_DATA_ACCESS or OT_SEGMENT_ACCESS.
 		 */
 		if (ct->t_ontrap != NULL) {
-			if (ct->t_ontrap->ot_prot & OT_DATA_ACCESS)
-				ct->t_ontrap->ot_trap |= OT_DATA_ACCESS;
+			int ttype =  ct->t_ontrap->ot_prot &
+			    (OT_DATA_ACCESS | OT_SEGMENT_ACCESS);
 
-			if (ct->t_ontrap->ot_prot & OT_SEGMENT_ACCESS)
-				ct->t_ontrap->ot_trap |= OT_SEGMENT_ACCESS;
-			longjmp(&curthread->t_ontrap->ot_jmpbuf);
+			if (ttype != 0) {
+				ct->t_ontrap->ot_trap |= ttype;
+				if (tudebug)
+					showregs(type, rp, (caddr_t)0);
+				longjmp(&curthread->t_ontrap->ot_jmpbuf);
+			}
 		}
 
 		/*
@@ -1126,7 +1130,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			goto cleanup;
 		}
 		/*FALLTHROUGH*/
-#endif
+#endif	/* __amd64 || __xpv */
 	case T_SEGFLT:	/* segment not present fault */
 #if defined(__amd64)
 		/*
@@ -1138,6 +1142,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		if (ct->t_ontrap != NULL &&
 		    ct->t_ontrap->ot_prot & OT_SEGMENT_ACCESS) {
 			ct->t_ontrap->ot_trap |= OT_SEGMENT_ACCESS;
+			if (tudebug)
+				showregs(type, rp, (caddr_t)0);
 			longjmp(&curthread->t_ontrap->ot_jmpbuf);
 		}
 #endif	/* __amd64 */
@@ -1608,11 +1614,14 @@ showregs(uint_t type, struct regs *rp, caddr_t addr)
 	    (uint_t)getcr0(), FMT_CR0, (uint_t)getcr4(), FMT_CR4);
 #endif	/* __lint */
 
+	printf("cr2: %lx", getcr2());
+#if !defined(__xpv)
+	printf("cr3: %lx", getcr3());
 #if defined(__amd64)
-	printf("cr2: %lx cr3: %lx cr8: %lx\n", getcr2(), getcr3(), getcr8());
-#elif defined(__i386)
-	printf("cr2: %lx cr3: %lx\n", getcr2(), getcr3());
+	printf("cr8: %lx\n", getcr8());
 #endif
+#endif
+	printf("\n");
 
 	dumpregs(rp);
 	splx(s);
@@ -1657,6 +1666,82 @@ dumpregs(struct regs *rp)
 }
 
 /*
+ * Test to see if the instruction is iret on i386 or iretq on amd64.
+ *
+ * On the hypervisor we can only test for nopop_sys_rtt_syscall. If true
+ * then we are in the context of hypervisor's failsafe handler because it
+ * tried to iret and failed due to a bad selector. See xen_failsafe_callback.
+ */
+static int
+instr_is_iret(caddr_t pc)
+{
+
+#if defined(__xpv)
+	extern void nopop_sys_rtt_syscall(void);
+	return ((pc == (caddr_t)nopop_sys_rtt_syscall) ? 1 : 0);
+
+#else
+
+#if defined(__amd64)
+	static const uint8_t iret_insn[2] = { 0x48, 0xcf };	/* iretq */
+
+#elif defined(__i386)
+	static const uint8_t iret_insn[1] = { 0xcf };		/* iret */
+#endif	/* __i386 */
+	return (bcmp(pc, iret_insn, sizeof (iret_insn)) == 0);
+
+#endif	/* __xpv */
+}
+
+#if defined(__i386)
+
+/*
+ * Test to see if the instruction is part of __SEGREGS_POP
+ *
+ * Note carefully the appallingly awful dependency between
+ * the instruction sequence used in __SEGREGS_POP and these
+ * instructions encoded here.
+ */
+static int
+instr_is_segregs_pop(caddr_t pc)
+{
+	static const uint8_t movw_0_esp_gs[4] = { 0x8e, 0x6c, 0x24, 0x0 };
+	static const uint8_t movw_4_esp_fs[4] = { 0x8e, 0x64, 0x24, 0x4 };
+	static const uint8_t movw_8_esp_es[4] = { 0x8e, 0x44, 0x24, 0x8 };
+	static const uint8_t movw_c_esp_ds[4] = { 0x8e, 0x5c, 0x24, 0xc };
+
+	if (bcmp(pc, movw_0_esp_gs, sizeof (movw_0_esp_gs)) == 0 ||
+	    bcmp(pc, movw_4_esp_fs, sizeof (movw_4_esp_fs)) == 0 ||
+	    bcmp(pc, movw_8_esp_es, sizeof (movw_8_esp_es)) == 0 ||
+	    bcmp(pc, movw_c_esp_ds, sizeof (movw_c_esp_ds)) == 0)
+		return (1);
+
+	return (0);
+}
+
+#endif	/* __i386 */
+
+/*
+ * Test to see if the instruction is part of _sys_rtt.
+ *
+ * Again on the hypervisor if we try to IRET to user land with a bad code
+ * or stack selector we will get vectored through xen_failsafe_callback.
+ * In which case we assume we got here via _sys_rtt since we only allow
+ * IRET to user land to take place in _sys_rtt.
+ */
+static int
+instr_is_sys_rtt(caddr_t pc)
+{
+	extern void _sys_rtt(), _sys_rtt_end();
+
+	if ((uintptr_t)pc < (uintptr_t)_sys_rtt ||
+	    (uintptr_t)pc > (uintptr_t)_sys_rtt_end)
+		return (0);
+
+	return (1);
+}
+
+/*
  * Handle #gp faults in kernel mode.
  *
  * One legitimate way this can happen is if we attempt to update segment
@@ -1688,33 +1773,12 @@ kern_gpfault(struct regs *rp)
 	caddr_t pc = (caddr_t)rp->r_pc;
 	int v;
 
-	extern void _sys_rtt(), sr_sup();
-
-#if defined(__amd64)
-	static const uint8_t iretq_insn[2] = { 0x48, 0xcf };
-
-#elif defined(__i386)
-	static const uint8_t iret_insn[1] = { 0xcf };
-
 	/*
-	 * Note carefully the appallingly awful dependency between
-	 * the instruction sequence used in __SEGREGS_POP and these
-	 * instructions encoded here.
-	 *
-	 * XX64	Add some commentary to locore.s/privregs.h to document this.
+	 * if we're not an lwp, or in the case of running native the
+	 * pc range is outside _sys_rtt, then we should immediately
+	 * be die()ing horribly.
 	 */
-	static const uint8_t movw_0_esp_gs[4] = { 0x8e, 0x6c, 0x24, 0x0 };
-	static const uint8_t movw_4_esp_fs[4] = { 0x8e, 0x64, 0x24, 0x4 };
-	static const uint8_t movw_8_esp_es[4] = { 0x8e, 0x44, 0x24, 0x8 };
-	static const uint8_t movw_c_esp_ds[4] = { 0x8e, 0x5c, 0x24, 0xc };
-#endif
-	/*
-	 * if we're not an lwp, or the pc range is outside _sys_rtt, then
-	 * we should immediately be die()ing horribly
-	 */
-	if (lwp == NULL ||
-	    (uintptr_t)pc < (uintptr_t)_sys_rtt ||
-	    (uintptr_t)pc > (uintptr_t)sr_sup)
+	if (lwp == NULL || !instr_is_sys_rtt(pc))
 		return (1);
 
 	/*
@@ -1725,12 +1789,9 @@ kern_gpfault(struct regs *rp)
 	 * based on the order in which the stack is deconstructed in
 	 * _sys_rtt. Ew.
 	 */
-
-#if defined(__amd64)
-
-	if (bcmp(pc, iretq_insn, sizeof (iretq_insn)) == 0) {
+	if (instr_is_iret(pc)) {
 		/*
-		 * We took the #gp while trying to perform the iretq.
+		 * We took the #gp while trying to perform the IRET.
 		 * This means that either %cs or %ss are bad.
 		 * All we know for sure is that most of the general
 		 * registers have been restored, including the
@@ -1758,58 +1819,35 @@ kern_gpfault(struct regs *rp)
 		ASSERT(trp->r_pc == lwptoregs(lwp)->r_pc);
 		ASSERT(trp->r_err == rp->r_err);
 
+
+
+	}
+
+#if defined(__amd64)
+	if (trp == NULL && lwp->lwp_pcb.pcb_rupdate != 0) {
+
+		/*
+		 * This is the common case -- we're trying to load
+		 * a bad segment register value in the only section
+		 * of kernel code that ever loads segment registers.
+		 *
+		 * We don't need to do anything at this point because
+		 * the pcb contains all the pending segment register
+		 * state, and the regs are still intact because we
+		 * didn't adjust the stack pointer yet.  Given the fidelity
+		 * of all this, we could conceivably send a signal
+		 * to the lwp, rather than core-ing.
+		 */
+		trp = lwptoregs(lwp);
+		ASSERT((caddr_t)trp == (caddr_t)rp->r_sp);
 	}
 
 #elif defined(__i386)
 
-	if (bcmp(pc, iret_insn, sizeof (iret_insn)) == 0) {
-		/*
-		 * We took the #gp while trying to perform the iret.
-		 * This means that either %cs or %ss are bad.
-		 * All we know for sure is that most of the general
-		 * registers have been restored, including the
-		 * segment registers, and all we have left on the
-		 * topmost part of the lwp's stack are the registers that
-		 * the iret was unable to consume.
-		 *
-		 * All the rest of the state was crushed by the #gp
-		 * which pushed -its- registers atop our old save area
-		 * (because we had to decrement the stack pointer, sigh) so
-		 * all that we can try and do is to reconstruct the
-		 * crushed frame from the #gp trap frame itself.
-		 */
-		trp = &tmpregs;
-		trp->r_ss = lwptoregs(lwp)->r_ss;
-		trp->r_sp = lwptoregs(lwp)->r_sp;
-		trp->r_ps = lwptoregs(lwp)->r_ps;
-		trp->r_cs = lwptoregs(lwp)->r_cs;
-		trp->r_pc = lwptoregs(lwp)->r_pc;
-		bcopy(rp, trp, offsetof(struct regs, r_pc));
+	if (trp == NULL && instr_is_segregs_pop(pc))
+		trp = lwptoregs(lwp);
 
-		ASSERT(trp->r_pc == lwptoregs(lwp)->r_pc);
-		ASSERT(trp->r_err == rp->r_err);
-
-	} else {
-		/*
-		 * Segment registers are reloaded in _sys_rtt
-		 * via the following sequence:
-		 *
-		 *	movw	0(%esp), %gs
-		 *	movw	4(%esp), %fs
-		 *	movw	8(%esp), %es
-		 *	movw	12(%esp), %ds
-		 *	addl	$16, %esp
-		 *
-		 * Thus if any of them fault, we know the user
-		 * registers are left unharmed on the stack.
-		 */
-		if (bcmp(pc, movw_0_esp_gs, sizeof (movw_0_esp_gs)) == 0 ||
-		    bcmp(pc, movw_4_esp_fs, sizeof (movw_4_esp_fs)) == 0 ||
-		    bcmp(pc, movw_8_esp_es, sizeof (movw_8_esp_es)) == 0 ||
-		    bcmp(pc, movw_c_esp_ds, sizeof (movw_c_esp_ds)) == 0)
-			trp = lwptoregs(lwp);
-	}
-#endif	/* __amd64 */
+#endif	/* __i386 */
 
 	if (trp == NULL)
 		return (1);
@@ -1831,13 +1869,14 @@ kern_gpfault(struct regs *rp)
 	if ((caddr_t)trp != (caddr_t)lwptoregs(lwp))
 		bcopy(trp, lwptoregs(lwp), sizeof (*trp));
 
+
 	mutex_enter(&p->p_lock);
 	lwp->lwp_cursig = SIGSEGV;
 	mutex_exit(&p->p_lock);
 
 	/*
-	 * Terminate all LWPs but don't discard them.  If another lwp beat us to
-	 * the punch by calling exit(), evaporate now.
+	 * Terminate all LWPs but don't discard them.  If another lwp beat
+	 * us to the punch by calling exit(), evaporate now.
 	 */
 	proc_is_exiting(p);
 	if (exitlwps(1) != 0) {
@@ -1862,6 +1901,7 @@ kern_gpfault(struct regs *rp)
  * dump_tss() - Display the TSS structure
  */
 
+#if !defined(__xpv)
 #if defined(__amd64)
 
 static void
@@ -1909,11 +1949,12 @@ dump_tss(void)
 }
 
 #endif	/* __amd64 */
+#endif	/* !__xpv */
 
 #if defined(TRAPTRACE)
 
-int ttrace_nrec = 0;		/* number of records to dump out */
-int ttrace_dump_nregs = 5;	/* dump out this many records with regs too */
+int ttrace_nrec = 10;		/* number of records to dump out */
+int ttrace_dump_nregs = 0;	/* dump out this many records with regs too */
 
 /*
  * Dump out the last ttrace_nrec traptrace records on each CPU
@@ -1928,12 +1969,12 @@ dump_ttrace(void)
 	int n = NCPU;
 #if defined(__amd64)
 	const char banner[] =
-		"\ncpu          address    timestamp "
-		"type  vc  handler   pc\n";
+	    "\ncpu          address    timestamp "
+	    "type  vc  handler   pc\n";
 	const char fmt1[] = "%3d %016lx %12llx ";
 #elif defined(__i386)
 	const char banner[] =
-		"\ncpu  address     timestamp type  vc  handler   pc\n";
+	    "\ncpu  address     timestamp type  vc  handler   pc\n";
 	const char fmt1[] = "%3d %08lx %12llx ";
 #endif
 	const char fmt2[] = "%4s %3x ";
@@ -2139,20 +2180,22 @@ trap_trace_get_traceptr(uint8_t marker, ulong_t pc, ulong_t sp)
 #endif	/* TRAPTRACE */
 
 void
-panic_showtrap(struct trap_info *tip)
+panic_showtrap(struct panic_trap_info *tip)
 {
 	showregs(tip->trap_type, tip->trap_regs, tip->trap_addr);
 
 #if defined(TRAPTRACE)
 	dump_ttrace();
-#endif	/* TRAPTRACE */
+#endif
 
+#if !defined(__xpv)
 	if (tip->trap_type == T_DBLFLT)
 		dump_tss();
+#endif
 }
 
 void
-panic_savetrap(panic_data_t *pdp, struct trap_info *tip)
+panic_savetrap(panic_data_t *pdp, struct panic_trap_info *tip)
 {
 	panic_saveregs(pdp, tip->trap_regs);
 }

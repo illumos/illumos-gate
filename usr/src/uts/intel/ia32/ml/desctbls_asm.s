@@ -165,6 +165,10 @@ load_segment_registers(selector_t cs, selector_t fs, selector_t gs,
     selector_t ss)
 {}
 
+selector_t
+get_cs_register()
+{ return (0); }
+
 #else	/* __lint */
 
 	/*
@@ -193,6 +197,12 @@ load_segment_registers(selector_t cs, selector_t fs, selector_t gs,
 	ret
 	SET_SIZE(load_segment_registers)
 
+	ENTRY_NP(get_cs_register)
+	movq	$0, %rax
+	movw	%cs, %rax
+	ret
+	SET_SIZE(get_cs_register)
+
 #endif	/* __lint */
 #elif defined(__i386)
 
@@ -204,6 +214,10 @@ load_segment_registers(
     selector_t cs, selector_t ds, selector_t es,
     selector_t fs, selector_t gs, selector_t ss)
 {}
+
+selector_t
+get_cs_register()
+{ return ((selector_t) 0); }
 
 #else	/* __lint */
 
@@ -229,6 +243,12 @@ load_segment_registers(
 	ret
 	SET_SIZE(load_segment_registers)
 
+	ENTRY_NP(get_cs_register)
+	movl	$0, %eax
+	movw	%cs, %ax
+	ret
+	SET_SIZE(get_cs_register)
+
 #endif	/* __lint */
 #endif	/* __i386 */
 
@@ -242,12 +262,6 @@ wr_ldtr(selector_t ldtsel)
 selector_t
 rd_ldtr(void)
 { return (0); }
-
-#if defined(__amd64)
-void
-clr_ldt_sregs(void)
-{}
-#endif
 
 #else	/* __lint */
 
@@ -264,44 +278,6 @@ clr_ldt_sregs(void)
 	sldt	%ax
 	ret
 	SET_SIZE(rd_ldtr)
-
-	/*
-	 * Make sure any stale ldt selectors are cleared by loading
-	 * KDS_SEL (kernel %ds gdt selector). This is necessary
-	 * since the kernel does not use %es, %fs and %ds. %cs and
-	 * %ss are necessary and setup by the kernel along with %gs
-	 * to point to current cpu struct. If we take a kmdb breakpoint
-	 * in the kernel and resume with a stale ldt selector kmdb
-	 * would #gp fault if it points to a ldt in the context of
-	 * another process.
-	 *
-	 * WARNING: Nocona and AMD have different behaviour about storing
-	 * the null selector into %fs and %gs while in long mode. On AMD
-	 * chips fsbase and gsbase is not cleared. But on nocona storing
-	 * null selector into %fs or %gs has the side effect of clearing
-	 * fsbase or gsbase. For that reason we use KDS_SEL which has
-	 * consistent behavoir between AMD and Nocona.
-	 */
-	ENTRY_NP(clr_ldt_sregs)
-
-	/*
-	 * Save GSBASE before resetting %gs to KDS_SEL
-	 * then restore GSBASE.
-	 */
-	cli
-	movq	%rbx, %rdi
-	movw	$KDS_SEL, %bx
-        movl    $MSR_AMD_GSBASE, %ecx
-        rdmsr
-        movw    %bx, %gs
-	wrmsr
-	sti
-	movw	%bx, %ds
-	movw	%bx, %es
-	movw	%bx, %fs
-	movq	%rdi, %rbx
-	ret
-	SET_SIZE(clr_ldt_sregs)
 
 #elif defined(__i386)
 

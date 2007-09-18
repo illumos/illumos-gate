@@ -27,7 +27,8 @@
 
 LIBRARY = libdladm.a
 VERS    = .1
-OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o libdlwlan.o
+OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
+	libdlwlan.o libdlvnic.o
 
 include ../../Makefile.lib
 

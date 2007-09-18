@@ -37,6 +37,7 @@
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_gelf.h>
+#include <mdb/mdb_kb.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,17 +71,15 @@ typedef struct kt_module {
 } kt_module_t;
 
 typedef struct kt_data {
-	ssize_t (*k_aread)();		/* Libkvm kvm_aread() routine */
-	ssize_t (*k_awrite)();		/* Libkvm kvm_awrite() routine */
-	ssize_t (*k_pread)();		/* Libkvm kvm_pread() routine */
-	ssize_t (*k_pwrite)();		/* Libkvm kvm_pwrite() routine */
+	mdb_kb_ops_t *k_kb_ops;		/* KVM backend ops */
 	void (*k_dump_print_content)();	/* mdb_ks dump_print_content routine */
 	int (*k_dump_find_curproc)();	/* mdb_ks dump_find_curproc routine */
 	char *k_symfile;		/* Symbol table pathname */
 	char *k_kvmfile;		/* Core file pathname */
+	int k_xpv_domu;			/* Hypervisor domain dump? */
 	const char *k_rtld_name;	/* module containing krtld */
 	mdb_map_t k_map;		/* Persistant map for callers */
-	kvm_t *k_cookie;		/* Cookie for libkvm routines */
+	void *k_cookie;			/* Cookie for libkvm routines */
 	struct as *k_as;		/* Kernel VA of kas struct */
 	mdb_io_t *k_fio;		/* File i/o backend */
 	mdb_gelf_file_t *k_file;	/* ELF file object */
@@ -97,6 +96,8 @@ typedef struct kt_data {
 	mdb_dcmd_f *k_dcmd_stack;	/* Dcmd to print stack trace */
 	mdb_dcmd_f *k_dcmd_stackv;	/* Dcmd to print verbose stack trace */
 	mdb_dcmd_f *k_dcmd_stackr;	/* Dcmd to print stack trace and regs */
+	mdb_dcmd_f *k_dcmd_cpustack;	/* Dcmd to print CPU stack trace */
+	mdb_dcmd_f *k_dcmd_cpuregs;	/* Dcmd to print CPU registers */
 	GElf_Sym k_intr_sym;		/* Kernel locore cmnint symbol */
 	GElf_Sym k_trap_sym;		/* Kernel locore cmntrap symbol */
 	struct dumphdr *k_dumphdr;	/* Dump header for post-mortem */
@@ -164,6 +165,12 @@ extern void kt_sparcv7_init(mdb_tgt_t *);
 extern void kt_ia32_init(mdb_tgt_t *);
 extern void kt_amd64_init(mdb_tgt_t *);
 #endif	/* __sparc */
+
+typedef int (*mdb_name_lookup_fcn_t)(const char *, GElf_Sym *);
+typedef int (*mdb_addr_lookup_fcn_t)(uintptr_t, int, char *, size_t,
+    GElf_Sym *);
+extern void mdb_kvm_add_name_lookup(mdb_name_lookup_fcn_t);
+extern void mdb_kvm_add_addr_lookup(mdb_addr_lookup_fcn_t);
 
 #endif	/* _MDB */
 

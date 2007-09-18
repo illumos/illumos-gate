@@ -122,7 +122,7 @@ as_add_callback(struct as *as, void (*cb_func)(), void *arg, uint_t events,
 	if (size != -1) {
 		saddr = (caddr_t)((uintptr_t)vaddr & (uintptr_t)PAGEMASK);
 		rsize = (((size_t)(vaddr + size) + PAGEOFFSET) & PAGEMASK) -
-			(size_t)saddr;
+		    (size_t)saddr;
 		/* check for wraparound */
 		if (saddr + rsize < saddr)
 			return (ENOMEM);
@@ -638,7 +638,7 @@ void
 as_init(void)
 {
 	as_cache = kmem_cache_create("as_cache", sizeof (struct as), 0,
-		as_constructor, as_destructor, NULL, NULL, NULL, 0);
+	    as_constructor, as_destructor, NULL, NULL, NULL, 0);
 }
 
 /*
@@ -696,7 +696,8 @@ top:
 	 * When as_do_callbacks returns zero, all callbacks have completed.
 	 */
 	mutex_enter(&as->a_contents);
-	while (as->a_callbacks && as_do_callbacks(as, AS_ALL_EVENT, 0, 0));
+	while (as->a_callbacks && as_do_callbacks(as, AS_ALL_EVENT, 0, 0))
+		;
 
 	/* This will prevent new XHATs from attaching to as */
 	if (!called)
@@ -913,13 +914,13 @@ retry:
 
 	/* Kernel probe */
 	TNF_PROBE_3(address_fault, "vm pagefault", /* CSTYLED */,
-		tnf_opaque,	address,	addr,
-		tnf_fault_type,	fault_type,	type,
-		tnf_seg_access,	access,		rw);
+	    tnf_opaque,	address,	addr,
+	    tnf_fault_type,	fault_type,	type,
+	    tnf_seg_access,	access,		rw);
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	/*
 	 * XXX -- Don't grab the as lock for segkmap. We should grab it for
@@ -1084,7 +1085,7 @@ retry:
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 	seg = as_segat(as, raddr);
@@ -1148,7 +1149,7 @@ as_setprot(struct as *as, caddr_t addr, size_t size, uint_t prot)
 setprot_top:
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	if (raddr + rsize < raddr)		/* check for wraparound */
 		return (ENOMEM);
@@ -1249,8 +1250,8 @@ setprot_top:
 			 */
 			mutex_enter(&as->a_contents);
 			if (as->a_callbacks &&
-				(cb = as_find_callback(as, AS_SETPROT_EVENT,
-						seg->s_base, seg->s_size))) {
+			    (cb = as_find_callback(as, AS_SETPROT_EVENT,
+			    seg->s_base, seg->s_size))) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				as_execute_callback(as, cb, AS_SETPROT_EVENT);
 			} else {
@@ -1292,7 +1293,7 @@ as_checkprot(struct as *as, caddr_t addr, size_t size, uint_t prot)
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	if (raddr + rsize < raddr)		/* check for wraparound */
 		return (ENOMEM);
@@ -1421,8 +1422,8 @@ top:
 			as_setwatch(as);
 			mutex_enter(&as->a_contents);
 			if (as->a_callbacks &&
-				(cb = as_find_callback(as, AS_UNMAP_EVENT,
-						seg->s_base, seg->s_size))) {
+			    (cb = as_find_callback(as, AS_UNMAP_EVENT,
+			    seg->s_base, seg->s_size))) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				as_execute_callback(as, cb, AS_UNMAP_EVENT);
 			} else {
@@ -1696,7 +1697,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	/*
 	 * check for wrap around
@@ -2099,7 +2100,7 @@ as_incore(struct as *as, caddr_t addr,
 	*sizep = 0;
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = ((((size_t)addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	if (raddr + rsize < raddr)		/* check for wraparound */
 		return (ENOMEM);
@@ -2147,10 +2148,10 @@ as_segunlock(struct seg *seg, caddr_t addr, int attr,
 	while (bt_range(bitmap, &pos1, &pos2, end_pos)) {
 		size = ptob((pos2 - pos1));
 		range_start = (caddr_t)((uintptr_t)addr +
-			ptob(pos1 - position));
+		    ptob(pos1 - position));
 
 		(void) SEGOP_LOCKOP(seg, range_start, size, attr, MC_UNLOCK,
-			(ulong_t *)NULL, (size_t)NULL);
+		    (ulong_t *)NULL, (size_t)NULL);
 		pos1 = pos2;
 	}
 }
@@ -2234,12 +2235,12 @@ retry:
 			raddr = (caddr_t)((uintptr_t)seg->s_base &
 			    (uintptr_t)PAGEMASK);
 			rlen += (((uintptr_t)(seg->s_base + seg->s_size) +
-				PAGEOFFSET) & PAGEMASK) - (uintptr_t)raddr;
+			    PAGEOFFSET) & PAGEMASK) - (uintptr_t)raddr;
 		} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
 		mlock_size = BT_BITOUL(btopr(rlen));
 		if ((mlock_map = (ulong_t *)kmem_zalloc(mlock_size *
-			sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
+		    sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				return (EAGAIN);
 		}
@@ -2254,13 +2255,13 @@ retry:
 
 		if (error) {
 			for (seg = AS_SEGFIRST(as); seg != NULL;
-				seg = AS_SEGNEXT(as, seg)) {
+			    seg = AS_SEGNEXT(as, seg)) {
 
 				raddr = (caddr_t)((uintptr_t)seg->s_base &
-					(uintptr_t)PAGEMASK);
+				    (uintptr_t)PAGEMASK);
 				npages = seg_pages(seg);
 				as_segunlock(seg, raddr, attr, mlock_map,
-					idx, npages);
+				    idx, npages);
 				idx += npages;
 			}
 		}
@@ -2289,7 +2290,7 @@ retry:
 	 */
 	initraddr = raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	initrsize = rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 
 	if (raddr + rsize < raddr) {		/* check for wraparound */
 		AS_LOCK_EXIT(as, &as->a_lock);
@@ -2307,7 +2308,7 @@ retry:
 	if (func == MC_LOCK) {
 		mlock_size = BT_BITOUL(btopr(rsize));
 		if ((mlock_map = (ulong_t *)kmem_zalloc(mlock_size *
-			sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
+		    sizeof (ulong_t), KM_NOSLEEP)) == NULL) {
 				AS_LOCK_EXIT(as, &as->a_lock);
 				return (EAGAIN);
 		}
@@ -2329,9 +2330,9 @@ retry:
 			if (seg == NULL || raddr != seg->s_base) {
 				if (func == MC_LOCK) {
 					as_unlockerr(as, attr, mlock_map,
-						initraddr, initrsize - rsize);
+					    initraddr, initrsize - rsize);
 					kmem_free(mlock_map,
-						mlock_size * sizeof (ulong_t));
+					    mlock_size * sizeof (ulong_t));
 				}
 				AS_LOCK_EXIT(as, &as->a_lock);
 				return (ENOMEM);
@@ -2364,11 +2365,11 @@ retry:
 		 */
 		case MC_LOCK:
 			if (error = SEGOP_LOCKOP(seg, raddr, ssize,
-				attr, func, mlock_map, pos)) {
+			    attr, func, mlock_map, pos)) {
 				as_unlockerr(as, attr, mlock_map, initraddr,
-					initrsize - rsize + ssize);
+				    initrsize - rsize + ssize);
 				kmem_free(mlock_map, mlock_size *
-					sizeof (ulong_t));
+				    sizeof (ulong_t));
 				AS_LOCK_EXIT(as, &as->a_lock);
 				goto lockerr;
 			}
@@ -2379,7 +2380,7 @@ retry:
 		 */
 		case MC_UNLOCK:
 			(void) SEGOP_LOCKOP(seg, raddr, ssize, attr, func,
-				(ulong_t *)NULL, (size_t)NULL);
+			    (ulong_t *)NULL, (size_t)NULL);
 			break;
 
 		/*
@@ -2488,8 +2489,8 @@ as_exec(struct as *oas, caddr_t ostka, size_t stksz,
 	return (0);
 }
 
-static int
-f_decode(faultcode_t fault_err)
+int
+fc_decode(faultcode_t fault_err)
 {
 	int error = 0;
 
@@ -2528,7 +2529,7 @@ as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 top:
 	/*
 	 * if the request crosses two segments let
@@ -2574,7 +2575,7 @@ top:
 	 */
 	fault_err = as_fault(as->a_hat, as, addr, size, F_INVAL, rw);
 	if (fault_err != 0) {
-		return (f_decode(fault_err));
+		return (fc_decode(fault_err));
 	}
 
 	prefaulted = 1;
@@ -2591,7 +2592,7 @@ slow:
 	 */
 	fault_err = as_fault(as->a_hat, as, addr, size, F_SOFTLOCK, rw);
 	if (fault_err != 0) {
-		return (f_decode(fault_err));
+		return (fc_decode(fault_err));
 	}
 	*ppp = NULL;
 
@@ -2623,7 +2624,7 @@ as_pageunlock(struct as *as, struct page **pp, caddr_t addr, size_t size,
 	}
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 	seg = as_findseg(as, addr, 0);
 	ASSERT(seg);
@@ -2650,7 +2651,7 @@ as_pagereclaim(struct as *as, struct page **pp, caddr_t addr,
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
-		(size_t)raddr;
+	    (size_t)raddr;
 	seg = as_findseg(as, addr, 0);
 	ASSERT(seg);
 	SEGOP_PAGELOCK(seg, raddr, rsize, &pp, L_PAGERECLAIM, rw);
@@ -2921,7 +2922,7 @@ as_iset_default_lpsize(struct as *as, caddr_t addr, size_t size, int flags,
 {
 	int rtype = (type & MAP_SHARED) ? MAPPGSZC_SHM : MAPPGSZC_PRIVM;
 	uint_t szcvec = map_pgszcvec(addr, size, (uintptr_t)addr,
-					flags, rtype, 1);
+	    flags, rtype, 1);
 	uint_t szc;
 	uint_t nszc;
 	int error;

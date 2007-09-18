@@ -43,6 +43,9 @@
 #include <sys/kdi_regs.h>
 #include <sys/psw.h>
 #include <sys/uadmin.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 #ifdef _ASM
 
@@ -75,8 +78,34 @@
 	movq	%r11, KRS_GDT(%rax);		\
 1:
 
-/* %ss, %rsp, %rflags, %cs, %rip, %err, %trapno already on stack */
+#ifdef __xpv
 
+#define	SAVE_GSBASE(reg) /* nothing */
+#define	RESTORE_GSBASE(reg) /* nothing */
+
+#else
+
+#define	SAVE_GSBASE(base)				\
+	movl	$MSR_AMD_GSBASE, %ecx;			\
+	rdmsr;						\
+	shlq	$32, %rdx;				\
+	orq	%rax, %rdx;				\
+	movq	%rdx, REG_OFF(KDIREG_GSBASE)(base)
+
+#define	RESTORE_GSBASE(base)				\
+	movq	REG_OFF(KDIREG_GSBASE)(base), %rdx;	\
+	movq	%rdx, %rax;				\
+	shrq	$32, %rdx;				\
+	movl	$MSR_AMD_GSBASE, %ecx;			\
+	wrmsr
+
+#endif /* __xpv */
+
+/*
+ * %ss, %rsp, %rflags, %cs, %rip, %err, %trapno are already on the stack.  Note
+ * that on the hypervisor, we skip the save/restore of GSBASE: it's slow, and
+ * unnecessary.
+ */
 #define	KDI_SAVE_REGS(base) \
 	movq	%rdi, REG_OFF(KDIREG_RDI)(base);	\
 	movq	%rsi, REG_OFF(KDIREG_RSI)(base);	\
@@ -105,19 +134,11 @@
 	movq	%rax, REG_OFF(KDIREG_FS)(base);		\
 	movw	%gs, %ax;				\
 	movq	%rax, REG_OFF(KDIREG_GS)(base);		\
-	movl	$MSR_AMD_GSBASE, %ecx;			\
-	rdmsr;						\
-	shlq	$32, %rdx;				\
-	orq	%rax, %rdx;				\
-	movq	%rdx, REG_OFF(KDIREG_GSBASE)(base)
+	SAVE_GSBASE(base)
 
 #define	KDI_RESTORE_REGS(base) \
 	movq	base, %rdi;				\
-	movq	REG_OFF(KDIREG_GSBASE)(%rdi), %rdx;	\
-	movq	%rdx, %rax;				\
-	shrq	$32, %rdx;				\
-	movl	$MSR_AMD_GSBASE, %ecx;			\
-	wrmsr;						\
+	RESTORE_GSBASE(%rdi);				\
 	movq	REG_OFF(KDIREG_ES)(%rdi), %rax;		\
 	movw	%ax, %es;				\
 	movq	REG_OFF(KDIREG_DS)(%rdi), %rax;		\
@@ -137,6 +158,86 @@
 	movq	REG_OFF(KDIREG_RDX)(%rdi), %rdx;	\
 	movq	REG_OFF(KDIREG_RSI)(%rdi), %rsi;	\
 	movq	REG_OFF(KDIREG_RDI)(%rdi), %rdi
+
+/*
+ * Given the address of the current CPU's cpusave area in %rax, the following
+ * macro restores the debugging state to said CPU.  Restored state includes
+ * the debug registers from the global %dr variables, and debugging MSRs from
+ * the CPU save area.  This code would be in a separate routine, but for the
+ * fact that some of the MSRs are jump-sensitive.  As such, we need to minimize
+ * the number of jumps taken subsequent to the update of said MSRs.  We can
+ * remove one jump (the ret) by using a macro instead of a function for the
+ * debugging state restoration code.
+ *
+ * Takes the cpusave area in %rdi as a parameter, clobbers %rax-%rdx
+ */	
+#define	KDI_RESTORE_DEBUGGING_STATE \
+	pushq	%rdi;						\
+	leaq	kdi_drreg(%rip), %r15;				\
+	movl	$7, %edi;					\
+	movq	DR_CTL(%r15), %rsi;				\
+	call	kdi_dreg_set;					\
+								\
+	movl	$6, %edi;					\
+	movq	$KDIREG_DRSTAT_RESERVED, %rsi;			\
+	call	kdi_dreg_set;					\
+								\
+	movl	$0, %edi;					\
+	movq	DRADDR_OFF(0)(%r15), %rsi;			\
+	call	kdi_dreg_set;					\
+	movl	$1, %edi;					\
+	movq	DRADDR_OFF(1)(%r15), %rsi;			\
+	call	kdi_dreg_set;					\
+	movl	$2, %edi;					\
+	movq	DRADDR_OFF(2)(%r15), %rsi;			\
+	call	kdi_dreg_set;					\
+	movl	$3, %edi;					\
+	movq	DRADDR_OFF(3)(%r15), %rsi;			\
+	call	kdi_dreg_set;					\
+	popq	%rdi;						\
+								\
+	/*							\
+	 * Write any requested MSRs.				\
+	 */							\
+	movq	KRS_MSR(%rdi), %rbx;				\
+	cmpq	$0, %rbx;					\
+	je	3f;						\
+1:								\
+	movl	MSR_NUM(%rbx), %ecx;				\
+	cmpl	$0, %ecx;					\
+	je	3f;						\
+								\
+	movl	MSR_TYPE(%rbx), %edx;				\
+	cmpl	$KDI_MSR_WRITE, %edx;				\
+	jne	2f;						\
+								\
+	movq	MSR_VALP(%rbx), %rdx;				\
+	movl	0(%rdx), %eax;					\
+	movl	4(%rdx), %edx;					\
+	wrmsr;							\
+2:								\
+	addq	$MSR_SIZE, %rbx;				\
+	jmp	1b;						\
+3:								\
+	/*							\
+	 * We must not branch after re-enabling LBR.  If	\
+	 * kdi_wsr_wrexit_msr is set, it contains the number	\
+	 * of the MSR that controls LBR.  kdi_wsr_wrexit_valp	\
+	 * contains the value that is to be written to enable	\
+	 * LBR.							\
+	 */							\
+	leaq	kdi_msr_wrexit_msr(%rip), %rcx;			\
+	movl	(%rcx), %ecx;					\
+	cmpl	$0, %ecx;					\
+	je	1f;						\
+								\
+	leaq	kdi_msr_wrexit_valp(%rip), %rdx;		\
+	movq	(%rdx), %rdx;					\
+	movl	0(%rdx), %eax;					\
+	movl	4(%rdx), %edx;					\
+								\
+	wrmsr;							\
+1:
 
 /*
  * Each cpusave buffer has an area set aside for a ring buffer of breadcrumbs.
@@ -171,10 +272,6 @@
 
 #endif	/* _ASM */
 
-/*
- * The main entry point for master CPUs.  It also serves as the trap handler
- * for all traps and interrupts taken during single-step.
- */
 #if defined(__lint)
 void
 kdi_cmnint(void)
@@ -188,6 +285,10 @@ kdi_cmnint(void)
 	movq	(%rcx), %rcx
 	SET_SIZE(kdi_nmiint)
 
+	/*
+	 * The main entry point for master CPUs.  It also serves as the trap
+	 * handler for all traps and interrupts taken during single-step.
+	 */
 	ENTRY_NP(kdi_cmnint)
 	ALTENTRY(kdi_master_entry)
 
@@ -199,13 +300,23 @@ kdi_cmnint(void)
 	subq	$REG_OFF(KDIREG_TRAPNO), %rsp
 	KDI_SAVE_REGS(%rsp)
 
+#ifdef __xpv
+	/*
+	 * Clear saved_upcall_mask in unused byte of cs slot on stack.
+	 * It can only confuse things.
+	 */
+	movb	$0, REG_OFF(KDIREG_CS)+4(%rsp)
+#endif
+
+#if !defined(__xpv)
 	/*
 	 * Switch to the kernel's GSBASE.  Neither GSBASE nor the ill-named
 	 * KGSBASE can be trusted, as the kernel may or may not have already
 	 * done a swapgs.  All is not lost, as the kernel can divine the correct
 	 * value for us.  Note that the previous GSBASE is saved in the
 	 * KDI_SAVE_REGS macro to prevent a usermode process's GSBASE from being
-	 * blown away.
+	 * blown away.  On the hypervisor, we don't need to do this, since it's
+	 * ensured we're on our requested kernel GSBASE already.
 	 */
 	subq	$10, %rsp
 	sgdt	(%rsp)
@@ -217,6 +328,7 @@ kdi_cmnint(void)
 	shrq	$32, %rdx
 	movl	$MSR_AMD_GSBASE, %ecx
 	wrmsr
+#endif	/* __xpv */
 
 	GET_CPUSAVE_ADDR	/* %rax = cpusave, %rbx = CPU ID */
 
@@ -355,32 +467,41 @@ kdi_slave_entry_patch:
 
 #endif	/* __lint */
 
+/*
+ * The state of the world:
+ *
+ * The stack has a complete set of saved registers and segment
+ * selectors, arranged in the kdi_regs.h order.  It also has a pointer
+ * to our cpusave area.
+ *
+ * We need to save, into the cpusave area, a pointer to these saved
+ * registers.  First we check whether we should jump straight back to
+ * the kernel.  If not, we save a few more registers, ready the
+ * machine for debugger entry, and enter the debugger.
+ */
+
 #if !defined(__lint)
 
 	ENTRY_NP(kdi_save_common_state)
 
-	/*
-	 * The state of the world:
-	 *
-	 * The stack has a complete set of saved registers and segment
-	 * selectors, arranged in the kdi_regs.h order.  It also has a pointer
-	 * to our cpusave area.
-	 *
-	 * We need to save, into the cpusave area, a pointer to these saved
-	 * registers.  After that, we save a few more registers, ready the
-	 * machine for debugger entry, and enter the debugger.
-	 */
+	popq	%rdi			/* the cpusave area */
+	movq	%rsp, KRS_GREGS(%rdi)	/* save ptr to current saved regs */
 
-	popq	%rax			/* the cpusave area */
-	movq	%rsp, KRS_GREGS(%rax)	/* save ptr to current saved regs */
+	pushq	%rdi
+	call	kdi_trap_pass
+	cmpq	$1, %rax
+	je	kdi_pass_to_kernel
+	popq	%rax /* cpusave in %rax */
 
 	SAVE_IDTGDT
 
+#if !defined(__xpv)
 	/* Save off %cr0, and clear write protect */
 	movq	%cr0, %rcx
 	movq	%rcx, KRS_CR0(%rax)
 	andq	$_BITNOT(CR0_WP), %rcx
 	movq	%rcx, %cr0
+#endif
 
 	/* Save the debug registers and disable any active watchpoints */
 
@@ -454,9 +575,8 @@ no_msr:
 
 	call	kdi_debugger_entry
 
-	/* Pass cpusave and debugger return code for "call" to resume */
+	/* Pass cpusave to kdi_resume */
 	popq	%rdi
-	movq	%rax, %rsi
 
 	jmp	kdi_resume
 
@@ -465,82 +585,111 @@ no_msr:
 #endif	/* !__lint */
 
 /*
- * Given the address of the current CPU's cpusave area in %rax, the following
- * macro restores the debugging state to said CPU.  Restored state includes
- * the debug registers from the global %dr variables, and debugging MSRs from
- * the CPU save area.  This code would be in a separate routine, but for the
- * fact that some of the MSRs are jump-sensitive.  As such, we need to minimize
- * the number of jumps taken subsequent to the update of said MSRs.  We can
- * remove one jump (the ret) by using a macro instead of a function for the
- * debugging state restoration code.
- *
- * Takes the cpusave area in %rdi as a parameter, clobbers %rax-%rdx
- */	
-#define	KDI_RESTORE_DEBUGGING_STATE \
-	pushq	%rdi;						\
-	leaq	kdi_drreg, %r15;				\
-	movl	$7, %edi;					\
-	movq	DR_CTL(%r15), %rsi;				\
-	call	kdi_dreg_set;					\
-								\
-	movl	$6, %edi;					\
-	movq	$KDIREG_DRSTAT_RESERVED, %rsi;			\
-	call	kdi_dreg_set;					\
-								\
-	movl	$0, %edi;					\
-	movq	DRADDR_OFF(0)(%r15), %rsi;			\
-	call	kdi_dreg_set;					\
-	movl	$1, %edi;					\
-	movq	DRADDR_OFF(1)(%r15), %rsi;			\
-	call	kdi_dreg_set;					\
-	movl	$2, %edi;					\
-	movq	DRADDR_OFF(2)(%r15), %rsi;			\
-	call	kdi_dreg_set;					\
-	movl	$3, %edi;					\
-	movq	DRADDR_OFF(3)(%r15), %rsi;			\
-	call	kdi_dreg_set;					\
-	popq	%rdi;						\
-								\
-	/*							\
-	 * Write any requested MSRs.				\
-	 */							\
-	movq	KRS_MSR(%rdi), %rbx;				\
-	cmpq	$0, %rbx;					\
-	je	3f;						\
-1:								\
-	movl	MSR_NUM(%rbx), %ecx;				\
-	cmpl	$0, %ecx;					\
-	je	3f;						\
-								\
-	movl	MSR_TYPE(%rbx), %edx;				\
-	cmpl	$KDI_MSR_WRITE, %edx;				\
-	jne	2f;						\
-								\
-	movq	MSR_VALP(%rbx), %rdx;				\
-	movl	0(%rdx), %eax;					\
-	movl	4(%rdx), %edx;					\
-	wrmsr;							\
-2:								\
-	addq	$MSR_SIZE, %rbx;				\
-	jmp	1b;						\
-3:								\
-	/*							\
-	 * We must not branch after re-enabling LBR.  If	\
-	 * kdi_wsr_wrexit_msr is set, it contains the number	\
-	 * of the MSR that controls LBR.  kdi_wsr_wrexit_valp	\
-	 * contains the value that is to be written to enable	\
-	 * LBR.							\
-	 */							\
-	movl	kdi_msr_wrexit_msr, %ecx;			\
-	cmpl	$0, %ecx;					\
-	je	1f;						\
-								\
-	movq	kdi_msr_wrexit_valp, %rdx;			\
-	movl	0(%rdx), %eax;					\
-	movl	4(%rdx), %edx;					\
-								\
-	wrmsr;							\
+ * Resume the world.  The code that calls kdi_resume has already
+ * decided whether or not to restore the IDT.
+ */
+#if defined(__lint)
+void
+kdi_resume(void)
+{
+}
+#else	/* __lint */
+
+	/* cpusave in %rdi */
+	ENTRY_NP(kdi_resume)
+
+	/*
+	 * Send this CPU back into the world
+	 */
+#if !defined(__xpv)
+	movq	KRS_CR0(%rdi), %rdx
+	movq	%rdx, %cr0
+#endif
+
+	KDI_RESTORE_DEBUGGING_STATE
+
+	movq	KRS_GREGS(%rdi), %rsp
+	KDI_RESTORE_REGS(%rsp)
+	addq	$REG_OFF(KDIREG_RIP), %rsp	/* Discard state, trapno, err */
+	IRET
+	/*NOTREACHED*/
+	SET_SIZE(kdi_resume)
+
+#endif	/* __lint */
+
+#if !defined(__lint)
+
+	ENTRY_NP(kdi_pass_to_kernel)
+
+	popq	%rdi /* cpusave */
+
+	movq	$KDI_CPU_STATE_NONE, KRS_CPU_STATE(%rdi)
+
+	/*
+	 * Find the trap and vector off the right kernel handler.  The trap
+	 * handler will expect the stack to be in trap order, with %rip being
+	 * the last entry, so we'll need to restore all our regs.  On i86xpv
+	 * we'll need to compensate for XPV_TRAP_POP.
+	 *
+	 * We're hard-coding the three cases where KMDB has installed permanent
+	 * handlers, since after we KDI_RESTORE_REGS(), we don't have registers
+	 * to work with; we can't use a global since other CPUs can easily pass
+	 * through here at the same time.
+	 *
+	 * Note that we handle T_DBGENTR since userspace might have tried it.
+	 */
+	movq	KRS_GREGS(%rdi), %rsp
+	movq	REG_OFF(KDIREG_TRAPNO)(%rsp), %rdi
+	cmpq	$T_SGLSTP, %rdi
+	je	1f
+	cmpq	$T_BPTFLT, %rdi
+	je	2f
+	cmpq	$T_DBGENTR, %rdi
+	je	3f
+	/*
+	 * Hmm, unknown handler.  Somebody forgot to update this when they
+	 * added a new trap interposition... try to drop back into kmdb.
+	 */
+	int	$T_DBGENTR
+	
+#define	CALL_TRAP_HANDLER(name) \
+	KDI_RESTORE_REGS(%rsp); \
+	/* Discard state, trapno, err */ \
+	addq	$REG_OFF(KDIREG_RIP), %rsp; \
+	XPV_TRAP_PUSH; \
+	jmp	%cs:name
+
 1:
+	CALL_TRAP_HANDLER(dbgtrap)
+	/*NOTREACHED*/
+2:
+	CALL_TRAP_HANDLER(brktrap)
+	/*NOTREACHED*/
+3:
+	CALL_TRAP_HANDLER(invaltrap)
+	/*NOTREACHED*/
+
+	SET_SIZE(kdi_pass_to_kernel)
+
+	/*
+	 * A minimal version of mdboot(), to be used by the master CPU only.
+	 */
+	ENTRY_NP(kdi_reboot)
+
+	movl	$AD_BOOT, %edi
+	movl	$A_SHUTDOWN, %esi
+	call	*psm_shutdownf
+#if defined(__xpv)
+	movl	$SHUTDOWN_reboot, %edi
+	call	HYPERVISOR_shutdown
+#else
+	call	reset
+#endif
+	/*NOTREACHED*/
+
+	SET_SIZE(kdi_reboot)
+
+#endif	/* !__lint */
 
 #if defined(__lint)
 /*ARGSUSED*/
@@ -564,90 +713,3 @@ kdi_cpu_debug_init(kdi_cpusave_t *save)
 	SET_SIZE(kdi_cpu_debug_init)
 #endif	/* !__lint */
 
-/*
- * Resume the world.  The code that calls kdi_resume has already
- * decided whether or not to restore the IDT.
- */
-#if defined(__lint)
-void
-kdi_resume(void)
-{
-}
-#else	/* __lint */
-
-	ENTRY_NP(kdi_resume)
-
-	/* cpusave in %rdi, debugger command in %rsi */
-
-	cmpq	$KDI_RESUME_PASS_TO_KERNEL, %rsi
-	je	kdi_pass_to_kernel
-
-	/*
-	 * Send this CPU back into the world
-	 */
-	movq	KRS_CR0(%rdi), %rdx
-	movq	%rdx, %cr0
-
-	KDI_RESTORE_DEBUGGING_STATE
-
-	movq	KRS_GREGS(%rdi), %rsp
-	KDI_RESTORE_REGS(%rsp)
-	addq	$REG_OFF(KDIREG_RIP), %rsp	/* Discard state, trapno, err */
-	IRET
-	/*NOTREACHED*/
-	SET_SIZE(kdi_resume)
-
-#endif	/* __lint */
-
-#if !defined(__lint)
-
-	ENTRY_NP(kdi_pass_to_kernel)
-
-	/* cpusave is still in %rdi */
-	movq	KRS_CR0(%rdi), %rdx
-	movq	%rdx, %cr0
-
-	/*
-	 * When we replaced the kernel's handlers in the IDT, we made note of
-	 * the handlers being replaced, thus allowing us to pass traps directly
-	 * to said handlers here.  We won't have any registers available for use
-	 * after we start popping, and we know we're single-threaded here, so
-	 * we have to use a global to store the handler address.
-	 */
-	movq	KRS_GREGS(%rdi), %rsp
-	movq	REG_OFF(KDIREG_TRAPNO)(%rsp), %rdi
-	call	kdi_kernel_trap2hdlr
-	movq	%rax, kdi_kernel_handler
-
-	/*
-	 * The trap handler will expect the stack to be in trap order, with
-	 * %rip being the last entry.  Our stack is currently in kdi_regs.h
-	 * order, so we'll need to pop (and restore) our way back down.
-	 */
-	KDI_RESTORE_REGS(%rsp)
-	addq	$REG_OFF(KDIREG_RIP), %rsp	/* Discard state, trapno, err */
-
-	jmp	*%cs:kdi_kernel_handler
-	/*NOTREACHED*/
-
-	SET_SIZE(kdi_pass_to_kernel)
-
-	/*
-	 * Reboot the system.  This routine is to be called only by the master
-	 * CPU.
-	 */
-	ENTRY_NP(kdi_reboot)
-
-	movl	$AD_BOOT, %edi
-	movl	$A_SHUTDOWN, %esi
-	call	*psm_shutdownf
-
-	/*
-	 * psm_shutdown didn't work or it wasn't set, try pc_reset.
-	 */
-	call	pc_reset
-	/*NOTREACHED*/
-
-	SET_SIZE(kdi_reboot)
-
-#endif	/* !__lint */

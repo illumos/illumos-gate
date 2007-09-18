@@ -84,6 +84,7 @@ f none usr/kernel/sys/exacctsys 755 root sys
 f none usr/kernel/sys/sysacct 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_xen_link.so 755 root sys
 s none usr/sbin/installgrub=../../sbin/installgrub
 f none usr/sbin/prtdiag 2755 root sys
 f none usr/sbin/rtc 555 root bin

@@ -123,11 +123,19 @@ extern "C" {
  *
  * PT_NOCONSIST - There is no hment entry for this mapping.
  *
+ * PT_FOREIGN - used for the hypervisor, check via
+ *		(pte & PT_SOFTWARE) >= PT_FOREIGN
+ *		as it might set	0x800 for foreign grant table mappings.
  */
 #define	PT_NOSYNC	(0x200)	/* PTE was created with HAT_NOSYNC */
 #define	PT_NOCONSIST	(0x400)	/* PTE was created with HAT_LOAD_NOCONSIST */
+#define	PT_FOREIGN	(0x600)	/* MFN mapped on the hypervisor has no PFN */
 
+#ifdef __xpv
+#include <sys/xen_mmu.h>
+#else
 #include <sys/pc_mmu.h>
+#endif
 
 /*
  * The software extraction for a single Page Table Entry will always

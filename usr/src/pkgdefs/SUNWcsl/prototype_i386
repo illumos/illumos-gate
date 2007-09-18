@@ -50,6 +50,7 @@
 d none usr/lib/libc 755 root bin
 f none usr/lib/libc/libc_hwcap1.so.1 755 root bin
 f none usr/lib/libc/libc_hwcap2.so.1 755 root bin
+f none usr/lib/libc/libc_hwcap3.so.1 755 root bin
 d none usr/ccs/lib/amd64 755 root bin
 s none usr/ccs/lib/amd64/libcurses.so=../../../../lib/amd64/libcurses.so.1
 s none usr/ccs/lib/amd64/libform.so=../../../lib/amd64/libform.so.1

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,8 @@
  */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,14 +52,22 @@ extern "C" {
  */
 #ifdef __amd64
 /*
- * The maximum stack size on amd64 is chosen to allow the stack to consume
- * all the va space between the top of the user's virtual address space and
- * the top of the va hole.
+ * On amd64, the stack grows down from just below KERNELBASE (see the
+ * definition of USERLIMIT in i86pc/sys/machparam.h). Theoretically,
+ * it could grow down to the top of the VA hole (0xffff800000000000),
+ * giving it a possible maximum of about 125T. For an amd64 xpv
+ * kernel, all user VA space is below the VA hole. The theoretical
+ * maximum for the stack is about the same, although it can't grow
+ * to quite that size, since it would clash with the heap.
+ *
+ * Pick an upper limit that will work in both cases: 32T.
+ *
+ * For 32bit processes, the stack is below the text segment.
  */
-#define	MAXSSIZ		(USRSTACK - 0xFFFF800000000000)
+#define	MAXSSIZ		(32ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL)
 #else
 #define	MAXSSIZ		(USRSTACK - 1024*1024)
-#endif
+#endif /* __amd64 */
 #define	DFLSSIZ		(8*1024*1024 + ((USRSTACK) & 0x3FFFFF))
 
 /*

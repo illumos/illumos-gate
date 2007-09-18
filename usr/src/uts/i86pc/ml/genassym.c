@@ -54,6 +54,10 @@
 #include <sys/sunddi.h>
 #include <sys/mach_mmu.h>
 
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
+
 #undef	exit		/* unhide exit, see comment above */
 extern void exit(int);
 
@@ -177,5 +181,10 @@ main(int argc, char *argv[])
 
 	printf("#define\tKPREEMPT_SYNC 0x%x\n", KPREEMPT_SYNC);
 
+#if defined(__xpv)
+	printf("#define\tSHUTDOWN_reboot 0x%x\n", SHUTDOWN_reboot);
+	printf("#define\tSCHEDOP_block 0x%x\n", SCHEDOP_block);
+	printf("#define\tVGCF_IN_SYSCALL 0x%x\n", VGCF_IN_KERNEL);
+#endif
 	return (0);
 }

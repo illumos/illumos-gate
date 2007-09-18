@@ -94,7 +94,8 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 			rval = pcb->pcb_fs = LWPFS_SEL;
 		}
 		if (thisthread)
-			CPU->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
+			gdt_update_usegd(GDT_LWPFS, &pcb->pcb_fsdesc);
+
 		pcb->pcb_fsbase = base;
 		break;
 	case _LWP_GSBASE:
@@ -108,7 +109,8 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 			rval = pcb->pcb_gs = LWPGS_SEL;
 		}
 		if (thisthread)
-			CPU->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
+			gdt_update_usegd(GDT_LWPGS, &pcb->pcb_gsdesc);
+
 		pcb->pcb_gsbase = base;
 		break;
 	default:
@@ -128,14 +130,16 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 		set_usegd(&pcb->pcb_fsdesc, (void *)base, -1,
 		    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
 		if (thisthread)
-			CPU->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
+			gdt_update_usegd(GDT_LWPFS, &pcb->pcb_fsdesc);
+
 		rval = rp->r_fs = LWPFS_SEL;
 		break;
 	case _LWP_GSBASE:
 		set_usegd(&pcb->pcb_gsdesc, (void *)base, -1,
 		    SDT_MEMRWA, SEL_UPL, SDP_PAGES, SDP_OP32);
 		if (thisthread)
-			CPU->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
+			gdt_update_usegd(GDT_LWPGS, &pcb->pcb_gsdesc);
+
 		rval = rp->r_gs = LWPGS_SEL;
 		break;
 	default:

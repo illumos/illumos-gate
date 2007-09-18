@@ -69,3 +69,10 @@ f none platform/i86pc/kernel/drv/pci-ide 755 root sys
 f none platform/i86pc/kernel/drv/pci-ide.conf 644 root sys
 d none platform/i86pc/kernel/drv/amd64 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci-ide 755 root sys
+d none platform/i86xpv 755 root sys
+d none platform/i86xpv/kernel 755 root sys
+d none platform/i86xpv/kernel/drv 755 root sys
+d none platform/i86xpv/kernel/drv/amd64 755 root sys
+f none platform/i86xpv/kernel/drv/amd64/pci-ide 755 root sys
+f none platform/i86xpv/kernel/drv/pci-ide 755 root sys
+f none platform/i86xpv/kernel/drv/pci-ide.conf 644 root sys

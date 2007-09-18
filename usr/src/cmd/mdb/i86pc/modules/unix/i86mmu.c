@@ -37,6 +37,9 @@
 #include <sys/machparam.h>
 #include <sys/controlregs.h>
 #include <sys/mach_mmu.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 #include <vm/as.h>
 
 #include <mdb/mdb_modapi.h>
@@ -51,7 +54,7 @@ struct pfn2pp {
 };
 
 static int do_va2pa(uintptr_t, struct as *, int, physaddr_t *, pfn_t *);
-static void get_mmu(void);
+static void init_mmu(void);
 
 int
 platform_vtop(uintptr_t addr, struct as *asp, physaddr_t *pap)
@@ -59,10 +62,8 @@ platform_vtop(uintptr_t addr, struct as *asp, physaddr_t *pap)
 	if (asp == NULL)
 		return (DCMD_ERR);
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
@@ -127,7 +128,7 @@ page_num2pp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (page.p_pagenum != pfn2pp.pfn) {
 		mdb_warn("WARNING! Found page structure contains "
-			"different pagenumber %x\n", page.p_pagenum);
+		    "different pagenumber %x\n", page.p_pagenum);
 	}
 
 	return (DCMD_OK);
@@ -154,7 +155,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (DCMD_HDRSPEC(flags))
 		mdb_printf("%<u>%?s %?s %?s %?s %?s%</u>\n", "ADDR",
-			"PAGES", "EPAGES", "BASE", "END");
+		    "PAGES", "EPAGES", "BASE", "END");
 
 	if (mdb_vread(&ms, sizeof (struct memseg), addr) == -1) {
 		mdb_warn("can't read memseg at %#lx", addr);
@@ -162,7 +163,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%0?lx %0?lx %0?lx %0?lx %0?lx\n", addr,
-		ms.pages, ms.epages, ms.pages_base, ms.pages_end);
+	    ms.pages, ms.epages, ms.pages_base, ms.pages_end);
 
 	return (DCMD_OK);
 }
@@ -221,15 +222,24 @@ memseg_walk_fini(mdb_walk_state_t *wsp)
  * Now HAT related dcmds.
  */
 
-struct hat *khat;		/* value of kas.a_hat */
+static struct hat *khat;		/* value of kas.a_hat */
 struct hat_mmu_info mmu;
 uintptr_t kernelbase;
+
+/*
+ * stuff for i86xpv images
+ */
+static int is_xpv;
+static uintptr_t mfn_list_addr; /* kernel MFN list address */
+uintptr_t xen_virt_start; /* address of mfn_to_pfn[] table */
+ulong_t mfn_count;	/* number of pfn's in the MFN list */
+pfn_t *mfn_list;	/* local MFN list copy */
 
 /*
  * read mmu parameters from kernel
  */
 static void
-get_mmu(void)
+init_mmu(void)
 {
 	struct as kas;
 
@@ -243,11 +253,206 @@ get_mmu(void)
 	if (mdb_readsym(&kernelbase, sizeof (kernelbase), "kernelbase") == -1)
 		mdb_warn("Couldn't find kernelbase\n");
 	khat = kas.a_hat;
+
+	/*
+	 * Is this a paravirtualized domain image?
+	 */
+	if (mdb_readsym(&mfn_list_addr, sizeof (mfn_list_addr),
+	    "mfn_list") == -1 ||
+	    mdb_readsym(&xen_virt_start, sizeof (xen_virt_start),
+	    "xen_virt_start") == -1 ||
+	    mdb_readsym(&mfn_count, sizeof (mfn_count), "mfn_count") == -1) {
+		mfn_list_addr = NULL;
+	}
+
+	is_xpv = mfn_list_addr != NULL;
+
+#ifndef _KMDB
+	/*
+	 * recreate the local mfn_list
+	 */
+	if (is_xpv) {
+		size_t sz = mfn_count * sizeof (pfn_t);
+		mfn_list = mdb_zalloc(sz, UM_SLEEP);
+
+		if (mdb_vread(mfn_list, sz, (uintptr_t)mfn_list_addr) == -1) {
+			mdb_warn("Failed to read MFN list\n");
+			mdb_free(mfn_list, sz);
+			mfn_list = NULL;
+		}
+	}
+#endif
 }
+
+void
+free_mmu(void)
+{
+#ifdef __xpv
+	if (mfn_list != NULL)
+		mdb_free(mfn_list, mfn_count * sizeof (mfn_t));
+#endif
+}
+
+#ifdef __xpv
+
+#ifdef _KMDB
+
+/*
+ * Convert between MFNs and PFNs.  Since we're in kmdb we can go directly
+ * through the machine to phys mapping and the MFN list.
+ */
+
+pfn_t
+mdb_mfn_to_pfn(mfn_t mfn)
+{
+	pfn_t pfn;
+	mfn_t tmp;
+	pfn_t *pfn_list;
+
+	if (mfn_list_addr == NULL)
+		return (-(pfn_t)1);
+
+	pfn_list = (pfn_t *)xen_virt_start;
+	if (mdb_vread(&pfn, sizeof (pfn), (uintptr_t)(pfn_list + mfn)) == -1)
+		return (-(pfn_t)1);
+
+	if (mdb_vread(&tmp, sizeof (tmp),
+	    (uintptr_t)(mfn_list_addr + (pfn * sizeof (mfn_t)))) == -1)
+		return (-(pfn_t)1);
+
+	if (pfn >= mfn_count || tmp != mfn)
+		return (-(pfn_t)1);
+
+	return (pfn);
+}
+
+mfn_t
+mdb_pfn_to_mfn(pfn_t pfn)
+{
+	mfn_t mfn;
+
+	init_mmu();
+
+	if (mfn_list_addr == NULL || pfn >= mfn_count)
+		return (-(mfn_t)1);
+
+	if (mdb_vread(&mfn, sizeof (mfn),
+	    (uintptr_t)(mfn_list_addr + (pfn * sizeof (mfn_t)))) == -1)
+		return (-(mfn_t)1);
+
+	return (mfn);
+}
+
+#else /* _KMDB */
+
+/*
+ * Convert between MFNs and PFNs.  Since a crash dump doesn't include the
+ * MFN->PFN translation table (it's part of the hypervisor, not our image)
+ * we do the MFN->PFN translation by searching the PFN->MFN (mfn_list)
+ * table, if it's there.
+ */
+
+pfn_t
+mdb_mfn_to_pfn(mfn_t mfn)
+{
+	pfn_t pfn;
+
+	init_mmu();
+
+	if (mfn_list == NULL)
+		return (-(pfn_t)1);
+
+	for (pfn = 0; pfn < mfn_count; ++pfn) {
+		if (mfn_list[pfn] != mfn)
+			continue;
+		return (pfn);
+	}
+
+	return (-(pfn_t)1);
+}
+
+mfn_t
+mdb_pfn_to_mfn(pfn_t pfn)
+{
+	init_mmu();
+
+	if (mfn_list == NULL || pfn >= mfn_count)
+		return (-(mfn_t)1);
+
+	return (mfn_list[pfn]);
+}
+
+#endif /* _KMDB */
+
+static paddr_t
+mdb_ma_to_pa(uint64_t ma)
+{
+	pfn_t pfn = mdb_mfn_to_pfn(mmu_btop(ma));
+	if (pfn == -(pfn_t)1)
+		return (-(paddr_t)1);
+
+	return (mmu_ptob((paddr_t)pfn) | (ma & (MMU_PAGESIZE - 1)));
+}
+
+#else /* __xpv */
 
 #define	mdb_ma_to_pa(ma) (ma)
 #define	mdb_mfn_to_pfn(mfn) (mfn)
 #define	mdb_pfn_to_mfn(pfn) (pfn)
+
+#endif /* __xpv */
+
+/*
+ * ::mfntopfn dcmd translates hypervisor machine page number
+ * to physical page number
+ */
+/*ARGSUSED*/
+int
+mfntopfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	pfn_t pfn;
+
+	if ((flags & DCMD_ADDRSPEC) == 0) {
+		mdb_warn("MFN missing\n");
+		return (DCMD_USAGE);
+	}
+
+	if ((pfn = mdb_mfn_to_pfn((pfn_t)addr)) == -(pfn_t)1) {
+		mdb_warn("Invalid mfn %lr\n", (pfn_t)addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%lr\n", pfn);
+
+	return (DCMD_OK);
+}
+
+/*
+ * ::pfntomfn dcmd translates physical page number to
+ * hypervisor machine page number
+ */
+/*ARGSUSED*/
+int
+pfntomfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	pfn_t mfn;
+
+	if ((flags & DCMD_ADDRSPEC) == 0) {
+		mdb_warn("PFN missing\n");
+		return (DCMD_USAGE);
+	}
+
+	if ((mfn = mdb_pfn_to_mfn((pfn_t)addr)) == -(pfn_t)1) {
+		mdb_warn("Invalid pfn %lr\n", (pfn_t)addr);
+		return (DCMD_ABORT);
+	}
+
+	mdb_printf("%lr\n", mfn);
+
+	if (flags & DCMD_LOOP)
+		mdb_set_dot(addr + 1);
+	return (DCMD_OK);
+}
 
 static pfn_t
 pte2mfn(x86pte_t pte, uint_t level)
@@ -281,7 +486,7 @@ do_pte_dcmd(int level, uint64_t pte)
 		mdb_printf("noexec ");
 
 	mfn = pte2mfn(pte, level);
-	mdb_printf("%s=0x%lr ", "pfn", mfn);
+	mdb_printf("%s=0x%lr ", is_xpv ? "mfn" : "pfn", mfn);
 
 	if (PTE_GET(pte, PT_NOCONSIST))
 		mdb_printf("noconsist ");
@@ -351,10 +556,8 @@ pte_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char *level_str = NULL;
 	char *pte_str = NULL;
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
@@ -529,10 +732,8 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pfn_t mfn;
 	int rc;
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
@@ -567,6 +768,9 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("Virtual address 0x%p maps pfn 0x%lr", addr, pfn);
+
+	if (is_xpv)
+		mdb_printf(" (mfn 0x%lr)", mfn);
 
 	mdb_printf("\n");
 
@@ -677,7 +881,7 @@ do_report_maps(pfn_t pfn)
 					if (mmu_btop(mdb_ma_to_pa(pte)) != pfn)
 						continue;
 					mdb_printf("hat=%p maps addr=%p\n",
-						hatp, (caddr_t)base);
+					    hatp, (caddr_t)base);
 				}
 			}
 		}
@@ -697,10 +901,8 @@ report_maps_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pfn_t pfn;
 	uint_t mflag = 0;
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
@@ -819,10 +1021,8 @@ ptable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pfn_t pfn;
 	uint_t mflag = 0;
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
@@ -886,10 +1086,8 @@ htables_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	hat_t *hat;
 
-	/*
-	 * The kernel has to at least have made it thru mmu_init()
-	 */
-	get_mmu();
+	init_mmu();
+
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 

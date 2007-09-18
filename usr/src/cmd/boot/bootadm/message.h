@@ -368,10 +368,6 @@ see %s\n")
 gettext("bootadm -m upgrade run, but the failsafe archives have not been\n\
 updated.  Not updating line %d\n")
 
-#define	NO_FAILSAFE_KERNEL	\
-gettext("Could not find failsafe kernel -- no failsafe entry will be\n\
-installed in /boot/grub/menu.lst\n")
-
 #ifdef	__cplusplus
 }
 #endif

@@ -19,14 +19,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-LINK_SRCS_sparc = misc_link_sparc.c
-LINK_OBJS_sparc = misc_link_sparc.o
-LINK_MODS_sparc = SUNW_misc_link_sparc.so
+MISC_LINK_ISA	= misc_link_sparc
+
+LINK_SRCS_sparc =		\
+	$(MISC_LINK_ISA).c
+
+LINK_OBJS_sparc =		\
+	$(MISC_LINK_ISA).o
+
+LINK_MODS_sparc =		\
+	SUNW_$(MISC_LINK_ISA).so
 
 include ../Makefile.com
 

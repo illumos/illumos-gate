@@ -49,15 +49,15 @@ extern "C" {
  *
  *	If lock is PLAT_HOLD_LOCK, in addition to the above, attempt to lock
  *	the page exclusively.  Again, if the lock is successful, the page
- *	pointer will be put in pp, and PLAT_HOLD_OK will be returned.  pp_ret
- *	must be passed to a later call to plat_release_page.  If the page
- *	wasn't found, or the lock couldn't be grabbed, the return value will
- *	be PLAT_HOLD_FAIL.
+ *	pointer will be put in pp_ret, and PLAT_HOLD_OK will be returned.
+ *	pp_ret must be passed to a later call to plat_release_page.  If the
+ *	page wasn't found, or the lock couldn't be grabbed, the return value
+ *	will be PLAT_HOLD_FAIL.
  *
  * void plat_release_page(page_t *pp)
  *
  *	Unlock the page pp.  Should only be called after a previous,
- *	successful call to plat_release_page(pfn, PLAT_HOLD_LOCK, &pp);
+ *	successful call to plat_hold_page(pfn, PLAT_HOLD_LOCK, &pp);
  */
 
 #define	PLAT_HOLD_NO_LOCK	0

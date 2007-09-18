@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +128,7 @@
 #include <sys/t_lock.h>
 #include <sys/cred.h>
 #include <sys/systm.h>
+#include <sys/archsystm.h>
 #include <sys/uadmin.h>
 #include <sys/callb.h>
 #include <sys/vfs.h>
@@ -313,7 +313,16 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		fm_banner();
 		errorq_panic();
 
-		printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id, (void *)t);
+#if defined(__x86)
+		/*
+		 * A hypervisor panic originates outside of Solaris, so we
+		 * don't want to prepend the panic message with misleading
+		 * pointers from within Solaris.
+		 */
+		if (!IN_XPV_PANIC())
+#endif
+			printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id,
+			    (void *)t);
 		vprintf(format, alist);
 		printf("\n\n");
 
@@ -385,7 +394,8 @@ spin:
 	 * and unable to jump into the debugger.
 	 */
 	splx(MIN(s, ipltospl(CLOCK_LEVEL)));
-	for (;;);
+	for (;;)
+		;
 }
 
 void

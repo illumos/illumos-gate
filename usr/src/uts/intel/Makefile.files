@@ -47,7 +47,6 @@ CORE_OBJS +=		\
 	float.o		\
 	fpu.o		\
 	i86_subr.o	\
-	lwp_private.o	\
 	lock_prim.o	\
 	ovbcopy.o	\
 	polled_io.o	\
@@ -71,6 +70,7 @@ GENUNIX_OBJS +=		\
 	archdep.o	\
 	getcontext.o	\
 	install_utrap.o	\
+	lwp_private.o	\
 	prom_enter.o	\
 	prom_exit.o	\
 	prom_panic.o	\
@@ -130,6 +130,7 @@ BSCBUS_OBJS += bscbus.o
 BSCV_OBJS += bscv.o
 CMDK_OBJS += cmdk.o
 CMLB_OBJS += cmlb.o
+CPUNEX_OBJS += cpunex.o
 DADK_OBJS += dadk.o
 DNET_OBJS += dnet.o mii.o
 FD_OBJS += fd.o

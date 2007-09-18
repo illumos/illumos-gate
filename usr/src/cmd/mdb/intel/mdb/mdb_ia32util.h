@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,9 +51,6 @@ extern int mdb_ia32_kvm_frame(void *, uintptr_t, uint_t, const long *,
     const mdb_tgt_gregset_t *);
 extern int mdb_ia32_kvm_framev(void *, uintptr_t, uint_t, const long *,
     const mdb_tgt_gregset_t *);
-
-/* Provided by the target */
-extern int mdb_kvm_intrframe(mdb_tgt_t *, uintptr_t, uintptr_t, uintptr_t);
 
 #ifdef __cplusplus
 }

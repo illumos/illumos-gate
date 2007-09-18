@@ -56,7 +56,6 @@ CORE_OBJS +=			\
 	hold_page.o		\
 	hrtimers.o		\
 	htable.o		\
-	i8254.o			\
 	i86_mmu.o		\
 	instr_size.o		\
 	intr.o			\
@@ -72,6 +71,7 @@ CORE_OBJS +=			\
 	mem_config_stubs.o	\
 	memnode.o		\
 	microcode.o		\
+	microfind.o		\
 	mlsetup.o		\
 	mp_call.o		\
 	mp_implfuncs.o		\
@@ -143,9 +143,10 @@ DBOOT_OBJS_32 =
 DBOOT_OBJS_64 += dboot_elfload.o
 
 DBOOT_OBJS +=			\
+	dboot_asm.o		\
 	dboot_grub.o		\
-	dboot_startkern.o	\
 	dboot_printf.o		\
+	dboot_startkern.o	\
 	memcpy.o		\
 	memset.o		\
 	muldiv.o		\
@@ -175,7 +176,6 @@ MCAMD_OBJS	+= \
 	mcamd_pcicfg.o
 
 CPUDRV_OBJS	+= cpudrv.o cpudrv_plat.o cpu_acpi.o speedstep.o
-CPUNEX_OBJS	+= cpunex.o
 PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
 ROOTNEX_OBJS += rootnex.o

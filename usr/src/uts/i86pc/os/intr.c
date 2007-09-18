@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -54,7 +55,34 @@
 #include <sys/x86_archext.h>
 #include <sys/promif.h>
 #include <vm/hat_i86.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
 
+
+#if defined(__xpv) && defined(DEBUG)
+
+/*
+ * This panic message is intended as an aid to interrupt debugging.
+ *
+ * The associated assertion tests the condition of enabling
+ * events when events are already enabled.  The implication
+ * being that whatever code the programmer thought was
+ * protected by having events disabled until the second
+ * enable happened really wasn't protected at all ..
+ */
+
+int stistipanic = 1;	/* controls the debug panic check */
+const char *stistimsg = "stisti";
+ulong_t laststi[NCPU];
+
+/*
+ * This variable tracks the last place events were disabled on each cpu
+ * it assists in debugging when asserts that interupts are enabled trip.
+ */
+ulong_t lastcli[NCPU];
+
+#endif
 
 /*
  * Set cpu's base SPL level to the highest active interrupt level
@@ -409,7 +437,7 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
  * The first time intr_get_time() is called while handling an interrupt,
  * it returns the time since the interrupt handler was invoked. Subsequent
  * calls will return the time since the prior call to intr_get_time(). Time
- * is returned as ticks. Use tsc_scalehrtime() to convert ticks to nsec.
+ * is returned as ticks. Use scalehrtimef() to convert ticks to nsec.
  *
  * Theory Of Intrstat[][]:
  *
@@ -739,7 +767,7 @@ cpu_kstat_intrstat_update(kstat_t *ksp, int rw)
 
 	for (i = 0; i < PIL_MAX; i++) {
 		hrt = (hrtime_t)cpup->cpu_m.intrstat[i + 1][0];
-		tsc_scalehrtime(&hrt);
+		scalehrtimef(&hrt);
 		knp[i * 2].value.ui64 = (uint64_t)hrt;
 		knp[(i * 2) + 1].value.ui64 = cpup->cpu_stats.sys.intr[i];
 	}
@@ -869,7 +897,7 @@ dosoftint(struct regs *regs)
 	while (cpu->cpu_softinfo.st_pending) {
 		oldipl = cpu->cpu_pri;
 		newsp = dosoftint_prolog(cpu, (caddr_t)regs,
-			cpu->cpu_softinfo.st_pending, oldipl);
+		    cpu->cpu_softinfo.st_pending, oldipl);
 		/*
 		 * If returned stack pointer is NULL, priority is too high
 		 * to run any of the pending softints now.
@@ -901,10 +929,12 @@ do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 	ttp->ttr_vector = 0xff;
 #endif	/* TRAPTRACE */
 
+#if !defined(__xpv)
 	/*
 	 * Handle any pending TLB flushing
 	 */
 	tlb_service();
+#endif
 
 	/*
 	 * If it's a softint go do it now.

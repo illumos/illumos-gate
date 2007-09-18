@@ -122,6 +122,7 @@ COMMON_SUBDIRS=		\
 	devctl		\
 	devinfo		\
 	devmgmt		\
+	devprop		\
 	dfs.cmds	\
 	diff		\
 	diff3		\
@@ -405,6 +406,7 @@ COMMON_SUBDIRS=		\
 	valtools	\
 	vgrind		\
 	vi		\
+	vna		\
 	volcheck	\
 	volrmmount	\
 	w		\

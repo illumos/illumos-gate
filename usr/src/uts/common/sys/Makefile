@@ -565,6 +565,8 @@ CHKHDRS=			\
 	vmem_impl.h		\
 	vmmeter.h		\
 	vmsystm.h		\
+	vnic.h			\
+	vnic_impl.h		\
 	vnode.h			\
 	vtoc.h			\
 	vtrace.h		\

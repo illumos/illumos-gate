@@ -78,6 +78,7 @@ typedef struct entry {
 #define	BAM_ENTRY_MINIROOT	0x10	/* entry uses the failsafe miniroot */
 #define	BAM_ENTRY_DBOOT		0x20	/* Is a dboot entry */
 #define	BAM_ENTRY_32BIT		0x40	/* Is a 32-bit entry */
+#define	BAM_ENTRY_HV		0x80	/* Is a hypervisor entry */
 
 typedef struct {
 	line_t	*start;
@@ -98,6 +99,9 @@ typedef enum {
 /*
  * Menu related
  * menu_cmd_t and menu_cmds must be kept in sync
+ *
+ * The *_DOLLAR_CMD values must be 1 greater than the
+ * respective [KERNEL|MODULE]_CMD values.
  */
 typedef enum {
 	DEFAULT_CMD = 0,
@@ -105,9 +109,9 @@ typedef enum {
 	TITLE_CMD,
 	ROOT_CMD,
 	KERNEL_CMD,
-	KERNEL_DOLLAR_CMD,
+	KERNEL_DOLLAR_CMD,	/* Must be KERNEL_CMD + 1 */
 	MODULE_CMD,
-	MODULE_DOLLAR_CMD,
+	MODULE_DOLLAR_CMD,	/* Must be MODULE_CMD + 1 */
 	SEP_CMD,
 	COMMENT_CMD,
 	CHAINLOADER_CMD,
@@ -123,9 +127,17 @@ typedef enum {
 	BAM_DIRECT_DBOOT
 } direct_or_multi_t;
 
+/* Is there a hypervisor present? */
+typedef enum {
+	BAM_HV_UNKNOWN,
+	BAM_HV_NO,
+	BAM_HV_PRESENT
+} hv_t;
+
 extern int bam_verbose;
 extern int bam_force;
 extern direct_or_multi_t bam_direct;
+extern hv_t bam_is_hv;
 
 extern error_t upgrade_menu(menu_t *, char *, char *);
 extern void *s_calloc(size_t, size_t);
@@ -137,6 +149,7 @@ extern error_t dboot_or_multiboot(const char *);
 extern char *get_special(char *);
 extern char *os_to_grubdisk(char *, int);
 extern void update_line(line_t *);
+extern int add_boot_entry(menu_t *, char *, char *, char *, char *, char *);
 
 #define	BAM_MAXLINE	8192
 
@@ -157,6 +170,9 @@ extern void update_line(line_t *);
 /* Title used for failsafe entries */
 #define	FAILSAFE_TITLE	"Solaris failsafe"
 
+/* Title used for hv entries */
+#define	NEW_HV_ENTRY	"Solaris xVM"
+
 /* multiboot */
 #define	MULTI_BOOT	"/platform/i86pc/multiboot"
 #define	MULTI_BOOT_FAILSAFE	"/boot/multiboot"
@@ -176,6 +192,13 @@ extern void update_line(line_t *);
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"
 #define	MULTI_BOOT_ARCHIVE	DIRECT_BOOT_ARCHIVE_32
 #define	MINIROOT	"/boot/x86.miniroot-safe"
+
+/* Hypervisors */
+#define	XEN_32			"/boot/xen.gz"
+#define	XEN_64			"/boot/amd64/xen.gz"
+#define	XEN_MENU		"/boot/$ISADIR/xen.gz"
+#define	HYPERVISOR_KERNEL	"/platform/i86xpv/kernel/$ISADIR/unix"
+#define	KERNEL_MODULE_LINE	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL
 
 #ifdef __cplusplus
 }

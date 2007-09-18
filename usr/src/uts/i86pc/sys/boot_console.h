@@ -41,6 +41,10 @@ extern "C" {
 #define	CONS_TTYA		1
 #define	CONS_TTYB		2
 #define	CONS_USBSER		3
+#define	CONS_HYPERVISOR		4
+
+#define	CONS_MIN	CONS_SCREEN_TEXT
+#define	CONS_MAX	CONS_HYPERVISOR
 
 #define	CONS_COLOR	7
 
@@ -49,11 +53,16 @@ extern int kb_getchar(void);
 extern int kb_ischar(void);
 
 extern void bcons_init(char *);
-extern void bcons_init2(char *, char *, char *);
 extern void bcons_putchar(int);
 extern int bcons_getchar(void);
 extern int bcons_ischar(void);
 extern int bcons_gets(char *, int);
+
+#if !defined(_BOOT)
+extern void bcons_init2(char *, char *, char *);
+extern boolean_t bcons_hypervisor_redirect(void);
+extern void bcons_device_change(int);
+#endif /* !_BOOT */
 
 extern int console;
 

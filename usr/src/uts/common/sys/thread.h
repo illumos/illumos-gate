@@ -96,7 +96,7 @@ typedef struct {
 typedef struct _kthread	*kthread_id_t;
 
 struct turnstile;
-struct trap_info;
+struct panic_trap_info;
 struct upimutex;
 struct kproject;
 struct on_trap_data;
@@ -284,7 +284,7 @@ typedef struct _kthread {
 	struct _kthread	*t_priback;
 
 	struct sleepq	*t_sleepq;	/* sleep queue thread is waiting on */
-	struct trap_info *t_panic_trap;	/* saved data from fatal trap */
+	struct panic_trap_info *t_panic_trap;	/* saved data from fatal trap */
 	int		*t_lgrp_affinity;	/* lgroup affinity */
 	struct upimutex	*t_upimutex;	/* list of upimutexes owned by thread */
 	uint32_t	t_nupinest;	/* number of nested held upi mutexes */

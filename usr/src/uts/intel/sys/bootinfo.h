@@ -89,7 +89,12 @@ struct xboot_info {
 	native_ptr_t	bi_pte_to_pt_window;
 	native_ptr_t	bi_kseg_size;	/* size used for kernel nucleus pages */
 	uint64_t	bi_top_page_table;
+#if defined(__xpv)
+	native_ptr_t	bi_xen_start_info;
+	native_ptr_t	bi_shared_info;		/* VA for shared_info */
+#else
 	native_ptr_t	bi_mb_info;
+#endif
 };
 #pragma pack()
 

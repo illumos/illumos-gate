@@ -285,7 +285,8 @@ static char *tod_fault_table[] = {
 	"Reversed",			/* TOD_REVERSED */
 	"Stalled",			/* TOD_STALLED */
 	"Jumped",			/* TOD_JUMPED */
-	"Changed in Clock Rate"		/* TOD_RATECHANGED */
+	"Changed in Clock Rate",	/* TOD_RATECHANGED */
+	"Is Read-Only"			/* TOD_RDONLY */
 	/*
 	 * no strings needed for TOD_NOFAULT
 	 */
@@ -1970,6 +1971,8 @@ deadman_init(void)
  *       TOD_JUMPED: current tod value advanced too far from previous value.
  *       TOD_RATECHANGED: the ratio between average tod delta and
  *       average tick delta has changed.
+ * (3) TOD_RDONLY: when the TOD clock is not writeable e.g. because it is
+ *     a virtual TOD provided by a hypervisor.
  */
 enum tod_fault_type
 tod_fault(enum tod_fault_type ftype, int off)
@@ -2003,6 +2006,15 @@ tod_fault(enum tod_fault_type ftype, int off)
 				    "reason [%s]. -- "
 				    " Stopped tracking Time Of Day clock.",
 				    tod_fault_table[ftype]);
+				tod_faulted = ftype;
+			}
+			break;
+		case TOD_RDONLY:
+			if (tod_faulted == TOD_NOFAULT) {
+				plat_tod_fault(ftype);
+				cmn_err(CE_NOTE, "!Time of Day clock is "
+				    "Read-Only; set of Date/Time will not "
+				    "persist across reboot.");
 				tod_faulted = ftype;
 			}
 			break;

@@ -98,3 +98,12 @@ f none platform/i86pc/kernel/kmdb/cpu.AuthenticAMD.15 555 root sys
 f none platform/i86pc/kernel/kmdb/pcplusmp 555 root sys
 f none platform/i86pc/kernel/kmdb/uppc 555 root sys
 f none platform/i86pc/kernel/kmdb/unix 555 root sys
+
+d none platform/i86xpv 755 root sys
+d none platform/i86xpv/kernel 755 root sys
+d none platform/i86xpv/kernel/kmdb 755 root sys
+d none platform/i86xpv/kernel/kmdb/amd64 755 root sys
+f none platform/i86xpv/kernel/kmdb/amd64/unix 555 root sys
+f none platform/i86xpv/kernel/kmdb/amd64/xpv_psm 555 root sys
+f none platform/i86xpv/kernel/kmdb/unix 555 root sys
+f none platform/i86xpv/kernel/kmdb/xpv_psm 555 root sys

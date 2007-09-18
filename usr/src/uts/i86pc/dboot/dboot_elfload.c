@@ -50,18 +50,18 @@ getehdr(void)
 
 	ident = PGETBYTES(0);
 	if (ident == NULL)
-		dboot_panic("Cannot read kernel ELF header\n");
+		dboot_panic("Cannot read kernel ELF header");
 
 	if (ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||
 	    ident[EI_MAG2] != ELFMAG2 || ident[EI_MAG3] != ELFMAG3)
-		dboot_panic("not an ELF file!\n");
+		dboot_panic("not an ELF file!");
 
 	if (ident[EI_CLASS] == ELFCLASS32)
 		hdr = PGETBYTES(0);
 	else if (ident[EI_CLASS] == ELFCLASS64)
 		hdr = PGETBYTES(0);
 	else
-		dboot_panic("Unknown ELF class\n");
+		dboot_panic("Unknown ELF class");
 
 	return (hdr);
 }
@@ -86,20 +86,20 @@ dboot_elfload64(uintptr_t file_image)
 
 	eh = getehdr();
 	if (eh == NULL)
-		dboot_panic("getehdr() failed\n");
+		dboot_panic("getehdr() failed");
 
 	if (eh->e_type != ET_EXEC)
-		dboot_panic("not ET_EXEC, e_type = 0x%x\n", eh->e_type);
+		dboot_panic("not ET_EXEC, e_type = 0x%x", eh->e_type);
 
 	if (eh->e_phnum == 0 || eh->e_phoff == 0)
-		dboot_panic("no program headers\n");
+		dboot_panic("no program headers");
 
 	/*
 	 * Get the program headers.
 	 */
 	allphdrs = PGETBYTES(eh->e_phoff);
 	if (allphdrs == NULL)
-		dboot_panic("Failed to get program headers e_phnum = %d\n",
+		dboot_panic("Failed to get program headers e_phnum = %d",
 		    eh->e_phnum);
 
 	/*
@@ -149,7 +149,7 @@ dboot_elfload64(uintptr_t file_image)
 		 * copy the data to kernel area
 		 */
 		if (phdr->p_paddr != FOUR_MEG && phdr->p_paddr != 2 * FOUR_MEG)
-			dboot_panic("Bad paddr for kernel nucleus segment\n");
+			dboot_panic("Bad paddr for kernel nucleus segment");
 		src = (uintptr_t)PGETBYTES(phdr->p_offset);
 		dst = ktext_phys + phdr->p_paddr - FOUR_MEG;
 		if (prom_debug)

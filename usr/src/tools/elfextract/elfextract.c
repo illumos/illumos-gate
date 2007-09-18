@@ -196,6 +196,7 @@ main(int argc, char **argv)
 	void *hdr = NULL;
 	struct stat stats;
 	ssize_t r;
+	size_t pgsz;
 	uint_t len;
 
 	/*
@@ -226,31 +227,18 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	len = stats.st_blocks * 512;
-	len += 0xfff;
-	len &= ~0xfff;
+	pgsz = getpagesize();
+	len = (stats.st_size + (pgsz - 1)) & (~(pgsz - 1));
 
-#ifdef BUG_6491065_IS_FIXED
 	/*
 	 * mmap the file
 	 */
 	image = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
 	if (image == MAP_FAILED) {
 		(void) fprintf(stderr, "%s: mmap() of %s failed, %s\n",
-			pname, fname, strerror(errno));
-		exit(1);
-	}
-#else
-	if ((image = malloc(stats.st_size)) == NULL) {
-		(void) fprintf(stderr, "%s: out of memory\n", pname);
-		exit(1);
-	}
-	if ((r = read(fd, image, stats.st_size)) != stats.st_size) {
-		(void) fprintf(stderr, "%s: stat(%s, ...) failed, %s\n",
 		    pname, fname, strerror(errno));
 		exit(1);
 	}
-#endif
 
 	ident = ELFSEEK(0);
 	if (ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||

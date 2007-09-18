@@ -59,6 +59,8 @@ extern int address_in_memlist(struct memlist *, uint64_t, size_t);
  */
 extern struct memlist *phys_install;
 
+extern pgcnt_t num_phys_pages();
+
 #ifdef __cplusplus
 }
 #endif

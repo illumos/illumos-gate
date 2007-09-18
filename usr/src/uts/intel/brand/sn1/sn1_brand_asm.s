@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ sn1_brand_int91_callback(void)
 	 */
 	movq	24(%r15), %rcx	/* user-space handler == proc_data for sn1 */
 	movq	(%r15), %r15	/* Restore scratch register */
-	sysret
+	jmp	nopop_sys_syscall32_sysretl
 9:
 	popq	%r15
 	retq
@@ -189,7 +189,7 @@ sn1_brand_int91_callback(void)
 	 */
 	movq	24(%r15), %rcx	/* user-space handler == proc_data for sn1 */
 	movq	(%r15), %r15	/* Restore scratch register */
-	sysretq
+	jmp	nopop_sys_syscall_sysretq
 9:
 	popq	%r15
 	retq
@@ -251,7 +251,7 @@ sn1_brand_int91_callback(void)
 	popq	%rax		/* Restore scratch register		*/
 	popq	%r15		/* Restore scratch register		*/
 	movq	32(%rsp), %rsp	/* Remove all callback stuff from stack	*/
-	iretq
+	jmp	nopop_sys_rtt_syscall32
 9:
 	popq	%r15
 	retq
@@ -310,7 +310,7 @@ sn1_brand_int91_callback(void)
 
 	popl	%ebx		/* Restore scratch register 		*/
 	addl	$32, %esp	/* Remove all callback stuff from stack	*/
-	iret
+	jmp	nopop_sys_rtt_syscall
 9:
 	popl	%ebx
 	ret

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,13 @@
 #include <sys/rootnex.h>
 #include <vm/hat_i86.h>
 #include <sys/ddifm.h>
+
+#ifdef __xpv
+#include <sys/bootinfo.h>
+#include <sys/hypervisor.h>
+#include <sys/bootconf.h>
+#include <vm/kboot_mmu.h>
+#endif
 
 /*
  * enable/disable extra checking of function parameters. Useful for debugging
@@ -141,6 +148,14 @@ static rootnex_intprop_t rootnex_intprp[] = {
 	{ DDI_RELATIVE_ADDRESSING,	1 },
 };
 #define	NROOT_INTPROPS	(sizeof (rootnex_intprp) / sizeof (rootnex_intprop_t))
+
+#ifdef __xpv
+typedef maddr_t rootnex_addr_t;
+#define	ROOTNEX_PADDR_TO_RBASE(xinfo, pa)	\
+	(DOMAIN_IS_INITDOMAIN(xinfo) ? pa_to_ma(pa) : (pa))
+#else
+typedef paddr_t rootnex_addr_t;
+#endif
 
 
 static struct cb_ops rootnex_cb_ops = {
@@ -267,7 +282,6 @@ extern int ignore_hardware_nodes;	/* force flag from ddi_impl.c */
 extern int ddi_map_debug_flag;
 #define	ddi_map_debug	if (ddi_map_debug_flag) prom_printf
 #endif
-#define	ptob64(x)	(((uint64_t)(x)) << MMU_PAGESHIFT)
 extern void i86_pp_map(page_t *pp, caddr_t kaddr);
 extern void i86_va_map(caddr_t vaddr, struct as *asp, caddr_t kaddr);
 extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
@@ -370,7 +384,6 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int fmcap;
 	int e;
-
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -779,12 +792,10 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	rp = mp->map_obj.rp = &tmp_reg;		/* Use tmp_reg in request */
 
 #ifdef	DDI_MAP_DEBUG
-	cmn_err(CE_CONT,
-		"rootnex: <%s,%s> <0x%x, 0x%x, 0x%d>"
-		" offset %d len %d handle 0x%x\n",
-		ddi_get_name(dip), ddi_get_name(rdip),
-		rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
-		offset, len, mp->map_handlep);
+	cmn_err(CE_CONT, "rootnex: <%s,%s> <0x%x, 0x%x, 0x%d> offset %d len %d "
+	    "handle 0x%x\n", ddi_get_name(dip), ddi_get_name(rdip),
+	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size, offset,
+	    len, mp->map_handlep);
 #endif	/* DDI_MAP_DEBUG */
 
 	/*
@@ -819,12 +830,10 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 		rp->regspec_size = (uint_t)len;
 
 #ifdef	DDI_MAP_DEBUG
-	cmn_err(CE_CONT,
-		"             <%s,%s> <0x%x, 0x%x, 0x%d>"
-		" offset %d len %d handle 0x%x\n",
-		ddi_get_name(dip), ddi_get_name(rdip),
-		rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
-		offset, len, mp->map_handlep);
+	cmn_err(CE_CONT, "             <%s,%s> <0x%x, 0x%x, 0x%d> offset %d "
+	    "len %d handle 0x%x\n", ddi_get_name(dip), ddi_get_name(rdip),
+	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
+	    offset, len, mp->map_handlep);
 #endif	/* DDI_MAP_DEBUG */
 
 	/*
@@ -896,8 +905,7 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
 	 * XXX	What about devices with their own segment drivers?
 	 */
 	if (seg->s_ops == &segdev_ops) {
-		struct segdev_data *sdp =
-			(struct segdev_data *)seg->s_data;
+		struct segdev_data *sdp = (struct segdev_data *)seg->s_data;
 
 		if (hat == NULL) {
 			/*
@@ -929,13 +937,14 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
 static int
 rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 {
-	ulong_t base;
+	rootnex_addr_t rbase;
 	void *cvaddr;
 	uint_t npages, pgoffset;
 	struct regspec *rp;
 	ddi_acc_hdl_t *hp;
 	ddi_acc_impl_t *ap;
 	uint_t	hat_acc_flags;
+	paddr_t pbase;
 
 	rp = mp->map_obj.rp;
 	hp = mp->map_handlep;
@@ -975,8 +984,8 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 
 		if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
 #ifdef  DDI_MAP_DEBUG
-			ddi_map_debug("rootnex_map_regspec: mmap() \
-to I/O space is not supported.\n");
+			ddi_map_debug("rootnex_map_regspec: mmap() "
+			    "to I/O space is not supported.\n");
 #endif  /* DDI_MAP_DEBUG */
 			return (DDI_ME_INVAL);
 		} else {
@@ -985,11 +994,21 @@ to I/O space is not supported.\n");
 			 */
 			*vaddrp =
 			    (rp->regspec_bustype > 1 && rp->regspec_addr == 0) ?
-				((caddr_t)(uintptr_t)rp->regspec_bustype) :
-				((caddr_t)(uintptr_t)rp->regspec_addr);
-
+			    ((caddr_t)(uintptr_t)rp->regspec_bustype) :
+			    ((caddr_t)(uintptr_t)rp->regspec_addr);
+#ifdef __xpv
+			if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+				hp->ah_pfn = xen_assign_pfn(
+				    mmu_btop((ulong_t)rp->regspec_addr &
+				    MMU_PAGEMASK));
+			} else {
+				hp->ah_pfn = mmu_btop(
+				    (ulong_t)rp->regspec_addr & MMU_PAGEMASK);
+			}
+#else
 			hp->ah_pfn = mmu_btop((ulong_t)rp->regspec_addr &
-			    (~MMU_PAGEOFFSET));
+			    MMU_PAGEMASK);
+#endif
 			hp->ah_pnum = mmu_btopr(rp->regspec_size +
 			    (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET);
 		}
@@ -1036,8 +1055,21 @@ to I/O space is not supported.\n");
 		hat_acc_flags = HAT_STRICTORDER;
 	}
 
-	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
-	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
+	rbase = (rootnex_addr_t)(rp->regspec_addr & MMU_PAGEMASK);
+#ifdef __xpv
+	/*
+	 * If we're dom0, we're using a real device so we need to translate
+	 * the MA to a PA.
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		pbase = pfn_to_pa(xen_assign_pfn(mmu_btop(rbase)));
+	} else {
+		pbase = rbase;
+	}
+#else
+	pbase = rbase;
+#endif
+	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET;
 
 	if (rp->regspec_size == 0) {
 #ifdef  DDI_MAP_DEBUG
@@ -1047,14 +1079,14 @@ to I/O space is not supported.\n");
 	}
 
 	if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
-		*vaddrp = (caddr_t)mmu_btop(base);
+		/* extra cast to make gcc happy */
+		*vaddrp = (caddr_t)((uintptr_t)mmu_btop(pbase));
 	} else {
 		npages = mmu_btopr(rp->regspec_size + pgoffset);
 
 #ifdef	DDI_MAP_DEBUG
-		ddi_map_debug("rootnex_map_regspec: Mapping %d pages \
-physical %x ",
-		    npages, base);
+		ddi_map_debug("rootnex_map_regspec: Mapping %d pages "
+		    "physical %llx", npages, pbase);
 #endif	/* DDI_MAP_DEBUG */
 
 		cvaddr = device_arena_alloc(ptob(npages), VM_NOSLEEP);
@@ -1064,14 +1096,15 @@ physical %x ",
 		/*
 		 * Now map in the pages we've allocated...
 		 */
-		hat_devload(kas.a_hat, cvaddr, mmu_ptob(npages), mmu_btop(base),
-		    mp->map_prot | hat_acc_flags, HAT_LOAD_LOCK);
+		hat_devload(kas.a_hat, cvaddr, mmu_ptob(npages),
+		    mmu_btop(pbase), mp->map_prot | hat_acc_flags,
+		    HAT_LOAD_LOCK);
 		*vaddrp = (caddr_t)cvaddr + pgoffset;
 
 		/* save away pfn and npages for FMA */
 		hp = mp->map_handlep;
 		if (hp) {
-			hp->ah_pfn = mmu_btop(base);
+			hp->ah_pfn = mmu_btop(pbase);
 			hp->ah_pnum = npages;
 		}
 	}
@@ -1146,10 +1179,11 @@ rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 static int
 rootnex_map_handle(ddi_map_req_t *mp)
 {
+	rootnex_addr_t rbase;
 	ddi_acc_hdl_t *hp;
-	ulong_t base;
 	uint_t pgoffset;
 	struct regspec *rp;
+	paddr_t pbase;
 
 	rp = mp->map_obj.rp;
 
@@ -1212,13 +1246,29 @@ rootnex_map_handle(ddi_map_req_t *mp)
 		return (DDI_FAILURE);
 	}
 
-	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
-	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
+	rbase = (rootnex_addr_t)rp->regspec_addr &
+	    (~(rootnex_addr_t)MMU_PAGEOFFSET);
+	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET;
 
 	if (rp->regspec_size == 0)
 		return (DDI_ME_INVAL);
 
-	hp->ah_pfn = mmu_btop(base);
+#ifdef __xpv
+	/*
+	 * If we're dom0, we're using a real device so we need to translate
+	 * the MA to a PA.
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		pbase = pfn_to_pa(xen_assign_pfn(mmu_btop(rbase))) |
+		    (rbase & MMU_PAGEOFFSET);
+	} else {
+		pbase = rbase;
+	}
+#else
+	pbase = rbase;
+#endif
+
+	hp->ah_pfn = mmu_btop(pbase);
 	hp->ah_pnum = mmu_btopr(rp->regspec_size + pgoffset);
 
 	return (DDI_SUCCESS);
@@ -2123,6 +2173,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
     rootnex_sglinfo_t *sglinfo)
 {
 	ddi_dma_atyp_t buftype;
+	rootnex_addr_t raddr;
 	uint64_t last_page;
 	uint64_t offset;
 	uint64_t addrhi;
@@ -2159,7 +2210,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 		ASSERT(!PP_ISFREE(pp) && PAGE_LOCKED(pp));
 		offset =  dmar_object->dmao_obj.pp_obj.pp_offset &
 		    MMU_PAGEOFFSET;
-		paddr = ptob64(pp->p_pagenum) + offset;
+		paddr = pfn_to_pa(pp->p_pagenum) + offset;
 		psize = MIN(size, (MMU_PAGESIZE - offset));
 		pp = pp->p_next;
 		sglinfo->si_asp = NULL;
@@ -2180,7 +2231,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 		}
 
 		ASSERT(!PP_ISFREE(pplist[pcnt]));
-		paddr = ptob64(pplist[pcnt]->p_pagenum);
+		paddr = pfn_to_pa(pplist[pcnt]->p_pagenum);
 		paddr += offset;
 		psize = MIN(size, (MMU_PAGESIZE - offset));
 		pcnt++;
@@ -2199,18 +2250,28 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			sglinfo->si_asp = &kas;
 		}
 
-		paddr = ptob64(hat_getpfnum(sglinfo->si_asp->a_hat, vaddr));
+		paddr = pfn_to_pa(hat_getpfnum(sglinfo->si_asp->a_hat, vaddr));
 		paddr += offset;
 		psize = MIN(size, (MMU_PAGESIZE - offset));
 		vaddr += psize;
 	}
+
+#ifdef __xpv
+	/*
+	 * If we're dom0, we're using a real device so we need to load
+	 * the cookies with MFNs instead of PFNs.
+	 */
+	raddr = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+	raddr = paddr;
+#endif
 
 	/*
 	 * Setup the first cookie with the physical address of the page and the
 	 * size of the page (which takes into account the initial offset into
 	 * the page.
 	 */
-	sgl[cnt].dmac_laddress = paddr;
+	sgl[cnt].dmac_laddress = raddr;
 	sgl[cnt].dmac_size = psize;
 	sgl[cnt].dmac_type = 0;
 
@@ -2230,7 +2291,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 	 * uses the copy buffer in case the copy buffer is not physically
 	 * contiguous.
 	 */
-	if ((paddr < addrlo) || ((paddr + psize) > addrhi)) {
+	if ((raddr < addrlo) || ((raddr + psize) > addrhi)) {
 		sglinfo->si_copybuf_req += MMU_PAGESIZE;
 		sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
 		if ((cnt + 1) < sglinfo->si_max_pages) {
@@ -2246,7 +2307,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 	 * page is physically contiguous. Keep decrementing size until we are
 	 * done with the buffer.
 	 */
-	last_page = paddr & MMU_PAGEMASK;
+	last_page = raddr & MMU_PAGEMASK;
 	size -= psize;
 
 	while (size > 0) {
@@ -2256,22 +2317,32 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 		if (buftype == DMA_OTYP_PAGES) {
 			/* get the paddr from the page_t */
 			ASSERT(!PP_ISFREE(pp) && PAGE_LOCKED(pp));
-			paddr = ptob64(pp->p_pagenum);
+			paddr = pfn_to_pa(pp->p_pagenum);
 			pp = pp->p_next;
 		} else if (pplist != NULL) {
 			/* index into the array of page_t's to get the paddr */
 			ASSERT(!PP_ISFREE(pplist[pcnt]));
-			paddr = ptob64(pplist[pcnt]->p_pagenum);
+			paddr = pfn_to_pa(pplist[pcnt]->p_pagenum);
 			pcnt++;
 		} else {
 			/* call into the VM to get the paddr */
-			paddr =  ptob64(hat_getpfnum(sglinfo->si_asp->a_hat,
+			paddr =  pfn_to_pa(hat_getpfnum(sglinfo->si_asp->a_hat,
 			    vaddr));
 			vaddr += psize;
 		}
 
+#ifdef __xpv
+		/*
+		 * If we're dom0, we're using a real device so we need to load
+		 * the cookies with MFNs instead of PFNs.
+		 */
+		raddr = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+		raddr = paddr;
+#endif
+
 		/* check to see if this page needs the copy buffer */
-		if ((paddr < addrlo) || ((paddr + psize) > addrhi)) {
+		if ((raddr < addrlo) || ((raddr + psize) > addrhi)) {
 			sglinfo->si_copybuf_req += MMU_PAGESIZE;
 
 			/*
@@ -2283,7 +2354,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			if (sgl[cnt].dmac_size != 0) {
 				cnt++;
 			}
-			sgl[cnt].dmac_laddress = paddr;
+			sgl[cnt].dmac_laddress = raddr;
 			sgl[cnt].dmac_size = psize;
 #if defined(__amd64)
 			sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
@@ -2309,8 +2380,8 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 		 * puts us over the max cookie size, or the current sgl doesn't
 		 * have anything in it.
 		 */
-		} else if (((last_page + MMU_PAGESIZE) != paddr) ||
-		    !(paddr & sglinfo->si_segmask) ||
+		} else if (((last_page + MMU_PAGESIZE) != raddr) ||
+		    !(raddr & sglinfo->si_segmask) ||
 		    ((sgl[cnt].dmac_size + psize) > maxseg) ||
 		    (sgl[cnt].dmac_size == 0)) {
 			/*
@@ -2322,7 +2393,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			}
 
 			/* save the cookie information */
-			sgl[cnt].dmac_laddress = paddr;
+			sgl[cnt].dmac_laddress = raddr;
 			sgl[cnt].dmac_size = psize;
 #if defined(__amd64)
 			sgl[cnt].dmac_type = 0;
@@ -2360,7 +2431,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 		 * next page is physically contiguous. Keep decrementing size
 		 * until we are done with the buffer.
 		 */
-		last_page = paddr;
+		last_page = raddr;
 		size -= psize;
 	}
 
@@ -2950,6 +3021,7 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 {
 	boolean_t copybuf_sz_power_2;
 	rootnex_sglinfo_t *sinfo;
+	paddr_t paddr;
 	uint_t pidx;
 	uint_t pcnt;
 	off_t poff;
@@ -2981,10 +3053,11 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 		 * get the offset into the page. For the 64-bit kernel, get the
 		 * pfn which we'll use with seg kpm.
 		 */
-		poff = cookie->_dmu._dmac_ll & MMU_PAGEOFFSET;
+		poff = cookie->dmac_laddress & MMU_PAGEOFFSET;
 #if defined(__amd64)
-		pfn = cookie->_dmu._dmac_ll >> MMU_PAGESHIFT;
-#endif
+		/* mfn_to_pfn() is a NOP on i86pc */
+		pfn = mfn_to_pfn(cookie->dmac_laddress >> MMU_PAGESHIFT);
+#endif /* __amd64 */
 
 		/* figure out if the copybuf size is a power of 2 */
 		if (dma->dp_copybuf_size & (dma->dp_copybuf_size - 1)) {
@@ -3022,8 +3095,18 @@ rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
 		 * the physical address of the copy buffer page that we will
 		 * use.
 		 */
-		cookie->_dmu._dmac_ll = ptob64(hat_getpfnum(kas.a_hat,
+		paddr = pfn_to_pa(hat_getpfnum(kas.a_hat,
 		    dma->dp_pgmap[pidx].pm_cbaddr)) + poff;
+
+#ifdef __xpv
+		/*
+		 * If we're dom0, we're using a real device so we need to load
+		 * the cookies with MAs instead of PAs.
+		 */
+		cookie->dmac_laddress = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+		cookie->dmac_laddress = paddr;
+#endif
 
 		/* if we have a kernel VA, it's easy, just save that address */
 		if ((dmar_object->dmao_type != DMA_OTYP_PAGES) &&
@@ -3245,7 +3328,7 @@ rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	cookie--;
 	(*windowp)->wd_trim.tr_trim_last = B_TRUE;
 	(*windowp)->wd_trim.tr_last_cookie = cookie;
-	(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+	(*windowp)->wd_trim.tr_last_paddr = cookie->dmac_laddress;
 	ASSERT(cookie->dmac_size > trim_sz);
 	(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
 	(*windowp)->wd_size -= trim_sz;
@@ -3268,7 +3351,7 @@ rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
 	(*windowp)->wd_cookie_cnt++;
 	(*windowp)->wd_trim.tr_trim_first = B_TRUE;
-	(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll + coffset;
+	(*windowp)->wd_trim.tr_first_paddr = cookie->dmac_laddress + coffset;
 	(*windowp)->wd_trim.tr_first_size = trim_sz;
 	if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
 		(*windowp)->wd_dosync = B_TRUE;
@@ -3296,7 +3379,7 @@ rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		trim_sz = (*windowp)->wd_size - dma->dp_maxxfer;
 		(*windowp)->wd_trim.tr_trim_last = B_TRUE;
 		(*windowp)->wd_trim.tr_last_cookie = cookie;
-		(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+		(*windowp)->wd_trim.tr_last_paddr = cookie->dmac_laddress;
 		(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
 		(*windowp)->wd_size -= trim_sz;
 		ASSERT((*windowp)->wd_size == dma->dp_maxxfer);
@@ -3310,7 +3393,7 @@ rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
 		(*windowp)->wd_cookie_cnt++;
 		(*windowp)->wd_trim.tr_trim_first = B_TRUE;
-		(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll +
+		(*windowp)->wd_trim.tr_first_paddr = cookie->dmac_laddress +
 		    coffset;
 		(*windowp)->wd_trim.tr_first_size = trim_sz;
 	}
@@ -3332,6 +3415,7 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	rootnex_sglinfo_t *sinfo;
 	off_t new_offset;
 	size_t trim_sz;
+	paddr_t paddr;
 	off_t coffset;
 	uint_t pidx;
 	off_t poff;
@@ -3422,7 +3506,7 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	cookie--;
 	(*windowp)->wd_trim.tr_trim_last = B_TRUE;
 	(*windowp)->wd_trim.tr_last_cookie = cookie;
-	(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+	(*windowp)->wd_trim.tr_last_paddr = cookie->dmac_laddress;
 	ASSERT(cookie->dmac_size > trim_sz);
 	(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
 	(*windowp)->wd_size -= trim_sz;
@@ -3473,7 +3557,7 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
 	(*windowp)->wd_cookie_cnt++;
 	(*windowp)->wd_trim.tr_trim_first = B_TRUE;
-	(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll + coffset;
+	(*windowp)->wd_trim.tr_first_paddr = cookie->dmac_laddress + coffset;
 	(*windowp)->wd_trim.tr_first_size = trim_sz;
 
 	/*
@@ -3491,8 +3575,20 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		(*windowp)->wd_trim.tr_first_pidx = pidx;
 		(*windowp)->wd_trim.tr_first_cbaddr = dma->dp_cbaddr;
 		poff = (*windowp)->wd_trim.tr_first_paddr & MMU_PAGEOFFSET;
-		(*windowp)->wd_trim.tr_first_paddr = ptob64(hat_getpfnum(
-		    kas.a_hat, dma->dp_cbaddr)) + poff;
+
+		paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, dma->dp_cbaddr)) +
+		    poff;
+#ifdef __xpv
+		/*
+		 * If we're dom0, we're using a real device so we need to load
+		 * the cookies with MAs instead of PAs.
+		 */
+		(*windowp)->wd_trim.tr_first_paddr =
+		    ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+		(*windowp)->wd_trim.tr_first_paddr = paddr;
+#endif
+
 #if !defined(__amd64)
 		(*windowp)->wd_trim.tr_first_kaddr = dma->dp_kva;
 #endif
@@ -3522,9 +3618,20 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		 */
 		cookie++;
 		dma->dp_pgmap[pidx + 1].pm_cbaddr += MMU_PAGESIZE;
-		poff = cookie->_dmu._dmac_ll & MMU_PAGEOFFSET;
-		cookie->_dmu._dmac_ll = ptob64(hat_getpfnum(kas.a_hat,
+		poff = cookie->dmac_laddress & MMU_PAGEOFFSET;
+
+		paddr = pfn_to_pa(hat_getpfnum(kas.a_hat,
 		    dma->dp_pgmap[pidx + 1].pm_cbaddr)) + poff;
+#ifdef __xpv
+		/*
+		 * If we're dom0, we're using a real device so we need to load
+		 * the cookies with MAs instead of PAs.
+		 */
+		cookie->dmac_laddress = ROOTNEX_PADDR_TO_RBASE(xen_info, paddr);
+#else
+		cookie->dmac_laddress = paddr;
+#endif
+
 #if !defined(__amd64)
 		ASSERT(dma->dp_pgmap[pidx + 1].pm_mapped == B_FALSE);
 		dma->dp_pgmap[pidx + 1].pm_kaddr += MMU_PAGESIZE;
@@ -3588,7 +3695,7 @@ rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 		(*windowp)->wd_cookie_cnt++;
 		(*windowp)->wd_trim.tr_trim_last = B_TRUE;
 		(*windowp)->wd_trim.tr_last_cookie = cookie;
-		(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+		(*windowp)->wd_trim.tr_last_paddr = cookie->dmac_laddress;
 		(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
 		(*windowp)->wd_size = dma->dp_maxxfer;
 
@@ -3613,7 +3720,7 @@ rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	(*windowp)->wd_size = trim_sz;
 	if (trim_sz < dmac_size) {
 		(*windowp)->wd_trim.tr_trim_first = B_TRUE;
-		(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll +
+		(*windowp)->wd_trim.tr_first_paddr = cookie->dmac_laddress +
 		    coffset;
 		(*windowp)->wd_trim.tr_first_size = trim_sz;
 	}
@@ -3924,7 +4031,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	/* if needed, adjust the first and/or last cookies for trim */
 	trim = &window->wd_trim;
 	if (trim->tr_trim_first) {
-		window->wd_first_cookie->_dmu._dmac_ll = trim->tr_first_paddr;
+		window->wd_first_cookie->dmac_laddress = trim->tr_first_paddr;
 		window->wd_first_cookie->dmac_size = trim->tr_first_size;
 #if !defined(__amd64)
 		window->wd_first_cookie->dmac_type =
@@ -3941,7 +4048,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		}
 	}
 	if (trim->tr_trim_last) {
-		trim->tr_last_cookie->_dmu._dmac_ll = trim->tr_last_paddr;
+		trim->tr_last_cookie->dmac_laddress = trim->tr_last_paddr;
 		trim->tr_last_cookie->dmac_size = trim->tr_last_size;
 		if (trim->tr_last_copybuf_win) {
 			dma->dp_pgmap[trim->tr_last_pidx].pm_cbaddr =

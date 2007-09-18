@@ -45,6 +45,10 @@
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
 
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
+
 #define	PCIEX_BDF_OFFSET_DELTA	4
 #define	PCIEX_REG_FUNC_SHIFT	(PCI_REG_FUNC_SHIFT + PCIEX_BDF_OFFSET_DELTA)
 #define	PCIEX_REG_DEV_SHIFT	(PCI_REG_DEV_SHIFT + PCIEX_BDF_OFFSET_DELTA)
@@ -836,7 +840,16 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	if (pcitool_debug)
 		prom_printf("Got base virtual address:0x%p\n", virt_base);
 
+#ifdef __xpv
+	/*
+	 * We should only get here if we are dom0.
+	 * We're using a real device so we need to translate the MA to a PFN.
+	 */
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+	pfn = xen_assign_pfn(mmu_btop(page_base));
+#else
 	pfn = btop(page_base);
+#endif
 
 	/* Now map the allocated virtual space to the physical address. */
 	hat_devload(kas.a_hat, virt_base, mmu_ptob(*num_pages), pfn,

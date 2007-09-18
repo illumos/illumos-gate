@@ -61,6 +61,9 @@
 #include <sys/sunndi.h>
 #include <sys/vmem.h>
 #include <sys/pci_impl.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
 #include <sys/mach_intr.h>
 #include <vm/hat_i86.h>
 #include <sys/x86_archext.h>
@@ -199,7 +202,12 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	 * attach the isa nexus to get ACPI resource usage
 	 * isa is "kind of" a pseudo node
 	 */
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		(void) i_ddi_attach_pseudo_node("isa");
+#else
 	(void) i_ddi_attach_pseudo_node("isa");
+#endif
 
 	/* reprogram devices not set up by firmware (BIOS) */
 	impl_bus_reprobe();
@@ -637,8 +645,7 @@ make_ddi_ppd(dev_info_t *child, struct ddi_parent_private_data **ppd)
 		struct intrspec *new;
 		struct prop_ispec *l;
 
-		n = pdptr->par_nintr =
-			intr_len / sizeof (struct prop_ispec);
+		n = pdptr->par_nintr = intr_len / sizeof (struct prop_ispec);
 		l = (struct prop_ispec *)intr_prop;
 		pdptr->par_intr =
 		    new = kmem_zalloc(n * sizeof (struct intrspec), KM_SLEEP);
@@ -968,6 +975,15 @@ page_create_io_wrapper(void *addr, size_t len, int vmflag, void *arg)
 	    PG_EXCL | ((vmflag & VM_NOSLEEP) ? 0 : PG_WAIT), &kas, addr, arg));
 }
 
+#ifdef __xpv
+static void
+segkmem_free_io(vmem_t *vmp, void * ptr, size_t size)
+{
+	extern void page_destroy_io(page_t *);
+	segkmem_xfree(vmp, ptr, size, page_destroy_io);
+}
+#endif
+
 static void *
 segkmem_alloc_io_4P(vmem_t *vmp, size_t size, int vmflag)
 {
@@ -1072,7 +1088,13 @@ kmem_io_init(int a)
 
 	kmem_io[a].kmem_io_arena = vmem_create(io_arena_params[a].io_name,
 	    NULL, 0, PAGESIZE, io_arena_params[a].io_alloc,
-	    segkmem_free, heap_arena, 0, VM_SLEEP);
+#ifdef __xpv
+	    segkmem_free_io,
+#else
+	    segkmem_free,
+#endif
+	    heap_arena, 0, VM_SLEEP);
+
 	for (c = 0; c < KA_NCACHE; c++) {
 		size_t size = KA_ALIGN << c;
 		(void) sprintf(name, "%s_%lu",
@@ -1157,8 +1179,15 @@ void
 ka_init(void)
 {
 	int a;
+	paddr_t maxphysaddr;
+#if !defined(__xpv)
 	extern pfn_t physmax;
-	uint64_t maxphysaddr = mmu_ptob((uint64_t)physmax + 1) - 1;
+
+	maxphysaddr = mmu_ptob((paddr_t)physmax) + MMU_PAGEOFFSET;
+#else
+	maxphysaddr = mmu_ptob((paddr_t)HYPERVISOR_memory_op(
+	    XENMEM_maximum_ram_page, NULL)) + MMU_PAGEOFFSET;
+#endif
 
 	ASSERT(maxphysaddr <= io_arena_params[0].io_limit);
 
@@ -1282,9 +1311,7 @@ contig_alloc(size_t size, ddi_dma_attr_t *attr, uintptr_t align, int cansleep)
 	if (addr) {
 		ASSERT(!((uintptr_t)addr & (align - 1)));
 
-		if (page_resv(pgcnt,
-			(cansleep) ? KM_SLEEP : KM_NOSLEEP) == 0) {
-
+		if (page_resv(pgcnt, (cansleep) ? KM_SLEEP : KM_NOSLEEP) == 0) {
 			vmem_free(heap_arena, addr, asize);
 			return (NULL);
 		}
@@ -1298,7 +1325,7 @@ contig_alloc(size_t size, ddi_dma_attr_t *attr, uintptr_t align, int cansleep)
 			pflag |= PG_PHYSCONTIG;
 
 		ppl = page_create_io(&kvp, (u_offset_t)(uintptr_t)addr,
-			asize, pflag, &kas, (caddr_t)addr, attr);
+		    asize, pflag, &kas, (caddr_t)addr, attr);
 
 		if (!ppl) {
 			vmem_free(heap_arena, addr, asize);
@@ -1313,8 +1340,8 @@ contig_alloc(size_t size, ddi_dma_attr_t *attr, uintptr_t align, int cansleep)
 			page_io_unlock(pp);
 			page_downgrade(pp);
 			hat_memload(kas.a_hat, (caddr_t)(uintptr_t)pp->p_offset,
-				pp, (PROT_ALL & ~PROT_USER) |
-				HAT_NOSYNC, HAT_LOAD_LOCK);
+			    pp, (PROT_ALL & ~PROT_USER) |
+			    HAT_NOSYNC, HAT_LOAD_LOCK);
 		}
 	}
 	return (addr);
@@ -1331,15 +1358,14 @@ contig_free(void *addr, size_t size)
 	hat_unload(kas.a_hat, addr, asize, HAT_UNLOAD_UNLOCK);
 
 	for (a = addr, ea = a + asize; a < ea; a += PAGESIZE) {
-		pp = page_find(&kvp,
-				(u_offset_t)(uintptr_t)a);
+		pp = page_find(&kvp, (u_offset_t)(uintptr_t)a);
 		if (!pp)
 			panic("contig_free: contig pp not found");
 
 		if (!page_tryupgrade(pp)) {
 			page_unlock(pp);
 			pp = page_lookup(&kvp,
-				(u_offset_t)(uintptr_t)a, SE_EXCL);
+			    (u_offset_t)(uintptr_t)a, SE_EXCL);
 			if (pp == NULL)
 				panic("contig_free: page freed");
 		}
@@ -1460,10 +1486,10 @@ kfreea(void *addr)
 		size_t	*saddr = addr;
 		if (saddr[-4] == 0)
 			vmem_free((vmem_t *)saddr[-3], (void *)saddr[-2],
-				saddr[-1]);
+			    saddr[-1]);
 		else
 			kmem_cache_free((kmem_cache_t *)saddr[-4],
-				(void *)saddr[-2]);
+			    (void *)saddr[-2]);
 	}
 }
 
@@ -1575,8 +1601,8 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	}
 
 	if (attr->dma_attr_minxfer == 0 || attr->dma_attr_align == 0 ||
-		(attr->dma_attr_align & (attr->dma_attr_align - 1)) ||
-		(attr->dma_attr_minxfer & (attr->dma_attr_minxfer - 1))) {
+	    (attr->dma_attr_align & (attr->dma_attr_align - 1)) ||
+	    (attr->dma_attr_minxfer & (attr->dma_attr_minxfer - 1))) {
 			return (DDI_FAILURE);
 	}
 
@@ -1699,7 +1725,7 @@ i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
 	attrp->dma_attr_flags = 0;
 
 	ret = i_ddi_mem_alloc(dip, attrp, length, cansleep, streaming,
-			accattrp, kaddrp, &rlen, ap);
+	    accattrp, kaddrp, &rlen, ap);
 	if (ret == DDI_SUCCESS) {
 		if (real_length)
 			*real_length = (uint_t)rlen;
@@ -1770,6 +1796,18 @@ impl_assign_instance(dev_info_t *dip)
 int
 impl_keep_instance(dev_info_t *dip)
 {
+
+#if defined(__xpv)
+	/*
+	 * Do not persist instance numbers assigned to devices in dom0
+	 */
+	dev_info_t *pdip;
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		if (((pdip = ddi_get_parent(dip)) != NULL) &&
+		    (strcmp(ddi_get_name(pdip), "xpvd") == 0))
+			return (DDI_SUCCESS);
+	}
+#endif
 	return (DDI_FAILURE);
 }
 
@@ -2013,9 +2051,9 @@ x86_old_bootpath_name_addr_match(dev_info_t *cdip, char *caddr, char *naddr)
 	int	rv = DDI_FAILURE;
 
 	if ((ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		"devconf-addr", (caddr_t)&daddr, &dlen) == DDI_PROP_SUCCESS) &&
+	    "devconf-addr", (caddr_t)&daddr, &dlen) == DDI_PROP_SUCCESS) &&
 	    (ddi_getprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		"ignore-hardware-nodes", -1) != -1)) {
+	    "ignore-hardware-nodes", -1) != -1)) {
 		if (strcmp(daddr, caddr) == 0) {
 			return (DDI_SUCCESS);
 		}
@@ -2135,8 +2173,8 @@ x86_old_bootpath_name_addr_match(dev_info_t *cdip, char *caddr, char *naddr)
 	    (strcmp(bootdev_module, lkupname) == 0 ||
 	    strcmp(bootdev_oldmod, lkupname) == 0) &&
 	    ((ddi_getprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		"ignore-hardware-nodes", -1) != -1) ||
-		ignore_hardware_nodes) &&
+	    "ignore-hardware-nodes", -1) != -1) ||
+	    ignore_hardware_nodes) &&
 	    strcmp(bootdev_newaddr, caddr) == 0 &&
 	    strcmp(bootdev_oldaddr, naddr) == 0) {
 		rv = DDI_SUCCESS;
@@ -2467,6 +2505,10 @@ impl_setup_ddi(void)
 	(void) BOP_GETPROP(bootops,
 	    "ramdisk_end", (void *)&ramdisk_end);
 
+#ifdef __xpv
+	ramdisk_start -= ONE_GIG;
+	ramdisk_end -= ONE_GIG;
+#endif
 	rd_mem_prop.phys = ramdisk_start;
 	rd_mem_prop.size = ramdisk_end - ramdisk_start + 1;
 
@@ -2567,13 +2609,22 @@ impl_bus_initialprobe(void)
 	struct bus_probe *probe;
 
 	/* load modules to install bus probes */
-	if (modload("misc", "pci_autoconfig") < 0) {
-		cmn_err(CE_PANIC, "failed to load misc/pci_autoconfig");
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		if (modload("misc", "pci_autoconfig") < 0) {
+			panic("failed to load misc/pci_autoconfig");
+		}
 	}
+	(void) modload("misc", "xpv_autoconfig");
+#else
+	if (modload("misc", "pci_autoconfig") < 0) {
+		panic("failed to load misc/pci_autoconfig");
+	}
+#endif
 
 	probe = bus_probes;
 	while (probe) {
-		/* run the probe function */
+		/* run the probe functions */
 		(*probe->probe)(0);
 		probe = probe->next;
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,6 +169,7 @@ extern mdb_io_t *mdb_strio_create(const char *);
 extern mdb_io_t *mdb_termio_create(const char *, mdb_io_t *, mdb_io_t *);
 extern mdb_io_t *mdb_pipeio_create(mdb_iobsvc_f *, mdb_iobsvc_f *);
 extern mdb_io_t *mdb_nullio_create(void);
+extern mdb_io_t *mdb_memio_create(char *, size_t);
 
 /*
  * Functions for testing whether the given iob is of a given backend type:

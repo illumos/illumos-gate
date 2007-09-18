@@ -53,6 +53,10 @@
 #include <sys/privregs.h>
 #include <sys/sysmacros.h>
 #include <sys/ctype.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#include <net/if.h>
+#endif
 #include <vm/kboot_mmu.h>
 #include <vm/hat_pte.h>
 #include "acpi_fw.h"
@@ -102,6 +106,11 @@ static bootprop_t *bprops = NULL;
 static char *curr_page = NULL;		/* ptr to avail bprop memory */
 static int curr_space = 0;		/* amount of memory at curr_page */
 
+#ifdef __xpv
+start_info_t *xen_info;
+shared_info_t *HYPERVISOR_shared_info;
+#endif
+
 /*
  * some allocator statistics
  */
@@ -136,6 +145,15 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 
 	/*
 	 * find the lowest or highest available memory in physinstalled
+	 * On 32 bit avoid physmem above 4Gig if PAE isn't enabled
+	 */
+#if defined(__i386)
+	if (xbootp->bi_use_pae == 0 && high_phys > FOUR_GIG)
+		high_phys = FOUR_GIG;
+#endif
+
+	/*
+	 * find the highest available memory in physinstalled
 	 */
 	size = P2ROUNDUP(size, align);
 	for (; ml; ml = ml->next) {
@@ -497,10 +515,16 @@ boot_prop_finish(void)
 	int n_len;
 	char *value;
 	int v_len;
-	char *inputdev;	/* these override the comand line if serial ports */
+	char *inputdev;	/* these override the command line if serial ports */
 	char *outputdev;
 	char *consoledev;
 	uint64_t lvalue;
+	int use_xencons = 0;
+
+#ifdef __xpv
+	if (!DOMAIN_IS_INITDOMAIN(xen_info))
+		use_xencons = 1;
+#endif /* __xpv */
 
 	DBG_MSG("Opening /boot/solaris/bootenv.rc\n");
 	fd = BRD_OPEN(bfs_ops, "/boot/solaris/bootenv.rc", 0);
@@ -615,30 +639,43 @@ done:
 	/*
 	 * check to see if we have to override the default value of the console
 	 */
-	inputdev = line;
-	v_len = do_bsys_getproplen(NULL, "input-device");
-	if (v_len > 0)
-		(void) do_bsys_getprop(NULL, "input-device", inputdev);
-	else
-		v_len = 0;
-	inputdev[v_len] = 0;
+	if (!use_xencons) {
+		inputdev = line;
+		v_len = do_bsys_getproplen(NULL, "input-device");
+		if (v_len > 0)
+			(void) do_bsys_getprop(NULL, "input-device", inputdev);
+		else
+			v_len = 0;
+		inputdev[v_len] = 0;
 
-	outputdev = inputdev + v_len + 1;
-	v_len = do_bsys_getproplen(NULL, "output-device");
-	if (v_len > 0)
-		(void) do_bsys_getprop(NULL, "output-device", outputdev);
-	else
-		v_len = 0;
-	outputdev[v_len] = 0;
+		outputdev = inputdev + v_len + 1;
+		v_len = do_bsys_getproplen(NULL, "output-device");
+		if (v_len > 0)
+			(void) do_bsys_getprop(NULL, "output-device",
+			    outputdev);
+		else
+			v_len = 0;
+		outputdev[v_len] = 0;
 
-	consoledev = outputdev + v_len + 1;
-	v_len = do_bsys_getproplen(NULL, "console");
-	if (v_len > 0)
-		(void) do_bsys_getprop(NULL, "console", consoledev);
-	else
-		v_len = 0;
-	consoledev[v_len] = 0;
-	bcons_init2(inputdev, outputdev, consoledev);
+		consoledev = outputdev + v_len + 1;
+		v_len = do_bsys_getproplen(NULL, "console");
+		if (v_len > 0)
+			(void) do_bsys_getprop(NULL, "console", consoledev);
+		else
+			v_len = 0;
+		consoledev[v_len] = 0;
+		bcons_init2(inputdev, outputdev, consoledev);
+	} else {
+		/*
+		 * Ensure console property exists
+		 * If not create it as "hypervisor"
+		 */
+		v_len = do_bsys_getproplen(NULL, "console");
+		if (v_len < 0)
+			bsetprops("console", "hypervisor");
+		inputdev = outputdev = consoledev = "hypervisor";
+		bcons_init2(inputdev, outputdev, consoledev);
+	}
 
 	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug) {
 		value = line;
@@ -706,6 +743,9 @@ typedef int (*bios_func_t)(int, bios_regs_t *);
 static void
 do_bsys_doint(bootops_t *bop, int intnum, struct bop_regs *rp)
 {
+#if defined(__xpv)
+	prom_panic("unsupported call to BOP_DOINT()\n");
+#else	/* __xpv */
 	static int firsttime = 1;
 	bios_func_t bios_func = (bios_func_t)(void *)(uintptr_t)0x5000;
 	bios_regs_t br;
@@ -745,6 +785,7 @@ do_bsys_doint(bootops_t *bop, int intnum, struct bop_regs *rp)
 	rp->edi.word.di = br.di;
 	rp->ds = br.ds;
 	rp->es = br.es;
+#endif /* __xpv */
 }
 
 static struct boot_syscalls bop_sysp = {
@@ -756,6 +797,150 @@ static struct boot_syscalls bop_sysp = {
 static char *whoami;
 
 #define	BUFLEN	64
+
+#if defined(__xpv)
+
+static char namebuf[32];
+
+static void
+xen_parse_props(char *s, char *prop_map[], int n_prop)
+{
+	char **prop_name = prop_map;
+	char *cp = s, *scp;
+
+	do {
+		scp = cp;
+		while ((*cp != NULL) && (*cp != ':'))
+			cp++;
+
+		if ((scp != cp) && (*prop_name != NULL)) {
+			*cp = NULL;
+			bsetprops(*prop_name, scp);
+		}
+
+		cp++;
+		prop_name++;
+		n_prop--;
+	} while (n_prop > 0);
+}
+
+#define	VBDPATHLEN	64
+
+/*
+ * parse the 'xpv-root' property to create properties used by
+ * ufs_mountroot.
+ */
+static void
+xen_vbdroot_props(char *s)
+{
+	char vbdpath[VBDPATHLEN] = "/xpvd/xdf@";
+	const char lnamefix[] = "/dev/dsk/c0d";
+	char *pnp;
+	char *prop_p;
+	char mi;
+	short minor;
+	long addr = 0;
+
+	pnp = vbdpath + strlen(vbdpath);
+	prop_p = s + strlen(lnamefix);
+	while ((*prop_p != '\0') && (*prop_p != 's') && (*prop_p != 'p'))
+		addr = addr * 10 + *prop_p++ - '0';
+	(void) snprintf(pnp, VBDPATHLEN, "%lx", addr);
+	pnp = vbdpath + strlen(vbdpath);
+	if (*prop_p == 's')
+		mi = 'a';
+	else if (*prop_p == 'p')
+		mi = 'q';
+	else
+		ASSERT(0); /* shouldn't be here */
+	prop_p++;
+	ASSERT(*prop_p != '\0');
+	if (ISDIGIT(*prop_p)) {
+		minor = *prop_p - '0';
+		prop_p++;
+		if (ISDIGIT(*prop_p)) {
+			minor = minor * 10 + *prop_p - '0';
+		}
+	} else {
+		/* malformed root path, use 0 as default */
+		minor = 0;
+	}
+	ASSERT(minor < 16); /* at most 16 partitions */
+	mi += minor;
+	*pnp++ = ':';
+	*pnp++ = mi;
+	*pnp++ = '\0';
+	bsetprops("fstype", "ufs");
+	bsetprops("bootpath", vbdpath);
+
+	DBG_MSG("VBD bootpath set to ");
+	DBG_MSG(vbdpath);
+	DBG_MSG("\n");
+}
+
+/*
+ * parse the xpv-nfsroot property to create properties used by
+ * nfs_mountroot.
+ */
+static void
+xen_nfsroot_props(char *s)
+{
+	char *prop_map[] = {
+		BP_SERVER_IP,	/* server IP address */
+		BP_SERVER_NAME,	/* server hostname */
+		BP_SERVER_PATH,	/* root path */
+	};
+	int n_prop = sizeof (prop_map) / sizeof (prop_map[0]);
+
+	bsetprop("fstype", 6, "nfsdyn", 7);
+
+	xen_parse_props(s, prop_map, n_prop);
+
+	/*
+	 * If a server name wasn't specified, use a default.
+	 */
+	if (do_bsys_getproplen(NULL, BP_SERVER_NAME) == -1)
+		bsetprops(BP_SERVER_NAME, "unknown");
+}
+
+/*
+ * Extract our IP address, etc. from the "xpv-ip" property.
+ */
+static void
+xen_ip_props(char *s)
+{
+	char *prop_map[] = {
+		BP_HOST_IP,		/* IP address */
+		NULL,			/* NFS server IP address (ignored in */
+					/* favour of xpv-nfsroot) */
+		BP_ROUTER_IP,		/* IP gateway */
+		BP_SUBNET_MASK,		/* IP subnet mask */
+		"xpv-hostname",		/* hostname (ignored) */
+		BP_NETWORK_INTERFACE,	/* interface name */
+		"xpv-hcp",		/* host configuration protocol */
+	};
+	int n_prop = sizeof (prop_map) / sizeof (prop_map[0]);
+	char ifname[IFNAMSIZ];
+
+	xen_parse_props(s, prop_map, n_prop);
+
+	/*
+	 * A Linux dom0 administrator expects all interfaces to be
+	 * called "ethX", which is not the case here.
+	 *
+	 * If the interface name specified is "eth0", presume that
+	 * this is really intended to be "xnf0" (the first domU ->
+	 * dom0 interface for this domain).
+	 */
+	if ((do_bsys_getprop(NULL, BP_NETWORK_INTERFACE, ifname) == 0) &&
+	    (strcmp("eth0", ifname) == 0)) {
+		bsetprops(BP_NETWORK_INTERFACE, "xnf0");
+		bop_printf(NULL,
+		    "network interface name 'eth0' replaced with 'xnf0'\n");
+	}
+}
+
+#else	/* __xpv */
 
 static void
 setup_rarp_props(struct sol_netinfo *sip)
@@ -798,6 +983,8 @@ setup_rarp_props(struct sol_netinfo *sip)
 	}
 }
 
+#endif	/* __xpv */
+
 /*
  * 1st pass at building the table of boot properties. This includes:
  * - values set on the command line: -B a=x,b=y,c=z ....
@@ -816,16 +1003,18 @@ build_boot_properties(void)
 	int name_len;
 	char *value;
 	int value_len;
-	static int stdout_val = 0;
 	struct boot_modules *bm;
 	char *propbuf;
 	int quoted = 0;
 	int boot_arg_len;
+#ifndef __xpv
+	static int stdout_val = 0;
 	uchar_t boot_device;
 	char str[3];
 	multiboot_info_t *mbi;
 	int netboot;
 	struct sol_netinfo *sip;
+#endif
 
 	/*
 	 * These have to be done first, so that kobj_mount_root() works
@@ -850,6 +1039,75 @@ build_boot_properties(void)
 	boot_args = do_bsys_alloc(NULL, NULL, boot_arg_len, MMU_PAGESIZE);
 	boot_args[0] = 0;
 	boot_arg_len = 0;
+
+#ifdef __xpv
+	/*
+	 * Xen puts a lot of device information in front of the kernel name
+	 * let's grab them and make them boot properties.  The first
+	 * string w/o an "=" in it will be the boot-file property.
+	 */
+	(void) strcpy(namebuf, "xpv-");
+	for (;;) {
+		/*
+		 * get to next property
+		 */
+		while (ISSPACE(*value))
+			++value;
+		name = value;
+		/*
+		 * look for an "="
+		 */
+		while (*value && !ISSPACE(*value) && *value != '=') {
+			value++;
+		}
+		if (*value != '=') { /* no "=" in the property */
+			value = name;
+			break;
+		}
+		name_len = value - name;
+		value_len = 0;
+		/*
+		 * skip over the "="
+		 */
+		value++;
+		while (value[value_len] && !ISSPACE(value[value_len])) {
+			++value_len;
+		}
+		/*
+		 * build property name with "xpv-" prefix
+		 */
+		if (name_len + 4 > 32) { /* skip if name too long */
+			value += value_len;
+			continue;
+		}
+		bcopy(name, &namebuf[4], name_len);
+		name_len += 4;
+		namebuf[name_len] = 0;
+		bcopy(value, propbuf, value_len);
+		propbuf[value_len] = 0;
+		bsetprops(namebuf, propbuf);
+
+		/*
+		 * xpv-root is set to the logical disk name of the xen
+		 * VBD when booting from a disk-based filesystem.
+		 */
+		if (strcmp(namebuf, "xpv-root") == 0)
+			xen_vbdroot_props(propbuf);
+		/*
+		 * While we're here, if we have a "xpv-nfsroot" property
+		 * then we need to set "fstype" to "nfsdyn" so we mount
+		 * our root from the nfs server.  Also parse the xpv-nfsroot
+		 * property to create the properties that nfs_mountroot will
+		 * need to find the root and mount it.
+		 */
+		if (strcmp(namebuf, "xpv-nfsroot") == 0)
+			xen_nfsroot_props(propbuf);
+
+		if (strcmp(namebuf, "xpv-ip") == 0)
+			xen_ip_props(propbuf);
+		value += value_len;
+	}
+#endif
 
 	while (ISSPACE(*value))
 		++value;
@@ -961,6 +1219,7 @@ build_boot_properties(void)
 	 */
 	bsetprops("boot-args", boot_args);
 
+#ifndef __xpv
 	/*
 	 * set the BIOS boot device from GRUB
 	 */
@@ -993,12 +1252,18 @@ build_boot_properties(void)
 	}
 	bsetprop("stdout", strlen("stdout"),
 	    &stdout_val, sizeof (stdout_val));
+#endif /* __xpv */
 
 	/*
 	 * more conjured up values for made up things....
 	 */
+#if defined(__xpv)
+	bsetprops("mfg-name", "i86xpv");
+	bsetprops("impl-arch-name", "i86xpv");
+#else
 	bsetprops("mfg-name", "i86pc");
 	bsetprops("impl-arch-name", "i86pc");
+#endif
 
 	/*
 	 * Build firmware-provided system properties
@@ -1006,6 +1271,8 @@ build_boot_properties(void)
 	build_firmware_properties();
 
 	/*
+	 * XXPV
+	 *
 	 * Find out what these are:
 	 * - cpuid_feature_ecx_include
 	 * - cpuid_feature_ecx_exclude
@@ -1019,6 +1286,101 @@ build_boot_properties(void)
 	 */
 }
 
+#ifdef __xpv
+/*
+ * Under the Hypervisor, memory usable for DMA may be scarce. One
+ * very likely large pool of DMA friendly memory is occupied by
+ * the boot_archive, as it was loaded by grub into low MFNs.
+ *
+ * Here we free up that memory by copying the boot archive to what are
+ * likely higher MFN pages and then swapping the mfn/pfn mappings.
+ */
+#define	PFN_2GIG	0x80000
+static void
+relocate_boot_archive(void)
+{
+	mfn_t max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
+	struct boot_modules *bm = xbootp->bi_modules;
+	uintptr_t va;
+	pfn_t va_pfn;
+	mfn_t va_mfn;
+	caddr_t copy;
+	pfn_t copy_pfn;
+	mfn_t copy_mfn;
+	size_t	len;
+	int slop;
+	int total = 0;
+	int relocated = 0;
+	int mmu_update_return;
+	mmu_update_t t[2];
+	x86pte_t pte;
+
+	/*
+	 * If all MFN's are below 2Gig, don't bother doing this.
+	 */
+	if (max_mfn < PFN_2GIG)
+		return;
+	if (xbootp->bi_module_cnt < 1) {
+		DBG_MSG("no boot_archive!");
+		return;
+	}
+
+	DBG_MSG("moving boot_archive to high MFN memory\n");
+	va = (uintptr_t)bm->bm_addr;
+	len = bm->bm_size;
+	slop = va & MMU_PAGEOFFSET;
+	if (slop) {
+		va += MMU_PAGESIZE - slop;
+		len -= MMU_PAGESIZE - slop;
+	}
+	len = P2ALIGN(len, MMU_PAGESIZE);
+
+	/*
+	 * Go through all boot_archive pages, swapping any low MFN pages
+	 * with memory at next_phys.
+	 */
+	while (len != 0) {
+		++total;
+		va_pfn = mmu_btop(va - ONE_GIG);
+		va_mfn = mfn_list[va_pfn];
+		if (mfn_list[va_pfn] < PFN_2GIG) {
+			copy = kbm_remap_window(next_phys, 1);
+			bcopy((void *)va, copy, MMU_PAGESIZE);
+			copy_pfn = mmu_btop(next_phys);
+			copy_mfn = mfn_list[copy_pfn];
+
+			pte = mfn_to_ma(copy_mfn) | PT_NOCONSIST | PT_VALID;
+			if (HYPERVISOR_update_va_mapping(va, pte,
+			    UVMF_INVLPG | UVMF_LOCAL))
+				bop_panic("relocate_boot_archive():  "
+				    "HYPERVISOR_update_va_mapping() failed");
+
+			mfn_list[va_pfn] = copy_mfn;
+			mfn_list[copy_pfn] = va_mfn;
+
+			t[0].ptr = mfn_to_ma(copy_mfn) | MMU_MACHPHYS_UPDATE;
+			t[0].val = va_pfn;
+			t[1].ptr = mfn_to_ma(va_mfn) | MMU_MACHPHYS_UPDATE;
+			t[1].val = copy_pfn;
+			if (HYPERVISOR_mmu_update(t, 2, &mmu_update_return,
+			    DOMID_SELF) != 0 || mmu_update_return != 2)
+				bop_panic("relocate_boot_archive():  "
+				    "HYPERVISOR_mmu_update() failed");
+
+			next_phys += MMU_PAGESIZE;
+			++relocated;
+		}
+		len -= MMU_PAGESIZE;
+		va += MMU_PAGESIZE;
+	}
+	DBG_MSG("Relocated pages:\n");
+	DBG(relocated);
+	DBG_MSG("Out of total pages:\n");
+	DBG(total);
+}
+#endif /* __xpv */
+
+#if !defined(__xpv)
 /*
  * Install a temporary IDT that lets us catch errors in the boot time code.
  * We shouldn't get any faults at all while this is installed, so we'll
@@ -1140,12 +1502,13 @@ bop_idt_init(void)
 	bzero(&bop_idt, sizeof (bop_idt));
 	for (t = 0; t < NIDT; ++t) {
 		set_gatesegd(&bop_idt[t], &bop_trap_handler, bcode_sel,
-		    SDT_SYSIGT, SEL_KPL);
+		    SDT_SYSIGT, TRP_KPL);
 	}
 	bop_idt_info.dtr_limit = sizeof (bop_idt) - 1;
 	bop_idt_info.dtr_base = (uintptr_t)&bop_idt;
 	wr_idtr(&bop_idt_info);
 }
+#endif
 
 /*
  * This is where we enter the kernel. It dummies up the boot_ops and
@@ -1161,6 +1524,10 @@ _start(struct xboot_info *xbp)
 	 * 1st off - initialize the console for any error messages
 	 */
 	xbootp = xbp;
+#ifdef __xpv
+	HYPERVISOR_shared_info = (void *)xbootp->bi_shared_info;
+	xen_info = xbootp->bi_xen_start_info;
+#endif
 	bcons_init((void *)xbootp->bi_cmdline);
 	have_console = 1;
 
@@ -1174,11 +1541,13 @@ _start(struct xboot_info *xbp)
 	DBG_MSG((char *)xbootp->bi_cmdline);
 	DBG_MSG("\n\n\n");
 
+#ifndef __xpv
 	/*
 	 * Install an IDT to catch early pagefaults (shouldn't have any).
 	 * Also needed for kmdb.
 	 */
 	bop_idt_init();
+#endif
 
 	/*
 	 * physavail is no longer used by startup
@@ -1195,6 +1564,16 @@ _start(struct xboot_info *xbp)
 	next_virt = (uintptr_t)xbootp->bi_next_vaddr;
 	DBG(next_virt);
 	DBG_MSG("Initializing boot time memory management...");
+#ifdef __xpv
+	{
+		xen_platform_parameters_t p;
+
+		/* This call shouldn't fail, dboot already did it once. */
+		(void) HYPERVISOR_xen_version(XENVER_platform_parameters, &p);
+		mfn_to_pfn_mapping = (pfn_t *)(xen_virt_start = p.virt_start);
+		DBG(xen_virt_start);
+	}
+#endif
 	kbm_init(xbootp);
 	DBG_MSG("done\n");
 
@@ -1216,6 +1595,17 @@ _start(struct xboot_info *xbp)
 	 */
 	bops->bsys_ealloc = do_bsys_ealloc;
 
+#ifdef __xpv
+	/*
+	 * On domain 0 we need to free up some physical memory that is
+	 * usable for DMA. Since GRUB loaded the boot_archive, it is
+	 * sitting in low MFN memory. We'll relocated the boot archive
+	 * pages to high PFN memory.
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		relocate_boot_archive();
+#endif
+
 	/*
 	 *
 	 */
@@ -1225,6 +1615,7 @@ _start(struct xboot_info *xbp)
 	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug) {
 		char *name;
 		char *value;
+		char *cp;
 		int len;
 
 		value = do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);
@@ -1236,7 +1627,13 @@ _start(struct xboot_info *xbp)
 			len = do_bsys_getproplen(NULL, name);
 			bop_printf(NULL, "len=%d ", len);
 			value[len] = 0;
-			bop_printf(NULL, "%s\n", value);
+			for (cp = value; *cp; ++cp) {
+				if (' ' <= *cp && *cp <= '~')
+					bop_printf(NULL, "%c", *cp);
+				else
+					bop_printf(NULL, "-0x%x-", *cp);
+			}
+			bop_printf(NULL, "\n");
 		}
 	}
 
@@ -1272,6 +1669,7 @@ bop_no_more_mem(void)
 }
 
 
+#ifndef __xpv
 /*
  * Set ACPI firmware properties
  */
@@ -1570,20 +1968,50 @@ process_slit(struct slit *tp)
 	bsetprop(SLIT_PROPNAME, strlen(SLIT_PROPNAME), &tp->entry,
 	    tp->number * tp->number);
 }
+#else /* __xpv */
+static void
+enumerate_xen_cpus()
+{
+	processorid_t	id, max_id;
+
+	/*
+	 * User-set boot-ncpus overrides enumeration
+	 */
+	if (do_bsys_getproplen(NULL, "boot-ncpus") >= 0)
+		return;
+
+	/*
+	 * Probe every possible virtual CPU id and remember the
+	 * highest id present; the count of CPUs is one greater
+	 * than this.  This tacitly assumes at least cpu 0 is present.
+	 */
+	max_id = 0;
+	for (id = 0; id < MAX_VIRT_CPUS; id++)
+		if (HYPERVISOR_vcpu_op(VCPUOP_is_up, id, NULL) == 0)
+			max_id = id;
+
+	bsetpropsi("boot-ncpus", max_id+1);
+
+}
+#endif /* __xpv */
 
 static void
 build_firmware_properties(void)
 {
+#ifndef __xpv
 	struct table_header *tp;
 
-	if (tp = find_fw_table("APIC"))
+	if ((tp = find_fw_table("APIC")) != NULL)
 		process_madt((struct madt *)tp);
 
-	if (tp = find_fw_table("SRAT"))
+	if ((tp = find_fw_table("SRAT")) != NULL)
 		process_srat((struct srat *)tp);
 
 	if (tp = find_fw_table("SLIT"))
 		process_slit((struct slit *)tp);
+#else /* __xpv */
+	enumerate_xen_cpus();
+#endif /* __xpv */
 }
 
 /*

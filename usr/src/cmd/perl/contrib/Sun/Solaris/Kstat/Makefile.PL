@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,7 @@ if ($arch eq 'sparc') {
 	    ' -I/usr/platform/sun4v/include';
 } elsif ($arch eq 'i386') {
 	$includes .= '-I/usr/platform/i86pc/include' .
-	    ' -I/usr/platform/i86xen/include';
+	    ' -I/usr/platform/i86xpv/include';
 } else {
 	die("Unknown architecture $arch\n");
 }

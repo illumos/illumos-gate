@@ -791,7 +791,7 @@ p4_pcbe_program(void *token)
 	build_cfgs(cfgs, NULL, token);
 
 	if (p4_rdpmc_avail) {
-		uint32_t curcr4 = getcr4();
+		ulong_t curcr4 = getcr4();
 		if (kcpc_allow_nonpriv(token))
 			setcr4(curcr4 | CR4_PCE);
 		else

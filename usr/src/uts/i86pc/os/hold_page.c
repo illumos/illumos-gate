@@ -28,10 +28,37 @@
 
 #include <sys/hold_page.h>
 
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
+
 /*ARGSUSED*/
 int
 plat_hold_page(pfn_t pfn, int lock, page_t **pp_ret)
 {
+#if defined(__xpv)
+	page_t *pp = page_numtopp_nolock(pfn);
+
+	if (pp == NULL)
+		return (PLAT_HOLD_FAIL);
+
+	if (lock == PLAT_HOLD_LOCK) {
+		ASSERT(pp_ret != NULL);
+		if (page_trylock(pp, SE_EXCL) == 0)
+			return (PLAT_HOLD_FAIL);
+	}
+
+	if (mfn_list[pfn] == MFN_INVALID) {
+		/* We failed - release the lock if we grabbed it earlier */
+		if (lock == PLAT_HOLD_LOCK) {
+			page_unlock(pp);
+		}
+		return (PLAT_HOLD_FAIL);
+	}
+	if (lock == PLAT_HOLD_LOCK)
+		*pp_ret = pp;
+#endif	/* __xpv */
+
 	return (PLAT_HOLD_OK);
 }
 
@@ -39,4 +66,8 @@ plat_hold_page(pfn_t pfn, int lock, page_t **pp_ret)
 void
 plat_release_page(page_t *pp)
 {
+#if defined(__xpv)
+	ASSERT((pp != NULL) && PAGE_LOCKED(pp));
+	page_unlock(pp);
+#endif
 }

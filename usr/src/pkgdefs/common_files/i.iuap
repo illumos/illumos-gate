@@ -67,6 +67,7 @@ do
 			cp /tmp/x.$$ $dest
 			rm -f /tmp/x.$$
 		fi
+		add_driver xencons
 		add_driver_replace se
 		add_driver_replace su
 		add_driver usbser_edge

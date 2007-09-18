@@ -46,6 +46,9 @@
 #include <sys/sdt.h>
 #include <sys/stack.h>
 #include <sys/ddi_impldefs.h>
+#ifdef __xpv
+#include <sys/evtchn_impl.h>
+#endif
 
 typedef struct av_softinfo {
 	cpuset_t	av_pending;	/* pending bitmasks */
@@ -75,7 +78,12 @@ static char multilevel2[] =
 	"conflicts with another device using the same vector %d with an IPL\n"
 	"of %d. Reconfigure the conflicting devices to use different vectors.";
 
+#ifdef __xpv
+#define	MAX_VECT	NR_IRQS
+#else
 #define	MAX_VECT	256
+#endif
+
 struct autovec *nmivect = NULL;
 struct av_head autovect[MAX_VECT];
 struct av_head softvect[LOCK_LEVEL + 1];
@@ -338,7 +346,6 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 	/* find where it goes in list */
 	for (p = vectp->avh_link; p != NULL; p = p->av_link) {
 		if (p->av_vector == NULL) {	/* freed struct available */
-			kmem_free(mem, sizeof (struct autovec));
 			p->av_intarg1 = arg1;
 			p->av_intarg2 = arg2;
 			p->av_ticksp = ticksp;
@@ -351,8 +358,13 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 			if (pri_level < (int)vectp->avh_lo_pri) {
 				vectp->avh_lo_pri = (ushort_t)pri_level;
 			}
+			/*
+			 * To prevent calling service routine before args
+			 * and ticksp are ready fill in vector last.
+			 */
 			p->av_vector = f;
 			mutex_exit(&av_lock);
+			kmem_free(mem, sizeof (struct autovec));
 			return;
 		}
 	}
@@ -473,12 +485,14 @@ wait_till_seen(int ipl)
 	} while (cpu_in_chain);
 }
 
+static uint64_t dummy_tick;
+
 /* remove an interrupt vector from the chain */
 static void
 remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 	int vect)
 {
-	struct autovec *endp, *p, *target;
+	struct autovec *p, *target;
 	int	lo_pri, hi_pri;
 	int	ipl;
 	/*
@@ -490,17 +504,18 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 	ipl = pri_level;
 	lo_pri = MAXIPL;
 	hi_pri = 0;
-	for (endp = p = vectp->avh_link; p && p->av_vector; p = p->av_link) {
-		endp = p;
+	for (p = vectp->avh_link; p; p = p->av_link) {
 		if ((p->av_vector == f) && (p->av_intr_id == intr_id)) {
 			/* found the handler */
 			target = p;
 			continue;
 		}
-		if (p->av_prilevel > hi_pri)
-			hi_pri = p->av_prilevel;
-		if (p->av_prilevel < lo_pri)
-			lo_pri = p->av_prilevel;
+		if (p->av_vector != NULL) {
+			if (p->av_prilevel > hi_pri)
+				hi_pri = p->av_prilevel;
+			if (p->av_prilevel < lo_pri)
+				lo_pri = p->av_prilevel;
+		}
 	}
 	if (ipl < hi_pri)
 		ipl = hi_pri;
@@ -511,26 +526,21 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 		return;
 	}
 
+	/*
+	 * This drops the handler from the chain, it can no longer be called.
+	 * However, there is no guarantee that the handler is not currently
+	 * still executing.
+	 */
 	target->av_vector = NULL;
-	target->av_ticksp = NULL;
+	/*
+	 * There is a race where we could be just about to pick up the ticksp
+	 * pointer to increment it after returning from the service routine
+	 * in av_dispatch_autovect.  Rather than NULL it out let's just point
+	 * it off to something safe so that any final tick update attempt
+	 * won't fault.
+	 */
+	target->av_ticksp = &dummy_tick;
 	wait_till_seen(ipl);
-	if (endp != target) {	/* vector to be removed is not last in chain */
-		target->av_vector = endp->av_vector;
-		target->av_intarg1 = endp->av_intarg1;
-		target->av_intarg2 = endp->av_intarg2;
-		target->av_ticksp = endp->av_ticksp;
-		target->av_intr_id = endp->av_intr_id;
-		target->av_prilevel = endp->av_prilevel;
-		target->av_dip = endp->av_dip;
-		/*
-		 * We have a hole here where the routine corresponding to
-		 * endp may not get called. Do a wait_till_seen to take care
-		 * of this.
-		 */
-		wait_till_seen(ipl);
-		endp->av_vector = NULL;
-		endp->av_ticksp = NULL;
-	}
 
 	if (lo_pri > hi_pri) {	/* the chain is now empty */
 		/* Leave the unused entries here for probable future use */
@@ -629,8 +639,12 @@ av_dispatch_autovect(uint_t vec)
 			caddr_t arg2 = av->av_intarg2;
 			dev_info_t *dip = av->av_dip;
 
+			/*
+			 * We must walk the entire chain.  Removed handlers
+			 * may be anywhere in the chain.
+			 */
 			if (intr == NULL)
-				break;
+				continue;
 
 			DTRACE_PROBE4(interrupt__start, dev_info_t *, dip,
 			    void *, intr, caddr_t, arg1, caddr_t, arg2);
@@ -668,8 +682,12 @@ av_dispatch_softvect(uint_t pil)
 	ASSERT(pil >= 0 && pil <= PIL_MAX);
 
 	for (av = softvect[pil].avh_link; av; av = av->av_link) {
+		/*
+		 * We must walk the entire chain.  Removed handlers
+		 * may be anywhere in the chain.
+		 */
 		if ((intr = av->av_vector) == NULL)
-			break;
+			continue;
 		arg1 = av->av_intarg1;
 		arg2 = av->av_intarg2;
 

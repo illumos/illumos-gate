@@ -40,6 +40,9 @@
 #include <sys/machsystm.h>
 #include <sys/promif.h>
 #include <sys/kobj.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 #include <vm/kboot_mmu.h>
 #include <vm/hat_pte.h>
 #include <vm/hat_i86.h>
@@ -50,7 +53,7 @@
  * Joe's debug printing
  */
 #define	DBG(x)    \
-	bop_printf(NULL, "boot_mmu.c: %s is %" PRIx64 "\n", #x, (uint64_t)(x));
+	bop_printf(NULL, "%M%: %s is %" PRIx64 "\n", #x, (uint64_t)(x));
 #else
 #define	DBG(x)	/* naught */
 #endif
@@ -111,6 +114,13 @@ kbm_init(struct xboot_info *bi)
 		top_level = 1;
 	}
 
+#ifdef __xpv
+	xen_info = bi->bi_xen_start_info;
+	mfn_list = (mfn_t *)xen_info->mfn_list;
+	DBG(mfn_list);
+	mfn_count = xen_info->nr_pages;
+	DBG(mfn_count);
+#endif
 	top_page_table = bi->bi_top_page_table;
 	DBG(top_page_table);
 }
@@ -122,15 +132,23 @@ kbm_init(struct xboot_info *bi)
 void *
 kbm_remap_window(paddr_t physaddr, int writeable)
 {
-	uint_t pt_bits = PT_NOCONSIST | PT_VALID | PT_WRITABLE;
+	x86pte_t pt_bits = PT_NOCONSIST | PT_VALID | PT_WRITABLE;
 
 	DBG(physaddr);
 
+#ifdef __xpv
+	if (!writeable)
+		pt_bits &= ~PT_WRITABLE;
+	if (HYPERVISOR_update_va_mapping((uintptr_t)window,
+	    pa_to_ma(physaddr) | pt_bits, UVMF_INVLPG | UVMF_LOCAL) < 0)
+		bop_panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	if (kbm_pae_support)
 		*((x86pte_t *)pte_to_window) = physaddr | pt_bits;
 	else
 		*((x86pte32_t *)pte_to_window) = physaddr | pt_bits;
 	mmu_tlbflush_entry(window);
+#endif
 	DBG(window);
 	return (window);
 }
@@ -154,6 +172,15 @@ kbm_map(uintptr_t va, paddr_t pa, uint_t level, uint_t is_kernel)
 	if (kbm_pge_support && is_kernel)
 		pteval |= PT_GLOBAL;
 
+#ifdef __xpv
+	/*
+	 * try update_va_mapping first - fails if page table is missing.
+	 */
+	if (HYPERVISOR_update_va_mapping(va, pteval,
+	    UVMF_INVLPG | UVMF_LOCAL) == 0)
+		return;
+#endif
+
 	/*
 	 * Find the pte that will map this address. This creates any
 	 * missing intermediate level page tables.
@@ -162,12 +189,53 @@ kbm_map(uintptr_t va, paddr_t pa, uint_t level, uint_t is_kernel)
 	if (ptep == NULL)
 		bop_panic("kbm_map: find_pte returned NULL");
 
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping(va, pteval, UVMF_INVLPG | UVMF_LOCAL))
+		bop_panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	if (kbm_pae_support)
 		*ptep = pteval;
 	else
 		*((x86pte32_t *)ptep) = pteval;
 	mmu_tlbflush_entry((caddr_t)va);
+#endif
 }
+
+#ifdef __xpv
+
+/*
+ * Add a mapping for the machine page at the given virtual address.
+ */
+void
+kbm_map_ma(maddr_t ma, uintptr_t va, uint_t level)
+{
+	paddr_t pte_physaddr;
+	x86pte_t pteval;
+
+	pteval = ma | PT_NOCONSIST | PT_VALID | PT_REF | PT_WRITABLE;
+	if (level == 1)
+		pteval |= PT_PAGESIZE;
+
+	/*
+	 * try update_va_mapping first - fails if page table is missing.
+	 */
+	if (HYPERVISOR_update_va_mapping(va,
+	    pteval, UVMF_INVLPG | UVMF_LOCAL) == 0)
+		return;
+
+	/*
+	 * Find the pte that will map this address. This creates any
+	 * missing intermediate level page tables
+	 */
+	(void) find_pte(va, &pte_physaddr, level, 0);
+
+	if (HYPERVISOR_update_va_mapping(va,
+	    pteval, UVMF_INVLPG | UVMF_LOCAL) != 0)
+		bop_panic("HYPERVISOR_update_va_mapping failed");
+}
+
+#endif /* __xpv */
+
 
 /*
  * Probe the boot time page tables to find the first mapping
@@ -200,7 +268,11 @@ restart_new_va:
 			probe_va = mmu.hole_end;
 
 		if (IN_HYPERVISOR_VA(probe_va))
+#if defined(__amd64) && defined(__xpv)
+			probe_va = HYPERVISOR_VIRT_END;
+#else
 			return (0);
+#endif
 
 		/*
 		 * If we don't have a valid PTP/PTE at this level
@@ -263,6 +335,10 @@ kbm_unmap(uintptr_t va)
 	if (khat_running)
 		panic("kbm_unmap() called too late");
 	else {
+#ifdef __xpv
+		(void) HYPERVISOR_update_va_mapping(va, 0,
+		    UVMF_INVLPG | UVMF_LOCAL);
+#else
 		x86pte_t *ptep;
 		level_t	level = 0;
 		uint_t  probe_only = 1;
@@ -276,6 +352,7 @@ kbm_unmap(uintptr_t va)
 		else
 			*((x86pte32_t *)ptep) = 0;
 		mmu_tlbflush_entry((caddr_t)va);
+#endif
 	}
 }
 
@@ -305,11 +382,16 @@ kbm_remap(uintptr_t va, pfn_t pfn)
 	else
 		old_pte = *((x86pte32_t *)ptep);
 
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping(va, pte_val, UVMF_INVLPG | UVMF_LOCAL))
+		bop_panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	if (kbm_pae_support)
 		*((x86pte_t *)ptep) = pte_val;
 	else
 		*((x86pte32_t *)ptep) = pte_val;
 	mmu_tlbflush_entry((caddr_t)va);
+#endif
 
 	if (!(old_pte & PT_VALID) || ma_to_pa(old_pte) == -1)
 		return (PFN_INVALID);
@@ -325,6 +407,11 @@ kbm_read_only(uintptr_t va, paddr_t pa)
 {
 	x86pte_t pte_val = pa_to_ma(pa) |
 	    PT_NOCONSIST | PT_REF | PT_MOD | PT_VALID;
+
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping(va, pte_val, UVMF_INVLPG | UVMF_LOCAL))
+		bop_panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	x86pte_t *ptep;
 	level_t	level = 0;
 
@@ -337,6 +424,7 @@ kbm_read_only(uintptr_t va, paddr_t pa)
 	else
 		*((x86pte32_t *)ptep) = pte_val;
 	mmu_tlbflush_entry((caddr_t)va);
+#endif
 }
 
 /*
@@ -364,11 +452,17 @@ kbm_push(paddr_t pa)
 void
 kbm_pop(void)
 {
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping((uintptr_t)window, save_pte,
+	    UVMF_INVLPG | UVMF_LOCAL) < 0)
+		bop_panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	if (kbm_pae_support)
 		*((x86pte_t *)pte_to_window) = save_pte;
 	else
 		*((x86pte32_t *)pte_to_window) = save_pte;
 	mmu_tlbflush_entry(window);
+#endif
 }
 
 x86pte_t
@@ -381,6 +475,7 @@ get_pteval(paddr_t table, uint_t index)
 	return (((x86pte32_t *)table_ptr)[index]);
 }
 
+#ifndef __xpv
 void
 set_pteval(paddr_t table, uint_t index, uint_t level, x86pte_t pteval)
 {
@@ -392,6 +487,7 @@ set_pteval(paddr_t table, uint_t index, uint_t level, x86pte_t pteval)
 	if (level == top_level && level == 2)
 		reload_cr3();
 }
+#endif
 
 paddr_t
 make_ptable(x86pte_t *pteval, uint_t level)
@@ -402,6 +498,10 @@ make_ptable(x86pte_t *pteval, uint_t level)
 	new_table = do_bop_phys_alloc(MMU_PAGESIZE, MMU_PAGESIZE);
 	table_ptr = kbm_remap_window(new_table, 1);
 	bzero(table_ptr, MMU_PAGESIZE);
+#ifdef __xpv
+	/* Remove write permission to the new page table.  */
+	(void) kbm_remap_window(new_table, 0);
+#endif
 
 	if (level == top_level && level == 2)
 		*pteval = pa_to_ma(new_table) | PT_VALID;

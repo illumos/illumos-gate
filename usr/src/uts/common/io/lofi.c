@@ -586,6 +586,13 @@ lofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_soft_state_free(lofi_statep, 0);
 		return (DDI_FAILURE);
 	}
+	/* driver handles kernel-issued IOCTLs */
+	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
+	    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
+		ddi_remove_minor_node(dip, NULL);
+		ddi_soft_state_free(lofi_statep, 0);
+		return (DDI_FAILURE);
+	}
 	lofi_dip = dip;
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
@@ -600,6 +607,7 @@ lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	lofi_dip = NULL;
 	ddi_remove_minor_node(dip, NULL);
+	ddi_prop_remove_all(dip);
 	ddi_soft_state_free(lofi_statep, 0);
 	return (DDI_SUCCESS);
 }

@@ -56,7 +56,6 @@ extern "C" {
 extern void mach_cpu_idle(void);
 extern void mach_cpu_halt(char *);
 extern int mach_cpu_start(cpu_t *, void *);
-extern uint32_t *mach_alloc_mwait(cpu_t *cp);
 
 extern int Cpudelay;
 extern void setcpudelay(void);
@@ -70,6 +69,12 @@ extern int kcpc_hw_load_pcbe(void);
 extern void kcpc_hw_init(cpu_t *cp);
 extern void kcpc_hw_fini(cpu_t *cp);
 extern int kcpc_hw_overflow_intr_installed;
+
+struct panic_trap_info {
+	struct regs *trap_regs;
+	uint_t trap_type;
+	caddr_t trap_addr;
+};
 
 struct memconf {
 	pfn_t	mcf_spfn;	/* begin page frame number */
@@ -97,7 +102,10 @@ extern void trap(struct regs *, caddr_t, processorid_t);
 extern void do_interrupt(struct regs *, trap_trace_rec_t *);
 extern void memscrub_disable(void);
 
+#ifndef __xpv
 extern unsigned int microdata;
+#endif
+
 extern int use_mp;
 
 extern struct cpu	cpus[];		/* pointer to other cpus */
@@ -124,6 +132,12 @@ extern void memlist_add(uint64_t, uint64_t, struct memlist *,
 extern page_t *page_get_physical(uintptr_t);
 extern int linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 extern int dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
+
+#ifdef __xpv
+#include <sys/xen_mmu.h>
+extern page_t *page_get_high_mfn(mfn_t);
+#endif
+
 
 #endif /* _KERNEL */
 

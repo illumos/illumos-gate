@@ -294,7 +294,7 @@ if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
 		echo "starting DHCP on primary interface $primary"
 		/sbin/ifconfig $primary auto-dhcp primary $cmdline
 		# Exit code 4 means ifconfig timed out waiting for dhcpagent
-		[ $? != 0 ]  && [ $? != 4 ] && i4d_fail="$i4d_fail $primary"
+		[ $? != 0 ] && [ $? != 4 ] && i4d_fail="$i4d_fail $primary"
 	fi
 
 	set -- $interface_names
@@ -346,6 +346,69 @@ if [ -f /etc/defaultrouter ]; then
 fi
 
 #
+# If we get here and were not asked to plumb any IPv4 interfaces, look
+# for boot properties that direct us.
+#
+# - The "network-interface" property is required and indicates the
+#   interface name.
+# - The "xpv-hcp" property, if present, is used by the hypervisor
+#   tools to indicate how the specified interface should be configured.
+#   Permitted values are "dhcp" and "off", where "off" indicates static
+#   IP configuration.
+#
+# In the case where "xpv-hcp" is set to "dhcp", no further properties
+# are required or examined.
+#
+# In the case where "xpv-hcp" is not present or set to "off", the
+# "host-ip" and "subnet-mask" properties are used to configure
+# the specified interface.  The "router-ip" property, if present,
+# is used to add a default route.
+#
+nic="`/sbin/devprop network-interface`"
+if smf_is_globalzone && [ -z "$inet_list" ] && [ -n "$nic" ]; then
+	hcp="`/sbin/devprop xpv-hcp`"
+	case "$hcp" in
+	"dhcp")
+		/sbin/ifconfig $nic plumb 2>/dev/null
+		[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
+			# The interface is successfully plumbed, so
+			# modify "inet_list" to force the exit code
+			# checks to work.
+			inet_list=$nic;
+			# Given that this is the only IPv4 interface,
+			# we assert that it is primary.
+			echo "starting DHCP on primary interface $primary";
+			/sbin/ifconfig $nic auto-dhcp primary;
+			# Exit code 4 means ifconfig timed out waiting
+			# for dhcpagent
+			[ $? != 0 ] && [ $? != 4 ] && \
+			    i4d_fail="$i4d_fail $nic";
+		)
+		;;
+
+	"off"|"")
+		/sbin/devprop host-ip subnet-mask router-ip | (
+			read ip;
+			read mask;
+			read router;
+			[ -n "$ip" ] && [ -n "$mask" ] && \
+				/sbin/ifconfig $nic plumb 2>/dev/null
+			[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
+				# The interface is successfully
+				# plumbed, so modify "inet_list" to
+				# force the exit code checks to work.
+				inet_list=$nic;
+				/sbin/ifconfig $nic  inet $ip \
+				    netmask $mask broadcast + up 2>/dev/null;
+				[ -n "$router" ] && route add \
+				    default $router 2>/dev/null;
+			)
+		)
+		;;
+	esac
+fi
+
+#
 # We tell smf this service is online if any of the following is true:
 # - no interfaces were configured for plumbing and no DHCP failures
 # - any non-loopback IPv4 interfaces are up and have a non-zero address
@@ -363,7 +426,7 @@ fi
 if [ -n "`/sbin/ifconfig -a4u`" ]; then
     	/sbin/ifconfig -a4u | while read intf addr rest; do
 		[ $intf = inet ] && [ $addr != 127.0.0.1 ] &&
-		[ $addr != 0.0.0.0 ] && exit 0
+		[ $addr != 0.0.0.0 ] && exit $SMF_EXIT_OK
 	done && exit $SMF_EXIT_OK
 fi
 
@@ -373,7 +436,7 @@ fi
 # Any non-loopback IPv6 interfaces up?
 if [ -n "`/sbin/ifconfig -au6`" ]; then
 	/sbin/ifconfig -au6 | while read intf addr rest; do
-		[ $intf = inet6 ] && [ $addr != ::1/128 ] && exit 0
+		[ $intf = inet6 ] && [ $addr != ::1/128 ] && exit $SMF_EXIT_OK
 	done && exit $SMF_EXIT_OK
 fi
 

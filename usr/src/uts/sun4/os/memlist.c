@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +89,18 @@
 
 u_longlong_t	spec_hole_start = 0x80000000000ull;
 u_longlong_t	spec_hole_end = 0xfffff80000000000ull;
+
+pgcnt_t
+num_phys_pages()
+{
+	pgcnt_t npages = 0;
+	struct memlist *mp;
+
+	for (mp = phys_install; mp != NULL; mp = mp->next)
+		npages += mp->size >> PAGESHIFT;
+
+	return (npages);
+}
 
 /*
  * Count the number of available pages and the number of
@@ -346,7 +357,7 @@ fix_prom_pages(struct memlist *orig, struct memlist *new)
 				 *	physical memory machines.
 				 */
 				(void) page_hashin(pp, &prom_ppages,
-					(offset_t)pfnum, NULL);
+				    (offset_t)pfnum, NULL);
 
 				if (kcage_on) {
 					ASSERT(pp->p_szc == 0);

@@ -583,7 +583,6 @@ extern void upcount_inc(uid_t, zoneid_t);
 extern void upcount_dec(uid_t, zoneid_t);
 extern int upcount_get(uid_t, zoneid_t);
 #if defined(__x86)
-extern void ldt_dup(proc_t *, proc_t *);
 extern selector_t setup_thrptr(proc_t *, uintptr_t);
 extern void deferred_singlestep_trap(caddr_t);
 #endif

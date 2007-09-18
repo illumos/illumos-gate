@@ -97,6 +97,11 @@ SUNWprivate_1.1 {
 	dladm_wlan_wpa_del_key;
 	dladm_wlan_wpa_set_key;
 	dladm_wlan_wpa_set_mlme;
+	dladm_vnic_create;
+	dladm_vnic_modify;
+	dladm_vnic_delete;
+	dladm_vnic_walk_sys;
+	dladm_vnic_mac_addr_str_to_type;
 
     local:
 	*;

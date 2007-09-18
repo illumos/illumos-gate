@@ -119,7 +119,15 @@ struct regs {
 #include <sys/machprivregs.h>
 #include <sys/pcb.h>
 
-#ifdef DEBUG
+/*
+ * We can not safely sample {fs,gs}base on the hypervisor. The rdmsr
+ * instruction triggers a #gp fault which is emulated in the hypervisor
+ * on behalf of the guest. This is normally ok but if the guest is in
+ * the special failsafe handler it must not fault again or the hypervisor
+ * will kill the domain. We could use something different than INTR_PUSH
+ * in xen_failsafe_callback but for now we will not sample them.
+ */
+#if defined(DEBUG) && !defined(__xpv)
 #define	__SAVE_BASES				\
 	movl    $MSR_AMD_FSBASE, %ecx;          \
 	rdmsr;                                  \
@@ -252,17 +260,17 @@ extern __inline__ ulong_t getcr8(void)
 	uint64_t value;
 
 	__asm__ __volatile__(
-		"movq %%cr8, %0"
-		: "=r" (value));
+	    "movq %%cr8, %0"
+	    : "=r" (value));
 	return (value);
 }
 
 extern __inline__ void setcr8(ulong_t value)
 {
 	__asm__ __volatile__(
-		"movq %0, %%cr8"
-		: /* no output */
-		: "r" (value));
+	    "movq %0, %%cr8"
+	    : /* no output */
+	    : "r" (value));
 }
 
 #else

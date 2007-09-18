@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,62 +196,62 @@ do_options(int argc, char *argv[])
 			 * of the main loop so they aren't re-interpreted.
 			 */
 			switch (*ptr) {
-			    case 's':
-			    case 'S':
+			case 's':
+			case 'S':
 				option_s = 1;
 				break;
-			    case 'f':
-			    case 'F':
+			case 'f':
+			case 'F':
 				option_f = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 'l':
-			    case 'L':
+			case 'l':
+			case 'L':
 				option_l = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 'x':
-			    case 'X':
+			case 'x':
+			case 'X':
 				option_x = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 'd':
-			    case 'D':
+			case 'd':
+			case 'D':
 				option_d = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 't':
-			    case 'T':
+			case 't':
+			case 'T':
 				option_t = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 'p':
-			    case 'P':
+			case 'p':
+			case 'P':
 				option_p = argv[next++];
 				if (next > argc)
 					goto badopt;
 				break;
-			    case 'm':
+			case 'm':
 				option_msg = 1;
 				break;
-			    case 'M':
+			case 'M':
 				option_msg = 1;
 				diag_msg = 1;
 				break;
-			    case 'e':
+			case 'e':
 				expert_mode = 1;
 				break;
 #ifdef DEBUG
-			    case 'z':
+			case 'z':
 				dev_expert = 1;
 				break;
 #endif
-			    default:
+			default:
 badopt:
 				usage();
 				break;
@@ -324,7 +324,7 @@ sup_init()
 			nopened_files++;
 		} else {
 			err_print("Unable to open data file '%s' - %s.\n",
-				file_name, strerror(errno));
+			    file_name, strerror(errno));
 			fullabort();
 		}
 	}
@@ -365,7 +365,7 @@ sup_init()
 		 */
 		if (stat(fname, &stbuf) == -1) {
 			err_print("Unable to access '%s' - %s.\n",
-				fname, strerror(errno));
+			    fname, strerror(errno));
 		} else {
 			if (S_ISDIR(stbuf.st_mode)) {
 				if (*(p-1) != '/')
@@ -514,7 +514,7 @@ sup_setpath()
 		 * so no dangling references.
 		 */
 		search_path = build_argvlist(search_path, &path_size,
-			&path_alloc, cleaned);
+		    &path_alloc, cleaned);
 		/*
 		 * Pull in some grammar.
 		 */
@@ -659,9 +659,10 @@ sup_setdtype()
 					}
 				}
 				if (i == OTHER_CTLRS) {
-				    datafile_error("Unknown controller '%s'",
-					cleaned);
-				    return;
+					datafile_error(
+					    "Unknown controller '%s'",
+					    cleaned);
+					return;
 				}
 			}
 			/*
@@ -680,7 +681,7 @@ sup_setdtype()
 		val = (int)strtol(cleaned, &ptr, 0);
 		if (*ptr != '\0') {
 			datafile_error("Expecting an integer, found '%s'",
-				cleaned);
+			    cleaned);
 			return;
 		}
 		/*
@@ -1058,7 +1059,7 @@ sup_setpart()
 		 * in cylinders or blocks.
 		 */
 		if (((flags & (SUP_DISK|SUP_CTLR)) == (SUP_DISK|SUP_CTLR)) &&
-				dtype == NULL && ctype == NULL) {
+		    dtype == NULL && ctype == NULL) {
 			/*
 			 * Attempt to match the specified ctlr to a known type.
 			 */
@@ -1091,7 +1092,7 @@ sup_setpart()
 			 * Attempt to match the specified disk to a known type.
 			 */
 			for (dtype = ctype->ctype_dlist; dtype != NULL;
-						dtype = dtype->dtype_next) {
+			    dtype = dtype->dtype_next) {
 				if (strcmp(dtype->dtype_asciilabel, disk) == 0)
 					break;
 			}
@@ -1166,14 +1167,13 @@ sup_setpart()
 			status = sup_gettoken(token);
 			if (status != SUP_COMMA) {
 				datafile_error(
-					"Expecting ', ', found '%s'",
-					token);
+				    "Expecting ', ', found '%s'", token);
 				return;
 			}
 			status = sup_gettoken(token);
 			if (status != SUP_STRING) {
 				datafile_error("Expecting value, found '%s'",
-					token);
+				    token);
 				return;
 			}
 			clean_token(cleaned, token);
@@ -1190,13 +1190,13 @@ sup_setpart()
 			status = sup_gettoken(token);
 			if (status != SUP_COMMA) {
 				datafile_error("Expecting ', ', found '%s'",
-					token);
+				    token);
 				return;
 			}
 			status = sup_gettoken(token);
 			if (status != SUP_STRING) {
 				datafile_error("Expecting value, found '%s'",
-					token);
+				    token);
 				return;
 			}
 			clean_token(cleaned, token);
@@ -1209,7 +1209,7 @@ sup_setpart()
 		val1 = str2cyls(cleaned);
 		if (val1 == -1) {
 			datafile_error("Expecting an integer, found '%s'",
-				cleaned);
+			    cleaned);
 			return;
 		}
 		/*
@@ -1239,7 +1239,7 @@ sup_setpart()
 		val2 = str2blks(cleaned);
 		if (val2 == -1) {
 			datafile_error("Expecting an integer, found '%s'",
-				cleaned);
+			    cleaned);
 			return;
 		}
 		/*
@@ -1318,12 +1318,12 @@ do_search(char *arglist[])
 	 */
 	if (getcwd(curdir, sizeof (curdir)) == NULL) {
 		err_print("Cannot get current directory - %s\n",
-			strerror(errno));
+		    strerror(errno));
 		fullabort();
 	}
 	if (chdir(directory) == -1) {
 		err_print("Cannot set directory to %s - %s\n",
-			directory, strerror(errno));
+		    directory, strerror(errno));
 		fullabort();
 	}
 
@@ -1361,7 +1361,7 @@ do_search(char *arglist[])
 		 */
 		if ((dir = opendir(".")) == NULL) {
 			err_print("Cannot open %s - %s\n",
-				directory, strerror(errno));
+			    directory, strerror(errno));
 			fullabort();
 		}
 
@@ -1373,25 +1373,24 @@ do_search(char *arglist[])
 		 */
 		while ((dp = readdir(dir)) != NULL) {
 			if (strcmp(dp->d_name, ".") == 0 ||
-						strcmp(dp->d_name, "..") == 0)
+			    strcmp(dp->d_name, "..") == 0)
 				continue;
 			if (!conventional_name(dp->d_name)) {
-			    if (!fdisk_physical_name(dp->d_name)) {
-				/*
-				 * If non-conventional name represents
-				 * a link to non-s2 slice , ignore it.
-				 */
-				    if (!name_represents_wholedisk
-						(dp->d_name)) {
-					(void) strcpy(path, directory);
-					(void) strcat(path, "/");
-					(void) strcat(path, dp->d_name);
-					add_device_to_disklist(dp->d_name,
-							path);
-				    }
-			    }
+				if (!fdisk_physical_name(dp->d_name)) {
+					/*
+					 * If non-conventional name represents
+					 * a link to non-s2 slice , ignore it.
+					 */
+					if (!name_represents_wholedisk
+					    (dp->d_name)) {
+						(void) strcpy(path, directory);
+						(void) strcat(path, "/");
+						(void) strcat(path, dp->d_name);
+						add_device_to_disklist(
+						    dp->d_name, path);
+					}
+				}
 			}
-
 		}
 		rewinddir(dir);
 
@@ -1402,7 +1401,7 @@ do_search(char *arglist[])
 		 */
 		while ((dp = readdir(dir)) != NULL) {
 			if (strcmp(dp->d_name, ".") == 0 ||
-						strcmp(dp->d_name, "..") == 0)
+			    strcmp(dp->d_name, "..") == 0)
 				continue;
 			if (whole_disk_name(dp->d_name)) {
 				(void) strcpy(path, directory);
@@ -1417,7 +1416,7 @@ do_search(char *arglist[])
 		 */
 		if (closedir(dir) == -1) {
 			err_print("Cannot close directory %s - %s\n",
-				directory, strerror(errno));
+			    directory, strerror(errno));
 			fullabort();
 		}
 
@@ -1430,7 +1429,7 @@ do_search(char *arglist[])
 	 */
 	if (chdir(curdir) == -1) {
 		err_print("Cannot set directory to %s - %s\n",
-			curdir, strerror(errno));
+		    curdir, strerror(errno));
 		fullabort();
 	}
 
@@ -1469,11 +1468,11 @@ do_search(char *arglist[])
 			}
 			type = disk->disk_type;
 			nblks = type->dtype_ncyl * type->dtype_nhead *
-				type->dtype_nsect;
+			    type->dtype_nsect;
 			if (disk->label_type == L_TYPE_SOLARIS)
-			    scaled = bn2mb(nblks);
+				scaled = bn2mb(nblks);
 			else
-			    scaled = bn2mb(type->capacity);
+				scaled = bn2mb(type->capacity);
 			fmt_print("with capacity of ");
 			if (scaled > 1024.0) {
 				fmt_print("%1.2fGB\n", scaled/1024.0);
@@ -1652,7 +1651,7 @@ add_device_to_disklist(char *devname, char *devpath)
 		tctlr->ctype_ctype = dkinfo.dki_ctype;
 		tctlr->ctype_name = zalloc(DK_DEVLEN);
 		if (strlcpy(tctlr->ctype_name, dkinfo.dki_cname,
-			DK_DEVLEN) > DK_DEVLEN) {
+		    DK_DEVLEN) > DK_DEVLEN) {
 			/*
 			 * DKIOCINFO returned a controller name longer
 			 * than DK_DEVLEN bytes, which means more of the
@@ -1711,7 +1710,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	 */
 	if (dkinfo.dki_ctype == DKC_SCSI_CCS) {
 		i = scsi_rdwr(DIR_READ, search_file, (daddr_t)0,
-			1, (char *)&search_label, F_SILENT, NULL);
+		    1, (char *)&search_label, F_SILENT, NULL);
 		switch (i) {
 		case DSK_RESERVED:
 			access_flags |= DSK_RESERVED;
@@ -1769,8 +1768,8 @@ add_device_to_disklist(char *devname, char *devpath)
 	    search_ctlr = search_ctlr->ctlr_next)
 		if (search_ctlr->ctlr_addr == dkinfo.dki_addr &&
 		    search_ctlr->ctlr_space == dkinfo.dki_space &&
-			search_ctlr->ctlr_ctype->ctype_ctype ==
-				dkinfo.dki_ctype)
+		    search_ctlr->ctlr_ctype->ctype_ctype ==
+		    dkinfo.dki_ctype)
 			break;
 	/*
 	 * If no match was found, we need to identify this ctlr.
@@ -1802,7 +1801,7 @@ add_device_to_disklist(char *devname, char *devpath)
 		 * to the list of found ctlrs.
 		 */
 		search_ctlr = (struct ctlr_info *)
-			zalloc(sizeof (struct ctlr_info));
+		    zalloc(sizeof (struct ctlr_info));
 		search_ctlr->ctlr_ctype = mlp->ctlr_type;
 		if (ctlr_list == NULL)
 			ctlr_list = search_ctlr;
@@ -1865,39 +1864,40 @@ add_device_to_disklist(char *devname, char *devpath)
 	 */
 	ctlr = search_ctlr->ctlr_ctype;
 	if ((status == -1) && (ctlr->ctype_ctype == DKC_SCSI_CCS)) {
-	    if (option_msg && diag_msg) {
-		err_print("%s: attempting auto configuration\n",
-		    search_disk->disk_name);
-	    }
-	    switch (search_disk->label_type) {
-	    case (L_TYPE_SOLARIS):
-		if (auto_sense(search_file, 0, &search_label) != NULL) {
-		/*
-		 * Auto config worked, so we now have
-		 * a valid label for the disk.  Mark
-		 * the disk as needing the label flushed.
-		 */
-			status = 0;
-			search_disk->disk_flags |=
-			    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
+		if (option_msg && diag_msg) {
+			err_print("%s: attempting auto configuration\n",
+			    search_disk->disk_name);
 		}
-		break;
-	    case (L_TYPE_EFI):
-		efi_disk = auto_efi_sense(search_file, &efi_info);
-		if (efi_disk != NULL) {
-		/*
-		 * Auto config worked, so we now have
-		 * a valid label for the disk.
-		 */
-			status = 0;
-			search_disk->disk_flags |=
-			    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
+
+		switch (search_disk->label_type) {
+		case (L_TYPE_SOLARIS):
+			if (auto_sense(search_file, 0, &search_label) != NULL) {
+			/*
+			 * Auto config worked, so we now have
+			 * a valid label for the disk.  Mark
+			 * the disk as needing the label flushed.
+			 */
+				status = 0;
+				search_disk->disk_flags |=
+				    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
+			}
+			break;
+		case (L_TYPE_EFI):
+			efi_disk = auto_efi_sense(search_file, &efi_info);
+			if (efi_disk != NULL) {
+				/*
+				 * Auto config worked, so we now have
+				 * a valid label for the disk.
+				 */
+				status = 0;
+				search_disk->disk_flags |=
+				    (DSK_LABEL_DIRTY | DSK_AUTO_CONFIG);
+			}
+			break;
+		default:
+			/* Should never happen */
+			break;
 		}
-		break;
-	    default:
-		    /* Should never happen */
-		break;
-	    }
 	}
 	/*
 	 * Close the file for this disk.
@@ -1958,16 +1958,18 @@ add_device_to_disklist(char *devname, char *devpath)
 		 * Copy the volume name, if present
 		 */
 		for (i = 0; i < search_parts->etoc->efi_nparts; i++) {
-		    if (search_parts->etoc->efi_parts[i].p_tag ==
-			V_RESERVED) {
-			    if (search_parts->etoc->efi_parts[i].p_name) {
-				bcopy(search_parts->etoc->efi_parts[i].p_name,
-				    search_disk->v_volume, LEN_DKL_VVOL);
-			    } else {
-				bzero(search_disk->v_volume, LEN_DKL_VVOL);
-			    }
-			    break;
-		    }
+			if (search_parts->etoc->efi_parts[i].p_tag ==
+			    V_RESERVED) {
+				if (search_parts->etoc->efi_parts[i].p_name) {
+					bcopy(search_parts->etoc->efi_parts[i]
+					    .p_name, search_disk->v_volume,
+					    LEN_DKL_VVOL);
+				} else {
+					bzero(search_disk->v_volume,
+					    LEN_DKL_VVOL);
+				}
+				break;
+			}
 		}
 		return;
 	}
@@ -2026,6 +2028,7 @@ add_device_to_disklist(char *devname, char *devpath)
 		 */
 		if ((search_ctlr->ctlr_ctype->ctype_ctype != DKC_SCSI_CCS) &&
 		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_DIRECT) &&
+		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_VBD) &&
 		    (search_ctlr->ctlr_ctype->ctype_ctype != DKC_PCMCIA_ATA)) {
 			search_dtype->dtype_flags |= DT_NEED_SPEFS;
 		}
@@ -2102,7 +2105,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	 */
 	if (search_label.dkl_vtoc.v_version == V_VERSION) {
 		bcopy(search_label.dkl_vtoc.v_volume,
-			search_disk->v_volume, LEN_DKL_VVOL);
+		    search_disk->v_volume, LEN_DKL_VVOL);
 		search_parts->vtoc = search_label.dkl_vtoc;
 	} else {
 		bzero(search_disk->v_volume, LEN_DKL_VVOL);
@@ -2128,10 +2131,9 @@ disk_is_known(struct dk_cinfo *dkinfo)
 	dp = disk_list;
 	while (dp != NULL) {
 		if (dp->disk_dkinfo.dki_ctype == dkinfo->dki_ctype &&
-			dp->disk_dkinfo.dki_cnum == dkinfo->dki_cnum &&
-			dp->disk_dkinfo.dki_unit == dkinfo->dki_unit &&
-				strcmp(dp->disk_dkinfo.dki_dname,
-					dkinfo->dki_dname) == 0) {
+		    dp->disk_dkinfo.dki_cnum == dkinfo->dki_cnum &&
+		    dp->disk_dkinfo.dki_unit == dkinfo->dki_unit &&
+		    strcmp(dp->disk_dkinfo.dki_dname, dkinfo->dki_dname) == 0) {
 			return (1);
 		}
 		dp = dp->disk_next;
@@ -2267,10 +2269,9 @@ diskname_match(char *name, struct disk_info *disk)
 	(void) close(fd);
 
 	if (disk->disk_dkinfo.dki_ctype == dkinfo.dki_ctype &&
-		disk->disk_dkinfo.dki_cnum == dkinfo.dki_cnum &&
-			disk->disk_dkinfo.dki_unit == dkinfo.dki_unit &&
-				strcmp(disk->disk_dkinfo.dki_dname,
-					dkinfo.dki_dname) == 0) {
+	    disk->disk_dkinfo.dki_cnum == dkinfo.dki_cnum &&
+	    disk->disk_dkinfo.dki_unit == dkinfo.dki_unit &&
+	    strcmp(disk->disk_dkinfo.dki_dname, dkinfo.dki_dname) == 0) {
 		return (1);
 	}
 	return (0);
@@ -2673,7 +2674,7 @@ get_physical_name(char *path)
 	}
 	if (chdir(s) == -1) {
 		err_print("cannot chdir() to %s - %s\n",
-			s, strerror(errno));
+		    s, strerror(errno));
 		goto exit;
 	}
 
@@ -2689,7 +2690,7 @@ get_physical_name(char *path)
 		}
 		if (lstat(s, &stbuf) == -1) {
 			err_print("%s: lstat() failed - %s\n",
-				s, strerror(errno));
+			    s, strerror(errno));
 			goto exit;
 		}
 		/*
@@ -2713,7 +2714,7 @@ get_physical_name(char *path)
 				 */
 				if (getcwd(dir, sizeof (dir)) == NULL) {
 					err_print("getcwd() failed - %s\n",
-						strerror(errno));
+					    strerror(errno));
 					goto exit;
 				}
 				(void) strcat(dir, "/");
@@ -2723,7 +2724,7 @@ get_physical_name(char *path)
 				 * /devices prefix, remove it.
 				 */
 				p = (strstr(dir, DEVFS_PREFIX) == dir) ?
-					dir+strlen(DEVFS_PREFIX) : dir;
+				    dir+strlen(DEVFS_PREFIX) : dir;
 				result = alloc_string(p);
 			}
 			goto exit;
@@ -2731,7 +2732,7 @@ get_physical_name(char *path)
 		i = readlink(s, buf, sizeof (buf));
 		if (i == -1) {
 			err_print("%s: readlink() failed - %s\n",
-				s, strerror(errno));
+			    s, strerror(errno));
 			goto exit;
 		}
 		level++;
@@ -2748,7 +2749,7 @@ get_physical_name(char *path)
 			*p = 0;
 			if (chdir(dir) == -1) {
 				err_print("cannot chdir() to %s - %s\n",
-					dir, strerror(errno));
+				    dir, strerror(errno));
 				goto exit;
 			}
 			(void) strcpy(s, p+1);
@@ -2760,7 +2761,7 @@ get_physical_name(char *path)
 exit:
 	if (chdir(savedir) == -1) {
 		err_print("cannot chdir() to %s - %s\n",
-			savedir, strerror(errno));
+		    savedir, strerror(errno));
 	}
 
 	return (result);
@@ -2791,7 +2792,7 @@ sort_disk_list()
 	 * Allocate a simple disk list array and fill it in
 	 */
 	disks = (struct disk_info **)
-		zalloc((n+1) * sizeof (struct disk_info *));
+	    zalloc((n+1) * sizeof (struct disk_info *));
 
 	dp = disks;
 	for (d = disk_list; d != NULL; d = d->disk_next) {
@@ -2803,7 +2804,7 @@ sort_disk_list()
 	 * Sort the disk list array
 	 */
 	qsort((void *) disks, n, sizeof (struct disk_info *),
-		disk_name_compare);
+	    disk_name_compare);
 
 	/*
 	 * Rebuild the linked list disk list structure

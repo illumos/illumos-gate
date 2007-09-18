@@ -1036,7 +1036,7 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 
 	(void) snprintf(name, MAXNAMELEN, "%s%u", drvname, ppa);
 
-	if (strcmp(drvname, "aggr") != 0 &&
+	if (strcmp(drvname, "aggr") != 0 && strcmp(drvname, "vnic") != 0 &&
 	    qassociate(dsp->ds_wq, DLS_PPA2INST(ppa)) != 0)
 		return (EINVAL);
 
@@ -1554,8 +1554,7 @@ str_notify_phys_addr(dld_str_t *dsp, const uint8_t *addr)
 	bcopy(addr, &dlip[1], addr_length);
 
 	ethertype = (dsp->ds_sap < ETHERTYPE_802_MIN) ? 0 : dsp->ds_sap;
-	*(uint16_t *)((uchar_t *)(dlip + 1) + addr_length) =
-		ethertype;
+	*(uint16_t *)((uchar_t *)(dlip + 1) + addr_length) = ethertype;
 
 	qreply(dsp->ds_wq, mp);
 }
@@ -1753,10 +1752,11 @@ str_notify(void *arg, mac_notify_type_t type)
 		break;
 
 	case MAC_NOTE_RESOURCE:
+	case MAC_NOTE_VNIC:
 		/*
 		 * This notification is sent whenever the MAC resources
-		 * change. We need to renegotiate the capabilities.
-		 * Send the appropriate DL_NOTIFY_IND.
+		 * change or capabilities change. We need to renegotiate
+		 * the capabilities. Send the appropriate DL_NOTIFY_IND.
 		 */
 		str_notify_capab_reneg(dsp);
 		break;

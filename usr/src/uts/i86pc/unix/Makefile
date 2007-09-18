@@ -56,7 +56,6 @@ LINTS		= $(SPECIAL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 
 ROOTMODULE	= $(ROOT_PSM_KERN_DIR)/$(UNIX)
 ROOT_MULTIBOOT	= $(ROOT_PSM_DIR)/$(MULTIBOOT)
-BOOT_KERNEL	= $(ROOT_BOOT_PSM_KERN_DIR)/$(UNIX)
 
 UNIX_BIN	= $(OBJS_DIR)/$(UNIX)
 
@@ -71,6 +70,7 @@ CTFEXTRAOBJS	= $(OBJS_DIR)/vers.o
 
 DBOOT_OBJS_DIR	= dboot/$(OBJS_DIR)
 DBOOT_OBJECTS	= $(DBOOT_OBJS:%=$(DBOOT_OBJS_DIR)/%)
+DBOOT_BIN	= $(DBOOT_OBJS_DIR)/$(DBOOT)
 DBOOT_O		= $(OBJS_DIR)/$(DBOOT).o
 DBOOT_S		= $(DBOOT_O:%.o=%.s)
 DBOOT_LINTS	= $(DBOOT_OBJS:%.o=$(DBOOT_OBJS_DIR)/%.ln)
@@ -87,7 +87,7 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 ALL_TARGET	= $(UNIX_BIN) $(MULTIBOOT)
 LINT_TARGET	= $(LINT_LIB) $(DBOOT_LINT_LIB)
-INSTALL_TARGET	= $(UNIX_BIN) $(MULTIBOOT) $(ROOTMODULE) $(ROOT_MULTIBOOT) $(BOOT_KERNEL)
+INSTALL_TARGET	= $(UNIX_BIN) $(MULTIBOOT) $(ROOTMODULE) $(ROOT_MULTIBOOT)
 
 #
 #	This is UNIX_DIR. Use a short path.
@@ -108,7 +108,7 @@ CLEANFILES	+=		\
 	$(OBJS_DIR)/bios_call_src.o \
 	$(OBJS_DIR)/bios_call_src \
 	$(OBJS_DIR)/bios_call.s \
-	$(DBOOT_OBJS_DIR)/$(DBOOT)
+	$(DBOOT_BIN)
 
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN) $(MULTIBOOT)
 CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
@@ -167,13 +167,15 @@ $(UNIX_BIN):	$(UNIX_O) $(MODSTUBS_O) $(MAPFILE_NAME) \
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o
 
-$(DBOOT_O):	$(DBOOT_OBJS_DIR) $(DBOOT_OBJECTS)
-	$(LD) -dn -M dboot/Mapfile.dboot \
-		-o $(DBOOT_OBJS_DIR)/$(DBOOT) $(DBOOT_OBJECTS)
+$(DBOOT_BIN):	$(DBOOT_OBJS_DIR) $(DBOOT_OBJECTS) dboot/Mapfile.dboot
+	$(LD) -dn -e _start -M dboot/Mapfile.dboot \
+		-o $(DBOOT_BIN) $(DBOOT_OBJECTS)
+
+$(DBOOT_O):	$(DBOOT_BIN)
 	@echo "	.data"					> $(DBOOT_S)
 	@echo "	.globl	dboot_image"			>> $(DBOOT_S)
 	@echo "dboot_image:"				>> $(DBOOT_S)
-	$(ELFEXTRACT) $(DBOOT_OBJS_DIR)/$(DBOOT)	>> $(DBOOT_S)
+	$(ELFEXTRACT) $(DBOOT_BIN)			>> $(DBOOT_S)
 	$(COMPILE.s) -o $(DBOOT_O) $(DBOOT_S)
 
 $(DBOOT_OBJS_DIR):
@@ -184,14 +186,7 @@ $(DBOOT_OBJS_DIR):
 # dboot.o the dependency here.
 #
 $(MULTIBOOT):	$(DBOOT_O)
-	$(CP)	$(DBOOT_OBJS_DIR)/$(DBOOT) $(MULTIBOOT)
-	$(POST_PROCESS)
-
-#
-# The boot kernel is a copy of the 32-bit kernel paired with the
-# install/failsafe miniroot
-$(BOOT_KERNEL):	$(ROOTMODULE) $(ROOT_BOOT_PSM_KERN_DIR)
-	$(CP)	$(ROOTMODULE) $(BOOT_KERNEL)
+	$(CP)	$(DBOOT_BIN) $(MULTIBOOT)
 	$(POST_PROCESS)
 
 #

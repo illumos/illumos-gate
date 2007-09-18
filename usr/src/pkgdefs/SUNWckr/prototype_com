@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -117,6 +117,7 @@ f none kernel/drv/tl.conf 644 root sys
 f none kernel/drv/udp.conf 644 root sys
 f none kernel/drv/udp6.conf 644 root sys
 f none kernel/drv/vni.conf 644 root sys
+f none kernel/drv/vnic.conf 644 root sys
 f none kernel/drv/wc.conf 644 root sys
 d none kernel/exec 755 root sys
 d none kernel/fs 755 root sys

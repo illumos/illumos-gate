@@ -72,6 +72,9 @@
 #include <vm/seg_kp.h>
 #include <vm/seg_kpm.h>
 #include <vm/vm_dep.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 #include <vm/kboot_mmu.h>
 #include <vm/seg_spt.h>
 
@@ -85,29 +88,15 @@ struct hat_mmu_info mmu;
 /*
  * The page that is the kernel's top level pagetable.
  *
- * For 32 bit VLP support, the kernel hat will use the 1st 4 entries
+ * For 32 bit PAE support on i86pc, the kernel hat will use the 1st 4 entries
  * on this 4K page for its top level page table. The remaining groups of
  * 4 entries are used for per processor copies of user VLP pagetables for
  * running threads.  See hat_switch() and reload_pae32() for details.
  *
- * vlp_page[0] - 0th level==2 PTE for kernel HAT (will be zero)
- * vlp_page[1] - 1st level==2 PTE for kernel HAT (will be zero)
- * vlp_page[2] - 2nd level==2 PTE for kernel HAT (zero for small memory)
- * vlp_page[3] - 3rd level==2 PTE for kernel
- *
- * vlp_page[4] - 0th level==2 PTE for user thread on cpu 0
- * vlp_page[5] - 1st level==2 PTE for user thread on cpu 0
- * vlp_page[6] - 2nd level==2 PTE for user thread on cpu 0
- * vlp_page[7] - probably copy of kernel PTE
- *
- * vlp_page[8]  - 0th level==2 PTE for user thread on cpu 1
- * vlp_page[9]  - 1st level==2 PTE for user thread on cpu 1
- * vlp_page[10] - 2nd level==2 PTE for user thread on cpu 1
- * vlp_page[11] - probably copy of kernel PTE
- * ...
- *
- * when / where the kernel PTE's are (entry 2 or 3 or none) depends
- * on kernelbase.
+ * vlp_page[0..3] - level==2 PTEs for kernel HAT
+ * vlp_page[4..7] - level==2 PTEs for user thread on cpu 0
+ * vlp_page[8..11]  - level==2 PTE for user thread on cpu 1
+ * etc...
  */
 static x86pte_t *vlp_page;
 
@@ -119,27 +108,24 @@ static x86pte_t hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected,
 
 /*
  * The kernel address space exists in all HATs. To implement this the
- * kernel reserves a fixed number of entries in every topmost level page
- * table. The values are setup in hat_init() and then copied to every hat
- * created by hat_alloc(). This means that kernelbase must be:
+ * kernel reserves a fixed number of entries in the topmost level(s) of page
+ * tables. The values are setup during startup and then copied to every user
+ * hat created by hat_alloc(). This means that kernelbase must be:
  *
  *	  4Meg aligned for 32 bit kernels
  *	512Gig aligned for x86_64 64 bit kernel
  *
- * The PAE 32 bit hat is handled as a special case. Otherwise requiring 1Gig
- * alignment would use too much VA for the kernel.
- *
+ * The hat_kernel_range_ts describe what needs to be copied from kernel hat
+ * to each user hat.
  */
-static uint_t	khat_start;	/* index of 1st entry in kernel's top ptable */
-static uint_t	khat_entries;	/* number of entries in kernel's top ptable */
-
-#if defined(__i386)
-
-static htable_t	*khat_pae32_htable = NULL;
-static uint_t	khat_pae32_start;
-static uint_t	khat_pae32_entries;
-
-#endif
+typedef struct hat_kernel_range {
+	level_t		hkr_level;
+	uintptr_t	hkr_start_va;
+	uintptr_t	hkr_end_va;	/* zero means to end of memory */
+} hat_kernel_range_t;
+#define	NUM_KERNEL_RANGE 2
+static hat_kernel_range_t kernel_ranges[NUM_KERNEL_RANGE];
+static int num_kernel_ranges;
 
 uint_t use_boot_reserve = 1;	/* cleared after early boot process */
 uint_t can_steal_post_boot = 0;	/* set late in boot to enable stealing */
@@ -214,9 +200,16 @@ hati_constructor(void *buf, void *handle, int kmflags)
 hat_t *
 hat_alloc(struct as *as)
 {
-	hat_t		*hat;
-	htable_t	*ht;	/* top level htable */
-	uint_t		use_vlp;
+	hat_t			*hat;
+	htable_t		*ht;	/* top level htable */
+	uint_t			use_vlp;
+	uint_t			r;
+	hat_kernel_range_t	*rp;
+	uintptr_t		va;
+	uintptr_t		eva;
+	uint_t			start;
+	uint_t			cnt;
+	htable_t		*src;
 
 	/*
 	 * Once we start creating user process HATs we can enable
@@ -231,14 +224,21 @@ hat_alloc(struct as *as)
 	mutex_init(&hat->hat_mutex, NULL, MUTEX_DEFAULT, NULL);
 	ASSERT(hat->hat_flags == 0);
 
+#if defined(__xpv)
 	/*
-	 * a 32 bit process uses a VLP style hat when using PAE
+	 * No VLP stuff on the hypervisor due to the 64-bit split top level
+	 * page tables.  On 32-bit it's not needed as the hypervisor takes
+	 * care of copying the top level PTEs to a below 4Gig page.
 	 */
+	use_vlp = 0;
+#else	/* __xpv */
+	/* 32 bit processes uses a VLP style hat when running with PAE */
 #if defined(__amd64)
 	use_vlp = (ttoproc(curthread)->p_model == DATAMODEL_ILP32);
 #elif defined(__i386)
 	use_vlp = mmu.pae_hat;
 #endif
+#endif	/* __xpv */
 	if (use_vlp) {
 		hat->hat_flags = HAT_VLP;
 		bzero(hat->hat_vlp_ptes, VLP_SIZE);
@@ -258,40 +258,65 @@ hat_alloc(struct as *as)
 
 	/*
 	 * Initialize Kernel HAT entries at the top of the top level page
-	 * table for the new hat.
-	 *
-	 * Note that we don't call htable_release() for the top level, that
-	 * happens when the hat is destroyed in hat_free_end()
+	 * tables for the new hat.
 	 */
 	hat->hat_htable = NULL;
 	hat->hat_ht_cached = NULL;
+	XPV_DISALLOW_MIGRATE();
 	ht = htable_create(hat, (uintptr_t)0, TOP_LEVEL(hat), NULL);
-
-	if (!(hat->hat_flags & HAT_VLP))
-		x86pte_copy(kas.a_hat->hat_htable, ht, khat_start,
-		    khat_entries);
-#if defined(__i386)
-	else if (khat_entries > 0)
-		bcopy(vlp_page + khat_start, hat->hat_vlp_ptes + khat_start,
-		    khat_entries * sizeof (x86pte_t));
-#endif
 	hat->hat_htable = ht;
 
-#if defined(__i386)
-	/*
-	 * PAE32 HAT alignment is less restrictive than the others to keep
-	 * the kernel from using too much VA. Because of this we may need
-	 * one layer further down when kernelbase isn't 1Gig aligned.
-	 * See hat_free_end() for the htable_release() that goes with this
-	 * htable_create()
-	 */
-	if (khat_pae32_htable != NULL) {
-		ht = htable_create(hat, kernelbase,
-		    khat_pae32_htable->ht_level, NULL);
-		x86pte_copy(khat_pae32_htable, ht, khat_pae32_start,
-		    khat_pae32_entries);
-		ht->ht_valid_cnt = khat_pae32_entries;
+#if defined(__amd64)
+	if (hat->hat_flags & HAT_VLP)
+		goto init_done;
+#endif
+
+	for (r = 0; r < num_kernel_ranges; ++r) {
+		rp = &kernel_ranges[r];
+		for (va = rp->hkr_start_va; va != rp->hkr_end_va;
+		    va += cnt * LEVEL_SIZE(rp->hkr_level)) {
+
+			if (rp->hkr_level == TOP_LEVEL(hat))
+				ht = hat->hat_htable;
+			else
+				ht = htable_create(hat, va, rp->hkr_level,
+				    NULL);
+
+			start = htable_va2entry(va, ht);
+			cnt = HTABLE_NUM_PTES(ht) - start;
+			eva = va +
+			    ((uintptr_t)cnt << LEVEL_SHIFT(rp->hkr_level));
+			if (rp->hkr_end_va != 0 &&
+			    (eva > rp->hkr_end_va || eva == 0))
+				cnt = htable_va2entry(rp->hkr_end_va, ht) -
+				    start;
+
+#if defined(__i386) && !defined(__xpv)
+			if (ht->ht_flags & HTABLE_VLP) {
+				bcopy(&vlp_page[start],
+				    &hat->hat_vlp_ptes[start],
+				    cnt * sizeof (x86pte_t));
+				continue;
+			}
+#endif
+			src = htable_lookup(kas.a_hat, va, rp->hkr_level);
+			ASSERT(src != NULL);
+			x86pte_copy(src, ht, start, cnt);
+			htable_release(src);
+		}
 	}
+
+init_done:
+	XPV_ALLOW_MIGRATE();
+
+#if defined(__xpv)
+	/*
+	 * Pin top level page tables after initializing them
+	 */
+	xen_pin(hat->hat_htable->ht_pfn, mmu.max_level);
+#if defined(__amd64)
+	xen_pin(hat->hat_user_ptable, mmu.max_level);
+#endif
 #endif
 
 	/*
@@ -346,13 +371,8 @@ hat_free_start(hat_t *hat)
 void
 hat_free_end(hat_t *hat)
 {
-	int i;
 	kmem_cache_t *cache;
 
-#ifdef DEBUG
-	for (i = 0; i <= mmu.max_page_level; i++)
-		ASSERT(hat->hat_pages_mapped[i] == 0);
-#endif
 	ASSERT(hat->hat_flags & HAT_FREEING);
 
 	/*
@@ -374,6 +394,16 @@ hat_free_end(hat_t *hat)
 		kas.a_hat->hat_prev = hat->hat_prev;
 	mutex_exit(&hat_list_lock);
 	hat->hat_next = hat->hat_prev = NULL;
+
+#if defined(__xpv)
+	/*
+	 * On the hypervisor, unpin top level page table(s)
+	 */
+	xen_unpin(hat->hat_htable->ht_pfn);
+#if defined(__amd64)
+	xen_unpin(hat->hat_user_ptable);
+#endif
+#endif
 
 	/*
 	 * Make a pass through the htables freeing them all up.
@@ -535,6 +565,9 @@ mmu_init(void)
 
 	for (i = 0; i <= mmu.max_page_level; ++i) {
 		mmu.pte_bits[i] = PT_VALID;
+#if defined(__xpv) && defined(__amd64)
+		mmu.pte_bits[i] |= PT_USER;
+#endif
 		if (i > 0)
 			mmu.pte_bits[i] |= PT_PAGESIZE;
 	}
@@ -674,7 +707,7 @@ hat_init()
 static void
 hat_vlp_setup(struct cpu *cpu)
 {
-#if defined(__amd64)
+#if defined(__amd64) && !defined(__xpv)
 	struct hat_cpu_info *hci = cpu->cpu_hat_info;
 	pfn_t pfn;
 
@@ -693,20 +726,19 @@ hat_vlp_setup(struct cpu *cpu)
 	hci->hci_vlp_pfn =
 	    hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_vlp_l3ptes);
 	ASSERT(hci->hci_vlp_pfn != PFN_INVALID);
-	bcopy(vlp_page + khat_start, hci->hci_vlp_l3ptes + khat_start,
-	    khat_entries * sizeof (x86pte_t));
+	bcopy(vlp_page, hci->hci_vlp_l3ptes, MMU_PAGESIZE);
 
 	pfn = hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_vlp_l2ptes);
 	ASSERT(pfn != PFN_INVALID);
 	hci->hci_vlp_l3ptes[0] = MAKEPTP(pfn, 2);
-#endif /* __amd64 */
+#endif /* __amd64 && !__xpv */
 }
 
 /*ARGSUSED*/
 static void
 hat_vlp_teardown(cpu_t *cpu)
 {
-#if defined(__amd64)
+#if defined(__amd64) && !defined(__xpv)
 	struct hat_cpu_info *hci;
 
 	if ((hci = cpu->cpu_hat_info) == NULL)
@@ -715,7 +747,14 @@ hat_vlp_teardown(cpu_t *cpu)
 		kmem_free(hci->hci_vlp_l2ptes, MMU_PAGESIZE);
 	if (hci->hci_vlp_l3ptes)
 		kmem_free(hci->hci_vlp_l3ptes, MMU_PAGESIZE);
-#endif	/* __amd64 */
+#endif
+}
+
+#define	NEXT_HKR(r, l, s, e) {			\
+	kernel_ranges[r].hkr_level = l;		\
+	kernel_ranges[r].hkr_start_va = s;	\
+	kernel_ranges[r].hkr_end_va = e;	\
+	++r;					\
 }
 
 /*
@@ -729,90 +768,91 @@ hat_vlp_teardown(cpu_t *cpu)
 void
 hat_init_finish(void)
 {
-	htable_t	*top = kas.a_hat->hat_htable;
-	htable_t	*ht;
-	uint_t		e;
-	x86pte_t	pte;
-	uintptr_t	va = kernelbase;
 	size_t		size;
+	uint_t		r = 0;
+	uintptr_t	va;
+	hat_kernel_range_t *rp;
 
-
-#if defined(__i386)
-	ASSERT((va & LEVEL_MASK(1)) == va);
-
-	/*
-	 * Deal with kernelbase not 1Gig aligned for 32 bit PAE hats.
-	 */
-	if (!mmu.pae_hat || (va & LEVEL_OFFSET(mmu.max_level)) == 0) {
-		khat_pae32_htable = NULL;
-	} else {
-		ASSERT(mmu.max_level == 2);
-		ASSERT((va & LEVEL_OFFSET(mmu.max_level - 1)) == 0);
-		khat_pae32_htable =
-		    htable_create(kas.a_hat, va, mmu.max_level - 1, NULL);
-		khat_pae32_start = htable_va2entry(va, khat_pae32_htable);
-		khat_pae32_entries = mmu.ptes_per_table - khat_pae32_start;
-		for (e = khat_pae32_start; e < mmu.ptes_per_table;
-		    ++e, va += LEVEL_SIZE(mmu.max_level - 1)) {
-			pte = x86pte_get(khat_pae32_htable, e);
-			if (PTE_ISVALID(pte))
-				continue;
-			ht = htable_create(kas.a_hat, va, mmu.max_level - 2,
-			    NULL);
-			ASSERT(ht != NULL);
-		}
-	}
-#endif
-
-	/*
-	 * The kernel hat will need fixed values in the highest level
-	 * ptable for copying to all other hat's. This implies
-	 * alignment restrictions on _userlimit.
-	 *
-	 * Note we don't htable_release() these htables. This keeps them
-	 * from ever being stolen or free'd.
-	 *
-	 * top_level_count is used instead of ptes_per_table, since
-	 * on 32-bit PAE we only have 4 usable entries at the top level ptable.
-	 */
-	if (va == 0)
-		khat_start = mmu.top_level_count;
-	else
-		khat_start = htable_va2entry(va, kas.a_hat->hat_htable);
-	khat_entries = mmu.top_level_count - khat_start;
-	for (e = khat_start; e < mmu.top_level_count;
-	    ++e, va += LEVEL_SIZE(mmu.max_level)) {
-		if (IN_HYPERVISOR_VA(va))
-			continue;
-		pte = x86pte_get(top, e);
-		if (PTE_ISVALID(pte))
-			continue;
-		ht = htable_create(kas.a_hat, va, mmu.max_level - 1, NULL);
-		ASSERT(ht != NULL);
-	}
 
 	/*
 	 * We are now effectively running on the kernel hat.
 	 * Clearing use_boot_reserve shuts off using the pre-allocated boot
 	 * reserve for all HAT allocations.  From here on, the reserves are
-	 * only used when mapping in memory for the hat's own allocations.
+	 * only used when avoiding recursion in kmem_alloc().
 	 */
 	use_boot_reserve = 0;
 	htable_adjust_reserve();
 
 	/*
-	 * 32 bit kernels use only 4 of the 512 entries in its top level
-	 * pagetable. We'll use the remainder for the "per CPU" page tables
-	 * for VLP processes.
-	 *
-	 * We also map the top level kernel pagetable into the kernel to make
-	 * it easy to use bcopy to initialize new address spaces.
+	 * User HATs are initialized with copies of all kernel mappings in
+	 * higher level page tables. Ensure that those entries exist.
+	 */
+#if defined(__amd64)
+
+	NEXT_HKR(r, 3, kernelbase, 0);
+#if defined(__xpv)
+	NEXT_HKR(r, 3, HYPERVISOR_VIRT_START, HYPERVISOR_VIRT_END);
+#endif
+
+#elif defined(__i386)
+
+#if !defined(__xpv)
+	if (mmu.pae_hat) {
+		va = kernelbase;
+		if ((va & LEVEL_MASK(2)) != va) {
+			va = P2ROUNDUP(va, LEVEL_SIZE(2));
+			NEXT_HKR(r, 1, kernelbase, va);
+		}
+		if (va != 0)
+			NEXT_HKR(r, 2, va, 0);
+	} else
+#endif /* __xpv */
+		NEXT_HKR(r, 1, kernelbase, 0);
+
+#endif /* __i386 */
+
+	num_kernel_ranges = r;
+
+	/*
+	 * Create all the kernel pagetables that will have entries
+	 * shared to user HATs.
+	 */
+	for (r = 0; r < num_kernel_ranges; ++r) {
+		rp = &kernel_ranges[r];
+		for (va = rp->hkr_start_va; va != rp->hkr_end_va;
+		    va += LEVEL_SIZE(rp->hkr_level)) {
+			htable_t *ht;
+
+			if (IN_HYPERVISOR_VA(va))
+				continue;
+
+			/* can/must skip if a page mapping already exists */
+			if (rp->hkr_level <= mmu.max_page_level &&
+			    (ht = htable_getpage(kas.a_hat, va, NULL)) !=
+			    NULL) {
+				htable_release(ht);
+				continue;
+			}
+
+			(void) htable_create(kas.a_hat, va, rp->hkr_level - 1,
+			    NULL);
+		}
+	}
+
+	/*
+	 * 32 bit PAE metal kernels use only 4 of the 512 entries in the
+	 * page holding the top level pagetable. We use the remainder for
+	 * the "per CPU" page tables for VLP processes.
+	 * Map the top level kernel pagetable into the kernel to make
+	 * it easy to use bcopy access these tables.
 	 */
 	if (mmu.pae_hat) {
 		vlp_page = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
 		hat_devload(kas.a_hat, (caddr_t)vlp_page, MMU_PAGESIZE,
 		    kas.a_hat->hat_htable->ht_pfn,
+#if !defined(__xpv)
 		    PROT_WRITE |
+#endif
 		    PROT_READ | HAT_NOSYNC | HAT_UNORDERED_OK,
 		    HAT_LOAD | HAT_LOAD_NOCONSIST);
 	}
@@ -865,11 +905,14 @@ reload_pae32(hat_t *hat, cpu_t *cpu)
 
 /*
  * Switch to a new active hat, maintaining bit masks to track active CPUs.
+ *
+ * On the 32-bit PAE hypervisor, %cr3 is a 64-bit value, on metal it
+ * remains a 32-bit value.
  */
 void
 hat_switch(hat_t *hat)
 {
-	uintptr_t	newcr3;
+	uint64_t	newcr3;
 	cpu_t		*cpu = CPU;
 	hat_t		*old = cpu->cpu_current_hat;
 
@@ -906,9 +949,37 @@ hat_switch(hat_t *hat)
 		    (cpu->cpu_id + 1) * VLP_SIZE;
 #endif
 	} else {
-		newcr3 = MAKECR3(hat->hat_htable->ht_pfn);
+		newcr3 = MAKECR3((uint64_t)hat->hat_htable->ht_pfn);
 	}
+#ifdef __xpv
+	{
+		struct mmuext_op t[2];
+		uint_t retcnt;
+		uint_t opcnt = 1;
+
+		t[0].cmd = MMUEXT_NEW_BASEPTR;
+		t[0].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
+#if defined(__amd64)
+		/*
+		 * There's an interesting problem here, as to what to
+		 * actually specify when switching to the kernel hat.
+		 * For now we'll reuse the kernel hat again.
+		 */
+		t[1].cmd = MMUEXT_NEW_USER_BASEPTR;
+		if (hat == kas.a_hat)
+			t[1].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
+		else
+			t[1].arg1.mfn = pfn_to_mfn(hat->hat_user_ptable);
+		++opcnt;
+#endif	/* __amd64 */
+		if (HYPERVISOR_mmuext_op(t, opcnt, &retcnt, DOMID_SELF) < 0)
+			panic("HYPERVISOR_mmu_update() failed");
+		ASSERT(retcnt == opcnt);
+
+	}
+#else
 	setcr3(newcr3);
+#endif
 	ASSERT(cpu == CPU);
 }
 
@@ -1003,6 +1074,7 @@ hat_swapout(hat_t *hat)
 	htable_t	*ht = NULL;
 	level_t		l;
 
+	XPV_DISALLOW_MIGRATE();
 	/*
 	 * We can't just call hat_unload(hat, 0, _userlimit...)  here, because
 	 * seg_spt and shared pagetables can't be swapped out.
@@ -1061,6 +1133,7 @@ hat_swapout(hat_t *hat)
 	 * go back and flush all the htables off the cached list.
 	 */
 	htable_purge_hat(hat);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -1138,11 +1211,11 @@ hati_sync_pte_to_page(page_t *pp, x86pte_t pte, level_t level)
 
 /*
  * This the set of PTE bits for PFN, permissions and caching
- * that require a TLB flush (hat_tlb_inval) if changed on a HAT_LOAD_REMAP
+ * that are allowed to change on a HAT_LOAD_REMAP
  */
 #define	PT_REMAP_BITS							\
 	(PT_PADDR | PT_NX | PT_WRITABLE | PT_WRITETHRU |		\
-	PT_NOCACHE | PT_PAT_4K | PT_PAT_LARGE)
+	PT_NOCACHE | PT_PAT_4K | PT_PAT_LARGE | PT_IGNORE | PT_REF | PT_MOD)
 
 #define	REMAPASSERT(EX)	if (!(EX)) panic("hati_pte_map: " #EX)
 /*
@@ -1239,11 +1312,11 @@ hati_pte_map(
 	}
 
 	/*
-	 * We only let remaps change the bits for PFNs, permissions
-	 * or caching type.
+	 * We only let remaps change the certain bits in the PTE.
 	 */
-	ASSERT(PTE_GET(old_pte, ~(PT_REMAP_BITS | PT_REF | PT_MOD)) ==
-	    PTE_GET(pte, ~PT_REMAP_BITS));
+	if (PTE_GET(old_pte, ~PT_REMAP_BITS) != PTE_GET(pte, ~PT_REMAP_BITS))
+		panic("remap bits changed: old_pte="FMT_PTE", pte="FMT_PTE"\n",
+		    old_pte, pte);
 
 	/*
 	 * We don't create any mapping list entries on a remap, so release
@@ -1429,6 +1502,7 @@ hat_memload(
 	level_t		level = 0;
 	pfn_t		pfn = page_pptonum(pp);
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va < _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1444,6 +1518,7 @@ hat_memload(
 	if (mmu.kmap_addr <= va && va < mmu.kmap_eaddr) {
 		ASSERT(hat == kas.a_hat);
 		hat_kmap_load(addr, pp, attr, flags);
+		XPV_ALLOW_MIGRATE();
 		return;
 	}
 
@@ -1454,6 +1529,7 @@ hat_memload(
 	attr |= HAT_STORECACHING_OK;
 	if (hati_load_common(hat, va, pp, attr, flags, level, pfn) != 0)
 		panic("unexpected hati_load_common() failure");
+	XPV_ALLOW_MIGRATE();
 }
 
 /* ARGSUSED */
@@ -1484,6 +1560,7 @@ hat_memload_array(
 	pfn_t		pfn;
 	pgcnt_t		i;
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1555,6 +1632,7 @@ hat_memload_array(
 		va += pgsize;
 		pgindx += mmu_btop(pgsize);
 	}
+	XPV_ALLOW_MIGRATE();
 }
 
 /* ARGSUSED */
@@ -1613,6 +1691,7 @@ hat_devload(
 	int		f;	/* per PTE copy of flags  - maybe modified */
 	uint_t		a;	/* per PTE copy of attr */
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || eva <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1645,18 +1724,15 @@ hat_devload(
 		 */
 		a = attr;
 		f = flags;
-		if (pf_is_memory(pfn)) {
-			if (!(a & HAT_PLAT_NOCACHE))
-				a |= HAT_STORECACHING_OK;
-
-			if (f & HAT_LOAD_NOCONSIST)
-				pp = NULL;
-			else
-				pp = page_numtopp_nolock(pfn);
-		} else {
-			pp = NULL;
+		if (!pf_is_memory(pfn))
 			f |= HAT_LOAD_NOCONSIST;
-		}
+		else if (!(a & HAT_PLAT_NOCACHE))
+			a |= HAT_STORECACHING_OK;
+
+		if (f & HAT_LOAD_NOCONSIST)
+			pp = NULL;
+		else
+			pp = page_numtopp_nolock(pfn);
 
 		/*
 		 * load this page mapping
@@ -1675,6 +1751,7 @@ hat_devload(
 		va += pgsize;
 		pfn += mmu_btop(pgsize);
 	}
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -1701,6 +1778,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 	if (eaddr > _userlimit)
 		panic("hat_unlock() address out of range - above _userlimit");
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
 	while (vaddr < eaddr) {
 		(void) htable_walk(hat, &ht, &vaddr, eaddr);
@@ -1718,6 +1796,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 	}
 	if (ht)
 		htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 }
 
 /* ARGSUSED */
@@ -1728,6 +1807,7 @@ hat_unlock_region(struct hat *hat, caddr_t addr, size_t len,
 	panic("No shared region support on x86");
 }
 
+#if !defined(__xpv)
 /*
  * Cross call service routine to demap a virtual page on
  * the current CPU or flush all mappings in TLB.
@@ -1851,6 +1931,7 @@ tlb_service(void)
 	if (flags & PS_IE)
 		sti();
 }
+#endif /* !__xpv */
 
 /*
  * Internal routine to do cross calls to invalidate a range of pages on
@@ -1861,10 +1942,12 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
-	cpuset_t	check_cpus;
 	cpuset_t	cpus_to_shootdown;
+#ifndef __xpv
+	cpuset_t	check_cpus;
 	cpu_t		*cpup;
 	int		c;
+#endif
 
 	/*
 	 * If the hat is being destroyed, there are no more users, so
@@ -1887,7 +1970,14 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 	 * if not running with multiple CPUs, don't use cross calls
 	 */
 	if (panicstr || !flushes_require_xcalls) {
+#ifdef __xpv
+		if (va == DEMAP_ALL_ADDR)
+			xen_flush_tlb();
+		else
+			xen_flush_va((caddr_t)va);
+#else
 		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+#endif
 		return;
 	}
 
@@ -1903,6 +1993,7 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 	else
 		cpus_to_shootdown = hat->hat_cpus;
 
+#ifndef __xpv
 	/*
 	 * If any CPUs in the set are idle, just request a delayed flush
 	 * and avoid waking them up.
@@ -1930,17 +2021,32 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 			CPUSET_DEL(cpus_to_shootdown, c);
 		}
 	}
+#endif
 
 	if (CPUSET_ISNULL(cpus_to_shootdown) ||
 	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
 
+#ifdef __xpv
+		if (va == DEMAP_ALL_ADDR)
+			xen_flush_tlb();
+		else
+			xen_flush_va((caddr_t)va);
+#else
 		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+#endif
 
 	} else {
 
 		CPUSET_ADD(cpus_to_shootdown, CPU->cpu_id);
+#ifdef __xpv
+		if (va == DEMAP_ALL_ADDR)
+			xen_gflush_tlb(cpus_to_shootdown);
+		else
+			xen_gflush_va((caddr_t)va, cpus_to_shootdown);
+#else
 		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL, X_CALL_HIPRI,
 		    cpus_to_shootdown, hati_demap_func);
+#endif
 
 	}
 	kpreempt_enable();
@@ -1985,6 +2091,10 @@ hat_pte_unmap(
 		if (PTE_GET(old_pte, PT_SOFTWARE) >= PT_NOCONSIST) {
 			pp = NULL;
 		} else {
+#ifdef __xpv
+			if (pfn == PFN_INVALID)
+				panic("Invalid PFN, but not PT_NOCONSIST");
+#endif
 			pp = page_numtopp_nolock(pfn);
 			if (pp == NULL) {
 				panic("no page_t, not NOCONSIST: old_pte="
@@ -2000,10 +2110,16 @@ hat_pte_unmap(
 		 * hasn't changed, as the mappings are no longer in use by
 		 * any thread, invalidation is unnecessary.
 		 * If not freeing, do a full invalidate.
+		 *
+		 * On the hypervisor we must always remove mappings, as a
+		 * writable mapping left behind could cause a page table
+		 * allocation to fail.
 		 */
+#if !defined(__xpv)
 		if (hat->hat_flags & HAT_FREEING)
 			old_pte = x86pte_get(ht, entry);
 		else
+#endif
 			old_pte = x86pte_inval(ht, entry, old_pte, pte_ptr);
 
 		/*
@@ -2098,6 +2214,7 @@ hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 {
 	uintptr_t va = (uintptr_t)addr;
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
 
 	/*
@@ -2109,6 +2226,7 @@ hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 	} else {
 		hat_unload_callback(hat, addr, len, flags, NULL);
 	}
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -2164,6 +2282,7 @@ hat_unload_callback(
 	uint_t		r_cnt = 0;
 	x86pte_t	old_pte;
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
@@ -2179,6 +2298,7 @@ hat_unload_callback(
 				hat_pte_unmap(ht, entry, flags, old_pte, NULL);
 			htable_release(ht);
 		}
+		XPV_ALLOW_MIGRATE();
 		return;
 	}
 
@@ -2225,6 +2345,7 @@ hat_unload_callback(
 	 */
 	if (r_cnt > 0)
 		handle_ranges(cb, r_cnt, r);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -2251,6 +2372,7 @@ hat_sync(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 	ASSERT(IS_PAGEALIGNED(eaddr));
 	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 
+	XPV_DISALLOW_MIGRATE();
 	for (; vaddr < eaddr; vaddr += LEVEL_SIZE(ht->ht_level)) {
 try_again:
 		pte = htable_walk(hat, &ht, &vaddr, eaddr);
@@ -2304,6 +2426,7 @@ try_again:
 	}
 	if (ht)
 		htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -2373,6 +2496,7 @@ hat_updateattr(hat_t *hat, caddr_t addr, size_t len, uint_t attr, int what)
 	x86pte_t	oldpte, newpte;
 	page_t		*pp;
 
+	XPV_DISALLOW_MIGRATE();
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
 	ASSERT(hat == kas.a_hat ||
@@ -2460,6 +2584,7 @@ try_again:
 	}
 	if (ht)
 		htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -2537,6 +2662,7 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 	if (IN_VA_HOLE(vaddr))
 		return (PFN_INVALID);
 
+	XPV_DISALLOW_MIGRATE();
 	/*
 	 * A very common use of hat_getpfnum() is from the DDI for kernel pages.
 	 * Use the kmap_ptes (which also covers the 32 bit heap) to speed
@@ -2548,21 +2674,25 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 
 		pg_index = mmu_btop(vaddr - mmu.kmap_addr);
 		pte = GET_PTE(PT_INDEX_PTR(mmu.kmap_ptes, pg_index));
-		if (!PTE_ISVALID(pte))
-			return (PFN_INVALID);
-		/*LINTED [use of constant 0 causes a silly lint warning] */
-		return (PTE2PFN(pte, 0));
+		if (PTE_ISVALID(pte))
+			/*LINTED [use of constant 0 causes a lint warning] */
+			pfn = PTE2PFN(pte, 0);
+		XPV_ALLOW_MIGRATE();
+		return (pfn);
 	}
 
 	ht = htable_getpage(hat, vaddr, &entry);
-	if (ht == NULL)
+	if (ht == NULL) {
+		XPV_ALLOW_MIGRATE();
 		return (PFN_INVALID);
+	}
 	ASSERT(vaddr >= ht->ht_vaddr);
 	ASSERT(vaddr <= HTABLE_LAST_PAGE(ht));
 	pfn = PTE2PFN(x86pte_get(ht, entry), ht->ht_level);
 	if (ht->ht_level > 0)
 		pfn += mmu_btop(vaddr & LEVEL_OFFSET(ht->ht_level));
 	htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 	return (pfn);
 }
 
@@ -2590,7 +2720,7 @@ hat_getkpfnum(caddr_t addr)
 	if ((uintptr_t)addr < kernelbase)
 		return (PFN_INVALID);
 
-
+	XPV_DISALLOW_MIGRATE();
 	if (segkpm && IS_KPM_ADDR(addr)) {
 		badcaller = 1;
 		pfn = hat_kpm_va2pfn(addr);
@@ -2601,6 +2731,7 @@ hat_getkpfnum(caddr_t addr)
 
 	if (badcaller)
 		hat_getkpfnum_badcall(caller());
+	XPV_ALLOW_MIGRATE();
 	return (pfn);
 }
 #endif /* __amd64 */
@@ -2638,10 +2769,8 @@ hat_probe(hat_t *hat, caddr_t addr)
 	}
 
 	ht = htable_getpage(hat, vaddr, &entry);
-	if (ht == NULL)
-		return (0);
 	htable_release(ht);
-	return (1);
+	return (ht != NULL);
 }
 
 /*
@@ -2708,6 +2837,7 @@ hat_share(
 		ASSERT(hat_get_mapped_size(ism_hat) == 0);
 		return (0);
 	}
+	XPV_DISALLOW_MIGRATE();
 
 	/*
 	 * The SPT segment driver often passes us a size larger than there are
@@ -2857,6 +2987,7 @@ not_shared:
 	}
 	if (ism_ht != NULL)
 		htable_release(ism_ht);
+	XPV_ALLOW_MIGRATE();
 	return (0);
 }
 
@@ -2881,6 +3012,7 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	ASSERT(eaddr <= _userlimit);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
+	XPV_DISALLOW_MIGRATE();
 
 	/*
 	 * First go through and remove any shared pagetables.
@@ -2930,6 +3062,7 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	if (!is_it_dism(hat, addr))
 		flags |= HAT_UNLOAD_UNLOCK;
 	hat_unload(hat, addr, len, flags);
+	XPV_ALLOW_MIGRATE();
 }
 
 
@@ -2957,6 +3090,7 @@ hati_page_clrwrt(struct page *pp)
 	x86pte_t	new;
 	uint_t		pszc = 0;
 
+	XPV_DISALLOW_MIGRATE();
 next_size:
 	/*
 	 * walk thru the mapping list clearing write permission
@@ -2998,6 +3132,7 @@ next_size:
 			goto next_size;
 		}
 	}
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -3161,6 +3296,7 @@ hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
 	uint_t		entry;
 	level_t		level;
 
+	XPV_DISALLOW_MIGRATE();
 #if defined(__amd64)
 	/*
 	 * clear the vpm ref.
@@ -3188,6 +3324,7 @@ next_size:
 				 * If not part of a larger page, we're done.
 				 */
 				if (cur_pp->p_szc <= pg_szcd) {
+					XPV_ALLOW_MIGRATE();
 					return (0);
 				}
 
@@ -3447,6 +3584,7 @@ hat_pagesync(struct page *pp, uint_t flags)
 		}
 	}
 
+	XPV_DISALLOW_MIGRATE();
 next_size:
 	/*
 	 * walk thru the mapping list syncing (and clearing) ref/mod bits.
@@ -3506,6 +3644,7 @@ try_again:
 		}
 	}
 done:
+	XPV_ALLOW_MIGRATE();
 	return (save_pp->p_nrm & nrmbits);
 }
 
@@ -3587,7 +3726,9 @@ void
 hat_thread_exit(kthread_t *thd)
 {
 	ASSERT(thd->t_procp->p_as == &kas);
+	XPV_DISALLOW_MIGRATE();
 	hat_switch(thd->t_procp->p_as->a_hat);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -3597,11 +3738,13 @@ hat_thread_exit(kthread_t *thd)
 void
 hat_setup(hat_t *hat, int flags)
 {
+	XPV_DISALLOW_MIGRATE();
 	kpreempt_disable();
 
 	hat_switch(hat);
 
 	kpreempt_enable();
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -3664,6 +3807,11 @@ hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 	/*
 	 * invalidate any left over mapping and decrement the htable valid count
 	 */
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping((uintptr_t)addr, 0,
+	    UVMF_INVLPG | UVMF_LOCAL))
+		panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	{
 		x86pte_t *pteptr;
 
@@ -3676,6 +3824,7 @@ hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 		mmu_tlbflush_entry(addr);
 		x86pte_mapout();
 	}
+#endif
 
 	ht = htable_getpte(kas.a_hat, ALIGN2PAGE(addr), NULL, NULL, 0);
 	if (ht == NULL)
@@ -3717,7 +3866,12 @@ hat_mempte_remap(
 	ASSERT(ht->ht_pfn == mmu_btop(pte_pa));
 	htable_release(ht);
 #endif
+	XPV_DISALLOW_MIGRATE();
 	pte = hati_mkpte(pfn, attr, 0, flags);
+#ifdef __xpv
+	if (HYPERVISOR_update_va_mapping(va, pte, UVMF_INVLPG | UVMF_LOCAL))
+		panic("HYPERVISOR_update_va_mapping() failed");
+#else
 	{
 		x86pte_t *pteptr;
 
@@ -3730,6 +3884,8 @@ hat_mempte_remap(
 		mmu_tlbflush_entry(addr);
 		x86pte_mapout();
 	}
+#endif
+	XPV_ALLOW_MIGRATE();
 }
 
 
@@ -4052,3 +4208,30 @@ hat_kpm_mseghash_clear(int nentries)
 void
 hat_kpm_mseghash_update(pgcnt_t inx, struct memseg *msp)
 {}
+
+#ifdef __xpv
+/*
+ * There are specific Hypervisor calls to establish and remove mappings
+ * to grant table references and the privcmd driver. We have to ensure
+ * that a page table actually exists.
+ */
+void
+hat_prepare_mapping(hat_t *hat, caddr_t addr)
+{
+	ASSERT(IS_P2ALIGNED((uintptr_t)addr, MMU_PAGESIZE));
+	(void) htable_create(hat, (uintptr_t)addr, 0, NULL);
+}
+
+void
+hat_release_mapping(hat_t *hat, caddr_t addr)
+{
+	htable_t *ht;
+
+	ASSERT(IS_P2ALIGNED((uintptr_t)addr, MMU_PAGESIZE));
+	ht = htable_lookup(hat, (uintptr_t)addr, 0);
+	ASSERT(ht != NULL);
+	ASSERT(ht->ht_busy >= 2);
+	htable_release(ht);
+	htable_release(ht);
+}
+#endif

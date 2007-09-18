@@ -121,6 +121,7 @@ extern char *dumppath;
 
 extern int dump_timeout;
 extern int dump_timeleft;
+extern int dump_ioerr;
 extern int sync_timeout;
 extern int sync_timeleft;
 

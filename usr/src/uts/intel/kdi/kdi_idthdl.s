@@ -70,12 +70,34 @@ this won't assemble
  * Generic trap and interrupt handlers.
  */
 
+#if defined(__xpv) && defined(__amd64)
+
+/*
+ * The hypervisor places r11 and rcx on the stack.
+ */
+
+#define	TRAP_NOERR(trapno) \
+	popq	%rcx;		\
+	popq	%r11;		\
+	pushq	$trapno
+
+#define	TRAP_ERR(trapno) 	\
+	popq	%rcx;		\
+	popq	%r11;		\
+	pushq	$0;		\
+	pushq	$trapno
+
+#else
+
 #define	TRAP_NOERR(trapno) 	\
 	push	$trapno
 
 #define	TRAP_ERR(trapno) 	\
 	push	$0;		\
 	push	$trapno
+
+#endif	/* __xpv && __amd64 */
+
 
 #define	MKIVCT(n) \
 	ENTRY_NP(kdi_ivct/**/n/**/);	\

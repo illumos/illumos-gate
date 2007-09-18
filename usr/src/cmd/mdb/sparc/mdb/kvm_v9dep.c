@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,13 +115,7 @@ kt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 static int
 kt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	kt_data_t *kt = mdb.m_target->t_data;
-
-	if (argc != 0 || (flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	mdb_v9printregs(kt->k_regs);
-
+	mdb_v9printregs((const mdb_tgt_gregset_t *)addr);
 	return (DCMD_OK);
 }
 
@@ -178,6 +171,14 @@ kt_stackr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	return (kt_stack_common(addr, flags, argc, argv, mdb_kvm_v9framer,
 	    PC_FAKE));
+}
+
+/*ARGSUSED*/
+static int
+kt_notsup(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	errno = EMDB_TGTNOTSUP;
+	return (DCMD_ERR);
 }
 
 const mdb_tgt_ops_t kt_sparcv9_ops = {
@@ -260,6 +261,8 @@ kt_sparcv9_init(mdb_tgt_t *t)
 	kt->k_dcmd_stack = kt_stack;
 	kt->k_dcmd_stackv = kt_stackv;
 	kt->k_dcmd_stackr = kt_stackr;
+	kt->k_dcmd_cpustack = kt_notsup;
+	kt->k_dcmd_cpuregs = kt_notsup;
 
 	t->t_ops = &kt_sparcv9_ops;
 	kregs = kt->k_regs->kregs;

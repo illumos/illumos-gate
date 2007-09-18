@@ -36,15 +36,72 @@
 #include "boot_vga.h"
 
 #if defined(_BOOT)
+#include "../dboot/dboot_asm.h"
 #include "../dboot/dboot_xboot.h"
 #endif
 
 #define	VGA_COLOR_CRTC_INDEX	0x3d4
 #define	VGA_COLOR_CRTC_DATA	0x3d5
+
+#if defined(__xpv) && defined(_BOOT)
+
+/*
+ * Device memory address
+ *
+ * In dboot under the hypervisor we don't have any memory mappings
+ * for the first meg of low memory so we can't access devices there.
+ * Intead we've mapped the device memory that we need to access into
+ * a local variable within dboot so we can access the device memory
+ * there.
+ */
+extern unsigned short *video_fb;
+#define	VGA_SCREEN		((unsigned short *)video_fb)
+
+#else /* __xpv && _BOOT */
+
+/* Device memory address */
 #define	VGA_SCREEN		((unsigned short *)0xb8000)
+
+#endif /* __xpv && _BOOT */
+
 
 static void vga_set_crtc(int index, unsigned char val);
 static unsigned char vga_get_crtc(int index);
+
+void
+vga_cursor_display(void)
+{
+	unsigned char val, msl;
+
+	/*
+	 * Figure out the maximum scan line value.  We need this to set the
+	 * cursor size.
+	 */
+	msl = vga_get_crtc(VGA_CRTC_MAX_S_LN) & 0x1f;
+
+	/*
+	 * Enable the cursor and set it's size.  Preserve the upper two
+	 * bits of the control register.
+	 * - Bits 0-4 are the starting scan line of the cursor.
+	 *   Scanning is done from top-to-bottom.  The top-most scan
+	 *   line is 0 and the bottom most scan line is the maximum scan
+	 *   line value.
+	 * - Bit 5 is the cursor disable bit.
+	 */
+	val = vga_get_crtc(VGA_CRTC_CSSL);
+	vga_set_crtc(VGA_CRTC_CSSL, (val & 0xc) | ((msl - 2) & 0x1f));
+
+	/*
+	 * Continue setting the cursors size.
+	 * - Bits 0-4 are the ending scan line of the cursor.
+	 *   Scanning is done from top-to-bottom.  The top-most scan
+	 *   line is 0 and the bottom most scan line is the maximum scan
+	 *   line value.
+	 * - Bits 5-6 are the cursor skew.
+	 */
+	vga_set_crtc(VGA_CRTC_CESL, msl);
+}
+
 
 void
 vga_clear(int color)
@@ -100,8 +157,7 @@ vga_getpos(int *row, int *col)
 {
 	int off;
 
-	off = (vga_get_crtc(VGA_CRTC_CLAH) << 8) +
-		vga_get_crtc(VGA_CRTC_CLAL);
+	off = (vga_get_crtc(VGA_CRTC_CLAH) << 8) + vga_get_crtc(VGA_CRTC_CLAL);
 	*row = off / VGA_TEXT_COLS;
 	*col = off % VGA_TEXT_COLS;
 }
@@ -112,7 +168,6 @@ vga_set_crtc(int index, unsigned char val)
 	outb(VGA_COLOR_CRTC_INDEX, index);
 	outb(VGA_COLOR_CRTC_DATA, val);
 }
-
 
 static unsigned char
 vga_get_crtc(int index)

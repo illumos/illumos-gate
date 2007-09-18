@@ -63,10 +63,15 @@
 #include <sys/cmn_err.h>
 #include <sys/segments.h>
 #include <sys/clock.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#include <sys/note.h>
+#endif
 
-static void setup_ldt(proc_t *pp);
-static void *ldt_map(proc_t *pp, uint_t seli);
-static void ldt_free(proc_t *pp);
+static void ldt_alloc(proc_t *, uint_t);
+static void ldt_free(proc_t *);
+static void ldt_dup(proc_t *, proc_t *);
+static void ldt_grow(proc_t *, uint_t);
 
 /*
  * sysi86 System Call
@@ -100,7 +105,16 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 			if (newpl > oldpl && (error =
 			    secpolicy_sys_config(CRED(), B_FALSE)) != 0)
 				return (set_errno(error));
+#if defined(__xpv)
+			kpreempt_disable();
+			installctx(curthread, NULL, xen_disable_user_iopl,
+			    xen_enable_user_iopl, NULL, NULL,
+			    xen_disable_user_iopl, NULL);
+			xen_enable_user_iopl();
+			kpreempt_enable();
+#else
 			rp->r_ps ^= oldpl ^ newpl;
+#endif
 		} else
 			error = EINVAL;
 		break;
@@ -265,6 +279,8 @@ static void
 ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 {
 
+	ASSERT(bcmp(usd, &null_udesc, sizeof (*usd)) == 0);
+
 	USEGD_SETBASE(usd, ssd->bo);
 	USEGD_SETLIMIT(usd, ssd->ls);
 
@@ -279,28 +295,37 @@ ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 	ASSERT(usd->usd_dpl == SEL_UPL);
 
 	/*
+	 * 64-bit code selectors are never allowed in the LDT.
+	 * Reserved bit is always 0 on 32-bit sytems.
+	 */
+#if defined(__amd64)
+	usd->usd_long = 0;
+#else
+	usd->usd_reserved = 0;
+#endif
+
+	/*
 	 * set avl, DB and granularity bits.
 	 */
 	usd->usd_avl = ssd->acc2;
-
-#if defined(__amd64)
-	usd->usd_long = ssd->acc2 >> 1;
-#else
-	usd->usd_reserved = ssd->acc2 >> 1;
-#endif
-
 	usd->usd_def32 = ssd->acc2 >> (1 + 1);
 	usd->usd_gran = ssd->acc2 >> (1 + 1 + 1);
 }
+
+
+#if defined(__i386)
 
 static void
 ssd_to_sgd(struct ssd *ssd, gate_desc_t *sgd)
 {
 
+	ASSERT(bcmp(sgd, &null_sdesc, sizeof (*sgd)) == 0);
+
 	sgd->sgd_looffset = ssd->bo;
 	sgd->sgd_hioffset = ssd->bo >> 16;
 
 	sgd->sgd_selector = ssd->ls;
+
 	/*
 	 * set type, dpl and present bits.
 	 */
@@ -309,22 +334,24 @@ ssd_to_sgd(struct ssd *ssd, gate_desc_t *sgd)
 	sgd->sgd_p = ssd->acc1 >> 7;
 	ASSERT(sgd->sgd_type == SDT_SYSCGT);
 	ASSERT(sgd->sgd_dpl == SEL_UPL);
-
-#if defined(__i386)	/* reserved, ignored in amd64 */
 	sgd->sgd_stkcpy = 0;
-#endif
 }
+
+#endif	/* __i386 */
 
 /*
  * Load LDT register with the current process's LDT.
  */
-void
+static void
 ldt_load(void)
 {
-	/*
-	 */
+#if defined(__xpv)
+	xen_set_ldt(get_ssd_base(&curproc->p_ldt_desc),
+	    curproc->p_ldtlimit + 1);
+#else
 	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = curproc->p_ldt_desc;
 	wr_ldtr(ULDT_SEL);
+#endif
 }
 
 /*
@@ -334,8 +361,12 @@ ldt_load(void)
 void
 ldt_unload(void)
 {
-	CPU->cpu_gdt[GDT_LDT] = zero_udesc;
+#if defined(__xpv)
+	xen_set_ldt(NULL, 0);
+#else
+	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = null_sdesc;
 	wr_ldtr(0);
+#endif
 }
 
 /*ARGSUSED*/
@@ -363,7 +394,7 @@ ldt_savectx(proc_t *p)
 	 *	the context of the wine process and do not have our
 	 *	ldtr register pointing to the private ldt.
 	 */
-	clr_ldt_sregs();
+	reset_sregs();
 #endif
 
 	ldt_unload();
@@ -453,8 +484,10 @@ int
 setdscr(struct ssd *ssd)
 {
 	ushort_t seli; 		/* selector index */
-	user_desc_t *dscrp;	/* descriptor pointer */
+	user_desc_t *ldp;	/* descriptor pointer */
+	user_desc_t ndesc;	/* new descriptor */
 	proc_t	*pp = ttoproc(curthread);
+	int	rc = 0;
 
 	/*
 	 * LDT segments: executable and data at DPL 3 only.
@@ -469,6 +502,7 @@ setdscr(struct ssd *ssd)
 	if (seli >= MAXNLDT || seli < LDT_UDBASE)
 		return (EINVAL);
 
+	ndesc = null_udesc;
 	mutex_enter(&pp->p_ldtlock);
 
 	/*
@@ -476,8 +510,7 @@ setdscr(struct ssd *ssd)
 	 * private LDT for it.
 	 */
 	if (pp->p_ldt == NULL) {
-		kpreempt_disable();
-		setup_ldt(pp);
+		ldt_alloc(pp, seli);
 
 		/*
 		 * Now that this process has a private LDT, the use of
@@ -492,23 +525,22 @@ setdscr(struct ssd *ssd)
 		 * thread to take the slow path (which doesn't make use
 		 * of sysenter or sysexit) back out.
 		 */
-
+		kpreempt_disable();
 		ldt_installctx(pp, NULL);
-
 		cpu_fast_syscall_disable(NULL);
-
 		ASSERT(curthread->t_post_sys != 0);
-		wr_ldtr(ULDT_SEL);
 		kpreempt_enable();
-	}
 
-	if (ldt_map(pp, seli) == NULL) {
-		mutex_exit(&pp->p_ldtlock);
-		return (ENOMEM);
+	} else if (seli > pp->p_ldtlimit) {
+
+		/*
+		 * Increase size of ldt to include seli.
+		 */
+		ldt_grow(pp, seli);
 	}
 
 	ASSERT(seli <= pp->p_ldtlimit);
-	dscrp = &pp->p_ldt[seli];
+	ldp = &pp->p_ldt[seli];
 
 	/*
 	 * On the 64-bit kernel, this is where things get more subtle.
@@ -604,9 +636,9 @@ setdscr(struct ssd *ssd)
 	 * If acc1 is zero, clear the descriptor (including the 'present' bit)
 	 */
 	if (ssd->acc1 == 0) {
-		bzero(dscrp, sizeof (*dscrp));
+		rc  = ldt_update_segd(ldp, &null_udesc);
 		mutex_exit(&pp->p_ldtlock);
-		return (0);
+		return (rc);
 	}
 
 	/*
@@ -634,188 +666,223 @@ setdscr(struct ssd *ssd)
 	 * Set up a code or data user segment descriptor.
 	 */
 	if (SI86SSD_ISUSEG(ssd)) {
-		ssd_to_usd(ssd, dscrp);
+		ssd_to_usd(ssd, &ndesc);
+		rc = ldt_update_segd(ldp, &ndesc);
 		mutex_exit(&pp->p_ldtlock);
-		return (0);
+		return (rc);
 	}
 
+#if defined(__i386)
 	/*
-	 * Allow a call gate only if the destination is in the LDT.
+	 * Allow a call gate only if the destination is in the LDT
+	 * and the system is running in 32-bit legacy mode.
+	 *
+	 * In long mode 32-bit call gates are redefined as 64-bit call
+	 * gates and the hw enforces that the target code selector
+	 * of the call gate must be 64-bit selector. A #gp fault is
+	 * generated if otherwise. Since we do not allow 32-bit processes
+	 * to switch themselves to 64-bits we never allow call gates
+	 * on 64-bit system system.
 	 */
 	if (SI86SSD_TYPE(ssd) == SDT_SYSCGT && SELISLDT(ssd->ls)) {
-		ssd_to_sgd(ssd, (gate_desc_t *)dscrp);
+
+
+		ssd_to_sgd(ssd, (gate_desc_t *)&ndesc);
+		rc = ldt_update_segd(ldp, &ndesc);
 		mutex_exit(&pp->p_ldtlock);
-		return (0);
+		return (rc);
 	}
+#endif	/* __i386 */
 
 	mutex_exit(&pp->p_ldtlock);
 	return (EINVAL);
 }
 
 /*
- * Allocate a private LDT for this process and initialize it with the
- * default entries.
+ * Allocate new LDT for process just large enough to contain seli.
+ * Note we allocate and grow LDT in PAGESIZE chunks. We do this
+ * to simplify the implementation and because on the hypervisor it's
+ * required, since the LDT must live on pages that have PROT_WRITE
+ * removed and which are given to the hypervisor.
  */
 static void
-setup_ldt(proc_t *pp)
+ldt_alloc(proc_t *pp, uint_t seli)
 {
-	user_desc_t *ldtp;	/* descriptor pointer */
-	pgcnt_t npages = btopr(MAXNLDT * sizeof (user_desc_t));
+	user_desc_t	*ldt;
+	size_t		ldtsz;
+	uint_t		nsels;
+
+	ASSERT(MUTEX_HELD(&pp->p_ldtlock));
+	ASSERT(pp->p_ldt == NULL);
+	ASSERT(pp->p_ldtlimit == 0);
 
 	/*
-	 * Allocate maximum virtual space we need for this LDT.
+	 * Allocate new LDT just large enough to contain seli.
 	 */
-	ldtp = vmem_alloc(heap_arena, ptob(npages), VM_SLEEP);
+	ldtsz = P2ROUNDUP((seli + 1) * sizeof (user_desc_t), PAGESIZE);
+	nsels = ldtsz / sizeof (user_desc_t);
+	ASSERT(nsels >= MINNLDT && nsels <= MAXNLDT);
 
-	/*
-	 * Allocate the minimum number of physical pages for LDT.
-	 */
-	(void) segkmem_xalloc(NULL, ldtp, MINNLDT * sizeof (user_desc_t),
-	    VM_SLEEP, 0, segkmem_page_create, NULL);
+	ldt = kmem_zalloc(ldtsz, KM_SLEEP);
+	ASSERT(IS_P2ALIGNED(ldt, PAGESIZE));
 
-	bzero(ldtp, ptob(btopr(MINNLDT * sizeof (user_desc_t))));
+#if defined(__xpv)
+	if (xen_ldt_setprot(ldt, ldtsz, PROT_READ))
+		panic("ldt_alloc:xen_ldt_setprot(PROT_READ) failed");
+#endif
 
-	kpreempt_disable();
+	pp->p_ldt = ldt;
+	pp->p_ldtlimit = nsels - 1;
+	set_syssegd(&pp->p_ldt_desc, ldt, ldtsz - 1, SDT_SYSLDT, SEL_KPL);
 
-	/* Update proc structure. XXX - need any locks here??? */
-
-	set_syssegd(&pp->p_ldt_desc, ldtp, MINNLDT * sizeof (user_desc_t) - 1,
-	    SDT_SYSLDT, SEL_KPL);
-
-	pp->p_ldtlimit = MINNLDT - 1;
-	pp->p_ldt = ldtp;
-	if (pp == curproc)
-		*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = pp->p_ldt_desc;
-
-	kpreempt_enable();
-}
-
-/*
- * Map the page corresponding to the selector entry. If the page is
- * already mapped then it simply returns with the pointer to the entry.
- * Otherwise it allocates a physical page for it and returns the pointer
- * to the entry.  Returns 0 for errors.
- */
-static void *
-ldt_map(proc_t *pp, uint_t seli)
-{
-	caddr_t ent0_addr = (caddr_t)&pp->p_ldt[0];
-	caddr_t ent_addr = (caddr_t)&pp->p_ldt[seli];
-	volatile caddr_t page = (caddr_t)((uintptr_t)ent0_addr & (~PAGEOFFSET));
-	caddr_t epage = (caddr_t)((uintptr_t)ent_addr & (~PAGEOFFSET));
-	on_trap_data_t otd;
-
-	ASSERT(pp->p_ldt != NULL);
-
-	if (seli <= pp->p_ldtlimit)
-		return (ent_addr);
-
-	/*
-	 * We are increasing the size of the process's LDT.
-	 * Make sure this and all intervening pages are mapped.
-	 */
-	while (page <= epage) {
-		if (!on_trap(&otd, OT_DATA_ACCESS))
-			(void) *(volatile int *)page;	/* peek at the page */
-		else {		/* Allocate a physical page */
-			(void) segkmem_xalloc(NULL, page, PAGESIZE, VM_SLEEP, 0,
-			    segkmem_page_create, NULL);
-			bzero(page, PAGESIZE);
-		}
-		no_trap();
-		page += PAGESIZE;
+	if (pp == curproc) {
+		kpreempt_disable();
+		ldt_load();
+		kpreempt_enable();
 	}
-
-	/* XXX - need any locks to update proc_t or gdt ??? */
-
-	ASSERT(curproc == pp);
-
-	kpreempt_disable();
-	pp->p_ldtlimit = seli;
-	SYSSEGD_SETLIMIT(&pp->p_ldt_desc, (seli+1) * sizeof (user_desc_t) -1);
-
-	ldt_load();
-	kpreempt_enable();
-
-	return (ent_addr);
 }
 
-/*
- * Free up the kernel memory used for LDT of this process.
- */
 static void
 ldt_free(proc_t *pp)
 {
-	on_trap_data_t otd;
-	caddr_t start, end;
-	volatile caddr_t addr;
+	user_desc_t	*ldt;
+	size_t		ldtsz;
 
 	ASSERT(pp->p_ldt != NULL);
 
 	mutex_enter(&pp->p_ldtlock);
-	start = (caddr_t)pp->p_ldt; /* beginning of the LDT */
-	end = start + (pp->p_ldtlimit * sizeof (user_desc_t));
+	ldt = pp->p_ldt;
+	ldtsz = (pp->p_ldtlimit + 1) * sizeof (user_desc_t);
 
-	/* Free the physical page(s) used for mapping LDT */
-	for (addr = start; addr <= end; addr += PAGESIZE) {
-		if (!on_trap(&otd, OT_DATA_ACCESS)) {
-			/* peek at the address */
-			(void) *(volatile int *)addr;
-			segkmem_free(NULL, addr, PAGESIZE);
-		}
-	}
-	no_trap();
+	ASSERT(IS_P2ALIGNED(ldtsz, PAGESIZE));
 
-	/* Free up the virtual address space used for this LDT */
-	vmem_free(heap_arena, pp->p_ldt,
-	    ptob(btopr(MAXNLDT * sizeof (user_desc_t))));
-	kpreempt_disable();
 	pp->p_ldt = NULL;
-	pp->p_ldt_desc = zero_sdesc;
 	pp->p_ldtlimit = 0;
-
-	if (pp == curproc)
-		ldt_unload();
-	kpreempt_enable();
+	pp->p_ldt_desc = null_sdesc;
 	mutex_exit(&pp->p_ldtlock);
+
+	if (pp == curproc) {
+		kpreempt_disable();
+		ldt_unload();
+		kpreempt_enable();
+	}
+
+#if defined(__xpv)
+	/*
+	 * We are not allowed to make the ldt writable until after
+	 * we tell the hypervisor to unload it.
+	 */
+	if (xen_ldt_setprot(ldt, ldtsz, PROT_READ | PROT_WRITE))
+		panic("ldt_free:xen_ldt_setprot(PROT_READ|PROT_WRITE) failed");
+#endif
+
+	kmem_free(ldt, ldtsz);
 }
 
 /*
  * On fork copy new ldt for child.
  */
-void
+static void
 ldt_dup(proc_t *pp, proc_t *cp)
 {
-	on_trap_data_t otd;
-	caddr_t start, end;
-	volatile caddr_t addr, caddr;
-	int	minsize;
+	size_t	ldtsz;
 
-	ASSERT(pp->p_ldt);
+	ASSERT(pp->p_ldt != NULL);
+	ASSERT(cp != curproc);
 
-	setup_ldt(cp);
-
+	/*
+	 * I assume the parent's ldt can't increase since we're in a fork.
+	 */
 	mutex_enter(&pp->p_ldtlock);
-	cp->p_ldtlimit = pp->p_ldtlimit;
-	SYSSEGD_SETLIMIT(&cp->p_ldt_desc,
-	    (pp->p_ldtlimit+1) * sizeof (user_desc_t) -1);
-	start = (caddr_t)pp->p_ldt; /* beginning of the LDT */
-	end = start + (pp->p_ldtlimit * sizeof (user_desc_t));
-	caddr = (caddr_t)cp->p_ldt; /* child LDT start */
+	mutex_enter(&cp->p_ldtlock);
 
-	minsize = ((MINNLDT * sizeof (user_desc_t)) + PAGESIZE) & ~PAGEOFFSET;
-	/* Walk thru the physical page(s) used for parent's LDT */
-	for (addr = start; addr <= end; addr += PAGESIZE, caddr += PAGESIZE) {
-		if (!on_trap(&otd, OT_DATA_ACCESS)) {
-			(void) *(volatile int *)addr; /* peek at the address */
-			/* allocate a page if necessary */
-			if (caddr >= ((caddr_t)cp->p_ldt + minsize)) {
-				(void) segkmem_xalloc(NULL, caddr, PAGESIZE,
-				    VM_SLEEP, 0, segkmem_page_create, NULL);
-			}
-			bcopy(addr, caddr, PAGESIZE);
-		}
-	}
-	no_trap();
+	ldtsz = (pp->p_ldtlimit + 1) * sizeof (user_desc_t);
+
+	ldt_alloc(cp, pp->p_ldtlimit);
+
+#if defined(__xpv)
+	/*
+	 * Make child's ldt writable so it can be copied into from
+	 * parent's ldt. This works since ldt_alloc above did not load
+	 * the ldt since its for the child process. If we tried to make
+	 * an LDT writable that is loaded in hw the setprot operation
+	 * would fail.
+	 */
+	if (xen_ldt_setprot(cp->p_ldt, ldtsz, PROT_READ | PROT_WRITE))
+		panic("ldt_dup:xen_ldt_setprot(PROT_READ|PROT_WRITE) failed");
+#endif
+
+	bcopy(pp->p_ldt, cp->p_ldt, ldtsz);
+
+#if defined(__xpv)
+	if (xen_ldt_setprot(cp->p_ldt, ldtsz, PROT_READ))
+		panic("ldt_dup:xen_ldt_setprot(PROT_READ) failed");
+#endif
+	mutex_exit(&cp->p_ldtlock);
 	mutex_exit(&pp->p_ldtlock);
+
+}
+
+static void
+ldt_grow(proc_t *pp, uint_t seli)
+{
+	user_desc_t	*oldt, *nldt;
+	uint_t		nsels;
+	size_t		oldtsz, nldtsz;
+
+	ASSERT(MUTEX_HELD(&pp->p_ldtlock));
+	ASSERT(pp->p_ldt != NULL);
+	ASSERT(pp->p_ldtlimit != 0);
+
+	/*
+	 * Allocate larger LDT just large enough to contain seli.
+	 */
+	nldtsz = P2ROUNDUP((seli + 1) * sizeof (user_desc_t), PAGESIZE);
+	nsels = nldtsz / sizeof (user_desc_t);
+	ASSERT(nsels >= MINNLDT && nsels <= MAXNLDT);
+	ASSERT(nsels > pp->p_ldtlimit);
+
+	oldt = pp->p_ldt;
+	oldtsz = (pp->p_ldtlimit + 1) * sizeof (user_desc_t);
+
+	nldt = kmem_zalloc(nldtsz, KM_SLEEP);
+	ASSERT(IS_P2ALIGNED(nldt, PAGESIZE));
+
+	bcopy(oldt, nldt, oldtsz);
+
+	/*
+	 * unload old ldt.
+	 */
+	kpreempt_disable();
+	ldt_unload();
+	kpreempt_enable();
+
+#if defined(__xpv)
+
+	/*
+	 * Make old ldt writable and new ldt read only.
+	 */
+	if (xen_ldt_setprot(oldt, oldtsz, PROT_READ | PROT_WRITE))
+		panic("ldt_grow:xen_ldt_setprot(PROT_READ|PROT_WRITE) failed");
+
+	if (xen_ldt_setprot(nldt, nldtsz, PROT_READ))
+		panic("ldt_grow:xen_ldt_setprot(PROT_READ) failed");
+#endif
+
+	pp->p_ldt = nldt;
+	pp->p_ldtlimit = nsels - 1;
+
+	/*
+	 * write new ldt segment descriptor.
+	 */
+	set_syssegd(&pp->p_ldt_desc, nldt, nldtsz - 1, SDT_SYSLDT, SEL_KPL);
+
+	/*
+	 * load the new ldt.
+	 */
+	kpreempt_disable();
+	ldt_load();
+	kpreempt_enable();
+
+	kmem_free(oldt, oldtsz);
 }

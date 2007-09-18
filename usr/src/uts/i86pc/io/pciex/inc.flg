@@ -56,6 +56,7 @@ find_files "s.*"	\
 # to compile the drivers/modules
 find_files "s.*"	\
 	usr/src/uts/i86pc/npe			\
+	usr/src/uts/i86xpv/npe			\
 	usr/src/uts/intel/pci_autoconfig	\
 	usr/src/uts/intel/pcie_pci		\
 	usr/src/uts/intel/pciehpc		\
@@ -101,6 +102,11 @@ echo_file  usr/src/uts/i86pc/Makefile.files
 echo_file  usr/src/uts/i86pc/Makefile.rules
 echo_file  usr/src/uts/i86pc/Makefile.i86pc
 echo_file  usr/src/uts/i86pc/Makefile.targ
+echo_file  usr/src/uts/i86xpv/Makefile
+echo_file  usr/src/uts/i86xpv/Makefile.files
+echo_file  usr/src/uts/i86xpv/Makefile.rules
+echo_file  usr/src/uts/i86xpv/Makefile.i86xpv
+echo_file  usr/src/uts/i86xpv/Makefile.targ
 echo_file  usr/src/uts/intel/Makefile
 echo_file  usr/src/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules

@@ -79,6 +79,7 @@ PSARC 2004/619: RULE E2: lib/amd64/libc.so.1: SUNW_1.20.4
 PSARC 2004/619: RULE E2: lib/amd64/libc.so.1: SUNW_1.18
 4747313: RULE E2: usr/lib/libc/libc_hwcap1.so.1: SUNW_1.20.4
 PSARC 2004/619: RULE E2: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.20.4
+PSARC 2004/619: RULE E2: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.20.4
 6195030: RULE E2: lib/amd64/libdl.so.1: SUNW_1.1
 
 #############################################
@@ -769,6 +770,22 @@ PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.6
 PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.7
 PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.8
 PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.9
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.10
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.11
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.12
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.13
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.14
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.15
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.16
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.17
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.2
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.3
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.4
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.5
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.6
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.7
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.8
+PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap3.so.1: SUNW_1.9
 PSARC 2002/506: RULE W5: lib/libdevinfo.so.1: SUNW_1.2
 PSARC 2002/506: RULE W5: lib/sparcv9/libdevinfo.so.1: SUNW_1.2
 PSARC 2004/619: RULE W5: lib/amd64/libdevinfo.so.1: SUNW_1.2

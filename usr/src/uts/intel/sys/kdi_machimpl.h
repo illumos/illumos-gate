@@ -110,7 +110,11 @@ extern void kdi_idtr_set(gate_desc_t *, size_t);
 extern void kdi_idt_write(struct gate_desc *, uint_t);
 extern void kdi_idt_sync(void);
 extern void kdi_idt_switch(kdi_cpusave_t *);
+#ifdef __xpv
+extern void kdi_idtr_write(desctbr_t *);
+#else
 #define	kdi_idtr_write(idtr) wr_idtr(idtr)
+#endif
 
 extern void kdi_activate(kdi_main_t, kdi_cpusave_t *, uint_t);
 extern void kdi_deactivate(void);

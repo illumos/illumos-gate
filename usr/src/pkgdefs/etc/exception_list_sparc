@@ -87,11 +87,17 @@ usr/include/libdllink.h		sparc
 usr/include/libdlaggr.h		sparc
 usr/include/libdlwlan.h		sparc
 usr/include/libdlwlan_impl.h	sparc
+usr/include/libdlvnic.h		sparc
 lib/libdladm.so			sparc
 lib/llib-ldladm.ln		sparc
 lib/sparcv9/libdladm.so		sparc
 lib/sparcv9/llib-ldladm.ln	sparc
 lib/llib-ldladm			sparc
+#
+# Virtual Network Interface Card (VNIC)
+#
+usr/include/sys/vnic.h		sparc
+usr/include/sys/vnic_impl.h	sparc
 #
 # IKE and IPsec support library exceptions.  The IKE support
 # library contains exclusively private interfaces, as does

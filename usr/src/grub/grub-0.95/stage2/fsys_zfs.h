@@ -59,7 +59,8 @@ typedef	unsigned int size_t;
 /*
  * Global Memory addresses to store MOS and DNODE data
  */
-#define	MOS		((dnode_phys_t *)(RAW_ADDR(0x100000)))
+#define	MOS		((dnode_phys_t *)\
+	(RAW_ADDR ((mbi.mem_upper << 10) + 0x100000) - ZFS_SCRATCH_SIZE))
 #define	DNODE		(MOS+1) /* move sizeof(dnode_phys_t) bytes */
 #define	ZFS_SCRATCH	((char *)(DNODE+1))
 

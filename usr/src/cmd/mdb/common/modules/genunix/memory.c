@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,9 @@
 #include <sys/thread.h>
 #include <sys/swap.h>
 #include <sys/memlist.h>
-
+#if defined(__i386) || defined(__amd64)
+#include <sys/balloon_impl.h>
+#endif
 
 /*
  * Page walker.
@@ -274,10 +276,14 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ulong_t pagesize;
 	pgcnt_t total_pages;
-	ulong_t physmem;
+	ulong_t physmem, freemem;
 	memstat_t stats;
 	memstat_t unused_stats;
 	GElf_Sym sym;
+#if defined(__i386) || defined(__amd64)
+	bln_stats_t bln_stats;
+	ssize_t bln_size;
+#endif
 
 	bzero(&stats, sizeof (memstat_t));
 	bzero(&unused_stats, sizeof (memstat_t));
@@ -305,7 +311,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	/* read kernel vnode pointer */
 	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "kvp",
-		(GElf_Sym *)&sym) == -1) {
+	    (GElf_Sym *)&sym) == -1) {
 		mdb_warn("unable to read kvp");
 		return (DCMD_ERR);
 	}
@@ -317,7 +323,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * it isn't found, it's not a fatal error.
 	 */
 	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "zvp",
-		(GElf_Sym *)&sym) == -1) {
+	    (GElf_Sym *)&sym) == -1) {
 		stats.ms_zvp = NULL;
 	} else {
 		stats.ms_zvp = (struct vnode *)(uintptr_t)sym.st_value;
@@ -325,14 +331,14 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	/* Walk page structures, summarizing usage */
 	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,
-		&stats) == -1) {
+	    &stats) == -1) {
 		mdb_warn("can't walk pages");
 		return (DCMD_ERR);
 	}
 
 	/* read unused pages vnode */
 	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "unused_pages_vp",
-		(GElf_Sym *)&sym) == -1) {
+	    (GElf_Sym *)&sym) == -1) {
 		mdb_warn("unable to read unused_pages_vp");
 		return (DCMD_ERR);
 	}
@@ -341,7 +347,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	/* Find unused pages */
 	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,
-		&unused_stats) == -1) {
+	    &unused_stats) == -1) {
 		mdb_warn("can't walk pages");
 		return (DCMD_ERR);
 	}
@@ -360,7 +366,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("Page Summary                Pages                MB"
 	    "  %%Tot\n");
 	mdb_printf("------------     ----------------  ----------------"
-		"  ----\n");
+	    "  ----\n");
 	mdb_printf("Kernel           %16llu  %16llu  %3llu%%\n",
 	    stats.ms_kmem,
 	    (uint64_t)stats.ms_kmem * pagesize / (1024 * 1024),
@@ -381,10 +387,29 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    stats.ms_cachelist,
 	    (uint64_t)stats.ms_cachelist * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_cachelist));
-	mdb_printf("Free (freelist)  %16llu  %16llu  %3llu%%\n",
-	    physmem - stats.ms_total,
-	    (uint64_t)(physmem - stats.ms_total) * pagesize / (1024 * 1024),
-	    MS_PCT_TOTAL(physmem - stats.ms_total));
+
+	freemem = physmem - stats.ms_total;
+
+#if defined(__i386) || defined(__amd64)
+	/* Are we running under Xen?  If so, get balloon memory usage. */
+	if ((bln_size = mdb_readvar(&bln_stats, "bln_stats")) != -1) {
+		freemem -= bln_stats.bln_hv_pages;
+	}
+#endif
+
+	mdb_printf("Free (freelist)  %16llu  %16llu  %3llu%%\n", freemem,
+	    (uint64_t)freemem * pagesize / (1024 * 1024),
+	    MS_PCT_TOTAL(freemem));
+
+#if defined(__i386) || defined(__amd64)
+	if (bln_size != -1) {
+		mdb_printf("Balloon          %16ld  %16ld  %3ld%%\n",
+		    bln_stats.bln_hv_pages,
+		    bln_stats.bln_hv_pages * (long)pagesize / (1024 * 1024),
+		    MS_PCT_TOTAL(bln_stats.bln_hv_pages));
+	}
+#endif
+
 	mdb_printf("\nTotal            %16lu  %16lu\n",
 	    physmem,
 	    (uint64_t)physmem * pagesize / (1024 * 1024));

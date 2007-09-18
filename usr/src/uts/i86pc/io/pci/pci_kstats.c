@@ -147,7 +147,7 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	pci_ks_template.ihks_pil.value.ui64 = ih_p->ih_pri;
 	pci_ks_template.ihks_time.value.ui64 =
 	    ((ihdl_plat_t *)ih_p->ih_private)->ip_ticks;
-	tsc_scalehrtime((hrtime_t *)&pci_ks_template.ihks_time.value.ui64);
+	scalehrtime((hrtime_t *)&pci_ks_template.ihks_time.value.ui64);
 	pci_ks_template.ihks_cookie.value.ui64 = ih_p->ih_vector;
 	/* CPU won't be user bound at this point. */
 	pci_ks_template.ihks_cpu.value.ui64 = intrinfo.avgi_cpu_id;

@@ -957,7 +957,8 @@ segkmem_zio_alloc(vmem_t *vmp, size_t size, int vmflag)
  * kernel memory that is exported by drivers to user space.
  */
 static void
-segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp)
+segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp,
+    void (*func)(page_t *))
 {
 	page_t *pp;
 	caddr_t addr = inaddr;
@@ -999,9 +1000,13 @@ segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp)
 			panic("segkmem_free: page not found");
 		/* Clear p_lckcnt so page_destroy() doesn't update availrmem */
 		pp->p_lckcnt = 0;
-		page_destroy(pp, 0);
+		if (func)
+			func(pp);
+		else
+			page_destroy(pp, 0);
 	}
-	page_unresv(npages);
+	if (func == NULL)
+		page_unresv(npages);
 
 	if (vmp != NULL)
 		vmem_free(vmp, inaddr, size);
@@ -1009,15 +1014,21 @@ segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp)
 }
 
 void
+segkmem_xfree(vmem_t *vmp, void *inaddr, size_t size, void (*func)(page_t *))
+{
+	segkmem_free_vn(vmp, inaddr, size, &kvp, func);
+}
+
+void
 segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 {
-	segkmem_free_vn(vmp, inaddr, size, &kvp);
+	segkmem_free_vn(vmp, inaddr, size, &kvp, NULL);
 }
 
 void
 segkmem_zio_free(vmem_t *vmp, void *inaddr, size_t size)
 {
-	segkmem_free_vn(vmp, inaddr, size, &zvp);
+	segkmem_free_vn(vmp, inaddr, size, &zvp, NULL);
 }
 
 void

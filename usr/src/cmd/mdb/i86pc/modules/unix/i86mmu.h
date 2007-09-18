@@ -47,6 +47,12 @@ extern int ptable_dcmd(uintptr_t addr, uint_t flags, int argc,
 extern int va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
+extern int mfntopfn_dcmd(uintptr_t addr, uint_t flags, int argc,
+	const mdb_arg_t *argv);
+
+extern int pfntomfn_dcmd(uintptr_t addr, uint_t flags, int argc,
+	const mdb_arg_t *argv);
+
 extern int page_num2pp(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
@@ -57,6 +63,7 @@ extern int memseg_walk_init(mdb_walk_state_t *);
 extern int memseg_walk_step(mdb_walk_state_t *);
 extern void memseg_walk_fini(mdb_walk_state_t *);
 
+extern void free_mmu(void);
 
 #ifdef	__cplusplus
 }

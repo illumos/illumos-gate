@@ -53,12 +53,14 @@ SRCS += \
 	mdb_gelf.c \
 	mdb_help.c \
 	mdb_io.c \
+	mdb_kb_kvm.c \
 	mdb_kproc.c \
 	mdb_kvm.c \
 	mdb_logio.c \
 	mdb_list.c \
 	mdb_macalias.c \
 	mdb_main.c \
+	mdb_memio.c \
 	mdb_modapi.c \
 	mdb_module.c \
 	mdb_module_load.c \
@@ -85,6 +87,9 @@ SRCS += \
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm \
 	$(ZLAZYLOAD) -lscf $(ZNOLAZYLOAD)

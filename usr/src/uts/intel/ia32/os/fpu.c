@@ -369,6 +369,7 @@ fpnoextflt(struct regs *rp)
 		return (1); /* error */
 	}
 
+#if !defined(__xpv)	/* XXPV	Is this ifdef needed now? */
 	/*
 	 * A paranoid cross-check: for the SSE case, ensure that %cr4 is
 	 * configured to enable fully fledged (%xmm) fxsave/fxrestor on
@@ -377,6 +378,7 @@ fpnoextflt(struct regs *rp)
 	ASSERT((fp_kind == __FP_SSE && (getcr4() & CR4_OSFXSR) == CR4_OSFXSR) ||
 	    (fp_kind != __FP_SSE &&
 	    (getcr4() & (CR4_OSXMMEXCPT|CR4_OSFXSR)) == 0));
+#endif
 
 	if (fp->fpu_flags & FPU_EN) {
 		/* case 2 */
@@ -402,6 +404,7 @@ fpnoextflt(struct regs *rp)
 int
 fpextovrflt(struct regs *rp)
 {
+#if !defined(__xpv)		/* XXPV	Do we need this ifdef either */
 	ulong_t cur_cr0;
 
 	ASSERT(fp_kind != FP_NO);
@@ -409,6 +412,7 @@ fpextovrflt(struct regs *rp)
 	cur_cr0 = getcr0();
 	fpinit();		/* initialize the FPU hardware */
 	setcr0(cur_cr0);
+#endif
 	sti();
 	return (1); 		/* error, send SIGSEGV signal to the thread */
 }

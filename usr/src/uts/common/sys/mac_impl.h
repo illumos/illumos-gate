@@ -67,6 +67,7 @@ struct mac_rx_fn_s {
 	mac_rx_t		mrf_fn;
 	void			*mrf_arg;
 	boolean_t		mrf_inuse;
+	boolean_t		mrf_active;
 };
 
 typedef struct mac_txloop_fn_s		mac_txloop_fn_t;
@@ -88,6 +89,30 @@ typedef struct mactype_s {
 	mac_stat_info_t	*mt_stats;	/* array of mac_stat_info_t elements */
 	size_t		mt_statcount;	/* number of elements in mt_stats */
 } mactype_t;
+
+
+#define	MAC_VNIC_TXINFO_REFHOLD(mvt) {				\
+	mutex_enter(&(mvt)->mv_lock);				\
+	(mvt)->mv_refs++;					\
+	mutex_exit(&(mvt)->mv_lock);				\
+}
+
+#define	MAC_VNIC_TXINFO_REFRELE(mvt) {				\
+	mutex_enter(&(mvt)->mv_lock);				\
+	if (--(mvt)->mv_refs == 0 && (mvt)->mv_clearing) {	\
+	    (mvt)->mv_clearing = B_FALSE;			\
+	    cv_signal(&(mvt)->mv_cv);				\
+	}							\
+	mutex_exit(&(mvt)->mv_lock);				\
+}
+
+typedef struct mac_vnic_tx_s {
+	mac_txinfo_t	mv_txinfo;	/* provided by VNIC */
+	uint32_t	mv_refs;
+	kmutex_t	mv_lock;
+	kcondvar_t	mv_cv;
+	boolean_t	mv_clearing;
+} mac_vnic_tx_t;
 
 /*
  * Each registered MAC is associated with a mac_t structure.
@@ -123,7 +148,7 @@ typedef struct mac_impl_s {
 	kcondvar_t		mi_notify_cv;
 	krwlock_t		mi_rx_lock;
 	mac_rx_fn_t		*mi_mrfp;
-	krwlock_t		mi_txloop_lock;
+	krwlock_t		mi_tx_lock;
 	mac_txloop_fn_t		*mi_mtfp;
 	krwlock_t		mi_resource_lock;
 	mac_resource_add_t	mi_resource_add;
@@ -139,6 +164,13 @@ typedef struct mac_impl_s {
 						/* for removal */
 	kmutex_t		mi_lock;
 	kcondvar_t		mi_rx_cv;
+	boolean_t		mi_shareable;
+	boolean_t		mi_vnic_present;
+	mac_vnic_tx_t		*mi_vnic_tx;
+	mac_txinfo_t		mi_vnic_txinfo;
+	mac_txinfo_t		mi_vnic_txloopinfo;
+	mac_getcapab_t		mi_vnic_getcapab_fn;
+	void			*mi_vnic_getcapab_arg;
 } mac_impl_t;
 
 #define	mi_getstat	mi_callbacks->mc_getstat

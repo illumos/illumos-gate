@@ -125,10 +125,8 @@ struct hat_cpu_info {
  *
  * XX64 - The check for the VA hole needs to be better generalized.
  */
-#define	HTABLE_NUM_PTES_PAE(ht)		\
-	(((ht)->ht_flags & HTABLE_VLP) ? 4 : 512)
 #if defined(__amd64)
-#define	HTABLE_NUM_PTES(ht)	HTABLE_NUM_PTES_PAE(ht)
+#define	HTABLE_NUM_PTES(ht)	(((ht)->ht_flags & HTABLE_VLP) ? 4 : 512)
 
 #define	HTABLE_LAST_PAGE(ht)						\
 	((ht)->ht_level == mmu.max_level ? ((uintptr_t)0UL - MMU_PAGESIZE) :\
@@ -141,7 +139,8 @@ struct hat_cpu_info {
 
 #elif defined(__i386)
 
-#define	HTABLE_NUM_PTES(ht)	(!mmu.pae_hat ? 1024 : HTABLE_NUM_PTES_PAE(ht))
+#define	HTABLE_NUM_PTES(ht)	\
+	(!mmu.pae_hat ? 1024 : ((ht)->ht_level == 2 ? 4 : 512))
 
 #define	HTABLE_LAST_PAGE(ht)	((ht)->ht_vaddr - MMU_PAGESIZE + \
 	((uintptr_t)HTABLE_NUM_PTES(ht) << LEVEL_SHIFT((ht)->ht_level)))
@@ -212,15 +211,16 @@ extern void htable_reserve(uint_t);
 extern void htable_adjust_reserve(void);
 
 /*
+ * return number of bytes mapped by all the htables in a given hat
+ */
+extern size_t htable_mapped(struct hat *);
+
+
+/*
  * Attach initial pagetables as htables
  */
 extern void htable_attach(struct hat *, uintptr_t, level_t, struct htable *,
     pfn_t);
-
-/*
- * return the number of pages mapped by a hat
- */
-extern pgcnt_t htable_count_pages(struct hat *);
 
 /*
  * Routine to find the next populated htable at or above a given virtual
@@ -294,6 +294,42 @@ extern void x86pte_mapout(void);
 #define	HTABLE_DEC(x)	atomic_dec16((uint16_t *)&x)
 #define	HTABLE_LOCK_INC(ht)	atomic_add_32(&(ht)->ht_lock_cnt, 1)
 #define	HTABLE_LOCK_DEC(ht)	atomic_add_32(&(ht)->ht_lock_cnt, -1)
+
+#ifdef __xpv
+extern void xen_flush_va(caddr_t va);
+extern void xen_gflush_va(caddr_t va, cpuset_t);
+extern void xen_flush_tlb(void);
+extern void xen_gflush_tlb(cpuset_t);
+extern void xen_pin(pfn_t, level_t);
+extern void xen_unpin(pfn_t);
+extern int xen_kpm_page(pfn_t, uint_t);
+
+/*
+ * The hypervisor maps all page tables into our address space read-only.
+ * Under normal circumstances, the hypervisor then handles all updates to
+ * the page tables underneath the covers for us.  However, when we are
+ * trying to dump core after a hypervisor panic, the hypervisor is no
+ * longer available to do these updates.  To work around the protection
+ * problem, we simply disable write-protect checking for the duration of a
+ * pagetable update operation.
+ */
+#define	XPV_ALLOW_PAGETABLE_UPDATES()					\
+	{								\
+		if (IN_XPV_PANIC())					\
+			setcr0((getcr0() & ~CR0_WP) & 0xffffffff); 	\
+	}
+#define	XPV_DISALLOW_PAGETABLE_UPDATES()				\
+	{								\
+		if (IN_XPV_PANIC() > 0)					\
+			setcr0((getcr0() | CR0_WP) & 0xffffffff);	\
+	}
+
+#else /* __xpv */
+
+#define	XPV_ALLOW_PAGETABLE_UPDATES()
+#define	XPV_DISALLOW_PAGETABLE_UPDATES()
+
+#endif
 
 #endif	/* _KERNEL */
 

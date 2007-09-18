@@ -75,9 +75,21 @@ int fpu_pentium_fdivbug = 0;
 
 #endif
 
+#if defined(__xpv)
+
+/*
+ * Use of SSE or otherwise is forcibly configured for us by the hypervisor.
+ */
+
+#define	ENABLE_SSE()
+#define	DISABLE_SSE()
+
+#else	/* __xpv */
 
 #define	ENABLE_SSE()	setcr4(CR4_ENABLE_SSE_FLAGS(getcr4()))
 #define	DISABLE_SSE()	setcr4(CR4_DISABLE_SSE_FLAGS(getcr4()))
+
+#endif	/* __xpv */
 
 /*
  * Try and figure out what kind of FP capabilities we have, and
@@ -109,6 +121,7 @@ fpu_probe(void)
 		}
 #endif
 
+#ifndef __xpv
 		/*
 		 * Check and see if the fpu is present by looking
 		 * at the "extension type" bit.  (While this used to
@@ -118,6 +131,7 @@ fpu_probe(void)
 		 */
 		if ((getcr0() & CR0_ET) == 0)
 			continue;
+#endif
 
 #if defined(__amd64)
 		/*

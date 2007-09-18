@@ -63,6 +63,10 @@ extern int kbm_probe(uintptr_t *va, size_t *len, pfn_t *pfn, uint_t *prot);
  */
 extern void kbm_map(uintptr_t va, paddr_t pa, uint_t level, uint_t is_kernel);
 
+#ifdef __xpv
+extern void kbm_map_ma(maddr_t ma, uintptr_t va, uint_t level);
+#endif
+
 /*
  * unmap a single 4K page at VA
  */

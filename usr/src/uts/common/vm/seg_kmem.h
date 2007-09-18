@@ -74,6 +74,7 @@ extern void *segkmem_xalloc(vmem_t *, void *, size_t, int, uint_t,
 extern void *segkmem_alloc(vmem_t *, size_t, int);
 extern void *segkmem_alloc_permanent(vmem_t *, size_t, int);
 extern void segkmem_free(vmem_t *, void *, size_t);
+extern void segkmem_xfree(vmem_t *, void *, size_t, void (*)(page_t *));
 
 extern void *boot_alloc(void *, size_t, uint_t);
 extern void boot_mapin(caddr_t addr, size_t size);

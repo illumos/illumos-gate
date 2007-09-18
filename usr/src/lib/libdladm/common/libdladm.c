@@ -127,6 +127,25 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_KEYINVAL:
 		s = "invalid key";
 		break;
+	case DLADM_STATUS_INVALIDID:
+		s = "invalid VNIC id";
+		break;
+	case DLADM_STATUS_INVALIDMACADDRLEN:
+		s = "invalid MAC address length";
+		break;
+	case DLADM_STATUS_INVALIDMACADDRTYPE:
+		s = "invalid MAC address type";
+		break;
+	case DLADM_STATUS_AUTOIDNOTEMP:
+		s = "automatic VNIC ID assigment not supported with"
+		    "persistant operations";
+		break;
+	case DLADM_STATUS_AUTOIDNOAVAILABLEID:
+		s = "no available VNIC ID for automatic assignment";
+		break;
+	case DLADM_STATUS_BUSY:
+		s = "device busy";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -160,6 +179,8 @@ dladm_errno2status(int err)
 		return (DLADM_STATUS_DENIED);
 	case EIO:
 		return (DLADM_STATUS_IOERR);
+	case EBUSY:
+		return (DLADM_STATUS_BUSY);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}

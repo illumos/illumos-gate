@@ -589,15 +589,20 @@ extern void add_cpunode2devtree(processorid_t, struct cpuid_info *);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
+
+#if !defined(__xpv)
 extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
+#endif
 
 struct cpu_ucode_info;
 
+#if !defined(__xpv)
 extern void ucode_alloc_space(struct cpu *);
 extern void ucode_free_space(struct cpu *);
 extern void ucode_check(struct cpu *);
 extern void ucode_free();
+#endif
 
 extern uint_t workaround_errata(struct cpu *);
 

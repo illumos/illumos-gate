@@ -19,17 +19,36 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-LINK_SRCS_i386 = misc_link_i386.c lx_link_i386.c
-LINK_OBJS_i386 = misc_link_i386.o lx_link_i386.o
-LINK_MODS_i386 = SUNW_misc_link_i386.so SUNW_lx_link_i386.so
+MISC_LINK_ISA	= misc_link_i386
+LX_LINK_ISA	= lx_link_i386
+XEN_LINK	= xen_link
+
+LINK_SRCS_i386 = 			\
+	$(MISC_LINK_ISA).c		\
+	$(LX_LINK_ISA).c		\
+	$(XEN_LINK).c
+
+LINK_OBJS_i386 =			\
+	$(MISC_LINK_ISA).o		\
+	$(LX_LINK_ISA).o		\
+	$(XEN_LINK).o
+
+LINK_MODS_i386 =			\
+	SUNW_$(MISC_LINK_ISA).so	\
+	SUNW_$(LX_LINK_ISA).so		\
+	SUNW_$(XEN_LINK).so
 
 include ../Makefile.com
 
-lx_link_i386.o := CPPFLAGS += -I$(UTSBASE)/common/brand/lx
+$(LX_LINK_ISA).o $(LX_LINK_ISA).ln $(LX_LINK_ISA).po \
+	:= CPPFLAGS += -I$(UTSBASE)/common/brand/lx
+
+$(XEN_LINK).o $(XEN_LINK).ln $(XEN_LINK).po \
+	:= CPPFLAGS += -I$(UTSBASE)/i86xpv
 
 install: all

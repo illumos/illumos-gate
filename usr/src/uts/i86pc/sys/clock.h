@@ -52,17 +52,21 @@ extern void unlock_hres_lock(void);
 extern void hres_tick(void);
 extern void (*hrtime_tick)(void);
 
+#ifndef __xpv
 extern void tsc_hrtimeinit(uint64_t cpu_freq_hz);
-extern hrtime_t tsc_gethrtime(void);
-extern hrtime_t tsc_gethrtime_delta(void);
-extern hrtime_t tsc_gethrtimeunscaled(void);
-extern void tsc_scalehrtime(hrtime_t *);
-extern hrtime_t tsc_gethrtimeunscaled_delta(void);
-extern void tsc_tick(void);
 extern void tsc_sync_master(processorid_t);
 extern void tsc_sync_slave(void);
+#endif
+
+/*
+ * Careful: this can always return zero on some systems.  Use the system hrtime
+ * routines if you want a meaningful time.
+ */
 extern hrtime_t tsc_read(void);
+
 extern hrtime_t __rdtsc_insn(void);
+
+extern int tsc_gethrtime_enable;
 
 #define	ADJ_SHIFT 4		/* used in get_hrestime */
 

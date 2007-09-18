@@ -60,7 +60,7 @@
  */
 static int	do_geometry_sanity_check(void);
 static int	vtoc_to_label(struct dk_label *label, struct vtoc *vtoc,
-		struct dk_geom *geom);
+		struct dk_geom *geom, struct dk_cinfo *cinfo);
 extern int	read_vtoc(int, struct vtoc *);
 extern int	write_vtoc(int, struct vtoc *);
 static int	vtoc64_to_label(struct efi_info *, struct dk_gpt *);
@@ -194,13 +194,13 @@ do_geometry_sanity_check()
 
 	if (uscsi_read_capacity(cur_file, &capacity)) {
 		err_print("Warning: Unable to get capacity."
-				" Cannot check geometry\n");
+		    " Cannot check geometry\n");
 		return (0);	/* Just ignore this problem */
 	}
 
 	if (capacity.sc_capacity < ncyl * nhead * nsect) {
 		err_print("\nWarning: Current geometry overshoots "
-				"actual geometry of disk\n\n");
+		    "actual geometry of disk\n\n");
 		if (check("Continue labelling disk") != 0)
 			return (-1);
 		return (0);	/* Just ignore this problem */
@@ -220,8 +220,8 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 	struct dk_gpt	*efi;
 
 	if (efi_alloc_and_init(fd, EFI_NUMPAR, new_vtoc) != 0) {
-	    err_print("SMI vtoc to EFI failed\n");
-	    return (-1);
+		err_print("SMI vtoc to EFI failed\n");
+		return (-1);
 	}
 	efi = *new_vtoc;
 
@@ -281,17 +281,17 @@ write_label()
 	 * If EFI label, then write it out to disk
 	 */
 	if (cur_label == L_TYPE_EFI) {
-	    enter_critical();
-	    vtoc64 = cur_parts->etoc;
-	    err_check(vtoc64);
-	    if (efi_write(cur_file, vtoc64) != 0) {
-		err_print("Warning: error writing EFI.\n");
-		error = -1;
-	    }
+		enter_critical();
+		vtoc64 = cur_parts->etoc;
+		err_check(vtoc64);
+		if (efi_write(cur_file, vtoc64) != 0) {
+			err_print("Warning: error writing EFI.\n");
+			error = -1;
+			}
 
-	    cur_disk->disk_flags |= DSK_LABEL;
-	    exit_critical();
-	    return (error);
+		cur_disk->disk_flags |= DSK_LABEL;
+		exit_critical();
+		return (error);
 	}
 
 	/*
@@ -429,21 +429,20 @@ write_label()
 	for (sec = 1; ((sec < BAD_LISTCNT * 2 + 1) && (sec < nsect));
 	    sec += 2) {
 		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, (diskaddr_t)
-			((chs2bn(ncyl + acyl - 1, head, sec)) + solaris_offset),
-			1, (caddr_t)&new_label, F_NORMAL, NULL)) {
+		    ((chs2bn(ncyl + acyl - 1, head, sec)) + solaris_offset),
+		    1, (caddr_t)&new_label, F_NORMAL, NULL)) {
 			err_print("Warning: error reading backup label.\n");
 			error = -1;
 		} else {
 			if (bcmp((char *)&label, (char *)&new_label,
-				sizeof (struct dk_label)) == 0) {
+			    sizeof (struct dk_label)) == 0) {
 					nbackups++;
 			}
 		}
 	}
 	if (nbackups != BAD_LISTCNT) {
 		err_print("Warning: %s\n", nbackups == 0 ?
-			"no backup labels" :
-			"some backup labels incorrect");
+		    "no backup labels" : "some backup labels incorrect");
 	}
 	/*
 	 * Mark the current disk as labelled and notify the kernel of what
@@ -466,11 +465,15 @@ read_label(int fd, struct dk_label *label)
 {
 	struct vtoc	vtoc;
 	struct dk_geom	geom;
+	struct dk_cinfo	dkinfo;
 
-	if (read_vtoc(fd, &vtoc) < 0 || ioctl(fd, DKIOCGGEOM, &geom) == -1) {
+	if (read_vtoc(fd, &vtoc) < 0		||
+	    ioctl(fd, DKIOCGGEOM, &geom) == -1	||
+	    ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
 		return (-1);
 	}
-	return (vtoc_to_label(label, &vtoc, &geom));
+
+	return (vtoc_to_label(label, &vtoc, &geom, &dkinfo));
 }
 
 int
@@ -608,7 +611,7 @@ vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)
 	/* XXX do a sanity check here for nparts */
 	nparts = vtoc->efi_nparts;
 	lmap = (struct dk_gpt *) calloc(1, (sizeof (struct dk_part) *
-		    nparts) + sizeof (struct dk_gpt));
+	    nparts) + sizeof (struct dk_gpt));
 	if (lmap == NULL) {
 		err_print("vtoc64_to_label: unable to allocate lmap\n");
 		fullabort();
@@ -628,7 +631,7 @@ vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)
 	lmap->efi_last_u_lba = vtoc->efi_last_u_lba;
 	lmap->efi_flags = vtoc->efi_flags;
 	(void) memcpy((uchar_t *)&lmap->efi_disk_uguid,
-		(uchar_t *)&vtoc->efi_disk_uguid, sizeof (struct uuid));
+	    (uchar_t *)&vtoc->efi_disk_uguid, sizeof (struct uuid));
 
 	for (i = 0; i < nparts; i++) {
 		lmap->efi_parts[i].p_tag = vtoc->efi_parts[i].p_tag;
@@ -650,7 +653,8 @@ vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)
  * Convert vtoc/geom to label.
  */
 static int
-vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom)
+vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
+    struct dk_cinfo *cinfo)
 {
 #if defined(_SUNOS_VTOC_8)
 	struct dk_map32		*lmap;
@@ -670,7 +674,7 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom)
 	 * Sanity-check the vtoc
 	 */
 	if (vtoc->v_sanity != VTOC_SANE || vtoc->v_sectorsz != DEV_BSIZE ||
-			vtoc->v_nparts != V_NUMPAR) {
+	    vtoc->v_nparts != V_NUMPAR) {
 		return (-1);
 	}
 
@@ -678,7 +682,7 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom)
 	 * Sanity check of geometry
 	 */
 	if (geom->dkg_ncyl == 0 || geom->dkg_nhead == 0 ||
-			geom->dkg_nsect == 0) {
+	    geom->dkg_nsect == 0) {
 		return (-1);
 	}
 
@@ -718,25 +722,30 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom)
 	label->dkl_vtoc.v_version = vtoc->v_version;
 
 	(void) memcpy(label->dkl_vtoc.v_volume, vtoc->v_volume,
-		LEN_DKL_VVOL);
+	    LEN_DKL_VVOL);
 	for (i = 0; i < V_NUMPAR; i++) {
 		label->dkl_vtoc.v_part[i].p_tag = vtoc->v_part[i].p_tag;
 		label->dkl_vtoc.v_part[i].p_flag = vtoc->v_part[i].p_flag;
 	}
 	(void) memcpy((char *)label->dkl_vtoc.v_bootinfo,
-		(char *)vtoc->v_bootinfo, sizeof (vtoc->v_bootinfo));
+	    (char *)vtoc->v_bootinfo, sizeof (vtoc->v_bootinfo));
 	(void) memcpy((char *)label->dkl_vtoc.v_reserved,
-		(char *)vtoc->v_reserved, sizeof (vtoc->v_reserved));
+	    (char *)vtoc->v_reserved, sizeof (vtoc->v_reserved));
 	(void) memcpy((char *)label->dkl_vtoc.v_timestamp,
-		(char *)vtoc->timestamp, sizeof (vtoc->timestamp));
+	    (char *)vtoc->timestamp, sizeof (vtoc->timestamp));
 
 	(void) memcpy(label->dkl_asciilabel, vtoc->v_asciilabel,
-		LEN_DKL_ASCII);
+	    LEN_DKL_ASCII);
 
 	/*
 	 * Note the conversion from starting sector number
 	 * to starting cylinder number.
 	 * Return error if division results in a remainder.
+	 *
+	 * Note: don't check, if probing virtual disk in Xen
+	 * for that virtual disk will use fabricated # of headers
+	 * and sectors per track which may cause the capacity
+	 * not multiple of # of blocks per cylinder
 	 */
 #if defined(_SUNOS_VTOC_8)
 	lmap = label->dkl_map;
@@ -752,9 +761,11 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom)
 	nblks = (int)label->dkl_nsect * (int)label->dkl_nhead;
 
 	for (i = 0; i < NDKMAP; i++, lmap++, vpart++) {
-		if ((vpart->p_start % nblks) != 0 ||
-				(vpart->p_size % nblks) != 0) {
-			return (-1);
+		if (cinfo->dki_ctype != DKC_VBD) {
+			if ((vpart->p_start % nblks) != 0 ||
+			    (vpart->p_size % nblks) != 0) {
+				return (-1);
+			}
 		}
 #if defined(_SUNOS_VTOC_8)
 		lmap->dkl_cylno = vpart->p_start / nblks;
@@ -826,16 +837,16 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 #endif	/* defined(_SUNOS_VTOC_16) */
 		}
 		(void) memcpy(vtoc->v_volume, label->dkl_vtoc.v_volume,
-			LEN_DKL_VVOL);
+		    LEN_DKL_VVOL);
 		(void) memcpy((char *)vtoc->v_bootinfo,
-			(char *)label->dkl_vtoc.v_bootinfo,
-				sizeof (vtoc->v_bootinfo));
+		    (char *)label->dkl_vtoc.v_bootinfo,
+		    sizeof (vtoc->v_bootinfo));
 		(void) memcpy((char *)vtoc->v_reserved,
-			(char *)label->dkl_vtoc.v_reserved,
-				sizeof (vtoc->v_reserved));
+		    (char *)label->dkl_vtoc.v_reserved,
+		    sizeof (vtoc->v_reserved));
 		(void) memcpy((char *)vtoc->timestamp,
-			(char *)label->dkl_vtoc.v_timestamp,
-				sizeof (vtoc->timestamp));
+		    (char *)label->dkl_vtoc.v_timestamp,
+		    sizeof (vtoc->timestamp));
 		break;
 
 	default:
@@ -853,7 +864,7 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 	vtoc->v_nparts = V_NUMPAR;
 
 	(void) memcpy(vtoc->v_asciilabel, label->dkl_asciilabel,
-		LEN_DKL_ASCII);
+	    LEN_DKL_ASCII);
 
 #if defined(_SUNOS_VTOC_8)
 	/*
@@ -909,22 +920,21 @@ err_check(struct dk_gpt *vtoc)
 		    (vtoc->efi_parts[i].p_size != 0)) {
 			(void) fprintf(stderr,
 "partition %d is \"unassigned\" but has a size of %llu\n", i,
-			vtoc->efi_parts[i].p_size);
+			    vtoc->efi_parts[i].p_size);
 		}
 		if (vtoc->efi_parts[i].p_tag == V_UNASSIGNED) {
 			continue;
 		}
 		if (vtoc->efi_parts[i].p_tag == V_RESERVED) {
 			if (resv_part != -1) {
-			    (void) fprintf(stderr,
-"found duplicate reserved partition at %d\n",
-				i);
+				(void) fprintf(stderr,
+"found duplicate reserved partition at %d\n", i);
 			}
 			resv_part = i;
 			if (vtoc->efi_parts[i].p_size != EFI_MIN_RESV_SIZE)
 				(void) fprintf(stderr,
 "Warning: reserved partition size must be %d sectors\n",
-				EFI_MIN_RESV_SIZE);
+				    EFI_MIN_RESV_SIZE);
 		}
 		if ((vtoc->efi_parts[i].p_start < vtoc->efi_first_u_lba) ||
 		    (vtoc->efi_parts[i].p_start > vtoc->efi_last_u_lba)) {
@@ -977,7 +987,7 @@ err_check(struct dk_gpt *vtoc)
 	/* make sure there is a reserved partition */
 	if (resv_part == -1) {
 		(void) fprintf(stderr,
-			"no reserved partition found\n");
+		    "no reserved partition found\n");
 	}
 }
 

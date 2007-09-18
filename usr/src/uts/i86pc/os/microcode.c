@@ -45,6 +45,9 @@
 #include <sys/ucode.h>
 #include <sys/x86_archext.h>
 #include <sys/x_call.h>
+#ifdef	__xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * Microcode specific information per core
@@ -127,9 +130,18 @@ ucode_free()
  * Check whether or not a processor is capable of microcode operations
  * Returns 1 if it is capable, 0 if not.
  */
+/*ARGSUSED*/
 static int
 ucode_capable(cpu_t *cp)
 {
+	/* i86xpv guest domain can't update microcode */
+#ifdef	__xpv
+	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
+		return (0);
+	}
+#endif
+
+#ifndef	__xpv
 	/*
 	 * At this point we only support microcode update for Intel
 	 * processors family 6 and above.
@@ -142,6 +154,13 @@ ucode_capable(cpu_t *cp)
 		return (0);
 	else
 		return (1);
+#else
+	/*
+	 * XXPV - remove when microcode loading works in dom0. Don't support
+	 * microcode loading in dom0 right now.
+	 */
+	return (0);
+#endif
 }
 
 /*
@@ -580,14 +599,6 @@ ucode_update(uint8_t *ucodep, int size)
 void
 ucode_check(cpu_t *cp)
 {
-#ifdef __xpv
-{
-	This needs to be ported.  Only do ucode update from dom0.  In
-	    addition figure out how to bind to physical CPUs when doing
-	    it in dom0.
-}
-#endif	/* __xpv */
-
 	struct cpu_ucode_info *uinfop;
 	ucode_errno_t rc = EM_OK;
 

@@ -235,6 +235,7 @@
 #include <sys/atomic.h>
 #include <sys/cpu.h>
 #include <sys/stack.h>
+#include <sys/archsystm.h>
 
 #define	BACKOFF_BASE	50
 #define	BACKOFF_CAP 	1600

@@ -62,10 +62,10 @@
  * This style of activation is much simpler, as the CPUs are already running,
  * and are using their own copy of the kernel's IDT.  We simply interpose upon
  * each CPU's IDT.  We save the handlers we replace, both for deactivation and
- * for passing traps back to the kernel.  Note that for Xen's benefit, we need
- * to xcall to the other CPUs to do this, since we need to actively set the
- * trap entries in its virtual IDT from that vcpu's context rather than just
- * modify the IDT table from the CPU running kdi_activate().
+ * for passing traps back to the kernel.  Note that for the hypervisors'
+ * benefit, we need to xcall to the other CPUs to do this, since we need to
+ * actively set the trap entries in its virtual IDT from that vcpu's context
+ * rather than just modifying the IDT table from the CPU running kdi_activate().
  */
 
 #include <sys/types.h>
@@ -130,10 +130,13 @@ typedef struct kdi_gate_spec {
 	uint_t kgs_dpl;
 } kdi_gate_spec_t;
 
+/*
+ * Beware: kdi_pass_to_kernel() has unpleasant knowledge of this list.
+ */
 static const kdi_gate_spec_t kdi_gate_specs[KDI_GATE_NVECS] = {
-	{ T_SGLSTP, SEL_KPL },
-	{ T_BPTFLT, SEL_UPL },
-	{ T_DBGENTR, SEL_KPL }
+	{ T_SGLSTP, TRP_KPL },
+	{ T_BPTFLT, TRP_UPL },
+	{ T_DBGENTR, TRP_KPL }
 };
 
 static gate_desc_t kdi_kgates[KDI_GATE_NVECS];
@@ -154,7 +157,9 @@ struct idt_description {
 	{ T_BOUNDFLT, 0,	kdi_trap5, NULL },
 	{ T_ILLINST, 0,		kdi_trap6, NULL },
 	{ T_NOEXTFLT, 0,	kdi_trap7, NULL },
+#if !defined(__xpv)
 	{ T_DBLFLT, 0,		syserrtrap, NULL },
+#endif
 	{ T_EXTOVRFLT, 0,	kdi_trap9, NULL },
 	{ T_TSSFLT, 0,		kdi_traperr10, NULL },
 	{ T_SEGFLT, 0,		kdi_traperr11, NULL },
@@ -186,7 +191,7 @@ kdi_idt_init(selector_t sel)
 			caddr_t hdlr = (caddr_t)id->id_basehdlr +
 			    incr * (i - id->id_low);
 			set_gatesegd(&kdi_idt[i], (void (*)())hdlr, sel,
-			    SDT_SYSIGT, SEL_KPL);
+			    SDT_SYSIGT, TRP_KPL);
 		}
 	}
 }
@@ -262,25 +267,6 @@ kdi_idt_gates_restore(void)
 
 	for (i = 0; i < KDI_GATE_NVECS; i++)
 		kdi_idt_write(&kdi_kgates[i], kdi_gate_specs[i].kgs_vec);
-}
-
-/*
- * Used by the code which passes traps back to the kernel to retrieve the
- * address of the kernel's handler for a given trap.  We get this address
- * from the descriptor save area, which we populated when we loaded the
- * debugger (mod-loaded) or initialized the kernel's IDT (boot-loaded).
- */
-uintptr_t
-kdi_kernel_trap2hdlr(int vec)
-{
-	int i;
-
-	for (i = 0; i < KDI_GATE_NVECS; i++) {
-		if (kdi_gate_specs[i].kgs_vec == vec)
-			return (GATESEG_GETOFFSET(&kdi_kgates[i]));
-	}
-
-	return (NULL);
 }
 
 /*
@@ -502,7 +488,7 @@ kdi_deactivate(void)
  * prepared to handle the trap, we'll assume there's a problem and will
  * give the user a chance to debug it.
  */
-static int
+int
 kdi_trap_pass(kdi_cpusave_t *cpusave)
 {
 	greg_t tt = cpusave->krs_gregs[KDIREG_TRAPNO];
@@ -524,7 +510,7 @@ kdi_trap_pass(kdi_cpusave_t *cpusave)
 	 * do this.
 	 */
 	if (tt == T_SGLSTP &&
-	    pc == (greg_t)sys_sysenter || pc == (greg_t)brand_sys_sysenter)
+	    (pc == (greg_t)sys_sysenter || pc == (greg_t)brand_sys_sysenter))
 		return (1);
 
 	return (0);
@@ -534,14 +520,9 @@ kdi_trap_pass(kdi_cpusave_t *cpusave)
  * State has been saved, and all CPUs are on the CPU-specific stacks.  All
  * CPUs enter here, and head off into the debugger proper.
  */
-int
+void
 kdi_debugger_entry(kdi_cpusave_t *cpusave)
 {
-	if (kdi_trap_pass(cpusave)) {
-		cpusave->krs_cpu_state = KDI_CPU_STATE_NONE;
-		return (KDI_RESUME_PASS_TO_KERNEL);
-	}
-
 	/*
 	 * BPTFLT gives us control with %eip set to the instruction *after*
 	 * the int 3.  Back it off, so we're looking at the instruction that
@@ -551,5 +532,4 @@ kdi_debugger_entry(kdi_cpusave_t *cpusave)
 		cpusave->krs_gregs[KDIREG_PC]--;
 
 	kdi_kmdb_main(cpusave);
-	return (KDI_RESUME);
 }

@@ -28,5 +28,11 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-dboot = LOAD ?RWX V0xC00000 P0xC00000 A0x1000;
+dboot = LOAD ?RWXO V0xC00000 P0xC00000 A0x1000;
+#
+# Make sure that dboot_grub.s`_start is the first thing in the dboot
+# .text segment, since when we boot that's where the boot loader will
+# start execution
+#
+dboot : .text : *dboot_grub.o;
 dboot : ?A;

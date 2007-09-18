@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,13 +54,16 @@ include ../Makefile.lib
 #
 VAR1 =		hwcap1
 VAR2 =		hwcap2
+VAR3 =		hwcap3
 
 VAR1_DYNLIB =	$(LIBRARY:%.a=%_$(VAR1).so$(VERS))
 VAR1_BLDDIR =	$(MACH)_$(VAR1)
 VAR2_DYNLIB =	$(LIBRARY:%.a=%_$(VAR2).so$(VERS))
 VAR2_BLDDIR =	$(MACH)_$(VAR2)
+VAR3_DYNLIB =	$(LIBRARY:%.a=%_$(VAR3).so$(VERS))
+VAR3_BLDDIR =	$(MACH)_$(VAR3)
 
-i386_VARIANTS=	$(VAR1) $(VAR2)
+i386_VARIANTS=	$(VAR1) $(VAR2) $(VAR3)
 sparc_VARIANTS=
 
 i386_ETC=	$(MACH)/etc
@@ -96,6 +99,7 @@ $(ROOTFS_LIBDIR64)/$(DYNLIB)	:=	FILEMODE = 755
 $(ROOTVARIANTDIR)			:= FILEMODE= 755
 $(ROOTVARIANTDIR)/$(VAR1_DYNLIB)	:= FILEMODE= 755
 $(ROOTVARIANTDIR)/$(VAR2_DYNLIB)	:= FILEMODE= 755
+$(ROOTVARIANTDIR)/$(VAR3_DYNLIB)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
@@ -167,6 +171,8 @@ $(ROOTVARIANTDIR): $(ROOTLIB)
 $(ROOTVARIANTDIR)/%: $(ROOTVARIANTDIR) $(VAR1_BLDDIR)/%
 	$(INS.file)
 $(ROOTVARIANTDIR)/%: $(ROOTVARIANTDIR) $(VAR2_BLDDIR)/%
+	$(INS.file)
+$(ROOTVARIANTDIR)/%: $(ROOTVARIANTDIR) $(VAR3_BLDDIR)/%
 	$(INS.file)
 
 # install rule for lint library target

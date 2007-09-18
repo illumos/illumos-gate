@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,7 +231,7 @@ static void		init_config(void);
 static void		cacheinit(void);
 static int		cacheinfo(char *, int, struct netbuf *, char *, int);
 static int		dlifconfig(TIUSER *, struct in_addr *, struct in_addr *,
-			    struct in_addr *);
+			    struct in_addr *, uint_t);
 static int		setifflags(TIUSER *, uint_t);
 
 static char		*inet_ntoa(struct in_addr);
@@ -337,9 +336,9 @@ mount_root(char *name, char *path, int version, struct nfs_args *args,
 		break;
 	case NFS_V4:
 		((struct sockaddr_in *)args->addr->buf)->sin_port =
-							htons(NFS_PORT);
+		    htons(NFS_PORT);
 		if (ping_prog(args->addr, NFS_PROGRAM, NFS_V4, IPPROTO_TCP,
-				&stat)) {
+		    &stat)) {
 			proto = IPPROTO_TCP;
 			rc = 0;
 		} else {
@@ -558,7 +557,7 @@ mountnfs3(struct netbuf *sa, char *server,
 	if (mountres3.fhs_status != MNT_OK) {
 		if (dldebug)
 			printf("mountnfs3: fhs_status %d\n",
-					mountres3.fhs_status);
+			    mountres3.fhs_status);
 		ret = ENXIO;	/* XXX */
 		goto out;
 	}
@@ -1123,7 +1122,7 @@ dhcpinit(void)
 	if ((rc = t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
 	    FREAD|FWRITE, &tiptr, CRED())) == 0) {
 		if (rc = dlifconfig(tiptr, &pl->pkt->yiaddr, &subnet,
-		    &braddr)) {
+		    &braddr, IFF_DHCPRUNNING)) {
 			nfs_perror(rc, "dhcp: dlifconfig failed: %m\n");
 			kmem_free(pl->pkt, pl->len);
 			kmem_free(pl, sizeof (PKT_LIST));
@@ -1326,7 +1325,7 @@ cacheinfo(char *name, int namelen,
  */
 static int
 dlifconfig(TIUSER *tiptr, struct in_addr *myIPaddr, struct in_addr *mymask,
-    struct in_addr *mybraddr)
+    struct in_addr *mybraddr, uint_t flags)
 {
 	int rc;
 	struct netbuf sbuf;
@@ -1374,7 +1373,7 @@ dlifconfig(TIUSER *tiptr, struct in_addr *myIPaddr, struct in_addr *mymask,
 	/*
 	 * Now turn on the interface.
 	 */
-	if (rc = setifflags(tiptr, IFF_UP | IFF_DHCPRUNNING)) {
+	if (rc = setifflags(tiptr, IFF_UP | flags)) {
 		nfs_perror(rc,
 		    "dlifconfig: couldn't enable network interface: %m\n");
 		return (rc);
@@ -1638,8 +1637,8 @@ revarp_start(ldi_handle_t lh, struct netbuf *myaddr)
 		/* Fallback using per-node address */
 		(void) localetheraddr((struct ether_addr *)NULL, &myether);
 		cmn_err(CE_CONT, "?DLPI failed to get Ethernet address. Using "
-			"system wide Ethernet address %s\n",
-			ether_sprintf(&myether));
+		    "system wide Ethernet address %s\n",
+		    ether_sprintf(&myether));
 	}
 
 getreply:
@@ -1862,8 +1861,8 @@ myxdr_mountres3_ok(XDR *xdrs, struct mountres3_ok *objp)
 	if (!myxdr_fhandle3(xdrs, &objp->fhandle))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->auth_flavors.auth_flavors_val,
-		(uint_t *)&objp->auth_flavors.auth_flavors_len, ~0,
-		sizeof (int), (xdrproc_t)xdr_int))
+	    (uint_t *)&objp->auth_flavors.auth_flavors_len, ~0,
+	    sizeof (int), (xdrproc_t)xdr_int))
 		return (FALSE);
 	return (TRUE);
 }
@@ -2202,6 +2201,139 @@ dl_info(ldi_handle_t lh, dl_info_ack_t *info)
 }
 
 /*
+ * Configure the 'default' interface based on existing boot properties.
+ */
+static int
+bp_netconfig(void)
+{
+	char *str;
+	struct in_addr my_ip, my_netmask, my_router, my_broadcast;
+	struct sockaddr_in *sin;
+	TIUSER *tiptr;
+	int rc;
+	struct rtentry rtentry;
+
+	my_ip.s_addr = my_netmask.s_addr = my_router.s_addr = 0;
+
+	/*
+	 * No way of getting this right now.  Collude with dlifconfig()
+	 * to let the protocol stack choose.
+	 */
+	my_broadcast.s_addr = INADDR_BROADCAST;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_HOST_IP, &str) == DDI_SUCCESS) {
+		if (inet_aton(str, (uchar_t *)&my_ip) != 0)
+			cmn_err(CE_NOTE, "host-ip %s is invalid\n",
+			    str);
+		ddi_prop_free(str);
+		if (dldebug)
+			printf("host ip is %s\n",
+			    inet_ntoa(my_ip));
+	}
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_SUBNET_MASK, &str) == DDI_SUCCESS) {
+		if (inet_aton(str, (uchar_t *)&my_netmask) != 0)
+			cmn_err(CE_NOTE, "subnet-mask %s is invalid\n",
+			    str);
+		ddi_prop_free(str);
+		if (dldebug)
+			printf("subnet mask is %s\n",
+			    inet_ntoa(my_netmask));
+	}
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_ROUTER_IP, &str) == DDI_SUCCESS) {
+		if (inet_aton(str, (uchar_t *)&my_router) != 0)
+			cmn_err(CE_NOTE, "router-ip %s is invalid\n",
+			    str);
+		ddi_prop_free(str);
+		if (dldebug)
+			printf("router ip is %s\n",
+			    inet_ntoa(my_router));
+	}
+	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_SERVER_PATH, &server_path_c);
+	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_SERVER_NAME, &server_name_c);
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_SERVER_ROOTOPTS, &str) == DDI_SUCCESS) {
+		(void) strlcpy(rootopts, str, sizeof (rootopts));
+		ddi_prop_free(str);
+	}
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, BP_SERVER_IP, &str) == DDI_SUCCESS) {
+		if (inet_aton(str, server_ip) != 0)
+			cmn_err(CE_NOTE, "server-ip %s is invalid\n",
+			    str);
+		ddi_prop_free(str);
+		if (dldebug)
+			printf("server ip is %s\n",
+			    inet_ntoa(*(struct in_addr *)server_ip));
+	}
+
+	/*
+	 * We need all of these to configure based on properties.
+	 */
+	if ((my_ip.s_addr == 0) ||
+	    (my_netmask.s_addr == 0) ||
+	    (server_path_c == NULL) ||
+	    (server_name_c == NULL) ||
+	    (*(uint_t *)server_ip == 0))
+		return (-1);
+
+	cmn_err(CE_CONT, "?IP address: %s\n", inet_ntoa(my_ip));
+	cmn_err(CE_CONT, "?IP netmask: %s\n", inet_ntoa(my_netmask));
+	if (my_router.s_addr != 0)
+		cmn_err(CE_CONT, "?IP router: %s\n", inet_ntoa(my_router));
+	cmn_err(CE_CONT, "?NFS server: %s (%s)\n", server_name_c,
+	    inet_ntoa(*(struct in_addr *)server_ip));
+	cmn_err(CE_CONT, "?NFS path: %s\n", server_path_c);
+
+	/*
+	 * Configure the interface.
+	 */
+	if ((rc = t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
+	    FREAD|FWRITE, &tiptr, CRED())) != 0) {
+		nfs_perror(rc, "bp_netconfig: t_kopen udp failed: %m.\n");
+		return (rc);
+	}
+
+	if ((rc = dlifconfig(tiptr, &my_ip, &my_netmask, &my_broadcast,
+	    0)) < 0) {
+		nfs_perror(rc, "bp_netconfig: dlifconfig failed: %m.\n");
+		(void) t_kclose(tiptr, 0);
+		return (rc);
+	}
+
+	if (my_router.s_addr != 0) {
+		/*
+		 * Add a default route.
+		 */
+		sin = (struct sockaddr_in *)&rtentry.rt_dst;
+		bzero(sin, sizeof (*sin));
+		sin->sin_family = AF_INET;
+
+		sin = (struct sockaddr_in *)&rtentry.rt_gateway;
+		bzero(sin, sizeof (*sin));
+		sin->sin_family = AF_INET;
+		sin->sin_addr = my_router;
+
+		rtentry.rt_flags = RTF_GATEWAY | RTF_UP;
+
+		if ((rc = rtioctl(tiptr, SIOCADDRT, &rtentry)) != 0) {
+			nfs_perror(rc,
+			    "bp_netconfig: couldn't add route: %m.\n");
+			(void) t_kclose(tiptr, 0);
+			return (rc);
+		}
+	}
+
+	(void) t_kclose(tiptr, 0);
+
+	return (0);
+}
+
+/*
  * The network device we will use to boot from is plumbed. Extract the details
  * from rootfs.
  */
@@ -2224,7 +2356,9 @@ init_config(void)
 	 * Now we bringup the interface.
 	 * Try cached dhcp response first. If it fails, do rarp.
 	 */
-	if (dhcpinit() != 0 && whoami() != 0)
+	if ((bp_netconfig() != 0) &&
+	    (dhcpinit() != 0) &&
+	    (whoami() != 0))
 		cmn_err(CE_WARN,
 		    "%s: no response from interface", ifname);
 	else if (dldebug)

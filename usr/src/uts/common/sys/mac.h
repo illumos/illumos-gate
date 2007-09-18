@@ -84,6 +84,11 @@ typedef enum {
 	LINK_DUPLEX_FULL
 } link_duplex_t;
 
+/*
+ * Maximum MAC address length
+ */
+#define	MAXMACADDRLEN	20
+
 #ifdef	_KERNEL
 
 typedef struct mac_stat_info_s {
@@ -150,11 +155,6 @@ enum mac_driver_stat {
 	    (_stat) == MAC_STAT_OPACKETS ||	\
 	    (_stat) == MAC_STAT_UNDERFLOWS ||	\
 	    (_stat) == MAC_STAT_OVERFLOWS)
-
-/*
- * Maximum MAC address length
- */
-#define	MAXMACADDRLEN	20
 
 /*
  * Immutable information. (This may not be modified after registration).
@@ -324,6 +324,7 @@ typedef enum {
 	MAC_NOTE_RESOURCE,
 	MAC_NOTE_DEVPROMISC,
 	MAC_NOTE_FASTPATH_FLUSH,
+	MAC_NOTE_VNIC,
 	MAC_NNOTE	/* must be the last entry */
 } mac_notify_type_t;
 
@@ -513,6 +514,7 @@ extern void			mac_dest_get(mac_handle_t, uint8_t *);
 extern void			mac_resources(mac_handle_t);
 extern void			mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
 extern const mac_txinfo_t	*mac_tx_get(mac_handle_t);
+extern const mac_txinfo_t	*mac_vnic_tx_get(mac_handle_t);
 extern link_state_t		mac_link_get(mac_handle_t);
 extern mac_notify_handle_t	mac_notify_add(mac_handle_t, mac_notify_t,
     void *);
@@ -520,6 +522,8 @@ extern void			mac_notify_remove(mac_handle_t,
     mac_notify_handle_t);
 extern void			mac_notify(mac_handle_t);
 extern mac_rx_handle_t		mac_rx_add(mac_handle_t, mac_rx_t, void *);
+extern mac_rx_handle_t		mac_active_rx_add(mac_handle_t, mac_rx_t,
+    void *);
 extern void			mac_rx_remove(mac_handle_t, mac_rx_handle_t,
     boolean_t);
 extern void			mac_rx_remove_wait(mac_handle_t);
@@ -529,11 +533,19 @@ extern mac_txloop_handle_t	mac_txloop_add(mac_handle_t, mac_txloop_t,
 extern void			mac_txloop_remove(mac_handle_t,
     mac_txloop_handle_t);
 extern boolean_t		mac_active_set(mac_handle_t);
+extern boolean_t		mac_active_shareable_set(mac_handle_t);
 extern void			mac_active_clear(mac_handle_t);
+extern void			mac_active_rx(void *, mac_resource_handle_t,
+    mblk_t *);
+extern boolean_t		mac_vnic_set(mac_handle_t, mac_txinfo_t *,
+    mac_getcapab_t, void *);
+extern void			mac_vnic_clear(mac_handle_t);
 extern void			mac_resource_set(mac_handle_t,
     mac_resource_add_t, void *);
 extern dev_info_t		*mac_devinfo_get(mac_handle_t);
 extern boolean_t		mac_capab_get(mac_handle_t, mac_capab_t,
+    void *);
+extern boolean_t		mac_vnic_capab_get(mac_handle_t, mac_capab_t,
     void *);
 extern boolean_t		mac_sap_verify(mac_handle_t, uint32_t,
     uint32_t *);
@@ -550,6 +562,7 @@ extern mblk_t			*mac_header_uncook(mac_handle_t, mblk_t *);
 extern mac_register_t		*mac_alloc(uint_t);
 extern void			mac_free(mac_register_t *);
 extern int			mac_register(mac_register_t *, mac_handle_t *);
+extern int			mac_disable(mac_handle_t);
 extern int  			mac_unregister(mac_handle_t);
 extern void 			mac_rx(mac_handle_t, mac_resource_handle_t,
     mblk_t *);

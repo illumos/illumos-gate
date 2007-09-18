@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,12 @@ gcpu_nil(void)
 	return (0);
 }
 
+static void *
+gcpu_null(void)
+{
+	return (NULL);
+}
+
 /*ARGSUSED*/
 static int
 gcpu_init(cpu_t *cpu, void **datap)
@@ -92,7 +98,7 @@ const cmi_ops_t _cmi_ops = {
 	(int (*)())gcpu_notsup,	/* cmi_mca_inject */
 	gcpu_nop,		/* cmi_mca_poke */
 	(void (*)())gcpu_nop,			/* cmi_mc_register */
-	(const cmi_mc_ops_t *(*)())gcpu_nop	/* cmi_mc_getops */
+	(const cmi_mc_ops_t *(*)())gcpu_null	/* cmi_mc_getops */
 };
 
 static struct modlcpu modlcpu = {

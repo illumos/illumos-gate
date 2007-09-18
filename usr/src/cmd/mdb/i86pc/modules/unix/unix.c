@@ -787,7 +787,7 @@ report_maps_help(void)
 	    "Given a PFN, report HAT structures that map the page, or use\n"
 	    "the page as a pagetable.\n"
 	    "\n"
-	    "-m Interpret the PFN as a Xen MFN (machine frame number)\n");
+	    "-m Interpret the PFN as an MFN (machine frame number)\n");
 }
 
 static void
@@ -797,7 +797,7 @@ ptable_help(void)
 	    "Given a PFN holding a page table, print its contents, and\n"
 	    "the address of the corresponding htable structure.\n"
 	    "\n"
-	    "-m Interpret the PFN as a Xen MFN (machine frame number)\n");
+	    "-m Interpret the PFN as an MFN (machine frame number)\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
@@ -817,6 +817,10 @@ static const mdb_dcmd_t dcmds[] = {
 	    pte_dcmd },
 	{ "page_num2pp", ":", "page frame number to page structure",
 	    page_num2pp },
+	{ "pfntomfn", ":", "convert physical page to hypervisor machine page",
+	    pfntomfn_dcmd },
+	{ "mfntopfn", ":", "convert hypervisor machine page to physical page",
+	    mfntopfn_dcmd },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ NULL }
 };
@@ -837,4 +841,10 @@ const mdb_modinfo_t *
 _mdb_init(void)
 {
 	return (&modinfo);
+}
+
+void
+_mdb_fini(void)
+{
+	free_mmu();
 }

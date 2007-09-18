@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,8 @@
 #include <sys/traptrace.h>
 #include <sys/clock.h>
 #include <sys/panic.h>
+#include <sys/privregs.h>
+
 #include "assym.h"
 
 #endif	/* __lint */
@@ -104,7 +105,7 @@ getlgrp(void)
 	movq	%rax, %rdx
 	shrq	$32, %rdx			/* high 32-bit in %edx */
 	FAST_INTR_POP
-	iretq
+	FAST_INTR_RETURN
 	SET_SIZE(get_hrtime)
 
 #elif defined(__i386)
@@ -114,7 +115,7 @@ getlgrp(void)
 	FAST_INTR_PUSH
 	call	*gethrtimef
 	FAST_INTR_POP
-	iret
+	FAST_INTR_RETURN
 	SET_SIZE(get_hrtime)
 
 #endif	/* __i386 */
@@ -131,7 +132,7 @@ getlgrp(void)
 	movl	CLONGSIZE(%rsp), %edx
 	addq	$TIMESPEC_SIZE, %rsp
 	FAST_INTR_POP
-	iretq
+	FAST_INTR_RETURN
 	SET_SIZE(get_hrestime)
 
 #elif defined(__i386)
@@ -146,7 +147,7 @@ getlgrp(void)
 	movl	_CONST(4 + CLONGSIZE)(%esp), %edx
 	addl	$_CONST(4 + TIMESPEC_SIZE), %esp
 	FAST_INTR_POP
-	iret
+	FAST_INTR_RETURN
 	SET_SIZE(get_hrestime)
 
 #endif	/* __i386 */
@@ -168,8 +169,7 @@ getlgrp(void)
 	movq	%rax, %rdx
 	shrq	$32, %rdx			/* high 32-bit in %rdx */
 	FAST_INTR_POP
-	iretq
-
+	FAST_INTR_RETURN
 	SET_SIZE(gethrvtime)
 
 #elif defined(__i386)
@@ -193,7 +193,7 @@ getlgrp(void)
 	movl	4(%ecx), %edx
 	addl	$0x8, %esp
 	FAST_INTR_POP
-	iret
+	FAST_INTR_RETURN
 	SET_SIZE(gethrvtime)
 
 #endif	/* __i386 */
@@ -207,7 +207,7 @@ getlgrp(void)
 	movl	LPL_LGRPID(%rcx), %edx
 	movl	%gs:CPU_ID, %eax
 	FAST_INTR_POP
-	iretq
+	FAST_INTR_RETURN
 	SET_SIZE(getlgrp)
 
 #elif defined(__i386)
@@ -219,7 +219,7 @@ getlgrp(void)
 	movl	LPL_LGRPID(%ecx), %edx
 	movl	%gs:CPU_ID, %eax
 	FAST_INTR_POP
-	iret
+	FAST_INTR_RETURN
 	SET_SIZE(getlgrp)
 
 #endif	/* __i386 */

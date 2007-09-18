@@ -627,7 +627,7 @@ uint64_t sync_tt;
 void
 sync_handler(void)
 {
-	struct  trap_info 	ti;
+	struct  panic_trap_info 	ti;
 	int i;
 
 	/*

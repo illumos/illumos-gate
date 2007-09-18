@@ -448,7 +448,6 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 		if ((vp->v_type == VREG) && (vap->va_mask & AT_SIZE) &&
 		    (vap->va_size == 0)) {
 			ASSERT(parent->sdev_attrvp);
-			ASSERT(VTOSDEV(vp)->sdev_attrvp);
 			error = VOP_CREATE(parent->sdev_attrvp,
 			    nm, vap, excl, mode, &avp, cred, flag);
 
@@ -1232,7 +1231,8 @@ sdev_inactive(struct vnode *vp, struct cred *cred)
 			dv->sdev_nlink--;
 		}
 		for (idv = ddv->sdev_dot; idv && idv != dv;
-		    prev = idv, idv = idv->sdev_next);
+		    prev = idv, idv = idv->sdev_next)
+			;
 		ASSERT(idv == dv);
 		if (prev == NULL)
 			ddv->sdev_dot = dv->sdev_next;

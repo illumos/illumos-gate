@@ -42,6 +42,9 @@
 #include <sys/cmn_err.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
 #include <sys/bootinfo.h>
 #include <vm/kboot_mmu.h>
 #include <sys/machsystm.h>
@@ -51,9 +54,12 @@
  * in order to implement vtop and physical read/writes
  */
 static uintptr_t hat_kdi_page = 0;	/* vaddr for phsical page accesses */
-static x86pte_t *hat_kdi_pte = NULL;	/* vaddr of pte for hat_kdi_page */
 static uint_t use_kbm = 1;
 uint_t hat_kdi_use_pae;			/* if 0, use x86pte32_t for pte type */
+
+#if !defined(__xpv)
+static x86pte_t *hat_kdi_pte = NULL;	/* vaddr of pte for hat_kdi_page */
+#endif
 
 /*
  * Get the address for remapping physical pages during boot
@@ -84,6 +90,7 @@ hat_kdi_init(void)
 	ht = htable_create(kas.a_hat, hat_kdi_page, 0, NULL);
 	use_kbm = 0;
 
+#ifndef __xpv
 	/*
 	 * Get an address at which to put the pagetable and devload it.
 	 */
@@ -97,9 +104,46 @@ hat_kdi_init(void)
 
 	HTABLE_INC(ht->ht_valid_cnt);
 	htable_release(ht);
+#endif
 }
+
+#ifdef __xpv
+
+/*
+ * translate machine address to physical address
+ */
+static uint64_t
+kdi_ptom(uint64_t pa)
+{
+	extern pfn_t *mfn_list;
+	ulong_t mfn = mfn_list[mmu_btop(pa)];
+
+	return (pfn_to_pa(mfn) | (pa & MMU_PAGEOFFSET));
+}
+
+/*
+ * This is like mfn_to_pfn(), but we can't use ontrap() from kmdb.
+ * Instead we let the fault happen and kmdb deals with it.
+ */
+static uint64_t
+kdi_mtop(uint64_t ma)
+{
+	pfn_t pfn;
+	mfn_t mfn = ma >> MMU_PAGESHIFT;
+
+	if (HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL) < mfn)
+		return (ma | PFN_IS_FOREIGN_MFN);
+
+	pfn = mfn_to_pfn_mapping[mfn];
+	if (pfn >= mfn_count || pfn_to_mfn(pfn) != mfn)
+		return (ma | PFN_IS_FOREIGN_MFN);
+	return (pfn_to_pa(pfn) | (ma & MMU_PAGEOFFSET));
+}
+
+#else
 #define	kdi_mtop(m)	(m)
 #define	kdi_ptom(p)	(p)
+#endif
 
 /*ARGSUSED*/
 int
@@ -132,7 +176,11 @@ kdi_vtop(uintptr_t va, uint64_t *pap)
 	 * We can't go through normal hat routines, so we'll use
 	 * kdi_pread() to walk the page tables
 	 */
+#if defined(__xpv)
+	*pap = pfn_to_pa(CPU->cpu_current_hat->hat_htable->ht_pfn);
+#else
 	*pap = getcr3() & MMU_PAGEMASK;
+#endif
 	for (level = mmu.max_level; ; --level) {
 		index = (va >> LEVEL_SHIFT(level)) & (mmu.ptes_per_table - 1);
 		*pap += index << mmu.pte_size_shift;
@@ -179,7 +227,7 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		pgoff = pa & MMU_PAGEOFFSET;
 		sz = MIN(nbytes, MMU_PAGESIZE - pgoff);
 		va = (caddr_t)hat_kdi_page + pgoff;
-		pte = mmu_ptob(mmu_btop(pa)) | PT_VALID;
+		pte = kdi_ptom(mmu_ptob(mmu_btop(pa))) | PT_VALID;
 		if (doread) {
 			from = va;
 			to = buf;
@@ -194,11 +242,17 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		 */
 		if (use_kbm)
 			(void) kbm_push(pa);
+#if defined(__xpv)
+		else
+			(void) HYPERVISOR_update_va_mapping(
+			    (uintptr_t)va, pte, UVMF_INVLPG);
+#else
 		else if (hat_kdi_use_pae)
 			*hat_kdi_pte = pte;
 		else
 			*(x86pte32_t *)hat_kdi_pte = pte;
 		mmu_tlbflush_entry((caddr_t)hat_kdi_page);
+#endif
 
 		bcopy(from, to, sz);
 
@@ -207,11 +261,17 @@ kdi_prw(caddr_t buf, size_t nbytes, uint64_t pa, size_t *ncopiedp, int doread)
 		 */
 		if (use_kbm)
 			kbm_pop();
+#if defined(__xpv)
+		else
+			(void) HYPERVISOR_update_va_mapping(
+			    (uintptr_t)va, 0, UVMF_INVLPG);
+#else
 		else if (hat_kdi_use_pae)
 			*hat_kdi_pte = 0;
 		else
 			*(x86pte32_t *)hat_kdi_pte = 0;
 		mmu_tlbflush_entry((caddr_t)hat_kdi_page);
+#endif
 
 		buf += sz;
 		pa += sz;

@@ -588,15 +588,35 @@ getuserpc()
  * Since struct regs stores each 16-bit segment register as a 32-bit greg_t, we
  * also explicitly zero the top 16 bits since they may be coming from the
  * user's address space via setcontext(2) or /proc.
+ *
+ * Note about null selector. When running on the hypervisor if we allow a
+ * process to set its %cs to null selector with RPL of 0 the hypervisor will
+ * crash the domain. If running on bare metal we would get a #gp fault and
+ * be able to kill the process and continue on. Therefore we make sure to
+ * force RPL to SEL_UPL even for null selector when setting %cs.
  */
+
+#if defined(IS_CS) || defined(IS_NOT_CS)
+#error	"IS_CS and IS_NOT_CS already defined"
+#endif
+
+#define	IS_CS		1
+#define	IS_NOT_CS	0
 
 /*ARGSUSED*/
 static greg_t
-fix_segreg(greg_t sr, model_t datamodel)
+fix_segreg(greg_t sr, int iscs, model_t datamodel)
 {
 	kthread_t *t = curthread;
 
 	switch (sr &= 0xffff) {
+
+	case 0:
+		if (iscs == IS_CS)
+			return (0 | SEL_UPL);
+		else
+			return (0);
+
 #if defined(__amd64)
 	/*
 	 * If lwp attempts to switch data model then force their
@@ -604,13 +624,13 @@ fix_segreg(greg_t sr, model_t datamodel)
 	 */
 	case U32CS_SEL:
 		if (datamodel == DATAMODEL_NATIVE)
-			return (0);
+			return (0 | SEL_UPL);
 		else
 			return (sr);
 
 	case UCS_SEL:
 		if (datamodel == DATAMODEL_ILP32)
-			return (0);
+			return (0 | SEL_UPL);
 #elif defined(__i386)
 	case UCS_SEL:
 #endif
@@ -618,7 +638,7 @@ fix_segreg(greg_t sr, model_t datamodel)
 	case UDS_SEL:
 	case LWPFS_SEL:
 	case LWPGS_SEL:
-	case 0:
+	case SEL_UPL:
 		return (sr);
 	default:
 		break;
@@ -628,20 +648,34 @@ fix_segreg(greg_t sr, model_t datamodel)
 	 * Allow this process's brand to do any necessary segment register
 	 * manipulation.
 	 */
-	if (PROC_IS_BRANDED(t->t_procp) && BRMOP(t->t_procp)->b_fixsegreg)
-		return (BRMOP(t->t_procp)->b_fixsegreg(sr, datamodel));
+	if (PROC_IS_BRANDED(t->t_procp) && BRMOP(t->t_procp)->b_fixsegreg) {
+		greg_t bsr = BRMOP(t->t_procp)->b_fixsegreg(sr, datamodel);
+
+		if (bsr == 0 && iscs == IS_CS)
+			return (0 | SEL_UPL);
+		else
+			return (bsr);
+	}
 
 	/*
 	 * Force it into the LDT in ring 3 for 32-bit processes, which by
 	 * default do not have an LDT, so that any attempt to use an invalid
-	 * selector will reference the (non-existant) LDT, and cause a #gp fault
-	 * for the process.
+	 * selector will reference the (non-existant) LDT, and cause a #gp
+	 * fault for the process.
 	 *
 	 * 64-bit processes get the null gdt selector since they
 	 * are not allowed to have a private LDT.
 	 */
 #if defined(__amd64)
-	return (datamodel == DATAMODEL_ILP32 ? (sr | SEL_TI_LDT | SEL_UPL) : 0);
+	if (datamodel == DATAMODEL_ILP32) {
+		return (sr | SEL_TI_LDT | SEL_UPL);
+	} else {
+		if (iscs == IS_CS)
+			return (0 | SEL_UPL);
+		else
+			return (0);
+	}
+
 #elif defined(__i386)
 	return (sr | SEL_TI_LDT | SEL_UPL);
 #endif
@@ -706,8 +740,8 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		 */
 		pcb->pcb_fsbase = grp[REG_FSBASE];
 		pcb->pcb_gsbase = grp[REG_GSBASE];
-		pcb->pcb_fs = fix_segreg(grp[REG_FS], datamodel);
-		pcb->pcb_gs = fix_segreg(grp[REG_GS], datamodel);
+		pcb->pcb_fs = fix_segreg(grp[REG_FS], IS_NOT_CS, datamodel);
+		pcb->pcb_gs = fix_segreg(grp[REG_GS], IS_NOT_CS, datamodel);
 
 		/*
 		 * Ensure that we go out via update_sregs
@@ -729,30 +763,22 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		rp->r_err = (uint32_t)grp[REG_ERR];
 		rp->r_rip = (uint32_t)grp[REG_RIP];
 
-		/*
-		 * The kernel uses %cs to determine if it is dealing with
-		 * another part of the kernel or with a userland application.
-		 * Specifically, it tests the privilege bits. For this reason,
-		 * we must prevent user apps from ending up with a NULL selector
-		 * in %cs. Instead, we'll use index 0 into the GDT but with the
-		 * privilege bits set to usermode.
-		 */
-		rp->r_cs = fix_segreg(grp[REG_CS], datamodel) | SEL_UPL;
-		rp->r_ss = fix_segreg(grp[REG_DS], datamodel);
+		rp->r_cs = fix_segreg(grp[REG_CS], IS_CS, datamodel);
+		rp->r_ss = fix_segreg(grp[REG_DS], IS_NOT_CS, datamodel);
 
 		rp->r_rsp = (uint32_t)grp[REG_RSP];
 
 		if (thisthread)
 			kpreempt_disable();
 
-		pcb->pcb_ds = fix_segreg(grp[REG_DS], datamodel);
-		pcb->pcb_es = fix_segreg(grp[REG_ES], datamodel);
+		pcb->pcb_ds = fix_segreg(grp[REG_DS], IS_NOT_CS, datamodel);
+		pcb->pcb_es = fix_segreg(grp[REG_ES], IS_NOT_CS, datamodel);
 
 		/*
 		 * (See fsbase/gsbase commentary above)
 		 */
-		pcb->pcb_fs = fix_segreg(grp[REG_FS], datamodel);
-		pcb->pcb_gs = fix_segreg(grp[REG_GS], datamodel);
+		pcb->pcb_fs = fix_segreg(grp[REG_FS], IS_NOT_CS, datamodel);
+		pcb->pcb_gs = fix_segreg(grp[REG_GS], IS_NOT_CS, datamodel);
 
 		/*
 		 * Ensure that we go out via update_sregs
@@ -782,12 +808,12 @@ setgregs(klwp_t *lwp, gregset_t grp)
 	 */
 	bcopy(grp, &rp->r_gs, sizeof (gregset_t));
 
-	rp->r_cs = fix_segreg(rp->r_cs, datamodel);
-	rp->r_ss = fix_segreg(rp->r_ss, datamodel);
-	rp->r_ds = fix_segreg(rp->r_ds, datamodel);
-	rp->r_es = fix_segreg(rp->r_es, datamodel);
-	rp->r_fs = fix_segreg(rp->r_fs, datamodel);
-	rp->r_gs = fix_segreg(rp->r_gs, datamodel);
+	rp->r_cs = fix_segreg(rp->r_cs, IS_CS, datamodel);
+	rp->r_ss = fix_segreg(rp->r_ss, IS_NOT_CS, datamodel);
+	rp->r_ds = fix_segreg(rp->r_ds, IS_NOT_CS, datamodel);
+	rp->r_es = fix_segreg(rp->r_es, IS_NOT_CS, datamodel);
+	rp->r_fs = fix_segreg(rp->r_fs, IS_NOT_CS, datamodel);
+	rp->r_gs = fix_segreg(rp->r_gs, IS_NOT_CS, datamodel);
 
 #endif	/* __i386 */
 }
@@ -1140,6 +1166,7 @@ traceback(caddr_t fpreg)
 	if (!panicstr)
 		printf("traceback: %%fp = %p\n", (void *)fp);
 
+	fp = (struct frame *)plat_traceback(fpreg);
 	if ((uintptr_t)fp < KERNELBASE)
 		goto out;
 
@@ -1222,6 +1249,7 @@ traceback(caddr_t fpreg)
 
 	kpreempt_enable();
 
+	fp = (struct frame *)plat_traceback(fpreg);
 	if ((uintptr_t)fp < KERNELBASE)
 		goto out;
 

@@ -66,6 +66,9 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/mach_mmu.h>
 #include <sys/sysmacros.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
 #include <sys/cpu_module.h>
 
 struct cpu	cpus[1];			/* CPU data */
@@ -98,8 +101,6 @@ static void cpu_sep_enable(void);
 static void cpu_sep_disable(void);
 static void cpu_asysc_enable(void);
 static void cpu_asysc_disable(void);
-
-extern int tsc_gethrtime_enable;
 
 /*
  * Init CPU info - get CPU type info for processor_info system call.
@@ -238,7 +239,9 @@ mp_startup_init(int cpun)
 	kthread_id_t tp;
 	caddr_t	sp;
 	proc_t *procp;
+#if !defined(__xpv)
 	extern int idle_cpu_prefer_mwait;
+#endif
 	extern void idle();
 
 #ifdef TRAPTRACE
@@ -248,8 +251,10 @@ mp_startup_init(int cpun)
 	ASSERT(cpun < NCPU && cpu[cpun] == NULL);
 
 	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
+#if !defined(__xpv)
 	if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
 		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(CPU);
+#endif
 
 	procp = curthread->t_procp;
 
@@ -384,10 +389,12 @@ mp_startup_init(int cpun)
 	 */
 	cpuid_alloc_space(cp);
 
+#if !defined(__xpv)
 	/*
 	 * alloc space for ucode_info
 	 */
 	ucode_alloc_space(cp);
+#endif
 
 	hat_cpu_online(cp);
 
@@ -478,7 +485,9 @@ mp_startup_fini(struct cpu *cp, int error)
 
 	cpuid_free_space(cp);
 
+#if !defined(__xpv)
 	ucode_free_space(cp);
+#endif
 
 	if (cp->cpu_m.mcpu_idt != CPU->cpu_m.mcpu_idt)
 		kmem_free(cp->cpu_m.mcpu_idt, sizeof (idt0));
@@ -500,8 +509,10 @@ mp_startup_fini(struct cpu *cp, int error)
 	disp_cpu_fini(cp);
 	mutex_exit(&cpu_lock);
 
+#if !defined(__xpv)
 	if (cp->cpu_m.mcpu_mwait != NULL)
 		cpuid_mwait_free(cp);
+#endif
 	kmem_free(cp, sizeof (*cp));
 }
 
@@ -604,6 +615,35 @@ msr_warning(cpu_t *cp, const char *rw, uint_t msr, int error)
 	cmn_err(CE_WARN, "cpu%d: couldn't %smsr 0x%x, error %d",
 	    cp->cpu_id, rw, msr, error);
 }
+
+#if defined(__xpv)
+
+/*
+ * On dom0, we can determine the number of physical cpus on the machine.
+ * This number is important when figuring out what workarounds are
+ * appropriate, so compute it now.
+ */
+static uint_t
+xen_get_nphyscpus(void)
+{
+	static uint_t nphyscpus = 0;
+
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+
+	if (nphyscpus == 0) {
+		xen_sysctl_t op;
+		xen_sysctl_physinfo_t *pi = &op.u.physinfo;
+
+		op.cmd = XEN_SYSCTL_physinfo;
+		op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+		if (HYPERVISOR_sysctl(&op) == 0)
+			nphyscpus = pi->threads_per_core *
+			    pi->cores_per_socket * pi->sockets_per_node *
+			    pi->nr_nodes;
+	}
+	return (nphyscpus);
+}
+#endif
 
 uint_t
 workaround_errata(struct cpu *cpu)
@@ -793,10 +833,16 @@ workaround_errata(struct cpu *cpu)
 		 * Erratum 122 is only present in MP configurations (multi-core
 		 * or multi-processor).
 		 */
+#if defined(__xpv)
+		if (!DOMAIN_IS_INITDOMAIN(xen_info))
+			break;
+		if (!opteron_erratum_122 && xen_get_nphyscpus() == 1)
+			break;
+#else
 		if (!opteron_erratum_122 && lgrp_plat_node_cnt == 1 &&
 		    cpuid_get_ncpu_per_chip(cpu) == 1)
 			break;
-
+#endif
 		/* disable TLB Flush Filter */
 
 		if ((error = checked_rdmsr(msr, &value)) != 0) {
@@ -835,7 +881,10 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (cpuid_get_ncpu_per_chip(cpu) < 2)
 			break;
-
+#if defined(__xpv)
+		if (!DOMAIN_IS_INITDOMAIN(xen_info))
+			break;
+#endif
 		/*
 		 * The "workaround" is to print a warning to upgrade the BIOS
 		 */
@@ -872,10 +921,15 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_erratum_131)
 			break;
-
+#if defined(__xpv)
+		if (!DOMAIN_IS_INITDOMAIN(xen_info))
+			break;
+		if (xen_get_nphyscpus() < 4)
+			break;
+#else
 		if (lgrp_plat_node_cnt * cpuid_get_ncpu_per_chip(cpu) < 4)
 			break;
-
+#endif
 		/*
 		 * Print a warning if neither of the workarounds for
 		 * erratum 131 is present.
@@ -909,6 +963,19 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_workaround_6336786) {
 			opteron_workaround_6336786++;
+#if defined(__xpv)
+		} else if ((DOMAIN_IS_INITDOMAIN(xen_info) &&
+		    xen_get_nphyscpus() > 1) ||
+		    opteron_workaround_6336786_UP) {
+			/*
+			 * XXPV	Hmm.  We can't walk the set of lgrps on
+			 *	the hypervisor; so just complain and drive
+			 *	on.  This probably needs to be fixed in
+			 *	the hypervisor itself.
+			 */
+			opteron_workaround_6336786++;
+			workaround_warning(cpu, 6336786);
+#else	/* __xpv */
 		} else if ((lgrp_plat_node_cnt *
 		    cpuid_get_ncpu_per_chip(cpu) > 1) ||
 		    opteron_workaround_6336786_UP) {
@@ -925,6 +992,7 @@ workaround_errata(struct cpu *cpu)
 				pci_putb_func(0, node + 24, 3, 0x87, data);
 			}
 			opteron_workaround_6336786++;
+#endif	/* __xpv */
 		}
 #else
 		workaround_warning(cpu, 6336786);
@@ -950,10 +1018,30 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_workaround_6323525) {
 			opteron_workaround_6323525++;
+#if defined(__xpv)
+		} else if (x86_feature & X86_SSE2) {
+			if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+				/*
+				 * XXPV	Use dom0_msr here when extended
+				 *	operations are supported?
+				 */
+				if (xen_get_nphyscpus() > 1)
+					opteron_workaround_6323525++;
+			} else {
+				/*
+				 * We have no way to tell how many physical
+				 * cpus there are, or even if this processor
+				 * has the problem, so enable the workaround
+				 * unconditionally (at some performance cost).
+				 */
+				opteron_workaround_6323525++;
+			}
+#else	/* __xpv */
 		} else if ((x86_feature & X86_SSE2) && ((lgrp_plat_node_cnt *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
 			if ((xrdmsr(MSR_BU_CFG) & 0x02) == 0)
 				opteron_workaround_6323525++;
+#endif	/* __xpv */
 		}
 #else
 		workaround_warning(cpu, 6323525);
@@ -961,7 +1049,11 @@ workaround_errata(struct cpu *cpu)
 #endif
 	}
 
+#ifdef __xpv
+	return (0);
+#else
 	return (missing);
+#endif
 }
 
 void
@@ -1121,8 +1213,10 @@ start_cpu(processorid_t who)
 
 	mach_cpucontext_free(cp, ctx, 0);
 
+#ifndef __xpv
 	if (tsc_gethrtime_enable)
 		tsc_sync_master(who);
+#endif
 
 	if (dtrace_cpu_init != NULL) {
 		/*
@@ -1207,8 +1301,10 @@ start_other_cpus(int cprboot)
 			CPUSET_DEL(mp_cpus, who);
 	}
 
+#if !defined(__xpv)
 	/* Free the space allocated to hold the microcode file */
 	ucode_free();
+#endif
 
 	affinity_clear();
 
@@ -1270,8 +1366,10 @@ mp_startup(void)
 	/* Let cpu0 continue into tsc_sync_master() */
 	CPUSET_ATOMIC_ADD(procset, cp->cpu_id);
 
+#ifndef __xpv
 	if (tsc_gethrtime_enable)
 		tsc_sync_slave();
+#endif
 
 	/*
 	 * Once this was done from assembly, but it's safer here; if
@@ -1284,12 +1382,14 @@ mp_startup(void)
 
 	new_x86_feature = cpuid_pass1(cp);
 
+#ifndef __xpv
 	/*
 	 * We need to Sync MTRR with cpu0's MTRR. We have to do
 	 * this with interrupts disabled.
 	 */
 	if (x86_feature & X86_MTRR)
 		mtrr_sync();
+#endif
 
 	/*
 	 * Set up TSC_AUX to contain the cpuid for this processor
@@ -1368,10 +1468,12 @@ mp_startup(void)
 		(*dtrace_cpu_init)(cp->cpu_id);
 	}
 
+#if !defined(__xpv)
 	/*
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
 	ucode_check(cp);
+#endif
 
 	mutex_exit(&cpu_lock);
 
@@ -1453,13 +1555,21 @@ mp_cpu_stop(struct cpu *cp)
 	extern int cbe_psm_timer_mode;
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
+#ifdef __xpv
+	/*
+	 * We can't offline vcpu0.
+	 */
+	if (cp->cpu_id == 0)
+		return (EBUSY);
+#endif
+
 	/*
 	 * If TIMER_PERIODIC mode is used, CPU0 is the one running it;
 	 * can't stop it.  (This is true only for machines with no TSC.)
 	 */
 
 	if ((cbe_psm_timer_mode == TIMER_PERIODIC) && (cp->cpu_id == 0))
-		return (1);
+		return (EBUSY);
 
 	return (0);
 }

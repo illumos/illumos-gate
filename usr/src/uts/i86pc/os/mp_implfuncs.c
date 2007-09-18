@@ -35,6 +35,11 @@
 #include <sys/psm_modctl.h>
 #include <sys/smp_impldefs.h>
 #include <sys/reboot.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#include <vm/kboot_mmu.h>
+#include <vm/hat_pte.h>
+#endif
 
 /*
  *	External reference functions
@@ -83,11 +88,11 @@ psm_modlinkage_alloc(struct psm_info *infop)
 	struct psm_sw *swp;
 
 	memsz = sizeof (struct modlinkage) + sizeof (struct modlpsm) +
-		sizeof (struct psm_sw);
+	    sizeof (struct psm_sw);
 	mlinkp = (struct modlinkage *)kmem_zalloc(memsz, KM_NOSLEEP);
 	if (!mlinkp) {
 		cmn_err(CE_WARN, "!psm_mod_init: Cannot install %s",
-			infop->p_mach_idstring);
+		    infop->p_mach_idstring);
 		return (NULL);
 	}
 	mlpsmp = (struct modlpsm *)(mlinkp + 1);
@@ -113,7 +118,7 @@ psm_modlinkage_free(struct modlinkage *mlinkp)
 		return;
 
 	(void) kmem_free(mlinkp, (sizeof (struct modlinkage) +
-		sizeof (struct modlpsm) + sizeof (struct psm_sw)));
+	    sizeof (struct modlpsm) + sizeof (struct psm_sw)));
 }
 
 int
@@ -211,7 +216,20 @@ psm_map_phys_new(paddr_t addr, size_t len, int prot)
 		return (0);
 
 	pgoffset = addr & MMU_PAGEOFFSET;
+#ifdef __xpv
+	/*
+	 * If we're dom0, we're starting from a MA. translate that to a PA
+	 * XXPV - what about driver domains???
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		base = pfn_to_pa(xen_assign_pfn(mmu_btop(addr))) |
+		    (addr & MMU_PAGEOFFSET);
+	} else {
+		base = addr;
+	}
+#else
 	base = addr;
+#endif
 	npages = mmu_btopr(len + pgoffset);
 	cvaddr = device_arena_alloc(ptob(npages), VM_NOSLEEP);
 	if (cvaddr == NULL)
@@ -330,7 +348,11 @@ mod_infopsm(struct modlpsm *modl, struct modlinkage *modlp, int *p0)
 	return (0);
 }
 
+#if defined(__xpv)
+#define	DEFAULT_PSM_MODULE	"xpv_psm"
+#else
 #define	DEFAULT_PSM_MODULE	"uppc"
+#endif
 
 static char *
 psm_get_impl_module(int first)
@@ -363,9 +385,8 @@ psm_modload(void)
 	mutex_init(&psmsw_lock, NULL, MUTEX_DEFAULT, NULL);
 	open_mach_list();
 
-	for (this = psm_get_impl_module(1);
-		this != (char *)NULL;
-		this = psm_get_impl_module(0)) {
+	for (this = psm_get_impl_module(1); this != (char *)NULL;
+	    this = psm_get_impl_module(0)) {
 		if (modload("mach", this) == -1)
 			cmn_err(CE_WARN, "!Cannot load psm %s", this);
 	}
@@ -399,7 +420,7 @@ psm_install(void)
 		err = mod_remove_by_name(cswp->psw_infop->p_mach_idstring);
 		if (err)
 			cmn_err(CE_WARN, "%s: mod_remove_by_name failed %d",
-				&machstring[0], err);
+			    &machstring[0], err);
 		mutex_enter(&psmsw_lock);
 	}
 	mutex_exit(&psmsw_lock);

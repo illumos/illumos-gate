@@ -74,6 +74,10 @@
 #include <sys/atomic.h>
 #include "gfx_private.h"
 
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
+
 /*
  * Create a kva mapping for a pa (start..start+size) with
  * the specified cache attributes (mode).
@@ -87,9 +91,19 @@ gfxp_map_kernel_space(uint64_t start, size_t size, uint32_t mode)
 	caddr_t cvaddr;
 	int hat_flags;
 	uint_t hat_attr;
+	pfn_t pfn;
 
 	if (size == 0)
 		return (0);
+
+#ifdef __xpv
+	/*
+	 * The hypervisor doesn't allow r/w mappings to some pages, such as
+	 * page tables, gdt, etc. Detect %cr3 to notify users of this interface.
+	 */
+	if (start == mmu_ptob(mmu_btop(getcr3())))
+		return (0);
+#endif
 
 	if (mode == GFXP_MEMORY_CACHED)
 		hat_attr = HAT_STORECACHING_OK;
@@ -104,8 +118,16 @@ gfxp_map_kernel_space(uint64_t start, size_t size, uint32_t mode)
 	cvaddr = vmem_alloc(heap_arena, ptob(npages), VM_NOSLEEP);
 	if (cvaddr == NULL)
 		return (NULL);
-	hat_devload(kas.a_hat, cvaddr, ptob(npages), base >> PAGESHIFT,
-			PROT_READ|PROT_WRITE|hat_attr, hat_flags);
+
+#ifdef __xpv
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+	pfn = xen_assign_pfn(mmu_btop(base));
+#else
+	pfn = btop(base);
+#endif
+
+	hat_devload(kas.a_hat, cvaddr, ptob(npages), pfn,
+	    PROT_READ|PROT_WRITE|hat_attr, hat_flags);
 	return (cvaddr + pgoffset);
 }
 
@@ -136,7 +158,12 @@ gfxp_unmap_kernel_space(gfxp_kva_t address, size_t size)
 int
 gfxp_va2pa(struct as *as, caddr_t addr, uint64_t *pa)
 {
-	*pa = (uint64_t)(hat_getpfnum(as->a_hat, addr) << PAGESHIFT);
+#ifdef __xpv
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+	*pa = pa_to_ma(pfn_to_pa(hat_getpfnum(as->a_hat, addr)));
+#else
+	*pa = pfn_to_pa(hat_getpfnum(as->a_hat, addr));
+#endif
 	return (0);
 }
 
@@ -222,5 +249,10 @@ gfxp_munlock_user_memory(caddr_t address, size_t length)
 gfx_maddr_t
 gfxp_convert_addr(paddr_t paddr)
 {
+#ifdef __xpv
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+	return (pfn_to_pa(xen_assign_pfn(btop(paddr))));
+#else
 	return ((gfx_maddr_t)paddr);
+#endif
 }

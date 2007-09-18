@@ -413,7 +413,11 @@ packmedia()
 	RELEASE=`basename "$RELEASE"`
 
 	mkdir -p "$MEDIA/$RELEASE/Tools/Boot"
+	mkdir -p "$MEDIA/boot/amd64"
 	mkdir -p "$MEDIA/boot/platform/i86pc/kernel"
+	mkdir -p "$MEDIA/boot/platform/i86pc/kernel/amd64"
+	mkdir -p "$MEDIA/boot/platform/i86xpv/kernel"
+	mkdir -p "$MEDIA/boot/platform/i86xpv/kernel/amd64"
 
 	# archive package databases to conserve memory
 	#
@@ -426,12 +430,6 @@ packmedia()
 
 	rm -rf "$MINIROOT/tmp/root/var/sadm/install"
 	rm -rf "$MINIROOT/tmp/root/var/sadm/pkg"
-
-	# clear out 64 bit support to conserve memory
-	#
-	if [ "$STRIP_AMD64" != false ] ; then
-		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
-	fi
 
 	archive_X "$MEDIA" "$MINIROOT"
 
@@ -447,6 +445,12 @@ packmedia()
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
 	cp "$MINIROOT/platform/i86pc/kernel/unix" \
 	    "$MEDIA/boot/platform/i86pc/kernel/unix"
+	cp "$MINIROOT/platform/i86pc/kernel/amd64/unix" \
+	    "$MEDIA/boot/platform/i86pc/kernel/amd64/unix"
+	cp "$MINIROOT/platform/i86xpv/kernel/unix" \
+	    "$MEDIA/boot/platform/i86xpv/kernel/unix"
+	cp "$MINIROOT/platform/i86xpv/kernel/amd64/unix" \
+	    "$MEDIA/boot/platform/i86xpv/kernel/amd64/unix"
 
 	# copy the install menu to menu.lst so we have a menu
 	# on the install media
@@ -459,6 +463,10 @@ packmedia()
 	(
 		cd "$MEDIA/$RELEASE/Tools/Boot"
 		ln -sf ../../../boot/x86.miniroot
+		ln -sf ../../../boot/platform/i86pc/kernel/unix
+		ln -sf ../../../boot/platform/i86pc/kernel/amd64/unix
+		ln -sf ../../../boot/platform/i86xpv/kernel/unix
+		ln -sf ../../../boot/platform/i86xpv/kernel/amd64/unix
 		ln -sf ../../../boot/multiboot
 		ln -sf ../../../boot/grub/pxegrub
 	)
@@ -669,13 +677,28 @@ trap cleanup EXIT
 case $1 in
 	packmedia)
 		MEDIA="$MR"
-		MR="$MR/boot/x86.miniroot"
+		MR="$MEDIA/boot/x86.miniroot"
 
 		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
 			archive_X "$MEDIA" "$UNPACKED_ROOT"
 		else
 			packmedia "$MEDIA" "$UNPACKED_ROOT"
+			
+			# create the 64-bit miniroot
+			# if the -6 option was passed, don't strip
+			# the 64-bit modules from the 32-bit miniroot
+			MR="$MEDIA/boot/amd64/x86.miniroot"
 			pack
+
+			if [ "$STRIP_AMD64" = false ] ; then
+				ln $MR $MEDIA/boot/x86.miniroot
+			else
+				# create the 32-bit miniroot
+				MR="$MEDIA/boot/x86.miniroot"
+				find "$UNPACKED_ROOT" -name amd64 \
+				    -type directory | xargs rm -rf
+				pack
+			fi
 		fi ;;
 	unpackmedia)
 		MEDIA="$MR"

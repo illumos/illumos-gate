@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,81 +46,19 @@
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_ia32util.h>
+#include <mdb/kvm_isadep.h>
 #include <mdb/mdb_kvm.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb.h>
 
-static int
-kt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
-    const char *rname, mdb_tgt_reg_t *rp)
-{
-	const mdb_tgt_regdesc_t *rdp;
-	kt_data_t *kt = t->t_data;
-
-	if (tid != kt->k_tid)
-		return (set_errno(EMDB_NOREGS));
-
-	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
-		if (strcmp(rname, rdp->rd_name) == 0) {
-			*rp = kt->k_regs->kregs[rdp->rd_num];
-			return (0);
-		}
-	}
-
-	return (set_errno(EMDB_BADREG));
-}
-
-static int
-kt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
-{
-	const mdb_tgt_regdesc_t *rdp;
-	kt_data_t *kt = t->t_data;
-
-	if (tid != kt->k_tid)
-		return (set_errno(EMDB_NOREGS));
-
-	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
-		if (strcmp(rname, rdp->rd_name) == 0) {
-			kt->k_regs->kregs[rdp->rd_num] = (kreg_t)r;
-			return (0);
-		}
-	}
-
-	return (set_errno(EMDB_BADREG));
-}
 
 /*ARGSUSED*/
 int
 kt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	kt_data_t *kt = mdb.m_target->t_data;
-
-	if (argc != 0 || (flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	mdb_ia32_printregs(kt->k_regs);
-
+	mdb_ia32_printregs((const mdb_tgt_gregset_t *)addr);
 	return (DCMD_OK);
-}
-
-/*
- * Return a flag indicating if the specified %eip is likely to have an
- * interrupt frame on the stack.  We do this by comparing the address to the
- * range of addresses spanned by several well-known routines, and looking
- * to see if the next and previous %ebp values are "far" apart.  Sigh.
- */
-int
-mdb_kvm_intrframe(mdb_tgt_t *t, uintptr_t pc, uintptr_t fp,
-    uintptr_t prevfp)
-{
-	kt_data_t *kt = t->t_data;
-
-	return ((pc >= kt->k_intr_sym.st_value &&
-	    (pc < kt->k_intr_sym.st_value + kt->k_intr_sym.st_size)) ||
-	    (pc >= kt->k_trap_sym.st_value &&
-	    (pc < kt->k_trap_sym.st_value + kt->k_trap_sym.st_size)) ||
-	    (fp >= prevfp + 0x2000) || (fp <= prevfp - 0x2000));
 }
 
 static int
@@ -153,13 +90,13 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
 	return (DCMD_OK);
 }
 
-static int
+int
 kt_stack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	return (kt_stack_common(addr, flags, argc, argv, mdb_ia32_kvm_frame));
 }
 
-static int
+int
 kt_stackv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	return (kt_stack_common(addr, flags, argc, argv, mdb_ia32_kvm_framev));
@@ -220,14 +157,39 @@ const mdb_tgt_ops_t kt_ia32_ops = {
 };
 
 void
+kt_regs_to_kregs(struct regs *regs, mdb_tgt_gregset_t *gregs)
+{
+	gregs->kregs[KREG_SAVFP] = regs->r_savfp;
+	gregs->kregs[KREG_SAVPC] = regs->r_savpc;
+	gregs->kregs[KREG_EAX] = regs->r_eax;
+	gregs->kregs[KREG_EBX] = regs->r_ebx;
+	gregs->kregs[KREG_ECX] = regs->r_ecx;
+	gregs->kregs[KREG_EDX] = regs->r_edx;
+	gregs->kregs[KREG_ESI] = regs->r_esi;
+	gregs->kregs[KREG_EDI] = regs->r_edi;
+	gregs->kregs[KREG_EBP] = regs->r_ebp;
+	gregs->kregs[KREG_ESP] = regs->r_esp;
+	gregs->kregs[KREG_CS] = regs->r_cs;
+	gregs->kregs[KREG_DS] = regs->r_ds;
+	gregs->kregs[KREG_SS] = regs->r_ss;
+	gregs->kregs[KREG_ES] = regs->r_es;
+	gregs->kregs[KREG_FS] = regs->r_fs;
+	gregs->kregs[KREG_GS] = regs->r_gs;
+	gregs->kregs[KREG_EFLAGS] = regs->r_efl;
+	gregs->kregs[KREG_EIP] = regs->r_eip;
+	gregs->kregs[KREG_UESP] = regs->r_uesp;
+	gregs->kregs[KREG_TRAPNO] = regs->r_trapno;
+	gregs->kregs[KREG_ERR] = regs->r_err;
+}
+
+void
 kt_ia32_init(mdb_tgt_t *t)
 {
 	kt_data_t *kt = t->t_data;
-
 	panic_data_t pd;
-	kreg_t *kregs;
 	label_t label;
 	struct regs regs;
+	kreg_t *kregs;
 	uintptr_t addr;
 
 	/*
@@ -243,6 +205,8 @@ kt_ia32_init(mdb_tgt_t *t)
 	kt->k_dcmd_stack = kt_stack;
 	kt->k_dcmd_stackv = kt_stackv;
 	kt->k_dcmd_stackr = kt_stackv;
+	kt->k_dcmd_cpustack = kt_cpustack;
+	kt->k_dcmd_cpuregs = kt_cpuregs;
 
 	t->t_ops = &kt_ia32_ops;
 	kregs = kt->k_regs->kregs;
@@ -265,7 +229,7 @@ kt_ia32_init(mdb_tgt_t *t)
 	 * Don't attempt to load any thread or register information if
 	 * we're examining the live operating system.
 	 */
-	if (strcmp(kt->k_symfile, "/dev/ksyms") == 0)
+	if (kt->k_symfile != NULL && strcmp(kt->k_symfile, "/dev/ksyms") == 0)
 		return;
 
 	/*
@@ -299,44 +263,38 @@ kt_ia32_init(mdb_tgt_t *t)
 
 		mdb_free(pdp, pd_size);
 
-	} else if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &addr, sizeof (addr),
+		return;
+	}
+
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &addr, sizeof (addr),
 	    MDB_TGT_OBJ_EXEC, "panic_reg") == sizeof (addr) && addr != NULL &&
 	    mdb_tgt_vread(t, &regs, sizeof (regs), addr) == sizeof (regs)) {
+		kt_regs_to_kregs(&regs, kt->k_regs);
+		return;
+	}
 
-		kregs[KREG_SAVFP] = regs.r_savfp;
-		kregs[KREG_SAVPC] = regs.r_savpc;
-		kregs[KREG_EAX] = regs.r_eax;
-		kregs[KREG_EBX] = regs.r_ebx;
-		kregs[KREG_ECX] = regs.r_ecx;
-		kregs[KREG_EDX] = regs.r_edx;
-		kregs[KREG_ESI] = regs.r_esi;
-		kregs[KREG_EDI] = regs.r_edi;
-		kregs[KREG_EBP] = regs.r_ebp;
-		kregs[KREG_ESP] = regs.r_esp;
-		kregs[KREG_CS] = regs.r_cs;
-		kregs[KREG_DS] = regs.r_ds;
-		kregs[KREG_SS] = regs.r_ss;
-		kregs[KREG_ES] = regs.r_es;
-		kregs[KREG_FS] = regs.r_fs;
-		kregs[KREG_GS] = regs.r_gs;
-		kregs[KREG_EFLAGS] = regs.r_efl;
-		kregs[KREG_EIP] = regs.r_eip;
-		kregs[KREG_UESP] = regs.r_uesp;
-		kregs[KREG_TRAPNO] = regs.r_trapno;
-		kregs[KREG_ERR] = regs.r_err;
+	/*
+	 * If we can't read any panic regs, then our penultimate try is for any
+	 * CPU context that may have been stored (for example, in Xen core
+	 * dumps).  As this can only succeed for kernels with the above
+	 * methods available, we let it over-ride the older panic_regs method,
+	 * which will always manage to read the label_t, even if there's
+	 * nothing useful there.
+	 */
+	if (kt_kvmregs(t, 0, kt->k_regs) == 0)
+		return;
 
-	} else if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &label, sizeof (label),
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &label, sizeof (label),
 	    MDB_TGT_OBJ_EXEC, "panic_regs") == sizeof (label)) {
-
 		kregs[KREG_EDI] = label.val[0];
 		kregs[KREG_ESI] = label.val[1];
 		kregs[KREG_EBX] = label.val[2];
 		kregs[KREG_EBP] = label.val[3];
 		kregs[KREG_ESP] = label.val[4];
 		kregs[KREG_EIP] = label.val[5];
-
-	} else {
-		warn("failed to read panicbuf, panic_reg and panic_regs -- "
-		    "current register set will be unavailable\n");
+		return;
 	}
+
+	warn("failed to read panicbuf, panic_reg and panic_regs -- "
+	    "current register set will be unavailable\n");
 }

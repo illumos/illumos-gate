@@ -79,7 +79,6 @@ static struct apic_io_intr *apic_find_io_intr(int irqno);
 static int apic_find_free_irq(int start, int end);
 static void apic_mark_vector(uchar_t oldvector, uchar_t newvector);
 static void apic_xlate_vector_free_timeout_handler(void *arg);
-static void apic_reprogram_timeout_handler(void *arg);
 static int apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
     int new_bind_cpu, int apicindex, int intin_no, int which_irq,
     struct ioapic_reprogram_data *drep);
@@ -91,8 +90,6 @@ static int apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno,
 static int apic_setup_irq_table(dev_info_t *dip, int irqno,
     struct apic_io_intr *intrp, struct intrspec *ispec, iflag_t *intr_flagp,
     int type);
-static int apic_setup_sci_irq_table(int irqno, uchar_t ipl,
-    iflag_t *intr_flagp);
 static void apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp);
 static void apic_try_deferred_reprogram(int ipl, int vect);
 static void delete_defer_repro_ent(int which_irq);
@@ -239,7 +236,7 @@ lock_t	apic_ioapic_lock;
 
 /*
  * apic_defer_reprogram_lock ensures that only one processor is handling
- * deferred interrupt programming at apic_intr_exit time.
+ * deferred interrupt programming at *_intr_exit time.
  */
 static	lock_t	apic_defer_reprogram_lock;
 
@@ -1333,7 +1330,7 @@ apic_addspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	 * At the end of apic_picinit(), we will call setup_io_intr().
 	 */
 
-	if (!apic_flag)
+	if (!apic_picinit_called)
 		return (PSM_SUCCESS);
 
 	/*
@@ -1457,7 +1454,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (irqptr->airq_mps_intr_index == RESERVE_INDEX)
 		return (PSM_SUCCESS);
 
-	if (!apic_flag) {
+	if (!apic_picinit_called) {
 		/*
 		 * Clear irq_struct. If two devices shared an intpt
 		 * line & 1 unloaded before picinit, we are hosed. But, then
@@ -2964,7 +2961,7 @@ delete_defer_repro_ent(int which_irq)
 
 	if (--apic_reprogram_outstanding == 0) {
 
-		setlvlx = apic_intr_exit;
+		setlvlx = psm_intr_exit_fn();
 	}
 }
 
@@ -3019,7 +3016,7 @@ apic_try_deferred_reprogram(int prev_ipl, int irq)
 	int reproirq, iflag;
 	struct ioapic_reprogram_data *drep;
 
-	apic_intr_exit(prev_ipl, irq);
+	(*psm_intr_exit_fn())(prev_ipl, irq);
 
 	if (!lock_try(&apic_defer_reprogram_lock)) {
 		return;
@@ -3031,7 +3028,7 @@ apic_try_deferred_reprogram(int prev_ipl, int irq)
 	 * It's still possible for the last deferred reprogramming to clear
 	 * between the time we entered this function and the time we get to
 	 * the for loop below.  In that case, *setlvlx will have been set
-	 * back to apic_intr_exit and drep will be NULL. (There's no way to
+	 * back to *_intr_exit and drep will be NULL. (There's no way to
 	 * stop that from happening -- we would need to grab a lock before
 	 * calling *setlvlx, which is neither realistic nor prudent).
 	 */
@@ -3055,10 +3052,10 @@ apic_try_deferred_reprogram(int prev_ipl, int irq)
 	/*
 	 * Either we found a deferred action to perform, or
 	 * we entered this function spuriously, after *setlvlx
-	 * was restored to point to apic_intr_enter.  Any other
+	 * was restored to point to *_intr_exit.  Any other
 	 * permutation is invalid.
 	 */
-	ASSERT(drep != NULL || *setlvlx == apic_intr_exit);
+	ASSERT(drep != NULL || *setlvlx == psm_intr_exit_fn());
 
 	/*
 	 * Though we can't really do anything about errors

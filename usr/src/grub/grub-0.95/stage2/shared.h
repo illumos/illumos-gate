@@ -44,6 +44,9 @@ extern char *grub_scratch_mem;
 # define RAW_SEG(x) (x)
 #endif
 
+/* ZFS will use the top 4 Meg of physical memory (below 4Gig) for sratch */
+#define ZFS_SCRATCH_SIZE 0x400000
+
 #define	MAXNAMELEN	256
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 

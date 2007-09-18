@@ -75,10 +75,16 @@ ushort_t	pcie_device_ctrl_default = \
 		    PCIE_DEVCTL_RO_EN;
 
 /* PCI-Express AER Root Control Register */
+#if defined(__xpv)
+ushort_t	pcie_root_ctrl_default = \
+		    PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN | \
+		    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN;
+#else
 ushort_t	pcie_root_ctrl_default = \
 		    PCIE_ROOTCTL_SYS_ERR_ON_CE_EN | \
 		    PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN | \
 		    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN;
+#endif  /* __xpv */
 
 /* PCI-Express Root Error Command Register */
 ushort_t	pcie_root_error_cmd_default = \
@@ -429,6 +435,7 @@ pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
 	}
 }
 
+/* ARGSUSED */
 static void
 pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
     uint16_t cap_ptr, uint16_t aer_ptr)
@@ -443,6 +450,19 @@ pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 	    ddi_driver_name(child), rc_ctl,
 	    pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2));
 
+#if defined(__xpv)
+	/*
+	 * When we're booted under the hypervisor we won't receive MSI's, so
+	 * to ensure that uncorrectable errors aren't ignored we set the
+	 * SERR_FAT and SERR_NONFAT bits in the Root Control Register.
+	 */
+	rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
+	pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
+	    rc_ctl | pcie_root_ctrl_default);
+	PCIE_ERROR_DBG("%s: PCIe Root Control Register=0x%x->0x%x\n",
+	    ddi_driver_name(child), rc_ctl,
+	    pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL));
+#else
 	rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
 	    pcie_serr_disable_flag ? (rc_ctl & ~pcie_root_ctrl_default) :
@@ -469,6 +489,7 @@ pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 	if (rc_ctl & PCIE_AER_CTL_ECRC_CHECK_CAP)
 		rc_ctl |= PCIE_AER_CTL_ECRC_CHECK_ENA;
 	pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_CTL, rc_ctl);
+#endif  /* __xpv */
 }
 
 /*
@@ -659,7 +680,7 @@ pcie_error_find_cap_reg(ddi_acc_handle_t cfg_hdl, uint8_t cap_id)
 			return (PCI_CAP_NEXT_PTR_NULL);
 
 		caps_ptr = P2ALIGN(pci_config_get8(cfg_hdl,
-				(caps_ptr + PCI_CAP_NEXT_PTR)), 4);
+		    (caps_ptr + PCI_CAP_NEXT_PTR)), 4);
 	}
 
 	return (caps_ptr);

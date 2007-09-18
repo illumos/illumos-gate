@@ -54,6 +54,17 @@ struct cpuid_info;
 struct cmi;
 struct cpu_ucode_info;
 
+/*
+ * A note about the hypervisor affinity bits: a one bit in the affinity mask
+ * means the corresponding event channel is allowed to be serviced
+ * by this cpu.
+ */
+struct xen_evt_data {
+	ulong_t		pending_sel[PIL_MAX + 1]; /* event array selectors */
+	ulong_t		pending_evts[PIL_MAX + 1][sizeof (ulong_t) * 8];
+	ulong_t		evt_affinity[sizeof (ulong_t) * 8]; /* service on cpu */
+};
+
 struct	machcpu {
 	/* define all the x_call stuff */
 	volatile int	xc_pend[X_CALL_LEVELS];
@@ -101,9 +112,10 @@ struct	machcpu {
 #endif
 
 	struct vcpu_info *mcpu_vcpu_info;
-	uint64_t	mcpu_gdtpa;	/* xen: GDT in physical address */
+	uint64_t	mcpu_gdtpa;	/* hypervisor: GDT physical address */
 
-	uint16_t mcpu_intr_pending;	/* xen: pending interrupt levels */
+	uint16_t mcpu_intr_pending;	/* hypervisor: pending intrpt levels */
+	struct xen_evt_data *mcpu_evt_pend; /* hypervisor: pending events */
 
 	volatile uint32_t *mcpu_mwait;	/* MONITOR/MWAIT buffer */
 

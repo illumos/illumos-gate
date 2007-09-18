@@ -48,6 +48,7 @@ extern void vga_getpos(int *, int *);
 extern void vga_clear(int);
 extern void vga_scroll(int);
 extern void vga_drawc(int, int);
+extern void vga_cursor_display(void);
 
 #ifdef __cplusplus
 }

@@ -14748,11 +14748,12 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 void
 ip_rput(queue_t *q, mblk_t *mp)
 {
-	ill_t		*ill = (ill_t *)q->q_ptr;
-	ip_stack_t	*ipst = ill->ill_ipst;
+	ill_t	*ill;
 	union DL_primitives *dl;
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_rput_start: q %p", q);
+
+	ill = (ill_t *)q->q_ptr;
 
 	if (ill->ill_state_flags & (ILL_CONDEMNED | ILL_LL_SUBNET_PENDING)) {
 		/*
@@ -14774,73 +14775,75 @@ ip_rput(queue_t *q, mblk_t *mp)
 		}
 	}
 
-	/*
-	 * if db_ref > 1 then copymsg and free original. Packet may be
-	 * changed and we do not want the other entity who has a reference to
-	 * this message to trip over the changes. This is a blind change because
-	 * trying to catch all places that might change the packet is too
-	 * difficult.
-	 *
-	 * This corresponds to the fast path case, where we have a chain of
-	 * M_DATA mblks.  We check the db_ref count of only the 1st data block
-	 * in the mblk chain. There doesn't seem to be a reason why a device
-	 * driver would send up data with varying db_ref counts in the mblk
-	 * chain. In any case the Fast path is a private interface, and our
-	 * drivers don't do such a thing. Given the above assumption, there is
-	 * no need to walk down the entire mblk chain (which could have a
-	 * potential performance problem)
-	 */
-	if (mp->b_datap->db_ref > 1) {
-		mblk_t  *mp1;
-		boolean_t adjusted = B_FALSE;
-		IP_STAT(ipst, ip_db_ref);
-
-		/*
-		 * The IP_RECVSLLA option depends on having the link layer
-		 * header. First check that:
-		 * a> the underlying device is of type ether, since this
-		 * option is currently supported only over ethernet.
-		 * b> there is enough room to copy over the link layer header.
-		 *
-		 * Once the checks are done, adjust rptr so that the link layer
-		 * header will be copied via copymsg. Note that, IFT_ETHER may
-		 * be returned by some non-ethernet drivers but in this case the
-		 * second check will fail.
-		 */
-		if (ill->ill_type == IFT_ETHER &&
-		    (mp->b_rptr - mp->b_datap->db_base) >=
-		    sizeof (struct ether_header)) {
-			mp->b_rptr -= sizeof (struct ether_header);
-			adjusted = B_TRUE;
-		}
-		mp1 = copymsg(mp);
-		if (mp1 == NULL) {
-			mp->b_next = NULL;
-			/* clear b_prev - used by ip_mroute_decap */
-			mp->b_prev = NULL;
-			freemsg(mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-			    "ip_rput_end: q %p (%S)", q, "copymsg");
-			return;
-		}
-		if (adjusted) {
-			/*
-			 * Copy is done. Restore the pointer in the _new_ mblk
-			 */
-			mp1->b_rptr += sizeof (struct ether_header);
-		}
-		/* Copy b_prev - used by ip_mroute_decap */
-		mp1->b_prev = mp->b_prev;
-		mp->b_prev = NULL;
-		freemsg(mp);
-		mp = mp1;
-	}
-
 	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 	    "ip_rput_end: q %p (%S)", q, "end");
 
 	ip_input(ill, NULL, mp, NULL);
+}
+
+static mblk_t *
+ip_fix_dbref(ill_t *ill, mblk_t *mp)
+{
+	mblk_t *mp1;
+	boolean_t adjusted = B_FALSE;
+	ip_stack_t *ipst = ill->ill_ipst;
+
+	IP_STAT(ipst, ip_db_ref);
+	/*
+	 * The IP_RECVSLLA option depends on having the
+	 * link layer header. First check that:
+	 * a> the underlying device is of type ether,
+	 * since this option is currently supported only
+	 * over ethernet.
+	 * b> there is enough room to copy over the link
+	 * layer header.
+	 *
+	 * Once the checks are done, adjust rptr so that
+	 * the link layer header will be copied via
+	 * copymsg. Note that, IFT_ETHER may be returned
+	 * by some non-ethernet drivers but in this case
+	 * the second check will fail.
+	 */
+	if (ill->ill_type == IFT_ETHER &&
+	    (mp->b_rptr - mp->b_datap->db_base) >=
+	    sizeof (struct ether_header)) {
+		mp->b_rptr -= sizeof (struct ether_header);
+		adjusted = B_TRUE;
+	}
+	mp1 = copymsg(mp);
+
+	if (mp1 == NULL) {
+		mp->b_next = NULL;
+		/* clear b_prev - used by ip_mroute_decap */
+		mp->b_prev = NULL;
+		freemsg(mp);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
+	}
+
+	if (adjusted) {
+		/*
+		 * Copy is done. Restore the pointer in
+		 * the _new_ mblk
+		 */
+		mp1->b_rptr += sizeof (struct ether_header);
+	}
+
+	/* Copy b_prev - used by ip_mroute_decap */
+	mp1->b_prev = mp->b_prev;
+	mp->b_prev = NULL;
+
+	/* preserve the hardware checksum flags and data, if present */
+	if (DB_CKSUMFLAGS(mp) != 0) {
+		DB_CKSUMFLAGS(mp1) = DB_CKSUMFLAGS(mp);
+		DB_CKSUMSTART(mp1) = DB_CKSUMSTART(mp);
+		DB_CKSUMSTUFF(mp1) = DB_CKSUMSTUFF(mp);
+		DB_CKSUMEND(mp1) = DB_CKSUMEND(mp);
+		DB_CKSUM16(mp1) = DB_CKSUM16(mp);
+	}
+
+	freemsg(mp);
+	return (mp1);
 }
 
 /*
@@ -14909,8 +14912,34 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		prev_dst = dst;
 
 		/*
+		 * if db_ref > 1 then copymsg and free original. Packet
+		 * may be changed and we do not want the other entity
+		 * who has a reference to this message to trip over the
+		 * changes. This is a blind change because trying to
+		 * catch all places that might change the packet is too
+		 * difficult.
+		 *
+		 * This corresponds to the fast path case, where we have
+		 * a chain of M_DATA mblks.  We check the db_ref count
+		 * of only the 1st data block in the mblk chain. There
+		 * doesn't seem to be a reason why a device driver would
+		 * send up data with varying db_ref counts in the mblk
+		 * chain. In any case the Fast path is a private
+		 * interface, and our drivers don't do such a thing.
+		 * Given the above assumption, there is no need to walk
+		 * down the entire mblk chain (which could have a
+		 * potential performance problem)
+		 */
+
+		if (DB_REF(mp) > 1) {
+			if ((mp = ip_fix_dbref(ill, mp)) == NULL)
+				continue;
+		}
+
+		/*
 		 * Check and align the IP header.
 		 */
+		first_mp = mp;
 		if (DB_TYPE(mp) == M_DATA) {
 			dmp = mp;
 		} else if (DB_TYPE(mp) == M_PROTO &&

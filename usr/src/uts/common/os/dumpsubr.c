@@ -78,6 +78,7 @@ static u_offset_t dumpvp_limit;	/* maximum write offset */
 char		*dumppath;	/* pathname of dump device */
 int		dump_timeout = 120; /* timeout for dumping page during panic */
 int		dump_timeleft;	/* portion of dump_timeout remaining */
+int		dump_ioerr;	/* dump i/o error */
 
 #ifdef DEBUG
 int		dumpfaildebug = 1;	/* enter debugger if dump fails */
@@ -88,7 +89,6 @@ int		dumpfaildebug = 0;
 static ulong_t	*dump_bitmap;	/* bitmap for marking pages to dump */
 static pgcnt_t	dump_bitmapsize; /* size of bitmap */
 static pid_t	*dump_pids;	/* list of process IDs at dump time */
-static int	dump_ioerr;	/* dump i/o error */
 static offset_t	dumpvp_off;	/* current dump device offset */
 static char	*dump_cmap;	/* VA for dump compression mapping */
 static char	*dumpbuf_cur, *dumpbuf_start, *dumpbuf_end;
@@ -151,7 +151,6 @@ static void
 dumphdr_init(void)
 {
 	pgcnt_t npages = 0;
-	struct memlist *mp;
 
 	ASSERT(MUTEX_HELD(&dump_lock));
 
@@ -173,8 +172,7 @@ dumphdr_init(void)
 		dump_pids = kmem_alloc(v.v_proc * sizeof (pid_t), KM_SLEEP);
 	}
 
-	for (mp = phys_install; mp != NULL; mp = mp->next)
-		npages += mp->size >> PAGESHIFT;
+	npages = num_phys_pages();
 
 	if (dump_bitmapsize != npages) {
 		void *map = kmem_alloc(BT_SIZEOFMAP(npages), KM_SLEEP);

@@ -42,211 +42,53 @@ extern "C" {
 #include <sys/memnode.h>
 
 /*
- * WARNING: vm_dep.h is included by files in common. As such, macros
- * dependent upon PTE36 such as LARGEPAGESIZE cannot be used in this file.
+ * WARNING: vm_dep.h is included by files in common.
  */
 
 #define	GETTICK()	tsc_read()
 
-/* memranges in descending order */
-extern pfn_t		*memranges;
+extern uint_t page_create_update_flags_x86(uint_t);
 
-#define	MEMRANGEHI(mtype)						\
-	((mtype > 0) ? memranges[mtype - 1] - 1: physmax)
-#define	MEMRANGELO(mtype)	(memranges[mtype])
+extern size_t plcnt_sz(size_t);
+#define	PLCNT_SZ(ctrs_sz) (ctrs_sz = plcnt_sz(ctrs_sz))
 
-#define	MTYPE_FREEMEM(mt)						\
-	(mnoderanges[mt].mnr_mt_clpgcnt +				\
-	    mnoderanges[mt].mnr_mt_flpgcnt +				\
-	    mnoderanges[mt].mnr_mt_lgpgcnt)
+extern caddr_t plcnt_init(caddr_t);
+#define	PLCNT_INIT(addr) (addr = plcnt_init(addr))
 
-/*
- * combined memory ranges from mnode and memranges[] to manage single
- * mnode/mtype dimension in the page lists.
- */
-typedef struct {
-	pfn_t	mnr_pfnlo;
-	pfn_t	mnr_pfnhi;
-	int	mnr_mnode;
-	int	mnr_memrange;		/* index into memranges[] */
-	/* maintain page list stats */
-	pgcnt_t	mnr_mt_pgmax;		/* mnode/mtype max page cnt */
-	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
-	pgcnt_t	mnr_mt_flpgcnt;		/* free list cnt - small pages */
-	pgcnt_t	mnr_mt_lgpgcnt;		/* free list cnt - large pages */
-#ifdef DEBUG
-	struct mnr_mts {		/* mnode/mtype szc stats */
-		pgcnt_t	mnr_mts_pgcnt;
-		int	mnr_mts_colors;
-		pgcnt_t *mnr_mtsc_pgcnt;
-	} 	*mnr_mts;
-#endif
-} mnoderange_t;
-
-#ifdef DEBUG
-#define	PLCNT_SZ(ctrs_sz) {						\
-	int	szc, colors;						\
-	ctrs_sz += mnoderangecnt * sizeof (struct mnr_mts) *		\
-	    mmu_page_sizes;						\
-	for (szc = 0; szc < mmu_page_sizes; szc++) {			\
-		colors = page_get_pagecolors(szc);			\
-		ctrs_sz += mnoderangecnt * sizeof (pgcnt_t) * colors;	\
-	}								\
-}
-
-#define	PLCNT_INIT(addr) {						\
-	int	mt, szc, colors;					\
-	for (mt = 0; mt < mnoderangecnt; mt++) {			\
-		mnoderanges[mt].mnr_mts = (struct mnr_mts *)addr;	\
-		addr += (sizeof (struct mnr_mts) * mmu_page_sizes);	\
-		for (szc = 0; szc < mmu_page_sizes; szc++) {		\
-			colors = page_get_pagecolors(szc);		\
-			mnoderanges[mt].mnr_mts[szc].mnr_mts_colors =	\
-			    colors;					\
-			mnoderanges[mt].mnr_mts[szc].mnr_mtsc_pgcnt =	\
-			    (pgcnt_t *)addr;				\
-			addr += (sizeof (pgcnt_t) * colors);		\
-		}							\
-	}								\
-}
-#define	PLCNT_DO(pp, mtype, szc, cnt, flags) {				\
-	int	bin = PP_2_BIN(pp);					\
-	if (flags & PG_CACHE_LIST)					\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_clpgcnt, cnt);				\
-	else if (szc)							\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_lgpgcnt, cnt);				\
-	else								\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_flpgcnt, cnt);				\
-	atomic_add_long(&mnoderanges[mtype].mnr_mts[szc].		\
-	    mnr_mts_pgcnt, cnt);					\
-	atomic_add_long(&mnoderanges[mtype].mnr_mts[szc].		\
-	    mnr_mtsc_pgcnt[bin], cnt);					\
-}
-#else
-#define	PLCNT_SZ(ctrs_sz)
-#define	PLCNT_INIT(base)
-#define	PLCNT_DO(pp, mtype, szc, cnt, flags) {				\
-	if (flags & PG_CACHE_LIST)					\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_clpgcnt, cnt);				\
-	else if (szc)							\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_lgpgcnt, cnt);				\
-	else								\
-		atomic_add_long(&mnoderanges[mtype].			\
-		    mnr_mt_flpgcnt, cnt);				\
-}
-#endif
-
-#define	PLCNT_INCR(pp, mnode, mtype, szc, flags) {			\
-	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
-	ASSERT(mtype == PP_2_MTYPE(pp));				\
-	if (physmax4g && mtype <= mtype4g)				\
-		atomic_add_long(&freemem4g, cnt);			\
-	PLCNT_DO(pp, mtype, szc, cnt, flags);				\
-}
-
-#define	PLCNT_DECR(pp, mnode, mtype, szc, flags) {			\
-	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
-	ASSERT(mtype == PP_2_MTYPE(pp));				\
-	if (physmax4g && mtype <= mtype4g)				\
-		atomic_add_long(&freemem4g, cnt);			\
-	PLCNT_DO(pp, mtype, szc, cnt, flags);				\
-}
+extern void plcnt_inc_dec(page_t *, int, int, long, int);
+#define	PLCNT_INCR(pp, mnode, mtype, szc, flags)			\
+	plcnt_inc_dec(pp, mtype, szc, 1l << PAGE_BSZS_SHIFT(szc), flags)
+#define	PLCNT_DECR(pp, mnode, mtype, szc, flags)			\
+	plcnt_inc_dec(pp, mtype, szc, -1l << PAGE_BSZS_SHIFT(szc), flags)
 
 /*
- * macros to update page list max counts.  no-op on x86.
+ * macro to update page list max counts.  no-op on x86.
  */
 #define	PLCNT_XFER_NORELOC(pp)
 
 #define	PLCNT_MODIFY_MAX(pfn, cnt)	mtype_modify_max(pfn, (pgcnt_t)cnt)
-
-extern mnoderange_t	*mnoderanges;
-extern int		mnoderangecnt;
-extern int		mtype4g;
-
-/*
- * 4g memory management variables for systems with more than 4g of memory:
- *
- * physical memory below 4g is required for 32bit dma devices and, currently,
- * for kmem memory. On systems with more than 4g of memory, the pool of memory
- * below 4g can be depleted without any paging activity given that there is
- * likely to be sufficient memory above 4g.
- *
- * physmax4g is set true if the largest pfn is over 4g. The rest of the
- * 4g memory management code is enabled only when physmax4g is true.
- *
- * maxmem4g is the count of the maximum number of pages on the page lists
- * with physical addresses below 4g. It can be a lot less then 4g given that
- * BIOS may reserve large chunks of space below 4g for hot plug pci devices,
- * agp aperture etc.
- *
- * freemem4g maintains the count of the number of available pages on the
- * page lists with physical addresses below 4g.
- *
- * DESFREE4G specifies the desired amount of below 4g memory. It defaults to
- * 6% (desfree4gshift = 4) of maxmem4g.
- *
- * RESTRICT4G_ALLOC returns true if freemem4g falls below DESFREE4G
- * and the amount of physical memory above 4g is greater than freemem4g.
- * In this case, page_get_* routines will restrict below 4g allocations
- * for requests that don't specifically require it.
- */
-
-extern int		physmax4g;
-extern pgcnt_t		maxmem4g;
-extern pgcnt_t		freemem4g;
-extern int		lotsfree4gshift;
-extern int		desfree4gshift;
-#define	LOTSFREE4G	(maxmem4g >> lotsfree4gshift)
-#define	DESFREE4G	(maxmem4g >> desfree4gshift)
-
-#define	RESTRICT4G_ALLOC					\
-	(physmax4g && (freemem4g < DESFREE4G) && ((freemem4g << 1) < freemem))
-
-/*
- * 16m memory management:
- *
- * reserve some amount of physical memory below 16m for legacy devices.
- *
- * RESTRICT16M_ALLOC returns true if an there are sufficient free pages above
- * 16m or if the 16m pool drops below DESFREE16M.
- *
- * In this case, general page allocations via page_get_{free,cache}list
- * routines will be restricted from allocating from the 16m pool. Allocations
- * that require specific pfn ranges (page_get_anylist) and PG_PANIC allocations
- * are not restricted.
- */
-
-#define	FREEMEM16M	MTYPE_FREEMEM(0)
-#define	DESFREE16M	desfree16m
-#define	RESTRICT16M_ALLOC(freemem, pgcnt, flags)		\
-	((freemem != 0) && ((flags & PG_PANIC) == 0) &&		\
-	    ((freemem >= (FREEMEM16M)) ||			\
-	    (FREEMEM16M  < (DESFREE16M + pgcnt))))
-extern pgcnt_t		desfree16m;
-
-extern int		restricted_kmemalloc;
-extern int		memrange_num(pfn_t);
-extern int		pfn_2_mtype(pfn_t);
-extern int		mtype_func(int, int, uint_t);
-extern void		mtype_modify_max(pfn_t, long);
-extern int		mnode_pgcnt(int);
-extern int		mnode_range_cnt(int);
-
-#define	NUM_MEM_RANGES	4		/* memory range types */
+extern int memrange_num(pfn_t);
+extern int pfn_2_mtype(pfn_t);
+extern int mtype_func(int, int, uint_t);
+extern void mtype_modify_max(pfn_t, long);
+extern int mnode_pgcnt(int);
+extern int mnode_range_cnt(int);
 
 /*
  * candidate counters in vm_pagelist.c are indexed by color and range
  */
+#define	NUM_MEM_RANGES	4		/* memory range types */
 #define	MAX_MNODE_MRANGES	NUM_MEM_RANGES
 #define	MNODE_RANGE_CNT(mnode)	mnode_range_cnt(mnode)
-#define	MNODE_MAX_MRANGE(mnode)	(memrange_num(mem_node_config[mnode].physbase))
+#define	MNODE_MAX_MRANGE(mnode)	memrange_num(mem_node_config[mnode].physbase)
+
+/*
+ * This was really badly defined, it implicitly uses mnode_maxmrange[]
+ * which is a static in vm_pagelist.c
+ */
+extern int mtype_2_mrange(int);
 #define	MTYPE_2_MRANGE(mnode, mtype)	\
-	(mnode_maxmrange[mnode] - mnoderanges[mtype].mnr_memrange)
+	(mnode_maxmrange[mnode] - mtype_2_mrange(mtype))
 
 /*
  * Per page size free lists. Allocated dynamically.
@@ -366,7 +208,7 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
 #define	PP_2_MEM_NODE(pp)	(PFN_2_MEM_NODE(pp->p_pagenum))
-#define	PP_2_MTYPE(pp)		(pfn_2_mtype(pfn_to_mfn(pp->p_pagenum)))
+#define	PP_2_MTYPE(pp)		(pfn_2_mtype(pp->p_pagenum))
 #define	PP_2_SZC(pp)		(pp->p_szc)
 
 #define	SZCPAGES(szc)		(1 << PAGE_BSZS_SHIFT(szc))
@@ -402,76 +244,9 @@ uint_t	page_list_walk_next_bin(uchar_t szc, uint_t bin,
 extern struct cpu	cpus[];
 #define	CPU0		cpus
 
-#if defined(__amd64)
-
-/*
- * set the mtype range (called from page_get_{free,cache}list)
- *   - set range to above 4g if the system has more than 4g of memory and the
- *   amount of memory below 4g runs low. If not, set range to above 16m if
- *   16m threshold is reached otherwise set range to all of memory
- *   starting from the hi pfns.
- *
- * page_get_anylist gets its mtype range from the specified ddi_dma_attr_t.
- */
-#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz) {			\
-	mtype = mnoderangecnt - 1;					\
-	if (RESTRICT4G_ALLOC) {						\
-		VM_STAT_ADD(vmm_vmstats.restrict4gcnt);			\
-		/* here only for > 4g systems */			\
-		flags |= PGI_MT_RANGE4G;				\
-	} else if (RESTRICT16M_ALLOC(freemem, btop(pgsz), flags)) {	\
-		flags |= PGI_MT_RANGE16M;				\
-	} else {							\
-		VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);		\
-		VM_STAT_COND_ADD((flags & PG_PANIC),			\
-		    vmm_vmstats.pgpanicalloc);				\
-		flags |= PGI_MT_RANGE0;					\
-	}								\
-}
-
-#elif defined(__i386)
-
-/*
- * set the mtype range
- *   - kmem requests needs to be below 4g if restricted_kmemalloc is set.
- *   - for non kmem requests, set range to above 4g if the amount of memory
- *   below 4g runs low.
- */
-
-#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz) {			\
-	if (restricted_kmemalloc && VN_ISKAS(vp) &&			\
-	    (caddr_t)(vaddr) >= kernelheap &&				\
-	    (caddr_t)(vaddr) < ekernelheap) {				\
-		ASSERT(physmax4g);					\
-		mtype = mtype4g;					\
-		if (RESTRICT16M_ALLOC(freemem4g - btop(pgsz),		\
-		    btop(pgsz), flags)) {				\
-			flags |= PGI_MT_RANGE16M;			\
-		} else {						\
-			VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);	\
-			VM_STAT_COND_ADD((flags & PG_PANIC),		\
-			    vmm_vmstats.pgpanicalloc);			\
-			flags |= PGI_MT_RANGE0;				\
-		}							\
-	} else {							\
-		mtype = mnoderangecnt - 1;				\
-		if (RESTRICT4G_ALLOC) {					\
-			VM_STAT_ADD(vmm_vmstats.restrict4gcnt);		\
-			/* here only for > 4g systems */		\
-			flags |= PGI_MT_RANGE4G;			\
-		} else if (RESTRICT16M_ALLOC(freemem, btop(pgsz),	\
-		    flags)) {						\
-			flags |= PGI_MT_RANGE16M;			\
-		} else {						\
-			VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);	\
-			VM_STAT_COND_ADD((flags & PG_PANIC),		\
-			    vmm_vmstats.pgpanicalloc);			\
-			flags |= PGI_MT_RANGE0;				\
-		}							\
-	}								\
-}
-
-#endif	/* __i386 */
+extern int mtype_init(vnode_t *, caddr_t, uint_t *, size_t);
+#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz)		\
+	(mtype = mtype_init(vp, vaddr, &(flags), pgsz))
 
 /*
  * macros to loop through the mtype range (page_get_mnode_{free,cache,any}list,
@@ -495,24 +270,15 @@ extern struct cpu	cpus[];
 	}								\
 }
 
-/* mtype init for page_get_replacement_page */
-
-#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt) {		\
-	mtype = mnoderangecnt - 1;					\
-	if (RESTRICT16M_ALLOC(freemem, pgcnt, flags)) {			\
-		flags |= PGI_MT_RANGE16M;				\
-	} else {							\
-		VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);		\
-		flags |= PGI_MT_RANGE0;					\
-	}								\
-}
+extern int mtype_pgr_init(int *, page_t *, int, pgcnt_t);
+#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt)			\
+	(mtype = mtype_pgr_init(&flags, pp, mnode, pgcnt))
 
 #define	MNODE_PGCNT(mnode)		mnode_pgcnt(mnode)
 
+extern void mnodetype_2_pfn(int, int, pfn_t *, pfn_t *);
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\
-	ASSERT(mnoderanges[mtype].mnr_mnode == mnode);			\
-	pfnlo = mnoderanges[mtype].mnr_pfnlo;				\
-	pfnhi = mnoderanges[mtype].mnr_pfnhi;
+	mnodetype_2_pfn(mnode, mtype, &pfnlo, &pfnhi)
 
 #define	PC_BIN_MUTEX(mnode, bin, flags) ((flags & PG_FREE_LIST) ?	\
 	&fpc_mutex[(bin) & (NPC_MUTEX - 1)][mnode] :			\
@@ -596,10 +362,11 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
  * PGI range flags - should not overlap PGI flags
  */
 #define	PGI_MT_RANGE0	0x1000000	/* mtype range to 0 */
-#define	PGI_MT_RANGE16M	0x2000000	/* mtype range to 16m */
+#define	PGI_MT_RANGE16M 0x2000000	/* mtype range to 16m */
 #define	PGI_MT_RANGE4G	0x4000000	/* mtype range to 4g */
 #define	PGI_MT_NEXT	0x8000000	/* get next mtype */
 #define	PGI_MT_RANGE	(PGI_MT_RANGE0 | PGI_MT_RANGE16M | PGI_MT_RANGE4G)
+
 
 /*
  * Maximum and default values for user heap, stack, private and shared

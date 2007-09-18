@@ -33,6 +33,7 @@ HDRS=  \
 	asm_linkage.h	\
 	kdi_regs.h	\
 	machtypes.h	\
+	privmregs.h	\
 	privregs.h	\
 	psw.h		\
 	pte.h		\

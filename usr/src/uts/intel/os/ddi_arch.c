@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,11 +97,11 @@ i_ddi_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 #ifdef	DDI_MAP_DEBUG
 	cmn_err(CE_CONT,
-		"i_ddi_bus_map: <%s,%s> <0x%x, 0x%x, 0x%d> "
-		"offset %d len %d handle 0x%x\n",
-		ddi_get_name(dip), ddi_get_name(rdip),
-		rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
-		offset, len, mp->map_handlep);
+	    "i_ddi_bus_map: <%s,%s> <0x%x, 0x%x, 0x%d> "
+	    "offset %d len %d handle 0x%x\n",
+	    ddi_get_name(dip), ddi_get_name(rdip),
+	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
+	    offset, len, mp->map_handlep);
 #endif	/* DDI_MAP_DEBUG */
 
 	/*
@@ -138,11 +137,11 @@ i_ddi_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 #ifdef	DDI_MAP_DEBUG
 	cmn_err(CE_CONT,
-		"               <%s,%s> <0x%x, 0x%x, 0x%d> "
-		"offset %d len %d\n",
-		ddi_get_name(dip), ddi_get_name(rdip),
-		rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
-		offset, len);
+	    "               <%s,%s> <0x%x, 0x%x, 0x%d> "
+	    "offset %d len %d\n",
+	    ddi_get_name(dip), ddi_get_name(rdip),
+	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
+	    offset, len);
 #endif	/* DDI_MAP_DEBUG */
 
 	/*
@@ -318,9 +317,9 @@ void
 drv_usecwait(clock_t count)
 {
 	int tens = 0;
-	extern int tsc_gethrtime_initted;
+	extern int gethrtime_hires;
 
-	if (tsc_gethrtime_initted) {
+	if (gethrtime_hires) {
 		hrtime_t start, end;
 		hrtime_t waittime;
 
@@ -329,8 +328,8 @@ drv_usecwait(clock_t count)
 			/* in case there are callers depending on the */
 			/* old behaviour */
 			waittime = ((count > 10) ?
-				(((hrtime_t)count / 10) + 1) : 1) *
-				10 * (NANOSEC / MICROSEC);
+			    (((hrtime_t)count / 10) + 1) : 1) *
+			    10 * (NANOSEC / MICROSEC);
 		} else  {
 			waittime = (hrtime_t)count * (NANOSEC / MICROSEC);
 		}

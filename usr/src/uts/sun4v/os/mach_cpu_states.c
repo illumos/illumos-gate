@@ -307,7 +307,7 @@ panic_idle(void)
 	membar_stld();
 
 	for (;;)
-		;
+		continue;
 }
 
 /*
@@ -531,7 +531,7 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 
 	uint_t reason = pstate->ptl1_regs.ptl1_gregs[0].ptl1_g1;
 	uint_t tl = pstate->ptl1_regs.ptl1_trap_regs[0].ptl1_tl;
-	struct trap_info ti = { 0 };
+	struct panic_trap_info ti = { 0 };
 
 	/*
 	 * Use trap_info for a place holder to call panic_savetrap() and
@@ -1045,7 +1045,7 @@ kdi_tickwait(clock_t nticks)
 	clock_t endtick = gettick() + nticks;
 
 	while (gettick() < endtick)
-		;
+		continue;
 }
 
 static void
@@ -1456,10 +1456,9 @@ mach_set_soft_state(uint64_t state, uint64_t *string_ra)
 
 	if (soft_state_initialized && *string_ra) {
 		rc = hv_soft_state_set(state, *string_ra);
-
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN,
-			    "hv_soft_state_set returned %ld\n", rc);
+			cmn_err(CE_WARN, "hv_soft_state_set returned %ld\n",
+			    rc);
 		}
 	}
 }
@@ -1472,8 +1471,8 @@ mach_get_soft_state(uint64_t *state, uint64_t *string_ra)
 	if (soft_state_initialized && *string_ra) {
 		rc = hv_soft_state_get(*string_ra, state);
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN,
-			    "hv_soft_state_get returned %ld\n", rc);
+			cmn_err(CE_WARN, "hv_soft_state_get returned %ld\n",
+			    rc);
 			*state = -1;
 		}
 	}

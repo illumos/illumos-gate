@@ -1,0 +1,1078 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/* derived from netbsd's xen_machdep.c 1.1.2.1 */
+
+/*
+ *
+ * Copyright (c) 2004 Christian Limpach.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. This section intentionally left blank.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * Section 3 of the above license was updated in response to bug 6379571.
+ */
+
+#include <sys/types.h>
+#include <sys/cmn_err.h>
+#include <sys/trap.h>
+#include <sys/segments.h>
+#include <sys/sunddi.h>		/* for ddi_strtoul */
+#include <sys/hypervisor.h>
+#include <sys/xen_mmu.h>
+#include <sys/machsystm.h>
+#include <sys/promif.h>
+#include <sys/bootconf.h>
+#include <sys/bootinfo.h>
+#include <sys/cpr.h>
+#include <sys/taskq.h>
+#include <sys/uadmin.h>
+#include <sys/evtchn_impl.h>
+#include <sys/archsystm.h>
+#include <xen/sys/xenbus_impl.h>
+#include <sys/mach_mmu.h>
+#include <vm/hat_i86.h>
+#include <sys/gnttab.h>
+#include <sys/reboot.h>
+#include <sys/stack.h>
+#include <sys/clock.h>
+#include <sys/bitmap.h>
+#include <sys/processor.h>
+#include <sys/xen_errno.h>
+#include <sys/xpv_panic.h>
+#include <sys/smp_impldefs.h>
+#include <sys/cpu.h>
+#include <sys/balloon_impl.h>
+#include <sys/ddi.h>
+
+/*
+ * Hypervisor-specific utility routines - these can be invoked from the
+ * normal control flow.  It might be useful to partition these into
+ * different files, but let's see how it looks before we get too
+ * carried away with that idea.
+ */
+
+/*
+ * In the current absence of any useful way to debug domains that are hung
+ * whilst suspending, we have a more clumsy approach...
+ */
+#ifdef DEBUG
+#define	SUSPEND_DEBUG if (xen_suspend_debug) xen_printf
+#else
+#define	SUSPEND_DEBUG(...)
+#endif
+
+int cpr_debug;
+cpuset_t cpu_suspend_set;
+cpuset_t cpu_suspend_lost_set;
+volatile int xen_suspending_cpus;
+static int xen_suspend_debug;
+
+void
+xen_set_callback(void (*func)(void), uint_t type, uint_t flags)
+{
+	struct callback_register cb;
+
+	bzero(&cb, sizeof (cb));
+#if defined(__amd64)
+	cb.address = (ulong_t)func;
+#elif defined(__i386)
+	cb.address.cs = KCS_SEL;
+	cb.address.eip = (ulong_t)func;
+#endif
+	cb.type = type;
+	cb.flags = flags;
+
+	/*
+	 * XXPV always ignore return value for NMI
+	 */
+	if (HYPERVISOR_callback_op(CALLBACKOP_register, &cb) != 0 &&
+	    type != CALLBACKTYPE_nmi)
+		panic("HYPERVISOR_callback_op failed");
+}
+
+void
+xen_init_callbacks(void)
+{
+	/*
+	 * register event (interrupt) handler.
+	 */
+	xen_set_callback(xen_callback, CALLBACKTYPE_event, 0);
+
+	/*
+	 * failsafe handler.
+	 */
+	xen_set_callback(xen_failsafe_callback, CALLBACKTYPE_failsafe,
+	    CALLBACKF_mask_events);
+
+	/*
+	 * NMI handler.
+	 */
+	xen_set_callback(nmiint, CALLBACKTYPE_nmi, 0);
+
+	/*
+	 * system call handler
+	 * XXPV move to init_cpu_syscall?
+	 */
+#if defined(__amd64)
+	xen_set_callback(sys_syscall, CALLBACKTYPE_syscall,
+	    CALLBACKF_mask_events);
+#endif	/* __amd64 */
+}
+
+
+/*
+ * cmn_err() followed by a 1/4 second delay; this gives the
+ * logging service a chance to flush messages and helps avoid
+ * intermixing output from prom_printf().
+ * XXPV: doesn't exactly help us on UP though.
+ */
+/*PRINTFLIKE2*/
+void
+cpr_err(int ce, const char *fmt, ...)
+{
+	va_list adx;
+
+	va_start(adx, fmt);
+	vcmn_err(ce, fmt, adx);
+	va_end(adx);
+	drv_usecwait(MICROSEC >> 2);
+}
+
+void
+xen_suspend_devices(void)
+{
+	int rc;
+
+	SUSPEND_DEBUG("xen_suspend_devices\n");
+
+	if ((rc = cpr_suspend_devices(ddi_root_node())) != 0)
+		panic("failed to suspend devices: %d", rc);
+}
+
+void
+xen_resume_devices(void)
+{
+	int rc;
+
+	SUSPEND_DEBUG("xen_resume_devices\n");
+
+	if ((rc = cpr_resume_devices(ddi_root_node(), 0)) != 0)
+		panic("failed to resume devices: %d", rc);
+}
+
+/*
+ * The list of mfn pages is out of date.  Recompute it.
+ * XXPV: can we race against another suspend call? Think not.
+ */
+static void
+rebuild_mfn_list(void)
+{
+	int i = 0;
+	size_t sz;
+	size_t off;
+	pfn_t pfn;
+
+	SUSPEND_DEBUG("rebuild_mfn_list\n");
+
+	sz = ((mfn_count * sizeof (mfn_t)) + MMU_PAGEOFFSET) & MMU_PAGEMASK;
+
+	for (off = 0; off < sz; off += MMU_PAGESIZE) {
+		size_t j = mmu_btop(off);
+		if (((j * sizeof (mfn_t)) & MMU_PAGEOFFSET) == 0) {
+			pfn = hat_getpfnum(kas.a_hat,
+			    (caddr_t)&mfn_list_pages[j]);
+			mfn_list_pages_page[i++] = pfn_to_mfn(pfn);
+		}
+
+		pfn = hat_getpfnum(kas.a_hat, (caddr_t)mfn_list + off);
+		mfn_list_pages[j] = pfn_to_mfn(pfn);
+	}
+
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)mfn_list_pages_page);
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list
+	    = pfn_to_mfn(pfn);
+}
+
+static void
+suspend_cpus(void)
+{
+	int i;
+
+	SUSPEND_DEBUG("suspend_cpus\n");
+
+	xen_suspending_cpus = 1;
+
+	pause_cpus(NULL);
+
+	SUSPEND_DEBUG("waiting for offline CPUs\n");
+
+	/*
+	 * For us to proceed safely, all CPUs except the current one must be
+	 * present in cpu_suspend_set.  Running CPUs will participate in
+	 * pause_cpus(), and eventually reach mach_cpu_pause().  Powered-off
+	 * VCPUs will already be in the set, again in mach_cpu_pause().
+	 * Finally, offline CPUs will be sitting in mach_cpu_idle().
+	 */
+	while (!CPUSET_ISEQUAL(mp_cpus, cpu_suspend_set))
+		SMT_PAUSE();
+
+	for (i = 1; i < ncpus; i++) {
+		if (!CPU_IN_SET(cpu_suspend_lost_set, i)) {
+			SUSPEND_DEBUG("xen_vcpu_down %d\n", i);
+			(void) xen_vcpu_down(i);
+		}
+
+		mach_cpucontext_reset(cpu[i]);
+	}
+}
+
+static void
+resume_cpus(void)
+{
+	int i;
+
+	xen_suspending_cpus = 0;
+
+	for (i = 1; i < ncpus; i++) {
+		if (cpu[i] == NULL)
+			continue;
+
+		if (!CPU_IN_SET(cpu_suspend_lost_set, i)) {
+			SUSPEND_DEBUG("xen_vcpu_up %d\n", i);
+			mach_cpucontext_restore(cpu[i]);
+			(void) xen_vcpu_up(i);
+		}
+	}
+
+	start_cpus();
+}
+
+/*
+ * Top level routine to direct suspend/resume of a domain.
+ */
+void
+xen_suspend_domain(void)
+{
+	extern void rtcsync(void);
+	extern hrtime_t hres_last_tick;
+	mfn_t start_info_mfn;
+	ulong_t flags;
+	pfn_t pfn;
+	int i;
+
+	/*
+	 * XXPV - Are we definitely OK to suspend by the time we've connected
+	 * the handler?
+	 */
+
+	cpr_err(CE_NOTE, "Domain suspending for save/migrate");
+
+	SUSPEND_DEBUG("xen_suspend_domain\n");
+
+	/*
+	 * suspend interrupts and devices
+	 * XXPV - we use suspend/resume for both save/restore domains (like sun
+	 * cpr) and for migration.  Would be nice to know the difference if
+	 * possible.  For save/restore where down time may be a long time, we
+	 * may want to do more of the things that cpr does.  (i.e. notify user
+	 * processes, shrink memory footprint for faster restore, etc.)
+	 */
+	xen_suspend_devices();
+	SUSPEND_DEBUG("xenbus_suspend\n");
+	xenbus_suspend();
+
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)xen_info);
+	start_info_mfn = pfn_to_mfn(pfn);
+
+	/*
+	 * XXPV: cpu hotplug can hold this under a xenbus watch. Are we safe
+	 * wrt xenbus being suspended here?
+	 */
+	mutex_enter(&cpu_lock);
+
+	/*
+	 * Suspend must be done on vcpu 0, as no context for other CPUs is
+	 * saved.
+	 *
+	 * XXPV - add to taskq API ?
+	 */
+	thread_affinity_set(curthread, 0);
+	kpreempt_disable();
+
+	SUSPEND_DEBUG("xen_start_migrate\n");
+	xen_start_migrate();
+	if (ncpus > 1)
+		suspend_cpus();
+
+	/*
+	 * We can grab the ec_lock as it's a spinlock with a high SPL. Hence
+	 * any holder would have dropped it to get through suspend_cpus().
+	 */
+	mutex_enter(&ec_lock);
+
+	/*
+	 * From here on in, we can't take locks.
+	 */
+	SUSPEND_DEBUG("ec_suspend\n");
+	ec_suspend();
+	SUSPEND_DEBUG("gnttab_suspend\n");
+	gnttab_suspend();
+
+	flags = intr_clear();
+
+	xpv_time_suspend();
+
+	/*
+	 * Currently, the hypervisor incorrectly fails to bring back
+	 * powered-down VCPUs.  Thus we need to record any powered-down VCPUs
+	 * to prevent any attempts to operate on them.  But we have to do this
+	 * *after* the very first time we do ec_suspend().
+	 */
+	for (i = 1; i < ncpus; i++) {
+		if (cpu[i] == NULL)
+			continue;
+
+		if (cpu_get_state(cpu[i]) == P_POWEROFF)
+			CPUSET_ATOMIC_ADD(cpu_suspend_lost_set, i);
+	}
+
+	/*
+	 * The dom0 save/migrate code doesn't automatically translate
+	 * these into PFNs, but expects them to be, so we do it here.
+	 * We don't use mfn_to_pfn() because so many OS services have
+	 * been disabled at this point.
+	 */
+	xen_info->store_mfn = mfn_to_pfn_mapping[xen_info->store_mfn];
+	xen_info->console.domU.mfn =
+	    mfn_to_pfn_mapping[xen_info->console.domU.mfn];
+
+	if (CPU->cpu_m.mcpu_vcpu_info->evtchn_upcall_mask == 0) {
+		prom_printf("xen_suspend_domain(): "
+		    "CPU->cpu_m.mcpu_vcpu_info->evtchn_upcall_mask not set\n");
+		(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+	}
+
+	if (HYPERVISOR_update_va_mapping((uintptr_t)HYPERVISOR_shared_info,
+	    0, UVMF_INVLPG)) {
+		prom_printf("xen_suspend_domain(): "
+		    "HYPERVISOR_update_va_mapping() failed\n");
+		(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+	}
+
+	SUSPEND_DEBUG("HYPERVISOR_suspend\n");
+
+	/*
+	 * At this point we suspend and sometime later resume.
+	 */
+	if (HYPERVISOR_suspend(start_info_mfn)) {
+		prom_printf("xen_suspend_domain(): "
+		    "HYPERVISOR_suspend() failed\n");
+		(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+	}
+
+	/*
+	 * Point HYPERVISOR_shared_info to its new value.
+	 */
+	if (HYPERVISOR_update_va_mapping((uintptr_t)HYPERVISOR_shared_info,
+	    xen_info->shared_info | PT_NOCONSIST | PT_VALID | PT_WRITABLE,
+	    UVMF_INVLPG))
+		(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+
+	if (xen_info->nr_pages != mfn_count) {
+		prom_printf("xen_suspend_domain(): number of pages"
+		    " changed, was 0x%lx, now 0x%lx\n", mfn_count,
+		    xen_info->nr_pages);
+		(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+	}
+
+	xpv_time_resume();
+
+	cached_max_mfn = 0;
+
+	SUSPEND_DEBUG("gnttab_resume\n");
+	gnttab_resume();
+
+	/* XXPV: add a note that this must be lockless. */
+	SUSPEND_DEBUG("ec_resume\n");
+	ec_resume();
+
+	intr_restore(flags);
+
+	if (ncpus > 1)
+		resume_cpus();
+
+	mutex_exit(&ec_lock);
+	xen_end_migrate();
+	mutex_exit(&cpu_lock);
+
+	/*
+	 * Now we can take locks again.
+	 */
+
+	/*
+	 * Force the tick value used for tv_nsec in hres_tick() to be up to
+	 * date. rtcsync() will reset the hrestime value appropriately.
+	 */
+	hres_last_tick = xpv_gethrtime();
+
+	/*
+	 * XXPV: we need to have resumed the CPUs since this takes locks, but
+	 * can remote CPUs see bad state? Presumably yes. Should probably nest
+	 * taking of todlock inside of cpu_lock, or vice versa, then provide an
+	 * unlocked version.  Probably need to call clkinitf to reset cpu freq
+	 * and re-calibrate if we migrated to a different speed cpu.  Also need
+	 * to make a (re)init_cpu_info call to update processor info structs
+	 * and device tree info.  That remains to be written at the moment.
+	 */
+	rtcsync();
+
+	rebuild_mfn_list();
+
+	SUSPEND_DEBUG("xenbus_resume\n");
+	xenbus_resume();
+	SUSPEND_DEBUG("xenbus_resume_devices\n");
+	xen_resume_devices();
+
+	thread_affinity_clear(curthread);
+	kpreempt_enable();
+
+	SUSPEND_DEBUG("finished xen_suspend_domain\n");
+	cmn_err(CE_NOTE, "domain restore/migrate completed");
+}
+
+/*ARGSUSED*/
+int
+xen_debug_handler(void *arg)
+{
+	debug_enter("External debug event received");
+
+	/*
+	 * If we've not got KMDB loaded, output some stuff difficult to capture
+	 * from a domain core.
+	 */
+	if (!(boothowto & RB_DEBUG)) {
+		shared_info_t *si = HYPERVISOR_shared_info;
+		int i;
+
+		prom_printf("evtchn_pending [ ");
+		for (i = 0; i < 8; i++)
+			prom_printf("%lx ", si->evtchn_pending[i]);
+		prom_printf("]\nevtchn_mask [ ");
+		for (i = 0; i < 8; i++)
+			prom_printf("%lx ", si->evtchn_mask[i]);
+		prom_printf("]\n");
+
+		for (i = 0; i < ncpus; i++) {
+			vcpu_info_t *vcpu = &si->vcpu_info[i];
+			if (cpu[i] == NULL)
+				continue;
+			prom_printf("CPU%d pending %d mask %d sel %lx\n",
+			    i, vcpu->evtchn_upcall_pending,
+			    vcpu->evtchn_upcall_mask,
+			    vcpu->evtchn_pending_sel);
+		}
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+xen_sysrq_handler(struct xenbus_watch *watch, const char **vec,
+    unsigned int len)
+{
+	xenbus_transaction_t xbt;
+	char key = '\0';
+	int ret;
+
+retry:
+	if (xenbus_transaction_start(&xbt)) {
+		cmn_err(CE_WARN, "failed to start sysrq transaction");
+		return;
+	}
+
+	if ((ret = xenbus_scanf(xbt, "control", "sysrq", "%c", &key)) != 0) {
+		/*
+		 * ENOENT happens in response to our own xenbus_rm.
+		 * XXPV - this happens spuriously on boot?
+		 */
+		if (ret != ENOENT)
+			cmn_err(CE_WARN, "failed to read sysrq: %d", ret);
+		goto out;
+	}
+
+	if ((ret = xenbus_rm(xbt, "control", "sysrq")) != 0) {
+		cmn_err(CE_WARN, "failed to reset sysrq: %d", ret);
+		goto out;
+	}
+
+	if (xenbus_transaction_end(xbt, 0) == EAGAIN)
+		goto retry;
+
+	/*
+	 * Somewhat arbitrary - on Linux this means 'reboot'. We could just
+	 * accept any key, but this might increase the risk of sending a
+	 * harmless sysrq to the wrong domain...
+	 */
+	if (key == 'b')
+		(void) xen_debug_handler(NULL);
+	else
+		cmn_err(CE_WARN, "Ignored sysrq %c", key);
+	return;
+
+out:
+	(void) xenbus_transaction_end(xbt, 1);
+}
+
+taskq_t *xen_shutdown_tq;
+volatile int shutdown_req_active;
+
+#define	SHUTDOWN_INVALID	-1
+#define	SHUTDOWN_POWEROFF	0
+#define	SHUTDOWN_REBOOT		1
+#define	SHUTDOWN_SUSPEND	2
+#define	SHUTDOWN_HALT		3
+#define	SHUTDOWN_MAX		4
+
+#define	SHUTDOWN_TIMEOUT_SECS (60 * 5)
+
+static const char *cmd_strings[SHUTDOWN_MAX] = {
+	"poweroff",
+	"reboot",
+	"suspend",
+	"halt"
+};
+
+static void
+xen_dirty_shutdown(void *arg)
+{
+	int cmd = (uintptr_t)arg;
+
+	cmn_err(CE_WARN, "Externally requested shutdown failed or "
+	    "timed out.\nShutting down.\n");
+
+	switch (cmd) {
+	case SHUTDOWN_HALT:
+	case SHUTDOWN_POWEROFF:
+		(void) kadmin(A_SHUTDOWN, AD_POWEROFF, NULL, kcred);
+		break;
+	case SHUTDOWN_REBOOT:
+		(void) kadmin(A_REBOOT, AD_BOOT, NULL, kcred);
+		break;
+	}
+}
+
+static void
+xen_shutdown(void *arg)
+{
+	nvlist_t *attr_list = NULL;
+	sysevent_t *event = NULL;
+	sysevent_id_t eid;
+	int cmd = (uintptr_t)arg;
+	int err;
+
+	ASSERT(cmd > SHUTDOWN_INVALID && cmd < SHUTDOWN_MAX);
+
+	if (cmd == SHUTDOWN_SUSPEND) {
+		xen_suspend_domain();
+		shutdown_req_active = 0;
+		return;
+	}
+
+	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME, KM_SLEEP);
+	if (err != DDI_SUCCESS)
+		goto failure;
+
+	err = nvlist_add_string(attr_list, "shutdown", cmd_strings[cmd]);
+	if (err != DDI_SUCCESS)
+		goto failure;
+
+	if ((event = sysevent_alloc("EC_xpvsys", "control", "SUNW:kern:xpv",
+	    SE_SLEEP)) == NULL)
+		goto failure;
+	(void) sysevent_attach_attributes(event,
+	    (sysevent_attr_list_t *)attr_list);
+
+	err = log_sysevent(event, SE_SLEEP, &eid);
+
+	sysevent_detach_attributes(event);
+	sysevent_free(event);
+
+	if (err != 0)
+		goto failure;
+
+	(void) timeout(xen_dirty_shutdown, arg,
+	    SHUTDOWN_TIMEOUT_SECS * drv_usectohz(MICROSEC));
+
+	nvlist_free(attr_list);
+	return;
+
+failure:
+	if (attr_list != NULL)
+		nvlist_free(attr_list);
+	xen_dirty_shutdown(arg);
+}
+
+/*ARGSUSED*/
+static void
+xen_shutdown_handler(struct xenbus_watch *watch, const char **vec,
+	unsigned int len)
+{
+	char *str;
+	xenbus_transaction_t xbt;
+	int err, shutdown_code = SHUTDOWN_INVALID;
+	unsigned int slen;
+
+again:
+	err = xenbus_transaction_start(&xbt);
+	if (err)
+		return;
+	if (xenbus_read(xbt, "control", "shutdown", (void *)&str, &slen)) {
+		(void) xenbus_transaction_end(xbt, 1);
+		return;
+	}
+
+	SUSPEND_DEBUG("%d: xen_shutdown_handler: \"%s\"\n", CPU->cpu_id, str);
+
+	/*
+	 * If this is a watch fired from our write below, check out early to
+	 * avoid an infinite loop.
+	 */
+	if (strcmp(str, "") == 0) {
+		(void) xenbus_transaction_end(xbt, 0);
+		kmem_free(str, slen);
+		return;
+	} else if (strcmp(str, "poweroff") == 0) {
+		shutdown_code = SHUTDOWN_POWEROFF;
+	} else if (strcmp(str, "reboot") == 0) {
+		shutdown_code = SHUTDOWN_REBOOT;
+	} else if (strcmp(str, "suspend") == 0) {
+		shutdown_code = SHUTDOWN_SUSPEND;
+	} else if (strcmp(str, "halt") == 0) {
+		shutdown_code = SHUTDOWN_HALT;
+	} else {
+		printf("Ignoring shutdown request: %s\n", str);
+	}
+
+	/*
+	 * XXPV	Should we check the value of xenbus_write() too, or are all
+	 *	errors automatically folded into xenbus_transaction_end() ??
+	 */
+	(void) xenbus_write(xbt, "control", "shutdown", "");
+	err = xenbus_transaction_end(xbt, 0);
+	if (err == EAGAIN) {
+		SUSPEND_DEBUG("%d: trying again\n", CPU->cpu_id);
+		kmem_free(str, slen);
+		goto again;
+	}
+
+	kmem_free(str, slen);
+	if (shutdown_code != SHUTDOWN_INVALID) {
+		if (shutdown_code == SHUTDOWN_SUSPEND) {
+			while (shutdown_req_active)
+				SMT_PAUSE();
+		}
+
+		shutdown_req_active = 1;
+		(void) taskq_dispatch(xen_shutdown_tq, xen_shutdown,
+		    (void *)(intptr_t)shutdown_code, 0);
+	}
+}
+
+static struct xenbus_watch shutdown_watch;
+static struct xenbus_watch sysrq_watch;
+
+void
+xen_late_startup(void)
+{
+	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
+		xen_shutdown_tq = taskq_create("shutdown_taskq", 1,
+		    maxclsyspri - 1, 1, 1, TASKQ_PREPOPULATE);
+		shutdown_watch.node = "control/shutdown";
+		shutdown_watch.callback = xen_shutdown_handler;
+		if (register_xenbus_watch(&shutdown_watch))
+			cmn_err(CE_WARN, "Failed to set shutdown watcher");
+
+		sysrq_watch.node = "control/sysrq";
+		sysrq_watch.callback = xen_sysrq_handler;
+		if (register_xenbus_watch(&sysrq_watch))
+			cmn_err(CE_WARN, "Failed to set sysrq watcher");
+	}
+	balloon_init(xen_info->nr_pages);
+}
+
+#ifdef DEBUG
+#define	XEN_PRINTF_BUFSIZE	1024
+
+char xen_printf_buffer[XEN_PRINTF_BUFSIZE];
+
+/*
+ * Printf function that calls hypervisor directly.  For DomU it only
+ * works when running on a xen hypervisor built with debug on.  Works
+ * always since no I/O ring interaction is needed.
+ */
+/*PRINTFLIKE1*/
+void
+xen_printf(const char *fmt, ...)
+{
+	va_list	ap;
+
+	va_start(ap, fmt);
+	(void) vsnprintf(xen_printf_buffer, XEN_PRINTF_BUFSIZE, fmt, ap);
+	va_end(ap);
+
+	(void) HYPERVISOR_console_io(CONSOLEIO_write,
+	    strlen(xen_printf_buffer), xen_printf_buffer);
+}
+#else
+void
+xen_printf(const char *fmt, ...)
+{
+}
+#endif	/* DEBUG */
+
+/*
+ * Determine helpful version information.
+ *
+ * (And leave a copy around in the data segment so we can look
+ * at them later with e.g. kmdb.)
+ */
+struct xenver {
+	char *xv_ver;
+	char *xv_chgset;
+	char *xv_compiler;
+	char *xv_compile_date;
+	char *xv_compile_by;
+	char *xv_compile_domain;
+	char *xv_caps;
+} xenver;
+
+static char *
+sprintf_alloc(const char *fmt, ...)
+{
+	va_list ap;
+	size_t len;
+	char *p;
+
+	va_start(ap, fmt);
+	len = 1 + vsnprintf(NULL, 0, fmt, ap);
+	p = kmem_alloc(len, KM_SLEEP);
+	(void) vsnprintf(p, len, fmt, ap);
+	va_end(ap);
+	return (p);
+}
+
+void
+xen_version(void)
+{
+	static const char strfmt[] = "%s";
+	static const char xenver_sun[] = "3.0.4-1-xvm";  /* XXPV */
+	union {
+		xen_extraversion_t xver;
+		xen_changeset_info_t chgset;
+		xen_compile_info_t build;
+		xen_capabilities_info_t caps;
+	} data, *src = &data;
+
+	ulong_t ver = HYPERVISOR_xen_version(XENVER_version, 0);
+
+	if (HYPERVISOR_xen_version(XENVER_extraversion, src) == 0) {
+		((char *)(src->xver))[sizeof (src->xver) - 1] = '\0';
+	} else
+		((char *)(src->xver))[0] = '\0';
+
+	xenver.xv_ver = sprintf_alloc("%lu.%lu%s",
+	    BITX(ver, 31, 16), BITX(ver, 15, 0), src->xver);
+
+	if (HYPERVISOR_xen_version(XENVER_changeset, src) == 0) {
+		((char *)(src->chgset))[sizeof (src->chgset) - 1] = '\0';
+		xenver.xv_chgset = sprintf_alloc(strfmt, src->chgset);
+	}
+
+	cmn_err(CE_CONT, "?xen v%s chgset '%s'\n",
+	    xenver.xv_ver, xenver.xv_chgset);
+
+	/*
+	 * XXPV - Solaris guests currently require special version of
+	 * the hypervisor from Sun to function properly called "3.0.4-1-xvm".
+	 * This version is based on "3.0.4-1" plus changes from
+	 * Sun that are a work-in-progress.
+	 *
+	 * This version check will disappear after appropriate fixes
+	 * are accepted upstream.
+	 */
+	if (strcmp(xenver.xv_ver, xenver_sun) != 0) {
+		cmn_err(CE_WARN, "Found xen v%s but need xen v%s",
+		    xenver.xv_ver, xenver_sun);
+		cmn_err(CE_WARN, "The kernel may not function correctly");
+	}
+
+	if (HYPERVISOR_xen_version(XENVER_compile_info, src) == 0) {
+		xenver.xv_compiler = sprintf_alloc(strfmt,
+		    data.build.compiler);
+		xenver.xv_compile_date = sprintf_alloc(strfmt,
+		    data.build.compile_date);
+		xenver.xv_compile_by = sprintf_alloc(strfmt,
+		    data.build.compile_by);
+		xenver.xv_compile_domain = sprintf_alloc(strfmt,
+		    data.build.compile_domain);
+	}
+
+	/*
+	 * Capabilities are a set of space separated ascii strings
+	 * e.g. 'xen-3.1-x86_32p' or 'hvm-3.2-x86_64'
+	 */
+	if (HYPERVISOR_xen_version(XENVER_capabilities, src) == 0) {
+		((char *)(src->caps))[sizeof (src->caps) - 1] = '\0';
+		xenver.xv_caps = sprintf_alloc(strfmt, src->caps);
+	}
+}
+
+/*
+ * Miscellaneous hypercall wrappers with slightly more verbose diagnostics.
+ */
+
+void
+xen_set_gdt(ulong_t *frame_list, int entries)
+{
+	int err;
+	if ((err = HYPERVISOR_set_gdt(frame_list, entries)) != 0) {
+		/*
+		 * X_EINVAL:	reserved entry or bad frames
+		 * X_EFAULT:	bad address
+		 */
+		panic("xen_set_gdt(%p, %d): error %d",
+		    (void *)frame_list, entries, -(int)err);
+	}
+}
+
+void
+xen_set_ldt(user_desc_t *ldt, uint_t nsels)
+{
+	struct mmuext_op	op;
+	long			err;
+
+	op.cmd = MMUEXT_SET_LDT;
+	op.arg1.linear_addr = (uintptr_t)ldt;
+	op.arg2.nr_ents = nsels;
+
+	if ((err = HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF)) != 0) {
+		panic("xen_set_ldt(%p, %d): error %d",
+		    (void *)ldt, nsels, -(int)err);
+	}
+}
+
+void
+xen_stack_switch(ulong_t ss, ulong_t esp)
+{
+	long err;
+
+	if ((err = HYPERVISOR_stack_switch(ss, esp)) != 0) {
+		/*
+		 * X_EPERM:	bad selector
+		 */
+		panic("xen_stack_switch(%lx, %lx): error %d", ss, esp,
+		    -(int)err);
+	}
+}
+
+long
+xen_set_trap_table(trap_info_t *table)
+{
+	long err;
+
+	if ((err = HYPERVISOR_set_trap_table(table)) != 0) {
+		/*
+		 * X_EFAULT:	bad address
+		 * X_EPERM:	bad selector
+		 */
+		panic("xen_set_trap_table(%p): error %d", (void *)table,
+		    -(int)err);
+	}
+	return (err);
+}
+
+#if defined(__amd64)
+void
+xen_set_segment_base(int reg, ulong_t value)
+{
+	long err;
+
+	if ((err = HYPERVISOR_set_segment_base(reg, value)) != 0) {
+		/*
+		 * X_EFAULT:	bad address
+		 * X_EINVAL:	bad type
+		 */
+		panic("xen_set_segment_base(%d, %lx): error %d",
+		    reg, value, -(int)err);
+	}
+}
+#endif	/* __amd64 */
+
+/*
+ * Translate a hypervisor errcode to a Solaris error code.
+ */
+int
+xen_xlate_errcode(int error)
+{
+	switch (-error) {
+
+	/*
+	 * Translate hypervisor errno's into native errno's
+	 */
+
+#define	CASE(num)	case X_##num: error = num; break
+
+	CASE(EPERM);	CASE(ENOENT);	CASE(ESRCH);
+	CASE(EINTR);	CASE(EIO);	CASE(ENXIO);
+	CASE(E2BIG);	CASE(ENOMEM);	CASE(EACCES);
+	CASE(EFAULT);	CASE(EBUSY);	CASE(EEXIST);
+	CASE(ENODEV);	CASE(EISDIR);	CASE(EINVAL);
+	CASE(ENOSPC);	CASE(ESPIPE);	CASE(EROFS);
+	CASE(ENOSYS);	CASE(ENOTEMPTY); CASE(EISCONN);
+	CASE(ENODATA);
+
+#undef CASE
+
+	default:
+		panic("xen_xlate_errcode: unknown error %d", error);
+	}
+
+	return (error);
+}
+
+/*
+ * Raise PS_IOPL on current vcpu to user level.
+ * Caller responsible for preventing kernel preemption.
+ */
+void
+xen_enable_user_iopl(void)
+{
+	physdev_set_iopl_t set_iopl;
+	set_iopl.iopl = 3;		/* user ring 3 */
+	(void) HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+}
+
+/*
+ * Drop PS_IOPL on current vcpu to kernel level
+ */
+void
+xen_disable_user_iopl(void)
+{
+	physdev_set_iopl_t set_iopl;
+	set_iopl.iopl = 1;		/* kernel pseudo ring 1 */
+	(void) HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+}
+
+int
+xen_gdt_setprot(cpu_t *cp, uint_t prot)
+{
+	int err;
+#if defined(__amd64)
+	int pt_bits = PT_VALID;
+	if (prot & PROT_WRITE)
+		pt_bits |= PT_WRITABLE;
+#endif
+
+	if ((err = as_setprot(&kas, (caddr_t)cp->cpu_gdt,
+	    MMU_PAGESIZE, prot)) != 0)
+		goto done;
+
+#if defined(__amd64)
+	err = xen_kpm_page(mmu_btop(cp->cpu_m.mcpu_gdtpa), pt_bits);
+#endif
+
+done:
+	if (err) {
+		cmn_err(CE_WARN, "cpu%d: xen_gdt_setprot(%s) failed: error %d",
+		    cp->cpu_id, (prot & PROT_WRITE) ? "writable" : "read-only",
+		    err);
+	}
+
+	return (err);
+}
+
+int
+xen_ldt_setprot(user_desc_t *ldt, size_t lsize, uint_t prot)
+{
+	int err;
+	caddr_t	lva = (caddr_t)ldt;
+#if defined(__amd64)
+	int pt_bits = PT_VALID;
+	pgcnt_t npgs;
+	if (prot & PROT_WRITE)
+		pt_bits |= PT_WRITABLE;
+#endif	/* __amd64 */
+
+	if ((err = as_setprot(&kas, (caddr_t)ldt, lsize, prot)) != 0)
+		goto done;
+
+#if defined(__amd64)
+
+	ASSERT(IS_P2ALIGNED(lsize, PAGESIZE));
+	npgs = mmu_btop(lsize);
+	while (npgs--) {
+		if ((err = xen_kpm_page(hat_getpfnum(kas.a_hat, lva),
+		    pt_bits)) != 0)
+			break;
+		lva += PAGESIZE;
+	}
+#endif	/* __amd64 */
+
+done:
+	if (err) {
+		cmn_err(CE_WARN, "xen_ldt_setprot(%p, %s) failed: error %d",
+		    (void *)lva,
+		    (prot & PROT_WRITE) ? "writable" : "read-only", err);
+	}
+
+	return (err);
+}

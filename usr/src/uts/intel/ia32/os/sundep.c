@@ -90,6 +90,10 @@
 #include <sys/x86_archext.h>
 #include <sys/segments.h>
 #include <sys/ontrap.h>
+#include <sys/cpu.h>
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * Compare the version of boot that boot says it is against
@@ -294,8 +298,8 @@ lwp_load(klwp_t *lwp, gregset_t grp, uintptr_t thrptr)
 	rp->r_ps = PSL_USER;
 
 	/*
-	 * For 64-bit lwps, we allow null %fs selector value, and null
-	 * %gs selector to point anywhere in the address space using
+	 * For 64-bit lwps, we allow one magic %fs selector value, and one
+	 * magic %gs selector to point anywhere in the address space using
 	 * %fsbase and %gsbase behind the scenes.  libc uses %fs to point
 	 * at the ulwp_t structure.
 	 *
@@ -437,6 +441,7 @@ lwp_pcb_exit(void)
 #define	VALID_LWP_DESC(udp) ((udp)->usd_type == SDT_MEMRWA && \
 	    (udp)->usd_p == 1 && (udp)->usd_dpl == SEL_UPL)
 
+/*ARGSUSED*/
 void
 lwp_segregs_save(klwp_t *lwp)
 {
@@ -466,16 +471,18 @@ lwp_segregs_save(klwp_t *lwp)
 	}
 #endif	/* __amd64 */
 
+#if !defined(__xpv)	/* XXPV not sure if we can re-read gdt? */
 	ASSERT(bcmp(&CPU->cpu_gdt[GDT_LWPFS], &lwp->lwp_pcb.pcb_fsdesc,
 	    sizeof (lwp->lwp_pcb.pcb_fsdesc)) == 0);
 	ASSERT(bcmp(&CPU->cpu_gdt[GDT_LWPGS], &lwp->lwp_pcb.pcb_gsdesc,
 	    sizeof (lwp->lwp_pcb.pcb_gsdesc)) == 0);
+#endif
 }
 
 #if defined(__amd64)
 
 /*
- * Update the segment registers with new values from the pcb
+ * Update the segment registers with new values from the pcb.
  *
  * We have to do this carefully, and in the following order,
  * in case any of the selectors points at a bogus descriptor.
@@ -495,6 +502,29 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 
 	if (!on_trap(&otd, OT_SEGMENT_ACCESS)) {
 
+#if defined(__xpv)
+		/*
+		 * On the hyervisor this is easy. The hypercall below will
+		 * swapgs and load %gs with the user selector. If the user
+		 * selector is bad the hypervisor will catch the fault and
+		 * load %gs with the null selector instead. Either way the
+		 * kernel's gsbase is not damaged.
+		 */
+		kgsbase = (ulong_t)CPU;
+		if (HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL,
+		    pcb->pcb_gs) != 0) {
+				no_trap();
+				return (1);
+		}
+
+		rp->r_gs = pcb->pcb_gs;
+		ASSERT((cpu_t *)kgsbase == CPU);
+
+#else	/* __xpv */
+
+		/*
+		 * A little more complicated running native.
+		 */
 		kgsbase = (ulong_t)CPU;
 		__set_gs(pcb->pcb_gs);
 
@@ -505,7 +535,7 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 		 *
 		 * We've just mucked up the kernel's gsbase.  Oops.  In
 		 * particular we can't take any traps at all.  Make the newly
-		 * computed gsbase be the hidden gs via __swapgs , and fix
+		 * computed gsbase be the hidden gs via __swapgs, and fix
 		 * the kernel's gsbase back again. Later, when we return to
 		 * userland we'll swapgs again restoring gsbase just loaded
 		 * above.
@@ -517,6 +547,8 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 		 * restore kernel's gsbase
 		 */
 		wrmsr(MSR_AMD_GSBASE, kgsbase);
+
+#endif	/* __xpv */
 
 		/*
 		 * Only override the descriptor base address if
@@ -535,8 +567,17 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 		 * libc. This should be ripped out at some point in the
 		 * future.
 		 */
-		if (pcb->pcb_gs == LWPGS_SEL || pcb->pcb_gs == 0)
+		if (pcb->pcb_gs == LWPGS_SEL || pcb->pcb_gs == 0) {
+#if defined(__xpv)
+			if (HYPERVISOR_set_segment_base(SEGBASE_GS_USER,
+			    pcb->pcb_gsbase)) {
+				no_trap();
+				return (1);
+			}
+#else
 			wrmsr(MSR_AMD_KGSBASE, pcb->pcb_gsbase);
+#endif
+		}
 
 		__set_ds(pcb->pcb_ds);
 		rp->r_ds = pcb->pcb_ds;
@@ -550,8 +591,17 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 		/*
 		 * Same as for %gs
 		 */
-		if (pcb->pcb_fs == LWPFS_SEL || pcb->pcb_fs == 0)
+		if (pcb->pcb_fs == LWPFS_SEL || pcb->pcb_fs == 0) {
+#if defined(__xpv)
+			if (HYPERVISOR_set_segment_base(SEGBASE_FS,
+			    pcb->pcb_fsbase)) {
+				no_trap();
+				return (1);
+			}
+#else
 			wrmsr(MSR_AMD_FSBASE, pcb->pcb_fsbase);
+#endif
+		}
 
 	} else {
 		cli();
@@ -560,6 +610,52 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 	no_trap();
 	return (rc);
 }
+
+/*
+ * Make sure any stale selectors are cleared from the segment registers
+ * by putting KDS_SEL (the kernel's default %ds gdt selector) into them.
+ * This is necessary because the kernel itself does not use %es, %fs, nor
+ * %ds. (%cs and %ss are necessary, and are set up by the kernel - along with
+ * %gs - to point to the current cpu struct.) If we enter kmdb while in the
+ * kernel and resume with a stale ldt or brandz selector sitting there in a
+ * segment register, kmdb will #gp fault if the stale selector points to,
+ * for example, an ldt in the context of another process.
+ *
+ * WARNING: Intel and AMD chips behave differently when storing
+ * the null selector into %fs and %gs while in long mode. On AMD
+ * chips fsbase and gsbase are not cleared. But on Intel chips, storing
+ * a null selector into %fs or %gs has the side effect of clearing
+ * fsbase or gsbase. For that reason we use KDS_SEL, which has
+ * consistent behavor between AMD and Intel.
+ *
+ * Caller responsible for preventing cpu migration.
+ */
+void
+reset_sregs(void)
+{
+	ulong_t kgsbase = (ulong_t)CPU;
+
+	ASSERT(curthread->t_preempt != 0 || getpil() >= DISP_LEVEL);
+
+	cli();
+	__set_gs(KGS_SEL);
+
+	/*
+	 * restore kernel gsbase
+	 */
+#if defined(__xpv)
+	xen_set_segment_base(SEGBASE_GS_KERNEL, kgsbase);
+#else
+	wrmsr(MSR_AMD_GSBASE, kgsbase);
+#endif
+
+	sti();
+
+	__set_ds(KDS_SEL);
+	__set_es(0 | SEL_KPL);	/* selector RPL not ring 0 on hypervisor */
+	__set_fs(KFS_SEL);
+}
+
 #endif	/* __amd64 */
 
 #ifdef _SYSCALL32_IMPL
@@ -572,19 +668,17 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
  * %cs) it will fault immediately. This also allows us to simplify
  * assertions and checks in the kernel.
  */
+
 static void
 gdt_ucode_model(model_t model)
 {
-	cpu_t *cpu;
-
 	kpreempt_disable();
-	cpu = CPU;
 	if (model == DATAMODEL_NATIVE) {
-		cpu->cpu_gdt[GDT_UCODE].usd_p = 1;
-		cpu->cpu_gdt[GDT_U32CODE].usd_p = 0;
+		gdt_update_usegd(GDT_UCODE, &ucs_on);
+		gdt_update_usegd(GDT_U32CODE, &ucs32_off);
 	} else {
-		cpu->cpu_gdt[GDT_U32CODE].usd_p = 1;
-		cpu->cpu_gdt[GDT_UCODE].usd_p = 0;
+		gdt_update_usegd(GDT_U32CODE, &ucs32_on);
+		gdt_update_usegd(GDT_UCODE, &ucs_off);
 	}
 	kpreempt_enable();
 }
@@ -599,7 +693,6 @@ static void
 lwp_segregs_restore(klwp_t *lwp)
 {
 	pcb_t *pcb = &lwp->lwp_pcb;
-	cpu_t *cpu = CPU;
 
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_fsdesc));
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_gsdesc));
@@ -608,8 +701,8 @@ lwp_segregs_restore(klwp_t *lwp)
 	gdt_ucode_model(DATAMODEL_NATIVE);
 #endif
 
-	cpu->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
-	cpu->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
+	gdt_update_usegd(GDT_LWPFS, &pcb->pcb_fsdesc);
+	gdt_update_usegd(GDT_LWPGS, &pcb->pcb_gsdesc);
 
 }
 
@@ -626,8 +719,8 @@ lwp_segregs_restore32(klwp_t *lwp)
 	ASSERT(VALID_LWP_DESC(&lwp->lwp_pcb.pcb_gsdesc));
 
 	gdt_ucode_model(DATAMODEL_ILP32);
-	cpu->cpu_gdt[GDT_LWPFS] = pcb->pcb_fsdesc;
-	cpu->cpu_gdt[GDT_LWPGS] = pcb->pcb_gsdesc;
+	gdt_update_usegd(GDT_LWPFS, &pcb->pcb_fsdesc);
+	gdt_update_usegd(GDT_LWPGS, &pcb->pcb_gsdesc);
 }
 
 #endif	/* _SYSCALL32_IMPL */

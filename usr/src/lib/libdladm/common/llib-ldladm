@@ -31,3 +31,4 @@
 #include <libdllink.h>
 #include <libdlaggr.h>
 #include <libdlwlan.h>
+#include <libdlvnic.h>

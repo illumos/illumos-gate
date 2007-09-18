@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -42,6 +43,7 @@
 #include <sys/smp_impldefs.h>
 #include <sys/dtrace.h>
 #include <sys/time.h>
+#include <sys/panic.h>
 
 /*
  * Using the Pentium's TSC register for gethrtime()
@@ -131,11 +133,7 @@ static volatile int tsc_sync_go;
 #define	TSC_SYNC_GO		2
 #define	TSC_SYNC_AGAIN		3
 
-/*
- * XX64	Is the faster way to do this with a 64-bit ABI?
- */
-
-#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) { 		\
+#define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) {	 	\
 	unsigned int *_l = (unsigned int *)&(tsc); 	\
 	(hrt) += mul32(_l[1], scale) << NSEC_SHIFT; 	\
 	(hrt) += mul32(_l[0], scale) >> (32 - NSEC_SHIFT); \
@@ -162,6 +160,230 @@ static hrtime_t	shadow_tsc_hrtime_base;
 static hrtime_t	shadow_tsc_last;
 static uint_t	shadow_nsec_scale;
 static uint32_t	shadow_hres_lock;
+
+hrtime_t
+tsc_gethrtime(void)
+{
+	uint32_t old_hres_lock;
+	hrtime_t tsc, hrt;
+
+	do {
+		old_hres_lock = hres_lock;
+
+		if ((tsc = tsc_read()) >= tsc_last) {
+			/*
+			 * It would seem to be obvious that this is true
+			 * (that is, the past is less than the present),
+			 * but it isn't true in the presence of suspend/resume
+			 * cycles.  If we manage to call gethrtime()
+			 * after a resume, but before the first call to
+			 * tsc_tick(), we will see the jump.  In this case,
+			 * we will simply use the value in TSC as the delta.
+			 */
+			tsc -= tsc_last;
+		} else if (tsc >= tsc_last - 2*tsc_max_delta) {
+			/*
+			 * There is a chance that tsc_tick() has just run on
+			 * another CPU, and we have drifted just enough so that
+			 * we appear behind tsc_last.  In this case, force the
+			 * delta to be zero.
+			 */
+			tsc = 0;
+		}
+
+		hrt = tsc_hrtime_base;
+
+		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
+	} while ((old_hres_lock & ~1) != hres_lock);
+
+	return (hrt);
+}
+
+hrtime_t
+tsc_gethrtime_delta(void)
+{
+	uint32_t old_hres_lock;
+	hrtime_t tsc, hrt;
+	int flags;
+
+	do {
+		old_hres_lock = hres_lock;
+
+		/*
+		 * We need to disable interrupts here to assure that we
+		 * don't migrate between the call to tsc_read() and
+		 * adding the CPU's TSC tick delta. Note that disabling
+		 * and reenabling preemption is forbidden here because
+		 * we may be in the middle of a fast trap. In the amd64
+		 * kernel we cannot tolerate preemption during a fast
+		 * trap. See _update_sregs().
+		 */
+
+		flags = clear_int_flag();
+		tsc = tsc_read() + tsc_sync_tick_delta[CPU->cpu_id];
+		restore_int_flag(flags);
+
+		/* See comments in tsc_gethrtime() above */
+
+		if (tsc >= tsc_last) {
+			tsc -= tsc_last;
+		} else if (tsc >= tsc_last - 2 * tsc_max_delta) {
+			tsc = 0;
+		}
+
+		hrt = tsc_hrtime_base;
+
+		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
+	} while ((old_hres_lock & ~1) != hres_lock);
+
+	return (hrt);
+}
+
+/*
+ * This is similar to the above, but it cannot actually spin on hres_lock.
+ * As a result, it caches all of the variables it needs; if the variables
+ * don't change, it's done.
+ */
+hrtime_t
+dtrace_gethrtime(void)
+{
+	uint32_t old_hres_lock;
+	hrtime_t tsc, hrt;
+	int flags;
+
+	do {
+		old_hres_lock = hres_lock;
+
+		/*
+		 * Interrupts are disabled to ensure that the thread isn't
+		 * migrated between the tsc_read() and adding the CPU's
+		 * TSC tick delta.
+		 */
+		flags = clear_int_flag();
+
+		tsc = tsc_read();
+
+		if (gethrtimef == tsc_gethrtime_delta)
+			tsc += tsc_sync_tick_delta[CPU->cpu_id];
+
+		restore_int_flag(flags);
+
+		/*
+		 * See the comments in tsc_gethrtime(), above.
+		 */
+		if (tsc >= tsc_last)
+			tsc -= tsc_last;
+		else if (tsc >= tsc_last - 2*tsc_max_delta)
+			tsc = 0;
+
+		hrt = tsc_hrtime_base;
+
+		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
+
+		if ((old_hres_lock & ~1) == hres_lock)
+			break;
+
+		/*
+		 * If we're here, the clock lock is locked -- or it has been
+		 * unlocked and locked since we looked.  This may be due to
+		 * tsc_tick() running on another CPU -- or it may be because
+		 * some code path has ended up in dtrace_probe() with
+		 * CLOCK_LOCK held.  We'll try to determine that we're in
+		 * the former case by taking another lap if the lock has
+		 * changed since when we first looked at it.
+		 */
+		if (old_hres_lock != hres_lock)
+			continue;
+
+		/*
+		 * So the lock was and is locked.  We'll use the old data
+		 * instead.
+		 */
+		old_hres_lock = shadow_hres_lock;
+
+		/*
+		 * Again, disable interrupts to ensure that the thread
+		 * isn't migrated between the tsc_read() and adding
+		 * the CPU's TSC tick delta.
+		 */
+		flags = clear_int_flag();
+
+		tsc = tsc_read();
+
+		if (gethrtimef == tsc_gethrtime_delta)
+			tsc += tsc_sync_tick_delta[CPU->cpu_id];
+
+		restore_int_flag(flags);
+
+		/*
+		 * See the comments in tsc_gethrtime(), above.
+		 */
+		if (tsc >= shadow_tsc_last)
+			tsc -= shadow_tsc_last;
+		else if (tsc >= shadow_tsc_last - 2 * tsc_max_delta)
+			tsc = 0;
+
+		hrt = shadow_tsc_hrtime_base;
+
+		TSC_CONVERT_AND_ADD(tsc, hrt, shadow_nsec_scale);
+	} while ((old_hres_lock & ~1) != shadow_hres_lock);
+
+	return (hrt);
+}
+
+hrtime_t
+tsc_gethrtimeunscaled(void)
+{
+	uint32_t old_hres_lock;
+	hrtime_t tsc;
+
+	do {
+		old_hres_lock = hres_lock;
+
+		/* See tsc_tick(). */
+		tsc = tsc_read() + tsc_last_jumped;
+	} while ((old_hres_lock & ~1) != hres_lock);
+
+	return (tsc);
+}
+
+
+/* Convert a tsc timestamp to nanoseconds */
+void
+tsc_scalehrtime(hrtime_t *tsc)
+{
+	hrtime_t hrt;
+	hrtime_t mytsc;
+
+	if (tsc == NULL)
+		return;
+	mytsc = *tsc;
+
+	TSC_CONVERT(mytsc, hrt, nsec_scale);
+	*tsc  = hrt;
+}
+
+hrtime_t
+tsc_gethrtimeunscaled_delta(void)
+{
+	hrtime_t hrt;
+	int flags;
+
+	/*
+	 * Similarly to tsc_gethrtime_delta, we need to disable preemption
+	 * to prevent migration between the call to tsc_gethrtimeunscaled
+	 * and adding the CPU's hrtime delta. Note that disabling and
+	 * reenabling preemption is forbidden here because we may be in the
+	 * middle of a fast trap. In the amd64 kernel we cannot tolerate
+	 * preemption during a fast trap. See _update_sregs().
+	 */
+
+	flags = clear_int_flag();
+	hrt = tsc_gethrtimeunscaled() + tsc_sync_tick_delta[CPU->cpu_id];
+	restore_int_flag(flags);
+
+	return (hrt);
+}
 
 /*
  * Called by the master after the sync operation is complete.  If the
@@ -313,31 +535,6 @@ tsc_sync_slave(void)
 	restore_int_flag(flags);
 }
 
-void
-tsc_hrtimeinit(uint64_t cpu_freq_hz)
-{
-	longlong_t tsc;
-	ulong_t flags;
-
-	/*
-	 * cpu_freq_hz is the measured cpu frequency in hertz
-	 */
-
-	/*
-	 * We can't accommodate CPUs slower than 31.25 MHz.
-	 */
-	ASSERT(cpu_freq_hz > NANOSEC / (1 << NSEC_SHIFT));
-	nsec_scale =
-	    (uint_t)
-		(((uint64_t)NANOSEC << (32 - NSEC_SHIFT)) / cpu_freq_hz);
-
-	flags = clear_int_flag();
-	tsc = tsc_read();
-	(void) tsc_gethrtime();
-	tsc_max_delta = tsc_read() - tsc;
-	restore_int_flag(flags);
-}
-
 /*
  * Called once per second on a CPU from the cyclic subsystem's
  * CY_HIGH_LEVEL interrupt.  (No longer just cpu0-only)
@@ -395,267 +592,32 @@ tsc_tick(void)
 	CLOCK_UNLOCK(spl);
 }
 
-hrtime_t
-tsc_gethrtime(void)
-{
-	uint32_t old_hres_lock;
-	hrtime_t tsc, hrt;
-
-	do {
-		old_hres_lock = hres_lock;
-
-		if ((tsc = tsc_read()) >= tsc_last) {
-			/*
-			 * It would seem to be obvious that this is true
-			 * (that is, the past is less than the present),
-			 * but it isn't true in the presence of suspend/resume
-			 * cycles.  If we manage to call gethrtime()
-			 * after a resume, but before the first call to
-			 * tsc_tick(), we will see the jump.  In this case,
-			 * we will simply use the value in TSC as the delta.
-			 */
-			tsc -= tsc_last;
-		} else if (tsc >= tsc_last - 2*tsc_max_delta) {
-			/*
-			 * There is a chance that tsc_tick() has just run on
-			 * another CPU, and we have drifted just enough so that
-			 * we appear behind tsc_last.  In this case, force the
-			 * delta to be zero.
-			 */
-			tsc = 0;
-		}
-		hrt = tsc_hrtime_base;
-
-		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
-	} while ((old_hres_lock & ~1) != hres_lock);
-
-	return (hrt);
-}
-
-/*
- * This is similar to the above, but it cannot actually spin on hres_lock.
- * As a result, it caches all of the variables it needs; if the variables
- * don't change, it's done.
- */
-hrtime_t
-dtrace_gethrtime(void)
-{
-	uint32_t old_hres_lock;
-	hrtime_t tsc, hrt;
-	int flags;
-
-	do {
-		old_hres_lock = hres_lock;
-
-		/*
-		 * Interrupts are disabled to ensure that the thread isn't
-		 * migrated between the tsc_read() and adding the CPU's
-		 * TSC tick delta.
-		 */
-		flags = clear_int_flag();
-
-		tsc = tsc_read();
-
-		if (gethrtimef == tsc_gethrtime_delta)
-			tsc += tsc_sync_tick_delta[CPU->cpu_id];
-
-		restore_int_flag(flags);
-
-		/*
-		 * See the comments in tsc_gethrtime(), above.
-		 */
-		if (tsc >= tsc_last)
-			tsc -= tsc_last;
-		else if (tsc >= tsc_last - 2*tsc_max_delta)
-			tsc = 0;
-
-		hrt = tsc_hrtime_base;
-
-		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
-
-		if ((old_hres_lock & ~1) == hres_lock)
-			break;
-
-		/*
-		 * If we're here, the clock lock is locked -- or it has been
-		 * unlocked and locked since we looked.  This may be due to
-		 * tsc_tick() running on another CPU -- or it may be because
-		 * some code path has ended up in dtrace_probe() with
-		 * CLOCK_LOCK held.  We'll try to determine that we're in
-		 * the former case by taking another lap if the lock has
-		 * changed since when we first looked at it.
-		 */
-		if (old_hres_lock != hres_lock)
-			continue;
-
-		/*
-		 * So the lock was and is locked.  We'll use the old data
-		 * instead.
-		 */
-		old_hres_lock = shadow_hres_lock;
-
-		/*
-		 * Again, disable interrupts to ensure that the thread
-		 * isn't migrated between the tsc_read() and adding
-		 * the CPU's TSC tick delta.
-		 */
-		flags = clear_int_flag();
-
-		tsc = tsc_read();
-
-		if (gethrtimef == tsc_gethrtime_delta)
-			tsc += tsc_sync_tick_delta[CPU->cpu_id];
-
-		restore_int_flag(flags);
-
-		/*
-		 * See the comments in tsc_gethrtime(), above.
-		 */
-		if (tsc >= shadow_tsc_last)
-			tsc -= shadow_tsc_last;
-		else if (tsc >= shadow_tsc_last - 2 * tsc_max_delta)
-			tsc = 0;
-
-		hrt = shadow_tsc_hrtime_base;
-
-		TSC_CONVERT_AND_ADD(tsc, hrt, shadow_nsec_scale);
-	} while ((old_hres_lock & ~1) != shadow_hres_lock);
-
-	return (hrt);
-}
-
-hrtime_t
-tsc_gethrtime_delta(void)
-{
-	uint32_t old_hres_lock;
-	hrtime_t tsc, hrt;
-	int flags;
-
-	do {
-		old_hres_lock = hres_lock;
-
-		/*
-		 * We need to disable interrupts here to assure that we
-		 * don't migrate between the call to tsc_read() and
-		 * adding the CPU's TSC tick delta. Note that disabling
-		 * and reenabling preemption is forbidden here because
-		 * we may be in the middle of a fast trap. In the amd64
-		 * kernel we cannot tolerate preemption during a fast
-		 * trap. See _update_sregs().
-		 */
-
-		flags = clear_int_flag();
-		tsc = tsc_read() + tsc_sync_tick_delta[CPU->cpu_id];
-		restore_int_flag(flags);
-
-		/* See comments in tsc_gethrtime() above */
-
-		if (tsc >= tsc_last) {
-			tsc -= tsc_last;
-		} else if (tsc >= tsc_last - 2 * tsc_max_delta) {
-			tsc = 0;
-		}
-
-		hrt = tsc_hrtime_base;
-
-		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
-	} while ((old_hres_lock & ~1) != hres_lock);
-
-	return (hrt);
-}
-
-extern uint64_t cpu_freq_hz;
-extern int tsc_gethrtime_enable;
-
-/*
- * The following converts nanoseconds of highres-time to ticks
- */
-
-static uint64_t
-hrtime2tick(hrtime_t ts)
-{
-	hrtime_t q = ts / NANOSEC;
-	hrtime_t r = ts - (q * NANOSEC);
-
-	return (q * cpu_freq_hz + ((r * cpu_freq_hz) / NANOSEC));
-}
-
-/*
- * This is used to convert scaled high-res time from nanoseconds to
- * unscaled hardware ticks.  (Read from hardware timestamp counter)
- */
-
-uint64_t
-unscalehrtime(hrtime_t ts)
-{
-	if (tsc_gethrtime_enable) {
-		uint64_t unscale = 0;
-		hrtime_t rescale;
-		hrtime_t diff = ts;
-
-		while (diff > (nsec_per_tick)) {
-			unscale += hrtime2tick(diff);
-			rescale = unscale;
-			scalehrtime(&rescale);
-			diff = ts - rescale;
-		}
-
-		return (unscale);
-	}
-	return (0);
-}
-
-
-hrtime_t
-tsc_gethrtimeunscaled(void)
-{
-	uint32_t old_hres_lock;
-	hrtime_t tsc;
-
-	do {
-		old_hres_lock = hres_lock;
-
-		/* See tsc_tick(). */
-		tsc = tsc_read() + tsc_last_jumped;
-	} while ((old_hres_lock & ~1) != hres_lock);
-
-	return (tsc);
-}
-
-
-/* Convert a tsc timestamp to nanoseconds */
 void
-tsc_scalehrtime(hrtime_t *tsc)
+tsc_hrtimeinit(uint64_t cpu_freq_hz)
 {
-	hrtime_t hrt;
-	hrtime_t mytsc;
-
-	if (tsc == NULL)
-		return;
-	mytsc = *tsc;
-
-	TSC_CONVERT(mytsc, hrt, nsec_scale);
-	*tsc  = hrt;
-}
-
-hrtime_t
-tsc_gethrtimeunscaled_delta(void)
-{
-	hrtime_t hrt;
-	int flags;
+	extern int gethrtime_hires;
+	longlong_t tsc;
+	ulong_t flags;
 
 	/*
-	 * Similarly to tsc_gethrtime_delta, we need to disable preemption
-	 * to prevent migration between the call to tsc_gethrtimeunscaled
-	 * and adding the CPU's hrtime delta. Note that disabling and
-	 * reenabling preemption is forbidden here because we may be in the
-	 * middle of a fast trap. In the amd64 kernel we cannot tolerate
-	 * preemption during a fast trap. See _update_sregs().
+	 * cpu_freq_hz is the measured cpu frequency in hertz
 	 */
 
-	flags = clear_int_flag();
-	hrt = tsc_gethrtimeunscaled() + tsc_sync_tick_delta[CPU->cpu_id];
-	restore_int_flag(flags);
+	/*
+	 * We can't accommodate CPUs slower than 31.25 MHz.
+	 */
+	ASSERT(cpu_freq_hz > NANOSEC / (1 << NSEC_SHIFT));
+	nsec_scale =
+	    (uint_t)(((uint64_t)NANOSEC << (32 - NSEC_SHIFT)) / cpu_freq_hz);
 
-	return (hrt);
+	flags = clear_int_flag();
+	tsc = tsc_read();
+	(void) tsc_gethrtime();
+	tsc_max_delta = tsc_read() - tsc;
+	restore_int_flag(flags);
+	gethrtimef = tsc_gethrtime;
+	gethrtimeunscaledf = tsc_gethrtimeunscaled;
+	scalehrtimef = tsc_scalehrtime;
+	hrtime_tick = tsc_tick;
+	gethrtime_hires = 1;
 }

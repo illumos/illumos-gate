@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,6 +57,7 @@ static kmem_cache_t	*i_mac_impl_cachep;
 static mod_hash_t	*i_mac_impl_hash;
 krwlock_t		i_mac_impl_lock;
 uint_t			i_mac_impl_count;
+static kmem_cache_t	*mac_vnic_tx_cache;
 
 #define	MACTYPE_KMODDIR	"mac"
 #define	MACTYPE_HASHSZ	67
@@ -67,6 +69,8 @@ static mod_hash_t	*i_mactype_hash;
 static kmutex_t		i_mactype_lock;
 
 static void i_mac_notify_thread(void *);
+static mblk_t *mac_vnic_tx(void *, mblk_t *);
+static mblk_t *mac_vnic_txloop(void *, mblk_t *);
 
 /*
  * Private functions.
@@ -86,7 +90,7 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 	rw_init(&mip->mi_data_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_notify_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_rx_lock, NULL, RW_DRIVER, NULL);
-	rw_init(&mip->mi_txloop_lock, NULL, RW_DRIVER, NULL);
+	rw_init(&mip->mi_tx_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_resource_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&mip->mi_activelink_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&mip->mi_notify_bits_lock, NULL, MUTEX_DRIVER, NULL);
@@ -119,13 +123,40 @@ i_mac_destructor(void *buf, void *arg)
 	rw_destroy(&mip->mi_data_lock);
 	rw_destroy(&mip->mi_notify_lock);
 	rw_destroy(&mip->mi_rx_lock);
-	rw_destroy(&mip->mi_txloop_lock);
+	rw_destroy(&mip->mi_tx_lock);
 	rw_destroy(&mip->mi_resource_lock);
 	mutex_destroy(&mip->mi_activelink_lock);
 	mutex_destroy(&mip->mi_notify_bits_lock);
 	cv_destroy(&mip->mi_notify_cv);
 	mutex_destroy(&mip->mi_lock);
 	cv_destroy(&mip->mi_rx_cv);
+}
+
+/*
+ * mac_vnic_tx_t kmem cache support functions.
+ */
+
+/* ARGSUSED */
+static int
+i_mac_vnic_tx_ctor(void *buf, void *arg, int mkflag)
+{
+	mac_vnic_tx_t *vnic_tx = buf;
+
+	bzero(buf, sizeof (mac_vnic_tx_t));
+	mutex_init(&vnic_tx->mv_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&vnic_tx->mv_cv, NULL, CV_DRIVER, NULL);
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+i_mac_vnic_tx_dtor(void *buf, void *arg)
+{
+	mac_vnic_tx_t *vnic_tx = buf;
+
+	ASSERT(vnic_tx->mv_refs == 0);
+	mutex_destroy(&vnic_tx->mv_lock);
+	cv_destroy(&vnic_tx->mv_cv);
 }
 
 static void
@@ -311,6 +342,11 @@ mac_init(void)
 	    NULL, NULL, NULL, 0);
 	ASSERT(i_mac_impl_cachep != NULL);
 
+	mac_vnic_tx_cache = kmem_cache_create("mac_vnic_tx_cache",
+	    sizeof (mac_vnic_tx_t), 0, i_mac_vnic_tx_ctor, i_mac_vnic_tx_dtor,
+	    NULL, NULL, NULL, 0);
+	ASSERT(mac_vnic_tx_cache != NULL);
+
 	i_mac_impl_hash = mod_hash_create_extended("mac_impl_hash",
 	    IMPL_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
@@ -333,6 +369,7 @@ mac_fini(void)
 	rw_destroy(&i_mac_impl_lock);
 
 	kmem_cache_destroy(i_mac_impl_cachep);
+	kmem_cache_destroy(mac_vnic_tx_cache);
 
 	mod_hash_destroy_hash(i_mactype_hash);
 	return (0);
@@ -364,6 +401,9 @@ mac_open(const char *macname, uint_t ddi_instance, mac_handle_t *mhp)
 	 */
 	if (ddi_parse(macname, driver, &instance) != DDI_SUCCESS)
 		return (EINVAL);
+
+	if ((strcmp(driver, "aggr") == 0) || (strcmp(driver, "vnic") == 0))
+		ddi_instance = 0;
 
 	/*
 	 * Get the major number of the driver.
@@ -870,7 +910,7 @@ mac_ioctl(mac_handle_t mh, queue_t *wq, mblk_t *bp)
 }
 
 const mac_txinfo_t *
-mac_tx_get(mac_handle_t mh)
+mac_do_tx_get(mac_handle_t mh, boolean_t is_vnic)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 	mac_txinfo_t	*mtp;
@@ -881,22 +921,51 @@ mac_tx_get(mac_handle_t mh)
 	 * call mac_txloop_add() prior to enabling MAC_PROMISC, and to disable
 	 * MAC_PROMISC prior to calling mac_txloop_remove().
 	 */
-	rw_enter(&mip->mi_txloop_lock, RW_READER);
+	rw_enter(&mip->mi_tx_lock, RW_READER);
 
 	if (mac_promisc_get(mh, MAC_PROMISC)) {
 		ASSERT(mip->mi_mtfp != NULL);
-		mtp = &mip->mi_txloopinfo;
+		if (mip->mi_vnic_present && !is_vnic) {
+			mtp = &mip->mi_vnic_txloopinfo;
+		} else {
+			mtp = &mip->mi_txloopinfo;
+		}
 	} else {
-		/*
-		 * Note that we cannot ASSERT() that mip->mi_mtfp is NULL,
-		 * because to satisfy the above ASSERT(), we have to disable
-		 * MAC_PROMISC prior to calling mac_txloop_remove().
-		 */
-		mtp = &mip->mi_txinfo;
+		if (mip->mi_vnic_present && !is_vnic) {
+			mtp = &mip->mi_vnic_txinfo;
+		} else {
+			/*
+			 * Note that we cannot ASSERT() that mip->mi_mtfp is
+			 * NULL, because to satisfy the above ASSERT(), we
+			 * have to disable MAC_PROMISC prior to calling
+			 * mac_txloop_remove().
+			 */
+			mtp = &mip->mi_txinfo;
+		}
 	}
 
-	rw_exit(&mip->mi_txloop_lock);
+	rw_exit(&mip->mi_tx_lock);
 	return (mtp);
+}
+
+/*
+ * Invoked by VNIC to obtain the transmit entry point.
+ */
+const mac_txinfo_t *
+mac_vnic_tx_get(mac_handle_t mh)
+{
+	return (mac_do_tx_get(mh, B_TRUE));
+}
+
+/*
+ * Invoked by any non-VNIC client to obtain the transmit entry point.
+ * If a VNIC is present, the VNIC transmit function provided by the VNIC
+ * will be returned to the MAC client.
+ */
+const mac_txinfo_t *
+mac_tx_get(mac_handle_t mh)
+{
+	return (mac_do_tx_get(mh, B_FALSE));
 }
 
 link_state_t
@@ -973,7 +1042,7 @@ mac_notify(mac_handle_t mh)
  * can be found atop mac_rx().
  */
 mac_rx_handle_t
-mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
+mac_do_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg, boolean_t is_active)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 	mac_rx_fn_t	*mrfp;
@@ -981,6 +1050,7 @@ mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
 	mrfp = kmem_zalloc(sizeof (mac_rx_fn_t), KM_SLEEP);
 	mrfp->mrf_fn = rx;
 	mrfp->mrf_arg = arg;
+	mrfp->mrf_active = is_active;
 
 	/*
 	 * Add it to the head of the 'rx' callback list.
@@ -1003,6 +1073,18 @@ mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
 	rw_exit(&(mip->mi_rx_lock));
 
 	return ((mac_rx_handle_t)mrfp);
+}
+
+mac_rx_handle_t
+mac_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
+{
+	return (mac_do_rx_add(mh, rx, arg, B_FALSE));
+}
+
+mac_rx_handle_t
+mac_active_rx_add(mac_handle_t mh, mac_rx_t rx, void *arg)
+{
+	return (mac_do_rx_add(mh, rx, arg, B_TRUE));
 }
 
 /*
@@ -1087,10 +1169,10 @@ mac_txloop_add(mac_handle_t mh, mac_txloop_t tx, void *arg)
 	/*
 	 * Add it to the head of the 'tx' callback list.
 	 */
-	rw_enter(&(mip->mi_txloop_lock), RW_WRITER);
+	rw_enter(&(mip->mi_tx_lock), RW_WRITER);
 	mtfp->mtf_nextp = mip->mi_mtfp;
 	mip->mi_mtfp = mtfp;
-	rw_exit(&(mip->mi_txloop_lock));
+	rw_exit(&(mip->mi_tx_lock));
 
 	return ((mac_txloop_handle_t)mtfp);
 }
@@ -1110,7 +1192,7 @@ mac_txloop_remove(mac_handle_t mh, mac_txloop_handle_t mth)
 	/*
 	 * Search the 'tx' callback list for the function.
 	 */
-	rw_enter(&(mip->mi_txloop_lock), RW_WRITER);
+	rw_enter(&(mip->mi_tx_lock), RW_WRITER);
 	for (pp = &(mip->mi_mtfp); (p = *pp) != NULL; pp = &(p->mtf_nextp)) {
 		if (p == mtfp)
 			break;
@@ -1120,7 +1202,7 @@ mac_txloop_remove(mac_handle_t mh, mac_txloop_handle_t mth)
 	/* Remove it from the list. */
 	*pp = p->mtf_nextp;
 	kmem_free(mtfp, sizeof (mac_txloop_fn_t));
-	rw_exit(&(mip->mi_txloop_lock));
+	rw_exit(&(mip->mi_tx_lock));
 }
 
 void
@@ -1295,12 +1377,19 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_dip = mregp->m_dip;
 
 	/*
-	 * Set up the two possible transmit routines.
+	 * Set up the possible transmit routines.
 	 */
 	mip->mi_txinfo.mt_fn = mip->mi_tx;
 	mip->mi_txinfo.mt_arg = mip->mi_driver;
+
+	mip->mi_vnic_txinfo.mt_fn = mac_vnic_tx;
+	mip->mi_vnic_txinfo.mt_arg = mip;
+
 	mip->mi_txloopinfo.mt_fn = mac_txloop;
 	mip->mi_txloopinfo.mt_arg = mip;
+
+	mip->mi_vnic_txloopinfo.mt_fn = mac_vnic_txloop;
+	mip->mi_vnic_txloopinfo.mt_arg = mip;
 
 	/*
 	 * Allocate a notification thread.
@@ -1405,12 +1494,10 @@ fail:
 }
 
 int
-mac_unregister(mac_handle_t mh)
+mac_disable(mac_handle_t mh)
 {
 	int			err;
 	mac_impl_t		*mip = (mac_impl_t *)mh;
-	mod_hash_val_t		val;
-	mac_multicst_addr_t	*p, *nextp;
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
@@ -1430,6 +1517,29 @@ mac_unregister(mac_handle_t mh)
 		mip->mi_disabled = B_FALSE;
 		rw_exit(&i_mac_impl_lock);
 		return (err);
+	}
+
+	return (0);
+}
+
+int
+mac_unregister(mac_handle_t mh)
+{
+	int			err;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mod_hash_val_t		val;
+	mac_multicst_addr_t	*p, *nextp;
+
+	/*
+	 * See if there are any other references to this mac_t (e.g., VLAN's).
+	 * If not, set mi_disabled to prevent any new VLAN's from being
+	 * created while we're destroying this mac. Once mac_disable() returns
+	 * 0, the rest of mac_unregister() stuff should continue without
+	 * returning an error.
+	 */
+	if (!mip->mi_disabled) {
+		if ((err = mac_disable(mh)) != 0)
+			return (err);
 	}
 
 	/*
@@ -1508,8 +1618,9 @@ mac_unregister(mac_handle_t mh)
  * will be upgraded to WRITER mode when there are marked upcalls to be
  * cleaned.
  */
-void
-mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
+static void
+mac_do_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain,
+    boolean_t active_only)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 	mblk_t		*bp = mp_chain;
@@ -1534,6 +1645,18 @@ mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	do {
 		mblk_t *recv_bp;
 
+		if (active_only && !mrfp->mrf_active) {
+			mrfp = mrfp->mrf_nextp;
+			if (mrfp == NULL) {
+				/*
+				 * We hit the last receiver, but it's not
+				 * active.
+				 */
+				freemsgchain(bp);
+			}
+			continue;
+		}
+
 		recv_bp = (mrfp->mrf_nextp != NULL) ? copymsgchain(bp) : bp;
 		if (recv_bp != NULL) {
 			if (mrfp->mrf_inuse) {
@@ -1549,6 +1672,7 @@ mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 				freemsgchain(recv_bp);
 			}
 		}
+
 		mrfp = mrfp->mrf_nextp;
 	} while (mrfp != NULL);
 
@@ -1603,15 +1727,84 @@ mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	rw_exit(&mip->mi_rx_lock);
 }
 
+void
+mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
+{
+	mac_do_rx(mh, mrh, mp_chain, B_FALSE);
+}
+
+/*
+ * Send a packet chain up to the receive callbacks which declared
+ * themselves as being active.
+ */
+void
+mac_active_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp_chain)
+{
+	mac_do_rx(arg, mrh, mp_chain, B_TRUE);
+}
+
+/*
+ * Function passed to the active client sharing a VNIC. This function
+ * is returned by mac_tx_get() when a VNIC is present. It invokes
+ * the VNIC transmit entry point which was specified by the VNIC when
+ * it called mac_vnic_set(). The VNIC transmit entry point will
+ * pass the packets to the local VNICs and/or to the underlying VNICs
+ * if needed.
+ */
+static mblk_t *
+mac_vnic_tx(void *arg, mblk_t *mp)
+{
+	mac_impl_t	*mip = arg;
+	mac_txinfo_t	*mtfp;
+	mac_vnic_tx_t	*mvt;
+
+	/*
+	 * There is a race between the notification of the VNIC
+	 * addition and removal, and the processing of the VNIC notification
+	 * by the MAC client. During this window, it is possible for
+	 * an active MAC client to contine invoking mac_vnic_tx() while
+	 * the VNIC has already been removed. So we cannot assume
+	 * that mi_vnic_present will always be true when mac_vnic_tx()
+	 * is invoked.
+	 */
+	rw_enter(&mip->mi_tx_lock, RW_READER);
+	if (!mip->mi_vnic_present) {
+		rw_exit(&mip->mi_tx_lock);
+		freemsgchain(mp);
+		return (NULL);
+	}
+
+	ASSERT(mip->mi_vnic_tx != NULL);
+	mvt = mip->mi_vnic_tx;
+	MAC_VNIC_TXINFO_REFHOLD(mvt);
+	rw_exit(&mip->mi_tx_lock);
+
+	mtfp = &mvt->mv_txinfo;
+	mtfp->mt_fn(mtfp->mt_arg, mp);
+
+	MAC_VNIC_TXINFO_REFRELE(mvt);
+	return (NULL);
+}
+
 /*
  * Transmit function -- ONLY used when there are registered loopback listeners.
  */
 mblk_t *
-mac_txloop(void *arg, mblk_t *bp)
+mac_do_txloop(void *arg, mblk_t *bp, boolean_t call_vnic)
 {
 	mac_impl_t	*mip = arg;
 	mac_txloop_fn_t	*mtfp;
 	mblk_t		*loop_bp, *resid_bp, *next_bp;
+
+	if (call_vnic) {
+		/*
+		 * In promiscous mode, a copy of the sent packet will
+		 * be sent to the client's promiscous receive entry
+		 * points via mac_vnic_tx()->
+		 * mac_active_rx_promisc()->mac_rx_default().
+		 */
+		return (mac_vnic_tx(arg, bp));
+	}
 
 	while (bp != NULL) {
 		next_bp = bp->b_next;
@@ -1626,7 +1819,7 @@ mac_txloop(void *arg, mblk_t *bp)
 			goto noresources;
 		}
 
-		rw_enter(&mip->mi_txloop_lock, RW_READER);
+		rw_enter(&mip->mi_tx_lock, RW_READER);
 		mtfp = mip->mi_mtfp;
 		while (mtfp != NULL && loop_bp != NULL) {
 			bp = loop_bp;
@@ -1640,7 +1833,7 @@ mac_txloop(void *arg, mblk_t *bp)
 			mtfp->mtf_fn(mtfp->mtf_arg, bp);
 			mtfp = mtfp->mtf_nextp;
 		}
-		rw_exit(&mip->mi_txloop_lock);
+		rw_exit(&mip->mi_tx_lock);
 
 		/*
 		 * It's possible we've raced with the disabling of promiscuous
@@ -1657,6 +1850,18 @@ mac_txloop(void *arg, mblk_t *bp)
 noresources:
 	bp->b_next = next_bp;
 	return (bp);
+}
+
+mblk_t *
+mac_txloop(void *arg, mblk_t *bp)
+{
+	return (mac_do_txloop(arg, bp, B_FALSE));
+}
+
+static mblk_t *
+mac_vnic_txloop(void *arg, mblk_t *bp)
+{
+	return (mac_do_txloop(arg, bp, B_TRUE));
 }
 
 void
@@ -1832,7 +2037,7 @@ mac_promisc_refresh(mac_handle_t mh, mac_setpromisc_t refresh, void *arg)
 }
 
 boolean_t
-mac_active_set(mac_handle_t mh)
+mac_do_active_set(mac_handle_t mh, boolean_t shareable)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
@@ -1842,8 +2047,28 @@ mac_active_set(mac_handle_t mh)
 		return (B_FALSE);
 	}
 	mip->mi_activelink = B_TRUE;
+	mip->mi_shareable = shareable;
 	mutex_exit(&mip->mi_activelink_lock);
 	return (B_TRUE);
+}
+
+/*
+ * Called by MAC clients. By default, active MAC clients cannot
+ * share the NIC with VNICs.
+ */
+boolean_t
+mac_active_set(mac_handle_t mh)
+{
+	return (mac_do_active_set(mh, B_FALSE));
+}
+
+/*
+ * Called by MAC clients which can share the NIC with VNICS, e.g. DLS.
+ */
+boolean_t
+mac_active_shareable_set(mac_handle_t mh)
+{
+	return (mac_do_active_set(mh, B_TRUE));
 }
 
 void
@@ -1855,6 +2080,79 @@ mac_active_clear(mac_handle_t mh)
 	ASSERT(mip->mi_activelink);
 	mip->mi_activelink = B_FALSE;
 	mutex_exit(&mip->mi_activelink_lock);
+}
+
+boolean_t
+mac_vnic_set(mac_handle_t mh, mac_txinfo_t *tx_info, mac_getcapab_t getcapab_fn,
+    void *getcapab_arg)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	mac_vnic_tx_t	*vnic_tx;
+
+	mutex_enter(&mip->mi_activelink_lock);
+	rw_enter(&mip->mi_tx_lock, RW_WRITER);
+	ASSERT(!mip->mi_vnic_present);
+
+	if (mip->mi_activelink && !mip->mi_shareable) {
+		/*
+		 * The NIC is already used by an active client which cannot
+		 * share it with VNICs.
+		 */
+		rw_exit(&mip->mi_tx_lock);
+		mutex_exit(&mip->mi_activelink_lock);
+		return (B_FALSE);
+	}
+
+	vnic_tx = kmem_cache_alloc(mac_vnic_tx_cache, KM_SLEEP);
+	vnic_tx->mv_refs = 0;
+	vnic_tx->mv_txinfo = *tx_info;
+	vnic_tx->mv_clearing = B_FALSE;
+
+	mip->mi_vnic_present = B_TRUE;
+	mip->mi_vnic_tx = vnic_tx;
+	mip->mi_vnic_getcapab_fn = getcapab_fn;
+	mip->mi_vnic_getcapab_arg = getcapab_arg;
+	rw_exit(&mip->mi_tx_lock);
+	mutex_exit(&mip->mi_activelink_lock);
+
+	i_mac_notify(mip, MAC_NOTE_VNIC);
+	return (B_TRUE);
+}
+
+void
+mac_vnic_clear(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_vnic_tx_t	*vnic_tx;
+
+	rw_enter(&mip->mi_tx_lock, RW_WRITER);
+	ASSERT(mip->mi_vnic_present);
+	mip->mi_vnic_present = B_FALSE;
+	/*
+	 * Setting mi_vnic_tx to NULL here under the lock guarantees
+	 * that no new references to the current VNIC transmit structure
+	 * will be taken by mac_vnic_tx(). This is a necessary condition
+	 * for safely waiting for the reference count to drop to
+	 * zero below.
+	 */
+	vnic_tx = mip->mi_vnic_tx;
+	mip->mi_vnic_tx = NULL;
+	mip->mi_vnic_getcapab_fn = NULL;
+	mip->mi_vnic_getcapab_arg = NULL;
+	rw_exit(&mip->mi_tx_lock);
+
+	i_mac_notify(mip, MAC_NOTE_VNIC);
+
+	/*
+	 * Wait for all TX calls referencing the VNIC transmit
+	 * entry point that was removed to complete.
+	 */
+	mutex_enter(&vnic_tx->mv_lock);
+	vnic_tx->mv_clearing = B_TRUE;
+	while (vnic_tx->mv_refs > 0)
+		cv_wait(&vnic_tx->mv_cv, &vnic_tx->mv_lock);
+	mutex_exit(&vnic_tx->mv_lock);
+	kmem_cache_free(mac_vnic_tx_cache, vnic_tx);
 }
 
 /*
@@ -1906,14 +2204,40 @@ mac_info_get(const char *name, mac_info_t *minfop)
 }
 
 boolean_t
-mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
+mac_do_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data,
+    boolean_t is_vnic)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (!is_vnic) {
+		rw_enter(&mip->mi_tx_lock, RW_READER);
+		if (mip->mi_vnic_present) {
+			boolean_t rv;
+
+			rv = mip->mi_vnic_getcapab_fn(mip->mi_vnic_getcapab_arg,
+			    cap, cap_data);
+			rw_exit(&mip->mi_tx_lock);
+			return (rv);
+		}
+		rw_exit(&mip->mi_tx_lock);
+	}
 
 	if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB)
 		return (mip->mi_getcapab(mip->mi_driver, cap, cap_data));
 	else
 		return (B_FALSE);
+}
+
+boolean_t
+mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
+{
+	return (mac_do_capab_get(mh, cap, cap_data, B_FALSE));
+}
+
+boolean_t
+mac_vnic_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
+{
+	return (mac_do_capab_get(mh, cap, cap_data, B_TRUE));
 }
 
 boolean_t

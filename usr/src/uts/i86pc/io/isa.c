@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,11 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/acpi/acpi_enum.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#include <sys/evtchn_impl.h>
+#endif
+
 
 extern int isa_resource_setup(void);
 static char USED_RESOURCES[] = "used-resources";
@@ -198,6 +203,17 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	int rval;
 
+#if defined(__xpv)
+	/*
+	 * don't allow isa to attach in domU. this can happen if someone sets
+	 * the console wrong, etc. ISA devices assume the H/W is there and
+	 * will cause the domU to panic.
+	 */
+	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
+		return (DDI_FAILURE);
+	}
+#endif
+
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
@@ -338,7 +354,7 @@ is_pnpisa(dev_info_t *dip)
 	if (ndi_dev_is_persistent_node(dip) == 0)
 		return (0);
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-		(caddr_t)&isa_regs, &proplen) != DDI_PROP_SUCCESS) {
+	    (caddr_t)&isa_regs, &proplen) != DDI_PROP_SUCCESS) {
 		return (0);
 	}
 	pnpisa = isa_regs[0].phys_hi & 0x80000000;
@@ -609,6 +625,15 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 	/* serial ports */
 	for (i = 0; i < 2; i++) {
+#if defined(__xpv)
+		/*
+		 * the hypervisor may be reserving the serial ports for console
+		 * and/or debug use.  Probe the irqs to see if they are
+		 * available.
+		 */
+		if (ec_probe_pirq(asy_intrs[i]) == 0)
+			continue; /* in use */
+#endif
 		ndi_devi_alloc_sleep(isa_dip, "asy",
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
@@ -665,7 +690,7 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 	 * the base I/O addresses of the first four serial ports.
 	 */
 	bios_data = (ushort_t *)psm_map_new((paddr_t)BIOS_DATA_AREA, size,
-		PSM_PROT_READ);
+	    PSM_PROT_READ);
 	for (i = 0; i < num_BIOS_serial; i++) {
 		if (bios_data[i] == 0) {
 			/* no COM[i]: port */
@@ -683,8 +708,8 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 
 			/* Match by addr */
 			ret = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, xdip,
-				DDI_PROP_DONTPASS, "reg", (int **)&tmpregs,
-				(uint_t *)&tmpregs_len);
+			    DDI_PROP_DONTPASS, "reg", (int **)&tmpregs,
+			    (uint_t *)&tmpregs_len);
 			if (ret != DDI_PROP_SUCCESS) {
 				/* error */
 				continue;
@@ -692,12 +717,12 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 
 			if (tmpregs->regspec_addr == bios_data[i])
 				found = 1;
-
 			/*
 			 * Free the memory allocated by
 			 * ddi_prop_lookup_int_array().
 			 */
 			ddi_prop_free(tmpregs);
+
 		}
 
 		/* If not found, then add it */
@@ -717,6 +742,47 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			(void) ndi_devi_bind_driver(xdip, 0);
 		}
 	}
+#if defined(__xpv)
+	/*
+	 * Check each serial port to see if it is in use by the hypervisor.
+	 * If it is in use, then remove the node from the device tree.
+	 */
+	i = 0;
+	for (xdip = ddi_get_child(isa_dip); xdip != NULL; ) {
+		int asy_intr;
+		dev_info_t *curdip;
+
+		curdip = xdip;
+		xdip = ddi_get_next_sibling(xdip);
+		if (strncmp(ddi_node_name(curdip), "asy", 3) != 0) {
+			/* skip non asy */
+			continue;
+		}
+		/*
+		 * Check if the hypervisor is using the serial port by probing
+		 * the irq and if it is using it remove the node
+		 * from the device tree
+		 */
+		asy_intr = ddi_prop_get_int(DDI_DEV_T_ANY, curdip,
+		    DDI_PROP_DONTPASS, "interrupts", -1);
+		if (asy_intr == -1) {
+			/* error */
+			continue;
+		}
+
+		if (ec_probe_pirq(asy_intr)) {
+			continue;
+		}
+		ret = ndi_devi_free(curdip);
+		if (ret != DDI_SUCCESS)
+			cmn_err(CE_WARN,
+			    "could not remove asy%d node", i);
+		else
+			cmn_err(CE_NOTE, "!asy%d unavailable, reserved"
+			    " to hypervisor", i);
+		i++;
+	}
+#endif	/* __xpv */
 
 	psm_unmap((caddr_t)bios_data, size);
 }

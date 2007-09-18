@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,10 +196,11 @@ mdb_path_alloc(const char *s, size_t *newlen)
 	arg_r.a_un.a_str = strcmp(mdb.m_root, "/") ? mdb.m_root : "";
 
 	/*
-	 * %t embedded in path string expands to the target name.
+	 * %t embedded in path string expands to the target name, defaulting to
+	 * kvm; this is so we can find mdb_kb, which is used during bootstrap.
 	 */
 	arg_t.a_type = MDB_TYPE_STRING;
-	arg_t.a_un.a_str = mdb.m_target ? mdb_tgt_name(mdb.m_target) : "none";
+	arg_t.a_un.a_str = mdb.m_target ? mdb_tgt_name(mdb.m_target) : "kvm";
 
 	/*
 	 * %R and %V expand to uname -r (release) and uname -v (version).
@@ -576,6 +577,12 @@ mdb_destroy(void)
 	mdb_macalias_destroy();
 
 	/*
+	 * Some targets use modules during ->t_destroy, so do it first.
+	 */
+	if (mdb.m_target != NULL)
+		(void) mdb_tgt_destroy(mdb.m_target);
+
+	/*
 	 * Unload modules _before_ destroying the disassemblers since a
 	 * module that installs a disassembler should try to clean up after
 	 * itself.
@@ -590,9 +597,6 @@ mdb_destroy(void)
 
 	if (mdb.m_defdisasm != NULL)
 		strfree(mdb.m_defdisasm);
-
-	if (mdb.m_target != NULL)
-		(void) mdb_tgt_destroy(mdb.m_target);
 
 	if (mdb.m_prsym != NULL)
 		mdb_gelf_symtab_destroy(mdb.m_prsym);
@@ -1370,7 +1374,14 @@ mdb_get_module(void)
 	if (mdb.m_lmod)
 		return (mdb.m_lmod);
 
-	if (mdb.m_frame && mdb.m_frame->f_cp && mdb.m_frame->f_cp->c_dcmd)
+	if (mdb.m_frame == NULL)
+		return (NULL);
+
+	if (mdb.m_frame->f_wcbs && mdb.m_frame->f_wcbs->w_walker &&
+	    mdb.m_frame->f_wcbs->w_walker->iwlk_modp)
+		return (mdb.m_frame->f_wcbs->w_walker->iwlk_modp);
+
+	if (mdb.m_frame->f_cp && mdb.m_frame->f_cp->c_dcmd)
 		return (mdb.m_frame->f_cp->c_dcmd->idc_modp);
 
 	return (NULL);

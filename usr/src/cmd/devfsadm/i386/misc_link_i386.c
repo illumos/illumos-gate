@@ -585,8 +585,6 @@ xsvc(di_minor_t minor, di_node_t node)
 static int
 ucode(di_minor_t minor, di_node_t node)
 {
-	char *mn;
-
 	(void) devfsadm_mklink("ucode", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

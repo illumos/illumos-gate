@@ -137,8 +137,6 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 	mdb_printf("   %%err = 0x%x\n", kregs[KREG_ERR]);
 }
 
-
-
 /*
  * Sun Studio 10 patch compiler and gcc 3.4.3 Sun branch implemented a
  * "-save_args" option on amd64.  When the option is specified, INTEGER
@@ -303,6 +301,22 @@ is_argsaved(mdb_tgt_t *t, uintptr_t fstart, uint64_t size, uint_t argc,
 	return (0);
 }
 
+/*
+ * We expect all proper Solaris core files to have STACK_ALIGN-aligned stacks.
+ * Hence the name.  However, if the core file resulted from a
+ * hypervisor-initiated panic, the hypervisor's frames may only be 64-bit
+ * aligned instead of 128.
+ */
+static int
+fp_is_aligned(uintptr_t fp, int xpv_panic)
+{
+	if (!xpv_panic && (fp & (STACK_ALIGN -1)))
+		return (0);
+	if ((fp & sizeof (uintptr_t) - 1))
+		return (0);
+	return (1);
+}
+
 int
 mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
     mdb_tgt_stack_f *func, void *arg)
@@ -322,13 +336,20 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_RBP];
 	uintptr_t pc = gsp->kregs[KREG_RIP];
-	uintptr_t curpc;
+	uintptr_t lastfp, curpc;
 
 	ssize_t size;
 
 	GElf_Sym s;
 	mdb_syminfo_t sip;
 	mdb_ctf_funcinfo_t mfp;
+	int xpv_panic = 0;
+#ifndef	_KMDB
+	int xp;
+
+	if ((mdb_readsym(&xp, sizeof (xp), "xpv_panicking") != -1) && (xp > 0))
+		xpv_panic = 1;
+#endif
 
 	bcopy(gsp, &gregs, sizeof (gregs));
 
@@ -336,7 +357,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 		curpc = pc;
 
-		if (fp & (STACK_ALIGN - 1))
+		if (!fp_is_aligned(fp, xpv_panic))
 			return (set_errno(EMDB_STKALIGN));
 
 		if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) != sizeof (fr))
@@ -397,7 +418,21 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 		kregs[KREG_RSP] = kregs[KREG_RBP];
 
-		kregs[KREG_RBP] = fp = fr.fr_savfp;
+		lastfp = fp;
+		fp = fr.fr_savfp;
+		/*
+		 * The Xen hypervisor marks a stack frame as belonging to
+		 * an exception by inverting the bits of the pointer to
+		 * that frame.  We attempt to identify these frames by
+		 * inverting the pointer and seeing if it is within 0xfff
+		 * bytes of the last frame.
+		 */
+		if (xpv_panic)
+			if ((fp != 0) && (fp < lastfp) &&
+			    ((lastfp ^ ~fp) < 0xfff))
+			fp = ~fp;
+
+		kregs[KREG_RBP] = fp;
 		kregs[KREG_RIP] = pc = fr.fr_savpc;
 
 		if (curpc == pc)

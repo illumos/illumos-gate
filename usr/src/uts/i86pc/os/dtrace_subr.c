@@ -124,7 +124,7 @@ dtrace_toxic_ranges(void (*func)(uintptr_t base, uintptr_t limit))
 		len = (caddr_t)KERNEL_TEXT - vaddr;
 		vaddr = device_arena_contains(vaddr, len, &len);
 		if (vaddr == NULL)
-		    break;
+			break;
 		(*func)((uintptr_t)vaddr, (uintptr_t)vaddr + len);
 	}
 #endif
@@ -155,7 +155,7 @@ dtrace_xcall(processorid_t cpu, dtrace_xcall_t func, void *arg)
 
 	kpreempt_disable();
 	xc_sync((xc_arg_t)func, (xc_arg_t)arg, 0, X_CALL_HIPRI, set,
-		(xc_func_t)dtrace_xcall_func);
+	    (xc_func_t)dtrace_xcall_func);
 	kpreempt_enable();
 }
 
@@ -388,10 +388,15 @@ dtrace_safe_defer_signal(void)
 
 /*
  * Additional artificial frames for the machine type. For i86pc, we're already
- * accounted for, so return 0.
+ * accounted for, so return 0. On the hypervisor, we have an additional frame
+ * (xen_callback_handler).
  */
 int
 dtrace_mach_aframes(void)
 {
+#ifdef __xpv
+	return (1);
+#else
 	return (0);
+#endif
 }

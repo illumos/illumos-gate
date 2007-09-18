@@ -81,6 +81,7 @@ extern void brand_sys_syscall();
 extern void brand_sys_syscall32();
 extern void brand_sys_syscall_int();
 extern int update_sregs();
+extern void reset_sregs();
 #elif defined(__i386)
 extern void sys_call();
 extern void brand_sys_call();
@@ -175,10 +176,21 @@ extern uint_t bsrw_insn(uint16_t);
 extern int sys_rtt_common(struct regs *);
 extern void fakesoftint(void);
 
+extern void *plat_traceback(void *);
 
+#if defined(__xpv)
+extern void xen_init_callbacks(void);
+extern void xen_set_callback(void (*)(void), uint_t, uint_t);
+extern void xen_printf(const char *, ...);
+#define	cpr_dprintf xen_printf
+extern int xpv_panicking;
+#define	IN_XPV_PANIC() (xpv_panicking > 0)
+#else
 extern void setup_mca(void);
 extern void setup_mtrr(void);
 #define	cpr_dprintf prom_printf
+#define	IN_XPV_PANIC() (__lintzero)
+#endif
 
 #endif /* _KERNEL */
 

@@ -44,6 +44,12 @@
 #define	PIT_COUNTDOWN	(PIT_READMODE | PIT_NDIVMODE)
 #define	MICROCOUNT	0x2000
 
+/*
+ * Loop count for 10 microsecond wait.  MUST be initialized for those who
+ * insist on calling "tenmicrosec" before the clock has been initialized.
+ */
+unsigned int microdata = 50;
+
 void
 microfind(void)
 {

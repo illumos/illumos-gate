@@ -46,10 +46,6 @@
  * Specifics are now in separate files and may be overridden by TOD
  * modules.
  */
-unsigned int microdata = 50;	/* loop count for 10 microsecond wait. */
-				/* MUST be initialized for those who */
-				/* insist on calling "tenmicrosec" before */
-				/* the clock has been initialized. */
 
 char *tod_module_name;		/* Settable in /etc/system */
 

@@ -71,7 +71,32 @@ ndptrap_frstor(void)
  * generate an error code. This is so the rest
  * of the kernel can expect a consistent stack
  * from from any exception.
+ *
+ * Note that for all exceptions for amd64
+ * %r11 and %rcx are on the stack. Just pop
+ * them back into their appropriate registers and let
+ * it get saved as is running native.
  */
+
+#if defined(__xpv) && defined(__amd64)
+
+#define	NPTRAP_NOERR(trapno)	\
+	pushq	$0;		\
+	pushq	$trapno	
+
+#define	TRAP_NOERR(trapno)	\
+	XPV_TRAP_POP;		\
+	NPTRAP_NOERR(trapno)
+
+/*
+ * error code already pushed by hw
+ * onto stack.
+ */
+#define	TRAP_ERR(trapno)	\
+	XPV_TRAP_POP;		\
+	pushq	$trapno	
+
+#else /* __xpv && __amd64 */
 
 #define	TRAP_NOERR(trapno)	\
 	push	$0;		\
@@ -85,6 +110,8 @@ ndptrap_frstor(void)
  */
 #define	TRAP_ERR(trapno)	\
 	push	$trapno	
+
+#endif	/* __xpv && __amd64 */
 
 
 	/*
@@ -105,6 +132,7 @@ ndptrap_frstor(void)
 	TRAP_NOERR(T_SGLSTP)	/* $1 */
 
 #if defined(__amd64)
+#if !defined(__xpv)		/* no sysenter support yet */
 	/*
 	 * If we get here as a result of single-stepping a sysenter
 	 * instruction, we suddenly find ourselves taking a #db
@@ -136,24 +164,46 @@ ndptrap_frstor(void)
 	jne	1f
 	SWAPGS
 1:	popq	%r11
+#endif	/* !__xpv */
 
 	INTR_PUSH
+#if defined(__xpv)
+	movl	$6, %edi
+	call	kdi_dreg_get
+	movq	%rax, %r15		/* %db6 -> %r15 */
+	movl	$6, %edi
+	movl	$0, %esi
+	call	kdi_dreg_set		/* 0 -> %db6 */
+#else
 	movq	%db6, %r15
 	xorl	%eax, %eax
 	movq	%rax, %db6
+#endif
 
 #elif defined(__i386)
 
 	INTR_PUSH
+#if defined(__xpv)
+	pushl	$6
+	call	kdi_dreg_get
+	addl	$4, %esp
+	movl	%eax, %esi		/* %dr6 -> %esi */
+	pushl	$0
+	pushl	$6
+	call	kdi_dreg_set		/* 0 -> %dr6 */
+	addl	$8, %esp
+#else
 	movl	%db6, %esi
 	xorl	%eax, %eax
 	movl	%eax, %db6
+#endif
 #endif	/* __i386 */
 
 	jmp	cmntrap_pushed
 	SET_SIZE(dbgtrap)
 
 #if defined(__amd64)
+#if !defined(__xpv)
 
 /*
  * Macro to set the gsbase or kgsbase to the address of the struct cpu
@@ -205,6 +255,11 @@ ndptrap_frstor(void)
 	movq	REGOFF_RBP(%rsp), %rbp;					\
 	addq	$REGOFF_TRAPNO, %rsp	/* pop stack */
 
+#else	/* __xpv */
+
+#define	SET_CPU_GSBASE	/* noop on the hypervisor */
+
+#endif	/* __xpv */
 #endif	/* __amd64 */
 
 
@@ -212,6 +267,8 @@ ndptrap_frstor(void)
 
 	/*
 	 * #NMI
+	 *
+	 * XXPV: See 6532669.
 	 */
 	ENTRY_NP(nmiint)
 	TRAP_NOERR(T_NMIFLT)	/* $2 */
@@ -276,6 +333,7 @@ ndptrap_frstor(void)
 	ENTRY_NP(brktrap)
 
 #if defined(__amd64)
+	XPV_TRAP_POP
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	bp_user
 
@@ -319,9 +377,14 @@ bp_user:
 
 	ENTRY_NP(invoptrap)
 
+	XPV_TRAP_POP
+
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	ud_user
 
+#if defined(__xpv)
+	movb	$0, 12(%rsp)		/* clear saved upcall_mask from %cs */
+#endif
 	push	$0			/* error code -- zero for #UD */
 ud_kernel:
 	push	$0xdddd			/* a dummy trap number */
@@ -448,6 +511,9 @@ ud_user:
 	jne	8f
 
 	addl	$4, %esp
+#if defined(__xpv)
+	movb	$0, 6(%esp)		/* clear saved upcall_mask from %cs */
+#endif	/* __xpv */
 	pusha
 	pushl	%eax			/* push %eax -- may be return value */
 	pushl	%esp			/* push stack pointer */
@@ -555,6 +621,68 @@ _emul_done:
 	/*
 	 * #NM
 	 */
+#if defined(__xpv)
+
+	ENTRY_NP(ndptrap)
+	/*
+	 * (On the hypervisor we must make a hypercall so we might as well
+	 * save everything and handle as in a normal trap.)
+	 */
+	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
+	INTR_PUSH
+	
+	/*
+	 * We want to do this quickly as every lwp using fp will take this
+	 * after a context switch -- we do the frequent path in ndptrap_frstor
+	 * below; for all other cases, we let the trap code handle it
+	 */
+	LOADCPU(%rbx)			/* swapgs handled in hypervisor */
+	cmpl	$0, fpu_exists(%rip)
+	je	.handle_in_trap		/* let trap handle no fp case */
+	movq	CPU_THREAD(%rbx), %r15	/* %r15 = curthread */
+	movl	$FPU_EN, %ebx
+	movq	T_LWP(%r15), %r15	/* %r15 = lwp */
+	testq	%r15, %r15
+	jz	.handle_in_trap		/* should not happen? */
+#if LWP_PCB_FPU	!= 0
+	addq	$LWP_PCB_FPU, %r15	/* &lwp->lwp_pcb.pcb_fpu */
+#endif
+	testl	%ebx, PCB_FPU_FLAGS(%r15)
+	jz	.handle_in_trap		/* must be the first fault */
+	CLTS
+	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%r15)
+#if FPU_CTX_FPU_REGS != 0
+	addq	$FPU_CTX_FPU_REGS, %r15
+#endif
+	/*
+	 * the label below is used in trap.c to detect FP faults in
+	 * kernel due to user fault.
+	 */
+	ALTENTRY(ndptrap_frstor)
+	fxrstor	(%r15)
+	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
+	je	.return_to_kernel
+
+	ASSERT_UPCALL_MASK_IS_SET
+	USER_POP
+	IRET				/* return to user mode */
+	/*NOTREACHED*/
+
+.return_to_kernel:
+	INTR_POP
+	IRET
+	/*NOTREACHED*/
+
+.handle_in_trap:
+	INTR_POP
+	pushq	$0			/* can not use TRAP_NOERR */
+	pushq	$T_NOEXTFLT
+	jmp	cmninttrap
+	SET_SIZE(ndptrap_frstor)
+	SET_SIZE(ndptrap)
+
+#else	/* __xpv */
+
 	ENTRY_NP(ndptrap)
 	/*
 	 * We want to do this quickly as every lwp using fp will take this
@@ -607,6 +735,8 @@ _emul_done:
 	jmp	cmninttrap
 	SET_SIZE(ndptrap_frstor)
 	SET_SIZE(ndptrap)
+
+#endif	/* __xpv */
 
 #elif defined(__i386)
 
@@ -669,6 +799,7 @@ _patch_fxrstor_ebx:
 
 #endif	/* __i386 */
 
+#if !defined(__xpv)
 #if defined(__amd64)
 
 	/*
@@ -676,17 +807,16 @@ _patch_fxrstor_ebx:
 	 */
 	ENTRY_NP(syserrtrap)
 	pushq	$T_DBLFLT
-
 	SET_CPU_GSBASE
 
 	/*
-	 * We share this handler with kmdb (if kmdb is loaded).  As such, we may
-	 * have reached this point after encountering a #df in kmdb.  If that
-	 * happens, we'll still be on kmdb's IDT.  We need to switch back to this
-	 * CPU's IDT before proceeding.  Furthermore, if we did arrive here from
-	 * kmdb, kmdb is probably in a very sickly state, and shouldn't be
-	 * entered from the panic flow.  We'll suppress that entry by setting
-	 * nopanicdebug.
+	 * We share this handler with kmdb (if kmdb is loaded).  As such, we
+	 * may have reached this point after encountering a #df in kmdb.  If
+	 * that happens, we'll still be on kmdb's IDT.  We need to switch back
+	 * to this CPU's IDT before proceeding.  Furthermore, if we did arrive
+	 * here from kmdb, kmdb is probably in a very sickly state, and
+	 * shouldn't be entered from the panic flow.  We'll suppress that
+	 * entry by setting nopanicdebug.
 	 */
 	pushq	%rax
 	subq	$DESCTBR_SIZE, %rsp
@@ -732,14 +862,15 @@ _patch_fxrstor_ebx:
 	cli				/* disable interrupts */
 
 	/*
-	 * We share this handler with kmdb (if kmdb is loaded).  As such, we may
-	 * have reached this point after encountering a #df in kmdb.  If that
-	 * happens, we'll still be on kmdb's IDT.  We need to switch back to this
-	 * CPU's IDT before proceeding.  Furthermore, if we did arrive here from
-	 * kmdb, kmdb is probably in a very sickly state, and shouldn't be
-	 * entered from the panic flow.  We'll suppress that entry by setting
-	 * nopanicdebug.
+	 * We share this handler with kmdb (if kmdb is loaded).  As such, we
+	 * may have reached this point after encountering a #df in kmdb.  If
+	 * that happens, we'll still be on kmdb's IDT.  We need to switch back
+	 * to this CPU's IDT before proceeding.  Furthermore, if we did arrive
+	 * here from kmdb, kmdb is probably in a very sickly state, and
+	 * shouldn't be entered from the panic flow.  We'll suppress that
+	 * entry by setting nopanicdebug.
 	 */
+
 	subl	$DESCTBR_SIZE, %esp
 	movl	%gs:CPU_IDT, %eax
 	sidt	(%esp)
@@ -845,6 +976,7 @@ make_frame:
 	SET_SIZE(syserrtrap)
 
 #endif	/* __i386 */
+#endif	/* !__xpv */
 
 	ENTRY_NP(overrun)
 	push	$0
@@ -896,6 +1028,17 @@ make_frame:
 	ENTRY_NP(pftrap)
 	TRAP_ERR(T_PGFLT)	/* $14 already have error code on stack */
 	INTR_PUSH
+#if defined(__xpv)
+
+#if defined(__amd64)
+	movq	%gs:CPU_VCPU_INFO, %r15
+	movq	VCPU_INFO_ARCH_CR2(%r15), %r15	/* vcpu[].arch.cr2 */
+#elif defined(__i386)
+	movl	%gs:CPU_VCPU_INFO, %esi
+	movl	VCPU_INFO_ARCH_CR2(%esi), %esi	/* vcpu[].arch.cr2 */
+#endif	/* __i386 */
+
+#else	/* __xpv */
 
 #if defined(__amd64)
 	movq	%cr2, %r15
@@ -903,6 +1046,7 @@ make_frame:
 	movl	%cr2, %esi
 #endif	/* __i386 */
 
+#endif	/* __xpv */
 	jmp	cmntrap_pushed
 	SET_SIZE(pftrap)
 
@@ -1056,8 +1200,15 @@ check_for_user_address:
 	 * Instead we should push a real (soft?) error code
 	 * on the stack and #gp handler could know about fasttraps?
 	 */
+	XPV_TRAP_POP
+
 	subq	$2, (%rsp)	/* XXX int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_FASTTRAP, GATE_DESC_SIZE) + 2)
+
+#if defined(__xpv)
+	pushq	%r11
+	pushq	%rcx
+#endif
 	jmp	gptrap
 	SET_SIZE(fasttrap)
 
@@ -1096,6 +1247,7 @@ check_for_user_address:
 	 * XXX a constant would be nicer.
 	 */
 	ENTRY_NP(fast_null)
+	XPV_TRAP_POP
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
 	IRET
 	/*NOTREACHED*/

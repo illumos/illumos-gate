@@ -136,7 +136,7 @@ extern void *set_tba(void *);
 extern caddr_t set_trap_table(void);
 extern struct scb trap_table;
 
-struct trap_info {
+struct panic_trap_info {
 	struct regs *trap_regs;
 	uint_t	trap_type;
 	caddr_t trap_addr;

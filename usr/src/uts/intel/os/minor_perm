@@ -145,6 +145,7 @@ chxge:* 0666 root sys
 pcn:* 0666 root sys
 rtls:* 0666 root sys
 ath:* 0666 root sys
+vnic:* 0666 root sys
 ipw:* 0666 root sys
 iwi:* 0666 root sys
 pcwl:* 0666 root sys

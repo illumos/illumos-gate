@@ -66,6 +66,7 @@ HDRS	=			\
 	old_procfs.h		\
 	pcb.h			\
 	pmem.h			\
+	privmregs.h		\
 	privregs.h		\
 	procfs_isa.h		\
 	prom_emul.h		\

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +115,12 @@ extern hrtime_t panic_hrtime;
 extern timespec_t panic_hrestime;
 
 /*
+ * Forward declarations for types:
+ */
+struct panic_trap_info;
+struct regs;
+
+/*
  * Miscellaneous state variables defined in or used by the panic code:
  */
 extern char *panic_bootstr;
@@ -129,20 +134,17 @@ extern int in_sync;
 extern int panic_quiesce;
 extern int panic_sync;
 extern int panic_dump;
-
-/*
- * Forward declarations for types:
- */
-struct trap_info;
-struct regs;
+extern int64_t panic_lbolt64;
+extern label_t panic_regs;
+extern struct regs *panic_reg;
 
 /*
  * Panic functions called from the common panic code which must be
  * implemented by architecture or platform-specific code:
  */
 extern void panic_saveregs(panic_data_t *, struct regs *);
-extern void panic_savetrap(panic_data_t *, struct trap_info *);
-extern void panic_showtrap(struct trap_info *);
+extern void panic_savetrap(panic_data_t *, struct panic_trap_info *);
+extern void panic_showtrap(struct panic_trap_info *);
 extern void panic_stopcpus(cpu_t *, kthread_t *, int);
 extern void panic_enter_hw(int);
 extern void panic_quiesce_hw(panic_data_t *);

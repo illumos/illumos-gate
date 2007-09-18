@@ -135,6 +135,7 @@ f none kernel/drv/sparcv9/uata 755 root sys
 f none kernel/drv/sparcv9/udp 755 root sys
 f none kernel/drv/sparcv9/udp6 755 root sys
 f none kernel/drv/sparcv9/vni 755 root sys
+f none kernel/drv/sparcv9/vnic 755 root sys
 f none kernel/drv/sparcv9/wc 755 root sys
 d none kernel/exec/sparcv9 755 root sys
 f none kernel/exec/sparcv9/aoutexec 755 root sys

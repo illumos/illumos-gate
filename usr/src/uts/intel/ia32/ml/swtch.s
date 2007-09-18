@@ -128,6 +128,40 @@
 	movq	P_AS(hatp), scratch_reg;		\
 	movq	A_HAT(scratch_reg), hatp
 
+#if defined (__xpv)
+
+#define	TSC_READ()					\
+	call	tsc_read;				\
+	movq	%rax, %r14;
+
+#else
+
+#define	TSC_READ()					\
+	rdtsc;						\
+	shlq	$32, %rdx;				\
+	movl	%eax, %r14d;				\
+	orq	%rdx, %r14
+
+#endif
+
+/*
+ * If we are resuming an interrupt thread, store a timestamp in the thread
+ * structure.  If an interrupt occurs between tsc_read() and its subsequent
+ * store, the timestamp will be stale by the time it is stored.  We can detect
+ * this by doing a compare-and-swap on the thread's timestamp, since any
+ * interrupt occurring in this window will put a new timestamp in the thread's
+ * t_intr_start field.
+ */
+#define	STORE_INTR_START(thread_t)			\
+	testw	$T_INTR_THREAD, T_FLAGS(thread_t);	\
+	jz	1f;					\
+0:							\
+	TSC_READ();					\
+	movq	T_INTR_START(thread_t), %rax;		\
+	cmpxchgq %r14, T_INTR_START(thread_t);		\
+	jnz	0b;					\
+1:
+
 #elif defined (__i386)
 
 /*
@@ -171,6 +205,31 @@
 	movl	T_PROCP(thread_t), hatp;		\
 	movl	P_AS(hatp), scratch_reg;		\
 	movl	A_HAT(scratch_reg), hatp
+
+/*
+ * If we are resuming an interrupt thread, store a timestamp in the thread
+ * structure.  If an interrupt occurs between tsc_read() and its subsequent
+ * store, the timestamp will be stale by the time it is stored.  We can detect
+ * this by doing a compare-and-swap on the thread's timestamp, since any
+ * interrupt occurring in this window will put a new timestamp in the thread's
+ * t_intr_start field.
+ */
+#define	STORE_INTR_START(thread_t)			\
+	testw	$T_INTR_THREAD, T_FLAGS(thread_t);	\
+	jz	1f;					\
+	pushl	%ecx;					\
+0:							\
+	pushl	T_INTR_START(thread_t);			\
+	pushl	T_INTR_START+4(thread_t);		\
+	call	tsc_read;				\
+	movl	%eax, %ebx;				\
+	movl	%edx, %ecx;				\
+	popl	%edx;					\
+	popl	%eax;					\
+	cmpxchg8b T_INTR_START(thread_t);		\
+	jnz	0b;					\
+	popl	%ecx;					\
+1:
 
 #endif	/* __amd64 */
 
@@ -299,7 +358,13 @@ resume(kthread_t *t)
 	movq	CPU_TSS(%r13), %r14
 	movq	T_STACK(%r12), %rax
 	addq	$REGSIZE+MINFRAME, %rax	/* to the bottom of thread stack */
+#if !defined(__xpv)
 	movq	%rax, TSS_RSP0(%r14)
+#else
+	movl	$KDS_SEL, %edi
+	movq	%rax, %rsi
+	call	HYPERVISOR_stack_switch
+#endif	/* __xpv */
 
 	movq	%r12, CPU_THREAD(%r13)	/* set CPU's thread pointer */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
@@ -328,36 +393,8 @@ resume(kthread_t *t)
 	call	restorepctx
 .norestorepctx:
 	
-	/*
-	 * If we are resuming an interrupt thread, store a timestamp 
-	 * in the thread structure.
-	 */
-	testw	$T_INTR_THREAD, T_FLAGS(%r12)
-	jz	1f
+	STORE_INTR_START(%r12)
 
-0:
-	/*
-	 * If an interrupt occurs between the rdtsc instruction and its
-	 * subsequent store, the timestamp will be stale by the time it is
-	 * stored. We can detect this by doing a compare-and-swap on the
-	 * thread's timestamp, since any interrupt occurring in this window
-	 * will put a new timestamp in the thread's t_intr_start field.
-	 */
-	movq	T_INTR_START(%r12), %rcx
-	rdtsc
-
-	/*
-	 * After rdtsc:
-	 *     High 32 bits of TC are in %edx
-	 *     Low 32 bits of TC are in %eax
-	 */
-	shlq	$32, %rdx
-	movl	%eax, %r14d
-	orq	%rdx, %r14
-	movq	%rcx, %rax
-	cmpxchgq %r14, T_INTR_START(%r12)
-	jnz	0b
-1:
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the
 	 * resuming thread's PC after first setting the priority as low as
@@ -484,7 +521,14 @@ resume_return:
 	 */
 	movl	CPU_TSS(%esi), %ecx
 	addl	$REGSIZE+MINFRAME, %eax	/* to the bottom of thread stack */
+#if !defined(__xpv)
 	movl	%eax, TSS_ESP0(%ecx)
+#else
+	pushl	%eax
+	pushl	$KDS_SEL
+	call	HYPERVISOR_stack_switch
+	addl	$8, %esp
+#endif	/* __xpv */
 
 	movl	%edi, CPU_THREAD(%esi)	/* set CPU's thread pointer */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
@@ -516,34 +560,8 @@ resume_return:
 	addl	$4, %esp		/* restore stack pointer */
 .norestorepctx:
 
-	/*
-	 * If we are resuming an interrupt thread, store a timestamp 
-	 * in the thread structure.
-	 */
-	testw	$T_INTR_THREAD, T_FLAGS(%edi)
-	jz	1f
-	pushl	%ecx
-0:
-	/*
-	 * If an interrupt occurs between the rdtsc instruction and its
-	 * subsequent store, the timestamp will be stale by the time it is
-	 * stored. We can detect this by doing a compare-and-swap on the
-	 * thread's timestamp, since any interrupt occurring in this window
-	 * will put a new timestamp in the thread's t_intr_start field.
-	 */
-	pushl	T_INTR_START(%edi)
-	pushl	T_INTR_START+4(%edi)
-	.globl	_tsc_patch15
-_tsc_patch15:
-	nop; nop			/* patched to rdtsc if available */
-	movl	%eax, %ebx
-	movl	%edx, %ecx
-	popl	%edx
-	popl	%eax
-	cmpxchg8b T_INTR_START(%edi)
-	jnz	0b
-	popl	%ecx
-1:
+	STORE_INTR_START(%edi)
+
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the
 	 * resuming thread's PC after first setting the priority as low as
@@ -607,6 +625,14 @@ resume_from_zombie(kthread_t *t)
 	movq	%gs:CPU_THREAD, %r13	/* %r13 = curthread */
 
 	/* clean up the fp unit. It might be left enabled */
+
+#if defined(__xpv)		/* XXPV XXtclayton */
+	/*
+	 * Remove this after bringup.
+	 * (Too many #gp's for an instrumented hypervisor.)
+	 */
+	STTS(%rax)
+#else
 	movq	%cr0, %rax
 	testq	$CR0_TS, %rax
 	jnz	.zfpu_disabled		/* if TS already set, nothing to do */
@@ -614,6 +640,8 @@ resume_from_zombie(kthread_t *t)
 	orq	$CR0_TS, %rax
 	movq	%rax, %cr0
 .zfpu_disabled:
+
+#endif	/* __xpv */
 
 	/* 
 	 * Temporarily switch to the idle thread's stack so that the zombie
@@ -761,35 +789,8 @@ resume_from_intr(kthread_t *t)
 	xorl	%eax, %eax
 	xchgb	%al, T_LOCK(%r13)
 
-	/*
-	 * If we are resuming an interrupt thread, store a timestamp in
-	 * the thread structure.
-	 */
-	testw	$T_INTR_THREAD, T_FLAGS(%r12)
-	jz	1f
-0:
-	/*
-	 * If an interrupt occurs between the rdtsc instruction and its
-	 * subsequent store, the timestamp will be stale by the time it is
-	 * stored. We can detect this by doing a compare-and-swap on the
-	 * thread's timestamp, since any interrupt occurring in this window
-	 * will put a new timestamp in the thread's t_intr_start field.
-	 */
-	movq	T_INTR_START(%r12), %rcx
-	rdtsc
+	STORE_INTR_START(%r12)
 
-	/*
-	 * After rdtsc:
-	 *     High 32 bits of TC are in %edx
-	 *     Low 32 bits of TC are in %eax
-	 */
-	shlq	$32, %rdx
-	movl	%eax, %r14d
-	orq	%rdx, %r14
-	movq	%rcx, %rax
-	cmpxchgq %r14, T_INTR_START(%r12)
-	jnz	0b
-1:
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the
 	 * resuming thread's PC after first setting the priority as low as
@@ -837,32 +838,8 @@ resume_from_intr_return:
 	xorl	%eax,%eax
 	xchgb	%al, T_LOCK(%esi)
 
-	/*
-	 * If we are resuming an interrupt thread, store a timestamp in
-	 * the thread structure.
-	 */
-	testw	$T_INTR_THREAD, T_FLAGS(%edi)
-	jz	1f
-0:
-	/*
-	 * If an interrupt occurs between the rdtsc instruction and its
-	 * subsequent store, the timestamp will be stale by the time it is
-	 * stored. We can detect this by doing a compare-and-swap on the
-	 * thread's timestamp, since any interrupt occurring in this window
-	 * will put a new timestamp in the thread's t_intr_start field.
-	 */
-	pushl	T_INTR_START(%edi)
-	pushl	T_INTR_START+4(%edi)
-	.globl	_tsc_patch16
-_tsc_patch16:
-	nop; nop			/* patched to rdtsc if available */
-	movl	%eax, %ebx
-	movl	%edx, %ecx
-	popl	%edx
-	popl	%eax
-	cmpxchg8b T_INTR_START(%edi)
-	jnz	0b
-1:
+	STORE_INTR_START(%edi)
+
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the
 	 * resuming thread's PC after first setting the priority as low as

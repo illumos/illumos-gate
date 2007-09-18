@@ -31,6 +31,7 @@ include ../../../../Makefile.master
 
 HDRS=	\
 	kdi_regs.h \
+	privmregs.h \
 	privregs.h
 
 ROOTINCISA= $(ROOT)/usr/include/amd64

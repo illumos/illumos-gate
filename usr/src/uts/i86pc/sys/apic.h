@@ -710,6 +710,8 @@ extern int apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count,
     int pri, int behavior);
 extern void  apic_free_vectors(dev_info_t *dip, int inum, int count, int pri,
     int type);
+extern int apic_get_vector_intr_info(int vecirq,
+    apic_get_intr_t *intr_params_p);
 extern uchar_t apic_find_multi_vectors(int pri, int count);
 extern int apic_setup_io_intr(void *p, int irq, boolean_t deferred);
 extern uint32_t *mapin_apic(uint32_t addr, size_t len, int flags);
@@ -731,7 +733,7 @@ extern apic_cpus_info_t *apic_cpus;
 #ifdef _MACHDEP
 extern cpuset_t apic_cpumask;
 #endif
-extern uint_t apic_flag;
+extern uint_t apic_picinit_called;
 extern uchar_t apic_ipltopri[MAXIPL+1];
 extern uchar_t apic_vector_to_irq[APIC_MAX_VECTOR+1];
 extern int apic_max_device_irq;

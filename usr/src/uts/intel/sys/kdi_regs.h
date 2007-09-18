@@ -47,9 +47,6 @@ extern "C" {
 
 #define	KDI_NCRUMBS	5
 
-#define	KDI_RESUME			0
-#define	KDI_RESUME_PASS_TO_KERNEL	1
-
 #define	KDI_CPU_STATE_NONE		0
 #define	KDI_CPU_STATE_MASTER		1
 #define	KDI_CPU_STATE_SLAVE		2

@@ -1,0 +1,241 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This Makefile defines file modules in the directory uts/i86xpv
+#	and its children. These are the source files which are i86xpv
+#	"implementation architecture" dependent.
+#
+
+#
+#	object lists
+#
+CORE_OBJS +=			\
+	balloon.o		\
+	beeper.o		\
+	biosdisk.o		\
+	cbe.o			\
+	cmi.o			\
+	confunix.o		\
+	cpuid.o			\
+	cpupm.o			\
+	dis_tables.o		\
+	ddi_impl.o		\
+	dtrace_subr.o		\
+	dvma.o			\
+	fakebop.o		\
+	fpu_subr.o		\
+	graphics.o		\
+	hardclk.o		\
+	hat_i86.o		\
+	hat_kdi.o		\
+	hment.o			\
+	hold_page.o		\
+	hrtimers.o		\
+	htable.o		\
+	i86_mmu.o		\
+	instr_size.o		\
+	intr.o			\
+	kboot_mmu.o		\
+	kdi_subr.o		\
+	kdi_idt.o		\
+	kdi_idthdl.o		\
+	kdi_asm.o		\
+	lgrpplat.o		\
+	mach_kdi.o		\
+	mach_sysconfig.o	\
+	machdep.o		\
+	mem_config_stubs.o	\
+	memnode.o		\
+	microcode.o		\
+	mlsetup.o		\
+	mp_call.o		\
+	mp_implfuncs.o		\
+	mp_machdep.o		\
+	mp_startup.o		\
+	memscrub.o		\
+	notes.o			\
+	pci_bios.o		\
+	pci_cfgspace.o		\
+	pci_mech1.o		\
+	pci_mech2.o		\
+	pci_neptune.o		\
+	pci_orion.o		\
+	pmem.o			\
+	ppage.o			\
+	startup.o		\
+	xpv_timestamp.o		\
+	todpc_subr.o		\
+	trap.o			\
+	vm_machdep.o		\
+	x_call.o
+
+#
+#	Add the SMBIOS subsystem object files directly to the list of objects
+#	built into unix itself; this is all common code except for smb_dev.c.
+#
+CORE_OBJS += $(SMBIOS_OBJS)
+
+#
+# These get compiled twice:
+# - once in the dboot (direct boot) identity mapped code 
+# - once for use during early startup in unix
+#
+BOOT_DRIVER_OBJS =		\
+	boot_console.o		\
+	boot_keyboard.o		\
+	boot_keyboard_table.o	\
+	boot_mmu.o		\
+	boot_vga.o		\
+	boot_xconsole.o
+
+CORE_OBJS += $(BOOT_DRIVER_OBJS)
+
+#
+# Extra XEN files separated out for now.
+#
+CORE_OBJS +=			\
+	cpr_driver.o		\
+	evtchn.o		\
+	gnttab.o		\
+	hypercall.o		\
+	hyperevent.o		\
+	hypersubr.o		\
+	mp_xen.o		\
+	panic_asm.o		\
+	xenguest.o		\
+	xenbus_client.o		\
+	xenbus_comms.o		\
+	xenbus_probe.o		\
+	xenbus_xs.o		\
+	xen_machdep.o		\
+	xen_mmu.o		\
+	xpv_panic.o		\
+	xvdi.o
+
+#
+#	locore.o is special. It must be the first file relocated so that it
+#	it is relocated just where its name implies.
+#
+SPECIAL_OBJS_32 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm.o
+
+SPECIAL_OBJS_64 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm_amd64.o
+
+SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
+
+#
+# object files used to boot into full kernel
+#
+DBOOT_OBJS_32 =	muldiv.o
+
+DBOOT_OBJS_64 =
+
+DBOOT_OBJS +=			\
+	dboot_asm.o		\
+	dboot_printf.o		\
+	dboot_startkern.o	\
+	dboot_xen.o		\
+	hypercall.o		\
+	hypersubr.o		\
+	memcpy.o		\
+	memset.o		\
+	string.o		\
+	$(BOOT_DRIVER_OBJS)	\
+	$(DBOOT_OBJS_$(CLASS))
+
+#
+#			driver & misc modules
+#
+ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
+DOMCAPS_OBJS += domcaps.o
+BALLOON_OBJS += balloon_drv.o
+EVTCHN_OBJS += evtchn_dev.o
+GFX_PRIVATE_OBJS += gfx_private.o gfxp_pci.o gfxp_segmap.o \
+		    gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
+PCI_E_MISC_OBJS += pcie_error.o
+PCI_E_NEXUS_OBJS += npe.o npe_misc.o
+PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
+PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
+PRIVCMD_OBJS += seg_mf.o privcmd.o privcmd_hcall.o
+ROOTNEX_OBJS += rootnex.o
+XPVTOD_OBJS += xpvtod.o
+XPV_AUTOCONFIG_OBJS += xpv_autoconfig.o
+XPV_PSM_OBJS += xpv_psm.o mp_platform_common.o apic_introp.o psm_common.o
+XENBUS_OBJS += xenbus_dev.o
+XENCONS_OBJS += xencons.o
+XPVD_OBJS += xpvd.o
+XNB_OBJS += xnb.o
+XNBE_OBJS += xnbe.o
+XNBO_OBJS += xnbo.o
+XNBU_OBJS += xnbu.o
+XNF_OBJS += xnf.o
+XSVC_OBJS += xsvc.o
+XDF_OBJS += xdf.o
+XDB_OBJS += xdb.o
+
+#
+#	Build up defines and paths.
+#
+INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/i86pc -I$(SRC)/common
+
+#
+# Since the assym files are derived, the dependencies must be explicit for
+# all files including this file. (This is only actually required in the
+# instance when the .nse_depinfo file does not exist.) It may seem that
+# the lint targets should also have a similar dependency, but they don't
+# since only C headers are included when #defined(__lint) is true.
+#
+
+ASSYM_DEPS      += 		\
+	copy.o			\
+	desctbls_asm.o		\
+	ddi_i86_asm.o		\
+	exception.o		\
+	fast_trap_asm.o		\
+	float.o			\
+	hyperevent.o		\
+	i86_subr.o		\
+	kdi_asm.o		\
+	interrupt.o		\
+	lock_prim.o		\
+	locore.o		\
+	panic_asm.o		\
+	sseblk.o		\
+	swtch.o			\
+	syscall_asm.o		\
+	syscall_asm_amd64.o
+
+$(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
+
+ASSYM_DEPS += kdi_asm.o

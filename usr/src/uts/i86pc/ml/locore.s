@@ -65,6 +65,10 @@
 #include <sys/pit.h>
 #include <sys/panic.h>
 
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
+
 #include "assym.h"
 
 /*
@@ -216,6 +220,8 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 	/*
 	 * kobj_init() vectors us back to here with (note) a slightly different
 	 * set of arguments than _start is given (see lint prototypes above).
+	 *
+	 * XXX	Make this less vile, please.
 	 */
 	ENTRY_NP(_locore_start)
 
@@ -261,6 +267,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 	popq	%r11
 	movq	%r11, REGOFF_RFL(%rsp)
 
+#if !defined(__xpv)
 	/*
 	 * Enable write protect and alignment check faults.
 	 */
@@ -268,6 +275,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 	orq	$_CONST(CR0_WP|CR0_AM), %rax
 	andq	$_BITNOT(CR0_WT|CR0_CE), %rax
 	movq	%rax, %cr0
+#endif	/* __xpv */
 
 	/*
 	 * (We just assert this works by virtue of being here) 
@@ -317,8 +325,9 @@ _locore_start(struct boot_syscalls *sysp, struct bootops *bop)
 	/*
 	 * kobj_init() vectors us back to here with (note) a slightly different
 	 * set of arguments than _start is given (see lint prototypes above).
+	 *
+	 * XXX	Make this less vile, please.
 	 */
-
 	ENTRY_NP(_locore_start)
 
 	/*
@@ -349,6 +358,7 @@ _locore_start(struct boot_syscalls *sysp, struct bootops *bop)
 	pushal	
 	pushfl
 
+#if !defined(__xpv)
 	/*
 	 * Override bios settings and enable write protect and
 	 * alignment check faults.
@@ -1107,6 +1117,8 @@ cpu_done:
 	popfl					/* Restore original FLAGS */
 	popal					/* Restore all registers */
 
+#endif	/* !__xpv */
+
 	/*
 	 *  mlsetup(%esp) gets called.
 	 */
@@ -1156,6 +1168,7 @@ cmntrap()
 	ENTRY_NP2(cmntrap, _cmntrap)
 
 	INTR_PUSH
+
 	ALTENTRY(cmntrap_pushed)
 
 	movq	%rsp, %rbp
@@ -1330,6 +1343,7 @@ cmntrap()
 	movl	%ecx, REGOFF_EIP(%ebp)
 	INTR_POP_KERNEL
 	IRET
+	/*NOTREACHED*/
 2:
 	pushl	$dtrace_badflags
 	call	panic
@@ -1366,9 +1380,11 @@ void
 cmninttrap()
 {}
 
+#if !defined(__xpv)
 void
 bop_trap_handler(void)
 {}
+#endif
 
 #else	/* __lint */
 
@@ -1394,6 +1410,7 @@ bop_trap_handler(void)
 	jmp	_sys_rtt
 	SET_SIZE(cmninttrap)
 
+#if !defined(__xpv)
 	/*
 	 * Handle traps early in boot. Just revectors into C quickly as
 	 * these are always fatal errors.
@@ -1402,6 +1419,7 @@ bop_trap_handler(void)
 	movq	%rsp, %rdi
 	call	bop_trap
 	SET_SIZE(bop_trap_handler)
+#endif
 
 #elif defined(__i386)
 
@@ -1426,6 +1444,7 @@ bop_trap_handler(void)
 	jmp	_sys_rtt
 	SET_SIZE(cmninttrap)
 
+#if !defined(__xpv)
 	/*
 	 * Handle traps early in boot. Just revectors into C quickly as
 	 * these are always fatal errors.
@@ -1435,6 +1454,7 @@ bop_trap_handler(void)
 	pushl	%eax
 	call	bop_trap
 	SET_SIZE(bop_trap_handler)
+#endif
 
 #endif	/* __i386 */
 
@@ -1464,7 +1484,12 @@ dtrace_trap()
 	movq	%rsp, %rbp
 
 	movl	%gs:CPU_ID, %edx
+#if defined(__xpv)
+	movq	%gs:CPU_VCPU_INFO, %rsi
+	movq	VCPU_INFO_ARCH_CR2(%rsi), %rsi
+#else
 	movq	%cr2, %rsi
+#endif
 	movq	%rsp, %rdi
 
 	ENABLE_INTR_FLAGS
@@ -1487,7 +1512,12 @@ dtrace_trap()
 	movl	%esp, %ebp
 
 	pushl	%gs:CPU_ID
+#if defined(__xpv)
+	movl	%gs:CPU_VCPU_INFO, %eax
+	movl	VCPU_INFO_ARCH_CR2(%eax), %eax
+#else
 	movl	%cr2, %eax
+#endif
 	pushl	%eax
 	pushl	%ebp
 
@@ -1597,6 +1627,7 @@ _no_pending_updates:
 	 */
 	ALTENTRY(_sys_rtt)
 	CLI(%rax)			/* disable interrupts */
+	ALTENTRY(_sys_rtt_ints_disabled)
 	movq	%rsp, %rdi		/* pass rp to sys_rtt_common */
 	call	sys_rtt_common		/* do common sys_rtt tasks */
 	testq	%rax, %rax		/* returning to userland? */
@@ -1614,15 +1645,26 @@ _no_pending_updates:
 	 */
 	ALTENTRY(sys_rtt_syscall32)
 	USER32_POP
+
+	/*
+	 * There can be no instructions between this label and IRET or
+	 * we could end up breaking linux brand support. See label usage
+	 * in lx_brand_int80_callback for an example.
+	 */
+	ALTENTRY(nopop_sys_rtt_syscall32)
 	IRET
 	/*NOTREACHED*/
+	SET_SIZE(nopop_sys_rtt_syscall32)
+
 	ALTENTRY(sys_rtt_syscall)
 	/*
 	 * Return to 64-bit userland
 	 */
 	USER_POP
+	ALTENTRY(nopop_sys_rtt_syscall)
 	IRET
 	/*NOTREACHED*/
+	SET_SIZE(nopop_sys_rtt_syscall)
 
 	/*
 	 * Return to supervisor
@@ -1636,10 +1678,14 @@ _no_pending_updates:
 	 */
 	INTR_POP
 	IRET
+	.globl	_sys_rtt_end
+_sys_rtt_end:
 	/*NOTREACHED*/
 	SET_SIZE(sr_sup)
+	SET_SIZE(_sys_rtt_end)
 	SET_SIZE(lwp_rtt)
 	SET_SIZE(lwp_rtt_initial)
+	SET_SIZE(_sys_rtt_ints_disabled)
 	SET_SIZE(_sys_rtt)
 	SET_SIZE(sys_rtt_syscall)
 	SET_SIZE(sys_rtt_syscall32)
@@ -1688,6 +1734,7 @@ _lwp_rtt:
 	 */
 	ALTENTRY(_sys_rtt)
 	CLI(%eax)			/* disable interrupts */
+	ALTENTRY(_sys_rtt_ints_disabled)
 	pushl	%esp			/* pass rp to sys_rtt_common */
 	call	sys_rtt_common
 	addl	$4, %esp		/* pop arg */
@@ -1699,7 +1746,18 @@ _lwp_rtt:
 	 */
 	ALTENTRY(sys_rtt_syscall)
 	INTR_POP_USER
+
+	/*
+	 * There can be no instructions between this label and IRET or
+	 * we could end up breaking linux brand support. See label usage
+	 * in lx_brand_int80_callback for an example.
+	 */
+	ALTENTRY(nopop_sys_rtt_syscall)
 	IRET
+	/*NOTREACHED*/
+	SET_SIZE(nopop_sys_rtt_syscall)
+
+	ALTENTRY(_sys_rtt_end)
 
 	/*
 	 * Return to supervisor
@@ -1711,10 +1769,13 @@ _lwp_rtt:
 	 */
 	INTR_POP_KERNEL
 	IRET
+	/*NOTREACHED*/
 
 	SET_SIZE(sr_sup)
+	SET_SIZE(_sys_rtt_end)
 	SET_SIZE(lwp_rtt)
 	SET_SIZE(lwp_rtt_initial)
+	SET_SIZE(_sys_rtt_ints_disabled)
 	SET_SIZE(_sys_rtt)
 	SET_SIZE(sys_rtt_syscall)
 

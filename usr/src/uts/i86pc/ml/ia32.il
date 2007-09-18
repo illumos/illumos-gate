@@ -153,17 +153,6 @@
 	.end
 
 /*
- * Read Time Stamp Counter
- * uint64_t tsc_read();
- *
- * usage:
- * uint64_t cycles = tsc_read();
- */
-	.inline	tsc_read, 0
-	rdtsc				/ %edx:%eax = RDTSC
-	.end
-
-/*
  * Call the halt instruction. This will put the CPU to sleep until
  * it is again awoken via an interrupt.
  * This function should be called with interrupts already disabled

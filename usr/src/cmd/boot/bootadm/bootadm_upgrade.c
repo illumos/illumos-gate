@@ -44,6 +44,7 @@
 #include "bootadm.h"
 
 direct_or_multi_t bam_direct = BAM_DIRECT_NOT_SET;
+hv_t bam_is_hv = BAM_HV_UNKNOWN;
 
 error_t
 dboot_or_multiboot(const char *root)
@@ -53,6 +54,7 @@ dboot_or_multiboot(const char *root)
 	uchar_t *ident;
 	int fd, m;
 	multiboot_header_t *mbh;
+	struct stat sb;
 
 	(void) snprintf(fname, PATH_MAX, "%s/%s", root,
 	    "platform/i86pc/kernel/unix");
@@ -99,6 +101,16 @@ dboot_or_multiboot(const char *root)
 	}
 	(void) munmap(image, 8192);
 	(void) close(fd);
+
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		(void) snprintf(fname, PATH_MAX, "%s/%s", root, XEN_32);
+		if (stat(fname, &sb) == 0) {
+			bam_is_hv = BAM_HV_PRESENT;
+		} else {
+			bam_is_hv = BAM_HV_NO;
+		}
+	}
+
 	return (BAM_SUCCESS);
 }
 
@@ -458,11 +470,13 @@ upgrade_menu(menu_t *mp, char *root, char *opt)
 {
 	entry_t	*cur_entry;
 	line_t	*cur_line;
-	int	i, skipit = 0, num_entries = 0;
+	int	i, skipit, num_entries, found_hv;
 	int	*hand_entries = NULL;
 	boolean_t found_kernel = B_FALSE;
 	error_t	rv;
 	char	*rootdev, *grubdisk = NULL;
+
+	skipit = num_entries = found_hv = 0;
 
 	rootdev = get_special(root);
 	if (rootdev) {
@@ -492,6 +506,11 @@ upgrade_menu(menu_t *mp, char *root, char *opt)
 				    (num_entries + 1) * sizeof (int));
 			}
 			hand_entries[num_entries++] = cur_entry->entryNum;
+			continue;
+		}
+
+		if (cur_entry->flags & BAM_ENTRY_HV) {
+			found_hv = 1;
 			continue;
 		}
 
@@ -552,6 +571,15 @@ upgrade_menu(menu_t *mp, char *root, char *opt)
 			if (cur_line == cur_entry->end)
 				break;
 		}
+	}
+
+	/*
+	 * If we're upgrading to a virtualized kernel and there are no
+	 * hv entries in menu.lst, we need to add one.
+	 */
+	if ((bam_is_hv == BAM_HV_PRESENT) && (found_hv == 0)) {
+		(void) add_boot_entry(mp, NEW_HV_ENTRY, grubdisk,
+		    XEN_MENU, KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE);
 	}
 
 	/*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <dlfcn.h>
 #include <libctf.h>
 #include <errno.h>
+#include <kvm.h>
 
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_debug.h>
@@ -381,7 +382,7 @@ main(int argc, char *argv[], char *envp[])
 	char *p;
 
 	const char *Iflag = NULL, *Lflag = NULL, *Vflag = NULL, *pidarg = NULL;
-	int Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
+	int fflag = 0, Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
 
 	int ttylike;
 
@@ -471,6 +472,7 @@ main(int argc, char *argv[], char *envp[])
 		    "fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
 			switch (c) {
 			case 'f':
+				fflag++;
 				tgt_ctor = mdb_rawfile_tgt_create;
 				break;
 			case 'k':
@@ -831,51 +833,12 @@ main(int argc, char *argv[], char *envp[])
 		 * ours, attempt to exec the mdb of the appropriate class.
 		 */
 #ifdef _LP64
-		if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
+		if (ehdr.e_ident[EI_CLASS] == ELFCLASS32)
+			goto reexec;
 #else
-		if (ehdr.e_ident[EI_CLASS] == ELFCLASS64) {
+		if (ehdr.e_ident[EI_CLASS] == ELFCLASS64)
+			goto reexec;
 #endif
-			if ((p = strrchr(execname, '/')) == NULL)
-				die("cannot determine absolute pathname\n");
-#ifdef _LP64
-#ifdef __sparc
-			(void) strcpy(p, "/../sparcv7/");
-#else
-			(void) strcpy(p, "/../i86/");
-#endif
-#else
-#ifdef __sparc
-			(void) strcpy(p, "/../sparcv9/");
-#else
-			(void) strcpy(p, "/../amd64/");
-#endif
-#endif
-			(void) strcat(p, mdb.m_pname);
-
-			if (mdb.m_term != NULL)
-				(void) IOP_CTL(in_io, TCSETSW, &tios);
-
-			(void) putenv("_MDB_EXEC=1");
-			(void) execv(execname, argv);
-
-			/*
-			 * If execv fails, suppress ENOEXEC.  Experience shows
-			 * the most common reason is that the machine is booted
-			 * under a 32-bit kernel, in which case it is clearer
-			 * to only print the message below.
-			 */
-			if (errno != ENOEXEC)
-				warn("failed to exec %s", execname);
-#ifdef _LP64
-			die("64-bit %s cannot debug 32-bit program %s\n",
-			    mdb.m_pname, tgt_argv[0] ?
-			    tgt_argv[0] : tgt_argv[1]);
-#else
-			die("32-bit %s cannot debug 64-bit program %s\n",
-			    mdb.m_pname, tgt_argv[0] ?
-			    tgt_argv[0] : tgt_argv[1]);
-#endif
-		}
 	}
 
 tcreate:
@@ -908,6 +871,35 @@ tcreate:
 
 	if (mdb_get_prompt() == NULL && !(mdb.m_flags & MDB_FL_ADB))
 		(void) mdb_set_prompt(MDB_DEF_PROMPT);
+
+#ifdef __x86
+	/*
+	 * Unpleasant hack: we might be debugging a hypervisor domain dump,
+	 * which can be a non-ELF file in earlier versions.  Since we need to
+	 * know some unpleasant details about the format of the file, we ask
+	 * mdb_kb to identify the file if it can, and switch targets based on
+	 * its response.
+	 */
+	if (tgt_ctor == mdb_rawfile_tgt_create && !fflag) {
+		int (*identify)(const char *, int *);
+		int longmode;
+
+		if (mdb_module_load("mdb_kb",
+		    MDB_MOD_GLOBAL | MDB_MOD_SILENT) == 0 &&
+		    (identify = (int (*)())dlsym(RTLD_NEXT, "xkb_identify"))
+		    != NULL && identify(tgt_argv[0], &longmode) == 1) {
+			tgt_ctor = mdb_kvm_tgt_create;
+#ifdef _LP64
+			if (!longmode)
+				goto reexec;
+#else
+			if (longmode)
+				goto reexec;
+#endif
+		}
+	}
+#endif /* __x86 */
+
 
 	tgt = mdb_tgt_create(tgt_ctor, mdb.m_tgtflags, tgt_argc, tgt_argv);
 
@@ -1016,4 +1008,47 @@ tcreate:
 	terminate((status == MDB_ERR_QUIT || status == 0) ? 0 : 1);
 	/*NOTREACHED*/
 	return (0);
+
+reexec:
+	if ((p = strrchr(execname, '/')) == NULL)
+		die("cannot determine absolute pathname\n");
+#ifdef _LP64
+#ifdef __sparc
+	(void) strcpy(p, "/../sparcv7/");
+#else
+	(void) strcpy(p, "/../i86/");
+#endif
+#else
+#ifdef __sparc
+	(void) strcpy(p, "/../sparcv9/");
+#else
+	(void) strcpy(p, "/../amd64/");
+#endif
+#endif
+	(void) strcat(p, mdb.m_pname);
+
+	if (mdb.m_term != NULL)
+		(void) IOP_CTL(in_io, TCSETSW, &tios);
+
+	(void) putenv("_MDB_EXEC=1");
+	(void) execv(execname, argv);
+
+	/*
+	 * If execv fails, suppress ENOEXEC.  Experience shows the most common
+	 * reason is that the machine is booted under a 32-bit kernel, in which
+	 * case it is clearer to only print the message below.
+	 */
+	if (errno != ENOEXEC)
+		warn("failed to exec %s", execname);
+#ifdef _LP64
+	die("64-bit %s cannot debug 32-bit program %s\n",
+	    mdb.m_pname, tgt_argv[0] ?
+	    tgt_argv[0] : tgt_argv[1]);
+#else
+	die("32-bit %s cannot debug 64-bit program %s\n",
+	    mdb.m_pname, tgt_argv[0] ?
+	    tgt_argv[0] : tgt_argv[1]);
+#endif
+
+	goto tcreate;
 }

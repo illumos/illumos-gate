@@ -59,12 +59,14 @@ f none usr/include/asm/mmu.h 644 root bin
 d none usr/include/amd64 755 root bin
 d none usr/include/amd64/sys 755 root bin
 f none usr/include/amd64/sys/kdi_regs.h 644 root bin
+f none usr/include/amd64/sys/privmregs.h 644 root bin
 f none usr/include/amd64/sys/privregs.h 644 root bin
 d none usr/include/ia32 755 root bin
 d none usr/include/ia32/sys 755 root bin
 f none usr/include/ia32/sys/asm_linkage.h 644 root bin
 f none usr/include/ia32/sys/kdi_regs.h 644 root bin
 f none usr/include/ia32/sys/machtypes.h 644 root bin
+f none usr/include/ia32/sys/privmregs.h 644 root bin
 f none usr/include/ia32/sys/privregs.h 644 root bin
 f none usr/include/ia32/sys/psw.h 644 root bin
 f none usr/include/ia32/sys/pte.h 644 root bin
@@ -98,6 +100,7 @@ f none usr/include/sys/pcic_var.h 644 root bin
 f none usr/include/sys/pic.h 644 root bin
 f none usr/include/sys/pit.h 644 root bin
 f none usr/include/sys/pmem.h 644 root bin
+f none usr/include/sys/privmregs.h 644 root bin
 f none usr/include/sys/privregs.h 644 root bin
 f none usr/include/sys/prom_emul.h 644 root bin
 f none usr/include/sys/prom_isa.h 644 root bin
@@ -126,8 +129,10 @@ f none usr/platform/i86pc/include/sys/cram.h 644 root bin
 f none usr/platform/i86pc/include/sys/debug_info.h 644 root bin
 f none usr/platform/i86pc/include/sys/ddi_subrdefs.h 644 root bin
 f none usr/platform/i86pc/include/sys/mach_mmu.h 644 root bin
+f none usr/platform/i86pc/include/sys/machclock.h 644 root bin
 f none usr/platform/i86pc/include/sys/machcpuvar.h 644 root bin
 f none usr/platform/i86pc/include/sys/machparam.h 644 root bin
+f none usr/platform/i86pc/include/sys/machprivregs.h 644 root bin
 f none usr/platform/i86pc/include/sys/machsystm.h 644 root bin
 f none usr/platform/i86pc/include/sys/machthread.h 644 root bin
 f none usr/platform/i86pc/include/sys/memnode.h 644 root bin
@@ -148,6 +153,20 @@ f none usr/platform/i86pc/include/vm/hat_pte.h 644 root bin
 f none usr/platform/i86pc/include/vm/htable.h 644 root bin
 f none usr/platform/i86pc/include/vm/hment.h 644 root bin
 f none usr/platform/i86pc/include/vm/kboot_mmu.h 644 root bin
+d none usr/platform/i86xpv 755 root sys
+d none usr/platform/i86xpv/include 755 root bin
+d none usr/platform/i86xpv/include/sys 755 root bin
+f none usr/platform/i86xpv/include/sys/balloon.h 644 root bin
+f none usr/platform/i86xpv/include/sys/hypervisor.h 644 root bin
+f none usr/platform/i86xpv/include/sys/machprivregs.h 644 root bin
+f none usr/platform/i86xpv/include/sys/xen_errno.h 644 root bin
+f none usr/platform/i86xpv/include/sys/xen_mmu.h 644 root bin
+f none usr/platform/i86xpv/include/sys/xpv_impl.h 644 root bin
+d none usr/platform/i86xpv/include/vm 755 root bin
+f none usr/platform/i86xpv/include/vm/seg_mf.h 644 root bin
 d none usr/share/src/uts/i86pc 755 root bin
 s none usr/share/src/uts/i86pc/sys=../../../../platform/i86pc/include/sys
 s none usr/share/src/uts/i86pc/vm=../../../../platform/i86pc/include/vm
+d none usr/share/src/uts/i86xpv 755 root bin
+s none usr/share/src/uts/i86xpv/sys=../../../../platform/i86xpv/include/sys
+s none usr/share/src/uts/i86xpv/vm=../../../../platform/i86xpv/include/vm

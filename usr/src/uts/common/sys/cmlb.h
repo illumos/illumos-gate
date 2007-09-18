@@ -60,6 +60,7 @@ typedef struct tg_attribute {
 #define	CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT	0x00000001
 #define	CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8		0x00000002
 #define	CMLB_OFF_BY_ONE					0x00000004
+#define	CMLB_FAKE_LABEL_ONE_PARTITION			0x00000008
 
 
 /* bit definitions of flag passed to cmlb_validate */

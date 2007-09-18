@@ -647,6 +647,7 @@ f none usr/lib/t450 555 root bin
 d none usr/lib/term 755 root bin
 f none usr/lib/utmp_update 4555 root bin
 f none usr/lib/utmpd 555 root bin
+f none usr/lib/vna 555 root bin
 f none usr/lib/vplot 555 root bin
 s none usr/mail=../var/mail
 d none usr/net 755 root sys

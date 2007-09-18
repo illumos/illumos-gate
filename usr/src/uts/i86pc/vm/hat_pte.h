@@ -59,16 +59,29 @@ extern "C" {
 	(PTE_ISVALID(p) && ((l) == 0 || PTE_GET(p, PT_PAGESIZE)))
 
 /*
- * Handy macro to check if 2 PTE's are the same - ignores REF/MOD bits
+ * Handy macro to check if 2 PTE's are the same - ignores REF/MOD bits.
+ * On the 64 bit hypervisor we also have to ignore the high order software
+ * bits and the global bit which are set/cleared capriciously (by the
+ * hypervisor!)
  */
-#define	PTE_EQUIV(a, b)	 (((a) | PT_REF | PT_MOD) == ((b) | PT_REF | PT_MOD))
+#if defined(__amd64) && defined(__xpv)
+#define	PT_IGNORE	((0x7fful << 52) | PT_GLOBAL)
+#else
+#define	PT_IGNORE	(0)
+#endif
+#define	PTE_EQUIV(a, b)	 (((a) | (PT_IGNORE | PT_REF | PT_MOD)) == \
+	((b) | (PT_IGNORE | PT_REF | PT_MOD)))
 
 /*
  * Shorthand for converting a PTE to it's pfn.
  */
 #define	PTE2MFN(p, l)	\
 	mmu_btop(PTE_GET((p), PTE_IS_LGPG((p), (l)) ? PT_PADDR_LGPG : PT_PADDR))
+#ifdef __xpv
+#define	PTE2PFN(p, l) pte2pfn(p, l)
+#else
 #define	PTE2PFN(p, l) PTE2MFN(p, l)
+#endif
 
 #define	PT_NX		(0x8000000000000000ull)
 #define	PT_PADDR	(0x000ffffffffff000ull)
@@ -77,10 +90,30 @@ extern "C" {
 /*
  * Macros to create a PTP or PTE from the pfn and level
  */
+#ifdef __xpv
+
+/*
+ * we use the highest order bit in physical address pfns to mark foreign mfns
+ */
+#ifdef _LP64
+#define	PFN_IS_FOREIGN_MFN (1ul << 51)
+#else
+#define	PFN_IS_FOREIGN_MFN (1ul << 31)
+#endif
+
+#define	MAKEPTP(pfn, l)	\
+	(pa_to_ma(pfn_to_pa(pfn)) | mmu.ptp_bits[(l) + 1])
+#define	MAKEPTE(pfn, l) \
+	((pfn & PFN_IS_FOREIGN_MFN) ? \
+	((pfn_to_pa(pfn & ~PFN_IS_FOREIGN_MFN) | mmu.pte_bits[l]) | \
+	PT_FOREIGN | PT_REF | PT_MOD) : \
+	(pa_to_ma(pfn_to_pa(pfn)) | mmu.pte_bits[l]))
+#else
 #define	MAKEPTP(pfn, l)	\
 	(pfn_to_pa(pfn) | mmu.ptp_bits[(l) + 1])
 #define	MAKEPTE(pfn, l)	\
 	(pfn_to_pa(pfn) | mmu.pte_bits[l])
+#endif
 
 /*
  * The idea of "level" refers to the level where the page table is used in the
@@ -251,6 +284,10 @@ extern x86pte_t get_pte64(x86pte_t *ptr);
  * From pfn to bytes, careful not to lose bits on PAE.
  */
 #define	pfn_to_pa(pfn) (mmu_ptob((paddr_t)(pfn)))
+
+#ifdef __xpv
+extern pfn_t pte2pfn(x86pte_t, level_t);
+#endif
 
 extern struct hat_mmu_info mmu;
 

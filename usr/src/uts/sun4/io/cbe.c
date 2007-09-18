@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ hrtime2tick(hrtime_t ts)
 	return (q * sys_tick_freq + ((r * sys_tick_freq) / NANOSEC));
 }
 
-uint64_t
+static uint64_t
 unscalehrtime(hrtime_t ts)
 {
 	uint64_t unscale = 0;

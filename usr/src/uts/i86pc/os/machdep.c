@@ -117,6 +117,10 @@
 #include <sys/mem.h>
 #include <sys/dumphdr.h>
 #include <sys/compress.h>
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#include <sys/xpv_panic.h>
+#endif
 
 #ifdef	TRAPTRACE
 #include <sys/traptrace.h>
@@ -167,7 +171,9 @@ extern void pm_cfb_rele(void);
 void
 mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 {
+#ifndef __xpv
 	extern void mtrr_resync(void);
+#endif
 
 	if (!panicstr) {
 		kpreempt_disable();
@@ -190,6 +196,9 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	if (!(fcn == AD_HALT || fcn == AD_POWEROFF))
 		prom_printf("rebooting...\n");
 
+	if (IN_XPV_PANIC())
+		reset();
+
 	/*
 	 * We can't bring up the console from above lock level, so do it now
 	 */
@@ -205,6 +214,19 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	 * Clear any unresolved UEs from memory.
 	 */
 	page_retire_mdboot();
+
+#if defined(__xpv)
+	/*
+	 * XXPV	Should probably think some more about how we deal
+	 *	with panicing before it's really safe to panic.
+	 *	On hypervisors, we reboot very quickly..  Perhaps panic
+	 *	should only attempt to recover by rebooting if,
+	 *	say, we were able to mount the root filesystem,
+	 *	or if we successfully launched init(1m).
+	 */
+	if (panicstr && proc_init == NULL)
+		(void) HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+#endif
 
 	/*
 	 * stop other cpus and raise our priority.  since there is only
@@ -229,7 +251,9 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	(void) spl8();
 	(*psm_shutdownf)(cmd, fcn);
 
+#ifndef __xpv
 	mtrr_resync();
+#endif
 
 	if (fcn == AD_HALT || fcn == AD_POWEROFF)
 		halt((char *)NULL);
@@ -330,6 +354,7 @@ debug_enter(
 void
 reset(void)
 {
+#if !defined(__xpv)
 	ushort_t *bios_memchk;
 
 	/*
@@ -345,6 +370,12 @@ reset(void)
 	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "efi-systab"))
 		efi_reset();
 	pc_reset();
+#else
+	if (IN_XPV_PANIC())
+		pc_reset();
+	(void) HYPERVISOR_shutdown(SHUTDOWN_reboot);
+	panic("HYPERVISOR_shutdown() failed");
+#endif
 	/*NOTREACHED*/
 }
 
@@ -427,7 +458,7 @@ sysp_getchar()
 
 	s = clear_int_flag();
 	i = cons_polledio->cons_polledio_getchar(
-		cons_polledio->cons_polledio_argument);
+	    cons_polledio->cons_polledio_argument);
 	restore_int_flag(s);
 	return (i);
 }
@@ -446,7 +477,7 @@ sysp_putchar(int c)
 
 	s = clear_int_flag();
 	cons_polledio->cons_polledio_putchar(
-		cons_polledio->cons_polledio_argument, c);
+	    cons_polledio->cons_polledio_argument, c);
 	restore_int_flag(s);
 }
 
@@ -462,7 +493,7 @@ sysp_ischar()
 
 	s = clear_int_flag();
 	i = cons_polledio->cons_polledio_ischar(
-		cons_polledio->cons_polledio_argument);
+	    cons_polledio->cons_polledio_argument);
 	restore_int_flag(s);
 	return (i);
 }
@@ -482,6 +513,10 @@ static struct boot_syscalls kern_sysp = {
 	sysp_ischar,	/*	int	(*ischar)();	9  */
 };
 
+#if defined(__xpv)
+int using_kern_polledio;
+#endif
+
 void
 kadb_uses_kernel()
 {
@@ -490,6 +525,9 @@ kadb_uses_kernel()
 	 * control kadb's I/O; it only controls the kernel's prom_* I/O.
 	 */
 	sysp = &kern_sysp;
+#if defined(__xpv)
+	using_kern_polledio = 1;
+#endif
 }
 
 /*
@@ -514,7 +552,7 @@ poll_port(ushort_t port, ushort_t mask, ushort_t onbits, ushort_t offbits)
 	for (i = 500000; i; i--) {
 		maskval = inb(port) & mask;
 		if (((maskval & onbits) == onbits) &&
-			((maskval & offbits) == 0))
+		    ((maskval & offbits) == 0))
 			return (0);
 		drv_usecwait(10);
 	}
@@ -759,10 +797,16 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 	processorid_t i;
 	cpuset_t xcset;
 
-	(void) splzs();
+	/*
+	 * In the case of a Xen panic, the hypervisor has already stopped
+	 * all of the CPUs.
+	 */
+	if (!IN_XPV_PANIC()) {
+		(void) splzs();
 
-	CPUSET_ALL_BUT(xcset, cp->cpu_id);
-	xc_trycall(NULL, NULL, NULL, xcset, (int (*)())panic_idle);
+		CPUSET_ALL_BUT(xcset, cp->cpu_id);
+		xc_trycall(NULL, NULL, NULL, xcset, (int (*)())panic_idle);
+	}
 
 	for (i = 0; i < NCPU; i++) {
 		if (i != cp->cpu_id && cpu[i] != NULL &&
@@ -807,6 +851,16 @@ void
 panic_dump_hw(int spl)
 {
 	/* Nothing to do here */
+}
+
+void *
+plat_traceback(void *fpreg)
+{
+#ifdef __xpv
+	if (IN_XPV_PANIC())
+		return (xpv_traceback(fpreg));
+#endif
+	return (fpreg);
 }
 
 /*ARGSUSED*/
@@ -858,9 +912,9 @@ volatile unsigned long	tenmicrodata;
 void
 tenmicrosec(void)
 {
-	extern int	tsc_gethrtime_initted;
+	extern int gethrtime_hires;
 
-	if (tsc_gethrtime_initted) {
+	if (gethrtime_hires) {
 		hrtime_t start, end;
 		start = end =  gethrtime();
 		while ((end - start) < (10 * (NANOSEC / MICROSEC))) {
@@ -868,6 +922,13 @@ tenmicrosec(void)
 			end = gethrtime();
 		}
 	} else {
+#if defined(__xpv)
+		hrtime_t newtime;
+
+		newtime = xpv_gethrtime() + 10000; /* now + 10 us */
+		while (xpv_gethrtime() < newtime)
+			SMT_PAUSE();
+#else	/* __xpv */
 		int i;
 
 		/*
@@ -875,6 +936,7 @@ tenmicrosec(void)
 		 */
 		for (i = 0; i < microdata; i++)
 			tenmicrodata = microdata;
+#endif	/* __xpv */
 	}
 }
 
@@ -994,31 +1056,117 @@ checked_wrmsr(uint_t msr, uint64_t value)
 }
 
 /*
- * Return true if the given page VA can be read via /dev/kmem.
+ * The mem driver's usual method of using hat_devload() to establish a
+ * temporary mapping will not work for foreign pages mapped into this
+ * domain or for the special hypervisor-provided pages.  For the foreign
+ * pages, we often don't know which domain owns them, so we can't ask the
+ * hypervisor to set up a new mapping.  For the other pages, we don't have
+ * a pfn, so we can't create a new PTE.  For these special cases, we do a
+ * direct uiomove() from the existing kernel virtual address.
  */
 /*ARGSUSED*/
 int
-plat_mem_valid_page(uintptr_t pageaddr, uio_rw_t rw)
+plat_mem_do_mmio(struct uio *uio, enum uio_rw rw)
 {
-	return (0);
+#if defined(__xpv)
+	void *va = (void *)(uintptr_t)uio->uio_loffset;
+	off_t pageoff = uio->uio_loffset & PAGEOFFSET;
+	size_t nbytes = MIN((size_t)(PAGESIZE - pageoff),
+	    (size_t)uio->uio_iov->iov_len);
+
+	if ((rw == UIO_READ &&
+	    (va == HYPERVISOR_shared_info || va == xen_info)) ||
+	    (pfn_is_foreign(hat_getpfnum(kas.a_hat, va))))
+		return (uiomove(va, nbytes, rw, uio));
+#endif
+	return (ENOTSUP);
+}
+
+pgcnt_t
+num_phys_pages()
+{
+	pgcnt_t npages = 0;
+	struct memlist *mp;
+
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		xen_sysctl_t op;
+
+		op.cmd = XEN_SYSCTL_physinfo;
+		op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+		if (HYPERVISOR_sysctl(&op) != 0)
+			panic("physinfo op refused");
+
+		return ((pgcnt_t)op.u.physinfo.total_pages);
+	}
+#endif /* __xpv */
+
+	for (mp = phys_install; mp != NULL; mp = mp->next)
+		npages += mp->size >> PAGESHIFT;
+
+	return (npages);
 }
 
 int
 dump_plat_addr()
 {
+#ifdef __xpv
+	pfn_t pfn = mmu_btop(xen_info->shared_info) | PFN_IS_FOREIGN_MFN;
+	mem_vtop_t mem_vtop;
+	int cnt;
+
+	/*
+	 * On the hypervisor, we want to dump the page with shared_info on it.
+	 */
+	if (!IN_XPV_PANIC()) {
+		mem_vtop.m_as = &kas;
+		mem_vtop.m_va = HYPERVISOR_shared_info;
+		mem_vtop.m_pfn = pfn;
+		dumpvp_write(&mem_vtop, sizeof (mem_vtop_t));
+		cnt = 1;
+	} else {
+		cnt = dump_xpv_addr();
+	}
+	return (cnt);
+#else
 	return (0);
+#endif
 }
 
 void
 dump_plat_pfn()
 {
+#ifdef __xpv
+	pfn_t pfn = mmu_btop(xen_info->shared_info) | PFN_IS_FOREIGN_MFN;
+
+	if (!IN_XPV_PANIC())
+		dumpvp_write(&pfn, sizeof (pfn));
+	else
+		dump_xpv_pfn();
+#endif
 }
 
 /*ARGSUSED*/
 int
 dump_plat_data(void *dump_cbuf)
 {
+#ifdef __xpv
+	uint32_t csize;
+	int cnt;
+
+	if (!IN_XPV_PANIC()) {
+		csize = (uint32_t)compress(HYPERVISOR_shared_info, dump_cbuf,
+		    PAGESIZE);
+		dumpvp_write(&csize, sizeof (uint32_t));
+		dumpvp_write(dump_cbuf, csize);
+		cnt = 1;
+	} else {
+		cnt = dump_xpv_data(dump_cbuf);
+	}
+	return (cnt);
+#else
 	return (0);
+#endif
 }
 
 /*

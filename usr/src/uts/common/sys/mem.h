@@ -142,7 +142,7 @@ typedef struct mem_info {
 
 extern pfn_t impl_obmem_pfnum(pfn_t);
 
-extern int plat_mem_valid_page(uintptr_t, uio_rw_t);
+extern int plat_mem_do_mmio(struct uio *, enum uio_rw);
 
 #endif	/* _KERNEL */
 

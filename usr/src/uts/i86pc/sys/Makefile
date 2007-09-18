@@ -47,8 +47,10 @@ HDRS=  \
 	ddi_subrdefs.h	\
 	debug_info.h 	\
 	mach_mmu.h	\
+	machclock.h	\
 	machcpuvar.h	\
 	machparam.h	\
+	machprivregs.h	\
 	machsystm.h	\
 	machthread.h	\
 	memnode.h	\

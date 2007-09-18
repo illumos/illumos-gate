@@ -42,6 +42,8 @@ extern __inline__ void ht_pause(void)
 	    "pause");
 }
 
+#if !defined(__xpv)
+
 extern __inline__ void cli(void)
 {
 	__asm__ __volatile__(
@@ -60,6 +62,8 @@ extern __inline__ void i86_halt(void)
 	    "sti; hlt");
 }
 
+#endif /* !__xpv */
+
 #endif	/* __i386 || defined(__amd64) */
 
 #if defined(__amd64)
@@ -67,40 +71,44 @@ extern __inline__ void i86_halt(void)
 extern __inline__ void __set_ds(selector_t value)
 {
 	__asm__ __volatile__(
-	"movw	%0, %%ds"
-	: /* no output */
-	: "r" (value));
+	    "movw	%0, %%ds"
+	    : /* no output */
+	    : "r" (value));
 }
 
 extern __inline__ void __set_es(selector_t value)
 {
 	__asm__ __volatile__(
-	"movw	%0, %%es"
-	: /* no output */
-	: "r" (value));
+	    "movw	%0, %%es"
+	    : /* no output */
+	    : "r" (value));
 }
 
 extern __inline__ void __set_fs(selector_t value)
 {
 	__asm__ __volatile__(
-	"movw	%0, %%fs"
-	: /* no output */
-	: "r" (value));
+	    "movw	%0, %%fs"
+	    : /* no output */
+	    : "r" (value));
 }
 
 extern __inline__ void __set_gs(selector_t value)
 {
 	__asm__ __volatile__(
-	"movw	%0, %%gs"
-	: /* no output */
-	: "r" (value));
+	    "movw	%0, %%gs"
+	    : /* no output */
+	    : "r" (value));
 }
+
+#if !defined(__xpv)
 
 extern __inline__ void __swapgs(void)
 {
 	__asm__ __volatile__(
-	"mfence; swapgs");
+	    "mfence; swapgs");
 }
+
+#endif /* !__xpv */
 
 #endif	/* __amd64 */
 

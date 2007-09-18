@@ -116,6 +116,16 @@ pcie_pci 184
 kssl 185
 mc-amd 186
 tzmon 187
+xpvd 191
+xnf 192
+xdf 193
+xencons 194
+xenbus 195
+privcmd 196
+evtchn 197
+xdb 199
+domcaps 200
+balloon 201
 did 239
 lx_ptm 240
 lx_systrace 241
@@ -126,3 +136,7 @@ ucode 245
 ppm 246
 cpunex 247
 cpudrv 248
+xnbe 249
+xnbo 250
+xnbu 251
+vnic 252

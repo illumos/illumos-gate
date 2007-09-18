@@ -199,7 +199,7 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 		ZCONS_SLAVE_NAME ")$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	{ "pseudo", "^cpu/self/cpuid$", RM_ALWAYS | RM_PRE | RM_HOT,
+	{ "pseudo", "^" CPUID_SELF_NAME "$", RM_ALWAYS | RM_PRE | RM_HOT,
 	    ILEVEL_0, devfsadm_rm_all
 	},
 	{ "enclosure", "^es/ses[0-9]+$", RM_POST,

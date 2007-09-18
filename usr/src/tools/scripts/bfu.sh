@@ -1990,7 +1990,7 @@ cleanup_eeprom_console()
 	bootenvrc="$root/boot/solaris/bootenv.rc"
 	menu_console=`eeprom console 2>/dev/null | \
 	    grep -v 'data not available' | cut -d= -f2-`
-	bootenv_console=`grep '^setprop[ 	]\{1,\}console\>' $bootenvrc`
+	bootenv_console=`grep '^setprop[	 ]\{1,\}console\>' $bootenvrc`
 	if [ -n "$menu_console" ] && [ -z "$bootenv_console" ]; then
 		echo "setprop console '$menu_console'" >> $bootenvrc
 	fi
@@ -2062,7 +2062,7 @@ multi_or_direct=no
 # running on (before the bfu), and what the failsafe archives are
 # (again, before the bfu).  failsafe_type is only needed on diskful
 # bfu's, so it's not set in the diskless case.
-# Possible values: unknown, dca, multiboot, directboot
+# Possible values: unknown, dca, multiboot, directboot, xpv
 #
 archive_type=unknown
 system_type=unknown
@@ -2108,12 +2108,16 @@ esac
 #
 # Determine what kind of archives we're installing, using the following rules:
 #
-# 1. If strap.com is present, the archives are pre-multiboot
-# 2. If symdef is present, the archives are directboot
-# 3. Otherwise, the archives are multiboot
+# 1. If i86xpv archives exist, the archives are xpv
+# 2. If strap.com is present, the archives are pre-multiboot
+# 3. If symdef is present, the archives are directboot
+# 4. Otherwise, the archives are multiboot
 #
 if [ $target_isa = i386 ]; then
-	if [ -f $cpiodir/i86pc.boot$ZFIX ] && \
+	if [ -f $cpiodir/i86xpv.root$ZFIX ]; then
+		archive_type=xpv
+		multi_or_direct=yes
+	elif [ -f $cpiodir/i86pc.boot$ZFIX ] && \
 	    archive_file_exists i86pc.boot "strap.com"; then
 		archive_type=dca
 	elif [ -f $cpiodir/i86pc.root$ZFIX ] && \
@@ -2144,6 +2148,16 @@ if [ $diskless = no ]; then
 		chmod 755 $root/platform/sun4u-us3
 		chown root $root/platform/sun4u-us3
 		chgrp sys $root/platform/sun4u-us3
+	fi
+
+	if [ $target_isa = i386 -a $archive_type = xpv ]; then
+		#
+		# On i386, we want to apply the archives for both platforms
+		# (i86pc and i86xpv) if they exist.  We force the platform
+		# to i86xpv so that both will be applied.
+		#
+		karch=i86pc
+		plat=i86xpv
 	fi
 
 	if [ $karch != $plat -a -f ${cpiodir}/${plat}.usr$ZFIX ]; then
@@ -2216,10 +2230,22 @@ else
 	test -f generic.root$ZFIX || fail "$cpiodir/generic.root$ZFIX missing"
 	allarchs=$(echo $(ls *.root$ZFIX | grep -v generic.root$ZFIX | \
 		sed -e 's/.root.*//'))
-	# XXX Pick karch as last available root arch
-	karch=${allarchs##* }
-	# XXX Pick plat as first available root arch
-	plat=${allarchs%% *}
+
+	if [ $target_isa = i386 -a $archive_type = xpv ]; then
+		#
+		# On i386, we want to apply the archives for both platforms
+		# (i86pc and i86xpv) if they exist.  We force the platform
+		# to i86xpv so that both will be applied.
+		#
+		karch=i86pc
+		plat=i86xpv
+	else
+		# XXX Pick karch as last available root arch
+		karch=${allarchs##* }
+		# XXX Pick plat as first available root arch
+		plat=${allarchs%% *}
+	fi
+
 	rootlist=""
 	for root in /export/root/*
 	do
@@ -2302,10 +2328,11 @@ fi
 
 #
 # We need biosdev if we're moving from pre-multiboot to multiboot or directboot
-# kernels.
+# kernels.  If we already have an i86xpv kernel, then we must already be a
+# directboot kernel, and can therefore skip the check.
 #
-if [ $target_isa = i386 ] && [ $multi_or_direct = yes ] && [ $diskless = no ]
-then
+if [ $target_isa = i386 ] && [ $multi_or_direct = yes ] && \
+    [ $diskless = no ] && [ ! -d /platform/i86xpv/ ]; then
 	prtconf -v | grep biosdev >/dev/null 2>&1
 	if [ $? -ne 0 ] && [ ! -f $rootprefix/platform/i86pc/multiboot ]; then
 		echo "biosdev cannot be run on this machine."
@@ -2525,11 +2552,16 @@ done
 MULTIBOOT_BIN_DIR=${MULTIBOOT_BIN_DIR:=${GATE}/public/multiboot}
 have_new_bootadm=unknown
 
-if [ -x $root/boot/solaris/bin/symdef ] && \
-    $root/boot/solaris/bin/symdef $root/platform/i86pc/kernel/unix dboot_image
-then
+if [ -f "$root/platform/i86xpv/kernel/unix" ]; then
+	root_is_xpv=yes
+	root_is_directboot=yes
+elif [ -x "$root/boot/solaris/bin/symdef" ] && \
+    "$root"/boot/solaris/bin/symdef "$root/platform/i86pc/kernel/unix" \
+    dboot_image; then
+	root_is_xpv=no
 	root_is_directboot=yes
 else
+	root_is_xpv=no
 	root_is_directboot=no
 fi
 
@@ -2551,10 +2583,13 @@ if [ $multi_or_direct = yes ]; then
 		    [ -f $DIRECTBOOT_BIN_DIR/$file ]; then
 			cp $DIRECTBOOT_BIN_DIR/$file /tmp/bfubin/
 		else
-			if [ $root_is_directboot = yes ]; then
+			if [ $root_is_xpv = yes ] ||
+			    [ $root_is_directboot = yes ] &&
+			    [ $archive_type = multiboot ]; then
 				cp $root/$cmd /tmp/bfubin/
 				have_new_bootadm=yes
-			elif [ $archive_type = directboot ]; then
+			elif [ $archive_type = directboot ] || \
+			    [ $archive_type = xpv ]; then
 				DBOOT_TMPDIR=/tmp/dboot.$$
 				trap "rm -rf $DBOOT_TMPDIR" EXIT
 				OLD_PWD=$(pwd)
@@ -4639,15 +4674,18 @@ check_dca_to_multiboot()
 
 #
 # Figure out the boot architecture of the current system:
-# 1. If dboot_image is in unix, it's a dboot system
-# 2. Otherwise, if multiboot is present, it's a multiboot system
-# 3. Otherwise, it's a pre-multiboot system
+# 1. If an i86xpv kernel exists, it's a xpv system
+# 2. If dboot_image is in unix, it's a dboot system
+# 3. Otherwise, if multiboot is present, it's a multiboot system
+# 4. Otherwise, it's a pre-multiboot system
 #
 # This is called before we lay down the new archives.
 #
 check_system_type()
 {
-	if [ -x $root/boot/solaris/bin/symdef ] && \
+	if [ -f $root/platform/i86xpv/kernel/unix ]; then
+		system_type=xpv
+	elif [ -x $root/boot/solaris/bin/symdef ] && \
 	    $root/boot/solaris/bin/symdef $root/platform/i86pc/kernel/unix \
 	    dboot_image; then
 		system_type=directboot
@@ -7057,7 +7095,7 @@ mondo_loop() {
 			/^new/ { lastname = $3 }
 			/^old/ { if (lastname == $3) { print $2 "/" $3 } }
 		    ' | while read x; do
-			echo rm $x
+			echo "rm $x"
 			rm $x
 		done
 	fi

@@ -48,6 +48,11 @@
 #include <sys/clock.h>
 #include <sys/model.h>
 #include <sys/panic.h>
+
+#if defined(__xpv)
+#include <sys/hypervisor.h>
+#endif
+
 #include "assym.h"
 
 #endif	/* __lint */
@@ -138,7 +143,7 @@
  *
  */
 #define	BRAND_CALLBACK(callback_id)					    \
-	movq	%rsp, %gs:CPU_RTMP_RSP	/* save the stack pointer	*/ ;\
+	movq	%rsp, %gs:CPU_RTMP_RSP  /* save the stack pointer       */ ;\
 	movq	%r15, %gs:CPU_RTMP_R15	/* save %r15			*/ ;\
 	movq	%gs:CPU_THREAD, %r15	/* load the thread pointer	*/ ;\
 	movq	T_STACK(%r15), %rsp	/* switch to the kernel stack	*/ ;\
@@ -160,9 +165,9 @@
 	movq	%gs:CPU_RTMP_RSP, %r15	/* grab the user stack pointer	*/ ;\
 	pushq	(%r15)			/* push the return address	*/ ;\
 	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
-	swapgs								   ;\
+	SWAPGS				/* user gsbase                  */ ;\
 	call	*32(%rsp)		/* call callback		*/ ;\
-	swapgs								   ;\
+	SWAPGS				/* kernel gsbase                */ ;\
 1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
 
@@ -240,13 +245,13 @@
 #if !defined(__lint)
 
 __lwptoregs_msg:
-	.string	"syscall_asm_amd64.s:%d lwptoregs(%p) [%p] != rp [%p]"
+	.string	"%M%:%d lwptoregs(%p) [%p] != rp [%p]"
 
 __codesel_msg:
-	.string	"syscall_asm_amd64.s:%d rp->r_cs [%ld] != %ld"
+	.string	"%M%:%d rp->r_cs [%ld] != %ld"
 
 __no_rupdate_msg:
-	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_rupdate != 0"
+	.string	"%M%:%d lwp %p, pcb_rupdate != 0"
 
 #endif	/* !__lint */
 
@@ -354,14 +359,51 @@ size_t _allsyscalls_size;
 #else	/* __lint */
 
 	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_SYSCALL)
-	SWAPGS
+	SWAPGS				/* user gsbase */
+
+#if defined(__xpv)
+	/*
+	 * Note that swapgs is handled for us by the hypervisor. Here
+	 * it is empty.
+	 */
+	jmp	nopop_sys_syscall
+#endif
 	
 	ALTENTRY(sys_syscall)
-	SWAPGS
-	movq	%rsp, %gs:CPU_RTMP_RSP
+	SWAPGS				/* kernel gsbase */
+#if defined(__xpv)
+	/*
+	 * Even though we got here by a syscall instruction from user land
+	 * the hypervisor constructs our stack the same way as is done
+	 * for interrupt gates. The only exception is that it pushes kernel
+	 * cs and ss instead of user cs and ss for some reason.  This is all
+	 * different from running native on the metal.
+	 *
+	 * Stack on entry:
+	 *      (0x0)rsp	rcx	(user rip)
+	 *      (0x8)rsp	r11	(user rflags)
+	 *      (0x10)rsp	user rip
+	 *      (0x18)rsp	kernel cs
+	 *      (0x20)rsp	user rflags 
+	 *      (0x28)rsp	user rsp
+	 *      (0x30)rsp	kernel ss
+	 */
+
+	XPV_TRAP_POP
+nopop_sys_syscall:
+	ASSERT_UPCALL_MASK_IS_SET
+
 	movq	%r15, %gs:CPU_RTMP_R15
+	movq	0x18(%rsp), %r15		/* save user stack */
+	movq	%r15, %gs:CPU_RTMP_RSP
+#else
+	movq	%r15, %gs:CPU_RTMP_R15
+	movq	%rsp, %gs:CPU_RTMP_RSP
+#endif	/* __xpv */
+
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
 
@@ -522,9 +564,24 @@ _syscall_invoke:
 
 	movq	REGOFF_RIP(%rsp), %rcx	
 	movl	REGOFF_RFL(%rsp), %r11d
+
+#if defined(__xpv)
+	addq	$REGOFF_RIP, %rsp
+#else
 	movq	REGOFF_RSP(%rsp), %rsp
-	SWAPGS
-	sysretq
+#endif
+
+        /*
+         * There can be no instructions between the ALTENTRY below and
+	 * SYSRET or we could end up breaking brand support. See label usage
+         * in sn1_brand_syscall_callback for an example.
+         */
+	ASSERT_UPCALL_MASK_IS_SET
+	SWAPGS				/* user gsbase */
+        ALTENTRY(nopop_sys_syscall_sysretq)
+	SYSRETQ
+        /*NOTREACHED*/
+        SET_SIZE(nopop_sys_syscall_sysretq)
 
 _syscall_pre:
 	call	pre_syscall
@@ -571,12 +628,23 @@ sys_syscall32()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_syscall32)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
-	SWAPGS
+	SWAPGS				/* user gsbase */
+
+#if defined(__xpv)
+	jmp	nopop_sys_syscall32
+#endif
 
 	ALTENTRY(sys_syscall32)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
+
+#if defined(__xpv)
+	XPV_TRAP_POP
+nopop_sys_syscall32:
+#endif
+
 	movl	%esp, %r10d
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
@@ -732,8 +800,12 @@ _syscall32_save:
 	movl	REGOFF_RIP(%rsp), %ecx		/* %ecx -> %eip */
 	movl	REGOFF_RSP(%rsp), %esp
 
-	swapgs
-	sysretl
+	ASSERT_UPCALL_MASK_IS_SET
+	SWAPGS				/* user gsbase */
+        ALTENTRY(nopop_sys_syscall32_sysretl)
+	SYSRETL
+        SET_SIZE(nopop_sys_syscall32_sysretl)
+	/*NOTREACHED*/
 
 _full_syscall_postsys32:
 	STI
@@ -803,8 +875,7 @@ sys_sysenter()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_sysenter)
-	SWAPGS
-
+	SWAPGS				/* kernel gsbase */
 	ALTENTRY(_brand_sys_sysenter_post_swapgs)
 	BRAND_CALLBACK(BRAND_CB_SYSENTER)
 	/*
@@ -814,7 +885,7 @@ sys_sysenter()
 	jmp	_sys_sysenter_post_swapgs
 
 	ALTENTRY(sys_sysenter)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
 
 	ALTENTRY(_sys_sysenter_post_swapgs)
 	movq	%gs:CPU_THREAD, %r15
@@ -1014,20 +1085,33 @@ sys_int80()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_int80)
-	swapgs
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_INT80)
-	swapgs
+	SWAPGS				/* user gsbase */
+#if defined(__xpv)
+	jmp	nopop_int80
+#endif
 
 	ENTRY_NP(sys_int80)
 	/*
 	 * We hit an int80, but this process isn't of a brand with an int80
 	 * handler.  Bad process!  Make it look as if the INT failed.
-	 * Modify %eip to point before the INT, push the expected error
-	 * code and fake a GP fault.
-	 * 
+	 * Modify %rip to point before the INT, push the expected error
+	 * code and fake a GP fault. Note on 64-bit hypervisor we need
+	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
+	 * because gptrap will pop them again with its own XPV_TRAP_POP.
 	 */
+#if defined(__xpv)
+	XPV_TRAP_POP
+nopop_int80:
+#endif
 	subq	$2, (%rsp)	/* int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+#if defined(__xpv)
+	push	%r11
+	push	%rcx
+#endif
 	jmp	gptrap			/ GP fault
 	SET_SIZE(sys_int80)
 	SET_SIZE(brand_sys_int80)
@@ -1049,12 +1133,23 @@ sys_syscall_int()
 #else	/* __lint */
 
 	ENTRY_NP(brand_sys_syscall_int)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
 	BRAND_CALLBACK(BRAND_CB_INT91)
-	swapgs
+	SWAPGS				/* user gsbase */
+
+#if defined(__xpv)
+	jmp	nopop_syscall_int
+#endif
 
 	ALTENTRY(sys_syscall_int)
-	swapgs
+	SWAPGS				/* kernel gsbase */
+
+#if defined(__xpv)
+	XPV_TRAP_POP
+nopop_syscall_int:
+#endif
+
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
 	movl	%eax, %eax
@@ -1095,7 +1190,7 @@ sys_lcall32()
 #else	/* __lint */
 
 	ENTRY_NP(sys_lcall32)
-	SWAPGS
+	SWAPGS				/* kernel gsbase */
 	pushq	$0
 	pushq	%rbp
 	movq	%rsp, %rbp

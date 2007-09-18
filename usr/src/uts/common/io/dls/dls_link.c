@@ -1001,7 +1001,7 @@ dls_link_add(dls_link_t *dlp, uint32_t sap, dls_impl_t *dip)
 	/* Replace the existing receive function if there is one. */
 	if (dlp->dl_mrh != NULL)
 		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
-	dlp->dl_mrh = mac_rx_add(dlp->dl_mh, rx, (void *)dlp);
+	dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	mutex_exit(&dlp->dl_lock);
 }
 
@@ -1099,7 +1099,7 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 			rx = i_dls_link_rx;
 
 		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
-		dlp->dl_mrh = mac_rx_add(dlp->dl_mh, rx, (void *)dlp);
+		dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	}
 	mutex_exit(&dlp->dl_lock);
 }

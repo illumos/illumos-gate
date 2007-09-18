@@ -57,37 +57,6 @@
 
 #endif	/* lint */
 
-#if defined(__i386)
-
-#if defined(__lint)
-
-void
-patch_tsc(void)
-{}
-
-#else	/* __lint */
-
-/*
- * To cope with processors that do not implement the rdtsc instruction,
- * we patch the kernel to use rdtsc if that feature is detected on the CPU.
- * On an unpatched kernel, all locations requiring rdtsc are nop's.
- *
- * This function patches the nop's to rdtsc.
- */
-	ENTRY_NP(patch_tsc)
-	movw	_rdtsc_insn, %cx
-	movw	%cx, _tsc_patch15
-	movw	%cx, _tsc_patch16
-	ret
-_rdtsc_insn:
-	rdtsc
-	SET_SIZE(patch_tsc)
-
-#endif	/* __lint */
-
-#endif	/* __i386 */
-
-
 #if defined(__lint)
 
 void
@@ -134,7 +103,8 @@ _interrupt(void)
 
 	movq	%rsp, %rdi		/* pass struct regs pointer */
 	call	do_interrupt
-	jmp	_sys_rtt
+
+	jmp	_sys_rtt_ints_disabled
 	/*NOTREACHED*/
 
 	SET_SIZE(cmnint)
@@ -164,7 +134,9 @@ _interrupt(void)
 	call	do_interrupt		/* interrupt service routine */
 	addl	$8, %esp		/* pop args off of stack */
 
-	jmp	_sys_rtt
+	jmp	_sys_rtt_ints_disabled
+	/*NOTREACHED*/
+
 	SET_SIZE(cmnint)
 	SET_SIZE(_interrupt)
 
@@ -213,6 +185,11 @@ fakesoftint(void)
 	pushq	$KDS_SEL	/* %ss */
 	pushq	%r11		/* %rsp */
 	pushf			/* rflags */
+#if defined(__xpv)
+	popq	%r11
+	EVENT_MASK_TO_IE(%rdi, %r11)
+	pushq	%r11
+#endif
 	pushq	$KCS_SEL	/* %cs */
 	leaq	fakesoftint_return(%rip), %r11
 	pushq	%r11		/* %rip */
@@ -228,6 +205,11 @@ fakesoftint(void)
 
 	ENTRY_NP(fakesoftint)
 	pushfl
+#if defined(__xpv)
+	popl	%eax
+	EVENT_MASK_TO_IE(%edx, %eax)
+	pushl	%eax
+#endif
 	pushl	%cs
 	pushl	$fakesoftint_return
 	pushl	$0

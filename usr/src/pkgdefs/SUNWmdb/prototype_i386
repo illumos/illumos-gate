@@ -46,6 +46,17 @@ f none usr/platform/i86pc/lib/mdb/kvm/cpu.AuthenticAMD.15.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/pcplusmp.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/uppc.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/unix.so 555 root sys
+d none usr/platform/i86xpv 755 root sys
+d none usr/platform/i86xpv/lib 755 root bin
+d none usr/platform/i86xpv/lib/mdb 755 root sys
+d none usr/platform/i86xpv/lib/mdb/kvm 755 root sys
+d none usr/platform/i86xpv/lib/mdb/kvm/amd64 755 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/amd64/unix.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/amd64/xpv.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/amd64/xpv_psm.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/unix.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/xpv.so 555 root sys
+f none usr/platform/i86xpv/lib/mdb/kvm/xpv_psm.so 555 root sys
 d none usr/lib/mdb/kvm/amd64 755 root sys
 f none usr/lib/mdb/kvm/amd64/arp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/audiosup.so 555 root sys
@@ -61,6 +72,7 @@ f none usr/lib/mdb/kvm/amd64/krtld.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/logindmux.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/md.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/mdb_kb.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/mdb_ks.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/mpt.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/nca.so 555 root sys
@@ -89,6 +101,7 @@ f none usr/lib/mdb/kvm/krtld.so 555 root sys
 f none usr/lib/mdb/kvm/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/logindmux.so 555 root sys
 f none usr/lib/mdb/kvm/md.so 555 root sys
+f none usr/lib/mdb/kvm/mdb_kb.so 555 root sys
 f none usr/lib/mdb/kvm/mdb_ks.so 555 root sys
 f none usr/lib/mdb/kvm/mpt.so 555 root sys
 f none usr/lib/mdb/kvm/nca.so 555 root sys

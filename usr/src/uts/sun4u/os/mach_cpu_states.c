@@ -200,7 +200,8 @@ panic_idle(void)
 	CPU->cpu_m.in_prom = 1;
 	membar_stld();
 
-	for (;;);
+	for (;;)
+		continue;
 }
 
 /*
@@ -263,7 +264,7 @@ panic_enter_hw(int spl)
 			 * that the current level 14 has been serviced.
 			 */
 			wr_clr_softint((1 << PIL_14) |
-				TICK_INT_MASK | STICK_INT_MASK);
+			    TICK_INT_MASK | STICK_INT_MASK);
 		}
 
 		enable_vec_intr(opstate);
@@ -399,7 +400,7 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 
 	uint_t reason = pstate->ptl1_regs.ptl1_g1;
 	uint_t tl = pstate->ptl1_regs.ptl1_trap_regs[0].ptl1_tl;
-	struct trap_info ti = { 0 };
+	struct panic_trap_info ti = { 0 };
 
 	/*
 	 * Use trap_info for a place holder to call panic_savetrap() and

@@ -47,81 +47,18 @@
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_amd64util.h>
+#include <mdb/kvm_isadep.h>
 #include <mdb/mdb_kvm.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb.h>
 
-static int
-kt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
-    const char *rname, mdb_tgt_reg_t *rp)
-{
-	const mdb_tgt_regdesc_t *rdp;
-	kt_data_t *kt = t->t_data;
-
-	if (tid != kt->k_tid)
-		return (set_errno(EMDB_NOREGS));
-
-	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
-		if (strcmp(rname, rdp->rd_name) == 0) {
-			*rp = kt->k_regs->kregs[rdp->rd_num];
-			return (0);
-		}
-	}
-
-	return (set_errno(EMDB_BADREG));
-}
-
-static int
-kt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
-{
-	const mdb_tgt_regdesc_t *rdp;
-	kt_data_t *kt = t->t_data;
-
-	if (tid != kt->k_tid)
-		return (set_errno(EMDB_NOREGS));
-
-	for (rdp = kt->k_rds; rdp->rd_name != NULL; rdp++) {
-		if (strcmp(rname, rdp->rd_name) == 0) {
-			kt->k_regs->kregs[rdp->rd_num] = (kreg_t)r;
-			return (0);
-		}
-	}
-
-	return (set_errno(EMDB_BADREG));
-}
-
 /*ARGSUSED*/
 int
 kt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	kt_data_t *kt = mdb.m_target->t_data;
-
-	if (argc != 0 || (flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	mdb_amd64_printregs(kt->k_regs);
-
+	mdb_amd64_printregs((const mdb_tgt_gregset_t *)addr);
 	return (DCMD_OK);
-}
-
-/*
- * Return a flag indicating if the specified %eip is likely to have an
- * interrupt frame on the stack.  We do this by comparing the address to the
- * range of addresses spanned by several well-known routines, and looking
- * to see if the next and previous %ebp values are "far" apart.  Sigh.
- */
-int
-mdb_kvm_intrframe(mdb_tgt_t *t, uintptr_t pc, uintptr_t fp,
-    uintptr_t prevfp)
-{
-	kt_data_t *kt = t->t_data;
-
-	return ((pc >= kt->k_intr_sym.st_value &&
-	    (pc < kt->k_intr_sym.st_value + kt->k_intr_sym.st_size)) ||
-	    (pc >= kt->k_trap_sym.st_value &&
-	    (pc < kt->k_trap_sym.st_value + kt->k_trap_sym.st_size)) ||
-	    (fp >= prevfp + 0x2000) || (fp <= prevfp - 0x2000));
 }
 
 static int
@@ -153,13 +90,13 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
 	return (DCMD_OK);
 }
 
-static int
+int
 kt_stack(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	return (kt_stack_common(addr, flags, argc, argv, mdb_amd64_kvm_frame));
 }
 
-static int
+int
 kt_stackv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	return (kt_stack_common(addr, flags, argc, argv, mdb_amd64_kvm_framev));
@@ -220,12 +157,43 @@ const mdb_tgt_ops_t kt_amd64_ops = {
 };
 
 void
+kt_regs_to_kregs(struct regs *regs, mdb_tgt_gregset_t *gregs)
+{
+	gregs->kregs[KREG_SAVFP] = regs->r_savfp;
+	gregs->kregs[KREG_SAVPC] = regs->r_savpc;
+	gregs->kregs[KREG_RDI] = regs->r_rdi;
+	gregs->kregs[KREG_RSI] = regs->r_rsi;
+	gregs->kregs[KREG_RDX] = regs->r_rdx;
+	gregs->kregs[KREG_RCX] = regs->r_rcx;
+	gregs->kregs[KREG_R8] = regs->r_r8;
+	gregs->kregs[KREG_R9] = regs->r_r9;
+	gregs->kregs[KREG_RAX] = regs->r_rax;
+	gregs->kregs[KREG_RBX] = regs->r_rbx;
+	gregs->kregs[KREG_RBP] = regs->r_rbp;
+	gregs->kregs[KREG_R10] = regs->r_r10;
+	gregs->kregs[KREG_R11] = regs->r_r11;
+	gregs->kregs[KREG_R12] = regs->r_r12;
+	gregs->kregs[KREG_R13] = regs->r_r13;
+	gregs->kregs[KREG_R14] = regs->r_r14;
+	gregs->kregs[KREG_R15] = regs->r_r15;
+	gregs->kregs[KREG_DS] = regs->r_ds;
+	gregs->kregs[KREG_ES] = regs->r_es;
+	gregs->kregs[KREG_FS] = regs->r_fs;
+	gregs->kregs[KREG_GS] = regs->r_gs;
+	gregs->kregs[KREG_TRAPNO] = regs->r_trapno;
+	gregs->kregs[KREG_ERR] = regs->r_err;
+	gregs->kregs[KREG_RIP] = regs->r_rip;
+	gregs->kregs[KREG_CS] = regs->r_cs;
+	gregs->kregs[KREG_RFLAGS] = regs->r_rfl;
+	gregs->kregs[KREG_RSP] = regs->r_rsp;
+	gregs->kregs[KREG_SS] = regs->r_ss;
+}
+
+void
 kt_amd64_init(mdb_tgt_t *t)
 {
 	kt_data_t *kt = t->t_data;
-
 	panic_data_t pd;
-	kreg_t *kregs;
 	struct regs regs;
 	uintptr_t addr;
 
@@ -242,9 +210,10 @@ kt_amd64_init(mdb_tgt_t *t)
 	kt->k_dcmd_stack = kt_stack;
 	kt->k_dcmd_stackv = kt_stackv;
 	kt->k_dcmd_stackr = kt_stackv;
+	kt->k_dcmd_cpustack = kt_cpustack;
+	kt->k_dcmd_cpuregs = kt_cpuregs;
 
 	t->t_ops = &kt_amd64_ops;
-	kregs = kt->k_regs->kregs;
 
 	(void) mdb_dis_select("amd64");
 
@@ -264,7 +233,7 @@ kt_amd64_init(mdb_tgt_t *t)
 	 * Don't attempt to load any thread or register information if
 	 * we're examining the live operating system.
 	 */
-	if (strcmp(kt->k_symfile, "/dev/ksyms") == 0)
+	if (kt->k_symfile != NULL && strcmp(kt->k_symfile, "/dev/ksyms") == 0)
 		return;
 
 	/*
@@ -298,41 +267,23 @@ kt_amd64_init(mdb_tgt_t *t)
 
 		mdb_free(pdp, pd_size);
 
-	} else if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &addr, sizeof (addr),
+		return;
+	};
+
+	if (mdb_tgt_readsym(t, MDB_TGT_AS_VIRT, &addr, sizeof (addr),
 	    MDB_TGT_OBJ_EXEC, "panic_reg") == sizeof (addr) && addr != NULL &&
 	    mdb_tgt_vread(t, &regs, sizeof (regs), addr) == sizeof (regs)) {
-
-		kregs[KREG_SAVFP] = regs.r_savfp;
-		kregs[KREG_SAVPC] = regs.r_savpc;
-		kregs[KREG_RDI] = regs.r_rdi;
-		kregs[KREG_RSI] = regs.r_rsi;
-		kregs[KREG_RDX] = regs.r_rdx;
-		kregs[KREG_RCX] = regs.r_rcx;
-		kregs[KREG_R8] = regs.r_r8;
-		kregs[KREG_R9] = regs.r_r9;
-		kregs[KREG_RAX] = regs.r_rax;
-		kregs[KREG_RBX] = regs.r_rbx;
-		kregs[KREG_RBP] = regs.r_rbp;
-		kregs[KREG_R10] = regs.r_r10;
-		kregs[KREG_R11] = regs.r_r11;
-		kregs[KREG_R12] = regs.r_r12;
-		kregs[KREG_R13] = regs.r_r13;
-		kregs[KREG_R14] = regs.r_r14;
-		kregs[KREG_R15] = regs.r_r15;
-		kregs[KREG_DS] = regs.r_ds;
-		kregs[KREG_ES] = regs.r_es;
-		kregs[KREG_FS] = regs.r_fs;
-		kregs[KREG_GS] = regs.r_gs;
-		kregs[KREG_TRAPNO] = regs.r_trapno;
-		kregs[KREG_ERR] = regs.r_err;
-		kregs[KREG_RIP] = regs.r_rip;
-		kregs[KREG_CS] = regs.r_cs;
-		kregs[KREG_RFLAGS] = regs.r_rfl;
-		kregs[KREG_RSP] = regs.r_rsp;
-		kregs[KREG_SS] = regs.r_ss;
-
-	} else {
-		warn("failed to read panicbuf and panic_reg -- "
-		    "current register set will be unavailable\n");
+		kt_regs_to_kregs(&regs, kt->k_regs);
+		return;
 	}
+
+	/*
+	 * If we can't read any panic regs, then our final try is for any CPU
+	 * context that may have been stored (for example, in Xen core dumps).
+	 */
+	if (kt_kvmregs(t, 0, kt->k_regs) == 0)
+		return;
+
+	warn("failed to read panicbuf and panic_reg -- "
+	    "current register set will be unavailable\n");
 }

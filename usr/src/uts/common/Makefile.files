@@ -563,6 +563,8 @@ MAC_WIFI_OBJS +=	mac_wifi.o
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
 
+VNIC_OBJS +=	vnic_ctl.o vnic_dev.o vnic_bcast.o vnic_cl.o
+
 NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
 		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o \

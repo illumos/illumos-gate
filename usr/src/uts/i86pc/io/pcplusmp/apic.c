@@ -65,6 +65,7 @@
 #include <sys/note.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/spl.h>
+#include <sys/clock.h>
 
 /*
  *	Local Function Prototypes
@@ -73,7 +74,7 @@ static void apic_init_intr();
 static void apic_ret();
 static int get_apic_cmd1();
 static int get_apic_pri();
-static void apic_nmi_intr(caddr_t arg);
+static void apic_nmi_intr(caddr_t arg, struct regs *rp);
 
 /*
  *	standard MP entries
@@ -262,7 +263,7 @@ int	apic_debug_msgbufindex = 0;
 apic_cpus_info_t	*apic_cpus;
 
 cpuset_t	apic_cpumask;
-uint_t	apic_flag;
+uint_t	apic_picinit_called;
 
 /* Flag to indicate that we need to shut down all processors */
 static uint_t	apic_shutdown_processors;
@@ -611,7 +612,7 @@ apic_picinit(void)
 	}
 
 	/* set a flag so we know we have run apic_picinit() */
-	apic_flag = 1;
+	apic_picinit_called = 1;
 	LOCK_INIT_CLEAR(&apic_gethrtime_lock);
 	LOCK_INIT_CLEAR(&apic_ioapic_lock);
 	LOCK_INIT_CLEAR(&apic_error_lock);
@@ -843,6 +844,12 @@ apic_intr_exit(int prev_ipl, int irq)
 	cpu_infop->aci_ISR_in_progress &= (2 << prev_ipl) - 1;
 }
 
+intr_exit_fn_t
+psm_intr_exit_fn(void)
+{
+	return (apic_intr_exit);
+}
+
 /*
  * Mask all interrupts below or equal to the given IPL
  */
@@ -1063,39 +1070,34 @@ gethrtime_again:
 /* apic NMI handler */
 /*ARGSUSED*/
 static void
-apic_nmi_intr(caddr_t arg)
+apic_nmi_intr(caddr_t arg, struct regs *rp)
 {
 	if (apic_shutdown_processors) {
 		apic_disable_local_apic();
 		return;
 	}
 
-	if (lock_try(&apic_nmi_lock)) {
-		if (apic_kmdb_on_nmi) {
-			if (psm_debugger() == 0) {
-				cmn_err(CE_PANIC,
-				    "NMI detected, kmdb is not available.");
-			} else {
-				debug_enter("\nNMI detected, entering kmdb.\n");
-			}
-		} else {
-			if (apic_panic_on_nmi) {
-				/* Keep panic from entering kmdb. */
-				nopanicdebug = 1;
-				cmn_err(CE_PANIC, "pcplusmp: NMI received");
-			} else {
-				/*
-				 * prom_printf is the best shot we have
-				 * of something which is problem free from
-				 * high level/NMI type of interrupts
-				 */
-				prom_printf("pcplusmp: NMI received\n");
-				apic_error |= APIC_ERR_NMI;
-				apic_num_nmis++;
-			}
-		}
-		lock_clear(&apic_nmi_lock);
+	apic_error |= APIC_ERR_NMI;
+
+	if (!lock_try(&apic_nmi_lock))
+		return;
+	apic_num_nmis++;
+
+	if (apic_kmdb_on_nmi && psm_debugger()) {
+		debug_enter("NMI received: entering kmdb\n");
+	} else if (apic_panic_on_nmi) {
+		/* Keep panic from entering kmdb. */
+		nopanicdebug = 1;
+		panic("NMI received\n");
+	} else {
+		/*
+		 * prom_printf is the best shot we have of something which is
+		 * problem free from high level/NMI type of interrupts
+		 */
+		prom_printf("NMI received\n");
 	}
+
+	lock_clear(&apic_nmi_lock);
 }
 
 /*ARGSUSED*/
@@ -1109,6 +1111,25 @@ static int
 apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 {
 	return (apic_delspl_common(irqno, ipl, min_ipl,  max_ipl));
+}
+
+/*
+ * Return HW interrupt number corresponding to the given IPL
+ */
+/*ARGSUSED*/
+static int
+apic_softlvl_to_irq(int ipl)
+{
+	/*
+	 * Do not use apic to trigger soft interrupt.
+	 * It will cause the system to hang when 2 hardware interrupts
+	 * at the same priority with the softint are already accepted
+	 * by the apic.  Cause the AV_PENDING bit will not be cleared
+	 * until one of the hardware interrupt is eoi'ed.  If we need
+	 * to send an ipi at this time, we will end up looping forever
+	 * to wait for the AV_PENDING bit to clear.
+	 */
+	return (PSM_SV_SOFTWARE);
 }
 
 static int
@@ -1289,7 +1310,6 @@ apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 static int
 apic_clkinit(int hertz)
 {
-
 	uint_t		apic_ticks = 0;
 	uint_t		pit_ticks;
 	int		ret;
@@ -1340,7 +1360,7 @@ apic_clkinit(int hertz)
 
 	if (hertz == 0) {
 		/* requested one_shot */
-		if (!apic_oneshot_enable)
+		if (!tsc_gethrtime_enable || !apic_oneshot_enable)
 			return (0);
 		apic_oneshot = 1;
 		ret = (int)APIC_TICKS_TO_NSECS(1);

@@ -128,26 +128,6 @@ kmt_next(mdb_tgt_t *t, uintptr_t *p)
 	return (mdb_isa_next(t, p, pc, instr));
 }
 
-/*
- * Return a flag indicating if the specified %eip is likely to have an
- * interrupt frame on the stack.  We do this by comparing the address to the
- * range of addresses spanned by several well-known routines, and looking
- * to see if the next and previous %ebp values are "far" apart.  Sigh.
- */
-int
-mdb_kvm_intrframe(mdb_tgt_t *t, uintptr_t pc, uintptr_t fp,
-    uintptr_t prevfp)
-{
-	kmt_data_t *kmt = t->t_data;
-	const size_t dist = 0x800 * sizeof (uintptr_t);
-
-	return ((pc >= kmt->kmt_cmnint.st_value &&
-	    (pc < kmt->kmt_cmnint.st_value + kmt->kmt_cmnint.st_size)) ||
-	    (pc >= kmt->kmt_cmntrap.st_value &&
-	    (pc < kmt->kmt_cmntrap.st_value + kmt->kmt_cmntrap.st_size)) ||
-	    (fp >= prevfp + dist) || (fp <= prevfp - dist));
-}
-
 /*ARGSUSED*/
 static int
 kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,

@@ -255,7 +255,6 @@ DRV_KMODS	+= tzmon
 DRV_KMODS	+= battery
 
 DRV_KMODS	+= cpudrv
-DRV_KMODS	+= cpunex
 DRV_KMODS	+= ppm
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest

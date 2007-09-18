@@ -28,7 +28,7 @@
 include $(SRC)/lib/Makefile.lib
 
 HDRS =		libdladm.h libdladm_impl.h libdllink.h libdlaggr.h	\
-		libdlwlan.h libdlwlan_impl.h
+		libdlwlan.h libdlwlan_impl.h libdlvnic.h
 HDRDIR =	common
 
 SUBDIRS =	$(MACH)
@@ -36,7 +36,8 @@ $(BUILD64)SUBDIRS += $(MACH64)
 
 POFILE =	libdladm.po
 MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
-		common/libdllink.c common/libdlaggr.c common/libdlwlan.c
+		common/libdllink.c common/libdlaggr.c	\
+		common/libdlwlan.c common/libdlvnic.c
 XGETFLAGS =     -a -x libdladm.xcl
 
 all :=		TARGET = all

@@ -92,12 +92,15 @@ struct hat {
 	htable_t	**hat_ht_hash;	/* htable hash buckets */
 	htable_t	*hat_ht_cached;	/* cached free htables */
 	x86pte_t	hat_vlp_ptes[VLP_NUM_PTES];
+#if defined(__amd64) && defined(__xpv)
+	pfn_t		hat_user_ptable; /* alt top ptable for user mode */
+#endif
 };
 typedef struct hat hat_t;
 
-#define	PGCNT_INC(hat, level) \
+#define	PGCNT_INC(hat, level)	\
 	atomic_add_long(&(hat)->hat_pages_mapped[level], 1);
-#define	PGCNT_DEC(hat, level) \
+#define	PGCNT_DEC(hat, level)	\
 	atomic_add_long(&(hat)->hat_pages_mapped[level], -1);
 
 /*
@@ -108,16 +111,20 @@ typedef struct hat hat_t;
  *
  * HAT_VLP - indicates a 32 bit process has a virtual address range less than
  *	the hardware's physical address range. (VLP->Virtual Less-than Physical)
+ *	Note - never used on the hypervisor.
  *
  * HAT_VICTIM - This is set while a hat is being examined for page table
  *	stealing and prevents it from being freed.
  *
  * HAT_SHARED - The hat has exported it's page tables via hat_share()
+ *
+ * HAT_PINNED - On the hypervisor, indicates the top page table has been pinned.
  */
 #define	HAT_FREEING	(0x0001)
 #define	HAT_VLP		(0x0002)
 #define	HAT_VICTIM	(0x0004)
 #define	HAT_SHARED	(0x0008)
+#define	HAT_PINNED	(0x0010)
 
 /*
  * Additional platform attribute for hat_devload() to force no caching.
@@ -231,18 +238,38 @@ extern void hat_kmap_init(uintptr_t base, size_t len);
 
 extern hment_t *hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry);
 
+#if !defined(__xpv)
 /*
  * routines to deal with delayed TLB invalidations for idle CPUs
  */
 extern void tlb_going_idle(void);
 extern void tlb_service(void);
+#endif
 
 /*
  * Hat switch function invoked to load a new context into %cr3
  */
 extern void hat_switch(struct hat *hat);
 
+#ifdef __xpv
+/*
+ * Interfaces to use around code that maps/unmaps grant table references.
+ */
+extern void hat_prepare_mapping(hat_t *, caddr_t);
+extern void hat_release_mapping(hat_t *, caddr_t);
+
+#define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
+#define	XPV_ALLOW_MIGRATE()	xen_allow_migrate()
+
+#else
+
+#define	XPV_DISALLOW_MIGRATE()	/* nothing */
+#define	XPV_ALLOW_MIGRATE()	/* nothing */
+
 #define	pfn_is_foreign(pfn)	__lintzero
+
+#endif
+
 
 #endif	/* _KERNEL */
 

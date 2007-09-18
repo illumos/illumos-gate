@@ -291,7 +291,7 @@ ptl1_showtrap(ptl1_state_t *pstate)
 }
 
 void
-panic_showtrap(struct trap_info *tip)
+panic_showtrap(struct panic_trap_info *tip)
 {
 	ptl1_state_t *pstate = &CPU->cpu_m.ptl1_state;
 	/*
@@ -334,7 +334,7 @@ ptl1_savetrap(panic_data_t *pdp, ptl1_state_t *pstate)
 }
 
 void
-panic_savetrap(panic_data_t *pdp, struct trap_info *tip)
+panic_savetrap(panic_data_t *pdp, struct panic_trap_info *tip)
 {
 	panic_nv_t *pnv;
 	ptl1_state_t *pstate = &CPU->cpu_m.ptl1_state;

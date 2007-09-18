@@ -74,7 +74,11 @@ extern "C" {
 #if defined(__amd64)
 
 #define	IRET	iretq
+#define	SYSRETQ	sysretq
+#define	SYSRETL	sysretl
 #define	SWAPGS	swapgs
+#define	XPV_TRAP_POP	/* empty */
+#define	XPV_TRAP_PUSH	/* empty */
 
 #elif defined(__i386)
 
@@ -83,6 +87,7 @@ extern "C" {
 #endif	/* __i386 */
 
 #define	CLEAN_CS	/* empty */
+
 
 /*
  * Macros for saving the original segment registers and restoring them

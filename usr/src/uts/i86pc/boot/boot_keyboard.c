@@ -37,8 +37,9 @@
 #include "boot_keyboard_table.h"
 
 #if defined(_BOOT)
+#include "dboot/dboot_asm.h"
 #include "dboot/dboot_xboot.h"
-#endif
+#endif /* _BOOT */
 
 /*
  * Definitions for BIOS keyboard state.  We use BIOS's variable to store
@@ -63,8 +64,28 @@
 #define	BIOS_CAPS_SHIFT		0x40
 #define	BIOS_INS_SHIFT		0x80
 
+#if defined(__xpv) && defined(_BOOT)
+
+/*
+ * Device memory addresses
+ *
+ * In dboot under the hypervisor we don't have any memory mappings
+ * for the first meg of low memory so we can't access devices there.
+ * Intead we've mapped the device memory that we need to access into
+ * a local variable within dboot so we can access the device memory
+ * there.
+ */
+extern unsigned short *kb_status;
+#define	kb_flag		((unsigned char *)&kb_status[BIOS_KB_FLAG])
+#define	kb_flag_1	((unsigned char *)&kb_status[BIOS_KB_FLAG_1])
+
+#else /* __xpv && _BOOT */
+
+/* Device memory addresses */
 #define	kb_flag		((unsigned char *)BIOS_KB_FLAG)
 #define	kb_flag_1	((unsigned char *)BIOS_KB_FLAG_1)
+
+#endif /* __xpv && _BOOT */
 
 /*
  * Keyboard controller registers
@@ -449,56 +470,18 @@ kb_update_leds(void)
 void
 kb_init(void)
 {
-	unsigned char pic_mask;
-	int retries;
-
 	/*
-	 * Write the command byte to turn off interrupts and
-	 * disable the auxiliary port.
-	 *
-	 * 0x80:  0 = Reserved, must be zero.
-	 * 0x40:  1 = Translate to XT codes.
-	 *		Solaris turns this off later, but we have a legacy
-	 *		of using XT codes.
-	 * 0x20:  1 = Disable aux (mouse) port.
-	 * 0x10:  0 = Enable main (keyboard) port.
-	 * 0x08:  0 = Reserved, must be zero.
-	 * 0x04:  1 = System flag, 1 means passed self-test.
-	 *		Caution:  setting this bit to zero causes some
-	 *		systems (HP Kayak XA) to fail to reboot without
-	 *		a hard reset.
-	 * 0x02:  0 = Disable aux interrupts.
-	 * 0x01:  0 = Disable aux interrupts.
+	 * Resist the urge to muck with the keyboard/mouse.  Just assume
+	 * that the bios, grub, and any optional hypervisor have left
+	 * the keyboard in a sane and usable state.  Messing with it now
+	 * could result it making it unusuable, which would break early
+	 * kmdb debugging support.  Note that we don't actually need to
+	 * disable interrupts for the keyboard/mouse since we're already
+	 * in protected mode and we're not compeating with the bios for
+	 * keyboard access.  Also, we don't need to disable the mouse
+	 * port since our polled input routine will just drop any mouse
+	 * data that it recieves.
 	 */
-
-	for (retries = 0;
-	    (inb(I8042_STAT) & I8042_STAT_INBF) != 0 && retries < 100000;
-	    retries++)
-		/* LOOP */;
-	outb(I8042_CMD, I8042_WCB);
-
-	for (retries = 0;
-	    (inb(I8042_STAT) & I8042_STAT_INBF) != 0 && retries < 100000;
-	    retries++)
-		/* LOOP */;
-	outb(I8042_DATA, 0x64);
-
-	/*
-	 * If we're running on a system with an emulated 8042 (with
-	 * USB and SMI emulation), the above command *might* not
-	 * have turned off keyboard interrupts.  If it didn't,
-	 * we will lose keystrokes to the BIOS int handler every
-	 * time someone hits a key while BIOS and STI are active..
-	 * that is, every time we're in bootconf.exe, for example.
-	 * Turn off ints at the PIC to prevent this from happening.
-	 *
-	 * Yes, this is yet another workaround for buggy BIOS
-	 * emulation.
-	 */
-
-	pic_mask = inb(MIMR_PORT);
-	outb(MIMR_PORT, pic_mask | MIMR_KB);
-
 	kb_update_leds();
 }
 

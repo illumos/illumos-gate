@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -690,7 +690,7 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 					ptm_flags |= P6_INV;
 			} else if (strncmp(attrs[i].ka_name, "umask", 5) == 0) {
 				if ((attrs[i].ka_val | CPC_P6_PES_UMASK_MASK) !=
-					CPC_P6_PES_UMASK_MASK) {
+				    CPC_P6_PES_UMASK_MASK) {
 					kmem_free(conf,
 					    sizeof (ptm_pcbe_config_t));
 					return (CPC_ATTRIBUTE_OUT_OF_RANGE);
@@ -699,7 +699,7 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 				    CPC_P6_PES_UMASK_SHIFT;
 			} else if (strncmp(attrs[i].ka_name, "cmask", 5) == 0) {
 				if ((attrs[i].ka_val | CPC_P6_PES_CMASK_MASK) !=
-					CPC_P6_PES_CMASK_MASK) {
+				    CPC_P6_PES_CMASK_MASK) {
 					kmem_free(conf,
 					    sizeof (ptm_pcbe_config_t));
 					return (CPC_ATTRIBUTE_OUT_OF_RANGE);
@@ -769,7 +769,7 @@ ptm_pcbe_program(void *token)
 	ASSERT(pic0->ptm_picno == 0 && pic1->ptm_picno == 1);
 
 	if (ptm_rdpmc_avail) {
-		uint32_t curcr4 = getcr4();
+		ulong_t curcr4 = getcr4();
 		if (kcpc_allow_nonpriv(token))
 			setcr4(curcr4 | CR4_PCE);
 		else
@@ -804,7 +804,7 @@ ptm_pcbe_allstop(void)
 		wrmsr(P5_CESR, ALL_STOPPED);
 	else {
 		wrmsr(REG_PERFEVNT0, ALL_STOPPED);
-		setcr4((uint32_t)getcr4() & ~CR4_PCE);
+		setcr4(getcr4() & ~CR4_PCE);
 	}
 }
 

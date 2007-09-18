@@ -1823,13 +1823,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 	flags &= ~PG_MATCH_COLOR;
 	locked = 0;
 #if defined(__i386) || defined(__amd64)
-	/*
-	 * page_create_get_something may be called because 4g memory may be
-	 * depleted. Set flags to allow for relocation of base page below
-	 * 4g if necessary.
-	 */
-	if (physmax4g)
-		flags |= (PGI_PGCPSZC0 | PGI_PGCPHIPRI);
+	flags = page_create_update_flags_x86(flags);
 #endif
 
 	lgrp = lgrp_mem_choose(seg, vaddr, PAGESIZE);
