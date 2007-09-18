@@ -104,7 +104,7 @@ int	do_piclinfo(int);
 static	void opl_disp_environ(void);
 static	void opl_disp_hw_revisions(Sys_tree *tree, Prom_node *root);
 static	uint64_t print_opl_memory_line(int lsb, struct cs_status *cs_stat,
-    int ngrps);
+    int ngrps, int mirror_mode);
 static	uint64_t get_opl_mem_regs(Board_node *bnode);
 void 	add_node(Sys_tree *root, Prom_node *pnode);
 static	int get_prop_size(Prop *prop);
@@ -571,10 +571,18 @@ get_opl_mem_regs(Board_node *bnode)
 		cs_size = get_prop_size(find_prop(pnode, "cs-status"));
 
 		if (cs_size > 0) {
+			int	*mirror_mode = NULL;
+			int	mode = 0;
 
 			/* OBP returns lists of 7 ints */
 			cs_stat = (struct cs_status *)get_prop_val
 			    (find_prop(pnode, "cs-status"));
+
+			mirror_mode = (int *)(get_prop_val
+			    (find_prop(pnode, "mirror-mode")));
+
+			if (mirror_mode != NULL)
+				mode = (*mirror_mode);
 
 			/*
 			 * The units of cs_size will be either number of bytes
@@ -598,8 +606,9 @@ get_opl_mem_regs(Board_node *bnode)
 			}
 
 			if (cs_stat != NULL) {
-				total_mem += print_opl_memory_line(
-				    bnode->board_num, cs_stat, ngrps);
+				total_mem +=
+				    print_opl_memory_line(bnode->board_num,
+				    cs_stat, ngrps, mode);
 			}
 		}
 
@@ -617,21 +626,25 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 {
 	Board_node	*bnode = tree->bd_list;
 	uint64_t	total_mem = 0, total_sys_mem = 0;
-	char *hdrfmt =	"\n%-5.5s  %-6.6s  %-18.18s  %-10.10s %-8.8s  %-10.10s";
+	char *hdrfmt =  "\n%-5.5s  %-6.6s  %-18.18s  %-10.10s"
+	    " %-6.6s  %-5.5s %-7.7s %-10.10s";
 
 	(void) textdomain(TEXT_DOMAIN);
 
-	log_printf("======================", 0);
+	log_printf("============================", 0);
 	log_printf(gettext(" Memory Configuration "), 0);
-	log_printf("======================", 0);
+	log_printf("============================", 0);
 	log_printf("\n", 0);
 
-	log_printf(hdrfmt, "",
+	log_printf(hdrfmt,
+	    "",
 	    gettext("Memory"),
 	    gettext("Available"),
 	    gettext("Memory"),
 	    gettext("DIMM"),
-	    gettext("Number of"),
+	    gettext("# of"),
+	    gettext("Mirror"),
+	    gettext("Interleave"),
 	    0);
 
 	log_printf(hdrfmt,
@@ -640,11 +653,13 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	    gettext("Size"),
 	    gettext("Status"),
 	    gettext("Size"),
-	    gettext("DIMMs"), 0);
+	    gettext("DIMMs"),
+	    gettext("Mode"),
+	    gettext("Factor"), 0);
 
 	log_printf(hdrfmt,
 	    "---", "-------", "------------------", "-------", "------",
-	    "---------", 0);
+	    "-----", "-------", "----------",  0);
 
 	log_printf("\n", 0);
 
@@ -673,12 +688,35 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
  * information that get_opl_mem_regs() has gathered.
  */
 static uint64_t
-print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
+print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps,
+	int mirror_mode)
 {
 	int	i;
 	uint64_t	total_board_mem = 0;
+	int		i_factor = 2;   /* default to non-mirror mode */
+	int		interleave;
 
 	(void) textdomain(TEXT_DOMAIN);
+
+	if (mirror_mode)
+		i_factor *= 2;
+
+	/*
+	 * Interleave factor calculation:
+	 * Obtain "mirror-mode" property from pseudo-mc.
+	 * cs_stat[0].dimms/i_factor represents interleave factor per
+	 * pseudo-mc node. Must use cs_stat[0].dimms since this will yield
+	 * interleave factor even if some DIMMs are isolated.
+	 *
+	 * Mirror mode:
+	 *   interleave factor = (# of DIMMs on cs_stat[0]/4)
+	 *
+	 * Non-mirror mode:
+	 *   interleave factor = (# of DIMMs on cs_stat[0]/2)
+	 */
+
+	interleave = cs_stat[0].dimms/i_factor;
+
 
 	for (i = 0; i < ngrps; i++) {
 		uint64_t	mem_size;
@@ -713,7 +751,19 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
 		    + cs_stat[i].dimm_lo)/MBYTE, 0);
 
 		/* Number of DIMMs */
-		log_printf("        %2d\n", cs_stat[i].dimms);
+		log_printf("  %2d", cs_stat[i].dimms);
+
+		/* Mirror Mode */
+		if (mirror_mode) {
+			log_printf("%-4.4s", " yes");
+		} else
+			log_printf("%-4.4s", " no ");
+
+		/* Interleave Factor */
+		if (interleave)
+			log_printf("      %d-way\n", interleave);
+		else
+			log_printf("      None\n");
 	}
 	return (total_board_mem);
 }

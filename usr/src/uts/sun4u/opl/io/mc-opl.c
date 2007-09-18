@@ -40,6 +40,7 @@
 #include <sys/ksynch.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/ddifm.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
@@ -505,10 +506,10 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (mc_timeout_period == 0) {
 		mc_patrol_interval_sec = (int)ddi_getprop(DDI_DEV_T_ANY, devi,
-			DDI_PROP_DONTPASS, "mc-timeout-interval-sec",
-			mc_patrol_interval_sec);
-		mc_timeout_period = drv_usectohz(
-			1000000 * mc_patrol_interval_sec / OPL_MAX_BOARDS);
+		    DDI_PROP_DONTPASS, "mc-timeout-interval-sec",
+		    mc_patrol_interval_sec);
+		mc_timeout_period = drv_usectohz(1000000 *
+		    mc_patrol_interval_sec / OPL_MAX_BOARDS);
 	}
 
 	/* set informations in mc state */
@@ -525,7 +526,7 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_enter(&mc_polling_lock);
 	if (!mc_pollthr_running) {
 		(void) thread_create(NULL, 0, (void (*)())mc_polling_thread,
-			NULL, 0, &p0, TS_RUN, mc_poll_priority);
+		    NULL, 0, &p0, TS_RUN, mc_poll_priority);
 	}
 	mutex_exit(&mc_polling_lock);
 	ddi_report_dev(devi);
@@ -638,7 +639,7 @@ mcaddr_to_pa(mc_opl_t *mcp, mc_addr_t *maddr, uint64_t *pa)
 	int bank0, bank1;
 
 	MC_LOG("mcaddr /LSB%d/B%d/%x\n", maddr->ma_bd, bank,
-		maddr->ma_dimm_addr);
+	    maddr->ma_dimm_addr);
 
 	/* loc validity check */
 	ASSERT(maddr->ma_bd >= 0 && OPL_BOARD_MAX > maddr->ma_bd);
@@ -685,15 +686,14 @@ mcaddr_to_pa(mc_opl_t *mcp, mc_addr_t *maddr, uint64_t *pa)
 	 * there is no need to check ma_bd because it is generated from
 	 * mcp.  They are the same.
 	 */
-	if ((bank0 == bank1) &&
-		(maddr->ma_dimm_addr == maddr1.ma_dimm_addr)) {
+	if ((bank0 == bank1) && (maddr->ma_dimm_addr ==
+	    maddr1.ma_dimm_addr)) {
 		return (0);
 	} else {
 		cmn_err(CE_WARN, "Translation error source /LSB%d/B%d/%x, "
-			"PA %lx, target /LSB%d/B%d/%x\n",
-			maddr->ma_bd, bank, maddr->ma_dimm_addr,
-			*pa, maddr1.ma_bd, maddr1.ma_bank,
-			maddr1.ma_dimm_addr);
+		    "PA %lx, target /LSB%d/B%d/%x\n", maddr->ma_bd, bank,
+		    maddr->ma_dimm_addr, *pa, maddr1.ma_bd, maddr1.ma_bank,
+		    maddr1.ma_dimm_addr);
 		return (-1);
 	}
 }
@@ -795,8 +795,8 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
 	maddr->ma_phys_bd = mcp->mc_phys_board_num;
 	maddr->ma_bank = pa_to_bank(mcp, pa_offset);
 	maddr->ma_dimm_addr = pa_to_dimm(mcp, pa_offset);
-	MC_LOG("pa %lx -> mcaddr /LSB%d/B%d/%x\n",
-		pa_offset, maddr->ma_bd, maddr->ma_bank, maddr->ma_dimm_addr);
+	MC_LOG("pa %lx -> mcaddr /LSB%d/B%d/%x\n", pa_offset, maddr->ma_bd,
+	    maddr->ma_bank, maddr->ma_dimm_addr);
 	return (0);
 }
 
@@ -856,8 +856,7 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
 			j = (cs == 0) ?  i : i + 2;
 			memb_num = mc_ff_dimm_unum_table[i][0],
-			snprintf(buf, buflen,
-			    "/%s/%s%c/MEM%s MEM%s",
+			    snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
 			    model_names[plat_model].unit_name,
 			    model_names[plat_model].mem_name, memb_num,
 			    &mc_ff_dimm_unum_table[j][1],
@@ -913,44 +912,41 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	/*
 	 * Encode all the common data into the ereport.
 	 */
-	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s-%s",
-		MC_OPL_ERROR_CLASS,
-		mc_aflt->mflt_is_ptrl ? MC_OPL_PTRL_SUBCLASS :
-		MC_OPL_MI_SUBCLASS,
-		mc_aflt->mflt_erpt_class);
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s-%s", MC_OPL_ERROR_CLASS,
+	    mc_aflt->mflt_is_ptrl ? MC_OPL_PTRL_SUBCLASS : MC_OPL_MI_SUBCLASS,
+	    mc_aflt->mflt_erpt_class);
 
 	MC_LOG("mc_ereport_post: ereport %s\n", buf);
 
 
 	fm_ereport_set(ereport, FM_EREPORT_VERSION, buf,
-		fm_ena_generate(mc_aflt->mflt_id, FM_ENA_FMT1),
-		detector, NULL);
+	    fm_ena_generate(mc_aflt->mflt_id, FM_ENA_FMT1), detector, NULL);
 
 	/*
 	 * Set payload.
 	 */
 	fm_payload_set(ereport, MC_OPL_BOARD, DATA_TYPE_UINT32,
-		flt_stat->mf_flt_maddr.ma_bd, NULL);
+	    flt_stat->mf_flt_maddr.ma_bd, NULL);
 
 	fm_payload_set(ereport, MC_OPL_PA, DATA_TYPE_UINT64,
-		flt_stat->mf_flt_paddr, NULL);
+	    flt_stat->mf_flt_paddr, NULL);
 
 	if (flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
-		fm_payload_set(ereport, MC_OPL_FLT_TYPE,
-			DATA_TYPE_UINT8, ECC_STICKY, NULL);
+		fm_payload_set(ereport, MC_OPL_FLT_TYPE, DATA_TYPE_UINT8,
+		    ECC_STICKY, NULL);
 	}
 
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_flt_maddr.ma_bank;
 
-	fm_payload_set(ereport, MC_OPL_BANK, DATA_TYPE_UINT32_ARRAY,
-		nflts, values, NULL);
+	fm_payload_set(ereport, MC_OPL_BANK, DATA_TYPE_UINT32_ARRAY, nflts,
+	    values, NULL);
 
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_cntl;
 
-	fm_payload_set(ereport, MC_OPL_STATUS, DATA_TYPE_UINT32_ARRAY,
-		nflts, values, NULL);
+	fm_payload_set(ereport, MC_OPL_STATUS, DATA_TYPE_UINT32_ARRAY, nflts,
+	    values, NULL);
 
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_err_add;
@@ -960,14 +956,14 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 		offset = values[0];
 
 	}
-	fm_payload_set(ereport, MC_OPL_ERR_ADD, DATA_TYPE_UINT32_ARRAY,
-		nflts, values, NULL);
+	fm_payload_set(ereport, MC_OPL_ERR_ADD, DATA_TYPE_UINT32_ARRAY, nflts,
+	    values, NULL);
 
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_err_log;
 
-	fm_payload_set(ereport, MC_OPL_ERR_LOG, DATA_TYPE_UINT32_ARRAY,
-		nflts, values, NULL);
+	fm_payload_set(ereport, MC_OPL_ERR_LOG, DATA_TYPE_UINT32_ARRAY, nflts,
+	    values, NULL);
 
 	for (i = 0; i < nflts; i++) {
 		flt_stat = mc_aflt->mflt_stat[i];
@@ -982,14 +978,14 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 		}
 	}
 
-	fm_payload_set(ereport, MC_OPL_ERR_SYND,
-		DATA_TYPE_UINT32_ARRAY, nflts, synd, NULL);
+	fm_payload_set(ereport, MC_OPL_ERR_SYND, DATA_TYPE_UINT32_ARRAY, nflts,
+	    synd, NULL);
 
-	fm_payload_set(ereport, MC_OPL_ERR_DIMMSLOT,
-		DATA_TYPE_UINT32_ARRAY, nflts, dslot, NULL);
+	fm_payload_set(ereport, MC_OPL_ERR_DIMMSLOT, DATA_TYPE_UINT32_ARRAY,
+	    nflts, dslot, NULL);
 
-	fm_payload_set(ereport, MC_OPL_ERR_DRAM,
-		DATA_TYPE_UINT32_ARRAY, nflts, values, NULL);
+	fm_payload_set(ereport, MC_OPL_ERR_DRAM, DATA_TYPE_UINT32_ARRAY, nflts,
+	    values, NULL);
 
 	device_path[0] = 0;
 	p = &device_path[0];
@@ -1002,9 +998,9 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 
 		flt_stat = mc_aflt->mflt_stat[i];
 		bank = flt_stat->mf_flt_maddr.ma_bank;
-		ret =  mc_set_mem_unum(p + strlen(p), blen,
-			flt_stat->mf_flt_maddr.ma_phys_bd, bank,
-			flt_stat->mf_type, flt_stat->mf_dimm_slot);
+		ret = mc_set_mem_unum(p + strlen(p), blen,
+		    flt_stat->mf_flt_maddr.ma_phys_bd, bank, flt_stat->mf_type,
+		    flt_stat->mf_dimm_slot);
 
 		if (ret != 0) {
 			cmn_err(CE_WARN,
@@ -1031,12 +1027,12 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 		}
 	}
 
-	(void) fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
-		NULL, device_path, (ret == 0) ? sid : NULL,
-		(ret == 0) ? offset : (uint64_t)-1);
+	(void) fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION, NULL,
+	    device_path, (ret == 0) ? sid : NULL, (ret == 0) ? offset :
+	    (uint64_t)-1);
 
-	fm_payload_set(ereport, MC_OPL_RESOURCE, DATA_TYPE_NVLIST,
-		resource, NULL);
+	fm_payload_set(ereport, MC_OPL_RESOURCE, DATA_TYPE_NVLIST, resource,
+	    NULL);
 
 	if (panicstr) {
 		errorq_commit(ereport_errorq, eqep, ERRORQ_SYNC);
@@ -1056,8 +1052,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	uint64_t pa = (uint64_t)(-1);
 	int i;
 
-	MC_LOG("mc_err_drain: %s\n",
-		mc_aflt->mflt_erpt_class);
+	MC_LOG("mc_err_drain: %s\n", mc_aflt->mflt_erpt_class);
 	/*
 	 * we come here only when we have:
 	 * In mirror mode: MUE, SUE
@@ -1065,7 +1060,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	 */
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
 		rv = mcaddr_to_pa(mc_aflt->mflt_mcp,
-			&(mc_aflt->mflt_stat[i]->mf_flt_maddr), &pa);
+		    &(mc_aflt->mflt_stat[i]->mf_flt_maddr), &pa);
 
 		/* Ensure the pa is valid (not in isolated memory block) */
 		if (rv == 0 && pa_is_valid(mc_aflt->mflt_mcp, pa))
@@ -1088,7 +1083,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 		 */
 		if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
 			MC_LOG("offline page at pa %lx error %x\n", pa,
-				mc_aflt->mflt_pr);
+			    mc_aflt->mflt_pr);
 			(void) page_retire(pa, mc_aflt->mflt_pr);
 		}
 		break;
@@ -1142,7 +1137,7 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 	if (!mc_rangecheck_pa(mcp, pa)) {
 		/* pa is not on this board, just retry */
 		cmn_err(CE_WARN, "restart_patrol: invalid address %lx "
-			"on board %d\n", pa, mcp->mc_board_num);
+		    "on board %d\n", pa, mcp->mc_board_num);
 		MAC_PTRL_START(mcp, bank);
 		return (0);
 	}
@@ -1166,51 +1161,55 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 		int wrapcount = 0;
 		uint64_t origpa = pa;
 		while (wrapcount < 2) {
-		    if (!pa_is_valid(mcp, pa)) {
-			/*
-			 * Not in physinstall - advance to the
-			 * next memory isolation blocksize
-			 */
-			MC_LOG("Invalid PA\n");
-			pa = roundup(pa + 1, mc_isolation_bsize);
-		    } else {
-			int rv;
-			if ((rv = page_retire_check(pa, NULL)) != 0 &&
-			    rv != EAGAIN) {
+			if (!pa_is_valid(mcp, pa)) {
 				/*
-				 * The page is "good" (not retired), we will
-				 * use automatic HW restart algorithm if
-				 * this is the original current starting page
+				 * Not in physinstall - advance to the
+				 * next memory isolation blocksize
 				 */
-				if (pa == origpa) {
-				    MC_LOG("Page has no error. Auto restart\n");
-				    MAC_PTRL_START(mcp, bank);
-				    return (0);
-				} else {
-				    /* found a subsequent good page */
-				    break;
+				MC_LOG("Invalid PA\n");
+				pa = roundup(pa + 1, mc_isolation_bsize);
+			} else {
+				int rv;
+				if ((rv = page_retire_check(pa, NULL)) != 0 &&
+				    rv != EAGAIN) {
+					/*
+					 * The page is "good" (not retired),
+					 * we will use automatic HW restart
+					 * algorithm if this is the original
+					 * current starting page.
+					 */
+					if (pa == origpa) {
+						MC_LOG("Page has no error. "
+						    "Auto restart\n");
+						MAC_PTRL_START(mcp, bank);
+						return (0);
+					} else {
+						/*
+						 * found a subsequent good page
+						 */
+						break;
+					}
 				}
+
+				/*
+				 * Skip to the next page
+				 */
+				pa = roundup(pa + 1, PAGESIZE);
+				MC_LOG("Skipping bad page to %lx\n", pa);
 			}
 
-			/*
-			 * Skip to the next page
-			 */
-			pa = roundup(pa + 1, PAGESIZE);
-			MC_LOG("Skipping bad page to %lx\n", pa);
-		    }
-
-		    /* Check to see if we hit the end of the memory range */
-		    if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
-			MC_LOG("Wrap around\n");
-			pa = mcp->mc_start_address;
-			wrapcount++;
-		    }
+			/* Check to see if we hit the end of the memory range */
+			if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
+				MC_LOG("Wrap around\n");
+				pa = mcp->mc_start_address;
+				wrapcount++;
+			}
 		}
 
 		if (wrapcount > 1) {
-		    MC_LOG("Failed to find a good page. Just restart\n");
-		    MAC_PTRL_START(mcp, bank);
-		    return (0);
+			MC_LOG("Failed to find a good page. Just restart\n");
+			MAC_PTRL_START(mcp, bank);
+			return (0);
 		}
 	}
 
@@ -1280,7 +1279,7 @@ do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr)
 bad:
 	/* This is bad.  Just reset the circuit */
 	cmn_err(CE_WARN, "mc-opl rewrite timeout on /LSB%d/B%d\n",
-		mcp->mc_board_num, bank);
+	    mcp->mc_board_num, bank);
 	cntl = MAC_CNTL_REW_END;
 	MAC_CMD(mcp, bank, MAC_CNTL_PTRL_RESET);
 	MAC_CLEAR_ERRS(mcp, bank, MAC_CNTL_REW_ERRS);
@@ -1295,42 +1294,46 @@ mc_process_scf_log(mc_opl_t *mcp)
 	int bank;
 
 	for (bank = 0; bank < BANKNUM_PER_SB; bank++) {
-	    while ((p = mcp->mc_scf_log[bank]) != NULL &&
-		(n < mc_max_errlog_processed)) {
-		ASSERT(bank == p->sl_bank);
-		count = 0;
-		while ((LD_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank))
-			& MAC_STATIC_ERR_VLD)) {
-			if (count++ >= (mc_max_scf_loop)) {
-				break;
+		while ((p = mcp->mc_scf_log[bank]) != NULL &&
+		    (n < mc_max_errlog_processed)) {
+			ASSERT(bank == p->sl_bank);
+			count = 0;
+			while ((LD_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank))
+			    & MAC_STATIC_ERR_VLD)) {
+				if (count++ >= (mc_max_scf_loop)) {
+					break;
+				}
+				drv_usecwait(mc_scf_delay);
 			}
-			drv_usecwait(mc_scf_delay);
-		}
 
-		if (count < mc_max_scf_loop) {
-			ST_MAC_REG(MAC_STATIC_ERR_LOG(mcp, p->sl_bank),
-				p->sl_err_log);
+			if (count < mc_max_scf_loop) {
+				ST_MAC_REG(MAC_STATIC_ERR_LOG(mcp, p->sl_bank),
+				    p->sl_err_log);
 
-			ST_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank),
-				p->sl_err_add|MAC_STATIC_ERR_VLD);
-			mcp->mc_scf_retry[bank] = 0;
-		} else {
-			/* if we try too many times, just drop the req */
-			if (mcp->mc_scf_retry[bank]++ <= mc_max_scf_retry) {
-				return;
+				ST_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank),
+				    p->sl_err_add|MAC_STATIC_ERR_VLD);
+				mcp->mc_scf_retry[bank] = 0;
 			} else {
-			    if ((++mc_pce_dropped & 0xff) == 0) {
-				cmn_err(CE_WARN,
-				    "Cannot report Permanent CE to SCF\n");
-			    }
+				/*
+				 * if we try too many times, just drop the req
+				 */
+				if (mcp->mc_scf_retry[bank]++ <=
+				    mc_max_scf_retry) {
+					return;
+				} else {
+					if ((++mc_pce_dropped & 0xff) == 0) {
+						cmn_err(CE_WARN, "Cannot "
+						    "report Permanent CE to "
+						    "SCF\n");
+					}
+				}
 			}
+			n++;
+			mcp->mc_scf_log[bank] = p->sl_next;
+			mcp->mc_scf_total[bank]--;
+			ASSERT(mcp->mc_scf_total[bank] >= 0);
+			kmem_free(p, sizeof (scf_log_t));
 		}
-		n++;
-		mcp->mc_scf_log[bank] = p->sl_next;
-		mcp->mc_scf_total[bank]--;
-		ASSERT(mcp->mc_scf_total[bank] >= 0);
-		kmem_free(p, sizeof (scf_log_t));
-	    }
 	}
 }
 void
@@ -1340,7 +1343,7 @@ mc_queue_scf_log(mc_opl_t *mcp, mc_flt_stat_t *flt_stat, int bank)
 
 	if (mcp->mc_scf_total[bank] >= mc_max_scf_logs) {
 		if ((++mc_pce_dropped & 0xff) == 0) {
-		    cmn_err(CE_WARN, "Too many Permanent CE requests.\n");
+			cmn_err(CE_WARN, "Too many Permanent CE requests.\n");
 		}
 		return;
 	}
@@ -1457,7 +1460,7 @@ static void
 mc_read_ptrl_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
 {
 	flt_stat->mf_cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank)) &
-		MAC_CNTL_PTRL_ERRS;
+	    MAC_CNTL_PTRL_ERRS;
 	flt_stat->mf_err_add = LD_MAC_REG(MAC_PTRL_ERR_ADD(mcp, bank));
 	flt_stat->mf_err_log = LD_MAC_REG(MAC_PTRL_ERR_LOG(mcp, bank));
 	flt_stat->mf_flt_maddr.ma_bd = mcp->mc_board_num;
@@ -1471,19 +1474,16 @@ mc_read_mi_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
 {
 	uint32_t status, old_status;
 
-	status = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank)) &
-		MAC_CNTL_MI_ERRS;
+	status = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank)) & MAC_CNTL_MI_ERRS;
 	old_status = 0;
 
 	/* we keep reading until the status is stable */
 	while (old_status != status) {
 		old_status = status;
-		flt_stat->mf_err_add =
-			LD_MAC_REG(MAC_MI_ERR_ADD(mcp, bank));
-		flt_stat->mf_err_log =
-			LD_MAC_REG(MAC_MI_ERR_LOG(mcp, bank));
+		flt_stat->mf_err_add = LD_MAC_REG(MAC_MI_ERR_ADD(mcp, bank));
+		flt_stat->mf_err_log = LD_MAC_REG(MAC_MI_ERR_LOG(mcp, bank));
 		status = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank)) &
-			MAC_CNTL_MI_ERRS;
+		    MAC_CNTL_MI_ERRS;
 		if (status == old_status) {
 			break;
 		}
@@ -1539,15 +1539,15 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	int rv = 0;
 
 	MC_LOG("process mirror errors cntl[0] = %x, cntl[1] = %x\n",
-		flt_stat[0].mf_cntl, flt_stat[1].mf_cntl);
+	    flt_stat[0].mf_cntl, flt_stat[1].mf_cntl);
 
 	if (ptrl_error) {
-		if (((flt_stat[0].mf_cntl | flt_stat[1].mf_cntl)
-			& MAC_CNTL_PTRL_ERRS) == 0)
+		if (((flt_stat[0].mf_cntl | flt_stat[1].mf_cntl) &
+		    MAC_CNTL_PTRL_ERRS) == 0)
 			return (0);
 	} else {
-		if (((flt_stat[0].mf_cntl | flt_stat[1].mf_cntl)
-			& MAC_CNTL_MI_ERRS) == 0)
+		if (((flt_stat[0].mf_cntl | flt_stat[1].mf_cntl) &
+		    MAC_CNTL_MI_ERRS) == 0)
 			return (0);
 	}
 
@@ -1558,9 +1558,9 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	for (i = 0; i < 2; i++) {
 		if (IS_CE_ONLY(flt_stat[i].mf_cntl, ptrl_error)) {
 			MC_LOG("CE detected on bank %d\n",
-				flt_stat[i].mf_flt_maddr.ma_bank);
+			    flt_stat[i].mf_flt_maddr.ma_bank);
 			mc_scrub_ce(mcp, flt_stat[i].mf_flt_maddr.ma_bank,
-				&flt_stat[i], ptrl_error);
+			    &flt_stat[i], ptrl_error);
 			rv = 1;
 		}
 	}
@@ -1596,7 +1596,7 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 		}
 
 		if (IS_UE(flt_stat[0].mf_cntl, ptrl_error) &&
-			IS_UE(flt_stat[1].mf_cntl, ptrl_error)) {
+		    IS_UE(flt_stat[1].mf_cntl, ptrl_error)) {
 			/* Both side are UE's */
 
 			MAC_SET_ERRLOG_INFO(&flt_stat[0]);
@@ -1615,7 +1615,9 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 
 		/* Now the only case is UE/CE, UE/OK, or don't care */
 		for (i = 0; i < 2; i++) {
-		    if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
+			if (!IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
+				continue;
+			}
 
 			/* rewrite can clear the one side UE error */
 
@@ -1633,7 +1635,6 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			mc_err_drain(mc_aflt);
 			/* Once we hit a UE/CE or UE/OK case, done */
 			return (1);
-		    }
 		}
 
 	} else {
@@ -1642,41 +1643,42 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 		 * on the 2 banks are not related at all.
 		 */
 		for (i = 0; i < 2; i++) {
-		    if (IS_CMPE(flt_stat[i].mf_cntl, ptrl_error)) {
-			flt_stat[i].mf_type = FLT_TYPE_CMPE;
-			mc_aflt->mflt_erpt_class = MC_OPL_CMPE;
-			mc_aflt->mflt_nflts = 1;
-			mc_aflt->mflt_stat[0] = &flt_stat[i];
-			mc_aflt->mflt_pr = PR_UE;
-			/*
-			 * Compare error is result of MAC internal error, so
-			 * simply log it instead of publishing an ereport. SCF
-			 * diagnoses all the MAC internal and its i/f error.
-			 * mc_err_drain(mc_aflt);
-			 */
-			MC_LOG("cmpe error detected\n");
-			/* no more report on this bank */
-			flt_stat[i].mf_cntl = 0;
-			rv = 1;
-		    }
+			if (IS_CMPE(flt_stat[i].mf_cntl, ptrl_error)) {
+				flt_stat[i].mf_type = FLT_TYPE_CMPE;
+				mc_aflt->mflt_erpt_class = MC_OPL_CMPE;
+				mc_aflt->mflt_nflts = 1;
+				mc_aflt->mflt_stat[0] = &flt_stat[i];
+				mc_aflt->mflt_pr = PR_UE;
+				/*
+				 * Compare error is result of MAC internal
+				 * error, so simply log it instead of
+				 * publishing an ereport. SCF diagnoses all
+				 * the MAC internal and its interface error.
+				 * mc_err_drain(mc_aflt);
+				 */
+				MC_LOG("cmpe error detected\n");
+				/* no more report on this bank */
+				flt_stat[i].mf_cntl = 0;
+				rv = 1;
+			}
 		}
 
 		/* rewrite can clear the one side UE error */
 
 		for (i = 0; i < 2; i++) {
-		    if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
-			(void) do_rewrite(mcp,
-				flt_stat[i].mf_flt_maddr.ma_bank,
-				flt_stat[i].mf_flt_maddr.ma_dimm_addr);
-			flt_stat[i].mf_type = FLT_TYPE_UE;
-			MAC_SET_ERRLOG_INFO(&flt_stat[i]);
-			mc_aflt->mflt_erpt_class = MC_OPL_SUE;
-			mc_aflt->mflt_stat[0] = &flt_stat[i];
-			mc_aflt->mflt_nflts = 1;
-			mc_aflt->mflt_pr = PR_MCE;
-			mc_err_drain(mc_aflt);
-			rv = 1;
-		    }
+			if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
+				(void) do_rewrite(mcp,
+				    flt_stat[i].mf_flt_maddr.ma_bank,
+				    flt_stat[i].mf_flt_maddr.ma_dimm_addr);
+				flt_stat[i].mf_type = FLT_TYPE_UE;
+				MAC_SET_ERRLOG_INFO(&flt_stat[i]);
+				mc_aflt->mflt_erpt_class = MC_OPL_SUE;
+				mc_aflt->mflt_stat[0] = &flt_stat[i];
+				mc_aflt->mflt_nflts = 1;
+				mc_aflt->mflt_pr = PR_MCE;
+				mc_err_drain(mc_aflt);
+				rv = 1;
+			}
 		}
 	}
 	return (rv);
@@ -1717,24 +1719,21 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 			rsaddr->mi_restartaddr = flt_stat[i].mf_flt_maddr;
 
 		MC_LOG("ptrl registers cntl %x add %x log %x\n",
-			flt_stat[i].mf_cntl,
-			flt_stat[i].mf_err_add,
-			flt_stat[i].mf_err_log);
+		    flt_stat[i].mf_cntl, flt_stat[i].mf_err_add,
+		    flt_stat[i].mf_err_log);
 
 		/* MI registers */
 		mc_read_mi_reg(mcp, bank, &mi_flt_stat[i]);
 
 		MC_LOG("MI registers cntl %x add %x log %x\n",
-			mi_flt_stat[i].mf_cntl,
-			mi_flt_stat[i].mf_err_add,
-			mi_flt_stat[i].mf_err_log);
+		    mi_flt_stat[i].mf_cntl, mi_flt_stat[i].mf_err_add,
+		    mi_flt_stat[i].mf_err_log);
 
 		bank = bank^1;
 	}
 
 	/* clear errors once we read all the registers */
-	MAC_CLEAR_ERRS(mcp, bank,
-		(MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
+	MAC_CLEAR_ERRS(mcp, bank, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
 	MAC_CLEAR_ERRS(mcp, bank ^ 1, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
@@ -1742,26 +1741,24 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 
 	/* if not error mode, cntl1 is 0 */
 	if ((mi_flt_stat[0].mf_err_add & MAC_ERR_ADD_INVALID) ||
-		(mi_flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
+	    (mi_flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
 		mi_flt_stat[0].mf_cntl = 0;
 
 	if ((mi_flt_stat[1].mf_err_add & MAC_ERR_ADD_INVALID) ||
-		(mi_flt_stat[1].mf_err_log & MAC_ERR_LOG_INVALID))
+	    (mi_flt_stat[1].mf_err_log & MAC_ERR_LOG_INVALID))
 		mi_flt_stat[1].mf_cntl = 0;
 
 	mc_aflt.mflt_is_ptrl = 0;
 	mi_valid = mc_process_error_mir(mcp, &mc_aflt, &mi_flt_stat[0]);
 
 	if ((((flt_stat[0].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
-		MAC_CNTL_PTRL_ERR_SHIFT) ==
-		((mi_flt_stat[0].mf_cntl & MAC_CNTL_MI_ERRS) >>
-		MAC_CNTL_MI_ERR_SHIFT)) &&
-		(flt_stat[0].mf_err_add == mi_flt_stat[0].mf_err_add) &&
-		(((flt_stat[1].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
-		MAC_CNTL_PTRL_ERR_SHIFT) ==
-		((mi_flt_stat[1].mf_cntl & MAC_CNTL_MI_ERRS) >>
-		MAC_CNTL_MI_ERR_SHIFT)) &&
-		(flt_stat[1].mf_err_add == mi_flt_stat[1].mf_err_add)) {
+	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat[0].mf_cntl &
+	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
+	    (flt_stat[0].mf_err_add == mi_flt_stat[0].mf_err_add) &&
+	    (((flt_stat[1].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
+	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat[1].mf_cntl &
+	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
+	    (flt_stat[1].mf_err_add == mi_flt_stat[1].mf_err_add)) {
 #ifdef DEBUG
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
@@ -1771,11 +1768,11 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 	}
 	/* if not error mode, cntl1 is 0 */
 	if ((flt_stat[0].mf_err_add & MAC_ERR_ADD_INVALID) ||
-		(flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
+	    (flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
 		flt_stat[0].mf_cntl = 0;
 
 	if ((flt_stat[1].mf_err_add & MAC_ERR_ADD_INVALID) ||
-		(flt_stat[1].mf_err_log & MAC_ERR_LOG_INVALID))
+	    (flt_stat[1].mf_err_log & MAC_ERR_LOG_INVALID))
 		flt_stat[1].mf_cntl = 0;
 
 	mc_aflt.mflt_is_ptrl = 1;
@@ -1812,9 +1809,8 @@ mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 		}
 		rv = 1;
 	}
-	MC_LOG("mc_process_error: fault type %x erpt %s\n",
-		flt_stat->mf_type,
-		mc_aflt->mflt_erpt_class);
+	MC_LOG("mc_process_error: fault type %x erpt %s\n", flt_stat->mf_type,
+	    mc_aflt->mflt_erpt_class);
 	if (mc_aflt->mflt_erpt_class) {
 		mc_aflt->mflt_stat[0] = flt_stat;
 		mc_aflt->mflt_nflts = 1;
@@ -1843,35 +1839,30 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 	ASSERT(rsaddr);
 	rsaddr->mi_restartaddr = flt_stat.mf_flt_maddr;
 
-	MC_LOG("ptrl registers cntl %x add %x log %x\n",
-		flt_stat.mf_cntl,
-		flt_stat.mf_err_add,
-		flt_stat.mf_err_log);
+	MC_LOG("ptrl registers cntl %x add %x log %x\n", flt_stat.mf_cntl,
+	    flt_stat.mf_err_add, flt_stat.mf_err_log);
 
 	/* MI registers */
 	mc_read_mi_reg(mcp, bank, &mi_flt_stat);
 
 
-	MC_LOG("MI registers cntl %x add %x log %x\n",
-		mi_flt_stat.mf_cntl,
-		mi_flt_stat.mf_err_add,
-		mi_flt_stat.mf_err_log);
+	MC_LOG("MI registers cntl %x add %x log %x\n", mi_flt_stat.mf_cntl,
+	    mi_flt_stat.mf_err_add, mi_flt_stat.mf_err_log);
 
 	/* clear errors once we read all the registers */
 	MAC_CLEAR_ERRS(mcp, bank, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
 	mc_aflt.mflt_is_ptrl = 0;
 	if ((mi_flt_stat.mf_cntl & MAC_CNTL_MI_ERRS) &&
-		((mi_flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
-		((mi_flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
+	    ((mi_flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
+	    ((mi_flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
 		mi_valid = mc_process_error(mcp, bank, &mc_aflt, &mi_flt_stat);
 	}
 
 	if ((((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) >>
-		MAC_CNTL_PTRL_ERR_SHIFT) ==
-		((mi_flt_stat.mf_cntl & MAC_CNTL_MI_ERRS) >>
-		MAC_CNTL_MI_ERR_SHIFT)) &&
-		(flt_stat.mf_err_add == mi_flt_stat.mf_err_add)) {
+	    MAC_CNTL_PTRL_ERR_SHIFT) == ((mi_flt_stat.mf_cntl &
+	    MAC_CNTL_MI_ERRS) >> MAC_CNTL_MI_ERR_SHIFT)) &&
+	    (flt_stat.mf_err_add == mi_flt_stat.mf_err_add)) {
 #ifdef DEBUG
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
@@ -1882,10 +1873,10 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 
 	mc_aflt.mflt_is_ptrl = 1;
 	if ((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) &&
-		((flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
-		((flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
-		rsaddr->mi_valid = mc_process_error(mcp, bank,
-			&mc_aflt, &flt_stat);
+	    ((flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
+	    ((flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
+		rsaddr->mi_valid = mc_process_error(mcp, bank, &mc_aflt,
+		    &flt_stat);
 	}
 }
 /*
@@ -1935,8 +1926,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 
 			if (mc_debug_show_all || stat) {
 				MC_LOG("/LSB%d/B%d stat %x cntl %x\n",
-					mcp->mc_board_num, i,
-					stat, cntl);
+				    mcp->mc_board_num, i, stat, cntl);
 			}
 
 			/*
@@ -1947,13 +1937,13 @@ mc_check_errors_func(mc_opl_t *mcp)
 				MAC_CLEAR_MAX(mcp, i);
 				mcp->mc_period[ebk]++;
 				if (IS_MIRROR(mcp, i))
-				    MC_LOG("mirror mc period %ld on "
-					"/LSB%d/B%d\n", mcp->mc_period[ebk],
-					mcp->mc_board_num, i);
+					MC_LOG("mirror mc period %ld on "
+					    "/LSB%d/B%d\n", mcp->mc_period[ebk],
+					    mcp->mc_board_num, i);
 				else {
-				    MC_LOG("mc period %ld on "
-					"/LSB%d/B%d\n", mcp->mc_period[ebk],
-					mcp->mc_board_num, i);
+					MC_LOG("mc period %ld on "
+					    "/LSB%d/B%d\n", mcp->mc_period[ebk],
+					    mcp->mc_board_num, i);
 				}
 			}
 
@@ -1986,29 +1976,34 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * wrapped (counted as completing a 'period').
 				 */
 				if (mcp->mc_speedup_period[ebk] > 0) {
-				    if (wrapped &&
-					(--mcp->mc_speedup_period[ebk] == 0)) {
-					/*
-					 * We did try to speed up.
-					 * The speed up period has expired
-					 * and the HW patrol is still running.
-					 * The errors must be intermittent.
-					 * We have no choice but to ignore
-					 * them, reset the scan speed to normal
-					 * and clear the MI error bits. For
-					 * mirror mode, we need to clear errors
-					 * on both banks.
-					 */
-					MC_LOG("Clearing MI errors\n");
-					MAC_CLEAR_ERRS(mcp, i,
-					    MAC_CNTL_MI_ERRS);
+					if (wrapped &&
+					    (--mcp->mc_speedup_period[ebk] ==
+					    0)) {
+						/*
+						 * We did try to speed up.
+						 * The speed up period has
+						 * expired and the HW patrol
+						 * is still running.  The
+						 * errors must be intermittent.
+						 * We have no choice but to
+						 * ignore them, reset the scan
+						 * speed to normal and clear
+						 * the MI error bits. For
+						 * mirror mode, we need to
+						 * clear errors on both banks.
+						 */
+						MC_LOG("Clearing MI errors\n");
+						MAC_CLEAR_ERRS(mcp, i,
+						    MAC_CNTL_MI_ERRS);
 
-					if (IS_MIRROR(mcp, i)) {
-					    MC_LOG("Clearing Mirror MI errs\n");
-					    MAC_CLEAR_ERRS(mcp, i^1,
-						MAC_CNTL_MI_ERRS);
+						if (IS_MIRROR(mcp, i)) {
+							MC_LOG("Clearing "
+							    "Mirror MI errs\n");
+							MAC_CLEAR_ERRS(mcp,
+							    i^1,
+							    MAC_CNTL_MI_ERRS);
+						}
 					}
-				    }
 				} else if (stat & MAC_STAT_MI_ERRS) {
 					/*
 					 * MI errors detected but we cannot
@@ -2033,9 +2028,10 @@ mc_check_errors_func(mc_opl_t *mcp)
 				rsaddr_info.mi_valid = 0;
 				rsaddr_info.mi_injectrestart = 0;
 				if (IS_MIRROR(mcp, i)) {
-				    mc_error_handler_mir(mcp, i, &rsaddr_info);
+					mc_error_handler_mir(mcp, i,
+					    &rsaddr_info);
 				} else {
-				    mc_error_handler(mcp, i, &rsaddr_info);
+					mc_error_handler(mcp, i, &rsaddr_info);
 				}
 
 				error_count++;
@@ -2127,7 +2123,7 @@ get_base_address(mc_opl_t *mcp)
 	int len;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, mcp->mc_dip, DDI_PROP_DONTPASS,
-		"sb-mem-ranges", (caddr_t)&mem_range, &len) != DDI_SUCCESS) {
+	    "sb-mem-ranges", (caddr_t)&mem_range, &len) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -2159,8 +2155,8 @@ static char *mc_tbl_name[] = {
 static int
 mc_rangecheck_pa(mc_opl_t *mcp, uint64_t pa)
 {
-	if ((pa < mcp->mc_start_address) ||
-		(mcp->mc_start_address + mcp->mc_size <= pa))
+	if ((pa < mcp->mc_start_address) || (mcp->mc_start_address +
+	    mcp->mc_size <= pa))
 		return (0);
 	else
 		return (1);
@@ -2238,7 +2234,7 @@ mc_memlist_del_span(struct memlist *mlist, uint64_t base, uint64_t len)
 					 * splitting an memlist entry.
 					 */
 					nl = kmem_alloc(sizeof (struct memlist),
-						KM_SLEEP);
+					    KM_SLEEP);
 					nl->address = end;
 					nl->size = mend - nl->address;
 					if ((nl->next = nlp) != NULL)
@@ -2288,8 +2284,8 @@ mc_get_mlist(mc_opl_t *mcp)
 		startpa = mcp->mc_start_address + mcp->mc_size;
 		endpa = ptob(physmax + 1);
 		if (endpa > startpa) {
-			mlist = mc_memlist_del_span(mlist,
-				startpa, endpa - startpa);
+			mlist = mc_memlist_del_span(mlist, startpa,
+			    endpa - startpa);
 		}
 	}
 
@@ -2308,6 +2304,8 @@ mc_board_add(mc_opl_t *mcp)
 	uint32_t mirr;
 	int nbanks = 0;
 	uint64_t nbytes = 0;
+	int mirror_mode = 0;
+	int ret;
 
 	/*
 	 * Get configurations from "pseudo-mc" node which includes:
@@ -2317,7 +2315,7 @@ mc_board_add(mc_opl_t *mcp)
 	 *			to physical address or vice versa.
 	 */
 	mcp->mc_board_num = (int)ddi_getprop(DDI_DEV_T_ANY, mcp->mc_dip,
-		DDI_PROP_DONTPASS, "board#", -1);
+	    DDI_PROP_DONTPASS, "board#", -1);
 
 	if (mcp->mc_board_num == -1) {
 		return (DDI_FAILURE);
@@ -2335,8 +2333,8 @@ mc_board_add(mc_opl_t *mcp)
 	for (i = 0; i < MC_TT_CS; i++) {
 		len = MC_TT_ENTRIES;
 		cc = ddi_getlongprop_buf(DDI_DEV_T_ANY, mcp->mc_dip,
-			DDI_PROP_DONTPASS, mc_tbl_name[i],
-			(caddr_t)mcp->mc_trans_table[i], &len);
+		    DDI_PROP_DONTPASS, mc_tbl_name[i],
+		    (caddr_t)mcp->mc_trans_table[i], &len);
 
 		if (cc != DDI_SUCCESS) {
 			bzero(mcp->mc_trans_table[i], MC_TT_ENTRIES);
@@ -2348,14 +2346,14 @@ mc_board_add(mc_opl_t *mcp)
 
 	/* initialize bank informations */
 	cc = ddi_getlongprop(DDI_DEV_T_ANY, mcp->mc_dip, DDI_PROP_DONTPASS,
-		"mc-addr", (caddr_t)&macaddr, &len);
+	    "mc-addr", (caddr_t)&macaddr, &len);
 	if (cc != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "Cannot get mc-addr. err=%d\n", cc);
 		return (DDI_FAILURE);
 	}
 
 	cc = ddi_getlongprop(DDI_DEV_T_ANY, mcp->mc_dip, DDI_PROP_DONTPASS,
-		"cs-status", (caddr_t)&cs_status, &len1);
+	    "cs-status", (caddr_t)&cs_status, &len1);
 
 	if (cc != DDI_SUCCESS) {
 		if (len > 0)
@@ -2377,7 +2375,7 @@ mc_board_add(mc_opl_t *mcp)
 
 	for (i = 0; i < len1 / sizeof (cs_status_t); i++) {
 		nbytes += ((uint64_t)cs_status[i].cs_avail_hi << 32) |
-			((uint64_t)cs_status[i].cs_avail_low);
+		    ((uint64_t)cs_status[i].cs_avail_low);
 	}
 	if (len1 > 0)
 		kmem_free(cs_status, len1);
@@ -2474,16 +2472,16 @@ mc_board_add(mc_opl_t *mcp)
 		mirr = LD_MAC_REG(MAC_MIRR(mcp, bk));
 
 		if (mirr & MAC_MIRR_MIRROR_MODE) {
-			MC_LOG("Mirror -> /LSB%d/B%d\n",
-				mcp->mc_board_num, bk);
+			MC_LOG("Mirror -> /LSB%d/B%d\n", mcp->mc_board_num,
+			    bk);
 			bankp->mcb_status |= BANK_MIRROR_MODE;
+			mirror_mode = 1;
 			/*
 			 * The following bit is only used for
 			 * error injection.  We should clear it
 			 */
 			if (mirr & MAC_MIRR_BANK_EXCLUSIVE)
-				ST_MAC_REG(MAC_MIRR(mcp, bk),
-					0);
+				ST_MAC_REG(MAC_MIRR(mcp, bk), 0);
 		}
 
 		/*
@@ -2491,22 +2489,27 @@ mc_board_add(mc_opl_t *mcp)
 		 * of the mirror is not running
 		 */
 		if (!(mirr & MAC_MIRR_MIRROR_MODE) ||
-			!(mcp->mc_bank[bk^1].mcb_status &
-			BANK_PTRL_RUNNING)) {
-			MC_LOG("Starting up /LSB%d/B%d\n",
-				mcp->mc_board_num, bk);
+		    !(mcp->mc_bank[bk^1].mcb_status & BANK_PTRL_RUNNING)) {
+			MC_LOG("Starting up /LSB%d/B%d\n", mcp->mc_board_num,
+			    bk);
 			get_ptrl_start_address(mcp, bk, &rsaddr.mi_restartaddr);
 			rsaddr.mi_valid = 0;
 			rsaddr.mi_injectrestart = 0;
 			restart_patrol(mcp, bk, &rsaddr);
 		} else {
 			MC_LOG("Not starting up /LSB%d/B%d\n",
-				mcp->mc_board_num, bk);
+			    mcp->mc_board_num, bk);
 		}
 		bankp->mcb_status |= BANK_PTRL_RUNNING;
 	}
 	if (len > 0)
 		kmem_free(macaddr, len);
+
+	ret = ndi_prop_update_int(DDI_DEV_T_NONE, mcp->mc_dip, "mirror-mode",
+	    mirror_mode);
+	if (ret != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "Unable to update mirror-mode property");
+	}
 
 	mcp->mc_dimm_list = mc_get_dimm_list(mcp);
 
@@ -2547,11 +2550,11 @@ mc_board_del(mc_opl_t *mcp)
 
 	/* just throw away all the scf logs */
 	for (i = 0; i < BANKNUM_PER_SB; i++) {
-	    while ((p = mcp->mc_scf_log[i]) != NULL) {
-		mcp->mc_scf_log[i] = p->sl_next;
-		mcp->mc_scf_total[i]--;
-		kmem_free(p, sizeof (scf_log_t));
-	    }
+		while ((p = mcp->mc_scf_log[i]) != NULL) {
+			mcp->mc_scf_log[i] = p->sl_next;
+			mcp->mc_scf_total[i]--;
+			kmem_free(p, sizeof (scf_log_t));
+		}
 	}
 
 	if (mcp->mlist)
@@ -2670,7 +2673,7 @@ mc_pa_to_mcp(uint64_t pa)
 			continue;
 		/* if mac patrol is suspended, we cannot rely on it */
 		if (!(mcp->mc_status & MC_POLL_RUNNING) ||
-			(mcp->mc_status & MC_SOFT_SUSPENDED))
+		    (mcp->mc_status & MC_SOFT_SUSPENDED))
 			continue;
 		if (mc_rangecheck_pa(mcp, pa)) {
 			return (mcp);
@@ -2709,7 +2712,7 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	mutex_enter(&mcmutex);
 
 	if (((mcp = mc_pa_to_mcp(flt_addr)) == NULL) ||
-		(!pa_is_valid(mcp, flt_addr))) {
+	    (!pa_is_valid(mcp, flt_addr))) {
 		mutex_exit(&mcmutex);
 		if (snprintf(buf, buflen, "UNKNOWN") >= buflen) {
 			return (ENOSPC);
@@ -2792,7 +2795,7 @@ insert_mcp(mc_opl_t *mcp)
 	mutex_enter(&mcmutex);
 	if (mc_instances[mcp->mc_board_num] != NULL) {
 		MC_LOG("mc-opl instance for board# %d already exists\n",
-			mcp->mc_board_num);
+		    mcp->mc_board_num);
 	}
 	mc_instances[mcp->mc_board_num] = mcp;
 	mutex_exit(&mcmutex);
@@ -2814,8 +2817,7 @@ mc_lock_va(uint64_t pa, caddr_t new_va)
 	tte_t tte;
 
 	vtag_flushpage(new_va, (uint64_t)ksfmmup);
-	sfmmu_memtte(&tte, pa >> PAGESHIFT,
-		PROC_DATA|HAT_NOSYNC, TTE8K);
+	sfmmu_memtte(&tte, pa >> PAGESHIFT, PROC_DATA|HAT_NOSYNC, TTE8K);
 	tte.tte_intlo |= TTE_LCK_INT;
 	sfmmu_dtlb_ld_kva(new_va, &tte);
 }
@@ -2882,8 +2884,8 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 	dimm_addr = pa_to_dimm(mcp, pa0);
 
-	MC_LOG("injecting error to /LSB%d/B%d/%x\n",
-		mcp->mc_board_num, bank, dimm_addr);
+	MC_LOG("injecting error to /LSB%d/B%d/%x\n", mcp->mc_board_num, bank,
+	    dimm_addr);
 
 
 	switch (error_type) {
@@ -2900,8 +2902,8 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 	if (both_sides) {
 		ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), 0);
-		ST_MAC_REG(MAC_EG_ADD(mcp, bank^1),
-			dimm_addr & MAC_EG_ADD_MASK);
+		ST_MAC_REG(MAC_EG_ADD(mcp, bank^1), dimm_addr &
+		    MAC_EG_ADD_MASK);
 	}
 
 	switch (error_type) {
@@ -2911,25 +2913,22 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	case MC_INJECT_UE:
 	case MC_INJECT_MUE:
 		if (flags & MC_INJECT_FLAG_PATH) {
-			cntl = MAC_EG_ADD_FIX
-				|MAC_EG_FORCE_READ00|MAC_EG_FORCE_READ16
-				|MAC_EG_RDERR_ONCE;
+			cntl = MAC_EG_ADD_FIX | MAC_EG_FORCE_READ00 |
+			    MAC_EG_FORCE_READ16 | MAC_EG_RDERR_ONCE;
 		} else {
-			cntl = MAC_EG_ADD_FIX|MAC_EG_FORCE_DERR00
-				|MAC_EG_FORCE_DERR16|MAC_EG_DERR_ONCE;
+			cntl = MAC_EG_ADD_FIX | MAC_EG_FORCE_DERR00 |
+			    MAC_EG_FORCE_DERR16 | MAC_EG_DERR_ONCE;
 		}
 		flags |= MC_INJECT_FLAG_ST;
 		break;
 	case MC_INJECT_INTERMITTENT_CE:
 	case MC_INJECT_INTERMITTENT_MCE:
 		if (flags & MC_INJECT_FLAG_PATH) {
-			cntl = MAC_EG_ADD_FIX
-				|MAC_EG_FORCE_READ00
-				|MAC_EG_RDERR_ONCE;
+			cntl = MAC_EG_ADD_FIX |MAC_EG_FORCE_READ00 |
+			    MAC_EG_RDERR_ONCE;
 		} else {
-			cntl = MAC_EG_ADD_FIX
-				|MAC_EG_FORCE_DERR16
-				|MAC_EG_DERR_ONCE;
+			cntl = MAC_EG_ADD_FIX | MAC_EG_FORCE_DERR16 |
+			    MAC_EG_DERR_ONCE;
 		}
 		extra_injection_needed = 1;
 		flags |= MC_INJECT_FLAG_ST;
@@ -2937,13 +2936,11 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	case MC_INJECT_PERMANENT_CE:
 	case MC_INJECT_PERMANENT_MCE:
 		if (flags & MC_INJECT_FLAG_PATH) {
-			cntl = MAC_EG_ADD_FIX
-				|MAC_EG_FORCE_READ00
-				|MAC_EG_RDERR_ALWAYS;
+			cntl = MAC_EG_ADD_FIX | MAC_EG_FORCE_READ00 |
+			    MAC_EG_RDERR_ALWAYS;
 		} else {
-			cntl = MAC_EG_ADD_FIX
-				|MAC_EG_FORCE_DERR16
-				|MAC_EG_DERR_ALWAYS;
+			cntl = MAC_EG_ADD_FIX | MAC_EG_FORCE_DERR16 |
+			    MAC_EG_DERR_ALWAYS;
 		}
 		flags |= MC_INJECT_FLAG_ST;
 		break;
@@ -2974,7 +2971,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 		if (both_sides) {
 			ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl &
-				MAC_EG_SETUP_MASK);
+			    MAC_EG_SETUP_MASK);
 			ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl);
 		}
 	}
@@ -3008,7 +3005,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 				caddr_t	va, va1;
 
 				va = ppmapin(pp, PROT_READ|PROT_WRITE,
-					(caddr_t)-1);
+				    (caddr_t)-1);
 				kpreempt_disable();
 				mc_lock_va((uint64_t)pa, va);
 				va1 = va + (pa & (PAGESIZE - 1));
@@ -3024,7 +3021,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 				extra_injection_needed = 1;
 			} else {
 				cmn_err(CE_WARN, "Cannot find page structure"
-					" for PA %lx\n", pa);
+				    " for PA %lx\n", pa);
 			}
 		} else {
 			MC_LOG("Reading from %lx\n", pa);
@@ -3044,13 +3041,13 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 			 * is running.
 			 */
 			ST_MAC_REG(MAC_EG_CNTL(mcp, bank),
-				cntl & MAC_EG_SETUP_MASK);
+			    cntl & MAC_EG_SETUP_MASK);
 			ST_MAC_REG(MAC_EG_CNTL(mcp, bank), cntl);
 
 			if (both_sides) {
-			    ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl &
-				MAC_EG_SETUP_MASK);
-			    ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl);
+				ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl &
+				    MAC_EG_SETUP_MASK);
+				ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl);
 			}
 			data = 0xf0e0d0c0;
 			MC_LOG("Writing %x to %lx\n", data, pa);
@@ -3612,7 +3609,7 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	if (arg != NULL) {
 		if (ddi_copyin((const void *)arg, (void *)&pa,
-			sizeof (uint64_t), 0) < 0) {
+		    sizeof (uint64_t), 0) < 0) {
 			rv = EFAULT;
 			return (rv);
 		}
@@ -3630,36 +3627,28 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	switch (cmd) {
 	case MCI_CE:
-		mc_inject_error(MC_INJECT_INTERMITTENT_CE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_INTERMITTENT_CE, pa, flags);
 		break;
 	case MCI_PERM_CE:
-		mc_inject_error(MC_INJECT_PERMANENT_CE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_PERMANENT_CE, pa, flags);
 		break;
 	case MCI_UE:
-		mc_inject_error(MC_INJECT_UE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_UE, pa, flags);
 		break;
 	case MCI_M_CE:
-		mc_inject_error(MC_INJECT_INTERMITTENT_MCE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_INTERMITTENT_MCE, pa, flags);
 		break;
 	case MCI_M_PCE:
-		mc_inject_error(MC_INJECT_PERMANENT_MCE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_PERMANENT_MCE, pa, flags);
 		break;
 	case MCI_M_UE:
-		mc_inject_error(MC_INJECT_MUE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_MUE, pa, flags);
 		break;
 	case MCI_CMP:
-		mc_inject_error(MC_INJECT_CMPE, pa,
-			flags);
+		mc_inject_error(MC_INJECT_CMPE, pa, flags);
 		break;
 	case MCI_NOP:
-		mc_inject_error(MC_INJECT_NOP, pa, flags);
-		break;
+		mc_inject_error(MC_INJECT_NOP, pa, flags); break;
 	case MCI_SHOW_ALL:
 		mc_debug_show_all = 1;
 		break;
@@ -3675,7 +3664,7 @@ mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		for (i = 0; i < flags; i++) {
 			buf = kmem_alloc(512 * 1024 * 1024, KM_SLEEP);
 			cmn_err(CE_NOTE, "kmem buf %llx PA %llx\n",
-				(u_longlong_t)buf, (u_longlong_t)va_to_pa(buf));
+			    (u_longlong_t)buf, (u_longlong_t)va_to_pa(buf));
 		}
 		break;
 	case MCI_SUSPEND:
