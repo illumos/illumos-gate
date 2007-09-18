@@ -802,7 +802,7 @@ get_l2_cache_info(md_t *mdp, mde_cookie_t cpu_node_cookie,
 {
 	mde_cookie_t *cachelist;
 	int ncaches, i;
-	uint64_t max_level;
+	uint64_t cache_level = 0;
 
 	ncaches = md_alloc_scan_dag(mdp, cpu_node_cookie, "cache",
 	    "fwd", &cachelist);
@@ -813,9 +813,7 @@ get_l2_cache_info(md_t *mdp, mde_cookie_t cpu_node_cookie,
 		return (0);
 	}
 
-	max_level = 0;
 	for (i = 0; i < ncaches; i++) {
-		uint64_t cache_level;
 		uint64_t local_assoc;
 		uint64_t local_size;
 		uint64_t local_lsize;
@@ -823,7 +821,7 @@ get_l2_cache_info(md_t *mdp, mde_cookie_t cpu_node_cookie,
 		if (md_get_prop_val(mdp, cachelist[i], "level", &cache_level))
 			continue;
 
-		if (cache_level <= max_level) continue;
+		if (cache_level != 2) continue;
 
 		/* If properties are missing from this cache ignore it */
 
@@ -842,15 +840,15 @@ get_l2_cache_info(md_t *mdp, mde_cookie_t cpu_node_cookie,
 			continue;
 		}
 
-		max_level = cache_level;
 		*associativity = local_assoc;
 		*size = local_size;
 		*linesize = local_lsize;
+		break;
 	}
 
 	md_free_scan_dag(mdp, &cachelist);
 
-	return ((max_level > 0) ? 1 : 0);
+	return ((cache_level == 2) ? 1 : 0);
 }
 
 
