@@ -935,6 +935,15 @@ typedef struct e1000g {
 	caddr_t nd_data;
 	nd_param_t nd_params[PARAM_COUNT];
 
+	uint16_t phy_ctrl;		/* contents of PHY_CTRL */
+	uint16_t phy_status;		/* contents of PHY_STATUS */
+	uint16_t phy_an_adv;		/* contents of PHY_AUTONEG_ADV */
+	uint16_t phy_an_exp;		/* contents of PHY_AUTONEG_EXP */
+	uint16_t phy_ext_status;	/* contents of PHY_EXT_STATUS */
+	uint16_t phy_1000t_ctrl;	/* contents of PHY_1000T_CTRL */
+	uint16_t phy_1000t_status;	/* contents of PHY_1000T_STATUS */
+	uint16_t phy_lp_able;		/* contents of PHY_LP_ABILITY */
+
 } e1000g_t;
 
 
@@ -973,6 +982,7 @@ void e1000g_clear_tx_interrupt(struct e1000g *Adapter);
 void e1000g_mask_tx_interrupt(struct e1000g *Adapter);
 void phy_spd_state(struct e1000_hw *hw, boolean_t enable);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
+void e1000g_get_driver_control(struct e1000_hw *hw);
 
 #pragma inline(e1000_rar_set)
 

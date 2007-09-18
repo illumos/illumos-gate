@@ -49,9 +49,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.1";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.2";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.1";
+static char e1000g_version[] = "Driver Ver. 5.2.2";
 
 /*
  * Proto types for DDI entry points
@@ -142,6 +142,7 @@ static boolean_t e1000g_link_up(struct e1000g *);
 #ifdef __sparc
 static boolean_t e1000g_find_mac_address(struct e1000g *);
 #endif
+static void e1000g_get_phy_state(struct e1000g *);
 static void e1000g_free_priv_devi_node(struct e1000g *, boolean_t);
 
 static struct cb_ops cb_ws_ops = {
@@ -1248,6 +1249,9 @@ e1000g_init(struct e1000g *Adapter)
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
 
+	/* Make sure driver has control */
+	e1000g_get_driver_control(hw);
+
 	/*
 	 * Initialize unicast addresses.
 	 */
@@ -1289,6 +1293,9 @@ e1000g_init(struct e1000g *Adapter)
 		e1000_enable_pciex_master(hw);
 	}
 
+	/* Save the state of the phy */
+	e1000g_get_phy_state(Adapter);
+
 	Adapter->init_count++;
 
 	rw_exit(&Adapter->chip_lock);
@@ -1310,9 +1317,6 @@ e1000g_link_up(struct e1000g *Adapter)
 	boolean_t link_up;
 
 	hw = &Adapter->shared;
-
-	/* Ensure this is set to get accurate copper link status */
-	hw->mac.get_link_status = B_TRUE;
 
 	e1000_check_for_link(hw);
 
@@ -1814,23 +1818,36 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 
 		stop_watchdog_timer(Adapter);
 
-		mutex_enter(&Adapter->link_lock);
+		rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+		/*
+		 * Because we got a link-status-change interrupt, force
+		 * e1000_check_for_link() to look at phy
+		 */
+		Adapter->shared.mac.get_link_status = B_TRUE;
+
 		/* e1000g_link_check takes care of link status change */
 		link_changed = e1000g_link_check(Adapter);
+
+		/* Get new phy state */
+		e1000g_get_phy_state(Adapter);
+
 		/*
 		 * If the link timer has not timed out, we'll not notify
 		 * the upper layer with any link state until the link is up.
 		 */
 		if (link_changed && !Adapter->link_complete) {
 			if (Adapter->link_state == LINK_STATE_UP) {
+				mutex_enter(&Adapter->link_lock);
 				Adapter->link_complete = B_TRUE;
 				tid = Adapter->link_tid;
 				Adapter->link_tid = 0;
+				mutex_exit(&Adapter->link_lock);
 			} else {
 				link_changed = B_FALSE;
 			}
 		}
-		mutex_exit(&Adapter->link_lock);
+		rw_exit(&Adapter->chip_lock);
 
 		if (link_changed) {
 			if (tid != 0)
@@ -2705,9 +2722,7 @@ e1000g_link_check(struct e1000g *Adapter)
 				Adapter->tx_link_down_timeout++;
 			} else if (Adapter->tx_link_down_timeout ==
 			    MAX_TX_LINK_DOWN_TIMEOUT) {
-				rw_enter(&Adapter->chip_lock, RW_WRITER);
 				e1000g_tx_clean(Adapter);
-				rw_exit(&Adapter->chip_lock);
 				Adapter->tx_link_down_timeout++;
 			}
 		}
@@ -2736,10 +2751,10 @@ e1000g_local_timer(void *ws)
 	}
 
 	link_changed = B_FALSE;
-	mutex_enter(&Adapter->link_lock);
+	rw_enter(&Adapter->chip_lock, RW_READER);
 	if (Adapter->link_complete)
 		link_changed = e1000g_link_check(Adapter);
-	mutex_exit(&Adapter->link_lock);
+	rw_exit(&Adapter->chip_lock);
 
 	if (link_changed) {
 		/*
@@ -3452,8 +3467,6 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 	uint32_t *lbmp;
 	uint32_t size;
 	uint32_t value;
-	uint16_t phy_status;
-	uint16_t phy_ext_status;
 
 	hw = &Adapter->shared;
 
@@ -3469,12 +3482,22 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		if (iocp->ioc_count != size)
 			return (IOC_INVAL);
 
-		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_ext_status);
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
+		rw_enter(&Adapter->chip_lock, RW_WRITER);
+		e1000g_get_phy_state(Adapter);
+
+		/*
+		 * Workaround for hardware faults. In order to get a stable
+		 * state of phy, we will wait for a specific interval and
+		 * try again. The time delay is an experiential value based
+		 * on our testing.
+		 */
+		msec_delay(100);
+		e1000g_get_phy_state(Adapter);
+		rw_exit(&Adapter->chip_lock);
 
 		value = sizeof (lb_normal);
-		if ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
+		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
 		    (hw->media_type == e1000_media_type_fiber) ||
 		    (hw->media_type == e1000_media_type_internal_serdes)) {
 			value += sizeof (lb_phy);
@@ -3485,10 +3508,10 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 				break;
 			}
 		}
-		if ((phy_status & MII_SR_100X_FD_CAPS) ||
-		    (phy_status & MII_SR_100T2_FD_CAPS))
+		if ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
 			value += sizeof (lb_external100);
-		if (phy_status & MII_SR_10T_FD_CAPS)
+		if (Adapter->phy_status & MII_SR_10T_FD_CAPS)
 			value += sizeof (lb_external10);
 
 		lbsp = (lb_info_sz_t *)mp->b_cont->b_rptr;
@@ -3496,12 +3519,9 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		break;
 
 	case LB_GET_INFO:
-		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_ext_status);
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_status);
-
 		value = sizeof (lb_normal);
-		if ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
+		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
 		    (hw->media_type == e1000_media_type_fiber) ||
 		    (hw->media_type == e1000_media_type_internal_serdes)) {
 			value += sizeof (lb_phy);
@@ -3512,10 +3532,10 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 				break;
 			}
 		}
-		if ((phy_status & MII_SR_100X_FD_CAPS) ||
-		    (phy_status & MII_SR_100T2_FD_CAPS))
+		if ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
 			value += sizeof (lb_external100);
-		if (phy_status & MII_SR_10T_FD_CAPS)
+		if (Adapter->phy_status & MII_SR_10T_FD_CAPS)
 			value += sizeof (lb_external10);
 
 		size = value;
@@ -3525,8 +3545,8 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		value = 0;
 		lbpp = (lb_property_t *)mp->b_cont->b_rptr;
 		lbpp[value++] = lb_normal;
-		if ((phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
+		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
 		    (hw->media_type == e1000_media_type_fiber) ||
 		    (hw->media_type == e1000_media_type_internal_serdes)) {
 			lbpp[value++] = lb_phy;
@@ -3537,10 +3557,10 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 				break;
 			}
 		}
-		if ((phy_status & MII_SR_100X_FD_CAPS) ||
-		    (phy_status & MII_SR_100T2_FD_CAPS))
+		if ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
 			lbpp[value++] = lb_external100;
-		if (phy_status & MII_SR_10T_FD_CAPS)
+		if (Adapter->phy_status & MII_SR_10T_FD_CAPS)
 			lbpp[value++] = lb_external10;
 		break;
 
@@ -3574,10 +3594,8 @@ static boolean_t
 e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 {
 	struct e1000_hw *hw;
-#ifndef __sparc
-	uint32_t reg_rctl;
-#endif
 	int i, times;
+	boolean_t link_up;
 
 	if (mode == Adapter->loopback_mode)
 		return (B_TRUE);
@@ -3585,19 +3603,26 @@ e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 	hw = &Adapter->shared;
 	times = 0;
 
-again:
-	switch (mode) {
-	default:
-		return (B_FALSE);
+	Adapter->loopback_mode = mode;
 
-	case E1000G_LB_NONE:
-		/* Get original speed and duplex settings */
-		e1000g_force_speed_duplex(Adapter);
+	if (mode == E1000G_LB_NONE) {
 		/* Reset the chip */
 		hw->phy.wait_for_link = B_TRUE;
 		(void) e1000g_reset(Adapter);
 		hw->phy.wait_for_link = B_FALSE;
-		break;
+		return (B_TRUE);
+	}
+
+again:
+
+	(void) e1000g_reset(Adapter);
+
+	rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+	switch (mode) {
+	default:
+		rw_exit(&Adapter->chip_lock);
+		return (B_FALSE);
 
 	case E1000G_LB_EXTERNAL_1000:
 		e1000g_set_external_loopback_1000(Adapter);
@@ -3618,30 +3643,25 @@ again:
 
 	times++;
 
-	switch (mode) {
-	case E1000G_LB_EXTERNAL_1000:
-	case E1000G_LB_EXTERNAL_100:
-	case E1000G_LB_EXTERNAL_10:
-	case E1000G_LB_INTERNAL_PHY:
-		/* Wait for link up */
-		for (i = (PHY_FORCE_LIMIT * 2); i > 0; i--)
-			msec_delay(100);
+	/* Wait for link up */
+	for (i = (PHY_FORCE_LIMIT * 2); i > 0; i--)
+		msec_delay(100);
 
-		if (!e1000g_link_up(Adapter)) {
+	link_up = e1000g_link_up(Adapter);
+
+	rw_exit(&Adapter->chip_lock);
+
+	if (!link_up) {
+		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
+		    "Failed to get the link up");
+		if (times < 2) {
+			/* Reset the link */
 			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
-			    "Failed to get the link up");
-			if (times < 2) {
-				/* Reset the link */
-				E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
-				    "Reset the link ...");
-				(void) e1000g_reset(Adapter);
-				goto again;
-			}
+			    "Reset the link ...");
+			(void) e1000g_reset(Adapter);
+			goto again;
 		}
-		break;
 	}
-
-	Adapter->loopback_mode = mode;
 
 	return (B_TRUE);
 }
@@ -3659,6 +3679,7 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 	uint32_t ctrl;
 	uint32_t status;
 	uint16_t phy_ctrl;
+	uint32_t txcw;
 
 	hw = &Adapter->shared;
 
@@ -3684,6 +3705,15 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 		/* Reset PHY to auto-neg off and force 1000 */
 		e1000_write_phy_reg(hw, PHY_CONTROL,
 		    phy_ctrl | MII_CR_RESET);
+		/*
+		 * Disable PHY receiver for 82540/545/546 and 82573 Family.
+		 * See comments above e1000g_set_internal_loopback() for the
+		 * background.
+		 */
+		e1000_write_phy_reg(hw, 29, 0x001F);
+		e1000_write_phy_reg(hw, 30, 0x8FFC);
+		e1000_write_phy_reg(hw, 29, 0x001A);
+		e1000_write_phy_reg(hw, 30, 0x8FF0);
 		break;
 	}
 
@@ -3729,11 +3759,31 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 
 	case e1000_82571:
 	case e1000_82572:
+		/*
+		 * The fiber/SerDes versions of this adapter do not contain an
+		 * accessible PHY. Therefore, loopback beyond MAC must be done
+		 * using SerDes analog loopback.
+		 */
 		if (hw->media_type != e1000_media_type_copper) {
-			/* Set ILOS on fiber nic if half duplex is detected */
 			status = E1000_READ_REG(hw, E1000_STATUS);
-			if ((status & E1000_STATUS_FD) == 0)
+			/* Set ILOS on fiber nic if half duplex is detected */
+			if (((status & E1000_STATUS_LU) == 0) ||
+			    ((status & E1000_STATUS_FD) == 0) ||
+			    (hw->media_type ==
+			    e1000_media_type_internal_serdes))
 				ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
+
+			/* Disable autoneg by setting bit 31 of TXCW to zero */
+			txcw = E1000_READ_REG(hw, E1000_TXCW);
+			txcw &= ~((uint32_t)1 << 31);
+			E1000_WRITE_REG(hw, E1000_TXCW, txcw);
+
+			/*
+			 * Write 0x410 to Serdes Control register
+			 * to enable Serdes analog loopback
+			 */
+			E1000_WRITE_REG(hw, E1000_SCTL, 0x0410);
+			msec_delay(10);
 		}
 		break;
 
@@ -3744,23 +3794,6 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 
-	/*
-	 * Disable PHY receiver for 82540/545/546 and 82573 Family.
-	 * For background, see comments above e1000g_set_internal_loopback().
-	 */
-	switch (hw->mac.type) {
-	case e1000_82540:
-	case e1000_82545:
-	case e1000_82545_rev_3:
-	case e1000_82546:
-	case e1000_82546_rev_3:
-	case e1000_82573:
-		e1000_write_phy_reg(hw, 29, 0x001F);
-		e1000_write_phy_reg(hw, 30, 0x8FFC);
-		e1000_write_phy_reg(hw, 29, 0x001A);
-		e1000_write_phy_reg(hw, 30, 0x8FF0);
-		break;
-	}
 }
 
 static void
@@ -4277,4 +4310,22 @@ e1000g_disable_intrs(struct e1000g *Adapter)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * e1000g_get_phy_state - get the state of PHY registers, save in the adapter
+ */
+static void
+e1000g_get_phy_state(struct e1000g *Adapter)
+{
+	struct e1000_hw *hw = &Adapter->shared;
+
+	e1000_read_phy_reg(hw, PHY_CONTROL, &Adapter->phy_ctrl);
+	e1000_read_phy_reg(hw, PHY_STATUS, &Adapter->phy_status);
+	e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &Adapter->phy_an_adv);
+	e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &Adapter->phy_an_exp);
+	e1000_read_phy_reg(hw, PHY_EXT_STATUS, &Adapter->phy_ext_status);
+	e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
+	e1000_read_phy_reg(hw, PHY_1000T_STATUS, &Adapter->phy_1000t_status);
+	e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
 }

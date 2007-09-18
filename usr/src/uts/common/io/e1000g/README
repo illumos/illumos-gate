@@ -533,3 +533,13 @@ Notes on packaging:
   This version has the following fix:
    6594676 e1000g should free private dips while no rx buffers are held by upper layer
 
+5.2.2
+======
+  This version has the following fix:
+   6480448 Sunvts netlbtest external loopback failed on 82546 chipset
+   6521984 Sunvts netlbtest failed on Northstar QGE cards
+   6531842 e1000g link goes down and up frequently on T2000 systems
+   6540535 Sunvts netlbtest internal loopback failed on ophir devices
+   6579605 Sunvts netlbtest internal loopback failed on Northstar fiber card
+   6595668 e1000g postinstall script missed 5 device ids which had been supported by shared code
+

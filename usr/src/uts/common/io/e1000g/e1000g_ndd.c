@@ -269,57 +269,58 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 {
 	struct e1000g *Adapter;
 	struct e1000_hw *hw;
-	uint16_t phy_reg;
 
 	Adapter = ndp->ndp_instance;
 	ASSERT(Adapter);
 	hw = &Adapter->shared;
 
+	rw_enter(&Adapter->chip_lock, RW_READER);
+
 	switch (ndp->ndp_info) {
 	/* Hardware Capabilities */
 	case PARAM_AUTONEG_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
 		break;
 	case PARAM_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_PAUSE) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_ASM_DIR) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_1000FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_reg);
-		ndp->ndp_val = ((phy_reg & IEEE_ESR_1000T_FD_CAPS) ||
-		    (phy_reg & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		ndp->ndp_val =
+		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_1000HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_EXT_STATUS, &phy_reg);
-		ndp->ndp_val = ((phy_reg & IEEE_ESR_1000T_HD_CAPS) ||
-		    (phy_reg & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+		ndp->ndp_val =
+		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_100T4_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & MII_SR_100T4_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_100FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = ((phy_reg & MII_SR_100X_FD_CAPS) ||
-		    (phy_reg & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		ndp->ndp_val =
+		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_100HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = ((phy_reg & MII_SR_100X_HD_CAPS) ||
-		    (phy_reg & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		ndp->ndp_val =
+		    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
 		break;
 	case PARAM_10FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_10HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Auto-Negotiation Advertisement Capabilities */
@@ -327,82 +328,82 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 		ndp->ndp_val = hw->mac.autoneg;
 		break;
 	case PARAM_ADV_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_PAUSE) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_ADV_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_ASM_DIR) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_ADV_1000FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_reg);
-		ndp->ndp_val = (phy_reg & CR_1000T_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_1000HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_reg);
-		ndp->ndp_val = (phy_reg & CR_1000T_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100T4_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_100T4_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_100HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_10FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_ADV_10HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Link-Partner's Advertisement Capabilities */
 	case PARAM_LP_AUTONEG_CAP:
-		e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_PAUSE) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
 		break;
 	case PARAM_LP_ASYM_PAUSE_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_ASM_DIR) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
 		break;
 	case PARAM_LP_1000FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & SR_1000T_LP_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_1000HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_reg);
-		ndp->ndp_val = (phy_reg & SR_1000T_LP_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100T4_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_100HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_10FDX_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case PARAM_LP_10HDX_CAP:
-		e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_reg);
-		ndp->ndp_val = (phy_reg & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
+		ndp->ndp_val =
+		    (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
 		break;
 
 	/* Force Speed and Duplex Parameter */
@@ -475,6 +476,8 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 	default:
 		break;
 	}
+
+	rw_exit(&Adapter->chip_lock);
 }
 
 static void

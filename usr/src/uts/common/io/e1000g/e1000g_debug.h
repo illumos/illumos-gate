@@ -113,7 +113,14 @@ extern "C" {
 
 #define	E1000G_STAT(val)	(val)++;
 
-void e1000g_log(void *instance, int level, char *fmt, ...);
+void e1000g_log(void *, int, char *, ...);
+
+#ifdef E1000G_DEBUG
+void eeprom_dump(void *);
+void phy_dump(void *);
+void mac_dump(void *);
+void pciconfig_dump(void *);
+#endif
 
 #ifdef E1000G_DEBUG
 extern int e1000g_debug;
