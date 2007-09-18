@@ -605,7 +605,6 @@ extern uint32_t		lgrp_loadavg_tolerance;
 extern uint32_t		lgrp_loadavg_max_effect;
 extern uint32_t		lgrp_load_thresh;
 extern lgrp_mem_policy_t lgrp_mem_policy_root;
-extern int		tsb_lgrp_affinity;
 
 #endif	/* _KERNEL && _KMEMUSER */
 

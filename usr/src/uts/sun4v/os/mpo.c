@@ -37,6 +37,7 @@
 #include <sys/mdesc.h>
 #include <sys/mpo.h>
 #include <vm/vm_dep.h>
+#include <vm/hat_sfmmu.h>
 
 /*
  * MPO and the sun4v memory representation
@@ -728,10 +729,12 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	uint64_t stripe, frag, remove;
 	mem_stripe_t *ms;
 
-	/* Check for non-MPO sun4v platforms */
+	/* Pre-reserve space for plat_assign_lgrphand_to_mem_node */
+	max_mem_nodes = max_locality_groups;
 
+	/* Check for non-MPO sun4v platforms */
 	if (n_locality_groups <= 1) {
-		mpo_plat_assign_lgrphand_to_mem_node((lgrp_handle_t)0, 0);
+		mpo_plat_assign_lgrphand_to_mem_node(LGRP_DEFAULT_HANDLE, 0);
 		for (elem = 0; elem < nelems; elem += 2) {
 			base = list[elem];
 			len = list[elem+1];
@@ -742,11 +745,10 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 		mem_node_pfn_shift = 0;
 		mem_node_physalign = 0;
 		n_mem_stripes = 0;
-		return;
+		if (n_mblocks == 1)
+			return;
 	}
 
-	/* Pre-reserve space for plat_assign_lgrphand_to_mem_node */
-	max_mem_nodes = max_locality_groups;
 	bzero(mem_stripes, sizeof (mem_stripes));
 	stripe = ptob(mnode_pages);
 	stride = max_locality_groups * stripe;
@@ -808,9 +810,17 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 			ms->offset = btop(offset);
 			ms->exists = 1;
 
-			mpo_plat_assign_lgrphand_to_mem_node(lgrphand, mnode);
-			mpo_mem_node_add_slice(ms->physbase, ms->physmax);
-
+			/*
+			 * If we have only 1 lgroup and multiple mblocks,
+			 * then we have already established our lgrp handle
+			 * to mem_node and mem_node_config values above.
+			 */
+			if (n_locality_groups > 1) {
+				mpo_plat_assign_lgrphand_to_mem_node(lgrphand,
+				    mnode);
+				mpo_mem_node_add_slice(ms->physbase,
+				    ms->physmax);
+			}
 			base = stripe_end;
 			stripe_end += stripe;
 			offset = 0;
@@ -837,7 +847,7 @@ plat_lgrp_cpu_to_hand(processorid_t id)
 	if (n_locality_groups > 1) {
 		return ((lgrp_handle_t)mpo_cpu[(int)id].home);
 	} else {
-		return ((lgrp_handle_t)0); /* Default */
+		return ((lgrp_handle_t)LGRP_DEFAULT_HANDLE); /* Default */
 	}
 }
 

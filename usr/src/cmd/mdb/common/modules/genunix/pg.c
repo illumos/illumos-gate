@@ -43,7 +43,8 @@ char *pg_hw_names[] = {
 	"ipipe",
 	"cache",
 	"fpu",
-	"mpipe/chip",
+	"mpipe",
+	"chip",
 	"memory",
 };
 
@@ -78,7 +79,7 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_getopts(argc, argv,
 	    'q', MDB_OPT_SETBITS, TRUE, &opt_q,
-		NULL) != argc)
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (flags & DCMD_PIPE_OUT)
@@ -111,7 +112,7 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_vread(&pg_class, sizeof (struct pg_class),
-		(uintptr_t)pg.pg_class) == -1) {
+	    (uintptr_t)pg.pg_class) == -1) {
 		mdb_warn("unable to read 'pg_class' at %p", pg.pg_class);
 		return (DCMD_ERR);
 	}

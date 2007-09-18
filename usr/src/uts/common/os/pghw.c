@@ -365,6 +365,8 @@ pghw_type_string(pghw_type_t hw)
 		return ("cache");
 	case PGHW_FPU:
 		return ("fpu");
+	case PGHW_MPIPE:
+		return ("mpipe");
 	case PGHW_CHIP:
 		return ("chip");
 	case PGHW_MEMORY:

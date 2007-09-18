@@ -201,6 +201,10 @@ cpu_map_exec_units(struct cpu *cp)
 	cp->cpu_m.cpu_mpipe = cpunodes[cp->cpu_id].l2_cache_mapping;
 	if (cp->cpu_m.cpu_mpipe == NO_L2_CACHE_MAPPING_FOUND)
 		cp->cpu_m.cpu_mpipe = CPU_L2_CACHEID_INVALID;
+
+	cp->cpu_m.cpu_chip = cpunodes[cp->cpu_id].l2_cache_mapping;
+	if (cp->cpu_m.cpu_chip == NO_L2_CACHE_MAPPING_FOUND)
+		cp->cpu_m.cpu_chip = CPU_CHIPID_INVALID;
 }
 
 static int cpucnt;

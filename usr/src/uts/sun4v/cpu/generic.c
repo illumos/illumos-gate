@@ -168,6 +168,12 @@ cpu_map_exec_units(struct cpu *cp)
 	if (cp->cpu_m.cpu_fpu == NO_EU_MAPPING_FOUND)
 		cp->cpu_m.cpu_fpu = (id_t)(cp->cpu_id);
 
+	/*
+	 * The cpu_chip field is initialized based on the information
+	 * in the MD and assume that all cpus within a chip
+	 * share the same L2 cache. If no such info is available, we
+	 * set the cpu to belong to the defacto chip 0.
+	 */
 	cp->cpu_m.cpu_mpipe = cpunodes[cp->cpu_id].l2_cache_mapping;
 	if (cp->cpu_m.cpu_mpipe == NO_L2_CACHE_MAPPING_FOUND)
 		cp->cpu_m.cpu_mpipe = CPU_L2_CACHEID_INVALID;

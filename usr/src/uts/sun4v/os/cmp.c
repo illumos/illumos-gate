@@ -120,6 +120,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	switch (hw) {
 	case PGHW_IPIPE:
 		return (cpu->cpu_m.cpu_ipipe);
+	case PGHW_CHIP:
+		return (cpu->cpu_m.cpu_chip);
 	case PGHW_MPIPE:
 		return (cpu->cpu_m.cpu_mpipe);
 	case PGHW_FPU:
