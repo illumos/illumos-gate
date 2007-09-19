@@ -1,7 +1,5 @@
 /*
- * Copyright (c) 1999-2003 Damien Miller.  All rights reserved.
- * Copyright (c) 2003 Ben Lindstrom. All rights reserved.
- * Copyright (c) 2002 Tim Rice.  All rights reserved.
+ * Copyright (c) 2002 Nils Nordman.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,10 +22,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_OPENBSD_COMPAT_H
-#define	_OPENBSD_COMPAT_H
+#ifndef	_PROGRESSMETER_H
+#define	_PROGRESSMETER_H
 
-/* $Id: openbsd-compat.h,v 1.17 2002/09/12 00:33:02 djm Exp $ */
+/* $OpenBSD: progressmeter.h,v 1.2 2006/03/25 22:22:43 djm Exp $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -35,53 +33,11 @@
 extern "C" {
 #endif
 
-#include "config.h"
-
-/* OpenBSD function replacements */
-#include "bindresvport.h"
-#include "getcwd.h"
-#include "realpath.h"
-#include "rresvport.h"
-#include "strlcpy.h"
-#include "strlcat.h"
-#include "strmode.h"
-#include "mktemp.h"
-#include "daemon.h"
-#include "dirname.h"
-#include "base64.h"
-#include "sigact.h"
-#include "inet_ntoa.h"
-#include "inet_ntop.h"
-#include "strsep.h"
-#include "setproctitle.h"
-#include "getgrouplist.h"
-#include "glob.h"
-#include "readpassphrase.h"
-#include "getopt.h"
-
-/* Home grown routines */
-#include "bsd-arc4random.h"
-#include "bsd-getpeereid.h"
-#include "bsd-misc.h"
-#include "bsd-snprintf.h"
-#include "bsd-waitpid.h"
-
-/* rfc2553 socket API replacements */
-#include "fake-getaddrinfo.h"
-#include "fake-getnameinfo.h"
-#include "fake-socket.h"
-
-/* Routines for a single OS platform */
-#include "bsd-cray.h"
-#include "port-irix.h"
-#include "port-aix.h"
-
-#ifndef HAVE_VASPRINTF
-int vasprintf(char **, const char *, va_list);
-#endif
+void	start_progress_meter(char *, off_t, off_t *);
+void	stop_progress_meter(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _OPENBSD_COMPAT_H */
+#endif /* _PROGRESSMETER_H */

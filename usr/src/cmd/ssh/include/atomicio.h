@@ -1,16 +1,5 @@
-/*	$OpenBSD: atomicio.h,v 1.4 2001/06/26 06:32:46 itojun Exp $	*/
-
-#ifndef	_ATOMICIO_H
-#define	_ATOMICIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
+ * Copyright (c) 2006 Damien Miller.  All rights reserved.
  * Copyright (c) 1995,1999 Theo de Raadt.  All rights reserved.
  * All rights reserved.
  *
@@ -35,10 +24,29 @@ extern "C" {
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef	_ATOMICIO_H
+#define	_ATOMICIO_H
+
+/*	$OpenBSD: atomicio.h,v 1.4 2001/06/26 06:32:46 itojun Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Ensure all of data on socket comes through. f==read || f==write
  */
 ssize_t	atomicio(ssize_t (*)(), int, void *, size_t);
+
+#define	vwrite (ssize_t (*)(int, void *, size_t))write
+
+/*
+ * ensure all of data on socket comes through. f==readv || f==writev
+ */
+size_t	atomiciov(ssize_t (*)(int, const struct iovec *, int),
+    int, const struct iovec *, int);
 
 #ifdef __cplusplus
 }

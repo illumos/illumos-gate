@@ -30,9 +30,6 @@ typedef struct {
 	u_int	 end;		/* Offset of last byte containing data. */
 }       Buffer;
 
-#define	BUFFER_MAX_CHUNK	0x100000
-#define	BUFFER_MAX_LEN		0xa00000
-
 void	 buffer_init(Buffer *);
 void	 buffer_clear(Buffer *);
 void	 buffer_free(Buffer *);
@@ -42,6 +39,8 @@ void	*buffer_ptr(Buffer *);
 
 void	 buffer_append(Buffer *, const void *, u_int);
 void	*buffer_append_space(Buffer *, u_int);
+
+int	 buffer_check_alloc(Buffer *, u_int);
 
 void	 buffer_get(Buffer *, void *, u_int);
 

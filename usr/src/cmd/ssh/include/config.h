@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 /* $Id: acconfig.h,v 1.145 2002/09/26 00:38:48 tim Exp $ */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -409,6 +409,9 @@ extern "C" {
 /* Define if you want smartcard support using sectok */
 /* #undef USE_SECTOK */
 
+/* Use libedit for sftp */
+#undef USE_LIBEDIT
+
 /* Define if you want smartcard support using OpenSC */
 /* #undef USE_OPENSC */
 
@@ -433,6 +436,9 @@ extern "C" {
 
 /* Define to 1 if you have the `arc4random' function. */
 /* #undef HAVE_ARC4RANDOM */
+
+/* Define to 1 if you have the `asprintf' function. */
+/* #undef HAVE_ASPRINTF */
 
 /* Define to 1 if you have the `b64_ntop' function. */
 /* #undef HAVE_B64_NTOP */
@@ -903,6 +909,9 @@ extern "C" {
 
 /* Define to 1 if you have the <utmp.h> header file. */
 #define HAVE_UTMP_H 1
+
+/* Define to 1 if you have the `vasprintf' function. */
+/* #undef HAVE_VASPRINTF */
 
 /* Define to 1 if you have the `vhangup' function. */
 #define HAVE_VHANGUP 1

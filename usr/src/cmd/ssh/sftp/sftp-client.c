@@ -1,30 +1,22 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
- * Copyright (c) 2001,2002 Damien Miller.  All rights reserved.
+ * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+/* $OpenBSD: sftp-client.c,v 1.76 2007/01/22 11:32:50 djm Exp $ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* XXX: memleaks */
 /* XXX: signed vs unsigned */
@@ -32,24 +24,42 @@
 /* XXX: copy between two remote sites */
 
 #include "includes.h"
-RCSID("$OpenBSD: sftp-client.c,v 1.35 2002/09/11 22:41:49 djm Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <sys/types.h>
+#include <sys/param.h>
 #include "sys-queue.h"
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
+#include <sys/uio.h>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "xmalloc.h"
 #include "buffer.h"
 #include "bufaux.h"
-#include "getput.h"
-#include "xmalloc.h"
 #include "log.h"
 #include "atomicio.h"
+#include "progressmeter.h"
+#include "misc.h"
 
 #include "sftp.h"
 #include "sftp-common.h"
 #include "sftp-client.h"
 
-/* Minimum amount of data to read at at time */
+extern volatile sig_atomic_t interrupted;
+extern int showprogress;
+
+/* Minimum amount of data to read at a time */
 #define MIN_READ_SIZE	512
 
 struct sftp_conn {
@@ -64,47 +74,48 @@ struct sftp_conn {
 static void
 send_msg(int fd, Buffer *m)
 {
-	int mlen = buffer_len(m);
-	int len;
-	Buffer oqueue;
+	char mlen[4];
+	struct iovec iov[2];
 
-	buffer_init(&oqueue);
-	buffer_put_int(&oqueue, mlen);
-	buffer_append(&oqueue, buffer_ptr(m), mlen);
-	buffer_consume(m, mlen);
+	if (buffer_len(m) > SFTP_MAX_MSG_LENGTH)
+		fatal("Outbound message too long %u", buffer_len(m));
 
-	len = atomicio(write, fd, buffer_ptr(&oqueue), buffer_len(&oqueue));
-	if (len <= 0)
+	/* Send length first */
+	put_u32(mlen, buffer_len(m));
+	iov[0].iov_base = mlen;
+	iov[0].iov_len = sizeof(mlen);
+	iov[1].iov_base = buffer_ptr(m);
+	iov[1].iov_len = buffer_len(m);
+
+	if (atomiciov(writev, fd, iov, 2) != buffer_len(m) + sizeof(mlen))
 		fatal("Couldn't send packet: %s", strerror(errno));
 
-	buffer_free(&oqueue);
+	buffer_clear(m);
 }
 
 static void
 get_msg(int fd, Buffer *m)
 {
-	u_int len, msg_len;
-	unsigned char buf[4096];
+	u_int msg_len;
 
-	len = atomicio(read, fd, buf, 4);
-	if (len == 0)
-		fatal("Connection closed");
-	else if (len == (u_int) -1)
-		fatal("Couldn't read packet: %s", strerror(errno));
+	buffer_append_space(m, 4);
+	if (atomicio(read, fd, buffer_ptr(m), 4) != 4) {
+		if (errno == EPIPE)
+			fatal("Connection closed");
+		else
+			fatal("Couldn't read packet: %s", strerror(errno));
+	}
 
-	msg_len = GET_32BIT(buf);
-	if (msg_len > 256 * 1024)
+	msg_len = buffer_get_int(m);
+	if (msg_len > SFTP_MAX_MSG_LENGTH)
 		fatal("Received message too long %u", msg_len);
 
-	while (msg_len) {
-		len = atomicio(read, fd, buf, MIN(msg_len, sizeof(buf)));
-		if (len == 0)
+	buffer_append_space(m, msg_len);
+	if (atomicio(read, fd, buffer_ptr(m), msg_len) != msg_len) {
+		if (errno == EPIPE)
 			fatal("Connection closed");
-		else if (len == (u_int) -1)
-			fatal("Couldn't read packet: %s", strerror(errno));
-
-		msg_len -= len;
-		buffer_append(m, buf, len);
+		else
+			fatal("Read packet: %s", strerror(errno));
 	}
 }
 
@@ -182,6 +193,7 @@ get_handle(int fd, u_int expected_id, u_int *len)
 		int status = buffer_get_int(&msg);
 
 		error("Couldn't get handle: %s", fx2txt(status));
+		buffer_free(&msg);
 		return(NULL);
 	} else if (type != SSH2_FXP_HANDLE)
 		fatal("Expected SSH2_FXP_HANDLE(%u) packet, got %u",
@@ -216,6 +228,7 @@ get_decode_stat(int fd, u_int expected_id, int quiet)
 			debug("Couldn't stat remote file: %s", fx2txt(status));
 		else
 			error("Couldn't stat remote file: %s", fx2txt(status));
+		buffer_free(&msg);
 		return(NULL);
 	} else if (type != SSH2_FXP_ATTRS) {
 		fatal("Expected SSH2_FXP_ATTRS(%u) packet, got %u",
@@ -318,7 +331,7 @@ do_lsreaddir(struct sftp_conn *conn, char *path, int printflag,
     SFTP_DIRENT ***dir)
 {
 	Buffer msg;
-	u_int type, id, handle_len, i, expected_id, ents = 0;
+	u_int count, type, id, handle_len, i, expected_id, ents = 0;
 	char *handle;
 
 	id = conn->msg_id++;
@@ -341,9 +354,7 @@ do_lsreaddir(struct sftp_conn *conn, char *path, int printflag,
 		(*dir)[0] = NULL;
 	}
 
-	for (;;) {
-		int count;
-
+	for (; !interrupted;) {
 		id = expected_id = conn->msg_id++;
 
 		debug3("Sending SSH2_FXP_READDIR I:%u", id);
@@ -377,6 +388,7 @@ do_lsreaddir(struct sftp_conn *conn, char *path, int printflag,
 				error("Couldn't read directory: %s",
 				    fx2txt(status));
 				do_close(conn, handle, handle_len);
+				xfree(handle);
 				return(status);
 			}
 		} else if (type != SSH2_FXP_NAME)
@@ -399,8 +411,7 @@ do_lsreaddir(struct sftp_conn *conn, char *path, int printflag,
 				printf("%s\n", longname);
 
 			if (dir) {
-				*dir = xrealloc(*dir, sizeof(**dir) *
-				    (ents + 2));
+				*dir = xrealloc(*dir, (ents + 2) * sizeof(**dir));
 				(*dir)[ents] = xmalloc(sizeof(***dir));
 				(*dir)[ents]->filename = xstrdup(filename);
 				(*dir)[ents]->longname = xstrdup(longname);
@@ -416,6 +427,13 @@ do_lsreaddir(struct sftp_conn *conn, char *path, int printflag,
 	buffer_free(&msg);
 	do_close(conn, handle, handle_len);
 	xfree(handle);
+
+	/* Don't return partial matches on interrupt */
+	if (interrupted && dir != NULL && *dir != NULL) {
+		free_sftp_dirents(*dir);
+		*dir = xmalloc(sizeof(**dir));
+		**dir = NULL;
+	}
 
 	return(0);
 }
@@ -520,6 +538,7 @@ do_lstat(struct sftp_conn *conn, char *path, int quiet)
 	return(get_decode_stat(conn->fd_in, id, quiet));
 }
 
+/* this is never used so hush the lint */
 #if 0
 Attrib *
 do_fstat(struct sftp_conn *conn, char *handle, u_int handle_len, int quiet)
@@ -574,6 +593,8 @@ do_realpath(struct sftp_conn *conn, char *path)
 	Buffer msg;
 	u_int type, expected_id, count, id;
 	char *filename, *longname;
+	/* LINTED */
+	Attrib *a;
 
 	expected_id = id = conn->msg_id++;
 	send_string_request(conn->fd_out, id, SSH2_FXP_REALPATH, path,
@@ -603,7 +624,7 @@ do_realpath(struct sftp_conn *conn, char *path)
 
 	filename = buffer_get_string(&msg, NULL);
 	longname = buffer_get_string(&msg, NULL);
-	(void) decode_attrib(&msg);
+	a = decode_attrib(&msg);
 
 	debug3("SSH_FXP_REALPATH %s -> %s", path, filename);
 
@@ -654,7 +675,7 @@ do_symlink(struct sftp_conn *conn, char *oldpath, char *newpath)
 
 	buffer_init(&msg);
 
-	/* Send rename request */
+	/* Send symlink request */
 	id = conn->msg_id++;
 	buffer_put_char(&msg, SSH2_FXP_SYMLINK);
 	buffer_put_int(&msg, id);
@@ -667,12 +688,13 @@ do_symlink(struct sftp_conn *conn, char *oldpath, char *newpath)
 
 	status = get_status(conn->fd_in, id);
 	if (status != SSH2_FX_OK)
-		error("Couldn't rename file \"%s\" to \"%s\": %s", oldpath,
+		error("Couldn't symlink file \"%s\" to \"%s\": %s", oldpath,
 		    newpath, fx2txt(status));
 
 	return(status);
 }
 
+/* this is never used so hush the lint */
 #if 0
 char *
 do_readlink(struct sftp_conn *conn, char *path)
@@ -680,6 +702,7 @@ do_readlink(struct sftp_conn *conn, char *path)
 	Buffer msg;
 	u_int type, expected_id, count, id;
 	char *filename, *longname;
+	Attrib *a;
 
 	expected_id = id = conn->msg_id++;
 	send_string_request(conn->fd_out, id, SSH2_FXP_READLINK, path,
@@ -709,7 +732,7 @@ do_readlink(struct sftp_conn *conn, char *path)
 
 	filename = buffer_get_string(&msg, NULL);
 	longname = buffer_get_string(&msg, NULL);
-	(void) decode_attrib(&msg);
+	a = decode_attrib(&msg);
 
 	debug3("SSH_FXP_READLINK %s -> %s", path, filename);
 
@@ -745,10 +768,11 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 	Attrib junk, *a;
 	Buffer msg;
 	char *handle;
-	int local_fd, status, num_req, max_req, write_error;
+	int local_fd, status = 0, write_error;
 	int read_error, write_errno;
 	u_int64_t offset, size;
-	u_int handle_len, mode, type, id, buflen;
+	u_int handle_len, mode, type, id, buflen, num_req, max_req;
+	off_t progress_counter;
 	struct request {
 		u_int id;
 		u_int len;
@@ -766,13 +790,13 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 
 	/* XXX: should we preserve set[ug]id? */
 	if (a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS)
-		mode = S_IWRITE | (a->perm & 0777);
+		mode = a->perm & 0777;
 	else
 		mode = 0666;
 
 	if ((a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS) &&
-	    S_ISDIR(a->perm)) {
-		error("Cannot download a directory: %s", remote_path);
+	    (!S_ISREG(a->perm))) {
+		error("Cannot download non-regular file: %s", remote_path);
 		return(-1);
 	}
 
@@ -801,7 +825,8 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 		return(-1);
 	}
 
-	local_fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	local_fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC,
+	    mode | S_IWRITE);
 	if (local_fd == -1) {
 		error("Couldn't open local file \"%s\" for writing: %s",
 		    local_path, strerror(errno));
@@ -813,9 +838,24 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 	/* Read from remote and write to local */
 	write_error = read_error = write_errno = num_req = offset = 0;
 	max_req = 1;
+	progress_counter = 0;
+
+	if (showprogress && size != 0)
+		start_progress_meter(remote_path, size, &progress_counter);
+
 	while (num_req > 0 || max_req > 0) {
 		char *data;
 		u_int len;
+
+		/*
+		 * Simulate EOF on interrupt: stop sending new requests and
+		 * allow outstanding requests to drain gracefully
+		 */
+		if (interrupted) {
+			if (num_req == 0) /* If we haven't started yet... */
+				break;
+			max_req = 0;
+		}
 
 		/* Send some more requests */
 		while (num_req < max_req) {
@@ -841,7 +881,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 		debug3("Received reply T:%u I:%u R:%d", type, id, max_req);
 
 		/* Find the request in our queue */
-		for(req = TAILQ_FIRST(&requests);
+		for (req = TAILQ_FIRST(&requests);
 		    req != NULL && req->id != id;
 		    req = TAILQ_NEXT(req, tq))
 			;
@@ -865,14 +905,15 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 			    (unsigned long long)req->offset + len - 1);
 			if (len > req->len)
 				fatal("Received more data than asked for "
-				      "%u > %u", len, req->len);
+				    "%u > %u", len, req->len);
 			if ((lseek(local_fd, req->offset, SEEK_SET) == -1 ||
-			     atomicio(write, local_fd, data, len) != len) &&
+			    atomicio(vwrite, local_fd, data, len) != len) &&
 			    !write_error) {
 				write_errno = errno;
 				write_error = 1;
 				max_req = 0;
 			}
+			progress_counter += len;
 			xfree(data);
 
 			if (len == req->len) {
@@ -903,8 +944,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 					    (unsigned long long)offset,
 					    num_req);
 					max_req = 1;
-				}
-				else if (max_req < conn->num_requests + 1) {
+				} else if (max_req <= conn->num_requests) {
 					++max_req;
 				}
 			}
@@ -914,6 +954,9 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 			    SSH2_FXP_DATA, type);
 		}
 	}
+
+	if (showprogress && size)
+		stop_progress_meter();
 
 	/* Sanity check */
 	if (TAILQ_FIRST(&requests) != NULL)
@@ -934,11 +977,11 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 		/* Override umask and utimes if asked */
 #ifdef HAVE_FCHMOD
 		if (pflag && fchmod(local_fd, mode) == -1)
-#else 
+#else
 		if (pflag && chmod(local_path, mode) == -1)
 #endif /* HAVE_FCHMOD */
 			error("Couldn't set mode on \"%s\": %s", local_path,
-			      strerror(errno));
+			    strerror(errno));
 		if (pflag && (a->flags & SSH2_FILEXFER_ATTR_ACMODTIME)) {
 			struct timeval tv[2];
 			tv[0].tv_sec = a->atime;
@@ -946,7 +989,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 			tv[0].tv_usec = tv[1].tv_usec = 0;
 			if (utimes(local_path, tv) == -1)
 				error("Can't set times on \"%s\": %s",
-				      local_path, strerror(errno));
+				    local_path, strerror(errno));
 		}
 	}
 	close(local_fd);
@@ -976,7 +1019,7 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 		TAILQ_ENTRY(outstanding_ack) tq;
 	};
 	TAILQ_HEAD(ackhead, outstanding_ack) acks;
-	struct outstanding_ack *ack;
+	struct outstanding_ack *ack = NULL;
 
 	TAILQ_INIT(&acks);
 
@@ -988,6 +1031,11 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 	if (fstat(local_fd, &sb) == -1) {
 		error("Couldn't fstat local file \"%s\": %s",
 		    local_path, strerror(errno));
+		close(local_fd);
+		return(-1);
+	}
+	if (!S_ISREG(sb.st_mode)) {
+		error("%s is not a regular file", local_path);
 		close(local_fd);
 		return(-1);
 	}
@@ -1025,14 +1073,21 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 
 	/* Read from local and write to remote */
 	offset = 0;
+	if (showprogress)
+		start_progress_meter(local_path, sb.st_size, (off_t *)&offset);
+
 	for (;;) {
 		int len;
 
 		/*
-		 * Can't use atomicio here because it returns 0 on EOF, thus losing
-		 * the last block of the file
+		 * Can't use atomicio here because it returns 0 on EOF,
+		 * thus losing the last block of the file.
+		 * Simulate an EOF on interrupt, allowing ACKs from the
+		 * server to drain.
 		 */
-		do
+		if (interrupted)
+			len = 0;
+		else do
 			len = read(local_fd, data, conn->transfer_buflen);
 		while ((len == -1) && (errno == EINTR || errno == EAGAIN));
 
@@ -1055,7 +1110,7 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 			buffer_put_string(&msg, data, len);
 			send_msg(conn->fd_out, &msg);
 			debug3("Sent message SSH2_FXP_WRITE I:%u O:%llu S:%u",
-			       id, (unsigned long long)offset, len);
+			    id, (unsigned long long)offset, len);
 		} else if (TAILQ_FIRST(&acks) == NULL)
 			break;
 
@@ -1079,7 +1134,7 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 			debug3("SSH2_FXP_STATUS %d", status);
 
 			/* Find the request in our queue */
-			for(ack = TAILQ_FIRST(&acks);
+			for (ack = TAILQ_FIRST(&acks);
 			    ack != NULL && ack->id != r_id;
 			    ack = TAILQ_NEXT(ack, tq))
 				;
@@ -1089,18 +1144,25 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 
 			if (status != SSH2_FX_OK) {
 				error("Couldn't write to remote file \"%s\": %s",
-				      remote_path, fx2txt(status));
+				    remote_path, fx2txt(status));
+				if (showprogress)
+					stop_progress_meter();
 				do_close(conn, handle, handle_len);
 				close(local_fd);
+				xfree(data);
+				xfree(ack);
+				status = -1;
 				goto done;
 			}
 			debug3("In write loop, ack for %u %u bytes at %llu",
-			   ack->id, ack->len, (unsigned long long)ack->offset);
+			    ack->id, ack->len, (unsigned long long)ack->offset);
 			++ackid;
 			xfree(ack);
 		}
 		offset += len;
 	}
+	if (showprogress)
+		stop_progress_meter();
 	xfree(data);
 
 	if (close(local_fd) == -1) {

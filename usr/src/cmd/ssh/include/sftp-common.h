@@ -1,15 +1,3 @@
-/*	$OpenBSD: sftp-common.h,v 1.4 2002/09/11 22:41:50 djm Exp $	*/
-
-#ifndef	_SFTP_COMMON_H
-#define	_SFTP_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2001 Damien Miller.  All rights reserved.
@@ -35,6 +23,20 @@ extern "C" {
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef	_SFTP_COMMON_H
+#define	_SFTP_COMMON_H
+
+/* $OpenBSD: sftp-common.h,v 1.10 2006/08/03 03:34:42 deraadt Exp $ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Maximum packet that we are willing to send/accept */
+#define	SFTP_MAX_MSG_LENGTH	(256 * 1024)
+
 typedef struct Attrib Attrib;
 
 /* File attributes */
@@ -49,11 +51,11 @@ struct Attrib {
 };
 
 void	 attrib_clear(Attrib *);
-void	 stat_to_attrib(struct stat *, Attrib *);
-void	 attrib_to_stat(Attrib *, struct stat *);
+void	 stat_to_attrib(const struct stat *, Attrib *);
+void	 attrib_to_stat(const Attrib *, struct stat *);
 Attrib	*decode_attrib(Buffer *);
-void	 encode_attrib(Buffer *, Attrib *);
-char	*ls_file(char *, struct stat *, int);
+void	 encode_attrib(Buffer *, const Attrib *);
+char	*ls_file(const char *, const struct stat *, int);
 
 const char *fx2txt(int);
 
