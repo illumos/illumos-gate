@@ -1988,6 +1988,7 @@ scsi_hba_nodename_compatible_get(struct scsi_inquiry *inq, char *binding_set,
 		{"sd",			"scsa,07.bmpt"},
 		{"st",			"scsa,01.bmpt"},
 		{"ses",			"scsa,0d.bmpt"},
+		{"sgen",		"scsa,08.bmpt"},
 		{NULL,		NULL}
 	};
 	struct nodename_aliases *nap;
