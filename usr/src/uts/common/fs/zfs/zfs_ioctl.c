@@ -599,7 +599,7 @@ zfs_secpolicy_inherit(zfs_cmd_t *zc, cred_t *cr)
 {
 	zfs_prop_t prop = zfs_name_to_prop(zc->zc_value);
 
-	if (prop == ZFS_PROP_INVAL) {
+	if (prop == ZPROP_INVAL) {
 		if (!zfs_prop_user(zc->zc_value))
 			return (EINVAL);
 		return (zfs_secpolicy_write_perms(zc->zc_name,
@@ -615,35 +615,33 @@ zfs_secpolicy_inherit(zfs_cmd_t *zc, cred_t *cr)
  * Returns the nvlist as specified by the user in the zfs_cmd_t.
  */
 static int
-get_nvlist(zfs_cmd_t *zc, nvlist_t **nvp)
+get_nvlist(uint64_t nvl, uint64_t size, nvlist_t **nvp)
 {
 	char *packed;
-	size_t size;
 	int error;
-	nvlist_t *config = NULL;
+	nvlist_t *list = NULL;
 
 	/*
 	 * Read in and unpack the user-supplied nvlist.
 	 */
-	if ((size = zc->zc_nvlist_src_size) == 0)
+	if (size == 0)
 		return (EINVAL);
 
 	packed = kmem_alloc(size, KM_SLEEP);
 
-	if ((error = xcopyin((void *)(uintptr_t)zc->zc_nvlist_src, packed,
-	    size)) != 0) {
+	if ((error = xcopyin((void *)(uintptr_t)nvl, packed, size)) != 0) {
 		kmem_free(packed, size);
 		return (error);
 	}
 
-	if ((error = nvlist_unpack(packed, size, &config, 0)) != 0) {
+	if ((error = nvlist_unpack(packed, size, &list, 0)) != 0) {
 		kmem_free(packed, size);
 		return (error);
 	}
 
 	kmem_free(packed, size);
 
-	*nvp = config;
+	*nvp = list;
 	return (0);
 }
 
@@ -675,20 +673,30 @@ static int
 zfs_ioc_pool_create(zfs_cmd_t *zc)
 {
 	int error;
-	nvlist_t *config;
+	nvlist_t *config, *props = NULL;
 	char *buf;
 
-	if ((error = get_nvlist(zc, &config)) != 0)
+	if (error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &config))
 		return (error);
+
+	if (zc->zc_nvlist_src_size != 0 && (error =
+	    get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size, &props))) {
+		nvlist_free(config);
+		return (error);
+	}
 
 	buf = history_str_get(zc);
 
-	error = spa_create(zc->zc_name, config, zc->zc_value[0] == '\0' ?
-	    NULL : zc->zc_value, buf);
+	error = spa_create(zc->zc_name, config, props, buf);
 
 	if (buf != NULL)
 		history_str_free(buf);
+
 	nvlist_free(config);
+
+	if (props)
+		nvlist_free(props);
 
 	return (error);
 }
@@ -706,20 +714,29 @@ static int
 zfs_ioc_pool_import(zfs_cmd_t *zc)
 {
 	int error;
-	nvlist_t *config;
+	nvlist_t *config, *props = NULL;
 	uint64_t guid;
 
-	if ((error = get_nvlist(zc, &config)) != 0)
+	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &config)) != 0)
 		return (error);
+
+	if (zc->zc_nvlist_src_size != 0 && (error =
+	    get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size, &props))) {
+		nvlist_free(config);
+		return (error);
+	}
 
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
 	    guid != zc->zc_guid)
 		error = EINVAL;
 	else
-		error = spa_import(zc->zc_name, config,
-		    zc->zc_value[0] == '\0' ? NULL : zc->zc_value);
+		error = spa_import(zc->zc_name, config, props);
 
 	nvlist_free(config);
+
+	if (props)
+		nvlist_free(props);
 
 	return (error);
 }
@@ -786,7 +803,8 @@ zfs_ioc_pool_tryimport(zfs_cmd_t *zc)
 	nvlist_t *tryconfig, *config;
 	int error;
 
-	if ((error = get_nvlist(zc, &tryconfig)) != 0)
+	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &tryconfig)) != 0)
 		return (error);
 
 	config = spa_tryimport(tryconfig);
@@ -843,7 +861,7 @@ zfs_ioc_pool_upgrade(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	spa_upgrade(spa);
+	spa_upgrade(spa, zc->zc_cookie);
 	spa_close(spa, FTAG);
 
 	return (error);
@@ -929,7 +947,8 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 		return (EDOM);
 	}
 
-	if ((error = get_nvlist(zc, &config)) == 0) {
+	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &config)) == 0) {
 		error = spa_vdev_add(spa, config);
 		nvlist_free(config);
 	}
@@ -996,7 +1015,8 @@ zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	if ((error = get_nvlist(zc, &config)) == 0) {
+	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &config)) == 0) {
 		error = spa_vdev_attach(spa, zc->zc_guid, config, replacing);
 		nvlist_free(config);
 	}
@@ -1205,7 +1225,7 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 		const char *propname = nvpair_name(elem);
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 
-		if (prop == ZFS_PROP_INVAL) {
+		if (prop == ZPROP_INVAL) {
 			/*
 			 * If this is a user-defined property, it must be a
 			 * string, and there is no further validation to do.
@@ -1274,7 +1294,7 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 		const char *propname = nvpair_name(elem);
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 
-		if (prop == ZFS_PROP_INVAL) {
+		if (prop == ZPROP_INVAL) {
 			VERIFY(nvpair_value_string(elem, &strval) == 0);
 			error = dsl_prop_set(name, propname, 1,
 			    strlen(strval) + 1, strval);
@@ -1367,7 +1387,8 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	nvlist_t *nvl;
 	int error;
 
-	if ((error = get_nvlist(zc, &nvl)) != 0)
+	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &nvl)) != 0)
 		return (error);
 
 	error = zfs_set_prop_nvlist(zc->zc_name, nvl);
@@ -1386,98 +1407,22 @@ zfs_ioc_inherit_prop(zfs_cmd_t *zc)
 static int
 zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 {
-	nvlist_t *nvl;
-	int error, reset_bootfs = 0;
-	uint64_t objnum;
-	uint64_t intval;
-	zpool_prop_t prop;
-	nvpair_t *elem;
-	char *propname, *strval;
+	nvlist_t *props;
 	spa_t *spa;
-	vdev_t *rvdev;
-	char *vdev_type;
-	objset_t *os;
+	int error;
 
-	if ((error = get_nvlist(zc, &nvl)) != 0)
+	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &props)))
 		return (error);
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
-		nvlist_free(nvl);
+		nvlist_free(props);
 		return (error);
 	}
 
-	if (spa_version(spa) < SPA_VERSION_BOOTFS) {
-		nvlist_free(nvl);
-		spa_close(spa, FTAG);
-		return (ENOTSUP);
-	}
+	error = spa_prop_set(spa, props);
 
-	elem = NULL;
-	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
-
-		propname = nvpair_name(elem);
-
-		if ((prop = zpool_name_to_prop(propname)) ==
-		    ZFS_PROP_INVAL) {
-			nvlist_free(nvl);
-			spa_close(spa, FTAG);
-			return (EINVAL);
-		}
-
-		switch (prop) {
-		case ZPOOL_PROP_DELEGATION:
-			VERIFY(nvpair_value_uint64(elem, &intval) == 0);
-			if (intval > 1)
-				error = EINVAL;
-			break;
-		case ZPOOL_PROP_BOOTFS:
-			/*
-			 * A bootable filesystem can not be on a RAIDZ pool
-			 * nor a striped pool with more than 1 device.
-			 */
-			rvdev = spa->spa_root_vdev;
-			vdev_type =
-			    rvdev->vdev_child[0]->vdev_ops->vdev_op_type;
-			if (strcmp(vdev_type, VDEV_TYPE_RAIDZ) == 0 ||
-			    (strcmp(vdev_type, VDEV_TYPE_MIRROR) != 0 &&
-			    rvdev->vdev_children > 1)) {
-				error = ENOTSUP;
-				break;
-			}
-
-			reset_bootfs = 1;
-
-			VERIFY(nvpair_value_string(elem, &strval) == 0);
-			if (strval == NULL || strval[0] == '\0') {
-				objnum = zpool_prop_default_numeric(
-				    ZPOOL_PROP_BOOTFS);
-				break;
-			}
-
-			if (error = dmu_objset_open(strval, DMU_OST_ZFS,
-			    DS_MODE_STANDARD | DS_MODE_READONLY, &os))
-				break;
-			objnum = dmu_objset_id(os);
-			dmu_objset_close(os);
-			break;
-		}
-
-		if (error)
-			break;
-	}
-	if (error == 0) {
-		if (reset_bootfs) {
-			VERIFY(nvlist_remove(nvl,
-			    zpool_prop_to_name(ZPOOL_PROP_BOOTFS),
-			    DATA_TYPE_STRING) == 0);
-			VERIFY(nvlist_add_uint64(nvl,
-			    zpool_prop_to_name(ZPOOL_PROP_BOOTFS),
-			    objnum) == 0);
-		}
-		error = spa_set_props(spa, nvl);
-	}
-
-	nvlist_free(nvl);
+	nvlist_free(props);
 	spa_close(spa, FTAG);
 
 	return (error);
@@ -1493,7 +1438,7 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_get_props(spa, &nvp);
+	error = spa_prop_get(spa, &nvp);
 
 	if (error == 0 && zc->zc_nvlist_dst != NULL)
 		error = put_nvlist(zc, nvp);
@@ -1518,7 +1463,8 @@ zfs_ioc_iscsi_perm_check(zfs_cmd_t *zc)
 	uint_t group_cnt;
 	cred_t	*usercred;
 
-	if ((error = get_nvlist(zc, &nvp)) != 0) {
+	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &nvp)) != 0) {
 		return (error);
 	}
 
@@ -1559,7 +1505,8 @@ zfs_ioc_set_fsacl(zfs_cmd_t *zc)
 	int error;
 	nvlist_t *fsaclnv = NULL;
 
-	if ((error = get_nvlist(zc, &fsaclnv)) != 0)
+	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &fsaclnv)) != 0)
 		return (error);
 
 	/*
@@ -1684,7 +1631,8 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		return (EINVAL);
 
 	if (zc->zc_nvlist_src != NULL &&
-	    (error = get_nvlist(zc, &nvprops)) != 0)
+	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &nvprops)) != 0)
 		return (error);
 
 	if (zc->zc_value[0] != '\0') {

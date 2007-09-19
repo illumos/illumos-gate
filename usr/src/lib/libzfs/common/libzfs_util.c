@@ -37,6 +37,8 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <math.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
 #include <sys/types.h>
@@ -555,6 +557,7 @@ libzfs_init(void)
 	hdl->libzfs_sharetab = fopen("/etc/dfs/sharetab", "r");
 
 	zfs_prop_init();
+	zpool_prop_init();
 
 	return (hdl);
 }
@@ -671,13 +674,14 @@ zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
 void
 zcmd_free_nvlists(zfs_cmd_t *zc)
 {
+	free((void *)(uintptr_t)zc->zc_nvlist_conf);
 	free((void *)(uintptr_t)zc->zc_nvlist_src);
 	free((void *)(uintptr_t)zc->zc_nvlist_dst);
 }
 
-int
-zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl,
-    size_t *size)
+static int
+zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
+    nvlist_t *nvl)
 {
 	char *packed;
 	size_t len;
@@ -689,12 +693,24 @@ zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl,
 
 	verify(nvlist_pack(nvl, &packed, &len, NV_ENCODE_NATIVE, 0) == 0);
 
-	zc->zc_nvlist_src = (uint64_t)(uintptr_t)packed;
-	zc->zc_nvlist_src_size = len;
+	*outnv = (uint64_t)(uintptr_t)packed;
+	*outlen = len;
 
-	if (size)
-		*size = len;
 	return (0);
+}
+
+int
+zcmd_write_conf_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
+{
+	return (zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_conf,
+	    &zc->zc_nvlist_conf_size, nvl));
+}
+
+int
+zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
+{
+	return (zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_src,
+	    &zc->zc_nvlist_src_size, nvl));
 }
 
 /*
@@ -710,10 +726,32 @@ zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 	return (0);
 }
 
-static void
-zfs_print_prop_headers(libzfs_get_cbdata_t *cbp)
+int
+zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
 {
-	zfs_proplist_t *pl = cbp->cb_proplist;
+	int error;
+
+	zc->zc_history = (uint64_t)(uintptr_t)hdl->libzfs_log_str;
+	error = ioctl(hdl->libzfs_fd, request, zc);
+	if (hdl->libzfs_log_str) {
+		free(hdl->libzfs_log_str);
+		hdl->libzfs_log_str = NULL;
+	}
+	zc->zc_history = 0;
+
+	return (error);
+}
+
+/*
+ * ================================================================
+ * API shared by zfs and zpool property management
+ * ================================================================
+ */
+
+static void
+zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
+{
+	zprop_list_t *pl = cbp->cb_proplist;
 	int i;
 	char *title;
 	size_t len;
@@ -745,8 +783,12 @@ zfs_print_prop_headers(libzfs_get_cbdata_t *cbp)
 		/*
 		 * 'PROPERTY' column
 		 */
-		if (pl->pl_prop != ZFS_PROP_INVAL) {
-			len = strlen(zfs_prop_to_name(pl->pl_prop));
+		if (pl->pl_prop != ZPROP_INVAL) {
+			const char *propname = (type == ZFS_TYPE_POOL) ?
+			    zpool_prop_to_name(pl->pl_prop) :
+			    zfs_prop_to_name(pl->pl_prop);
+
+			len = strlen(propname);
 			if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
 				cbp->cb_colwidths[GET_COL_PROPERTY] = len;
 		} else {
@@ -765,7 +807,8 @@ zfs_print_prop_headers(libzfs_get_cbdata_t *cbp)
 		/*
 		 * 'NAME' and 'SOURCE' columns
 		 */
-		if (pl->pl_prop == ZFS_PROP_NAME &&
+		if (pl->pl_prop == (type == ZFS_TYPE_POOL ? ZPOOL_PROP_NAME :
+		    ZFS_PROP_NAME) &&
 		    pl->pl_width > cbp->cb_colwidths[GET_COL_NAME]) {
 			cbp->cb_colwidths[GET_COL_NAME] = pl->pl_width;
 			cbp->cb_colwidths[GET_COL_SOURCE] = pl->pl_width +
@@ -811,8 +854,8 @@ zfs_print_prop_headers(libzfs_get_cbdata_t *cbp)
  * structure.
  */
 void
-libzfs_print_one_property(const char *name, libzfs_get_cbdata_t *cbp,
-    const char *propname, const char *value, zfs_source_t sourcetype,
+zprop_print_one_property(const char *name, zprop_get_cbdata_t *cbp,
+    const char *propname, const char *value, zprop_source_t sourcetype,
     const char *source)
 {
 	int i;
@@ -826,7 +869,7 @@ libzfs_print_one_property(const char *name, libzfs_get_cbdata_t *cbp,
 		return;
 
 	if (cbp->cb_first)
-		zfs_print_prop_headers(cbp);
+		zprop_print_headers(cbp, cbp->cb_type);
 
 	for (i = 0; i < 4; i++) {
 		switch (cbp->cb_columns[i]) {
@@ -844,23 +887,23 @@ libzfs_print_one_property(const char *name, libzfs_get_cbdata_t *cbp,
 
 		case GET_COL_SOURCE:
 			switch (sourcetype) {
-			case ZFS_SRC_NONE:
+			case ZPROP_SRC_NONE:
 				str = "-";
 				break;
 
-			case ZFS_SRC_DEFAULT:
+			case ZPROP_SRC_DEFAULT:
 				str = "default";
 				break;
 
-			case ZFS_SRC_LOCAL:
+			case ZPROP_SRC_LOCAL:
 				str = "local";
 				break;
 
-			case ZFS_SRC_TEMPORARY:
+			case ZPROP_SRC_TEMPORARY:
 				str = "temporary";
 				break;
 
-			case ZFS_SRC_INHERITED:
+			case ZPROP_SRC_INHERITED:
 				(void) snprintf(buf, sizeof (buf),
 				    "inherited from %s", source);
 				str = buf;
@@ -886,18 +929,427 @@ libzfs_print_one_property(const char *name, libzfs_get_cbdata_t *cbp,
 	(void) printf("\n");
 }
 
-int
-zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
+/*
+ * Given a numeric suffix, convert the value into a number of bits that the
+ * resulting value must be shifted.
+ */
+static int
+str2shift(libzfs_handle_t *hdl, const char *buf)
 {
-	int error;
+	const char *ends = "BKMGTPEZ";
+	int i;
 
-	zc->zc_history = (uint64_t)(uintptr_t)hdl->libzfs_log_str;
-	error = ioctl(hdl->libzfs_fd, request, zc);
-	if (hdl->libzfs_log_str) {
-		free(hdl->libzfs_log_str);
-		hdl->libzfs_log_str = NULL;
+	if (buf[0] == '\0')
+		return (0);
+	for (i = 0; i < strlen(ends); i++) {
+		if (toupper(buf[0]) == ends[i])
+			break;
 	}
-	zc->zc_history = 0;
+	if (i == strlen(ends)) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "invalid numeric suffix '%s'"), buf);
+		return (-1);
+	}
 
-	return (error);
+	/*
+	 * We want to allow trailing 'b' characters for 'GB' or 'Mb'.  But don't
+	 * allow 'BB' - that's just weird.
+	 */
+	if (buf[1] == '\0' || (toupper(buf[1]) == 'B' && buf[2] == '\0' &&
+	    toupper(buf[0]) != 'B'))
+		return (10*i);
+
+	zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+	    "invalid numeric suffix '%s'"), buf);
+	return (-1);
+}
+
+/*
+ * Convert a string of the form '100G' into a real number.  Used when setting
+ * properties or creating a volume.  'buf' is used to place an extended error
+ * message for the caller to use.
+ */
+int
+zfs_nicestrtonum(libzfs_handle_t *hdl, const char *value, uint64_t *num)
+{
+	char *end;
+	int shift;
+
+	*num = 0;
+
+	/* Check to see if this looks like a number.  */
+	if ((value[0] < '0' || value[0] > '9') && value[0] != '.') {
+		if (hdl)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "bad numeric value '%s'"), value);
+		return (-1);
+	}
+
+	/* Rely on stroll() to process the numeric portion.  */
+	errno = 0;
+	*num = strtoll(value, &end, 10);
+
+	/*
+	 * Check for ERANGE, which indicates that the value is too large to fit
+	 * in a 64-bit value.
+	 */
+	if (errno == ERANGE) {
+		if (hdl)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "numeric value is too large"));
+		return (-1);
+	}
+
+	/*
+	 * If we have a decimal value, then do the computation with floating
+	 * point arithmetic.  Otherwise, use standard arithmetic.
+	 */
+	if (*end == '.') {
+		double fval = strtod(value, &end);
+
+		if ((shift = str2shift(hdl, end)) == -1)
+			return (-1);
+
+		fval *= pow(2, shift);
+
+		if (fval > UINT64_MAX) {
+			if (hdl)
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "numeric value is too large"));
+			return (-1);
+		}
+
+		*num = (uint64_t)fval;
+	} else {
+		if ((shift = str2shift(hdl, end)) == -1)
+			return (-1);
+
+		/* Check for overflow */
+		if (shift >= 64 || (*num << shift) >> shift != *num) {
+			if (hdl)
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "numeric value is too large"));
+			return (-1);
+		}
+
+		*num <<= shift;
+	}
+
+	return (0);
+}
+
+/*
+ * Given a propname=value nvpair to set, parse any numeric properties
+ * (index, boolean, etc) if they are specified as strings and add the
+ * resulting nvpair to the returned nvlist.
+ *
+ * At the DSL layer, all properties are either 64-bit numbers or strings.
+ * We want the user to be able to ignore this fact and specify properties
+ * as native values (numbers, for example) or as strings (to simplify
+ * command line utilities).  This also handles converting index types
+ * (compression, checksum, etc) from strings to their on-disk index.
+ */
+int
+zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
+    zfs_type_t type, nvlist_t *ret, char **svalp, uint64_t *ivalp,
+    const char *errbuf)
+{
+	data_type_t datatype = nvpair_type(elem);
+	zprop_type_t proptype;
+	const char *propname;
+	char *value;
+	boolean_t isnone = B_FALSE;
+
+	if (type == ZFS_TYPE_POOL) {
+		proptype = zpool_prop_get_type(prop);
+		propname = zpool_prop_to_name(prop);
+	} else {
+		proptype = zfs_prop_get_type(prop);
+		propname = zfs_prop_to_name(prop);
+	}
+
+	/*
+	 * Convert any properties to the internal DSL value types.
+	 */
+	*svalp = NULL;
+	*ivalp = 0;
+
+	switch (proptype) {
+	case PROP_TYPE_STRING:
+		if (datatype != DATA_TYPE_STRING) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "'%s' must be a string"), nvpair_name(elem));
+			goto error;
+		}
+		(void) nvpair_value_string(elem, svalp);
+		if (strlen(*svalp) >= ZFS_MAXPROPLEN) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "'%s' is too long"), nvpair_name(elem));
+			goto error;
+		}
+		break;
+
+	case PROP_TYPE_NUMBER:
+		if (datatype == DATA_TYPE_STRING) {
+			(void) nvpair_value_string(elem, &value);
+			if (strcmp(value, "none") == 0) {
+				isnone = B_TRUE;
+			} else if (zfs_nicestrtonum(hdl, value, ivalp)
+			    != 0) {
+				goto error;
+			}
+		} else if (datatype == DATA_TYPE_UINT64) {
+			(void) nvpair_value_uint64(elem, ivalp);
+		} else {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "'%s' must be a number"), nvpair_name(elem));
+			goto error;
+		}
+
+		/*
+		 * Quota special: force 'none' and don't allow 0.
+		 */
+		if ((type & ZFS_TYPE_DATASET) && *ivalp == 0 &&
+		    !isnone && prop == ZFS_PROP_QUOTA) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "use 'none' to disable quota"));
+			goto error;
+		}
+		break;
+
+	case PROP_TYPE_INDEX:
+		if (datatype != DATA_TYPE_STRING) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "'%s' must be a string"), nvpair_name(elem));
+			goto error;
+		}
+
+		(void) nvpair_value_string(elem, &value);
+
+		if (zprop_string_to_index(prop, value, ivalp, type) != 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "'%s' must be one of '%s'"), propname,
+			    zprop_values(prop, type));
+			goto error;
+		}
+		break;
+
+	default:
+		abort();
+	}
+
+	/*
+	 * Add the result to our return set of properties.
+	 */
+	if (*svalp != NULL) {
+		if (nvlist_add_string(ret, propname, *svalp) != 0) {
+			(void) no_memory(hdl);
+			return (-1);
+		}
+	} else {
+		if (nvlist_add_uint64(ret, propname, *ivalp) != 0) {
+			(void) no_memory(hdl);
+			return (-1);
+		}
+	}
+
+	return (0);
+error:
+	(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+	return (-1);
+}
+
+/*
+ * Given a comma-separated list of properties, construct a property list
+ * containing both user-defined and native properties.  This function will
+ * return a NULL list if 'all' is specified, which can later be expanded
+ * by zprop_expand_list().
+ */
+int
+zprop_get_list(libzfs_handle_t *hdl, char *props, zprop_list_t **listp,
+    zfs_type_t type)
+{
+	size_t len;
+	char *s, *p;
+	char c;
+	int prop;
+	zprop_list_t *entry;
+	zprop_list_t **last;
+
+	*listp = NULL;
+	last = listp;
+
+	/*
+	 * If 'all' is specified, return a NULL list.
+	 */
+	if (strcmp(props, "all") == 0)
+		return (0);
+
+	/*
+	 * If no props were specified, return an error.
+	 */
+	if (props[0] == '\0') {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "no properties specified"));
+		return (zfs_error(hdl, EZFS_BADPROP, dgettext(TEXT_DOMAIN,
+		    "bad property list")));
+	}
+
+	/*
+	 * It would be nice to use getsubopt() here, but the inclusion of column
+	 * aliases makes this more effort than it's worth.
+	 */
+	s = props;
+	while (*s != '\0') {
+		if ((p = strchr(s, ',')) == NULL) {
+			len = strlen(s);
+			p = s + len;
+		} else {
+			len = p - s;
+		}
+
+		/*
+		 * Check for empty options.
+		 */
+		if (len == 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "empty property name"));
+			return (zfs_error(hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "bad property list")));
+		}
+
+		/*
+		 * Check all regular property names.
+		 */
+		c = s[len];
+		s[len] = '\0';
+		prop = zprop_name_to_prop(s, type);
+
+		if (prop != ZPROP_INVAL && !zprop_valid_for_type(prop, type))
+			prop = ZPROP_INVAL;
+
+		/*
+		 * When no property table entry can be found, return failure if
+		 * this is a pool property or if this isn't a user-defined
+		 * dataset property,
+		 */
+		if (prop == ZPROP_INVAL && (type == ZFS_TYPE_POOL ||
+		    !zfs_prop_user(s))) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "invalid property '%s'"), s);
+			return (zfs_error(hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "bad property list")));
+		}
+
+		if ((entry = zfs_alloc(hdl, sizeof (zprop_list_t))) == NULL)
+			return (-1);
+
+		entry->pl_prop = prop;
+		if (prop == ZPROP_INVAL) {
+			if ((entry->pl_user_prop = zfs_strdup(hdl, s))
+			    == NULL) {
+				free(entry);
+				return (-1);
+			}
+			entry->pl_width = strlen(s);
+		} else {
+			entry->pl_width = zprop_width(prop, &entry->pl_fixed,
+			    type);
+		}
+
+		*last = entry;
+		last = &entry->pl_next;
+
+		s = p;
+		if (c == ',')
+			s++;
+	}
+
+	return (0);
+}
+
+void
+zprop_free_list(zprop_list_t *pl)
+{
+	zprop_list_t *next;
+
+	while (pl != NULL) {
+		next = pl->pl_next;
+		free(pl->pl_user_prop);
+		free(pl);
+		pl = next;
+	}
+}
+
+typedef struct expand_data {
+	zprop_list_t	**last;
+	libzfs_handle_t	*hdl;
+	zfs_type_t type;
+} expand_data_t;
+
+int
+zprop_expand_list_cb(int prop, void *cb)
+{
+	zprop_list_t *entry;
+	expand_data_t *edp = cb;
+
+	if ((entry = zfs_alloc(edp->hdl, sizeof (zprop_list_t))) == NULL)
+		return (ZPROP_INVAL);
+
+	entry->pl_prop = prop;
+	entry->pl_width = zprop_width(prop, &entry->pl_fixed, edp->type);
+	entry->pl_all = B_TRUE;
+
+	*(edp->last) = entry;
+	edp->last = &entry->pl_next;
+
+	return (ZPROP_CONT);
+}
+
+int
+zprop_expand_list(libzfs_handle_t *hdl, zprop_list_t **plp, zfs_type_t type)
+{
+	zprop_list_t *entry;
+	zprop_list_t **last;
+	expand_data_t exp;
+
+	if (*plp == NULL) {
+		/*
+		 * If this is the very first time we've been called for an 'all'
+		 * specification, expand the list to include all native
+		 * properties.
+		 */
+		last = plp;
+
+		exp.last = last;
+		exp.hdl = hdl;
+		exp.type = type;
+
+		if (zprop_iter_common(zprop_expand_list_cb, &exp, B_FALSE,
+		    B_FALSE, type) == ZPROP_INVAL)
+			return (-1);
+
+		/*
+		 * Add 'name' to the beginning of the list, which is handled
+		 * specially.
+		 */
+		if ((entry = zfs_alloc(hdl, sizeof (zprop_list_t))) == NULL)
+			return (-1);
+
+		entry->pl_prop = (type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME :
+		    ZFS_PROP_NAME;
+		entry->pl_width = zprop_width(entry->pl_prop,
+		    &entry->pl_fixed, type);
+		entry->pl_all = B_TRUE;
+		entry->pl_next = *plp;
+		*plp = entry;
+	}
+	return (0);
+}
+
+int
+zprop_iter(zprop_func func, void *cb, boolean_t show_all, boolean_t ordered,
+    zfs_type_t type)
+{
+	return (zprop_iter_common(func, cb, show_all, ordered, type));
 }

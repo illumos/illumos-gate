@@ -169,10 +169,11 @@ static int
 zfs_mark_pool(zpool_handle_t *zhp, void *unused)
 {
 	zfs_case_t *zcp;
-	uint64_t pool_guid = zpool_get_guid(zhp);
+	uint64_t pool_guid;
 	nvlist_t *config, *vd;
 	int ret;
 
+	pool_guid = zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL);
 	/*
 	 * Mark any cases associated with just this pool.
 	 */

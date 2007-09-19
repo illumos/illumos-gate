@@ -1076,6 +1076,7 @@ spa_init(int mode)
 	dmu_init();
 	zil_init();
 	zfs_prop_init();
+	zpool_prop_init();
 	spa_config_load();
 }
 

@@ -44,14 +44,15 @@ dodefault(const char *propname, int intsz, int numint, void *buf)
 {
 	zfs_prop_t prop;
 
-	if ((prop = zfs_name_to_prop(propname)) == ZFS_PROP_INVAL ||
+	if ((prop = zfs_name_to_prop(propname)) == ZPROP_INVAL ||
 	    zfs_prop_readonly(prop))
 		return (ENOENT);
 
 	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
 		if (intsz != 1)
 			return (EOVERFLOW);
-		(void) strncpy(buf, zfs_prop_default_string(prop), numint);
+		(void) strncpy(buf, zfs_prop_default_string(prop),
+		    numint);
 	} else {
 		if (intsz != 8 || numint < 1)
 			return (EOVERFLOW);
@@ -92,7 +93,7 @@ dsl_prop_get_impl(dsl_dir_t *dd, const char *propname,
 		/*
 		 * Break out of this loop for non-inheritable properties.
 		 */
-		if (prop != ZFS_PROP_INVAL &&
+		if (prop != ZPROP_INVAL &&
 		    !zfs_prop_inheritable(prop))
 			break;
 	}
@@ -448,7 +449,7 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 			 * Skip non-inheritable properties.
 			 */
 			if ((prop = zfs_name_to_prop(za.za_name)) !=
-			    ZFS_PROP_INVAL && !zfs_prop_inheritable(prop) &&
+			    ZPROP_INVAL && !zfs_prop_inheritable(prop) &&
 			    dd != ds->ds_dir)
 				continue;
 
@@ -472,20 +473,20 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 					kmem_free(tmp, za.za_num_integers);
 					break;
 				}
-				VERIFY(nvlist_add_string(propval,
-				    ZFS_PROP_VALUE, tmp) == 0);
+				VERIFY(nvlist_add_string(propval, ZPROP_VALUE,
+				    tmp) == 0);
 				kmem_free(tmp, za.za_num_integers);
 			} else {
 				/*
 				 * Integer property
 				 */
 				ASSERT(za.za_integer_length == 8);
-				(void) nvlist_add_uint64(propval,
-				    ZFS_PROP_VALUE, za.za_first_integer);
+				(void) nvlist_add_uint64(propval, ZPROP_VALUE,
+				    za.za_first_integer);
 			}
 
-			VERIFY(nvlist_add_string(propval,
-			    ZFS_PROP_SOURCE, setpoint) == 0);
+			VERIFY(nvlist_add_string(propval, ZPROP_SOURCE,
+			    setpoint) == 0);
 			VERIFY(nvlist_add_nvlist(*nvp, za.za_name,
 			    propval) == 0);
 			nvlist_free(propval);
@@ -507,7 +508,7 @@ dsl_prop_nvlist_add_uint64(nvlist_t *nv, zfs_prop_t prop, uint64_t value)
 	nvlist_t *propval;
 
 	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	VERIFY(nvlist_add_uint64(propval, ZFS_PROP_VALUE, value) == 0);
+	VERIFY(nvlist_add_uint64(propval, ZPROP_VALUE, value) == 0);
 	VERIFY(nvlist_add_nvlist(nv, zfs_prop_to_name(prop), propval) == 0);
 	nvlist_free(propval);
 }
@@ -518,7 +519,7 @@ dsl_prop_nvlist_add_string(nvlist_t *nv, zfs_prop_t prop, const char *value)
 	nvlist_t *propval;
 
 	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	VERIFY(nvlist_add_string(propval, ZFS_PROP_VALUE, value) == 0);
+	VERIFY(nvlist_add_string(propval, ZPROP_VALUE, value) == 0);
 	VERIFY(nvlist_add_nvlist(nv, zfs_prop_to_name(prop), propval) == 0);
 	nvlist_free(propval);
 }

@@ -204,10 +204,10 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
  */
 static boolean_t
 zfs_is_mountable(zfs_handle_t *zhp, char *buf, size_t buflen,
-    zfs_source_t *source)
+    zprop_source_t *source)
 {
 	char sourceloc[ZFS_MAXNAMELEN];
-	zfs_source_t sourcetype;
+	zprop_source_t sourcetype;
 
 	if (!zfs_prop_valid_for_type(ZFS_PROP_MOUNTPOINT, zhp->zfs_type))
 		return (B_FALSE);
@@ -779,14 +779,14 @@ void
 remove_mountpoint(zfs_handle_t *zhp)
 {
 	char mountpoint[ZFS_MAXPROPLEN];
-	zfs_source_t source;
+	zprop_source_t source;
 
 	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint),
 	    &source))
 		return;
 
-	if (source == ZFS_SRC_DEFAULT ||
-	    source == ZFS_SRC_INHERITED) {
+	if (source == ZPROP_SRC_DEFAULT ||
+	    source == ZPROP_SRC_INHERITED) {
 		/*
 		 * Try to remove the directory, silently ignoring any errors.
 		 * The filesystem may have since been removed or moved around,
@@ -957,7 +957,7 @@ zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 		return (-1);
 	cb.cb_alloc = 4;
 
-	if ((zfsp = zfs_open(hdl, zhp->zpool_name, ZFS_TYPE_ANY)) == NULL)
+	if ((zfsp = zfs_open(hdl, zhp->zpool_name, ZFS_TYPE_DATASET)) == NULL)
 		goto out;
 
 	cb.cb_datasets[0] = zfsp;

@@ -55,7 +55,8 @@ find_pool(zpool_handle_t *zhp, void *data)
 {
 	find_cbdata_t *cbp = data;
 
-	if (cbp->cb_guid == zpool_get_guid(zhp)) {
+	if (cbp->cb_guid ==
+	    zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL)) {
 		cbp->cb_zhp = zhp;
 		return (1);
 	}

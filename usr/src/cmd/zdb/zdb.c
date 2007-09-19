@@ -2361,9 +2361,23 @@ main(int argc, char **argv)
 
 		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir);
 		if (error == 0) {
-			error = spa_import(argv[0], exported_conf, vdev_dir);
+			nvlist_t *nvl = NULL;
+
+			if (vdev_dir != NULL) {
+				if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+					error = ENOMEM;
+				else if (nvlist_add_string(nvl,
+				    zpool_prop_to_name(ZPOOL_PROP_ALTROOT),
+				    vdev_dir) != 0)
+					error = ENOMEM;
+			}
+
+			if (error == 0)
+				error = spa_import(argv[0], exported_conf, nvl);
 			if (error == 0)
 				error = spa_open(argv[0], &spa, FTAG);
+
+			nvlist_free(nvl);
 		}
 	}
 

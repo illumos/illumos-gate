@@ -58,11 +58,6 @@ typedef struct spa_history_phys {
 	uint64_t sh_records_lost;	/* num of records overwritten */
 } spa_history_phys_t;
 
-typedef struct spa_props {
-	nvlist_t	*spa_props_nvp;
-	list_node_t	spa_list_node;
-} spa_props_t;
-
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -145,6 +140,7 @@ struct spa {
 	uint64_t	spa_pool_props_object;	/* object for properties */
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	boolean_t	spa_delegation;		/* delegation on/off */
+	boolean_t	spa_temporary;		/* temporary on/off */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

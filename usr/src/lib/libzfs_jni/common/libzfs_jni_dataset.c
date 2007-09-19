@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -180,7 +180,7 @@ new_FileSystemBean(JNIEnv *env, FileSystemBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-			ZFSJNI_PACKAGE_DATA "FileSystemBean");
+		    ZFSJNI_PACKAGE_DATA "FileSystemBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -201,7 +201,7 @@ new_VolumeBean(JNIEnv *env, VolumeBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-			ZFSJNI_PACKAGE_DATA "VolumeBean");
+		    ZFSJNI_PACKAGE_DATA "VolumeBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -222,7 +222,7 @@ new_SnapshotBean(JNIEnv *env, SnapshotBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-			ZFSJNI_PACKAGE_DATA "SnapshotBean");
+		    ZFSJNI_PACKAGE_DATA "SnapshotBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -243,7 +243,7 @@ new_FileSystemSnapshotBean(JNIEnv *env, FileSystemSnapshotBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-			ZFSJNI_PACKAGE_DATA "FileSystemSnapshotBean");
+		    ZFSJNI_PACKAGE_DATA "FileSystemSnapshotBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -264,7 +264,7 @@ new_VolumeSnapshotBean(JNIEnv *env, VolumeSnapshotBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-			ZFSJNI_PACKAGE_DATA "VolumeSnapshotBean");
+		    ZFSJNI_PACKAGE_DATA "VolumeSnapshotBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -370,17 +370,17 @@ populate_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp,
 		/* Override value set in populate_DeviceStatsBean */
 		(*env)->CallVoidMethod(env, object->object,
 		    dev_stats->method_setSize,
-		    zpool_get_space_total(zphp));
+		    zpool_get_prop_int(zphp, ZPOOL_PROP_SIZE, NULL));
 
 		(*env)->CallVoidMethod(env, object->object,
 		    pool_stats->method_setPoolState,
 		    zjni_pool_state_to_obj(
-			env, zpool_get_state(zphp)));
+		    env, zpool_get_state(zphp)));
 
 		(*env)->CallVoidMethod(env, object->object,
 		    pool_stats->method_setPoolStatus,
 		    zjni_pool_status_to_obj(env,
-			zpool_get_status(zphp, &msgid)));
+		    zpool_get_status(zphp, &msgid)));
 
 		/*
 		 * If a root file system does not exist for this pool, the pool
@@ -388,11 +388,12 @@ populate_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp,
 		 * Otherwise, populate all fields of the Java object.
 		 */
 		if (zhp == NULL) {
-		    result = set_name_in_DatasetBean(env,
-			(char *)zpool_get_name(zphp), (DatasetBean_t *)bean);
+			result = set_name_in_DatasetBean(env,
+			    (char *)zpool_get_name(zphp),
+			    (DatasetBean_t *)bean);
 		} else {
-		    result = populate_FileSystemBean(
-			env, zhp, (FileSystemBean_t *)bean);
+			result = populate_FileSystemBean(
+			    env, zhp, (FileSystemBean_t *)bean);
 		}
 	}
 
@@ -574,7 +575,7 @@ is_fs_snapshot(zfs_handle_t *zhp)
 	zjni_get_dataset_from_snapshot(
 	    zfs_get_name(zhp), parent, sizeof (parent));
 
-	parent_zhp = zfs_open(g_zfs, parent, ZFS_TYPE_ANY);
+	parent_zhp = zfs_open(g_zfs, parent, ZFS_TYPE_DATASET);
 	if (parent_zhp == NULL) {
 		return (-1);
 	}
@@ -611,9 +612,8 @@ zjni_create_add_Pool(zpool_handle_t *zphp, void *data)
 
 	jobject bean = create_PoolBean(env, zphp, zhp);
 
-	if (zhp != NULL) {
-	    zfs_close(zhp);
-	}
+	if (zhp != NULL)
+		zfs_close(zhp);
 
 	zpool_close(zphp);
 
@@ -741,7 +741,7 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 
 	data.data.env = env;
 	data.data.list = (zjni_Collection_t *)list;
-	data.typemask = ZFS_TYPE_ANY;
+	data.typemask = ZFS_TYPE_DATASET;
 
 	npaths = (*env)->GetArrayLength(env, paths);
 	for (i = 0; i < npaths; i++) {
@@ -753,7 +753,8 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 			const char *path =
 			    (*env)->GetStringUTFChars(env, pathUTF, NULL);
 
-			zfs_handle_t *zhp = zfs_open(g_zfs, path, ZFS_TYPE_ANY);
+			zfs_handle_t *zhp = zfs_open(g_zfs, path,
+			    ZFS_TYPE_DATASET);
 			if (zhp != NULL) {
 				/* Add all dependents of this Dataset to list */
 				(void) zfs_iter_dependents(zhp, B_FALSE,

@@ -167,9 +167,10 @@ spa_config_sync(void)
 	spa = NULL;
 	while ((spa = spa_next(spa)) != NULL) {
 		mutex_enter(&spa->spa_config_cache_lock);
-		if (spa->spa_config && spa->spa_name && spa->spa_root == NULL)
+		if (spa->spa_config && spa->spa_name && !spa->spa_temporary) {
 			VERIFY(nvlist_add_nvlist(config, spa->spa_name,
 			    spa->spa_config) == 0);
+		}
 		mutex_exit(&spa->spa_config_cache_lock);
 	}
 

@@ -385,7 +385,7 @@ change_one(zfs_handle_t *zhp, void *data)
 	char property[ZFS_MAXPROPLEN];
 	char where[64];
 	prop_changenode_t *cn;
-	zfs_source_t sourcetype;
+	zprop_source_t sourcetype;
 
 	/*
 	 * We only want to unmount/unshare those filesystems that may inherit
@@ -406,7 +406,8 @@ change_one(zfs_handle_t *zhp, void *data)
 	}
 
 	if (clp->cl_alldependents || clp->cl_allchildren ||
-	    sourcetype == ZFS_SRC_DEFAULT || sourcetype == ZFS_SRC_INHERITED) {
+	    sourcetype == ZPROP_SRC_DEFAULT ||
+	    sourcetype == ZPROP_SRC_INHERITED) {
 		if ((cn = zfs_alloc(zfs_get_handle(zhp),
 		    sizeof (prop_changenode_t))) == NULL) {
 			zfs_close(zhp);
@@ -578,7 +579,7 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * and can't tell the difference.
 	 */
 	if ((temp = zfs_open(zhp->zfs_hdl, zfs_get_name(zhp),
-	    ZFS_TYPE_ANY)) == NULL) {
+	    ZFS_TYPE_DATASET)) == NULL) {
 		changelist_free(clp);
 		return (NULL);
 	}

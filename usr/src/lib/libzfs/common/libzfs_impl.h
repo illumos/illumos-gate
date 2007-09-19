@@ -106,21 +106,17 @@ int zpool_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
 int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
     size_t *);
 
-int zfs_expand_proplist_common(libzfs_handle_t *, zfs_proplist_t **,
-    zfs_type_t);
-int zfs_get_proplist_common(libzfs_handle_t *, char *, zfs_proplist_t **,
-    zfs_type_t);
-zfs_prop_t zfs_prop_iter_common(zfs_prop_f, void *, zfs_type_t, boolean_t,
-    boolean_t);
-zfs_prop_t zfs_name_to_prop_common(const char *, zfs_type_t);
 
-nvlist_t *zfs_validate_properties(libzfs_handle_t *, zfs_type_t, char *,
-	nvlist_t *, uint64_t, zfs_handle_t *zhp, const char *errbuf);
+int zprop_parse_value(libzfs_handle_t *, nvpair_t *, int, zfs_type_t,
+    nvlist_t *, char **, uint64_t *, const char *);
+int zprop_expand_list(libzfs_handle_t *hdl, zprop_list_t **plp,
+    zfs_type_t type);
 
 typedef struct prop_changelist prop_changelist_t;
 
 int zcmd_alloc_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *, size_t);
-int zcmd_write_src_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t *, size_t *);
+int zcmd_write_src_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t *);
+int zcmd_write_conf_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t *);
 int zcmd_expand_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *);
 int zcmd_read_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t **);
 void zcmd_free_nvlists(zfs_cmd_t *);

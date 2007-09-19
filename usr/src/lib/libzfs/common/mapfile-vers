@@ -33,7 +33,6 @@ SUNWprivate_1.1 {
 	libzfs_fini;
 	libzfs_init;
 	libzfs_print_on_error;
-	libzfs_print_one_property;
 	zfs_build_perms;
 	zfs_clone;
 	zfs_close;
@@ -45,11 +44,9 @@ SUNWprivate_1.1 {
 	zfs_destroy_snaps;
 	zfs_expand_proplist;
 	zfs_free_allows;
-	zfs_free_proplist;
 	zfs_get_handle;
 	zfs_get_name;
 	zfs_get_user_props;
-	zfs_get_proplist;
 	zfs_get_type;
 	zfs_iscsi_perm_check;
 	zfs_is_mounted;
@@ -82,8 +79,6 @@ SUNWprivate_1.1 {
 	zfs_prop_inherit;
 	zfs_prop_inheritable;
 	zfs_prop_is_string;
-	zfs_prop_iter;
-	zfs_prop_iter_ordered;
 	zfs_prop_readonly;
 	zfs_prop_set;
 	zfs_prop_string_to_index;
@@ -91,7 +86,6 @@ SUNWprivate_1.1 {
 	zfs_prop_user;
 	zfs_prop_valid_for_type;
 	zfs_prop_values;
-	zfs_prop_width;
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_rename;
@@ -122,20 +116,15 @@ SUNWprivate_1.1 {
 	zpool_find_vdev;
 	zpool_get_config;
 	zpool_get_errlog;
-	zpool_get_guid;
 	zpool_get_handle;
 	zpool_get_history;
 	zpool_get_name;
 	zpool_get_prop;
 	zpool_get_prop_int;
-	zpool_get_proplist;
-	zpool_get_root;
-	zpool_get_space_total;
-	zpool_get_space_used;
 	zpool_get_state;
 	zpool_get_status;
-	zpool_get_version;
 	zpool_import;
+	zpool_import_props;
 	zpool_import_status;
 	zpool_in_use;
 	zpool_iter;
@@ -145,7 +134,9 @@ SUNWprivate_1.1 {
 	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
-	zpool_prop_iter;
+	zpool_prop_align_right;
+	zpool_prop_column_name;
+	zpool_prop_readonly;
 	zpool_prop_to_name;
 	zpool_prop_values;
 	zpool_read_label;
@@ -155,6 +146,7 @@ SUNWprivate_1.1 {
 	zpool_set_history_str;
 	zpool_set_prop;
 	zpool_stage_history;
+	zpool_state_to_name;
 	zpool_unmount_datasets;
 	zpool_upgrade;
 	zpool_vdev_attach;
@@ -166,6 +158,10 @@ SUNWprivate_1.1 {
 	zpool_vdev_offline;
 	zpool_vdev_online;
 	zpool_vdev_remove;
+	zprop_free_list;
+	zprop_get_list;
+	zprop_iter;
+	zprop_print_one_property;
     local:
 	*;
 };

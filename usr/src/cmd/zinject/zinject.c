@@ -731,7 +731,7 @@ main(int argc, char **argv)
 	 * time we access the pool.
 	 */
 	if (dataset[0] != '\0' && domount) {
-		if ((zhp = zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL)
+		if ((zhp = zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET)) == NULL)
 			return (1);
 
 		if (zfs_unmount(zhp, NULL, 0) != 0)

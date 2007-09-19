@@ -89,7 +89,7 @@ zfs_prop_t props_boolean[] = {
 	ZFS_PROP_READONLY,
 	ZFS_PROP_SETUID,
 	ZFS_PROP_ZONED,
-	ZFS_PROP_INVAL
+	ZPROP_INVAL
 };
 
 zfs_prop_t props_long[] = {
@@ -100,13 +100,13 @@ zfs_prop_t props_long[] = {
 	ZFS_PROP_RESERVATION,
 	ZFS_PROP_USED,
 	ZFS_PROP_VOLSIZE,
-	ZFS_PROP_INVAL
+	ZPROP_INVAL
 };
 
 zfs_prop_t props_string[] = {
 	ZFS_PROP_ORIGIN,
 	/* ZFS_PROP_TYPE, */
-	ZFS_PROP_INVAL
+	ZPROP_INVAL
 };
 
 custom_prop_desct_t props_custom[] = {
@@ -154,7 +154,7 @@ custom_prop_desct_t props_custom[] = {
 	    ZFSJNI_PACKAGE_DATA "VolBlockSizeProperty",
 	    "java/lang/Long" },
 
-	{ ZFS_PROP_INVAL, NULL, NULL, NULL, NULL },
+	{ ZPROP_INVAL, NULL, NULL, NULL, NULL },
 };
 
 /*
@@ -168,7 +168,7 @@ create_BasicProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 {
 	jobject propertyObject = NULL;
 	char source[ZFS_MAXNAMELEN];
-	zfs_source_t srctype;
+	zprop_source_t srctype;
 	jobject propValue = NULL;
 
 	if (convert_str != NULL) {
@@ -199,7 +199,7 @@ create_BasicProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 		jboolean readOnly = zfs_prop_readonly(prop) ?
 		    JNI_TRUE : JNI_FALSE;
 
-		if (srctype == ZFS_SRC_INHERITED) {
+		if (srctype == ZPROP_SRC_INHERITED) {
 
 			jstring propSource = (*env)->NewStringUTF(env, source);
 
@@ -261,7 +261,7 @@ create_ObjectProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 {
 	jobject propertyObject = NULL;
 	char source[ZFS_MAXNAMELEN];
-	zfs_source_t srctype;
+	zprop_source_t srctype;
 	jobject propValue = NULL;
 
 	if (convert_str != NULL) {
@@ -286,7 +286,7 @@ create_ObjectProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 		char signature[1024];
 		jclass class = (*env)->FindClass(env, propClass);
 
-		if (srctype == ZFS_SRC_INHERITED) {
+		if (srctype == ZPROP_SRC_INHERITED) {
 
 			jstring propSource = (*env)->NewStringUTF(env, source);
 
@@ -347,7 +347,7 @@ create_default_BasicProperty(JNIEnv *env, zfs_prop_t prop,
 
 			jclass class = (*env)->FindClass(env, propClass);
 			jobject lineage =
-			    zjni_int_to_Lineage(env, ZFS_SRC_DEFAULT);
+			    zjni_int_to_Lineage(env, ZPROP_SRC_DEFAULT);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(Ljava/lang/String;L%s;ZL" ZFSJNI_PACKAGE_DATA
@@ -412,7 +412,7 @@ create_default_ObjectProperty(JNIEnv *env, zfs_prop_t prop,
 
 			jclass class = (*env)->FindClass(env, propClass);
 			jobject lineage =
-			    zjni_int_to_Lineage(env, ZFS_SRC_DEFAULT);
+			    zjni_int_to_Lineage(env, ZPROP_SRC_DEFAULT);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(L%s;L" ZFSJNI_PACKAGE_DATA "Property$Lineage;)V",
@@ -496,25 +496,25 @@ jobject
 zjni_get_default_property(JNIEnv *env, zfs_prop_t prop)
 {
 	int i;
-	for (i = 0; props_boolean[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_boolean[i] != ZPROP_INVAL; i++) {
 		if (prop == props_boolean[i]) {
 			return (create_default_BooleanProperty(env, prop));
 		}
 	}
 
-	for (i = 0; props_long[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_long[i] != ZPROP_INVAL; i++) {
 		if (prop == props_long[i]) {
 			return (create_default_LongProperty(env, prop));
 		}
 	}
 
-	for (i = 0; props_string[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_string[i] != ZPROP_INVAL; i++) {
 		if (prop == props_string[i]) {
 			return (create_default_StringProperty(env, prop));
 		}
 	}
 
-	for (i = 0; props_custom[i].prop != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_custom[i].prop != ZPROP_INVAL; i++) {
 		if (prop == props_custom[i].prop) {
 			return create_default_ObjectProperty(env,
 			    props_custom[i].prop,
@@ -528,15 +528,15 @@ zjni_get_default_property(JNIEnv *env, zfs_prop_t prop)
 	return (NULL);
 }
 
-static zfs_prop_t
-zjni_get_property_from_name_cb(zfs_prop_t prop, void *cb)
+static int
+zjni_get_property_from_name_cb(int prop, void *cb)
 {
 	const char *name = cb;
 
 	if (strcasecmp(name, zfs_prop_to_name(prop)) == 0)
 		return (prop);
 
-	return (ZFS_PROP_CONT);
+	return (ZPROP_CONT);
 }
 
 zfs_prop_t
@@ -544,20 +544,21 @@ zjni_get_property_from_name(const char *name)
 {
 	zfs_prop_t prop;
 
-	prop = zfs_prop_iter(zjni_get_property_from_name_cb, (void *)name);
-	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
+	prop = zprop_iter(zjni_get_property_from_name_cb, (void *)name,
+	    B_FALSE, B_FALSE, ZFS_TYPE_DATASET);
+	return (prop == ZPROP_CONT ? ZPROP_INVAL : prop);
 }
 
 jobject
-zjni_int_to_Lineage(JNIEnv *env, zfs_source_t srctype)
+zjni_int_to_Lineage(JNIEnv *env, zprop_source_t srctype)
 {
-	/* zfs_source_t to Property$Lineage map */
+	/* zprop_source_t to Property$Lineage map */
 	static zjni_field_mapping_t lineage_map[] = {
-		{ ZFS_SRC_NONE, "ZFS_PROP_LINEAGE_NOTINHERITABLE" },
-		{ ZFS_SRC_DEFAULT, "ZFS_PROP_LINEAGE_DEFAULT" },
-		{ ZFS_SRC_LOCAL, "ZFS_PROP_LINEAGE_LOCAL" },
-		{ ZFS_SRC_TEMPORARY, "ZFS_PROP_LINEAGE_TEMPORARY" },
-		{ ZFS_SRC_INHERITED, "ZFS_PROP_LINEAGE_INHERITED" }
+		{ ZPROP_SRC_NONE, "ZFS_PROP_LINEAGE_NOTINHERITABLE" },
+		{ ZPROP_SRC_DEFAULT, "ZFS_PROP_LINEAGE_DEFAULT" },
+		{ ZPROP_SRC_LOCAL, "ZFS_PROP_LINEAGE_LOCAL" },
+		{ ZPROP_SRC_TEMPORARY, "ZFS_PROP_LINEAGE_TEMPORARY" },
+		{ ZPROP_SRC_INHERITED, "ZFS_PROP_LINEAGE_INHERITED" }
 	};
 
 	return (zjni_int_to_enum(env, srctype,
@@ -576,7 +577,7 @@ zjni_get_Dataset_properties(JNIEnv *env, zfs_handle_t *zhp)
 	zjni_ArrayList_t *proplist = &proplist_obj;
 	zjni_new_ArrayList(env, proplist);
 
-	for (i = 0; props_boolean[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_boolean[i] != ZPROP_INVAL; i++) {
 		/* Create property and add to list */
 		prop = create_BooleanProperty(env, zhp, props_boolean[i]);
 
@@ -599,7 +600,7 @@ zjni_get_Dataset_properties(JNIEnv *env, zfs_handle_t *zhp)
 		}
 	}
 
-	for (i = 0; props_long[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_long[i] != ZPROP_INVAL; i++) {
 		/* Create property and add to list */
 		prop = create_LongProperty(env, zhp, props_long[i]);
 
@@ -621,7 +622,7 @@ zjni_get_Dataset_properties(JNIEnv *env, zfs_handle_t *zhp)
 		}
 	}
 
-	for (i = 0; props_string[i] != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_string[i] != ZPROP_INVAL; i++) {
 		/* Create property and add to list */
 		prop = create_StringProperty(env, zhp, props_string[i]);
 
@@ -643,7 +644,7 @@ zjni_get_Dataset_properties(JNIEnv *env, zfs_handle_t *zhp)
 		}
 	}
 
-	for (i = 0; props_custom[i].prop != ZFS_PROP_INVAL; i++) {
+	for (i = 0; props_custom[i].prop != ZPROP_INVAL; i++) {
 		/* Create property and add to list */
 		prop = create_ObjectProperty(env, zhp, props_custom[i].prop,
 		    props_custom[i].convert_str, props_custom[i].convert_uint64,

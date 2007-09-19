@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ find_pool(zpool_handle_t *zhp, void *data)
 {
 	cbdata_t *cbp = data;
 
-	if (zpool_get_guid(zhp) == cbp->cb_guid) {
+	if (zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL) == cbp->cb_guid) {
 		cbp->cb_pool = zhp;
 		return (1);
 	}

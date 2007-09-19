@@ -376,7 +376,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 */
 	islog = 0;
 	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &islog);
-	if (islog && spa_version(spa) < ZFS_VERSION_SLOGS)
+	if (islog && spa_version(spa) < SPA_VERSION_SLOGS)
 		return (ENOTSUP);
 
 	/*

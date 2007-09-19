@@ -145,7 +145,7 @@ zfs_process_add(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 	 * true online (without the unspare flag), which will trigger a FMA
 	 * fault.
 	 */
-	if (!zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOREPLACE) ||
+	if (!zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOREPLACE, NULL) ||
 	    (isdisk && !wholedisk)) {
 		(void) zpool_vdev_online(zhp, fullpath, ZFS_ONLINE_FORCEFAULT,
 		    &newstate);

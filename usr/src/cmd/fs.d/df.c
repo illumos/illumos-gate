@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,12 +352,12 @@ usage(void)
 {
 #ifdef  XPG4
 	errmsg(ERR_NONAME,
-	"Usage: %s [-F FSType] [-abeghklntPVZ] [-o FSType-specific_options]"
-		" [directory | block_device | resource]", program_name);
+	    "Usage: %s [-F FSType] [-abeghklntPVZ] [-o FSType-specific_options]"
+	    " [directory | block_device | resource]", program_name);
 #else
 	errmsg(ERR_NONAME,
-	"Usage: %s [-F FSType] [-abeghklntVvZ] [-o FSType-specific_options]"
-		" [directory | block_device | resource]", program_name);
+	    "Usage: %s [-F FSType] [-abeghklntVvZ] [-o FSType-specific_options]"
+	    " [directory | block_device | resource]", program_name);
 #endif
 	exit(1);
 	/* NOTREACHED */
@@ -439,7 +439,7 @@ init_remote_fs(void)
 
 	if ((fp = fopen(REMOTE_FS, "r")) == NULL) {
 		errmsg(ERR_NOFLAGS,
-			"Warning: can't open %s, ignored", REMOTE_FS);
+		    "Warning: can't open %s, ignored", REMOTE_FS);
 		return;
 	}
 
@@ -512,16 +512,16 @@ mtab_error(char *mtab_file, int status)
 {
 	if (status == MNT_TOOLONG)
 		errmsg(ERR_NOFLAGS, "a line in %s exceeds %d characters",
-			mtab_file, MNT_LINE_MAX);
+		    mtab_file, MNT_LINE_MAX);
 	else if (status == MNT_TOOMANY)
 		errmsg(ERR_NOFLAGS,
-			"a line in %s has too many fields", mtab_file);
+		    "a line in %s has too many fields", mtab_file);
 	else if (status == MNT_TOOFEW)
 		errmsg(ERR_NOFLAGS,
-			"a line in %s has too few fields", mtab_file);
+		    "a line in %s has too few fields", mtab_file);
 	else
 		errmsg(ERR_NOFLAGS,
-			"error while reading %s: %d", mtab_file, status);
+		    "error while reading %s: %d", mtab_file, status);
 	exit(1);
 	/* NOTREACHED */
 }
@@ -545,23 +545,23 @@ mtab_read_file(void)
 	mount_table_allocated_entries = MOUNT_TABLE_ENTRIES;
 	mount_table_entries = 0;
 	mount_table = xmalloc(
-		mount_table_allocated_entries * sizeof (struct mtab_entry));
+	    mount_table_allocated_entries * sizeof (struct mtab_entry));
 
 	while ((status = getextmntent(fp, &mtab, sizeof (struct extmnttab)))
-		== 0) {
+	    == 0) {
 		struct mtab_entry *mtep;
 
 		if (mount_table_entries == mount_table_allocated_entries) {
 			mount_table_allocated_entries += MOUNT_TABLE_ENTRIES;
 			mount_table = xrealloc(mount_table,
-				mount_table_allocated_entries *
-					sizeof (struct mtab_entry));
+			    mount_table_allocated_entries *
+			    sizeof (struct mtab_entry));
 		}
 		mtep = &mount_table[mount_table_entries++];
 		mtep->mte_mount = mntdup(&mtab);
 		mtep->mte_dev_is_valid = FALSE;
 		mtep->mte_ignore = (hasmntopt((struct mnttab *)&mtab,
-			MNTOPT_IGNORE) != NULL);
+		    MNTOPT_IGNORE) != NULL);
 	}
 
 	(void) fclose(fp);
@@ -595,7 +595,7 @@ parse_options(int argc, char *argv[])
 		if (arg == 'F') {
 			if (F_option)
 				errmsg(ERR_FATAL + ERR_USAGE,
-					"more than one FSType specified");
+				    "more than one FSType specified");
 			F_option = 1;
 			FSType = optarg;
 		} else if (arg == 'V' && ! V_option) {
@@ -815,7 +815,7 @@ path_mount_entry(struct df_request *dfrp, dev_t devno)
 				 */
 				match = tmatch;
 				if (!EQ(match->mte_mount->mnt_fstype,
-					MNTTYPE_LOFS)) {
+				    MNTTYPE_LOFS)) {
 					break;
 				}
 			}
@@ -823,7 +823,7 @@ path_mount_entry(struct df_request *dfrp, dev_t devno)
 	}
 	if (! match) {
 		errmsg(ERR_NOFLAGS,
-			"Could not find mount point for %s", dir);
+		    "Could not find mount point for %s", dir);
 		return;
 	}
 	dfrp->dfr_mte = match;
@@ -889,8 +889,8 @@ run_fs_specific_df(struct df_request request_list[], int entries)
 		struct df_request *dfrp = &request_list[i];
 
 		argv[argv_index++] = (dfrp->dfr_cmd_arg == NULL)
-						? DFR_MOUNT_POINT(dfrp)
-						: dfrp->dfr_cmd_arg;
+		    ? DFR_MOUNT_POINT(dfrp)
+		    : dfrp->dfr_cmd_arg;
 	}
 
 	if (V_option) {
@@ -909,8 +909,8 @@ run_fs_specific_df(struct df_request request_list[], int entries)
 		(void) execv(cmd_path, argv);
 		if (errno == ENOENT)
 			errmsg(ERR_NOFLAGS,
-				"operation not applicable for FSType %s",
-					fstype);
+			    "operation not applicable for FSType %s",
+			    fstype);
 		else
 			errmsg(ERR_PERROR, "cannot execute %s:", cmd_path);
 		exit(2);
@@ -963,8 +963,9 @@ prune_list(struct df_request request_list[],
 		if (! DFR_ISMOUNTEDFS(dfrp)) {
 			if (l_option || n_option) {
 				errmsg(ERR_NOFLAGS,
-		"%s option incompatible with unmounted special device (%s)",
-			l_option ? "-l" : "-n", dfrp->dfr_cmd_arg);
+				    "%s option incompatible with unmounted "
+				    "special device (%s)",
+				    l_option ? "-l" : "-n", dfrp->dfr_cmd_arg);
 				dfrp->dfr_valid = FALSE;
 				errors++;
 			}
@@ -986,7 +987,7 @@ prune_list(struct df_request request_list[],
 			if (dfrp->dfr_cmd_arg != NULL) {
 				errmsg(ERR_NOFLAGS,
 				"Warning: %s mounted as a %s file system",
-					dfrp->dfr_cmd_arg, dfrp->dfr_fstype);
+				    dfrp->dfr_cmd_arg, dfrp->dfr_fstype);
 				errors++;
 			}
 			continue;
@@ -998,8 +999,8 @@ prune_list(struct df_request request_list[],
 		if (l_option && is_remote_fs(dfrp->dfr_fstype)) {
 			if (dfrp->dfr_cmd_arg != NULL) {
 				errmsg(ERR_NOFLAGS,
-				"Warning: %s is not a local file system",
-					dfrp->dfr_cmd_arg);
+				    "Warning: %s is not a local file system",
+				    dfrp->dfr_cmd_arg);
 				errors++;
 			}
 			dfrp->dfr_valid = FALSE;
@@ -1012,7 +1013,7 @@ prune_list(struct df_request request_list[],
 		 * the command line.
 		 */
 		if (dfrp->dfr_mte->mte_ignore &&
-			! (a_option || dfrp->dfr_cmd_arg)) {
+		    ! (a_option || dfrp->dfr_cmd_arg)) {
 			dfrp->dfr_valid = FALSE;
 			continue;
 		}
@@ -1035,19 +1036,19 @@ print_header(void)
 		int arg = 'h';
 
 		(void) printf("%-*s %*s %*s %*s %-*s %s\n",
-			FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
 #ifdef XPG4
-			SCALED_WIDTH, TRANSLATE("Size"),
-			SCALED_WIDTH, TRANSLATE("Used"),
-			AVAILABLE_WIDTH, TRANSLATE("Available"),
-			CAPACITY_WIDTH, TRANSLATE("Capacity"),
+		    SCALED_WIDTH, TRANSLATE("Size"),
+		    SCALED_WIDTH, TRANSLATE("Used"),
+		    AVAILABLE_WIDTH, TRANSLATE("Available"),
+		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
 #else
-			SCALED_WIDTH, TRANSLATE("size"),
-			SCALED_WIDTH, TRANSLATE("used"),
-			AVAILABLE_WIDTH, TRANSLATE("avail"),
-			CAPACITY_WIDTH, TRANSLATE("capacity"),
+		    SCALED_WIDTH, TRANSLATE("size"),
+		    SCALED_WIDTH, TRANSLATE("used"),
+		    AVAILABLE_WIDTH, TRANSLATE("avail"),
+		    CAPACITY_WIDTH, TRANSLATE("capacity"),
 #endif
-			TRANSLATE("Mounted on"));
+		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
 	}
@@ -1055,19 +1056,19 @@ print_header(void)
 		int arg = 'h';
 
 		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
-			FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
 #ifdef XPG4
-			KBYTE_WIDTH, TRANSLATE("1024-blocks"),
-			KBYTE_WIDTH, TRANSLATE("Used"),
-			KBYTE_WIDTH, TRANSLATE("Available"),
-			CAPACITY_WIDTH, TRANSLATE("Capacity"),
+		    KBYTE_WIDTH, TRANSLATE("1024-blocks"),
+		    KBYTE_WIDTH, TRANSLATE("Used"),
+		    KBYTE_WIDTH, TRANSLATE("Available"),
+		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
 #else
-			KBYTE_WIDTH, TRANSLATE("kbytes"),
-			KBYTE_WIDTH, TRANSLATE("used"),
-			KBYTE_WIDTH, TRANSLATE("avail"),
-			CAPACITY_WIDTH, TRANSLATE("capacity"),
+		    KBYTE_WIDTH, TRANSLATE("kbytes"),
+		    KBYTE_WIDTH, TRANSLATE("used"),
+		    KBYTE_WIDTH, TRANSLATE("avail"),
+		    CAPACITY_WIDTH, TRANSLATE("capacity"),
 #endif
-			TRANSLATE("Mounted on"));
+		    TRANSLATE("Mounted on"));
 		SET_OPTION(h);
 		return;
 	}
@@ -1076,12 +1077,12 @@ print_header(void)
 		int arg = 'h';
 
 		(void) printf(gettext("%-*s %*s %*s %*s %-*s %s\n"),
-			FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-			KBYTE_WIDTH, TRANSLATE("512-blocks"),
-			KBYTE_WIDTH, TRANSLATE("Used"),
-			KBYTE_WIDTH, TRANSLATE("Available"),
-			CAPACITY_WIDTH, TRANSLATE("Capacity"),
-			TRANSLATE("Mounted on"));
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    KBYTE_WIDTH, TRANSLATE("512-blocks"),
+		    KBYTE_WIDTH, TRANSLATE("Used"),
+		    KBYTE_WIDTH, TRANSLATE("Available"),
+		    CAPACITY_WIDTH, TRANSLATE("Capacity"),
+		    TRANSLATE("Mounted on"));
 
 		SET_OPTION(h);
 		return;
@@ -1089,24 +1090,24 @@ print_header(void)
 	/* End XCU4 */
 	if (v_option) {
 		(void) printf("%-*s %-*s %*s %*s %*s %-*s\n",
-			IBCS2_MOUNT_POINT_WIDTH, TRANSLATE("Mount Dir"),
-			IBCS2_FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-			BLOCK_WIDTH, TRANSLATE("blocks"),
-			BLOCK_WIDTH, TRANSLATE("used"),
-			BLOCK_WIDTH, TRANSLATE("free"),
-			CAPACITY_WIDTH, TRANSLATE(" %used"));
+		    IBCS2_MOUNT_POINT_WIDTH, TRANSLATE("Mount Dir"),
+		    IBCS2_FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    BLOCK_WIDTH, TRANSLATE("blocks"),
+		    BLOCK_WIDTH, TRANSLATE("used"),
+		    BLOCK_WIDTH, TRANSLATE("free"),
+		    CAPACITY_WIDTH, TRANSLATE(" %used"));
 		return;
 	}
 	if (e_option) {
 		(void) printf(gettext("%-*s %*s\n"),
-			FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-			BLOCK_WIDTH, TRANSLATE("ifree"));
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    BLOCK_WIDTH, TRANSLATE("ifree"));
 		return;
 	}
 	if (b_option) {
 		(void) printf(gettext("%-*s %*s\n"),
-			FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
-			BLOCK_WIDTH, TRANSLATE("avail"));
+		    FILESYSTEM_WIDTH, TRANSLATE("Filesystem"),
+		    BLOCK_WIDTH, TRANSLATE("avail"));
 		return;
 	}
 }
@@ -1245,7 +1246,8 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 	do {
 		*slash = '\0';
 
-		if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL) {
+		if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET))
+		    == NULL) {
 			free(dataset);
 			return;
 		}
@@ -1262,7 +1264,7 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 	} while ((slash = strrchr(dataset, '/')) != NULL);
 
 
-	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL) {
+	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET)) == NULL) {
 		free(dataset);
 		return;
 	}
@@ -1345,14 +1347,14 @@ g_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	    + MAX(SPECIAL_DEVICE_WIDTH, strlen(DFR_SPECIAL(dfrp)))
 	    + 20); /* plus slop - nulls & formatting */
 	(void) sprintf(temp_buf, "%-*s(%-*s):",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp));
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp));
 
 	(void) printf("%-*s %*lu %-*s %*lu %-*s\n",
-	NCOL1_WIDTH + 1 + SCOL1_WIDTH + 1 + NCOL2_WIDTH + 1 +  SCOL2_WIDTH,
-		temp_buf,
-	NCOL3_WIDTH, fsp->f_bsize, SCOL3_WIDTH, block_size_str,
-	NCOL4_WIDTH, fsp->f_frsize, SCOL4_WIDTH, frag_size_str);
+	    NCOL1_WIDTH + 1 + SCOL1_WIDTH + 1 + NCOL2_WIDTH + 1 +  SCOL2_WIDTH,
+	    temp_buf,
+	    NCOL3_WIDTH, fsp->f_bsize, SCOL3_WIDTH, block_size_str,
+	    NCOL4_WIDTH, fsp->f_frsize, SCOL4_WIDTH, frag_size_str);
 	free(temp_buf);
 
 	/*
@@ -1366,32 +1368,32 @@ g_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	adjust_total_blocks(dfrp, &total_blocks, fsp->f_frsize);
 
 	(void) printf("%*s %-*s %*s %-*s %*s %-*s %*s %-*s\n",
-		NCOL1_WIDTH, number_to_string(total_blocks_buf,
-					total_blocks, fsp->f_frsize, 512),
-			SCOL1_WIDTH, total_blocks_str,
-		NCOL2_WIDTH, number_to_string(free_blocks_buf,
-					fsp->f_bfree, fsp->f_frsize, 512),
-			SCOL2_WIDTH, free_blocks_str,
-		NCOL3_WIDTH, number_to_string(available_blocks_buf,
-					available_blocks, fsp->f_frsize, 512),
-			SCOL3_WIDTH, available_str,
-		NCOL4_WIDTH, number_to_string(total_files_buf,
-					fsp->f_files, 1, 1),
-			SCOL4_WIDTH, total_files_str);
+	    NCOL1_WIDTH, number_to_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, 512),
+	    SCOL1_WIDTH, total_blocks_str,
+	    NCOL2_WIDTH, number_to_string(free_blocks_buf,
+	    fsp->f_bfree, fsp->f_frsize, 512),
+	    SCOL2_WIDTH, free_blocks_str,
+	    NCOL3_WIDTH, number_to_string(available_blocks_buf,
+	    available_blocks, fsp->f_frsize, 512),
+	    SCOL3_WIDTH, available_str,
+	    NCOL4_WIDTH, number_to_string(total_files_buf,
+	    fsp->f_files, 1, 1),
+	    SCOL4_WIDTH, total_files_str);
 
 	(void) printf("%*s %-*s %*lu %-*s %s\n",
-		NCOL1_WIDTH, number_to_string(free_files_buf,
-					fsp->f_ffree, 1, 1),
-			SCOL1_WIDTH, free_files_str,
-		NCOL2_WIDTH, fsp->f_fsid, SCOL2_WIDTH, fsys_id_str,
-		fsp->f_fstr);
+	    NCOL1_WIDTH, number_to_string(free_files_buf,
+	    fsp->f_ffree, 1, 1),
+	    SCOL1_WIDTH, free_files_str,
+	    NCOL2_WIDTH, fsp->f_fsid, SCOL2_WIDTH, fsys_id_str,
+	    fsp->f_fstr);
 
 	(void) printf("%*s %-*s %#*.*lx %-*s %*s %-*s\n\n",
-		NCOL1_WIDTH, fsp->f_basetype, SCOL1_WIDTH, fstype_str,
-		NCOL2_WIDTH, NCOL2_WIDTH-2, fsp->f_flag, SCOL2_WIDTH, flag_str,
-		NCOL3_WIDTH, number_to_string(fname_buf,
-			(unsigned long long)fsp->f_namemax, 1, 1),
-			SCOL3_WIDTH, fname_str);
+	    NCOL1_WIDTH, fsp->f_basetype, SCOL1_WIDTH, fstype_str,
+	    NCOL2_WIDTH, NCOL2_WIDTH-2, fsp->f_flag, SCOL2_WIDTH, flag_str,
+	    NCOL3_WIDTH, number_to_string(fname_buf,
+	    (unsigned long long)fsp->f_namemax, 1, 1),
+	    SCOL3_WIDTH, fname_str);
 }
 
 
@@ -1432,10 +1434,10 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 		 * hence the addition of 0.5.
 		 */
 		(void) sprintf(capacity_buf, "%5.0f%%",
-			(total_blocks == 0) ? 0.0 :
-			((double)used_blocks /
-				(double)(total_blocks - reserved_blocks))
-					* 100.0 + 0.5);
+		    (total_blocks == 0) ? 0.0 :
+		    ((double)used_blocks /
+		    (double)(total_blocks - reserved_blocks))
+		    * 100.0 + 0.5);
 	}
 
 	/*
@@ -1457,52 +1459,52 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 
 	if (use_scaling) { /* comes from the -h option */
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
-		FILESYSTEM_WIDTH, file_system,
-		SCALED_WIDTH, number_to_scaled_string(total_blocks_buf,
-					total_blocks, fsp->f_frsize, scale),
-		SCALED_WIDTH, number_to_scaled_string(used_blocks_buf,
-					used_blocks, fsp->f_frsize, scale),
-		AVAILABLE_WIDTH, number_to_scaled_string(available_blocks_buf,
-					available_blocks, fsp->f_frsize, scale),
-		CAPACITY_WIDTH, capacity_buf,
-		DFR_MOUNT_POINT(dfrp));
+	    FILESYSTEM_WIDTH, file_system,
+	    SCALED_WIDTH, number_to_scaled_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, scale),
+	    SCALED_WIDTH, number_to_scaled_string(used_blocks_buf,
+	    used_blocks, fsp->f_frsize, scale),
+	    AVAILABLE_WIDTH, number_to_scaled_string(available_blocks_buf,
+	    available_blocks, fsp->f_frsize, scale),
+	    CAPACITY_WIDTH, capacity_buf,
+	    DFR_MOUNT_POINT(dfrp));
 		return;
 	}
 
 	if (v_option) {
 	(void) printf("%-*.*s %-*.*s %*lld %*lld %*lld %-.*s\n",
-		IBCS2_MOUNT_POINT_WIDTH, IBCS2_MOUNT_POINT_WIDTH,
-		DFR_MOUNT_POINT(dfrp),
-		IBCS2_FILESYSTEM_WIDTH, IBCS2_FILESYSTEM_WIDTH, file_system,
-		BLOCK_WIDTH, total_blocks,
-		BLOCK_WIDTH, used_blocks,
-		BLOCK_WIDTH, available_blocks,
-		CAPACITY_WIDTH,	capacity_buf);
+	    IBCS2_MOUNT_POINT_WIDTH, IBCS2_MOUNT_POINT_WIDTH,
+	    DFR_MOUNT_POINT(dfrp),
+	    IBCS2_FILESYSTEM_WIDTH, IBCS2_FILESYSTEM_WIDTH, file_system,
+	    BLOCK_WIDTH, total_blocks,
+	    BLOCK_WIDTH, used_blocks,
+	    BLOCK_WIDTH, available_blocks,
+	    CAPACITY_WIDTH,	capacity_buf);
 		return;
 	}
 
 	if (P_option && !k_option) {
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
-		FILESYSTEM_WIDTH, file_system,
-		KBYTE_WIDTH, number_to_string(total_blocks_buf,
-					total_blocks, fsp->f_frsize, 512),
-		KBYTE_WIDTH, number_to_string(used_blocks_buf,
-					used_blocks, fsp->f_frsize, 512),
-		KBYTE_WIDTH, number_to_string(available_blocks_buf,
-					available_blocks, fsp->f_frsize, 512),
-		CAPACITY_WIDTH, capacity_buf,
-		DFR_MOUNT_POINT(dfrp));
+	    FILESYSTEM_WIDTH, file_system,
+	    KBYTE_WIDTH, number_to_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, 512),
+	    KBYTE_WIDTH, number_to_string(used_blocks_buf,
+	    used_blocks, fsp->f_frsize, 512),
+	    KBYTE_WIDTH, number_to_string(available_blocks_buf,
+	    available_blocks, fsp->f_frsize, 512),
+	    CAPACITY_WIDTH, capacity_buf,
+	    DFR_MOUNT_POINT(dfrp));
 	} else {
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
-		FILESYSTEM_WIDTH, file_system,
-		KBYTE_WIDTH, number_to_string(total_blocks_buf,
-					total_blocks, fsp->f_frsize, 1024),
-		KBYTE_WIDTH, number_to_string(used_blocks_buf,
-					used_blocks, fsp->f_frsize, 1024),
-		KBYTE_WIDTH, number_to_string(available_blocks_buf,
-					available_blocks, fsp->f_frsize, 1024),
-		CAPACITY_WIDTH,	capacity_buf,
-		DFR_MOUNT_POINT(dfrp));
+	    FILESYSTEM_WIDTH, file_system,
+	    KBYTE_WIDTH, number_to_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, 1024),
+	    KBYTE_WIDTH, number_to_string(used_blocks_buf,
+	    used_blocks, fsp->f_frsize, 1024),
+	    KBYTE_WIDTH, number_to_string(available_blocks_buf,
+	    available_blocks, fsp->f_frsize, 1024),
+	    CAPACITY_WIDTH,	capacity_buf,
+	    DFR_MOUNT_POINT(dfrp));
 	}
 }
 
@@ -1548,14 +1550,14 @@ t_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	adjust_total_blocks(dfrp, &total_blocks, fsp->f_frsize);
 
 	(void) printf("%-*s(%-*s): %*s %s %*s %s\n",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
-		BLOCK_WIDTH, number_to_string(free_blocks_buf,
-			fsp->f_bfree, fsp->f_frsize, 512),
-			blocks_str,
-		NFILES_WIDTH, number_to_string(free_files_buf,
-			fsp->f_ffree, 1, 1),
-		files_str);
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
+	    BLOCK_WIDTH, number_to_string(free_blocks_buf,
+	    fsp->f_bfree, fsp->f_frsize, 512),
+	    blocks_str,
+	    NFILES_WIDTH, number_to_string(free_files_buf,
+	    fsp->f_ffree, 1, 1),
+	    files_str);
 	/*
 	 * The total column used to use the same space as the mnt pt & special
 	 * dev fields. However, this doesn't work with massive special dev
@@ -1566,13 +1568,13 @@ t_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	 * used static buffer was overflowed by the same massive special dev.
 	 */
 	(void) printf("%*s: %*s %s %*s %s\n",
-		MNT_SPEC_WIDTH, total_str,
-		BLOCK_WIDTH, number_to_string(total_blocks_buf,
-				total_blocks, fsp->f_frsize, 512),
-		blocks_str,
-		NFILES_WIDTH, number_to_string(total_files_buf,
-				fsp->f_files, 1, 1),
-		files_str);
+	    MNT_SPEC_WIDTH, total_str,
+	    BLOCK_WIDTH, number_to_string(total_blocks_buf,
+	    total_blocks, fsp->f_frsize, 512),
+	    blocks_str,
+	    NFILES_WIDTH, number_to_string(total_files_buf,
+	    fsp->f_files, 1, 1),
+	    files_str);
 }
 
 
@@ -1585,18 +1587,18 @@ eb_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	STRINGS_INIT();
 
 	(void) printf("%-*s(%-*s): %*s %s\n",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
-		MAX(KBYTE_WIDTH, NFILES_WIDTH),
-			number_to_string(free_kbytes_buf,
-			fsp->f_bfree, fsp->f_frsize, 1024),
-		kilobytes_str);
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
+	    MAX(KBYTE_WIDTH, NFILES_WIDTH),
+	    number_to_string(free_kbytes_buf,
+	    fsp->f_bfree, fsp->f_frsize, 1024),
+	    kilobytes_str);
 	(void) printf("%-*s(%-*s): %*s %s\n",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
-		MAX(NFILES_WIDTH, NFILES_WIDTH),
-			number_to_string(free_files_buf, fsp->f_ffree, 1, 1),
-		files_str);
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
+	    MAX(NFILES_WIDTH, NFILES_WIDTH),
+	    number_to_string(free_files_buf, fsp->f_ffree, 1, 1),
+	    files_str);
 }
 
 
@@ -1606,9 +1608,9 @@ e_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	numbuf_t free_files_buf;
 
 	(void) printf("%-*s %*s\n",
-		FILESYSTEM_WIDTH, DFR_SPECIAL(dfrp),
-		NFILES_WIDTH,
-			number_to_string(free_files_buf, fsp->f_ffree, 1, 1));
+	    FILESYSTEM_WIDTH, DFR_SPECIAL(dfrp),
+	    NFILES_WIDTH,
+	    number_to_string(free_files_buf, fsp->f_ffree, 1, 1));
 }
 
 
@@ -1618,9 +1620,9 @@ b_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	numbuf_t free_blocks_buf;
 
 	(void) printf("%-*s %*s\n",
-		FILESYSTEM_WIDTH, DFR_SPECIAL(dfrp),
-		BLOCK_WIDTH, number_to_string(free_blocks_buf,
-				fsp->f_bfree, fsp->f_frsize, 1024));
+	    FILESYSTEM_WIDTH, DFR_SPECIAL(dfrp),
+	    BLOCK_WIDTH, number_to_string(free_blocks_buf,
+	    fsp->f_bfree, fsp->f_frsize, 1024));
 }
 
 
@@ -1629,8 +1631,8 @@ static void
 n_output(struct df_request *dfrp, struct statvfs64 *fsp)
 {
 	(void) printf("%-*s: %-*s\n",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		FSTYPE_WIDTH, dfrp->dfr_fstype);
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    FSTYPE_WIDTH, dfrp->dfr_fstype);
 }
 
 
@@ -1643,14 +1645,14 @@ default_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	STRINGS_INIT();
 
 	(void) printf("%-*s(%-*s):%*s %s %*s %s\n",
-		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
-		SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
-		BLOCK_WIDTH, number_to_string(free_blocks_buf,
-			fsp->f_bfree, fsp->f_frsize, 512),
-		blocks_str,
-		NFILES_WIDTH, number_to_string(free_files_buf,
-			fsp->f_ffree, 1, 1),
-		files_str);
+	    MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
+	    SPECIAL_DEVICE_WIDTH, DFR_SPECIAL(dfrp),
+	    BLOCK_WIDTH, number_to_string(free_blocks_buf,
+	    fsp->f_bfree, fsp->f_frsize, 512),
+	    blocks_str,
+	    NFILES_WIDTH, number_to_string(free_files_buf,
+	    fsp->f_ffree, 1, 1),
+	    files_str);
 }
 
 
@@ -1666,8 +1668,8 @@ V_output(struct df_request *dfrp, struct statvfs64 *fsp)
 		temp_buf[0] = NUL;
 
 	(void) printf("%s -F %s %s%s\n",
-		program_name, dfrp->dfr_fstype, temp_buf,
-		dfrp->dfr_cmd_arg ? dfrp->dfr_cmd_arg: DFR_SPECIAL(dfrp));
+	    program_name, dfrp->dfr_fstype, temp_buf,
+	    dfrp->dfr_cmd_arg ? dfrp->dfr_cmd_arg: DFR_SPECIAL(dfrp));
 }
 
 
@@ -1691,7 +1693,7 @@ vfs_error(char *file, int status)
 {
 	if (status == VFS_TOOLONG)
 		errmsg(ERR_NOFLAGS, "a line in %s exceeds %d characters",
-			file, MNT_LINE_MAX);
+		    file, MNT_LINE_MAX);
 	else if (status == VFS_TOOMANY)
 		errmsg(ERR_NOFLAGS, "a line in %s has too many fields", file);
 	else if (status == VFS_TOOFEW)
@@ -1844,10 +1846,10 @@ create_request_list(
 					bdev_mount_entry(dfrp);
 					dfrp->dfr_valid = TRUE;
 				} else if (S_ISDIR(arg_stat[i].st_mode) ||
-					S_ISREG(arg_stat[i].st_mode) ||
-					S_ISFIFO(arg_stat[i].st_mode)) {
+				    S_ISREG(arg_stat[i].st_mode) ||
+				    S_ISFIFO(arg_stat[i].st_mode)) {
 					path_mount_entry(dfrp,
-						arg_stat[i].st_dev);
+					    arg_stat[i].st_dev);
 					if (! DFR_ISMOUNTEDFS(dfrp)) {
 						errors++;
 						continue;
@@ -1865,8 +1867,8 @@ create_request_list(
 			 */
 			if (!dfrp->dfr_valid) {
 				errmsg(ERR_NOFLAGS,
-		"(%-10s) not a block device, directory or mounted resource",
-					arg);
+				    "(%-10s) not a block device, directory or "
+				    "mounted resource", arg);
 				errors++;
 				continue;
 			}
@@ -1876,10 +1878,10 @@ create_request_list(
 			 */
 			if (DFR_ISMOUNTEDFS(dfrp))
 				dfrp->dfr_fstype =
-					dfrp->dfr_mte->mte_mount->mnt_fstype;
+				    dfrp->dfr_mte->mte_mount->mnt_fstype;
 			else
 				dfrp->dfr_fstype =
-					find_fstype(dfrp->dfr_cmd_arg);
+				    find_fstype(dfrp->dfr_cmd_arg);
 
 			request_index++;
 		}
@@ -1974,7 +1976,7 @@ do_df(int argc, char *argv[])
 		 * for each request.
 		 */
 		qsort(requests,
-			n_requests, sizeof (struct df_request), df_reqcomp);
+		    n_requests, sizeof (struct df_request), df_reqcomp);
 		for (i = 0; i < n_requests; i = j) {
 			char *fstype = requests[i].dfr_fstype;
 
@@ -2000,8 +2002,10 @@ do_df(int argc, char *argv[])
 					dfrp = &requests[k];
 					if (dfrp->dfr_cmd_arg != NULL) {
 						errmsg(ERR_NOFLAGS,
-				"Warning: %s mounted as a %s file system",
-					dfrp->dfr_cmd_arg, dfrp->dfr_fstype);
+						    "Warning: %s mounted as a "
+						    "%s file system",
+						    dfrp->dfr_cmd_arg,
+						    dfrp->dfr_fstype);
 						errors++;
 					}
 				}
@@ -2036,11 +2040,11 @@ do_df(int argc, char *argv[])
 					struct statvfs64 stvfs;
 
 					if ((dfop->dfo_flags & DFO_STATVFS) &&
-						statvfs64(DFR_MOUNT_POINT(dfrp),
-							&stvfs) == -1) {
+					    statvfs64(DFR_MOUNT_POINT(dfrp),
+					    &stvfs) == -1) {
 						errmsg(ERR_PERROR,
-							"cannot statvfs %s:",
-							DFR_MOUNT_POINT(dfrp));
+						    "cannot statvfs %s:",
+						    DFR_MOUNT_POINT(dfrp));
 						errors++;
 						continue;
 					}
@@ -2112,12 +2116,12 @@ do_devnm(int argc, char *argv[])
 		}
 
 		if (! is_remote_fs(st.st_fstype) &&
-			! EQ(st.st_fstype, MNTTYPE_TMPFS) &&
-				(dev_name = find_dev_name(file, st.st_dev)))
+		    ! EQ(st.st_fstype, MNTTYPE_TMPFS) &&
+		    (dev_name = find_dev_name(file, st.st_dev)))
 			(void) printf("%s %s\n", dev_name, file);
 		else
 			errmsg(ERR_NOFLAGS,
-				"%s not found", file);
+			    "%s not found", file);
 	}
 	exit(errors);
 	/* NOTREACHED */

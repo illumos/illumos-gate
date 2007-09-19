@@ -382,7 +382,6 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 	char *name, *hostname;
 	zfs_cmd_t zc = { 0 };
 	uint64_t version, guid;
-	size_t len;
 	int err;
 	uint_t children = 0;
 	nvlist_t **child = NULL;
@@ -591,13 +590,14 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		/*
 		 * Try to do the import in order to get vdev state.
 		 */
-		if (zcmd_write_src_nvlist(hdl, &zc, config, &len) != 0)
+		if (zcmd_write_conf_nvlist(hdl, &zc, config) != 0)
 			goto error;
 
 		nvlist_free(config);
 		config = NULL;
 
-		if (zcmd_alloc_dst_nvlist(hdl, &zc, len * 2) != 0) {
+		if (zcmd_alloc_dst_nvlist(hdl, &zc,
+		    zc.zc_nvlist_conf_size * 2) != 0) {
 			zcmd_free_nvlists(&zc);
 			goto error;
 		}

@@ -1491,7 +1491,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 			    (zh = libzfs_init()) == NULL)
 				goto error;
 
-			if ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) ==
+			if ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) ==
 			    NULL) {
 				libzfs_fini(zh);
 				goto error;

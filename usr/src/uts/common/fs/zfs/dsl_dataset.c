@@ -1324,7 +1324,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 	if (ds_prev && ds->ds_prev != ds_prev)
 		dsl_dataset_close(ds_prev, DS_MODE_NONE, FTAG);
 
-	spa_clear_bootfs(dp->dp_spa, ds->ds_object, tx);
+	spa_prop_clear_bootfs(dp->dp_spa, ds->ds_object, tx);
 	spa_history_internal_log(LOG_DS_DESTROY, dp->dp_spa, tx,
 	    cr, "dataset = %llu", ds->ds_object);
 

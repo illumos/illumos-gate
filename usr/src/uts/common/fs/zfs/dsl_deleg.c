@@ -245,7 +245,7 @@ dsl_deleg_set(const char *ddname, nvlist_t *nvp, boolean_t unset)
 		return (error);
 
 	if (spa_version(dmu_objset_spa(dd->dd_pool->dp_meta_objset)) <
-	    ZFS_VERSION_DELEGATED_PERMS) {
+	    SPA_VERSION_DELEGATED_PERMS) {
 		dsl_dir_close(dd, FTAG);
 		return (ENOTSUP);
 	}
@@ -553,7 +553,7 @@ dsl_deleg_access(const char *ddname, const char *perm, cred_t *cr)
 	}
 
 	if (spa_version(dmu_objset_spa(dp->dp_meta_objset)) <
-	    ZFS_VERSION_DELEGATED_PERMS) {
+	    SPA_VERSION_DELEGATED_PERMS) {
 		dsl_dir_close(startdd, FTAG);
 		return (EPERM);
 	}
@@ -689,7 +689,7 @@ dsl_deleg_set_create_perms(dsl_dir_t *sdd, dmu_tx_t *tx, cred_t *cr)
 	uint64_t uid = crgetuid(cr);
 
 	if (spa_version(dmu_objset_spa(sdd->dd_pool->dp_meta_objset)) <
-	    ZFS_VERSION_DELEGATED_PERMS)
+	    SPA_VERSION_DELEGATED_PERMS)
 		return;
 
 	for (dd = sdd->dd_parent; dd != NULL; dd = dd->dd_parent) {

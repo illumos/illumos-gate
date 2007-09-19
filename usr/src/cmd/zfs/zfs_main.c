@@ -273,11 +273,11 @@ safe_malloc(size_t size)
 }
 
 /*
- * Callback routinue that will print out information for each of the
+ * Callback routine that will print out information for each of
  * the properties.
  */
-static zfs_prop_t
-usage_prop_cb(zfs_prop_t prop, void *cb)
+static int
+usage_prop_cb(int prop, void *cb)
 {
 	FILE *fp = cb;
 
@@ -298,7 +298,7 @@ usage_prop_cb(zfs_prop_t prop, void *cb)
 	else
 		(void) fprintf(fp, "%s\n", zfs_prop_values(prop));
 
-	return (ZFS_PROP_CONT);
+	return (ZPROP_CONT);
 }
 
 /*
@@ -350,7 +350,8 @@ usage(boolean_t requested)
 		    "PROPERTY", "EDIT", "INHERIT", "VALUES");
 
 		/* Iterate over all properties */
-		(void) zfs_prop_iter_ordered(usage_prop_cb, fp);
+		(void) zprop_iter(usage_prop_cb, fp, B_FALSE, B_TRUE,
+		    ZFS_TYPE_DATASET);
 
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
@@ -450,7 +451,9 @@ zfs_do_clone(int argc, char **argv)
 
 	/* create the mountpoint if necessary */
 	if (ret == 0) {
-		zfs_handle_t *clone = zfs_open(g_zfs, argv[1], ZFS_TYPE_ANY);
+		zfs_handle_t *clone;
+
+		clone = zfs_open(g_zfs, argv[1], ZFS_TYPE_DATASET);
 		if (clone != NULL) {
 			if ((ret = zfs_mount(clone, NULL, 0)) == 0)
 				ret = zfs_share(clone);
@@ -626,7 +629,7 @@ zfs_do_create(int argc, char **argv)
 	if (zfs_create(g_zfs, argv[0], type, props) != 0)
 		goto error;
 
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET)) == NULL)
 		goto error;
 
 	/*
@@ -853,7 +856,7 @@ zfs_do_destroy(int argc, char **argv)
 		int ret;
 
 		*cp = '\0';
-		if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+		if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET)) == NULL)
 			return (1);
 		*cp = '@';
 		cp++;
@@ -877,7 +880,7 @@ zfs_do_destroy(int argc, char **argv)
 
 
 	/* Open the given dataset */
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET)) == NULL)
 		return (1);
 
 	cb.cb_target = zhp;
@@ -953,11 +956,11 @@ static int
 get_callback(zfs_handle_t *zhp, void *data)
 {
 	char buf[ZFS_MAXPROPLEN];
-	zfs_source_t sourcetype;
+	zprop_source_t sourcetype;
 	char source[ZFS_MAXNAMELEN];
-	libzfs_get_cbdata_t *cbp = data;
+	zprop_get_cbdata_t *cbp = data;
 	nvlist_t *userprop = zfs_get_user_props(zhp);
-	zfs_proplist_t *pl = cbp->cb_proplist;
+	zprop_list_t *pl = cbp->cb_proplist;
 	nvlist_t *propval;
 	char *strval;
 	char *sourceval;
@@ -971,7 +974,7 @@ get_callback(zfs_handle_t *zhp, void *data)
 		    pl == cbp->cb_proplist)
 			continue;
 
-		if (pl->pl_prop != ZFS_PROP_INVAL) {
+		if (pl->pl_prop != ZPROP_INVAL) {
 			if (zfs_prop_get(zhp, pl->pl_prop, buf,
 			    sizeof (buf), &sourcetype, source,
 			    sizeof (source),
@@ -979,17 +982,17 @@ get_callback(zfs_handle_t *zhp, void *data)
 				if (pl->pl_all)
 					continue;
 				if (!zfs_prop_valid_for_type(pl->pl_prop,
-				    ZFS_TYPE_ANY)) {
+				    ZFS_TYPE_DATASET)) {
 					(void) fprintf(stderr,
 					    gettext("No such property '%s'\n"),
 					    zfs_prop_to_name(pl->pl_prop));
 					continue;
 				}
-				sourcetype = ZFS_SRC_NONE;
+				sourcetype = ZPROP_SRC_NONE;
 				(void) strlcpy(buf, "-", sizeof (buf));
 			}
 
-			libzfs_print_one_property(zfs_get_name(zhp), cbp,
+			zprop_print_one_property(zfs_get_name(zhp), cbp,
 			    zfs_prop_to_name(pl->pl_prop),
 			    buf, sourcetype, source);
 		} else {
@@ -997,25 +1000,25 @@ get_callback(zfs_handle_t *zhp, void *data)
 			    pl->pl_user_prop, &propval) != 0) {
 				if (pl->pl_all)
 					continue;
-				sourcetype = ZFS_SRC_NONE;
+				sourcetype = ZPROP_SRC_NONE;
 				strval = "-";
 			} else {
 				verify(nvlist_lookup_string(propval,
-				    ZFS_PROP_VALUE, &strval) == 0);
+				    ZPROP_VALUE, &strval) == 0);
 				verify(nvlist_lookup_string(propval,
-				    ZFS_PROP_SOURCE, &sourceval) == 0);
+				    ZPROP_SOURCE, &sourceval) == 0);
 
 				if (strcmp(sourceval,
 				    zfs_get_name(zhp)) == 0) {
-					sourcetype = ZFS_SRC_LOCAL;
+					sourcetype = ZPROP_SRC_LOCAL;
 				} else {
-					sourcetype = ZFS_SRC_INHERITED;
+					sourcetype = ZPROP_SRC_INHERITED;
 					(void) strlcpy(source,
 					    sourceval, sizeof (source));
 				}
 			}
 
-			libzfs_print_one_property(zfs_get_name(zhp), cbp,
+			zprop_print_one_property(zfs_get_name(zhp), cbp,
 			    pl->pl_user_prop, strval, sourcetype,
 			    source);
 		}
@@ -1027,21 +1030,22 @@ get_callback(zfs_handle_t *zhp, void *data)
 static int
 zfs_do_get(int argc, char **argv)
 {
-	libzfs_get_cbdata_t cb = { 0 };
+	zprop_get_cbdata_t cb = { 0 };
 	boolean_t recurse = B_FALSE;
 	int i, c;
 	char *value, *fields;
 	int ret;
-	zfs_proplist_t fake_name = { 0 };
+	zprop_list_t fake_name = { 0 };
 
 	/*
 	 * Set up default columns and sources.
 	 */
-	cb.cb_sources = ZFS_SRC_ALL;
+	cb.cb_sources = ZPROP_SRC_ALL;
 	cb.cb_columns[0] = GET_COL_NAME;
 	cb.cb_columns[1] = GET_COL_PROPERTY;
 	cb.cb_columns[2] = GET_COL_VALUE;
 	cb.cb_columns[3] = GET_COL_SOURCE;
+	cb.cb_type = ZFS_TYPE_DATASET;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":o:s:rHp")) != -1) {
@@ -1112,19 +1116,19 @@ zfs_do_get(int argc, char **argv)
 				switch (getsubopt(&optarg, source_subopts,
 				    &value)) {
 				case 0:
-					cb.cb_sources |= ZFS_SRC_LOCAL;
+					cb.cb_sources |= ZPROP_SRC_LOCAL;
 					break;
 				case 1:
-					cb.cb_sources |= ZFS_SRC_DEFAULT;
+					cb.cb_sources |= ZPROP_SRC_DEFAULT;
 					break;
 				case 2:
-					cb.cb_sources |= ZFS_SRC_INHERITED;
+					cb.cb_sources |= ZPROP_SRC_INHERITED;
 					break;
 				case 3:
-					cb.cb_sources |= ZFS_SRC_TEMPORARY;
+					cb.cb_sources |= ZPROP_SRC_TEMPORARY;
 					break;
 				case 4:
-					cb.cb_sources |= ZFS_SRC_NONE;
+					cb.cb_sources |= ZPROP_SRC_NONE;
 					break;
 				default:
 					(void) fprintf(stderr,
@@ -1153,7 +1157,8 @@ zfs_do_get(int argc, char **argv)
 
 	fields = argv[0];
 
-	if (zfs_get_proplist(g_zfs, fields, &cb.cb_proplist) != 0)
+	if (zprop_get_list(g_zfs, fields, &cb.cb_proplist, ZFS_TYPE_DATASET)
+	    != 0)
 		usage(B_FALSE);
 
 	argc--;
@@ -1177,13 +1182,13 @@ zfs_do_get(int argc, char **argv)
 	cb.cb_first = B_TRUE;
 
 	/* run for each object */
-	ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY, NULL,
+	ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_DATASET, NULL,
 	    &cb.cb_proplist, get_callback, &cb, B_FALSE);
 
 	if (cb.cb_proplist == &fake_name)
-		zfs_free_proplist(fake_name.pl_next);
+		zprop_free_list(fake_name.pl_next);
 	else
-		zfs_free_proplist(cb.cb_proplist);
+		zprop_free_list(cb.cb_proplist);
 
 	return (ret);
 }
@@ -1250,7 +1255,7 @@ zfs_do_inherit(int argc, char **argv)
 	argc--;
 	argv++;
 
-	if ((prop = zfs_name_to_prop(propname)) != ZFS_PROP_INVAL) {
+	if ((prop = zfs_name_to_prop(propname)) != ZPROP_INVAL) {
 		if (zfs_prop_readonly(prop)) {
 			(void) fprintf(stderr, gettext(
 			    "%s property is read-only\n"),
@@ -1502,14 +1507,14 @@ zfs_do_upgrade(int argc, char **argv)
 typedef struct list_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_scripted;
-	zfs_proplist_t	*cb_proplist;
+	zprop_list_t	*cb_proplist;
 } list_cbdata_t;
 
 /*
  * Given a list of columns to display, output appropriate headers for each one.
  */
 static void
-print_header(zfs_proplist_t *pl)
+print_header(zprop_list_t *pl)
 {
 	char headerbuf[ZFS_MAXPROPLEN];
 	const char *header;
@@ -1525,7 +1530,7 @@ print_header(zfs_proplist_t *pl)
 		}
 
 		right_justify = B_FALSE;
-		if (pl->pl_prop != ZFS_PROP_INVAL) {
+		if (pl->pl_prop != ZPROP_INVAL) {
 			header = zfs_prop_column_name(pl->pl_prop);
 			right_justify = zfs_prop_align_right(pl->pl_prop);
 		} else {
@@ -1551,7 +1556,7 @@ print_header(zfs_proplist_t *pl)
  * to the described layout.
  */
 static void
-print_dataset(zfs_handle_t *zhp, zfs_proplist_t *pl, int scripted)
+print_dataset(zfs_handle_t *zhp, zprop_list_t *pl, boolean_t scripted)
 {
 	boolean_t first = B_TRUE;
 	char property[ZFS_MAXPROPLEN];
@@ -1572,7 +1577,7 @@ print_dataset(zfs_handle_t *zhp, zfs_proplist_t *pl, int scripted)
 		}
 
 		right_justify = B_FALSE;
-		if (pl->pl_prop != ZFS_PROP_INVAL) {
+		if (pl->pl_prop != ZPROP_INVAL) {
 			if (zfs_prop_get(zhp, pl->pl_prop, property,
 			    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
 				propstr = "-";
@@ -1586,7 +1591,7 @@ print_dataset(zfs_handle_t *zhp, zfs_proplist_t *pl, int scripted)
 				propstr = "-";
 			else
 				verify(nvlist_lookup_string(propval,
-				    ZFS_PROP_VALUE, &propstr) == 0);
+				    ZPROP_VALUE, &propstr) == 0);
 		}
 
 		width = pl->pl_width;
@@ -1634,7 +1639,7 @@ zfs_do_list(int argc, char **argv)
 	boolean_t scripted = B_FALSE;
 	static char default_fields[] =
 	    "name,used,available,referenced,mountpoint";
-	int types = ZFS_TYPE_ANY;
+	int types = ZFS_TYPE_DATASET;
 	char *fields = NULL;
 	char *basic_fields = default_fields;
 	list_cbdata_t cb = { 0 };
@@ -1712,11 +1717,12 @@ zfs_do_list(int argc, char **argv)
 		fields = basic_fields;
 
 	/*
-	 * If the user specifies '-o all', the zfs_get_proplist() doesn't
+	 * If the user specifies '-o all', the zprop_get_list() doesn't
 	 * normally include the name of the dataset.  For 'zfs list', we always
 	 * want this property to be first.
 	 */
-	if (zfs_get_proplist(g_zfs, fields, &cb.cb_proplist) != 0)
+	if (zprop_get_list(g_zfs, fields, &cb.cb_proplist, ZFS_TYPE_DATASET)
+	    != 0)
 		usage(B_FALSE);
 
 	cb.cb_scripted = scripted;
@@ -1725,7 +1731,7 @@ zfs_do_list(int argc, char **argv)
 	ret = zfs_for_each(argc, argv, recurse, types, sortcol, &cb.cb_proplist,
 	    list_callback, &cb, B_TRUE);
 
-	zfs_free_proplist(cb.cb_proplist);
+	zprop_free_list(cb.cb_proplist);
 	zfs_free_sort_columns(sortcol);
 
 	if (ret == 0 && cb.cb_first && !cb.cb_scripted)
@@ -1802,7 +1808,7 @@ zfs_do_rename(int argc, char **argv)
 	}
 
 	if ((zhp = zfs_open(g_zfs, argv[0], parents ? ZFS_TYPE_FILESYSTEM |
-	    ZFS_TYPE_VOLUME : ZFS_TYPE_ANY)) == NULL)
+	    ZFS_TYPE_VOLUME : ZFS_TYPE_DATASET)) == NULL)
 		return (1);
 
 	/* If we were asked and the name looks good, try to create ancestors. */
@@ -1998,7 +2004,7 @@ zfs_do_rollback(int argc, char **argv)
 	(void) strlcpy(parentname, argv[0], sizeof (parentname));
 	verify((delim = strrchr(parentname, '@')) != NULL);
 	*delim = '\0';
-	if ((zhp = zfs_open(g_zfs, parentname, ZFS_TYPE_ANY)) == NULL) {
+	if ((zhp = zfs_open(g_zfs, parentname, ZFS_TYPE_DATASET)) == NULL) {
 		zfs_close(snap);
 		return (1);
 	}
@@ -2106,7 +2112,7 @@ zfs_do_set(int argc, char **argv)
 
 
 	ret = zfs_for_each(argc - 2, argv + 2, B_FALSE,
-	    ZFS_TYPE_ANY, NULL, NULL, set_callback, &cb, B_FALSE);
+	    ZFS_TYPE_DATASET, NULL, NULL, set_callback, &cb, B_FALSE);
 
 	return (ret);
 }
@@ -2374,7 +2380,7 @@ zfs_print_allows(char *ds)
 		    " permissions\n"));
 		return (1);
 	}
-	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_DATASET)) == NULL)
 		return (1);
 
 	if (zfs_perm_get(zhp, &perms)) {
@@ -2607,7 +2613,7 @@ parse_allow_args(int *argc, char **argv[], boolean_t unallow,
 			return (-1);
 	}
 
-	if ((zhp = zfs_open(g_zfs, *ds, ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, *ds, ZFS_TYPE_DATASET)) == NULL)
 		return (-1);
 
 	if ((zfs_build_perms(zhp, who, perms,
@@ -2635,7 +2641,7 @@ zfs_do_allow(int argc, char **argv)
 	if (ret == 1)
 		return (zfs_print_allows(argv[0]));
 
-	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_DATASET)) == NULL)
 		return (1);
 
 	if (zfs_perm_set(zhp, zperms)) {

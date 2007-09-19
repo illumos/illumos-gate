@@ -300,7 +300,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getDatasets(JNIEnv *env,
 	}
 
 	return (zjni_get_Datasets_below(env, containerUTF,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, ZFS_TYPE_ANY,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, ZFS_TYPE_DATASET,
 	    ZFSJNI_PACKAGE_DATA "Dataset"));
 }
 
@@ -315,7 +315,7 @@ JNIEXPORT jobject JNICALL
 Java_com_sun_zfs_common_model_SystemDataModel_getDataset(JNIEnv *env,
     jobject obj, jstring nameUTF)
 {
-	return (zjni_get_Dataset(env, nameUTF, ZFS_TYPE_ANY));
+	return (zjni_get_Dataset(env, nameUTF, ZFS_TYPE_DATASET));
 }
 
 /*
@@ -486,7 +486,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getPropertyDefault(JNIEnv *env,
 	zfs_prop_t prop = zjni_get_property_from_name(name);
 	(*env)->ReleaseStringUTFChars(env, nameUTF, name);
 
-	if (prop != ZFS_PROP_INVAL) {
+	if (prop != ZPROP_INVAL) {
 		defProperty = zjni_get_default_property(env, prop);
 	}
 
@@ -504,8 +504,8 @@ typedef struct mapping_data {
 	zjni_ArrayList_t	*list;
 } mapping_data_t;
 
-static zfs_prop_t
-mapping_cb(zfs_prop_t prop, void *cb)
+static int
+mapping_cb(int prop, void *cb)
 {
 	mapping_data_t *map = cb;
 	JNIEnv *env = map->env;
@@ -519,7 +519,7 @@ mapping_cb(zfs_prop_t prop, void *cb)
 		    ((zjni_Collection_t *)list)->method_add, propName);
 	}
 
-	return (ZFS_PROP_CONT);
+	return (ZPROP_CONT);
 }
 
 /*
@@ -569,7 +569,8 @@ Java_com_sun_zfs_common_model_SystemDataModel_getValidPropertyNames(JNIEnv *env,
 			map_data.env = env;
 			map_data.type = mappings[i].type;
 			map_data.list = list;
-			(void) zfs_prop_iter(mapping_cb, &map_data);
+			(void) zprop_iter(mapping_cb, &map_data, B_FALSE,
+			    B_FALSE, ZFS_TYPE_DATASET);
 			break;
 		}
 	}

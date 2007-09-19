@@ -128,14 +128,16 @@ typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];
 	char		zc_value[MAXPATHLEN * 2];
 	uint64_t	zc_guid;
-	uint64_t	zc_nvlist_src;	/* really (char *) */
+	uint64_t	zc_nvlist_conf;		/* really (char *) */
+	uint64_t	zc_nvlist_conf_size;
+	uint64_t	zc_nvlist_src;		/* really (char *) */
 	uint64_t	zc_nvlist_src_size;
-	uint64_t	zc_nvlist_dst;	/* really (char *) */
+	uint64_t	zc_nvlist_dst;		/* really (char *) */
 	uint64_t	zc_nvlist_dst_size;
 	uint64_t	zc_cookie;
 	uint64_t	zc_objset_type;
 	uint64_t	zc_perm_action;
-	uint64_t 	zc_history;	/* really (char *) */
+	uint64_t 	zc_history;		/* really (char *) */
 	uint64_t 	zc_history_len;
 	uint64_t	zc_history_offset;
 	uint64_t	zc_obj;

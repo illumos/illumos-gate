@@ -639,7 +639,7 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 	zfs_handle_t **zlist;
 	char shareopts[ZFS_MAXPROPLEN];
 	sa_share_t share;
-	zfs_source_t source;
+	zprop_source_t source;
 	char sourcestr[ZFS_MAXPROPLEN];
 	char mountpoint[ZFS_MAXPROPLEN];
 	size_t count = 0, i;
@@ -667,7 +667,7 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 	for (i = 0; i < count; i++) {
 		char *dataset;
 
-		source = ZFS_SRC_ALL;
+		source = ZPROP_SRC_ALL;
 		/* If no mountpoint, skip. */
 		if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT,
 		    mountpoint, sizeof (mountpoint), NULL, NULL, 0,
@@ -711,7 +711,7 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 				share = NULL;
 			}
 			if (err == SA_OK) {
-				if (source & ZFS_SRC_INHERITED) {
+				if (source & ZPROP_SRC_INHERITED) {
 					err = zfs_inherited(handle,
 					    share, sourcestr,
 					    shareopts, mountpoint);

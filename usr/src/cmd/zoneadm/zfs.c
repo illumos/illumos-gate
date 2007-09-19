@@ -433,7 +433,7 @@ clone_snap(char *snapshot_name, char *zonepath)
 		return (Z_ERR);
 
 	/* create the mountpoint if necessary */
-	if ((clone = zfs_open(g_zfs, zonepath, ZFS_TYPE_ANY)) == NULL)
+	if ((clone = zfs_open(g_zfs, zonepath, ZFS_TYPE_DATASET)) == NULL)
 		return (Z_ERR);
 
 	/*
@@ -544,7 +544,7 @@ snap2path(char *snap_name, char *path, int len)
 
 	/* Get the file system name from the snap_name. */
 	*p = '\0';
-	zhp = zfs_open(g_zfs, snap_name, ZFS_TYPE_ANY);
+	zhp = zfs_open(g_zfs, snap_name, ZFS_TYPE_DATASET);
 	*p = '@';
 	if (zhp == NULL)
 		return (Z_ERR);
@@ -729,7 +729,7 @@ create_zfs_zonepath(char *zonepath)
 	}
 
 	if (zfs_create(g_zfs, zfs_name, ZFS_TYPE_FILESYSTEM, props) != 0 ||
-	    (zhp = zfs_open(g_zfs, zfs_name, ZFS_TYPE_ANY)) == NULL) {
+	    (zhp = zfs_open(g_zfs, zfs_name, ZFS_TYPE_DATASET)) == NULL) {
 		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "
 		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
 		nvlist_free(props);
@@ -911,7 +911,7 @@ verify_datasets(zone_dochandle_t handle)
 	zfs_handle_t *zhp;
 	char propbuf[ZFS_MAXPROPLEN];
 	char source[ZFS_MAXNAMELEN];
-	zfs_source_t srctype;
+	zprop_source_t srctype;
 
 	if (zonecfg_setdsent(handle) != Z_OK) {
 		/*
@@ -937,7 +937,7 @@ verify_datasets(zone_dochandle_t handle)
 		if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf,
 		    sizeof (propbuf), &srctype, source,
 		    sizeof (source), 0) == 0 &&
-		    (srctype == ZFS_SRC_INHERITED)) {
+		    (srctype == ZPROP_SRC_INHERITED)) {
 			(void) fprintf(stderr, gettext("could not verify zfs "
 			    "dataset %s: mountpoint cannot be inherited\n"),
 			    dstab.zone_dataset_name);
@@ -975,7 +975,7 @@ verify_fs_zfs(struct zone_fstab *fstab)
 	char propbuf[ZFS_MAXPROPLEN];
 
 	if ((zhp = zfs_open(g_zfs, fstab->zone_fs_special,
-	    ZFS_TYPE_ANY)) == NULL) {
+	    ZFS_TYPE_DATASET)) == NULL) {
 		(void) fprintf(stderr, gettext("could not verify fs %s: "
 		    "could not access zfs dataset '%s'\n"),
 		    fstab->zone_fs_dir, fstab->zone_fs_special);

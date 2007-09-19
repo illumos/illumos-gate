@@ -36,105 +36,24 @@
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
-#include <util/qsort.h>
 #else
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #endif
 
-typedef enum {
-	PROP_DEFAULT,
-	PROP_READONLY,
-	PROP_INHERIT
-} prop_attr_t;
+static zprop_desc_t zfs_prop_table[ZFS_NUM_PROPS];
 
-typedef struct zfs_index {
-	const char *name;
-	uint64_t index;
-} zfs_index_t;
-
-typedef struct {
-	const char *pd_name;		/* human-readable property name */
-	zfs_proptype_t pd_proptype;	/* string, boolean, index, number */
-	const char *pd_strdefault;	/* default for strings */
-	uint64_t pd_numdefault;		/* for boolean / index / number */
-	prop_attr_t pd_attr;		/* default, readonly, inherit */
-	int pd_types;			/* bitfield of valid dataset types */
-					/* fs | vol | snap; or pool */
-	const char *pd_values;		/* string telling acceptable values */
-	const char *pd_colname;		/* column header for "zfs list" */
-	boolean_t pd_rightalign;	/* column alignment for "zfs list" */
-	boolean_t pd_visible;		/* do we list this property with the */
-					/* "zfs get" help message */
-	const zfs_index_t *pd_table;	/* for index properties, a table */
-					/* defining the possible values */
-} prop_desc_t;
-
-static prop_desc_t zfs_prop_table[ZFS_NUM_PROPS];
-
-static void
-register_impl(zfs_prop_t prop, const char *name, zfs_proptype_t type,
-    uint64_t numdefault, const char *strdefault, prop_attr_t attr,
-    int objset_types, const char *values, const char *colname,
-    boolean_t rightalign, boolean_t visible, const zfs_index_t *table)
+zprop_desc_t *
+zfs_prop_get_table(void)
 {
-	prop_desc_t *pd = &zfs_prop_table[prop];
-
-	ASSERT(pd->pd_name == NULL || pd->pd_name == name);
-
-	pd->pd_name = name;
-	pd->pd_proptype = type;
-	pd->pd_numdefault = numdefault;
-	pd->pd_strdefault = strdefault;
-	pd->pd_attr = attr;
-	pd->pd_types = objset_types;
-	pd->pd_values = values;
-	pd->pd_colname = colname;
-	pd->pd_rightalign = rightalign;
-	pd->pd_visible = visible;
-	pd->pd_table = table;
-}
-
-static void
-register_string(zfs_prop_t prop, const char *name, const char *def,
-    prop_attr_t attr, int objset_types, const char *values,
-    const char *colname)
-{
-	register_impl(prop, name, PROP_TYPE_STRING, 0, def, attr,
-	    objset_types, values, colname, B_FALSE, B_TRUE, NULL);
-
-}
-
-static void
-register_number(zfs_prop_t prop, const char *name, uint64_t def,
-    prop_attr_t attr, int objset_types, const char *values, const char *colname)
-{
-	register_impl(prop, name, PROP_TYPE_NUMBER, def, NULL, attr,
-	    objset_types, values, colname, B_TRUE, B_TRUE, NULL);
-}
-
-static void
-register_index(zfs_prop_t prop, const char *name, uint64_t def,
-    prop_attr_t attr, int objset_types, const char *values, const char *colname,
-    const zfs_index_t *table)
-{
-	register_impl(prop, name, PROP_TYPE_INDEX, def, NULL, attr,
-	    objset_types, values, colname, B_TRUE, B_TRUE, table);
-}
-
-static void
-register_hidden(zfs_prop_t prop, const char *name, zfs_proptype_t type,
-    prop_attr_t attr, int objset_types, const char *colname)
-{
-	register_impl(prop, name, type, 0, NULL, attr,
-	    objset_types, NULL, colname, B_FALSE, B_FALSE, NULL);
+	return (zfs_prop_table);
 }
 
 void
 zfs_prop_init(void)
 {
-	static zfs_index_t checksum_table[] = {
+	static zprop_index_t checksum_table[] = {
 		{ "on",		ZIO_CHECKSUM_ON },
 		{ "off",	ZIO_CHECKSUM_OFF },
 		{ "fletcher2",	ZIO_CHECKSUM_FLETCHER_2 },
@@ -143,7 +62,7 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
-	static zfs_index_t compress_table[] = {
+	static zprop_index_t compress_table[] = {
 		{ "on",		ZIO_COMPRESS_ON },
 		{ "off",	ZIO_COMPRESS_OFF },
 		{ "lzjb",	ZIO_COMPRESS_LZJB },
@@ -160,20 +79,20 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
-	static zfs_index_t snapdir_table[] = {
+	static zprop_index_t snapdir_table[] = {
 		{ "hidden",	ZFS_SNAPDIR_HIDDEN },
 		{ "visible",	ZFS_SNAPDIR_VISIBLE },
 		{ NULL }
 	};
 
-	static zfs_index_t acl_mode_table[] = {
+	static zprop_index_t acl_mode_table[] = {
 		{ "discard",	ZFS_ACL_DISCARD },
 		{ "groupmask",	ZFS_ACL_GROUPMASK },
 		{ "passthrough", ZFS_ACL_PASSTHROUGH },
 		{ NULL }
 	};
 
-	static zfs_index_t acl_inherit_table[] = {
+	static zprop_index_t acl_inherit_table[] = {
 		{ "discard",	ZFS_ACL_DISCARD },
 		{ "noallow",	ZFS_ACL_NOALLOW },
 		{ "secure",	ZFS_ACL_SECURE },
@@ -181,21 +100,21 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
-	static zfs_index_t copies_table[] = {
+	static zprop_index_t copies_table[] = {
 		{ "1",		1 },
 		{ "2",		2 },
 		{ "3",		3 },
 		{ NULL }
 	};
 
-	static zfs_index_t version_table[] = {
+	static zprop_index_t version_table[] = {
 		{ "1",		1 },
 		{ "2",		2 },
 		{ "current",	ZPL_VERSION },
 		{ NULL }
 	};
 
-	static zfs_index_t boolean_table[] = {
+	static zprop_index_t boolean_table[] = {
 		{ "off",	0 },
 		{ "on",		1 },
 		{ NULL }
@@ -215,8 +134,7 @@ zfs_prop_init(void)
 	    "hidden | visible", "SNAPDIR", snapdir_table);
 	register_index(ZFS_PROP_ACLMODE, "aclmode", ZFS_ACL_GROUPMASK,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
-	    "discard | groupmask | passthrough", "ACLMODE",
-	    acl_mode_table);
+	    "discard | groupmask | passthrough", "ACLMODE", acl_mode_table);
 	register_index(ZFS_PROP_ACLINHERIT, "aclinherit", ZFS_ACL_SECURE,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | secure | passthrough", "ACLINHERIT",
@@ -254,43 +172,36 @@ zfs_prop_init(void)
 	/* default index (boolean) properties */
 	register_index(ZFS_PROP_CANMOUNT, "canmount", 1, PROP_DEFAULT,
 	    ZFS_TYPE_FILESYSTEM, "on | off", "CANMOUNT", boolean_table);
-	register_index(ZPOOL_PROP_DELEGATION, "delegation", 1, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "DELEGATION", boolean_table);
-	register_index(ZPOOL_PROP_AUTOREPLACE, "autoreplace", 0, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | off", "REPLACE", boolean_table);
 
 	/* readonly index (boolean) properties */
 	register_index(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,
-	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED", boolean_table);
+	    ZFS_TYPE_FILESYSTEM, "yes | no", "MOUNTED", boolean_table);
 
 	/* string properties */
 	register_string(ZFS_PROP_ORIGIN, "origin", NULL, PROP_READONLY,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<snapshot>", "ORIGIN");
-	register_string(ZPOOL_PROP_BOOTFS, "bootfs", NULL, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS");
 	register_string(ZFS_PROP_MOUNTPOINT, "mountpoint", "/", PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "<path> | legacy | none", "MOUNTPOINT");
 	register_string(ZFS_PROP_SHARENFS, "sharenfs", "off", PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off | share(1M) options", "SHARENFS");
 	register_string(ZFS_PROP_SHAREISCSI, "shareiscsi", "off", PROP_INHERIT,
-	    ZFS_TYPE_ANY, "on | off | type=<type>", "SHAREISCSI");
+	    ZFS_TYPE_DATASET, "on | off | type=<type>", "SHAREISCSI");
 	register_string(ZFS_PROP_TYPE, "type", NULL, PROP_READONLY,
-	    ZFS_TYPE_ANY, "filesystem | volume | snapshot", "TYPE");
+	    ZFS_TYPE_DATASET, "filesystem | volume | snapshot", "TYPE");
 
 	/* readonly number properties */
 	register_number(ZFS_PROP_USED, "used", 0, PROP_READONLY,
-	    ZFS_TYPE_ANY, "<size>", "USED");
+	    ZFS_TYPE_DATASET, "<size>", "USED");
 	register_number(ZFS_PROP_AVAILABLE, "available", 0, PROP_READONLY,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "<size>", "AVAIL");
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "AVAIL");
 	register_number(ZFS_PROP_REFERENCED, "referenced", 0, PROP_READONLY,
-	    ZFS_TYPE_ANY, "<size>", "REFER");
+	    ZFS_TYPE_DATASET, "<size>", "REFER");
 	register_number(ZFS_PROP_COMPRESSRATIO, "compressratio", 0,
-	    PROP_READONLY, ZFS_TYPE_ANY,
+	    PROP_READONLY, ZFS_TYPE_DATASET,
 	    "<1.00x or higher if compressed>", "RATIO");
 	register_number(ZFS_PROP_VOLBLOCKSIZE, "volblocksize", 8192,
-	    PROP_READONLY,
-	    ZFS_TYPE_VOLUME, "512 to 128k, power of 2",	"VOLBLOCK");
+	    PROP_READONLY, ZFS_TYPE_VOLUME,
+	    "512 to 128k, power of 2", "VOLBLOCK");
 
 	/* default number properties */
 	register_number(ZFS_PROP_QUOTA, "quota", 0, PROP_DEFAULT,
@@ -307,181 +218,25 @@ zfs_prop_init(void)
 
 	/* hidden properties */
 	register_hidden(ZFS_PROP_CREATETXG, "createtxg", PROP_TYPE_NUMBER,
-	    PROP_READONLY, ZFS_TYPE_ANY, NULL);
+	    PROP_READONLY, ZFS_TYPE_DATASET, NULL);
 	register_hidden(ZFS_PROP_NUMCLONES, "numclones", PROP_TYPE_NUMBER,
 	    PROP_READONLY, ZFS_TYPE_SNAPSHOT, NULL);
 	register_hidden(ZFS_PROP_NAME, "name", PROP_TYPE_STRING,
-	    PROP_READONLY, ZFS_TYPE_ANY, "NAME");
+	    PROP_READONLY, ZFS_TYPE_DATASET, "NAME");
 	register_hidden(ZFS_PROP_ISCSIOPTIONS, "iscsioptions", PROP_TYPE_STRING,
 	    PROP_INHERIT, ZFS_TYPE_VOLUME, "ISCSIOPTIONS");
-	register_hidden(ZPOOL_PROP_NAME, "zpoolname", PROP_TYPE_STRING,
-	    PROP_READONLY, ZFS_TYPE_POOL, NULL);
 
 	/* oddball properties */
 	register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0, NULL,
-	    PROP_READONLY, ZFS_TYPE_ANY,
+	    PROP_READONLY, ZFS_TYPE_DATASET,
 	    "<date>", "CREATION", B_FALSE, B_TRUE, NULL);
 }
 
-
-/*
- * Returns TRUE if the property applies to any of the given dataset types.
- */
-int
-zfs_prop_valid_for_type(zfs_prop_t prop, int types)
-{
-	return ((zfs_prop_table[prop].pd_types & types) != 0);
-}
-
-/*
- * Determine if the specified property is visible or not.
- */
 boolean_t
-zfs_prop_is_visible(zfs_prop_t prop)
+zfs_prop_delegatable(zfs_prop_t prop)
 {
-	if (prop < 0)
-		return (B_FALSE);
-
-	return (zfs_prop_table[prop].pd_visible);
-}
-
-/*
- * A comparison function we can use to order indexes into the
- * zfs_prop_table[]
- */
-static int
-zfs_prop_compare(const void *arg1, const void *arg2)
-{
-	const zfs_prop_t *p1 = arg1;
-	const zfs_prop_t *p2 = arg2;
-	boolean_t p1ro, p2ro;
-
-	p1ro = (zfs_prop_table[*p1].pd_attr == PROP_READONLY);
-	p2ro = (zfs_prop_table[*p2].pd_attr == PROP_READONLY);
-
-	if (p1ro == p2ro) {
-		return (strcmp(zfs_prop_table[*p1].pd_name,
-		    zfs_prop_table[*p2].pd_name));
-	}
-
-	return (p1ro ? -1 : 1);
-}
-
-/*
- * Iterate over all properties, calling back into the specified function
- * for each property. We will continue to iterate until we either
- * reach the end or the callback function something other than
- * ZFS_PROP_CONT.
- */
-zfs_prop_t
-zfs_prop_iter_common(zfs_prop_f func, void *cb, zfs_type_t type,
-    boolean_t show_all, boolean_t ordered)
-{
-	int i;
-	zfs_prop_t order[ZFS_NUM_PROPS];
-
-	for (int j = 0; j < ZFS_NUM_PROPS; j++)
-		order[j] = j;
-
-
-	if (ordered) {
-		qsort((void *)order, ZFS_NUM_PROPS, sizeof (zfs_prop_t),
-		    zfs_prop_compare);
-	}
-
-	for (i = 0; i < ZFS_NUM_PROPS; i++) {
-		if (zfs_prop_valid_for_type(order[i], type) &&
-		    (zfs_prop_is_visible(order[i]) || show_all)) {
-			if (func(order[i], cb) != ZFS_PROP_CONT)
-				return (order[i]);
-		}
-	}
-	return (ZFS_PROP_CONT);
-}
-
-zfs_prop_t
-zfs_prop_iter(zfs_prop_f func, void *cb)
-{
-	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, B_FALSE, B_FALSE));
-}
-
-zfs_prop_t
-zfs_prop_iter_ordered(zfs_prop_f func, void *cb)
-{
-	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, B_FALSE, B_TRUE));
-}
-
-zpool_prop_t
-zpool_prop_iter(zpool_prop_f func, void *cb)
-{
-	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_POOL, B_FALSE,
-	    B_FALSE));
-}
-
-zfs_proptype_t
-zfs_prop_get_type(zfs_prop_t prop)
-{
-	return (zfs_prop_table[prop].pd_proptype);
-}
-
-zfs_proptype_t
-zpool_prop_get_type(zfs_prop_t prop)
-{
-	return (zfs_prop_table[prop].pd_proptype);
-}
-
-static boolean_t
-propname_match(const char *p, zfs_prop_t prop, size_t len)
-{
-	const char *propname = zfs_prop_table[prop].pd_name;
-#ifndef _KERNEL
-	const char *colname = zfs_prop_table[prop].pd_colname;
-	int c;
-
-	if (colname == NULL)
-		return (B_FALSE);
-#endif
-
-	if (len == strlen(propname) &&
-	    strncmp(p, propname, len) == 0)
-		return (B_TRUE);
-
-#ifndef _KERNEL
-	if (len != strlen(colname))
-		return (B_FALSE);
-
-	for (c = 0; c < len; c++)
-		if (p[c] != tolower(colname[c]))
-			break;
-
-	return (colname[c] == '\0');
-#else
-	return (B_FALSE);
-#endif
-}
-
-zfs_prop_t
-zfs_name_to_prop_cb(zfs_prop_t prop, void *cb_data)
-{
-	const char *propname = cb_data;
-
-	if (propname_match(propname, prop, strlen(propname)))
-		return (prop);
-
-	return (ZFS_PROP_CONT);
-}
-
-/*
- * Given a property name and its type, returns the corresponding property ID.
- */
-zfs_prop_t
-zfs_name_to_prop_common(const char *propname, zfs_type_t type)
-{
-	zfs_prop_t prop;
-
-	prop = zfs_prop_iter_common(zfs_name_to_prop_cb, (void *)propname,
-	    type, B_TRUE, B_FALSE);
-	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
+	zprop_desc_t *pd = &zfs_prop_table[prop];
+	return (pd->pd_attr != PROP_READONLY);
 }
 
 /*
@@ -490,24 +245,9 @@ zfs_name_to_prop_common(const char *propname, zfs_type_t type)
 zfs_prop_t
 zfs_name_to_prop(const char *propname)
 {
-	return (zfs_name_to_prop_common(propname, ZFS_TYPE_ANY));
+	return (zprop_name_to_prop(propname, ZFS_TYPE_DATASET));
 }
 
-/*
- * Given a pool property name, returns the corresponding property ID.
- */
-zpool_prop_t
-zpool_name_to_prop(const char *propname)
-{
-	return (zfs_name_to_prop_common(propname, ZFS_TYPE_POOL));
-}
-
-boolean_t
-zfs_prop_delegatable(zfs_prop_t prop)
-{
-	prop_desc_t *pd = &zfs_prop_table[prop];
-	return (pd->pd_attr != PROP_READONLY && pd->pd_types != ZFS_TYPE_POOL);
-}
 
 /*
  * For user property names, we allow all lowercase alphanumeric characters, plus
@@ -546,16 +286,47 @@ zfs_prop_user(const char *name)
 }
 
 /*
- * Return the default value for the given property.
+ * Tables of index types, plus functions to convert between the user view
+ * (strings) and internal representation (uint64_t).
  */
-const char *
-zfs_prop_default_string(zfs_prop_t prop)
+int
+zfs_prop_string_to_index(zfs_prop_t prop, const char *string, uint64_t *index)
 {
-	return (zfs_prop_table[prop].pd_strdefault);
+	return (zprop_string_to_index(prop, string, index, ZFS_TYPE_DATASET));
+}
+
+int
+zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
+{
+	return (zprop_index_to_string(prop, index, string, ZFS_TYPE_DATASET));
+}
+
+/*
+ * Returns TRUE if the property applies to any of the given dataset types.
+ */
+int
+zfs_prop_valid_for_type(int prop, zfs_type_t types)
+{
+	return (zprop_valid_for_type(prop, types));
+}
+
+zprop_type_t
+zfs_prop_get_type(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_proptype);
+}
+
+/*
+ * Returns TRUE if the property is readonly.
+ */
+boolean_t
+zfs_prop_readonly(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_attr == PROP_READONLY);
 }
 
 const char *
-zpool_prop_default_string(zpool_prop_t prop)
+zfs_prop_default_string(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_strdefault);
 }
@@ -564,21 +335,6 @@ uint64_t
 zfs_prop_default_numeric(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_numdefault);
-}
-
-uint64_t
-zpool_prop_default_numeric(zpool_prop_t prop)
-{
-	return (zfs_prop_table[prop].pd_numdefault);
-}
-
-/*
- * Returns TRUE if the property is readonly.
- */
-int
-zfs_prop_readonly(zfs_prop_t prop)
-{
-	return (zfs_prop_table[prop].pd_attr == PROP_READONLY);
 }
 
 /*
@@ -592,64 +348,12 @@ zfs_prop_to_name(zfs_prop_t prop)
 }
 
 /*
- * Given a pool property ID, returns the corresponding name.
- * Assuming the pool property ID is valid.
- */
-const char *
-zpool_prop_to_name(zpool_prop_t prop)
-{
-	return (zfs_prop_table[prop].pd_name);
-}
-
-/*
  * Returns TRUE if the property is inheritable.
  */
-int
+boolean_t
 zfs_prop_inheritable(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_attr == PROP_INHERIT);
-}
-
-/*
- * Tables of index types, plus functions to convert between the user view
- * (strings) and internal representation (uint64_t).
- */
-int
-zfs_prop_string_to_index(zfs_prop_t prop, const char *string, uint64_t *index)
-{
-	const zfs_index_t *table;
-	int i;
-
-	if ((table = zfs_prop_table[prop].pd_table) == NULL)
-		return (-1);
-
-	for (i = 0; table[i].name != NULL; i++) {
-		if (strcmp(string, table[i].name) == 0) {
-			*index = table[i].index;
-			return (0);
-		}
-	}
-
-	return (-1);
-}
-
-int
-zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
-{
-	const zfs_index_t *table;
-	int i;
-
-	if ((table = zfs_prop_table[prop].pd_table) == NULL)
-		return (-1);
-
-	for (i = 0; table[i].name != NULL; i++) {
-		if (table[i].index == index) {
-			*string = table[i].name;
-			return (0);
-		}
-	}
-
-	return (-1);
 }
 
 #ifndef _KERNEL
@@ -661,22 +365,6 @@ zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
 const char *
 zfs_prop_values(zfs_prop_t prop)
 {
-	if (zfs_prop_table[prop].pd_types == ZFS_TYPE_POOL)
-		return (NULL);
-
-	return (zfs_prop_table[prop].pd_values);
-}
-
-/*
- * Returns a string describing the set of acceptable values for the given
- * zpool property, or NULL if it cannot be set.
- */
-const char *
-zpool_prop_values(zfs_prop_t prop)
-{
-	if (zfs_prop_table[prop].pd_types != ZFS_TYPE_POOL)
-		return (NULL);
-
 	return (zfs_prop_table[prop].pd_values);
 }
 
@@ -711,59 +399,4 @@ zfs_prop_align_right(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_rightalign);
 }
-
-/*
- * Determines the minimum width for the column, and indicates whether it's fixed
- * or not.  Only string columns are non-fixed.
- */
-size_t
-zfs_prop_width(zfs_prop_t prop, boolean_t *fixed)
-{
-	prop_desc_t *pd = &zfs_prop_table[prop];
-	const zfs_index_t *idx;
-	size_t ret;
-	int i;
-
-	*fixed = B_TRUE;
-
-	/*
-	 * Start with the width of the column name.
-	 */
-	ret = strlen(pd->pd_colname);
-
-	/*
-	 * For fixed-width values, make sure the width is large enough to hold
-	 * any possible value.
-	 */
-	switch (pd->pd_proptype) {
-	case PROP_TYPE_NUMBER:
-		/*
-		 * The maximum length of a human-readable number is 5 characters
-		 * ("20.4M", for example).
-		 */
-		if (ret < 5)
-			ret = 5;
-		/*
-		 * 'creation' is handled specially because it's a number
-		 * internally, but displayed as a date string.
-		 */
-		if (prop == ZFS_PROP_CREATION)
-			*fixed = B_FALSE;
-		break;
-	case PROP_TYPE_INDEX:
-		idx = zfs_prop_table[prop].pd_table;
-		for (i = 0; idx[i].name != NULL; i++) {
-			if (strlen(idx[i].name) > ret)
-				ret = strlen(idx[i].name);
-		}
-		break;
-
-	case PROP_TYPE_STRING:
-		*fixed = B_FALSE;
-		break;
-	}
-
-	return (ret);
-}
-
 #endif

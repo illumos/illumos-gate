@@ -698,7 +698,7 @@ modify_zfs(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (((zh = libzfs_init()) == NULL) ||
-	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) == NULL)) {
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_DATASET)) == NULL)) {
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		goto error;
 	}
