@@ -95,7 +95,7 @@ conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
 	conv_arg.oflags = mode;
 	conv_arg.rflags = mode & ~(RTLD_LAZY | RTLD_NOW | RTLD_GLOBAL);
 
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)dl_mode_buf->buf);
 }
@@ -139,7 +139,8 @@ conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
  * we build a "|" separated string.
  */
 const char *
-conv_dl_flag(int flags, int fmt_flags, Conv_dl_flag_buf_t *dl_flag_buf)
+conv_dl_flag(int flags, Conv_fmt_flags_t fmt_flags,
+    Conv_dl_flag_buf_t *dl_flag_buf)
 {
 	static Val_desc vda[] = {
 		{ RTLD_REL_RELATIVE,	MSG_ORIG(MSG_RTLD_REL_RELATIVE) },
@@ -164,7 +165,7 @@ conv_dl_flag(int flags, int fmt_flags, Conv_dl_flag_buf_t *dl_flag_buf)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.buf = dl_flag_buf->buf;
-	if (fmt_flags & CONV_FMT_ALTCRLE) {
+	if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_CRLE) {
 		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_GBL_QUOTE);
 		conv_arg.sep = MSG_ORIG(MSG_GBL_SEP);
 	} else {		/* Use default delimiters */
@@ -178,7 +179,7 @@ conv_dl_flag(int flags, int fmt_flags, Conv_dl_flag_buf_t *dl_flag_buf)
 	*lstr = NULL;
 	conv_arg.oflags = conv_arg.rflags = flags;
 
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)dl_flag_buf->buf);
 }

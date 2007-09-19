@@ -42,7 +42,8 @@ static const Msg registers[] = { 0,
 };
 
 const char *
-conv_sym_SPARC_value(Addr val, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_sym_SPARC_value(Addr val, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	if ((val < STO_SPARC_REGISTER_G1) || (val > STO_SPARC_REGISTER_G7)) {
 		return (conv_invalid_val(inv_buf, val, fmt_flags));

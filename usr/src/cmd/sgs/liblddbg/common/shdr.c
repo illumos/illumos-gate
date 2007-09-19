@@ -37,7 +37,7 @@ Elf_shdr(Lm_list *lml, Half mach, Shdr *shdr)
 	Conv_sec_flags_buf_t	sec_flags_buf;
 
 	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
-	    conv_sec_flags(shdr->sh_flags, &sec_flags_buf));
+	    conv_sec_flags(shdr->sh_flags, 0, &sec_flags_buf));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
 	    conv_sec_type(mach, shdr->sh_type, 0, &inv_buf1));
 	if (shdr->sh_entsize == 0) {

@@ -54,6 +54,7 @@ f none usr/bin/sparcv9/dump 0555 root bin
 s none usr/ccs/bin/sparcv9/dump=../../../bin/sparcv9/dump
 f none usr/bin/sparcv9/elfdump 0555 root bin
 s none usr/ccs/bin/sparcv9/elfdump=../../../bin/sparcv9/elfdump
+f none usr/bin/sparcv9/elfedit 0555 root bin
 f none usr/bin/sparcv9/mcs 0555 root bin
 s none usr/ccs/bin/sparcv9/mcs=../../../bin/sparcv9/mcs
 f none usr/bin/sparcv9/nm 0555 root bin
@@ -65,3 +66,12 @@ s none usr/ccs/bin/sparcv9/strip=../../../bin/sparcv9/strip
 d none usr/lib/sparcv9 0755 root bin
 f none usr/lib/sparcv9/llib-ll.ln 0644 root bin
 f none usr/lib/sparcv9/llib-ly.ln 0644 root bin
+d none usr/lib/elfedit/sparcv9 755 root bin
+s none usr/lib/elfedit/64=sparcv9
+f none usr/lib/elfedit/sparcv9/cap.so 755 root bin
+f none usr/lib/elfedit/sparcv9/dyn.so 755 root bin
+f none usr/lib/elfedit/sparcv9/ehdr.so 755 root bin
+f none usr/lib/elfedit/sparcv9/phdr.so 755 root bin
+f none usr/lib/elfedit/sparcv9/shdr.so 755 root bin
+f none usr/lib/elfedit/sparcv9/sym.so 755 root bin
+f none usr/lib/elfedit/sparcv9/syminfo.so 755 root bin

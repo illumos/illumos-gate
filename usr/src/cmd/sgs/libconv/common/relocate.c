@@ -35,7 +35,8 @@
  * Generic front-end that determines machine specific relocations.
  */
 const char *
-conv_reloc_type(Half mach, Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_reloc_type(Half mach, Word type, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	switch (mach) {
 	case EM_386:
@@ -59,7 +60,7 @@ conv_reloc_type(Half mach, Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
  * do_reloc().
  */
 const char *
-conv_reloc_type_static(Half mach, Word type, int fmt_flags)
+conv_reloc_type_static(Half mach, Word type, Conv_fmt_flags_t fmt_flags)
 {
 	static Conv_inv_buf_t inv_buf;
 

@@ -1462,7 +1462,8 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * received a numeric (e.g. "0x200") or text representation
 	 * (e.g. "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags, &ehdr_flags_buf);
+	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags,
+	    0, &ehdr_flags_buf);
 	if (flgs[0] == '[')
 		mdb_printf(MSG_ORIG(MSG_EHDR_LINE5), flgs);
 	else
@@ -1505,7 +1506,7 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf(MSG_ORIG(MSG_EPHDR_TITLE), addr);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE1), phdr.p_vaddr,
-	    conv_phdr_flags(phdr.p_flags, &phdr_flags_buf));
+	    conv_phdr_flags(phdr.p_flags, 0, &phdr_flags_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE2), phdr.p_paddr,
 	    conv_phdr_type(M_MACH, phdr.p_type, 0, &inv_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz, phdr.p_memsz);

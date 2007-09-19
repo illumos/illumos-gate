@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,14 +33,16 @@ COMOBJS32 =	cap32.o			dynamic32.o \
 		phdr32.o		\
 		relocate_i38632.o	relocate_amd6432.o \
 		relocate_sparc32.o	sections32.o \
-		symbols32.o		symbols_sparc32.o
+		symbols32.o		symbols_sparc32.o \
+		syminfo32.o
 
 COMOBJS64 =	cap64.o			dynamic64.o \
 		elf64.o			globals64.o \
 		phdr64.o		\
 		relocate_i38664.o	relocate_amd6464.o \
 		relocate_sparc64.o	sections64.o \
-		symbols64.o		symbols_sparc64.o
+		symbols64.o		symbols_sparc64.o \
+		syminfo64.o
 
 COMOBJS=	arch.o			config.o \
 		data.o			deftag.o \

@@ -51,7 +51,6 @@ f none $SGSDIR/lib/amd64/librtld_db.so.1=lib/amd64/librtld_db.so.1 755 root bin
 s none $SGSDIR/lib/amd64/librtld_db.so=librtld_db.so.1
 d none $SGSDIR/usr/bin/amd64 755 root bin
 f none $SGSDIR/usr/bin/amd64/crle=usr/bin/amd64/crle 555 root bin
-!include prototype_i386_ext_usr_bin
 f none $SGSDIR/usr/bin/amd64/moe=usr/bin/amd64/moe 555 root bin
 f none $SGSDIR/usr/bin/amd64/pvs=usr/bin/amd64/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/amd64 755 root bin
@@ -59,6 +58,7 @@ f none $SGSDIR/usr/bin/amd64/dump=usr/bin/amd64/dump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/dump=../../../bin/amd64/dump
 f none $SGSDIR/usr/bin/amd64/elfdump=usr/bin/amd64/elfdump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/elfdump=../../../bin/amd64/elfdump
+f none $SGSDIR/usr/bin/amd64/elfedit=usr/bin/amd64/elfedit 0555 root bin
 f none $SGSDIR/usr/bin/amd64/ld=usr/bin/amd64/ld 755 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
 f none $SGSDIR/usr/bin/amd64/nm=usr/bin/amd64/nm 0555 root bin
@@ -67,7 +67,15 @@ f none $SGSDIR/usr/bin/amd64/mcs=usr/bin/amd64/mcs 0555 root bin
 s none $SGSDIR/usr/ccs/bin/amd64/mcs=../../../bin/amd64/mcs
 l none $SGSDIR/usr/bin/amd64/strip=./mcs
 s none $SGSDIR/usr/ccs/bin/amd64/strip=../../../bin/amd64/strip
-!include prototype_i386_ext_usr_lib
+d none $SGSDIR/usr/lib/elfedit/amd64 755 root bin
+s none $SGSDIR/usr/lib/elfedit/64=amd64
+f none $SGSDIR/usr/lib/elfedit/amd64/cap.so=usr/lib/elfedit/amd64/cap.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/dyn.so=usr/lib/elfedit/amd64/dyn.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/ehdr.so=usr/lib/elfedit/amd64/ehdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/phdr.so=usr/lib/elfedit/amd64/phdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/shdr.so=usr/lib/elfedit/amd64/shdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/sym.so=usr/lib/elfedit/amd64/sym.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/amd64/syminfo.so=usr/lib/elfedit/amd64/syminfo.so 755 root bin
 d none $SGSDIR/usr/lib/link_audit/amd64 755 root bin
 s none $SGSDIR/usr/lib/link_audit/64=amd64
 f none $SGSDIR/usr/lib/link_audit/amd64/ldprof.so.1=usr/lib/link_audit/amd64/ldprof.so.1 755 root bin

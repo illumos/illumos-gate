@@ -94,8 +94,12 @@ elf32_checksum(Elf * elf)
 	 * stream to be processed from different architectures - presently this
 	 * is irrelevant, as the checksum simply sums the data bytes, their
 	 * order doesn't matter.  But being uncooked is slightly less overhead.
+	 *
+	 * If the file is writable, the raw data will not reflect any
+	 * changes made in the process, so the uncooked version is only
+	 * for readonly files.
 	 */
-	if (elf->ed_myflags & EDF_MEMORY)
+	if ((elf->ed_myflags & (EDF_MEMORY | EDF_WRITE)) != 0)
 		getdata = elf_getdata;
 	else
 		getdata = elf_rawdata;

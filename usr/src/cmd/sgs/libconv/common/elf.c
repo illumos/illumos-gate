@@ -42,7 +42,8 @@ DEFINE_conv_map2str
 
 
 const char *
-conv_ehdr_class(uchar_t class, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_class(uchar_t class, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	classes[] = {
 		MSG_ELFCLASSNONE, MSG_ELFCLASS32, MSG_ELFCLASS64
@@ -51,12 +52,22 @@ conv_ehdr_class(uchar_t class, int fmt_flags, Conv_inv_buf_t *inv_buf)
 		MSG_ELFCLASSNONE_ALT, MSG_ELFCLASS32_ALT, MSG_ELFCLASS64_ALT
 	};
 
+	/* Use alternative strings? */
+	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+	case CONV_FMT_ALT_DUMP:
+	case CONV_FMT_ALT_FILE:
+		return (conv_map2str(inv_buf, class, fmt_flags,
+		    ARRAY_NELTS(classes_alt), classes_alt));
+	}
+
+	/* Use default strings */
 	return (conv_map2str(inv_buf, class, fmt_flags,
-	    ARRAY_NELTS(classes), classes, classes_alt, classes_alt));
+	    ARRAY_NELTS(classes), classes));
 }
 
 const char *
-conv_ehdr_data(uchar_t data, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_data(uchar_t data, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	datas[] = {
 		MSG_ELFDATANONE, MSG_ELFDATA2LSB, MSG_ELFDATA2MSB
@@ -68,8 +79,19 @@ conv_ehdr_data(uchar_t data, int fmt_flags, Conv_inv_buf_t *inv_buf)
 		MSG_ELFDATANONE_ALT, MSG_ELFDATA2LSB_ALT2, MSG_ELFDATA2MSB_ALT2
 	};
 
+	/* Use alternative strings? */
+	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+	case CONV_FMT_ALT_DUMP:
+		return (conv_map2str(inv_buf, data, fmt_flags,
+		    ARRAY_NELTS(datas_dump), datas_dump));
+	case CONV_FMT_ALT_FILE:
+		return (conv_map2str(inv_buf, data, fmt_flags,
+		    ARRAY_NELTS(datas_file), datas_file));
+	}
+
+	/* Use default strings */
 	return (conv_map2str(inv_buf, data, fmt_flags,
-	    ARRAY_NELTS(datas), datas, datas_dump, datas_file));
+	    ARRAY_NELTS(datas), datas));
 }
 
 static const Msg machines[EM_NUM] = {
@@ -145,15 +167,25 @@ static const Msg machines_alt[EM_NUM] = {
 #endif
 
 const char *
-conv_ehdr_mach(Half machine, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_mach(Half machine, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
+	/* Use alternative strings? */
+	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+	case CONV_FMT_ALT_DUMP:
+	case CONV_FMT_ALT_FILE:
+		return (conv_map2str(inv_buf, machine, fmt_flags,
+		    ARRAY_NELTS(machines_alt), machines_alt));
+	}
+
+	/* Use default strings */
 	return (conv_map2str(inv_buf, machine, fmt_flags,
-	    ARRAY_NELTS(machines), machines, machines_alt, machines_alt));
+	    ARRAY_NELTS(machines), machines));
 }
 
 
 const char *
-conv_ehdr_type(Half etype, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_type(Half etype, Conv_fmt_flags_t fmt_flags, Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	etypes[] = {
 		MSG_ET_NONE,		MSG_ET_REL,		MSG_ET_EXEC,
@@ -165,18 +197,32 @@ conv_ehdr_type(Half etype, int fmt_flags, Conv_inv_buf_t *inv_buf)
 	};
 
 	if (etype == ET_SUNWPSEUDO) {
-		return ((fmt_flags & CONV_FMTALTMASK)
-		    ? MSG_ORIG(MSG_ET_SUNWPSEUDO_ALT)
-		    : MSG_ORIG(MSG_ET_SUNWPSEUDO));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			return (MSG_ORIG(MSG_ET_SUNWPSEUDO_ALT));
+		default:
+			return (MSG_ORIG(MSG_ET_SUNWPSEUDO));
+		}
 	}
 
+	/* Use alternative strings? */
+	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+	case CONV_FMT_ALT_DUMP:
+	case CONV_FMT_ALT_FILE:
+		return (conv_map2str(inv_buf, etype, fmt_flags,
+		    ARRAY_NELTS(etypes_alt), etypes_alt));
+	}
+
+	/* Use default strings */
 	return (conv_map2str(inv_buf, etype, fmt_flags,
-	    ARRAY_NELTS(etypes), etypes, etypes_alt, etypes_alt));
+	    ARRAY_NELTS(etypes), etypes));
 
 }
 
 const char *
-conv_ehdr_vers(Word version, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_vers(Word version, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	versions[] = {
 		MSG_EV_NONE,		MSG_EV_CURRENT
@@ -185,8 +231,17 @@ conv_ehdr_vers(Word version, int fmt_flags, Conv_inv_buf_t *inv_buf)
 		MSG_EV_NONE_ALT,	MSG_EV_CURRENT_ALT
 	};
 
+	/* Use alternative strings? */
+	switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+	case CONV_FMT_ALT_DUMP:
+	case CONV_FMT_ALT_FILE:
+		return (conv_map2str(inv_buf, version, fmt_flags,
+		    ARRAY_NELTS(versions_alt), versions_alt));
+	}
+
+	/* Use default strings */
 	return (conv_map2str(inv_buf, version, fmt_flags,
-	    ARRAY_NELTS(versions), versions, versions_alt, versions_alt));
+	    ARRAY_NELTS(versions), versions));
 }
 
 #define	EFLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -213,7 +268,8 @@ conv_ehdr_vers(Word version, int fmt_flags, Conv_inv_buf_t *inv_buf)
  * Make a string representation of the e_flags field.
  */
 const char *
-conv_ehdr_flags(Half mach, Word flags, Conv_ehdr_flags_buf_t *flags_buf)
+conv_ehdr_flags(Half mach, Word flags, Conv_fmt_flags_t fmt_flags,
+    Conv_ehdr_flags_buf_t *flags_buf)
 {
 	static Val_desc vda[] = {
 		{ EF_SPARC_32PLUS,	MSG_ORIG(MSG_EF_SPARC_32PLUS) },
@@ -251,7 +307,7 @@ conv_ehdr_flags(Half mach, Word flags, Conv_ehdr_flags_buf_t *flags_buf)
 		}
 		*lstr = NULL;
 
-		(void) conv_expn_field(&conv_arg);
+		(void) conv_expn_field(&conv_arg, fmt_flags);
 
 		return (conv_arg.buf);
 	}
@@ -263,7 +319,8 @@ conv_ehdr_flags(Half mach, Word flags, Conv_ehdr_flags_buf_t *flags_buf)
  * Make a string representation of the e_ident[EI_OSABI] field.
  */
 const char *
-conv_ehdr_osabi(uchar_t osabi, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_ehdr_osabi(uchar_t osabi, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	osabi_arr[] = {
 		MSG_OSABI_NONE,		MSG_OSABI_HPUX,
@@ -290,20 +347,38 @@ conv_ehdr_osabi(uchar_t osabi, int fmt_flags, Conv_inv_buf_t *inv_buf)
 
 	switch (osabi) {
 	case ELFOSABI_ARM:
-		str = (fmt_flags & CONV_FMTALTMASK) ?
-		    MSG_ORIG(MSG_OSABI_ARM_ALT) : MSG_ORIG(MSG_OSABI_ARM);
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			str = MSG_ORIG(MSG_OSABI_ARM_ALT);
+			break;
+		default:
+			str = MSG_ORIG(MSG_OSABI_ARM);
+		}
 		break;
 
 	case ELFOSABI_STANDALONE:
-		str = (fmt_flags & CONV_FMTALTMASK) ?
-		    MSG_ORIG(MSG_OSABI_STANDALONE_ALT) :
-		    MSG_ORIG(MSG_OSABI_STANDALONE);
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			str = MSG_ORIG(MSG_OSABI_STANDALONE_ALT);
+			break;
+		default:
+			str = MSG_ORIG(MSG_OSABI_STANDALONE);
+		}
 		break;
 
 	default:
-		str = conv_map2str(inv_buf, osabi, fmt_flags,
-		    ARRAY_NELTS(osabi_arr), osabi_arr, osabi_arr_alt,
-		    osabi_arr_alt);
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			str = conv_map2str(inv_buf, osabi, fmt_flags,
+			    ARRAY_NELTS(osabi_arr_alt), osabi_arr_alt);
+			break;
+		default:
+			str = conv_map2str(inv_buf, osabi, fmt_flags,
+			    ARRAY_NELTS(osabi_arr), osabi_arr);
+		}
 		break;
 	}
 
@@ -341,7 +416,7 @@ conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf)
 		/*
 		 * Only called from ld.so.1, thus M_MACH is hardcoded.
 		 */
-		return (conv_ehdr_flags(M_MACH, (Word)info,
+		return (conv_ehdr_flags(M_MACH, (Word)info, 0,
 		    &reject_desc_buf->flags_buf));
 	else if (type == SGS_REJ_UNKFILE)
 		return ((const char *)0);

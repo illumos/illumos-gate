@@ -286,12 +286,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if ((id->id_data != M_DATA) || (id->id_machine != M_MACH)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_WRONGARCH),
 			    crle->c_name, crle->c_confil,
-			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE,
+			    conv_ehdr_data(id->id_data, CONV_FMT_ALT_FILE,
 			    &inv_buf1),
-			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE,
+			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALT_FILE,
 			    &inv_buf2),
-			    conv_ehdr_data(M_DATA, CONV_FMT_ALTFILE, &inv_buf3),
-			    conv_ehdr_mach(M_MACH, CONV_FMT_ALTFILE,
+			    conv_ehdr_data(M_DATA, CONV_FMT_ALT_FILE,
+			    &inv_buf3),
+			    conv_ehdr_mach(M_MACH, CONV_FMT_ALT_FILE,
 			    &inv_buf4));
 			return (INSCFG_RET_FAIL);
 		}
@@ -366,11 +367,11 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		 */
 		if (id)
 			(void) printf(MSG_INTL(MSG_DMP_PLATFORM),
-			    conv_ehdr_class(id->id_class, CONV_FMT_ALTFILE,
+			    conv_ehdr_class(id->id_class, CONV_FMT_ALT_FILE,
 			    &inv_buf1),
-			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE,
+			    conv_ehdr_data(id->id_data, CONV_FMT_ALT_FILE,
 			    &inv_buf2),
-			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE,
+			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALT_FILE,
 			    &inv_buf3));
 
 		/*
@@ -388,7 +389,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if (head->ch_dlflags &&
 		    (head->ch_dlflags != RTLD_REL_RELATIVE)) {
 			(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_FLAGS),
-			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALTCRLE,
+			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALT_CRLE,
 			    &dl_flag_buf));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
@@ -1052,11 +1053,11 @@ inspectconfig(Crle_desc * crle, int c_class)
 				(void) printf(MSG_INTL(MSG_DEF_NOCONF), file);
 				(void) printf(MSG_INTL(MSG_DMP_PLATFORM),
 				    conv_ehdr_class(M_CLASS,
-				    CONV_FMT_ALTFILE, &inv_buf1),
+				    CONV_FMT_ALT_FILE, &inv_buf1),
 				    conv_ehdr_data(M_DATA,
-				    CONV_FMT_ALTFILE, &inv_buf2),
+				    CONV_FMT_ALT_FILE, &inv_buf2),
 				    conv_ehdr_mach(M_MACH,
-				    CONV_FMT_ALTFILE, &inv_buf3));
+				    CONV_FMT_ALT_FILE, &inv_buf3));
 
 
 				if (crle->c_flags & CRLE_AOUT) {

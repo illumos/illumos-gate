@@ -708,7 +708,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			Conv_cap_val_hw1_buf_t cap_val_hw1_buf;
 
 			const char *str =
-			    conv_cap_val_hw1(mhwcap, M_MACH, &cap_val_hw1_buf);
+			    conv_cap_val_hw1(mhwcap, M_MACH, 0,
+			    &cap_val_hw1_buf);
 
 			if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
 				(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),

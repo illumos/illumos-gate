@@ -50,7 +50,7 @@ conv_sym_other(uchar_t other, Conv_inv_buf_t *inv_buf)
 	inv_buf->buf[ndx++] = visibility[vis];
 
 	/*
-	 * If unkown bits are present in stother - throw out a '?'
+	 * If unknown bits are present in st_other - throw out a '?'
 	 */
 	if (other & ~MSK_SYM_VISIBILITY)
 		inv_buf->buf[ndx++] = '?';
@@ -60,36 +60,87 @@ conv_sym_other(uchar_t other, Conv_inv_buf_t *inv_buf)
 }
 
 const char *
-conv_sym_info_type(Half mach, uchar_t type, int fmt_flags,
+conv_sym_other_vis(uchar_t value, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
+{
+	static const Msg	vis[] = {
+		MSG_STV_DEFAULT,	MSG_STV_INTERNAL,
+		MSG_STV_HIDDEN,		MSG_STV_PROTECTED
+	};
+
+	static const Msg	vis_alt[] = {
+		MSG_STV_DEFAULT_ALT,	MSG_STV_INTERNAL_ALT,
+		MSG_STV_HIDDEN_ALT,	MSG_STV_PROTECTED_ALT
+	};
+
+	if (value >= (sizeof (vis) / sizeof (vis[0])))
+		return (conv_invalid_val(inv_buf, value, fmt_flags));
+
+	/* If full ELF names are desired, use those strings */
+	if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_FULLNAME)
+		return (MSG_ORIG(vis_alt[value]));
+
+	/* Default strings */
+	return (MSG_ORIG(vis[value]));
+}
+
+const char *
+conv_sym_info_type(Half mach, uchar_t type, Conv_fmt_flags_t fmt_flags,
     Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	types[] = {
-		MSG_STT_NOTYPE,		MSG_STT_OBJECT,		MSG_STT_FUNC,
-		MSG_STT_SECTION,	MSG_STT_FILE,		MSG_STT_COMMON,
+		MSG_STT_NOTYPE,		MSG_STT_OBJECT,
+		MSG_STT_FUNC,		MSG_STT_SECTION,
+		MSG_STT_FILE,		MSG_STT_COMMON,
 		MSG_STT_TLS
 	};
 
+	static const Msg	types_alt[] = {
+		MSG_STT_NOTYPE_ALT,	MSG_STT_OBJECT_ALT,
+		MSG_STT_FUNC_ALT,	MSG_STT_SECTION_ALT,
+		MSG_STT_FILE_ALT,	MSG_STT_COMMON_ALT,
+		MSG_STT_TLS_ALT
+	};
+
 	if (type < STT_NUM) {
+		/* If full ELF names are desired, use those strings */
+		if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_FULLNAME)
+			return (MSG_ORIG(types_alt[type]));
+
+		/* Default strings */
 		return (MSG_ORIG(types[type]));
 	} else if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER)) {
-		return (MSG_ORIG(MSG_STT_REGISTER));
+		if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_FULLNAME)
+			return (MSG_ORIG(MSG_STT_SPARC_REGISTER_ALT));
+
+		return (MSG_ORIG(MSG_STT_SPARC_REGISTER));
 	} else {
 		return (conv_invalid_val(inv_buf, type, fmt_flags));
 	}
 }
 
 const char *
-conv_sym_info_bind(uchar_t bind, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_sym_info_bind(uchar_t bind, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	binds[] = {
 		MSG_STB_LOCAL,		MSG_STB_GLOBAL,		MSG_STB_WEAK
 	};
 
+	static const Msg	binds_alt[] = {
+		MSG_STB_LOCAL_ALT,	MSG_STB_GLOBAL_ALT,	MSG_STB_WEAK_ALT
+	};
+
 	if (bind >= STB_NUM)
 		return (conv_invalid_val(inv_buf, bind, fmt_flags));
-	else
-		return (MSG_ORIG(binds[bind]));
+
+	/* If full ELF names are desired, use those strings */
+	if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_FULLNAME)
+		return (MSG_ORIG(binds_alt[bind]));
+
+	/* Default strings */
+	return (MSG_ORIG(binds[bind]));
 }
 
 const char *

@@ -2054,7 +2054,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				    0, &c_buf.flag);
 				break;
 			case DT_FLAGS_1:
-				name = conv_dyn_flag1(dyn->d_un.d_val,
+				name = conv_dyn_flag1(dyn->d_un.d_val, 0,
 				    &c_buf.flag1);
 				break;
 			case DT_POSFLAG_1:
@@ -3244,7 +3244,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 
 		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
 			if (!match(0, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALTFILE, &inv_buf), ndx))
+			    phdr->p_type, CONV_FMT_ALT_FILE, &inv_buf), ndx))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));

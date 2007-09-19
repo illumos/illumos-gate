@@ -101,8 +101,9 @@ DTEXTDOM =
 # Define any generic sgsmsg(1l) flags.  The default message generation system
 # is to use gettext(3i), add the -C flag to switch to catgets(3c).
 
-SGSMSG =	$(SGSTOOLS)/$(MACH)/sgsmsg
-CHKMSG =	$(SGSTOOLS)/chkmsg.sh
+SGSMSG =		$(SGSTOOLS)/$(MACH)/sgsmsg
+SGSMSG_PIGLATIN_NL =	perl $(SGSTOOLS)/common/sgsmsg_piglatin_nl.pl
+CHKMSG =		$(SGSTOOLS)/chkmsg.sh
 
 SGSMSGVFLAG =
 SGSMSGFLAGS =	$(SGSMSGVFLAG) -i $(SGSMSGID)/sgs.ident

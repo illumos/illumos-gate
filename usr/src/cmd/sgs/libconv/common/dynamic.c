@@ -61,7 +61,7 @@ DEFINE_conv_map2str
 #endif
 
 const char *
-conv_dyn_posflag1(Xword flags, int fmt_flags,
+conv_dyn_posflag1(Xword flags, Conv_fmt_flags_t fmt_flags,
     Conv_dyn_posflag1_buf_t *dyn_posflag1_buf)
 {
 	static Val_desc vda[] = {
@@ -85,10 +85,11 @@ conv_dyn_posflag1(Xword flags, int fmt_flags,
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	arg = (fmt_flags & CONV_FMT_ALTDUMP) ? &conv_arg_alt : &conv_arg;
+	arg = (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_DUMP) ?
+	    &conv_arg_alt : &conv_arg;
 	arg->buf = dyn_posflag1_buf->buf;
 	arg->oflags = arg->rflags = flags;
-	(void) conv_expn_field(arg);
+	(void) conv_expn_field(arg, fmt_flags);
 
 	return ((const char *)dyn_posflag1_buf);
 }
@@ -115,7 +116,8 @@ conv_dyn_posflag1(Xword flags, int fmt_flags,
 #endif
 
 const char *
-conv_dyn_flag(Xword flags, int fmt_flags, Conv_dyn_flag_buf_t *dyn_flag_buf)
+conv_dyn_flag(Xword flags, Conv_fmt_flags_t fmt_flags,
+    Conv_dyn_flag_buf_t *dyn_flag_buf)
 {
 	static Val_desc vda[] = {
 		{ DF_ORIGIN,		MSG_ORIG(MSG_DF_ORIGIN) },
@@ -133,12 +135,12 @@ conv_dyn_flag(Xword flags, int fmt_flags, Conv_dyn_flag_buf_t *dyn_flag_buf)
 
 	conv_arg.buf = dyn_flag_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	if (fmt_flags & CONV_FMT_ALTDUMP) {
+	if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_DUMP) {
 		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
 	} else {
 		conv_arg.prefix = conv_arg.suffix = NULL;
 	}
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)dyn_flag_buf->buf);
 }
@@ -184,7 +186,8 @@ conv_dyn_flag(Xword flags, int fmt_flags, Conv_dyn_flag_buf_t *dyn_flag_buf)
 #endif
 
 const char *
-conv_dyn_flag1(Xword flags, Conv_dyn_flag1_buf_t *dyn_flag1_buf)
+conv_dyn_flag1(Xword flags, Conv_fmt_flags_t fmt_flags,
+    Conv_dyn_flag1_buf_t *dyn_flag1_buf)
 {
 	static Val_desc vda[] = {
 		{ DF_1_NOW,		MSG_ORIG(MSG_DF1_NOW) },
@@ -222,7 +225,7 @@ conv_dyn_flag1(Xword flags, Conv_dyn_flag1_buf_t *dyn_flag1_buf)
 
 	conv_arg.oflags = conv_arg.rflags = flags;
 	conv_arg.buf = dyn_flag1_buf->buf;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)dyn_flag1_buf->buf);
 }
@@ -246,7 +249,7 @@ conv_dyn_flag1(Xword flags, Conv_dyn_flag1_buf_t *dyn_flag1_buf)
 #endif
 
 const char *
-conv_dyn_feature1(Xword flags, int fmt_flags,
+conv_dyn_feature1(Xword flags, Conv_fmt_flags_t fmt_flags,
     Conv_dyn_feature1_buf_t *dyn_feature1_buf)
 {
 	static Val_desc vda[] = {
@@ -262,18 +265,19 @@ conv_dyn_feature1(Xword flags, int fmt_flags,
 
 	conv_arg.buf = dyn_feature1_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	if (fmt_flags & CONV_FMT_ALTDUMP) {
+	if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_DUMP) {
 		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
 	} else {
 		conv_arg.prefix = conv_arg.suffix = NULL;
 	}
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)dyn_feature1_buf->buf);
 }
 
 const char *
-conv_dyn_tag(Xword tag, Half mach, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_dyn_tag(Xword tag, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	/*
 	 * Dynamic tag values are sparse, cover a wide range, and have
@@ -399,9 +403,15 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags, Conv_inv_buf_t *inv_buf)
 
 
 
-	if (tag <= DT_FLAGS)
+	if (tag <= DT_FLAGS) {
+		/* use 'dump' style? */
+		if (CONV_TYPE_FMT_ALT(fmt_flags) == CONV_FMT_ALT_DUMP)
+			return (conv_map2str(inv_buf, tag, fmt_flags,
+			    ARRAY_NELTS(tags_null_alt), tags_null_alt));
+		/* Standard style */
 		return (conv_map2str(inv_buf, tag, fmt_flags,
-		    ARRAY_NELTS(tags_null), tags_null, tags_null_alt, NULL));
+		    ARRAY_NELTS(tags_null), tags_null));
+	}
 	DYN_RANGE(DT_PREINIT_ARRAY, tags_preinit_array);
 	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
 	if (tag == DT_SUNW_STRPAD)
@@ -466,7 +476,7 @@ conv_bnd_type(uint_t flags, Conv_bnd_type_buf_t *bnd_type_buf)
 
 	conv_arg.buf = bnd_type_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)bnd_type_buf->buf);
 }
@@ -519,7 +529,7 @@ conv_bnd_obj(uint_t flags, Conv_bnd_obj_buf_t *bnd_obj_buf)
 	 */
 	conv_arg.buf = bnd_obj_buf->buf;
 	conv_arg.oflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)bnd_obj_buf->buf);
 }

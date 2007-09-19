@@ -53,7 +53,7 @@ Dbg_tls_modent(Lm_list *lml, TLS_modinfo * tmodent)
 
 	if ((flags = tmodent->tm_flags) != 0) {
 		conv_arg.oflags = conv_arg.rflags = flags;
-		(void) conv_expn_field(&conv_arg);
+		(void) conv_expn_field(&conv_arg, 0);
 	} else {
 		flagstr[0] = '\0';
 	}

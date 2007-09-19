@@ -1,0 +1,185 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+{
+	global:
+		main;			# debuggers seem to like this.
+
+
+
+		# liblddbg dbg_print() function
+		dbg_print =		NODIRECT;
+
+
+
+		# Core API
+		elfedit_command_usage;
+		elfedit_cpl_match;
+		elfedit_cpl_module;
+		elfedit_cpl_command;
+		elfedit_elferr;
+		elfedit_flags;
+		elfedit_malloc;
+		elfedit_msg;
+		elfedit_outstyle;
+		elfedit_pager_init;
+		elfedit_printf;
+		elfedit_realloc;
+
+
+
+		# ato[u]i routines
+		elfedit_const_to_atoui;
+		elfedit_mach_sunw_hw1_to_atoui;
+
+		elfedit_atoi;
+		elfedit_atoui;
+		elfedit_atoconst;
+
+		elfedit_atoi2;
+		elfedit_atoui2;
+		elfedit_atoconst2;
+
+		elfedit_atoi_range;
+		elfedit_atoui_range;
+		elfedit_atoconst_range;
+
+		elfedit_atoi_range2;
+		elfedit_atoui_range2;
+		elfedit_atoconst_range2;
+
+		elfedit_atoi_value_to_str;
+		elfedit_atoui_value_to_str;
+		elfedit_atoconst_value_to_str;
+
+		elfedit_cpl_atoi;
+		elfedit_cpl_atoui;
+		elfedit_cpl_atoconst;
+
+
+
+		# Convenience functions built on top of the ato[u]i routines
+		elfedit_atobool;
+		elfedit_atoshndx;
+
+
+
+		# Getopt
+		elfedit_getopt_init;
+		elfedit_getopt;
+
+
+
+		# Utilities
+		elfedit_array_elts_delete;
+
+		elfedit_array_elts_move;
+
+		elfedit_bits_set;
+
+		elfedit32_dyn_elt_init;
+		elfedit64_dyn_elt_init;
+
+		elfedit32_dyn_elt_save;
+		elfedit64_dyn_elt_save;
+
+		elfedit32_dyn_offset_to_str;
+		elfedit64_dyn_offset_to_str;
+
+		elfedit32_dynstr_getpad;
+		elfedit64_dynstr_getpad;
+
+		elfedit32_dynstr_insert;
+		elfedit64_dynstr_insert;
+
+		elfedit32_modified_ehdr;
+		elfedit64_modified_ehdr;
+
+		elfedit32_modified_phdr;
+		elfedit64_modified_phdr;
+
+		elfedit32_modified_shdr;
+		elfedit64_modified_shdr;
+
+		elfedit32_modified_data;
+		elfedit64_modified_data;
+
+		elfedit32_name_to_shndx;
+		elfedit64_name_to_shndx;
+
+		elfedit32_name_to_symndx;
+		elfedit64_name_to_symndx;
+
+		elfedit32_offset_to_str;
+		elfedit64_offset_to_str;
+
+		elfedit32_sec_findstr;
+		elfedit64_sec_findstr;
+
+		elfedit32_sec_getcap;
+		elfedit64_sec_getcap;
+
+		elfedit32_sec_getdyn;
+		elfedit64_sec_getdyn;
+
+		elfedit32_sec_getstr;
+		elfedit64_sec_getstr;
+
+		elfedit32_sec_getsyminfo;
+		elfedit64_sec_getsyminfo;
+
+		elfedit32_sec_getsymtab;
+		elfedit64_sec_getsymtab;
+
+		elfedit32_sec_getversym;
+		elfedit64_sec_getversym;
+
+		elfedit32_sec_getxshndx;
+		elfedit64_sec_getxshndx;
+
+		elfedit32_sec_issymtab;
+		elfedit64_sec_issymtab;
+
+		elfedit32_shndx_to_name;
+		elfedit64_shndx_to_name;
+
+		elfedit32_sec_msgprefix;
+		elfedit64_sec_msgprefix;
+
+		elfedit32_strtab_insert;
+		elfedit64_strtab_insert;
+
+		elfedit32_strtab_insert_test;
+		elfedit64_strtab_insert_test;
+
+		elfedit32_type_to_shndx;
+		elfedit64_type_to_shndx;
+
+	local:
+		*;
+};

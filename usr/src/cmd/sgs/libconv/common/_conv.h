@@ -68,27 +68,19 @@ extern "C" {
  *		a result string, if necessary.
  *	bufsize - sizeof(buf)
  *	val - The value for which a string is desired.
- *	flags - CONV_FMT_* values, used to influence formatting of
- *		the resulting string.
- *	num_msg - # of Msg entries in msg, msg_altdump, and msg_altfile.
+ *	flags - CONV_FMT_* values to be passed to conv_invalid_val() if
+ *		necessary. The caller is reponsible for having examined
+ *		the CONV_FMT_ALT_* part of flags and passing the proper
+ *		msg array.
+ *	num_msg - # of Msg entries in msg.
  *	msg - Array of num_msg Msg items corresponding to the possible
  *		strings corresponding to val.
- *	msg_altdump - NULL, or array of num_msg Msg items, to be used
- *		instead of msg when the CONV_FMT_ALTDUMP flag is set.
- *	msg_altfile - NULL, or array of num_msg Msg items, to be used
- *		instead of msg when the CONV_FMT_ALTFILE flag is set.
  *
  * exit:
  *	If val lies in the range [0-(num_msg-1)], then the string
- *	corresponding to it is returned:
- *		1) If CONV_FMT_ALTDUMP is set and msg_altdump is non-NULL,
- *			the string comes from msg_altdump.
- *		2) If CONV_FMT_ALTFILE is set and msg_altfile is non-NULL,
- *			the string comes from msg_altfile.
- *		3) If neither of the previous rules holds, the string
- *			comes from msg.
- *	if val is outside the range, an ASCII representation of it is
- *	formatted into string, and that is returned.
+ *	corresponding to it is returned. If val is outside the range,
+ *	conv_invalid_val() is called to format an ASCII representation
+ *	of it into string, and that is returned.
  *
  * note:
  *	Ideally, this would be a function defined in globals.c.
@@ -100,18 +92,11 @@ extern "C" {
 #define	DEFINE_conv_map2str \
 static \
 const char * \
-conv_map2str(Conv_inv_buf_t *inv_buf, int val, int flags, int num_msg, \
-	const Msg *msg, const Msg *msg_altdump, const Msg *msg_altfile) \
+conv_map2str(Conv_inv_buf_t *inv_buf, int val, Conv_fmt_flags_t flags, \
+    int num_msg, const Msg *msg) \
 { \
-	if ((val >= 0) && (val < num_msg)) { \
-		if ((flags & CONV_FMT_ALTDUMP) && msg_altdump) { \
-			return (MSG_ORIG(msg_altdump[val])); \
-		} else if ((flags & CONV_FMT_ALTFILE) && msg_altfile) { \
-			return (MSG_ORIG(msg_altfile[val])); \
-		} else { \
-			return (MSG_ORIG(msg[val])); \
-		} \
-	} \
+	if ((val >= 0) && (val < num_msg)) \
+		return (MSG_ORIG(msg[val])); \
 \
 	/* If we get here, it's an unknown value */ \
 	return (conv_invalid_val(inv_buf, val, flags)); \

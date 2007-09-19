@@ -63,7 +63,6 @@ s none $SGSDIR/lib/librtld_db.so=librtld_db.so.1
 f none $SGSDIR/lib/librtld_db.so.1=lib/librtld_db.so.1 755 root bin
 d none $SGSDIR/usr/bin 755 root bin
 f none $SGSDIR/usr/bin/crle=usr/bin/crle 555 root bin
-!include prototype_com_ext_usr_bin
 f none $SGSDIR/usr/bin/ldd=usr/bin/ldd 555 root bin
 f none $SGSDIR/usr/bin/moe=usr/bin/moe 555 root bin
 f none $SGSDIR/usr/bin/pvs=usr/bin/pvs 555 root bin
@@ -75,6 +74,7 @@ f none $SGSDIR/usr/bin/dump=usr/bin/dump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/dump=../../bin/dump
 f none $SGSDIR/usr/bin/elfdump=usr/bin/elfdump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/elfdump=../../bin/elfdump
+f none $SGSDIR/usr/bin/elfedit=usr/bin/elfedit 0555 root bin
 f none $SGSDIR/usr/bin/lari=usr/bin/lari 0555 root bin
 s none $SGSDIR/usr/ccs/bin/lari=../../bin/lari
 f none $SGSDIR/usr/bin/ld=usr/bin/ld 755 root bin
@@ -106,7 +106,15 @@ f none $SGSDIR/usr/lib/0@0.so.1=usr/lib/0@0.so.1 755 root bin
 f none $SGSDIR/usr/lib/lddstub=usr/lib/lddstub 555 root bin
 f none $SGSDIR/usr/lib/libcrle.so.1=usr/lib/libcrle.so.1 755 root bin
 f none $SGSDIR/usr/lib/libldstab.so.1=usr/lib/libldstab.so.1 755 root bin
-!include prototype_com_ext_usr_lib
+d none $SGSDIR/usr/lib/elfedit 755 root bin
+s none $SGSDIR/usr/lib/elfedit/32=.
+f none $SGSDIR/usr/lib/elfedit/cap.so=usr/lib/elfedit/cap.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/dyn.so=usr/lib/elfedit/dyn.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/ehdr.so=usr/lib/elfedit/ehdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/phdr.so=usr/lib/elfedit/phdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/shdr.so=usr/lib/elfedit/shdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sym.so=usr/lib/elfedit/sym.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/syminfo.so=usr/lib/elfedit/syminfo.so 755 root bin
 d none $SGSDIR/usr/lib/link_audit 755 root bin
 s none $SGSDIR/usr/lib/link_audit/32=.
 f none $SGSDIR/usr/lib/link_audit/ldprof.so.1=usr/lib/link_audit/ldprof.so.1 755 root bin

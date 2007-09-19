@@ -45,7 +45,8 @@
  *	to the string is returned.
  */
 const char *
-conv_invalid_val(Conv_inv_buf_t *inv_buf, Xword value, int fmt_flags)
+conv_invalid_val(Conv_inv_buf_t *inv_buf, Xword value,
+    Conv_fmt_flags_t fmt_flags)
 {
 	const char	*fmt;
 
@@ -151,7 +152,7 @@ cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
  *	case, arg->buf contains a numeric representation of the value.
  */
 int
-conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
+conv_expn_field(CONV_EXPN_FIELD_ARG *arg, Conv_fmt_flags_t fmt_flags)
 {
 	const Val_desc *vde;
 	CONV_EXPN_FIELD_STATE state;
@@ -167,9 +168,10 @@ conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
 	state.sep_str_len = strlen(state.sep_str);
 
 	/* Prefix string */
-	if (!cef_cp(arg, &state, FALSE,
-	    (arg->prefix ? arg->prefix : MSG_ORIG(MSG_GBL_OSQBRKT))))
-		return (FALSE);
+	if ((fmt_flags & CONV_FMT_NOBKT) == 0)
+		if (!cef_cp(arg, &state, FALSE,
+		    (arg->prefix ? arg->prefix : MSG_ORIG(MSG_GBL_OSQBRKT))))
+			return (FALSE);
 
 	/* Any strings in the lead_str array go at the head of the list */
 	lead_str = arg->lead_str;
@@ -201,15 +203,16 @@ conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
 	if (rflags) {
 		Conv_inv_buf_t inv_buf;
 
-		(void) conv_invalid_val(&inv_buf, rflags, 0);
+		(void) conv_invalid_val(&inv_buf, rflags, fmt_flags);
 		if (!cef_cp(arg, &state, TRUE, inv_buf.buf))
 			return (FALSE);
 	}
 
 	/* Suffix string */
-	if (!cef_cp(arg, &state, FALSE,
-	    (arg->suffix ? arg->suffix : MSG_ORIG(MSG_GBL_CSQBRKT))))
-		return (FALSE);
+	if ((fmt_flags & CONV_FMT_NOBKT) == 0)
+		if (!cef_cp(arg, &state, FALSE,
+		    (arg->suffix ? arg->suffix : MSG_ORIG(MSG_GBL_CSQBRKT))))
+			return (FALSE);
 
 	/* Terminate the buffer */
 	*state.cur = '\0';

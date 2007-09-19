@@ -38,9 +38,6 @@ pkg: FRC
 $(DATAFILES): ../common/$$@
 	$(RM) $@; cp ../common/$@ $@
 
-$(DATAFILES_EXT): ../../ext/packages/common/$$@
-	$(RM) $@; cp ../../ext/packages/common/$@ $@
-
 awk_pkginfo:	../bld_awk_pkginfo ../common/$(README)
 	../bld_awk_pkginfo -R ../common/$(README) $(VERDEBUG) \
 		-m $(MACH) -r "$(RELEASE)" -o $@

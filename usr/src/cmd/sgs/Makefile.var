@@ -190,6 +190,12 @@ VAR_ELFDUMP_LLDFLAGS=	'-R$$ORIGIN/../../lib'
 VAR_ELFDUMP_LLDFLAGS64 ='-R$$ORIGIN/../../../lib/$(MACH64)'
 
 #
+# elfedit
+#
+VAR_ELFEDIT_LLDFLAGS=	'-R$$ORIGIN/../../lib'
+VAR_ELFEDIT_LLDFLAGS64 ='-R$$ORIGIN/../../../lib/$(MACH64)'
+
+#
 # lddstub
 #
 VAR_LDDSTUB_INTERP=	-I'$$ORIGIN/ld.so.1'

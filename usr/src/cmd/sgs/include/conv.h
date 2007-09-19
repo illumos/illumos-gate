@@ -108,16 +108,16 @@ typedef union {
 
 
 /* conv_ehdr_flags() */
-#define	CONF_EHDR_FLAGS_BASE_BUFSIZE	69
+#define	CONV_EHDR_FLAGS_BASE_BUFSIZE	69
 #define	CONV32_EHDR_FLAGS_BUFSIZE	\
-	(CONF_EHDR_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_EHDR_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_EHDR_FLAGS_BUFSIZE];
 } Conv32_ehdr_flags_buf_t;
 
 #define	CONV64_EHDR_FLAGS_BUFSIZE	\
-	(CONF_EHDR_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_EHDR_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_EHDR_FLAGS_BUFSIZE];
@@ -288,16 +288,16 @@ typedef union {
 
 
 /* conv_dyn_posflag1() */
-#define	CONF_DYN_POSFLAG1_BASE_BUFSIZE	23
+#define	CONV_DYN_POSFLAG1_BASE_BUFSIZE	23
 #define	CONV32_DYN_POSFLAG1_BUFSIZE	\
-	(CONF_DYN_POSFLAG1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_DYN_POSFLAG1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_DYN_POSFLAG1_BUFSIZE];
 } Conv32_dyn_posflag1_buf_t;
 
 #define	CONV64_DYN_POSFLAG1_BUFSIZE	\
-	(CONF_DYN_POSFLAG1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_DYN_POSFLAG1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_DYN_POSFLAG1_BUFSIZE];
@@ -305,16 +305,16 @@ typedef union {
 
 
 /* conv_dyn_flag() */
-#define	CONF_DYN_FLAG_BASE_BUFSIZE	48
+#define	CONV_DYN_FLAG_BASE_BUFSIZE	48
 #define	CONV32_DYN_FLAG_BUFSIZE	\
-	(CONF_DYN_FLAG_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_DYN_FLAG_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_DYN_FLAG_BUFSIZE];
 } Conv32_dyn_flag_buf_t;
 
 #define	CONV64_DYN_FLAG_BUFSIZE	\
-	(CONF_DYN_FLAG_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_DYN_FLAG_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_DYN_FLAG_BUFSIZE];
@@ -322,16 +322,16 @@ typedef union {
 
 
 /* conv_dyn_flag1() */
-#define	CONF_DYN_FLAG1_BASE_BUFSIZE	223
+#define	CONV_DYN_FLAG1_BASE_BUFSIZE	223
 #define	CONV32_DYN_FLAG1_BUFSIZE	\
-	(CONF_DYN_FLAG1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_DYN_FLAG1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_DYN_FLAG1_BUFSIZE];
 } Conv32_dyn_flag1_buf_t;
 
 #define	CONV64_DYN_FLAG1_BUFSIZE	\
-	(CONF_DYN_FLAG1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_DYN_FLAG1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_DYN_FLAG1_BUFSIZE];
@@ -339,16 +339,16 @@ typedef union {
 
 
 /* conv_dyn_feature1() */
-#define	CONF_DYN_FEATURE1_BASE_BUFSIZE	20
+#define	CONV_DYN_FEATURE1_BASE_BUFSIZE	20
 #define	CONV32_DYN_FEATURE1_BUFSIZE	\
-	(CONF_DYN_FEATURE1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_DYN_FEATURE1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_DYN_FEATURE1_BUFSIZE];
 } Conv32_dyn_feature1_buf_t;
 
 #define	CONV64_DYN_FEATURE1_BUFSIZE	\
-	(CONF_DYN_FEATURE1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_DYN_FEATURE1_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_DYN_FEATURE1_BUFSIZE];
@@ -356,16 +356,16 @@ typedef union {
 
 
 /* conv_bnd_type() */
-#define	CONF_BND_TYPE_BASE_BUFSIZE	29
+#define	CONV_BND_TYPE_BASE_BUFSIZE	29
 #define	CONV32_BND_TYPE_BUFSIZE	\
-	(CONF_BND_TYPE_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_BND_TYPE_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_BND_TYPE_BUFSIZE];
 } Conv32_bnd_type_buf_t;
 
 #define	CONV64_BND_TYPE_BUFSIZE	\
-	(CONF_BND_TYPE_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_BND_TYPE_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_BND_TYPE_BUFSIZE];
@@ -373,16 +373,16 @@ typedef union {
 
 
 /* conv_bnd_obj() */
-#define	CONF_BND_OBJ_BASE_BUFSIZE	38
+#define	CONV_BND_OBJ_BASE_BUFSIZE	38
 #define	CONV32_BND_OBJ_BUFSIZE	\
-	(CONF_BND_OBJ_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_BND_OBJ_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_BND_OBJ_BUFSIZE];
 } Conv32_bnd_obj_buf_t;
 
 #define	CONV64_BND_OBJ_BUFSIZE	\
-	(CONF_BND_OBJ_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_BND_OBJ_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_BND_OBJ_BUFSIZE];
@@ -390,16 +390,16 @@ typedef union {
 
 
 /* conv_phdr_flags() */
-#define	CONF_PHDR_FLAGS_BASE_BUFSIZE	35
+#define	CONV_PHDR_FLAGS_BASE_BUFSIZE	35
 #define	CONV32_PHDR_FLAGS_BUFSIZE	\
-	(CONF_PHDR_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_PHDR_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_PHDR_FLAGS_BUFSIZE];
 } Conv32_phdr_flags_buf_t;
 
 #define	CONV64_PHDR_FLAGS_BUFSIZE	\
-	(CONF_PHDR_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_PHDR_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_PHDR_FLAGS_BUFSIZE];
@@ -407,16 +407,16 @@ typedef union {
 
 
 /* conv_sec_flags() */
-#define	CONF_SEC_FLAGS_BASE_BUFSIZE	168
+#define	CONV_SEC_FLAGS_BASE_BUFSIZE	168
 #define	CONV32_SEC_FLAGS_BUFSIZE	\
-	(CONF_SEC_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+	(CONV_SEC_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
 	char			buf[CONV32_SEC_FLAGS_BUFSIZE];
 } Conv32_sec_flags_buf_t;
 
 #define	CONV64_SEC_FLAGS_BUFSIZE	\
-	(CONF_SEC_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+	(CONV_SEC_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
 typedef union {
 	Conv64_inv_buf_t	inv_buf;
 	char			buf[CONV64_SEC_FLAGS_BUFSIZE];
@@ -435,6 +435,23 @@ typedef union {
 } Conv64_dwarf_ehe_buf_t;
 
 
+/* conv_syminfo_flags() */
+#define	CONV_SYMINFO_FLAGS_BASE_BUFSIZE	36
+#define	CONV32_SYMINFO_FLAGS_BUFSIZE	\
+	(CONV_SYMINFO_FLAGS_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV32_SYMINFO_FLAGS_BUFSIZE];
+} Conv32_syminfo_flags_buf_t;
+
+#define	CONV64_SYMINFO_FLAGS_BUFSIZE	\
+	(CONV_SYMINFO_FLAGS_BASE_BUFSIZE + CONV64_INV_BUFSIZE)
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV64_SYMINFO_FLAGS_BUFSIZE];
+} Conv64_syminfo_flags_buf_t;
+
+
 
 /*
  * Generic names for class specific buffer types above
@@ -450,6 +467,7 @@ typedef union {
 #define	CONV_BND_OBJ_BUFSIZE		CONV64_BND_OBJ_BUFSIZE
 #define	CONV_PHDR_FLAGS_BUFSIZE		CONV64_PHDR_FLAGS_BUFSIZE
 #define	CONV_SEC_FLAGS_BUFSIZE		CONV64_SEC_FLAGS_BUFSIZE
+#define	CONV_SYMINFO_FLAGS_BUFSIZE	CONV64_SYMINFO_FLAGS_BUFSIZE
 
 #define	Conv_inv_buf_t			Conv64_inv_buf_t
 #define	Conv_ehdr_flags_buf_t		Conv64_ehdr_flags_buf_t
@@ -473,6 +491,7 @@ typedef union {
 #define	Conv_phdr_flags_buf_t		Conv64_phdr_flags_buf_t
 #define	Conv_sec_flags_buf_t		Conv64_sec_flags_buf_t
 #define	Conv_dwarf_ehe_buf_t		Conv64_dwarf_ehe_buf_t
+#define	Conv_syminfo_flags_buf_t	Conv64_syminfo_flags_buf_t
 #else
 #define	CONV_INV_BUFSIZE		CONV32_INV_BUFSIZE
 #define	CONV_EHDR_FLAGS_BUFSIZE		CONV32_EHDR_FLAGS_BUFSIZE
@@ -484,6 +503,7 @@ typedef union {
 #define	CONV_BND_OBJ_BUFSIZE		CONV32_BND_OBJ_BUFSIZE
 #define	CONV_PHDR_FLAGS_BUFSIZE		CONV32_PHDR_FLAGS_BUFSIZE
 #define	CONV_SEC_FLAGS_BUFSIZE		CONV32_SEC_FLAGS_BUFSIZE
+#define	CONV_SYMINFO_FLAGS_BUFSIZE	CONV32_SYMINFO_FLAGS_BUFSIZE
 
 #define	Conv_inv_buf_t			Conv32_inv_buf_t
 #define	Conv_ehdr_flags_buf_t		Conv32_ehdr_flags_buf_t
@@ -507,30 +527,65 @@ typedef union {
 #define	Conv_phdr_flags_buf_t		Conv32_phdr_flags_buf_t
 #define	Conv_sec_flags_buf_t		Conv32_sec_flags_buf_t
 #define	Conv_dwarf_ehe_buf_t		Conv32_dwarf_ehe_buf_t
+#define	Conv_syminfo_flags_buf_t	Conv32_syminfo_flags_buf_t
 #endif
 
 
 
 
 /*
- * Flags that alter standard formatting for conversion routines.
+ * Many conversion routines accept a fmt_flags argument of this type
+ * to allow the caller to modify the output. There are two parts to
+ * this value:
+ *
+ *	(1) Format requests (decimal vs hex, etc...)
+ *	(2) The low order bits specified by CONV_MASK_FMT_ALT
+ *		and retrieved by CONV_TYPE_FMT_ALT are integer
+ *		values that specify that an alternate set of
+ *		strings should be used. This is necessary because
+ *		different utilities evolved to use different strings,
+ *		and there are backward compatability guarantees in
+ *		place that prevent changing them.
+ *
+ * These values are designed such that a caller can always supply a
+ * simple 0 in order to receive "default" behavior.
  */
-#define	CONV_FMT_DECIMAL	0x01	/* conv_invalid_val() should print */
-					/*    integer print as decimal */
-					/*    (default is hex) */
-#define	CONV_FMT_SPACE		0x02	/* conv_invalid_val() should append */
-					/*    a space after the number.  */
-#define	CONV_FMT_ALTDUMP	0x04	/* Output strings using the versions */
-					/*    used by the dump program. */
-#define	CONV_FMT_ALTFILE	0x08	/* Output strings in the form used */
-					/*    by the file(1) command */
-#define	CONV_FMT_ALTCRLE	0x10	/* Output strings in the form used */
-					/*    by the crle(1) command */
+typedef int Conv_fmt_flags_t;
 
 /*
- * Mask of CONV_FMT bits that reflect a desire to use alternate strings.
+ * The bottom 8 bits of Conv_fmt_flags_t are used to encode
+ * alternative strings.
+ *
+ * If a given conversion routine does not support alternative strings
+ * for a given CONV_FMT_ALT type, it silently ignores the request and
+ * supplies the default set. This means that a utility like dump(1) is
+ * free to specify its special type in every conversion routine call,
+ * without regard to whether it has any special meaning for that particular
+ * routine. It will receive its special strings if there are any, and
+ * the defaults otherwise.
  */
-#define	CONV_FMTALTMASK	(CONV_FMT_ALTDUMP | CONV_FMT_ALTFILE)
+#define	CONV_MASK_FMT_ALT		0xff
+#define	CONV_TYPE_FMT_ALT(fmt_flags)	(fmt_flags & CONV_MASK_FMT_ALT)
+
+#define	CONV_FMT_ALT_DEFAULT	0	/* "Standard" strings */
+#define	CONV_FMT_ALT_DUMP	1	/* Style of strings used by dump(1) */
+#define	CONV_FMT_ALT_FILE	2	/* Style of strings used by file(1) */
+#define	CONV_FMT_ALT_CRLE	3	/* Style of strings used by crle(1) */
+#define	CONV_FMT_ALT_FULLNAME	4	/* Strings should be full #define */
+					/* 	(e.g. STB_LOCAL, not LOCL) */
+
+/*
+ * Flags that alter standard formatting for conversion routines.
+ * These bits start after the range occupied by CONV_MASK_FMT_ALT.
+ */
+#define	CONV_FMT_DECIMAL	0x0100	/* conv_invalid_val() should print */
+					/*    integer print as decimal */
+					/*    (default is hex) */
+#define	CONV_FMT_SPACE		0x0200	/* conv_invalid_val() should append */
+					/*    a space after the number.  */
+#define	CONV_FMT_NOBKT		0x0400	/* conv_expn_field() should omit */
+					/*    prefix and suffix strings */
+
 
 /*
  * The expansion of bit-field data items is driven from a value descriptor and
@@ -589,7 +644,8 @@ extern	const char	*conv_config_upm(const char *, const char *,
 			    const char *, size_t);
 extern	const char	*conv_def_tag(Symref, Conv_inv_buf_t *);
 extern	const char	*conv_demangle_name(const char *);
-extern	const char	*conv_dl_flag(int, int, Conv_dl_flag_buf_t *);
+extern	const char	*conv_dl_flag(int, Conv_fmt_flags_t,
+			    Conv_dl_flag_buf_t *);
 extern	const char	*conv_dl_mode(int, int, Conv_dl_mode_buf_t *);
 extern	const char	*conv_dwarf_ehe(uint_t, Conv_dwarf_ehe_buf_t *);
 extern	const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
@@ -643,8 +699,10 @@ extern	const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
 #define	conv_sym_info_type	conv64_sym_info_type
 #define	conv_sym_shndx		conv64_sym_shndx
 #define	conv_sym_other		conv64_sym_other
+#define	conv_sym_other_vis	conv64_sym_other_vis
 #define	conv_sym_value		conv64_sym_value
 #define	conv_sym_SPARC_value	conv64_sym_SPARC_value
+#define	conv_syminfo_flags	conv64_syminfo_flags
 #else
 #define	conv_bnd_obj		conv32_bnd_obj
 #define	conv_bnd_type		conv32_bnd_type
@@ -681,52 +739,80 @@ extern	const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
 #define	conv_sym_info_type	conv32_sym_info_type
 #define	conv_sym_shndx		conv32_sym_shndx
 #define	conv_sym_other		conv32_sym_other
+#define	conv_sym_other_vis	conv32_sym_other_vis
 #define	conv_sym_value		conv32_sym_value
 #define	conv_sym_SPARC_value	conv32_sym_SPARC_value
+#define	conv_syminfo_flags	conv32_syminfo_flags
 #endif
 
 extern	const char	*conv_bnd_obj(uint_t, Conv_bnd_obj_buf_t *);
 extern	const char	*conv_bnd_type(uint_t, Conv_bnd_type_buf_t *);
 extern	const char	*conv_cap_tag(Xword, Conv_inv_buf_t *);
 extern	const char	*conv_cap_val(Xword, Xword, Half, Conv_cap_val_buf_t *);
-extern	const char	*conv_cap_val_hw1(Xword, Half,
+extern	const char	*conv_cap_val_hw1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_hw1_buf_t *);
-extern	const char	*conv_cap_val_sf1(Xword, Half,
+extern	const char	*conv_cap_val_sf1(Xword, Half, Conv_fmt_flags_t,
 			    Conv_cap_val_sf1_buf_t *);
-extern	const char	*conv_dyn_flag1(Xword, Conv_dyn_flag1_buf_t *);
-extern	const char	*conv_dyn_flag(Xword, int, Conv_dyn_flag_buf_t *);
-extern	const char	*conv_dyn_posflag1(Xword, int,
+extern	const char	*conv_dyn_flag1(Xword, Conv_fmt_flags_t,
+			    Conv_dyn_flag1_buf_t *);
+extern	const char	*conv_dyn_flag(Xword, Conv_fmt_flags_t,
+			    Conv_dyn_flag_buf_t *);
+extern	const char	*conv_dyn_posflag1(Xword, Conv_fmt_flags_t,
 			    Conv_dyn_posflag1_buf_t *);
-extern	const char	*conv_dyn_tag(Xword, Half, int, Conv_inv_buf_t *);
-extern	const char	*conv_dyn_feature1(Xword, int,
+extern	const char	*conv_dyn_tag(Xword, Half, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_dyn_feature1(Xword, Conv_fmt_flags_t,
 			    Conv_dyn_feature1_buf_t *);
-extern	const char	*conv_ehdr_class(uchar_t, int, Conv_inv_buf_t *);
-extern	const char	*conv_ehdr_data(uchar_t, int, Conv_inv_buf_t *);
-extern	const char	*conv_ehdr_flags(Half, Word, Conv_ehdr_flags_buf_t *);
-extern	const char	*conv_ehdr_mach(Half, int, Conv_inv_buf_t *);
-extern	const char	*conv_ehdr_osabi(uchar_t, int, Conv_inv_buf_t *);
-extern	const char	*conv_ehdr_type(Half, int, Conv_inv_buf_t *);
-extern	const char	*conv_ehdr_vers(Word, int, Conv_inv_buf_t *);
-extern	int		conv_expn_field(CONV_EXPN_FIELD_ARG *);
-extern	const char	*conv_invalid_val(Conv_inv_buf_t *, Xword, int);
-extern	const char	*conv_phdr_flags(Word, Conv_phdr_flags_buf_t *);
-extern	const char	*conv_phdr_type(Half, Word, int, Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_class(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_data(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_flags(Half, Word, Conv_fmt_flags_t,
+			    Conv_ehdr_flags_buf_t *);
+extern	const char	*conv_ehdr_mach(Half, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_osabi(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_type(Half, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_ehdr_vers(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	int		conv_expn_field(CONV_EXPN_FIELD_ARG *,
+			    Conv_fmt_flags_t);
+extern	const char	*conv_invalid_val(Conv_inv_buf_t *, Xword,
+			    Conv_fmt_flags_t);
+extern	const char	*conv_phdr_flags(Word, Conv_fmt_flags_t fmt_flags,
+			    Conv_phdr_flags_buf_t *);
+extern	const char	*conv_phdr_type(Half, Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
 extern	const char	*conv_reject_desc(Rej_desc *, Conv_reject_desc_buf_t *);
-extern	const char	*conv_reloc_type(Half, Word, int, Conv_inv_buf_t *);
-extern	const char	*conv_reloc_type_static(Half, Word, int);
-extern	const char	*conv_reloc_386_type(Word, int, Conv_inv_buf_t *);
-extern	const char	*conv_reloc_amd64_type(Word, int, Conv_inv_buf_t *);
-extern	const char	*conv_reloc_SPARC_type(Word, int, Conv_inv_buf_t *);
-extern	const char	*conv_sec_flags(Xword, Conv_sec_flags_buf_t *);
+extern	const char	*conv_reloc_type(Half, Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_reloc_type_static(Half, Word, Conv_fmt_flags_t);
+extern	const char	*conv_reloc_386_type(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_reloc_amd64_type(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_reloc_SPARC_type(Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_sec_flags(Xword, Conv_fmt_flags_t,
+			    Conv_sec_flags_buf_t *);
 extern	const char	*conv_sec_linkinfo(Word, Xword, Conv_inv_buf_t *);
-extern	const char	*conv_sec_type(Half, Word, int, Conv_inv_buf_t *);
-extern	const char	*conv_sym_info_bind(uchar_t, int, Conv_inv_buf_t *);
-extern	const char	*conv_sym_info_type(Half, uchar_t, int,
+extern	const char	*conv_sec_type(Half, Word, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_sym_info_bind(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_sym_info_type(Half, uchar_t, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_sym_shndx(Half, Conv_inv_buf_t *);
 extern	const char	*conv_sym_other(uchar_t, Conv_inv_buf_t *);
+extern	const char	*conv_sym_other_vis(uchar_t, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
 extern	const char	*conv_sym_value(Half, uchar_t, Addr, Conv_inv_buf_t *);
-extern	const char	*conv_sym_SPARC_value(Addr, int, Conv_inv_buf_t *);
+extern	const char	*conv_sym_SPARC_value(Addr, Conv_fmt_flags_t,
+			    Conv_inv_buf_t *);
+extern	const char	*conv_syminfo_flags(Xword flags, Conv_fmt_flags_t,
+			    Conv_syminfo_flags_buf_t *syminfo_flags_buf);
 
 #ifdef	__cplusplus
 }

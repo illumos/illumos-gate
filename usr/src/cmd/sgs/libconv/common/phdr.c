@@ -37,7 +37,8 @@
 DEFINE_conv_map2str
 
 const char *
-conv_phdr_type(Half mach, Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_phdr_type(Half mach, Word type, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	static const Msg	phdrs[] = {
 		MSG_PT_NULL,		MSG_PT_LOAD,
@@ -67,15 +68,33 @@ error "PT_NUM has grown. Update phdrs[]"
 #endif
 
 	if (type < PT_NUM) {
-		return (conv_map2str(inv_buf, type, fmt_flags,
-		    ARRAY_NELTS(phdrs), phdrs, phdrs_alt, phdrs_alt));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			return (conv_map2str(inv_buf, type, fmt_flags,
+			    ARRAY_NELTS(phdrs_alt), phdrs_alt));
+		default:
+			return (conv_map2str(inv_buf, type, fmt_flags,
+			    ARRAY_NELTS(phdrs), phdrs));
+		}
 	} else if ((type >= PT_SUNWBSS) && (type <= PT_HISUNW)) {
-		return (conv_map2str(inv_buf, (type - PT_SUNWBSS), fmt_flags,
-		    ARRAY_NELTS(uphdrs), uphdrs, uphdrs_alt, uphdrs_alt));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			return (conv_map2str(inv_buf, (type - PT_SUNWBSS),
+			    fmt_flags, ARRAY_NELTS(uphdrs_alt), uphdrs_alt));
+		default:
+			return (conv_map2str(inv_buf, (type - PT_SUNWBSS),
+			    fmt_flags, ARRAY_NELTS(uphdrs), uphdrs));
+		}
 	} else if ((type == PT_SUNW_UNWIND) && (mach == EM_AMD64)) {
-		return ((fmt_flags & CONV_FMTALTMASK) ?
-		    MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT) :
-		    MSG_ORIG(MSG_PT_SUNW_UNWIND));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+		case CONV_FMT_ALT_FILE:
+			return (MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT));
+		default:
+			return (MSG_ORIG(MSG_PT_SUNW_UNWIND));
+		}
 	} else
 		return (conv_invalid_val(inv_buf, type, 0));
 }
@@ -101,7 +120,8 @@ error "PT_NUM has grown. Update phdrs[]"
 #endif
 
 const char *
-conv_phdr_flags(Word flags, Conv_phdr_flags_buf_t *phdr_flags_buf)
+conv_phdr_flags(Word flags, Conv_fmt_flags_t fmt_flags,
+    Conv_phdr_flags_buf_t *phdr_flags_buf)
 {
 	static Val_desc vda[] = {
 		{ PF_X,			MSG_ORIG(MSG_PF_X) },
@@ -118,7 +138,7 @@ conv_phdr_flags(Word flags, Conv_phdr_flags_buf_t *phdr_flags_buf)
 
 	conv_arg.buf = phdr_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)phdr_flags_buf->buf);
 }

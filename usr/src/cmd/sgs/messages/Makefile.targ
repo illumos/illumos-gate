@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,8 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/sgs/messages/Makefile.targ
 
@@ -44,9 +43,15 @@ delete lint:
 clean:
 		$(RM) $(CLEANFILES)
 
-$(POFILE):	$(POFILES)
+# The elfedit modules message files need a special rule that runs
+# the elfedit catalog target. It generates module messages files
+# as part of that process.
+$(POFILES_ELFEDIT_MODULES) :
+		@ cd ../../elfedit; pwd; $(MAKE) catalog
+
+$(POFILE):	$(POFILES) $(POFILES_ELFEDIT_MODULES)
 		$(RM) $(POFILE)
-		cat $(POFILES) > $(POFILE)
+		cat $(POFILES) $(POFILES_ELFEDIT_MODULES) > $(POFILE)
 
 
 # Install a local version of the message catalog.  Test using: LANG=piglatin
@@ -61,12 +66,13 @@ $(MSGDIR)/$(TEST_MOFILE): \
 		$(MSGFMT) -o $(MSGDIR)/$(TEST_MOFILE) $(TEST_POFILE)
 
 $(TEST_MSGID):	$(POFILE)
-		grep "^msgid" $(POFILE) | nl -v1 -i2 > $(TEST_MSGID)
+		grep "^msgid" $(POFILE) | \
+			$(SGSMSG_PIGLATIN_NL) 1 > $(TEST_MSGID)
 
 $(TEST_MSGSTR):	$(POFILE)
 		cat $(POFILE) | $(SGSTOOLS)/$(MACH)/piglatin | \
 		    grep "^sgidmay" | sed -e "s/^sgidmay/msgstr/" | \
-		    nl -v2 -i2 > $(TEST_MSGSTR)
+		    $(SGSMSG_PIGLATIN_NL) 2 > $(TEST_MSGSTR)
 
 $(MSGDIR):
 		-@mkdir -p $(MSGDIR)

@@ -32,10 +32,8 @@ LINTLOG=	../lint.$(MACH).log
 PKGARCHIVE=	.
 DATAFILES=	copyright prototype_com prototype_$(MACH) postinstall \
 		preremove depend checkinstall
-DATAFILES_EXT=	prototype_com_ext_usr_bin prototype_com_ext_usr_lib \
-		prototype_$(MACH)_ext_usr_bin prototype_$(MACH)_ext_usr_lib
 README=		SUNWonld-README
-FILES=		$(DATAFILES) $(DATAFILES_EXT) pkginfo
+FILES=		$(DATAFILES) pkginfo
 PACKAGE= 	SUNWonld
 ROOTONLD=	$(ROOT)/opt/SUNWonld
 ROOTREADME=	$(README:%=$(ROOTONLD)/%)

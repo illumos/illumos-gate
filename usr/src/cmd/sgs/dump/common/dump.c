@@ -56,7 +56,7 @@
  *	- Unknown items to be printed as integers using decimal formatting
  *	- The "Dump Style" versions of strings.
  */
-#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALTDUMP)
+#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALT_DUMP)
 
 const char *UNKNOWN = "<unknown>";
 
@@ -1261,7 +1261,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 						break;
 					case DT_FLAGS_1:
 						str = conv_dyn_flag1(
-						    p_dyn.d_un.d_val,
+						    p_dyn.d_un.d_val, 0,
 						    &conv_buf.dyn_flag1);
 						break;
 					}

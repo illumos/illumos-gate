@@ -37,46 +37,60 @@
 
 static int
 conv_cap_1(Xword val, char *str, size_t len, Half mach,
+    Conv_fmt_flags_t fmt_flags,
     int (*fptr)(uint64_t, char *, size_t, int, ushort_t))
 {
 	size_t	_len;
+	int do_bkt = (fmt_flags & CONV_FMT_NOBKT) == 0;
 
-	_len = sprintf(str, MSG_ORIG(MSG_GBL_OSQBRKT), EC_XWORD(val));
+	/*
+	 * Note that for the purposes of this routine, I consider
+	 * CONV_FMT_NOBKT to mean no brackets, or anything that
+	 * is placed outside of them. We also drop the hex version
+	 * of the flags that are put in front of the opening bracket.
+	 */
+	if (do_bkt) {
+		_len = sprintf(str, MSG_ORIG(MSG_GBL_OSQBRKT), EC_XWORD(val));
 
-	len -= _len;
-	str += _len;
+		len -= _len;
+		str += _len;
+	}
 
 	if ((*fptr)(val, str, len, CAP_FMT_SNGSPACE, mach) != 0)
 		return (0);
 
-	_len = strlen(str);
-	if ((len - _len) >= MSG_GBL_CSQBRKT_SIZE) {
-		str += _len;
-		(void) strcpy(str, MSG_ORIG(MSG_GBL_CSQBRKT));
+	if (do_bkt) {
+		_len = strlen(str);
+		if ((len - _len) >= MSG_GBL_CSQBRKT_SIZE) {
+			str += _len;
+			(void) strcpy(str, MSG_ORIG(MSG_GBL_CSQBRKT));
+		}
 	}
 	return (1);
 }
 
 const char *
-conv_cap_val_hw1(Xword val, Half mach, Conv_cap_val_hw1_buf_t *cap_val_hw1_buf)
+conv_cap_val_hw1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_cap_val_hw1_buf_t *cap_val_hw1_buf)
 {
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	if (conv_cap_1(val, cap_val_hw1_buf->buf, sizeof (cap_val_hw1_buf->buf),
-	    mach, hwcap_1_val2str) == 0)
+	    mach, fmt_flags, hwcap_1_val2str) == 0)
 		return (conv_invalid_val(&cap_val_hw1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_hw1_buf->buf);
 }
 
 const char *
-conv_cap_val_sf1(Xword val, Half mach, Conv_cap_val_sf1_buf_t *cap_val_sf1_buf)
+conv_cap_val_sf1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
+    Conv_cap_val_sf1_buf_t *cap_val_sf1_buf)
 {
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	if (conv_cap_1(val, cap_val_sf1_buf->buf, sizeof (cap_val_sf1_buf->buf),
-	    mach, sfcap_1_val2str) == 0)
+	    mach, fmt_flags, sfcap_1_val2str) == 0)
 		return (conv_invalid_val(&cap_val_sf1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_sf1_buf->buf);
 }
@@ -99,10 +113,10 @@ const char *
 conv_cap_val(Xword tag, Xword val, Half mach, Conv_cap_val_buf_t *cap_val_buf)
 {
 	if (tag == CA_SUNW_HW_1)
-		return (conv_cap_val_hw1(val, mach,
+		return (conv_cap_val_hw1(val, mach, 0,
 		    &cap_val_buf->cap_val_hw1_buf));
 	else if (tag == CA_SUNW_SF_1)
-		return (conv_cap_val_sf1(val, mach,
+		return (conv_cap_val_sf1(val, mach, 0,
 		    &cap_val_buf->cap_val_sf1_buf));
 	else
 		return (conv_invalid_val(&cap_val_buf->inv_buf, val, 0));

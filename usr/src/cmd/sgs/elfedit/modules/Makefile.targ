@@ -1,0 +1,145 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+
+$(PICDIR)/%.o:	%.c
+		$(COMPILE.c) $< -o $@
+		$(POST_PROCESS_O)
+
+$(PICDIR)/%.o:	../common/%.c
+		$(COMPILE.c) $< -o $@
+		$(POST_PROCESS_O)
+
+$(PICDIR)/%32.o:	../common/%.c
+		$(COMPILE.c) $< -o $@
+		$(POST_PROCESS_O)
+
+$(PICDIR)/%64.o:	../common/%.c
+		$(COMPILE.c) -D_ELF64 $< -o $@
+		$(POST_PROCESS_O)
+
+
+$(CAP_LIB): $(CAP_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(DYN_LIB): $(DYN_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(EHDR_LIB): $(EHDR_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(PHDR_LIB): $(PHDR_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(SHDR_LIB): $(SHDR_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(SYM_LIB): $(SYM_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+$(SYMINFO_LIB): $(SYMINFO_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
+
+$(ROOTELFEDITDIR):
+		$(INS.dir)
+
+$(ROOTELFEDITDIR64):
+		$(INS.dir)
+
+
+$(ROOTELFEDITDIR)/%: %
+		$(INS.file)
+
+$(ROOTELFEDITDIR64)/%: %
+		$(INS.file)
+
+
+../common/%.c:	%_msg.h
+
+%_msg.h %_msg.c:	$(SGSMSG) ../common/%.msg
+		$(SGSMSG) $(SGSMSGFLAGS) -l -h $@ -d $@ \
+			-m $(SGSMSGDIR)/elfedit_$* -n $*_msg $<
+
+# This rule causes the message catalog file to be created under
+# sgs/messages, but does not regenerate the C or header file for the module.
+$(SGSMSGDIR)/elfedit_%: $(SGSMSG) ../common/%.msg
+		$(SGSMSG) $(SGSMSGFLAGS) -l -m $(SGSMSGDIR)/elfedit_$* $<
+
+$(SGSMSG):
+		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
+		@ pwd
+
+catalog:	$(SGSMSGDIR)/elfedit_cap \
+		$(SGSMSGDIR)/elfedit_dyn \
+		$(SGSMSGDIR)/elfedit_ehdr \
+		$(SGSMSGDIR)/elfedit_phdr \
+		$(SGSMSGDIR)/elfedit_shdr \
+		$(SGSMSGDIR)/elfedit_sym \
+		$(SGSMSGDIR)/elfedit_syminfo
+		
+
+chkmsg:		$(SRCS)
+		sh $(CHKMSG) -m ../common/cap.msg ../common/cap.c
+		sh $(CHKMSG) -m ../common/dyn.msg ../common/dyn.c
+		sh $(CHKMSG) -m ../common/ehdr.msg ../common/ehdr.c
+		sh $(CHKMSG) -m ../common/phdr.msg ../common/phdr.c
+		sh $(CHKMSG) -m ../common/shdr.msg ../common/shdr.c
+		sh $(CHKMSG) -m ../common/sym.msg ../common/sym.c
+		sh $(CHKMSG) -m ../common/syminfo.msg ../common/syminfo.c
+
+lint:
+		@echo "\nLint of: cap.so"		 > $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/cap.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: dyn.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/dyn.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: ehdr.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/ehdr.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: phdr.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/phdr.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: shdr.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/shdr.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: sym.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/sym.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: syminfo.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/syminfo.c 		>> $(LINTOUT) 2>&1
+
+include		$(SRC)/lib/Makefile.targ

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2000,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/messages/Makefile.com
@@ -46,8 +45,14 @@ MSGFMT=		msgfmt
 
 POFILES=	ld		ldd		libld		liblddbg \
 		libldstab	librtld		rtld		libelf \
-		ldprof		libcrle		crle		pvs \
-		elfdump		lari
+		ldprof		libcrle		crle		moe \
+		pvs 		elfdump		elfedit		lari
+
+# These message files are generated as a side effect of generating the
+# elfedit messages. Otherwise they are the same thing as POFILES
+POFILES_ELFEDIT_MODULES = \
+		elfedit_cap 	elfedit_dyn	elfedit_ehdr	elfedit_phdr \
+		elfedit_shdr 	elfedit_sym	elfedit_syminfo	lari
 
 
 # Define a local version of the message catalog.  Test using: LANG=piglatin
@@ -61,4 +66,4 @@ TEST_MOFILE=	$(TEXT_DOMAIN).mo
 
 CLEANFILES=	$(POFILE) $(TEST_MSGID) $(TEST_MSGSTR) $(TEST_POFILE) \
 		$(TEST_MOFILE)
-CLOBBERFILES=	$(POFILES)
+CLOBBERFILES=	$(POFILES) $(POFILES_ELFEDIT_MODULES)

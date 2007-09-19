@@ -55,6 +55,7 @@ f none usr/bin/dump 0555 root bin
 s none usr/ccs/bin/dump=../../bin/dump
 f none usr/bin/elfdump 0555 root bin
 s none usr/ccs/bin/elfdump=../../bin/elfdump
+f none usr/bin/elfedit 0555 root bin
 f none usr/bin/error 0555 root bin
 s none usr/ccs/bin/error=../../bin/error
 f none usr/bin/gprof 0555 root bin
@@ -102,3 +103,12 @@ s none usr/ccs/lib/llib-ll.ln=../../lib/llib-ll.ln
 f none usr/lib/llib-ly 0644 root bin
 f none usr/lib/llib-ly.ln 0644 root bin
 s none usr/ccs/lib/llib-ly.ln=../../lib/llib-ly.ln
+d none usr/lib/elfedit 755 root bin
+s none usr/lib/elfedit/32=.
+f none usr/lib/elfedit/cap.so 755 root bin
+f none usr/lib/elfedit/dyn.so 755 root bin
+f none usr/lib/elfedit/ehdr.so 755 root bin
+f none usr/lib/elfedit/phdr.so 755 root bin
+f none usr/lib/elfedit/shdr.so 755 root bin
+f none usr/lib/elfedit/sym.so 755 root bin
+f none usr/lib/elfedit/syminfo.so 755 root bin

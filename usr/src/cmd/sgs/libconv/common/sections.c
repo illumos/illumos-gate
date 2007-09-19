@@ -90,31 +90,49 @@ static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
 
 
 const char *
-conv_sec_type(Half mach, Word sec, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_sec_type(Half mach, Word sec, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	if (sec < SHT_NUM) {
-		return (conv_map2str(inv_buf, sec, fmt_flags,
-		    ARRAY_NELTS(secs), secs, secs_alt, NULL));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+			return (conv_map2str(inv_buf, sec, fmt_flags,
+			    ARRAY_NELTS(secs_alt), secs_alt));
+		default:
+			return (conv_map2str(inv_buf, sec, fmt_flags,
+			    ARRAY_NELTS(secs), secs));
+		}
 	} else if ((sec >= SHT_LOSUNW) && (sec <= SHT_HISUNW)) {
-		return (conv_map2str(inv_buf, sec - SHT_LOSUNW,
-		    fmt_flags, ARRAY_NELTS(usecs), usecs, usecs_alt, NULL));
+		switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+		case CONV_FMT_ALT_DUMP:
+			return (conv_map2str(inv_buf, sec - SHT_LOSUNW,
+			    fmt_flags, ARRAY_NELTS(usecs_alt), usecs_alt));
+		default:
+			return (conv_map2str(inv_buf, sec - SHT_LOSUNW,
+			    fmt_flags, ARRAY_NELTS(usecs), usecs));
+		}
 	} else if ((sec >= SHT_LOPROC) && (sec <= SHT_HIPROC)) {
 		switch (mach) {
 		case EM_SPARC:
 		case EM_SPARC32PLUS:
 		case EM_SPARCV9:
-			if (sec == SHT_SPARC_GOTDATA) {
-				return (fmt_flags & CONV_FMT_ALTDUMP)
-				    ? MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT)
-				    : MSG_ORIG(MSG_SHT_SPARC_GOTDATA);
+			if (sec != SHT_SPARC_GOTDATA)
+				break;
+			switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+			case CONV_FMT_ALT_DUMP:
+			case CONV_FMT_ALT_FILE:
+				return (MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT));
 			}
-			break;
+			return (MSG_ORIG(MSG_SHT_SPARC_GOTDATA));
 		case EM_AMD64:
-			if (sec == SHT_AMD64_UNWIND) {
-				return (fmt_flags & CONV_FMT_ALTDUMP)
-				    ? MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT)
-				    : MSG_ORIG(MSG_SHT_AMD64_UNWIND);
+			if (sec != SHT_AMD64_UNWIND)
+				break;
+			switch (CONV_TYPE_FMT_ALT(fmt_flags)) {
+			case CONV_FMT_ALT_DUMP:
+			case CONV_FMT_ALT_FILE:
+				return (MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT));
 			}
+			return (MSG_ORIG(MSG_SHT_AMD64_UNWIND));
 		}
 	}
 
@@ -152,7 +170,8 @@ conv_sec_type(Half mach, Word sec, int fmt_flags, Conv_inv_buf_t *inv_buf)
 #endif
 
 const char *
-conv_sec_flags(Xword flags, Conv_sec_flags_buf_t *sec_flags_buf)
+conv_sec_flags(Xword flags, Conv_fmt_flags_t fmt_flags,
+    Conv_sec_flags_buf_t *sec_flags_buf)
 {
 	static Val_desc vda[] = {
 		{ SHF_WRITE,		MSG_ORIG(MSG_SHF_WRITE) },
@@ -178,7 +197,7 @@ conv_sec_flags(Xword flags, Conv_sec_flags_buf_t *sec_flags_buf)
 
 	conv_arg.buf = sec_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, fmt_flags);
 
 	return ((const char *)sec_flags_buf->buf);
 }
@@ -193,6 +212,6 @@ conv_sec_linkinfo(Word info, Xword flags, Conv_inv_buf_t *inv_buf)
 			return (MSG_ORIG(MSG_SHN_AFTER));
 	}
 
-	(void) conv_invalid_val(inv_buf, info, 1);
+	(void) conv_invalid_val(inv_buf, info, CONV_FMT_DECIMAL);
 	return ((const char *)inv_buf->buf);
 }

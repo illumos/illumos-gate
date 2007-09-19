@@ -61,7 +61,7 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	 * numeric (e.g. "0x200") or text representation (e.g.
 	 * "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_ehdr_flags(ehdr->e_machine, ehdr->e_flags, &flags_buf);
+	flgs = conv_ehdr_flags(ehdr->e_machine, ehdr->e_flags, 0, &flags_buf);
 	if (flgs[0] == '[')
 		dbg_print(lml, MSG_ORIG(MSG_ELF_FLAGS_FMT), flgs);
 	else
@@ -104,7 +104,7 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_TITLE));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_ADDR), EC_ADDR(shdr0->sh_addr),
-	    conv_sec_flags(shdr0->sh_flags, &sec_flags_buf));
+	    conv_sec_flags(shdr0->sh_flags, 0, &sec_flags_buf));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
 	    conv_sec_type(ehdr->e_machine, shdr0->sh_type, 0, &inv_buf1));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_OFFSET), EC_OFF(shdr0->sh_offset),

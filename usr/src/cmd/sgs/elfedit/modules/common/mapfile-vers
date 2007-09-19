@@ -1,0 +1,191 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# This mapfile is shared by all of the elfedit modules.
+# These sharable objects only export two functions,
+# elfedit[32|64]_init. Everything else is reduced to
+# local scope.
+#
+# The routines exported by elfedit for use by the modules
+# are also defined here, using the PARENT mapfile keyword.
+
+SUNWprivate_1.1 {
+	global:
+		# Standard init routines exported by every module
+		elfedit32_init;
+		elfedit64_init;
+
+
+		# liblddbg dbg_print() function
+		dbg_print =			PARENT NODIRECT;
+
+
+		# Core API
+		elfedit_command_usage =		PARENT;
+		elfedit_cpl_match =		PARENT;
+		elfedit_elferr =		PARENT;
+		elfedit_flags =			PARENT;
+		elfedit_malloc =		PARENT;
+		elfedit_msg =			PARENT;
+		elfedit_outstyle =		PARENT;
+		elfedit_pager_init =		PARENT;
+		elfedit_printf =		PARENT;
+		elfedit_realloc =		PARENT;
+
+
+
+		# ato[u]i routines
+		elfedit_const_to_atoui =	PARENT;
+		elfedit_mach_sunw_hw1_to_atoui = PARENT;
+
+		elfedit_atoi =			PARENT;
+		elfedit_atoui =			PARENT;
+		elfedit_atoconst =		PARENT;
+
+		elfedit_atoi2 =			PARENT;
+		elfedit_atoui2 =		PARENT;
+		elfedit_atoconst2 =		PARENT;
+
+		elfedit_atoi_range =		PARENT;
+		elfedit_atoui_range =		PARENT;
+		elfedit_atoconst_range =	PARENT;
+
+		elfedit_atoi_range2 =		PARENT;
+		elfedit_atoui_range2 =		PARENT;
+		elfedit_atoconst_range2 =	PARENT;
+
+		elfedit_atoi_value_to_str =	PARENT;
+		elfedit_atoui_value_to_str =	PARENT;
+		elfedit_atoconst_value_to_str =	PARENT;
+
+		elfedit_cpl_atoi =		PARENT;
+		elfedit_cpl_atoui =		PARENT;
+		elfedit_cpl_atoconst =		PARENT;
+
+
+
+		# Convenience functions built on top of the ato[u]i routines
+		elfedit_atobool =		PARENT;
+		elfedit_atoshndx =		PARENT;
+
+
+
+		# Getopt
+		elfedit_getopt_init =		PARENT;
+		elfedit_getopt =		PARENT;
+
+
+
+		# Utilities
+		elfedit_array_elts_delete =	PARENT;
+
+		elfedit_array_elts_move =	PARENT;
+
+		elfedit_bits_set =		PARENT;
+
+		elfedit32_dyn_elt_init =	PARENT;
+		elfedit64_dyn_elt_init =	PARENT;
+
+		elfedit32_dyn_elt_save =	PARENT;
+		elfedit64_dyn_elt_save =	PARENT;
+
+		elfedit32_dyn_offset_to_str =	PARENT;
+		elfedit64_dyn_offset_to_str =	PARENT;
+
+		elfedit32_dynstr_getpad =	PARENT;
+		elfedit64_dynstr_getpad =	PARENT;
+
+		elfedit32_dynstr_insert =	PARENT;
+		elfedit64_dynstr_insert =	PARENT;
+
+		elfedit32_modified_data =	PARENT;
+		elfedit64_modified_data =	PARENT;
+
+		elfedit32_modified_ehdr =	PARENT;
+		elfedit64_modified_ehdr =	PARENT;
+
+		elfedit32_modified_phdr =	PARENT;
+		elfedit64_modified_phdr =	PARENT;
+
+		elfedit32_modified_shdr =	PARENT;
+		elfedit64_modified_shdr =	PARENT;
+
+		elfedit32_name_to_shndx =	PARENT;
+		elfedit64_name_to_shndx =	PARENT;
+
+		elfedit32_name_to_symndx =	PARENT;
+		elfedit64_name_to_symndx =	PARENT;
+
+		elfedit32_offset_to_str =	PARENT;
+		elfedit64_offset_to_str =	PARENT;
+
+		elfedit32_sec_findstr =		PARENT;
+		elfedit64_sec_findstr =		PARENT;
+
+		elfedit32_sec_getcap =		PARENT;
+		elfedit64_sec_getcap =		PARENT;
+
+		elfedit32_sec_getdyn =		PARENT;
+		elfedit64_sec_getdyn =		PARENT;
+
+		elfedit32_sec_getstr =		PARENT;
+		elfedit64_sec_getstr =		PARENT;
+
+		elfedit32_sec_getsyminfo =	PARENT;
+		elfedit64_sec_getsyminfo =	PARENT;
+
+		elfedit32_sec_getsymtab =	PARENT;
+		elfedit64_sec_getsymtab =	PARENT;
+
+		elfedit32_sec_getversym =	PARENT;
+		elfedit64_sec_getversym =	PARENT;
+
+		elfedit32_sec_getxshndx =	PARENT;
+		elfedit64_sec_getxshndx =	PARENT;
+
+		elfedit32_sec_issymtab =	PARENT;
+		elfedit64_sec_issymtab =	PARENT;
+
+		elfedit32_shndx_to_name =	PARENT;
+		elfedit64_shndx_to_name =	PARENT;
+
+		elfedit32_sec_msgprefix =	PARENT;
+		elfedit64_sec_msgprefix =	PARENT;
+
+		elfedit32_strtab_insert =	PARENT;
+		elfedit64_strtab_insert =	PARENT;
+
+		elfedit32_strtab_insert_test =	PARENT;
+		elfedit64_strtab_insert_test =	PARENT;
+
+		elfedit32_type_to_shndx =	PARENT;
+		elfedit64_type_to_shndx =	PARENT;
+
+local:
+		*;
+};

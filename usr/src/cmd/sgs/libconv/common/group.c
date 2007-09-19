@@ -75,7 +75,7 @@ conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 
 	conv_arg.buf = grphdl_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)grphdl_flags_buf->buf);
 }
@@ -127,7 +127,7 @@ conv_grpdesc_flags(uint_t flags, Conv_grpdesc_flags_buf_t *grpdesc_flags_buf)
 
 	conv_arg.buf = grpdesc_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)grpdesc_flags_buf->buf);
 }

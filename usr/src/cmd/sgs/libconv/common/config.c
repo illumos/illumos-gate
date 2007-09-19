@@ -80,7 +80,7 @@ conv_config_feat(int features, Conv_config_feat_buf_t *config_feat_buf)
 
 	conv_arg.buf = config_feat_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = features;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)config_feat_buf->buf);
 }
@@ -160,7 +160,7 @@ conv_config_obj(ushort_t flags, Conv_config_obj_buf_t *config_obj_buf)
 	*lstr = NULL;
 	conv_arg.oflags = conv_arg.rflags &= ~RTC_OBJ_OPTINAL;
 
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)config_obj_buf->buf);
 }

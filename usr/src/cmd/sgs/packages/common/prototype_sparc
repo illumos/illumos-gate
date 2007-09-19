@@ -51,7 +51,6 @@ f none $SGSDIR/lib/sparcv9/librtld_db.so.1=lib/sparcv9/librtld_db.so.1 755 root 
 s none $SGSDIR/lib/sparcv9/librtld_db.so=librtld_db.so.1
 d none $SGSDIR/usr/bin/sparcv9 755 root bin
 f none $SGSDIR/usr/bin/sparcv9/crle=usr/bin/sparcv9/crle 555 root bin
-!include prototype_sparc_ext_usr_bin
 f none $SGSDIR/usr/bin/sparcv9/moe=usr/bin/sparcv9/moe 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/pvs=usr/bin/sparcv9/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/sparcv9 755 root bin
@@ -59,6 +58,7 @@ f none $SGSDIR/usr/bin/sparcv9/dump=usr/bin/sparcv9/dump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/sparcv9/dump=../../../bin/sparcv9/dump
 f none $SGSDIR/usr/bin/sparcv9/elfdump=usr/bin/sparcv9/elfdump 0555 root bin
 s none $SGSDIR/usr/ccs/bin/sparcv9/elfdump=../../../bin/sparcv9/elfdump
+f none $SGSDIR/usr/bin/sparcv9/elfedit=usr/bin/sparcv9/elfedit 0555 root bin
 f none $SGSDIR/usr/bin/sparcv9/ld=usr/bin/sparcv9/ld 755 root bin
 s none $SGSDIR/usr/ccs/bin/sparcv9/ld=../../../bin/sparcv9/ld
 f none $SGSDIR/usr/bin/sparcv9/nm=usr/bin/sparcv9/nm 0555 root bin
@@ -68,7 +68,15 @@ s none $SGSDIR/usr/ccs/bin/sparcv9/mcs=../../../bin/sparcv9/mcs 0555 root bin
 l none $SGSDIR/usr/bin/sparcv9/strip=./mcs
 s none $SGSDIR/usr/ccs/bin/sparcv9/strip=../../../bin/sparcv9/strip
 f none $SGSDIR/usr/lib/ld.so=usr/lib/ld.so 755 root bin
-!include prototype_sparc_ext_usr_lib
+d none $SGSDIR/usr/lib/elfedit/sparcv9 755 root bin
+s none $SGSDIR/usr/lib/elfedit/64=sparcv9
+f none $SGSDIR/usr/lib/elfedit/sparcv9/cap.so=usr/lib/elfedit/sparcv9/cap.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/dyn.so=usr/lib/elfedit/sparcv9/dyn.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/ehdr.so=usr/lib/elfedit/sparcv9/ehdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/phdr.so=usr/lib/elfedit/sparcv9/phdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/shdr.so=usr/lib/elfedit/sparcv9/shdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/sym.so=usr/lib/elfedit/sparcv9/sym.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/syminfo.so=usr/lib/elfedit/sparcv9/syminfo.so 755 root bin
 d none $SGSDIR/usr/lib/link_audit/sparcv9 755 root bin
 s none $SGSDIR/usr/lib/link_audit/64=sparcv9
 f none $SGSDIR/usr/lib/link_audit/sparcv9/ldprof.so.1=usr/lib/link_audit/sparcv9/ldprof.so.1 755 root bin

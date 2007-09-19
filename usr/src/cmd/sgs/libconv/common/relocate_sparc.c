@@ -88,7 +88,8 @@ static const Msg rels[R_SPARC_NUM] = {
 #endif
 
 const char *
-conv_reloc_SPARC_type(Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
+conv_reloc_SPARC_type(Word type, Conv_fmt_flags_t fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
 	if (type >= R_SPARC_NUM)
 		return (conv_invalid_val(inv_buf, type, fmt_flags));

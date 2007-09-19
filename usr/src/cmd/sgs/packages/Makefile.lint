@@ -55,13 +55,11 @@ LSUBDIRS2 =	../rtld \
 		../libldmake \
 		../rtld/mdbmod
 
-LINTLDIRS_EXT:sh=	if [ -f ../ext/packages/lintldirs ]; \
-				then cat ../ext/packages/lintldirs; \
-			fi
-
 LINTLDIRS=	../libld \
 		../sgsdemangler \
 		../elfdump \
+		../elfedit \
+		../elfedit/modules \
 		../crle \
 		../dump \
 		../ld \
@@ -69,7 +67,7 @@ LINTLDIRS=	../libld \
 		../nm \
 		../mcs \
 		../moe \
-		../pvs $(LINTLDIRS_EXT)
+		../pvs
 
 $(LSUBDIRS1) $(LSUBDIRS2) :=	TARGET = lint
 $(LINTLDIRS) :=	TARGET = lint

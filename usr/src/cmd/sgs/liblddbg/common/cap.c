@@ -60,7 +60,7 @@ Dbg_cap_val_hw1(Lm_list *lml, Xword val, Half mach)
 
 	Dbg_util_nl(lml, DBG_NL_FRC);
 	dbg_print(lml, MSG_INTL(MSG_CAP_VAL_HW1),
-	    conv_cap_val_hw1(val, mach, &cap_val_hw1_buf));
+	    conv_cap_val_hw1(val, mach, 0, &cap_val_hw1_buf));
 	Dbg_util_nl(lml, DBG_NL_FRC);
 }
 

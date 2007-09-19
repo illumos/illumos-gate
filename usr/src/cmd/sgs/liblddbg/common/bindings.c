@@ -119,7 +119,7 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
 	binfo &= DBG_BINFO_MSK;
 	if (binfo) {
 		conv_arg.oflags = conv_arg.rflags = binfo;
-		(void) conv_expn_field(&conv_arg);
+		(void) conv_expn_field(&conv_arg, 0);
 	} else {
 		binfostr[0] = '\0';
 	}

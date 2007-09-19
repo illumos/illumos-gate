@@ -89,7 +89,7 @@ conv_seg_flags(Half flags, Conv_seg_flags_buf_t *seg_flags_buf)
 
 	conv_arg.buf = seg_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
-	(void) conv_expn_field(&conv_arg);
+	(void) conv_expn_field(&conv_arg, 0);
 
 	return ((const char *)seg_flags_buf->buf);
 }

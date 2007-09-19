@@ -1259,3 +1259,5 @@ Bugid   Risk Synopsis
 6602294 ps_pbrandname breaks apps linked directly against librtld_db
 	(link-editor components only)
 6603313 dlclose() can fail to unload objects after fix for 6573641
+6234471 need a way to edit ELF objects
+	PSARC/2007/509 elfedit

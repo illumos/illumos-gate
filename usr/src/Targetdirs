@@ -255,6 +255,7 @@ ROOT.BIN= \
 	/usr/lib/class/TS \
 	/usr/lib/crypto \
 	/usr/lib/drv \
+	/usr/lib/elfedit \
 	/usr/lib/font \
 	/usr/lib/fp \
 	/usr/lib/fp/libp \
@@ -340,6 +341,7 @@ ROOT.BIN64= \
 	/usr/ccs/lib/$(MACH64) \
 	/usr/lib/$(MACH64) \
         /usr/lib/$(MACH64)/gss \
+	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
 	/usr/lib/fp/libp/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
@@ -464,6 +466,7 @@ SYM.ROOT.BIN= \
 	/usr/preserve \
 	/usr/src \
 	/usr/lib/32 \
+	/usr/lib/elfedit/32 \
 	/usr/lib/libp/32 \
 	/usr/lib/lwp/32 \
 	/usr/lib/link_audit/32 \
@@ -482,6 +485,7 @@ SYM.ROOT.BIN64= \
 	/lib/64 \
 	/lib/secure/64 \
 	/usr/lib/64 \
+	/usr/lib/elfedit/64 \
 	/usr/lib/libp/64 \
 	/usr/lib/link_audit/64 \
 	/usr/lib/lwp/64 \
@@ -618,6 +622,7 @@ $(ROOT)/usr/spool:=			LINKDEST=../var/spool
 $(ROOT)/usr/tmp:=			LINKDEST=../var/tmp
 $(ROOT)/usr/lib/tmac:=			LINKDEST=../share/lib/tmac
 $(ROOT)/usr/lib/32:=			LINKDEST=.
+$(ROOT)/usr/lib/elfedit/32:=		LINKDEST=.
 $(ROOT)/usr/lib/libp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/lwp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/link_audit/32:=		LINKDEST=.
@@ -631,6 +636,7 @@ $(ROOT)/usr/ucblib/32:=			LINKDEST=.
 $(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)

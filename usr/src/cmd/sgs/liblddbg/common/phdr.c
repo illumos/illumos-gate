@@ -37,7 +37,7 @@ Elf_phdr(Lm_list *lml, Half mach, Phdr *phdr)
 	Conv_phdr_flags_buf_t	phdr_flags_buf;
 
 	dbg_print(lml, MSG_ORIG(MSG_PHD_VADDR), EC_ADDR(phdr->p_vaddr),
-	    conv_phdr_flags(phdr->p_flags, &phdr_flags_buf));
+	    conv_phdr_flags(phdr->p_flags, 0, &phdr_flags_buf));
 	dbg_print(lml, MSG_ORIG(MSG_PHD_PADDR), EC_ADDR(phdr->p_paddr),
 	    conv_phdr_type(mach, phdr->p_type, 0, &inv_buf));
 	dbg_print(lml, MSG_ORIG(MSG_PHD_FILESZ), EC_XWORD(phdr->p_filesz),

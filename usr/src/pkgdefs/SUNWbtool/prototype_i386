@@ -54,6 +54,7 @@ f none usr/bin/amd64/dump 0555 root bin
 s none usr/ccs/bin/amd64/dump=../../../bin/amd64/dump
 f none usr/bin/amd64/elfdump 0555 root bin
 s none usr/ccs/bin/amd64/elfdump=../../../bin/amd64/elfdump
+f none usr/bin/amd64/elfedit 0555 root bin
 f none usr/bin/amd64/mcs 0555 root bin
 s none usr/ccs/bin/amd64/mcs=../../../bin/amd64/mcs
 f none usr/bin/amd64/nm 0555 root bin
@@ -65,3 +66,12 @@ s none usr/ccs/bin/amd64/strip=../../../bin/amd64/strip
 d none usr/lib/amd64 0755 root bin
 f none usr/lib/amd64/llib-ll.ln 0644 root bin
 f none usr/lib/amd64/llib-ly.ln 0644 root bin
+d none usr/lib/elfedit/amd64 755 root bin
+s none usr/lib/elfedit/64=amd64
+f none usr/lib/elfedit/amd64/cap.so 755 root bin
+f none usr/lib/elfedit/amd64/dyn.so 755 root bin
+f none usr/lib/elfedit/amd64/ehdr.so 755 root bin
+f none usr/lib/elfedit/amd64/phdr.so 755 root bin
+f none usr/lib/elfedit/amd64/shdr.so 755 root bin
+f none usr/lib/elfedit/amd64/sym.so 755 root bin
+f none usr/lib/elfedit/amd64/syminfo.so 755 root bin
