@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,18 +95,21 @@ checkut_line(char *line)
 	struct utmpx *u;
 	char buf[33], ttyn[33];
 	int rvalue = 0;
+	pid_t ownpid = getpid();
 
 	(void) strncpy(buf, lastname(line), sizeof (u->ut_line));
 	buf[sizeof (u->ut_line)] = '\0';
 
 	setutxent();
 	while ((u = getutxent()) != NULL) {
-		if (u->ut_type == USER_PROCESS) {
-			strncpy(ttyn, u->ut_line, sizeof (u->ut_line));
-			ttyn[sizeof (u->ut_line)] = '\0';
-			if (strcmp(buf, ttyn) == 0) {
-				rvalue = 1;
-				break;
+		if (u->ut_pid == ownpid) {
+			if (u->ut_type == USER_PROCESS) {
+				strncpy(ttyn, u->ut_line, sizeof (u->ut_line));
+				ttyn[sizeof (u->ut_line)] = '\0';
+				if (strcmp(buf, ttyn) == 0) {
+					rvalue = 1;
+					break;
+				}
 			}
 		}
 	}
