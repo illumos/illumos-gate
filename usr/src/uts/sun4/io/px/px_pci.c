@@ -721,15 +721,17 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				    as->cmd);
 
 			/*
-			 * For hotplug-capable slots, we should explicitly
+			 * For empty hotplug-capable slots, we should explicitly
 			 * disable the errors, so that we won't panic upon
 			 * unsupported hotplug messages.
 			 */
-			if (!ddi_prop_exists(DDI_DEV_T_ANY, rdip,
-			    DDI_PROP_DONTPASS, "hotplug-capable")) {
+			if ((!ddi_prop_exists(DDI_DEV_T_ANY, rdip,
+			    DDI_PROP_DONTPASS, "hotplug-capable")) ||
+			    ddi_get_child(rdip)) {
 				(void) pcie_postattach_child(rdip);
 				return (DDI_SUCCESS);
 			}
+
 			if (pci_config_setup(rdip, &config_handle) ==
 			    DDI_SUCCESS) {
 				pcie_disable_errors(rdip, config_handle);
