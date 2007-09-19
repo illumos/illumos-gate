@@ -109,6 +109,7 @@ $SkipTextrelFiles = qr{ ^(?:
 
 # Define any files that are allowed undefined references.
 $SkipUndefDirs = qr{
+	usr/lib/elfedit/ |		# elfedit modules have callbacks
 	usr/lib/inet/ppp/ |		# pppd plugins have callbacks
 	usr/lib/libp/ |			# libc.so.1 requires _mcount
 	/lib/mdb/ |			# mdb modules have callbacks
