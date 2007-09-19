@@ -916,7 +916,8 @@ create_irecache:
 	/* Obtain dst_ill */
 	dst_ill = ip_newroute_get_dst_ill(ire->ire_ipif->ipif_ill);
 	if (dst_ill == NULL) {
-		ip2dbg(("ire_forward no dst ill; ire 0x%p\n", (void *)ire));
+		ip2dbg(("ire_forward no dst ill; ire 0x%p\n",
+		    (void *)ire));
 		goto icmp_err_ret;
 	}
 
@@ -1110,6 +1111,10 @@ ire_get_bucket(ire_t *ire)
 	 * add the route. based on BSD's rtrequest1(RTM_ADD)
 	 */
 	R_Malloc(rt, rt_entry_cache,  sizeof (*rt));
+	/* kmem_alloc failed */
+	if (rt == NULL)
+		return (NULL);
+
 	(void) memset(rt, 0, sizeof (*rt));
 	rt->rt_nodes->rn_key = (char *)&rt->rt_dst;
 	rt->rt_dst = rdst;
