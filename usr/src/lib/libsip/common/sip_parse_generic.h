@@ -41,7 +41,8 @@ extern "C" {
 extern int		sip_atoi(_sip_header_t	*, int *);
 extern int		sip_find_token(_sip_header_t  *, char);
 extern int		sip_find_cr(_sip_header_t *);
-extern int		sip_find_separator(_sip_header_t *, char, char, char);
+extern int		sip_find_separator(_sip_header_t *, char, char, char,
+			    boolean_t);
 extern int		sip_find_white_space(_sip_header_t *);
 extern int		sip_skip_white_space(_sip_header_t *);
 extern int		sip_reverse_skip_white_space(_sip_header_t *);

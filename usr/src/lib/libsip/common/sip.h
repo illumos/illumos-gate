@@ -626,6 +626,9 @@ extern const sip_str_t	*sip_get_content_sub_type(sip_msg_t, int *);
 extern char		*sip_get_content(sip_msg_t, int *);
 extern sip_msg_t	sip_create_dialog_req(sip_method_t, sip_dialog_t,
 			    char *, char *, int, char *, uint32_t, int);
+extern sip_msg_t	sip_create_dialog_req_nocontact(sip_method_t,
+			    sip_dialog_t, char *, char *, int, char *,
+			    uint32_t, int);
 
 extern int			sip_get_dialog_state(sip_dialog_t, int *);
 extern int			sip_get_dialog_method(sip_dialog_t, int *);
@@ -635,6 +638,8 @@ extern const sip_str_t		*sip_get_dialog_remote_tag(sip_dialog_t, int *);
 extern const struct sip_uri	*sip_get_dialog_local_uri(sip_dialog_t, int *);
 extern const struct sip_uri	*sip_get_dialog_remote_uri(sip_dialog_t, int *);
 extern const struct sip_uri	*sip_get_dialog_remote_target_uri(sip_dialog_t,
+				    int *);
+extern const struct sip_uri	*sip_get_dialog_local_contact_uri(sip_dialog_t,
 				    int *);
 extern const sip_str_t		*sip_get_dialog_route_set(sip_dialog_t, int *);
 extern boolean_t		sip_is_dialog_secure(sip_dialog_t, int *);

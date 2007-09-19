@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,6 +72,7 @@ SUNW_1.1 {
 	sip_hold_trans;
 	sip_release_trans;
 	sip_create_dialog_req;
+	sip_create_dialog_req_nocontact;
 	sip_hold_dialog;
 	sip_release_dialog;
 	sip_delete_dialog;
@@ -83,6 +84,7 @@ SUNW_1.1 {
 	sip_get_dialog_local_uri;
 	sip_get_dialog_remote_uri;
 	sip_get_dialog_remote_target_uri;
+	sip_get_dialog_local_contact_uri;
 	sip_get_dialog_route_set;
 	sip_is_dialog_secure;
 	sip_get_dialog_local_cseq;

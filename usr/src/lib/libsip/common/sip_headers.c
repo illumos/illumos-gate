@@ -728,7 +728,7 @@ _sip_get_header_functions(sip_header_function_t *sip_header_function_table,
 		}
 		header_name = sip_header->sip_hdr_current;
 		if (sip_find_separator(sip_header, SIP_HCOLON, (char)NULL,
-		    (char)NULL) != 0) {
+		    (char)NULL, B_FALSE) != 0) {
 			return (NULL);
 		}
 		len = sip_header->sip_hdr_current - header_name;

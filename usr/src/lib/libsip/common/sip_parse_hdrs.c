@@ -133,7 +133,7 @@ sip_parse_allow_header(_sip_header_t *hdr, sip_parsed_header_t **phdr)
 		value->sip_value_header = parsed_header;
 
 		if (sip_find_separator(hdr, SIP_COMMA, (char)NULL,
-		    (char)NULL) == 0) {
+		    (char)NULL, B_FALSE) == 0) {
 			multi_value = B_TRUE;
 		}
 
@@ -506,7 +506,7 @@ sip_parse_retryaft_header(_sip_header_t *sip_header,
 		if (sip_find_token(sip_header, SIP_RPAR) == 0) {
 			value->intstr_str_len =
 			    sip_header->sip_hdr_current -
-				value->intstr_str_ptr - 1;
+			    value->intstr_str_ptr - 1;
 			if (sip_find_token(sip_header, SIP_SEMI) == 0) {
 				sip_header->sip_hdr_current--;
 				(void) sip_parse_params(sip_header,
@@ -749,7 +749,7 @@ sip_parse_warn_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 			if (sip_find_token(sip_header, SIP_QUOTE) == 0) {
 				value->warn_text_len =
 				    sip_header->sip_hdr_current -
-					value->warn_text_ptr - 1;
+				    value->warn_text_ptr - 1;
 			} else {
 				value->sip_value_state = SIP_VALUE_BAD;
 				goto get_next_val;
@@ -1260,7 +1260,7 @@ sip_parse_via_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 				goto get_next_via_value;
 			}
 		} else if (sip_find_separator(sip_header, SIP_SEMI, SIP_COMMA,
-		    SIP_HCOLON)) {
+		    SIP_HCOLON, B_FALSE)) {
 			if (sip_goto_next_value(sip_header) != 0) {
 				sip_free_phdr(parsed_header);
 				return (EPROTO);
@@ -1469,7 +1469,7 @@ sip_parse_cftr_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 				value->sip_value_state = SIP_VALUE_BAD;
 				goto get_next_cftr_value;
 			} else if (sip_find_separator(sip_header, SIP_SEMI,
-			    SIP_LAQUOT, SIP_COMMA) != 0) {
+			    SIP_LAQUOT, SIP_COMMA, B_TRUE) != 0) {
 				/*
 				 * only a uri.
 				 */
@@ -1489,9 +1489,15 @@ sip_parse_cftr_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 					value->sip_value_state = SIP_VALUE_BAD;
 					goto get_next_cftr_value;
 				}
-				continue;
+				goto get_next_cftr_value;
 			}
-
+			/*
+			 * This is needed to get rid of leading white spaces of
+			 * display name or uri
+			 */
+			--sip_header->sip_hdr_current;
+			(void) sip_reverse_skip_white_space(sip_header);
+			++sip_header->sip_hdr_current;
 			tmp_ptr_2 = sip_header->sip_hdr_current;
 			if (*sip_header->sip_hdr_current == SIP_SP) {
 				if (sip_skip_white_space(sip_header) != 0) {
@@ -1515,7 +1521,7 @@ sip_parse_cftr_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 						    SIP_VALUE_BAD;
 						goto get_next_cftr_value;
 					}
-					continue;
+					goto get_next_cftr_value;
 				}
 			}
 
@@ -1576,7 +1582,7 @@ sip_parse_cftr_header(_sip_header_t *sip_header, sip_parsed_header_t **header)
 		tmp_ptr = sip_header->sip_hdr_current;
 
 		if (sip_find_separator(sip_header, SIP_RAQUOT, (char)NULL,
-		    (char)NULL)) {
+		    (char)NULL, B_FALSE)) {
 			if (sip_goto_next_value(sip_header) != 0) {
 				sip_free_cftr_header(parsed_header);
 				return (EPROTO);
@@ -1622,7 +1628,11 @@ get_next_cftr_value:
 		 * Parse uri
 		 */
 		if (value->cftr_uri.sip_str_len > 0) {
-			int		error;
+			int			error;
+			uint_t			uri_errflags;
+			char			*uri = "*";
+			_sip_msg_t		*sip_msg;
+			sip_message_type_t	*msg_type;
 
 			value->sip_value_parsed_uri = sip_parse_uri(
 			    &value->cftr_uri, &error);
@@ -1630,10 +1640,29 @@ get_next_cftr_value:
 				sip_free_cftr_header(parsed_header);
 				return (ENOMEM);
 			}
-			if (error != 0 ||
-			    ((_sip_uri_t *)value->sip_value_parsed_uri)->
-			    sip_uri_errflags != 0) {
-				value->sip_value_state = SIP_VALUE_BAD;
+			uri_errflags = ((_sip_uri_t *)value->
+			    sip_value_parsed_uri)->sip_uri_errflags;
+			if (error != 0 || uri_errflags != 0) {
+				if ((strcmp(SIP_CONTACT, sip_header->
+				    sip_header_functions->header_name) == 0) &&
+				    (strncmp(value->cftr_uri.sip_str_ptr, uri,
+				    strlen(uri)) == 0) && (strlen(uri) ==
+				    value->cftr_uri.sip_str_len)) {
+					sip_msg = sip_header->sip_hdr_sipmsg;
+					msg_type = sip_msg->sip_msg_req_res;
+					if (msg_type->is_request && msg_type->
+					    sip_req_method == REGISTER) {
+						error = 0;
+						((_sip_uri_t *)value->
+						    sip_value_parsed_uri)->
+						    sip_uri_errflags = 0;
+					} else {
+						value->sip_value_state =
+						    SIP_VALUE_BAD;
+					}
+				} else {
+					value->sip_value_state = SIP_VALUE_BAD;
+				}
 			}
 		}
 

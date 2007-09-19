@@ -119,6 +119,29 @@ err_ret:
 }
 
 /*
+ * Create a request using the state maintained in the dialog. The request will
+ * not have Contact header.
+ */
+sip_msg_t
+sip_create_dialog_req_nocontact(sip_method_t method, sip_dialog_t dialog,
+    char *transport, char *sent_by, int sent_by_port, char *via_param,
+    uint32_t maxforward, int cseq)
+{
+	sip_msg_t	sip_msg;
+
+	sip_msg = sip_create_dialog_req(method, dialog, transport, sent_by,
+	    sent_by_port, via_param, maxforward, cseq);
+	if (sip_msg != NULL) {
+		if (sip_delete_header_by_name(sip_msg, SIP_CONTACT) != 0) {
+			sip_free_msg(sip_msg);
+			return (NULL);
+		}
+	}
+
+	return (sip_msg);
+}
+
+/*
  * Get the Dialog method
  */
 int
@@ -360,6 +383,39 @@ sip_get_dialog_remote_target_uri(sip_dialog_t dialog, int *error)
 	(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 
 	return ((sip_uri_t)rtarg);
+}
+
+/*
+ * Return the dialog local contact uri.
+ */
+const struct sip_uri *
+sip_get_dialog_local_contact_uri(sip_dialog_t dialog, int *error)
+{
+	_sip_dialog_t		*_dialog;
+	const struct sip_uri	*lcuri = NULL;
+	const struct sip_value	*val;
+
+	if (error != NULL)
+		*error = 0;
+	if (!sip_manage_dialog || dialog == NULL) {
+		if (error != NULL)
+			*error = EINVAL;
+		return (NULL);
+	}
+	_dialog = (_sip_dialog_t *)dialog;
+	(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
+	if (dialog->sip_dlg_local_contact != NULL) {
+		val = sip_get_header_value(_dialog->sip_dlg_local_contact,
+		    error);
+		if (val == NULL) {
+			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+			return (NULL);
+		}
+		lcuri = val->sip_value_parse_uri;
+	}
+	(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+
+	return ((sip_uri_t)lcuri);
 }
 
 /*
