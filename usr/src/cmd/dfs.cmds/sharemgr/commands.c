@@ -2293,6 +2293,47 @@ add_security(sa_group_t group, char *sectype,
 }
 
 /*
+ * zfscheck(group, share)
+ *
+ * For the special case where a share was provided, make sure it is a
+ * compatible path for a ZFS property change.  The only path
+ * acceptable is the path that defines the zfs sub-group (dataset with
+ * the sharenfs property set) and not one of the paths that inherited
+ * the NFS properties. Returns SA_OK if it is usable and
+ * SA_NOT_ALLOWED if it isn't.
+ *
+ * If group is not a ZFS group/subgroup, we assume OK since the check
+ * on return will catch errors for those cases.  What we are looking
+ * for here is that the group is ZFS and the share is not the defining
+ * share.  All else is SA_OK.
+ */
+
+static int
+zfscheck(sa_group_t group, sa_share_t share)
+{
+	int ret = SA_OK;
+	char *attr;
+
+	if (sa_group_is_zfs(group)) {
+		/*
+		 * The group is a ZFS group.  Does the share represent
+		 * the dataset that defined the group? It is only OK
+		 * if the attribute "subgroup" exists on the share and
+		 * has a value of "true".
+		 */
+
+		ret = SA_NOT_ALLOWED;
+		attr = sa_get_share_attr(share, "subgroup");
+		if (attr != NULL) {
+			if (strcmp(attr, "true") == 0)
+				ret = SA_OK;
+			sa_free_attr_string(attr);
+		}
+	}
+	return (ret);
+}
+
+/*
  * basic_set(groupname, optlist, protocol, sharepath, dryrun)
  *
  * This function implements "set" when a name space (-S) is not
@@ -2319,6 +2360,16 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 				    "Share does not exist in group %s\n"),
 				    groupname, sharepath);
 				ret = SA_NO_SUCH_PATH;
+			} else {
+				/* if ZFS and OK, then only group */
+				ret = zfscheck(group, share);
+				if (ret == SA_OK &&
+				    sa_group_is_zfs(group))
+					share = NULL;
+				if (ret == SA_NOT_ALLOWED)
+					(void) printf(gettext(
+					    "Properties on ZFS group shares "
+					    "not supported: %s\n"), sharepath);
 			}
 		}
 		if (ret == SA_OK) {
@@ -2396,6 +2447,16 @@ space_set(sa_handle_t handle, char *groupname, struct options *optlist,
 				    "Share does not exist in group %s\n"),
 				    groupname, sharepath);
 				ret = SA_NO_SUCH_PATH;
+			} else {
+				/* if ZFS and OK, then only group */
+				ret = zfscheck(group, share);
+				if (ret == SA_OK &&
+				    sa_group_is_zfs(group))
+					share = NULL;
+				if (ret == SA_NOT_ALLOWED)
+					(void) printf(gettext(
+					    "Properties on ZFS group shares "
+					    "not supported: %s\n"), sharepath);
 			}
 		}
 		if (ret == SA_OK) {
@@ -2535,12 +2596,17 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 		ret = SA_SYNTAX_ERR;
 	} else {
 		/*
-		 * If a group already exists, we can only add a new
-		 * protocol to it and not create a new one or add the
-		 * same protocol again.
+		 * Group already exists so we can proceed after a few
+		 * additional checks related to ZFS handling.
 		 */
 
 		groupname = argv[optind];
+		if (strcmp(groupname, "zfs") == 0) {
+			(void) printf(gettext("Changing properties for group "
+			    "\"zfs\" not allowed\n"));
+			return (SA_NOT_ALLOWED);
+		}
+
 		auth = check_authorizations(groupname, flags);
 		if (optset == NULL)
 			ret = basic_set(handle, groupname, optlist, protocol,

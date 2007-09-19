@@ -561,37 +561,41 @@ zfs_notinherited(sa_group_t group, char *mountpoint, char *shareopts)
 {
 	int err = SA_OK;
 	sa_share_t share;
+	char *options;
 
 	set_node_attr(group, "zfs", "true");
 	share = _sa_add_share(group, mountpoint, SA_SHARE_TRANSIENT, &err);
 	if (err == SA_OK) {
-		if (strcmp(shareopts, "on") != 0) {
-			char *options;
+		if (strcmp(shareopts, "on") == 0)
+			shareopts = "rw";
+
+		options = strdup(shareopts);
+		if (options != NULL) {
+			err = sa_parse_legacy_options(group, options,
+			    "nfs");
+			free(options);
+		}
+		if (err == SA_PROP_SHARE_ONLY) {
+			/*
+			 * Same as above, some properties may
+			 * only be on shares, but due to the
+			 * ZFS sub-groups being artificial, we
+			 * sometimes get this and have to deal
+			 * with it. We do it by attempting to
+			 * put it on the share.
+			 */
 			options = strdup(shareopts);
 			if (options != NULL) {
-				err = sa_parse_legacy_options(group, options,
-				    "nfs");
+				err = sa_parse_legacy_options(share,
+				    options, "nfs");
 				free(options);
 			}
-			if (err == SA_PROP_SHARE_ONLY) {
-				/*
-				 * Same as above, some properties may
-				 * only be on shares, but due to the
-				 * ZFS sub-groups being artificial, we
-				 * sometimes get this and have to deal
-				 * with it. We do it by attempting to
-				 * put it on the share.
-				 */
-				options = strdup(shareopts);
-				if (options != NULL) {
-					err = sa_parse_legacy_options(share,
-					    options, "nfs");
-					free(options);
-				}
-			}
-			/* unmark the share's changed state */
-			set_node_attr(share, "changed", NULL);
 		}
+		/* Mark as the defining node of the subgroup */
+		set_node_attr(share, "subgroup", "true");
+
+		/* unmark the share's changed state */
+		set_node_attr(share, "changed", NULL);
 	}
 	return (err);
 }
@@ -873,7 +877,6 @@ sa_zfs_update(sa_group_t group)
 					if (strcmp(optstring, zfsopts) != 0)
 						doupdate++;
 				}
-
 				if (doupdate) {
 					if (optstring != NULL &&
 					    strlen(optstring) > 0) {
