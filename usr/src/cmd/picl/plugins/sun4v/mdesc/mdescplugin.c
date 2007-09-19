@@ -242,8 +242,9 @@ signal_devtree(void)
 		free(nvl);
 		return;
 	}
+	packed_nvl = NULL;
 	if (nvlist_pack(nvl, &packed_nvl, &nvl_size, NV_ENCODE_NATIVE,
-	    NULL) != 0) {
+	    0) != 0) {
 		free(nvl);
 		return;
 	}
