@@ -44,6 +44,7 @@ extern "C" {
 #include <cryptoutil.h>
 #include <pkcs11Session.h>
 #include <pkcs11Slot.h>
+#include <sys/crypto/ioctl.h>
 
 /*
  * In "generic_attr_t", attributes that are not CK_BBOOL and
@@ -537,6 +538,11 @@ typedef struct ses_to_be_freed_list {
 	pthread_mutex_t ses_to_be_free_mutex;
 } ses_to_be_freed_list_t;
 
+typedef struct cipher_mechs_threshold {
+	int		mech_type;
+	uint32_t	mech_threshold;
+} cipher_mechs_threshold_t;
+
 /* Global variables */
 extern metaslot_config_t metaslot_config;
 extern boolean_t metaslot_enabled;
@@ -548,7 +554,7 @@ extern pthread_mutex_t initmutex;
 
 extern ses_to_be_freed_list_t ses_delay_freed;
 extern object_to_be_freed_list_t obj_delay_freed;
-extern int (*Tmp_GetThreshold)(CK_MECHANISM_TYPE);
+extern void (*Tmp_GetThreshold)(void *);
 
 extern CK_BBOOL falsevalue;
 extern CK_BBOOL truevalue;

@@ -62,7 +62,8 @@ CK_SLOT_ID fast_slot = 0;
 boolean_t metaslot_enabled = B_FALSE;
 boolean_t metaslot_auto_key_migrate = B_FALSE;
 metaslot_config_t metaslot_config;
-int (*Tmp_GetThreshold)(CK_MECHANISM_TYPE) = NULL;
+void (*Tmp_GetThreshold)(void *) = NULL;
+cipher_mechs_threshold_t meta_mechs_threshold[MAX_NUM_THRESHOLD];
 
 static const char *conf_err = "See cryptoadm(1M). Skipping this plug-in.";
 
@@ -698,7 +699,14 @@ verifycleanup:
 
 		if (Tmp_GetThreshold == NULL) {
 			Tmp_GetThreshold =
-			    (int(*)())dlsym(dldesc, "_SUNW_GetThreshold");
+			    (void(*)())dlsym(dldesc, "_SUNW_GetThreshold");
+
+			/* Get the threshold values for the supported mechs */
+			if (Tmp_GetThreshold != NULL) {
+				(void) memset(meta_mechs_threshold, 0,
+				    sizeof (meta_mechs_threshold));
+				Tmp_GetThreshold(meta_mechs_threshold);
+			}
 		}
 
 		/* Set and reset values to process next provider */

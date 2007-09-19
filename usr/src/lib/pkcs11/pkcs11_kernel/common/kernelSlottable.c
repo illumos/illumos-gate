@@ -70,12 +70,13 @@ kernel_get_slot_number()
 
 /*
  * This function will be used by metaslot to get the kernel
- * provider's threshold value for a particular mechanism.
+ * provider's threshold value for the supported mechanisms.
  */
-int
-_SUNW_GetThreshold(CK_MECHANISM_TYPE mechanism)
+void
+_SUNW_GetThreshold(void *thresholdp)
 {
 
+	cipher_mechs_threshold_t *tp = (cipher_mechs_threshold_t *)thresholdp;
 	kernel_slot_t *pslot;
 	int i;
 
@@ -88,12 +89,11 @@ _SUNW_GetThreshold(CK_MECHANISM_TYPE mechanism)
 	pslot = slot_table[0];
 
 	for (i = 0; i < pslot->total_threshold_count; i++) {
-		if (mechanism == pslot->sl_mechs_threshold[i].mech_type)
-			return (pslot->sl_mechs_threshold[i].mech_threshold);
+		tp[i].mech_type =
+		    pslot->sl_mechs_threshold[i].mech_type;
+		tp[i].mech_threshold =
+		    pslot->sl_mechs_threshold[i].mech_threshold;
 	}
-
-	/* no matching mechanism */
-	return (0);
 }
 
 /*

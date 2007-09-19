@@ -32,6 +32,8 @@
 #include <strings.h>
 #include "metaGlobal.h"
 
+extern cipher_mechs_threshold_t	meta_mechs_threshold[];
+
 CK_RV
 meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
 	CK_MECHANISM *pMechanism, meta_object_t *key)
@@ -423,6 +425,21 @@ finish:
 	return (rv);
 }
 
+int
+meta_GetThreshold(CK_MECHANISM_TYPE mechanism)
+{
+
+	int i;
+
+	for (i = 0; i < MAX_NUM_THRESHOLD; i++) {
+		if (mechanism == meta_mechs_threshold[i].mech_type)
+			return (meta_mechs_threshold[i].mech_threshold);
+	}
+
+	/* no matching mechanism */
+	return (0);
+}
+
 /*
  * meta_do_operation
  *
@@ -470,7 +487,7 @@ meta_do_operation(CK_FLAGS optype, int mode,
 			if (!session->init.app) {
 				return (CKR_OPERATION_NOT_INITIALIZED);
 			}
-			threshold = Tmp_GetThreshold(
+			threshold = meta_GetThreshold(
 			    session->init.pMech->mechanism);
 		}
 
