@@ -119,6 +119,7 @@ Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kprop:euid=0;privs=none
 Kerberos Server Management:solaris:cmd:::/usr/sbin/kadmin.local:euid=0;privs=none
 Kerberos Server Management:solaris:cmd:::/usr/sbin/kdb5_util:euid=0;privs=none
 Kerberos Server Management:solaris:cmd:::/usr/sbin/kdb5_ldap_util:euid=0;privs=none
+Kerberos Server Management:solaris:cmd:::/usr/sbin/kdcmgr:euid=0;privs=none
 Kerberos Client Management:solaris:cmd:::/usr/bin/klist:euid=0;privs=file_dac_read
 Kerberos Client Management:solaris:cmd:::/usr/sbin/kadmin:euid=0;privs=none
 Kerberos Client Management:solaris:cmd:::/usr/sbin/kclient:euid=0;privs=none

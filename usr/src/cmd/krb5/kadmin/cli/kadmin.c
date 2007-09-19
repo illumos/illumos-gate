@@ -1383,10 +1383,16 @@ void kadmin_addprinc(argc, argv)
 		"the same.\n\n"), canon);
 	}
 
+	/*
+	 * Solaris Kerberos: We unset KRB5_KDB_DISALLOW_ALL_TIX before
+	 * kadmin_parse_princ_args is called, because -allow_tix may
+	 * have been an argument.  We still have to unset here because
+	 * kadmin_parse_princ_args will not reset the attribute unless
+	 * it is was explicity defined.
+	 */
+	princ.attributes &= ~KRB5_KDB_DISALLOW_ALL_TIX;
 	(void) kadmin_parse_princ_args(argc, argv, &princ, &mask, &pass,
 			&randkey, &ks_tuple, &n_ks_tuple, "add_principal");
-
-	princ.attributes &= ~KRB5_KDB_DISALLOW_ALL_TIX;
 	mask = KADM5_ATTRIBUTES;
 	retval = kadm5_modify_principal(handle, &princ, mask);
 	if (retval) {

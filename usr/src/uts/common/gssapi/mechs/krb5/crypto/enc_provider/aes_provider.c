@@ -560,7 +560,9 @@ krb5int_aes_decrypt(krb5_context context,
 			libp = input->data + ((nblocks - 1) * BLOCK_SIZE);
 
 			/* first save orig input data for later restore */
-			bcopy(nlibp, orig_input, BLOCK_SIZE + partialamount);
+			/* we know that partial amount is 0, because */
+			/* nblocks is > 1, so we copy the last two blocks */
+			bcopy(nlibp, orig_input, sizeof (orig_input));
 
 			/* swap */
 			bcopy(nlibp, tmp, BLOCK_SIZE);
@@ -575,7 +577,7 @@ krb5int_aes_decrypt(krb5_context context,
 
 		if (nblocks > 1) {
 			/* restore orig input data */
-			bcopy(orig_input, nlibp, BLOCK_SIZE + partialamount);
+			bcopy(orig_input, nlibp, sizeof (orig_input));
 		}
 
 		if (ret != 0) {
@@ -806,7 +808,9 @@ krb5int_aes_decrypt(krb5_context context,
 			libp = input->data + ((nblocks - 1) * BLOCK_SIZE);
 
 			/* first save orig input data for later restore */
-			bcopy(nlibp, orig_input, BLOCK_SIZE + partialamount);
+			/* we know that partial amount is 0, because */
+			/* nblocks is > 1, so we copy the last two blocks */
+			bcopy(nlibp, orig_input, sizeof (orig_input));
 
 			bcopy(nlibp, tmp, BLOCK_SIZE);
 			bcopy(libp, nlibp, BLOCK_SIZE);
@@ -844,7 +848,7 @@ krb5int_aes_decrypt(krb5_context context,
 
 		if (nblocks > 1) {
 			/* restore orig input data */
-			bcopy(orig_input, nlibp, BLOCK_SIZE + partialamount);
+			bcopy(orig_input, nlibp, sizeof (orig_input));
 		}
 	} else {
 		char tmp_ivec_data[BLOCK_SIZE], tmp_input_data[BLOCK_SIZE],

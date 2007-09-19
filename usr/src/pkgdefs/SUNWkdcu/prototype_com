@@ -56,6 +56,7 @@ s none usr/lib/krb5/db2.so=db2.so.1
 f none usr/lib/krb5/gkadmin.jar 444 root bin
 f none usr/lib/krb5/kadmind 500 root bin
 f none usr/lib/krb5/kldap.so.1 755 root bin
+f none usr/lib/krb5/klookup 555 root bin
 s none usr/lib/krb5/kldap.so=kldap.so.1
 f none usr/lib/krb5/kprop 555 root bin
 f none usr/lib/krb5/kprop_script 555 root bin
@@ -82,6 +83,7 @@ f none usr/sbin/kadmin.local 555 root bin
 f none usr/sbin/kclient 555 root bin
 f none usr/sbin/kdb5_util 555 root bin
 f none usr/sbin/kdb5_ldap_util 555 root bin
+f none usr/sbin/kdcmgr 555 root bin
 f none usr/sbin/kproplog 555 root bin
 d none usr/share 755 root sys
 d none usr/share/lib 755 root sys
