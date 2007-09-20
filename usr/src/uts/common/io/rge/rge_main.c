@@ -145,7 +145,7 @@ rge_alloc_dma_mem(rge_t *rgep, size_t memsize, ddi_dma_attr_t *dma_attr_p,
 	 * Allocate handle
 	 */
 	err = ddi_dma_alloc_handle(rgep->devinfo, dma_attr_p,
-		    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
+	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS) {
 		dma_p->dma_hdl = NULL;
 		return (DDI_FAILURE);
@@ -1177,7 +1177,7 @@ rge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		 * Error, reply with a NAK and EINVAL or the specified error
 		 */
 		miocnak(wq, mp, 0, iocp->ioc_error == 0 ?
-			EINVAL : iocp->ioc_error);
+		    EINVAL : iocp->ioc_error);
 		break;
 
 	case IOC_DONE:
@@ -1200,7 +1200,7 @@ rge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		 * OK, send prepared reply as ACK or NAK
 		 */
 		mp->b_datap->db_type = iocp->ioc_error == 0 ?
-			M_IOCACK : M_IOCNAK;
+		    M_IOCACK : M_IOCNAK;
 		qreply(wq, mp);
 		break;
 	}
@@ -1410,10 +1410,9 @@ rge_unattach(rge_t *rgep)
 	 * Quiesce the PHY and MAC (leave it reset but still powered).
 	 * Clean up and free all RGE data structures
 	 */
-	if (rgep->cyclic_id) {
-		mutex_enter(&cpu_lock);
-		cyclic_remove(rgep->cyclic_id);
-		mutex_exit(&cpu_lock);
+	if (rgep->periodic_id != NULL) {
+		ddi_periodic_delete(rgep->periodic_id);
+		rgep->periodic_id = NULL;
 	}
 
 	if (rgep->progress & PROGRESS_KSTATS)
@@ -1511,8 +1510,6 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	rge_t *rgep;			/* Our private data	*/
 	mac_register_t *macp;
 	chip_id_t *cidp;
-	cyc_handler_t cychand;
-	cyc_time_t cyctime;
 	int intr_types;
 	caddr_t regs;
 	int instance;
@@ -1530,7 +1527,7 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	instance = ddi_get_instance(devinfo);
 	RGE_GTRACE(("rge_attach($%p, %d) instance %d",
-		(void *)devinfo, cmd, instance));
+	    (void *)devinfo, cmd, instance));
 	RGE_BRKPT(NULL, "rge_attach");
 
 	switch (cmd) {
@@ -1553,13 +1550,13 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	rgep->rge_mac_state = RGE_MAC_ATTACH;
 	rgep->debug = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, debug_propname, rge_debug);
+	    DDI_PROP_DONTPASS, debug_propname, rge_debug);
 	rgep->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, mtu_propname, ETHERMTU);
+	    DDI_PROP_DONTPASS, mtu_propname, ETHERMTU);
 	rgep->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, msi_propname, B_TRUE);
+	    DDI_PROP_DONTPASS, msi_propname, B_TRUE);
 	(void) snprintf(rgep->ifname, sizeof (rgep->ifname), "%s%d",
-		RGE_DRIVER_NAME, instance);
+	    RGE_DRIVER_NAME, instance);
 
 	/*
 	 * Map config space registers
@@ -1637,14 +1634,14 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * interrupts ...
 	 */
 	err = ddi_intr_add_softint(devinfo, &rgep->resched_hdl,
-		DDI_INTR_SOFTPRI_MIN, rge_reschedule, (caddr_t)rgep);
+	    DDI_INTR_SOFTPRI_MIN, rge_reschedule, (caddr_t)rgep);
 	if (err != DDI_SUCCESS) {
 		rge_problem(rgep, "ddi_intr_add_softint() failed");
 		goto attach_fail;
 	}
 	rgep->progress |= PROGRESS_RESCHED;
 	err = ddi_intr_add_softint(devinfo, &rgep->factotum_hdl,
-		DDI_INTR_SOFTPRI_MIN, rge_chip_factotum, (caddr_t)rgep);
+	    DDI_INTR_SOFTPRI_MIN, rge_chip_factotum, (caddr_t)rgep);
 	if (err != DDI_SUCCESS) {
 		rge_problem(rgep, "ddi_intr_add_softint() failed");
 		goto attach_fail;
@@ -1771,14 +1768,12 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (err != 0)
 		goto attach_fail;
 
-	cychand.cyh_func = rge_chip_cyclic;
-	cychand.cyh_arg = rgep;
-	cychand.cyh_level = CY_LOCK_LEVEL;
-	cyctime.cyt_when = 0;
-	cyctime.cyt_interval = RGE_CYCLIC_PERIOD;
-	mutex_enter(&cpu_lock);
-	rgep->cyclic_id = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
+	/*
+	 * Register a periodical handler.
+	 * reg_chip_cyclic() is invoked in kernel context.
+	 */
+	rgep->periodic_id = ddi_periodic_add(rge_chip_cyclic, rgep,
+	    RGE_CYCLIC_PERIOD, DDI_IPL_0);
 
 	rgep->progress |= PROGRESS_READY;
 	return (DDI_SUCCESS);

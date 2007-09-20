@@ -43,7 +43,6 @@
 #include <sys/poll.h>
 #include <sys/pbio.h>
 #include <sys/sysmacros.h>
-#include <sys/cyclic.h>
 
 /* Added for prom interface */
 #include <sys/promif.h>
@@ -157,7 +156,7 @@ _init(void)
 
 	if (strcmp(tod_module_name, "todds1337") == 0) {
 		if ((error = ddi_soft_state_init(&ds1337_statep,
-			sizeof (ds1337_state_t), 0)) != DDI_SUCCESS) {
+		    sizeof (ds1337_state_t), 0)) != DDI_SUCCESS) {
 			return (error);
 		}
 
@@ -233,9 +232,6 @@ todds1337_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	static ds1337_state_t	*statep = NULL;
 	i2c_transfer_t	*i2c_tp = NULL;
 	uint8_t tempVal = (uint8_t)0;
-	cyc_handler_t cychand;
-	cyc_time_t  cyctime;
-
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
@@ -354,18 +350,12 @@ todds1337_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		(void) i2c_transfer_free(statep->ds1337_i2c_hdl, i2c_tp);
 	}
 
-	/* Create a cyclic handler to read TOD */
-	cychand.cyh_func = todds1337_cyclic;
-	cychand.cyh_arg = &soft_rtc;
-	cychand.cyh_level = CY_LOW_LEVEL;
-	cyctime.cyt_when = 0;
-	cyctime.cyt_interval = i2c_cyclic_timeout;
-	ASSERT(statep->cycid == CYCLIC_NONE);
-	mutex_enter(&cpu_lock);
-	statep->cycid = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
-	ASSERT(statep->cycid != CYCLIC_NONE);
-
+	/*
+	 * Create a periodical handler to read TOD.
+	 */
+	ASSERT(statep->cycid == NULL);
+	statep->cycid = ddi_periodic_add(todds1337_cyclic, &soft_rtc,
+	    i2c_cyclic_timeout, DDI_IPL_1);
 	statep->state = TOD_ATTACHED;
 	todds1337_attach_done = 1;
 	ddi_report_dev(dip);
@@ -777,9 +767,9 @@ todds1337_read_rtc(struct rtc_t *rtc)
 		    i2c_tp)) != I2C_SUCCESS) {
 			goto done;
 		}
-	    /* for first read, need to get valid data */
-	    while (tod_read[0] == -1 && counter > 0) {
-	    /* move data to static buffer */
+		/* for first read, need to get valid data */
+		while (tod_read[0] == -1 && counter > 0) {
+		/* move data to static buffer */
 		bcopy(i2c_tp->i2c_rbuf, tod_read, 7);
 
 		/* now read again */
@@ -789,22 +779,22 @@ todds1337_read_rtc(struct rtc_t *rtc)
 		i2c_tp->i2c_rlen = 7;	/* Read 7 regs */
 		if ((i2c_cmd_status = i2c_transfer(statep->ds1337_i2c_hdl,
 		    i2c_tp)) != I2C_SUCCESS) {
-		    goto done;
+			goto done;
 		}
 		/* if they are not the same, then read again */
 		if (bcmp(tod_read, i2c_tp->i2c_rbuf, 7) != 0) {
-		    tod_read[0] = -1;
-		    counter--;
+			tod_read[0] = -1;
+			counter--;
 		}
-	    }
+	}
 
 	} while (i2c_tp->i2c_rbuf[0] == 0x59 &&
 	    /* if seconds register is 0x59 (BCD), add data should match */
-		bcmp(&tod_read[1], &i2c_tp->i2c_rbuf[1], 6) != 0 &&
-		    counter-- > 0);
+	    bcmp(&tod_read[1], &i2c_tp->i2c_rbuf[1], 6) != 0 &&
+	    counter-- > 0);
 
 	if (counter < 0)
-	    cmn_err(CE_WARN, "i2ctod: TOD Chip failed ??");
+		cmn_err(CE_WARN, "i2ctod: TOD Chip failed ??");
 
 	/* move data to static buffer */
 	bcopy(i2c_tp->i2c_rbuf, tod_read, 7);

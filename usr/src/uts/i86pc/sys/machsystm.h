@@ -62,6 +62,7 @@ extern void setcpudelay(void);
 
 extern void send_dirint(int, int);
 extern void siron(void);
+extern void sir_on(int);
 
 extern void return_instr(void);
 

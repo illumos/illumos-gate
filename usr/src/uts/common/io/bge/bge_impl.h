@@ -52,7 +52,6 @@ extern "C" {
 #include <sys/dlpi.h>
 #include <sys/devops.h>
 #include <sys/debug.h>
-#include <sys/cyclic.h>
 #include <sys/conf.h>
 
 #include <netinet/ip6.h>
@@ -63,7 +62,7 @@ extern "C" {
 #include <inet/nd.h>
 #include <sys/pattr.h>
 
-#include <sys/dditypes.h>
+#include <sys/disp.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
@@ -770,7 +769,7 @@ typedef struct bge {
 	ddi_acc_handle_t	cfg_handle;	/* DDI I/O handle	*/
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	void			*io_regs;	/* mapped registers	*/
-	cyclic_id_t		cyclic_id;	/* cyclic callback	*/
+	ddi_periodic_t		periodic_id;	/* periodical callback	*/
 	ddi_softintr_t		factotum_id;	/* factotum callback	*/
 	ddi_softintr_t		drain_id;	/* reschedule callback	*/
 

@@ -231,6 +231,7 @@ extern void send_dirint(int, int);
 extern void setsoftint(uint64_t);
 extern void setsoftint_tl1(uint64_t, uint64_t);
 extern void siron(void);
+extern void sir_on(int);
 extern uint64_t getidsr(void);
 extern void intr_enqueue_req(uint_t pil, uint64_t inum);
 extern void intr_dequeue_req(uint_t pil, uint64_t inum);

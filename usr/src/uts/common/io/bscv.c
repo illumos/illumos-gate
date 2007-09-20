@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@
 #include <sys/stream.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
-#include <sys/cyclic.h>
 #include <sys/reboot.h>
 #include <sys/modctl.h>
 #include <sys/mkdev.h>
@@ -52,7 +51,6 @@
 #include <sys/consdev.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/disp.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -223,7 +221,6 @@ static boolean_t bscv_panic_callback(void *, int);
 static void bscv_watchdog_cyclic_add(bscv_soft_state_t *);
 static void bscv_watchdog_cyclic_remove(bscv_soft_state_t *);
 
-extern kmutex_t	cpu_lock; 	/* needed for cyclics */
 static uint8_t	wdog_reset_on_timeout = 1;
 
 #define	WDOG_ON			1
@@ -623,7 +620,7 @@ bscv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ssp->cssp_prog = B_FALSE;
 		ssp->task_flags = 0;
 		ssp->debug = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "debug", 0);
+		    DDI_PROP_DONTPASS, "debug", 0);
 		ssp->majornum = ddi_driver_major(dip);
 		ssp->minornum = BSCV_INST_TO_MINOR(instance);
 #if defined(__i386) || defined(__amd64)
@@ -703,7 +700,7 @@ bscv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (bscv_watchdog_enable && (boothowto & RB_DEBUG)) {
 			bscv_watchdog_available = 0;
 			cmn_err(CE_WARN, "bscv: kernel debugger "
-				"detected: hardware watchdog disabled");
+			    "detected: hardware watchdog disabled");
 		}
 
 		/*
@@ -856,7 +853,7 @@ bscv_map_regs(bscv_soft_state_t *ssp)
 	 * of elements of the regs property array.
 	 */
 	retval = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, ssp->dip,
-		    DDI_PROP_DONTPASS, "reg", &props, &nelements);
+	    DDI_PROP_DONTPASS, "reg", &props, &nelements);
 
 	/* We don't need props anymore.  Free memory if it was allocated */
 	if (retval == DDI_PROP_SUCCESS)
@@ -890,8 +887,8 @@ bscv_map_regs(bscv_soft_state_t *ssp)
 
 	for (i = 0; i < ssp->nchannels; i++) {
 		retval = ddi_regs_map_setup(ssp->dip, i,
-			    (caddr_t *)&ssp->channel[i].regs,
-			    0, 0, &ssp->attr, &ssp->channel[i].handle);
+		    (caddr_t *)&ssp->channel[i].regs,
+		    0, 0, &ssp->attr, &ssp->channel[i].handle);
 		if (retval != DDI_SUCCESS) {
 			bscv_trace(ssp, 'A', "bscv_map_regs", "map failure"
 			    " 0x%x on space %d", retval, i);
@@ -988,9 +985,9 @@ bscv_full_stop(bscv_soft_state_t *ssp)
 
 #if defined(__i386) || defined(__amd64)
 	if (ddi_in_panic()) {
-	    bscv_inform_bsc(ssp, BSC_INFORM_PANIC);
+		bscv_inform_bsc(ssp, BSC_INFORM_PANIC);
 	} else {
-	    bscv_inform_bsc(ssp, BSC_INFORM_OFFLINE);
+		bscv_inform_bsc(ssp, BSC_INFORM_OFFLINE);
 	}
 #endif /* __i386 || __amd64 */
 
@@ -1009,7 +1006,7 @@ bscv_full_stop(bscv_soft_state_t *ssp)
 		break;
 	}
 	bscv_setclear8_volatile(ssp, chan_general,
-		EBUS_IDX_ALARM, bits2set, bits2clear);
+	    EBUS_IDX_ALARM, bits2set, bits2clear);
 
 	bscv_exit(ssp);
 }
@@ -1367,10 +1364,10 @@ bscv_rep_rw8(bscv_soft_state_t *ssp, int chan, uint8_t *host_addr,
 		} else {
 			if (is_write) {
 				bscv_put8_once(ssp, chan,
-					dev_addr, *host_addr++);
+				    dev_addr, *host_addr++);
 			} else {
 				*host_addr++ = bscv_get8_once(ssp, chan,
-								dev_addr);
+				    dev_addr);
 			}
 			/* We need this because _once routines don't do it */
 			if (ssp->command_error != 0) {
@@ -1514,7 +1511,7 @@ bscv_put8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint8_t val)
 
 	/* Do the access and get fault code - may take a long time */
 	ddi_put8(ssp->channel[chan].handle,
-		&ssp->channel[chan].regs[addr], val);
+	    &ssp->channel[chan].regs[addr], val);
 	fault = ddi_get32(ssp->channel[chan].handle,
 	    (uint32_t *)BSC_NEXUS_ADDR(ssp, chan, 0, LOMBUS_FAULT_REG));
 
@@ -1572,7 +1569,7 @@ bscv_get8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 
 	/* Do the access and get fault code - may take a long time */
 	val = ddi_get8(ssp->channel[chan].handle,
-			&ssp->channel[chan].regs[addr]);
+	    &ssp->channel[chan].regs[addr]);
 	fault = ddi_get32(ssp->channel[chan].handle,
 	    (uint32_t *)BSC_NEXUS_ADDR(ssp, chan, 0, LOMBUS_FAULT_REG));
 	ssp->command_error = fault;
@@ -1659,9 +1656,9 @@ bscv_resync_comms(bscv_soft_state_t *ssp, int chan)
 		return;
 	}
 	if (command_error >= LOMBUS_ERR_BASE &&
-			command_error != LOMBUS_ERR_REG_NUM &&
-			command_error != LOMBUS_ERR_REG_SIZE &&
-			command_error != LOMBUS_ERR_TIMEOUT) {
+	    command_error != LOMBUS_ERR_REG_NUM &&
+	    command_error != LOMBUS_ERR_REG_SIZE &&
+	    command_error != LOMBUS_ERR_TIMEOUT) {
 		/* Resync here to make sure that the lom is talking */
 		cmn_err(CE_WARN, "!bscv_resync_comms: "
 		    "Attempting comms resync after comms fault 0x%x",
@@ -1670,7 +1667,7 @@ bscv_resync_comms(bscv_soft_state_t *ssp, int chan)
 			/* Probe */
 			fault = ddi_get32(ssp->channel[chan].handle,
 			    (uint32_t *)BSC_NEXUS_ADDR(ssp, chan, 0,
-				LOMBUS_PROBE_REG));
+			    LOMBUS_PROBE_REG));
 
 			if (fault == 0) {
 				break;
@@ -1719,9 +1716,9 @@ bscv_window_setup(bscv_soft_state_t *ssp)
 		return (ssp->eeinfo_valid);
 	}
 	ssp->eeprom_size =
-		bscv_get8(ssp, chan_general, EBUS_IDX_EEPROM_SIZE_KB) * 1024;
+	    bscv_get8(ssp, chan_general, EBUS_IDX_EEPROM_SIZE_KB) * 1024;
 	ssp->eventlog_start = bscv_get16(ssp, chan_general,
-				EBUS_IDX_LOG_START_HI);
+	    EBUS_IDX_LOG_START_HI);
 
 	/*
 	 * The log does not run to the end of the EEPROM because it is a
@@ -2056,11 +2053,11 @@ bscv_ioc_dogstate(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	dogstate.dog_enable = (dogval & EBUS_WDOG_ENABLE) ? 1 : 0;
 	dogstate.reset_enable = (dogval & EBUS_WDOG_RST) ? 1 : 0;
 	dogstate.dog_timeout = bscv_get8_locked(ssp, chan_general,
-		EBUS_IDX_WDOG_TIME, &res);
+	    EBUS_IDX_WDOG_TIME, &res);
 
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&dogstate,
-		(caddr_t)arg, sizeof (dogstate), mode) < 0)) {
+	    (caddr_t)arg, sizeof (dogstate), mode) < 0)) {
 		res = EFAULT;
 	}
 	return (res);
@@ -2082,7 +2079,7 @@ bscv_ioc_psustate(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 
 	for (i = 0; i < MAX_PSUS; i++) {
 		psustat = bscv_get8_locked(ssp, chan_general,
-			    EBUS_IDX_PSU1_STAT + i, &res);
+		    EBUS_IDX_PSU1_STAT + i, &res);
 		psudata.fitted[i] = psustat & EBUS_PSU_PRESENT;
 		psudata.output[i] = psustat & EBUS_PSU_OUTPUT;
 		psudata.supplyb[i] = psustat & EBUS_PSU_INPUTB;
@@ -2153,7 +2150,7 @@ bscv_ioc_fledstate(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	}
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&fled_info, (caddr_t)arg,
-		sizeof (fled_info), mode) < 0)) {
+	    sizeof (fled_info), mode) < 0)) {
 		res = EFAULT;
 	}
 	return (res);
@@ -2226,7 +2223,7 @@ bscv_ioc_ledstate(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	/* copy out lom_state */
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&led_state, (caddr_t)arg,
-		sizeof (lom_led_state_t), mode) < 0)) {
+	    sizeof (lom_led_state_t), mode) < 0)) {
 		res = EFAULT;
 	}
 	return (res);
@@ -2248,15 +2245,15 @@ bscv_ioc_info(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	int res = 0;
 
 	info.ser_char = bscv_get8_locked(ssp, chan_general, EBUS_IDX_ESCAPE,
-		&res);
+	    &res);
 	info.a3mode = WATCHDOG;
 	info.fver = bscv_get8_locked(ssp, chan_general, EBUS_IDX_FW_REV, &res);
 	csum = bscv_get8_locked(ssp, chan_general, EBUS_IDX_CHECK_HI, &res)
-		<< 8;
+	    << 8;
 	csum |= bscv_get8_locked(ssp, chan_general, EBUS_IDX_CHECK_LO, &res);
 	info.fchksum = csum;
 	info.prod_rev = bscv_get8_locked(ssp, chan_general, EBUS_IDX_MODEL_REV,
-		&res);
+	    &res);
 	for (i = 0; i < sizeof (info.prod_id); i++) {
 		info.prod_id[i] = bscv_get8_locked(ssp,
 		    chan_general, EBUS_IDX_MODEL_ID1 + i, &res);
@@ -2292,9 +2289,9 @@ bscv_ioc_mread(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		    EBUS_IDX_MODEL_ID1 + i, &res);
 	}
 	mprog.mod_rev = bscv_get8_locked(ssp, chan_general, EBUS_IDX_MODEL_REV,
-		&res);
+	    &res);
 	mprog.config = bscv_get8_locked(ssp, chan_general, EBUS_IDX_CONFIG,
-		&res);
+	    &res);
 
 	/* Read the fan calibration values */
 	fanz = sizeof (mprog.fanhz) / sizeof (mprog.fanhz[0]);
@@ -2324,8 +2321,8 @@ bscv_ioc_volts(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	int res = 0;
 
 	supply = (bscv_get8_locked(ssp, chan_general, EBUS_IDX_SUPPLY_HI, &res)
-		<< 8) | bscv_get8_locked(ssp, chan_general, EBUS_IDX_SUPPLY_LO,
-		&res);
+	    << 8) | bscv_get8_locked(ssp, chan_general, EBUS_IDX_SUPPLY_LO,
+	    &res);
 
 	for (i = 0; i < ssp->volts.num; i++) {
 		ssp->volts.status[i] = (supply >> i) & 1;
@@ -2333,7 +2330,7 @@ bscv_ioc_volts(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&ssp->volts, (caddr_t)arg,
-		sizeof (ssp->volts), mode) < 0)) {
+	    sizeof (ssp->volts), mode) < 0)) {
 		res = EFAULT;
 	}
 	return (res);
@@ -2350,14 +2347,14 @@ bscv_ioc_stats(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	int res = 0;
 
 	status = bscv_get8_locked(ssp, chan_general, EBUS_IDX_CBREAK_STATUS,
-		&res);
+	    &res);
 	for (i = 0; i < ssp->sflags.num; i++) {
 		ssp->sflags.status[i] = (int)((status >> i) & 1);
 	}
 
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&ssp->sflags, (caddr_t)arg,
-		    sizeof (ssp->sflags), mode) < 0)) {
+	    sizeof (ssp->sflags), mode) < 0)) {
 		res = EFAULT;
 	}
 	return (res);
@@ -2392,7 +2389,7 @@ bscv_ioc_temp(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	bcopy(ssp->temps.name_ov, temps.name_ov, sizeof (temps.name_ov));
 	temps.num_ov = ssp->temps.num_ov;
 	status_ov = bscv_get8_locked(ssp, chan_general, EBUS_IDX_OTEMP_STATUS,
-		&res);
+	    &res);
 	for (i = 0; i < ssp->temps.num_ov; i++) {
 		ssp->temps.status_ov[i] = (status_ov >> i) & 1;
 	}
@@ -2530,16 +2527,16 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		if (level <= eventlog2->level) {
 			/* Arggh why the funny byte ordering 3, 2, 0, 1 */
 			eventlog2->code[events_recorded] =
-				((unsigned)event.ev_event |
-				    ((unsigned)event.ev_subsys << 8) |
-				    ((unsigned)event.ev_resource << 16) |
-				    ((unsigned)event.ev_detail << 24));
+			    ((unsigned)event.ev_event |
+			    ((unsigned)event.ev_subsys << 8) |
+			    ((unsigned)event.ev_resource << 16) |
+			    ((unsigned)event.ev_detail << 24));
 
 			eventlog2->time[events_recorded] =
-				((unsigned)event.ev_data[0] |
-				    ((unsigned)event.ev_data[1] << 8) |
-				    ((unsigned)event.ev_data[3] << 16) |
-				    ((unsigned)event.ev_data[2] << 24));
+			    ((unsigned)event.ev_data[0] |
+			    ((unsigned)event.ev_data[1] << 8) |
+			    ((unsigned)event.ev_data[3] << 16) |
+			    ((unsigned)event.ev_data[2] << 24));
 
 			bscv_build_eventstring(ssp,
 			    &event, eventlog2->string[events_recorded],
@@ -2555,7 +2552,7 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)eventlog2, (caddr_t)arg,
-		sizeof (lom_eventlog2_t), mode) < 0)) {
+	    sizeof (lom_eventlog2_t), mode) < 0)) {
 		res = EFAULT;
 	}
 
@@ -2583,17 +2580,17 @@ bscv_ioc_info2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 
 	info2.fver = bscv_get8_locked(ssp, chan_general, EBUS_IDX_FW_REV, &res);
 	csum = bscv_get8_locked(ssp, chan_general, EBUS_IDX_CHECK_HI, &res)
-		<< 8;
+	    << 8;
 	csum |= bscv_get8_locked(ssp, chan_general, EBUS_IDX_CHECK_LO, &res);
 	info2.fchksum = csum;
 	info2.prod_rev = bscv_get8_locked(ssp, chan_general,
-		EBUS_IDX_MODEL_REV, &res);
+	    EBUS_IDX_MODEL_REV, &res);
 	for (i = 0; i < sizeof (info2.prod_id); i++) {
 		info2.prod_id[i] = bscv_get8_locked(ssp, chan_general,
 		    EBUS_IDX_MODEL_ID1 + i, &res);
 	}
 	info2.serial_config = bscv_get8_locked(ssp, chan_general,
-		EBUS_IDX_SER_TIMEOUT, &res);
+	    EBUS_IDX_SER_TIMEOUT, &res);
 	if (bscv_get8_locked(ssp, chan_general, EBUS_IDX_CONFIG_MISC, &res) &
 	    EBUS_CONFIG_MISC_SECURITY_ENABLED) {
 		info2.serial_config |= LOM_SER_SECURITY;
@@ -2607,14 +2604,14 @@ bscv_ioc_info2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		info2.serial_config |= LOM_DISABLE_WDOG_BREAK;
 	}
 	info2.baud_rate = bscv_get8_locked(ssp, chan_general,
-		EBUS_IDX_SER_BAUD, &res);
+	    EBUS_IDX_SER_BAUD, &res);
 	info2.serial_hw_config =
-		    ((int)bscv_get8_locked(ssp, chan_general,
-			EBUS_IDX_SER_CHARMODE, &res) |
-		    ((int)bscv_get8_locked(ssp, chan_general,
-			EBUS_IDX_SER_FLOWCTL, &res) << 8) |
-		    ((int)bscv_get8_locked(ssp, chan_general,
-			EBUS_IDX_SER_MODEMTYPE, &res) << 16));
+	    ((int)bscv_get8_locked(ssp, chan_general,
+	    EBUS_IDX_SER_CHARMODE, &res) |
+	    ((int)bscv_get8_locked(ssp, chan_general,
+	    EBUS_IDX_SER_FLOWCTL, &res) << 8) |
+	    ((int)bscv_get8_locked(ssp, chan_general,
+	    EBUS_IDX_SER_MODEMTYPE, &res) << 16));
 
 	/*
 	 * There is no phone home support on the blade platform.  We hardcode
@@ -2686,7 +2683,7 @@ bscv_ioc_test(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		 * and wait for the return code.
 		 */
 		bscv_put8(ssp, chan_general,
-				EBUS_IDX_SELFTEST0 + testnum, testarg);
+		    EBUS_IDX_SELFTEST0 + testnum, testarg);
 		if (bscv_faulty(ssp)) {
 			res = EIO;
 		} else {
@@ -2740,7 +2737,7 @@ bscv_ioc_mprog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	base_addr = (mprog2.addr_space - 240) * data_size;
 
 	eeprom_size = bscv_get8(ssp, chan_general, EBUS_IDX_EEPROM_SIZE_KB) *
-			1024;
+	    1024;
 
 	if (bscv_faulty(ssp)) {
 		bscv_exit(ssp);
@@ -2815,7 +2812,7 @@ bscv_ioc_mread2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	data_size = 255;
 	base_addr = (mprog2.addr_space - 240) * data_size;
 	eeprom_size = bscv_get8(ssp, chan_general, EBUS_IDX_EEPROM_SIZE_KB) *
-			1024;
+	    1024;
 
 	if (bscv_faulty(ssp)) {
 		bscv_exit(ssp);
@@ -3007,7 +3004,7 @@ bscv_event_daemon(void *arg)
 			    utsname.nodename);
 			ssp->nodename_change = B_TRUE;
 			(void) strncpy(ssp->last_nodename, utsname.nodename,
-				sizeof (ssp->last_nodename));
+			    sizeof (ssp->last_nodename));
 			/* enforce null termination */
 			ssp->last_nodename[sizeof (ssp->last_nodename) - 1] =
 			    '\0';
@@ -3017,12 +3014,12 @@ bscv_event_daemon(void *arg)
 		if (((ssp->task_flags & TASK_PAUSE_FLG) == 0) &&
 		    fault_cnt == 0 && ssp->cssp_prog == B_FALSE &&
 		    (ssp->event_waiting || ssp->status_change ||
-			ssp->nodename_change || ssp->watchdog_change)) {
+		    ssp->nodename_change || ssp->watchdog_change)) {
 
 			do_events = ssp->event_waiting;
 			ssp->event_waiting = B_FALSE;
 			ssp->task_flags |= do_events ?
-				TASK_EVENT_PENDING_FLG : 0;
+			    TASK_EVENT_PENDING_FLG : 0;
 			do_status = ssp->status_change;
 			ssp->status_change = B_FALSE;
 			do_nodename = ssp->nodename_change;
@@ -3119,7 +3116,7 @@ bscv_event_daemon(void *arg)
 
 	ASSERT(!(ssp->task_flags & TASK_EVENT_PENDING_FLG));
 	ssp->task_flags &=
-		~(TASK_STOP_FLG | TASK_ALIVE_FLG | TASK_EVENT_CONSUMER_FLG);
+	    ~(TASK_STOP_FLG | TASK_ALIVE_FLG | TASK_EVENT_CONSUMER_FLG);
 	mutex_exit(&ssp->task_mu);
 
 	bscv_trace(ssp, 'D', "bscv_event_daemon",
@@ -3161,8 +3158,8 @@ bscv_stop_event_daemon(bscv_soft_state_t *ssp)
 
 	/* Wait for task daemon to stop running. */
 	for (try = 0;
-		((ssp->task_flags & TASK_ALIVE_FLG) && try < 10);
-		try++) {
+	    ((ssp->task_flags & TASK_ALIVE_FLG) && try < 10);
+	    try++) {
 		/* Signal that the task daemon should stop */
 		ssp->task_flags |= TASK_STOP_FLG;
 		cv_signal(&ssp->task_cv);
@@ -3211,10 +3208,10 @@ bscv_pause_event_daemon(bscv_soft_state_t *ssp)
 
 	/* Wait for task daemon to pause. */
 	for (try = 0;
-		(!(ssp->task_flags & TASK_SLEEPING_FLG) &&
-		    (ssp->task_flags & TASK_ALIVE_FLG) &&
-		    try < 10);
-		try++) {
+	    (!(ssp->task_flags & TASK_SLEEPING_FLG) &&
+	    (ssp->task_flags & TASK_ALIVE_FLG) &&
+	    try < 10);
+	    try++) {
 		/* Paranoia */
 		ssp->task_flags |= TASK_PAUSE_FLG;
 		cv_signal(&ssp->task_cv);
@@ -3392,7 +3389,7 @@ bscv_event_validate(bscv_soft_state_t *ssp, uint32_t newptr, uint8_t unread)
 	    (newptr >= (ssp->eventlog_start + ssp->eventlog_size))) {
 		if (!ssp->event_fault_reported) {
 			cmn_err(CE_WARN, "Event pointer out of range. "
-				"Cannot read events.");
+			    "Cannot read events.");
 			ssp->event_fault_reported = B_TRUE;
 		}
 		return (-1);
@@ -3531,8 +3528,8 @@ bscv_event_snprintgmttime(char *buf, size_t bufsz, todinfo_t t)
 	year = 1900 + t.tod_year;
 
 	return (snprintf(buf, bufsz, "%04d-%02d-%02d %02d:%02d:%02dZ",
-			year, t.tod_month, t.tod_day, t.tod_hour,
-			t.tod_min, t.tod_sec));
+	    year, t.tod_month, t.tod_day, t.tod_hour,
+	    t.tod_min, t.tod_sec));
 }
 
 /*
@@ -3569,19 +3566,19 @@ bscv_build_eventstring(bscv_soft_state_t *ssp, lom_event_t *event,
 
 	/* time */
 	bsctm = (((uint32_t)event->ev_data[0]) << 24) |
-			(((uint32_t)event->ev_data[1]) << 16) |
-			(((uint32_t)event->ev_data[2]) << 8) |
-			((uint32_t)event->ev_data[3]);
+	    (((uint32_t)event->ev_data[1]) << 16) |
+	    (((uint32_t)event->ev_data[2]) << 8) |
+	    ((uint32_t)event->ev_data[3]);
 	if (bsctm < BSC_TIME_SANITY) {
 		/* offset */
 		buf += snprintf(buf, bufend-buf, "+P%dd%02dh%02dm%02ds",
-			(int)(bsctm/86400), (int)(bsctm/3600%24),
-			(int)(bsctm/60%60), (int)(bsctm%60));
+		    (int)(bsctm/86400), (int)(bsctm/3600%24),
+		    (int)(bsctm/60%60), (int)(bsctm%60));
 	} else {
 		/* absolute time */
 		mutex_enter(&tod_lock);
 		buf += bscv_event_snprintgmttime(buf, bufend-buf,
-			    utc_to_tod(bsctm));
+		    utc_to_tod(bsctm));
 		mutex_exit(&tod_lock);
 	}
 	buf += snprintf(buf, bufend-buf, " ");
@@ -3640,7 +3637,7 @@ bscv_build_eventstring(bscv_soft_state_t *ssp, lom_event_t *event,
 	switch (subsystem) {
 	case EVENT_SUBSYS_TEMP:
 		if ((eventtype != EVENT_RECOVERED) &&
-			eventtype != EVENT_DEVICE_INACCESSIBLE) {
+		    eventtype != EVENT_DEVICE_INACCESSIBLE) {
 			buf += snprintf(buf, bufend - buf, " - %d degC",
 			    (int8_t)event->ev_detail);
 		}
@@ -3680,7 +3677,7 @@ bscv_build_eventstring(bscv_soft_state_t *ssp, lom_event_t *event,
 				buf += snprintf(buf, bufend - buf, " by user");
 				break;
 			case LOM_RESET_DETAIL_REPROGRAMMING:
-			    buf += snprintf(buf, bufend - buf,
+				buf += snprintf(buf, bufend - buf,
 				" after flash download");
 				break;
 			default:
@@ -3960,7 +3957,7 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 
 	if ((state_chng & EBUS_STATE_FAN) && ((dev_no - 1) < MAX_FANS)) {
 		fanspeed = bscv_get8(ssp, chan_general,
-					EBUS_IDX_FAN1_SPEED + dev_no - 1);
+		    EBUS_IDX_FAN1_SPEED + dev_no - 1);
 		/*
 		 * Only remember fanspeeds which are real values or
 		 * NOT PRESENT values.
@@ -3973,7 +3970,7 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 
 	if ((state_chng & EBUS_STATE_PSU) && ((dev_no - 1) < MAX_PSUS)) {
 		(void) bscv_get8(ssp, chan_general,
-					EBUS_IDX_PSU1_STAT + dev_no - 1);
+		    EBUS_IDX_PSU1_STAT + dev_no - 1);
 	}
 
 	if (state_chng & EBUS_STATE_GP) {
@@ -3987,7 +3984,7 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 	if ((state_chng & EBUS_STATE_TEMPERATURE) &&
 	    ((dev_no - 1) < MAX_TEMPS)) {
 		temp = bscv_get8(ssp, chan_general,
-					EBUS_IDX_TEMP1 + dev_no - 1);
+		    EBUS_IDX_TEMP1 + dev_no - 1);
 		/*
 		 * Only remember temperatures which are real values or
 		 * a NOT PRESENT value.
@@ -4105,77 +4102,77 @@ bscv_sysevent(bscv_soft_state_t *ssp, lom_event_t *event)
 	/* Map ev_subsys to sysevent class/sub-class */
 
 	switch (EVENT_DECODE_SUBSYS(event->ev_subsys)) {
-	    case EVENT_SUBSYS_NONE:
+		case EVENT_SUBSYS_NONE:
 		break;
-	    case EVENT_SUBSYS_ALARM:
+		case EVENT_SUBSYS_ALARM:
 		break;
-	    case EVENT_SUBSYS_TEMP:
+		case EVENT_SUBSYS_TEMP:
 		class = EC_ENV, subclass = ESC_ENV_TEMP;
 		res_id = bscv_get_label(ssp->temps.name, ssp->temps.num,
 		    event->ev_resource - 1);
 		switch (event->ev_event) {
-		    case EVENT_SEVERE_OVERHEAT:
+			case EVENT_SEVERE_OVERHEAT:
 			fru_state = ENV_FAILED;
 			break;
-		    case EVENT_OVERHEAT:
+			case EVENT_OVERHEAT:
 			fru_state = ENV_WARNING;
 			break;
-		    case EVENT_NO_OVERHEAT:
+			case EVENT_NO_OVERHEAT:
 			fru_state = ENV_OK;
 			break;
-		    default:
+			default:
 			return;
 		}
 		break;
-	    case EVENT_SUBSYS_OVERTEMP:
+		case EVENT_SUBSYS_OVERTEMP:
 		break;
-	    case EVENT_SUBSYS_FAN:
+		case EVENT_SUBSYS_FAN:
 		class = EC_ENV, subclass = ESC_ENV_FAN;
 		res_id = bscv_get_label(ssp->fan_names, ssp->num_fans,
 		    event->ev_resource - 1);
 		switch (event->ev_event) {
-		    case EVENT_FAILED:
+			case EVENT_FAILED:
 			fru_state = ENV_FAILED;
 			break;
-		    case EVENT_RECOVERED:
+			case EVENT_RECOVERED:
 			fru_state = ENV_OK;
 			break;
-		    default:
+			default:
 			return;
 		}
 		break;
-	    case EVENT_SUBSYS_SUPPLY:
+		case EVENT_SUBSYS_SUPPLY:
 		class = EC_ENV, subclass = ESC_ENV_POWER;
 		res_id = bscv_get_label(ssp->sflags.name, ssp->sflags.num,
 		    event->ev_resource - 1);
 		switch (event->ev_event) {
-		    case EVENT_FAILED:
+			case EVENT_FAILED:
 			fru_state = ENV_FAILED;
 			break;
-		    case EVENT_RECOVERED:
+			case EVENT_RECOVERED:
 			fru_state = ENV_OK;
 			break;
-		    default:
+			default:
 			return;
 		}
 		break;
-	    case EVENT_SUBSYS_BREAKER:
+		case EVENT_SUBSYS_BREAKER:
 		break;
-	    case EVENT_SUBSYS_PSU:
+		case EVENT_SUBSYS_PSU:
 		break;
-	    case EVENT_SUBSYS_USER:
+		case EVENT_SUBSYS_USER:
 		break;
-	    case EVENT_SUBSYS_PHONEHOME:
+		case EVENT_SUBSYS_PHONEHOME:
 		break;
-	    case EVENT_SUBSYS_LOM:
+		case EVENT_SUBSYS_LOM:
 		break;
-	    case EVENT_SUBSYS_HOST:
+		case EVENT_SUBSYS_HOST:
 		break;
-	    case EVENT_SUBSYS_EVENTLOG:
+		case EVENT_SUBSYS_EVENTLOG:
 		break;
-	    case EVENT_SUBSYS_EXTRA:
+		case EVENT_SUBSYS_EXTRA:
 		break;
-	    case EVENT_SUBSYS_LED:
+		case EVENT_SUBSYS_LED:
 		if (event->ev_event != EVENT_FAULT_LED &&
 		    event->ev_event != EVENT_STATE_CHANGE)
 			return;
@@ -4194,31 +4191,31 @@ bscv_sysevent(bscv_soft_state_t *ssp, lom_event_t *event)
 		    event->ev_resource - 1);
 
 		switch (event->ev_detail) {
-		    case LOM_LED_STATE_ON_STEADY:
+			case LOM_LED_STATE_ON_STEADY:
 			fru_state = ENV_LED_ON;
 			break;
-		    case LOM_LED_STATE_ON_FLASHING:
-		    case LOM_LED_STATE_ON_SLOWFLASH:
+			case LOM_LED_STATE_ON_FLASHING:
+			case LOM_LED_STATE_ON_SLOWFLASH:
 			fru_state = ENV_LED_BLINKING;
 			break;
-		    case LOM_LED_STATE_OFF:
+			case LOM_LED_STATE_OFF:
 			fru_state = ENV_LED_OFF;
 			break;
-		    case LOM_LED_STATE_INACCESSIBLE:
+			case LOM_LED_STATE_INACCESSIBLE:
 			fru_state = ENV_LED_INACCESSIBLE;
 			break;
-		    case LOM_LED_STATE_STANDBY:
+			case LOM_LED_STATE_STANDBY:
 			fru_state = ENV_LED_STANDBY;
 			break;
-		    case LOM_LED_STATE_NOT_PRESENT:
+			case LOM_LED_STATE_NOT_PRESENT:
 			fru_state = ENV_LED_NOT_PRESENT;
 			break;
-		    default:
+			default:
 			fru_state = ENV_LED_INACCESSIBLE;
 			break;
 		}
 		break;
-	    default :
+		default :
 		break;
 	}
 
@@ -4300,7 +4297,7 @@ bscv_prog(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	} else {
 		if (ssp->image == NULL) {
 			ssp->image = (uint8_t *)kmem_zalloc(
-				BSC_IMAGE_MAX_SIZE, KM_SLEEP);
+			    BSC_IMAGE_MAX_SIZE, KM_SLEEP);
 		}
 		res = bscv_prog_receive_image(ssp, prog,
 		    ssp->image, BSC_IMAGE_MAX_SIZE);
@@ -4352,7 +4349,7 @@ bscv_get_pagesize(bscv_soft_state_t *ssp)
 	ASSERT(bscv_held(ssp));
 
 	pagesize = bscv_get32(ssp, chan_prog,
-		    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PAGE0));
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PAGE0));
 
 	bscv_trace(ssp, 'U', "bscv_get_pagesize", "pagesize 0x%x", pagesize);
 
@@ -4376,7 +4373,7 @@ bscv_set_pagesize(bscv_soft_state_t *ssp, uint32_t pagesize)
 	 * changes it.
 	 */
 	bscv_put32(ssp, chan_prog,
-		BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PSIZ0), pagesize);
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PSIZ0), pagesize);
 
 	return (old_pagesize);
 }
@@ -4389,11 +4386,11 @@ bscv_enter_programming_mode(bscv_soft_state_t *ssp)
 	ASSERT(bscv_held(ssp));
 
 	bscv_put8(ssp, chan_prog,
-		BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR),
-		EBUS_PROGRAM_PCR_PRGMODE_ON);
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR),
+	    EBUS_PROGRAM_PCR_PRGMODE_ON);
 
 	retval = bscv_get8(ssp, chan_prog, BSCVA(EBUS_CMD_SPACE_PROGRAM,
-		    EBUS_PROGRAM_PCSR));
+	    EBUS_PROGRAM_PCSR));
 
 	return (retval);
 }
@@ -4415,7 +4412,7 @@ bscv_leave_programming_mode(bscv_soft_state_t *ssp, boolean_t with_jmp)
 	}
 
 	bscv_put8(ssp, chan_prog,
-		BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR), reg);
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR), reg);
 }
 
 
@@ -4425,7 +4422,7 @@ bscv_set_jump_to_addr(bscv_soft_state_t *ssp, uint32_t loadaddr)
 	ASSERT(bscv_held(ssp));
 
 	bscv_put32(ssp, chan_prog,
-		BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PADR0), loadaddr);
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PADR0), loadaddr);
 
 	bscv_trace(ssp, 'U', "bscv_set_jump_to_addr",
 	    "set jump to loadaddr 0x%x", loadaddr);
@@ -4555,7 +4552,7 @@ bscv_do_page_data_once(bscv_soft_state_t *ssp, uint32_t index,
 		for (i = size; i < pagesize; i++) {
 			bscv_put8(ssp, chan_prog,
 			    BSCVA(EBUS_CMD_SPACE_PROGRAM,
-				EBUS_PROGRAM_DATA),
+			    EBUS_PROGRAM_DATA),
 			    0);
 		}
 	}
@@ -4564,7 +4561,7 @@ bscv_do_page_data_once(bscv_soft_state_t *ssp, uint32_t index,
 	chksum = 0;
 	for (i = 0; i < size; i++) {
 		chksum = ((chksum << 3) | (chksum >> 13)) ^
-			*(imagep + index + i);
+		    *(imagep + index + i);
 	}
 	/* Cope with non-pagesize sized bufers */
 	for (; i < pagesize; i++) {
@@ -4578,7 +4575,7 @@ bscv_do_page_data_once(bscv_soft_state_t *ssp, uint32_t index,
 	    EBUS_PROGRAM_PCR_PROGRAM);
 
 	retval = bscv_get8(ssp, chan_prog,
-			BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR));
+	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PCSR));
 
 	*calcd_chksum = chksum;
 	return (retval);
@@ -4645,7 +4642,7 @@ bscv_do_pages(bscv_soft_state_t *ssp, uint32_t loadaddr, uint32_t image_size,
 
 	for (index = 0; index < image_size; index += pagesize) {
 		retval = bscv_do_page(ssp, loadaddr, index, image_size,
-			    pagesize, imagep, is_image2);
+		    pagesize, imagep, is_image2);
 		if (bscv_faulty(ssp) || !PSR_SUCCESS(retval)) {
 			bscv_trace(ssp, 'U', "bscv_do_pages",
 			    "Failed to program lom (status 0x%x)", retval);
@@ -4710,7 +4707,7 @@ bscv_prog_image(bscv_soft_state_t *ssp, boolean_t is_image2,
 	(void) bscv_set_pagesize(ssp, pagesize);
 
 	retval = bscv_do_pages(ssp, loadaddr, image_size, pagesize, imagep,
-		    is_image2);
+	    is_image2);
 	if (bscv_faulty(ssp) || !PSR_SUCCESS(retval)) {
 		bscv_trace(ssp, 'U', "bscv_prog_image",
 		    "Failed to program lom (status 0x%x)", retval);
@@ -4823,7 +4820,7 @@ bscv_prog_receive_image(bscv_soft_state_t *ssp, lom_prog_t *prog,
 			ssp->image2_processing = !ssp->image2_processing;
 		} else if ((ssp->image_ptr < sizeof (*prog_data)) ||
 		    (prog_data->platform.bscv.size !=
-			(ssp->image_ptr - sizeof (*prog_data)))) {
+		    (ssp->image_ptr - sizeof (*prog_data)))) {
 			/* Image too small for new style image */
 			cmn_err(CE_WARN, "image too small");
 			res = EINVAL;
@@ -5129,9 +5126,7 @@ bscv_cleanup(bscv_soft_state_t *ssp)
 	}
 
 #if defined(__i386) || defined(__amd64)
-	mutex_enter(&cpu_lock);
 	bscv_watchdog_cyclic_remove(ssp);
-	mutex_exit(&cpu_lock);
 #endif /* __i386 || __amd64 */
 	ddi_soft_state_free(bscv_statep, instance);
 
@@ -5209,7 +5204,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 			 * sync so lets try the read again.
 			 */
 			probeval = bscv_get8(ssp, chan_general,
-							EBUS_IDX_PROBEAA);
+			    EBUS_IDX_PROBEAA);
 			if (bscv_faulty(ssp)) {
 				bscv_trace(ssp, 'A', "bscv_probe_check",
 				    "Init readAA1 failed");
@@ -5603,7 +5598,7 @@ static void bscv_setup_watchdog(bscv_soft_state_t *ssp)
 
 	/* Set the timeout */
 	bscv_put8(ssp, chan_general,
-		EBUS_IDX_WDOG_TIME, ssp->watchdog_timeout);
+	    EBUS_IDX_WDOG_TIME, ssp->watchdog_timeout);
 
 	/* Set whether to reset the system on timeout */
 	if (ssp->watchdog_reset_on_timeout) {
@@ -5627,9 +5622,7 @@ static void bscv_setup_watchdog(bscv_soft_state_t *ssp)
 
 #if defined(__i386) || defined(__amd64)
 	/* start the cyclic based watchdog patter */
-	mutex_enter(&cpu_lock);
 	bscv_watchdog_cyclic_add(ssp);
-	mutex_exit(&cpu_lock);
 #endif /* __i386 || __amd64 */
 	ssp->progress |= BSCV_WDOG_CFG;
 }
@@ -5778,7 +5771,7 @@ bscv_write_hostname(bscv_soft_state_t *ssp,
 			needretry = 0;
 			for (i = 0; i < length; i++) {
 				bscv_put8_once(ssp, chan_general,
-					EBUS_IDX_HNAME_CHAR, host_nodename[i]);
+				    EBUS_IDX_HNAME_CHAR, host_nodename[i]);
 				/* Retry on any error */
 				if (bscv_retcode(ssp) != 0) {
 					needretry = 1;
@@ -5832,7 +5825,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 	 */
 	bzero(&ssp->volts, sizeof (lom_volts_t));
 	ssp->volts.num = EBUS_CONFIG2_NSUPPLY_DEC(
-				bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG2));
+	    bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG2));
 	if (ssp->volts.num > MAX_VOLTS) {
 		cmn_err(CE_WARN,
 		    "lom: firmware reported too many voltage lines. ");
@@ -5857,7 +5850,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 
 	for (i = 0; i < ssp->volts.num; i++) {
 		ssp->volts.shutdown_enabled[i] =
-			(((mask >> i) & 1) == 0) ? 0 : 1;
+		    (((mask >> i) & 1) == 0) ? 0 : 1;
 	}
 
 	/*
@@ -5869,7 +5862,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 
 	bzero(&ssp->temps, sizeof (lom_temp_t));
 	ssp->temps.num = EBUS_CONFIG2_NTEMP_DEC(
-				bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG2));
+	    bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG2));
 	if (ssp->temps.num > MAX_TEMPS) {
 		cmn_err(CE_WARN,
 		    "lom: firmware reported too many temperatures being "
@@ -5879,7 +5872,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 		ssp->temps.num = MAX_TEMPS;
 	}
 	ssp->temps.num_ov = EBUS_CONFIG3_NOTEMP_DEC(
-				bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG3));
+	    bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG3));
 	if (ssp->temps.num_ov > MAX_TEMPS) {
 		cmn_err(CE_WARN,
 		    "lom: firmware reported too many over temperatures being "
@@ -5973,7 +5966,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 	 * To get the fan static info we need address space 5
 	 */
 	ssp->num_fans = EBUS_CONFIG_NFAN_DEC(
-				bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG));
+	    bscv_get8(ssp, chan_general, EBUS_IDX_CONFIG));
 	if (ssp->num_fans > MAX_FANS) {
 		cmn_err(CE_WARN,
 		    "lom: firmware reported too many fans. ");
@@ -5985,7 +5978,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 
 	for (i = 0; i < ssp->num_fans; i++) {
 		fanspeed = bscv_get8(ssp, chan_general,
-					EBUS_IDX_FAN1_SPEED + i);
+		    EBUS_IDX_FAN1_SPEED + i);
 		if ((fanspeed <= LOM_FAN_MAX_SPEED) ||
 		    (fanspeed == LOM_FAN_NOT_PRESENT)) {
 			/*
@@ -6131,7 +6124,7 @@ bscv_setup_events(bscv_soft_state_t *ssp)
 		bits2set |= EBUS_ALARM_NOEVENTS;
 	}
 	bscv_setclear8_volatile(ssp, chan_general, EBUS_IDX_ALARM,
-		bits2set, bits2clear);
+	    bits2set, bits2clear);
 }
 
 #ifdef __sparc
@@ -6260,7 +6253,7 @@ bscv_set_watchdog_timer(bscv_soft_state_t *ssp, uint_t timeoutval)
 	 */
 	if (bscv_watchdog_available && (!watchdog_activated ||
 	    (watchdog_activated &&
-		(timeoutval != bscv_watchdog_timeout_seconds)))) {
+	    (timeoutval != bscv_watchdog_timeout_seconds)))) {
 		bscv_watchdog_timeout_seconds = timeoutval;
 		bscv_watchdog_cfg_request(ssp, WDOG_ON);
 		return (bscv_watchdog_timeout_seconds);
@@ -6321,23 +6314,12 @@ bscv_panic_callback(void *arg, int code)
 static void
 bscv_watchdog_cyclic_add(bscv_soft_state_t *ssp)
 {
-	cyc_handler_t hdlr;
-	cyc_time_t when;
-
-	ASSERT(MUTEX_HELD(&cpu_lock));	/* for cyclic_add */
-
-	if (ssp->cyclic_id != CYCLIC_NONE) {
+	if (ssp->periodic_id != NULL) {
 		return;
 	}
 
-	hdlr.cyh_level = CY_LOCK_LEVEL;
-	hdlr.cyh_func = (cyc_func_t)bscv_watchdog_pat_request;
-	hdlr.cyh_arg = (void *)ssp;
-
-	when.cyt_when = 0;
-	when.cyt_interval = WATCHDOG_PAT_INTERVAL;
-
-	ssp->cyclic_id = cyclic_add(&hdlr, &when);
+	ssp->periodic_id = ddi_periodic_add(bscv_watchdog_pat_request, ssp,
+	    WATCHDOG_PAT_INTERVAL, DDI_IPL_10);
 
 	bscv_trace(ssp, 'X', "bscv_watchdog_cyclic_add:",
 	    "cyclic added");
@@ -6352,14 +6334,11 @@ bscv_watchdog_cyclic_add(bscv_soft_state_t *ssp)
 static void
 bscv_watchdog_cyclic_remove(bscv_soft_state_t *ssp)
 {
-	ASSERT(MUTEX_HELD(&cpu_lock));	/* for cyclic_remove */
-
-	if (ssp->cyclic_id == CYCLIC_NONE) {
+	if (ssp->periodic_id == NULL) {
 		return;
 	}
-
-	cyclic_remove(ssp->cyclic_id);
-	ssp->cyclic_id = CYCLIC_NONE;
+	ddi_periodic_delete(ssp->periodic_id);
+	ssp->periodic_id = NULL;
 	bscv_trace(ssp, 'X', "bscv_watchdog_cyclic_remove:",
 	    "cyclic removed");
 }
@@ -6383,7 +6362,7 @@ bscv_trace(bscv_soft_state_t *ssp, char code, const char *caller,
 	if (ssp->debug & (1 << (code-'@'))) {
 		p = buf;
 		(void) snprintf(p, sizeof (buf) - (p - buf),
-			"%s/%s: ", MYNAME, caller);
+		    "%s/%s: ", MYNAME, caller);
 		p += strlen(p);
 
 		va_start(va, fmt);

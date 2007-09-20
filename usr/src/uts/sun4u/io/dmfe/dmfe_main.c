@@ -25,6 +25,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+#include <sys/sunddi.h>
 #include <sys/dmfe_impl.h>
 
 /*
@@ -447,7 +449,7 @@ dmfe_init_rings(dmfe_t *dmfep)
 	 * Set the base address of the RX descriptor list in CSR3
 	 */
 	DMFE_DEBUG(("RX descriptor VA: $%p (DVMA $%x)",
-		    descp->mem_va, descp->mem_dvma));
+	    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, RX_BASE_ADDR_REG, descp->mem_dvma);
 
 	/*
@@ -481,7 +483,7 @@ dmfe_init_rings(dmfe_t *dmfep)
 	 * Set the base address of the TX descrptor list in CSR4
 	 */
 	DMFE_DEBUG(("TX descriptor VA: $%p (DVMA $%x)",
-		    descp->mem_va, descp->mem_dvma));
+	    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, TX_BASE_ADDR_REG, descp->mem_dvma);
 }
 
@@ -507,7 +509,7 @@ dmfe_start_chip(dmfe_t *dmfep, int mode)
 	 */
 	dmfe_chip_put32(dmfep, STATUS_REG, TX_STOPPED_INT | RX_STOPPED_INT);
 	dmfep->chip_state = mode & START_RECEIVE ? CHIP_TX_RX :
-		mode & START_TRANSMIT ? CHIP_TX_ONLY : CHIP_STOPPED;
+	    mode & START_TRANSMIT ? CHIP_TX_ONLY : CHIP_STOPPED;
 }
 
 /*
@@ -544,11 +546,11 @@ dmfe_enable_interrupts(dmfe_t *dmfep)
 	 * Put 'the standard set of interrupts' in the interrupt mask register
 	 */
 	dmfep->imask =	RX_PKTDONE_INT | TX_PKTDONE_INT |
-			RX_STOPPED_INT | TX_STOPPED_INT |
-			RX_UNAVAIL_INT | SYSTEM_ERR_INT;
+	    RX_STOPPED_INT | TX_STOPPED_INT |
+	    RX_UNAVAIL_INT | SYSTEM_ERR_INT;
 
 	dmfe_chip_put32(dmfep, INT_MASK_REG,
-		NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT | dmfep->imask);
+	    NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT | dmfep->imask);
 	dmfep->chip_state = CHIP_RUNNING;
 
 	DMFE_DEBUG(("dmfe_enable_interrupts: imask 0x%x", dmfep->imask));
@@ -691,7 +693,7 @@ dmfe_getp(dmfe_t *dmfep)
 		packet_length = (desc0 >> 16) & 0x3fff;
 		if (packet_length > DMFE_MAX_PKT_SIZE) {
 			DMFE_DEBUG(("dmfe_getp: dropping oversize packet, "
-				"length %d", packet_length));
+			    "length %d", packet_length));
 			goto skip;
 		} else if (packet_length < ETHERMIN) {
 			/*
@@ -703,7 +705,7 @@ dmfe_getp(dmfe_t *dmfep)
 			 * since the hardware should drop RUNT frames.
 			 */
 			DMFE_DEBUG(("dmfe_getp: dropping undersize packet, "
-				"length %d", packet_length));
+			    "length %d", packet_length));
 			goto skip;
 		}
 
@@ -716,8 +718,8 @@ dmfe_getp(dmfe_t *dmfep)
 		 * discard these here so they don't get sent upstream ...)
 		 */
 		(void) ddi_dma_sync(dmfep->rx_buff.dma_hdl,
-			index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
-			DDI_DMA_SYNC_FORKERNEL);
+		    index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
+		    DDI_DMA_SYNC_FORKERNEL);
 		rxb = &dmfep->rx_buff.mem_va[index*DMFE_BUF_SIZE];
 
 
@@ -888,7 +890,7 @@ dmfe_update_tx_stats(dmfe_t *dmfep, int index, uint32_t desc0, uint32_t desc1)
 	collisions = ((desc0 >> 3) & 0x0f);
 	errsum = desc0 & TX_ERR_SUMMARY;
 	errbits = desc0 & (TX_UNDERFLOW | TX_LATE_COLL | TX_CARRIER_LOSS |
-				TX_NO_CARRIER | TX_EXCESS_COLL | TX_JABBER_TO);
+	    TX_NO_CARRIER | TX_EXCESS_COLL | TX_JABBER_TO);
 	if ((errsum == 0) != (errbits == 0)) {
 		dmfe_log(dmfep, "dubious TX error status 0x%x", desc0);
 		desc0 |= TX_ERR_SUMMARY;
@@ -1194,8 +1196,8 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		desc1 = TX_FIRST_DESC | TX_LAST_DESC | totlen;
 
 		(void) ddi_dma_sync(dmfep->tx_buff.dma_hdl,
-			index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
-			DDI_DMA_SYNC_FORDEV);
+		    index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
+		    DDI_DMA_SYNC_FORDEV);
 
 	}
 
@@ -1441,7 +1443,7 @@ dmfe_m_unicst(void *arg, const uint8_t *macaddr)
 	 */
 	for (index = 0; index < ETHERADDRL; index += 2)
 		dmfe_setup_put32(&dmfep->tx_desc, SETUPBUF_PHYS+index/2,
-			(macaddr[index+1] << 8) | macaddr[index]);
+		    (macaddr[index+1] << 8) | macaddr[index]);
 
 	/*
 	 * Finally, we're ready to "transmit" the setup frame
@@ -1528,7 +1530,7 @@ dmfe_start(dmfe_t *dmfep)
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	ASSERT(dmfep->chip_state == CHIP_RESET ||
-		dmfep->chip_state == CHIP_STOPPED);
+	    dmfep->chip_state == CHIP_STOPPED);
 
 	/*
 	 * Make opmode consistent with PHY duplex setting
@@ -1766,7 +1768,7 @@ static void
 dmfe_wake_factotum(dmfe_t *dmfep, int ks_id, const char *why)
 {
 	DMFE_DEBUG(("dmfe_wake_factotum: %s [%d] flag %d",
-		why, ks_id, dmfep->factotum_flag));
+	    why, ks_id, dmfep->factotum_flag));
 
 	ASSERT(mutex_owned(dmfep->oplock));
 	DRV_KS_INC(dmfep, ks_id);
@@ -1832,7 +1834,7 @@ dmfe_tick_link_check(dmfe_t *dmfep, uint32_t gpsr, uint32_t istat)
 
 	if (why != NULL) {
 		DMFE_DEBUG(("dmfe_%s: link %d phy %d utp %d",
-			why, dmfep->link_state, phy_state, utp_state));
+		    why, dmfep->link_state, phy_state, utp_state));
 		dmfe_wake_factotum(dmfep, ks_id, why);
 	}
 }
@@ -1884,7 +1886,7 @@ dmfe_tick_stall_check(dmfe_t *dmfep, uint32_t gpsr, uint32_t istat)
 				dmfe_log(dmfep, "TX stall detected "
 				    "after %d ticks in state %d; "
 				    "automatic recovery initiated",
-					dmfep->tx_pending_tix, tx_state);
+				    dmfep->tx_pending_tix, tx_state);
 				tx_stall = B_TRUE;
 			}
 		}
@@ -2065,7 +2067,7 @@ dmfe_interrupt(caddr_t arg)
 
 			if (warning_msg)
 				dmfe_warning(dmfep, "abnormal interrupt, "
-					"status 0x%x: %s", istat, msg);
+				    "status 0x%x: %s", istat, msg);
 
 			/*
 			 * We don't want to run the entire reinitialisation
@@ -2084,7 +2086,7 @@ dmfe_interrupt(caddr_t arg)
 			 * in case ...
 			 */
 			DMFE_DEBUG(("unexpected interrupt bits: 0x%x",
-				istat));
+			    istat));
 		}
 	}
 
@@ -2436,7 +2438,7 @@ dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 		 * Select any of the various loopback modes
 		 */
 		DMFE_DEBUG(("dmfe_loop_ioctl: SET_LOOP_MODE %d",
-			loop_req_p->loopback));
+		    loop_req_p->loopback));
 		switch (loop_req_p->loopback) {
 		default:
 			return (IOC_INVAL);
@@ -2621,7 +2623,7 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 	 */
 	bzero(dmfep->curr_addr, sizeof (dmfep->curr_addr));
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dmfep->devinfo,
-		DDI_PROP_DONTPASS, localmac_propname, &prop, &propsize);
+	    DDI_PROP_DONTPASS, localmac_propname, &prop, &propsize);
 	if (err == DDI_PROP_SUCCESS) {
 		if (propsize == ETHERADDRL)
 			ethaddr_copy(prop, dmfep->curr_addr);
@@ -2629,7 +2631,7 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 	}
 
 	DMFE_DEBUG(("dmfe_setup_mac_address: factory %s",
-		ether_sprintf((void *)dmfep->curr_addr)));
+	    ether_sprintf((void *)dmfep->curr_addr)));
 }
 
 static int
@@ -2645,7 +2647,7 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	 * Allocate handle
 	 */
 	err = ddi_dma_alloc_handle(dmfep->devinfo, &dma_attr,
-		DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
+	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2653,9 +2655,9 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	 * Allocate memory
 	 */
 	err = ddi_dma_mem_alloc(dma_p->dma_hdl, memsize + setup + slop,
-		attr_p, dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
-		DDI_DMA_SLEEP, NULL,
-		&dma_p->mem_va, &dma_p->alength, &dma_p->acc_hdl);
+	    attr_p, dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
+	    DDI_DMA_SLEEP, NULL,
+	    &dma_p->mem_va, &dma_p->alength, &dma_p->acc_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2663,8 +2665,8 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	 * Bind the two together
 	 */
 	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
-		dma_p->mem_va, dma_p->alength, dma_flags,
-		DDI_DMA_SLEEP, NULL, &dma_cookie, &ncookies);
+	    dma_p->mem_va, dma_p->alength, dma_flags,
+	    DDI_DMA_SLEEP, NULL, &dma_cookie, &ncookies);
 	if (err != DDI_DMA_MAPPED)
 		return (DDI_FAILURE);
 	if ((dma_p->ncookies = ncookies) != 1)
@@ -2696,8 +2698,8 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	 */
 	memsize = dmfep->tx.n_desc*sizeof (struct tx_desc_type);
 	err = dmfe_alloc_dma_mem(dmfep, memsize, SETUPBUF_SIZE, DMFE_SLOP,
-		&dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		&dmfep->tx_desc);
+	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    &dmfep->tx_desc);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2705,9 +2707,9 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	 * Allocate memory & handles for TX buffers
 	 */
 	memsize = dmfep->tx.n_desc*DMFE_BUF_SIZE,
-	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
-		&dmfe_data_accattr, DDI_DMA_WRITE | DMFE_DMA_MODE,
-		&dmfep->tx_buff);
+	    err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
+	    &dmfe_data_accattr, DDI_DMA_WRITE | DMFE_DMA_MODE,
+	    &dmfep->tx_buff);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2716,8 +2718,8 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	 */
 	memsize = dmfep->rx.n_desc*sizeof (struct rx_desc_type);
 	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, DMFE_SLOP,
-		&dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		&dmfep->rx_desc);
+	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    &dmfep->rx_desc);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2725,9 +2727,9 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	 * Allocate memory & handles for RX buffers
 	 */
 	memsize = dmfep->rx.n_desc*DMFE_BUF_SIZE,
-	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
-		&dmfe_data_accattr, DDI_DMA_READ | DMFE_DMA_MODE,
-		&dmfep->rx_buff);
+	    err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
+	    &dmfe_data_accattr, DDI_DMA_READ | DMFE_DMA_MODE,
+	    &dmfep->rx_buff);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2783,12 +2785,11 @@ dmfe_unattach(dmfe_t *dmfep)
 	/*
 	 * Clean up and free all DMFE data structures
 	 */
-	if (dmfep->cycid != CYCLIC_NONE) {
-		mutex_enter(&cpu_lock);
-		cyclic_remove(dmfep->cycid);
-		mutex_exit(&cpu_lock);
-		dmfep->cycid = CYCLIC_NONE;
+	if (dmfep->cycid != NULL) {
+		ddi_periodic_delete(dmfep->cycid);
+		dmfep->cycid = NULL;
 	}
+
 	if (dmfep->ksp_drv != NULL)
 		kstat_delete(dmfep->ksp_drv);
 	if (dmfep->progress & PROGRESS_HWINT) {
@@ -2834,7 +2835,7 @@ dmfe_config_init(dmfe_t *dmfep, chip_id_t *idp)
 
 	regval = pci_config_get32(handle, PCI_DMFE_CONF_CFDD);
 	pci_config_put32(handle, PCI_DMFE_CONF_CFDD,
-		regval & ~(CFDD_SLEEP | CFDD_SNOOZE));
+	    regval & ~(CFDD_SLEEP | CFDD_SNOOZE));
 
 	pci_config_teardown(&handle);
 	return (DDI_SUCCESS);
@@ -2881,12 +2882,12 @@ dmfe_init_kstats(dmfe_t *dmfep, int instance)
 
 	/* Create and initialise driver-defined kstats */
 	ksp = kstat_create(DRIVER_NAME, instance, "dmfe_events", "net",
-		KSTAT_TYPE_NAMED, KS_DRV_COUNT, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED, KS_DRV_COUNT, KSTAT_FLAG_PERSISTENT);
 	if (ksp != NULL) {
 		for (knp = ksp->ks_data, ksip = ks_drv_names;
-			ksip->name != NULL; ++ksip) {
+		    ksip->name != NULL; ++ksip) {
 			kstat_named_init(&knp[ksip->index], ksip->name,
-				KSTAT_DATA_UINT64);
+			    KSTAT_DATA_UINT64);
 		}
 		dmfep->ksp_drv = ksp;
 		dmfep->knp_drv = knp;
@@ -2943,8 +2944,6 @@ static int
 dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	mac_register_t *macp;
-	cyc_handler_t cychand;
-	cyc_time_t cyctime;
 	dmfe_t *dmfep;				/* Our private data	*/
 	uint32_t csr6;
 	int instance;
@@ -2974,11 +2973,11 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 #if	DMFEDEBUG
 	dmfep->debug = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo, 0,
-		debug_propname, dmfe_debug);
+	    debug_propname, dmfe_debug);
 #endif	/* DMFEDEBUG */
-	dmfep->cycid = CYCLIC_NONE;
+	dmfep->cycid = NULL;
 	(void) snprintf(dmfep->ifname, sizeof (dmfep->ifname), "dmfe%d",
-			    instance);
+	    instance);
 	dmfe_find_mac_address(dmfep);
 
 	/*
@@ -2987,7 +2986,7 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	csr6 = TX_THRESHOLD_HI | STORE_AND_FORWARD | EXT_MII_IF | OPN_25_MB1;
 	dmfep->opmode = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, opmode_propname, csr6);
+	    DDI_PROP_DONTPASS, opmode_propname, csr6);
 
 	/*
 	 * Read chip ID & set up config space command register(s)
@@ -3011,7 +3010,7 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Map operating registers
 	 */
 	err = ddi_regs_map_setup(devinfo, DMFE_PCI_RNUMBER,
-		&dmfep->io_reg, 0, 0, &dmfe_reg_accattr, &dmfep->io_handle);
+	    &dmfep->io_reg, 0, 0, &dmfe_reg_accattr, &dmfep->io_handle);
 	if (err != DDI_SUCCESS) {
 		dmfe_error(dmfep, "ddi_regs_map_setup() failed");
 		goto attach_fail;
@@ -3035,7 +3034,7 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	dmfep->link_poll_tix = factotum_start_tix;
 	if (ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &dmfep->factotum_id,
-		NULL, NULL, dmfe_factotum, (caddr_t)dmfep) != DDI_SUCCESS) {
+	    NULL, NULL, dmfe_factotum, (caddr_t)dmfep) != DDI_SUCCESS) {
 		dmfe_error(dmfep, "ddi_add_softintr() failed");
 		goto attach_fail;
 	}
@@ -3045,7 +3044,7 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Add the h/w interrupt handler & initialise mutexen
 	 */
 	if (ddi_add_intr(devinfo, 0, &dmfep->iblk, NULL,
-		dmfe_interrupt, (caddr_t)dmfep) != DDI_SUCCESS) {
+	    dmfe_interrupt, (caddr_t)dmfep) != DDI_SUCCESS) {
 		dmfe_error(dmfep, "ddi_add_intr() failed");
 		goto attach_fail;
 	}
@@ -3120,19 +3119,12 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	/*
 	 * Install the cyclic callback that we use to check for link
-	 * status, transmit stall, etc.  We ASSERT that this can't fail
+	 * status, transmit stall, etc. The cyclic callback (dmfe_cyclic())
+	 * is invoked in kernel context then.
 	 */
-	cychand.cyh_func = dmfe_cyclic;
-	cychand.cyh_arg = dmfep;
-	cychand.cyh_level = CY_LOW_LEVEL;
-	cyctime.cyt_when = 0;
-	cyctime.cyt_interval = dmfe_tick_us*1000;	/* ns */
-	ASSERT(dmfep->cycid == CYCLIC_NONE);
-	mutex_enter(&cpu_lock);
-	dmfep->cycid = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
-	ASSERT(dmfep->cycid != CYCLIC_NONE);
-
+	ASSERT(dmfep->cycid == NULL);
+	dmfep->cycid = ddi_periodic_add(dmfe_cyclic, dmfep,
+	    dmfe_tick_us * 1000, DDI_IPL_0);
 	return (DDI_SUCCESS);
 
 attach_fail:

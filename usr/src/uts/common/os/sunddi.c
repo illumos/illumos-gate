@@ -60,6 +60,7 @@
 #include <sys/conf.h>
 #include <sys/ddi_impldefs.h>	/* include implementation structure defs */
 #include <sys/ndi_impldefs.h>	/* include prototypes */
+#include <sys/ddi_timer.h>
 #include <sys/hwconf.h>
 #include <sys/pathname.h>
 #include <sys/modctl.h>
@@ -5300,6 +5301,125 @@ void
 ddi_run_callback(uintptr_t *listid)
 {
 	softcall(real_callback_run, listid);
+}
+
+/*
+ * ddi_periodic_t
+ * ddi_periodic_add(void (*func)(void *), void *arg, hrtime_t interval,
+ *     int level)
+ *
+ * INTERFACE LEVEL
+ *      Solaris DDI specific (Solaris DDI)
+ *
+ * PARAMETERS
+ *      func: the callback function
+ *
+ *            The callback function will be invoked. The function is invoked
+ *            in kernel context if the argument level passed is the zero.
+ *            Otherwise it's invoked in interrupt context at the specified
+ *            level.
+ *
+ *       arg: the argument passed to the callback function
+ *
+ *  interval: interval time
+ *
+ *    level : callback interrupt level
+ *
+ *            If the value is the zero, the callback function is invoked
+ *            in kernel context. If the value is more than the zero, but
+ *            less than or equal to ten, the callback function is invoked in
+ *            interrupt context at the specified interrupt level, which may
+ *            be used for real time applications.
+ *
+ *            This value must be in range of 0-10, which can be a numeric
+ *            number or a pre-defined macro (DDI_IPL_0, ... , DDI_IPL_10).
+ *
+ * DESCRIPTION
+ *      ddi_periodic_add(9F) schedules the specified function to be
+ *      periodically invoked in the interval time.
+ *
+ *      As well as timeout(9F), the exact time interval over which the function
+ *      takes effect cannot be guaranteed, but the value given is a close
+ *      approximation.
+ *
+ *      Drivers waiting on behalf of processes with real-time constraints must
+ *      pass non-zero value with the level argument to ddi_periodic_add(9F).
+ *
+ * RETURN VALUES
+ *      ddi_periodic_add(9F) returns a non-zero opaque value (ddi_periodic_t),
+ *      which must be used for ddi_periodic_delete(9F) to specify the request.
+ *
+ * CONTEXT
+ *      ddi_periodic_add(9F) can be called in user or kernel context, but
+ *      it cannot be called in interrupt context, which is different from
+ *      timeout(9F).
+ */
+ddi_periodic_t
+ddi_periodic_add(void (*func)(void *), void *arg, hrtime_t interval, int level)
+{
+	/*
+	 * Sanity check of the argument level.
+	 */
+	if (level < DDI_IPL_0 || level > DDI_IPL_10)
+		cmn_err(CE_PANIC,
+		    "ddi_periodic_add: invalid interrupt level (%d).", level);
+
+	/*
+	 * Sanity check of the context. ddi_periodic_add() cannot be
+	 * called in either interrupt context or high interrupt context.
+	 */
+	if (servicing_interrupt())
+		cmn_err(CE_PANIC,
+		    "ddi_periodic_add: called in (high) interrupt context.");
+
+	return ((ddi_periodic_t)i_timeout(func, arg, interval, level));
+}
+
+/*
+ * void
+ * ddi_periodic_delete(ddi_periodic_t req)
+ *
+ * INTERFACE LEVEL
+ *     Solaris DDI specific (Solaris DDI)
+ *
+ * PARAMETERS
+ *     req: ddi_periodic_t opaque value ddi_periodic_add(9F) returned
+ *     previously.
+ *
+ * DESCRIPTION
+ *     ddi_periodic_delete(9F) cancels the ddi_periodic_add(9F) request
+ *     previously requested.
+ *
+ *     ddi_periodic_delete(9F) will not return until the pending request
+ *     is canceled or executed.
+ *
+ *     As well as untimeout(9F), calling ddi_periodic_delete(9F) for a
+ *     timeout which is either running on another CPU, or has already
+ *     completed causes no problems. However, unlike untimeout(9F), there is
+ *     no restrictions on the lock which might be held across the call to
+ *     ddi_periodic_delete(9F).
+ *
+ *     Drivers should be structured with the understanding that the arrival of
+ *     both an interrupt and a timeout for that interrupt can occasionally
+ *     occur, in either order.
+ *
+ * CONTEXT
+ *     ddi_periodic_delete(9F) can be called in user or kernel context, but
+ *     it cannot be called in interrupt context, which is different from
+ *     untimeout(9F).
+ */
+void
+ddi_periodic_delete(ddi_periodic_t req)
+{
+	/*
+	 * Sanity check of the context. ddi_periodic_delete() cannot be
+	 * called in either interrupt context or high interrupt context.
+	 */
+	if (servicing_interrupt())
+		cmn_err(CE_PANIC,
+		    "ddi_periodic_delete: called in (high) interrupt context.");
+
+	i_untimeout((timeout_t)req);
 }
 
 dev_info_t *

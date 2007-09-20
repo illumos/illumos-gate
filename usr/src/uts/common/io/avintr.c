@@ -88,9 +88,25 @@ struct autovec *nmivect = NULL;
 struct av_head autovect[MAX_VECT];
 struct av_head softvect[LOCK_LEVEL + 1];
 kmutex_t av_lock;
+/*
+ * These are software interrupt handlers dedicated to ddi timer.
+ * The interrupt levels up to 10 are supported, but high interrupts
+ * must not be used there.
+ */
+ddi_softint_hdl_impl_t softlevel_hdl[DDI_IPL_10] = {
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 1 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 2 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 3 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 4 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 5 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 6 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 7 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 8 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 9 */
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 10 */
+};
 ddi_softint_hdl_impl_t softlevel1_hdl =
 	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
-
 
 /*
  * clear/check softint pending flag corresponding for
@@ -578,7 +594,18 @@ kdi_siron(void)
 void
 siron(void)
 {
+	/* Level 1 software interrupt */
 	(*setsoftint)(1, softlevel1_hdl.ih_pending);
+}
+
+/*
+ * Trigger software interrupts dedicated to ddi timer.
+ */
+void
+sir_on(int level)
+{
+	ASSERT(level >= DDI_IPL_1 && level <= DDI_IPL_10);
+	(*setsoftint)(level, softlevel_hdl[level-1].ih_pending);
 }
 
 /*

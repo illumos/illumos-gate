@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ typedef struct rmc_comm_serdev_state {
 	ddi_acc_handle_t sio_handle;
 	uint8_t *sio_regs;
 	ddi_softintr_t softid;
-	cyclic_id_t cycid;
+	ddi_periodic_t cycid; /* periodical callback */
 
 	/*
 	 * Hardware mutex (initialised using <hw_iblk>),

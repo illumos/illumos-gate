@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "lombus" driver provides access to the LOMlite2 virtual registers,
@@ -41,7 +40,6 @@
 
 #include <sys/types.h>
 #include <sys/conf.h>
-#include <sys/cyclic.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/file.h>
@@ -265,7 +263,7 @@ struct lombus_state {
 	ddi_acc_handle_t sio_handle;
 	uint8_t *sio_regs;
 	ddi_softintr_t softid;
-	cyclic_id_t cycid;
+	ddi_periodic_t cycid; /* periodical callback */
 
 	/*
 	 * Parameters derived from .conf properties
@@ -358,7 +356,7 @@ lombus_trace(struct lombus_state *ssp, char code, const char *caller,
 	if (ssp->debug & (1 << (code-'@'))) {
 		p = buf;
 		snprintf(p, sizeof (buf) - (p - buf),
-			"%s/%s: ", MYNAME, caller);
+		    "%s/%s: ", MYNAME, caller);
 		p += strlen(p);
 
 		va_start(va, fmt);
@@ -522,7 +520,7 @@ sio_lom_ready(struct lombus_state *ssp)
 	rslt = (status & SIO_MSR_CTS) != 0 && !sio_faulty(ssp);
 
 	lombus_trace(ssp, 'R', "sio_lom_ready", "S $%02x R %d F %d",
-		status, rslt, ssp->fake_cts);
+	    status, rslt, ssp->fake_cts);
 
 	return (rslt || ssp->fake_cts);
 }
@@ -549,7 +547,7 @@ sio_irq_pending(struct lombus_state *ssp)
 
 	rslt = (status & SIO_EIR_IPF) == 0 && !sio_faulty(ssp);
 	lombus_trace(ssp, 'I', "sio_irq_pending", "S $%02x R %d",
-		status, rslt);
+	    status, rslt);
 
 	/*
 	 * To investigate whether we're getting any abnormal interrupts
@@ -622,7 +620,7 @@ lombus_hi_intr(caddr_t arg)
 	uint_t claim;
 
 	claim = DDI_INTR_UNCLAIMED;
-	if (ssp->cycid != CYCLIC_NONE) {
+	if (ssp->cycid != NULL) {
 		mutex_enter(ssp->hw_mutex);
 		if (ssp->hw_int_enabled) {
 			lombus_set_irq(ssp, B_FALSE);
@@ -651,8 +649,8 @@ lombus_receive(struct lombus_state *ssp)
 	uint8_t tmp;
 
 	lombus_trace(ssp, 'S', "lombus_receive",
-		"state %d; error $%x",
-		ssp->cmdstate, ssp->error);
+	    "state %d; error $%x",
+	    ssp->cmdstate, ssp->error);
 
 	/*
 	 * Check for access faults before starting the receive
@@ -680,12 +678,12 @@ lombus_receive(struct lombus_state *ssp)
 	}
 
 	lombus_trace(ssp, 'S', "lombus_receive",
-		"rcvd %d: $%02x $%02x $%02x $%02x $%02x $%02x $%02x $%02x",
-		rcvd,
-		ssp->reply[0], ssp->reply[1],
-		ssp->reply[2], ssp->reply[3],
-		ssp->reply[4], ssp->reply[5],
-		ssp->reply[6], ssp->reply[7]);
+	    "rcvd %d: $%02x $%02x $%02x $%02x $%02x $%02x $%02x $%02x",
+	    rcvd,
+	    ssp->reply[0], ssp->reply[1],
+	    ssp->reply[2], ssp->reply[3],
+	    ssp->reply[4], ssp->reply[5],
+	    ssp->reply[6], ssp->reply[7]);
 
 	if (ssp->cmdstate != LOMBUS_CMDSTATE_WAITING) {
 		/*
@@ -738,12 +736,12 @@ lombus_receive(struct lombus_state *ssp)
 		 */
 		if (ssp->allow_echo) {
 			lombus_trace(ssp, 'E', "lombus_receive",
-				"echo $%02x $%02x $%02x $%02x "
-				"$%02x $%02x $%02x $%02x",
-				ssp->reply[0], ssp->reply[1],
-				ssp->reply[2], ssp->reply[3],
-				ssp->reply[4], ssp->reply[5],
-				ssp->reply[6], ssp->reply[7]);
+			    "echo $%02x $%02x $%02x $%02x "
+			    "$%02x $%02x $%02x $%02x",
+			    ssp->reply[0], ssp->reply[1],
+			    ssp->reply[2], ssp->reply[3],
+			    ssp->reply[4], ssp->reply[5],
+			    ssp->reply[6], ssp->reply[7]);
 			ssp->index = 0;
 		} else {
 			ssp->cmdstate = LOMBUS_CMDSTATE_ERROR;
@@ -781,8 +779,8 @@ lombus_receive(struct lombus_state *ssp)
 	}
 
 	lombus_trace(ssp, 'T', "lombus_receive",
-		"rcvd %d; last $%02x; state %d; error $%x; ready %d",
-			rcvd, data, ssp->cmdstate, ssp->error, ready);
+	    "rcvd %d; last $%02x; state %d; error $%x; ready %d",
+	    rcvd, data, ssp->cmdstate, ssp->error, ready);
 
 	if (ready)
 		cv_broadcast(ssp->lo_cv);
@@ -1866,8 +1864,8 @@ lombus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		return (DDI_ME_INVAL);
 
 	return (lombus_map_handle(ssp, mp->map_op,
-		rsp->lombus_space, VREG_TO_ADDR(rsp->lombus_base+off), len,
-		mp->map_handlep, addrp));
+	    rsp->lombus_space, VREG_TO_ADDR(rsp->lombus_base+off), len,
+	    mp->map_handlep, addrp));
 }
 
 static int
@@ -1909,7 +1907,7 @@ lombus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 		 */
 		cdip = arg;
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, cdip,
-			DDI_PROP_DONTPASS, "reg", &regs, &nregs);
+		    DDI_PROP_DONTPASS, "reg", &regs, &nregs);
 		lombus_trace(ssp, 'C', "initchild",
 		    "prop status %d size %d", err, nregs);
 		if (err != DDI_PROP_SUCCESS)
@@ -1960,7 +1958,7 @@ lombus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 		ddi_set_parent_data(cdip, lcip);
 
 		(void) snprintf(addr, sizeof (addr),
-			"%x,%x", rsp[0].lombus_space, rsp[0].lombus_base);
+		    "%x,%x", rsp[0].lombus_space, rsp[0].lombus_base);
 		ddi_set_name_addr(cdip, addr);
 
 		return (DDI_SUCCESS);
@@ -1979,8 +1977,8 @@ lombus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 			return (DDI_FAILURE);
 
 		cmn_err(CE_CONT, "?LOM device: %s@%s, %s#%d\n",
-			ddi_node_name(rdip), ddi_get_name_addr(rdip),
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_node_name(rdip), ddi_get_name_addr(rdip),
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 		return (DDI_SUCCESS);
 
@@ -2011,10 +2009,9 @@ lombus_unattach(struct lombus_state *ssp, int instance)
 {
 	if (ssp != NULL) {
 		lombus_hw_reset(ssp);
-		if (ssp->cycid != CYCLIC_NONE) {
-			mutex_enter(&cpu_lock);
-			cyclic_remove(ssp->cycid);
-			mutex_exit(&cpu_lock);
+		if (ssp->cycid != NULL) {
+			ddi_periodic_delete(ssp->cycid);
+			ssp->cycid = NULL;
 			if (ssp->sio_handle != NULL)
 				ddi_remove_intr(ssp->dip, 0, ssp->hw_iblk);
 			ddi_remove_softintr(ssp->softid);
@@ -2038,8 +2035,6 @@ static int
 lombus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct lombus_state *ssp = NULL;
-	cyc_handler_t cychand;
-	cyc_time_t cyctime;
 	int instance;
 	int err;
 
@@ -2072,20 +2067,20 @@ lombus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 *  Set various options from .conf properties
 	 */
 	ssp->allow_echo = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "allow-lom-echo", 0) != 0;
+	    DDI_PROP_DONTPASS, "allow-lom-echo", 0) != 0;
 	ssp->baud = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "baud-rate", 0);
+	    DDI_PROP_DONTPASS, "baud-rate", 0);
 	ssp->debug = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "debug", 0);
+	    DDI_PROP_DONTPASS, "debug", 0);
 	ssp->fake_cts = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "fake-cts", 0) != 0;
+	    DDI_PROP_DONTPASS, "fake-cts", 0) != 0;
 
 	/*
 	 * Initialise current state & time
 	 */
 	ssp->cmdstate = LOMBUS_CMDSTATE_IDLE;
 	ssp->hw_last_pat = gethrtime();
-	ssp->cycid = CYCLIC_NONE;
+	ssp->cycid = NULL;
 
 	/*
 	 *  Online the hardware ...
@@ -2101,26 +2096,23 @@ lombus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Enable interrupts
 	 */
 	err = ddi_add_softintr(dip, DDI_SOFTINT_LOW, &ssp->softid,
-		&ssp->lo_iblk, NULL, lombus_softint, (caddr_t)ssp);
+	    &ssp->lo_iblk, NULL, lombus_softint, (caddr_t)ssp);
 	if (err != DDI_SUCCESS)
 		return (lombus_unattach(ssp, instance));
 
 	if (ssp->sio_handle != NULL)
 		err = ddi_add_intr(dip, 0, &ssp->hw_iblk, NULL,
-			lombus_hi_intr, (caddr_t)ssp);
+		    lombus_hi_intr, (caddr_t)ssp);
 
 	mutex_init(ssp->hw_mutex, NULL, MUTEX_DRIVER, ssp->hw_iblk);
 	mutex_init(ssp->lo_mutex, NULL, MUTEX_DRIVER, ssp->lo_iblk);
 	cv_init(ssp->lo_cv, NULL, CV_DRIVER, NULL);
 
-	cychand.cyh_func = lombus_cyclic;
-	cychand.cyh_arg = ssp;
-	cychand.cyh_level = CY_LOW_LEVEL;
-	cyctime.cyt_when = 0;			/* from the next second	*/
-	cyctime.cyt_interval = LOMBUS_ONE_SEC;	/* call at 1s intervals	*/
-	mutex_enter(&cpu_lock);
-	ssp->cycid = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
+	/*
+	 * Register a periodical handler.
+	 */
+	ssp->cycid = ddi_periodic_add(lombus_cyclic, ssp, LOMBUS_ONE_SEC,
+	    DDI_IPL_1);
 
 	/*
 	 * Final check before enabling h/w interrupts - did
@@ -2273,7 +2265,7 @@ _init(void)
 	int err;
 
 	err = ddi_soft_state_init(&lombus_statep,
-		sizeof (struct lombus_state), 0);
+	    sizeof (struct lombus_state), 0);
 	if (err == DDI_SUCCESS)
 		if ((err = mod_install(&modlinkage)) != 0) {
 			ddi_soft_state_fini(&lombus_statep);

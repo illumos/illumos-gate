@@ -67,6 +67,7 @@
 #include <sys/rctl.h>
 #include <sys/task.h>
 #include <sys/sdt.h>
+#include <sys/ddi_timer.h>
 
 /*
  * for NTP support
@@ -1041,6 +1042,18 @@ clock_init(void)
 
 	when.cyt_when = 0;
 	when.cyt_interval = nsec_per_tick;
+
+	mutex_enter(&cpu_lock);
+	clock_cyclic = cyclic_add(&hdlr, &when);
+	mutex_exit(&cpu_lock);
+
+	/*
+	 * cyclic_timer is dedicated to the ddi interface, which
+	 * uses the same clock resolution as the system one.
+	 */
+	hdlr.cyh_func = (cyc_func_t)cyclic_timer;
+	hdlr.cyh_level = CY_LOCK_LEVEL;
+	hdlr.cyh_arg = NULL;
 
 	mutex_enter(&cpu_lock);
 	clock_cyclic = cyclic_add(&hdlr, &when);

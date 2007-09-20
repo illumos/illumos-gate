@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "rmc_comm" driver provides access to the RMC so that its clients need
@@ -35,7 +35,6 @@
  *  Header files
  */
 #include <sys/conf.h>
-#include <sys/cyclic.h>
 #include <sys/membar.h>
 #include <sys/modctl.h>
 #include <sys/strlog.h>
@@ -237,7 +236,7 @@ static void
 sio_check_fault_status(struct rmc_comm_state *rcs)
 {
 	rcs->sd_state.sio_fault =
-		ddi_check_acc_handle(rcs->sd_state.sio_handle) != DDI_SUCCESS;
+	    ddi_check_acc_handle(rcs->sd_state.sio_handle) != DDI_SUCCESS;
 }
 
 boolean_t
@@ -305,7 +304,7 @@ rmc_comm_hi_intr(caddr_t arg)
 	uint_t claim;
 
 	claim = DDI_INTR_UNCLAIMED;
-	if (rcs->sd_state.cycid != CYCLIC_NONE) {
+	if (rcs->sd_state.cycid != NULL) {
 		/*
 		 * Handle the case where this interrupt fires during
 		 * panic processing.  If that occurs, then a thread
@@ -597,11 +596,9 @@ rmc_comm_online(struct rmc_comm_state *rcs, dev_info_t *dip)
 int
 rmc_comm_serdev_init(struct rmc_comm_state *rcs, dev_info_t *dip)
 {
-	cyc_handler_t cychand;
-	cyc_time_t cyctime;
 	int err = DDI_SUCCESS;
 
-	rcs->sd_state.cycid = CYCLIC_NONE;
+	rcs->sd_state.cycid = NULL;
 
 	/*
 	 *  Online the hardware ...
@@ -656,7 +653,7 @@ rmc_comm_serdev_init(struct rmc_comm_state *rcs, dev_info_t *dip)
 
 	if (rcs->sd_state.sio_handle != NULL) {
 		err = ddi_add_intr(dip, 0, &rcs->sd_state.hw_iblk, NULL,
-			rmc_comm_hi_intr, (caddr_t)rcs);
+		    rmc_comm_hi_intr, (caddr_t)rcs);
 
 		/*
 		 * did we successfully install the h/w interrupt handler?
@@ -669,20 +666,11 @@ rmc_comm_serdev_init(struct rmc_comm_state *rcs, dev_info_t *dip)
 		}
 	}
 
-
 	/*
-	 * Start cyclic callbacks
+	 * Start periodical callbacks
 	 */
-
-	cychand.cyh_func = rmc_comm_cyclic;
-	cychand.cyh_arg = rcs;
-	cychand.cyh_level = CY_LOW_LEVEL;
-	cyctime.cyt_when = 0;			/* from the next second	*/
-	cyctime.cyt_interval = 5*RMC_COMM_ONE_SEC; /* call at 5s intervals */
-	mutex_enter(&cpu_lock);
-	rcs->sd_state.cycid = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
-
+	rcs->sd_state.cycid = ddi_periodic_add(rmc_comm_cyclic, rcs,
+	    5 * RMC_COMM_ONE_SEC, DDI_IPL_1);
 	return (0);
 }
 
@@ -696,10 +684,9 @@ rmc_comm_serdev_fini(struct rmc_comm_state *rcs, dev_info_t *dip)
 {
 	rmc_comm_hw_reset(rcs);
 
-	if (rcs->sd_state.cycid != CYCLIC_NONE) {
-		mutex_enter(&cpu_lock);
-		cyclic_remove(rcs->sd_state.cycid);
-		mutex_exit(&cpu_lock);
+	if (rcs->sd_state.cycid != NULL) {
+		ddi_periodic_delete(rcs->sd_state.cycid);
+		rcs->sd_state.cycid = NULL;
 
 		if (rcs->sd_state.sio_handle != NULL)
 			ddi_remove_intr(dip, 0, rcs->sd_state.hw_iblk);
@@ -796,12 +783,12 @@ rmc_comm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_exit(rcs->dp_state.dp_mutex);
 
 		current_sgn_p = (sig_state_t *)modgetsymvalue(
-			"current_sgn", 0);
+		    "current_sgn", 0);
 		if ((current_sgn_p != NULL) &&
-			(current_sgn_p->state_t.sig != 0)) {
+		    (current_sgn_p->state_t.sig != 0)) {
 			CPU_SIGNATURE(current_sgn_p->state_t.sig,
-				current_sgn_p->state_t.state,
-				current_sgn_p->state_t.sub_state, -1);
+			    current_sgn_p->state_t.state,
+			    current_sgn_p->state_t.sub_state, -1);
 		}
 		return (DDI_SUCCESS);
 
@@ -844,7 +831,7 @@ rmc_comm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if ((rcs->baud_divisor_factor < SIO_BAUD_DIVISOR_MIN) ||
 	    (rcs->baud_divisor_factor > SIO_BAUD_DIVISOR_MAX))
-	    rcs->baud_divisor_factor = SIO_BAUD_DIVISOR_MIN;
+		rcs->baud_divisor_factor = SIO_BAUD_DIVISOR_MIN;
 
 	/*
 	 * initialize serial device
@@ -996,7 +983,7 @@ _init(void)
 
 	mutex_init(&rmc_comm_attach_lock, NULL, MUTEX_DRIVER, NULL);
 	err = ddi_soft_state_init(&rmc_comm_statep,
-		sizeof (struct rmc_comm_state), 0);
+	    sizeof (struct rmc_comm_state), 0);
 	if (err == DDI_SUCCESS)
 		if ((err = mod_install(&modlinkage)) != 0) {
 			ddi_soft_state_fini(&rmc_comm_statep);

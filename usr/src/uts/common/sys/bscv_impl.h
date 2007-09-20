@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,7 +292,7 @@ struct {
 #endif /* __sparc */
 	uint8_t		last_event[8];	/* last event read and reported */
 #if defined(__i386) || defined(__amd64)
-	cyclic_id_t	cyclic_id;	/* watchdog patter cyclic timer */
+	ddi_periodic_t 	periodic_id; /* watchdog patter periodical callback */
 	callb_id_t	callb_id;	/* Need to store the ID so we can */
 					/* unschedule the panic callback */
 	char		last_nodename[128]; /* copy of last utsname.nodename */

@@ -43,7 +43,6 @@ extern "C" {
 #include <sys/ethernet.h>
 #include <sys/devops.h>
 #include <sys/debug.h>
-#include <sys/cyclic.h>
 #include <sys/conf.h>
 
 #include <inet/common.h>
@@ -249,7 +248,7 @@ typedef struct {
 	dma_area_t		rx_desc;	/* receive descriptors	*/
 	dma_area_t		rx_buff;	/* receive buffers	*/
 
-	cyclic_id_t		cycid;		/* cyclic callback id	 */
+	ddi_periodic_t		cycid;		/* periodical callback 	*/
 	ddi_softintr_t		factotum_id;	/* identity of factotum	*/
 	ddi_iblock_cookie_t	iblk;
 

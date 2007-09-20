@@ -292,6 +292,11 @@ typedef struct {
 	uint_t			flags;
 } peekpoke_ctlops_t;
 
+/*
+ * Used by the high resolution timeout functions
+ */
+typedef struct __ddi_periodic *ddi_periodic_t;
+
 #endif	/* !_ASM */
 
 /*

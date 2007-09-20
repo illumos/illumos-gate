@@ -33,6 +33,7 @@
 #include <sys/membar.h>
 #include <sys/kmem.h>
 #include <sys/intr.h>
+#include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/cmn_err.h>
 #include <sys/privregs.h>
@@ -44,6 +45,7 @@
 #include <sys/debug.h>
 #include <sys/cyclic.h>
 #include <sys/kdi_impl.h>
+#include <sys/ddi_timer.h>
 
 #include <sys/cpu_sgnblk_defs.h>
 
@@ -55,12 +57,13 @@ static kmutex_t intr_dist_cpu_lock;
 static struct intr_dist *intr_dist_head = NULL;
 static struct intr_dist *intr_dist_whead = NULL;
 
-uint64_t siron_inum;
+static uint64_t siron_inum[DDI_IPL_10]; /* software interrupt numbers */
 uint64_t *siron_cpu_inum = NULL;
 uint64_t siron_poke_cpu_inum;
 static int siron_cpu_setup(cpu_setup_t, int, void *);
 extern uint_t softlevel1();
 
+static uint64_t siron1_inum; /* backward compatibility */
 uint64_t poke_cpu_inum;
 uint_t poke_cpu_intr(caddr_t arg1, caddr_t arg2);
 uint_t siron_poke_cpu_intr(caddr_t arg1, caddr_t arg2);
@@ -84,7 +87,8 @@ uint_t siron_poke_cpu_intr(caddr_t arg1, caddr_t arg2);
  * stripped of its gatekeeper task, retaining only its intr_init job, where
  * it indicates that there is a pending need to call siron().
  */
-int siron_pending;
+static int siron_pending[DDI_IPL_10]; /* software interrupt pending flags */
+static int siron1_pending; /* backward compatibility */
 
 int intr_policy = INTR_WEIGHTED_DIST;	/* interrupt distribution policy */
 int intr_dist_debug = 0;
@@ -100,6 +104,7 @@ int intr_dist_weight_maxfactor = 2;
 void
 intr_init(cpu_t *cp)
 {
+	int i;
 	extern uint_t softlevel1();
 
 	init_ivintr();
@@ -110,7 +115,16 @@ intr_init(cpu_t *cp)
 	 * the work is done when CPU is configured.
 	 */
 	siron_cpu_inum = kmem_zalloc(sizeof (uint64_t) * NCPU, KM_SLEEP);
-	siron_inum = add_softintr(PIL_1, softlevel1, 0, SOFTINT_ST);
+	/*
+	 * Register these software interrupts for ddi timer.
+	 * Software interrupts up to the level 10 are supported.
+	 */
+	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
+		siron_inum[i-1] = add_softintr(i, (softintrfunc)timer_softintr,
+		    (caddr_t)(uintptr_t)(i), SOFTINT_ST);
+	}
+
+	siron1_inum = add_softintr(PIL_1, softlevel1, 0, SOFTINT_ST);
 	poke_cpu_inum = add_softintr(PIL_13, poke_cpu_intr, 0, SOFTINT_MT);
 	siron_poke_cpu_inum = add_softintr(PIL_13,
 	    siron_poke_cpu_intr, 0, SOFTINT_MT);
@@ -125,8 +139,14 @@ intr_init(cpu_t *cp)
 	 * init_intr(), so we have to wait until now before we can dispatch the
 	 * pending soft interrupt (if any).
 	 */
-	if (siron_pending) {
-		siron_pending = 0;
+	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
+		if (siron_pending[i-1]) {
+			siron_pending[i-1] = 0;
+			sir_on(i);
+		}
+	}
+	if (siron1_pending) {
+		siron1_pending = 0;
 		siron();
 	}
 }
@@ -144,6 +164,19 @@ poke_cpu_intr(caddr_t arg1, caddr_t arg2)
 }
 
 /*
+ * Trigger software interrupts dedicated to ddi timer.
+ */
+void
+sir_on(int level)
+{
+	ASSERT(level >= DDI_IPL_1 && level <= DDI_IPL_10);
+	if (siron_inum[level-1])
+		setsoftint(siron_inum[level-1]);
+	else
+		siron_pending[level-1] = 1;
+}
+
+/*
  * kmdb uses siron (and thus setsoftint) while the world is stopped in order to
  * inform its driver component that there's work to be done.  We need to keep
  * DTrace from instrumenting kmdb's siron and setsoftint.  We duplicate siron,
@@ -157,10 +190,10 @@ poke_cpu_intr(caddr_t arg1, caddr_t arg2)
 void
 kdi_siron(void)
 {
-	if (siron_inum != 0)
-		kdi_setsoftint(siron_inum);
+	if (siron1_inum != 0)
+		kdi_setsoftint(siron1_inum);
 	else
-		siron_pending = 1;
+		siron1_pending = 1;
 }
 
 void
@@ -178,15 +211,15 @@ siron(void)
 {
 	uint64_t inum;
 
-	if (siron_inum != 0) {
+	if (siron1_inum != 0) {
 		if (siron_cpu_inum[CPU->cpu_id] != 0)
 			inum = siron_cpu_inum[CPU->cpu_id];
 		else
-			inum = siron_inum;
+			inum = siron1_inum;
 
 		setsoftint(inum);
 	} else
-		siron_pending = 1;
+		siron1_pending = 1;
 }
 
 /*

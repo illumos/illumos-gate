@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.59";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.60";
 
 /*
  * Property names
@@ -525,7 +525,6 @@ bge_m_start(void *arg)
 	if (bgep->asf_enabled) {
 		if ((bgep->asf_status == ASF_STAT_RUN) &&
 		    (bgep->asf_pseudostop)) {
-
 			bgep->bge_mac_state = BGE_MAC_STARTED;
 			mutex_exit(bgep->genlock);
 			return (0);
@@ -2333,10 +2332,9 @@ bge_unattach(bge_t *bgep)
 	 * Quiesce the PHY and MAC (leave it reset but still powered).
 	 * Clean up and free all BGE data structures
 	 */
-	if (bgep->cyclic_id) {
-		mutex_enter(&cpu_lock);
-		cyclic_remove(bgep->cyclic_id);
-		mutex_exit(&cpu_lock);
+	if (bgep->periodic_id != NULL) {
+		ddi_periodic_delete(bgep->periodic_id);
+		bgep->periodic_id = NULL;
 	}
 	if (bgep->progress & PROGRESS_KSTATS)
 		bge_fini_kstats(bgep);
@@ -2484,8 +2482,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	bge_t *bgep;				/* Our private data	*/
 	mac_register_t *macp;
 	chip_id_t *cidp;
-	cyc_handler_t cychand;
-	cyc_time_t cyctime;
 	caddr_t regs;
 	int instance;
 	int err;
@@ -2873,14 +2869,12 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (err != 0)
 		goto attach_fail;
 
-	cychand.cyh_func = bge_chip_cyclic;
-	cychand.cyh_arg = bgep;
-	cychand.cyh_level = CY_LOCK_LEVEL;
-	cyctime.cyt_when = 0;
-	cyctime.cyt_interval = BGE_CYCLIC_PERIOD;
-	mutex_enter(&cpu_lock);
-	bgep->cyclic_id = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
+	/*
+	 * Register a periodical handler.
+	 * bge_chip_cyclic() is invoked in kernel context.
+	 */
+	bgep->periodic_id = ddi_periodic_add(bge_chip_cyclic, bgep,
+	    BGE_CYCLIC_PERIOD, DDI_IPL_0);
 
 	bgep->progress |= PROGRESS_READY;
 	ASSERT(bgep->bge_guard == BGE_GUARD);

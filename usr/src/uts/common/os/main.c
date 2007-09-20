@@ -56,6 +56,7 @@
 #include <sys/modctl.h>
 #include <sys/vm.h>
 #include <sys/callb.h>
+#include <sys/ddi_timer.h>
 #include <sys/kmem.h>
 #include <sys/vmem.h>
 #include <sys/cpuvar.h>
@@ -396,6 +397,7 @@ main(void)
 	segkmem_gc();
 	callb_init();
 	callout_init();	/* callout table MUST be init'd before clock starts */
+	timer_init();	/* timer must be initialized before cyclic starts */
 	cbe_init();
 	clock_init();
 

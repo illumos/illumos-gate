@@ -722,6 +722,7 @@ f none usr/include/sys/ddi_intr.h 644 root bin
 f none usr/include/sys/ddi_intr_impl.h 644 root bin
 f none usr/include/sys/ddi_isa.h 644 root bin
 f none usr/include/sys/ddi_obsolete.h 644 root bin
+f none usr/include/sys/ddi_timer.h 644 root bin
 f none usr/include/sys/ddidevmap.h 644 root bin
 f none usr/include/sys/ddidmareq.h 644 root bin
 f none usr/include/sys/ddimapreq.h 644 root bin

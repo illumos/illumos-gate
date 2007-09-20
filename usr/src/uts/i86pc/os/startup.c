@@ -112,6 +112,7 @@
 #include <sys/cpu_module.h>
 #include <sys/smbios.h>
 #include <sys/debug_info.h>
+#include <sys/ddi_timer.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -1909,6 +1910,7 @@ load_tod_module(char *todmod)
 static void
 startup_end(void)
 {
+	int i;
 	extern void setx86isalist(void);
 
 	PRM_POINT("startup_end() starting...");
@@ -1983,6 +1985,17 @@ startup_end(void)
 
 	(void) add_avsoftintr((void *)&softlevel1_hdl, 1, softlevel1,
 	    "softlevel1", NULL, NULL); /* XXX to be moved later */
+
+	/*
+	 * Register these software interrupts for ddi timer.
+	 * Software interrupts up to the level 10 are supported.
+	 */
+	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
+		char name[sizeof ("timer_softintr") + 2];
+		(void) sprintf(name, "timer_softintr%02d", i);
+		(void) add_avsoftintr((void *)&softlevel_hdl[i-1], i,
+		    (avfunc)timer_softintr, name, (caddr_t)(uintptr_t)i, NULL);
+	}
 
 	PRM_POINT("startup_end() done");
 }

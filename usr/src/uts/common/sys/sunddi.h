@@ -2077,6 +2077,26 @@ boolean_t ddi_taskq_suspended(ddi_taskq_t *tq);
  */
 int ddi_parse(const char *, char *, uint_t *);
 
+/*
+ * DDI interrupt priority level
+ */
+#define	DDI_IPL_0	(0)	/* kernel context */
+#define	DDI_IPL_1	(1)	/* interrupt priority level 1 */
+#define	DDI_IPL_2	(2)	/* interrupt priority level 2 */
+#define	DDI_IPL_3	(3)	/* interrupt priority level 3 */
+#define	DDI_IPL_4	(4)	/* interrupt priority level 4 */
+#define	DDI_IPL_5	(5)	/* interrupt priority level 5 */
+#define	DDI_IPL_6	(6)	/* interrupt priority level 6 */
+#define	DDI_IPL_7	(7)	/* interrupt priority level 7 */
+#define	DDI_IPL_8	(8)	/* interrupt priority level 8 */
+#define	DDI_IPL_9	(9)	/* interrupt priority level 9 */
+#define	DDI_IPL_10	(10)	/* interrupt priority level 10 */
+
+/*
+ * DDI periodic timeout interface
+ */
+ddi_periodic_t ddi_periodic_add(void (*)(void *), void *, hrtime_t, int);
+void ddi_periodic_delete(ddi_periodic_t);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

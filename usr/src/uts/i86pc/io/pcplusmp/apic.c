@@ -61,11 +61,12 @@
 #include <sys/cpuvar.h>
 #include <sys/rm_platter.h>
 #include <sys/privregs.h>
-#include <sys/cyclic.h>
 #include <sys/note.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/spl.h>
 #include <sys/clock.h>
+#include <sys/dditypes.h>
+#include <sys/sunddi.h>
 
 /*
  *	Local Function Prototypes
@@ -1754,23 +1755,19 @@ apic_timer_disable(void)
 }
 
 
-cyclic_id_t apic_cyclic_id;
+ddi_periodic_t apic_periodic_id;
 
 /*
- * If this module needs to be a consumer of cyclic subsystem, they
- * can be added here, since at this time kernel cyclic subsystem is initialized
- * argument is not currently used, and is reserved for future.
+ * If this module needs a periodic handler for the interrupt distribution, it
+ * can be added here. The argument to the periodic handler is not currently
+ * used, but is reserved for future.
  */
 static void
 apic_post_cyclic_setup(void *arg)
 {
 _NOTE(ARGUNUSED(arg))
-	cyc_handler_t hdlr;
-	cyc_time_t when;
-
 	/* cpu_lock is held */
-
-	/* set up cyclics for intr redistribution */
+	/* set up a periodic handler for intr redistribution */
 
 	/*
 	 * In peridoc mode intr redistribution processing is done in
@@ -1778,16 +1775,14 @@ _NOTE(ARGUNUSED(arg))
 	 */
 	if (!apic_oneshot)
 		return;
-
-	hdlr.cyh_level = CY_LOW_LEVEL;
-	hdlr.cyh_func = (cyc_func_t)apic_redistribute_compute;
-	hdlr.cyh_arg = NULL;
-
-	when.cyt_when = 0;
-	when.cyt_interval = apic_redistribute_sample_interval;
-	apic_cyclic_id = cyclic_add(&hdlr, &when);
-
-
+	/*
+	 * Register a periodical handler for the redistribution processing.
+	 * On X86, CY_LOW_LEVEL is mapped to the level 2 interrupt, so
+	 * DDI_IPL_2 should be passed to ddi_periodic_add() here.
+	 */
+	apic_periodic_id = ddi_periodic_add(
+	    (void (*)(void *))apic_redistribute_compute, NULL,
+	    apic_redistribute_sample_interval, DDI_IPL_2);
 }
 
 static void

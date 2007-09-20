@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +43,6 @@
 #include <sys/poll.h>
 #include <sys/pbio.h>
 #include <sys/sysmacros.h>
-#include <sys/cyclic.h>
 
 /* Added for prom interface */
 #include <sys/promif.h>
@@ -164,7 +162,7 @@ _init(void)
 
 	if (strcmp(tod_module_name, "todds1307") == 0) {
 		if ((error = ddi_soft_state_init(&ds1307_statep,
-			sizeof (ds1307_state_t), 0)) != DDI_SUCCESS) {
+		    sizeof (ds1307_state_t), 0)) != DDI_SUCCESS) {
 			return (error);
 		}
 
@@ -172,7 +170,7 @@ _init(void)
 		tod_ops.tod_set = todds1307_set;
 		tod_ops.tod_set_watchdog_timer = todds1307_set_watchdog_timer;
 		tod_ops.tod_clear_watchdog_timer =
-				todds1307_clear_watchdog_timer;
+		    todds1307_clear_watchdog_timer;
 		tod_ops.tod_set_power_alarm = todds1307_set_power_alarm;
 		tod_ops.tod_clear_power_alarm = todds1307_clear_power_alarm;
 	}
@@ -236,9 +234,6 @@ todds1307_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	static ds1307_state_t	*statep = NULL;
 	i2c_transfer_t	*i2c_tp = NULL;
 	uint8_t tempVal = (uint8_t)0;
-	cyc_handler_t cychand;
-	cyc_time_t  cyctime;
-
 	switch (cmd) {
 
 		case DDI_ATTACH:
@@ -278,7 +273,7 @@ todds1307_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* check and initialize the oscillator */
 
 	(void) i2c_transfer_alloc(statep->ds1307_i2c_hdl,
-					&i2c_tp, 1, 1, I2C_SLEEP);
+	    &i2c_tp, 1, 1, I2C_SLEEP);
 	i2c_tp->i2c_version = I2C_XFER_REV;
 	i2c_tp->i2c_flags = I2C_WR_RD;
 	i2c_tp->i2c_wbuf[0] = (uchar_t)0x00; /* Read 00h */
@@ -298,7 +293,7 @@ todds1307_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (tempVal & 0x80) {			 /* check Oscillator */
 		(void) i2c_transfer_alloc(statep->ds1307_i2c_hdl, &i2c_tp,
-						2, 1, I2C_SLEEP);
+		    2, 1, I2C_SLEEP);
 		i2c_tp->i2c_version = I2C_XFER_REV;
 		i2c_tp->i2c_flags = I2C_WR;
 		i2c_tp->i2c_wbuf[0] = 0x00;
@@ -307,26 +302,21 @@ todds1307_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		i2c_tp->i2c_wlen = 2;
 					/* Enable oscillator */
 		if ((i2c_transfer(statep->ds1307_i2c_hdl, i2c_tp))
-						!= I2C_SUCCESS) {
+		    != I2C_SUCCESS) {
 			(void) i2c_transfer_free(statep->ds1307_i2c_hdl,
-								i2c_tp);
+			    i2c_tp);
 			ddi_soft_state_free(ds1307_statep, instance);
 			return (DDI_FAILURE);
 		}
 		(void) i2c_transfer_free(statep->ds1307_i2c_hdl, i2c_tp);
 	}
 
-	/* Create a cyclic handler to read TOD */
-	cychand.cyh_func = todds1307_cyclic;
-	cychand.cyh_arg = &soft_rtc;
-	cychand.cyh_level = CY_LOW_LEVEL;
-	cyctime.cyt_when = 0;
-	cyctime.cyt_interval = i2c_cyclic_timeout;
-	ASSERT(statep->cycid == CYCLIC_NONE);
-	mutex_enter(&cpu_lock);
-	statep->cycid = cyclic_add(&cychand, &cyctime);
-	mutex_exit(&cpu_lock);
-	ASSERT(statep->cycid != CYCLIC_NONE);
+	/*
+	 * Create a periodical handler to read TOD.
+	 */
+	ASSERT(statep->cycid == NULL);
+	statep->cycid = ddi_periodic_add(todds1307_cyclic, &soft_rtc,
+	    i2c_cyclic_timeout, DDI_IPL_1);
 
 	statep->state = TOD_ATTACHED;
 	todds1307_attach_done = 1;
@@ -509,7 +499,7 @@ todds1307_read_rtc(struct rtc_t *rtc)
 	 * to accomodate sec, min, hrs, dayOfWeek, dayOfMonth, year
 	 */
 	if ((i2c_transfer_alloc(statep->ds1307_i2c_hdl, &i2c_tp, 1,
-				7, I2C_SLEEP)) != I2C_SUCCESS) {
+	    7, I2C_SLEEP)) != I2C_SUCCESS) {
 		mutex_exit(&todds1307_rd_lock);
 		return (DDI_FAILURE);
 	}
@@ -522,13 +512,13 @@ todds1307_read_rtc(struct rtc_t *rtc)
 		i2c_tp->i2c_rlen = 7;	/* Read 7 regs */
 
 		if ((i2c_cmd_status = i2c_transfer(statep->ds1307_i2c_hdl,
-						i2c_tp)) != I2C_SUCCESS) {
+		    i2c_tp)) != I2C_SUCCESS) {
 			drv_usecwait(I2C_DELAY);
 			goto done;
 		}
-	    /* for first read, need to get valid data */
-	    while (tod_read[0] == -1 && counter > 0) {
-	    /* move data to static buffer */
+		/* for first read, need to get valid data */
+		while (tod_read[0] == -1 && counter > 0) {
+		/* move data to static buffer */
 		bcopy(i2c_tp->i2c_rbuf, tod_read, 7);
 
 		/* now read again */
@@ -537,16 +527,16 @@ todds1307_read_rtc(struct rtc_t *rtc)
 		i2c_tp->i2c_wlen = 1;	/* Write one byte address */
 		i2c_tp->i2c_rlen = 7;	/* Read 7 regs */
 		if ((i2c_cmd_status = i2c_transfer(statep->ds1307_i2c_hdl,
-					    i2c_tp)) != I2C_SUCCESS) {
-		    drv_usecwait(I2C_DELAY);
-		    goto done;
+		    i2c_tp)) != I2C_SUCCESS) {
+			drv_usecwait(I2C_DELAY);
+			goto done;
 		}
 		/* if they are not the same, then read again */
 		if (bcmp(tod_read, i2c_tp->i2c_rbuf, 7) != 0) {
-		    tod_read[0] = -1;
-		    counter--;
+			tod_read[0] = -1;
+			counter--;
 		}
-	    }
+	}
 
 	} while (i2c_tp->i2c_rbuf[0] == 0x59 &&
 	    /* if seconds register is 0x59 (BCD), add data should match */
@@ -554,7 +544,7 @@ todds1307_read_rtc(struct rtc_t *rtc)
 	    counter-- > 0);
 
 	if (counter < 0)
-	    cmn_err(CE_WARN, "i2ctod: TOD Chip failed ??");
+		cmn_err(CE_WARN, "i2ctod: TOD Chip failed ??");
 
 	/* move data to static buffer */
 	bcopy(i2c_tp->i2c_rbuf, tod_read, 7);
@@ -594,7 +584,7 @@ todds1307_write_rtc(struct rtc_t *rtc)
 	}
 
 	if ((i2c_cmd_status = i2c_transfer_alloc(statep->ds1307_i2c_hdl,
-				&i2c_tp, 8, 0, I2C_SLEEP)) != I2C_SUCCESS) {
+	    &i2c_tp, 8, 0, I2C_SLEEP)) != I2C_SUCCESS) {
 		return (i2c_cmd_status);
 	}
 
@@ -611,7 +601,7 @@ todds1307_write_rtc(struct rtc_t *rtc)
 	i2c_tp->i2c_wlen = 8;
 
 	if ((i2c_cmd_status = i2c_transfer(statep->ds1307_i2c_hdl,
-					i2c_tp)) != I2C_SUCCESS) {
+	    i2c_tp)) != I2C_SUCCESS) {
 		(void) i2c_transfer_free(statep->ds1307_i2c_hdl, i2c_tp);
 		/* delay(drv_usectohz(I2C_DELAY)); */
 		drv_usecwait(I2C_DELAY);
@@ -680,7 +670,7 @@ todds1307_setup_prom()
 	char tod1307_devpath[MAXNAMELEN];
 
 	if ((todnode = prom_findnode_bydevtype(prom_rootnode(),
-			DS1307_DEVICE_TYPE)) == OBP_NONODE)
+	    DS1307_DEVICE_TYPE)) == OBP_NONODE)
 		return (DDI_FAILURE);
 
 	/*
@@ -688,7 +678,7 @@ todds1307_setup_prom()
 	 * node and get the ihandle
 	 */
 	if (prom_phandle_to_path(todnode, tod1307_devpath,
-			sizeof (tod1307_devpath)) < 0) {
+	    sizeof (tod1307_devpath)) < 0) {
 		cmn_err(CE_WARN, "prom_phandle_to_path failed");
 		return (DDI_FAILURE);
 	}

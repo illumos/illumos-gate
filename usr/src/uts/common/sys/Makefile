@@ -160,6 +160,7 @@ CHKHDRS=			\
 	ddi_impldefs.h		\
 	ddi_implfuncs.h		\
 	ddi_obsolete.h		\
+	ddi_timer.h		\
 	ddidevmap.h		\
 	ddidmareq.h		\
 	ddimapreq.h		\
