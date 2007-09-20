@@ -1218,6 +1218,15 @@ check_verf(struct rpc_msg *msg, gss_ctx_id_t context, int *qop_state, uid_t uid)
 	 * We have to reconstruct the RPC header from the previously
 	 * parsed information, since we haven't kept the header intact.
 	 */
+
+	oa = &msg->rm_call.cb_cred;
+	if (oa->oa_length > MAX_AUTH_BYTES)
+		return (FALSE);
+
+	/* 8 XDR units from the IXDR macro calls. */
+	if (sizeof (hdr) < (8 * BYTES_PER_XDR_UNIT +
+	    RNDUP(oa->oa_length)))
+		return (FALSE);
 	buf = (int *)hdr;
 	IXDR_PUT_U_INT32(buf, msg->rm_xid);
 	IXDR_PUT_ENUM(buf, msg->rm_direction);
@@ -1225,7 +1234,6 @@ check_verf(struct rpc_msg *msg, gss_ctx_id_t context, int *qop_state, uid_t uid)
 	IXDR_PUT_U_INT32(buf, msg->rm_call.cb_prog);
 	IXDR_PUT_U_INT32(buf, msg->rm_call.cb_vers);
 	IXDR_PUT_U_INT32(buf, msg->rm_call.cb_proc);
-	oa = &msg->rm_call.cb_cred;
 	IXDR_PUT_ENUM(buf, oa->oa_flavor);
 	IXDR_PUT_U_INT32(buf, oa->oa_length);
 	if (oa->oa_length) {
