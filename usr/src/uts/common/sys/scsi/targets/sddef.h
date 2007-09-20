@@ -1337,6 +1337,11 @@ struct sd_xbuf {
 	ssize_t	xb_sense_resid;		/* residual of RQS command */
 	uchar_t	xb_sense_status;	/* scsi status byte of RQS command */
 	uchar_t	xb_sense_data[SENSE_LENGTH];	/* sense data from RQS cmd */
+	/*
+	 * Extra sense larger than SENSE_LENGTH will be allocated
+	 * right after xb_sense_data[SENSE_LENGTH]. Please do not
+	 * add any new field after it.
+	 */
 };
 
 _NOTE(SCHEME_PROTECTS_DATA("unique per pkt", sd_xbuf))

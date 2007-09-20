@@ -2095,8 +2095,15 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 		 * that uscmd->uscsi_rqbuf and uscmd->uscsi_rqlen are used
 		 * below to perform the copy back to the caller's buf.
 		 */
-		uscmd->uscsi_rqlen = SENSE_LENGTH;
-		uscmd->uscsi_rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
+		if (uicmd->uic_rqlen <= SENSE_LENGTH) {
+			uscmd->uscsi_rqlen = SENSE_LENGTH;
+			uscmd->uscsi_rqbuf = kmem_zalloc(SENSE_LENGTH,
+			    KM_SLEEP);
+		} else {
+			uscmd->uscsi_rqlen = MAX_SENSE_LENGTH;
+			uscmd->uscsi_rqbuf = kmem_zalloc(MAX_SENSE_LENGTH,
+			    KM_SLEEP);
+		}
 		uscmd->uscsi_rqresid = uscmd->uscsi_rqlen;
 	} else {
 		uscmd->uscsi_rqbuf = NULL;
@@ -2269,6 +2276,7 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 #endif /* _MULTI_DATAMODEL */
 	struct uscsi_i_cmd	*uicmd = (struct uscsi_i_cmd *)uscmd;
 	caddr_t	k_rqbuf;
+	int	k_rqlen;
 	caddr_t	k_cdb;
 	int	rval = 0;
 
@@ -2297,6 +2305,7 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 	 * mapped in by a lower layer.
 	 */
 	k_rqbuf = uscmd->uscsi_rqbuf;
+	k_rqlen = uscmd->uscsi_rqlen;
 	k_cdb   = uscmd->uscsi_cdb;
 	uscmd->uscsi_rqbuf = uicmd->uic_rqbuf;
 	uscmd->uscsi_rqlen = uicmd->uic_rqlen;
@@ -2329,7 +2338,7 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 #endif /* _MULTI_DATAMODE */
 
 	if (k_rqbuf != NULL) {
-		kmem_free(k_rqbuf, SENSE_LENGTH);
+		kmem_free(k_rqbuf, k_rqlen);
 	}
 	if (k_cdb != NULL) {
 		kmem_free(k_cdb, (size_t)uscmd->uscsi_cdblen);
