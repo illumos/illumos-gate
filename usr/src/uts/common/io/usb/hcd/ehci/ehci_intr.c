@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -687,8 +687,8 @@ ehci_check_for_short_xfer(
 				/* Halt the pipe to mirror OHCI behavior */
 				Set_QH(pp->pp_qh->qh_status,
 				    ((Get_QH(pp->pp_qh->qh_status) &
-					~EHCI_QH_STS_ACTIVE) |
-					EHCI_QH_STS_HALTED));
+				    ~EHCI_QH_STS_ACTIVE) |
+				    EHCI_QH_STS_HALTED));
 				error = USB_CR_DATA_UNDERRUN;
 			}
 
@@ -976,6 +976,24 @@ ehci_handle_ctrl_qtd(
 
 		break;
 	case EHCI_CTRL_STATUS_PHASE:
+		/*
+		 * On some particular hardware, status phase is seen to
+		 * finish before data phase gets timeouted. Don't handle
+		 * the transfer result here if not all qtds are finished.
+		 * Let the timeout handler handle it.
+		 */
+		if (tw->tw_num_qtds != 0) {
+			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "Status complete, but the transfer is not done: "
+			    "tw 0x%p, qtd 0x%p, tw_num_qtd 0x%d",
+			    (void *)tw, (void *)qtd, tw->tw_num_qtds);
+
+			ehci_print_qh(ehcip, pp->pp_qh);
+			ehci_print_qtd(ehcip, qtd);
+
+			break;
+		}
+
 		if ((tw->tw_length) &&
 		    (tw->tw_direction == EHCI_QTD_CTRL_IN_PID)) {
 			/*
@@ -1070,7 +1088,7 @@ ehci_handle_intr_qtd(
 	void			*tw_handle_callback_value)
 {
 	usb_intr_req_t		*curr_intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	usb_req_attrs_t		attrs;
@@ -1170,7 +1188,7 @@ ehci_handle_one_xfer_completion(
 	usba_pipe_handle_data_t	*ph = tw->tw_pipe_private->pp_pipe_handle;
 	ehci_pipe_private_t	*pp = tw->tw_pipe_private;
 	usb_intr_req_t		*curr_intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_handle_one_xfer_completion: tw = 0x%p", tw);
