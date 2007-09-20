@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -445,11 +445,8 @@ ip_addr_ex_token(parse_context_t *ctx)
 int
 ip_token(parse_context_t *ctx)
 {
-	ctx->adr.adr_now +=	(2 * sizeof (char)) +
-				(3 * sizeof (short)) +
-				(2 * sizeof (char)) +
-				sizeof (short) +
-				(2 * sizeof (int32_t));
+	ctx->adr.adr_now += (2 * sizeof (char)) + (3 * sizeof (short)) +
+	    (2 * sizeof (char)) + sizeof (short) + (2 * sizeof (int32_t));
 	return (0);
 }
 
@@ -766,13 +763,14 @@ path_attr_token(parse_context_t *ctx)
 	ctx->out.sf_atpath += offset;
 	p = ctx->out.sf_atpath;		/* save for fix up, below */
 	(void) memcpy(ctx->out.sf_atpath, ctx->adr.adr_now,
-		ctx->out.sf_atpathlen - offset);
+	    ctx->out.sf_atpathlen - offset);
 	ctx->out.sf_atpathlen--;
 
 	/* fix up: replace each eos except the last with ' ' */
 
 	for (i = 0; i < count; i++) {
-		while (*p++ != '\0');
+		while (*p++ != '\0')
+			;
 		*(p - 1) = ' ';
 	}
 	return (0);
@@ -965,10 +963,8 @@ socket_ex_token(parse_context_t *ctx)
 	ctx->adr.adr_now += (2 * sizeof (short));
 	adrm_short(&(ctx->adr), &ip_size, 1);
 
-	ctx->adr.adr_now +=	sizeof (short) +
-				(ip_size * sizeof (char)) +
-				sizeof (short) +
-				(ip_size * sizeof (char));
+	ctx->adr.adr_now += sizeof (short) + (ip_size * sizeof (char)) +
+	    sizeof (short) + (ip_size * sizeof (char));
 	return (0);
 }
 
@@ -1009,7 +1005,7 @@ subject32_token(parse_context_t *ctx)
 
 	adrm_int32(&(ctx->adr), &port, 1);
 	ctx->out.sf_tid.at_type = AU_IPv4;
-	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_addr[0]), 1);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 4);
 
 	return (0);
 }
@@ -1036,7 +1032,7 @@ subject32_ex_token(parse_context_t *ctx)
 
 	adrm_int32(&(ctx->adr), &port, 1);
 	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_type), 1);
-	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_addr[0]), 4);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 16);
 
 	return (0);
 }
@@ -1063,7 +1059,7 @@ subject64_token(parse_context_t *ctx)
 
 	adrm_int64(&(ctx->adr), &port, 1);
 	ctx->out.sf_tid.at_type = AU_IPv4;
-	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_addr[0]), 1);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 4);
 
 	return (0);
 }
@@ -1091,7 +1087,7 @@ subject64_ex_token(parse_context_t *ctx)
 	adrm_u_int32(&(ctx->adr), (uint32_t *)&(ctx->out.sf_asid), 1);
 	adrm_int64(&(ctx->adr), &port, 1);
 	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_type), 1);
-	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_tid.at_addr[0]), 4);
+	adrm_u_char(&(ctx->adr), (uchar_t *)&(ctx->out.sf_tid.at_addr[0]), 16);
 
 	return (0);
 }
@@ -1181,7 +1177,8 @@ collapse_path(char *s, size_t ls)
 			is += 1;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
@@ -1190,11 +1187,13 @@ collapse_path(char *s, size_t ls)
 			is += 2;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
-		while (is < ls && (s[id++] = s[is++]) != '/');
+		while (is < ls && (s[id++] = s[is++]) != '/')
+			;
 		is--;
 	}
 	return ((size_t)id - 1);
