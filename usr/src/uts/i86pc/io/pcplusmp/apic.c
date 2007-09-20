@@ -1113,25 +1113,6 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	return (apic_delspl_common(irqno, ipl, min_ipl,  max_ipl));
 }
 
-/*
- * Return HW interrupt number corresponding to the given IPL
- */
-/*ARGSUSED*/
-static int
-apic_softlvl_to_irq(int ipl)
-{
-	/*
-	 * Do not use apic to trigger soft interrupt.
-	 * It will cause the system to hang when 2 hardware interrupts
-	 * at the same priority with the softint are already accepted
-	 * by the apic.  Cause the AV_PENDING bit will not be cleared
-	 * until one of the hardware interrupt is eoi'ed.  If we need
-	 * to send an ipi at this time, we will end up looping forever
-	 * to wait for the AV_PENDING bit to clear.
-	 */
-	return (PSM_SV_SOFTWARE);
-}
-
 static int
 apic_post_cpu_start()
 {
