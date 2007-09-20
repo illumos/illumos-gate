@@ -2583,9 +2583,9 @@ if [ $multi_or_direct = yes ]; then
 		    [ -f $DIRECTBOOT_BIN_DIR/$file ]; then
 			cp $DIRECTBOOT_BIN_DIR/$file /tmp/bfubin/
 		else
-			if [ $root_is_xpv = yes ] ||
-			    [ $root_is_directboot = yes ] &&
-			    [ $archive_type = multiboot ]; then
+			if [[ $root_is_xpv = yes ||
+			    $root_is_directboot = yes &&
+			    $archive_type = multiboot ]]; then
 				cp $root/$cmd /tmp/bfubin/
 				have_new_bootadm=yes
 			elif [ $archive_type = directboot ] || \
@@ -5116,11 +5116,11 @@ check_boot_env()
 			install_failsafe
 			[ $system_type = dca ] && setup_grub_menu
 
-			if [ $have_new_bootadm = yes ] || \
-			    [ -x /tmp/bfubin/symdef ] && \
-			    [ -x /tmp/bfubin/bootadm ] && \
+			if [ $have_new_bootadm = yes ] ||
+			    ( [ -x /tmp/bfubin/symdef ] &&
+			    [ -x /tmp/bfubin/bootadm ] &&
 			    /tmp/bfubin/symdef /tmp/bfubin/bootadm \
-			    dboot_or_multiboot; then
+			    dboot_or_multiboot ); then
 				if [[ -z $rootprefix ]]; then
 					PATH=/tmp/bfubin /tmp/bfubin/bootadm \
 					    -m upgrade $bootadm_f_flag
