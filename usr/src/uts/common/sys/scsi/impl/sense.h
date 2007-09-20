@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,11 +59,6 @@ extern "C" {
 
 #define	SENSE_LENGTH	\
 	(roundup(sizeof (struct scsi_extended_sense), sizeof (int)))
-
-/*
- * Per SPC-3 standard, the maximum length of sense data is 252 bytes.
- */
-#define	MAX_SENSE_LENGTH	252
 
 /*
  * Minimum useful Sense Length value

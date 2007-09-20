@@ -1332,7 +1332,7 @@ static void sd_handle_request_sense(struct sd_lun *un, struct buf *bp,
 static void sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static int sd_validate_sense_data(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, size_t actual_len);
+	struct sd_xbuf *xp);
 static void sd_decode_sense(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
 
@@ -10469,13 +10469,7 @@ sd_uscsi_strategy(struct buf *bp)
 		break;
 	}
 
-	/*
-	 * We may allocate extra buf for external USCSI commands. If the
-	 * application asks for bigger than 20-byte sense data via USCSI,
-	 * SCSA layer will allocate 252 bytes sense buf for that command.
-	 */
-	xp = kmem_zalloc(sizeof (struct sd_xbuf) - SENSE_LENGTH +
-	    (int)(((struct uscsi_cmd *)(uip->ui_cmdp))->uscsi_rqlen), KM_SLEEP);
+	xp = kmem_alloc(sizeof (struct sd_xbuf), KM_SLEEP);
 	sd_xbuf_init(un, bp, xp, chain_type, uip->ui_cmdp);
 
 	/* Use the index obtained within xbuf_init */
@@ -10706,8 +10700,7 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
 
 	mutex_exit(SD_MUTEX(un));
 
-	kmem_free(xp, sizeof (struct sd_xbuf) - SENSE_LENGTH +
-	    (int)(((struct uscsi_cmd *)(xp->xb_pktinfo))->uscsi_rqlen));
+	kmem_free(xp, sizeof (struct sd_xbuf));
 	biodone(bp);
 
 	SD_INFO(SD_LOG_IO, un, "sd_uscsi_iodone: exit.\n");
@@ -12185,20 +12178,11 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 	 *	 retry. Besides, ucsci command does not allow DMA breakup,
 	 *	 so there is no need to set PKT_DMA_PARTIAL flag.
 	 */
-	if (uscmd->uscsi_rqlen > SENSE_LENGTH) {
-		pktp = scsi_init_pkt(SD_ADDRESS(un), NULL,
-		    ((bp->b_bcount != 0) ? bp : NULL), uscmd->uscsi_cdblen,
-		    ((int)(uscmd->uscsi_rqlen) + sizeof (struct scsi_arq_status)
-		    - sizeof (struct scsi_extended_sense)), 0,
-		    (un->un_pkt_flags & ~PKT_DMA_PARTIAL) | PKT_XARQ,
-		    sdrunout, (caddr_t)un);
-	} else {
-		pktp = scsi_init_pkt(SD_ADDRESS(un), NULL,
-		    ((bp->b_bcount != 0) ? bp : NULL), uscmd->uscsi_cdblen,
-		    sizeof (struct scsi_arq_status), 0,
-		    (un->un_pkt_flags & ~PKT_DMA_PARTIAL),
-		    sdrunout, (caddr_t)un);
-	}
+	pktp = scsi_init_pkt(SD_ADDRESS(un), NULL,
+	    ((bp->b_bcount != 0) ? bp : NULL), uscmd->uscsi_cdblen,
+	    sizeof (struct scsi_arq_status), 0,
+	    (un->un_pkt_flags & ~PKT_DMA_PARTIAL),
+	    sdrunout, (caddr_t)un);
 
 	if (pktp == NULL) {
 		*pktpp = NULL;
@@ -12367,8 +12351,7 @@ sd_destroypkt_for_uscsi(struct buf *bp)
 		 */
 		uscmd->uscsi_rqstatus = xp->xb_sense_status;
 		uscmd->uscsi_rqresid  = xp->xb_sense_resid;
-		bcopy(xp->xb_sense_data, uscmd->uscsi_rqbuf,
-		    uscmd->uscsi_rqlen);
+		bcopy(xp->xb_sense_data, uscmd->uscsi_rqbuf, SENSE_LENGTH);
 	}
 
 	/* We are done with the scsi_pkt; free it now */
@@ -14387,7 +14370,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 	 * the CDB in the scsi_pkt for a REQUEST SENSE command.
 	 */
 	un->un_rqs_bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
-	    MAX_SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
+	    SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
 	if (un->un_rqs_bp == NULL) {
 		return (DDI_FAILURE);
 	}
@@ -14402,7 +14385,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 
 	/* Set up the CDB in the scsi_pkt for a REQUEST SENSE command. */
 	(void) scsi_setup_cdb((union scsi_cdb *)un->un_rqs_pktp->pkt_cdbp,
-	    SCMD_REQUEST_SENSE, 0, MAX_SENSE_LENGTH, 0);
+	    SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
 
 	SD_FILL_SCSI1_LUN(un, un->un_rqs_pktp);
 
@@ -14765,7 +14748,6 @@ sdintr(struct scsi_pkt *pktp)
 	struct buf	*bp;
 	struct sd_xbuf	*xp;
 	struct sd_lun	*un;
-	size_t		actual_len;
 
 	ASSERT(pktp != NULL);
 	bp = (struct buf *)pktp->pkt_private;
@@ -14822,11 +14804,6 @@ sdintr(struct scsi_pkt *pktp)
 		goto exit;
 	}
 
-	if (pktp->pkt_state & STATE_XARQ_DONE) {
-		SD_TRACE(SD_LOG_COMMON, un,
-		    "sdintr: extra sense data received. pkt=%p\n", pktp);
-	}
-
 	/*
 	 * First see if the pkt has auto-request sense data with it....
 	 * Look at the packet state first so we don't take a performance
@@ -14850,26 +14827,9 @@ sdintr(struct scsi_pkt *pktp)
 			    *((uchar_t *)(&(asp->sts_rqpkt_status)));
 			xp->xb_sense_state  = asp->sts_rqpkt_state;
 			xp->xb_sense_resid  = asp->sts_rqpkt_resid;
-			if (pktp->pkt_state & STATE_XARQ_DONE) {
-				actual_len = MAX_SENSE_LENGTH -
-				    xp->xb_sense_resid;
-			} else {
-				if (xp->xb_sense_resid > SENSE_LENGTH) {
-					actual_len = MAX_SENSE_LENGTH -
-					    xp->xb_sense_resid;
-				} else {
-					actual_len = SENSE_LENGTH -
-					    xp->xb_sense_resid;
-				}
-				if (xp->xb_pkt_flags & SD_XB_USCSICMD) {
-					xp->xb_sense_resid =
-					    (int)(((struct uscsi_cmd *)
-					    (xp->xb_pktinfo))->
-					    uscsi_rqlen) - actual_len;
-				}
-			}
 			bcopy(&asp->sts_sensedata, xp->xb_sense_data,
-			    actual_len);
+			    min(sizeof (struct scsi_extended_sense),
+			    SENSE_LENGTH));
 
 			/* fail the command */
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
@@ -15268,7 +15228,6 @@ sd_handle_request_sense(struct sd_lun *un, struct buf *sense_bp,
 	struct buf	*cmd_bp;	/* buf for the original command */
 	struct sd_xbuf	*cmd_xp;	/* sd_xbuf for the original command */
 	struct scsi_pkt *cmd_pktp;	/* pkt for the original command */
-	size_t		actual_len;	/* actual sense data length */
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -15316,22 +15275,8 @@ sd_handle_request_sense(struct sd_lun *un, struct buf *sense_bp,
 	 */
 	cmd_xp->xb_sense_status = *(sense_pktp->pkt_scbp);
 	cmd_xp->xb_sense_state  = sense_pktp->pkt_state;
-	actual_len = MAX_SENSE_LENGTH - sense_pktp->pkt_resid;
-	if ((cmd_xp->xb_pkt_flags & SD_XB_USCSICMD) &&
-	    (((struct uscsi_cmd *)cmd_xp->xb_pktinfo)->uscsi_rqlen >
-	    SENSE_LENGTH)) {
-		bcopy(sense_bp->b_un.b_addr, cmd_xp->xb_sense_data,
-		    min(actual_len, MAX_SENSE_LENGTH));
-		cmd_xp->xb_sense_resid = sense_pktp->pkt_resid;
-	} else {
-		bcopy(sense_bp->b_un.b_addr, cmd_xp->xb_sense_data,
-		    min(actual_len, SENSE_LENGTH));
-		if (actual_len < SENSE_LENGTH) {
-			cmd_xp->xb_sense_resid = SENSE_LENGTH - actual_len;
-		} else {
-			cmd_xp->xb_sense_resid = 0;
-		}
-	}
+	cmd_xp->xb_sense_resid  = sense_pktp->pkt_resid;
+	bcopy(sense_bp->b_un.b_addr, cmd_xp->xb_sense_data, SENSE_LENGTH);
 
 	/*
 	 *  Free up the RQS command....
@@ -15352,7 +15297,7 @@ sd_handle_request_sense(struct sd_lun *un, struct buf *sense_bp,
 	 * action. Just fail a non-retryable command.
 	 */
 	if ((cmd_pktp->pkt_flags & FLAG_DIAGNOSE) == 0) {
-		if (sd_validate_sense_data(un, cmd_bp, cmd_xp, actual_len) ==
+		if (sd_validate_sense_data(un, cmd_bp, cmd_xp) ==
 		    SD_SENSE_DATA_IS_VALID) {
 			sd_decode_sense(un, cmd_bp, cmd_xp, cmd_pktp);
 		}
@@ -15386,7 +15331,6 @@ sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct scsi_arq_status *asp;
-	size_t actual_len;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -15423,27 +15367,14 @@ sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
 	xp->xb_sense_status = *((uchar_t *)(&(asp->sts_rqpkt_status)));
 	xp->xb_sense_state  = asp->sts_rqpkt_state;
 	xp->xb_sense_resid  = asp->sts_rqpkt_resid;
-	if (xp->xb_sense_state & STATE_XARQ_DONE) {
-		actual_len = MAX_SENSE_LENGTH - xp->xb_sense_resid;
-	} else {
-		if (xp->xb_sense_resid > SENSE_LENGTH) {
-			actual_len = MAX_SENSE_LENGTH - xp->xb_sense_resid;
-		} else {
-			actual_len = SENSE_LENGTH - xp->xb_sense_resid;
-		}
-		if (xp->xb_pkt_flags & SD_XB_USCSICMD) {
-			xp->xb_sense_resid = (int)(((struct uscsi_cmd *)
-			    (xp->xb_pktinfo))->uscsi_rqlen) - actual_len;
-		}
-	}
-	bcopy(&asp->sts_sensedata, xp->xb_sense_data, actual_len);
+	bcopy(&asp->sts_sensedata, xp->xb_sense_data,
+	    min(sizeof (struct scsi_extended_sense), SENSE_LENGTH));
 
 	/*
 	 * See if we have valid sense data, if so then turn it over to
 	 * sd_decode_sense() to figure out the right course of action.
 	 */
-	if (sd_validate_sense_data(un, bp, xp, actual_len) ==
-	    SD_SENSE_DATA_IS_VALID) {
+	if (sd_validate_sense_data(un, bp, xp) == SD_SENSE_DATA_IS_VALID) {
 		sd_decode_sense(un, bp, xp, pktp);
 	}
 }
@@ -15493,11 +15424,11 @@ sd_print_sense_failed_msg(struct sd_lun *un, struct buf *bp, void *arg,
  */
 
 static int
-sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
-	size_t actual_len)
+sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp)
 {
 	struct scsi_extended_sense *esp;
 	struct	scsi_pkt *pktp;
+	size_t	actual_len;
 	char	*msgp = NULL;
 
 	ASSERT(un != NULL);
@@ -15549,6 +15480,7 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	 * Note: We are assuming the returned sense data is SENSE_LENGTH bytes
 	 * or less.
 	 */
+	actual_len = (int)(SENSE_LENGTH - xp->xb_sense_resid);
 	if (((xp->xb_sense_state & STATE_XFERRED_DATA) == 0) ||
 	    (actual_len == 0)) {
 		msgp = "Request Sense couldn't get sense data\n";
