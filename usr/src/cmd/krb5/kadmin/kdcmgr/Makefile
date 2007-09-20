@@ -38,7 +38,7 @@ include ../../../Makefile.cmd
 
 POFILE=		$(SSRCS:%.sh=%.po)
 
-LDLIBS	+=	-lresolv -lsocket -lnsl
+LDLIBS	+=	-lresolv -lnsl
 
 .KEEP_STATE:
 
@@ -50,6 +50,7 @@ install: $(PROG) $(KRB5SBINPROG) $(KRB5LIBKLPROG)
 
 $(KLPROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 lint:
 	$(LINT.c) $(CSRCS) $(LDLIBS)
