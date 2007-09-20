@@ -36,6 +36,7 @@
 #include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/cmn_err.h>
+#include <sys/id_space.h>
 #include <sys/list.h>
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
@@ -52,6 +53,8 @@
 #include <sys/aggr_impl.h>
 
 static kmem_cache_t *aggr_port_cache;
+static id_space_t *aggr_portids;
+
 static void aggr_port_notify_cb(void *, mac_notify_type_t);
 
 /*ARGSUSED*/
@@ -81,6 +84,14 @@ aggr_port_init(void)
 	aggr_port_cache = kmem_cache_create("aggr_port_cache",
 	    sizeof (aggr_port_t), 0, aggr_port_constructor,
 	    aggr_port_destructor, NULL, NULL, NULL, 0);
+
+	/*
+	 * Allocate a id space to manage port identification. The range of
+	 * the arena will be from 1 to UINT16_MAX, because the LACP protocol
+	 * uses it to be a 16 bits unique identfication.
+	 */
+	aggr_portids = id_space_create("aggr_portids", 1, UINT16_MAX);
+	ASSERT(aggr_portids != NULL);
 }
 
 void
@@ -92,6 +103,7 @@ aggr_port_fini(void)
 	 * ports when this function is invoked.
 	 */
 	kmem_cache_destroy(aggr_port_cache);
+	id_space_destroy(aggr_portids);
 }
 
 mac_resource_handle_t
@@ -120,6 +132,7 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 	int err;
 	mac_handle_t mh;
 	aggr_port_t *port;
+	uint16_t portid;
 	uint_t i;
 	const mac_info_t *mip;
 	char driver[MAXNAMELEN];
@@ -139,7 +152,13 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 		return (EINVAL);
 	}
 
+	if ((portid = (uint16_t)id_alloc(aggr_portids)) == 0) {
+		mac_close(mh);
+		return (ENOMEM);
+	}
+
 	if (!mac_active_set(mh)) {
+		id_free(aggr_portids, portid);
 		mac_close(mh);
 		return (EBUSY);
 	}
@@ -167,6 +186,7 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 	port->lp_started = B_FALSE;
 	port->lp_tx_enabled = B_FALSE;
 	port->lp_promisc_on = B_FALSE;
+	port->lp_portid = portid;
 
 	/*
 	 * Save the current statistics of the port. They will be used
@@ -215,6 +235,8 @@ aggr_port_free(aggr_port_t *port)
 	if (port->lp_grp != NULL)
 		AGGR_GRP_REFRELE(port->lp_grp);
 	port->lp_grp = NULL;
+	id_free(aggr_portids, port->lp_portid);
+	port->lp_portid = 0;
 	kmem_cache_free(aggr_port_cache, port);
 }
 
@@ -336,10 +358,8 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port,
 	 * the group, update the MAC address of the constituent
 	 * ports.
 	 */
-	if (mac_addr_changed) {
-		link_state_changed = link_state_changed ||
-		    aggr_grp_update_ports_mac(grp);
-	}
+	if (mac_addr_changed && aggr_grp_update_ports_mac(grp))
+		link_state_changed = B_TRUE;
 
 done:
 	*mac_addr_changedp = mac_addr_changed;

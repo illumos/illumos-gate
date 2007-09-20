@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,8 +117,7 @@
 #define	CACHE_IF_STALE		0x1		/* stale cached data */
 #define	CACHE_IF_NEW		0x2		/* new cached interface */
 #define	CACHE_IF_OFFLINED	0x4		/* interface offlined */
-#define	CACHE_IF_UPDATED	0x8		/* interface props. updated */
-#define	CACHE_IF_IGNORE		0x10		/* state held elsewhere */
+#define	CACHE_IF_IGNORE		0x8		/* state held elsewhere */
 
 /* Network Cache lookup options */
 #define	CACHE_NO_REFRESH	0x1		/* cache refresh not needed */
@@ -283,9 +281,6 @@ static void	clr_cfg_state(ip_pif_t *);
 static uint64_t	if_get_flags(ip_pif_t *);
 static int	mpathd_send_cmd(mpathd_cmd_t *);
 static int	connect_to_mpathd(int);
-#ifdef RCM_IPMP_DEBUG
-static void	dump_node(ip_cache_t *);
-#endif
 static int	modop(char *, char *, int, char);
 static int	get_modlist(char *, ip_lif_t *);
 static int	ip_domux2fd(int *, int *, struct lifreq *);
@@ -516,10 +511,10 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 		if (ip_offlinelist(hd, node, errorp, flags, depend_info) ==
 		    RCM_SUCCESS) {
 			rcm_log_message(RCM_DEBUG,
-				"IP: consumers agree on detach");
+			    "IP: consumers agree on detach");
 		} else {
 			ip_log_err(node, errorp,
-				"Device consumers prohibit offline");
+			    "Device consumers prohibit offline");
 			(void) mutex_unlock(&cache_lock);
 			return (RCM_FAILURE);
 		}
@@ -594,10 +589,10 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 			if (ip_offlinelist(hd, node, errorp, flags,
 			    depend_info) == RCM_SUCCESS) {
 				rcm_log_message(RCM_DEBUG,
-					"IP: consumers agree on detach");
+				    "IP: consumers agree on detach");
 			} else {
 				ip_log_err(node, errorp,
-					"Device consumers prohibit offline");
+				    "Device consumers prohibit offline");
 				(void) mutex_unlock(&cache_lock);
 				errno = EBUSY;
 				return (RCM_FAILURE);
@@ -815,6 +810,7 @@ ip_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 
 	/* remove the cached entry for the resource */
 	cache_remove(node);
+	free_node(node);
 
 	(void) mutex_unlock(&cache_lock);
 	return (RCM_SUCCESS);
@@ -888,7 +884,7 @@ ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 		if (nip != (struct net_interface *)0) {
 			if (nip->name != 0) {
 				ip_consumer_notify(hd, nip->name, errorp, flags,
-					depend_info);
+				    depend_info);
 				free(nip->name);
 			}
 			if (nip->type != 0)
@@ -1244,7 +1240,6 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 				probelif->li_ifflags = ifflags;
 
 				lif_listed++;
-				probe->ip_cachestate |= CACHE_IF_UPDATED;
 				probelif->li_cachestate &= ~(CACHE_IF_STALE);
 				break;
 			}
@@ -1264,8 +1259,6 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		}
 
 		probe->ip_pif = probepif;
-
-		probe->ip_cachestate |= CACHE_IF_UPDATED;
 
 		/* Save interface name */
 		(void) memcpy(&probepif->pi_ifname, &pif.pi_ifname,
@@ -1303,9 +1296,6 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		probelif->li_pif = probepif;
 
 		probepif->pi_lifs = probelif;
-		probelif->li_cachestate = CACHE_IF_NEW;
-
-		probe->ip_cachestate |= CACHE_IF_UPDATED;
 	}
 
 	rcm_log_message(RCM_TRACE3, "IP: update_pif: (%s) success\n",
@@ -1610,7 +1600,7 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 							    "(%s) %s\n"),
 							    pif->pi_ifname,
 							    strerror(errno));
-							    clr_cfg_state(pif);
+							clr_cfg_state(pif);
 							return (-1);
 						}
 						i++;
@@ -1621,7 +1611,7 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 					    "%s failed: %s\n"), pif->pi_ifname,
 					    lif->li_modules[i],
 					    strerror(errno));
-					    clr_cfg_state(pif);
+					clr_cfg_state(pif);
 					return (-1);
 				}
 			}
@@ -1723,7 +1713,7 @@ if_unplumb(ip_cache_t *node)
 		if (rcm_exec_cmd(syscmd) != 0) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: Cannot unplumb (%s) %s\n"),
-				    pif->pi_ifname, strerror(errno));
+			    pif->pi_ifname, strerror(errno));
 			return (-1);
 		}
 	}
@@ -1736,7 +1726,7 @@ if_unplumb(ip_cache_t *node)
 		if (rcm_exec_cmd(syscmd) != 0) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: Cannot unplumb (%s) %s\n"),
-				    pif->pi_ifname, strerror(errno));
+			    pif->pi_ifname, strerror(errno));
 			return (-1);
 		}
 	}
@@ -1861,7 +1851,7 @@ if_replumb(ip_cache_t *node)
 				if (rcm_exec_cmd(syscmd) != 0) {
 					rcm_log_message(RCM_ERROR,
 					    _("IP: Cannot addif (%s:%d) "
-						"%s\n"),
+					    "%s\n"),
 					    pif->pi_ifname, i, strerror(errno));
 					return (-1);
 				}
@@ -3501,8 +3491,7 @@ get_mpathd_dest(char *addr, int family)
 		}
 		freehostent(hp);
 	}
-	rcm_log_message(RCM_TRACE2, "IP: ifaddr(%s) = %s\n",
-		    addr, ifaddr);
+	rcm_log_message(RCM_TRACE2, "IP: ifaddr(%s) = %s\n", addr, ifaddr);
 
 	/* now search the interfaces */
 	lifrp = lifc.lifc_req;
@@ -3622,38 +3611,3 @@ tokenize(char *line, char **tokens, char *tspace, int *ntok)
 		*sp++ = '\0';
 	}
 }
-
-#ifdef RCM_IPMP_DEBUG
-static void
-dump_node(ip_cache_t *node)
-{
-	ip_pif_t *pif = node->ip_pif;
-	ip_lif_t *lif = pif->pi_lifs;
-
-	rcm_log_message(RCM_TRACE1, "Node dump:\n");
-	rcm_log_message(RCM_TRACE1, "resource = %s\t cache flags = 0x%x\n",
-	    node->ip_resource, node->ip_cachestate);
-	rcm_log_message(RCM_TRACE1, "ifname = %s\n", pif->pi_ifname);
-	rcm_log_message(RCM_TRACE1, "groupname = %s\n", pif->pi_grpname);
-
-	if (lif == NULL) {
-		rcm_log_message(RCM_TRACE1, "No lifs hosted on this device.\n");
-		return;
-	}
-
-	rcm_log_message(RCM_TRACE1,
-	    "Logical interfaces hosted on this device - \n");
-	while (lif != NULL) {
-		rcm_log_message(RCM_TRACE1, "\t ifnum = %d \t ifflags = 0x%x",
-		    lif->li_ifnum, lif->li_ifflags);
-		if (lif->li_addr.family == AF_INET)
-			rcm_log_message(RCM_TRACE1, "\t Family = IPv4");
-		else if (lif->li_addr.family == AF_INET6)
-			rcm_log_message(RCM_TRACE1, "\t Family = IPv6");
-		else rcm_log_message(RCM_TRACE1, "\t Family = <Unknown>");
-		rcm_log_message(RCM_TRACE1, "\n");
-
-		lif = lif->li_next;
-	}
-}
-#endif /* RCM_IPMP_DEBUG */

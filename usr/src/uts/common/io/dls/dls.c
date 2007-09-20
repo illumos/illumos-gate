@@ -458,8 +458,7 @@ multi:
 	 * with the same dls_link_t.
 	 */
 	mutex_enter(&dlp->dl_promisc_lock);
-	if (dlp->dl_npromisc == 0 &&
-	    (flags & (DLS_PROMISC_MULTI|DLS_PROMISC_PHYS))) {
+	if ((dlp->dl_npromisc == 0) && (flags & DLS_PROMISC_PHYS)) {
 		ASSERT(dlp->dl_mth == NULL);
 		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dlp->dl_txloop, dlp);
 	}
@@ -469,19 +468,19 @@ multi:
 	 */
 	if (flags & DLS_PROMISC_MULTI) {
 		if (!(dip->di_promisc & DLS_PROMISC_MULTI)) {
-			err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
-			if (err != 0)
+			if ((err = mac_promisc_set(dip->di_mh, B_TRUE,
+			    MAC_DEVPROMISC)) != 0) {
 				goto done;
+			}
 			dip->di_promisc |= DLS_PROMISC_MULTI;
-			dlp->dl_npromisc++;
 		}
 	} else {
 		if (dip->di_promisc & DLS_PROMISC_MULTI) {
-			err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
-			if (err != 0)
+			if ((err = mac_promisc_set(dip->di_mh, B_FALSE,
+			    MAC_DEVPROMISC)) != 0) {
 				goto done;
+			}
 			dip->di_promisc &= ~DLS_PROMISC_MULTI;
-			dlp->dl_npromisc--;
 		}
 	}
 

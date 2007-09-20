@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@ typedef struct aggr_port_s {
 	struct aggr_port_s *lp_next;
 	struct aggr_grp_s *lp_grp;		/* back ptr to group */
 	char		lp_devname[MAXNAMELEN + 1];
+	uint16_t	lp_portid;
 	uint8_t		lp_addr[ETHERADDRL];	/* port MAC address */
 	uint32_t	lp_refs;		/* refcount */
 	aggr_port_state_t lp_state;

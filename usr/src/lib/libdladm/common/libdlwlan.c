@@ -1814,8 +1814,10 @@ do_check_rate(int fd, wldp_t *gbuf, prop_desc_t *pdp, char **prop_val,
 		return (DLADM_STATUS_BADVALCNT);
 
 	buf = malloc((sizeof (char *) + DLADM_STRSIZE) * MAX_SUPPORT_RATES);
-	if (buf == NULL)
+	if (buf == NULL) {
+		status = DLADM_STATUS_NOMEM;
 		goto done;
+	}
 
 	modval = (char **)(void *)buf;
 	for (i = 0; i < MAX_SUPPORT_RATES; i++) {

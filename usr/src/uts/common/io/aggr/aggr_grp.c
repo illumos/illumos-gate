@@ -329,8 +329,8 @@ aggr_grp_update_ports_mac(aggr_grp_t *grp)
 	    cport = cport->lp_next) {
 		rw_enter(&cport->lp_lock, RW_WRITER);
 		if (aggr_port_unicst(cport, grp->lg_addr) != 0) {
-			link_state_changed = link_state_changed ||
-			    aggr_grp_detach_port(grp, cport);
+			if (aggr_grp_detach_port(grp, cport))
+				link_state_changed = B_TRUE;
 		} else {
 			/*
 			 * If a port was detached because of a previous
@@ -339,8 +339,8 @@ aggr_grp_update_ports_mac(aggr_grp_t *grp)
 			 * address now, and this might cause the link state
 			 * of the aggregation to change.
 			 */
-			link_state_changed = link_state_changed ||
-			    aggr_grp_attach_port(grp, cport);
+			if (aggr_grp_attach_port(grp, cport))
+				link_state_changed = B_TRUE;
 		}
 		rw_exit(&cport->lp_lock);
 	}
@@ -517,13 +517,13 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 		/*
 		 * Attach each port if necessary.
 		 */
-		link_state_changed = link_state_changed ||
-		    aggr_port_notify_link(grp, port, B_FALSE);
+		if (aggr_port_notify_link(grp, port, B_FALSE))
+			link_state_changed = B_TRUE;
 	}
 
 	/* update the MAC address of the constituent ports */
-	link_state_changed = link_state_changed ||
-	    aggr_grp_update_ports_mac(grp);
+	if (aggr_grp_update_ports_mac(grp))
+		link_state_changed = B_TRUE;
 
 	if (link_state_changed)
 		mac_link_update(grp->lg_mh, grp->lg_link_state);
@@ -765,8 +765,13 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	/*
 	 * Attach each port if necessary.
 	 */
-	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
-		(void) aggr_port_notify_link(grp, port, B_FALSE);
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		if (aggr_port_notify_link(grp, port, B_FALSE))
+			link_state_changed = B_TRUE;
+	}
+
+	if (link_state_changed)
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 	/* add new group to hash table */
 	err = mod_hash_insert(aggr_grp_hash, GRP_HASH_KEY(key),
@@ -907,9 +912,8 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	 * the remaining consistuent ports according to the new MAC
 	 * address of the group.
 	 */
-	if (mac_addr_changed)
-		link_state_changed = link_state_changed ||
-		    aggr_grp_update_ports_mac(grp);
+	if (mac_addr_changed && aggr_grp_update_ports_mac(grp))
+		link_state_changed = B_TRUE;
 
 done:
 	if (mac_addr_changedp != NULL)
@@ -1306,8 +1310,8 @@ aggr_m_promisc(void *arg, boolean_t on)
 		AGGR_PORT_REFHOLD(port);
 		if (port->lp_started) {
 			if (aggr_port_promisc(port, on) != 0) {
-				link_state_changed = link_state_changed ||
-				    aggr_grp_detach_port(grp, port);
+				if (aggr_grp_detach_port(grp, port))
+					link_state_changed = B_TRUE;
 			} else {
 				/*
 				 * If a port was detached because of a previous
@@ -1316,8 +1320,8 @@ aggr_m_promisc(void *arg, boolean_t on)
 				 * the promiscuity now, and this might cause
 				 * the link state of the aggregation to change.
 				 */
-				link_state_changed = link_state_changed ||
-				    aggr_grp_attach_port(grp, port);
+				if (aggr_grp_attach_port(grp, port))
+					link_state_changed = B_TRUE;
 			}
 		}
 		rw_exit(&port->lp_lock);

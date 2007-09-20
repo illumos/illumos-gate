@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,22 +132,6 @@ aggr_lacp_fini(void)
 	mutex_destroy(&lacp_sel_lock);
 }
 
-static int
-inst_num(char *devname)
-{
-	int inst = 0;
-	int fact = 1;
-	char *p = &devname[strlen(devname)-1];
-
-	while (*p >= '0' && *p <= '9' && p >= devname) {
-		inst += (*p - '0') * fact;
-		fact *= 10;
-		p--;
-	}
-
-	return (inst);
-}
-
 /*
  * Set the port LACP state to SELECTED. Returns B_FALSE if the operation
  * could not be performed due to a memory allocation error, B_TRUE otherwise.
@@ -196,23 +180,13 @@ aggr_lacp_init_port(aggr_port_t *portp)
 {
 	aggr_grp_t *aggrp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
-	uint16_t offset;
-	uint32_t instance;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(aggrp));
 	ASSERT(RW_LOCK_HELD(&aggrp->lg_lock));
 	ASSERT(RW_LOCK_HELD(&portp->lp_lock));
 
-	/*
-	 * Port numbers must be unique. For now, we encode the first two
-	 * characters into the top byte of the port number. This will work
-	 * with multiple types of NICs provided that the first two
-	 * characters are unique.
-	 */
-	offset = ((portp->lp_devname[0] + portp->lp_devname[1]) << 8);
-	instance = inst_num(portp->lp_devname);
 	/* actor port # */
-	pl->ActorPortNumber = offset + instance;
+	pl->ActorPortNumber = portp->lp_portid;
 	AGGR_LACP_DBG(("aggr_lacp_init_port(%s): "
 	    "ActorPortNumber = 0x%x\n", portp->lp_devname,
 	    pl->ActorPortNumber));
@@ -297,7 +271,7 @@ lacp_reset_port(aggr_port_t *portp)
 
 	/* reset operational port state */
 	pl->ActorOperPortState.bit.timeout =
-		pl->ActorAdminPortState.bit.timeout;
+	    pl->ActorAdminPortState.bit.timeout;
 
 	pl->ActorOperPortState.bit.sync = B_FALSE;
 	pl->ActorOperPortState.bit.collecting = B_FALSE;
@@ -1007,8 +981,8 @@ aggr_lacp_set_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode,
 		    (mode == AGGR_LACP_ACTIVE);
 
 		port->lp_lacp.ActorAdminPortState.bit.timeout =
-			port->lp_lacp.ActorOperPortState.bit.timeout =
-			(timer == AGGR_LACP_TIMER_SHORT);
+		    port->lp_lacp.ActorOperPortState.bit.timeout =
+		    (timer == AGGR_LACP_TIMER_SHORT);
 
 		if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
 			/* Turn ON Collector_Distributor */
@@ -1775,7 +1749,7 @@ record_PDU(aggr_port_t *portp, lacp_t *lacp)
 	    (ntohs(lacp->partner_info.port_priority) ==
 	    pl->ActorPortPriority) &&
 	    (ether_cmp(&lacp->partner_info.system_id,
-		(struct ether_addr *)&aggrp->lg_addr) == 0) &&
+	    (struct ether_addr *)&aggrp->lg_addr) == 0) &&
 	    (ntohs(lacp->partner_info.system_priority) ==
 	    aggrp->aggr.ActorSystemPriority) &&
 	    (ntohs(lacp->partner_info.key) == pl->ActorOperPortKey) &&
