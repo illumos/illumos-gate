@@ -454,6 +454,8 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	uintptr_t sp;
 	int n;
 
+	ASSERT(DTRACE_CPUFLAG_ISSET(CPU_DTRACE_NOFAULT));
+
 	if (pcstack_limit <= 0)
 		return;
 

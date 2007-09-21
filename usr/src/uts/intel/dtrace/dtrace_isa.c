@@ -214,11 +214,11 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	proc_t *p = curproc;
 	struct regs *rp;
 	uintptr_t pc, sp;
-	volatile uint16_t *flags =
-	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	int n;
 
-	if (*flags & CPU_DTRACE_FAULT)
+	ASSERT(DTRACE_CPUFLAG_ISSET(CPU_DTRACE_NOFAULT));
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_FAULT))
 		return;
 
 	if (pcstack_limit <= 0)

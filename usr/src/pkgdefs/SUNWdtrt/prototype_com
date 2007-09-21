@@ -1002,6 +1002,7 @@ f none SUNWdtrt/tst/common/safety/tst.strjoin.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.strstr.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.strtok.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.substr.d 0444 root bin
+f none SUNWdtrt/tst/common/safety/tst.ucaller.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.uid.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.unalign.d 0444 root bin
 f none SUNWdtrt/tst/common/safety/tst.uregs.d 0444 root bin

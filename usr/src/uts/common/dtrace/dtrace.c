@@ -2639,7 +2639,9 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 			 * we're after.
 			 */
 			ustack[2] = NULL;
+			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			dtrace_getupcstack(ustack, 3);
+			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			mstate->dtms_ucaller = ustack[2];
 			mstate->dtms_present |= DTRACE_MSTATE_UCALLER;
 		}
