@@ -527,7 +527,16 @@ set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
 				connected = TRUE;
 				break;
 			}
-			if (!(t_errno == TSYSERR && errno == EINTR)) {
+			if (t_errno == TLOOK) {
+				switch (t_look(fd)) {
+				case T_DISCONNECT:
+					(void) t_rcvdis(fd, (struct
+					    t_discon *) NULL);
+					break;
+				default:
+					break;
+				}
+			} else if (!(t_errno == TSYSERR && errno == EINTR)) {
 				break;
 			}
 			if ((state = t_getstate(fd)) == T_OUTCON) {
