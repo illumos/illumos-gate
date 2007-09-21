@@ -518,6 +518,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				just_once = B_FALSE;
 				goto try_again;
 			} else {
+				flow->inuse = B_FALSE;
 				mutex_exit(&fhead->lock);
 				flowacct1dbg(("flowacct_update_flows_tbl: "\
 				    "maximum active flows exceeded\n"));
@@ -538,6 +539,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				    FLOWACCT_DEL_OBJ);
 			}
 			atomic_add_32(&flowacct_data->nflows, -1);
+			flow->inuse = B_FALSE;
 			mutex_exit(&fhead->lock);
 			return (-1);
 		}
@@ -552,6 +554,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				    FLOWACCT_DEL_OBJ);
 			}
 			atomic_add_32(&flowacct_data->nflows, -1);
+			flow->inuse = B_FALSE;
 			mutex_exit(&fhead->lock);
 			return (-1);
 		}
@@ -822,12 +825,20 @@ flowacct_timer(int type, flowacct_data_t *flowacct_data)
 		 * a new item for this flow.
 		 */
 		if (!flow->inuse) {
-			if (fl_hdr == thead->tail) {
-				thead->head = thead->tail = NULL;
+			if (fl_hdr->timeout_prev != NULL) {
+				fl_hdr->timeout_prev->timeout_next =
+				    fl_hdr->timeout_next;
 			} else {
 				thead->head = fl_hdr->timeout_next;
-				thead->head->timeout_prev = NULL;
 			}
+			if (fl_hdr->timeout_next != NULL) {
+				fl_hdr->timeout_next->timeout_prev =
+				    fl_hdr->timeout_prev;
+			} else {
+				thead->tail = fl_hdr->timeout_prev;
+			}
+			fl_hdr->timeout_prev = NULL;
+			fl_hdr->timeout_next = NULL;
 			flowacct_del_obj(head, fl_hdr, FLOWACCT_DEL_OBJ);
 			atomic_add_64(&flowacct_data->usedmem, flow_size);
 		}
