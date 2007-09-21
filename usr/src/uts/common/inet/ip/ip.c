@@ -15678,24 +15678,20 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ip_dlpi_error(ill, dlea->dl_error_primitive,
 			    dlea->dl_errno, dlea->dl_unix_errno);
 		break;
-	case DL_CAPABILITY_ACK: {
-		boolean_t reneg_flag = B_FALSE;
+	case DL_CAPABILITY_ACK:
 		/* Call a routine to handle this one. */
 		ill_dlpi_done(ill, DL_CAPABILITY_REQ);
-		/*
-		 * Check if the ACK is due to renegotiation case since we
-		 * will need to send a new CAPABILITY_REQ later.
-		 */
-		if (ill->ill_dlpi_capab_state == IDS_RENEG) {
-			/* This is the ack for a renogiation case */
-			reneg_flag = B_TRUE;
-			ill->ill_dlpi_capab_state = IDS_UNKNOWN;
-		}
 		ill_capability_ack(ill, mp);
-		if (reneg_flag)
+
+		/*
+		 * If the ack is due to renegotiation, we will need to send
+		 * a new CAPABILITY_REQ to start the renegotiation.
+		 */
+		if (ill->ill_capab_reneg) {
+			ill->ill_capab_reneg = B_FALSE;
 			ill_capability_probe(ill);
+		}
 		break;
-	}
 	case DL_CONTROL_ACK:
 		/* We treat all of these as "fire and forget" */
 		ill_dlpi_done(ill, DL_CONTROL_REQ);
@@ -15996,17 +15992,26 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			/*
 			 * Something changed on the driver side.
 			 * It wants us to renegotiate the capabilities
-			 * on this ill. The most likely cause is the
-			 * aggregation interface under us where a
-			 * port got added or went away.
+			 * on this ill. One possible cause is the aggregation
+			 * interface under us where a port got added or
+			 * went away.
 			 *
-			 * We reset the capabilities and set the
-			 * state to IDS_RENG so that when the ack
-			 * comes back, we can start the
-			 * renegotiation process.
+			 * If the capability negotiation is already done
+			 * or is in progress, reset the capabilities and
+			 * mark the ill's ill_capab_reneg to be B_TRUE,
+			 * so that when the ack comes back, we can start
+			 * the renegotiation process.
+			 *
+			 * Note that if ill_capab_reneg is already B_TRUE
+			 * (ill_dlpi_capab_state is IDS_UNKNOWN in this case),
+			 * the capability resetting request has been sent
+			 * and the renegotiation has not been started yet;
+			 * nothing needs to be done in this case.
 			 */
-			ill_capability_reset(ill);
-			ill->ill_dlpi_capab_state = IDS_RENEG;
+			if (ill->ill_dlpi_capab_state != IDS_UNKNOWN) {
+				ill_capability_reset(ill);
+				ill->ill_capab_reneg = B_TRUE;
+			}
 			break;
 		default:
 			ip0dbg(("ip_rput_dlpi_writer: unknown notification "

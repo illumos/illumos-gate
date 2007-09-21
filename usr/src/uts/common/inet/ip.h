@@ -1836,8 +1836,8 @@ typedef struct ill_s {
 		ill_up_ipifs : 1,
 
 		ill_note_link : 1,	/* supports link-up notification */
-
-		ill_pad_to_bit_31 : 19;
+		ill_capab_reneg : 1, /* capability renegotiation to be done */
+		ill_pad_to_bit_31 : 18;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -2146,7 +2146,6 @@ typedef struct ipmx_s {
 #define	IDS_INPROGRESS	1	/* DLPI request sent */
 #define	IDS_OK		2	/* DLPI request completed successfully */
 #define	IDS_FAILED	3	/* DLPI request failed */
-#define	IDS_RENEG	4	/* Driver asked for a renegotiation */
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct ipparam_s {

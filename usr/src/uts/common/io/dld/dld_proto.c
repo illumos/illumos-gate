@@ -1692,7 +1692,7 @@ proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
 
 	if (type == SOFT_RING_NONE) {
 		rx = (dsp->ds_mode == DLD_FASTPATH) ?
-			    dld_str_rx_fastpath : dld_str_rx_unitdata;
+		    dld_str_rx_fastpath : dld_str_rx_unitdata;
 	} else {
 		rx = (dls_rx_t)dls_soft_ring_fanout;
 	}
@@ -1734,7 +1734,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 */
 	if (!(dld_opt & DLD_OPT_NO_SOFTRING)) {
 		subsize += sizeof (dl_capability_sub_t) +
-				    sizeof (dl_capab_dls_t);
+		    sizeof (dl_capab_dls_t);
 	}
 
 	/*
@@ -1942,4 +1942,17 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	rw_exit(&dsp->ds_lock);
 	qreply(q, mp);
 	return (B_TRUE);
+}
+
+/*
+ * Disable any enabled capabilities.
+ */
+void
+dld_capabilities_disable(dld_str_t *dsp)
+{
+	if (dsp->ds_polling)
+		proto_poll_disable(dsp);
+
+	if (dsp->ds_soft_ring)
+		proto_soft_ring_disable(dsp);
 }

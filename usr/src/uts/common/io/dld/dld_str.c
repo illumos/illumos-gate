@@ -1098,10 +1098,11 @@ dld_str_detach(dld_str_t *dsp)
 	mac_notify_remove(dsp->ds_mh, dsp->ds_mnh);
 
 	/*
-	 * Clear the polling and promisc flags.
+	 * Disable the capabilities and clear the promisc flag.
 	 */
-	dsp->ds_polling = B_FALSE;
-	dsp->ds_soft_ring = B_FALSE;
+	ASSERT(!dsp->ds_polling);
+	ASSERT(!dsp->ds_soft_ring);
+	dld_capabilities_disable(dsp);
 	dsp->ds_promisc = 0;
 
 	/*

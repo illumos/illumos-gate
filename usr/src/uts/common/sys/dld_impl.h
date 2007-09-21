@@ -243,6 +243,7 @@ extern void		dld_tx_single(dld_str_t *, mblk_t *);
  */
 extern void		dld_proto(dld_str_t *, mblk_t *);
 extern void		dld_finish_pending_ops(dld_str_t *);
+extern void		dld_capabilities_disable(dld_str_t *);
 
 /*
  * Options: there should be a separate bit defined here for each

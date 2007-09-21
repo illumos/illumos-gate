@@ -1737,11 +1737,9 @@ void
 ill_capability_probe(ill_t *ill)
 {
 	/*
-	 * Do so only if negotiation is enabled, capabilities are unknown,
-	 * and a capability negotiation is not already in progress.
+	 * Do so only if capabilities are still unknown.
 	 */
-	if (ill->ill_dlpi_capab_state != IDS_UNKNOWN &&
-	    ill->ill_dlpi_capab_state != IDS_RENEG)
+	if (ill->ill_dlpi_capab_state != IDS_UNKNOWN)
 		return;
 
 	ill->ill_dlpi_capab_state = IDS_INPROGRESS;
@@ -1767,6 +1765,7 @@ ill_capability_reset(ill_t *ill)
 	 * features are turned off until the state reaches IDS_OK.
 	 */
 	ill->ill_dlpi_capab_state = IDS_UNKNOWN;
+	ill->ill_capab_reneg = B_FALSE;
 
 	/*
 	 * Disable sub-capabilities and request a list of sub-capability
@@ -18143,8 +18142,20 @@ ill_dl_down(ill_t *ill)
 		mutex_enter(&ill->ill_lock);
 		ill->ill_state_flags |= ILL_DL_UNBIND_IN_PROGRESS;
 		mutex_exit(&ill->ill_lock);
-		if (ill->ill_dlpi_capab_state == IDS_OK)
+		/*
+		 * Reset the capabilities if the negotiation is done or is
+		 * still in progress. Note that ill_capability_reset() will
+		 * set ill_dlpi_capab_state to IDS_UNKNOWN, so the subsequent
+		 * DL_CAPABILITY_ACK and DL_NOTE_CAPAB_RENEG will be ignored.
+		 *
+		 * Further, reset ill_capab_reneg to be B_FALSE so that the
+		 * subsequent DL_CAPABILITY_ACK can be ignored, to prevent
+		 * the capabilities renegotiation from happening.
+		 */
+		if (ill->ill_dlpi_capab_state != IDS_UNKNOWN)
 			ill_capability_reset(ill);
+		ill->ill_capab_reneg = B_FALSE;
+
 		ill_dlpi_send(ill, mp);
 	}
 
