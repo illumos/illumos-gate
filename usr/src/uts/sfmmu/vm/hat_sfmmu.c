@@ -8164,15 +8164,15 @@ again:
 
 		hmeblkp = sfmmu_hmetohblk(sfhme);
 		if (hmeblkp->hblk_xhat_bit) {
-		    cnt++;
-		    if (cnt > sh_thresh) {
-			sfmmu_mlist_exit(pml);
-			return (1);
-		    }
-		    continue;
+			cnt++;
+			if (cnt > sh_thresh) {
+				sfmmu_mlist_exit(pml);
+				return (1);
+			}
+			continue;
 		}
 		if (hme_size(sfhme) != sz) {
-		    continue;
+			continue;
 		}
 
 		if (hmeblkp->hblk_shared) {
