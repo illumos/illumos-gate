@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,77 @@ struct svm_daemon svmd_kill_list[] = {
 #define	DAEMON_COUNT (sizeof (svmd_kill_list)/ sizeof (struct svm_daemon))
 
 extern int procsigs(int block, sigset_t *oldsigs, md_error_t *ep);
+
+/*
+ * Are the locator blocks for the replicas using devids
+ */
+static int	devid_in_use = FALSE;
+
+static char *
+getlongname(
+	struct mddb_config	*c,
+	md_error_t		*ep
+)
+{
+	char		*diskname = NULL;
+	char		*devid_str;
+	devid_nmlist_t	*disklist = NULL;
+
+	c->c_locator.l_devid_flags = MDDB_DEVID_GETSZ;
+	if (metaioctl(MD_DB_ENDDEV, c, &c->c_mde, NULL) != 0) {
+		(void) mdstealerror(ep, &c->c_mde);
+		return (NULL);
+	}
+
+	if (c->c_locator.l_devid_flags & MDDB_DEVID_SZ) {
+		c->c_locator.l_devid = (uintptr_t)
+		    Malloc(c->c_locator.l_devid_sz);
+		c->c_locator.l_devid_flags =
+		    MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
+	} else {
+		(void) mderror(ep, MDE_NODEVID, "");
+		goto out;
+	}
+
+	if (metaioctl(MD_DB_ENDDEV, c, &c->c_mde, NULL) != 0) {
+		(void) mdstealerror(ep, &c->c_mde);
+		goto out;
+	}
+
+	if (c->c_locator.l_devid_flags & MDDB_DEVID_NOSPACE) {
+		(void) mderror(ep, MDE_NODEVID, "");
+		goto out;
+	}
+
+	if (metaioctl(MD_DB_GETDEV, c, &c->c_mde, NULL) != 0) {
+		(void) mdstealerror(ep, &c->c_mde);
+		goto out;
+	}
+
+	if (c->c_locator.l_devid != NULL) {
+		if (meta_deviceid_to_nmlist("/dev/dsk",
+		    (ddi_devid_t)(uintptr_t)c->c_locator.l_devid,
+		    c->c_locator.l_minor_name, &disklist) != 0) {
+			devid_str = devid_str_encode(
+			    (ddi_devid_t)(uintptr_t)c->c_locator.l_devid, NULL);
+			(void) mderror(ep, MDE_MISSING_DEVID_DISK, "");
+			mderrorextra(ep, devid_str);
+			if (devid_str != NULL)
+				devid_str_free(devid_str);
+			goto out;
+		}
+		diskname = Strdup(disklist[0].devname);
+	}
+
+out:
+	if (disklist != NULL)
+		devid_free_nmlist(disklist);
+
+	if (c->c_locator.l_devid != NULL)
+		Free((void *)(uintptr_t)c->c_locator.l_devid);
+
+	return (diskname);
+}
 
 /*
  * meta_get_lb_inittime sends a request for the lb_inittime to the kernel
@@ -255,10 +326,10 @@ mkmasterblks(
 	}
 
 	if (crcchk((uchar_t *)mb, (uint_t *)&mb->mb_checksum,
-		(uint_t)DEV_BSIZE, (crc_skip_t *)NULL)) {
+	    (uint_t)DEV_BSIZE, (crc_skip_t *)NULL)) {
 		Free(mb);
 		return (mdmddberror(ep, MDE_NOTVERIFIED,
-			meta_getminor(np->dev), sp->setno, 0, np->rname));
+		    meta_getminor(np->dev), sp->setno, 0, np->rname));
 	}
 
 	Free(mb);
@@ -413,7 +484,7 @@ buildconf(mdsetname_t *sp, md_error_t *ep)
 	if (fprintf(cfp, "do not hand edit\n") < 0)
 		goto error;
 	if (fprintf(cfp,
-		"#driver\tminor_t\tdaddr_t\tdevice id\tchecksum\n") < 0)
+	    "#driver\tminor_t\tdaddr_t\tdevice id\tchecksum\n") < 0)
 		goto error;
 
 	/* dump replicas */
@@ -499,7 +570,7 @@ buildconf(mdsetname_t *sp, md_error_t *ep)
 	/* tempfile error */
 error:
 	rval = (in_miniroot) ? mdsyserror(ep, errno, tname):
-				mdsyserror(ep, errno, META_DBCONFTMP);
+	    mdsyserror(ep, errno, META_DBCONFTMP);
 
 
 	/* cleanup, return success */
@@ -508,7 +579,7 @@ out:
 		metafreereplicalist(rlp);
 	if ((cfp != NULL) && (fclose(cfp) != 0) && (rval == 0)) {
 		rval = (in_miniroot) ? mdsyserror(ep, errno, tname):
-					mdsyserror(ep, errno, META_DBCONFTMP);
+		    mdsyserror(ep, errno, META_DBCONFTMP);
 	}
 	free(tname);
 	return (rval);
@@ -894,13 +965,19 @@ meta_db_addsidenms(
 			c.c_locator.l_blkno = blkno;
 			(void) strncpy(c.c_locator.l_driver, dname,
 			    sizeof (c.c_locator.l_driver));
-			(void) splitname(bname, &c.c_devname);
+			if (splitname(bname, &c.c_devname) ==
+			    METASPLIT_LONGDISKNAME && devid_in_use == FALSE) {
+				rval = mddeverror(ep, MDE_DISKNAMETOOLONG,
+				    NODEV64, np->rname);
+				break;
+			}
+
 			c.c_locator.l_mnum = mnum;
 
 			/* Fill in setno, setname, and sideno */
 			c.c_setno = sp->setno;
 			(void) strncpy(c.c_setname, sp->setname,
-				sizeof (c.c_setname));
+			    sizeof (c.c_setname));
 			c.c_sideno = sideno;
 
 			/*
@@ -1147,7 +1224,7 @@ meta_db_patch(
 	}
 
 	if ((fflush(tsfp) != 0) || (fsync(fileno(tsfp)) != 0) ||
-					    (fclose(tsfp) != 0)) {
+	    (fclose(tsfp) != 0)) {
 		(void) mdsyserror(ep, errno, tsname);
 		goto out;
 	}
@@ -1464,10 +1541,10 @@ meta_db_attach(
 			if (stale_bool == TRUE)
 				flags |= MD_MSGF_NO_LOG;
 			send_rval = mdmn_send_message(sp->setno,
-				MD_MN_MSG_META_DB_ATTACH,
-				flags, (char *)&attach,
-				sizeof (md_mn_msg_meta_db_attach_t),
-				&resultp, ep);
+			    MD_MN_MSG_META_DB_ATTACH,
+			    flags, (char *)&attach,
+			    sizeof (md_mn_msg_meta_db_attach_t),
+			    &resultp, ep);
 			if (send_rval != 0) {
 				rval = -1;
 				if (resultp == NULL)
@@ -1491,62 +1568,73 @@ meta_db_attach(
 			if (resultp)
 				free_result(resultp);
 		} else {
-		    /* Adding mddb(s) to just this node */
-		    for (i = 0; i < dbcnt; i++) {
-			(void) memset(&c, 0, sizeof (c));
-			/* Fill in device/replica info */
-			c.c_locator.l_dev = meta_cmpldev(np->dev);
-			c.c_locator.l_blkno = i * dbsize + 16;
-			blkno = c.c_locator.l_blkno;
-			(void) strncpy(c.c_locator.l_driver, cinfo->dname,
-			    sizeof (c.c_locator.l_driver));
-			(void) splitname(np->bname, &c.c_devname);
-			c.c_locator.l_mnum = meta_getminor(np->dev);
+			/* Adding mddb(s) to just this node */
+			for (i = 0; i < dbcnt; i++) {
+				(void) memset(&c, 0, sizeof (c));
+				/* Fill in device/replica info */
+				c.c_locator.l_dev = meta_cmpldev(np->dev);
+				c.c_locator.l_blkno = i * dbsize + 16;
+				blkno = c.c_locator.l_blkno;
+				(void) strncpy(c.c_locator.l_driver,
+				    cinfo->dname,
+				    sizeof (c.c_locator.l_driver));
 
-			/* Fill in setno, setname, and sideno */
-			c.c_setno = sp->setno;
-			if (! metaislocalset(sp)) {
-				if (MD_MNSET_DESC(sd)) {
-					c.c_multi_node = 1;
+				if (splitname(np->bname, &c.c_devname) ==
+				    METASPLIT_LONGDISKNAME && devid_in_use ==
+				    FALSE) {
+					rval = mddeverror(ep,
+					    MDE_DISKNAMETOOLONG,
+					    NODEV64, np->rname);
+					goto out;
 				}
+
+				c.c_locator.l_mnum = meta_getminor(np->dev);
+
+				/* Fill in setno, setname, and sideno */
+				c.c_setno = sp->setno;
+				if (! metaislocalset(sp)) {
+					if (MD_MNSET_DESC(sd)) {
+						c.c_multi_node = 1;
+					}
+				}
+				(void) strcpy(c.c_setname, sp->setname);
+				c.c_sideno = sideno;
+
+				/*
+				 * Don't need device id information from this
+				 * ioctl Kernel determines device id from
+				 * dev_t, which is just what this code would do.
+				 */
+				c.c_locator.l_devid = (uint64_t)0;
+				c.c_locator.l_devid_flags = 0;
+
+				if (timeval != NULL)
+					c.c_timestamp = *timeval;
+
+				if (setup_med_cfg(sp, &c,
+				    (options & MDCHK_SET_FORCE), ep)) {
+					rval = -1;
+					goto out;
+				}
+
+				if (metaioctl(MD_DB_NEWDEV, &c, &c.c_mde,
+				    NULL) != 0) {
+					rval = mdstealerror(ep, &c.c_mde);
+					goto out;
+				}
+				/*
+				 * This is either a traditional diskset OR this
+				 * is the first replica added to a MN diskset.
+				 * In either case, set broadcast to NO_BCAST so
+				 * that message won't go through rpc.mdcommd.
+				 * If this is a traditional diskset, the bcast
+				 * flag is ignored since traditional disksets
+				 * don't use the rpc.mdcommd.
+				 */
+				if (meta_db_addsidenms(sp, np, blkno,
+				    DB_ADDSIDENMS_NO_BCAST, ep))
+					goto out;
 			}
-			(void) strcpy(c.c_setname, sp->setname);
-			c.c_sideno = sideno;
-
-			/*
-			 * Don't need device id information from this ioctl
-			 * Kernel determines device id from dev_t, which
-			 * is just what this code would do.
-			 */
-			c.c_locator.l_devid = (uint64_t)0;
-			c.c_locator.l_devid_flags = 0;
-
-			if (timeval != NULL)
-				c.c_timestamp = *timeval;
-
-			if (setup_med_cfg(sp, &c, (options & MDCHK_SET_FORCE),
-			    ep)) {
-				rval = -1;
-				goto out;
-			}
-
-			if (metaioctl(MD_DB_NEWDEV, &c, &c.c_mde, NULL) != 0) {
-				rval = mdstealerror(ep, &c.c_mde);
-				goto out;
-			}
-			/*
-			 * This is either a traditional diskset OR this
-			 * is the first replica added to a MN diskset.
-			 * In either case, set broadcast to NO_BCAST so
-			 * that message won't go through rpc.mdcommd.
-			 * If this is a traditional diskset, the bcast
-			 * flag is ignored since traditional disksets
-			 * don't use the rpc.mdcommd.
-			 */
-			if (meta_db_addsidenms(sp, np, blkno,
-			    DB_ADDSIDENMS_NO_BCAST, ep))
-				goto out;
-		    }
 		}
 		if (! metaislocalset(sp)) {
 			/* update the dbcnt and size in dd */
@@ -1769,6 +1857,14 @@ meta_db_detach(
 
 		devname = splicename(&c.c_devname);
 
+		if (strstr(devname, META_LONGDISKNAME_STR) != NULL) {
+			Free(devname);
+			devname = getlongname(&c, ep);
+			if (devname == NULL) {
+				return (-1);
+			}
+		}
+
 		if ((index = in_deletelist(devname, db_nlp)) != -1) {
 			found = 1;
 			tag_array[index] = 1;
@@ -1776,9 +1872,8 @@ meta_db_detach(
 		}
 
 		errored = c.c_locator.l_flags & (MDDB_F_EREAD |
-				MDDB_F_EWRITE | MDDB_F_TOOSMALL |
-				MDDB_F_EFMT | MDDB_F_EDATA |
-				MDDB_F_EMASTER);
+		    MDDB_F_EWRITE | MDDB_F_TOOSMALL | MDDB_F_EFMT |
+		    MDDB_F_EDATA | MDDB_F_EMASTER);
 
 		/*
 		 * There are four combinations of "errored" and "found"
@@ -1837,8 +1932,8 @@ meta_db_detach(
 	 */
 
 	if ((invalid_replicas_todelete != replica_delete_count) &&
-		(invalid_replicas_nottodelete > valid_replicas_nottodelete) &&
-				(force_option != MDFORCE_LOCAL))
+	    (invalid_replicas_nottodelete > valid_replicas_nottodelete) &&
+	    (force_option != MDFORCE_LOCAL))
 		return (mderror(ep, MDE_DEL_VALIDDB_NOTALLOWED, sp->setname));
 
 	/*
@@ -1911,10 +2006,10 @@ meta_db_detach(
 			if (stale_bool == TRUE)
 				flags |= MD_MSGF_NO_LOG;
 			send_rval = mdmn_send_message(sp->setno,
-				MD_MN_MSG_META_DB_DETACH,
-				flags, (char *)&detach,
-				sizeof (md_mn_msg_meta_db_detach_t),
-				&resultp, ep);
+			    MD_MN_MSG_META_DB_DETACH,
+			    flags, (char *)&detach,
+			    sizeof (md_mn_msg_meta_db_detach_t),
+			    &resultp, ep);
 			if (send_rval != 0) {
 				rval = -1;
 				if (resultp == NULL)
@@ -1955,6 +2050,16 @@ meta_db_detach(
 				}
 
 				devname = splicename(&c.c_devname);
+
+				if (strstr(devname, META_LONGDISKNAME_STR)
+				    != NULL) {
+					Free(devname);
+					devname = getlongname(&c, ep);
+					if (devname == NULL) {
+						return (-1);
+					}
+				}
+
 				if (strcmp(devname, np->bname) != 0) {
 					Free(devname);
 					i++;
@@ -2008,9 +2113,9 @@ out:
 
 			for (i = 0; i < DAEMON_COUNT; i++) {
 				(void) snprintf(buf, MAXPATHLEN,
-					"/usr/bin/pkill -%s -x %s",
-					svmd_kill_list[i].svmd_kill_val,
-					svmd_kill_list[i].svmd_name);
+				    "/usr/bin/pkill -%s -x %s",
+				    svmd_kill_list[i].svmd_kill_val,
+				    svmd_kill_list[i].svmd_name);
 				if (pclose(popen(buf, "w")) == -1)
 					md_perror(buf);
 			}
@@ -2068,12 +2173,46 @@ metareplicaname(
 	md_replica_t	*rp;
 	char		*devname;
 	size_t		sz;
+	devid_nmlist_t	*disklist = NULL;
+	char		*devid_str;
 
 	/* allocate replicaname */
 	rp = Zalloc(sizeof (*rp));
 
 	/* get device name */
 	devname = splicename(&c->c_devname);
+
+	/*
+	 * Check if the device has a long name (>40 characters) and
+	 * if so then we have to use devids to get the device name.
+	 * If this cannot be done then we have to fail the request.
+	 */
+	if (strstr(devname, META_LONGDISKNAME_STR) != NULL) {
+		if (c->c_locator.l_devid != NULL) {
+			if (meta_deviceid_to_nmlist("/dev/dsk",
+			    (ddi_devid_t)(uintptr_t)c->c_locator.l_devid,
+			    c->c_locator.l_minor_name, &disklist) != 0) {
+				devid_str = devid_str_encode(
+				    (ddi_devid_t)(uintptr_t)
+				    c->c_locator.l_devid, NULL);
+				(void) mderror(ep, MDE_MISSING_DEVID_DISK, "");
+				mderrorextra(ep, devid_str);
+				if (devid_str != NULL)
+					devid_str_free(devid_str);
+				Free(rp);
+				Free(devname);
+				return (NULL);
+			}
+		} else {
+			(void) mderror(ep, MDE_NODEVID, "");
+			Free(rp);
+			Free(devname);
+			return (NULL);
+		}
+		Free(devname);
+		devname = disklist[0].devname;
+	}
+
 	if (flags & PRINT_FAST) {
 		if ((rp->r_namep = metaname_fast(&sp, devname,
 		    LOGICAL_DEVICE, ep)) == NULL) {
@@ -2194,7 +2333,7 @@ metareplicalist(
 			 * space has been alloc'd.
 			 */
 			c.c_locator.l_devid_flags =
-				MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
+			    MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
 		}
 
 		if (metaioctl(MD_DB_ENDDEV, &c, &c.c_mde, NULL) != 0) {
@@ -2215,10 +2354,10 @@ metareplicalist(
 		if (c.c_locator.l_devid_flags & MDDB_DEVID_NOSPACE) {
 			(void) fprintf(stderr,
 			    dgettext(TEXT_DOMAIN,
-				"Error: Relocation Information "
-				"(drvnm=%s, mnum=0x%lx) \n"
-				"relocation information size changed - \n"
-				"rerun command\n"),
+			    "Error: Relocation Information "
+			    "(drvnm=%s, mnum=0x%lx) \n"
+			    "relocation information size changed - \n"
+			    "rerun command\n"),
 			    c.c_locator.l_driver, c.c_locator.l_mnum);
 			(void) mderror(ep, MDE_DEVID_TOOBIG, NULL);
 			goto out;
@@ -2380,7 +2519,7 @@ meta_setup_db_locations(
 		(void) strcpy(c.c_locator.l_minor_name, minor_name);
 		free(minor_name);
 		c.c_locator.l_devid_flags = MDDB_DEVID_VALID |
-			MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
+		    MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
 		c.c_locator.l_devid_sz = sz;
 
 		devid_size = strlen(devidp);
@@ -2423,9 +2562,16 @@ meta_setup_db_locations(
 	c.c_id = 0;
 	c.c_setno = MD_LOCAL_SET;
 
-	/* Don't need device id information from this ioctl */
+	/*
+	 * While we do not need the devid here we may need to
+	 * know if devid's are being used by the kernel for
+	 * the replicas. This is because under some circumstances
+	 * we can only manipulate the SVM configuration if the
+	 * kernel is using devid's.
+	 */
 	c.c_locator.l_devid = (uint64_t)0;
-	c.c_locator.l_devid_flags = 0;
+	c.c_locator.l_devid_flags = MDDB_DEVID_GETSZ;
+	c.c_locator.l_devid_sz = 0;
 
 	if (metaioctl(MD_DB_GETDEV, &c, &c.c_mde, NULL) != 0) {
 		if (! mdismddberror(&c.c_mde, MDE_DB_INVALID))
@@ -2436,6 +2582,14 @@ meta_setup_db_locations(
 	if (c.c_flags & MDDB_C_STALE)
 		return (mdmddberror(ep, MDE_DB_STALE, NODEV32, MD_LOCAL_SET,
 		    0, NULL));
+
+	if (c.c_locator.l_devid_sz != 0) {
+		/*
+		 * Devid's are being used to track the replicas because
+		 * there is space for a devid.
+		 */
+		devid_in_use = TRUE;
+	}
 
 	/* success */
 	return (rval);
@@ -2508,7 +2662,7 @@ meta_get_replica_names(
 		 * of traversing the list each time
 		 */
 		tailpp = meta_namelist_append_wrapper(
-			tailpp, rl->rl_repp->r_namep);
+		    tailpp, rl->rl_repp->r_namep);
 		++cnt;
 	}
 

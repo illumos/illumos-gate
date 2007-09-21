@@ -20,7 +20,7 @@
 % */
 %
 %/*
-% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
@@ -1404,7 +1404,8 @@ enum md_void_errno_t {
 				/* instance name desired for hot spare pool */
 				/* is being used for a metadevice. */
 	MDE_ZONE_ADMIN,		/* in a zone & no admin device */
-	MDE_NAME_ILLEGAL	/* illegal syntax for metadevice or hsp name */
+	MDE_NAME_ILLEGAL,	/* illegal syntax for metadevice or hsp name */
+	MDE_MISSING_DEVID_DISK	/* unable to find disk using devid */
 };
 
 struct md_void_error_t {
@@ -1455,7 +1456,8 @@ enum md_dev_errno_t {
 	MDE_MULTNM,		/* Multiple entries for device in namespace */
 	MDE_TOO_MANY_PARTS,	/* dev has more than MD_MAX_PARTS partitions */
 	MDE_REPART_REPLICA,	/* replica slice would move with repartitioning */
-	MDE_IS_DUMP		/* device already in use as dump device */
+	MDE_IS_DUMP,		/* device already in use as dump device */
+	MDE_DISKNAMETOOLONG	/* devid's not in use and diskname too long */
 };
 
 struct md_dev_error_t {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -180,7 +180,7 @@ metacookerror(
 		case MDEC_DEV:
 		{
 			md_dev_error_t	*ip =
-					&ep->info.md_error_info_t_u.dev_error;
+			    &ep->info.md_error_info_t_u.dev_error;
 
 			ep->name = dev_name(MD_SET_BAD, ip->dev);
 			break;
@@ -190,7 +190,7 @@ metacookerror(
 		case MDEC_USE:
 		{
 			md_use_error_t	*ip =
-					&ep->info.md_error_info_t_u.use_error;
+			    &ep->info.md_error_info_t_u.use_error;
 
 			ep->name = dev_name(MD_SET_BAD, ip->dev);
 			if (ip->where == NULL) {
@@ -204,7 +204,7 @@ metacookerror(
 		case MDEC_MD:
 		{
 			md_md_error_t	*ip =
-					&ep->info.md_error_info_t_u.md_error;
+			    &ep->info.md_error_info_t_u.md_error;
 
 			ep->name = md_name(ip->mnum);
 			break;
@@ -214,7 +214,7 @@ metacookerror(
 		case MDEC_COMP:
 		{
 			md_comp_error_t	*ip =
-					&ep->info.md_error_info_t_u.comp_error;
+			    &ep->info.md_error_info_t_u.comp_error;
 			char		*mdname, *devname;
 			size_t 		len;
 
@@ -235,7 +235,7 @@ metacookerror(
 		case MDEC_HSP:
 		{
 			md_hsp_error_t	*ip =
-					&ep->info.md_error_info_t_u.hsp_error;
+			    &ep->info.md_error_info_t_u.hsp_error;
 
 			ep->name = hsp_name(ip->hsp);
 			break;
@@ -245,7 +245,7 @@ metacookerror(
 		case MDEC_HS:
 		{
 			md_hs_error_t	*ip =
-					&ep->info.md_error_info_t_u.hs_error;
+			    &ep->info.md_error_info_t_u.hs_error;
 			char		*hspname, *devname;
 			size_t 		len;
 
@@ -265,7 +265,7 @@ metacookerror(
 		case MDEC_MDDB:
 		{
 			md_mddb_error_t	*ip =
-					&ep->info.md_error_info_t_u.mddb_error;
+			    &ep->info.md_error_info_t_u.mddb_error;
 			if (ip->mnum != NODEV32)
 				ep->name = md_name(ip->mnum);
 			ep->name = set_name(ip->setno);
@@ -432,7 +432,7 @@ mdoverlaperror(
 )
 {
 	md_overlap_error_t *ip =
-			&ep->info.md_error_info_t_u.overlap_error;
+	    &ep->info.md_error_info_t_u.overlap_error;
 
 	assert(overlap != NULL);
 	mdclrerror(ep);
@@ -441,7 +441,7 @@ mdoverlaperror(
 	ip->overlap = Strdup(overlap);
 	ip->where = NULL;
 	if (where != NULL)
-	    ip->where = Strdup(where);
+		ip->where = Strdup(where);
 
 	metacookerror(ep, name);
 	return (-1);
@@ -718,7 +718,7 @@ void_to_str(
 		break;
 	case MDE_NOTENOUGH_DB:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
-			"must have at least 1 database (-f overrides)"));
+		    "must have at least 1 database (-f overrides)"));
 		break;
 	case MDE_DELDB_NOTALLOWED:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
@@ -893,6 +893,10 @@ void_to_str(
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		"Volume administration unavailable within non-global zones."));
 		break;
+	case MDE_MISSING_DEVID_DISK:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		    "device id does not exist."));
+		break;
 	default:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "unknown void error code %d"), ip->errnum);
@@ -1060,6 +1064,12 @@ dev_to_str(
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "cannot repartition a slice with an existing replica"));
 		break;
+	case MDE_DISKNAMETOOLONG:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		    "disk name is too long with device ids disabled "
+		    "in Solaris Volume Manager. Check /kernel/drv/md.conf "
+		    "for md_devid_destroy, remove it and reboot"));
+		break;
 	default:
 		(void) snprintf(p, psize,
 		    dgettext(TEXT_DOMAIN, "unknown dev error code %d"),
@@ -1081,7 +1091,7 @@ overlap_to_str(
 )
 {
 	md_overlap_error_t	*ip =
-			&ep->info.md_error_info_t_u.overlap_error;
+	    &ep->info.md_error_info_t_u.overlap_error;
 	char		*p = buf + strlen(buf);
 	size_t		psize = size - strlen(buf);
 
@@ -1089,7 +1099,7 @@ overlap_to_str(
 	case MDE_OVERLAP_MOUNTED:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "overlaps with %s which is mounted as \'%s\'"),
-			ip->overlap, ip->where);
+		    ip->overlap, ip->where);
 		break;
 	case MDE_OVERLAP_SWAP:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
@@ -1137,12 +1147,12 @@ use_to_str(
 		 */
 		if (strcmp(ip->where, MDB_STR) != 0) {
 			(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
-				"has appeared more than once in the "
-				"specification of %s"), ip->where);
+			    "has appeared more than once in the "
+			    "specification of %s"), ip->where);
 		} else {
 			(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
-				"has appeared more than once in the "
-				"specification of " MDB_STR));
+			    "has appeared more than once in the "
+			    "specification of " MDB_STR));
 		}
 		break;
 	case MDE_OVERLAP:
@@ -1270,7 +1280,7 @@ md_to_str(
 		break;
 	case MDE_LAST_SM:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
-			"attempt to detach last running submirror"));
+		    "attempt to detach last running submirror"));
 		break;
 	case MDE_NO_READABLE_SM:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,

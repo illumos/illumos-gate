@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,7 @@ die right now
 #define	ADMSPECIAL		"/dev/md/admin"
 
 #define	MDB_STR			"metadevice state database"
+#define	META_LONGDISKNAME_STR	"<long disk name>"
 
 /* default database size (4MB) */
 #define	MD_DBSIZE	(8192)
@@ -174,6 +175,13 @@ typedef	uint_t  mddevopts_t;
 #define	METADEVADM_DEVIDINVALID	2
 #define	METADEVADM_DSKNAME_ERR	3
 #define	METADEVADM_DISKMOVE	4
+
+/*
+ * return values for the splitname function
+ */
+#define	METASPLIT_SUCCESS		0
+#define	METASPLIT_LONGPREFIX		1
+#define	METASPLIT_LONGDISKNAME		2
 
 /*
  * meta_check* options

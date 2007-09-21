@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,8 @@
  */
 
 /*
- * Copyright (c) 1992, 1993, 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +38,8 @@ splitname(char *name, md_splitname *spn)
 	size_t prefixlen;
 	size_t suffixlen;
 	char	*lastslash;
+	int	retval = METASPLIT_SUCCESS;
+
 	lastslash = strrchr(name, '/');
 	if (lastslash != NULL) {
 		prefixlen = lastslash - name;
@@ -47,14 +48,26 @@ splitname(char *name, md_splitname *spn)
 		prefixlen = 0;
 		suffixlen = strlen(name);
 	}
-	if (prefixlen > MD_MAXPREFIX ||
-	    suffixlen > MD_MAXSUFFIX)
-		return (1);
+	if (prefixlen > MD_MAXPREFIX)
+		return (METASPLIT_LONGPREFIX);
+
+	if (suffixlen > MD_MAXSUFFIX) {
+		lastslash = META_LONGDISKNAME_STR;
+		prefixlen = 0;
+		suffixlen = strlen(lastslash);
+		(void) memcpy(SPN_SUFFIX(spn).suf_data, lastslash, suffixlen);
+		SPN_SUFFIX(spn).suf_len = suffixlen;
+		retval = METASPLIT_LONGDISKNAME;
+	} else {
+		(void) memcpy(SPN_SUFFIX(spn).suf_data, lastslash + 1,
+		    suffixlen);
+		SPN_SUFFIX(spn).suf_len = suffixlen;
+	}
+
 	(void) memcpy(SPN_PREFIX(spn).pre_data, name, prefixlen);
 	SPN_PREFIX(spn).pre_len = prefixlen;
-	(void) memcpy(SPN_SUFFIX(spn).suf_data, lastslash + 1, suffixlen);
-	SPN_SUFFIX(spn).suf_len = suffixlen;
-	return (0);
+
+	return (retval);
 }
 
 char *
