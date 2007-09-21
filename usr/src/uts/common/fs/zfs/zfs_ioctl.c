@@ -861,6 +861,11 @@ zfs_ioc_pool_upgrade(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
+	if (zc->zc_cookie < spa_version(spa) || zc->zc_cookie > SPA_VERSION) {
+		spa_close(spa, FTAG);
+		return (EINVAL);
+	}
+
 	spa_upgrade(spa, zc->zc_cookie);
 	spa_close(spa, FTAG);
 
