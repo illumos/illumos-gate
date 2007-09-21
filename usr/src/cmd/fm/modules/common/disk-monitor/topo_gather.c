@@ -47,6 +47,7 @@
 
 #include "disk.h"
 #include "disk_monitor.h"
+#include "hotplug_mgr.h"
 #include "topo_gather.h"
 
 #define	TOPO_PGROUP_IO		"io"	/* duplicated from did_props.h */
@@ -474,7 +475,8 @@ topo_add_bay(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	int		err = 0, i;
 	conf_err_t	conferr;
 	boolean_t	conf_failure = B_FALSE;
-	char		*physid = NULL;
+	char		*unadj_physid = NULL;
+	char		physid[MAXPATHLEN];
 	char		*label;
 	nvlist_t	*diskprops = NULL;
 	char		*cstr = NULL;
@@ -521,14 +523,21 @@ topo_add_bay(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	 * Determine the physical path to the attachment point
 	 */
 	if (topo_prop_get_string(node, TOPO_PGROUP_IO,
-	    TOPO_IO_AP_PATH, &physid, &err) != 0) {
+	    TOPO_IO_AP_PATH, &unadj_physid, &err) == 0) {
 
-		/* physid cannot have been allocated */
+		adjust_dynamic_ap(unadj_physid, physid);
+		topo_hdl_strfree(thp, unadj_physid);
+	} else {
+
+		/* unadj_physid cannot have been allocated */
 		if (cstr)
 			dstrfree(cstr);
 		nvlist_free(nvlp);
 		return (-1);
 	}
+
+	/*
+	 */
 
 	/*
 	 * Process the properties.  If we encounter a property that
@@ -713,7 +722,6 @@ topo_add_bay(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	}
 
 
-	topo_hdl_strfree(thp, physid);
 	return (0);
 }
 

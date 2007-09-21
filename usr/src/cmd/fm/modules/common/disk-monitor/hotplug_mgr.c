@@ -81,7 +81,7 @@ nsleep(int seconds)
 
 static int
 config_list_ext_poll(int num, char * const *path,
-    cfga_list_data_t **list_array, int *nlist)
+    cfga_list_data_t **list_array, int *nlist, int flag)
 {
 	boolean_t done = B_FALSE;
 	boolean_t timedout = B_FALSE;
@@ -92,7 +92,7 @@ config_list_ext_poll(int num, char * const *path,
 
 	do {
 		switch ((e = config_list_ext(num, path, list_array,
-		    nlist, NULL, NULL, NULL, CFGA_FLAG_LIST_ALL))) {
+		    nlist, NULL, NULL, NULL, flag))) {
 
 		case CFGA_OK:
 
@@ -120,6 +120,64 @@ config_list_ext_poll(int num, char * const *path,
 }
 
 /*
+ * Given a physical attachment point with a dynamic component
+ * (as in the case of SCSI APs), ensure the 'controller'
+ * portion of the dynamic component matches the physical portion.
+ * Argument 'adjusted' must point to a buffer of at least
+ * MAXPATHLEN bytes.
+ */
+void
+adjust_dynamic_ap(const char *apid, char *adjusted)
+{
+	cfga_list_data_t *list_array = NULL;
+	int nlist;
+	char *ap_path[1];
+	char phys[MAXPATHLEN];
+	char dev_phys[MAXPATHLEN];
+	char *dyn;
+	int c, t, d;
+
+	dm_assert((strlen(apid) + 8 /* strlen("/devices") */) < MAXPATHLEN);
+
+	/* In the case of any error, return the unadjusted APID */
+	(void) strcpy(adjusted, apid);
+
+	/* if AP is not dynamic or not a disk node, no need to adjust it */
+	dyn = strstr(apid, "::");
+	if ((dyn == NULL) || (dyn == apid) ||
+	    (sscanf(dyn, "::dsk/c%dt%dd%d", &c, &t, &d) != 3))
+		return;
+
+	/*
+	 * Copy the AP_ID and terminate it at the '::' that we know
+	 * for a fact it contains.  Pre-pend '/devices' for the sake
+	 * of cfgadm_scsi, and get the cfgadm data for the controller.
+	 */
+	(void) strcpy(phys, apid);
+	*strstr(phys, "::") = '\0';
+	(void) snprintf(dev_phys, MAXPATHLEN, "/devices%s", phys);
+	ap_path[0] = dev_phys;
+
+	if (config_list_ext_poll(1, ap_path, &list_array, &nlist, 0)
+	    != CFGA_OK)
+		return;
+
+	dm_assert(nlist == 1);
+
+	if (sscanf(list_array[0].ap_log_id, "c%d", &c) == 1)
+		(void) snprintf(adjusted, MAXPATHLEN, "%s::dsk/c%dt%dd%d",
+		    phys, c, t, d);
+
+	free(list_array);
+}
+
+static int
+disk_ap_is_scsi(const char *ap_path)
+{
+	return (strstr(ap_path, ":scsi:") != NULL);
+}
+
+/*
  * Looks up the attachment point's state and returns it in one of
  * the hotplug states that the state change manager understands.
  */
@@ -128,9 +186,10 @@ disk_ap_state_to_hotplug_state(diskmon_t *diskp)
 {
 	hotplug_state_t state = HPS_UNKNOWN;
 	cfga_list_data_t *list_array = NULL;
-	int nlist;
+	int rv, nlist;
 	char *app = (char *)dm_prop_lookup(diskp->app_props,
 	    DISK_AP_PROP_APID);
+	char adj_app[MAXPATHLEN];
 	char *ap_path[1];
 	char *devices_app;
 	int len;
@@ -138,42 +197,42 @@ disk_ap_state_to_hotplug_state(diskmon_t *diskp)
 
 	dm_assert(app != NULL);
 
-	ap_path[0] = app;
+	adjust_dynamic_ap(app, adj_app);
+	ap_path[0] = adj_app;
+	devices_app = NULL;
 
-	if (config_list_ext_poll(1, ap_path, &list_array, &nlist)
-	    == CFGA_OK) {
+	rv = config_list_ext_poll(1, ap_path, &list_array, &nlist,
+	    CFGA_FLAG_LIST_ALL);
 
-		dm_assert(nlist == 1);
-		dm_assert(strcmp(app, list_array[0].ap_phys_id) == 0);
-
-		list_valid = B_TRUE;
-
-	} else {
+	if (rv != CFGA_OK) {
 		/*
-		 * The sata libcfgadm plugin adds a
+		 * The SATA and SCSI libcfgadm plugins add a
 		 * /devices to the phys id; to use it, we must
 		 * prepend this string before the call.
 		 */
-		len = 8 /* strlen("/devices") */ + strlen(app) + 1;
+		len = 8 /* strlen("/devices") */ + strlen(adj_app) + 1;
 		devices_app = dmalloc(len);
-
 		(void) snprintf(devices_app, len, "/devices%s",
-		    app);
-
+		    adj_app);
 		ap_path[0] = devices_app;
 
-		if (config_list_ext_poll(1, ap_path, &list_array, &nlist)
-		    == CFGA_OK) {
-
-			dm_assert(nlist == 1);
-			dm_assert(strcmp(devices_app, list_array[0].ap_phys_id)
-			    == 0);
-
-			list_valid = B_TRUE;
-		}
-
-		dfree(devices_app, len);
+		rv = config_list_ext_poll(1, ap_path, &list_array, &nlist,
+		    CFGA_FLAG_LIST_ALL);
 	}
+
+	/*
+	 * cfgadm_scsi will return an error for an absent target,
+	 * so treat an error as "absent"; otherwise, make sure
+	 * cfgadm_xxx has returned a list of 1 item
+	 */
+	if (rv == CFGA_OK) {
+		dm_assert(nlist == 1);
+		list_valid = B_TRUE;
+	} else if (disk_ap_is_scsi(ap_path[0]))
+		state = HPS_ABSENT;
+
+	if (devices_app != NULL)
+		dfree(devices_app, len);
 
 	if (list_valid) {
 		/*
@@ -252,7 +311,8 @@ disk_sysev_to_state(diskmon_t *diskp, sysevent_t *evp)
 		}
 
 	} else if (strcmp(class_name, EC_DR) == 0 &&
-	    strcmp(subclass, ESC_DR_AP_STATE_CHANGE) == 0) {
+	    ((strcmp(subclass, ESC_DR_AP_STATE_CHANGE) == 0) ||
+	    (strcmp(subclass, ESC_DR_TARGET_STATE_CHANGE) == 0))) {
 
 		if (sysevent_lookup_attr(evp, DR_HINT, SE_DATA_TYPE_STRING,
 		    &se_val) == 0 && se_val.value.sv_string != NULL) {
@@ -273,12 +333,94 @@ disk_sysev_to_state(diskmon_t *diskp, sysevent_t *evp)
 		/*
 		 * If the state could not be determined by the hint
 		 * (or there was no hint), ask the AP directly.
+		 * SCSI HBAs may send an insertion sysevent
+		 * *after* configuring the target node, so double-
+		 * check HPS_PRESENT
 		 */
-		if (state == HPS_UNKNOWN)
+		if ((state == HPS_UNKNOWN) || (state = HPS_PRESENT))
 			state = disk_ap_state_to_hotplug_state(diskp);
 	}
 
 	return (state);
+}
+
+static void
+disk_split_ap_path_sata(const char *ap_path, char *device, int *target)
+{
+	char *p;
+	int n;
+
+	/*
+	 *  /devices/rootnode/.../device:target
+	 */
+	(void) strncpy(device, ap_path, MAXPATHLEN);
+	p = strrchr(device, ':');
+	dm_assert(p != NULL);
+	n = sscanf(p, ":%d", target);
+	dm_assert(n == 1);
+	*p = '\0';
+}
+
+static void
+disk_split_ap_path_scsi(const char *ap_path, char *device, int *target)
+{
+	char *p;
+	int n;
+
+	/*
+	 *  /devices/rootnode/.../device:scsi::dsk/cXtXdX
+	 */
+
+	(void) strncpy(device, ap_path, MAXPATHLEN);
+	p = strrchr(device, ':');
+	dm_assert(p != NULL);
+
+	n = sscanf(p, ":dsk/c%*dt%dd%*d", target);
+	dm_assert(n == 1);
+
+	*strchr(device, ':') = '\0';
+}
+
+static void
+disk_split_ap_path(const char *ap_path, char *device, int *target)
+{
+	/*
+	 * The AP path comes in two forms; for SATA devices,
+	 * is is of the form:
+	 *   /devices/rootnode/.../device:portnum
+	 * and for SCSI devices, it is of the form:
+	 *  /devices/rootnode/.../device:scsi::dsk/cXtXdX
+	 */
+
+	if (disk_ap_is_scsi(ap_path))
+		disk_split_ap_path_scsi(ap_path, device, target);
+	else
+		disk_split_ap_path_sata(ap_path, device, target);
+}
+
+static void
+disk_split_device_path(const char *dev_path, char *device, int *target)
+{
+	char *t, *p, *e;
+
+	/*
+	 * The disk device path is of the form:
+	 * /rootnode/.../device/target@tgtid,tgtlun
+	 */
+
+	(void) strncpy(device, dev_path, MAXPATHLEN);
+	e = t = strrchr(device, '/');
+	dm_assert(t != NULL);
+
+	t = strchr(t, '@');
+	dm_assert(t != NULL);
+	t += 1;
+
+	if ((p = strchr(t, ',')) != NULL)
+		*p = '\0';
+
+	*target = strtol(t, 0, 16);
+	*e = '\0';
 }
 
 /*
@@ -288,16 +430,19 @@ disk_sysev_to_state(diskmon_t *diskp, sysevent_t *evp)
 static diskmon_t *
 disk_match_by_device_path(diskmon_t *disklistp, const char *dev_path)
 {
-	char *p;
-	int targetid;
-	char tgtnum[MAXNAMELEN];
-	char finalpath[MAXPATHLEN];
-	char devicepath[MAXPATHLEN];
+	char dev_device[MAXPATHLEN];
+	int dev_target;
+	char ap_device[MAXPATHLEN];
+	int ap_target;
+
 	dm_assert(disklistp != NULL);
 	dm_assert(dev_path != NULL);
 
 	if (strncmp(dev_path, DEVICES_PREFIX, 8) == 0)
 		dev_path += 8;
+
+	/* pare dev_path into device and target components */
+	disk_split_device_path(dev_path, (char *)&dev_device, &dev_target);
 
 	/*
 	 * The AP path specified in the configuration properties is
@@ -311,42 +456,14 @@ disk_match_by_device_path(diskmon_t *disklistp, const char *dev_path)
 		    DISK_AP_PROP_APID);
 		dm_assert(app != NULL);
 
-		/*
-		 * The disk device path is of the form:
-		 * /rootnode/.../device/target@tgtid,tgtlun
-		 * The AP path is of the form:
-		 * /devices/rootnode/.../device:portnum
-		 */
-
+		/* Not necessary to adjust the APID here */
 		if (strncmp(app, DEVICES_PREFIX, 8) == 0)
 			app += 8;
 
-		/* Get the target number from the disk path: */
-		p = strrchr(dev_path, '/');
-		dm_assert(p != NULL);
+		disk_split_ap_path(app, (char *)&ap_device, &ap_target);
 
-		p = strchr(p, '@');
-		dm_assert(p != NULL);
-
-		bzero(tgtnum, MAXNAMELEN);
-		(void) strlcpy(tgtnum, p + 1, MAXNAMELEN);
-
-		if ((p = strchr(tgtnum, ',')) != NULL)
-			*p = 0;
-
-		targetid = strtol(tgtnum, 0, 16);
-
-		/*
-		 * Now copy the last part of the disk path and create the
-		 * string we want to match.
-		 */
-		(void) strlcpy(devicepath, dev_path, MAXPATHLEN);
-		if ((p = strrchr(devicepath, '/')) != NULL)
-			*p = 0;
-		(void) snprintf(finalpath, MAXPATHLEN, "%s:%x",
-		    devicepath, targetid);
-
-		if (strcmp(finalpath, app) == 0)
+		if ((strcmp(dev_device, ap_device) == 0) &&
+		    (dev_target == ap_target))
 			return (disklistp);
 
 		disklistp = disklistp->next;
@@ -372,6 +489,39 @@ disk_match_by_ap_id(diskmon_t *disklistp, const char *ap_id)
 		dm_assert(disk_ap_id != NULL);
 
 		if (strcmp(disk_ap_id, ap_id) == 0)
+			return (disklistp);
+
+		disklistp = disklistp->next;
+	}
+	return (NULL);
+}
+
+static diskmon_t *
+disk_match_by_target_id(diskmon_t *disklistp, const char *target_path)
+{
+	const char *disk_ap_id;
+
+	char match_device[MAXPATHLEN];
+	int match_target;
+
+	char ap_device[MAXPATHLEN];
+	int ap_target;
+
+
+	/* Match only the device-tree portion of the name */
+	if (strncmp(target_path, DEVICES_PREFIX, 8) == 0)
+		target_path += 8;
+	disk_split_ap_path(target_path, (char *)&match_device, &match_target);
+
+	while (disklistp != NULL) {
+
+		disk_ap_id = dm_prop_lookup(disklistp->app_props,
+		    DISK_AP_PROP_APID);
+		dm_assert(disk_ap_id != NULL);
+
+		disk_split_ap_path(disk_ap_id, (char *)&ap_device, &ap_target);
+		if ((match_target == ap_target) &&
+		    (strcmp(match_device, ap_device) == 0))
 			return (disklistp);
 
 		disklistp = disklistp->next;
@@ -408,6 +558,15 @@ match_sysevent_to_disk(diskmon_t *disklistp, sysevent_t *evp)
 		    &se_val) == 0 && se_val.value.sv_string != NULL) {
 
 			dmp = disk_match_by_ap_id(disklistp,
+			    se_val.value.sv_string);
+		}
+	} else if (strcmp(class_name, EC_DR) == 0 &&
+	    strcmp(subclass, ESC_DR_TARGET_STATE_CHANGE) == 0) {
+		/* get DR_TARGET_ID */
+		if (sysevent_lookup_attr(evp, DR_TARGET_ID,
+		    SE_DATA_TYPE_STRING, &se_val) == 0 &&
+		    se_val.value.sv_string != NULL) {
+			dmp = disk_match_by_target_id(disklistp,
 			    se_val.value.sv_string);
 		}
 	}
@@ -545,7 +704,8 @@ init_sysevents(void)
 		ESC_DEVFS_DEVI_REMOVE
 	};
 	const char *dr_subclasses[] = {
-		ESC_DR_AP_STATE_CHANGE
+		ESC_DR_AP_STATE_CHANGE,
+		ESC_DR_TARGET_STATE_CHANGE
 	};
 	const char *platform_subclasses[] = {
 		ESC_PLATFORM_SP_RESET
@@ -558,7 +718,8 @@ init_sysevents(void)
 	}
 
 	if (sysevent_subscribe_event(sysevent_handle, EC_DEVFS,
-	    devfs_subclasses, 2) != 0) {
+	    devfs_subclasses,
+	    sizeof (devfs_subclasses)/sizeof (devfs_subclasses[0])) != 0) {
 
 		log_err("Could not initialize the hotplug manager "
 		    "sysevent_subscribe_event(event class = EC_DEVFS) "
@@ -567,7 +728,8 @@ init_sysevents(void)
 		rv = -1;
 
 	} else if (sysevent_subscribe_event(sysevent_handle, EC_DR,
-	    dr_subclasses, 1) != 0) {
+	    dr_subclasses,
+	    sizeof (dr_subclasses)/sizeof (dr_subclasses[0])) != 0) {
 
 		log_err("Could not initialize the hotplug manager "
 		    "sysevent_subscribe_event(event class = EC_DR) "
@@ -578,7 +740,9 @@ init_sysevents(void)
 
 		rv = -1;
 	} else if (sysevent_subscribe_event(sysevent_handle, EC_PLATFORM,
-	    platform_subclasses, 1) != 0) {
+	    platform_subclasses,
+	    sizeof (platform_subclasses)/sizeof (platform_subclasses[0]))
+	    != 0) {
 
 		log_err("Could not initialize the hotplug manager "
 		    "sysevent_subscribe_event(event class = EC_PLATFORM) "

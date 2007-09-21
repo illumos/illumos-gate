@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ typedef enum {
 extern hotplug_state_t disk_ap_state_to_hotplug_state(diskmon_t *diskp);
 extern hotplug_mgr_init_err_t init_hotplug_manager(void);
 extern void cleanup_hotplug_manager(void);
+extern void adjust_dynamic_ap(const char *, char *);
 
 #ifdef	__cplusplus
 }
