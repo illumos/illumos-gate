@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,9 +183,8 @@ nfslog_init()
 	 */
 	for (indx = 0; nfslog_mem_alloc[indx].size != (-1); indx++) {
 		nfslog_mem_alloc[indx].mem_cache =
-			kmem_cache_create(nfslog_mem_alloc[indx].cache_name,
-				ALLOC_SIZE(indx),
-				0, NULL, NULL, NULL, NULL, NULL, 0);
+		    kmem_cache_create(nfslog_mem_alloc[indx].cache_name,
+		    ALLOC_SIZE(indx), 0, NULL, NULL, NULL, NULL, NULL, 0);
 	}
 }
 
@@ -215,13 +214,13 @@ nfslog_setup(struct exportinfo *exi)
 	for (lbp = nfslog_buffer_list; lbp != NULL; lbp = lbp->lb_next) {
 		LOGGING_DPRINT((10,
 		    "searching for buffer... found log_buffer '%s'\n",
-				lbp->lb_path));
+		    lbp->lb_path));
 		if (strcmp(lbp->lb_path, kex->ex_log_buffer) == 0) {
 			/* Found our match. Ref it and return */
 			LOG_BUFFER_HOLD(lbp);
 			exi->exi_logbuffer = lbp;
 			LOGGING_DPRINT((10,  "\tfound log_buffer for '%s'\n",
-				kex->ex_log_buffer));
+			    kex->ex_log_buffer));
 			rw_exit(&nfslog_buffer_list_lock);
 			return (0);
 		}
@@ -244,7 +243,7 @@ nfslog_setup(struct exportinfo *exi)
 
 	rw_enter(&nfslog_buffer_list_lock, RW_WRITER);
 	for (lbp = nfslog_buffer_list; lbp != NULL;
-		lbp = lbp->lb_next) {
+	    lbp = lbp->lb_next) {
 		if (strcmp(lbp->lb_path, kex->ex_log_buffer) == 0) {
 				/*
 				 * A log_buffer already exists for the
@@ -254,10 +253,8 @@ nfslog_setup(struct exportinfo *exi)
 
 			exi->exi_logbuffer = lbp;
 
-			LOGGING_DPRINT((10,
-				"found log_buffer for '%s' "
-				"after allocation\n",
-				kex->ex_log_buffer));
+			LOGGING_DPRINT((10, "found log_buffer for '%s' "
+			    "after allocation\n", kex->ex_log_buffer));
 
 			rw_exit(&nfslog_buffer_list_lock);
 
@@ -272,8 +269,7 @@ nfslog_setup(struct exportinfo *exi)
 	 * increment the reference count because the node is
 	 * entered into the global list.
 	 */
-	LOGGING_DPRINT((10, "exportfs: adding nlbp=%p to list\n",
-		nlbp));
+	LOGGING_DPRINT((10, "exportfs: adding nlbp=%p to list\n", nlbp));
 
 	nlbp->lb_next = nfslog_buffer_list;
 	nfslog_buffer_list = nlbp;
@@ -362,7 +358,7 @@ log_buffer_rele(struct log_buffer *lbp)
 		 * list.
 		 */
 		LOGGING_DPRINT((10,
-			"log_buffer_rele lbp=%p disconnecting\n", lbp));
+		    "log_buffer_rele lbp=%p disconnecting\n", lbp));
 		/*
 		 * Hold additional reference before dropping the lb_lock
 		 */
@@ -397,7 +393,7 @@ log_buffer_rele(struct log_buffer *lbp)
 
 			/* Drop the log_buffer from the master list */
 			for (tlbp = nfslog_buffer_list; tlbp->lb_next != NULL;
-					tlbp = tlbp->lb_next) {
+			    tlbp = tlbp->lb_next) {
 				if (tlbp->lb_next == lbp) {
 					tlbp->lb_next = lbp->lb_next;
 					break;
@@ -445,13 +441,13 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 
 	LOGGING_DPRINT((3, "log_file_create: %s\n", name));
 	if (error = vn_open(name, UIO_SYSSPACE, FCREAT|FWRITE|FOFFMAX,
-			LOG_MODE, &vp, CRCREAT, 0)) {
+	    LOG_MODE, &vp, CRCREAT, 0)) {
 		nfs_cmn_err(error, CE_WARN,
-			"log_file_create: Can not open %s - error %m", name);
+		    "log_file_create: Can not open %s - error %m", name);
 		goto out;
 	}
 	LOGGING_DPRINT((3, "log_file_create: %s vp=%p v_count=%d\n",
-		name, vp, vp->v_count));
+	    name, vp, vp->v_count));
 
 	logfile = (struct log_file *)kmem_zalloc(sizeof (*logfile), KM_SLEEP);
 	logfile->lf_path = name;
@@ -468,8 +464,7 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 	error = VOP_GETATTR(vp, &va, 0, CRED());
 	if (error) {
 		nfs_cmn_err(error, CE_WARN,
-			"log_file_create: Can not stat %s - error = %m",
-			name);
+		    "log_file_create: Can not stat %s - error = %m",  name);
 		goto out;
 	}
 
@@ -499,8 +494,8 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 
 		if (error != 0) {
 			nfs_cmn_err(error, CE_WARN,
-				"log_file_create: Can not write header "
-				"on %s - error = %m", name);
+			    "log_file_create: Can not write header "
+			    "on %s - error = %m", name);
 			goto out;
 		}
 	}
@@ -515,11 +510,11 @@ out:
 	if (vp != NULL) {
 		int error1;
 		error1 = VOP_CLOSE(vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
-				CRED());
+		    CRED());
 		if (error1) {
 			nfs_cmn_err(error1, CE_WARN,
-				"log_file_create: Can not close %s - "
-				"error = %m", name);
+			    "log_file_create: Can not close %s - "
+			    "error = %m", name);
 		}
 		VN_RELE(vp);
 	}
@@ -548,8 +543,8 @@ log_file_rele(struct log_file *lfp)
 	mutex_enter(&lfp->lf_lock);
 	if (--lfp->lf_refcnt > 0) {
 		LOGGING_DPRINT((10,
-			"log_file_rele lfp=%p decremented refcnt to %d\n",
-			lfp, lfp->lf_refcnt));
+		    "log_file_rele lfp=%p decremented refcnt to %d\n",
+		    lfp, lfp->lf_refcnt));
 		mutex_exit(&lfp->lf_lock);
 		return;
 	}
@@ -566,16 +561,15 @@ log_file_rele(struct log_file *lfp)
 	ASSERT(lfp->lf_writers == 0);
 
 	if (error = VOP_CLOSE(lfp->lf_vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
-		CRED())) {
+	    CRED())) {
 		nfs_cmn_err(error, CE_WARN,
-			"NFS: Could not close log buffer %s - error = %m",
-			lfp->lf_path);
+		    "NFS: Could not close log buffer %s - error = %m",
+		    lfp->lf_path);
 #ifdef DEBUG
 	} else {
 		LOGGING_DPRINT((3,
-			"log_file_rele: %s has been closed vp=%p "
-			"v_count=%d\n",
-			lfp->lf_path, lfp->lf_vp, lfp->lf_vp->v_count));
+		    "log_file_rele: %s has been closed vp=%p v_count=%d\n",
+		    lfp->lf_path, lfp->lf_vp, lfp->lf_vp->v_count));
 #endif
 	}
 	VN_RELE(lfp->lf_vp);
@@ -611,8 +605,8 @@ nfslog_record_alloc(
 	struct lr_alloc *lrp;
 
 	lrp = (struct lr_alloc *)
-		kmem_cache_alloc(nfslog_mem_alloc[alloc_indx].mem_cache,
-			KM_NOSLEEP);
+	    kmem_cache_alloc(nfslog_mem_alloc[alloc_indx].mem_cache,
+	    KM_NOSLEEP);
 
 	if (lrp == NULL) {
 		*cookie = NULL;
@@ -624,7 +618,7 @@ nfslog_record_alloc(
 	lrp->lr_flags = 0;
 
 	lrp->log_record = (caddr_t)((uintptr_t)lrp +
-		(uintptr_t)sizeof (struct lr_alloc));
+	    (uintptr_t)sizeof (struct lr_alloc));
 	lrp->size = nfslog_mem_alloc[alloc_indx].size;
 	lrp->alloc_cache = nfslog_mem_alloc[alloc_indx].mem_cache;
 	lrp->exi = exi;
@@ -639,8 +633,8 @@ nfslog_record_alloc(
 	*cookie = (void *)lrp;
 
 	LOGGING_DPRINT((3,
-		"nfslog_record_alloc(log_buffer=%p mem=%p size=%lu)\n",
-		exi->exi_logbuffer, lrp->log_record, lrp->size));
+	    "nfslog_record_alloc(log_buffer=%p mem=%p size=%lu)\n",
+	    exi->exi_logbuffer, lrp->log_record, lrp->size));
 	return (lrp->log_record);
 }
 
@@ -706,8 +700,7 @@ nfslog_record_put(void *cookie, size_t size, bool_t sync,
 	 * via the sync parameter.
 	 */
 	if (lbp->lb_size_queued >= nfslog_num_bytes_to_write ||
-		lbp->lb_num_recs > nfslog_num_records_to_write ||
-		sync == TRUE) {
+	    lbp->lb_num_recs > nfslog_num_records_to_write || sync == TRUE) {
 		mutex_exit(&lbp->lb_lock);
 		(void) nfslog_records_flush_to_disk(lbp);
 	} else {
@@ -859,14 +852,14 @@ out:
 	if (error) {
 		if (!(lfp->lf_flags & L_PRINTED)) {
 			nfs_cmn_err(error, CE_WARN,
-				"NFS Logging disabled for buffer %s - "
-				"write error = %m\n", lfp->lf_path);
+			    "NFS Logging disabled for buffer %s - "
+			    "write error = %m\n", lfp->lf_path);
 			lfp->lf_flags |= L_PRINTED;
 		}
 	} else if (lfp->lf_flags & (L_ERROR | L_PRINTED)) {
 		lfp->lf_flags &= ~(L_ERROR | L_PRINTED);
 		cmn_err(CE_WARN,
-			"NFS Logging re-enabled for buffer %s\n", lfp->lf_path);
+		    "NFS Logging re-enabled for buffer %s\n", lfp->lf_path);
 	}
 
 	return (error);
@@ -894,7 +887,7 @@ nfslog_free_logrecords(struct lr_alloc *lrp_writers)
 				log_buffer_rele(lrp_free->lb);
 			if (lrp_free->alloc_cache) /* double check */
 				kmem_cache_free(lrp_free->alloc_cache,
-					(void *)lrp_free);
+				    (void *)lrp_free);
 		} else {
 			/*
 			 * after being pulled from the list the
@@ -938,7 +931,7 @@ nfslog_logbuffer_rename(struct log_buffer *lbp)
 	mutex_exit(&(lf)->lf_lock);
 
 	LOGGING_DPRINT((10, "nfslog_logbuffer_rename: renaming %s to %s\n",
-		lf->lf_path, lbp->lb_path));
+	    lf->lf_path, lbp->lb_path));
 
 	/*
 	 * rename the current buffer to what the daemon expects
@@ -1001,8 +994,8 @@ nfslog_logfile_rename(char *from, char *new)
 
 	if (error = vn_rename(from, new, UIO_SYSSPACE)) {
 		cmn_err(CE_WARN,
-			"nfslog_logfile_rename: couldn't rename %s to %s\n",
-			from, new);
+		    "nfslog_logfile_rename: couldn't rename %s to %s\n",
+		    from, new);
 	}
 	return (error);
 }
@@ -1070,8 +1063,8 @@ nfslog_record_append2all(struct lr_alloc *lrp)
 		if (error) {
 			ret_error = -1;
 			nfs_cmn_err(error, CE_WARN,
-				"rfsl_log_pubfh: could not append record to "
-				"\"%s\" error = %m\n", lbp->lb_path);
+			    "rfsl_log_pubfh: could not append record to "
+			    "\"%s\" error = %m\n", lbp->lb_path);
 		}
 		log_buffer_rele(lbp);
 		rw_enter(&nfslog_buffer_list_lock, RW_READER);
@@ -1123,13 +1116,13 @@ nfsl_flush(struct nfsl_flush_args *args, model_t model)
 	STRUCT_SET_HANDLE(uap, model, args);
 
 	tparams = (struct flush_thread_params *)
-		kmem_zalloc(sizeof (*tparams), KM_SLEEP);
+	    kmem_zalloc(sizeof (*tparams), KM_SLEEP);
 
 	nfsl_args = &tparams->tp_args;
 	nfsl_args->version =  STRUCT_FGET(uap, version);
 	if (nfsl_args->version != NFSL_FLUSH_ARGS_VERS) {
 		cmn_err(CE_WARN, "nfsl_flush: exected version %d, got %d",
-			NFSL_FLUSH_ARGS_VERS, nfsl_args->version);
+		    NFSL_FLUSH_ARGS_VERS, nfsl_args->version);
 		return (EIO);
 	}
 
@@ -1141,12 +1134,12 @@ nfsl_flush(struct nfsl_flush_args *args, model_t model)
 		nfsl_args->buff_len = STRUCT_FGET(uap, buff_len);
 
 		nfsl_args->buff = (char *)
-			kmem_alloc(nfsl_args->buff_len, KM_NOSLEEP);
+		    kmem_alloc(nfsl_args->buff_len, KM_NOSLEEP);
 		if (nfsl_args->buff == NULL)
 			return (ENOMEM);
 
 		error = copyinstr((const char *)STRUCT_FGETP(uap, buff),
-			nfsl_args->buff, nfsl_args->buff_len, &buffer_len);
+		    nfsl_args->buff, nfsl_args->buff_len, &buffer_len);
 		if (error)
 			return (EFAULT);
 
@@ -1155,7 +1148,7 @@ nfsl_flush(struct nfsl_flush_args *args, model_t model)
 	}
 
 	LOGGING_DPRINT((10, "nfsl_flush: Flushing %s buffer(s)\n",
-		nfsl_args->directive & NFSL_ALL ? "all" : nfsl_args->buff));
+	    nfsl_args->directive & NFSL_ALL ? "all" : nfsl_args->buff));
 
 	if (nfsl_args->directive & NFSL_SYNC) {
 		/*
@@ -1188,7 +1181,7 @@ static void
 nfslog_do_flush(struct flush_thread_params *tparams)
 {
 	struct nfsl_flush_args *args;
-	struct log_buffer *lbp;
+	struct log_buffer *lbp, *nlbp;
 	int error = ENOENT;
 	int found = 0;
 	char *buf_inprog;	/* name of buff in progress */
@@ -1204,20 +1197,32 @@ nfslog_do_flush(struct flush_thread_params *tparams)
 		return;
 
 	rw_enter(&nfslog_buffer_list_lock, RW_READER);
-	for (lbp = nfslog_buffer_list; lbp != NULL; lbp = lbp->lb_next) {
+	if ((lbp = nfslog_buffer_list) != NULL) {
+		LOG_BUFFER_HOLD(lbp);
+	}
+	for (nlbp = NULL; lbp != NULL; lbp = nlbp) {
+		if ((nlbp = lbp->lb_next) != NULL) {
+			LOG_BUFFER_HOLD(nlbp);
+		}
+		rw_exit(&nfslog_buffer_list_lock);
 		if (args->directive & NFSL_ALL) {
 			(void) nfslog_records_flush_to_disk(lbp);
 		} else {
 			if ((strcmp(lbp->lb_path, args->buff) == 0) &&
-				(args->directive & NFSL_RENAME)) {
-
+			    (args->directive & NFSL_RENAME)) {
 				error = nfslog_logbuffer_rename(lbp);
 				found++;
+				if (nlbp != NULL)
+					log_buffer_rele(nlbp);
+				log_buffer_rele(lbp);
 				break;
 			}
 		}
+		log_buffer_rele(lbp);
+		rw_enter(&nfslog_buffer_list_lock, RW_READER);
 	}
-	rw_exit(&nfslog_buffer_list_lock);
+	if (!found)
+		rw_exit(&nfslog_buffer_list_lock);
 
 	if (!found && ((args->directive & NFSL_ALL) == 0) &&
 	    (args->directive & NFSL_RENAME)) {
@@ -1226,10 +1231,10 @@ nfslog_do_flush(struct flush_thread_params *tparams)
 		 * simply rename the file indicated.
 		 */
 		buf_inprog_len = strlen(args->buff) +
-			strlen(LOG_INPROG_STRING) + 1;
+		    strlen(LOG_INPROG_STRING) + 1;
 		buf_inprog = (caddr_t)kmem_alloc(buf_inprog_len, KM_SLEEP);
 		(void) sprintf(buf_inprog, "%s%s",
-			args->buff, LOG_INPROG_STRING);
+		    args->buff, LOG_INPROG_STRING);
 
 		error = nfslog_logfile_rename(buf_inprog, args->buff);
 
@@ -1576,21 +1581,21 @@ nfslog_get_exi(
 		switch (req->rq_vers) {
 		case NFS_V3:
 			if ((req->rq_proc == NFSPROC3_LOOKUP) &&
-				(((LOOKUP3res *)res)->status == NFS3_OK)) {
+			    (((LOOKUP3res *)res)->status == NFS3_OK)) {
 				fh3 = &((LOOKUP3res *)res)->res_u.ok.object;
 				exi_ret = checkexport(&fh3->fh3_fsid,
-					FH3TOXFIDP(fh3));
+				    FH3TOXFIDP(fh3));
 			}
 			break;
 
 		case NFS_VERSION:
 			if ((req->rq_proc == RFS_LOOKUP) &&
-				(((struct nfsdiropres *)
-					res)->dr_status == NFS_OK)) {
-				fh =
-		&((struct nfsdiropres *)res)->dr_u.dr_drok_u.drok_fhandle;
+			    (((struct nfsdiropres *)
+			    res)->dr_status == NFS_OK)) {
+				fh =  &((struct nfsdiropres *)res)->
+				    dr_u.dr_drok_u.drok_fhandle;
 				exi_ret = checkexport(&fh->fh_fsid,
-					(fid_t *)&fh->fh_xlen);
+				    (fid_t *)&fh->fh_xlen);
 			}
 			break;
 		default:
@@ -1706,8 +1711,8 @@ nfslog_write_record(struct exportinfo *exi, struct svc_req *req,
 		/* Pick the size to alloc; end of the road - return */
 		if (nfslog_mem_alloc[alloc_indx].size == (-1)) {
 			cmn_err(CE_WARN,
-				"NFSLOG: unable to encode record - prog=%d "
-				"proc = %d", req->rq_prog, req->rq_proc);
+			    "NFSLOG: unable to encode record - prog=%d "
+			    "proc = %d", req->rq_prog, req->rq_proc);
 			return;
 		}
 
@@ -1720,15 +1725,15 @@ nfslog_write_record(struct exportinfo *exi, struct svc_req *req,
 		}
 
 		xdrmem_create(&xdrs, buffer,
-			nfslog_mem_alloc[alloc_indx].size, XDR_ENCODE);
+		    nfslog_mem_alloc[alloc_indx].size, XDR_ENCODE);
 
 		/*
 		 * Encode the header, args and results of the record
 		 */
 		if (xdr_nfslog_request_record(&xdrs, exi, req, cr, pnb,
-			nfslog_mem_alloc[alloc_indx].size, record_id) &&
-			(*disp->xdrargs)(&xdrs, args) &&
-			(*disp->xdrres)(&xdrs, res)) {
+		    nfslog_mem_alloc[alloc_indx].size, record_id) &&
+		    (*disp->xdrargs)(&xdrs, args) &&
+		    (*disp->xdrres)(&xdrs, res)) {
 				encode_ok = TRUE;
 
 				rfs_log_good++;
@@ -1756,8 +1761,8 @@ nfslog_write_record(struct exportinfo *exi, struct svc_req *req,
 	 * If the record_id is 0 then this is most likely a share/unshare
 	 * request and it should be written synchronously to the log file.
 	 */
-	nfslog_record_put(log_cookie, final_size,
-		(record_id == 0), which_buffers);
+	nfslog_record_put(log_cookie,
+	    final_size, (record_id == 0), which_buffers);
 }
 
 static char *
@@ -1810,7 +1815,7 @@ log_public_record(struct exportinfo *exi, cred_t *cr)
 	 * to each of the open log buffers
 	 */
 	nfslog_write_record(exi, &req,
-		(caddr_t)&args, (caddr_t)&res, cr, &nb, 0, NFSLOG_ALL_BUFFERS);
+	    (caddr_t)&args, (caddr_t)&res, cr, &nb, 0, NFSLOG_ALL_BUFFERS);
 
 	kmem_free(args.name, free_length);
 }
@@ -1837,9 +1842,8 @@ nfslog_share_record(struct exportinfo *exi, cred_t *cr)
 		req.rq_vers = NFSLOG_VERSION;
 		req.rq_proc = NFSLOG_SHARE;
 		req.rq_cred.oa_flavor = AUTH_NONE;
-		nfslog_write_record(exi, &req,
-			(caddr_t)exi, (caddr_t)&res, cr,
-			&nb, 0, NFSLOG_ONE_BUFFER);
+		nfslog_write_record(exi, &req, (caddr_t)exi, (caddr_t)&res, cr,
+		    &nb, 0, NFSLOG_ONE_BUFFER);
 	}
 
 	log_public_record(exi, cr);
@@ -1865,7 +1869,7 @@ nfslog_unshare_record(struct exportinfo *exi, cred_t *cr)
 	req.rq_proc = NFSLOG_UNSHARE;
 	req.rq_cred.oa_flavor = AUTH_NONE;
 	nfslog_write_record(exi, &req,
-		(caddr_t)exi, (caddr_t)&res, cr, &nb, 0, NFSLOG_ONE_BUFFER);
+	    (caddr_t)exi, (caddr_t)&res, cr, &nb, 0, NFSLOG_ONE_BUFFER);
 }
 
 
@@ -1904,9 +1908,8 @@ nfslog_getfh(struct exportinfo *exi,
 		gfh.gfh_fh_buf = *fh;
 		gfh.gfh_path = namebuf;
 
-		nfslog_write_record(exi, &req,
-			(caddr_t)&gfh, (caddr_t)&res, cr, &nb, 0,
-			NFSLOG_ONE_BUFFER);
+		nfslog_write_record(exi, &req, (caddr_t)&gfh, (caddr_t)&res,
+		    cr, &nb, 0, NFSLOG_ONE_BUFFER);
 	}
 	kmem_free(namebuf, MAXPATHLEN + 4);
 }
