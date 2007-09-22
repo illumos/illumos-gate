@@ -565,6 +565,7 @@ usr/lib/krb5/README.db2			sparc
 usr/lib/krb5/db2.so			sparc
 usr/lib/krb5/db2.so.1			sparc
 usr/lib/krb5/kadmind			sparc
+usr/lib/krb5/klookup			sparc
 usr/lib/krb5/kprop			sparc
 usr/lib/krb5/kprop_script		sparc
 usr/lib/krb5/kpropd			sparc
@@ -587,6 +588,7 @@ usr/sbin/kadmin				sparc
 usr/sbin/kclient			sparc
 usr/sbin/kdb5_util			sparc
 usr/sbin/kdb5_ldap_util			sparc
+usr/sbin/kdcmgr				sparc
 usr/sbin/kproplog			sparc
 usr/share/lib/ldif/kerberos.ldif	sparc
 var/krb5				sparc
