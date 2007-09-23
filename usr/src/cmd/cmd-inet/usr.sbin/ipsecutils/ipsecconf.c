@@ -94,6 +94,7 @@ static char spdsock_diag_buf[SPDSOCK_DIAG_BUF_LEN];
  */
 #define	CURL_BEGIN		'{'
 #define	CURL_END		'}'
+#define	BACK_SLASH		'\\'
 #define	MAXARGS			20
 #define	NOERROR			0
 
@@ -145,9 +146,12 @@ static char all_polheads;	/* So we can easily get "". */
  * Following are used for reporting errors with arguments.
  * We store the line numbers of each argument as we parse them,
  * so that the error reporting is more specific. We can have only
- * MAXARGS -1 for pattern and properties and one for action.
+ * (MAXARGS - 1) arguments between any pair of CURL_BEGIN CURL_END.
+ * Because a single command can be made up of multiple action/property
+ * combinations, the maximum command size is (2 * (MAXARGS -1)) for each
+ * of patterns, properties and actions.
  */
-#define	ARG_BUF_LEN		((2 * (MAXARGS - 1)) + 1)
+#define	ARG_BUF_LEN		((2 * 3 * (MAXARGS - 1)) + 1)
 static int arg_indices[ARG_BUF_LEN];
 static int argindex;
 static int linecount;
@@ -206,7 +210,7 @@ typedef struct ap_s
 
 /* one lexxed out rule */
 typedef struct act_prop_s {
-	char *pattern[MAXARGS+1];
+	char *pattern[MAXARGS + 1];
 	ap_t ap[MAXARGS + 1];
 } act_prop_t;
 
@@ -913,7 +917,7 @@ ips_act_wild_props_to_action(struct spd_attribute *ap,
 
 			if (use_ah &&
 			    !alg_rangecheck(AH_AUTH, auth_alg,
-				&act_ptr->iap_aauth))
+			    &act_ptr->iap_aauth))
 				continue;
 
 
@@ -1027,7 +1031,7 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 		if (conf->ips_ulp_prot != 0) {
 			spd_proto = (struct spd_proto *)next;
 			spd_proto->spd_proto_len =
-				SPD_8TO64(sizeof (struct spd_proto));
+			    SPD_8TO64(sizeof (struct spd_proto));
 			spd_proto->spd_proto_exttype = SPD_EXT_PROTO;
 			spd_proto->spd_proto_number = conf->ips_ulp_prot;
 			next = (uint64_t *)&(spd_proto[1]);
@@ -1041,7 +1045,7 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 			    sizeof (spd_if_t));
 			spd_if->spd_if_exttype = SPD_EXT_TUN_NAME;
 			(void) strlcpy((char *)spd_if->spd_if_name, tunif,
-				TUNNAMEMAXLEN);
+			    TUNNAMEMAXLEN);
 			next = (uint64_t *)(spd_if) + spd_if->spd_if_len;
 		}
 
@@ -1077,13 +1081,13 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 		    conf->ips_src_port_max != 0) {
 			spd_portrange = (struct spd_portrange *)next;
 			spd_portrange->spd_ports_len =
-				SPD_8TO64(sizeof (struct spd_portrange));
+			    SPD_8TO64(sizeof (struct spd_portrange));
 			spd_portrange->spd_ports_exttype =
-				(conf->swap)?SPD_EXT_REMPORT:SPD_EXT_LCLPORT;
+			    (conf->swap)?SPD_EXT_REMPORT:SPD_EXT_LCLPORT;
 			spd_portrange->spd_ports_minport =
-				conf->ips_src_port_min;
+			    conf->ips_src_port_min;
 			spd_portrange->spd_ports_maxport =
-				conf->ips_src_port_max;
+			    conf->ips_src_port_max;
 			next = (uint64_t *)&(spd_portrange[1]);
 		}
 		/* dst port */
@@ -1091,13 +1095,13 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 		    conf->ips_dst_port_max != 0) {
 			spd_portrange = (struct spd_portrange *)next;
 			spd_portrange->spd_ports_len =
-				SPD_8TO64(sizeof (struct spd_portrange));
+			    SPD_8TO64(sizeof (struct spd_portrange));
 			spd_portrange->spd_ports_exttype =
-				(conf->swap)?SPD_EXT_LCLPORT:SPD_EXT_REMPORT;
+			    (conf->swap)?SPD_EXT_LCLPORT:SPD_EXT_REMPORT;
 			spd_portrange->spd_ports_minport =
-				conf->ips_dst_port_min;
+			    conf->ips_dst_port_min;
 			spd_portrange->spd_ports_maxport =
-				conf->ips_dst_port_max;
+			    conf->ips_dst_port_max;
 			next = (uint64_t *)&(spd_portrange[1]);
 		}
 
@@ -1107,14 +1111,14 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 			next = (uint64_t *)(spd_address + 1);
 
 			spd_address->spd_address_exttype =
-				(conf->swap)?SPD_EXT_REMADDR:SPD_EXT_LCLADDR;
+			    (conf->swap)?SPD_EXT_REMADDR:SPD_EXT_LCLADDR;
 			spd_address->spd_address_prefixlen =
-				conf->ips_src_mask_len;
+			    conf->ips_src_mask_len;
 
 			if (conf->ips_isv4) {
 				spd_address->spd_address_af = AF_INET;
 				(void) memcpy(next, &(conf->ips_src_addr),
-				sizeof (ipaddr_t));
+				    sizeof (ipaddr_t));
 				spd_address->spd_address_len = 2;
 				next += SPD_8TO64(sizeof (ipaddr_t) + 4);
 				if (!conf->has_smask)
@@ -1127,7 +1131,7 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 				next += SPD_8TO64(sizeof (in6_addr_t));
 				if (!conf->has_smask)
 					spd_address->spd_address_prefixlen
-						= 128;
+					    = 128;
 			}
 		}
 
@@ -1138,9 +1142,9 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 			next = (uint64_t *)(spd_address + 1);
 
 			spd_address->spd_address_exttype =
-				(conf->swap)?SPD_EXT_LCLADDR:SPD_EXT_REMADDR;
+			    (conf->swap)?SPD_EXT_LCLADDR:SPD_EXT_REMADDR;
 			spd_address->spd_address_prefixlen =
-				conf->ips_dst_mask_len;
+			    conf->ips_dst_mask_len;
 
 			if (conf->ips_isv4) {
 				spd_address->spd_address_af = AF_INET;
@@ -1159,7 +1163,7 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 				next += SPD_8TO64(sizeof (in6_addr_t));
 				if (!conf->has_dmask)
 					spd_address->spd_address_prefixlen
-						= 128;
+					    = 128;
 			}
 		}
 
@@ -1294,7 +1298,7 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf, int *diag)
 			if (exts[SPD_EXT_RULE]) {
 				conf->ips_policy_index =
 				    ((struct spd_rule *)
-					exts[SPD_EXT_RULE])->spd_rule_index;
+				    exts[SPD_EXT_RULE])->spd_rule_index;
 
 				if (add_index(conf->ips_policy_index)) {
 					free(return_buf);
@@ -1325,10 +1329,10 @@ main(int argc, char *argv[])
 	boolean_t just_check = B_FALSE;
 
 	char *smf_warning = gettext(
-		"\n\tIPsec policy should be managed using smf(5). Modifying\n"
-		"\tthe IPsec policy from the command line while the 'policy'\n"
-		"\tservice is enabled could result in an inconsistent\n"
-		"\tsecurity policy.\n\n");
+	    "\n\tIPsec policy should be managed using smf(5). Modifying\n"
+	    "\tthe IPsec policy from the command line while the 'policy'\n"
+	    "\tservice is enabled could result in an inconsistent\n"
+	    "\tsecurity policy.\n\n");
 
 	flushret = 0;
 
@@ -1791,7 +1795,7 @@ print_raw_address(void *input, boolean_t isv4)
 	cp = NULL;
 	if (!ipsecconf_nflag) {
 		if (sysinfo(SI_HOSTNAME, domain, MAXHOSTNAMELEN) != -1 &&
-			(cp = strchr(domain, '.')) != NULL) {
+		    (cp = strchr(domain, '.')) != NULL) {
 			(void) strlcpy(domain, cp + 1, sizeof (domain));
 		} else {
 			domain[0] = 0;
@@ -1799,7 +1803,7 @@ print_raw_address(void *input, boolean_t isv4)
 		hp = getipnodebyaddr(addr_ptr, addr_len, af, &error_num);
 		if (hp) {
 			if ((cp = strchr(hp->h_name, '.')) != 0 &&
-					strcasecmp(cp + 1, domain) == 0)
+			    strcasecmp(cp + 1, domain) == 0)
 				*cp = 0;
 			cp = hp->h_name;
 		}
@@ -1905,8 +1909,8 @@ ipsec_conf_list(void)
 	if (rmsg == NULL || rmsg->spd_msg_errno != 0) {
 		warnx("%s: %s", gettext("ruleset dump failed"),
 		    (rmsg == NULL ?
-			gettext("read error") :
-			sys_error_message(rmsg->spd_msg_errno)));
+		    gettext("read error") :
+		    sys_error_message(rmsg->spd_msg_errno)));
 		(void) close(pfd);
 		return (-1);
 	}
@@ -2072,11 +2076,10 @@ print_pfpol_msg(spd_msg_t *msg)
 
 	if (exts[SPD_EXT_REMPORT] != NULL) {
 		spd_portrange =
-			(struct spd_portrange *)exts[SPD_EXT_REMPORT];
+		    (struct spd_portrange *)exts[SPD_EXT_REMPORT];
 		if (spd_portrange->spd_ports_minport != 0) {
 			print_port(
-				spd_portrange->spd_ports_minport,
-				TOK_rport);
+			    spd_portrange->spd_ports_minport, TOK_rport);
 		}
 	}
 
@@ -2108,7 +2111,7 @@ print_pfpol_msg(spd_msg_t *msg)
 
 		for (act_count = 0;
 		    act_count < spd_ext_actions->spd_actions_len -1;
-			act_count++) {
+		    act_count++) {
 
 			switch (app->spd_attr_tag) {
 
@@ -2293,8 +2296,8 @@ pfpol_msg_dump(spd_msg_t *msg, char *tag)
 
 			(void) printf("%s\n",
 			    inet_ntop(spd_address->spd_address_af,
-				(void *) (spd_address +1), abuf,
-				INET6_ADDRSTRLEN));
+			    (void *) (spd_address +1), abuf,
+			    INET6_ADDRSTRLEN));
 
 			(void) printf("prefixlen: %d\n",
 			    spd_address->spd_address_prefixlen);
@@ -2508,7 +2511,7 @@ ipsec_conf_del(int policy_index, boolean_t ignore_spd)
 		}
 		if (index == policy_index &&
 		    (interface_name == NULL ||
-			strncmp(interface_name, lifname, LIFNAMSIZ) == 0)) {
+		    strncmp(interface_name, lifname, LIFNAMSIZ) == 0)) {
 			if (!ignore_spd) {
 				ret = parse_one(fp, act_props);
 				if (ret == -1) {
@@ -2796,8 +2799,8 @@ static void
 reconfigure()
 {
 	(void) fprintf(stderr, gettext(
-		"\tipsecconf -f \n "
-		"\tipsecconf -a policy_file\n"));
+	    "\tipsecconf -f \n "
+	    "\tipsecconf -a policy_file\n"));
 }
 
 static void
@@ -3088,8 +3091,7 @@ do_port_adds(ips_conf_t *cptr)
 	if (ret != 0 && !ipsecconf_qflag) {
 		warnx(
 		    gettext("Could not add IPv4 policy for sport %d, dport %d "
-			"- diagnostic %d - %s"),
-		    ntohs(cptr->ips_src_port_min),
+		    "- diagnostic %d - %s"), ntohs(cptr->ips_src_port_min),
 		    ntohs(cptr->ips_dst_port_min), diag, spdsock_diag(diag));
 	}
 
@@ -3245,7 +3247,7 @@ do_address_adds(ips_conf_t *cptr, int *diag)
 				 */
 				isv4 = cptr->ips_isv4 =
 				    IN6_IS_ADDR_V4MAPPED(
-					    &cptr->ips_dst_addr_v6);
+				    &cptr->ips_dst_addr_v6);
 			} else if ((dhp != &hent) && (isv4 !=
 			    IN6_IS_ADDR_V4MAPPED(&cptr->ips_dst_addr_v6))) {
 				/* v6/v4 mismatch. */
@@ -3622,7 +3624,7 @@ static int
 validate_properties(ips_act_props_t *cptr, boolean_t dir, boolean_t is_alg)
 {
 	if (cptr->iap_action == SPD_ACTTYPE_PASS ||
-		cptr->iap_action == SPD_ACTTYPE_DROP) {
+	    cptr->iap_action == SPD_ACTTYPE_DROP) {
 		if (!dir) {
 			warnx(gettext("dir string "
 			    "not found for bypass policy"));
@@ -3696,21 +3698,23 @@ scan:
 			int len = strlen(ibuf);
 			if ((cbuf_offset + len + 1) >= CBUF_LEN)
 				return (-1);
+
 			(void) strcpy(cbuf + cbuf_offset, ibuf);
 			cbuf_offset += len;
 		}
 		/*
 		 * Start of the non-empty non-space character.
 		 */
-		tmp_buf = buf++;
+		tmp_buf = buf;
 
 		/* Skip until next whitespace or CURL_BEGIN */
 		while (*buf != NULL && !isspace(*buf) &&
 		    *buf != CURL_BEGIN)
 			buf++;
 
-
 		if (*buf != NULL) {
+			if (tmp_buf == buf) /* No action token */
+				goto error;
 			if (*buf == CURL_BEGIN) {
 				*buf = NULL;
 				/* Allocate an extra byte for the null also */
@@ -3752,14 +3756,20 @@ scan:
 			(void) strcpy(*action, tmp_buf);
 			*leftover = NULL;
 		}
-		if (argindex >= ARG_BUF_LEN)
+		if (argindex >= ARG_BUF_LEN) {
+			warnx(gettext("(parsing one command) "
+			    "Too many selectors before action."));
 			return (-1);
+		}
 		arg_indices[argindex++] = linecount;
 		return (PARSE_SUCCESS);
 	}
 	/*
 	 * Return error, on an empty action field.
 	 */
+error:
+	warnx(gettext("(parsing one command) "
+	    "Missing action token."));
 	return (-1);
 }
 
@@ -3833,9 +3843,10 @@ scan:
 				 * If we never read a newline character,
 				 * we don't want to print 0.
 				 */
-				warnx(gettext("line %d : line must start "
-				    "with \"{\" character"),
-				    (linecount == 0) ? 1 : linecount);
+				warnx(gettext("line %d : pattern must start "
+				    "with \"%c\" character"),
+				    (linecount == 0) ? 1 : linecount,
+				    CURL_BEGIN);
 				return (-1);
 			}
 			buf++;
@@ -3910,7 +3921,7 @@ ret:
 						(void) strcpy(argvec[i],
 						    tmp_buf);
 						if (argindex >= ARG_BUF_LEN)
-							return (-1);
+							goto toomanyargs;
 						arg_indices[argindex++] =
 						    linecount;
 					}
@@ -3941,8 +3952,17 @@ ret:
 				return (ENOMEM);
 			}
 			(void) strcpy(argvec[i++], tmp_buf);
-			if (argindex >= ARG_BUF_LEN)
+			if (argindex >= ARG_BUF_LEN) {
+			/*
+			 * The number of tokens in a single policy entry
+			 * exceeds the number of buffers available to fully
+			 * parse the policy entry.
+			 */
+toomanyargs:
+				warnx(gettext("(parsing one command) "
+				    "Too many tokens in single policy entry."));
 				return (-1);
+			}
 			arg_indices[argindex++] = linecount;
 		}
 	}
@@ -3953,8 +3973,11 @@ ret:
 	 * above. If curl_begin_seen and we are here,
 	 * something is wrong.
 	 */
-	if (curl_begin_seen)
+	if (curl_begin_seen) {
+		warnx(gettext("(parsing one command) "
+		    "Pattern or Properties incomplete."));
 		return (-1);
+	}
 	return (PARSE_EOF);		/* Nothing more in the file */
 }
 
@@ -3983,7 +4006,6 @@ parse_one(FILE *fp, act_prop_t *act_props)
 	cbuf_offset = 0;
 	assert(shp == NULL && dhp == NULL);
 
-
 	for (;;) {
 		switch (pstate) {
 		case pattern:
@@ -3995,9 +4017,10 @@ parse_one(FILE *fp, act_prop_t *act_props)
 			    act_props->pattern, &leftover);
 			if (ret == PARSE_EOF) {
 				/* EOF reached */
-				return (0);
+				return (PARSE_EOF);
 			}
 			if (ret != 0) {
+				ret = -1;
 				goto err;
 			}
 			pstate = action;
@@ -4011,6 +4034,7 @@ parse_one(FILE *fp, act_prop_t *act_props)
 			ret = parse_action(fp,
 			    &act_props->ap[ap_num].act, &leftover);
 			if (ret != 0) {
+				ret = -1;
 				goto err;
 			}
 
@@ -4035,7 +4059,7 @@ parse_one(FILE *fp, act_prop_t *act_props)
 				 * character, we don't want
 				 * to print 0.
 				 */
-				warnx(gettext("(parsing one command)"
+				warnx(gettext("(parsing one command) "
 				    "Invalid action on line %d: %s"),
 				    (linecount == 0) ? 1 : linecount,
 				    act_props->ap[ap_num].act);
@@ -4053,23 +4077,31 @@ parse_one(FILE *fp, act_prop_t *act_props)
 			ret = parse_pattern_or_prop(fp,
 			    act_props->ap[ap_num].prop, &leftover);
 			if (ret != 0) {
+				if (ret == PARSE_EOF) {
+					warnx(gettext("(parsing one command) "
+					    "Missing properties."));
+				}
+				ret = -1;
 				goto err;
 			}
 
 			if (leftover != NULL) {
 				/* Accomodate spaces at the end */
 				while (*leftover != NULL) {
+					if (*leftover == BACK_SLASH) {
+						warnx(gettext("Invalid line "
+						    "continuation character."));
+						ret = -1;
+						goto err;
+					}
 					if (*leftover == 'o') {
 						leftover++;
 						if (*leftover == 'r') {
 							leftover++;
 							ap_num++;
-							if (ap_num > MAXARGS)
-								return (1);
 							pstate = action;
 							goto again;
 						}
-
 					}
 					if (!isspace(*leftover)) {
 						ret = -1;
@@ -4088,9 +4120,11 @@ parse_one(FILE *fp, act_prop_t *act_props)
 		} /* switch(pstate) */
 
 again:
-		if (ap_num > MAXARGS)
-			return (0);
-	} /* while(1) */
+		if (ap_num > MAXARGS) {
+			warnx(gettext("Too many actions."));
+			return (-1);
+		}
+	} /* for(;;) */
 err:
 	if (ret != 0) {
 		/*
@@ -4774,7 +4808,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 			if (property_table[j].string == NULL) {
 				warnx(gettext("Invalid properties on line "
 				    "%d: %s"),
-					(arg_indices[line_no] == 0) ?
+				    (arg_indices[line_no] == 0) ?
 				    1 : arg_indices[line_no],
 				    act_props->ap[ap_num].prop[i]);
 				return (-1);
@@ -4922,17 +4956,17 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					cptr->ips_dir = SPD_RULE_FLAG_INBOUND;
 				} else {
 					error_message(BAD_ERROR,
-					IPSEC_CONF_IPSEC_DIR, line_no);
+					    IPSEC_CONF_IPSEC_DIR, line_no);
 					return (-1);
 				}
 				if ((cptr->ips_dir & SPD_RULE_FLAG_INBOUND) &&
-					iap->iap_act_tok == TOK_apply) {
+				    iap->iap_act_tok == TOK_apply) {
 					warnx(gettext("Direction"
 					    " in conflict with action"));
 					return (-1);
 				}
 				if ((cptr->ips_dir & SPD_RULE_FLAG_OUTBOUND) &&
-					iap->iap_act_tok == TOK_permit) {
+				    iap->iap_act_tok == TOK_permit) {
 					warnx(gettext("Direction"
 					    "in conflict with action"));
 					return (-1);
@@ -5054,19 +5088,19 @@ dump_conf(ips_conf_t *conf)
 
 	(void) printf("Source Addr is %s\n",
 	    inet_ntop(af, addr_ptr(isv4, &conf->ips_src_addr_v6, &addr),
-		buf, INET6_ADDRSTRLEN));
+	    buf, INET6_ADDRSTRLEN));
 
 	(void) printf("Dest Addr is %s\n",
 	    inet_ntop(af, addr_ptr(isv4, &conf->ips_dst_addr_v6, &addr),
-		buf, INET6_ADDRSTRLEN));
+	    buf, INET6_ADDRSTRLEN));
 
 	(void) printf("Source Mask is %s\n",
 	    inet_ntop(af, addr_ptr(isv4, &conf->ips_src_mask_v6, &addr),
-		buf, INET6_ADDRSTRLEN));
+	    buf, INET6_ADDRSTRLEN));
 
 	(void) printf("Dest Mask is %s\n",
 	    inet_ntop(af, addr_ptr(isv4, &conf->ips_dst_mask_v6, &addr),
-		buf, INET6_ADDRSTRLEN));
+	    buf, INET6_ADDRSTRLEN));
 
 	(void) printf("Source port %d\n", ntohs(conf->ips_src_port_min));
 	(void) printf("Dest port %d\n", ntohs(conf->ips_dst_port_min));
@@ -5101,12 +5135,12 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 	FILE *fp, *policy_fp;
 	int ret, flushret, i, j, diag, num_rules, good_rules;
 	char *warning = gettext(
-		"\tWARNING : New policy entries that are being added may\n "
-		"\taffect the existing connections. Existing connections\n"
-		"\tthat are not subjected to policy constraints, may be\n"
-		"\tsubjected to policy constraints because of the new\n"
-		"\tpolicy. This can disrupt the communication of the\n"
-		"\texisting connections.\n\n");
+	    "\tWARNING : New policy entries that are being added may\n "
+	    "\taffect the existing connections. Existing connections\n"
+	    "\tthat are not subjected to policy constraints, may be\n"
+	    "\tsubjected to policy constraints because of the new\n"
+	    "\tpolicy. This can disrupt the communication of the\n"
+	    "\texisting connections.\n\n");
 
 	boolean_t first_time = B_TRUE;
 	num_rules = 0;
@@ -5158,18 +5192,20 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 	 * parse_pattern_or_prop and in parse_action (called by
 	 * parse_one) as we parse arguments.
 	 */
-	while ((ret = parse_one(fp, act_props)) == 0) {
+	while ((ret = parse_one(fp, act_props)) != PARSE_EOF) {
+		num_rules++;
+		if (ret != 0) {
+			(void) print_cmd_buf(stderr, NOERROR);
+			continue;
+		}
 
 		/*
 		 * If there is no action and parse returned success,
 		 * it means that there is nothing to add.
 		 */
-
 		if (act_props->pattern[0] == NULL &&
 		    act_props->ap[0].act == NULL)
 				break;
-
-		num_rules++;
 
 		ret = form_ipsec_conf(act_props, &conf);
 		if (ret != 0) {
@@ -5231,7 +5267,7 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 				goto next;
 			case EBUSY:
 				warnx(gettext(
-					"Can't set mask and /NN prefix."));
+				    "Can't set mask and /NN prefix."));
 				ret = -1;
 				break;
 			case ENOENT:
@@ -5250,7 +5286,7 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 				break;
 			case EOPNOTSUPP:
 				warnx(gettext("Can't set /NN"
-					" prefix on multi-host name."));
+				    " prefix on multi-host name."));
 				ret = -1;
 				break;
 			case ERANGE:
@@ -5259,7 +5295,7 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 				break;
 			case ESRCH:
 				warnx(gettext("No matching IPv4 or "
-					"IPv6 saddr/daddr pairs"));
+				    "IPv6 saddr/daddr pairs"));
 				ret = -1;
 				break;
 			default:
@@ -5334,6 +5370,8 @@ next:
 				free(act_props->ap[j].prop[i]);
 		}
 	}
+	if (ret == PARSE_EOF)
+		ret = 0; /* Not an error */
 bail:
 	if (ret == -1) {
 		(void) print_cmd_buf(stderr, EINVAL);
@@ -5349,18 +5387,12 @@ bail:
 	(void) printf("ipsec_conf_add: ret val = %d\n", ret);
 	(void) fflush(stdout);
 #endif
-	if (!good_rules) {
+	if (num_rules == 0 && ret == 0) {
 		nuke_adds();
 		(void) restore_all_signals();
 		(void) unlock(lfd);
 		EXIT_OK("Policy file does not contain any valid rules.");
 	}
-	if (smf_managed && !just_check) {
-		(void) fprintf(stdout, gettext(
-		    "%d policy rules added.\n"), good_rules);
-		(void) fflush(stdout);
-	}
-
 	if (num_rules != good_rules) {
 		/* This is an error */
 		nuke_adds();
@@ -5369,16 +5401,19 @@ bail:
 		EXIT_BADCONFIG2("%d policy rule(s) contained errors.",
 		    num_rules - good_rules);
 	}
-
 	/* looks good, flip it in */
 	if (ret == 0 && !just_check) {
 		if (!ipsecconf_qflag) {
 			(void) printf("%s", warning);
 		}
+		if (smf_managed)
+			warnx(gettext("%d policy rules added."), good_rules);
 		ipsec_conf_admin(SPD_FLIP);
 	} else {
 		nuke_adds();
 		if (just_check) {
+			(void) fprintf(stdout, gettext("IPsec configuration "
+			    "does not contain any errors.\n"));
 			(void) fprintf(stdout, gettext(
 			    "IPsec policy was not modified.\n"));
 			(void) fflush(stdout);
@@ -5398,14 +5433,14 @@ ipsec_conf_sub()
 	FILE *remove_fp, *policy_fp;
 	char rbuf[MAXLEN], pbuf[MAXLEN], /* remove buffer, and policy buffer */
 	    *warning = gettext(
-		"\tWARNING: Policy entries that are being removed may\n"
-		"\taffect the existing connections.  Existing connections\n"
-		"\tthat are subjected to policy constraints may no longer\n"
-		"\tbe subjected to policy contraints because of its\n"
-		"\tremoval.  This can compromise security, and disrupt\n"
-		"\tthe communication of the existing connection.\n"
-		"\tConnections that are latched will remain unaffected\n"
-		"\tuntil they close.\n");
+	    "\tWARNING: Policy entries that are being removed may\n"
+	    "\taffect the existing connections.  Existing connections\n"
+	    "\tthat are subjected to policy constraints may no longer\n"
+	    "\tbe subjected to policy contraints because of its\n"
+	    "\tremoval.  This can compromise security, and disrupt\n"
+	    "\tthe communication of the existing connection.\n"
+	    "\tConnections that are latched will remain unaffected\n"
+	    "\tuntil they close.\n");
 	int ret = 0;
 	int index_len, pindex = 0; /* init value in case of pfile error */
 
@@ -5457,9 +5492,11 @@ ipsec_conf_sub()
 		int pbuf_len = 0;
 		char *tmp;
 		/* skip blanks here (so we don't need to do it below)! */
-		for (tmp = rbuf; (*tmp != '\0') && isspace(*tmp); tmp++);
+		for (tmp = rbuf; (*tmp != '\0') && isspace(*tmp); )
+			tmp++;
+
 		if (*tmp == '\0')
-			continue;
+			continue; /* while(); */
 
 		/* skip the INDEX_TAG lines in the remove buffer */
 		if (strncasecmp(rbuf, INDEX_TAG, index_len) == 0)
@@ -5467,7 +5504,7 @@ ipsec_conf_sub()
 
 		/* skip commented lines */
 		if (*tmp == '#')
-			continue;
+			continue; /* while(); */
 
 		/*
 		 * We start by presuming only good policies are in the pfile,
@@ -5492,7 +5529,7 @@ ipsec_conf_sub()
 				if ((pindex = parse_index(buf, NULL)) == -1) {
 					/* bad index, we can't continue */
 					warnx(gettext(
-						"Invalid index in the file"));
+					    "Invalid index in the file"));
 					(void) fclose(remove_fp);
 					(void) fclose(policy_fp);
 					free(act_props);
@@ -5548,7 +5585,7 @@ ipsec_conf_sub()
 			prev_prev_offset = prev_offset;
 		}
 		/* Didn't find a match - look at the next remove policy */
-		continue;
+		continue; /* while(); */
 
 delete:
 		(void) fclose(policy_fp);
