@@ -221,8 +221,7 @@ pcfs_read(
 	}
 	error = rwpcp(pcp, uiop, UIO_READ, ioflag);
 	if ((fsp->pcfs_vfs->vfs_flag & VFS_RDONLY) == 0) {
-		pcp->pc_flags |= PC_ACC;
-		pc_mark_acc(pcp);
+		pc_mark_acc(fsp, pcp);
 	}
 	pc_unlockfs(fsp);
 	if (error) {
@@ -262,7 +261,7 @@ pcfs_write(
 	}
 	error = rwpcp(pcp, uiop, UIO_WRITE, ioflag);
 	pcp->pc_flags |= PC_MOD;
-	pc_mark_mod(pcp);
+	pc_mark_mod(fsp, pcp);
 	if (ioflag & (FSYNC|FDSYNC))
 		(void) pc_nodeupdate(pcp);
 
@@ -492,9 +491,10 @@ rwpcp(
 		 * Unlock the pages which have been allocated by
 		 * page_create_va() in segmap_pagecreate().
 		 */
-		if (newpage)
+		if (newpage) {
 			segmap_pageunlock(segkmap, base, (size_t)n,
 			    rw == UIO_WRITE ? S_WRITE : S_READ);
+		}
 
 		if (error) {
 			PC_DPRINTF1(1, "rwpcp error2=%d\n", error);
@@ -593,9 +593,26 @@ pcfs_getattr(
 	vap->va_fsid = vp->v_vfsp->vfs_dev;
 	vap->va_nodeid = (ino64_t)pc_makenodeid(pcp->pc_eblkno,
 	    pcp->pc_eoffset, pcp->pc_entry.pcd_attr,
-	    pc_getstartcluster(fsp, &pcp->pc_entry), fsp->pcfs_entps);
+	    pc_getstartcluster(fsp, &pcp->pc_entry), pc_direntpersec(fsp));
 	vap->va_nlink = 1;
 	vap->va_size = (u_offset_t)pcp->pc_size;
+	vap->va_rdev = 0;
+	vap->va_nblocks =
+	    (fsblkcnt64_t)howmany((offset_t)pcp->pc_size, DEV_BSIZE);
+	vap->va_blksize = fsp->pcfs_clsize;
+
+	/*
+	 * FAT root directories have no timestamps. In order not to return
+	 * "time zero" (1/1/1970), we record the time of the mount and give
+	 * that. This breaks less expectations.
+	 */
+	if (vp->v_flag & VROOT) {
+		vap->va_mtime = fsp->pcfs_mounttime;
+		vap->va_atime = fsp->pcfs_mounttime;
+		vap->va_ctime = fsp->pcfs_mounttime;
+		pc_unlockfs(fsp);
+		return (0);
+	}
 
 	pc_pcttotv(&pcp->pc_entry.pcd_mtime, &unixtime);
 	if ((fsp->pcfs_flags & PCFS_NOCLAMPTIME) == 0) {
@@ -643,10 +660,6 @@ pcfs_getattr(
 	vap->va_atime.tv_sec = (time_t)unixtime;
 	vap->va_atime.tv_nsec = 0;
 
-	vap->va_rdev = 0;
-	vap->va_nblocks = (fsblkcnt64_t)howmany((offset_t)pcp->pc_size,
-	    DEV_BSIZE);
-	vap->va_blksize = fsp->pcfs_clsize;
 	pc_unlockfs(fsp);
 	return (0);
 }
@@ -1411,8 +1424,7 @@ pcfs_getapage(
 	 */
 	if ((pcp->pc_flags & PC_ACC) == 0 &&
 	    ((fsp->pcfs_vfs->vfs_flag & VFS_RDONLY) == 0)) {
-		pcp->pc_flags |= PC_ACC;
-		pc_mark_acc(pcp);
+		pc_mark_acc(fsp, pcp);
 	}
 reread:
 	if ((pagefound = page_exists(vp, off)) == NULL) {
@@ -1459,10 +1471,7 @@ reread:
 			bp = pageio_setup(pp, xfersize, devvp, B_READ);
 			bp->b_edev = devvp->v_rdev;
 			bp->b_dev = cmpdev(devvp->v_rdev);
-			bp->b_blkno = bn +
-			    /* add a sector offset within the cluster */
-			    /* when the clustersize > PAGESIZE */
-			    (xferoffset - lbnoff) / fsp->pcfs_secsize;
+			bp->b_blkno = bn + btodt(xferoffset - lbnoff);
 			bp->b_un.b_addr = (caddr_t)(uintptr_t)pgoff;
 			bp->b_file = vp;
 			bp->b_offset = (offset_t)(off + pgoff);
@@ -1722,7 +1731,7 @@ pcfs_putapage(
 	 */
 	if ((pcp->pc_flags & PC_MOD) == 0 || (flags & B_FORCE)) {
 		pcp->pc_flags |= PC_MOD;
-		pc_mark_mod(pcp);
+		pc_mark_mod(fsp, pcp);
 	}
 	pp = pvn_write_kluster(vp, pp, &io_off, &io_len, pp->p_offset,
 	    PAGESIZE, flags);
@@ -1757,10 +1766,7 @@ pcfs_putapage(
 		bp = pageio_setup(pp, xfersize, devvp, B_WRITE | flags);
 		bp->b_edev = devvp->v_rdev;
 		bp->b_dev = cmpdev(devvp->v_rdev);
-		bp->b_blkno = bn +
-		    /* add a sector offset within the cluster */
-		    /* when the clustersize > PAGESIZE */
-		    (xferoffset - lbnoff) / fsp->pcfs_secsize;
+		bp->b_blkno = bn + btodt(xferoffset - lbnoff);
 		bp->b_un.b_addr = (caddr_t)(uintptr_t)pgoff;
 		bp->b_file = vp;
 		bp->b_offset = (offset_t)(io_off + pgoff);
@@ -2162,13 +2168,13 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 	char	*lfn_base;
 	int	boff;
 	int	i, cs;
-	char 	*buf;
+	char	*buf;
 	uchar_t	cksum;
-	int 	detached = 0;
+	int	detached = 0;
 	int	error = 0;
 	int	foldcase;
 	int	count = 0;
-	size_t u16l = 0, u8l = 0;
+	size_t	u16l = 0, u8l = 0;
 
 	foldcase = (fsp->pcfs_flags & PCFS_FOLDCASE);
 	lfn_base = kmem_alloc(PCMAXNAM_UTF16, KM_SLEEP);
@@ -2311,7 +2317,7 @@ pc_read_long_fn(struct vnode *dvp, struct uio *uiop, struct pc_dirent *ld,
 	ld->d_off = uiop->uio_loffset + sizeof (struct pcdir);
 	ld->d_ino = pc_makenodeid(pc_daddrdb(fsp, (*bp)->b_blkno),
 	    pc_blkoff(fsp, *offset), ep->pcd_attr,
-	    pc_getstartcluster(fsp, ep), fsp->pcfs_entps);
+	    pc_getstartcluster(fsp, ep), pc_direntpersec(fsp));
 	(void) uiomove((caddr_t)ld, ld->d_reclen, UIO_READ, uiop);
 	uiop->uio_loffset = ld->d_off;
 	*offset += sizeof (struct pcdir);
@@ -2342,7 +2348,8 @@ pc_read_short_fn(struct vnode *dvp, struct uio *uiop, struct pc_dirent *ld,
 		return (0);
 	}
 	ld->d_ino = (ino64_t)pc_makenodeid(pc_daddrdb(fsp, (*bp)->b_blkno),
-	    boff, ep->pcd_attr, pc_getstartcluster(fsp, ep), fsp->pcfs_entps);
+	    boff, ep->pcd_attr, pc_getstartcluster(fsp, ep),
+	    pc_direntpersec(fsp));
 	foldcase = (fsp->pcfs_flags & PCFS_FOLDCASE);
 	error = pc_fname_ext_to_name(&ld->d_name[0], &ep->pcd_filename[0],
 	    &ep->pcd_ext[0], foldcase);

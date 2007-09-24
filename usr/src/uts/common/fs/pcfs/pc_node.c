@@ -242,7 +242,7 @@ retry:
 		}
 		err = syncpcp(pcp, B_INVAL);
 		if (err) {
-			(void) syncpcp(pcp, B_INVAL|B_FORCE);
+			(void) syncpcp(pcp, B_INVAL | B_FORCE);
 		}
 	}
 	if (vn_has_cached_data(vp)) {
@@ -300,38 +300,55 @@ retry:
 /*
  * Mark a pcnode as modified with the current time.
  */
+/* ARGSUSED */
 void
-pc_mark_mod(struct pcnode *pcp)
+pc_mark_mod(struct pcfs *fsp, struct pcnode *pcp)
 {
 	timestruc_t now;
 
-	if (PCTOV(pcp)->v_type == VREG) {
-		gethrestime(&now);
-		if (pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime))
-			PC_DPRINTF1(2, "pc_mark_mod failed timestamp "
-			    "conversion, curtime = %lld\n",
-			    (long long)now.tv_sec);
-		pcp->pc_flags |= PC_CHG;
-	}
+	if (PCTOV(pcp)->v_type == VDIR)
+		return;
+
+	ASSERT(PCTOV(pcp)->v_type == VREG);
+
+	gethrestime(&now);
+	if (pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime))
+		PC_DPRINTF1(2, "pc_mark_mod failed timestamp "
+		    "conversion, curtime = %lld\n",
+		    (long long)now.tv_sec);
+
+	pcp->pc_flags |= PC_CHG;
 }
 
 /*
  * Mark a pcnode as accessed with the current time.
  */
 void
-pc_mark_acc(struct pcnode *pcp)
+pc_mark_acc(struct pcfs *fsp, struct pcnode *pcp)
 {
 	struct pctime pt = { 0, 0 };
 	timestruc_t now;
 
-	if (PCTOV(pcp)->v_type == VREG) {
-		gethrestime(&now);
-		if (pc_tvtopct(&now, &pt))
-			PC_DPRINTF1(2, "pc_mark_acc failed timestamp "
-			    "conversion, curtime = %lld\n",
-			    (long long)now.tv_sec);
+	if (fsp->pcfs_flags & PCFS_NOATIME || PCTOV(pcp)->v_type == VDIR)
+		return;
+
+	ASSERT(PCTOV(pcp)->v_type == VREG);
+
+	gethrestime(&now);
+	if (pc_tvtopct(&now, &pt)) {
+		PC_DPRINTF1(2, "pc_mark_acc failed timestamp "
+		    "conversion, curtime = %lld\n",
+		    (long long)now.tv_sec);
+		return;
+	}
+
+	/*
+	 * We don't really want to write the adate for every access
+	 * on flash media; make sure it really changed !
+	 */
+	if (pcp->pc_entry.pcd_ladate != pt.pct_date) {
 		pcp->pc_entry.pcd_ladate = pt.pct_date;
-		pcp->pc_flags |= PC_CHG;
+		pcp->pc_flags |= (PC_CHG | PC_ACC);
 	}
 }
 
@@ -365,7 +382,7 @@ pc_truncate(struct pcnode *pcp, uint_t length)
 	 */
 	if (length > pcp->pc_size) {
 		daddr_t bno;
-		uint_t llcn;
+		uint_t llcn = howmany((offset_t)length, fsp->pcfs_clsize);
 
 		/*
 		 * We are extending a file.
@@ -373,8 +390,7 @@ pc_truncate(struct pcnode *pcp, uint_t length)
 		 * since we don't need to use the block number(s).
 		 */
 		if ((daddr_t)howmany((offset_t)pcp->pc_size, fsp->pcfs_clsize) <
-		    (llcn = (daddr_t)howmany((offset_t)length,
-				fsp->pcfs_clsize))) {
+		    (daddr_t)llcn) {
 			error = pc_balloc(pcp, (daddr_t)(llcn - 1), 1, &bno);
 		}
 		if (error) {
@@ -405,7 +421,7 @@ pc_truncate(struct pcnode *pcp, uint_t length)
 			 * end of the file.
 			 */
 			(void) pvn_vplist_dirty(PCTOV(pcp), (u_offset_t)length,
-				pcfs_putapage, B_INVAL | B_TRUNC, CRED());
+			    pcfs_putapage, B_INVAL | B_TRUNC, CRED());
 		} else {
 			/*
 			 * pvn_vpzero() cannot deal with more than MAXBSIZE
@@ -424,12 +440,16 @@ pc_truncate(struct pcnode *pcp, uint_t length)
 			    (u_offset_t)length + nbytes,
 			    pcfs_putapage, B_INVAL | B_TRUNC, CRED());
 		}
-		error = pc_bfree(pcp,
-		    (pc_cluster32_t)howmany((offset_t)length,
-			    fsp->pcfs_clsize));
+		error = pc_bfree(pcp, (pc_cluster32_t)
+		    howmany((offset_t)length, fsp->pcfs_clsize));
 		pcp->pc_size = length;
 	}
-	pc_mark_mod(pcp);
+
+	/*
+	 * This is the only place in PCFS code where pc_mark_mod() is called
+	 * without setting PC_MOD. May be a historical artifact ...
+	 */
+	pc_mark_mod(fsp, pcp);
 	return (error);
 }
 
@@ -441,7 +461,6 @@ pc_getentryblock(struct pcnode *pcp, struct buf **bpp)
 {
 	struct pcfs *fsp;
 
-	PC_DPRINTF0(7, "pc_getentryblock ");
 	fsp = VFSTOPCFS(PCTOV(pcp)->v_vfsp);
 	if (pcp->pc_eblkno >= fsp->pcfs_datastart ||
 	    (pcp->pc_eblkno - fsp->pcfs_rdirstart) <
@@ -451,11 +470,10 @@ pc_getentryblock(struct pcnode *pcp, struct buf **bpp)
 	} else {
 		*bpp = bread(fsp->pcfs_xdev,
 		    pc_dbdaddr(fsp, pcp->pc_eblkno),
-		    (int)(fsp->pcfs_datastart-pcp->pc_eblkno) *
+		    (int)(fsp->pcfs_datastart - pcp->pc_eblkno) *
 		    fsp->pcfs_secsize);
 	}
 	if ((*bpp)->b_flags & B_ERROR) {
-		PC_DPRINTF0(1, "pc_getentryblock: error ");
 		brelse(*bpp);
 		pc_mark_irrecov(fsp);
 		return (EIO);
@@ -475,7 +493,6 @@ pc_nodesync(struct pcnode *pcp)
 	int err;
 	struct vnode *vp;
 
-	PC_DPRINTF1(7, "pc_nodesync pcp=0x%p\n", (void *)pcp);
 	vp = PCTOV(pcp);
 	fsp = VFSTOPCFS(vp->v_vfsp);
 	err = 0;
@@ -540,11 +557,9 @@ pc_nodeupdate(struct pcnode *pcp)
 	*((struct pcdir *)(bp->b_un.b_addr + pcp->pc_eoffset)) = pcp->pc_entry;
 	bwrite2(bp);
 	error = geterror(bp);
-	if (error)
-		error = EIO;
 	brelse(bp);
 	if (error) {
-		PC_DPRINTF0(1, "pc_nodeupdate ERROR\n");
+		error = EIO;
 		pc_mark_irrecov(VFSTOPCFS(vp->v_vfsp));
 	}
 	pcp->pc_flags &= ~(PC_CHG | PC_MOD | PC_ACC);
@@ -556,7 +571,6 @@ pc_nodeupdate(struct pcnode *pcp)
  * got the pcnode from.
  * MUST be called with node unlocked.
  */
-/* ARGSUSED */
 int
 pc_verify(struct pcfs *fsp)
 {
@@ -567,13 +581,25 @@ pc_verify(struct pcfs *fsp)
 		return (EIO);
 
 	if (!(fsp->pcfs_flags & PCFS_NOCHK) && fsp->pcfs_fatp) {
+		/*
+		 * This "has it been removed" check should better be
+		 * modified for removeable media that are not floppies.
+		 * dkio-managed devices such as USB/firewire external
+		 * disks/memory sticks/floppies (gasp) do not understand
+		 * this ioctl.
+		 */
 		PC_DPRINTF1(4, "pc_verify fsp=0x%p\n", (void *)fsp);
 		error = cdev_ioctl(fsp->pcfs_vfs->vfs_dev,
-		    FDGETCHANGE, (intptr_t)&fdstatus, FNATIVE|FKIOCTL,
+		    FDGETCHANGE, (intptr_t)&fdstatus, FNATIVE | FKIOCTL,
 		    NULL, NULL);
 
 		if (error) {
 			if (error == ENOTTY || error == ENXIO) {
+				/*
+				 * See comment above. This is a workaround
+				 * for removeable media that don't understand
+				 * floppy ioctls.
+				 */
 				error = 0;
 			} else {
 				PC_DPRINTF1(1,
@@ -607,7 +633,7 @@ pc_verify(struct pcfs *fsp)
 			}
 		}
 	}
-	if (!(error || fsp->pcfs_fatp)) {
+	if (error == 0 && fsp->pcfs_fatp == NULL) {
 		error = pc_getfat(fsp);
 	}
 
@@ -636,11 +662,11 @@ pc_mark_irrecov(struct pcfs *fsp)
 
 		fsp->pcfs_flags |= PCFS_IRRECOV;
 		cmn_err(CE_WARN,
-			"Disk was changed during an update or\n"
-			"an irrecoverable error was encountered.\n"
-			"File damage is possible.  To prevent further\n"
-			"damage, this pcfs instance will now be frozen.\n"
-			"Use umount(1M) to release the instance.\n");
+		    "Disk was changed during an update or\n"
+		    "an irrecoverable error was encountered.\n"
+		    "File damage is possible.  To prevent further\n"
+		    "damage, this pcfs instance will now be frozen.\n"
+		    "Use umount(1M) to release the instance.\n");
 		(void) pc_unlockfs(fsp);
 	}
 }

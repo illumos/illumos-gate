@@ -172,10 +172,24 @@ struct pcdir_lfn {
 	uchar_t pcdl_thirdfilename[PCLF_THIRDNAMESIZE];
 };
 
+/*
+ * FAT LFN entries are consecutively numbered downwards, and the last
+ * entry of a LFN chain will have the 0x40 'termination' marker logically
+ * or'ed in. The entry immediately preceeding the short name has number 1,
+ * consecutively increasing. Since the filename length limit on FAT is
+ * 255 unicode characters and every LFN entry contributes 13 characters,
+ * the maximum sequence number is 255/13 + 1 == 20.
+ */
 #define	PCDL_IS_LAST_LFN(x) ((x->pcdl_ordinal) & 0x40)
 #define	PCDL_LFN_BITS (PCA_RDONLY | PCA_HIDDEN | PCA_SYSTEM | PCA_LABEL)
-#define	PCDL_IS_LFN(x) (enable_long_filenames && \
-			    (((x)->pcd_attr & PCDL_LFN_BITS) == PCDL_LFN_BITS))
+#define	PCDL_LFN_MASK (PCDL_LFN_BITS | PCA_DIR | PCA_ARCH)
+#define	PCDL_LFN_VALID_ORD(x)						\
+	(((((struct pcdir_lfn *)(x))->pcdl_ordinal & ~0x40) > 0) &&	\
+	((((struct pcdir_lfn *)(x))->pcdl_ordinal & ~0x40) <= 20))
+#define	PCDL_IS_LFN(x)							\
+	(enable_long_filenames &&					\
+	(((x)->pcd_attr & PCDL_LFN_MASK) == PCDL_LFN_BITS) &&		\
+	PCDL_LFN_VALID_ORD((x)))
 
 /*
  * The first char of the file name has special meaning as follows:

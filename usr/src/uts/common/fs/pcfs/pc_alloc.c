@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,91 +63,94 @@ pc_bmap(
 	pc_cluster32_t cn, ncn;		/* current, next cluster number */
 	daddr_t olcn = lcn;
 
-	PC_DPRINTF2(6, "pc_bmap: pcp=0x%p, lcn=%ld\n", (void *)pcp, lcn);
-
 	vp = PCTOV(pcp);
 	fsp = VFSTOPCFS(vp->v_vfsp);
+
 	if (lcn < 0)
 		return (ENOENT);
+
+	/*
+	 * FAT12 / FAT16 root directories are a continuous section on disk
+	 * before the actual data clusters. Specialcase this here.
+	 */
 	if (!IS_FAT32(fsp) && (vp->v_flag & VROOT)) {
-		daddr_t lbn, bn; /* logical (disk) block number */
+		daddr_t lbn; /* logical (disk) block number */
 
 		lbn = pc_cltodb(fsp, lcn);
 		if (lbn >= fsp->pcfs_rdirsec) {
 			PC_DPRINTF0(2, "pc_bmap: ENOENT1\n");
 			return (ENOENT);
 		}
-		bn = fsp->pcfs_rdirstart + lbn;
-		*dbnp = pc_dbdaddr(fsp, bn);
+		*dbnp = pc_dbdaddr(fsp, fsp->pcfs_rdirstart + lbn);
 		if (contigbp) {
 			ASSERT (*contigbp >= fsp->pcfs_secsize);
 			*contigbp = MIN(*contigbp,
 			    fsp->pcfs_secsize * (fsp->pcfs_rdirsec - lbn));
 		}
-	} else {
+		return (0);
+	}
 
-		if (lcn >= fsp->pcfs_ncluster) {
-			PC_DPRINTF0(2, "pc_bmap: ENOENT2\n");
-			return (ENOENT);
-		}
-		if (vp->v_type == VREG &&
-		    (pcp->pc_size == 0 ||
-		    lcn >= (daddr_t)howmany((offset_t)pcp->pc_size,
-				fsp->pcfs_clsize))) {
-			PC_DPRINTF0(2, "pc_bmap: ENOENT3\n");
-			return (ENOENT);
-		}
-		ncn = pcp->pc_scluster;
-		if (IS_FAT32(fsp) && ncn == 0)
-			ncn = fsp->pcfs_rdirstart;
+	if (lcn >= fsp->pcfs_ncluster) {
+		PC_DPRINTF0(2, "pc_bmap: ENOENT2\n");
+		return (ENOENT);
+	}
+	if (vp->v_type == VREG &&
+	    (pcp->pc_size == 0 ||
+	    lcn >= (daddr_t)howmany((offset_t)pcp->pc_size,
+			fsp->pcfs_clsize))) {
+		PC_DPRINTF0(2, "pc_bmap: ENOENT3\n");
+		return (ENOENT);
+	}
+	ncn = pcp->pc_scluster;
+	if (IS_FAT32(fsp) && ncn == 0)
+		ncn = fsp->pcfs_rdirstart;
 
-		/* Do we have a cached index/cluster pair? */
-		if (pcp->pc_lindex > 0 && lcn >= pcp->pc_lindex) {
-			lcn -= pcp->pc_lindex;
-			ncn = pcp->pc_lcluster;
+	/* Do we have a cached index/cluster pair? */
+	if (pcp->pc_lindex > 0 && lcn >= pcp->pc_lindex) {
+		lcn -= pcp->pc_lindex;
+		ncn = pcp->pc_lcluster;
+	}
+	do {
+		cn = ncn;
+		if (!pc_validcl(fsp, cn)) {
+			if (IS_FAT32(fsp) && cn >= PCF_LASTCLUSTER32 &&
+			    vp->v_type == VDIR) {
+				PC_DPRINTF0(2, "pc_bmap: ENOENT4\n");
+				return (ENOENT);
+			} else if (!IS_FAT32(fsp) &&
+			    cn >= PCF_LASTCLUSTER &&
+			    vp->v_type == VDIR) {
+				PC_DPRINTF0(2, "pc_bmap: ENOENT5\n");
+				return (ENOENT);
+			} else {
+				PC_DPRINTF1(1,
+				    "pc_bmap: badfs cn=%d\n", cn);
+				(void) pc_badfs(fsp);
+				return (EIO);
+			}
 		}
-		do {
+		ncn = pc_getcluster(fsp, cn);
+	} while (lcn--);
+
+	/*
+	 * Cache this cluster, as we'll most likely visit the
+	 * one after this next time.  Considerably improves
+	 * performance on sequential reads and writes.
+	 */
+	pcp->pc_lindex = olcn;
+	pcp->pc_lcluster = cn;
+	*dbnp = pc_cldaddr(fsp, cn);
+
+	if (contigbp && *contigbp > fsp->pcfs_clsize) {
+		uint_t count = fsp->pcfs_clsize;
+
+		while ((cn + 1) == ncn && count < *contigbp &&
+		    pc_validcl(fsp, ncn)) {
+			count += fsp->pcfs_clsize;
 			cn = ncn;
-			if (!pc_validcl(fsp, cn)) {
-				if (IS_FAT32(fsp) && cn >= PCF_LASTCLUSTER32 &&
-				    vp->v_type == VDIR) {
-					PC_DPRINTF0(2, "pc_bmap: ENOENT4\n");
-					return (ENOENT);
-				} else if (!IS_FAT32(fsp) &&
-				    cn >= PCF_LASTCLUSTER &&
-				    vp->v_type == VDIR) {
-					PC_DPRINTF0(2, "pc_bmap: ENOENT5\n");
-					return (ENOENT);
-				} else {
-					PC_DPRINTF1(1,
-					    "pc_bmap: badfs cn=%d\n", cn);
-					(void) pc_badfs(fsp);
-					return (EIO);
-				}
-			}
-			ncn = pc_getcluster(fsp, cn);
-		} while (lcn--);
-
-		/*
-		 * Cache this cluster, as we'll most likely visit the
-		 * one after this next time.  Considerably improves
-		 * performance on sequential reads and writes.
-		 */
-		pcp->pc_lindex = olcn;
-		pcp->pc_lcluster = cn;
-		*dbnp = pc_cldaddr(fsp, cn);
-
-		if (contigbp && *contigbp > fsp->pcfs_clsize) {
-			uint_t count = fsp->pcfs_clsize;
-
-			while ((cn + 1) == ncn && count < *contigbp &&
-			    pc_validcl(fsp, ncn)) {
-				count += fsp->pcfs_clsize;
-				cn = ncn;
-				ncn = pc_getcluster(fsp, ncn);
-			}
-			*contigbp = count;
+			ncn = pc_getcluster(fsp, ncn);
 		}
+		*contigbp = count;
 	}
 	return (0);
 }
@@ -165,8 +168,8 @@ pc_balloc(
 {
 	struct pcfs *fsp;	/* pcfs that file is in */
 	struct vnode *vp;
-
-	PC_DPRINTF2(5, "pc_balloc: pcp=0x%p, lcn=%ld\n", (void *)pcp, lcn);
+	pc_cluster32_t cn;	/* current cluster number */
+	pc_cluster32_t ncn;	/* next cluster number */
 
 	vp = PCTOV(pcp);
 	fsp = VFSTOPCFS(vp -> v_vfsp);
@@ -175,6 +178,9 @@ pc_balloc(
 		return (EFBIG);
 	}
 
+	/*
+	 * Again, FAT12/FAT16 root directories are not data clusters.
+	 */
 	if (!IS_FAT32(fsp) && (vp->v_flag & VROOT)) {
 		daddr_t lbn;
 
@@ -182,65 +188,64 @@ pc_balloc(
 		if (lbn >= fsp->pcfs_rdirsec)
 			return (ENOSPC);
 		*dbnp = pc_dbdaddr(fsp, fsp->pcfs_rdirstart + lbn);
-	} else {
-		pc_cluster32_t cn;	/* current cluster number */
-		pc_cluster32_t ncn;	/* next cluster number */
+		return (0);
+	}
 
-		if (lcn >= fsp->pcfs_ncluster)
+	if (lcn >= fsp->pcfs_ncluster)
+		return (ENOSPC);
+	if ((vp->v_type == VREG && pcp->pc_size == 0) ||
+	    (vp->v_type == VDIR && lcn == 0)) {
+		switch (cn = pc_alloccluster(fsp, 1)) {
+		case PCF_FREECLUSTER:
 			return (ENOSPC);
-		if ((vp->v_type == VREG && pcp->pc_size == 0) ||
-		    (vp->v_type == VDIR && lcn == 0)) {
-			switch (cn = pc_alloccluster(fsp, 1)) {
+		case PCF_ERRORCLUSTER:
+			return (EIO);
+		}
+		pcp->pc_scluster = cn;
+	} else {
+		cn = pcp->pc_scluster;
+		if (IS_FAT32(fsp) && cn == 0)
+			cn = fsp->pcfs_rdirstart;
+		if (!pc_validcl(fsp, cn)) {
+			PC_DPRINTF1(1, "pc_balloc: badfs cn=%d\n", cn);
+			(void) pc_badfs(fsp);
+			return (EIO);
+		}
+	}
+
+	if (pcp->pc_lindex > 0 && lcn > pcp->pc_lindex) {
+		lcn -= pcp->pc_lindex;
+		cn = pcp->pc_lcluster;
+	}
+	while (lcn-- > 0) {
+		ncn = pc_getcluster(fsp, cn);
+		if ((IS_FAT32(fsp) && ncn >= PCF_LASTCLUSTER32) ||
+		    (!IS_FAT32(fsp) && ncn >= PCF_LASTCLUSTER)) {
+			/*
+			 * Extend file (no holes).
+			 */
+			switch (ncn = pc_alloccluster(fsp, zwrite)) {
 			case PCF_FREECLUSTER:
 				return (ENOSPC);
 			case PCF_ERRORCLUSTER:
 				return (EIO);
 			}
-			pcp->pc_scluster = cn;
-		} else {
-			cn = pcp->pc_scluster;
-			if (IS_FAT32(fsp) && cn == 0)
-				cn = fsp->pcfs_rdirstart;
-			if (!pc_validcl(fsp, cn)) {
-				PC_DPRINTF1(1, "pc_balloc: badfs cn=%d\n", cn);
-				(void) pc_badfs(fsp);
-				return (EIO);
-			}
+			pc_setcluster(fsp, cn, ncn);
+		} else if (!pc_validcl(fsp, ncn)) {
+			PC_DPRINTF1(1,
+			    "pc_balloc: badfs ncn=%d\n", ncn);
+			(void) pc_badfs(fsp);
+			return (EIO);
 		}
-
-		if (pcp->pc_lindex > 0 && lcn > pcp->pc_lindex) {
-			lcn -= pcp->pc_lindex;
-			cn = pcp->pc_lcluster;
-		}
-		while (lcn-- > 0) {
-			ncn = pc_getcluster(fsp, cn);
-			if ((IS_FAT32(fsp) && ncn >= PCF_LASTCLUSTER32) ||
-			    (!IS_FAT32(fsp) && ncn >= PCF_LASTCLUSTER)) {
-				/*
-				 * Extend file (no holes).
-				 */
-				switch (ncn = pc_alloccluster(fsp, zwrite)) {
-				case PCF_FREECLUSTER:
-					return (ENOSPC);
-				case PCF_ERRORCLUSTER:
-					return (EIO);
-				}
-				pc_setcluster(fsp, cn, ncn);
-			} else if (!pc_validcl(fsp, ncn)) {
-				PC_DPRINTF1(1,
-				    "pc_balloc: badfs ncn=%d\n", ncn);
-				(void) pc_badfs(fsp);
-				return (EIO);
-			}
-			cn = ncn;
-		}
-		/*
-		 * Do not cache the new cluster/index values; when
-		 * extending the file we're interested in the last
-		 * written cluster and not the last cluster allocated.
-		 */
-		*dbnp = pc_cldaddr(fsp, cn);
+		cn = ncn;
 	}
+	/*
+	 * Do not cache the new cluster/index values; when
+	 * extending the file we're interested in the last
+	 * written cluster and not the last cluster allocated.
+	 */
+	*dbnp = pc_cldaddr(fsp, cn);
+
 	return (0);
 }
 
@@ -261,9 +266,6 @@ pc_bfree(struct pcnode *pcp, pc_cluster32_t skipcl)
 	if (!IS_FAT32(fsp) && (vp->v_flag & VROOT)) {
 		panic("pc_bfree");
 	}
-
-	PC_DPRINTF2(5, "pc_bfree: pcp=0x%p, after first %d clusters\n",
-	    (void *)pcp, skipcl);
 
 	if (pcp->pc_size == 0 && vp->v_type == VREG) {
 		return (0);
@@ -333,8 +335,8 @@ pc_freeclusters(struct pcfs *fsp)
 	int free = 0;
 
 	if (IS_FAT32(fsp) &&
-	    fsp->fsinfo_native.fs_free_clusters != FSINFO_UNKNOWN)
-		return (fsp->fsinfo_native.fs_free_clusters);
+	    fsp->pcfs_fsinfo.fs_free_clusters != FSINFO_UNKNOWN)
+		return (fsp->pcfs_fsinfo.fs_free_clusters);
 
 	/*
 	 * make sure the FAT is in core
@@ -347,8 +349,8 @@ pc_freeclusters(struct pcfs *fsp)
 	}
 
 	if (IS_FAT32(fsp)) {
-		ASSERT(fsp->fsinfo_native.fs_free_clusters == FSINFO_UNKNOWN);
-		fsp->fsinfo_native.fs_free_clusters = free;
+		ASSERT(fsp->pcfs_fsinfo.fs_free_clusters == FSINFO_UNKNOWN);
+		fsp->pcfs_fsinfo.fs_free_clusters = free;
 	}
 	return (free);
 }
@@ -367,17 +369,19 @@ pc_getcluster(struct pcfs *fsp, pc_cluster32_t cn)
 {
 	unsigned char *fp;
 
-	PC_DPRINTF1(7, "pc_getcluster: cn=%x ", cn);
 	if (fsp->pcfs_fatp == (uchar_t *)0 || !pc_validcl(fsp, cn))
 		panic("pc_getcluster");
 
-	if (IS_FAT32(fsp)) {	/* 32 bit FAT */
+	switch (fsp->pcfs_fattype) {
+	case FAT32:
 		fp = fsp->pcfs_fatp + (cn << 2);
 		cn = ltohi(*(pc_cluster32_t *)fp);
-	} else if (fsp->pcfs_flags & PCFS_FAT16) {	/* 16 bit FAT */
+		break;
+	case FAT16:
 		fp = fsp->pcfs_fatp + (cn << 1);
 		cn = ltohs(*(pc_cluster16_t *)fp);
-	} else {	/* 12 bit FAT */
+		break;
+	case FAT12:
 		fp = fsp->pcfs_fatp + (cn + (cn >> 1));
 		if (cn & 01) {
 			cn = (((unsigned int)*fp++ & 0xf0) >> 4);
@@ -388,8 +392,11 @@ pc_getcluster(struct pcfs *fsp, pc_cluster32_t cn)
 		}
 		if (cn >= PCF_12BCLUSTER)
 			cn |= PCF_RESCLUSTER;
+		break;
+	default:
+		pc_mark_irrecov(fsp);
+		cn = PCF_ERRORCLUSTER;
 	}
-	PC_DPRINTF1(7, " %x\n", cn);
 	return (cn);
 }
 
@@ -402,22 +409,23 @@ void
 pc_setcluster(struct pcfs *fsp, pc_cluster32_t cn, pc_cluster32_t ncn)
 {
 	unsigned char *fp;
+	pc_cluster16_t ncn16;
 
-	PC_DPRINTF2(7, "pc_setcluster: cn=%d ncn=%d\n", cn, ncn);
 	if (fsp->pcfs_fatp == (uchar_t *)0 || !pc_validcl(fsp, cn))
 		panic("pc_setcluster");
 	fsp->pcfs_flags |= PCFS_FATMOD;
 	pc_mark_fat_updated(fsp, cn);
-	if (IS_FAT32(fsp)) {	/* 32 bit FAT */
+	switch (fsp->pcfs_fattype) {
+	case FAT32:
 		fp = fsp->pcfs_fatp + (cn << 2);
 		*(pc_cluster32_t *)fp = htoli(ncn);
-	} else if (fsp->pcfs_flags & PCFS_FAT16) {	/* 16 bit FAT */
-		pc_cluster16_t	ncn16;
-
+		break;
+	case FAT16:
 		fp = fsp->pcfs_fatp + (cn << 1);
 		ncn16 = (pc_cluster16_t)ncn;
 		*(pc_cluster16_t *)fp = htols(ncn16);
-	} else {	/* 12 bit FAT */
+		break;
+	case FAT12:
 		fp = fsp->pcfs_fatp + (cn + (cn >> 1));
 		if (cn & 01) {
 			*fp = (*fp & 0x0f) | ((ncn << 4) & 0xf0);
@@ -427,13 +435,16 @@ pc_setcluster(struct pcfs *fsp, pc_cluster32_t cn, pc_cluster32_t ncn)
 			*fp++ = ncn & 0xff;
 			*fp = (*fp & 0xf0) | ((ncn >> 8) & 0x0f);
 		}
+		break;
+	default:
+		pc_mark_irrecov(fsp);
 	}
 	if (ncn == PCF_FREECLUSTER) {
 		fsp->pcfs_nxfrecls = PCF_FIRSTCLUSTER;
 		if (IS_FAT32(fsp)) {
-			if (fsp->fsinfo_native.fs_free_clusters !=
+			if (fsp->pcfs_fsinfo.fs_free_clusters !=
 			    FSINFO_UNKNOWN)
-				fsp->fsinfo_native.fs_free_clusters++;
+				fsp->pcfs_fsinfo.fs_free_clusters++;
 		}
 	}
 }
@@ -459,9 +470,9 @@ pc_alloccluster(
 
 			if (IS_FAT32(fsp)) {
 				pc_setcluster(fsp, cn, PCF_LASTCLUSTERMARK32);
-				if (fsp->fsinfo_native.fs_free_clusters !=
+				if (fsp->pcfs_fsinfo.fs_free_clusters !=
 				    FSINFO_UNKNOWN)
-					fsp->fsinfo_native.fs_free_clusters--;
+					fsp->pcfs_fsinfo.fs_free_clusters--;
 			} else
 				pc_setcluster(fsp, cn, PCF_LASTCLUSTERMARK);
 			if (zwrite) {
@@ -477,15 +488,11 @@ pc_alloccluster(
 				error = geterror(bp);
 				brelse(bp);
 				if (error) {
-					PC_DPRINTF0(1,
-					    "pc_alloccluster: error\n");
 					pc_mark_irrecov(fsp);
 					return (PCF_ERRORCLUSTER);
 				}
 			}
 			fsp->pcfs_nxfrecls = cn + 1;
-			PC_DPRINTF1(5, "pc_alloccluster: new cluster = %d\n",
-			    cn);
 			return (cn);
 		}
 	}
