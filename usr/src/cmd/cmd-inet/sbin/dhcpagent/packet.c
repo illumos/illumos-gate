@@ -1547,7 +1547,7 @@ next_retransmission(dhcp_smach_t *dsmp, boolean_t first_send,
 boolean_t
 dhcp_ip_default(void)
 {
-	int on;
+	int on = 1;
 
 	if ((v4_sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		dhcpmsg(MSG_ERR,
