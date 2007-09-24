@@ -2501,6 +2501,7 @@ verify_bootblkfile(char *fn, boot_sector_t *bs, ulong_t *blkfilesize)
 		    (bs->bs.bs_jump_code[0] != OPCODE1 &&
 		    bs->bs.bs_jump_code[0] != OPCODE2)
 #endif
+		    /* CSTYLED */
 		    ) {
 			(void) close(bsfd);
 			bsfd = -1;
