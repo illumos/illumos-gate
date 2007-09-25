@@ -1394,7 +1394,7 @@ sid2pid_first_pass(lookup_state_t *state, sqlite *cache, idmap_mapping *req,
 	 */
 	req->direction = _IDMAP_F_DONE;
 
-	if (req->id1.idmap_id_u.sid.prefix == NULL) {
+	if (EMPTY_STRING(req->id1.idmap_id_u.sid.prefix)) {
 		retcode = IDMAP_ERR_SID;
 		goto out;
 	}
@@ -1431,8 +1431,8 @@ sid2pid_first_pass(lookup_state_t *state, sqlite *cache, idmap_mapping *req,
 	/*
 	 * Check if we already have the name (i.e name2pid lookups)
 	 */
-	if (req->id1name != NULL &&
-	    req->id1domain != NULL) {
+	if (!EMPTY_STRING(req->id1name) &&
+	    !EMPTY_STRING(req->id1domain)) {
 		retcode = IDMAP_SUCCESS;
 		req->direction |= _IDMAP_F_S2N_CACHE;
 		goto out;
@@ -2112,7 +2112,7 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 	if (req->direction & _IDMAP_F_S2N_CACHE)
 		goto out;
 
-	if (req->id1name == NULL)
+	if (EMPTY_STRING(req->id1name))
 		goto out;
 
 	sql = sqlite_mprintf("INSERT OR REPLACE into name_cache "
@@ -2565,7 +2565,7 @@ pid2sid_first_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 	}
 
 	/* uid/gid to name */
-	if (req->id1name != NULL) {
+	if (!EMPTY_STRING(req->id1name)) {
 		unixname = req->id1name;
 	} else if (is_user) {
 		errno = 0;
@@ -2614,9 +2614,13 @@ fallback_localsid:
 	(void) generate_localsid(req, res, is_user);
 
 out:
-	if (retcode == IDMAP_SUCCESS && req->id1name == NULL &&
+	if (retcode == IDMAP_SUCCESS && EMPTY_STRING(req->id1name) &&
 	    unixname != NULL) {
+		if (req->id1name != NULL)
+			free(req->id1name);
 		req->id1name = strdup(unixname);
+		if (req->id1name == NULL)
+			retcode = IDMAP_ERR_MEMORY;
 	}
 	if (req->direction != _IDMAP_F_DONE)
 		state->pid2sid_done = FALSE;
@@ -2744,12 +2748,12 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	winname = mapping->id1name;
 	windomain = mapping->id1domain;
 
-	if (winname == NULL && windomain != NULL) {
+	if (EMPTY_STRING(winname) && !EMPTY_STRING(windomain)) {
 		retcode = IDMAP_ERR_ARG;
 		goto out;
 	}
 
-	if (winname != NULL && windomain == NULL) {
+	if (!EMPTY_STRING(winname) && EMPTY_STRING(windomain)) {
 		retcode = IDMAP_SUCCESS;
 		if ((cp = strchr(winname, '@')) != NULL) {
 			/*
@@ -2781,7 +2785,8 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 		windomain = mapping->id1domain;
 	}
 
-	if (winname != NULL && mapping->id1.idmap_id_u.sid.prefix == NULL) {
+	if (!EMPTY_STRING(winname) &&
+	    EMPTY_STRING(mapping->id1.idmap_id_u.sid.prefix)) {
 		retcode = lookup_name2sid(cache, winname, windomain,
 			&is_user, &mapping->id1.idmap_id_u.sid.prefix,
 			&mapping->id1.idmap_id_u.sid.rid, mapping);
@@ -2858,12 +2863,14 @@ get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 
 	unixname = mapping->id1name;
 
-	if (unixname == NULL && mapping->id1.idmap_id_u.uid == SENTINEL_PID) {
+	if (EMPTY_STRING(unixname) &&
+	    mapping->id1.idmap_id_u.uid == SENTINEL_PID) {
 		retcode = IDMAP_ERR_ARG;
 		goto out;
 	}
 
-	if (unixname != NULL && mapping->id1.idmap_id_u.uid == SENTINEL_PID) {
+	if (!EMPTY_STRING(unixname) &&
+	    mapping->id1.idmap_id_u.uid == SENTINEL_PID) {
 		/* Get uid/gid by name */
 		if (is_user) {
 			errno = 0;
