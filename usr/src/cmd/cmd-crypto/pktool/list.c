@@ -406,6 +406,7 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 		if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
 			int num = numattr;
 
+			private = B_FALSE;
 			keyclass = KMF_ASYM_PUB;
 			kmf_set_attr_at_index(attrlist, num,
 			    KMF_KEYCLASS_ATTR, &keyclass,

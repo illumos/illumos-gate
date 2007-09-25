@@ -1877,6 +1877,7 @@ getObjectKeytype(KMF_HANDLE_T handle, CK_OBJECT_HANDLE obj,
 	return (rv);
 
 }
+
 static CK_RV
 getObjectLabel(KMF_HANDLE_T handle, CK_OBJECT_HANDLE obj,
 	char **outlabel)
@@ -1901,6 +1902,33 @@ getObjectLabel(KMF_HANDLE_T handle, CK_OBJECT_HANDLE obj,
 	return (rv);
 }
 
+static CK_RV
+getObjectKeyclass(KMF_HANDLE_T handle, CK_OBJECT_HANDLE obj,
+	KMF_KEY_CLASS *keyclass)
+{
+	CK_RV rv = CKR_OK;
+	CK_ATTRIBUTE templ;
+	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
+	CK_OBJECT_CLASS class;
+
+	templ.type = CKA_CLASS;
+	templ.pValue = &class;
+	templ.ulValueLen = sizeof (CK_OBJECT_CLASS);
+
+	rv = C_GetAttributeValue(kmfh->pk11handle, obj, &templ, 1);
+	if (rv == CKR_OK) {
+		if (class == CKO_PUBLIC_KEY) {
+			*keyclass = KMF_ASYM_PUB;
+		} else if (class == CKO_PRIVATE_KEY) {
+			*keyclass = KMF_ASYM_PRI;
+		} else if (class == CKO_SECRET_KEY) {
+			*keyclass = KMF_SYMMETRIC;
+		}
+	} else {
+		*keyclass = KMF_KEYCLASS_NONE;
+	}
+	return (rv);
+}
 
 KMF_RETURN
 KMFPK11_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
@@ -2695,7 +2723,6 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 				if (keys != NULL) {
 					CK_ULONG keytype;
 					keys[n].kstype = KMF_KEYSTORE_PK11TOKEN;
-					keys[n].keyclass = keyclass;
 					keys[n].israw = FALSE;
 					keys[n].keyp = (void *)hObj;
 
@@ -2711,12 +2738,20 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 					if (ckrv != CKR_OK)
 						goto end;
 
+					if (keyclass == KMF_KEYCLASS_NONE) {
+						ckrv = getObjectKeyclass(handle,
+						    (CK_OBJECT_HANDLE)
+						    keys[n].keyp,
+						    &(keys[n].keyclass));
+						if (ckrv != CKR_OK)
+							goto end;
+					} else {
+						keys[n].keyclass = keyclass;
+					}
 					if (keytype == CKK_RSA) {
 						keys[n].keyalg = KMF_RSA;
-						keys[n].keyclass = KMF_ASYM_PRI;
 					} else if (keytype == CKK_DSA) {
 						keys[n].keyalg = KMF_DSA;
-						keys[n].keyclass = KMF_ASYM_PRI;
 					} else if (keytype == CKK_AES) {
 						keys[n].keyalg = KMF_AES;
 						keys[n].keyclass =
