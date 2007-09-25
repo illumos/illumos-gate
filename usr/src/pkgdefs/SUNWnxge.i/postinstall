@@ -73,9 +73,6 @@ if [ $? -eq 1 ]; then
                 echo "\nFailed add_drv!\n" >&2
                 exit 1
         fi
-else
-        echo " add_drv Failed;  ${DRV} is already in ${BASEDIR}/etc/name_to_major"
-        exit 0
 fi
 
 exit 0

@@ -121,7 +121,11 @@ npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = IPP_REG_ADDR(port, ipp_fzc_offset[i]);
+#if defined(__i386)
+		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
+#else
 		NXGE_REG_RD64(handle, offset, &value);
+#endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 			"%s\t 0x%08llx \n",
 			offset, ipp_fzc_name[i], value));
@@ -147,7 +151,11 @@ npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = IPP_REG_ADDR(port, ipp_fzc_offset[i]);
+#if defined(__i386)
+		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
+#else
 		NXGE_REG_RD64(handle, offset, &value);
+#endif
 	}
 
 }

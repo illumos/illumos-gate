@@ -1783,7 +1783,11 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 		ipp_status_t status;
 
 		(void) npi_ipp_get_status(handle, nxgep->function_num, &status);
+#if defined(__i386)
+		printf("\n\tIPP status 0x%llux\n", (uint64_t)status.value);
+#else
 		printf("\n\tIPP status 0x%lux\n", (uint64_t)status.value);
+#endif
 	}
 }
 
@@ -3273,8 +3277,13 @@ nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			tdi.bits.ldw.conf_part_err = 1;
 		else if (err_id == NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR)
 			tdi.bits.ldw.pkt_part_err = 1;
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to TDMC_INTR_DBG_REG\n",
+				tdi.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TDMC_INTR_DBG_REG\n",
 				tdi.value);
+#endif
 		TXDMA_REG_WRITE64(nxgep->npi_handle, TDMC_INTR_DBG_REG,
 			chan, tdi.value);
 

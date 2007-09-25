@@ -579,8 +579,11 @@ nxge_rxbuf_pp_to_vp(p_nxge_t nxgep, p_rx_rbr_ring_t rbr_p,
 		"==> nxge_rxbuf_pp_to_vp: buf_pp $%p btype %d",
 		pkt_buf_addr_pp,
 		pktbufsz_type));
-
+#if defined(__i386)
+	pktbuf_pp = (uint64_t)(uint32_t)pkt_buf_addr_pp;
+#else
 	pktbuf_pp = (uint64_t)pkt_buf_addr_pp;
+#endif
 
 	switch (pktbufsz_type) {
 	case 0:
@@ -808,9 +811,13 @@ found_index:
 		total_index, dvma_addr,
 		offset, block_size,
 		block_index));
-
-	*pkt_buf_addr_p = (uint64_t *)((uint64_t)bufinfo[anchor_index].kaddr
-				+ offset);
+#if defined(__i386)
+	*pkt_buf_addr_p = (uint64_t *)((uint32_t)bufinfo[anchor_index].kaddr +
+		(uint32_t)offset);
+#else
+	*pkt_buf_addr_p = (uint64_t *)((uint64_t)bufinfo[anchor_index].kaddr +
+		(uint64_t)offset);
+#endif
 
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 		"==> nxge_rxbuf_pp_to_vp: "
@@ -1029,7 +1036,11 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	hd_addr.addr = 0;
 	(void) npi_rxdma_rdc_rbr_head_get(handle, rdc, &hd_addr);
 	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
+#if defined(__i386)
+		(void *)(uint32_t)hd_addr.addr);
+#else
 		(void *)hd_addr.addr);
+#endif
 
 	/* RBR stats */
 	(void) npi_rxdma_rdc_rbr_stat_get(handle, rdc, &rbr_stat);
@@ -1039,7 +1050,11 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	tail_addr.addr = 0;
 	(void) npi_rxdma_rdc_rcr_tail_get(handle, rdc, &tail_addr);
 	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
+#if defined(__i386)
+		(void *)(uint32_t)tail_addr.addr);
+#else
 		(void *)tail_addr.addr);
+#endif
 
 	/* RCR qlen */
 	(void) npi_rxdma_rdc_rcr_qlen_get(handle, rdc, &qlen);
@@ -2103,9 +2118,13 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	pktbufsz_type = ((rcr_entry & RCR_PKTBUFSZ_MASK) >>
 				RCR_PKTBUFSZ_SHIFT);
-
+#if defined(__i386)
+	pkt_buf_addr_pp = (uint64_t *)(uint32_t)((rcr_entry &
+			RCR_PKT_BUF_ADDR_MASK) << RCR_PKT_BUF_ADDR_SHIFT);
+#else
 	pkt_buf_addr_pp = (uint64_t *)((rcr_entry & RCR_PKT_BUF_ADDR_MASK) <<
 			RCR_PKT_BUF_ADDR_SHIFT);
+#endif
 
 	channel = rcr_p->rdc;
 
@@ -2149,8 +2168,13 @@ nxge_receive_packet(p_nxge_t nxgep,
 	l2_len -= ETHERFCSL;
 
 	/* shift 6 bits to get the full io address */
+#if defined(__i386)
+	pkt_buf_addr_pp = (uint64_t *)((uint32_t)pkt_buf_addr_pp <<
+				RCR_PKT_BUF_ADDR_SHIFT_FULL);
+#else
 	pkt_buf_addr_pp = (uint64_t *)((uint64_t)pkt_buf_addr_pp <<
 				RCR_PKT_BUF_ADDR_SHIFT_FULL);
+#endif
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 		"==> (rbr) nxge_receive_packet: entry 0x%0llx "
 		"full pkt_buf_addr_pp $%p l2_len %d",
@@ -3295,7 +3319,11 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 		(p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
+#if defined(__i386)
+		(p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
+#else
 		(p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
+#endif
 
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 			(nxge_port_rcr_size - 1);
@@ -3518,11 +3546,19 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	for (i = 0; i < rbrp->num_blocks; i++, dma_bufp++) {
 		bsize = dma_bufp->block_size;
 		nblocks = dma_bufp->nblocks;
+#if defined(__i386)
+		ring_info->buffer[i].dvma_addr = (uint32_t)dma_bufp->ioaddr_pp;
+#else
 		ring_info->buffer[i].dvma_addr = (uint64_t)dma_bufp->ioaddr_pp;
+#endif
 		ring_info->buffer[i].buf_index = i;
 		ring_info->buffer[i].buf_size = dma_bufp->alength;
 		ring_info->buffer[i].start_index = index;
+#if defined(__i386)
+		ring_info->buffer[i].kaddr = (uint32_t)dma_bufp->kaddrp;
+#else
 		ring_info->buffer[i].kaddr = (uint64_t)dma_bufp->kaddrp;
+#endif
 
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 			" nxge_map_rxdma_channel_buf_ring: map channel %d "
@@ -4244,7 +4280,11 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 	rcrp->rcr_desc_rd_head_p = rcrp->rcr_desc_first_p =
 		(p_rcr_entry_t)DMA_COMMON_VPTR(rcrp->rcr_desc);
 	rcrp->rcr_desc_rd_head_pp = rcrp->rcr_desc_first_pp =
+#if defined(__i386)
+		(p_rcr_entry_t)(uint32_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
+#else
 		(p_rcr_entry_t)DMA_COMMON_IOADDR(rcrp->rcr_desc);
+#endif
 
 	rcrp->rcr_desc_last_p = rcrp->rcr_desc_rd_head_p +
 		(nxge_port_rcr_size - 1);
@@ -4447,8 +4487,13 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			cs.bits.hdw.rbrlogpage = 1;
 		else if (err_id == NXGE_FM_EREPORT_RDMC_CFIGLOGPAGE)
 			cs.bits.hdw.cfiglogpage = 1;
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to RX_DMA_CTL_STAT_DBG_REG\n",
+				cs.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to RX_DMA_CTL_STAT_DBG_REG\n",
 				cs.value);
+#endif
 		RXDMA_REG_WRITE64(nxgep->npi_handle, RX_DMA_CTL_STAT_DBG_REG,
 			chan, cs.value);
 		break;
@@ -4462,9 +4507,15 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			cdfs.bits.ldw.zcp_eop_err = (1 << nxgep->mac.portnum);
 		else if (err_id == NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR)
 			cdfs.bits.ldw.ipp_eop_err = (1 << nxgep->mac.portnum);
+#if defined(__i386)
+		cmn_err(CE_NOTE,
+			"!Write 0x%llx to RX_CTL_DAT_FIFO_STAT_DBG_REG\n",
+			cdfs.value);
+#else
 		cmn_err(CE_NOTE,
 			"!Write 0x%lx to RX_CTL_DAT_FIFO_STAT_DBG_REG\n",
 			cdfs.value);
+#endif
 		RXDMA_REG_WRITE64(nxgep->npi_handle,
 			RX_CTL_DAT_FIFO_STAT_DBG_REG, chan, cdfs.value);
 		break;

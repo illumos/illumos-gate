@@ -1838,7 +1838,11 @@ nxge_fflp_update_hw(p_nxge_t nxgep)
 
 	/* configure vlan tables */
 	pa = (p_nxge_param_t)&nxgep->param_arr[param_vlan_2rdc_grp];
+#if defined(__i386)
+	val_ptr = (uint64_t *)(uint32_t)pa->value;
+#else
 	val_ptr = (uint64_t *)pa->value;
+#endif
 	cfgd_vlans = ((pa->type & NXGE_PARAM_ARRAY_CNT_MASK) >>
 		NXGE_PARAM_ARRAY_CNT_SHIFT);
 
@@ -1858,7 +1862,11 @@ nxge_fflp_update_hw(p_nxge_t nxgep)
 	/* config MAC addresses */
 	num_macs = p_cfgp->max_macs;
 	pa = (p_nxge_param_t)&nxgep->param_arr[param_mac_2rdc_grp];
+#if defined(__i386)
+	val_ptr = (uint64_t *)(uint32_t)pa->value;
+#else
 	val_ptr = (uint64_t *)pa->value;
+#endif
 
 	for (alt_mac = 0; alt_mac < num_macs; alt_mac++) {
 		if (p_class_cfgp->mac_host_info[alt_mac].flag) {

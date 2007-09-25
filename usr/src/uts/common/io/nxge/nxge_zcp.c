@@ -372,8 +372,13 @@ nxge_zcp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			zcps.bits.ldw.slv_tt_index_err = 1;
 		if (err_id == NXGE_FM_EREPORT_ZCP_TT_INDEX_ERR)
 			zcps.bits.ldw.zcp_tt_index_err = 1;
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to ZCP_INT_STAT_TEST_REG\n",
+			zcps.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to ZCP_INT_STAT_TEST_REG\n",
 			zcps.value);
+#endif
 		NXGE_REG_WR64(nxgep->npi_handle, ZCP_INT_STAT_TEST_REG,
 			zcps.value);
 		break;

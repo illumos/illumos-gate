@@ -516,7 +516,12 @@ npi_mac_dump_regs(npi_handle_t handle, uint8_t port)
 				    "\nXMAC Register Dump for port %d\n",
 				    port));
 		for (i = 0; i < num_regs; i++) {
+#if defined(__i386)
+			XMAC_REG_RD(handle, port, (uint32_t)xmac_offset[i],
+				&value);
+#else
 			XMAC_REG_RD(handle, port, xmac_offset[i], &value);
+#endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 				"%08llx %s\t %08llx \n",
 				(XMAC_REG_ADDR((port), (xmac_offset[i]))),
@@ -535,7 +540,12 @@ npi_mac_dump_regs(npi_handle_t handle, uint8_t port)
 				    "\nBMAC Register Dump for port %d\n",
 				    port));
 		for (i = 0; i < num_regs; i++) {
+#if defined(__i386)
+			BMAC_REG_RD(handle, port, (uint32_t)bmac_offset[i],
+				&value);
+#else
 			BMAC_REG_RD(handle, port, bmac_offset[i], &value);
+#endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
 				"%08llx %s\t %08llx \n",
 				(BMAC_REG_ADDR((port), (bmac_offset[i]))),

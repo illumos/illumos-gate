@@ -53,6 +53,7 @@ d none platform 755 root sys
 d none platform/i86pc 755 root sys
 d none platform/i86pc/kernel 755 root sys
 d none platform/i86pc/kernel/drv 755 root sys
+f none platform/i86pc/kernel/drv/nxge 755 root sys
 e renameold platform/i86pc/kernel/drv/nxge.conf 0644 root sys
 d none platform/i86pc/kernel/drv/amd64 755 root sys
 f none platform/i86pc/kernel/drv/amd64/nxge 755 root sys

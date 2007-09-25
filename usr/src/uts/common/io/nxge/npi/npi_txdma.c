@@ -142,7 +142,12 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 
 	num_regs = NUM_TDC_DMC_REGS;
 	for (i = 0; i < num_regs; i++) {
+#if defined(__i386)
+		TXDMA_REG_READ64(handle, (uint32_t)tdc_dmc_offset[i], tdc,
+			&value);
+#else
 		TXDMA_REG_READ64(handle, tdc_dmc_offset[i], tdc, &value);
+#endif
 		offset = NXGE_TXDMA_OFFSET(tdc_dmc_offset[i], handle.is_vraddr,
 				tdc);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
@@ -158,7 +163,11 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
 		offset = NXGE_TXLOG_OFFSET(tdc_fzc_offset[i], tdc);
+#if defined(__i386)
+		NXGE_REG_RD64(handle, (uint32_t)offset, &value);
+#else
 		NXGE_REG_RD64(handle, offset, &value);
+#endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 			"%s\t %016llx \n",
 			offset, tdc_fzc_name[i],
@@ -196,7 +205,11 @@ npi_txdma_dump_fzc_regs(npi_handle_t handle)
 
 	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
+#if defined(__i386)
+		NXGE_REG_RD64(handle, (uint32_t)tx_fzc_offset[i], &value);
+#else
 		NXGE_REG_RD64(handle, tx_fzc_offset[i], &value);
+#endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
 			"%s\t 0x%08llx \n",
 			tx_fzc_offset[i],
@@ -230,8 +243,12 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 	num_regs = NUM_TDC_DMC_REGS;
 	value = 0;
 	for (i = 0; i < num_regs; i++) {
-		TXDMA_REG_WRITE64(handle, tdc_dmc_offset[i], tdc,
+#if defined(__i386)
+		TXDMA_REG_WRITE64(handle, (uint32_t)tdc_dmc_offset[i], tdc,
 			value);
+#else
+		TXDMA_REG_WRITE64(handle, tdc_dmc_offset[i], tdc, value);
+#endif
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,

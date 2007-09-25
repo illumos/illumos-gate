@@ -159,7 +159,11 @@ typedef	ddi_iblock_cookie_t 		nxge_intr_cookie_t;
 
 typedef ddi_acc_handle_t		nxge_os_acc_handle_t;
 typedef	nxge_os_acc_handle_t		npi_reg_handle_t;
-typedef	uint64_t			npi_reg_ptr_t;
+#if defined(__i386)
+typedef	uint32_t			npi_reg_ptr_t;
+#else
+typedef uint64_t			npi_reg_ptr_t;
+#endif
 
 typedef ddi_dma_handle_t		nxge_os_dma_handle_t;
 typedef struct _nxge_dma_common_t	nxge_os_dma_common_t;
@@ -222,9 +226,15 @@ typedef frtn_t				nxge_os_frtn_t;
 	(ddi_get32(NPI_REGH(npi_handle), \
 	(uint32_t *)(NPI_REGP(npi_handle) + offset)))
 
+#if defined(__i386)
+#define	NXGE_NPI_PIO_READ64(npi_handle, offset)		\
+	(ddi_get64(NPI_REGH(npi_handle),		\
+	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset)))
+#else
 #define	NXGE_NPI_PIO_READ64(npi_handle, offset)		\
 	(ddi_get64(NPI_REGH(npi_handle),		\
 	(uint64_t *)(NPI_REGP(npi_handle) + offset)))
+#endif
 
 #define	NXGE_NPI_PIO_WRITE8(npi_handle, offset, data)	\
 	(ddi_put8(NPI_REGH(npi_handle),			\
@@ -238,9 +248,15 @@ typedef frtn_t				nxge_os_frtn_t;
 	(ddi_put32(NPI_REGH(npi_handle),		\
 	(uint32_t *)(NPI_REGP(npi_handle) + offset), data))
 
+#if defined(__i386)
+#define	NXGE_NPI_PIO_WRITE64(npi_handle, offset, data)	\
+	(ddi_put64(NPI_REGH(npi_handle),		\
+	(uint64_t *)(NPI_REGP(npi_handle) + (uint32_t)offset), data))
+#else
 #define	NXGE_NPI_PIO_WRITE64(npi_handle, offset, data)	\
 	(ddi_put64(NPI_REGH(npi_handle),		\
 	(uint64_t *)(NPI_REGP(npi_handle) + offset), data))
+#endif
 
 #define	NXGE_MEM_PIO_READ8(npi_handle)		\
 	(ddi_get8(NPI_REGH(npi_handle), (uint8_t *)NPI_REGP(npi_handle)))

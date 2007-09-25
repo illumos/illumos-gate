@@ -362,8 +362,13 @@ nxge_txc_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			ro_ecc_ctl.bits.ldw.single_bit_err = 1;
 		else
 			ro_ecc_ctl.bits.ldw.double_bit_err = 1;
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_ROECC_CTL_REG\n",
+					ro_ecc_ctl.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_ROECC_CTL_REG\n",
 					ro_ecc_ctl.value);
+#endif
 		TXC_FZC_CNTL_REG_WRITE64(nxgep->npi_handle, TXC_ROECC_CTL_REG,
 					portn, ro_ecc_ctl.value);
 		break;
@@ -376,8 +381,13 @@ nxge_txc_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			sf_ecc_ctl.bits.ldw.single_bit_err = 1;
 		else
 			sf_ecc_ctl.bits.ldw.double_bit_err = 1;
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_SFECC_CTL_REG\n",
+					sf_ecc_ctl.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_SFECC_CTL_REG\n",
 					sf_ecc_ctl.value);
+#endif
 		TXC_FZC_CNTL_REG_WRITE64(nxgep->npi_handle, TXC_SFECC_CTL_REG,
 					portn, sf_ecc_ctl.value);
 		break;
@@ -386,8 +396,13 @@ nxge_txc_inject_err(p_nxge_t nxgep, uint32_t err_id)
 					&txcs.value);
 		nxge_txc_inject_port_err(portn, &txcs,
 						TXC_INT_STAT_REORDER_ERR);
+#if defined(__i386)
+		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_INT_STAT_DBG_REG\n",
+					txcs.value);
+#else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_INT_STAT_DBG_REG\n",
 					txcs.value);
+#endif
 		NXGE_REG_WR64(nxgep->npi_handle, TXC_INT_STAT_DBG_REG,
 					txcs.value);
 		break;

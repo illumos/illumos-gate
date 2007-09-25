@@ -268,7 +268,11 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		tx_desc_pp = &tx_desc_ring_pp[i];
 #endif
 		tx_msg_p = &tx_msg_ring[i];
+#if defined(__i386)
+		npi_desc_handle.regp = (uint32_t)tx_desc_p;
+#else
 		npi_desc_handle.regp = (uint64_t)tx_desc_p;
+#endif
 		if (!header_set &&
 			((!nxge_tx_use_bcopy && (len > TX_BCOPY_SIZE)) ||
 				(len >= bcopy_thresh))) {
@@ -435,8 +439,11 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 					"ngathers %d",
 					len, clen,
 					ngathers));
-
+#if defined(__i386)
+				npi_desc_handle.regp = (uint32_t)tx_desc_p;
+#else
 				npi_desc_handle.regp = (uint64_t)tx_desc_p;
+#endif
 				while (ncookies > 1) {
 					ngathers++;
 					/*
@@ -484,7 +491,11 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 					tx_desc_p = &tx_desc_ring_vp[i];
 
 					npi_desc_handle.regp =
+#if defined(__i386)
+						(uint32_t)tx_desc_p;
+#else
 						(uint64_t)tx_desc_p;
+#endif
 					tx_msg_p = &tx_msg_ring[i];
 					tx_msg_p->flags.dma_type = USE_NONE;
 					tx_desc.value = 0;
@@ -509,7 +520,11 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 
 		nmp = nmp->b_cont;
 nxge_start_control_header_only:
+#if defined(__i386)
+		npi_desc_handle.regp = (uint32_t)tx_desc_p;
+#else
 		npi_desc_handle.regp = (uint64_t)tx_desc_p;
+#endif
 		ngathers++;
 
 		if (ngathers == 1) {
@@ -589,7 +604,11 @@ nxge_start_control_header_only:
 
 	tx_msg_p->tx_message = mp;
 	tx_desc_p = &tx_desc_ring_vp[sop_index];
+#if defined(__i386)
+	npi_desc_handle.regp = (uint32_t)tx_desc_p;
+#else
 	npi_desc_handle.regp = (uint64_t)tx_desc_p;
+#endif
 
 	pkthdrp = (p_tx_pkt_hdr_all_t)hdrp;
 	pkthdrp->reserved = 0;
@@ -799,7 +818,11 @@ nxge_start_fail2:
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: clean up"));
 		for (i = 0; i < ngathers; i++) {
 			tx_desc_p = &tx_desc_ring_vp[cur_index];
+#if defined(__i386)
+			npi_handle.regp = (uint32_t)tx_desc_p;
+#else
 			npi_handle.regp = (uint64_t)tx_desc_p;
+#endif
 			tx_msg_p = &tx_msg_ring[cur_index];
 			(void) npi_txdma_desc_set_zero(npi_handle, 1);
 			if (tx_msg_p->flags.dma_type == USE_DVMA) {
@@ -1035,7 +1058,11 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 
 	case NXGE_TX_LB_HASH:
 		if (hp->hash) {
+#if defined(__i386)
+			ring_index = ((uint32_t)(hp->hash) % maxtdcs);
+#else
 			ring_index = ((uint64_t)(hp->hash) % maxtdcs);
+#endif
 		} else {
 			ring_index = mp->b_band % maxtdcs;
 		}

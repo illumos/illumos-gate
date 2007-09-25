@@ -1443,7 +1443,11 @@ nxge_uninit(p_nxge_t nxgep)
 void
 nxge_get64(p_nxge_t nxgep, p_mblk_t mp)
 {
+#if defined(__i386)
+	size_t		reg;
+#else
 	uint64_t	reg;
+#endif
 	uint64_t	regdata;
 	int		i, retry;
 
@@ -1460,7 +1464,11 @@ nxge_get64(p_nxge_t nxgep, p_mblk_t mp)
 void
 nxge_put64(p_nxge_t nxgep, p_mblk_t mp)
 {
+#if defined(__i386)
+	size_t		reg;
+#else
 	uint64_t	reg;
+#endif
 	uint64_t	buf[2];
 
 	bcopy((char *)mp->b_rptr, (char *)&buf[0], 2 * sizeof (uint64_t));
@@ -2896,9 +2904,18 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 	dma_p->kaddrp = kaddrp;
 	dma_p->last_kaddrp = (unsigned char *)kaddrp +
 			dma_p->alength - RXBUF_64B_ALIGNED;
+#if defined(__i386)
+	dma_p->ioaddr_pp =
+		(unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress;
+#else
 	dma_p->ioaddr_pp = (unsigned char *)dma_p->dma_cookie.dmac_laddress;
+#endif
 	dma_p->last_ioaddr_pp =
+#if defined(__i386)
+		(unsigned char *)(uint32_t)dma_p->dma_cookie.dmac_laddress +
+#else
 		(unsigned char *)dma_p->dma_cookie.dmac_laddress +
+#endif
 				dma_p->alength - RXBUF_64B_ALIGNED;
 
 	NPI_DMA_ACC_HANDLE_SET(dma_p, dma_p->acc_handle);
