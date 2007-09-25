@@ -37,6 +37,7 @@ i386_CORE_OBJS += \
 sparc_CORE_OBJS +=
 
 COMMON_CORE_OBJS +=		\
+		beep.o		\
 		bitset.o	\
 		bp_map.o	\
 		brand.o		\

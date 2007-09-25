@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include "sys/reboot.h"
 #include <sys/promif.h>
 #include <sys/beep.h>
+#include <sys/inttypes.h>
 
 /*
  * For any keyboard, there is a unique code describing the position
@@ -385,8 +386,8 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	 * just for fun, so blow past those to get the keyboard scan code.
 	 */
 	while (kb8042_is_input_avail(kb8042, MAX_WAIT_USECS, B_TRUE) &&
-		(scanset = ddi_get8(kb8042->handle, kb8042->addr + port))
-		    == KB_ACK)
+	    (scanset = ddi_get8(kb8042->handle, kb8042->addr + port))
+	    == KB_ACK)
 		;
 
 #ifdef KD_DEBUG
@@ -455,14 +456,14 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	kb8042->polled_synthetic_release_pending = B_FALSE;
 
 	if (ddi_create_minor_node(devi, module_name, S_IFCHR, 0,
-		    DDI_NT_KEYBOARD, 0) == DDI_FAILURE) {
+	    DDI_NT_KEYBOARD, 0) == DDI_FAILURE) {
 		goto failure;
 	}
 
 	kb8042->init_state |= KB8042_MINOR_NODE_CREATED;
 
 	rc = ddi_regs_map_setup(devi, 0, (caddr_t *)&kb8042->addr,
-		(offset_t)0, (offset_t)0, &attr, &kb8042->handle);
+	    (offset_t)0, (offset_t)0, &attr, &kb8042->handle);
 	if (rc != DDI_SUCCESS) {
 #if	defined(KD_DEBUG)
 		cmn_err(CE_WARN, "kb8042_attach:  can't map registers");
@@ -473,7 +474,7 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	kb8042->init_state |= KB8042_REGS_MAPPED;
 
 	if (ddi_get_iblock_cookie(devi, 0, &kb8042->w_iblock) !=
-		DDI_SUCCESS) {
+	    DDI_SUCCESS) {
 		cmn_err(CE_WARN, "kb8042_attach:  Can't get iblock cookie");
 		goto failure;
 	}
@@ -522,8 +523,8 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Turn on interrupts...
 	 */
 	if (ddi_add_intr(devi, 0,
-		&kb8042->w_iblock, (ddi_idevice_cookie_t *)NULL,
-		kb8042_intr, (caddr_t)kb8042) != DDI_SUCCESS) {
+	    &kb8042->w_iblock, (ddi_idevice_cookie_t *)NULL,
+	    kb8042_intr, (caddr_t)kb8042) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "kb8042_attach: cannot add interrupt");
 		goto failure;
 	}
@@ -671,9 +672,9 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kb8042_get_initial_leds(kb8042, &initial_leds, &initial_led_mask);
 	err = kbtrans_streams_init(qp, sflag, credp,
-		(struct kbtrans_hardware *)kb8042, &kb8042_callbacks,
-		&kb8042->hw_kbtrans,
-		initial_leds, initial_led_mask);
+	    (struct kbtrans_hardware *)kb8042, &kb8042_callbacks,
+	    &kb8042->hw_kbtrans,
+	    initial_leds, initial_led_mask);
 	if (err != 0)
 		return (err);
 
@@ -681,19 +682,19 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kb8042->polledio.cons_polledio_version = CONSPOLLEDIO_V1;
 	kb8042->polledio.cons_polledio_argument =
-		(cons_polledio_arg_t)kb8042;
+	    (cons_polledio_arg_t)kb8042;
 	kb8042->polledio.cons_polledio_putchar = NULL;
 	kb8042->polledio.cons_polledio_getchar =
-		(int (*)(cons_polledio_arg_t))kb8042_polled_getchar;
+	    (int (*)(cons_polledio_arg_t))kb8042_polled_getchar;
 	kb8042->polledio.cons_polledio_ischar =
-		(boolean_t (*)(cons_polledio_arg_t))kb8042_polled_ischar;
+	    (boolean_t (*)(cons_polledio_arg_t))kb8042_polled_ischar;
 	kb8042->polledio.cons_polledio_enter = NULL;
 	kb8042->polledio.cons_polledio_exit = NULL;
 	kb8042->polledio.cons_polledio_setled =
-		(void (*)(cons_polledio_arg_t, int))kb8042_polled_setled;
+	    (void (*)(cons_polledio_arg_t, int))kb8042_polled_setled;
 	kb8042->polledio.cons_polledio_keycheck =
-		(boolean_t (*)(cons_polledio_arg_t, int *,
-		enum keystate *))kb8042_polled_keycheck;
+	    (boolean_t (*)(cons_polledio_arg_t, int *,
+	    enum keystate *))kb8042_polled_keycheck;
 
 	qprocson(qp);
 
@@ -707,6 +708,9 @@ static int
 kb8042_close(queue_t *qp, int flag, cred_t *credp)
 {
 	struct kb8042	*kb8042;
+
+	/* If a beep is in progress, stop that */
+	(void) beeper_off();
 
 	kb8042 = (struct kb8042 *)qp->q_ptr;
 
@@ -756,7 +760,7 @@ kb8042_wsrv(queue_t *qp)
 			continue;
 		default:
 			cmn_err(CE_NOTE, "kb8042_wsrv: bad msg %x",
-						mp->b_datap->db_type);
+			    mp->b_datap->db_type);
 			freemsg(mp);
 			continue;
 		}
@@ -771,6 +775,9 @@ kb8042_ioctlmsg(struct kb8042 *kb8042, queue_t *qp, mblk_t *mp)
 	mblk_t		*datap;
 	int		error;
 	int		tmp;
+	int		cycles;
+	int		frequency;
+	int		msecs;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 
@@ -873,6 +880,33 @@ kb8042_ioctlmsg(struct kb8042 *kb8042, queue_t *qp, mblk_t *mp)
 		miocack(qp, mp, 0, 0);
 		break;
 
+	case KIOCMKTONE:
+		if (iocp->ioc_count != TRANSPARENT) {
+			miocnak(qp, mp, 0, EINVAL);
+			return;
+		}
+
+		tmp = (int)(*(intptr_t *)mp->b_cont->b_rptr);
+		cycles = tmp & 0xffff;
+		msecs = (tmp >> 16) & 0xffff;
+
+		if (cycles == 0)
+			frequency = UINT16_MAX;
+		else if (cycles == UINT16_MAX)
+			frequency = 0;
+		else {
+			frequency = (PIT_HZ + cycles / 2) / cycles;
+			if (frequency > UINT16_MAX)
+				frequency = UINT16_MAX;
+		}
+
+		error = beep_mktone(frequency, msecs);
+		if (error != 0)
+			miocnak(qp, mp, 0, error);
+		else
+			miocack(qp, mp, 0, 0);
+		break;
+
 	default:
 #ifdef DEBUG1
 		cmn_err(CE_NOTE, "!kb8042_ioctlmsg %x", iocp->ioc_cmd);
@@ -903,7 +937,7 @@ kb8042_received_byte(
 		return;
 
 	legit = KeyboardConvertScan(kb8042, scancode, &key_pos, &state,
-		&synthetic_release_needed);
+	    &synthetic_release_needed);
 
 	if (legit == 0) {
 		/* Eaten by translation */
@@ -917,9 +951,9 @@ kb8042_received_byte(
 #ifdef	KD_DEBUG
 	if (kb8042_debug) {
 		prom_printf("kb8042_intr:  0x%x -> %s %d",
-			scancode,
-			state == KEY_RELEASED ? "released" : "pressed",
-			key_pos);
+		    scancode,
+		    state == KEY_RELEASED ? "released" : "pressed",
+		    key_pos);
 	}
 #endif
 
@@ -994,8 +1028,8 @@ kb8042_received_byte(
 #if	defined(KD_DEBUG)
 	if (kb8042_pressrelease_debug) {
 		prom_printf(" %s%d ",
-			state == KEY_PRESSED ? "+" : "-",
-			key_pos);
+		    state == KEY_PRESSED ? "+" : "-",
+		    key_pos);
 	}
 #endif
 
@@ -1059,7 +1093,7 @@ kb8042_intr(caddr_t arg)
 		rc = DDI_INTR_CLAIMED;
 
 		scancode = ddi_get8(kb8042->handle,
-			kb8042->addr + I8042_INT_INPUT_DATA);
+		    kb8042->addr + I8042_INT_INPUT_DATA);
 
 #if	defined(KD_DEBUG)
 		if (kb8042_low_level_debug)
@@ -1131,7 +1165,7 @@ kb8042_polled_keycheck(
 		}
 
 		scancode = ddi_get8(kb8042->handle,
-				kb8042->addr + I8042_POLL_INPUT_DATA);
+		    kb8042->addr + I8042_POLL_INPUT_DATA);
 
 #if	defined(KD_DEBUG)
 		if (kb8042_low_level_debug)
@@ -1150,7 +1184,7 @@ kb8042_polled_keycheck(
 #endif
 
 		legit = KeyboardConvertScan(kb8042, scancode, key, state,
-			&synthetic_release_needed);
+		    &synthetic_release_needed);
 		if (!legit) {
 #ifdef	KD_DEBUG
 			if (kb8042_getchar_debug)
@@ -1161,8 +1195,8 @@ kb8042_polled_keycheck(
 #ifdef	KD_DEBUG
 		if (kb8042_getchar_debug) {
 			prom_printf(" -> %s %d\n",
-				*state == KEY_PRESSED ? "pressed" : "released",
-				*key);
+			    *state == KEY_PRESSED ? "pressed" : "released",
+			    *key);
 		}
 #endif
 		/*
@@ -1256,7 +1290,7 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 	/* wait for up to 250 ms for a response */
 	for (cnt = 0; cnt < 250; cnt++) {
 		ready = ddi_get8(kb8042->handle,
-			kb8042->addr + I8042_INT_INPUT_AVAIL);
+		    kb8042->addr + I8042_INT_INPUT_AVAIL);
 		if (ready != 0)
 			break;
 		drv_usecwait(1000);
@@ -1269,7 +1303,7 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 	 */
 	if (ready != 0) {
 		byt = ddi_get8(kb8042->handle,
-			kb8042->addr + I8042_INT_INPUT_DATA);
+		    kb8042->addr + I8042_INT_INPUT_DATA);
 #if	defined(KD_DEBUG)
 		if (kb8042_low_level_debug)
 			prom_printf(" <K:%x ", byt);
@@ -1298,8 +1332,8 @@ kb8042_state_machine(struct kb8042 *kb8042, int scancode, boolean_t polled)
 	case KB_COMMAND_STATE_LED:
 		if (scancode == KB_ACK) {
 			kb8042_send_to_keyboard(kb8042,
-				kb8042_xlate_leds(kb8042->leds.desired),
-				polled);
+			    kb8042_xlate_leds(kb8042->leds.desired),
+			    polled);
 			kb8042->leds.commanded = kb8042->leds.desired;
 			kb8042->command_state = KB_COMMAND_STATE_WAIT;
 			return (STATE_INTERNAL);
@@ -1436,10 +1470,10 @@ kb8042_type4_cmd(struct kb8042 *kb8042, int cmd)
 {
 	switch (cmd) {
 	case KBD_CMD_BELL:
-		beeper_on(BEEP_TYPE4);
+		(void) beeper_on(BEEP_TYPE4);
 		break;
 	case KBD_CMD_NOBELL:
-		beeper_off();
+		(void) beeper_off();
 		break;
 	}
 }

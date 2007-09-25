@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +38,7 @@
 #include <sys/kmem.h>
 #include <sys/devops.h>
 #include <sys/bbc_beep.h>
-#include <sys/beep_driver.h>
+#include <sys/beep.h>
 
 
 /* Pointer to the state structure */
@@ -66,9 +65,9 @@ static int bbc_beep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int bbc_beep_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int bbc_beep_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
-static void bbc_beep_freq(dev_info_t *, int);
-static void bbc_beep_on(dev_info_t *);
-static void bbc_beep_off(dev_info_t *);
+static void bbc_beep_freq(void *arg, int freq);
+static void bbc_beep_on(void *arg);
+static void bbc_beep_off(void *arg);
 static void bbc_beep_cleanup(bbc_beep_state_t *);
 static int bbc_beep_map_regs(dev_info_t *, bbc_beep_state_t *);
 static bbc_beep_state_t *bbc_beep_obtain_state(dev_info_t *);
@@ -128,7 +127,7 @@ _init(void)
 
 	/* Initialize the soft state structures */
 	if ((error = ddi_soft_state_init(&bbc_beep_statep,
-			sizeof (bbc_beep_state_t), 1)) != 0) {
+	    sizeof (bbc_beep_state_t), 1)) != 0) {
 
 		return (error);
 	}
@@ -219,14 +218,14 @@ bbc_beep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (bbc_beep_map_regs(dip, bbc_beeptr) != DDI_SUCCESS) {
 
 		BBC_BEEP_DEBUG((CE_WARN, \
-			"bbc_beep_attach: Mapping of bbc registers failed."));
+		    "bbc_beep_attach: Mapping of bbc registers failed."));
 
 		bbc_beep_cleanup(bbc_beeptr);
 
 		return (DDI_FAILURE);
 	}
 
-	(void) beep_init(dip, bbc_beep_on, bbc_beep_off, bbc_beep_freq);
+	(void) beep_init((void *)dip, bbc_beep_on, bbc_beep_off, bbc_beep_freq);
 
 	/* Display information in the banner */
 	ddi_report_dev(dip);
@@ -241,7 +240,6 @@ bbc_beep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 /*
  * bbc_beep_detach:
  */
-/* ARGSUSED */
 static int
 bbc_beep_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
@@ -324,8 +322,9 @@ bbc_beep_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
  *	Set the frequency
  */
 static void
-bbc_beep_freq(dev_info_t *dip, int freq)
+bbc_beep_freq(void *arg, int freq)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	unsigned long counter;
 	int8_t beep_c2 = 0;
 	int8_t beep_c3 = 0;
@@ -362,8 +361,9 @@ bbc_beep_freq(dev_info_t *dip, int freq)
  *	Turn the beeper on
  */
 static void
-bbc_beep_on(dev_info_t *dip)
+bbc_beep_on(void *arg)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	bbc_beep_state_t *bbc_beeptr = bbc_beep_obtain_state(dip);
 
 	BEEP_WRITE_CTRL_REG(BBC_BEEP_ON);
@@ -380,8 +380,9 @@ bbc_beep_on(dev_info_t *dip)
  * 	Turn the beeper off
  */
 static void
-bbc_beep_off(dev_info_t *dip)
+bbc_beep_off(void *arg)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	bbc_beep_state_t *bbc_beeptr = bbc_beep_obtain_state(dip);
 
 	BEEP_WRITE_CTRL_REG(BBC_BEEP_OFF);
@@ -414,11 +415,11 @@ bbc_beep_map_regs(dev_info_t *dip, bbc_beep_state_t *bbc_beeptr)
 
 	/* Map in operational registers */
 	if (ddi_regs_map_setup(dip, 0,
-			(caddr_t *)&bbc_beeptr->bbc_beep_regsp,
-			0,
-			sizeof (bbc_beep_regs_t),
-			&attr,
-			&bbc_beeptr->bbc_beep_regs_handle) != DDI_SUCCESS) {
+	    (caddr_t *)&bbc_beeptr->bbc_beep_regsp,
+	    0,
+	    sizeof (bbc_beep_regs_t),
+	    &attr,
+	    &bbc_beeptr->bbc_beep_regs_handle) != DDI_SUCCESS) {
 
 		return (DDI_FAILURE);
 	}
@@ -489,7 +490,7 @@ bbc_beep_hztocounter(int freq)
 	 * Get system frequency for the root dev_info properties
 	 */
 	system_freq = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
-			0, "clock-frequency", 0);
+	    0, "clock-frequency", 0);
 
 	oldfreq = 0;
 

@@ -611,15 +611,15 @@ tem_chkparam(
 			/* erase cursor to end of screen */
 			/* FIRST erase cursor to end of line */
 			tem_clear_chars(tem,
-				tems->a_c_dimension.width -
-				    tems->a_c_cursor.col,
-				tems->a_c_cursor.row,
-				tems->a_c_cursor.col, credp, called_from);
+			    tems->a_c_dimension.width -
+			    tems->a_c_cursor.col,
+			    tems->a_c_cursor.row,
+			    tems->a_c_cursor.col, credp, called_from);
 
 			/* THEN erase lines below the cursor */
 			for (row = tems->a_c_cursor.row + 1;
-				row < tems->a_c_dimension.height;
-				row++) {
+			    row < tems->a_c_dimension.height;
+			    row++) {
 				tem_clear_chars(tem,
 				    tems->a_c_dimension.width,
 				    row, 0, credp, called_from);
@@ -630,17 +630,17 @@ tem_chkparam(
 			/* erase beginning of screen to cursor */
 			/* FIRST erase lines above the cursor */
 			for (row = 0;
-				row < tems->a_c_cursor.row;
-				row++) {
+			    row < tems->a_c_cursor.row;
+			    row++) {
 				tem_clear_chars(tem,
 				    tems->a_c_dimension.width,
 				    row, 0, credp, called_from);
 			}
 			/* THEN erase beginning of line to cursor */
 			tem_clear_chars(tem,
-				tems->a_c_cursor.col + 1,
-				tems->a_c_cursor.row,
-				    0, credp, called_from);
+			    tems->a_c_cursor.col + 1,
+			    tems->a_c_cursor.row,
+			    0, credp, called_from);
 			break;
 
 		case 2:
@@ -649,8 +649,8 @@ tem_chkparam(
 			    row < tems->a_c_dimension.height;
 			    row++) {
 				tem_clear_chars(tem,
-				tems->a_c_dimension.width,
-				row, 0, credp, called_from);
+				    tems->a_c_dimension.width,
+				    row, 0, credp, called_from);
 			}
 			break;
 		}
@@ -692,20 +692,20 @@ tem_chkparam(
 		tem_send_data(tem, credp, called_from);
 		tem_setparam(tem, 1, 1);
 		tem_scroll(tem,
-			tems->a_c_cursor.row,
-			tems->a_c_dimension.height - 1,
-			tems->a_params[0], TEM_SCROLL_DOWN,
-			    credp, called_from);
+		    tems->a_c_cursor.row,
+		    tems->a_c_dimension.height - 1,
+		    tems->a_params[0], TEM_SCROLL_DOWN,
+		    credp, called_from);
 		break;
 
 	case 'M':		/* delete line */
 		tem_send_data(tem, credp, called_from);
 		tem_setparam(tem, 1, 1);
 		tem_scroll(tem,
-			tems->a_c_cursor.row,
-			tems->a_c_dimension.height - 1,
-			tems->a_params[0], TEM_SCROLL_UP,
-			    credp, called_from);
+		    tems->a_c_cursor.row,
+		    tems->a_c_dimension.height - 1,
+		    tems->a_params[0], TEM_SCROLL_UP,
+		    credp, called_from);
 		break;
 
 	case 'P':		/* DCH - delete char */
@@ -718,27 +718,27 @@ tem_chkparam(
 		tem_send_data(tem, credp, called_from);
 		tem_setparam(tem, 1, 1);
 		tem_scroll(tem, 0,
-			tems->a_c_dimension.height - 1,
-			tems->a_params[0], TEM_SCROLL_UP,
-			    credp, called_from);
+		    tems->a_c_dimension.height - 1,
+		    tems->a_params[0], TEM_SCROLL_UP,
+		    credp, called_from);
 		break;
 
 	case 'T':		/* scroll down */
 		tem_send_data(tem, credp, called_from);
 		tem_setparam(tem, 1, 1);
 		tem_scroll(tem, 0,
-			tems->a_c_dimension.height - 1,
-			tems->a_params[0], TEM_SCROLL_DOWN,
-			    credp, called_from);
+		    tems->a_c_dimension.height - 1,
+		    tems->a_params[0], TEM_SCROLL_DOWN,
+		    credp, called_from);
 		break;
 
 	case 'X':		/* erase char */
 		tem_setparam(tem, 1, 1);
 		tem_clear_chars(tem,
-			tems->a_params[0],
-			tems->a_c_cursor.row,
-			tems->a_c_cursor.col,
-			    credp, called_from);
+		    tems->a_params[0],
+		    tems->a_c_cursor.row,
+		    tems->a_c_cursor.col,
+		    credp, called_from);
 		break;
 
 	case 'Z':		/* cursor backward tabulation */
@@ -779,14 +779,14 @@ tem_getparams(struct tem *tem, uchar_t ch,
 		tems->a_gotparam = B_TRUE;  /* Remember got parameter */
 		return; /* Return immediately */
 	} else if (tems->a_state == A_STATE_CSI_EQUAL ||
-		tems->a_state == A_STATE_CSI_QMARK) {
+	    tems->a_state == A_STATE_CSI_QMARK) {
 		tems->a_state = A_STATE_START;
 	} else {
 		if (tems->a_curparam < TEM_MAXPARAMS) {
 			if (tems->a_gotparam) {
 				/* get the parameter value */
 				tems->a_params[tems->a_curparam] =
-							tems->a_paramval;
+				    tems->a_paramval;
 			}
 			tems->a_curparam++;
 		}
@@ -877,7 +877,7 @@ tem_lf(struct tem *tem,
 	}
 
 	tem_mv_cursor(tem, row, tems->a_c_cursor.col,
-		credp, called_from);
+	    credp, called_from);
 
 	if (tems->a_nscroll == 0) {
 		/* erase rest of cursor line */
@@ -922,12 +922,12 @@ tem_send_data(struct tem *tem, cred_t *credp,
 		 * Call the primitive to render this data.
 		 */
 		(*tems->in_fp.f_display)(tem,
-			tems->a_outbuf,
-			tems->a_outindex,
-			tems->a_s_cursor.row,
-			    tems->a_s_cursor.col,
-			fg_color, bg_color,
-			credp, called_from);
+		    tems->a_outbuf,
+		    tems->a_outindex,
+		    tems->a_s_cursor.row,
+		    tems->a_s_cursor.col,
+		    fg_color, bg_color,
+		    credp, called_from);
 		tems->a_outindex = 0;
 	}
 	tem_align_cursor(tem);
@@ -1119,9 +1119,9 @@ static void
 tem_bell(struct tem *tem, enum called_from called_from)
 {
 	if (called_from == CALLED_FROM_STANDALONE)
-		beep_polled(BEEP_CONSOLE);
+		(void) beep_polled(BEEP_CONSOLE);
 	else
-		beep(BEEP_CONSOLE);
+		(void) beep(BEEP_CONSOLE);
 }
 
 
@@ -1205,7 +1205,7 @@ tem_copy_area(struct tem *tem,
 		return;
 
 	(*tems->in_fp.f_copy)(tem, s_col, s_row,
-		e_col, e_row, t_col, t_row, credp, called_from);
+	    e_col, e_row, t_col, t_row, credp, called_from);
 }
 
 static void
@@ -1516,7 +1516,7 @@ tem_cls(struct tem *tem,
 	if (tems->display_mode == VIS_TEXT) {
 		for (row = 0; row < tems->a_c_dimension.height; row++) {
 			tem_clear_chars(tem, tems->a_c_dimension.width,
-				row, 0, credp, called_from);
+			    row, 0, credp, called_from);
 		}
 		tems->a_c_cursor.row = 0;
 		tems->a_c_cursor.col = 0;
@@ -1550,7 +1550,7 @@ tem_back_tab(struct tem *tem,
 	}
 
 	tem_mv_cursor(tem, tems->a_c_cursor.row,
-	tabstop, credp, called_from);
+	    tabstop, credp, called_from);
 }
 
 static void
@@ -1587,9 +1587,9 @@ tem_set_tab(struct tem *tem)
 	if (tems->a_ntabs == TEM_MAXTAB)
 		return;
 	if (tems->a_ntabs == 0 ||
-		tems->a_tabs[tems->a_ntabs] < tems->a_c_cursor.col) {
-			tems->a_tabs[tems->a_ntabs++] = tems->a_c_cursor.col;
-			return;
+	    tems->a_tabs[tems->a_ntabs] < tems->a_c_cursor.col) {
+		tems->a_tabs[tems->a_ntabs++] = tems->a_c_cursor.col;
+		return;
 	}
 	for (i = 0; i < tems->a_ntabs; i++) {
 		if (tems->a_tabs[i] == tems->a_c_cursor.col)
@@ -1758,33 +1758,33 @@ tem_shift(
 	case TEM_SHIFT_LEFT:
 		if (count < rest_of_line) {
 			tem_copy_area(tem,
-				tems->a_c_cursor.col + count,
-				tems->a_c_cursor.row,
-				tems->a_c_dimension.width - 1,
-				tems->a_c_cursor.row,
-				tems->a_c_cursor.col,
-				tems->a_c_cursor.row,
-				credp, called_from);
+			    tems->a_c_cursor.col + count,
+			    tems->a_c_cursor.row,
+			    tems->a_c_dimension.width - 1,
+			    tems->a_c_cursor.row,
+			    tems->a_c_cursor.col,
+			    tems->a_c_cursor.row,
+			    credp, called_from);
 		}
 
 		tem_clear_chars(tem, count, tems->a_c_cursor.row,
-			(tems->a_c_dimension.width - count), credp,
-			called_from);
+		    (tems->a_c_dimension.width - count), credp,
+		    called_from);
 		break;
 	case TEM_SHIFT_RIGHT:
 		if (count < rest_of_line) {
 			tem_copy_area(tem,
-				tems->a_c_cursor.col,
-				tems->a_c_cursor.row,
-				tems->a_c_dimension.width - count - 1,
-				tems->a_c_cursor.row,
-				tems->a_c_cursor.col + count,
-				tems->a_c_cursor.row,
-				credp, called_from);
+			    tems->a_c_cursor.col,
+			    tems->a_c_cursor.row,
+			    tems->a_c_dimension.width - count - 1,
+			    tems->a_c_cursor.row,
+			    tems->a_c_cursor.col + count,
+			    tems->a_c_cursor.row,
+			    credp, called_from);
 		}
 
 		tem_clear_chars(tem, count, tems->a_c_cursor.row,
-			tems->a_c_cursor.col, credp, called_from);
+		    tems->a_c_cursor.col, credp, called_from);
 		break;
 	}
 }
@@ -1823,9 +1823,9 @@ tem_pix_cursor(struct tem *tem, short action,
 	    MUTEX_HELD(&tem->lock));
 
 	ca.row = tems->a_c_cursor.row * tems->a_font.height +
-				tems->a_p_offset.y;
+	    tems->a_p_offset.y;
 	ca.col = tems->a_c_cursor.col * tems->a_font.width +
-				tems->a_p_offset.x;
+	    tems->a_p_offset.x;
 	ca.width = tems->a_font.width;
 	ca.height = tems->a_font.height;
 	if (tems->a_pdepth == 8 || tems->a_pdepth == 4) {
@@ -1901,7 +1901,7 @@ set_font(struct font *f, short *rows, short *cols, short height, short width)
 	f->width = font_selected->width;
 	f->height = font_selected->height;
 	bcopy((caddr_t)font_selected->encoding, (caddr_t)f->char_ptr,
-			sizeof (f->char_ptr));
+	    sizeof (f->char_ptr));
 	f->image_data = font_selected->image;
 
 }
@@ -2067,8 +2067,8 @@ bit_to_pix24(
 			nbits = MIN(8, bitsleft);
 			bitsleft -= nbits;
 			for (i = 0; i < nbits; i++) {
-			    *destp++ = ((data << i) & 0x80 ?
-				fg_color32 : bg_color32);
+				*destp++ = ((data << i) & 0x80 ?
+				    fg_color32 : bg_color32);
 			}
 		}
 	}
@@ -2085,9 +2085,9 @@ text_color_t
 ansi_fg_to_solaris(struct tem *tem, int ansi)
 {
 	if (tem->state->a_flags & TEM_ATTR_BOLD)
-	    return (fg_brt_xlate[ansi]);
+		return (fg_brt_xlate[ansi]);
 	else
-	    return (fg_dim_xlate[ansi]);
+		return (fg_dim_xlate[ansi]);
 }
 
 static void

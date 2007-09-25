@@ -2051,6 +2051,8 @@ post_startup(void)
 	 */
 	(void) modload("fs", "procfs");
 
+	(void) i_ddi_attach_hw_nodes("pit_beep");
+
 #if defined(__i386)
 	/*
 	 * Check for required functional Floating Point hardware,

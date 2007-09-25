@@ -983,6 +983,7 @@ conskbd_virtual_kbd_ioctl(queue_t *q, mblk_t *mp)
 		break;
 
 	case KIOCCMD:
+	case KIOCMKTONE:
 		if (conskbd.conskbd_lqueue_list == NULL ||
 		    mp->b_cont == NULL) {
 			miocnak(q, mp, 0, EINVAL);
@@ -1275,7 +1276,8 @@ conskbd_handle_downstream_msg(queue_t *q, mblk_t *mp)
 
 	ASSERT(iocp->ioc_cmd == CONSOPENPOLLEDIO ||
 	    iocp->ioc_cmd == CONSCLOSEPOLLEDIO ||
-	    iocp->ioc_cmd == KIOCCMD);
+	    iocp->ioc_cmd == KIOCCMD ||
+	    iocp->ioc_cmd == KIOCMKTONE);
 
 	msg->kpm_upper_queue = q;
 	msg->kpm_req_msg = mp;
@@ -1963,6 +1965,7 @@ conskbd_mux_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
 		break;
 
 	case KIOCCMD:
+	case KIOCMKTONE:
 		for (mp = msg->kpm_resp_list; mp; ) {
 			msg->kpm_resp_list = mp->b_next;
 

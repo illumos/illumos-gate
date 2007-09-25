@@ -56,6 +56,8 @@
 #include <sys/policy.h>
 
 #include <sys/modctl.h>
+#include <sys/beep.h>
+#include <sys/int_limits.h>
 
 static struct streamtab kbd_info;
 
@@ -231,6 +233,8 @@ static void	kbdioctl(queue_t *, mblk_t *);
 static void	kbdflush(struct kbddata *);
 static void	kbduse(struct kbddata *, unsigned);
 static void	kbdsetled(struct kbddata *);
+static void	kbd_beep_off(void *arg);
+static void	kbd_beep_on(void *arg);
 static void	kbdcmd(queue_t *, char);
 static void	kbdreset(struct kbddata *, uint_t);
 static int	kbdsetkey(struct kbddata *, struct kiockey *,  cred_t *);
@@ -342,7 +346,7 @@ kbdopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 	}
 	while ((datap = allocb(sizeof (struct termios), BPRI_HI)) ==
-		NULL) {
+	    NULL) {
 		timeout_id_t id = qbufcall(q, sizeof (struct termios), BPRI_HI,
 		    dummy_callback, NULL);
 		if (!qwait_sig(q)) {
@@ -407,6 +411,8 @@ kbdopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	 */
 	kbdreset(kbdd, HARD_RESET);
 
+	(void) beep_init((void *)WR(q), kbd_beep_on, kbd_beep_off, NULL);
+
 	return (0);
 
 error:
@@ -426,6 +432,7 @@ kbdclose(register queue_t *q, int flag, cred_t *crp)
 	register mblk_t *mp;
 
 	qprocsoff(q);
+	(void) beep_fini();
 	/*
 	 * Since we're about to destroy our private data, turn off
 	 * our open flag first, so we don't accept any more input
@@ -510,6 +517,10 @@ kbdioctl(register queue_t *q, register mblk_t *mp)
 	mblk_t *datap;
 	size_t	ioctlrespsize;
 	int	err = 0;
+	int	tmp;
+	int	cycles;
+	int	frequency;
+	int	msecs;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 
@@ -543,7 +554,39 @@ kbdioctl(register queue_t *q, register mblk_t *mp)
 		if (err != 0)
 			break;
 
-		kbdcmd(q, (char)(*(int *)mp->b_cont->b_rptr));
+		tmp = (char)(*(int *)mp->b_cont->b_rptr);
+		if (tmp == KBD_CMD_BELL)
+			(void) beeper_on(BEEP_TYPE4);
+		else if (tmp == KBD_CMD_NOBELL)
+			(void) beeper_off();
+		else
+			kbdcmd(q, tmp);
+		break;
+
+	case KIOCMKTONE:
+		if (iocp->ioc_count != TRANSPARENT) {
+			/*
+			 * We don't support non-transparent ioctls,
+			 * i.e. I_STR ioctls
+			 */
+			err = EINVAL;
+			break;
+		}
+		tmp = (int)(*(intptr_t *)mp->b_cont->b_rptr);
+		cycles = tmp & 0xffff;
+		msecs = (tmp >> 16) & 0xffff;
+
+		if (cycles == 0)
+			frequency = UINT16_MAX;
+		else if (cycles == UINT16_MAX)
+			frequency = 0;
+		else {
+			frequency = (PIT_HZ + cycles / 2) / cycles;
+			if (frequency > UINT16_MAX)
+				frequency = UINT16_MAX;
+		}
+
+		err = beep_mktone(frequency, msecs);
 		break;
 
 	case KIOCSLED:
@@ -576,7 +619,7 @@ kbdioctl(register queue_t *q, register mblk_t *mp)
 		*(int *)datap->b_wptr =
 		    (kbdd->kbdd_translate == TR_EVENT ||
 		    kbdd->kbdd_translate == TR_UNTRANS_EVENT) ?
-			VUID_FIRM_EVENT: VUID_NATIVE;
+		    VUID_FIRM_EVENT: VUID_NATIVE;
 		datap->b_wptr += sizeof (int);
 		if (mp->b_cont)  /* free msg to prevent memory leak */
 			freemsg(mp->b_cont);
@@ -955,6 +998,20 @@ kbduse(register struct kbddata *kbdd, unsigned keycode)
 		kbdtranslate(kbdd, keycode, readq);
 }
 
+static void
+kbd_beep_on(void *arg)
+{
+	kbdcmd((queue_t *)arg, KBD_CMD_BELL);
+}
+
+
+static void
+kbd_beep_off(void *arg)
+{
+	kbdcmd((queue_t *)arg, KBD_CMD_NOBELL);
+}
+
+
 /*
  * kbdclick is used to remember the current click value of the
  * Sun-3 keyboard.  This brain damaged keyboard will reset the
@@ -980,7 +1037,7 @@ kbdcmd(register queue_t *q, char cmd)
 	if (canput(q)) {
 		if ((bp = allocb(1, BPRI_MED)) == NULL)
 			cmn_err(CE_WARN,
-				"kbdcmd: Can't allocate block for command");
+			    "kbdcmd: Can't allocate block for command");
 		else {
 			*bp->b_wptr++ = cmd;
 			putnext(q, bp);
@@ -1417,7 +1474,7 @@ kbdinput(register struct kbddata *kbdd, register unsigned key)
 				    len > 0 && len < 8) {
 					if (strcmp(wrkbuf, "true") == 0) {
 						kbdcmd(kbdd->kbdd_writeq,
-							KBD_CMD_CLICK);
+						    KBD_CMD_CLICK);
 					}
 				}
 			}
@@ -1604,7 +1661,7 @@ kbdid(register struct kbddata *kbdd, int id)
 		k->k_id = keytables[0].id;
 		k->k_curkeyboard = keytables[0].table;
 		cmn_err(CE_WARN, "kbd: Unknown keyboard type, "
-			"Type %d assumed", k->k_id);
+		    "Type %d assumed", k->k_id);
 	}
 }
 
@@ -1780,32 +1837,33 @@ kbdtranslate(struct kbddata *kbdd, unsigned keycode, queue_t *q)
 				if (kb_compose_map[entry] >= 0) {
 					if (kbdd->compose_key <= entry) {
 						ret_val = kbd_do_compose(
-							kbdd->compose_key,
-							entry,
-							&result_iso);
+						    kbdd->compose_key,
+						    entry,
+						    &result_iso);
 					} else {
 						ret_val = kbd_do_compose(
-							entry,
-							kbdd->compose_key,
-							&result_iso);
+						    entry,
+						    kbdd->compose_key,
+						    &result_iso);
 					}
 					if (ret_val == 1) {
 						if (kbdd->kbdd_translate ==
-								TR_EVENT) {
+						    TR_EVENT) {
 							fe.id =
-							(kbdd->kbdd_compat ?
-							ISO_FIRST : EUC_FIRST)
-							+ result_iso;
+							    (kbdd->kbdd_compat ?
+							    ISO_FIRST :
+							    EUC_FIRST)
+							    + result_iso;
 							fe.value = 1;
 							kbdqueueevent(
-								kbdd,
-								&fe);
+							    kbdd,
+							    &fe);
 						} else if (
-							kbdd->kbdd_translate ==
-								TR_ASCII)
+						    kbdd->kbdd_translate ==
+						    TR_ASCII)
 							kbdputcode(
-								result_iso,
-								q);
+							    result_iso,
+							    q);
 					}
 				}
 			}
@@ -1816,7 +1874,7 @@ kbdtranslate(struct kbddata *kbdd, unsigned keycode, queue_t *q)
 			k->k_state = NORMAL;	/* next state is "normal" */
 			for (i = 0;
 			    (kb_fltaccent_table[i].fa_entry
-				!= kbdd->fltaccent_entry) ||
+			    != kbdd->fltaccent_entry) ||
 			    (kb_fltaccent_table[i].ascii != entry);
 			    i++) {
 				if (kb_fltaccent_table[i].fa_entry == 0)
@@ -1825,8 +1883,8 @@ kbdtranslate(struct kbddata *kbdd, unsigned keycode, queue_t *q)
 			}
 			if (kbdd->kbdd_translate == TR_EVENT) {
 				fe.id = (kbdd->kbdd_compat ?
-					ISO_FIRST : EUC_FIRST)
-					+ kb_fltaccent_table[i].iso;
+				    ISO_FIRST : EUC_FIRST)
+				    + kb_fltaccent_table[i].iso;
 				fe.value = 1;
 				kbdqueueevent(kbdd, &fe);
 			} else if (kbdd->kbdd_translate == TR_ASCII)
@@ -2008,8 +2066,8 @@ kbdtranslate(struct kbddata *kbdd, unsigned keycode, queue_t *q)
 		case TR_ASCII:
 			bufp = buf;
 			cp = strsetwithdecimal(bufp + 2,
-				(uint_t)((entry & 0x003F) + 192),
-				sizeof (buf) - 5);
+			    (uint_t)((entry & 0x003F) + 192),
+			    sizeof (buf) - 5);
 			*bufp++ = '\033'; /* Escape */
 			*bufp++ = '[';
 			while (*cp != '\0')
@@ -2327,7 +2385,7 @@ kbdputbuf(char *buf, queue_t *q)
 	else {
 		if ((bp = allocb((int)strlen(buf), BPRI_HI)) == NULL)
 			cmn_err(CE_WARN,
-				"kbdputbuf: Can't allocate block for keycode");
+			    "kbdputbuf: Can't allocate block for keycode");
 		else {
 			while (*buf) {
 				*bp->b_wptr++ = *buf;
@@ -2352,7 +2410,7 @@ kbdqueueevent(struct kbddata *kbdd, Firm_event *fe)
 	if (!canput(q)) {
 		if (kbd_overflow_msg)
 			cmn_err(CE_WARN,
-				"kbd: Buffer flushed when overflowed");
+			    "kbd: Buffer flushed when overflowed");
 		kbdflush(kbdd);
 		kbd_overflow_cnt++;
 	} else {

@@ -146,6 +146,7 @@ PCI_E_PCINEXUS_OBJS += pcie_pci.o
 PCI_PCINEXUS_OBJS += pci_pci.o
 PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o
 PCN_OBJS += mii.o
+PIT_BEEP_OBJS += pit_beep.o
 POWER_OBJS += power.o
 PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o \
 			pci_memlist.o pci_resource.o

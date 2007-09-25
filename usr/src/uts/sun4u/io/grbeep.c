@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +42,7 @@
 #include <sys/kmem.h>
 #include <sys/devops.h>
 #include <sys/grbeep.h>
-#include <sys/beep_driver.h>
+#include <sys/beep.h>
 
 
 /* Pointer to the state structure */
@@ -70,9 +69,9 @@ static int grbeep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int grbeep_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int grbeep_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
-static void grbeep_freq(dev_info_t *, int);
-static void grbeep_on(dev_info_t *);
-static void grbeep_off(dev_info_t *);
+static void grbeep_freq(void *arg, int freq);
+static void grbeep_on(void *arg);
+static void grbeep_off(void *arg);
 static void grbeep_cleanup(grbeep_state_t *);
 static int grbeep_map_regs(dev_info_t *, grbeep_state_t *);
 static grbeep_state_t *grbeep_obtain_state(dev_info_t *);
@@ -131,7 +130,7 @@ _init(void)
 
 	/* Initialize the soft state structures */
 	if ((error = ddi_soft_state_init(&grbeep_statep,
-			sizeof (grbeep_state_t), 1)) != 0) {
+	    sizeof (grbeep_state_t), 1)) != 0) {
 
 		return (error);
 	}
@@ -224,19 +223,18 @@ grbeep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (grbeep_map_regs(dip, grbeeptr) != DDI_SUCCESS) {
 
 		GRBEEP_DEBUG((CE_WARN,
-			"grbeep_attach: Mapping of beep registers failed."));
+		    "grbeep_attach: Mapping of beep registers failed."));
 
 		grbeep_cleanup(grbeeptr);
 
 		return (DDI_FAILURE);
 	}
 
-	(void) beep_init(dip, grbeep_on, grbeep_off, grbeep_freq);
+	(void) beep_init((void *)dip, grbeep_on, grbeep_off, grbeep_freq);
 
 	/* Display information in the banner */
 	ddi_report_dev(dip);
 
-	mutex_init(&grbeeptr->grbeep_mutex, NULL, MUTEX_DRIVER, NULL);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_attach: dip = 0x%p done",
 	    (void *)dip));
 
@@ -247,7 +245,6 @@ grbeep_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 /*
  * grbeep_detach:
  */
-/* ARGSUSED */
 static int
 grbeep_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
@@ -330,16 +327,15 @@ grbeep_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
  * grbeep_freq() :
  * 	Set beep frequency
  */
-/*ARGSUSED*/
 static void
-grbeep_freq(dev_info_t *dip, int freq)
+grbeep_freq(void *arg, int freq)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	grbeep_state_t *grbeeptr = grbeep_obtain_state(dip);
 	int divisor = 0;
 
 	ASSERT(freq != 0);
 
-	mutex_enter(&grbeeptr->grbeep_mutex);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_freq: dip=0x%p freq=%d mode=%d",
 	    (void *)dip, freq, grbeeptr->grbeep_mode));
 
@@ -354,12 +350,10 @@ grbeep_freq(dev_info_t *dip, int freq)
 	}
 
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_freq: first=0x%x second=0x%x",
-			(divisor & 0xff), ((divisor & 0xff00) >> 8)));
+	    (divisor & 0xff), ((divisor & 0xff00) >> 8)));
 
 	GRBEEP_WRITE_FREQ_DIVISOR_REG(divisor & 0xff);
 	GRBEEP_WRITE_FREQ_DIVISOR_REG((divisor & 0xff00) >> 8);
-
-	mutex_exit(&grbeeptr->grbeep_mutex);
 }
 
 
@@ -368,11 +362,11 @@ grbeep_freq(dev_info_t *dip, int freq)
  *	Turn the beeper on
  */
 static void
-grbeep_on(dev_info_t *dip)
+grbeep_on(void *arg)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	grbeep_state_t *grbeeptr = grbeep_obtain_state(dip);
 
-	mutex_enter(&grbeeptr->grbeep_mutex);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_on: dip = 0x%p mode=%d",
 	    (void *)dip, grbeeptr->grbeep_mode));
 
@@ -384,7 +378,6 @@ grbeep_on(dev_info_t *dip)
 
 	}
 
-	mutex_exit(&grbeeptr->grbeep_mutex);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_on: dip = 0x%p done", (void *)dip));
 }
 
@@ -393,13 +386,12 @@ grbeep_on(dev_info_t *dip)
  * grbeep_off() :
  * 	Turn the beeper off
  */
-/*ARGSUSED*/
 static void
-grbeep_off(dev_info_t *dip)
+grbeep_off(void *arg)
 {
+	dev_info_t *dip = (dev_info_t *)arg;
 	grbeep_state_t *grbeeptr = grbeep_obtain_state(dip);
 
-	mutex_enter(&grbeeptr->grbeep_mutex);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_off: dip = 0x%p mode=%d",
 	    (void *)dip, grbeeptr->grbeep_mode));
 
@@ -411,7 +403,6 @@ grbeep_off(dev_info_t *dip)
 
 	}
 
-	mutex_exit(&grbeeptr->grbeep_mutex);
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_off: dip = 0x%p done", (void *)dip));
 }
 
@@ -441,7 +432,7 @@ grbeep_map_regs(dev_info_t *dip, grbeep_state_t *grbeeptr)
 	    sizeof (grbeep_freq_regs_t),
 	    &attr,
 	    &grbeeptr->grbeep_freq_regs_handle)
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 
 		GRBEEP_DEBUG((CE_CONT, "grbeep_map_regs: Failed to map"));
 		return (DDI_FAILURE);
@@ -454,7 +445,7 @@ grbeep_map_regs(dev_info_t *dip, grbeep_state_t *grbeeptr)
 	    1,
 	    &attr,
 	    &grbeeptr->grbeep_start_stop_reg_handle)
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 
 		GRBEEP_DEBUG((CE_CONT, "grbeep_map_regs: Failed to map"));
 		ddi_regs_map_free((void *)&grbeeptr->grbeep_freq_regs_handle);
@@ -495,7 +486,6 @@ grbeep_cleanup(grbeep_state_t *grbeeptr)
 {
 	int instance = ddi_get_instance(grbeeptr->grbeep_dip);
 
-	mutex_destroy(&grbeeptr->grbeep_mutex);
 	ddi_soft_state_free(grbeep_statep, instance);
 
 	GRBEEP_DEBUG1((CE_CONT, "grbeep_cleanup: done"));

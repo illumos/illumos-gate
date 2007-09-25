@@ -819,6 +819,7 @@ const struct ioc {
 	{ (uint_t)KIOCGRPTRATE,		"KIOCGRPTRATE",	NULL },
 	{ (uint_t)KIOCSRPTRATE,		"KIOCSRPTRATE",	NULL },
 	{ (uint_t)KIOCSETFREQ,		"KIOCSETFREQ",	NULL },
+	{ (uint_t)KIOCMKTONE,		"KIOCMKTONE",	NULL },
 
 	/* ptm/pts driver I_STR ioctls */
 	{ (uint_t)ISPTM,		"ISPTM",		NULL},

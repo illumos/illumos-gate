@@ -275,6 +275,7 @@ DRV_KMODS	+= pcie_pci
 DRV_KMODS	+= physmem
 DRV_KMODS	+= pcan
 DRV_KMODS	+= pcwl
+DRV_KMODS	+= pit_beep
 DRV_KMODS	+= pm
 DRV_KMODS	+= poll
 DRV_KMODS	+= pool

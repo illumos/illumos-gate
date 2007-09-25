@@ -34,7 +34,6 @@
 #	object lists
 #
 CORE_OBJS +=			\
-	beeper.o		\
 	biosdisk.o		\
 	bios_call.o		\
 	cbe.o			\

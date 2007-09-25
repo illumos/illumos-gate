@@ -224,6 +224,17 @@ struct freq_request {
 	int16_t	freq;		/* Frequency */
 };
 
+#define	KIOCMKTONE	(KIOC|27)
+
+/*
+ * For historical reasons, the frequency argument to KIOCMKTONE is
+ * in i8254 clock cycles.
+ */
+
+#define	PIT_HZ		1193182		/* 8254's cycles per second */
+
+#define	KDMKTONE	KIOCMKTONE
+
 /* Used to control the AutoRepeat Min-delay and Min-Rate */
 #define	KIOCRPTDELAY_MIN	(100)
 #define	KIOCRPTRATE_MIN		(1)

@@ -48,6 +48,7 @@
 #include <sys/usb/clients/usbkbm/usbkbm.h>
 #include <sys/beep.h>
 #include <sys/policy.h>
+#include <sys/inttypes.h>
 
 /* debugging information */
 uint_t	usbkbm_errmask = (uint_t)PRINT_MASK_ALL;
@@ -164,7 +165,7 @@ _init(void)
 	usbkbm_keyindex = kbtrans_usbkb_maptab_init();
 
 	usbkbm_log_handle = usb_alloc_log_hdl(NULL, "usbkbm",
-		&usbkbm_errlevel, &usbkbm_errmask, NULL, 0);
+	    &usbkbm_errlevel, &usbkbm_errmask, NULL, 0);
 
 	sp = (usbkbm_save_state_t *)space_fetch("SUNW,usbkbm_state");
 
@@ -181,16 +182,16 @@ _init(void)
 
 	/* Restore abort information */
 	usbkbm_keyindex->k_abort1 =
-		    sp->usbkbm_save_keyindex.k_abort1;
+	    sp->usbkbm_save_keyindex.k_abort1;
 
 	usbkbm_keyindex->k_abort2 =
-		    sp->usbkbm_save_keyindex.k_abort2;
+	    sp->usbkbm_save_keyindex.k_abort2;
 
 	usbkbm_keyindex->k_newabort1 =
-		    sp->usbkbm_save_keyindex.k_newabort1;
+	    sp->usbkbm_save_keyindex.k_newabort1;
 
 	usbkbm_keyindex->k_newabort2 =
-		    sp->usbkbm_save_keyindex.k_newabort2;
+	    sp->usbkbm_save_keyindex.k_newabort2;
 
 	/* Restore keytables */
 	bcopy(sp->usbkbm_save_keyindex.k_normal,
@@ -215,19 +216,19 @@ _init(void)
 	    usbkbm_keyindex->k_up, USB_KEYTABLE_SIZE);
 
 	kmem_free(sp->usbkbm_save_keyindex.k_normal,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_shifted,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_caps,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_altgraph,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_numlock,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_control,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 	kmem_free(sp->usbkbm_save_keyindex.k_up,
-		USB_KEYTABLE_SIZE);
+	    USB_KEYTABLE_SIZE);
 
 	kmem_free(sp, sizeof (usbkbm_save_state_t));
 	space_free("SUNW,usbkbm_state");
@@ -284,19 +285,19 @@ _fini(void)
 
 	/* Allocate space for keytables to be stored */
 	sp->usbkbm_save_keyindex.k_normal =
-		kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_shifted =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_caps =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_altgraph =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_numlock =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_control =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 	sp->usbkbm_save_keyindex.k_up =
-		    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
+	    kmem_alloc(USB_KEYTABLE_SIZE, KM_SLEEP);
 
 	/* Copy over the keytables */
 	bcopy(usbkbm_keyindex->k_normal,
@@ -388,10 +389,10 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	packet_size = 0;
 
 	if (q->q_ptr) {
-	    USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-		"usbkbm_open already opened");
+		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
+		    "usbkbm_open already opened");
 
-	    return (0); /* already opened */
+		return (0); /* already opened */
 	}
 
 	/*
@@ -409,7 +410,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	case CLONEOPEN:
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-			"usbkbm_open: Clone open not supported");
+		    "usbkbm_open: Clone open not supported");
 
 		/* FALLTHRU */
 	default:
@@ -422,7 +423,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	usbkbmd = kmem_zalloc(sizeof (usbkbm_state_t), KM_SLEEP);
 
 	USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-		"usbkbm_state= %p", (void *)usbkbmd);
+	    "usbkbm_state= %p", (void *)usbkbmd);
 
 	/*
 	 * Set up private data.
@@ -439,12 +440,12 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	WR(q)->q_ptr = (caddr_t)usbkbmd;
 
 	error = kbtrans_streams_init(q, sflag, crp,
-		(struct kbtrans_hardware *)usbkbmd, &kbd_usb_callbacks,
-		&usbkbmd->usbkbm_kbtrans, usbkbm_led_state, 0);
+	    (struct kbtrans_hardware *)usbkbmd, &kbd_usb_callbacks,
+	    &usbkbmd->usbkbm_kbtrans, usbkbm_led_state, 0);
 
 	if (error != 0) {
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-			"kbdopen:  kbtrans_streams_init failed\n");
+		    "kbdopen:  kbtrans_streams_init failed\n");
 		kmem_free(usbkbmd, sizeof (*usbkbmd));
 
 		return (error);
@@ -455,40 +456,40 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	 * This information is set once, and doesn't change
 	 */
 	usbkbmd->usbkbm_polled_info.cons_polledio_version =
-				    CONSPOLLEDIO_V1;
+	    CONSPOLLEDIO_V1;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_argument =
-				(cons_polledio_arg_t)usbkbmd;
+	    (cons_polledio_arg_t)usbkbmd;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_putchar = NULL;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_getchar =
-				usbkbm_polled_getchar;
+	    usbkbm_polled_getchar;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_ischar =
-				usbkbm_polled_ischar;
+	    usbkbm_polled_ischar;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_enter =
-				    usbkbm_polled_enter;
+	    usbkbm_polled_enter;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_exit =
-				usbkbm_polled_exit;
+	    usbkbm_polled_exit;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_setled =
-		(void (*)(cons_polledio_arg_t, int))usbkbm_polled_setled;
+	    (void (*)(cons_polledio_arg_t, int))usbkbm_polled_setled;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_keycheck =
-		(boolean_t (*)(cons_polledio_arg_t, int *,
-		enum keystate *))usbkbm_polled_keycheck;
+	    (boolean_t (*)(cons_polledio_arg_t, int *,
+	    enum keystate *))usbkbm_polled_keycheck;
 	/*
 	 * The head and the tail pointing at the same byte means empty or
 	 * full. usbkbm_polled_buffer_num_characters is used to
 	 * tell the difference.
 	 */
 	usbkbmd->usbkbm_polled_buffer_head =
-			usbkbmd->usbkbm_polled_scancode_buffer;
+	    usbkbmd->usbkbm_polled_scancode_buffer;
 	usbkbmd->usbkbm_polled_buffer_tail =
-			usbkbmd->usbkbm_polled_scancode_buffer;
+	    usbkbmd->usbkbm_polled_scancode_buffer;
 	usbkbmd->usbkbm_polled_buffer_num_characters = 0;
 
 	qprocson(q);
@@ -534,8 +535,8 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	if (usbkbmd->usbkbm_report_descr != NULL) {
 		if (hidparser_get_country_code(usbkbmd->usbkbm_report_descr,
-			(uint16_t *)&usbkbmd->usbkbm_layout) ==
-			HIDPARSER_FAILURE) {
+		    (uint16_t *)&usbkbmd->usbkbm_layout) ==
+		    HIDPARSER_FAILURE) {
 
 			USB_DPRINTF_L3(PRINT_MASK_OPEN,
 			    usbkbm_log_handle, "get_country_code failed"
@@ -545,16 +546,16 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 
 		if (hidparser_get_packet_size(usbkbmd->usbkbm_report_descr,
-			0, HIDPARSER_ITEM_INPUT, (uint32_t *)&packet_size) ==
-			HIDPARSER_FAILURE) {
+		    0, HIDPARSER_ITEM_INPUT, (uint32_t *)&packet_size) ==
+		    HIDPARSER_FAILURE) {
 
 			USB_DPRINTF_L3(PRINT_MASK_OPEN,
-				usbkbm_log_handle, "get_packet_size failed"
-				"setting default packet size(8)");
+			    usbkbm_log_handle, "get_packet_size failed"
+			    "setting default packet size(8)");
 
 			/* Setting to default packet size = 8 */
 			usbkbmd->usbkbm_packet_size =
-				USB_KBD_DEFAULT_PACKET_SIZE;
+			    USB_KBD_DEFAULT_PACKET_SIZE;
 		} else {
 			usbkbmd->usbkbm_packet_size = packet_size/8;
 		}
@@ -565,7 +566,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 		usbkbmd->usbkbm_layout = usbkbm_layout;
 		usbkbmd->usbkbm_packet_size =
-			USB_KBD_DEFAULT_PACKET_SIZE;
+		    USB_KBD_DEFAULT_PACKET_SIZE;
 	}
 
 	/*
@@ -585,22 +586,22 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 
 		if ((usbkbmd->usbkbm_vid_pid.VendorId ==
-			HID_SUN_JAPANESE_TYPE6_KBD_VID) &&
-			(usbkbmd->usbkbm_vid_pid.ProductId ==
-			HID_SUN_JAPANESE_TYPE6_KBD_PID)) {
+		    HID_SUN_JAPANESE_TYPE6_KBD_VID) &&
+		    (usbkbmd->usbkbm_vid_pid.ProductId ==
+		    HID_SUN_JAPANESE_TYPE6_KBD_PID)) {
 			usbkbmd->usbkbm_layout = SUN_JAPANESE_TYPE6;
 		}
 	}
 
 	kbtrans_streams_set_keyboard(usbkbmd->usbkbm_kbtrans, KB_USB,
-					usbkbm_keyindex);
+	    usbkbm_keyindex);
 
 	usbkbmd->usbkbm_flags = USBKBM_OPEN;
 
 	kbtrans_streams_enable(usbkbmd->usbkbm_kbtrans);
 
 	USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-			"usbkbm_open exiting");
+	    "usbkbm_open exiting");
 	return (0);
 }
 
@@ -616,7 +617,7 @@ usbkbm_close(register queue_t *q, int flag, cred_t *crp)
 	usbkbm_state_t *usbkbmd = (usbkbm_state_t *)q->q_ptr;
 
 	/* If a beep is in progress, stop that */
-	beeper_off();
+	(void) beeper_off();
 
 	(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
 
@@ -631,7 +632,7 @@ usbkbm_close(register queue_t *q, int flag, cred_t *crp)
 	kmem_free(usbkbmd, sizeof (usbkbm_state_t));
 
 	USB_DPRINTF_L3(PRINT_MASK_CLOSE, usbkbm_log_handle,
-		"usbkbm_close exiting");
+	    "usbkbm_close exiting");
 
 	return (0);
 }
@@ -649,7 +650,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 	enum kbtrans_message_response	ret;
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-				"usbkbm_wput entering");
+	    "usbkbm_wput entering");
 
 	usbkbmd = (usbkbm_state_t *)q->q_ptr;
 
@@ -659,7 +660,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 	if (ret == KBTRANS_MESSAGE_HANDLED) {
 
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_wput exiting:2");
+		    "usbkbm_wput exiting:2");
 
 		return;
 	}
@@ -685,7 +686,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 		if (ret == KBTRANS_MESSAGE_HANDLED) {
 
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-				"usbkbm_wput exiting:1");
+			    "usbkbm_wput exiting:1");
 
 			return;
 		}
@@ -700,7 +701,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 	putnext(q, mp);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-		"usbkbm_wput exiting:3");
+	    "usbkbm_wput exiting:3");
 }
 
 /*
@@ -718,6 +719,9 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 	size_t			ioctlrespsize;
 	int			err;
 	int			tmp;
+	int			cycles;
+	int			frequency;
+	int			msecs;
 	char			command;
 
 	err = 0;
@@ -799,7 +803,7 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 		 */
 		if (usbkbmd->usbkbm_setled_second_byte) {
 			usbkbm_streams_setled((struct kbtrans_hardware *)
-						usbkbmd, command);
+			    usbkbmd, command);
 			usbkbmd->usbkbm_setled_second_byte = 0;
 			break;
 		}
@@ -823,7 +827,7 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 
 	case CONSOPENPOLLEDIO:
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_ioctl CONSOPENPOLLEDIO");
+		    "usbkbm_ioctl CONSOPENPOLLEDIO");
 
 		err = miocpullup(mp, sizeof (struct cons_polledio *));
 		if (err != 0) {
@@ -857,7 +861,7 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 
 	case CONSCLOSEPOLLEDIO:
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_ioctl CONSCLOSEPOLLEDIO mp = 0x%p", (void *)mp);
+		    "usbkbm_ioctl CONSCLOSEPOLLEDIO mp = 0x%p", (void *)mp);
 
 		usbkbmd->usbkbm_pending_link = mp;
 
@@ -888,6 +892,29 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 		 */
 		break;
 
+
+	case KIOCMKTONE:
+		if (iocp->ioc_count != TRANSPARENT) {
+			err = EINVAL;
+			break;
+		}
+
+		tmp = (int)(*(intptr_t *)mp->b_cont->b_rptr);
+		cycles = tmp & 0xffff;
+		msecs = (tmp >> 16) & 0xffff;
+
+		if (cycles == 0)
+			frequency = UINT16_MAX;
+		else if (cycles == UINT16_MAX)
+			frequency = 0;
+		else {
+			frequency = (PIT_HZ + cycles / 2) / cycles;
+			if (frequency > UINT16_MAX)
+				frequency = UINT16_MAX;
+		}
+
+		err = beep_mktone(frequency, msecs);
+		break;
 
 	default:
 
@@ -927,11 +954,11 @@ allocfailure:
 	if (usbkbmd->usbkbm_streams_bufcallid) {
 
 		qunbufcall(usbkbmd->usbkbm_readq,
-			usbkbmd->usbkbm_streams_bufcallid);
+		    usbkbmd->usbkbm_streams_bufcallid);
 	}
 	usbkbmd->usbkbm_streams_bufcallid =
-		qbufcall(usbkbmd->usbkbm_readq, ioctlrespsize, BPRI_HI,
-			usbkbm_reioctl, usbkbmd);
+	    qbufcall(usbkbmd->usbkbm_readq, ioctlrespsize, BPRI_HI,
+	    usbkbm_reioctl, usbkbmd);
 
 	return (KBTRANS_MESSAGE_HANDLED);
 }
@@ -991,7 +1018,7 @@ usbkbm_kioccmd(usbkbm_state_t *usbkbmd, register mblk_t *mp,
 			 * in it, the generic beeper interface
 			 * is used. Turn the beeper on.
 			 */
-			beeper_on(BEEP_TYPE4);
+			(void) beeper_on(BEEP_TYPE4);
 			break;
 
 		case KBD_CMD_NOBELL:
@@ -1000,7 +1027,7 @@ usbkbm_kioccmd(usbkbm_state_t *usbkbmd, register mblk_t *mp,
 			 * in it, the generic beeper interface
 			 * is used. Turn the beeper off.
 			 */
-			beeper_off();
+			(void) beeper_off();
 			break;
 
 		case KBD_CMD_CLICK:
@@ -1030,7 +1057,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	usbkbmd = (usbkbm_state_t *)q->q_ptr;
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-		"usbkbm_rput");
+	    "usbkbm_rput");
 
 	if (usbkbmd == 0) {
 		freemsg(mp);	/* nobody's listening */
@@ -1126,7 +1153,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 
 	case HID_SET_REPORT:
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_mctl_receive HID_SET mctl");
+		    "usbkbm_mctl_receive HID_SET mctl");
 		freemsg(mp);
 		/* Setting of the LED is not waiting for this message */
 
@@ -1163,7 +1190,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		break;
 	case HID_OPEN_POLLED_INPUT:
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_mctl_receive HID_OPEN_POLLED_INPUT");
+		    "usbkbm_mctl_receive HID_OPEN_POLLED_INPUT");
 
 		size = sizeof (hid_polled_input_callback_t);
 		reply_mp = usbkbmd->usbkbm_pending_link;
@@ -1183,7 +1210,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 			 * The structure is saved in the states structure
 			 */
 			*(cons_polledio_t **)reply_mp->b_cont->b_rptr =
-				&usbkbmd->usbkbm_polled_info;
+			    &usbkbmd->usbkbm_polled_info;
 
 		} else {
 			reply_mp->b_datap->db_type = M_IOCNAK;
@@ -1197,11 +1224,11 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		break;
 	case HID_CLOSE_POLLED_INPUT:
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_mctl_receive HID_CLOSE_POLLED_INPUT");
+		    "usbkbm_mctl_receive HID_CLOSE_POLLED_INPUT");
 
 
 		bzero(&usbkbmd->usbkbm_hid_callback,
-				sizeof (hid_polled_input_callback_t));
+		    sizeof (hid_polled_input_callback_t));
 
 		freemsg(mp);
 
@@ -1210,8 +1237,8 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		iocp = (struct iocblk *)reply_mp->b_rptr;
 
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_mctl_receive reply reply_mp 0x%p cmd 0x%x",
-			(void *)reply_mp, iocp->ioc_cmd);
+		    "usbkbm_mctl_receive reply reply_mp 0x%p cmd 0x%x",
+		    (void *)reply_mp, iocp->ioc_cmd);
 
 
 		reply_mp->b_datap->db_type = M_IOCACK;
@@ -1252,11 +1279,11 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		/* FALLTHRU */
 	case HID_FULL_POWER :
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-			"usbkbm_mctl_receive restore LEDs");
+		    "usbkbm_mctl_receive restore LEDs");
 
 		/* send setled command down to restore LED states */
 		usbkbm_streams_setled((struct kbtrans_hardware *)usbkbmd,
-					usbkbm_led_state);
+		    usbkbm_led_state);
 
 		freemsg(mp);
 
@@ -1373,10 +1400,10 @@ usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
 	}
 
 	hid_polled_handle =
-			usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
+	    usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
 
 	num_keys = (usbkbmd->usbkbm_hid_callback.hid_polled_read)
-				(hid_polled_handle, &buffer);
+	    (hid_polled_handle, &buffer);
 
 	/*
 	 * If we don't get any characters back then indicate that, and we
@@ -1393,7 +1420,7 @@ usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
 	 * individual key/state values.
 	 */
 	usbkbm_unpack_usb_packet(usbkbmd, usbkbm_poll_callback,
-		buffer, num_keys);
+	    buffer, num_keys);
 
 	/*
 	 * If a scancode was returned as a result of this packet,
@@ -1478,7 +1505,7 @@ usbkbm_poll_callback(usbkbm_state_t *usbkbmd, int key, enum keystate state)
 	 * Check to make sure that the buffer isn't already full
 	 */
 	if (usbkbmd->usbkbm_polled_buffer_num_characters ==
-		USB_POLLED_BUFFER_SIZE) {
+	    USB_POLLED_BUFFER_SIZE) {
 
 		/*
 		 * The buffer is full, we will drop this character.
@@ -1506,11 +1533,11 @@ usbkbm_poll_callback(usbkbm_state_t *usbkbmd, int key, enum keystate state)
 	 * Check to see if the tail has wrapped.
 	 */
 	if (usbkbmd->usbkbm_polled_buffer_head -
-		usbkbmd->usbkbm_polled_scancode_buffer ==
-			USB_POLLED_BUFFER_SIZE) {
+	    usbkbmd->usbkbm_polled_scancode_buffer ==
+	    USB_POLLED_BUFFER_SIZE) {
 
 		usbkbmd->usbkbm_polled_buffer_head =
-			usbkbmd->usbkbm_polled_scancode_buffer;
+		    usbkbmd->usbkbm_polled_scancode_buffer;
 	}
 }
 
@@ -1539,11 +1566,11 @@ usbkbm_get_scancode(usbkbm_state_t *usbkbmd, int *key, enum keystate *state)
 	 * Check to see if the tail has wrapped.
 	 */
 	if (usbkbmd->usbkbm_polled_buffer_tail -
-		usbkbmd->usbkbm_polled_scancode_buffer ==
-			USB_POLLED_BUFFER_SIZE) {
+	    usbkbmd->usbkbm_polled_scancode_buffer ==
+	    USB_POLLED_BUFFER_SIZE) {
 
 		usbkbmd->usbkbm_polled_buffer_tail =
-			usbkbmd->usbkbm_polled_scancode_buffer;
+		    usbkbmd->usbkbm_polled_scancode_buffer;
 	}
 
 	/*
@@ -1613,16 +1640,16 @@ usbkbm_polled_enter(cons_polledio_arg_t arg)
 	 */
 	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex ++) {
 		usbkbmd->usbkbm_lastusbpacket[uindex] =
-			usbkbmd->usbkbm_pendingusbpacket[uindex];
+		    usbkbmd->usbkbm_pendingusbpacket[uindex];
 
 		usbkbmd->usbkbm_pendingusbpacket[uindex] = 0;
 	}
 
 	hid_polled_handle =
-		usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
+	    usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
 
 	(void) (usbkbmd->usbkbm_hid_callback.hid_polled_input_enter)
-					(hid_polled_handle);
+	    (hid_polled_handle);
 }
 
 /*
@@ -1648,16 +1675,16 @@ usbkbm_polled_exit(cons_polledio_arg_t arg)
 	 */
 	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex ++) {
 		usbkbmd->usbkbm_pendingusbpacket[uindex] =
-			usbkbmd->usbkbm_lastusbpacket[uindex];
+		    usbkbmd->usbkbm_lastusbpacket[uindex];
 
 		usbkbmd->usbkbm_lastusbpacket[uindex] = 0;
 	}
 
 	hid_polled_handle =
-			usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
+	    usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
 
 	(void) (usbkbmd->usbkbm_hid_callback.hid_polled_input_exit)
-			(hid_polled_handle);
+	    (hid_polled_handle);
 }
 
 /*
@@ -1687,57 +1714,57 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	for (uindex = 0; uindex < packet_size; uindex++) {
 
 		USB_DPRINTF_L3(PRINT_MASK_PACKET, usbkbm_log_handle,
-			" %x ", usbpacket[uindex]);
+		    " %x ", usbpacket[uindex]);
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_PACKET, usbkbm_log_handle,
-			" is the usbkeypacket");
+	    " is the usbkeypacket");
 
 	/* check to see if modifier keys are different */
 	if (mkb != lastmkb) {
 
 		if ((mkb & USB_LSHIFTBIT) != (lastmkb & USB_LSHIFTBIT)) {
 			(*func)(usbkbmd, USB_LSHIFTKEY, (mkb&USB_LSHIFTBIT) ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-				"unpack: sending USB_LSHIFTKEY");
+			    "unpack: sending USB_LSHIFTKEY");
 		}
 
 		if ((mkb & USB_LCTLBIT) != (lastmkb & USB_LCTLBIT)) {
 			(*func)(usbkbmd, USB_LCTLCKEY, mkb&USB_LCTLBIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_LALTBIT) != (lastmkb & USB_LALTBIT)) {
 			(*func)(usbkbmd, USB_LALTKEY, mkb&USB_LALTBIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_LMETABIT) != (lastmkb & USB_LMETABIT)) {
 			(*func)(usbkbmd, USB_LMETAKEY, mkb&USB_LMETABIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RMETABIT) != (lastmkb & USB_RMETABIT)) {
 			(*func)(usbkbmd, USB_RMETAKEY, mkb&USB_RMETABIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RALTBIT) != (lastmkb & USB_RALTBIT)) {
 			(*func)(usbkbmd, USB_RALTKEY, mkb&USB_RALTBIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RCTLBIT) != (lastmkb & USB_RCTLBIT)) {
 			(*func)(usbkbmd, USB_RCTLCKEY, mkb&USB_RCTLBIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RSHIFTBIT) != (lastmkb & USB_RSHIFTBIT)) {
 			(*func)(usbkbmd, USB_RSHIFTKEY, mkb&USB_RSHIFTBIT ?
-				KEY_PRESSED : KEY_RELEASED);
+			    KEY_PRESSED : KEY_RELEASED);
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-				"unpack: sending USB_RSHIFTKEY");
+			    "unpack: sending USB_RSHIFTKEY");
 		}
 	}
 
@@ -1748,7 +1775,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	if (usbpacket[2] == USB_ERRORROLLOVER) {
 		rollover = 1;
 		for (uindex = 3; uindex < packet_size;
-			uindex++) {
+		    uindex++) {
 			if (usbpacket[uindex] != USB_ERRORROLLOVER) {
 				rollover = 0;
 				break;
@@ -1756,7 +1783,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 		}
 		if (rollover) {
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-				"unpack: errorrollover");
+			    "unpack: errorrollover");
 			return;
 		}
 	}
@@ -1804,7 +1831,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 
 			if (!usbkbm_is_modkey(usbpacket[uindex])) {
 				(*func)(usbkbmd, usbpacket[uindex],
-						    KEY_PRESSED);
+				    KEY_PRESSED);
 			} else {
 				usbkbmd->usbkbm_pendingusbpacket[uindex] = 0;
 
@@ -1820,7 +1847,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	 */
 	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex++) {
 		lastusbpacket[uindex] =
-			usbkbmd->usbkbm_pendingusbpacket[uindex];
+		    usbkbmd->usbkbm_pendingusbpacket[uindex];
 		usbkbmd->usbkbm_pendingusbpacket[uindex] = 0;
 	}
 }
