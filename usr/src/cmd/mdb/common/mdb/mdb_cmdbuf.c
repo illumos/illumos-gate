@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,13 +167,24 @@ const char *
 mdb_cmdbuf_accept(mdb_cmdbuf_t *cmd)
 {
 	if (cmd->cmd_bufidx < cmd->cmd_linelen) {
+		int is_repeating = 0;
+
 		cmd->cmd_buf[cmd->cmd_buflen++] = '\0';
 		(void) strcpy(cmd->cmd_linebuf, cmd->cmd_buf);
 
+		if (cmd->cmd_hold != cmd->cmd_hnew) {
+			int lastidx = cmd->cmd_hnew == 0 ? cmd->cmd_halloc - 1 :
+			    cmd->cmd_hnew - 1;
+
+			is_repeating = strcmp(cmd->cmd_buf,
+			    cmd->cmd_history[lastidx]) == 0;
+		}
+
 		/*
-		 * Don't bother inserting empty buffers into the history ring.
+		 * Don't bother inserting empty or repeating buffers into the
+		 * history ring.
 		 */
-		if (cmd->cmd_buflen > 1) {
+		if (cmd->cmd_buflen > 1 && !is_repeating) {
 			cmd->cmd_hnew = (cmd->cmd_hnew + 1) % cmd->cmd_histlen;
 			if (cmd->cmd_hnew >= cmd->cmd_halloc)
 				mdb_cmdbuf_allocchunk(cmd);
@@ -186,6 +197,8 @@ mdb_cmdbuf_accept(mdb_cmdbuf_t *cmd)
 				    (cmd->cmd_hold + 1) % cmd->cmd_histlen;
 			else
 				cmd->cmd_hlen++;
+		} else if (is_repeating) {
+			cmd->cmd_hcur = cmd->cmd_hnew;
 		}
 
 		cmd->cmd_bufidx = 0;
