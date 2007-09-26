@@ -585,6 +585,7 @@ usr/sbin/kdb5_util			i386
 usr/sbin/kdb5_ldap_util			i386
 usr/sbin/kdcmgr				i386
 usr/sbin/kproplog			i386
+usr/share/lib/ldif			i386
 usr/share/lib/ldif/kerberos.ldif	i386
 var/krb5				i386
 var/svc/manifest/network/security/kadmin.xml	i386

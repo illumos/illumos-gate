@@ -590,6 +590,7 @@ usr/sbin/kdb5_util			sparc
 usr/sbin/kdb5_ldap_util			sparc
 usr/sbin/kdcmgr				sparc
 usr/sbin/kproplog			sparc
+usr/share/lib/ldif			sparc
 usr/share/lib/ldif/kerberos.ldif	sparc
 var/krb5				sparc
 var/svc/manifest/network/security/kadmin.xml	sparc
