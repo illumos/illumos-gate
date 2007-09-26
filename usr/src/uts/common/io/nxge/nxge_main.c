@@ -1472,7 +1472,11 @@ nxge_put64(p_nxge_t nxgep, p_mblk_t mp)
 	uint64_t	buf[2];
 
 	bcopy((char *)mp->b_rptr, (char *)&buf[0], 2 * sizeof (uint64_t));
+#if defined(__i386)
+	reg = (size_t)buf[0];
+#else
 	reg = buf[0];
+#endif
 
 	NXGE_NPI_PIO_WRITE64(nxgep->npi_handle, reg, buf[1]);
 }
