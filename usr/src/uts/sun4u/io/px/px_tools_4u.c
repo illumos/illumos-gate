@@ -65,7 +65,11 @@
  * workaround can break.  Also, other PIL 15 interrupts besides the ones we are
  * enveloping could delay processing of the interrupt we are trying to protect.
  */
-int pxtool_delay_ticks = 1;
+
+/*
+ * Set delay to 10 ms
+ */
+int pxtool_delay_usec = 10000;
 
 /* Number of inos per root complex. */
 int pxtool_num_inos = INTERRUPT_MAPPING_ENTRIES;
@@ -121,10 +125,10 @@ pxtool_safe_phys_peek(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 
 	/*
 	 * Workaround: delay taking down safe access env.
-	 * For more info, see comments where pxtool_delay_ticks is declared.
+	 * For more info, see comments where pxtool_delay_usec is declared.
 	 */
-	if (pxtool_delay_ticks > 0)
-		delay(pxtool_delay_ticks);
+	if ((err == DDI_FAILURE) && (pxtool_delay_usec > 0))
+		delay(drv_usectohz(pxtool_delay_usec));
 
 	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	pxu_p->pcitool_addr = NULL;
@@ -218,10 +222,10 @@ pxtool_safe_phys_poke(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 
 	/*
 	 * Workaround: delay taking down safe access env.
-	 * For more info, see comments where pxtool_delay_ticks is declared.
+	 * For more info, see comments where pxtool_delay_usec is declared.
 	 */
-	if (pxtool_delay_ticks > 0)
-		delay(pxtool_delay_ticks);
+	if (pxtool_delay_usec > 0)
+		delay(drv_usectohz(pxtool_delay_usec));
 
 	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	pxu_p->pcitool_addr = NULL;

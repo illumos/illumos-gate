@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,12 +70,12 @@ px_pec_attach(px_t *px_p)
 	pec_p->pec_px_p = px_p;
 
 	len = snprintf(pec_p->pec_nameinst_str,
-		sizeof (pec_p->pec_nameinst_str),
-		"%s%d", NAMEINST(dip));
+	    sizeof (pec_p->pec_nameinst_str),
+	    "%s%d", NAMEINST(dip));
 	pec_p->pec_nameaddr_str = pec_p->pec_nameinst_str + ++len;
 	(void) snprintf(pec_p->pec_nameaddr_str,
-		sizeof (pec_p->pec_nameinst_str) - len,
-		"%s@%s", NAMEADDR(dip));
+	    sizeof (pec_p->pec_nameinst_str) - len,
+	    "%s@%s", NAMEADDR(dip));
 
 	/*
 	 * Add interrupt handlers to process correctable/fatal/non fatal
@@ -111,7 +111,7 @@ px_pec_attach(px_t *px_p)
 				continue;
 		}
 		rng_addr = (uint64_t)(rangep->parent_high &
-					px_ranges_phi_mask) << 32;
+		    px_ranges_phi_mask) << 32;
 		rng_addr |= (uint64_t)rangep->parent_low;
 		rng_size = (uint64_t)rangep->size_high << 32;
 		rng_size |= (uint64_t)rangep->size_low;
@@ -120,8 +120,11 @@ px_pec_attach(px_t *px_p)
 		*pfnlp = mmu_btop(rng_addr + rng_size);
 	}
 
-	mutex_init(&pec_p->pec_pokefault_mutex, NULL, MUTEX_DRIVER,
-	    (void *)px_p->px_fm_ibc);
+	/*
+	 * This lock is for serializing safe acc calls. It is not associated
+	 * with an iblock cookie.
+	 */
+	mutex_init(&pec_p->pec_pokefault_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	return (DDI_SUCCESS);
 }
