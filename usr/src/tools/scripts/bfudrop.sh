@@ -187,7 +187,7 @@ ROOT="$newproto" makebfu
 mkdir -p "$stagedir/$subdir/$MACH" || \
     fail "can't create $stagedir/$subdir/$MACH."
 
-archvdir="archives/$MACH/$build"
+archvdir=$CPIODIR
 [[ -d "$archvdir" ]] || fail "can't find $archvdir."
 
 # copy archives
