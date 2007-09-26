@@ -79,6 +79,15 @@ is_64bit_aper(agp_target_softstate_t *softstate)
 {
 	return (softstate->tsoft_devid == AMD_BR_8151);
 }
+/*
+ * Check if it is an intel bridge
+ */
+static int
+is_intel_br(agp_target_softstate_t *softstate)
+{
+	return ((softstate->tsoft_devid & VENDOR_ID_MASK) ==
+	    INTEL_VENDOR_ID);
+}
 
 /*
  * agp_target_cap_find()
@@ -154,10 +163,10 @@ agp_target_get_apbase(agp_target_softstate_t *softstate)
 {
 	uint64_t aper_base;
 
-	if (!is_64bit_aper(softstate)) {
+	if (is_intel_br(softstate)) {
 		aper_base = pci_config_get32(softstate->tsoft_pcihdl,
 		    AGP_CONF_APERBASE) & AGP_32_APERBASE_MASK;
-	} else {
+	} else if (is_64bit_aper(softstate)) {
 		aper_base = pci_config_get64(softstate->tsoft_pcihdl,
 		    AGP_CONF_APERBASE);
 		/* 32-bit or 64-bit aperbase base pointer */
@@ -166,6 +175,7 @@ agp_target_get_apbase(agp_target_softstate_t *softstate)
 		else
 			aper_base &= AGP_64_APERBASE_MASK;
 	}
+
 	return (aper_base);
 }
 
@@ -192,11 +202,11 @@ agp_target_get_apsize(agp_target_softstate_t *softstate)
 	ASSERT(softstate->tsoft_acaptr);
 	cap = softstate->tsoft_acaptr;
 
-	if ((softstate->tsoft_devid & VENDOR_ID_MASK) == INTEL_VENDOR_ID) {
+	if (is_intel_br(softstate)) {
 		/* extend this value to 16 bit for later tests */
 		value = (uint16_t)pci_config_get8(softstate->tsoft_pcihdl,
 		    cap + AGP_CONF_APERSIZE) | AGP_APER_SIZE_MASK;
-	} else {
+	} else if (is_64bit_aper(softstate)) {
 		value = pci_config_get16(softstate->tsoft_pcihdl,
 		    cap + AGP_CONF_APERSIZE);
 	}
@@ -456,8 +466,7 @@ agp_target_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softstate->tsoft_acaptr = agp_target_cap_find(softstate->tsoft_pcihdl);
 	if (softstate->tsoft_acaptr == 0) {
 		/* Make a correction for some Intel chipsets */
-		if ((softstate->tsoft_devid & VENDOR_ID_MASK) ==
-		    INTEL_VENDOR_ID)
+		if (is_intel_br(softstate))
 			softstate->tsoft_acaptr = AGP_CAP_OFF_DEF;
 		else
 			return (DDI_FAILURE);
@@ -520,17 +529,17 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	switch (cmd) {
 	case CHIP_DETECT:
 	{
-		int type;
-		switch (st->tsoft_devid & VENDOR_ID_MASK) {
-		case INTEL_VENDOR_ID:
+		int type = 0;
+
+		if (is_intel_br(st))
 			type = CHIP_IS_INTEL;
-			break;
-		case AMD_VENDOR_ID:
+		else if (is_64bit_aper(st))
 			type = CHIP_IS_AMD;
-			break;
-		default:
+		else {
 			type = 0;
+			TARGETDB_PRINT2((CE_WARN, "Unknown bridge!"));
 		}
+
 		if (ddi_copyout(&type, (void *)data, sizeof (int), mode)) {
 			mutex_exit(&st->tsoft_lock);
 			return (EFAULT);
@@ -542,8 +551,7 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	{
 		size_t prealloc_size;
 
-		if ((st->tsoft_devid & VENDOR_ID_MASK) !=
-		    INTEL_VENDOR_ID) {
+		if (!is_intel_br(st)) {
 			mutex_exit(&st->tsoft_lock);
 			return (EINVAL);
 		}
@@ -645,11 +653,21 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 
 		ASSERT(st->tsoft_acaptr);
 
-		value = pci_config_get8(st->tsoft_pcihdl,
-		    st->tsoft_acaptr + AGP_CONF_MISC);
-		value |= AGP_MISC_APEN;
-		pci_config_put8(st->tsoft_pcihdl,
-		    st->tsoft_acaptr + AGP_CONF_MISC, value);
+		/*
+		 * In Intel agp bridges, agp misc register offset
+		 * is indexed from 0 instead of capability register.
+		 * AMD agp bridges have no such misc register
+		 * to control the aperture access, and they have
+		 * similar regsiters in CPU gart devices instead.
+		 */
+
+		if (is_intel_br(st)) {
+			value = pci_config_get8(st->tsoft_pcihdl,
+			    st->tsoft_acaptr + AGP_CONF_MISC);
+			value |= AGP_MISC_APEN;
+			pci_config_put8(st->tsoft_pcihdl,
+			    st->tsoft_acaptr + AGP_CONF_MISC, value);
+		}
 		break;
 
 	}
@@ -663,11 +681,13 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		pci_config_put16(st->tsoft_pcihdl,
 		    st->tsoft_acaptr + AGP_CONF_CONTROL, 0x0);
 
-		value2 = pci_config_get8(st->tsoft_pcihdl,
-		    st->tsoft_acaptr + AGP_CONF_MISC);
-		value2 &= ~AGP_MISC_APEN;
-		pci_config_put8(st->tsoft_pcihdl,
-		    st->tsoft_acaptr + AGP_CONF_MISC, value2);
+		if (is_intel_br(st)) {
+			value2 = pci_config_get8(st->tsoft_pcihdl,
+			    st->tsoft_acaptr + AGP_CONF_MISC);
+			value2 &= ~AGP_MISC_APEN;
+			pci_config_put8(st->tsoft_pcihdl,
+			    st->tsoft_acaptr + AGP_CONF_MISC, value2);
+		}
 
 		value1 = pci_config_get32(st->tsoft_pcihdl,
 		    st->tsoft_acaptr + AGP_CONF_COMMAND);

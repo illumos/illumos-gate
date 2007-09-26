@@ -31,7 +31,7 @@ PATH=/usr/bin:/usr/sbin:${PATH}
 export PATH
 
 # the following ids are sorted in numeric order
-BRALIAS="\
+IGFX_ALIAS="\
 	\"pci8086,2562\" \
 	\"pci8086,2572\" \
 	\"pci8086,2582\" \
@@ -47,20 +47,97 @@ BRALIAS="\
 	"
 DRVPERM='* 0644 root sys'
 
-installed() {
-	driver=$1
-	grep "^[	 ]*${driver}\>" $BASEDIR/etc/name_to_major > \
-		/dev/null 2>&1
-	return $?
+# Function: check_add_drv()
+#
+# This function will check if the module has an entry in etc/name_to_major
+# If not simply calls add_drv with the arguments given. If there is
+# such an entry in name_to_major file, it adds entries in driver_aliases
+# and minor_perm if necessary.
+# The syntax of this function is the same as add_drv. 
+
+check_add_drv()
+{
+	alias=""
+	ADD_ALIAS=0
+	ADD_MINOR=0
+	OPTIND=1
+
+	cmd="add_drv"
+
+	while getopts i:b:m:  opt
+	do
+		case $opt in
+			i )	ADD_ALIAS=1	
+				alias=$OPTARG
+				cmd=$cmd" -i '$alias'"
+				;;
+			m )	ADD_MINOR=1
+				minor=$OPTARG
+				cmd=$cmd" -m '$minor'"
+				;;
+			b)	BASEDIR=$OPTARG
+				cmd=$cmd" -b $BASEDIR"
+				;;
+			\?) 	echo "check_add_drv can not handle this option"
+				return
+				;;
+			esac
+	done 
+	shift `/usr/bin/expr $OPTIND - 1`
+	
+	drvname=$1
+
+	cmd=$cmd" "$drvname
+
+	/usr/bin/grep "^$drvname[ 	]" $BASEDIR/etc/name_to_major >  /dev/null 2>&1
+	
+	if [ $? -ne 0 ]
+	then
+		eval $cmd
+	else
+		# entry already in name_to_major, add alias, minorperm
+		# if necessary
+		if [ $ADD_ALIAS = 1 ]	
+		then
+			for i in $alias
+			do
+				/usr/bin/egrep "$i" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
+				if [ $? -ne 0 ]
+				then
+					echo "$drvname $i" >> $BASEDIR/etc/driver_aliases
+				else
+					/usr/bin/egrep "^$drvname[ 	]+$i" $BASEDIR/etc/driver_aliases>/dev/null 2>&1
+					if [ $? -ne 0 ]
+					then
+						return 1
+					fi
+
+				fi
+			done
+		fi
+
+		if [ $ADD_MINOR = 1 ]
+		then
+			/usr/bin/grep "^$drvname:" $BASEDIR/etc/minor_perm > /dev/null 2>&1
+			if [ $? -ne 0 ]
+			then 
+				minorentry="$drvname:$minor"
+				echo $minorentry >> $BASEDIR/etc/minor_perm
+			fi
+		fi
+	fi
+
 }
 
 EXIT=0
 
-installed i915 || \
-add_drv -b "${BASEDIR}" \
-	-m "${DRVPERM}" \
-	-i "${BRALIAS}" \
-	i915 || \
-EXIT=1
+if [ "${BASEDIR:=/}" = "/" ]
+then
+	ADD_DRV="check_add_drv"
+else
+	ADD_DRV="check_add_drv -b ${BASEDIR}"
+fi
+
+${ADD_DRV} -m "${DRVPERM}" -i "${IGFX_ALIAS}" i915 || EXIT=1
 
 exit ${EXIT}
