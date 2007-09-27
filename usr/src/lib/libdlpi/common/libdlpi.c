@@ -58,9 +58,10 @@ static int i_dlpi_remove_ppa(char *);
 static int i_dlpi_attach(dlpi_impl_t *);
 static void i_dlpi_passive(dlpi_impl_t *);
 
-static int i_dlpi_strputmsg(int, const dlpi_msg_t *, const void *, size_t, int);
-static int i_dlpi_strgetmsg(int, int, dlpi_msg_t *, t_uscalar_t, t_uscalar_t,
-    size_t, void *, size_t *, size_t *);
+static int i_dlpi_strputmsg(dlpi_impl_t *, const dlpi_msg_t *, const void *,
+    size_t, int);
+static int i_dlpi_strgetmsg(dlpi_impl_t *, int, dlpi_msg_t *, t_uscalar_t,
+    t_uscalar_t, size_t, void *, size_t *, size_t *);
 static int i_dlpi_msg_common(dlpi_impl_t *, const dlpi_msg_t *, dlpi_msg_t *,
     size_t, int);
 
@@ -69,6 +70,9 @@ static int i_dlpi_multi(dlpi_handle_t, t_uscalar_t, const uint8_t *, size_t);
 static int i_dlpi_promisc(dlpi_handle_t, t_uscalar_t, uint_t);
 static uint_t i_dlpi_buildsap(uint8_t *, uint_t);
 static void i_dlpi_writesap(void *, uint_t, uint_t);
+static int i_dlpi_notifyind_process(dlpi_impl_t *, dl_notify_ind_t *);
+static boolean_t i_dlpi_notifyidexists(dlpi_impl_t *, dlpi_notifyent_t *);
+static void i_dlpi_deletenotifyid(dlpi_impl_t *);
 
 int
 dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
@@ -95,6 +99,8 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	dip->dli_ppa = ifsp.ifsp_ppa;
 	dip->dli_mod_cnt = ifsp.ifsp_modcnt;
 	dip->dli_oflags = flags;
+	dip->dli_notifylistp = NULL;
+	dip->dli_note_processing = B_FALSE;
 
 	for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
 		(void) strlcpy(dip->dli_modlist[cnt], ifsp.ifsp_mods[cnt],
@@ -161,8 +167,14 @@ void
 dlpi_close(dlpi_handle_t dh)
 {
 	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
+	dlpi_notifyent_t *next, *dnp;
 
 	if (dip != NULL) {
+		for (dnp = dip->dli_notifylistp; dnp != NULL; dnp = next) {
+			next = dnp->dln_next;
+			free(dnp);
+		}
+
 		(void) close(dip->dli_fd);
 		free(dip);
 	}
@@ -586,7 +598,7 @@ dlpi_send(dlpi_handle_t dh, const void *daddrp, size_t daddrlen,
 		return (DLPI_EINHANDLE);
 
 	if (dip->dli_oflags & DLPI_RAW)
-		return (i_dlpi_strputmsg(dip->dli_fd, NULL, msgbuf, msglen, 0));
+		return (i_dlpi_strputmsg(dip, NULL, msgbuf, msglen, 0));
 
 	if ((daddrlen > 0 && daddrp == NULL) || daddrlen > DLPI_PHYSADDR_MAX)
 		return (DLPI_EINVAL);
@@ -627,7 +639,7 @@ dlpi_send(dlpi_handle_t dh, const void *daddrp, size_t daddrlen,
 		    dip->dli_saplen);
 	}
 
-	return (i_dlpi_strputmsg(dip->dli_fd, &req, msgbuf, msglen, 0));
+	return (i_dlpi_strputmsg(dip, &req, msgbuf, msglen, 0));
 }
 
 int
@@ -649,8 +661,8 @@ dlpi_recv(dlpi_handle_t dh, void *saddrp, size_t *saddrlenp, void *msgbuf,
 	 * length.
 	 */
 	if (dip->dli_oflags & DLPI_RAW) {
-		retval = i_dlpi_strgetmsg(dip->dli_fd, msec, NULL, 0, 0, 0,
-		    msgbuf, msglenp, &totmsglen);
+		retval = i_dlpi_strgetmsg(dip, msec, NULL, 0, 0, 0, msgbuf,
+		    msglenp, &totmsglen);
 
 		if (retval == DLPI_SUCCESS && recvp != NULL)
 			recvp->dri_totmsglen = totmsglen;
@@ -661,9 +673,9 @@ dlpi_recv(dlpi_handle_t dh, void *saddrp, size_t *saddrlenp, void *msgbuf,
 	udatap = &(ind.dlm_msg->unitdata_ind);
 	indendp = (caddr_t)ind.dlm_msg + ind.dlm_msgsz;
 
-	if ((retval = i_dlpi_strgetmsg(dip->dli_fd, msec, &ind,
-	    DL_UNITDATA_IND, DL_UNITDATA_IND, DL_UNITDATA_IND_SIZE,
-	    msgbuf, msglenp, &totmsglen)) != DLPI_SUCCESS)
+	if ((retval = i_dlpi_strgetmsg(dip, msec, &ind, DL_UNITDATA_IND,
+	    DL_UNITDATA_IND, DL_UNITDATA_IND_SIZE, msgbuf,
+	    msglenp, &totmsglen)) != DLPI_SUCCESS)
 		return (retval);
 
 	/*
@@ -722,6 +734,91 @@ dlpi_recv(dlpi_handle_t dh, void *saddrp, size_t *saddrlenp, void *msgbuf,
 		recvp->dri_destaddrtype = udatap->dl_group_address;
 		recvp->dri_totmsglen = totmsglen;
 	}
+
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_enabnotify(dlpi_handle_t dh, uint_t notes, dlpi_notifyfunc_t *funcp,
+    void *arg, dlpi_notifyid_t *id)
+{
+	int			retval;
+	dlpi_msg_t		req, ack;
+	dl_notify_req_t		*notifyreqp;
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+	dlpi_notifyent_t	*newnotifp;
+	dlpi_info_t 		dlinfo;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	retval = dlpi_info((dlpi_handle_t)dip, &dlinfo, 0);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+	if (dlinfo.di_state != DL_IDLE)
+		return (DL_OUTSTATE);
+
+	if (dip->dli_note_processing)
+		return (DLPI_FAILURE);
+
+	if (funcp == NULL || id == NULL)
+		return (DLPI_EINVAL);
+
+	if ((~DLPI_NOTIFICATION_TYPES & notes) ||
+	    !(notes & DLPI_NOTIFICATION_TYPES))
+		return (DLPI_ENOTEINVAL);
+
+	DLPI_MSG_CREATE(req, DL_NOTIFY_REQ);
+	DLPI_MSG_CREATE(ack, DL_NOTIFY_ACK);
+
+	notifyreqp = &(req.dlm_msg->notify_req);
+	notifyreqp->dl_notifications = notes;
+	notifyreqp->dl_timelimit = 0;
+
+	retval = i_dlpi_msg_common(dip, &req, &ack, DL_NOTIFY_ACK_SIZE, 0);
+	if (retval == DL_NOTSUPPORTED)
+		return (DLPI_ENOTENOTSUP);
+
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+
+	if ((newnotifp = calloc(1, sizeof (dlpi_notifyent_t))) == NULL)
+		return (DL_SYSERR);
+
+	/* Register notification information. */
+	newnotifp->dln_fnp = funcp;
+	newnotifp->dln_notes = notes;
+	newnotifp->arg = arg;
+	newnotifp->dln_rm = B_FALSE;
+
+	/* Insert notification node at head */
+	newnotifp->dln_next = dip->dli_notifylistp;
+	dip->dli_notifylistp = newnotifp;
+
+	*id = (dlpi_notifyid_t)newnotifp;
+	return (DLPI_SUCCESS);
+}
+
+int
+dlpi_disabnotify(dlpi_handle_t dh, dlpi_notifyid_t id, void **argp)
+{
+	dlpi_impl_t		*dip = (dlpi_impl_t *)dh;
+	dlpi_notifyent_t	*remid = (dlpi_notifyent_t *)id;
+
+	if (dip == NULL)
+		return (DLPI_EINHANDLE);
+
+	/* Walk the notifyentry list to find matching id. */
+	if (!(i_dlpi_notifyidexists(dip, remid)))
+		return (DLPI_ENOTEIDINVAL);
+
+	if (argp != NULL)
+		*argp = remid->arg;
+
+	remid->dln_rm = B_TRUE;
+	/* Delete node if callbacks are not being processed. */
+	if (!dip->dli_note_processing)
+		i_dlpi_deletenotifyid(dip);
 
 	return (DLPI_SUCCESS);
 }
@@ -1087,7 +1184,7 @@ i_dlpi_passive(dlpi_impl_t *dip)
 /*
  * Send a dlpi control message and/or data message on a stream. The inputs
  * for this function are:
- *	int fd:		file descriptor of open stream to send message
+ * 	dlpi_impl_t *dip: internal dlpi handle to open stream
  *	const dlpi_msg_t *dlreqp: request message structure
  *	void *databuf:	data buffer
  *	size_t datalen:	data buffer len
@@ -1095,10 +1192,11 @@ i_dlpi_passive(dlpi_impl_t *dip)
  * Returns DLPI_SUCCESS if putmsg() succeeds, otherwise DL_SYSERR on failure.
  */
 static int
-i_dlpi_strputmsg(int fd, const dlpi_msg_t *dlreqp,
+i_dlpi_strputmsg(dlpi_impl_t *dip, const dlpi_msg_t *dlreqp,
     const void *databuf, size_t datalen, int flags)
 {
 	int		retval;
+	int		fd = dip->dli_fd;
 	struct strbuf	ctl;
 	struct strbuf   data;
 
@@ -1119,7 +1217,7 @@ i_dlpi_strputmsg(int fd, const dlpi_msg_t *dlreqp,
 /*
  * Get a DLPI control message and/or data message from a stream. The inputs
  * for this function are:
- * 	int fd: 		file descriptor of open stream
+ * 	dlpi_impl_t *dip: 	internal dlpi handle
  * 	int msec: 		timeout to wait for message
  *	dlpi_msg_t *dlreplyp:	reply message structure, the message size
  *				member on return stores actual size received
@@ -1131,21 +1229,26 @@ i_dlpi_strputmsg(int fd, const dlpi_msg_t *dlreqp,
  *	size_t *totdatalenp: 	total data received. Greater than 'datalenp' if
  *				actual data received is larger than 'databuf'
  * Function returns DLPI_SUCCESS if requested message is retrieved
- * otherwise returns error code or timeouts.
+ * otherwise returns error code or timeouts. If a notification arrives on
+ * the stream the callback is notified. However, error returned during the
+ * handling of notification is ignored as it would be confusing to actual caller
+ * of this function.
  */
 static int
-i_dlpi_strgetmsg(int fd, int msec, dlpi_msg_t *dlreplyp, t_uscalar_t dlreqprim,
-    t_uscalar_t dlreplyprim, size_t dlreplyminsz, void *databuf,
-    size_t *datalenp, size_t *totdatalenp)
+i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
+    t_uscalar_t dlreqprim, t_uscalar_t dlreplyprim, size_t dlreplyminsz,
+    void *databuf, size_t *datalenp, size_t *totdatalenp)
 {
 	int			retval;
 	int			flags = 0;
+	int			fd = dip->dli_fd;
 	struct strbuf		ctl, data;
 	struct pollfd		pfd;
 	hrtime_t		start, current;
 	long			bufc[DLPI_CHUNKSIZE / sizeof (long)];
 	long			bufd[DLPI_CHUNKSIZE / sizeof (long)];
 	union DL_primitives	*dlprim;
+	dl_notify_ind_t		*dlnotif;
 	boolean_t		infinite = (msec < 0);	/* infinite timeout */
 
 	if ((dlreplyp == NULL && databuf == NULL) ||
@@ -1230,6 +1333,21 @@ i_dlpi_strgetmsg(int fd, int msec, dlpi_msg_t *dlreplyp, t_uscalar_t dlreqprim,
 		}
 
 		/*
+		 * Check if DL_NOTIFY_IND message received. If there is one,
+		 * notify the callback function(s) and continue processing the
+		 * requested message.
+		 */
+		if (dip->dli_notifylistp != NULL &&
+		    dlreplyp->dlm_msg->dl_primitive == DL_NOTIFY_IND) {
+			if (ctl.len < DL_NOTIFY_IND_SIZE)
+				continue;
+			dlnotif = &(dlreplyp->dlm_msg->notify_ind);
+
+			(void) i_dlpi_notifyind_process(dip, dlnotif);
+			continue;
+		}
+
+		/*
 		 * If we were expecting a data message, and we got one, set
 		 * *datalenp.  If we aren't waiting on a control message, then
 		 * we're done.
@@ -1285,8 +1403,10 @@ i_dlpi_strgetmsg(int fd, int msec, dlpi_msg_t *dlreplyp, t_uscalar_t dlreqprim,
  *	size_t dlreplyminsz: minimum size of reply primitive
  *	int flags: flags to be set to send a message
  * This routine succeeds if the message is an expected request/acknowledged
- * message. Unexpected asynchronous messages (e.g. unexpected DL_NOTIFY_IND
- * messages) will be discarded.
+ * message. However, if DLPI notification has been enabled via
+ * dlpi_enabnotify(), DL_NOTIFY_IND messages are handled before handling
+ * expected messages. Otherwise, any other unexpected asynchronous messages will
+ * be discarded.
  */
 static int
 i_dlpi_msg_common(dlpi_impl_t *dip, const dlpi_msg_t *dlreqp,
@@ -1297,12 +1417,12 @@ i_dlpi_msg_common(dlpi_impl_t *dip, const dlpi_msg_t *dlreqp,
 	t_uscalar_t 	dlreplyprim = dlreplyp->dlm_msg->dl_primitive;
 
 	/* Put the requested primitive on the stream. */
-	retval = i_dlpi_strputmsg(dip->dli_fd, dlreqp, NULL, 0, flags);
+	retval = i_dlpi_strputmsg(dip, dlreqp, NULL, 0, flags);
 	if (retval != DLPI_SUCCESS)
 		return (retval);
 
 	/* Retrieve acknowledged message for requested primitive. */
-	retval = i_dlpi_strgetmsg(dip->dli_fd, (dip->dli_timeout * MILLISEC),
+	retval = i_dlpi_strgetmsg(dip, (dip->dli_timeout * MILLISEC),
 	    dlreplyp, dlreqprim, dlreplyprim, dlreplyminsz, NULL, NULL, NULL);
 	if (retval != DLPI_SUCCESS)
 		return (retval);
@@ -1374,7 +1494,11 @@ static const char *libdlpi_errlist[] = {
 	"DLPI operation failed",		/* DLPI_FAILURE */
 	"DLPI style-2 node reports style-1",	/* DLPI_ENOTSTYLE2 */
 	"bad DLPI message",			/* DLPI_EBADMSG */
-	"DLPI raw mode not supported"		/* DLPI_ERAWNOTSUP */
+	"DLPI raw mode not supported",		/* DLPI_ERAWNOTSUP */
+	"DLPI notification not supported by link",
+						/* DLPI_ENOTENOTSUP */
+	"invalid DLPI notification type",	/* DLPI_ENOTEINVAL */
+	"invalid DLPI notification id"		/* DLPI_ENOTEIDINVAL */
 };
 
 const char *
@@ -1384,7 +1508,7 @@ dlpi_strerror(int err)
 		return (strerror(errno));
 	else if (err >= 0 && err < NELEMS(dlpi_errlist))
 		return (dgettext(TEXT_DOMAIN, dlpi_errlist[err]));
-	else if (err > DLPI_SUCCESS && err < DLPI_ERRMAX)
+	else if (err >= DLPI_SUCCESS && err < DLPI_ERRMAX)
 		return (dgettext(TEXT_DOMAIN, libdlpi_errlist[err -
 		    DLPI_SUCCESS]));
 	else
@@ -1463,7 +1587,11 @@ static const dlpi_primsz_t dlpi_primsizes[] = {
 { DL_PHYS_ADDR_REQ, 	DL_PHYS_ADDR_REQ_SIZE				},
 { DL_PHYS_ADDR_ACK, 	DL_PHYS_ADDR_ACK_SIZE + DLPI_PHYSADDR_MAX	},
 { DL_SET_PHYS_ADDR_REQ, DL_SET_PHYS_ADDR_REQ_SIZE + DLPI_PHYSADDR_MAX	},
-{ DL_OK_ACK,		MAX(DL_ERROR_ACK_SIZE, DL_OK_ACK_SIZE)		}
+{ DL_OK_ACK,		MAX(DL_ERROR_ACK_SIZE, DL_OK_ACK_SIZE)		},
+{ DL_NOTIFY_REQ,	DL_NOTIFY_REQ_SIZE				},
+{ DL_NOTIFY_ACK,	MAX(DL_ERROR_ACK_SIZE, DL_NOTIFY_ACK_SIZE)	},
+{ DL_NOTIFY_IND,	DL_NOTIFY_IND_SIZE + DLPI_PHYSADDR_MAX +
+			DLPI_SAPLEN_MAX					}
 };
 
 /*
@@ -1521,4 +1649,107 @@ i_dlpi_writesap(void *dstbuf, uint_t sap, uint_t saplen)
 #endif
 
 	(void) memcpy(dstbuf, sapp, saplen);
+}
+
+/*
+ * Fill notification payload and callback each registered functions.
+ * Delete nodes if any was called while processing.
+ */
+static int
+i_dlpi_notifyind_process(dlpi_impl_t *dip, dl_notify_ind_t *dlnotifyindp)
+{
+	dlpi_notifyinfo_t	notifinfo;
+	t_uscalar_t		dataoff, datalen;
+	caddr_t			datap;
+	dlpi_notifyent_t	*dnp;
+	uint_t			note = dlnotifyindp->dl_notification;
+	uint_t			deletenode = B_FALSE;
+
+	notifinfo.dni_note = note;
+
+	switch (note) {
+	case DL_NOTE_SPEED:
+		notifinfo.dni_speed = dlnotifyindp->dl_data;
+		break;
+	case DL_NOTE_SDU_SIZE:
+		notifinfo.dni_size = dlnotifyindp->dl_data;
+		break;
+	case DL_NOTE_PHYS_ADDR:
+		dataoff = dlnotifyindp->dl_addr_offset;
+		datalen = dlnotifyindp->dl_addr_length;
+
+		if (dataoff == 0 || datalen == 0)
+			return (DLPI_EBADMSG);
+
+		datap = (caddr_t)dlnotifyindp + dataoff;
+		if (dataoff < DL_NOTIFY_IND_SIZE)
+			return (DLPI_EBADMSG);
+
+		notifinfo.dni_physaddrlen = datalen - dip->dli_saplen;
+
+		if (notifinfo.dni_physaddrlen > DLPI_PHYSADDR_MAX)
+			return (DL_BADADDR);
+
+		(void) memcpy(notifinfo.dni_physaddr, datap,
+		    notifinfo.dni_physaddrlen);
+		break;
+	}
+
+	dip->dli_note_processing = B_TRUE;
+
+	for (dnp = dip->dli_notifylistp; dnp != NULL; dnp = dnp->dln_next) {
+		if (note & dnp->dln_notes)
+			dnp->dln_fnp((dlpi_handle_t)dip, &notifinfo, dnp->arg);
+		if (dnp->dln_rm)
+			deletenode = B_TRUE;
+	}
+
+	dip->dli_note_processing = B_FALSE;
+
+	/* Walk the notifyentry list to unregister marked entries. */
+	if (deletenode)
+		i_dlpi_deletenotifyid(dip);
+
+	return (DLPI_SUCCESS);
+}
+/*
+ * Find registered notification.
+ */
+static boolean_t
+i_dlpi_notifyidexists(dlpi_impl_t *dip, dlpi_notifyent_t *id)
+{
+	dlpi_notifyent_t	*dnp;
+
+	for (dnp = dip->dli_notifylistp; dnp != NULL; dnp = dnp->dln_next) {
+		if (id == dnp)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * Walk the list of notifications and deleted nodes marked to be deleted.
+ */
+static void
+i_dlpi_deletenotifyid(dlpi_impl_t *dip)
+{
+	dlpi_notifyent_t	 *prev, *dnp;
+
+	prev = NULL;
+	dnp = dip->dli_notifylistp;
+	while (dnp != NULL) {
+		if (!dnp->dln_rm) {
+			prev = dnp;
+			dnp = dnp->dln_next;
+		} else if (prev == NULL) {
+			dip->dli_notifylistp = dnp->dln_next;
+			free(dnp);
+			dnp = dip->dli_notifylistp;
+		} else {
+			prev->dln_next = dnp->dln_next;
+			free(dnp);
+			dnp = prev->dln_next;
+		}
+	}
 }

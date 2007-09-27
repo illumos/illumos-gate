@@ -88,6 +88,10 @@ enum {
 	DLPI_ENOTSTYLE2,		/* DLPI style-2 node reports style-1 */
 	DLPI_EBADMSG,			/* bad DLPI message */
 	DLPI_ERAWNOTSUP,		/* DLPI raw mode not supported */
+	DLPI_ENOTEINVAL,		/* invalid DLPI notification type */
+	DLPI_ENOTENOTSUP,		/* DLPI notification not supported */
+					/* by link */
+	DLPI_ENOTEIDINVAL,		/* invalid DLPI notification id */
 	DLPI_ERRMAX			/* Highest + 1 libdlpi error code */
 };
 
@@ -137,7 +141,39 @@ typedef struct {
 	size_t  	dri_totmsglen;
 } dlpi_recvinfo_t;
 
+/*
+ * DLPI notification, (DL_NOTIFY_IND) payload information;
+ * see dlpi_enabnotify(3DLPI).
+ */
+typedef struct {
+	uint_t  dni_note;
+	union {
+		uint_t  dniu_speed;
+		uint_t  dniu_size;
+		struct {
+			uchar_t physaddr[DLPI_PHYSADDR_MAX];
+			uchar_t physaddrlen;
+		} dniu_addr;
+	} dni_data;
+} dlpi_notifyinfo_t;
+
+#define	dni_speed dni_data.dniu_speed
+#define	dni_size dni_data.dniu_size
+#define	dni_physaddr dni_data.dniu_addr.physaddr
+#define	dni_physaddrlen dni_data.dniu_addr.physaddrlen
+
 typedef struct __dlpi_handle *dlpi_handle_t;
+
+/*
+ * dlpi_notifyid_t refers to a registered notification. Its value should
+ * not be interpreted by the interface consumer.
+ */
+typedef struct __dlpi_notifyid *dlpi_notifyid_t;
+
+/*
+ * Callback function invoked with arguments; see dlpi_enabnotify(3DLPI).
+ */
+typedef void dlpi_notifyfunc_t(dlpi_handle_t, dlpi_notifyinfo_t *, void *);
 
 extern const char	*dlpi_mactype(uint_t);
 extern const char 	*dlpi_strerror(int);
@@ -158,6 +194,9 @@ extern int dlpi_recv(dlpi_handle_t, void *, size_t *, void *, size_t *,
     int, dlpi_recvinfo_t *);
 extern int dlpi_send(dlpi_handle_t, const void *, size_t, const void *, size_t,
     const dlpi_sendinfo_t *);
+extern int dlpi_enabnotify(dlpi_handle_t, uint_t, dlpi_notifyfunc_t *,
+    void *arg, dlpi_notifyid_t *);
+extern int dlpi_disabnotify(dlpi_handle_t, dlpi_notifyid_t, void **);
 extern int dlpi_fd(dlpi_handle_t);
 extern int dlpi_set_timeout(dlpi_handle_t, int);
 extern uint_t dlpi_arptype(uint_t);

@@ -32,6 +32,8 @@ SUNW_1.1 {	# first release of libdlpi, Solaris 11
         dlpi_close;
         dlpi_disabmulti;
         dlpi_enabmulti;
+	dlpi_enabnotify;
+	dlpi_disabnotify;
         dlpi_fd;
         dlpi_get_physaddr;
 	dlpi_iftype;

@@ -64,6 +64,15 @@ extern "C" {
 	(dlmsg).dlm_msg->dl_primitive = (dlprimitive);
 
 /*
+ * Publicly available DLPI notification types. This list may change if
+ * new DLPI notification types are made public. See dlpi(7P).
+ *
+ */
+#define	DLPI_NOTIFICATION_TYPES	(DL_NOTE_LINK_DOWN | DL_NOTE_LINK_UP | \
+	DL_NOTE_PHYS_ADDR | DL_NOTE_SDU_SIZE | DL_NOTE_SPEED | \
+	DL_NOTE_PROMISC_ON_PHYS | DL_NOTE_PROMISC_OFF_PHYS)
+
+/*
  * Used in a mactype lookup table.
  */
 typedef struct dlpi_mactype_s {
@@ -90,6 +99,16 @@ typedef struct dlpi_msg {
 					/* provide buffer size for dlm_msg */
 } dlpi_msg_t;
 
+typedef struct dlpi_notifyent {
+	uint_t			dln_notes;
+					/* notification types registered */
+	dlpi_notifyfunc_t	*dln_fnp;
+					/* callback to call */
+	void 			*arg;	/* argument to pass to callback */
+	uint_t			dln_rm;	/* true if should be removed */
+	struct dlpi_notifyent	*dln_next;
+} dlpi_notifyent_t;
+
 /*
  * Private libdlpi structure associated with each DLPI handle.
  */
@@ -111,6 +130,11 @@ typedef struct dlpi_impl_s {
 					/* array of mods */
 	uint_t		dli_mactype;	/* mac type */
 	uint_t		dli_oflags;	/* flags set at open */
+	uint_t		dli_note_processing;
+					/* true if notification is being */
+					/* processed */
+	dlpi_notifyent_t *dli_notifylistp;
+					/* list of registered notifications */
 } dlpi_impl_t;
 
 #ifdef __cplusplus
