@@ -24,12 +24,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-BD=${BASEDIR:-/}
-if [ "$ACTIVE_PATCH" = "" ]
-then
-	if grep "\<xsvc\>" $BD/etc/name_to_major > /dev/null 2>&1
-	then
-		rem_drv -b ${BD} xsvc
-	fi
-fi
-exit 0
+
+include drv_utils
+
+pkg_drvadd xsvc || exit 1

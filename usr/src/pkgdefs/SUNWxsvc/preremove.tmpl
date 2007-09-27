@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -25,22 +25,6 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+include drv_utils
 
-# 
-# Driver info 
-# 
-ADD_DRV="add_drv -b ${BASEDIR}"
-
-DRV=xsvc
-grep "^${DRV} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-	${ADD_DRV} ${DRV}
-        if [ $? -ne 0 ]; then
-                echo "\nFailed add_drv of ${DRV}!\n" >&2
-                exit 1
-        fi
-fi
-
-exit 0
+pkg_drvrem xsvc || exit 1

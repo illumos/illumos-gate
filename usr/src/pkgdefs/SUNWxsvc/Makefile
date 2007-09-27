@@ -26,12 +26,13 @@
  
 include ../Makefile.com
 
-DATAFILES +=
-CLOBBERFILES += $(MACHDATAFILES)
+TMPLFILES += postinstall preremove
+DATAFILES += depend
 
 .KEEP_STATE:
 
-all: $(FILES) $(MACHDATAFILES)
+all: $(FILES)
 install: all pkg
 
 include ../Makefile.targ
+include ../Makefile.prtarg

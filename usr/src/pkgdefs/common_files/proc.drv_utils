@@ -1,0 +1,204 @@
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# proc.drv_utils -- common code for driver add/remove
+#
+# pkg_drvadd - add a driver, has the same syntax as add_drv(1M)
+#
+#  EXAMPLES:
+#    pkg_drvadd mydrv
+#    pkg_drvadd -i '"pciex0000,0001"' mydrv
+#    pkg_drvadd -i '"pciex0000,0001"' -m '* 0666 root sys' mydrv
+#    pkg_drvadd -i '"pciex0000,0001" "pciex0000,0002"' mydrv
+#    ALIASES1='"pciex0000,0001" "pciex0000,0002"'
+#    ALIASES2='"pciex0000,0003" "pciex0000,0004"'
+#    pkg_drvadd -n -b "/" -m '* 0666 root sys' -c scsi \
+#	-i "'$ALIASES1 $ALIASES2'" -v  mydrv
+#
+# pkg_drvrem - remove list of drivers
+#   ARG1-ARG[last] = driver names
+#  e.g.
+#    pkg_drvrem mydrv1 mydrv2
+#
+# pkg_drvadd and pkg_drvrem will perform necessary clean-up and
+# return a non-zero exit code on a fatal failure.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+# setup the default basedir, can be overridden with -b
+if [ "${BASEDIR:=/}" != "/" ]
+then
+	BD_OPT="-b ${BASEDIR}"
+fi
+BD_OPT_DEFAULT="${BD_OPT}"
+BASEDIR_DEFAULT="${BASEDIR}"
+
+# returns 1 if driver not already installed
+not_installed() {
+	DRIVER=$1
+	grep "^${DRIVER} " ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+	if [ "$?" -eq 0 ]; then
+		return 1
+	else
+		return 0
+	fi
+}
+
+# get the driver name from the args
+driver_name() {
+	shift `expr $# - 1`
+	DRV=$1
+}
+
+# see if the basedir was overriden in the args
+basedir_override() {
+	OPTIND=1
+	while getopts fnvb:c:i:m:p:P: OPT 2>/dev/null; do
+		case "${OPT}" in
+		b)	BASEDIR="${OPTARG}"
+			BD_OPT="-b \"${OPTARG}\""
+			OPTIND=1
+			return
+			;;
+		esac
+	done
+	OPTIND=1
+
+	# if we get this far, reset to the default
+	BASEDIR="${BASEDIR_DEFAULT}"
+	BD_OPT="${BD_OPT_DEFAULT}"
+}
+
+pkg_drvadd() {
+	STATUS=0
+
+	driver_name "$@"
+	basedir_override "$@"
+
+	# if the driver isn't installed, we'll add_drv. If it's already
+	# installed (i.e. upgrade), we'll update_drv -a
+	if not_installed ${DRV} ; then
+		CMD="add_drv"
+		UPDATE=0
+		CHECK_ADD=0
+	else
+		CMD="update_drv"
+		UPDATE=1
+		CHECK_ADD=1
+	fi
+
+	CMD="${CMD} ${BD_OPT}"
+
+	while getopts fnvb:c:i:m:p:P: OPT 2>/dev/null; do
+		case "${OPT}" in
+		# -c is only supported in add_drv
+		c)	if [ ${UPDATE} -eq 0 ]; then
+				CMD="${CMD} -c ${OPTARG}"
+			fi
+			;;
+		# -n is only supported in add_drv
+		n)	if [ ${UPDATE} -eq 0 ]; then
+				CMD="${CMD} -${OPT}"
+			fi
+			;;
+		f | v)	CMD="${CMD} -${OPT}"
+			;;
+		m | p | P)
+			if [ ${CHECK_ADD} -eq 1 ]; then
+				CMD="${CMD} -a"
+				CHECK_ADD=0
+			fi
+			CMD="${CMD} -${OPT} \"${OPTARG}\""
+			;;
+		# only use the aliases which aren't already in
+		# etc/driver_aliases
+		i)	TMPALIAS=`echo ${OPTARG} | /usr/bin/sed -e "s/'//g"`
+			ALIASDIR="${BASEDIR}"/etc/driver_aliases
+			FOUND=0
+			for I in ${TMPALIAS}; do
+				/usr/bin/egrep -s "^${DRV}[  ]+${I}" ${ALIASDIR}
+				if [ $? -ne 0 ]; then
+					if [ ${CHECK_ADD} -eq 1 ]; then
+						CMD="${CMD} -a"
+						CHECK_ADD=0
+					fi
+					if [ ${FOUND} -eq 0 ]; then
+						CMD="${CMD} -i '"
+						FOUND=1
+					fi
+					CMD="${CMD} ${I}"
+				fi
+			done
+			if [ ${FOUND} -ne 0 ]; then
+				CMD="${CMD}'"
+			fi
+			;;
+		\?)	echo "pkg_drvadd(): Unsupported option -${OPT}"
+			return
+			;;
+		esac
+	done
+
+	CMD="${CMD} ${DRV}"
+	eval ${CMD}
+	if [ $? -ne 0 ]; then
+		echo "pkg_drvadd(): Failed \"${CMD}\"!\n" >&2
+		STATUS=1
+	fi
+
+	return ${STATUS}
+}
+
+pkg_drvrem() {
+	STATUS=0
+	CMD="rem_drv"
+
+	basedir_override "$@"
+	CMD="${CMD} ${BD_OPT}"
+
+	if [ "$1" =  "-b" ]; then
+		shift 2
+	fi
+
+	while [ $# -ne 0  ]
+	do
+		DRV=$1
+		if not_installed ${DRV} ; then
+			echo "driver ${DRV} not installed"
+		else
+			eval "${CMD} ${DRV}"
+			if [ $? -ne 0 ]; then
+				echo "pkg_drvrem(): Failed \"${CMD} ${DRV}\"!\n" >&2
+				STATUS=1
+			fi
+		fi
+		shift
+	done
+
+	return ${STATUS}
+}

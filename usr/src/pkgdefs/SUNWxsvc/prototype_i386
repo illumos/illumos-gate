@@ -33,7 +33,7 @@ i copyright
 i depend
 i pkginfo
 i postinstall
-i postremove
+i preremove
 
 #!search <pathname pathname ...>	# where to find pkg objects
 #!include <filename>			# include another 'prototype' file
