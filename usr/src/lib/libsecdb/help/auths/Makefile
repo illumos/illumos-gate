@@ -87,6 +87,7 @@ HTMLENTS = \
 	SmfValueHeader.html \
 	SmfValueInetd.html \
 	SmfValueIPsec.html \
+	SmfValueIscsitgt.html \
 	SmfValueMDNS.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \

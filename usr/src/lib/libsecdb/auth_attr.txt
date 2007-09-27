@@ -141,3 +141,8 @@ solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::h
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html
 solaris.system.shutdown:::Shutdown the System::help=SysShutdown.html
+#
+solaris.smf.manage.iscsitgt:::Manage ISCSI Target Service States::help=SmfValueIscsitgt.html
+solaris.smf.read.iscsitgt:::Read ISCSI Target secrets::help=SmfValueIscsitgt.html
+solaris.smf.modify.iscsitgt:::Add/Remove Values of ISCSI Target Service Properties::help=SmfValueIscsitgt.html
+solaris.smf.value.iscsitgt:::Change Values of ISCSI Target Service Properties::help=SmfValueIscsitgt.html

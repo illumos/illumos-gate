@@ -48,6 +48,7 @@
 #include "errcode.h"
 #include "isns_client.h"
 #include <sys/scsi/generic/commands.h>
+#include "mgmt_scf.h"
 
 #define	CRC32_STR	"CRC32C"
 #define	NONE_STR	"None"
@@ -1060,30 +1061,6 @@ sna_lte(uint32_t n1, uint32_t n2)
 }
 
 Boolean_t
-update_config_main(char **msg)
-{
-	if (tgt_dump2file(main_config, config_file) == False) {
-		xml_rtn_msg(msg, ERR_UPDATE_MAINCFG_FAILED);
-		return (False);
-	} else
-		return (True);
-}
-
-Boolean_t
-update_config_targets(char **msg)
-{
-	char	path[MAXPATHLEN];
-
-	(void) snprintf(path, sizeof (path), "%s/config.xml", target_basedir);
-	if (tgt_dump2file(targets_config, path) == False) {
-		if (msg != NULL)
-			xml_rtn_msg(msg, ERR_UPDATE_TARGCFG_FAILED);
-		return (False);
-	} else
-		return (True);
-}
-
-Boolean_t
 util_create_guid(char **guid)
 {
 	eui_16_t	eui;
@@ -1511,14 +1488,11 @@ void
 remove_target_common(char *name, int lun_num, char **msg)
 {
 	tgt_node_t	*targ			= NULL;
-	tgt_node_t	*list, *lun, *node, *c;
+	tgt_node_t	*list, *lun, *c;
 	char		path[MAXPATHLEN];
 	char		*tname			= NULL;
 	char		*iname			= NULL;
-	char		*bs_path		= NULL;
-	int		chk, xml_fd;
-	Boolean_t	bs_delete		= False;
-	xmlTextReaderPtr	r;
+	int		chk;
 
 	(void) pthread_mutex_lock(&targ_config_mutex);
 	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ)) !=
@@ -1613,34 +1587,9 @@ remove_target_common(char *name, int lun_num, char **msg)
 	(void) unlink(path);
 	(void) snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
 	    iname, PARAMBASE, lun_num);
-
-	/*
-	 * See if there's a backing store for this lun, which means LUNBASE
-	 * was just a symbolic link, and delete the backing store if we
-	 * created it in the first place.
-	 */
-	xml_fd = open(path, O_RDONLY);
-	if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL, 0)) !=
-	    NULL) {
-		node = NULL;
-		while (xmlTextReaderRead(r) == 1)
-			if (tgt_node_process(r, &node) == False)
-				break;
-		close(xml_fd);
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
-		xmlCleanupParser();
-
-		(void) tgt_find_value_str(node, XML_ELEMENT_BACK, &bs_path);
-		if ((tgt_find_value_boolean(node, XML_ELEMENT_DELETE_BACK,
-		    &bs_delete) == True) && (bs_delete == True))
-			unlink(bs_path);
-		if (bs_path != NULL)
-			free(bs_path);
-		tgt_node_free(node);
-	}
-
 	(void) unlink(path);
+
+	(void) mgmt_param_remove(tname, lun_num);
 
 	/*
 	 * If the was LUN 0 then do to the previous check
@@ -1674,11 +1623,38 @@ remove_target_common(char *name, int lun_num, char **msg)
 	/*
 	 * Not much we can do here if we fail to updated the config.
 	 */
-	if (update_config_targets(msg) == False)
+	if (mgmt_config_save2scf() == False)
 		syslog(LOG_ERR, "Failed to update target configuration!");
 
 error:
 	(void) pthread_mutex_unlock(&targ_config_mutex);
 	if (iname != NULL)
 		free(iname);
+}
+
+/*
+ * []----
+ * | get_local_name
+ * |
+ * | This function fetches local name from a iscsi-name
+ * | Caller is responsible to free the string.
+ * []----
+ */
+char *
+get_local_name(char *iname)
+{
+	tgt_node_t	*targ = NULL;
+	char		*str;
+	char		*ret = NULL;
+
+	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
+	    != NULL) {
+		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
+		    True) && (strcmp(str, iname) == 0)) {
+			free(str);
+			ret = strdup(targ->x_value);
+			break;
+		}
+	}
+	return (ret);
 }

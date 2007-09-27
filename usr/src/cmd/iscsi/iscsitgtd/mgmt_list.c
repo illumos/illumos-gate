@@ -45,11 +45,12 @@
 #include "iscsi_conn.h"
 #include "port.h"
 #include "errcode.h"
+#include "mgmt_scf.h"
 
-static char *list_targets(tgt_node_t *x, ucred_t *cred);
-static char *list_initiator(tgt_node_t *x, ucred_t *cred);
-static char *list_tpgt(tgt_node_t *x, ucred_t *cred);
-static char *list_admin(tgt_node_t *x, ucred_t *cred);
+static char *list_targets(tgt_node_t *x);
+static char *list_initiator(tgt_node_t *x);
+static char *list_tpgt(tgt_node_t *x);
+static char *list_admin(tgt_node_t *x);
 static void target_info(char **msg, char *targ_name, tgt_node_t *tnode);
 static void target_stat(char **msg, char *iname, mgmt_type_t type);
 
@@ -59,8 +60,8 @@ list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
     ucred_t *cred)
 {
 	tgt_node_t	*x;
-	char		msgbuf[80],
-			*reply_msg	= NULL;
+	char		msgbuf[80];
+	char		*reply_msg	= NULL;
 
 	if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
@@ -70,13 +71,13 @@ list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = list_targets(x, cred);
+			reply_msg = list_targets(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = list_initiator(x, cred);
+			reply_msg = list_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = list_tpgt(x, cred);
+			reply_msg = list_tpgt(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ADMIN) == 0) {
-			reply_msg = list_admin(x, cred);
+			reply_msg = list_admin(x);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for list element",
@@ -89,14 +90,14 @@ list_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 
 /*ARGSUSED*/
 static char *
-list_targets(tgt_node_t *x, ucred_t *cred)
+list_targets(tgt_node_t *x)
 {
-	char		*msg	= NULL,
-			*prop	= NULL,
-			*iname	= NULL;
+	char		*msg	= NULL;
+	char		*prop	= NULL;
+	char		*iname	= NULL;
 	tgt_node_t	*targ	= NULL;
-	Boolean_t	luninfo	= False,
-			dostat	= False;
+	Boolean_t	luninfo	= False;
+	Boolean_t	dostat	= False;
 
 	/*
 	 * It's okay to not supply a "name" element. That just means the
@@ -118,13 +119,13 @@ list_targets(tgt_node_t *x, ucred_t *cred)
 	    targ)) != NULL) {
 		if (targ->x_value == NULL) {
 			tgt_buf_add(&msg, XML_ELEMENT_TARG,
-				    "bogus entry");
+			    "bogus entry");
 			continue;
 		}
 		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
 		    False) {
 			tgt_buf_add(&msg, XML_ELEMENT_TARG,
-				    "missing iscsi-name");
+			    "missing iscsi-name");
 			continue;
 		}
 		if (prop != NULL) {
@@ -163,11 +164,11 @@ list_targets(tgt_node_t *x, ucred_t *cred)
 
 /*ARGSUSED*/
 static char *
-list_initiator(tgt_node_t *x, ucred_t *cred)
+list_initiator(tgt_node_t *x)
 {
-	char		*msg	= NULL,
-			*attr,
-			*prop	= NULL;
+	char		*msg	= NULL;
+	char		*attr	= NULL;
+	char		*prop	= NULL;
 	Boolean_t	verbose	= False;
 	tgt_node_t	*init	= NULL;
 
@@ -221,13 +222,13 @@ list_initiator(tgt_node_t *x, ucred_t *cred)
 
 /*ARGSUSED*/
 static char *
-list_tpgt(tgt_node_t *x, ucred_t *cred)
+list_tpgt(tgt_node_t *x)
 {
-	char		*msg	= NULL,
-			*prop	= NULL;
+	char		*msg	= NULL;
+	char		*prop	= NULL;
 	Boolean_t	verbose	= False;
-	tgt_node_t	*tpgt	= NULL,
-			*ip	= NULL;
+	tgt_node_t	*tpgt	= NULL;
+	tgt_node_t	*ip	= NULL;
 
 	/* ---- Optional arguments ---- */
 	if ((tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == True) &&
@@ -263,7 +264,7 @@ list_tpgt(tgt_node_t *x, ucred_t *cred)
 
 /*ARGSUSED*/
 static char *
-list_admin(tgt_node_t *x, ucred_t *cred)
+list_admin(tgt_node_t *x)
 {
 	char		*msg	= NULL;
 	admin_table_t	*p;
@@ -296,8 +297,8 @@ target_stat(char **msg, char *targ_name, mgmt_type_t type)
 	msg_t		*m;
 	target_queue_t	*q = queue_alloc();
 	mgmt_request_t	mgmt_rqst;
-	int		msg_sent,
-			i;
+	int		msg_sent;
+	int		i;
 	extern pthread_mutex_t	port_mutex;
 
 	mgmt_rqst.m_q		= q;
@@ -348,16 +349,14 @@ target_stat(char **msg, char *targ_name, mgmt_type_t type)
 static void
 target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 {
-	char			path[MAXPATHLEN],
-				lun_buf[16],
-				*prop;
-	xmlTextReaderPtr	r;
-	tgt_node_t		*lnode,	/* list node */
-				*lnp, /* list node pointer */
-				*lun,
-				*params;
-	int			xml_fd,
-				lun_num;
+	char			lun_buf[16];
+	char			*prop;
+	char			*local_name = NULL;
+	tgt_node_t		*lnode;	/* list node */
+	tgt_node_t		*lnp; /* list node pointer */
+	tgt_node_t		*lun;
+	tgt_node_t		*params;
+	int			lun_num;
 	Boolean_t		incore;
 
 	if ((lnode = tgt_node_next(tnode, XML_ELEMENT_ACLLIST, NULL)) !=
@@ -405,22 +404,11 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 		    False)
 			continue;
 		if (incore == False) {
-			(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
-			    target_basedir, targ_name, PARAMBASE, lun_num);
-			if ((xml_fd = open(path, O_RDONLY)) < 0)
-				continue;
-			if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd,
-			    NULL, NULL, 0)) == NULL)
-				continue;
-
-			params = NULL;
-			while (xmlTextReaderRead(r) == 1) {
-				if (tgt_node_process(r, &params) == False)
-					break;
+			local_name = get_local_name(targ_name);
+			if (local_name != NULL) {
+				mgmt_get_param(&params, local_name, lun_num);
+				free(local_name);
 			}
-			(void) close(xml_fd);
-			xmlTextReaderClose(r);
-			xmlFreeTextReader(r);
 		} else {
 			params = lun;
 		}

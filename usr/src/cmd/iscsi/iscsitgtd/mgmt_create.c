@@ -55,21 +55,22 @@
 #include "errcode.h"
 #include "t10_spc.h"
 #include "isns_client.h"
+#include "mgmt_scf.h"
 
 extern char *getfullrawname();
 
-static char *create_target(tgt_node_t *, ucred_t *);
-static char *create_initiator(tgt_node_t *, ucred_t *);
-static char *create_tpgt(tgt_node_t *, ucred_t *);
+static char *create_target(tgt_node_t *);
+static char *create_initiator(tgt_node_t *);
+static char *create_tpgt(tgt_node_t *);
 static char *create_zfs(tgt_node_t *, ucred_t *);
 static Boolean_t create_target_dir(char *targ_name, char *local_name);
 static char *create_node_name(char *local_nick, char *alias);
-static Boolean_t create_lun(char *targ_name, char *type, int lun,
-    char *size_str, char *backing, err_code_t *code);
-static Boolean_t create_lun_common(char *targ_name, int lun, uint64_t size,
-    err_code_t *code);
+static Boolean_t create_lun(char *targ_name, char *local_name, char *type,
+    int lun, char *size_str, char *backing, err_code_t *code);
+static Boolean_t create_lun_common(char *targ_name, char *local_name, int lun,
+    uint64_t size, err_code_t *code);
 static Boolean_t setup_disk_backing(err_code_t *code, char *path, char *backing,
-    FILE *fp, uint64_t *size);
+    tgt_node_t *n, uint64_t *size);
 static Boolean_t setup_raw_backing(err_code_t *code, char *path, char *backing,
     uint64_t *size);
 static void zfs_lun(tgt_node_t *l, uint64_t size, char *dataset);
@@ -90,7 +91,9 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 	char		msgbuf[80];
 	char		*reply_msg	= NULL;
 
-	if (p->x_child == NULL) {
+	if (check_auth_addremove(cred) != True) {
+		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
+	} else if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 	} else {
 		x = p->x_child;
@@ -98,11 +101,11 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = create_target(x, cred);
+			reply_msg = create_target(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = create_initiator(x, cred);
+			reply_msg = create_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = create_tpgt(x, cred);
+			reply_msg = create_tpgt(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
 			reply_msg = create_zfs(x, cred);
 		} else {
@@ -119,7 +122,7 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
  * create_target -- an administrative request to create a target
  */
 static char *
-create_target(tgt_node_t *x, ucred_t *cred)
+create_target(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
@@ -133,14 +136,6 @@ create_target(tgt_node_t *x, ucred_t *cred)
 	int		i;
 	tgt_node_t	*n, *c, *l;
 	err_code_t	code;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		goto error;
-	}
 
 	(void) tgt_find_value_str(x, XML_ELEMENT_BACK, &backing);
 	(void) tgt_find_value_str(x, XML_ELEMENT_ALIAS, &alias);
@@ -219,7 +214,7 @@ create_target(tgt_node_t *x, ucred_t *cred)
 	 * target. Checking to see if there's a duplicate LUN will be
 	 * done later.
 	 */
-	for (n = targets_config->x_child; n; n = n->x_sibling) {
+	for (n = main_config->x_child; n; n = n->x_sibling) {
 		if (strcmp(n->x_value, name) == 0)
 			break;
 	}
@@ -264,9 +259,9 @@ create_target(tgt_node_t *x, ucred_t *cred)
 		tgt_node_add(c, l);
 	}
 
-	if (create_lun(node_name, type, lun, size, backing, &code) == True) {
-
-		if (update_config_targets(&msg) == False)
+	if (create_lun(node_name, name, type, lun, size, backing, &code)
+	    == True) {
+		if (mgmt_config_save2scf() == False)
 			goto error;
 
 		/* Only isns register on the 1st creation of the target */
@@ -313,21 +308,13 @@ error:
 }
 
 static char *
-create_initiator(tgt_node_t *x, ucred_t *cred)
+create_initiator(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
 	char		*iscsi_name	= NULL;
 	tgt_node_t	*inode		= NULL;
 	tgt_node_t	*n, *c;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		goto error;
-	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -355,7 +342,7 @@ create_initiator(tgt_node_t *x, ucred_t *cred)
 	tgt_node_add(n, c);
 	tgt_node_add(main_config, n);
 
-	if (update_config_main(&msg) == True)
+	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
 
 error:
@@ -368,7 +355,7 @@ error:
 }
 
 static char *
-create_tpgt(tgt_node_t *x, ucred_t *cred)
+create_tpgt(tgt_node_t *x)
 {
 	char		*msg	= NULL;
 	char		*tpgt	= NULL;
@@ -376,14 +363,6 @@ create_tpgt(tgt_node_t *x, ucred_t *cred)
 	tgt_node_t	*tnode	= NULL;
 	tgt_node_t	*n;
 	int		tpgt_val;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		goto error;
-	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &tpgt) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -409,7 +388,7 @@ create_tpgt(tgt_node_t *x, ucred_t *cred)
 	n = tgt_node_alloc(XML_ELEMENT_TPGT, String, tpgt);
 	tgt_node_add(main_config, n);
 
-	if (update_config_main(&msg) == True)
+	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
 
 error:
@@ -464,16 +443,16 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
 	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
 	    ucred_geteuid(cred) != 0) {
-
 		/*
 		 * See if user has ZFS dataset permissions to do operation
 		 */
 		if (zfs_iscsi_perm_check(zh, dataset, cred) != 0) {
 			xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+			free(dataset);
+			libzfs_fini(zh);
 			goto error;
 		}
 	}
-
 
 	while ((dnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    dnode)) != NULL) {
@@ -770,10 +749,10 @@ create_target_dir(char *targ_name, char *local_name)
  * []----
  */
 static Boolean_t
-create_lun(char *targ_name, char *type, int lun, char *size_str, char *backing,
-    err_code_t *code)
+create_lun(char *targ_name, char *local_name, char *type, int lun,
+    char *size_str, char *backing, err_code_t *code)
 {
-	uint64_t	size;
+	uint64_t	size, ssize;
 	int		fd		= -1;
 	int		rpm		= DEFAULT_RPM;
 	int		heads		= DEFAULT_HEADS;
@@ -784,7 +763,8 @@ create_lun(char *targ_name, char *type, int lun, char *size_str, char *backing,
 	char		*vid		= DEFAULT_VID;
 	char		*pid		= DEFAULT_PID;
 	char		path[MAXPATHLEN];
-	FILE		*fp		= NULL;
+	tgt_node_t	*n		= NULL;
+	tgt_node_t	*pn		= NULL;
 
 	/*
 	 * after calling stroll_multipler it's an error for size to be
@@ -807,74 +787,78 @@ create_lun(char *targ_name, char *type, int lun, char *size_str, char *backing,
 	 * Make sure we're not trying to recreate an existing LU.
 	 */
 	(void) snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
-	    targ_name, PARAMBASE, lun);
+	    targ_name, LUNBASE, lun);
 	if (access(path, F_OK) == 0) {
 		*code = ERR_LUN_EXISTS;
 		return (False);
 	}
 
-	if ((fp = fopen(path, "w+")) == NULL) {
-		*code = ERR_OPEN_PARAM_FILE_FAILED;
-		return (False);
-	}
+	n = tgt_node_alloc(XML_ELEMENT_PARAMS, String, NULL);
 
-	(void) fprintf(fp, "<%s version='1.0'>\n", XML_ELEMENT_PARAMS);
-	(void) fprintf(fp, "\t<%s>0</%s>\n", XML_ELEMENT_GUID,
-	    XML_ELEMENT_GUID);
-	(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_PID, pid,
-	    XML_ELEMENT_PID);
-	(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_VID, vid,
-	    XML_ELEMENT_VID);
-	(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_DTYPE, type,
-	    XML_ELEMENT_DTYPE);
+	pn = tgt_node_alloc(XML_ELEMENT_VERS, String, "1.0");
+	tgt_node_add_attr(n, pn);
+
+	pn = tgt_node_alloc(XML_ELEMENT_GUID, String, "0");
+	tgt_node_add(n, pn);
+	pn = tgt_node_alloc(XML_ELEMENT_PID, String, pid);
+	tgt_node_add(n, pn);
+	pn = tgt_node_alloc(XML_ELEMENT_VID, String, vid);
+	tgt_node_add(n, pn);
+	pn = tgt_node_alloc(XML_ELEMENT_DTYPE, String, type);
+	tgt_node_add(n, pn);
 
 	if (strcmp(type, TGT_TYPE_DISK) == 0) {
 
 		(void) snprintf(path, sizeof (path), "%s/%s/lun.%d",
 		    target_basedir, targ_name, lun);
-		if (setup_disk_backing(code, path, backing, fp, &size) == False)
+		if (setup_disk_backing(code, path, backing, n, &size) == False)
 			goto error;
 
 		create_geom(size, &cylinders, &heads, &spt);
 
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_RPM, rpm,
-		    XML_ELEMENT_RPM);
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_HEADS, heads,
-		    XML_ELEMENT_HEADS);
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_CYLINDERS,
-		    cylinders, XML_ELEMENT_CYLINDERS);
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_SPT, spt,
-		    XML_ELEMENT_SPT);
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_BPS,
-		    bytes_sect, XML_ELEMENT_BPS);
-		(void) fprintf(fp, "\t<%s>%d</%s>\n", XML_ELEMENT_INTERLEAVE,
-		    interleave, XML_ELEMENT_INTERLEAVE);
-		(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_STATUS,
-		    TGT_STATUS_OFFLINE, XML_ELEMENT_STATUS);
+		pn = tgt_node_alloc(XML_ELEMENT_RPM, Int, &rpm);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_HEADS, Int, &heads);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_CYLINDERS, Int, &cylinders);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_SPT, Int, &spt);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_BPS, Int, &bytes_sect);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_INTERLEAVE, Int, &interleave);
+		tgt_node_add(n, pn);
+		pn = tgt_node_alloc(XML_ELEMENT_STATUS, String,
+		    TGT_STATUS_OFFLINE);
+		tgt_node_add(n, pn);
 
 	} else if (strcmp(type, TGT_TYPE_TAPE) == 0) {
 #ifndef	_LP64
 		*code = ERR_TAPE_NOT_SUPPORTED_IN_32BIT;
 		goto error;
 #else
-		(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_STATUS,
-		    TGT_STATUS_OFFLINE, XML_ELEMENT_STATUS);
+		pn = tgt_node_alloc(XML_ELEMENT_STATUS, String,
+		    TGT_STATUS_OFFLINE);
+		tgt_node_add(n, pn);
+
 		(void) snprintf(path, sizeof (path), "%s/%s/lun.%d",
 		    target_basedir, targ_name, lun);
-		if (setup_disk_backing(code, path, backing, fp, &size) == False)
+		if (setup_disk_backing(code, path, backing, n, &size) == False)
 			goto error;
 #endif
 
 	} else if (strcmp(type, TGT_TYPE_RAW) == 0) {
 
-		(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_STATUS,
-		    TGT_STATUS_ONLINE, XML_ELEMENT_STATUS);
+		pn = tgt_node_alloc(XML_ELEMENT_STATUS, String,
+		    TGT_STATUS_ONLINE);
+		tgt_node_add(n, pn);
+
 		backing = getfullrawname(backing);
 		if (setup_raw_backing(code, path, backing, &size) == False)
 			goto error;
 
-		(void) fprintf(fp, "\t<%s>false</%s>\n", XML_ELEMENT_MMAP_LUN,
-		    XML_ELEMENT_MMAP_LUN);
+		pn = tgt_node_alloc(XML_ELEMENT_MMAP_LUN, String, "false");
+		tgt_node_add(n, pn);
 
 		(void) snprintf(path, sizeof (path), "%s/%s/lun.%d",
 		    target_basedir, targ_name, lun);
@@ -898,34 +882,38 @@ create_lun(char *targ_name, char *type, int lun, char *size_str, char *backing,
 	 * Wait to set the size until here because it may be unknown until
 	 * the possible backing store has been setup.
 	 */
-	(void) fprintf(fp, "\t<%s>0x%llx</%s>\n", XML_ELEMENT_SIZE,
-	    size / 512LL, XML_ELEMENT_SIZE);
+	ssize = size / 512LL;
+	pn = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &ssize);
+	tgt_node_add(n, pn);
+
 	if (backing != NULL) {
-		(void) fprintf(fp, "\t<%s>%s</%s>\n", XML_ELEMENT_BACK,
-		    backing, XML_ELEMENT_BACK);
+		pn = tgt_node_alloc(XML_ELEMENT_BACK, String, backing);
+		tgt_node_add(n, pn);
 	}
 
-	(void) fprintf(fp, "</%s>\n", XML_ELEMENT_PARAMS);
-	(void) fclose(fp);
-	fp = NULL;
+	mgmt_param_save2scf(n, local_name, lun);
 
 	if ((strcmp(type, TGT_TYPE_DISK) == 0) ||
 	    (strcmp(type, TGT_TYPE_TAPE) == 0)) {
-		if (create_lun_common(targ_name, lun, size, code) == False)
+		if (create_lun_common(targ_name, local_name, lun, size,
+		    code) == False)
 			goto error;
 	}
+
+	tgt_node_free(n);
 
 	*code = ERR_SUCCESS;
 	return (True);
 
 error:
+	/* Free node n */
+	tgt_node_free(n);
+
 	(void) snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
 	    targ_name, PARAMBASE, lun);
 	(void) unlink(path);
 	if (fd == -1)
 		(void) close(fd);
-	if (fp != NULL)
-		(void) fclose(fp);
 	return (False);
 }
 
@@ -938,7 +926,8 @@ error:
  * []----
  */
 static Boolean_t
-create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
+create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
+    err_code_t *code)
 {
 	struct stat		s;
 	int			fd			= -1;
@@ -947,7 +936,6 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 	struct statvfs		fs;
 	tgt_node_t		*node			= NULL;
 	tgt_node_t		*c;
-	xmlTextReaderPtr	r;
 
 	/*
 	 * Touch the last block of the file which will cause file systems
@@ -1040,34 +1028,19 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 			queue_message_free(queue_message_get(tp->q));
 		}
 	} else {
+		mgmt_get_param(&node, local_name, lun);
 
-		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
-		    target_basedir, targ_name, PARAMBASE, lun);
-		if (r = (xmlTextReaderPtr)xmlReaderForFile(path, NULL, 0)) {
-			while (xmlTextReaderRead(r) == 1)
-				if (tgt_node_process(r, &node) == False)
-					break;
-			c = tgt_node_alloc(XML_ELEMENT_STATUS, String,
-			    TGT_STATUS_ONLINE);
-			tgt_node_replace(node, c, MatchName);
-			tgt_node_free(c);
-			if (tgt_dump2file(node, path) == False) {
-				queue_prt(mgmtq, Q_STE_ERRS,
-				    "GEN%d  failed to dump out params", lun);
-				goto error;
-			}
-			tgt_node_free(node);
-			xmlTextReaderClose(r);
-			xmlFreeTextReader(r);
-			xmlCleanupParser();
+		c = tgt_node_alloc(XML_ELEMENT_STATUS, String,
+		    TGT_STATUS_ONLINE);
+		tgt_node_replace(node, c, MatchName);
+		tgt_node_free(c);
 
-			/*
-			 * The thick_provo_start will issue an inventory
-			 * change once it's finished.
-			 */
-			iscsi_inventory_change(targ_name);
-		} else
-			return (False);
+		if (mgmt_param_save2scf(node, local_name, lun) == False) {
+			queue_prt(mgmtq, Q_STE_ERRS,
+			    "GEN%d  failed to dump out params", lun);
+			goto error;
+		}
+		iscsi_inventory_change(targ_name);
 	}
 
 	return (True);
@@ -1108,7 +1081,7 @@ readefi(int fd, struct dk_gpt **efi, int *slice)
  * []----
  */
 static Boolean_t
-setup_disk_backing(err_code_t *code, char *path, char *backing, FILE *fp,
+setup_disk_backing(err_code_t *code, char *path, char *backing, tgt_node_t *n,
     uint64_t *size)
 {
 	struct stat	s;
@@ -1116,6 +1089,7 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, FILE *fp,
 	struct vtoc	vtoc;
 	struct dk_gpt	*efi;
 	int		slice, fd;
+	tgt_node_t	*pn;
 
 	/*
 	 * Error checking regarding size and backing store has already
@@ -1130,8 +1104,9 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, FILE *fp,
 			*code = ERR_STAT_BACKING_FAILED;
 			return (False);
 		} else {
-			(void) fprintf(fp, "\t<%s>true</%s>\n",
-			    XML_ELEMENT_DELETE_BACK, XML_ELEMENT_DELETE_BACK);
+			pn = tgt_node_alloc(XML_ELEMENT_DELETE_BACK, String,
+			    "true");
+			tgt_node_add(n, pn);
 			if ((fd = open(backing, O_RDWR|O_CREAT|O_LARGEFILE,
 			    0600)) < 0) {
 				*code = ERR_FAILED_TO_CREATE_LU;

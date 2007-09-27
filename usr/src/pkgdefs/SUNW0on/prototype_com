@@ -258,6 +258,7 @@ f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIPsec.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueIscsitgt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueMDNS.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNWAM.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin

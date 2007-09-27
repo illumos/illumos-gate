@@ -35,7 +35,7 @@ COBJS	+= iscsi_authclient.o iscsi_authglue.o iscsi_cmd.o iscsi_conn.o
 COBJS	+= iscsi_crc.o iscsi_ffp.o iscsi_login.o iscsi_sess.o radius.o
 COBJS	+= t10_sam.o t10_spc.o t10_sbc.o t10_raw_if.o t10_ssc.o t10_osd.o
 COBJS	+= t10_spc_pr.o util.o util_err.o util_ifname.o util_port.o util_queue.o
-COBJS	+= isns_client.o isns.o
+COBJS	+= isns_client.o isns.o mgmt_scf.o
 OBJS=	$(COBJS) $(DSRC:%.d=%.o)
 SRCS=	$(COBJS:%.o=../%.c) $(COMMON_SRCS)
 
@@ -63,7 +63,7 @@ CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 all: $(PROG)
 
 LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
-LDLIBS  +=	-liscsitgt -lzfs -ldlpi
+LDLIBS  += -liscsitgt -lzfs -ldlpi -lsecdb -lscf -lsasl
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)

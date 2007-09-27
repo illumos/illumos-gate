@@ -59,6 +59,7 @@
 #include "t10.h"
 #include "t10_spc.h"
 #include "utility.h"
+#include "mgmt_scf.h"
 
 /*
  * []------------------------------------------------------------------[]
@@ -826,6 +827,7 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 	msg_t			*m		= NULL;
 	target_queue_t		*rq		= NULL;
 	char			path[MAXPATHLEN];
+	char			*local_name;
 	tgt_node_t		*n1;
 	Boolean_t		rval		= False;
 	struct statvfs		fs;
@@ -952,13 +954,13 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 			goto error;
 		}
 
-		if (tgt_dump2file(cmd->c_lu->l_common->l_root, path) ==
-		    False) {
-			queue_prt(mgmtq, Q_STE_ERRS,
-			    "STE%x  failed to dump out params\n", lun);
+		local_name = get_local_name(cmd->c_lu->l_targ->s_targ_base);
+		if (local_name == NULL)
 			goto error;
-		}
 
+		mgmt_param_save2scf(cmd->c_lu->l_common->l_root, local_name,
+		    lun);
+		free(local_name);
 		queue_message_set(cmd->c_lu->l_common->l_from_transports, 0,
 		    msg_lu_online, 0);
 	}
@@ -1320,6 +1322,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	char			*guid		= NULL;
 	char			*str;
 	char			*dataset	= NULL;
+	char			*local_name	= NULL;
 	t10_lu_common_t		lc;
 	t10_lu_common_t		*common		= NULL;
 	tgt_node_t		*n		= NULL;
@@ -1379,10 +1382,12 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	l->l_targ_lun		= lun;
 
 	targ = NULL;
+
 	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
 	    != NULL) {
 		if ((tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
 		    True) && (strcmp(str, t->s_targ_base) == 0)) {
+			local_name = strdup(targ->x_value);
 			free(str);
 			break;
 		} else if (str) {
@@ -1390,6 +1395,8 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 			str = NULL;
 		}
 	}
+	if (local_name == NULL)
+		goto error;
 
 	if ((ll = tgt_node_next(targ, XML_ELEMENT_LUNLIST, NULL)) == NULL)
 		goto error;
@@ -1410,6 +1417,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * Set the targ variable back to NULL to indicate that
 		 * we don't have an incore copy of the information.
 		 * If the guid is currently 0, we'll update that value
+		 * If the guid is currently 0, we'll update that value
 		 * and update the ZFS property if targ is not NULL.
 		 * Otherwise will update parameter file.
 		 */
@@ -1420,40 +1428,8 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * for this LUN. That's the only parsing this section of code
 		 * will do to the params file.
 		 */
-		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
-		    target_basedir, t->s_targ_base, PARAMBASE, lun);
 
-		(void) pthread_mutex_lock(&lu_list_mutex);
-		if ((xml_fd = open(path, O_RDONLY)) < 0) {
-			(void) pthread_mutex_unlock(&lu_list_mutex);
-			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
-			/* ---- ACCESS DENIED - INVALID LU IDENTIFIER ---- */
-			spc_sense_ascq(cmd, 0x20, 0x9);
-			goto error;
-		}
-		n = NULL;
-		if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
-		    0)) != NULL) {
-			while (xmlTextReaderRead(r) == 1)
-				if (tgt_node_process(r, &n) == False)
-					break;
-		} else {
-			(void) pthread_mutex_unlock(&lu_list_mutex);
-			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
-			goto error;
-		}
-
-		(void) close(xml_fd);
-		/*
-		 * Set xml_fd back to -1 so that if an error occurs later we
-		 * don't attempt to close a file descriptor that another thread
-		 * might have opened.
-		 */
-		xml_fd = -1;
-
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
-		r = NULL;
+		mgmt_get_param(&n, local_name, lun);
 		okay_to_free = True;
 
 		if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
@@ -1512,7 +1488,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 			dataset = NULL;
 			str = NULL;
 
-		} else if (tgt_dump2file(n, path) == False) {
+		} else if (mgmt_param_save2scf(n, local_name, lun) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
@@ -1630,6 +1606,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 	queue_message_set(common->l_from_transports, 0, msg_lu_add, (void *)l);
 
 	free(guid);
+	free(local_name);
 
 	cmd->c_lu = l;
 	return (True);

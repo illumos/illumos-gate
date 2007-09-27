@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,8 +71,6 @@ void connection_parameters_default(iscsi_conn_t *c);
 int sna_lt(uint32_t n1, uint32_t n2);
 int sna_lte(uint32_t n1, uint32_t n2);
 void xml_rtn_msg(char **buf, err_code_t code);
-Boolean_t update_config_targets(char **msg);
-Boolean_t update_config_main(char **msg);
 Boolean_t add_target_alias(iscsi_conn_t *c, char **text, int *test_length);
 Boolean_t validate_version(tgt_node_t *node, int *maj, int *min);
 char *create_tpgt_list(char *tname);
@@ -86,6 +84,7 @@ void thick_provo_stop(char *targ, int lun);
 void *thick_provo_start(void *v);
 Boolean_t thick_provo_chk_thr(char *targ, int lun);
 void remove_target_common(char *name, int lun, char **msg);
+char *get_local_name(char *iname);
 
 
 #ifdef __cplusplus

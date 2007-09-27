@@ -46,10 +46,11 @@
 #include "iscsi_cmd.h"
 #include "errcode.h"
 #include "isns_client.h"
+#include "mgmt_scf.h"
 
-static char *remove_target(tgt_node_t *x, ucred_t *cred);
-static char *remove_initiator(tgt_node_t *x, ucred_t *cred);
-static char *remove_tpgt(tgt_node_t *x, ucred_t *cred);
+static char *remove_target(tgt_node_t *x);
+static char *remove_initiator(tgt_node_t *x);
+static char *remove_tpgt(tgt_node_t *x);
 static char *remove_zfs(tgt_node_t *x, ucred_t *cred);
 
 
@@ -62,7 +63,9 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 	char		msgbuf[80];
 	char		*reply_msg	= NULL;
 
-	if (p->x_child == NULL) {
+	if (check_auth_addremove(cred) != True) {
+		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
+	} else if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 	} else {
 		x = p->x_child;
@@ -70,11 +73,11 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = remove_target(x, cred);
+			reply_msg = remove_target(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = remove_initiator(x, cred);
+			reply_msg = remove_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = remove_tpgt(x, cred);
+			reply_msg = remove_tpgt(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
 			reply_msg = remove_zfs(x, cred);
 		} else {
@@ -96,8 +99,8 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 	char		*prop;
 	char		*msg		= NULL;
 	tgt_node_t		*targ = NULL;
-	const priv_set_t	*eset;
 	libzfs_handle_t		*zh = NULL;
+	const priv_set_t	*eset;
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -168,7 +171,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 }
 
 static char *
-remove_target(tgt_node_t *x, ucred_t *cred)
+remove_target(tgt_node_t *x)
 {
 	char		*msg			= NULL;
 	char		*prop			= NULL;
@@ -177,15 +180,6 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 	tgt_node_t	*c			= NULL;
 	Boolean_t	change_made		= False;
 	int		lun_num;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
-
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -289,7 +283,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (change_made == True) {
-		if (update_config_targets(&msg) == True)
+		if (mgmt_config_save2scf() == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
@@ -306,20 +300,11 @@ error:
 }
 
 static char *
-remove_initiator(tgt_node_t *x, ucred_t *cred)
+remove_initiator(tgt_node_t *x)
 {
 	char		*msg	= NULL;
 	char		*name;
 	tgt_node_t	*node	= NULL;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
-
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -341,29 +326,20 @@ remove_initiator(tgt_node_t *x, ucred_t *cred)
 	}
 	(void) tgt_node_remove(main_config, node, MatchBoth);
 
-	if (update_config_main(&msg) == True)
+	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
 
 	return (msg);
 }
 
 static char *
-remove_tpgt(tgt_node_t *x, ucred_t *cred)
+remove_tpgt(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*prop		= NULL;
 	tgt_node_t	*node		= NULL;
 	tgt_node_t	*c		= NULL;
 	Boolean_t	change_made	= False;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
-
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -403,7 +379,7 @@ remove_tpgt(tgt_node_t *x, ucred_t *cred)
 		/* Isns re-register all target */
 		if (isns_enabled() == True)
 			isns_reg_all();
-		if (update_config_main(&msg) == True)
+		if (mgmt_config_save2scf() == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,8 +61,9 @@ static void buf_add_str(char **b, char *str);
 void
 tgt_node_free(tgt_node_t *n)
 {
-	tgt_node_t	*c,
-			*c1;
+	tgt_node_t	*c;
+	tgt_node_t	*c1;
+
 	if (n == NULL)
 		return;
 	for (c = n->x_child; c; ) {
@@ -110,7 +111,7 @@ xml_update_config(tgt_node_t *t, int depth, FILE *output)
 		(void) fprintf(output, "    ");
 	if (strcmp(t->x_name, XML_COMMENT_STR) == 0) {
 		(void) fprintf(output, "<%s%s%s>\n", XML_COMMENT_STR,
-			t->x_value, XML_COMMENT_END);
+		    t->x_value, XML_COMMENT_END);
 		return;
 	}
 	if ((t->x_child == NULL) && (t->x_value != NULL) &&
@@ -196,12 +197,12 @@ char *common_attr_list[] = {
 Boolean_t
 tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node)
 {
-	const xmlChar	*name,
-			*value;
+	const xmlChar	*name;
+	const xmlChar	*value;
 	char		**ap;
 	xmlElementType	node_type;
-	tgt_node_t	*n,
-			*an;
+	tgt_node_t	*n;
+	tgt_node_t	*an;
 
 	n = *node;
 	if (n == NULL) {
@@ -347,8 +348,8 @@ tgt_find_value_int(tgt_node_t *n, char *name, int *value)
 Boolean_t
 tgt_find_value_intchk(tgt_node_t *n, char *name, int *value)
 {
-	char		*str,
-			chk[32];
+	char		*str;
+	char		chk[32];
 	Boolean_t	rval;
 
 	if (tgt_find_value_str(n, name, &str) == True) {
@@ -408,8 +409,8 @@ tgt_find_value_boolean(tgt_node_t *n, char *name, Boolean_t *value)
 tgt_node_t *
 tgt_node_next(tgt_node_t *n, char *name, tgt_node_t *cur)
 {
-	tgt_node_t	*x,
-			*p;
+	tgt_node_t	*x;
+	tgt_node_t	*p;
 
 	if (n == NULL)
 		return (NULL);
@@ -515,7 +516,7 @@ tgt_node_alloc(char *name, xml_val_type_t type, void *value)
 			    (char *)value);
 			break;
 		case Int:
-			(void) snprintf(value_str, value_len, "0x%x",
+			(void) snprintf(value_str, value_len, "%d",
 			    *(int *)value);
 			break;
 		case Uint64:
@@ -575,8 +576,8 @@ tgt_xml_decode(char *buf, uint8_t **ip, size_t *ip_size)
 Boolean_t
 tgt_node_remove(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 {
-	tgt_node_t	*s,
-			*c	= NULL;
+	tgt_node_t	*s;
+	tgt_node_t	*c	= NULL;
 
 	if ((parent == NULL) || (child == NULL))
 		return (False);
@@ -589,7 +590,7 @@ tgt_node_remove(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 		 */
 		if ((strcmp(s->x_name, child->x_name) == 0) &&
 		    ((m == MatchName) || (strcmp(s->x_value,
-			child->x_value) == 0))) {
+		    child->x_value) == 0))) {
 
 			if (parent->x_child == s) {
 				parent->x_child = s->x_sibling;
@@ -609,8 +610,8 @@ tgt_node_remove(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 void
 tgt_node_replace(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 {
-	tgt_node_t	*s,
-			*c;
+	tgt_node_t	*s;
+	tgt_node_t	*c;
 
 	if ((parent == NULL) || (child == NULL))
 		return;
@@ -623,7 +624,7 @@ tgt_node_replace(tgt_node_t *parent, tgt_node_t *child, match_type_t m)
 		 */
 		if ((strcmp(s->x_name, child->x_name) == 0) &&
 		    ((m == MatchName) || (strcmp(s->x_value,
-			child->x_value) == 0))) {
+		    child->x_value) == 0))) {
 
 			/*
 			 * We have a match. Now save the values of the new
@@ -677,8 +678,8 @@ tgt_node_find(tgt_node_t *n, char *name)
 tgt_node_t *
 tgt_node_dup(tgt_node_t *n)
 {
-	tgt_node_t	*d = node_alloc(),
-			*c;
+	tgt_node_t	*d = node_alloc();
+	tgt_node_t	*c;
 
 	if (d == NULL)
 		return (NULL);
@@ -835,8 +836,8 @@ node_child(tgt_node_t *x)
 static tgt_node_t *
 node_alloc_attr(tgt_node_t *x)
 {
-	tgt_node_t	*n,
-			*next;
+	tgt_node_t	*n;
+	tgt_node_t	*next;
 
 	n = node_alloc();
 	if (x->x_attr == NULL) {
@@ -854,8 +855,8 @@ node_alloc_attr(tgt_node_t *x)
 static void
 buf_add_str(char **b, char *str)
 {
-	int	len,
-		olen	= 0;
+	int	len;
+	int	olen	= 0;
 	char	*p = *b;
 
 	/*
@@ -907,8 +908,8 @@ static void
 buf_add_comment(char **b, char *comment)
 {
 	char	*p	= *b;
-	int	len,
-		olen;
+	int	len;
+	int	olen;
 
 	if (comment == NULL)
 		return;
@@ -933,8 +934,8 @@ buf_add_comment(char **b, char *comment)
 static char *
 strip_space(char *value)
 {
-	char	*p,
-		*n;
+	char	*p;
+	char	*n;
 
 	for (p = value; p && *p; p++)
 		if (!isspace(*p))

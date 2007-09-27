@@ -39,7 +39,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <libzfs.h>
-#include <priv.h>
 #include <libgen.h>
 
 #include <iscsitgt_impl.h>
@@ -49,12 +48,13 @@
 #include "target.h"
 #include "errcode.h"
 #include "isns_client.h"
+#include "mgmt_scf.h"
 
-static char *modify_target(tgt_node_t *x, ucred_t *cred);
-static char *modify_initiator(tgt_node_t *x, ucred_t *cred);
-static char *modify_admin(tgt_node_t *x, ucred_t *cred);
-static char *modify_tpgt(tgt_node_t *x, ucred_t *cred);
-static char *modify_zfs(tgt_node_t *x, ucred_t *cred);
+static char *modify_target(tgt_node_t *x);
+static char *modify_initiator(tgt_node_t *x);
+static char *modify_admin(tgt_node_t *x);
+static char *modify_tpgt(tgt_node_t *x);
+static char *modify_zfs(tgt_node_t *x);
 static Boolean_t modify_element(char *, char *, tgt_node_t *, match_type_t);
 
 /*
@@ -70,24 +70,25 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 	tgt_node_t	*x;
 	char		*reply_msg	= NULL;
 
-	if (p->x_child == NULL) {
+	if (check_auth_modify(cred) != True) {
+		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
+	} else if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
-
 	} else {
 		x = p->x_child;
 
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
-			reply_msg = modify_target(x, cred);
+			reply_msg = modify_target(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_INIT) == 0) {
-			reply_msg = modify_initiator(x, cred);
+			reply_msg = modify_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ADMIN) == 0) {
-			reply_msg = modify_admin(x, cred);
+			reply_msg = modify_admin(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
-			reply_msg = modify_tpgt(x, cred);
+			reply_msg = modify_tpgt(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-			reply_msg = modify_zfs(x, cred);
+			reply_msg = modify_zfs(x);
 		} else {
 			xml_rtn_msg(&reply_msg, ERR_INVALID_OBJECT);
 		}
@@ -101,11 +102,12 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
  * []----
  */
 static char *
-modify_target(tgt_node_t *x, ucred_t *cred)
+modify_target(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
 	char		iscsi_path[MAXPATHLEN];
+	char		targ_name[64];
 	char		*iscsi		= NULL;
 	char		*prop		= NULL;
 	char		path[MAXPATHLEN];
@@ -118,19 +120,10 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	tgt_node_t	*tpgt		= NULL;
 	Boolean_t	change_made	= False;
 	int		lun		= 0;
-	int		fd, xml_fd;
+	int		fd;
 	uint64_t	val, new_lu_size, cur_lu_size;
 	struct stat	st;
-	xmlTextReaderPtr	r;
-	const priv_set_t	*eset;
 	uint32_t		isns_mods	= 0;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -156,6 +149,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	iscsi = basename(iscsi_path);
 
 	/* ---- Finished with these so go ahead and release the memory ---- */
+	strncpy(targ_name, name, sizeof (targ_name));
 	free(name);
 
 	if (t == NULL) {
@@ -193,26 +187,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
 		/* ---- read in current parameters ---- */
-		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
-		    iscsi, PARAMBASE, lun);
-		if ((xml_fd = open(path, O_RDONLY)) < 0) {
-			xml_rtn_msg(&msg, ERR_OPEN_PARAM_FILE_FAILED);
-			return (msg);
-		}
-		if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
-		    0)) != NULL) {
-			node = NULL;
-			while (xmlTextReaderRead(r) == 1)
-				if (tgt_node_process(r, &node) == False)
-					break;
-		} else {
-			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
-			return (msg);
-		}
-
-		(void) close(xml_fd);
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
+		mgmt_get_param(&node, targ_name, lun);
 
 		/* ---- validate that we're indeed growing the LU ---- */
 		if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
@@ -268,12 +243,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		tgt_node_free(c);
 
 		/* ---- now update params file ---- */
-		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
-		    iscsi, PARAMBASE, lun);
-		if (tgt_dump2file(node, path) == False) {
-			xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
-			return (msg);
-		}
+		mgmt_param_save2scf(node, targ_name, lun);
 
 		/* ---- grow lu backing store ---- */
 		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
@@ -324,6 +294,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			    != NULL) {
 				isns_mods |= ISNS_MOD_TPGT;
 				break;
+			} else {
+				xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
+				return (msg);
 			}
 		}
 
@@ -438,7 +411,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (change_made == True) {
-		if (update_config_targets(&msg) == False) {
+		if (mgmt_config_save2scf() == False) {
 			xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
 			return (msg);
 		}
@@ -462,21 +435,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
  * []----
  */
 static char *
-modify_initiator(tgt_node_t *x, ucred_t *cred)
+modify_initiator(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
 	char		*prop		= NULL;
 	tgt_node_t	*inode		= NULL;
 	Boolean_t	changes_made	= False;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -532,7 +497,7 @@ modify_initiator(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (changes_made == True) {
-		if (update_config_main(&msg) == True)
+		if (mgmt_config_save2scf() == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
@@ -547,20 +512,12 @@ modify_initiator(tgt_node_t *x, ucred_t *cred)
  * []----
  */
 static char *
-modify_admin(tgt_node_t *x, ucred_t *cred)
+modify_admin(tgt_node_t *x)
 {
 	char		*msg	= NULL;
 	char		*prop;
 	Boolean_t	changes_made = False;
 	admin_table_t	*ap;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
 
 	for (ap = admin_prop_list; ap->name; ap++) {
 		if (tgt_find_value_str(x, ap->name, &prop) == True) {
@@ -592,7 +549,7 @@ modify_admin(tgt_node_t *x, ucred_t *cred)
 			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
 			return (msg);
 		}
-		if (update_config_main(&msg) == True)
+		if (mgmt_config_save2scf() == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
@@ -607,21 +564,13 @@ modify_admin(tgt_node_t *x, ucred_t *cred)
  * []----
  */
 static char *
-modify_tpgt(tgt_node_t *x, ucred_t *cred)
+modify_tpgt(tgt_node_t *x)
 {
 	struct addrinfo	*res	= NULL;
 	char		*msg	= NULL;
 	char		*name	= NULL;
 	char		*ip_str	= NULL;
 	tgt_node_t	*tnode	= NULL;
-	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
@@ -650,7 +599,7 @@ modify_tpgt(tgt_node_t *x, ucred_t *cred)
 		return (msg);
 	}
 
-	if (update_config_main(&msg) == True)
+	if (mgmt_config_save2scf() == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
 
 	/*
@@ -677,7 +626,7 @@ error:
  */
 /*ARGSUSED*/
 static char *
-modify_zfs(tgt_node_t *x, ucred_t *cred)
+modify_zfs(tgt_node_t *x)
 {
 	char		*msg		= NULL;
 	char		*prop		= NULL;
@@ -740,9 +689,10 @@ modify_element(char *name, char *value, tgt_node_t *p, match_type_t m)
 {
 	tgt_node_t	*c;
 
-	if ((c = tgt_node_alloc(name, String, value)) == NULL)
+
+	if ((c = tgt_node_alloc(name, String, value)) == NULL) {
 		return (False);
-	else {
+	} else {
 		tgt_node_replace(p, c, m);
 		tgt_node_free(c);
 		return (True);
@@ -804,10 +754,6 @@ update_basedir(char *name, char *prop)
 		target_basedir = strdup(prop);
 		if ((mkdir(target_basedir, 0700) != 0) && (errno != EEXIST)) {
 			xml_rtn_msg(&msg, ERR_CREATE_TARGET_DIR_FAILED);
-		} else {
-			if (process_target_config() == False) {
-				xml_rtn_msg(&msg, ERR_CREATE_TARGET_DIR_FAILED);
-			}
 		}
 	} else {
 		xml_rtn_msg(&msg, ERR_VALID_TARG_EXIST);

@@ -57,7 +57,6 @@
 #include <sys/select.h>
 #include <iscsitgt_impl.h>
 #include <umem.h>
-#include <priv.h>
 
 #include "queue.h"
 #include "port.h"
@@ -67,6 +66,7 @@
 #include "iscsi_ffp.h"
 #include "errcode.h"
 #include "t10.h"
+#include "mgmt_scf.h"
 
 #include "isns_client.h"
 
@@ -150,149 +150,6 @@ cmd_table_t cmd_table[] = {
 
 /*
  * []----
- * | process_target_config -- Load up the targets into memory
- * []----
- */
-Boolean_t
-process_target_config()
-{
-	xmlTextReaderPtr	r			= NULL;
-	char			path[MAXPATHLEN];
-	char			*target			= NULL;
-	struct stat		ss;
-	tgt_node_t		*node			= NULL;
-	tgt_node_t		*next			= NULL;
-	int			xml_fd			= -1;
-
-	if (target_basedir != NULL) {
-		if (access(target_basedir, R_OK) != 0) {
-
-			/*
-			 * The target base directory has been set, but no
-			 * longer exists which means someone has removed it
-			 * behind our back. Obviously something bad has
-			 * occurred, but we should attempt to start anyway and
-			 * do so with an empty configuration.
-			 */
-			r = (xmlTextReaderPtr)xmlReaderForMemory(EMPTY_CONFIG,
-			    strlen(EMPTY_CONFIG), NULL, NULL, 0);
-			syslog(LOG_WARNING,
-			    "Previous target directory (%s) has been removed",
-			    target_basedir);
-
-		} else {
-
-			(void) snprintf(path, MAXPATHLEN, "%s/%s",
-			    target_basedir, "config.xml");
-			if (access(path, R_OK) != 0) {
-
-				/*
-				 * No existing configuration, but we have
-				 * the target directory so attempt to create
-				 * an empty configuration file.
-				 * If the open or write fail there's a
-				 * serious problem which needs attention.
-				 */
-				if ((xml_fd = open(path,
-				    O_RDWR | O_CREAT, 0600)) < 0) {
-
-					syslog(LOG_ERR,
-					    "Can not create empty "
-					    "configuration file in %s",
-					    target_basedir);
-					return (False);
-				}
-
-				if (write(xml_fd, EMPTY_CONFIG,
-				    strlen(EMPTY_CONFIG)) !=
-				    strlen(EMPTY_CONFIG)) {
-					syslog(LOG_ERR, "Failed to write empty "
-					    "configuration file in %s", path);
-					return (False);
-				}
-
-				(void) close(xml_fd);
-			}
-
-			if ((xml_fd = open(path, O_RDONLY)) >= 0)
-				r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd,
-				    NULL, NULL, 0);
-		}
-	} else {
-		r = (xmlTextReaderPtr)xmlReaderForMemory(EMPTY_CONFIG,
-		    strlen(EMPTY_CONFIG), NULL, NULL, 0);
-	}
-
-	if (r != NULL) {
-		while (xmlTextReaderRead(r) == 1) {
-			if (tgt_node_process(r, &node) == False)
-				break;
-		}
-
-		/*
-		 * Validate the configuration file has the appropriate
-		 * version number.
-		 */
-		targets_vers_maj = XML_VERS_TARG_MAJ;
-		targets_vers_min = XML_VERS_TARG_MIN;
-		if (validate_version(node, &targets_vers_maj,
-		    &targets_vers_min) == False) {
-			syslog(LOG_ERR, "Target config(%s/config.xml) invalid",
-			    target_basedir);
-			return (False);
-		}
-
-		while ((next = tgt_node_next(node, XML_ELEMENT_TARG,
-		    next)) != NULL) {
-			if (tgt_find_value_str(next, XML_ELEMENT_INAME,
-			    &target) == False) {
-				continue;
-			}
-			(void) snprintf(path, MAXPATHLEN, "%s/%s",
-			    target_basedir, target);
-			if (stat(path, &ss) < 0) {
-				continue;
-			}
-			if ((ss.st_mode & S_IFDIR) == 0) {
-				continue;
-			}
-			free(target);
-		}
-		if (xml_fd != -1)
-			(void) close(xml_fd);
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
-		xmlCleanupParser();
-
-		/*
-		 * It's possible that nodes exist, these would be ZFS nodes.
-		 * We to move them to the new configuration tree.
-		 */
-		if (targets_config) {
-			next = NULL;
-			while ((next = tgt_node_next(targets_config,
-			    XML_ELEMENT_TARG, next)) != NULL) {
-				tgt_node_add(node, tgt_node_dup(next));
-			}
-
-			tgt_node_free(targets_config);
-		}
-		targets_config = node;
-		return (True);
-	} else {
-
-		if (xml_fd != -1)
-			(void) close(xml_fd);
-		/*
-		 * NOTE: Look at sending a syslog message or maybe
-		 * something to FMA.
-		 */
-		return (False);
-	}
-}
-
-/*
- * []----
  * | process_config -- parse the main configuration file
  * |
  * | Everything in the configuratin file is optional. That's because
@@ -301,95 +158,62 @@ process_target_config()
  * []----
  */
 static Boolean_t
-process_config(char *file)
+process_config()
 {
-	xmlTextReaderPtr	r;
-	int			ret;
-	int			xml_fd		= -1;
 	tgt_node_t		*node = NULL;
 
 #ifndef lint
 	LIBXML_TEST_VERSION;
 #endif
 
-	if (access(file, R_OK) != 0) {
-		if ((xml_fd = open(file, O_RDWR | O_CREAT, 0600)) < 0)
-			return (False);
-		if (write(xml_fd, EMPTY_CONFIG, strlen(EMPTY_CONFIG)) !=
-		    strlen(EMPTY_CONFIG))
-			return (False);
-		(void) close(xml_fd);
-	}
-
-	if ((xml_fd = open(file, O_RDONLY)) >= 0)
-		r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL, 0);
-
-	if (r != NULL) {
-		ret = xmlTextReaderRead(r);
-		while (ret == 1) {
-			if (tgt_node_process(r, &node) == False) {
-				break;
-			}
-			ret = xmlTextReaderRead(r);
-		}
-
-		/*
-		 * Validate the configuration file has the appropriate
-		 * version number.
-		 */
-		main_vers_maj = XML_VERS_MAIN_MAJ;
-		main_vers_min = XML_VERS_MAIN_MIN;
-		if (validate_version(node, &main_vers_maj, &main_vers_min) ==
-		    False) {
-			syslog(LOG_ERR, "Target main config invalid");
-			return (False);
-		}
-
-		/*
-		 * The base directory is optional in the sense that the daemon
-		 * can start without it, but the daemon can't really do
-		 * anything until the administrator sets the value.
-		 */
-		(void) tgt_find_value_str(node, XML_ELEMENT_BASEDIR,
-		    &target_basedir);
-
-		/*
-		 * These are optional settings for the target. Each of
-		 * these has a default value which can be overwritten in
-		 * the configuration file.
-		 */
-		(void) tgt_find_value_str(node, XML_ELEMENT_TARGLOG,
-		    &target_log);
-		(void) tgt_find_value_int(node, XML_ELEMENT_ISCSIPORT,
-		    &iscsi_port);
-		(void) tgt_find_value_int(node, XML_ELEMENT_DBGLVL, &dbg_lvl);
-		(void) tgt_find_value_boolean(node, XML_ELEMENT_ENFORCE,
-		    &enforce_strict_guid);
-		(void) tgt_find_value_boolean(node, XML_ELEMENT_THIN_PROVO,
-		    &thin_provisioning);
-		(void) tgt_find_value_boolean(node, XML_ELEMENT_DISABLE_TPGS,
-		    &disable_tpgs);
-		(void) tgt_find_value_boolean(node, XML_ELEMENT_TIMESTAMPS,
-		    &dbg_timestamps);
-		(void) tgt_find_value_boolean(node, XML_ELEMENT_PGR_PERSIST,
-		    &pgr_persist);
-		if (tgt_find_value_int(node, XML_ELEMENT_LOGLVL,
-		    &qlog_lvl) == True)
-			queue_log(True);
-
-		main_config = node;
-		if (xml_fd != -1)
-			(void) close(xml_fd);
-		xmlTextReaderClose(r);
-		xmlFreeTextReader(r);
-		xmlCleanupParser();
-
-		return (True);
-	} else {
-		if (xml_fd != -1)
-			(void) close(xml_fd);
+	if (mgmt_get_main_config(&node) == False) {
 		return (False);
 	}
+
+	main_vers_maj = XML_VERS_MAIN_MAJ;
+	main_vers_min = XML_VERS_MAIN_MIN;
+	if (validate_version(node, &main_vers_maj, &main_vers_min) ==
+	    False) {
+		syslog(LOG_ERR, "Target main config invalid");
+		return (False);
+	}
+
+	/*
+	 * The base directory is optional in the sense that the daemon
+	 * can start without it, but the daemon can't really do
+	 * anything until the administrator sets the value.
+	 */
+	(void) tgt_find_value_str(node, XML_ELEMENT_BASEDIR,
+	    &target_basedir);
+
+	/*
+	 * These are optional settings for the target. Each of
+	 * these has a default value which can be overwritten in
+	 * the configuration.
+	 */
+	(void) tgt_find_value_str(node, XML_ELEMENT_TARGLOG,
+	    &target_log);
+	(void) tgt_find_value_int(node, XML_ELEMENT_ISCSIPORT,
+	    &iscsi_port);
+	(void) tgt_find_value_intchk(node, XML_ELEMENT_DBGLVL, &dbg_lvl);
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_ENFORCE,
+	    &enforce_strict_guid);
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_THIN_PROVO,
+	    &thin_provisioning);
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_DISABLE_TPGS,
+	    &disable_tpgs);
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_TIMESTAMPS,
+	    &dbg_timestamps);
+	(void) tgt_find_value_boolean(node, XML_ELEMENT_PGR_PERSIST,
+	    &pgr_persist);
+	if (tgt_find_value_intchk(node, XML_ELEMENT_LOGLVL,
+	    &qlog_lvl) == True)
+		queue_log(True);
+
+	main_config = node;
+	targets_config = node;
+
+	return (True);
 }
 
 /*
@@ -503,13 +327,10 @@ variable_handler(tgt_node_t *x, target_queue_t *reply, target_queue_t *mgmt,
 	char			*reply_buf	= NULL;
 	var_table_t		*v;
 	tgt_node_t		*c;
-	const priv_set_t	*eset;
 
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
+	if (check_auth_modify(cred) != True) {
 		xml_rtn_msg(&reply_buf, ERR_NO_PERMISSION);
+		queue_str(reply, 0, msg_mgmt_rply, reply_buf);
 		return;
 	}
 	for (c = x->x_child; c; c = c->x_sibling) {
@@ -881,7 +702,11 @@ main(int argc, char **argv)
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
-	if (process_config(config_file) == False)
+
+	if (mgmt_convert_conf() == CONVERT_FAIL)
+		exit(SMF_EXIT_ERR_CONFIG);
+
+	if (process_config() == False)
 		exit(SMF_EXIT_ERR_CONFIG);
 
 	/*
@@ -895,9 +720,6 @@ main(int argc, char **argv)
 	 */
 	if (target_basedir == NULL)
 		target_basedir = strdup(DEFAULT_TARGET_BASEDIR);
-
-	if (process_target_config() == False)
-		exit(SMF_EXIT_ERR_CONFIG);
 
 	(void) tgt_find_value_boolean(main_config, XML_ELEMENT_DBGDAEMON,
 	    &daemonize);

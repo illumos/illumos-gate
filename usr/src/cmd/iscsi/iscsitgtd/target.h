@@ -190,8 +190,6 @@ char *valid_radius_srv(char *name, char *prop);
 char *valid_isns_srv(char *name, char *prop);
 Boolean_t if_find_mac(target_queue_t *mgmt);
 void if_target_address(char **text, int *text_length, struct sockaddr *sp);
-Boolean_t process_target_config();
-
 
 extern admin_table_t	admin_prop_list[];
 extern char 		*target_basedir;
