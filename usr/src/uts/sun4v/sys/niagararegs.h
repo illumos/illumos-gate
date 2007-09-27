@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,6 +249,7 @@ extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
  * when an uncorrectable error is written back from L2 cache.
  */
 #define	NI_DRAM_POISON_SYND_FROM_LDWU		0x1118
+#define	N2_DRAM_POISON_SYND_FROM_LDWU		0x8221
 
 /*
  * This L2 poison syndrome is placed on 4 byte checkwords of L2

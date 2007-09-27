@@ -286,6 +286,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 		CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lvf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lrf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.ltu",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.itl2nd",	cmd_nop },
 	{ "ereport.cpu.*.dtl2nd",	cmd_nop },
 	{ "ereport.cpu.*.icl2nd",	cmd_nop },
@@ -299,7 +300,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldsc", 	cmd_xxc,	CMD_ERRCL_LDSC |
 	    CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.ltc",		cmd_txce },
+	{ "ereport.cpu.*.ltc",		cmd_txce,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldau",		cmd_xxu, 	CMD_ERRCL_LDAU |
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldwu",		cmd_nop },
@@ -307,8 +308,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.ldsu",		cmd_xxu,	CMD_ERRCL_LDSU |
 	    CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.lvu",		cmd_l2ctl },
-	{ "ereport.cpu.*.lru",		cmd_l2ctl },
+	{ "ereport.cpu.*.lvu",		cmd_l2ctl, 	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lru",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.fbr",		cmd_fb },
 	{ "ereport.cpu.*.fbu",		cmd_fb },
 	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },

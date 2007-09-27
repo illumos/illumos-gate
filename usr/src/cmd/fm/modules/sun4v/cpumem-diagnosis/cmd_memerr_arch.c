@@ -92,13 +92,26 @@ cmd_mem_synd_check(fmd_hdl_t *hdl, uint64_t afar, uint8_t afar_status,
 	 * indicate an L2 problem, which should be diagnosed from the
 	 * corresponding L2 cache ereport.
 	 */
-	if (cpu->cpu_type == CPU_ULTRASPARC_T1) {
-		if (synd == NI_DRAM_POISON_SYND_FROM_LDWU) {
-			fmd_hdl_debug(hdl,
-			    "discarding UE due to magic syndrome %x\n",
-			    synd);
-			return (CMD_EVD_UNUSED);
-		}
+	switch (cpu->cpu_type) {
+		case CPU_ULTRASPARC_T1:
+			if (synd == NI_DRAM_POISON_SYND_FROM_LDWU) {
+				fmd_hdl_debug(hdl,
+				    "discarding UE due to magic syndrome %x\n",
+				    synd);
+				return (CMD_EVD_UNUSED);
+			}
+			break;
+		case CPU_ULTRASPARC_T2:
+		case CPU_ULTRASPARC_T2plus:
+			if (synd == N2_DRAM_POISON_SYND_FROM_LDWU) {
+				fmd_hdl_debug(hdl,
+				    "discarding UE due to magic syndrome %x\n",
+				    synd);
+				return (CMD_EVD_UNUSED);
+			}
+			break;
+		default:
+			break;
 	}
 	return (CMD_EVD_OK);
 }
