@@ -258,7 +258,6 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	} else {
 		mach_set_soft_state(SIS_TRANSITION,
 		    &SOLARIS_SOFT_STATE_REBOOT_MSG);
-
 		reboot_machine(bootstr);
 	}
 	/* MAYBE REACHED */
@@ -1191,7 +1190,7 @@ xt_sync(cpuset_t cpuset)
 		uint8_t volatile byte[NCPU];
 		uint64_t volatile xword[NCPU / 8];
 	} cpu_sync;
-	uint64_t starttick, endtick, tick, lasttick;
+	uint64_t starttick, endtick, tick, lasttick, traptrace_id;
 	uint_t largestid, smallestid;
 	int i, j;
 
@@ -1222,8 +1221,15 @@ xt_sync(cpuset_t cpuset)
 		cpu_sync.byte[largestid] = 1;
 	}
 
+	/*
+	 * To help debug xt_sync panic, each mondo is uniquely identified
+	 * by passing the tick value, traptrace_id as the second mondo
+	 * argument to xt_some which is logged in CPU's mondo queue,
+	 * traptrace buffer and the panic message.
+	 */
+	traptrace_id = gettick();
 	xt_some(cpuset, (xcfunc_t *)xt_sync_tl1,
-	    (uint64_t)cpu_sync.byte, 0);
+	    (uint64_t)cpu_sync.byte, traptrace_id);
 
 	starttick = lasttick = gettick();
 	endtick = starttick + xc_tick_limit;
@@ -1244,12 +1250,18 @@ xt_sync(cpuset_t cpuset)
 				if (panic_quiesce)
 					goto out;
 				cmn_err(CE_CONT, "Cross trap sync timeout:  "
-				    "cpuids:");
+				    "at cpu_sync.xword[%d]: 0x%lx "
+				    "cpu_sync.byte: 0x%lx "
+				    "starttick: 0x%lx endtick: 0x%lx "
+				    "traptrace_id = 0x%lx\n",
+				    i, cpu_sync.xword[i],
+				    (uint64_t)cpu_sync.byte,
+				    starttick, endtick, traptrace_id);
+				cmn_err(CE_CONT, "CPUIDs:");
 				for (j = (i * 8); j <= largestid; j++) {
 					if (cpu_sync.byte[j] != 0)
 						cmn_err(CE_CONT, " 0x%x", j);
 				}
-				cmn_err(CE_CONT, "\n");
 				cmn_err(CE_PANIC, "xt_sync: timeout");
 			}
 		}
@@ -1457,8 +1469,8 @@ mach_set_soft_state(uint64_t state, uint64_t *string_ra)
 	if (soft_state_initialized && *string_ra) {
 		rc = hv_soft_state_set(state, *string_ra);
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN, "hv_soft_state_set returned %ld\n",
-			    rc);
+			cmn_err(CE_WARN,
+			    "hv_soft_state_set returned %ld\n", rc);
 		}
 	}
 }
@@ -1471,8 +1483,8 @@ mach_get_soft_state(uint64_t *state, uint64_t *string_ra)
 	if (soft_state_initialized && *string_ra) {
 		rc = hv_soft_state_get(*string_ra, state);
 		if (rc != H_EOK) {
-			cmn_err(CE_WARN, "hv_soft_state_get returned %ld\n",
-			    rc);
+			cmn_err(CE_WARN,
+			    "hv_soft_state_get returned %ld\n", rc);
 			*state = -1;
 		}
 	}

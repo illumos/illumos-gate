@@ -63,6 +63,7 @@ s none platform/SUNW,SPARC-Enterprise-T5220=sun4v
 s none platform/SUNW,SPARC-Enterprise-T5120=sun4v
 s none platform/SUNW,T5140=sun4v
 s none platform/SUNW,T5240=sun4v
+s none platform/SUNW,T5440=sun4v
 s none platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
 s none platform/SUNW,SPARC-Enterprise-T1000=sun4v
 s none platform/SUNW,Sun-Blade-T6300=sun4v

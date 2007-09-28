@@ -141,6 +141,10 @@ s none usr/platform/SUNW,SPARC-Enterprise-T5220=SUNW,SPARC-Enterprise-T5120
 #
 s none usr/platform/SUNW,T5240=SUNW,T5140
 #
+# add Batoka link
+#
+s none usr/platform/SUNW,T5440=SUNW,T5140
+#
 # add erie fujitsu link
 #
 s none usr/platform/SUNW,SPARC-Enterprise-T1000=SUNW,Sun-Fire-T200

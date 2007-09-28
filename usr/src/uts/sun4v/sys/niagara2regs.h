@@ -102,8 +102,6 @@ extern "C" {
 /*
  * Niagara2 DRAM performance counters
  */
-#define	NIAGARA_DRAM_BANKS		0x4
-
 #define	NIAGARA_DRAM_PIC0_SEL_SHIFT	0x4
 #define	NIAGARA_DRAM_PIC1_SEL_SHIFT	0x0
 
@@ -117,6 +115,8 @@ extern "C" {
  * SPARC/DRAM performance counter register numbers for HV_NIAGARA2_GETPERF
  * and HV_NIAGARA2_SETPERF for Niagara2
  */
+#define	NIAGARA_DRAM_BANKS		0x4
+
 #define	HV_NIAGARA_SPARC_CTL		0x0
 #define	HV_NIAGARA_DRAM_CTL0		0x1
 #define	HV_NIAGARA_DRAM_COUNT0		0x2
@@ -131,8 +131,10 @@ extern "C" {
 /*
  * SPARC/DRAM performance counter register numbers for HV_VFALLS_GETPERF
  * and HV_VFALLS_SETPERF for Victoria Falls
- * Support for 2-node configuration
+ * Support for 4-node configuration
  */
+#define	NIAGARA_DRAM_BANKS		0x8
+
 #define	HV_NIAGARA_SPARC_CTL		0x0
 #define	HV_NIAGARA_L2_CTL		0x1
 #define	HV_NIAGARA_DRAM_CTL0		0x2
@@ -143,6 +145,97 @@ extern "C" {
 #define	HV_NIAGARA_DRAM_COUNT2		0x7
 #define	HV_NIAGARA_DRAM_CTL3		0x8
 #define	HV_NIAGARA_DRAM_COUNT3		0x9
+#define	HV_NIAGARA_DRAM_CTL4		0xa
+#define	HV_NIAGARA_DRAM_COUNT4		0xb
+#define	HV_NIAGARA_DRAM_CTL5		0xc
+#define	HV_NIAGARA_DRAM_COUNT5		0xd
+#define	HV_NIAGARA_DRAM_CTL6		0xe
+#define	HV_NIAGARA_DRAM_COUNT6		0xf
+#define	HV_NIAGARA_DRAM_CTL7		0x10
+#define	HV_NIAGARA_DRAM_COUNT7		0x11
+
+#define	ZAMBEZI_PIC0_SEL_SHIFT		0x0
+#define	ZAMBEZI_PIC1_SEL_SHIFT		0x8
+
+#define	ZAMBEZI_LPU_COUNTERS		0x10
+#define	ZAMBEZI_GPD_COUNTERS		0x4
+#define	ZAMBEZI_ASU_COUNTERS		0x4
+
+#define	HV_ZAM0_LPU_A_PCR		0x12
+#define	HV_ZAM0_LPU_A_PIC0		0x13
+#define	HV_ZAM0_LPU_A_PIC1		0x14
+#define	HV_ZAM0_LPU_B_PCR		0x15
+#define	HV_ZAM0_LPU_B_PIC0		0x16
+#define	HV_ZAM0_LPU_B_PIC1		0x17
+#define	HV_ZAM0_LPU_C_PCR		0x18
+#define	HV_ZAM0_LPU_C_PIC0		0x19
+#define	HV_ZAM0_LPU_C_PIC1		0x1a
+#define	HV_ZAM0_LPU_D_PCR		0x1b
+#define	HV_ZAM0_LPU_D_PIC0		0x1c
+#define	HV_ZAM0_LPU_D_PIC1		0x1d
+#define	HV_ZAM0_GPD_PCR			0x1e
+#define	HV_ZAM0_GPD_PIC0		0x1f
+#define	HV_ZAM0_GPD_PIC1		0x20
+#define	HV_ZAM0_ASU_PCR			0x21
+#define	HV_ZAM0_ASU_PIC0		0x22
+#define	HV_ZAM0_ASU_PIC1		0x23
+
+#define	HV_ZAM1_LPU_A_PCR		0x24
+#define	HV_ZAM1_LPU_A_PIC0		0x25
+#define	HV_ZAM1_LPU_A_PIC1		0x26
+#define	HV_ZAM1_LPU_B_PCR		0x27
+#define	HV_ZAM1_LPU_B_PIC0		0x28
+#define	HV_ZAM1_LPU_B_PIC1		0x29
+#define	HV_ZAM1_LPU_C_PCR		0x2a
+#define	HV_ZAM1_LPU_C_PIC0		0x2b
+#define	HV_ZAM1_LPU_C_PIC1		0x2c
+#define	HV_ZAM1_LPU_D_PCR		0x2d
+#define	HV_ZAM1_LPU_D_PIC0		0x2e
+#define	HV_ZAM1_LPU_D_PIC1		0x2f
+#define	HV_ZAM1_GPD_PCR			0x30
+#define	HV_ZAM1_GPD_PIC0		0x31
+#define	HV_ZAM1_GPD_PIC1		0x32
+#define	HV_ZAM1_ASU_PCR			0x33
+#define	HV_ZAM1_ASU_PIC0		0x34
+#define	HV_ZAM1_ASU_PIC1		0x35
+
+#define	HV_ZAM2_LPU_A_PCR		0x36
+#define	HV_ZAM2_LPU_A_PIC0		0x37
+#define	HV_ZAM2_LPU_A_PIC1		0x38
+#define	HV_ZAM2_LPU_B_PCR		0x39
+#define	HV_ZAM2_LPU_B_PIC0		0x3a
+#define	HV_ZAM2_LPU_B_PIC1		0x3b
+#define	HV_ZAM2_LPU_C_PCR		0x3c
+#define	HV_ZAM2_LPU_C_PIC0		0x3d
+#define	HV_ZAM2_LPU_C_PIC1		0x3e
+#define	HV_ZAM2_LPU_D_PCR		0x3f
+#define	HV_ZAM2_LPU_D_PIC0		0x40
+#define	HV_ZAM2_LPU_D_PIC1		0x41
+#define	HV_ZAM2_GPD_PCR			0x42
+#define	HV_ZAM2_GPD_PIC0		0x43
+#define	HV_ZAM2_GPD_PIC1		0x44
+#define	HV_ZAM2_ASU_PCR			0x45
+#define	HV_ZAM2_ASU_PIC0		0x46
+#define	HV_ZAM2_ASU_PIC1		0x47
+
+#define	HV_ZAM3_LPU_A_PCR		0x48
+#define	HV_ZAM3_LPU_A_PIC0		0x49
+#define	HV_ZAM3_LPU_A_PIC1		0x4a
+#define	HV_ZAM3_LPU_B_PCR		0x4b
+#define	HV_ZAM3_LPU_B_PIC0		0x4c
+#define	HV_ZAM3_LPU_B_PIC1		0x4d
+#define	HV_ZAM3_LPU_C_PCR		0x4e
+#define	HV_ZAM3_LPU_C_PIC0		0x4f
+#define	HV_ZAM3_LPU_C_PIC1		0x50
+#define	HV_ZAM3_LPU_D_PCR		0x51
+#define	HV_ZAM3_LPU_D_PIC0		0x52
+#define	HV_ZAM3_LPU_D_PIC1		0x53
+#define	HV_ZAM3_GPD_PCR			0x54
+#define	HV_ZAM3_GPD_PIC0		0x55
+#define	HV_ZAM3_GPD_PIC1		0x56
+#define	HV_ZAM3_ASU_PCR			0x57
+#define	HV_ZAM3_ASU_PIC0		0x58
+#define	HV_ZAM3_ASU_PIC1		0x59
 
 #define	VFALLS_L2_CTL_MASK		0x3
 #define	VFALLS_SL3_MASK			0x300
