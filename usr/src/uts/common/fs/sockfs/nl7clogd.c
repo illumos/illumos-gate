@@ -579,7 +579,7 @@ error:
 
 		if ((vp = nca_fio_vp(&fio)) != NULL)
 			VN_RELE(vp);
-		kmem_free(name, strlen(name));
+		kmem_free(name, (strlen(name) + 1));
 		nca_fio_ix(&fio)++;
 	}
 	nca_fio_cnt(&fio) = 0;
