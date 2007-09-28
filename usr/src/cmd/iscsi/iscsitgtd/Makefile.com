@@ -63,7 +63,7 @@ CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 all: $(PROG)
 
 LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
-LDLIBS  += -liscsitgt -lzfs -ldlpi -lsecdb -lscf -lsasl
+LDLIBS  += -liscsitgt -lzfs -ldlpi -lscf -lsasl
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
