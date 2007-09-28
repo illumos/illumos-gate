@@ -62,11 +62,27 @@ Use is subject to license terms.
 			  code is generated but neither Java nor JNI code is.
 			- included text is just a comment
 			Within an event block, the following tags are defined:
-			<entry>, <debug>, <altname>
+			<entry>, <debug>, <altname>, <title>, <program>, <see>
 
 	altname		defines the internal name of an audit record; if
 			omitted, the internal name is the same as the
 			external name.
+
+	title,		these tags are used by bsmrecord build to create
+	program,	audit_record_attr database from adt events.
+	see		Following example demonstrates their semantics:
+
+			bsmrecord -p passwd
+			passwd		<-   <title>
+			  program     various              See passwd(1)
+			  		^-   <program>		^-   <see>
+			  event ID    6163                 AUE_passwd
+			  class       lo                   (0x00001000)
+			      header
+			      subject
+			      [text]                       username...
+			      					^-   <comment>
+			      return
 
 	entry		defines the correspondence between the data
 			supplied by the caller and the token to be
@@ -76,7 +92,7 @@ Use is subject to license terms.
 			  it is the list of names of data to be associated
 			  with one output token.  (See <external>, below)
 			Within an entry block, the following tags are defined:
-			<internal>, <external>, <debug>
+			<internal>, <external>, <debug>, <comment>
 
 	internal	defines the token to be generated.
 			- token is a name that must also be defined with
@@ -147,6 +163,10 @@ Use is subject to license terms.
 			in the same order as the id's.
 			If the type is an array, its length must be given
 			explicitly.
+
+	comment		Used by bsmrecord build to generate audit_record_attr.
+			Comment is explanation note printed with token type.
+			See example above for other tags related to bsmrecord.
 
 	token		Define allowed token names.
 			- id is the name of token; this name is used
@@ -656,7 +676,7 @@ Use is subject to license terms.
 	<entry id="username">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
-	    <comment>success/fail message</comment>
+	    <comment>username if different than caller</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>

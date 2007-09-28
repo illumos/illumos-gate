@@ -56,7 +56,6 @@ Use is subject to license terms.
 		<xs:element name="title" type="xs:string" minOccurs="0" maxOccurs="1"/>
 		<xs:element name="program" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
 		<xs:element name="see" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
-		<xs:element name="note" type="xs:string" minOccurs="0" maxOccurs="1"/>
 		<xs:element name="entry" type="entry_t" minOccurs="0" maxOccurs="unbounded"/>
 	</xs:sequence>
 	<xs:attribute name="id" type="xs:string" use="required"/>
