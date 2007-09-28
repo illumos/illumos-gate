@@ -59,6 +59,14 @@ physnm_t t5220_pnms[] = {
 	{   5, "MB/RISER2/PCIE5" }
 };
 
+physnm_t usbrdt5240_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/RISER0/EM0" },
+	{   1, "MB/RISER0/EM1" },
+	{   2, "MB/RISER1/EM2" },
+	{   3, "MB/RISER1/EM3" }
+};
+
 physnm_t netra_t5220_pnms[] = {
 	/* Slot #, Label */
 	{   0, "MB/RISER0/PCIE0" },
@@ -89,6 +97,9 @@ pphysnm_t plat_pnames[] = {
 	{ "T5240",
 	    sizeof (t5220_pnms) / sizeof (physnm_t),
 	    t5220_pnms },
+	{ "USBRDT-5240",
+	    sizeof (usbrdt5240_pnms) / sizeof (physnm_t),
+	    usbrdt5240_pnms },
 	{ "Netra-T5220",
 	    sizeof (netra_t5220_pnms) / sizeof (physnm_t),
 	    netra_t5220_pnms }
@@ -124,6 +135,7 @@ pdevlabs_t plats_missing[] = {
 	{ "Netra-T5220",
 	    0,
 	    NULL }
+
 };
 
 missing_names_t Missing = {

@@ -207,6 +207,12 @@ d none usr/platform/SUNW,Netra-CP3260/lib/fm 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,Netra-CP3260/lib/fm/topo/maps/Netra-CP3260-hc-topology.xml 444 root bin
+d none usr/platform/SUNW,USBRDT-5240 755 root sys
+d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/fm 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/fm/topo 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps 755 root bin
+f none usr/platform/SUNW,USBRDT-5240/lib/fm/topo/maps/USBRDT-5240-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-T5220 755 root sys
 d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
 d none usr/platform/SUNW,Netra-T5220/lib/fm 755 root bin
