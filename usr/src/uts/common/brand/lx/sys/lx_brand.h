@@ -203,7 +203,8 @@ typedef struct lx_lwp_data {
 
 /* brand specific data */
 typedef struct lx_zone_data {
-	int kernel_version;
+	int lxzd_kernel_version;
+	int lxzd_max_syscall;
 } lx_zone_data_t;
 
 #define	BR_CPU_BOUND	0x0001

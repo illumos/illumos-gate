@@ -121,9 +121,8 @@
  *         | 'scratch space'			|
  *         | user's %ebx			|
  *         | user's %gs selector		|
- *         | kernel's %gs selector		|
- *    |    | lwp brand data			|
- *    |    | proc brand data			|
+ *    |    | kernel's %gs selector		|
+ *    |    | lwp pointer			|
  *    v    | user return address		|
  *         | callback wrapper return addr 	|
  *         --------------------------------------
@@ -141,25 +140,24 @@
 	movw	%bx, %gs		/* switch to the kernel's %gs	*/ ;\
 	movl	%gs:CPU_THREAD, %ebx	/* load the thread pointer	*/ ;\
 	movl	T_LWP(%ebx), %ebx	/* load the lwp pointer		*/ ;\
-	pushl	LWP_BRAND(%ebx)		/* push the lwp's brand data	*/ ;\
+	pushl	%ebx			/* push the lwp pointer		*/ ;\
 	movl	LWP_PROCP(%ebx), %ebx	/* load the proc pointer	*/ ;\
-	pushl	P_BRAND_DATA(%ebx)	/* push the proc's brand data	*/ ;\
 	movl	P_BRAND(%ebx), %ebx	/* load the brand pointer	*/ ;\
 	movl	B_MACHOPS(%ebx), %ebx	/* load the machops pointer	*/ ;\
 	movl	_CONST(_MUL(callback_id, CPTRSIZE))(%ebx), %ebx		   ;\
 	cmpl	$0, %ebx						   ;\
 	je	1f							   ;\
-	movl	%ebx, 20(%esp)		/* save callback to scratch	*/ ;\
-	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
+	movl	%ebx, 16(%esp)		/* save callback to scratch	*/ ;\
+	movl	8(%esp), %ebx		/* grab the the user %gs	*/ ;\
 	movw	%bx, %gs		/* restore the user %gs		*/ ;\
-	movl	16(%esp), %ebx		/* restore %ebx			*/ ;\
-	pushl	24(%esp)		/* push the return address	*/ ;\
-	call	*24(%esp)		/* call callback		*/ ;\
+	movl	12(%esp), %ebx		/* restore %ebx			*/ ;\
+	pushl	20(%esp)		/* push the return address	*/ ;\
+	call	*20(%esp)		/* call callback		*/ ;\
 	addl	$4, %esp		/* get rid of ret addr		*/ ;\
-1:	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
+1:	movl	8(%esp), %ebx		/* grab the the user %gs	*/ ;\
 	movw	%bx, %gs		/* restore the user %gs		*/ ;\
-	movl	16(%esp), %ebx		/* restore user's %ebx		*/ ;\
-	addl	$24, %esp		/* restore stack ptr		*/ 
+	movl	12(%esp), %ebx		/* restore user's %ebx		*/ ;\
+	addl	$20, %esp		/* restore stack ptr		*/ 
 
 #define	MSTATE_TRANSITION(from, to)		\
 	pushl	$to;				\

@@ -135,15 +135,14 @@
  * stack:  --------------------------------------
  *         | callback pointer			|
  *    |    | user stack pointer			|
- *    |    | lwp brand data			|
- *    |    | proc brand data			|
+ *    |    | lwp pointer			|
  *    v    | userland return address		|
  *         | callback wrapper return addr	|
  *         --------------------------------------
  *
  */
 #define	BRAND_CALLBACK(callback_id)					    \
-	movq	%rsp, %gs:CPU_RTMP_RSP  /* save the stack pointer       */ ;\
+	movq	%rsp, %gs:CPU_RTMP_RSP	/* save the stack pointer	*/ ;\
 	movq	%r15, %gs:CPU_RTMP_R15	/* save %r15			*/ ;\
 	movq	%gs:CPU_THREAD, %r15	/* load the thread pointer	*/ ;\
 	movq	T_STACK(%r15), %rsp	/* switch to the kernel stack	*/ ;\
@@ -153,21 +152,20 @@
 	movq	%r14, 8(%rsp)		/* stash the user stack pointer	*/ ;\
 	popq	%r14			/* restore %r14			*/ ;\
 	movq	T_LWP(%r15), %r15	/* load the lwp pointer		*/ ;\
-	pushq	LWP_BRAND(%r15)		/* push the lwp's brand data	*/ ;\
+	pushq	%r15			/* push the lwp pointer		*/ ;\
 	movq	LWP_PROCP(%r15), %r15	/* load the proc pointer	*/ ;\
-	pushq	P_BRAND_DATA(%r15)	/* push the proc's brand data	*/ ;\
 	movq	P_BRAND(%r15), %r15	/* load the brand pointer	*/ ;\
 	movq	B_MACHOPS(%r15), %r15	/* load the machops pointer	*/ ;\
 	movq	_CONST(_MUL(callback_id, CPTRSIZE))(%r15), %r15		   ;\
 	cmpq	$0, %r15						   ;\
 	je	1f							   ;\
-	movq	%r15, 24(%rsp)		/* save the callback pointer	*/ ;\
+	movq	%r15, 16(%rsp)		/* save the callback pointer	*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %r15	/* grab the user stack pointer	*/ ;\
 	pushq	(%r15)			/* push the return address	*/ ;\
 	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	SWAPGS				/* user gsbase                  */ ;\
-	call	*32(%rsp)		/* call callback		*/ ;\
-	SWAPGS				/* kernel gsbase                */ ;\
+	call	*24(%rsp)		/* call callback		*/ ;\
+	SWAPGS				/* kernel gsbase		*/ ;\
 1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
 

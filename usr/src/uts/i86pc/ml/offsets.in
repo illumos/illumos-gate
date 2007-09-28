@@ -77,6 +77,7 @@ proc		PROCSIZE
 	p_model
 	p_pctx
 	p_agenttp
+	p_zone
 	p_brand
 	p_brand_data
 
@@ -383,3 +384,6 @@ copyops
 
 brand
 	b_machops
+
+zone
+	zone_brand_data

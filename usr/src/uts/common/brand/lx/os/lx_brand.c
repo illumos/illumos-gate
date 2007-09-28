@@ -360,10 +360,11 @@ lx_init_brand_data(zone_t *zone)
 	ASSERT(zone->zone_brand_data == NULL);
 	data = (lx_zone_data_t *)kmem_zalloc(sizeof (lx_zone_data_t), KM_SLEEP);
 	/*
-	 * Default kernel_version to LX_KERN_2_4, this can be changed by a call
-	 * to setattr() which is made during zone boot
+	 * Set the default lxzd_kernel_version to LX_KERN_2_4.
+	 * This can be changed by a call to setattr() during zone boot.
 	 */
-	data->kernel_version = LX_KERN_2_4;
+	data->lxzd_kernel_version = LX_KERN_2_4;
+	data->lxzd_max_syscall = LX_NSYSCALLS_2_4;
 	zone->zone_brand_data = data;
 }
 
@@ -611,7 +612,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 int
 lx_get_zone_kern_version(zone_t *zone)
 {
-	return (((lx_zone_data_t *)zone->zone_brand_data)->kernel_version);
+	return (((lx_zone_data_t *)zone->zone_brand_data)->lxzd_kernel_version);
 }
 
 int
@@ -623,7 +624,11 @@ lx_get_kern_version()
 void
 lx_set_kern_version(zone_t *zone, int vers)
 {
-	((lx_zone_data_t *)zone->zone_brand_data)->kernel_version = vers;
+	lx_zone_data_t *lxzd = (lx_zone_data_t *)zone->zone_brand_data;
+
+	lxzd->lxzd_kernel_version = vers;
+	if (vers == LX_KERN_2_6)
+		lxzd->lxzd_max_syscall = LX_NSYSCALLS_2_6;
 }
 
 /*

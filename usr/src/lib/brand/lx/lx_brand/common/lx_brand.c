@@ -166,8 +166,6 @@ struct lx_sysent {
 };
 
 static struct lx_sysent sysents[LX_NSYSCALLS + 1];
-/* Differs for kernel versions, set during lx_init */
-static int lx_max_syscall;
 
 static uintptr_t stack_bottom;
 
@@ -401,10 +399,13 @@ lx_emulate(lx_regs_t *rp)
 
 	syscall_num = rp->lxr_eax;
 
-	if (syscall_num < 0 || syscall_num > lx_max_syscall)
-		s = &sysents[0];
-	else
-		s = &sysents[syscall_num];
+	/*
+	 * lx_brand_int80_callback() ensures that the syscall_num is sane;
+	 * Use it as is.
+	 */
+	assert(syscall_num >= 0);
+	assert(syscall_num < (sizeof (sysents) / sizeof (sysents[0])));
+	s = &sysents[syscall_num];
 
 	if ((ret = lx_emulate_args(rp, s, args)) != 0)
 		goto out;
@@ -677,11 +678,6 @@ lx_init(int argc, char *argv[], char *envp[])
 	lx_close_fh(stderr);
 
 	lx_debug_init();
-
-	if (lx_get_kern_version() <= LX_KERN_2_4)
-		lx_max_syscall = LX_NSYSCALLS_2_4;
-	else
-		lx_max_syscall = LX_NSYSCALLS_2_6;
 
 	r = getenv("LX_RELEASE");
 	if (r == NULL) {

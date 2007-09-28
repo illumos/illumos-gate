@@ -43,3 +43,6 @@ lx_proc_data
 	l_handler
 	l_tracehandler
 	l_traceflag
+
+lx_zone_data
+	lxzd_max_syscall
