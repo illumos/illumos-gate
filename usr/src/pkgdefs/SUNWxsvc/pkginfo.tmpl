@@ -29,6 +29,10 @@
 # package, such as package abbreviation, full package name, package version,
 # and package architecture.
 #
+# NOTE: VERSION **MUST** be "ONVERS.0,REV=0.0.0" since this is what it
+#       was when a package with the same name lived in the ihv-gate. Changing
+#       this value will break upgrade until ONVERS is incremented to 11.12
+#
 PKG="SUNWxsvc"
 NAME="Sun Xserver pseudo driver"
 ARCH="i386"
@@ -40,7 +44,7 @@ CLASSES="none"
 DESC="Sun Xserver pseudo driver"
 SUNW_PRODNAME="SunOS"
 SUNW_PRODVERS="RELEASE/VERSION"
-VERSION="ONVERS,REV=0.0.0"
+VERSION="ONVERS.0,REV=0.0.0"
 VENDOR="Sun Microsystems, Inc."
 HOTLINE="Please contact your local service provider"
 EMAIL=""
