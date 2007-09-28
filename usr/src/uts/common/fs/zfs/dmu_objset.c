@@ -177,7 +177,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			return (err);
 		}
 		osi->os_phys = osi->os_phys_buf->b_data;
-		arc_release(osi->os_phys_buf, &osi->os_phys_buf);
+		if (ds == NULL || dsl_dataset_is_snapshot(ds) == 0)
+			arc_release(osi->os_phys_buf, &osi->os_phys_buf);
 	} else {
 		osi->os_phys_buf = arc_buf_alloc(spa, sizeof (objset_phys_t),
 		    &osi->os_phys_buf, ARC_BUFC_METADATA);

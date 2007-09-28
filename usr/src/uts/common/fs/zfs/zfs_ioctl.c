@@ -1093,7 +1093,7 @@ retry:
 	    (error = dsl_prop_get_all(os, &nv)) == 0) {
 		dmu_objset_stats(os, nv);
 		/*
-		 * NB: {zpl,zvol}_get_stats() will read the objset contents,
+		 * NB: zvol_get_stats() will read the objset contents,
 		 * which we aren't supposed to do with a
 		 * DS_MODE_STANDARD open, because it could be
 		 * inconsistent.  So this is a bit of a workaround...
@@ -1101,8 +1101,6 @@ retry:
 		if (!zc->zc_objset_stats.dds_inconsistent) {
 			if (dmu_objset_type(os) == DMU_OST_ZVOL)
 				VERIFY(zvol_get_stats(os, nv) == 0);
-			else if (dmu_objset_type(os) == DMU_OST_ZFS)
-				(void) zfs_get_stats(os, nv);
 		}
 		error = put_nvlist(zc, nv);
 		nvlist_free(nv);
@@ -1112,6 +1110,47 @@ retry:
 
 	dmu_objset_close(os);
 	return (error);
+}
+
+static int
+zfs_ioc_objset_version(zfs_cmd_t *zc)
+{
+	objset_t *os = NULL;
+	int error;
+
+retry:
+	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	if (error != 0) {
+		/*
+		 * This is ugly: dmu_objset_open() can return EBUSY if
+		 * the objset is held exclusively. Fortunately this hold is
+		 * only for a short while, so we retry here.
+		 * This avoids user code having to handle EBUSY,
+		 * for example for a "zfs list".
+		 */
+		if (error == EBUSY) {
+			delay(1);
+			goto retry;
+		}
+		return (error);
+	}
+
+	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
+
+	/*
+	 * NB: zfs_get_version() will read the objset contents,
+	 * which we aren't supposed to do with a
+	 * DS_MODE_STANDARD open, because it could be
+	 * inconsistent.  So this is a bit of a workaround...
+	 */
+	zc->zc_cookie = 0;
+	if (!zc->zc_objset_stats.dds_inconsistent)
+		if (dmu_objset_type(os) == DMU_OST_ZFS)
+			(void) zfs_get_version(os, &zc->zc_cookie);
+
+	dmu_objset_close(os);
+	return (0);
 }
 
 static int
@@ -2087,6 +2126,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_vdev_detach, zfs_secpolicy_config, POOL_NAME, B_TRUE },
 	{ zfs_ioc_vdev_setpath,	zfs_secpolicy_config, POOL_NAME, B_FALSE },
 	{ zfs_ioc_objset_stats,	zfs_secpolicy_read, DATASET_NAME, B_FALSE },
+	{ zfs_ioc_objset_version, zfs_secpolicy_read, DATASET_NAME, B_FALSE },
 	{ zfs_ioc_dataset_list_next, zfs_secpolicy_read,
 	    DATASET_NAME, B_FALSE },
 	{ zfs_ioc_snapshot_list_next, zfs_secpolicy_read,

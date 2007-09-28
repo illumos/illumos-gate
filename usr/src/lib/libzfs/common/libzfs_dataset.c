@@ -1788,6 +1788,7 @@ static int
 get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
     char **source, uint64_t *val)
 {
+	zfs_cmd_t zc = { 0 };
 	struct mnttab mnt;
 	char *mntopt_on = NULL;
 	char *mntopt_off = NULL;
@@ -1898,6 +1899,18 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 
 	case ZFS_PROP_NUMCLONES:
 		*val = zhp->zfs_dmustats.dds_num_clones;
+		break;
+
+	case ZFS_PROP_VERSION:
+		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_OBJSET_VERSION, &zc) ||
+		    (zc.zc_cookie == 0)) {
+			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
+			    "unable to get version property"));
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADVERSION,
+			    dgettext(TEXT_DOMAIN, "internal error")));
+		}
+		*val = zc.zc_cookie;
 		break;
 
 	default:

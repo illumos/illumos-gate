@@ -1322,15 +1322,11 @@ zfs_busy(void)
 }
 
 int
-zfs_get_stats(objset_t *os, nvlist_t *nv)
+zfs_get_version(objset_t *os, uint64_t *version)
 {
 	int error;
-	uint64_t val;
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1, &val);
-	if (error == 0)
-		dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_VERSION, val);
-
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1, version);
 	return (error);
 }
 

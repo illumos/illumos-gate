@@ -257,7 +257,7 @@ extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);
 extern dev_t	zfs_cmpldev(uint64_t);
-extern int	zfs_get_stats(objset_t *os, nvlist_t *nv);
+extern int	zfs_get_version(objset_t *os, uint64_t *version);
 extern int	zfs_set_version(const char *name, uint64_t newvers);
 
 extern void zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
