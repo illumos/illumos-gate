@@ -53,6 +53,7 @@ static	int	pcicfg_start_devno = 0;	/* for Debug only */
 #define	PCICFG_NODEVICE 42
 #define	PCICFG_NOMEMORY 43
 #define	PCICFG_NOMULTI	44
+#define	PCICFG_NORESRC	45
 
 #define	PCICFG_HIADDR(n) ((uint32_t)(((uint64_t)(n) & \
 	0xFFFFFFFF00000000ULL)>> 32))
@@ -534,7 +535,6 @@ _info(struct modinfo *modinfop)
  * will create the device tree and program the devices
  * registers.
  */
-
 int
 pcicfg_configure(dev_info_t *devi, uint_t device)
 {
@@ -570,6 +570,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 
 		switch (rv = pcicfg_probe_children(attach_point,
 			bus, device, func, &highest_bus)) {
+			case PCICFG_NORESRC:
 			case PCICFG_FAILURE:
 				DEBUG2("configure failed: "
 				"bus [0x%x] device [0x%x]\n",
@@ -621,13 +622,10 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 		 * check if this is a bridge in nontransparent mode
 		 */
 		if (pcicfg_is_ntbridge(new_device) != DDI_FAILURE) {
-
-			int rc;
-
 			DEBUG0("pcicfg: Found nontransparent bridge.\n");
 
-			rc = pcicfg_configure_ntbridge(new_device, bus, device);
-			if (rc == PCICFG_FAILURE)
+			rv = pcicfg_configure_ntbridge(new_device, bus, device);
+			if (rv != PCICFG_SUCCESS)
 				goto cleanup;
 		}
 	}
@@ -666,7 +664,26 @@ cleanup:
 	}
 	ndi_devi_exit(devi, circ);
 
-	return (PCICFG_FAILURE);
+	/*
+	 * Use private return codes to help identify issues without debugging
+	 * enabled.  Resource limitations and mis-configurations are
+	 * probably the most likely caue of configuration failures on x86.
+	 * Convert return code back to values expected by the external
+	 * consumer before returning so we will warn only once on the first
+	 * encountered failure.
+	 */
+	if (rv == PCICFG_NORESRC) {
+		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+		(void) ddi_pathname(devi, path);
+		cmn_err(CE_CONT, "?Not enough PCI resources to "
+		    "configure: %s\n", path);
+
+		kmem_free(path, MAXPATHLEN);
+		rv = PCICFG_FAILURE;
+	}
+
+	return (rv);
 }
 
 /*
@@ -722,7 +739,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		&next_bus, &blen, NDI_RA_TYPE_PCI_BUSNUM,
 		NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("ntbridge: Failed to get a bus number\n");
-		return (rc);
+		return (PCICFG_NORESRC);
 	}
 
 	DEBUG1("ntbridge bus range start  ->[%d]\n", next_bus);
@@ -760,7 +777,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	}
 	DEBUG0("pcicfg: Success loading nontransparent bridge nexus driver..");
 
-	/* Now set aside pci resources for our children. */
+	/* Now set aside pci resource allocation requests for our children */
 	if (pcicfg_ntbridge_allocate_resources(new_device) !=
 				PCICFG_SUCCESS) {
 		max_devs = 0;
@@ -769,6 +786,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		max_devs = PCI_MAX_DEVICES;
 
 	/* Probe devices on 2nd bus */
+	rc = PCICFG_SUCCESS;
 	for (devno = pcicfg_start_devno; devno < max_devs; devno++) {
 
 		ndi_devi_alloc_sleep(new_device, DEVI_PSEUDO_NEXNAME,
@@ -805,13 +823,13 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 			continue;
 
 		/* Lets fake attachments points for each child, */
-		if (pcicfg_configure(new_device, devno) != PCICFG_SUCCESS) {
+		rc = pcicfg_configure(new_device, devno);
+		if (rc != PCICFG_SUCCESS) {
 			int old_dev = pcicfg_start_devno;
 
 			cmn_err(CE_WARN,
 			"Error configuring ntbridge child dev=%d\n", devno);
 
-			rc = PCICFG_FAILURE;
 			while (old_dev != devno) {
 				if (pcicfg_ntbridge_unconfigure_child(
 					new_device, old_dev) == PCICFG_FAILURE)
@@ -826,7 +844,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	} /* devno loop */
 	DEBUG1("ntbridge: finish probing 2nd bus, rc=%d\n", rc);
 
-	if (rc != PCICFG_FAILURE)
+	if (rc == PCICFG_SUCCESS)
 		rc = pcicfg_ntbridge_configure_done(new_device);
 	else {
 		pcicfg_phdl_t *entry = pcicfg_find_phdl(new_device);
@@ -1914,7 +1932,7 @@ pcicfg_device_assign(dev_info_t *dip)
 					DEBUG0("Failed to allocate 64b mem\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
-					return (PCICFG_FAILURE);
+					return (PCICFG_NORESRC);
 				}
 				DEBUG3("64 addr = [0x%x.0x%x] len [0x%x]\n",
 					PCICFG_HIADDR(answer),
@@ -1952,7 +1970,7 @@ pcicfg_device_assign(dev_info_t *dip)
 					DEBUG0("Failed to allocate 32b mem\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
-					return (PCICFG_FAILURE);
+					return (PCICFG_NORESRC);
 				}
 				DEBUG3("32 addr = [0x%x.0x%x] len [0x%x]\n",
 					PCICFG_HIADDR(answer),
@@ -1977,7 +1995,7 @@ pcicfg_device_assign(dev_info_t *dip)
 					DEBUG0("Failed to allocate I/O\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
-					return (PCICFG_FAILURE);
+					return (PCICFG_NORESRC);
 				}
 				DEBUG3("I/O addr = [0x%x.0x%x] len [0x%x]\n",
 					PCICFG_HIADDR(answer),
@@ -3362,7 +3380,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	uint8_t			header_type, pcie_dev = 0;
 	int			i;
 	uint32_t		request;
-	int			ret;
+	int			ret = PCICFG_FAILURE;
 
 	/*
 	 * This node will be put immediately below
@@ -3443,8 +3461,9 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 		DEBUG3("--Bridge found bus [0x%x] device"
 			"[0x%x] func [0x%x]\n", bus, device, func);
 
-		if (pcicfg_probe_bridge(new_child, config_handle,
-				bus, highest_bus) != PCICFG_SUCCESS) {
+		ret = pcicfg_probe_bridge(new_child, config_handle, bus,
+		    highest_bus);
+		if (ret != PCICFG_SUCCESS) {
 			(void) pcicfg_free_bridge_resources(new_child);
 			goto failedchild;
 		}
@@ -3524,7 +3543,8 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 		}
 
 		/* now allocate & program the resources */
-		if (pcicfg_device_assign(new_child) != PCICFG_SUCCESS) {
+		ret = pcicfg_device_assign(new_child);
+		if (ret != PCICFG_SUCCESS) {
 			(void) pcicfg_free_device_resources(new_child);
 			goto failedchild;
 		}
@@ -3544,7 +3564,7 @@ failedchild:
 failedconfig:
 
 	(void) ndi_devi_free(new_child);
-	return (PCICFG_FAILURE);
+	return (ret);
 }
 
 static int
@@ -3618,7 +3638,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		} else {
 			DEBUG0(
 			    "Failed to allocate bus range for bridge\n");
-			rval = PCICFG_FAILURE;
+			rval = PCICFG_NORESRC;
 			goto cleanup;
 		}
 	}
@@ -3669,7 +3689,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		} else {
 			DEBUG0(
 			    "Failed to allocate memory for bridge\n");
-			rval = PCICFG_FAILURE;
+			rval = PCICFG_NORESRC;
 			goto cleanup;
 		}
 	}

@@ -40,6 +40,7 @@
 #include "../../../../common/pci/pci_strings.h"
 #include <sys/apic.h>
 #include <io/pciex/pcie_nvidia.h>
+#include <io/hotplug/pciehpc/pciehpc_acpi.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 
@@ -92,12 +93,15 @@ static void add_bus_range_prop(int);
 static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
+static ACPI_STATUS lookup_acpi_obj(ACPI_HANDLE, char *, ACPI_HANDLE *);
+static int check_ppb_hotplug(dev_info_t *);
 static void fix_ppb_res(uchar_t);
 static void alloc_res_array();
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
 
 extern int pci_slot_names_prop(int, char *, int);
+extern ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE, uint32_t *);
 
 /* set non-zero to force PCI peer-bus renumbering */
 int pci_bus_always_renumber = 0;
@@ -411,6 +415,58 @@ remove_used_resources()
 }
 
 /*
+ * Walk up ACPI namespace starting from parobj looking for object with name
+ */
+static ACPI_STATUS
+lookup_acpi_obj(ACPI_HANDLE parobj, char *name, ACPI_HANDLE *retobjp)
+{
+	ACPI_HANDLE obj;
+
+	do {
+		if (AcpiGetHandle(parobj, name, retobjp) == AE_OK) {
+			ASSERT(*retobjp != NULL);
+			return (AE_OK);
+		}
+		obj = parobj;
+	} while (AcpiGetParent(obj, &parobj) == AE_OK);
+
+	*retobjp = NULL;
+	return (AE_NOT_FOUND);
+}
+
+static int
+check_ppb_hotplug(dev_info_t *dip)
+{
+	ACPI_HANDLE pcibus_obj;
+	ACPI_HANDLE obj;
+	uint32_t hp_mode = ACPI_HP_MODE;
+
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "pci-hotplug-type", INBAND_HPC_NONE) != INBAND_HPC_PCIE)
+		return (0);
+
+	if (acpica_get_handle(dip, &pcibus_obj) != AE_OK)
+		return (0);
+
+	if (lookup_acpi_obj(pcibus_obj, "_OSC", &obj) == AE_OK) {
+		if (pciehpc_acpi_eval_osc(obj, &hp_mode) != AE_OK)
+			hp_mode = ACPI_HP_MODE;
+	}
+
+	if (hp_mode == NATIVE_HP_MODE)
+		return (1);
+
+	/*
+	 * if ACPI hotplug mode, a child obj for the slot is also required
+	 */
+	if (AcpiGetNextObject(ACPI_TYPE_DEVICE, pcibus_obj, NULL, &obj) !=
+	    AE_OK)
+		return (0);
+
+	return (1);
+}
+
+/*
  * Assign i/o resources to unconfigured hotplug bridges after the first pass.
  * It must be after the first pass in order to use the ports left over after
  * accounting for i/o resources of bridges that have been configured by bios.
@@ -421,82 +477,82 @@ static void
 fix_ppb_res(uchar_t secbus)
 {
 	uchar_t bus, dev, func;
-	uint_t io_base, io_limit, io_size = 0x1000;
-	uint64_t addr = 0;
-	int *regp = NULL, rv;
+	uint_t base, limit;
+	uint_t io_size = 0x1000; /* io range must be mult of and 4k aligned */
+	uint64_t addr;
+	int *regp = NULL;
 	uint_t reglen;
+	int rv, cap_ptr, physhi;
 	dev_info_t *dip;
 
-	dip = pci_bus_res[secbus].dip;
 	/* some entries may be empty due to discontiguous bus numbering */
+	dip = pci_bus_res[secbus].dip;
 	if (dip == NULL)
 		return;
 
-	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "pci-hotplug-type", INBAND_HPC_NONE) == INBAND_HPC_NONE)
+	if (!check_ppb_hotplug(dip))
 		return;
 
 	rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", &regp, &reglen);
-	if (rv != DDI_PROP_SUCCESS || reglen == 0) {
-		/* panic to enforce proper calling order */
-		cmn_err(CE_PANIC, "reg property unset for bus %d\n", secbus);
-		return;
-	}
+	ASSERT(rv == DDI_PROP_SUCCESS && reglen > 0);
+	physhi = regp[0];
+	ddi_prop_free(regp);
 
-	func = (uchar_t)((regp[0] >> 8) & 0x7);
-	dev = (uchar_t)((regp[0] >> 11) & 0x1f);
-	bus = (uchar_t)((regp[0] >> 16) & 0xff);
+	func = (uchar_t)PCI_REG_FUNC_G(physhi);
+	dev = (uchar_t)PCI_REG_DEV_G(physhi);
+	bus = (uchar_t)PCI_REG_BUS_G(physhi);
 	ASSERT(bus == pci_bus_res[secbus].par_bus);
 
 	/*
-	 * io_base >= io_limit means that the bridge was not configured
-	 * This may have been set by the bios or by add_ppb_props()
+	 * Check if the slot is enabled
 	 */
-	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
-	ASSERT(io_base != 0xff && io_limit != 0xff);
-
-	io_base = (io_base & 0xf0) << 8;
-	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
-	if (io_base < io_limit && io_base != 0)
+	cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
+	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL)
 		return;
 
-	if (ddi_get_child(dip) != NULL) {
-		cmn_err(CE_WARN, "detected unsupported configuration: "
-		    "non-empty bridge (bus 0x%x, dev 0x%x, func 0x%x) without "
-		    "I/O resources assigned by bios for secondary bus 0x%x\n",
-		    bus, dev, func, secbus);
-		goto IOFAIL;
-	}
+	if (pci_getw(bus, dev, func, (uint16_t)cap_ptr + PCIE_LINKCTL) &
+	    PCIE_LINKCTL_LINK_DISABLE)
+		return;
 
-	if (pci_bus_res[bus].io_ports != NULL)
+	/*
+	 * base >= limit means that the bridge was not configured
+	 * This may have been set by the bios or by add_ppb_props() upon
+	 * detecting that I/O was disabled
+	 */
+
+	/*
+	 * I/O; check and attempt to allocate io_size amount from parent
+	 */
+	base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+	limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
+	ASSERT(base != 0xff && limit != 0xff);
+
+	base = (base & 0xf0) << 8;
+	limit = ((limit & 0xf0) << 8) | 0xfff;
+
+	addr = 0;
+	if ((base > limit || base == 0) &&
+	    pci_bus_res[bus].io_ports != NULL) {
 		addr = memlist_find(&pci_bus_res[bus].io_ports, io_size,
 		    0x1000);
-
-	ASSERT(addr <= 0xf000);
-	if (addr == 0) {
-		cmn_err(CE_WARN, "out of I/O resources on bridge: bus 0x%x, "
-		    "dev 0x%x, func 0x%x, for secondary bus 0x%x\n",
-		    bus, dev, func, secbus);
-		goto IOFAIL;
+		ASSERT(addr <= 0xffff - io_size);
+	}
+	if (addr != 0) {
+		memlist_insert(&pci_bus_res[secbus].io_ports, addr, io_size);
+		base = addr;
+		limit = addr + io_size - 1;
+		pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
+		    (uint8_t)((base >> 8) & 0xf0));
+		pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
+		    (uint8_t)((limit >> 8) & 0xf0));
 	}
 
-	memlist_insert(&pci_bus_res[secbus].io_ports, addr, io_size);
-	io_base = addr;
-	io_limit = addr + io_size - 1;
-	pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
-	    (uint8_t)((io_base >> 8) & 0xf0));
-	pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
-	    (uint8_t)((io_limit >> 8) & 0xf0));
-
+	/*
+	 * Account for new resources
+	 */
 	add_ppb_ranges_prop(secbus);
-	return;
-
-	/*NOTREACHED*/
-IOFAIL:
-	cmn_err(CE_WARN, "devices under bridge bus 0x%x, dev 0x%x, func 0x%x "
-	    "will not be assigned I/O ports\n", bus, dev, func);
 }
 
 void
@@ -591,7 +647,7 @@ create_root_bus_dip(uchar_t bus)
 		    memlist_dup(bootops->boot_mem->pcimem);
 	/* Exclude 0x00 to 0xff of the I/O space, used by all PCs */
 	if (pci_bus_res[0].io_ports == NULL)
-		memlist_insert(&pci_bus_res[0].io_ports, 0x100, 0xff00);
+		memlist_insert(&pci_bus_res[0].io_ports, 0x100, 0xffff);
 }
 
 /*

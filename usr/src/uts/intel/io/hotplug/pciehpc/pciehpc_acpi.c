@@ -62,8 +62,7 @@ static void pciehpc_acpi_notify_handler(ACPI_HANDLE device, uint32_t val,
 	void *context);
 static ACPI_STATUS pciehpc_acpi_ej0_present(ACPI_HANDLE pcibus_obj);
 static ACPI_STATUS pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp);
-static ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl,
-	uint32_t *hp_mode);
+ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode);
 static ACPI_STATUS pciehpc_acpi_find_osc(ACPI_HANDLE busobj,
 	ACPI_HANDLE *osc_hdlp);
 
@@ -763,7 +762,7 @@ pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp)
  * If platform doesn't support native hot-plug then hp_mode will be set
  * to ACPI_HP_MODE.
  */
-static ACPI_STATUS
+ACPI_STATUS
 pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 {
 	ACPI_STATUS		status;
