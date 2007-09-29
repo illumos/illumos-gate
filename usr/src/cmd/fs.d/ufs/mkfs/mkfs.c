@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -525,6 +525,9 @@ long	apc = 0;			/* alternate sectors per cylinder */
 int	apc_flag = RC_DEFAULT;
 char	opt = 't';			/* optimization style, `t' or `s' */
 char	mtb = 'n';			/* multi-terabyte format, 'y' or 'n' */
+#define	DEFAULT_SECT_TRAK_CPG	(nsect_flag == RC_DEFAULT && \
+				ntrack_flag == RC_DEFAULT && \
+				cpg_flag == RC_DEFAULT)
 
 long	debug = 0;			/* enable debugging output */
 
@@ -556,6 +559,8 @@ static int	waslog;		/* true when ufs logging disabled during grow */
  */
 #define	NOTENOUGHSPACE 33
 int		grow;
+#define	GROW_WITH_DEFAULT_TRAK	(grow && ntrack_flag == RC_DEFAULT)
+
 static int	Pflag;		/* probe to which size the fs can be grown */
 int		ismounted;
 char		*directory;
@@ -641,7 +646,7 @@ main(int argc, char *argv[])
 	uint64_t nbytes64;
 	int remaining_cg;
 	int do_dot = 0;
-	int use_efi_dflts = 0, retry = 0;
+	int use_efi_dflts = 0, retry = 0, isremovable = 0;
 	int invalid_sb_cnt, ret, skip_this_sb, cg_too_small;
 	int geom_nsect, geom_ntrack, geom_cpg;
 
@@ -730,8 +735,7 @@ main(int argc, char *argv[])
 					break;
 				} else {
 					(void) fprintf(stderr, gettext(
-						"illegal option: %s\n"),
-						string);
+					    "illegal option: %s\n"), string);
 					usage();
 				}
 
@@ -747,11 +751,11 @@ main(int argc, char *argv[])
 
 				(void) fprintf(stdout, gettext("mkfs -F ufs "));
 				for (opt_count = 1; opt_count < argc;
-								opt_count++) {
+				    opt_count++) {
 					opt_text = argv[opt_count];
 					if (opt_text)
-					    (void) fprintf(stdout, " %s ",
-								opt_text);
+						(void) fprintf(stdout, " %s ",
+						    opt_text);
 				}
 				(void) fprintf(stdout, "\n");
 			}
@@ -914,6 +918,9 @@ main(int argc, char *argv[])
 	 *    per cylinder, spc (sectors-per-cylinder), and many others.
 	 */
 
+	/*
+	 * Figure out the partition size and initialize the label_type.
+	 */
 	max_fssize = get_max_size(fsi);
 
 	/*
@@ -994,9 +1001,22 @@ main(int argc, char *argv[])
 		fssize_db = number(max_fssize, "size", 0);
 	}
 
+	/*
+	 * Initialize the parameters in the same way as newfs so that
+	 * newfs and mkfs would result in the same file system layout
+	 * for EFI labelled disks. Do this only in the absence of user
+	 * specified values for these parameters.
+	 */
+	if (label_type == LABEL_TYPE_EFI) {
+		if (apc_flag == RC_DEFAULT) apc = 0;
+		if (nrpos_flag == RC_DEFAULT) nrpos = 1;
+		if (ntrack_flag == RC_DEFAULT) ntrack = DEF_TRACKS_EFI;
+		if (rps_flag == RC_DEFAULT) rps = DEFHZ;
+		if (nsect_flag == RC_DEFAULT) nsect = DEF_SECTORS_EFI;
+	}
 
 	if ((maxcontig_flag == RC_DEFAULT) || (tmpmaxcontig == -1) ||
-		(maxcontig == -1)) {
+	    (maxcontig == -1)) {
 		long maxtrax = get_max_track_size(fsi);
 		maxcontig = maxtrax / bsize;
 
@@ -1056,6 +1076,7 @@ main(int argc, char *argv[])
 
 	if (max_fssize > ((diskaddr_t)bsize/DEV_BSIZE) * INT_MAX)
 		max_fssize = ((diskaddr_t)bsize/DEV_BSIZE) * INT_MAX;
+
 	range_check_64(&fssize_db, "size", 1024LL, max_fssize, max_fssize, 1);
 
 	if (fssize_db >= SECTORS_PER_TERABYTE) {
@@ -1067,6 +1088,7 @@ main(int argc, char *argv[])
 "       accessible until the system is rebooted with a 64-bit kernel.\n"));
 		}
 	}
+	dprintf(("DeBuG mtb : %c\n", mtb));
 
 	/*
 	 * With newer and much larger disks, the newfs(1M) and mkfs_ufs(1M)
@@ -1092,11 +1114,8 @@ main(int argc, char *argv[])
 	 * geometry style layout, thereby warranting the need for alternate
 	 * logic in superblock detection.
 	 */
-
-	if (mtb != 'y' && label_type == LABEL_TYPE_VTOC &&
-	    ((ntrack == -1 || (grow && ntrack_flag == RC_DEFAULT)) ||
-	    (nsect_flag == RC_DEFAULT && ntrack_flag == RC_DEFAULT &&
-	    cpg_flag == RC_DEFAULT))) {
+	if (mtb != 'y' && (ntrack == -1 || GROW_WITH_DEFAULT_TRAK ||
+	    DEFAULT_SECT_TRAK_CPG)) {
 		/*
 		 * "-1" indicates that we were called from newfs and ntracks
 		 * was not specified in newfs command line. Calculate nsect
@@ -1108,28 +1127,40 @@ main(int argc, char *argv[])
 		 * the geometry based values that newfs would have arrived at.
 		 * Newfs would have arrived at these values as below.
 		 */
-
-		if (ioctl(fsi, DKIOCGGEOM, &dkg)) {
-		    dprintf(("%s: Unable to read Disk geometry", fsys));
-		    perror(gettext("Unable to read Disk geometry"));
-		    lockexit(32);
-		} else {
-		    nsect = dkg.dkg_nsect;
-		    ntrack = dkg.dkg_nhead;
-#ifdef i386	/* Bug 1170182 */
-		    if (ntrack > 32 && (ntrack % 16) != 0) {
-			ntrack -= (ntrack % 16);
-		    }
-#endif
-		    if ((dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect)
-				> CHSLIMIT) {
+		if (label_type == LABEL_TYPE_EFI ||
+		    label_type == LABEL_TYPE_OTHER) {
 			use_efi_dflts = 1;
 			retry = 1;
-		    }
+		} else if (ioctl(fsi, DKIOCGGEOM, &dkg)) {
+			dprintf(("%s: Unable to read Disk geometry", fsys));
+			perror(gettext("Unable to read Disk geometry"));
+			lockexit(32);
+		} else {
+			nsect = dkg.dkg_nsect;
+			ntrack = dkg.dkg_nhead;
+#ifdef i386	/* Bug 1170182 */
+			if (ntrack > 32 && (ntrack % 16) != 0) {
+				ntrack -= (ntrack % 16);
+			}
+#endif
+			if (ioctl(fsi, DKIOCREMOVABLE, &isremovable)) {
+				(void) fprintf(stderr, gettext(
+				    "%s: Unable to find Media type. "
+				    "Proceeding with system determined "
+				    "parameters.\n"), fsys);
+				isremovable = 0;
+			}
+			if (((dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect)
+			    > CHSLIMIT) || isremovable) {
+				use_efi_dflts = 1;
+				retry = 1;
+			}
 		}
-		dprintf(("DeBuG CHSLIMIT = %d geom = %ld\n", CHSLIMIT,
-			dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
 	}
+	dprintf(("DeBuG CHSLIMIT = %d geom = %ld\n", CHSLIMIT,
+	    dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
+	dprintf(("DeBuG label_type = %d isremovable = %d use_efi_dflts = %d\n",
+	    label_type, isremovable, use_efi_dflts));
 
 	/*
 	 * For the newfs -N case, even if the disksize is > CHSLIMIT, do not
@@ -1153,7 +1184,7 @@ main(int argc, char *argv[])
 		if (grow && ntrack_flag != RC_DEFAULT)
 			goto start_fs_creation;
 		rdfs((diskaddr_t)(SBOFF / sectorsize), (int)sbsize,
-			(char *)&altsblock);
+		    (char *)&altsblock);
 		ret = checksblock(altsblock, 1);
 
 		if (!ret) {
@@ -1162,28 +1193,28 @@ main(int argc, char *argv[])
 				goto start_fs_creation;
 			}
 			use_efi_dflts = (altsblock.fs_version ==
-				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
+			    UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
 		} else {
 			/*
 			 * The primary superblock didn't help in determining
 			 * the fs_version. Try the first alternate superblock.
 			 */
 			dprintf(("DeBuG checksblock() failed - error : %d"
-				" for sb : %d\n", ret, SBOFF/sectorsize));
+			    " for sb : %d\n", ret, SBOFF/sectorsize));
 			rdfs((diskaddr_t)ALTSB, (int)sbsize,
-				(char *)&altsblock);
+			    (char *)&altsblock);
 			ret = checksblock(altsblock, 1);
 
 			if (!ret) {
-			    if (altsblock.fs_magic == MTB_UFS_MAGIC) {
-				mtb = 'y';
-				goto start_fs_creation;
-			    }
-			    use_efi_dflts = (altsblock.fs_version ==
-				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
+				if (altsblock.fs_magic == MTB_UFS_MAGIC) {
+					mtb = 'y';
+					goto start_fs_creation;
+				}
+				use_efi_dflts = (altsblock.fs_version ==
+				    UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
 			}
 			dprintf(("DeBuG checksblock() returned : %d"
-				" for sb : %d\n", ret, ALTSB));
+			    " for sb : %d\n", ret, ALTSB));
 		}
 	}
 
@@ -1191,7 +1222,7 @@ main(int argc, char *argv[])
 	geom_ntrack = ntrack;
 	geom_cpg = cpg;
 	dprintf(("DeBuG geom_nsect=%d, geom_ntrack=%d, geom_cpg=%d\n",
-		geom_nsect, geom_ntrack, geom_cpg));
+	    geom_nsect, geom_ntrack, geom_cpg));
 
 start_fs_creation:
 retry_alternate_logic:
@@ -1273,15 +1304,16 @@ retry_alternate_logic:
 	 * configured for multi-terabyte access, nbpi must be at least 1MB.
 	 */
 	if (mtb == 'y' && nbpi < MTB_NBPI) {
-		(void) fprintf(stderr, gettext("mkfs: bad value for nbpi: "
-			"must be at least 1048576 for multi-terabyte, "
-			"nbpi reset to default 1048576\n"));
+		if (nbpi_flag != RC_DEFAULT)
+			(void) fprintf(stderr, gettext("mkfs: bad value for "
+			    "nbpi: must be at least 1048576 for multi-terabyte,"
+			    " nbpi reset to default 1048576\n"));
 		nbpi = MTB_NBPI;
 	}
 
 	if (mtb == 'y')
 		range_check(&nbpi, "nbpi", MTB_NBPI, 2 * MB, MTB_NBPI,
-			nbpi_flag);
+		    nbpi_flag);
 	else
 		range_check(&nbpi, "nbpi", DEV_BSIZE, 2 * MB, NBPI, nbpi_flag);
 
@@ -1318,7 +1350,12 @@ retry_alternate_logic:
 	}
 
 	dprintf(("DeBuG cpg : %ld\n", cpg));
-	if (cpg == -1)
+	/*
+	 * Increase the cpg to maxcpg if either newfs was invoked
+	 * with -T option or if mkfs wants to create a mtb file system
+	 * and if the user has not specified the cpg.
+	 */
+	if (cpg == -1 || (mtb == 'y' && cpg_flag == RC_DEFAULT))
 		cpg = maxcpg;
 	dprintf(("DeBuG cpg : %ld\n", cpg));
 
@@ -1388,14 +1425,14 @@ retry_alternate_logic:
 		 */
 		if (statvfs64(MNTTAB, &fs) < 0) {
 			(void) fprintf(stderr, gettext("can't statvfs %s\n"),
-				MNTTAB);
+			    MNTTAB);
 			exit(32);
 		}
 
 		if (strcmp(MNTTYPE_MNTFS, fs.f_basetype) != 0) {
 			(void) fprintf(stderr, gettext(
-				"%s file system type is not %s, can't mkfs\n"),
-				MNTTAB, MNTTYPE_MNTFS);
+			    "%s file system type is not %s, can't mkfs\n"),
+			    MNTTAB, MNTTYPE_MNTFS);
 			exit(32);
 		}
 
@@ -1411,7 +1448,7 @@ retry_alternate_logic:
 		if ((special != NULL) && (*special != '\0')) {
 			if ((mnttab = fopen(MNTTAB, "r")) == NULL) {
 				(void) fprintf(stderr, gettext(
-					"can't open %s\n"), MNTTAB);
+				    "can't open %s\n"), MNTTAB);
 				exit(32);
 			}
 			while ((getmntent(mnttab, &mntp)) == NULL) {
@@ -1706,7 +1743,7 @@ grow10:
 		mincpg = sblock.fs_cpg;
 		nbytes64 = (uint64_t)mincpg * bpcg - used;
 		inospercg = (uint64_t)roundup((nbytes64 / nbpi),
-			INOPB(&sblock));
+		    INOPB(&sblock));
 		sblock.fs_ipg = (int32_t)inospercg;
 	}
 	if (inodecramped) {
@@ -1785,7 +1822,7 @@ grow10:
 		sblock.fs_cpg -= mincpc;
 		nbytes64 = (uint64_t)sblock.fs_cpg * bpcg - used;
 		sblock.fs_ipg = roundup((uint32_t)(nbytes64 / nbpi),
-			INOPB(&sblock));
+		    INOPB(&sblock));
 	}
 	/*
 	 * Must insure there is enough space to hold block map.
@@ -1797,7 +1834,7 @@ grow10:
 		sblock.fs_cpg -= mincpc;
 		nbytes64 = (uint64_t)sblock.fs_cpg * bpcg - used;
 		sblock.fs_ipg = roundup((uint32_t)(nbytes64 / nbpi),
-			INOPB(&sblock));
+		    INOPB(&sblock));
 	}
 	sblock.fs_fpg = (sblock.fs_cpg * sblock.fs_spc) / NSPF(&sblock);
 	if ((sblock.fs_cpg * sblock.fs_spc) % NSPB(&sblock) != 0) {
@@ -1808,7 +1845,7 @@ grow10:
 	if (sblock.fs_cpg < mincpg) {
 		(void) fprintf(stderr, gettext(
 "With the given parameters, cgsize must be at least %ld; please re-run mkfs\n"),
-			mincpg);
+		    mincpg);
 		lockexit(32);
 	}
 	sblock.fs_cgsize = fragroundup(&sblock, CGSIZE(&sblock));
@@ -1833,7 +1870,7 @@ grow20:
 	}
 	if (sblock.fs_ncyl < 1) {
 		(void) fprintf(stderr, gettext(
-			"file systems must have at least one cylinder\n"));
+		    "file systems must have at least one cylinder\n"));
 		lockexit(32);
 	}
 	if (grow)
@@ -2053,8 +2090,8 @@ grow40:
 	}
 	if (cg_too_small) {
 		(void) fprintf(stderr, gettext("File system creation failed. "
-			"There is only one cylinder group and\nthat is "
-			"not even big enough to hold the inodes.\n"));
+		    "There is only one cylinder group and\nthat is "
+		    "not even big enough to hold the inodes.\n"));
 		lockexit(32);
 	}
 	/*
@@ -2076,42 +2113,43 @@ grow40:
 		 * superblocks failed, so complain and exit.
 		 */
 		if (Nflag && retry) {
-		    skip_this_sb = 0;
-		    rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
-		    ret = checksblock(altsblock, 1);
-		    if (ret) {
-			skip_this_sb = 1;
-			invalid_sb_cnt++;
-			dprintf(("DeBuG checksblock() failed - error : %d"
-			    " for sb : %llu invalid_sb_cnt : %d\n",
-			    ret, num, invalid_sb_cnt));
-		    } else {
-			/*
-			 * Though the superblock looks sane, verify if the
-			 * fs_version in the superblock and the logic that
-			 * we are using to arrive at the superblocks match.
-			 */
-			if (use_efi_dflts && altsblock.fs_version
-			    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+			skip_this_sb = 0;
+			rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
+			ret = checksblock(altsblock, 1);
+			if (ret) {
 				skip_this_sb = 1;
 				invalid_sb_cnt++;
+				dprintf(("DeBuG checksblock() failed - error :"
+				    " %d for sb : %llu invalid_sb_cnt : %d\n",
+				    ret, num, invalid_sb_cnt));
+			} else {
+				/*
+				 * Though the superblock looks sane, verify if
+				 * the fs_version in the superblock and the
+				 * logic that we are using to arrive at the
+				 * superblocks match.
+				 */
+				if (use_efi_dflts && altsblock.fs_version
+				    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+					skip_this_sb = 1;
+					invalid_sb_cnt++;
+				}
 			}
-		    }
-		    if (invalid_sb_cnt >= INVALIDSBLIMIT) {
-			if (retry > 1) {
-			    (void) fprintf(stderr, gettext(
-				"Error determining alternate "
-				"superblock locations\n"));
-			    free(tmpbuf);
-			    lockexit(32);
+			if (invalid_sb_cnt >= INVALIDSBLIMIT) {
+				if (retry > 1) {
+					(void) fprintf(stderr, gettext(
+					    "Error determining alternate "
+					    "superblock locations\n"));
+					free(tmpbuf);
+					lockexit(32);
+				}
+				retry++;
+				use_efi_dflts = !use_efi_dflts;
+				free(tmpbuf);
+				goto retry_alternate_logic;
 			}
-			retry++;
-			use_efi_dflts = !use_efi_dflts;
-			free(tmpbuf);
-			goto retry_alternate_logic;
-		    }
-		    if (skip_this_sb)
-			continue;
+			if (skip_this_sb)
+				continue;
 		}
 		(void) sprintf(pbuf, " %llu,", num);
 		plen = strlen(pbuf);
@@ -2179,42 +2217,43 @@ grow40:
 			initcg(cylno);
 		num = fsbtodb(&sblock, (uint64_t)cgsblock(&sblock, cylno));
 		if (Nflag && retry) {
-		    skip_this_sb = 0;
-		    rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
-		    ret = checksblock(altsblock, 1);
-		    if (ret) {
-			skip_this_sb = 1;
-			invalid_sb_cnt++;
-			dprintf(("DeBuG checksblock() failed - error : %d"
-			    " for sb : %llu invalid_sb_cnt : %d\n",
-			    ret, num, invalid_sb_cnt));
-		    } else {
-			/*
-			 * Though the superblock looks sane, verify if the
-			 * fs_version in the superblock and the logic that
-			 * we are using to arrive at the superblocks match.
-			 */
-			if (use_efi_dflts && altsblock.fs_version
-			    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+			skip_this_sb = 0;
+			rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
+			ret = checksblock(altsblock, 1);
+			if (ret) {
 				skip_this_sb = 1;
 				invalid_sb_cnt++;
+				dprintf(("DeBuG checksblock() failed - error :"
+				    " %d for sb : %llu invalid_sb_cnt : %d\n",
+				    ret, num, invalid_sb_cnt));
+			} else {
+				/*
+				 * Though the superblock looks sane, verify if
+				 * the fs_version in the superblock and the
+				 * logic that we are using to arrive at the
+				 * superblocks match.
+				 */
+				if (use_efi_dflts && altsblock.fs_version
+				    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+					skip_this_sb = 1;
+					invalid_sb_cnt++;
+				}
 			}
-		    }
-		    if (invalid_sb_cnt >= INVALIDSBLIMIT) {
-			if (retry > 1) {
-			    (void) fprintf(stderr, gettext(
-				"Error determining alternate "
-				"superblock locations\n"));
-			    free(tmpbuf);
-			    lockexit(32);
+			if (invalid_sb_cnt >= INVALIDSBLIMIT) {
+				if (retry > 1) {
+					(void) fprintf(stderr, gettext(
+					    "Error determining alternate "
+					    "superblock locations\n"));
+					free(tmpbuf);
+					lockexit(32);
+				}
+				retry++;
+				use_efi_dflts = !use_efi_dflts;
+				free(tmpbuf);
+				goto retry_alternate_logic;
 			}
-			retry++;
-			use_efi_dflts = !use_efi_dflts;
-			free(tmpbuf);
-			goto retry_alternate_logic;
-		    }
-		    if (skip_this_sb)
-			continue;
+			if (skip_this_sb)
+				continue;
 		}
 		/* Don't print ',' for the last superblock */
 		if (cylno == sblock.fs_ncg-1)
@@ -2509,10 +2548,10 @@ initcg(int cylno)
 	icg.cg_btotoff = &icg.cg_space[0] - (uchar_t *)(&icg.cg_link);
 	icg.cg_boff = icg.cg_btotoff + sblock.fs_cpg * sizeof (long);
 	icg.cg_iusedoff = icg.cg_boff +
-		sblock.fs_cpg * sblock.fs_nrpos * sizeof (short);
+	    sblock.fs_cpg * sblock.fs_nrpos * sizeof (short);
 	icg.cg_freeoff = icg.cg_iusedoff + howmany(sblock.fs_ipg, NBBY);
 	icg.cg_nextfreeoff = icg.cg_freeoff +
-		howmany(sblock.fs_cpg * sblock.fs_spc / NSPF(&sblock), NBBY);
+	    howmany(sblock.fs_cpg * sblock.fs_spc / NSPF(&sblock), NBBY);
 	for (i = 0; i < sblock.fs_frag; i++) {
 		icg.cg_frsum[i] = 0;
 	}
@@ -2699,7 +2738,7 @@ initcg(int cylno)
 	sblock.fs_cstotal.cs_nifree += icg.cg_cs.cs_nifree;
 	*cs = icg.cg_cs;
 	awtfs(fsbtodb(&sblock, (uint64_t)cgtod(&sblock, cylno)),
-		sblock.fs_bsize, (char *)&icg, RELEASE);
+	    sblock.fs_bsize, (char *)&icg, RELEASE);
 }
 
 /*
@@ -2815,7 +2854,7 @@ alloc(int size, int mode)
 	}
 	if (acg.cg_cs.cs_nbfree == 0) {
 		(void) fprintf(stderr,
-			gettext("first cylinder group ran out of space\n"));
+		    gettext("first cylinder group ran out of space\n"));
 		lockexit(32);
 	}
 	for (d = 0; d < acg.cg_ndblk; d += sblock.fs_frag)
@@ -2873,8 +2912,8 @@ iput(struct inode *ip)
 	fscs[0].cs_nifree--;
 	if ((int)ip->i_number >= sblock.fs_ipg * sblock.fs_ncg) {
 		(void) fprintf(stderr,
-			gettext("fsinit: inode value out of range (%d).\n"),
-			ip->i_number);
+		    gettext("fsinit: inode value out of range (%d).\n"),
+		    ip->i_number);
 		lockexit(32);
 	}
 	d = fsbtodb(&sblock, (uint64_t)itod(&sblock, (int)ip->i_number));
@@ -3110,7 +3149,7 @@ get_aiop()
 		results.max = MAXAIO;
 
 		results.trans = (aio_trans *)calloc(results.max,
-						sizeof (aio_trans));
+		    sizeof (aio_trans));
 		if (results.trans == NULL) {
 			perror("calloc");
 			lockexit(32);
@@ -3250,7 +3289,7 @@ awtfs(diskaddr_t bno, int size, char *bf, int release)
 		transp->release = release;
 
 		n = aiowrite(fso, bf, size, (off_t)bno * sectorsize,
-				SEEK_SET, &transp->resultbuf);
+		    SEEK_SET, &transp->resultbuf);
 
 		if (n < 0) {
 			/*
@@ -3269,7 +3308,7 @@ awtfs(diskaddr_t bno, int size, char *bf, int release)
 			 */
 			results.outstanding++;
 			if (results.outstanding > results.maxpend)
-			    results.maxpend = results.outstanding;
+				results.maxpend = results.outstanding;
 		}
 	}
 
@@ -3418,35 +3457,35 @@ usage()
 {
 	(void) fprintf(stderr,
 	    gettext("ufs usage: mkfs [-F FSType] [-V] [-m] [-o options] "
-		"special "			/* param 0 */
-		"size(sectors) \\ \n"));	/* param 1 */
+	    "special "				/* param 0 */
+	    "size(sectors) \\ \n"));		/* param 1 */
 	(void) fprintf(stderr,
-		"[nsect "			/* param 2 */
-		"ntrack "			/* param 3 */
-		"bsize "			/* param 4 */
-		"fragsize "			/* param 5 */
-		"cpg "				/* param 6 */
-		"free "				/* param 7 */
-		"rps "				/* param 8 */
-		"nbpi "				/* param 9 */
-		"opt "				/* param 10 */
-		"apc "				/* param 11 */
-		"gap "				/* param 12 */
-		"nrpos "			/* param 13 */
-		"maxcontig "			/* param 14 */
-		"mtb]\n");			/* param 15 */
+	    "[nsect "				/* param 2 */
+	    "ntrack "				/* param 3 */
+	    "bsize "				/* param 4 */
+	    "fragsize "				/* param 5 */
+	    "cpg "				/* param 6 */
+	    "free "				/* param 7 */
+	    "rps "				/* param 8 */
+	    "nbpi "				/* param 9 */
+	    "opt "				/* param 10 */
+	    "apc "				/* param 11 */
+	    "gap "				/* param 12 */
+	    "nrpos "				/* param 13 */
+	    "maxcontig "			/* param 14 */
+	    "mtb]\n");				/* param 15 */
 	(void) fprintf(stderr,
-		gettext(" -m : dump fs cmd line used to make this partition\n"
-		" -V :print this command line and return\n"
-		" -o :ufs options: :nsect=%d,ntrack=%d,bsize=%d,fragsize=%d\n"
-		" -o :ufs options: :cgsize=%d,free=%d,rps=%d,nbpi=%d,opt=%c\n"
-		" -o :ufs options: :apc=%d,gap=%d,nrpos=%d,maxcontig=%d\n"
-		" -o :ufs options: :mtb=%c,calcsb,calcbinsb\n"
+	    gettext(" -m : dump fs cmd line used to make this partition\n"
+	    " -V :print this command line and return\n"
+	    " -o :ufs options: :nsect=%d,ntrack=%d,bsize=%d,fragsize=%d\n"
+	    " -o :ufs options: :cgsize=%d,free=%d,rps=%d,nbpi=%d,opt=%c\n"
+	    " -o :ufs options: :apc=%d,gap=%d,nrpos=%d,maxcontig=%d\n"
+	    " -o :ufs options: :mtb=%c,calcsb,calcbinsb\n"
 "NOTE that all -o suboptions: must be separated only by commas so as to\n"
 "be parsed as a single argument\n"),
-		nsect, ntrack, bsize, fragsize, cpg, sblock.fs_minfree, rps,
-		nbpi, opt, apc, (rotdelay == -1) ? 0 : rotdelay,
-		sblock.fs_nrpos, maxcontig, mtb);
+	    nsect, ntrack, bsize, fragsize, cpg, sblock.fs_minfree, rps,
+	    nbpi, opt, apc, (rotdelay == -1) ? 0 : rotdelay,
+	    sblock.fs_nrpos, maxcontig, mtb);
 	lockexit(32);
 }
 
@@ -3469,24 +3508,24 @@ dump_fscmd(char *fsys, int fsi)
 
 	if ((sblock.fs_magic != FS_MAGIC) &&
 	    (sblock.fs_magic != MTB_UFS_MAGIC)) {
-	    (void) fprintf(stderr, gettext(
-		"[not currently a valid file system - bad superblock]\n"));
+		(void) fprintf(stderr, gettext(
+		    "[not currently a valid file system - bad superblock]\n"));
 		lockexit(32);
 	}
 
 	if (sblock.fs_magic == FS_MAGIC &&
 	    (sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
 	    sblock.fs_version != UFS_VERSION_MIN)) {
-	    (void) fprintf(stderr, gettext(
-		"Unknown version of UFS format: %d\n"), sblock.fs_version);
+		(void) fprintf(stderr, gettext(
+		    "Unknown version of UFS format: %d\n"), sblock.fs_version);
 		lockexit(32);
 	}
 
 	if (sblock.fs_magic == MTB_UFS_MAGIC &&
 	    (sblock.fs_version > MTB_UFS_VERSION_1 ||
 	    sblock.fs_version < MTB_UFS_VERSION_MIN)) {
-	    (void) fprintf(stderr, gettext(
-		"Unknown version of UFS format: %d\n"), sblock.fs_version);
+		(void) fprintf(stderr, gettext(
+		    "Unknown version of UFS format: %d\n"), sblock.fs_version);
 		lockexit(32);
 	}
 
@@ -3574,7 +3613,7 @@ number(uint64_t d_value, char *param, int flags)
 		n = n*10 + *cs++ - '0';
 	}
 	if (minus)
-	    n = -n;
+		n = -n;
 	for (;;) {
 		switch (*cs++) {
 		case 'k':
@@ -3737,32 +3776,30 @@ lockexit(int exitstatus)
 		if (waslog) {
 			if (rl_log_control(fsys, _FIOLOGENABLE) != RL_SUCCESS) {
 				(void) fprintf(stderr, gettext(
-					"failed to re-enable logging\n"));
+				    "failed to re-enable logging\n"));
 			}
 		}
 	} else if (grow) {
 		if (isbad) {
 			(void) fprintf(stderr, gettext(
-				"Filesystem is currently inconsistent.  It "
-				"must be repaired with fsck(1M)\nbefore being "
-				"used.  Use the following command to "
-				"do this:\n\n\tfsck %s\n\n"),
-					fsys);
+			    "Filesystem is currently inconsistent.  It "
+			    "must be repaired with fsck(1M)\nbefore being "
+			    "used.  Use the following command to "
+			    "do this:\n\n\tfsck %s\n\n"), fsys);
 
 			if (ismounted) {
 				(void) fprintf(stderr, gettext(
-					"You will be told that the filesystem "
-					"is already mounted, and asked if you\n"
-					"wish to continue.  Answer `yes' to "
-					"this question.\n\n"));
+				    "You will be told that the filesystem "
+				    "is already mounted, and asked if you\n"
+				    "wish to continue.  Answer `yes' to "
+				    "this question.\n\n"));
 			}
 
 			(void) fprintf(stderr, gettext(
-					"One problem should be reported, that "
-					"the summary information is bad.\n"
-					"You will then be asked if it "
-					"should be salvaged.  Answer `yes' "
-					"to\nthis question.\n\n"));
+			    "One problem should be reported, that the summary "
+			    "information is bad.\nYou will then be asked if it "
+			    "should be salvaged.  Answer `yes' to\nthis "
+			    "question.\n\n"));
 		}
 
 		if (ismounted) {
@@ -3772,21 +3809,20 @@ lockexit(int exitstatus)
 			 * face of future code changes.
 			 */
 			(void) fprintf(stderr, gettext(
-				"The filesystem is currently mounted "
-				"read-only and write-locked.  "));
+			    "The filesystem is currently mounted "
+			    "read-only and write-locked.  "));
 			if (isbad) {
 				(void) fprintf(stderr, gettext(
-					"After\nrunning fsck, unlock the "
-					"filesystem and "));
+				    "After\nrunning fsck, unlock the "
+				    "filesystem and "));
 			} else {
 				(void) fprintf(stderr, gettext(
-					"Unlock the filesystem\nand "));
+				    "Unlock the filesystem\nand "));
 			}
 
 			(void) fprintf(stderr, gettext(
-				"re-enable writing with\nthe following "
-				"command:\n\n\tlockfs -u %s\n\n"),
-					directory);
+			    "re-enable writing with\nthe following "
+			    "command:\n\n\tlockfs -u %s\n\n"), directory);
 		}
 	}
 
@@ -3866,8 +3902,8 @@ checksummarysize()
 	if (testforce)
 		if (testfrags > cg0frags) {
 			(void) fprintf(stderr,
-				gettext("Too many test frags (%lld); "
-				"try %lld\n"), testfrags, cg0frags);
+			    gettext("Too many test frags (%lld); "
+			    "try %lld\n"), testfrags, cg0frags);
 			lockexit(32);
 		}
 
@@ -3901,29 +3937,30 @@ checksblock(struct fs sb, int proceed)
 	char *errmsg;
 
 	if ((sb.fs_magic != FS_MAGIC) && (sb.fs_magic != MTB_UFS_MAGIC)) {
-	    err = 1;
-	    errmsg = gettext("Bad superblock; magic number wrong\n");
+		err = 1;
+		errmsg = gettext("Bad superblock; magic number wrong\n");
 	} else if ((sb.fs_magic == FS_MAGIC &&
-		(sb.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
-		sb.fs_version != UFS_VERSION_MIN)) ||
-		(sb.fs_magic == MTB_UFS_MAGIC &&
-		(sb.fs_version > MTB_UFS_VERSION_1 ||
-		sb.fs_version < MTB_UFS_VERSION_MIN))) {
-	    err = 2;
-	    errmsg = gettext("Unrecognized version of UFS\n");
+	    (sb.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    sb.fs_version != UFS_VERSION_MIN)) ||
+	    (sb.fs_magic == MTB_UFS_MAGIC &&
+	    (sb.fs_version > MTB_UFS_VERSION_1 ||
+	    sb.fs_version < MTB_UFS_VERSION_MIN))) {
+		err = 2;
+		errmsg = gettext("Unrecognized version of UFS\n");
 	} else if (sb.fs_ncg < 1) {
-	    err = 3;
-	    errmsg = gettext("Bad superblock; ncg out of range\n");
+		err = 3;
+		errmsg = gettext("Bad superblock; ncg out of range\n");
 	} else if (sb.fs_cpg < 1) {
-	    err = 4;
-	    errmsg = gettext("Bad superblock; cpg out of range\n");
+		err = 4;
+		errmsg = gettext("Bad superblock; cpg out of range\n");
 	} else if (sb.fs_ncg * sb.fs_cpg < sb.fs_ncyl ||
-		(sb.fs_ncg - 1) * sb.fs_cpg >= sb.fs_ncyl) {
-	    err = 5;
-	    errmsg = gettext("Bad superblock; ncyl out of range\n");
+	    (sb.fs_ncg - 1) * sb.fs_cpg >= sb.fs_ncyl) {
+		err = 5;
+		errmsg = gettext("Bad superblock; ncyl out of range\n");
 	} else if (sb.fs_sbsize <= 0 || sb.fs_sbsize > sb.fs_bsize) {
-	    err = 6;
-	    errmsg = gettext("Bad superblock; superblock size out of range\n");
+		err = 6;
+		errmsg = gettext("Bad superblock; superblock size out of "
+		    "range\n");
 	}
 
 	if (proceed) {
@@ -4035,7 +4072,7 @@ growinit(char *devstr)
 	(void) checksblock(sblock, 0);
 	if (sblock.fs_postblformat != FS_DYNAMICPOSTBLFMT) {
 		(void) fprintf(stderr,
-			gettext("old file system format; can't growfs\n"));
+		    gettext("old file system format; can't growfs\n"));
 		lockexit(32);
 	}
 
@@ -4076,7 +4113,7 @@ growinit(char *devstr)
 	    ((FSOKAY == (sblock.fs_state + sblock.fs_time)) &&
 	    (sblock.fs_clean == FSLOG && !islog))) {
 		(void) fprintf(stderr,
-			gettext("logging device has errors; can't growfs\n"));
+		    gettext("logging device has errors; can't growfs\n"));
 		lockexit(32);
 	}
 
@@ -4086,7 +4123,7 @@ growinit(char *devstr)
 	if (isufslog) {
 		if (rl_log_control(devstr, _FIOLOGDISABLE) != RL_SUCCESS) {
 			(void) fprintf(stderr, gettext(
-				"failed to disable logging\n"));
+			    "failed to disable logging\n"));
 			lockexit(32);
 		}
 		islog = 0;
@@ -4160,7 +4197,7 @@ checkdev(char *rdev, char *bdev)
 	}
 	if ((statarea.st_mode & S_IFMT) != S_IFCHR) {
 		(void) fprintf(stderr,
-			gettext("%s is not a character device\n"), rdev);
+		    gettext("%s is not a character device\n"), rdev);
 		lockexit(32);
 	}
 }
@@ -4174,25 +4211,25 @@ checkmount(struct mnttab *mntp, char *bdevname)
 	if (strcmp(bdevname, mntp->mnt_special) == 0) {
 		if (stat64(mntp->mnt_mountp, &statdir) == -1) {
 			(void) fprintf(stderr, gettext("can't stat %s\n"),
-				mntp->mnt_mountp);
+			    mntp->mnt_mountp);
 			lockexit(32);
 		}
 		if (stat64(mntp->mnt_special, &statdev) == -1) {
 			(void) fprintf(stderr, gettext("can't stat %s\n"),
-				mntp->mnt_special);
+			    mntp->mnt_special);
 			lockexit(32);
 		}
 		if (statdir.st_dev != statdev.st_rdev) {
 			(void) fprintf(stderr, gettext(
-				"%s is not mounted on %s; mnttab(4) wrong\n"),
-				mntp->mnt_special, mntp->mnt_mountp);
+			    "%s is not mounted on %s; mnttab(4) wrong\n"),
+			    mntp->mnt_special, mntp->mnt_mountp);
 			lockexit(32);
 		}
 		ismounted = 1;
 		if (directory) {
 			if (strcmp(mntp->mnt_mountp, directory) != 0) {
 				(void) fprintf(stderr,
-				gettext("%s is mounted on %s, not %s\n"),
+				    gettext("%s is mounted on %s, not %s\n"),
 				    bdevname, mntp->mnt_mountp, directory);
 				lockexit(32);
 			}
@@ -4224,7 +4261,7 @@ gdinode(ino_t ino)
 	if (itod(&sblock, ino) != difrag) {
 		difrag = itod(&sblock, ino);
 		rdfs(fsbtodb(&sblock, (uint64_t)difrag), (int)sblock.fs_bsize,
-			(char *)dibuf);
+		    (char *)dibuf);
 	}
 	return (dibuf + (ino % INOPB(&sblock)));
 }
@@ -4330,7 +4367,7 @@ addcsfrag(ino_t ino, daddr32_t frag, struct csfrag **cfap)
 	cfp->frags	= 1;
 	cfp->size	= sblock.fs_fsize;
 	for (prev = NULL, curr = *cfap; curr != NULL;
-		prev = curr, curr = curr->next) {
+	    prev = curr, curr = curr->next) {
 		if (frag < curr->ofrag) {
 			cfp->next = curr;
 			if (prev)
@@ -4509,16 +4546,15 @@ read_summaryinfo(struct	fs *fsp)
 
 	if ((csp = malloc((size_t)fsp->fs_cssize)) == NULL) {
 		(void) fprintf(stderr, gettext("cannot create csum list,"
-			" not enough memory\n"));
+		    " not enough memory\n"));
 		exit(32);
 	}
 
 	for (i = 0; i < fsp->fs_cssize; i += fsp->fs_bsize) {
 		rdfs(fsbtodb(fsp,
-			(uint64_t)(fsp->fs_csaddr + numfrags(fsp, i))),
-			(int)(fsp->fs_cssize - i < fsp->fs_bsize ?
-			fsp->fs_cssize - i : fsp->fs_bsize),
-			((caddr_t)csp) + i);
+		    (uint64_t)(fsp->fs_csaddr + numfrags(fsp, i))),
+		    (int)(fsp->fs_cssize - i < fsp->fs_bsize ?
+		    fsp->fs_cssize - i : fsp->fs_bsize), ((caddr_t)csp) + i);
 	}
 
 	return (csp);
@@ -4539,12 +4575,12 @@ checkfragallocated(daddr32_t frag)
 	 * frag is smaller then the one in the list.
 	 */
 	for (cfp = csfragfree; cfp != NULL && frag >= cfp->ofrag;
-		cfp = cfp->next) {
+	    cfp = cfp->next) {
 		if (frag == cfp->ofrag)
 			return (1);
 	}
 	for (cfp = csfragino; cfp != NULL && frag >= cfp->ofrag;
-		cfp = cfp->next) {
+	    cfp = cfp->next) {
 		if (frag == cfp->ofrag && cfp->nfrag != 0)
 			return (cfp->frags);
 	}
@@ -4599,11 +4635,11 @@ probe_summaryinfo()
 	 * build list of frags needed for cg summary info block extension
 	 */
 	oldfrag_daddr = howmany(sblock.fs_cssize, sblock.fs_fsize) +
-		sblock.fs_csaddr;
+	    sblock.fs_csaddr;
 	new_fs_ncg = howmany(dbtofsb(&sblock, fssize_db), sblock.fs_fpg);
 	new_fs_cssize = fragroundup(&sblock, new_fs_ncg * sizeof (struct csum));
 	newfrag_daddr = howmany(new_fs_cssize, sblock.fs_fsize) +
-		sblock.fs_csaddr;
+	    sblock.fs_csaddr;
 	/*
 	 * add all of the frags that are required to grow the cyl summary to the
 	 * csfrag list, which is the generic/unknown list, since at this point
@@ -4634,7 +4670,7 @@ probe_summaryinfo()
 		 */
 		int64_t tmp_frags;
 		for (daddr = oldfrag_daddr; daddr < newfrag_daddr;
-			daddr += tmp_frags) {
+		    daddr += tmp_frags) {
 			if ((tmp_frags = checkfragallocated(daddr)) > 0)
 				growth_csum_frags += tmp_frags;
 			else
@@ -4655,7 +4691,7 @@ probe_summaryinfo()
 	 * `growth_csum_frags' and the number of fragments per cylinder group.
 	 */
 	growth_fs_frags = howmany(sblock.fs_fsize, sizeof (struct csum)) *
-		growth_csum_frags * sblock.fs_fpg;
+	    growth_csum_frags * sblock.fs_fpg;
 
 	/*
 	 * compute free fragments in the last cylinder group
@@ -4669,7 +4705,7 @@ probe_summaryinfo()
 	 * group without extending the csum block.
 	 */
 	spare_csum = howmany(sblock.fs_cssize, sizeof (struct csum)) -
-		sblock.fs_ncg;
+	    sblock.fs_ncg;
 	if (spare_csum > 0)
 		growth_fs_frags += spare_csum * sblock.fs_fpg;
 
@@ -4894,7 +4930,7 @@ rdcg(long cylno)
 		flcg();
 		curcylno = cylno;
 		rdfs(fsbtodb(&sblock, (uint64_t)cgtod(&sblock, curcylno)),
-			(int)sblock.fs_cgsize, (char *)&acg);
+		    (int)sblock.fs_cgsize, (char *)&acg);
 	}
 }
 
@@ -4904,12 +4940,12 @@ flcg()
 	if (cylnodirty) {
 		if (debug && Pflag) {
 			(void) fprintf(stderr,
-				"Assert: cylnodirty set in probe mode\n");
+			    "Assert: cylnodirty set in probe mode\n");
 			return;
 		}
 		resetallocinfo();
 		wtfs(fsbtodb(&sblock, (uint64_t)cgtod(&sblock, curcylno)),
-			(int)sblock.fs_cgsize, (char *)&acg);
+		    (int)sblock.fs_cgsize, (char *)&acg);
 		cylnodirty = 0;
 	}
 	curcylno = -1;
@@ -5137,9 +5173,9 @@ ulockfs()
 
 	if (LOCKFS_IS_MOD(&lockfs)) {
 		(void) fprintf(stderr,
-			gettext("FILE SYSTEM CHANGED DURING GROWFS!\n"));
+		    gettext("FILE SYSTEM CHANGED DURING GROWFS!\n"));
 		(void) fprintf(stderr,
-			gettext("   See lockfs(1), umount(1), and fsck(1)\n"));
+		    gettext("   See lockfs(1), umount(1), and fsck(1)\n"));
 		lockexit(32);
 	}
 	/*
@@ -5222,10 +5258,10 @@ wtsb()
 	 */
 	for (i = 0; i < sblock.fs_cssize; i += sblock.fs_bsize)
 		wtfs(fsbtodb(&sblock, (uint64_t)(sblock.fs_csaddr +
-			numfrags(&sblock, i))),
-			(int)(sblock.fs_cssize - i < sblock.fs_bsize ?
-			sblock.fs_cssize - i : sblock.fs_bsize),
-			((char *)fscs) + i);
+		    numfrags(&sblock, i))),
+		    (int)(sblock.fs_cssize - i < sblock.fs_bsize ?
+		    sblock.fs_cssize - i : sblock.fs_bsize),
+		    ((char *)fscs) + i);
 
 	/*
 	 * write superblock
@@ -5325,7 +5361,7 @@ range_check(long *varp, char *name, long minimum, long maximum,
     long def_val, int user_supplied)
 {
 	dprintf(("DeBuG %s : %ld (%ld %ld %ld)\n",
-		name, *varp, minimum, maximum, def_val));
+	    name, *varp, minimum, maximum, def_val));
 
 	if ((*varp < minimum) || (*varp > maximum)) {
 		if (user_supplied != RC_DEFAULT) {
@@ -5438,10 +5474,10 @@ confirm_abort(void)
 	char line[80];
 
 	printf(gettext("\n\nAborting at this point will leave the filesystem "
-		"in an inconsistent\nstate.  If you do choose to stop, "
-		"you will be given instructions on how to\nrecover "
-		"the filesystem.  Do you wish to cancel the filesystem "
-		"grow\noperation (y/n)?"));
+	    "in an inconsistent\nstate.  If you do choose to stop, "
+	    "you will be given instructions on how to\nrecover "
+	    "the filesystem.  Do you wish to cancel the filesystem "
+	    "grow\noperation (y/n)?"));
 	if (getline(stdin, line, sizeof (line)) == EOF)
 		line[0] = 'y';
 
@@ -5585,7 +5621,7 @@ compute_maxcpg(long bsize, long fragsize, long nbpi, long nrpos, long spc)
 		maxcpg_given_fragsize =
 		    (bsize - (sizeof (struct cg)) - (bsize / inode_divisor)) /
 		    (sizeof (long) + nrpos * sizeof (short) +
-						(spc / spf) / NBBY);
+		    (spc / spf) / NBBY);
 
 		if (maxcpg_given_fragsize >= maxcpg_given_nbpi)
 			return (maxcpg_given_nbpi);

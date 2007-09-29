@@ -25,7 +25,7 @@
 /*
  * newfs: friendly front end to mkfs
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,9 +142,11 @@ static int	label_type;	/* see types below */
 /*
  * The variable use_efi_dflts is an indicator of whether to use EFI logic
  * or the geometry logic in laying out the filesystem. This is decided
- * based on the size of the disk and is used only for non-EFI labeled disks.
+ * based on the size/type of the disk and is used only for non-EFI labeled
+ * disks and removable media.
  */
 static int	use_efi_dflts = 0;
+static int	isremovable = 0;
 
 static char	device[MAXPATHLEN];
 static char	cmd[BUFSIZ];
@@ -235,13 +237,12 @@ main(int argc, char *argv[])
 
 		case 'o':
 			if (strcmp(optarg, "space") == 0)
-			    optim = FS_OPTSPACE;
+				optim = FS_OPTSPACE;
 			else if (strcmp(optarg, "time") == 0)
-			    optim = FS_OPTTIME;
+				optim = FS_OPTTIME;
 			else
-			    fatal(gettext(
-"%s: bad optimization preference (options are `space' or `time')"),
-				optarg);
+				fatal(gettext(
+"%s: bad optimization preference (options are `space' or `time')"), optarg);
 			break;
 
 		case 'a':
@@ -261,7 +262,7 @@ main(int argc, char *argv[])
 
 		case 'f':
 			fsize = number("fragsize", optarg, NR_NONE,
-				DESFRAGSIZE);
+			    DESFRAGSIZE);
 			fsize_flag++;
 			/* xxx ought to test against bsize for upper limit */
 			if (fsize < DEV_BSIZE)
@@ -557,7 +558,7 @@ main(int argc, char *argv[])
 			density = MINDENSITY;
 		else
 			density = (int)((((longlong_t)fssize + (GBSEC - 1)) /
-						GBSEC) * MINDENSITY);
+			    GBSEC) * MINDENSITY);
 		if (density <= 0)
 			density = MINDENSITY;
 		if (density > MAXDEFDENSITY)
@@ -575,7 +576,7 @@ main(int argc, char *argv[])
 		    bsize / sizeof (struct inode));
 		maxcpg = (bsize - sizeof (struct cg) - howmany(maxipg, NBBY)) /
 		    (sizeof (long) + nrpos * sizeof (short) +
-			nsectors / (MAXFRAG * NBBY));
+		    nsectors / (MAXFRAG * NBBY));
 		cpg = (fssize / GBSEC) * 32;
 		if (cpg > maxcpg)
 			cpg = maxcpg;
@@ -615,8 +616,14 @@ main(int argc, char *argv[])
 		if (!yes())
 			exit(0);
 	}
+	/*
+	 * Geometry information does not make sense for removable media
+	 * anyway, so indicate mkfs to use the default parameters by passing -1.
+	 */
+	if (!Tflag && isremovable)
+		ntracks = -1;
 	dprintf(("DeBuG newfs : nsect=%d ntrak=%d cpg=%d\n",
-		nsectors, ntracks, cpg));
+	    nsectors, ntracks, cpg));
 	/*
 	 * If alternates-per-cylinder is ever implemented:
 	 * need to get apc from dp->d_apc if no -a switch???
@@ -727,12 +734,19 @@ getdiskbydev(char *disk)
 	 */
 	actual_size = get_device_size(fd, disk);
 
+	if (ioctl(fd, DKIOCREMOVABLE, &isremovable)) {
+		(void) fprintf(stderr, gettext(
+		    "%s: Unable to find Media type. Proceeding with "
+		    "system determined parameters.\n"), disk);
+		isremovable = 0;
+	}
+
 	if (label_type == LABEL_TYPE_VTOC) {
 		if (ioctl(fd, DKIOCGGEOM, &g))
 			fatal(gettext(
 			    "%s: Unable to read Disk geometry"), disk);
 		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d\n",
-			g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT));
+		    g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT));
 		if (((g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect) > CHSLIMIT) &&
 		    !Tflag) {
 			dprintf(("DeBuG newfs : geom > CHSLIMIT\n"));
@@ -1146,7 +1160,7 @@ number(char *param, char *value, int flags, int def_value)
 		n = n*10 + *cs++ - '0';
 	}
 	if (minus)
-	    n = -n;
+		n = -n;
 	for (;;) {
 		switch (*cs++) {
 		case '\0':
@@ -1198,7 +1212,7 @@ number64(char *param, char *value, int flags, int64_t def_value)
 		n = n*10 + *cs++ - '0';
 	}
 	if (minus)
-	    n = -n;
+		n = -n;
 	for (;;) {
 		switch (*cs++) {
 		case '\0':
