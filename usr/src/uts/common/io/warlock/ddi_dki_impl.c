@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 int warlock_dummy(void);
 int _init(void);
 int _fini(void);
-int _info(void);
+int _info(struct modinfo *a);
 int scsi_init(void);
 
 int main(void) {
@@ -64,7 +64,7 @@ int main(void) {
 	 */
 	_init();
 	_fini();
-	_info();
+	_info(0);
 	(*devops_p->devo_identify)(0);
 	(*devops_p->devo_probe)(0);
 	(*devops_p->devo_attach)(0, 0);

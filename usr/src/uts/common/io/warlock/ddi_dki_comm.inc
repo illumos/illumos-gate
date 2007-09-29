@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.
  * All rights reserved.  Use is subject to license terms.
  */
 
@@ -68,7 +68,8 @@ struct bus_ops *busops_p, warlock_bus_ops = {
 
 
 /* This rendition of mod_remove() tells warlock that it calls detach. */
-int mod_remove(void) {
+int
+mod_remove(struct modlinkage *a) {
 	(*devops_p->devo_detach)(NULL, 0);
 }
 
