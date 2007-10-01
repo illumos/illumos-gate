@@ -81,6 +81,7 @@
 #include <sys/stack.h>
 #include <sys/trap.h>
 #include <sys/fp.h>
+#include <vm/kboot_mmu.h>
 #include <vm/anon.h>
 #include <vm/as.h>
 #include <vm/page.h>
@@ -112,9 +113,11 @@
 #include <sys/cpu_module.h>
 #include <sys/smbios.h>
 #include <sys/debug_info.h>
+#include <sys/bootinfo.h>
 #include <sys/ddi_timer.h>
 
 #ifdef __xpv
+
 #include <sys/hypervisor.h>
 #include <sys/xen_mmu.h>
 #include <sys/evtchn_impl.h>
@@ -122,12 +125,12 @@
 #include <sys/xpv_panic.h>
 #include <xen/sys/xenbus_comms.h>
 #include <xen/public/physdev.h>
-extern void xen_late_startup(void);
-extern struct xen_evt_data cpu0_evt_data;
-#endif
 
-#include <sys/bootinfo.h>
-#include <vm/kboot_mmu.h>
+extern void xen_late_startup(void);
+
+struct xen_evt_data cpu0_evt_data;
+
+#endif /* __xpv */
 
 extern void progressbar_init(void);
 extern void progressbar_start(void);
@@ -1668,9 +1671,9 @@ startup_vm(void)
 
 #ifndef __xpv
 	/*
-	 * Setup MTRR (Memory type range registers)
+	 * Setup Page Attribute Table
 	 */
-	setup_mtrr();
+	pat_sync();
 #endif
 
 	/*
@@ -2346,138 +2349,47 @@ kvm_init(void)
 
 #ifndef __xpv
 /*
- * These are MTTR registers supported by P6
+ * Solaris adds an entry for Write Combining caching to the PAT
  */
-static struct	mtrrvar	mtrrphys_arr[MAX_MTRRVAR];
-static uint64_t mtrr64k, mtrr16k1, mtrr16k2;
-static uint64_t mtrr4k1, mtrr4k2, mtrr4k3;
-static uint64_t mtrr4k4, mtrr4k5, mtrr4k6;
-static uint64_t mtrr4k7, mtrr4k8, mtrrcap;
-uint64_t mtrrdef, pat_attr_reg;
-
-/*
- * Disable reprogramming of MTRRs by default.
- */
-int	enable_relaxed_mtrr = 0;
+static uint64_t pat_attr_reg = PAT_DEFAULT_ATTRIBUTE;
 
 void
-setup_mtrr(void)
+pat_sync(void)
 {
-	int i, ecx;
-	int vcnt;
-	struct	mtrrvar	*mtrrphys;
+	ulong_t	cr0, cr0_orig, cr4;
 
-	if (!(x86_feature & X86_MTRR))
+	if (!(x86_feature & X86_PAT))
 		return;
+	cr0_orig = cr0 = getcr0();
+	cr4 = getcr4();
 
-	mtrrcap = rdmsr(REG_MTRRCAP);
-	mtrrdef = rdmsr(REG_MTRRDEF);
-	if (mtrrcap & MTRRCAP_FIX) {
-		mtrr64k = rdmsr(REG_MTRR64K);
-		mtrr16k1 = rdmsr(REG_MTRR16K1);
-		mtrr16k2 = rdmsr(REG_MTRR16K2);
-		mtrr4k1 = rdmsr(REG_MTRR4K1);
-		mtrr4k2 = rdmsr(REG_MTRR4K2);
-		mtrr4k3 = rdmsr(REG_MTRR4K3);
-		mtrr4k4 = rdmsr(REG_MTRR4K4);
-		mtrr4k5 = rdmsr(REG_MTRR4K5);
-		mtrr4k6 = rdmsr(REG_MTRR4K6);
-		mtrr4k7 = rdmsr(REG_MTRR4K7);
-		mtrr4k8 = rdmsr(REG_MTRR4K8);
-	}
-	if ((vcnt = (mtrrcap & MTRRCAP_VCNTMASK)) > MAX_MTRRVAR)
-		vcnt = MAX_MTRRVAR;
-
-	for (i = 0, ecx = REG_MTRRPHYSBASE0, mtrrphys = mtrrphys_arr;
-	    i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
-		mtrrphys->mtrrphys_base = rdmsr(ecx);
-		mtrrphys->mtrrphys_mask = rdmsr(ecx + 1);
-		if ((x86_feature & X86_PAT) && enable_relaxed_mtrr)
-			mtrrphys->mtrrphys_mask &= ~MTRRPHYSMASK_V;
-	}
-	if (x86_feature & X86_PAT) {
-		if (enable_relaxed_mtrr)
-			mtrrdef = MTRR_TYPE_WB|MTRRDEF_FE|MTRRDEF_E;
-		pat_attr_reg = PAT_DEFAULT_ATTRIBUTE;
-	}
-
-	mtrr_sync();
-}
-
-/*
- * Sync current cpu mtrr with the incore copy of mtrr.
- * This function has to be invoked with interrupts disabled
- * Currently we do not capture other cpu's. This is invoked on cpu0
- * just after reading /etc/system.
- * On other cpu's its invoked from mp_startup().
- */
-void
-mtrr_sync(void)
-{
-	uint_t	crvalue, cr0_orig;
-	int	vcnt, i, ecx;
-	struct	mtrrvar	*mtrrphys;
-
-	cr0_orig = crvalue = getcr0();
-	crvalue |= CR0_CD;
-	crvalue &= ~CR0_NW;
-	setcr0(crvalue);
+	/* disable caching and flush all caches and TLBs */
+	cr0 |= CR0_CD;
+	cr0 &= ~CR0_NW;
+	setcr0(cr0);
 	invalidate_cache();
-
-#if !defined(__xpv)
-	reload_cr3();
-#endif
-	if (x86_feature & X86_PAT)
-		wrmsr(REG_MTRRPAT, pat_attr_reg);
-
-	wrmsr(REG_MTRRDEF, rdmsr(REG_MTRRDEF) &
-	    ~((uint64_t)(uintptr_t)MTRRDEF_E));
-
-	if (mtrrcap & MTRRCAP_FIX) {
-		wrmsr(REG_MTRR64K, mtrr64k);
-		wrmsr(REG_MTRR16K1, mtrr16k1);
-		wrmsr(REG_MTRR16K2, mtrr16k2);
-		wrmsr(REG_MTRR4K1, mtrr4k1);
-		wrmsr(REG_MTRR4K2, mtrr4k2);
-		wrmsr(REG_MTRR4K3, mtrr4k3);
-		wrmsr(REG_MTRR4K4, mtrr4k4);
-		wrmsr(REG_MTRR4K5, mtrr4k5);
-		wrmsr(REG_MTRR4K6, mtrr4k6);
-		wrmsr(REG_MTRR4K7, mtrr4k7);
-		wrmsr(REG_MTRR4K8, mtrr4k8);
+	if (cr4 & CR4_PGE) {
+		setcr4(cr4 & ~(ulong_t)CR4_PGE);
+		setcr4(cr4);
+	} else {
+		reload_cr3();
 	}
-	if ((vcnt = (mtrrcap & MTRRCAP_VCNTMASK)) > MAX_MTRRVAR)
-		vcnt = MAX_MTRRVAR;
-	for (i = 0, ecx = REG_MTRRPHYSBASE0, mtrrphys = mtrrphys_arr;
-	    i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
-		wrmsr(ecx, mtrrphys->mtrrphys_base);
-		wrmsr(ecx + 1, mtrrphys->mtrrphys_mask);
-	}
-	wrmsr(REG_MTRRDEF, mtrrdef);
 
-#if !defined(__xpv)
-	reload_cr3();
-#endif
+	/* add our entry to the PAT */
+	wrmsr(REG_PAT, pat_attr_reg);
+
+	/* flush TLBs and cache again, then reenable cr0 caching */
+	if (cr4 & CR4_PGE) {
+		setcr4(cr4 & ~(ulong_t)CR4_PGE);
+		setcr4(cr4);
+	} else {
+		reload_cr3();
+	}
 	invalidate_cache();
 	setcr0(cr0_orig);
 }
 
-/*
- * resync mtrr so that BIOS is happy. Called from mdboot
- */
-void
-mtrr_resync(void)
-{
-	if ((x86_feature & X86_PAT) && enable_relaxed_mtrr) {
-		/*
-		 * We could have changed the default mtrr definition.
-		 * Put it back to uncached which is what it is at power on
-		 */
-		mtrrdef = MTRR_TYPE_UC|MTRRDEF_FE|MTRRDEF_E;
-		mtrr_sync();
-	}
-}
-#endif
+#endif /* !__xpv */
 
 void
 get_system_configuration(void)

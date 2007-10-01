@@ -24,6 +24,71 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Virtual CPU management.
+ *
+ * VCPUs can be controlled in one of two ways; through the domain itself
+ * (psradm, p_online(), etc.), and via changes in xenstore (vcpu_config()).
+ * Unfortunately, the terminology is used in different ways; they work out as
+ * follows:
+ *
+ * P_ONLINE: the VCPU is up and running, taking interrupts and running threads
+ *
+ * P_OFFLINE: the VCPU is up and running, but quiesced (i.e. blocked in the
+ * hypervisor on the idle thread).  It must be up since a downed VCPU cannot
+ * receive interrupts, and we require this for offline CPUs in Solaris.
+ *
+ * P_POWEROFF: the VCPU is down (we never called xen_vcpu_up(), or called
+ * xen_vcpu_down() for it).  It can't take interrupts or run anything, though
+ * if it has run previously, its software state (cpu_t, machcpu structures, IPI
+ * event channels, etc.) will still exist.
+ *
+ * The hypervisor has two notions of CPU states as represented in the store:
+ *
+ * "offline": the VCPU is down.  Corresponds to P_POWEROFF.
+ *
+ * "online": the VCPU is running.  Corresponds to a CPU state other than
+ * P_POWEROFF.
+ *
+ * Currently, only a notification via xenstore can bring a CPU into a
+ * P_POWEROFF state, and only the domain can change between P_ONLINE, P_NOINTR,
+ * P_OFFLINE, etc.  We need to be careful to treat xenstore notifications
+ * idempotently, as we'll get 'duplicate' entries when we resume a domain.
+ *
+ * Note that the xenstore configuration is strictly advisory, in that a domain
+ * can choose to ignore it and still power up a VCPU in the offline state. To
+ * play nice, we don't allow it. Thus, any attempt to power on/off a CPU is
+ * ENOTSUP from within Solaris.
+ *
+ * Powering off a VCPU and suspending the domain use similar code. The
+ * difficulty here is that we must ensure that each VCPU is in a stable
+ * state: it must have a saved PCB, and not be responding to interrupts
+ * (since we are just about to remove its ability to run on a real CPU,
+ * possibly forever).  However, an offline CPU in Solaris can take
+ * cross-call interrupts, as mentioned, so we must go through a
+ * two-stage process.  First, we use the standard Solaris pause_cpus().
+ * This ensures that all CPUs are either in mach_cpu_pause() or
+ * mach_cpu_idle(), and nothing will cross-call them.
+ *
+ * Powered-off-CPUs are already safe, as we own the cpu_lock needed to
+ * bring them back up, and in state CPU_PHASE_POWERED_OFF.
+ *
+ * Running CPUs are spinning in mach_cpu_pause() waiting for either
+ * PAUSE_IDLE or CPU_PHASE_WAIT_SAFE.
+ *
+ * Offline CPUs are either running the idle thread and periodically
+ * checking for CPU_PHASE_WAIT_SAFE, or blocked in the hypervisor.
+ *
+ * Thus, we set CPU_PHASE_WAIT_SAFE for every powered-on CPU, as well as
+ * poking them to make sure they're not blocked[1]. When every CPU has
+ * responded by reaching a safe state and setting CPU_PHASE_SAFE, we
+ * know we can suspend, or power-off a CPU, without problems.
+ *
+ * [1] note that we have to repeatedly poke offline CPUs: it's the only
+ * way to ensure that the CPU doesn't miss the state change before
+ * dropping into HYPERVISOR_block().
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -35,26 +100,37 @@
 #include <sys/machsystm.h>
 #include <sys/segments.h>
 #include <sys/cpuvar.h>
-#include <sys/psw.h>
 #include <sys/x86_archext.h>
 #include <sys/controlregs.h>
-#include <vm/as.h>
-#include <vm/hat.h>
-#include <vm/hat_i86.h>
-#include <sys/mman.h>
 #include <sys/hypervisor.h>
-#include <xen/sys/xenbus_impl.h>
 #include <sys/xpv_panic.h>
-#include <util/sscanf.h>
+#include <sys/mman.h>
+#include <sys/psw.h>
 #include <sys/cpu.h>
-#include <asm/cpu.h>
+#include <sys/sunddi.h>
+#include <util/sscanf.h>
+#include <vm/hat_i86.h>
+#include <vm/hat.h>
+#include <vm/as.h>
 
-#include <xen/public/vcpu.h>
 #include <xen/public/io/xs_wire.h>
+#include <xen/sys/xenbus_impl.h>
+#include <xen/public/vcpu.h>
 
-struct xen_evt_data cpu0_evt_data;		/* cpu0's pending event data */
+#define	CPU_PHASE_NONE 0
+#define	CPU_PHASE_WAIT_SAFE 1
+#define	CPU_PHASE_SAFE 2
+#define	CPU_PHASE_POWERED_OFF 3
+
+/*
+ * We can only poke CPUs during barrier enter 256 times a second at
+ * most.
+ */
+#define	POKE_TIMEOUT (NANOSEC / 256)
 
 static taskq_t *cpu_config_tq;
+static int cpu_phase[NCPU];
+
 static void vcpu_config_event(struct xenbus_watch *, const char **, uint_t);
 static int xen_vcpu_initialize(processorid_t, vcpu_guest_context_t *);
 
@@ -352,10 +428,8 @@ pcb_to_user_regs(label_t *pcb, vcpu_guest_context_t *vgc)
 }
 
 /*
- * Restore the context of a CPU during resume.  The CPU must either
- * have been blocked in cpu_idle() (running the idle thread), if it was
- * offline, or inside cpu_pause_thread().  Either way we can restore safely
- * from the t_pcb.
+ * Restore the context of a CPU during resume.  This context is always
+ * inside enter_safe_phase(), below.
  */
 void
 mach_cpucontext_restore(cpu_t *cp)
@@ -390,16 +464,56 @@ mach_cpucontext_restore(cpu_t *cp)
 	ASSERT(err == 0);
 }
 
+/*
+ * Reach a point at which the CPU can be safely powered-off or
+ * suspended.  Nothing can wake this CPU out of the loop.
+ */
+static void
+enter_safe_phase(void)
+{
+	ulong_t flags = intr_clear();
+
+	if (setjmp(&curthread->t_pcb) == 0) {
+		cpu_phase[CPU->cpu_id] = CPU_PHASE_SAFE;
+		while (cpu_phase[CPU->cpu_id] == CPU_PHASE_SAFE)
+			SMT_PAUSE();
+	}
+
+	ASSERT(!interrupts_enabled());
+
+	intr_restore(flags);
+}
+
+/*
+ * Offline CPUs run this code even under a pause_cpus(), so we must
+ * check if we need to enter the safe phase.
+ */
 void
 mach_cpu_idle(void)
 {
 	if (IN_XPV_PANIC()) {
 		xpv_panic_halt();
 	} else  {
-		(void) setjmp(&curthread->t_pcb);
-		CPUSET_ATOMIC_ADD(cpu_suspend_set, CPU->cpu_id);
 		(void) HYPERVISOR_block();
-		CPUSET_ATOMIC_DEL(cpu_suspend_set, CPU->cpu_id);
+		if (cpu_phase[CPU->cpu_id] == CPU_PHASE_WAIT_SAFE)
+			enter_safe_phase();
+	}
+}
+
+/*
+ * Spin until either start_cpus() wakes us up, or we get a request to
+ * enter the safe phase (followed by a later start_cpus()).
+ */
+void
+mach_cpu_pause(volatile char *safe)
+{
+	*safe = PAUSE_WAIT;
+	membar_enter();
+
+	while (*safe != PAUSE_IDLE) {
+		if (cpu_phase[CPU->cpu_id] == CPU_PHASE_WAIT_SAFE)
+			enter_safe_phase();
+		SMT_PAUSE();
 	}
 }
 
@@ -410,67 +524,6 @@ mach_cpu_halt(char *msg)
 		prom_printf("%s\n", msg);
 	(void) xen_vcpu_down(CPU->cpu_id);
 }
-
-void
-mach_cpu_pause(volatile char *safe)
-{
-	ulong_t flags;
-
-	flags = intr_clear();
-
-	if (setjmp(&curthread->t_pcb) == 0) {
-		CPUSET_ATOMIC_ADD(cpu_suspend_set, CPU->cpu_id);
-		/*
-		 * This cpu is now safe.
-		 */
-		*safe = PAUSE_WAIT;
-		membar_enter();
-	}
-
-	while (*safe != PAUSE_IDLE)
-		SMT_PAUSE();
-
-	CPUSET_ATOMIC_DEL(cpu_suspend_set, CPU->cpu_id);
-
-	intr_restore(flags);
-}
-
-/*
- * Virtual CPU management.
- *
- * VCPUs can be controlled in one of two ways; through the domain itself
- * (psradm, p_online(), etc.), and via changes in xenstore (vcpu_config()).
- * Unfortunately, the terminology is used in different ways; they work out as
- * follows:
- *
- * P_ONLINE: the VCPU is up and running, taking interrupts and running threads
- *
- * P_OFFLINE: the VCPU is up and running, but quiesced (i.e. blocked in the
- * hypervisor on the idle thread).  It must be up since a downed VCPU cannot
- * receive interrupts, and we require this for offline CPUs in Solaris.
- *
- * P_POWEROFF: the VCPU is down (we never called xen_vcpu_up(), or called
- * xen_vcpu_down() for it).  It can't take interrupts or run anything, though
- * if it has run previously, its software state (cpu_t, machcpu structures, IPI
- * event channels, etc.) will still exist.
- *
- * The hypervisor has two notions of CPU states as represented in the store:
- *
- * "offline": the VCPU is down.  Corresponds to P_POWEROFF.
- *
- * "online": the VCPU is running.  Corresponds to a CPU state other than
- * P_POWEROFF.
- *
- * Currently, only a notification via xenstore can bring a CPU into a
- * P_POWEROFF state, and only the domain can change between P_ONLINE, P_NOINTR,
- * P_OFFLINE, etc.  We need to be careful to treat xenstore notifications
- * idempotently, as we'll get 'duplicate' entries when we resume a domain.
- *
- * Note that the xenstore configuration is strictly advisory, in that a domain
- * can choose to ignore it and still power up a VCPU in the offline state. To
- * play nice, we don't allow it. Thus, any attempt to power on/off a CPU is
- * ENOTSUP from within Solaris.
- */
 
 /*ARGSUSED*/
 int
@@ -486,78 +539,122 @@ mp_cpu_poweroff(struct cpu *cp)
 	return (ENOTSUP);
 }
 
-static int
-poweron_vcpu(struct cpu *cp)
+void
+mp_enter_barrier(void)
 {
-	int error;
+	hrtime_t last_poke_time = 0;
+	int poke_allowed = 0;
+	int done = 0;
+	int i;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-	if (HYPERVISOR_vcpu_op(VCPUOP_is_up, cp->cpu_id, NULL) != 0) {
-		printf("poweron_vcpu: vcpu%d is not available!\n",
-		    cp->cpu_id);
-		return (ENXIO);
-	}
+	pause_cpus(NULL);
 
-	if ((error = xen_vcpu_up(cp->cpu_id)) == 0) {
-		CPUSET_ADD(cpu_ready_set, cp->cpu_id);
-		cp->cpu_flags |= CPU_EXISTS | CPU_READY | CPU_RUNNING;
-		cp->cpu_flags &= ~CPU_POWEROFF;
-		/*
-		 * There are some nasty races possible here.
-		 * Tell the vcpu it's up one more time.
-		 * XXPV	Is this enough?  Is this safe?
-		 */
-		(void) xen_vcpu_up(cp->cpu_id);
+	while (!done) {
+		done = 1;
+		poke_allowed = 0;
 
-		cpu_set_state(cp);
+		if (xpv_gethrtime() - last_poke_time > POKE_TIMEOUT) {
+			last_poke_time = xpv_gethrtime();
+			poke_allowed = 1;
+		}
+
+		for (i = 0; i < NCPU; i++) {
+			cpu_t *cp = cpu_get(i);
+
+			if (cp == NULL || cp == CPU)
+				continue;
+
+			switch (cpu_phase[i]) {
+			case CPU_PHASE_NONE:
+				cpu_phase[i] = CPU_PHASE_WAIT_SAFE;
+				poke_cpu(i);
+				done = 0;
+				break;
+
+			case CPU_PHASE_WAIT_SAFE:
+				if (poke_allowed)
+					poke_cpu(i);
+				done = 0;
+				break;
+
+			case CPU_PHASE_SAFE:
+			case CPU_PHASE_POWERED_OFF:
+				break;
+			}
+		}
+
+		SMT_PAUSE();
 	}
-	return (error);
 }
 
-static int
-poweroff_poke(void)
+void
+mp_leave_barrier(void)
 {
-	CPUSET_ATOMIC_DEL(cpu_suspend_set, CPU->cpu_id);
-	return (0);
+	int i;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	for (i = 0; i < NCPU; i++) {
+		cpu_t *cp = cpu_get(i);
+
+		if (cp == NULL || cp == CPU)
+			continue;
+
+		switch (cpu_phase[i]) {
+		/*
+		 * If we see a CPU in one of these phases, something has
+		 * gone badly wrong with the guarantees
+		 * mp_enter_barrier() is supposed to provide.  Rather
+		 * than attempt to stumble along (and since we can't
+		 * panic properly in this context), we tell the
+		 * hypervisor we've crashed.
+		 */
+		case CPU_PHASE_NONE:
+		case CPU_PHASE_WAIT_SAFE:
+			(void) HYPERVISOR_shutdown(SHUTDOWN_crash);
+			break;
+
+		case CPU_PHASE_POWERED_OFF:
+			break;
+
+		case CPU_PHASE_SAFE:
+			cpu_phase[i] = CPU_PHASE_NONE;
+		}
+	}
+
+	start_cpus();
 }
 
-/*
- * We must ensure that the VCPU reaches a safe state (in the suspend set, and
- * thus is not going to change) before we can power it off.  The VCPU could
- * still be in mach_cpu_pause() and about to head back out; so just checking
- * cpu_suspend_set() isn't sufficient to make sure the VCPU has stopped moving.
- * Instead, we xcall it to delete itself from the set; whichever way it comes
- * back from that xcall, it won't mark itself in the set until it's safely back
- * in mach_cpu_idle().
- */
 static int
 poweroff_vcpu(struct cpu *cp)
 {
 	int error;
-	cpuset_t set;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	ASSERT(CPU->cpu_id != cp->cpu_id);
 	ASSERT(cp->cpu_flags & CPU_QUIESCED);
 
-	CPUSET_ONLY(set, cp->cpu_id);
-
-	xc_sync(0, 0, 0, X_CALL_HIPRI, set, (xc_func_t)poweroff_poke);
-
-	while (!CPU_IN_SET(cpu_suspend_set, cp->cpu_id))
-		SMT_PAUSE();
+	mp_enter_barrier();
 
 	if ((error = xen_vcpu_down(cp->cpu_id)) == 0) {
-		ASSERT(CPU_IN_SET(cpu_suspend_set, cp->cpu_id));
+		ASSERT(cpu_phase[cp->cpu_id] == CPU_PHASE_SAFE);
+
 		CPUSET_DEL(cpu_ready_set, cp->cpu_id);
+
 		cp->cpu_flags |= CPU_POWEROFF | CPU_OFFLINE;
 		cp->cpu_flags &=
 		    ~(CPU_RUNNING | CPU_READY | CPU_EXISTS | CPU_ENABLE);
 
+		cpu_phase[cp->cpu_id] = CPU_PHASE_POWERED_OFF;
+
 		cpu_set_state(cp);
 	}
+
+	mp_leave_barrier();
+
 	return (error);
 }
 
@@ -627,6 +724,37 @@ vcpu_config_new(processorid_t id)
 	affinity_set(CPU_CURRENT);
 	error = start_cpu(id);
 	affinity_clear();
+	return (error);
+}
+
+static int
+poweron_vcpu(struct cpu *cp)
+{
+	int error;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (HYPERVISOR_vcpu_op(VCPUOP_is_up, cp->cpu_id, NULL) != 0) {
+		printf("poweron_vcpu: vcpu%d is not available!\n",
+		    cp->cpu_id);
+		return (ENXIO);
+	}
+
+	if ((error = xen_vcpu_up(cp->cpu_id)) == 0) {
+		CPUSET_ADD(cpu_ready_set, cp->cpu_id);
+		cp->cpu_flags |= CPU_EXISTS | CPU_READY | CPU_RUNNING;
+		cp->cpu_flags &= ~CPU_POWEROFF;
+		/*
+		 * There are some nasty races possible here.
+		 * Tell the vcpu it's up one more time.
+		 * XXPV	Is this enough?  Is this safe?
+		 */
+		(void) xen_vcpu_up(cp->cpu_id);
+
+		cpu_phase[cp->cpu_id] = CPU_PHASE_NONE;
+
+		cpu_set_state(cp);
+	}
 	return (error);
 }
 

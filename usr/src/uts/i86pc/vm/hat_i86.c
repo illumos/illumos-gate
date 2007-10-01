@@ -2893,7 +2893,7 @@ hat_share(
 		/*
 		 * The range of address space must cover a full table.
 		 */
-		if (e_ism_addr - ism_addr < LEVEL_SIZE(1 + 1))
+		if (e_ism_addr - ism_addr < LEVEL_SIZE(l + 1))
 			goto not_shared;
 
 		/*

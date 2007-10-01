@@ -171,10 +171,6 @@ extern void pm_cfb_rele(void);
 void
 mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 {
-#ifndef __xpv
-	extern void mtrr_resync(void);
-#endif
-
 	if (!panicstr) {
 		kpreempt_disable();
 		affinity_set(CPU_CURRENT);
@@ -250,10 +246,6 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 
 	(void) spl8();
 	(*psm_shutdownf)(cmd, fcn);
-
-#ifndef __xpv
-	mtrr_resync();
-#endif
 
 	if (fcn == AD_HALT || fcn == AD_POWEROFF)
 		halt((char *)NULL);

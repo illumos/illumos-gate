@@ -106,9 +106,10 @@ extern void xen_version(void);
 extern void mach_cpucontext_reset(cpu_t *);
 extern void mach_cpucontext_restore(cpu_t *);
 
-extern cpuset_t cpu_suspend_set;
+extern void mp_enter_barrier(void);
+extern void mp_leave_barrier(void);
+
 extern cpuset_t cpu_suspend_lost_set;
-extern volatile int xen_suspending_cpus;
 
 extern int xen_gdt_setprot(cpu_t *, uint_t);
 extern int xen_ldt_setprot(user_desc_t *, size_t, uint_t);

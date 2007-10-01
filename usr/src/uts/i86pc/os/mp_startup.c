@@ -1384,11 +1384,10 @@ mp_startup(void)
 
 #ifndef __xpv
 	/*
-	 * We need to Sync MTRR with cpu0's MTRR. We have to do
-	 * this with interrupts disabled.
+	 * Program this cpu's PAT
 	 */
-	if (x86_feature & X86_MTRR)
-		mtrr_sync();
+	if (x86_feature & X86_PAT)
+		pat_sync();
 #endif
 
 	/*

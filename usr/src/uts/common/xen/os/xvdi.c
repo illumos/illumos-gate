@@ -267,6 +267,13 @@ xvdi_init_dev(dev_info_t *dip)
 	else
 		(void) snprintf(xsnamebuf, sizeof (xsnamebuf),
 		    "%s/%d/%d", xdcp->xs_path_be, domid, vdevnum);
+	if ((xenbus_read_driver_state(xsname) >= XenbusStateClosing)) {
+		/* Don't try to init a dev that may be closing */
+		mutex_destroy(&pdp->xd_lk);
+		kmem_free(pdp, sizeof (*pdp));
+		ddi_set_parent_data(dip, NULL);
+		return (DDI_FAILURE);
+	}
 
 	pdp->xd_xsdev.nodename = i_ddi_strdup(xsname, KM_SLEEP);
 	pdp->xd_xsdev.devicetype = xdcp->xsdev;
@@ -333,6 +340,9 @@ xvdi_uninit_dev(dev_info_t *dip)
 
 		/* Remove any registered watches. */
 		i_xvdi_rem_watches(dip);
+
+		/* tell other end to close */
+		(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosed);
 
 		if (pdp->xd_xsdev.nodename != NULL)
 			kmem_free((char *)(pdp->xd_xsdev.nodename),
@@ -683,6 +693,7 @@ xvdi_create_dev(dev_info_t *parent, xendev_devclass_t devclass,
 	char xsnamebuf[TYPICALMAXPATHLEN];
 	char *type, *node = NULL, *xsname = NULL;
 	unsigned int tlen;
+	int ret;
 
 	ASSERT(DEVI_BUSY_OWNED(parent));
 
@@ -752,13 +763,11 @@ xvdi_create_dev(dev_info_t *parent, xendev_devclass_t devclass,
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "vdev", vdev);
 
 	if (i_ddi_devi_attached(parent))
-		/*
-		 * Cleanup happens in xendev_removechild when the
-		 * other end closes or a driver fails to attach.
-		 */
-		(void) ndi_devi_online(dip, 0);
+		ret = ndi_devi_online(dip, 0);
 	else
-		(void) ndi_devi_bind_driver(dip, 0);
+		ret = ndi_devi_bind_driver(dip, 0);
+	if (ret != NDI_SUCCESS)
+		(void) ndi_devi_offline(dip, NDI_DEVI_REMOVE);
 
 	return (dip);
 }

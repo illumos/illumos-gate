@@ -888,22 +888,15 @@ xenwatch_thread(void)
 		mutex_enter(&watch_events_lock);
 		while (list_empty(&watch_events))
 			cv_wait(&watch_events_cv, &watch_events_lock);
-
-		mutex_enter(&xenwatch_mutex);
-
 		msg = list_head(&watch_events);
-		if (msg != NULL)
-			list_remove(&watch_events, msg);
+		ASSERT(msg != NULL);
+		list_remove(&watch_events, msg);
 		mutex_exit(&watch_events_lock);
 
-		if (msg != NULL) {
-			msg->un.watch.handle->callback(
-			    msg->un.watch.handle,
-			    (const char **)msg->un.watch.vec,
-			    msg->un.watch.vec_size);
-			free_stored_msg(msg);
-		}
-
+		mutex_enter(&xenwatch_mutex);
+		msg->un.watch.handle->callback(msg->un.watch.handle,
+		    (const char **)msg->un.watch.vec, msg->un.watch.vec_size);
+		free_stored_msg(msg);
 		mutex_exit(&xenwatch_mutex);
 	}
 }

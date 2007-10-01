@@ -139,10 +139,13 @@ retry:
 		}
 	}
 
-	if (!PP_ISFREE(pp) || !page_reclaim(pp, (kmutex_t *)NULL)) {
+	if (!PP_ISFREE(pp)) {
 		page_unlock(pp);
 		return (NULL);
 	}
+
+	if (!page_reclaim(pp, (kmutex_t *)NULL))
+		return (NULL);
 
 	return (pp);
 }

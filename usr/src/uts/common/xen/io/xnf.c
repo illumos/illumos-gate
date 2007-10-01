@@ -820,8 +820,6 @@ failure:
 	if (macp != NULL)
 		mac_free(macp);
 
-	(void) xvdi_switch_state(devinfo, XBT_NULL, XenbusStateClosed);
-
 	return (DDI_FAILURE);
 }
 

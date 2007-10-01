@@ -1542,9 +1542,6 @@ vnic_promisc_rx(vnic_mac_t *vnic_mac, vnic_t *sender, mblk_t *mp)
 	for (loop = vnic_mac->va_promisc;
 	    loop != NULL;
 	    loop = loop->vn_promisc_next) {
-		mblk_t *copy;
-		uint64_t gen;
-
 		if (loop == sender)
 			continue;
 
@@ -1557,15 +1554,22 @@ vnic_promisc_rx(vnic_mac_t *vnic_mac, vnic_t *sender, mblk_t *mp)
 		ASSERT(flow != NULL);
 
 		if (!flow->vf_is_active) {
+			mblk_t *copy;
+			uint64_t gen;
+
+			if ((copy = vnic_copymsg_cksum(mp)) == NULL)
+				break;
+			if ((sender != NULL) &&
+			    ((copy = vnic_fix_cksum(copy)) == NULL))
+				break;
+
 			VNIC_FLOW_REFHOLD(flow);
 			gen = vnic_mac->va_promisc_gen;
 			rw_exit(&vnic_mac->va_promisc_lock);
 
-			if ((copy = vnic_copymsg_cksum(mp)) != NULL) {
-				fn_info = vnic_classifier_get_fn_info(flow);
-				(fn_info->ff_fn)(fn_info->ff_arg1,
-				    fn_info->ff_arg2, copy);
-			}
+			fn_info = vnic_classifier_get_fn_info(flow);
+			(fn_info->ff_fn)(fn_info->ff_arg1,
+			    fn_info->ff_arg2, copy);
 
 			VNIC_FLOW_REFRELE(flow);
 			rw_enter(&vnic_mac->va_promisc_lock, RW_READER);

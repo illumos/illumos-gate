@@ -64,7 +64,6 @@
 #include <sys/cmn_err.h>
 #include <sys/trap.h>
 #include <sys/segments.h>
-#include <sys/sunddi.h>		/* for ddi_strtoul */
 #include <sys/hypervisor.h>
 #include <sys/xen_mmu.h>
 #include <sys/machsystm.h>
@@ -92,17 +91,6 @@
 #include <sys/balloon_impl.h>
 #include <sys/ddi.h>
 
-/*
- * Hypervisor-specific utility routines - these can be invoked from the
- * normal control flow.  It might be useful to partition these into
- * different files, but let's see how it looks before we get too
- * carried away with that idea.
- */
-
-/*
- * In the current absence of any useful way to debug domains that are hung
- * whilst suspending, we have a more clumsy approach...
- */
 #ifdef DEBUG
 #define	SUSPEND_DEBUG if (xen_suspend_debug) xen_printf
 #else
@@ -110,9 +98,7 @@
 #endif
 
 int cpr_debug;
-cpuset_t cpu_suspend_set;
 cpuset_t cpu_suspend_lost_set;
-volatile int xen_suspending_cpus;
 static int xen_suspend_debug;
 
 void
@@ -210,7 +196,6 @@ xen_resume_devices(void)
 
 /*
  * The list of mfn pages is out of date.  Recompute it.
- * XXPV: can we race against another suspend call? Think not.
  */
 static void
 rebuild_mfn_list(void)
@@ -248,21 +233,7 @@ suspend_cpus(void)
 
 	SUSPEND_DEBUG("suspend_cpus\n");
 
-	xen_suspending_cpus = 1;
-
-	pause_cpus(NULL);
-
-	SUSPEND_DEBUG("waiting for offline CPUs\n");
-
-	/*
-	 * For us to proceed safely, all CPUs except the current one must be
-	 * present in cpu_suspend_set.  Running CPUs will participate in
-	 * pause_cpus(), and eventually reach mach_cpu_pause().  Powered-off
-	 * VCPUs will already be in the set, again in mach_cpu_pause().
-	 * Finally, offline CPUs will be sitting in mach_cpu_idle().
-	 */
-	while (!CPUSET_ISEQUAL(mp_cpus, cpu_suspend_set))
-		SMT_PAUSE();
+	mp_enter_barrier();
 
 	for (i = 1; i < ncpus; i++) {
 		if (!CPU_IN_SET(cpu_suspend_lost_set, i)) {
@@ -279,8 +250,6 @@ resume_cpus(void)
 {
 	int i;
 
-	xen_suspending_cpus = 0;
-
 	for (i = 1; i < ncpus; i++) {
 		if (cpu[i] == NULL)
 			continue;
@@ -292,7 +261,7 @@ resume_cpus(void)
 		}
 	}
 
-	start_cpus();
+	mp_leave_barrier();
 }
 
 /*
@@ -573,7 +542,6 @@ out:
 }
 
 taskq_t *xen_shutdown_tq;
-volatile int shutdown_req_active;
 
 #define	SHUTDOWN_INVALID	-1
 #define	SHUTDOWN_POWEROFF	0
@@ -623,7 +591,6 @@ xen_shutdown(void *arg)
 
 	if (cmd == SHUTDOWN_SUSPEND) {
 		xen_suspend_domain();
-		shutdown_req_active = 0;
 		return;
 	}
 
@@ -716,12 +683,6 @@ again:
 
 	kmem_free(str, slen);
 	if (shutdown_code != SHUTDOWN_INVALID) {
-		if (shutdown_code == SHUTDOWN_SUSPEND) {
-			while (shutdown_req_active)
-				SMT_PAUSE();
-		}
-
-		shutdown_req_active = 1;
 		(void) taskq_dispatch(xen_shutdown_tq, xen_shutdown,
 		    (void *)(intptr_t)shutdown_code, 0);
 	}

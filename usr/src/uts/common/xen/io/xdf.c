@@ -511,6 +511,7 @@ xdf_suspend(dev_info_t *devi)
 {
 	xdf_t *vdp;
 	int instance;
+	enum xdf_state st;
 
 	instance = ddi_get_instance(devi);
 
@@ -522,16 +523,25 @@ xdf_suspend(dev_info_t *devi)
 
 	xvdi_suspend(devi);
 
-	/* stop further I/O requests */
 	mutex_enter(&vdp->xdf_cb_lk);
 	mutex_enter(&vdp->xdf_dev_lk);
-	vdp->xdf_status = XD_SUSPEND;
+	st = vdp->xdf_status;
+	/* change status to stop further I/O requests */
+	if (st == XD_READY)
+		vdp->xdf_status = XD_SUSPEND;
 	mutex_exit(&vdp->xdf_dev_lk);
 	mutex_exit(&vdp->xdf_cb_lk);
 
 	/* make sure no more I/O responses left in the ring buffer */
-	(void) ddi_remove_intr(devi, 0, NULL);
-	(void) xdf_drain_io(vdp);
+	if ((st == XD_INIT) || (st == XD_READY)) {
+		(void) ddi_remove_intr(devi, 0, NULL);
+		(void) xdf_drain_io(vdp);
+		/*
+		 * no need to teardown the ring buffer here
+		 * it will be simply re-init'ed during resume when
+		 * we call xvdi_alloc_ring
+		 */
+	}
 
 	if (xdfdebug & SUSRES_DBG)
 		xen_printf("xdf_suspend: SUCCESS\n");
@@ -561,7 +571,7 @@ xdf_resume(dev_info_t *devi)
 	}
 
 	mutex_enter(&vdp->xdf_dev_lk);
-	ASSERT(vdp->xdf_status == XD_SUSPEND);
+	ASSERT(vdp->xdf_status != XD_READY);
 	vdp->xdf_status = XD_UNKNOWN;
 	mutex_exit(&vdp->xdf_dev_lk);
 

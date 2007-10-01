@@ -187,7 +187,7 @@ extern int xpv_panicking;
 #define	IN_XPV_PANIC() (xpv_panicking > 0)
 #else
 extern void setup_mca(void);
-extern void setup_mtrr(void);
+extern void pat_sync(void);
 #define	cpr_dprintf prom_printf
 #define	IN_XPV_PANIC() (__lintzero)
 #endif

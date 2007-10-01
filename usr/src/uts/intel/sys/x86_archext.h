@@ -191,23 +191,8 @@ extern "C" {
 #define	K5_TSC		0x10
 #define	K5_TR12		0x12
 
-#define	REG_MTRRCAP		0xfe
-#define	REG_MTRRDEF		0x2ff
-#define	REG_MTRR64K		0x250
-#define	REG_MTRR16K1		0x258
-#define	REG_MTRR16K2		0x259
-#define	REG_MTRR4K1		0x268
-#define	REG_MTRR4K2		0x269
-#define	REG_MTRR4K3		0x26a
-#define	REG_MTRR4K4		0x26b
-#define	REG_MTRR4K5		0x26c
-#define	REG_MTRR4K6		0x26d
-#define	REG_MTRR4K7		0x26e
-#define	REG_MTRR4K8		0x26f
-#define	REG_MTRRPAT		0x277
+#define	REG_PAT		0x277
 
-#define	REG_MTRRPHYSBASE0	0x200
-#define	REG_MTRRPHYSMASK7	0x20f
 #define	REG_MC0_CTL		0x400
 #define	REG_MC5_MISC		0x417
 #define	REG_PERFCTR0		0xc1
@@ -285,66 +270,34 @@ extern "C" {
 
 #define	MCI_CTL_VALUE		0xffffffff
 
-#define	MTRRTYPE_MASK		0xff
-
-
-#define	MTRRCAP_FIX		0x100
-#define	MTRRCAP_VCNTMASK	0xff
-#define	MTRRCAP_USWC		0x400
-
-#define	MTRRDEF_E		0x800
-#define	MTRRDEF_FE		0x400
-
-#define	MTRRPHYSMASK_V		0x800
-
 #define	MTRR_TYPE_UC		0
 #define	MTRR_TYPE_WC		1
 #define	MTRR_TYPE_WT		4
 #define	MTRR_TYPE_WP		5
 #define	MTRR_TYPE_WB		6
+#define	MTRR_TYPE_UC_		7
 
 /*
- * Page attribute table is setup in the following way
- * PAT0	Write-BACK
+ * For Solaris we set up the page attritubute table in the following way:
+ * PAT0	Write-Back
  * PAT1	Write-Through
- * PAT2	Unchacheable
+ * PAT2	Unchacheable-
  * PAT3	Uncacheable
- * PAT4 Uncacheable
- * PAT5	Write-Protect
+ * PAT4 Write-Back
+ * PAT5	Write-Through
  * PAT6	Write-Combine
  * PAT7 Uncacheable
+ * The only difference from h/w default is entry 6.
  */
-#define	PAT_DEFAULT_ATTRIBUTE \
-	((uint64_t)MTRR_TYPE_WC << 48)|((uint64_t)MTRR_TYPE_WP << 40)| \
-	(MTRR_TYPE_WT << 8)|(MTRR_TYPE_WB)
-
-
-#define	MTRR_SETTYPE(a, t)	((a &= (uint64_t)~0xff),\
-				    (a |= ((t) & 0xff)))
-#define	MTRR_SETVINVALID(a)	((a) &= ~MTRRPHYSMASK_V)
-
-
-#define	MTRR_SETVBASE(a, b, t)	((a) =\
-					((((uint64_t)(b)) & 0xffffff000)|\
-					(((uint32_t)(t)) & 0xff)))
-
-#define	MTRR_SETVMASK(a, s, v) ((a) =\
-				((~(((uint64_t)(s)) - 1) & 0xffffff000)|\
-					(((uint32_t)(v)) << 11)))
-
-#define	MTRR_GETVBASE(a)	(((uint64_t)(a)) & 0xffffff000)
-#define	MTRR_GETVTYPE(a)	(((uint64_t)(a)) & 0xff)
-#define	MTRR_GETVSIZE(a)	((~((uint64_t)(a)) + 1) & 0xffffff000)
-
-
-#define	MAX_MTRRVAR	8
-
-#if !defined(_ASM)
-typedef	struct	mtrrvar {
-	uint64_t	mtrrphys_base;
-	uint64_t	mtrrphys_mask;
-} mtrrvar_t;
-#endif	/* _ASM */
+#define	PAT_DEFAULT_ATTRIBUTE			\
+	((uint64_t)MTRR_TYPE_WB |		\
+	((uint64_t)MTRR_TYPE_WT << 8) |		\
+	((uint64_t)MTRR_TYPE_UC_ << 16) |	\
+	((uint64_t)MTRR_TYPE_UC << 24) |	\
+	((uint64_t)MTRR_TYPE_WB << 32) |	\
+	((uint64_t)MTRR_TYPE_WT << 40) |	\
+	((uint64_t)MTRR_TYPE_WC << 48) |	\
+	((uint64_t)MTRR_TYPE_UC << 56))
 
 #define	X86_LARGEPAGE	0x00000001
 #define	X86_TSC		0x00000002
