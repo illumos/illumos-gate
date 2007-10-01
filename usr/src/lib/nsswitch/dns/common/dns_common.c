@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,7 +217,7 @@ ent2str(
 			if (IN6_IS_ADDR_V4MAPPED((struct in6_addr *)*p)) {
 				/* LINTED: E_BAD_PTR_CAST_ALIGN */
 				IN6_V4MAPPED_TO_INADDR((struct in6_addr *)*p,
-							&in4);
+				    &in4);
 				af = AF_INET;
 				addr = &in4;
 			} else {
@@ -232,10 +232,16 @@ ent2str(
 		if (res == NULL)
 			return (NSS_STR_PARSE_PARSE);
 
-		if ((n = snprintf(s, l, "%s %s", res, hp->h_name)) >= l)
+		if ((n = snprintf(s, l, "%s", res)) >= l)
 			return (NSS_STR_PARSE_ERANGE);
 		l -= n;
 		s += n;
+		if (hp->h_name != NULL && *hp->h_name != '\0') {
+			if ((n = snprintf(s, l, " %s", hp->h_name)) >= l)
+				return (NSS_STR_PARSE_ERANGE);
+			l -= n;
+			s += n;
+		}
 		if (p == hp->h_addr_list) {
 			for (q = hp->h_aliases; q && *q; q++) {
 				if ((n = snprintf(s, l, " %s", *q)) >= l)
@@ -338,7 +344,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	/* misc variables */
 	int		af;
 	char		*ap, *apc;
-	int		hlen, alen, iplen, len;
+	int		hlen = 0, alen, iplen, len;
 
 	statp = &stat;
 	(void) memset(statp, '\0', sizeof (struct __res_state));
@@ -406,6 +412,11 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		return (NSS_ERROR);
 	} else
 		hlen = strlen(host);
+	/* no host name is an error, return */
+	if (hlen <= 0) {
+		__res_ndestroy(statp);
+		return (NSS_ERROR);
+	}
 	cp += n + QFIXEDSZ;
 	if (cp > eom) {
 		__res_ndestroy(statp);

@@ -85,6 +85,7 @@ void _nscd_init_cache_sema(sema_t *sema, char *cache_name);
 nscd_rc_t _nscd_alloc_frontend_cfg();
 void _nscd_APP_check_cred(void *buf, pid_t *pidp, char *dc_str,
 	int log_comp, int log_level);
+void _nscd_restart_if_cfgfile_changed();
 #ifdef	__cplusplus
 }
 #endif

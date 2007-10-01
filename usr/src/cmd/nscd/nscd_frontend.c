@@ -171,27 +171,28 @@ dozip(void)
 	/* not much here */
 }
 
-static void
-restart_if_cfgfile_changed()
+void
+_nscd_restart_if_cfgfile_changed()
 {
 
-	static mutex_t	nsswitch_lock = DEFAULTMUTEX;
-	static time_t	last_nsswitch_check = 0;
-	static time_t	last_nsswitch_modified = 0;
-	static time_t	last_resolv_modified = 0;
-	time_t		now = time(NULL);
-	char		*me = "restart_if_cfgfile_changed";
+	static mutex_t		nsswitch_lock = DEFAULTMUTEX;
+	static timestruc_t	last_nsswitch_check = { 0 };
+	static timestruc_t	last_nsswitch_modified = { 0 };
+	static timestruc_t	last_resolv_modified = { 0 };
+	time_t			now = time(NULL);
+	char			*me = "_nscd_restart_if_cfgfile_changed";
 
-	if (now - last_nsswitch_check <= _NSC_FILE_CHECK_TIME)
+	if (now - last_nsswitch_check.tv_sec < _NSC_FILE_CHECK_TIME)
 		return;
 
 	(void) mutex_lock(&nsswitch_lock);
 
-	if (now - last_nsswitch_check > _NSC_FILE_CHECK_TIME) {
+	if (now - last_nsswitch_check.tv_sec >= _NSC_FILE_CHECK_TIME) {
 		struct stat nss_buf;
 		struct stat res_buf;
 
-		last_nsswitch_check = now;
+		last_nsswitch_check.tv_sec = now;
+		last_nsswitch_check.tv_nsec = 0;
 
 		(void) mutex_unlock(&nsswitch_lock); /* let others continue */
 
@@ -201,28 +202,32 @@ restart_if_cfgfile_changed()
 		 *  it if it happens to disappear later on for a bit.
 		 */
 
-		if (last_resolv_modified >= 0) {
+		if (last_resolv_modified.tv_sec >= 0) {
 			if (stat("/etc/resolv.conf", &res_buf) < 0) {
-				if (last_resolv_modified == 0)
-					last_resolv_modified = -1;
-				else
-					res_buf.st_mtime = last_resolv_modified;
-			} else if (last_resolv_modified == 0) {
-				last_resolv_modified = res_buf.st_mtime;
+				if (last_resolv_modified.tv_sec == 0) {
+					last_resolv_modified.tv_sec = -1;
+					last_resolv_modified.tv_nsec = 0;
+				} else
+					res_buf.st_mtim = last_resolv_modified;
+			} else if (last_resolv_modified.tv_sec == 0) {
+				last_resolv_modified = res_buf.st_mtim;
 			}
 		}
 
 		if (stat("/etc/nsswitch.conf", &nss_buf) < 0) {
+			return;
+		} else if (last_nsswitch_modified.tv_sec == 0) {
+			last_nsswitch_modified = nss_buf.st_mtim;
+		}
 
-			/*EMPTY*/;
+		if (last_nsswitch_modified.tv_sec < nss_buf.st_mtim.tv_sec ||
+		    (last_nsswitch_modified.tv_sec == nss_buf.st_mtim.tv_sec &&
+		    last_nsswitch_modified.tv_nsec < nss_buf.st_mtim.tv_nsec) ||
+		    (last_resolv_modified.tv_sec > 0 &&
+		    (last_resolv_modified.tv_sec < res_buf.st_mtim.tv_sec ||
+		    (last_resolv_modified.tv_sec == res_buf.st_mtim.tv_sec &&
+		    last_resolv_modified.tv_nsec < res_buf.st_mtim.tv_nsec)))) {
 
-		} else if (last_nsswitch_modified == 0) {
-
-			last_nsswitch_modified = nss_buf.st_mtime;
-
-		} else if ((last_nsswitch_modified < nss_buf.st_mtime) ||
-		    ((last_resolv_modified > 0) &&
-		    (last_resolv_modified < res_buf.st_mtime))) {
 			static mutex_t exit_lock = DEFAULTMUTEX;
 			char *fmri;
 
@@ -866,7 +871,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	 *  need to restart if main nscd and config file(s) changed
 	 */
 	if (_whoami == NSCD_MAIN)
-		restart_if_cfgfile_changed();
+		_nscd_restart_if_cfgfile_changed();
 
 	if ((phdr->nsc_callnumber & NSCDV2CATMASK) == NSCD_CALLCAT_APP) {
 
@@ -1054,6 +1059,7 @@ _nscd_setup_server(char *execname, char **argv)
 	int		fd;
 	int		errnum;
 	int		bind_failed = 0;
+	mode_t		old_mask;
 	struct stat	buf;
 	sigset_t	myset;
 	struct sigaction action;
@@ -1100,7 +1106,10 @@ _nscd_setup_server(char *execname, char **argv)
 	/* bind to file system */
 	if (is_system_labeled() && (getzoneid() == GLOBAL_ZONEID)) {
 		if (stat(TSOL_NAME_SERVICE_DOOR, &buf) < 0) {
-			int newfd;
+			int	newfd;
+
+			/* make sure the door will be readable by all */
+			old_mask = umask(0);
 			if ((newfd = creat(TSOL_NAME_SERVICE_DOOR, 0444)) < 0) {
 				errnum = errno;
 				_NSCD_LOG(NSCD_LOG_FRONT_END,
@@ -1110,6 +1119,8 @@ _nscd_setup_server(char *execname, char **argv)
 				    strerror(errnum));
 				bind_failed = 1;
 			}
+			/* rstore the old file mode creation mask */
+			(void) umask(old_mask);
 			(void) close(newfd);
 		}
 		if (symlink(TSOL_NAME_SERVICE_DOOR, NAME_SERVICE_DOOR) != 0) {
@@ -1123,7 +1134,10 @@ _nscd_setup_server(char *execname, char **argv)
 			}
 		}
 	} else if (stat(NAME_SERVICE_DOOR, &buf) < 0) {
-		int newfd;
+		int	newfd;
+
+		/* make sure the door will be readable by all */
+		old_mask = umask(0);
 		if ((newfd = creat(NAME_SERVICE_DOOR, 0444)) < 0) {
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
@@ -1131,6 +1145,8 @@ _nscd_setup_server(char *execname, char **argv)
 			    strerror(errnum));
 			bind_failed = 1;
 		}
+		/* rstore the old file mode creation mask */
+		(void) umask(old_mask);
 		(void) close(newfd);
 	}
 

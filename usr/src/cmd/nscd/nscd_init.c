@@ -112,7 +112,7 @@ _nscd_init(
 	if ((rc = _nscd_init_all_nsw_be_info_db()) != NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
 		(me, "_nscd_init_all_nsw_be_info_db failed (rc = %d)\n",
-			rc);
+		    rc);
 		return (rc);
 	}
 
@@ -142,7 +142,7 @@ _nscd_init(
 	if (rc != NSCD_SUCCESS) {
 		(void) printf(
 		gettext("reading config file %s failed with rc = %d, %s\n"),
-			"/etc/nsswitch.conf", rc, NSCD_ERR2MSG(err));
+		    "/etc/nsswitch.conf", rc, NSCD_ERR2MSG(err));
 		if (err != NULL)
 			_nscd_cfg_free_error(err);
 
@@ -150,6 +150,10 @@ _nscd_init(
 	(me, "unable to read /etc/nsswitch.conf (rc = %d)\n", rc);
 		return (rc);
 	}
+	/*
+	 * remember which version of /etc/nsswitch.conf that was read
+	 */
+	_nscd_restart_if_cfgfile_changed();
 
 	/*
 	 * read in the nscd configuration
@@ -167,13 +171,13 @@ _nscd_init(
 	if (rc != NSCD_SUCCESS) {
 		(void) printf(
 		gettext("reading config file %s failed with rc = %d, %s\n"),
-			cfgfile, rc, NSCD_ERR2MSG(err));
+		    cfgfile, rc, NSCD_ERR2MSG(err));
 		if (err != NULL)
 			_nscd_cfg_free_error(err);
 
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
-	(me, "unable to read configuration from %s (rc = %d)\n",
-			cfgfile, rc);
+		(me, "unable to read configuration from %s (rc = %d)\n",
+		    cfgfile, rc);
 
 		return (rc);
 	}
@@ -221,8 +225,8 @@ _nscd_refresh()
 	if (access(cfgfile, R_OK) != 0) {
 		(void) snprintf(errmsg, sizeof (errmsg),
 		"unable to read the config file %s (rc = %d), %s\n",
-			cfgfile, NSCD_CFG_FILE_ACCESS_ERROR,
-			strerror(errno));
+		    cfgfile, NSCD_CFG_FILE_ACCESS_ERROR,
+		    strerror(errno));
 
 		goto error_exit;
 	}
@@ -230,8 +234,8 @@ _nscd_refresh()
 	rc = _nscd_cfg_read_file(cfgfile, &err);
 	if (rc != NSCD_SUCCESS) {
 		(void) snprintf(errmsg, sizeof (errmsg),
-		"unable to parse the config file %s (rc = %d), %s\n",
-		cfgfile, rc, NSCD_ERR2MSG(err));
+		    "unable to parse the config file %s (rc = %d), %s\n",
+		    cfgfile, rc, NSCD_ERR2MSG(err));
 
 		goto error_exit;
 	}

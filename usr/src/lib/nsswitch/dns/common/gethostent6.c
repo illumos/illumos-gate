@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -289,6 +289,7 @@ getbyname(be, a)
 	sigset_t	oldmask;
 	int		converr = 0, gotv6 = 0;
 	struct hostent	v6he;
+	struct hostent	mhe;
 	char		*v6Name = 0;
 	struct in6_addr	**v6Addrs = 0, **mergeAddrs = 0;
 	char		**v6Aliases = 0, **mergeAliases = 0;
@@ -361,6 +362,7 @@ getbyname(be, a)
 
 	/* Merge the results */
 	if (he != NULL) {
+		mhe = *he;
 		mergeAddrs = cloneAddrList(he, v6Addrs, &converr);
 		if (converr) {
 			if (v6Name != 0)
@@ -375,7 +377,7 @@ getbyname(be, a)
 						old_retry);
 			return (_herrno2nss(argp->h_errno));
 		}
-		he->h_addr_list = (char **)mergeAddrs;
+		mhe.h_addr_list = (char **)mergeAddrs;
 
 		mergeAliases = cloneAliasList(he, v6Aliases, &converr);
 		if (converr) {
@@ -393,11 +395,12 @@ getbyname(be, a)
 						old_retry);
 			return (_herrno2nss(argp->h_errno));
 		}
-		he->h_aliases = mergeAliases;
+		mhe.h_aliases = mergeAliases;
 
 		/* reset h_length, h_addrtype */
-		he->h_length = sizeof (struct in6_addr);
-		he->h_addrtype = AF_INET6;
+		mhe.h_length = sizeof (struct in6_addr);
+		mhe.h_addrtype = AF_INET6;
+		he = &mhe;
 
 	} else if (gotv6) {
 		v6he.h_name = v6Name;

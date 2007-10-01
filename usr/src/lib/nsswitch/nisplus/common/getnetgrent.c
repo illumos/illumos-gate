@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,10 +168,12 @@ getnetgr_end(be, dummy)
 	void			*dummy;
 {
 	struct grouplist	*gl;
+	struct grouplist	*next;
 
-	for (gl = be->all_members; gl != NULL; gl = gl->gl_nxt) {
+	for (gl = be->all_members; gl != NULL; gl = next) {
 		enum nss_netgr_argn	i;
 
+		next = gl->gl_nxt;
 		for (i = NSS_NETGR_MACHINE;  i < NSS_NETGR_N;  i++) {
 			if (gl->triple[i] != 0) {
 				free(gl->triple[i]);
