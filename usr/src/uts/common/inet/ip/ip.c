@@ -6942,23 +6942,26 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 
 /*
  * If we have a IPsec NAT-Traversal packet, strip the zero-SPI or
- * pass it along to ESP if the SPI is non-zero.
+ * pass it along to ESP if the SPI is non-zero.  Returns TRUE if the mblk
+ * is not consumed.
  *
- * One of three things can happen, all of which affect the passed-in mblk:
+ * One of four things can happen, all of which affect the passed-in mblk:
  *
- * 1.) The packet is stock UDP and has had its zero-SPI stripped.  Return TRUE.
- *     (NOTE:  ICMP messages that go through here just get returned.)
+ * 1.) ICMP messages that go through here just get returned TRUE.
  *
- * 2.) The packet is ESP-in-UDP, has been transformed into an equivalent
- *     ESP packet, and is passed along to ESP.  Return FALSE.
+ * 2.) The packet is stock UDP and gets its zero-SPI stripped.  Return TRUE.
  *
- * 3.) The packet is an ESP-in-UDP Keepalive.  Drop it and return FALSE.
+ * 3.) The packet is ESP-in-UDP, gets transformed into an equivalent
+ *     ESP packet, and is passed along to ESP for consumption.  Return FALSE.
+ *
+ * 4.) The packet is an ESP-in-UDP Keepalive.  Drop it and return FALSE.
  */
 static boolean_t
-zero_spi_check(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ill_t *recv_ill, ipsec_stack_t *ipss)
+zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
+    ipsec_stack_t *ipss)
 {
-	int shift, plen, iph_len = IPH_HDR_LENGTH(ipha);
+	int shift, plen, iph_len;
+	ipha_t *ipha;
 	udpha_t *udpha;
 	uint32_t *spi;
 	uint8_t *orptr;
@@ -6977,12 +6980,12 @@ zero_spi_check(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		/* Bunch of reality checks for DEBUG kernels... */
 		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
 		ASSERT(((ipha_t *)mp->b_rptr)->ipha_protocol == IPPROTO_ICMP);
-		ASSERT((uint8_t *)ipha != mp->b_rptr);
 
 		return (B_TRUE);
 	}
 
-	ASSERT((uint8_t *)ipha == mp->b_rptr);
+	ipha = (ipha_t *)mp->b_rptr;
+	iph_len = IPH_HDR_LENGTH(ipha);
 	plen = ntohs(ipha->ipha_length);
 
 	if (plen - iph_len - sizeof (udpha_t) < sizeof (uint32_t)) {
@@ -7000,17 +7003,15 @@ zero_spi_check(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	}
 
 	if (MBLKL(mp) < iph_len + sizeof (udpha_t) + sizeof (*spi)) {
-		mblk_t *tmp = msgpullup(mp, -1);
-
 		/* might as well pull it all up - it might be ESP. */
-		if (tmp == NULL) {
+		if (!pullupmsg(mp, -1)) {
 			ip_drop_packet(mp, B_TRUE, recv_ill, NULL,
 			    DROPPER(ipss, ipds_esp_nomem),
 			    &ipss->ipsec_dropper);
 			return (B_FALSE);
 		}
-		freemsg(mp);
-		mp = tmp;
+
+		ipha = (ipha_t *)mp->b_rptr;
 	}
 	spi = (uint32_t *)(mp->b_rptr + iph_len + sizeof (udpha_t));
 	if (*spi == 0) {
@@ -7123,10 +7124,8 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 			return;
 		}
 
-		if (!zero_spi_check(ill->ill_rq, mp, ipha, NULL, recv_ill,
-		    ipss)) {
+		if (!zero_spi_check(ill->ill_rq, mp, NULL, recv_ill, ipss))
 			return;
-		}
 	}
 
 	/* Handle options. */
@@ -12188,7 +12187,7 @@ ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
 		}
 
 		/* "ill" is "recv_ill" in actuality. */
-		if (!zero_spi_check(q, *mpp, ipha, ire, ill, ipss))
+		if (!zero_spi_check(q, *mpp, ire, ill, ipss))
 			return (B_FALSE);
 
 		/* Else continue like a normal UDP packet. */
