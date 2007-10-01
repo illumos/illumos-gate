@@ -115,8 +115,10 @@ error "PT_NUM has grown. Update phdrs[]"
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_PHDR_FLAGS_BUFSIZE < PHDRSZ
-#error "CONV_PHDR_FLAGS_BUFSIZE is not large enough"
+#if (CONV_PHDR_FLAGS_BUFSIZE != PHDRSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE PHDRSZ
+#include "report_bufsize.h"
+#error "CONV_PHDR_FLAGS_BUFSIZE does not match PHDRSZ"
 #endif
 
 const char *

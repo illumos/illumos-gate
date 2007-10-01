@@ -1261,3 +1261,4 @@ Bugid   Risk Synopsis
 6603313 dlclose() can fail to unload objects after fix for 6573641
 6234471 need a way to edit ELF objects
 	PSARC/2007/509 elfedit
+5035454 mixing -Kpic and -KPIC may cause SIGSEGV with -xarch=v9

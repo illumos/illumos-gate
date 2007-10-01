@@ -52,8 +52,10 @@
  * is not available in the environment of other programs that include
  * the conv.h header file.
  */
-#if CONV_SYMINFO_FLAGS_BUFSIZE < FLAGSZ
-#error "CONV_SYMINFO_FLAGS_BUFSIZE is not large enough"
+#if (CONV_SYMINFO_FLAGS_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_SYMINFO_FLAGS_BUFSIZE does not match FLAGSZ"
 #endif
 
 const char *

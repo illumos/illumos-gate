@@ -48,8 +48,10 @@
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_GRPHDL_FLAGS_BUFSIZE < HDLSZ) && !defined(__lint)
-#error "CONV_GRPHDL_FLAGS_BUFSIZE is not large enough"
+#if (CONV_GRPHDL_FLAGS_BUFSIZE != HDLSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE HDLSZ
+#include "report_bufsize.h"
+#error "CONV_GRPHDL_FLAGS_BUFSIZE does not match HDLSZ"
 #endif
 
 /*
@@ -99,8 +101,10 @@ conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_GRPDESC_FLAGS_BUFSIZE < DESCSZ) && !defined(__lint)
-#error "CONV_GRPDESC_FLAGS_BUFSIZE is not large enough"
+#if (CONV_GRPDESC_FLAGS_BUFSIZE != DESCSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE DESCSZ
+#include "report_bufsize.h"
+#error "CONV_GRPDESC_FLAGS_BUFSIZE does not match DESCSZ"
 #endif
 
 /*

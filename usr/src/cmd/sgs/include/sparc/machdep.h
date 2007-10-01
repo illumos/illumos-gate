@@ -157,6 +157,7 @@ extern "C" {
 					/* transition flags for got sizing */
 #define	M_GOT_LARGE	(Sword)(-M_GOT_MAXSMALL - 1)
 #define	M_GOT_SMALL	(Sword)(-M_GOT_MAXSMALL - 2)
+#define	M_GOT_MIXED	(Sword)(-M_GOT_MAXSMALL - 3)
 
 
 /*

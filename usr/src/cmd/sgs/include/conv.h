@@ -190,7 +190,7 @@ typedef union {
 
 
 /* conv_config_feat() */
-#define	CONV_CONFIG_FEAT_BUFSIZE	195
+#define	CONV_CONFIG_FEAT_BUFSIZE	194
 
 typedef union {
 	Conv32_inv_buf_t	inv_buf;
@@ -232,7 +232,7 @@ typedef union {
 
 
 /* conv_dl_flag() */
-#define	CONV_DL_FLAG_BUFSIZE		195
+#define	CONV_DL_FLAG_BUFSIZE		175
 
 typedef union {
 	Conv32_inv_buf_t	inv_buf;

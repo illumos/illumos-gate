@@ -165,8 +165,10 @@ conv_sec_type(Half mach, Word sec, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_SEC_FLAGS_BUFSIZE < FLAGSZ
-#error "CONV_SEC_FLAGS_BUFSIZE is not large enough"
+#if (CONV_SEC_FLAGS_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_SEC_FLAGS_BUFSIZE does not match FLAGSZ"
 #endif
 
 const char *

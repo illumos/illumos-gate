@@ -56,8 +56,10 @@ DEFINE_conv_map2str
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_DYN_POSFLAG1_BUFSIZE < POSSZ
-#error "CONV_DYN_POSFLAG1_BUFSIZE is not large enough"
+#if (CONV_DYN_POSFLAG1_BUFSIZE != POSSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE POSSZ
+#include "report_bufsize.h"
+#error "CONV_DYN_POSFLAG1_BUFSIZE does not match POSSZ"
 #endif
 
 const char *
@@ -111,10 +113,11 @@ conv_dyn_posflag1(Xword flags, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_DYN_FLAG_BUFSIZE < FLAGSZ
-#error "CONV_DYN_FLAG_BUFSIZE is not large enough"
+#if (CONV_DYN_FLAG_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_DYN_FLAG_BUFSIZE does not match FLAGSZ"
 #endif
-
 const char *
 conv_dyn_flag(Xword flags, Conv_fmt_flags_t fmt_flags,
     Conv_dyn_flag_buf_t *dyn_flag_buf)
@@ -181,8 +184,10 @@ conv_dyn_flag(Xword flags, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_DYN_FLAG1_BUFSIZE < FLAG1SZ
-#error "CONV_DYN_FLAG1_BUFSIZE is not large enough"
+#if (CONV_DYN_FLAG1_BUFSIZE != FLAG1SZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAG1SZ
+#include "report_bufsize.h"
+#error "CONV_DYN_FLAG1_BUFSIZE does not match FLAG1SZ"
 #endif
 
 const char *
@@ -244,8 +249,10 @@ conv_dyn_flag1(Xword flags, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_DYN_FEATURE1_BUFSIZE < FEATSZ
-#error "CONV_DYN_FEATURE1_BUFSIZE is not large enough"
+#if (CONV_DYN_FEATURE1_BUFSIZE != FEATSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FEATSZ
+#include "report_bufsize.h"
+#error "CONV_DYN_FEATURE1_BUFSIZE does not match FEATSZ"
 #endif
 
 const char *
@@ -455,8 +462,10 @@ conv_dyn_tag(Xword tag, Half mach, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_BND_TYPE_BUFSIZE < BINDTSZ
-#error "CONV_BND_TYPE_BUFSIZE is not large enough"
+#if (CONV_BND_TYPE_BUFSIZE != BINDTSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE BINDTSZ
+#include "report_bufsize.h"
+#error "CONV_BND_TYPE_BUFSIZE does not match BINDTSZ"
 #endif
 
 const char *
@@ -501,8 +510,10 @@ conv_bnd_type(uint_t flags, Conv_bnd_type_buf_t *bnd_type_buf)
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_BND_OBJ_BUFSIZE < BINDOSZ
-#error "CONV_BND_OBJ_BUFSIZE is not large enough"
+#if (CONV_BND_OBJ_BUFSIZE != BINDOSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE BINDOSZ
+#include "report_bufsize.h"
+#error "CONV_BND_OBJ_BUFSIZE does not match BINDOSZ"
 #endif
 
 const char *

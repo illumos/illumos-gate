@@ -41,6 +41,7 @@
  */
 static Sword neggotoffset = 0;		/* off. of GOT table from GOT symbol */
 static Sword smlgotcnt = M_GOT_XNumber;	/* no. of small GOT symbols */
+static Sword mixgotcnt = 0;		/* # syms with both large/small GOT */
 
 Word
 ld_init_rel(Rel_desc *reld, void *reloc)
@@ -1788,6 +1789,7 @@ ld_reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
  * into the GOT, whereas large uses an unsigned 32-bit offset.
  */
 static	Sword small_index;	/* starting index for small GOT entries */
+static	Sword mixed_index;	/* starting index for mixed GOT entries */
 static	Sword large_index;	/* starting index for large GOT entries */
 
 uintptr_t
@@ -1811,6 +1813,10 @@ ld_assign_got(Ofl_desc *ofl, Sym_desc * sdp)
 			small_index += gotents;
 			if (small_index == 0)
 				small_index = M_GOT_XNumber;
+			break;
+		case M_GOT_MIXED:
+			gnp->gn_gotndx = mixed_index;
+			mixed_index += gotents;
 			break;
 		case M_GOT_LARGE:
 			gnp->gn_gotndx = large_index;
@@ -1886,25 +1892,55 @@ ld_assign_got_ndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
 	Listnode *	lnp, * plnp;
 	uint_t		gotents;
 
-	raddend = rsp->rel_raddend;
-	if (pgnp && (pgnp->gn_addend == raddend) && (pgnp->gn_gotref == gref)) {
-		/*
-		 * If an entry for this addend already exists, determine if it
-		 * should be changed to a SMALL got.
-		 */
-		if ((pgnp->gn_gotndx != M_GOT_SMALL) &&
-		    (rsp->rel_rtype == R_SPARC_GOT13)) {
-			smlgotcnt++;
-			pgnp->gn_gotndx = M_GOT_SMALL;
-			sdp->sd_flags |= FLG_SY_SMGOT;
-		}
-		return (1);
-	}
-
+	/* Some TLS requires two relocations with two GOT entries */
 	if ((gref == GOT_REF_TLSGD) || (gref == GOT_REF_TLSLD))
 		gotents = 2;
 	else
 		gotents = 1;
+
+	raddend = rsp->rel_raddend;
+	if (pgnp && (pgnp->gn_addend == raddend) && (pgnp->gn_gotref == gref)) {
+
+		/*
+		 * If an entry for this addend already exists, determine if it
+		 * has mixed mode GOT access (both PIC and pic).
+		 *
+		 * In order to be accessible by both large and small pic,
+		 * a mixed mode GOT must be located in the positive index
+		 * range above _GLOBAL_OFFSET_TABLE_, and in the range
+		 * reachable small pic. This is necessary because the large
+		 * PIC mode cannot use a negative offset. This implies that
+		 * there can be no more than (M_GOT_MAXSMALL/2 - M_GOT_XNumber)
+		 * such entries.
+		 */
+		switch (pgnp->gn_gotndx) {
+		case M_GOT_SMALL:
+			/*
+			 * This one was previously identified as a small
+			 * GOT. If this access is large, then convert
+			 * it to mixed.
+			 */
+			if (rsp->rel_rtype != R_SPARC_GOT13) {
+				pgnp->gn_gotndx = M_GOT_MIXED;
+				mixgotcnt += gotents;
+			}
+			break;
+
+		case M_GOT_LARGE:
+			/*
+			 * This one was previously identified as a large
+			 * GOT. If this access is small, convert it to mixed.
+			 */
+			if (rsp->rel_rtype == R_SPARC_GOT13) {
+				smlgotcnt += gotents;
+				mixgotcnt += gotents;
+				pgnp->gn_gotndx = M_GOT_MIXED;
+				sdp->sd_flags |= FLG_SY_SMGOT;
+			}
+			break;
+		}
+		return (1);
+	}
 
 	plnp = 0;
 	for (LIST_TRAVERSE(lst, lnp, _gnp)) {
@@ -1924,10 +1960,11 @@ ld_assign_got_ndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
 
 	if (rsp->rel_rtype == R_SPARC_GOT13) {
 		gnp->gn_gotndx = M_GOT_SMALL;
-		smlgotcnt++;
+		smlgotcnt += gotents;
 		sdp->sd_flags |= FLG_SY_SMGOT;
-	} else
+	} else {
 		gnp->gn_gotndx = M_GOT_LARGE;
+	}
 
 	if (gref == GOT_REF_TLSLD) {
 		ofl->ofl_tlsldgotndx = gnp;
@@ -1966,15 +2003,31 @@ ld_assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
 uintptr_t
 ld_allocate_got(Ofl_desc * ofl)
 {
+	const Sword	first_large_ndx = M_GOT_MAXSMALL / 2;
 	Sym_desc *	sdp;
 	Addr		addr;
 
 	/*
-	 * Sanity check -- is this going to fit at all?
+	 * Sanity check -- is this going to fit at all? There are two
+	 * limits to be concerned about:
+	 *	1) There is a limit on the number of small pic GOT indices,
+	 *		given by M_GOT_MAXSMALL.
+	 *	2) If there are more than (M_GOT_MAXSMALL/2 - M_GOT_XNumber)
+	 *		small GOT indices, there will be items at negative
+	 *		offsets from _GLOBAL_OFFSET_TABLE_. Items that are
+	 *		accessed via large (PIC) code cannot reach these
+	 *		negative slots, so mixed mode items must be in the
+	 *		non-negative range. This implies a limit of
+	 *		(M_GOT_MAXSMALL/2 - M_GOT_XNumber) mixed mode indices.
 	 */
-	if (smlgotcnt >= M_GOT_MAXSMALL) {
+	if (smlgotcnt > M_GOT_MAXSMALL) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_SMALLGOT),
 		    EC_WORD(smlgotcnt), M_GOT_MAXSMALL);
+		return (S_ERROR);
+	}
+	if (mixgotcnt > (first_large_ndx - M_GOT_XNumber)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_MIXEDGOT),
+		    EC_WORD(mixgotcnt), first_large_ndx - M_GOT_XNumber);
 		return (S_ERROR);
 	}
 
@@ -1982,14 +2035,25 @@ ld_allocate_got(Ofl_desc * ofl)
 	 * Set starting offset to be either 0, or a negative index into
 	 * the GOT based on the number of small symbols we've got.
 	 */
-	neggotoffset = ((smlgotcnt > (M_GOT_MAXSMALL / 2)) ?
-	    -((smlgotcnt - (M_GOT_MAXSMALL / 2))) : 0);
+	neggotoffset = ((smlgotcnt >= first_large_ndx) ?
+	    (first_large_ndx - smlgotcnt) : 0);
 
 	/*
-	 * Initialize the large and small got offsets (used in assign_got()).
+	 * Initialize the got offsets used by assign_got() to
+	 * locate GOT items:
+	 *	small - Starting index of items referenced only
+	 *		by small offsets (-Kpic).
+	 *	mixed - Starting index of items referenced
+	 *		by both large (-KPIC) and small (-Kpic).
+	 *	large - Indexes referenced only by large (-KPIC)
+	 *
+	 *  Small items can have negative indexes (i.e. lie below
+	 *	_GLOBAL_OFFSET_TABLE_). Mixed and large items must have
+	 *	non-negative offsets.
 	 */
-	small_index = neggotoffset == 0 ? M_GOT_XNumber : neggotoffset;
+	small_index = (neggotoffset == 0) ? M_GOT_XNumber : neggotoffset;
 	large_index = neggotoffset + smlgotcnt;
+	mixed_index = large_index - mixgotcnt;
 
 	/*
 	 * Assign bias to GOT symbols.

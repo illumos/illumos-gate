@@ -58,8 +58,10 @@
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_SEG_FLAGS_BUFSIZE < SEGSZ) && !defined(__lint)
-#error "CONV_SEG_FLAGS_BUFSIZE is not large enough"
+#if (CONV_SEG_FLAGS_BUFSIZE != SEGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE SEGSZ
+#include "report_bufsize.h"
+#error "CONV_SEG_FLAGS_BUFSIZE does not match SEGSZ"
 #endif
 
 const char *

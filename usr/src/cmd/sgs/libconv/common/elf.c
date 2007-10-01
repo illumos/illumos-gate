@@ -260,8 +260,10 @@ conv_ehdr_vers(Word version, Conv_fmt_flags_t fmt_flags,
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if CONV_EHDR_FLAGS_BUFSIZE < EFLAGSZ
-#error "CONV_EHDR_FLAGS_BUFSIZE is not large enough"
+#if (CONV_EHDR_FLAGS_BUFSIZE != EFLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE EFLAGSZ
+#include "report_bufsize.h"
+#error "CONV_EHDR_FLAGS_BUFSIZE does not match EFLAGSZ"
 #endif
 
 /*

@@ -51,6 +51,7 @@ find_files "s.*" \
 	usr/src/cmd/sgs/messages \
 	usr/src/cmd/sgs/moe \
 	usr/src/cmd/sgs/elfdump \
+	usr/src/cmd/sgs/elfedit \
 	usr/src/cmd/sgs/pvs \
 	usr/src/cmd/sgs/rtld \
 	usr/src/cmd/sgs/rtld.4.x \

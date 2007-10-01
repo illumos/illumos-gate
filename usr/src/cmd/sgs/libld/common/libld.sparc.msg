@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,6 +47,10 @@
 @ MSG_REL_ASSIGNGOT	"internal error: assign_got() invalid got index \
 			 0x%llx for symbol `%s'"
 @ MSG_REL_SMALLGOT	"too many symbols require `small' PIC references:\n\
+			 \thave %d, maximum %d -- recompile some \
+			 modules -K PIC."
+@ MSG_REL_MIXEDGOT	"too many symbols require mixed mode \
+			 (both `small' and `large') PIC references:\n\
 			 \thave %d, maximum %d -- recompile some \
 			 modules -K PIC."
 

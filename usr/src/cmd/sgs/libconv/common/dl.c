@@ -51,8 +51,10 @@
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_DL_MODE_BUFSIZE < MODESZ) && !defined(__lint)
-#error "CONV_DL_MODE_BUFSIZE is not large enough"
+#if (CONV_DL_MODE_BUFSIZE != MODESZ) && !defined(__lint)
+#define	REPORT_BUFSIZE MODESZ
+#include "report_bufsize.h"
+#error "CONV_DL_MODE_BUFSIZE does not match MODESZ"
 #endif
 
 /*
@@ -129,8 +131,10 @@ conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_DL_FLAG_BUFSIZE < FLAGSZ) && !defined(__lint)
-#error "CONV_DL_FLAG_BUFSIZE is not large enough"
+#if (CONV_DL_FLAG_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_DL_FLAG_BUFSIZE does not match FLAGSZ"
 #endif
 
 /*

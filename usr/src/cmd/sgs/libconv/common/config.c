@@ -53,8 +53,10 @@
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_CONFIG_FEAT_BUFSIZE < FEATSZ) && !defined(__lint)
-#error "CONV_CONFIG_FEAT_BUFSIZE is not large enough"
+#if (CONV_CONFIG_FEAT_BUFSIZE != FEATSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FEATSZ
+#include "report_bufsize.h"
+#error "CONV_CONFIG_FEAT_BUFSIZE does not match FEATSZ"
 #endif
 
 /*
@@ -111,8 +113,10 @@ conv_config_feat(int features, Conv_config_feat_buf_t *config_feat_buf)
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_CONFIG_OBJ_BUFSIZE < FLAGSZ) && !defined(__lint)
-#error "CONV_CONFIG_OBJ_BUFSIZE is not large enough"
+#if (CONV_CONFIG_OBJ_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_CONFIG_OBJ_BUFSIZE does not match FLAGSZ"
 #endif
 
 /*

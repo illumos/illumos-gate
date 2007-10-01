@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,9 +46,21 @@ pics/elfcap.o:	$(ELFCAP)/elfcap.c
 		$(COMPILE.c) -DCAP_UPPERCASE -o $@ $(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
+# This rule generates the report_bufsize.h include file used by libconv
+# code to ensure that their private buffer size calculations agree with
+# the public values exposed in sgs/include/conv.h. The limit value
+# supplied must be larger than the largest buffer used in libconv. There
+# is little penalty for making it very large, because the header file is
+# only included in error situations where the compilation will fail.
+#
+# We make this depend on Makefile.targ, because a change to Makefile.targ
+# can change the limit, in which case we want to force everything to rebuild.
+report_bufsize.h:	../Makefile.targ
+		perl ../../tools/libconv_mk_report_bufsize.pl 2000
+
 ../common/%.c:	%_msg.h
 
-%_msg.h:	$(SGSMSG) ../common/%.msg
+%_msg.h:	$(SGSMSG) ../common/%.msg report_bufsize.h
 		$(SGSMSG) $(SGSMSGFLAGS) -l -h $@ -d $@ $<
 
 $(SGSMSG):	FRC

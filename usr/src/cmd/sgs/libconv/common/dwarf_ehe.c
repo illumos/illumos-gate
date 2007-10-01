@@ -44,8 +44,10 @@
  * information that is not available in the environment of other programs
  * that include the conv.h header file.
  */
-#if (CONV_DWARF_EHE_BUFSIZE < FLAGSZ) && !defined(__lint)
-#error "CONV_DWARF_EHE_BUFSIZE is not large enough"
+#if (CONV_DWARF_EHE_BUFSIZE != FLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE FLAGSZ
+#include "report_bufsize.h"
+#error "CONV_DWARF_EHE_BUFSIZE does not match FLAGSZ"
 #endif
 
 const char *

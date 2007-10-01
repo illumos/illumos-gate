@@ -1205,7 +1205,7 @@
 
 # Global offset table entries.
 
-@ MSG_GOT_INDEX		" [%ld]"
+@ MSG_GOT_INDEX		" [%d]"
 @ MSG_GOT_SMALL_PIC	"pic"
 @ MSG_GOT_BIG_PIC	"PIC"
 
