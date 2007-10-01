@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,7 +25,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,9 +72,8 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			if (GET_ACTION(info->flags) == ACT_DELETE)
 				break;
 			if (shdr.sh_type == SHT_NOBITS) {
-				error_message(ACT_PRINT_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog, cur_file, SECT_NAME);
+				error_message(ACT_PRINT_ERROR, PLAIN_ERROR,
+				    (char *)0, prog, cur_file, SECT_NAME);
 				break;
 			}
 			doprint(cur_file, info);
@@ -97,10 +95,14 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 					ret = 0;
 					UNSET_CANDIDATE(info->flags);
 				} else {
+					char *name = info->name;
+
 					ret++;
+					if (name == NULL)
+						name = gettext("<unknown>");
 					error_message(ACT_DELETE1_ERROR,
-					PLAIN_ERROR, (char *)0,
-					prog, cur_file, info->name);
+					    PLAIN_ERROR, (char *)0,
+					    prog, cur_file, name);
 				}
 				break;
 			} else if (info->rel_loc == IN) {
@@ -115,9 +117,9 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 				} else {
 					ret++;
 					error_message(ACT_DELETE2_ERROR,
-					PLAIN_ERROR, (char *)0,
-					prog, cur_file, SECT_NAME,
-					info->rel_name);
+					    PLAIN_ERROR, (char *)0,
+					    prog, cur_file, SECT_NAME,
+					    info->rel_name);
 				}
 				break;
 			} else if (GET_LOC(info->flags) == PRIOR) {
@@ -139,14 +141,14 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			if (shdr.sh_type == SHT_NOBITS) {
 				ret++;
 				error_message(ACT_APPEND1_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog, cur_file, SECT_NAME);
+				    PLAIN_ERROR, (char *)0,
+				    prog, cur_file, SECT_NAME);
 				break;
 			} else if (GET_LOC(info->flags) == IN) {
 				ret++;
 				error_message(ACT_APPEND2_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog, cur_file, SECT_NAME);
+				    PLAIN_ERROR, (char *)0,
+				    prog, cur_file, SECT_NAME);
 				break;
 			}
 			doappend(Action[act_index].a_string, info);
@@ -167,14 +169,14 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			if (shdr.sh_type == SHT_NOBITS) {
 				ret++;
 				error_message(ACT_COMPRESS1_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog, cur_file, SECT_NAME);
+				    PLAIN_ERROR, (char *)0,
+				    prog, cur_file, SECT_NAME);
 				break;
 			} else if (GET_LOC(info->flags) == IN) {
 				ret++;
 				error_message(ACT_COMPRESS2_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog, cur_file, SECT_NAME);
+				    PLAIN_ERROR, (char *)0,
+				    prog, cur_file, SECT_NAME);
 				break;
 			}
 
@@ -200,17 +202,13 @@ dozap(section_info_table *info)
 
 	info->mdata = data = malloc(sizeof (Elf_Data));
 	if (data == NULL) {
-		error_message(MALLOC_ERROR,
-		PLAIN_ERROR, (char *)0,
-		prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
 		exit(1);
 	}
 	*data = *info->data;
 	data->d_buf = calloc(1, data->d_size);
 	if (data->d_buf == NULL) {
-		error_message(MALLOC_ERROR,
-		PLAIN_ERROR, (char *)0,
-		prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
 		exit(1);
 	}
 }
@@ -288,9 +286,8 @@ doappend(char *a_string, section_info_table *info)
 		 */
 		info->mdata = data = calloc(1, sizeof (Elf_Data));
 		if (data == NULL) {
-			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0,
-			prog);
+			error_message(MALLOC_ERROR, PLAIN_ERROR,
+			    (char *)0, prog);
 			exit(1);
 		}
 		*data = *info->data;
@@ -308,9 +305,8 @@ doappend(char *a_string, section_info_table *info)
 			 */
 			data->d_buf = calloc(1, len + 2);
 			if (data->d_buf == 0) {
-				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				error_message(MALLOC_ERROR, PLAIN_ERROR,
+				    (char *)0, prog);
 				exit(1);
 			}
 			tp = (char *)data->d_buf;
@@ -324,9 +320,8 @@ doappend(char *a_string, section_info_table *info)
 			 */
 			p = malloc(len + 1 + data->d_size);
 			if (p == NULL) {
-				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				error_message(MALLOC_ERROR, PLAIN_ERROR,
+				    (char *)0, prog);
 				exit(1);
 			}
 			(void) memcpy(p, data->d_buf, data->d_size);
@@ -351,9 +346,8 @@ doappend(char *a_string, section_info_table *info)
 				free(data->d_buf);
 			data->d_buf = calloc(1, len + 2);
 			if (data->d_buf == 0) {
-				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				error_message(MALLOC_ERROR, PLAIN_ERROR,
+				    (char *)0, prog);
 				exit(1);
 			}
 			tp = (char *)data->d_buf;
@@ -367,9 +361,8 @@ doappend(char *a_string, section_info_table *info)
 			 */
 			p = malloc(len + 1 + data->d_size);
 			if (p == NULL) {
-				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				error_message(MALLOC_ERROR, PLAIN_ERROR,
+				    (char *)0, prog);
 				exit(1);
 			}
 			(void) memcpy(p, data->d_buf, data->d_size);
@@ -403,9 +396,8 @@ docompress(section_info_table *info)
 		char *p;
 		info->mdata = data = calloc(1, sizeof (Elf_Data));
 		if (data == NULL) {
-			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0,
-			prog);
+			error_message(MALLOC_ERROR, PLAIN_ERROR,
+			    (char *)0, prog);
 			exit(1);
 		}
 		*data = *info->data;
@@ -444,9 +436,7 @@ compress(char *str, size_t *size)
 	strings = malloc(str_size);
 
 	if (hash_key == NULL || hash_str == NULL || strings == NULL) {
-		error_message(MALLOC_ERROR,
-		PLAIN_ERROR, (char *)0,
-		prog);
+		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
 		mcs_exit(FAILURE);
 	}
 
@@ -468,8 +458,7 @@ compress(char *str, size_t *size)
 				if ((strings = (char *)
 				    realloc(strings, str_size)) == NULL) {
 					error_message(MALLOC_ERROR,
-					PLAIN_ERROR, (char *)0,
-					prog);
+					    PLAIN_ERROR, (char *)0, prog);
 					mcs_exit(FAILURE);
 				}
 			}
@@ -481,8 +470,7 @@ compress(char *str, size_t *size)
 			if ((strings = (char *)
 			    realloc(strings, str_size)) == NULL) {
 				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				    PLAIN_ERROR, (char *)0, prog);
 				mcs_exit(FAILURE);
 			}
 		}
@@ -506,13 +494,12 @@ compress(char *str, size_t *size)
 		if (hash_num == hash_end) {
 			hash_end *= 2;
 			hash_key = realloc((char *)hash_key,
-				hash_end * sizeof (int));
+			    hash_end * sizeof (int));
 			hash_str = realloc((char *)hash_str,
-				hash_end * sizeof (size_t));
+			    hash_end * sizeof (size_t));
 			if (hash_key == NULL || hash_str == NULL) {
 				error_message(MALLOC_ERROR,
-				PLAIN_ERROR, (char *)0,
-				prog);
+				    PLAIN_ERROR, (char *)0, prog);
 				mcs_exit(FAILURE);
 			}
 		}

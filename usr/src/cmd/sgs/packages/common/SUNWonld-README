@@ -1262,3 +1262,6 @@ Bugid   Risk Synopsis
 6234471 need a way to edit ELF objects
 	PSARC/2007/509 elfedit
 5035454 mixing -Kpic and -KPIC may cause SIGSEGV with -xarch=v9
+6473571 strip and mcs get confused and corrupt files when passed
+	non-ELF arguments
+6253589 mcs has problems handling multiple SHT_NOTE sections
