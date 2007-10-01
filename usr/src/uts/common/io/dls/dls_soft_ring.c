@@ -69,7 +69,13 @@
 static void soft_ring_fire(void *);
 static void soft_ring_drain(soft_ring_t *, clock_t);
 static void soft_ring_worker(soft_ring_t *);
-static void soft_ring_stop_workers(soft_ring_t **, int);
+static void soft_ring_set_destroy(soft_ring_t **, int);
+static void dls_taskq_stop_soft_ring(void *);
+
+typedef struct soft_ring_taskq {
+	soft_ring_t	**ringp_list;
+	uint_t		ring_size;
+} soft_ring_taskq_t;
 
 kmem_cache_t *soft_ring_cache;
 
@@ -177,38 +183,38 @@ soft_ring_create(char *name, processorid_t bind, clock_t wait,
 
 soft_ring_t **
 soft_ring_set_create(char *name, processorid_t bind, clock_t wait,
-    uint_t type, pri_t pri, int cnt)
+    uint_t type, pri_t pri, int ring_size)
 {
 	int 		i;
 	soft_ring_t	**ringp_list;
 
 	if ((ringp_list =
-	    (soft_ring_t **) kmem_zalloc(sizeof (soft_ring_t *) * cnt,
+	    (soft_ring_t **) kmem_zalloc(sizeof (soft_ring_t *) * ring_size,
 	    KM_NOSLEEP)) != NULL) {
-		for (i = 0; i < cnt; i++) {
+		for (i = 0; i < ring_size; i++) {
 			ringp_list[i] = soft_ring_create(name, bind, wait,
 			    type, pri);
 			if (ringp_list[i] == NULL)
 				break;
 		}
-		if (i != cnt) {
-			soft_ring_stop_workers(ringp_list, i);
-			soft_ring_set_destroy(ringp_list, i);
+		if (i != ring_size) {
+			soft_ring_set_destroy(ringp_list, ring_size);
 			ringp_list = NULL;
 		}
 	}
 	return (ringp_list);
 }
 
-static void
-soft_ring_stop_workers(soft_ring_t **ringp_set, int cnt)
+void
+soft_ring_set_destroy(soft_ring_t **ringp_set, int ring_size)
 {
 	int 		i;
+	mblk_t		*mp;
 	soft_ring_t	*ringp;
 	timeout_id_t 	tid;
 	kt_did_t	t_did = 0;
 
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; (i < ring_size) && (ringp_set[i] != NULL); i++) {
 		ringp = ringp_set[i];
 
 		soft_ring_unbind((void *)ringp);
@@ -239,18 +245,6 @@ soft_ring_stop_workers(soft_ring_t **ringp_set, int cnt)
 		 */
 		if (t_did)
 			thread_join(t_did);
-	}
-}
-
-void
-soft_ring_set_destroy(soft_ring_t **ringp_set, int cnt)
-{
-	int 		i;
-	mblk_t		*mp;
-	soft_ring_t	*ringp;
-
-	for (i = 0; i < cnt; i++) {
-		ringp = ringp_set[i];
 
 		mutex_enter(&ringp->s_ring_lock);
 
@@ -272,7 +266,7 @@ soft_ring_set_destroy(soft_ring_t **ringp_set, int cnt)
 		kmem_cache_free(soft_ring_cache, ringp);
 		ringp_set[i] = NULL;
 	}
-	kmem_free(ringp_set, sizeof (soft_ring_t *) * cnt);
+	kmem_free(ringp_set, sizeof (soft_ring_t *) * ring_size);
 }
 
 /* ARGSUSED */
@@ -542,7 +536,7 @@ dls_soft_ring_workers(dls_channel_t dc)
 	dls_impl_t	*dip = (dls_impl_t *)dc;
 	boolean_t ret = B_FALSE;
 
-	rw_enter(&(dip->di_lock), RW_WRITER);
+	rw_enter(&(dip->di_lock), RW_READER);
 	if (dip->di_soft_ring_list != NULL)
 		ret = B_TRUE;
 	rw_exit(&(dip->di_lock));
@@ -553,33 +547,82 @@ void
 dls_soft_ring_disable(dls_channel_t dc)
 {
 	dls_impl_t	*dip = (dls_impl_t *)dc;
+	soft_ring_t	**ringp_list = NULL;
+	int		ring_size;
 
 	rw_enter(&(dip->di_lock), RW_WRITER);
-	if (dip->di_soft_ring_list != NULL)
-		soft_ring_stop_workers(dip->di_soft_ring_list,
-		    dip->di_soft_ring_size);
+	if (dip->di_soft_ring_list != NULL) {
+		ringp_list = dip->di_soft_ring_list;
+		ring_size = dip->di_soft_ring_size;
+		dip->di_soft_ring_list = NULL;
+	}
+	dip->di_soft_ring_size = 0;
 	rw_exit(&(dip->di_lock));
+
+	if (ringp_list != NULL)
+		soft_ring_set_destroy(ringp_list, ring_size);
+}
+
+static void
+dls_taskq_stop_soft_ring(void *arg)
+{
+	soft_ring_taskq_t	*ring_taskq;
+	soft_ring_t		**ringp_list;
+	int			ring_size;
+
+	ring_taskq = (soft_ring_taskq_t *)arg;
+	ringp_list = ring_taskq->ringp_list;
+	ring_size = ring_taskq->ring_size;
+	kmem_free(ring_taskq, sizeof (soft_ring_taskq_t));
+
+	soft_ring_set_destroy(ringp_list, ring_size);
 }
 
 boolean_t
 dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 {
-	dls_impl_t	*dip;
-	int		i;
-	soft_ring_t	**softring_set;
-	soft_ring_t	*softring;
-	mac_rx_fifo_t	mrf;
-	char		name[64];
+	dls_impl_t		*dip;
+	int			i;
+	soft_ring_t		**softring_set;
+	soft_ring_t		*softring;
+	mac_rx_fifo_t		mrf;
+	soft_ring_taskq_t	*ring_taskq;
+	char			name[64];
 
 	dip = (dls_impl_t *)dc;
 
 	rw_enter(&(dip->di_lock), RW_WRITER);
 
 	if (dip->di_soft_ring_list != NULL) {
-		soft_ring_stop_workers(dip->di_soft_ring_list,
-		    dip->di_soft_ring_size);
-		soft_ring_set_destroy(dip->di_soft_ring_list,
-		    dip->di_soft_ring_size);
+		/*
+		 * Both ds_lock and di_lock are held as writer.
+		 * As soft_ring_set_destroy() blocks for the
+		 * worker thread(s) to complete, there is a possibility
+		 * that the worker thread(s) could be in the process
+		 * of draining the queue and is blocked waiting for
+		 * either ds_lock or di_lock. Moreover the NIC interrupt
+		 * thread could be blocked in dls_accept().
+		 * To avoid deadlock condition, taskq thread would be
+		 * created to handle soft_ring_set_destroy() and
+		 * blocking if required which would avoid holding
+		 * both ds_lock and di_lock.
+		 * NOTE: we cannot drop either locks here, due to
+		 * weird race conditions seen.
+		 */
+		ring_taskq = (soft_ring_taskq_t *)
+		    kmem_zalloc(sizeof (soft_ring_taskq_t), KM_NOSLEEP);
+		if (ring_taskq == NULL) {
+			rw_exit(&(dip->di_lock));
+			return (B_FALSE);
+		}
+		ring_taskq->ringp_list = dip->di_soft_ring_list;
+		ring_taskq->ring_size = dip->di_soft_ring_size;
+		if (taskq_dispatch(system_taskq, dls_taskq_stop_soft_ring,
+		    ring_taskq, TQ_NOSLEEP) == NULL) {
+			rw_exit(&(dip->di_lock));
+			kmem_free(ring_taskq, sizeof (soft_ring_taskq_t));
+			return (B_FALSE);
+		}
 		dip->di_soft_ring_list = NULL;
 	}
 	dip->di_soft_ring_size = 0;
