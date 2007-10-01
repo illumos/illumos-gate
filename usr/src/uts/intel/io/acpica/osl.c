@@ -92,6 +92,11 @@ static int cpu_map_built = 0;
 
 static int acpi_has_broken_bbn = -1;
 
+/* buffer for AcpiOsVprintf() */
+#define	ACPI_OSL_PR_BUFLEN	1024
+static char *acpi_osl_pr_buffer = NULL;
+static int acpi_osl_pr_buflen;
+
 #define	D2A_DEBUG
 
 /*
@@ -146,20 +151,31 @@ init_event_queues()
 }
 
 /*
- *
+ * One-time initialization of OSL layer
  */
 ACPI_STATUS
 AcpiOsInitialize(void)
 {
+	/*
+	 * Allocate buffer for AcpiOsVprintf() here to avoid
+	 * kmem_alloc()/kmem_free() at high PIL
+	 */
+	acpi_osl_pr_buffer = kmem_alloc(ACPI_OSL_PR_BUFLEN, KM_SLEEP);
+	if (acpi_osl_pr_buffer != NULL)
+		acpi_osl_pr_buflen = ACPI_OSL_PR_BUFLEN;
+
 	return (AE_OK);
 }
 
 /*
- *
+ * One-time shut-down of OSL layer
  */
 ACPI_STATUS
 AcpiOsTerminate(void)
 {
+
+	if (acpi_osl_pr_buffer != NULL)
+		kmem_free(acpi_osl_pr_buffer, acpi_osl_pr_buflen);
 
 	discard_event_queues();
 	return (AE_OK);
@@ -1009,7 +1025,7 @@ int	acpica_outbuf_offset;
  *
  */
 static void
-acpica_pr_buf(char *buf, int buflen)
+acpica_pr_buf(char *buf)
 {
 	char c, *bufp, *outp;
 	int	out_remaining;
@@ -1039,34 +1055,27 @@ acpica_pr_buf(char *buf, int buflen)
 	}
 
 	acpica_outbuf_offset = outp - acpica_outbuf;
-	kmem_free(buf, buflen);
 }
 
 void
 AcpiOsVprintf(const char *Format, va_list Args)
 {
-	va_list	save;
-	int	buflen;
-	char	*buf;
 
 	/*
-	 * Try to be nice and emit the message via strlog().
-	 * Unfortunately, vstrlog() doesn't define the format
-	 * string as const char, so we allocate a local buffer
-	 * use vsnprintf().
-	 *
-	 * If we fail to allocate a string buffer, we resort
-	 * to printf().
+	 * If AcpiOsInitialize() failed to allocate a string buffer,
+	 * resort to vprintf().
 	 */
-	va_copy(save, Args);
-	buflen = vsnprintf(NULL, 0, Format, save) + 1;
-	buf = kmem_alloc(buflen, KM_NOSLEEP);
-	if (buf == NULL) {
+	if (acpi_osl_pr_buffer == NULL) {
 		vprintf(Format, Args);
 		return;
 	}
-	(void) vsnprintf(buf, buflen, Format, Args);
-	acpica_pr_buf(buf, buflen);
+
+	/*
+	 * It is possible that a very long debug output statement will
+	 * be truncated; this is silently ignored.
+	 */
+	(void) vsnprintf(acpi_osl_pr_buffer, acpi_osl_pr_buflen, Format, Args);
+	acpica_pr_buf(acpi_osl_pr_buffer);
 }
 
 void

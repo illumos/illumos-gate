@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -47,7 +47,7 @@
  */
 static	struct modlmisc modlmisc = {
 	&mod_miscops,
-	"ACPI interpreter %I%",
+	"ACPI interpreter",
 };
 
 static	struct modlinkage modlinkage = {
@@ -402,8 +402,8 @@ error:
 	 * and value were chosen in order to remain compatible with acpi_intp.
 	 */
 	e_ddi_prop_update_int(DDI_DEV_T_NONE, ddi_root_node(), "acpi-status",
-		(status == AE_OK) ? (ACPI_BOOT_INIT | ACPI_BOOT_ENABLE |
-		ACPI_BOOT_BOOTCONF) : 0);
+	    (status == AE_OK) ? (ACPI_BOOT_INIT | ACPI_BOOT_ENABLE |
+	    ACPI_BOOT_BOOTCONF) : 0);
 
 	mutex_exit(&acpica_module_lock);
 	return (status);
@@ -452,7 +452,7 @@ acpica_get_sci(int *sci_irq, iflag_t *sci_flags)
 	/* search for ISOs that modify it */
 	/* if we don't find a MADT, that's OK; no ISOs then */
 	if (AcpiGetFirmwareTable(APIC_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-			    (ACPI_TABLE_HEADER **) &mat) != AE_OK) {
+	    (ACPI_TABLE_HEADER **) &mat) != AE_OK) {
 		return (AE_OK);
 	}
 
