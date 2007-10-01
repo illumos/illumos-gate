@@ -86,15 +86,6 @@
 stateid4 nfs4_deleg_any = { 0x7FFFFFF0 };
 char nfs4_deleg_fh[] = "\0377\0376\0375\0374";
 nfs_fh4 nfs4_deleg_anyfh = { sizeof (nfs4_deleg_fh)-1, nfs4_deleg_fh };
-int nfs4_deleg_accept_phony = OPEN_DELEGATE_NONE;
-nfsace4 nfs4_deleg_ace_phony;
-nfs_space_limit4 nfs4_deleg_space_phony = { NFS_LIMIT_SIZE, 8192 };
-nfs_space_limit4 nfs4_deleg_space_phony2 = { NFS_LIMIT_BLOCKS, 0 };
-nfs_modified_limit4 nfs4_deleg_space_phonyl = { 8, 512 };
-changeid4 nfs4_deleg_change_phony = 0x7eeeeeee76666660LL;
-int nfs4_use_phony_limit;
-int nfs4_use_phony_recall;
-int nfs4_phony_recall_v;
 nfsstat4 cb4_getattr_fail = NFS4_OK;
 nfsstat4 cb4_recall_fail = NFS4_OK;
 
@@ -388,8 +379,7 @@ cb_getattr_free(nfs_cb_resop4 *resop)
 {
 	if (resop->nfs_cb_resop4_u.opcbgetattr.obj_attributes.attrlist4)
 		kmem_free(resop->nfs_cb_resop4_u.opcbgetattr.
-			obj_attributes.attrlist4,
-			cb_getattr_bytes);
+		    obj_attributes.attrlist4, cb_getattr_bytes);
 }
 
 static void
@@ -493,7 +483,7 @@ cb_recall(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 
 	/* Fire up a thread to do the delegreturn */
 	nfs4delegreturn_async(rp, NFS4_DR_RECALL|NFS4_DR_REOPEN,
-					args->truncate);
+	    args->truncate);
 
 	*cs->statusp = resp->status = 0;
 }
@@ -576,9 +566,9 @@ cb_compound(CB_COMPOUND4args *args, CB_COMPOUND4res *resp, struct svc_req *req,
 	 */
 	resp->tag.utf8string_len = args->tag.utf8string_len;
 	resp->tag.utf8string_val = kmem_alloc(resp->tag.utf8string_len,
-					KM_SLEEP);
+	    KM_SLEEP);
 	bcopy(args->tag.utf8string_val, resp->tag.utf8string_val,
-		args->tag.utf8string_len);
+	    args->tag.utf8string_len);
 
 	/*
 	 * XXX for now, minorversion should be zero
@@ -606,7 +596,7 @@ cb_compound(CB_COMPOUND4args *args, CB_COMPOUND4res *resp, struct svc_req *req,
 
 	resp->array_len = args->array_len;
 	resp->array = kmem_zalloc(args->array_len * sizeof (nfs_cb_resop4),
-							KM_SLEEP);
+	    KM_SLEEP);
 
 	for (i = 0; i < args->array_len && cs.cont; i++) {
 
@@ -652,11 +642,11 @@ cb_compound(CB_COMPOUND4args *args, CB_COMPOUND4res *resp, struct svc_req *req,
 		if ((i + 1) < args->array_len && !cs.cont) {
 
 			new_res = kmem_alloc(
-				(i+1) * sizeof (nfs_cb_resop4), KM_SLEEP);
+			    (i+1) * sizeof (nfs_cb_resop4), KM_SLEEP);
 			bcopy(resp->array,
-				new_res, (i+1) * sizeof (nfs_cb_resop4));
+			    new_res, (i+1) * sizeof (nfs_cb_resop4));
 			kmem_free(resp->array,
-				args->array_len * sizeof (nfs_cb_resop4));
+			    args->array_len * sizeof (nfs_cb_resop4));
 
 			resp->array_len =  i + 1;
 			resp->array = new_res;
@@ -699,7 +689,7 @@ cb_compound_free(CB_COMPOUND4res *resp)
 
 	if (resp->array != NULL) {
 		kmem_free(resp->array,
-			resp->array_len * sizeof (nfs_cb_resop4));
+		    resp->array_len * sizeof (nfs_cb_resop4));
 	}
 }
 
@@ -884,8 +874,8 @@ nfs4_cb_args(nfs4_server_t *np, struct knetconfig *knc, SETCLIENTID4args *args)
 	if (found == FALSE) {
 
 		NFS4_DEBUG(nfs4_callback_debug,
-		(CE_WARN, "nfs4_cb_args: could not find netid for %s/%s\n",
-			knc->knc_protofmly, knc->knc_proto));
+		    (CE_WARN, "nfs4_cb_args: could not find netid for %s/%s\n",
+		    knc->knc_protofmly, knc->knc_proto));
 
 		args->callback.cb_program = 0;
 		args->callback.cb_location.r_netid = NULL;
@@ -1064,7 +1054,7 @@ nfs4_svc(struct nfs4_svc_args *arg, model_t model)
 		    &nfs4_cb_sct, NULL, NFS_CB_SVCPOOL_ID, FALSE);
 		if (error) {
 			CB_WARN1("nfs4_svc: svc_tli_kcreate failed %d\n",
-				error);
+			    error);
 			kmem_free(addrmask.buf, addrmask.maxlen);
 		}
 	}
@@ -1089,7 +1079,7 @@ nfs4_callback_init_zone(zoneid_t zoneid)
 	ncg = kmem_zalloc(sizeof (*ncg), KM_SLEEP);
 
 	ncg->nfs4prog2server = kmem_zalloc(nfs4_num_prognums *
-		sizeof (struct nfs4_server *), KM_SLEEP);
+	    sizeof (struct nfs4_server *), KM_SLEEP);
 
 	/* initialize the dlist */
 	mutex_init(&ncg->nfs4_dlist_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -1106,11 +1096,11 @@ nfs4_callback_init_zone(zoneid_t zoneid)
 	    sizeof (nfs4_callback_stats_tmpl));
 	/* register "nfs:0:nfs4_callback_stats" for this zone */
 	if ((nfs4_callback_kstat =
-		kstat_create_zone("nfs", 0, "nfs4_callback_stats", "misc",
-		    KSTAT_TYPE_NAMED,
-		    sizeof (ncg->nfs4_callback_stats) / sizeof (kstat_named_t),
-		    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE,
-		    zoneid)) != NULL) {
+	    kstat_create_zone("nfs", 0, "nfs4_callback_stats", "misc",
+	    KSTAT_TYPE_NAMED,
+	    sizeof (ncg->nfs4_callback_stats) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE,
+	    zoneid)) != NULL) {
 		nfs4_callback_kstat->ks_data = &ncg->nfs4_callback_stats;
 		kstat_install(nfs4_callback_kstat);
 	}
@@ -1264,7 +1254,7 @@ nfs4_callback_init(void)
 
 	/* initialize the callback table */
 	nfs4_cb_sc = kmem_alloc(nfs4_num_prognums *
-		sizeof (SVC_CALLOUT), KM_SLEEP);
+	    sizeof (SVC_CALLOUT), KM_SLEEP);
 
 	for (i = 0; i < nfs4_num_prognums; i++) {
 		nfs4_cb_sc[i].sc_prog = NFS4_CALLBACK+i;
@@ -1391,7 +1381,7 @@ nfs4delegreturn_save_lost_rqst(int error, nfs4_lost_rqst_t *lost_rqstp,
 	}
 
 	NFS4_DEBUG(nfs4_lost_rqst_debug, (CE_NOTE,
-			"nfs4close_save_lost_rqst: error %d", error));
+	    "nfs4close_save_lost_rqst: error %d", error));
 
 	lost_rqstp->lr_op = OP_DELEGRETURN;
 	/*
@@ -1435,7 +1425,7 @@ nfs4delegreturn_otw(rnode4_t *rp, cred_t *cr, nfs4_error_t *ep)
 
 	argops[2].argop = OP_DELEGRETURN;
 	argops[2].nfs_argop4_u.opdelegreturn.deleg_stateid =
-		rp->r_deleg_stateid;
+	    rp->r_deleg_stateid;
 
 	t = gethrtime();
 	rfs4call(VTOMI4(RTOV4(rp)), &args, &res, cr, &doqueue, 0, ep);
@@ -1466,7 +1456,7 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
 
 	while (!done) {
 		e.error = nfs4_start_fop(mi, vp, NULL, OH_DELEGRETURN,
-				&recov_state, &recovonly);
+		    &recov_state, &recovonly);
 
 		if (e.error) {
 			if (flags & NFS4_DR_FORCE) {
@@ -1498,11 +1488,11 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
 			 */
 			nfs4_error_init(&e, EINTR);
 			nfs4delegreturn_save_lost_rqst(e.error, &lost_rqst,
-				cr, vp);
+			    cr, vp);
 			(void) nfs4_start_recovery(&e, mi, vp,
-				NULL, &rp->r_deleg_stateid,
-				lost_rqst.lr_op == OP_DELEGRETURN ?
-				&lost_rqst : NULL, OP_DELEGRETURN, NULL);
+			    NULL, &rp->r_deleg_stateid,
+			    lost_rqst.lr_op == OP_DELEGRETURN ?
+			    &lost_rqst : NULL, OP_DELEGRETURN, NULL);
 			nfs4_end_op(mi, vp, NULL, &recov_state, needrecov);
 			break;
 		}
@@ -1522,11 +1512,11 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
 
 		if (needrecov) {
 			nfs4delegreturn_save_lost_rqst(e.error, &lost_rqst,
-				cr, vp);
+			    cr, vp);
 			(void) nfs4_start_recovery(&e, mi, vp,
-				NULL, &rp->r_deleg_stateid,
-				lost_rqst.lr_op == OP_DELEGRETURN ?
-				&lost_rqst : NULL, OP_DELEGRETURN, NULL);
+			    NULL, &rp->r_deleg_stateid,
+			    lost_rqst.lr_op == OP_DELEGRETURN ?
+			    &lost_rqst : NULL, OP_DELEGRETURN, NULL);
 		} else {
 			nfs4delegreturn_cleanup_impl(rp, NULL, ncg);
 			done = TRUE;
@@ -1667,7 +1657,7 @@ nfs4delegreturn_impl(rnode4_t *rp, int flags, struct nfs4_callback_globals *ncg)
 			error = deleg_reopen(vp, &needrecov, ncg, flags);
 			if (error != 0) {
 				if ((flags & (NFS4_DR_FORCE | NFS4_DR_RECALL))
-									== 0)
+				    == 0)
 					goto out;
 			} else if (needrecov) {
 				if ((flags & NFS4_DR_FORCE) == 0)
@@ -1734,7 +1724,7 @@ nfs4delegreturn_async(rnode4_t *rp, int flags, bool_t trunc)
 	 */
 
 	(void) zthread_create(NULL, 0, nfs4delegreturn_thread, pp, 0,
-				minclsyspri);
+	    minclsyspri);
 }
 
 static void
@@ -1749,7 +1739,7 @@ delegreturn_all_thread(rpcprog_t *pp)
 	struct nfs4_callback_globals *ncg;
 
 	NFS4_DEBUG(nfs4_drat_debug,
-		(CE_NOTE, "delereturn_all_thread: prog %d\n", *pp));
+	    (CE_NOTE, "delereturn_all_thread: prog %d\n", *pp));
 
 	prog = *pp;
 	kmem_free(pp, sizeof (*pp));
@@ -1779,7 +1769,7 @@ delegreturn_all_thread(rpcprog_t *pp)
 		VN_HOLD(vp);
 		mutex_exit(&np->s_lock);
 		(void) nfs4delegreturn_impl(rp, NFS4_DR_PUSH|NFS4_DR_REOPEN,
-									ncg);
+		    ncg);
 		VN_RELE(vp);
 
 		/* retake the s_lock for next trip through the loop */
@@ -1788,7 +1778,7 @@ delegreturn_all_thread(rpcprog_t *pp)
 	mutex_exit(&np->s_lock);
 out:
 	NFS4_DEBUG(nfs4_drat_debug,
-		(CE_NOTE, "delereturn_all_thread: complete\n"));
+	    (CE_NOTE, "delereturn_all_thread: complete\n"));
 	zthread_exit();
 }
 
@@ -1926,10 +1916,10 @@ retry:
 			ncg->nfs4_callback_stats.claim_cur.value.ui64++;
 
 			nfs4_reopen(vp, osp, &e, CLAIM_DELEGATE_CUR, FALSE,
-					FALSE);
+			    FALSE);
 			if (e.error == 0 && e.stat == NFS4_OK)
 				ncg->nfs4_callback_stats.
-					claim_cur_ok.value.ui64++;
+				    claim_cur_ok.value.ui64++;
 		}
 
 		if (e.error == EAGAIN) {
@@ -1965,7 +1955,7 @@ retry:
 			 * thread will take it from here.
 			 */
 			(void) nfs4_start_recovery(&e, mi, vp, NULL, NULL,
-				NULL, OP_OPEN, NULL);
+			    NULL, OP_OPEN, NULL);
 			open_stream_rele(osp, rp);
 			*recovp = TRUE;
 			break;
@@ -2055,7 +2045,7 @@ nfs4delegreturn_thread(struct cb_recall_pass *args)
 	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,
-			"nfsv4delegRtn");
+	    "nfsv4delegRtn");
 
 	rp = args->rp;
 	vp = RTOV4(rp);
@@ -2128,7 +2118,7 @@ nfs4delegreturn_thread(struct cb_recall_pass *args)
 
 		if (error)
 			CB_WARN1("nfs4delegreturn_thread: VOP_PUTPAGE: %d\n",
-				error);
+			    error);
 	}
 
 	/*
@@ -2156,7 +2146,7 @@ out:
  * already called nfs4_start_op().
  */
 void
-nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
+nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim, OPEN4res *res,
 	nfs4_ga_res_t *garp, cred_t *cr)
 {
 	open_read_delegation4 *orp;
@@ -2165,16 +2155,36 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 	bool_t already = FALSE;
 	bool_t recall = FALSE;
 	bool_t valid_garp = TRUE;
+	bool_t delegation_granted = FALSE;
+	bool_t dr_needed = FALSE;
+	bool_t recov;
+	int dr_flags = 0;
 	long mapcnt;
 	uint_t rflag;
 	mntinfo4_t *mi;
-	bool_t recov;
 	struct nfs4_callback_globals *ncg;
 	open_delegation_type4 odt;
 
 	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
+	mi = VTOMI4(RTOV4(rp));
+
+	/*
+	 * Accept a delegation granted to the client via an OPEN.
+	 * Set the delegation fields in the rnode and insert the
+	 * rnode onto the list anchored in the nfs4_server_t.  The
+	 * proper locking order requires the nfs4_server_t first,
+	 * even though it may not be needed in all cases.
+	 *
+	 * NB: find_nfs4_server returns with s_lock held.
+	 */
+
+	if ((np = find_nfs4_server(mi)) == NULL)
+		return;
+
+	/* grab the statelock too, for examining r_mapcnt */
+	mutex_enter(&rp->r_statelock);
 	mutex_enter(&rp->r_statev4_lock);
 
 	if (rp->r_deleg_type == OPEN_DELEGATE_READ ||
@@ -2182,31 +2192,34 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 		already = TRUE;
 
 	odt = res->delegation.delegation_type;
-	mutex_exit(&rp->r_statev4_lock);
 
 	if (odt == OPEN_DELEGATE_READ) {
 
-		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = res->delegation.delegation_type;
 		orp = &res->delegation.open_delegation4_u.read;
 		rp->r_deleg_stateid = orp->stateid;
 		rp->r_deleg_perms = orp->permissions;
-		recall = orp->recall;
-		mutex_exit(&rp->r_statev4_lock);
+		if (claim == CLAIM_PREVIOUS)
+			if ((recall = orp->recall) != 0)
+				dr_needed = TRUE;
+
+		delegation_granted = TRUE;
 
 		ncg->nfs4_callback_stats.delegations.value.ui64++;
 		ncg->nfs4_callback_stats.delegaccept_r.value.ui64++;
 
 	} else if (odt == OPEN_DELEGATE_WRITE) {
 
-		mutex_enter(&rp->r_statelock);
-		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = res->delegation.delegation_type;
 		owp = &res->delegation.open_delegation4_u.write;
 		rp->r_deleg_stateid = owp->stateid;
 		rp->r_deleg_perms = owp->permissions;
 		rp->r_deleg_limit = owp->space_limit;
-		recall = owp->recall;
+		if (claim == CLAIM_PREVIOUS)
+			if ((recall = owp->recall) != 0)
+				dr_needed = TRUE;
+
+		delegation_granted = TRUE;
 
 		if (garp == NULL || !garp->n4g_change_valid) {
 			valid_garp = FALSE;
@@ -2229,181 +2242,95 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 			rp->r_deleg_change++;
 
 		NFS4_DEBUG(nfs4_callback_debug, (CE_NOTE,
-			"nfs4_delegation_accept: r_deleg_change: 0x%x\n",
-			(int)(rp->r_deleg_change >> 32)));
+		    "nfs4_delegation_accept: r_deleg_change: 0x%x\n",
+		    (int)(rp->r_deleg_change >> 32)));
 		NFS4_DEBUG(nfs4_callback_debug, (CE_NOTE,
-			"nfs4_delegation_accept: r_delg_change_grant: 0x%x\n",
-			(int)(rp->r_deleg_change_grant >> 32)));
+		    "nfs4_delegation_accept: r_delg_change_grant: 0x%x\n",
+		    (int)(rp->r_deleg_change_grant >> 32)));
 
-#ifdef	DEBUG
-		if (nfs4_use_phony_limit == 1)
-			rp->r_deleg_limit = nfs4_deleg_space_phony;
-		if (nfs4_use_phony_limit == 2) {
-			rp->r_deleg_limit = nfs4_deleg_space_phony2;
-			rp->r_deleg_limit.nfs_space_limit4_u.mod_blocks =
-				nfs4_deleg_space_phonyl;
-		}
-#endif
-		mutex_exit(&rp->r_statev4_lock);
-		mutex_exit(&rp->r_statelock);
 
 		ncg->nfs4_callback_stats.delegations.value.ui64++;
 		ncg->nfs4_callback_stats.delegaccept_rw.value.ui64++;
-
-#ifdef	DEBUG
-
-	} else if (nfs4_deleg_accept_phony == OPEN_DELEGATE_READ) {
-
-		mutex_enter(&rp->r_statev4_lock);
-		rp->r_deleg_type = OPEN_DELEGATE_READ;
-		rp->r_deleg_stateid = nfs4_deleg_any;
-		rp->r_deleg_perms = nfs4_deleg_ace_phony;
-		rp->r_deleg_change = nfs4_deleg_change_phony;
-		rp->r_deleg_change_grant = rp->r_deleg_change;
-		mutex_exit(&rp->r_statev4_lock);
-
-	} else if (nfs4_deleg_accept_phony == OPEN_DELEGATE_WRITE) {
-
-		mutex_enter(&rp->r_statev4_lock);
-		rp->r_deleg_type = OPEN_DELEGATE_WRITE;
-		rp->r_deleg_stateid = nfs4_deleg_any;
-		rp->r_deleg_perms = nfs4_deleg_ace_phony;
-		rp->r_deleg_limit = nfs4_deleg_space_phony;
-		rp->r_deleg_change = nfs4_deleg_change_phony;
-		rp->r_deleg_change_grant = rp->r_deleg_change;
-		mutex_exit(&rp->r_statev4_lock);
-
-#endif
-	} else {
-
-		if (already) {
-			switch (claim) {
-
-			case CLAIM_NULL:
-			case CLAIM_PREVIOUS:
-				/*
-				 * The file may already have a delegation when
-				 * it is reopened during recovery.  In this
-				 * case, we consider the delegation to no longer
-				 * be valid.  As a courtesy, attempt to return
-				 * the delegation.
-				 */
-				mi = VTOMI4(RTOV4(rp));
-				mutex_enter(&mi->mi_lock);
-				recov = mi->mi_recovflags & MI4R_REOPEN_FILES;
-				mutex_exit(&mi->mi_lock);
-
-				/*
-				 * We need to hold rp->r_statev4_lock while
-				 * checking rp->r_deleg_return_pending and
-				 * when calling nfs4_dlistadd() if we're in
-				 * recovery.
-				 */
-				mutex_enter(&rp->r_statev4_lock);
-				if (rp->r_deleg_return_pending == TRUE) {
-					/*
-					 * We're alreading in the throes of
-					 * returning a delegation.  Drop
-					 * the lock and head for the return.
-					 */
-					mutex_exit(&rp->r_statev4_lock);
-				} else if (recov) {
-					/*
-					 * Cannot call delegreturn from inside
-					 * of recovery or VOP_PUTPAGE will hang
-					 * due to nfs4_start_fop call in
-					 * nfs4write.  Use dlistadd to add the
-					 * rnode to the list of rnodes needing
-					 * cleaning.
-					 *
-					 * NB: We're in recover so don't reopen
-					 */
-					nfs4_dlistadd(rp, ncg,
-						NFS4_DR_PUSH|NFS4_DR_DISCARD);
-					mutex_exit(&rp->r_statev4_lock);
-				} else {
-					mutex_exit(&rp->r_statev4_lock);
-					/* XXX - Do we need to reopen? */
-					(void) nfs4delegreturn_impl(rp,
-						(NFS4_DR_PUSH |
-						    NFS4_DR_DID_OP |
-						    NFS4_DR_REOPEN),
-						ncg);
-				}
-				break;
-
-			default:
-				/*
-				 * CLAIM_DELEGATE_CUR, CLAIM_DELEGATE_PREV
-				 * fall through here
-				 */
-				break;
-			}
-		}
-
-		/* No delegation granted, get out. */
-		return;
+	} else if (already) {
+		/*
+		 * No delegation granted.  If the rnode currently has
+		 * has one, then consider it tainted and return it.
+		 */
+		dr_needed = TRUE;
 	}
+
+	if (delegation_granted) {
+		/* Add the rnode to the list. */
+		if (!already) {
+			crhold(cr);
+			rp->r_deleg_cred = cr;
+
+			ASSERT(mutex_owned(&np->s_lock));
+			list_insert_head(&np->s_deleg_list, rp);
+			/* added list node gets a reference */
+			np->s_refcnt++;
+			nfs4_inc_state_ref_count_nolock(np, mi);
+		}
+		rp->r_deleg_needs_recovery = OPEN_DELEGATE_NONE;
+	}
+
+	/*
+	 * We've now safely accepted the delegation, if any.  Drop the
+	 * locks and figure out what post-processing is needed.  We'd
+	 * like to retain r_statev4_lock, but nfs4_server_rele takes
+	 * s_lock which would be a lock ordering violation.
+	 */
+	mutex_exit(&rp->r_statev4_lock);
+	mutex_exit(&rp->r_statelock);
+	mutex_exit(&np->s_lock);
+	nfs4_server_rele(np);
+
+	/*
+	 * Check to see if we are in recovery.  Remember that
+	 * this function is protected by start_op, so a recovery
+	 * cannot begin until we are out of here.
+	 */
+	mutex_enter(&mi->mi_lock);
+	recov = mi->mi_recovflags & MI4_RECOV_ACTIV;
+	mutex_exit(&mi->mi_lock);
 
 	mutex_enter(&rp->r_statev4_lock);
-	rp->r_deleg_return_pending = FALSE;
-	rp->r_deleg_needs_recovery = OPEN_DELEGATE_NONE;
-	if (claim == CLAIM_PREVIOUS)
-		rp->r_deleg_needs_recall = recall;
 
-#ifdef	DEBUG
-	if (nfs4_use_phony_recall)
-		rp->r_deleg_needs_recall = nfs4_phony_recall_v;
-#endif
+	if (nfs4_delegreturn_policy == IMMEDIATE || !valid_garp)
+		dr_needed = TRUE;
 
-	/*
-	 * If the server has requested a recall, then put the
-	 * vnode on a list of files which need to be cleaned.
-	 * This will be done later by the recovery thread to
-	 * avoid a deadlock.  If this were a CLAIM_NULL open
-	 * and the server set recall, then the server is just
-	 * confused; the delegation will be returned eventually.
-	 */
-	if (rp->r_deleg_needs_recall)
-		nfs4_dlistadd(rp, ncg, NFS4_DR_PUSH|NFS4_DR_REOPEN);
+	if (dr_needed && rp->r_deleg_return_pending == FALSE) {
+		if (recov) {
+			/*
+			 * We cannot call delegreturn from inside
+			 * of recovery or VOP_PUTPAGE will hang
+			 * due to nfs4_start_fop call in
+			 * nfs4write.  Use dlistadd to add the
+			 * rnode to the list of rnodes needing
+			 * cleaning.  We do not need to do reopen
+			 * here because recov_openfiles will do it.
+			 * In the non-recall case, just discard the
+			 * delegation as it is no longer valid.
+			 */
+			if (recall)
+				dr_flags = NFS4_DR_PUSH;
+			else
+				dr_flags = NFS4_DR_PUSH|NFS4_DR_DISCARD;
 
-	if (already == FALSE) {
-		rp->r_deleg_cred = cr;
-		crhold(cr);
+			nfs4_dlistadd(rp, ncg, dr_flags);
+			dr_flags = 0;
+		} else {
+			/*
+			 * Push the modified data back to the server,
+			 * reopen any delegation open streams, and return
+			 * the delegation.  Drop the statev4_lock first!
+			 */
+			dr_flags =  NFS4_DR_PUSH|NFS4_DR_DID_OP|NFS4_DR_REOPEN;
+		}
 	}
 	mutex_exit(&rp->r_statev4_lock);
-
-	if (already == FALSE) {
-
-		/*
-		 * Add this rnode to the list of rnodes with delegations
-		 * for this nfs4_server.  find_nfs4_server returns with
-		 * the mutex locked, so don't forget to mutex exit.
-		 */
-
-		if ((np = find_nfs4_server(VTOMI4(RTOV4(rp)))) == NULL) {
-
-			mutex_enter(&rp->r_statev4_lock);
-			rp->r_deleg_type = OPEN_DELEGATE_NONE;
-			mutex_exit(&rp->r_statev4_lock);
-			return;
-		}
-
-		list_insert_head(&np->s_deleg_list, rp);
-		/* added list node gets a reference */
-		np->s_refcnt++;
-		nfs4_inc_state_ref_count_nolock(np, VTOMI4(RTOV4(rp)));
-		mutex_exit(&np->s_lock);
-		nfs4_server_rele(np);
-	}
-
-	/*
-	 * This call to nfs4delegreturn assumes that nfs4_start_op MUST
-	 * not be called by nfs4delegreturn.
-	 */
-	if (nfs4_delegreturn_policy == IMMEDIATE || !valid_garp)
-		(void) nfs4delegreturn_impl(rp,
-			NFS4_DR_PUSH|NFS4_DR_DID_OP|NFS4_DR_REOPEN, ncg);
+	if (dr_flags)
+		(void) nfs4delegreturn_impl(rp, dr_flags, ncg);
 }
 
 /*
@@ -2449,7 +2376,7 @@ nfs4delegabandon(rnode4_t *rp)
 	 */
 
 	(void) zthread_create(NULL, 0, nfs4delegreturn_thread, pp, 0,
-				minclsyspri);
+	    minclsyspri);
 }
 
 static int
@@ -2471,7 +2398,7 @@ wait_for_recall1(vnode_t *vp, nfs4_op_hint_t op, nfs4_recov_state_t *rsp,
 		 * with delegreturn.
 		 */
 		error = nfs_rw_enter_sig(&rp->r_deleg_recall_lock,
-			RW_READER, INTR4(vp));
+		    RW_READER, INTR4(vp));
 
 		if (error == 0)
 			rsp->rs_flags |= flg;
@@ -2484,8 +2411,8 @@ void
 nfs4_end_op_recall(vnode_t *vp1, vnode_t *vp2, nfs4_recov_state_t *rsp)
 {
 	NFS4_DEBUG(nfs4_recall_debug,
-		(CE_NOTE, "nfs4_end_op_recall: 0x%p, 0x%p\n",
-		(void *)vp1, (void *)vp2));
+	    (CE_NOTE, "nfs4_end_op_recall: 0x%p, 0x%p\n",
+	    (void *)vp1, (void *)vp2));
 
 	if (vp2 && rsp->rs_flags & NFS4_RS_RECALL_HELD2)
 		nfs_rw_exit(&VTOR4(vp2)->r_deleg_recall_lock);
@@ -2500,8 +2427,8 @@ wait_for_recall(vnode_t *vp1, vnode_t *vp2, nfs4_op_hint_t op,
 	int error;
 
 	NFS4_DEBUG(nfs4_recall_debug,
-		(CE_NOTE, "wait_for_recall:    0x%p, 0x%p\n",
-		(void *)vp1, (void *) vp2));
+	    (CE_NOTE, "wait_for_recall:    0x%p, 0x%p\n",
+	    (void *)vp1, (void *) vp2));
 
 	rsp->rs_flags &= ~(NFS4_RS_RECALL_HELD1|NFS4_RS_RECALL_HELD2);
 
