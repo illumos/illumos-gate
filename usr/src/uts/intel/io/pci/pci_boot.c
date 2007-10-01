@@ -99,6 +99,7 @@ static void fix_ppb_res(uchar_t);
 static void alloc_res_array();
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
+static void pciex_slot_names_prop(dev_info_t *, ushort_t);
 
 extern int pci_slot_names_prop(int, char *, int);
 extern ACPI_STATUS pciehpc_acpi_eval_osc(ACPI_HANDLE, uint32_t *);
@@ -1091,9 +1092,12 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	if (status & PCI_STAT_UDF)
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "udf-supported");
-	if (pciex && slot_num)
+	if (pciex && slot_num) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    "physical-slot#", slot_num);
+		if (!is_pci_bridge)
+			pciex_slot_names_prop(dip, slot_num);
+	}
 
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "power-consumption", power, 2);
@@ -1880,6 +1884,13 @@ add_bus_slot_names_prop(int bus)
 	char slotprop[256];
 	int len;
 
+	if (pci_bus_res[bus].dip != NULL) {
+		/* simply return if the property is already defined */
+		if (ddi_prop_exists(DDI_DEV_T_ANY, pci_bus_res[bus].dip,
+		    DDI_PROP_DONTPASS, "slot-names"))
+			return;
+	}
+
 	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));
 	if (len > 0) {
 		/*
@@ -2077,4 +2088,29 @@ create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
 	/* reg */
 	(void) ndi_prop_update_int64(DDI_DEV_T_NONE, ioapic_node,
 	    "reg", physaddr);
+}
+
+/*
+ * NOTE: For PCIe slots, the name is generated from the slot number
+ * information obtained from Slot Capabilities register.
+ * For non-PCIe slots, it is generated based on the slot number
+ * information in the PCI IRQ table.
+ */
+static void
+pciex_slot_names_prop(dev_info_t *dip, ushort_t slot_num)
+{
+	char slotprop[256];
+	int len;
+
+	bzero(slotprop, sizeof (slotprop));
+
+	/* set mask to 1 as there is only one slot (i.e dev 0) */
+	*(uint32_t *)slotprop = 1;
+	len = 4;
+	(void) snprintf(slotprop + len, sizeof (slotprop) - len, "pcie%d",
+	    slot_num);
+	len += strlen(slotprop + len) + 1;
+	len += len % 4;
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "slot-names",
+	    (int *)slotprop, len / sizeof (int));
 }
