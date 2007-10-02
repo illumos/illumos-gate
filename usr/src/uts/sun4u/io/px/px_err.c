@@ -1148,6 +1148,25 @@ PX_ERPT_SEND_DEC(do_not)
 	return (PX_NO_ERROR);
 }
 
+/*
+ * Search the px_cb_list_t embedded in the px_cb_t for the
+ * px_t of the specified Leaf (leaf_id).  Return its associated dip.
+ */
+static dev_info_t *
+px_err_search_cb(px_cb_t *px_cb_p, uint_t leaf_id)
+{
+	int		i;
+	px_cb_list_t	*pxl_elemp;
+
+	for (i = px_cb_p->attachcnt, pxl_elemp = px_cb_p->pxl; i > 0;
+	    i--, pxl_elemp = pxl_elemp->next) {
+		if ((((pxu_t *)pxl_elemp->pxp->px_plat_p)->portid &
+		    OBERON_PORT_ID_LEAF_MASK) == leaf_id) {
+			return (pxl_elemp->pxp->px_dip);
+		}
+	}
+	return (NULL);
+}
 
 /* UBC FATAL - see io erpt doc, section 1.1 */
 /* ARGSUSED */
@@ -1160,6 +1179,10 @@ PX_ERPT_SEND_DEC(ubc_fatal)
 	uint64_t	device_id = 0;
 	uint8_t		cpu_version = 0;
 	nvlist_t	*resource = NULL;
+	uint64_t	ubc_intr_status;
+	px_t		*px_p;
+	px_cb_t		*px_cb_p;
+	dev_info_t	*actual_dip;
 
 	unum[0] = '\0';
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
@@ -1208,6 +1231,36 @@ PX_ERPT_SEND_DEC(ubc_fatal)
 		}
 	}
 
+	/*
+	 * For most of the errors represented in the UBC Interrupt Status
+	 * register, one can compute the dip of the actual Leaf that was
+	 * involved in the error.  To do this, find the px_cb_t structure
+	 * that is shared between a pair of Leaves (eg, LeafA and LeafB).
+	 *
+	 * If any of the error bits for LeafA are set in the hardware
+	 * register, search the list of px_t's rooted in the px_cb_t for
+	 * the one corresponding to LeafA.  If error bits for LeafB are set,
+	 * search the list for LeafB's px_t.  The px_t references its
+	 * associated dip.
+	 */
+	px_p = DIP_TO_STATE(rpdip);
+	px_cb_p = ((pxu_t *)px_p->px_plat_p)->px_cb_p;
+
+	/* read hardware register */
+	ubc_intr_status = CSR_XR(csr_base, UBC_INTERRUPT_STATUS);
+
+	if ((ubc_intr_status & UBC_INTERRUPT_STATUS_LEAFA) != 0) {
+		/* then Leaf A is involved in the error */
+		actual_dip = px_err_search_cb(px_cb_p, OBERON_PORT_ID_LEAF_A);
+		ASSERT(actual_dip != NULL);
+		rpdip = actual_dip;
+	} else if ((ubc_intr_status & UBC_INTERRUPT_STATUS_LEAFB) != 0) {
+		/* then Leaf B is involved in the error */
+		actual_dip = px_err_search_cb(px_cb_p, OBERON_PORT_ID_LEAF_B);
+		ASSERT(actual_dip != NULL);
+		rpdip = actual_dip;
+	} /* else error cannot be associated with a Leaf */
+
 	if (resource) {
 		ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
@@ -1216,8 +1269,7 @@ PX_ERPT_SEND_DEC(ubc_fatal)
 		    CSR_XR(csr_base, UBC_ERROR_LOG_ENABLE),
 		    OBERON_UBC_IE, DATA_TYPE_UINT64,
 		    CSR_XR(csr_base, UBC_INTERRUPT_ENABLE),
-		    OBERON_UBC_IS, DATA_TYPE_UINT64,
-		    CSR_XR(csr_base, UBC_INTERRUPT_STATUS),
+		    OBERON_UBC_IS, DATA_TYPE_UINT64, ubc_intr_status,
 		    OBERON_UBC_ESS, DATA_TYPE_UINT64,
 		    CSR_XR(csr_base, UBC_ERROR_STATUS_SET),
 		    OBERON_UBC_MUE, DATA_TYPE_UINT64, memory_ue_log,
@@ -1235,8 +1287,7 @@ PX_ERPT_SEND_DEC(ubc_fatal)
 		    CSR_XR(csr_base, UBC_ERROR_LOG_ENABLE),
 		    OBERON_UBC_IE, DATA_TYPE_UINT64,
 		    CSR_XR(csr_base, UBC_INTERRUPT_ENABLE),
-		    OBERON_UBC_IS, DATA_TYPE_UINT64,
-		    CSR_XR(csr_base, UBC_INTERRUPT_STATUS),
+		    OBERON_UBC_IS, DATA_TYPE_UINT64, ubc_intr_status,
 		    OBERON_UBC_ESS, DATA_TYPE_UINT64,
 		    CSR_XR(csr_base, UBC_ERROR_STATUS_SET),
 		    OBERON_UBC_MUE, DATA_TYPE_UINT64, memory_ue_log,

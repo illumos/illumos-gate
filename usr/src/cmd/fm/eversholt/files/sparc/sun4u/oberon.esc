@@ -91,13 +91,16 @@ event ereport.io.oberon.pec.ecrc@hostbridge/pciexrc{within(5s)};
  *  Errors marked with * may cause PCI-E abort
  */ 
 
-fru hostbridge/pciexrc; 
-asru hostbridge/pciexrc; 
-event fault.io.oberon@hostbridge/pciexrc, 
-    FITrate=HB_FIT, FRU=hostbridge/pciexrc, ASRU=hostbridge/pciexrc;
-prop fault.io.oberon@hostbridge/pciexrc (0)-> 
+fru hostbridge;
+asru hostbridge;
+event fault.io.oberon@hostbridge,
+    FITrate=HB_FIT, FRU=hostbridge, ASRU=hostbridge;
+prop fault.io.oberon@hostbridge (0)-> 
     ereport.io.oberon.ubc.dmawtuea@hostbridge/pciexrc,
-    ereport.io.oberon.ubc.dmawtueb@hostbridge/pciexrc,
+    ereport.io.oberon.ubc.dmawtueb@hostbridge/pciexrc;
+event fault.io.oberon@hostbridge/pciexrc, 
+    FITrate=HB_FIT, FRU=hostbridge, ASRU=hostbridge;
+prop fault.io.oberon@hostbridge/pciexrc (0)-> 
     ereport.io.oberon.pec.ecrc@hostbridge/pciexrc { IS_PRIMARY };
 
 /* 
