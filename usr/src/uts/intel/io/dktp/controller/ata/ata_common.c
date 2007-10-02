@@ -46,7 +46,6 @@
  * Solaris Entry Points.
  */
 
-static	int	ata_probe(dev_info_t *dip);
 static	int	ata_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static	int	ata_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static	int	ata_bus_ctl(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t o,
@@ -293,7 +292,7 @@ static struct dev_ops	ata_ops = {
 	0,			/* refcnt  */
 	ddi_getinfo_1to1,	/* info */
 	nulldev,		/* identify */
-	ata_probe,		/* probe */
+	NULL,			/* probe */
 	ata_attach,		/* attach */
 	ata_detach,		/* detach */
 	ata_devo_reset,		/* reset */
@@ -314,7 +313,6 @@ static struct modlinkage modlinkage = {
 
 #ifdef ATA_DEBUG
 int	ata_debug_init = FALSE;
-int	ata_debug_probe = FALSE;
 int	ata_debug_attach = FALSE;
 
 int	ata_debug = ADBG_FLAG_ERROR
@@ -394,67 +392,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-
-/* driver probe entry point */
-
-static int
-ata_probe(
-	dev_info_t *dip)
-{
-	ddi_acc_handle_t io_hdl1 = NULL;
-	ddi_acc_handle_t io_hdl2 = NULL;
-	ddi_acc_handle_t bm_hdl = NULL;
-	caddr_t		 ioaddr1;
-	caddr_t		 ioaddr2;
-	caddr_t		 bm_addr;
-	int		 drive;
-	struct ata_id	*ata_id_bufp;
-	int		 rc = DDI_PROBE_FAILURE;
-
-	ADBG_TRACE(("ata_probe entered\n"));
-#ifdef ATA_DEBUG
-	if (ata_debug_probe)
-		debug_enter("\nATA_PROBE\n");
-#endif
-
-	if (!ata_setup_ioaddr(dip, &io_hdl1, &ioaddr1, &io_hdl2, &ioaddr2,
-			&bm_hdl, &bm_addr))
-		return (rc);
-
-	ata_id_bufp = kmem_zalloc(sizeof (*ata_id_bufp), KM_SLEEP);
-
-	for (drive = 0; drive < ATA_MAXTARG; drive++) {
-		uchar_t	drvhd;
-
-		/* set up drv/hd and feature registers */
-
-		drvhd = (drive == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1);
-
-
-		if (ata_drive_type(drvhd, io_hdl1, ioaddr1, io_hdl2, ioaddr2,
-		    ata_id_bufp) != ATA_DEV_NONE) {
-			rc = (DDI_PROBE_SUCCESS);
-			break;
-		}
-	}
-
-	/* always leave the controller set to drive 0 */
-	if (drive != 0) {
-		ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD, ATDH_DRIVE0);
-		ata_nsecwait(400);
-	}
-
-out2:
-	kmem_free(ata_id_bufp, sizeof (*ata_id_bufp));
-
-	if (io_hdl1)
-		ddi_regs_map_free(&io_hdl1);
-	if (io_hdl2)
-		ddi_regs_map_free(&io_hdl2);
-	if (bm_hdl)
-		ddi_regs_map_free(&bm_hdl);
-	return (rc);
-}
 
 /*
  *
@@ -650,10 +587,10 @@ ata_detach(
 	if (ata_ctlp->ac_bmhandle)
 		ddi_regs_map_free(&ata_ctlp->ac_bmhandle);
 
-	ddi_prop_remove_all(dip);
-
 	/* destroy controller */
 	ata_destroy_controller(dip);
+
+	ddi_prop_remove_all(dip);
 
 	return (DDI_SUCCESS);
 }
@@ -1419,11 +1356,7 @@ ata_drive_type(
 
 	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS);
 
-	/*
-	 * 0x0, 0x7f, or 0xff can happen when no drive is present
-	 */
-	if ((status & ATS_BSY) || (status == 0x0) || (status == 0x7f) ||
-	    (status == 0xff) || (status & ATS_DF)) {
+	if (status & ATS_BSY) {
 		ADBG_TRACE(("ata_drive_type 0x%p 0x%x\n", ioaddr1, status));
 		return (ATA_DEV_NONE);
 	}
@@ -1592,11 +1525,10 @@ ata_id_common(
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_FEATURE, 0);
 
 	/*
-	 * Disable interrupts from the device.  ata_id_common() is
-	 * called at device probe time before the interrupt handled is
-	 * registered.  When the ata hardware is sharing its
-	 * interrupt with another device, the shared interrupt might
-	 * have already been unmasked in the interrupt controller and
+	 * Disable interrupts from the device.  When the ata
+	 * hardware is sharing its interrupt with another
+	 * device, the shared interrupt might have already been
+	 * unmasked in the interrupt controller and
 	 * triggering ata device interrupts will result in an
 	 * interrupt storm and a hung system.
 	 */
@@ -1611,24 +1543,38 @@ ata_id_common(
 	ata_nsecwait(400);
 
 	/*
+	 * read alternate status and check for conditions which
+	 * may indicate the drive is not present, to prevent getting
+	 * stuck in ata_wait3() below.
+	 */
+	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS);
+
+	/*
+	 * 0x0, 0x7f, or ATS_DF can happen when no drive is present
+	 */
+	if ((status == 0x0) || (status == 0x7f) ||
+	    ((status & (ATS_BSY|ATS_DF)) == ATS_DF)) {
+		/* invalid status, can't be an ATA or ATAPI device */
+		return (FALSE);
+	}
+
+	/*
 	 * According to the ATA specification, some drives may have
 	 * to read the media to complete this command.  We need to
 	 * make sure we give them enough time to respond.
 	 */
-
 	(void) ata_wait3(io_hdl2, ioaddr2, 0, ATS_BSY,
 			ATS_ERR, ATS_BSY, 0x7f, 0, 5 * 1000000);
 
 	/*
 	 * read the status byte and clear the pending interrupt
 	 */
-	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr1 + AT_STATUS);
+	status = ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_STATUS);
 
 	/*
-	 * 0x0, 0x7f, or 0xff can happen when no drive is present
+	 * this happens if there's no drive present
 	 */
-	if ((status == 0x0) || (status == 0x7f) || (status == 0xff) ||
-	    (status & ATS_DF)) {
+	if (status == 0xff || status == 0x7f) {
 		/* invalid status, can't be an ATA or ATAPI device */
 		return (FALSE);
 	}

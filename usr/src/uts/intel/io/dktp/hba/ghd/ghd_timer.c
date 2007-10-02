@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,11 +718,12 @@ static void
 ghd_timeout_disable(tmr_t *tmrp)
 {
 	ASSERT(tmrp != NULL);
-	ASSERT(tmrp->t_ccc_listp == NULL);
 
 	mutex_enter(&tglobal_mutex);
-	if (tmrp->t_refs-- <= 1)
+	if (tmrp->t_refs-- <= 1) {
+		ASSERT(tmrp->t_ccc_listp == NULL);
 		(void) untimeout(tmrp->t_timeout_id);
+	}
 	mutex_exit(&tglobal_mutex);
 }
 
