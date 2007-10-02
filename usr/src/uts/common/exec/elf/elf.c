@@ -345,10 +345,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 */
 	if ((level < 2) &&
 	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
-		kmem_free(bigwad, sizeof (struct bigwad));
-		return (BROP(p)->b_elfexec(vp, uap, args,
+		error = BROP(p)->b_elfexec(vp, uap, args,
 		    idatap, level + 1, execsz, setid, exec_file, cred,
-		    brand_action));
+		    brand_action);
+		goto out;
 	}
 
 	/*
