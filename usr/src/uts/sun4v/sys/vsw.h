@@ -329,7 +329,9 @@ typedef struct vsw_ldc_list {
 /* multicast addresses port is interested in */
 typedef struct mcst_addr {
 	struct mcst_addr	*nextp;
-	uint64_t		addr;
+	struct ether_addr	mca;	/* multicast address */
+	uint64_t		addr;	/* mcast addr converted to hash key */
+	boolean_t		mac_added; /* added into physical device */
 } mcst_addr_t;
 
 /* Port detach states */
@@ -479,25 +481,22 @@ typedef struct vsw_mac_ring_s {
 #define		NUM_SMODES	3	/* number of switching modes */
 
 /*
- * Bits indicating which properties we've read from MD or physical device.
- */
-#define		VSW_MD_PHYSNAME	0x1
-#define		VSW_MD_MACADDR	0x2
-#define		VSW_DEV_MACADDR	0x4
-#define		VSW_MD_SMODE	0x8
-
-/*
  * vsw instance state information.
  */
 typedef struct	vsw {
 	int			instance;	/* instance # */
 	dev_info_t		*dip;		/* associated dev_info */
+	uint64_t		regprop;	/* "reg" property */
 	struct vsw		*next;		/* next in list */
 	char			physname[LIFNAMSIZ];	/* phys-dev */
 	uint8_t			smode[NUM_SMODES];	/* switching mode */
 	int			smode_idx;	/* curr pos in smode array */
 	int			smode_num;	/* # of modes specified */
-	uint8_t			mdprops;	/* bitmask of props found */
+	kmutex_t		swtmout_lock;	/* setup switching tmout lock */
+	boolean_t		swtmout_enabled; /* setup switching tmout on */
+	timeout_id_t		swtmout_id;	/* setup switching tmout id */
+	uint32_t		switching_setup_done; /* setup switching done */
+	int			mac_open_retries; /* mac_open() retry count */
 	vsw_port_list_t		plist;		/* associated ports */
 	ddi_taskq_t		*taskq_p;	/* VIO ctrl msg taskq */
 	mod_hash_t		*fdb;		/* forwarding database */

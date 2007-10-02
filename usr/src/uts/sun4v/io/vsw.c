@@ -70,6 +70,7 @@
 #include <sys/vnet_common.h>
 #include <sys/vio_util.h>
 #include <sys/sdt.h>
+#include <sys/atomic.h>
 
 /*
  * Function prototypes.
@@ -79,7 +80,8 @@ static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int vsw_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static	int vsw_get_md_physname(vsw_t *, md_t *, mde_cookie_t, char *);
 static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *, int *);
-static	int vsw_get_physaddr(vsw_t *);
+static	void vsw_setup_switching_timeout(void *arg);
+static	void vsw_stop_switching_timeout(vsw_t *vswp);
 static	int vsw_setup_switching(vsw_t *);
 static	int vsw_setup_layer2(vsw_t *);
 static	int vsw_setup_layer3(vsw_t *);
@@ -107,6 +109,10 @@ static int vsw_prog_if(vsw_t *);
 static int vsw_prog_ports(vsw_t *);
 static int vsw_mac_attach(vsw_t *vswp);
 static void vsw_mac_detach(vsw_t *vswp);
+static int vsw_mac_open(vsw_t *vswp);
+static void vsw_mac_close(vsw_t *vswp);
+static void vsw_set_addrs(vsw_t *vswp);
+static void vsw_unset_addrs(vsw_t *vswp);
 
 static void vsw_rx_queue_cb(void *, mac_resource_handle_t, mblk_t *);
 static void vsw_rx_cb(void *, mac_resource_handle_t, mblk_t *);
@@ -126,8 +132,9 @@ static	int vsw_mdeg_register(vsw_t *vswp);
 static	void vsw_mdeg_unregister(vsw_t *vswp);
 static	int vsw_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *);
-static	void vsw_get_initial_md_properties(vsw_t *vswp, md_t *, mde_cookie_t);
+static	int vsw_get_initial_md_properties(vsw_t *vswp, md_t *, mde_cookie_t);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
+static	int vsw_read_mdprops(vsw_t *vswp);
 
 /* Port add/deletion routines */
 static	int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
@@ -204,7 +211,7 @@ static	vsw_port_t *vsw_lookup_fdb(vsw_t *vswp, struct ether_header *);
 static	int vsw_add_rem_mcst(vnet_mcast_msg_t *, vsw_port_t *);
 static	int vsw_add_mcst(vsw_t *, uint8_t, uint64_t, void *);
 static	int vsw_del_mcst(vsw_t *, uint8_t, uint64_t, void *);
-static	void vsw_del_addr(uint8_t, void *, uint64_t);
+static	mcst_addr_t *vsw_del_addr(uint8_t, void *, uint64_t);
 static	void vsw_del_mcst_port(vsw_port_t *);
 static	void vsw_del_mcst_vsw(vsw_t *);
 
@@ -226,6 +233,7 @@ static int vsw_check_dring_info(vio_dring_reg_msg_t *);
 static	caddr_t vsw_print_ethaddr(uint8_t *addr, char *ebuf);
 static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
 static int vsw_free_ring(dring_info_t *);
+static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 
 /* Debugging routines */
 static void dump_flags(uint64_t);
@@ -238,6 +246,8 @@ int	vsw_wretries = 100;		/* # of write attempts */
 int	vsw_chain_len = 150;		/* max # of mblks in msg chain */
 int	vsw_desc_delay = 0;		/* delay in us */
 int	vsw_read_attempts = 5;		/* # of reads of descriptor */
+int	vsw_mac_open_retries = 20;	/* max # of mac_open() retries */
+int	vsw_setup_switching_delay = 3;	/* setup sw timeout interval in sec */
 
 uint32_t	vsw_mblk_size = VSW_MBLK_SIZE;
 uint32_t	vsw_num_mblks = VSW_NUM_MBLKS;
@@ -533,15 +543,18 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char		hashname[MAXNAMELEN];
 	char		qname[TASKQ_NAMELEN];
 	enum		{ PROG_init = 0x00,
-				PROG_if_lock = 0x01,
-				PROG_fdb = 0x02,
-				PROG_mfdb = 0x04,
-				PROG_report_dev = 0x08,
-				PROG_plist = 0x10,
-				PROG_taskq = 0x20}
+				PROG_locks = 0x01,
+				PROG_readmd = 0x02,
+				PROG_fdb = 0x04,
+				PROG_mfdb = 0x08,
+				PROG_taskq = 0x10,
+				PROG_swmode = 0x20,
+				PROG_macreg = 0x40,
+				PROG_mdreg = 0x80}
 			progress;
 
 	progress = PROG_init;
+	int		rv;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -572,8 +585,19 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mutex_init(&vswp->hw_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->mac_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&vswp->mca_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&vswp->swtmout_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
-	progress |= PROG_if_lock;
+	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
+	rw_init(&vswp->plist.lockrw, NULL, RW_DRIVER, NULL);
+
+	progress |= PROG_locks;
+
+	rv = vsw_read_mdprops(vswp);
+	if (rv != 0)
+		goto vsw_attach_fail;
+
+	progress |= PROG_readmd;
 
 	/* setup the unicast forwarding database  */
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_unicst_table-%d",
@@ -588,33 +612,10 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) snprintf(hashname, MAXNAMELEN, "vsw_mcst_table-%d",
 	    vswp->instance);
 	D2(vswp, "creating multicast hash table %s)...", hashname);
-	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
 	vswp->mfdb = mod_hash_create_ptrhash(hashname, VSW_NCHAINS,
 	    mod_hash_null_valdtor, sizeof (void *));
 
 	progress |= PROG_mfdb;
-
-	/*
-	 * create lock protecting list of multicast addresses
-	 * which could come via m_multicst() entry point when plumbed.
-	 */
-	mutex_init(&vswp->mca_lock, NULL, MUTEX_DRIVER, NULL);
-	vswp->mcap = NULL;
-
-	ddi_report_dev(vswp->dip);
-
-	progress |= PROG_report_dev;
-
-	WRITE_ENTER(&vsw_rw);
-	vswp->next = vsw_head;
-	vsw_head = vswp;
-	RW_EXIT(&vsw_rw);
-
-	/* setup the port list */
-	rw_init(&vswp->plist.lockrw, NULL, RW_DRIVER, NULL);
-	vswp->plist.head = NULL;
-
-	progress |= PROG_plist;
 
 	/*
 	 * Create the taskq which will process all the VIO
@@ -638,6 +639,37 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * Setup the required switching mode,
+	 * based on the mdprops that we read earlier.
+	 */
+	rv = vsw_setup_switching(vswp);
+	if (rv == EAGAIN) {
+		/*
+		 * Unable to setup switching mode;
+		 * as the error is EAGAIN, schedule a timeout to retry.
+		 */
+		mutex_enter(&vswp->swtmout_lock);
+
+		vswp->swtmout_enabled = B_TRUE;
+		vswp->swtmout_id =
+		    timeout(vsw_setup_switching_timeout, vswp,
+		    (vsw_setup_switching_delay * drv_usectohz(MICROSEC)));
+
+		mutex_exit(&vswp->swtmout_lock);
+	} else if (rv != 0) {
+		goto vsw_attach_fail;
+	}
+
+	progress |= PROG_swmode;
+
+	/* Register with mac layer as a provider */
+	rv = vsw_mac_register(vswp);
+	if (rv != 0)
+		goto vsw_attach_fail;
+
+	progress |= PROG_macreg;
+
+	/*
 	 * Now we have everything setup, register an interest in
 	 * specific MD nodes.
 	 *
@@ -648,44 +680,55 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * that our callback will be invoked even if our specified nodes
 	 * have not actually changed).
 	 *
-	 * Until the callback is invoked we cannot switch any pkts as
-	 * we don't know basic information such as what mode we are
-	 * operating in. However we expect the callback to be invoked
-	 * immediately upon registration as this driver should only
-	 * be attaching if there are vsw nodes in the MD.
 	 */
-	if (vsw_mdeg_register(vswp))
+	rv = vsw_mdeg_register(vswp);
+	if (rv != 0)
 		goto vsw_attach_fail;
 
+	progress |= PROG_mdreg;
+
+	WRITE_ENTER(&vsw_rw);
+	vswp->next = vsw_head;
+	vsw_head = vswp;
+	RW_EXIT(&vsw_rw);
+
+	ddi_report_dev(vswp->dip);
 	return (DDI_SUCCESS);
 
 vsw_attach_fail:
 	DERR(NULL, "vsw_attach: failed");
 
+	if (progress & PROG_mdreg) {
+		vsw_mdeg_unregister(vswp);
+		(void) vsw_detach_ports(vswp);
+	}
+
+	if (progress & PROG_macreg)
+		(void) vsw_mac_unregister(vswp);
+
+	if (progress & PROG_swmode) {
+		vsw_stop_switching_timeout(vswp);
+		mutex_enter(&vswp->mac_lock);
+		vsw_mac_detach(vswp);
+		vsw_mac_close(vswp);
+		mutex_exit(&vswp->mac_lock);
+	}
+
 	if (progress & PROG_taskq)
 		ddi_taskq_destroy(vswp->taskq_p);
 
-	if (progress & PROG_plist)
-		rw_destroy(&vswp->plist.lockrw);
-
-	if (progress & PROG_report_dev) {
-		ddi_remove_minor_node(dip, NULL);
-		mutex_destroy(&vswp->mca_lock);
-	}
-
-	if (progress & PROG_mfdb) {
+	if (progress & PROG_mfdb)
 		mod_hash_destroy_hash(vswp->mfdb);
-		vswp->mfdb = NULL;
-		rw_destroy(&vswp->mfdbrw);
-	}
 
-	if (progress & PROG_fdb) {
+	if (progress & PROG_fdb)
 		mod_hash_destroy_hash(vswp->fdb);
-		vswp->fdb = NULL;
-	}
 
-	if (progress & PROG_if_lock) {
+	if (progress & PROG_locks) {
+		rw_destroy(&vswp->plist.lockrw);
+		rw_destroy(&vswp->mfdbrw);
 		rw_destroy(&vswp->if_lockrw);
+		mutex_destroy(&vswp->swtmout_lock);
+		mutex_destroy(&vswp->mca_lock);
 		mutex_destroy(&vswp->mac_lock);
 		mutex_destroy(&vswp->hw_lock);
 	}
@@ -718,6 +761,9 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	D2(vswp, "detaching instance %d", instance);
+
+	/* Stop any pending timeout to setup switching mode. */
+	vsw_stop_switching_timeout(vswp);
 
 	if (vswp->if_state & VSW_IF_REG) {
 		if (vsw_mac_unregister(vswp) != 0) {
@@ -752,18 +798,14 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * the physical device.
 	 */
 	mutex_enter(&vswp->mac_lock);
-	if (vswp->mh != NULL) {
-		if (vswp->mstarted)
-			mac_stop(vswp->mh);
-		if (vswp->mresources)
-			mac_resource_set(vswp->mh, NULL, NULL);
-		mac_close(vswp->mh);
 
-		vswp->mh = NULL;
-		vswp->txinfo = NULL;
-	}
+	vsw_mac_detach(vswp);
+	vsw_mac_close(vswp);
+
 	mutex_exit(&vswp->mac_lock);
+
 	mutex_destroy(&vswp->mac_lock);
+	mutex_destroy(&vswp->swtmout_lock);
 
 	/*
 	 * Destroy any free pools that may still exist.
@@ -996,42 +1038,6 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 }
 
 /*
- * Get the mac address of the physical device.
- *
- * Returns 0 on success, 1 on failure.
- */
-static int
-vsw_get_physaddr(vsw_t *vswp)
-{
-	mac_handle_t	mh;
-	char		drv[LIFNAMSIZ];
-	uint_t		ddi_instance;
-
-	D1(vswp, "%s: enter", __func__);
-
-	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS)
-		return (1);
-
-	if (mac_open(vswp->physname, ddi_instance, &mh) != 0) {
-		cmn_err(CE_WARN, "!vsw%d: mac_open %s failed",
-		    vswp->instance, vswp->physname);
-		return (1);
-	}
-
-	READ_ENTER(&vswp->if_lockrw);
-	mac_unicst_get(mh, vswp->if_addr.ether_addr_octet);
-	RW_EXIT(&vswp->if_lockrw);
-
-	mac_close(mh);
-
-	vswp->mdprops |= VSW_DEV_MACADDR;
-
-	D1(vswp, "%s: exit", __func__);
-
-	return (0);
-}
-
-/*
  * Check to see if the card supports the setting of multiple unicst
  * addresses.
  *
@@ -1043,20 +1049,17 @@ vsw_get_hw_maddr(vsw_t *vswp)
 {
 	D1(vswp, "%s: enter", __func__);
 
-	mutex_enter(&vswp->mac_lock);
-	if (vswp->mh == NULL) {
-		mutex_exit(&vswp->mac_lock);
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+
+	if (vswp->mh == NULL)
 		return (1);
-	}
 
 	if (!mac_capab_get(vswp->mh, MAC_CAPAB_MULTIADDRESS, &vswp->maddr)) {
 		cmn_err(CE_WARN, "!vsw%d: device (%s) does not support "
 		    "setting multiple unicast addresses", vswp->instance,
 		    vswp->physname);
-		mutex_exit(&vswp->mac_lock);
 		return (1);
 	}
-	mutex_exit(&vswp->mac_lock);
 
 	D2(vswp, "%s: %d addrs : %d free", __func__,
 	    vswp->maddr.maddr_naddr, vswp->maddr.maddr_naddrfree);
@@ -1067,9 +1070,277 @@ vsw_get_hw_maddr(vsw_t *vswp)
 }
 
 /*
+ * Program unicast and multicast addresses of vsw interface and the ports
+ * into the physical device.
+ */
+static void
+vsw_set_addrs(vsw_t *vswp)
+{
+	vsw_port_list_t	*plist = &vswp->plist;
+	vsw_port_t	*port;
+	mcst_addr_t	*mcap;
+	int		rv;
+
+	READ_ENTER(&vswp->if_lockrw);
+
+	if (vswp->if_state & VSW_IF_UP) {
+
+		/* program unicst addr of vsw interface in the physdev */
+		if (vswp->addr_set == VSW_ADDR_UNSET) {
+			mutex_enter(&vswp->hw_lock);
+			rv = vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
+			mutex_exit(&vswp->hw_lock);
+			if (rv != 0) {
+				cmn_err(CE_NOTE,
+				    "!vsw%d: failed to program interface "
+				    "unicast address\n", vswp->instance);
+			}
+			/*
+			 * Notify the MAC layer of the changed address.
+			 */
+			mac_unicst_update(vswp->if_mh,
+			    (uint8_t *)&vswp->if_addr);
+		}
+
+		/* program mcast addrs of vsw interface in the physdev */
+		mutex_enter(&vswp->mca_lock);
+		mutex_enter(&vswp->mac_lock);
+		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
+			if (mcap->mac_added)
+				continue;
+			rv = mac_multicst_add(vswp->mh, (uchar_t *)&mcap->mca);
+			if (rv == 0) {
+				mcap->mac_added = B_TRUE;
+			} else {
+				cmn_err(CE_WARN, "!vsw%d: unable to add "
+				    "multicast address: %s\n", vswp->instance,
+				    ether_sprintf((void *)&mcap->mca));
+			}
+		}
+		mutex_exit(&vswp->mac_lock);
+		mutex_exit(&vswp->mca_lock);
+
+	}
+
+	RW_EXIT(&vswp->if_lockrw);
+
+	WRITE_ENTER(&plist->lockrw);
+
+	/* program unicast address of ports in the physical device */
+	mutex_enter(&vswp->hw_lock);
+	for (port = plist->head; port != NULL; port = port->p_next) {
+		if (port->addr_set != VSW_ADDR_UNSET) /* addr already set */
+			continue;
+		if (vsw_set_hw(vswp, port, VSW_VNETPORT)) {
+			cmn_err(CE_NOTE,
+			    "!vsw%d: port:%d failed to set unicast address\n",
+			    vswp->instance, port->p_instance);
+		}
+	}
+	mutex_exit(&vswp->hw_lock);
+
+	/* program multicast addresses of ports in the physdev */
+	for (port = plist->head; port != NULL; port = port->p_next) {
+		mutex_enter(&port->mca_lock);
+		mutex_enter(&vswp->mac_lock);
+		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
+			if (mcap->mac_added)
+				continue;
+			rv = mac_multicst_add(vswp->mh, (uchar_t *)&mcap->mca);
+			if (rv == 0) {
+				mcap->mac_added = B_TRUE;
+			} else {
+				cmn_err(CE_WARN, "!vsw%d: unable to add "
+				    "multicast address: %s\n", vswp->instance,
+				    ether_sprintf((void *)&mcap->mca));
+			}
+		}
+		mutex_exit(&vswp->mac_lock);
+		mutex_exit(&port->mca_lock);
+	}
+
+	RW_EXIT(&plist->lockrw);
+}
+
+/*
+ * Remove unicast and multicast addresses of vsw interface and the ports
+ * from the physical device.
+ */
+static void
+vsw_unset_addrs(vsw_t *vswp)
+{
+	vsw_port_list_t	*plist = &vswp->plist;
+	vsw_port_t	*port;
+	mcst_addr_t	*mcap;
+
+	READ_ENTER(&vswp->if_lockrw);
+
+	if (vswp->if_state & VSW_IF_UP) {
+
+		/*
+		 * Remove unicast addr of vsw interfce
+		 * from current physdev
+		 */
+		mutex_enter(&vswp->hw_lock);
+		(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
+		mutex_exit(&vswp->hw_lock);
+
+		/*
+		 * Remove mcast addrs of vsw interface
+		 * from current physdev
+		 */
+		mutex_enter(&vswp->mca_lock);
+		mutex_enter(&vswp->mac_lock);
+		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
+			if (!mcap->mac_added)
+				continue;
+			(void) mac_multicst_remove(vswp->mh,
+			    (uchar_t *)&mcap->mca);
+			mcap->mac_added = B_FALSE;
+		}
+		mutex_exit(&vswp->mac_lock);
+		mutex_exit(&vswp->mca_lock);
+
+	}
+
+	RW_EXIT(&vswp->if_lockrw);
+
+	WRITE_ENTER(&plist->lockrw);
+
+	/*
+	 * Remove unicast address of ports from the current physical device
+	 */
+	mutex_enter(&vswp->hw_lock);
+	for (port = plist->head; port != NULL; port = port->p_next) {
+		/* Remove address if was programmed into HW. */
+		if (port->addr_set == VSW_ADDR_UNSET)
+			continue;
+		(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
+	}
+	mutex_exit(&vswp->hw_lock);
+
+	/* Remove multicast addresses of ports from the current physdev */
+	for (port = plist->head; port != NULL; port = port->p_next) {
+		mutex_enter(&port->mca_lock);
+		mutex_enter(&vswp->mac_lock);
+		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
+			if (!mcap->mac_added)
+				continue;
+			(void) mac_multicst_remove(vswp->mh,
+			    (uchar_t *)&mcap->mca);
+			mcap->mac_added = B_FALSE;
+		}
+		mutex_exit(&vswp->mac_lock);
+		mutex_exit(&port->mca_lock);
+	}
+
+	RW_EXIT(&plist->lockrw);
+}
+
+/* copy mac address of vsw into soft state structure */
+static void
+vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr)
+{
+	int	i;
+
+	WRITE_ENTER(&vswp->if_lockrw);
+	for (i = ETHERADDRL - 1; i >= 0; i--) {
+		vswp->if_addr.ether_addr_octet[i] = macaddr & 0xFF;
+		macaddr >>= 8;
+	}
+	RW_EXIT(&vswp->if_lockrw);
+}
+
+/*
+ * Timeout routine to setup switching mode:
+ * vsw_setup_switching() is invoked from vsw_attach() or vsw_update_md_prop()
+ * initially. If it fails and the error is EAGAIN, then this timeout handler
+ * is started to retry vsw_setup_switching(). vsw_setup_switching() is retried
+ * until we successfully finish it; or the returned error is not EAGAIN.
+ */
+static void
+vsw_setup_switching_timeout(void *arg)
+{
+	vsw_t		*vswp = (vsw_t *)arg;
+	int		rv;
+
+	if (vswp->swtmout_enabled == B_FALSE)
+		return;
+
+	rv = vsw_setup_switching(vswp);
+
+	if (rv == 0) {
+		/*
+		 * Successfully setup switching mode.
+		 * Program unicst, mcst addrs of vsw
+		 * interface and ports in the physdev.
+		 */
+		vsw_set_addrs(vswp);
+	}
+
+	mutex_enter(&vswp->swtmout_lock);
+
+	if (rv == EAGAIN && vswp->swtmout_enabled == B_TRUE) {
+		/*
+		 * Reschedule timeout() if the error is EAGAIN and the
+		 * timeout is still enabled. For errors other than EAGAIN,
+		 * we simply return without rescheduling timeout().
+		 */
+		vswp->swtmout_id =
+		    timeout(vsw_setup_switching_timeout, vswp,
+		    (vsw_setup_switching_delay * drv_usectohz(MICROSEC)));
+		goto exit;
+	}
+
+	/* timeout handler completed */
+	vswp->swtmout_enabled = B_FALSE;
+	vswp->swtmout_id = 0;
+
+exit:
+	mutex_exit(&vswp->swtmout_lock);
+}
+
+/*
+ * Cancel the timeout handler to setup switching mode.
+ */
+static void
+vsw_stop_switching_timeout(vsw_t *vswp)
+{
+	timeout_id_t tid;
+
+	mutex_enter(&vswp->swtmout_lock);
+
+	tid = vswp->swtmout_id;
+
+	if (tid != 0) {
+		/* signal timeout handler to stop */
+		vswp->swtmout_enabled = B_FALSE;
+		vswp->swtmout_id = 0;
+		mutex_exit(&vswp->swtmout_lock);
+
+		(void) untimeout(tid);
+	} else {
+		mutex_exit(&vswp->swtmout_lock);
+	}
+
+	(void) atomic_swap_32(&vswp->switching_setup_done, B_FALSE);
+
+	mutex_enter(&vswp->mac_lock);
+	vswp->mac_open_retries = 0;
+	mutex_exit(&vswp->mac_lock);
+}
+
+/*
  * Setup the required switching mode.
+ * This routine is invoked from vsw_attach() or vsw_update_md_prop()
+ * initially. If it fails and the error is EAGAIN, then a timeout handler
+ * is started to retry vsw_setup_switching(), until it successfully finishes;
+ * or the returned error is not EAGAIN.
  *
- * Returns 0 on success, 1 on failure.
+ * Returns:
+ *  0 on success.
+ *  EAGAIN if retry is needed.
+ *  1 on all other failures.
  */
 static int
 vsw_setup_switching(vsw_t *vswp)
@@ -1078,8 +1349,15 @@ vsw_setup_switching(vsw_t *vswp)
 
 	D1(vswp, "%s: enter", __func__);
 
-	/* select best switching mode */
-	for (i = 0; i < vswp->smode_num; i++) {
+	/*
+	 * Select best switching mode.
+	 * Note that we start from the saved smode_idx. This is done as
+	 * this routine can be called from the timeout handler to retry
+	 * setting up a specific mode. Currently only the function which
+	 * sets up layer2/promisc mode returns EAGAIN if the underlying
+	 * physical device is not available yet, causing retries.
+	 */
+	for (i = vswp->smode_idx; i < vswp->smode_num; i++) {
 		vswp->smode_idx = i;
 		switch (vswp->smode[i]) {
 		case VSW_LAYER2:
@@ -1093,18 +1371,21 @@ vsw_setup_switching(vsw_t *vswp)
 
 		default:
 			DERR(vswp, "unknown switch mode");
-			rv = 1;
 			break;
 		}
 
-		if (rv == 0)
+		if ((rv == 0) || (rv == EAGAIN))
 			break;
+
+		/* all other errors(rv != 0): continue & select the next mode */
+		rv = 1;
 	}
 
-	if (rv == 1) {
+	if (rv && (rv != EAGAIN)) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to setup specified "
 		    "switching mode", vswp->instance);
-		return (rv);
+	} else if (rv == 0) {
+		(void) atomic_swap_32(&vswp->switching_setup_done, B_TRUE);
 	}
 
 	D2(vswp, "%s: Operating in mode %d", __func__,
@@ -1112,63 +1393,87 @@ vsw_setup_switching(vsw_t *vswp)
 
 	D1(vswp, "%s: exit", __func__);
 
-	return (0);
+	return (rv);
 }
 
 /*
  * Setup for layer 2 switching.
  *
- * Returns 0 on success, 1 on failure.
+ * Returns:
+ *  0 on success.
+ *  EAGAIN if retry is needed.
+ *  EIO on all other failures.
  */
 static int
 vsw_setup_layer2(vsw_t *vswp)
 {
+	int	rv;
+
 	D1(vswp, "%s: enter", __func__);
 
 	vswp->vsw_switch_frame = vsw_switch_l2_frame;
+
+	rv = strlen(vswp->physname);
+	if (rv == 0) {
+		/*
+		 * Physical device name is NULL, which is
+		 * required for layer 2.
+		 */
+		cmn_err(CE_WARN, "!vsw%d: no physical device name specified",
+		    vswp->instance);
+		return (EIO);
+	}
+
+	mutex_enter(&vswp->mac_lock);
+
+	rv = vsw_mac_open(vswp);
+	if (rv != 0) {
+		if (rv != EAGAIN) {
+			cmn_err(CE_WARN, "!vsw%d: Unable to open physical "
+			    "device: %s\n", vswp->instance, vswp->physname);
+		}
+		mutex_exit(&vswp->mac_lock);
+		return (rv);
+	}
+
+	if (vswp->smode[vswp->smode_idx] == VSW_LAYER2) {
+		/*
+		 * Verify that underlying device can support multiple
+		 * unicast mac addresses.
+		 */
+		rv = vsw_get_hw_maddr(vswp);
+		if (rv != 0) {
+			cmn_err(CE_WARN, "!vsw%d: Unable to setup "
+			    "layer2 switching", vswp->instance);
+			goto exit_error;
+		}
+	}
 
 	/*
 	 * Attempt to link into the MAC layer so we can get
 	 * and send packets out over the physical adapter.
 	 */
-	if (vswp->mdprops & VSW_MD_PHYSNAME) {
-		if (vsw_mac_attach(vswp) != 0) {
-			/*
-			 * Registration with the MAC layer has failed,
-			 * so return 1 so that can fall back to next
-			 * prefered switching method.
-			 */
-			cmn_err(CE_WARN, "!vsw%d: Unable to join as MAC layer "
-			    "client", vswp->instance);
-			return (1);
-		}
-
-		if (vswp->smode[vswp->smode_idx] == VSW_LAYER2) {
-			/*
-			 * Verify that underlying device can support multiple
-			 * unicast mac addresses.
-			 */
-			if (vsw_get_hw_maddr(vswp) != 0) {
-				cmn_err(CE_WARN, "!vsw%d: Unable to setup "
-				    "layer2 switching", vswp->instance);
-				vsw_mac_detach(vswp);
-				return (1);
-			}
-		}
-
-	} else {
+	rv = vsw_mac_attach(vswp);
+	if (rv != 0) {
 		/*
-		 * No physical device name found in MD which is
-		 * required for layer 2.
+		 * Registration with the MAC layer has failed,
+		 * so return error so that can fall back to next
+		 * prefered switching method.
 		 */
-		cmn_err(CE_WARN, "!vsw%d: no physical device name specified",
-		    vswp->instance);
-		return (1);
+		cmn_err(CE_WARN, "!vsw%d: Unable to setup physical device: "
+		    "%s\n", vswp->instance, vswp->physname);
+		goto exit_error;
 	}
 
 	D1(vswp, "%s: exit", __func__);
 
+	mutex_exit(&vswp->mac_lock);
 	return (0);
+
+exit_error:
+	vsw_mac_close(vswp);
+	mutex_exit(&vswp->mac_lock);
+	return (EIO);
 }
 
 static int
@@ -1185,6 +1490,87 @@ vsw_setup_layer3(vsw_t *vswp)
 }
 
 /*
+ * Open the underlying physical device for access in layer2 mode.
+ * Returns:
+ * 0 on success
+ * EAGAIN if mac_open() fails due to the device being not available yet.
+ * EIO on any other failures.
+ */
+static int
+vsw_mac_open(vsw_t *vswp)
+{
+	char	drv[LIFNAMSIZ];
+	uint_t	ddi_instance;
+	int	rv;
+
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+
+	if (vswp->mh != NULL) {
+		/* already open */
+		return (0);
+	}
+
+	if (vswp->mac_open_retries++ >= vsw_mac_open_retries) {
+		/* exceeded max retries */
+		return (EIO);
+	}
+
+	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "!vsw%d: invalid device name: %s",
+		    vswp->instance, vswp->physname);
+		return (EIO);
+	}
+
+	/*
+	 * Aggregation devices are special in that the device instance
+	 * must be set to zero when they are being mac_open()'ed.
+	 *
+	 * The only way to determine if we are being passed an aggregated
+	 * device is to check the device name.
+	 */
+	if (strcmp(drv, "aggr") == 0) {
+		ddi_instance = 0;
+	}
+
+	rv = mac_open(vswp->physname, ddi_instance, &vswp->mh);
+	if (rv != 0) {
+		/*
+		 * If mac_open() failed and the error indicates that the
+		 * device is not available yet, then, we return EAGAIN to
+		 * indicate that it needs to be retried.
+		 * For example, this may happen during boot up, as the
+		 * required link aggregation groups(devices) have not been
+		 * created yet.
+		 */
+		if (rv == ENOENT) {
+			return (EAGAIN);
+		} else {
+			cmn_err(CE_WARN, "vsw%d: mac_open %s failed rv:%x",
+			    vswp->instance, vswp->physname, rv);
+			return (EIO);
+		}
+	}
+
+	vswp->mac_open_retries = 0;
+
+	return (0);
+}
+
+/*
+ * Close the underlying physical device.
+ */
+static void
+vsw_mac_close(vsw_t *vswp)
+{
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+
+	if (vswp->mh != NULL) {
+		mac_close(vswp->mh);
+		vswp->mh = NULL;
+	}
+}
+
+/*
  * Link into the MAC layer to gain access to the services provided by
  * the underlying physical device driver (which should also have
  * registered with the MAC layer).
@@ -1194,30 +1580,13 @@ vsw_setup_layer3(vsw_t *vswp)
 static int
 vsw_mac_attach(vsw_t *vswp)
 {
-	char	drv[LIFNAMSIZ];
-	uint_t	ddi_instance;
-
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(vswp->mh == NULL);
 	ASSERT(vswp->mrh == NULL);
 	ASSERT(vswp->mstarted == B_FALSE);
 	ASSERT(vswp->mresources == B_FALSE);
 
-	ASSERT(vswp->mdprops & VSW_MD_PHYSNAME);
-
-	mutex_enter(&vswp->mac_lock);
-	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!vsw%d: invalid device name: %s",
-		    vswp->instance, vswp->physname);
-		goto mac_fail_exit;
-	}
-
-	if ((mac_open(vswp->physname, ddi_instance, &vswp->mh)) != 0) {
-		cmn_err(CE_WARN, "!vsw%d: mac_open %s failed",
-		    vswp->instance, vswp->physname);
-		goto mac_fail_exit;
-	}
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 
 	ASSERT(vswp->mh != NULL);
 
@@ -1265,15 +1634,12 @@ vsw_mac_attach(vsw_t *vswp)
 		goto mac_fail_exit;
 	}
 
-	mutex_exit(&vswp->mac_lock);
-
 	vswp->mstarted = B_TRUE;
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
 
 mac_fail_exit:
-	mutex_exit(&vswp->mac_lock);
 	vsw_mac_detach(vswp);
 
 	D1(vswp, "%s: exit", __func__);
@@ -1286,12 +1652,11 @@ vsw_mac_detach(vsw_t *vswp)
 	D1(vswp, "vsw_mac_detach: enter");
 
 	ASSERT(vswp != NULL);
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 
 	if (vsw_multi_ring_enable) {
 		vsw_mac_ring_tbl_destroy(vswp);
 	}
-
-	mutex_enter(&vswp->mac_lock);
 
 	if (vswp->mh != NULL) {
 		if (vswp->mstarted)
@@ -1300,15 +1665,11 @@ vsw_mac_detach(vsw_t *vswp)
 			mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
 		if (vswp->mresources)
 			mac_resource_set(vswp->mh, NULL, NULL);
-		mac_close(vswp->mh);
 	}
 
 	vswp->mrh = NULL;
-	vswp->mh = NULL;
 	vswp->txinfo = NULL;
 	vswp->mstarted = B_FALSE;
-
-	mutex_exit(&vswp->mac_lock);
 
 	D1(vswp, "vsw_mac_detach: exit");
 }
@@ -1355,23 +1716,11 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 		ASSERT(port != NULL);
 		ether_copy(&port->p_macaddr, &mac_addr.mma_addr);
 	} else {
-		READ_ENTER(&vswp->if_lockrw);
-		/*
-		 * Don't program if the interface is not UP. This
-		 * is possible if the address has just been changed
-		 * in the MD node, but the interface has not yet been
-		 * plumbed.
-		 */
-		if (!(vswp->if_state & VSW_IF_UP)) {
-			RW_EXIT(&vswp->if_lockrw);
-			return (0);
-		}
 		ether_copy(&vswp->if_addr, &mac_addr.mma_addr);
-		RW_EXIT(&vswp->if_lockrw);
 	}
 
 	err = vsw_set_hw_addr(vswp, &mac_addr);
-	if (err != 0) {
+	if (err == ENOSPC) {
 		/*
 		 * Mark that attempt should be made to re-config sometime
 		 * in future if a port is deleted.
@@ -1397,6 +1746,9 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 		return (err);
 	}
 
+	if (err != 0)
+		return (err);
+
 	if (type == VSW_VNETPORT) {
 		port->addr_slot = mac_addr.mma_slot;
 		port->addr_set = VSW_ADDR_HW;
@@ -1405,11 +1757,8 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 		vswp->addr_set = VSW_ADDR_HW;
 	}
 
-	D2(vswp, "programmed addr %x:%x:%x:%x:%x:%x into slot %d "
-	    "of device %s",
-	    mac_addr.mma_addr[0], mac_addr.mma_addr[1],
-	    mac_addr.mma_addr[2], mac_addr.mma_addr[3],
-	    mac_addr.mma_addr[4], mac_addr.mma_addr[5],
+	D2(vswp, "programmed addr %s into slot %d "
+	"of device %s", ether_sprintf((void *)mac_addr.mma_addr),
 	    mac_addr.mma_slot, vswp->physname);
 
 	D1(vswp, "%s: exit", __func__);
@@ -1487,21 +1836,21 @@ static int
 vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
 {
 	void	*mah;
-	int	rv;
+	int	rv = EINVAL;
 
 	D1(vswp, "%s: enter", __func__);
 
 	ASSERT(MUTEX_HELD(&vswp->hw_lock));
 
 	if (vswp->maddr.maddr_handle == NULL)
-		return (1);
+		return (rv);
 
 	mah = vswp->maddr.maddr_handle;
 
 	rv = vswp->maddr.maddr_add(mah, mac);
 
 	if (rv == 0)
-		return (0);
+		return (rv);
 
 	/*
 	 * Its okay for the add to fail because we have exhausted
@@ -1510,14 +1859,11 @@ vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
 	 */
 	if (rv != ENOSPC) {
 		cmn_err(CE_WARN, "!vsw%d: error programming "
-		    "address %x:%x:%x:%x:%x:%x into HW "
-		    "err (%d)", vswp->instance,
-		    mac->mma_addr[0], mac->mma_addr[1],
-		    mac->mma_addr[2], mac->mma_addr[3],
-		    mac->mma_addr[4], mac->mma_addr[5], rv);
+		    "address %s into HW err (%d)",
+		    vswp->instance, ether_sprintf((void *)mac->mma_addr), rv);
 	}
 	D1(vswp, "%s: exit", __func__);
-	return (1);
+	return (rv);
 }
 
 /*
@@ -2199,7 +2545,8 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
 	mblk_t			*nextp;
 
 	mutex_enter(&vswp->mac_lock);
-	if (vswp->mh == NULL) {
+	if ((vswp->mh == NULL) || (vswp->mstarted == B_FALSE)) {
+
 		DERR(vswp, "vsw_tx_msg: dropping pkts: no tx routine avail");
 		mutex_exit(&vswp->mac_lock);
 		return (mp);
@@ -2247,8 +2594,17 @@ vsw_mac_register(vsw_t *vswp)
 	macp->m_max_sdu = ETHERMTU;
 	rv = mac_register(macp, &vswp->if_mh);
 	mac_free(macp);
-	if (rv == 0)
-		vswp->if_state |= VSW_IF_REG;
+	if (rv != 0) {
+		/*
+		 * Treat this as a non-fatal error as we may be
+		 * able to operate in some other mode.
+		 */
+		cmn_err(CE_NOTE, "!vsw%d: Unable to register as "
+		    "a provider with MAC layer", vswp->instance);
+		return (rv);
+	}
+
+	vswp->if_state |= VSW_IF_REG;
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -2337,12 +2693,28 @@ vsw_m_start(void *arg)
 	D1(vswp, "%s: enter", __func__);
 
 	WRITE_ENTER(&vswp->if_lockrw);
-	vswp->if_state |= VSW_IF_UP;
-	RW_EXIT(&vswp->if_lockrw);
 
-	mutex_enter(&vswp->hw_lock);
-	(void) vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
-	mutex_exit(&vswp->hw_lock);
+	vswp->if_state |= VSW_IF_UP;
+
+	if (vswp->switching_setup_done == B_FALSE) {
+		/*
+		 * If the switching mode has not been setup yet, just
+		 * return. The unicast address will be programmed
+		 * after the physical device is successfully setup by the
+		 * timeout handler.
+		 */
+		RW_EXIT(&vswp->if_lockrw);
+		return (0);
+	}
+
+	/* if in layer2 mode, program unicast address. */
+	if (vswp->mh != NULL) {
+		mutex_enter(&vswp->hw_lock);
+		(void) vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
+		mutex_exit(&vswp->hw_lock);
+	}
+
+	RW_EXIT(&vswp->if_lockrw);
 
 	D1(vswp, "%s: exit (state = %d)", __func__, vswp->if_state);
 	return (0);
@@ -2394,14 +2766,12 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			mcst_p = kmem_zalloc(sizeof (mcst_addr_t), KM_NOSLEEP);
 			if (mcst_p == NULL) {
 				DERR(vswp, "%s unable to alloc mem", __func__);
+				(void) vsw_del_mcst(vswp,
+				    VSW_LOCALDEV, addr, NULL);
 				return (1);
 			}
 			mcst_p->addr = addr;
-
-			mutex_enter(&vswp->mca_lock);
-			mcst_p->nextp = vswp->mcap;
-			vswp->mcap = mcst_p;
-			mutex_exit(&vswp->mca_lock);
+			ether_copy(mca, &mcst_p->mca);
 
 			/*
 			 * Call into the underlying driver to program the
@@ -2415,18 +2785,25 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 					    "add multicast address",
 					    vswp->instance);
 					mutex_exit(&vswp->mac_lock);
-					goto vsw_remove_addr;
+					(void) vsw_del_mcst(vswp,
+					    VSW_LOCALDEV, addr, NULL);
+					kmem_free(mcst_p, sizeof (*mcst_p));
+					return (ret);
 				}
+				mcst_p->mac_added = B_TRUE;
 			}
 			mutex_exit(&vswp->mac_lock);
+
+			mutex_enter(&vswp->mca_lock);
+			mcst_p->nextp = vswp->mcap;
+			vswp->mcap = mcst_p;
+			mutex_exit(&vswp->mca_lock);
 		} else {
 			cmn_err(CE_WARN, "!vsw%d: unable to add multicast "
 			    "address", vswp->instance);
 		}
 		return (ret);
 	}
-
-vsw_remove_addr:
 
 	D2(vswp, "%s: removing multicast", __func__);
 	/*
@@ -2438,12 +2815,16 @@ vsw_remove_addr:
 		 * ..and then from the list maintained in the
 		 * vsw_t structure.
 		 */
-		vsw_del_addr(VSW_LOCALDEV, vswp, addr);
+		mcst_p = vsw_del_addr(VSW_LOCALDEV, vswp, addr);
+		ASSERT(mcst_p != NULL);
 
 		mutex_enter(&vswp->mac_lock);
-		if (vswp->mh != NULL)
+		if (vswp->mh != NULL && mcst_p->mac_added) {
 			(void) mac_multicst_remove(vswp->mh, mca);
+			mcst_p->mac_added = B_FALSE;
+		}
 		mutex_exit(&vswp->mac_lock);
+		kmem_free(mcst_p, sizeof (*mcst_p));
 	}
 
 	D1(vswp, "%s: exit", __func__);
@@ -2496,29 +2877,9 @@ vsw_mdeg_register(vsw_t *vswp)
 	mdeg_node_spec_t	*inst_specp;
 	mdeg_handle_t		mdeg_hdl, mdeg_port_hdl;
 	size_t			templatesz;
-	int			inst, rv;
+	int			rv;
 
 	D1(vswp, "%s: enter", __func__);
-
-	/*
-	 * In each 'virtual-device' node in the MD there is a
-	 * 'cfg-handle' property which is the MD's concept of
-	 * an instance number (this may be completely different from
-	 * the device drivers instance #). OBP reads that value and
-	 * stores it in the 'reg' property of the appropriate node in
-	 * the device tree. So we use the 'reg' value when registering
-	 * with the mdeg framework, to ensure we get events for the
-	 * correct nodes.
-	 */
-	inst = ddi_prop_get_int(DDI_DEV_T_ANY, vswp->dip,
-	    DDI_PROP_DONTPASS, reg_propname, -1);
-	if (inst == -1) {
-		cmn_err(CE_WARN, "!vsw%d: Unable to read %s property from "
-		    "OBP device tree", vswp->instance, reg_propname);
-		return (1);
-	}
-
-	D2(vswp, "%s: instance %d registering with mdeg", __func__, inst);
 
 	/*
 	 * Allocate and initialize a per-instance copy
@@ -2530,13 +2891,15 @@ vsw_mdeg_register(vsw_t *vswp)
 
 	bcopy(vsw_prop_template, pspecp, templatesz);
 
-	VSW_SET_MDEG_PROP_INST(pspecp, inst);
+	VSW_SET_MDEG_PROP_INST(pspecp, vswp->regprop);
 
 	/* initialize the complete prop spec structure */
 	inst_specp = kmem_zalloc(sizeof (mdeg_node_spec_t), KM_SLEEP);
 	inst_specp->namep = "virtual-device";
 	inst_specp->specp = pspecp;
 
+	D2(vswp, "%s: instance %d registering with mdeg", __func__,
+	    vswp->regprop);
 	/*
 	 * Register an interest in 'virtual-device' nodes with a
 	 * 'name' property of 'virtual-network-switch'
@@ -2612,7 +2975,6 @@ static int
 vsw_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 {
 	vsw_t		*vswp;
-	int		idx;
 	md_t		*mdp;
 	mde_cookie_t	node;
 	uint64_t	inst;
@@ -2629,58 +2991,76 @@ vsw_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	    resp->match_prev.nelem);
 
 	/*
-	 * Expect 'added' to be non-zero if virtual-network-switch
-	 * nodes exist in the MD when the driver attaches.
-	 */
-	for (idx = 0; idx < resp->added.nelem; idx++) {
-		mdp = resp->added.mdp;
-		node = resp->added.mdep[idx];
-
-		if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
-			DERR(vswp, "%s: unable to get node name for "
-			    "node(%d) 0x%lx", __func__, idx, node);
-			continue;
-		}
-
-		if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
-			DERR(vswp, "%s: prop(cfg-handle) not found port(%d)",
-			    __func__, idx);
-			continue;
-		}
-
-		D2(vswp, "%s: added node(%d) 0x%lx with name %s "
-		    "and inst %d", __func__, idx, node, node_name, inst);
-
-		vsw_get_initial_md_properties(vswp, mdp, node);
-	}
-
-	/*
+	 * We get an initial callback for this node as 'added'
+	 * after registering with mdeg. Note that we would have
+	 * already gathered information about this vsw node by
+	 * walking MD earlier during attach (in vsw_read_mdprops()).
+	 * So, there is a window where the properties of this
+	 * node might have changed when we get this initial 'added'
+	 * callback. We handle this as if an update occured
+	 * and invoke the same function which handles updates to
+	 * the properties of this vsw-node if any.
+	 *
 	 * A non-zero 'match' value indicates that the MD has been
-	 * updated and that a virtual-network-switch node is present
-	 * which may or may not have been updated. It is up to the clients
-	 * to examine their own nodes and determine if they have changed.
+	 * updated and that a virtual-network-switch node is
+	 * present which may or may not have been updated. It is
+	 * up to the clients to examine their own nodes and
+	 * determine if they have changed.
 	 */
-	for (idx = 0; idx < resp->match_curr.nelem; idx++) {
+	if (resp->added.nelem != 0) {
+
+		if (resp->added.nelem != 1) {
+			cmn_err(CE_NOTE, "!vsw%d: number of nodes added "
+			    "invalid: %d\n", vswp->instance, resp->added.nelem);
+			return (MDEG_FAILURE);
+		}
+
+		mdp = resp->added.mdp;
+		node = resp->added.mdep[0];
+
+	} else if (resp->match_curr.nelem != 0) {
+
+		if (resp->match_curr.nelem != 1) {
+			cmn_err(CE_NOTE, "!vsw%d: number of nodes updated "
+			    "invalid: %d\n", vswp->instance,
+			    resp->match_curr.nelem);
+			return (MDEG_FAILURE);
+		}
+
 		mdp = resp->match_curr.mdp;
-		node = resp->match_curr.mdep[idx];
+		node = resp->match_curr.mdep[0];
 
-		if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
-			DERR(vswp, "%s: unable to get node name for "
-			    "node(%d) 0x%lx", __func__, idx, node);
-			continue;
-		}
-
-		if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
-			DERR(vswp, "%s: prop(cfg-handle) not found port(%d)",
-			    __func__, idx);
-			continue;
-		}
-
-		D2(vswp, "%s: changed node(%d) 0x%lx with name %s "
-		    "and inst %d", __func__, idx, node, node_name, inst);
-
-		vsw_update_md_prop(vswp, mdp, node);
+	} else {
+		return (MDEG_FAILURE);
 	}
+
+	/* Validate name and instance */
+	if (md_get_prop_str(mdp, node, "name", &node_name) != 0) {
+		DERR(vswp, "%s: unable to get node name\n",  __func__);
+		return (MDEG_FAILURE);
+	}
+
+	/* is this a virtual-network-switch? */
+	if (strcmp(node_name, vsw_propname) != 0) {
+		DERR(vswp, "%s: Invalid node name: %s\n",
+		    __func__, node_name);
+		return (MDEG_FAILURE);
+	}
+
+	if (md_get_prop_val(mdp, node, "cfg-handle", &inst)) {
+		DERR(vswp, "%s: prop(cfg-handle) not found\n",
+		    __func__);
+		return (MDEG_FAILURE);
+	}
+
+	/* is this the right instance of vsw? */
+	if (inst != vswp->regprop) {
+		DERR(vswp, "%s: Invalid cfg-handle: %lx\n",
+		    __func__, inst);
+		return (MDEG_FAILURE);
+	}
+
+	vsw_update_md_prop(vswp, mdp, node);
 
 	return (MDEG_SUCCESS);
 }
@@ -2751,9 +3131,115 @@ vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 }
 
 /*
+ * Scan the machine description for this instance of vsw
+ * and read its properties. Called only from vsw_attach().
+ * Returns: 0 on success, 1 on failure.
+ */
+static int
+vsw_read_mdprops(vsw_t *vswp)
+{
+	md_t		*mdp = NULL;
+	mde_cookie_t	rootnode;
+	mde_cookie_t	*listp = NULL;
+	uint64_t	inst;
+	uint64_t	cfgh;
+	char		*name;
+	int		rv = 1;
+	int		num_nodes = 0;
+	int		num_devs = 0;
+	int		listsz = 0;
+	int		i;
+
+	/*
+	 * In each 'virtual-device' node in the MD there is a
+	 * 'cfg-handle' property which is the MD's concept of
+	 * an instance number (this may be completely different from
+	 * the device drivers instance #). OBP reads that value and
+	 * stores it in the 'reg' property of the appropriate node in
+	 * the device tree. We first read this reg property and use this
+	 * to compare against the 'cfg-handle' property of vsw nodes
+	 * in MD to get to this specific vsw instance and then read
+	 * other properties that we are interested in.
+	 * We also cache the value of 'reg' property and use it later
+	 * to register callbacks with mdeg (see vsw_mdeg_register())
+	 */
+	inst = ddi_prop_get_int(DDI_DEV_T_ANY, vswp->dip,
+	    DDI_PROP_DONTPASS, reg_propname, -1);
+	if (inst == -1) {
+		cmn_err(CE_NOTE, "!vsw%d: Unable to read %s property from "
+		    "OBP device tree", vswp->instance, reg_propname);
+		return (rv);
+	}
+
+	vswp->regprop = inst;
+
+	if ((mdp = md_get_handle()) == NULL) {
+		DWARN(vswp, "%s: cannot init MD\n", __func__);
+		return (rv);
+	}
+
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = (mde_cookie_t *)kmem_zalloc(listsz, KM_SLEEP);
+
+	rootnode = md_root_node(mdp);
+
+	/* search for all "virtual_device" nodes */
+	num_devs = md_scan_dag(mdp, rootnode,
+	    md_find_name(mdp, vdev_propname),
+	    md_find_name(mdp, "fwd"), listp);
+	if (num_devs <= 0) {
+		DWARN(vswp, "%s: invalid num_devs:%d\n", __func__, num_devs);
+		goto vsw_readmd_exit;
+	}
+
+	/*
+	 * Now loop through the list of virtual-devices looking for
+	 * devices with name "virtual-network-switch" and for each
+	 * such device compare its instance with what we have from
+	 * the 'reg' property to find the right node in MD and then
+	 * read all its properties.
+	 */
+	for (i = 0; i < num_devs; i++) {
+
+		if (md_get_prop_str(mdp, listp[i], "name", &name) != 0) {
+			DWARN(vswp, "%s: name property not found\n",
+			    __func__);
+			goto vsw_readmd_exit;
+		}
+
+		/* is this a virtual-network-switch? */
+		if (strcmp(name, vsw_propname) != 0)
+			continue;
+
+		if (md_get_prop_val(mdp, listp[i], "cfg-handle", &cfgh) != 0) {
+			DWARN(vswp, "%s: cfg-handle property not found\n",
+			    __func__);
+			goto vsw_readmd_exit;
+		}
+
+		/* is this the required instance of vsw? */
+		if (inst != cfgh)
+			continue;
+
+		/* now read all properties of this vsw instance */
+		rv = vsw_get_initial_md_properties(vswp, mdp, listp[i]);
+		break;
+	}
+
+vsw_readmd_exit:
+
+	kmem_free(listp, listsz);
+	(void) md_fini_handle(mdp);
+	return (rv);
+}
+
+/*
  * Read the initial start-of-day values from the specified MD node.
  */
-static void
+static int
 vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 {
 	int		i;
@@ -2761,46 +3247,18 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 	D1(vswp, "%s: enter", __func__);
 
-	if (vsw_get_md_physname(vswp, mdp, node, vswp->physname) == 0) {
-		/*
-		 * Note it is valid for the physname property to
-		 * be NULL so check actual name length to determine
-		 * if we have a actual device name.
-		 */
-		if (strlen(vswp->physname) > 0)
-			vswp->mdprops |= VSW_MD_PHYSNAME;
-	} else {
-		cmn_err(CE_WARN, "!vsw%d: Unable to read name of physical "
-		    "device from MD", vswp->instance);
-		return;
+	if (vsw_get_md_physname(vswp, mdp, node, vswp->physname) != 0) {
+		return (1);
 	}
 
 	/* mac address for vswitch device itself */
 	if (md_get_prop_val(mdp, node, macaddr_propname, &macaddr) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to get MAC address from MD",
 		    vswp->instance);
-
-		/*
-		 * Fallback to using the mac address of the physical
-		 * device.
-		 */
-		if (vsw_get_physaddr(vswp) == 0) {
-			cmn_err(CE_NOTE, "!vsw%d: Using MAC address from "
-			    "physical device (%s)", vswp->instance,
-			    vswp->physname);
-		} else {
-			cmn_err(CE_WARN, "!vsw%d: Unable to get MAC address"
-			    "from device %s", vswp->instance, vswp->physname);
-		}
-	} else {
-		WRITE_ENTER(&vswp->if_lockrw);
-		for (i = ETHERADDRL - 1; i >= 0; i--) {
-			vswp->if_addr.ether_addr_octet[i] = macaddr & 0xFF;
-			macaddr >>= 8;
-		}
-		RW_EXIT(&vswp->if_lockrw);
-		vswp->mdprops |= VSW_MD_MACADDR;
+		return (1);
 	}
+
+	vsw_save_lmacaddr(vswp, macaddr);
 
 	if (vsw_get_md_smodes(vswp, mdp, node, vswp->smode, &vswp->smode_num)) {
 		cmn_err(CE_WARN, "vsw%d: Unable to read %s property from "
@@ -2813,31 +3271,10 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		vswp->smode_num = NUM_SMODES;
 	} else {
 		ASSERT(vswp->smode_num != 0);
-		vswp->mdprops |= VSW_MD_SMODE;
-	}
-
-	/*
-	 * Unable to setup any switching mode, nothing more
-	 * we can do.
-	 */
-	if (vsw_setup_switching(vswp))
-		return;
-
-	WRITE_ENTER(&vswp->if_lockrw);
-	vswp->if_state &= ~VSW_IF_UP;
-	RW_EXIT(&vswp->if_lockrw);
-	if (vswp->mdprops & (VSW_MD_MACADDR | VSW_DEV_MACADDR)) {
-		if (vsw_mac_register(vswp) != 0) {
-			/*
-			 * Treat this as a non-fatal error as we may be
-			 * able to operate in some other mode.
-			 */
-			cmn_err(CE_WARN, "vsw%d: Unable to register as "
-			    "provider with MAC layer", vswp->instance);
-		}
 	}
 
 	D1(vswp, "%s: exit", __func__);
+	return (0);
 }
 
 /*
@@ -2861,12 +3298,11 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	uint8_t		new_smode[NUM_SMODES];
 	int		i, smode_num = 0;
 	uint64_t 	macaddr = 0;
-	vsw_port_list_t *plist = &vswp->plist;
-	vsw_port_t	*port = NULL;
 	enum		{MD_init = 0x1,
 				MD_physname = 0x2,
 				MD_macaddr = 0x4,
 				MD_smode = 0x8} updated;
+	int		rv;
 
 	updated = MD_init;
 
@@ -2883,7 +3319,8 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 * the vsw is being changed to 'routed' mode.
 		 */
 		if ((strlen(physname) != 0) &&
-		    (ddi_parse(physname, drv, &ddi_instance) != DDI_SUCCESS)) {
+		    (ddi_parse(physname, drv,
+		    &ddi_instance) != DDI_SUCCESS)) {
 			cmn_err(CE_WARN, "!vsw%d: new device name %s is not"
 			    " a valid device name/instance",
 			    vswp->instance, physname);
@@ -2913,26 +3350,32 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		    vswp->instance);
 		goto fail_reconf;
 	} else {
+		uint64_t maddr = macaddr;
 		READ_ENTER(&vswp->if_lockrw);
 		for (i = ETHERADDRL - 1; i >= 0; i--) {
-			if (vswp->if_addr.ether_addr_octet[i] !=
-			    (macaddr & 0xFF)) {
+			if (vswp->if_addr.ether_addr_octet[i]
+			    != (macaddr & 0xFF)) {
 				D2(vswp, "%s: octet[%d] 0x%x != 0x%x",
 				    __func__, i,
 				    vswp->if_addr.ether_addr_octet[i],
 				    (macaddr & 0xFF));
 				updated |= MD_macaddr;
+				macaddr = maddr;
 				break;
 			}
 			macaddr >>= 8;
 		}
 		RW_EXIT(&vswp->if_lockrw);
+		if (updated & MD_macaddr) {
+			vsw_save_lmacaddr(vswp, macaddr);
+		}
 	}
 
 	/*
 	 * Check if switching modes have changed.
 	 */
-	if (vsw_get_md_smodes(vswp, mdp, node, new_smode, &smode_num)) {
+	if (vsw_get_md_smodes(vswp, mdp, node,
+	    new_smode, &smode_num)) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read %s property from MD",
 		    vswp->instance, smode_propname);
 		goto fail_reconf;
@@ -2958,26 +3401,27 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	 */
 
 	if (updated & (MD_physname | MD_smode)) {
-		/*
-		 * Disconnect all ports from the current card
-		 */
-		WRITE_ENTER(&plist->lockrw);
-		for (port = plist->head; port != NULL; port = port->p_next) {
-			/* Remove address if was programmed into HW. */
-			mutex_enter(&vswp->hw_lock);
-			if (vsw_unset_hw(vswp, port, VSW_VNETPORT)) {
-				mutex_exit(&vswp->hw_lock);
-				RW_EXIT(&plist->lockrw);
-				goto fail_update;
-			}
-			mutex_exit(&vswp->hw_lock);
-		}
-		RW_EXIT(&plist->lockrw);
 
 		/*
-		 * Stop, detach the old device..
+		 * Stop any pending timeout to setup switching mode.
 		 */
+		vsw_stop_switching_timeout(vswp);
+
+		/*
+		 * Remove unicst, mcst addrs of vsw interface
+		 * and ports from the physdev.
+		 */
+		vsw_unset_addrs(vswp);
+
+		/*
+		 * Stop, detach and close the old device..
+		 */
+		mutex_enter(&vswp->mac_lock);
+
 		vsw_mac_detach(vswp);
+		vsw_mac_close(vswp);
+
+		mutex_exit(&vswp->mac_lock);
 
 		/*
 		 * Update phys name.
@@ -2987,9 +3431,6 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			    vswp->instance, vswp->physname, physname);
 			(void) strncpy(vswp->physname,
 			    physname, strlen(physname) + 1);
-
-			if (strlen(vswp->physname) > 0)
-				vswp->mdprops |= VSW_MD_PHYSNAME;
 		}
 
 		/*
@@ -3006,49 +3447,76 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		/*
 		 * ..and attach, start the new device.
 		 */
-		if (vsw_setup_switching(vswp))
+		rv = vsw_setup_switching(vswp);
+		if (rv == EAGAIN) {
+			/*
+			 * Unable to setup switching mode.
+			 * As the error is EAGAIN, schedule a timeout to retry
+			 * and return. Programming addresses of ports and
+			 * vsw interface will be done when the timeout handler
+			 * completes successfully.
+			 */
+			mutex_enter(&vswp->swtmout_lock);
+
+			vswp->swtmout_enabled = B_TRUE;
+			vswp->swtmout_id =
+			    timeout(vsw_setup_switching_timeout, vswp,
+			    (vsw_setup_switching_delay *
+			    drv_usectohz(MICROSEC)));
+
+			mutex_exit(&vswp->swtmout_lock);
+
+			return;
+
+		} else if (rv) {
 			goto fail_update;
+		}
 
 		/*
-		 * Connect ports to new card.
+		 * program unicst, mcst addrs of vsw interface
+		 * and ports in the physdev.
 		 */
-		WRITE_ENTER(&plist->lockrw);
-		for (port = plist->head; port != NULL; port = port->p_next) {
-			mutex_enter(&vswp->hw_lock);
-			if (vsw_set_hw(vswp, port, VSW_VNETPORT)) {
-				mutex_exit(&vswp->hw_lock);
-				RW_EXIT(&plist->lockrw);
-				goto fail_update;
-			}
-			mutex_exit(&vswp->hw_lock);
-		}
-		RW_EXIT(&plist->lockrw);
-	}
+		vsw_set_addrs(vswp);
 
-	if (updated & MD_macaddr) {
+	} else if (updated & MD_macaddr) {
+		/*
+		 * We enter here if only MD_macaddr is exclusively updated.
+		 * If MD_physname and/or MD_smode are also updated, then
+		 * as part of that, we would have implicitly processed
+		 * MD_macaddr update (above).
+		 */
 		cmn_err(CE_NOTE, "!vsw%d: changing mac address to 0x%lx",
 		    vswp->instance, macaddr);
 
-		WRITE_ENTER(&vswp->if_lockrw);
-		for (i = ETHERADDRL - 1; i >= 0; i--) {
-			vswp->if_addr.ether_addr_octet[i] = macaddr & 0xFF;
-			macaddr >>= 8;
+		READ_ENTER(&vswp->if_lockrw);
+		if (vswp->if_state & VSW_IF_UP) {
+
+			mutex_enter(&vswp->hw_lock);
+			/*
+			 * Remove old mac address of vsw interface
+			 * from the physdev
+			 */
+			(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
+			/*
+			 * Program new mac address of vsw interface
+			 * in the physdev
+			 */
+			rv = vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
+			mutex_exit(&vswp->hw_lock);
+			if (rv != 0) {
+				cmn_err(CE_NOTE,
+				    "!vsw%d: failed to program interface "
+				    "unicast address\n", vswp->instance);
+			}
+			/*
+			 * Notify the MAC layer of the changed address.
+			 */
+			mac_unicst_update(vswp->if_mh,
+			    (uint8_t *)&vswp->if_addr);
+
 		}
 		RW_EXIT(&vswp->if_lockrw);
 
-		/*
-		 * Remove old address from HW (if programmed) and set
-		 * new address.
-		 */
-		mutex_enter(&vswp->hw_lock);
-		(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
-		(void) vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
-		mutex_exit(&vswp->hw_lock);
-
-		/*
-		 * Notify the MAC layer of the changed address.
-		 */
-		mac_unicst_update(vswp->if_mh, (uint8_t *)&vswp->if_addr);
 	}
 
 	return;
@@ -3208,7 +3676,8 @@ struct ether_addr *macaddr)
 	port->state = VSW_PORT_INIT;
 
 	if (nids > VSW_PORT_MAX_LDCS) {
-		D2(vswp, "%s: using first of %d ldc ids", __func__, nids);
+		D2(vswp, "%s: using first of %d ldc ids",
+		    __func__, nids);
 		nids = VSW_PORT_MAX_LDCS;
 	}
 
@@ -3235,20 +3704,29 @@ struct ether_addr *macaddr)
 
 	ether_copy(macaddr, &port->p_macaddr);
 
+	if (vswp->switching_setup_done == B_TRUE) {
+		/*
+		 * If the underlying physical device has been setup,
+		 * program the mac address of this port in it.
+		 * Otherwise, port macaddr will be set after the physical
+		 * device is successfully setup by the timeout handler.
+		 */
+		mutex_enter(&vswp->hw_lock);
+		(void) vsw_set_hw(vswp, port, VSW_VNETPORT);
+		mutex_exit(&vswp->hw_lock);
+	}
+
 	WRITE_ENTER(&plist->lockrw);
 
 	/* create the fdb entry for this port/mac address */
 	(void) vsw_add_fdb(vswp, port);
-
-	mutex_enter(&vswp->hw_lock);
-	(void) vsw_set_hw(vswp, port, VSW_VNETPORT);
-	mutex_exit(&vswp->hw_lock);
 
 	/* link it into the list of ports for this vsw instance */
 	prev_port = (vsw_port_t **)(&plist->head);
 	port->p_next = *prev_port;
 	*prev_port = port;
 	plist->num_ports++;
+
 	RW_EXIT(&plist->lockrw);
 
 	/*
@@ -3299,9 +3777,19 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 
 	/* Remove address if was programmed into HW. */
 	mutex_enter(&vswp->hw_lock);
-	(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
+
+	/*
+	 * Port's address may not have been set in hardware. This could
+	 * happen if the underlying physical device is not yet available and
+	 * vsw_setup_switching_timeout() may be in progress.
+	 * We remove its addr from hardware only if it has been set before.
+	 */
+	if (port->addr_set != VSW_ADDR_UNSET)
+		(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
+
 	if (vswp->recfg_reqd)
 		vsw_reconfig_hw(vswp);
+
 	mutex_exit(&vswp->hw_lock);
 
 	if (vsw_port_delete(port)) {
@@ -7608,13 +8096,6 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 
 	D2(vswp, "%s: %d addresses", __func__, mcst_pkt->count);
 
-	mutex_enter(&vswp->mac_lock);
-	if (vswp->mh == NULL) {
-		mutex_exit(&vswp->mac_lock);
-		return (1);
-	}
-	mutex_exit(&vswp->mac_lock);
-
 	for (i = 0; i < mcst_pkt->count; i++) {
 		/*
 		 * Convert address into form that can be used
@@ -7635,21 +8116,19 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * port structure to include this new
 				 * one.
 				 */
-				mcst_p = kmem_alloc(
-				    sizeof (mcst_addr_t), KM_NOSLEEP);
+				mcst_p = kmem_zalloc(sizeof (mcst_addr_t),
+				    KM_NOSLEEP);
 				if (mcst_p == NULL) {
 					DERR(vswp, "%s: unable to alloc mem",
 					    __func__);
+					(void) vsw_del_mcst(vswp,
+					    VSW_VNETPORT, addr, port);
 					return (1);
 				}
 
 				mcst_p->nextp = NULL;
 				mcst_p->addr = addr;
-
-				mutex_enter(&port->mca_lock);
-				mcst_p->nextp = port->mcap;
-				port->mcap = mcst_p;
-				mutex_exit(&port->mca_lock);
+				ether_copy(&mcst_pkt->mca[i], &mcst_p->mca);
 
 				/*
 				 * Program the address into HW. If the addr
@@ -7658,19 +8137,30 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * used when the address is being deleted)
 				 */
 				mutex_enter(&vswp->mac_lock);
-				if ((vswp->mh == NULL) ||
-				    mac_multicst_add(vswp->mh,
-				    (uchar_t *)&mcst_pkt->mca[i])) {
-					mutex_exit(&vswp->mac_lock);
-					cmn_err(CE_WARN, "!vsw%d: unable to "
-					    "add multicast address",
-					    vswp->instance);
-					(void) vsw_del_mcst(vswp, VSW_VNETPORT,
-					    addr, port);
-					vsw_del_addr(VSW_VNETPORT, port, addr);
-					return (1);
+				if (vswp->mh != NULL) {
+					if (mac_multicst_add(vswp->mh,
+					    (uchar_t *)&mcst_pkt->mca[i])) {
+						mutex_exit(&vswp->mac_lock);
+						cmn_err(CE_WARN, "!vsw%d: "
+						    "unable to add multicast "
+						    "address: %s\n",
+						    vswp->instance,
+						    ether_sprintf((void *)
+						    &mcst_p->mca));
+						(void) vsw_del_mcst(vswp,
+						    VSW_VNETPORT, addr, port);
+						kmem_free(mcst_p,
+						    sizeof (*mcst_p));
+						return (1);
+					}
+					mcst_p->mac_added = B_TRUE;
 				}
 				mutex_exit(&vswp->mac_lock);
+
+				mutex_enter(&port->mca_lock);
+				mcst_p->nextp = port->mcap;
+				port->mcap = mcst_p;
+				mutex_exit(&port->mca_lock);
 
 			} else {
 				DERR(vswp, "%s: error adding multicast "
@@ -7689,7 +8179,8 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				    "0x%llx for port %ld", __func__, addr,
 				    port->p_instance);
 
-				vsw_del_addr(VSW_VNETPORT, port, addr);
+				mcst_p = vsw_del_addr(VSW_VNETPORT, port, addr);
+				ASSERT(mcst_p != NULL);
 
 				/*
 				 * Remove the address from HW. The address
@@ -7700,16 +8191,24 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * address.
 				 */
 				mutex_enter(&vswp->mac_lock);
-				if ((vswp->mh == NULL) ||
-				    mac_multicst_remove(vswp->mh,
-				    (uchar_t *)&mcst_pkt->mca[i])) {
-					mutex_exit(&vswp->mac_lock);
-					cmn_err(CE_WARN, "!vsw%d: unable to "
-					    "remove multicast address",
-					    vswp->instance);
-					return (1);
+				if (vswp->mh != NULL && mcst_p->mac_added) {
+					if (mac_multicst_remove(vswp->mh,
+					    (uchar_t *)&mcst_pkt->mca[i])) {
+						mutex_exit(&vswp->mac_lock);
+						cmn_err(CE_WARN, "!vsw%d: "
+						    "unable to remove mcast "
+						    "address: %s\n",
+						    vswp->instance,
+						    ether_sprintf((void *)
+						    &mcst_p->mca));
+						kmem_free(mcst_p,
+						    sizeof (*mcst_p));
+						return (1);
+					}
+					mcst_p->mac_added = B_FALSE;
 				}
 				mutex_exit(&vswp->mac_lock);
+				kmem_free(mcst_p, sizeof (*mcst_p));
 
 			} else {
 				DERR(vswp, "%s: error deleting multicast "
@@ -7876,7 +8375,6 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 				 * just replace it with updated value.
 				 */
 				ment = curr_p->nextp;
-				kmem_free(curr_p, sizeof (mfdb_ent_t));
 				if (ment == NULL) {
 					(void) mod_hash_destroy(vswp->mfdb,
 					    (mod_hash_val_t)addr);
@@ -7891,7 +8389,6 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 				 * replacement, just adjust list pointers.
 				 */
 				prev_p->nextp = curr_p->nextp;
-				kmem_free(curr_p, sizeof (mfdb_ent_t));
 			}
 			break;
 		}
@@ -7904,6 +8401,9 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 
 	D1(vswp, "%s: exit", __func__);
 
+	if (curr_p == NULL)
+		return (1);
+	kmem_free(curr_p, sizeof (mfdb_ent_t));
 	return (0);
 }
 
@@ -7916,20 +8416,43 @@ vsw_del_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg)
 static void
 vsw_del_mcst_port(vsw_port_t *port)
 {
-	mcst_addr_t	*mcst_p = NULL;
+	mcst_addr_t	*mcap = NULL;
 	vsw_t		*vswp = port->p_vswp;
 
 	D1(vswp, "%s: enter", __func__);
 
 	mutex_enter(&port->mca_lock);
-	while (port->mcap != NULL) {
-		(void) vsw_del_mcst(vswp, VSW_VNETPORT,
-		    port->mcap->addr, port);
 
-		mcst_p = port->mcap->nextp;
-		kmem_free(port->mcap, sizeof (mcst_addr_t));
-		port->mcap = mcst_p;
+	while ((mcap = port->mcap) != NULL) {
+
+		port->mcap = mcap->nextp;
+
+		mutex_exit(&port->mca_lock);
+
+		(void) vsw_del_mcst(vswp, VSW_VNETPORT,
+		    mcap->addr, port);
+
+		/*
+		 * Remove the address from HW. The address
+		 * will actually only be removed once the ref
+		 * count within the MAC layer has dropped to
+		 * zero. I.e. we can safely call this fn even
+		 * if other ports are interested in this
+		 * address.
+		 */
+		mutex_enter(&vswp->mac_lock);
+		if (vswp->mh != NULL && mcap->mac_added) {
+			(void) mac_multicst_remove(vswp->mh,
+			    (uchar_t *)&mcap->mca);
+		}
+		mutex_exit(&vswp->mac_lock);
+
+		kmem_free(mcap, sizeof (*mcap));
+
+		mutex_enter(&port->mca_lock);
+
 	}
+
 	mutex_exit(&port->mca_lock);
 
 	D1(vswp, "%s: exit", __func__);
@@ -7966,12 +8489,11 @@ vsw_del_mcst_vsw(vsw_t *vswp)
 	D1(vswp, "%s: exit", __func__);
 }
 
-
 /*
  * Remove the specified address from the list of address maintained
  * in this port node.
  */
-static void
+static mcst_addr_t *
 vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr)
 {
 	vsw_t		*vswp = NULL;
@@ -8005,7 +8527,6 @@ vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr)
 			} else {
 				prev_p->nextp = curr_p->nextp;
 			}
-			kmem_free(curr_p, sizeof (mcst_addr_t));
 			break;
 		} else {
 			prev_p = curr_p;
@@ -8019,6 +8540,8 @@ vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr)
 		mutex_exit(&vswp->mca_lock);
 
 	D1(NULL, "%s: exit", __func__);
+
+	return (curr_p);
 }
 
 /*

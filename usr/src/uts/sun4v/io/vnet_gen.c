@@ -274,7 +274,7 @@ static char id_propname[] = "id";
 static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 0} };
 
 /* Tunables */
-uint32_t vgen_hwd_interval = 1000;	/* handshake watchdog freq in msec */
+uint32_t vgen_hwd_interval = 5;		/* handshake watchdog freq in sec */
 uint32_t vgen_max_hretries = VNET_NUM_HANDSHAKES; /* # of handshake retries */
 uint32_t vgen_ldcwr_retries = 10;	/* max # of ldc_write() retries */
 uint32_t vgen_ldcup_retries = 5;	/* max # of ldc_up() retries */
@@ -819,7 +819,9 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	if (ldcp->hphase == VH_DONE) {
 		/*
 		 * If handshake is done, send a msg to vsw to add/remove
-		 * the multicast address.
+		 * the multicast address. Otherwise, we just update this
+		 * mcast address in our table and the table will be sync'd
+		 * with vsw when handshake completes.
 		 */
 		tagp->vio_msgtype = VIO_TYPE_CTRL;
 		tagp->vio_subtype = VIO_SUBTYPE_INFO;
@@ -834,9 +836,6 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			mutex_exit(&ldcp->cblock);
 			goto vgen_mcast_exit;
 		}
-	} else {
-		/* set the flag to send a msg to vsw after handshake is done */
-		ldcp->need_mcast_sync = B_TRUE;
 	}
 
 	mutex_exit(&ldcp->cblock);
@@ -3291,7 +3290,7 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		 * vgen_ldc_uninit() is invoked(vgen_stop).
 		 */
 		ldcp->htid = timeout(vgen_hwatchdog, (caddr_t)ldcp,
-		    drv_usectohz(vgen_hwd_interval * 1000));
+		    drv_usectohz(vgen_hwd_interval * MICROSEC));
 
 		/* Phase 1 involves negotiating the version */
 		rv = vgen_send_version_negotiate(ldcp);
@@ -3318,10 +3317,11 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		ldcp->hretries = 0;
 		DBG1(vgenp, ldcp, "Handshake Done\n");
 
-		if (ldcp->need_mcast_sync) {
-			/* need to sync multicast table with vsw */
-
-			ldcp->need_mcast_sync = B_FALSE;
+		if (ldcp->portp == vgenp->vsw_portp) {
+			/*
+			 * If this channel(port) is connected to vsw,
+			 * need to sync multicast table with vsw.
+			 */
 			mutex_exit(&ldcp->cblock);
 
 			mutex_enter(&vgenp->lock);

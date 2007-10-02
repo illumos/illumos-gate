@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ extern "C" {
 
 #define	VNET_IPALIGN		6	/* padding for IP header alignment */
 
-#define	VNET_NUM_HANDSHAKES	3	/* # of handshake attempts */
+#define	VNET_NUM_HANDSHAKES	6	/* # of handshake attempts */
 
 /* vnet descriptor */
 typedef struct vnet_public_desc {

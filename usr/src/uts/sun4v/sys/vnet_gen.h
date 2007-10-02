@@ -293,7 +293,6 @@ typedef struct vgen_ldc {
 	uint32_t		flags;		/* flags */
 	boolean_t		need_resched;	/* reschedule tx */
 	boolean_t		need_ldc_reset; /* ldc_reset needed */
-	boolean_t		need_mcast_sync; /* sync mcast table with vsw */
 	uint32_t		hretries;	/* handshake retry count */
 	boolean_t		resched_peer;	/* send tx msg to peer */
 	uint32_t		resched_peer_txi; /* tx index to resched peer */
