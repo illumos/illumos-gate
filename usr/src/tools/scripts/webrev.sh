@@ -175,7 +175,7 @@ bug2url()
 #
 sac2url()
 {
-	if [[ -z $Oflag ]]; then
+	if [[ -z "$Oflag" ]]; then
 	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\1/\2/\3\">\1 \2/\3</a>|g'
 	else
 	    sed -e 's|\([A-Z]\{1,2\}ARC\)[ /]\([0-9]\{4\}\)/\([0-9]\{3\}\)|<a href=\"'$SACURL'/\2/\3\">\1 \2/\3</a>|g'
@@ -1757,7 +1757,7 @@ WDIR=${WDIR:-$CWS/webrev}
 #
 WNAME=${CWS##*/}
 
-if [ ${WDIR%%/*} ]; then
+if [ "${WDIR%%/*}" ]; then
 	WDIR=$PWD/$WDIR
 fi
 
@@ -1802,7 +1802,7 @@ BUGURL='http://monaco.sfbay.sun.com/detail.jsp?cr='
 #
 SACURL='http://sac.eng.sun.com'
 [[ -n $WEBREV_SACURL ]] && SACURL="$WEBREV_SACURL"
-[[ -n $Oflag ]] && \
+[[ -n "$Oflag" ]] && \
     SACURL='http://www.opensolaris.org/os/community/arc/caselog'
 
 rm -f $WDIR/$WNAME.patch
@@ -1886,11 +1886,12 @@ do
 	#
 	# If we're in OpenSolaris mode, we enforce a minor policy:
 	# help to make sure the reviewer doesn't accidentally publish
-	# source which is in usr/closed/*
+	# source which is in usr/closed/* or deleted_files/usr/closed/*
 	#
-	if [[ -n $Oflag ]]; then
+	if [[ -n "$Oflag" ]]; then
 		pclosed=${P##usr/closed/}
-		if [[ $pclosed != $P ]]; then
+		pdeleted=${P##deleted_files/usr/closed/}
+		if [[ "$pclosed" != "$P" || "$pdeleted" != "$P" ]]; then
 			print "*** Omitting closed source for OpenSolaris" \
 			    "mode review"
 			continue
@@ -1928,10 +1929,10 @@ do
 		# child's version is checked out and get the parent's version
 		# with keywords expanded or unexpanded as appropriate.
 		#
-		if [ -f $PWS/$PDIR/SCCS/s.$PF -o \
-		    -f $PWS/$PDIR/SCCS/p.$PF ]; then
+		if [ -f "$PWS/$PDIR/SCCS/s.$PF" -o \
+		    -f "$PWS/$PDIR/SCCS/p.$PF" ]; then
 			rm -f $olddir/$PDIR/$PF
-			if [ -f SCCS/p.$F ]; then
+			if [ -f "SCCS/p.$F" ]; then
 				sccs get -s -p -k $PWS/$PDIR/$PF \
 				    > $olddir/$PDIR/$PF
 			else
@@ -1986,10 +1987,10 @@ do
 
 	rm -f $WDIR/$DIR/$F.patch
 	if [[ -z $rename ]]; then
-		if [ ! -f $ofile ]; then
+		if [ ! -f "$ofile" ]; then
 			diff -u /dev/null $nfile | sh -c "$cleanse_newfile" \
 			    > $WDIR/$DIR/$F.patch
-		elif [ ! -f $nfile ]; then
+		elif [ ! -f "$nfile" ]; then
 			diff -u $ofile /dev/null | sh -c "$cleanse_rmfile" \
 			    > $WDIR/$DIR/$F.patch
 		else
@@ -2107,6 +2108,13 @@ elif [[ -x $CODEREVIEW && -x $PS2PDF ]]; then
 	print "Done."
 else
 	print " Generating PDF: Skipped: missing 'ps2pdf' or 'codereview'"
+fi
+
+# If we're in OpenSolaris mode and there's a closed dir under $WDIR,
+# delete it - prevent accidental publishing of closed source
+
+if [[ -n "$Oflag" ]]; then
+	/usr/bin/find $WDIR -type d -name closed -exec /bin/rm -rf {} \;
 fi
 
 # Now build the index.html file that contains
@@ -2263,10 +2271,11 @@ do
 	print "<b>$P</b> $oldname"
 
 	#
-	# Check for usr/closed
+	# Check for usr/closed and deleted_files/usr/closed
 	#
 	if [ ! -z "$Oflag" ]; then
-		if [[ $P == usr/closed/* ]]; then
+		if [[ $P == usr/closed/* || \
+		    $P == deleted_files/usr/closed/* ]]; then
 			print "&nbsp;&nbsp;<i>Closed source: omitted from" \
 			    "this review</i>"
 		fi
