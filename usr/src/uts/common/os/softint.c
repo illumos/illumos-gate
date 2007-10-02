@@ -168,6 +168,7 @@ static void (*kdi_softcall_func)(void);
 extern void siron_poke_cpu(cpuset_t);
 
 extern void siron(void);
+extern void kdi_siron(void);
 
 void
 softcall_init(void)
@@ -220,8 +221,15 @@ softcall_choose_cpu()
 	 */
 	cp = cplist;
 	do {
+		/*
+		 * Don't select this CPU if :
+		 *   - in cpuset already
+		 *   - CPU is not accepting interrupts
+		 *   - CPU is being offlined
+		 */
 		if (CPU_IN_SET(*softcall_cpuset, cp->cpu_id) ||
-		    (cp->cpu_flags & CPU_ENABLE) == 0)
+		    (cp->cpu_flags & CPU_ENABLE) == 0 ||
+		    (cp == cpu_inmotion))
 			continue;
 
 		/* if CPU is not busy */
@@ -351,7 +359,7 @@ kdi_softcall(void (*func)(void))
 	kdi_softcall_func = func;
 
 	if (softhead == NULL)
-		siron();
+		kdi_siron();
 }
 
 /*
@@ -373,6 +381,19 @@ softint(void)
 	void (*func)();
 	caddr_t arg;
 	int cpu_id = CPU->cpu_id;
+
+	/*
+	 * Don't process softcall queue if current CPU is quiesced or
+	 * offlined. This can happen when a CPU is running pause
+	 * thread but softcall already sent a xcall.
+	 */
+	if (CPU->cpu_flags & (CPU_QUIESCED|CPU_OFFLINE)) {
+		if (softcall_cpuset != NULL &&
+		    CPU_IN_SET(*softcall_cpuset, cpu_id)) {
+			CPUSET_DEL(*softcall_cpuset, cpu_id);
+			goto out;
+		}
+	}
 
 	mutex_enter(&softcall_lock);
 
