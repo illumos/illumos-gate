@@ -252,7 +252,12 @@ typedef enum  {
 #define	TX_STREAM_MIN 512
 #define	TX_FASTDVMA_MIN 1024
 
-#define	NXGE_ERROR_SHOW_MAX	0
+/*
+ * Send repeated FMA ereports or display messages about some non-fatal
+ * hardware errors only the the first NXGE_ERROR_SHOW_MAX -1 times
+ */
+#define	NXGE_ERROR_SHOW_MAX	2
+
 
 /*
  * Defaults

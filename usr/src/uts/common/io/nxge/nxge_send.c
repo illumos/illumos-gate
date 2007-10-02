@@ -253,15 +253,19 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		 * broken into two in the next pass.
 		 */
 		if (len > TX_MAX_TRANSFER_LENGTH - TX_PKT_HEADER_SIZE) {
-			t_mp = dupb(nmp);
-			nmp->b_wptr = nmp->b_rptr +
-				(TX_MAX_TRANSFER_LENGTH - TX_PKT_HEADER_SIZE);
-			t_mp->b_rptr = nmp->b_wptr;
-			t_mp->b_cont = nmp->b_cont;
-			nmp->b_cont = t_mp;
-			len = MBLKL(nmp);
+			if ((t_mp = dupb(nmp)) != NULL) {
+				nmp->b_wptr = nmp->b_rptr +
+				    (TX_MAX_TRANSFER_LENGTH
+				    - TX_PKT_HEADER_SIZE);
+				t_mp->b_rptr = nmp->b_wptr;
+				t_mp->b_cont = nmp->b_cont;
+				nmp->b_cont = t_mp;
+				len = MBLKL(nmp);
+			} else {
+				good_packet = B_FALSE;
+				goto nxge_start_fail2;
+			}
 		}
-
 		tx_desc.value = 0;
 		tx_desc_p = &tx_desc_ring_vp[i];
 #ifdef	NXGE_DEBUG
@@ -827,24 +831,23 @@ nxge_start_fail2:
 			(void) npi_txdma_desc_set_zero(npi_handle, 1);
 			if (tx_msg_p->flags.dma_type == USE_DVMA) {
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"tx_desc_p = %X index = %d",
-					tx_desc_p, tx_ring_p->rd_index));
-				(void) dvma_unload(
-						tx_msg_p->dvma_handle,
-						0, -1);
+				    "tx_desc_p = %X index = %d",
+				    tx_desc_p, tx_ring_p->rd_index));
+				(void) dvma_unload(tx_msg_p->dvma_handle,
+				    0, -1);
 				tx_msg_p->dvma_handle = NULL;
 				if (tx_ring_p->dvma_wr_index ==
-					tx_ring_p->dvma_wrap_mask)
+				    tx_ring_p->dvma_wrap_mask)
 					tx_ring_p->dvma_wr_index = 0;
 				else
 					tx_ring_p->dvma_wr_index++;
 				tx_ring_p->dvma_pending--;
-			} else if (tx_msg_p->flags.dma_type ==
-					USE_DMA) {
+			} else if (tx_msg_p->flags.dma_type == USE_DMA) {
 				if (ddi_dma_unbind_handle(
-					tx_msg_p->dma_handle))
+				    tx_msg_p->dma_handle)) {
 					cmn_err(CE_WARN, "!nxge_start: "
-						"ddi_dma_unbind_handle failed");
+					    "ddi_dma_unbind_handle failed");
+				}
 			}
 			tx_msg_p->flags.dma_type = USE_NONE;
 			cur_index = TXDMA_DESC_NEXT_INDEX(cur_index, 1,

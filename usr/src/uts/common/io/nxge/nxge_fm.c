@@ -150,7 +150,7 @@ nxge_fm_ereport_attr_t nxge_fm_ereport_rdmc[] = {
 	{NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR,	"rxdma_ipp_eop_err",
 						DDI_FM_DEVICE_INVAL_STATE,
 						DDI_SERVICE_LOST},
-	{NXGE_FM_EREPORT_RDMC_COMPLETION_ERR,	"rxdma_completion_err",
+	{NXGE_FM_EREPORT_RDMC_RCR_ERR,		"rxdma_completion_err",
 						DDI_FM_DEVICE_INTERN_UNCORR,
 						DDI_SERVICE_UNAFFECTED},
 	{NXGE_FM_EREPORT_RDMC_CONFIG_ERR,	"rxdma_config_err",
@@ -698,7 +698,7 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			    NULL);
 			}
 			break;
-		case NXGE_FM_EREPORT_RDMC_COMPLETION_ERR:
+		case NXGE_FM_EREPORT_RDMC_RCR_ERR:
 			{
 			uint8_t err_type;
 			err_type = statsp->

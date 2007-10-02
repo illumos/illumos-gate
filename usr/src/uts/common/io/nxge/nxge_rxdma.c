@@ -1035,10 +1035,11 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	/* RBR head */
 	hd_addr.addr = 0;
 	(void) npi_rxdma_rdc_rbr_head_get(handle, rdc, &hd_addr);
-	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
 #if defined(__i386)
+	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
 		(void *)(uint32_t)hd_addr.addr);
 #else
+	printf("nxge_rxdma_regs_dump: got hdptr $%p \n",
 		(void *)hd_addr.addr);
 #endif
 
@@ -1049,10 +1050,11 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	/* RCR tail */
 	tail_addr.addr = 0;
 	(void) npi_rxdma_rdc_rcr_tail_get(handle, rdc, &tail_addr);
-	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
 #if defined(__i386)
+	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
 		(void *)(uint32_t)tail_addr.addr);
 #else
+	printf("nxge_rxdma_regs_dump: got tail ptr $%p \n",
 		(void *)tail_addr.addr);
 #endif
 
@@ -2081,7 +2083,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 	uint16_t		l2_len;
 	uint16_t		skip_len;
 	uint8_t			pktbufsz_type;
-	uint16_t		pktbufsz;
 	uint64_t		rcr_entry;
 	uint64_t		*pkt_buf_addr_pp;
 	uint64_t		*pkt_buf_addr_p;
@@ -2196,8 +2197,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	MUTEX_ENTER(&rcr_p->lock);
 	MUTEX_ENTER(&rx_rbr_p->lock);
-
-	bytes_read = rcr_p->rcvd_pkt_bytes;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"==> (rbr 1) nxge_receive_packet: entry 0x%0llx "
@@ -2351,65 +2350,75 @@ nxge_receive_packet(p_nxge_t nxgep,
 				/* Update error stats */
 			error_disp_cnt = NXGE_ERROR_SHOW_MAX;
 			rdc_stats->errlog.compl_err_type = error_type;
-			NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, NULL,
-				    NXGE_FM_EREPORT_RDMC_COMPLETION_ERR);
 
 			switch (error_type) {
-				case RCR_L2_ERROR:
-					rdc_stats->l2_err++;
-					if (rdc_stats->l2_err <
-						error_disp_cnt)
-						NXGE_ERROR_MSG((nxgep,
-						NXGE_ERR_CTL,
-						" nxge_receive_packet:"
-						" channel %d RCR L2_ERROR",
-						channel));
-					break;
-				case RCR_L4_CSUM_ERROR:
-					error_send_up = B_TRUE;
-					rdc_stats->l4_cksum_err++;
-					if (rdc_stats->l4_cksum_err <
-						error_disp_cnt)
-						NXGE_ERROR_MSG((nxgep,
-						NXGE_ERR_CTL,
-							" nxge_receive_packet:"
-							" channel %d"
-							" RCR L4_CSUM_ERROR",
-							channel));
-					break;
-				case RCR_FFLP_SOFT_ERROR:
-					error_send_up = B_TRUE;
-					rdc_stats->fflp_soft_err++;
-					if (rdc_stats->fflp_soft_err <
-						error_disp_cnt)
-						NXGE_ERROR_MSG((nxgep,
-							NXGE_ERR_CTL,
-							" nxge_receive_packet:"
-							" channel %d"
-							" RCR FFLP_SOFT_ERROR",
-							channel));
-					break;
-				case RCR_ZCP_SOFT_ERROR:
-					error_send_up = B_TRUE;
-					rdc_stats->fflp_soft_err++;
-					if (rdc_stats->zcp_soft_err <
-						error_disp_cnt)
-						NXGE_ERROR_MSG((nxgep,
-							NXGE_ERR_CTL,
-							" nxge_receive_packet:"
-							" Channel %d"
-							" RCR ZCP_SOFT_ERROR",
-							channel));
-					break;
-				default:
+			case RCR_L2_ERROR:
+				rdc_stats->l2_err++;
+				if (rdc_stats->l2_err <
+				    error_disp_cnt) {
+					NXGE_FM_REPORT_ERROR(nxgep,
+					    nxgep->mac.portnum, NULL,
+					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-							" nxge_receive_packet:"
-							" Channel %d"
-							" RCR entry 0x%llx"
-							" error 0x%x",
-							rcr_entry, channel,
-							error_type));
-					break;
+					    " nxge_receive_packet:"
+					    " channel %d RCR L2_ERROR",
+					    channel));
+				}
+				break;
+			case RCR_L4_CSUM_ERROR:
+				error_send_up = B_TRUE;
+				rdc_stats->l4_cksum_err++;
+				if (rdc_stats->l4_cksum_err <
+				    error_disp_cnt) {
+					NXGE_FM_REPORT_ERROR(nxgep,
+					    nxgep->mac.portnum, NULL,
+					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    " nxge_receive_packet:"
+					    " channel %d"
+					    " RCR L4_CSUM_ERROR", channel));
+				}
+				break;
+			case RCR_FFLP_SOFT_ERROR:
+				error_send_up = B_TRUE;
+				rdc_stats->fflp_soft_err++;
+				if (rdc_stats->fflp_soft_err <
+				    error_disp_cnt) {
+					NXGE_FM_REPORT_ERROR(nxgep,
+					    nxgep->mac.portnum, NULL,
+					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
+					NXGE_ERROR_MSG((nxgep,
+					    NXGE_ERR_CTL,
+					    " nxge_receive_packet:"
+					    " channel %d"
+					    " RCR FFLP_SOFT_ERROR", channel));
+				}
+				break;
+			case RCR_ZCP_SOFT_ERROR:
+				error_send_up = B_TRUE;
+				rdc_stats->fflp_soft_err++;
+				if (rdc_stats->zcp_soft_err <
+				    error_disp_cnt)
+					NXGE_FM_REPORT_ERROR(nxgep,
+					    nxgep->mac.portnum, NULL,
+					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    " nxge_receive_packet: Channel %d"
+					    " RCR ZCP_SOFT_ERROR", channel));
+				break;
+			default:
+				rdc_stats->rcr_unknown_err++;
+				if (rdc_stats->rcr_unknown_err
+				    < error_disp_cnt) {
+					NXGE_FM_REPORT_ERROR(nxgep,
+					    nxgep->mac.portnum, NULL,
+					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    " nxge_receive_packet: Channel %d"
+					    " RCR entry 0x%llx error 0x%x",
+					    rcr_entry, channel, error_type));
+				}
+				break;
 			}
 		}
 
@@ -2434,58 +2443,58 @@ nxge_receive_packet(p_nxge_t nxgep,
 	NXGE_DEBUG_MSG((nxgep, RX2_CTL,
 		"==> nxge_receive_packet: DMA sync second "));
 
+	bytes_read = rcr_p->rcvd_pkt_bytes;
 	skip_len = sw_offset_bytes + hdr_size;
 	if (!rx_msg_p->rx_use_bcopy) {
 		/*
 		 * For loaned up buffers, the driver reference count
 		 * will be incremented first and then the free state.
 		 */
-		nmp = nxge_dupb(rx_msg_p, buf_offset, bsize);
-	} else {
-		nmp = nxge_dupb_bcopy(rx_msg_p, buf_offset + skip_len, l2_len);
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"==> nxge_receive_packet: use bcopy "
-			"rbr consumed %d "
-			"pktbufsz_type %d "
-			"offset %d "
-			"hdr_size %d l2_len %d "
-			"nmp->b_rptr $%p",
-			rx_rbr_p->rbr_consumed,
-			pktbufsz_type,
-			buf_offset, hdr_size, l2_len,
-			nmp->b_rptr));
-	}
-	if (nmp != NULL) {
-		pktbufsz = nxge_get_pktbuf_size(nxgep, pktbufsz_type,
-			rx_rbr_p->rbr_cfgb);
-		if (!rx_msg_p->rx_use_bcopy) {
+		if ((nmp = nxge_dupb(rx_msg_p, buf_offset, bsize)) != NULL) {
 			if (first_entry) {
-				bytes_read = 0;
 				nmp->b_rptr = &nmp->b_rptr[skip_len];
-				if (l2_len > pktbufsz - skip_len)
-					nmp->b_wptr = &nmp->b_rptr[pktbufsz
-						- skip_len];
-				else
+				if (l2_len < bsize - skip_len) {
 					nmp->b_wptr = &nmp->b_rptr[l2_len];
+				} else {
+					nmp->b_wptr = &nmp->b_rptr[bsize
+					    - skip_len];
+				}
 			} else {
-				if (l2_len - bytes_read > pktbufsz)
-					nmp->b_wptr = &nmp->b_rptr[pktbufsz];
-				else
+				if (l2_len - bytes_read < bsize) {
 					nmp->b_wptr =
 					    &nmp->b_rptr[l2_len - bytes_read];
+				} else {
+					nmp->b_wptr = &nmp->b_rptr[bsize];
+				}
 			}
-			bytes_read += nmp->b_wptr - nmp->b_rptr;
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-				"==> nxge_receive_packet after dupb: "
-				"rbr consumed %d "
-				"pktbufsz_type %d "
-				"nmp $%p rptr $%p wptr $%p "
-				"buf_offset %d bzise %d l2_len %d skip_len %d",
-				rx_rbr_p->rbr_consumed,
-				pktbufsz_type,
-				nmp, nmp->b_rptr, nmp->b_wptr,
-				buf_offset, bsize, l2_len, skip_len));
 		}
+	} else {
+		if (first_entry) {
+			nmp = nxge_dupb_bcopy(rx_msg_p, buf_offset + skip_len,
+			    l2_len < bsize - skip_len ?
+			    l2_len : bsize - skip_len);
+		} else {
+			nmp = nxge_dupb_bcopy(rx_msg_p, buf_offset,
+			    l2_len - bytes_read < bsize ?
+			    l2_len - bytes_read : bsize);
+		}
+	}
+	if (nmp != NULL) {
+		if (first_entry)
+			bytes_read  = nmp->b_wptr - nmp->b_rptr;
+		else
+			bytes_read += nmp->b_wptr - nmp->b_rptr;
+
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "==> nxge_receive_packet after dupb: "
+		    "rbr consumed %d "
+		    "pktbufsz_type %d "
+		    "nmp $%p rptr $%p wptr $%p "
+		    "buf_offset %d bzise %d l2_len %d skip_len %d",
+		    rx_rbr_p->rbr_consumed,
+		    pktbufsz_type,
+		    nmp, nmp->b_rptr, nmp->b_wptr,
+		    buf_offset, bsize, l2_len, skip_len));
 	} else {
 		cmn_err(CE_WARN, "!nxge_receive_packet: "
 			"update stats (error)");
@@ -2500,12 +2509,9 @@ nxge_receive_packet(p_nxge_t nxgep,
 		return;
 	}
 
-	rcr_p->rcvd_pkt_bytes = bytes_read;
-
 	if (buffer_free == B_TRUE) {
 		rx_msg_p->free = B_TRUE;
 	}
-
 	/*
 	 * ERROR, FRAG and PKT_TYPE are only reported
 	 * in the first entry.
@@ -2513,8 +2519,17 @@ nxge_receive_packet(p_nxge_t nxgep,
 	 * L4 checksum is OK.
 	 */
 	is_valid = (nmp != NULL);
-	rdc_stats->ibytes += l2_len;
-	rdc_stats->ipackets++;
+	if (first_entry) {
+		rdc_stats->ipackets++; /* count only 1st seg for jumbo */
+		rdc_stats->ibytes += skip_len + l2_len < bsize ?
+		l2_len : bsize;
+	} else {
+		rdc_stats->ibytes += l2_len - bytes_read < bsize ?
+		    l2_len - bytes_read : bsize;
+	}
+
+	rcr_p->rcvd_pkt_bytes = bytes_read;
+
 	MUTEX_EXIT(&rx_rbr_p->lock);
 	MUTEX_EXIT(&rcr_p->lock);
 
@@ -2529,8 +2544,9 @@ nxge_receive_packet(p_nxge_t nxgep,
 		if (first_entry) {
 			*mp = nmp;
 			*mp_cont = NULL;
-		} else
+		} else {
 			*mp_cont = nmp;
+		}
 	}
 
 	/*
@@ -4521,7 +4537,7 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 		break;
 	case NXGE_FM_EREPORT_RDMC_DCF_ERR:
 		break;
-	case NXGE_FM_EREPORT_RDMC_COMPLETION_ERR:
+	case NXGE_FM_EREPORT_RDMC_RCR_ERR:
 		break;
 	}
 }

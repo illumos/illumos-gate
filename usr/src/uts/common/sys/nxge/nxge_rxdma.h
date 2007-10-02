@@ -120,6 +120,7 @@ typedef struct _nxge_rx_ring_stats_t {
 	uint32_t	l4_cksum_err;
 	uint32_t	fflp_soft_err;
 	uint32_t	zcp_soft_err;
+	uint32_t	rcr_unknown_err;
 	uint32_t	dcf_err;
 	uint32_t 	rbr_tmout;
 	uint32_t 	rsp_cnt_err;

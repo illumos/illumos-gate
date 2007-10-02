@@ -293,6 +293,8 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	p_ipp_errlog_t errlogp;
 	boolean_t rxport_fatal = B_FALSE;
 	nxge_status_t status = NXGE_OK;
+	uint8_t cnt8;
+	uint16_t cnt16;
 
 	handle = nxgep->npi_handle;
 	statsp = (p_nxge_ipp_stats_t)&nxgep->statsp->ipp_stats;
@@ -389,6 +391,8 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
+		/* Clear the IPP_BAD_CS_CNT counter by reading it */
+		(void) npi_ipp_get_cs_err_count(handle, portn, &cnt16);
 		statsp->bad_cs_cnt += IPP_BAD_CS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 			NXGE_FM_EREPORT_IPP_BAD_CS_MX);
@@ -398,6 +402,8 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 				"nxge_ipp_err_evnts: bad_cs_max\n"));
 	}
 	if (istatus.bits.w0.pkt_discard_cnt_ovfl) {
+		/* Clear the IPP_PKT_DIS counter by reading it */
+		(void) npi_ipp_get_pkt_dis_count(handle, portn, &cnt16);
 		statsp->pkt_dis_cnt += IPP_PKT_DIS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 			NXGE_FM_EREPORT_IPP_PKT_DIS_MX);
@@ -406,7 +412,17 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				"nxge_ipp_err_evnts: pkt_dis_max\n"));
 	}
-
+	if (istatus.bits.w0.ecc_err_cnt_ovfl) {
+		/* Clear the IPP_ECC counter by reading it */
+		(void) npi_ipp_get_ecc_err_count(handle, portn, &cnt8);
+		statsp->ecc_err_cnt += IPP_ECC_CNT_MASK;
+		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			NXGE_FM_EREPORT_IPP_ECC_ERR_MAX);
+		if (statsp->ecc_err_cnt < (IPP_MAX_ERR_SHOW *
+				IPP_ECC_CNT_MASK))
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				"nxge_ipp_err_evnts: pkt_ecc_err_max\n"));
+	}
 	/*
 	 * Making sure that error source is cleared if this is an injected
 	 * error.
@@ -615,7 +631,7 @@ fail:
 
 /* ARGSUSED */
 /*
- *    A hardware bug may cause faked ECCUEs (ECC Uncorrectable Error).
+ *    A hardware bug may cause fake ECCUEs (ECC Uncorrectable Error).
  * This function checks if a ECCUE is real(valid) or not.  It is not
  * real if rd_ptr == wr_ptr.
  *    The hardware module that has the bug is used not only by the IPP
