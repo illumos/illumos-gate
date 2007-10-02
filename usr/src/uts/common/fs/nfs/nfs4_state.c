@@ -2298,7 +2298,8 @@ rfs4_findfile(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 		mutex_exit(&vp->v_lock);
 		if (fp) {
 			rfs4_dbe_lock(fp->dbe);
-			if (rfs4_dbe_is_invalid(fp->dbe)) {
+			if (rfs4_dbe_is_invalid(fp->dbe) ||
+			    (rfs4_dbe_refcnt(fp->dbe) == 0)) {
 				rfs4_dbe_unlock(fp->dbe);
 				fp = NULL;
 			} else {
@@ -2331,7 +2332,8 @@ rfs4_findfile_withlock(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 		mutex_exit(&vp->v_lock);
 		if (fp) {
 			rfs4_dbe_lock(fp->dbe);
-			if (rfs4_dbe_is_invalid(fp->dbe)) {
+			if (rfs4_dbe_is_invalid(fp->dbe) ||
+			    (rfs4_dbe_refcnt(fp->dbe) == 0)) {
 				rfs4_dbe_unlock(fp->dbe);
 				fp = NULL;
 			} else {
