@@ -114,31 +114,37 @@ record_error(char *ep, char *ebuf, char *fmt, ...)
 	err_ptr = ep;
 
 	va_start(ap, fmt);
-	(void) vsnprintf(tmp_buff, sizeof (tmp_buff), fmt, ap);
+	length = vsnprintf(tmp_buff, sizeof (tmp_buff), fmt, ap);
 	va_end(ap);
 
-	if (ep == NULL) {
-		/*
-		 * This is the first error to record, get a
-		 * new buffer, copy in the command line that
-		 * triggered this error/warning.
-		 */
-		if (ebuf != NULL) {
-			length = strlen(ebuf);
-			err_ptr = calloc(length, sizeof (char));
-			if (err_ptr == NULL)
-				Bail("calloc() failed");
-			(void) strlcpy(err_ptr, ebuf, length);
-		}
-	} else {
-		length = strlen(ep);
-	}
-	length += strlen(tmp_buff);
 	/* There is a new line character */
 	length++;
-	err_ptr = realloc(err_ptr, length);
+
+	if (ep == NULL) {
+		if (ebuf != NULL)
+			length += strlen(ebuf);
+	} else  {
+		length += strlen(ep);
+	}
+
+	if (err_ptr == NULL)
+		err_ptr = calloc(length, sizeof (char));
+	else
+		err_ptr = realloc(err_ptr, length);
+
 	if (err_ptr == NULL)
 		Bail("realloc() failure");
+
+	/*
+	 * If (ep == NULL) then this is the first error to record,
+	 * copy in the command line that triggered this error/warning.
+	 */
+	if (ep == NULL && ebuf != NULL)
+		(void) strlcpy(err_ptr, ebuf, length);
+
+	/*
+	 * Now the actual error.
+	 */
 	(void) strlcat(err_ptr, tmp_buff, length);
 	return (err_ptr);
 }
@@ -204,6 +210,7 @@ handle_errors(char *ep, char *ebuf, boolean_t fatal, boolean_t done)
 		}
 		return;
 	}
+	EXIT_FATAL(NULL);
 }
 
 /*
