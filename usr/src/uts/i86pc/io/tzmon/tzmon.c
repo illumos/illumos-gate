@@ -128,7 +128,7 @@ extern	struct	mod_ops mod_driverops;
 
 static	struct modldrv modldrv = {
 	&mod_driverops,
-	"ACPI Thermal Zone Monitor %I%",
+	"ACPI Thermal Zone Monitor",
 	&tzmon_ops,
 };
 
@@ -677,7 +677,7 @@ tzmon_eval_zone(thermal_zone_t *tzp)
 	if (tzp->hot > 0 && tmp >= tzp->hot) {
 		cmn_err(CE_WARN,
 		    "tzmon: Thermal zone (%s) is too hot (%d C); "
-			"initiating shutdown\n",
+		    "initiating shutdown\n",
 		    (char *)tzp->zone_name, K_TO_C(tmp));
 
 		tzmon_do_shutdown();
@@ -687,7 +687,7 @@ tzmon_eval_zone(thermal_zone_t *tzp)
 	if (tzp->crt > 0 && tmp >= tzp->crt) {
 		cmn_err(CE_WARN,
 		    "tzmon: Thermal zone (%s) is critically hot (%d C); "
-			"initiating rapid shutdown\n",
+		    "initiating rapid shutdown\n",
 		    (char *)tzp->zone_name, K_TO_C(tmp));
 
 		/* shut down (fairly) immediately */
