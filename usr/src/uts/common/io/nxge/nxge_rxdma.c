@@ -1654,6 +1654,8 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	int ref_cnt;
 	boolean_t free_state = B_FALSE;
 
+	rx_rbr_ring_t *ring = rx_msg_p->rx_rbr_p;
+
 	NXGE_DEBUG_MSG((NULL, MEM2_CTL, "==> nxge_freeb"));
 	NXGE_DEBUG_MSG((NULL, MEM2_CTL,
 		"nxge_freeb:rx_msg_p = $%p (block pending %d)",
@@ -1680,6 +1682,20 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 		}
 
 		KMEM_FREE(rx_msg_p, sizeof (rx_msg_t));
+
+		/* Decrement the receive buffer ring's reference count, too. */
+		atomic_dec_32(&ring->rbr_ref_cnt);
+
+		/*
+		 * Free the receive buffer ring, iff
+		 * 1. all the receive buffers have been freed
+		 * 2. and we are in the proper state (that is,
+		 *    we are not UNMAPPING).
+		 */
+		if (ring->rbr_ref_cnt == 0 &&
+		    ring->rbr_state == RBR_UNMAPPED) {
+			KMEM_FREE(ring, sizeof (*ring));
+		}
 		return;
 	}
 
@@ -1689,8 +1705,8 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	if (free_state && (ref_cnt == 1)) {
 		NXGE_DEBUG_MSG((NULL, RX_CTL,
 		    "nxge_freeb: post page $%p:", rx_msg_p));
-		nxge_post_page(rx_msg_p->nxgep, rx_msg_p->rx_rbr_p,
-		    rx_msg_p);
+		if (ring->rbr_state == RBR_POSTING)
+			nxge_post_page(rx_msg_p->nxgep, ring, rx_msg_p);
 	}
 
 	NXGE_DEBUG_MSG((NULL, MEM2_CTL, "<== nxge_freeb"));
@@ -3498,8 +3514,7 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		goto nxge_map_rxdma_channel_buf_ring_exit;
 	}
 
-	rbrp = (p_rx_rbr_ring_t)
-		KMEM_ZALLOC(sizeof (rx_rbr_ring_t), KM_SLEEP);
+	rbrp = (p_rx_rbr_ring_t)KMEM_ZALLOC(sizeof (*rbrp), KM_SLEEP);
 
 	size = nmsgs * sizeof (p_rx_msg_t);
 	rx_msg_ring = KMEM_ZALLOC(size, KM_SLEEP);
@@ -3604,6 +3619,8 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 
 			mblk_p = rx_msg_p->rx_mblk_p;
 			mblk_p->b_wptr = mblk_p->b_rptr + bsize;
+
+			rbrp->rbr_ref_cnt++;
 			index++;
 			rx_msg_p->buf_dma.dma_channel = channel;
 		}
@@ -3625,6 +3642,11 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		" nxge_map_rxdma_channel_buf_ring: "
 		"channel %d done buf info init", channel));
+
+	/*
+	 * Finally, permit nxge_freeb() to call nxge_post_page().
+	 */
+	rbrp->rbr_state = RBR_POSTING;
 
 	*rbr_p = rbrp;
 	goto nxge_map_rxdma_channel_buf_ring_exit;
@@ -3716,11 +3738,33 @@ nxge_unmap_rxdma_channel_buf_ring(p_nxge_t nxgep,
 		}
 	}
 
+	/*
+	 * We no longer may use the mutex <post_lock>. By setting
+	 * <rbr_state> to anything but POSTING, we prevent
+	 * nxge_post_page() from accessing a dead mutex.
+	 */
+	rbr_p->rbr_state = RBR_UNMAPPING;
 	MUTEX_DESTROY(&rbr_p->post_lock);
+
 	MUTEX_DESTROY(&rbr_p->lock);
 	KMEM_FREE(ring_info, sizeof (rxring_info_t));
 	KMEM_FREE(rx_msg_ring, size);
-	KMEM_FREE(rbr_p, sizeof (rx_rbr_ring_t));
+
+	if (rbr_p->rbr_ref_cnt == 0) {
+		/* This is the normal state of affairs. */
+		KMEM_FREE(rbr_p, sizeof (*rbr_p));
+	} else {
+		/*
+		 * Some of our buffers are still being used.
+		 * Therefore, tell nxge_freeb() this ring is
+		 * unmapped, so it may free <rbr_p> for us.
+		 */
+		rbr_p->rbr_state = RBR_UNMAPPED;
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "unmap_rxdma_buf_ring: %d %s outstanding.",
+		    rbr_p->rbr_ref_cnt,
+		    rbr_p->rbr_ref_cnt == 1 ? "msg" : "msgs"));
+	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
 		"<== nxge_unmap_rxdma_channel_buf_ring"));

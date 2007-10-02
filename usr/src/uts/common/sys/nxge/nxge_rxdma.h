@@ -301,6 +301,13 @@ typedef struct _rxring_info_t {
 } rxring_info_t, *p_rxring_info_t;
 
 
+typedef enum {
+	RBR_POSTING = 1,	/* We may post rx buffers. */
+	RBR_UNMAPPING,		/* We are in the process of unmapping. */
+	RBR_UNMAPPED		/* The ring is unmapped. */
+} rbr_state_t;
+
+
 /* Receive Buffer Block Ring */
 typedef struct _rx_rbr_ring_t {
 	nxge_os_dma_common_t	rbr_desc;
@@ -381,6 +388,15 @@ typedef struct _rx_rbr_ring_t {
 	uint_t 			rbr_threshold_lo;
 	nxge_rxbuf_type_t	rbr_bufsize_type;
 	boolean_t		rbr_use_bcopy;
+
+	/*
+	 * <rbr_ref_cnt> is a count of those receive buffers which
+	 * have been loaned to the kernel.  We will not free this
+	 * ring until the reference count reaches zero (0).
+	 */
+	uint32_t		rbr_ref_cnt;
+	rbr_state_t		rbr_state; /* POSTING, etc */
+
 } rx_rbr_ring_t, *p_rx_rbr_ring_t;
 
 /* Receive Mailbox */
