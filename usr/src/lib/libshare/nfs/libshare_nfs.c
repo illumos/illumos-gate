@@ -1188,7 +1188,7 @@ count_security(sa_optionset_t opts)
  * at a time.
  */
 
-static void
+static int
 nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
 			sa_property_t prop, int sep)
 {
@@ -1197,6 +1197,7 @@ nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
 	int curlen;
 	char *buff = *rbuff;
 	size_t buffsize = *rbuffsize;
+	int printed = B_FALSE;
 
 	name = sa_get_property_attr(prop, "type");
 	value = sa_get_property_attr(prop, "value");
@@ -1214,11 +1215,16 @@ nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
 		 */
 		switch (gettype(name)) {
 		case OPT_TYPE_BOOLEAN:
+			/*
+			 * For NFS, boolean value of FALSE means it
+			 * doesn't show up in the option list at all.
+			 */
 			if (value != NULL && strcasecmp(value, "false") == 0)
-				*name = '\0';
-			if (value != NULL)
+				goto skip;
+			if (value != NULL) {
 				sa_free_attr_string(value);
-			value = NULL;
+				value = NULL;
+			}
 			break;
 		case OPT_TYPE_ACCLIST:
 			if (value != NULL && strcmp(value, "*") == 0) {
@@ -1254,12 +1260,14 @@ nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
 			}
 			*rbuff = buff;
 			*rbuffsize = buffsize;
-			if (buff == NULL) {
-				return;
-			}
+			if (buff == NULL)
+				goto skip;
+
 		}
+
 		if (buff == NULL)
-			return;
+			goto skip;
+
 		if (value == NULL) {
 			(void) snprintf(buff + curlen, buffsize - curlen,
 			    "%s%s", sep ? "," : "",
@@ -1269,11 +1277,14 @@ nfs_sprint_option(char **rbuff, size_t *rbuffsize, size_t incr,
 			    "%s%s=%s", sep ? "," : "",
 			    name, value != NULL ? value : "");
 		}
+		printed = B_TRUE;
 	}
+skip:
 	if (name != NULL)
 		sa_free_attr_string(name);
 	if (value != NULL)
 		sa_free_attr_string(value);
+	return (printed);
 }
 
 /*
@@ -1324,8 +1335,9 @@ nfs_format_options(sa_group_t group, int hier)
 			 * of these that were also in
 			 * optdefault
 			 */
-			nfs_sprint_option(&buff, &buffsize, OPT_CHUNK,
-			    prop, sep);
+			if (nfs_sprint_option(&buff, &buffsize, OPT_CHUNK,
+			    prop, sep))
+				sep = 1;
 			if (buff == NULL) {
 				/*
 				 * buff could become NULL if there
@@ -1342,7 +1354,6 @@ nfs_format_options(sa_group_t group, int hier)
 					    options);
 				return (buff);
 			}
-			sep = 1;
 		}
 	}
 	secoptions = (sa_optionset_t)sa_get_all_security_types(group,
@@ -1359,21 +1370,23 @@ nfs_format_options(sa_group_t group, int hier)
 				if (sectype != NULL) {
 					prop = sa_create_property(
 					    "sec", sectype);
-					nfs_sprint_option(&buff,
-					    &buffsize, OPT_CHUNK,
-					    prop, sep);
+					if (prop == NULL)
+						goto err;
+					if (nfs_sprint_option(&buff,
+					    &buffsize, OPT_CHUNK, prop, sep))
+						sep = 1;
 					(void) sa_remove_property(prop);
-					sep = 1;
+					if (buff == NULL)
+						goto err;
 				}
 				for (prop = sa_get_property(security,
 				    NULL); prop != NULL;
 				    prop = sa_get_next_property(prop)) {
-					nfs_sprint_option(&buff,
-					    &buffsize, OPT_CHUNK, prop,
-					    sep);
+					if (nfs_sprint_option(&buff,
+					    &buffsize, OPT_CHUNK, prop, sep))
+						sep = 1;
 					if (buff == NULL)
 						goto err;
-					sep = 1;
 				}
 				sa_free_derived_optionset(security);
 			}
@@ -2070,10 +2083,9 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 					    nfsl_findconfig(configlist, value,
 					    &error) == NULL) {
 						ret = SA_BAD_VALUE;
-					} else {
-						nfsl_freeconfig_list(
-						    &configlist);
 					}
+					/* Must always free when done */
+					nfsl_freeconfig_list(&configlist);
 				} else {
 					ret = SA_CONFIG_ERR;
 				}
@@ -2093,7 +2105,10 @@ nfs_validate_property(sa_property_t property, sa_optionset_t parent)
 			default:
 				break;
 			}
-			sa_free_attr_string(value);
+
+			if (value != NULL)
+				sa_free_attr_string(value);
+
 			if (ret == SA_OK && optdefs[optindex].check != NULL) {
 				/* do the property specific check */
 				ret = optdefs[optindex].check(property);
@@ -2206,7 +2221,7 @@ struct proto_option_defs {
  * the protoset holds the defined options so we don't have to read
  * them multiple times
  */
-sa_protocol_properties_t protoset;
+static sa_protocol_properties_t protoset;
 
 static int
 findprotoopt(char *name, int whichname)
@@ -2397,7 +2412,10 @@ add_defaults()
 static void
 free_protoprops()
 {
-	xmlFreeNode(protoset);
+	if (protoset != NULL) {
+		xmlFreeNode(protoset);
+		protoset = NULL;
+	}
 }
 
 /*
