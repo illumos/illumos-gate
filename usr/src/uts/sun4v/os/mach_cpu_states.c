@@ -198,15 +198,16 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 				break;
 			}
 		}
-	}
 
-	/*
-	 * If LDoms is running, we must save the boot string before we
-	 * enter restricted mode.  This is possible only if we are not
-	 * being called from panic.
-	 */
-	if (domaining_enabled() && invoke_cb)
-		store_boot_cmd(bootstr);
+		/*
+		 * If LDoms is running, we must save the boot string
+		 * before we enter restricted mode.  This is possible
+		 * only if we are not being called from panic.
+		 */
+		if (domaining_enabled() && invoke_cb)
+			store_boot_cmd(bootstr);
+
+	}
 
 	/*
 	 * At a high interrupt level we can't:
