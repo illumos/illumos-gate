@@ -1384,7 +1384,6 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	 * the packet out without ttl or IPSec processing.
 	 */
 	switch (ire->ire_type) {
-	case IRE_IF_NORESOLVER:
 	case IRE_CACHE:
 		if (sire != NULL) {
 			UPDATE_OB_PKT_COUNT(sire);
@@ -1393,6 +1392,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		}
 		ire_cache = ire;
 		break;
+	case IRE_IF_NORESOLVER:
 	case IRE_IF_RESOLVER:
 		/*
 		 * Call ire_forward(). This function
