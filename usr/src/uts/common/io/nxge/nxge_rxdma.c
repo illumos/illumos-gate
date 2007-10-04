@@ -128,9 +128,6 @@ nxge_rxdma_fatal_err_recover(p_nxge_t, uint16_t);
 nxge_status_t
 nxge_rx_port_fatal_err_recover(p_nxge_t);
 
-static uint16_t
-nxge_get_pktbuf_size(p_nxge_t nxgep, int bufsz_type, rbr_cfig_b_t rbr_cfgb);
-
 nxge_status_t
 nxge_init_rxdma_channels(p_nxge_t nxgep)
 {
@@ -2538,7 +2535,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 	if (first_entry) {
 		rdc_stats->ipackets++; /* count only 1st seg for jumbo */
 		rdc_stats->ibytes += skip_len + l2_len < bsize ?
-		l2_len : bsize;
+		    l2_len : bsize;
 	} else {
 		rdc_stats->ibytes += l2_len - bytes_read < bsize ?
 		    l2_len - bytes_read : bsize;
@@ -4584,99 +4581,4 @@ nxge_rxdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 	case NXGE_FM_EREPORT_RDMC_RCR_ERR:
 		break;
 	}
-}
-
-
-static uint16_t
-nxge_get_pktbuf_size(p_nxge_t nxgep, int bufsz_type, rbr_cfig_b_t rbr_cfgb)
-{
-	uint16_t sz = RBR_BKSIZE_8K_BYTES;
-
-	switch (bufsz_type) {
-	case RCR_PKTBUFSZ_0:
-		switch (rbr_cfgb.bits.ldw.bufsz0) {
-		case RBR_BUFSZ0_256B:
-			sz = RBR_BUFSZ0_256_BYTES;
-			break;
-		case RBR_BUFSZ0_512B:
-			sz = RBR_BUFSZ0_512B_BYTES;
-			break;
-		case RBR_BUFSZ0_1K:
-			sz = RBR_BUFSZ0_1K_BYTES;
-			break;
-		case RBR_BUFSZ0_2K:
-			sz = RBR_BUFSZ0_2K_BYTES;
-			break;
-		default:
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_get_pktbug_size: bad bufsz0"));
-			break;
-		}
-		break;
-	case RCR_PKTBUFSZ_1:
-		switch (rbr_cfgb.bits.ldw.bufsz1) {
-		case RBR_BUFSZ1_1K:
-			sz = RBR_BUFSZ1_1K_BYTES;
-			break;
-		case RBR_BUFSZ1_2K:
-			sz = RBR_BUFSZ1_2K_BYTES;
-			break;
-		case RBR_BUFSZ1_4K:
-			sz = RBR_BUFSZ1_4K_BYTES;
-			break;
-		case RBR_BUFSZ1_8K:
-			sz = RBR_BUFSZ1_8K_BYTES;
-			break;
-		default:
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_get_pktbug_size: bad bufsz1"));
-			break;
-		}
-		break;
-	case RCR_PKTBUFSZ_2:
-		switch (rbr_cfgb.bits.ldw.bufsz2) {
-		case RBR_BUFSZ2_2K:
-			sz = RBR_BUFSZ2_2K_BYTES;
-			break;
-		case RBR_BUFSZ2_4K:
-			sz = RBR_BUFSZ2_4K_BYTES;
-			break;
-		case RBR_BUFSZ2_8K:
-			sz = RBR_BUFSZ2_8K_BYTES;
-			break;
-		case RBR_BUFSZ2_16K:
-			sz = RBR_BUFSZ2_16K_BYTES;
-			break;
-		default:
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_get_pktbug_size: bad bufsz2"));
-			break;
-		}
-		break;
-	case RCR_SINGLE_BLOCK:
-		switch (rbr_cfgb.bits.ldw.bksize) {
-		case BKSIZE_4K:
-			sz = RBR_BKSIZE_4K_BYTES;
-			break;
-		case BKSIZE_8K:
-			sz = RBR_BKSIZE_8K_BYTES;
-			break;
-		case BKSIZE_16K:
-			sz = RBR_BKSIZE_16K_BYTES;
-			break;
-		case BKSIZE_32K:
-			sz = RBR_BKSIZE_32K_BYTES;
-			break;
-		default:
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_get_pktbug_size: bad bksize"));
-			break;
-		}
-		break;
-	default:
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"nxge_get_pktbug_size: bad bufsz_type"));
-		break;
-	}
-	return (sz);
 }
