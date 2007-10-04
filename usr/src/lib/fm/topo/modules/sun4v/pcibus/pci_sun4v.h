@@ -72,9 +72,9 @@ physnm_t netra_t5220_pnms[] = {
 	{   0, "MB/RISER0/PCIE0" },
 	{   1, "MB/RISER1/PCIE1" },
 	{   2, "MB/RISER2/PCIE2" },
-	{   3, "MB/PCI_MEZZ/PCIE3" },
-	{   4, "MB/PCI_MEZZ/PCIX1" },
-	{   5, "MB/PCI_MEZZ/PCIX2" }
+	{   3, "MB/PCI_MEZZ/PCIX3" },
+	{   4, "MB/PCI_MEZZ/PCIX4" },
+	{   5, "MB/PCI_MEZZ/PCIE5" }
 };
 
 pphysnm_t plat_pnames[] = {
