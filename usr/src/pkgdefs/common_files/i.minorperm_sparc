@@ -93,7 +93,6 @@ clone:ce			0600 root sys 0666 root sys	/dev/ce
 clone:eri			0600 root sys 0666 root sys	/dev/eri
 clone:ge			0600 root sys 0666 root sys	/dev/ge
 clone:hme			0600 root sys 0666 root sys	/dev/hme
-clone:le			0600 root sys 0666 root sys	/dev/le
 clone:qfe			0600 root sys 0666 root sys	/dev/qfe
 clone:bge			0600 root sys 0666 root sys	/dev/bge
 clone:rge			0600 root sys 0666 root sys	/dev/rge
@@ -104,7 +103,10 @@ clone:chxge			0600 root sys 0666 root sys	/dev/chxge
 clone:vsw			0600 root sys 0666 root sys	/dev/vsw
 clone:vnet			0600 root sys 0666 root sys	/dev/vnet
 clone:pcwl                      0600 root sys 0666 root sys     /dev/pcwl
-clone:pcan                      0600 root sys 0666 root sys     /dev/pcan
+clone:pcan			0600 root sys 0666 root sys     /dev/pcan
+clone:afe			0600 root sys 0666 root sys     /dev/afe
+clone:mxfe			0600 root sys 0666 root sys     /dev/mxfe
+clone:rtls			0600 root sys 0666 root sys     /dev/rtls
 bge:*				0600 root sys 0666 root sys	/dev/bge*
 rge:*				0600 root sys 0666 root sys	/dev/rge*
 xge:*				0600 root sys 0666 root sys	/dev/xge*
@@ -119,6 +121,9 @@ clone:dmfe			0600 root sys 0666 root sys	/dev/dmfe
 dmfe:*				0600 root sys 0666 root sys	/dev/dmfe*
 clone:pcelx			0600 root sys 0666 root sys	/dev/pcelx
 pcelx:*				0600 root sys 0666 root sys	/dev/pcelx*
+afe:*				0600 root sys 0666 root sys	/dev/afe*
+mxfe:*				0600 root sys 0666 root sys	/dev/mxfe*
+rtls:*				0600 root sys 0666 root sys	/dev/rtls*
 ipf:*				0600 root sys 0666 root sys	/dev/ipf
 pfil:*				0600 root sys 0666 root sys	/dev/pfil
 scsi_vhci:devctl	0600 root sys 0666 root sys /devices/scsi_vhci:devctl
@@ -172,6 +177,7 @@ clone:rts
 clone:ipsecah
 clone:ipsecesp
 clone:keysock
+clone:le
 su:*
 profile:profile
 clone:qe
@@ -197,7 +203,6 @@ EOF
 
 make_add_list() {
 cat > /tmp/add.$$ << EOF
-clone:le
 clone:llc1
 stc:*
 mcpzsa:*
@@ -278,6 +283,9 @@ clone:vsw
 clone:vnet
 clone:pcwl
 clone:pcan
+clone:afe
+clone:mxfe
+clone:rtls
 bge:*
 rge:*
 xge:*
@@ -288,6 +296,9 @@ vsw:*
 vnet:*
 pcwl:*
 pcan:*
+afe:*
+mxfe:*
+rtls:*
 clone:dmfe
 dmfe:*
 clone:pcelx

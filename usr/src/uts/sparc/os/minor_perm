@@ -20,7 +20,6 @@ ipsecesp:ipsecesp 0666 root sys
 keysock:keysock 0666 root sys
 clone:loop 0666 root sys
 clone:ptmx 0666 root sys
-clone:le 0666 root sys
 clone:llc1 0666 root sys
 rts:rts 0666 root sys
 tcp:tcp 0666 root sys
@@ -159,6 +158,9 @@ clone:pcwl 0666 root sys
 clone:pcan 0666 root sys
 clone:vsw 0666 root sys
 clone:vnet 0666 root sys
+clone:afe 0666 root sys
+clone:mxfe 0666 root sys
+clone:rtls 0666 root sys
 bge:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys
@@ -169,6 +171,9 @@ pcwl:* 0666 root sys
 pcan:* 0666 root sys
 vsw:* 0666 root sys
 vnet:* 0666 root sys
+afe:* 0666 root sys
+mxfe:* 0666 root sys
+rtls:* 0666 root sys
 vnic:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys

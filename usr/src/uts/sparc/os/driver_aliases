@@ -132,8 +132,6 @@ mpt "pciex1000,56"
 mpt "pciex1000,58"
 power "ali1535d+-power"
 ramdisk SUNW,ramdisk
-dmfe "pci108e,9102"
-dmfe "pci128h,9102"
 ctsmc "nct-ds80ch11-smc"
 sd "scsiclass,00"
 ssd "scsa,00.bfcp"

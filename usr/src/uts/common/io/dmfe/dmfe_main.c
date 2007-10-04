@@ -27,7 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
-#include <sys/dmfe_impl.h>
+#include "dmfe_impl.h"
 
 /*
  * This is the string displayed by modinfo, etc.
@@ -115,15 +115,15 @@ static uint32_t dmfe_setup_desc1 = TX_SETUP_PACKET | SETUPBUF_SIZE |
 
 /*
  * Some tunable parameters ...
- *	Number of RX/TX ring entries (32/32)
+ *	Number of RX/TX ring entries (128/128)
  *	Minimum number of TX ring slots to keep free (1)
  *	Low-water mark at which to try to reclaim TX ring slots (1)
  *	How often to take a TX-done interrupt (twice per ring cycle)
  *	Whether to reclaim TX ring entries on a TX-done interrupt (no)
  */
 
-#define	DMFE_TX_DESC		32	/* Should be a multiple of 4 <= 256 */
-#define	DMFE_RX_DESC		32	/* Should be a multiple of 4 <= 256 */
+#define	DMFE_TX_DESC		128	/* Should be a multiple of 4 <= 256 */
+#define	DMFE_RX_DESC		128	/* Should be a multiple of 4 <= 256 */
 
 static uint32_t dmfe_rx_desc = DMFE_RX_DESC;
 static uint32_t dmfe_tx_desc = DMFE_TX_DESC;
@@ -546,8 +546,7 @@ dmfe_enable_interrupts(dmfe_t *dmfep)
 	 * Put 'the standard set of interrupts' in the interrupt mask register
 	 */
 	dmfep->imask =	RX_PKTDONE_INT | TX_PKTDONE_INT |
-	    RX_STOPPED_INT | TX_STOPPED_INT |
-	    RX_UNAVAIL_INT | SYSTEM_ERR_INT;
+	    RX_STOPPED_INT | TX_STOPPED_INT | RX_UNAVAIL_INT | SYSTEM_ERR_INT;
 
 	dmfe_chip_put32(dmfep, INT_MASK_REG,
 	    NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT | dmfep->imask);
@@ -718,7 +717,7 @@ dmfe_getp(dmfe_t *dmfep)
 		 * discard these here so they don't get sent upstream ...)
 		 */
 		(void) ddi_dma_sync(dmfep->rx_buff.dma_hdl,
-		    index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
+		    index * DMFE_BUF_SIZE, DMFE_BUF_SIZE,
 		    DDI_DMA_SYNC_FORKERNEL);
 		rxb = &dmfep->rx_buff.mem_va[index*DMFE_BUF_SIZE];
 
@@ -961,7 +960,6 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
 	dma_area_t *descp;
 	uint32_t desc0;
 	uint32_t desc1;
-	int nfree;
 	int i;
 
 	ASSERT(mutex_owned(dmfep->txlock));
@@ -971,20 +969,6 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
 	 */
 	descp = &dmfep->tx_desc;
 	DMA_SYNC(descp, DDI_DMA_SYNC_FORKERNEL);
-
-#if	DMFEDEBUG
-	/*
-	 * check that we own all descriptors from next_free to next_used-1
-	 */
-	nfree = 0;
-	i = dmfep->tx.next_free;
-	do {
-		ASSERT((dmfe_ring_get32(descp, i, DESC0) & TX_OWN) == 0);
-		nfree += 1;
-		i = NEXT(i, dmfep->tx.n_desc);
-	} while (i != dmfep->tx.next_busy);
-	ASSERT(nfree == dmfep->tx.n_free);
-#endif	/* DMFEDEBUG */
 
 	/*
 	 * Early exit if there are no descriptors to reclaim, either
@@ -1196,9 +1180,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		desc1 = TX_FIRST_DESC | TX_LAST_DESC | totlen;
 
 		(void) ddi_dma_sync(dmfep->tx_buff.dma_hdl,
-		    index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
-		    DDI_DMA_SYNC_FORDEV);
-
+		    index * DMFE_BUF_SIZE, DMFE_BUF_SIZE, DDI_DMA_SYNC_FORDEV);
 	}
 
 	/*
@@ -2085,8 +2067,7 @@ dmfe_interrupt(caddr_t arg)
 			 * they weren't Abnormal?), but we'll check just
 			 * in case ...
 			 */
-			DMFE_DEBUG(("unexpected interrupt bits: 0x%x",
-			    istat));
+			DMFE_DEBUG(("unexpected interrupt bits: 0x%x", istat));
 		}
 	}
 
@@ -2620,6 +2601,9 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 	 * We have to find the "vendor's factory-set address".  This is
 	 * the value of the property "local-mac-address", as set by OBP
 	 * (or a .conf file!)
+	 *
+	 * If the property is not there, then we try to find the factory
+	 * mac address from the devices serial EEPROM.
 	 */
 	bzero(dmfep->curr_addr, sizeof (dmfep->curr_addr));
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dmfep->devinfo,
@@ -2628,6 +2612,10 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 		if (propsize == ETHERADDRL)
 			ethaddr_copy(prop, dmfep->curr_addr);
 		ddi_prop_free(prop);
+	} else {
+		/* no property set... check eeprom */
+		dmfe_read_eeprom(dmfep, EEPROM_EN_ADDR, dmfep->curr_addr,
+		    ETHERADDRL);
 	}
 
 	DMFE_DEBUG(("dmfe_setup_mac_address: factory %s",
@@ -2696,7 +2684,7 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	/*
 	 * Allocate memory & handles for TX descriptor ring
 	 */
-	memsize = dmfep->tx.n_desc*sizeof (struct tx_desc_type);
+	memsize = dmfep->tx.n_desc * sizeof (struct tx_desc_type);
 	err = dmfe_alloc_dma_mem(dmfep, memsize, SETUPBUF_SIZE, DMFE_SLOP,
 	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &dmfep->tx_desc);
@@ -2706,8 +2694,8 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	/*
 	 * Allocate memory & handles for TX buffers
 	 */
-	memsize = dmfep->tx.n_desc*DMFE_BUF_SIZE,
-	    err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
+	memsize = dmfep->tx.n_desc * DMFE_BUF_SIZE;
+	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
 	    &dmfe_data_accattr, DDI_DMA_WRITE | DMFE_DMA_MODE,
 	    &dmfep->tx_buff);
 	if (err != DDI_SUCCESS)
@@ -2716,7 +2704,7 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	/*
 	 * Allocate memory & handles for RX descriptor ring
 	 */
-	memsize = dmfep->rx.n_desc*sizeof (struct rx_desc_type);
+	memsize = dmfep->rx.n_desc * sizeof (struct rx_desc_type);
 	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, DMFE_SLOP,
 	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &dmfep->rx_desc);
@@ -2726,10 +2714,9 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	/*
 	 * Allocate memory & handles for RX buffers
 	 */
-	memsize = dmfep->rx.n_desc*DMFE_BUF_SIZE,
-	    err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
-	    &dmfe_data_accattr, DDI_DMA_READ | DMFE_DMA_MODE,
-	    &dmfep->rx_buff);
+	memsize = dmfep->rx.n_desc * DMFE_BUF_SIZE;
+	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
+	    &dmfe_data_accattr, DDI_DMA_READ | DMFE_DMA_MODE, &dmfep->rx_buff);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2978,7 +2965,6 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	dmfep->cycid = NULL;
 	(void) snprintf(dmfep->ifname, sizeof (dmfep->ifname), "dmfe%d",
 	    instance);
-	dmfe_find_mac_address(dmfep);
 
 	/*
 	 * Check for custom "opmode-reg-value" property;
@@ -3016,6 +3002,11 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	dmfep->progress |= PROGRESS_REGS;
+
+	/*
+	 * Get our MAC address.
+	 */
+	dmfe_find_mac_address(dmfep);
 
 	/*
 	 * Allocate the TX and RX descriptors/buffers.

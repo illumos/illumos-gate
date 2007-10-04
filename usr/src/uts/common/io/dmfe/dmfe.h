@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,6 +289,8 @@ struct tx_desc_type {
 #define	WRITE_OP		0x00002000UL
 #define	READ_OP			0x00004000UL
 #define	SER_15_MB1		0x00008000UL
+#define	READ_EEPROM		(READ_OP | SEL_EEPROM)
+#define	READ_EEPROM_CS		(READ_OP | SEL_EEPROM | SEL_CHIP)
 
 #define	MII_CLOCK		0x00010000UL
 #define	MII_DATA_OUT		0x00020000UL
@@ -350,8 +351,12 @@ struct tx_desc_type {
 
 
 /* SROM access definitions */
-#define	HIGH_ADDRESS_BIT	0x00000020UL
+#define	HIGH_ADDRESS_BIT	0x20			/* 6 bits */
+#define	HIGH_CMD_BIT		0x4			/* 3 bits */
+#define	HIGH_DATA_BIT		0x8000			/* 16 bits */
 #define	SROM_DELAY		5			/* 5 microseconds */
+#define	EEPROM_READ_CMD		6
+#define	EEPROM_EN_ADDR		20
 
 /* MII access definitions */
 #define	MII_REG_ADDR_SHIFT	18

@@ -136,6 +136,9 @@ clone:pcan 0666 root sys
 clone:ral 0666 root sys
 clone:rtw 0666 root sys
 clone:wpi 0666 root sys
+clone:dmfe 0666 root sys
+clone:afe 0666 root sys
+clone:mxfe 0666 root sys
 bge:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys
@@ -157,3 +160,6 @@ physmem:* 0600 root sys
 sdp:sdp 0666 root sys
 battery:* 0666 root sys
 ucode:* 0644 root sys
+dmfe:* 0666 root sys
+afe:* 0666 root sys
+mxfe:* 0666 root sys

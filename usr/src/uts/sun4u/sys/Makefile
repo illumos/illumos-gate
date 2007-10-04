@@ -113,12 +113,6 @@ $(CLOSED_BUILD)CLOSED_HDRS=	\
 	memtestio_sr.h		\
 	memtestio_u.h
 
-DMFEHDRS =	dmfe.h dmfe_impl.h miiregs.h
-
-ROOTDMFEDIR = $(ROOT)/usr/include/sys
-
-ROOTDMFEHDRS = $(DMFEHDRS:%=$(ROOTDMFEDIR)/%)
-
 $(CLOSED_BUILD)CLOSED_I2CHDRS =	clients/scmi2c.h
 
 I2CHDRS =	clients/max1617.h misc/i2c_svc.h clients/i2c_client.h	\
@@ -163,9 +157,9 @@ $(CLOSED_BUILD)CHECKHDRS += \
 
 .PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTMONHDRS) $(SUN4_ROOTHDRS)
 
-install_h: $(ROOTDIRS) $(USR_PSM_ISYS_I2C_DIRS) $(ROOTDMFEDIR) .WAIT \
+install_h: $(ROOTDIRS) $(USR_PSM_ISYS_I2C_DIRS) .WAIT \
 		$(ROOTHDRS) $(ROOTI2CHDRS) \
-		$(ROOTMONHDRS) $(ROOTDMFEHDRS) \
+		$(ROOTMONHDRS) \
 		$(SUN4_ROOTHDRS) $(ROOTLINK)
 
 check:	$(CHECKHDRS)
@@ -193,12 +187,6 @@ $(USR_PSM_ISYS_DIR)/%:	../../sun4/sys/% $(USR_PSM_ISYS_DIR)
 
 $(USR_PSM_MON_DIR)/%:	mon/% $(USR_PSM_MON_DIR)
 	$(INS.file)
-
-$(ROOTDMFEDIR)/%: % $(ROOTDMFEDIR)
-	$(INS.file)
-
-$(ROOTDMFEDIR):
-	$(INS.dir.root.bin)
 
 $(ROOTDIRS):
 	$(INS.dir.root.bin)

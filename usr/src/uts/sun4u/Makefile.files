@@ -138,7 +138,6 @@ GPTWO_CPU_OBJS	+= gptwo_cpu.o
 ZULUVM_OBJS  	+= zuluvm.o zulu_asm.o zulu_hat.o zulu_hat_asm.o
 
 JBUSPPM_OBJS	+= jbusppm.o 
-DMFE_OBJS	+= dmfe_log.o dmfe_main.o dmfe_mii.o dmfe_ndd.o
 RMC_COMM_OBJS	+= rmc_comm.o rmc_comm_crctab.o rmc_comm_dp.o rmc_comm_drvintf.o
 RMCADM_OBJS	+= rmcadm.o
 

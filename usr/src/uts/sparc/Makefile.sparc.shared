@@ -271,7 +271,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 #	Machine Specific Driver Modules (/kernel/drv):
 #
 DRV_KMODS	+= audio1575 audio810 audiohd audiocs audiots
-DRV_KMODS	+= bge bpp eri esp fas hme qfe
+DRV_KMODS	+= bge bpp dmfe eri esp fas hme qfe
 DRV_KMODS	+= openeepr options sd ses st
 DRV_KMODS	+= ssd
 DRV_KMODS	+= ecpp

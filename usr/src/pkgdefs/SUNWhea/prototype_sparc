@@ -70,8 +70,6 @@ d none usr/include/sys/dktp 755 root bin
 f none usr/include/sys/dktp/dadkio.h 644 root bin
 f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dmaga.h 644 root bin
-f none usr/include/sys/dmfe.h 644 root bin
-f none usr/include/sys/dmfe_impl.h 644 root bin
 f none usr/include/sys/eri.h 644 root bin
 f none usr/include/sys/eri_common.h 644 root bin
 f none usr/include/sys/eri_mac.h 644 root bin

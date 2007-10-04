@@ -6436,6 +6436,13 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove platform specific dmfe driver ... its common now
+	if [ $target_isa = sparc ]; then
+		rm -f $root/platform/sun4u/kernel/drv/sparcv9/dmfe
+		rm -f $root/platform/sun4u/kernel/drv/dmfe.conf
+	fi
+
+	#
 	# Diskless clients have already extracted /usr so don't delete this
 	# Non-global zones never extracts /usr so don't delete these
 	#
@@ -6709,6 +6716,8 @@ mondo_loop() {
 	rm -f $root/usr/include/sys/dktp/sctarget.h
 	rm -f $root/usr/include/sys/dktp/tgcd.h
 	rm -f $root/usr/include/sys/dktp/tgpassthru.h
+	rm -f $root/usr/include/sys/dmfe.h
+	rm -f $root/usr/include/sys/dmfe_impl.h
  
 	#
 	# Remove Floating Point Emulator for EOF as per PSARC/2003/651
@@ -7277,7 +7286,6 @@ mondo_loop() {
 			clone:eri		eri
 			clone:ge		ge
 			clone:hme		hme
-			clone:le		le
 			clone:qfe		qfe
 			clone:bge		bge
 			bge:*			bge*
@@ -7293,6 +7301,12 @@ mondo_loop() {
 			iprb:*			iprb*
 			clone:spwr		spwr
 			spwr:*			spwr*
+			clone:afe		afe
+			afe:*			afe*
+			clone:mxfe		mxfe
+			mxfe:*			mxfe*
+			clone:rtls		rtls
+			rtls:*			rtls*
 		EOF
 
 		if [ $target_isa = i386 ] && [[ $rootslice = /dev/rdsk/* || \

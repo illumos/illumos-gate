@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/dmfe_impl.h>
+#include "dmfe_impl.h"
 
 /*
  * The bit-twiddling required by the MII interface makes the functions
@@ -82,6 +82,104 @@ enum xcvr_type {
 };
 
 /*
+ * ======== Low-level SROM access ========
+ */
+
+/*
+ * EEPROM access is here because it shares register functionality with MII.
+ * NB: <romaddr> is a byte address but must be 16-bit aligned.
+ *     <cnt> is a byte count, and must be a multiple of 2.
+ */
+void
+dmfe_read_eeprom(dmfe_t *dmfep, uint16_t raddr, uint8_t *ptr, int cnt)
+{
+	uint16_t value;
+	uint16_t bit;
+
+	/* only a whole number of words for now */
+	ASSERT((cnt % 2) == 0);
+	ASSERT((raddr % 2) == 0);
+	ASSERT(cnt > 0);
+	ASSERT(((raddr + cnt) / 2) < (HIGH_ADDRESS_BIT << 1));
+
+	raddr /= 2;	/* make it a word address */
+
+	/* loop over multiple words... rom access in 16-bit increments */
+	while (cnt > 0) {
+
+		/* select the eeprom */
+		dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM);
+		drv_usecwait(1);
+		dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM_CS);
+		drv_usecwait(1);
+		dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM_CS | SEL_CLK);
+		drv_usecwait(1);
+		dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM_CS);
+		drv_usecwait(1);
+
+		/* send 3 bit read command */
+		for (bit = HIGH_CMD_BIT; bit != 0; bit >>= 1) {
+
+			value = (bit & EEPROM_READ_CMD) ? DATA_IN : 0;
+
+			/* strobe the bit in */
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | value);
+			drv_usecwait(1);
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | SEL_CLK | value);
+			drv_usecwait(1);
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | value);
+			drv_usecwait(1);
+		}
+
+		/* send 6 bit address */
+		for (bit = HIGH_ADDRESS_BIT; bit != 0; bit >>= 1) {
+			value = (bit & raddr) ? DATA_IN : 0;
+
+			/* strobe the bit in */
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | value);
+			drv_usecwait(1);
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | SEL_CLK | value);
+			drv_usecwait(1);
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | value);
+			drv_usecwait(1);
+		}
+
+		/* shift out data */
+		value = 0;
+		for (bit = HIGH_DATA_BIT; bit != 0; bit >>= 1) {
+
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG,
+			    READ_EEPROM_CS | SEL_CLK);
+			drv_usecwait(1);
+
+			if (dmfe_chip_get32(dmfep, ETHER_ROM_REG) & DATA_OUT)
+				value |= bit;
+			drv_usecwait(1);
+
+			dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM_CS);
+			drv_usecwait(1);
+		}
+
+		/* turn off EEPROM access */
+		dmfe_chip_put32(dmfep, ETHER_ROM_REG, READ_EEPROM);
+		drv_usecwait(1);
+
+		/* this makes it endian neutral */
+		*ptr++ = value & 0xff;
+		*ptr++ = (value >> 8);
+
+		cnt -= 2;
+		raddr++;
+	}
+}
+
+/*
  * ======== Lowest-level bit-twiddling to drive MII interface ========
  */
 
@@ -118,7 +216,7 @@ dmfe_poke_mii(dmfe_t *dmfep, uint32_t mii_data, uint_t nbits)
 	}
 
 	dmfe_chip_put32(dmfep, ETHER_ROM_REG,
-		MII_WRITE | dbit);			/* Clock Low	*/
+	    MII_WRITE | dbit);				/* Clock Low	*/
 	drv_usecwait(MII_DELAY);
 }
 
@@ -270,7 +368,7 @@ dmfe_probe_phy(dmfe_t *dmfep)
 	bmsr = dmfe_mii_status(dmfep);
 
 	DMFE_DEBUG(("dmfe_probe_phy($%p, %d) BMSR 0x%x",
-		(void *)dmfep, dmfep->phy_addr, bmsr));
+	    (void *)dmfep, dmfep->phy_addr, bmsr));
 
 	/*
 	 * At least one bit in BMSR should be set (for the device
@@ -342,9 +440,9 @@ dmfe_update_phy(dmfe_t *dmfep)
 	uint16_t anar;
 
 	DMFE_DEBUG(("dmfe_update_phy: autoneg %d 100fdx %d 100hdx %d "
-		"10fdx %d 10hdx %d", dmfep->param_autoneg,
-		dmfep->param_anar_100fdx, dmfep->param_anar_100hdx,
-		dmfep->param_anar_10fdx, dmfep->param_anar_10hdx));
+	    "10fdx %d 10hdx %d", dmfep->param_autoneg,
+	    dmfep->param_anar_100fdx, dmfep->param_anar_100hdx,
+	    dmfep->param_anar_10fdx, dmfep->param_anar_10hdx));
 
 	ASSERT(mutex_owned(dmfep->milock));
 
@@ -488,7 +586,7 @@ dmfe_check_bmsr(dmfe_t *dmfep)
 	 */
 	new_bmsr = dmfe_mii_status(dmfep);
 	DMFE_DEBUG(("dmfe_check_bmsr: bmsr 0x%x -> 0x%x",
-		dmfep->phy_bmsr, new_bmsr));
+	    dmfep->phy_bmsr, new_bmsr));
 
 	/*
 	 * Record new value and timestamp if it's changed
@@ -659,8 +757,8 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	DRV_KS_SET(dmfep, KS_MIIREG_DSCSR, dmfep->phy_dscsr);
 
 	DMFE_DEBUG(("dmfe_process_bmsr: ANAR 0x%x->0x%x ANLPAR 0x%x SCSR 0x%x",
-		dmfep->phy_anar_w, dmfep->phy_anar_r,
-		dmfep->phy_anlpar, dmfep->phy_dscsr));
+	    dmfep->phy_anar_w, dmfep->phy_anar_r,
+	    dmfep->phy_anlpar, dmfep->phy_dscsr));
 
 	/*
 	 * Capabilities of DM9102A
@@ -753,7 +851,7 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	}
 
 	DMFE_DEBUG(("dmfe_process_bmsr: BMSR 0x%x state %d -> %d @ %d",
-		dmfep->phy_bmsr, dmfep->link_state, newstate, time));
+	    dmfep->phy_bmsr, dmfep->link_state, newstate, time));
 
 	return (newstate);
 }

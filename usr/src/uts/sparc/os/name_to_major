@@ -170,7 +170,6 @@ profile 220
 systrace 221
 sdt 222
 fasttrap 223
-dmfe 224
 todds1307 225
 pool 226
 zcons 227

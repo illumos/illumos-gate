@@ -73,7 +73,7 @@ do
 	done
 
 	# potential deletions
-	deletions="elx dld"
+	deletions="elx dld le"
 
 	for dev in $deletions
 	do

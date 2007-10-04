@@ -57,12 +57,10 @@ spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 # Raw network interface access permissions
 #
 ce		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-dmfe		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 eri		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ge		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 hme		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ibd		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-le		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 qfe		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 aggr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess

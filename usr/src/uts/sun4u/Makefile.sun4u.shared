@@ -398,7 +398,6 @@ DRV_KMODS	+= pmubus
 DRV_KMODS	+= pmugpio
 DRV_KMODS	+= pmc
 DRV_KMODS	+= trapstat
-DRV_KMODS	+= dmfe
 DRV_KMODS	+= rmc_comm
 DRV_KMODS	+= rmcadm
 DRV_KMODS	+= rmclomv

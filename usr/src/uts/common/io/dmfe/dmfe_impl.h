@@ -56,9 +56,9 @@ extern "C" {
 #include <sys/sunddi.h>
 
 #include <sys/miiregs.h>
-#include <sys/dmfe.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
+#include "dmfe.h"
 
 #define	DMFE_MAX_PKT_SIZE	(VLAN_TAGSZ + ETHERMAX + ETHERFCSL)
 
@@ -114,6 +114,7 @@ typedef struct {
 	uint32_t		ndp_max;
 	uint32_t		ndp_val;
 	char			*ndp_name;
+	struct dmfe		*ndp_dmfe;
 } nd_param_t;
 
 /*
@@ -228,7 +229,7 @@ enum ioc_reply {
 /*
  * Per-instance soft-state structure
  */
-typedef struct {
+typedef struct dmfe {
 	/*
 	 * These fields are set by attach() and unchanged thereafter ...
 	 */
@@ -359,6 +360,7 @@ typedef struct {
 	uint32_t		imask;		/* interrupt mask shadow */
 	enum mac_state		mac_state;	/* RESET/STOPPED/STARTED */
 	enum chip_state		chip_state;	/* see above		 */
+	boolean_t		link_reset;	/* ndd needs link reset  */
 
 	/*
 	 * Physical link state data (protected by oplock)
@@ -507,7 +509,7 @@ typedef struct {
 /*
  * Bit test macros, returning boolean_t values
  */
-#define	BIS(w, b)		((w) & (b))
+#define	BIS(w, b)		(((w) & (b)) != 0)
 #define	BIC(w, b)		!BIS(w, b)
 
 #define	DMFE_GUARD		0x1919603003090218
@@ -611,6 +613,7 @@ uint32_t dmfe_chip_get32(dmfe_t *dmfep, off_t offset);
 void dmfe_chip_put32(dmfe_t *dmfep, off_t offset, uint32_t value);
 
 /* dmfe_mii.c */
+void dmfe_read_eeprom(dmfe_t *dmfep, uint16_t addr, uint8_t *ptr, int cnt);
 boolean_t dmfe_init_phy(dmfe_t *dmfep);
 void dmfe_update_phy(dmfe_t *dmfep);
 boolean_t dmfe_check_link(dmfe_t *dmfep);

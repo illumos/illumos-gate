@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/dmfe_impl.h>
+#include "dmfe_impl.h"
 
 
 #define	DMFE_DBG	DMFE_DBG_NDD	/* debug flag for this code	*/
@@ -119,15 +119,15 @@ dmfe_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 
 /*
  * Validates the request to set a DMFE parameter to a specific value.
- * If the request is OK, the parameter is set.  Also the <info> field
- * is incremented to show that the parameter was touched, even though
- * it may have been set to the same value it already had.
+ * If the request is OK, the parameter is set.  Also, update the link reset
+ * to show that a link reset is required if the parameter changed, or for
+ * magic parameters, that it was touched even if the value did not change.
  */
 static int
 dmfe_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 {
 	nd_param_t *ndp;
-	size_t new_value;
+	long new_value;
 	char *end;
 
 	_NOTE(ARGUNUSED(q, mp, credp))
@@ -136,14 +136,16 @@ dmfe_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 	if (ndp->ndp_name[0] == '-')
 		return (EACCES);	/* shouldn't happen!	*/
 
-	new_value = mi_strtol(value, &end, 10);
-	if (end == value)
+	if (ddi_strtol(value, &end, 10, &new_value) != 0)
 		return (EINVAL);
 	if (new_value < ndp->ndp_min || new_value > ndp->ndp_max)
 		return (EINVAL);
 
+	if ((ndp->ndp_name[0] == '*') ||
+	    (ndp->ndp_val != new_value)) {
+		ndp->ndp_dmfe->link_reset = B_TRUE;
+	}
 	ndp->ndp_val = new_value;
-	ndp->ndp_info += 1;
 	return (0);
 }
 
@@ -173,6 +175,7 @@ dmfe_param_register(dmfe_t *dmfep)
 		 */
 		ndp = &dmfep->nd_params[tmplp->ndp_info];
 		*ndp = *tmplp;
+		ndp->ndp_dmfe = dmfep;
 		nm = &ndp->ndp_name[0];
 		setfn = *nm++ == '-' ? NULL : dmfe_param_set;
 		if (!nd_load(nddpp, nm, dmfe_param_get, setfn, (caddr_t)ndp))
@@ -184,7 +187,7 @@ dmfe_param_register(dmfe_t *dmfep)
 
 nd_fail:
 	DMFE_DEBUG(("dmfe_param_register: FAILED at index %d [info %d]",
-		tmplp-nd_template, tmplp->ndp_info));
+	    tmplp-nd_template, tmplp->ndp_info));
 	nd_free(nddpp);
 	return (B_FALSE);
 }
@@ -223,10 +226,10 @@ dmfe_nd_init(dmfe_t *dmfep)
 	 */
 	dip = dmfep->devinfo;
 	speed = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		0, transfer_speed_propname, -1);
+	    0, transfer_speed_propname, -1);
 	if (speed != -1) {
 		dmfe_log(dmfep, "%s property is %d",
-			transfer_speed_propname, speed);
+		    transfer_speed_propname, speed);
 		switch (speed) {
 		case 100:
 			dmfep->param_anar_10hdx = 0;
@@ -287,9 +290,9 @@ dmfe_nd_init(dmfe_t *dmfep)
 	 * parameter will be set to a default value (100Mb/s, half-duplex).
 	 */
 	speed = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, speed_propname, -1);
+	    DDI_PROP_DONTPASS, speed_propname, -1);
 	duplex = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, duplex_propname, -1);
+	    DDI_PROP_DONTPASS, duplex_propname, -1);
 
 	if (speed != -1 || duplex != -1) {
 		/* force speed */
@@ -300,8 +303,7 @@ dmfe_nd_init(dmfe_t *dmfep)
 		dmfep->param_anar_100T4 = 0;
 		dmfep->param_autoneg = 0;
 
-		dmfe_log(dmfep, "%s property is %d",
-			speed_propname, speed);
+		dmfe_log(dmfep, "%s property is %d", speed_propname, speed);
 		switch (speed) {
 		case 10:
 			dmfep->param_anar_100hdx = 0;
@@ -315,8 +317,7 @@ dmfe_nd_init(dmfe_t *dmfep)
 			break;
 		}
 
-		dmfe_log(dmfep, "%s property is %d",
-			duplex_propname, duplex);
+		dmfe_log(dmfep, "%s property is %d", duplex_propname, duplex);
 		switch (duplex) {
 		case 1:
 			dmfep->param_anar_10hdx = 0;
@@ -337,8 +338,6 @@ dmfe_nd_init(dmfe_t *dmfep)
 enum ioc_reply
 dmfe_nd_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 {
-	nd_param_t *ndp;
-	uint32_t info;
 	int ok;
 
 	switch (cmd) {
@@ -379,21 +378,20 @@ dmfe_nd_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 		 * didn't touch the magic 'autonegotiation' parameter,
 		 * we can just tell our caller to send the prepared reply.
 		 *
-		 * If the 'autonegotiation' parameter *was* touched, we
-		 * flag it so the top-level ioctl code knows to update
+		 * If the 'autonegotiation' parameter *was* touched (or any
+		 * of the other link parameters modified), we flag
+		 * it so the top-level ioctl code knows to update
 		 * the PHY and restart the chip before replying ...
 		 */
-		ndp = &dmfep->nd_params[PARAM_ADV_AUTONEG_CAP];
-		info = ndp->ndp_info;
 		ok = nd_getset(wq, dmfep->nd_data_p, mp);
-		DMFE_DEBUG(("dmfe_nd_ioctl: set %s autoneg %d info %d/%d",
-			ok ? "OK" : "FAIL", ndp->ndp_val,
-			info, ndp->ndp_info));
+		DMFE_DEBUG(("dmfe_nd_ioctl: set %s link_reset %d",
+		    ok ? "OK" : "FAIL", dmfep->link_reset));
 
 		if (!ok)
 			return (IOC_INVAL);
-		if (ndp->ndp_info == info)
+		if (!dmfep->link_reset)
 			return (IOC_REPLY);
+		dmfep->link_reset = B_FALSE;
 		return (IOC_RESTART);
 	}
 }

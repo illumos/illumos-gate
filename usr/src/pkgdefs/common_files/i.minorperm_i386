@@ -119,6 +119,9 @@ clone:pcan              0600 root sys 0666 root sys     /dev/pcan
 clone:ral		0600 root sys 0666 root sys	/dev/ral
 clone:rtw		0600 root sys 0666 root sys	/dev/rtw
 clone:wpi		0600 root sys 0666 root sys	/dev/wpi
+clone:afe		0600 root sys 0666 root sys	/dev/afe
+clone:dmfe		0600 root sys 0666 root sys	/dev/dmfe
+clone:mxfe		0600 root sys 0666 root sys	/dev/mxfe
 bge:*			0600 root sys 0666 root sys	/dev/bge*
 rge:*			0600 root sys 0666 root sys	/dev/rge*
 xge:*			0600 root sys 0666 root sys	/dev/xge*
@@ -135,6 +138,9 @@ pcan:*                  0600 root sys 0666 root sys     /dev/pcan*
 ral:*			0600 root sys 0666 root sys	/dev/ral*
 rtw:*			0600 root sys 0666 root sys	/dev/rtw*
 wpi:*			0600 root sys 0666 root sys	/dev/wpi*
+afe:*			0600 root sys 0666 root sys	/dev/afe*
+dmfe:*			0600 root sys 0666 root sys	/dev/dmfe*
+mxfe:*			0600 root sys 0666 root sys	/dev/mxfe*
 EOF
 }
 
@@ -268,6 +274,9 @@ clone:pcan
 clone:ral
 clone:rtw
 clone:wpi
+clone:afe
+clone:dmfe
+clone:mxfe
 bge:*
 rge:*
 xge:*
@@ -284,6 +293,9 @@ pcan:*
 ral:*
 rtw:*
 wpi:*
+afe:*
+dmfe:*
+mxfe:*
 bmc:bmc
 dld:*
 aggr:*

@@ -1342,6 +1342,8 @@ AFE_OBJS += afe.o
 BGE_OBJS += bge_main2.o bge_chip2.o bge_kstats.o bge_log.o bge_ndd.o \
 		bge_atomic.o bge_mii.o bge_send.o bge_recv2.o
 
+DMFE_OBJS += dmfe_log.o dmfe_main.o dmfe_mii.o dmfe_ndd.o
+
 IXGB_OBJS += ixgb.o ixgb_atomic.o ixgb_chip.o ixgb_gld.o ixgb_kstats.o \
 		ixgb_log.o ixgb_ndd.o ixgb_rx.o ixgb_tx.o ixgb_xmii.o
 

@@ -419,7 +419,6 @@ f none platform/sun4u/kernel/crypto/sparcv9/md5 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/rsa 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/sha1 755 root sys
 d none platform/sun4u/kernel/drv 755 root sys
-f none platform/sun4u/kernel/drv/dmfe.conf 644 root sys
 f none platform/sun4u/kernel/drv/i2bsc.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmc_comm.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmcadm.conf 644 root sys
@@ -432,7 +431,6 @@ f none platform/sun4u/kernel/drv/sparcv9/bbc_beep 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/ctsmc 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/db21554 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/dma 755 root sys
-f none platform/sun4u/kernel/drv/sparcv9/dmfe 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/ebus 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/epic 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/fd 755 root sys
