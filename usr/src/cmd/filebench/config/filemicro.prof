@@ -1,0 +1,187 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+DEFAULTS {
+	runtime = 3600;
+        dir = /tmp;
+        stats = /tmp;
+	filesystem = tmpfs;
+	description = "filemicro tmpfs";
+}
+
+CONFIG createfiles {
+	personality = createfiles;
+	function = generic;
+	nfiles = 1000;
+	dirwidth = 20;
+	filesize = 16k;
+	nthreads = 16;
+}
+
+CONFIG copyfiles {
+	function = generic;
+	personality = copyfiles;
+	filesize = 16k;
+	nthreads = 16;
+	nfiles = 10000;
+	dirwidth = 20;
+}
+
+CONFIG deletefiles {
+	function = generic;
+	personality = deletefiles;
+	filesize = 16k;
+	nthreads = 16;
+	nfiles = 50000;
+	meandirwidth = 20;
+}
+
+CONFIG createandalloc128k {
+	function = generic;
+	personality = filemicro_create;
+	nthreads = 1;
+	iosize = 1m;
+	count = 64;
+	nfiles = 1000;
+}
+
+CONFIG createallocsync {
+	function = generic;
+	personality = filemicro_create;
+	nthreads = 1;
+	iosize = 1m;
+	count = 1k;
+	sync = 1;
+}
+
+CONFIG createallocfsync {
+	function = generic;
+	personality = filemicro_writefsync;
+	nthreads = 1;
+}
+
+CONFIG createallocappend {
+	function = generic;
+	personality = filemicro_createrand;
+	nthreads = 1;
+}
+
+CONFIG randread2k {
+	function = generic;
+	personality = filemicro_rread;
+	cached = 0;
+	iosize = 2k;
+}
+
+CONFIG randread2kcached {
+	function = generic;
+	personality = filemicro_rread;
+	cached = 1;
+	iosize = 2k;
+}
+
+CONFIG randwrite2ksync {
+	function = generic;
+	personality = filemicro_rwrite;
+	iosize = 2k;
+	nthreads = 1;
+	sync = 1;
+}
+
+CONFIG randwrite2ksync4thread {
+	function = generic;
+	personality = filemicro_rwrite;
+	iosize = 2k;
+	nthreads = 4;
+	sync = 1;
+}
+
+CONFIG randwrite8kfsynccached {
+	function = generic;
+	personality = filemicro_rwritefsync;
+	iosize = 8k;
+	nthreads = 1;
+	cached = 1;
+}
+
+CONFIG seqread32k {
+	function = generic;
+	personality = filemicro_seqread;
+	iosize = 32k;
+	nthreads = 1;
+	cached = 0;
+	filesize = 100m;
+}
+
+CONFIG seqread32kcached {
+	function = generic;
+	personality = filemicro_seqread;
+	iosize = 32k;
+	nthreads = 1;
+	cached = 1;
+	filesize = 100m;
+}
+
+CONFIG seqwrite32k {
+	function = generic;
+	personality = filemicro_seqwrite;
+	iosize = 32k;
+	count = 32k;
+	nthreads = 1;
+	cached = 0;
+	sync = 0;
+}
+
+CONFIG seqwrite32kdsync {
+	function = generic;
+	personality = filemicro_seqwrite;
+	iosize = 32k;
+	count = 32k;
+	nthreads = 1;
+	cached = 0;
+	sync = 1;
+}
+
+CONFIG seqwriterand8k {
+	function = generic;
+	personality = filemicro_seqwriterand;
+	iosize = 8k;
+	count = 128k;
+	nthreads = 1;
+	cached = 0;
+	sync = 0;
+}
+
+CONFIG unlink1g {
+	function = generic;
+	personality = filemicro_delete;
+	nthreads = 1;
+	filesize = 1g;
+	nfiles = 10;
+}
+
+
+

@@ -122,6 +122,7 @@ COMMON_SUBDIRS = \
 	cmd/fdformat \
 	cmd/fgrep \
 	cmd/file \
+	cmd/filebench \
 	cmd/find \
 	cmd/fmthard \
 	cmd/fmtmsg \

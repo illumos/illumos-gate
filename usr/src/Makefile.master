@@ -158,6 +158,7 @@ ELFDUMP=	/usr/ccs/bin/elfdump
 M4=		/usr/ccs/bin/m4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
+FLEX=		$(SFW_ROOT)/bin/flex
 YACC=		/usr/ccs/bin/yacc
 CPP=		/usr/lib/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac

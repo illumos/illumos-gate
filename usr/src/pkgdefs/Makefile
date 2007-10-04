@@ -206,6 +206,7 @@ COMMON_SUBDIRS= \
 	SUNWdtrp \
 	SUNWdtrt \
 	SUNWesu  \
+	SUNWfilebench \
 	SUNWfmd  \
 	SUNWfmdr  \
 	SUNWfss \
