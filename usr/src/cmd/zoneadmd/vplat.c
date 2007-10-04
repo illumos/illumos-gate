@@ -125,12 +125,6 @@
 #define	V4_ADDR_LEN	32
 #define	V6_ADDR_LEN	128
 
-/* 0755 is the default directory mode. */
-#define	DEFAULT_DIR_MODE \
-	(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
-#define	DEFAULT_DIR_USER -1	/* user ID for chown: -1 means don't change */
-#define	DEFAULT_DIR_GROUP -1	/* grp ID for chown: -1 means don't change */
-
 #define	IPD_DEFAULT_OPTS \
 	MNTOPT_RO "," MNTOPT_LOFS_NOSUB "," MNTOPT_NODEVICES
 
@@ -418,7 +412,7 @@ check_lofs_needed(zlog_t *zlogp, struct zone_fstab *fsptr)
 	return (0);
 }
 
-static int
+int
 make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode,
     uid_t userid, gid_t groupid)
 {
@@ -880,10 +874,20 @@ domount(zlog_t *zlogp, const char *fstype, const char *opts,
 }
 
 /*
- * Make sure if a given path exists, it is not a sym-link, and is a directory.
+ * Check if a given mount point path exists.
+ * If it does, make sure it doesn't contain any symlinks.
+ * Note that if "leaf" is false we're checking an intermediate
+ * component of the mount point path, so it must be a directory.
+ * If "leaf" is true, then we're checking the entire mount point
+ * path, so the mount point itself can be anything aside from a
+ * symbolic link.
+ *
+ * If the path is invalid then a negative value is returned.  If the
+ * path exists and is a valid mount point path then 0 is returned.
+ * If the path doesn't exist return a positive value.
  */
 static int
-check_path(zlog_t *zlogp, const char *path)
+valid_mount_point(zlog_t *zlogp, const char *path, const boolean_t leaf)
 {
 	struct stat statbuf;
 	char respath[MAXPATHLEN];
@@ -891,7 +895,7 @@ check_path(zlog_t *zlogp, const char *path)
 
 	if (lstat(path, &statbuf) != 0) {
 		if (errno == ENOENT)
-			return (0);
+			return (1);
 		zerror(zlogp, B_TRUE, "can't stat %s", path);
 		return (-1);
 	}
@@ -899,24 +903,9 @@ check_path(zlog_t *zlogp, const char *path)
 		zerror(zlogp, B_FALSE, "%s is a symlink", path);
 		return (-1);
 	}
-	if (!S_ISDIR(statbuf.st_mode)) {
-		if (is_system_labeled() && S_ISREG(statbuf.st_mode)) {
-			/*
-			 * The need to mount readonly copies of
-			 * global zone /etc/ files is unique to
-			 * Trusted Extensions.
-			 * The check for /etc/ via strstr() is to
-			 * allow paths like $ZONEROOT/etc/passwd
-			 */
-			if (strstr(path, "/etc/") == NULL) {
-				zerror(zlogp, B_FALSE,
-				    "%s is not in /etc", path);
-				return (-1);
-			}
-		} else {
-			zerror(zlogp, B_FALSE, "%s is not a directory", path);
-			return (-1);
-		}
+	if (!leaf && !S_ISDIR(statbuf.st_mode)) {
+		zerror(zlogp, B_FALSE, "%s is not a directory", path);
+		return (-1);
 	}
 	if ((res = resolvepath(path, respath, sizeof (respath))) == -1) {
 		zerror(zlogp, B_TRUE, "unable to resolve path %s", path);
@@ -925,7 +914,7 @@ check_path(zlog_t *zlogp, const char *path)
 	respath[res] = '\0';
 	if (strcmp(path, respath) != 0) {
 		/*
-		 * We don't like ".."s and "."s throwing us off
+		 * We don't like ".."s, "."s, or "//"s throwing us off
 		 */
 		zerror(zlogp, B_FALSE, "%s is not a canonical path", path);
 		return (-1);
@@ -934,38 +923,81 @@ check_path(zlog_t *zlogp, const char *path)
 }
 
 /*
- * Check every component of rootpath/relpath.  If any component fails (ie,
- * exists but isn't the canonical path to a directory), it is returned in
- * badpath, which is assumed to be at least of size MAXPATHLEN.
+ * Validate a mount point path.  A valid mount point path is an
+ * absolute path that either doesn't exist, or, if it does exists it
+ * must be an absolute canonical path that doesn't have any symbolic
+ * links in it.  The target of a mount point path can be any filesystem
+ * object.  (Different filesystems can support different mount points,
+ * for example "lofs" and "mntfs" both support files and directories
+ * while "ufs" just supports directories.)
  *
- * Relpath must begin with '/'.
+ * If the path is invalid then a negative value is returned.  If the
+ * path exists and is a valid mount point path then 0 is returned.
+ * If the path doesn't exist return a positive value.
  */
-static boolean_t
-valid_mount_path(zlog_t *zlogp, const char *rootpath, const char *relpath)
+int
+valid_mount_path(zlog_t *zlogp, const char *rootpath, const char *spec,
+    const char *dir, const char *fstype)
 {
-	char abspath[MAXPATHLEN], *slashp;
+	char abspath[MAXPATHLEN], *slashp, *slashp_next;
+	int rv;
 
 	/*
-	 * Make sure abspath has at least one '/' after its rootpath
-	 * component, and ends with '/'.
+	 * Sanity check the target mount point path.
+	 * It must be a non-null string that starts with a '/'.
 	 */
-	if (snprintf(abspath, sizeof (abspath), "%s%s/", rootpath, relpath) >=
-	    sizeof (abspath)) {
-		zerror(zlogp, B_FALSE, "pathname %s%s is too long", rootpath,
-		    relpath);
-		return (B_FALSE);
+	if (dir[0] != '/') {
+		if (spec[0] == '\0') {
+			/*
+			 * This must be an invalid ipd entry (see comments
+			 * in mount_filesystems_ipdent()).
+			 */
+			zerror(zlogp, B_FALSE,
+			    "invalid inherit-pkg-dir entry: \"%s\"", dir);
+		} else {
+			/* Something went wrong. */
+			zerror(zlogp, B_FALSE, "invalid mount directory, "
+			    "type: \"%s\", special: \"%s\", dir: \"%s\"",
+			    fstype, spec, dir);
+		}
+		return (-1);
 	}
 
+	/*
+	 * Join rootpath and dir.  Make sure abspath ends with '/', this
+	 * is added to all paths (even non-directory paths) to allow us
+	 * to detect the end of paths below.  If the path already ends
+	 * in a '/', then that's ok too (although we'll fail the
+	 * cannonical path check in valid_mount_point()).
+	 */
+	if (snprintf(abspath, sizeof (abspath),
+	    "%s%s/", rootpath, dir) >= sizeof (abspath)) {
+		zerror(zlogp, B_FALSE, "pathname %s%s is too long",
+		    rootpath, dir);
+		return (-1);
+	}
+
+	/*
+	 * Starting with rootpath, verify the mount path one component
+	 * at a time.  Continue until we've evaluated all of abspath.
+	 */
 	slashp = &abspath[strlen(rootpath)];
 	assert(*slashp == '/');
 	do {
+		slashp_next = strchr(slashp + 1, '/');
 		*slashp = '\0';
-		if (check_path(zlogp, abspath) != 0)
-			return (B_FALSE);
+		if (slashp_next != NULL) {
+			/* This is an intermediary mount path component. */
+			rv = valid_mount_point(zlogp, abspath, B_FALSE);
+		} else {
+			/* This is the last component of the mount path. */
+			rv = valid_mount_point(zlogp, abspath, B_TRUE);
+		}
+		if (rv < 0)
+			return (rv);
 		*slashp = '/';
-		slashp++;
-	} while ((slashp = strchr(slashp, '/')) != NULL);
-	return (B_TRUE);
+	} while ((slashp = slashp_next) != NULL);
+	return (rv);
 }
 
 static int
@@ -1115,15 +1147,36 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 	zone_fsopt_t *optptr;
 	int rv;
 
-	if (!valid_mount_path(zlogp, rootpath, fsptr->zone_fs_dir)) {
+	if ((rv = valid_mount_path(zlogp, rootpath, fsptr->zone_fs_special,
+	    fsptr->zone_fs_dir, fsptr->zone_fs_type)) < 0) {
 		zerror(zlogp, B_FALSE, "%s%s is not a valid mount point",
 		    rootpath, fsptr->zone_fs_dir);
 		return (-1);
-	}
+	} else if (rv > 0) {
+		/* The mount point path doesn't exist, create it now. */
+		if (make_one_dir(zlogp, rootpath, fsptr->zone_fs_dir,
+		    DEFAULT_DIR_MODE, DEFAULT_DIR_USER,
+		    DEFAULT_DIR_GROUP) != 0) {
+			zerror(zlogp, B_FALSE, "failed to create mount point");
+			return (-1);
+		}
 
-	if (make_one_dir(zlogp, rootpath, fsptr->zone_fs_dir,
-	    DEFAULT_DIR_MODE, DEFAULT_DIR_USER, DEFAULT_DIR_GROUP) != 0)
-		return (-1);
+		/*
+		 * Now this might seem weird, but we need to invoke
+		 * valid_mount_path() again.  Why?  Because it checks
+		 * to make sure that the mount point path is canonical,
+		 * which it can only do if the path exists, so now that
+		 * we've created the path we have to verify it again.
+		 */
+		if ((rv = valid_mount_path(zlogp, rootpath,
+		    fsptr->zone_fs_special, fsptr->zone_fs_dir,
+		    fsptr->zone_fs_type)) < 0) {
+			zerror(zlogp, B_FALSE,
+			    "%s%s is not a valid mount point",
+			    rootpath, fsptr->zone_fs_dir);
+			return (-1);
+		}
+	}
 
 	(void) snprintf(path, sizeof (path), "%s%s", rootpath,
 	    fsptr->zone_fs_dir);

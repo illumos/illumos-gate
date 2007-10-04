@@ -58,6 +58,13 @@ extern "C" {
 
 #define	CLUSTER_BRAND_NAME	"cluster"
 
+/* 0755 is the default directory mode. */
+#define	DEFAULT_DIR_MODE \
+	(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+#define	DEFAULT_DIR_USER -1	/* user ID for chown: -1 means don't change */
+#define	DEFAULT_DIR_GROUP -1	/* grp ID for chown: -1 means don't change */
+
+
 typedef struct zlog {
 	FILE *logfile;	/* file to log to */
 
@@ -109,6 +116,14 @@ extern void eventstream_write(zone_evt_t evt);
 extern zoneid_t vplat_create(zlog_t *, boolean_t);
 extern int vplat_bringup(zlog_t *, boolean_t, zoneid_t);
 extern int vplat_teardown(zlog_t *, boolean_t, boolean_t);
+
+/*
+ * Filesystem mounting interfaces.
+ */
+extern int valid_mount_path(zlog_t *, const char *, const char *,
+    const char *, const char *);
+extern int make_one_dir(zlog_t *, const char *, const char *,
+    mode_t, uid_t, gid_t);
 
 /*
  * Console subsystem routines.

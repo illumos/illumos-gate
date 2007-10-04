@@ -511,10 +511,45 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 {
 	zlog_t *zlogp = ((fs_callback_t *)data)->zlogp;
 	zoneid_t zoneid = ((fs_callback_t *)data)->zoneid;
+	char rootpath[MAXPATHLEN];
 	pid_t child;
 	int child_status;
 	int tmpl_fd;
+	int rv;
 	ctid_t ct;
+
+	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone root");
+		return (-1);
+	}
+
+	if ((rv = valid_mount_path(zlogp, rootpath, spec, dir, fstype)) < 0) {
+		zerror(zlogp, B_FALSE, "%s%s is not a valid mount point",
+		    rootpath, dir);
+		return (-1);
+	} else if (rv > 0) {
+		/* The mount point path doesn't exist, create it now. */
+		if (make_one_dir(zlogp, rootpath, dir,
+		    DEFAULT_DIR_MODE, DEFAULT_DIR_USER,
+		    DEFAULT_DIR_GROUP) != 0) {
+			zerror(zlogp, B_FALSE, "failed to create mount point");
+			return (-1);
+		}
+
+		/*
+		 * Now this might seem weird, but we need to invoke
+		 * valid_mount_path() again.  Why?  Because it checks
+		 * to make sure that the mount point path is canonical,
+		 * which it can only do if the path exists, so now that
+		 * we've created the path we have to verify it again.
+		 */
+		if ((rv = valid_mount_path(zlogp, rootpath, spec, dir,
+		    fstype)) < 0) {
+			zerror(zlogp, B_FALSE,
+			    "%s%s is not a valid mount point", rootpath, dir);
+			return (-1);
+		}
+	}
 
 	if ((tmpl_fd = init_template()) == -1) {
 		zerror(zlogp, B_TRUE, "failed to create contract");
