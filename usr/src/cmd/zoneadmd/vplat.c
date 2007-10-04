@@ -3123,7 +3123,7 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	struct zone_dstab dstab;
 	size_t total, offset, len;
 	int error = -1;
-	char *str;
+	char *str = NULL;
 
 	*bufp = NULL;
 	*bufsizep = 0;
@@ -3166,9 +3166,9 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
 		len = strlen(dstab.zone_dataset_name);
 		(void) strlcpy(str + offset, dstab.zone_dataset_name,
-		    sizeof (dstab.zone_dataset_name) - offset);
+		    total - offset);
 		offset += len;
-		if (offset != total - 1)
+		if (offset < total - 1)
 			str[offset++] = ',';
 	}
 	(void) zonecfg_enddsent(handle);
