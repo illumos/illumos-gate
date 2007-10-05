@@ -24,17 +24,6 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MISC_LINK_ISA	= misc_link_sparc
-
-LINK_SRCS_sparc =		\
-	$(MISC_LINK_ISA).c
-
-LINK_OBJS_sparc =		\
-	$(MISC_LINK_ISA).o
-
-LINK_MODS_sparc =		\
-	SUNW_$(MISC_LINK_ISA).so
+LINK_OBJS_sparc = misc_link_sparc.o
 
 include ../Makefile.com
-
-install: all

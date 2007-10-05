@@ -19,22 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include $(SRC)/lib/Makefile.lib
-
 SUBDIRS =	$(MACH) 
-
-MSGSRCS :sh= echo */*.[ch]
-MSGFILES = $(MSGSRCS:%.c=%.i)
-POFILE = libmeta.po	
-
-DCFILES = common/meta_print.po
-DCFILE = libmeta.dc
 
 install :=	TARGET= install
 clean :=	TARGET= clean
@@ -42,34 +33,15 @@ clobber :=	TARGET= clobber
 lint :=		TARGET= lint
 test :=		TARGET= test
 debug :=	TARGET= debug
-
-CPPFLAGS += -I$(SRC)/lib/lvm/libmeta/common/hdrs
+_msg :=		TARGET= _msg
+_dc :=		TARGET= _dc
 
 .KEEP_STATE:
 
-all debug install lint: $(SUBDIRS)
-
-clean: $(SUBDIRS)
-	$(RM) $(MSGFILES) $(DCFILES)
-
-clobber: $(SUBDIRS)
-	$(RM) $(POFILE) $(DCFILE)
-
-$(DCFILE):= XGETFLAGS = -c TRANSLATION_NOTE_LC_TIME -t
-
-$(DCFILE): $(DCFILES)
-	$(CAT) $(DCFILES) > $(DCFILE)
-
-$(POFILE): $(MSGFILES)
-	$(BUILDPO.msgfiles)
-
-_msg: $(MSGDOMAINPOFILE)
-
-_dc: $(DCMSGDOMAINPOFILE)
+all debug install lint clean clobber _msg _dc: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
-include $(SRC)/Makefile.msg.targ

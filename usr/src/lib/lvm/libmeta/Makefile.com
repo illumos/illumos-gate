@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -117,12 +117,19 @@ LOCAL_SRCS =	$(LOCAL_OBJS:%.o=../common/%.c)
 DERIVED_SRCS =	$(DERIVED_OBJS:%.o=%.c)
 SPC_SRCS = 	$(SPC_OBJS:%.o=../common/%.c)
 
-include ../../../Makefile.lib
-
 OBJECTS64 =	$(LOCAL_OBJS) $(DERIVED_OBJS) $(CMN_OBJS)
 OBJECTS =	$(OBJECTS64) $(SPC_OBJS)
 
 include $(SRC)/lib/lvm/Makefile.lvm
+
+MSGSRCS = $(LOCAL_SRCS) $(SPC_SRCS)
+MSGFILES = $(MSGSRCS:%.c=%.i)
+POFILE = libmeta.po     
+
+DCFILES = ../common/meta_print.po
+DCFILE = libmeta.dc
+
+CLOBBERFILES += $(POFILE) $(DCFILE)
 
 # install this library in the root filesystem
 include ../../../Makefile.rootfs
@@ -133,7 +140,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 lint :=		SRCS = $(CMN_SRCS) $(LOCAL_SRCS) $(SPC_SRCS)
 CPPFLAGS +=     -I$(SRC)/lib/lvm/libmeta/common/hdrs
 LDLIBS += 	-lnsl -lc -ladm -ldevid -lgen -lefi -ldevinfo -lscf
-CLEANFILES += 	$(DERIVED_SRCS)
+CLEANFILES += 	$(DERIVED_SRCS) $(MSGFILES) $(DCFILES)
 
 .KEEP_STATE:
 
@@ -144,6 +151,8 @@ $(BIG_TARGETS) := CPPFLAGS += -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64
 $(LINTLIB) := CPPFLAGS += -D_LARGEFILE_SOURCE=1 -D_FILE_OFFSET_BITS=64
 
 all: $(LIBS)
+
+install debug: all $(ROOTLIBS) $(ROOTLINT) $(ROOTLINKS)
 
 objs/%.o profs/%.o pics/%.o: $(COMMON)/%.c
 	$(COMPILE.c) -o $@ $<
@@ -184,4 +193,17 @@ mhdx_xdr.c: $(SRC)/uts/common/sys/lvm/mhdx.x
 mdmn_commd_xdr.c: $(SRC)/uts/common/sys/lvm/mdmn_commd.x
 	$(RPCGEN) -c $(SRC)/uts/common/sys/lvm/mdmn_commd.x -o $@
 
+$(DCFILE):= XGETFLAGS = -c TRANSLATION_NOTE_LC_TIME -t
+
+$(DCFILE): $(DCFILES)
+	$(CAT) $(DCFILES) > $(DCFILE)
+
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg: $(MSGDOMAINPOFILE)
+
+_dc: $(DCMSGDOMAINPOFILE)
+
 include $(SRC)/lib/lvm/Makefile.targ
+include $(SRC)/Makefile.msg.targ

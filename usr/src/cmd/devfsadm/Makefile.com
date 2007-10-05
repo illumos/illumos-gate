@@ -49,28 +49,7 @@ DEVFSADM_DIR = devfsadm
 
 CLOBBERFILES = $(MODS) $(DEVLINKTAB) $(DEVFSCOMPATLINKS) $(DEVFSADM_DAEMON)
 
-LINK_SRCS =			\
-	$(COMMON)/disk_link.c	\
-	$(COMMON)/ieee1394_link.c	\
-	$(COMMON)/dcam1394_link.c	\
-	$(COMMON)/tape_link.c	\
-	$(COMMON)/usb_link.c	\
-	$(COMMON)/port_link.c	\
-	$(COMMON)/audio_link.c	\
-	$(COMMON)/cfg_link.c	\
-	$(COMMON)/misc_link.c	\
-	$(COMMON)/lofi_link.c	\
-	$(COMMON)/ramdisk_link.c	\
-	$(COMMON)/fssnap_link.c \
-	$(COMMON)/sgen_link.c	\
-	$(COMMON)/md_link.c	\
-	$(COMMON)/dtrace_link.c	\
-	$(COMMON)/zfs_link.c	\
-	$(LINK_SRCS_$(MACH))
-
-LINT_MODULES = $(LINK_SRCS:.c=.ln)
-
-LINK_OBJS =			\
+LINK_OBJS_CMN =			\
 	disk_link.o		\
 	ieee1394_link.o		\
 	dcam1394_link.o		\
@@ -86,27 +65,17 @@ LINK_OBJS =			\
 	sgen_link.o		\
 	md_link.o		\
 	dtrace_link.o		\
-	zfs_link.o		\
-	$(LINK_OBJS_$(MACH))
+	zfs_link.o
 
-LINK_MODS =			\
-	SUNW_disk_link.so	\
-	SUNW_ieee1394_link.so	\
-	SUNW_dcam1394_link.so	\
-	SUNW_tape_link.so	\
-	SUNW_usb_link.so	\
-	SUNW_port_link.so	\
-	SUNW_audio_link.so	\
-	SUNW_cfg_link.so	\
-	SUNW_misc_link.so	\
-	SUNW_lofi_link.so	\
-	SUNW_ramdisk_link.so	\
-	SUNW_fssnap_link.so     \
-	SUNW_sgen_link.so	\
-	SUNW_md_link.so		\
-	SUNW_dtrace_link.so	\
-	SUNW_zfs_link.so	\
-	$(LINK_MODS_$(MACH))
+LINK_OBJS =	$(LINK_OBJS_CMN) \
+		$(LINK_OBJS_$(MACH))
+
+LINK_SRCS =	$(LINK_OBJS_CMN:%.o=$(COMMON)/%.c) \
+		$(LINK_OBJS_$(MACH):%.o=%.c)
+
+LINT_MODULES = $(LINK_SRCS:%.c=%.ln)
+
+LINK_MODS =	$(LINK_OBJS:%.o=SUNW_%.so)
 
 DEVLINKTAB = devlink.tab
 DEVLINKTAB_SRC = $(COMMON)/$(DEVLINKTAB).sh
@@ -124,6 +93,9 @@ LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbrand -lbsm $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -lzonecfg -lbrand -lbsm
 LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -ldoor $(LAZYLIBS) -lnsl
+
+LINK_MOD_LDLIBS=
+SUNW_md_link.so :=	LINK_MOD_LDLIBS=	-lmeta
 
 SRCS = $(DEVFSADM_SRC) $(LINK_SRCS)
 OBJS = $(DEVFSADM_OBJ) $(LINK_OBJS)
@@ -181,13 +153,11 @@ clean:
 
 lint: $(DEVFSADM_MOD).ln $(LINT_MODULES)
 
-devfsadm.ln: FRC
+devfsadm.ln: $(DEVFSADM_SRC)
 	$(LINT.c) $(DEVFSADM_SRC) $(LDLIBS)
 
-%.ln: FRC
+%.ln: $(DEVFSADM_SRC) %.c
 	$(LINT.c) $(DEVFSADM_SRC) $(@:.ln=.c) $(LDLIBS)
-
-FRC:
 
 include ../../Makefile.targ
 
@@ -195,14 +165,16 @@ $(POFILE):      $(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
 $(DEVFSADM_MOD): $(DEVFSADM_OBJ)
-	$(LINK.c) -o $@ $< $(DEVFSADM_OBJ) $(LDLIBS) -lmeta
+	$(LINK.c) -o $@ $< $(DEVFSADM_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
 SUNW_%.so: %.o
-	$(LINK.c) -o $@ $(GSHARED) -h $@ $<
+	$(LINK.c) -o $@ $(GSHARED) -h $@ $< $(LINK_MOD_LDLIBS)
+	$(POST_PROCESS_SO)
 
 %.o: $(COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
+	$(COMPILE.c) -o $@ $< $(CTFCONVERT_HOOK)
+	$(POST_PROCESS_O)
 
 
 $(DEVLINKTAB): $(DEVLINKTAB_SRC)
