@@ -111,8 +111,7 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	Sword		plt_off;
 	Word		got_off;
 	Xword		val1;
-	Word		flags = ofl->ofl_flags;
-	Word		dtflags1 = ofl->ofl_dtflags_1;
+	int		bswap;
 
 	got_off = sdp->sd_aux->sa_PLTGOTndx * M_GOT_ENTSIZE;
 	plt_off = M_PLT_RESERVSZ + ((sdp->sd_aux->sa_PLTndx - 1) *
@@ -130,6 +129,21 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	    M_PLT_INSSIZE;
 
 	/*
+	 * If '-z noreloc' is specified - skip the do_reloc_ld
+	 * stage.
+	 */
+	if (!OFL_DO_RELOC(ofl))
+		return (1);
+
+	/*
+	 * If the running linker has a different byte order than
+	 * the target host, tell do_reloc_ld() to swap bytes.
+	 *
+	 * We know the PLT is PROGBITS --- we don't have to check
+	 */
+	bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
+
+	/*
 	 * patchup:
 	 *	jmpq	*name1@gotpcrel(%rip)
 	 *
@@ -138,20 +152,12 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	val1 = (ofl->ofl_osgot->os_shdr->sh_addr + got_off) -
 	    (ofl->ofl_osplt->os_shdr->sh_addr + plt_off) - 0x06;
 
-	/*
-	 * If '-z noreloc' is specified - skip the do_reloc
-	 * stage.
-	 */
-	if ((flags & FLG_OF_RELOBJ) ||
-	    !(dtflags1 & DF_1_NORELOC)) {
-		if (do_reloc(R_AMD64_GOTPCREL, &pltent[0x02],
-		    &val1, MSG_ORIG(MSG_SYM_PLTENT),
-		    MSG_ORIG(MSG_SPECFIL_PLTENT), ofl->ofl_lml) == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_PLT_PLTNFAIL), sdp->sd_aux->sa_PLTndx,
-			    demangle(sdp->sd_name));
-			return (S_ERROR);
-		}
+	if (do_reloc_ld(R_AMD64_GOTPCREL, &pltent[0x02],
+	    &val1, MSG_ORIG(MSG_SYM_PLTENT),
+	    MSG_ORIG(MSG_SPECFIL_PLTENT), bswap, ofl->ofl_lml) == 0) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_PLT_PLTNFAIL),
+		    sdp->sd_aux->sa_PLTndx, demangle(sdp->sd_name));
+		return (S_ERROR);
 	}
 
 	/*
@@ -159,47 +165,34 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	 *	pushq	$pltndx
 	 */
 	val1 = (Xword)(sdp->sd_aux->sa_PLTndx - 1);
-	/*
-	 * If '-z noreloc' is specified - skip the do_reloc
-	 * stage.
-	 */
-	if ((flags & FLG_OF_RELOBJ) ||
-	    !(dtflags1 & DF_1_NORELOC)) {
-		if (do_reloc(R_AMD64_32, &pltent[0x07],
-		    &val1, MSG_ORIG(MSG_SYM_PLTENT),
-		    MSG_ORIG(MSG_SPECFIL_PLTENT), ofl->ofl_lml) == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_PLT_PLTNFAIL), sdp->sd_aux->sa_PLTndx,
-			    demangle(sdp->sd_name));
-			return (S_ERROR);
-		}
+
+	if (do_reloc_ld(R_AMD64_32, &pltent[0x07],
+	    &val1, MSG_ORIG(MSG_SYM_PLTENT),
+	    MSG_ORIG(MSG_SPECFIL_PLTENT), bswap, ofl->ofl_lml) == 0) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_PLT_PLTNFAIL),
+		    sdp->sd_aux->sa_PLTndx, demangle(sdp->sd_name));
+		return (S_ERROR);
 	}
 
 	/*
 	 * patchup:
 	 *	jmpq	.plt0(%rip)
-	 * NOTE: 0x10 represents next instruction.  The rather complex series
-	 * of casts is necessary to sign extend an offset into a 64-bit value
-	 * while satisfying various compiler error checks.  Handle with care.
+	 * NOTE: 0x10 represents next instruction. The rather complex
+	 * series of casts is necessary to sign extend an offset into
+	 * a 64-bit value while satisfying various compiler error
+	 * checks.  Handle with care.
 	 */
 	val1 = (Xword)((intptr_t)((uintptr_t)plt0 -
 	    (uintptr_t)(&pltent[0x10])));
 
-	/*
-	 * If '-z noreloc' is specified - skip the do_reloc
-	 * stage.
-	 */
-	if ((flags & FLG_OF_RELOBJ) ||
-	    !(dtflags1 & DF_1_NORELOC)) {
-		if (do_reloc(R_AMD64_PC32, &pltent[0x0c],
-		    &val1, MSG_ORIG(MSG_SYM_PLTENT),
-		    MSG_ORIG(MSG_SPECFIL_PLTENT), ofl->ofl_lml) == 0) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_PLT_PLTNFAIL), sdp->sd_aux->sa_PLTndx,
-			    demangle(sdp->sd_name));
-			return (S_ERROR);
-		}
+	if (do_reloc_ld(R_AMD64_PC32, &pltent[0x0c],
+	    &val1, MSG_ORIG(MSG_SYM_PLTENT),
+	    MSG_ORIG(MSG_SPECFIL_PLTENT), bswap, ofl->ofl_lml) == 0) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_PLT_PLTNFAIL),
+		    sdp->sd_aux->sa_PLTndx, demangle(sdp->sd_name));
+		return (S_ERROR);
 	}
+
 	return (1);
 }
 
@@ -608,7 +601,6 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Listnode	*lnp;
 	uintptr_t	return_code = 1;
 	Word		flags = ofl->ofl_flags;
-	Word		dtflags1 = ofl->ofl_dtflags_1;
 
 	if (ofl->ofl_actrels.head)
 		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
@@ -822,7 +814,11 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				/*
 				 * And do it.
 				 */
-				*(Xword *)R2addr = value;
+				if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
+					*(Xword *)R2addr =
+					    ld_byteswap_Xword(value);
+				else
+					*(Xword *)R2addr = value;
 				continue;
 
 			} else if (IS_GOT_BASED(arsp->rel_rtype) &&
@@ -969,13 +965,19 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				value -= *addr;
 
 			/*
-			 * If '-z noreloc' is specified - skip the do_reloc
+			 * If '-z noreloc' is specified - skip the do_reloc_ld
 			 * stage.
 			 */
-			if ((flags & FLG_OF_RELOBJ) ||
-			    !(dtflags1 & DF_1_NORELOC)) {
-				if (do_reloc((uchar_t)arsp->rel_rtype,
+			if (OFL_DO_RELOC(ofl)) {
+				/*
+				 * If this is a PROGBITS section and the
+				 * running linker has a different byte order
+				 * than the target host, tell do_reloc_ld()
+				 * to swap bytes.
+				 */
+				if (do_reloc_ld((uchar_t)arsp->rel_rtype,
 				    addr, &value, arsp->rel_sname, ifl_name,
+				    OFL_SWAP_RELOC_DATA(ofl, arsp),
 				    ofl->ofl_lml) == 0)
 					return_code = S_ERROR;
 			}
@@ -1454,9 +1456,6 @@ static uchar_t plt0_template[M_PLT_ENTSIZE] = {
 uintptr_t
 ld_fillin_gotplt(Ofl_desc *ofl)
 {
-	Word	flags = ofl->ofl_flags;
-	Word	dtflags1 = ofl->ofl_dtflags_1;
-
 	if (ofl->ofl_osgot) {
 		Sym_desc	*sdp;
 
@@ -1481,12 +1480,29 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 	 *	0x0e NOP
 	 *	0x0f NOP
 	 */
-	if ((flags & FLG_OF_DYNAMIC) && ofl->ofl_osplt) {
+	if ((ofl->ofl_flags & FLG_OF_DYNAMIC) && ofl->ofl_osplt) {
 		uchar_t	*pltent;
 		Xword	val1;
+		int	bswap;
 
 		pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf;
 		bcopy(plt0_template, pltent, sizeof (plt0_template));
+
+		/*
+		 * If '-z noreloc' is specified - skip the do_reloc_ld
+		 * stage.
+		 */
+		if (!OFL_DO_RELOC(ofl))
+			return (1);
+
+		/*
+		 * If the running linker has a different byte order than
+		 * the target host, tell do_reloc_ld() to swap bytes.
+		 *
+		 * We know the GOT is PROGBITS --- we don't have
+		 * to check.
+		 */
+		bswap = (ofl->ofl_flags1 & FLG_OF1_ENCDIFF) != 0;
 
 		/*
 		 * filin:
@@ -1500,19 +1516,12 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 		    (M_GOT_XLINKMAP * M_GOT_ENTSIZE) -
 		    ofl->ofl_osplt->os_shdr->sh_addr - 0x06;
 
-		/*
-		 * If '-z noreloc' is specified - skip the do_reloc
-		 * stage.
-		 */
-		if ((flags & FLG_OF_RELOBJ) ||
-		    !(dtflags1 & DF_1_NORELOC)) {
-			if (do_reloc(R_AMD64_GOTPCREL, &pltent[0x02],
-			    &val1, MSG_ORIG(MSG_SYM_PLTENT),
-			    MSG_ORIG(MSG_SPECFIL_PLTENT), ofl->ofl_lml) == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_PLT_PLT0FAIL));
-				return (S_ERROR);
-			}
+		if (do_reloc_ld(R_AMD64_GOTPCREL, &pltent[0x02],
+		    &val1, MSG_ORIG(MSG_SYM_PLTENT),
+		    MSG_ORIG(MSG_SPECFIL_PLTENT), bswap, ofl->ofl_lml) == 0) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_PLT_PLT0FAIL));
+			return (S_ERROR);
 		}
 
 		/*
@@ -1522,20 +1531,15 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 		val1 = (ofl->ofl_osgot->os_shdr->sh_addr) +
 		    (M_GOT_XRTLD * M_GOT_ENTSIZE) -
 		    ofl->ofl_osplt->os_shdr->sh_addr - 0x0c;
-		/*
-		 * If '-z noreloc' is specified - skip the do_reloc
-		 * stage.
-		 */
-		if ((flags & FLG_OF_RELOBJ) ||
-		    !(dtflags1 & DF_1_NORELOC)) {
-			if (do_reloc(R_AMD64_GOTPCREL, &pltent[0x08],
-			    &val1, MSG_ORIG(MSG_SYM_PLTENT),
-			    MSG_ORIG(MSG_SPECFIL_PLTENT), ofl->ofl_lml) == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_PLT_PLT0FAIL));
-				return (S_ERROR);
-			}
+
+		if (do_reloc_ld(R_AMD64_GOTPCREL, &pltent[0x08],
+		    &val1, MSG_ORIG(MSG_SYM_PLTENT),
+		    MSG_ORIG(MSG_SPECFIL_PLTENT), bswap, ofl->ofl_lml) == 0) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_PLT_PLT0FAIL));
+			return (S_ERROR);
 		}
 	}
+
 	return (1);
 }

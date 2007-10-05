@@ -938,7 +938,6 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Listnode	*lnp;
 	uintptr_t	return_code = 1;
 	Word		flags = ofl->ofl_flags;
-	Word		dtflags1 = ofl->ofl_dtflags_1;
 
 	if (ofl->ofl_actrels.head)
 		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
@@ -1149,7 +1148,11 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				/*
 				 * And do it.
 				 */
-				*(Xword *)R2addr = value;
+				if (ofl->ofl_flags1 & FLG_OF1_ENCDIFF)
+					*(Xword *)R2addr =
+					    ld_byteswap_Xword(value);
+				else
+					*(Xword *)R2addr = value;
 				continue;
 
 			} else if (IS_GOT_BASED(arsp->rel_rtype) &&
@@ -1273,10 +1276,10 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 * If '-z noreloc' is specified - skip the do_reloc
 			 * stage.
 			 */
-			if ((flags & FLG_OF_RELOBJ) ||
-			    !(dtflags1 & DF_1_NORELOC)) {
-				if (do_reloc((uchar_t)arsp->rel_rtype, addr,
+			if (OFL_DO_RELOC(ofl)) {
+				if (do_reloc_ld((uchar_t)arsp->rel_rtype, addr,
 				    &value, arsp->rel_sname, ifl_name,
+				    OFL_SWAP_RELOC_DATA(ofl, arsp),
 				    ofl->ofl_lml) == 0)
 					return_code = S_ERROR;
 			}

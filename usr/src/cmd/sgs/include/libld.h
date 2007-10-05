@@ -360,7 +360,8 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
 #define	FLG_OF1_RLXREL	0x00400000	/* -z relaxreloc flag set */
-
+#define	FLG_OF1_ENCDIFF	0x00800000	/* Host running linker has different */
+					/*	byte order than output object */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
@@ -376,7 +377,7 @@ struct ofl_desc {
  * Test to see if the output file would allow the presence of
  * a .dynsym section.
  */
-#define	OFL_ALLOW_DYNSYM(ofl) ((ofl->ofl_flags & \
+#define	OFL_ALLOW_DYNSYM(_ofl) (((_ofl)->ofl_flags & \
 	(FLG_OF_DYNAMIC | FLG_OF_RELOBJ)) == FLG_OF_DYNAMIC)
 
 /*
@@ -386,8 +387,24 @@ struct ofl_desc {
  * even if the answer is True (1), we will only generate one if there
  * are local symbols that require it.
  */
-#define	OFL_ALLOW_LDYNSYM(ofl) ((ofl->ofl_flags & \
+#define	OFL_ALLOW_LDYNSYM(_ofl) (((_ofl)->ofl_flags & \
 	(FLG_OF_DYNAMIC | FLG_OF_RELOBJ | FLG_OF_NOLDYNSYM)) == FLG_OF_DYNAMIC)
+
+/*
+ * Test to see if relocation processing should be done. This is normally
+ * true, but can be disabled via the '-z noreloc' option. Note that
+ * relocatable objects are still relocated even if '-z noreloc' is present.
+ */
+#define	OFL_DO_RELOC(_ofl) (((_ofl)->ofl_flags & FLG_OF_RELOBJ) || \
+	!((_ofl)->ofl_dtflags_1 & DF_1_NORELOC))
+
+/*
+ * Determine whether relocation processing needs to swap the
+ * data being relocated.
+ */
+#define	OFL_SWAP_RELOC_DATA(_ofl, _rel) \
+	((((_ofl)->ofl_flags1 & FLG_OF1_ENCDIFF) != 0) && \
+	((_rel)->rel_osdesc->os_shdr->sh_type == SHT_PROGBITS))
 
 /*
  * Relocation (active & output) processing structure - transparent to common

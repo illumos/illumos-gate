@@ -139,7 +139,7 @@ elf_plt_trace_write(uint_t roffset, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		 *	pushl	dyn_data
 		 */
 		symvalue = (Word)dyndata;
-		if (do_reloc(R_386_32, &dyn_plt[4], &symvalue,
+		if (do_reloc_rtld(R_386_32, &dyn_plt[4], &symvalue,
 		    MSG_ORIG(MSG_SYM_LADYNDATA),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -154,7 +154,7 @@ elf_plt_trace_write(uint_t roffset, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		 *	jmp	elf_plt_trace
 		 */
 		symvalue = (ulong_t)(elf_plt_trace) - (ulong_t)(dyn_plt + 9);
-		if (do_reloc(R_386_PC32, &dyn_plt[9], &symvalue,
+		if (do_reloc_rtld(R_386_PC32, &dyn_plt[9], &symvalue,
 		    MSG_ORIG(MSG_SYM_ELFPLTTRACE),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -977,8 +977,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			/*
 			 * Write the relocation out.
 			 */
-			if (do_reloc(rtype, (uchar_t *)roffset, (Word *)&value,
-			    name, NAME(lmp), LIST(lmp)) == 0)
+			if (do_reloc_rtld(rtype, (uchar_t *)roffset,
+			    (Word *)&value, name, NAME(lmp), LIST(lmp)) == 0)
 				ret = 0;
 
 			DBG_CALL(Dbg_reloc_apply_val(LIST(lmp), ELF_DBG_RTLD,

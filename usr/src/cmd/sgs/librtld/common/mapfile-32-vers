@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +28,6 @@
 
 {
 	global:
-		do32_reloc =	FUNCTION parent;
-		reloc32_table =	DATA parent;
+		do32_reloc_rtld =	FUNCTION parent;
+		reloc32_table =		DATA parent;
 };

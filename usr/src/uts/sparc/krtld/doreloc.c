@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,10 +344,20 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  * Upon successful completion of do_reloc() *value will be set to the
  * 'bit-shifted' value that will be or'ed into memory.
  */
-/* ARGSUSED5 */
+#if defined(_KERNEL)
+#define	lml	0		/* Needed by arglist of REL_ERR_* macros */
 int
-do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+    const char *file)
+#elif defined(DO_RELOC_LIBLD)
+int
+do_reloc_ld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+    const char *file, int bswap, void *lml)
+#else
+int
+do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
     const char *file, void *lml)
+#endif
 {
 	Xword			uvalue = 0;
 	Xword			basevalue, sigbit_mask, sigfit_mask;
@@ -355,6 +365,17 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 	uchar_t			bshift;
 	int			field_size, re_flags;
 	const Rel_entry *	rep;
+
+#if defined(DO_RELOC_LIBLD)
+	/*
+	 * We do not support building the sparc linker as a cross linker
+	 * at this time.
+	 */
+	if (bswap) {
+		REL_ERR_NOSWAP(lml, file, sym, rtype);
+		return (0);
+	}
+#endif
 
 	rep = &reloc_table[rtype];
 	bshift = rep->re_bshift;

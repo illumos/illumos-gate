@@ -162,7 +162,7 @@ elf_plt_trace_write(ulong_t roffset, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		 */
 		symvalue = (Xword)((uintptr_t)dyndata -
 		    (uintptr_t)(&dyn_plt[TRCREL1OFF]) - 4);
-		if (do_reloc(R_AMD64_PC32, &dyn_plt[TRCREL1OFF],
+		if (do_reloc_rtld(R_AMD64_PC32, &dyn_plt[TRCREL1OFF],
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -175,7 +175,7 @@ elf_plt_trace_write(ulong_t roffset, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		 *	R_AMD64_64	0x15	0	elf_plt_trace
 		 */
 		symvalue = (Xword)elf_plt_trace;
-		if (do_reloc(R_AMD64_64, &dyn_plt[TRCREL2OFF],
+		if (do_reloc_rtld(R_AMD64_64, &dyn_plt[TRCREL2OFF],
 		    &symvalue, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -1023,7 +1023,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			/*
 			 * Write the relocation out.
 			 */
-			if (do_reloc(rtype, (uchar_t *)roffset,
+			if (do_reloc_rtld(rtype, (uchar_t *)roffset,
 			    (Xword *)&value, name, NAME(lmp), LIST(lmp)) == 0)
 				ret = 0;
 

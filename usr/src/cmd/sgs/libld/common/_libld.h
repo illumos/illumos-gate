@@ -330,6 +330,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_assign_got_ndx	ld64_assign_got_ndx
 #define	ld_assign_got_TLS	ld64_assign_got_TLS
 #define	ld_assign_plt_ndx	ld64_assign_plt_ndx
+#define	ld_byteswap_Xword	ld64_byteswap_Xword
 #define	ld_calc_got_offset	ld64_calc_got_offset
 #define	ld_calc_plt_addr	ld64_calc_plt_addr
 #define	ld_disp_errmsg		ld64_disp_errmsg
@@ -427,6 +428,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_assign_got_ndx	ld32_assign_got_ndx
 #define	ld_assign_got_TLS	ld32_assign_got_TLS
 #define	ld_assign_plt_ndx	ld32_assign_plt_ndx
+#define	ld_byteswap_Xword	ld32_byteswap_Xword
 #define	ld_calc_got_offset	ld32_calc_got_offset
 #define	ld_calc_plt_addr	ld32_calc_plt_addr
 #define	ld_disp_errmsg		ld32_disp_errmsg
@@ -531,6 +533,7 @@ extern uintptr_t	ld_assign_got_TLS(Boolean, Rel_desc *, Ofl_desc *,
 			    Word, Word);
 extern void		ld_assign_plt_ndx(Sym_desc *, Ofl_desc *);
 
+extern Xword		ld_byteswap_Xword(Xword);
 extern Xword		ld_calc_got_offset(Rel_desc *, Ofl_desc *);
 extern Xword		ld_calc_plt_addr(Sym_desc *, Ofl_desc *);
 

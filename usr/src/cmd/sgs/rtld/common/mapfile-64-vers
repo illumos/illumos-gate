@@ -28,6 +28,6 @@
 
 SUNWprivate_1.2 {
 	protected:
-		do64_reloc;		# Required to support librtld.so
+		do64_reloc_rtld;	# Required to support librtld.so
 		reloc64_table;
 };

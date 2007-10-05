@@ -503,6 +503,31 @@ ld_add_actrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	return (1);
 }
 
+/*
+ * In the platform specific machrel.XXX.c files, we sometimes write
+ * a value directly into the GOT. This function can be used when
+ * the running linker has the opposite byte order of the object being
+ * produced.
+ */
+Xword
+ld_byteswap_Xword(Xword v)
+{
+#ifdef _ELF64
+	return ((v << 56) |
+	    ((v & 0x0000ff00) << 40) |
+	    ((v & 0x00ff0000) << 24) |
+	    ((v & 0xff000000) << 8) |
+	    ((v >> 8)  & 0xff000000) |
+	    ((v >> 24) & 0x00ff0000) |
+	    ((v >> 40) & 0x0000ff00) |
+	    (v >> 56));		/* Xword is unsigned - 0 bits enter from left */
+#else
+	return (((v << 24) | ((v & 0xff00) << 8) |
+	    ((v >> 8) & 0xff00) | (v >> 24)));
+#endif
+}
+
+
 uintptr_t
 ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 {

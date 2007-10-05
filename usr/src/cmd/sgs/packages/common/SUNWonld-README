@@ -1265,3 +1265,4 @@ Bugid   Risk Synopsis
 6473571 strip and mcs get confused and corrupt files when passed
 	non-ELF arguments
 6253589 mcs has problems handling multiple SHT_NOTE sections
+6610591 do_reloc() should not require unused arguments

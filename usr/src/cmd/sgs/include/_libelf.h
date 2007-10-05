@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern "C" {
 
 extern Elf64_Off	_elf_getxoff(Elf_Data *);
 extern GElf_Xword	_gelf_getdyndtflags_1(Elf *elf);
+extern uint_t		_elf_sys_encoding(void);
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -137,7 +137,7 @@ apply_reloc(void *vrel, Reloc *reloc, const char *name, uchar_t *oaddr,
 		(void) memcpy((void *)oaddr, (void *)value,
 		    (size_t)reloc->r_size);
 	} else {
-		(void) do_reloc(type, oaddr, &value, reloc->r_name, name,
+		(void) do_reloc_rtld(type, oaddr, &value, reloc->r_name, name,
 		    LIST(lmp));
 	}
 }

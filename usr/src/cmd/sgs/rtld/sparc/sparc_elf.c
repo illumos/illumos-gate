@@ -283,7 +283,7 @@ elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
 		 *	sethi	%hi(dyndata), %g1
 		 */
 		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_HI22, (uchar_t *)(dyn_plt + 0x20),
+		if (do_reloc_rtld(R_SPARC_HI22, (uchar_t *)(dyn_plt + 0x20),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -295,7 +295,7 @@ elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
 		 *	or	%g1, %lo(dyndata), %g1
 		 */
 		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_LO10, (uchar_t *)(dyn_plt + 0x24),
+		if (do_reloc_rtld(R_SPARC_LO10, (uchar_t *)(dyn_plt + 0x24),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -308,7 +308,7 @@ elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
 		 */
 		symvalue = (Xword)((uintptr_t)&elf_plt_trace -
 		    (dyn_plt + 0x28));
-		if (do_reloc(R_SPARC_WDISP30, (uchar_t *)(dyn_plt + 0x28),
+		if (do_reloc_rtld(R_SPARC_WDISP30, (uchar_t *)(dyn_plt + 0x28),
 		    &symvalue, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
 		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
@@ -1130,7 +1130,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				} else
 					*(uint_t *)roffset += value;
 			} else {
-				if (do_reloc(rtype, (uchar_t *)roffset,
+				if (do_reloc_rtld(rtype, (uchar_t *)roffset,
 				    (Xword *)&value, name,
 				    NAME(lmp), LIST(lmp)) == 0)
 					ret = 0;
@@ -1138,7 +1138,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 
 			/*
 			 * The value now contains the 'bit-shifted' value that
-			 * was or'ed into memory (this was set by do_reloc()).
+			 * was or'ed into memory (this was set by
+			 * do_reloc_rtld()).
 			 */
 			DBG_CALL(Dbg_reloc_apply_val(LIST(lmp), ELF_DBG_RTLD,
 			    (Xword)roffset, (Xword)value));

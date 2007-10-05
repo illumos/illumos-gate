@@ -798,6 +798,31 @@ _elf32_entsz(Elf *elf, Elf32_Word shtype, unsigned ver)
 
 
 /*
+ * Determine the data encoding used by the current system.
+ */
+uint_t
+_elf_sys_encoding(void)
+{
+	union {
+		Elf32_Word	w;
+		unsigned char	c[W_sizeof];
+	} u;
+
+	u.w = 0x10203;
+	/*CONSTANTCONDITION*/
+	if (~(Elf32_Word)0 == -(Elf32_Sword)1 && tomw(u.c, W_L) == 0x10203)
+		return (ELFDATA2LSB);
+
+	/*CONSTANTCONDITION*/
+	if (~(Elf32_Word)0 == -(Elf32_Sword)1 && tomw(u.c, W_M) == 0x10203)
+		return (ELFDATA2MSB);
+
+	/* Not expected to occur */
+	return (ELFDATANONE);
+}
+
+
+/*
  * XX64	This routine is also used to 'version' interactions with Elf64
  *	applications, but there's no way to figure out if the caller is
  *	asking Elf32 or Elf64 questions, even though it has Elf32
@@ -807,13 +832,6 @@ unsigned
 elf_version(unsigned ver)
 {
 	register unsigned	j;
-	union
-	{
-		Elf32_Word	w;
-		unsigned char	c[W_sizeof];
-	} u;
-
-
 
 	if (ver == EV_NONE)
 		return EV_CURRENT;
@@ -832,15 +850,7 @@ elf_version(unsigned ver)
 	}
 	_elf_work = ver;
 
-	u.w = 0x10203;
-	/*CONSTANTCONDITION*/
-	if (~(Elf32_Word)0 == -(Elf32_Sword)1
-	&& tomw(u.c, W_L) == 0x10203)
-		_elf_encode = ELFDATA2LSB;
-	/*CONSTANTCONDITION*/
-	else if (~(Elf32_Word)0 == -(Elf32_Sword)1
-	&& tomw(u.c, W_M) == 0x10203)
-		_elf_encode = ELFDATA2MSB;
+	_elf_encode = _elf_sys_encoding();
 
 	(void) mutex_unlock(&_elf_globals_mutex);
 

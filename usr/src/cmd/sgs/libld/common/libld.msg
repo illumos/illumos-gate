@@ -225,6 +225,8 @@
 			 skipping null relocation record"
 @ MSG_REL_NOTSUP	"relocation error: %s: file %s: section %s: \
 			 relocation not currently supported"
+@ MSG_REL_NOSWAP	"relocation error: %s: file %s: symbol %s: \
+			 linker does not support byte swapping relocated data"
 @ MSG_REL_PICREDLOC	"relocation error: %s: file %s symbol %s: \
 			 -z redlocsym may not be used for pic code"
 @ MSG_REL_TLSLE		"relocation error: %s: file %s: symbol %s: \

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,9 +175,9 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 		if (kobj_debug & D_RELOCATIONS) {
 			Sym *	symp;
 			symp = (Sym *)
-				(mp->symtbl+(stndx * mp->symhdr->sh_entsize));
+			    (mp->symtbl+(stndx * mp->symhdr->sh_entsize));
 			_kobj_printf(ops, "krtld:\t%s",
-				conv_reloc_386_type(rtype));
+			    conv_reloc_386_type(rtype));
 			_kobj_printf(ops, "\t0x%8x", off);
 			_kobj_printf(ops, "  %s\n",
 			    (const char *)mp->strings + symp->st_name);
@@ -200,7 +200,7 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 			 * value is base address of this object
 			 */
 			symref = (Sym *)
-				(mp->symtbl+(stndx * mp->symhdr->sh_entsize));
+			    (mp->symtbl+(stndx * mp->symhdr->sh_entsize));
 
 			if (ELF32_ST_BIND(symref->st_info) == STB_LOCAL) {
 				/* *** this is different for .o and .so */
@@ -219,10 +219,8 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 
 				if (symref->st_shndx == SHN_UNDEF &&
 				    tnf_reloc_resolve(mp->strings +
-					symref->st_name, &symref->st_value,
-					off,
-					&probelist,
-					&taglist) != 0) {
+				    symref->st_name, &symref->st_value,
+				    off, &probelist, &taglist) != 0) {
 					if (ELF32_ST_BIND(symref->st_info)
 					    != STB_WEAK) {
 						_kobj_printf(ops,
@@ -258,9 +256,9 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 		}
 #endif
 
-		if (do_reloc(rtype, (unsigned char *)off, (Word *)&value,
+		if (do_reloc_krtld(rtype, (unsigned char *)off, (Word *)&value,
 		    (const char *)mp->strings + symref->st_name,
-		    mp->filename, 0) == 0)
+		    mp->filename) == 0)
 			err = 1;
 
 	} /* end of while loop */
@@ -283,7 +281,7 @@ do_relocations(struct module *mp)
 	/* do the relocations */
 	for (shn = 1; shn < mp->hdr.e_shnum; shn++) {
 		rshp = (Shdr *)
-			(mp->shdrs + shn * mp->hdr.e_shentsize);
+		    (mp->shdrs + shn * mp->hdr.e_shentsize);
 		if (rshp->sh_type == SHT_RELA) {
 			_kobj_printf(ops, "%s can't process type SHT_RELA\n",
 			    mp->filename);

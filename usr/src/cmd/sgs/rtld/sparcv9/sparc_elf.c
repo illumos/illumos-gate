@@ -328,7 +328,7 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
 
 /*
  * Relocate the instructions given by the VAL64_TO_G1 macro above.
- * The arguments parallel those of do_reloc().
+ * The arguments parallel those of do_reloc_rtld().
  *
  * entry:
  *	off - Address of 1st instruction in sequence.
@@ -349,7 +349,7 @@ reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 	 *	sethi	%hh(value), %g5
 	 */
 	tmp_value = (Xword)value;
-	if (do_reloc(R_SPARC_HH22, off, &tmp_value, sym,
+	if (do_reloc_rtld(R_SPARC_HH22, off, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
@@ -359,7 +359,7 @@ reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 	 *	or	%g5, %hm(value), %g5
 	 */
 	tmp_value = (Xword)value;
-	if (do_reloc(R_SPARC_HM10, off + 4, &tmp_value, sym,
+	if (do_reloc_rtld(R_SPARC_HM10, off + 4, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
@@ -369,7 +369,7 @@ reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 	 *	sethi	%lm(value), %g1
 	 */
 	tmp_value = (Xword)value;
-	if (do_reloc(R_SPARC_LM22, off + 12, &tmp_value, sym,
+	if (do_reloc_rtld(R_SPARC_LM22, off + 12, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
@@ -379,7 +379,7 @@ reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 	 *	or	%g1, %lo(value), %g1
 	 */
 	tmp_value = (Xword)value;
-	if (do_reloc(R_SPARC_LO10, off + 16, &tmp_value, sym,
+	if (do_reloc_rtld(R_SPARC_LO10, off + 16, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
@@ -1394,7 +1394,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				} else
 					*(ulong_t *)roffset += value;
 			} else {
-				if (do_reloc(rtype, (uchar_t *)roffset,
+				if (do_reloc_rtld(rtype, (uchar_t *)roffset,
 				    (Xword *)&value, name,
 				    NAME(lmp), LIST(lmp)) == 0)
 					ret = 0;
@@ -1402,7 +1402,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 
 			/*
 			 * The value now contains the 'bit-shifted' value that
-			 * was or'ed into memory (this was set by do_reloc()).
+			 * was or'ed into memory (this was set by
+			 * do_reloc_rtld()).
 			 */
 			DBG_CALL(Dbg_reloc_apply_val(LIST(lmp), ELF_DBG_RTLD,
 			    (Xword)roffset, (Xword)value));

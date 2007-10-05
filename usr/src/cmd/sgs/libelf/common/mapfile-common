@@ -167,6 +167,7 @@ SUNWprivate_1.1 {
 	_elf_getscn =		NODYNSORT;
 	_elf32_getshdr =	NODYNSORT;
 	_elf_hash =		NODYNSORT;
+	_elf_sys_encoding;
 	_elf_kind =		NODYNSORT;
 	_elf_ndxscn =		NODYNSORT;
 	_elf_newdata =		NODYNSORT;

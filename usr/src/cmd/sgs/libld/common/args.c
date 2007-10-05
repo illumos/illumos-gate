@@ -530,6 +530,15 @@ check_flags(Ofl_desc * ofl, int argc)
 		return (S_ERROR);
 
 	/*
+	 * Does the host currently running the linker have the same
+	 * byte order as the target for which the object is being produced?
+	 * If not, set FLG_OF1_ENCDIFF so relocation code will know
+	 * to check.
+	 */
+	if (_elf_sys_encoding() != M_DATA)
+		ofl->ofl_flags1 |= FLG_OF1_ENCDIFF;
+
+	/*
 	 * Initialize string tables.  Symbol definitions within mapfiles can
 	 * result in the creation of input sections.
 	 */

@@ -89,10 +89,12 @@ extern "C" {
  */
 #if	!defined(_KERNEL)
 #if	defined(_ELF64)
-#define	do_reloc		do64_reloc
+#define	do_reloc_ld		do64_reloc_ld
+#define	do_reloc_rtld		do64_reloc_rtld
 #define	reloc_table		reloc64_table
 #else
-#define	do_reloc		do32_reloc
+#define	do_reloc_ld		do32_reloc_ld
+#define	do_reloc_rtld		do32_reloc_rtld
 #define	reloc_table		reloc32_table
 #endif
 #endif
@@ -150,9 +152,43 @@ extern	const Rel_entry		reloc_table[];
 
 /*
  * Relocation engine.
+ *
+ * The do_reloc() code is used in three different places: The kernel,
+ * the linker, and the runtime linker. All three use the same first
+ * 5 arguments. In addition:
+ *	- The linker and rtld want a link map pointer argument
+ *	- The linker wants to pass a byte swap argument that tells
+ *		the relocation engine that the data it is relocating
+ *		has the opposite byte order of the system running the
+ *		linker.
+ *
+ * To ensure that there is never any confusion about which version is
+ * being linked to, we give each variant a different name, even though
+ * each one is generated from the same source code.
+ *
+ *	do_reloc_krtld()
+ *	The kernel version is provided if the _KERNEL macro is defined.
+ *
+ *	do_reloc_ld()
+ *	The ld version is provided if the DO_RELOC_LIBLD macro is defined.
+ *
+ *	do_reloc_rtld()
+ *	The rtld version is provided if neither _KERNEL or DO_RELOC_LIBLD
+ *	are defined.
+ *
+ * Implementations of do_reloc() should use these same macros to
+ * conditionalize any code not used by all three versions.
  */
-extern	int	do_reloc(uchar_t, uchar_t *, Xword *, const char *,
+#if defined(_KERNEL)
+extern	int	do_reloc_krtld(uchar_t, uchar_t *, Xword *, const char *,
+		    const char *);
+#elif defined(DO_RELOC_LIBLD)
+extern	int	do_reloc_ld(uchar_t, uchar_t *, Xword *, const char *,
+		    const char *, int, void *);
+#else
+extern	int	do_reloc_rtld(uchar_t, uchar_t *, Xword *, const char *,
 		    const char *, void *);
+#endif
 
 #if defined(_KERNEL)
 /*
@@ -209,7 +245,7 @@ extern const char	*conv_reloc_SPARC_type(Word);
  * must have errors reported through a single eprintf() call.  The kernel's
  * _kobj_printf is somewhat more limited, and must receive messages with only
  * one argument to the format string.  The following macros account for these
- * differences, as krtld and rtld share do_reloc().
+ * differences, as krtld and rtld share the same do_reloc() source.
  */
 #define	REL_ERR_UNIMPL(lml, file, sym, rtype) \
 	_kobj_printf(ops, MSG_REL_PREFIL, (file)); \
@@ -283,6 +319,11 @@ extern	const char *demangle(const char *);
 	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue))))
+
+#define	REL_ERR_NOSWAP(lml, file, sym, rtype) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSWAP), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
+	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN))))
 
 #endif	/* _KERNEL */
 

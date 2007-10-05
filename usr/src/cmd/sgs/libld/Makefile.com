@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,7 +74,7 @@ package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
 CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
 		    -I$(SRCBASE)/uts/common/krtld -I$(ELFCAP) \
-		    $(VAR_LIBLD_CPPFLAGS)
+		    $(VAR_LIBLD_CPPFLAGS) -DDO_RELOC_LIBLD
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc
 
