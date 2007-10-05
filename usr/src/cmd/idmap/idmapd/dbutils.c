@@ -898,7 +898,7 @@ sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
  *
  * Background:
  *
- * These well-known principals are stored (as of Windows Server 2003) under:
+ * Some of the well-known principals are stored under:
  * cn=WellKnown Security Principals, cn=Configuration, dc=<forestRootDomain>
  * They belong to objectClass "foreignSecurityPrincipal". They don't have
  * "samAccountName" nor "userPrincipalName" attributes. Their names are
@@ -907,17 +907,22 @@ sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
  * these duplicate entries have the stringified SID in the "name" and "cn"
  * attributes instead of the actual name.
  *
- * These principals remain constant across all operating systems. Using
- * a hard-coded table here improves performance and avoids additional
- * complexity in the AD lookup code in adutils.c
+ * Those of the form S-1-5-32-X are Builtin groups and are stored in the
+ * cn=builtin container (except, Power Users which is not stored in AD)
  *
- * Currently we don't support localization of well-known SID names,
+ * These principals are and will remain constant. Therefore doing AD lookups
+ * provides no benefit. Also, using hard-coded table (and thus avoiding AD
+ * lookup) improves performance and avoids additional complexity in the
+ * adutils.c code. Moreover these SIDs can be used when no Active Directory
+ * is available (such as the CIFS server's "workgroup" mode).
+ *
+ * Notes:
+ * 1. Currently we don't support localization of well-known SID names,
  * unlike Windows.
  *
- * Note that other well-known SIDs (i.e. S-1-5-<domain>-<w-k RID> and
- * S-1-5-32-<w-k RID>) are not stored here because AD does have normal
- * user/group objects for these objects and can be looked up using the
- * existing AD lookup code.
+ * 2. Other well-known SIDs i.e. S-1-5-<domain>-<w-k RID> are not stored
+ * here. AD does have normal user/group objects for these objects and
+ * can be looked up using the existing AD lookup code.
  */
 static wksids_table_t wksids[] = {
 	{"S-1-1", 0, "Everyone", 0, SENTINEL_PID, -1},
@@ -925,6 +930,7 @@ static wksids_table_t wksids[] = {
 	{"S-1-3", 1, "Creator Group", 0, IDMAP_WK_CREATOR_GROUP_GID, 0},
 	{"S-1-3", 2, "Creator Owner Server", 1, SENTINEL_PID, -1},
 	{"S-1-3", 3, "Creator Group Server", 0, SENTINEL_PID, -1},
+	{"S-1-3", 4, "Owner Rights", 0, SENTINEL_PID, -1},
 	{"S-1-5", 1, "Dialup", 0, SENTINEL_PID, -1},
 	{"S-1-5", 2, "Network", 0, SENTINEL_PID, -1},
 	{"S-1-5", 3, "Batch", 0, SENTINEL_PID, -1},
@@ -939,10 +945,39 @@ static wksids_table_t wksids[] = {
 	{"S-1-5", 13, "Terminal Server User", 0, SENTINEL_PID, -1},
 	{"S-1-5", 14, "Remote Interactive Logon", 0, SENTINEL_PID, -1},
 	{"S-1-5", 15, "This Organization", 0, SENTINEL_PID, -1},
+	{"S-1-5", 17, "IUSR", 0, SENTINEL_PID, -1},
 	{"S-1-5", 18, "Local System", 0, IDMAP_WK_LOCAL_SYSTEM_GID, 0},
 	{"S-1-5", 19, "Local Service", 0, SENTINEL_PID, -1},
 	{"S-1-5", 20, "Network Service", 0, SENTINEL_PID, -1},
 	{"S-1-5", 1000, "Other Organization", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 544, "Administrators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 545, "Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 546, "Guests", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 547, "Power Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 548, "Account Operators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 549, "Server Operators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 550, "Print Operators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 551, "Backup Operators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 552, "Replicator", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 554, "Pre-Windows 2000 Compatible Access", 0,
+	    SENTINEL_PID, -1},
+	{"S-1-5-32", 555, "Remote Desktop Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 556, "Network Configuration Operators", 0,
+	    SENTINEL_PID, -1},
+	{"S-1-5-32", 557, "Incoming Forest Trust Builders", 0,
+	    SENTINEL_PID, -1},
+	{"S-1-5-32", 558, "Performance Monitor Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 559, "Performance Log Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 560, "Windows Authorization Access Group", 0,
+	    SENTINEL_PID, -1},
+	{"S-1-5-32", 561, "Terminal Server License Servers", 0,
+	    SENTINEL_PID, -1},
+	{"S-1-5-32", 561, "Distributed COM Users", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 568, "IIS_IUSRS", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 569, "Cryptograhic Operators", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 573, "Event Log Readers", 0, SENTINEL_PID, -1},
+	{"S-1-5-32", 574, "Certificate Service DCOM Access", 0,
+	    SENTINEL_PID, -1},
 	{"S-1-5-64", 21, "Digest Authentication", 0, SENTINEL_PID, -1},
 	{"S-1-5-64", 10, "NTLM Authentication", 0, SENTINEL_PID, -1},
 	{"S-1-5-64", 14, "SChannel Authentication", 0, SENTINEL_PID, -1},
