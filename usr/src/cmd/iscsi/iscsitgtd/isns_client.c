@@ -218,8 +218,7 @@ process_scn(int so, isns_pdu_t *scn)
 {
 	uint8_t		*ptr = scn->payload;
 	isns_tlv_t	*tlv;
-	uint16_t	len = scn->payload_len;
-	uint32_t	done = 0;
+	uint16_t	cnt = 0;
 	uint32_t	got_dest = 0;
 	uint32_t	got_source = 0;
 	uint32_t	bitmap = 0;
@@ -227,14 +226,15 @@ process_scn(int so, isns_pdu_t *scn)
 	char		dest[MAXNAMELEN];
 	char		source[MAXNAMELEN];
 
-	queue_prt(mgmtq, Q_ISNS_DBG, "PROCESS_SCN %u\n", len);
+	queue_prt(mgmtq, Q_ISNS_DBG, "PROCESS_SCN %u\n",
+	    scn->payload_len);
 
-	if (len < TAG_LEN_SZ) {
+	if (scn->payload_len < TAG_LEN_SZ) {
 		syslog(LOG_ALERT, "ISNS SCN message error\n");
 		return;
 	}
 
-	while (done == 0) {
+	while (cnt < scn->payload_len) {
 		/* LINTED */
 		tlv = (isns_tlv_t *)ptr;
 		tlv->attr_id = ntohl(tlv->attr_id);
@@ -268,19 +268,11 @@ process_scn(int so, isns_pdu_t *scn)
 				    "PROCESS_SCN bitmap %u\n", bitmap);
 				got_bitmap = 1;
 				break;
-			case ISNS_DELIMITER_ATTR_ID:
-				queue_prt(mgmtq, Q_ISNS_DBG,
-				    "PROCESS_SCN DELIMIT\n");
-				done = 1;
-				break;
 			default:
 				queue_prt(mgmtq, Q_ISNS_DBG,
 				    "PROCESS_SCN DEFAULT\n");
 				break;
 		}
-
-		if (done)
-			break;
 
 		if (got_source && !got_bitmap) {
 			queue_prt(mgmtq, Q_ISNS_DBG,
@@ -317,7 +309,7 @@ process_scn(int so, isns_pdu_t *scn)
 		}
 
 		/* next attribute */
-		len -= ISNS_ATTR_SZ(tlv->attr_len);
+		cnt += ISNS_ATTR_SZ(tlv->attr_len);
 		ptr += ISNS_ATTR_SZ(tlv->attr_len);
 	}
 	queue_prt(mgmtq, Q_ISNS_DBG, "DONE PROCESS_SCN\n");
@@ -790,9 +782,8 @@ isns_dev_attr_dereg(int so, char *node)
 	}
 
 	/* add operation attributes */
-	/* EID */
-	if (isns_append_attr(cmd, ISNS_EID_ATTR_ID,
-	    STRLEN(isns_args.entity), isns_args.entity, 0) != 0) {
+	if (isns_append_attr(cmd, ISNS_ISCSI_NAME_ATTR_ID,
+	    STRLEN(node), node, 0) != 0) {
 		goto error;
 	}
 
