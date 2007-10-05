@@ -220,6 +220,7 @@ add_16:
 	ALTENTRY(atomic_add_int_nv)
 add_32:
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ld	[%o0], %o2
 1:
 	add	%o2, %o1, %o3
@@ -230,7 +231,7 @@ add_32:
 	retl
 	add	%o2, %o1, %o0		! return new value
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, add32, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, add32, 0b)
 	SET_SIZE(atomic_add_int_nv)
 	SET_SIZE(atomic_add_int)
 	SET_SIZE(atomic_add_32_nv)
@@ -266,6 +267,7 @@ add_32:
 	ALTENTRY(atomic_add_long_nv)
 add_64:
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ldx	[%o0], %o2
 1:
 	add	%o2, %o1, %o3
@@ -277,7 +279,7 @@ add_64:
 	add	%o2, %o1, %o0		! return new value
 
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, add64, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, add64, 0b)
 	SET_SIZE(atomic_add_long_nv)
 	SET_SIZE(atomic_add_long)
 	SET_SIZE(atomic_add_ptr_nv)
@@ -348,6 +350,7 @@ add_64:
 	ALTENTRY(atomic_or_uint)
 	ALTENTRY(atomic_or_uint_nv)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ld	[%o0], %o2
 1:
 	or	%o2, %o1, %o3
@@ -359,7 +362,7 @@ add_64:
 	or	%o2, %o1, %o0		! return new value
 
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, or32, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, or32, 0b)
 	SET_SIZE(atomic_or_uint_nv)
 	SET_SIZE(atomic_or_uint)
 	SET_SIZE(atomic_or_32_nv)
@@ -370,6 +373,7 @@ add_64:
 	ALTENTRY(atomic_or_ulong)
 	ALTENTRY(atomic_or_ulong_nv)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ldx	[%o0], %o2
 1:
 	or	%o2, %o1, %o3
@@ -381,7 +385,7 @@ add_64:
 	or	%o2, %o1, %o0		! return new value
 	
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, or64, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, or64, 0b)
 	SET_SIZE(atomic_or_ulong_nv)
 	SET_SIZE(atomic_or_ulong)
 	SET_SIZE(atomic_or_64_nv)
@@ -450,6 +454,7 @@ add_64:
 	ALTENTRY(atomic_and_uint)
 	ALTENTRY(atomic_and_uint_nv)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ld	[%o0], %o2
 1:
 	and	%o2, %o1, %o3
@@ -461,7 +466,7 @@ add_64:
 	and	%o2, %o1, %o0		! return new value
 
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, and32, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, and32, 0b)
 	SET_SIZE(atomic_and_uint_nv)
 	SET_SIZE(atomic_and_uint)
 	SET_SIZE(atomic_and_32_nv)
@@ -472,6 +477,7 @@ add_64:
 	ALTENTRY(atomic_and_ulong)
 	ALTENTRY(atomic_and_ulong_nv)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ldx	[%o0], %o2
 1:
 	and	%o2, %o1, %o3
@@ -483,7 +489,7 @@ add_64:
 	and	%o2, %o1, %o0		! return new value
 
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, and64, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, and64, 0b)
 	SET_SIZE(atomic_and_ulong_nv)
 	SET_SIZE(atomic_and_ulong)
 	SET_SIZE(atomic_and_64_nv)
@@ -622,6 +628,7 @@ add_64:
 	ENTRY(atomic_swap_32)
 	ALTENTRY(atomic_swap_uint)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ld	[%o0], %o2
 1:
 	mov	%o1, %o3
@@ -632,7 +639,7 @@ add_64:
 	retl
 	mov	%o3, %o0
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, swap32, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, swap32, 0b)
 	SET_SIZE(atomic_swap_uint)
 	SET_SIZE(atomic_swap_32)
 
@@ -640,6 +647,7 @@ add_64:
 	ALTENTRY(atomic_swap_ptr)
 	ALTENTRY(atomic_swap_ulong)
 	ATOMIC_BACKOFF_INIT(%o4)
+0:
 	ldx	[%o0], %o2
 1:
 	mov	%o1, %o3
@@ -650,7 +658,7 @@ add_64:
 	retl
 	mov	%o3, %o0
 2:	
-	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, swap64, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o4, %o5, swap64, 0b)
 	SET_SIZE(atomic_swap_ulong)
 	SET_SIZE(atomic_swap_ptr)
 	SET_SIZE(atomic_swap_64)
@@ -659,6 +667,7 @@ add_64:
 	ATOMIC_BACKOFF_INIT(%o5)
 	mov	1, %o3
 	slln	%o3, %o1, %o3
+0:
 	ldn	[%o0], %o2
 1:
 	andcc	%o2, %o3, %g0		! test if the bit is set
@@ -674,13 +683,14 @@ add_64:
 	retl
 	nop
 5:	
-	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, setlongexcl, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, setlongexcl, 0b)
 	SET_SIZE(atomic_set_long_excl)
 
 	ENTRY(atomic_clear_long_excl)
 	ATOMIC_BACKOFF_INIT(%o5)
 	mov	1, %o3
 	slln	%o3, %o1, %o3
+0:
 	ldn	[%o0], %o2
 1:
 	andncc	%o3, %o2, %g0		! test if the bit is clear
@@ -696,7 +706,7 @@ add_64:
 	retl
 	nop
 5:	
-	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, clrlongexcl, 1b)
+	ATOMIC_BACKOFF_BACKOFF(%o5, %g1, clrlongexcl, 0b)
 	SET_SIZE(atomic_clear_long_excl)
 
 #if !defined(_KERNEL)
