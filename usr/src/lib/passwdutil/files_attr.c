@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -706,7 +706,7 @@ files_update(attrlist *items, pwu_repository_t *rep, void *buf)
 						return (PWU_NOMEM);
 					/* algorithm problem? */
 					syslog(LOG_AUTH | LOG_ALERT,
-						"passwdutil: crypt_gensalt %m");
+					    "passwdutil: crypt_gensalt %m");
 					return (PWU_UPDATE_FAILED);
 				}
 				hash = crypt(p->data.val_s, salt);
@@ -716,7 +716,6 @@ files_update(attrlist *items, pwu_repository_t *rep, void *buf)
 					return (PWU_NOMEM);
 				}
 				pword = strdup(hash);
-				free(hash);
 				if (pword == NULL) {
 					errno = ENOMEM;
 					return (PWU_NOMEM);
@@ -758,7 +757,7 @@ files_update(attrlist *items, pwu_repository_t *rep, void *buf)
 			    strncmp(spw->sp_pwdp, LOCKSTRING,
 			    sizeof (LOCKSTRING)-1) == 0) {
 				(void) strcpy(spw->sp_pwdp, spw->sp_pwdp +
-					sizeof (LOCKSTRING)-1);
+				    sizeof (LOCKSTRING)-1);
 			}
 			spw->sp_lstchg = DAY_NOW_32;
 			break;
@@ -1144,7 +1143,7 @@ files_update_history(char *name, struct spwd *spwd)
 	FILE	*dst;	/* temp history database being updated */
 	struct	stat64 statbuf;
 	char buf[MAX_LOGNAME + MAXHISTORY +
-		(MAXHISTORY * CRYPT_MAXCIPHERTEXTLEN)+1];
+	    (MAXHISTORY * CRYPT_MAXCIPHERTEXTLEN)+1];
 	int	found;
 
 	if ((histsize = def_getint("HISTORY=", DEFHISTORY)) == 0) {
