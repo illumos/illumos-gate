@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,40 +26,38 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.cmd
+LIBRARY = libelfsign.a
+VERS = .1
 
-SUBDIRS1 = \
-	cryptoadm \
-	decrypt \
-	digest \
-	elfsign \
-	pktool \
-	kmfcfg
+OBJECTS = \
+	elfcertlib.o \
+	elfsignlib.o
 
-$(CLOSED_BUILD)SUBDIRS1 += \
-	$(CLOSED)/cmd/cmd-crypto/kcfd
+include $(SRC)/lib/Makefile.lib
 
-SUBDIRS2 = \
-	etc \
-	scripts
+SRCDIR =	../common
 
-$(CLOSED_BUILD)SUBDIRS2 += \
-	$(CLOSED)/cmd/cmd-crypto/etc
+LIBS =		$(DYNLIB) $(LINTLIB)
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-all:=           TARGET= all
-install:=       TARGET= install
-clean:=         TARGET= clean
-clobber:=       TARGET= clobber
-lint:=          TARGET= lint
-_msg:=          TARGET= _msg
+LDLIBS +=	-lmd -lelf -lkmf -lcryptoutil -lc
+
+MAPFILE =	mapfile
+MAPFILES =	$(MAPFILE)
+
+CFLAGS +=	$(CCMT) $(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS
 
 .KEEP_STATE:
 
-all clean clobber lint _msg: $(SUBDIRS1)
+all:		$(LIBS)
 
-install: $(SUBDIRS1) $(SUBDIRS2)
+lint:		lintcheck
 
-$(SUBDIRS1) $(SUBDIRS2): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+$(MAPFILE):	$(SRCDIR)/$(MAPFILE).map
+		$(RM) $@
+		$(CPP) $(SRCDIR)/$(MAPFILE).map > $@
 
-FRC:
+CLEANFILES +=	$(MAPFILE)
+
+include $(SRC)/lib/Makefile.targ

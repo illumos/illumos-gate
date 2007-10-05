@@ -58,10 +58,6 @@ typedef enum ELFsign_status_e {
 #define	SIG_MAX_LENGTH		1024
 
 #define	ELF_SIGNATURE_SECTION	".SUNW_signature"
-#define	ELFSIGN_CRYPTO		"Solaris Cryptographic Framework"
-#define	USAGELIMITED		"OU=UsageLimited"
-#define	ESA			".esa"
-#define	ESA_LEN			sizeof (".esa")
 
 typedef struct kcf_door_arg_s {
 	short		da_version;
@@ -138,83 +134,6 @@ struct filesignatures {
 #ifndef	_KERNEL
 
 #define	_PATH_KCFD_DOOR	"/var/run/kcfd_door"
-
-#define	ES_FMT_RSA_MD5_SHA1	"rsa_md5_sha1"
-#define	ES_FMT_RSA_SHA1		"rsa_sha1"
-enum ES_ACTION {
-	ES_GET,
-	ES_GET_CRYPTO,
-	ES_UPDATE,
-	ES_UPDATE_RSA_MD5_SHA1,
-	ES_UPDATE_RSA_SHA1
-};
-#define	ES_ACTISUPDATE(a)	((a) >= ES_UPDATE)
-
-/*
- * ELF signature handling
- */
-typedef struct ELFsign_s *ELFsign_t;
-struct ELFsign_sig_info {
-	char	*esi_format;
-	char	*esi_signer;
-	time_t	esi_time;
-};
-
-extern struct filesignatures *elfsign_insert_dso(ELFsign_t ess,
-    struct filesignatures *fsp, const char *dn, int dn_len,
-    const uchar_t *sig, int sig_len, const char *oid, int oid_len);
-extern filesig_vers_t elfsign_extract_sig(ELFsign_t ess,
-    struct filesignatures *fsp, uchar_t *sig, size_t *sig_len);
-extern ELFsign_status_t elfsign_begin(const char *,
-    const char *, char *, enum ES_ACTION, ELFsign_t *);
-extern void elfsign_end(ELFsign_t ess);
-extern ELFsign_status_t elfsign_verify_signature(ELFsign_t ess,
-    struct ELFsign_sig_info **esipp);
-extern ELFsign_status_t elfsign_hash(ELFsign_t ess, uchar_t *hash,
-    size_t *hash_len);
-extern ELFsign_status_t elfsign_hash_mem_resident(ELFsign_t ess,
-    uchar_t *hash, size_t *hash_len);
-extern ELFsign_status_t elfsign_hash_esa(ELFsign_t ess,
-    uchar_t *esa_buf, size_t esa_buf_len, uchar_t **hash, size_t *hash_len);
-extern void elfsign_buffer_len(ELFsign_t ess, size_t *ip, uchar_t *cp,
-    enum ES_ACTION action);
-
-extern ELFsign_status_t elfsign_signatures(ELFsign_t ess,
-    struct filesignatures **fspp, size_t *fs_len, enum ES_ACTION action);
-
-extern char const *elfsign_strerror(ELFsign_status_t);
-extern boolean_t elfsign_sig_info(struct filesignatures *fssp,
-    struct ELFsign_sig_info **esipp);
-extern void elfsign_sig_info_free(struct ELFsign_sig_info *);
-
-extern ELFsign_t elfsign_new_ess(void);
-
-/*
- * ELF "Certificate Library"
- */
-
-extern const char _PATH_ELFSIGN_CERTS[];
-
-#define	ELFCERT_MAX_DN_LEN	255
-
-typedef struct ELFCert_s *ELFCert_t;
-
-extern boolean_t elfcertlib_init(ELFsign_t, char *);
-
-extern boolean_t elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
-	char *signer_DN, ELFCert_t *certp, enum ES_ACTION action);
-extern void elfcertlib_releasecert(ELFsign_t, ELFCert_t);
-extern char *elfcertlib_getdn(ELFCert_t cert);
-extern char *elfcertlib_getissuer(ELFCert_t cert);
-
-extern boolean_t elfcertlib_loadprivatekey(ELFsign_t ess, ELFCert_t cert,
-	const char *path);
-extern boolean_t elfcertlib_loadtokenkey(ELFsign_t ess, ELFCert_t cert,
-	const char *token_id, const char *pin);
-
-extern boolean_t elfcertlib_sign(ELFsign_t ess, ELFCert_t cert,
-	const uchar_t *data, size_t data_len, uchar_t *sig,
-	size_t *sig_len);
 
 #endif	/* _KERNEL */
 

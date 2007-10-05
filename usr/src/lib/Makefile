@@ -176,10 +176,8 @@ SUBDIRS += \
 	libscf		\
 	libinetsvc	\
 	librestart	\
-	libsched
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/libelfsign
-SUBDIRS += \
+	libsched	\
+	libelfsign	\
 	pkcs11		.WAIT	\
 	libpctx		.WAIT	\
 	libcpc		\
@@ -350,6 +348,7 @@ HDRSUBDIRS=		\
 	libdns_sd	\
 	libdtrace	\
 	libdtrace_jni	\
+	libelfsign	\
 	libeti		\
 	libfstyp	\
 	libgen		\
@@ -499,8 +498,7 @@ libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
-$(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
-			$(CLOSED)/lib/libike libcryptoutil pkcs11
+libelfsign:	libcryptoutil libkmf
 libidmap:	libnsl
 libinetcfg:	libnsl libsocket libdevinfo
 libkmf:		libcryptoutil pkcs11 openssl

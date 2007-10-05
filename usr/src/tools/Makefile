@@ -54,7 +54,7 @@ COMMON_SUBDIRS= \
 #
 #  special versions of commands for use only in build
 #
-CLOSED_UNSHIPPED_SUBDIRS = \
+UNSHIPPED_SUBDIRS = \
 	elfsign
 
 sparc_SUBDIRS= \
@@ -75,9 +75,11 @@ LINTSUBDIRS= \
 	protocmp \
 	protolist
 
-SUBDIRS= $(BOOT_SUBDIRS) $($(MACH)_SUBDIRS) $(COMMON_SUBDIRS)
-
-$(CLOSED_BUILD)CLOSED_SUBDIRS= $(CLOSED_UNSHIPPED_SUBDIRS)
+SUBDIRS= \
+	$(BOOT_SUBDIRS) \
+	$($(MACH)_SUBDIRS) \
+	$(COMMON_SUBDIRS) \
+	$(UNSHIPPED_SUBDIRS)
 
 #
 # Packages built here
@@ -116,11 +118,11 @@ _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all install: $(ROOTDIRS) .WAIT $(SUBDIRS) $(CLOSED_SUBDIRS)
+all install: $(ROOTDIRS) .WAIT $(SUBDIRS)
 
-clean: $(SUBDIRS) $(CLOSED_SUBDIRS)
+clean: $(SUBDIRS)
 
-clobber: $(SUBDIRS) $(CLOSED_SUBDIRS)
+clobber: $(SUBDIRS)
 	$(RM) -rf $(TOOLS_PROTO)
 
 pkg: install .WAIT $(PKG_SUBDIRS)
@@ -134,9 +136,6 @@ $(SUBDIRS): FRC
 
 $(PKG_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) install
-
-$(CLOSED_SUBDIRS): FRC
-	cd $(CLOSED)/tools/$@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

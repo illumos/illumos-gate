@@ -329,6 +329,7 @@ COMMON_SUBDIRS = \
 	lib/libdoor \
 	lib/libdtrace \
 	lib/libefi \
+	lib/libelfsign \
 	lib/libexacct \
 	lib/libgen \
 	lib/libgss \
@@ -423,7 +424,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/tail \
 	$(CLOSED)/cmd/tr \
 	$(CLOSED)/lib/libc_i18n \
-	$(CLOSED)/lib/libelfsign \
 	$(CLOSED)/lib/smartcard
 
 i386_SUBDIRS= \

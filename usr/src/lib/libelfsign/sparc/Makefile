@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,40 +26,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.cmd
-
-SUBDIRS1 = \
-	cryptoadm \
-	decrypt \
-	digest \
-	elfsign \
-	pktool \
-	kmfcfg
-
-$(CLOSED_BUILD)SUBDIRS1 += \
-	$(CLOSED)/cmd/cmd-crypto/kcfd
-
-SUBDIRS2 = \
-	etc \
-	scripts
-
-$(CLOSED_BUILD)SUBDIRS2 += \
-	$(CLOSED)/cmd/cmd-crypto/etc
-
-all:=           TARGET= all
-install:=       TARGET= install
-clean:=         TARGET= clean
-clobber:=       TARGET= clobber
-lint:=          TARGET= lint
-_msg:=          TARGET= _msg
+include ../Makefile.com
 
 .KEEP_STATE:
 
-all clean clobber lint _msg: $(SUBDIRS1)
-
-install: $(SUBDIRS1) $(SUBDIRS2)
-
-$(SUBDIRS1) $(SUBDIRS2): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
-
-FRC:
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

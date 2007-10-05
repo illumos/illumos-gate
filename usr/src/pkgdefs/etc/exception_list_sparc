@@ -54,6 +54,7 @@ usr/lib/llib-lcryptoutil.ln		sparc
 usr/lib/llib-lcryptoutil		sparc
 usr/lib/sparcv9/llib-lcryptoutil.ln	sparc
 usr/include/cryptoutil.h		sparc
+usr/include/libelfsign.h		sparc
 #
 # The following files are used by libdhcpsvc, the
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).

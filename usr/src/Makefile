@@ -243,7 +243,6 @@ EXPORT_SRC:
 	@cd lib/gss_mechs/mech_krb5;		pwd; $(MAKE) EXPORT_SRC
 	@cd lib/gss_mechs/mech_spnego;		pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libcrypt; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/lib/libelfsign;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libgss;   pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libnsl;	  pwd; $(MAKE) EXPORT_SRC
@@ -316,7 +315,6 @@ CRYPT_SRC:
 	@cd lib/gss_mechs/mech_dh/backend; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_krb5; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_spnego; pwd; $(MAKE) CRYPT_SRC
-	@cd $(CLOSED)/lib/libelfsign;   pwd; $(MAKE) CRYPT_SRC
 	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libnsl;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libsasl;	 pwd; $(MAKE) CRYPT_SRC
