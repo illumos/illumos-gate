@@ -1981,6 +1981,9 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 
 		return (0);
 
+	case DKIOCFLUSHWRITECACHE:
+		return (VOP_FSYNC(vd->file_vnode, FSYNC, kcred));
+
 	default:
 		return (ENOTSUP);
 	}

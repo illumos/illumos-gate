@@ -1195,6 +1195,7 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	int	instance;
 	int	slice;
+	int	rv;
 	vdc_t	*vdc;
 
 	instance = VDCUNIT(dev);
@@ -1210,6 +1211,19 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	DMSG(vdc, 0, "[%d] flag = %x, otyp = %x\n", instance, flag, otyp);
 
 	slice = VDCPART(dev);
+
+	/*
+	 * Attempt to flush the W$ on a close operation. If this is
+	 * not a supported IOCTL command or the backing device is read-only
+	 * do not fail the close operation.
+	 */
+	rv = vd_process_ioctl(dev, DKIOCFLUSHWRITECACHE, NULL, FKIOCTL);
+
+	if (rv != 0 && rv != ENOTSUP && rv != ENOTTY && rv != EROFS) {
+		DMSG(vdc, 0, "[%d] flush failed with error %d on close\n",
+		    instance, rv);
+		return (EIO);
+	}
 
 	mutex_enter(&vdc->lock);
 	vdc_mark_closed(vdc, slice, flag, otyp);
@@ -4919,14 +4933,6 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 			DMSG(vdc, 1, "[%d] Flush W$: mode %x\n",
 			    instance, mode);
-
-			/*
-			 * If the backing device is not a 'real' disk then the
-			 * W$ operation request to the vDisk server will fail
-			 * so we might as well save the cycles and return now.
-			 */
-			if (vdc->vdisk_type != VD_DISK_TYPE_DISK)
-				return (ENOTTY);
 
 			/*
 			 * If arg is NULL, then there is no callback function
