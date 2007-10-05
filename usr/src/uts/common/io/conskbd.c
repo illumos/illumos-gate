@@ -1860,13 +1860,16 @@ conskbd_mux_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	mp->b_prev = (mblk_t *)lqs;
 	msg->kpm_resp_list = mp;
 	msg->kpm_resp_nums ++;
-	mutex_exit(&msg->kpm_lock);
 
-	if (msg->kpm_resp_nums < msg->kpm_req_nums)
+	if (msg->kpm_resp_nums < msg->kpm_req_nums) {
+		mutex_exit(&msg->kpm_lock);
 		return;
+	}
 
 	ASSERT(msg->kpm_resp_nums == msg->kpm_req_nums);
 	ASSERT(mp == msg->kpm_resp_list);
+
+	mutex_exit(&msg->kpm_lock);
 
 	conskbd_mux_dequeue_msg(msg);
 
@@ -2402,9 +2405,11 @@ conskbd_mux_dequeue_msg(conskbd_pending_msg_t *msg)
 	mutex_enter(&conskbd_msgq_lock);
 	prev = conskbd_msg_queue;
 
-	for (p = prev; p != msg; p = p->kpm_next)
+	for (p = prev; p && p != msg; p = p->kpm_next)
 		prev = p;
+
 	ASSERT(p && p == msg);
+
 	if (prev == p) {
 		conskbd_msg_queue = msg->kpm_next;
 	} else {
