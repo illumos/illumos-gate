@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -619,18 +619,11 @@ errorq_drain(errorq_t *eqp)
 
 		eep->eqe_next = NULL;
 
-		for (;;) {
-			fep = eqp->eq_free;
-			eep->eqe_prev = fep;
-			membar_producer();
-
-			if (casptr(&eqp->eq_free, fep, eep) == fep)
-				break;
-		}
-
 		/*
 		 * On panic, we add the element to the dump list for each
 		 * nvlist errorq.  Elements are stored oldest to newest.
+		 * Then continue, so we don't free and subsequently overwrite
+		 * any elements which we've put on the dump queue.
 		 */
 		if (panicstr && (eqp->eq_flags & ERRORQ_NVLIST)) {
 			if (eqp->eq_dump == NULL)
@@ -638,6 +631,16 @@ errorq_drain(errorq_t *eqp)
 			else
 				dep = dep->eqe_dump = eep;
 			membar_producer();
+			continue;
+		}
+
+		for (;;) {
+			fep = eqp->eq_free;
+			eep->eqe_prev = fep;
+			membar_producer();
+
+			if (casptr(&eqp->eq_free, fep, eep) == fep)
+				break;
 		}
 	}
 
@@ -752,18 +755,11 @@ errorq_panic_drain(uint_t what)
 			nep = eep->eqe_next;
 			eep->eqe_next = NULL;
 
-			for (;;) {
-				fep = eqp->eq_free;
-				eep->eqe_prev = fep;
-				membar_producer();
-
-				if (casptr(&eqp->eq_free, fep, eep) == fep)
-					break;
-			}
-
 			/*
 			 * On panic, we add the element to the dump list for
-			 * each nvlist errorq, stored oldest to newest.
+			 * each nvlist errorq, stored oldest to newest. Then
+			 * continue, so we don't free and subsequently overwrite
+			 * any elements which we've put on the dump queue.
 			 */
 			if (eqp->eq_flags & ERRORQ_NVLIST) {
 				if (eqp->eq_dump == NULL)
@@ -771,6 +767,16 @@ errorq_panic_drain(uint_t what)
 				else
 					dep = dep->eqe_dump = eep;
 				membar_producer();
+				continue;
+			}
+
+			for (;;) {
+				fep = eqp->eq_free;
+				eep->eqe_prev = fep;
+				membar_producer();
+
+				if (casptr(&eqp->eq_free, fep, eep) == fep)
+					break;
 			}
 		}
 

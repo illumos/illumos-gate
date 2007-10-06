@@ -1904,6 +1904,7 @@ event ereport.io.pciex.tl.uc@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pciex.noadverr@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pciex.correctable@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pciex.a-nonfatal@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pciex.fatal@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pci.nr@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.pci.nr@pciexrc{within(5s)};
@@ -1915,6 +1916,7 @@ event ereport.io.pci.mdpe@pciexrc{within(5s)};
 event ereport.io.pci.sserr@pciexrc{within(5s)};
 event ereport.io.pciex.tl.uc@pciexrc{within(5s)};
 event ereport.io.pciex.noadverr@pciexrc{within(5s)};
+event ereport.io.pciex.a-nonfatal@pciexrc{within(5s)};
 event ereport.io.pciex.rc.ce-msg@pciexrc{within(5s)};
 event ereport.io.pciex.rc.mce-msg@pciexrc{within(5s)};
 event ereport.io.pciex.rc.mue-msg@pciexrc{within(5s)};
@@ -1934,6 +1936,7 @@ prop upset.io.pciex.discard@pciexbus/pciexdev/pciexfn (1)->
     ereport.io.pciex.noadverr@pciexbus/pciexdev/pciexfn,
     ereport.io.pciex.correctable@pciexbus/pciexdev/pciexfn,
     ereport.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
+    ereport.io.pciex.a-nonfatal@pciexbus/pciexdev/pciexfn,
     ereport.io.pciex.fatal@pciexbus/pciexdev/pciexfn;
 
 prop error.io.pciex.discard_rc@pciexrc (1)->
@@ -1945,6 +1948,7 @@ prop upset.io.pciex.discard@pciexrc (1)->
     error.io.pciex.discard_rc@pciexrc,
     ereport.io.pci.nr@pciexrc,
     ereport.io.pciex.noadverr@pciexrc,
+    ereport.io.pciex.a-nonfatal@pciexrc,
     ereport.io.pciex.rc.ce-msg@pciexrc,
     ereport.io.pciex.rc.mce-msg@pciexrc,
     ereport.io.pciex.rc.mue-msg@pciexrc,

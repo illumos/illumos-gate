@@ -311,7 +311,6 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 			log_printq(log_consq);
 
 		fm_banner();
-		errorq_panic();
 
 #if defined(__x86)
 		/*
@@ -377,6 +376,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 	if (panic_trigger(&panic_dump)) {
 		panic_dump_hw(s);
 		splx(ipltospl(CLOCK_LEVEL));
+		errorq_panic();
 		do_polled_io = 1;
 		dumpsys();
 	} else if (((boothowto & RB_DEBUG) || obpdebug) && !nopanicdebug) {
