@@ -614,7 +614,9 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
 				size += sizeof (lb_external1000);
 				size += sizeof (lb_mac1000);
-				if (nxgep->mac.portmode == PORT_1G_COPPER)
+				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    (nxgep->mac.portmode ==
+				    PORT_1G_RGMII_FIBER))
 					size += sizeof (lb_phy1000);
 			}
 			if (nxgep->statsp->mac_stats.cap_100fdx)
@@ -647,7 +649,9 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
 				size += sizeof (lb_external1000);
 				size += sizeof (lb_mac1000);
-				if (nxgep->mac.portmode == PORT_1G_COPPER)
+				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    (nxgep->mac.portmode ==
+				    PORT_1G_RGMII_FIBER))
 					size += sizeof (lb_phy1000);
 			}
 			if (nxgep->statsp->mac_stats.cap_100fdx)
@@ -678,7 +682,9 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 					lb_props[i++] = lb_external10;
 				if (nxgep->statsp->mac_stats.cap_1000fdx)
 					lb_props[i++] = lb_mac1000;
-				if (nxgep->mac.portmode == PORT_1G_COPPER) {
+				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    (nxgep->mac.portmode ==
+				    PORT_1G_RGMII_FIBER)) {
 					if (nxgep->statsp->mac_stats.
 						cap_1000fdx)
 						lb_props[i++] = lb_phy1000;
@@ -821,7 +827,8 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 			(nxgep->mac.portmode == PORT_10G_FIBER)))
 		lb_info = &lb_phy10g;
 	else if ((lb_mode == lb_phy1000.value) &&
-		(nxgep->mac.portmode == PORT_1G_COPPER))
+	    ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)))
 		lb_info = &lb_phy1000;
 	else if ((lb_mode == lb_phy.value) &&
 		(nxgep->mac.portmode == PORT_1G_COPPER))

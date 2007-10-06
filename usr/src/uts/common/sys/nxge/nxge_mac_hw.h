@@ -121,7 +121,7 @@ typedef enum  {
 	(NXGE_PHY_SERDES << NXGE_PHY_SHIFT))
 #define	NXGE_PORT_10G_SERDES	(NXGE_PORT_SPD_10G |	\
 	(NXGE_PHY_SERDES << NXGE_PHY_SHIFT))
-#define	NXGE_PORT_1G_RGMII_FIBER	(NXGE_PORT_SPD_10G |	\
+#define	NXGE_PORT_1G_RGMII_FIBER	(NXGE_PORT_SPD_1G |	\
 	(NXGE_PHY_RGMII_FIBER << NXGE_PHY_SHIFT))
 #define	NXGE_PORT_NONE		(NXGE_PORT_SPD_NONE |	\
 	(NXGE_PHY_NONE << NXGE_PHY_SHIFT))
@@ -2360,6 +2360,11 @@ typedef	union _xpcs_config_t {
 #define	ESR_PLL_CFG_HALF_RATE_1		0x10
 #define	ESR_PLL_CFG_HALF_RATE_2		0x20
 #define	ESR_PLL_CFG_HALF_RATE_3		0x40
+#define	ESR_PLL_CFG_1G_SERDES		(ESR_PLL_CFG_FBDIV_0 | \
+					ESR_PLL_CFG_HALF_RATE_0 | \
+					ESR_PLL_CFG_HALF_RATE_1 | \
+					ESR_PLL_CFG_HALF_RATE_2 | \
+					ESR_PLL_CFG_HALF_RATE_3)
 
 /* ESR Neptune Serdes Control Register */
 #define	ESR_CTL_EN_SYNCDET_0		0x00000001
@@ -2386,6 +2391,19 @@ typedef	union _xpcs_config_t {
 #define	ESR_CTL_RXITERM_1		0x20000000
 #define	ESR_CTL_RXITERM_2		0x40000000
 #define	ESR_CTL_RXITERM_3		0x80000000
+#define	ESR_CTL_1G_SERDES		(ESR_CTL_EN_SYNCDET_0 | \
+					ESR_CTL_EN_SYNCDET_1 |	\
+					ESR_CTL_EN_SYNCDET_2 |	\
+					ESR_CTL_EN_SYNCDET_3 |  \
+					(0x1 << ESR_CTL_OUT_EMPH_0_SHIFT) | \
+					(0x1 << ESR_CTL_OUT_EMPH_1_SHIFT) | \
+					(0x1 << ESR_CTL_OUT_EMPH_2_SHIFT) | \
+					(0x1 << ESR_CTL_OUT_EMPH_3_SHIFT) | \
+					(0x1 << ESR_CTL_OUT_EMPH_3_SHIFT) | \
+					(0x1 << ESR_CTL_LOSADJ_0_SHIFT) | \
+					(0x1 << ESR_CTL_LOSADJ_1_SHIFT) | \
+					(0x1 << ESR_CTL_LOSADJ_2_SHIFT) | \
+					(0x1 << ESR_CTL_LOSADJ_3_SHIFT))
 
 /* ESR Neptune Serdes Test Configuration Register */
 #define	ESR_TSTCFG_LBTEST_MD_0_MASK	0x00000003
@@ -2396,6 +2414,10 @@ typedef	union _xpcs_config_t {
 #define	ESR_TSTCFG_LBTEST_MD_2_SHIFT	4
 #define	ESR_TSTCFG_LBTEST_MD_3_MASK	0x000000c0
 #define	ESR_TSTCFG_LBTEST_MD_3_SHIFT	6
+#define	ESR_TSTCFG_LBTEST_PAD		(ESR_PAD_LOOPBACK_CH3 | \
+					ESR_PAD_LOOPBACK_CH2 | \
+					ESR_PAD_LOOPBACK_CH1 | \
+					ESR_PAD_LOOPBACK_CH0)
 
 /* ESR Neptune Ethernet RGMII Configuration Register */
 #define	ESR_RGMII_PT0_IN_USE		0x00000001
@@ -2430,6 +2452,10 @@ typedef	union _xpcs_config_t {
 #define	ESR_SIG_LOS_P0_CH2		0x00000004
 #define	ESR_SIG_LOS_P0_CH1		0x00000002
 #define	ESR_SIG_LOS_P0_CH0		0x00000001
+#define	ESR_SIG_P0_BITS_MASK_1G		(ESR_SIG_SERDES_RDY0_P0 | \
+					ESR_SIG_DETECT0_P0)
+#define	ESR_SIG_P1_BITS_MASK_1G		(ESR_SIG_SERDES_RDY0_P1 | \
+					ESR_SIG_DETECT0_P1)
 
 /* ESR Debug Selection Register */
 #define	ESR_DEBUG_SEL_MASK		0x00000003f

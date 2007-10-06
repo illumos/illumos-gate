@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,9 @@ extern "C" {
 #define	MII_RES2		13
 #define	MII_RES3		14
 #define	MII_ESR			15
+#define	MII_SHADOW		0x1c
+/* Shadow register definition */
+#define	MII_MODE_CONTROL_REG	0x1f
 
 #define	NXGE_MAX_MII_REGS	32
 
@@ -72,7 +75,9 @@ typedef struct _mii_regs {
 	uchar_t gsr;		/* Gigabit basic mode status register */
 	uchar_t mii_res1[4];	/* For future use by MII working group */
 	uchar_t esr;		/* Extended status register. */
-	uchar_t vendor_res[16];	/* For future use by Phy Vendors */
+	uchar_t vendor_res[12];	/* For future use by Phy Vendors */
+	uchar_t shadow;
+	uchar_t vendor_res2[3]; /* For future use by Phy Vendors */
 } mii_regs_t, *p_mii_regs_t;
 
 /*
@@ -446,6 +451,39 @@ typedef union _mii_esr {
 #endif
 	} bits;
 } mii_esr_t, *p_mii_esr_t;
+
+#define	NXGE_MODE_SELECT_FIBER	0x01
+/* Shadow regiser 0x11111 */
+typedef union _mii_mode_control_stat {
+	uint16_t value;
+	struct {
+#if defined(_BIT_FIELDS_HTOL)
+		uint16_t write_enable:1;
+		uint16_t shadow:5;
+		uint16_t rsv:1;
+		uint16_t change:1;
+		uint16_t copper:1;
+		uint16_t fiber:1;
+		uint16_t copper_energy:1;
+		uint16_t fiber_signal:1;
+		uint16_t rsv1:1;
+		uint16_t mode:2;
+		uint16_t enable:1;
+#elif defined(_BIT_FIELDS_LTOH)
+		uint16_t enable:1;
+		uint16_t mode:2;
+		uint16_t rsv1:1;
+		uint16_t fiber_signal:1;
+		uint16_t copper_energy:1;
+		uint16_t fiber:1;
+		uint16_t copper:1;
+		uint16_t change:1;
+		uint16_t rsv:1;
+		uint16_t shadow:5;
+		uint16_t write_enable:1;
+#endif
+	} bits;
+} mii_mode_control_stat_t, *p_mode_control_stat_t;
 
 #ifdef __cplusplus
 }

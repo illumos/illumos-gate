@@ -4910,6 +4910,7 @@ nxge_get_nports(p_nxge_t nxgep)
 		case P_NEPTUNE_ATLAS_4PORT:
 		case P_NEPTUNE_MARAMBA_P0:
 		case P_NEPTUNE_MARAMBA_P1:
+		case P_NEPTUNE_ALONSO:
 			nports = 4;
 			break;
 		default:

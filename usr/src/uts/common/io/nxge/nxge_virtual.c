@@ -1978,7 +1978,14 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			ch_arr_p = &tx_1_1G_1_10G_2_1G[0];
 			break;
 		default:
-			ch_arr_p = &p4_tx_equal[0];
+			switch (nxgep->platform_type) {
+			case P_NEPTUNE_ALONSO:
+				ch_arr_p = &tx_2_10G_2_1G[0];
+				break;
+			default:
+				ch_arr_p = &p4_tx_equal[0];
+				break;
+			}
 			break;
 		}
 		st_txdma = 0;
@@ -2013,7 +2020,14 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			tx_ndmas = tx_1_1G_1_10G_2_1G[nxgep->function_num];
 			break;
 		default:
-			tx_ndmas = p4_tx_equal[nxgep->function_num];
+			switch (nxgep->platform_type) {
+			case P_NEPTUNE_ALONSO:
+				tx_ndmas = tx_2_10G_2_1G[nxgep->function_num];
+				break;
+			default:
+				tx_ndmas = p4_tx_equal[nxgep->function_num];
+				break;
+			}
 			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
@@ -2050,7 +2064,14 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			ch_arr_p = &rx_1_1G_1_10G_2_1G[0];
 			break;
 		default:
-			ch_arr_p = &p4_rx_equal[0];
+			switch (nxgep->platform_type) {
+			case P_NEPTUNE_ALONSO:
+				ch_arr_p = &rx_2_10G_2_1G[0];
+				break;
+			default:
+				ch_arr_p = &p4_rx_equal[0];
+				break;
+			}
 			break;
 		}
 		st_rxdma = 0;
@@ -2086,7 +2107,14 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			rx_ndmas = rx_1_1G_1_10G_2_1G[nxgep->function_num];
 			break;
 		default:
-			rx_ndmas = p4_rx_equal[nxgep->function_num];
+			switch (nxgep->platform_type) {
+			case P_NEPTUNE_ALONSO:
+				rx_ndmas = rx_2_10G_2_1G[nxgep->function_num];
+				break;
+			default:
+				rx_ndmas = p4_rx_equal[nxgep->function_num];
+				break;
+			}
 			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,

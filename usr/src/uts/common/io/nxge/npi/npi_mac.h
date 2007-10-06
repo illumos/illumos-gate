@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,6 +565,7 @@ npi_status_t npi_mac_dump_regs(npi_handle_t, uint8_t);
 
 /* MIF common functions */
 void npi_mac_mif_set_indirect_mode(npi_handle_t, boolean_t);
+void npi_mac_mif_set_atca_mode(npi_handle_t, boolean_t);
 
 #ifdef	__cplusplus
 }

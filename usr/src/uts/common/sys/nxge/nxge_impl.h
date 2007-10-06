@@ -352,14 +352,16 @@ typedef enum {
 	P_NEPTUNE_ATLAS_4PORT,
 	P_NEPTUNE_MARAMBA_P0,
 	P_NEPTUNE_MARAMBA_P1,
+	P_NEPTUNE_ALONSO,
 	P_NEPTUNE_NIU
 } platform_type_t;
 
-#define	NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)	\
-	(((nxgep->platform_type) == P_NEPTUNE_ATLAS_2PORT) ||	\
-	    ((nxgep->platform_type) == P_NEPTUNE_ATLAS_4PORT) ||	\
-	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P0) ||	\
-	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1))
+#define	NXGE_IS_VALID_NEPTUNE_TYPE(nxgep) \
+	(((nxgep->platform_type) == P_NEPTUNE_ATLAS_2PORT) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_ATLAS_4PORT) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P0) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_ALONSO))
 
 typedef enum {
 	CFG_DEFAULT = 0,	/* default cfg */
@@ -647,6 +649,8 @@ typedef struct _nxge_mmac_stats_t {
 #define	NXGE_2XGF_LP_BM_STR		"501-7283"
 #define	NXGE_QGC_PEM_BM_STR		"501-7765"
 #define	NXGE_2XGF_PEM_BM_STR		"501-7626"
+#define	NXGE_ALONSO_BM_STR		"373-0202-01"
+#define	NXGE_ALONSO_MODEL_STR		"SUNW,CP3220"
 #define	NXGE_EROM_LEN			1048576
 
 #endif
@@ -866,6 +870,7 @@ nxge_status_t nxge_link_init(p_nxge_t);
 nxge_status_t nxge_xif_init(p_nxge_t);
 nxge_status_t nxge_pcs_init(p_nxge_t);
 nxge_status_t nxge_serdes_init(p_nxge_t);
+nxge_status_t nxge_serdes_reset(p_nxge_t);
 nxge_status_t nxge_xcvr_find(p_nxge_t);
 nxge_status_t nxge_get_xcvr_type(p_nxge_t);
 nxge_status_t nxge_setup_xcvr_table(p_nxge_t);
@@ -880,6 +885,7 @@ nxge_status_t nxge_tx_mac_reset(p_nxge_t);
 nxge_status_t nxge_rx_mac_reset(p_nxge_t);
 nxge_status_t nxge_link_intr(p_nxge_t, link_intr_enable_t);
 nxge_status_t nxge_mii_xcvr_init(p_nxge_t);
+nxge_status_t nxge_mii_xcvr_fiber_init(p_nxge_t);
 nxge_status_t nxge_mii_read(p_nxge_t, uint8_t,
 			uint8_t, uint16_t *);
 nxge_status_t nxge_mii_write(p_nxge_t, uint8_t,

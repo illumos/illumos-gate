@@ -250,8 +250,16 @@ nxge_vpd_info_get(p_nxge_t nxgep)
 	    (strncmp(nxgep->vpd_info.bd_model, NXGE_2XGF_PEM_BM_STR,
 	    strlen(NXGE_2XGF_PEM_BM_STR)) == 0)) {
 		nxgep->platform_type = P_NEPTUNE_ATLAS_2PORT;
+	} else if (strncmp(nxgep->vpd_info.bd_model,
+	    NXGE_ALONSO_BM_STR, strlen(NXGE_ALONSO_BM_STR)) == 0) {
+		nxgep->platform_type = P_NEPTUNE_ALONSO;
 	}
 
+	/* If Alonso platform, replace "mif" for the last 2 ports phy-type */
+	if ((nxgep->platform_type == P_NEPTUNE_ALONSO) &&
+	    ((nxgep->function_num == 2) || (nxgep->function_num == 3))) {
+		(void) strcpy(nxgep->vpd_info.phy_type, "mif");
+	}
 }
 
 static void

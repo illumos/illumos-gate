@@ -3454,6 +3454,16 @@ npi_mac_mif_set_indirect_mode(npi_handle_t handle, boolean_t on_off)
 	MIF_REG_WR(handle, MIF_CONFIG_REG, mif_cfg.value);
 }
 
+void
+npi_mac_mif_set_atca_mode(npi_handle_t handle, boolean_t on_off)
+{
+	mif_cfg_t mif_cfg;
+
+	MIF_REG_RD(handle, MIF_CONFIG_REG, &mif_cfg.value);
+	mif_cfg.bits.w0.atca_ge = on_off;
+	MIF_REG_WR(handle, MIF_CONFIG_REG, mif_cfg.value);
+}
+
 npi_status_t
 npi_bmac_send_pause(npi_handle_t handle, uint8_t portn, uint16_t pause_time)
 {
