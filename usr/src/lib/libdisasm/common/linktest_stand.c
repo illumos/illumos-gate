@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 
 void mdb_free(void) {}
 void snprintf(void) {}
+void vsnprintf(void) {}
 void mdb_zalloc(void) {}
 void strcmp(void) {}
 void strlen(void) {}

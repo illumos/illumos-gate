@@ -67,21 +67,8 @@ mkdir -p $closedroot || exit 1
 # rather than a tar pipeline to make it easier to detect errors.
 #
 # We need /lib/libc_i18n.a & /lib/{sparcv9,amd64}/libc_i18n.a
-# libdisasm is open on x86, but closed on sparc - how confusing...
 #
 
-(
-	echo lib/libc_i18n.a
-	[ -n "$plat64" ] && echo lib/$plat64/libc_i18n.a
-	if [ "$isa" = "sparc" ]; then
-		echo usr/lib/libdisasm.so.1
-		echo usr/lib/libdisasm.so
-		echo usr/lib/$plat64/libdisasm.so.1
-		echo usr/lib/$plat64/libdisasm.so
-		echo usr/lib/$plat64/libstanddisasm.so
-		echo usr/lib/$plat64/llib-ldisasm.ln
-		echo usr/lib/llib-ldisasm
-		echo usr/lib/mdb/disasm
-		echo usr/lib/llib-ldisasm.ln
-	fi
-) | cpio -dpu $closedroot
+mkdir -p $closedroot/lib/$plat64
+cp lib/libc_i18n.a $closedroot/lib
+cp lib/$plat64/libc_i18n.a $closedroot/lib/$plat64

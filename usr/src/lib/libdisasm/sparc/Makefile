@@ -23,33 +23,16 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.lib
+ISASRCDIR=.
 
-HDRS=		libdisasm.h
+include ../Makefile.com
 
-HDRDIR=		common
-SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+TYPES=library standalone
 
-all := 		TARGET = all
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-install	:=	TARGET = install
-lint :=		TARGET = lint
-
-.KEEP_STATE:
-
-all clean clobber install lint: $(SUBDIRS)
-
-install_h:	$(ROOTHDRS)
-
-check:		$(CHECKHDRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLINT) $(ROOTLIBS)
+INSTALL_DEPS_standalone =	$(ROOTLIBS)
 
 include ../Makefile.targ
+
+C99MODE = $(C99_ENABLE)

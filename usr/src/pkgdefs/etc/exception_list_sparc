@@ -866,6 +866,7 @@ usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	sparc
 # This library is installed in the proto area by the build of libdisasm, and is
 # only used when building the KMDB disasm module.
 #
+usr/lib/libstanddisasm.so		sparc
 usr/lib/sparcv9/libstanddisasm.so	sparc
 #
 # TSol: tsol doesn't ship lint source, and tsnet isn't for customers at all.

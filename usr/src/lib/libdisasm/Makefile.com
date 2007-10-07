@@ -50,10 +50,11 @@ COMDIR=		$(SRC)/lib/libdisasm/common
 # Architecture-dependent files common to both versions of libdisasm
 #
 OBJECTS_common_i386 = dis_i386.o dis_tables.o
-OBJECTS_common_sparc = dis_sparc.o
+OBJECTS_common_sparc = dis_sparc.o instr.o dis_sparc_fmt.o
 
 SRCS_common_i386 = $(ISASRCDIR)/dis_i386.c $(SRC)/common/dis/i386/dis_tables.c
-SRCS_common_sparc = $(ISASRCDIR)/dis_sparc.c
+SRCS_common_sparc = $(ISASRCDIR)/dis_sparc.c $(ISASRCDIR)/instr.c \
+	$(ISASRCDIR)/dis_sparc_fmt.c
 
 #
 # Architecture-independent files common to both version of libdisasm
@@ -112,7 +113,7 @@ STAND_RENAMED_FUNCS= \
 	snprintf
 
 CPPFLAGS_standalone = -DDIS_STANDALONE $(STAND_RENAMED_FUNCS:%=-D%=mdb_%) \
-	-I$(SRC)/cmd/mdb/common
+	-Dvsnprintf=mdb_iob_vsnprintf -I$(SRC)/cmd/mdb/common
 CPPFLAGS_library = -D_REENTRANT
 CPPFLAGS +=	-I$(COMDIR) $(CPPFLAGS_$(CURTYPE))
 

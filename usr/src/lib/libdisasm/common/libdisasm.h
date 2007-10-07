@@ -43,6 +43,7 @@ typedef struct dis_handle dis_handle_t;
 #define	DIS_SPARC_V8		0x01
 #define	DIS_SPARC_V9		0x02
 #define	DIS_SPARC_V9_SGI	0x04
+#define	DIS_SPARC_V9_OPL	0x08
 
 /* x86 diassembler flags (mutually exclusive) */
 #define	DIS_X86_SIZE16		0x08
