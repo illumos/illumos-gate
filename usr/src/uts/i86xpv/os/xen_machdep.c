@@ -60,6 +60,7 @@
  * Section 3 of the above license was updated in response to bug 6379571.
  */
 
+#include <sys/ctype.h>
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/trap.h>
@@ -100,6 +101,121 @@
 int cpr_debug;
 cpuset_t cpu_suspend_lost_set;
 static int xen_suspend_debug;
+
+/*
+ * Determine helpful version information.
+ *
+ * (And leave copies in the data segment so we can look at them later
+ * with e.g. kmdb.)
+ */
+
+typedef enum xen_version {
+	XENVER_BOOT_IDX,
+	XENVER_CURRENT_IDX
+} xen_version_t;
+
+struct xenver {
+	ulong_t xv_major;
+	ulong_t xv_minor;
+	ulong_t xv_revision;
+	xen_extraversion_t xv_ver;
+	xen_changeset_info_t xv_chgset;
+	xen_compile_info_t xv_build;
+	xen_capabilities_info_t xv_caps;
+} xenver[2];
+
+#define	XENVER_BOOT(m)	(xenver[XENVER_BOOT_IDX].m)
+#define	XENVER_CURRENT(m)	(xenver[XENVER_CURRENT_IDX].m)
+
+/*
+ * Update the xenver data. We maintain two copies, boot and
+ * current. If we are setting the boot, then also set current.
+ */
+static void
+xen_set_version(xen_version_t idx)
+{
+	ulong_t ver;
+
+	bzero(&xenver[idx], sizeof (xenver[idx]));
+
+	ver = HYPERVISOR_xen_version(XENVER_version, 0);
+
+	xenver[idx].xv_major = BITX(ver, 31, 16);
+	xenver[idx].xv_minor = BITX(ver, 15, 0);
+
+	(void) HYPERVISOR_xen_version(XENVER_extraversion, &xenver[idx].xv_ver);
+
+	/*
+	 * The revision is buried in the extraversion information that is
+	 * maintained by the hypervisor. For our purposes we expect that
+	 * the revision number is:
+	 * 	- the second character in the extraversion information
+	 *	- one character long
+	 *	- numeric digit
+	 * If it isn't then we can't extract the revision and we leave it
+	 * set to 0.
+	 */
+	if (strlen(xenver[idx].xv_ver) > 1 && isdigit(xenver[idx].xv_ver[1]))
+		xenver[idx].xv_revision = xenver[idx].xv_ver[1] - '0';
+	else
+		cmn_err(CE_WARN, "Cannot extract revision on this hypervisor "
+		    "version: v%s, unexpected version format",
+		    xenver[idx].xv_ver);
+
+	(void) HYPERVISOR_xen_version(XENVER_changeset,
+	    &xenver[idx].xv_chgset);
+
+	(void) HYPERVISOR_xen_version(XENVER_compile_info,
+	    &xenver[idx].xv_build);
+	/*
+	 * Capabilities are a set of space separated ascii strings
+	 * e.g. 'xen-3.1-x86_32p' or 'hvm-3.2-x86_64'
+	 */
+	(void) HYPERVISOR_xen_version(XENVER_capabilities,
+	    &xenver[idx].xv_caps);
+
+	cmn_err(CE_CONT, "?v%lu.%lu%s chgset '%s'\n", xenver[idx].xv_major,
+	    xenver[idx].xv_minor, xenver[idx].xv_ver, xenver[idx].xv_chgset);
+
+	if (idx == XENVER_BOOT_IDX)
+		bcopy(&xenver[XENVER_BOOT_IDX], &xenver[XENVER_CURRENT_IDX],
+		    sizeof (xenver[XENVER_BOOT_IDX]));
+}
+
+typedef enum xen_hypervisor_check {
+	XEN_RUN_CHECK,
+	XEN_SUSPEND_CHECK
+} xen_hypervisor_check_t;
+
+/*
+ * To run the hypervisor must be 3.0.4 or better. To suspend/resume
+ * we need 3.0.4 or better and if it is 3.0.4. then it must be provided
+ * by the Solaris xVM project.
+ * Checking can be disabled for testing purposes by setting the
+ * xen_suspend_debug variable.
+ */
+static int
+xen_hypervisor_supports_solaris(xen_hypervisor_check_t check)
+{
+	if (xen_suspend_debug == 1)
+		return (1);
+	if (XENVER_CURRENT(xv_major) < 3)
+		return (0);
+	if (XENVER_CURRENT(xv_major) > 3)
+		return (1);
+	if (XENVER_CURRENT(xv_minor) > 0)
+		return (1);
+	if (XENVER_CURRENT(xv_revision) < 4)
+		return (0);
+	if (XENVER_CURRENT(xv_revision) == 4 && check == XEN_SUSPEND_CHECK) {
+		if (strlen(XENVER_CURRENT(xv_ver)) < 4)
+			return (0);
+		if (strncmp(XENVER_CURRENT(xv_ver) +
+		    strlen(XENVER_CURRENT(xv_ver)) - 4, "-xvm", 4))
+			return (0);
+	}
+	return (1);
+}
 
 void
 xen_set_callback(void (*func)(void), uint_t type, uint_t flags)
@@ -278,6 +394,17 @@ xen_suspend_domain(void)
 	int i;
 
 	/*
+	 * Check that we are happy to suspend on this hypervisor.
+	 */
+	if (xen_hypervisor_supports_solaris(XEN_SUSPEND_CHECK) == 0) {
+		cpr_err(CE_WARN, "Cannot suspend on this hypervisor "
+		    "version: v%lu.%lu%s, need at least version v3.0.4 or "
+		    "-xvm based hypervisor", XENVER_CURRENT(xv_major),
+		    XENVER_CURRENT(xv_minor), XENVER_CURRENT(xv_ver));
+		return;
+	}
+
+	/*
 	 * XXPV - Are we definitely OK to suspend by the time we've connected
 	 * the handler?
 	 */
@@ -454,6 +581,25 @@ xen_suspend_domain(void)
 	kpreempt_enable();
 
 	SUSPEND_DEBUG("finished xen_suspend_domain\n");
+
+	/*
+	 * We have restarted our suspended domain, update the hypervisor
+	 * details. NB: This must be done at the end of this function,
+	 * since we need the domain to be completely resumed before
+	 * these functions will work correctly.
+	 */
+	xen_set_version(XENVER_CURRENT_IDX);
+
+	/*
+	 * We can check and report a warning, but we don't stop the
+	 * process.
+	 */
+	if (xen_hypervisor_supports_solaris(XEN_SUSPEND_CHECK) == 0)
+		cmn_err(CE_WARN, "Found hypervisor version: v%lu.%lu%s "
+		    "but need at least version v3.0.4",
+		    XENVER_CURRENT(xv_major), XENVER_CURRENT(xv_minor),
+		    XENVER_CURRENT(xv_ver));
+
 	cmn_err(CE_NOTE, "domain restore/migrate completed");
 }
 
@@ -740,101 +886,15 @@ xen_printf(const char *fmt, ...)
 }
 #endif	/* DEBUG */
 
-/*
- * Determine helpful version information.
- *
- * (And leave a copy around in the data segment so we can look
- * at them later with e.g. kmdb.)
- */
-struct xenver {
-	char *xv_ver;
-	char *xv_chgset;
-	char *xv_compiler;
-	char *xv_compile_date;
-	char *xv_compile_by;
-	char *xv_compile_domain;
-	char *xv_caps;
-} xenver;
-
-static char *
-sprintf_alloc(const char *fmt, ...)
-{
-	va_list ap;
-	size_t len;
-	char *p;
-
-	va_start(ap, fmt);
-	len = 1 + vsnprintf(NULL, 0, fmt, ap);
-	p = kmem_alloc(len, KM_SLEEP);
-	(void) vsnprintf(p, len, fmt, ap);
-	va_end(ap);
-	return (p);
-}
-
 void
 xen_version(void)
 {
-	static const char strfmt[] = "%s";
-	static const char xenver_sun[] = "3.0.4-1-xvm";  /* XXPV */
-	union {
-		xen_extraversion_t xver;
-		xen_changeset_info_t chgset;
-		xen_compile_info_t build;
-		xen_capabilities_info_t caps;
-	} data, *src = &data;
-
-	ulong_t ver = HYPERVISOR_xen_version(XENVER_version, 0);
-
-	if (HYPERVISOR_xen_version(XENVER_extraversion, src) == 0) {
-		((char *)(src->xver))[sizeof (src->xver) - 1] = '\0';
-	} else
-		((char *)(src->xver))[0] = '\0';
-
-	xenver.xv_ver = sprintf_alloc("%lu.%lu%s",
-	    BITX(ver, 31, 16), BITX(ver, 15, 0), src->xver);
-
-	if (HYPERVISOR_xen_version(XENVER_changeset, src) == 0) {
-		((char *)(src->chgset))[sizeof (src->chgset) - 1] = '\0';
-		xenver.xv_chgset = sprintf_alloc(strfmt, src->chgset);
-	}
-
-	cmn_err(CE_CONT, "?xen v%s chgset '%s'\n",
-	    xenver.xv_ver, xenver.xv_chgset);
-
-	/*
-	 * XXPV - Solaris guests currently require special version of
-	 * the hypervisor from Sun to function properly called "3.0.4-1-xvm".
-	 * This version is based on "3.0.4-1" plus changes from
-	 * Sun that are a work-in-progress.
-	 *
-	 * This version check will disappear after appropriate fixes
-	 * are accepted upstream.
-	 */
-	if (strcmp(xenver.xv_ver, xenver_sun) != 0) {
-		cmn_err(CE_WARN, "Found xen v%s but need xen v%s",
-		    xenver.xv_ver, xenver_sun);
-		cmn_err(CE_WARN, "The kernel may not function correctly");
-	}
-
-	if (HYPERVISOR_xen_version(XENVER_compile_info, src) == 0) {
-		xenver.xv_compiler = sprintf_alloc(strfmt,
-		    data.build.compiler);
-		xenver.xv_compile_date = sprintf_alloc(strfmt,
-		    data.build.compile_date);
-		xenver.xv_compile_by = sprintf_alloc(strfmt,
-		    data.build.compile_by);
-		xenver.xv_compile_domain = sprintf_alloc(strfmt,
-		    data.build.compile_domain);
-	}
-
-	/*
-	 * Capabilities are a set of space separated ascii strings
-	 * e.g. 'xen-3.1-x86_32p' or 'hvm-3.2-x86_64'
-	 */
-	if (HYPERVISOR_xen_version(XENVER_capabilities, src) == 0) {
-		((char *)(src->caps))[sizeof (src->caps) - 1] = '\0';
-		xenver.xv_caps = sprintf_alloc(strfmt, src->caps);
-	}
+	xen_set_version(XENVER_BOOT_IDX);
+	if (xen_hypervisor_supports_solaris(XEN_RUN_CHECK) == 0)
+		cmn_err(CE_WARN, "Found hypervisor version: v%lu.%lu%s "
+		    "but need at least version v3.0.4",
+		    XENVER_CURRENT(xv_major), XENVER_CURRENT(xv_minor),
+		    XENVER_CURRENT(xv_ver));
 }
 
 /*
