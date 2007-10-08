@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -431,7 +430,7 @@ psvc_fan_init_speed_0(psvc_opaque_t hdlp, char *id)
 		return (status);
 
 	status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR, &control_id,
-		PSVC_FAN_DRIVE_CONTROL, 0);
+	    PSVC_FAN_DRIVE_CONTROL, 0);
 	if (status != PSVC_SUCCESS)
 		return (status);
 
@@ -545,7 +544,9 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 	char		led_state[32];
 	boolean_t	present;
 	static int8_t	hotplug_failed_count = 0;
+	static int	unplugged_ps = 0;
 	int	retry;
+	char		*unplugged_id;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &present);
 	if (status == PSVC_FAILURE) {
@@ -623,28 +624,28 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 	    state, PSVC_HOTPLUGGED));
 
 	if ((strcmp(valid_switch_state, PSVC_OFF) == 0) &&
-		(strcmp(state, PSVC_HOTPLUGGED) != 0)) {
+	    (strcmp(state, PSVC_HOTPLUGGED) != 0)) {
 		strcpy(state, PSVC_HOTPLUGGED);
 		strcpy(fault, PSVC_NO_FAULT);
 		strcpy(led_state, PSVC_LED_OFF);
 		status = psvc_set_attr(hdlp, id, PSVC_STATE_ATTR,
-			state);
+		    state);
 		if (status == PSVC_FAILURE)
 			return (status);
 		status = psvc_get_attr(hdlp, id, PSVC_ASSOC_MATCHES_ATTR,
-			&led_count, PSVC_DEV_FAULT_LED);
+		    &led_count, PSVC_DEV_FAULT_LED);
 		if (status == PSVC_FAILURE)
 			return (status);
 
 		for (j = 0; j < led_count; j++) {
 
 			status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
-				&led_id, PSVC_DEV_FAULT_LED, j);
+			    &led_id, PSVC_DEV_FAULT_LED, j);
 			if (status != PSVC_SUCCESS)
 				return (status);
 
 			status = psvc_set_attr(hdlp, led_id,
-				PSVC_LED_STATE_ATTR, led_state);
+			    PSVC_LED_STATE_ATTR, led_state);
 			if (status != PSVC_SUCCESS) {
 				syslog(LOG_ERR, SET_LED_FAILED_MSG, led_id,
 				    errno);
@@ -652,17 +653,42 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 			}
 
 		}
+		strcpy(led_state, PSVC_LED_ON);
+		status = psvc_set_attr(hdlp, "FSP_POWER_FAULT_LED",
+		    PSVC_LED_STATE_ATTR, led_state);
+		if (status != PSVC_SUCCESS) {
+			syslog(LOG_ERR, SET_LED_FAILED_MSG, led_id, errno);
+			return (status);
+		}
+		unplugged_id = id + 2;
+		unplugged_ps = unplugged_ps | (1 << (int)strtol(unplugged_id,
+		    (char **)NULL, 10));
+		status = update_gen_fault_led(hdlp, GEN_FAULT_LED);
 		syslog(LOG_ERR, PS_UNPLUGGED_MSG, id);
 		return (status);
 	}
 
 	if ((strcmp(valid_switch_state, PSVC_ON) == 0) &&
-		(strcmp(state, PSVC_HOTPLUGGED) == 0)) {
+	    (strcmp(state, PSVC_HOTPLUGGED) == 0)) {
 		strcpy(state, PSVC_OK);
 		strcpy(fault, PSVC_NO_FAULT);
 		status = psvc_set_attr(hdlp, id, PSVC_STATE_ATTR, state);
 		if (status == PSVC_FAILURE)
 			return (status);
+		unplugged_id = id + 2;
+		unplugged_ps = unplugged_ps ^ (1 << (int)strtol(unplugged_id,
+		    (char **)NULL, 10));
+		if (unplugged_ps == 0) {
+			strcpy(led_state, PSVC_LED_OFF);
+			status = psvc_set_attr(hdlp, "FSP_POWER_FAULT_LED",
+			    PSVC_LED_STATE_ATTR, led_state);
+			if (status != PSVC_SUCCESS) {
+				syslog(LOG_ERR, SET_LED_FAILED_MSG, led_id,
+				    errno);
+				return (status);
+			}
+			status = update_gen_fault_led(hdlp, GEN_FAULT_LED);
+		}
 		syslog(LOG_ERR, PS_PLUGGED_MSG, id);
 	}
 
@@ -706,10 +732,10 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 
 	for (i = 0; i < DAKTARI_MAX_PS; i++) {
 		status = psvc_get_attr(hdlp, power_supply_id[i],
-			PSVC_PRESENCE_ATTR, &present);
+		    PSVC_PRESENCE_ATTR, &present);
 		if (status == PSVC_FAILURE) {
 			syslog(LOG_ERR, GET_PRESENCE_FAILED_MSG,
-				power_supply_id[i], errno);
+			    power_supply_id[i], errno);
 			return (status);
 		}
 
@@ -735,7 +761,7 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 
 		for (j = 0; j < DAK_MAX_PS_I_SENSORS; ++j) {
 			status = psvc_get_attr(hdlp, sensor_id[i][j],
-				PSVC_SENSOR_VALUE_ATTR, &amps);
+			    PSVC_SENSOR_VALUE_ATTR, &amps);
 			if (status != PSVC_SUCCESS) {
 				if (overcurrent_failed_check == 0) {
 					/*
@@ -978,7 +1004,7 @@ psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 				syslog(LOG_ERR, DEVICE_FAILURE_MSG, dev_label);
 				for (j = 0; j < DAK_MAX_FAULT_SENSORS; ++j) {
 					if (strcmp(bad_sensors[j],
-						EMPTY_STRING) != 0)
+					    EMPTY_STRING) != 0)
 						syslog(LOG_ERR, "%s\n",
 						    bad_sensors[j]);
 				}
@@ -1040,7 +1066,7 @@ psvc_ps_check_and_disable_dr_policy_0(psvc_opaque_t hdlp, char *id)
 			continue;
 		} else {
 			rv = psvc_get_attr(hdlp, name[i], PSVC_STATE_ATTR,
-				state);
+			    state);
 			if (rv != PSVC_SUCCESS)
 				return (rv);
 
@@ -1096,15 +1122,15 @@ psvc_fan_blast_shutoff_policy_0(psvc_opaque_t hdlp, char *id)
 	if (status != PSVC_SUCCESS)
 		return (status);
 	status = psvc_set_attr(hdlp, id, PSVC_SWITCH_STATE_ATTR,
-		PSVC_SWITCH_OFF);
+	    PSVC_SWITCH_OFF);
 	if (status != PSVC_SUCCESS)
 		return (status);
 	status = psvc_set_attr(hdlp, id, PSVC_SWITCH_STATE_ATTR,
-		PSVC_SWITCH_ON);
+	    PSVC_SWITCH_ON);
 	if (status != PSVC_SUCCESS)
 		return (status);
 	status = psvc_set_attr(hdlp, id, PSVC_SWITCH_STATE_ATTR,
-		PSVC_SWITCH_OFF);
+	    PSVC_SWITCH_OFF);
 
 	return (status);
 }
@@ -1403,7 +1429,7 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	int retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PREV_PRESENCE_ATTR,
-		&previous_presence);
+	    &previous_presence);
 	if (status != PSVC_SUCCESS)
 		return (status);
 
@@ -1460,22 +1486,22 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 
 		/* Enable i2c bus */
 		psvc_get_attr(hdlp, id, PSVC_ASSOC_MATCHES_ATTR,
-			&switch_count, PSVC_HOTPLUG_ENABLE_SWITCH);
+		    &switch_count, PSVC_HOTPLUG_ENABLE_SWITCH);
 		for (i = 0; i < switch_count; ++i) {
 			status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
-				&switch_id, PSVC_HOTPLUG_ENABLE_SWITCH, i);
+			    &switch_id, PSVC_HOTPLUG_ENABLE_SWITCH, i);
 			if (status == PSVC_FAILURE)
 				return (status);
 
 			strcpy(switch_state, PSVC_SWITCH_OFF);
 			status = psvc_set_attr(hdlp, switch_id,
-				PSVC_SWITCH_STATE_ATTR, switch_state);
+			    PSVC_SWITCH_STATE_ATTR, switch_state);
 			if (status == PSVC_FAILURE)
 				return (status);
 
 			strcpy(switch_state, PSVC_SWITCH_ON);
 			status = psvc_set_attr(hdlp, switch_id,
-				PSVC_SWITCH_STATE_ATTR, switch_state);
+			    PSVC_SWITCH_STATE_ATTR, switch_state);
 			if (status == PSVC_FAILURE)
 				return (status);
 		}
@@ -1499,11 +1525,11 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 		syslog(LOG_ERR, DEVICE_REMOVED_MSG, label);
 		ptree_delete_node(child_node);
 		psvc_get_attr(hdlp, id, PSVC_ASSOC_MATCHES_ATTR, &led_count,
-			PSVC_DEV_FAULT_LED);
+		    PSVC_DEV_FAULT_LED);
 
 		for (i = 0; i < led_count; i++) {
 			status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
-				&led_id, PSVC_DEV_FAULT_LED, i);
+			    &led_id, PSVC_DEV_FAULT_LED, i);
 			if (status != PSVC_SUCCESS) {
 				return (status);
 			}
@@ -1512,7 +1538,7 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 			    PSVC_LED_STATE_ATTR, PSVC_OFF);
 			if (status != PSVC_SUCCESS) {
 				syslog(LOG_ERR, SET_LED_FAILED_MSG, led_id,
-					errno);
+				    errno);
 				return (status);
 			}
 
@@ -1544,22 +1570,22 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 		 * device tree.
 		 */
 		snprintf(pcf8574_devpath, sizeof (pcf8574_devpath), PCF8574,
-			devices[ps_instance][1].addr[1]);
+		    devices[ps_instance][1].addr[1]);
 		snprintf(pcf8591_devpath, sizeof (pcf8591_devpath), PCF8591,
-			devices[ps_instance][0].addr[1]);
+		    devices[ps_instance][0].addr[1]);
 		snprintf(fru_devpath, sizeof (fru_devpath), FRU,
-			devices[ps_instance][2].addr[1]);
+		    devices[ps_instance][2].addr[1]);
 
 		dev_handle = devctl_device_acquire(pcf8591_devpath, 0);
 		if (dev_handle == NULL) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				pcf8591_devpath, errno);
+			    pcf8591_devpath, errno);
 			devctl_release(dev_handle);
 			return (PSVC_FAILURE);
 		} else if ((devctl_device_remove(dev_handle)) &&
-			(errno != ENXIO)) {
+		    (errno != ENXIO)) {
 				syslog(LOG_ERR, DEVTREE_NODE_DELETE_FAILED,
-					pcf8591_devpath, errno);
+				    pcf8591_devpath, errno);
 				devctl_release(dev_handle);
 				return (PSVC_FAILURE);
 			} else {
@@ -1570,13 +1596,13 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 		dev_handle = devctl_device_acquire(pcf8574_devpath, 0);
 		if (dev_handle == NULL) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				pcf8574_devpath, errno);
+			    pcf8574_devpath, errno);
 			devctl_release(dev_handle);
 			return (PSVC_FAILURE);
 		} else if ((devctl_device_remove(dev_handle)) &&
-			(errno != ENXIO)) {
+		    (errno != ENXIO)) {
 				syslog(LOG_ERR, DEVTREE_NODE_DELETE_FAILED,
-					pcf8574_devpath, errno);
+				    pcf8574_devpath, errno);
 				devctl_release(dev_handle);
 				return (PSVC_FAILURE);
 			} else {
@@ -1587,13 +1613,13 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 		dev_handle = devctl_device_acquire(fru_devpath, 0);
 		if (dev_handle == NULL) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				fru_devpath, errno);
+			    fru_devpath, errno);
 			devctl_release(dev_handle);
 			return (PSVC_FAILURE);
 		} else if ((devctl_device_remove(dev_handle)) &&
-			(errno != ENXIO)) {
+		    (errno != ENXIO)) {
 				syslog(LOG_ERR, DEVTREE_NODE_DELETE_FAILED,
-					fru_devpath, errno);
+				    fru_devpath, errno);
 				devctl_release(dev_handle);
 				return (PSVC_FAILURE);
 			} else {
@@ -1631,27 +1657,27 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 		ddef_hdl = devctl_ddef_alloc(devices[ps_instance][i].name, 0);
 		if (ddef_hdl == NULL) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				devices[ps_instance][i].name, errno);
+			    devices[ps_instance][i].name, errno);
 			return (PSVC_FAILURE);
 		}
 		status = devctl_ddef_string(ddef_hdl, "compatible",
-			devices[ps_instance][i].compatible);
+		    devices[ps_instance][i].compatible);
 		if (status == -1) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				devices[ps_instance][i].name, errno);
+			    devices[ps_instance][i].name, errno);
 			return (PSVC_FAILURE);
 		}
 		status = devctl_ddef_int_array(ddef_hdl, "reg", 2,
-			devices[ps_instance][i].addr);
+		    devices[ps_instance][i].addr);
 		if (status == -1) {
 			syslog(LOG_ERR, DEVICE_HANDLE_FAIL_MSG,
-				devices[ps_instance][i].name, errno);
+			    devices[ps_instance][i].name, errno);
 			return (PSVC_FAILURE);
 		}
 		if (devctl_bus_dev_create(bus_handle, ddef_hdl, 0,
-			&dev_handle)) {
+		    &dev_handle)) {
 			syslog(LOG_ERR, DEVTREE_NODE_CREATE_FAILED,
-				devices[ps_instance][i].name, errno);
+			    devices[ps_instance][i].name, errno);
 			return (PSVC_FAILURE);
 		} else
 			devctl_release(dev_handle);
@@ -1701,7 +1727,7 @@ psvc_shutdown_policy(psvc_opaque_t hdlp, char *id)
 		retry++;
 	} while (((strcmp(fault, PSVC_TEMP_LO_SHUT) == 0) ||
 	    (strcmp(fault, PSVC_TEMP_HI_SHUT) == 0)) &&
-		(retry < n_retry_temp_shutdown));
+	    (retry < n_retry_temp_shutdown));
 	if ((strcmp(fault, PSVC_TEMP_LO_SHUT) == 0) ||
 	    (strcmp(fault, PSVC_TEMP_HI_SHUT) == 0)) {
 		shutdown_routine();
@@ -1754,7 +1780,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 		prev_state[0] = 0;
 
 		status = psvc_get_attr(hdlp, disk_id[i], PSVC_PRESENCE_ATTR,
-			&present);
+		    &present);
 		if (status != PSVC_SUCCESS)
 			return (status);
 
@@ -1811,11 +1837,11 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 			strcpy(disk_state, PSVC_OK);
 		}
 		status = psvc_set_attr(hdlp, disk_id[i], PSVC_STATE_ATTR,
-			disk_state);
+		    disk_state);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		status = psvc_set_attr(hdlp, disk_id[i], PSVC_FAULTID_ATTR,
-			disk_fault);
+		    disk_fault);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		/*
@@ -1823,7 +1849,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 		 * the current state of the disk
 		 */
 		status = psvc_get_attr(hdlp, disk_id[i], PSVC_PREV_STATE_ATTR,
-			prev_state);
+		    prev_state);
 		if (status != PSVC_SUCCESS)
 			return (status);
 
@@ -1849,7 +1875,7 @@ psvc_update_FSP_fault_led_policy_0(psvc_opaque_t hdlp, char *id)
 	boolean_t	present;
 
 	status = psvc_get_attr(hdlp, id, PSVC_ASSOC_MATCHES_ATTR, &dev_count,
-		PSVC_DEV_FAULT_SENSOR);
+	    PSVC_DEV_FAULT_SENSOR);
 	if (status != PSVC_SUCCESS)
 		return (status);
 
@@ -1857,11 +1883,11 @@ psvc_update_FSP_fault_led_policy_0(psvc_opaque_t hdlp, char *id)
 
 	for (i = 0; i < dev_count; i++) {
 		status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
-			&dev_id, PSVC_DEV_FAULT_SENSOR, i);
+		    &dev_id, PSVC_DEV_FAULT_SENSOR, i);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		status = psvc_get_attr(hdlp, dev_id, PSVC_PRESENCE_ATTR,
-			&present);
+		    &present);
 		if (status != PSVC_SUCCESS)
 			return (status);
 
@@ -1869,7 +1895,7 @@ psvc_update_FSP_fault_led_policy_0(psvc_opaque_t hdlp, char *id)
 			continue;
 
 		status = psvc_get_attr(hdlp, dev_id, PSVC_STATE_ATTR,
-			dev_state);
+		    dev_state);
 		if (status != PSVC_SUCCESS)
 			return (status);
 
@@ -1913,7 +1939,7 @@ update_gen_fault_led(psvc_opaque_t hdlp, char *id)
 	char	led_state[32];
 
 	status = psvc_get_attr(hdlp, id, PSVC_ASSOC_MATCHES_ATTR, &led_count,
-		PSVC_DEV_FAULT_SENSOR);
+	    PSVC_DEV_FAULT_SENSOR);
 	if (status != PSVC_SUCCESS)
 		return (status);
 
@@ -1921,11 +1947,11 @@ update_gen_fault_led(psvc_opaque_t hdlp, char *id)
 
 	for (i = 0; i < led_count; i++) {
 		status = psvc_get_attr(hdlp, id, PSVC_ASSOC_ID_ATTR,
-			&led_id, PSVC_DEV_FAULT_SENSOR, i);
+		    &led_id, PSVC_DEV_FAULT_SENSOR, i);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		status = psvc_get_attr(hdlp, led_id, PSVC_STATE_ATTR,
-			led_state);
+		    led_state);
 		if (status != PSVC_SUCCESS)
 			return (status);
 
