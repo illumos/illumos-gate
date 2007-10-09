@@ -3260,11 +3260,11 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	switch (xcvr_reg) {
-	case MII_BMCR:
+	case MII_CONTROL:
 		PCS_REG_RD(handle, portn, PCS_MII_CTRL_REG, &val);
 		*value = (uint16_t)val;
 		break;
-	case MII_BMSR:
+	case MII_STATUS:
 		PCS_REG_RD(handle, portn, PCS_MII_STATUS_REG, &val);
 		pcs_stat.value = val;
 		PCS_REG_RD(handle, portn, PCS_STATE_MACHINE_REG, &val);
@@ -3277,7 +3277,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		}
 		*value = (uint16_t)pcs_stat.value;
 		break;
-	case MII_ESR:
+	case NXGE_MII_ESR:
 		PCS_REG_RD(handle, portn, PCS_MII_ADVERT_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		esr.value = 0;
@@ -3285,7 +3285,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		esr.bits.link_1000hdx = pcs_anar.bits.w0.half_duplex;
 		*value = esr.value;
 		break;
-	case MII_ANAR:
+	case MII_AN_ADVERT:
 		PCS_REG_RD(handle, portn, PCS_MII_ADVERT_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		anar.value = 0;
@@ -3293,14 +3293,14 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		anar.bits.cap_asmpause = pcs_anar.bits.w0.asm_pause;
 		*value = anar.value;
 		break;
-	case MII_ANLPAR:
+	case MII_AN_LPABLE:
 		PCS_REG_RD(handle, portn, PCS_MII_LPA_REG, &val);
 		pcs_anlpar.value = (uint16_t)val;
 		anlpar.bits.cap_pause = pcs_anlpar.bits.w0.pause;
 		anlpar.bits.cap_asmpause = pcs_anlpar.bits.w0.asm_pause;
 		*value = anlpar.value;
 		break;
-	case MII_ANER:
+	case MII_AN_EXPANSION:
 		PCS_REG_RD(handle, portn, PCS_MII_ADVERT_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		aner.value = 0;
@@ -3308,7 +3308,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 						pcs_anar.bits.w0.half_duplex;
 		*value = aner.value;
 		break;
-	case MII_GSR:
+	case NXGE_MII_GSR:
 		PCS_REG_RD(handle, portn, PCS_MII_LPA_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		gsr.value = 0;
@@ -3339,11 +3339,11 @@ npi_mac_pcs_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
 	switch (xcvr_reg) {
-	case MII_BMCR:
+	case MII_CONTROL:
 		val = (uint16_t)value;
 		PCS_REG_WR(handle, portn, PCS_MII_CTRL_REG, val);
 		break;
-	case MII_ANAR:
+	case MII_AN_ADVERT:
 		PCS_REG_RD(handle, portn, PCS_MII_ADVERT_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		anar.value = value;
@@ -3352,7 +3352,7 @@ npi_mac_pcs_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		val = pcs_anar.value;
 		PCS_REG_WR(handle, portn, PCS_MII_ADVERT_REG, val);
 		break;
-	case MII_GCR:
+	case NXGE_MII_GCR:
 		PCS_REG_RD(handle, portn, PCS_MII_ADVERT_REG, &val);
 		pcs_anar.value = (uint16_t)val;
 		gcr.value = value;

@@ -32,31 +32,26 @@
 extern "C" {
 #endif
 
+#include <sys/miiregs.h>
+
 /*
  * Configuration Register space.
  */
 
-#define	MII_BMCR		0
-#define	MII_BMSR		1
-#define	MII_IDR1		2
-#define	MII_IDR2		3
-#define	MII_ANAR		4
-#define	MII_ANLPAR		5
-#define	MII_ANER		6
-#define	MII_NPTXR		7
-#define	MII_LPRXNPR		8
-#define	MII_GCR			9
-#define	MII_GSR			10
-#define	MII_RES0		11
-#define	MII_RES1		12
-#define	MII_RES2		13
-#define	MII_RES3		14
-#define	MII_ESR			15
-#define	MII_SHADOW		0x1c
-/* Shadow register definition */
-#define	MII_MODE_CONTROL_REG	0x1f
+#define	NXGE_MII_LPRXNPR		8
+#define	NXGE_MII_GCR			9
+#define	NXGE_MII_GSR			10
+#define	NXGE_MII_RES0			11
+#define	NXGE_MII_RES1			12
+#define	NXGE_MII_RES2			13
+#define	NXGE_MII_RES3			14
+#define	NXGE_MII_ESR			15
 
-#define	NXGE_MAX_MII_REGS	32
+#define	NXGE_MII_SHADOW			MII_VENDOR(0xc)
+/* Shadow register definition */
+#define	NXGE_MII_MODE_CONTROL_REG	MII_VENDOR(0xf)
+
+#define	NXGE_MAX_MII_REGS		32
 
 /*
  * Configuration Register space.
@@ -83,22 +78,6 @@ typedef struct _mii_regs {
 /*
  * MII Register 0: Basic mode control register.
  */
-#define	BMCR_RES		0x003f  /* Unused... */
-#define	BMCR_SSEL_MSB		0x0040  /* Used to manually select speed */
-					/* (with * bit 6) when auto-neg */
-					/* disabled */
-#define	BMCR_COL_TEST		0x0080  /* Collision test */
-#define	BMCR_DPLX_MD		0x0100  /* Full duplex */
-#define	BMCR_RESTART_AN		0x0200  /* Auto negotiation restart */
-#define	BMCR_ISOLATE		0x0400	/* Disconnect BCM5464R from MII */
-#define	BMCR_PDOWN		0x0800	/* Powerdown the BCM5464R */
-#define	BMCR_ANENABLE		0x1000	/* Enable auto negotiation */
-#define	BMCR_SSEL_LSB		0x2000  /* Used to manually select speed */
-					/* (with bit 13) when auto-neg */
-					/* disabled */
-#define	BMCR_LOOPBACK		0x4000	/* TXD loopback bits */
-#define	BMCR_RESET		0x8000	/* Reset the BCM5464R */
-
 typedef union _mii_bmcr {
 	uint16_t value;
 	struct {
@@ -133,24 +112,6 @@ typedef union _mii_bmcr {
 /*
  * MII Register 1:  Basic mode status register.
  */
-#define	BMSR_ERCAP		0x0001  /* Ext-reg capability */
-#define	BMSR_JCD		0x0002  /* Jabber detected */
-#define	BMSR_LSTATUS		0x0004  /* Link status */
-#define	BMSR_ANEGCAPABLE	0x0008  /* Able to do auto-negotiation */
-#define	BMSR_RFAULT		0x0010  /* Remote fault detected */
-#define	BMSR_ANEGCOMPLETE	0x0020  /* Auto-negotiation complete */
-#define	BMSR_MF_PRE_SUP		0x0040  /* Preamble for MIF frame suppressed, */
-					/* always 1 for BCM5464R */
-#define	BMSR_RESV		0x0080  /* Unused... */
-#define	BMSR_ESTAT		0x0100  /* Contains IEEE extended status reg */
-#define	BMSR_100BASE2HALF	0x0200  /* Can do 100mbps, 2k pkts half-dplx */
-#define	BMSR_100BASE2FULL	0x0400  /* Can do 100mbps, 2k pkts full-dplx */
-#define	BMSR_10HALF		0x0800  /* Can do 10mbps, half-duplex */
-#define	BMSR_10FULL		0x1000  /* Can do 10mbps, full-duplex */
-#define	BMSR_100HALF		0x2000  /* Can do 100mbps, half-duplex */
-#define	BMSR_100FULL		0x4000  /* Can do 100mbps, full-duplex */
-#define	BMSR_100BASE4		0x8000  /* Can do 100mbps, 4k packets */
-
 typedef union _mii_bmsr {
 	uint16_t value;
 	struct {
@@ -222,27 +183,6 @@ typedef union _mii_idr2 {
 /*
  * MII Register 4: Auto-negotiation advertisement register.
  */
-#define	ADVERTISE_SLCT		0x001f  /* Selector bits for proto, 0x01 */
-					/* indicates IEEE 802.3 CSMA/CD phy */
-#define	ADVERTISE_CSMA		0x0001  /* Only selector supported */
-#define	ADVERTISE_10HALF	0x0020  /* Try for 10mbps half-duplex  */
-#define	ADVERTISE_10FULL	0x0040  /* Try for 10mbps full-duplex  */
-#define	ADVERTISE_100HALF	0x0080  /* Try for 100mbps half-duplex */
-#define	ADVERTISE_100FULL	0x0100  /* Try for 100mbps full-duplex */
-#define	ADVERTISE_100BASE4	0x0200  /* Try for 100mbps 4k packets. set to */
-					/* 0, BCM5464R not 100BASE-T4 capable */
-#define	ADVERTISE_RES1		0x0400  /* Unused... */
-#define	ADVERTISE_ASM_PAUS	0x0800  /* advertise asymmetric pause */
-#define	ADVERTISE_PAUS		0x1000  /* can do full dplx pause */
-#define	ADVERTISE_RFAULT	0x2000  /* Say we can detect faults */
-#define	ADVERTISE_RES0		0x4000  /* Unused... */
-#define	ADVERTISE_NPAGE		0x8000  /* Next page bit */
-
-#define	ADVERTISE_FULL (ADVERTISE_100FULL | ADVERTISE_10FULL | \
-			ADVERTISE_CSMA)
-#define	ADVERTISE_ALL (ADVERTISE_10HALF | ADVERTISE_10FULL | \
-			ADVERTISE_100HALF | ADVERTISE_100FULL)
-
 typedef union _mii_anar {
 	uint16_t value;
 	struct {
@@ -279,34 +219,11 @@ typedef union _mii_anar {
 /*
  * MII Register 5: Auto-negotiation link partner ability register.
  */
-#define	LPA_SLCT		0x001f  /* Same as advertise selector */
-#define	LPA_10HALF		0x0020  /* Can do 10mbps half-duplex */
-#define	LPA_10FULL		0x0040  /* Can do 10mbps full-duplex */
-#define	LPA_100HALF		0x0080  /* Can do 100mbps half-duplex */
-#define	LPA_100FULL		0x0100  /* Can do 100mbps full-duplex */
-#define	LPA_100BASE4		0x0200  /* Can do 100mbps 4k packets */
-#define	LPA_RES1		0x0400  /* Unused... */
-#define	LPA_ASM_PAUS		0x0800  /* advertise asymmetric pause */
-#define	LPA__PAUS		0x1000  /* can do full dplx pause */
-#define	LPA_RFAULT		0x2000	/* Link partner faulted */
-#define	LPA_LPACK		0x4000	/* Link partner acked us */
-#define	LPA_NPAGE		0x8000	/* Next page bit */
-
-#define	LPA_DUPLEX		(LPA_10FULL | LPA_100FULL)
-#define	LPA_100			(LPA_100FULL | LPA_100HALF | LPA_100BASE4)
-
 typedef mii_anar_t mii_anlpar_t, *pmii_anlpar_t;
 
 /*
  * MII Register 6: Auto-negotiation expansion register.
  */
-#define	EXPANSION_LP_AN_ABLE	0x0001	/* Link partner has auto-neg cap */
-#define	EXPANSION_PG_RX		0x0002	/* Got new RX page code word */
-#define	EXPANSION_NP_ABLE	0x0004	/* This enables npage words */
-#define	EXPANSION_LPNP_ABLE	0x0008	/* Link partner supports npage */
-#define	EXPANSION_MFAULTS	0x0010	/* Multiple link faults detected */
-#define	EXPANSION_RESV		0xffe0	/* Unused... */
-
 typedef union _mii_aner {
 	uint16_t value;
 	struct {

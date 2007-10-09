@@ -2450,7 +2450,7 @@ nxge_1G_copper_link_intr_start(p_nxge_t nxgep)
 	uint8_t		portn = nxgep->mac.portnum;
 
 	rs = npi_mac_mif_link_intr_enable(nxgep->npi_handle, portn,
-	    MII_BMSR, BMSR_LSTATUS);
+	    MII_STATUS, MII_STATUS_LINKUP);
 
 	if (rs != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
@@ -5235,7 +5235,7 @@ nxge_mii_get_link_mode(p_nxge_t nxgep)
 	xcvr_portn = statsp->mac_stats.xcvr_portn;
 	mii_regs = NULL;
 	mode.value = 0;
-	mode.bits.shadow = MII_MODE_CONTROL_REG;
+	mode.bits.shadow = NXGE_MII_MODE_CONTROL_REG;
 #if defined(__i386)
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 	    (uint8_t)(uint32_t)(&mii_regs->shadow),
@@ -5271,7 +5271,7 @@ nxge_mii_get_link_mode(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "nxge_mii_get_link_mode: "
 	    "(address 0x%x) port 0x%x mode value 0x%x link mode 0x%x",
-	    MII_MODE_CONTROL_REG, xcvr_portn,
+	    NXGE_MII_MODE_CONTROL_REG, xcvr_portn,
 	    mode.value, nxgep->mac.portmode));
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -5358,7 +5358,7 @@ nxge_mii_dump(p_nxge_t nxgep)
 	    xcvr_portn, idr2.value));
 
 	mode.value = 0;
-	mode.bits.shadow = MII_MODE_CONTROL_REG;
+	mode.bits.shadow = NXGE_MII_MODE_CONTROL_REG;
 
 #if defined(__i386)
 	(void) nxge_mii_write(nxgep, xcvr_portn,
