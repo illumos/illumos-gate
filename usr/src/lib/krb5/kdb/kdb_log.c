@@ -309,6 +309,7 @@ ulog_replay(krb5_context context, kdb_incr_result_t *incr_ret)
 	char			*dbprincstr = NULL;
 	kdb_log_context		*log_ctx;
 	kdb_hlog_t		*ulog = NULL;
+	bool_t			fini = FALSE;
 
 	INIT_ULOG(context);
 
@@ -324,8 +325,13 @@ ulog_replay(krb5_context context, kdb_incr_result_t *incr_ret)
 	errlast.last_time.seconds = (unsigned int)0;
 	errlast.last_time.useconds = (unsigned int)0;
 
-	if ((retval = krb5_db_inited(context)))
-		goto cleanup;
+	if (krb5_db_inited(context)) {
+		retval = krb5_db_open(context, NULL,
+		    KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN);
+		if (retval != 0)
+			goto cleanup;
+		fini = TRUE;
+	}
 
 	for (i = 0; i < no_of_updates; i++) {
 		int nentry = 1;
@@ -400,6 +406,9 @@ cleanup:
 		else
 			ulog_finish_update_slave(ulog, incr_ret->lastentry);
 	}
+
+	if (fini == TRUE)
+		krb5_db_fini(context);
 
 	return (retval);
 }

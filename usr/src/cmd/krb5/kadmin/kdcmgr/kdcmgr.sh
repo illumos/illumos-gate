@@ -49,7 +49,7 @@ function usage {
 	printf "\t$(gettext "destroy")\n"
 	printf "\t$(gettext "status")\n\n"
 
-	cleanup
+	cleanup 1
 }
 
 function ask {
@@ -96,9 +96,12 @@ function query {
 
 function cleanup {
 
+	integer ret=$1
+
 	kdestroy -q -c $TMP_CCACHE 1>$TMP_FILE 2>&1
         rm -f $TMP_FILE
-        exit 1
+
+        exit $ret
 }
 
 function error_message {
@@ -106,7 +109,7 @@ function error_message {
         printf "---------------------------------------------------\n"
         printf "$(gettext "Setup FAILED").\n\n"
 
-	cleanup
+	cleanup 1
 }
 
 function check_bin {
@@ -137,7 +140,7 @@ function ok_to_proceed {
 
 	if [[ $answer = no ]]; then
 		printf "\n$(gettext "Exiting, no action performed")\n\n"
-		cleanup
+		cleanup 0
 	fi
 }
 
@@ -524,7 +527,7 @@ function destroy_kdc {
 			echo "\t$KRB5KT\n\t$KADM5KT\n\t$PRINCDB\n\t$OLDPRINCDB\n\t$STASH\n"
 			if [[ -z $d_option ]]; then
 				printf "$(gettext "You must first run 'kdcmgr destroy' to remove all of these files before creating a KDC server").\n\n"
-				exit 1
+				cleanup 1
 			else
 				ok_to_proceed "$(gettext "All of these files will be removed, okay to proceed?")"
 			fi
@@ -532,13 +535,15 @@ function destroy_kdc {
 	else
 		if [[ -n $d_option ]]; then
 			printf "\n$(gettext "No KDC related files exist, exiting").\n\n"
-			exit 0
+			cleanup 0
 		fi
 		return
 	fi
 
 	printf "$(gettext "yes")\n" | kdb5_util destroy > /dev/null 2>&1
 	rm -f $KRB5KT $KADM5KT
+
+	cleanup 0
 }
 
 function kadm5_acl_configed {
@@ -596,7 +601,7 @@ function status_kdc {
 	    printf "$(gettext "Stash file not found") (/var/krb5/.k5.*).\n"
 	echo
 
-	exit 0
+	cleanup 0
 }
 
 # Start of Main script
@@ -633,12 +638,8 @@ fi
 
 if [[ ! -f /etc/resolv.conf ]]; then
 	printf "$(gettext "Error: need to configure /etc/resolv.conf").\n"
-	exit 1
-fi
 
-if [[ ! -x $KDCRES ]]; then
-	printf "$(gettext "Error: %s does not exist or not executable").\n" $KDCRES
-	exit 1
+	cleanup 1
 fi
 
 fqhn=`$KDCRES`
@@ -649,7 +650,8 @@ elif [[ -n $(hostname) && -n $(domainname) ]]; then
 else
 	printf "$(gettext "Error: can not determine full hostname (FQHN).  Aborting")\n"
 	printf "$(gettext "Note, trying to use hostname and domainname to get FQHN").\n"
-	exit 1
+
+	cleanup 1
 fi
 
 ping_check $fqhn
@@ -669,7 +671,7 @@ do
 		p)	PWFILE=$OPTARG
 			if [[ ! -r $PWFILE ]]; then
 				printf "\n$(gettext "Password file %s does not exist, exiting").\n\n" $PWFILE
-				exit 1
+				cleanup 1
 			fi
 			;;
 		r)	REALM=$OPTARG;;
@@ -691,8 +693,7 @@ case "$*" in
 	"create slave")		slave=yes;;
 	destroy)		d_option=yes
 				kill_daemons
-				destroy_kdc
-				exit 0;;
+				destroy_kdc;;
 	status)			status_kdc;;
 	*)			usage;;
 esac
@@ -747,6 +748,4 @@ fi
 printf "\n---------------------------------------------------\n"
 printf "$(gettext "Setup COMPLETE").\n\n"
 
-rm -f $TMP_FILE
-
-exit 0
+cleanup 0

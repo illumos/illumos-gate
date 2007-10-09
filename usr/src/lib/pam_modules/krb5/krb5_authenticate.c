@@ -186,6 +186,8 @@ pam_sm_authenticate(
 		}
 	}
 
+	if (kmd->user != NULL)
+		free(kmd->user);
 	if ((kmd->user = strdup(user)) == NULL) {
 		result = PAM_BUF_ERR;
 		goto out;
@@ -313,8 +315,8 @@ attempt_krb5_auth(
 	char		**krb5_pass,
 	boolean_t	verify_tik)
 {
-	krb5_principal	me = NULL;
-	krb5_principal	server = NULL;
+	krb5_principal	me = NULL, clientp = NULL;
+	krb5_principal	server = NULL, serverp = NULL;
 	krb5_creds	*my_creds;
 	krb5_timestamp	now;
 	krb5_error_code	code = 0;
@@ -375,6 +377,7 @@ attempt_krb5_auth(
 		result = PAM_SYSTEM_ERR;
 		goto out_err;
 	}
+	clientp = my_creds->client;
 
 	if (code = krb5_build_principal_ext(kmd->kcontext, &server,
 			    krb5_princ_realm(kmd->kcontext, me)->length,
@@ -395,6 +398,7 @@ attempt_krb5_auth(
 		result = PAM_SYSTEM_ERR;
 		goto out_err;
 	}
+	serverp = my_creds->server;
 
 	if (code = krb5_timeofday(kmd->kcontext, &now)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
@@ -687,6 +691,21 @@ out:
 		krb5_free_principal(kmd->kcontext, me);
 	if (as_reply)
 		krb5_free_kdc_rep(kmd->kcontext, as_reply);
+
+	/*
+	 * clientp or serverp could be NULL in certain error cases in this
+	 * function.  mycreds->[client|server] could also be NULL in case
+	 * of error in this function, see out_err above.  The pointers clientp
+	 * and serverp reference the input argument in my_creds for
+	 * get_init_creds and must be freed if the input argument does not
+	 * match the output argument, which occurs during a successful call
+	 * to get_init_creds.
+	 */
+	if (clientp && my_creds->client && clientp != my_creds->client)
+		krb5_free_principal(kmd->kcontext, clientp);
+	if (serverp && my_creds->server && serverp != my_creds->server)
+		krb5_free_principal(kmd->kcontext, serverp);
+
 	if (kmd->kcontext) {
 		krb5_free_context(kmd->kcontext);
 		kmd->kcontext = NULL;
@@ -716,11 +735,10 @@ krb5_cleanup(pam_handle_t *pamh, void *data, int pam_status)
 	}
 
 	/*
-	 * if pam_status is PAM_SUCCESS, clean up based on value in
-	 * auth_status, otherwise just purge the context
+	 * Apps could be calling pam_end here, so we should always clean
+	 * up regardless of success or failure here.
 	 */
-	if ((pam_status == PAM_SUCCESS) &&
-	    (kmd->auth_status == PAM_SUCCESS) && kmd->ccache)
+	if (kmd->ccache)
 		krb5_cc_close(kmd->kcontext, kmd->ccache);
 
 	if (kmd->password) {
@@ -728,14 +746,14 @@ krb5_cleanup(pam_handle_t *pamh, void *data, int pam_status)
 		free(kmd->password);
 	}
 
-	if (kmd->user != NULL)
+	if (kmd->user)
 		free(kmd->user);
 
-	if ((pam_status != PAM_SUCCESS) ||
-	    (kmd->auth_status != PAM_SUCCESS)) {
-		krb5_free_cred_contents(kmd->kcontext, &kmd->initcreds);
-		(void) memset((char *)&kmd->initcreds, 0, sizeof (krb5_creds));
-	}
+	if (kmd->env)
+		free(kmd->env);
+
+	krb5_free_cred_contents(kmd->kcontext, &kmd->initcreds);
+	(void) memset((char *)&kmd->initcreds, 0, sizeof (krb5_creds));
 
 	free(kmd);
 }
