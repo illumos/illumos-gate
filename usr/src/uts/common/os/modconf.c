@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@
 #include <sys/cpc_pcbe.h>
 #include <sys/kstat.h>
 #include <sys/fs/sdev_node.h>
+#include <sys/kiconv.h>
 
 extern int moddebug;
 
@@ -248,6 +249,16 @@ struct mod_ops mod_brandops = {
 	mod_installbrand, mod_removebrand, mod_infonull
 };
 
+/*
+ * kiconv modules.
+ */
+static int mod_installkiconv(struct modlkiconv *, struct modlinkage *);
+static int mod_removekiconv(struct modlkiconv *, struct modlinkage *);
+
+struct mod_ops mod_kiconvops = {
+	mod_installkiconv, mod_removekiconv, mod_infonull
+};
+
 static struct sysent *mod_getsysent(struct modlinkage *, struct sysent *);
 
 static char uninstall_err[] = "Cannot uninstall %s; not installed";
@@ -326,7 +337,7 @@ mod_remove(struct modlinkage *modlp)
 			while (*linkpp != last_linkp) {
 				if (MODL_INSTALL(*linkpp, modlp) != 0) {
 					cmn_err(CE_WARN, reins_err,
-						(*linkpp)->misc_linkinfo);
+					    (*linkpp)->misc_linkinfo);
 					break;
 				}
 				linkpp++;
@@ -1208,7 +1219,7 @@ mod_installsched(struct modlsched *modl, struct modlinkage *modlp)
 	rw_enter(clp->cl_lock, RW_WRITER);
 	if (SCHED_INSTALLED(clp)) {
 		printf("scheduling class %s is already installed\n",
-			modl->sched_class->cl_name);
+		    modl->sched_class->cl_name);
 		rw_exit(clp->cl_lock);
 		return (EBUSY);		/* it's already there */
 	}
@@ -1309,7 +1320,7 @@ mod_installexec(struct modlexec *modl, struct modlinkage *modlp)
 	}
 	if (eswp->exec_func != NULL) {
 		printf("exec type %x is already installed\n",
-			*eswp->exec_magic);
+		    *eswp->exec_magic);
 			return (EBUSY);		 /* it's already there! */
 	}
 
@@ -1429,4 +1440,21 @@ mod_removeipp(struct modlipp *modl, struct modlinkage *modlp)
 	ASSERT(mid != IPP_MOD_INVAL);
 
 	return (ipp_mod_unregister(mid));
+}
+
+/*
+ * Manage kiconv modules.
+ */
+/*ARGSUSED*/
+static int
+mod_installkiconv(struct modlkiconv *modl, struct modlinkage *modlp)
+{
+	return (kiconv_register_module(modl->kiconv_moddef));
+}
+
+/*ARGSUSED*/
+static int
+mod_removekiconv(struct modlkiconv *modl, struct modlinkage *modlp)
+{
+	return (kiconv_unregister_module(modl->kiconv_moddef));
 }

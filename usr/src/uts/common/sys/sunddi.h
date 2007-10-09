@@ -60,6 +60,7 @@
 #include <sys/ddi_obsolete.h>
 #endif
 #include <sys/u8_textprep.h>
+#include <sys/kiconv.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -440,6 +441,18 @@ extern void *memchr(const void *, int, size_t);
 
 extern int ddi_strtol(const char *, char **, int, long *);
 extern int ddi_strtoul(const char *, char **, int, unsigned long *);
+
+/*
+ * kiconv functions and their macros.
+ */
+#define	KICONV_IGNORE_NULL	(0x0001)
+#define	KICONV_REPLACE_INVALID	(0x0002)
+
+extern kiconv_t kiconv_open(const char *, const char *);
+extern size_t kiconv(kiconv_t, char **, size_t *, char **, size_t *, int *);
+extern int kiconv_close(kiconv_t);
+extern size_t kiconvstr(const char *, const char *, char *, size_t *, char *,
+	size_t *, int, int *);
 
 /*
  * ddi_map_regs

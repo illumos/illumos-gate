@@ -463,3 +463,8 @@ MAC_KMODS	+= mac_wifi
 # 'Devname' Modules (kernel/devname)
 #
 DEVNAME_KMODS	+= sdev_nsconfig_mod
+
+#
+#	kiconv modules (/kernel/kiconv):
+#
+KICONV_KMODS	+= kiconv_emea

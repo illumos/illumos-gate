@@ -142,3 +142,4 @@ f manifest var/svc/manifest/system/fmd.xml 0444 root sys
 f manifest var/svc/manifest/system/intrd.xml 0444 root sys
 f manifest var/svc/manifest/system/scheduler.xml 0444 root sys
 d none kernel/devname 755 root sys
+d none kernel/kiconv 755 root sys

@@ -971,3 +971,10 @@ usr/lib/llib-lsqlite.ln			sparc
 usr/include/sqlite			sparc
 usr/include/sqlite/sqlite-misc.h	sparc
 usr/include/sqlite/sqlite.h		sparc
+#
+# Private/Internal kiconv header files. Do not ship.
+#
+usr/include/sys/kiconv.h		sparc
+usr/include/sys/kiconv_emea1.h		sparc
+usr/include/sys/kiconv_emea2.h		sparc
+usr/include/sys/kiconv_latin1.h		sparc

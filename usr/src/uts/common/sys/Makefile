@@ -284,6 +284,10 @@ CHKHDRS=			\
 	kcpc.h			\
 	kdi.h			\
 	kdi_impl.h		\
+	kiconv.h		\
+	kiconv_emea1.h		\
+	kiconv_emea2.h		\
+	kiconv_latin1.h		\
 	kidmap.h		\
 	klwp.h			\
 	kmdb.h			\

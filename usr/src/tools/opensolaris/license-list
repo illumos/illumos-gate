@@ -115,6 +115,7 @@ usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE
 usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/wpi/fw-wpi/LICENSE
 usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart
+usr/src/uts/common/sys/THIRDPARTYLICENSE.icu
 usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 usr/src/uts/common/sys/i2o/THIRDPARTYLICENSE
 usr/src/uts/common/zmod/THIRDPARTYLICENSE

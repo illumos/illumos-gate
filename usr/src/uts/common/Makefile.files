@@ -175,6 +175,7 @@ GENUNIX_OBJS +=	\
 		ioctl.o		\
 		issetugid.o	\
 		ippconf.o	\
+		kiconv.o	\
 		kdi.o		\
 		kcpc.o		\
 		kmem.o		\
@@ -1430,3 +1431,8 @@ NXGE_NPI_OBJS =	\
 
 NXGE_HCALL_OBJS =	\
 		nxge_hcall.o
+
+#
+#	kiconv modules
+#
+KICONV_EMEA_OBJS += kiconv_emea.o

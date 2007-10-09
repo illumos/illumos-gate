@@ -73,6 +73,7 @@
 #include <sys/kdi.h>
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
+#include <sys/kiconv.h>
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -199,6 +200,7 @@ thread_init(void)
 	zone_init();
 	project_init();
 	brand_init();
+	kiconv_init();
 	task_init();
 	tcache_init();
 	pool_init();

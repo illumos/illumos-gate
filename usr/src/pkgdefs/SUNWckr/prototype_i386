@@ -450,3 +450,6 @@ f none kernel/sys/amd64/pset 755 root sys
 l none kernel/sys/amd64/rpcmod=../../../kernel/strmod/amd64/rpcmod
 f none kernel/sys/amd64/semsys 755 root sys
 f none kernel/sys/amd64/shmsys 755 root sys
+f none kernel/kiconv/kiconv_emea 755 root sys
+d none kernel/kiconv/amd64 755 root sys
+f none kernel/kiconv/amd64/kiconv_emea 755 root sys

@@ -233,6 +233,9 @@ $(USR_PCBE_DIR)/%:	$(OBJS_DIR)/% $(USR_PCBE_DIR) FRC
 $(USR_DEVNAME_DIR)/%:	$(OBJS_DIR)/% $(USR_DEVNAME_DIR) FRC
 	$(INS.file)
 
+$(ROOT_KICONV_DIR)/%:	$(OBJS_DIR)/% $(ROOT_KICONV_DIR) FRC
+	$(INS.file)
+
 include $(SRC)/Makefile.psm.targ
 
 #
