@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,8 +29,11 @@
 
 case "$1" in
 'start')
-	if /usr/lib/sysevent/syseventd >/dev/msglog 2>&1; then :; else
-		exit
+	/usr/lib/sysevent/syseventd >/dev/msglog 2>&1
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		echo "WARNING: /usr/lib/sysevent/syseventd failed: exit status $rc"
+		exit $SMF_EXIT_ERR_FATAL
 	fi
 	;;
 

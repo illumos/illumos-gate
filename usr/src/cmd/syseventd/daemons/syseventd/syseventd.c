@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,6 +234,18 @@ flt_handler(int sig)
 	}
 }
 
+/*
+ * Daemon parent process only.
+ * Child process signal to indicate successful daemon initialization.
+ * This is the normal and expected exit path of the daemon parent.
+ */
+/*ARGSUSED*/
+static void
+sigusr1(int sig)
+{
+	syseventd_exit(0);
+}
+
 static void
 sigwait_thr()
 {
@@ -278,6 +290,7 @@ main(int argc, char **argv)
 	int i, c;
 	int fd;
 	pid_t pid;
+	int has_forked = 0;
 	extern char *optarg;
 
 	(void) setlocale(LC_ALL, "");
@@ -319,11 +332,46 @@ main(int argc, char **argv)
 	/* demonize ourselves */
 	if (debug_level < DEBUG_LEVEL_FORK) {
 
-		if (fork()) {
-			syseventd_exit(0);
+		sigset_t mask;
+
+		(void) sigset(SIGUSR1, sigusr1);
+
+		(void) sigemptyset(&mask);
+		(void) sigaddset(&mask, SIGUSR1);
+		(void) sigprocmask(SIG_BLOCK, &mask, NULL);
+
+		if ((pid = fork()) == (pid_t)-1) {
+			(void) fprintf(stderr,
+			    "syseventd: fork failed - %s\n", strerror(errno));
+			syseventd_exit(1);
+		}
+
+		if (pid != 0) {
+			/*
+			 * parent
+			 * handshake with the daemon so that dependents
+			 * of the syseventd service don't start up until
+			 * the service is actually functional
+			 */
+			int status;
+			(void) sigprocmask(SIG_UNBLOCK, &mask, NULL);
+
+			if (waitpid(pid, &status, 0) != pid) {
+				/*
+				 * child process signal indicating
+				 * successful daemon initialization
+				 */
+				syseventd_exit(0);
+			}
+			/* child exited implying unsuccessful startup */
+			syseventd_exit(1);
 		}
 
 		/* child */
+
+		has_forked = 1;
+		(void) sigset(SIGUSR1, SIG_DFL);
+		(void) sigprocmask(SIG_UNBLOCK, &mask, NULL);
 
 		(void) chdir("/");
 		(void) setsid();
@@ -355,7 +403,7 @@ main(int argc, char **argv)
 	    USYNC_THREAD, NULL);
 	(void) sema_init(&sema_dispatch, 0, USYNC_THREAD, NULL);
 	(void) sema_init(&sema_resource, SE_EVENT_DISPATCH_CNT,
-			USYNC_THREAD, NULL);
+	    USYNC_THREAD, NULL);
 	(void) cond_init(&event_comp_cv, USYNC_THREAD, NULL);
 	eventbuf = (sysevent_t **)calloc(SE_EVENT_DISPATCH_CNT,
 	    sizeof (sysevent_t *));
@@ -392,19 +440,19 @@ main(int argc, char **argv)
 	}
 
 	if (thr_create(NULL, NULL, (void *(*)(void *))dispatch_message,
-				(void *)0, 0, NULL) < 0) {
+	    (void *)0, 0, NULL) < 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
 	if (thr_create(NULL, NULL,
-		(void *(*)(void *))event_completion_thr, NULL,
-			THR_BOUND, NULL) != 0) {
+	    (void *(*)(void *))event_completion_thr, NULL,
+	    THR_BOUND, NULL) != 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
 	/* Create signal catching thread */
 	if (thr_create(NULL, NULL, (void *(*)(void *))sigwait_thr,
-		NULL, 0, NULL) < 0) {
+	    NULL, 0, NULL) < 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
@@ -414,6 +462,16 @@ main(int argc, char **argv)
 	/* Initialize and load SLM clients */
 	initialize_client_tbl();
 	syseventd_init();
+
+	/* signal parent to indicate successful daemon initialization */
+	if (has_forked) {
+		if (kill(getppid(), SIGUSR1) != 0) {
+			syseventd_err_print(
+			    "signal to the parent failed - %s\n",
+			    strerror(errno));
+			syseventd_exit(2);
+		}
+	}
 
 	syseventd_print(8, "Pausing\n");
 
@@ -453,7 +511,7 @@ door_upcall(void *cookie, char *args, size_t alen,
 		ev = (sysevent_t *)
 		    &((log_event_upcall_arg_t *)(void *)args)->buf;
 		syseventd_print(2, "door_upcall: busy event %llx "
-			"retry\n", sysevent_get_seq(ev));
+		    "retry\n", sysevent_get_seq(ev));
 		rval = door_upcall_retval = EAGAIN;
 	} else {
 		/*
@@ -514,7 +572,7 @@ dispatch_message(void)
 		 */
 		while (sema_wait(&sema_resource) != 0) {
 			syseventd_print(1, "dispatch_message: sema_wait "
-				"failed\n");
+			    "failed\n");
 			(void) sleep(1);
 		}
 
@@ -540,10 +598,10 @@ dispatch_message(void)
 		(void) mutex_lock(&door_lock);
 		if (door_upcall_retval == EAGAIN && !fini_pending) {
 			syseventd_print(3, "dispatch_message: retrigger "
-				"door_upcall_retval = %d\n",
-				door_upcall_retval);
+			    "door_upcall_retval = %d\n",
+			    door_upcall_retval);
 			(void) modctl(MODEVENTS, (uintptr_t)MODEVENTS_FLUSH,
-				NULL, NULL, NULL, 0);
+			    NULL, NULL, NULL, 0);
 			door_upcall_retval = 0;
 		}
 		(void) mutex_unlock(&door_lock);
@@ -562,7 +620,7 @@ drain_eventq(struct sysevent_client *scp, int status)
 	struct event_dispatchq *eventq, *eventq_next;
 
 	syseventd_print(3, "Draining eventq for client %d\n",
-			scp->client_num);
+	    scp->client_num);
 
 	eventq = scp->eventq;
 	while (eventq) {
@@ -617,8 +675,8 @@ client_deliver_event_thr(void *arg)
 			if (fini_pending) {
 				scp->client_flags &= ~SE_CLIENT_THR_RUNNING;
 				syseventd_print(3, "Client %d delivery thread "
-					"exiting flags: 0X%x\n",
-					scp->client_num, scp->client_flags);
+				    "exiting flags: 0X%x\n",
+				    scp->client_num, scp->client_flags);
 				(void) mutex_unlock(&scp->client_lock);
 				return;
 			}
@@ -727,7 +785,7 @@ client_deliver_event_thr(void *arg)
 		}
 
 		syseventd_print(3, "No more events to process for client %d\n",
-			scp->client_num);
+		    scp->client_num);
 
 		/* Return if this was a synchronous delivery */
 		if (!SE_CLIENT_IS_THR_RUNNING(scp)) {
@@ -760,7 +818,7 @@ client_deliver_event(struct sysevent_client *scp, sysevent_t *ev,
 	struct event_dispatch_pkg *d_pkg;
 
 	syseventd_print(3, "client_deliver_event: id 0x%llx size %d\n",
-		(longlong_t)sysevent_get_seq(ev), ev_sz);
+	    (longlong_t)sysevent_get_seq(ev), ev_sz);
 	if (debug_level == 9) {
 		se_print(stdout, ev);
 	}
@@ -778,14 +836,14 @@ client_deliver_event(struct sysevent_client *scp, sysevent_t *ev,
 	 * Allocate a new dispatch package and eventq entry
 	 */
 	newq = (struct event_dispatchq *)malloc(
-		sizeof (struct event_dispatchq));
+	    sizeof (struct event_dispatchq));
 	if (newq == NULL) {
 		(void) mutex_unlock(&scp->client_lock);
 		return (NULL);
 	}
 
 	d_pkg = (struct event_dispatch_pkg *)malloc(
-		sizeof (struct event_dispatch_pkg));
+	    sizeof (struct event_dispatch_pkg));
 	if (d_pkg == NULL) {
 		free(newq);
 		(void) mutex_unlock(&scp->client_lock);
@@ -858,8 +916,8 @@ event_completion_thr()
 
 			while (client_count) {
 				syseventd_print(9, "Waiting for %d clients on "
-					"event id 0X%llx\n", client_count,
-					eid.eid_seq);
+				    "event id 0X%llx\n", client_count,
+				    eid.eid_seq);
 
 				(void) sema_wait(&ev_comp->client_sema);
 				--client_count;
@@ -891,9 +949,9 @@ event_completion_thr()
 			if (ok_to_free) {
 				for (i = 0; i < MAX_MODCTL_RETRY; ++i) {
 					if ((ret = modctl(MODEVENTS,
-						(uintptr_t)MODEVENTS_FREEDATA,
-						(uintptr_t)&eid, NULL,
-						NULL, 0)) != 0) {
+					    (uintptr_t)MODEVENTS_FREEDATA,
+					    (uintptr_t)&eid, NULL,
+					    NULL, 0)) != 0) {
 						syseventd_print(1, "attempting "
 						    "to free event 0X%llx\n",
 						    eid.eid_seq);
@@ -910,16 +968,16 @@ event_completion_thr()
 				}
 				if (ret) {
 					syseventd_print(1, "Unable to free "
-						"event 0X%llx from the "
-						"kernel\n", eid.eid_seq);
+					    "event 0X%llx from the "
+					    "kernel\n", eid.eid_seq);
 				}
 			} else {
 				syseventd_print(1, "Not freeing event 0X%llx\n",
-					eid.eid_seq);
+				    eid.eid_seq);
 			}
 
 			syseventd_print(2, "Event delivery complete for id "
-				"0X%llx\n", eid.eid_seq);
+			    "0X%llx\n", eid.eid_seq);
 
 			(void) mutex_lock(&ev_comp_lock);
 			event_compq = ev_comp->next;
@@ -970,11 +1028,11 @@ dispatch(void)
 	 * by the event completion thread (event_completion_thr).
 	 */
 	ev_comp = (struct ev_completion *)
-		malloc(sizeof (struct ev_completion));
+	    malloc(sizeof (struct ev_completion));
 	if (ev_comp == NULL) {
 		(void) rw_unlock(&mod_unload_lock);
 		syseventd_print(1, "Can not allocate event completion buffer "
-			"for event id 0X%llx\n", eid.eid_seq);
+		    "for event id 0X%llx\n", eid.eid_seq);
 		return (EAGAIN);
 	}
 	ev_comp->dispatch_list = NULL;
@@ -1003,11 +1061,11 @@ dispatch(void)
 
 		for (i = 0; i < MAX_MODCTL_RETRY; ++i) {
 			if ((ret = modctl(MODEVENTS,
-				(uintptr_t)MODEVENTS_GETDATA,
-				(uintptr_t)&eid,
-				(uintptr_t)ev_sz,
-				(uintptr_t)new_ev, 0))
-				== 0)
+			    (uintptr_t)MODEVENTS_GETDATA,
+			    (uintptr_t)&eid,
+			    (uintptr_t)ev_sz,
+			    (uintptr_t)new_ev, 0))
+			    == 0)
 				break;
 			else
 				(void) sleep(1);
@@ -1044,7 +1102,7 @@ dispatch(void)
 		 * delivery completes.
 		 */
 		dispatchq = (struct event_dispatchq *)malloc(
-			sizeof (struct event_dispatchq));
+		    sizeof (struct event_dispatchq));
 		if (dispatchq == NULL) {
 			syseventd_print(1, "Can not allocate dispatch q "
 			"for event id 0X%llx client %d\n", eid.eid_seq, i);
@@ -1054,11 +1112,11 @@ dispatch(void)
 
 		/* Initiate client delivery */
 		d_pkg = client_deliver_event(sysevent_client_tbl[i],
-			new_ev, &ev_comp->client_sema);
+		    new_ev, &ev_comp->client_sema);
 		if (d_pkg == NULL) {
 			syseventd_print(1, "Can not allocate dispatch "
-				"package for event id 0X%llx client %d\n",
-				eid.eid_seq, i);
+			    "package for event id 0X%llx client %d\n",
+			    eid.eid_seq, i);
 			free(dispatchq);
 			continue;
 		}
@@ -1116,24 +1174,24 @@ dir_num2name(int dirnum)
 	if (dirname[0][0] == '\0') {
 		if (sysinfo(SI_PLATFORM, infobuf, MAXPATHLEN) == -1) {
 			syseventd_print(1, "dir_num2name: "
-				"sysinfo error %s\n", strerror(errno));
+			    "sysinfo error %s\n", strerror(errno));
 			return (NULL);
 		} else if (snprintf(dirname[0], sizeof (dirname[0]),
 		    MODULE_DIR_HW, infobuf) >= sizeof (dirname[0])) {
 			syseventd_print(1, "dir_num2name: "
-				"platform name too long: %s\n",
-				infobuf);
+			    "platform name too long: %s\n",
+			    infobuf);
 			return (NULL);
 		}
 		if (sysinfo(SI_MACHINE, infobuf, MAXPATHLEN) == -1) {
 			syseventd_print(1, "dir_num2name: "
-				"sysinfo error %s\n", strerror(errno));
+			    "sysinfo error %s\n", strerror(errno));
 			return (NULL);
 		} else if (snprintf(dirname[1], sizeof (dirname[1]),
 		    MODULE_DIR_HW, infobuf) >= sizeof (dirname[1])) {
 			syseventd_print(1, "dir_num2name: "
-				"machine name too long: %s\n",
-				infobuf);
+			    "machine name too long: %s\n",
+			    infobuf);
 			return (NULL);
 		}
 		(void) strcpy(dirname[2], MODULE_DIR_GEN);
@@ -1163,7 +1221,7 @@ load_modules(char *dirname)
 	/* Return silently if module directory does not exist */
 	if ((mod_dir = opendir(dirname)) == NULL) {
 		syseventd_print(1, "Unable to open module directory %s: %s\n",
-			dirname, strerror(errno));
+		    dirname, strerror(errno));
 		return;
 	}
 
@@ -1188,11 +1246,11 @@ load_modules(char *dirname)
 		}
 		if ((dlh = dlopen(modpath, RTLD_LAZY)) == NULL) {
 			syseventd_err_print(LOAD_MOD_DLOPEN_ERR,
-				modpath, dlerror());
+			    modpath, dlerror());
 			continue;
 		} else if ((f = dlsym(dlh, EVENT_INIT)) == NULL) {
 			syseventd_err_print(LOAD_MOD_NO_INIT,
-				modpath, dlerror());
+			    modpath, dlerror());
 			(void) dlclose(dlh);
 			continue;
 		}
@@ -1200,7 +1258,7 @@ load_modules(char *dirname)
 		mod = malloc(sizeof (*mod));
 		if (mod == NULL) {
 			syseventd_err_print(LOAD_MOD_ALLOC_ERR, "mod",
-				strerror(errno));
+			    strerror(errno));
 			(void) dlclose(dlh);
 			continue;
 		}
@@ -1208,7 +1266,7 @@ load_modules(char *dirname)
 		mod->name = strdup(entp->d_name);
 		if (mod->name == NULL) {
 			syseventd_err_print(LOAD_MOD_ALLOC_ERR, "mod->name",
-				strerror(errno));
+			    strerror(errno));
 			(void) dlclose(dlh);
 			free(mod);
 			continue;
@@ -1221,7 +1279,7 @@ load_modules(char *dirname)
 		mod->event_mod_fini = (void (*)())dlsym(dlh, EVENT_FINI);
 		if (mod->event_mod_fini == NULL) {
 			syseventd_err_print(LOAD_MOD_DLSYM_ERR, mod->name,
-				dlerror());
+			    dlerror());
 			free(mod->name);
 			free(mod);
 			(void) dlclose(dlh);
@@ -1238,8 +1296,8 @@ load_modules(char *dirname)
 		}
 		if (mod_ops->major_version != SE_MAJOR_VERSION) {
 			syseventd_err_print(LOAD_MOD_VERSION_MISMATCH,
-				mod->name, SE_MAJOR_VERSION,
-				mod_ops->major_version);
+			    mod->name, SE_MAJOR_VERSION,
+			    mod_ops->major_version);
 			mod->event_mod_fini();
 			free(mod->name);
 			free(mod);
@@ -1250,11 +1308,10 @@ load_modules(char *dirname)
 		mod->deliver_event = mod_ops->deliver_event;
 		/* Add module entry to client list */
 		if ((client_id = insert_client((void *)mod, SLM_CLIENT,
-			(mod_ops->retry_limit <= SE_MAX_RETRY_LIMIT ?
-				mod_ops->retry_limit : SE_MAX_RETRY_LIMIT)))
-				< 0) {;
+		    (mod_ops->retry_limit <= SE_MAX_RETRY_LIMIT ?
+		    mod_ops->retry_limit : SE_MAX_RETRY_LIMIT))) < 0) {
 			syseventd_err_print(LOAD_MOD_ALLOC_ERR, "insert_client",
-				strerror(errno));
+			    strerror(errno));
 			mod->event_mod_fini();
 			free(mod->name);
 			free(mod);
@@ -1266,11 +1323,11 @@ load_modules(char *dirname)
 		++concurrency_level;
 		(void) thr_setconcurrency(concurrency_level);
 		if (thr_create(NULL, 0,
-			(void *(*)(void *))client_deliver_event_thr,
-			(void *)scp, THR_BOUND, &scp->tid) != 0) {
+		    (void *(*)(void *))client_deliver_event_thr,
+		    (void *)scp, THR_BOUND, &scp->tid) != 0) {
 
 			syseventd_err_print(LOAD_MOD_ALLOC_ERR, "insert_client",
-				strerror(errno));
+			    strerror(errno));
 			mod->event_mod_fini();
 			free(mod->name);
 			free(mod);
@@ -1316,15 +1373,15 @@ unload_modules(int sig)
 			scp = sysevent_client_tbl[i];
 			if (mutex_trylock(&scp->client_lock) == 0) {
 				if (scp->client_type != SLM_CLIENT ||
-					scp->client_data == NULL) {
+				    scp->client_data == NULL) {
 					(void) mutex_unlock(&scp->client_lock);
 					done++;
 					continue;
 				}
 			} else {
 				syseventd_print(3, "Skipping unload of "
-					"client %d: client locked\n",
-						scp->client_num);
+				    "client %d: client locked\n",
+				    scp->client_num);
 				continue;
 			}
 
@@ -1443,7 +1500,7 @@ retry:
 	door_upcall_retval = 0;
 
 	if (modctl(MODEVENTS, (uintptr_t)MODEVENTS_FLUSH, NULL, NULL, NULL, 0)
-		< 0) {
+	    < 0) {
 		syseventd_err_print(KERNEL_REPLAY_ERR, strerror(errno));
 		syseventd_exit(7);
 	}
@@ -1487,7 +1544,7 @@ enter_daemon_lock(void)
 	struct flock	lock;
 
 	syseventd_print(8, "enter_daemon_lock: lock file = %s\n",
-		DAEMON_LOCK_FILE);
+	    DAEMON_LOCK_FILE);
 
 	if (snprintf(local_lock_file, sizeof (local_lock_file), "%s%s",
 	    root_dir, DAEMON_LOCK_FILE) >= sizeof (local_lock_file)) {
@@ -1497,7 +1554,7 @@ enter_daemon_lock(void)
 	daemon_lock_fd = open(local_lock_file, O_CREAT|O_RDWR, 0644);
 	if (daemon_lock_fd < 0) {
 		syseventd_err_print(INIT_LOCK_OPEN_ERR,
-			local_lock_file, strerror(errno));
+		    local_lock_file, strerror(errno));
 		syseventd_exit(8);
 	}
 
@@ -1509,7 +1566,7 @@ enter_daemon_lock(void)
 	if (fcntl(daemon_lock_fd, F_SETLK, &lock) == -1) {
 		if (fcntl(daemon_lock_fd, F_GETLK, &lock) == -1) {
 			syseventd_err_print(INIT_LOCK_ERR,
-				local_lock_file, strerror(errno));
+			    local_lock_file, strerror(errno));
 			exit(2);
 		}
 		return (lock.l_pid);
@@ -1534,12 +1591,12 @@ exit_daemon_lock(void)
 
 	if (fcntl(daemon_lock_fd, F_SETLK, &lock) == -1) {
 		syseventd_err_print(INIT_UNLOCK_ERR,
-			local_lock_file, strerror(errno));
+		    local_lock_file, strerror(errno));
 	}
 
 	if (close(daemon_lock_fd) == -1) {
 		syseventd_err_print(INIT_LOCK_CLOSE_ERR,
-			local_lock_file, strerror(errno));
+		    local_lock_file, strerror(errno));
 		exit(-1);
 	}
 }
@@ -1593,12 +1650,12 @@ syseventd_print(int level, char *message, ...)
 	va_start(ap, message);
 	if (logflag) {
 		(void) syslog(LOG_DEBUG, "%s[%ld]: ",
-			    prog, getpid());
+		    prog, getpid());
 		(void) vsyslog(LOG_DEBUG, message, ap);
 	} else {
 		if (newline) {
 			(void) fprintf(stdout, "%s[%ld]: ",
-				prog, getpid());
+			    prog, getpid());
 			(void) vfprintf(stdout, message, ap);
 		} else {
 			(void) vfprintf(stdout, message, ap);
