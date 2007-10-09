@@ -44,7 +44,6 @@ extern "C" {
 
 struct cfgdata {
 	int raw_refcnt;
-	int cooked_refcnt;
 	/*
 	 * The begin field points to the first byte of raw
 	 * configuration information and end to the byte past the last
@@ -59,6 +58,7 @@ struct cfgdata {
 	struct lut *cpucache;
 };
 
+void structconfig_free(struct config *cp);
 struct cfgdata *config_snapshot(void);
 
 void config_cook(struct cfgdata *cdata);

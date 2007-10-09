@@ -133,7 +133,7 @@ pci_missing_match(topo_mod_t *mod, char *platform, did_t *dp)
 }
 
 const char *
-pci_slotname_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp)
+pci_slotname_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 {
 	const char *l;
 	char *plat, *pp;
@@ -156,8 +156,8 @@ pci_slotname_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp)
 		++pp;
 
 	did_BDF(dp, NULL, &d, NULL);
-	if ((l = pci_physslot_name_lookup(pp, dp)) == NULL)
-		if ((l = did_label(dp, d)) != NULL) {
+	if ((l = pci_physslot_name_lookup(pp, pdp)) == NULL)
+		if ((l = did_label(pdp, d)) != NULL) {
 			l = pci_slotname_rewrite(pp, l);
 		} else {
 			l = pci_missing_match(mod, pp, dp);
@@ -171,7 +171,8 @@ pci_label_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 {
 	uint64_t ptr;
 	const char *l;
-	did_t *dp;
+	did_t *dp, *pdp;
+	tnode_t *pnode;
 	char *nm;
 	int err;
 
@@ -196,11 +197,13 @@ pci_label_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 		return (-1);
 	}
 	dp = (did_t *)(uintptr_t)ptr;
+	pnode = did_gettnode(dp);
+	pdp = did_find(mod, topo_node_getspecific(pnode));
 
 	/*
 	 * Is there a slotname associated with the device?
 	 */
-	if ((l = pci_slotname_lookup(mod, node, dp)) != NULL) {
+	if ((l = pci_slotname_lookup(mod, node, dp, pdp)) != NULL) {
 		nvlist_t *rnvl;
 
 		if (topo_mod_nvalloc(mod, &rnvl, NV_UNIQUE_NAME) != 0 ||
@@ -214,4 +217,43 @@ pci_label_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 				return (topo_mod_seterrno(mod, err));
 		return (0);
 	}
+}
+
+int
+pci_fru_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
+{
+	int err = 0;
+	uint64_t ptr;
+	did_t *dp, *pdp;
+	tnode_t *pnode;
+	char *nm;
+
+	*out = NULL;
+	nm = topo_node_name(node);
+	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0)
+		return (0);
+
+	if (nvlist_lookup_uint64(in, "nv1", &ptr) != 0) {
+		topo_mod_dprintf(mod,
+		    "label method argument not found.\n");
+		return (-1);
+	}
+	dp = (did_t *)(uintptr_t)ptr;
+	pnode = did_gettnode(dp);
+	pdp = did_find(mod, topo_node_getspecific(pnode));
+
+	/*
+	 * Is there a slotname associated with the device?
+	 */
+	if (pci_slotname_lookup(mod, pnode, dp, pdp) != NULL) {
+		nvlist_t *rnvl;
+
+		if (topo_node_resource(node, &rnvl, &err) < 0 || rnvl == NULL) {
+			topo_mod_dprintf(mod, "pci_fru_compute error: %s\n",
+			    topo_strerror(topo_mod_errno(mod)));
+			return (topo_mod_seterrno(mod, err));
+		}
+		*out = rnvl;
+	}
+	return (0);
 }

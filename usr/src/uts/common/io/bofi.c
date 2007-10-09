@@ -131,7 +131,7 @@ static char nexus_name[NAMESIZE];
 
 static int initialized = 0;
 
-#define	NCLONES 256
+#define	NCLONES 2560
 static int clone_tab[NCLONES];
 
 static dev_info_t *our_dip;
@@ -1881,7 +1881,7 @@ bofi_errdef_free(struct bofi_errent *ep)
 	cv_destroy(&ep->cv);
 	kmem_free(ep->name, ep->errdef.namesize+1);
 	if ((ep->errdef.access_type & BOFI_LOG) &&
-		ep->errdef.log.logsize && ep->logbase) /* double check */
+	    ep->errdef.log.logsize && ep->logbase) /* double check */
 		kmem_free(ep->logbase,
 		    sizeof (struct acc_log_elem) * ep->errdef.log.logsize);
 
@@ -2254,7 +2254,7 @@ log_acc_event(struct bofi_errent *ep, uint_t at, offset_t offset, off_t len,
 	if (log->flags & BOFI_LOG_REPIO)
 		repcount = 1;
 	else if (repcount == 0 && edp->access_count > 0 &&
-				(log->flags & BOFI_LOG_FULL) == 0)
+	    (log->flags & BOFI_LOG_FULL) == 0)
 		edp->access_count += 1;
 
 	if (repcount && log->entries < log->logsize) {
@@ -2303,21 +2303,21 @@ do_dma_corrupt(struct bofi_shadow *hp, struct bofi_errent *ep,
 
 	ASSERT(MUTEX_HELD(&bofi_mutex));
 	if ((ep->errdef.access_count ||
-		ep->errdef.fail_count) &&
-		(ep->errdef.access_type & BOFI_LOG)) {
+	    ep->errdef.fail_count) &&
+	    (ep->errdef.access_type & BOFI_LOG)) {
 		uint_t atype;
 
 		if (synctype == DDI_DMA_SYNC_FORDEV)
 			atype = BOFI_DMA_W;
 		else if (synctype == DDI_DMA_SYNC_FORCPU ||
-			synctype == DDI_DMA_SYNC_FORKERNEL)
+		    synctype == DDI_DMA_SYNC_FORKERNEL)
 			atype = BOFI_DMA_R;
 		else
 			atype = 0;
 		if ((off <= ep->errdef.offset &&
-			off + length > ep->errdef.offset) ||
-			(off > ep->errdef.offset &&
-			off < ep->errdef.offset + ep->errdef.len)) {
+		    off + length > ep->errdef.offset) ||
+		    (off > ep->errdef.offset &&
+		    off < ep->errdef.offset + ep->errdef.len)) {
 			logaddr = (caddr_t)((uintptr_t)(hp->addr +
 			    off + LLSZMASK) & ~LLSZMASK);
 
@@ -4220,7 +4220,7 @@ bofi_dvma_reserve(dev_info_t *rdip, ddi_dma_handle_t handle)
 			 */
 			hp->allocaddr = ddi_umem_alloc(
 			    ((int)(uintptr_t)hp->addr & pagemask)
-				+ pagemask + 1,
+			    + pagemask + 1,
 			    KM_SLEEP, &hp->umem_cookie);
 			hp->addr = hp->allocaddr +
 			    ((int)(uintptr_t)hp->addr & pagemask);

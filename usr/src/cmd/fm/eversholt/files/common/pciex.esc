@@ -73,11 +73,13 @@
  * if the source-id payload is valid, then check it matches
  */
 #define SOURCE_ID_MATCHES_BDF \
-	(payloadprop("source-valid") == 0 || \
+	(!payloadprop_defined("source-valid") || \
+	payloadprop("source-valid") == 0 || \
 	payloadprop("source-id") == ((b << 8) | (d << 3) | f))
 
 #define SOURCE_ID_MATCHES_OWN_BDF \
-	(payloadprop("source-valid") == 1 && \
+	(payloadprop_defined("source-valid") && \
+	payloadprop("source-valid") == 1 && \
 	payloadprop("source-id") == (confprop(asru(pciexrc), TOPO_PCI_BDF) + 0))
 
 /*
@@ -1835,11 +1837,13 @@ prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn (0)->
 prop error.io.pciex.badreq-u@pciexbus[b]/pciexdev[d] (0)->
     ereport.io.pciex.tl.ur@pciexfn {
 	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
-	(payloadprop("source-valid") == 0 ||
+	(!payloadprop_defined("source-valid") ||
+	payloadprop("source-valid") == 0 ||
 	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) },
     ereport.io.pciex.tl.ca@pciexfn {
 	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
-	(payloadprop("source-valid") == 0 ||
+	(!payloadprop_defined("source-valid") ||
+	payloadprop("source-valid") == 0 ||
 	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) };
 
 prop error.io.pci.badreq-pw-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->

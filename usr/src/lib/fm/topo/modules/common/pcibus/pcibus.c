@@ -225,6 +225,7 @@ pciexbus_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	did_settnode(pd, parent);
 	if ((ntn = pci_tnode_create(mod, parent, PCIEX_BUS, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Bus_common_props, Bus_propcnt) < 0) {
@@ -272,14 +273,8 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
     topo_instance_t i)
 {
 	did_t *pd;
-	did_t *ppd;
-	di_node_t pdn;
 	tnode_t *ntn;
 
-	if ((pdn = topo_node_getspecific(parent)) == DI_NODE_NIL)
-		return (NULL);
-	if ((ppd = did_find(mod, pdn)) == NULL)
-		return (NULL);
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
 	/* remember parent tnode */
@@ -287,17 +282,6 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 
 	if ((ntn = pci_tnode_create(mod, parent, PCI_DEVICE, i, dn)) == NULL)
 		return (NULL);
-	/*
-	 * If our devinfo node is lacking certain information of its
-	 * own, we may need/want to inherit the information available
-	 * from our parent node's private data.
-	 */
-
-	if (did_inherit(ppd, pd) != 0) {
-		topo_node_unbind(ntn);
-		return (NULL);
-	}
-
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
 		topo_node_unbind(ntn);
 		return (NULL);
@@ -323,6 +307,7 @@ pcibus_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	did_settnode(pd, parent);
 	if ((ntn = pci_tnode_create(mod, parent, PCI_BUS, i, dn)) == NULL)
 		return (NULL);
 	/*

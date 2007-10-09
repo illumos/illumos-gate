@@ -54,11 +54,13 @@
 #include "eval.h"
 #include "config.h"
 #include "platform.h"
+#include "esclex.h"
 
 /* imported from eft.c... */
 extern char *Autoclose;
 extern int Dupclose;
 extern hrtime_t Hesitate;
+extern char *Serd_Override;
 extern nv_alloc_t Eft_nv_hdl;
 extern int Max_fme;
 extern fmd_hdl_t *Hdl;
@@ -82,7 +84,7 @@ static struct fme {
 	struct fme *next;		/* next exercise */
 	unsigned long long ull;		/* time when fme was created */
 	int id;				/* FME id */
-	struct cfgdata *cfgdata;	/* full configuration data */
+	struct config *config;		/* cooked configuration data */
 	struct lut *eventtree;		/* propagation tree for this FME */
 	/*
 	 * The initial error report that created this FME is kept in
@@ -152,8 +154,12 @@ static void fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     const char *eventstring, const struct ipath *ipp, nvlist_t *nvl);
 static void istat_counter_reset_cb(struct istat_entry *entp,
     struct stats *statp, const struct ipath *ipp);
+static void istat_counter_topo_chg_cb(struct istat_entry *entp,
+    struct stats *statp, void *unused);
 static void serd_reset_cb(struct serd_entry *entp, void *unused,
     const struct ipath *ipp);
+static void serd_topo_chg_cb(struct serd_entry *entp, void *unused,
+    void *unused2);
 static void destroy_fme_bufs(struct fme *fp);
 
 static struct fme *
@@ -205,7 +211,7 @@ fme_ready(struct fme *fmep)
 	fmep->diags = stats_new_counter(nbuf, "suspect lists diagnosed", 0);
 
 	out(O_ALTFP|O_VERB2, "newfme: config snapshot contains...");
-	config_print(O_ALTFP|O_VERB2, fmep->cfgdata->cooked);
+	config_print(O_ALTFP|O_VERB2, fmep->config);
 
 	return (fmep);
 }
@@ -340,7 +346,8 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	Nfmep = alloc_fme();
 
 	Nfmep->id = Nextid++;
-	Nfmep->cfgdata = cfgdata;
+	Nfmep->config = cfgdata->cooked;
+	config_free(cfgdata);
 	Nfmep->posted_suspects = 0;
 	Nfmep->uniqobs = 0;
 	Nfmep->state = FME_NOTHING;
@@ -350,10 +357,10 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	Nfmep->fmcase = fmcase;
 	Nfmep->hdl = hdl;
 
-	if ((Nfmep->eventtree = itree_create(cfgdata->cooked)) == NULL) {
+	if ((Nfmep->eventtree = itree_create(Nfmep->config)) == NULL) {
 		out(O_ALTFP, "newfme: NULL instance tree");
 		Undiag_reason = UD_INSTFAIL;
-		config_free(cfgdata);
+		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
 		Nfmep = NULL;
@@ -367,7 +374,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 		out(O_ALTFP, "newfme: e0 not in instance tree");
 		Undiag_reason = UD_BADEVENTI;
 		itree_free(Nfmep->eventtree);
-		config_free(cfgdata);
+		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
 		Nfmep = NULL;
@@ -622,7 +629,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	nvlist_t *defect;
 	struct case_list *bad;
 	struct fme *fmep;
-	struct cfgdata *cfgdata = NULL;
+	struct cfgdata *cfgdata;
 	size_t rawsz;
 	struct event *ep;
 	char *tmpbuf = alloca(OBBUFNMSZ);
@@ -737,7 +744,6 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	cfgdata->cooked = NULL;
 	cfgdata->devcache = NULL;
 	cfgdata->cpucache = NULL;
-	cfgdata->cooked_refcnt = 0;
 	cfgdata->raw_refcnt = 1;
 
 	if (rawsz > 0) {
@@ -753,18 +759,14 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	} else {
 		cfgdata->begin = cfgdata->end = cfgdata->nextfree = NULL;
 	}
-	fmep->cfgdata = cfgdata;
 
 	config_cook(cfgdata);
-	if (cfgdata->begin)
-		FREE(cfgdata->begin);
-	cfgdata->begin = NULL;
-	cfgdata->end = NULL;
-	cfgdata->nextfree = NULL;
+	fmep->config = cfgdata->cooked;
+	config_free(cfgdata);
 	out(O_ALTFP|O_STAMP, "config_restore added %d bytes",
 	    alloc_total() - init_size);
 
-	if ((fmep->eventtree = itree_create(cfgdata->cooked)) == NULL) {
+	if ((fmep->eventtree = itree_create(fmep->config)) == NULL) {
 		/* case not properly saved or irretrievable */
 		out(O_ALTFP, "restart_fme: NULL instance tree");
 		Undiag_reason = UD_INSTFAIL;
@@ -792,7 +794,8 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 badcase:
 	if (fmep->eventtree != NULL)
 		itree_free(fmep->eventtree);
-	config_free(cfgdata);
+	if (fmep->config)
+		structconfig_free(fmep->config);
 	destroy_fme_bufs(fmep);
 	FREE(fmep);
 
@@ -857,8 +860,8 @@ destroy_fme(struct fme *f)
 
 	if (f->eventtree != NULL)
 		itree_free(f->eventtree);
-	if (f->cfgdata != NULL)
-		config_free(f->cfgdata);
+	if (f->config)
+		structconfig_free(f->config);
 	lut_free(f->globals, globals_destructor, NULL);
 	FREE(f);
 }
@@ -1023,25 +1026,125 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 
 	if (!fmd_serd_exists(hdl, serdname)) {
 		struct node *nN, *nT;
+		const char *s;
+		struct node *nodep;
+		struct config *cp;
+		char *path;
+		uint_t nval;
+		hrtime_t tval;
+		const char *name;
+		char *serd_name;
+		int i;
+		char *ptr;
+		int got_n_override = 0, got_t_override = 0;
 
 		/* no SERD engine yet, so create it */
-		nN = lut_lookup(serdinst->u.stmt.lutp, (void *)L_N, NULL);
-		nT = lut_lookup(serdinst->u.stmt.lutp, (void *)L_T, NULL);
+		nodep = serdinst->u.stmt.np->u.event.epname;
+		name = serdinst->u.stmt.np->u.event.ename->u.name.s;
+		path = ipath2str(NULL, ipath(nodep));
+		cp = config_lookup(fmep->config, path, 0);
+		FREE((void *)path);
 
-		ASSERT(nN->t == T_NUM);
-		ASSERT(nT->t == T_TIMEVAL);
+		/*
+		 * We allow serd paramaters to be overridden, either from
+		 * eft.conf file values (if Serd_Override is set) or from
+		 * driver properties (for "serd.io.device" engines).
+		 */
+		if (Serd_Override != NULL) {
+			char *save_ptr, *ptr1, *ptr2, *ptr3;
+			ptr3 = save_ptr = STRDUP(Serd_Override);
+			while (*ptr3 != '\0') {
+				ptr1 = strchr(ptr3, ',');
+				*ptr1 = '\0';
+				if (strcmp(ptr3, name) == 0) {
+					ptr2 =  strchr(ptr1 + 1, ',');
+					*ptr2 = '\0';
+					nval = atoi(ptr1 + 1);
+					out(O_ALTFP, "serd override %s_n %d",
+					    name, nval);
+					ptr3 =  strchr(ptr2 + 1, ' ');
+					if (ptr3)
+						*ptr3 = '\0';
+					ptr = STRDUP(ptr2 + 1);
+					out(O_ALTFP, "serd override %s_t %s",
+					    name, ptr);
+					got_n_override = 1;
+					got_t_override = 1;
+					break;
+				} else {
+					ptr2 =  strchr(ptr1 + 1, ',');
+					ptr3 =  strchr(ptr2 + 1, ' ');
+					if (ptr3 == NULL)
+						break;
+				}
+				ptr3++;
+			}
+			FREE(save_ptr);
+		}
 
-		fmd_serd_create(hdl, serdname, (uint_t)nN->u.ull,
-		    (hrtime_t)nT->u.ull);
+		if (cp && got_n_override == 0) {
+			/*
+			 * convert serd engine name into property name
+			 */
+			serd_name = MALLOC(strlen(name) + 3);
+			for (i = 0; i < strlen(name); i++) {
+				if (name[i] == '.')
+					serd_name[i] = '_';
+				else
+					serd_name[i] = name[i];
+			}
+			serd_name[i++] = '_';
+			serd_name[i++] = 'n';
+			serd_name[i] = '\0';
+			if (s = config_getprop(cp, serd_name)) {
+				nval = atoi(s);
+				out(O_ALTFP, "serd override %s_n %s", name, s);
+				got_n_override = 1;
+			}
+			serd_name[i - 1] = 't';
+			if (s = config_getprop(cp, serd_name)) {
+				ptr = STRDUP(s);
+				out(O_ALTFP, "serd override %s_t %s", name, s);
+				got_t_override = 1;
+			}
+			FREE(serd_name);
+		}
+
+		if (!got_n_override) {
+			nN = lut_lookup(serdinst->u.stmt.lutp, (void *)L_N,
+			    NULL);
+			ASSERT(nN->t == T_NUM);
+			nval = (uint_t)nN->u.ull;
+		}
+		if (!got_t_override) {
+			nT = lut_lookup(serdinst->u.stmt.lutp, (void *)L_T,
+			    NULL);
+			ASSERT(nT->t == T_TIMEVAL);
+			tval = (hrtime_t)nT->u.ull;
+		} else {
+			const unsigned long long *ullp;
+			const char *suffix;
+			int len;
+
+			len = strspn(ptr, "0123456789");
+			suffix = stable(&ptr[len]);
+			ullp = (unsigned long long *)lut_lookup(Timesuffixlut,
+			    (void *)suffix, NULL);
+			ptr[len] = '\0';
+			tval = (unsigned long long)strtoul(ptr, NULL, 0) *
+			    (ullp ? *ullp : 1ll);
+			FREE(ptr);
+		}
+		fmd_serd_create(hdl, serdname, nval, tval);
 	}
 
 	newentp = MALLOC(sizeof (*newentp));
-	newentp->ename = serdinst->u.stmt.np->u.event.ename->u.name.s;
+	newentp->ename = stable(serdinst->u.stmt.np->u.event.ename->u.name.s);
 	newentp->ipath = ipath(serdinst->u.stmt.np->u.event.epname);
 	newentp->hdl = hdl;
 	if (lut_lookup(SerdEngines, newentp, (lut_cmp)serd_cmp) == NULL) {
 		SerdEngines = lut_add(SerdEngines, (void *)newentp,
-		    (void *)NULL, (lut_cmp)serd_cmp);
+		    (void *)newentp, (lut_cmp)serd_cmp);
 		Serd_need_save = 1;
 		serd_save();
 	} else {
@@ -1203,6 +1306,17 @@ fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 	}
 }
 
+/*ARGSUSED*/
+void
+fme_receive_topology_change(void)
+{
+	lut_walk(Istats, (lut_cb)istat_counter_topo_chg_cb, NULL);
+	istat_save();
+
+	lut_walk(SerdEngines, (lut_cb)serd_topo_chg_cb, NULL);
+	serd_save();
+}
+
 static int mark_arrows(struct fme *fmep, struct event *ep, int mark,
     unsigned long long at_latest_by, unsigned long long *pdelay, int keep);
 
@@ -1224,33 +1338,6 @@ clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
 		    ap = itree_next_arrow(bp, ap))
 			ap->arrowp->mark = 0;
 	}
-}
-
-static void
-fme_reload_cfgdata(struct fme *fmep)
-{
-	size_t rawsz;
-
-	fmep->cfgdata = MALLOC(sizeof (struct cfgdata));
-	fmep->cfgdata->cooked = NULL;
-	fmep->cfgdata->devcache = NULL;
-	fmep->cfgdata->cpucache = NULL;
-	fmep->cfgdata->cooked_refcnt = 0;
-	fmep->cfgdata->raw_refcnt = 1;
-	fmd_buf_read(fmep->hdl, fmep->fmcase, WOBUF_CFGLEN,
-	    (void *)&rawsz, sizeof (size_t));
-	if (rawsz > 0) {
-		fmep->cfgdata->begin = MALLOC(rawsz);
-		fmep->cfgdata->end = fmep->cfgdata->nextfree =
-		    fmep->cfgdata->begin + rawsz;
-		fmd_buf_read(fmep->hdl, fmep->fmcase, WOBUF_CFG,
-		    fmep->cfgdata->begin, rawsz);
-		config_cook(fmep->cfgdata);
-		FREE(fmep->cfgdata->begin);
-	}
-	fmep->cfgdata->begin = NULL;
-	fmep->cfgdata->end = NULL;
-	fmep->cfgdata->nextfree = NULL;
 }
 
 static void
@@ -1317,8 +1404,6 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		if (Debug == 0)
 			Verbose = 0;
 
-		fme_reload_cfgdata(fmep);
-
 		lut_walk(fmep->eventtree, (lut_cb)clear_arrows, (void *)fmep);
 		state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay);
 
@@ -1350,8 +1435,6 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		} else {
 
 			/* not a match, undo noting of observation */
-			config_free(fmep->cfgdata);
-			fmep->cfgdata = NULL;
 			fmep->ecurrent = NULL;
 			if (--ep->count == 0) {
 				/* unlink it from observations */
@@ -1674,6 +1757,79 @@ boom:
 	return (NULL);
 }
 
+/* an ipath cache entry is an array of these, with s==NULL at the end */
+struct ipath {
+	const char *s;	/* component name (in stable) */
+	int i;		/* instance number */
+};
+
+static nvlist_t *
+ipath2fmri(struct ipath *ipath)
+{
+	nvlist_t **pa, *f, *p;
+	uint_t depth = 0;
+	char *numstr, *nullbyte;
+	char *failure;
+	int err, i;
+	struct ipath *ipp;
+
+	for (ipp = ipath; ipp->s != NULL; ipp++)
+		depth++;
+
+	if ((err = nvlist_xalloc(&f, NV_UNIQUE_NAME, &Eft_nv_hdl)) != 0)
+		out(O_DIE|O_SYS, "alloc of fmri nvl failed");
+	pa = alloca(depth * sizeof (nvlist_t *));
+	for (i = 0; i < depth; i++)
+		pa[i] = NULL;
+
+	err = nvlist_add_string(f, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC);
+	err |= nvlist_add_uint8(f, FM_VERSION, FM_HC_SCHEME_VERSION);
+	err |= nvlist_add_string(f, FM_FMRI_HC_ROOT, "");
+	err |= nvlist_add_uint32(f, FM_FMRI_HC_LIST_SZ, depth);
+	if (err != 0) {
+		failure = "basic construction of FMRI failed";
+		goto boom;
+	}
+
+	numbuf[MAXDIGITIDX] = '\0';
+	nullbyte = &numbuf[MAXDIGITIDX];
+	i = 0;
+
+	for (ipp = ipath; ipp->s != NULL; ipp++) {
+		err = nvlist_xalloc(&p, NV_UNIQUE_NAME, &Eft_nv_hdl);
+		if (err != 0) {
+			failure = "alloc of an hc-pair failed";
+			goto boom;
+		}
+		err = nvlist_add_string(p, FM_FMRI_HC_NAME, ipp->s);
+		numstr = ulltostr(ipp->i, nullbyte);
+		err |= nvlist_add_string(p, FM_FMRI_HC_ID, numstr);
+		if (err != 0) {
+			failure = "construction of an hc-pair failed";
+			goto boom;
+		}
+		pa[i++] = p;
+	}
+
+	err = nvlist_add_nvlist_array(f, FM_FMRI_HC_LIST, pa, depth);
+	if (err == 0) {
+		for (i = 0; i < depth; i++)
+			if (pa[i] != NULL)
+				nvlist_free(pa[i]);
+		return (f);
+	}
+	failure = "addition of hc-pair array to FMRI failed";
+
+boom:
+	for (i = 0; i < depth; i++)
+		if (pa[i] != NULL)
+			nvlist_free(pa[i]);
+	nvlist_free(f);
+	out(O_DIE, "%s", failure);
+	/*NOTREACHED*/
+	return (NULL);
+}
+
 static uint_t
 avg(uint_t sum, uint_t cnt)
 {
@@ -1863,7 +2019,7 @@ trim_suspects(struct fme *fmep, boolean_t no_upsets, struct rsl **begin,
 	for (ep = fmep->psuspects; ep; ep = ep->psuspects) {
 		if (no_upsets && is_upset(ep->t))
 			continue;
-		get_resources(ep, rp, fmep->cfgdata->cooked);
+		get_resources(ep, rp, fmep->config);
 		rp++;
 		fmep->nsuspects++;
 		if (!is_fault(ep->t))
@@ -2156,6 +2312,25 @@ istat_counter_reset_cb(struct istat_entry *entp, struct stats *statp,
 	}
 }
 
+/*ARGSUSED*/
+static void
+istat_counter_topo_chg_cb(struct istat_entry *entp, struct stats *statp,
+    void *unused)
+{
+	char *path;
+	nvlist_t *fmri;
+
+	fmri = ipath2fmri((struct ipath *)(entp->ipath));
+	if (!platform_path_exists(fmri)) {
+		path = ipath2str(entp->ename, entp->ipath);
+		out(O_ALTFP, "istat_counter_topo_chg_cb: not present %s", path);
+		FREE(path);
+		stats_counter_reset(statp);
+		Istat_need_save = 1;
+	}
+	nvlist_free(fmri);
+}
+
 void
 istat_fini(void)
 {
@@ -2277,9 +2452,10 @@ fme_serd_load(fmd_hdl_t *hdl)
 			newentp->ipath = ipath(epname);
 			newentp->ename = stable(namestring);
 			SerdEngines = lut_add(SerdEngines, (void *)newentp,
-			    (void *)NULL, (lut_cmp)serd_cmp);
+			    (void *)newentp, (lut_cmp)serd_cmp);
 		} else
 			Serd_need_save = 1;
+		tree_free(epname);
 		nvlist_free(fmri);
 	}
 	/* save it back again in case some of the paths no longer exist */
@@ -2310,6 +2486,24 @@ serd_reset_cb(struct serd_entry *entp, void *unused, const struct ipath *ipp)
 		FREE(path);
 		Serd_need_save = 1;
 	}
+}
+
+/*ARGSUSED*/
+static void
+serd_topo_chg_cb(struct serd_entry *entp, void *unused, void *unused2)
+{
+	char *path;
+	nvlist_t *fmri;
+
+	fmri = ipath2fmri((struct ipath *)(entp->ipath));
+	if (!platform_path_exists(fmri)) {
+		path = ipath2str(entp->ename, entp->ipath);
+		out(O_ALTFP, "serd_topo_chg_cb: not present %s", path);
+		fmd_serd_reset(entp->hdl, path);
+		FREE(path);
+		Serd_need_save = 1;
+	}
+	nvlist_free(fmri);
 }
 
 void
@@ -2737,8 +2931,6 @@ fme_timer_fired(struct fme *fmep, id_t tid)
 	fmd_buf_write(fmep->hdl, fmep->fmcase,
 	    WOBUF_PULL, (void *)&fmep->pull, sizeof (fmep->pull));
 
-	fme_reload_cfgdata(fmep);
-
 	fme_eval(fmep, fmep->e0r);
 }
 
@@ -2852,8 +3044,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		(void) fme_set_timer(fmep, my_delay);
 		print_suspects(SLWAIT, fmep);
 		itree_prune(fmep->eventtree);
-		config_free(fmep->cfgdata);
-		fmep->cfgdata = NULL;
 		return;
 
 	case FME_DISPROVED:
@@ -2888,8 +3078,8 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 	}
 	itree_free(fmep->eventtree);
 	fmep->eventtree = NULL;
-	config_free(fmep->cfgdata);
-	fmep->cfgdata = NULL;
+	structconfig_free(fmep->config);
+	fmep->config = NULL;
 	destroy_fme_bufs(fmep);
 }
 
@@ -2935,7 +3125,7 @@ checkconstraints(struct fme *fmep, struct arrow *arrowp)
 
 	for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
 		if (eval_expr(ctp->cnode, NULL, NULL,
-		    &fmep->globals, fmep->cfgdata->cooked,
+		    &fmep->globals, fmep->config,
 		    arrowp, 0, &value)) {
 			/* evaluation successful */
 			if (value.t == UNDEFINED || value.v == 0) {

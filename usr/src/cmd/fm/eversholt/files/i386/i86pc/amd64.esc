@@ -485,7 +485,7 @@ prop upset.memory.discard3@chip/cpu
     ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.bu.s_eccm@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.nb.mem_ue@chip/cpu;
 
 /*								#CSTESTFAIL#
  * If the BIOS fails a chip-select during POST, or perhaps after a

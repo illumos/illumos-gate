@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -385,7 +385,7 @@ dump_log(uint_t lvl, FILE *fp, struct acc_log_elem *items,
 		uint_t offset, allthesame = 1;
 
 		if (logflags & BOFI_LOG_TIMESTAMP &&
-			getenv("DUMP_FULL_LOG") != 0)
+		    getenv("DUMP_FULL_LOG") != 0)
 			allthesame = 0;
 		else
 			for (i = 1; i < nitems; i++)
@@ -1292,7 +1292,7 @@ collect_state(int fd, int cmd,
 	size_t ls = errstate->log.logsize;
 
 	msg(2, "collect_state: pre: edp->access_type 0x%x (logsize %d)\n",
-		errdef->access_type, errdef->log.logsize);
+	    errdef->access_type, errdef->log.logsize);
 
 	do {
 		errstate->log.logsize = 0; /* only copy the driver log once */
@@ -1433,9 +1433,7 @@ match_hinfo(struct handle_info *hp, int instance, uint_t access_type,
 		return (0);
 	if ((access_type & BOFI_DMA_RW) &&
 	    (hp->access_type & BOFI_DMA_RW) &&
-	    (rnumber == -1 || hp->rnumber == rnumber) &&
-	    ((uintptr_t)(hp->addr_cookie + offset + len) & ~LLSZMASK) >
-	    ((uintptr_t)((hp->addr_cookie + offset) + LLSZMASK) & ~LLSZMASK))
+	    (rnumber == -1 || hp->rnumber == rnumber))
 		return (1);
 	else if ((access_type & BOFI_INTR) &&
 	    (hp->access_type & BOFI_INTR))
@@ -2364,11 +2362,11 @@ main(int argc, char *argv[])
 						alarmed = 0;
 						if ((timeleft -= edef_sleep) <=
 						    0) {
-							if (!do_status)
-							    print_err_reports(
-								outfile,
-								&es, "",
-								"", -1);
+							if (do_status)
+								break;
+							print_err_reports(
+							    outfile, &es, "",
+							    "", -1);
 							break;
 						}
 					} else if (!do_status)

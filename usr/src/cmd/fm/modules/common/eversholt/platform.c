@@ -303,6 +303,7 @@ platform_getpath(nvlist_t *nvl)
 			out(O_ALTFP, "XFILE: no configuration node has "
 			    "cpu-id matching %u.", id);
 
+		structconfig_free(Lastcfg->cooked);
 		config_free(Lastcfg);
 		in_getpath = 0;
 		return (ret);
@@ -668,7 +669,6 @@ platform_config_snapshot(void)
 	}
 
 	Lastcfg = MALLOC(sizeof (struct cfgdata));
-	Lastcfg->cooked_refcnt = 0;
 	Lastcfg->raw_refcnt = 2;	/* caller + Lastcfg */
 	Lastcfg->begin = Lastcfg->nextfree = Lastcfg->end = NULL;
 	Lastcfg->cooked = NULL;

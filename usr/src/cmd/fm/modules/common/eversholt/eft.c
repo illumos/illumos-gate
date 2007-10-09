@@ -30,6 +30,7 @@
 #include <string.h>
 #include <fm/fmd_api.h>
 #include <libnvpair.h>
+#include <fm/libtopo.h>
 #include "out.h"
 #include "stats.h"
 #include "alloc.h"
@@ -59,6 +60,7 @@ int Debug = 1;	/* turn on here and let fmd_hdl_debug() decide if really on */
 char *Autoclose;	/* close cases automatically after solving */
 int Dupclose;		/* close cases on duplicate diagosis */
 hrtime_t Hesitate;	/* hesitation time in ns */
+char *Serd_Override;	/* override for Serd engines */
 int Verbose;
 int Estats;
 int Warn;	/* zero -- eft.so should not issue language warnings */
@@ -125,11 +127,20 @@ eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
 	fme_close_case(hdl, fmcase);
 }
 
+/*
+ * The "serd_override" property allows the N and T parameters of specified serd
+ * engines to be overridden. The property is a string consisting of one or more
+ * space separated triplets. Each triplet is of the form "name,N,T" where "name"
+ * is the name of the serd engine and N and T are the new paremeters to use.
+ * For example "serd.io.device.nonfatal,5,3h" would set the parameters for the
+ * serd.io.device.nonfatal engine to 5 in 3 hours.
+ */
 static const fmd_prop_t eft_props[] = {
 	{ "autoclose", FMD_TYPE_STRING, NULL },
 	{ "dupclose", FMD_TYPE_BOOL, "false" },
 	{ "estats", FMD_TYPE_BOOL, "false" },
 	{ "hesitate", FMD_TYPE_INT64, "10000000000" },
+	{ "serd_override", FMD_TYPE_STRING, NULL },
 	{ "verbose", FMD_TYPE_INT32, "0" },
 	{ "warn", FMD_TYPE_BOOL, "false" },
 	{ "status", FMD_TYPE_STRING, NULL },
@@ -137,12 +148,21 @@ static const fmd_prop_t eft_props[] = {
 	{ NULL, 0, NULL }
 };
 
+/*ARGSUSED*/
+static void
+eft_topo_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
+{
+	fme_receive_topology_change();
+}
+
 static const fmd_hdl_ops_t eft_ops = {
 	eft_recv,	/* fmdo_recv */
 	eft_timeout,	/* fmdo_timeout */
 	eft_close,	/* fmdo_close */
 	NULL,		/* fmdo_stats */
 	NULL,		/* fmdo_gc */
+	NULL,		/* fmdo_send */
+	eft_topo_change	/* fmdo_topo_change */
 };
 
 #define	xstr(s) str(s)
@@ -291,6 +311,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	Autoclose = fmd_prop_get_string(hdl, "autoclose");
 	Dupclose = fmd_prop_get_int32(hdl, "dupclose");
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
+	Serd_Override = fmd_prop_get_string(hdl, "serd_override");
 	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
 
 	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {

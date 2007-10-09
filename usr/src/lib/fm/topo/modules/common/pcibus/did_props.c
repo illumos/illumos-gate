@@ -94,6 +94,10 @@ txprop_t Fn_common_props[] = {
 	{ DI_DEVIDPROP, &pci_pgroup, TOPO_PCI_DEVID, maybe_di_uint_to_str },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
 	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
+	{ "serd_io_device_nonfatal_n", &io_pgroup, "serd_io_device_nonfatal_n",
+	    maybe_di_uint_to_str },
+	{ "serd_io_device_nonfatal_t", &io_pgroup, "serd_io_device_nonfatal_t",
+	    maybe_di_uint_to_str },
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ DI_CLASSPROP, &pci_pgroup, TOPO_PCI_CLASS, maybe_di_uint_to_str },
 	{ DI_VENDIDPROP, &pci_pgroup, TOPO_PCI_VENDID, maybe_di_uint_to_str },
@@ -371,7 +375,9 @@ ASRU_set(tnode_t *tn, did_t *pd,
 	 */
 	mp = did_mod(pd);
 	nm = topo_node_name(tn);
-	if (strcmp(nm, PCI_FUNCTION) == 0 || strcmp(nm, PCIEX_FUNCTION) == 0 ||
+	if ((strcmp(nm, PCI_BUS) == 0 && did_gettnode(pd) &&
+	    strcmp(topo_node_name(did_gettnode(pd)), HOSTBRIDGE) == 0) ||
+	    strcmp(nm, PCI_FUNCTION) == 0 || strcmp(nm, PCIEX_FUNCTION) == 0 ||
 	    strcmp(nm, PCIEX_ROOT) == 0) {
 		if ((dnpath = di_devfs_path(did_dinode(pd))) != NULL) {
 			/*

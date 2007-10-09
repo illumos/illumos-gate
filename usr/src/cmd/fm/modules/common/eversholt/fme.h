@@ -72,6 +72,7 @@ struct fme;
 
 void fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     nvlist_t *nvl, const char *eventstring);
+void fme_receive_topology_change(void);
 void fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep,
     nvlist_t *nvl, const char *eventstring);
 void fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress);

@@ -282,11 +282,6 @@ config_cook(struct cfgdata *cdata)
 	extern struct lut *Usedprops;
 	extern struct lut *Usednames;
 
-	cdata->cooked_refcnt++;
-
-	if (cdata->cooked != NULL)
-		return;
-
 	cdata->cooked = newcnode(NULL, 0);
 
 	if ((cfgstr = cdata->begin) == cdata->nextfree) {
@@ -362,9 +357,9 @@ config_cook(struct cfgdata *cdata)
 		 * only actually add the props if the rules use them (saves
 		 * memory)
 		 */
-		if (lut_lookup(Usedprops, (void *)pn, NULL) != NULL &&
-		    lut_lookup(Usednames, (void *)config_lastcomp, NULL) !=
-		    NULL) {
+		if ((lut_lookup(Usedprops, (void *)pn, NULL) != NULL ||
+		    strncmp(pn, "serd_", 5) == 0) && lut_lookup(Usednames,
+		    (void *)config_lastcomp, NULL) != NULL) {
 			pv = STRDUP(equals + 1);
 			out(O_ALTFP|O_VERB3, "add prop (%s) val %p", pn,
 			    (void *)pv);
@@ -416,7 +411,7 @@ prop_destructor(void *left, void *right, void *arg)
 /*
  * structconfig_free -- free a struct config pointer and all its relatives
  */
-static void
+void
 structconfig_free(struct config *cp)
 {
 	if (cp == NULL)
@@ -437,19 +432,13 @@ config_free(struct cfgdata *cp)
 	if (cp == NULL)
 		return;
 
-	if (--cp->cooked_refcnt == 0) {
-		if (cp->cooked != NULL)
-			structconfig_free(cp->cooked);
-		cp->cooked = NULL;
+	if (--cp->raw_refcnt == 0) {
 		if (cp->devcache != NULL)
 			lut_free(cp->devcache, NULL, NULL);
 		cp->devcache = NULL;
 		if (cp->cpucache != NULL)
 			lut_free(cp->cpucache, NULL, NULL);
 		cp->cpucache = NULL;
-	}
-
-	if (--cp->raw_refcnt == 0) {
 		if (cp->begin != NULL)
 			FREE(cp->begin);
 		FREE(cp);

@@ -464,11 +464,17 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
 		    "payloadprop(\"%s\") ", np->u.quote.s);
 
-		if (platform_payloadprop(np, valuep)) {
-			/* platform_payloadprop() returned false */
-			out(O_ALTFP|O_VERB, "payloadprop \"%s\" not found.",
-			    np->u.quote.s);
+		if (arrowp->head->myevent->count == 0) {
+			/*
+			 * Haven't seen this ereport yet, so must defer
+			 */
+			out(O_ALTFP|O_VERB2, "ereport not yet seen - defer.");
 			return (0);
+		} else if (platform_payloadprop(np, valuep)) {
+			/* platform_payloadprop() returned false */
+			out(O_ALTFP|O_VERB, "not found.");
+			valuep->t = UNDEFINED;
+			return (1);
 		} else {
 			switch (valuep->t) {
 			case UINT64:
@@ -487,6 +493,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		}
 	} else if (funcname == L_setpayloadprop) {
 		struct evalue *payloadvalp;
+		int alloced = 0;
 
 		ASSERTinfo(np->t == T_LIST, ptree_nodetype2str(np->t));
 		ASSERTinfo(np->u.expr.left->t == T_QUOTE,
@@ -508,14 +515,23 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    arrowp->tail->myevent->payloadprops,
 		    (void *)np->u.expr.left->u.quote.s, NULL)) == NULL) {
 			payloadvalp = MALLOC(sizeof (*payloadvalp));
+			alloced = 1;
 		}
 
 		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
 		    arrowp, try, payloadvalp)) {
-			out(O_ALTFP|O_VERB2, " (cannot eval, using zero)");
-			payloadvalp->t = UINT64;
-			payloadvalp->v = 0;
+			out(O_ALTFP|O_VERB2, " (cannot eval)");
+			if (alloced)
+				FREE(payloadvalp);
+			return (0);
 		} else {
+			if (payloadvalp->t == UNDEFINED) {
+				/* function is always true */
+				out(O_ALTFP|O_VERB2, " (undefined)");
+				valuep->t = UINT64;
+				valuep->v = 1;
+				return (1);
+			}
 			if (payloadvalp->t == UINT64)
 				out(O_ALTFP|O_VERB2,
 				    " (%llu)", payloadvalp->v);
@@ -538,11 +554,16 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
 		    "payloadprop_defined(\"%s\") ", np->u.quote.s);
 
-		if (platform_payloadprop(np, NULL)) {
+		if (arrowp->head->myevent->count == 0) {
+			/*
+			 * Haven't seen this ereport yet, so must defer
+			 */
+			out(O_ALTFP|O_VERB2, "ereport not yet seen - defer.");
+			return (0);
+		} else if (platform_payloadprop(np, NULL)) {
 			/* platform_payloadprop() returned false */
 			valuep->v = 0;
-			out(O_ALTFP|O_VERB2, "payloadprop_defined: \"%s\" "
-			    "not defined.", np->u.quote.s);
+			out(O_ALTFP|O_VERB2, "not found.");
 		} else {
 			valuep->v = 1;
 			out(O_ALTFP|O_VERB2, "found.");
@@ -568,9 +589,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
 		    arrowp, try, &cmpval)) {
 			out(O_ALTFP|O_VERB2|O_NONL,
-			    "(cannot eval, using zero) ");
-			cmpval.t = UINT64;
-			cmpval.v = 0;
+			    "(cannot eval) ");
+			return (0);
 		} else {
 			switch (cmpval.t) {
 			case UNDEFINED:
@@ -601,9 +621,15 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    &nvals);
 		valuep->t = UINT64;
 		valuep->v = 0;
-		if (nvals == 0) {
-			out(O_ALTFP|O_VERB2, "not found.");
+		if (arrowp->head->myevent->count == 0) {
+			/*
+			 * Haven't seen this ereport yet, so must defer
+			 */
+			out(O_ALTFP|O_VERB2, "ereport not yet seen - defer.");
 			return (0);
+		} else if (nvals == 0) {
+			out(O_ALTFP|O_VERB2, "not found.");
+			return (1);
 		} else {
 			struct evalue preval;
 			int i;
@@ -1361,9 +1387,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *events[],
 		 *
 		 * "dotrue = 1" means stmtA should be evaluated.
 		 */
-		if (eval_expr(np->u.expr.left, ex, events, globals, croot,
-		    arrowp, try, &lval) &&
-		    lval.t != UNDEFINED && lval.v != 0)
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
+			return (0);
+
+		if (lval.t != UNDEFINED && lval.v != 0)
 			dotrue = 1;
 
 		ASSERT(np->u.expr.right != NULL);
@@ -1422,8 +1450,12 @@ eval_expr(struct node *np, struct lut *ex, struct node *events[],
 		    arrowp, try, valuep)) {
 			/*
 			 * if lhs is unknown, still check rhs. If that
-			 * is false we can return false irrespectice of lhs
+			 * is false we can return false irrespective of lhs
 			 */
+			if (!try) {
+				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
+				return (0);
+			}
 			if (!eval_expr(np->u.expr.right, ex, events, globals,
 			    croot, arrowp, try, valuep)) {
 				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
@@ -1452,8 +1484,12 @@ eval_expr(struct node *np, struct lut *ex, struct node *events[],
 		    arrowp, try, valuep)) {
 			/*
 			 * if lhs is unknown, still check rhs. If that
-			 * is true we can return true irrespectice of lhs
+			 * is true we can return true irrespective of lhs
 			 */
+			if (!try) {
+				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
+				return (0);
+			}
 			if (!eval_expr(np->u.expr.right, ex, events, globals,
 			    croot, arrowp, try, valuep)) {
 				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
