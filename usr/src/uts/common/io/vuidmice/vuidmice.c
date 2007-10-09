@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,38 +182,28 @@ static int
 vuidmice_open(queue_t *const qp, const dev_t *const devp,
 	const int oflag, const int sflag, const cred_t *const crp)
 {
+	if (qp->q_ptr != NULL)
+		return (0);	 /* reopen */
+
 	mutex_enter(&vuidmice_lock);
 
 	/* Allow only 1 open of this module */
-
 	if (module_open) {
 		mutex_exit(&vuidmice_lock);
 		return (EBUSY);
 	}
 
 	module_open++;
-
-	/*
-	 * If q_ptr already set, we've allocated a struct already
-	 */
-	if (qp->q_ptr != NULL) {
-		module_open--;
-		mutex_exit(&vuidmice_lock);
-		return (0);	 /* not failure -- just simultaneous open */
-	}
+	mutex_exit(&vuidmice_lock);
 
 	/*
 	 * Both the read and write queues share the same state structures.
 	 */
-
 	qp->q_ptr = kmem_zalloc(sizeof (struct MouseStateInfo), KM_SLEEP);
-
 	WR(qp)->q_ptr = qp->q_ptr;
 
 	/* initialize state */
 	STATEP->format = VUID_NATIVE;
-
-	mutex_exit(&vuidmice_lock);
 
 	qprocson(qp);
 
@@ -224,10 +213,9 @@ vuidmice_open(queue_t *const qp, const dev_t *const devp,
 
 		mutex_enter(&vuidmice_lock);
 		module_open--;
+		mutex_exit(&vuidmice_lock);
 		kmem_free(qp->q_ptr, sizeof (struct MouseStateInfo));
 		qp->q_ptr = NULL;
-		mutex_exit(&vuidmice_lock);
-
 		return (ENXIO);
 	}
 #endif
@@ -245,16 +233,14 @@ vuidmice_close(queue_t *const qp, const int flag, const cred_t *const crp)
 	flushq(qp, FLUSHALL);
 	flushq(OTHERQ(qp), FLUSHALL);
 
-	mutex_enter(&vuidmice_lock);
-
 #ifdef	VUID_CLOSE
 	VUID_CLOSE(qp);
 #endif
-
+	mutex_enter(&vuidmice_lock);
 	module_open--;
-	kmem_free(qp->q_ptr, sizeof (struct MouseStateInfo));
-	qp->q_ptr = NULL;	/* Dump the associated state structure */
 	mutex_exit(&vuidmice_lock);
+	kmem_free(qp->q_ptr, sizeof (struct MouseStateInfo));
+	qp->q_ptr = NULL;
 
 	return (0);
 }
@@ -299,21 +285,20 @@ vuidmice_rsrv(queue_t *const qp)
 			return (putbq(qp, mp)); /* read side is blocked */
 
 		switch (DB_TYPE(mp)) {
-			case M_DATA: {
-				if ((int)STATEP->format == VUID_FIRM_EVENT)
-					(void) VUID_QUEUE(qp, mp);
-				else
-					(void) putnext(qp, mp);
-				break;
-			}
-
-			default:
-				cmn_err(CE_WARN,
-				"vuidmice_rsrv: bad message type (0x%x)\n",
-					DB_TYPE(mp));
-
+		case M_DATA:
+			if ((int)STATEP->format == VUID_FIRM_EVENT)
+				(void) VUID_QUEUE(qp, mp);
+			else
 				(void) putnext(qp, mp);
-				break;
+			break;
+
+		default:
+			cmn_err(CE_WARN,
+			    "vuidmice_rsrv: bad message type (0x%x)\n",
+			    DB_TYPE(mp));
+
+			(void) putnext(qp, mp);
+			break;
 		}
 	}
 	return (0);
@@ -465,13 +450,11 @@ vuidmice_wput(queue_t *const qp, mblk_t *mp)
 		case VUIDSWHEELSTATE:
 		case MSIOSRESOLUTION:
 			error = vuidmice_handle_wheel_resolution_ioctl(qp,
-				    mp, iocbp->ioc_cmd);
+			    mp, iocbp->ioc_cmd);
 			if (!error) {
-
 				return (0);
 			} else {
 				miocnak(qp, mp, 0, error);
-
 				return (0);
 			}
 		default:
@@ -579,7 +562,7 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 			datap = mp->b_cont;
 			if (copyresp->cp_cmd == VUIDGWHEELSTATE) {
 				err = vuidmice_service_wheel_state(qp, datap,
-							    VUIDGWHEELSTATE);
+				    VUIDGWHEELSTATE);
 			} else {
 				err = vuidmice_service_wheel_info(datap);
 			}
@@ -694,18 +677,15 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 
 			return (err);
 		}
-		copyreq->cq_addr =
-		    (caddr_t)*((caddr_t *)mp->b_cont->b_rptr);
+		copyreq->cq_addr = (caddr_t)*((caddr_t *)mp->b_cont->b_rptr);
 		switch (cmd) {
 		case VUIDGWHEELCOUNT:
 			copyreq->cq_size = sizeof (int);
 			mp->b_datap->db_type = M_COPYOUT;
-			mp->b_wptr = mp->b_rptr
-					+ sizeof (struct copyreq);
+			mp->b_wptr = mp->b_rptr + sizeof (struct copyreq);
 			freemsg(mp->b_cont);
 			datap = allocb(sizeof (int), BPRI_HI);
-			*((int *)datap->b_wptr) =
-						STATEP->vuid_mouse_mode;
+			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
 			datap->b_wptr +=  sizeof (int);
 			mp->b_cont = datap;
 			qreply(qp, mp);
@@ -752,8 +732,7 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 				mp->b_cont = NULL;
 			}
 			datap = allocb(sizeof (int), BPRI_HI);
-			*((int *)datap->b_wptr) =
-						STATEP->vuid_mouse_mode;
+			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
 			datap->b_wptr +=  sizeof (int);
 			mp->b_cont = datap;
 			break;
@@ -810,19 +789,15 @@ vuidmice_service_wheel_info(register mblk_t *datap)
 	wi = (wheel_info *)datap->b_rptr;
 	if (wi->vers != VUID_WHEEL_INFO_VERS) {
 		err = EINVAL;
-
 		return (err);
 	}
 
 	if (wi->id > (VUIDMICE_NUM_WHEELS - 1)) {
 		err = EINVAL;
-
 		return (err);
 	}
-	wi->format =  (wi->id ==
-		VUIDMICE_VERTICAL_WHEEL_ID) ?
-		VUID_WHEEL_FORMAT_VERTICAL :
-		VUID_WHEEL_FORMAT_HORIZONTAL;
+	wi->format = (wi->id == VUIDMICE_VERTICAL_WHEEL_ID) ?
+	    VUID_WHEEL_FORMAT_VERTICAL : VUID_WHEEL_FORMAT_HORIZONTAL;
 
 	return (err);
 }
@@ -839,13 +814,11 @@ vuidmice_service_wheel_state(register queue_t	*qp,
 	ws = (wheel_state *)datap->b_rptr;
 	if (ws->vers != VUID_WHEEL_STATE_VERS) {
 		err = EINVAL;
-
 		return (err);
 	}
 
 	if (ws->id > (VUIDMICE_NUM_WHEELS - 1)) {
 		err = EINVAL;
-
 		return (err);
 	}
 
