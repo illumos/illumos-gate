@@ -160,6 +160,7 @@ pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
 		if (!yesno(prompt,
 		    gettext("Respond with yes or no.\n"),
 		    B_FALSE)) {
+			*keysdeleted = numkeys;
 			return (KMF_OK);
 		}
 		keys = (KMF_KEY_HANDLE *)malloc(numkeys *
@@ -424,7 +425,6 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 	KMF_ATTRIBUTE attrlist[16];
 	KMF_KEY_CLASS keyclass;
 	boolean_t token_bool = B_TRUE;
-	KMF_KEY_ALG keytype = 0;
 	boolean_t private;
 	/*
 	 * Symmetric keys and RSA/DSA private keys are always
@@ -461,10 +461,6 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 	    &private, sizeof (private));
 	numattr++;
 
-	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYALG_ATTR,
-	    &keytype, sizeof (keytype));
-	numattr++;
-
 	kmf_set_attr_at_index(attrlist, numattr, KMF_TOKEN_BOOL_ATTR,
 	    &token_bool, sizeof (token_bool));
 	numattr++;
@@ -496,6 +492,7 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
 		int num = numattr;
 
+		private = B_FALSE;
 		keyclass = KMF_ASYM_PUB;
 		kmf_set_attr_at_index(attrlist, num, KMF_KEYCLASS_ATTR,
 		    &keyclass, sizeof (keyclass));
@@ -814,10 +811,6 @@ pk_delete(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	/* If no object class specified, delete everything but CRLs */
-	if (oclass == 0)
-		oclass = PK_CERT_OBJ | PK_PUBKEY_OBJ | PK_PRIKEY_OBJ |
-		    PK_SYMKEY_OBJ;
 
 	/* No additional args allowed. */
 	argc -= optind_av;
@@ -845,7 +838,19 @@ pk_delete(int argc, char *argv[])
 		}
 		serial.val = bytes;
 		serial.len = bytelen;
+		/* If serial number was given, it must be a cert search */
+		if (oclass == 0)
+			oclass = PK_CERT_OBJ;
 	}
+	/*
+	 * If no object type was given but subject or issuer was,
+	 * it must be a certificate we are looking to delete.
+	 */
+	if ((issuer != NULL || subject != NULL) && oclass == 0)
+		oclass = PK_CERT_OBJ;
+	/* If no object class specified, delete everything but CRLs */
+	if (oclass == 0)
+		oclass = PK_CERT_OBJ | PK_KEY_OBJ;
 
 	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
 	    kstype == KMF_KEYSTORE_NSS) &&

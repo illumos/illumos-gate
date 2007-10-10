@@ -601,32 +601,44 @@ pk_gencsr(int argc, char *argv[])
 	if (kstype == 0)
 		kstype = KMF_KEYSTORE_PK11TOKEN;
 
+	if (EMPTYSTRING(outcsr) && interactive) {
+		(void) get_filename("CSR", &outcsr);
+	}
 	if (EMPTYSTRING(outcsr)) {
 		(void) printf(gettext("A filename must be specified to hold"
 		    "the final certificate request data.\n"));
 		return (PK_ERR_USAGE);
-	} else {
-		/*
-		 * verify that the outcsr file does not already exist
-		 * and that it can be created.
-		 */
-		rv = verify_file(outcsr);
-		if (rv != KMF_OK) {
-			cryptoerror(LOG_STDERR, gettext("output file (%s) "
-			    "cannot be created.\n"), outcsr);
-			return (PK_ERR_USAGE);
-		}
+	}
+	/*
+	 * verify that the outcsr file does not already exist
+	 * and that it can be created.
+	 */
+	rv = verify_file(outcsr);
+	if (rv != KMF_OK) {
+		cryptoerror(LOG_STDERR, gettext("output file (%s) "
+		    "cannot be created.\n"), outcsr);
+		return (PK_ERR_USAGE);
 	}
 
-	if ((kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN) &&
-	    EMPTYSTRING(certlabel)) {
-		cryptoerror(LOG_STDERR, gettext("A label must be specified "
-		    "to create a certificate request.\n"));
-		return (PK_ERR_USAGE);
-	} else if (kstype == KMF_KEYSTORE_OPENSSL && EMPTYSTRING(outkey)) {
-		cryptoerror(LOG_STDERR, gettext("A key filename must be "
-		    "specified to create a certificate request.\n"));
-		return (PK_ERR_USAGE);
+	if ((kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN)) {
+		if (EMPTYSTRING(certlabel) && interactive)
+			(void) get_certlabel(&certlabel);
+
+		if (EMPTYSTRING(certlabel)) {
+			cryptoerror(LOG_STDERR, gettext("A label must be "
+			    "specified to create a certificate request.\n"));
+			return (PK_ERR_USAGE);
+		}
+	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
+		if (EMPTYSTRING(outkey) && interactive)
+			(void) get_filename("private key", &outkey);
+
+		if (EMPTYSTRING(outkey)) {
+			cryptoerror(LOG_STDERR, gettext("A key filename "
+			    "must be specified to create a certificate "
+			    "request.\n"));
+			return (PK_ERR_USAGE);
+		}
 	}
 
 	if (format && (fmt = Str2Format(format)) == KMF_FORMAT_UNDEF) {

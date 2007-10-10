@@ -99,6 +99,9 @@ extern CK_RV	get_token_slots(CK_SLOT_ID_PTR *slot_list,
 		    CK_ULONG *slot_count);
 
 extern int get_subname(char **);
+extern int get_serial(char **);
+extern int get_certlabel(char **);
+extern int get_filename(char *, char **);
 
 extern int	getopt_av(int argc, char * const argv[], const char *optstring);
 extern char	*optarg_av;

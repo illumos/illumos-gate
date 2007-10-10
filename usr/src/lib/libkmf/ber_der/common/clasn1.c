@@ -31,7 +31,7 @@ encode_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 	}
 	if (algoid->parameters.Data == NULL ||
-		algoid->parameters.Length == 0) {
+	    algoid->parameters.Length == 0) {
 		if (kmfber_printf(asn1, "n}") == -1)
 			return (KMF_ERR_BAD_CERT_FORMAT);
 	} else {
@@ -40,7 +40,7 @@ encode_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
 		 * straight into the buffer.  It is already DER encoded.
 		 */
 		(void) kmfber_write(asn1, (char *)algoid->parameters.Data,
-			algoid->parameters.Length, 0);
+		    algoid->parameters.Length, 0);
 		if (kmfber_printf(asn1, "}") == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 		}
@@ -236,7 +236,7 @@ get_algoid(BerElement *asn1, KMF_X509_ALGORITHM_IDENTIFIER *algoid)
 		}
 		/* read the raw data into the Algoritm params area. */
 		if (kmfber_read(asn1, (char *)algoid->parameters.Data,
-			size) == -1) {
+		    size) == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
@@ -278,7 +278,7 @@ encode_spki(BerElement *asn1, KMF_X509_SPKI *spki)
 		return (ret);
 
 	if (kmfber_printf(asn1, "B}", spki->subjectPublicKey.Data,
-				spki->subjectPublicKey.Length * 8) == -1)
+	    spki->subjectPublicKey.Length * 8) == -1)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
 	return (ret);
@@ -369,8 +369,7 @@ DerEncodeDSASignature(KMF_DATA *rawdata, KMF_DATA *signature)
 	 */
 	n = DSA_RAW_SIG_LEN/2;
 	if (kmfber_printf(asn1, "{II}",
-			rawdata->Data, n,
-			&rawdata->Data[n], n) == -1) {
+	    rawdata->Data, n, &rawdata->Data[n], n) == -1) {
 		kmfber_free(asn1, 1);
 		return (KMF_ERR_MEMORY);
 	}
@@ -444,7 +443,7 @@ DerDecodeSPKI(KMF_DATA *EncodedSPKI, KMF_X509_SPKI *spki)
 	BerValue bv;
 
 	if (EncodedSPKI == NULL || EncodedSPKI->Data == NULL ||
-		spki == NULL)
+	    spki == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	(void) memset(spki, 0, sizeof (KMF_X509_SPKI));
@@ -481,17 +480,17 @@ CopySPKI(KMF_X509_SPKI *src,
 	(void) memset(newspki, 0, sizeof (KMF_X509_SPKI));
 
 	ret = CopyData(&src->algorithm.algorithm,
-		&newspki->algorithm.algorithm);
+	    &newspki->algorithm.algorithm);
 	if (ret != KMF_OK)
 		goto cleanup;
 
 	ret = CopyData(&src->algorithm.parameters,
-			&newspki->algorithm.parameters);
+	    &newspki->algorithm.parameters);
 	if (ret != KMF_OK)
 		goto cleanup;
 
 	ret = CopyData(&src->subjectPublicKey,
-		&newspki->subjectPublicKey);
+	    &newspki->subjectPublicKey);
 	if (ret != KMF_OK)
 		goto cleanup;
 
@@ -510,10 +509,10 @@ encode_validity(BerElement *asn1, KMF_X509_VALIDITY *validity)
 	int ret;
 
 	ret = kmfber_printf(asn1, "{tsts}",
-			validity->notBefore.timeType,
-			validity->notBefore.time.Data,
-			validity->notAfter.timeType,
-			validity->notAfter.time.Data);
+	    validity->notBefore.timeType,
+	    validity->notBefore.time.Data,
+	    validity->notAfter.timeType,
+	    validity->notAfter.time.Data);
 
 	if (ret == -1)
 		return (KMF_ERR_BAD_CERT_FORMAT);
@@ -561,8 +560,8 @@ AddRDN(KMF_X509_NAME *name, KMF_X509_RDN *newrdn)
 	/* Add new RDN record to existing list */
 	name->numberOfRDNs++;
 	name->RelativeDistinguishedName =
-			realloc(name->RelativeDistinguishedName,
-			name->numberOfRDNs * sizeof (KMF_X509_RDN));
+	    realloc(name->RelativeDistinguishedName,
+	    name->numberOfRDNs * sizeof (KMF_X509_RDN));
 
 	if (name->RelativeDistinguishedName == NULL) {
 		ret = KMF_ERR_MEMORY;
@@ -605,10 +604,10 @@ encode_rdn(BerElement *asn1, KMF_X509_NAME *name)
 
 		if (rdn->numberOfPairs > 0) {
 			if (kmfber_printf(asn1, "{Dto}",
-				&attrtvpair->type,
-				attrtvpair->valueType,
-				attrtvpair->value.Data,
-				attrtvpair->value.Length) == -1) {
+			    &attrtvpair->type,
+			    attrtvpair->valueType,
+			    attrtvpair->value.Data,
+			    attrtvpair->value.Length) == -1) {
 				ret = KMF_ERR_MEMORY;
 				goto cleanup;
 			}
@@ -649,7 +648,7 @@ CopyRDN(KMF_X509_NAME *srcname, KMF_X509_NAME **destname)
 
 	newname->numberOfRDNs = srcname->numberOfRDNs;
 	newname->RelativeDistinguishedName = malloc(newname->numberOfRDNs *
-			sizeof (KMF_X509_RDN));
+	    sizeof (KMF_X509_RDN));
 	if (newname->RelativeDistinguishedName == NULL) {
 		free(newname);
 		return (KMF_ERR_MEMORY);
@@ -664,13 +663,13 @@ CopyRDN(KMF_X509_NAME *srcname, KMF_X509_NAME **destname)
 		dstrdn->numberOfPairs = rdn->numberOfPairs;
 		if (dstrdn->numberOfPairs > 0) {
 			av = malloc(dstrdn->numberOfPairs *
-				sizeof (KMF_X509_TYPE_VALUE_PAIR));
+			    sizeof (KMF_X509_TYPE_VALUE_PAIR));
 			if (av == NULL) {
 				ret = KMF_ERR_MEMORY;
 				goto cleanup;
 			}
 			(void) memset(av, 0, dstrdn->numberOfPairs *
-				sizeof (KMF_X509_TYPE_VALUE_PAIR));
+			    sizeof (KMF_X509_TYPE_VALUE_PAIR));
 
 			dstrdn->AttributeTypeAndValue = av;
 			if (av == NULL) {
@@ -682,11 +681,11 @@ CopyRDN(KMF_X509_NAME *srcname, KMF_X509_NAME **destname)
 				srcav = &rdn->AttributeTypeAndValue[j];
 				dstav = &dstrdn->AttributeTypeAndValue[j];
 				if ((ret = CopyData(&srcav->type,
-					&dstav->type)) != KMF_OK)
+				    &dstav->type)) != KMF_OK)
 					goto cleanup;
 				dstav->valueType = srcav->valueType;
 				if ((ret = CopyData(&srcav->value,
-					&dstav->value)) != KMF_OK)
+				    &dstav->value)) != KMF_OK)
 					goto cleanup;
 			}
 		} else {
@@ -757,7 +756,7 @@ get_rdn(BerElement *asn1, KMF_X509_NAME *name)
 
 	/* Walk through the individual SET items until the "end" is reached */
 	while ((tag = kmfber_next_element(asn1, &size, end)) ==
-		BER_CONSTRUCTED_SET) {
+	    BER_CONSTRUCTED_SET) {
 		/* Skip over the SET tag */
 		if (kmfber_scanf(asn1, "T", &tag) == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
@@ -843,7 +842,7 @@ set_bigint(KMF_BIGINT *data, KMF_BIGINT *bigint)
 
 	data->len = bigint->len;
 	(void) memcpy((void *)data->val, (const void *)bigint->val,
-		bigint->len);
+	    bigint->len);
 
 	return (KMF_OK);
 }
@@ -855,9 +854,9 @@ encode_uniqueid(BerElement *asn1, int tag, KMF_DATA *id)
 	uint32_t len;
 
 	len = kmfber_calc_taglen(BER_BIT_STRING) +
-		kmfber_calc_lenlen(id->Length * 8) + id->Length;
+	    kmfber_calc_lenlen(id->Length * 8) + id->Length;
 	if (kmfber_printf(asn1, "TlB", tag, len,
-		id->Data, id->Length * 8) == -1)
+	    id->Data, id->Length * 8) == -1)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
 	return (ret);
@@ -881,15 +880,15 @@ encode_extension_list(BerElement *asn1, KMF_X509_EXTENSIONS *extns)
 
 		if (extns->extensions[i].critical) {
 			if (kmfber_printf(asn1, "b",
-				extns->extensions[i].critical) == -1) {
+			    extns->extensions[i].critical) == -1) {
 				ret = KMF_ERR_ENCODING;
 				goto cleanup;
 			}
 		}
 
 		if (kmfber_printf(asn1, "o}",
-			extns->extensions[i].BERvalue.Data,
-			extns->extensions[i].BERvalue.Length) == -1) {
+		    extns->extensions[i].BERvalue.Data,
+		    extns->extensions[i].BERvalue.Length) == -1) {
 			ret = KMF_ERR_ENCODING;
 			goto cleanup;
 		}
@@ -1012,7 +1011,7 @@ get_one_extension(BerElement *asn1, KMF_X509_EXTENSION **retex, char *end)
 		goto cleanup;
 	}
 	(void) memset(ex->value.tagAndValue, 0,
-		sizeof (KMF_X509EXT_TAGandVALUE));
+	    sizeof (KMF_X509EXT_TAGandVALUE));
 
 	/* Parse the Extension value field */
 	extnber = kmfder_init(&extValue);
@@ -1035,7 +1034,7 @@ get_one_extension(BerElement *asn1, KMF_X509_EXTENSION **retex, char *end)
 	ex->value.tagAndValue->value.Data = malloc(size);
 	ex->value.tagAndValue->value.Length = size;
 	size = kmfber_read(extnber,
-		(char *)ex->value.tagAndValue->value.Data, size);
+	    (char *)ex->value.tagAndValue->value.Data, size);
 	if (size != ex->value.tagAndValue->value.Length) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
@@ -1072,19 +1071,19 @@ get_extensions(BerElement *asn1, KMF_X509_EXTENSIONS *extns)
 	 * { {{D}Bo}, ... }
 	 */
 	if (kmfber_first_element(asn1, &size, &end) !=
-		BER_CONSTRUCTED_SEQUENCE)
+	    BER_CONSTRUCTED_SEQUENCE)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
 	while (kmfber_next_element(asn1, &size, end) ==
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 		ret = get_one_extension(asn1, &ex, end);
 		if (ret != KMF_OK)
 			goto cleanup;
 
 		extns->numberOfExtensions++;
 		extns->extensions = realloc(extns->extensions,
-			extns->numberOfExtensions *
-			sizeof (KMF_X509_EXTENSION));
+		    extns->numberOfExtensions *
+		    sizeof (KMF_X509_EXTENSION));
 		if (extns->extensions == NULL) {
 			ret = KMF_ERR_MEMORY;
 			break;
@@ -1169,7 +1168,7 @@ decode_tbscert_data(BerElement *asn1,
 	tbscert->extensions.extensions = NULL;
 
 	while ((kmfber_scanf(asn1, "t", &tag)) != -1 &&
-			(tag == 0xA1 || tag == 0xA2 || tag == 0xA3)) {
+	    (tag == 0xA1 || tag == 0xA2 || tag == 0xA3)) {
 		char *optfield;
 		ber_len_t len;
 
@@ -1178,25 +1177,25 @@ decode_tbscert_data(BerElement *asn1,
 		switch (tag) {
 			case 0xA1:
 				if (kmfber_scanf(asn1, "B", &optfield, &len) !=
-					BER_BIT_STRING) {
+				    BER_BIT_STRING) {
 					ret = KMF_ERR_BAD_CERT_FORMAT;
 					goto cleanup;
 				}
 				tbscert->issuerUniqueIdentifier.Data =
-					(uchar_t *)optfield;
+				    (uchar_t *)optfield;
 				tbscert->issuerUniqueIdentifier.Length =
-					len / 8;
+				    len / 8;
 				break;
 			case 0xA2:
 				if (kmfber_scanf(asn1, "B", &optfield, &len) !=
-					BER_BIT_STRING) {
+				    BER_BIT_STRING) {
 					ret = KMF_ERR_BAD_CERT_FORMAT;
 					goto cleanup;
 				}
 				tbscert->subjectUniqueIdentifier.Data =
-					(uchar_t *)optfield;
+				    (uchar_t *)optfield;
 				tbscert->subjectUniqueIdentifier.Length =
-					len / 8;
+				    len / 8;
 				break;
 			case 0xA3:
 			ret = get_extensions(asn1, &tbscert->extensions);
@@ -1291,7 +1290,7 @@ DerDecodeSignedCertificate(const KMF_DATA *Value,
 		return (KMF_ERR_MEMORY);
 
 	if (kmfber_first_element(asn1, &size, &end) !=
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
 	}
@@ -1315,7 +1314,7 @@ DerDecodeSignedCertificate(const KMF_DATA *Value,
 	 * The signature data my not be present yet.
 	 */
 	if ((ret = get_algoid(asn1,
-		&certptr->signature.algorithmIdentifier)) == KMF_OK) {
+	    &certptr->signature.algorithmIdentifier)) == KMF_OK) {
 
 		/* Check to see if the cert has a signature yet */
 		if (kmfber_next_element(asn1, &size, end) == BER_BIT_STRING) {
@@ -1333,7 +1332,7 @@ DerDecodeSignedCertificate(const KMF_DATA *Value,
 				goto cleanup;
 			}
 			certptr->signature.encrypted.Data =
-				(uchar_t *)signature;
+			    (uchar_t *)signature;
 			certptr->signature.encrypted.Length = size / 8;
 		} else {
 			certptr->signature.encrypted.Data = NULL;
@@ -1341,7 +1340,7 @@ DerDecodeSignedCertificate(const KMF_DATA *Value,
 		}
 	} else {
 		(void) memset(&certptr->signature, 0,
-			sizeof (certptr->signature));
+		    sizeof (certptr->signature));
 		ret = KMF_OK;
 	}
 
@@ -1458,7 +1457,7 @@ encode_tbs_cert(BerElement *asn1, KMF_X509_TBS_CERT *tbscert)
 		return (KMF_ERR_BAD_CERT_FORMAT);
 
 	(void) memcpy(&version, tbscert->version.Data,
-		tbscert->version.Length);
+	    tbscert->version.Length);
 
 	/* Start the sequence and add the version */
 	if (kmfber_printf(asn1, "{Tli", 0xA0, 3, version) == -1) {
@@ -1467,8 +1466,8 @@ encode_tbs_cert(BerElement *asn1, KMF_X509_TBS_CERT *tbscert)
 	}
 	/* Write the serial number */
 	if (kmfber_printf(asn1, "I",
-		(char *)tbscert->serialNumber.val,
-		(size_t)tbscert->serialNumber.len) == -1) {
+	    (char *)tbscert->serialNumber.val,
+	    (size_t)tbscert->serialNumber.len) == -1) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
 	}
@@ -1495,21 +1494,21 @@ encode_tbs_cert(BerElement *asn1, KMF_X509_TBS_CERT *tbscert)
 	/* Optional field:  issuer Unique ID */
 	if (tbscert->issuerUniqueIdentifier.Length > 0) {
 		if ((ret = encode_uniqueid(asn1, 0xA1,
-			&tbscert->issuerUniqueIdentifier)) != KMF_OK)
+		    &tbscert->issuerUniqueIdentifier)) != KMF_OK)
 			goto cleanup;
 	}
 
 	/* Optional field:  Subject Unique ID */
 	if (tbscert->subjectUniqueIdentifier.Length > 0) {
 		if ((ret = encode_uniqueid(asn1, 0xA2,
-			&tbscert->subjectUniqueIdentifier)) != KMF_OK)
+		    &tbscert->subjectUniqueIdentifier)) != KMF_OK)
 			goto cleanup;
 	}
 
 	/* Optional field: Certificate Extensions */
 	if (tbscert->extensions.numberOfExtensions > 0) {
 		if ((ret = encode_extensions(asn1,
-			&tbscert->extensions)) != KMF_OK)
+		    &tbscert->extensions)) != KMF_OK)
 			goto cleanup;
 	}
 
@@ -1604,12 +1603,12 @@ DerEncodeSignedCertificate(KMF_X509_CERTIFICATE *signed_cert_ptr,
 
 	/* Add the Algorithm & Signature Sequence */
 	if ((ret = encode_algoid(asn1,
-		&signature->algorithmIdentifier)) != KMF_OK)
+	    &signature->algorithmIdentifier)) != KMF_OK)
 		goto cleanup;
 
 	if (signature->encrypted.Length > 0) {
 		if (kmfber_printf(asn1, "B", signature->encrypted.Data,
-			signature->encrypted.Length * 8) == -1) {
+		    signature->encrypted.Length * 8) == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
@@ -1704,7 +1703,7 @@ ExtractX509CertParts(KMF_DATA *x509cert, KMF_DATA *tbscert,
 		}
 		/* Now get the signature data */
 		if (kmfber_scanf(der, "B", (char **)&signature->Data,
-			(ber_len_t *)&signature->Length) == -1) {
+		    (ber_len_t *)&signature->Length) == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
@@ -1799,8 +1798,8 @@ cleanup:
 				return (KMF_ERR_MEMORY);
 			}
 			(void) memcpy((*key_ptr)->Data,
-				SpkiPtr->subjectPublicKey.Data,
-				(*key_ptr)->Length);
+			    SpkiPtr->subjectPublicKey.Data,
+			    (*key_ptr)->Length);
 			return (ret);
 	}
 	return (ret);
@@ -1818,7 +1817,7 @@ decode_csr_extensions(BerElement *asn1, KMF_X509_EXTENSIONS *extns)
 
 	/* We only understand extension requests in a CSR */
 	if (memcmp(oid.bv_val, extension_request_oid.Data,
-		oid.bv_len) != 0) {
+	    oid.bv_len) != 0) {
 		return (KMF_ERR_UNKNOWN_CSR_ATTRIBUTE);
 	}
 
@@ -1947,7 +1946,7 @@ DerDecodeSignedCsr(const KMF_DATA *Value,
 		return (KMF_ERR_MEMORY);
 
 	if (kmfber_first_element(asn1, &size, &end) !=
-		BER_CONSTRUCTED_SEQUENCE) {
+	    BER_CONSTRUCTED_SEQUENCE) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
 	}
@@ -1968,7 +1967,7 @@ DerDecodeSignedCsr(const KMF_DATA *Value,
 	tbscsr = NULL;
 
 	if ((ret = get_algoid(asn1,
-		&csrptr->signature.algorithmIdentifier)) != KMF_OK)
+	    &csrptr->signature.algorithmIdentifier)) != KMF_OK)
 		goto cleanup;
 
 	/* Check to see if the cert has a signature yet */
@@ -2054,13 +2053,13 @@ encode_csr_extensions(BerElement *asn1, KMF_TBS_CSR *tbscsr)
 		}
 
 		if (kmfber_printf(extnasn1, "{D[{",
-			&extension_request_oid) == -1) {
+		    &extension_request_oid) == -1) {
 			ret = KMF_ERR_ENCODING;
 			goto cleanup_1;
 		}
 
 		if ((ret = encode_extension_list(extnasn1,
-			&tbscsr->extensions)) != KMF_OK) {
+		    &tbscsr->extensions)) != KMF_OK) {
 			goto cleanup_1;
 		}
 
@@ -2091,7 +2090,7 @@ cleanup_1:
 	/* Write the actual encoded extensions */
 	if (extnvalue != NULL && extnvalue->bv_val != NULL) {
 		if (kmfber_write(asn1, extnvalue->bv_val,
-			extnvalue->bv_len, 0) == -1) {
+		    extnvalue->bv_len, 0) == -1) {
 			ret = KMF_ERR_ENCODING;
 			goto cleanup;
 		}
@@ -2119,7 +2118,7 @@ encode_tbs_csr(BerElement *asn1, KMF_TBS_CSR *tbscsr)
 
 	/* Start the version */
 	(void) memcpy(&version, tbscsr->version.Data,
-		tbscsr->version.Length);
+	    tbscsr->version.Length);
 
 	if (kmfber_printf(asn1, "{i", version) == -1) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
@@ -2160,7 +2159,7 @@ DerEncodeDSAPrivateKey(KMF_DATA *encodedkey, KMF_RAW_DSA_KEY *dsa)
 		return (KMF_ERR_MEMORY);
 
 	if (kmfber_printf(asn1, "I",
-		dsa->value.val, dsa->value.len) == -1) {
+	    dsa->value.val, dsa->value.len) == -1) {
 		rv = KMF_ERR_MEMORY;
 		goto cleanup;
 	}
@@ -2192,15 +2191,15 @@ DerEncodeRSAPrivateKey(KMF_DATA *encodedkey, KMF_RAW_RSA_KEY *rsa)
 		return (KMF_ERR_MEMORY);
 
 	if (kmfber_printf(asn1, "{IIIIIIIII}",
-		&ver, 1,
-		rsa->mod.val, rsa->mod.len,
-		rsa->pubexp.val, rsa->pubexp.len,
-		rsa->priexp.val, rsa->priexp.len,
-		rsa->prime1.val, rsa->prime1.len,
-		rsa->prime2.val, rsa->prime2.len,
-		rsa->exp1.val, rsa->exp1.len,
-		rsa->exp2.val, rsa->exp2.len,
-		rsa->coef.val, rsa->coef.len) == -1)
+	    &ver, 1,
+	    rsa->mod.val, rsa->mod.len,
+	    rsa->pubexp.val, rsa->pubexp.len,
+	    rsa->priexp.val, rsa->priexp.len,
+	    rsa->prime1.val, rsa->prime1.len,
+	    rsa->prime2.val, rsa->prime2.len,
+	    rsa->exp1.val, rsa->exp1.len,
+	    rsa->exp2.val, rsa->exp2.len,
+	    rsa->coef.val, rsa->coef.len) == -1)
 		goto cleanup;
 
 	if (kmfber_flatten(asn1, &rsadata) == -1) {
@@ -2289,12 +2288,12 @@ DerEncodeSignedCsr(KMF_CSR_DATA *signed_csr_ptr,
 
 	/* Add the Algorithm & Signature Sequence */
 	if ((ret = encode_algoid(asn1,
-		&signature->algorithmIdentifier)) != KMF_OK)
+	    &signature->algorithmIdentifier)) != KMF_OK)
 		goto cleanup;
 
 	if (signature->encrypted.Length > 0) {
 		if (kmfber_printf(asn1, "B", signature->encrypted.Data,
-			signature->encrypted.Length * 8) == -1) {
+		    signature->encrypted.Length * 8) == -1) {
 			ret = KMF_ERR_BAD_CERT_FORMAT;
 			goto cleanup;
 		}
@@ -2342,77 +2341,82 @@ ExtractSPKIData(
 		return (KMF_ERR_BAD_PARAMETER);
 
 	switch (AlgorithmId) {
-	    case KMF_ALGID_DSA:
-	    case KMF_ALGID_SHA1WithDSA:
-		/* First, get the parameters from the algorithm definition */
-		PubKeyParams.bv_val = (char *)pKey->algorithm.parameters.Data;
-		PubKeyParams.bv_len = pKey->algorithm.parameters.Length;
-		if ((asn1 = kmfder_init(&PubKeyParams)) == NULL)
-			return (KMF_ERR_MEMORY);
+		case KMF_ALGID_DSA:
+		case KMF_ALGID_SHA1WithDSA:
+			*uNumKeyParts = 0;
+			/* Get the parameters from the algorithm definition */
+			PubKeyParams.bv_val =
+			    (char *)pKey->algorithm.parameters.Data;
+			PubKeyParams.bv_len = pKey->algorithm.parameters.Length;
+			if ((asn1 = kmfder_init(&PubKeyParams)) == NULL)
+				return (KMF_ERR_MEMORY);
 
-		if (kmfber_scanf(asn1, "{III}", &P, &Q, &G) == -1) {
+			if (kmfber_scanf(asn1, "{III}", &P, &Q, &G) == -1) {
+				kmfber_free(asn1, 1);
+				return (KMF_ERR_BAD_KEY_FORMAT);
+			}
+			pKeyParts[KMF_DSA_PRIME].Data = (uchar_t *)P->bv_val;
+			pKeyParts[KMF_DSA_PRIME].Length = P->bv_len;
+			pKeyParts[KMF_DSA_SUB_PRIME].Data =
+			    (uchar_t *)Q->bv_val;
+			pKeyParts[KMF_DSA_SUB_PRIME].Length = Q->bv_len;
+			pKeyParts[KMF_DSA_BASE].Data = (uchar_t *)G->bv_val;
+			pKeyParts[KMF_DSA_BASE].Length = G->bv_len;
+
+			free(P);
+			free(Q);
+			free(G);
 			kmfber_free(asn1, 1);
-			return (KMF_ERR_BAD_KEY_FORMAT);
-		}
-		pKeyParts[KMF_DSA_PRIME].Data = (uchar_t *)P->bv_val;
-		pKeyParts[KMF_DSA_PRIME].Length = P->bv_len;
-		pKeyParts[KMF_DSA_SUB_PRIME].Data = (uchar_t *)Q->bv_val;
-		pKeyParts[KMF_DSA_SUB_PRIME].Length = Q->bv_len;
-		pKeyParts[KMF_DSA_BASE].Data = (uchar_t *)G->bv_val;
-		pKeyParts[KMF_DSA_BASE].Length = G->bv_len;
 
-		free(P);
-		free(Q);
-		free(G);
-		kmfber_free(asn1, 1);
+			/* Get the PubKey data */
+			PubKeyData.bv_val = (char *)pKey->subjectPublicKey.Data;
+			PubKeyData.bv_len = pKey->subjectPublicKey.Length;
+			if ((asn1 = kmfder_init(&PubKeyData)) == NULL) {
+				ret = KMF_ERR_MEMORY;
+				goto cleanup;
+			}
+			PubKey = NULL;
+			if (kmfber_scanf(asn1, "I", &PubKey) == -1) {
+				ret = KMF_ERR_BAD_KEY_FORMAT;
+				goto cleanup;
+			}
+			pKeyParts[KMF_DSA_PUBLIC_VALUE].Data =
+			    (uchar_t *)PubKey->bv_val;
+			pKeyParts[KMF_DSA_PUBLIC_VALUE].Length = PubKey->bv_len;
 
-		/* Get the PubKey data */
-		PubKeyData.bv_val = (char *)pKey->subjectPublicKey.Data;
-		PubKeyData.bv_len = pKey->subjectPublicKey.Length;
-		if ((asn1 = kmfder_init(&PubKeyData)) == NULL) {
-			ret = KMF_ERR_MEMORY;
-			goto cleanup;
-		}
-		PubKey = NULL;
-		if (kmfber_scanf(asn1, "I", &PubKey) == -1) {
-			ret = KMF_ERR_BAD_KEY_FORMAT;
-			goto cleanup;
-		}
-		pKeyParts[KMF_DSA_PUBLIC_VALUE].Data =
-			(uchar_t *)PubKey->bv_val;
-		pKeyParts[KMF_DSA_PUBLIC_VALUE].Length = PubKey->bv_len;
+			free(PubKey);
 
-		free(PubKey);
+			*uNumKeyParts = KMF_NUMBER_DSA_PUBLIC_KEY_PARTS;
+			break;
 
-		*uNumKeyParts = KMF_NUMBER_DSA_PUBLIC_KEY_PARTS;
-		break;
+		case KMF_ALGID_RSA:
+		case KMF_ALGID_MD2WithRSA:
+		case KMF_ALGID_MD5WithRSA:
+		case KMF_ALGID_SHA1WithRSA:
+			*uNumKeyParts = 0;
+			PubKeyData.bv_val = (char *)pKey->subjectPublicKey.Data;
+			PubKeyData.bv_len = pKey->subjectPublicKey.Length;
+			if ((asn1 = kmfder_init(&PubKeyData)) == NULL) {
+				ret = KMF_ERR_MEMORY;
+				goto cleanup;
+			}
+			if (kmfber_scanf(asn1, "{II}", &Mod, &Exp) == -1) {
+				ret = KMF_ERR_BAD_KEY_FORMAT;
+				goto cleanup;
+			}
+			pKeyParts[KMF_RSA_MODULUS].Data =
+			    (uchar_t *)Mod->bv_val;
+			pKeyParts[KMF_RSA_MODULUS].Length = Mod->bv_len;
+			pKeyParts[KMF_RSA_PUBLIC_EXPONENT].Data =
+			    (uchar_t *)Exp->bv_val;
+			pKeyParts[KMF_RSA_PUBLIC_EXPONENT].Length = Exp->bv_len;
+			*uNumKeyParts = KMF_NUMBER_RSA_PUBLIC_KEY_PARTS;
 
-	    case KMF_ALGID_RSA:
-	    case KMF_ALGID_MD2WithRSA:
-	    case KMF_ALGID_MD5WithRSA:
-	    case KMF_ALGID_SHA1WithRSA:
-		PubKeyData.bv_val = (char *)pKey->subjectPublicKey.Data;
-		PubKeyData.bv_len = pKey->subjectPublicKey.Length;
-		if ((asn1 = kmfder_init(&PubKeyData)) == NULL) {
-			ret = KMF_ERR_MEMORY;
-			goto cleanup;
-		}
-		if (kmfber_scanf(asn1, "{II}", &Mod, &Exp) == -1) {
-			ret = KMF_ERR_BAD_KEY_FORMAT;
-			goto cleanup;
-		}
-		pKeyParts[KMF_RSA_MODULUS].Data = (uchar_t *)Mod->bv_val;
-		pKeyParts[KMF_RSA_MODULUS].Length = Mod->bv_len;
-		pKeyParts[KMF_RSA_PUBLIC_EXPONENT].Data =
-			(uchar_t *)Exp->bv_val;
-		pKeyParts[KMF_RSA_PUBLIC_EXPONENT].Length = Exp->bv_len;
-		*uNumKeyParts = KMF_NUMBER_RSA_PUBLIC_KEY_PARTS;
-
-		free(Mod);
-		free(Exp);
-		break;
-	    default:
-		return (KMF_ERR_BAD_PARAMETER);
+			free(Mod);
+			free(Exp);
+			break;
+		default:
+			return (KMF_ERR_BAD_PARAMETER);
 	}
 cleanup:
 	if (ret != KMF_OK) {

@@ -256,7 +256,7 @@ pk_find_certs(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attrlist, int numattr)
 }
 
 static KMF_RETURN
-pk_list_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
+pk_list_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr, char *label)
 {
 	KMF_RETURN rv;
 	KMF_KEY_HANDLE *keys;
@@ -275,7 +275,8 @@ pk_list_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
 	rv = kmf_find_key(handle, numattr, attrlist);
 	if (rv == KMF_OK && numkeys > 0) {
 		int i;
-		(void) printf(gettext("Found %d keys.\n"), numkeys);
+		(void) printf(gettext("Found %d %s keys.\n"),
+		    numkeys, label);
 		keys = (KMF_KEY_HANDLE *)malloc(numkeys *
 		    sizeof (KMF_KEY_HANDLE));
 		if (keys == NULL)
@@ -373,7 +374,8 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			}
 
 			/* list asymmetric private keys */
-			rv = pk_list_keys(kmfhandle, attrlist, num);
+			rv = pk_list_keys(kmfhandle, attrlist, num,
+			    "asymmetric private");
 		}
 
 		if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
@@ -400,7 +402,8 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			num++;
 
 			/* list symmetric keys */
-			rv = pk_list_keys(kmfhandle, attrlist, num);
+			rv = pk_list_keys(kmfhandle, attrlist, num,
+			    "symmetric");
 		}
 
 		if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
@@ -414,7 +417,8 @@ list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
 			num++;
 
 			/* list asymmetric public keys (if any) */
-			rv = pk_list_keys(kmfhandle, attrlist, num);
+			rv = pk_list_keys(kmfhandle, attrlist, num,
+			    "asymmetric public");
 		}
 
 		if (rv != KMF_OK)
@@ -550,7 +554,8 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 			num++;
 
 			/* list asymmetric private keys */
-			rv = pk_list_keys(kmfhandle, attrlist, num);
+			rv = pk_list_keys(kmfhandle, attrlist, num,
+			    "asymmetric private");
 		}
 		if (rv == KMF_ERR_KEY_NOT_FOUND)
 			rv = KMF_OK;
@@ -571,7 +576,8 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 			num++;
 
 			/* list symmetric keys */
-			rv = pk_list_keys(kmfhandle, attrlist, num);
+			rv = pk_list_keys(kmfhandle, attrlist, num,
+			    "symmetric");
 		}
 		if (rv == KMF_ERR_KEY_NOT_FOUND)
 			rv = KMF_OK;
@@ -719,7 +725,8 @@ list_nss_objects(KMF_HANDLE_T kmfhandle,
 		num++;
 
 		/* list asymmetric private keys */
-		rv = pk_list_keys(kmfhandle, attrlist, num);
+		rv = pk_list_keys(kmfhandle, attrlist, num,
+		    "asymmetric private");
 	}
 
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
@@ -738,7 +745,7 @@ list_nss_objects(KMF_HANDLE_T kmfhandle,
 		num++;
 
 		/* list symmetric keys */
-		rv = pk_list_keys(kmfhandle, attrlist, num);
+		rv = pk_list_keys(kmfhandle, attrlist, num, "symmetric");
 	}
 
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
@@ -751,7 +758,8 @@ list_nss_objects(KMF_HANDLE_T kmfhandle,
 		num++;
 
 		/* list asymmetric public keys */
-		rv = pk_list_keys(kmfhandle, attrlist, num);
+		rv = pk_list_keys(kmfhandle, attrlist, num,
+		    "asymmetric public");
 	}
 
 	/* If searching for public objects or certificates, find certs now */
@@ -985,9 +993,6 @@ pk_list(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	/* If no object class specified, list certificate objects. */
-	if (oclass == 0)
-		oclass = PK_CERT_OBJ;
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN && EMPTYSTRING(token_spec)) {
 		token_spec = PK_DEFAULT_PK11TOKEN;
@@ -1008,7 +1013,16 @@ pk_list(int argc, char *argv[])
 		}
 		serial.val = bytes;
 		serial.len = bytelen;
+		/* if objtype was not given, it must be for certs */
+		if (oclass == 0)
+			oclass = PK_CERT_OBJ;
 	}
+	if (oclass == 0 && (issuer != NULL || subject != NULL))
+		oclass = PK_CERT_OBJ;
+
+	/* If no object class specified, list public objects. */
+	if (oclass == 0)
+		oclass = PK_CERT_OBJ | PK_PUBKEY_OBJ;
 
 	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
 	    kstype == KMF_KEYSTORE_NSS) &&

@@ -79,8 +79,8 @@ ber_put_tag(BerElement	*ber, ber_tag_t tag, int nosos)
 	ntag = htonl(tag);
 
 	return (kmfber_write(ber,
-		((char *) &ntag) + sizeof (ber_int_t) - taglen,
-		taglen, nosos));
+	    ((char *) &ntag) + sizeof (ber_int_t) - taglen,
+	    taglen, nosos));
 }
 
 int
@@ -123,8 +123,8 @@ kmfber_put_len(BerElement *ber, ber_int_t len, int nosos)
 	if (len <= 127) {
 		netlen = htonl(len);
 		return (kmfber_write(ber,
-			(char *)&netlen + sizeof (ber_int_t) - 1,
-			1, nosos));
+		    (char *)&netlen + sizeof (ber_int_t) - 1,
+		    1, nosos));
 	}
 
 	/*
@@ -151,7 +151,7 @@ kmfber_put_len(BerElement *ber, ber_int_t len, int nosos)
 	/* write the length itself */
 	netlen = htonl(len);
 	if (kmfber_write(ber,
-		(char *) &netlen + (sizeof (ber_int_t) - i), i, nosos) != i)
+	    (char *) &netlen + (sizeof (ber_int_t) - i), i, nosos) != i)
 		return (-1);
 
 	return (i + 1);
@@ -201,7 +201,7 @@ ber_put_int_or_enum(BerElement *ber, ber_int_t num, ber_tag_t tag)
 	i++;
 	netnum = htonl(num);
 	if (kmfber_write(ber,
-		(char *) &netnum + (sizeof (ber_int_t) - i), i, 0) == i)
+	    (char *) &netnum + (sizeof (ber_int_t) - i), i, 0) == i)
 		/* length of tag + length + contents */
 		return (taglen + lenlen + i);
 
@@ -239,8 +239,8 @@ ber_put_oid(BerElement *ber, struct berval *oid, ber_tag_t tag)
 
 	len = (ber_int_t)oid->bv_len;
 	if ((lenlen = kmfber_put_len(ber, len, 0)) == -1 ||
-		kmfber_write(ber, oid->bv_val, oid->bv_len, 0) !=
-		(ber_int_t)oid->bv_len) {
+	    kmfber_write(ber, oid->bv_val, oid->bv_len, 0) !=
+	    (ber_int_t)oid->bv_len) {
 		rc = -1;
 	} else {
 		/* return length of tag + length + contents */
@@ -254,6 +254,7 @@ ber_put_big_int(BerElement *ber, ber_tag_t tag, char *data,
 	ber_len_t len)
 {
 	ber_int_t taglen, lenlen, ilen, rc;
+	char zero = 0x00;
 
 	if (tag == KMFBER_DEFAULT)
 		tag = BER_INTEGER;
@@ -261,10 +262,23 @@ ber_put_big_int(BerElement *ber, ber_tag_t tag, char *data,
 	if ((taglen = ber_put_tag(ber, tag, 0)) == -1)
 		return (-1);
 
+	/* Add a leading 0 if the high order bit is set */
+	if (data[0] & 0x80)
+		len++;
+
 	ilen = (ber_int_t)len;
-	if ((lenlen = kmfber_put_len(ber, ilen, 0)) == -1 ||
-		kmfber_write(ber, data, len, 0) != (ber_int_t)len) {
-		rc = -1;
+	if ((lenlen = kmfber_put_len(ber, ilen, 0)) == -1)
+		return (-1);
+
+	/* add leading 0 if hi bit set */
+	if ((data[0] & 0x80) && kmfber_write(ber, &zero, 1, 0) != 1)
+		return (-1);
+
+	/* Adjust the length of the write if hi-order bit is set */
+	if (data[0] & 0x80)
+		ilen = len - 1;
+	if (kmfber_write(ber, data, ilen, 0) != (ber_int_t)ilen) {
+		return (-1);
 	} else {
 		/* return length of tag + length + contents */
 		rc = taglen + lenlen + len;
@@ -306,7 +320,7 @@ kmfber_put_ostring(BerElement *ber, char *str, ber_len_t len,
 	 */
 	ilen = (ber_int_t)len;
 	if ((lenlen = kmfber_put_len(ber, ilen, 0)) == -1 ||
-		kmfber_write(ber, str, len, 0) != (ber_int_t)len) {
+	    kmfber_write(ber, str, len, 0) != (ber_int_t)len) {
 		rc = -1;
 	} else {
 		/* return length of tag + length + contents */
@@ -433,7 +447,7 @@ ber_start_seqorset(BerElement *ber, ber_tag_t tag)
 
 	/* Set aside room for a 4 byte length field */
 	new_sos->sos_ptr = new_sos->sos_first + kmfber_calc_taglen(tag) +
-		FOUR_BYTE_LEN;
+	    FOUR_BYTE_LEN;
 	new_sos->sos_tag = tag;
 
 	new_sos->sos_next = ber->ber_sos;
@@ -517,9 +531,9 @@ ber_put_seqorset(BerElement *ber)
 
 			/* the length itself */
 			if (kmfber_write(ber,
-				(char *)&netlen + sizeof (ber_int_t)
-				- (FOUR_BYTE_LEN - 1), FOUR_BYTE_LEN - 1, 1) !=
-				FOUR_BYTE_LEN - 1)
+			    (char *)&netlen + sizeof (ber_int_t)
+			    - (FOUR_BYTE_LEN - 1), FOUR_BYTE_LEN - 1, 1) !=
+			    FOUR_BYTE_LEN - 1)
 				return (-1);
 		}
 		/* The ber_ptr is at the set/seq start - move it to the end */
@@ -535,7 +549,7 @@ ber_put_seqorset(BerElement *ber)
 
 		if (ber->ber_options & KMFBER_OPT_USE_DER) {
 			ltag = (lenlen == 1) ? (unsigned char)len :
-				(unsigned char) (0x80 + (lenlen - 1));
+			    (unsigned char) (0x80 + (lenlen - 1));
 		}
 
 		/* one byte of length length */

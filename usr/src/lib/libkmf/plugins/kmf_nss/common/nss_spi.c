@@ -1343,9 +1343,11 @@ NSS_FindKey(KMF_HANDLE_T handle,
 	uint32_t maxkeys;
 	KMF_KEY_HANDLE *keys;
 	uint32_t *numkeys;
-	KMF_CREDENTIAL cred;
+	KMF_CREDENTIAL *cred = NULL;
 	KMF_KEY_CLASS keyclass;
 	char *findLabel;
+	char *nick;
+	int match = 0;
 	KMF_KEY_ALG keytype = KMF_KEYALG_NONE;
 
 	if (handle == NULL || attrlist == NULL || numattr == 0) {
@@ -1361,14 +1363,14 @@ NSS_FindKey(KMF_HANDLE_T handle,
 		return (rv);
 	}
 
-	rv = kmf_get_attr(KMF_CREDENTIAL_ATTR, attrlist, numattr,
-	    (void *)&cred, NULL);
-	if (rv != KMF_OK)
-		return (KMF_ERR_BAD_PARAMETER);
+	/* It is OK if this is NULL, we dont need a cred to find public keys */
+	cred = kmf_get_attr_ptr(KMF_CREDENTIAL_ATTR, attrlist, numattr);
 
-	rv = nss_authenticate(handle, nss_slot, &cred);
-	if (rv != KMF_OK) {
-		return (rv);
+	if (cred != NULL) {
+		rv = nss_authenticate(handle, nss_slot, cred);
+		if (rv != KMF_OK) {
+			return (rv);
+		}
 	}
 
 	maxkeys = *numkeys;
@@ -1412,37 +1414,65 @@ NSS_FindKey(KMF_HANDLE_T handle,
 	if (keyclass == KMF_ASYM_PUB) {
 		for (count = 0, pubnode = PUBKEY_LIST_HEAD(publist);
 		    !PUBKEY_LIST_END(pubnode, publist) && count < maxkeys;
-		    pubnode = PUBKEY_LIST_NEXT(pubnode), count++) {
-			if (keys != NULL) {
+		    pubnode = PUBKEY_LIST_NEXT(pubnode)) {
+			match = 0;
+			/*
+			 * Due to bug in NSS, we have to manually match
+			 * the labels to be sure we have a match.
+			 */
+			nick = PK11_GetPublicKeyNickname(pubnode->key);
+			if (findLabel) {
+				match = (nick &&
+				    (strcmp(nick, findLabel) == 0));
+			} else {
+				/* always match if findLabel is NULL */
+				match = 1;
+			}
+			if (keys != NULL && match) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
 				keys[count].keyclass = KMF_ASYM_PUB;
 				keys[count].keyp = (void *)pubnode->key;
-				keys[count].keylabel =
-				    PK11_GetPublicKeyNickname(pubnode->key);
+				keys[count].keylabel = nick;
 
 				if (pubnode->key->keyType == rsaKey)
 					keys[count].keyalg = KMF_RSA;
 				else if (pubnode->key->keyType == dsaKey)
 					keys[count].keyalg = KMF_DSA;
 			}
+			if (match)
+				count++;
 		}
 		*numkeys = count;
 	} else if (keyclass == KMF_ASYM_PRI) {
 		for (count = 0, prinode = PRIVKEY_LIST_HEAD(prilist);
 		    !PRIVKEY_LIST_END(prinode, prilist) && count < maxkeys;
-		    prinode = PRIVKEY_LIST_NEXT(prinode), count++) {
-			if (keys != NULL) {
+		    prinode = PRIVKEY_LIST_NEXT(prinode)) {
+			match = 0;
+			/*
+			 * Due to bug in NSS, we have to manually match
+			 * the labels to be sure we have a match.
+			 */
+			nick = PK11_GetPrivateKeyNickname(prinode->key);
+			if (findLabel) {
+				match = (nick &&
+				    (strcmp(nick, findLabel) == 0));
+			} else {
+				/* always match if findLabel is NULL */
+				match = 1;
+			}
+			if (keys != NULL && match) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
 				keys[count].keyclass = KMF_ASYM_PRI;
 				keys[count].keyp = (void *)prinode->key;
-				keys[count].keylabel =
-				    PK11_GetPrivateKeyNickname(prinode->key);
+				keys[count].keylabel = nick;
 
 				if (prinode->key->keyType == rsaKey)
 					keys[count].keyalg = KMF_RSA;
 				else if (prinode->key->keyType == dsaKey)
 					keys[count].keyalg = KMF_DSA;
 			}
+			if (match)
+				count++;
 		}
 		*numkeys = count;
 	} else if (keyclass == KMF_SYMMETRIC) {
@@ -1456,6 +1486,7 @@ NSS_FindKey(KMF_HANDLE_T handle,
 			CK_KEY_TYPE type;
 			KMF_KEY_ALG keyalg;
 
+			match = 0;
 			type = PK11_GetSymKeyType(symkey);
 			keyalg = pk11keytype2kmf(type);
 
@@ -1471,18 +1502,30 @@ NSS_FindKey(KMF_HANDLE_T handle,
 				PK11_FreeSymKey(symkey);
 				continue;
 			}
+			/*
+			 * Due to bug in NSS, we have to manually match
+			 * the labels to be sure we have a match.
+			 */
+			nick = PK11_GetSymKeyNickname(symkey);
+			if (findLabel) {
+				match = (nick &&
+				    (strcmp(nick, findLabel) == 0));
+			} else {
+				/* always match if findLabel is NULL */
+				match = 1;
+			}
 
-			if (keys != NULL) {
+			if (keys != NULL && match) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
 				keys[count].keyclass = KMF_SYMMETRIC;
 				keys[count].keyp = (void *) symkey;
-				keys[count].keylabel =
-				    PK11_GetSymKeyNickname(symkey);
+				keys[count].keylabel = nick;
 				keys[count].keyalg = keyalg;
 			} else {
 				PK11_FreeSymKey(symkey);
 			}
-			count++;
+			if (match)
+				count++;
 		}
 		/*
 		 * Cleanup memory for unused keys.

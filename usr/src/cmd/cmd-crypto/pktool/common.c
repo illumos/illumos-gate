@@ -709,18 +709,31 @@ get_pk12_password(KMF_CREDENTIAL *cred)
 	return (rv);
 }
 
+#define	FILENAME_PROMPT gettext("Filename:")
+#define	FILENAME_MINLEN	1
+#define	FILENAME_MAXLEN MAXPATHLEN
 
-#define	COUNTRY_PROMPT	"Country Name (2 letter code) [US]:"
-#define	STATE_PROMPT	"State or Province Name (full name) [Some-State]:"
-#define	LOCALITY_PROMPT	"Locality Name (eg, city) []:"
-#define	ORG_PROMPT	"Organization Name (eg, company) []:"
-#define	UNIT_PROMPT	"Organizational Unit Name (eg, section) []:"
-#define	NAME_PROMPT	"Common Name (eg, YOUR name) []:"
-#define	EMAIL_PROMPT	"Email Address []:"
+#define	COUNTRY_PROMPT	gettext("Country Name (2 letter code) [US]:")
+#define	STATE_PROMPT	gettext("State or Province Name (full name) " \
+	"[Some-State]:")
+#define	LOCALITY_PROMPT	gettext("Locality Name (eg, city) []:")
+#define	ORG_PROMPT	gettext("Organization Name (eg, company) []:")
+#define	UNIT_PROMPT	gettext("Organizational Unit Name (eg, section) []:")
+#define	NAME_PROMPT	gettext("Common Name (eg, YOUR name) []:")
+#define	EMAIL_PROMPT	gettext("Email Address []:")
+
+#define	SERNO_PROMPT	gettext("Serial Number (hex value, example: " \
+	"0x01020304):")
+#define	SERNO_MINLEN	3
+#define	SERNO_MAXLEN	42
+
+#define	LABEL_PROMPT	gettext("Enter a label for the certificate:")
+#define	LABEL_MINLEN	1
+#define	LABEL_MAXLEN	1024
 
 #define	COUNTRY_DEFAULT "US"
-#define	STATE_DEFAULT	"Some-State"
-#define	INVALID_INPUT 	"Invalid input; please re-enter ..."
+#define	STATE_DEFAULT	NULL
+#define	INVALID_INPUT 	gettext("Invalid input; please re-enter ...")
 
 #define	SUBNAMESIZ	1024
 #define	RDN_MIN		1
@@ -774,6 +787,44 @@ get_input_string(char *prompt, char *default_str, int min_len, int max_len)
 }
 
 int
+get_filename(char *txt, char **result)
+{
+	char prompt[1024];
+	char *fname = NULL;
+
+	(void) snprintf(prompt, sizeof (prompt),
+	    gettext("Enter filename for the %s: "),
+	    txt);
+	fname = get_input_string(prompt, NULL,
+	    FILENAME_MINLEN, FILENAME_MAXLEN);
+	*result = fname;
+	return (0);
+}
+
+int
+get_certlabel(char **result)
+{
+	char *label = NULL;
+
+	label = get_input_string(LABEL_PROMPT, NULL,
+	    LABEL_MINLEN, LABEL_MAXLEN);
+	*result = label;
+	return (0);
+}
+
+int
+get_serial(char **result)
+{
+	char *serial = NULL;
+
+	serial = get_input_string(SERNO_PROMPT, NULL, SERNO_MINLEN,
+	    SERNO_MAXLEN);
+
+	*result = serial;
+	return (0);
+}
+
+int
 get_subname(char **result)
 {
 	char *country = NULL;
@@ -793,9 +844,6 @@ get_subname(char **result)
 
 	state = get_input_string(STATE_PROMPT, STATE_DEFAULT,
 	    RDN_MIN, RDN_MAX);
-	if (state == NULL) {
-		goto out;
-	}
 
 	locality = get_input_string(LOCALITY_PROMPT, NULL, RDN_MIN, RDN_MAX);
 	org = get_input_string(ORG_PROMPT, NULL, RDN_MIN, RDN_MAX);
@@ -810,37 +858,33 @@ get_subname(char **result)
 	(void) memset(subname, 0, SUBNAMESIZ);
 	(void) strlcpy(subname, "C=", SUBNAMESIZ);
 	(void) strlcat(subname, country, SUBNAMESIZ);
-	(void) strlcat(subname, ", ", SUBNAMESIZ);
-	(void) strlcat(subname, "ST=", SUBNAMESIZ);
-	(void) strlcat(subname, state, SUBNAMESIZ);
+	if (state != NULL) {
+		(void) strlcat(subname, ", ST=", SUBNAMESIZ);
+		(void) strlcat(subname, state, SUBNAMESIZ);
+	}
 
-	if (locality) {
-		(void) strlcat(subname, ", ", SUBNAMESIZ);
-		(void) strlcat(subname, "L=", SUBNAMESIZ);
+	if (locality != NULL) {
+		(void) strlcat(subname, ", L=", SUBNAMESIZ);
 		(void) strlcat(subname, locality, SUBNAMESIZ);
 	}
 
-	if (org) {
-		(void) strlcat(subname, ", ", SUBNAMESIZ);
-		(void) strlcat(subname, "O=", SUBNAMESIZ);
+	if (org != NULL) {
+		(void) strlcat(subname, ", O=", SUBNAMESIZ);
 		(void) strlcat(subname, org, SUBNAMESIZ);
 	}
 
-	if (unit) {
-		(void) strlcat(subname, ", ", SUBNAMESIZ);
-		(void) strlcat(subname, "OU=", SUBNAMESIZ);
+	if (unit != NULL) {
+		(void) strlcat(subname, ", OU=", SUBNAMESIZ);
 		(void) strlcat(subname, unit, SUBNAMESIZ);
 	}
 
-	if (name) {
-		(void) strlcat(subname, ", ", SUBNAMESIZ);
-		(void) strlcat(subname, "CN=", SUBNAMESIZ);
+	if (name != NULL) {
+		(void) strlcat(subname, ", CN=", SUBNAMESIZ);
 		(void) strlcat(subname, name, SUBNAMESIZ);
 	}
 
-	if (email) {
-		(void) strlcat(subname, ", ", SUBNAMESIZ);
-		(void) strlcat(subname, "E=", SUBNAMESIZ);
+	if (email != NULL) {
+		(void) strlcat(subname, ", E=", SUBNAMESIZ);
 		(void) strlcat(subname, email, SUBNAMESIZ);
 	}
 

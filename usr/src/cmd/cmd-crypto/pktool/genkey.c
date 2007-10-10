@@ -287,8 +287,7 @@ genkey_file(KMF_HANDLE_T kmfhandle, KMF_KEY_ALG keyAlg, int keylen, char *dir,
 	keytype = keyAlg;
 	keylength = keylen;
 
-	dirpath = (dir == NULL) ? "." : dir;
-
+	dirpath = dir;
 
 	kmf_set_attr_at_index(attlist, i,
 	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));

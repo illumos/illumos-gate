@@ -791,11 +791,17 @@ pk_gencert(int argc, char *argv[])
 	if (kstype == 0)
 		kstype = KMF_KEYSTORE_PK11TOKEN;
 
-	if ((kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN) &&
-	    EMPTYSTRING(certlabel)) {
-		cryptoerror(LOG_STDERR, gettext("A label must be specified "
-		    "to create a self-signed certificate.\n"));
-		return (PK_ERR_USAGE);
+	if ((kstype == KMF_KEYSTORE_NSS || kstype == KMF_KEYSTORE_PK11TOKEN)) {
+		if (interactive && EMPTYSTRING(certlabel)) {
+			(void) get_certlabel(&certlabel);
+		}
+		/* It better not be empty now */
+		if (EMPTYSTRING(certlabel)) {
+			cryptoerror(LOG_STDERR, gettext("A label must be "
+			    "specified to create a self-signed certificate."
+			    "\n"));
+			return (PK_ERR_USAGE);
+		}
 	} else if (kstype == KMF_KEYSTORE_OPENSSL && EMPTYSTRING(outcert)) {
 		cryptoerror(LOG_STDERR, gettext("A certificate filename must "
 		    "be specified to create a self-signed certificate.\n"));
@@ -821,16 +827,19 @@ pk_gencert(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-
 	/*
 	 * Check the subject name.
 	 * If interactive is true, get it now interactively.
 	 */
 	if (interactive) {
-		if (get_subname(&subname) != KMF_OK) {
+		subname = NULL;
+		if (get_subname(&subname) != KMF_OK || subname == NULL) {
 			cryptoerror(LOG_STDERR, gettext("Failed to get the "
 			    "subject name interactively.\n"));
 			return (PK_ERR_USAGE);
+		}
+		if (serstr == NULL) {
+			(void) get_serial(&serstr);
 		}
 	} else {
 		if (EMPTYSTRING(subject)) {
