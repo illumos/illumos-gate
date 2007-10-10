@@ -211,7 +211,7 @@
 #
 
 @ MSG_GRP_INVALNDX	"group section error: %s: file %s: entry %d: \
-			 invalid section index: %d\n"
+			 invalid section index: %d"
 
 # Relocation processing messages (some of these are required to satisfy
 # do_reloc(), which is common code used by cmd/sgs/rtld - make sure both
@@ -423,10 +423,12 @@
 			 [%d] %s: size %#llx: symbol (address %#llx, \
 			 size %#llx) lies outside of containing section"
 @ MSG_SYM_MULDEF	"symbol `%s' is multiply-defined:"
+@ MSG_SYM_CONFVIS	"symbol `%s' has conflicting visibilities:"
 @ MSG_SYM_DIFFTYPE	"symbol `%s' has differing types:"
 @ MSG_SYM_DIFFATTR	"symbol `%s' has differing %s:\n\
 			 \t(file %s value=0x%llx; file %s value=0x%llx);"
 @ MSG_SYM_FILETYPES	"\t(file %s type=%s; file %s type=%s);"
+@ MSG_SYM_VISTYPES	"\t(file %s visibility=%s; file %s visibility=%s);"
 @ MSG_SYM_DEFTAKEN	"\t%s definition taken"
 @ MSG_SYM_DEFUPDATE	"\t%s definition taken and updated with larger size"
 @ MSG_SYM_LARGER	"\tlargest value applied"
@@ -903,7 +905,9 @@
 @ MSG_MAP_SEGRESV	"%s: %lld: segments `interp' or `dynamic' may not be \
 			 changed"
 
-@ MSG_MAP_SYMDEF	"%s: %lld: symbol `%s' is already defined in file: %s"
+@ MSG_MAP_SYMDEF1	"%s: %lld: symbol `%s' is already defined in file: \
+			 %s: %s"
+@ MSG_MAP_SYMDEF2	"%s: %lld: symbol `%s': %s"
 
 @ MSG_MAP_EXPSCOL	"%s: %lld: expected a `;'"
 @ MSG_MAP_EXPEQU	"%s: %lld: expected a `=', `:', `|', or `@'"
@@ -924,8 +928,6 @@
 			 ignored"
 @ MSG_MAP_NOINTPOSE	"%s: %lld: interposition symbols can only be defined \
 			 when building a dynamic executable"
-@ MSG_MAP_PROTNDIR	"%s: %lld: protected scope and no-direct declaration \
-			 are incompatible"
 @ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are imcompatible \
 			 with extern or parent symbols"
 
@@ -948,6 +950,21 @@
 
 @ MSG_MAP_SYMVAL	"symbol value"
 @ MSG_MAP_SYMSIZE	"symbol size"
+
+@ MSG_MAP_DIFF_SYMVAL	"symbol values differ"
+@ MSG_MAP_DIFF_SYMSZ	"symbol sizes differ"
+@ MSG_MAP_DIFF_SYMTYP	"symbol types differ"
+@ MSG_MAP_DIFF_SYMNDX	"symbol indexes differ"
+@ MSG_MAP_DIFF_SYMLCL	"symbol scope conflict against local and non-local"
+@ MSG_MAP_DIFF_SYMGLOB	"symbol scope conflict against singleton/exported"
+@ MSG_MAP_DIFF_SYMPROT	"symbol scope conflict against protected"
+@ MSG_MAP_DIFF_SYMVER	"symbol version conflict"
+@ MSG_MAP_DIFF_SYMMUL	"symbol multiple definition"
+@ MSG_MAP_DIFF_SNGLDIR	"singleton scope and direct declaration are \
+			 incompatible"
+@ MSG_MAP_DIFF_PROTNDIR	"protected scope and no-direct declaration \
+			 are incompatible"
+
 
 @ MSG_MAP_SECORDER	"section ordering requested, but no matching section \
 			 found: segment: %s section: %s"
@@ -992,6 +1009,8 @@
 @ MSG_STR_SYMBOLIC	"symbolic"
 @ MSG_STR_ELIMINATE	"eliminate"
 @ MSG_STR_LOCAL		"local"
+@ MSG_STR_EXPORTED	"exported"
+@ MSG_STR_SINGLETON	"singleton"
 @ MSG_STR_PROGBITS	"progbits"
 @ MSG_STR_SYMTAB	"symtab"
 @ MSG_STR_DYNSYM	"dynsym"

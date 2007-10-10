@@ -279,6 +279,7 @@ typedef struct {
 #define	DF_1_SYMINTPOSE	0x00800000	/* individual symbol interposers */
 					/*	exist */
 #define	DF_1_GLOBAUDIT	0x01000000	/* establish global auditing */
+#define	DF_1_SINGLETON	0x02000000	/* singleton symbols exist */
 
 /*
  * Values set to DT_FEATURE_1 tag's d_val.

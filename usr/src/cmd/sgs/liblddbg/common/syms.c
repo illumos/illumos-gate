@@ -78,16 +78,25 @@ Dbg_syms_dlsym(Rt_map *clmp, const char *sym, const char *next, int flag)
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
-	if (flag == DBG_DLSYM_NEXT)
+	switch (flag) {
+	case DBG_DLSYM_NEXT:
 		str = MSG_ORIG(MSG_SYM_NEXT);
-	else if (flag == DBG_DLSYM_DEFAULT)
+		break;
+	case DBG_DLSYM_DEFAULT:
 		str = MSG_ORIG(MSG_SYM_DEFAULT);
-	else if (flag == DBG_DLSYM_SELF)
+		break;
+	case DBG_DLSYM_SELF:
 		str = MSG_ORIG(MSG_SYM_SELF);
-	else if (flag == DBG_DLSYM_PROBE)
+		break;
+	case DBG_DLSYM_PROBE:
 		str = MSG_ORIG(MSG_SYM_PROBE);
-	else
+		break;
+	case DBG_DLSYM_SINGLETON:
+		str = MSG_ORIG(MSG_SYM_SINGLETON);
+		break;
+	default:
 		str = MSG_ORIG(MSG_STR_EMPTY);
+	}
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	if (next == 0)

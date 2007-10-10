@@ -218,7 +218,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	ulong_t		addr, reloff, symval, rsymndx;
 	char		*name;
 	Rela		*rptr;
-	Sym		*sym, *nsym;
+	Sym		*rsym, *nsym;
 	uint_t		binfo, sb_flags = 0, dbg_class;
 	Slookup		sl;
 	int		entry, lmflags;
@@ -260,8 +260,8 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	addr = (ulong_t)JMPREL(lmp);
 	rptr = (Rela *)(addr + reloff);
 	rsymndx = ELF_R_SYM(rptr->r_info);
-	sym = (Sym *)((ulong_t)SYMTAB(lmp) + (rsymndx * SYMENT(lmp)));
-	name = (char *)(STRTAB(lmp) + sym->st_name);
+	rsym = (Sym *)((ulong_t)SYMTAB(lmp) + (rsymndx * SYMENT(lmp)));
+	name = (char *)(STRTAB(lmp) + rsym->st_name);
 
 	/*
 	 * Determine the last link-map of this list, this'll be the starting
@@ -277,6 +277,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = rsymndx;
+	sl.sl_rsym = rsym;
 	sl.sl_flags = LKUP_DEFT;
 
 	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
@@ -782,7 +783,6 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					}
 				} else {
 					Slookup		sl;
-					uchar_t		bind;
 
 					/*
 					 * Lookup the symbol definition.
@@ -795,32 +795,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					sl.sl_imap = 0;
 					sl.sl_hash = 0;
 					sl.sl_rsymndx = rsymndx;
-
-					if (rtype == R_AMD64_COPY)
-						sl.sl_flags = LKUP_COPY;
-					else
-						sl.sl_flags = LKUP_DEFT;
-
-					sl.sl_flags |= LKUP_ALLCNTLIST;
-
-					if (rtype != R_AMD64_JUMP_SLOT)
-						sl.sl_flags |= LKUP_SPEC;
-
-					/*
-					 * Under ldd -w, any unresolved weak
-					 * references are diagnosed.  Set the
-					 * symbol binding as global to trigger
-					 * a relocation error if the symbol can
-					 * not be found.
-					 */
-					if (LIST(lmp)->lm_flags &
-					    LML_FLG_TRC_NOUNRESWEAK) {
-						bind = STB_GLOBAL;
-					} else if ((bind =
-					    ELF_ST_BIND(symref->st_info)) ==
-					    STB_WEAK) {
-						sl.sl_flags |= LKUP_WEAK;
-					}
+					sl.sl_rsym = symref;
+					sl.sl_rtype = rtype;
+					sl.sl_flags = LKUP_STDRELOC;
 
 					symdef = lookup_sym(&sl, &_lmp, &binfo);
 
@@ -835,7 +812,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					if (symdef == 0) {
 					    Lm_list	*lml = LIST(lmp);
 
-					    if (bind != STB_WEAK) {
+					    if (sl.sl_bind != STB_WEAK) {
 						if (lml->lm_flags &
 						    LML_FLG_IGNRELERR) {
 						    continue;

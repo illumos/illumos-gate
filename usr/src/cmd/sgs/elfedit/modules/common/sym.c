@@ -989,7 +989,7 @@ cmd_body_set_st_visibility(ARGSTATE *argstate, SYMSTATE *symstate)
 	 * visibility. Accepts STV_ symbolic names as well as integers.
 	 */
 	vis = elfedit_atoconst_range(argstate->argv[1],
-	    MSG_INTL(MSG_ARG_SYMVIS), 0, STV_PROTECTED, ELFEDIT_CONST_STV);
+	    MSG_INTL(MSG_ARG_SYMVIS), 0, STV_ELIMINATE, ELFEDIT_CONST_STV);
 	old_vis = st_other & MSK_SYM_VISIBILITY;
 
 	if (old_vis == vis) {

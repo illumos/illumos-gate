@@ -290,6 +290,24 @@ ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 }
 
 /*
+ * Data structure to indicate whether a symbol is visible for the purpose
+ * of archive extraction.
+ */
+static const Boolean
+sym_vis[STV_NUM] = {
+	TRUE,		/* STV_DEFAULT */
+	FALSE,		/* STV_INTERNAL */
+	FALSE,		/* STV_HIDDEN */
+	FALSE,		/* STV_PROTECTED */
+	TRUE,		/* STV_EXPORTED */
+	TRUE,		/* STV_SINGLETON */
+	FALSE		/* STV_ELIMINATE */
+};
+#if STV_NUM != (STV_ELIMINATE + 1)
+#error "STV_NUM has grown. Update sym_vis[]."
+#endif
+
+/*
  * Read the archive symbol table.  For each symbol in the table, determine
  * whether that symbol satisfies an unresolved reference, tentative reference,
  * or a reference that expects hidden or protected visibility.  If so, the
@@ -349,7 +367,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			Rej_desc	_rej = { 0 };
 			Ar_mem		*amp;
 			Sym		*sym;
-			Boolean		vis = TRUE;
+			Boolean		visible = TRUE;
 
 			/*
 			 * If the auxiliary members value indicates that this
@@ -404,7 +422,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				sym = sdp->sd_sym;
 
 				if (sdp->sd_ref == REF_DYN_NEED) {
-					uchar_t	oth;
+					uchar_t	vis;
 
 					if (ifl->ifl_vercnt) {
 						Word		vndx;
@@ -417,15 +435,12 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 							vers = FALSE;
 					}
 
-					oth = ELF_ST_VISIBILITY(sym->st_other);
-					if ((oth == STV_HIDDEN) ||
-					    (oth == STV_PROTECTED)) {
-						vis = FALSE;
-					}
+					vis = ELF_ST_VISIBILITY(sym->st_other);
+					visible = sym_vis[vis];
 				}
 
 				if (((ifl->ifl_flags & FLG_IF_NEEDED) == 0) ||
-				    (vis && vers &&
+				    (visible && vers &&
 				    (sym->st_shndx != SHN_UNDEF) &&
 				    (sym->st_shndx != SHN_COMMON)) ||
 				    ((ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
@@ -516,8 +531,8 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 *	reduced to hidden or protected visibility.
 			 */
 			if ((allexrt == 0) &&
-			    ((sym->st_shndx == SHN_COMMON) || (vis == FALSE))) {
-
+			    ((sym->st_shndx == SHN_COMMON) ||
+			    (visible == FALSE))) {
 				/*
 				 * If we don't already have a member structure
 				 * allocate one.

@@ -1934,15 +1934,35 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		sip += ndx;
 
 	/*
+	 * If this definition is a singleton, and we haven't followed a default
+	 * symbol search knowing that we're looking for a singleton (presumably
+	 * because the symbol definition has been changed since the referring
+	 * object was built), then reject this binding so that the caller can
+	 * fall back to a standard symbol search.
+	 */
+	if ((ELF_ST_VISIBILITY(sym->st_other) == STV_SINGLETON) &&
+	    (((slp->sl_flags & LKUP_STANDARD) == 0) ||
+	    (((slp->sl_flags & LKUP_SINGLETON) == 0) &&
+	    (LIST(ilmp)->lm_flags & LML_FLG_GROUPSEXIST)))) {
+		DBG_CALL(Dbg_bind_reject(slp->sl_cmap, ilmp, name,
+		    DBG_BNDREJ_SINGLE));
+		*binfo |= BINFO_REJSINGLE;
+		*binfo &= ~DBG_BINFO_MSK;
+		return ((Sym *)0);
+	}
+
+	/*
 	 * If this is a direct binding request, but the symbol definition has
 	 * disabled directly binding to it (presumably because the symbol
 	 * definition has been changed since the referring object was built),
 	 * indicate this failure so that the caller can fall back to a standard
-	 * symbol search.  Clear any debug binding information for cleanliness.
+	 * symbol search.
 	 */
 	if (sip && (slp->sl_flags & LKUP_DIRECT) &&
 	    (sip->si_flags & SYMINFO_FLG_NOEXTDIRECT)) {
-		*binfo |= BINFO_DIRECTDIS;
+		DBG_CALL(Dbg_bind_reject(slp->sl_cmap, ilmp, name,
+		    DBG_BNDREJ_NODIR));
+		*binfo |= BINFO_REJDIRECT;
 		*binfo &= ~DBG_BINFO_MSK;
 		return ((Sym *)0);
 	}

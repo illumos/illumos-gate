@@ -3314,7 +3314,7 @@ leave(Lm_list *lml)
 }
 
 int
-callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp)
+callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 {
 	Alist		*calp, *dalp;
 	Aliste		off1, off2;
@@ -3324,6 +3324,12 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp)
 	 * An object can always find symbols within itself.
 	 */
 	if (clmp == dlmp)
+		return (1);
+
+	/*
+	 * The search for a singleton must look in every loaded object.
+	 */
+	if (slflags & LKUP_SINGLETON)
 		return (1);
 
 	/*
@@ -3428,6 +3434,7 @@ set_environ(Lm_list *lml)
 	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
+	sl.sl_rsym = 0;
 	sl.sl_flags = LKUP_WEAK;
 
 	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo)) {

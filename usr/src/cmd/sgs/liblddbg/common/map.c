@@ -115,20 +115,15 @@ Dbg_map_symbol(Ofl_desc *ofl, Sym_desc *sdp)
 	Conv_inv_buf_t	inv_buf;
 	Lm_list		*lml = ofl->ofl_lml;
 
-	if (DBG_NOTCLASS(DBG_C_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP | DBG_C_SYMBOLS))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	/*
-	 * Provide for printing mapfile entered symbols when symbol debugging
-	 * hasn't been enabled.
-	 */
-	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
-		Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
-		    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
-		    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-		    conv_def_tag(sdp->sd_ref, &inv_buf));
+	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
+	    ofl->ofl_dehdr->e_machine, sdp->sd_sym, sdp->sd_aux ?
+	    sdp->sd_aux->sa_overndx : 0, 0, NULL,
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void

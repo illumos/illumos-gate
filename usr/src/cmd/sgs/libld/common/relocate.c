@@ -243,12 +243,15 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 	} else {
 		/*
 		 * If both symbols are local, no copy relocations can occur to
-		 * either symbol.
+		 * either symbol.  Note, this test is very similar to the test
+		 * used in ld_sym_adjust_vis().
 		 */
-		if ((rlocal == TRUE) && ((tsdp->sd_flags1 & FLG_SY1_LOCL) ||
-		    ((ofl->ofl_flags & FLG_OF_AUTOLCL) &&
-		    (tsdp->sd_flags1 & FLG_SY1_GLOB) == 0) ||
-		    (ELF_ST_BIND(tsdp->sd_sym->st_info) != STB_GLOBAL)))
+		if ((rlocal == TRUE) &&
+		    ((tsdp->sd_flags1 & FLG_SY1_HIDDEN) ||
+		    (ELF_ST_BIND(tsdp->sd_sym->st_info) != STB_GLOBAL) ||
+		    (((ofl->ofl_flags & FLG_OF_AUTOLCL) ||
+		    (ofl->ofl_flags1 & FLG_OF1_AUTOELM)) &&
+		    ((tsdp->sd_flags1 & MSK_SY1_NOAUTO) == 0))))
 			return (tsdp);
 
 		/*
@@ -826,13 +829,13 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		 * that are triggered by the REF_DYN_NEED state.
 		 */
 		sdp->sd_flags |= FLG_SY_MVTOCOMM;
-		sdp->sd_flags1 |= FLG_SY1_GLOB;
-		sdp->sd_flags1 &= ~FLG_SY1_LOCL;
+		sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+		sdp->sd_flags1 &= ~MSK_SY1_LOCAL;
 		sdp->sd_sym->st_other &= ~MSK_SYM_VISIBILITY;
 		if (_sdp) {
 			_sdp->sd_flags |= FLG_SY_MVTOCOMM;
-			_sdp->sd_flags1 |= FLG_SY1_GLOB;
-			_sdp->sd_flags1 &= ~FLG_SY1_LOCL;
+			_sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+			_sdp->sd_flags1 &= ~MSK_SY1_LOCAL;
 			_sdp->sd_sym->st_other &= ~MSK_SYM_VISIBILITY;
 
 			/*
@@ -966,8 +969,8 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 
 	/*
 	 * If -zredlocsym is in effect, translate all local symbol relocations
-	 * to be against against section symbols, since section symbols are
-	 * the only symbols which will be added to the .symtab.
+	 * to be against section symbols, since section symbols are the only
+	 * local symbols which will be added to the .symtab.
 	 */
 	if (local && (((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
 	    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL)) ||
@@ -1200,7 +1203,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 			 * explicit no-direct symbols should not be bound to
 			 * locally.
 			 */
-			if ((sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_PROT)))
+			if ((sdp->sd_flags1 &
+			    (FLG_SY1_HIDDEN | FLG_SY1_PROTECT)))
 				local = TRUE;
 			else if ((flags & FLG_OF_EXEC) ||
 			    ((flags & FLG_OF_SYMBOLIC) &&
@@ -1397,7 +1401,7 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 		(isp->is_indata->d_size == rep_isp->is_indata->d_size) &&
 		(isp->is_shdr->sh_type == rep_isp->is_shdr->sh_type) &&
 		((isp->is_shdr->sh_flags & SHF_GROUP) ==
-		    (rep_isp->is_shdr->sh_flags & SHF_GROUP)) &&
+		(rep_isp->is_shdr->sh_flags & SHF_GROUP)) &&
 		(strcmp(rep_is_name, is_name) == 0)) {
 		/*
 		 * We found the kept COMDAT section. Now, look at all of the
@@ -1456,7 +1460,7 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 			    }
 			}
 			DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
-				is_name, rep_sdp));
+			    is_name, rep_sdp));
 			return (rep_sdp);
 		    }
 		}
@@ -1869,6 +1873,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 				reld.rel_roffset +=
 				    /* LINTED */
 				    (_num * ELF_M_SIZE(mp->m_info));
+
 				/*
 				 * Generate Reld
 				 */
@@ -1884,6 +1889,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 			reld.rel_osdesc = ofl->ofl_osmove;
 			reld.rel_isdesc =
 			    ofl->ofl_osmove->os_isdescs.head->data;
+
 			if (process_reld(ofl,
 			    rsect, &reld, rsndx, reloc) == S_ERROR)
 				return (S_ERROR);
@@ -2319,10 +2325,9 @@ reloc_remain_title(Ofl_desc *ofl, int warning)
 	else
 		str1 = MSG_INTL(MSG_REL_RMN_ITM_11);
 
-	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_FMT_1),
-	    str1, MSG_INTL(MSG_REL_RMN_ITM_31), MSG_INTL(MSG_REL_RMN_ITM_12),
+	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_REL_REMAIN_FMT_1), str1,
+	    MSG_INTL(MSG_REL_RMN_ITM_31), MSG_INTL(MSG_REL_RMN_ITM_12),
 	    MSG_INTL(MSG_REL_RMN_ITM_2), MSG_INTL(MSG_REL_RMN_ITM_32));
-
 }
 
 void

@@ -57,6 +57,208 @@ sym_null(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 {
 }
 
+static void
+sym_visibility_diag(Error err, Sym_desc *sdp, Sym *osym, Sym *nsym,
+    Ifl_desc *ifl, Ofl_desc *ofl)
+{
+	Conv_inv_buf_t	inv_obuf, inv_nbuf;
+
+	eprintf(ofl->ofl_lml, err, MSG_INTL(MSG_SYM_CONFVIS),
+	    demangle(sdp->sd_name));
+	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_VISTYPES),
+	    sdp->sd_file->ifl_name, conv_sym_other(osym->st_other, &inv_obuf),
+	    ifl->ifl_name, conv_sym_other(nsym->st_other, &inv_nbuf));
+
+	if (err == ERR_FATAL)
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	else
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
+		    ifl->ifl_name);
+}
+
+/*
+ * STV_VISIBILITY rules for STV_DEFAULT/INTERNAL/HIDDEN/PROTECTED say that the
+ * most restrictive visibility value should be taken.  The precedence is:
+ *
+ *    (most restrictive) INTERNAL -> HIDDEN -> PROTECTED -> DEFAULT  (least)
+ *
+ * The STV_EXPORT and STV_SINGLETON visibilities are slightly different, in that
+ * the visibility must remain global and can not be reduced in any way.
+ *
+ * Resolution of different visibilities between two relocatable objects can
+ * take the following actions:
+ *
+ *  i.     if applicable, the most restrictive action is silently taken.
+ *  ii.    if a mapfile visibility definition competes with a more restrictive
+ *         relocatable object definition, then a warning is generated, but the
+ *         the more restrictive visibility is taken.
+ *  iii.   in the case of conflicts with an EXPORTED or SINGLETON symbol with
+ *	   any type of visibility between relocatable objects, the combination
+ *	   is deemed fatal.
+ *
+ *                                  new visibility
+ *                    D        I         H         P         X         S
+ *                 ------------------------------------------------------------
+ *              D |   D        I(mw)     H(mw)     P         X         S
+ *   original   I |   I        I         I         I         X(mw/of)  S(mw/of)
+ *  visibility  H |   H        I(mw)     H         H         X(mw/of)  S(mw/of)
+ *              P |   P        I(mw)     H(mw)     P         X(mw/of)  S(mw/of)
+ *              X |   X        I(mw/of)  H(mw/of)  P(mw/of)  X         S
+ *              S |   S        I(mw/of)  H(mw/of)  P(mw/of)  S         S
+ * where:
+ *
+ *  mw -  mapfile warning: if the original symbol originates from a mapfile
+ *        then warn the user that their scope definition is being overridden.
+ *  of -  object definitions are fatal: any combination of relocatable object
+ *        visibilities that conflict with a SINGLETON and EXPORTED are fatal.
+ *
+ * Note, an eliminate symbol (STV_ELIMINATE) is treated as hidden (STV_HIDDEN)
+ * for processing through this state table.
+ */
+static Half
+sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
+{
+	Sym	*osym = sdp->sd_sym;
+	uchar_t	wovis, ovis;
+	uchar_t	wnvis, nvis;
+
+	wovis = ovis = ELF_ST_VISIBILITY(osym->st_other);
+	wnvis = nvis = ELF_ST_VISIBILITY(nsym->st_other);
+
+	/*
+	 * If the original visibilities are eliminate, assign them hidden for
+	 * the state table processing.  The original visibility, rather than
+	 * the working visibility, will be returned to the caller.
+	 */
+	if (wovis == STV_ELIMINATE)
+		wovis = STV_HIDDEN;
+	if (wnvis == STV_ELIMINATE)
+		wnvis = STV_HIDDEN;
+
+	/*
+	 * The most complex visibility resolution is between two relocatable
+	 * objects.  However, in the case of SINGLETONS we also want to catch
+	 * any singleton definitions within shared objects.  Relocatable objects
+	 * that bind to these symbols inherit the singleton visibility as this
+	 * efficiently triggers ld.so.1 into carrying out the appropriate
+	 * runtime symbol search.  Any other resolution between a relocatable
+	 * object and a shared object will retain the relocatable objects
+	 * visibility.
+	 */
+	if ((sdp->sd_ref == REF_REL_NEED) &&
+	    (ifl->ifl_ehdr->e_type == ET_DYN)) {
+		if ((sdp->sd_sym->st_shndx == SHN_UNDEF) &&
+		    (nsym->st_shndx != SHN_UNDEF) && (wnvis == STV_SINGLETON))
+			return (STV_SINGLETON);
+		else
+			return (ovis);
+	}
+	if ((sdp->sd_ref != REF_REL_NEED) &&
+	    (ifl->ifl_ehdr->e_type == ET_REL)) {
+		if ((sdp->sd_sym->st_shndx != SHN_UNDEF) &&
+		    (nsym->st_shndx == SHN_UNDEF) && (wovis == STV_SINGLETON))
+			return (STV_SINGLETON);
+		else
+			return (nvis);
+	}
+
+	/*
+	 * If the visibilities are the same, we're done.  If the working
+	 * visibilities differ from the original, then one must have been
+	 * STV_HIDDEN and the other STV_ELIMINATE.
+	 */
+	if (wovis == wnvis) {
+		if (ovis == nvis)
+			return (nvis);
+		else
+			return (STV_ELIMINATE);
+	}
+
+	/*
+	 * An EXPORTED symbol or SINGLETON symbol can not be demoted, any
+	 * conflicting visibility from another object is fatal.  A conflicting
+	 * visibility from a mapfile produces a warning, as the mapfile
+	 * definition can be overridden.
+	 */
+	if ((wnvis == STV_EXPORTED) || (wnvis == STV_SINGLETON)) {
+		if ((wovis != STV_DEFAULT) && (wovis != STV_EXPORTED) &&
+		    (wovis != STV_SINGLETON)) {
+			if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+				sym_visibility_diag(ERR_WARNING, sdp, osym,
+				    nsym, ifl, ofl);
+			} else {
+				sym_visibility_diag(ERR_FATAL, sdp, osym,
+				    nsym, ifl, ofl);
+			}
+		}
+		return (nvis);
+	}
+	if (wovis == STV_SINGLETON) {
+		if ((wnvis == STV_EXPORTED) || (wnvis == STV_DEFAULT))
+			return (STV_SINGLETON);
+		if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+			sym_visibility_diag(ERR_WARNING, sdp, osym,
+			    nsym, ifl, ofl);
+		} else {
+			sym_visibility_diag(ERR_FATAL, sdp, osym,
+			    nsym, ifl, ofl);
+		}
+		return (nvis);
+	}
+	if (wovis == STV_EXPORTED) {
+		if (wnvis == STV_SINGLETON)
+			return (STV_SINGLETON);
+		if (wnvis == STV_DEFAULT)
+			return (STV_EXPORTED);
+		if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+			sym_visibility_diag(ERR_WARNING, sdp, osym,
+			    nsym, ifl, ofl);
+		} else {
+			sym_visibility_diag(ERR_FATAL, sdp, osym,
+			    nsym, ifl, ofl);
+		}
+		return (nvis);
+	}
+
+	/*
+	 * Now that symbols with the same visibility, and all instances of
+	 * SINGLETON's have been dealt with, we're left with visibilities that
+	 * differ, but can be dealt with in the order of how restrictive the
+	 * visibilities are.  When a differing visibility originates from a
+	 * mapfile definition, produces a warning, as the mapfile definition
+	 * can be overridden by the relocatable object.
+	 */
+	if ((wnvis == STV_INTERNAL) || (wovis == STV_INTERNAL)) {
+		if ((wnvis == STV_INTERNAL) &&
+		    (sdp->sd_flags1 & FLG_SY1_MAPFILE)) {
+			sym_visibility_diag(ERR_WARNING, sdp, osym, nsym,
+			    ifl, ofl);
+		}
+		return (STV_INTERNAL);
+
+	} else if ((wnvis == STV_HIDDEN) || (wovis == STV_HIDDEN)) {
+		if ((wnvis == STV_HIDDEN) &&
+		    (sdp->sd_flags1 & FLG_SY1_MAPFILE)) {
+			sym_visibility_diag(ERR_WARNING, sdp, osym, nsym,
+			    ifl, ofl);
+		}
+
+		/*
+		 * In the case of STV_ELIMINATE and STV_HIDDEN, the working
+		 * visibility can differ from the original visibility, so make
+		 * sure to return the original visibility.
+		 */
+		if ((ovis == STV_ELIMINATE) || (nvis == STV_ELIMINATE))
+			return (STV_ELIMINATE);
+		else
+			return (STV_HIDDEN);
+
+	} else if ((wnvis == STV_PROTECTED) || (wovis == STV_PROTECTED))
+		return (STV_PROTECTED);
+
+	return (STV_DEFAULT);
+}
+
 /*
  * Check if two symbols types are compatible
  */
@@ -76,26 +278,8 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		return;
 
 	/*
-	 * STV_VISIBILITY rules say that you must take the most restrictive
-	 * value for a symbols reference.  If we see a reference from two
-	 * objects, even if a symbol isn't promoted/overridden, make sure that
-	 * the more restrictive visibility is saved.
-	 */
-	if (ifl->ifl_ehdr->e_type == ET_REL) {
-		Sym *	osym = sdp->sd_sym;
-		Half	ovis = ELF_ST_VISIBILITY(osym->st_other);
-		Half	nvis = ELF_ST_VISIBILITY(nsym->st_other);
-
-		if ((nvis > STV_DEFAULT) &&
-		    ((ovis == STV_DEFAULT) || (nvis < ovis))) {
-			osym->st_other =
-			    (osym->st_other & ~MSK_SYM_VISIBILITY) | nvis;
-		}
-	}
-
-	/*
-	 * NOTYPE's can be combind with other types, only give an error if
-	 * combining two differing types without NOTYPE
+	 * NOTYPE's can be combined with other types, only give an error if
+	 * combining two differing types without NOTYPE.
 	 */
 	if ((otype == ntype) || (otype == STT_NOTYPE) || (ntype == STT_NOTYPE))
 		return;
@@ -176,12 +360,10 @@ sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
-	Sym		*osym = sdp->sd_sym;
-	Half		ovis = ELF_ST_VISIBILITY(osym->st_other);
-	Half		nvis = ELF_ST_VISIBILITY(nsym->st_other);
-	Word		link;
+	Sym	*osym = sdp->sd_sym;
+	Word	link;
 
 	/*
 	 * In the case of a WEAK UNDEF symbol don't let a symbol from an
@@ -216,7 +398,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 	/*
 	 * If the new symbol has PROTECTED visibility, mark it.  If a PROTECTED
-	 * symbol is copy relocated, a warning message will be printed. See
+	 * symbol is copy relocated, a warning message will be printed.  See
 	 * reloc_exec().
 	 */
 	if (ELF_ST_VISIBILITY(nsym->st_other) == STV_PROTECTED)
@@ -232,14 +414,6 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * relocatable object.
 	 */
 	if (ifl->ifl_ehdr->e_type == ET_REL) {
-		/*
-		 * Maintain the more restrictive visiblity
-		 */
-		if ((ovis > STV_DEFAULT) &&
-		    ((nvis == STV_DEFAULT) || (ovis < nvis))) {
-			osym->st_other =
-			    (osym->st_other & ~MSK_SYM_VISIBILITY) | ovis;
-		}
 		sdp->sd_ref = REF_REL_NEED;
 
 		if (nsym->st_shndx == SHN_UNDEF) {
@@ -259,7 +433,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			 */
 			if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
 			    ((sdp->sd_flags1 &
-			    (FLG_SY1_PROT | FLG_SY1_DIR)) == 0))
+			    (FLG_SY1_PROTECT | FLG_SY1_DIR)) == 0))
 				sdp->sd_flags1 |= FLG_SY1_NDIR;
 		}
 
@@ -280,19 +454,13 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			sdp->sd_ref = REF_DYN_NEED;
 
 		/*
-		 * Visibility from a DYN symbol does not override
-		 * previous symbol visibility.
-		 */
-		osym->st_other = (osym->st_other & ~MSK_SYM_VISIBILITY) | ovis;
-
-		/*
 		 * Determine the symbols availability.  A symbol is determined
 		 * to be unavailable if it belongs to a version of a shared
 		 * object that this user does not wish to use, or if it belongs
 		 * to an implicit shared object.
 		 */
 		if (ifl->ifl_vercnt) {
-			Ver_index *	vip;
+			Ver_index	*vip;
 			Half		vndx = ifl->ifl_versym[ndx];
 
 			sdp->sd_aux->sa_dverndx = vndx;
@@ -300,7 +468,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			if (!(vip->vi_flags & FLG_VER_AVAIL)) {
 				sdp->sd_flags |= FLG_SY_NOTAVAIL;
 				/*
-				 * If this is the first occurance of an
+				 * If this is the first occurrence of an
 				 * unavailable symbol record it for possible
 				 * use in later error diagnostics
 				 * (see sym_undef).
@@ -487,8 +655,8 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	Half	ofile = sdp->sd_file->ifl_ehdr->e_type;
 	Half	nfile = ifl->ifl_ehdr->e_type;
 	int	warn = 0;
-	Word	osymvis = ELF_ST_VISIBILITY(osym->st_other);
-	Word	nsymvis = ELF_ST_VISIBILITY(nsym->st_other);
+	uchar_t	ovis = ELF_ST_VISIBILITY(osym->st_other);
+	uchar_t	nvis = ELF_ST_VISIBILITY(nsym->st_other);
 
 	/*
 	 * Special rules for functions.
@@ -619,12 +787,12 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * requirements of tentative and weak symbols.
 	 */
 	if ((ofile == ET_REL) && (nfile == ET_DYN) && (otent == TRUE) &&
-	    (osymvis == STV_PROTECTED)) {
+	    (ovis == STV_PROTECTED)) {
 		return;
 	}
 
 	if ((ofile == ET_DYN) && (nfile == ET_REL) && (ntent == TRUE) &&
-	    (nsymvis == STV_PROTECTED)) {
+	    (nvis == STV_PROTECTED)) {
 		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	}
@@ -911,7 +1079,8 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	int		row, column;		/* State table coordinates */
 	Sym		*osym = sdp->sd_sym;
 	Is_desc		*isp;
-	Half		nfile = ifl->ifl_ehdr->e_type;
+	Half		vis = 0, nfile = ifl->ifl_ehdr->e_type;
+	Half		oref = sdp->sd_ref;
 
 	/*
 	 * Determine the original symbols definition (defines row in Action[]).
@@ -942,6 +1111,13 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	row = row + (REF_NUM * sdp->sd_ref);
 	if (nfile == ET_DYN)
 		row += (REF_NUM * SYM_NUM);
+
+	/*
+	 * If either the original or new symbol originates from a relocatable
+	 * object, determine the appropriate visibility for the resolved symbol.
+	 */
+	if ((oref == REF_REL_NEED) || (nfile == ET_REL))
+		vis = sym_visibility(sdp, nsym, ifl, ofl);
 
 	/*
 	 * Determine the new symbols definition (defines column in Action[]).
@@ -995,6 +1171,38 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 * Perform the required resolution.
 	 */
 	Action[row][column](sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+
+	/*
+	 * Apply any visibility requirements.  If a SINGLETON has been
+	 * established, make sure no symbol reduction indicators remain
+	 * associated with the symbol, and indicate that the symbol can not
+	 * be directly bound to.
+	 */
+	if ((oref == REF_REL_NEED) || (nfile == ET_REL)) {
+		if ((vis == STV_EXPORTED) || (vis == STV_SINGLETON)) {
+			sdp->sd_flags1 &= ~(FLG_SY1_PROTECT | FLG_SY1_ELIM |
+			    FLG_SY1_HIDDEN);
+
+			if (vis == STV_EXPORTED)
+				sdp->sd_flags1 |= FLG_SY1_EXPORT;
+			else {
+				sdp->sd_flags1 |=
+				    (FLG_SY1_NDIR | FLG_SY1_SINGLE);
+
+				if (sdp->sd_ref == REF_REL_NEED)
+					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+			}
+		} else if (vis == STV_PROTECTED) {
+			sdp->sd_flags1 |= FLG_SY1_PROTECT;
+		} else if ((vis == STV_INTERNAL) || (vis == STV_HIDDEN)) {
+			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+		} else if (vis == STV_ELIMINATE) {
+			sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+		}
+
+		sdp->sd_sym->st_other =
+		    (sdp->sd_sym->st_other & ~MSK_SYM_VISIBILITY) | vis;
+	}
 
 	/*
 	 * If the symbol has been resolved to the new input file, and this is

@@ -322,7 +322,7 @@ typedef union {
 
 
 /* conv_dyn_flag1() */
-#define	CONV_DYN_FLAG1_BASE_BUFSIZE	223
+#define	CONV_DYN_FLAG1_BASE_BUFSIZE	265
 #define	CONV32_DYN_FLAG1_BUFSIZE	\
 	(CONV_DYN_FLAG1_BASE_BUFSIZE + CONV32_INV_BUFSIZE)
 typedef union {

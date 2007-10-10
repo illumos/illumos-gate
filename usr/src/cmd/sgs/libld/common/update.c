@@ -478,7 +478,7 @@ update_osym(Ofl_desc *ofl)
 			if ((rsdp = ofl->ofl_regsyms[ndx]) == 0)
 				continue;
 
-			if (((rsdp->sd_flags1 & FLG_SY1_LOCL) == 0) &&
+			if (((rsdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
 			    (ELF_ST_BIND(rsdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -564,8 +564,7 @@ update_osym(Ofl_desc *ofl)
 			 * could be changed in a better way.
 			 */
 			if ((sgp->sg_phdr.p_flags & PF_W) == 0)
-				end = (Addr) S_ROUND(end,
-				    sysconf(_SC_PAGESIZE));
+				end = (Addr)S_ROUND(end, sysconf(_SC_PAGESIZE));
 
 			/*
 			 * If we're dealing with a memory reservation there are
@@ -872,8 +871,8 @@ update_osym(Ofl_desc *ofl)
 	    (sdp->sd_isc->is_osdesc == iosp)) {
 		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
-		sdp->sd_sym->st_size =
-		    sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+		sdp->sd_sym->st_size = sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+
 	} else if (iosp && !(flags & FLG_OF_RELOBJ)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
 		    MSG_ORIG(MSG_SYM_INIT_U), MSG_ORIG(MSG_SCN_INIT));
@@ -884,8 +883,8 @@ update_osym(Ofl_desc *ofl)
 	    (sdp->sd_isc->is_osdesc == fosp)) {
 		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
-		sdp->sd_sym->st_size =
-		    sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+		sdp->sd_sym->st_size = sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+
 	} else if (fosp && !(flags & FLG_OF_RELOBJ)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
 		    MSG_ORIG(MSG_SYM_FINI_U), MSG_ORIG(MSG_SCN_FINI));
@@ -960,10 +959,9 @@ update_osym(Ofl_desc *ofl)
 		sdp = sav->sav_symdesc;
 
 		/*
-		 * Ignore any symbols that have been marked as
-		 * invalid during input processing.  Providing
-		 * these aren't used for relocation they'll
-		 * just be dropped from the output image.
+		 * Ignore any symbols that have been marked as invalid during
+		 * input processing.  Providing these aren't used for
+		 * relocation, they will be dropped from the output image.
 		 */
 		if (sdp->sd_flags & FLG_SY_INVALID) {
 			DBG_CALL(Dbg_syms_old(ofl, sdp));
@@ -972,13 +970,12 @@ update_osym(Ofl_desc *ofl)
 		}
 
 		/*
-		 * Only needed symbols will be copied to the
-		 * output symbol table.
+		 * Only needed symbols are copied to the output symbol table.
 		 */
 		if (sdp->sd_ref == REF_DYN_SEEN)
 			continue;
 
-		if ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
+		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (flags & FLG_OF_PROCRED))
 			local = 1;
 		else
@@ -1038,8 +1035,8 @@ update_osym(Ofl_desc *ofl)
 				restore = 1;
 				sdp->sd_shndx = sunwbssndx;
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
-				symptr->st_value = (Xword)
-				    S_ROUND(sunwbssaddr, symptr->st_value);
+				symptr->st_value = (Xword)S_ROUND(sunwbssaddr,
+				    symptr->st_value);
 				sunwbssaddr = symptr->st_value +
 				    symptr->st_size;
 				sdp->sd_isc = ofl->ofl_issunwbss;
@@ -1050,7 +1047,7 @@ update_osym(Ofl_desc *ofl)
 				restore = 1;
 				sdp->sd_shndx = bssndx;
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
-				symptr->st_value = (Xword) S_ROUND(bssaddr,
+				symptr->st_value = (Xword)S_ROUND(bssaddr,
 				    symptr->st_value);
 				bssaddr = symptr->st_value + symptr->st_size;
 				sdp->sd_isc = ofl->ofl_isbss;
@@ -1079,7 +1076,7 @@ update_osym(Ofl_desc *ofl)
 			restore = 1;
 			sdp->sd_shndx = lbssndx;
 			sdp->sd_flags &= ~FLG_SY_SPECSEC;
-			symptr->st_value = (Xword) S_ROUND(lbssaddr,
+			symptr->st_value = (Xword)S_ROUND(lbssaddr,
 			    symptr->st_value);
 			lbssaddr = symptr->st_value + symptr->st_size;
 			sdp->sd_isc = ofl->ofl_islbss;
@@ -1165,7 +1162,7 @@ update_osym(Ofl_desc *ofl)
 		 * of the .symtab.  Retain the appropriate index for use in
 		 * version symbol indexing and relocation.
 		 */
-		if ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
+		if ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_ELIM)) &&
 		    (flags & FLG_OF_PROCRED)) {
 			local = 1;
 			if (!(sdp->sd_flags1 & FLG_SY1_ELIM) && !dynsym)
@@ -1209,9 +1206,7 @@ update_osym(Ofl_desc *ofl)
 				vndx = sap->sa_overndx;
 				if ((vndx == 0) &&
 				    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-					if (symflags1 & FLG_SY1_ELIM)
-						vndx = VER_NDX_ELIMINATE;
-					else if (symflags1 & FLG_SY1_LOCL)
+					if (symflags1 & FLG_SY1_HIDDEN)
 						vndx = VER_NDX_LOCAL;
 					else
 						vndx = VER_NDX_GLOBAL;
@@ -1412,23 +1407,28 @@ update_osym(Ofl_desc *ofl)
 
 		if (dynsym && !local) {
 			dynsym[dynsym_ndx] = *sdp->sd_sym;
+
 			/*
 			 * Provided this isn't an unnamed register symbol,
-			 * update its name and hash value.
+			 * update the symbols name and hash value.
 			 */
 			if (((sdp->sd_flags & FLG_SY_REGSYM) == 0) ||
 			    dynsym[dynsym_ndx].st_name) {
 				(void) st_setstring(dynstr, name, &stoff);
 				dynsym[dynsym_ndx].st_name = stoff;
+
 				if (stoff) {
 					Word _hashndx;
-					hashval = sap->sa_hash %
-					    ofl->ofl_hashbkts;
+
+					hashval =
+					    sap->sa_hash % ofl->ofl_hashbkts;
+
 					/* LINTED */
 					if (_hashndx = hashbkt[hashval]) {
-						while (hashchain[_hashndx])
+						while (hashchain[_hashndx]) {
 							_hashndx =
 							    hashchain[_hashndx];
+						}
 						hashchain[_hashndx] =
 						    sdp->sd_symndx;
 					} else {
@@ -1438,6 +1438,7 @@ update_osym(Ofl_desc *ofl)
 				}
 			}
 			sdp->sd_sym = sym = &dynsym[dynsym_ndx];
+
 			/*
 			 * Add it to sort section if it qualifies.
 			 * The indexes in that section are relative to the
@@ -1799,7 +1800,7 @@ update_osym(Ofl_desc *ofl)
 		 * be local, otherwise if it's from a shared object then we need
 		 * to maintain the binding of the original reference.
 		 */
-		if (sdp->sd_flags1 & FLG_SY1_LOCL) {
+		if (sdp->sd_flags1 & FLG_SY1_HIDDEN) {
 			if (flags & FLG_OF_PROCRED)
 				bind = STB_LOCAL;
 			else
@@ -1847,7 +1848,7 @@ update_osym(Ofl_desc *ofl)
 	 * string table.
 	 */
 	if (symtab) {
-		Shdr *	shdr = ofl->ofl_ossymtab->os_shdr;
+		Shdr	*shdr = ofl->ofl_ossymtab->os_shdr;
 
 		shdr->sh_info = ofl->ofl_shdrcnt + ofl->ofl_locscnt +
 		    ofl->ofl_scopecnt + 2;
@@ -1860,7 +1861,7 @@ update_osym(Ofl_desc *ofl)
 		}
 	}
 	if (dynsym) {
-		Shdr *	shdr = ofl->ofl_osdynsym->os_shdr;
+		Shdr	*shdr = ofl->ofl_osdynsym->os_shdr;
 
 		shdr->sh_info = 1 + ofl->ofl_dynshdrcnt + ofl->ofl_lregsymcnt;
 		/* LINTED */
@@ -1876,7 +1877,7 @@ update_osym(Ofl_desc *ofl)
 		}
 	}
 	if (ldynsym) {
-		Shdr *	shdr = ofl->ofl_osldynsym->os_shdr;
+		Shdr	*shdr = ofl->ofl_osldynsym->os_shdr;
 
 		/* ldynsym has no globals, so give index one past the end */
 		shdr->sh_info = ldynsym_ndx;
@@ -1921,6 +1922,7 @@ update_osym(Ofl_desc *ofl)
 			ofl->ofl_osdynsymsort->os_shdr->sh_link =
 			    (Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
 			assert(ofl->ofl_dynsymsortcnt == dynsymsort_ndx);
+
 			if (dynsymsort_ndx > 1) {
 				dynsort_compare_syms = ldynsym;
 				qsort(dynsymsort, dynsymsort_ndx,
@@ -1934,6 +1936,7 @@ update_osym(Ofl_desc *ofl)
 			ofl->ofl_osdyntlssort->os_shdr->sh_link =
 			    (Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
 			assert(ofl->ofl_dyntlssortcnt == dyntlssort_ndx);
+
 			if (dyntlssort_ndx > 1) {
 				dynsort_compare_syms = ldynsym;
 				qsort(dyntlssort, dyntlssort_ndx,
@@ -2291,11 +2294,11 @@ update_odynamic(Ofl_desc *ofl)
 			shdr =  ofl->ofl_osplt->os_shdr;
 
 			dyn->d_tag = DT_PLTPAD;
-			if (ofl->ofl_pltcnt)
+			if (ofl->ofl_pltcnt) {
 				dyn->d_un.d_ptr = shdr->sh_addr +
 				    M_PLT_RESERVSZ +
 				    ofl->ofl_pltcnt * M_PLT_ENTSIZE;
-			else
+			} else
 				dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
 			dyn->d_tag = DT_PLTPADSZ;
@@ -2399,8 +2402,10 @@ update_odynamic(Ofl_desc *ofl)
 	 * clear the DF_1_DIRECT flag.  The resultant object will use per-symbol
 	 * direct bindings rather than be enabled for global direct bindings.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_NDIRECT)
+	if (ofl->ofl_flags1 & FLG_OF1_NDIRECT) {
 		ofl->ofl_dtflags_1 &= ~DF_1_DIRECT;
+		ofl->ofl_dtflags_1 |= DF_1_NODIRECT;
+	}
 
 	dyn->d_tag = DT_FLAGS_1;
 	dyn->d_un.d_val = ofl->ofl_dtflags_1;
@@ -2599,8 +2604,8 @@ update_overneed(Ofl_desc *ofl)
 		_vnap = vnap = (Vernaux *)(vnd + 1);
 
 		if (sdf && (sdf->sdf_flags & FLG_SDF_SPECVER)) {
-			Sdv_desc *	sdv;
-			Listnode *	lnp2;
+			Sdv_desc	*sdv;
+			Listnode	*lnp2;
 
 			/*
 			 * If version needed definitions were specified in
@@ -2630,12 +2635,13 @@ update_overneed(Ofl_desc *ofl)
 			 */
 			for (cnt = _cnt = 0; _cnt <= ifl->ifl_vercnt;
 			    _cnt++) {
-				Ver_index *	vip = &ifl->ifl_verndx[_cnt];
+				Ver_index	*vip = &ifl->ifl_verndx[_cnt];
 
 				if (vip->vi_flags & FLG_VER_REFER) {
 					(void) st_setstring(dynstr,
 					    vip->vi_name, &stoff);
 					vnap->vna_name = stoff;
+
 					if (vip->vi_desc) {
 						vnap->vna_hash =
 						    vip->vi_desc->vd_hash;
@@ -2950,29 +2956,34 @@ update_move(Ofl_desc *ofl)
 		    psym->psym_symd->sd_name));
 		for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvp)) {
 			int	idx = 1;
+			Sym	*sym;
+
 			if ((mvp->mv_flag & FLG_MV_OUTSECT) == 0)
 				continue;
+
 			isp = mvp->mv_isp;
 			mv2 = mvp->mv_ientry;
 			sdp = isp->is_file->ifl_oldndx[ELF_M_SYM(mv2->m_info)];
+			sym = sdp->sd_sym;
 
 			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv2, sdp));
+
 			*mv1 = *mv2;
 			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
-				if (ELF_ST_BIND(sdp->sd_sym->st_info) ==
-				    STB_LOCAL) {
-					Half symbssndx = ofl->ofl_isbss->
+				if (ELF_ST_BIND(sym->st_info) == STB_LOCAL) {
+					Half	symbssndx = ofl->ofl_isbss->
 					    is_osdesc->os_scnsymndx;
+
 					mv1->m_info =
 					    /* LINTED */
 					    ELF_M_INFO(symbssndx, mv2->m_info);
-					if (ELF_ST_TYPE(sdp->sd_sym->st_info) !=
+
+					if (ELF_ST_TYPE(sym->st_info) !=
 					    STT_SECTION) {
-						mv1->m_poffset =
-						    sdp->sd_sym->st_value -
-						    ofl->ofl_isbss->
-						    is_osdesc->os_shdr->sh_addr
-						    + mv2->m_poffset;
+						mv1->m_poffset = sym->st_value -
+						    ofl->ofl_isbss->is_osdesc->
+						    os_shdr->sh_addr +
+						    mv2->m_poffset;
 					}
 				} else {
 					mv1->m_info =
@@ -2983,19 +2994,18 @@ update_move(Ofl_desc *ofl)
 			} else {
 				Boolean 	isredloc = FALSE;
 
-				if ((ELF_ST_BIND(sdp->sd_sym->st_info) ==
-				    STB_LOCAL) &&
+				if ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) &&
 				    (ofl->ofl_flags1 & FLG_OF1_REDLSYM))
 					isredloc = TRUE;
 
 				if (isredloc && !(sdp->sd_psyminfo)) {
-					Word symndx =
-					    sdp->sd_isc->is_osdesc->
-					    os_scnsymndx;
+					Word	symndx = sdp->sd_isc->
+					    is_osdesc->os_scnsymndx;
+
 					mv1->m_info =
 					    /* LINTED */
 					    ELF_M_INFO(symndx, mv2->m_info);
-					mv1->m_poffset += sdp->sd_sym->st_value;
+					mv1->m_poffset += sym->st_value;
 				} else {
 					if (isredloc)
 						DBG_CALL(Dbg_syms_reduce(ofl,
@@ -3601,14 +3611,12 @@ ld_update_outfile(Ofl_desc *ofl)
 			shdr = osp->os_shdr;
 
 			if (shdr->sh_link)
-				shdr->sh_link =
-				    translate_link(ofl, osp, shdr->sh_link,
-				    MSG_INTL(MSG_FIL_INVSHLINK));
+				shdr->sh_link = translate_link(ofl, osp,
+				    shdr->sh_link, MSG_INTL(MSG_FIL_INVSHLINK));
 
 			if (shdr->sh_info && (shdr->sh_flags & SHF_INFO_LINK))
-				shdr->sh_info =
-				    translate_link(ofl, osp, shdr->sh_info,
-				    MSG_INTL(MSG_FIL_INVSHINFO));
+				shdr->sh_info = translate_link(ofl, osp,
+				    shdr->sh_info, MSG_INTL(MSG_FIL_INVSHINFO));
 
 			if (!(flags & FLG_OF_RELOBJ) &&
 			    (phdr->p_type == PT_LOAD) ||

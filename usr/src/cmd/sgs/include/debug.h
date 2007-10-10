@@ -86,6 +86,7 @@ extern "C" {
 #define	DBG_DLSYM_DEFAULT	2
 #define	DBG_DLSYM_SELF		3
 #define	DBG_DLSYM_PROBE		4
+#define	DBG_DLSYM_SINGLETON	5
 
 #define	DBG_DLCLOSE_NULL	0
 #define	DBG_DLCLOSE_IGNORE	1
@@ -140,6 +141,11 @@ extern "C" {
 
 #define	DBG_NL_STD		0	/* newline controllers - standard and */
 #define	DBG_NL_FRC		2	/*    forced. */
+
+#define	DBG_BNDREJ_NODIR	0	/* bind rejected, direct to nodirect */
+#define	DBG_BNDREJ_SINGLE	1	/* bind rejected, singleton without */
+					/*    default search model */
+#define	DBG_BNDREJ_NUM		DBG_BNDREJ_SINGLE
 
 /*
  * Define a debug descriptor, and a user macro that inspects the descriptor as
@@ -205,6 +211,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_bind_plt_summary	Dbg64_bind_plt_summary
 #define	Dbg_bind_pltpad_from	Dbg64_bind_pltpad_from
 #define	Dbg_bind_pltpad_to	Dbg64_bind_pltpad_to
+#define	Dbg_bind_reject		Dbg64_bind_reject
 #define	Dbg_bind_weak		Dbg64_bind_weak
 
 #define	Dbg_cap_val_hw1		Dbg64_cap_val_hw1
@@ -403,6 +410,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 
 #define	Dbg_bind_global		Dbg32_bind_global
 #define	Dbg_bind_plt_summary	Dbg32_bind_plt_summary
+#define	Dbg_bind_reject		Dbg32_bind_reject
 #define	Dbg_bind_weak		Dbg32_bind_weak
 
 #define	Dbg_cap_val_hw1		Dbg32_cap_val_hw1
@@ -621,6 +629,7 @@ extern	void	Dbg_bind_plt_summary(Lm_list *, Half, Word, Word, Word, Word,
 extern	void	Dbg_bind_pltpad_from(Rt_map *, Addr, const char *);
 extern	void	Dbg_bind_pltpad_to(Rt_map *, Addr, const char *, const char *);
 #endif
+extern	void	Dbg_bind_reject(Rt_map *, Rt_map *, const char *, int);
 extern	void	Dbg_bind_weak(Rt_map *, Addr, Addr, const char *);
 
 extern	void	Dbg_cap_hw_candidate(Lm_list *, const char *);

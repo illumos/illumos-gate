@@ -266,6 +266,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	char		*_name;
 	Sym		*nsym;
 	Half		etype;
+	uchar_t		vis;
 	avl_index_t	_where;
 
 	/*
@@ -292,7 +293,6 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	sdp->sd_file = ifl;
 	sdp->sd_aux = sap;
 	savl->sav_hash = sap->sa_hash = hash;
-
 
 	/*
 	 * Copy the symbol table entry from the input file into the internal
@@ -364,9 +364,36 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	}
 
 	/*
-	 * Establish the symbols reference & visibility.
+	 * Establish the symbols visibility and reference.
 	 */
+	vis = ELF_ST_VISIBILITY(nsym->st_other);
+
 	if ((etype == ET_NONE) || (etype == ET_REL)) {
+		switch (vis) {
+		case STV_DEFAULT:
+			sdp->sd_flags1 |= FLG_SY1_DEFAULT;
+			break;
+		case STV_INTERNAL:
+		case STV_HIDDEN:
+			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+			break;
+		case STV_PROTECTED:
+			sdp->sd_flags1 |= FLG_SY1_PROTECT;
+			break;
+		case STV_EXPORTED:
+			sdp->sd_flags1 |= FLG_SY1_EXPORT;
+			break;
+		case STV_SINGLETON:
+			sdp->sd_flags1 |= (FLG_SY1_SINGLE | FLG_SY1_NDIR);
+			ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+			break;
+		case STV_ELIMINATE:
+			sdp->sd_flags1 |= FLG_SY1_ELIM;
+			break;
+		default:
+			assert(vis <= STV_ELIMINATE);
+		}
+
 		sdp->sd_ref = REF_REL_NEED;
 
 		/*
@@ -375,7 +402,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * tagged to prevent direct binding.
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
-		    ((sdp->sd_flags1 & (FLG_SY1_PROT | FLG_SY1_DIR)) == 0) &&
+		    ((sdp->sd_flags1 & (FLG_SY1_PROTECT | FLG_SY1_DIR)) == 0) &&
 		    (nsym->st_shndx != SHN_UNDEF)) {
 			sdp->sd_flags1 |= FLG_SY1_NDIR;
 		}
@@ -391,20 +418,28 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 			sdp->sd_aux->sa_bindto = ifl;
 
 		/*
-		 * If this is a protected symbol, mark it.
+		 * If this is a protected symbol, remember this.  Note, this
+		 * state is different from the FLG_SY1_PROTECT used to establish
+		 * a symbol definitions visibility.  This state is used to warn
+		 * against possible copy relocations against this referenced
+		 * symbol.
 		 */
-		if (ELF_ST_VISIBILITY(nsym->st_other) == STV_PROTECTED)
+		if (vis == STV_PROTECTED)
 			sdp->sd_flags |= FLG_SY_PROT;
 
 		/*
-		 * Mask out any visibility info from a DYN symbol.
+		 * If this is a SINGLETON definition, then indicate the symbol
+		 * can not be directly bound to, and retain the visibility.
+		 * This visibility will be inherited by any references made to
+		 * this symbol.
 		 */
-		nsym->st_other = nsym->st_other & ~MSK_SYM_VISIBILITY;
+		if ((vis == STV_SINGLETON) && (nsym->st_shndx != SHN_UNDEF))
+			sdp->sd_flags1 |= (FLG_SY1_SINGLE | FLG_SY1_NDIR);
 
 		/*
-		 * If the new symbol is from a shared library and it
-		 * is associated with a SHT_NOBITS section then this
-		 * symbol originated from a tentative symbol.
+		 * If the new symbol is from a shared library and is associated
+		 * with a SHT_NOBITS section then this symbol originated from a
+		 * tentative symbol.
 		 */
 		if (sdp->sd_isc &&
 		    (sdp->sd_isc->is_shdr->sh_type == SHT_NOBITS))
@@ -419,7 +454,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		sdp->sd_shndx = shndx = SHN_UNDEF;
 		sdp->sd_flags |= FLG_SY_REDUCED;
 		sdp->sd_flags1 |=
-		    (FLG_SY1_IGNORE | FLG_SY1_LOCL | FLG_SY1_ELIM);
+		    (FLG_SY1_HIDDEN | FLG_SY1_IGNORE | FLG_SY1_ELIM);
 	}
 
 	/*
@@ -499,7 +534,14 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 				return ((Sym_desc *)S_ERROR);
 	}
 
-	DBG_CALL(Dbg_syms_entered(ofl, nsym, sdp));
+	/*
+	 * Provided we're not processing a mapfile, diagnose the entered symbol.
+	 * Mapfile processing requires the symbol to be updated with additional
+	 * information, therefore the diagnosing of the symbol is deferred until
+	 * later (see Dbg_map_symbol()).
+	 */
+	if ((ifl == 0) || ((ifl->ifl_flags & FLG_IF_MAPFILE) == 0))
+		DBG_CALL(Dbg_syms_entered(ofl, nsym, sdp));
 	return (sdp);
 }
 
@@ -565,12 +607,12 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			 * should be defined protected, whereas all other
 			 * special symbols are tagged as no-direct.
 			 */
-			if (!(usdp->sd_flags1 & FLG_SY1_LOCL) &&
-			    (flags1 & FLG_SY1_GLOB)) {
+			if (((usdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
+			    (flags1 & FLG_SY1_DEFAULT)) {
 				usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 				if (sdaux_id == SDAUX_ID_GOT) {
 					usdp->sd_flags1 &= ~FLG_SY1_NDIR;
-					usdp->sd_flags1 |= FLG_SY1_PROT;
+					usdp->sd_flags1 |= FLG_SY1_PROTECT;
 					usdp->sd_sym->st_other = STV_PROTECTED;
 				} else if (
 				    ((usdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
@@ -614,9 +656,9 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 
 		if (sdaux_id == SDAUX_ID_GOT) {
-			usdp->sd_flags1 |= FLG_SY1_PROT;
+			usdp->sd_flags1 |= FLG_SY1_PROTECT;
 			usdp->sd_sym->st_other = STV_PROTECTED;
-		} else if ((flags1 & FLG_SY1_GLOB) &&
+		} else if ((flags1 & FLG_SY1_DEFAULT) &&
 		    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
 			usdp->sd_flags1 |= FLG_SY1_NDIR;
 		}
@@ -655,12 +697,12 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		 * automatic scoping).  The GOT should be defined protected,
 		 * whereas all other special symbols are tagged as no-direct.
 		 */
-		if (!(sdp->sd_flags1 & FLG_SY1_LOCL) &&
-		    (flags1 & FLG_SY1_GLOB)) {
+		if (((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
+		    (flags1 & FLG_SY1_DEFAULT)) {
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 			if (sdaux_id == SDAUX_ID_GOT) {
 				sdp->sd_flags1 &= ~FLG_SY1_NDIR;
-				sdp->sd_flags1 |= FLG_SY1_PROT;
+				sdp->sd_flags1 |= FLG_SY1_PROTECT;
 				sdp->sd_sym->st_other = STV_PROTECTED;
 			} else if (((sdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
 			    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
@@ -782,19 +824,22 @@ ld_sym_spec(Ofl_desc *ofl)
 	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
 
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT), MSG_ORIG(MSG_SYM_ETEXT_U),
-	    SDAUX_ID_ETEXT, 0, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_ETEXT, 0, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_EDATA), MSG_ORIG(MSG_SYM_EDATA_U),
-	    SDAUX_ID_EDATA, 0, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_EDATA, 0, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_END), MSG_ORIG(MSG_SYM_END_U),
-	    SDAUX_ID_END, FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_END, FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_END), MSG_ORIG(MSG_SYM_L_END_U),
-	    SDAUX_ID_END, 0, FLG_SY1_LOCL, ofl) == S_ERROR)
+	    SDAUX_ID_END, 0, FLG_SY1_HIDDEN, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_START), MSG_ORIG(MSG_SYM_L_START_U),
-	    SDAUX_ID_START, 0, FLG_SY1_LOCL, ofl) == S_ERROR)
+	    SDAUX_ID_START, 0, FLG_SY1_HIDDEN, ofl) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -802,13 +847,15 @@ ld_sym_spec(Ofl_desc *ofl)
 	 * static executables (in which case its value will be 0).
 	 */
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_DYNAMIC), MSG_ORIG(MSG_SYM_DYNAMIC_U),
-	    SDAUX_ID_DYN, FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
+	    SDAUX_ID_DYN, FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    ofl) == S_ERROR)
 		return (S_ERROR);
 
 	if (OFL_ALLOW_DYNSYM(ofl))
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
 		    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
-		    FLG_SY_DYNSORT, FLG_SY1_GLOB, ofl) == S_ERROR)
+		    FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+		    ofl) == S_ERROR)
 			return (S_ERROR);
 
 	/*
@@ -819,7 +866,7 @@ ld_sym_spec(Ofl_desc *ofl)
 	    SYM_NOHASH, 0, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
 		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY_DYNSORT,
-		    FLG_SY1_GLOB, ofl) == S_ERROR)
+		    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF), ofl) == S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -834,32 +881,48 @@ ld_sym_spec(Ofl_desc *ofl)
 void
 ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 {
-	Word	symvis, oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
+	Word	oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
 	Sym	*sym = sdp->sd_sym;
 
 	if ((sdp->sd_ref == REF_REL_NEED) &&
 	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		/*
-		 * If scoping is enabled, reduce any nonversioned global
-		 * symbols (any symbol that has been processed for relocations
-		 * will have already had this same reduction test applied).
+		 * If auto-reduction/elimination is enabled, reduce any
+		 * non-versioned global symbols.  This routine is called either
+		 * from any initial relocation processing that references this
+		 * symbol, or from the symbol validation processing.
+		 *
+		 * A symbol is a candidate for auto-reduction/elimination if:
+		 *
+		 *   .  the symbol wasn't explicitly defined within a mapfile
+		 *	(in which case all the necessary state has been applied
+		 *	to the symbol), or
+		 *   .	the symbol isn't one of the family of reserved
+		 *	special symbols (ie. _end, _etext, etc.), or
+		 *   .	the symbol isn't a SINGLETON, or
+		 *   .  the symbol wasn't explicitly defined within a version
+		 *	definition associated with an input relocatable object.
+		 *
 		 * Indicate that the symbol has been reduced as it may be
 		 * necessary to print these symbols later.
 		 */
 		if (((oflags & FLG_OF_AUTOLCL) ||
 		    (oflags1 & FLG_OF1_AUTOELM)) &&
-		    ((sdp->sd_flags1 & MSK_SY1_DEFINED) == 0)) {
-
-			sdp->sd_flags |= FLG_SY_REDUCED;
-			sdp->sd_flags1 |= FLG_SY1_LOCL;
-
-			if (ELF_ST_VISIBILITY(sym->st_other) != STV_INTERNAL)
-				sym->st_other = STV_HIDDEN |
-				    (sym->st_other & ~MSK_SYM_VISIBILITY);
+		    ((sdp->sd_flags1 & MSK_SY1_NOAUTO) == 0)) {
+			if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) {
+				sdp->sd_flags |= FLG_SY_REDUCED;
+				sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+			}
 
 			if (ofl->ofl_flags1 &
-			    (FLG_OF1_REDLSYM | FLG_OF1_AUTOELM))
+			    (FLG_OF1_REDLSYM | FLG_OF1_AUTOELM)) {
 				sdp->sd_flags1 |= FLG_SY1_ELIM;
+				sym->st_other = STV_ELIMINATE |
+				    (sym->st_other & ~MSK_SYM_VISIBILITY);
+			} else if (ELF_ST_VISIBILITY(sym->st_other) !=
+			    STV_INTERNAL)
+				sym->st_other = STV_HIDDEN |
+				    (sym->st_other & ~MSK_SYM_VISIBILITY);
 		}
 
 		/*
@@ -869,35 +932,12 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * attribute.
 		 */
 		if ((oflags & FLG_OF_SYMBOLIC) &&
-		    ((sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_NDIR)) == 0)) {
-			sdp->sd_flags1 |= FLG_SY1_PROT;
+		    ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_NDIR)) == 0)) {
+			sdp->sd_flags1 |= FLG_SY1_PROTECT;
 			if (ELF_ST_VISIBILITY(sym->st_other) == STV_DEFAULT)
 				sym->st_other = STV_PROTECTED |
 				    (sym->st_other & ~MSK_SYM_VISIBILITY);
 		}
-	}
-
-	/*
-	 * Check to see if the symbol visibility needs to be adjusted due to any
-	 * STV_* symbol attributes being set.
-	 *
-	 *    STV_PROTECTED ==	symbolic binding
-	 *    STV_INTERNAL ==	reduce to local
-	 *    STV_HIDDEN ==	reduce to local
-	 *
-	 * Note, UNDEF symbols can be assigned a visibility, thus the refencing
-	 * code can be dependent on this visibility.  Here, by only ignoring
-	 * REF_DYN_SEEN symbol definitions we can be assigning a visibility to
-	 * REF_DYN_NEED.  If the protected, or local assignment is made to
-	 * a REF_DYN_NEED symbol, it will be caught later as an illegal
-	 * visibility.
-	 */
-	if (!(oflags & FLG_OF_RELOBJ) && (sdp->sd_ref != REF_DYN_SEEN) &&
-	    (symvis = ELF_ST_VISIBILITY(sym->st_other))) {
-		if (symvis == STV_PROTECTED)
-			sdp->sd_flags1 |= FLG_SY1_PROT;
-		else if ((symvis == STV_INTERNAL) || (symvis == STV_HIDDEN))
-			sdp->sd_flags1 |= FLG_SY1_LOCL;
 	}
 
 	/*
@@ -1057,8 +1097,9 @@ ld_sym_validate(Ofl_desc *ofl)
 	 */
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
-		Is_desc *	isp;
+		Is_desc		*isp;
 		int		undeferr = 0;
+		uchar_t		vis;
 
 		sdp = sav->sav_symdesc;
 
@@ -1090,8 +1131,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		if ((type == STT_TLS) && (sym->st_size != 0) &&
 		    (sym->st_shndx != SHN_UNDEF) &&
 		    (sym->st_shndx != SHN_COMMON)) {
-			Is_desc *	isp = sdp->sd_isc;
-			Ifl_desc *	ifl = sdp->sd_file;
+			Is_desc		*isp = sdp->sd_isc;
+			Ifl_desc	*ifl = sdp->sd_file;
 
 			if ((isp == 0) || (isp->is_shdr == 0) ||
 			    ((isp->is_shdr->sh_flags & SHF_TLS) == 0)) {
@@ -1113,17 +1154,24 @@ ld_sym_validate(Ofl_desc *ofl)
 		}
 
 		/*
+		 * Record any STV_SINGLETON existence.
+		 */
+		if ((vis = ELF_ST_VISIBILITY(sym->st_other)) == STV_SINGLETON)
+			ofl->ofl_dtflags_1 |= DF_1_SINGLETON;
+
+		/*
 		 * If building a shared object or executable, and this is a
 		 * non-weak UNDEF symbol with reduced visibility (STV_*), then
 		 * give a fatal error.
 		 */
-		if (!(oflags & FLG_OF_RELOBJ) &&
-		    ELF_ST_VISIBILITY(sym->st_other) &&
+		if (((oflags & FLG_OF_RELOBJ) == 0) &&
 		    (sym->st_shndx == SHN_UNDEF) &&
 		    (ELF_ST_BIND(sym->st_info) != STB_WEAK)) {
-			sym_undef_entry(ofl, sdp, BNDLOCAL);
-			ofl->ofl_flags |= FLG_OF_FATAL;
-			continue;
+			if (vis && (vis != STV_SINGLETON)) {
+				sym_undef_entry(ofl, sdp, BNDLOCAL);
+				ofl->ofl_flags |= FLG_OF_FATAL;
+				continue;
+			}
 		}
 
 		/*
@@ -1133,7 +1181,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		if (((isp = sdp->sd_isc) != 0) && isp->is_shdr &&
 		    ((isp->is_shdr->sh_flags & SHF_ALLOC) == 0)) {
 			sdp->sd_flags |= FLG_SY_REDUCED;
-			sdp->sd_flags1 |= FLG_SY1_LOCL;
+			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
 		}
 
 		/*
@@ -1180,8 +1228,8 @@ ld_sym_validate(Ofl_desc *ofl)
 			    (((sdp->sd_flags &
 			    (FLG_SY_MAPREF | FLG_SY_MAPUSED)) ==
 			    FLG_SY_MAPREF) &&
-			    ((sdp->sd_flags1 & (FLG_SY1_LOCL |
-			    FLG_SY1_PROT)) == 0)))) {
+			    ((sdp->sd_flags1 & (FLG_SY1_HIDDEN |
+			    FLG_SY1_PROTECT)) == 0)))) {
 				sym_undef_entry(ofl, sdp, UNDEF);
 				ofl->ofl_flags |= undef;
 				undeferr = 1;
@@ -1228,7 +1276,7 @@ ld_sym_validate(Ofl_desc *ofl)
 
 			if (sdp->sd_file->ifl_vercnt) {
 				int		vndx;
-				Ver_index *	vip;
+				Ver_index	*vip;
 
 				vndx = sdp->sd_aux->sa_dverndx;
 				vip = &sdp->sd_file->ifl_verndx[vndx];
@@ -1261,7 +1309,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * a fatal error.
 		 */
 		if ((sdp->sd_ref == REF_DYN_NEED) &&
-		    (sdp->sd_flags1 & (FLG_SY1_LOCL | FLG_SY1_PROT))) {
+		    (sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_PROTECT))) {
 			sym_undef_entry(ofl, sdp, BNDLOCAL);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
@@ -1273,7 +1321,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if (verdesc && (sdp->sd_ref == REF_REL_NEED) &&
 		    (sym->st_shndx != SHN_UNDEF) &&
-		    (!(sdp->sd_flags1 & FLG_SY1_LOCL)) &&
+		    (!(sdp->sd_flags1 & FLG_SY1_HIDDEN)) &&
 		    (sdp->sd_aux->sa_overndx == 0)) {
 			sym_undef_entry(ofl, sdp, NOVERSION);
 			ofl->ofl_flags |= verdesc;
@@ -1302,7 +1350,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((sym->st_shndx == SHN_COMMON) &&
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
-		    ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
+		    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)))) {
 			int countbss = 0;
 
@@ -1361,16 +1409,13 @@ ld_sym_validate(Ofl_desc *ofl)
 
 		/*
 		 * Update the symbol count and the associated name string size.
-		 * If scoping is in effect for this symbol assign it will be
-		 * assigned to the .symtab/.strtab sections.
 		 */
-		if ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
+		if ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_ELIM)) &&
 		    (oflags & FLG_OF_PROCRED)) {
 			/*
-			 * If symbol gets eliminated count it.
-			 *
-			 * If symbol gets reduced to local,
-			 * count it's size for the .symtab.
+			 * If any reductions are being processed, keep a count
+			 * of eliminated symbols, and if the symbol is being
+			 * reduced to local, count it's size for the .symtab.
 			 */
 			if (sdp->sd_flags1 & FLG_SY1_ELIM) {
 				ofl->ofl_elimcnt++;
@@ -1468,7 +1513,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			if (sdp->sd_sym->st_name == 0)
 				sdp->sd_name = MSG_ORIG(MSG_STR_EMPTY);
 
-			if ((sdp->sd_flags1 & FLG_SY1_LOCL) ||
+			if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) ||
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL))
 				ofl->ofl_lregsymcnt++;
 		}

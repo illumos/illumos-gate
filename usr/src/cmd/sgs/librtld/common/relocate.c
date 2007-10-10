@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -208,7 +208,8 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 						reloc->r_value -= offset;
 
 					if (unknown == 0)
-					    unknown = MSG_INTL(MSG_STR_UNKNOWN);
+						unknown =
+						    MSG_INTL(MSG_STR_UNKNOWN);
 					reloc->r_name = unknown;
 					(*null)++;
 				} else {
@@ -279,6 +280,7 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 		sl.sl_imap = LIST(lmp)->lm_head;
 		sl.sl_hash = 0;
 		sl.sl_rsymndx = rsymndx;
+		sl.sl_rsym = sym;
 
 		if (type == M_R_COPY)
 			sl.sl_flags = LKUP_COPY;
@@ -472,6 +474,7 @@ update_reloc(Cache *ocache, Cache *icache, Cache *_icache, const char *name,
 		 * offset of the first relocation record against each sections
 		 * offset and size.
 		 */
+		/* BEGIN CSTYLED */
 #if	!defined(__lint)
 		if ((ircache == (Cache *)0) || (rel->r_offset < bgn) ||
 			(rel->r_offset > end)) {
@@ -499,6 +502,7 @@ update_reloc(Cache *ocache, Cache *icache, Cache *_icache, const char *name,
 			ircache = &icache[ndx];
 			orcache = &ocache[ndx];
 		}
+		/* END CSTYLED */
 
 		/*
 		 * Determine the relocation location of both the input and

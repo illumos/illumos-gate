@@ -539,14 +539,18 @@ typedef struct {
  *
  *	visibility = ELF32_ST_VISIBILITY(S.st_other)
  */
-#define	ELF32_ST_VISIBILITY(other)	((other)&0x3)
-#define	ELF64_ST_VISIBILITY(other)	((other)&0x3)
+#define	ELF32_ST_VISIBILITY(other)	((other)&0x7)
+#define	ELF64_ST_VISIBILITY(other)	((other)&0x7)
 
 #define	STV_DEFAULT	0
 #define	STV_INTERNAL	1
 #define	STV_HIDDEN	2
 #define	STV_PROTECTED	3
+#define	STV_EXPORTED	4
+#define	STV_SINGLETON	5
+#define	STV_ELIMINATE	6
 
+#define	STV_NUM		7
 
 /*
  *	Relocation

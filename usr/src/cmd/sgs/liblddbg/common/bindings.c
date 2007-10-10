@@ -159,6 +159,21 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
 }
 
 void
+Dbg_bind_reject(Rt_map *flmp, Rt_map *tlmp, const char *sym, int why)
+{
+	static Msg reason[DBG_BNDREJ_NUM + 1] = {
+		MSG_BNDREJ_NODIR,	/* MSG_INTL(MSG_BNDREJ_NODIR) */
+		MSG_BNDREJ_SINGLE	/* MSG_INTL(MSG_BNDREJ_SINGLE) */
+	};
+
+	if (DBG_NOTCLASS(DBG_C_BINDINGS))
+		return;
+
+	dbg_print(LIST(flmp), MSG_INTL(MSG_BND_REJECT), NAME(flmp), NAME(tlmp),
+	    sym, MSG_INTL(reason[why]));
+}
+
+void
 Dbg_bind_weak(Rt_map *flmp, Addr fabs, Addr frel, const char *sym)
 {
 	Lm_list		*lml = LIST(flmp);

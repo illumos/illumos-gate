@@ -39,6 +39,56 @@
 #include	"msg.h"
 #include	"_libld.h"
 
+static void
+remove_local(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
+{
+	Sym	*sym = sdp->sd_sym;
+	uchar_t	type = ELF_ST_TYPE(sym->st_info);
+	/* LINTED - only used for assert() */
+	int	err;
+
+	if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
+		ofl->ofl_locscnt--;
+		err = st_delstring(ofl->ofl_strtab, sdp->sd_name);
+		assert(err != -1);
+
+		if (allow_ldynsym && ldynsym_symtype[type]) {
+			ofl->ofl_dynlocscnt--;
+			err = st_delstring(ofl->ofl_dynstrtab, sdp->sd_name);
+			assert(err != -1);
+			/* Remove from sort section? */
+			DYNSORT_COUNT(sdp, sym, type, --);
+		}
+	}
+	sdp->sd_flags |= FLG_SY_ISDISC;
+}
+
+static void
+remove_scoped(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
+{
+	Sym	*sym = sdp->sd_sym;
+	uchar_t	type = ELF_ST_TYPE(sym->st_info);
+	/* LINTED - only used for assert() */
+	int	err;
+
+	ofl->ofl_scopecnt--;
+	ofl->ofl_elimcnt++;
+
+	err = st_delstring(ofl->ofl_strtab, sdp->sd_name);
+	assert(err != -1);
+
+	if (allow_ldynsym && ldynsym_symtype[type]) {
+		ofl->ofl_dynscopecnt--;
+		err = st_delstring(ofl->ofl_dynstrtab, sdp->sd_name);
+		assert(err != -1);
+		/* Remove from sort section? */
+		DYNSORT_COUNT(sdp, sym, type, --);
+	}
+	sdp->sd_flags1 |= FLG_SY1_ELIM;
+}
+
+#pragma inline(remove_local)
+#pragma inline(remove_scoped)
 
 /*
  * If -zignore is in effect, scan all input sections to see if there are any
@@ -136,24 +186,7 @@ ignore_section_processing(Ofl_desc *ofl)
 			    ((type == STT_FILE) ||
 			    ((symp->st_shndx == SHN_COMMON) &&
 			    ((sdp->sd_flags & FLG_SY_UPREQD) == 0)))) {
-				if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
-					ofl->ofl_locscnt--;
-					err = st_delstring(ofl->ofl_strtab,
-					    sdp->sd_name);
-					assert(err != -1);
-					if (allow_ldynsym &&
-					    ldynsym_symtype[type]) {
-						ofl->ofl_dynlocscnt--;
-						err = st_delstring(
-							ofl->ofl_dynstrtab,
-							sdp->sd_name);
-						assert(err != -1);
-						/* Remove from sort section? */
-						DYNSORT_COUNT(sdp, symp,
-						    type, --);
-					}
-				}
-				sdp->sd_flags |= FLG_SY_ISDISC;
+				remove_local(ofl, sdp, allow_ldynsym);
 				continue;
 			}
 
@@ -185,57 +218,22 @@ ignore_section_processing(Ofl_desc *ofl)
 			 * Finish processing any local symbols.
 			 */
 			if (ELF_ST_BIND(symp->st_info) == STB_LOCAL) {
-			    if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
-				if ((ofl->ofl_flags1 &
-				    FLG_OF1_REDLSYM) == 0) {
-					ofl->ofl_locscnt--;
-					err = st_delstring(ofl->ofl_strtab,
-					    sdp->sd_name);
-					assert(err != -1);
-					if (allow_ldynsym &&
-					    ldynsym_symtype[type]) {
-						ofl->ofl_dynlocscnt--;
-						err = st_delstring(
-						    ofl->ofl_dynstrtab,
-						    sdp->sd_name);
-						assert(err != -1);
-						/* Remove from sort section? */
-						DYNSORT_COUNT(sdp, symp,
-						    type, --);
-					}
-				}
-				sdp->sd_flags |= FLG_SY_ISDISC;
-			    }
-			    DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
-				sdp, sdp->sd_isc));
-			    continue;
+				if (ofl->ofl_flags1 & FLG_OF1_IGNORE)
+					remove_local(ofl, sdp, allow_ldynsym);
+
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
+				    sdp, sdp->sd_isc));
+				continue;
 			}
 
 			/*
 			 * Global symbols can only be eliminated when an objects
 			 * interfaces (versioning/scoping) is defined.
 			 */
-			if (sdp->sd_flags1 & FLG_SY1_LOCL) {
-				if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
-				    ofl->ofl_scopecnt--;
-				    ofl->ofl_elimcnt++;
+			if (sdp->sd_flags1 & FLG_SY1_HIDDEN) {
+				if (ofl->ofl_flags1 & FLG_OF1_IGNORE)
+					remove_scoped(ofl, sdp, allow_ldynsym);
 
-				    err = st_delstring(ofl->ofl_strtab,
-					sdp->sd_name);
-				    assert(err != -1);
-
-				    sdp->sd_flags1 |= FLG_SY1_ELIM;
-				    if (allow_ldynsym &&
-					ldynsym_symtype[type]) {
-					    ofl->ofl_dynscopecnt--;
-					    err = st_delstring(
-						ofl->ofl_dynstrtab,
-						sdp->sd_name);
-					    assert(err != -1);
-					    /* Remove from sort section? */
-					    DYNSORT_COUNT(sdp, symp, type, --);
-					}
-				}
 				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
 				    sdp, sdp->sd_isc));
 				continue;
@@ -1209,8 +1207,8 @@ make_plt(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 	size_t		size = (size_t)M_PLT_RESERVSZ +
-				(((size_t)ofl->ofl_pltcnt +
-				(size_t)ofl->ofl_pltpad) * M_PLT_ENTSIZE);
+	    (((size_t)ofl->ofl_pltcnt + (size_t)ofl->ofl_pltpad) *
+	    M_PLT_ENTSIZE);
 	size_t		rsize = (size_t)ofl->ofl_relocpltsz;
 
 #if	defined(__sparc)
@@ -1286,7 +1284,7 @@ make_hash(Ofl_desc *ofl)
 	 *		symbols in the .dynsym array + NULL symbol).
 	 */
 	cnt = 2 + ofl->ofl_hashbkts + (ofl->ofl_dynshdrcnt +
-		ofl->ofl_globcnt + ofl->ofl_lregsymcnt + 1);
+	    ofl->ofl_globcnt + ofl->ofl_lregsymcnt + 1);
 	size = cnt * shdr->sh_entsize;
 
 	/*
@@ -1353,7 +1351,7 @@ make_symtab(Ofl_desc *ofl)
 	 * the null first entry, the FILE symbol, and the .shstrtab entry.
 	 */
 	symcnt = (size_t)(3 + ofl->ofl_shdrcnt + ofl->ofl_scopecnt +
-		ofl->ofl_locscnt + ofl->ofl_globcnt);
+	    ofl->ofl_locscnt + ofl->ofl_globcnt);
 	size = symcnt * shdr->sh_entsize;
 
 	/*
@@ -1666,7 +1664,7 @@ make_dynstr(Ofl_desc *ofl)
 			if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
 				continue;
 
-			if (((sdp->sd_flags1 & FLG_SY1_LOCL) == 0) &&
+			if (((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -1846,7 +1844,7 @@ make_verneed(Ofl_desc *ofl)
 	 * value of ent_cnt specified here (0) is meaningless.
 	 */
 	if (new_section(ofl, SHT_SUNW_verneed, MSG_ORIG(MSG_SCN_SUNWVERSION),
-			0, &isec, &shdr, &data) == S_ERROR)
+	    0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	/* During version processing we calculated the total size. */
@@ -1891,7 +1889,7 @@ make_verdef(Ofl_desc *ofl)
 	 * value of ent_cnt specified here (0) is meaningless.
 	 */
 	if (new_section(ofl, SHT_SUNW_verdef, MSG_ORIG(MSG_SCN_SUNWVERSION),
-			0, &isec, &shdr, &data) == S_ERROR)
+	    0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
 
 	/* During version processing we calculated the total size. */
@@ -2251,35 +2249,35 @@ ld_make_sections(Ofl_desc *ofl)
 	 * the symbol table sizes.
 	 */
 	if (ofl->ofl_osversym || ofl->ofl_ossyminfo) {
-		Shdr *		shdr;
-		Is_desc *	isec;
-		Elf_Data *	data;
+		Shdr		*shdr;
+		Is_desc		*isec;
+		Elf_Data	*data;
 		size_t		size;
 		ulong_t		cnt;
+		Os_desc		*osp;
 
 		if (flags & (FLG_OF_RELOBJ | FLG_OF_STATIC)) {
-			isec = (Is_desc *)ofl->ofl_ossymtab->
-				os_isdescs.head->data;
+			osp = ofl->ofl_ossymtab;
 		} else {
-			isec = (Is_desc *)ofl->ofl_osdynsym->
-				os_isdescs.head->data;
+			osp = ofl->ofl_osdynsym;
 		}
+		isec = (Is_desc *)osp->os_isdescs.head->data;
 		cnt = (isec->is_shdr->sh_size / isec->is_shdr->sh_entsize);
 
 		if (ofl->ofl_osversym) {
-			isec = (Is_desc *)ofl->ofl_osversym->os_isdescs.
-				head->data;
+			osp = ofl->ofl_osversym;
+			isec = (Is_desc *)osp->os_isdescs.head->data;
 			data = isec->is_indata;
-			shdr = ofl->ofl_osversym->os_shdr;
+			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;
 			shdr->sh_size = (Xword)size;
 			data->d_size = size;
 		}
 		if (ofl->ofl_ossyminfo) {
-			isec = (Is_desc *)ofl->ofl_ossyminfo->os_isdescs.
-				head->data;
+			osp = ofl->ofl_ossyminfo;
+			isec = (Is_desc *)osp->os_isdescs.head->data;
 			data = isec->is_indata;
-			shdr = ofl->ofl_ossyminfo->os_shdr;
+			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;
 			shdr->sh_size = (Xword)size;
 			data->d_size = size;

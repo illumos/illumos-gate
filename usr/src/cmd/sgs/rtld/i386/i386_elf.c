@@ -198,7 +198,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	ulong_t		addr, symval, rsymndx;
 	char		*name;
 	Rel		*rptr;
-	Sym		*sym, *nsym;
+	Sym		*rsym, *nsym;
 	uint_t		binfo, sb_flags = 0, dbg_class;
 	Slookup		sl;
 	int		entry, lmflags;
@@ -238,8 +238,8 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	addr = (ulong_t)JMPREL(lmp);
 	rptr = (Rel *)(addr + reloff);
 	rsymndx = ELF_R_SYM(rptr->r_info);
-	sym = (Sym *)((ulong_t)SYMTAB(lmp) + (rsymndx * SYMENT(lmp)));
-	name = (char *)(STRTAB(lmp) + sym->st_name);
+	rsym = (Sym *)((ulong_t)SYMTAB(lmp) + (rsymndx * SYMENT(lmp)));
+	name = (char *)(STRTAB(lmp) + rsym->st_name);
 
 	/*
 	 * Determine the last link-map of this list, this'll be the starting
@@ -255,6 +255,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = rsymndx;
+	sl.sl_rsym = rsym;
 	sl.sl_flags = LKUP_DEFT;
 
 	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
@@ -494,6 +495,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		sl.sl_imap = lmp;
 		sl.sl_hash = elf_hash(MSG_ORIG(MSG_SYM_PLT));
 		sl.sl_rsymndx = 0;
+		sl.sl_rsym = 0;
 		sl.sl_flags = LKUP_DEFT;
 
 		if ((symdef = elf_find_sym(&sl, &_lmp, &binfo)) == 0)
@@ -738,7 +740,6 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					}
 				} else {
 					Slookup		sl;
-					uchar_t		bind;
 
 					/*
 					 * Lookup the symbol definition.
@@ -751,32 +752,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					sl.sl_imap = 0;
 					sl.sl_hash = 0;
 					sl.sl_rsymndx = rsymndx;
-
-					if (rtype == R_386_COPY)
-						sl.sl_flags = LKUP_COPY;
-					else
-						sl.sl_flags = LKUP_DEFT;
-
-					sl.sl_flags |= LKUP_ALLCNTLIST;
-
-					if (rtype != R_386_JMP_SLOT)
-						sl.sl_flags |= LKUP_SPEC;
-
-					/*
-					 * Under ldd -w, any unresolved weak
-					 * references are diagnosed.  Set the
-					 * symbol binding as global to trigger
-					 * a relocation error if the symbol can
-					 * not be found.
-					 */
-					if (LIST(lmp)->lm_flags &
-					    LML_FLG_TRC_NOUNRESWEAK) {
-						bind = STB_GLOBAL;
-					} else if ((bind =
-					    ELF_ST_BIND(symref->st_info)) ==
-					    STB_WEAK) {
-						sl.sl_flags |= LKUP_WEAK;
-					}
+					sl.sl_rsym = symref;
+					sl.sl_rtype = rtype;
+					sl.sl_flags = LKUP_STDRELOC;
 
 					symdef = lookup_sym(&sl, &_lmp, &binfo);
 
@@ -791,7 +769,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					if (symdef == 0) {
 					    Lm_list	*lml = LIST(lmp);
 
-					    if (bind != STB_WEAK) {
+					    if (sl.sl_bind != STB_WEAK) {
 						if (lml->lm_flags &
 						    LML_FLG_IGNRELERR) {
 						    continue;
@@ -1046,6 +1024,7 @@ _elf_copy_reloc(const char *name, Rt_map *rlmp, Rt_map *dlmp)
 	sl.sl_imap = rlmp;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
+	sl.sl_rsym = 0;
 	sl.sl_flags = LKUP_FIRST;
 
 	if ((symref = lookup_sym(&sl, &_lmp, &binfo)) == 0)

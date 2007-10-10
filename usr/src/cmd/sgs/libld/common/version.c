@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -260,10 +260,11 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			    (sdp->sd_ref != REF_REL_NEED)) {
 				sdp->sd_shndx = sdp->sd_sym->st_shndx = SHN_ABS;
 				sdp->sd_sym->st_info =
-					ELF_ST_INFO(bind, STT_OBJECT);
+				    ELF_ST_INFO(bind, STT_OBJECT);
 				sdp->sd_ref = REF_REL_NEED;
 				sdp->sd_flags |= FLG_SY_SPECSEC;
-				sdp->sd_flags1 |= FLG_SY1_GLOB;
+				sdp->sd_flags1 |=
+				    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
 				sdp->sd_aux->sa_overndx = vdp->vd_ndx;
 
 				/*
@@ -291,7 +292,8 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			DBG_CALL(Dbg_ver_symbol(ofl->ofl_lml, name));
 			if ((sdp = ld_sym_enter(name, sym, vdp->vd_hash,
 			    vdp->vd_file, ofl, 0, SHN_ABS, FLG_SY_SPECSEC,
-			    FLG_SY1_GLOB, &where)) == (Sym_desc *)S_ERROR)
+			    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+			    &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
 			sdp->sd_ref = REF_REL_NEED;
 			sdp->sd_aux->sa_overndx = vdp->vd_ndx;
@@ -647,7 +649,7 @@ ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		Half 		cnt = vdf->vd_cnt;
 		Half		ndx = vdf->vd_ndx;
 		Verdaux		*vdap = (Verdaux *)((uintptr_t)vdf +
-				    vdf->vd_aux);
+		    vdf->vd_aux);
 
 		/*
 		 * Keep track of the largest index for use in creating a
@@ -847,7 +849,7 @@ ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		const char	*name;
 		Half		cnt = vnd->vn_cnt;
 		Vernaux		*vnap = (Vernaux *)((uintptr_t)vnd +
-				    vnd->vn_aux);
+		    vnd->vn_aux);
 		Half		_cnt;
 
 		name = (char *)(str + vnd->vn_file);
@@ -900,21 +902,21 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 	vndx = ifl->ifl_versym[ndx];
 	if (vndx == 0) {
 		sdp->sd_flags |= FLG_SY_REDUCED;
-		sdp->sd_flags1 |= FLG_SY1_LOCL;
+		sdp->sd_flags1 |= FLG_SY1_HIDDEN;
 		return;
 	}
 
 	if (vndx == VER_NDX_ELIMINATE) {
 		sdp->sd_flags |= FLG_SY_REDUCED;
-		sdp->sd_flags1 |= (FLG_SY1_LOCL | FLG_SY1_ELIM);
+		sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
 		return;
 	}
 
 	if (vndx == VER_NDX_GLOBAL) {
-		if (!(sdp->sd_flags1 & FLG_SY1_LOCL)) {
-			sdp->sd_flags1 |= FLG_SY1_GLOB;
+		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
+			sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+		if (sdp->sd_aux->sa_overndx <= VER_NDX_GLOBAL)
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
-		}
 		return;
 	}
 
@@ -929,8 +931,8 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 		return;
 	}
 
-	if (!(sdp->sd_flags1 & FLG_SY1_LOCL))
-		sdp->sd_flags1 |= FLG_SY1_GLOB;
+	if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
+		sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
 
 	/*
 	 * Promote the symbols version index to the appropriate output version
@@ -1013,7 +1015,7 @@ ld_vers_verify(Ofl_desc *ofl)
 #else
 	if ((nv = getenv(MSG_ORIG(MSG_LD_NOVERSION_32))) == NULL)
 #endif
-	    nv = getenv(MSG_ORIG(MSG_LD_NOVERSION));
+		nv = getenv(MSG_ORIG(MSG_LD_NOVERSION));
 
 	if (nv && (*nv != '\0'))
 		return (1);

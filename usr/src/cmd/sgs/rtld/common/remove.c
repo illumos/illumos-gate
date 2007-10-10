@@ -1189,8 +1189,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 				 * must be bound to a filtee, so there's no need
 				 * to remain a part of this group either.
 				 */
-				if ((callable(lmp, dlmp, 0) == 0) ||
-				    callable(lmp, dlmp, ghp))
+				if ((callable(lmp, dlmp, 0, 0) == 0) ||
+				    callable(lmp, dlmp, ghp, 0))
 					continue;
 
 				if (gdp->gd_flags & GPD_REMOVE)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,9 +61,8 @@ make_mvsections(Ofl_desc *ofl)
 			/*
 			 * This global symbol goes to .sunwdata1
 			 */
-			size_sunwdata1 = (size_t)
-				S_ROUND(size_sunwdata1, sym->st_value) +
-				sym->st_size;
+			size_sunwdata1 = (size_t)S_ROUND(size_sunwdata1,
+			    sym->st_value) + sym->st_size;
 			if (align_val > align_sunwdata1)
 				align_sunwdata1 = align_val;
 
@@ -76,9 +75,8 @@ make_mvsections(Ofl_desc *ofl)
 				 * shared object, and this is a tentative symbol
 				 * this symbol goes to .sunwbss
 				 */
-				size_sunwbss = (size_t)
-					S_ROUND(size_sunwbss, sym->st_value) +
-					sym->st_size;
+				size_sunwbss = (size_t)S_ROUND(size_sunwbss,
+				    sym->st_value) + sym->st_size;
 				if (align_val > align_sunwbss)
 					align_sunwbss = align_val;
 			}
@@ -143,8 +141,7 @@ insert_mvitm(Ofl_desc *ofl, Psym_info *psymp, Mv_itm *itm)
 	 * head and tail.
 	 */
 	if (lnpc == (Listnode *) NULL) {
-		psymp->psym_mvs.tail =
-			psymp->psym_mvs.head = new;
+		psymp->psym_mvs.tail = psymp->psym_mvs.head = new;
 		return (1);
 	}
 
@@ -231,8 +228,8 @@ install_mv(Ofl_desc *ofl, Psym_info *psymp, Move *mv, Is_desc *isp)
 	for (i = 0; i < cnt; i++) {
 		/* LINTED */
 		mvitmp->mv_length = ELF_M_SIZE(mv->m_info);
-		mvitmp->mv_start = mv->m_poffset +
-			i * ((mv->m_stride + 1) * mvitmp->mv_length);
+		mvitmp->mv_start = mv->m_poffset + i *
+		    ((mv->m_stride + 1) * mvitmp->mv_length);
 		mvitmp->mv_ientry = mv;
 		mvitmp->mv_isp = isp;		/* Mark input section */
 
@@ -268,8 +265,7 @@ insert_psym(Ofl_desc *ofl, Psym_info *p1)
 	 * head and tail.
 	 */
 	if (lnpc == (Listnode *) NULL) {
-		ofl->ofl_parsym.tail =
-			ofl->ofl_parsym.head = new;
+		ofl->ofl_parsym.tail = ofl->ofl_parsym.head = new;
 		return (1);
 	}
 
@@ -485,7 +481,7 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 						    1)) == 0)
 							return (S_ERROR);
 						*(sdp->sd_osym) =
-							*(sdp->sd_sym);
+						    *(sdp->sd_sym);
 					}
 				}
 			} else
@@ -564,7 +560,7 @@ ld_sunwmove_preprocess(Ofl_desc *ofl)
 			 */
 			if (((sdp->sd_flags & FLG_SY_PAREXPN) == 0) &&
 			    ((ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL) ||
-			    ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
+			    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 			    (ofl->ofl_flags & FLG_OF_PROCRED)))) {
 				ofl->ofl_flags1 |= FLG_OF1_BSSOREL;
 			}

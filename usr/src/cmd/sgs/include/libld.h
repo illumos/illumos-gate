@@ -844,25 +844,46 @@ struct sym_avlnode {
 /*
  * Sym_desc.sd_flags1
  */
-#define	FLG_SY1_GLOB	0x00000001	/* global symbol, remain global */
-#define	FLG_SY1_PROT	0x00000002	/* global symbol, reduce to protected */
-#define	FLG_SY1_LOCL	0x00000004	/* global symbol, reduce to local */
-#define	FLG_SY1_DIR	0x00000008	/* global symbol, direct bindings */
-#define	FLG_SY1_NDIR	0x00000010	/* global symbol, nondirect bindings */
-#define	FLG_SY1_ELIM	0x00000020	/* global symbol, eliminate */
-#define	FLG_SY1_IGNORE	0x00000040	/* symbol should be ignored */
+#define	FLG_SY1_DEFAULT	0x00000001	/* global symbol, default */
+#define	FLG_SY1_SINGLE	0x00000002	/* global symbol, singleton defined */
+#define	FLG_SY1_PROTECT	0x00000004	/* global symbol, protected defined */
+#define	FLG_SY1_EXPORT	0x00000008	/* global symbol, exported defined */
 
-#define	MSK_SY1_DEFINED	(FLG_SY1_GLOB | FLG_SY1_PROT | FLG_SY1_LOCL)
-					/* The above mask indicates that */
-					/*    a symbol has been explicitly */
-					/*    scoped, and therefore is not */
-					/*    a candidate for auto-reduction */
+#define	MSK_SY1_GLOBAL \
+	(FLG_SY1_DEFAULT | FLG_SY1_SINGLE | FLG_SY1_PROTECT | FLG_SY1_EXPORT)
+					/* this mask indicates that the */
+					/*    symbol has been explicitly */
+					/*    defined within a mapfile */
+					/*    definition, and is a candidate */
+					/*    for versioning */
+
+#define	FLG_SY1_HIDDEN	0x00000010	/* global symbol, reduce to local */
+#define	FLG_SY1_ELIM	0x00000020	/* global symbol, eliminate */
+#define	FLG_SY1_IGNORE	0x00000040	/* global symbol, ignored */
+
+#define	MSK_SY1_LOCAL	(FLG_SY1_HIDDEN | FLG_SY1_ELIM | FLG_SY1_IGNORE)
+					/* this mask allows all local state */
+					/*    flags to be removed when the */
+					/*    symbol is copy relocated */
+
+#define	FLG_SY1_EXPDEF	0x00000100	/* symbol visibility defined */
+					/*    explicitly */
+
+#define	MSK_SY1_NOAUTO	(FLG_SY1_SINGLE | FLG_SY1_EXPORT | FLG_SY1_EXPDEF)
+					/* this mask indicates that the */
+					/*    symbol is not a  candidate for */
+					/*    auto-reduction/elimination */
+
+#define	FLG_SY1_MAPFILE 0x00000200	/* symbol attribute defined in a */
+					/*    mapfile */
+#define	FLG_SY1_DIR	0x00000400	/* global symbol, direct bindings */
+#define	FLG_SY1_NDIR	0x00000800	/* global symbol, nondirect bindings */
 
 /*
- * create a mask for (Sym.St_other & visibility) since the
- * gABI does not yet define a ELF*_ST_OTHER macro.
+ * Create a mask for (sym.st_other & visibility) since the gABI does not yet
+ * define a ELF*_ST_OTHER macro.
  */
-#define	MSK_SYM_VISIBILITY	0x03
+#define	MSK_SYM_VISIBILITY	0x7
 
 /*
  * Structure to manage the shared object definition lists.  There are two lists

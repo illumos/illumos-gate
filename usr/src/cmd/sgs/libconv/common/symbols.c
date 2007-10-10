@@ -38,13 +38,16 @@
 const char *
 conv_sym_other(uchar_t other, Conv_inv_buf_t *inv_buf)
 {
-	static const char	visibility[4] = {
+	static const char	visibility[7] = {
 		'D',	/* STV_DEFAULT */
 		'I',	/* STV_INTERNAL */
 		'H',	/* STV_HIDDEN */
-		'P'	/* STV_PROTECTED */
+		'P',	/* STV_PROTECTED */
+		'X',	/* STV_EXPORTED */
+		'S',	/* STV_SINGLETON */
+		'E'	/* STV_ELIMINATE */
 	};
-	uint_t		vis = ELF_ST_VISIBILITY(other);
+	uchar_t		vis = ELF_ST_VISIBILITY(other);
 	uint_t		ndx = 0;
 
 	inv_buf->buf[ndx++] = visibility[vis];
@@ -65,12 +68,16 @@ conv_sym_other_vis(uchar_t value, Conv_fmt_flags_t fmt_flags,
 {
 	static const Msg	vis[] = {
 		MSG_STV_DEFAULT,	MSG_STV_INTERNAL,
-		MSG_STV_HIDDEN,		MSG_STV_PROTECTED
+		MSG_STV_HIDDEN,		MSG_STV_PROTECTED,
+		MSG_STV_EXPORTED,	MSG_STV_SINGLETON,
+		MSG_STV_ELIMINATE
 	};
 
 	static const Msg	vis_alt[] = {
 		MSG_STV_DEFAULT_ALT,	MSG_STV_INTERNAL_ALT,
-		MSG_STV_HIDDEN_ALT,	MSG_STV_PROTECTED_ALT
+		MSG_STV_HIDDEN_ALT,	MSG_STV_PROTECTED_ALT,
+		MSG_STV_EXPORTED_ALT,	MSG_STV_SINGLETON_ALT,
+		MSG_STV_ELIMINATE_ALT
 	};
 
 	if (value >= (sizeof (vis) / sizeof (vis[0])))

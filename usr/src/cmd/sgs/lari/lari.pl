@@ -30,7 +30,8 @@
 #
 
 # Define all global variables (required for strict)
-use vars  qw($Prog $DestDir $ObjRef $ObjFlag $ObjSize $TmpDir $LddArgs $SymFlag);
+use vars  qw($Prog $DestDir $ObjRef $ObjFlag $ObjSize $ObjVis $TmpDir);
+use vars  qw($LddArgs $SymFlag);
 use vars  qw($Glob $Intp $Dirc $Cpyr $Prot $Extn $Self $Gfte $Plta $User $Func);
 use vars  qw($Sfte $Afte $Objt $Nodi $Osft $Oaft $Ssft $Saft $Msft);
 use vars  qw($Rtld $GlobWeak $MultSyms $CrtSyms $Platform $DbgSeed %opt);
@@ -112,6 +113,7 @@ $Msft = 0xf0000;	# filter mask
 $ObjRef =	0;
 $ObjFlag =	1;
 $ObjSize =	2;
+$ObjVis =	3;
 
 # Offset into $SymFltr{$SymName}{$Filtee} array.
 $SymFlag = 	0;
@@ -157,12 +159,12 @@ sub Cleanup {
 }
 
 # Check that we have arguments.
-if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
+if ((getopts('abCDd:imosVv', \%opt) == 0) || ($#ARGV < 0)) {
 	printf STDERR gettext("usage:\n");
 	printf STDERR
-	    gettext("    %s [-bCDsv] [-a | -i | -o ] file | dir ...\n"), $Prog;
+	    gettext("    %s [-bCDsVv] [-a | -i | -o ] file | dir ...\n"), $Prog;
 	printf STDERR
-	    gettext("    %s [-CDosv] [-m [-d mapdir]] file\n"), $Prog;
+	    gettext("    %s [-CDosVv] [-m [-d mapdir]] file\n"), $Prog;
 	print STDERR
 	    gettext("\t[-a]     print diagnostics for all symbols\n");
 	print STDERR
@@ -181,6 +183,8 @@ if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
 	    gettext("\t[-o]     limit diagnostics to overhead information\n");
 	print STDERR
 	    gettext("\t[-s]     save bindings information created by ldd(1)\n");
+	print STDERR
+	    gettext("\t[-V]     append interesting symbol visibilities\n");
 	print STDERR
 	    gettext("\t[-v]     ignore versioned objects\n");
 	exit 1;
@@ -870,7 +874,7 @@ sub ProcBindings {
 
 		foreach my $SymName (keys(%Symbols)) {
 			my ($Cnt);
-
+			
 			# If we're looking for interesting symbols, inspect
 			# each definition of each symbol.  If one is found to
 			# be interesting, the whole family are printed.
@@ -885,6 +889,8 @@ sub ProcBindings {
 				my ($DemName, $Type);
 				my ($Flag) = $Symbols{$SymName}{$Obj}[$ObjFlag];
 				my ($Str) = "$Cnt:";
+				my ($Vis);
+				my ($DisVis) = "";
 
 				# Do we just want overhead symbols.  Consider
 				# copy-relocations, and plt address binding,
@@ -997,12 +1003,25 @@ sub ProcBindings {
 				# Demangle the symbol name if desired.
 				$DemName = Demangle($SymName);
 
+				# If symbol visibility differences are
+				# interesting, append the verbose representation
+				# of any interesting visibilities.
+				$Vis = $Symbols{$SymName}{$Obj}[$ObjVis];
+				if ($opt{V} && $Vis) {
+					if ($Vis =~ 'S') {
+						$DisVis = "  (singleton)";
+					} elsif ($Vis =~ 'P') {
+						$DisVis = "  (protected)";
+					}
+				}
 				if ($Mult) {
 					print SORT "  [$Str]: " .
-					    "$SymName$Type$DemName: $Obj\n";
+					    "$SymName$Type$DemName: " .
+					    "$Obj$DisVis\n";
 				} else {
 					print SORT "[$Str]: " .
-					    "$SymName$Type$DemName: $Obj\n";
+					    "$SymName$Type$DemName: " .
+					    "$Obj$DisVis\n";
 				}
 			}
 		}
@@ -1462,6 +1481,7 @@ sub GetAllSymbols {
 		}
 
 		$Symbols{$Fields[8]}{$Obj}[$ObjFlag] |= $Flags;
+		$Symbols{$Fields[8]}{$Obj}[$ObjVis] = $Fields[5];
 		$Objects{$Obj}{$Fields[8]} |= $Flags;
 
 		# If the version field is non-null this object has already been

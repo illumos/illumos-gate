@@ -329,7 +329,6 @@ check_flags(Ofl_desc * ofl, int argc)
 			 * by -zdirect or mapfile DIRECT directives.
 			 */
 			if (Bdflag == SET_FALSE) {
-				ofl->ofl_dtflags_1 |= DF_1_NODIRECT;
 				ofl->ofl_flags1 |=
 				    (FLG_OF1_NDIRECT | FLG_OF1_ALNODIR);
 				ofl->ofl_flags |= FLG_OF_SYMINFO;

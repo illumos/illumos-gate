@@ -407,7 +407,9 @@ typedef struct {
  * Binding information.  Note, this is or'ed in with the DBG_BINFO flags to
  * convey information regarding symbol bindings.
  */
-#define	BINFO_DIRECTDIS	0x10000		/* a direct binding has been disabled */
+#define	BINFO_REJDIRECT	0x10000		/* reject a direct binding */
+#define	BINFO_REJSINGLE	0x20000		/* reject a singleton binding */
+#define	BINFO_REJECTED	0xf0000		/* a binding has been rejected */
 
 /*
  * Data declarations.
@@ -516,7 +518,7 @@ extern int		bufprint(Prfbuf *, const char *, ...);
 extern void		call_array(Addr *, uint_t, Rt_map *, Word);
 extern void		call_fini(Lm_list *, Rt_map **);
 extern void		call_init(Rt_map **, int);
-extern int		callable(Rt_map *, Rt_map *, Grp_hdl *);
+extern int		callable(Rt_map *, Rt_map *, Grp_hdl *, uint_t);
 extern Rt_map		*_caller(caddr_t, int);
 extern caddr_t		caller(void);
 extern void		*calloc(size_t, size_t);

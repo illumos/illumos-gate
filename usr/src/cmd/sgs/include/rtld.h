@@ -345,6 +345,7 @@ struct lm_list32 {
 						/*	dependencies remain */
 #define	LML_FLG_INTRPOSETSORT	0x00020000	/* interpose tsorting done */
 #define	LML_FLG_AUDITNOTIFY	0x00040000	/* audit consistent required */
+#define	LML_FLG_GROUPSEXIST	0x00080000	/* local groups exist */
 
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
@@ -839,7 +840,8 @@ typedef struct rt_map32 {
 					/*	only */
 #define	LKUP_COPY	0x0008		/* lookup symbol for a COPY reloc, do */
 					/*	not bind to symbol at head */
-#define	LKUP_ALLCNTLIST	0x0010		/* lookup symbol in all control lists */
+#define	LKUP_STDRELOC	0x0010		/* lookup originates from a standard */
+					/*	relocation (elf_reloc()) */
 #define	LKUP_SELF	0x0020		/* lookup symbol in ourself - undef */
 					/*	is valid */
 #define	LKUP_WEAK	0x0040		/* relocation reference is weak */
@@ -849,6 +851,9 @@ typedef struct rt_map32 {
 					/*	pending lazy dependencies */
 #define	LKUP_DIRECT	0x0400		/* direct binding request */
 #define	LKUP_SYMNDX	0x0800		/* establish symbol index */
+#define	LKUP_SINGLETON	0x1000		/* search for a singleton symbol */
+#define	LKUP_STANDARD	0x2000		/* standard lookup - originated from */
+					/* 	head link-map element */
 
 /*
  * Data structure for calling lookup_sym()
@@ -859,6 +864,10 @@ typedef struct {
 	Rt_map		*sl_imap;	/* initial link-map to search */
 	ulong_t		sl_hash;	/* symbol hash value */
 	ulong_t		sl_rsymndx;	/* referencing reloc symndx */
+	Sym		*sl_rsym;	/* referencing symbol */
+	uchar_t		sl_rtype;	/* relocation type associate with */
+					/*    symbol */
+	uchar_t		sl_bind;	/* symbols binding (returned) */
 	uint_t		sl_flags;	/* lookup flags */
 } Slookup;
 

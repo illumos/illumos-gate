@@ -1166,6 +1166,40 @@ releases:
 6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
 --------------------------------------------------------------------------------
 
+-------------------------------------
+Solaris 10 TBD (5th Q-update - s10u5)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6561987 data vac_conflict faults on lipthread libthread libs in s10.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T127111-01
+    Solaris/SunOS 5.10_x86	patch T127112-01
+--------------------------------------------------------------------------------
+6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
+6532924 AMD64: Solaris 5.11 55b: SEGV after whocatches
+6551627 OGL: SIGSEGV when trying to use OpenGL pipeline with splash screen,
+	Solaris/Nvidia only
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T127111-XX
+    Solaris/SunOS 5.10_x86	patch T127112-XX
+--------------------------------------------------------------------------------
+6479848 Enhancements to the linker support interface needed. (D)
+	PSARC/2006/595 link-editor support library interface - ld_open()
+6521608	assertion failure in runtime linker related to auditing
+6494228 pclose() error when an audit library calls popen() and the main target
+	is being run under ldd (D)
+6568745 segfault when using LD_DEBUG with bit_audit library when instrumenting
+	mozilla (D)
+	PSARC/2007/413 Add -zglobalaudit option to ld
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T127111-XX
+    Solaris/SunOS 5.10_x86	patch T127112-XX
+--------------------------------------------------------------------------------
+
 --------------
 Solaris Nevada
 --------------
@@ -1182,8 +1216,6 @@ Bugid   Risk Synopsis
 	PSARC/2006/558 R_*_SIZE relocation support
 6475375 symbol search optimization to reduce rescans
 6475497 elfdump(1) is misreporting sh_link
-6479848 Enhancements to the linker support interface needed. (D)
-	PSARC/2006/595 link-editor support library interface - ld_open()
 6482058 lari(1) could be faster, and handle per-symbol filters better
 6482974 defining virtual address of text segment can result in an invalid data
 	segment
@@ -1193,7 +1225,6 @@ Bugid   Risk Synopsis
 6488141 ld(1) should detect attempt to reference 0-length .bss section
 6496718 restricted visibility symbol references should trigger archive
 	extraction
-6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
 6515970 HWCAP processing doesn't clean up fmap structure - browser fails to
 	run java applet
 6494214 Refinements to symbolic binding, symbol declarations and
@@ -1201,14 +1232,11 @@ Bugid   Risk Synopsis
 	PSARC/2006/714 ld(1) mapfile: symbol interpose definition
 6475344 DTrace needs ELF function and data symbols sorted by address (D)
 	PSARC/2007/026 ELF symbol sort sections
-6494228 pclose() error when an audit library calls popen() and the main target
-	is being run under ldd (D)
 6518480 ld -melf_i386 doesn't complain (D)
 6519951 bfu is just another word for exit today (RPATH -> RUNPATH conversion
 	bites us)  (D) 
 6521504 ld: hardware capabilities processing from relocatables objects needs
 	hardening.
-6521608	assertion failure in runtime linker related to auditing
 6518322 Some ELF utilities need updating for .SUNW_ldynsym section (D)
 	PSARC/2007/074 -L option for nm(1) to display SHT_SUNW_LDYNSYM symbols
 6523787 dlopen() handle gets mistakenly orphaned - results in access to freed
@@ -1235,20 +1263,13 @@ Bugid   Risk Synopsis
 6246083 elfdump should allow section index specification
 	(numeric -N equivalent) (D)
 	PSARC/2007/247 Add -I option to elfdump
-6532924 AMD64: Solaris 5.11 55b: SEGV after whocatches
-6551627 OGL: SIGSEGV when trying to use OpenGL pipeline with splash screen,
-	Solaris/Nvidia only
 6556563 elfdump section overlap checking is too slow for large files
 5006034 need ?E mapfile feature extension (D)
-6561987 data vac_conflict faults on lipthread libthread libs in s10.
 6565476 rtld symbol version check prevents GNU ld binary from running
 6567670 ld(1) symbol size/section size verification uncovers Haskell
 	compiler inconsistency
 6530249 elfdump should handle ELF files with no section header table (D)
 	PSARC/2007/395 Add -P option to elfdump
-6568745 segfault when using LD_DEBUG with bit_audit library when instrumenting
-	mozilla (D)
-	PSARC/2007/413 Add -zglobalaudit option to ld
 6573641 ld.so.1 does not maintain parent relationship to a dlopen() caller.
 6577462 Additional improvements needed to handling of gcc's symbol versioning
 6583742 ELF string conversion library needs to lose static writable buffers
@@ -1259,10 +1280,13 @@ Bugid   Risk Synopsis
 6602294 ps_pbrandname breaks apps linked directly against librtld_db
 	(link-editor components only)
 6603313 dlclose() can fail to unload objects after fix for 6573641
-6234471 need a way to edit ELF objects
+6234471 need a way to edit ELF objects (D)
 	PSARC/2007/509 elfedit
 5035454 mixing -Kpic and -KPIC may cause SIGSEGV with -xarch=v9
 6473571 strip and mcs get confused and corrupt files when passed
 	non-ELF arguments
 6253589 mcs has problems handling multiple SHT_NOTE sections
 6610591 do_reloc() should not require unused arguments
+6602451 new symbol visibilities required: EXPORTED, SINGLETON and ELIMINATE (D)
+	PSARC/2007/559 new symbol visibilities - EXPORTED, SINGLETON, and
+	ELIMINATE

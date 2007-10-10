@@ -118,6 +118,7 @@ aout_bndr(caddr_t pc)
 	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
+	sl.sl_rsym = 0;
 	sl.sl_flags = LKUP_DEFT;
 
 	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo)) == 0) {
@@ -286,7 +287,9 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			sl.sl_imap = 0;
 			sl.sl_hash = 0;
 			sl.sl_rsymndx = 0;
-			sl.sl_flags = (LKUP_DEFT | LKUP_ALLCNTLIST);
+			sl.sl_rsym = 0;
+			sl.sl_rtype = 0;
+			sl.sl_flags = (LKUP_DEFT | LKUP_STDRELOC);
 
 			if ((sym = aout_lookup_sym(&sl, &_lmp, &binfo)) == 0) {
 				if (lml->lm_flags & LML_FLG_TRC_WARN) {

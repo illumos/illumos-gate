@@ -2490,7 +2490,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 		if ((FLAGS(lmp) & MSK_RT_INTPOSE) == 0)
 			break;
 
-		if (callable(lmp, *dlmp, 0)) {
+		if (callable(lmp, *dlmp, 0, sl.sl_flags)) {
 			Rt_map	*ilmp;
 
 			sl.sl_imap = lmp;
@@ -2631,7 +2631,7 @@ found:
 }
 
 static Sym *
-_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
+core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
     Aliste off)
 {
 	Rt_map	*lmp;
@@ -2646,11 +2646,12 @@ _lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 		lmp = ilmp;
 
 	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
-		if (callable(slp->sl_cmap, lmp, 0)) {
+		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {
 			Sym	*sym;
 
 			slp->sl_imap = lmp;
-			if ((sym = SYMINTP(lmp)(slp, dlmp, binfo)) != 0)
+			if (((sym = SYMINTP(lmp)(slp, dlmp, binfo)) != 0) ||
+			    (*binfo & BINFO_REJSINGLE))
 				return (sym);
 		}
 	}
@@ -2665,7 +2666,7 @@ _lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	for (lmp = ilmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {
 		if (LAZY(lmp) == 0)
 			continue;
-		if (callable(slp->sl_cmap, lmp, 0)) {
+		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {
 			Sym	*sym;
 
 			slp->sl_imap = lmp;
@@ -2676,32 +2677,16 @@ _lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	return (0);
 }
 
-/*
- * Symbol lookup routine.  Takes an ELF symbol name, and a list of link maps to
- * search (if the flag indicates LKUP_FIRST only the first link map of the list
- * is searched ie. we've been called from dlsym()).
- * If successful, return a pointer to the symbol table entry and a pointer to
- * the link map of the enclosing object.  Else return a null pointer.
- *
- * To improve elf performance, we first compute the elf hash value and pass
- * it to each find_sym() routine.  The elf function will use this value to
- * locate the symbol, the a.out function will simply ignore it.
- */
-Sym *
-lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+static Sym *
+_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 {
 	const char	*name = slp->sl_name;
 	Rt_map		*clmp = slp->sl_cmap;
 	Rt_map		*ilmp = slp->sl_imap, *lmp;
-	uint_t		flags = slp->sl_flags;
 	ulong_t		rsymndx;
-	Sym		*sym = 0;
+	Sym		*sym;
 	Syminfo		*sip;
 	Slookup		sl;
-
-	if (slp->sl_hash == 0)
-		slp->sl_hash = elf_hash(name);
-	*binfo = 0;
 
 	/*
 	 * Search the initial link map for the required symbol (this category is
@@ -2709,7 +2694,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * required symbol.  Therefore, we know we have permission to look at
 	 * the link map).
 	 */
-	if (flags & LKUP_FIRST)
+	if (slp->sl_flags & LKUP_FIRST)
 		return (SYMINTP(ilmp)(slp, dlmp, binfo));
 
 	/*
@@ -2719,7 +2704,6 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 */
 	if (((rsymndx = slp->sl_rsymndx) != 0) &&
 	    ((sip = SYMINFO(clmp)) != 0)) {
-
 		/*
 		 * Find the corresponding Syminfo entry for the original
 		 * referencing symbol.
@@ -2744,7 +2728,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			/*
 			 * If direct bindings have been disabled, and this isn't
 			 * a translator, skip any direct binding now that we've
-			 * insured the resolving object has been loaded.
+			 * ensured the resolving object has been loaded.
 			 *
 			 * If we need to direct bind to anything, we look in
 			 * ourselves, our parent, or in the link map we've just
@@ -2753,25 +2737,40 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			 * symbols from the head of the link map list.
 			 */
 			if (((FLAGS(clmp) & FLG_RT_TRANS) ||
-			    (!(LIST(clmp)->lm_tflags & LML_TFLG_NODIRECT))) &&
+			    ((!(LIST(clmp)->lm_tflags & LML_TFLG_NODIRECT)) &&
+			    (!(slp->sl_flags & LKUP_SINGLETON)))) &&
 			    ((FLAGS1(clmp) & FL1_RT_DIRECT) ||
 			    (sip->si_flags & SYMINFO_FLG_DIRECTBIND))) {
 				sym = lookup_sym_direct(slp, dlmp, binfo,
 				    sip, lmp);
 
 				/*
-				 * If this direct binding has been disabled
-				 * (presumably because the symbol definition has
-				 * been changed since the referring object was
-				 * built), fall back to a standard symbol
+				 * Determine whether this direct binding has
+				 * been rejected.  If we've bound to a singleton
+				 * without following a singleton search, then
+				 * return.  The caller detects this condition
+				 * and will trigger a new singleton search.
+				 *
+				 * For any other rejection (such as binding to
+				 * a symbol labeled as nodirect - presumably
+				 * because the symbol definition has been
+				 * changed since the referring object was last
+				 * built), fall through to a standard symbol
 				 * search.
 				 */
-				if ((*binfo & BINFO_DIRECTDIS) == 0)
+				if (((*binfo & BINFO_REJECTED) == 0) ||
+				    (*binfo & BINFO_REJSINGLE))
 					return (sym);
+
+				*binfo &= ~BINFO_REJECTED;
 			}
 		}
 	}
 
+	/*
+	 * Duplicate the lookup information, as we'll need to modify this
+	 * information for some of the following searches.
+	 */
 	sl = *slp;
 
 	/*
@@ -2779,7 +2778,8 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * referencing object for the symbol first.  Failing that, fall back to
 	 * our generic search.
 	 */
-	if (FLAGS1(clmp) & FL1_RT_SYMBOLIC) {
+	if ((FLAGS1(clmp) & FL1_RT_SYMBOLIC) &&
+	    ((sl.sl_flags & LKUP_SINGLETON) == 0)) {
 		sl.sl_imap = clmp;
 		if (sym = SYMINTP(clmp)(&sl, dlmp, binfo)) {
 			ulong_t	dsymndx = (((ulong_t)sym -
@@ -2798,25 +2798,36 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		}
 	}
 
+	sl.sl_flags |= LKUP_STANDARD;
+
 	/*
 	 * If this lookup originates from a standard relocation, then traverse
-	 * all link-map lists inspecting any object that is available to this
-	 * caller.  Otherwise, traverse the link-map list associate with the
-	 * caller.
+	 * all link-map control lists, inspecting any object that is available
+	 * to this caller.  Otherwise, traverse the link-map control list
+	 * associated with the caller.
 	 */
-	if (flags & LKUP_ALLCNTLIST) {
+	if (sl.sl_flags & LKUP_STDRELOC) {
 		Aliste	off;
 		Lm_cntl	*lmc;
 
-		sym = 0;
+		sym = NULL;
 
 		for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, off, lmc)) {
-			if ((sym = _lookup_sym(lmc->lc_head, &sl, dlmp,
-			    binfo, off)) != 0)
+			if (((sym = core_lookup_sym(lmc->lc_head, &sl, dlmp,
+			    binfo, off)) != NULL) ||
+			    (*binfo & BINFO_REJSINGLE))
 				break;
 		}
 	} else
-		sym = _lookup_sym(ilmp, &sl, dlmp, binfo, ALO_DATA);
+		sym = core_lookup_sym(ilmp, &sl, dlmp, binfo, ALO_DATA);
+
+	/*
+	 * If a symbol binding was rejected, because a binding occurred to a
+	 * singleton without following the default symbol search, return so
+	 * that the search can be repreated.
+	 */
+	if (*binfo & BINFO_REJSINGLE)
+		return (sym);
 
 	/*
 	 * To allow transitioning into a world of lazy loading dependencies see
@@ -2826,10 +2837,10 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * the reference can be satisfied.  Use of dlsym(RTLD_PROBE) sets the
 	 * LKUP_NOFALBACK flag, and this flag disables this fall back.
 	 */
-	if ((sym == 0) && ((sl.sl_flags & LKUP_NOFALBACK) == 0)) {
+	if ((sym == NULL) && ((sl.sl_flags & LKUP_NOFALBACK) == 0)) {
 		if ((lmp = ilmp) == 0)
 			lmp = LIST(clmp)->lm_head;
-		if ((flags & LKUP_WEAK) || (LIST(lmp)->lm_lazy == 0))
+		if ((sl.sl_flags & LKUP_WEAK) || (LIST(lmp)->lm_lazy == 0))
 			return ((Sym *)0);
 
 		DBG_CALL(Dbg_syms_lazy_rescan(LIST(clmp), name));
@@ -2839,7 +2850,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		 * looking for dependencies from the caller, otherwise use the
 		 * initial link-map.
 		 */
-		if (flags & LKUP_NEXT)
+		if (sl.sl_flags & LKUP_NEXT)
 			sym = _lazy_find_sym(clmp, &sl, dlmp, binfo);
 		else {
 			Aliste	off;
@@ -2852,6 +2863,87 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 					break;
 			}
 		}
+	}
+	return (sym);
+}
+
+/*
+ * Symbol lookup routine.  Takes an ELF symbol name, and a list of link maps to
+ * search.  If successful, return a pointer to the symbol table entry, a
+ * pointer to the link map of the enclosing object, and information relating
+ * to the type of binding.  Else return a null pointer.
+ *
+ * To improve elf performance, we first compute the elf hash value and pass
+ * it to each find_sym() routine.  The elf function will use this value to
+ * locate the symbol, the a.out function will simply ignore it.
+ */
+Sym *
+lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
+{
+	const char	*name = slp->sl_name;
+	Rt_map		*clmp = slp->sl_cmap;
+	Sym		*rsym = slp->sl_rsym, *sym = 0;
+	uchar_t		rtype = slp->sl_rtype;
+
+	if (slp->sl_hash == 0)
+		slp->sl_hash = elf_hash(name);
+	*binfo = 0;
+
+	/*
+	 * Establish any state that might be associated with a symbol reference.
+	 */
+	if (rsym) {
+		if ((slp->sl_flags & LKUP_STDRELOC) &&
+		    (ELF_ST_BIND(rsym->st_info) == STB_WEAK))
+			slp->sl_flags |= LKUP_WEAK;
+
+		if (ELF_ST_VISIBILITY(rsym->st_other) == STV_SINGLETON)
+			slp->sl_flags |= LKUP_SINGLETON;
+	}
+
+	/*
+	 * Establish any lookup state required for this type of relocation.
+	 */
+	if ((slp->sl_flags & LKUP_STDRELOC) && rtype) {
+		if (rtype == M_R_COPY)
+			slp->sl_flags |= LKUP_COPY;
+
+		if (rtype != M_R_JMP_SLOT)
+			slp->sl_flags |= LKUP_SPEC;
+	}
+
+	/*
+	 * Under ldd -w, any unresolved weak references are diagnosed.  Set the
+	 * symbol binding as global to trigger a relocation error if the symbol
+	 * can not be found.
+	 */
+	if (rsym) {
+		if (LIST(slp->sl_cmap)->lm_flags & LML_FLG_TRC_NOUNRESWEAK)
+			slp->sl_bind = STB_GLOBAL;
+		else if ((slp->sl_bind = ELF_ST_BIND(rsym->st_info)) ==
+		    STB_WEAK)
+			slp->sl_flags |= LKUP_WEAK;
+	}
+
+	/*
+	 * Carry out an initial symbol search.  This search takes into account
+	 * all the modes of the requested search.
+	 */
+	if (((sym = _lookup_sym(slp, dlmp, binfo)) == NULL) &&
+	    (*binfo & BINFO_REJSINGLE)) {
+		Slookup	sl = *slp;
+
+		/*
+		 * If a binding has been rejected because of binding to a
+		 * singleton without going through a singleton search, then
+		 * reset the lookup data, and try again.
+		 */
+		sl.sl_imap = LIST(sl.sl_cmap)->lm_head;
+		sl.sl_flags &= ~(LKUP_FIRST | LKUP_SELF | LKUP_NEXT);
+		sl.sl_flags |= LKUP_SINGLETON;
+		sl.sl_rsymndx = 0;
+		*binfo &= ~BINFO_REJECTED;
+		sym = _lookup_sym(&sl, dlmp, binfo);
 	}
 
 	/*

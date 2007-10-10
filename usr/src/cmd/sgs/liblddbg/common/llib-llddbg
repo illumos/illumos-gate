@@ -59,6 +59,8 @@ void	Dbg64_bind_global(Rt_map *, Elf64_Addr, Elf64_Off, Elf64_Xword,
 	    Pltbindtype, Rt_map *, Elf64_Addr, Elf64_Off, const char *, uint_t);
 void	Dbg64_bind_pltpad_to(Rt_map *, Addr, const char *, const char *);
 void	Dbg64_bind_pltpad_from(Rt_map *, Addr, const char *);
+void	Dbg32_bind_reject(Rt_map *, Rt_map *, const char *, int);
+void	Dbg64_bind_reject(Rt_map *, Rt_map *, const char *, int);
 void	Dbg32_bind_weak(Rt_map *, Elf32_Addr, Elf32_Addr, const char *);
 void	Dbg64_bind_weak(Rt_map *, Elf64_Addr, Elf64_Addr, const char *);
 

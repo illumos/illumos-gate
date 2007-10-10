@@ -289,6 +289,13 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 
 			if (hdl_add(ghp, nlmp, ndflags) == 0)
 				return (0);
+
+			/*
+			 * Indicate that a local group now exists.  This state
+			 * allows singleton searches to be optimized.
+			 */
+			if ((hflags & GPH_LDSO) == 0)
+				LIST(nlmp)->lm_flags |= LML_FLG_GROUPSEXIST;
 		}
 	} else {
 		/*
@@ -955,7 +962,7 @@ _dlmopen(Lmid_t lmid, const char *path, int mode)
  * Handle processing for dlsym.
  */
 Sym *
-dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
+dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 {
 	Rt_map		*nlmp, * lmp = ghp->gh_ownlmp;
 	Rt_map		*clmp = slp->sl_cmap;
@@ -1115,15 +1122,15 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 void *
 dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 {
-	Sym		*sym;
+	Sym		*sym = NULL;
 	Syminfo		*sip;
 	Slookup		sl;
 	uint_t		binfo;
 
 	sl.sl_name = name;
 	sl.sl_cmap = clmp;
-	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
+	sl.sl_rsym = 0;
 
 	/*
 	 * Standard relocations are evaluated using the symbol index of the
@@ -1133,18 +1140,34 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	 * symbol table entry for the same name, then establish the symbol
 	 * index so that any dependency requirements can be triggered.
 	 */
-	if (((intptr_t)handle < 0) && (sip = SYMINFO(clmp)) != 0) {
-		sl.sl_imap = clmp;
-		sl.sl_flags = LKUP_SYMNDX;
-		sl.sl_hash = elf_hash(name);
+	sl.sl_imap = clmp;
+	sl.sl_flags = LKUP_SYMNDX;
+	sl.sl_hash = elf_hash(name);
 
-		if ((sym = SYMINTP(clmp)(&sl, 0, 0)) != NULL) {
-			sl.sl_rsymndx = (((ulong_t)sym -
-			    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
-		}
+	if ((FCT(clmp) == &elf_fct) &&
+	    ((sym = SYMINTP(clmp)(&sl, 0, 0)) != NULL)) {
+		sl.sl_rsymndx = (((ulong_t)sym -
+		    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
+		sl.sl_rsym = sym;
 	}
 
-	if (handle == RTLD_NEXT) {
+	if (sym && (ELF_ST_VISIBILITY(sym->st_other) == STV_SINGLETON)) {
+		Rt_map	*hlmp = LIST(clmp)->lm_head;
+
+		/*
+		 * If a symbol reference is known, and that reference indicates
+		 * that the symbol is a singleton, then the search for the
+		 * symbol must follow the default search path.
+		 */
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_SINGLETON));
+
+		sl.sl_imap = hlmp;
+		sl.sl_flags = LKUP_SPEC;
+		if (handle == RTLD_PROBE)
+			sl.sl_flags |= LKUP_NOFALBACK;
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+
+	} else if (handle == RTLD_NEXT) {
 		Rt_map	*nlmp;
 
 		/*
@@ -1154,7 +1177,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * lookup_sym(), however here, we must do this up-front, as
 		 * lookup_sym() will be used to inspect the next object.
 		 */
-		if (sl.sl_rsymndx) {
+		if ((sl.sl_rsymndx) && ((sip = SYMINFO(clmp)) != 0)) {
 			/* LINTED */
 			sip = (Syminfo *)((char *)sip +
 			    (sl.sl_rsymndx * SYMINENT(clmp)));
@@ -1169,6 +1192,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 			 * lookup_sym() of the next object.
 			 */
 			sl.sl_rsymndx = 0;
+			sl.sl_rsym = 0;
 		}
 
 		/*
@@ -1197,7 +1221,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		    DBG_DLSYM_SELF));
 
 		sl.sl_imap = clmp;
-		sl.sl_flags = LKUP_SPEC;
+		sl.sl_flags = (LKUP_SPEC | LKUP_SELF);
 		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
 
 	} else if (handle == RTLD_DEFAULT) {

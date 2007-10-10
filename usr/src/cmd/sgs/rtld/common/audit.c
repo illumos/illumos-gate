@@ -878,6 +878,7 @@ audit_symget(Audit_list * alp, int info)
 	sl.sl_imap = lmp;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
+	sl.sl_rsym = 0;
 	sl.sl_flags = LKUP_FIRST;
 
 	if (sym = LM_LOOKUP_SYM(lmp)(&sl, &_lmp, &binfo)) {

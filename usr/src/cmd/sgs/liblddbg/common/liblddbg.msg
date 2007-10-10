@@ -303,6 +303,11 @@
 @ MSG_BND_WEAK_2	"binding file=%s (%#llx:%#llx) to 0x0 \
 			 (undefined weak): symbol `%s'"
 
+@ MSG_BND_REJECT	"binding file=%s to file=%s: symbol `%s': rejected: %s"
+@ MSG_BNDREJ_NODIR	"attempt to directly bind to a NODIRECT definition"
+@ MSG_BNDREJ_SINGLE	"attempt to bind to a SINGLETON definition without \
+			 following default search model"
+
 @ MSG_BND_PLTPAD_TO	"   pltpad: %#llx: file=%s bound to file=%s: \
 			 symbol `%s'"
 @ MSG_BND_PLTPAD_FROM	"   pltpad: %#llx: bound from file=%s: symbol `%s'"
@@ -1169,6 +1174,7 @@
 @ MSG_SYM_DEFAULT	"[ RTLD_DEFAULT ]"
 @ MSG_SYM_SELF		"[ RTLD_SELF ]"
 @ MSG_SYM_PROBE		"[ RTLD_PROBE ]"
+@ MSG_SYM_SINGLETON	"( singleton reference )"
 
 # Link-map mode strings
 
