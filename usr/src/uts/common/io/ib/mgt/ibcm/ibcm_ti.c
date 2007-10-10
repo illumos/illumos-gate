@@ -1243,6 +1243,21 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		if (ret_priv_data_len_p != NULL)
 			*ret_priv_data_len_p = 0;
 
+		if ((mode == IBT_BLOCKING) ||
+		    (mode == IBT_NOCALLBACKS)) {
+			IBCM_GET_CHAN_PRIVATE(channel, statep);
+			if (statep == NULL)
+				return (IBT_SUCCESS);
+			mutex_enter(&statep->state_mutex);
+			IBCM_RELEASE_CHAN_PRIVATE(channel);
+			IBCM_REF_CNT_INCR(statep);
+			while (statep->close_done != B_TRUE)
+				cv_wait(&statep->block_client_cv,
+				    &statep->state_mutex);
+			IBCM_REF_CNT_DECR(statep);
+			mutex_exit(&statep->state_mutex);
+		}
+
 		IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel: chan 0x%p "
 		    "already marked for closing", channel);
 
