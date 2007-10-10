@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1194,11 +1194,17 @@ extern "C" {
 #define	CPU_CE_NOT_DEFERRED	(C_AFSR_CECC_ERRS & \
 		~(C_AFSR_CE | C_AFSR_FRC | C_AFSR_RCE | C_AFSR_EMC))
 #else /* JALAPENO || SERRANO */
-#define	CPU_CE_NOT_DEFERRED		C_AFSR_CECC_ERRS & \
-					    ~(C_AFSR_CE | C_AFSR_EMC)
+#if defined(CHEETAH_PLUS)
+#define	CPU_CE_NOT_DEFERRED	(C_AFSR_CECC_ERRS & \
+		~(C_AFSR_CE | C_AFSR_EMC | C_AFSR_THCE))
+#else /* CHEETAH_PLUS */
+#define	CPU_CE_NOT_DEFERRED	(C_AFSR_CECC_ERRS & \
+		~(C_AFSR_CE | C_AFSR_EMC))
+#endif /* CHEETAH_PLUS */
 #endif /* JALAPENO || SERRANO */
 
-#define	CPU_CE_NOT_DEFERRED_EXT		C_AFSR_EXT_CECC_ERRS
+#define	CPU_CE_NOT_DEFERRED_EXT	(C_AFSR_EXT_CECC_ERRS & \
+		~(C_AFSR_L3_THCE))
 
 #if defined(CHEETAH_PLUS)
 

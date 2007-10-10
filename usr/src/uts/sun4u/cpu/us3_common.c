@@ -1688,7 +1688,7 @@ cpu_disrupting_error(struct regs *rp, ulong_t p_clo_flags)
 	 * of a error happening between checking the AFSR and enabling CEEN.
 	 */
 	if (ch_flt.flt_trapped_ce & CE_CEEN_NODEFER)
-	    set_error_enable(get_error_enable() | EN_REG_CEEN);
+		set_error_enable(get_error_enable() | EN_REG_CEEN);
 	if (clear_errors(&ch_flt)) {
 		(void) cpu_queue_events(&ch_flt, pr_reason, ch_flt.afsr_errs,
 		    NULL);
@@ -1893,10 +1893,9 @@ cpu_deferred_error(struct regs *rp, ulong_t p_clo_flags)
 	 * Log any errors that occurred
 	 */
 	if (((log_afsr &
-		((C_AFSR_ALL_ERRS | C_AFSR_EXT_ALL_ERRS) & ~C_AFSR_ME)) &&
-		cpu_queue_events(&ch_flt, pr_reason, log_afsr, clop) == 0) ||
-		(t_afsr_errs &
-		(C_AFSR_ASYNC_ERRS | C_AFSR_EXT_ASYNC_ERRS)) == 0) {
+	    ((C_AFSR_ALL_ERRS | C_AFSR_EXT_ALL_ERRS) & ~C_AFSR_ME)) &&
+	    cpu_queue_events(&ch_flt, pr_reason, log_afsr, clop) == 0) ||
+	    (t_afsr_errs & (C_AFSR_ASYNC_ERRS | C_AFSR_EXT_ASYNC_ERRS)) == 0) {
 		ch_flt.flt_type = CPU_INV_AFSR;
 		cpu_errorq_dispatch(FM_EREPORT_CPU_USIII_INVALID_AFSR,
 		    (void *)&ch_flt, sizeof (ch_async_flt_t), ue_queue,
@@ -2362,7 +2361,7 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 		    aflt->flt_prot == AFLT_PROT_EC) {
 
 			if (page_retire_check(aflt->flt_addr, NULL) == 0) {
-			    if (ch_flt->flt_trapped_ce & CE_CEEN_DEFER) {
+				if (ch_flt->flt_trapped_ce & CE_CEEN_DEFER) {
 
 				/*
 				 * Since we're skipping logging, we'll need
@@ -2371,8 +2370,9 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 				(void) timeout(cpu_delayed_check_ce_errors,
 				    (void *)(uintptr_t)aflt->flt_inst,
 				    drv_usectohz((clock_t)cpu_ceen_delay_secs
-						 * MICROSEC));
-			    }
+				    * MICROSEC));
+				}
+
 				/*
 				 * Inform memscrubber - scrubbing induced
 				 * CE on a retired page.
@@ -2550,7 +2550,7 @@ cpu_log_err(struct async_flt *aflt)
 	 */
 	if (pf_is_memory(aflt->flt_addr >> MMU_PAGESHIFT))
 		afar_status = afsr_to_afar_status(ch_flt->afsr_errs,
-				ch_flt->flt_bit);
+		    ch_flt->flt_bit);
 	else
 		afar_status = AFLT_STAT_INVALID;
 
@@ -2697,7 +2697,7 @@ cpu_ce_scrub_mem_err_common(struct async_flt *ecc, boolean_t logout_tried)
 	kpreempt_disable();
 	orig_err = get_error_enable();
 	if (orig_err & EN_REG_CEEN)
-	    set_error_enable(orig_err & ~EN_REG_CEEN);
+		set_error_enable(orig_err & ~EN_REG_CEEN);
 
 	/*
 	 * Our classification algorithm includes the line state before
@@ -2743,7 +2743,7 @@ cpu_ce_scrub_mem_err_common(struct async_flt *ecc, boolean_t logout_tried)
 	} else {
 		no_trap();
 		if (orig_err & EN_REG_CEEN)
-		    set_error_enable(orig_err);
+			set_error_enable(orig_err);
 		kpreempt_enable();
 		return (disp);
 	}
@@ -2766,7 +2766,7 @@ cpu_ce_scrub_mem_err_common(struct async_flt *ecc, boolean_t logout_tried)
 	} else {
 		no_trap();
 		if (orig_err & EN_REG_CEEN)
-		    set_error_enable(orig_err);
+			set_error_enable(orig_err);
 		kpreempt_enable();
 		return (disp);
 	}
@@ -2862,7 +2862,7 @@ cpu_ce_scrub_mem_err_common(struct async_flt *ecc, boolean_t logout_tried)
 	 * Re-enable CEEN if we turned it off.
 	 */
 	if (orig_err & EN_REG_CEEN)
-	    set_error_enable(orig_err);
+		set_error_enable(orig_err);
 	kpreempt_enable();
 
 	return (disp);
@@ -3570,8 +3570,8 @@ cpu_get_mem_info(uint64_t synd, uint64_t afar,
 
 	if (p2get_mem_info != NULL)
 		return ((p2get_mem_info)(synd_code, afar,
-			mem_sizep, seg_sizep, bank_sizep,
-			segsp, banksp, mcidp));
+		    mem_sizep, seg_sizep, bank_sizep,
+		    segsp, banksp, mcidp));
 	else
 		return (ENOTSUP);
 }
@@ -3930,7 +3930,7 @@ cpu_dcache_parity_check(ch_async_flt_t *ch_flt, int index)
 		 * Perform diagnostic read.
 		 */
 		get_dcache_dtag(index + way * dc_set_size,
-				(uint64_t *)&tmp_dcp);
+		    (uint64_t *)&tmp_dcp);
 
 		/*
 		 * Check tag for even parity.
@@ -3949,9 +3949,9 @@ cpu_dcache_parity_check(ch_async_flt_t *ch_flt, int index)
 				ch_flt->parity_data.dpe.cpl_tag |= CHP_DC_TAG;
 
 				if (popc64(tmp_dcp.dc_sntag &
-						CHP_DCSNTAG_PARMASK) & 1) {
+				    CHP_DCSNTAG_PARMASK) & 1) {
 					ch_flt->parity_data.dpe.cpl_tag |=
-								CHP_DC_SNTAG;
+					    CHP_DC_SNTAG;
 					ch_flt->parity_data.dpe.cpl_lcnt++;
 				}
 
@@ -3977,8 +3977,8 @@ cpu_dcache_parity_check(ch_async_flt_t *ch_flt, int index)
 					    PN_DC_DATA_PARITY_MASK)) & 1) ^
 					    (pbits & 1)) {
 						cpu_record_dc_data_parity(
-						ch_flt, dcp, &tmp_dcp, way,
-						word);
+						    ch_flt, dcp, &tmp_dcp, way,
+						    word);
 					}
 					pbits >>= 1;
 					data_word >>= 8;
@@ -4096,7 +4096,7 @@ cpu_icache_parity_check(ch_async_flt_t *ch_flt, int index)
 		 * Diagnostic reads expect address argument in ASI format.
 		 */
 		get_icache_dtag(2 * (index + way * ic_set_size),
-				(uint64_t *)&tmp_icp);
+		    (uint64_t *)&tmp_icp);
 
 		/*
 		 * If this is the index in which we expect to find the
@@ -4123,9 +4123,9 @@ cpu_icache_parity_check(ch_async_flt_t *ch_flt, int index)
 				ch_flt->parity_data.ipe.cpl_tag |= CHP_IC_TAG;
 
 				if (popc64(tmp_icp.ic_sntag &
-						CHP_ICSNTAG_PARMASK) & 1) {
+				    CHP_ICSNTAG_PARMASK) & 1) {
 					ch_flt->parity_data.ipe.cpl_tag |=
-								CHP_IC_SNTAG;
+					    CHP_IC_SNTAG;
 					ch_flt->parity_data.ipe.cpl_lcnt++;
 				}
 
@@ -4141,9 +4141,9 @@ cpu_icache_parity_check(ch_async_flt_t *ch_flt, int index)
 		 */
 		for (instr = 0; instr < num_instr; instr++) {
 			parmask = (tmp_icp.ic_data[instr] &
-					CH_ICDATA_PRED_ISPCREL) ?
-				(CHP_ICDATA_PCREL_PARMASK | pn_inst_parity) :
-				(CHP_ICDATA_NPCREL_PARMASK | pn_inst_parity);
+			    CH_ICDATA_PRED_ISPCREL) ?
+			    (CHP_ICDATA_PCREL_PARMASK | pn_inst_parity) :
+			    (CHP_ICDATA_NPCREL_PARMASK | pn_inst_parity);
 			if (popc64(tmp_icp.ic_data[instr] & parmask) & 1) {
 				/*
 				 * If this way is the one in which we expected
@@ -4154,7 +4154,7 @@ cpu_icache_parity_check(ch_async_flt_t *ch_flt, int index)
 				if (flt_index == index) {
 					ch_flt->parity_data.ipe.cpl_way = way;
 					ch_flt->parity_data.ipe.cpl_off =
-								instr * 4;
+					    instr * 4;
 				}
 				ch_flt->parity_data.ipe.cpl_lcnt++;
 				continue;
@@ -4201,7 +4201,7 @@ cpu_pcache_parity_check(ch_async_flt_t *ch_flt, int index)
 		 * Perform diagnostic read.
 		 */
 		get_pcache_dtag(index + way * pc_set_size,
-				(uint64_t *)&tmp_pcp);
+		    (uint64_t *)&tmp_pcp);
 		/*
 		 * Check data array for odd parity. There are 8 parity
 		 * bits (bits 57:50 of ASI_PCACHE_STATUS_DATA) and each
@@ -4235,7 +4235,7 @@ cpu_pcache_parity_check(ch_async_flt_t *ch_flt, int index)
 					ch_flt->parity_data.dpe.cpl_off =
 					    word * sizeof (uint64_t);
 					bcopy(&tmp_pcp, pcp,
-							sizeof (ch_pc_data_t));
+					    sizeof (ch_pc_data_t));
 				}
 				ch_flt->parity_data.dpe.cpl_lcnt++;
 			}
@@ -4274,7 +4274,7 @@ cpu_payload_add_dcache(struct async_flt *aflt, nvlist_t *nvl)
 			dcp = &ch_flt->flt_diag_data.chd_dc_data;
 		if (dcp->dc_logflag == DC_LOGFLAG_MAGIC) {
 			bcopy(dcp, &dcdata[ways_logged],
-				sizeof (ch_dc_data_t));
+			    sizeof (ch_dc_data_t));
 			ways_logged++;
 		}
 	}
@@ -4321,7 +4321,7 @@ cpu_payload_add_icache(struct async_flt *aflt, nvlist_t *nvl)
 			icp = &ch_flt->flt_diag_data.chd_ic_data;
 		if (icp->ic_logflag == IC_LOGFLAG_MAGIC) {
 			bcopy(icp, &icdata[ways_logged],
-				sizeof (ch_ic_data_t));
+			    sizeof (ch_ic_data_t));
 			ways_logged++;
 		}
 	}
@@ -4360,7 +4360,7 @@ cpu_payload_add_ecache(struct async_flt *aflt, nvlist_t *nvl)
 		ecp = &ch_flt->flt_diag_data.chd_ec_data[i];
 		if (ecp->ec_logflag == EC_LOGFLAG_MAGIC) {
 			bcopy(ecp, &ecdata[ways_logged],
-				sizeof (ch_ec_data_t));
+			    sizeof (ch_ec_data_t));
 			ways_logged++;
 		}
 	}
@@ -4405,7 +4405,7 @@ cpu_payload_add_ecache(struct async_flt *aflt, nvlist_t *nvl)
 	    DATA_TYPE_UINT8, (uint8_t)ways_logged, NULL);
 	if (ways_logged != 0) {
 		nelem = sizeof (ch_ec_data_t) /
-			sizeof (uint64_t) * ways_logged;
+		    sizeof (uint64_t) * ways_logged;
 		fm_payload_set(nvl, FM_EREPORT_PAYLOAD_NAME_L2_DATA,
 		    DATA_TYPE_UINT64_ARRAY, nelem,  (uint64_t *)ecdata, NULL);
 	}
@@ -5316,8 +5316,8 @@ sticksync_slave(void)
 
 			/* calculate time skew */
 			tskew = ((timestamp[EV_B_END] - timestamp[EV_B_START])
-				- (timestamp[EV_A_END] -
-				timestamp[EV_A_START])) / 2;
+			    - (timestamp[EV_A_END] - timestamp[EV_A_START]))
+			    / 2;
 
 			/* keep running count */
 			av_tskew += tskew;
@@ -5346,7 +5346,7 @@ sticksync_slave(void)
 #ifdef DEBUG
 		if (tries < DSYNC_ATTEMPTS)
 			stick_sync_stats[CPU->cpu_id].skew_val[tries] =
-				av_tskew;
+			    av_tskew;
 		++tries;
 #endif /* DEBUG */
 #ifdef lint
@@ -5674,13 +5674,13 @@ cpu_init_cache_scrub(void)
 		 */
 		if (csi->csi_freq > hz) {
 			cmn_err(CE_NOTE, "%s scrub calls_a_sec set too high "
-				"(%d); resetting to hz (%d)", csi->csi_name,
-				csi->csi_freq, hz);
+			    "(%d); resetting to hz (%d)", csi->csi_name,
+			    csi->csi_freq, hz);
 			csi->csi_freq = hz;
 		} else if (csi->csi_freq < 1) {
 			cmn_err(CE_NOTE, "%s scrub calls_a_sec set too low "
-				"(%d); resetting to 1", csi->csi_name,
-				csi->csi_freq);
+			    "(%d); resetting to 1", csi->csi_name,
+			    csi->csi_freq);
 			csi->csi_freq = 1;
 		}
 
@@ -5819,7 +5819,7 @@ scrub_dcache_line_intr(caddr_t arg1, caddr_t arg2)
 	uint32_t *countp = &csmp->chsm_outstanding[CACHE_SCRUBBER_INFO_D];
 	struct scrub_info *csi = (struct scrub_info *)arg1;
 	int scan_rate = (csmp->chsm_ecache_busy == ECACHE_CPU_IDLE) ?
-		dcache_scan_rate_idle : dcache_scan_rate_busy;
+	    dcache_scan_rate_idle : dcache_scan_rate_busy;
 
 	/*
 	 * The scan rates are expressed in units of tenths of a
@@ -5972,7 +5972,7 @@ scrub_ecache_line_intr(caddr_t arg1, caddr_t arg2)
 	uint32_t *countp = &csmp->chsm_outstanding[CACHE_SCRUBBER_INFO_E];
 	struct scrub_info *csi = (struct scrub_info *)arg1;
 	int scan_rate = (csmp->chsm_ecache_busy == ECACHE_CPU_IDLE) ?
-		ecache_scan_rate_idle : ecache_scan_rate_busy;
+	    ecache_scan_rate_idle : ecache_scan_rate_busy;
 	int ecache_nlines = csmp->chsm_ecache_nlines;
 
 	/*
@@ -6138,7 +6138,8 @@ cpu_check_ce(int flag, uint64_t pa, caddr_t va, uint_t psz)
 	 * If no CEEN errors have occurred during the timeout
 	 * interval, it is safe to re-enable CEEN and exit.
 	 */
-	if ((cpu_error_regs.afsr & C_AFSR_CECC_ERRS) == 0) {
+	if (((cpu_error_regs.afsr & C_AFSR_CECC_ERRS) |
+	    (cpu_error_regs.afsr_ext & C_AFSR_EXT_CECC_ERRS)) == 0) {
 		if (flag == TIMEOUT_CEEN_CHECK &&
 		    !((ec_err_enable = get_error_enable()) & EN_REG_CEEN))
 			set_error_enable(ec_err_enable | EN_REG_CEEN);
@@ -6150,17 +6151,18 @@ cpu_check_ce(int flag, uint64_t pa, caddr_t va, uint_t psz)
 	 * we log/clear the error.
 	 */
 	if ((ec_err_enable = get_error_enable()) & EN_REG_CEEN)
-	    set_error_enable(ec_err_enable & ~EN_REG_CEEN);
+		set_error_enable(ec_err_enable & ~EN_REG_CEEN);
 
 	/*
 	 * log/clear the CE. If CE_CEEN_DEFER is passed, the
 	 * timeout will be rescheduled when the error is logged.
 	 */
-	if (!(cpu_error_regs.afsr & cpu_ce_not_deferred))
-	    cpu_ce_detected(&cpu_error_regs,
-		CE_CEEN_DEFER | CE_CEEN_TIMEOUT);
+	if (!((cpu_error_regs.afsr & cpu_ce_not_deferred) |
+	    (cpu_error_regs.afsr_ext & cpu_ce_not_deferred_ext)))
+		cpu_ce_detected(&cpu_error_regs,
+		    CE_CEEN_DEFER | CE_CEEN_TIMEOUT);
 	else
-	    cpu_ce_detected(&cpu_error_regs, CE_CEEN_TIMEOUT);
+		cpu_ce_detected(&cpu_error_regs, CE_CEEN_TIMEOUT);
 
 	/*
 	 * If the memory scrubber runs while CEEN is
@@ -6208,7 +6210,7 @@ cpu_check_ce(int flag, uint64_t pa, caddr_t va, uint_t psz)
 	 */
 	if ((flag == TIMEOUT_CEEN_CHECK) &&
 	    (cpu_error_regs.afsr & cpu_ce_not_deferred))
-	    set_error_enable(ec_err_enable | EN_REG_CEEN);
+		set_error_enable(ec_err_enable | EN_REG_CEEN);
 
 }
 
@@ -6645,7 +6647,7 @@ cpu_ereport_post(struct async_flt *aflt)
 	 * Encode all the common data into the ereport.
 	 */
 	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s.%s",
-		FM_ERROR_CPU, cpu_type, aflt->flt_erpt_class);
+	    FM_ERROR_CPU, cpu_type, aflt->flt_erpt_class);
 
 	fm_ereport_set(ereport, FM_EREPORT_VERSION, buf,
 	    fm_ena_generate_cpu(aflt->flt_id, aflt->flt_inst, FM_ENA_FMT1),
