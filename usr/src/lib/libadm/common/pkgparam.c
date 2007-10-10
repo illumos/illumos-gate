@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,11 +22,11 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1 */
 /*LINTLIBRARY*/
 
 /*   5-20-92   newroot support added  */
@@ -121,7 +120,10 @@ fpkgparam(FILE *fp, char *param)
 {
 	char	ch, buffer[VALSIZ];
 	char	*mempt, *copy;
-	int	c, n, escape, begline, quoted;
+	int	c, n;
+	boolean_t check_end_quote = B_FALSE;
+	boolean_t begline, quoted, escape;
+	int idx = 0;
 
 	if (param == NULL) {
 		errno = ENOENT;
@@ -130,7 +132,7 @@ fpkgparam(FILE *fp, char *param)
 
 	mempt = NULL;
 
-	for (;;) {		/* for each entry in the file fp */
+	for (;;) {		/* For each entry in the file fp */
 		copy = buffer;
 		n = 0;
 
@@ -146,7 +148,7 @@ fpkgparam(FILE *fp, char *param)
 		/* If it's the end of the file, exit the for() loop */
 		if (c == EOF) {
 			errno = EINVAL;
-			return (NULL); /* no more entries left */
+			return (NULL); /* No more entries left */
 
 		/* If it's end of line, look for the next parameter. */
 		} else if (c == NEWLINE)
@@ -171,51 +173,96 @@ fpkgparam(FILE *fp, char *param)
 				copy = buffer;
 		}
 
-		n = quoted = escape = 0;
-		begline = 1;
+		n = 0;
+		quoted = escape = B_FALSE;
+		begline = B_TRUE; /* Value's line begins */
 
 		/* Now read the parameter value. */
 		while ((c = getc(fp)) != EOF) {
 			ch = (char)c;
+
 			if (begline && ((ch == ' ') || (ch == '\t')))
-				continue; /* ignore leading white space */
+				continue; /* Ignore leading white space */
+
+			/*
+			 * Take last end quote 'verbatim' if anything
+			 * other than space, newline and escape.
+			 * Example:
+			 * PARAM1="zonename="test-zone""
+			 *	Here in this example the letter 't' inside
+			 *	the value is followed by '"', this makes
+			 *	the previous end quote candidate '"',
+			 *	a part of value and the end quote
+			 *	disqualfies. Reset check_end_quote.
+			 * PARAM2="value"<== newline here
+			 * PARAM3="value"\
+			 * "continued"<== newline here.
+			 *	Check for end quote continues.
+			 */
+			if (ch != NEWLINE && ch != ' ' && ch != ESCAPE &&
+			    ch != '\t' && check_end_quote)
+				check_end_quote = B_FALSE;
 
 			if (ch == NEWLINE) {
-				if (!escape)
-					break; /* end of entry */
-				if (copy) {
-					if (escape) {
-						copy--; /* eat previous esc */
-						n--;
+				if (!escape) {
+					/*
+					 * The end quote candidate qualifies.
+					 * Eat any trailing spaces.
+					 */
+					if (check_end_quote) {
+						copy -= n - idx;
+						n = idx;
+						check_end_quote = B_FALSE;
+						quoted = B_FALSE;
 					}
-					*copy++ = NEWLINE;
+					break; /* End of entry */
 				}
-				escape = 0;
-				begline = 1; /* new input line */
+				/*
+				 * The end quote if exists, doesn't qualify.
+				 * Eat end quote and trailing spaces if any.
+				 * Value spans to next line.
+				 */
+				if (check_end_quote) {
+					copy -= n - idx;
+					n = idx;
+					check_end_quote = B_FALSE;
+				} else if (copy) {
+					copy--; /* Eat previous esc */
+					n--;
+				}
+				escape = B_FALSE;
+				begline = B_TRUE; /* New input line */
+				continue;
 			} else {
 				if (!escape && strchr(qset, ch)) {
-					/* handle quotes */
+					/* Handle quotes */
 					if (begline) {
-						quoted++;
-						begline = 0;
+						/* Starting quote */
+						quoted = B_TRUE;
+						begline = B_FALSE;
 						continue;
 					} else if (quoted) {
-						quoted = 0;
-						continue;
+						/*
+						 * This is the candidate
+						 * for end quote. Check
+						 * to see it qualifies.
+						 */
+						check_end_quote = B_TRUE;
+						idx = n;
 					}
 				}
 				if (ch == ESCAPE)
-					escape++;
+					escape = B_TRUE;
 				else if (escape)
-					escape = 0;
+					escape = B_FALSE;
 				if (copy) *copy++ = ch;
-				begline = 0;
+				begline = B_FALSE;
 			}
 
 			if (copy && ((++n % VALSIZ) == 0)) {
 				if (mempt) {
 					mempt = realloc(mempt,
-						(n+VALSIZ)*sizeof (char));
+					    (n+VALSIZ)*sizeof (char));
 					if (!mempt)
 						return (NULL);
 				} else {
