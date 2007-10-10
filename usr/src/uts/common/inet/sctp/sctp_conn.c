@@ -348,7 +348,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		sin = (sin_t *)dst;
 
 		/* Check for attempt to connect to non-unicast */
-		if (IN_MULTICAST(sin->sin_addr.s_addr) ||
+		if (CLASSD(sin->sin_addr.s_addr) ||
 		    (sin->sin_addr.s_addr == INADDR_BROADCAST)) {
 			ip0dbg(("sctp_connect: non-unicast\n"));
 			return (EINVAL);

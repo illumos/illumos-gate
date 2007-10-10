@@ -1444,7 +1444,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				if (ta == 0 ||
 				    ta == INADDR_BROADCAST ||
 				    ta == htonl(INADDR_LOOPBACK) ||
-				    IN_MULTICAST(ta) ||
+				    CLASSD(ta) ||
 				    sctp->sctp_connp->conn_ipv6_v6only) {
 					goto next;
 				}

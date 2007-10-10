@@ -1095,7 +1095,7 @@ sctp_check_addip_addr(sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph, int *cont,
 
 		/* screen XXX loopback to scoping */
 		if (*addr4 == 0 || *addr4 == INADDR_BROADCAST ||
-		    *addr4 == htonl(INADDR_LOOPBACK) || IN_MULTICAST(*addr4)) {
+		    *addr4 == htonl(INADDR_LOOPBACK) || CLASSD(*addr4)) {
 			dprint(1, ("addip: addr not unicast: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
 			mp = sctp_asconf_adderr(SCTP_ERR_BAD_MANDPARM, oph,

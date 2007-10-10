@@ -337,7 +337,7 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			if (check_addrs &&
 			    (addr4->s_addr == INADDR_ANY ||
 			    addr4->s_addr == INADDR_BROADCAST ||
-			    IN_MULTICAST(addr4->s_addr))) {
+			    CLASSD(addr4->s_addr))) {
 				err = EINVAL;
 				goto free_ret;
 			}
