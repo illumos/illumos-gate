@@ -44,7 +44,7 @@ POFILES=	interface.po wireless.po
 
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm
+LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm -lgen
 
 .KEEP_STATE:
 

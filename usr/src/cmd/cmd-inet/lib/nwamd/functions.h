@@ -69,7 +69,6 @@ extern boolean_t scan_wireless_nets(struct interface *);
 extern void create_known_wifi_nets_file(void);
 extern void update_known_wifi_nets_file(const char *, const char *);
 extern void *periodic_wireless_scan(void *);
-extern boolean_t known_wifi_nets_lookup(const char *, const char *);
 
 /* llp.c: link layer profile handling */
 extern void llp_parse_config(void);

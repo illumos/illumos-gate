@@ -98,6 +98,7 @@
 #include <libdladm.h>
 #include <libdllink.h>
 #include <libinetutil.h>
+#include <libgen.h>
 
 #include "defines.h"
 #include "structures.h"
@@ -121,6 +122,12 @@ typedef enum {
 	FAILURE,
 	TRY_AGAIN
 } return_vals_t;
+
+typedef enum {
+	ESSID = 0,
+	BSSID,
+	MAX_FIELDS
+} known_wifi_nets_fields_t;
 
 /*
  * Is a wireless interface doing a scan currently?  We only allow one
@@ -163,6 +170,8 @@ static char *get_zenity_response(char *const *);
 static boolean_t wlan_autoconf(const char *ifname);
 static int zenity_height(int);
 static boolean_t get_scan_results(void *, dladm_wlan_attr_t *);
+static boolean_t known_wifi_nets_lookup(const char *, const char *, char *);
+
 
 #define	WIRELESS_LAN_INIT_COUNT	8
 
@@ -537,6 +546,19 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 
 	sec = attrp->wa_secmode;
 
+	/*
+	 * Check whether ESSID is "hidden".
+	 * If so try to substitute it with the ESSID from the
+	 * known_wifi_nets with the same BSSID
+	 */
+	if (essid_name[0] == '\0') {
+		if (known_wifi_nets_lookup(essid_name, bssid_name,
+		    essid_name)) {
+			dprintf("Using ESSID %s with BSSID %s",
+			    essid_name, bssid_name);
+		}
+	}
+
 	if (!find_wlan_entry(arg, essid_name, bssid_name) &&
 	    add_wlan_entry(arg, essid_name, bssid_name, strength, sec)) {
 		return (B_TRUE);
@@ -899,7 +921,7 @@ update_known_wifi_nets_file(const char *essid, const char *bssid)
 		}
 	}
 	/* now see if this info is already in the file */
-	if (known_wifi_nets_lookup(essid, bssid) == B_FALSE) {
+	if (!known_wifi_nets_lookup(essid, bssid, NULL)) {
 		/* now add this to the file */
 		(void) fprintf(fp, "%s\t%s\n", essid,
 		    bssid == NULL ? "" : bssid);
@@ -909,13 +931,18 @@ update_known_wifi_nets_file(const char *essid, const char *bssid)
 
 /*
  * Check if the given AP (ESSID, BSSID pair) is on the known AP list.
+ * If found_essid is non-NULL and the match is found (B_TRUE is returned)
+ * the matched ESSID is copied out into buffer pointed by found_essid.
+ * The buffer is expected to be at least DLADM_STRSIZE bytes long.
  */
-boolean_t
-known_wifi_nets_lookup(const char *new_essid, const char *new_bssid)
+static boolean_t
+known_wifi_nets_lookup(const char *new_essid, const char *new_bssid,
+    char *found_essid)
 {
 	FILE *fp;
 	char line[LINE_MAX];
-	char *cp, *lasts, *essid, *bssid;
+	char *cp;
+	char *tok[MAX_FIELDS];
 	int line_num;
 	boolean_t found = B_FALSE;
 
@@ -935,8 +962,6 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid)
 		return (B_FALSE);
 	}
 	for (line_num = 1; fgets(line, sizeof (line), fp) != NULL; line_num++) {
-		if (line[strlen(line) - 1] == '\n')
-			line[strlen(line) - 1] = '\0';
 
 		cp = line;
 		while (isspace(*cp))
@@ -945,27 +970,36 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid)
 		if (*cp == '#' || *cp == '\0')
 			continue;
 
-		if ((essid = strtok_r(cp, "\t", &lasts)) == NULL) {
-			syslog(LOG_ERR, "%s:%d: not enough tokens; "
+		if (bufsplit(cp, MAX_FIELDS, tok) != MAX_FIELDS) {
+			syslog(LOG_ERR, "%s:%d: wrong number of tokens; "
 			    "ignoring entry", KNOWN_WIFI_NETS, line_num);
 			continue;
 		}
-		bssid = strtok_r(NULL, "\t", &lasts);
-		if (strcmp(essid, new_essid) != 0)
-			continue;
-		if (new_bssid == NULL) {
+
+		/*
+		 * If BSSID match is found we check ESSID, which should
+		 * either match as well, or be an empty string.
+		 * In latter case we'll retrieve the ESSID from known_wifi_nets
+		 * later.
+		 */
+		if (strcmp(tok[BSSID], new_bssid) == 0) {
 			/*
-			 * no BSSID specified => ESSID match
-			 * is good enough.
+			 * Got BSSID match, either ESSID was not specified,
+			 * or it should match
 			 */
-			found = B_TRUE;
-		} else if (bssid != NULL && strcmp(bssid, new_bssid) == 0) {
-			/* Match on both is always good. */
-			found = B_TRUE;
+			if (*new_essid == '\0' ||
+			    strcmp(tok[ESSID], new_essid) == 0) {
+				found = B_TRUE;
+				break;
+			}
 		}
-		if (found)
-			break;
 	}
+
+	if (found) {
+		if (found_essid != NULL)
+			(void) strlcpy(found_essid, tok[ESSID], DLADM_STRSIZE);
+	}
+
 	(void) fclose(fp);
 	return (found);
 }
@@ -1264,7 +1298,26 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 	 * off to autoconf if the connect fails
 	 */
 	if (connect_chosen_lan(reqlan, ifname)) {
-		/* succeeded, so add entry to known_essid_list_file */
+		/*
+		 * Succeeded, so add entry to known_essid_list_file;
+		 * but first make sure the reqlan->bssid isn't empty.
+		 */
+		if (reqlan->bssid == NULL) {
+			dladm_status_t		status;
+			dladm_wlan_linkattr_t	attr;
+			char			bssid[DLADM_STRSIZE];
+
+			status = dladm_wlan_get_linkattr(ifname, &attr);
+
+			if (status == DLADM_STATUS_OK) {
+				(void) dladm_wlan_bssid2str(
+				    &attr.la_wlan_attr.wa_bssid, bssid);
+				reqlan->bssid = strdup(bssid);
+			} else {
+				dprintf("failed to get linkattr after "
+				    "connecting to %s", reqlan->essid);
+			}
+		}
 		update_known_wifi_nets_file(reqlan->essid, reqlan->bssid);
 	} else {
 		/* failed to connect; try auto-conf */
@@ -1721,7 +1774,7 @@ start_over:
 			strongest = strength;
 
 		if (!known_wifi_nets_lookup(cur_wlans[i].essid,
-		    cur_wlans[i].bssid))
+		    cur_wlans[i].bssid, NULL))
 			continue;
 
 		if (already_in_visited_wlan_list(&cur_wlans[i])) {
