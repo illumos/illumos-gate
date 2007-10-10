@@ -1998,6 +1998,14 @@ do_print_defaults(ike_defaults_t *dp)
 	    gettext("seconds"), B_FALSE, ddp->rule_p2_softlife_secs,
 	    dp->rule_p2_softlife_secs);
 
+	print_defaults("-", gettext("system phase 2 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->sys_p2_lifetime_secs,
+	    dp->sys_p2_lifetime_secs);
+
+	print_defaults("-", gettext("system phase 2 soft lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->sys_p2_softlife_secs,
+	    dp->sys_p2_softlife_secs);
+
 	print_defaults("p2_lifetime_kb", gettext("phase 2 lifetime"),
 	    gettext("bytes"), B_TRUE, ddp->rule_p2_lifetime_kb,
 	    dp->rule_p2_lifetime_kb);
@@ -2005,6 +2013,14 @@ do_print_defaults(ike_defaults_t *dp)
 	print_defaults("p2_softlife_kb", gettext("phase 2 soft lifetime"),
 	    gettext("bytes"), B_TRUE, ddp->rule_p2_softlife_kb,
 	    dp->rule_p2_softlife_kb);
+
+	print_defaults("-", gettext("system phase 2 lifetime"),
+	    gettext("bytes"), B_FALSE, ddp->sys_p2_lifetime_bytes,
+	    dp->sys_p2_lifetime_bytes);
+
+	print_defaults("-", gettext("system phase 2 soft lifetime"),
+	    gettext("bytes"), B_FALSE, ddp->sys_p2_softlife_bytes,
+	    dp->sys_p2_softlife_bytes);
 
 	print_defaults("-", gettext("minimum phase 2 lifetime"),
 	    gettext("seconds"), B_FALSE, ddp->rule_p2_minlife,

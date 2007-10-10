@@ -161,8 +161,12 @@ typedef struct {
 	uint32_t	rule_p1_nonce_len;
 	uint32_t	rule_p2_lifetime_secs;
 	uint32_t	rule_p2_softlife_secs;
+	uint32_t	sys_p2_lifetime_secs;
+	uint32_t	sys_p2_softlife_secs;
 	uint32_t	rule_p2_lifetime_kb;
 	uint32_t	rule_p2_softlife_kb;
+	uint32_t	sys_p2_lifetime_bytes;
+	uint32_t	sys_p2_softlife_bytes;
 	uint32_t	rule_p2_minlife;
 	uint32_t	rule_p2_def_minlife;
 	uint32_t	rule_p2_nonce_len;
