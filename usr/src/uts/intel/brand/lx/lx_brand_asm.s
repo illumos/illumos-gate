@@ -64,7 +64,7 @@ lx_brand_int80_callback(void)
 	 * this:
 	 *  	   --------------------------------------
 	 *      24 | saved stack pointer		|
-	 *    | 16 | lwp brand data			|
+	 *    | 16 | lwp pointer			|
 	 *    v  8 | user return address (*)		|
 	 *       0 | caller's return addr (sys_int80)	|
 	 *         -------------------------------------
@@ -75,23 +75,19 @@ lx_brand_int80_callback(void)
 	pushq	%r15				/* push the proc pointer */
 	movq	P_ZONE(%r15), %r15		/* grab the zone pointer */
 	movq	ZONE_BRAND_DATA(%r15), %r15	/* grab the zone brand ptr */
-	pushq	%rax
+	pushq	%rax				/* save the syscall num */
 	movl	LXZD_MAX_SYSCALL(%r15), %eax	/* load the 'max sysnum' word */
-	xchgq	(%rsp), %rax			/* swap %rax and syscall num */
+	xchgq	(%rsp), %rax			/* swap %rax and stack value */
 	movq	32(%rsp), %r15			/* re-load the lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab the lwp brand data */
 	movl	%gs, BR_UGS(%r15)		/* save user %gs */
 
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
-	movq	(%rsp), %r15
-	cmpq	%r15, %rax			/* is syscall > MAX ? */
-	jg	0f				/* Yes */
-	cmpq	$0, %r15			/* is syscall > 0 ? */
-	jge	1f
+	cmpq	(%rsp), %rax			/* is 0 <= syscall <= MAX? */
+	jbe	0f				/* yes, syscall is OK */
+	xorl    %eax, %eax			/* no, zero syscall number */
 0:
-	xorl    %eax, %eax			/* null out syscall */
-1:
-	movq	8(%rsp), %r15			/* get the proc */
+	movq	8(%rsp), %r15			/* get the proc pointer */
 	movq	P_BRAND_DATA(%r15), %r15	/* grab the proc brand data */
 
 .lx_brand_int80_patch_point:
@@ -100,7 +96,7 @@ lx_brand_int80_callback(void)
 .lx_brand_int80_notrace:
 	movq	L_HANDLER(%r15), %r15		/* load the base address */
 	
-2:
+1:
 	/*
 	 * Rather than returning to the instruction after the int 80, we
 	 * transfer control into the brand library's handler table at
@@ -120,7 +116,7 @@ lx_brand_int80_callback(void)
 	 * handler table instead.
 	 */
 	movq	L_TRACEHANDLER(%r15), %r15	/* load trace handler address */
-	jmp	2b
+	jmp	1b
 	SET_SIZE(lx_brand_int80_callback)
 
 #define	PATCH_POINT	_CONST(.lx_brand_int80_patch_point + 1)
@@ -177,15 +173,11 @@ lx_brand_int80_callback(void)
 	movw	%gs, BR_UGS(%ebx)		/* save user %gs */
 
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
-	movl	(%esp), %ebx			/* get the max syscall */
-	cmpl	%ebx, %eax 			/* is syscall > MAX ? */
-	jg	0f				/* Yes */
-	cmpl	$0, %eax			/* is syscall > 0 ? */
-	jge	1f
+	cmpl	(%esp), %eax 			/* is 0 <= syscall <= MAX? */
+	jbe	0f				/* yes, syscall is OK */
+	xorl    %eax, %eax		     	/* no, zero syscall number */	
 0:
-	xorl    %eax, %eax		     	/* null out syscall */	
-1:
-	movl	4(%esp), %ebx			/* get the proc */
+	movl	4(%esp), %ebx			/* get the proc pointer */
 	movl	P_BRAND_DATA(%ebx), %ebx	/* grab the proc brand data */
 
 .lx_brand_int80_patch_point:
@@ -194,7 +186,7 @@ lx_brand_int80_callback(void)
 .lx_brand_int80_notrace:
 	movl	L_HANDLER(%ebx), %ebx		/* load the base address */
 
-2:
+1:
 	/*
 	 * See the corresponding comment in the amd64 version above.
 	 */
@@ -207,7 +199,7 @@ lx_brand_int80_callback(void)
 
 .lx_brand_int80_trace:
 	movl	L_TRACEHANDLER(%ebx), %ebx	/* load trace handler address */
-	jmp	2b
+	jmp	1b
 	SET_SIZE(lx_brand_int80_callback)
 
 
