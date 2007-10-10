@@ -391,7 +391,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
-		/* Clear the IPP_BAD_CS_CNT counter by reading it */
+		/*
+		 * Clear bit BAD_CS_MX of register IPP_INT_STAT
+		 * by reading register IPP_BAD_CS_CNT
+		 */
 		(void) npi_ipp_get_cs_err_count(handle, portn, &cnt16);
 		statsp->bad_cs_cnt += IPP_BAD_CS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
@@ -402,7 +405,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 				"nxge_ipp_err_evnts: bad_cs_max\n"));
 	}
 	if (istatus.bits.w0.pkt_discard_cnt_ovfl) {
-		/* Clear the IPP_PKT_DIS counter by reading it */
+		/*
+		 * Clear bit PKT_DIS_MX of register IPP_INT_STAT
+		 * by reading register IPP_PKT_DIS
+		 */
 		(void) npi_ipp_get_pkt_dis_count(handle, portn, &cnt16);
 		statsp->pkt_dis_cnt += IPP_PKT_DIS_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
@@ -413,7 +419,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 				"nxge_ipp_err_evnts: pkt_dis_max\n"));
 	}
 	if (istatus.bits.w0.ecc_err_cnt_ovfl) {
-		/* Clear the IPP_ECC counter by reading it */
+		/*
+		 * Clear bit ECC_ERR_MAX of register IPP_INI_STAT
+		 * by reading register IPP_ECC
+		 */
 		(void) npi_ipp_get_ecc_err_count(handle, portn, &cnt8);
 		statsp->ecc_err_cnt += IPP_ECC_CNT_MASK;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
@@ -493,16 +502,36 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			ipps.bits.w0.dfifo_corr_ecc_err = 1;
 		else if (err_id == NXGE_FM_EREPORT_IPP_PFIFO_PERR)
 			ipps.bits.w0.pre_fifo_perr = 1;
-		else if (err_id == NXGE_FM_EREPORT_IPP_ECC_ERR_MAX)
-			ipps.bits.w0.ecc_err_cnt_ovfl = 1;
-		else if (err_id == NXGE_FM_EREPORT_IPP_PFIFO_OVER)
+		else if (err_id == NXGE_FM_EREPORT_IPP_ECC_ERR_MAX) {
+			/*
+			 * Fill register IPP_ECC with max ECC-error-
+			 * counter value (0xff) to set the ECC_ERR_MAX bit
+			 * of the IPP_INT_STAT register and trigger an
+			 * FMA ereport.
+			 */
+			IPP_REG_WR(nxgep->npi_handle, portn,
+			    IPP_ECC_ERR_COUNTER_REG, IPP_ECC_CNT_MASK);
+		} else if (err_id == NXGE_FM_EREPORT_IPP_PFIFO_OVER)
 			ipps.bits.w0.pre_fifo_overrun = 1;
 		else if (err_id == NXGE_FM_EREPORT_IPP_PFIFO_UND)
 			ipps.bits.w0.pre_fifo_underrun = 1;
-		else if (err_id == NXGE_FM_EREPORT_IPP_BAD_CS_MX)
-			ipps.bits.w0.bad_cksum_cnt_ovfl = 1;
-		else if (err_id == NXGE_FM_EREPORT_IPP_PKT_DIS_MX)
-			ipps.bits.w0.pkt_discard_cnt_ovfl = 1;
+		else if (err_id == NXGE_FM_EREPORT_IPP_BAD_CS_MX) {
+			/*
+			 * Fill IPP_BAD_CS_CNT with max bad-checksum-counter
+			 * value (0x3fff) to set the BAD_CS_MX bit of
+			 * IPP_INT_STAT and trigger an FMA ereport.
+			 */
+			IPP_REG_WR(nxgep->npi_handle, portn,
+			    IPP_TCP_CKSUM_ERR_CNT_REG, IPP_BAD_CS_CNT_MASK);
+		} else if (err_id == NXGE_FM_EREPORT_IPP_PKT_DIS_MX) {
+			/*
+			 * Fill IPP_PKT_DIS with max packet-discard-counter
+			 * value (0x3fff) to set the PKT_DIS_MX bit of
+			 * IPP_INT_STAT and trigger an FMA ereport.
+			 */
+			IPP_REG_WR(nxgep->npi_handle, portn,
+			    IPP_DISCARD_PKT_CNT_REG, IPP_PKT_DIS_CNT_MASK);
+		}
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_INT_STATUS_REG\n",
 			(unsigned long long) ipps.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_INT_STATUS_REG,
@@ -620,7 +649,7 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		goto fail;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"Recovery Sucessful, RxPort Restored"));
+		"Recovery successful, RxPort restored"));
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_ipp_fatal_err_recover"));
 
 	return (NXGE_OK);
@@ -690,7 +719,7 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 
 		if (valid) {
 			/*
-			 * Futher check to see if the ECCUE is valid. The
+			 * Further check to see if the ECCUE is valid. The
 			 * error is real if the LSB of d4 is 1, which
 			 * indicates that the data that has set the ECC
 			 * error flag is the 16-byte internal control word.

@@ -567,7 +567,7 @@ npi_ipp_get_cs_err_count(npi_handle_t handle, uint8_t portn, uint16_t *err_cnt)
 {
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
-	IPP_REG_RD(handle, portn, IPP_ECC_ERR_COUNTER_REG, err_cnt);
+	IPP_REG_RD(handle, portn, IPP_TCP_CKSUM_ERR_CNT_REG, err_cnt);
 
 	return (NPI_SUCCESS);
 }
