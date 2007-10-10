@@ -423,6 +423,16 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 
 	mutex_enter(&zilog->zl_lock);
 
+	/*
+	 * It is possible for the ZIL to get the previously mounted zilog
+	 * structure of the same dataset if quickly remounted and the dbuf
+	 * eviction has not completed. In this case we can see a non
+	 * empty lwb list and keep_first will be set. We fix this by
+	 * clearing the keep_first. This will be slower but it's very rare.
+	 */
+	if (!list_is_empty(&zilog->zl_lwb_list) && keep_first)
+		keep_first = B_FALSE;
+
 	ASSERT3U(zilog->zl_destroy_txg, <, txg);
 	zilog->zl_destroy_txg = txg;
 	zilog->zl_keep_first = keep_first;
