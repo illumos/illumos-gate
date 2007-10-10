@@ -3272,9 +3272,12 @@ faulted:
 	if (!kpm_enable) {
 #ifdef __xpv
 		/*
-		 * The target page might get used for a page table before any
-		 * intervening change to the non-kpm mapping, so blow it away.
+		 * We can't leave unused mappings laying about under the
+		 * hypervisor, so blow them away.
 		 */
+		if (HYPERVISOR_update_va_mapping((uintptr_t)pp_addr1, 0,
+		    UVMF_INVLPG | UVMF_LOCAL) < 0)
+			panic("HYPERVISOR_update_va_mapping() failed");
 		if (HYPERVISOR_update_va_mapping((uintptr_t)pp_addr2, 0,
 		    UVMF_INVLPG | UVMF_LOCAL) < 0)
 			panic("HYPERVISOR_update_va_mapping() failed");

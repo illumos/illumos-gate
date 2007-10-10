@@ -1893,7 +1893,7 @@ x86pte_t *
 x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
 {
 	x86pte_t *pteptr;
-	x86pte_t pte;
+	x86pte_t pte = 0;
 	x86pte_t newpte;
 	int x;
 
@@ -1918,10 +1918,12 @@ x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
 	mutex_enter(&CPU->cpu_hat_info->hci_mutex);
 	x = PWIN_TABLE(CPU->cpu_id);
 	pteptr = (x86pte_t *)PWIN_PTE_VA(x);
+#ifndef __xpv
 	if (mmu.pae_hat)
 		pte = *pteptr;
 	else
 		pte = *(x86pte32_t *)pteptr;
+#endif
 
 	newpte = MAKEPTE(pfn, 0) | mmu.pt_global | mmu.pt_nx;
 
@@ -1977,6 +1979,19 @@ x86pte_mapout(void)
 	/*
 	 * Drop the CPU's hci_mutex and restore preemption.
 	 */
+#ifdef __xpv
+	if (!IN_XPV_PANIC()) {
+		uintptr_t va;
+
+		/*
+		 * We need to always clear the mapping in case a page
+		 * that was once a page table page is ballooned out.
+		 */
+		va = (uintptr_t)PWIN_VA(PWIN_TABLE(CPU->cpu_id));
+		(void) HYPERVISOR_update_va_mapping(va, 0,
+		    UVMF_INVLPG | UVMF_LOCAL);
+	}
+#endif
 	mutex_exit(&CPU->cpu_hat_info->hci_mutex);
 	kpreempt_enable();
 }
