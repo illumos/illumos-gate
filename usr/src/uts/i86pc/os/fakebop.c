@@ -1247,7 +1247,7 @@ build_boot_properties(void)
 			bsetprop("bootp-response", sizeof ("bootp-response"),
 			    (void *)(uintptr_t)mbi->drives_addr,
 			    mbi->drives_length);
-		else if (sip->sn_infotype == SN_TYPE_BOOTP)
+		else if (sip->sn_infotype == SN_TYPE_RARP)
 			setup_rarp_props(sip);
 	}
 	bsetprop("stdout", strlen("stdout"),
@@ -1280,7 +1280,6 @@ build_boot_properties(void)
 	 * - cpuid_feature_edx_exclude
 	 *
 	 * Find out what these are in multiboot:
-	 * - bootp-response
 	 * - netdev-path
 	 * - fstype
 	 */
