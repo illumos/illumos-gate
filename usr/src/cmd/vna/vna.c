@@ -91,7 +91,9 @@ v_add(char *dev, char *addr)
 {
 	struct ether_addr *ea;
 	dladm_vnic_attr_sys_t spec;
+	dladm_status_t status;
 	uint_t vid;
+	char buf[DLADM_STRSIZE];
 
 	ea = ether_aton(addr);
 	if (ea == NULL) {
@@ -109,9 +111,13 @@ v_add(char *dev, char *addr)
 	(void) memcpy(spec.va_mac_addr, (uchar_t *)ea->ether_addr_octet,
 	    spec.va_mac_len);
 
-	if (dladm_vnic_walk_sys(v_find, &spec) == DLADM_STATUS_OK) {
-		dladm_status_t status;
+	status = dladm_vnic_walk_sys(v_find, &spec);
+	switch (status) {
+	case DLADM_STATUS_EXIST:
+		vid = spec.va_vnic_id;
+		break;
 
+	case DLADM_STATUS_OK:
 		/*
 		 * None found, so create.
 		 */
@@ -119,14 +125,17 @@ v_add(char *dev, char *addr)
 		    (uchar_t *)ea->ether_addr_octet, ETHERADDRL,
 		    &vid, DLADM_VNIC_OPT_TEMP | DLADM_VNIC_OPT_AUTOID);
 		if (status != DLADM_STATUS_OK) {
-			char buf[DLADM_STRSIZE];
-
 			(void) fprintf(stderr, "dladm_vnic_create: %s\n",
 			    dladm_status2str(status, buf));
 			return (-1);
 		}
-	} else {
-		vid = spec.va_vnic_id;
+		break;
+
+	default:
+		(void) fprintf(stderr, "dladm_vnic_walk_sys: %s\n",
+		    dladm_status2str(status, buf));
+		return (-1);
+		/* NOTREACHED */
 	}
 
 	(void) printf("%d\n", vid);
