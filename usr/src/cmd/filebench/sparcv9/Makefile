@@ -25,6 +25,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
+include ../../Makefile.cmd.64
 
 FBBINDIRsparcv9 = $(ROOTFBBINDIR)/sparcv9
 PROGsparcv9 = $(PROG:%=$(FBBINDIRsparcv9)/%)

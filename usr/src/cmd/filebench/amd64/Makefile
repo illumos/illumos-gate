@@ -25,6 +25,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
+include ../../Makefile.cmd.64
 
 FBBINDIRamd64 = $(ROOTFBBINDIR)/amd64
 PROGamd64 = $(PROG:%=$(FBBINDIRamd64)/%)

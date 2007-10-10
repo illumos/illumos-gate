@@ -375,10 +375,9 @@ fatal:
 		}
 
 	} else if (filebench_shm->debug_level > LOG_INFO) {
-		(void) fprintf(stdout, "%5ld: %4.3f: %s",
-		    pid, (now - filebench_shm->epoch) / FSECS,
+		(void) fprintf(stdout, "%5d: %4.3f: %s",
+		    (int)pid, (now - filebench_shm->epoch) / FSECS,
 		    line);
-
 	} else {
 		(void) fprintf(stdout, "%4.3f: %s",
 		    (now - filebench_shm->epoch) / FSECS,
