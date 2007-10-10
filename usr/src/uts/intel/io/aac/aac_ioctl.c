@@ -61,6 +61,7 @@ extern void aac_free_dmamap(struct aac_cmd *);
 extern void aac_ioctl_complete(struct aac_softstate *, struct aac_cmd *);
 
 extern ddi_device_acc_attr_t aac_acc_attr;
+extern int aac_check_dma_handle(ddi_dma_handle_t);
 
 /*
  * IOCTL command handling functions
@@ -244,6 +245,12 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 		if ((rval = aac_send_fib(softs, acp)) != 0)
 			goto finish;
+	}
+
+	if (acp->flags & AAC_CMD_ERR) {
+		AACDB_PRINT(softs, CE_CONT, "FIB data corrupt");
+		rval = EIO;
+		goto finish;
 	}
 
 	if (ddi_copyout(fibp, (void *)arg, acp->fib_size, mode) != 0) {
@@ -500,16 +507,20 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		acp->flags |= AAC_CMD_DMA_VALID;
 
 		/* Copy in user srb buf content */
-		if ((srb->flags & SRB_DataOut) &&
-		    (ddi_copyin(
+		if (srb->flags & SRB_DataOut) {
+			if (ddi_copyin(
 #ifdef _LP64
-		    (void *)srb_sg_address,
+			    (void *)srb_sg_address,
 #else
-		    (void *)(uint32_t)srb_sg_address,
+			    (void *)(uint32_t)srb_sg_address,
 #endif
-		    acp->abp, srb_sg_bytecount, mode) != 0)) {
-			rval = EFAULT;
-			goto finish;
+			    acp->abp, srb_sg_bytecount, mode) != 0) {
+				rval = EFAULT;
+				goto finish;
+			}
+
+			(void) ddi_dma_sync(acp->buf_dma_handle, 0, 0,
+			    DDI_DMA_SYNC_FORDEV);
 		}
 	}
 
@@ -575,16 +586,25 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	if ((rval = aac_send_fib(softs, acp)) != 0)
 		goto finish;
 
-	if ((srb->sg.SgCount == 1) && (srb->flags & SRB_DataIn) &&
-	    (ddi_copyout(acp->abp,
+	if ((srb->sg.SgCount == 1) && (srb->flags & SRB_DataIn)) {
+		(void) ddi_dma_sync(acp->buf_dma_handle, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+		if (aac_check_dma_handle(acp->buf_dma_handle) != DDI_SUCCESS) {
+			ddi_fm_service_impact(softs->devinfo_p,
+			    DDI_SERVICE_UNAFFECTED);
+			rval = ENXIO;
+			goto finish;
+		}
+		if (ddi_copyout(acp->abp,
 #ifdef _LP64
-	    (void *)srb_sg_address,
+		    (void *)srb_sg_address,
 #else
-	    (void *)(uint32_t)srb_sg_address,
+		    (void *)(uint32_t)srb_sg_address,
 #endif
-	    srb_sg_bytecount, mode) != 0)) {
-		rval = EFAULT;
-		goto finish;
+		    srb_sg_bytecount, mode) != 0) {
+			rval = EFAULT;
+			goto finish;
+		}
 	}
 
 	/* Status struct */

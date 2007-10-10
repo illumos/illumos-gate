@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		16
+#define	AAC_DRIVER_BUGFIX_LEVEL		17
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -297,6 +297,8 @@ struct aac_softstate {
 	struct aac_fib_context *fibctx;
 	int devcfg_wait_on;		/* AIF event waited for rescan */
 
+	int fm_capabilities;
+
 #ifdef DEBUG
 	/* UART trace printf variables */
 	uint32_t debug_flags;		/* debug print flags bitmap */
@@ -318,6 +320,7 @@ struct aac_softstate {
 #define	AAC_CMD_CMPLT			(1 << 7)
 #define	AAC_CMD_ABORT			(1 << 8)
 #define	AAC_CMD_TIMEOUT			(1 << 9)
+#define	AAC_CMD_ERR			(1 << 10)
 
 struct aac_cmd {
 	struct aac_cmd *next;

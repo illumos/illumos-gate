@@ -49,6 +49,14 @@
 #include "aac_regs.h"
 #include "aac.h"
 
+/*
+ * FMA header files
+ */
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
+
 char _depends_on[] = "misc/scsi";
 
 /*
@@ -255,7 +263,7 @@ int aac_do_io(struct aac_softstate *, struct aac_cmd *);
 static int aac_do_poll_io(struct aac_softstate *, struct aac_cmd *);
 static int aac_do_async_io(struct aac_softstate *, struct aac_cmd *);
 static int aac_send_command(struct aac_softstate *, struct aac_slot *);
-static void aac_dma_sync_ac(struct aac_cmd *);
+static int aac_dma_sync_ac(struct aac_cmd *);
 static int aac_shutdown(struct aac_softstate *);
 static int aac_reset_adapter(struct aac_softstate *);
 
@@ -276,6 +284,16 @@ static int aac_open(dev_t *, int, int, cred_t *);
 static int aac_close(dev_t, int, int, cred_t *);
 static int aac_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 extern int aac_do_ioctl(struct aac_softstate *, int, intptr_t, int);
+
+/*
+ * FMA Prototypes
+ */
+static void aac_fm_init(struct aac_softstate *);
+static void aac_fm_fini(struct aac_softstate *);
+static int aac_fm_error_cb(dev_info_t *, ddi_fm_error_t *, const void *);
+int aac_check_acc_handle(ddi_acc_handle_t);
+int aac_check_dma_handle(ddi_dma_handle_t);
+void aac_fm_ereport(struct aac_softstate *, char *);
 
 #ifdef DEBUG
 /*
@@ -507,7 +525,8 @@ static struct aac_interface aac_rkt_interface = {
 ddi_device_acc_attr_t aac_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 static struct {
@@ -540,7 +559,7 @@ static ddi_dma_attr_t aac_buf_dma_attr = {
 	0xffffffffull,	/* segment boundary */
 	AAC_NSEG,	/* s/g list length */
 	AAC_BLK_SIZE,	/* granularity of device */
-	0,		/* DMA transfer flags */
+	DDI_DMA_FLAGERR	/* DMA transfer flags */
 };
 
 static ddi_dma_attr_t aac_addr_dma_attr = {
@@ -556,7 +575,7 @@ static ddi_dma_attr_t aac_addr_dma_attr = {
 	0x7fffffffull,	/* segment boundary */
 	1,		/* s/g list length */
 	1,		/* granularity of device */
-	0,		/* DMA transfer flags */
+	DDI_DMA_FLAGERR	/* DMA transfer flags */
 };
 
 int
@@ -669,6 +688,16 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	/* We have found the right card and everything is OK */
 	attach_state |= AAC_ATTACH_CARD_DETECTED;
+
+	/*
+	 * Initialize FMA
+	 */
+	softs->fm_capabilities = ddi_getprop(DDI_DEV_T_ANY, softs->devinfo_p,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "fm-capable",
+	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+
+	aac_fm_init(softs);
 
 	/* Map PCI mem space */
 	if (ddi_regs_map_setup(dip, 1,
@@ -814,6 +843,7 @@ error:
 	}
 	if (attach_state & AAC_ATTACH_PCI_MEM_MAPPED)
 		ddi_regs_map_free(&softs->pci_mem_handle);
+	aac_fm_fini(softs);
 	if (attach_state & AAC_ATTACH_CARD_DETECTED)
 		softs->card = AACERR;
 	if (attach_state & AAC_ATTACH_SOFTSTATE_ALLOCED)
@@ -867,6 +897,7 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rw_destroy(&softs->errlock);
 
 	ddi_regs_map_free(&softs->pci_mem_handle);
+	aac_fm_fini(softs);
 	softs->hwif = AAC_HWIF_UNKNOWN;
 	softs->card = AAC_UNKNOWN_CARD;
 	ddi_soft_state_free(aac_softstatep, ddi_get_instance(dip));
@@ -1064,6 +1095,11 @@ aac_handle_io(struct aac_softstate *softs, int index)
 
 	(void) ddi_dma_sync(slotp->fib_dma_handle, 0, 0, DDI_DMA_SYNC_FORCPU);
 
+	if (aac_check_dma_handle(slotp->fib_dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		acp->flags |= AAC_CMD_ERR;
+	}
+
 	/*
 	 * For fast response IO, the firmware do not return any FIB data,
 	 * so we need to fill in the FIB status and state so that FIB users
@@ -1098,6 +1134,10 @@ aac_intr_new(caddr_t arg)
 	index = AAC_OUTB_GET(softs);
 	if (index == 0xfffffffful)
 		index = AAC_OUTB_GET(softs);
+	if (aac_check_acc_handle(softs->pci_mem_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		return (DDI_INTR_UNCLAIMED);
+	}
 	if (index == 0xfffffffful)
 		return (DDI_INTR_UNCLAIMED);
 	do {
@@ -1113,7 +1153,12 @@ aac_intr_new(caddr_t arg)
 			for (i = 0; i < sizeof (struct aac_fib)/4; ++i)
 				((uint32_t *)fibp)[i] =
 				    PCI_MEM_GET32(softs, index+i*4);
-			(void) aac_handle_aif(softs, fibp);
+			if (aac_check_acc_handle(softs->pci_mem_handle) !=
+			    DDI_SUCCESS)
+				ddi_fm_service_impact(softs->devinfo_p,
+				    DDI_SERVICE_UNAFFECTED);
+			else
+				(void) aac_handle_aif(softs, fibp);
 			/*
 			 * AIF memory is owned by the adapter, so let it
 			 * know that we are done with it.
@@ -1147,6 +1192,11 @@ aac_intr_old(caddr_t arg)
 
 	/* AACDB_PRINT(softs, CE_NOTE, "INTR! old"); */
 	status = AAC_STATUS_GET(softs);
+	if (aac_check_acc_handle(softs->pci_mem_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	if (status & AAC_DB_RESPONSE_READY) {
 		int slot_idx;
 
@@ -1173,8 +1223,13 @@ aac_intr_old(caddr_t arg)
 		(void) ddi_dma_sync(softs->comm_space_dma_handle,
 		    AACOFFSET(struct aac_comm_space, adapter_print_buf),
 		    AAC_ADAPTER_PRINT_BUFSIZE, DDI_DMA_SYNC_FORCPU);
-		cmn_err(CE_NOTE, "MSG From Adapter: %s",
-		    softs->comm_space->adapter_print_buf);
+		if (aac_check_dma_handle(softs->comm_space_dma_handle) ==
+		    DDI_SUCCESS)
+			cmn_err(CE_NOTE, "MSG From Adapter: %s",
+			    softs->comm_space->adapter_print_buf);
+		else
+			ddi_fm_service_impact(softs->devinfo_p,
+			    DDI_SERVICE_UNAFFECTED);
 		AAC_NOTIFY(softs, AAC_DB_PRINTF_READY);
 		return (DDI_INTR_CLAIMED);
 	} else if (status & AAC_DB_COMMAND_READY) {
@@ -1294,12 +1349,17 @@ aac_ld_complete(struct aac_softstate *softs, struct aac_cmd *acp)
 	 * block_read/write has a similar response header, use blockread
 	 * response for both.
 	 */
-	resp = (struct aac_blockread_response *)&slotp->fibp->data[0];
-	if (resp->Status == ST_OK) {
-		acp->pkt->pkt_resid = 0;
-		acp->pkt->pkt_state |= STATE_XFERRED_DATA;
+	if (!(acp->flags & AAC_CMD_ERR)) {
+		resp = (struct aac_blockread_response *)&slotp->fibp->data[0];
+		if (resp->Status == ST_OK) {
+			acp->pkt->pkt_resid = 0;
+			acp->pkt->pkt_state |= STATE_XFERRED_DATA;
+		} else {
+			aac_set_arq_data_hwerr(acp);
+		}
 	} else {
-		aac_set_arq_data_hwerr(acp);
+		acp->pkt->pkt_reason = CMD_TRAN_ERR;
+		acp->pkt->pkt_statistics = 0;
 	}
 
 	ASSERT(!(acp->flags & AAC_CMD_SYNC));
@@ -1328,7 +1388,8 @@ aac_ioctl_complete(struct aac_softstate *softs, struct aac_cmd *acp)
 	acp->fib_size = slotp->fibp->Header.Size;
 
 	ASSERT(acp->fib_size <= softs->aac_max_fib_size);
-	bcopy(slotp->fibp, acp->fibp, acp->fib_size);
+	if (!(acp->flags & AAC_CMD_ERR))
+		bcopy(slotp->fibp, acp->fibp, acp->fib_size);
 
 	ASSERT(acp->flags & AAC_CMD_SYNC);
 	aac_release_slot(softs, slotp);
@@ -1815,12 +1876,17 @@ aac_common_attach(struct aac_softstate *softs)
 	    AAC_FWUP_TIMEOUT * 1000);
 	if (!(AAC_FWSTATUS_GET(softs) & AAC_KERNEL_UP_AND_RUNNING)) {
 		cmn_err(CE_CONT, "?Fatal error: controller not ready");
+		aac_fm_ereport(softs, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto error;
 	}
 
 	/* Read and set card supported options and settings */
-	if (aac_check_firmware(softs) == AACERR)
+	if (aac_check_firmware(softs) == AACERR) {
+		aac_fm_ereport(softs, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto error;
+	}
 
 	/* Clear out all interrupts */
 	AAC_STATUS_CLR(softs, ~0);
@@ -1832,6 +1898,8 @@ aac_common_attach(struct aac_softstate *softs)
 	}
 	if (aac_setup_comm_space(softs) != AACOK) {
 		cmn_err(CE_CONT, "?Setup communication space failed");
+		aac_fm_ereport(softs, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto error;
 	}
 
@@ -1920,6 +1988,8 @@ aac_common_attach(struct aac_softstate *softs)
 	/* Perform acceptance of adapter-detected config changes if possible */
 	if (aac_handle_adapter_config_issues(softs) != AACMPE_OK) {
 		cmn_err(CE_CONT, "?Handle adapter config issues failed");
+		aac_fm_ereport(softs, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto error;
 	}
 
@@ -1927,6 +1997,26 @@ aac_common_attach(struct aac_softstate *softs)
 	if (aac_get_containers(softs) != AACOK) {
 		cmn_err(CE_CONT, "?Fatal error: get container info error");
 		goto error;
+	}
+
+	/* Check dma & acc handles allocated in attach */
+	if (aac_check_dma_handle(softs->comm_space_dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
+		goto error;
+	}
+
+	if (aac_check_acc_handle(softs->pci_mem_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
+		goto error;
+	}
+
+	for (i = 0; i < softs->total_slots; i++) {
+		if (aac_check_dma_handle(softs->io_slot[i].fib_dma_handle) !=
+		    DDI_SUCCESS) {
+			ddi_fm_service_impact(softs->devinfo_p,
+			    DDI_SERVICE_LOST);
+			goto error;
+		}
 	}
 
 	return (AACOK);
@@ -2050,6 +2140,17 @@ aac_sync_fib(struct aac_softstate *softs, uint32_t cmd,
 		return (AACERR);
 	}
 
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    AACOFFSET(struct aac_comm_space, sync_fib), AAC_FIB_SIZE,
+	    DDI_DMA_SYNC_FORCPU);
+
+	if ((aac_check_acc_handle(softs->pci_mem_handle) != DDI_SUCCESS) ||
+	    (aac_check_dma_handle(softs->comm_space_dma_handle) !=
+	    DDI_SUCCESS)) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		return (AACERR);
+	}
+
 	return (AACOK);
 }
 
@@ -2139,6 +2240,16 @@ aac_fib_enqueue(struct aac_softstate *softs, int queue, uint32_t fib_addr,
 		mutex_enter(&softs->fib_mutex);
 
 	/* Get the producer/consumer indices */
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)softs->qtablep->qt_qindex[queue] - \
+	    (uint8_t *)softs->comm_space, sizeof (uint32_t) * 2,
+	    DDI_DMA_SYNC_FORCPU);
+	if (aac_check_dma_handle(softs->comm_space_dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		mutex_exit(&softs->fib_mutex);
+		return (AACERR);
+	}
+
 	pi = softs->qtablep->qt_qindex[queue][AAC_PRODUCER_INDEX];
 	ci = softs->qtablep->qt_qindex[queue][AAC_CONSUMER_INDEX];
 
@@ -2159,9 +2270,17 @@ aac_fib_enqueue(struct aac_softstate *softs, int queue, uint32_t fib_addr,
 	/* Fill in queue entry */
 	(softs->qentries[queue] + pi)->aq_fib_size = fib_size;
 	(softs->qentries[queue] + pi)->aq_fib_addr = fib_addr;
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)(softs->qentries[queue] + pi) - \
+	    (uint8_t *)softs->comm_space, sizeof (struct aac_queue_entry),
+	    DDI_DMA_SYNC_FORDEV);
 
 	/* Update producer index */
 	softs->qtablep->qt_qindex[queue][AAC_PRODUCER_INDEX] = pi + 1;
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)&softs->qtablep->qt_qindex[queue][AAC_PRODUCER_INDEX] - \
+	    (uint8_t *)softs->comm_space, sizeof (uint32_t),
+	    DDI_DMA_SYNC_FORDEV);
 
 	if (queue == AAC_ADAP_NORM_CMD_Q)
 		mutex_exit(&softs->fib_mutex);
@@ -2189,6 +2308,10 @@ aac_fib_dequeue(struct aac_softstate *softs, int queue, int *idxp)
 	mutex_enter(&softs->fib_mutex);
 
 	/* Get the producer/consumer indices */
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)softs->qtablep->qt_qindex[queue] - \
+	    (uint8_t *)softs->comm_space, sizeof (uint32_t) * 2,
+	    DDI_DMA_SYNC_FORCPU);
 	pi = softs->qtablep->qt_qindex[queue][AAC_PRODUCER_INDEX];
 	ci = softs->qtablep->qt_qindex[queue][AAC_CONSUMER_INDEX];
 
@@ -2212,6 +2335,15 @@ aac_fib_dequeue(struct aac_softstate *softs, int queue, int *idxp)
 		ci = 0;
 
 	/* Fetch the entry */
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)(softs->qentries[queue] + pi) - \
+	    (uint8_t *)softs->comm_space, sizeof (struct aac_queue_entry),
+	    DDI_DMA_SYNC_FORCPU);
+	if (aac_check_dma_handle(softs->comm_space_dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+		error = AACERR;
+	}
+
 	switch (queue) {
 	case AAC_HOST_NORM_RESP_Q:
 	case AAC_HOST_HIGH_RESP_Q:
@@ -2232,7 +2364,10 @@ aac_fib_dequeue(struct aac_softstate *softs, int queue, int *idxp)
 
 	/* Update consumer index */
 	softs->qtablep->qt_qindex[queue][AAC_CONSUMER_INDEX] = ci + 1;
-
+	(void) ddi_dma_sync(softs->comm_space_dma_handle,
+	    (uint8_t *)&softs->qtablep->qt_qindex[queue][AAC_CONSUMER_INDEX] - \
+	    (uint8_t *)softs->comm_space, sizeof (uint32_t),
+	    DDI_DMA_SYNC_FORDEV);
 out:
 	mutex_exit(&softs->fib_mutex);
 	if (unfull && aac_qinfo[queue].notify != 0)
@@ -2249,6 +2384,7 @@ aac_get_container_info(struct aac_softstate *softs, struct aac_fib *fibp,
     int cid)
 {
 	struct aac_mntinfo *mi;
+	struct aac_mntinforesp *mir;
 
 	mi = (struct aac_mntinfo *)&fibp->data[0];
 	mi->Command = /* Use 64-bit LBA if enabled */
@@ -2264,7 +2400,11 @@ aac_get_container_info(struct aac_softstate *softs, struct aac_fib *fibp,
 		return (NULL);
 	}
 
-	return ((struct aac_mntinforesp *)&fibp->data[0]);
+	mir = (struct aac_mntinforesp *)&fibp->data[0];
+	if (mir->Status == ST_OK)
+		return (mir);
+
+	return (NULL);
 }
 
 static struct aac_Container *
@@ -3054,12 +3194,15 @@ aac_reset_adapter(struct aac_softstate *softs)
 
 	ASSERT(rw_read_locked(&softs->errlock) == 0);
 
+	ddi_fm_acc_err_clear(softs->pci_mem_handle, DDI_FME_VER0);
 	/* Disable interrupt */
 	AAC_DISABLE_INTR(softs);
 
 	health = aac_check_adapter_health(softs);
-	if (health == -1)
+	if (health == -1) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto finish;
+	}
 	if (health == 0) /* flush drives if possible */
 		(void) aac_shutdown(softs);
 
@@ -3088,6 +3231,7 @@ aac_reset_adapter(struct aac_softstate *softs)
 		    sizeof (struct aac_pause_command));
 		aac_release_sync_fib(softs);
 
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
 		goto finish;
 	}
 
@@ -3259,7 +3403,7 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * have been resubmitted
 	 */
 	acp->flags &= ~(AAC_CMD_NO_INTR | AAC_CMD_CMPLT | \
-	    AAC_CMD_ABORT | AAC_CMD_TIMEOUT);
+	    AAC_CMD_ABORT | AAC_CMD_TIMEOUT | AAC_CMD_ERR);
 	acp->timeout = acp->pkt->pkt_time;
 	if (pkt->pkt_flags & FLAG_NOINTR)
 		acp->flags |= AAC_CMD_NO_INTR;
@@ -3272,8 +3416,13 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		pkt->pkt_resid = acp->bcount;
 		/* Consistent packets need to be sync'ed first */
 		if ((acp->flags & AAC_CMD_CONSISTENT) &&
-		    (acp->flags & AAC_CMD_BUF_WRITE))
-			aac_dma_sync_ac(acp);
+		    (acp->flags & AAC_CMD_BUF_WRITE)) {
+			if (aac_dma_sync_ac(acp) != AACOK) {
+				ddi_fm_service_impact(softs->devinfo_p,
+				    DDI_SERVICE_UNAFFECTED);
+				return (TRAN_BADPKT);
+			}
+		}
 	} else {
 		pkt->pkt_resid = 0;
 	}
@@ -3833,7 +3982,10 @@ aac_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	DBCALLED(NULL, 2);
 
-	aac_dma_sync_ac(acp);
+	if (aac_dma_sync_ac(acp) != AACOK)
+		ddi_fm_service_impact(
+		    (AAC_TRAN2SOFTS(ap->a_hba_tran))->devinfo_p,
+		    DDI_SERVICE_UNAFFECTED);
 }
 
 /*
@@ -4177,6 +4329,9 @@ aac_start_io(struct aac_softstate *softs, struct aac_slot *slotp,
 		    addr, size);
 	}
 
+	if (aac_check_dma_handle(slotp->fib_dma_handle) != DDI_SUCCESS)
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_UNAFFECTED);
+
 	/*
 	 * NOTE: We send command only when slots availabe, so should never
 	 * reach here.
@@ -4259,8 +4414,34 @@ aac_drain_comp_q(struct aac_softstate *softs)
 			 * Consistent packets need to be sync'ed first
 			 */
 			if ((acp->flags & AAC_CMD_CONSISTENT) &&
-			    (acp->flags & AAC_CMD_BUF_READ))
-				aac_dma_sync_ac(acp);
+			    (acp->flags & AAC_CMD_BUF_READ)) {
+				if (aac_dma_sync_ac(acp) != AACOK) {
+					ddi_fm_service_impact(softs->devinfo_p,
+					    DDI_SERVICE_UNAFFECTED);
+					pkt->pkt_reason = CMD_TRAN_ERR;
+					pkt->pkt_statistics = 0;
+				}
+			}
+
+			if ((aac_check_acc_handle(
+			    softs->comm_space_acc_handle) != DDI_SUCCESS) ||
+			    (aac_check_acc_handle(
+			    softs->pci_mem_handle) != DDI_SUCCESS)) {
+				ddi_fm_service_impact(softs->devinfo_p,
+				    DDI_SERVICE_UNAFFECTED);
+				ddi_fm_acc_err_clear(softs->pci_mem_handle,
+				    DDI_FME_VER0);
+				pkt->pkt_reason = CMD_TRAN_ERR;
+				pkt->pkt_statistics = 0;
+			}
+
+			if (aac_check_dma_handle(
+			    softs->comm_space_dma_handle) != DDI_SUCCESS) {
+				ddi_fm_service_impact(softs->devinfo_p,
+				    DDI_SERVICE_UNAFFECTED);
+				pkt->pkt_reason = CMD_TRAN_ERR;
+				pkt->pkt_statistics = 0;
+			}
 		}
 		if (acp->pkt->pkt_comp)
 			(*acp->pkt->pkt_comp)(acp->pkt);
@@ -4313,6 +4494,19 @@ aac_alloc_fib(struct aac_softstate *softs, struct aac_slot *slotp)
 		    "dma bind failed for slot fib area");
 		goto error;
 	}
+
+	/* Check dma handles allocated in fib attach */
+	if (aac_check_dma_handle(slotp->fib_dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
+		goto error;
+	}
+
+	/* Check acc handles allocated in fib attach */
+	if (aac_check_acc_handle(slotp->fib_acc_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(softs->devinfo_p, DDI_SERVICE_LOST);
+		goto error;
+	}
+
 	slotp->fib_phyaddr = cookie.dmac_laddress;
 	return (AACOK);
 
@@ -4489,7 +4683,7 @@ aac_do_poll_io(struct aac_softstate *softs, struct aac_cmd *acp)
 		mutex_exit(&softs->event_mutex);
 	}
 
-	if (acp->flags & AAC_CMD_CMPLT)
+	if ((acp->flags & AAC_CMD_CMPLT) && !(acp->flags & AAC_CMD_ERR))
 		return (AACOK);
 	return (AACERR);
 }
@@ -4516,7 +4710,7 @@ aac_do_async_io(struct aac_softstate *softs, struct aac_cmd *acp)
 	return (rval);
 }
 
-static void
+static int
 aac_dma_sync_ac(struct aac_cmd *acp)
 {
 	if (acp->buf_dma_handle) {
@@ -4531,6 +4725,9 @@ aac_dma_sync_ac(struct aac_cmd *acp)
 		} else {
 			(void) ddi_dma_sync(acp->buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORCPU);
+			if (aac_check_dma_handle(acp->buf_dma_handle) !=
+			    DDI_SUCCESS)
+				return (AACERR);
 			if (acp->abp != NULL)
 				ddi_rep_get8(acp->abh,
 				    (uint8_t *)acp->bp->b_un.b_addr,
@@ -4538,6 +4735,7 @@ aac_dma_sync_ac(struct aac_cmd *acp)
 				    DDI_DEV_AUTOINCR);
 		}
 	}
+	return (AACOK);
 }
 
 /*
@@ -4853,6 +5051,134 @@ aac_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		return (aac_do_ioctl(softs, cmd, arg, flag));
 	}
 	return (ENXIO);
+}
+
+/*
+ * The IO fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+aac_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+/*
+ * aac_fm_init - initialize fma capabilities and register with IO
+ *               fault services.
+ */
+static void
+aac_fm_init(struct aac_softstate *softs)
+{
+	/*
+	 * Need to change iblock to priority for new MSI intr
+	 */
+	ddi_iblock_cookie_t fm_ibc;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (softs->fm_capabilities) {
+		/* Adjust access and dma attributes for FMA */
+		aac_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		aac_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		aac_addr_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+
+		/*
+		 * Register capabilities with IO Fault Services.
+		 * fm_capabilities will be updated to indicate
+		 * capabilities actually supported (not requested.)
+		 */
+		ddi_fm_init(softs->devinfo_p, &softs->fm_capabilities, &fm_ibc);
+
+		/*
+		 * Initialize pci ereport capabilities if ereport
+		 * capable (should always be.)
+		 */
+		if (DDI_FM_EREPORT_CAP(softs->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(softs->fm_capabilities)) {
+			pci_ereport_setup(softs->devinfo_p);
+		}
+
+		/*
+		 * Register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(softs->fm_capabilities)) {
+			ddi_fm_handler_register(softs->devinfo_p,
+			    aac_fm_error_cb, (void *) softs);
+		}
+	} else {
+		/* Clear FMA if no capabilities */
+		aac_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		aac_buf_dma_attr.dma_attr_flags = 0;
+		aac_addr_dma_attr.dma_attr_flags = 0;
+	}
+}
+
+/*
+ * aac_fm_fini - Releases fma capabilities and un-registers with IO
+ *               fault services.
+ */
+static void
+aac_fm_fini(struct aac_softstate *softs)
+{
+	/* Only unregister FMA capabilities if registered */
+	if (softs->fm_capabilities) {
+
+		/*
+		 * Un-register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(softs->fm_capabilities)) {
+			ddi_fm_handler_unregister(softs->devinfo_p);
+		}
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(softs->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(softs->fm_capabilities)) {
+			pci_ereport_teardown(softs->devinfo_p);
+		}
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(softs->devinfo_p);
+
+	}
+}
+
+int
+aac_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+int
+aac_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+void
+aac_fm_ereport(struct aac_softstate *softs, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(softs->fm_capabilities)) {
+		ddi_fm_ereport_post(softs->devinfo_p, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERSION, NULL);
+	}
 }
 
 #ifdef DEBUG
