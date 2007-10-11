@@ -6777,9 +6777,9 @@ segvn_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 	if (pgno != 0) {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
 		if (svd->pageprot == 0) {
-			do
+			do {
 				protv[--pgno] = svd->prot;
-			while (pgno != 0);
+			} while (pgno != 0);
 		} else {
 			size_t pgoff = seg_page(seg, addr);
 
@@ -7987,7 +7987,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 
 		page = seg_page(seg, addr);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-		anon_disclaim(amp, svd->anon_index + page, len, 0);
+		anon_disclaim(amp, svd->anon_index + page, len);
 		ANON_LOCK_EXIT(&amp->a_rwlock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		return (0);

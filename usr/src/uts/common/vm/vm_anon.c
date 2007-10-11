@@ -1536,7 +1536,7 @@ anon_free_pages(
  * Make anonymous pages discardable
  */
 void
-anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
+anon_disclaim(struct anon_map *amp, ulong_t index, size_t size)
 {
 	spgcnt_t npages = btopr(size);
 	struct anon *ap;
@@ -1551,8 +1551,8 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 
 	ASSERT(RW_READ_HELD(&amp->a_rwlock));
 	pgcnt = 1;
-	for (; npages > 0; index = (pgcnt == 1) ? index + 1:
-		P2ROUNDUP(index + 1, pgcnt), npages -= pgcnt) {
+	for (; npages > 0; index = (pgcnt == 1) ? index + 1 :
+	    P2ROUNDUP(index + 1, pgcnt), npages -= pgcnt) {
 
 		/*
 		 * get anon pointer and index for the first valid entry
@@ -1575,17 +1575,10 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 
 		/*
 		 * Get anonymous page and try to lock it SE_EXCL;
-		 * For non blocking case if we couldn't grab the lock
-		 * we skip to next page.
-		 * For blocking case (ANON_PGLOOKUP_BLK) block
-		 * until we grab SE_EXCL lock.
+		 * if we couldn't grab the lock we skip to next page.
 		 */
 		swap_xlate(ap, &vp, &off);
-		if (flags & ANON_PGLOOKUP_BLK)
-			pp = page_lookup_create(vp, (u_offset_t)off,
-			    SE_EXCL, NULL, NULL, SE_EXCL_WANTED);
-		else
-			pp = page_lookup_nowait(vp, (u_offset_t)off, SE_EXCL);
+		pp = page_lookup_nowait(vp, (u_offset_t)off, SE_EXCL);
 		if (pp == NULL) {
 			segadvstat.MADV_FREE_miss.value.ul++;
 			pgcnt = 1;
@@ -1659,8 +1652,8 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 				if (ap->an_pvp) {
 					swap_phys_free(ap->an_pvp,
 					    ap->an_poff, PAGESIZE);
-					    ap->an_pvp = NULL;
-					    ap->an_poff = 0;
+					ap->an_pvp = NULL;
+					ap->an_poff = 0;
 				}
 				mutex_exit(ahm);
 				(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
@@ -1708,8 +1701,8 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 				if (ap->an_pvp) {
 					swap_phys_free(ap->an_pvp,
 					    ap->an_poff, PAGESIZE);
-					    ap->an_pvp = NULL;
-					    ap->an_poff = 0;
+					ap->an_pvp = NULL;
+					ap->an_poff = 0;
 				}
 				mutex_exit(ahm);
 			}

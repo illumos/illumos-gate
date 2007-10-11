@@ -1148,13 +1148,13 @@ htable_release(htable_t *ht)
 			 * an htable so we don't want to free the htable.
 			 */
 			HTABLE_ENTER(hashval);
-			ASSERT(ht->ht_lock_cnt == 0 || ht->ht_valid_cnt > 0);
 			ASSERT(ht->ht_valid_cnt >= 0);
 			ASSERT(ht->ht_busy > 0);
 			if (ht->ht_valid_cnt > 0)
 				break;
 			if (ht->ht_busy > 1)
 				break;
+			ASSERT(ht->ht_lock_cnt == 0);
 
 #if !defined(__xpv)
 			/*
