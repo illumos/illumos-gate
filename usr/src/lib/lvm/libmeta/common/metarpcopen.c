@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,11 @@
 
 #include <meta.h>
 #include <metad.h>
+#include <sdssc.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define	CC_TTL_MAX	20
 
@@ -182,7 +187,7 @@ client_create_vers_retry(char *hostname,
 	rpcvers_t	vers;		/* Version # not needed. */
 
 	return (clnt_create_vers_timed(hostname, METAD, &vers,
-		METAD_VERSION, METAD_VERSION_DEVID, "tcp", tout));
+	    METAD_VERSION, METAD_VERSION_DEVID, "tcp", tout));
 }
 
 /*
@@ -195,7 +200,7 @@ client_create_helper(char *hostname, void *private, struct timeval *time_out)
 	clnt_data_t	*cd = (clnt_data_t *)private;
 
 	return (clnt_create_timed(hostname, cd->cd_prognum, cd->cd_version,
-		cd->cd_nettype, time_out));
+	    cd->cd_nettype, time_out));
 }
 
 /*
@@ -270,8 +275,8 @@ meta_client_create_retry(
 		if (clnt != (CLIENT *) NULL)
 			break;
 		if ((rpc_createerr.cf_stat == RPC_RPCBFAILURE) ||
-			(rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED) ||
-			(rpc_createerr.cf_stat == RPC_CANTRECV)) {
+		    (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED) ||
+		    (rpc_createerr.cf_stat == RPC_CANTRECV)) {
 			if (debug) {
 				clnt_pcreateerror("meta_client_create_retry");
 			}
@@ -280,7 +285,7 @@ meta_client_create_retry(
 			if (gettimeofday(&curtime, NULL) == -1) {
 				if (ep != (md_error_t *)NULL) {
 					(void) mdsyserror(ep, errno,
-						"gettimeofday()");
+					    "gettimeofday()");
 				}
 				return (clnt);
 			}
@@ -291,7 +296,7 @@ meta_client_create_retry(
 	}
 	if ((clnt == (CLIENT *) NULL) && (ep != (md_error_t *)NULL)) {
 		(void) mdrpccreateerror(ep, hostname,
-			"meta_client_create_retry");
+		    "meta_client_create_retry");
 	}
 	return (clnt);
 }
@@ -311,7 +316,7 @@ meta_client_create(char *host, rpcprog_t prognum, rpcvers_t version,
 	cd.cd_version = version;
 	cd.cd_nettype = nettype;
 	return (meta_client_create_retry(host, client_create_helper,
-		(void *)&cd, MD_CLNT_CREATE_TOUT, (md_error_t *)NULL));
+	    (void *)&cd, MD_CLNT_CREATE_TOUT, (md_error_t *)NULL));
 }
 
 /*
@@ -329,6 +334,29 @@ metarpcopen(
 	int		i;
 	long		delta;
 	struct timeval	now;
+	struct in_addr	p_ip;
+	char		*host_sc = NULL;
+	char		host_priv[18];
+
+	/*
+	 * If we are in cluster mode, lets use the private interconnect
+	 * hostnames to establish the rpc connections.
+	 */
+	if (sdssc_bind_library() != SDSSC_NOT_BOUND)
+		if (sdssc_get_priv_ipaddr(hostname, &p_ip) == SDSSC_OKAY) {
+			/*
+			 * inet_ntoa() returns pointer to a string in the
+			 * base 256 notation d.d.d.d (IPv4) and so
+			 * host_priv[18] should be sufficient enough to
+			 * hold it.
+			 */
+			host_sc = inet_ntoa(p_ip);
+			if (host_sc != NULL) {
+				int size = sizeof (host_priv);
+				if (strlcpy(host_priv, host_sc, size) < size)
+					hostname = host_priv;
+			}
+		}
 
 	if (gettimeofday(&now, NULL) == -1) {
 		(void) mdsyserror(ep, errno, "gettimeofday()");
@@ -362,9 +390,9 @@ metarpcopen(
 					continue;
 				}
 				if (cl_sto(clntp, hostname, time_out,
-					ep) != 0) {
+				    ep) != 0) {
 					(void) mutex_unlock(
-						&client_header.ch_mutex);
+					    &client_header.ch_mutex);
 					return (NULL);
 				}
 				(void) mutex_unlock(&client_header.ch_mutex);
@@ -380,7 +408,7 @@ metarpcopen(
 	 * create a version 1 client handle.
 	 */
 	clntp = meta_client_create_retry(hostname, client_create_vers_retry,
-		(void *)NULL, MD_CLNT_CREATE_TOUT, ep);
+	    (void *)NULL, MD_CLNT_CREATE_TOUT, ep);
 
 	/* open connection */
 	if (clntp == NULL) {
