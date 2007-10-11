@@ -735,9 +735,6 @@ extern token_t *au_to_return64(char, uint64_t);
 extern token_t *au_to_seq(int);
 extern token_t *au_to_label(m_label_t *);
 extern token_t *au_to_socket(struct oldsocket *);
-extern token_t *au_to_socket_ex(short, short,
-				struct sockaddr *, struct sockaddr *);
-extern token_t *au_to_sock_inet(struct sockaddr_in *);
 extern token_t *au_to_subject(au_id_t, uid_t, gid_t, uid_t, gid_t,
 				pid_t, au_asid_t, au_tid_t *);
 extern token_t *au_to_subject_ex(au_id_t, uid_t, gid_t, uid_t, gid_t,

@@ -105,7 +105,7 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 	int sdomain = domain;
 
 	dprint(1, ("so_socket(%d,%d,%d,%p,%d)\n",
-		domain, type, protocol, devpath, version));
+	    domain, type, protocol, devpath, version));
 
 	if (domain == AF_NCA) {
 		/*
@@ -182,8 +182,8 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 		 * Issue SO_PROTOTYPE setsockopt.
 		 */
 		error = SOP_SETSOCKOPT(so, SOL_SOCKET, SO_PROTOTYPE,
-				&protocol,
-				(t_uscalar_t)sizeof (protocol));
+		    &protocol,
+		    (t_uscalar_t)sizeof (protocol));
 		if (error) {
 			(void) VOP_CLOSE(vp, 0, 1, 0, CRED());
 			VN_RELE(vp);
@@ -218,7 +218,7 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
  * Returns with the file descriptor held i.e. the caller has to
  * use releasef when done with the file descriptor.
  */
-static struct sonode *
+struct sonode *
 getsonode(int sock, int *errorp, file_t **fpp)
 {
 	file_t *fp;
@@ -454,9 +454,9 @@ so_socketpair(int sv[2])
 		name->sou_family = AF_UNIX;
 		name->sou_addr = so2->so_ux_laddr;
 		error = SOP_CONNECT(so1,
-				(struct sockaddr *)name,
-				(socklen_t)namelen,
-				0, _SOCONNECT_NOXLATE);
+		    (struct sockaddr *)name,
+		    (socklen_t)namelen,
+		    0, _SOCONNECT_NOXLATE);
 		if (error) {
 			kmem_free(name, namelen);
 			eprintsoline(so1, error);
@@ -464,9 +464,9 @@ so_socketpair(int sv[2])
 		}
 		name->sou_addr = so1->so_ux_laddr;
 		error = SOP_CONNECT(so2,
-				(struct sockaddr *)name,
-				(socklen_t)namelen,
-				0, _SOCONNECT_NOXLATE);
+		    (struct sockaddr *)name,
+		    (socklen_t)namelen,
+		    0, _SOCONNECT_NOXLATE);
 		kmem_free(name, namelen);
 		if (error) {
 			eprintsoline(so2, error);
@@ -510,9 +510,9 @@ so_socketpair(int sv[2])
 		name->sou_family = AF_UNIX;
 		name->sou_addr = so1->so_ux_laddr;
 		error = SOP_CONNECT(so2,
-				(struct sockaddr *)name,
-				(socklen_t)namelen,
-				FNONBLOCK, _SOCONNECT_NOXLATE);
+		    (struct sockaddr *)name,
+		    (socklen_t)namelen,
+		    FNONBLOCK, _SOCONNECT_NOXLATE);
 		kmem_free(name, namelen);
 		if (error) {
 			if (error != EINPROGRESS) {
@@ -581,7 +581,7 @@ bind(int sock, struct sockaddr *name, socklen_t namelen, int version)
 	int error;
 
 	dprint(1, ("bind(%d, %p, %d)\n",
-		sock, name, namelen));
+	    sock, name, namelen));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -632,7 +632,7 @@ listen(int sock, int backlog, int version)
 	int error;
 
 	dprint(1, ("listen(%d, %d)\n",
-		sock, backlog));
+	    sock, backlog));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -659,7 +659,7 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	int nfd;
 
 	dprint(1, ("accept(%d, %p, %p)\n",
-		sock, name, namelenp));
+	    sock, name, namelenp));
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL)
 		return (set_errno(error));
@@ -775,7 +775,7 @@ connect(int sock, struct sockaddr *name, socklen_t namelen, int version)
 	int error;
 
 	dprint(1, ("connect(%d, %p, %d)\n",
-		sock, name, namelen));
+	    sock, name, namelen));
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL)
 		return (set_errno(error));
@@ -809,7 +809,7 @@ shutdown(int sock, int how, int version)
 	int error;
 
 	dprint(1, ("shutdown(%d, %d)\n",
-		sock, how));
+	    sock, how));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -953,7 +953,7 @@ recv(int sock, void *buffer, size_t len, int flags)
 	struct iovec aiov[1];
 
 	dprint(1, ("recv(%d, %p, %ld, %d)\n",
-		sock, buffer, len, flags));
+	    sock, buffer, len, flags));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -983,7 +983,7 @@ recvfrom(int sock, void *buffer, size_t len, int flags,
 	struct iovec aiov[1];
 
 	dprint(1, ("recvfrom(%d, %p, %ld, %d, %p, %p)\n",
-		sock, buffer, len, flags, name, namelenp));
+	    sock, buffer, len, flags, name, namelenp));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -1031,7 +1031,7 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 	model_t	model;
 
 	dprint(1, ("recvmsg(%d, %p, %d)\n",
-		sock, msg, flags));
+	    sock, msg, flags));
 
 	model = get_udatamodel();
 	STRUCT_INIT(u_lmsg, model);
@@ -1120,13 +1120,13 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 	if (lmsg.msg_control != NULL &&
 	    (do_useracc == 0 ||
 	    useracc(lmsg.msg_control, lmsg.msg_controllen,
-			B_WRITE) != 0)) {
+	    B_WRITE) != 0)) {
 		return (set_errno(EFAULT));
 	}
 
 	return (recvit(sock, &lmsg, &auio, flags,
-		STRUCT_FADDR(umsgptr, msg_namelen),
-		STRUCT_FADDR(umsgptr, msg_controllen), flagsp));
+	    STRUCT_FADDR(umsgptr, msg_namelen),
+	    STRUCT_FADDR(umsgptr, msg_controllen), flagsp));
 }
 
 /*
@@ -1160,8 +1160,8 @@ sendit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 	if (name != NULL && namelen != 0) {
 		ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 		name = copyin_name(so,
-				(struct sockaddr *)name,
-				&namelen, &error);
+		    (struct sockaddr *)name,
+		    &namelen, &error);
 		if (name == NULL)
 			goto done3;
 		/* copyin_name null terminates addresses for AF_UNIX */
@@ -1228,7 +1228,7 @@ send(int sock, void *buffer, size_t len, int flags)
 	struct iovec aiov[1];
 
 	dprint(1, ("send(%d, %p, %ld, %d)\n",
-		sock, buffer, len, flags));
+	    sock, buffer, len, flags));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -1379,7 +1379,7 @@ sendto(int sock, void *buffer, size_t len, int flags,
 	struct iovec aiov[1];
 
 	dprint(1, ("sendto(%d, %p, %ld, %d, %p, %d)\n",
-		sock, buffer, len, flags, name, namelen));
+	    sock, buffer, len, flags, name, namelen));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -1422,7 +1422,7 @@ getpeername(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	socklen_t addrlen, size;
 
 	dprint(1, ("getpeername(%d, %p, %p)\n",
-		sock, name, namelenp));
+	    sock, name, namelenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		goto bad;
@@ -1492,7 +1492,7 @@ getsockname(int sock, struct sockaddr *name,
 	socklen_t addrlen, size;
 
 	dprint(1, ("getsockname(%d, %p, %p)\n",
-		sock, name, namelenp));
+	    sock, name, namelenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		goto bad;
@@ -1557,7 +1557,7 @@ getsockopt(int sock,
 	int error;
 
 	dprint(1, ("getsockopt(%d, %d, %d, %p, %p)\n",
-		sock, level, option_name, option_value, option_lenp));
+	    sock, level, option_name, option_value, option_lenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -1608,7 +1608,7 @@ setsockopt(int sock,
 	int error;
 
 	dprint(1, ("setsockopt(%d, %d, %d, %p, %d)\n",
-		sock, level, option_name, option_value, option_len));
+	    sock, level, option_name, option_value, option_len));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -1658,7 +1658,7 @@ sockconfig(int domain, int type, int protocol, char *devpath)
 	int error = 0;
 
 	dprint(1, ("sockconfig(%d, %d, %d, %p)\n",
-		domain, type, protocol, devpath));
+	    domain, type, protocol, devpath));
 
 	if (secpolicy_net_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));
@@ -2321,7 +2321,7 @@ done:
 		mutex_enter(&stp->sd_lock);
 		while (!(stp->sd_flag & STZCNOTIFY)) {
 			if (cv_wait_sig(&stp->sd_zcopy_wait,
-				&stp->sd_lock) == 0) {
+			    &stp->sd_lock) == 0) {
 				error = EINTR;
 				break;
 			}

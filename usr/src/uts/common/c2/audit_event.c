@@ -77,8 +77,6 @@
 #include <sys/port_impl.h>
 
 
-extern token_t	*au_to_sock_inet(struct sockaddr_in *);
-
 int	au_naevent;
 char	_depends_on[] = "fs/sockfs";
 
@@ -731,11 +729,6 @@ aui_null,	AUE_UMOUNT2,	aus_umount2,	/* 255 umount2 */
 };
 
 uint_t num_syscall = sizeof (audit_s2e) / sizeof (struct audit_s2e);
-
-char *so_not_bound = "socket not bound";
-char *so_not_conn  = "socket not connected";
-char *so_bad_addr  = "bad socket address";
-char *so_bad_peer_addr  = "bad peer address";
 
 /* null start function */
 /*ARGSUSED*/
@@ -2408,12 +2401,12 @@ aus_setgroups(struct t_audit_data *tad)
 		return;
 	if (gidsetsize != 0) {
 		gidlist = kmem_alloc(gidsetsize * sizeof (gid_t),
-						KM_SLEEP);
+		    KM_SLEEP);
 		if (copyin((caddr_t)gidset, gidlist,
-			gidsetsize * sizeof (gid_t)) == 0)
+		    gidsetsize * sizeof (gid_t)) == 0)
 			for (i = 0; i < gidsetsize; i++)
 				au_uwrite(au_to_arg32(1, "setgroups",
-						(uint32_t)gidlist[i]));
+				    (uint32_t)gidlist[i]));
 		kmem_free(gidlist, gidsetsize * sizeof (gid_t));
 	} else
 		au_uwrite(au_to_arg32(1, "setgroups", (uint32_t)0));
@@ -2764,60 +2757,60 @@ aus_auditsys(struct t_audit_data *tad)
 	case AUE_SETAUDIT:
 		STRUCT_INIT(ainfo, get_udatamodel());
 		if (copyin((caddr_t)a1, STRUCT_BUF(ainfo),
-				STRUCT_SIZE(ainfo))) {
+		    STRUCT_SIZE(ainfo))) {
 				return;
 		}
 		au_uwrite(au_to_arg32((char)1, "setaudit:auid",
-			(uint32_t)STRUCT_FGET(ainfo, ai_auid)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_auid)));
 #ifdef _LP64
 		au_uwrite(au_to_arg64((char)1, "setaudit:port",
-			(uint64_t)STRUCT_FGET(ainfo, ai_termid.port)));
+		    (uint64_t)STRUCT_FGET(ainfo, ai_termid.port)));
 #else
 		au_uwrite(au_to_arg32((char)1, "setaudit:port",
-			(uint32_t)STRUCT_FGET(ainfo, ai_termid.port)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_termid.port)));
 #endif
 		au_uwrite(au_to_arg32((char)1, "setaudit:machine",
-			(uint32_t)STRUCT_FGET(ainfo, ai_termid.machine)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_termid.machine)));
 		au_uwrite(au_to_arg32((char)1, "setaudit:as_success",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
 		au_uwrite(au_to_arg32((char)1, "setaudit:as_failure",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
 		au_uwrite(au_to_arg32((char)1, "setaudit:asid",
-			(uint32_t)STRUCT_FGET(ainfo, ai_asid)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_asid)));
 		break;
 	case AUE_SETAUDIT_ADDR:
 		STRUCT_INIT(ainfo_addr, get_udatamodel());
 		if (copyin((caddr_t)a1, STRUCT_BUF(ainfo_addr),
-				STRUCT_SIZE(ainfo_addr))) {
+		    STRUCT_SIZE(ainfo_addr))) {
 				return;
 		}
 		au_uwrite(au_to_arg32((char)1, "auid",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_auid)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_auid)));
 #ifdef _LP64
 		au_uwrite(au_to_arg64((char)1, "port",
-			(uint64_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
+		    (uint64_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
 #else
 		au_uwrite(au_to_arg32((char)1, "port",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
 #endif
 		au_uwrite(au_to_arg32((char)1, "type",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_type)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_type)));
 		if ((uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_type) ==
 		    AU_IPv4) {
 			au_uwrite(au_to_in_addr(
-				(struct in_addr *)STRUCT_FGETP(ainfo_addr,
-					ai_termid.at_addr)));
+			    (struct in_addr *)STRUCT_FGETP(ainfo_addr,
+			    ai_termid.at_addr)));
 		} else {
 			au_uwrite(au_to_in_addr_ex(
-				(int32_t *)STRUCT_FGETP(ainfo_addr,
-					ai_termid.at_addr)));
+			    (int32_t *)STRUCT_FGETP(ainfo_addr,
+			    ai_termid.at_addr)));
 		}
 		au_uwrite(au_to_arg32((char)1, "as_success",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_success)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_success)));
 		au_uwrite(au_to_arg32((char)1, "as_failure",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_failure)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_failure)));
 		au_uwrite(au_to_arg32((char)1, "asid",
-			(uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
 		break;
 	case AUE_AUDITSVC:
 		/*
@@ -2845,9 +2838,9 @@ aus_auditsys(struct t_audit_data *tad)
 		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))
 				return;
 		au_uwrite(au_to_arg32(
-			2, "setkmask:as_success", (uint32_t)mask.as_success));
+		    2, "setkmask:as_success", (uint32_t)mask.as_success));
 		au_uwrite(au_to_arg32(
-			2, "setkmask:as_failure", (uint32_t)mask.as_failure));
+		    2, "setkmask:as_failure", (uint32_t)mask.as_failure));
 		break;
 	case AUE_AUDITON_SPOLICY:
 		if (copyin((caddr_t)a2, &policy, sizeof (int)))
@@ -2864,54 +2857,54 @@ aus_auditsys(struct t_audit_data *tad)
 				return;
 		if (model == DATAMODEL_ILP32) {
 			au_uwrite(au_to_arg32(
-				3, "setqctrl:aq_hiwater",
-				(uint32_t)STRUCT_FGET(qctrl, aq_hiwater)));
+			    3, "setqctrl:aq_hiwater",
+			    (uint32_t)STRUCT_FGET(qctrl, aq_hiwater)));
 			au_uwrite(au_to_arg32(
-				3, "setqctrl:aq_lowater",
-				(uint32_t)STRUCT_FGET(qctrl, aq_lowater)));
+			    3, "setqctrl:aq_lowater",
+			    (uint32_t)STRUCT_FGET(qctrl, aq_lowater)));
 			au_uwrite(au_to_arg32(
-				3, "setqctrl:aq_bufsz",
-				(uint32_t)STRUCT_FGET(qctrl, aq_bufsz)));
+			    3, "setqctrl:aq_bufsz",
+			    (uint32_t)STRUCT_FGET(qctrl, aq_bufsz)));
 			au_uwrite(au_to_arg32(
-				3, "setqctrl:aq_delay",
-				(uint32_t)STRUCT_FGET(qctrl, aq_delay)));
+			    3, "setqctrl:aq_delay",
+			    (uint32_t)STRUCT_FGET(qctrl, aq_delay)));
 		} else {
 			au_uwrite(au_to_arg64(
-				3, "setqctrl:aq_hiwater",
-				(uint64_t)STRUCT_FGET(qctrl, aq_hiwater)));
+			    3, "setqctrl:aq_hiwater",
+			    (uint64_t)STRUCT_FGET(qctrl, aq_hiwater)));
 			au_uwrite(au_to_arg64(
-				3, "setqctrl:aq_lowater",
-				(uint64_t)STRUCT_FGET(qctrl, aq_lowater)));
+			    3, "setqctrl:aq_lowater",
+			    (uint64_t)STRUCT_FGET(qctrl, aq_lowater)));
 			au_uwrite(au_to_arg64(
-				3, "setqctrl:aq_bufsz",
-				(uint64_t)STRUCT_FGET(qctrl, aq_bufsz)));
+			    3, "setqctrl:aq_bufsz",
+			    (uint64_t)STRUCT_FGET(qctrl, aq_bufsz)));
 			au_uwrite(au_to_arg64(
-				3, "setqctrl:aq_delay",
-				(uint64_t)STRUCT_FGET(qctrl, aq_delay)));
+			    3, "setqctrl:aq_delay",
+			    (uint64_t)STRUCT_FGET(qctrl, aq_delay)));
 		}
 		break;
 	}
 	case AUE_AUDITON_SETUMASK:
 		STRUCT_INIT(ainfo, get_udatamodel());
 		if (copyin((caddr_t)uap->a2, STRUCT_BUF(ainfo),
-				STRUCT_SIZE(ainfo))) {
-				return;
+		    STRUCT_SIZE(ainfo))) {
+			return;
 		}
 		au_uwrite(au_to_arg32(3, "setumask:as_success",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
 		au_uwrite(au_to_arg32(3, "setumask:as_failure",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
 		break;
 	case AUE_AUDITON_SETSMASK:
 		STRUCT_INIT(ainfo, get_udatamodel());
 		if (copyin((caddr_t)uap->a2, STRUCT_BUF(ainfo),
-				STRUCT_SIZE(ainfo))) {
-				return;
+		    STRUCT_SIZE(ainfo))) {
+			return;
 		}
 		au_uwrite(au_to_arg32(3, "setsmask:as_success",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_success)));
 		au_uwrite(au_to_arg32(3, "setsmask:as_failure",
-			(uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
+		    (uint32_t)STRUCT_FGET(ainfo, ai_mask.as_failure)));
 		break;
 	case AUE_AUDITON_SETCOND:
 		if (copyin((caddr_t)a2, &auditstate, sizeof (int)))
@@ -2922,9 +2915,9 @@ aus_auditsys(struct t_audit_data *tad)
 		if (copyin((caddr_t)a2, &event, sizeof (au_evclass_map_t)))
 			return;
 		au_uwrite(au_to_arg32(
-			2, "setclass:ec_event", (uint32_t)event.ec_number));
+		    2, "setclass:ec_event", (uint32_t)event.ec_number));
 		au_uwrite(au_to_arg32(
-			3, "setclass:ec_class", (uint32_t)event.ec_class));
+		    3, "setclass:ec_class", (uint32_t)event.ec_class));
 		break;
 	case AUE_GETAUID:
 	case AUE_GETAUDIT:
@@ -3159,13 +3152,13 @@ aus_modctl(struct t_audit_data *tad)
 		bzero((caddr_t)STRUCT_BUF(mc), STRUCT_SIZE(mc));
 			/* get user arguments */
 		if (copyin((caddr_t)data, (caddr_t)STRUCT_BUF(mc),
-				STRUCT_SIZE(mc)) != 0)
+		    STRUCT_SIZE(mc)) != 0)
 			return;
 
 		mc_drvname = STRUCT_FGET(mc, drvname);
 		if ((drvname = ddi_major_to_name(
-			(major_t)STRUCT_FGET(mc, major))) != NULL &&
-			strncmp(drvname, mc_drvname, MAXMODCONFNAME) != 0) {
+		    (major_t)STRUCT_FGET(mc, major))) != NULL &&
+		    strncmp(drvname, mc_drvname, MAXMODCONFNAME) != 0) {
 				/* safety */
 			if (mc_drvname[0] != '\0') {
 				mc_drvname[MAXMODCONFNAME-1] = '\0';
@@ -3190,9 +3183,9 @@ aus_modctl(struct t_audit_data *tad)
 		STRUCT_INIT(alias, model);
 		for (i = 0; i < num_aliases; i++) {
 			bzero((caddr_t)STRUCT_BUF(alias),
-					STRUCT_SIZE(alias));
+			    STRUCT_SIZE(alias));
 			if (copyin((caddr_t)ap, (caddr_t)STRUCT_BUF(alias),
-					STRUCT_SIZE(alias)) != 0)
+			    STRUCT_SIZE(alias)) != 0)
 				break;
 			if (copyinstr(STRUCT_FGETP(alias, a_name), name,
 			    MAXMODCONFNAME, NULL) != 0) {
@@ -3210,44 +3203,6 @@ aus_modctl(struct t_audit_data *tad)
 	}
 }
 
-/*
- * private version of getsonode that does not do eprintsoline()
- */
-static struct sonode *
-au_getsonode(int sock, int *errorp, file_t **fpp)
-{
-	file_t *fp;
-	register vnode_t *vp;
-	struct sonode *so;
-
-	if ((fp = getf(sock)) == NULL) {
-		*errorp = EBADF;
-		return (NULL);
-	}
-	vp = fp->f_vnode;
-	/* Check if it is a socket */
-	if (vp->v_type != VSOCK) {
-		releasef(sock);
-		*errorp = ENOTSOCK;
-		return (NULL);
-	}
-	/*
-	 * Use the stream head to find the real socket vnode.
-	 * This is needed when namefs sits above sockfs.
-	 */
-	ASSERT(vp->v_stream);
-	ASSERT(vp->v_stream->sd_vnode);
-	vp = vp->v_stream->sd_vnode;
-	so = VTOSO(vp);
-	if (so->so_version == SOV_STREAM) {
-		releasef(sock);
-		*errorp = ENOTSOCK;
-		return (NULL);
-	}
-	if (fpp)
-		*fpp = fp;
-	return (so);
-}
 
 /*ARGSUSED*/
 static void
@@ -3290,7 +3245,7 @@ auf_accept(
 		return;
 	}
 
-	if ((so = au_getsonode((int)fd, &err, NULL)) == NULL) {
+	if ((so = getsonode(fd, &err, NULL)) == NULL) {
 		/*
 		 * not security relevant if doing a accept from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -3384,7 +3339,7 @@ auf_bind(struct t_audit_data *tad, int error, rval_t *rvp)
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, NULL)) == NULL) {
+	if ((so = getsonode(fd, &err, NULL)) == NULL) {
 		/*
 		 * not security relevant if doing a bind from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -3459,7 +3414,7 @@ auf_connect(struct t_audit_data *tad, int error, rval_t *rval)
 	fd = (int)uap->fd;
 
 
-	if ((so = au_getsonode(fd, &err, NULL)) == NULL) {
+	if ((so = getsonode(fd, &err, NULL)) == NULL) {
 		/*
 		 * not security relevant if doing a connect from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -3557,7 +3512,7 @@ aus_shutdown(struct t_audit_data *tad)
 
 	fd = (int)uap->fd;
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a shutdown using non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -3671,7 +3626,7 @@ auf_setsockopt(struct t_audit_data *tad, int error, rval_t *rval)
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a setsockopt from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -3843,7 +3798,7 @@ auf_recvmsg(
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a recvmsg from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -4053,7 +4008,7 @@ auf_recvfrom(
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a recvmsg from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -4259,7 +4214,7 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a sendmsg from non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -4458,7 +4413,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 		return;
 	}
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/*
 		 * not security relevant if doing a sendto using non socket
 		 * so no extra tokens. Should probably turn off audit record
@@ -4806,7 +4761,7 @@ aus_processor_bind(struct t_audit_data *tad)
 		au_uwrite(au_to_text("PBIND_NONE"));
 	else
 		au_uwrite(au_to_arg32(3, "processor_id",
-					(uint32_t)uap->processor_id));
+		    (uint32_t)uap->processor_id));
 
 	switch (uap->id_type) {
 	case P_MYID:
@@ -4882,7 +4837,7 @@ aus_processor_bind(struct t_audit_data *tad)
 		au_uwrite(au_to_text("PBIND_NONE for process"));
 	else
 		au_uwrite(au_to_arg32(3, "processor_id",
-					(uint32_t)uap->processor_id));
+		    (uint32_t)uap->processor_id));
 }
 
 /*ARGSUSED*/
@@ -5109,23 +5064,23 @@ aus_acl(struct t_audit_data *tad)
 	case GETACLCNT:
 		break;
 	case SETACL:
-	    if (uap->nentries < 3)
-		break;
-	    else {
-		size_t a_size = uap->nentries * sizeof (struct acl);
-		int i;
+		if (uap->nentries < 3)
+			break;
+		else {
+			size_t a_size = uap->nentries * sizeof (struct acl);
+			int i;
 
-		aclbufp = kmem_alloc(a_size, KM_SLEEP);
-		if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
+			aclbufp = kmem_alloc(a_size, KM_SLEEP);
+			if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
+				kmem_free(aclbufp, a_size);
+				break;
+			}
+			for (i = 0; i < uap->nentries; i++) {
+				au_uwrite(au_to_acl(aclbufp + i));
+			}
 			kmem_free(aclbufp, a_size);
 			break;
 		}
-		for (i = 0; i < uap->nentries; i++) {
-			au_uwrite(au_to_acl(aclbufp + i));
-		}
-		kmem_free(aclbufp, a_size);
-		break;
-	}
 	default:
 		break;
 	}
@@ -5174,23 +5129,23 @@ aus_facl(struct t_audit_data *tad)
 	case GETACLCNT:
 		break;
 	case SETACL:
-	    if (uap->nentries < 3)
-		break;
-	    else {
-		size_t a_size = uap->nentries * sizeof (struct acl);
-		int i;
+		if (uap->nentries < 3)
+			break;
+		else {
+			size_t a_size = uap->nentries * sizeof (struct acl);
+			int i;
 
-		aclbufp = kmem_alloc(a_size, KM_SLEEP);
-		if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
+			aclbufp = kmem_alloc(a_size, KM_SLEEP);
+			if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
+				kmem_free(aclbufp, a_size);
+				break;
+			}
+			for (i = 0; i < uap->nentries; i++) {
+				au_uwrite(au_to_acl(aclbufp + i));
+			}
 			kmem_free(aclbufp, a_size);
 			break;
 		}
-		for (i = 0; i < uap->nentries; i++) {
-			au_uwrite(au_to_acl(aclbufp + i));
-		}
-		kmem_free(aclbufp, a_size);
-		break;
-	}
 	default:
 		break;
 	}
@@ -5345,7 +5300,7 @@ auf_recv(tad, error, rval)
 
 	fd = (int)uap->fd;
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */
@@ -5485,7 +5440,7 @@ auf_send(tad, error, rval)
 
 	fd = (int)uap->fd;
 
-	if ((so = au_getsonode(fd, &err, &fp)) == NULL) {
+	if ((so = getsonode(fd, &err, &fp)) == NULL) {
 		/* Turn off audit record generation here. */
 		tad->tad_flag = 0;
 		/* free any residual audit data */

@@ -792,6 +792,7 @@ extern int	so_flip_async(struct sonode *, vnode_t *, int, cred_t *);
 extern int	so_set_siggrp(struct sonode *, vnode_t *, pid_t, int, cred_t *);
 extern void	*sock_kstat_init(zoneid_t);
 extern void	sock_kstat_fini(zoneid_t, void *);
+extern struct sonode *getsonode(int, int *, file_t **);
 
 /*
  * Function wrappers (mostly arround the sonode switch) for
