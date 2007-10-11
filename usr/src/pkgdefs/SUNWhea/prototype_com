@@ -941,6 +941,7 @@ f none usr/include/sys/kcpc.h 644 root bin
 f none usr/include/sys/kdi.h 644 root bin
 f none usr/include/sys/kdi_impl.h 644 root bin
 f none usr/include/sys/kdi_machimpl.h 644 root bin
+f none usr/include/sys/kiconv.h 644 root bin
 f none usr/include/sys/kidmap.h 644 root bin
 f none usr/include/sys/klwp.h 644 root bin
 f none usr/include/sys/kmem.h 644 root bin
