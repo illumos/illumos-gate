@@ -69,7 +69,7 @@ deleg_rdopen(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -102,7 +102,7 @@ deleg_wropen(
 	rfs4_dbe_lock(fp->dbe);
 	while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 		rc = rfs4_dbe_twait(fp->dbe,
-				lbolt + SEC_TO_TICK(rfs4_lease_time));
+		    lbolt + SEC_TO_TICK(rfs4_lease_time));
 		if (rc == -1) { /* timed out */
 			rfs4_dbe_unlock(fp->dbe);
 			rfs4_recall_deleg(fp, FALSE, NULL);
@@ -137,7 +137,7 @@ deleg_read(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -171,7 +171,7 @@ deleg_write(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -197,16 +197,14 @@ deleg_setattr(
 
 	/*
 	 * use caller context to compare caller to delegation owner
-	 * and if (changing mode, owner, group, or size)
 	 */
-	if ((vap->va_mask & (AT_MODE|AT_UID|AT_GID|AT_SIZE)) &&
-	    (ct == NULL || (ct->cc_caller_id != nfs4_srv_caller_id))) {
+	if (ct == NULL || (ct->cc_caller_id != nfs4_srv_caller_id)) {
 		fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
 		rfs4_recall_deleg(fp, FALSE, NULL);
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -241,7 +239,7 @@ deleg_rd_rwlock(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -270,7 +268,7 @@ deleg_wr_rwlock(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -303,7 +301,7 @@ deleg_space(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, FALSE, NULL);
@@ -333,7 +331,7 @@ deleg_setsecattr(
 	rfs4_dbe_lock(fp->dbe);
 	while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 		rc = rfs4_dbe_twait(fp->dbe,
-				lbolt + SEC_TO_TICK(rfs4_lease_time));
+		    lbolt + SEC_TO_TICK(rfs4_lease_time));
 		if (rc == -1) { /* timed out */
 			rfs4_dbe_unlock(fp->dbe);
 			rfs4_recall_deleg(fp, FALSE, NULL);
@@ -369,7 +367,7 @@ deleg_vnevent(
 		rfs4_dbe_lock(fp->dbe);
 		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
 			rc = rfs4_dbe_twait(fp->dbe,
-					lbolt + SEC_TO_TICK(rfs4_lease_time));
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
 			if (rc == -1) { /* timed out */
 				rfs4_dbe_unlock(fp->dbe);
 				rfs4_recall_deleg(fp, trunc, NULL);
