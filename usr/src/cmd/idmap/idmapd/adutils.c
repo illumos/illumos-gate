@@ -1473,17 +1473,16 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	 * Handle optional domain parameter and default domain
 	 * semantics.  The get a basedn from the domainname.
 	 */
-	if (dname == NULL || *dname != '\0') {
+	samAcctNameLen = strlen(name);
+	if (dname == NULL || *dname == '\0') {
 		/* domain name not given separately */
 		if ((cp = strchr(name, '@')) == NULL) {
 			/* nor is the name qualified */
 			dname = state->qadh->owner->dflt_w2k_dom;
 			basedn = state->qadh->owner->basedn;
-			samAcctNameLen = strlen(name);
 		} else {
 			/* the name is qualified */
-			/* LINTED */
-			samAcctNameLen = cp - name;
+			samAcctNameLen -= strlen(cp);
 			dname = cp + 1;
 		}
 	}

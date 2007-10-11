@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <libintl.h>
+#include <ucontext.h>
 #include "idmap_impl.h"
 
 static struct timeval TIMEOUT = { 25, 0 };
@@ -103,6 +104,8 @@ idmap_free(void *ptr) {
 }
 
 
+#define	MIN_STACK_NEEDS	16384
+
 /*
  * Create and Initialize idmap client handle for rpc/doors
  *
@@ -113,13 +116,45 @@ idmap_stat
 idmap_init(idmap_handle_t **handle) {
 	CLIENT			*clnt = NULL;
 	struct idmap_handle	*hptr;
+	uint_t			sendsz = 0;
+	stack_t			st;
 
 	*handle = NULL;
 	hptr = (struct idmap_handle *)calloc(1, sizeof (*hptr));
 	if (hptr == NULL)
 		return (IDMAP_ERR_MEMORY);
 
-	clnt = clnt_door_create(IDMAP_PROG, IDMAP_V1, 0);
+	/*
+	 * clnt_door_call() alloca()s sendsz bytes (twice too, once for
+	 * the call args buffer and once for the call result buffer), so
+	 * we want to pick a sendsz that will be large enough, but not
+	 * too large.
+	 */
+	if (stack_getbounds(&st) == 0) {
+		/*
+		 * Estimate how much stack space is left;
+		 * st.ss_sp is the top of stack.
+		 */
+		if ((char *)&sendsz < (char *)st.ss_sp)
+			/* stack grows up */
+			sendsz = ((char *)st.ss_sp - (char *)&sendsz);
+		else
+			/* stack grows down */
+			sendsz = ((char *)&sendsz - (char *)st.ss_sp);
+
+		/*
+		 * Take much of the stack space left, divided by two,
+		 * but leave enough for our needs (just a guess!), and
+		 * if we can't, then roll the dice.
+		 */
+		sendsz = RNDUP(sendsz / 2);
+		if (sendsz < MIN_STACK_NEEDS)
+			sendsz = 0;	/* RPC call may fail */
+		else if (sendsz > IDMAP_MAX_DOOR_RPC)
+			sendsz = IDMAP_MAX_DOOR_RPC;
+	}
+
+	clnt = clnt_door_create(IDMAP_PROG, IDMAP_V1, sendsz);
 	if (clnt == NULL) {
 		free(hptr);
 		return (IDMAP_ERR_RPC);

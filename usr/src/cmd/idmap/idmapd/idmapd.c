@@ -263,7 +263,7 @@ main(int argc, char **argv)
 static void
 init_idmapd() {
 	int	error;
-	int connmaxrec = RPC_MAX_SIZE;
+	int connmaxrec = IDMAP_MAX_DOOR_RPC;
 
 	/* create directories as root and chown to daemon uid */
 	if (create_directory(IDMAP_DBDIR, DAEMON_UID, DAEMON_GID) < 0)
@@ -303,7 +303,7 @@ init_idmapd() {
 		exit(1);
 	}
 
-	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, 0);
+	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, connmaxrec);
 	if (xprt == NULL) {
 		idmapdlog(LOG_ERR,
 		"idmapd: unable to create door RPC service");

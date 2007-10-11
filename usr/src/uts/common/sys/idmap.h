@@ -76,4 +76,11 @@
 /* Reserved SIDs */
 #define	IDMAP_WK_CREATOR_SID_AUTHORITY	"S-1-3"
 
+/*
+ * Max door RPC size for ID mapping (can't be too large relative to the
+ * default user-land thread stack size, since clnt_door_call()
+ * alloca()s).  See libidmap:idmap_init().
+ */
+#define	IDMAP_MAX_DOOR_RPC		(256 * 1024)
+
 #endif /* _SYS_IDMAP_H */

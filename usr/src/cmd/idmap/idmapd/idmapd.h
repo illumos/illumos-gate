@@ -141,7 +141,6 @@ typedef struct wksids_table {
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
-#define	RPC_MAX_SIZE	65536
 
 #define	EMPTY_STRING(str)	(str == NULL || *str == 0)
 
