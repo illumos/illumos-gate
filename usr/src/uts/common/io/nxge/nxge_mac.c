@@ -1937,8 +1937,9 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		SET_MAC_ATTR2(handle, ap, portn,
 		    MAC_PORT_FRAME_SIZE, 64, 0x2400, rs);
 	} else {
+		/* Do not add CRC 4 bytes to the max or the min frame size */
 		SET_MAC_ATTR2(handle, ap, portn,
-		    MAC_PORT_FRAME_SIZE, 64, 0x5EE + 4, rs);
+		    MAC_PORT_FRAME_SIZE, 64, 0x5EE, rs);
 	}
 
 	if (rs != NPI_SUCCESS)

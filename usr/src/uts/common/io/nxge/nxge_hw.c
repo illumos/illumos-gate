@@ -607,10 +607,16 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			size = sizeof (lb_normal);
 			if (nxgep->statsp->mac_stats.cap_10gfdx) {
 				size += sizeof (lb_external10g);
-				size += sizeof (lb_phy10g);
-				size += sizeof (lb_serdes10g);
 				size += sizeof (lb_mac10g);
+				/* Publish PHY loopback if PHY is present */
+				if (nxgep->mac.portmode == PORT_10G_COPPER ||
+				    nxgep->mac.portmode == PORT_10G_FIBER)
+					size += sizeof (lb_phy10g);
 			}
+			if (nxgep->mac.portmode == PORT_10G_FIBER ||
+			    nxgep->mac.portmode == PORT_10G_SERDES)
+				size += sizeof (lb_serdes10g);
+
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
 				size += sizeof (lb_external1000);
 				size += sizeof (lb_mac1000);
@@ -623,8 +629,8 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				size += sizeof (lb_external100);
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
-			else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
-			    (nxgep->mac.portmode == PORT_1G_SERDES))
+			if (nxgep->mac.portmode == PORT_1G_FIBER ||
+			    nxgep->mac.portmode == PORT_1G_SERDES)
 				size += sizeof (lb_serdes1000);
 
 			*(lb_info_sz_t *)mp->b_cont->b_rptr = size;
@@ -642,10 +648,16 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			size = sizeof (lb_normal);
 			if (nxgep->statsp->mac_stats.cap_10gfdx) {
 				size += sizeof (lb_external10g);
-				size += sizeof (lb_phy10g);
-				size += sizeof (lb_serdes10g);
 				size += sizeof (lb_mac10g);
+				/* Publish PHY loopback if PHY is present */
+				if (nxgep->mac.portmode == PORT_10G_COPPER ||
+				    nxgep->mac.portmode == PORT_10G_FIBER)
+					size += sizeof (lb_phy10g);
 			}
+			if (nxgep->mac.portmode == PORT_10G_FIBER ||
+			    nxgep->mac.portmode == PORT_10G_SERDES)
+				size += sizeof (lb_serdes10g);
+
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
 				size += sizeof (lb_external1000);
 				size += sizeof (lb_mac1000);
@@ -658,8 +670,8 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				size += sizeof (lb_external100);
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
-			else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
-			    (nxgep->mac.portmode == PORT_1G_SERDES))
+			if (nxgep->mac.portmode == PORT_1G_FIBER ||
+			    nxgep->mac.portmode == PORT_1G_SERDES)
 				size += sizeof (lb_serdes1000);
 
 			NXGE_DEBUG_MSG((nxgep, IOC_CTL,
@@ -670,10 +682,17 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				lb_props[i++] = lb_normal;
 				if (nxgep->statsp->mac_stats.cap_10gfdx) {
 					lb_props[i++] = lb_mac10g;
-					lb_props[i++] = lb_serdes10g;
-					lb_props[i++] = lb_phy10g;
+					if (nxgep->mac.portmode ==
+					    PORT_10G_COPPER ||
+					    nxgep->mac.portmode ==
+					    PORT_10G_FIBER)
+						lb_props[i++] = lb_phy10g;
 					lb_props[i++] = lb_external10g;
 				}
+				if (nxgep->mac.portmode == PORT_10G_FIBER ||
+				    nxgep->mac.portmode == PORT_10G_SERDES)
+					lb_props[i++] = lb_serdes10g;
+
 				if (nxgep->statsp->mac_stats.cap_1000fdx)
 					lb_props[i++] = lb_external1000;
 				if (nxgep->statsp->mac_stats.cap_100fdx)
