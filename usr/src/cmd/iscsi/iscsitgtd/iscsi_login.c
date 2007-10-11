@@ -713,7 +713,27 @@ make_login_response(iscsi_conn_t *c, iscsi_login_hdr_t *lhp)
 	r->max_version		= ISCSI_MAX_VERSION;
 	r->active_version	= ISCSI_MIN_VERSION;
 	r->itt			= lhp->itt;
-	r->tsid			= htons(c->c_sess->s_tsid);
+
+	/*
+	 * As per section 10.13.3 of iSCSI RFC (3720), For a new session,
+	 * the target MUST generate a non-zero TSIH and ONLY return it
+	 * in the Login Final-Response
+	 */
+	if ((lhp->flags & ISCSI_FLAG_LOGIN_TRANSIT) &&
+	    (ISCSI_LOGIN_NEXT_STAGE(lhp->flags) ==
+	    ISCSI_FULL_FEATURE_PHASE))
+		/*
+		 * If this is the final Login Response, send the target
+		 * calculated TSIH
+		 */
+		r->tsid		= htons(c->c_sess->s_tsid);
+	else
+		/*
+		 * If this is not the final Login Response, send the TSIH value
+		 * provided by the initiator.
+		 */
+		r->tsid		= lhp->tsid;
+
 	(void) pthread_mutex_lock(&c->c_mutex);
 	r->statsn		= htonl(c->c_statsn++);
 	(void) pthread_mutex_unlock(&c->c_mutex);

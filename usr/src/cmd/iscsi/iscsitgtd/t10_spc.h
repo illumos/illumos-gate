@@ -221,6 +221,10 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
 #define	SPC_INQ_VD_SSC3		0x0400
 #define	SPC_INQ_VD_OSD		0x0355
 
+/* --- Version Descriptor length details --- */
+#define	SPC_INQ_VD_IDX		0x3A
+#define	SPC_INQ_VD_LEN		0x10
+
 #define	SPC_INQ_PAGE0		0x00
 #define	SPC_INQ_PAGE80		0x80
 #define	SPC_INQ_PAGE83		0x83
@@ -434,6 +438,9 @@ struct mode_info_ctrl {
 #define	MODE_SENSE_DEV_CONFIG		0x10
 #define	MODE_SENSE_INFO_CTRL		0x1c
 #define	MODE_SENSE_SEND_ALL		0x3f
+
+/* -- Page Control Mask for Mode Sense -- */
+#define	SPC_MODE_SENSE_PC		0x3f
 
 #define	SCSI_REPORTLUNS_ADDRESS_SIZE			8
 #define	SCSI_REPORTLUNS_ADDRESS_MASK			0xC0

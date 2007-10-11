@@ -215,8 +215,14 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		/*
 		 * Return whatever is the smallest amount between the
 		 * INQUIRY data or the amount requested.
+		 * Version descriptor details also should be included
+		 * with the inquiry response. So, rtn_len should consider
+		 * version descriptor details in standard inquiry format
+		 * as per SPC-3 Revision 23, Section 6.4.2 Table 81
 		 */
-		rtn_len = min(rqst_len, sizeof (*inq));
+
+		rtn_len = min(rqst_len, max(sizeof (*inq),
+		    (SPC_INQ_VD_IDX + SPC_INQ_VD_LEN)));
 
 		inq = (struct scsi_inquiry *)rsp_buf;
 		/*

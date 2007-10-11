@@ -645,22 +645,29 @@ isns_update()
 		}
 		*isns_port = '\0';
 	}
+
+	/*
+	 * If the iSNS server is different, then dregister all from
+	 * the old iSNS server, and register all to the new iSNS server
+	 */
+
 	if (strcmp(isns_srv, isns_args.server) != 0) {
 		/* de-reg from old iSNS server */
 		(void) isns_dereg_all();
-	}
 
-	bcopy(isns_srv, isns_args.server, MAXHOSTNAMELEN);
-	free(isns_srv);
+		bcopy(isns_srv, isns_args.server, MAXHOSTNAMELEN);
 
-	if (isns_reg_all() == 0) {
-		/* scn register all targets */
-		if (isns_op_all(ISNS_SCN_REG) != 0) {
-			syslog(LOG_ERR, "SCN registrations failed\n");
-			isns_op_all(ISNS_DEV_DEREG);
-			return (-1);
+		if (isns_reg_all() == 0) {
+			/* scn register all targets */
+			if (isns_op_all(ISNS_SCN_REG) != 0) {
+				syslog(LOG_ERR, "SCN registrations failed\n");
+				isns_op_all(ISNS_DEV_DEREG);
+				return (-1);
+			}
 		}
 	}
+	if (isns_srv != NULL)
+		free(isns_srv);
 
 	return (0);
 }

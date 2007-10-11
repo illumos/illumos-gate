@@ -1009,29 +1009,51 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	io->da_clear_overlap	= False;
 	io->da_data_alloc	= True;
 	mode_hdr		= (struct mode_header *)io->da_data;
-	/*
-	 * We subtract one from the length because this value is not supposed
-	 * to contain it's size.
-	 */
-	mode_hdr->length = sizeof (struct mode_header) - 1 +
-	    MODE_BLK_DESC_LENGTH;
-	mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
 
 	/*
-	 * Need to fill in the block size. Some initiators are starting
-	 * to use this value, which is correct, instead of looking at
-	 * the page3 data which is starting to become obsolete.
-	 *
-	 * We define the space for the structure on the stack and then
-	 * copy it into the return area to avoid structure alignment issues.
+	 * If DBD flag is set, then we should not send back the block
+	 * descriptor details
 	 */
-	bzero(&bd, sizeof (bd));
-	bd.blksize_hi	= lobyte(hiword(d->d_bytes_sect));
-	bd.blksize_mid	= hibyte(loword(d->d_bytes_sect));
-	bd.blksize_lo	= lobyte(loword(d->d_bytes_sect));
-	bcopy(&bd, io->da_data + sizeof (*mode_hdr), sizeof (bd));
+	if (cdb[1] & SPC_MODE_SENSE_DBD) {
+		mode_hdr->length = sizeof (struct mode_header) - 1;
+		mode_hdr->bdesc_length  = 0;
+	}
+	/*
+	 * If DBD flag is zero, then we should add block descriptor details
+	 */
+	else {
+		/*
+		 * We subtract one from the length because this value is not
+		 * supposed to contain it's size.
+		 */
 
-	switch (cdb[2]) {
+		mode_hdr->length = sizeof (struct mode_header) - 1 +
+		    MODE_BLK_DESC_LENGTH;
+		mode_hdr->bdesc_length	= MODE_BLK_DESC_LENGTH;
+
+		/*
+		 * Need to fill in the block size. Some initiators are starting
+		 * to use this value, which is correct, instead of looking at
+		 * the page3 data which is starting to become obsolete.
+		 *
+		 * We define the space for the structure on the stack and then
+		 * copy it into the return area to avoid structure alignment
+		 * issues.
+		 */
+		bzero(&bd, sizeof (bd));
+		bd.blksize_hi	= lobyte(hiword(d->d_bytes_sect));
+		bd.blksize_mid	= hibyte(loword(d->d_bytes_sect));
+		bd.blksize_lo	= lobyte(loword(d->d_bytes_sect));
+		bcopy(&bd, io->da_data + sizeof (*mode_hdr), sizeof (bd));
+	}
+
+	/*
+	 * cdb[2] contains page code, and page control field. So, we need
+	 * to mask page control field,  while checking for the page code.
+	 */
+
+	switch (cdb[2] & SPC_MODE_SENSE_PC) {
+
 	case MODE_SENSE_PAGE3_CODE:
 		if ((d->d_heads == 0) && (d->d_cyl == 0) && (d->d_spt == 0)) {
 			sbc_io_free(io);
