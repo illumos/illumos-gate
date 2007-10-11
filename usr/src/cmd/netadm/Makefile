@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG= _sactab _pmtab _sysconfig iu.ap ttydefs
@@ -30,6 +30,8 @@ PROG= _sactab _pmtab _sysconfig iu.ap ttydefs
 SRCS= $(PROG:%=%.sh)
 
 include ../Makefile.cmd
+
+SUBDIRS= etc
 
 DEFPM=   zsmon
 
@@ -64,9 +66,15 @@ $(VARPMD)/% : %
 $(ETCPMD)/% : %
 	$(INS.file)
 
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clean
+lint :=		TARGET= lint
+
 .KEEP_STATE:
 
-all: $(PROG) $(PMLOG) 
+all: $(PROG) $(PMLOG) $(SUBDIRS)
 
 _sysconfig: _sysconf.sh
 	$(SH) _sysconf.sh
@@ -77,13 +85,18 @@ _sactab _pmtab iu.ap ttydefs:
 $(PMLOG):
 	$(TOUCH) $@
 
-install: all $(DIRS) $(ROOTETCSAF) $(ROOTETCF) $(ROOTETCPM) $(ROOTVARPM)
+install: all $(DIRS) $(SUBDIRS) $(ROOTETCSAF) $(ROOTETCF) $(ROOTETCPM) $(ROOTVARPM)
 
 $(DIRS):
 	$(INS.dir)
 
-clean:
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-lint:
+clean: $(SUBDIRS)
+
+lint: $(SUBDIRS)
+
+FRC:
 
 include ../Makefile.targ

@@ -22,37 +22,38 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #
 # SUNWcsr i.ttydefs script
 #
 
+upgrade_ttydefs () {
+
+	# Add the crtscts flag to the console settings
+	cat >> $PKG_INSTALL_ROOT/var/svc/profile/upgrade <<TTYEOF
+case \`uname -i\` in
+SUNW,SPARC-Enterprise)
+	sttydefs -r console
+	sttydefs -a console -i "9600 hupcl opost onlcr crtscts" -f "9600"
+	;;
+*)
+	;;
+esac
+TTYEOF
+}
+
 while read src dest
 do
-  if [ "`basename $src`" = "ttydefs" ]
-    then
-      TMP=/tmp/SUNWcsr.ttydefs.$$
-
-      # Make sure that there is a copy of the original $dest file.
-      if [ ! -f $dest ];  then
-          cp $src $dest
-        fi
-
-      # Confirm that this is an appropriate system.
-      PLATFORM_TOKEN=`uname -i`
-      case "$PLATFORM_TOKEN"
-      in
-        SUNW,SPARC-Enterprise)
-          # Add the crtscts flag for the console settings
-          sed -e "/^console:.*onlcr:/ {
-		 s/onlcr:/onlcr crtscts:/
-		}" $dest > ${TMP}
-          # Update the $dest file
-	  cp ${TMP} $dest 
-        ;;
-      esac
+  if [ "`basename $src`" = "ttydefs" ]; then
+	# Make sure that there is a copy of the original $dest file.
+	if [ ! -f $dest ]; then
+		# Since there was no previous file, assume that this 
+		# is a fresh install 
+		cp $src $dest
+		upgrade_ttydefs
+	fi
     fi
 done
 exit 0

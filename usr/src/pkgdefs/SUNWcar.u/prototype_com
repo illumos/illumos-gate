@@ -51,6 +51,8 @@ d none etc/flash 755 root sys
 d none etc/flash/precreation 700 root sys
 d none etc/flash/preexit 700 root sys
 d none etc/flash/postcreation 700 root sys
+d none etc/flash/postdeployment 700 root sys
+f none etc/flash/postdeployment/ttydefs.cleanup 744 root sys
 f none etc/flash/precreation/caplib 500 root sys
 d none platform 755 root sys
 d none platform/sun4u-opl 755 root sys
