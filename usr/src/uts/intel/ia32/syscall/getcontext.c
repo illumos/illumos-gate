@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,37 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 		}
 	}
 
+	/*
+	 * If either the trace flag or REQUEST_STEP is set,
+	 * arrange for single-stepping and turn off the trace flag.
+	 */
+	if ((rp->r_ps & PS_T) || (lwp->lwp_pcb.pcb_flags & REQUEST_STEP)) {
+		/*
+		 * Clear PS_T so that saved user context won't have trace
+		 * flag set.
+		 */
+		rp->r_ps &= ~PS_T;
+
+		if (!(lwp->lwp_pcb.pcb_flags & REQUEST_NOSTEP)) {
+			lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
+			/*
+			 * trap() always checks DEBUG_PENDING before
+			 * checking for any pending signal. This at times
+			 * can potentially lead to DEBUG_PENDING not being
+			 * honoured. (for eg: the lwp is stopped by
+			 * stop_on_fault() called from trap(), after being
+			 * awakened it might see a pending signal and call
+			 * savecontext(), however on the way back to userland
+			 * there is no place it can be detected). Hence in
+			 * anticipation of such occassions, set AST flag for
+			 * the thread which will make the thread take an
+			 * excursion through trap() where it will be handled
+			 * appropriately.
+			 */
+			aston(curthread);
+		}
+	}
+
 	getgregs(lwp, ucp->uc_mcontext.gregs);
 	if (lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN)
 		getfpregs(lwp, &ucp->uc_mcontext.fpregs);
@@ -96,27 +127,6 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 		ucp->uc_flags &= ~UC_FPU;
 
 	sigktou(&mask, &ucp->uc_sigmask);
-	/*
-	 * If the trace flag is set, arrange for single-stepping and
-	 * turn off the trace flag.
-	 */
-	if (rp->r_ps & PS_T) {
-		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
-		rp->r_ps &= ~PS_T;
-		/*
-		 * We always check DEBUG_PENDING before checking for any
-		 * pending signal. This at times can potentially lead to
-		 * DEBUG_PENDING not being honoured. (for eg: the lwp is
-		 * stopped by stop_on_fault() called from trap(), after
-		 * being awakened it might see a pending signal and call
-		 * savecontext(), however on the way back to userland there
-		 * is no place it can be detected). Hence in anticipation of
-		 * such occassion, we set AST flag for the thread which will
-		 * make the thread take an excursion through trap() where
-		 * we will handle it appropriately.
-		 */
-		aston(curthread);
-	}
 }
 
 /*
@@ -277,6 +287,26 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 		}
 	}
 
+	/*
+	 * If either the trace flag or REQUEST_STEP is set, arrange
+	 * for single-stepping and turn off the trace flag.
+	 */
+	if ((rp->r_ps & PS_T) || (lwp->lwp_pcb.pcb_flags & REQUEST_STEP)) {
+		/*
+		 * Clear PS_T so that saved user context won't have trace
+		 * flag set.
+		 */
+		rp->r_ps &= ~PS_T;
+
+		if (!(lwp->lwp_pcb.pcb_flags & REQUEST_NOSTEP)) {
+			lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
+			/*
+			 * See comments in savecontext().
+			 */
+			aston(curthread);
+		}
+	}
+
 	getgregs32(lwp, ucp->uc_mcontext.gregs);
 	if (lwp->lwp_pcb.pcb_fpu.fpu_flags & FPU_EN)
 		getfpregs32(lwp, &ucp->uc_mcontext.fpregs);
@@ -284,18 +314,6 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 		ucp->uc_flags &= ~UC_FPU;
 
 	sigktou(&mask, &ucp->uc_sigmask);
-	/*
-	 * If the trace flag is set, arrange for single-stepping and
-	 * turn off the trace flag.
-	 */
-	if (rp->r_ps & PS_T) {
-		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
-		rp->r_ps &= ~PS_T;
-		/*
-		 * See comments in savecontext().
-		 */
-		aston(curthread);
-	}
 }
 
 int
