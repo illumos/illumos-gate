@@ -213,78 +213,6 @@ extern "C" {
 #define	AHCI_TFD_STS_ERR	(0x1 << 0)
 #define	AHCI_TFD_ERR_SHIFT	8
 
-/* port SATA status bit fields */
-#define	AHCI_SSTATUS_DET_MASK		0x0000000f
-#define	AHCI_SSTATUS_SPD_MASK		0x000000f0
-#define	AHCI_SSTATUS_IPM_MASK		0x00000f00
-#define	AHCI_SSTATUS_SPD_SHIFT		4
-#define	AHCI_SSTATUS_IPM_SHIFT		8
-
-#define	AHCI_SSTATUS_GET_DET(x)		(x & AHCI_SSTATUS_DET_MASK)
-
-#define	AHCI_SSTATUS_SET_DET(x, new_val)	\
-	(x = (x & ~AHCI_SSTATUS_DET_MASK) | (new_val & AHCI_SSTATUS_DET_MASK))
-
-#define	AHCI_SSTATUS_DET_NODEV_NOPHY	0x0 /* no device, no PHY */
-#define	AHCI_SSTATUS_DET_DEVPRESENT_NOPHY 0x1 /* dev present, no PHY */
-#define	AHCI_SSTATUS_DET_DEVPRESENT_PHYONLINE 0x3 /* dev present, PHY online */
-#define	AHCI_SSTATUS_DET_PHYOFFLINE	0x4 /* PHY offline */
-
-#define	AHCI_SSTATUS_GET_IPM(x) 		\
-	((x & AHCI_SSTATUS_IPM_MASK) >> AHCI_SSTATUS_IPM_SHIFT)
-
-#define	AHCI_SSTATUS_IPM_NODEV_NOPHY	0x0 /* no device, no PHY */
-#define	AHCI_SSTATUS_IPM_INTERFACE_ACTIVE 0x1 /* interface active */
-#define	AHCI_SSTATUS_IPM_INTERFACE_POWERPARTIAL 0x2 /* partial power mgmt */
-#define	AHCI_SSTATUS_IPM_INTERFACE_POWERSLUMBER 0x6 /* slumber power mgmt */
-
-/* port SATA control bit fields */
-#define	AHCI_SCONTROL_DET_MASK		0x0000000f
-
-#define	AHCI_SCONTROL_GET_DET(x)	(x & AHCI_SCONTROL_DET_MASK)
-#define	AHCI_SCONTROL_SET_DET(x, new_val)	\
-	(x = (x & ~AHCI_SCONTROL_DET_MASK) | (new_val & AHCI_SCONTROL_DET_MASK))
-
-#define	AHCI_SCONTROL_DET_NOACTION	0x0 /* no action requested */
-#define	AHCI_SCONTROL_DET_COMRESET	0x1 /* send COMRESET */
-#define	AHCI_SCONTROL_DET_PHYOFFLINE	0x4 /* put Phy in offline mode */
-
-/* port SATA error bit fields */
-	/* Recovered Data Integrity Error */
-#define	AHCI_SERROR_ERR_I	(0x1 << 0)
-	/* Recovered Communications Error */
-#define	AHCI_SERROR_ERR_M	(0x1 << 1)
-	/* Transient Data Integrity Error */
-#define	AHCI_SERROR_ERR_T	(0x1 << 8)
-	/* Persistent Communication or Data Integrity Error */
-#define	AHCI_SERROR_ERR_C	(0x1 << 9)
-	/* Protocol Error */
-#define	AHCI_SERROR_ERR_P	(0x1 << 10)
-	/* Internal Error */
-#define	AHCI_SERROR_ERR_E	(0x1 << 11)
-	/* PhyRdy Change */
-#define	AHCI_SERROR_DIAG_N	(0x1 << 16)
-	/* Phy Internal Error */
-#define	AHCI_SERROR_DIAG_I	(0x1 << 17)
-	/* Comm Wake */
-#define	AHCI_SERROR_DIAG_W	(0x1 << 18)
-	/* 10B to 8B Decode Error */
-#define	AHCI_SERROR_DIAG_B	(0x1 << 19)
-	/* Disparity Error */
-#define	AHCI_SERROR_DIAG_D	(0x1 << 20)
-	/* CRC Error */
-#define	AHCI_SERROR_DIAG_C	(0x1 << 21)
-	/* Handshake Error */
-#define	AHCI_SERROR_DIAG_H	(0x1 << 22)
-	/* Link Sequence Error */
-#define	AHCI_SERROR_DIAG_S	(0x1 << 23)
-	/* Transport State Transion Error */
-#define	AHCI_SERROR_DIAG_T	(0x1 << 24)
-	/* Unknown FIS Type */
-#define	AHCI_SERROR_DIAG_F	(0x1 << 25)
-	/* Exchanged */
-#define	AHCI_SERROR_DIAG_X	(0x1 << 26)
-
 #define	AHCI_SERROR_CLEAR_ALL			0xffffffff
 
 /* per port registers offset */
@@ -339,6 +267,9 @@ extern "C" {
 #define	AHCI_SLOT_MASK(ahci_ctlp)				\
 	((ahci_ctlp->ahcictl_num_cmd_slots == AHCI_PORT_MAX_CMD_SLOTS) ? \
 	0xffffffff : ((0x1 << ahci_ctlp->ahcictl_num_cmd_slots) - 1))
+#define	AHCI_NCQ_SLOT_MASK(ahci_portp)				\
+	((ahci_portp->ahciport_max_ncq_tags == AHCI_PORT_MAX_CMD_SLOTS) ? \
+	0xffffffff : ((0x1 << ahci_portp->ahciport_max_ncq_tags) - 1))
 
 /* Device signatures */
 #define	AHCI_SIGNATURE_PORT_MULTIPLIER	0x96690101

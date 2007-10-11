@@ -276,6 +276,8 @@ static	void sata_decode_device_error(sata_pkt_txlate_t *,
 static	void sata_set_device_removed(dev_info_t *);
 static	boolean_t sata_check_device_removed(dev_info_t *);
 static	void sata_set_target_node_cleanup(sata_hba_inst_t *, int cport);
+static	int sata_ncq_err_ret_cmd_setup(sata_pkt_txlate_t *,
+    sata_drive_info_t *);
 static	int sata_atapi_err_ret_cmd_setup(sata_pkt_txlate_t *,
     sata_drive_info_t *);
 static	void sata_atapi_packet_cmd_setup(sata_cmd_t *, sata_drive_info_t *);
@@ -2639,7 +2641,8 @@ sata_get_error_retrieval_pkt(dev_info_t *dip, sata_device_t *sata_device,
 
 	switch (pkt_type) {
 	case SATA_ERR_RETR_PKT_TYPE_NCQ:
-		/* Placeholder only */
+		if (sata_ncq_err_ret_cmd_setup(spx, sdinfo) == SATA_SUCCESS)
+			return (spkt);
 		break;
 
 	case SATA_ERR_RETR_PKT_TYPE_ATAPI:
@@ -12759,6 +12762,59 @@ fail:
 	return (rval);
 }
 
+/*
+ * Set up error retrieval sata command for NCQ command error data
+ * recovery.
+ *
+ * Returns SATA_SUCCESS when data buffer is allocated and packet set-up,
+ * returns SATA_FAILURE otherwise.
+ */
+static int
+sata_ncq_err_ret_cmd_setup(sata_pkt_txlate_t *spx, sata_drive_info_t *sdinfo)
+{
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(sdinfo))
+#endif
+
+	sata_pkt_t *spkt = spx->txlt_sata_pkt;
+	sata_cmd_t *scmd;
+	struct buf *bp;
+
+	/* Operation modes are up to the caller */
+	spkt->satapkt_op_mode = SATA_OPMODE_SYNCH | SATA_OPMODE_INTERRUPTS;
+
+	/* Synchronous mode, no callback - may be changed by the caller */
+	spkt->satapkt_comp = NULL;
+	spkt->satapkt_time = sata_default_pkt_time;
+
+	scmd = &spkt->satapkt_cmd;
+	bcopy(&sata_rle_cmd, scmd, sizeof (sata_cmd_t));
+	scmd->satacmd_flags.sata_ignore_dev_reset = B_TRUE;
+
+	/*
+	 * Allocate dma_able buffer error data.
+	 * Buffer allocation will take care of buffer alignment and other DMA
+	 * attributes.
+	 */
+	bp = sata_alloc_local_buffer(spx,
+	    sizeof (struct sata_ncq_error_recovery_page));
+	if (bp == NULL)
+		return (SATA_FAILURE);
+
+	bp_mapin(bp); /* make data buffer accessible */
+	scmd->satacmd_bp = bp;
+
+	/*
+	 * Set-up pointer to the buffer handle, so HBA can sync buffer
+	 * before accessing it. Handle is in usual place in translate struct.
+	 */
+	scmd->satacmd_err_ret_buf_handle = &spx->txlt_buf_dma_handle;
+
+	ASSERT(scmd->satacmd_num_dma_cookies != 0);
+	ASSERT(scmd->satacmd_dma_cookie_list != NULL);
+
+	return (SATA_SUCCESS);
+}
 
 /*
  * sata_xlate_errors() is used to translate (S)ATA error

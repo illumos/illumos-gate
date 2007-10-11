@@ -39,14 +39,12 @@ typedef	struct ahci_event_arg {
 	void		*ahciea_ctlp;
 	void		*ahciea_portp;
 	uint32_t	ahciea_event;
-	uint32_t	ahciea_retrierr_slot;
 } ahci_event_arg_t;
 
 /* Warlock annotation */
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_ctlp))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_portp))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_event))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_retrierr_slot))
 
 /*
  * flags for ahciport_flags
@@ -67,12 +65,20 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_retrierr_slot))
  * AHCI_PORT_FLAG_STARTED: this flag will be set when the port is started,
  * that is PxCMD.ST is set with '1', and be cleared when the port is put into
  * idle, that is PxCMD.ST is changed from '1' to '0'.
+ *
+ * AHCI_PORT_FLAG_RDLOGEXT: this flag will be set when a READ LOG EXT which
+ * is used to retrieve NCQ failure context is being executed.
+ *
+ * AHCI_PORT_FLAG_NODEV: this flag will be set when a device is found gone
+ * during ahci_restart_port_wait_till_ready process.
  */
 #define	AHCI_PORT_FLAG_SPINUP	0x01
 #define	AHCI_PORT_FLAG_MOPPING	0x02
 #define	AHCI_PORT_FLAG_POLLING	0x04
 #define	AHCI_PORT_FLAG_RQSENSE	0x08
 #define	AHCI_PORT_FLAG_STARTED	0x10
+#define	AHCI_PORT_FLAG_RDLOGEXT	0x20
+#define	AHCI_PORT_FLAG_NODEV	0x40
 
 typedef struct ahci_port {
 	/* The physical port number */
@@ -89,6 +95,8 @@ typedef struct ahci_port {
 	 * AHCI_PORT_FLAG_POLLING
 	 * AHCI_PORT_FLAG_RQSENSE
 	 * AHCI_PORT_FLAG_STARTED
+	 * AHCI_PORT_FLAG_RDLOGEXT
+	 * AHCI_PORT_FLAG_NODEV
 	 */
 	int			ahciport_flags;
 
@@ -116,11 +124,23 @@ typedef struct ahci_port {
 	/* The whole mutex for the port structure */
 	kmutex_t		ahciport_mutex;
 
-	/* Keep the tags of all the pending commands */
+	/* The maximum number of tags for native queuing command transfers */
+	int			ahciport_max_ncq_tags;
+
+	/* Keep the tags of all pending non-ncq commands */
 	uint32_t		ahciport_pending_tags;
+
+	/*
+	 * Keep the tags of all pending ncq commands
+	 * (READ/WRITE FPDMA QUEUED)
+	 */
+	uint32_t		ahciport_pending_ncq_tags;
 
 	/* Keep all the pending sata packets */
 	sata_pkt_t		*ahciport_slot_pkts[AHCI_PORT_MAX_CMD_SLOTS];
+
+	/* Keep the error retrieval sata packet */
+	sata_pkt_t		*ahciport_err_retri_pkt;
 
 	/*
 	 * SATA HBA driver is supposed to remember and maintain device
@@ -179,7 +199,8 @@ typedef struct ahci_ctl {
 
 	/*
 	 * AHCI_CAP_PIO_MDRQ
-	 * AHCI_CAP_MCMDLIST_NONQUEUE
+	 * AHCI_CAP_NO_MCMDLIST_NONQUEUE
+	 * AHCI_CAP_NCQ
 	 */
 	int			ahcictl_cap;
 
@@ -244,13 +265,36 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 /* Values for ahcictl_cap */
 /* PIO Multiple DRQ Block */
 #define	AHCI_CAP_PIO_MDRQ		0x1
-/* Multiple command lists cannot be used for non queued commands */
+/*
+ * Multiple command slots in the command list cannot be used for
+ * non-queued commands
+ */
 #define	AHCI_CAP_NO_MCMDLIST_NONQUEUE	0x2
+/* Native Command Queuing (NCQ) */
+#define	AHCI_CAP_NCQ			0x4
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
 #define	AHCI_PORT_INIT		0x0002	/* Initialize port */
 #define	AHCI_RESET_NO_EVENTS_UP	0x0004	/* Don't send reset events up */
+
+#define	ERR_RETRI_CMD_IN_PROGRESS(ahci_portp)		\
+	(ahci_portp->ahciport_flags &			\
+	(AHCI_PORT_FLAG_RQSENSE|AHCI_PORT_FLAG_RDLOGEXT))
+
+#define	NON_NCQ_CMD_IN_PROGRESS(ahci_portp)		\
+	(!ERR_RETRI_CMD_IN_PROGRESS(ahci_portp) &&	\
+	ahci_portp->ahciport_pending_tags != 0 &&	\
+	ahci_portp->ahciport_pending_ncq_tags == 0)
+
+#define	NCQ_CMD_IN_PROGRESS(ahci_portp)			\
+	(!ERR_RETRI_CMD_IN_PROGRESS(ahci_portp) &&	\
+	ahci_portp->ahciport_pending_ncq_tags != 0)
+
+/* Command type for ahci_claim_free_slot routine */
+#define	AHCI_NON_NCQ_CMD	0x0
+#define	AHCI_NCQ_CMD		0x1
+#define	AHCI_ERR_RETRI_CMD	0x2
 
 /* State values for ahci_attach */
 #define	AHCI_ATTACH_STATE_NONE			(0x1 << 0)
@@ -305,6 +349,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_POWER		0x1000
 #define	AHCIDBG_COMMAND		0x2000
 #define	AHCIDBG_SENSEDATA	0x4000
+#define	AHCIDBG_NCQ		0x8000
 
 extern int ahci_debug_flag;
 
