@@ -1960,23 +1960,255 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
 	}
 }
 
+
+/*
+ * This value controls which test dyn_test() performs.
+ */
+typedef enum { DYN_TEST_ADDR, DYN_TEST_SIZE, DYN_TEST_ENTSIZE } dyn_test_t;
+
+/*
+ * Used by dynamic() to compare the value of a dynamic element against
+ * the starting address of the section it references.
+ *
+ * entry:
+ *	test_type - Specify which dyn item is being tested.
+ *	sh_type - SHT_* type value for required section.
+ *	sec_cache - Cache entry for section, or NULL if the object lacks
+ *		a section of this type.
+ *	dyn - Dyn entry to be tested
+ *	dynsec_cnt - # of dynamic section being examined. The first
+ *		dynamic section is 1, the next is 2, and so on...
+ *	ehdr - ELF header for file
+ *	file - Name of file
+ */
+static void
+dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
+    Word dynsec_cnt, Ehdr *ehdr, const char *file)
+{
+	Conv_inv_buf_t	buf1, buf2;
+
+	/*
+	 * These tests are based around the implicit assumption that
+	 * there is only one dynamic section in an object, and also only
+	 * one of the sections it references. We have therefore gathered
+	 * all of the necessary information to test this in a single pass
+	 * over the section headers, which is very efficient. We are not
+	 * aware of any case where more than one dynamic section would
+	 * be meaningful in an ELF object, so this is a reasonable solution.
+	 *
+	 * To test multiple dynamic sections correctly would be more
+	 * expensive in code and time. We would have to build a data structure
+	 * containing all the dynamic elements. Then, we would use the address
+	 * to locate the section it references and ensure the section is of
+	 * the right type and that the address in the dynamic element is
+	 * to the start of the section. Then, we could check the size and
+	 * entsize values against those same sections. This is O(n^2), and
+	 * also complicated.
+	 *
+	 * In the highly unlikely case that there is more than one dynamic
+	 * section, we only test the first one, and simply allow the values
+	 * of the subsequent one to be displayed unchallenged.
+	 */
+	if (dynsec_cnt != 1)
+		return;
+
+	/*
+	 * A DT_ item that references a section address should always find
+	 * the section in the file.
+	 */
+	if (sec_cache == NULL) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_DYNNOBCKSEC), file,
+		    conv_sec_type(ehdr->e_machine, sh_type, 0, &buf1),
+		    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf2));
+		return;
+	}
+
+
+	switch (test_type) {
+	case DYN_TEST_ADDR:
+		/* The section address should match the DT_ item value */
+		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_addr)
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_DYNBADADDR), file,
+			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
+			    EC_ADDR(dyn->d_un.d_val), sec_cache->c_ndx,
+			    sec_cache->c_name,
+			    EC_ADDR(sec_cache->c_shdr->sh_addr));
+		break;
+
+	case DYN_TEST_SIZE:
+		/* The section size should match the DT_ item value */
+		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_size)
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_DYNBADSIZE), file,
+			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
+			    EC_XWORD(dyn->d_un.d_val),
+			    sec_cache->c_ndx, sec_cache->c_name,
+			    EC_XWORD(sec_cache->c_shdr->sh_size));
+		break;
+
+	case DYN_TEST_ENTSIZE:
+		/* The sh_entsize value should match the DT_ item value */
+		if (dyn->d_un.d_val != sec_cache->c_shdr->sh_entsize)
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_DYNBADENTSIZE), file,
+			    conv_dyn_tag(dyn->d_tag, ehdr->e_machine, 0, &buf1),
+			    EC_XWORD(dyn->d_un.d_val),
+			    sec_cache->c_ndx, sec_cache->c_name,
+			    EC_XWORD(sec_cache->c_shdr->sh_entsize));
+		break;
+	}
+}
+
+
 /*
  * Search for and process a .dynamic section.
  */
 static void
 dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 {
+	struct {
+		Cache	*dynstr;
+		Cache	*dynsym;
+		Cache	*hash;
+		Cache	*fini;
+		Cache	*fini_array;
+		Cache	*init;
+		Cache	*init_array;
+		Cache	*preinit_array;
+		Cache	*rel;
+		Cache	*rela;
+		Cache	*sunw_cap;
+		Cache	*sunw_ldynsym;
+		Cache	*sunw_move;
+		Cache	*sunw_syminfo;
+		Cache	*sunw_symsort;
+		Cache	*sunw_tlssort;
+		Cache	*sunw_verdef;
+		Cache	*sunw_verneed;
+		Cache	*sunw_versym;
+	} sec;
+	Word	dynsec_ndx;
+	Word	dynsec_num;
+	int	dynsec_cnt;
 	Word	cnt;
 
+	/*
+	 * Make a pass over all the sections, gathering section information
+	 * we'll need below.
+	 */
+	dynsec_num = 0;
+	bzero(&sec, sizeof (sec));
 	for (cnt = 1; cnt < shnum; cnt++) {
+		Cache	*_cache = &cache[cnt];
+
+		switch (_cache->c_shdr->sh_type) {
+		case SHT_DYNAMIC:
+			if (dynsec_num == 0) {
+				dynsec_ndx = cnt;
+
+				/* Does it have a valid string table? */
+				(void) stringtbl(cache, 0, cnt, shnum, file,
+				    0, 0, &sec.dynstr);
+			}
+			dynsec_num++;
+			break;
+
+
+		case SHT_PROGBITS:
+			/*
+			 * We want to detect the .init and .fini sections,
+			 * if present. These are SHT_PROGBITS, so all we
+			 * have to go on is the section name. Normally comparing
+			 * names is a bad idea, but there are some special
+			 * names (i.e. .init/.fini/.interp) that are very
+			 * difficult to use in any other context, and for
+			 * these symbols, we do the heuristic match.
+			 */
+			if (strcmp(_cache->c_name,
+			    MSG_ORIG(MSG_ELF_INIT)) == 0) {
+				if (sec.init == NULL)
+					sec.init = _cache;
+			} else if (strcmp(_cache->c_name,
+			    MSG_ORIG(MSG_ELF_FINI)) == 0) {
+				if (sec.fini == NULL)
+					sec.fini = _cache;
+			}
+			break;
+
+		case SHT_REL:
+			/*
+			 * We want the SHT_REL section with the lowest
+			 * offset. The linker gathers them together,
+			 * and puts the address of the first one
+			 * into the DT_REL dynamic element.
+			 */
+			if ((sec.rel == NULL) ||
+			    (_cache->c_shdr->sh_offset <
+			    sec.rel->c_shdr->sh_offset))
+				sec.rel = _cache;
+			break;
+
+		case SHT_RELA:
+			/* RELA is handled just like RELA above */
+			if ((sec.rela == NULL) ||
+			    (_cache->c_shdr->sh_offset <
+			    sec.rela->c_shdr->sh_offset))
+				sec.rela = _cache;
+			break;
+
+		/*
+		 * The GRAB macro is used for the simple case in which
+		 * we simply grab the first section of the desired type.
+		 */
+#define	GRAB(_sec_type, _sec_field) \
+		case _sec_type: \
+			if (sec._sec_field == NULL) \
+				sec._sec_field = _cache; \
+				break
+		GRAB(SHT_DYNSYM,	dynsym);
+		GRAB(SHT_FINI_ARRAY,	fini_array);
+		GRAB(SHT_HASH,		hash);
+		GRAB(SHT_INIT_ARRAY,	init_array);
+		GRAB(SHT_SUNW_move,	sunw_move);
+		GRAB(SHT_PREINIT_ARRAY,	preinit_array);
+		GRAB(SHT_SUNW_cap,	sunw_cap);
+		GRAB(SHT_SUNW_LDYNSYM,	sunw_ldynsym);
+		GRAB(SHT_SUNW_syminfo,	sunw_syminfo);
+		GRAB(SHT_SUNW_symsort,	sunw_symsort);
+		GRAB(SHT_SUNW_tlssort,	sunw_tlssort);
+		GRAB(SHT_SUNW_verdef,	sunw_verdef);
+		GRAB(SHT_SUNW_verneed,	sunw_verneed);
+		GRAB(SHT_SUNW_versym,	sunw_versym);
+#undef GRAB
+		}
+	}
+
+	/*
+	 * If no dynamic section, return immediately. If more than one
+	 * dynamic section, then something odd is going on and an error
+	 * is in order, but then continue on and display them all.
+	 */
+	if (dynsec_num == 0)
+		return;
+	if (dynsec_num > 1)
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MULTDYN),
+		    file, EC_WORD(dynsec_num));
+
+
+	dynsec_cnt = 0;
+	for (cnt = dynsec_ndx; (cnt < shnum) && (dynsec_cnt < dynsec_num);
+	    cnt++) {
 		Dyn	*dyn;
 		ulong_t	numdyn;
 		int	ndx, end_ndx;
 		Cache	*_cache = &cache[cnt], *strsec;
 		Shdr	*shdr = _cache->c_shdr;
+		int	dumped = 0;
 
 		if (shdr->sh_type != SHT_DYNAMIC)
 			continue;
+		dynsec_cnt++;
 
 		/*
 		 * Verify the associated string table section.
@@ -1995,6 +2227,21 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 		numdyn = shdr->sh_size / shdr->sh_entsize;
 		dyn = (Dyn *)_cache->c_data->d_buf;
 
+		/*
+		 * We expect the REL/RELA entries to reference the reloc
+		 * section with the lowest address. However, this is
+		 * not true for dumped objects. Detect if this object has
+		 * been dumped so that we can skip the reloc address test
+		 * in that case.
+		 */
+		for (ndx = 0; ndx < numdyn; dyn++, ndx++) {
+			if (dyn->d_tag == DT_FLAGS_1) {
+				dumped = (dyn->d_un.d_val & DF_1_CONFALT) != 0;
+				break;
+			}
+		}
+		dyn = (Dyn *)_cache->c_data->d_buf;
+
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_DYNAMIC), _cache->c_name);
 
@@ -2007,11 +2254,42 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				Conv_dyn_posflag1_buf_t	posflag1;
 				Conv_dyn_feature1_buf_t	feature1;
 			} c_buf;
-			const char	*name;
+			const char	*name = NULL;
 
 			/*
 			 * Print the information numerically, and if possible
-			 * as a string.
+			 * as a string. If a string is available, name is
+			 * set to reference it.
+			 *
+			 * Also, take this opportunity to sanity check
+			 * the values of DT elements. In the code above,
+			 * we gathered information on sections that are
+			 * referenced by the dynamic section. Here, we
+			 * compare the attributes of those sections to
+			 * the DT_ items that reference them and report
+			 * on inconsistencies.
+			 *
+			 * Things not currently tested that could be improved
+			 * in later revisions include:
+			 *	- We don't check PLT or GOT related items
+			 *	- We don't handle computing the lengths of
+			 *		relocation arrays. To handle this
+			 *		requires examining data that spans
+			 *		across sections, in a contiguous span
+			 *		within a single segment.
+			 *	- DT_VERDEFNUM and DT_VERNEEDNUM can't be
+			 *		verified without parsing the sections.
+			 *	- We don't handle DT_SUNW_SYMSZ, which would
+			 *		be the sum of the lengths of .dynsym and
+			 *		.SUNW_ldynsym
+			 *	- DT_SUNW_STRPAD can't be verified other than
+			 *		to check that it's not larger than
+			 *		the string table.
+			 *	- Some items come in "all or none" clusters
+			 *		that give an address, element size,
+			 *		and data length in bytes. We don't
+			 *		verify that there are no missing items
+			 *		in such groups.
 			 */
 			switch (dyn->d_tag) {
 			case DT_NULL:
@@ -2030,8 +2308,8 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				continue;
 
 			/*
-			 * Print the information numerically, and if possible
-			 * as a string.
+			 * String items all reference the dynstr. The string()
+			 * function does the necessary sanity checking.
 			 */
 			case DT_NEEDED:
 			case DT_SONAME:
@@ -2068,11 +2346,180 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			case DT_DEPRECATED_SPARC_REGISTER:
 				name = MSG_INTL(MSG_STR_DEPRECATED);
 				break;
-			default:
-				name = MSG_ORIG(MSG_STR_EMPTY);
+
+			/*
+			 * Cases below this point are strictly sanity checking,
+			 * and do not generate a name string. The TEST_ macros
+			 * are used to hide the boilerplate arguments neeeded
+			 * by dyn_test().
+			 */
+#define	TEST_ADDR(_sh_type, _sec_field) \
+				dyn_test(DYN_TEST_ADDR, _sh_type, \
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+#define	TEST_SIZE(_sh_type, _sec_field) \
+				dyn_test(DYN_TEST_SIZE, _sh_type, \
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+#define	TEST_ENTSIZE(_sh_type, _sec_field) \
+				dyn_test(DYN_TEST_ENTSIZE, _sh_type, \
+				    sec._sec_field, dyn, dynsec_cnt, ehdr, file)
+
+			case DT_FINI:
+				TEST_ADDR(SHT_PROGBITS, fini);
 				break;
+
+			case DT_FINI_ARRAY:
+				TEST_ADDR(SHT_FINI_ARRAY, fini_array);
+				break;
+
+			case DT_FINI_ARRAYSZ:
+				TEST_SIZE(SHT_FINI_ARRAY, fini_array);
+				break;
+
+			case DT_HASH:
+				TEST_ADDR(SHT_HASH, hash);
+				break;
+
+			case DT_INIT:
+				TEST_ADDR(SHT_PROGBITS, init);
+				break;
+
+			case DT_INIT_ARRAY:
+				TEST_ADDR(SHT_INIT_ARRAY, init_array);
+				break;
+
+			case DT_INIT_ARRAYSZ:
+				TEST_SIZE(SHT_INIT_ARRAY, init_array);
+				break;
+
+			case DT_MOVEENT:
+				TEST_ENTSIZE(SHT_SUNW_move, sunw_move);
+				break;
+
+			case DT_MOVESZ:
+				TEST_SIZE(SHT_SUNW_move, sunw_move);
+				break;
+
+			case DT_MOVETAB:
+				TEST_ADDR(SHT_SUNW_move, sunw_move);
+				break;
+
+			case DT_PREINIT_ARRAY:
+				TEST_ADDR(SHT_PREINIT_ARRAY, preinit_array);
+				break;
+
+			case DT_PREINIT_ARRAYSZ:
+				TEST_SIZE(SHT_PREINIT_ARRAY, preinit_array);
+				break;
+
+			case DT_REL:
+				if (!dumped)
+					TEST_ADDR(SHT_REL, rel);
+				break;
+
+			case DT_RELENT:
+				TEST_ENTSIZE(SHT_REL, rel);
+				break;
+
+			case DT_RELA:
+				if (!dumped)
+					TEST_ADDR(SHT_RELA, rela);
+				break;
+
+			case DT_RELAENT:
+				TEST_ENTSIZE(SHT_RELA, rela);
+				break;
+
+			case DT_STRTAB:
+				TEST_ADDR(SHT_STRTAB, dynstr);
+				break;
+
+			case DT_STRSZ:
+				TEST_SIZE(SHT_STRTAB, dynstr);
+				break;
+
+			case DT_SUNW_CAP:
+				TEST_ADDR(SHT_SUNW_cap, sunw_cap);
+				break;
+
+			case DT_SUNW_SYMTAB:
+				TEST_ADDR(SHT_SUNW_LDYNSYM, sunw_ldynsym);
+				break;
+
+			case DT_SYMENT:
+				TEST_ENTSIZE(SHT_DYNSYM, dynsym);
+				break;
+
+			case DT_SYMINENT:
+				TEST_ENTSIZE(SHT_SUNW_syminfo, sunw_syminfo);
+				break;
+
+			case DT_SYMINFO:
+				TEST_ADDR(SHT_SUNW_syminfo, sunw_syminfo);
+				break;
+
+			case DT_SYMINSZ:
+				TEST_SIZE(SHT_SUNW_syminfo, sunw_syminfo);
+				break;
+
+			case DT_SYMTAB:
+				TEST_ADDR(SHT_DYNSYM, dynsym);
+				break;
+
+			case DT_SUNW_SORTENT:
+				/*
+				 * This entry is related to both the symsort and
+				 * tlssort sections.
+				 */
+				{
+					int test_tls =
+					    (sec.sunw_tlssort != NULL);
+					int test_sym =
+					    (sec.sunw_symsort != NULL) ||
+					    !test_tls;
+					if (test_sym)
+						TEST_ENTSIZE(SHT_SUNW_symsort,
+						    sunw_symsort);
+					if (test_tls)
+						TEST_ENTSIZE(SHT_SUNW_tlssort,
+						    sunw_tlssort);
+				}
+				break;
+
+
+			case DT_SUNW_SYMSORT:
+				TEST_ADDR(SHT_SUNW_symsort, sunw_symsort);
+				break;
+
+			case DT_SUNW_SYMSORTSZ:
+				TEST_SIZE(SHT_SUNW_symsort, sunw_symsort);
+				break;
+
+			case DT_SUNW_TLSSORT:
+				TEST_ADDR(SHT_SUNW_tlssort, sunw_tlssort);
+				break;
+
+			case DT_SUNW_TLSSORTSZ:
+				TEST_SIZE(SHT_SUNW_tlssort, sunw_tlssort);
+				break;
+
+			case DT_VERDEF:
+				TEST_ADDR(SHT_SUNW_verdef, sunw_verdef);
+				break;
+
+			case DT_VERNEED:
+				TEST_ADDR(SHT_SUNW_verneed, sunw_verneed);
+				break;
+
+			case DT_VERSYM:
+				TEST_ADDR(SHT_SUNW_versym, sunw_versym);
+				break;
+#undef TEST_ADDR
+#undef TEST_SIZE
+#undef TEST_ENTSIZE
 			}
 
+			if (name == NULL)
+				name = MSG_ORIG(MSG_STR_EMPTY);
 			Elf_dyn_entry(0, dyn, ndx, name, ehdr->e_machine);
 		}
 	}
@@ -2356,13 +2803,19 @@ note(Cache *cache, Word shnum, const char *file)
 
 		/*
 		 * As these sections are often hand rolled, make sure they're
-		 * properly aligned before proceeding.
+		 * properly aligned before proceeding, and issue an error
+		 * as necessary.
+		 *
+		 * Note that we will continue on to display the note even
+		 * if it has bad alignment. We can do this safely, because
+		 * libelf knows the alignment required for SHT_NOTE, and
+		 * takes steps to deliver a properly aligned buffer to us
+		 * even if the actual file is misaligned.
 		 */
-		if (shdr->sh_offset & (sizeof (Word) - 1)) {
+		if (shdr->sh_offset & (sizeof (Word) - 1))
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADALIGN),
 			    file, _cache->c_name);
-			continue;
-		}
+
 		if (_cache->c_data == NULL)
 			continue;
 
@@ -2648,7 +3101,7 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 static void
 got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 {
-	Cache		*gotcache = 0, *symtab = 0, *_cache;
+	Cache		*gotcache = NULL, *symtab = NULL;
 	Addr		gotbgn, gotend;
 	Shdr		*gotshdr;
 	Word		cnt, gotents, gotndx;
@@ -2662,14 +3115,13 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 	 * First, find the got.
 	 */
 	for (cnt = 1; cnt < shnum; cnt++) {
-		_cache = &cache[cnt];
-		if (strncmp(_cache->c_name, MSG_ORIG(MSG_ELF_GOT),
+		if (strncmp(cache[cnt].c_name, MSG_ORIG(MSG_ELF_GOT),
 		    MSG_ELF_GOT_SIZE) == 0) {
-			gotcache = _cache;
+			gotcache = &cache[cnt];
 			break;
 		}
 	}
-	if (gotcache == 0)
+	if (gotcache == NULL)
 		return;
 
 	/*
@@ -2677,7 +3129,7 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 	 */
 	if (ehdr->e_type == ET_REL) {
 		(void) fprintf(stderr, MSG_INTL(MSG_GOT_UNEXPECTED), file,
-		    _cache->c_name);
+		    gotcache->c_name);
 	}
 
 	gotshdr = gotcache->c_shdr;

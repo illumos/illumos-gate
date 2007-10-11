@@ -136,6 +136,15 @@
 			 and section[%d]: %s: %llx:%llx\n"
 @ MSG_ERR_SHDRMEMOVER	"%s: memory overlap between section header table: \
 			 %llx:%llx and section[%d]: %s: %llx:%llx\n"
+@ MSG_ERR_MULTDYN	"%s: %d dynamic sections seen (1 expected)\n"
+@ MSG_ERR_DYNNOBCKSEC	"%s: object lacks %s section required by DT_%s dynamic \
+			 entry\n"
+@ MSG_ERR_DYNBADADDR	"%s: DT_%s (%#llx) does not match \
+			 shdr[%d: %s].sh_addr (%#llx)\n"
+@ MSG_ERR_DYNBADSIZE	"%s: DT_%s (%#llx) does not match \
+			 shdr[%d: %s].sh_size (%#llx)\n"
+@ MSG_ERR_DYNBADENTSIZE	"%s: DT_%s (%#llx) does not match \
+			 shdr[%d: %s].sh_entsize (%#llx)\n"
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
@@ -238,6 +247,8 @@
 @ MSG_GRP_UNKNOWN	" 0x%x "
 
 @ MSG_ELF_GOT		".got"
+@ MSG_ELF_INIT		".init"
+@ MSG_ELF_FINI		".fini"
 
 @ MSG_ELF_GETEHDR	"elf_getehdr"
 @ MSG_ELF_GETPHDR	"elf_getphdr"
