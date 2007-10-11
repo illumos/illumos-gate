@@ -46,6 +46,7 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/sparc/tavor
 ../closed/uts/intel/tavor
 ../closed/uts/common/io/ib/adapters/tavor
+../closed/uts/common/sys/ib/adapters/mlnx_umap.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_agents.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_cfg.h
@@ -59,7 +60,6 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_rsrc.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_srq.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_typedef.h
-../closed/uts/common/sys/ib/adapters/tavor/tavor_umap.h
 ../closed/uts/common/sys/ib/adapters/tavor/tavor_wr.h
 ../closed/uts/sun4/forthdebug/tavor.fdbg
 ../closed/uts/sparc/daplt

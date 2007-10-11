@@ -47,6 +47,47 @@ extern "C" {
 #endif
 
 /*
+ * Endian Macros
+ *    h2b - host endian to big endian protocol
+ *    b2h - big endian protocol to host endian
+ *    h2l - host endian to little endian protocol
+ *    l2h - little endian protocol to host endian
+ */
+#if defined(_LITTLE_ENDIAN)
+#define	h2b16(x)	(htons(x))
+#define	h2b32(x)	(htonl(x))
+#define	h2b64(x)	(ddi_swap64(x))
+#define	b2h16(x)	(ntohs(x))
+#define	b2h32(x)	(ntohl(x))
+#define	b2h64(x)	(ddi_swap64(x))
+
+#define	h2l16(x)	(x)
+#define	h2l32(x)	(x)
+#define	h2l64(x)	(x)
+#define	l2h16(x)	(x)
+#define	l2h32(x)	(x)
+#define	l2h64(x)	(x)
+
+#elif defined(_BIG_ENDIAN)
+#define	h2b16(x)	(x)
+#define	h2b32(x)	(x)
+#define	h2b64(x)	(x)
+#define	b2h16(x)	(x)
+#define	b2h32(x)	(x)
+#define	b2h64(x)	(x)
+
+#define	h2l16(x)	(ddi_swap16(x))
+#define	h2l32(x)	(ddi_swap32(x))
+#define	h2l64(x)	(ddi_swap64(x))
+#define	l2h16(x)	(ddi_swap16(x))
+#define	l2h32(x)	(ddi_swap32(x))
+#define	l2h64(x)	(ddi_swap64(x))
+
+#else
+#error	"what endian is this machine?"
+#endif
+
+/*
  * Define Internal IBTL handles
  */
 typedef	struct	ibtl_clnt_s	*ibt_clnt_hdl_t;    /* ibt_attach() */
@@ -1314,6 +1355,20 @@ typedef enum ibt_object_type_e {
 	IBT_HDL_OPAQUE2,
 	IBT_HDL_SRQ
 } ibt_object_type_t;
+
+/*
+ * Standard information for ibt_ci_data_in() for memory regions.
+ *
+ * IBT_MR_DATA_IN_IF_VERSION is the value used in the mr_rev member.
+ * mr_func is the callback handler.  mr_arg1 and mr_arg2 are its arguments.
+ */
+#define	IBT_MR_DATA_IN_IF_VERSION	1
+typedef struct ibt_mr_data_in_s {
+	uint_t	mr_rev;
+	void	(*mr_func)(void *, void *);
+	void	*mr_arg1;
+	void	*mr_arg2;
+} ibt_mr_data_in_t;
 
 /*
  * Memory error handler data structures; code, and payload data.

@@ -44,47 +44,6 @@ extern "C" {
 #endif
 
 /*
- * Endian Macros
- *    h2b - host endian to big endian protocol
- *    b2h - big endian protocol to host endian
- *    h2l - host endian to little endian protocol
- *    l2h - little endian protocol to host endian
- */
-#if defined(_LITTLE_ENDIAN)
-#define	h2b16(x)	(htons(x))
-#define	h2b32(x)	(htonl(x))
-#define	h2b64(x)	(ddi_swap64(x))
-#define	b2h16(x)	(ntohs(x))
-#define	b2h32(x)	(ntohl(x))
-#define	b2h64(x)	(ddi_swap64(x))
-
-#define	h2l16(x)	(x)
-#define	h2l32(x)	(x)
-#define	h2l64(x)	(x)
-#define	l2h16(x)	(x)
-#define	l2h32(x)	(x)
-#define	l2h64(x)	(x)
-
-#elif defined(_BIG_ENDIAN)
-#define	h2b16(x)	(x)
-#define	h2b32(x)	(x)
-#define	h2b64(x)	(x)
-#define	b2h16(x)	(x)
-#define	b2h32(x)	(x)
-#define	b2h64(x)	(x)
-
-#define	h2l16(x)	(ddi_swap16(x))
-#define	h2l32(x)	(ddi_swap32(x))
-#define	h2l64(x)	(ddi_swap64(x))
-#define	l2h16(x)	(ddi_swap16(x))
-#define	l2h32(x)	(ddi_swap32(x))
-#define	l2h64(x)	(ddi_swap64(x))
-
-#else
-#error	"what endian is this machine?"
-#endif
-
-/*
  * Max number of paths that can be requested in an ibt_get_paths() call,
  * if IBT_PATH_PERF or IBT_PATH_AVAIL flag (ibt_path_flags_t) is set.
  */
