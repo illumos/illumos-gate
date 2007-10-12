@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1958,9 +1958,10 @@ inet_name(union any_in_addr *in, int family)
 		slen = sizeof (struct sockaddr_in6);
 		sin6.sin6_addr = in->addr6;
 		sin6.sin6_port = 0;
+		sin6.sin6_scope_id = 0;
 		sa = (struct sockaddr *)&sin6;
 		break;
-	deafult:
+	default:
 		(void) snprintf(line, sizeof (line),
 		    "<invalid address family>");
 		return (line);
