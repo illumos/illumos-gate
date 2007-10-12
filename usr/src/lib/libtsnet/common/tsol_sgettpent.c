@@ -267,8 +267,9 @@ tpstr_to_ent(tsol_tpstr_t *tpstrp, int *errp, char **errstrp)
 		*errp = LTSNET_SYSERR;
 		return (NULL);
 	}
-	if (strlcpy(tpentp->name, template, sizeof (tpentp->name)) >=
-	    sizeof (tpentp->name)) {
+	if ((strlcpy(tpentp->name, template, sizeof (tpentp->name)) >=
+	    sizeof (tpentp->name)) ||
+	    strpbrk(tpentp->name, TN_RESERVED) != NULL) {
 		*errp = LTSNET_ILL_NAME;
 		goto err_ret;
 	}

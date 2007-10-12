@@ -55,6 +55,7 @@ static void process_tp(const char *);
 static void process_tpl(const char *);
 static void process_tnzone(const char *);
 static void usage(void);
+static void translate_inet_addr(tsol_rhent_t *, int *, char [], int);
 
 static boolean_t verbose_mode;
 static boolean_t delete_mode;
@@ -127,6 +128,44 @@ print_error(int linenum, int err, const char *errstr)
 }
 
 /*
+ * Produce ascii format of address and prefix length
+ */
+static void
+translate_inet_addr(tsol_rhent_t *rhentp, int *alen, char abuf[], int abuflen)
+{
+	void *aptr;
+	tsol_rhent_t rhent;
+	struct in6_addr ipv6addr;
+	char tmpbuf[20];
+
+	(void) snprintf(tmpbuf, sizeof (tmpbuf), "/%d", rhentp->rh_prefix);
+
+	if (rhentp->rh_address.ta_family == AF_INET6) {
+		aptr = &(rhentp->rh_address.ta_addr_v6);
+		*alen = sizeof (ipv6addr);
+		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
+		    abuflen);
+		if (rhentp->rh_prefix != 128) {
+			if (strlcat(abuf, tmpbuf, abuflen) >= abuflen)
+				(void) fprintf(stderr, gettext(
+				    "tnctl: buffer overflow detected: %s\n"),
+				    abuf);
+		}
+	} else {
+		aptr = &(rhentp->rh_address.ta_addr_v4);
+		*alen = sizeof (rhent.rh_address.ta_addr_v4);
+		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
+		    abuflen);
+		if (rhentp->rh_prefix != 32) {
+			if (strlcat(abuf, tmpbuf, abuflen) >= abuflen)
+				(void) fprintf(stderr, gettext(
+				    "tnctl: buffer overflow detected: %s\n"),
+				    abuf);
+		}
+	}
+}
+
+/*
  * Load remote host entries from the designated file.
  */
 static void
@@ -135,6 +174,9 @@ process_rhl(const char *file)
 	boolean_t	success = B_FALSE;
 	tsol_rhent_t	*rhentp = NULL;
 	FILE		*fp;
+	int alen;
+	/* abuf holds: <numeric-ip-addr>'/'<prefix-length>'\0' */
+	char abuf[INET6_ADDRSTRLEN+5];
 
 	if ((fp = fopen(file, "r")) == NULL) {
 		(void) fprintf(stderr,
@@ -158,10 +200,12 @@ process_rhl(const char *file)
 			if (errno == EFAULT)
 				perror("tnrh");
 			else
+				translate_inet_addr(rhentp, &alen, abuf,
+				    sizeof (abuf));
 				(void) fprintf(stderr,
 				    gettext("tnctl: load of remote-host entry "
 				    "%1$s into kernel cache failed: %2$s\n"),
-				    rhentp->rh_template, strerror(errno));
+				    abuf, strerror(errno));
 			tsol_endrhent();
 			exit(1);
 		}
@@ -274,25 +318,7 @@ process_rh(const char *hostname)
 	}
 
 	/* produce ascii format of address and prefix length */
-	if (rhentp->rh_address.ta_family == AF_INET6) {
-		aptr = &(rhentp->rh_address.ta_addr_v6);
-		alen = sizeof (ipv6addr);
-		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
-		    sizeof (abuf));
-		if (rhentp->rh_prefix != 128) {
-			cp1 = abuf + strlen(abuf);
-			(void) sprintf(cp1, "/%d", rhentp->rh_prefix);
-		}
-	} else {
-		aptr = &(rhentp->rh_address.ta_addr_v4);
-		alen = sizeof (rhent.rh_address.ta_addr_v4);
-		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
-		    sizeof (abuf));
-		if (rhentp->rh_prefix != 32) {
-			cp1 = abuf + strlen(abuf);
-			(void) sprintf(cp1, "/%d", rhentp->rh_prefix);
-		}
-	}
+	translate_inet_addr(rhentp, &alen, abuf, sizeof (abuf));
 
 	/*
 	 * look up the entry from ldap or tnrhdb if this is a load

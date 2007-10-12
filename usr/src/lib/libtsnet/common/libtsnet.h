@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * All symbols and functions in this header file and library are private to Sun
@@ -44,6 +44,7 @@ extern "C" {
 #define	TNZONECFG_PATH	"/etc/security/tsol/tnzonecfg"
 
 #define	TNDB_COMMA	", \t"
+#define	TN_RESERVED	",#;"
 
 /*
  * String parsing routines
