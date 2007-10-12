@@ -42,6 +42,8 @@
  * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "includes.h"
 
 #if !defined(HAVE_B64_NTOP) && !defined(HAVE___B64_NTOP)
@@ -198,7 +200,7 @@ b64_ntop(u_char const *src, size_t srclength, char *target, size_t targsize)
  */
 
 int
-b64_pton(char const *src, u_char *target, size_t targsize)
+b64_pton(u_char const *src, u_char *target, size_t targsize)
 {
 	int tarindex, state, ch;
 	char *pos;
@@ -315,5 +317,3 @@ b64_pton(char const *src, u_char *target, size_t targsize)
 }
 
 #endif /* !defined(HAVE_B64_NTOP) && !defined(HAVE___B64_NTOP) */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"

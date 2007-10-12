@@ -1,15 +1,3 @@
-/*	$OpenBSD: key.h,v 1.19 2002/03/18 17:23:31 markus Exp $	*/
-
-#ifndef	_KEY_H
-#define	_KEY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -33,6 +21,18 @@ extern "C" {
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifndef	_KEY_H
+#define	_KEY_H
+
+/*	$OpenBSD: key.h,v 1.19 2002/03/18 17:23:31 markus Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include <openssl/rsa.h>
 #include <openssl/dsa.h>
@@ -68,10 +68,10 @@ Key	*key_new(int);
 Key	*key_new_private(int);
 void	 key_free(Key *);
 Key	*key_demote(Key *);
-int	 key_equal(Key *, Key *);
+int	 key_equal(const Key *, const Key *);
 char	*key_fingerprint(Key *, enum fp_type, enum fp_rep);
 char	*key_type(Key *);
-int	 key_write(Key *, FILE *);
+int	 key_write(const Key *, FILE *);
 int	 key_read(Key *, char **);
 u_int	 key_size(Key *);
 
@@ -80,8 +80,8 @@ Key	*key_from_private(Key *);
 int	 key_type_from_name(char *);
 
 Key	*key_from_blob(u_char *, int);
-int	 key_to_blob(Key *, u_char **, u_int *);
-char	*key_ssh_name(Key *);
+int	 key_to_blob(const Key *, u_char **, u_int *);
+char	*key_ssh_name(const Key *);
 int	 key_names_valid2(const char *);
 
 int	 key_sign(Key *, u_char **, u_int *, u_char *, u_int);

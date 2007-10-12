@@ -52,7 +52,7 @@ uudecode(const char *src, u_char *target, size_t targsize)
 		;
 	/* and remove trailing whitespace because __b64_pton needs this */
 	*p = '\0';
-	len = __b64_pton(encoded, target, targsize);
+	len = __b64_pton((u_char *) encoded, target, targsize);
 	xfree(encoded);
 	return len;
 }

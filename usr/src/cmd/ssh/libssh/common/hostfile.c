@@ -35,16 +35,115 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "includes.h"
-RCSID("$OpenBSD: hostfile.c,v 1.30 2002/07/24 16:11:18 markus Exp $");
+/* $OpenBSD: hostfile.c,v 1.45 2006/08/03 03:34:42 deraadt Exp $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "includes.h"
+
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
+
 #include "packet.h"
+#include "xmalloc.h"
 #include "match.h"
 #include "key.h"
 #include "hostfile.h"
 #include "log.h"
+
+/*
+ * Format of a hashed hostname is <MAGIC><SALT>|<HASHED_HOSTNAME>. <MAGIC> is
+ * "|1|". As in non-hashed hostnames this whole string is then followed by a
+ * space, a key type and the key (which is out of scope of this function).
+ *
+ * Example what can be in 's':
+ *
+ * |1|t17NtsuXSLwP0H0eYdd8vJeNakM=|9XFVPh3jZUrfY6YCWn8Ua5eGZtA=
+ */
+static int
+extract_salt(const char *s, u_int l, char *salt, size_t salt_len)
+{
+	char *p;
+	u_char *b64salt;
+	u_int b64len;
+	int ret;
+
+	if (l < sizeof(HASH_MAGIC) - 1) {
+		debug2("extract_salt: string too short");
+		return (-1);
+	}
+	if (strncmp(s, HASH_MAGIC, sizeof(HASH_MAGIC) - 1) != 0) {
+		debug2("extract_salt: invalid magic identifier");
+		return (-1);
+	}
+	s += sizeof(HASH_MAGIC) - 1;
+	l -= sizeof(HASH_MAGIC) - 1;
+	if ((p = memchr(s, HASH_DELIM, l)) == NULL) {
+		debug2("extract_salt: missing salt termination character");
+		return (-1);
+	}
+
+	b64len = p - s;
+	/* Sanity check */
+	if (b64len == 0 || b64len > 1024) {
+		debug2("extract_salt: bad encoded salt length %u", b64len);
+		return (-1);
+	}
+	b64salt = xmalloc(1 + b64len);
+	memcpy(b64salt, s, b64len);
+	b64salt[b64len] = '\0';
+
+	ret = __b64_pton(b64salt, (u_char *) salt, salt_len);
+	xfree(b64salt);
+	if (ret == -1) {
+		debug2("extract_salt: salt decode error");
+		return (-1);
+	}
+	if (ret != SHA_DIGEST_LENGTH) {
+		debug2("extract_salt: expected salt len %d, got %d",
+		    SHA_DIGEST_LENGTH, ret);
+		return (-1);
+	}
+
+	return (0);
+}
+
+char *
+host_hash(const char *host, const char *name_from_hostfile, u_int src_len)
+{
+	const EVP_MD *md = EVP_sha1();
+	HMAC_CTX mac_ctx;
+	char salt[256], result[256], uu_salt[512], uu_result[512];
+	static char encoded[1024];
+	u_int i, len;
+
+	len = EVP_MD_size(md);
+
+	if (name_from_hostfile == NULL) {
+		/* Create new salt */
+		for (i = 0; i < len; i++)
+			salt[i] = arc4random();
+	} else {
+		/* Extract salt from known host entry */
+		if (extract_salt(name_from_hostfile, src_len, salt,
+		    sizeof(salt)) == -1)
+			return (NULL);
+	}
+
+	HMAC_Init(&mac_ctx, salt, len, md);
+	HMAC_Update(&mac_ctx, (u_char *) host, strlen(host));
+	HMAC_Final(&mac_ctx, (u_char *) result, NULL);
+	HMAC_cleanup(&mac_ctx);
+
+	if (__b64_ntop((u_char *) salt, len, uu_salt, sizeof(uu_salt)) == -1 ||
+	    __b64_ntop((u_char *) result, len, uu_result, sizeof(uu_result)) == -1)
+		fatal("host_hash: __b64_ntop failed");
+
+	snprintf(encoded, sizeof(encoded), "%s%s%c%s", HASH_MAGIC, uu_salt,
+	    HASH_DELIM, uu_result);
+
+	return (encoded);
+}
 
 /*
  * Parses an RSA (number of bits, e, n) or DSA key from a string.  Moves the
@@ -74,7 +173,7 @@ hostfile_read_key(char **cpp, u_int *bitsp, Key *ret)
 }
 
 static int
-hostfile_check_key(int bits, Key *key, const char *host, const char *filename, int linenum)
+hostfile_check_key(int bits, const Key *key, const char *host, const char *filename, int linenum)
 {
 	if (key == NULL || key->type != KEY_RSA1 || key->rsa == NULL)
 		return 1;
@@ -100,13 +199,13 @@ hostfile_check_key(int bits, Key *key, const char *host, const char *filename, i
 
 static HostStatus
 check_host_in_hostfile_by_key_or_type(const char *filename,
-    const char *host, Key *key, int keytype, Key *found, int *numret)
+    const char *host, const Key *key, int keytype, Key *found, int *numret)
 {
 	FILE *f;
 	char line[8192];
 	int linenum = 0;
 	u_int kbits;
-	char *cp, *cp2;
+	char *cp, *cp2, *hashed_host;
 	HostStatus end_return;
 
 	debug3("check_host_in_hostfile: filename %s", filename);
@@ -139,8 +238,18 @@ check_host_in_hostfile_by_key_or_type(const char *filename,
 			;
 
 		/* Check if the host name matches. */
-		if (match_hostname(host, cp, (u_int) (cp2 - cp)) != 1)
-			continue;
+		if (match_hostname(host, cp, (u_int) (cp2 - cp)) != 1) {
+			if (*cp != HASH_DELIM)
+				continue;
+			hashed_host = host_hash(host, cp, (u_int) (cp2 - cp));
+			if (hashed_host == NULL) {
+				debug("Invalid hashed host line %d of %s",
+				    linenum, filename);
+				continue;
+			}
+			if (strncmp(hashed_host, cp, (u_int) (cp2 - cp)) != 0)
+				continue;
+		}
 
 		/* Got a match.  Skip host name. */
 		cp = cp2;
@@ -157,8 +266,10 @@ check_host_in_hostfile_by_key_or_type(const char *filename,
 
 		if (key == NULL) {
 			/* we found a key of the requested type */
-			if (found->type == keytype)
+			if (found->type == keytype) {
+				fclose(f);
 				return HOST_FOUND;
+			}
 			continue;
 		}
 
@@ -190,7 +301,7 @@ check_host_in_hostfile_by_key_or_type(const char *filename,
 }
 
 HostStatus
-check_host_in_hostfile(const char *filename, const char *host, Key *key,
+check_host_in_hostfile(const char *filename, const char *host, const Key *key,
     Key *found, int *numret)
 {
 	if (key == NULL)
@@ -213,16 +324,28 @@ lookup_key_in_hostfile_by_type(const char *filename, const char *host,
  */
 
 int
-add_host_to_hostfile(const char *filename, const char *host, Key *key)
+add_host_to_hostfile(const char *filename, const char *host, const Key *key,
+    int store_hash)
 {
 	FILE *f;
 	int success = 0;
+	char *hashed_host = NULL;
+
 	if (key == NULL)
 		return 1;	/* XXX ? */
 	f = fopen(filename, "a");
 	if (!f)
 		return 0;
-	fprintf(f, "%s ", host);
+
+	if (store_hash) {
+		if ((hashed_host = host_hash(host, NULL, 0)) == NULL) {
+			error("add_host_to_hostfile: host_hash failed");
+			fclose(f);
+			return 0;
+		}
+	}
+	fprintf(f, "%s ", store_hash ? hashed_host : host);
+
 	if (key_write(key, f)) {
 		success = 1;
 	} else {

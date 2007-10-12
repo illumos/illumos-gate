@@ -1,15 +1,3 @@
-/*	$OpenBSD: hostfile.h,v 1.12 2002/09/08 20:24:08 markus Exp $	*/
-
-#ifndef	_HOSTFILE_H
-#define	_HOSTFILE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -22,16 +10,32 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 
+#ifndef	_HOSTFILE_H
+#define	_HOSTFILE_H
+
+/*	$OpenBSD: hostfile.h,v 1.12 2002/09/08 20:24:08 markus Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
 	HOST_OK, HOST_NEW, HOST_CHANGED, HOST_FOUND
 }       HostStatus;
 
 int	 hostfile_read_key(char **, u_int *, Key *);
 HostStatus
-check_host_in_hostfile(const char *, const char *, Key *, Key *, int *);
-int	 add_host_to_hostfile(const char *, const char *, Key *);
-int	
+check_host_in_hostfile(const char *, const char *, const Key *, Key *, int *);
+int	add_host_to_hostfile(const char *, const char *, const Key *, int);
+int
 lookup_key_in_hostfile_by_type(const char *, const char *, int , Key *, int *);
+
+#define HASH_MAGIC	"|1|"
+#define HASH_DELIM	'|'
+
+char	*host_hash(const char *, const char *, u_int);
 
 #ifdef __cplusplus
 }

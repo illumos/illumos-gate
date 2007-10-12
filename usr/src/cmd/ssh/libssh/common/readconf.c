@@ -127,7 +127,7 @@ typedef enum {
 	oDynamicForward, oPreferredAuthentications, oHostbasedAuthentication,
 	oHostKeyAlgorithms, oBindAddress, oSmartcardDevice,
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
-	oFallBackToRsh, oUseRsh, oConnectTimeout,
+	oFallBackToRsh, oUseRsh, oConnectTimeout, oHashKnownHosts,
 	oServerAliveInterval, oServerAliveCountMax, oDisableBanner,
 	oDeprecated
 } OpCodes;
@@ -219,6 +219,7 @@ static struct {
 	{ "serveraliveinterval", oServerAliveInterval },
 	{ "serveralivecountmax", oServerAliveCountMax },
 	{ "disablebanner", oDisableBanner },
+	{ "hashknownhosts", oHashKnownHosts },
 	{ NULL, oBadOption }
 };
 
@@ -757,6 +758,10 @@ parse_int:
 		intptr = &options->server_alive_count_max;
 		goto parse_int;
 
+	case oHashKnownHosts:
+		intptr = &options->hash_known_hosts;
+		goto parse_flag;
+
 	case oDisableBanner:
 		arg = strdelim(&s);
 		if (get_yes_no_flag(&options->disable_banner, arg, filename,
@@ -909,6 +914,7 @@ initialize_options(Options * options)
 	options->use_rsh = -1;
 	options->server_alive_interval = -1;
 	options->server_alive_count_max = -1;
+	options->hash_known_hosts = -1;
 	options->disable_banner = -1;
 }
 
@@ -1050,6 +1056,8 @@ fill_default_options(Options * options)
 		options->server_alive_interval = 0;
 	if (options->server_alive_count_max == -1)
 		options->server_alive_count_max = 3;
+	if (options->hash_known_hosts == -1)
+		options->hash_known_hosts = 0;
 	if (options->disable_banner == -1)
 		options->disable_banner = 0;
 	/* options->proxy_command should not be set by default */

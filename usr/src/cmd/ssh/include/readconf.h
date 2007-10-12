@@ -1,15 +1,3 @@
-/*	$OpenBSD: readconf.h,v 1.43 2002/06/08 05:17:01 markus Exp $	*/
-
-#ifndef	_READCONF_H
-#define	_READCONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -26,6 +14,18 @@ extern "C" {
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#ifndef	_READCONF_H
+#define	_READCONF_H
+
+/*	$OpenBSD: readconf.h,v 1.43 2002/06/08 05:17:01 markus Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include "key.h"
 
@@ -129,6 +129,8 @@ typedef struct {
 	int	no_host_authentication_for_localhost;
 	int	server_alive_interval;
 	int	server_alive_count_max;
+
+	int	hash_known_hosts;
 }       Options;
 
 

@@ -1,8 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -14,6 +10,10 @@
  * software must be clearly marked as such, and if the derived work is
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "includes.h"
@@ -584,7 +584,7 @@ check_host_key(char *host, struct sockaddr *hostaddr, Key *host_key, int
 	char hostline[1000], *hostp, *fp;
 	HostStatus host_status;
 	HostStatus ip_status;
-	int local = 0, host_ip_differ = 0;
+	int r, local = 0, host_ip_differ = 0;
 	int salen;
 	char ntop[NI_MAXHOST];
 	char msg[1024];
@@ -662,7 +662,7 @@ check_host_key(char *host, struct sockaddr *hostaddr, Key *host_key, int
 	file_key = key_new(host_key->type);
 
 	/*
-	 * Check if the host key is present in the user\'s list of known
+	 * Check if the host key is present in the user's list of known
 	 * hosts or in the systemwide list.
 	 */
 	host_file = user_hostfile;
@@ -702,8 +702,8 @@ check_host_key(char *host, struct sockaddr *hostaddr, Key *host_key, int
 	case HOST_OK:
 		/* The host is known and the key matches. */
 		if (validated)
-			debug("Host '%.200s' is known and matches the "
-				"advertised %s host" "key.", host, type);
+			debug("Host '%.200s' is known and matches the %s host key.",
+			    host, type);
 		else
 			debug("Host '%.200s' is known and matches the %s host "
 				"key.", host, type);
@@ -714,7 +714,7 @@ check_host_key(char *host, struct sockaddr *hostaddr, Key *host_key, int
 				    "'%.128s' not in list of known hosts.",
 				    type, ip);
 			else if (!add_host_to_hostfile(user_hostfile, ip,
-			    host_key))
+			    host_key, options.hash_known_hosts))
 				log("Failed to add the %s host key for IP "
 				    "address '%.128s' to the list of known "
 				    "hosts (%.30s).", type, ip, user_hostfile);
@@ -756,17 +756,33 @@ check_host_key(char *host, struct sockaddr *hostaddr, Key *host_key, int
 			if (!confirm(msg))
 				goto fail;
 		}
-		if (options.check_host_ip && ip_status == HOST_NEW) {
-			snprintf(hostline, sizeof(hostline), "%s,%s", host, ip);
-			hostp = hostline;
-		} else
-			hostp = host;
-
 		/*
 		 * If not in strict mode, add the key automatically to the
 		 * local known_hosts file.
 		 */
-		if (!add_host_to_hostfile(user_hostfile, hostp, host_key))
+		if (options.check_host_ip && ip_status == HOST_NEW) {
+			snprintf(hostline, sizeof(hostline), "%s,%s",
+			    host, ip);
+			hostp = hostline;
+			if (options.hash_known_hosts) {
+				/* Add hash of host and IP separately */
+				r = add_host_to_hostfile(user_hostfile, host,
+				    host_key, options.hash_known_hosts) &&
+				    add_host_to_hostfile(user_hostfile, ip,
+				    host_key, options.hash_known_hosts);
+			} else {
+				/* Add unhashed "host,ip" */
+				r = add_host_to_hostfile(user_hostfile,
+				    hostline, host_key,
+				    options.hash_known_hosts);
+			}
+		} else {
+			r = add_host_to_hostfile(user_hostfile, host, host_key,
+			    options.hash_known_hosts);
+			hostp = host;
+		}
+
+		if (!r)
 			log("Failed to add the host to the list of known "
 			    "hosts (%.500s).", user_hostfile);
 		else

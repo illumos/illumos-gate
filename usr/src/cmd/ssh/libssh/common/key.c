@@ -148,7 +148,7 @@ key_free(Key *k)
 	xfree(k);
 }
 int
-key_equal(Key *a, Key *b)
+key_equal(const Key *a, const Key *b)
 {
 	if (a == NULL || b == NULL || a->type != b->type)
 		return 0;
@@ -492,7 +492,7 @@ key_read(Key *ret, char **cpp)
 }
 
 int
-key_write(Key *key, FILE *f)
+key_write(const Key *key, FILE *f)
 {
 	int n, success = 0;
 	u_int len, bits = 0;
@@ -542,7 +542,7 @@ key_type(Key *k)
 }
 
 char *
-key_ssh_name(Key *k)
+key_ssh_name(const Key *k)
 {
 	switch (k->type) {
 	case KEY_RSA:
@@ -746,7 +746,7 @@ key_from_blob(u_char *blob, int blen)
 }
 
 int
-key_to_blob(Key *key, u_char **blobp, u_int *lenp)
+key_to_blob(const Key *key, u_char **blobp, u_int *lenp)
 {
 	Buffer b;
 	int len;

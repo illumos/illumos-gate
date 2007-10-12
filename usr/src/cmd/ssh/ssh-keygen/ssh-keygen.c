@@ -1,8 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -15,11 +11,11 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 
-#include "includes.h"
-RCSID("$OpenBSD: ssh-keygen.c,v 1.101 2002/06/23 09:39:55 deraadt Exp $");
+/* $OpenBSD: ssh-keygen.c,v 1.160 2007/01/21 01:41:54 stevesk Exp $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "includes.h"
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
@@ -35,13 +31,16 @@ RCSID("$OpenBSD: ssh-keygen.c,v 1.101 2002/06/23 09:39:55 deraadt Exp $");
 #include "readpass.h"
 #include "misc.h"
 #include <langinfo.h>
+#include "match.h"
+#include "hostfile.h"
+#include "tildexpand.h"
 
 #ifdef SMARTCARD
 #include "scard.h"
 #endif
 
-/* Number of bits in the RSA/DSA key.  This value can be changed on the command line. */
-int bits = 1024;
+/* Number of bits in the RSA/DSA key.  This value can be set on the command line. */
+u_int32_t bits = 1024;
 
 /*
  * Flag indicating that we just want to change the passphrase.  This can be
@@ -56,6 +55,13 @@ int change_passphrase = 0;
 int change_comment = 0;
 
 int quiet = 0;
+
+/* Flag indicating that we want to hash a known_hosts file */
+int hash_hosts = 0;
+/* Flag indicating that we want to lookup a host in known_hosts file */
+int find_host = 0;
+/* Flag indicating that we want to delete a host from a known_hosts file */
+int delete_host = 0;
 
 /* Flag indicating that we just want to see the key fingerprint */
 int print_fingerprint = 0;
@@ -98,7 +104,7 @@ ask_filename(struct passwd *pw, const char *prompt)
 
 	if (key_type_name == NULL)
 		name = _PATH_SSH_CLIENT_ID_RSA;
-	else
+	else {
 		switch (key_type_from_name(key_type_name)) {
 		case KEY_RSA1:
 			name = _PATH_SSH_CLIENT_IDENTITY;
@@ -110,20 +116,19 @@ ask_filename(struct passwd *pw, const char *prompt)
 			name = _PATH_SSH_CLIENT_ID_RSA;
 			break;
 		default:
-			(void) fprintf(stderr, gettext("bad key type"));
+			fprintf(stderr, gettext("bad key type"));
 			exit(1);
 			break;
 		}
-
-	(void) snprintf(identity_file, sizeof(identity_file), "%s/%s", pw->pw_dir, name);
-	(void) fprintf(stderr, "%s (%s): ", gettext(prompt), identity_file);
-	(void) fflush(stderr);
+	}
+	snprintf(identity_file, sizeof(identity_file), "%s/%s", pw->pw_dir, name);
+	fprintf(stderr, "%s (%s): ", gettext(prompt), identity_file);
 	if (fgets(buf, sizeof(buf), stdin) == NULL)
 		exit(1);
 	if (strchr(buf, '\n'))
 		*strchr(buf, '\n') = 0;
 	if (strcmp(buf, "") != 0)
-		(void) strlcpy(identity_file, buf, sizeof(identity_file));
+		strlcpy(identity_file, buf, sizeof(identity_file));
 	have_identity = 1;
 }
 
@@ -141,7 +146,7 @@ load_identity(char *filename)
 			pass = read_passphrase(gettext("Enter passphrase: "),
 			    RP_ALLOW_STDIN);
 		prv = key_load_private(filename, pass, NULL);
-		(void) memset(pass, 0, strlen(pass));
+		memset(pass, 0, strlen(pass));
 		xfree(pass);
 	}
 	return prv;
@@ -168,21 +173,21 @@ do_convert_to_ssh2(struct passwd *pw)
 	}
 	if ((k = key_load_public(identity_file, NULL)) == NULL) {
 		if ((k = load_identity(identity_file)) == NULL) {
-			(void) fprintf(stderr, gettext("load failed\n"));
+			fprintf(stderr, gettext("load failed\n"));
 			exit(1);
 		}
 	}
 	if (key_to_blob(k, &blob, &len) <= 0) {
-		(void) fprintf(stderr, gettext("key_to_blob failed\n"));
+		fprintf(stderr, gettext("key_to_blob failed\n"));
 		exit(1);
 	}
-	(void) fprintf(stdout, "%s\n", SSH_COM_PUBLIC_BEGIN);
-	(void) fprintf(stdout, gettext(
+	fprintf(stdout, "%s\n", SSH_COM_PUBLIC_BEGIN);
+	fprintf(stdout, gettext(
 	    "Comment: \"%u-bit %s, converted from OpenSSH by %s@%s\"\n"),
 	    key_size(k), key_type(k),
 	    pw->pw_name, hostname);
 	dump_base64(stdout, blob, len);
-	(void) fprintf(stdout, "%s\n", SSH_COM_PUBLIC_END);
+	fprintf(stdout, "%s\n", SSH_COM_PUBLIC_END);
 	key_free(k);
 	xfree(blob);
 	exit(0);
@@ -191,13 +196,14 @@ do_convert_to_ssh2(struct passwd *pw)
 static void
 buffer_get_bignum_bits(Buffer *b, BIGNUM *value)
 {
-	int bits = buffer_get_int(b);
-	int bytes = (bits + 7) / 8;
+	u_int bignum_bits = buffer_get_int(b);
+	u_int bytes = (bignum_bits + 7) / 8;
 
 	if (buffer_len(b) < bytes)
 		fatal("buffer_get_bignum_bits: input buffer too small: "
 		    "need %d have %d", bytes, buffer_len(b));
-	(void) BN_bin2bn(buffer_ptr(b), bytes, value);
+	if (BN_bin2bn(buffer_ptr(b), bytes, value) == NULL)
+		fatal("buffer_get_bignum_bits: BN_bin2bn failed");
 	buffer_consume(b, bytes);
 }
 
@@ -227,7 +233,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	i2 = buffer_get_int(&b);
 	i3 = buffer_get_int(&b);
 	i4 = buffer_get_int(&b);
-	debug("ignore (%d %d %d %d)", i1,i2,i3,i4);
+	debug("ignore (%d %d %d %d)", i1, i2, i3, i4);
 	if (strcmp(cipher, "none") != 0) {
 		error("unsupported cipher %s", cipher);
 		xfree(cipher);
@@ -242,6 +248,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	} else if (strstr(type, "rsa")) {
 		ktype = KEY_RSA;
 	} else {
+		buffer_free(&b);
 		xfree(type);
 		return NULL;
 	}
@@ -287,10 +294,40 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	buffer_free(&b);
 
 	/* try the key */
-	(void) key_sign(key, &sig, &slen, data, sizeof(data));
+	key_sign(key, &sig, &slen, data, sizeof(data));
 	key_verify(key, sig, slen, data, sizeof(data));
 	xfree(sig);
 	return key;
+}
+
+static int
+get_line(FILE *fp, char *line, size_t len)
+{
+	int c;
+	size_t pos = 0;
+
+	line[0] = '\0';
+	while ((c = fgetc(fp)) != EOF) {
+		if (pos >= len - 1) {
+			fprintf(stderr, "input line too long.\n");
+			exit(1);
+		}
+		switch (c) {
+		case '\r':
+			c = fgetc(fp);
+			if (c != EOF && c != '\n' && ungetc(c, fp) == EOF) {
+				fprintf(stderr, "unget: %s\n", strerror(errno));
+				exit(1);
+			}
+			return pos;
+		case '\n':
+			return pos;
+		}
+		line[pos++] = c;
+		line[pos] = '\0';
+	}
+	/* We reached EOF */
+	return -1;
 }
 
 static void
@@ -299,7 +336,7 @@ do_convert_from_ssh2(struct passwd *pw)
 	Key *k;
 	int blen;
 	u_int len;
-	char line[1024], *p;
+	char line[1024];
 	u_char blob[8096];
 	char encoded[8096];
 	struct stat st;
@@ -318,12 +355,8 @@ do_convert_from_ssh2(struct passwd *pw)
 		exit(1);
 	}
 	encoded[0] = '\0';
-	while (fgets(line, sizeof(line), fp)) {
-		if (!(p = strchr(line, '\n'))) {
-			(void) fprintf(stderr, gettext("input line too long.\n"));
-			exit(1);
-		}
-		if (p > line && p[-1] == '\\')
+	while ((blen = get_line(fp, line, sizeof(line))) != -1) {
+		if (line[blen - 1] == '\\')
 			escaped++;
 		if (strncmp(line, "----", 4) == 0 ||
 		    strstr(line, ": ") != NULL) {
@@ -340,8 +373,7 @@ do_convert_from_ssh2(struct passwd *pw)
 			/* fprintf(stderr, "escaped: %s", line); */
 			continue;
 		}
-		*p = '\0';
-		(void) strlcat(encoded, line, sizeof(encoded));
+		strlcat(encoded, line, sizeof(encoded));
 	}
 	len = strlen(encoded);
 	if (((len % 4) == 3) &&
@@ -351,14 +383,14 @@ do_convert_from_ssh2(struct passwd *pw)
 		encoded[len-3] = '\0';
 	blen = uudecode(encoded, blob, sizeof(blob));
 	if (blen < 0) {
-		(void) fprintf(stderr, gettext("uudecode failed.\n"));
+		fprintf(stderr, gettext("uudecode failed.\n"));
 		exit(1);
 	}
 	k = private ?
 	    do_convert_private_ssh2_from_blob(blob, blen) :
 	    key_from_blob(blob, blen);
 	if (k == NULL) {
-		(void) fprintf(stderr, gettext("decode blob failed.\n"));
+		fprintf(stderr, gettext("decode blob failed.\n"));
 		exit(1);
 	}
 	ok = private ?
@@ -367,13 +399,13 @@ do_convert_from_ssh2(struct passwd *pw)
 		 PEM_write_RSAPrivateKey(stdout, k->rsa, NULL, NULL, 0, NULL, NULL)) :
 	    key_write(k, stdout);
 	if (!ok) {
-		(void) fprintf(stderr, gettext("key write failed"));
+		fprintf(stderr, gettext("key write failed"));
 		exit(1);
 	}
 	key_free(k);
 	if (!private)
-		(void) fprintf(stdout, "\n");
-	(void) fclose(fp);
+		fprintf(stdout, "\n");
+	fclose(fp);
 	exit(0);
 }
 
@@ -391,13 +423,13 @@ do_print_public(struct passwd *pw)
 	}
 	prv = load_identity(identity_file);
 	if (prv == NULL) {
-		(void) fprintf(stderr, gettext("load failed\n"));
+		fprintf(stderr, gettext("load failed\n"));
 		exit(1);
 	}
 	if (!key_write(prv, stdout))
-		(void) fprintf(stderr, gettext("key_write failed"));
+		fprintf(stderr, gettext("key_write failed"));
 	key_free(prv);
-	(void) fprintf(stdout, "\n");
+	fprintf(stdout, "\n");
 	exit(0);
 }
 
@@ -440,7 +472,7 @@ do_download(struct passwd *pw, const char *sc_reader_id)
 	for (i = 0; keys[i]; i++) {
 		key_write(keys[i], stdout);
 		key_free(keys[i]);
-		(void) fprintf(stdout, "\n");
+		fprintf(stdout, "\n");
 	}
 	xfree(keys);
 	exit(0);
@@ -470,14 +502,16 @@ do_fingerprint(struct passwd *pw)
 	public = key_load_public(identity_file, &comment);
 	if (public != NULL) {
 		fp = key_fingerprint(public, fptype, rep);
-		(void) printf("%u %s %s\n", key_size(public), fp, comment);
+		printf("%u %s %s\n", key_size(public), fp, comment);
 		key_free(public);
 		xfree(comment);
 		xfree(fp);
 		exit(0);
 	}
-	if (comment)
+	if (comment) {
 		xfree(comment);
+		comment = NULL;
+	}
 
 	f = fopen(identity_file, "r");
 	if (f != NULL) {
@@ -499,7 +533,7 @@ do_fingerprint(struct passwd *pw)
 			for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
 				;
 			if (!*cp || *cp == '\n' || *cp == '#')
-				continue ;
+				continue;
 			i = strtol(cp, &ep, 10);
 			if (i == 0 || ep == NULL || (*ep != ' ' && *ep != '\t')) {
 				int quoted = 0;
@@ -528,19 +562,214 @@ do_fingerprint(struct passwd *pw)
 			}
 			comment = *cp ? cp : comment;
 			fp = key_fingerprint(public, fptype, rep);
-			(void) printf("%u %s %s\n", key_size(public), fp,
+			printf("%u %s %s\n", key_size(public), fp,
 			    comment ? comment : gettext("no comment"));
 			xfree(fp);
 			key_free(public);
 			invalid = 0;
 		}
-		(void) fclose(f);
+		fclose(f);
 	}
 	if (invalid) {
-		(void) printf(gettext("%s is not a public key file.\n"),
+		printf(gettext("%s is not a public key file.\n"),
 		       identity_file);
 		exit(1);
 	}
+	exit(0);
+}
+
+static void
+print_host(FILE *f, const char *name, Key *public, int hash)
+{
+	if (hash && (name = host_hash(name, NULL, 0)) == NULL)
+		fatal("hash_host failed");
+	fprintf(f, "%s ", name);
+	if (!key_write(public, f))
+		fatal("key_write failed");
+	fprintf(f, "\n");
+}
+
+static void
+do_known_hosts(struct passwd *pw, const char *name)
+{
+	FILE *in, *out = stdout;
+	Key *public;
+	char *cp, *cp2, *kp, *kp2;
+	char line[16*1024], tmp[MAXPATHLEN], old[MAXPATHLEN];
+	int c, i, skip = 0, inplace = 0, num = 0, invalid = 0, has_unhashed = 0;
+
+	if (!have_identity) {
+		cp = tilde_expand_filename(_PATH_SSH_USER_HOSTFILE, pw->pw_uid);
+		if (strlcpy(identity_file, cp, sizeof(identity_file)) >=
+		    sizeof(identity_file))
+			fatal("Specified known hosts path too long");
+		xfree(cp);
+		have_identity = 1;
+	}
+	if ((in = fopen(identity_file, "r")) == NULL)
+		fatal("fopen: %s", strerror(errno));
+
+	/*
+	 * Find hosts goes to stdout, hash and deletions happen in-place
+	 * A corner case is ssh-keygen -HF foo, which should go to stdout
+	 */
+	if (!find_host && (hash_hosts || delete_host)) {
+		if (strlcpy(tmp, identity_file, sizeof(tmp)) >= sizeof(tmp) ||
+		    strlcat(tmp, ".XXXXXXXXXX", sizeof(tmp)) >= sizeof(tmp) ||
+		    strlcpy(old, identity_file, sizeof(old)) >= sizeof(old) ||
+		    strlcat(old, ".old", sizeof(old)) >= sizeof(old))
+			fatal("known_hosts path too long");
+		umask(077);
+		if ((c = mkstemp(tmp)) == -1)
+			fatal("mkstemp: %s", strerror(errno));
+		if ((out = fdopen(c, "w")) == NULL) {
+			c = errno;
+			unlink(tmp);
+			fatal("fdopen: %s", strerror(c));
+		}
+		inplace = 1;
+	}
+
+	while (fgets(line, sizeof(line), in)) {
+		num++;
+		i = strlen(line) - 1;
+		if (line[i] != '\n') {
+			error("line %d too long: %.40s...", num, line);
+			skip = 1;
+			invalid = 1;
+			continue;
+		}
+		if (skip) {
+			skip = 0;
+			continue;
+		}
+		line[i] = '\0';
+
+		/* Skip leading whitespace, empty and comment lines. */
+		for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
+			;
+		if (!*cp || *cp == '\n' || *cp == '#') {
+			if (inplace)
+				fprintf(out, "%s\n", cp);
+			continue;
+		}
+		/* Find the end of the host name portion. */
+		for (kp = cp; *kp && *kp != ' ' && *kp != '\t'; kp++)
+			;
+		if (*kp == '\0' || *(kp + 1) == '\0') {
+			error("line %d missing key: %.40s...",
+			    num, line);
+			invalid = 1;
+			continue;
+		}
+		*kp++ = '\0';
+		kp2 = kp;
+
+		public = key_new(KEY_RSA1);
+		if (key_read(public, &kp) != 1) {
+			kp = kp2;
+			key_free(public);
+			public = key_new(KEY_UNSPEC);
+			if (key_read(public, &kp) != 1) {
+				error("line %d invalid key: %.40s...",
+				    num, line);
+				key_free(public);
+				invalid = 1;
+				continue;
+			}
+		}
+
+		if (*cp == HASH_DELIM) {
+			if (find_host || delete_host) {
+				cp2 = host_hash(name, cp, strlen(cp));
+				if (cp2 == NULL) {
+					error("line %d: invalid hashed "
+					    "name: %.64s...", num, line);
+					invalid = 1;
+					continue;
+				}
+				c = (strcmp(cp2, cp) == 0);
+				if (find_host && c) {
+					printf(gettext("# Host %s found: "
+					    "line %d type %s\n"), name,
+					    num, key_type(public));
+					print_host(out, cp, public, 0);
+				}
+				if (delete_host && !c)
+					print_host(out, cp, public, 0);
+			} else if (hash_hosts)
+				print_host(out, cp, public, 0);
+		} else {
+			if (find_host || delete_host) {
+				c = (match_hostname(name, cp,
+				    strlen(cp)) == 1);
+				if (find_host && c) {
+					printf(gettext("# Host %s found: "
+					    "line %d type %s\n"), name,
+					    num, key_type(public));
+					print_host(out, name, public, hash_hosts);
+				}
+				if (delete_host && !c)
+					print_host(out, cp, public, 0);
+			} else if (hash_hosts) {
+				for (cp2 = strsep(&cp, ",");
+				    cp2 != NULL && *cp2 != '\0';
+				    cp2 = strsep(&cp, ",")) {
+					if (strcspn(cp2, "*?!") != strlen(cp2))
+						fprintf(stderr, gettext("Warning: "
+						   "ignoring host name with "
+						   "metacharacters: %.64s\n"),
+						    cp2);
+					else
+						print_host(out, cp2, public, 1);
+				}
+				has_unhashed = 1;
+			}
+		}
+		key_free(public);
+	}
+	fclose(in);
+
+	if (invalid) {
+		fprintf(stderr, gettext("%s is not a valid known_host file.\n"),
+		    identity_file);
+		if (inplace) {
+			fprintf(stderr, gettext("Not replacing existing known_hosts "
+			   "file because of errors\n"));
+			fclose(out);
+			unlink(tmp);
+		}
+		exit(1);
+	}
+
+	if (inplace) {
+		fclose(out);
+
+		/* Backup existing file */
+		if (unlink(old) == -1 && errno != ENOENT)
+			fatal("unlink %.100s: %s", old, strerror(errno));
+		if (link(identity_file, old) == -1)
+			fatal("link %.100s to %.100s: %s", identity_file, old,
+			    strerror(errno));
+		/* Move new one into place */
+		if (rename(tmp, identity_file) == -1) {
+			error("rename\"%s\" to \"%s\": %s", tmp, identity_file,
+			    strerror(errno));
+			unlink(tmp);
+			unlink(old);
+			exit(1);
+		}
+
+		fprintf(stderr, gettext("%s updated.\n"), identity_file);
+		fprintf(stderr, gettext("Original contents retained as %s\n"), old);
+		if (has_unhashed) {
+			fprintf(stderr, gettext("WARNING: %s contains unhashed "
+			    "entries\n"), old);
+			fprintf(stderr, gettext("Delete this file to ensure privacy "
+			    "of hostnames\n"));
+		}
+	}
+
 	exit(0);
 }
 
@@ -573,14 +802,14 @@ do_change_passphrase(struct passwd *pw)
 			    RP_ALLOW_STDIN);
 		private = key_load_private(identity_file, old_passphrase,
 		    &comment);
-		(void) memset(old_passphrase, 0, strlen(old_passphrase));
+		memset(old_passphrase, 0, strlen(old_passphrase));
 		xfree(old_passphrase);
 		if (private == NULL) {
-			(void) printf(gettext("Bad passphrase.\n"));
+			printf(gettext("Bad passphrase.\n"));
 			exit(1);
 		}
 	}
-	(void) printf(gettext("Key has comment '%s'\n"), comment);
+	printf(gettext("Key has comment '%s'\n"), comment);
 
 	/* Ask the new passphrase (twice). */
 	if (identity_new_passphrase) {
@@ -595,36 +824,36 @@ do_change_passphrase(struct passwd *pw)
 
 		/* Verify that they are the same. */
 		if (strcmp(passphrase1, passphrase2) != 0) {
-			(void) memset(passphrase1, 0, strlen(passphrase1));
-			(void) memset(passphrase2, 0, strlen(passphrase2));
+			memset(passphrase1, 0, strlen(passphrase1));
+			memset(passphrase2, 0, strlen(passphrase2));
 			xfree(passphrase1);
 			xfree(passphrase2);
-			(void) printf(gettext("Pass phrases do not match.  Try "
-				       "again.\n"));
+			printf(gettext("Pass phrases do not match.  Try "
+			    "again.\n"));
 			exit(1);
 		}
 		/* Destroy the other copy. */
-		(void) memset(passphrase2, 0, strlen(passphrase2));
+		memset(passphrase2, 0, strlen(passphrase2));
 		xfree(passphrase2);
 	}
 
 	/* Save the file using the new passphrase. */
 	if (!key_save_private(private, identity_file, passphrase1, comment)) {
-		(void) printf(gettext("Saving the key failed: %s.\n"), identity_file);
-		(void) memset(passphrase1, 0, strlen(passphrase1));
+		printf(gettext("Saving the key failed: %s.\n"), identity_file);
+		memset(passphrase1, 0, strlen(passphrase1));
 		xfree(passphrase1);
 		key_free(private);
 		xfree(comment);
 		exit(1);
 	}
 	/* Destroy the passphrase and the copy of the key in memory. */
-	(void) memset(passphrase1, 0, strlen(passphrase1));
+	memset(passphrase1, 0, strlen(passphrase1));
 	xfree(passphrase1);
 	key_free(private);		 /* Destroys contents */
 	xfree(comment);
 
-	(void) printf(gettext("Your identification has been saved with the new "
-		       "passphrase.\n"));
+	printf(gettext("Your identification has been saved with the new "
+	    "passphrase.\n"));
 	exit(0);
 }
 
@@ -656,33 +885,33 @@ do_change_comment(struct passwd *pw)
 		else
 			passphrase =
 			    read_passphrase(gettext("Enter passphrase: "),
-				    RP_ALLOW_STDIN);
+			    RP_ALLOW_STDIN);
 		/* Try to load using the passphrase. */
 		private = key_load_private(identity_file, passphrase, &comment);
 		if (private == NULL) {
-			(void) memset(passphrase, 0, strlen(passphrase));
+			memset(passphrase, 0, strlen(passphrase));
 			xfree(passphrase);
-			(void) printf(gettext("Bad passphrase.\n"));
+			printf(gettext("Bad passphrase.\n"));
 			exit(1);
 		}
 	} else {
 		passphrase = xstrdup("");
 	}
 	if (private->type != KEY_RSA1) {
-		(void) fprintf(stderr, gettext("Comments are only supported for "
-				    "RSA1 keys.\n"));
+		fprintf(stderr, gettext("Comments are only supported for "
+		    "RSA1 keys.\n"));
 		key_free(private);
 		exit(1);
 	}
-	(void) printf(gettext("Key now has comment '%s'\n"), comment);
+	printf(gettext("Key now has comment '%s'\n"), comment);
 
 	if (identity_comment) {
-		(void) strlcpy(new_comment, identity_comment, sizeof(new_comment));
+		strlcpy(new_comment, identity_comment, sizeof(new_comment));
 	} else {
-		(void) printf(gettext("Enter new comment: "));
-		(void) fflush(stdout);
+		printf(gettext("Enter new comment: "));
+		fflush(stdout);
 		if (!fgets(new_comment, sizeof(new_comment), stdin)) {
-			(void) memset(passphrase, 0, strlen(passphrase));
+			memset(passphrase, 0, strlen(passphrase));
 			key_free(private);
 			exit(1);
 		}
@@ -692,66 +921,71 @@ do_change_comment(struct passwd *pw)
 
 	/* Save the file using the new passphrase. */
 	if (!key_save_private(private, identity_file, passphrase, new_comment)) {
-		(void) printf(gettext("Saving the key failed: %s.\n"), identity_file);
-		(void) memset(passphrase, 0, strlen(passphrase));
+		printf(gettext("Saving the key failed: %s.\n"), identity_file);
+		memset(passphrase, 0, strlen(passphrase));
 		xfree(passphrase);
 		key_free(private);
 		xfree(comment);
 		exit(1);
 	}
-	(void) memset(passphrase, 0, strlen(passphrase));
+	memset(passphrase, 0, strlen(passphrase));
 	xfree(passphrase);
 	public = key_from_private(private);
 	key_free(private);
 
-	(void) strlcat(identity_file, ".pub", sizeof(identity_file));
+	strlcat(identity_file, ".pub", sizeof(identity_file));
 	fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1) {
-		(void) printf(gettext("Could not save your public key in %s\n"),
-		       identity_file);
+		printf(gettext("Could not save your public key in %s\n"),
+		    identity_file);
 		exit(1);
 	}
 	f = fdopen(fd, "w");
 	if (f == NULL) {
-		(void) printf(gettext("fdopen %s failed"), identity_file);
+		printf(gettext("fdopen %s failed"), identity_file);
 		exit(1);
 	}
 	if (!key_write(public, f))
-		(void) fprintf(stderr, gettext("write key failed"));
+		fprintf(stderr, gettext("write key failed"));
 	key_free(public);
-	(void) fprintf(f, " %s\n", new_comment);
-	(void) fclose(f);
+	fprintf(f, " %s\n", new_comment);
+	fclose(f);
 
 	xfree(comment);
 
-	(void) printf(gettext("The comment in your key file has been changed.\n"));
+	printf(gettext("The comment in your key file has been changed.\n"));
 	exit(0);
 }
 
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext(
+	fprintf(stderr, gettext(
 	"Usage: %s [options]\n"
 	"Options:\n"
 	"  -b bits     Number of bits in the key to create.\n"
-	"  -c          Change comment in private and public key files.\n"
-	"  -e          Convert OpenSSH to IETF SECSH key file.\n"
-	"  -f filename Filename of the key file.\n"
-	"  -i          Convert IETF SECSH to OpenSSH key file.\n"
-	"  -l          Show fingerprint of key file.\n"
-	"  -p          Change passphrase of private key file.\n"
-	"  -q          Quiet.\n"
-	"  -y          Read private key file and print public key.\n"
-	"  -t type     Specify type of key to create.\n"
 	"  -B          Show bubblebabble digest of key file.\n"
+	"  -c          Change comment in private and public key files.\n"
 	"  -C comment  Provide new comment.\n"
-	"  -N phrase   Provide new passphrase.\n"
-	"  -P phrase   Provide old passphrase.\n"
 #ifdef SMARTCARD
 	"  -D reader   Download public key from smartcard.\n"
+#endif /* SMARTCARD */
+	"  -e          Convert OpenSSH to IETF SECSH key file.\n"
+	"  -f filename Filename of the key file.\n"
+	"  -F hostname Find hostname in known hosts file.\n"
+	"  -H          Hash names in known_hosts file.\n"
+	"  -i          Convert IETF SECSH to OpenSSH key file.\n"
+	"  -l          Show fingerprint of key file.\n"
+	"  -N phrase   Provide new passphrase.\n"
+	"  -p          Change passphrase of private key file.\n"
+	"  -P phrase   Provide old passphrase.\n"
+	"  -q          Quiet.\n"
+	"  -R hostname Remove host from known_hosts file.\n"
+	"  -t type     Specify type of key to create.\n"
+#ifdef SMARTCARD
 	"  -U reader   Upload private key to smartcard.\n"
 #endif /* SMARTCARD */
+	"  -y          Read private key file and print public key.\n"
 	), __progname);
 
 	exit(1);
@@ -761,10 +995,11 @@ usage(void)
  * Main program for key management.
  */
 int
-main(int ac, char **av)
+main(int argc, char **argv)
 {
 	char dotsshdir[MAXPATHLEN], comment[1024], *passphrase1, *passphrase2;
 	char *reader_id = NULL;
+	char *rr_hostname = NULL;
 	Key *private, *public;
 	struct passwd *pw;
 	struct stat st;
@@ -777,9 +1012,12 @@ main(int ac, char **av)
 	extern int optind;
 	extern char *optarg;
 
-	__progname = get_progname(av[0]);
+	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
+	sanitise_stdfd();
 
-	(void) g11n_setlocale(LC_ALL, "");
+	__progname = get_progname(argv[0]);
+
+	g11n_setlocale(LC_ALL, "");
 
 	SSLeay_add_all_algorithms();
 	init_rng();
@@ -788,7 +1026,7 @@ main(int ac, char **av)
 	/* we need this for the home * directory.  */
 	pw = getpwuid(getuid());
 	if (!pw) {
-		(void) printf(gettext("You don't exist, go away!\n"));
+		printf(gettext("You don't exist, go away!\n"));
 		exit(1);
 	}
 	if (gethostname(hostname, sizeof(hostname)) < 0) {
@@ -797,18 +1035,29 @@ main(int ac, char **av)
 	}
 
 #ifdef SMARTCARD
-#define GETOPT_ARGS "deiqpclBRxXyb:f:t:U:D:P:N:C:"
+#define GETOPT_ARGS "deiqpclBHRxXyb:f:F:t:U:D:P:N:C:"
 #else
-#define GETOPT_ARGS "deiqpclBRxXyb:f:t:P:N:C:"
+#define GETOPT_ARGS "BcdeHilpqxXyb:C:f:F:N:P:R:t:"
 #endif /* SMARTCARD */
-	while ((opt = getopt(ac, av, GETOPT_ARGS)) != -1) {
+	while ((opt = getopt(argc, argv, GETOPT_ARGS)) != -1) {
 		switch (opt) {
 		case 'b':
 			bits = atoi(optarg);
 			if (bits < 512 || bits > 32768) {
-				(void) printf(gettext("Bits has bad value.\n"));
+				printf(gettext("Bits has bad value.\n"));
 				exit(1);
 			}
+			break;
+		case 'F':
+			find_host = 1;
+			rr_hostname = optarg;
+			break;
+		case 'H':
+			hash_hosts = 1;
+			break;
+		case 'R':
+			delete_host = 1;
+			rr_hostname = optarg;
 			break;
 		case 'l':
 			print_fingerprint = 1;
@@ -823,7 +1072,7 @@ main(int ac, char **av)
 			change_comment = 1;
 			break;
 		case 'f':
-			(void) strlcpy(identity_file, optarg, sizeof(identity_file));
+			strlcpy(identity_file, optarg, sizeof(identity_file));
 			have_identity = 1;
 			break;
 		case 'P':
@@ -837,10 +1086,6 @@ main(int ac, char **av)
 			break;
 		case 'q':
 			quiet = 1;
-			break;
-		case 'R':
-			/* unused */
-			exit(0);
 			break;
 		case 'e':
 		case 'x':
@@ -873,14 +1118,16 @@ main(int ac, char **av)
 			usage();
 		}
 	}
-	if (optind < ac) {
-		(void) printf(gettext("Too many arguments.\n"));
+	if (optind < argc) {
+		printf(gettext("Too many arguments.\n"));
 		usage();
 	}
 	if (change_passphrase && change_comment) {
-		(void) printf(gettext("Can only have one of -p and -c.\n"));
+		printf(gettext("Can only have one of -p and -c.\n"));
 		usage();
 	}
+	if (delete_host || hash_hosts || find_host)
+		do_known_hosts(pw, rr_hostname);
 	if (print_fingerprint || print_bubblebabble)
 		do_fingerprint(pw);
 	if (change_passphrase)
@@ -907,21 +1154,21 @@ main(int ac, char **av)
 	arc4random_stir();
 
 	if (key_type_name == NULL) {
-		(void) printf(gettext("You must specify a key type (-t).\n"));
+		printf(gettext("You must specify a key type (-t).\n"));
 		usage();
 	}
 	type = key_type_from_name(key_type_name);
 	if (type == KEY_UNSPEC) {
-		(void) fprintf(stderr, gettext("unknown key type %s\n"),
-			key_type_name);
+		fprintf(stderr, gettext("unknown key type %s\n"),
+		    key_type_name);
 		exit(1);
 	}
 	if (!quiet)
-		(void) printf(gettext("Generating public/private %s key pair.\n"),
-			key_type_name);
+		printf(gettext("Generating public/private %s key pair.\n"),
+		    key_type_name);
 	private = key_generate(type, bits);
 	if (private == NULL) {
-		(void) fprintf(stderr, gettext("key_generate failed"));
+		fprintf(stderr, gettext("key_generate failed"));
 		exit(1);
 	}
 	public  = key_from_private(private);
@@ -929,22 +1176,22 @@ main(int ac, char **av)
 	if (!have_identity)
 		ask_filename(pw, gettext("Enter file in which to save the key"));
 
-	/* Create ~/.ssh directory if it doesn\'t already exist. */
-	(void) snprintf(dotsshdir, sizeof dotsshdir, "%s/%s", pw->pw_dir, _PATH_SSH_USER_DIR);
+	/* Create ~/.ssh directory if it doesn't already exist. */
+	snprintf(dotsshdir, sizeof dotsshdir, "%s/%s", pw->pw_dir, _PATH_SSH_USER_DIR);
 	if (strstr(identity_file, dotsshdir) != NULL &&
 	    stat(dotsshdir, &st) < 0) {
 		if (mkdir(dotsshdir, 0700) < 0)
 			error("Could not create directory '%s'.", dotsshdir);
 		else if (!quiet)
-			(void) printf(gettext("Created directory '%s'.\n"), dotsshdir);
+			printf(gettext("Created directory '%s'.\n"), dotsshdir);
 	}
 	/* If the file already exists, ask the user to confirm. */
 	if (stat(identity_file, &st) >= 0) {
 		char yesno[128];
-		(void) printf(gettext("%s already exists.\n"), identity_file);
-		(void) printf(gettext("Overwrite (%s/%s)? "),
-				      nl_langinfo(YESSTR), nl_langinfo(NOSTR));
-		(void) fflush(stdout);
+		printf(gettext("%s already exists.\n"), identity_file);
+		printf(gettext("Overwrite (%s/%s)? "),
+		    nl_langinfo(YESSTR), nl_langinfo(NOSTR));
+		fflush(stdout);
 		if (fgets(yesno, sizeof(yesno), stdin) == NULL)
 			exit(1);
 		if (strcasecmp(chop(yesno), nl_langinfo(YESSTR)) != 0)
@@ -967,35 +1214,35 @@ passphrase_again:
 			 * The passphrases do not match.  Clear them and
 			 * retry.
 			 */
-			(void) memset(passphrase1, 0, strlen(passphrase1));
-			(void) memset(passphrase2, 0, strlen(passphrase2));
+			memset(passphrase1, 0, strlen(passphrase1));
+			memset(passphrase2, 0, strlen(passphrase2));
 			xfree(passphrase1);
 			xfree(passphrase2);
-			(void) printf(gettext("Passphrases do not match.  Try "
-				    "again.\n"));
+			printf(gettext("Passphrases do not match.  Try "
+			    "again.\n"));
 			goto passphrase_again;
 		}
 		/* Clear the other copy of the passphrase. */
-		(void) memset(passphrase2, 0, strlen(passphrase2));
+		memset(passphrase2, 0, strlen(passphrase2));
 		xfree(passphrase2);
 	}
 
 	if (identity_comment) {
-		(void) strlcpy(comment, identity_comment, sizeof(comment));
+		strlcpy(comment, identity_comment, sizeof(comment));
 	} else {
 		/* Create default commend field for the passphrase. */
-		(void) snprintf(comment, sizeof comment, "%s@%s", pw->pw_name, hostname);
+		snprintf(comment, sizeof comment, "%s@%s", pw->pw_name, hostname);
 	}
 
 	/* Save the key with the given passphrase and comment. */
 	if (!key_save_private(private, identity_file, passphrase1, comment)) {
-		(void) printf(gettext("Saving the key failed: %s.\n"), identity_file);
-		(void) memset(passphrase1, 0, strlen(passphrase1));
+		printf(gettext("Saving the key failed: %s.\n"), identity_file);
+		memset(passphrase1, 0, strlen(passphrase1));
 		xfree(passphrase1);
 		exit(1);
 	}
 	/* Clear the passphrase. */
-	(void) memset(passphrase1, 0, strlen(passphrase1));
+	memset(passphrase1, 0, strlen(passphrase1));
 	xfree(passphrase1);
 
 	/* Clear the private key and the random number generator. */
@@ -1003,32 +1250,32 @@ passphrase_again:
 	arc4random_stir();
 
 	if (!quiet)
-		(void) printf(gettext("Your identification has been saved in %s.\n"),
-			identity_file);
+		printf(gettext("Your identification has been saved in %s.\n"),
+		    identity_file);
 
-	(void) strlcat(identity_file, ".pub", sizeof(identity_file));
+	strlcat(identity_file, ".pub", sizeof(identity_file));
 	fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1) {
-		(void) printf(gettext("Could not save your public key in %s\n"),
-			identity_file);
+		printf(gettext("Could not save your public key in %s\n"),
+		    identity_file);
 		exit(1);
 	}
 	f = fdopen(fd, "w");
 	if (f == NULL) {
-		(void) printf(gettext("fdopen %s failed"), identity_file);
+		printf(gettext("fdopen %s failed"), identity_file);
 		exit(1);
 	}
 	if (!key_write(public, f))
-		(void) fprintf(stderr, gettext("write key failed"));
-	(void) fprintf(f, " %s\n", comment);
-	(void) fclose(f);
+		fprintf(stderr, gettext("write key failed"));
+	fprintf(f, " %s\n", comment);
+	fclose(f);
 
 	if (!quiet) {
 		char *fp = key_fingerprint(public, SSH_FP_MD5, SSH_FP_HEX);
-		(void) printf(gettext("Your public key has been saved in %s.\n"),
+		printf(gettext("Your public key has been saved in %s.\n"),
 		    identity_file);
-		(void) printf(gettext("The key fingerprint is:\n"));
-		(void) printf("%s %s\n", fp, comment);
+		printf(gettext("The key fingerprint is:\n"));
+		printf("%s %s\n", fp, comment);
 		xfree(fp);
 	}
 
