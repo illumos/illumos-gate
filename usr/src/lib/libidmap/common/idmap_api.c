@@ -1414,11 +1414,11 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		request.id1.idmap_id_u.sid.rid = *rid;
 	} else if (winname) {
 		retcode = idmap_strdupnull(&request.id1name, winname);
-		if (retcode != SUCCESS)
+		if (retcode != IDMAP_SUCCESS)
 			goto out;
 
 		retcode = idmap_strdupnull(&request.id1domain, windomain);
-		if (retcode != SUCCESS)
+		if (retcode != IDMAP_SUCCESS)
 			goto out;
 
 		request.id1.idmap_id_u.sid.prefix = NULL;
@@ -1740,10 +1740,15 @@ idmap_stat4prot(idmap_stat status) {
 
 
 /*
- * duplicate a string, possibly null
+ * This is a convenience routine which duplicates a string after
+ * checking for NULL pointers. This function will return success if
+ * either the 'to' OR 'from' pointers are NULL.
  */
 static idmap_stat
 idmap_strdupnull(char **to, const char *from) {
+	if (to == NULL)
+		return (IDMAP_SUCCESS);
+
 	if (from == NULL || *from == '\0') {
 		*to = NULL;
 		return (IDMAP_SUCCESS);
