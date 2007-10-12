@@ -419,7 +419,7 @@ exec_method(const restarter_inst_t *inst, int type, const char *method,
 		(void) utmpx_mark_init(getpid(), inst->ri_utmpx_prefix);
 
 	setlog(inst->ri_logstem);
-	log_instance(inst, B_FALSE, "Executing %s method (\"%s\")",
+	log_instance(inst, B_FALSE, "Executing %s method (\"%s\").",
 	    method_names[type], method);
 
 	if (need_session)
@@ -697,7 +697,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "events", O_RDONLY)) < 0) {
 			result = EFAULT;
 			log_instance(inst, B_TRUE, "Could not open service "
-			    "contract %ld.  Stop method not run.\n",
+			    "contract %ld.  Stop method not run.",
 			    inst->ri_i.i_primary_ctid);
 			goto out;
 		}
@@ -707,7 +707,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		log_framework(LOG_DEBUG, "%s: null method succeeds\n",
 		    inst->ri_i.i_fmri);
 
-		log_instance(inst, B_TRUE, "Executing %s method (null)", mname);
+		log_instance(inst, B_TRUE, "Executing %s method (null).",
+		    mname);
 
 		if (type == METHOD_START)
 			write_status(inst, mname, 0);
@@ -720,6 +721,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		if (inst->ri_i.i_primary_ctid == 0) {
 			log_error(LOG_ERR, "%s: :kill with no contract\n",
 			    inst->ri_i.i_fmri);
+			log_instance(inst, B_TRUE, "Invalid use of \":kill\" "
+			    "as stop method for transient service.");
 			result = EINVAL;
 			goto out;
 		}
@@ -728,7 +731,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "%s: :killing contract with signal %d\n",
 		    inst->ri_i.i_fmri, sig);
 
-		log_instance(inst, B_TRUE, "Executing %s method (:kill)",
+		log_instance(inst, B_TRUE, "Executing %s method (:kill).",
 		    mname);
 
 		if (contract_kill(inst->ri_i.i_primary_ctid, sig,
@@ -775,7 +778,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		method_record_start(inst);
 		if (method_rate_critical(inst)) {
 			log_instance(inst, B_TRUE, "Restarting too quickly, "
-			    "changing state to maintenance");
+			    "changing state to maintenance.");
 			result = ELOOP;
 			restarter_free_method_context(mcp);
 			goto out;
@@ -906,14 +909,14 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 				    "failed due to signal %s.\n",
 				    inst->ri_i.i_fmri, method, buf);
 				log_instance(inst, B_TRUE, "Method \"%s\" "
-				    "failed due to signal %s", mname, buf);
+				    "failed due to signal %s.", mname, buf);
 			} else {
 				log_error(LOG_WARNING, "%s: Method \"%s\" "
 				    "failed with exit status %d.\n",
 				    inst->ri_i.i_fmri, method,
 				    WEXITSTATUS(ret_status));
 				log_instance(inst, B_TRUE, "Method \"%s\" "
-				    "failed with exit status %d", mname,
+				    "failed with exit status %d.", mname,
 				    WEXITSTATUS(ret_status));
 			}
 			result = EAGAIN;
@@ -928,7 +931,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 
 		log_instance(inst, B_TRUE, "Method \"%s\" exited with status "
-		    "%d", mname, *exit_code);
+		    "%d.", mname, *exit_code);
 
 		if (*exit_code != 0)
 			goto contract_out;

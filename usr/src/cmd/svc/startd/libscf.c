@@ -2891,7 +2891,7 @@ libscf_get_method(scf_handle_t *h, int type, restarter_inst_t *inst,
 	error = expand_method_tokens(method, scf_inst, snap, type, &ret);
 	if (error != 0) {
 		log_instance(inst, B_TRUE, "Could not expand method tokens "
-		    "in \"%s\": %s", method, ret);
+		    "in \"%s\": %s.", method, ret);
 		error = LIBSCF_PROPERTY_ERROR;
 		goto get_method_cleanup;
 	}

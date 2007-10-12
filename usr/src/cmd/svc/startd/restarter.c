@@ -1910,7 +1910,7 @@ contract_action(scf_handle_t *h, restarter_inst_t *inst, ctid_t id,
 		log_framework(LOG_NOTICE,
 		    "%s: contract %ld received unexpected critical event "
 		    "(%d)\n", fmri, id, type);
-		    return;
+		return;
 	}
 
 	assert(instance_in_transition(inst) == 0);
@@ -2143,7 +2143,7 @@ is_timeout_ovr(restarter_inst_t *inst)
 	for (i = 0; timeout_ovr_svcs[i] != NULL; ++i) {
 		if (strcmp(inst->ri_i.i_fmri, timeout_ovr_svcs[i]) == 0) {
 			log_instance(inst, B_TRUE, "Timeout override by "
-			    "svc.startd.  Using infinite timeout");
+			    "svc.startd.  Using infinite timeout.");
 			return (1);
 		}
 	}
@@ -2275,7 +2275,7 @@ timeout_now()
 		log_framework(LOG_WARNING, "%s: Method or service exit timed "
 		    "out.  Killing contract %ld.\n", e->te_fmri, e->te_ctid);
 		log_instance_fmri(e->te_fmri, e->te_logstem, B_TRUE,
-		    "Method or service exit timed out.  Killing contract %ld",
+		    "Method or service exit timed out.  Killing contract %ld.",
 		    e->te_ctid);
 		e->te_fired = 1;
 		(void) contract_kill(e->te_ctid, SIGKILL, e->te_fmri);
@@ -2346,7 +2346,7 @@ restarter_init()
 {
 	restarter_instance_pool = startd_list_pool_create("restarter_instances",
 	    sizeof (restarter_inst_t), offsetof(restarter_inst_t,
-		ri_link), restarter_instance_compare, UU_LIST_POOL_DEBUG);
+	    ri_link), restarter_instance_compare, UU_LIST_POOL_DEBUG);
 	(void) memset(&instance_list, 0, sizeof (instance_list));
 
 	(void) pthread_mutex_init(&instance_list.ril_lock, &mutex_attrs);
