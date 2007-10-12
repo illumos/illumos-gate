@@ -622,9 +622,15 @@ again:
 	}
 
 	/*
-	 * finish initializing the vnode
+	 * Finish initializing the vnode, special handling for shadow inodes
+	 * because IFTOVT() will produce a v_type of VNON which is not what we
+	 * want, set v_type to VREG explicitly in that case.
 	 */
-	vp->v_type = IFTOVT((mode_t)ip->i_mode);
+	if (ftype == IFSHAD) {
+		vp->v_type = VREG;
+	} else {
+		vp->v_type = IFTOVT((mode_t)ip->i_mode);
+	}
 
 	ufs_reset_vnode(vp);
 

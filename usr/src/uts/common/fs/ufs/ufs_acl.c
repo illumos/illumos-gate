@@ -231,6 +231,7 @@ loop:
 	sip->i_seq++;
 	sip->i_mode = (o_mode_t)IFSHAD;
 	ITOV(sip)->v_type = VREG;
+	ufs_reset_vnode(ITOV(sip));
 	sip->i_nlink = 1;
 	sip->i_uid = crgetuid(cr);
 	sip->i_suid = (ulong_t)sip->i_uid > (ulong_t)USHRT_MAX ?
