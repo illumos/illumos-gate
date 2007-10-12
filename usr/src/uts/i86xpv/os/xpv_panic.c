@@ -882,6 +882,7 @@ init_xen_module()
 	}
 	kmem_free(names, namesize);
 	names = NULL;
+	shp = NULL;
 	mcp->mod_text = mp->text;
 	mcp->mod_text_size = mp->text_size;
 
@@ -921,7 +922,7 @@ init_xen_module()
 	 * Read in the CTF section
 	 */
 	if ((ctf_shp != NULL) && ((moddebug & MODDEBUG_NOCTF) == 0)) {
-		mp->ctfdata = kmem_zalloc(shp->sh_size, KM_SLEEP);
+		mp->ctfdata = kmem_zalloc(ctf_shp->sh_size, KM_SLEEP);
 		mp->ctfsize = ctf_shp->sh_size;
 		if (kobj_read_file(file, mp->ctfdata, mp->ctfsize,
 		    ctf_shp->sh_offset) < 0)
