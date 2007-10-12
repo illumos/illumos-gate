@@ -24,24 +24,11 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-ICMP6_MAJ
 cb_inet_devops
 fsw
-icmp_g_t_info_ack
-icmp_max_optsize
-icmp_opt_arr
-icmp_opt_obj
-icmp_param_arr
-icmp_valid_levels_arr
-icmpinfo
 inet_dev_info
 inet_devops
-info
 modldrv
 modlinkage
 modlstrmod
 netdev_privs
-rinit
-sin6_null
-sin_null
-winit

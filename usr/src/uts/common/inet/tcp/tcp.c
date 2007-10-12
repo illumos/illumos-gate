@@ -234,8 +234,6 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
  * packets of the meta buffer are send to the IP path one by one.
  */
 
-extern major_t TCP6_MAJ;
-
 /*
  * Values for squeue switch:
  * 1: squeue_enter_nodrain
@@ -909,11 +907,11 @@ static int	tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 			tcph_t *tcph, mblk_t *idmp);
 static squeue_func_t tcp_squeue_switch(int);
 
-static int	tcp_open(queue_t *, dev_t *, int, int, cred_t *);
+static int	tcp_open(queue_t *, dev_t *, int, int, cred_t *, boolean_t);
+static int	tcp_openv4(queue_t *, dev_t *, int, int, cred_t *);
+static int	tcp_openv6(queue_t *, dev_t *, int, int, cred_t *);
 static int	tcp_close(queue_t *, int);
 static int	tcpclose_accept(queue_t *);
-static int	tcp_modclose(queue_t *);
-static void	tcp_wput_mod(queue_t *, mblk_t *);
 
 static void	tcp_squeue_add(squeue_t *);
 static boolean_t tcp_zcopy_check(tcp_t *);
@@ -965,24 +963,16 @@ static struct module_info tcp_winfo =  {
 };
 
 /*
- * Entry points for TCP as a module. It only allows SNMP requests
- * to pass through.
- */
-struct qinit tcp_mod_rinit = {
-	(pfi_t)putnext, NULL, tcp_open, ip_snmpmod_close, NULL, &tcp_rinfo,
-};
-
-struct qinit tcp_mod_winit = {
-	(pfi_t)ip_snmpmod_wput, NULL, tcp_open, ip_snmpmod_close, NULL,
-	&tcp_rinfo
-};
-
-/*
  * Entry points for TCP as a device. The normal case which supports
  * the TCP functionality.
+ * We have separate open functions for the /dev/tcp and /dev/tcp6 devices.
  */
-struct qinit tcp_rinit = {
-	NULL, (pfi_t)tcp_rsrv, tcp_open, tcp_close, NULL, &tcp_rinfo
+struct qinit tcp_rinitv4 = {
+	NULL, (pfi_t)tcp_rsrv, tcp_openv4, tcp_close, NULL, &tcp_rinfo
+};
+
+struct qinit tcp_rinitv6 = {
+	NULL, (pfi_t)tcp_rsrv, tcp_openv6, tcp_close, NULL, &tcp_rinfo
 };
 
 struct qinit tcp_winit = {
@@ -1009,14 +999,22 @@ struct qinit tcp_acceptor_winit = {
 
 /*
  * Entry points for TCP loopback (read side only)
+ * The open routine is only used for reopens, thus no need to
+ * have a separate one for tcp_openv6.
  */
 struct qinit tcp_loopback_rinit = {
-	(pfi_t)0, (pfi_t)tcp_rsrv, tcp_open, tcp_close, (pfi_t)0,
+	(pfi_t)0, (pfi_t)tcp_rsrv, tcp_openv4, tcp_close, (pfi_t)0,
 	&tcp_rinfo, NULL, tcp_fuse_rrw, tcp_fuse_rinfop, STRUIOT_STANDARD
 };
 
-struct streamtab tcpinfo = {
-	&tcp_rinit, &tcp_winit
+/* For AF_INET aka /dev/tcp */
+struct streamtab tcpinfov4 = {
+	&tcp_rinitv4, &tcp_winit
+};
+
+/* For AF_INET6 aka /dev/tcp6 */
+struct streamtab tcpinfov6 = {
+	&tcp_rinitv6, &tcp_winit
 };
 
 /*
@@ -1599,16 +1597,16 @@ tcp_ipsec_cleanup(tcp_t *tcp)
 {
 	conn_t		*connp = tcp->tcp_connp;
 
-	if (connp->conn_flags & IPCL_TCPCONN) {
-		if (connp->conn_latch != NULL) {
-			IPLATCH_REFRELE(connp->conn_latch,
-			    connp->conn_netstack);
-			connp->conn_latch = NULL;
-		}
-		if (connp->conn_policy != NULL) {
-			IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
-			connp->conn_policy = NULL;
-		}
+	ASSERT(connp->conn_flags & IPCL_TCPCONN);
+
+	if (connp->conn_latch != NULL) {
+		IPLATCH_REFRELE(connp->conn_latch,
+		    connp->conn_netstack);
+		connp->conn_latch = NULL;
+	}
+	if (connp->conn_policy != NULL) {
+		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
+		connp->conn_policy = NULL;
 	}
 }
 
@@ -1681,11 +1679,16 @@ tcp_cleanup(tcp_t *tcp)
 	tcp_iphc_len = tcp->tcp_iphc_len;
 	tcp_hdr_grown = tcp->tcp_hdr_grown;
 
-	if (connp->conn_cred != NULL)
+	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
-	if (connp->conn_peercred != NULL)
+		connp->conn_cred = NULL;
+	}
+	if (connp->conn_peercred != NULL) {
 		crfree(connp->conn_peercred);
-	bzero(connp, sizeof (conn_t));
+		connp->conn_peercred = NULL;
+	}
+	ipcl_conn_cleanup(connp);
+	connp->conn_flags = IPCL_TCPCONN;
 	bzero(tcp, sizeof (tcp_t));
 
 	/* restore the state */
@@ -1696,14 +1699,13 @@ tcp_cleanup(tcp_t *tcp)
 	tcp->tcp_iphc_len = tcp_iphc_len;
 	tcp->tcp_hdr_grown = tcp_hdr_grown;
 
-
 	tcp->tcp_connp = connp;
 
-	connp->conn_tcp = tcp;
-	connp->conn_flags = IPCL_TCPCONN;
+	ASSERT(connp->conn_tcp == tcp);
+	ASSERT(connp->conn_flags & IPCL_TCPCONN);
 	connp->conn_state_flags = CONN_INCIPIENT;
-	connp->conn_ulp = IPPROTO_TCP;
-	connp->conn_ref = 1;
+	ASSERT(connp->conn_ulp == IPPROTO_TCP);
+	ASSERT(connp->conn_ref == 1);
 }
 
 /*
@@ -2448,7 +2450,6 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	econnp->conn_multicast_loop = aconnp->conn_multicast_loop;
 	econnp->conn_af_isv6 = aconnp->conn_af_isv6;
 	econnp->conn_pkt_isv6 = aconnp->conn_pkt_isv6;
-	econnp->conn_ulp = aconnp->conn_ulp;
 
 	/* Done with old IPC. Drop its ref on its connp */
 	CONN_DEC_REF(aconnp);
@@ -3004,7 +3005,7 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	uint_t	origipversion;
 	int	err;
 	queue_t *q = tcp->tcp_wq;
-	conn_t	*connp;
+	conn_t	*connp = tcp->tcp_connp;
 	mlp_type_t addrtype, mlptype;
 	zone_t	*zone;
 	cred_t	*cr;
@@ -3208,7 +3209,6 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		 * anonymous MLP.
 		 */
 		cr = DB_CREDDEF(mp, tcp->tcp_cred);
-		connp = tcp->tcp_connp;
 		if (connp->conn_anon_mlp && is_system_labeled()) {
 			zone = crgetzone(cr);
 			addrtype = tsol_mlp_addr_type(zone->zone_id,
@@ -3261,7 +3261,6 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		}
 		user_specified = B_TRUE;
 
-		connp = tcp->tcp_connp;
 		if (is_system_labeled()) {
 			zone = crgetzone(cr);
 			addrtype = tsol_mlp_addr_type(zone->zone_id,
@@ -3434,7 +3433,13 @@ do_bind:
 	/*
 	 * We can call ip_bind directly which returns a T_BIND_ACK mp. The
 	 * processing continues in tcp_rput_other().
+	 *
+	 * We need to make sure that the conn_recv is set to a non-null
+	 * value before we insert the conn into the classifier table.
+	 * This is to avoid a race with an incoming packet which does an
+	 * ipcl_classify().
 	 */
+	connp->conn_recv = tcp_conn_request;
 	if (tcp->tcp_family == AF_INET6) {
 		ASSERT(tcp->tcp_connp->conn_af_isv6);
 		mp = ip_bind_v6(q, mp, tcp->tcp_connp, &tcp->tcp_sticky_ipp);
@@ -4006,7 +4011,6 @@ tcp_close(queue_t *q, int flags)
 
 	ASSERT(WR(q)->q_next == NULL);
 	ASSERT(connp->conn_ref >= 2);
-	ASSERT((connp->conn_flags & IPCL_TCPMOD) == 0);
 
 	/*
 	 * We are being closed as /dev/tcp or /dev/tcp6.
@@ -6545,6 +6549,14 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 		    sizeof (ipa6_conn_t));
 	}
 	if (mp1) {
+		/*
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert the conn_t into the classifier table.
+		 * This is to avoid a race with an incoming packet which does
+		 * an ipcl_classify().
+		 */
+		tcp->tcp_connp->conn_recv = tcp_input;
+
 		/* Hang onto the T_OK_ACK for later. */
 		linkb(mp1, mp);
 		mblk_setcred(mp1, tcp->tcp_cred);
@@ -6738,6 +6750,14 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	}
 	mp1 = tcp_ip_bind_mp(tcp, O_T_BIND_REQ, sizeof (ipa6_conn_t));
 	if (mp1) {
+		/*
+		 * We need to make sure that the conn_recv is set to a non-null
+		 * value before we insert the conn_t into the classifier table.
+		 * This is to avoid a race with an incoming packet which does
+		 * an ipcl_classify().
+		 */
+		tcp->tcp_connp->conn_recv = tcp_input;
+
 		/* Hang onto the T_OK_ACK for later. */
 		linkb(mp1, mp);
 		mblk_setcred(mp1, tcp->tcp_cred);
@@ -6803,7 +6823,11 @@ tcp_def_q_set(tcp_t *tcp, mblk_t *mp)
 			/*
 			 * We are passing tcp_sticky_ipp as NULL
 			 * as it is not useful for tcp_default queue
+			 *
+			 * Set conn_recv just in case.
 			 */
+			tcp->tcp_connp->conn_recv = tcp_conn_request;
+
 			mp1 = ip_bind_v6(q, mp1, tcp->tcp_connp, NULL);
 			if (mp1 != NULL)
 				tcp_rput_other(tcp, mp1);
@@ -9561,8 +9585,23 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
 	(void) tcp_maxpsz_set(tcp, B_TRUE);
 }
 
+/* For /dev/tcp aka AF_INET open */
 static int
-tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+tcp_openv4(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (tcp_open(q, devp, flag, sflag, credp, B_FALSE));
+}
+
+/* For /dev/tcp6 aka AF_INET6 open */
+static int
+tcp_openv6(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (tcp_open(q, devp, flag, sflag, credp, B_TRUE));
+}
+
+static int
+tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
+    boolean_t isv6)
 {
 	tcp_t		*tcp = NULL;
 	conn_t		*connp;
@@ -9573,6 +9612,9 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	if (q->q_ptr != NULL)
 		return (0);
+
+	if (sflag == MODOPEN)
+		return (EINVAL);
 
 	if (!(flag & SO_ACCEPTOR)) {
 		/*
@@ -9613,31 +9655,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			tcp_g_q_setup(tcps);
 		}
 	}
-	if (sflag == MODOPEN) {
-		/*
-		 * This is a special case. The purpose of a modopen
-		 * is to allow just the T_SVR4_OPTMGMT_REQ to pass
-		 * through for MIB browsers. Everything else is failed.
-		 */
-		connp = (conn_t *)tcp_get_conn(IP_SQUEUE_GET(lbolt), tcps);
-		/* tcp_get_conn incremented refcnt */
-		netstack_rele(tcps->tcps_netstack);
 
-		if (connp == NULL)
-			return (ENOMEM);
-
-		connp->conn_flags |= IPCL_TCPMOD;
-		connp->conn_cred = credp;
-		connp->conn_zoneid = zoneid;
-		ASSERT(connp->conn_netstack == tcps->tcps_netstack);
-		ASSERT(connp->conn_netstack->netstack_tcp == tcps);
-		q->q_ptr = WR(q)->q_ptr = connp;
-		crhold(credp);
-		q->q_qinfo = &tcp_mod_rinit;
-		WR(q)->q_qinfo = &tcp_mod_winit;
-		qprocson(q);
-		return (0);
-	}
 	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
 		if (tcps != NULL)
 			netstack_rele(tcps->tcps_netstack);
@@ -9672,7 +9690,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	tcp = connp->conn_tcp;
 
 	q->q_ptr = WR(q)->q_ptr = connp;
-	if (getmajor(*devp) == TCP6_MAJ) {
+	if (isv6) {
 		connp->conn_flags |= (IPCL_TCP6|IPCL_ISV6);
 		connp->conn_send = ip_output_v6;
 		connp->conn_af_isv6 = B_TRUE;
@@ -9715,7 +9733,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	connp->conn_dev = conn_dev;
 
-	ASSERT(q->q_qinfo == &tcp_rinit);
+	ASSERT(q->q_qinfo == &tcp_rinitv4 || q->q_qinfo == &tcp_rinitv6);
 	ASSERT(WR(q)->q_qinfo == &tcp_winit);
 
 	if (flag & SO_SOCKSTR) {
@@ -16212,7 +16230,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 /*
  * Return SNMP stuff in buffer in mpdata.
  */
-int
+mblk_t *
 tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 {
 	mblk_t			*mpdata;
@@ -16229,14 +16247,20 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	mib2_tcp6ConnEntry_t	tce6;
 	mib2_transportMLPEntry_t mlp;
 	connf_t			*connfp;
-	conn_t			*connp;
 	int			i;
 	boolean_t 		ispriv;
 	zoneid_t 		zoneid;
 	int			v4_conn_idx;
 	int			v6_conn_idx;
-	tcp_stack_t		*tcps = Q_TO_TCP(q)->tcp_tcps;
-	ip_stack_t	*ipst;
+	conn_t			*connp = Q_TO_CONN(q);
+	tcp_stack_t		*tcps;
+	ip_stack_t		*ipst;
+	mblk_t			*mp2ctl;
+
+	/*
+	 * make a copy of the original message
+	 */
+	mp2ctl = copymsg(mpctl);
 
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL ||
@@ -16248,8 +16272,13 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 		freemsg(mp_attr_ctl);
 		freemsg(mp6_conn_ctl);
 		freemsg(mp6_attr_ctl);
-		return (0);
+		freemsg(mpctl);
+		freemsg(mp2ctl);
+		return (NULL);
 	}
+
+	ipst = connp->conn_netstack->netstack_ip;
+	tcps = connp->conn_netstack->netstack_tcp;
 
 	/* build table of connections -- need count in fixed part */
 	SET_MIB(tcps->tcps_mib.tcpRtoAlgorithm, 4);   /* vanj */
@@ -16487,7 +16516,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 		freemsg(mp6_attr_ctl);
 	else
 		qreply(q, mp6_attr_ctl);
-	return (1);
+	return (mp2ctl);
 }
 
 /* Return 0 if invalid set request, 1 otherwise, including non-tcp requests  */
@@ -18232,7 +18261,7 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 		eager->tcp_rq = rq;
 		eager->tcp_wq = q;
 		rq->q_ptr = econnp;
-		rq->q_qinfo = &tcp_rinit;
+		rq->q_qinfo = &tcp_rinitv4;	/* No open - same as rinitv6 */
 		q->q_ptr = econnp;
 		q->q_qinfo = &tcp_winit;
 		listener = eager->tcp_listener;
@@ -18468,7 +18497,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		}
 		if (type == T_SVR4_OPTMGMT_REQ) {
 			cred_t	*cr = DB_CREDDEF(mp, tcp->tcp_cred);
-			if (snmpcom_req(q, mp, tcp_snmp_set, tcp_snmp_get,
+			if (snmpcom_req(q, mp, tcp_snmp_set, ip_snmp_get,
 			    cr)) {
 				/*
 				 * This was a SNMP request
@@ -22151,8 +22180,8 @@ non_urgent_data:
 		tcp_info_req(tcp, mp);
 		break;
 	case T_SVR4_OPTMGMT_REQ:	/* manage options req */
-		/* Only IP is allowed to return meaningful value */
-		(void) svr4_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj);
+		(void) svr4_optcom_req(tcp->tcp_wq, mp, cr,
+		    &tcp_opt_obj, B_TRUE);
 		break;
 	case T_OPTMGMT_REQ:
 		/*
@@ -22160,7 +22189,8 @@ non_urgent_data:
 		 * T_OPTMGMT_REQ. See comments in ip.c
 		 */
 		/* Only IP is allowed to return meaningful value */
-		(void) tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj);
+		(void) tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
+		    B_TRUE);
 		break;
 
 	case T_UNITDATA_REQ:	/* unitdata request */
@@ -24888,7 +24918,6 @@ tcp_g_q_setup(tcp_stack_t *tcps)
 	mutex_exit(&tcps->tcps_g_q_lock);
 }
 
-major_t IP_MAJ;
 #define	IP	"ip"
 
 #define	TCP6DEV		"/devices/pseudo/tcp6@0:tcp6"
@@ -24904,10 +24933,13 @@ tcp_g_q_create(tcp_stack_t *tcps)
 	ldi_ident_t	li = NULL;
 	int		rval;
 	cred_t		*cr;
+	major_t IP_MAJ;
 
 #ifdef NS_DEBUG
 	(void) printf("tcp_g_q_create()\n");
 #endif
+
+	IP_MAJ = ddi_name_to_major(IP);
 
 	ASSERT(tcps->tcps_g_q_creator == curthread);
 
@@ -25002,6 +25034,9 @@ tcp_g_q_close(void *arg)
 	ldi_handle_t	lh = NULL;
 	ldi_ident_t	li = NULL;
 	cred_t		*cr;
+	major_t IP_MAJ;
+
+	IP_MAJ = ddi_name_to_major(IP);
 
 #ifdef NS_DEBUG
 	(void) printf("tcp_g_q_inactive() for stack %d refcnt %d\n",
@@ -25076,8 +25111,6 @@ tcp_g_q_inactive(tcp_stack_t *tcps)
 void
 tcp_ddi_g_init(void)
 {
-	IP_MAJ = ddi_name_to_major(IP);
-
 	tcp_timercache = kmem_cache_create("tcp_timercache",
 	    sizeof (tcp_timer_t) + sizeof (mblk_t), 0,
 	    NULL, NULL, NULL, NULL, NULL, 0);

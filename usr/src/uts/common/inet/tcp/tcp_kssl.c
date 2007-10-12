@@ -44,6 +44,7 @@
 #include <netinet/tcp.h>
 
 #include <inet/common.h>
+#include <inet/optcom.h>
 #include <inet/ipclassifier.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -178,7 +179,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 				 */
 				kssl_hold_ctx(tcp->tcp_kssl_ctx);
 				*((kssl_ctx_t *)ctxmp->b_rptr) =
-					tcp->tcp_kssl_ctx;
+				    tcp->tcp_kssl_ctx;
 				ctxmp->b_wptr = ctxmp->b_rptr +
 				    sizeof (kssl_ctx_t);
 

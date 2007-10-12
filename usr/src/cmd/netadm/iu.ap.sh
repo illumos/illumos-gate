@@ -43,7 +43,6 @@ case "$MACH" in
 	usbser_edge	-1	0	ldterm ttcompat
 	usbsprl	-1	0	ldterm ttcompat
 	usbsksp	-1	0	ldterm ttcompat
-	rts	-1	0	rts [anchor]
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
 " > iu.ap
@@ -73,7 +72,6 @@ case "$MACH" in
 	usbsacm -1	0	ldterm ttcompat
 	usbsprl -1	0	ldterm ttcompat
 	usbsksp -1	0	ldterm ttcompat
-	rts	-1	0	rts [anchor]
 	ttymux	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah

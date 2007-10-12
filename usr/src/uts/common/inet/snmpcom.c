@@ -51,9 +51,6 @@
 #include <inet/snmpcom.h>
 
 #include <inet/ip.h>
-#include <inet/ip6.h>
-#include <inet/tcp.h>
-#include <inet/udp_impl.h>
 
 #define	DEFAULT_LENGTH	sizeof (long)
 #define	DATA_MBLK_SIZE	1024
@@ -180,7 +177,6 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 	sor_t			*sreq;
 	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)mp->b_rptr;
 	struct T_optmgmt_ack	*toa;
-	boolean_t		pass_to_ip = B_FALSE;
 
 	if (mp->b_cont) {	/* don't deal with multiple mblk's */
 		freemsg(mp->b_cont);
@@ -190,7 +186,7 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 	}
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_optmgmt_req) ||
 	    !(req_start = (struct opthdr *)mi_offset_param(mp,
-		tor->OPT_offset, tor->OPT_length)))
+	    tor->OPT_offset, tor->OPT_length)))
 		goto bad_req1;
 	if (! __TPI_OPT_ISALIGNED(req_start))
 		goto bad_req1;
@@ -201,14 +197,10 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 	 * calling module to process or ignore as it sees fit.
 	 */
 	if ((!(req_start->level >= MIB2_RANGE_START &&
-			req_start->level <= MIB2_RANGE_END)) &&
+	    req_start->level <= MIB2_RANGE_END)) &&
 	    (!(req_start->level >= EXPER_RANGE_START &&
-			req_start->level <= EXPER_RANGE_END)))
+	    req_start->level <= EXPER_RANGE_END)))
 		return (B_FALSE);
-
-	if (setfn == tcp_snmp_set || setfn == udp_snmp_set ||
-	    getfn == tcp_snmp_get || getfn == udp_snmp_get)
-		pass_to_ip = B_TRUE;
 
 	switch (tor->MGMT_flags) {
 
@@ -218,11 +210,11 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 			return (B_TRUE);
 		}
 		req_end = (struct opthdr *)((uchar_t *)req_start +
-			tor->OPT_length);
+		    tor->OPT_length);
 		for (req = req_start; req < req_end; req = next_req) {
 			next_req =
-				(struct opthdr *)((uchar_t *)&req[1] +
-				_TPI_ALIGN_OPT(req->len));
+			    (struct opthdr *)((uchar_t *)&req[1] +
+			    _TPI_ALIGN_OPT(req->len));
 			if (next_req > req_end)
 				goto bad_req2;
 			for (sreq = req_arr; sreq < A_END(req_arr); sreq++) {
@@ -233,13 +225,11 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 			if (sreq >= A_END(req_arr))
 				goto bad_req3;
 			if (!(*setfn)(q, req->level, req->name,
-				(uchar_t *)&req[1], req->len))
+			    (uchar_t *)&req[1], req->len))
 				goto bad_req4;
 		}
 		if (q->q_next != NULL)
 			putnext(q, mp);
-		else if (pass_to_ip)
-			ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
 		else
 			freemsg(mp);
 		return (B_TRUE);
@@ -264,7 +254,7 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 		toa->OPT_offset = sizeof (struct T_optmgmt_ack);
 		toa->OPT_length = sizeof (struct opthdr);
 		toa->MGMT_flags = T_SUCCESS;
-		if (!(*getfn)(q, mpctl))
+		if (!(*getfn)(q, mpctl, req_start->level))
 			freemsg(mpctl);
 		/*
 		 * all data for this module has now been sent upstream.  If
@@ -273,9 +263,6 @@ snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 		 */
 		if (q->q_next != NULL) {
 			putnext(q, mp);
-			return (B_TRUE);
-		} else if (pass_to_ip) {
-			ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
 			return (B_TRUE);
 		}
 		if (mp->b_cont) {

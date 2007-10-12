@@ -87,12 +87,6 @@ extern "C" {
 
 #define	SCTP_MOD_NAME	"sctp"
 
-/* Minor numbers */
-#define	IPV4_MINOR	0
-#define	IPV6_MINOR	1
-#define	TCP_MINOR	2
-#define	TCP_MINOR6	3
-
 #ifndef	_IPADDR_T
 #define	_IPADDR_T
 typedef uint32_t ipaddr_t;
@@ -261,6 +255,8 @@ typedef struct ipoptp_s
 #define	Q_TO_CONN(q)	((conn_t *)(q)->q_ptr)
 #define	Q_TO_TCP(q)	(Q_TO_CONN((q))->conn_tcp)
 #define	Q_TO_UDP(q)	(Q_TO_CONN((q))->conn_udp)
+#define	Q_TO_ICMP(q)	(Q_TO_CONN((q))->conn_icmp)
+#define	Q_TO_RTS(q)	(Q_TO_CONN((q))->conn_rts)
 
 /*
  * The following two macros are used by IP to get the appropriate
@@ -1008,7 +1004,6 @@ typedef struct conn_s conn_t;
  *
  * ipc_multicast_loop		conn_multicast_loop
  * ipc_multi_router		conn_multi_router
- * ipc_priv_stream 		conn_priv_stream
  * ipc_draining 		conn_draining
  *
  * ipc_did_putbq		conn_did_putbq
@@ -3102,7 +3097,10 @@ extern void	ip_ire_g_fini(void);
 extern void	ip_ire_g_init(void);
 extern void	ip_ire_fini(ip_stack_t *);
 extern void	ip_ire_init(ip_stack_t *);
-extern int	ip_open(queue_t *, dev_t *, int, int, cred_t *);
+extern int	ip_openv4(queue_t *q, dev_t *devp, int flag, int sflag,
+		    cred_t *credp);
+extern int	ip_openv6(queue_t *q, dev_t *devp, int flag, int sflag,
+		    cred_t *credp);
 extern int	ip_reassemble(mblk_t *, ipf_t *, uint_t, boolean_t, ill_t *,
     size_t);
 extern int	ip_opt_set_ill(conn_t *, int, boolean_t, boolean_t,
@@ -3114,8 +3112,6 @@ extern void	ip_rput_dlpi(queue_t *, mblk_t *);
 extern void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
 extern void	ip_rput_forward_multicast(ipaddr_t, mblk_t *, ipif_t *);
 
-extern int	ip_snmpmod_close(queue_t *);
-extern void	ip_snmpmod_wput(queue_t *, mblk_t *);
 extern void	ip_mib2_add_ip_stats(mib2_ipIfStatsEntry_t *,
 		    mib2_ipIfStatsEntry_t *);
 extern void	ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *,
@@ -3125,7 +3121,7 @@ extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *,
     boolean_t);
 extern void	ip_rput_other(ipsq_t *, queue_t *, mblk_t *, void *);
 extern ire_t	*ip_check_multihome(void *, ire_t *, ill_t *);
-extern void	ip_setqinfo(queue_t *, minor_t, boolean_t, ip_stack_t *);
+extern void	ip_setpktversion(conn_t *, boolean_t, boolean_t, ip_stack_t *);
 extern void	ip_trash_ire_reclaim(void *);
 extern void	ip_trash_timer_expire(void *);
 extern void	ip_wput(queue_t *, mblk_t *);
@@ -3151,8 +3147,8 @@ extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
     boolean_t);
 extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);
 
-extern struct qinit rinit_ipv6;
-extern struct qinit winit_ipv6;
+extern struct qinit iprinitv6;
+extern struct qinit ipwinitv6;
 
 extern void	conn_drain_insert(conn_t *connp);
 extern	int	conn_ipsec_length(conn_t *connp);
@@ -3193,7 +3189,7 @@ extern ill_t	*ip_grab_attach_ill(ill_t *, mblk_t *, int, boolean_t,
     ip_stack_t *);
 extern ire_t	*conn_set_outgoing_ill(conn_t *, ire_t *, ill_t **);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
-extern int	ip_snmp_get(queue_t *q, mblk_t *mctl);
+extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level);
 extern int	ip_snmp_set(queue_t *q, int, int, uchar_t *, int);
 extern void	ip_process_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_quiesce_conn(conn_t *);
@@ -3391,17 +3387,6 @@ struct ill_dls_capab_s {
 	uint_t			ill_dls_soft_ring_cnt; /* Number of soft ring */
 	conn_t			*ill_unbind_conn; /* Conn used during unplumb */
 };
-
-/*
- * This message is sent by an upper-layer protocol to tell IP that it knows all
- * about labels and will construct them itself.  IP takes the slow path and
- * recomputes the label on every packet when this isn't true.
- */
-#define	IP_ULP_OUT_LABELED		(('O' << 8) + 'L')
-typedef struct out_labeled_s {
-	uint32_t	out_labeled_type;	/* OUT_LABELED */
-	queue_t		*out_qnext;		/* intermediate detection */
-} out_labeled_t;
 
 /*
  * IP squeues exports

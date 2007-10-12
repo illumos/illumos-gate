@@ -42,46 +42,47 @@
  * The symbols that all modules and drivers must define are:
  *
  *	INET_NAME	 The name of the module/driver.
- *	INET_STRTAB	 The name of the `streamtab' structure.
  *
  * The symbols that all modules must define are:
  *
+ *	INET_MODSTRTAB	 The name of the `streamtab' structure for this module.
  *	INET_MODDESC	 The one-line description for this module.
  *	INET_MODMTFLAGS  The mt-streams(9F) flags for the module.
  *
  * The symbols that all drivers must define are:
  *
+ *	INET_DEVSTRTAB	 The name of the `streamtab' structure for this driver.
  *	INET_DEVDESC	 The one-line description for this driver.
  *	INET_DEVMTFLAGS  The mt-streams(9F) flags for the driver.
  *	INET_DEVMINOR	 The minor number of the driver (usually 0).
  *
  * Drivers that need to masquerade as IP should set INET_DEVMTFLAGS to
- * IP_DEVMTFLAGS and then call INET_BECOME_IP() in their _init(9E) routine.
+ * IP_DEVMTFLAGS and set INET_DEVSTRTAB to ipinfo.
  */
 
-#if	!defined(INET_STRTAB)
-#error inetddi.c: INET_STRTAB is not defined!
-#elif	!defined(INET_NAME)
+#if	!defined(INET_NAME)
 #error inetddi.c: INET_NAME is not defined!
 #elif	!defined(INET_DEVDESC) && !defined(INET_MODDESC)
 #error inetddi.c: at least one of INET_DEVDESC or INET_MODDESC must be defined!
+#elif	defined(INET_DEVDESC) && !defined(INET_DEVSTRTAB)
+#error inetddi.c: INET_DEVDESC is defined but INET_DEVSTRTAB is not!
 #elif	defined(INET_DEVDESC) && !defined(INET_DEVMTFLAGS)
 #error inetddi.c: INET_DEVDESC is defined but INET_DEVMTFLAGS is not!
 #elif	defined(INET_DEVDESC) && !defined(INET_DEVMINOR)
 #error inetddi.c: INET_DEVDESC is defined but INET_DEVMINOR is not!
+#elif	defined(INET_MODDESC) && !defined(INET_MODSTRTAB)
+#error inetddi.c: INET_MODDESC is defined but INET_MODSTRTAB is not!
 #elif	defined(INET_MODDESC) && !defined(INET_MODMTFLAGS)
 #error inetddi.c: INET_MODDESC is defined but INET_MODMTFLAGS is not!
 #endif
 
-extern struct streamtab INET_STRTAB, ipinfo;
-
 #ifdef	INET_DEVDESC
 
+extern struct streamtab INET_DEVSTRTAB;
+
 /*
- * This macro is intended to be called from the _init() routine of drivers
- * that actually want to be IP.  Yes, this is a disgusting, vile hack.
+ * Drivers that actually want to be IP would set INET_DEVSTRTAB to ipinfo.
  */
-#define	INET_BECOME_IP()	(cb_inet_devops.cb_str = &ipinfo)
 
 static dev_info_t *inet_dev_info;
 
@@ -167,7 +168,7 @@ inet_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 }
 
 DDI_DEFINE_STREAM_OPS(inet_devops, nulldev, nulldev, inet_attach, inet_detach,
-    nulldev, inet_info, INET_DEVMTFLAGS, &INET_STRTAB);
+    nulldev, inet_info, INET_DEVMTFLAGS, &INET_DEVSTRTAB);
 
 static struct modldrv modldrv = {
 	&mod_driverops,
@@ -178,9 +179,11 @@ static struct modldrv modldrv = {
 #endif /* INET_DEVDESC */
 
 #ifdef	INET_MODDESC
+extern struct streamtab INET_MODSTRTAB;
+
 static struct fmodsw fsw = {
 	INET_NAME,
-	&INET_STRTAB,
+	&INET_MODSTRTAB,
 	INET_MODMTFLAGS
 };
 

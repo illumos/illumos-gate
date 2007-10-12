@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -640,10 +640,11 @@ rds_wput_other(queue_t *q, mblk_t *mp)
 			rds_bind(q, mp);
 			return;
 		case T_SVR4_OPTMGMT_REQ:
-			(void) svr4_optcom_req(q, mp, cr, &rds_opt_obj);
+			(void) svr4_optcom_req(q, mp, cr, &rds_opt_obj,
+			    B_FALSE);
 			return;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, cr, &rds_opt_obj);
+			(void) tpi_optcom_req(q, mp, cr, &rds_opt_obj, B_FALSE);
 			return;
 		case T_CONN_REQ:
 			/*

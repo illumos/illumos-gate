@@ -35,6 +35,7 @@
 #include <sys/tihdr.h>
 
 #include <inet/common.h>
+#include <inet/optcom.h>
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
 #include <inet/tcp.h>
@@ -1143,8 +1144,8 @@ tcp_fuse_syncstr_disable(tcp_t *tcp)
 	 * Also restore SR_SIGALLDATA so that strrput() can generate
 	 * the signals again for future M_DATA messages.
 	 */
-	rq->q_qinfo = &tcp_rinit;
-	rq->q_struiot = tcp_rinit.qi_struiot;
+	rq->q_qinfo = &tcp_rinitv4;	/* No open - same as rinitv6 */
+	rq->q_struiot = tcp_rinitv4.qi_struiot;
 	stp->sd_struiordq = NULL;
 	stp->sd_rput_opt |= SR_SIGALLDATA;
 	tcp->tcp_direct_sockfs = B_FALSE;

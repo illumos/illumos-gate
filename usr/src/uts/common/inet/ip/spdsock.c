@@ -742,10 +742,10 @@ spdsock_check_action(ipsec_act_t *act, boolean_t tunnel_polhead, int *diag,
 	}
 	if ((act->ipa_type != IPSEC_ACT_APPLY) &&
 	    (act->ipa_apply.ipp_use_ah ||
-		act->ipa_apply.ipp_use_esp ||
-		act->ipa_apply.ipp_use_espa ||
-		act->ipa_apply.ipp_use_se ||
-		act->ipa_apply.ipp_use_unique)) {
+	    act->ipa_apply.ipp_use_esp ||
+	    act->ipa_apply.ipp_use_espa ||
+	    act->ipa_apply.ipp_use_se ||
+	    act->ipa_apply.ipp_use_unique)) {
 		*diag = SPD_DIAGNOSTIC_ADD_INCON_FLAGS;
 		return (B_FALSE);
 	}
@@ -775,7 +775,7 @@ spdsock_ext_to_actvec(spd_ext_t **extv, ipsec_act_t **actpp, uint_t *nactp,
 
 	tunnel_polhead = (extv[SPD_EXT_TUN_NAME] != NULL &&
 	    (((struct spd_rule *)extv[SPD_EXT_RULE])->spd_rule_flags &
-		SPD_RULE_FLAG_TUNNEL));
+	    SPD_RULE_FLAG_TUNNEL));
 
 	*actpp = NULL;
 	*nactp = 0;
@@ -1174,7 +1174,7 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 
 	if (rule->spd_rule_index != 0) {
 		if (ipsec_policy_delete_index(iph, rule->spd_rule_index,
-			spds->spds_netstack) != 0) {
+		    spds->spds_netstack) != 0) {
 			err = ESRCH;
 			goto fail;
 		}
@@ -1582,9 +1582,9 @@ spdsock_encode_sel(uint8_t *base, uint_t offset, const ipsec_sel_t *sel)
 		offset = spdsock_encode_typecode(base, offset,
 		    selkey->ipsl_icmp_type, selkey->ipsl_icmp_type_end,
 		    (selkey->ipsl_valid & IPSL_ICMP_CODE) ?
-			selkey->ipsl_icmp_code : 255,
+		    selkey->ipsl_icmp_code : 255,
 		    (selkey->ipsl_valid & IPSL_ICMP_CODE) ?
-			selkey->ipsl_icmp_code_end : 255);
+		    selkey->ipsl_icmp_code_end : 255);
 	}
 	return (offset);
 }
@@ -2535,7 +2535,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			if (alg->alg_key_sizes == NULL ||
 			    cur_key >= alg->alg_nkey_sizes) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
-					"too many key sizes\n"));
+				    "too many key sizes\n"));
 				*diag = SPD_DIAGNOSTIC_ALG_NUM_KEY_SIZES;
 				goto bail;
 			}
@@ -2561,7 +2561,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			if (alg->alg_block_sizes == NULL ||
 			    cur_block >= alg->alg_nblock_sizes) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
-					"too many block sizes\n"));
+				    "too many block sizes\n"));
 				*diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
 				goto bail;
 			}
@@ -2574,7 +2574,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 
 			if (attr->spd_attr_value > CRYPTO_MAX_MECH_NAME) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
-					"mech name too long\n"));
+				    "mech name too long\n"));
 				*diag = SPD_DIAGNOSTIC_ALG_MECH_NAME_LEN;
 				goto bail;
 			}
@@ -2620,9 +2620,9 @@ bail:
 	/* cleanup */
 	ipsec_alg_free(alg);
 	for (alg_type = 0; alg_type < IPSEC_NALGTYPES; alg_type++)
-	    for (algid = 0; algid < IPSEC_MAX_ALGS; algid++)
+		for (algid = 0; algid < IPSEC_MAX_ALGS; algid++)
 		if (spds->spds_algs[alg_type][algid] != NULL)
-		    ipsec_alg_free(spds->spds_algs[alg_type][algid]);
+			ipsec_alg_free(spds->spds_algs[alg_type][algid]);
 }
 
 /*
@@ -3090,7 +3090,7 @@ spdsock_capability_req(queue_t *q, mblk_t *mp)
 	cap_bits1 = ((struct T_capability_req *)mp->b_rptr)->CAP_bits1;
 
 	mp = tpi_ack_alloc(mp, sizeof (struct T_capability_ack),
-		mp->b_datap->db_type, T_CAPABILITY_ACK);
+	    mp->b_datap->db_type, T_CAPABILITY_ACK);
 	if (mp == NULL)
 		return;
 
@@ -3231,7 +3231,7 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			return;
 		}
 		cr = zone_get_kcred(netstackid_to_zoneid(
-			spds->spds_netstack->netstack_stackid));
+		    spds->spds_netstack->netstack_stackid));
 		ASSERT(cr != NULL);
 
 		switch (((union T_primitives *)mp->b_rptr)->type) {
@@ -3243,11 +3243,11 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			break;
 		case T_SVR4_OPTMGMT_REQ:
 			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &spdsock_opt_obj);
+			    &spdsock_opt_obj, B_FALSE);
 			break;
 		case T_OPTMGMT_REQ:
 			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &spdsock_opt_obj);
+			    &spdsock_opt_obj, B_FALSE);
 			break;
 		case T_DATA_REQ:
 		case T_EXDATA_REQ:

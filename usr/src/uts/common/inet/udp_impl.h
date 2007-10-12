@@ -53,13 +53,89 @@ extern "C" {
 
 #define	UDP_MOD_ID		5607
 
-/* udp_mode. UDP_MT_HOT and UDP_SQUEUE are stable modes. Rest are transient */
-typedef enum {
-	UDP_MT_HOT = 0,			/* UDP endpoint is MT HOT */
-	UDP_MT_QUEUED = 1,		/* Messages enqueued in udp_mphead */
-	UDP_QUEUED_SQUEUE = 2,		/* Messages enqueued in conn_sqp */
-	UDP_SQUEUE = 3			/* Single threaded using squeues */
-} udp_mode_t;
+typedef struct udp_bits_s {
+
+	uint32_t
+
+	udpb_debug : 1,		/* SO_DEBUG "socket" option. */
+	udpb_dontroute : 1,	/* SO_DONTROUTE "socket" option. */
+	udpb_broadcast : 1,	/* SO_BROADCAST "socket" option. */
+	udpb_useloopback : 1,	/* SO_USELOOPBACK "socket" option */
+
+	udpb_reuseaddr : 1,	/* SO_REUSEADDR "socket" option. */
+	udpb_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
+	udpb_recvdstaddr : 1,	/* IP_RECVDSTADDR option */
+	udpb_recvopts : 1,	/* IP_RECVOPTS option */
+
+	udpb_unspec_source : 1,	/* IP*_UNSPEC_SRC option */
+	udpb_ip_recvpktinfo : 1,	/* IPV6_RECVPKTINFO option  */
+	udpb_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
+	udpb_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
+
+	udpb_ipv6_recvdstopts : 1,	/* IPV6_RECVDSTOPTS option */
+	udpb_ipv6_recvrthdr : 1,	/* IPV6_RECVRTHDR option */
+	udpb_ipv6_recvtclass : 1,	/* IPV6_RECVTCLASS */
+	udpb_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU */
+
+	udpb_anon_priv_bind : 1,
+	udpb_exclbind : 1,		/* ``exclusive'' binding */
+	udpb_recvif : 1,		/* IP_RECVIF option */
+	udpb_recvslla : 1,		/* IP_RECVSLLA option */
+
+	udpb_recvttl : 1,		/* IP_RECVTTL option */
+	udpb_recvucred : 1,		/* IP_RECVUCRED option */
+	udpb_old_ipv6_recvdstopts : 1,	/* old form of IPV6_DSTOPTS */
+	udpb_ipv6_recvrthdrdstopts : 1,	/* IPV6_RECVRTHDRDSTOPTS */
+
+	udpb_rcvhdr : 1,		/* UDP_RCVHDR option */
+	udpb_issocket : 1,		/* socket mode */
+	udpb_direct_sockfs : 1,		/* direct calls to/from sockfs */
+	udpb_timestamp : 1,		/* SO_TIMESTAMP "socket" option */
+
+	udpb_anon_mlp : 1,		/* SO_ANON_MLP */
+	udpb_mac_exempt : 1,		/* SO_MAC_EXEMPT */
+	udpb_nat_t_endpoint : 1,	/* UDP_NAT_T_ENDPOINT option */
+	udpb_pad_to_bit_31 : 1;
+} udp_bits_t;
+
+#define	udp_debug	udp_bits.udpb_debug
+#define	udp_dontroute	udp_bits.udpb_dontroute
+#define	udp_broadcast	udp_bits.udpb_broadcast
+#define	udp_useloopback	udp_bits.udpb_useloopback
+
+#define	udp_reuseaddr		udp_bits.udpb_reuseaddr
+#define	udp_dgram_errind	udp_bits.udpb_dgram_errind
+#define	udp_recvdstaddr		udp_bits.udpb_recvdstaddr
+#define	udp_recvopts		udp_bits.udpb_recvopts
+
+#define	udp_unspec_source	udp_bits.udpb_unspec_source
+#define	udp_ip_recvpktinfo	udp_bits.udpb_ip_recvpktinfo
+#define	udp_ipv6_recvhoplimit	udp_bits.udpb_ipv6_recvhoplimit
+#define	udp_ipv6_recvhopopts	udp_bits.udpb_ipv6_recvhopopts
+
+#define	udp_ipv6_recvdstopts	udp_bits.udpb_ipv6_recvdstopts
+#define	udp_ipv6_recvrthdr	udp_bits.udpb_ipv6_recvrthdr
+#define	udp_ipv6_recvtclass	udp_bits.udpb_ipv6_recvtclass
+#define	udp_ipv6_recvpathmtu	udp_bits.udpb_ipv6_recvpathmtu
+
+#define	udp_anon_priv_bind	udp_bits.udpb_anon_priv_bind
+#define	udp_exclbind		udp_bits.udpb_exclbind
+#define	udp_recvif		udp_bits.udpb_recvif
+#define	udp_recvslla		udp_bits.udpb_recvslla
+
+#define	udp_recvttl		udp_bits.udpb_recvttl
+#define	udp_recvucred		udp_bits.udpb_recvucred
+#define	udp_old_ipv6_recvdstopts	udp_bits.udpb_old_ipv6_recvdstopts
+#define	udp_ipv6_recvrthdrdstopts	udp_bits.udpb_ipv6_recvrthdrdstopts
+
+#define	udp_rcvhdr		udp_bits.udpb_rcvhdr
+#define	udp_issocket		udp_bits.udpb_issocket
+#define	udp_direct_sockfs	udp_bits.udpb_direct_sockfs
+#define	udp_timestamp		udp_bits.udpb_timestamp
+
+#define	udp_anon_mlp		udp_bits.udpb_anon_mlp
+#define	udp_mac_exempt		udp_bits.udpb_mac_exempt
+#define	udp_nat_t_endpoint	udp_bits.udpb_nat_t_endpoint
 
 /*
  * Bind hash list size and hash function.  It has to be a power of 2 for
@@ -80,6 +156,16 @@ typedef struct udp_fanout_s {
 #endif
 } udp_fanout_t;
 
+/*
+ * dev_q is the write side queue of the entity below IP.
+ * If there is a module below IP, we can't optimize by looking
+ * at q_first of the queue below IP. If the driver is directly
+ * below IP and if the q_first is NULL, we optimize by not doing
+ * the canput check
+ */
+#define	DEV_Q_IS_FLOW_CTLED(dev_q)					\
+	(((dev_q)->q_next != NULL || (dev_q)->q_first != NULL) &&	\
+	!canput(dev_q))
 
 /* Kstats */
 typedef struct udp_stat {			/* Class "net" kstats */
@@ -111,7 +197,11 @@ typedef struct udp_stat {			/* Class "net" kstats */
 	kstat_named_t	udp_in_recvpktinfo;
 	kstat_named_t	udp_in_recvtclass;
 	kstat_named_t	udp_in_timestamp;
-	kstat_named_t	udp_ip_recvpktinfo;
+	kstat_named_t	udp_ip_rcvpktinfo;
+	kstat_named_t	udp_direct_send;
+	kstat_named_t	udp_bwsq_send;
+	kstat_named_t	udp_connected_direct_send;
+	kstat_named_t	udp_connected_bwsq_send;
 #ifdef DEBUG
 	kstat_named_t	udp_data_conn;
 	kstat_named_t	udp_data_notconn;
@@ -173,20 +263,31 @@ typedef struct udp_stack udp_stack_t;
 
 /* Internal udp control structure, one per open stream */
 typedef	struct udp_s {
+	krwlock_t	udp_rwlock;	/* Protects most of udp_t */
+	t_scalar_t	udp_pending_op;	/* The current TPI operation */
+	/*
+	 * Following fields up to udp_ipversion protected by conn_lock,
+	 * and the fanout lock i.e.uf_lock. Need both locks to change the
+	 * field, either lock is sufficient for reading the field.
+	 */
 	uint32_t	udp_state;	/* TPI state */
 	in_port_t	udp_port;	/* Port bound to this stream */
 	in_port_t	udp_dstport;	/* Connected port */
 	in6_addr_t	udp_v6src;	/* Source address of this stream */
 	in6_addr_t	udp_bound_v6src; /* Explicitly bound address */
 	in6_addr_t	udp_v6dst;	/* Connected destination */
-	uint32_t	udp_flowinfo;	/* Connected flow id and tclass */
-	uint32_t	udp_max_hdr_len; /* For write offset in stream head */
-	sa_family_t	udp_family;	/* Family from socket() call */
 	/*
 	 * IP format that packets transmitted from this struct should use.
 	 * Value can be IP4_VERSION or IPV6_VERSION.
 	 */
 	ushort_t	udp_ipversion;
+
+	/* Written to only once at the time of opening the endpoint */
+	sa_family_t	udp_family;	/* Family from socket() call */
+
+	/* Following protected by udp_rwlock */
+	uint32_t	udp_flowinfo;	/* Connected flow id and tclass */
+	uint32_t	udp_max_hdr_len; /* For write offset in stream head */
 	uint32_t	udp_ip_snd_options_len; /* Len of IPv4 options */
 	uchar_t		*udp_ip_snd_options;    /* Ptr to IPv4 options */
 	uint32_t	udp_ip_rcv_options_len; /* Len of IPv4 options recvd */
@@ -196,69 +297,31 @@ typedef	struct udp_s {
 	uint_t		udp_multicast_if_index;	/* IPV6_MULTICAST_IF option */
 	int		udp_bound_if;		/* IP*_BOUND_IF option */
 	int		udp_xmit_if;		/* IP_XMIT_IF option */
+
+	/* Written to only once at the time of opening the endpoint */
 	conn_t		*udp_connp;
-	uint32_t
-		udp_debug : 1,		/* SO_DEBUG "socket" option. */
-		udp_dontroute : 1,	/* SO_DONTROUTE "socket" option. */
-		udp_broadcast : 1,	/* SO_BROADCAST "socket" option. */
-		udp_useloopback : 1,	/* SO_USELOOPBACK "socket" option */
 
-		udp_reuseaddr : 1,	/* SO_REUSEADDR "socket" option. */
-		udp_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
-		udp_recvdstaddr : 1,	/* IP_RECVDSTADDR option */
-		udp_recvopts : 1,	/* IP_RECVOPTS option */
-
-		udp_discon_pending : 1,	/* T_DISCON_REQ in progress */
-		udp_unspec_source : 1,	/* IP*_UNSPEC_SRC option */
-		udp_ip_recvpktinfo : 1,	/* IPV[4,6]_RECVPKTINFO option  */
-		udp_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
-
-		udp_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
-		udp_ipv6_recvdstopts : 1,	/* IPV6_RECVDSTOPTS option */
-		udp_ipv6_recvrthdr : 1,		/* IPV6_RECVRTHDR option */
-		udp_ipv6_recvtclass : 1,	/* IPV6_RECVTCLASS */
-
-		udp_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU */
-		udp_anon_priv_bind : 1,
-		udp_exclbind : 1,	/* ``exclusive'' binding */
-		udp_recvif : 1,		/* IP_RECVIF option */
-
-		udp_recvslla : 1,	/* IP_RECVSLLA option */
-		udp_recvttl : 1,	/* IP_RECVTTL option */
-		udp_recvucred : 1,	/* IP_RECVUCRED option */
-		udp_old_ipv6_recvdstopts : 1,	/* old form of IPV6_DSTOPTS */
-
-		udp_ipv6_recvrthdrdstopts : 1,	/* IPV6_RECVRTHDRDSTOPTS */
-		udp_rcvhdr : 1,		/* UDP_RCVHDR option */
-		udp_issocket : 1,	/* socket mode */
-		udp_direct_sockfs : 1,	/* direct calls to/from sockfs */
-
-		udp_timestamp : 1,	/* SO_TIMESTAMP "socket" option */
-		udp_anon_mlp : 1,		/* SO_ANON_MLP */
-		udp_mac_exempt : 1,		/* SO_MAC_EXEMPT */
-		udp_nat_t_endpoint : 1;	/* UDP_NAT_T_ENDPOINT option */
-
+	/* Following protected by udp_rwlock */
+	udp_bits_t	udp_bits;		/* Bit fields defined above */
 	uint8_t		udp_type_of_service;	/* IP_TOS option */
 	uint8_t		udp_ttl;		/* TTL or hoplimit */
-
 	ip6_pkt_t	udp_sticky_ipp;		/* Sticky options */
 	uint8_t		*udp_sticky_hdrs;	/* Prebuilt IPv6 hdrs */
 	uint_t		udp_sticky_hdrs_len;	/* Incl. ip6h and any ip6i */
+
+	/* Following 2 fields protected by the uf_lock */
 	struct udp_s	*udp_bind_hash; /* Bind hash chain */
 	struct udp_s	**udp_ptpbhn; /* Pointer to previous bind hash next. */
-	udp_mode_t	udp_mode;	/* Current mode of operation */
-	mblk_t		*udp_mphead;	/* Head of the queued operations */
-	mblk_t		*udp_mptail;	/* Tail of the queued operations */
-	uint_t		udp_mpcount;	/* Number of messages in the queue */
-	uint_t		udp_reader_count; /* Number of reader threads */
-	uint_t		udp_squeue_count; /* Number of messages in conn_sqp */
 
 	kmutex_t	udp_drain_lock;		/* lock for udp_rcv_list */
+	/* Protected by udp_drain_lock */
 	boolean_t	udp_drain_qfull;	/* drain queue is full */
+
+	/* Following protected by udp_rwlock */
 	mblk_t		*udp_rcv_list_head;	/* b_next chain of mblks */
 	mblk_t		*udp_rcv_list_tail;	/* last mblk in chain */
 	uint_t		udp_rcv_cnt;		/* total data in rcv_list */
-	uint_t		udp_rcv_msgcnt;		/* total messages in rcv_list */
+	uint_t		udp_rcv_msgcnt;		/* total msgs in rcv_list */
 	size_t		udp_rcv_hiwat;		/* receive high watermark */
 	uint_t		udp_label_len;		/* length of security label */
 	uint_t		udp_label_len_v6;	/* len of v6 security label */
@@ -268,7 +331,6 @@ typedef	struct udp_s {
 	pid_t		udp_open_pid;	/* process id when this was opened */
 	udp_stack_t	*udp_us;		/* Stack instance for zone */
 } udp_t;
-#define	udp_mib	udp_us->us_udp_mib
 
 /* UDP Protocol header */
 /* UDP Protocol header aligned */
@@ -303,22 +365,20 @@ typedef	struct udpahdr_s {
 #define	UDP_DBGSTAT(us, x)
 #endif /* DEBUG */
 
-extern major_t	UDP6_MAJ;
-
 extern int	udp_opt_default(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	udp_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	udp_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
 		    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
-extern int	udp_snmp_get(queue_t *, mblk_t *);
+extern mblk_t	*udp_snmp_get(queue_t *, mblk_t *);
 extern int	udp_snmp_set(queue_t *, t_scalar_t, t_scalar_t, uchar_t *, int);
 extern void	udp_close_free(conn_t *);
 extern void	udp_quiesce_conn(conn_t *);
 extern void	udp_ddi_init(void);
 extern void	udp_ddi_destroy(void);
 extern void	udp_resume_bind(conn_t *, mblk_t *);
-extern void	udp_conn_recv(conn_t *, mblk_t *);
-extern void	udp_wput_data(queue_t *, mblk_t *, struct sockaddr *,
-		    socklen_t);
+extern void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
+		    socklen_t addrlen);
+extern void	udp_wput(queue_t *, mblk_t *);
 
 extern int	udp_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
     uchar_t *ptr);

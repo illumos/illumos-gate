@@ -230,7 +230,6 @@ f none kernel/strmod/sparcv9/pipemod 755 root sys
 f none kernel/strmod/sparcv9/ptem 755 root sys
 f none kernel/strmod/sparcv9/redirmod 755 root sys
 f none kernel/strmod/sparcv9/rpcmod 755 root sys
-l none kernel/strmod/sparcv9/rts=../../../kernel/drv/sparcv9/rts
 l none kernel/strmod/sparcv9/tcp=../../../kernel/drv/sparcv9/tcp
 f none kernel/strmod/sparcv9/timod 755 root sys
 f none kernel/strmod/sparcv9/tirdwr 755 root sys

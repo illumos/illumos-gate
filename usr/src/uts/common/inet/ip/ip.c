@@ -69,6 +69,7 @@
 #include <inet/nd.h>
 #include <inet/arp.h>
 #include <inet/snmpcom.h>
+#include <inet/optcom.h>
 #include <inet/kstatcom.h>
 
 #include <netinet/igmp_var.h>
@@ -87,7 +88,6 @@
 #include <inet/ip_ire.h>
 #include <inet/ip_ftable.h>
 #include <inet/ip_rts.h>
-#include <inet/optcom.h>
 #include <inet/ip_ndp.h>
 #include <inet/ip_listutils.h>
 #include <netinet/igmp.h>
@@ -118,6 +118,8 @@
 #include <inet/sctp_ip.h>
 #include <inet/sctp/sctp_impl.h>
 #include <inet/udp_impl.h>
+#include <inet/rawip_impl.h>
+#include <inet/rts_impl.h>
 #include <sys/sunddi.h>
 
 #include <sys/tsol/label.h>
@@ -135,16 +137,6 @@ int ip_squeue_enter = 2;	/* Setable in /etc/system */
 
 squeue_func_t ip_input_proc;
 #define	SET_BPREV_FLAG(x)	((mblk_t *)(uintptr_t)(x))
-
-#define	TCP6 "tcp6"
-#define	TCP "tcp"
-#define	SCTP "sctp"
-#define	SCTP6 "sctp6"
-
-major_t TCP6_MAJ;
-major_t TCP_MAJ;
-major_t SCTP_MAJ;
-major_t SCTP6_MAJ;
 
 /*
  * Setable in /etc/system
@@ -610,6 +602,8 @@ uint_t ip_max_frag_dups = 10;
 
 static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 
+static int	ip_open(queue_t *q, dev_t *devp, int flag, int sflag,
+		    cred_t *credp, boolean_t isv6);
 static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
 
 static void	icmp_frag_needed(queue_t *, mblk_t *, int, zoneid_t,
@@ -673,7 +667,7 @@ static int	ip_rput_options(queue_t *, mblk_t *, ipha_t *, ipaddr_t *,
     ip_stack_t *);
 static boolean_t ip_rput_fragment(queue_t *, mblk_t **, ipha_t *, uint32_t *,
 		    uint16_t *);
-int		ip_snmp_get(queue_t *, mblk_t *);
+int		ip_snmp_get(queue_t *, mblk_t *, int);
 static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *,
 		    mib2_ipIfStatsEntry_t *, ip_stack_t *);
 static mblk_t	*ip_snmp_get_mib2_ip_traffic_stats(queue_t *, mblk_t *,
@@ -1367,28 +1361,49 @@ struct module_info ip_mod_info = {
  * problem by making the symbols here distinct from those in udp.c.
  */
 
-static struct qinit iprinit = {
-	(pfi_t)ip_rput, NULL, ip_open, ip_close, NULL,
+/*
+ * Entry points for IP as a device and as a module.
+ * FIXME: down the road we might want a separate module and driver qinit.
+ * We have separate open functions for the /dev/ip and /dev/ip6 devices.
+ */
+static struct qinit iprinitv4 = {
+	(pfi_t)ip_rput, NULL, ip_openv4, ip_close, NULL,
 	&ip_mod_info
 };
 
-static struct qinit ipwinit = {
-	(pfi_t)ip_wput, (pfi_t)ip_wsrv, ip_open, ip_close, NULL,
+struct qinit iprinitv6 = {
+	(pfi_t)ip_rput_v6, NULL, ip_openv6, ip_close, NULL,
+	&ip_mod_info
+};
+
+static struct qinit ipwinitv4 = {
+	(pfi_t)ip_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL,
+	&ip_mod_info
+};
+
+struct qinit ipwinitv6 = {
+	(pfi_t)ip_wput_v6, (pfi_t)ip_wsrv, NULL, NULL, NULL,
 	&ip_mod_info
 };
 
 static struct qinit iplrinit = {
-	(pfi_t)ip_lrput, NULL, ip_open, ip_close, NULL,
+	(pfi_t)ip_lrput, NULL, ip_openv4, ip_close, NULL,
 	&ip_mod_info
 };
 
 static struct qinit iplwinit = {
-	(pfi_t)ip_lwput, NULL, ip_open, ip_close, NULL,
+	(pfi_t)ip_lwput, NULL, NULL, NULL, NULL,
 	&ip_mod_info
 };
 
-struct streamtab ipinfo = {
-	&iprinit, &ipwinit, &iplrinit, &iplwinit
+/* For AF_INET aka /dev/ip */
+struct streamtab ipinfov4 = {
+	&iprinitv4, &ipwinitv4, &iplrinit, &iplwinit
+};
+
+/* For AF_INET6 aka /dev/ip6 */
+struct streamtab ipinfov6 = {
+	&iprinitv6, &ipwinitv6, &iplrinit, &iplwinit
 };
 
 #ifdef	DEBUG
@@ -4660,14 +4675,7 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 		connp->conn_fport = 0;
 		/*
 		 * Do we need to add a check to reject Multicast packets
-		 *
-		 * We need to make sure that the conn_recv is set to a non-null
-		 * value before we insert the conn into the classifier table.
-		 * This is to avoid a race with an incoming packet which does an
-		 * ipcl_classify().
 		 */
-		if (*mp->b_wptr == IPPROTO_TCP)
-			connp->conn_recv = tcp_conn_request;
 		error = ipcl_bind_insert(connp, *mp->b_wptr, src_addr, lport);
 	}
 
@@ -4683,8 +4691,6 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 				/* Falls through to bad_addr */
 			}
 		}
-	} else if (connp->conn_ulp == IPPROTO_TCP) {
-		connp->conn_recv = tcp_input;
 	}
 bad_addr:
 	if (error != 0) {
@@ -5124,12 +5130,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		/*
 		 * The addresses have been verified. Time to insert in
 		 * the correct fanout list.
-		 * We need to make sure that the conn_recv is set to a non-null
-		 * value before we insert into the classifier table to avoid a
-		 * race with an incoming packet which does an ipcl_classify().
 		 */
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_input;
 		error = ipcl_conn_insert(connp, protocol, src_addr,
 		    dst_addr, connp->conn_ports);
 	}
@@ -5494,7 +5495,7 @@ ip_modclose(ill_t *ill)
 }
 
 /*
- * This is called as part of close() for both IP and UDP
+ * This is called as part of close() for IP, UDP, ICMP, and RTS
  * in order to quiesce the conn.
  */
 void
@@ -5529,9 +5530,6 @@ ip_quiesce_conn(conn_t *connp)
 		ilg_cleanup_reqd = B_TRUE;
 	mutex_exit(&connp->conn_lock);
 
-	if (IPCL_IS_UDP(connp))
-		udp_quiesce_conn(connp);
-
 	if (conn_ioctl_cleanup_reqd)
 		conn_ioctl_cleanup(connp);
 
@@ -5560,8 +5558,7 @@ ip_quiesce_conn(conn_t *connp)
 	if (drain_cleanup_reqd)
 		conn_drain_tail(connp, B_TRUE);
 
-	if (connp->conn_rq == ipst->ips_ip_g_mrouter ||
-	    connp->conn_wq == ipst->ips_ip_g_mrouter)
+	if (connp == ipst->ips_ip_g_mrouter)
 		(void) ip_mrouter_done(NULL, ipst);
 
 	if (ilg_cleanup_reqd)
@@ -5617,26 +5614,6 @@ ip_close(queue_t *q, int flags)
 	 */
 	ASSERT(connp->conn_ref == 1);
 
-	/*
-	 * A conn which was previously marked as IPCL_UDP cannot
-	 * retain the flag because it would have been cleared by
-	 * udp_close().
-	 */
-	ASSERT(!IPCL_IS_UDP(connp));
-
-	if (connp->conn_latch != NULL) {
-		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
-		connp->conn_latch = NULL;
-	}
-	if (connp->conn_policy != NULL) {
-		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
-		connp->conn_policy = NULL;
-	}
-	if (connp->conn_ipsec_opt_mp != NULL) {
-		freemsg(connp->conn_ipsec_opt_mp);
-		connp->conn_ipsec_opt_mp = NULL;
-	}
-
 	inet_minor_free(ip_minor_arena, connp->conn_dev);
 
 	connp->conn_ref--;
@@ -5644,83 +5621,6 @@ ip_close(queue_t *q, int flags)
 
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	return (0);
-}
-
-int
-ip_snmpmod_close(queue_t *q)
-{
-	conn_t *connp = Q_TO_CONN(q);
-	ASSERT(connp->conn_flags & (IPCL_TCPMOD | IPCL_UDPMOD));
-
-	qprocsoff(q);
-
-	if (connp->conn_flags & IPCL_UDPMOD)
-		udp_close_free(connp);
-
-	if (connp->conn_cred != NULL) {
-		crfree(connp->conn_cred);
-		connp->conn_cred = NULL;
-	}
-	CONN_DEC_REF(connp);
-	q->q_ptr = WR(q)->q_ptr = NULL;
-	return (0);
-}
-
-/*
- * Write side put procedure for TCP module or UDP module instance.  TCP/UDP
- * as a module is only used for MIB browsers that push TCP/UDP over IP or ARP.
- * The only supported primitives are T_SVR4_OPTMGMT_REQ and T_OPTMGMT_REQ.
- * M_FLUSH messages and ioctls are only passed downstream; we don't flush our
- * queues as we never enqueue messages there and we don't handle any ioctls.
- * Everything else is freed.
- */
-void
-ip_snmpmod_wput(queue_t *q, mblk_t *mp)
-{
-	conn_t	*connp = q->q_ptr;
-	pfi_t	setfn;
-	pfi_t	getfn;
-
-	ASSERT(connp->conn_flags & (IPCL_TCPMOD | IPCL_UDPMOD));
-
-	switch (DB_TYPE(mp)) {
-	case M_PROTO:
-	case M_PCPROTO:
-		if ((MBLKL(mp) >= sizeof (t_scalar_t)) &&
-		    ((((union T_primitives *)mp->b_rptr)->type ==
-		    T_SVR4_OPTMGMT_REQ) ||
-		    (((union T_primitives *)mp->b_rptr)->type ==
-		    T_OPTMGMT_REQ))) {
-			/*
-			 * This is the only TPI primitive supported. Its
-			 * handling does not require tcp_t, but it does require
-			 * conn_t to check permissions.
-			 */
-			cred_t	*cr = DB_CREDDEF(mp, connp->conn_cred);
-
-			if (connp->conn_flags & IPCL_TCPMOD) {
-				setfn = tcp_snmp_set;
-				getfn = tcp_snmp_get;
-			} else {
-				setfn = udp_snmp_set;
-				getfn = udp_snmp_get;
-			}
-			if (!snmpcom_req(q, mp, setfn, getfn, cr)) {
-				freemsg(mp);
-				return;
-			}
-		} else if ((mp = mi_tpi_err_ack_alloc(mp, TPROTO, ENOTSUP))
-		    != NULL)
-			qreply(q, mp);
-		break;
-	case M_FLUSH:
-	case M_IOCTL:
-		putnext(q, mp);
-		break;
-	default:
-		freemsg(mp);
-		break;
-	}
 }
 
 /* Return the IP checksum for the IP header at "iph". */
@@ -5758,6 +5658,9 @@ ip_ddi_destroy(void)
 {
 	tnet_fini();
 
+	icmp_ddi_destroy();
+	rts_ddi_destroy();
+	udp_ddi_destroy();
 	sctp_ddi_g_destroy();
 	tcp_ddi_g_destroy();
 	ipsec_policy_g_destroy();
@@ -5925,11 +5828,6 @@ ip_thread_exit(void *phash)
 void
 ip_ddi_init(void)
 {
-	TCP6_MAJ = ddi_name_to_major(TCP6);
-	TCP_MAJ	= ddi_name_to_major(TCP);
-	SCTP_MAJ = ddi_name_to_major(SCTP);
-	SCTP6_MAJ = ddi_name_to_major(SCTP6);
-
 	ip_input_proc = ip_squeue_switch(ip_squeue_enter);
 
 	/*
@@ -5968,6 +5866,10 @@ ip_ddi_init(void)
 	sctp_ddi_g_init();
 
 	tnet_init();
+
+	udp_ddi_init();
+	rts_ddi_init();
+	icmp_ddi_init();
 }
 
 /*
@@ -6623,7 +6525,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
 				if (mctl_present)
 					freeb(first_mp1);
-				putnext(rq, mp1);
+				(connp->conn_recv)(connp, mp1, NULL);
 			}
 		}
 		mutex_enter(&connfp->connf_lock);
@@ -6669,6 +6571,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 			 *
 			 * Send the WHOLE packet up (incl. IPSEC_IN) without
 			 * a policy check.
+			 * FIXME to use conn_recv for tun later.
 			 */
 			putnext(rq, first_mp);
 			CONN_DEC_REF(connp);
@@ -6723,7 +6626,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 				    in_flags, IPCL_ZONEID(connp), ipst);
 			}
 			BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
-			putnext(rq, mp);
+			(connp->conn_recv)(connp, mp, NULL);
 			if (mctl_present)
 				freeb(first_mp);
 		}
@@ -6935,7 +6838,8 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		squeue_enter_nodrain(connp->conn_sqp, first_mp,
 		    connp->conn_recv, connp, SQTAG_IP_FANOUT_TCP);
 	} else {
-		putnext(connp->conn_rq, first_mp);
+		/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
+		(connp->conn_recv)(connp, first_mp, NULL);
 		CONN_DEC_REF(connp);
 	}
 }
@@ -7176,7 +7080,7 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	}
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	/* Send it upstream */
-	CONN_UDP_RECV(connp, mp);
+	(connp->conn_recv)(connp, mp, NULL);
 }
 
 /*
@@ -9830,9 +9734,24 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	return (0);
 }
 
+/* For /dev/ip aka AF_INET open */
+int
+ip_openv4(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (ip_open(q, devp, flag, sflag, credp, B_FALSE));
+}
+
+/* For /dev/ip6 aka AF_INET6 open */
+int
+ip_openv6(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (ip_open(q, devp, flag, sflag, credp, B_TRUE));
+}
+
 /* IP open routine. */
 int
-ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
+    boolean_t isv6)
 {
 	conn_t 		*connp;
 	major_t		maj;
@@ -9886,10 +9805,10 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		connp->conn_flags |= IPCL_SOCKET;
 
 	/* Minor tells us which /dev entry was opened */
-	if (geteminor(*devp) == IPV6_MINOR) {
+	if (isv6) {
 		connp->conn_flags |= IPCL_ISV6;
 		connp->conn_af_isv6 = B_TRUE;
-		ip_setqinfo(q, geteminor(*devp), B_FALSE, ipst);
+		ip_setpktversion(connp, isv6, B_FALSE, ipst);
 		connp->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
 	} else {
 		connp->conn_af_isv6 = B_FALSE;
@@ -9919,19 +9838,9 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
 		connp->conn_mac_exempt = B_TRUE;
 
-	/*
-	 * This should only happen for ndd, netstat, raw socket or other SCTP
-	 * administrative ops.  In these cases, we just need a normal conn_t
-	 * with ulp set to IPPROTO_SCTP.  All other ops are trapped and
-	 * an error will be returned.
-	 */
-	if (maj != SCTP_MAJ && maj != SCTP6_MAJ) {
-		connp->conn_rq = q;
-		connp->conn_wq = WR(q);
-	} else {
-		connp->conn_ulp = IPPROTO_SCTP;
-		connp->conn_rq = connp->conn_wq = NULL;
-	}
+	connp->conn_rq = q;
+	connp->conn_wq = WR(q);
+
 	/* Non-zero default values */
 	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
 
@@ -9949,34 +9858,28 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 }
 
 /*
- * Change q_qinfo based on the value of isv6.
- * This can not called on an ill queue.
- * Note that there is no race since either q_qinfo works for conn queues - it
- * is just an optimization to enter the best wput routine directly.
+ * Change the output format (IPv4 vs. IPv6) for a conn_t.
+ * Note that there is no race since either ip_output function works - it
+ * is just an optimization to enter the best ip_output routine directly.
  */
 void
-ip_setqinfo(queue_t *q, minor_t minor, boolean_t bump_mib, ip_stack_t *ipst)
+ip_setpktversion(conn_t *connp, boolean_t isv6, boolean_t bump_mib,
+    ip_stack_t *ipst)
 {
-	ASSERT(q->q_flag & QREADR);
-	ASSERT(WR(q)->q_next == NULL);
-	ASSERT(q->q_ptr != NULL);
-
-	if (minor == IPV6_MINOR)  {
+	if (isv6)  {
 		if (bump_mib) {
 			BUMP_MIB(&ipst->ips_ip6_mib,
 			    ipIfStatsOutSwitchIPVersion);
 		}
-		q->q_qinfo = &rinit_ipv6;
-		WR(q)->q_qinfo = &winit_ipv6;
-		(Q_TO_CONN(q))->conn_pkt_isv6 = B_TRUE;
+		connp->conn_send = ip_output_v6;
+		connp->conn_pkt_isv6 = B_TRUE;
 	} else {
 		if (bump_mib) {
 			BUMP_MIB(&ipst->ips_ip_mib,
 			    ipIfStatsOutSwitchIPVersion);
 		}
-		q->q_qinfo = &iprinit;
-		WR(q)->q_qinfo = &ipwinit;
-		(Q_TO_CONN(q))->conn_pkt_isv6 = B_FALSE;
+		connp->conn_send = ip_output;
+		connp->conn_pkt_isv6 = B_FALSE;
 	}
 
 }
@@ -10082,11 +9985,11 @@ conn_restart_ipsec_waiter(conn_t *connp, void *arg)
 		optreq_prim = ((union T_primitives *)mp->b_rptr)->type;
 		if (optreq_prim == T_OPTMGMT_REQ) {
 			err = tpi_optcom_req(CONNP_TO_WQ(connp), mp, cr,
-			    &ip_opt_obj);
+			    &ip_opt_obj, B_FALSE);
 		} else {
 			ASSERT(optreq_prim == T_SVR4_OPTMGMT_REQ);
 			err = svr4_optcom_req(CONNP_TO_WQ(connp), mp, cr,
-			    &ip_opt_obj);
+			    &ip_opt_obj, B_FALSE);
 		}
 		if (err != EINPROGRESS)
 			CONN_OPER_PENDING_DONE(connp);
@@ -10642,8 +10545,8 @@ setit:
 			/*
 			 * For backward compatibility, this option
 			 * implicitly sets ip_multicast_ill as used in
-			 * IP_MULTICAST_IF so that ip_wput gets
-			 * this ipif to send mcast packets.
+			 * IPV6_MULTICAST_IF so that ip_wput gets
+			 * this ill to send mcast packets.
 			 */
 			connp->conn_multicast_ill = ill;
 			connp->conn_orig_multicast_ifindex = (ill == NULL) ?
@@ -12884,7 +12787,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			if (ip_udp_check(q, connp, recv_ill,
 			    ipha, &mp, &first_mp, mctl_present, ire)) {
 				/* Send it upstream */
-				CONN_UDP_RECV(connp, mp);
+				(connp->conn_recv)(connp, mp, NULL);
 			}
 		}
 		/*
@@ -13310,7 +13213,8 @@ try_again:
 		SET_SQUEUE(first_mp, connp->conn_recv, connp);
 		return (first_mp);
 	} else {
-		putnext(connp->conn_rq, first_mp);
+		/* SOCK_RAW, IPPROTO_TCP case */
+		(connp->conn_recv)(connp, first_mp, NULL);
 		CONN_DEC_REF(connp);
 		return (NULL);
 	}
@@ -16415,7 +16319,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	uint32_t	ill_index;
 	ill_t		*out_ill;
 	mib2_ipIfStatsEntry_t *mibptr;
-	ip_stack_t	*ipst = in_ill->ill_ipst;
+	ip_stack_t	*ipst = ((ill_t *)(ire->ire_stq->q_ptr))->ill_ipst;
 
 	/* Get the ill_index of the incoming ILL */
 	ill_index = (in_ill != NULL) ? in_ill->ill_phyint->phyint_ifindex : 0;
@@ -18008,11 +17912,10 @@ bad_src_route:
  * should free mpctl.
  */
 int
-ip_snmp_get(queue_t *q, mblk_t *mpctl)
+ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 {
 	ip_stack_t *ipst;
 	sctp_stack_t *sctps;
-
 
 	if (q->q_next != NULL) {
 		ipst = ILLQ_TO_IPST(q);
@@ -18024,6 +17927,33 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl)
 
 	if (mpctl == NULL || mpctl->b_cont == NULL) {
 		return (0);
+	}
+
+	/*
+	 * For the purposes of the (broken) packet shell use
+	 * of the level we make sure MIB2_TCP/MIB2_UDP can be used
+	 * to make TCP and UDP appear first in the list of mib items.
+	 * TBD: We could expand this and use it in netstat so that
+	 * the kernel doesn't have to produce large tables (connections,
+	 * routes, etc) when netstat only wants the statistics or a particular
+	 * table.
+	 */
+	if (!(level == MIB2_TCP || level == MIB2_UDP)) {
+		if ((mpctl = icmp_snmp_get(q, mpctl)) == NULL) {
+			return (1);
+		}
+	}
+
+	if (level != MIB2_TCP) {
+		if ((mpctl = udp_snmp_get(q, mpctl)) == NULL) {
+			return (1);
+		}
+	}
+
+	if (level != MIB2_UDP) {
+		if ((mpctl = tcp_snmp_get(q, mpctl)) == NULL) {
+			return (1);
+		}
 	}
 
 	if ((mpctl = ip_snmp_get_mib2_ip_traffic_stats(q, mpctl,
@@ -20003,14 +19933,6 @@ ip_unbind(queue_t *q, mblk_t *mp)
 	if (mp == NULL)
 		return (NULL);
 
-	/*
-	 * Don't bzero the ports if its TCP since TCP still needs the
-	 * lport to remove it from its own bind hash. TCP will do the
-	 * cleanup.
-	 */
-	if (!IPCL_IS_TCP(connp))
-		bzero(&connp->u_port, sizeof (connp->u_port));
-
 	return (mp);
 }
 
@@ -20764,13 +20686,9 @@ version_hdrlen_check:
 		 */
 		if (((v_hlen >> 4) & 0x7) == IPV6_VERSION) {
 			/*
-			 * XXX implement a IPv4 and IPv6 packet counter per
-			 * conn and switch when ratio exceeds e.g. 10:1
+			 * FIXME: assume that callers of ip_output* call
+			 * the right version?
 			 */
-#ifdef notyet
-			if (q->q_next == NULL) /* Avoid ill queue */
-				ip_setqinfo(RD(q), B_TRUE, B_TRUE, ipst);
-#endif
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutWrongIPVersion);
 			ASSERT(xmit_ill == NULL);
 			if (attach_ill != NULL)
@@ -26807,11 +26725,11 @@ ip_restart_optmgmt(ipsq_t *dummy_sq, queue_t *q, mblk_t *first_mp, void *dummy)
 	 */
 	if (or->or_type == T_SVR4_OPTMGMT_REQ) {
 		err = svr4_optcom_req(q, first_mp, NULL,
-		    &ip_opt_obj);
+		    &ip_opt_obj, B_FALSE);
 	} else {
 		ASSERT(or->or_type == T_OPTMGMT_REQ);
 		err = tpi_optcom_req(q, first_mp, NULL,
-		    &ip_opt_obj);
+		    &ip_opt_obj, B_FALSE);
 	}
 	if (err != EINPROGRESS) {
 		/* operation is done */
@@ -27142,13 +27060,6 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	cr = DB_CREDDEF(mp, GET_QUEUE_CRED(q));
 
-	/* Check if it is a queue to /dev/sctp. */
-	if (connp != NULL && connp->conn_ulp == IPPROTO_SCTP &&
-	    connp->conn_rq == NULL) {
-		sctp_wput(q, mp);
-		return;
-	}
-
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
 		/*
@@ -27304,18 +27215,6 @@ nak:
 			return;
 		}
 
-		if (connp != NULL && *(uint32_t *)mp->b_rptr ==
-		    IP_ULP_OUT_LABELED) {
-			out_labeled_t *olp;
-
-			if (mp->b_wptr - mp->b_rptr != sizeof (*olp))
-				break;
-			olp = (out_labeled_t *)mp->b_rptr;
-			connp->conn_ulp_labeled = olp->out_qnext == q;
-			freemsg(mp);
-			return;
-		}
-
 		/* M_CTL messages are used by ARP to tell us things. */
 		if ((mp->b_wptr - mp->b_rptr) < sizeof (arc_t))
 			break;
@@ -27385,21 +27284,19 @@ nak:
 				goto protonak;
 			}
 			/*
-			 * Both TCP and UDP call ip_bind_{v4,v6}() directly
-			 * instead of going through this path.  We only get
-			 * here in the following cases:
-			 *
-			 * a. Bind retries, where ipsq is non-NULL.
-			 * b. T_BIND_REQ is issued from non TCP/UDP
-			 *    transport, e.g. icmp for raw socket,
-			 *    in which case ipsq will be NULL.
+			 * The transports except SCTP call ip_bind_{v4,v6}()
+			 * directly instead of a a putnext. SCTP doesn't
+			 * generate any T_BIND_REQ since it has its own
+			 * fanout data structures. However, ESP and AH
+			 * come in for regular binds; all other cases are
+			 * bind retries.
 			 */
-			ASSERT(ipsq != NULL ||
-			    (!IPCL_IS_TCP(connp) && !IPCL_IS_UDP(connp)));
+			ASSERT(!IPCL_IS_SCTP(connp));
 
 			/* Don't increment refcnt if this is a re-entry */
 			if (ipsq == NULL)
 				CONN_INC_REF(connp);
+
 			mp = connp->conn_af_isv6 ? ip_bind_v6(q, mp,
 			    connp, NULL) : ip_bind_v4(q, mp, connp);
 			if (mp == NULL)
@@ -27414,7 +27311,6 @@ nak:
 				squeue_fill(connp->conn_sqp, mp,
 				    ip_resume_tcp_bind, connp,
 				    SQTAG_BIND_RETRY);
-				return;
 			} else if (IPCL_IS_UDP(connp)) {
 				/*
 				 * In the case of UDP endpoint we
@@ -27422,10 +27318,18 @@ nak:
 				 */
 				ASSERT(ipsq != NULL);
 				udp_resume_bind(connp, mp);
-				return;
+			} else if (IPCL_IS_RAWIP(connp)) {
+				/*
+				 * In the case of RAWIP endpoint we
+				 * come here only for bind retries
+				 */
+				ASSERT(ipsq != NULL);
+				rawip_resume_bind(connp, mp);
+			} else {
+				/* The case of AH and ESP */
+				qreply(q, mp);
+				CONN_OPER_PENDING_DONE(connp);
 			}
-			qreply(q, mp);
-			CONN_OPER_PENDING_DONE(connp);
 			return;
 		}
 		case T_SVR4_OPTMGMT_REQ:
@@ -27452,7 +27356,8 @@ nak:
 				CONN_INC_REF(connp);
 				if (ip_check_for_ipsec_opt(q, mp))
 					return;
-				err = svr4_optcom_req(q, mp, cr, &ip_opt_obj);
+				err = svr4_optcom_req(q, mp, cr, &ip_opt_obj,
+				    B_FALSE);
 				if (err != EINPROGRESS) {
 					/* Operation is done */
 					CONN_OPER_PENDING_DONE(connp);
@@ -27482,7 +27387,7 @@ nak:
 			CONN_INC_REF(connp);
 			if (ip_check_for_ipsec_opt(q, mp))
 				return;
-			err = tpi_optcom_req(q, mp, cr, &ip_opt_obj);
+			err = tpi_optcom_req(q, mp, cr, &ip_opt_obj, B_FALSE);
 			if (err != EINPROGRESS) {
 				/* Operation is done */
 				CONN_OPER_PENDING_DONE(connp);
@@ -28459,7 +28364,7 @@ conn_walk_fanout_table(connf_t *connfp, uint_t count, pfv_t func, void *arg,
 	}
 }
 
-/* ipcl_walk routine invoked for ip_conn_report for each conn. */
+/* conn_walk_fanout routine invoked for ip_conn_report for each conn. */
 static void
 conn_report1(conn_t *connp, void *mp)
 {
@@ -29745,8 +29650,9 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 	/*
 	 * We are sending the IPSEC_IN message also up. Refer
 	 * to comments above this function.
+	 * This is the SOCK_RAW, IPPROTO_SCTP case.
 	 */
-	putnext(rq, mp);
+	(connp->conn_recv)(connp, mp, NULL);
 	CONN_DEC_REF(connp);
 }
 

@@ -37,8 +37,9 @@
 #define	INET_NAME	"arp"
 #define	INET_MODDESC	"ARP STREAMS module %I%"
 #define	INET_DEVDESC	"ARP STREAMS driver %I%"
-#define	INET_DEVMINOR	IPV4_MINOR
-#define	INET_STRTAB	arpinfo
+#define	INET_DEVMINOR	0
+#define	INET_DEVSTRTAB	ipinfov4
+#define	INET_MODSTRTAB	arpinfo
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
 #define	INET_MODMTFLAGS	(D_MP | D_MTPERMOD)
 
@@ -51,8 +52,6 @@ int
 _init(void)
 {
 	int	error;
-
-	INET_BECOME_IP();
 
 	/*
 	 * Note: After mod_install succeeds, another thread can enter

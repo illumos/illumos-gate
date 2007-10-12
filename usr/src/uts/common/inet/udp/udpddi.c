@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -35,51 +34,35 @@
 #include <inet/udp_impl.h>
 
 #define	INET_NAME	"udp"
-#define	INET_MODDESC	"UDP STREAMS module %I%"
+#define	INET_MODDESC	"UDP dummy STREAMS module %I%"
 #define	INET_DEVDESC	"UDP STREAMS driver %I%"
-#define	INET_DEVMINOR	IPV4_MINOR
-#define	INET_STRTAB	udpinfo
-#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS
+#define	INET_DEVMINOR	0
+#define	INET_MODSTRTAB	dummymodinfo
+#define	INET_DEVSTRTAB	udpinfov4
+#define	INET_MODMTFLAGS	D_MP
 /*
  * We define both synchronous STREAMS and sockfs direct-access
  * mode for UDP module instance, because it is autopushed on
  * top of /dev/ip for the sockets case.
  */
-#define	INET_MODMTFLAGS (D_MP|D_SYNCSTR|_D_DIRECT)
+#define	INET_DEVMTFLAGS (D_MP|D_SYNCSTR|_D_DIRECT)
 
 #include "../inetddi.c"
 
 int
 _init(void)
 {
-	int	error;
-
-	INET_BECOME_IP();
-
 	/*
-	 * Note: After mod_install succeeds, another thread can enter
-	 * therefore all initialization is done before it and any
-	 * de-initialization needed done if it fails.
+	 * device initialization happens when the actual code containing
+	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
 	 */
-	udp_ddi_init();
-	error = mod_install(&modlinkage);
-	if (error != 0)
-		udp_ddi_destroy();
-
-	return (error);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int	error;
-
-	error = mod_remove(&modlinkage);
-	if (error != 0)
-		return (error);
-
-	udp_ddi_destroy();
-	return (0);
+	return (mod_remove(&modlinkage));
 }
 
 int

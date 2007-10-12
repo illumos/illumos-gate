@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -34,18 +33,18 @@
 #include <inet/ip.h>
 
 #define	INET_NAME	"tcp"
-#define	INET_STRTAB	tcpinfo
+#define	INET_MODSTRTAB	dummymodinfo
+#define	INET_DEVSTRTAB	tcpinfov4
 #define	INET_DEVDESC	"TCP STREAMS driver %I%"
-#define	INET_MODDESC	"TCP STREAMS module %I%"
-#define	INET_DEVMINOR	TCP_MINOR
+#define	INET_MODDESC	"TCP dummy STREAMS module %I%"
+#define	INET_DEVMINOR	0
+#define	INET_MODMTFLAGS	D_MP
 /*
  * Note that unlike UDP, TCP uses synchronous STREAMS only
  * for TCP Fusion (loopback); this is why we don't define
- * D_SYNCSTR here.  Since TCP as a module is used only for
- * SNMP purposes, we define _D_DIRECT for device instance.
+ * D_SYNCSTR here.
  */
 #define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT)
-#define	INET_MODMTFLAGS	D_MP
 
 #include "../inetddi.c"
 
@@ -53,8 +52,8 @@ int
 _init(void)
 {
 	/*
-	 * device initialization occurs in ipddi.c:_init()
-	 * (i.e. it must be called before this routine)
+	 * device initialization happens when the actual code containing
+	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
 	 */
 	return (mod_install(&modlinkage));
 }

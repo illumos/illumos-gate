@@ -204,23 +204,13 @@ typedef struct opt_restart_s {
 #define	SETFN_CONN_NEGOTIATE		4 /* semantics for T_CONN_*_REQ */
 
 /*
- * Object to represent database of options to search passed to
- * {sock,tpi}optcom_req() interface routine to take care of option
- * management and associated methods.
- */
-extern optdb_obj_t tcp_opt_obj;
-extern optdb_obj_t udp_opt_obj;
-extern optdb_obj_t ip_opt_obj;
-
-extern uint_t	tcp_max_optsize;
-extern uint_t	udp_max_optsize;
-
-/*
  * Function prototypes
  */
 extern void optcom_err_ack(queue_t *, mblk_t *, t_scalar_t, int);
-extern int svr4_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *);
-extern int tpi_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *);
+extern int svr4_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *,
+    boolean_t);
+extern int tpi_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *,
+    boolean_t);
 extern int  tpi_optcom_buf(queue_t *, mblk_t *, t_scalar_t *, t_scalar_t,
     cred_t *, optdb_obj_t *, void *, int *);
 extern t_uscalar_t optcom_max_optsize(opdes_t *, uint_t);

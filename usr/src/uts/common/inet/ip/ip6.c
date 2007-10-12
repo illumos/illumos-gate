@@ -69,6 +69,7 @@
 
 #include <inet/common.h>
 #include <inet/mi.h>
+#include <inet/optcom.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <inet/arp.h>
@@ -86,7 +87,6 @@
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_rts.h>
-#include <inet/optcom.h>
 #include <inet/ip_ndp.h>
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
@@ -98,6 +98,8 @@
 #include <inet/ipclassifier.h>
 #include <inet/ipsecah.h>
 #include <inet/udp_impl.h>
+#include <inet/rawip_impl.h>
+#include <inet/rts_impl.h>
 #include <sys/squeue.h>
 
 #include <sys/tsol/label.h>
@@ -207,9 +209,6 @@ static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *, ip_stack_t *);
 static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
     conn_t *, int, int, int, zoneid_t);
 
-void ip_rput_v6(queue_t *, mblk_t *);
-static void ip_wput_v6(queue_t *, mblk_t *);
-
 /*
  * A template for an IPv6 AR_ENTRY_QUERY
  */
@@ -227,24 +226,6 @@ static areq_t	ipv6_areq_template = {
 	1000,			/* (re)xmit_interval in milliseconds */
 	4			/* max # of requests to buffer */
 	/* anything else filled in by the code */
-};
-
-struct qinit rinit_ipv6 = {
-	(pfi_t)ip_rput_v6,
-	NULL,
-	ip_open,
-	ip_close,
-	NULL,
-	&ip_mod_info
-};
-
-struct qinit winit_ipv6 = {
-	(pfi_t)ip_wput_v6,
-	(pfi_t)ip_wsrv,
-	ip_open,
-	ip_close,
-	NULL,
-	&ip_mod_info
 };
 
 /*
@@ -791,23 +772,6 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill,
 	    mctl_present, zoneid);
 }
 
-static void
-pkt_too_big(conn_t *connp, void *arg)
-{
-	mblk_t *mp;
-
-	if (!connp->conn_ipv6_recvpathmtu)
-		return;
-
-	/* create message and drop it on this connections read queue */
-	if ((mp = dupb((mblk_t *)arg)) == NULL) {
-		return;
-	}
-	mp->b_datap->db_type = M_CTL;
-
-	putnext(connp->conn_rq, mp);
-}
-
 /*
  * Fanout received ICMPv6 error packets to the transports.
  * Assumes the IPv6 plus ICMPv6 headers have been pulled up but nothing else.
@@ -866,18 +830,6 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 
 	/* Set message type, must be done after pullups */
 	mp->b_datap->db_type = M_CTL;
-
-	if (icmp6->icmp6_type == ICMP6_PACKET_TOO_BIG) {
-		/*
-		 * Deliver indication of ICMP6_PACKET_TOO_BIG to interested
-		 * sockets.
-		 *
-		 * Note I don't like walking every connection to deliver
-		 * this information to a set of listeners.  A separate
-		 * list could be kept to keep the cost of this down.
-		 */
-		ipcl_walk(pkt_too_big, (void *)mp, ipst);
-	}
 
 	/* Try to pass the ICMP message to clients who need it */
 	switch (nexthdr) {
@@ -2327,15 +2279,11 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 			connp->conn_pkt_isv6 = B_TRUE;
 		}
 	}
-	/* Update qinfo if v4/v6 changed */
-	if ((orig_pkt_isv6 != connp->conn_pkt_isv6) &&
-	    !(IPCL_IS_TCP(connp) || IPCL_IS_UDP(connp))) {
-		if (connp->conn_pkt_isv6)
-			ip_setqinfo(RD(q), IPV6_MINOR, B_TRUE, ipst);
-		else
-			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE, ipst);
-	}
 
+	/* Update conn_send and pktversion if v4/v6 changed */
+	if (orig_pkt_isv6 != connp->conn_pkt_isv6) {
+		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
+	}
 	/*
 	 * Pass the IPSEC headers size in ire_ipsec_overhead.
 	 * We can't do this in ip_bind_insert_ire because the policy
@@ -2520,15 +2468,6 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 		connp->conn_remv6 = ipv6_all_zeros;
 		connp->conn_lport = lport;
 		connp->conn_fport = 0;
-
-		/*
-		 * We need to make sure that the conn_recv is set to a non-null
-		 * value before we insert the conn_t into the classifier table.
-		 * This is to avoid a race with an incoming packet which does
-		 * an ipcl_classify().
-		 */
-		if (*mp->b_wptr == IPPROTO_TCP)
-			connp->conn_recv = tcp_conn_request;
 		error = ipcl_bind_insert_v6(connp, *mp->b_wptr, v6src, lport);
 	}
 	if (error == 0) {
@@ -2544,8 +2483,6 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 				goto bad_addr;
 			}
 		}
-	} else if (connp->conn_ulp == IPPROTO_TCP) {
-		connp->conn_recv = tcp_input;
 	}
 bad_addr:
 	if (error != 0) {
@@ -2604,8 +2541,8 @@ ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
 		} else if (IPCL_IS_UDP(connp)) {
 			udp_resume_bind(connp, mp);
 		} else {
-			qreply(q, mp);
-			CONN_OPER_PENDING_DONE(connp);
+			ASSERT(IPCL_IS_RAWIP(connp));
+			rawip_resume_bind(connp, mp);
 		}
 	}
 }
@@ -3014,13 +2951,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		/*
 		 * The addresses have been verified. Time to insert in
 		 * the correct fanout list.
-		 * We need to make sure that the conn_recv is set to a non-null
-		 * value before we insert the conn_t into the classifier table.
-		 * This is to avoid a race with an incoming packet which does
-		 * an ipcl_classify().
 		 */
-		if (protocol == IPPROTO_TCP)
-			connp->conn_recv = tcp_input;
 		error = ipcl_conn_insert_v6(connp, protocol, v6src, v6dst,
 		    connp->conn_ports,
 		    IPCL_IS_TCP(connp) ? connp->conn_tcp->tcp_bound_if : 0);
@@ -3329,7 +3260,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 					freeb(first_mp1);
 				BUMP_MIB(ill->ill_ip_mib,
 				    ipIfStatsHCInDelivers);
-				putnext(rq, mp1);
+				(connp->conn_recv)(connp, mp1, NULL);
 			}
 		}
 		mutex_enter(&connfp->connf_lock);
@@ -3415,7 +3346,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 			}
 		}
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		putnext(rq, mp);
+		(connp->conn_recv)(connp, mp, NULL);
 		if (mctl_present)
 			freeb(first_mp);
 	}
@@ -3702,7 +3633,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		(*ip_input_proc)(connp->conn_sqp, first_mp,
 		    connp->conn_recv, connp, SQTAG_IP6_TCP_INPUT);
 	} else {
-		putnext(connp->conn_rq, first_mp);
+		/* SOCK_RAW, IPPROTO_TCP case */
+		(connp->conn_recv)(connp, first_mp, NULL);
 		CONN_DEC_REF(connp);
 	}
 }
@@ -3852,7 +3784,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 		/* Send it upstream */
-		CONN_UDP_RECV(connp, mp);
+		(connp->conn_recv)(connp, mp, NULL);
 
 		IP6_STAT(ipst, ip6_udp_fannorm);
 		CONN_DEC_REF(connp);
@@ -3946,7 +3878,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 			/* Send it upstream */
-			CONN_UDP_RECV(connp, mp1);
+			(connp->conn_recv)(connp, mp1, NULL);
 		}
 next_one:
 		mutex_enter(&connfp->connf_lock);
@@ -4013,7 +3945,7 @@ next_one:
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 		/* Send it upstream */
-		CONN_UDP_RECV(connp, mp);
+		(connp->conn_recv)(connp, mp, NULL);
 	}
 	IP6_STAT(ipst, ip6_udp_fanmb);
 	CONN_DEC_REF(connp);
@@ -8438,7 +8370,7 @@ udp_fanout:
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 	/* Send it upstream */
-	CONN_UDP_RECV(connp, mp);
+	(connp->conn_recv)(connp, mp, NULL);
 
 	CONN_DEC_REF(connp);
 	freemsg(hada_mp);
@@ -10469,22 +10401,16 @@ send_from_ill:
 	return;
 
 notv6:
-	/*
-	 * XXX implement a IPv4 and IPv6 packet counter per conn and
-	 * switch when ratio exceeds e.g. 10:1
-	 */
+	/* FIXME?: assume the caller calls the right version of ip_output? */
 	if (q->q_next == NULL) {
 		connp = Q_TO_CONN(q);
 
-		if (IPCL_IS_TCP(connp)) {
-			/* change conn_send for the tcp_v4_connections */
-			connp->conn_send = ip_output;
-		} else if (connp->conn_ulp == IPPROTO_SCTP) {
-			/* The 'q' is the default SCTP queue */
-			connp = (conn_t *)arg;
-		} else {
-			ip_setqinfo(RD(q), IPV4_MINOR, B_TRUE, ipst);
-		}
+		/*
+		 * We can change conn_send for all types of conn, even
+		 * though only TCP uses it right now.
+		 * FIXME: sctp could use conn_send but doesn't currently.
+		 */
+		ip_setpktversion(connp, B_FALSE, B_TRUE, ipst);
 	}
 	BUMP_MIB(mibptr, ipIfStatsOutWrongIPVersion);
 	(void) ip_output(arg, first_mp, arg2, caller);
@@ -10499,7 +10425,7 @@ notv6:
  * in which case we use the global zoneid since those are all part of
  * the global zone.
  */
-static void
+void
 ip_wput_v6(queue_t *q, mblk_t *mp)
 {
 	if (CONN_Q(q))

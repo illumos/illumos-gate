@@ -74,7 +74,7 @@ do
 		add_driver usbsacm
 		add_driver usbsprl
 		add_driver usbsksp
-		add_driver_replace rts
+		remove_driver rts
 		add_driver ipsecah
 		add_driver ipsecesp
 		add_driver_replace zs

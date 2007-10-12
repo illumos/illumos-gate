@@ -370,8 +370,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	void			*nl7c = NULL;
 
 	dprintso(so, 1, ("sotpi_bindlisten(%p, %p, %d, %d, 0x%x) %s\n",
-		so, name, namelen, backlog, flags,
-		pr_state(so->so_state, so->so_mode)));
+	    so, name, namelen, backlog, flags,
+	    pr_state(so->so_state, so->so_mode)));
 
 	tcp_udp_xport = so->so_type == SOCK_STREAM || so->so_type == SOCK_DGRAM;
 
@@ -406,8 +406,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			ASSERT(so->so_ux_bound_vp);
 			addr = &so->so_ux_laddr;
 			addrlen = (t_uscalar_t)sizeof (so->so_ux_laddr);
-			dprintso(so, 1,
-			("sobind rebind UNIX: addrlen %d, addr 0x%p, vp %p\n",
+			dprintso(so, 1, ("sobind rebind UNIX: addrlen %d, "
+			    "addr 0x%p, vp %p\n",
 			    addrlen,
 			    ((struct so_ux_addr *)addr)->soua_vp,
 			    so->so_ux_bound_vp));
@@ -435,7 +435,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * just like BSD.
 			 */
 			so->so_laddr_len =
-				(socklen_t)sizeof (struct sockaddr);
+			    (socklen_t)sizeof (struct sockaddr);
 			ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
 			bzero(so->so_laddr_sa, so->so_laddr_len);
 			so->so_laddr_sa->sa_family = so->so_family;
@@ -519,7 +519,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			ASSERT(!(so->so_state & SS_ISBOUND));
 			if (name == NULL) {
 				so->so_state &=
-					~(SS_ISCONNECTED|SS_ISCONNECTING);
+				    ~(SS_ISCONNECTED|SS_ISCONNECTING);
 				goto done;
 			}
 		}
@@ -674,7 +674,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			break;
 		case AF_UNIX: {
 			struct sockaddr_un *soun =
-				(struct sockaddr_un *)so->so_laddr_sa;
+			    (struct sockaddr_un *)so->so_laddr_sa;
 			struct vnode *vp;
 			struct vattr vattr;
 
@@ -700,7 +700,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			vattr.va_mask = AT_TYPE|AT_MODE;
 			/* NOTE: holding so_lock */
 			error = vn_create(soun->sun_path, UIO_SYSSPACE, &vattr,
-						EXCL, 0, &vp, CRMKNOD, 0, 0);
+			    EXCL, 0, &vp, CRMKNOD, 0, 0);
 			if (error) {
 				if (error == EEXIST)
 					error = EADDRINUSE;
@@ -794,7 +794,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	bind_req.CONIND_number = backlog;
 	/* NOTE: holding so_lock while sleeping */
 	mp = soallocproto2(&bind_req, sizeof (bind_req),
-				addr, addrlen, 0, _ALLOC_SLEEP);
+	    addr, addrlen, 0, _ALLOC_SLEEP);
 	so->so_state &= ~SS_LADDR_VALID;
 
 	/* Done using so_laddr_sa - can drop the lock */
@@ -831,7 +831,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	}
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	if (error) {
 		eprintsoline(so, error);
 		mutex_enter(&so->so_lock);
@@ -879,8 +879,8 @@ skip_transport:
 	 * a sockaddr_in.
 	 */
 	addr = sogetoff(mp, bind_ack->ADDR_offset,
-			bind_ack->ADDR_length,
-			__TPI_ALIGN_SIZE);
+	    bind_ack->ADDR_length,
+	    __TPI_ALIGN_SIZE);
 	if (addr == NULL) {
 		freemsg(mp);
 		error = EPROTO;
@@ -1027,9 +1027,9 @@ skip_transport:
 				error = EADDRINUSE;
 				eprintsoline(so, error);
 				eprintso(so,
-					("addrlen %d, addr 0x%x, vp %p\n",
-					addrlen, *((int *)addr),
-					so->so_ux_bound_vp));
+				    ("addrlen %d, addr 0x%x, vp %p\n",
+				    addrlen, *((int *)addr),
+				    so->so_ux_bound_vp));
 				goto done;
 			}
 			so->so_state |= SS_LADDR_VALID;
@@ -1155,7 +1155,7 @@ sotpi_unbind(struct sonode *so, int flags)
 	mblk_t			*mp;
 
 	dprintso(so, 1, ("sotpi_unbind(%p, 0x%x) %s\n",
-			so, flags, pr_state(so->so_state, so->so_mode)));
+	    so, flags, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(so->so_flag & SOLOCKED);
@@ -1178,7 +1178,7 @@ sotpi_unbind(struct sonode *so, int flags)
 	mp = soallocproto1(&unbind_req, sizeof (unbind_req),
 	    0, _ALLOC_SLEEP);
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	mutex_enter(&so->so_lock);
 	if (error) {
 		eprintsoline(so, error);
@@ -1243,7 +1243,7 @@ sotpi_listen(struct sonode *so, int backlog)
 	int		error = 0;
 
 	dprintso(so, 1, ("sotpi_listen(%p, %d) %s\n",
-		so, backlog, pr_state(so->so_state, so->so_mode)));
+	    so, backlog, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_serv_type == T_CLTS)
 		return (EOPNOTSUPP);
@@ -1257,8 +1257,8 @@ sotpi_listen(struct sonode *so, int backlog)
 	 */
 	if (so->so_state & SS_ACCEPTCONN &&
 	    !((so->so_family == AF_INET || so->so_family == AF_INET6) &&
-		/*CONSTCOND*/
-		!solisten_tpi_tcp))
+	    /*CONSTCOND*/
+	    !solisten_tpi_tcp))
 		return (0);
 
 	if (so->so_state & SS_ISCONNECTED)
@@ -1302,7 +1302,7 @@ sotpi_listen(struct sonode *so, int backlog)
 			goto done;
 		}
 		error = sotpi_bindlisten(so, NULL, 0, backlog,
-			    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
+		    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
 	} else if (backlog > 0) {
 		/*
 		 * AF_INET{,6} hack to avoid losing the port.
@@ -1318,7 +1318,7 @@ sotpi_listen(struct sonode *so, int backlog)
 				goto done;
 		}
 		error = sotpi_bindlisten(so, NULL, 0, backlog,
-			    _SOBIND_REBIND|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
+		    _SOBIND_REBIND|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
 	} else {
 		so->so_state |= SS_ACCEPTCONN;
 		so->so_backlog = backlog;
@@ -1348,7 +1348,7 @@ sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 	mblk_t			*mp;
 
 	dprintso(so, 1, ("sodisconnect(%p, %d, 0x%x) %s\n",
-			so, seqno, flags, pr_state(so->so_state, so->so_mode)));
+	    so, seqno, flags, pr_state(so->so_state, so->so_mode)));
 
 	if (!(flags & _SODISCONNECT_LOCK_HELD)) {
 		mutex_enter(&so->so_lock);
@@ -1379,7 +1379,7 @@ sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 	mp = soallocproto1(&discon_req, sizeof (discon_req),
 	    0, _ALLOC_SLEEP);
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	mutex_enter(&so->so_lock);
 	if (error) {
 		eprintsoline(so, error);
@@ -1429,7 +1429,7 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	size_t			sinlen;
 
 	dprintso(so, 1, ("sotpi_accept(%p, 0x%x, %p) %s\n",
-		so, fflag, nsop, pr_state(so->so_state, so->so_mode)));
+	    so, fflag, nsop, pr_state(so->so_state, so->so_mode)));
 
 	/*
 	 * Defer single-threading the accepting socket until
@@ -1525,7 +1525,7 @@ again:
 	 */
 	VN_HOLD(so->so_accessvp);
 	nso = sotpi_create(so->so_accessvp, so->so_family, so->so_type,
-			so->so_protocol, so->so_version, so, &error);
+	    so->so_protocol, so->so_version, so, &error);
 	if (nso == NULL) {
 		ASSERT(error != 0);
 		/*
@@ -1753,7 +1753,7 @@ again:
 				 */
 				mutex_exit(&nso->so_lock);
 				(void) VOP_CLOSE(nvp, 0, 1, (offset_t)0,
-						CRED());
+				    CRED());
 				VN_RELE(nvp);
 				goto again;
 			}
@@ -1947,8 +1947,8 @@ sotpi_connect(struct sonode *so,
 	boolean_t		need_unlock;
 
 	dprintso(so, 1, ("sotpi_connect(%p, %p, %d, 0x%x, 0x%x) %s\n",
-		so, name, namelen, fflag, flags,
-		pr_state(so->so_state, so->so_mode)));
+	    so, name, namelen, fflag, flags,
+	    pr_state(so->so_state, so->so_mode)));
 
 	/*
 	 * Preallocate the T_CONN_REQ mblk before grabbing SOLOCKED to
@@ -2058,14 +2058,14 @@ sotpi_connect(struct sonode *so,
 			int val;
 
 			if ((so->so_family == AF_INET ||
-				so->so_family == AF_INET6) &&
+			    so->so_family == AF_INET6) &&
 			    (so->so_type == SOCK_DGRAM ||
-				so->so_type == SOCK_RAW) &&
+			    so->so_type == SOCK_RAW) &&
 			    /*CONSTCOND*/
 			    !soconnect_tpi_udp) {
 				/* XXX What about implicitly unbinding here? */
 				error = sodisconnect(so, -1,
-						_SODISCONNECT_LOCK_HELD);
+				    _SODISCONNECT_LOCK_HELD);
 			} else {
 				so->so_state &=
 				    ~(SS_ISCONNECTED | SS_ISCONNECTING |
@@ -2078,7 +2078,7 @@ sotpi_connect(struct sonode *so,
 
 			val = 0;
 			(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DGRAM_ERRIND,
-					&val, (t_uscalar_t)sizeof (val));
+			    &val, (t_uscalar_t)sizeof (val));
 
 			mutex_enter(&so->so_lock);
 			so_lock_single(so);	/* Set SOLOCKED */
@@ -2149,12 +2149,12 @@ sotpi_connect(struct sonode *so,
 			src = so->so_laddr_sa;
 			srclen = (t_uscalar_t)so->so_laddr_len;
 			dprintso(so, 1,
-				("sotpi_connect UNIX: srclen %d, src %p\n",
-				srclen, src));
+			    ("sotpi_connect UNIX: srclen %d, src %p\n",
+			    srclen, src));
 			error = so_ux_addr_xlate(so,
-				so->so_faddr_sa, (socklen_t)so->so_faddr_len,
-				(flags & _SOCONNECT_XPG4_2),
-				&addr, &addrlen);
+			    so->so_faddr_sa, (socklen_t)so->so_faddr_len,
+			    (flags & _SOCONNECT_XPG4_2),
+			    &addr, &addrlen);
 			if (error)
 				goto bad;
 		}
@@ -2189,7 +2189,7 @@ sotpi_connect(struct sonode *so,
 
 		val = 1;
 		(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DGRAM_ERRIND,
-					&val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val));
 
 		mutex_enter(&so->so_lock);
 		so_lock_single(so);	/* Set SOLOCKED */
@@ -2228,7 +2228,7 @@ sotpi_connect(struct sonode *so,
 			    IN6_IS_ADDR_V4MAPPED_ANY(
 			    &((sin6_t *)so->so_laddr_sa)->sin6_addr) ||
 			    ((sin6_t *)so->so_laddr_sa)->sin6_port == 0)
-				    so->so_state &= ~SS_LADDR_VALID;
+				so->so_state &= ~SS_LADDR_VALID;
 			break;
 
 		default:
@@ -2265,9 +2265,9 @@ sotpi_connect(struct sonode *so,
 		toh.len = (t_uscalar_t)(srclen + sizeof (struct T_opthdr));
 		toh.status = 0;
 		conn_req.OPT_length =
-			(t_scalar_t)(sizeof (toh) + _TPI_ALIGN_TOPT(srclen));
+		    (t_scalar_t)(sizeof (toh) + _TPI_ALIGN_TOPT(srclen));
 		conn_req.OPT_offset = (t_scalar_t)(sizeof (conn_req) +
-			_TPI_ALIGN_TOPT(addrlen));
+		    _TPI_ALIGN_TOPT(addrlen));
 
 		soappendmsg(mp, &conn_req, sizeof (conn_req));
 		soappendmsg(mp, addr, addrlen);
@@ -2290,7 +2290,7 @@ sotpi_connect(struct sonode *so,
 #endif /* C2_AUDIT */
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	mp = NULL;
 	mutex_enter(&so->so_lock);
 	if (error != 0)
@@ -2375,7 +2375,7 @@ sotpi_shutdown(struct sonode *so, int how)
 	int			error = 0;
 
 	dprintso(so, 1, ("sotpi_shutdown(%p, %d) %s\n",
-		so, how, pr_state(so->so_state, so->so_mode)));
+	    so, how, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -2390,7 +2390,7 @@ sotpi_shutdown(struct sonode *so, int how)
 			error = ENOTCONN;
 			if (xnet_check_print) {
 				printf("sockfs: X/Open shutdown check "
-					"caused ENOTCONN\n");
+				    "caused ENOTCONN\n");
 			}
 		}
 		goto done;
@@ -2424,7 +2424,7 @@ sotpi_shutdown(struct sonode *so, int how)
 	 * Assumes that the SS_CANT* flags are never cleared in the above code.
 	 */
 	state_change = (so->so_state & (SS_CANTRCVMORE|SS_CANTSENDMORE)) -
-		(old_state & (SS_CANTRCVMORE|SS_CANTSENDMORE));
+	    (old_state & (SS_CANTRCVMORE|SS_CANTSENDMORE));
 	ASSERT((state_change & ~(SS_CANTRCVMORE|SS_CANTSENDMORE)) == 0);
 
 	switch (state_change) {
@@ -2525,7 +2525,7 @@ sotpi_shutdown(struct sonode *so, int how)
 		 * Note that there is no T_OK_ACK for ordrel_req.
 		 */
 		error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
+		    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 		mutex_enter(&so->so_lock);
 		if (error) {
 			eprintsoline(so, error);
@@ -2574,7 +2574,7 @@ so_unix_close(struct sonode *so)
 		return;
 
 	dprintso(so, 1, ("so_unix_close(%p) %s\n",
-		so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	toh.level = SOL_SOCKET;
 	toh.name = SO_UNIX_CLOSE;
@@ -2615,7 +2615,7 @@ so_unix_close(struct sonode *so)
 		 * Length and family checks.
 		 */
 		error = so_addr_verify(so, so->so_faddr_sa,
-					(t_uscalar_t)so->so_faddr_len);
+		    (t_uscalar_t)so->so_faddr_len);
 		if (error) {
 			eprintsoline(so, error);
 			return;
@@ -2638,12 +2638,12 @@ so_unix_close(struct sonode *so)
 			src = so->so_laddr_sa;
 			srclen = (socklen_t)so->so_laddr_len;
 			dprintso(so, 1,
-				("so_ux_close: srclen %d, src %p\n",
-				srclen, src));
+			    ("so_ux_close: srclen %d, src %p\n",
+			    srclen, src));
 			error = so_ux_addr_xlate(so,
-				so->so_faddr_sa,
-				(socklen_t)so->so_faddr_len, 0,
-				&addr, &addrlen);
+			    so->so_faddr_sa,
+			    (socklen_t)so->so_faddr_len, 0,
+			    &addr, &addrlen);
 			if (error) {
 				eprintsoline(so, error);
 				return;
@@ -2655,7 +2655,7 @@ so_unix_close(struct sonode *so)
 		if (srclen == 0) {
 			tudr.OPT_length = (t_scalar_t)sizeof (toh);
 			tudr.OPT_offset = (t_scalar_t)(sizeof (tudr) +
-				_TPI_ALIGN_TOPT(addrlen));
+			    _TPI_ALIGN_TOPT(addrlen));
 
 			size = tudr.OPT_offset + tudr.OPT_length;
 			/* NOTE: holding so_lock while sleeping */
@@ -2676,7 +2676,7 @@ so_unix_close(struct sonode *so)
 			toh2.level = SOL_SOCKET;
 			toh2.name = SO_SRCADDR;
 			toh2.len = (t_uscalar_t)(srclen +
-					sizeof (struct T_opthdr));
+			    sizeof (struct T_opthdr));
 			toh2.status = 0;
 
 			size = tudr.OPT_offset + tudr.OPT_length;
@@ -2694,7 +2694,7 @@ so_unix_close(struct sonode *so)
 	}
 	mutex_exit(&so->so_lock);
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 	mutex_enter(&so->so_lock);
 }
 
@@ -2761,9 +2761,9 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
 		so->so_state ^= SS_HAVEOOBDATA|SS_HADOOBDATA;
 	}
 	dprintso(so, 1,
-		("after recvoob(%p): counts %d/%d state %s\n",
-		so, so->so_oobsigcnt,
-		so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
+	    ("after recvoob(%p): counts %d/%d state %s\n",
+	    so, so->so_oobsigcnt,
+	    so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
 	ASSERT(so_verify_oobstate(so));
 	mutex_exit(&so->so_lock);
 
@@ -2775,7 +2775,7 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
 		n = MIN(n, uiop->uio_resid);
 		if (n > 0)
 			error = uiomove(nmp->b_rptr, n,
-					UIO_READ, uiop);
+			    UIO_READ, uiop);
 		if (error)
 			break;
 		nmp = nmp->b_cont;
@@ -2807,9 +2807,9 @@ sorecv_update_oobstate(struct sonode *so)
 	mutex_enter(&so->so_lock);
 	ASSERT(so_verify_oobstate(so));
 	dprintso(so, 1,
-		("sorecv_update_oobstate: counts %d/%d state %s\n",
-		so->so_oobsigcnt,
-		so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
+	    ("sorecv_update_oobstate: counts %d/%d state %s\n",
+	    so->so_oobsigcnt,
+	    so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
 	if (so->so_oobsigcnt == 0) {
 		/* No more pending oob indications */
 		so->so_state &= ~(SS_OOBPEND|SS_HAVEOOBDATA|SS_RCVATMARK);
@@ -2920,8 +2920,8 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	msg->msg_flags = 0;
 
 	dprintso(so, 1, ("sotpi_recvmsg(%p, %p, 0x%x) state %s err %d\n",
-		so, msg, flags,
-		pr_state(so->so_state, so->so_mode), so->so_error));
+	    so, msg, flags,
+	    pr_state(so->so_state, so->so_mode), so->so_error));
 
 	/*
 	 * If we are not connected because we have never been connected
@@ -2962,7 +2962,7 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	msg->msg_namelen = 0;
 
 	dprintso(so, 1, ("sotpi_recvmsg: namelen %d controllen %d\n",
-		namelen, controllen));
+	    namelen, controllen));
 
 	mutex_enter(&so->so_lock);
 	/*
@@ -3201,8 +3201,8 @@ retry:
 			/* Caller wants source address */
 			addrlen = tpr->unitdata_ind.SRC_length;
 			addr = sogetoff(mp,
-				tpr->unitdata_ind.SRC_offset,
-				addrlen, 1);
+			    tpr->unitdata_ind.SRC_offset,
+			    addrlen, 1);
 			if (addr == NULL) {
 				freemsg(mp);
 				error = EPROTO;
@@ -3229,8 +3229,8 @@ retry:
 			 * Determine how large cmsg buffer is needed.
 			 */
 			opt = sogetoff(mp,
-				tpr->unitdata_ind.OPT_offset,
-				optlen, __TPI_ALIGN_SIZE);
+			    tpr->unitdata_ind.OPT_offset,
+			    optlen, __TPI_ALIGN_SIZE);
 
 			if (opt == NULL) {
 				freemsg(mp);
@@ -3241,7 +3241,7 @@ retry:
 			if (so->so_family == AF_UNIX)
 				so_getopt_srcaddr(opt, optlen, &addr, &addrlen);
 			ncontrollen = so_cmsglen(mp, opt, optlen,
-						!(flags & MSG_XPG4_2));
+			    !(flags & MSG_XPG4_2));
 			if (controllen != 0)
 				controllen = ncontrollen;
 			else if (ncontrollen != 0)
@@ -3274,13 +3274,13 @@ retry:
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
 			error = so_opt2cmsg(mp, opt, optlen,
-					!(flags & MSG_XPG4_2),
-					control, controllen);
+			    !(flags & MSG_XPG4_2),
+			    control, controllen);
 			if (error) {
 				freemsg(mp);
 				if (msg->msg_namelen != 0)
 					kmem_free(msg->msg_name,
-						msg->msg_namelen);
+					    msg->msg_namelen);
 				kmem_free(control, controllen);
 				eprintsoline(so, error);
 				goto err;
@@ -3315,8 +3315,8 @@ retry:
 			 * Determine how large cmsg buffer is needed.
 			 */
 			opt = sogetoff(mp,
-					tpr->optdata_ind.OPT_offset,
-					optlen, __TPI_ALIGN_SIZE);
+			    tpr->optdata_ind.OPT_offset,
+			    optlen, __TPI_ALIGN_SIZE);
 
 			if (opt == NULL) {
 				freemsg(mp);
@@ -3326,7 +3326,7 @@ retry:
 			}
 
 			ncontrollen = so_cmsglen(mp, opt, optlen,
-						!(flags & MSG_XPG4_2));
+			    !(flags & MSG_XPG4_2));
 			if (controllen != 0)
 				controllen = ncontrollen;
 			else if (ncontrollen != 0)
@@ -3344,8 +3344,8 @@ retry:
 			control = kmem_zalloc(controllen, KM_SLEEP);
 
 			error = so_opt2cmsg(mp, opt, optlen,
-					!(flags & MSG_XPG4_2),
-					control, controllen);
+			    !(flags & MSG_XPG4_2),
+			    control, controllen);
 			if (error) {
 				freemsg(mp);
 				kmem_free(control, controllen);
@@ -3388,11 +3388,11 @@ retry:
 	}
 	case T_EXDATA_IND: {
 		dprintso(so, 1,
-			("sotpi_recvmsg: EXDATA_IND counts %d/%d consumed %ld "
-			"state %s\n",
-			so->so_oobsigcnt, so->so_oobcnt,
-			saved_resid - uiop->uio_resid,
-			pr_state(so->so_state, so->so_mode)));
+		    ("sotpi_recvmsg: EXDATA_IND counts %d/%d consumed %ld "
+		    "state %s\n",
+		    so->so_oobsigcnt, so->so_oobcnt,
+		    saved_resid - uiop->uio_resid,
+		    pr_state(so->so_state, so->so_mode)));
 		/*
 		 * kstrgetmsg handles MSGMARK so there is nothing to
 		 * inspect in the T_EXDATA_IND.
@@ -3418,11 +3418,11 @@ retry:
 			 * underneath us.
 			 */
 			dprintso(so, 1,
-				("sotpi_recvmsg: consume EXDATA_IND "
-				"counts %d/%d state %s\n",
-				so->so_oobsigcnt,
-				so->so_oobcnt,
-				pr_state(so->so_state, so->so_mode)));
+			    ("sotpi_recvmsg: consume EXDATA_IND "
+			    "counts %d/%d state %s\n",
+			    so->so_oobsigcnt,
+			    so->so_oobcnt,
+			    pr_state(so->so_state, so->so_mode)));
 
 			pflag = MSG_ANY | MSG_DELAYERROR;
 			if (so->so_mode & SM_ATOMIC)
@@ -3432,7 +3432,7 @@ retry:
 			mp = NULL;
 
 			error = kstrgetmsg(SOTOV(so), &mp, uiop,
-				&pri, &pflag, (clock_t)-1, &rval);
+			    &pri, &pflag, (clock_t)-1, &rval);
 			ASSERT(uiop->uio_resid == saved_resid);
 
 			if (error) {
@@ -3573,8 +3573,8 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 			    ("sosend_dgramcmsg UNIX: srclen %d, src %p\n",
 			    srclen, src));
 			error = so_ux_addr_xlate(so, name, namelen,
-				(flags & MSG_XPG4_2),
-				&addr, &addrlen);
+			    (flags & MSG_XPG4_2),
+			    &addr, &addrlen);
 			if (error) {
 				eprintsoline(so, error);
 				return (error);
@@ -3587,7 +3587,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		srclen = 0;
 	}
 	optlen = so_optlen(control, controllen,
-					!(flags & MSG_XPG4_2));
+	    !(flags & MSG_XPG4_2));
 	tudr.PRIM_type = T_UNITDATA_REQ;
 	tudr.DEST_length = addrlen;
 	tudr.DEST_offset = (t_scalar_t)sizeof (tudr);
@@ -3597,7 +3597,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	else
 		tudr.OPT_length = optlen;
 	tudr.OPT_offset = (t_scalar_t)(sizeof (tudr) +
-				_TPI_ALIGN_TOPT(addrlen));
+	    _TPI_ALIGN_TOPT(addrlen));
 
 	size = tudr.OPT_offset + tudr.OPT_length;
 
@@ -3605,7 +3605,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	 * File descriptors only when SM_FDPASSING set.
 	 */
 	error = so_getfdopt(control, controllen,
-			!(flags & MSG_XPG4_2), &fds, &fdlen);
+	    !(flags & MSG_XPG4_2), &fds, &fdlen);
 	if (error)
 		return (error);
 	if (fdlen != -1) {
@@ -3635,7 +3635,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		toh.level = SOL_SOCKET;
 		toh.name = SO_FILEP;
 		toh.len = fdbuf->fd_size +
-				(t_uscalar_t)sizeof (struct T_opthdr);
+		    (t_uscalar_t)sizeof (struct T_opthdr);
 		toh.status = 0;
 		soappendmsg(mp, &toh, sizeof (toh));
 		soappendmsg(mp, fdbuf, fdbuf->fd_size);
@@ -3701,7 +3701,7 @@ sosend_svccmsg(struct sonode *so,
 	struct T_opthdr		toh;
 
 	dprintso(so, 1,
-		("sosend_svccmsg: resid %ld bytes\n", uiop->uio_resid));
+	    ("sosend_svccmsg: resid %ld bytes\n", uiop->uio_resid));
 
 	/*
 	 * Has to be bound and connected. However, since no locks are
@@ -3733,7 +3733,7 @@ sosend_svccmsg(struct sonode *so,
 			iosize = uiop->uio_resid;
 		}
 		dprintso(so, 1, ("sosend_svccmsg: sending %d, %ld bytes\n",
-			tdr.DATA_flag, iosize));
+		    tdr.DATA_flag, iosize));
 
 		optlen = so_optlen(control, controllen, !(flags & MSG_XPG4_2));
 		tdr.OPT_length = optlen;
@@ -3744,7 +3744,7 @@ sosend_svccmsg(struct sonode *so,
 		 * File descriptors only when SM_FDPASSING set.
 		 */
 		error = so_getfdopt(control, controllen,
-				!(flags & MSG_XPG4_2), &fds, &fdlen);
+		    !(flags & MSG_XPG4_2), &fds, &fdlen);
 		if (error)
 			return (error);
 		if (fdlen != -1) {
@@ -3772,7 +3772,7 @@ sosend_svccmsg(struct sonode *so,
 			toh.level = SOL_SOCKET;
 			toh.name = SO_FILEP;
 			toh.len = fdbuf->fd_size +
-				(t_uscalar_t)sizeof (struct T_opthdr);
+			    (t_uscalar_t)sizeof (struct T_opthdr);
 			toh.status = 0;
 			soappendmsg(mp, &toh, sizeof (toh));
 			soappendmsg(mp, fdbuf, fdbuf->fd_size);
@@ -3786,7 +3786,7 @@ sosend_svccmsg(struct sonode *so,
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 
 		error = kstrputmsg(SOTOV(so), mp, uiop, iosize,
-					0, MSG_BAND, 0);
+		    0, MSG_BAND, 0);
 		if (error) {
 			if (!first && error == EWOULDBLOCK)
 				return (0);
@@ -3880,11 +3880,11 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 			src = so->so_laddr_sa;
 			srclen = (socklen_t)so->so_laddr_len;
 			dprintso(so, 1,
-				("sosend_dgram UNIX: srclen %d, src %p\n",
-				srclen, src));
+			    ("sosend_dgram UNIX: srclen %d, src %p\n",
+			    srclen, src));
 			error = so_ux_addr_xlate(so, name, namelen,
-				(flags & MSG_XPG4_2),
-				&addr, &addrlen);
+			    (flags & MSG_XPG4_2),
+			    &addr, &addrlen);
 			if (error) {
 				eprintsoline(so, error);
 				goto done;
@@ -3922,9 +3922,9 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 		ssize_t size;
 
 		tudr.OPT_length = (t_scalar_t)(sizeof (toh) +
-					_TPI_ALIGN_TOPT(srclen));
+		    _TPI_ALIGN_TOPT(srclen));
 		tudr.OPT_offset = (t_scalar_t)(sizeof (tudr) +
-					_TPI_ALIGN_TOPT(addrlen));
+		    _TPI_ALIGN_TOPT(addrlen));
 
 		toh.level = SOL_SOCKET;
 		toh.name = SO_SRCADDR;
@@ -3982,8 +3982,8 @@ sosend_svc(struct sonode *so,
 	int			first = 1;
 
 	dprintso(so, 1,
-		("sosend_svc: %p, resid %ld bytes, prim %d, sflag 0x%x\n",
-		so, uiop->uio_resid, prim, sflag));
+	    ("sosend_svc: %p, resid %ld bytes, prim %d, sflag 0x%x\n",
+	    so, uiop->uio_resid, prim, sflag));
 
 	/*
 	 * Has to be bound and connected. However, since no locks are
@@ -4011,7 +4011,7 @@ sosend_svc(struct sonode *so,
 			iosize = uiop->uio_resid;
 		}
 		dprintso(so, 1, ("sosend_svc: sending 0x%x %d, %ld bytes\n",
-			prim, tdr.MORE_flag, iosize));
+		    prim, tdr.MORE_flag, iosize));
 		mp = soallocproto1(&tdr, sizeof (tdr), 0, _ALLOC_INTR);
 		if (mp == NULL) {
 			/*
@@ -4025,7 +4025,7 @@ sosend_svc(struct sonode *so,
 		}
 
 		error = kstrputmsg(SOTOV(so), mp, uiop, iosize,
-					0, sflag | MSG_BAND, 0);
+		    0, sflag | MSG_BAND, 0);
 		if (error) {
 			if (!first && error == EWOULDBLOCK)
 				return (0);
@@ -4077,8 +4077,8 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	int		flags;
 
 	dprintso(so, 1, ("sotpi_sendmsg(%p, %p, 0x%x) state %s, error %d\n",
-		so, msg, msg->msg_flags,
-		pr_state(so->so_state, so->so_mode), so->so_error));
+	    so, msg, msg->msg_flags,
+	    pr_state(so->so_state, so->so_mode), so->so_error));
 
 	mutex_enter(&so->so_lock);
 	so_state = so->so_state;
@@ -4176,8 +4176,8 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 			tudi = (struct T_uderror_ind *)so->so_eaddr_mp->b_rptr;
 			addrlen = tudi->DEST_length;
 			addr = sogetoff(so->so_eaddr_mp,
-					tudi->DEST_offset,
-					addrlen, 1);
+			    tudi->DEST_offset,
+			    addrlen, 1);
 			ASSERT(addr);	/* Checked by strsock_proto */
 			switch (so->so_family) {
 			case AF_INET: {
@@ -4202,7 +4202,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 				    namelen == addrlen &&
 				    sin1->sin6_port == sin2->sin6_port &&
 				    IN6_ARE_ADDR_EQUAL(&sin1->sin6_addr,
-					&sin2->sin6_addr))
+				    &sin2->sin6_addr))
 					match = B_TRUE;
 				break;
 			}
@@ -4218,9 +4218,9 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 				mutex_exit(&so->so_lock);
 #ifdef DEBUG
 				dprintso(so, 0,
-					("sockfs delayed error %d for %s\n",
-					error,
-					pr_addr(so->so_family, name, namelen)));
+				    ("sockfs delayed error %d for %s\n",
+				    error,
+				    pr_addr(so->so_family, name, namelen)));
 #endif /* DEBUG */
 				return (error);
 			}
@@ -4237,7 +4237,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 
 		val = 1;
 		error = sotpi_setsockopt(so, SOL_SOCKET, SO_DONTROUTE,
-					&val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val));
 		if (error)
 			return (error);
 		dontroute = 1;
@@ -4258,9 +4258,9 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 				goto done;
 			}
 			error = sosend_svccmsg(so, uiop,
-				!(flags & MSG_EOR),
-				msg->msg_control, msg->msg_controllen,
-				flags);
+			    !(flags & MSG_EOR),
+			    msg->msg_control, msg->msg_controllen,
+			    flags);
 		}
 		goto done;
 	}
@@ -4314,9 +4314,9 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		 */
 		if (!dontroute)
 			return (sosend_svc(so, uiop, prim,
-				!(flags & MSG_EOR), sflag));
+			    !(flags & MSG_EOR), sflag));
 		error = sosend_svc(so, uiop, prim,
-				!(flags & MSG_EOR), sflag);
+		    !(flags & MSG_EOR), sflag);
 	}
 	ASSERT(dontroute);
 done:
@@ -4325,7 +4325,7 @@ done:
 
 		val = 0;
 		(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DONTROUTE,
-				&val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val));
 	}
 	return (error);
 }
@@ -4340,7 +4340,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
     socklen_t namelen, struct uio *uiop, int flags)
 {
 	struct T_unitdata_req	tudr;
-	mblk_t			*mp;
+	mblk_t			*mp = NULL;
 	int			error = 0;
 	void			*addr;
 	socklen_t		addrlen;
@@ -4348,6 +4348,8 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	struct stdata		*stp = SOTOV(so)->v_stream;
 	int			so_state;
 	queue_t			*udp_wq;
+	boolean_t		connected;
+	mblk_t			*mpdata = NULL;
 
 	ASSERT(name != NULL && namelen != 0);
 	ASSERT(!(so->so_mode & SM_CONNREQUIRED));
@@ -4375,6 +4377,26 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 
 	so_state = so->so_state;
 
+	connected = so_state & SS_ISCONNECTED;
+	if (!connected) {
+		tudr.PRIM_type = T_UNITDATA_REQ;
+		tudr.DEST_length = addrlen;
+		tudr.DEST_offset = (t_scalar_t)sizeof (tudr);
+		tudr.OPT_length = 0;
+		tudr.OPT_offset = 0;
+
+		mp = soallocproto2(&tudr, sizeof (tudr), addr, addrlen, 0,
+		    _ALLOC_INTR);
+		if (mp == NULL) {
+			/*
+			 * Caught a signal waiting for memory.
+			 * Let send* return EINTR.
+			 */
+			error = EINTR;
+			goto done;
+		}
+	}
+
 	/*
 	 * For UDP we don't break up the copyin into smaller pieces
 	 * as in the TCP case.  That means if ENOMEM is returned by
@@ -4385,41 +4407,34 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	 */
 	udp_wq = stp->sd_wrq->q_next;
 	if (canput(udp_wq) &&
-	    (mp = mcopyinuio(stp, uiop, -1, -1, &error)) != NULL) {
-		ASSERT(DB_TYPE(mp) == M_DATA);
+	    (mpdata = mcopyinuio(stp, uiop, -1, -1, &error)) != NULL) {
+		ASSERT(DB_TYPE(mpdata) == M_DATA);
 		ASSERT(uiop->uio_resid == 0);
+		if (!connected)
+			linkb(mp, mpdata);
+		else
+			mp = mpdata;
 #ifdef C2_AUDIT
 		if (audit_active)
 			audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 #endif /* C2_AUDIT */
-		udp_wput_data(udp_wq, mp, addr, addrlen);
+
+		udp_wput(udp_wq, mp);
 		return (0);
 	}
-	if (error != 0 && error != ENOMEM)
+
+	ASSERT(mpdata == NULL);
+	if (error != 0 && error != ENOMEM) {
+		freemsg(mp);
 		return (error);
+	}
 
 	/*
 	 * For connected, let strwrite() handle the blocking case.
 	 * Otherwise we fall thru and use kstrputmsg().
 	 */
-	if (so_state & SS_ISCONNECTED)
+	if (connected)
 		return (strwrite(SOTOV(so), uiop, CRED()));
-
-	tudr.PRIM_type = T_UNITDATA_REQ;
-	tudr.DEST_length = addrlen;
-	tudr.DEST_offset = (t_scalar_t)sizeof (tudr);
-	tudr.OPT_length = 0;
-	tudr.OPT_offset = 0;
-
-	mp = soallocproto2(&tudr, sizeof (tudr), addr, addrlen, 0, _ALLOC_INTR);
-	if (mp == NULL) {
-		/*
-		 * Caught a signal waiting for memory.
-		 * Let send* return EINTR.
-		 */
-		error = EINTR;
-		goto done;
-	}
 
 #ifdef C2_AUDIT
 	if (audit_active)
@@ -4562,7 +4577,7 @@ sotpi_getpeername(struct sonode *so)
 	k_sigset_t	smask;
 
 	dprintso(so, 1, ("sotpi_getpeername(%p) %s\n",
-		so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -4580,8 +4595,8 @@ sotpi_getpeername(struct sonode *so)
 	}
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getpeername (local): %s\n",
-		pr_addr(so->so_family, so->so_faddr_sa,
-			(t_uscalar_t)so->so_faddr_len)));
+	    pr_addr(so->so_family, so->so_faddr_sa,
+	    (t_uscalar_t)so->so_faddr_len)));
 #endif /* DEBUG */
 
 	if (so->so_family == AF_UNIX) {
@@ -4611,7 +4626,7 @@ sotpi_getpeername(struct sonode *so)
 	res = 0;
 	ASSERT(CRED());
 	error = strioctl(SOTOV(so), TI_GETPEERNAME, (intptr_t)&strbuf,
-			0, K_TO_K, CRED(), &res);
+	    0, K_TO_K, CRED(), &res);
 	sigunintr(&smask);
 
 	mutex_enter(&so->so_lock);
@@ -4650,8 +4665,8 @@ sotpi_getpeername(struct sonode *so)
 	kmem_free(addr, addrlen);
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getpeername (tp): %s\n",
-			pr_addr(so->so_family, so->so_faddr_sa,
-				(t_uscalar_t)so->so_faddr_len)));
+	    pr_addr(so->so_family, so->so_faddr_sa,
+	    (t_uscalar_t)so->so_faddr_len)));
 #endif /* DEBUG */
 done:
 	so_unlock_single(so, SOLOCKED);
@@ -4672,7 +4687,7 @@ sotpi_getsockname(struct sonode *so)
 	k_sigset_t	smask;
 
 	dprintso(so, 1, ("sotpi_getsockname(%p) %s\n",
-		so, pr_state(so->so_state, so->so_mode)));
+	    so, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -4693,8 +4708,8 @@ sotpi_getsockname(struct sonode *so)
 	}
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getsockname (local): %s\n",
-		pr_addr(so->so_family, so->so_laddr_sa,
-			(t_uscalar_t)so->so_laddr_len)));
+	    pr_addr(so->so_family, so->so_laddr_sa,
+	    (t_uscalar_t)so->so_laddr_len)));
 #endif /* DEBUG */
 	if (so->so_family == AF_UNIX) {
 		/* Transport has different name space - return local info */
@@ -4726,7 +4741,7 @@ sotpi_getsockname(struct sonode *so)
 	res = 0;
 	ASSERT(CRED());
 	error = strioctl(SOTOV(so), TI_GETMYNAME, (intptr_t)&strbuf,
-			0, K_TO_K, CRED(), &res);
+	    0, K_TO_K, CRED(), &res);
 	sigunintr(&smask);
 
 	mutex_enter(&so->so_lock);
@@ -4762,8 +4777,8 @@ sotpi_getsockname(struct sonode *so)
 	kmem_free(addr, addrlen);
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getsockname (tp): %s\n",
-			pr_addr(so->so_family, so->so_laddr_sa,
-				(t_uscalar_t)so->so_laddr_len)));
+	    pr_addr(so->so_family, so->so_laddr_sa,
+	    (t_uscalar_t)so->so_laddr_len)));
 #endif /* DEBUG */
 done:
 	so_unlock_single(so, SOLOCKED);
@@ -4794,8 +4809,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	uint32_t		value;
 
 	dprintso(so, 1, ("sotpi_getsockopt(%p, 0x%x, 0x%x, %p, %p) %s\n",
-			so, level, option_name, optval, optlenp,
-			pr_state(so->so_state, so->so_mode)));
+	    so, level, option_name, optval, optlenp,
+	    pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -4920,7 +4935,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			if (lvalue == 0) {
 				mutex_exit(&so->so_lock);
 				(void) strqget(strvp2wq(SOTOV(so))->q_next,
-						QHIWAT, 0, &lvalue);
+				    QHIWAT, 0, &lvalue);
 				mutex_enter(&so->so_lock);
 				dprintso(so, 1,
 				    ("got SO_SNDBUF %ld from q\n", lvalue));
@@ -4950,7 +4965,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			if (lvalue == 0) {
 				mutex_exit(&so->so_lock);
 				(void) strqget(RD(strvp2wq(SOTOV(so))),
-						QHIWAT, 0, &lvalue);
+				    QHIWAT, 0, &lvalue);
 				mutex_enter(&so->so_lock);
 				dprintso(so, 1,
 				    ("got SO_RCVBUF %ld from q\n", lvalue));
@@ -5010,7 +5025,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	    &oh, sizeof (oh), NULL, maxlen, 0, _ALLOC_SLEEP);
 	/* Let option management work in the presence of data flow control */
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 	mp = NULL;
 	mutex_enter(&so->so_lock);
 	if (error) {
@@ -5031,7 +5046,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	ASSERT(mp);
 	optmgmt_ack = (struct T_optmgmt_ack *)mp->b_rptr;
 	opt_res = (struct opthdr *)sogetoff(mp, optmgmt_ack->OPT_offset,
-			optmgmt_ack->OPT_length, __TPI_ALIGN_SIZE);
+	    optmgmt_ack->OPT_length, __TPI_ALIGN_SIZE);
 	if (opt_res == NULL) {
 		if (option != NULL) {
 			/* We have a fallback value */
@@ -5046,7 +5061,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 
 	/* check to ensure that the option is within bounds */
 	if (((uintptr_t)option + opt_res->len < (uintptr_t)option) ||
-		(uintptr_t)option + opt_res->len > (uintptr_t)mp->b_wptr) {
+	    (uintptr_t)option + opt_res->len > (uintptr_t)mp->b_wptr) {
 		if (option != NULL) {
 			/* We have a fallback value */
 			error = 0;
@@ -5089,8 +5104,8 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	boolean_t		handled = B_FALSE;
 
 	dprintso(so, 1, ("sotpi_setsockopt(%p, 0x%x, 0x%x, %p, %d) %s\n",
-			so, level, option_name, optval, optlen,
-			pr_state(so->so_state, so->so_mode)));
+	    so, level, option_name, optval, optlen,
+	    pr_state(so->so_state, so->so_mode)));
 
 
 	/* X/Open requires this check */
@@ -5278,7 +5293,7 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	    &oh, sizeof (oh), optval, optlen, 0, _ALLOC_SLEEP);
 	/* Let option management work in the presence of data flow control */
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 	mp = NULL;
 	mutex_enter(&so->so_lock);
 	if (error) {
@@ -5384,13 +5399,13 @@ done:
 		case SO_DGRAM_ERRIND:
 			if (intvalue != 0) {
 				dprintso(so, 1,
-					("sotpi_setsockopt: setting 0x%x\n",
-					option_name));
+				    ("sotpi_setsockopt: setting 0x%x\n",
+				    option_name));
 				so->so_options |= option_name;
 			} else {
 				dprintso(so, 1,
-					("sotpi_setsockopt: clearing 0x%x\n",
-					option_name));
+				    ("sotpi_setsockopt: clearing 0x%x\n",
+				    option_name));
 				so->so_options &= ~option_name;
 			}
 			break;

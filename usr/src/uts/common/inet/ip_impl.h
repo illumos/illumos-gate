@@ -478,29 +478,13 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
  * flow-control.
  *
  * Note that these checks are done after the conn is found in
- * the UDP fanout table.  A UDP conn in that table may have its
- * IPCL_UDP bit cleared from the conn_flags when the application
- * pops the udp module without issuing an unbind; in this case
- * IP will still receive packets for the conn and deliver it
- * upstream via putnext.  This is the reason why we have to test
- * against IPCL_UDP.
+ * the UDP fanout table.
+ * FIXME? Might be faster to check both udp_drain_qfull and canputnext.
  */
 #define	CONN_UDP_FLOWCTLD(connp)					\
-	((CONN_UDP_SYNCSTR(connp) &&					\
-	(connp)->conn_udp->udp_drain_qfull) ||				\
-	(!CONN_UDP_SYNCSTR(connp) && !canputnext((connp)->conn_rq)))
-
-/*
- * Macro that delivers a given message upstream; if udp module
- * is directly above ip, the message is passed directly into
- * the stream-less entry point.  Otherwise putnext is used.
- */
-#define	CONN_UDP_RECV(connp, mp) {					\
-	if (IPCL_IS_UDP(connp))						\
-		udp_conn_recv(connp, mp);				\
-	else								\
-		putnext((connp)->conn_rq, mp);				\
-}
+	(CONN_UDP_SYNCSTR(connp) ?					\
+	(connp)->conn_udp->udp_drain_qfull :				\
+	!canputnext((connp)->conn_rq))
 
 #define	ILL_DLS_CAPABLE(ill)	\
 	(((ill)->ill_capabilities &		\

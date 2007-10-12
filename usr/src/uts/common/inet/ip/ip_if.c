@@ -22945,8 +22945,8 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 
 		ill->ill_isv6 = B_TRUE;
 		if (ill->ill_rq != NULL) {
-			ill->ill_rq->q_qinfo = &rinit_ipv6;
-			ill->ill_wq->q_qinfo = &winit_ipv6;
+			ill->ill_rq->q_qinfo = &iprinitv6;
+			ill->ill_wq->q_qinfo = &ipwinitv6;
 		}
 
 		/* Keep the !IN6_IS_ADDR_V4MAPPED assertions happy */

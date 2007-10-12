@@ -229,7 +229,6 @@ f none kernel/strmod/pipemod 755 root sys
 f none kernel/strmod/ptem 755 root sys
 f none kernel/strmod/redirmod 755 root sys
 f none kernel/strmod/rpcmod 755 root sys
-l none kernel/strmod/rts=../../kernel/drv/rts
 l none kernel/strmod/tcp=../../kernel/drv/tcp
 f none kernel/strmod/timod 755 root sys
 f none kernel/strmod/tirdwr 755 root sys
@@ -430,7 +429,6 @@ f none kernel/strmod/amd64/pipemod 755 root sys
 f none kernel/strmod/amd64/ptem 755 root sys
 f none kernel/strmod/amd64/redirmod 755 root sys
 f none kernel/strmod/amd64/rpcmod 755 root sys
-l none kernel/strmod/amd64/rts=../../../kernel/drv/amd64/rts
 l none kernel/strmod/amd64/tcp=../../../kernel/drv/amd64/tcp
 f none kernel/strmod/amd64/timod 755 root sys
 f none kernel/strmod/amd64/tirdwr 755 root sys

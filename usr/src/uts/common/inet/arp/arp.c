@@ -269,20 +269,20 @@ static arpparam_t	arp_param_arr[] = {
 #define	as_broadcast_interval	as_param_arr[11].arp_param_value
 #define	as_defend_period	as_param_arr[12].arp_param_value
 
-static struct module_info info = {
+static struct module_info arp_mod_info = {
 	0, "arp", 0, INFPSZ, 512, 128
 };
 
-static struct qinit rinit = {
-	(pfi_t)ar_rput, NULL, ar_open, ar_close, NULL, &info
+static struct qinit arprinit = {
+	(pfi_t)ar_rput, NULL, ar_open, ar_close, NULL, &arp_mod_info
 };
 
-static struct qinit winit = {
-	(pfi_t)ar_wput, (pfi_t)ar_wsrv, ar_open, ar_close, NULL, &info
+static struct qinit arpwinit = {
+	(pfi_t)ar_wput, (pfi_t)ar_wsrv, ar_open, ar_close, NULL, &arp_mod_info
 };
 
 struct streamtab arpinfo = {
-	&rinit, &winit
+	&arprinit, &arpwinit
 };
 
 /*
@@ -2491,15 +2491,15 @@ ar_mapping_add(queue_t *q, mblk_t *mp_orig)
 	}
 	return (ar_ce_create(
 	    arl,
-		arma->arma_proto,
-		hw_addr,
-		hw_addr_len,
-		proto_addr,
-		proto_addr_len,
-		proto_mask,
-		proto_extract_mask,
-		hw_extract_start,
-		arma->arma_flags | ACE_F_MAPPING));
+	    arma->arma_proto,
+	    hw_addr,
+	    hw_addr_len,
+	    proto_addr,
+	    proto_addr_len,
+	    proto_mask,
+	    proto_extract_mask,
+	    hw_extract_start,
+	    arma->arma_flags | ACE_F_MAPPING));
 }
 
 static boolean_t
@@ -2587,17 +2587,18 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	ar->ar_as = as;
 
 	/*
-	 * Probe for the DLPI info if we are not pushed on IP. Wait for
+	 * Probe for the DLPI info if we are not pushed on IP or UDP. Wait for
 	 * the reply. In case of error call ar_close() which will take
 	 * care of doing everything required to close this instance, such
 	 * as freeing the arl, restarting the timer on a different queue etc.
 	 */
-	if (strcmp(q->q_next->q_qinfo->qi_minfo->mi_idname, "ip") == 0) {
+	if (strcmp(q->q_next->q_qinfo->qi_minfo->mi_idname, "ip") == 0 ||
+	    strcmp(q->q_next->q_qinfo->qi_minfo->mi_idname, "udp") == 0) {
 		arc_t *arc;
 
 		/*
-		 * We are pushed directly on top of IP. There is no need to
-		 * send down a DL_INFO_REQ. Return success. This could
+		 * We are pushed directly on top of IP or UDP. There is no need
+		 * to send down a DL_INFO_REQ. Return success. This could
 		 * either be an ill stream (i.e. <arp-IP-Driver> stream)
 		 * or a stream corresponding to an open of /dev/arp
 		 * (i.e. <arp-IP> stream). Note that we don't support
@@ -2630,10 +2631,12 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	ASSERT(tmp_q->q_qinfo->qi_minfo != NULL);
 
-	if (strcmp(tmp_q->q_qinfo->qi_minfo->mi_idname, "ip") == 0) {
+	if (strcmp(tmp_q->q_qinfo->qi_minfo->mi_idname, "ip") == 0 ||
+	    strcmp(tmp_q->q_qinfo->qi_minfo->mi_idname, "udp") == 0) {
 		/*
-		 * We don't support pushing ARP arbitrarily on an IP driver
-		 * stream.  ARP has to be pushed directly above IP.
+		 * We don't support pushing ARP arbitrarily on an IP or UDP
+		 * driver stream.  ARP has to be pushed directly above IP or
+		 * UDP.
 		 */
 		(void) ar_close(RD(q));
 		return (ENOTSUP);
@@ -2759,7 +2762,7 @@ ar_plink_send(queue_t *q, mblk_t *mp)
 		if ((q->q_qinfo != NULL) && (q->q_qinfo->qi_minfo != NULL)) {
 			name = arpwq->q_qinfo->qi_minfo->mi_idname;
 			if (name != NULL && name[0] != NULL &&
-			    (strcmp(name, info.mi_idname) == 0))
+			    (strcmp(name, arp_mod_info.mi_idname) == 0))
 				break;
 		}
 		arpwq = arpwq->q_next;
@@ -3194,7 +3197,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
 
 	ARP_HOOK_IN(as->as_arp_physical_in_event, as->as_arp_physical_in,
-		    arl->arl_index, arh, mp, mp1, as);
+	    arl->arl_index, arh, mp, mp1, as);
 
 	DTRACE_PROBE1(arp__physical__in__end, mblk_t *, mp);
 
@@ -3502,7 +3505,7 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 		 */
 		if (ap != NULL) {
 			ap->ap_notifies = (dlp->notify_ack.dl_notifications &
-				DL_NOTE_LINK_UP) != 0;
+			    DL_NOTE_LINK_UP) != 0;
 		}
 		ar_dlpi_done(arl, DL_NOTIFY_REQ);
 		break;
@@ -3821,7 +3824,7 @@ ar_snmp_msg2(ace_t *ace, void *arg)
 	ntme.ipNetToMediaPhysAddress.o_length =
 	    MIN(OCTET_LENGTH, ace->ace_hw_addr_length);
 	if ((ace->ace_flags & ACE_F_RESOLVED) == 0)
-	    ntme.ipNetToMediaPhysAddress.o_length = 0;
+		ntme.ipNetToMediaPhysAddress.o_length = 0;
 	bcopy(ace->ace_hw_addr, ntme.ipNetToMediaPhysAddress.o_bytes,
 	    ntme.ipNetToMediaPhysAddress.o_length);
 

@@ -364,6 +364,7 @@ extern void 	ip_wput_ipsec_out_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
     ire_t *);
 extern int	ip_total_hdrs_len_v6(ip6_pkt_t *);
 extern int	ipsec_ah_get_hdr_size_v6(mblk_t *, boolean_t);
+extern void	ip_wput_v6(queue_t *, mblk_t *);
 extern void	ip_wput_local_v6(queue_t *, ill_t *, ip6_t *, mblk_t *,
     ire_t *, int);
 extern void	ip_output_v6(void *, mblk_t *, void *, int);

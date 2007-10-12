@@ -66,9 +66,6 @@ sctp_def_q_set(queue_t *q, mblk_t *mp)
 	sctp_stack_t	*sctps = connp->conn_netstack->
 	    netstack_sctp;
 
-	ASSERT(connp != NULL && connp->conn_ulp == IPPROTO_SCTP &&
-	    connp->conn_rq == NULL);
-
 	if ((mp1 = mp->b_cont) == NULL) {
 		iocp->ioc_error = EINVAL;
 		ip0dbg(("sctp_def_q_set: no file descriptor\n"));
@@ -159,4 +156,170 @@ err_ret:
 	iocp->ioc_count = 0;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
+}
+
+/*
+ * A SCTP streams driver which is there just to handle ioctls on /dev/sctp.
+ */
+static int sctp_str_close(queue_t *);
+static int sctp_str_open(queue_t *, dev_t *, int, int, cred_t *);
+
+static struct module_info sctp_mod_info =  {
+	5711, "sctp", 1, INFPSZ, 512, 128
+};
+
+static struct qinit sctprinit = {
+	NULL, NULL, sctp_str_open, sctp_str_close, NULL, &sctp_mod_info
+};
+
+static struct qinit sctpwinit = {
+	(pfi_t)sctp_wput, NULL, NULL, NULL, NULL, &sctp_mod_info
+};
+
+struct streamtab sctpinfo = {
+	&sctprinit, &sctpwinit
+};
+
+static int
+sctp_str_close(queue_t *q)
+{
+	conn_t	*connp = Q_TO_CONN(q);
+
+	qprocsoff(connp->conn_rq);
+
+	ASSERT(connp->conn_ref == 1);
+
+	inet_minor_free(ip_minor_arena, connp->conn_dev);
+
+	q->q_ptr = WR(q)->q_ptr = NULL;
+	CONN_DEC_REF(connp);
+
+	return (0);
+}
+
+/*ARGSUSED2*/
+static int
+sctp_str_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	conn_t 		*connp;
+	major_t		maj;
+	netstack_t	*ns;
+	zoneid_t	zoneid;
+
+	/* If the stream is already open, return immediately. */
+	if (q->q_ptr != NULL)
+		return (0);
+
+	/* If this is not a driver open, fail. */
+	if (sflag == MODOPEN)
+		return (EINVAL);
+
+	ns = netstack_find_by_cred(credp);
+	ASSERT(ns != NULL);
+
+	/*
+	 * For exclusive stacks we set the zoneid to zero
+	 * to make IP operate as if in the global zone.
+	 */
+	if (ns->netstack_stackid != GLOBAL_NETSTACKID)
+		zoneid = GLOBAL_ZONEID;
+	else
+		zoneid = crgetzoneid(credp);
+
+	/*
+	 * We are opening as a device. This is an IP client stream, and we
+	 * allocate an conn_t as the instance data.
+	 */
+	connp = ipcl_conn_create(IPCL_IPCCONN, KM_SLEEP, ns);
+
+	/*
+	 * ipcl_conn_create did a netstack_hold. Undo the hold that was
+	 * done by netstack_find_by_cred()
+	 */
+	netstack_rele(ns);
+
+	connp->conn_zoneid = zoneid;
+
+	connp->conn_rq = q;
+	connp->conn_wq = WR(q);
+	q->q_ptr = WR(q)->q_ptr = connp;
+
+	if ((connp->conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
+		/* CONN_DEC_REF takes care of netstack_rele() */
+		q->q_ptr = WR(q)->q_ptr = NULL;
+		CONN_DEC_REF(connp);
+		return (EBUSY);
+	}
+
+	maj = getemajor(*devp);
+	*devp = makedevice(maj, (minor_t)connp->conn_dev);
+
+	/*
+	 * connp->conn_cred is crfree()ed in ipcl_conn_destroy()
+	 */
+	connp->conn_cred = credp;
+	crhold(connp->conn_cred);
+
+	/*
+	 * Make the conn globally visible to walkers
+	 */
+	mutex_enter(&connp->conn_lock);
+	connp->conn_state_flags &= ~CONN_INCIPIENT;
+	mutex_exit(&connp->conn_lock);
+	ASSERT(connp->conn_ref == 1);
+
+	qprocson(q);
+
+	return (0);
+}
+
+
+/*
+ * The SCTP write put procedure which is used only to handle ioctls.
+ */
+void
+sctp_wput(queue_t *q, mblk_t *mp)
+{
+	uchar_t		*rptr;
+	t_scalar_t	type;
+
+	switch (mp->b_datap->db_type) {
+	case M_IOCTL:
+		sctp_wput_ioctl(q, mp);
+		break;
+	case M_DATA:
+		/* Should be handled in sctp_output() */
+		ASSERT(0);
+		freemsg(mp);
+		break;
+	case M_PROTO:
+	case M_PCPROTO:
+		rptr = mp->b_rptr;
+		if ((mp->b_wptr - rptr) >= sizeof (t_scalar_t)) {
+			type = ((union T_primitives *)rptr)->type;
+			/*
+			 * There is no "standard" way on how to respond
+			 * to T_CAPABILITY_REQ if a module does not
+			 * understand it.  And the current TI mod
+			 * has problems handling an error ack.  So we
+			 * catch the request here and reply with a response
+			 * which the TI mod knows how to respond to.
+			 */
+			switch (type) {
+			case T_CAPABILITY_REQ:
+				(void) putnextctl1(RD(q), M_ERROR, EPROTO);
+				break;
+			default:
+				if ((mp = mi_tpi_err_ack_alloc(mp,
+				    TNOTSUPPORT, 0)) != NULL) {
+					qreply(q, mp);
+					return;
+				}
+			}
+		}
+		/* FALLTHRU */
+	default:
+		freemsg(mp);
+		return;
+	}
 }

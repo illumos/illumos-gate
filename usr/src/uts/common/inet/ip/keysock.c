@@ -211,7 +211,7 @@ keysock_plumb_ipsec(netstack_t *ns)
 	keystack->keystack_plumbed = 0;	/* we're trying again.. */
 
 	cr = zone_get_kcred(netstackid_to_zoneid(
-		keystack->keystack_netstack->netstack_stackid));
+	    keystack->keystack_netstack->netstack_stackid));
 	ASSERT(cr != NULL);
 	/*
 	 * Load up the drivers (AH/ESP).
@@ -264,7 +264,7 @@ keysock_plumb_ipsec(netstack_t *ns)
 		goto bail;
 	}
 	err = ldi_ioctl(ip6_lh, I_PLINK, (intptr_t)lh,
-			FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
+	    FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
 	if (err) {
 		ks0dbg(("IPsec:  PLINK of KEYSOCK/AH failed (err %d).\n", err));
 		(void) ldi_close(lh, FREAD|FWRITE, cr);
@@ -290,7 +290,7 @@ keysock_plumb_ipsec(netstack_t *ns)
 			goto bail;
 		}
 		err = ldi_ioctl(ip6_lh, I_PLINK, (intptr_t)lh,
-				FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
+		    FREAD+FWRITE+FNOCTTY+FKIOCTL, cr, &muxid);
 		if (err) {
 			ks0dbg(("IPsec:  "
 			    "PLINK of KEYSOCK/ESP failed (err %d).\n", err));
@@ -755,7 +755,7 @@ keysock_capability_req(queue_t *q, mblk_t *mp)
 	cap_bits1 = ((struct T_capability_req *)mp->b_rptr)->CAP_bits1;
 
 	mp = tpi_ack_alloc(mp, sizeof (struct T_capability_ack),
-		mp->b_datap->db_type, T_CAPABILITY_ACK);
+	    mp->b_datap->db_type, T_CAPABILITY_ACK);
 	if (mp == NULL)
 		return;
 
@@ -909,7 +909,7 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			return;
 		}
 		cr = zone_get_kcred(netstackid_to_zoneid(
-			keystack->keystack_netstack->netstack_stackid));
+		    keystack->keystack_netstack->netstack_stackid));
 		ASSERT(cr != NULL);
 
 		switch (((union T_primitives *)mp->b_rptr)->type) {
@@ -921,11 +921,11 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			break;
 		case T_SVR4_OPTMGMT_REQ:
 			(void) svr4_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &keysock_opt_obj);
+			    &keysock_opt_obj, B_FALSE);
 			break;
 		case T_OPTMGMT_REQ:
 			(void) tpi_optcom_req(q, mp, DB_CREDDEF(mp, cr),
-			    &keysock_opt_obj);
+			    &keysock_opt_obj, B_FALSE);
 			break;
 		case T_DATA_REQ:
 		case T_EXDATA_REQ:
@@ -1026,11 +1026,11 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 		if (extv[SADB_EXT_KEY_ENCRYPT] != NULL)
 			bzero(extv[SADB_EXT_KEY_ENCRYPT],
 			    SADB_64TO8(
-				extv[SADB_EXT_KEY_ENCRYPT]->sadb_ext_len));
+			    extv[SADB_EXT_KEY_ENCRYPT]->sadb_ext_len));
 		if (extv[SADB_EXT_KEY_AUTH] != NULL)
 			bzero(extv[SADB_EXT_KEY_AUTH],
 			    SADB_64TO8(
-				extv[SADB_EXT_KEY_AUTH]->sadb_ext_len));
+			    extv[SADB_EXT_KEY_AUTH]->sadb_ext_len));
 		if (flushmsg) {
 			ks0dbg((
 			    "keysock: Downwards flush/dump message failed!\n"));
@@ -1347,7 +1347,7 @@ keysock_do_flushdump(queue_t *q, mblk_t *mp)
 			 */
 			mutex_enter(&keystack->keystack_consumers[i]->kc_lock);
 			ASSERT((keystack->keystack_consumers[i]->kc_flags &
-				KC_FLUSHING) == 0);
+			    KC_FLUSHING) == 0);
 			keystack->keystack_consumers[i]->kc_flags |=
 			    KC_FLUSHING;
 			mutex_exit(&(keystack->keystack_consumers[i]->kc_lock));
@@ -2098,8 +2098,8 @@ keysock_passup(mblk_t *mp, sadb_msg_t *samsg, minor_t serial,
 		    !toall &&
 		    !(ks->keysock_flags & KEYSOCK_PROMISC) &&
 		    !((ks->keysock_flags & KEYSOCK_EXTENDED) ?
-			allereg : allreg && kc != NULL &&
-			KEYSOCK_ISREG(ks, kc->kc_sa_type)))
+		    allereg : allreg && kc != NULL &&
+		    KEYSOCK_ISREG(ks, kc->kc_sa_type)))
 			continue;
 
 		mp1 = dupmsg(mp);
@@ -2257,7 +2257,7 @@ keysock_rput(queue_t *q, mblk_t *mp)
 		samsg = (sadb_msg_t *)mp1->b_rptr;
 		if (samsg->sadb_msg_type == SADB_FLUSH ||
 		    (samsg->sadb_msg_type == SADB_DUMP &&
-			samsg->sadb_msg_len == SADB_8TO64(sizeof (*samsg)))) {
+		    samsg->sadb_msg_len == SADB_8TO64(sizeof (*samsg)))) {
 			/*
 			 * If I'm an end-of-FLUSH or an end-of-DUMP marker...
 			 */

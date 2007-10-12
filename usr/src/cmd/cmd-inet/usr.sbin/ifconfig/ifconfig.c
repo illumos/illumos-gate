@@ -182,8 +182,8 @@ static void	usage(void);
 static int	strioctl(int s, int cmd, char *buf, int buflen);
 static int	setifdhcp(const char *caller, const char *ifname,
 		    int argc, char *argv[]);
-static int	ip_domux2fd(int *, int *, int *, int *);
-static int	ip_plink(int, int, int, int);
+static int	ip_domux2fd(int *, int *, int *, int *, int *);
+static int	ip_plink(int, int, int, int, int);
 static int	modop(char *arg, char op);
 static int	get_lun(char *);
 static void	selectifs(int argc, char *argv[], int af,
@@ -571,7 +571,7 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 		if (onflags || offflags) {
 			(void) memset(&lifrl, 0, sizeof (lifrl));
 			(void) strncpy(lifrl.lifr_name, lifrp->lifr_name,
-				sizeof (lifrl.lifr_name));
+			    sizeof (lifrl.lifr_name));
 			if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifrl) < 0) {
 				/*
 				 * Perror0() assumes the name to be in the
@@ -1209,7 +1209,7 @@ static int
 set_tun_esp_encr_alg(char *addr, int64_t param)
 {
 	return (set_tun_algs(ESP_ENCR_ALG,
-		    parsealg(addr, IPSEC_PROTO_ESP)));
+	    parsealg(addr, IPSEC_PROTO_ESP)));
 }
 
 /* ARGSUSED */
@@ -1217,7 +1217,7 @@ static int
 set_tun_esp_auth_alg(char *addr, int64_t param)
 {
 	return (set_tun_algs(ESP_AUTH_ALG,
-		    parsealg(addr, IPSEC_PROTO_AH)));
+	    parsealg(addr, IPSEC_PROTO_AH)));
 }
 
 /* ARGSUSED */
@@ -1225,7 +1225,7 @@ static int
 set_tun_ah_alg(char *addr, int64_t param)
 {
 	return (set_tun_algs(AH_AUTH_ALG,
-		    parsealg(addr, IPSEC_PROTO_AH)));
+	    parsealg(addr, IPSEC_PROTO_AH)));
 }
 
 /* ARGSUSED */
@@ -2224,6 +2224,7 @@ setifgroupname(char *grpname, int64_t param)
 static int
 modlist(char *null, int64_t param)
 {
+	int muxid_fd;
 	int muxfd;
 	int ipfd_lowstr;
 	int arpfd_lowstr;
@@ -2233,7 +2234,7 @@ modlist(char *null, int64_t param)
 	int orig_arpid;
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ip_domux2fd(&muxfd, &ipfd_lowstr, &arpfd_lowstr,
+	if (ip_domux2fd(&muxfd, &muxid_fd, &ipfd_lowstr, &arpfd_lowstr,
 	    &orig_arpid) < 0) {
 		return (-1);
 	}
@@ -2255,14 +2256,15 @@ modlist(char *null, int64_t param)
 				Perror0("cannot I_LIST for module names");
 			} else {
 				for (i = 0; i < strlist.sl_nmods; i++) {
-				    (void) printf("%d %s\n", i,
-				    strlist.sl_modlist[i].l_name);
+					(void) printf("%d %s\n", i,
+					    strlist.sl_modlist[i].l_name);
 				}
 			}
 			free(strlist.sl_modlist);
 		}
 	}
-	return (ip_plink(muxfd, ipfd_lowstr, arpfd_lowstr, orig_arpid));
+	return (ip_plink(muxfd, muxid_fd, ipfd_lowstr, arpfd_lowstr,
+	    orig_arpid));
 }
 
 #define	MODINSERT_OP	'i'
@@ -2291,27 +2293,26 @@ modremove(char *arg, int64_t param)
 }
 
 /*
- * Open a stream on /dev/udp, pop off all undesired modules (note that
- * the user may have configured autopush to add modules above or below
- * udp), and push the arp module onto raw IP.
+ * Open a stream on /dev/udp{,6}, pop off all undesired modules (note that
+ * the user may have configured autopush to add modules above
+ * udp), and push the arp module onto the resulting stream.
+ * This is used to make IP+ARP be able to atomically track the muxid
+ * for the I_PLINKed STREAMS, thus it isn't related to ARP running the ARP
+ * protocol.
  */
 static int
 open_arp_on_udp(char *udp_dev_name)
 {
 	int fd;
-	boolean_t popped;
 
 	if ((fd = open(udp_dev_name, O_RDWR)) == -1) {
 		Perror2("open", udp_dev_name);
 		return (-1);
 	}
 	errno = 0;
-	popped = _B_FALSE;
 	while (ioctl(fd, I_POP, 0) != -1)
-		popped = _B_TRUE;
-	if (!popped) {
-		Perror2("cannot pop", udp_dev_name);
-	} else if (errno != EINVAL) {
+		;
+	if (errno != EINVAL) {
 		Perror2("pop", udp_dev_name);
 	} else if (ioctl(fd, I_PUSH, ARP_MOD_NAME) == -1) {
 		Perror2("arp PUSH", udp_dev_name);
@@ -2328,8 +2329,10 @@ open_arp_on_udp(char *udp_dev_name)
  * global variable lifr.
  *
  * Param:
- *	int *udp_fd: (referenced) fd to /dev/udp (upper IP stream).
- *	int *fd: (referenced) fd to the lower IP stream.
+ *	int *muxfd: fd to /dev/udp{,6} for I_PLINK/I_PUNLINK
+ *	int *muxid_fd: fd to /dev/udp{,6} for LIFMUXID
+ *	int *ipfd_lowstr: fd to the lower IP stream.
+ *	int *arpfd_lowstr: fd to the lower ARP stream.
  *
  * Return:
  *	-1 if operation fails, 0 otherwise.
@@ -2338,12 +2341,11 @@ open_arp_on_udp(char *udp_dev_name)
  * for the logic of the PLINK/PUNLINK
  */
 static int
-ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
+ip_domux2fd(int *muxfd, int *muxid_fd, int *ipfd_lowstr, int *arpfd_lowstr,
+    int *orig_arpid)
 {
-	int		ip_fd;
 	uint64_t	flags;
 	char		*udp_dev_name;
-	char		*ip_dev_name;
 
 	*orig_arpid = 0;
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
@@ -2353,20 +2355,18 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
 	flags = lifr.lifr_flags;
 	if (flags & IFF_IPV4) {
 		udp_dev_name = UDP_DEV_NAME;
-		ip_dev_name  = IP_DEV_NAME;
 	} else if (flags & IFF_IPV6) {
 		udp_dev_name = UDP6_DEV_NAME;
-		ip_dev_name  = IP6_DEV_NAME;
 	} else {
 		return (-1);
 	}
 
-	if ((ip_fd = open(ip_dev_name, O_RDWR)) < 0) {
-		Perror2("open", ip_dev_name);
+	if ((*muxid_fd = open(udp_dev_name, O_RDWR)) < 0) {
+		Perror2("open", udp_dev_name);
 		return (-1);
 	}
-	if (ioctl(ip_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
-		Perror2("SIOCGLIFMUXID", ip_dev_name);
+	if (ioctl(*muxid_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
+		Perror2("SIOCGLIFMUXID", udp_dev_name);
 		return (-1);
 	}
 	if (debug > 0) {
@@ -2374,6 +2374,9 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
 		    lifr.lifr_arp_muxid, lifr.lifr_ip_muxid);
 	}
 
+	/*
+	 * Use /dev/udp{,6} as the mux to avoid linkcycles.
+	 */
 	if ((*muxfd = open_arp_on_udp(udp_dev_name)) == -1)
 		return (-1);
 
@@ -2393,7 +2396,7 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
 				 */
 				*orig_arpid = lifr.lifr_arp_muxid;
 				lifr.lifr_arp_muxid = 0;
-				(void) ioctl(*muxfd, SIOCSLIFMUXID,
+				(void) ioctl(*muxid_fd, SIOCSLIFMUXID,
 				    (caddr_t)&lifr);
 				*arpfd_lowstr = -1;
 			} else {
@@ -2415,7 +2418,7 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
 		/* Undo any changes we made */
 		if (*orig_arpid != 0) {
 			lifr.lifr_arp_muxid = *orig_arpid;
-			(void) ioctl(*muxfd, SIOCSLIFMUXID, (caddr_t)&lifr);
+			(void) ioctl(*muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
 		}
 		return (-1);
 	}
@@ -2424,7 +2427,7 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
 		/* Undo any changes we made */
 		if (*orig_arpid != 0) {
 			lifr.lifr_arp_muxid = *orig_arpid;
-			(void) ioctl(*muxfd, SIOCSLIFMUXID, (caddr_t)&lifr);
+			(void) ioctl(*muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
 		}
 		return (-1);
 	}
@@ -2439,8 +2442,10 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
  * must be called in pairs.
  *
  * Param:
- *	int udp_fd: fd to /dev/udp (upper IP stream).
- *	int fd: fd to the lower IP stream.
+ *	int muxfd: fd to /dev/udp{,6} for I_PLINK/I_PUNLINK
+ *	int muxid_fd: fd to /dev/udp{,6} for LIFMUXID
+ *	int ipfd_lowstr: fd to the lower IP stream.
+ *	int arpfd_lowstr: fd to the lower ARP stream.
  *
  * Return:
  *	-1 if operation fails, 0 otherwise.
@@ -2449,7 +2454,8 @@ ip_domux2fd(int *muxfd, int *ipfd_lowstr, int *arpfd_lowstr, int *orig_arpid)
  * for the logic of the PLINK/PUNLINK
  */
 static int
-ip_plink(int muxfd, int ipfd_lowstr, int arpfd_lowstr, int orig_arpid)
+ip_plink(int muxfd, int muxid_fd, int ipfd_lowstr, int arpfd_lowstr,
+    int orig_arpid)
 {
 	int ip_muxid;
 
@@ -2474,9 +2480,11 @@ ip_plink(int muxfd, int ipfd_lowstr, int arpfd_lowstr, int orig_arpid)
 		/* Undo the changes we did in ip_domux2fd */
 		lifr.lifr_arp_muxid = orig_arpid;
 		lifr.lifr_ip_muxid = ip_muxid;
-		(void) ioctl(muxfd, SIOCSLIFMUXID, (caddr_t)&lifr);
+		(void) ioctl(muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
 	}
 
+	(void) close(muxfd);
+	(void) close(muxid_fd);
 	return (0);
 }
 
@@ -2497,6 +2505,7 @@ modop(char *arg, char op)
 {
 	char *pos_p;
 	int muxfd;
+	int muxid_fd;
 	int ipfd_lowstr;  /* IP stream (lower stream of mux) to be plinked */
 	int arpfd_lowstr; /* ARP stream (lower stream of mux) to be plinked */
 	struct strmodconf mod;
@@ -2551,7 +2560,7 @@ modop(char *arg, char op)
 	}
 	mod.pos = atoi(pos_p);
 
-	if (ip_domux2fd(&muxfd, &ipfd_lowstr, &arpfd_lowstr,
+	if (ip_domux2fd(&muxfd, &muxid_fd, &ipfd_lowstr, &arpfd_lowstr,
 	    &orig_arpid) < 0) {
 		free(arg_str);
 		return (-1);
@@ -2581,7 +2590,8 @@ modop(char *arg, char op)
 		break;
 	}
 	free(arg_str);
-	return (ip_plink(muxfd, ipfd_lowstr, arpfd_lowstr, orig_arpid));
+	return (ip_plink(muxfd, muxid_fd, ipfd_lowstr, arpfd_lowstr,
+	    orig_arpid));
 }
 
 /*
@@ -3101,7 +3111,7 @@ configinfo(char *null, int64_t param)
 			(void) printf(" metric %d ", lifr.lifr_metric);
 	}
 	if (((flags & (IFF_VIRTUAL|IFF_LOOPBACK)) != IFF_VIRTUAL) &&
-		ioctl(s, SIOCGLIFMTU, (caddr_t)&lifr) >= 0)
+	    ioctl(s, SIOCGLIFMTU, (caddr_t)&lifr) >= 0)
 		(void) printf(" mtu %d", lifr.lifr_metric);
 
 	/* don't print index when in compatibility mode */
@@ -3259,7 +3269,7 @@ tun_status(void)
 
 	if ((protocol == AF_INET6) &&
 	    (icfg_get_tunnel_encaplimit(handle, &encaplimit) ==
-		ICFG_SUCCESS)) {
+	    ICFG_SUCCESS)) {
 		if (!tabbed) {
 			(void) printf("\t");
 			tabbed = _B_TRUE;
@@ -3350,7 +3360,7 @@ in_status(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_status: SIOCGLIFDSTADDR");
+				Perror0_exit("in_status: SIOCGLIFDSTADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_dstaddr;
 		(void) printf("--> %s ", inet_ntoa(sin->sin_addr));
@@ -3363,7 +3373,7 @@ in_status(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_status: SIOCGLIFBRDADDR");
+				Perror0_exit("in_status: SIOCGLIFBRDADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_addr;
 		if (sin->sin_addr.s_addr != 0) {
@@ -3450,7 +3460,7 @@ in6_status(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_status6: SIOCGLIFDSTADDR");
+				Perror0_exit("in_status6: SIOCGLIFDSTADDR");
 		}
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_dstaddr;
 		(void) printf("--> %s ",
@@ -3466,7 +3476,7 @@ in6_status(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_status6: SIOCGLIFTOKEN");
+				Perror0_exit("in_status6: SIOCGLIFTOKEN");
 		} else {
 			sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
 			(void) printf("token %s/%d ",
@@ -3569,7 +3579,7 @@ in_configinfo(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_configinfo: SIOCGLIFDSTADDR");
+				Perror0_exit("in_configinfo: SIOCGLIFDSTADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_dstaddr;
 		(void) printf(" destination %s ", inet_ntoa(sin->sin_addr));
@@ -3582,7 +3592,7 @@ in_configinfo(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in_configinfo: SIOCGLIFBRDADDR");
+				Perror0_exit("in_configinfo: SIOCGLIFBRDADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_addr;
 		if (sin->sin_addr.s_addr != 0) {
@@ -3678,7 +3688,7 @@ in6_configinfo(int force, uint64_t flags)
 				(void) memset(&lifr.lifr_addr, 0,
 				    sizeof (lifr.lifr_addr));
 			else
-			    Perror0_exit("in6_configinfo: SIOCGLIFDSTADDR");
+				Perror0_exit("in6_configinfo: SIOCGLIFDSTADDR");
 		}
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_dstaddr;
 		(void) printf(" destination %s ",
@@ -3692,7 +3702,7 @@ in6_configinfo(int force, uint64_t flags)
 			(void) memset(&lifr.lifr_addr, 0,
 			    sizeof (lifr.lifr_addr));
 		else
-		    Perror0_exit("in6_configinfo: SIOCGLIFTOKEN");
+			Perror0_exit("in6_configinfo: SIOCGLIFTOKEN");
 	} else {
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
 		(void) printf(" token %s/%d ",
@@ -3761,10 +3771,10 @@ get_lun(char *rsrc)
  * and IP uses the info in the I_PLINK message to get the muxid.
  *
  * a. STREAMS does not allow us to use /dev/ip itself as the mux. So we use
- *    /dev/udp[6].
+ *    /dev/udp{,6}.
  * b. SIOCGLIFMUXID returns the muxid corresponding to the V4 or V6 stream
  *    depending on the open i.e. V4 vs V6 open. So we need to use /dev/udp
- *    or /dev/udp6.
+ *    or /dev/udp6 for SIOCGLIFMUXID and SIOCSLIFMUXID.
  * c. We need to push ARP in order to get the required kernel support for
  *    atomic plumbings. The actual work done by ARP is explained in arp.c
  *    Without pushing ARP, we will still be able to plumb/unplumb. But
@@ -3963,6 +3973,7 @@ inetunplumb(char *arg, int64_t param)
 {
 	int ip_muxid, arp_muxid;
 	int mux_fd;
+	int muxid_fd;
 	char *udp_dev_name;
 	char *strptr;
 	uint64_t flags;
@@ -3994,15 +4005,18 @@ inetunplumb(char *arg, int64_t param)
 	else
 		udp_dev_name = UDP_DEV_NAME;
 
+	if ((muxid_fd = open(udp_dev_name, O_RDWR)) == -1)
+		exit(EXIT_FAILURE);
+
 	if ((mux_fd = open_arp_on_udp(udp_dev_name)) == -1)
 		exit(EXIT_FAILURE);
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(mux_fd, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
+	if (ioctl(muxid_fd, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
 		Perror0_exit("unplumb: SIOCGLIFFLAGS");
 	}
 	flags = lifr.lifr_flags;
-	if (ioctl(mux_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
+	if (ioctl(muxid_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
 		Perror0_exit("unplumb: SIOCGLIFMUXID");
 	}
 	arp_muxid = lifr.lifr_arp_muxid;
@@ -4028,7 +4042,7 @@ inetunplumb(char *arg, int64_t param)
 				 * for consistency of IP-ARP streams.
 				 */
 				lifr.lifr_arp_muxid = 0;
-				(void) ioctl(mux_fd, SIOCSLIFMUXID,
+				(void) ioctl(muxid_fd, SIOCSLIFMUXID,
 				    (caddr_t)&lifr);
 				changed_arp_muxid = _B_TRUE;
 			} else {
@@ -4048,12 +4062,13 @@ inetunplumb(char *arg, int64_t param)
 			save_errno = errno;
 			lifr.lifr_arp_muxid = arp_muxid;
 			lifr.lifr_ip_muxid = ip_muxid;
-			(void) ioctl(mux_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
+			(void) ioctl(muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
 			errno = save_errno;
 		}
 		Perror0_exit("I_PUNLINK for ip");
 	}
 	(void) close(mux_fd);
+	(void) close(muxid_fd);
 	return (0);
 }
 
@@ -4146,17 +4161,17 @@ Perror0(char *cmd)
 
 	case ENXIO:
 		(void) fprintf(stderr, "%s: %s: no such interface\n",
-			cmd, lifr.lifr_name);
+		    cmd, lifr.lifr_name);
 		break;
 
 	case EPERM:
 		(void) fprintf(stderr, "%s: %s: permission denied\n",
-			cmd, lifr.lifr_name);
+		    cmd, lifr.lifr_name);
 		break;
 
 	case EEXIST:
 		(void) fprintf(stderr, "%s: %s: already exists\n",
-			cmd, lifr.lifr_name);
+		    cmd, lifr.lifr_name);
 		break;
 
 	default: {
@@ -4189,12 +4204,12 @@ Perror2(char *cmd, char *str)
 
 	case ENXIO:
 		(void) fprintf(stderr, "%s: %s: no such interface\n",
-			cmd, str);
+		    cmd, str);
 		break;
 
 	case EPERM:
 		(void) fprintf(stderr, "%s: %s: permission denied\n",
-			cmd, str);
+		    cmd, str);
 		break;
 
 	default: {

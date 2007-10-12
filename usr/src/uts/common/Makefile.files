@@ -460,12 +460,14 @@ TSWTCL_OBJS +=	tswtcl.o tswtclddi.o
 
 ARP_OBJS +=	arpddi.o arp.o arp_netinfo.o
 
-ICMP_OBJS +=	icmpddi.o icmp.o icmp_opt_data.o
+ICMP_OBJS +=	icmpddi.o
 
 ICMP6_OBJS +=	icmp6ddi.o
 
-RTS_OBJS +=	rtsddi.o rts.o rts_opt_data.o
+RTS_OBJS +=	rtsddi.o
 
+IP_ICMP_OBJS =	icmp.o icmp_opt_data.o
+IP_RTS_OBJS =	rts.o rts_opt_data.o
 IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_kssl.o tcp_opt_data.o tcp_sack.o \
 		tcp_trace.o
 IP_UDP_OBJS =	udp.o udp_opt_data.o
@@ -482,7 +484,9 @@ IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_multi.o ip_ndp.o ip_opt_data.o ip_rts.o ip_srcid.o \
 		ipddi.o ipdrop.o mi.o nd.o optcom.o snmpcom.o ipsec_loader.o \
 		spd.o ipclassifier.o inet_common.o ip_squeue.o squeue.o \
-		ip_sadb.o ip_ftable.o radix.o \
+		ip_sadb.o ip_ftable.o radix.o ip_dummy.o \
+		$(IP_ICMP_OBJS) \
+		$(IP_RTS_OBJS) \
 		$(IP_TCP_OBJS) \
 		$(IP_UDP_OBJS) \
 		$(IP_SCTP_OBJS)

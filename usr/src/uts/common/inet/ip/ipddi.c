@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -33,11 +33,12 @@
 #include <inet/ip.h>
 
 #define	INET_NAME	"ip"
-#define	INET_STRTAB	ipinfo
+#define	INET_DEVSTRTAB	ipinfov4
+#define	INET_MODSTRTAB	ipinfov4
 #define	INET_MODDESC	"IP STREAMS module 1.47"
 #define	INET_DEVDESC	"IP STREAMS driver 1.47"
-#define	INET_DEVMINOR	IPV4_MINOR
-#define	INET_DEVMTFLAGS	D_MP	/* we are *really* ip :-) */
+#define	INET_DEVMINOR	0
+#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since we're really ip */
 #define	INET_MODMTFLAGS D_MP
 
 #include "../inetddi.c"

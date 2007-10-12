@@ -73,9 +73,6 @@
 #include "sctp_addr.h"
 #include "sctp_asconf.h"
 
-extern major_t SCTP6_MAJ;
-extern major_t SCTP_MAJ;
-
 int sctpdebug;
 sin6_t	sctp_sin6_null;	/* Zero address for quick clears */
 
@@ -1568,7 +1565,6 @@ sctp_g_q_setup(sctp_stack_t *sctps)
 	mutex_exit(&sctps->sctps_g_q_lock);
 }
 
-major_t IP_MAJ;
 #define	IP	"ip"
 
 #define	SCTP6DEV		"/devices/pseudo/sctp6@0:sctp6"
@@ -1584,11 +1580,14 @@ sctp_g_q_create(sctp_stack_t *sctps)
 	ldi_ident_t	li = NULL;
 	int		rval;
 	cred_t		*cr;
+	major_t IP_MAJ;
 
 #ifdef NS_DEBUG
 	(void) printf("sctp_g_q_create()for stack %d\n",
 	    sctps->sctps_netstack->netstack_stackid);
 #endif
+
+	IP_MAJ = ddi_name_to_major(IP);
 
 	ASSERT(sctps->sctps_g_q_creator == curthread);
 
@@ -1686,6 +1685,9 @@ sctp_g_q_close(void *arg)
 	ldi_handle_t	lh = NULL;
 	ldi_ident_t	li = NULL;
 	cred_t		*cr;
+	major_t IP_MAJ;
+
+	IP_MAJ = ddi_name_to_major(IP);
 
 	lh = sctps->sctps_g_q_lh;
 	if (lh == NULL)
@@ -1756,8 +1758,6 @@ sctp_g_q_inactive(sctp_stack_t *sctps)
 void
 sctp_ddi_g_init(void)
 {
-	IP_MAJ = ddi_name_to_major(IP);
-
 	/* Create sctp_t/conn_t cache */
 	sctp_conn_cache_init();
 

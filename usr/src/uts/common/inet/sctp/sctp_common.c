@@ -558,6 +558,7 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 	if (faddr->ire != NULL && faddr->ire->ire_type & IRE_BROADCAST) {
 		IRE_REFRELE_NOTR(faddr->ire);
 		sctp_timer_free(timer_mp);
+		faddr->timer_mp = NULL;
 		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
 		return (EADDRNOTAVAIL);
 	}

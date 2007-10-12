@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -188,7 +188,8 @@ optcom_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error, int sys_error)
  * svr4_optcom_req() or tpi_optcom_req() to restart the option processing.
  */
 int
-svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
+svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
+    boolean_t pass_to_ip)
 {
 	pfi_t	deffn = dbobjp->odb_deffn;
 	pfi_t	getfn = dbobjp->odb_getfn;
@@ -211,12 +212,8 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
 	struct opthdr *opt_start;
 	opdes_t	*optd;
 	boolean_t	pass_to_next = B_FALSE;
-	boolean_t	pass_to_ip = B_FALSE;
-	boolean_t	is_tcp;
 	struct T_optmgmt_ack *toa;
 	struct T_optmgmt_req *tor;
-
-	is_tcp = (dbobjp == &tcp_opt_obj);
 
 	/*
 	 * Allocate M_CTL and prepend to the packet for restarting this
@@ -310,7 +307,7 @@ no_mem:;
 			opt->name = optd->opdes_name;
 			if (!(optd->opdes_props & OP_DEF_FN) ||
 			    ((len = (*deffn)(q, opt->level,
-				opt->name, (uchar_t *)&opt[1])) < 0)) {
+			    opt->name, (uchar_t *)&opt[1])) < 0)) {
 				/*
 				 * Fill length and value from table.
 				 *
@@ -404,8 +401,8 @@ no_mem:;
 
 		if ((uchar_t *)next_opt < (uchar_t *)&opt[1] ||
 		    ((next_opt >= opt_end) &&
-			(((uchar_t *)next_opt - (uchar_t *)opt_end) >=
-			    __TPI_ALIGN_SIZE)))
+		    (((uchar_t *)next_opt - (uchar_t *)opt_end) >=
+		    __TPI_ALIGN_SIZE)))
 			goto bad_opt;
 
 		/* sanity check */
@@ -530,8 +527,8 @@ no_mem:;
 
 		for (opt = opt_start; opt < opt_end; opt = next_opt) {
 
-		    next_opt = (struct opthdr *)((uchar_t *)&opt[1] +
-			_TPI_ALIGN_OPT(opt->len));
+			next_opt = (struct opthdr *)((uchar_t *)&opt[1] +
+			    _TPI_ALIGN_OPT(opt->len));
 
 			opt1->name = opt->name;
 			opt1->level = opt->level;
@@ -544,12 +541,6 @@ no_mem:;
 			if (len < 0) {
 				opt1->len = opt->len;
 				bcopy(&opt[1], &opt1[1], opt->len);
-				/*
-				 * Pass the option down to IP only
-				 * if TCP hasn't processed it.
-				 */
-				if (is_tcp)
-					pass_to_ip = B_TRUE;
 			} else {
 				opt1->len = (t_uscalar_t)len;
 			}
@@ -634,13 +625,12 @@ restart:
 				optcom_err_ack(q, mp, TSYSERR, error);
 				freeb(first_mp);
 				return (0);
-			} else if (error < 0 && is_tcp) {
-				/*
-				 * Pass the option down to IP only
-				 * if TCP hasn't processed it.
-				 */
-				pass_to_ip = B_TRUE;
 			}
+			/*
+			 * error < 0 means option is not recognized.
+			 * But with OP_PASSNEXT the next module
+			 * might recognize it.
+			 */
 		}
 		/* Done with the restart control mp. */
 		freeb(first_mp);
@@ -675,7 +665,8 @@ bad_opt:;
  * New optcom_req inspired by TPI/XTI semantics
  */
 int
-tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
+tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
+    boolean_t pass_to_ip)
 {
 	t_scalar_t t_error;
 	mblk_t *toa_mp;
@@ -830,7 +821,7 @@ restart:
 	 * forwarding and if it is possible, we forward the message
 	 * downstream. Else we ack it.
 	 */
-	if (pass_to_next && (q->q_next != NULL || dbobjp == &tcp_opt_obj)) {
+	if (pass_to_next && (q->q_next != NULL || pass_to_ip)) {
 		/*
 		 * We pass it down as T_OPTMGMT_REQ. This code relies
 		 * on the happy coincidence that T_optmgmt_req and
@@ -941,7 +932,7 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 			if (tor->MGMT_flags == T_CHECK ||
 			    !topmost_tpiprovider ||
 			    ((allopt_len = opt_level_allopts_lengths(opt->level,
-				opt_arr, opt_arr_cnt)) == 0)) {
+			    opt_arr, opt_arr_cnt)) == 0)) {
 				/*
 				 * This is confusing but correct !
 				 * It is not valid to to use T_ALLOPT with
@@ -1173,7 +1164,7 @@ do_options_second_pass(queue_t *q, mblk_t *reqmp, mblk_t *ack_mp, cred_t *cr,
 		    (opt->status == T_NOTSUPPORT) ||
 		    (opt->status == T_FAILURE) ||
 		    ((tor->MGMT_flags & (T_NEGOTIATE|T_CHECK)) &&
-			(opt->status == T_READONLY));
+		    (opt->status == T_READONLY));
 
 		if (failed_option) {
 			/*
@@ -1475,7 +1466,7 @@ do_opt_default(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 					topth->status = T_FAILURE;
 					*worst_statusp =
 					    get_worst_status(T_FAILURE,
-						*worst_statusp);
+					    *worst_statusp);
 				}
 			} else {
 				/*
@@ -1729,8 +1720,8 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
 			if (optd->opdes_props & OP_DEF_FN) {
 				if ((optd->opdes_props & OP_VARLEN) ||
 				    ((optsize = (*deffn)(q, reqopt->level,
-					optd->opdes_name,
-					(uchar_t *)optd->opdes_defbuf)) < 0)) {
+				    optd->opdes_name,
+				    (uchar_t *)optd->opdes_defbuf)) < 0)) {
 					/* XXX - skip these too */
 					topth->status = T_SUCCESS;
 					continue; /* skip setting */

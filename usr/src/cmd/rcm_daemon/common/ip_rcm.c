@@ -283,8 +283,8 @@ static int	mpathd_send_cmd(mpathd_cmd_t *);
 static int	connect_to_mpathd(int);
 static int	modop(char *, char *, int, char);
 static int	get_modlist(char *, ip_lif_t *);
-static int	ip_domux2fd(int *, int *, struct lifreq *);
-static int	ip_plink(int, int, struct lifreq *);
+static int	ip_domux2fd(int *, int *, int *, struct lifreq *);
+static int	ip_plink(int, int, int, struct lifreq *);
 static int	ip_onlinelist(rcm_handle_t *, ip_cache_t *, char **, uint_t,
 			rcm_info_t **);
 static int	ip_offlinelist(rcm_handle_t *, ip_cache_t *, char **, uint_t,
@@ -2287,7 +2287,8 @@ modop(char *name, char *arg, int pos, char op)
 static int
 get_modlist(char *name, ip_lif_t *lif)
 {
-	int udp_fd;
+	int mux_fd;
+	int muxid_fd;
 	int fd;
 	int i;
 	int num_mods;
@@ -2298,7 +2299,7 @@ get_modlist(char *name, ip_lif_t *lif)
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	lifr.lifr_flags = lif->li_ifflags;
-	if (ip_domux2fd(&udp_fd, &fd, &lifr) < 0) {
+	if (ip_domux2fd(&mux_fd, &muxid_fd, &fd, &lifr) < 0) {
 		rcm_log_message(RCM_ERROR, _("IP: ip_domux2fd(%s)\n"), name);
 		return (-1);
 	}
@@ -2307,7 +2308,7 @@ get_modlist(char *name, ip_lif_t *lif)
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get_modlist(%s): I_LIST(%s) \n"),
 		    name, strerror(errno));
-		(void) ip_plink(udp_fd, fd, &lifr);
+		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
 		return (-1);
 	}
 
@@ -2317,7 +2318,7 @@ get_modlist(char *name, ip_lif_t *lif)
 	if (strlist.sl_modlist == NULL) {
 		rcm_log_message(RCM_ERROR, _("IP: get_modlist(%s): %s\n"),
 		    name, strerror(errno));
-		(void) ip_plink(udp_fd, fd, &lifr);
+		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
 		return (-1);
 	}
 
@@ -2325,7 +2326,7 @@ get_modlist(char *name, ip_lif_t *lif)
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get_modlist(%s): I_LIST error: %s\n"),
 		    name, strerror(errno));
-		(void) ip_plink(udp_fd, fd, &lifr);
+		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
 		return (-1);
 	}
 
@@ -2336,7 +2337,7 @@ get_modlist(char *name, ip_lif_t *lif)
 			rcm_log_message(RCM_ERROR,
 			    _("IP: get_modlist(%s): %s\n"),
 			    name, strerror(errno));
-			(void) ip_plink(udp_fd, fd, &lifr);
+			(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
 			return (-1);
 		}
 		(void) strcpy(lif->li_modules[i], strlist.sl_modlist[i].l_name);
@@ -2346,7 +2347,7 @@ get_modlist(char *name, ip_lif_t *lif)
 	free(strlist.sl_modlist);
 
 	rcm_log_message(RCM_TRACE1, "IP: getmodlist(%s) success\n", name);
-	return (ip_plink(udp_fd, fd, &lifr));
+	return (ip_plink(mux_fd, muxid_fd, fd, &lifr));
 }
 
 /*
@@ -2354,37 +2355,34 @@ get_modlist(char *name, ip_lif_t *lif)
  *		 Stolen from ifconfig.c
  */
 static int
-ip_domux2fd(int *udp_fd, int *fd, struct lifreq *lifr)
+ip_domux2fd(int *mux_fd, int *muxid_fdp, int *fd, struct lifreq *lifr)
 {
-	int ip_fd;
+	int muxid_fd;
 	char	*udp_dev_name;
-	char	*ip_dev_name;
 
 	if (lifr->lifr_flags & IFF_IPV6) {
-		udp_dev_name = UDP6_DEV_NAME;
-		ip_dev_name  = IP6_DEV_NAME;
+		udp_dev_name  = UDP6_DEV_NAME;
 	} else {
-		udp_dev_name = UDP_DEV_NAME;
-		ip_dev_name  = IP_DEV_NAME;
+		udp_dev_name  = UDP_DEV_NAME;
 	}
 
-	if ((ip_fd = open(ip_dev_name, O_RDWR)) < 0) {
-		rcm_log_message(RCM_ERROR, _("IP: ip_domux2fd: open(%s) %s\n"),
-		    ip_dev_name, strerror(errno));
-		return (-1);
-	}
-	if ((*udp_fd = open(udp_dev_name, O_RDWR)) < 0) {
+	if ((muxid_fd = open(udp_dev_name, O_RDWR)) < 0) {
 		rcm_log_message(RCM_ERROR, _("IP: ip_domux2fd: open(%s) %s\n"),
 		    udp_dev_name, strerror(errno));
-		(void) close(ip_fd);
 		return (-1);
 	}
-	if (ioctl(ip_fd, SIOCGLIFMUXID, (caddr_t)lifr) < 0) {
+	if ((*mux_fd = open(udp_dev_name, O_RDWR)) < 0) {
+		rcm_log_message(RCM_ERROR, _("IP: ip_domux2fd: open(%s) %s\n"),
+		    udp_dev_name, strerror(errno));
+		(void) close(muxid_fd);
+		return (-1);
+	}
+	if (ioctl(muxid_fd, SIOCGLIFMUXID, (caddr_t)lifr) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: ip_domux2fd: SIOCGLIFMUXID(%s): %s\n"),
-		    ip_dev_name, strerror(errno));
-		(void) close(*udp_fd);
-		(void) close(ip_fd);
+		    udp_dev_name, strerror(errno));
+		(void) close(*mux_fd);
+		(void) close(muxid_fd);
 		return (-1);
 	}
 
@@ -2392,25 +2390,25 @@ ip_domux2fd(int *udp_fd, int *fd, struct lifreq *lifr)
 	    "IP: ip_domux2fd: ARP_muxid %d IP_muxid %d\n",
 	    lifr->lifr_arp_muxid, lifr->lifr_ip_muxid);
 
-	if ((*fd = ioctl(*udp_fd, _I_MUXID2FD, lifr->lifr_ip_muxid)) < 0) {
+	if ((*fd = ioctl(*mux_fd, _I_MUXID2FD, lifr->lifr_ip_muxid)) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: ip_domux2fd: _I_MUXID2FD(%s): %s\n"),
 		    udp_dev_name, strerror(errno));
-		(void) close(*udp_fd);
-		(void) close(ip_fd);
+		(void) close(*mux_fd);
+		(void) close(muxid_fd);
 		return (-1);
 	}
-	if (ioctl(*udp_fd, I_PUNLINK, lifr->lifr_ip_muxid) < 0) {
+	if (ioctl(*mux_fd, I_PUNLINK, lifr->lifr_ip_muxid) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: ip_domux2fd: I_PUNLINK(%s): %s\n"),
 		    udp_dev_name, strerror(errno));
-		(void) close(*udp_fd);
-		(void) close(ip_fd);
+		(void) close(*mux_fd);
+		(void) close(muxid_fd);
 		return (-1);
 	}
 
-	/* Note: udp_fd is closed in ip_plink below */
-	(void) close(ip_fd);
+	/* Note: mux_fd and muxid_fd are closed in ip_plink below */
+	*muxid_fdp = muxid_fd;
 	return (0);
 }
 
@@ -2419,29 +2417,32 @@ ip_domux2fd(int *udp_fd, int *fd, struct lifreq *lifr)
  *	      Stolen from ifconfig.c
  */
 static int
-ip_plink(int udp_fd, int fd, struct lifreq *lifr)
+ip_plink(int mux_fd, int muxid_fd, int fd, struct lifreq *lifr)
 {
 	int mux_id;
 
-	if ((mux_id = ioctl(udp_fd, I_PLINK, fd)) < 0) {
+	if ((mux_id = ioctl(mux_fd, I_PLINK, fd)) < 0) {
 		rcm_log_message(RCM_ERROR, _("IP: ip_plink I_PLINK(%s): %s\n"),
 		    UDP_DEV_NAME, strerror(errno));
-		(void) close(udp_fd);
+		(void) close(mux_fd);
+		(void) close(muxid_fd);
 		(void) close(fd);
 		return (-1);
 	}
 
 	lifr->lifr_ip_muxid = mux_id;
-	if (ioctl(udp_fd, SIOCSLIFMUXID, (caddr_t)lifr) < 0) {
+	if (ioctl(muxid_fd, SIOCSLIFMUXID, (caddr_t)lifr) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: ip_plink SIOCSLIFMUXID(%s): %s\n"),
 		    UDP_DEV_NAME, strerror(errno));
-		(void) close(udp_fd);
+		(void) close(mux_fd);
+		(void) close(muxid_fd);
 		(void) close(fd);
 		return (-1);
 	}
 
-	(void) close(udp_fd);
+	(void) close(mux_fd);
+	(void) close(muxid_fd);
 	(void) close(fd);
 	return (0);
 }

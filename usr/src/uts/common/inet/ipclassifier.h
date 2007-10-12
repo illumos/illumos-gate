@@ -57,35 +57,42 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
  */
 
 /* Conn Flags */
-#define	IPCL_UDPMOD		0x00020000	/* Is UDP module instance */
-#define	IPCL_TCPMOD		0x00040000	/* Is TCP module instance */
+/* Unused			0x00020000 */
+/* Unused			0x00040000 */
 #define	IPCL_FULLY_BOUND	0x00080000	/* Bound to correct squeue */
 #define	IPCL_CHECK_POLICY	0x00100000	/* Needs policy checking */
 #define	IPCL_SOCKET		0x00200000	/* Sockfs connection */
 #define	IPCL_ACCEPTOR		0x00400000	/* Sockfs priv acceptor */
 #define	IPCL_CL_LISTENER	0x00800000	/* Cluster listener */
 #define	IPCL_EAGER		0x01000000	/* Incoming connection */
-#define	IPCL_UDP		0x02000000	/* A UDP connection */
-#define	IPCL_TCP6		0x04000000	/* A TCP6 connection */
-#define	IPCL_TCP4		0x08000000	/* A TCP connection */
+/* Unused			0x02000000 */
+#define	IPCL_TCP6		0x04000000	/* AF_INET6 TCP */
+#define	IPCL_TCP4		0x08000000	/* IPv4 packet format TCP */
+/* Unused			0x10000000 */
+/* Unused			0x20000000 */
 #define	IPCL_CONNECTED		0x40000000	/* Conn in connected table */
 #define	IPCL_BOUND		0x80000000	/* Conn in bind table */
 
 /* Flags identifying the type of conn */
-#define	IPCL_TCPCONN		0x00000001	/* Flag to indicate cache */
-#define	IPCL_SCTPCONN		0x00000002
-#define	IPCL_IPCCONN		0x00000004
-#define	IPCL_ISV6		0x00000008	/* Is a V6 connection */
-#define	IPCL_IPTUN		0x00000010	/* Has "tun" plumbed above it */
+#define	IPCL_TCPCONN		0x00000001	/* From tcp_conn_cache */
+#define	IPCL_SCTPCONN		0x00000002	/* From sctp_conn_cache */
+#define	IPCL_IPCCONN		0x00000004	/* From ip_conn_cache */
+#define	IPCL_UDPCONN		0x00000008	/* From udp_conn_cache */
+#define	IPCL_RAWIPCONN		0x00000010	/* From rawip_conn_cache */
+#define	IPCL_RTSCONN		0x00000020	/* From rts_conn_cache */
+#define	IPCL_ISV6		0x00000040	/* AF_INET6 */
+#define	IPCL_IPTUN		0x00000080	/* Has "tun" plumbed above it */
 
 /* Conn Masks */
 #define	IPCL_TCP		(IPCL_TCP4|IPCL_TCP6)
-#define	IPCL_REMOVED		0x00000020
-#define	IPCL_REUSED		0x00000040
+#define	IPCL_REMOVED		0x00000100
+#define	IPCL_REUSED		0x00000200
 
+/* The packet format is IPv4; could be an AF_INET or AF_INET6 socket */
 #define	IPCL_IS_TCP4(connp)						\
 	(((connp)->conn_flags & IPCL_TCP4))
 
+/* Connected AF_INET with no IPsec policy */
 #define	IPCL_IS_TCP4_CONNECTED_NO_POLICY(connp)				\
 	(((connp)->conn_flags &						\
 		(IPCL_TCP4|IPCL_CONNECTED|IPCL_CHECK_POLICY|IPCL_TCP6))	\
@@ -97,6 +104,7 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_IS_BOUND(connp)						\
 	((connp)->conn_flags & IPCL_BOUND)
 
+/* AF_INET TCP that is bound */
 #define	IPCL_IS_TCP4_BOUND(connp)					\
 	(((connp)->conn_flags &						\
 		(IPCL_TCP4|IPCL_BOUND|IPCL_TCP6)) ==			\
@@ -105,16 +113,26 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_IS_FULLY_BOUND(connp)					\
 	((connp)->conn_flags & IPCL_FULLY_BOUND)
 
-#define	IPCL_IS_TCP(connp)						\
-	((connp)->conn_flags & (IPCL_TCP4|IPCL_TCP6))
-
 /*
- * IPCL_UDP is set on the conn when udp is directly above ip;
- * this flag is cleared the moment udp is popped.
+ * Can't use conn_protocol since we need to tell difference
+ * between a real TCP socket and a SOCK_RAW, IPPROTO_TCP.
  */
-#define	IPCL_IS_UDP(connp)						\
-	((connp)->conn_flags & IPCL_UDP)
+#define	IPCL_IS_TCP(connp)						\
+	((connp)->conn_flags & IPCL_TCPCONN)
 
+#define	IPCL_IS_SCTP(connp)						\
+	((connp)->conn_flags & IPCL_SCTPCONN)
+
+#define	IPCL_IS_UDP(connp)						\
+	((connp)->conn_flags & IPCL_UDPCONN)
+
+#define	IPCL_IS_RAWIP(connp)						\
+	((connp)->conn_flags & IPCL_RAWIPCONN)
+
+#define	IPCL_IS_RTS(connp)						\
+	((connp)->conn_flags & IPCL_RTSCONN)
+
+/* FIXME: Isn't it sufficient to check IPCL_IPTUN? */
 #define	IPCL_IS_IPTUN(connp)						\
 	(((connp)->conn_ulp == IPPROTO_ENCAP ||				\
 	(connp)->conn_ulp == IPPROTO_IPV6) &&				\
@@ -129,12 +147,42 @@ typedef struct
 	pc_t	ctb_stack[CONN_STACK_DEPTH];
 } conn_trace_t;
 
+/*
+ * The initial fields in the conn_t are setup by the kmem_cache constructor,
+ * and are preserved when it is freed. Fields after that are bzero'ed when
+ * the conn_t is freed.
+ */
 struct conn_s {
 	kmutex_t	conn_lock;
 	uint32_t	conn_ref;		/* Reference counter */
-	uint_t		conn_state_flags;	/* IP state flags */
-	ire_t		*conn_ire_cache; 	/* outbound ire cache */
 	uint32_t	conn_flags;		/* Conn Flags */
+
+
+	union {
+		tcp_t		*cp_tcp;	/* Pointer to the tcp struct */
+		struct udp_s	*cp_udp;	/* Pointer to the udp struct */
+		struct icmp_s	*cp_icmp;	/* Pointer to rawip struct */
+		struct rts_s	*cp_rts;	/* Pointer to rts struct */
+		void		*cp_priv;
+	} conn_proto_priv;
+#define	conn_tcp	conn_proto_priv.cp_tcp
+#define	conn_udp	conn_proto_priv.cp_udp
+#define	conn_icmp	conn_proto_priv.cp_icmp
+#define	conn_rts	conn_proto_priv.cp_rts
+#define	conn_priv	conn_proto_priv.cp_priv
+
+	kcondvar_t	conn_cv;
+	uint8_t		conn_ulp;		/* protocol type */
+
+	edesc_rpf	conn_recv;		/* Pointer to recv routine */
+
+	/* Fields after this are bzero'ed when the conn_t is freed. */
+
+	squeue_t	*conn_sqp;		/* Squeue for processing */
+	uint_t		conn_state_flags;	/* IP state flags */
+#define	conn_start_clr	conn_state_flags
+
+	ire_t		*conn_ire_cache; 	/* outbound ire cache */
 	unsigned int
 		conn_on_sqp : 1,		/* Conn is being processed */
 		conn_dontroute : 1,		/* SO_DONTROUTE state */
@@ -178,13 +226,6 @@ struct conn_s {
 
 		conn_lso_ok : 1;		/* LSO is usable */
 
-	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
-	struct udp_s	*conn_udp;		/* Pointer to the udp struct */
-
-	squeue_t	*conn_sqp;		/* Squeue for processing */
-	edesc_rpf	conn_recv;		/* Pointer to recv routine */
-	void		*conn_pad1;
-
 	ill_t		*conn_xmit_if_ill;	/* Outbound ill */
 	ill_t		*conn_nofailover_ill;	/* Failover ill */
 	ipsec_latch_t	*conn_latch;		/* latched state */
@@ -201,7 +242,6 @@ struct conn_s {
 	struct ipsec_policy_head_s *conn_policy; /* Configured policy */
 	in6_addr_t	conn_bound_source_v6;
 #define	conn_bound_source	V4_PART_OF_V6(conn_bound_source_v6)
-	void		*conn_void[1];
 
 	connf_t		*conn_fanout;		/* Hash bucket we're part of */
 	struct conn_s	*conn_next;		/* Hash chain next */
@@ -226,18 +266,13 @@ struct conn_s {
 #define	conn_lport	u_port.tcpu_ports.tcpu_lport
 #define	conn_ports	u_port.conn_ports2
 #define	conn_upq	conn_rq
-	uint8_t		conn_ulp;		/* protocol type */
 	uint8_t		conn_unused_byte;
-	kcondvar_t	conn_cv;
 
 	uint_t		conn_proto;		/* SO_PROTOTYPE state */
 	ill_t		*conn_incoming_ill;	/* IP{,V6}_BOUND_IF */
 	ill_t		*conn_outgoing_pill;	/* IP{,V6}_BOUND_PIF */
 	ill_t		*conn_oper_pending_ill; /* pending shared ioctl */
-	ill_t		*conn_xioctl_pending_ill; /* pending excl ioctl */
 
-	/* this is used only when an unbind is in progress.. */
-	struct sq_s	*conn_pending_sq; /* waiting for ioctl on sq */
 	ilg_t	*conn_ilg;		/* Group memberships */
 	int	conn_ilg_allocated;	/* Number allocated */
 	int	conn_ilg_inuse;		/* Number currently used */
@@ -459,7 +494,6 @@ struct connf_s {
 
 #define	IPCL_TCP_EAGER_INIT(connp, protocol, src, rem, ports) {		\
 	(connp)->conn_flags |= (IPCL_TCP4|IPCL_EAGER);			\
-	(connp)->conn_ulp = protocol;					\
 	IN6_IPADDR_TO_V4MAPPED(src, &(connp)->conn_srcv6);		\
 	IN6_IPADDR_TO_V4MAPPED(rem, &(connp)->conn_remv6);		\
 	(connp)->conn_ports = ports;					\
@@ -468,8 +502,7 @@ struct connf_s {
 }
 
 #define	IPCL_TCP_EAGER_INIT_V6(connp, protocol, src, rem, ports) {	\
-	(connp)->conn_flags |= (IPCL_TCP6|IPCL_EAGER);			\
-	(connp)->conn_ulp = protocol;					\
+	(connp)->conn_flags |= (IPCL_TCP6|IPCL_EAGER|IPCL_ISV6);	\
 	(connp)->conn_srcv6 = src;					\
 	(connp)->conn_remv6 = rem;					\
 	(connp)->conn_ports = ports;					\
@@ -541,6 +574,7 @@ conn_t	*ipcl_lookup_listener_v6(uint16_t, in6_addr_t *, uint_t, zoneid_t,
 	    ip_stack_t *);
 int	conn_trace_ref(conn_t *);
 int	conn_untrace_ref(conn_t *);
+void	ipcl_conn_cleanup(conn_t *);
 conn_t *ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *, ipha_t *, tcph_t *,
 	    ip_stack_t *);
 conn_t *ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *, ip6_t *, tcph_t *,

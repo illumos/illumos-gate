@@ -146,12 +146,13 @@ rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af, ip_stack_t *ipst)
 		}
 		CONN_INC_REF(connp);
 		mutex_exit(&ipst->ips_rts_clients->connf_lock);
+		/* Pass to rts_input */
 		if (!checkqfull || canputnext(CONNP_TO_RQ(connp))) {
 			mp1 = dupmsg(mp);
 			if (mp1 == NULL)
 				mp1 = copymsg(mp);
 			if (mp1 != NULL)
-				putnext(CONNP_TO_RQ(connp), mp1);
+				(connp->conn_recv)(connp, mp1, NULL);
 		}
 
 		mutex_enter(&ipst->ips_rts_clients->connf_lock);
@@ -230,6 +231,30 @@ ip_rts_request_retry(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy)
 }
 
 /*
+ * This is a call from the RTS module
+ * indicating that this is a Routing Socket
+ * Stream. Insert this conn_t in routing
+ * socket client list.
+ */
+void
+ip_rts_register(conn_t *connp)
+{
+	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
+
+	connp->conn_loopback = 1;
+	ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
+}
+
+/*
+ * This is a call from the RTS module indicating that it is closing.
+ */
+void
+ip_rts_unregister(conn_t *connp)
+{
+	ipcl_hash_remove(connp);
+}
+
+/*
  * Processes requests received on a routing socket. It extracts all the
  * arguments and calls the appropriate function to process the request.
  *
@@ -301,26 +326,14 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	 * this is an indication from routing module
 	 * that it is a routing socket stream queue.
 	 */
-	if (mp->b_cont != NULL) {
-		mp1 = dupmsg(mp->b_cont);
-		if (mp1 == NULL) {
-			error  = ENOBUFS;
-			goto done;
-		}
-		mp = mp1;
-	} else {
-		/*
-		 * This is a message from RTS module
-		 * indicating that this is a Routing Socket
-		 * Stream. Insert this conn_t in routing
-		 * socket client list.
-		 */
-
-		connp->conn_loopback = 1;
-		ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
-
+	ASSERT(mp->b_cont != NULL);
+	mp1 = dupmsg(mp->b_cont);
+	if (mp1 == NULL) {
+		error  = ENOBUFS;
 		goto done;
 	}
+	mp = mp1;
+
 	if (mp->b_cont != NULL && !pullupmsg(mp, -1)) {
 		freemsg(mp);
 		error =  EINVAL;
@@ -891,7 +904,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 				if ((found_addrs & RTA_SRC) != 0 &&
 				    (rtm->rtm_flags & RTF_SETSRC) != 0 &&
 				    !IN6_ARE_ADDR_EQUAL(
-					&ire->ire_src_addr_v6, &src_addr_v6)) {
+				    &ire->ire_src_addr_v6, &src_addr_v6)) {
 
 					if (!IN6_IS_ADDR_UNSPECIFIED(
 					    &src_addr_v6)) {
@@ -1034,7 +1047,7 @@ done:
 	ioc_mp->b_datap->db_type = M_IOCACK;
 	if (iocp->ioc_error != 0)
 		iocp->ioc_count = 0;
-	qreply(q, ioc_mp);
+	(connp->conn_recv)(connp, ioc_mp, NULL);
 	/* conn was refheld in ip_wput_ioctl. */
 	CONN_OPER_PENDING_DONE(connp);
 
@@ -1149,7 +1162,7 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 			rts_fill_msg(RTM_GET, rtm_addrs, sire->ire_addr,
 			    sire->ire_mask, sire->ire_gateway_addr,
 			    (sire->ire_flags & RTF_SETSRC) ?
-				sire->ire_src_addr : ire->ire_src_addr,
+			    sire->ire_src_addr : ire->ire_src_addr,
 			    ire->ire_ipif->ipif_pp_dst_addr,
 			    0, ire->ire_ipif, new_mp, sacnt, gc);
 		}
@@ -1174,7 +1187,7 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 			rts_fill_msg_v6(RTM_GET, rtm_addrs, &sire->ire_addr_v6,
 			    &sire->ire_mask_v6, &gw_addr_v6,
 			    (sire->ire_flags & RTF_SETSRC) ?
-				&sire->ire_src_addr_v6 : &ire->ire_src_addr_v6,
+			    &sire->ire_src_addr_v6 : &ire->ire_src_addr_v6,
 			    &ire->ire_ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
 			    ire->ire_ipif, new_mp, sacnt, gc);
 		}

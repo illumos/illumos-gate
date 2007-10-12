@@ -32,47 +32,27 @@
 #include <inet/ip.h>
 
 #define	INET_NAME	"rts"
-#define	INET_STRTAB	rtsinfo
-#define	INET_MODDESC	"PF_ROUTE socket STREAMS module %I%"
+#define	INET_DEVSTRTAB	rtsinfo
 #define	INET_DEVDESC	"PF_ROUTE socket STREAMS driver %I%"
-#define	INET_DEVMINOR	IPV4_MINOR
-#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
-#define	INET_MODMTFLAGS	(D_MP|D_MTQPAIR|D_MTOUTPERIM|D_MTOCEXCL|D_SYNCSTR)
+#define	INET_DEVMINOR	0
+#define	INET_DEVMTFLAGS	(D_MP|D_MTQPAIR|D_SYNCSTR)
 
 #include "../inetddi.c"
-
-extern void rts_ddi_init(void);
-extern void rts_ddi_destroy(void);
 
 int
 _init(void)
 {
-	int	error;
-
-	INET_BECOME_IP();
-
 	/*
-	 * Note: After mod_install succeeds, another thread can enter
-	 * therefore all initialization is done before it.
+	 * device initialization happens when the actual code containing
+	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
 	 */
-	rts_ddi_init();
-	error = mod_install(&modlinkage);
-	if (error != 0)
-		rts_ddi_destroy();
-	return (error);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int	error;
-
-	error = mod_remove(&modlinkage);
-	if (error != 0)
-		return (error);
-
-	rts_ddi_destroy();
-	return (0);
+	return (mod_remove(&modlinkage));
 }
 
 int

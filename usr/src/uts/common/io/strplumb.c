@@ -232,48 +232,6 @@ strplumb_autopush(void)
 	mods[1] = NULL;
 
 	/*
-	 * UDP
-	 */
-	DBG0("setting up udp autopush\n");
-
-	mods[0] = UDP;
-
-	maj = ddi_name_to_major(UDP);
-	if ((err = kstr_autopush(SET_AUTOPUSH, &maj, &min, NULL, &anchor,
-	    mods)) != 0) {
-		printf("strplumb: kstr_autopush(SET/UDP) failed: %d\n", err);
-		return (err);
-	}
-
-	maj = ddi_name_to_major(UDP6);
-	if ((err = kstr_autopush(SET_AUTOPUSH, &maj, &min, NULL, &anchor,
-	    mods)) != 0) {
-		printf("strplumb: kstr_autopush(SET/UDP6) failed: %d\n", err);
-		return (err);
-	}
-
-	/*
-	 * ICMP
-	 */
-	DBG0("setting up icmp autopush\n");
-
-	mods[0] = ICMP;
-
-	maj = ddi_name_to_major(ICMP);
-	if ((err = kstr_autopush(SET_AUTOPUSH, &maj, &min, NULL, NULL,
-	    mods)) != 0) {
-		printf("strplumb: kstr_autopush(SET/ICMP) failed: %d\n", err);
-		return (err);
-	}
-
-	maj = ddi_name_to_major(ICMP6);
-	if ((err = kstr_autopush(SET_AUTOPUSH, &maj, &min, NULL, NULL,
-	    mods)) != 0) {
-		printf("strplumb: kstr_autopush(SET/ICMP6) failed: %d\n", err);
-		return (err);
-	}
-
-	/*
 	 * ARP
 	 */
 	DBG0("setting up arp autopush\n");
@@ -1047,19 +1005,19 @@ dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr)
 	case DL_PHYS_ADDR_ACK:
 		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_phys_addr_ack_t)) {
 			printf("dl_phys_addr: "
-				"DL_PHYS_ADDR_ACK protocol error\n");
+			    "DL_PHYS_ADDR_ACK protocol error\n");
 			break;
 		}
 		phys_addr_ack = &dl_prim->physaddr_ack;
 		if (phys_addr_ack->dl_addr_length != sizeof (*eaddr)) {
 			printf("dl_phys_addr: DL_PHYS_ADDR_ACK bad len %u\n",
-				phys_addr_ack->dl_addr_length);
+			    phys_addr_ack->dl_addr_length);
 			break;
 		}
 		if (phys_addr_ack->dl_addr_length +
 		    phys_addr_ack->dl_addr_offset > (mp->b_wptr-mp->b_rptr)) {
 			printf("dl_phys_addr: DL_PHYS_ADDR_ACK bad len %u\n",
-				phys_addr_ack->dl_addr_length);
+			    phys_addr_ack->dl_addr_length);
 			break;
 		}
 		addrp = mp->b_rptr + phys_addr_ack->dl_addr_offset;
@@ -1080,7 +1038,7 @@ dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr)
 
 	default:
 		printf("dl_phys_addr: bad ACK header %u\n",
-			dl_prim->dl_primitive);
+		    dl_prim->dl_primitive);
 		break;
 	}
 

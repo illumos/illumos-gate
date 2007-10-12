@@ -55,7 +55,11 @@ extern	void	ip_rts_newaddrmsg(int, int, const ipif_t *);
 
 extern	int	ip_rts_request(queue_t *, mblk_t *, cred_t *);
 
+extern	void	ip_rts_register(conn_t *);
+
 extern	void	ip_rts_rtmsg(int, ire_t *, int, ip_stack_t *);
+
+extern	void	ip_rts_unregister(conn_t *);
 
 extern	mblk_t	*rts_alloc_msg(int, int, sa_family_t, uint_t);
 

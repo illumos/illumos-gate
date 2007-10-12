@@ -288,7 +288,7 @@ struct ip_stack {
 	time_t		ips_ip_g_frag_timeout;
 	clock_t		ips_ip_g_frag_timo_ms;
 
-	queue_t		*ips_ip_g_mrouter;
+	struct conn_s	*ips_ip_g_mrouter;
 
 	/* Time since last icmp_pkt_err */
 	clock_t		ips_icmp_pkt_err_last;

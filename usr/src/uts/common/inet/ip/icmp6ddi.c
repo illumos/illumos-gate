@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,21 +32,19 @@
 #include <inet/ip.h>
 
 #define	INET_NAME	"icmp6"
-#define	INET_STRTAB	icmpinfo
+#define	INET_DEVSTRTAB	icmpinfov6
 #define	INET_DEVDESC	"ICMP6 STREAMS driver %I%"
-#define	INET_DEVMINOR	IPV6_MINOR
-#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since we're really ip */
+#define	INET_DEVMINOR	0
+#define	INET_DEVMTFLAGS	D_MP
 
 #include "../inetddi.c"
 
 int
 _init(void)
 {
-	INET_BECOME_IP();
-
 	/*
-	 * device initialization takes place in icmpddi.c:_init()
-	 * (i.e. it must be called first.)
+	 * device initialization happens when the actual code containing
+	 * module (/kernel/drv/ip) is loaded, and driven from ip_ddi_init()
 	 */
 	return (mod_install(&modlinkage));
 }

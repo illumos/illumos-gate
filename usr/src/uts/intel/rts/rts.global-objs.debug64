@@ -25,20 +25,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 cb_inet_devops
-fsw
 inet_dev_info
 inet_devops
-info
-lcl_param_arr
 modldrv
 modlinkage
-modlstrmod
 netdev_privs
-rinit
-rts_g_t_info_ack
-rtsinfo
-rts_max_optsize
-rts_opt_arr
-rts_opt_obj
-rts_valid_levels_arr
-winit

@@ -230,9 +230,13 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
  * 	globalhash table.
  *
  *	type:	This flag determines the type of conn_t which needs to be
- *		created.
+ *		created i.e., which kmem_cache it comes from.
  *		IPCL_TCPCONN	indicates a TCP connection
- *		IPCL_IPCONN	indicates all non-TCP connections.
+ *		IPCL_SCTPCONN	indicates a SCTP connection
+ *		IPCL_UDPCONN	indicates a UDP conn_t.
+ *		IPCL_RAWIPCONN	indicates a RAWIP/ICMP conn_t.
+ *		IPCL_RTSCONN	indicates a RTS conn_t.
+ *		IPCL_IPCCONN	indicates all other connections.
  *
  * void ipcl_conn_destroy(connp)
  *
@@ -266,6 +270,8 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
 #include <inet/udp_impl.h>
 #include <inet/sctp_ip.h>
 #include <inet/sctp/sctp_impl.h>
+#include <inet/rawip_impl.h>
+#include <inet/rts_impl.h>
 
 #include <sys/cpuvar.h>
 
@@ -313,30 +319,40 @@ uint_t ipcl_raw_fanout_size = 256;
 		50331599, 100663291, 201326557, 0}
 
 /*
- * wrapper structure to ensure that conn+tcpb are aligned
- * on cache lines.
+ * wrapper structure to ensure that conn and what follows it (tcp_t, etc)
+ * are aligned on cache lines.
  */
-typedef struct itc_s {
-	union {
-		conn_t	itcu_conn;
-		char	itcu_filler[CACHE_ALIGN(conn_s)];
-	}	itc_u;
-	tcp_t	itc_tcp;
+typedef union itc_s {
+	conn_t	itc_conn;
+	char	itcu_filler[CACHE_ALIGN(conn_s)];
 } itc_t;
 
-#define	itc_conn	itc_u.itcu_conn
-
-struct kmem_cache  *ipcl_tcpconn_cache;
-struct kmem_cache  *ipcl_conn_cache;
+struct kmem_cache  *tcp_conn_cache;
+struct kmem_cache  *ip_conn_cache;
 extern struct kmem_cache  *sctp_conn_cache;
 extern struct kmem_cache  *tcp_sack_info_cache;
 extern struct kmem_cache  *tcp_iphc_cache;
+struct kmem_cache  *udp_conn_cache;
+struct kmem_cache  *rawip_conn_cache;
+struct kmem_cache  *rts_conn_cache;
 
 extern void	tcp_timermp_free(tcp_t *);
 extern mblk_t	*tcp_timermp_alloc(int);
 
-static int	ipcl_tcpconn_constructor(void *, void *, int);
-static void	ipcl_tcpconn_destructor(void *, void *);
+static int	ip_conn_constructor(void *, void *, int);
+static void	ip_conn_destructor(void *, void *);
+
+static int	tcp_conn_constructor(void *, void *, int);
+static void	tcp_conn_destructor(void *, void *);
+
+static int	udp_conn_constructor(void *, void *, int);
+static void	udp_conn_destructor(void *, void *);
+
+static int	rawip_conn_constructor(void *, void *, int);
+static void	rawip_conn_destructor(void *, void *);
+
+static int	rts_conn_constructor(void *, void *, int);
+static void	rts_conn_destructor(void *, void *);
 
 #ifdef	IPCL_DEBUG
 #define	INET_NTOA_BUFSIZE	18
@@ -358,13 +374,29 @@ inet_ntoa_r(uint32_t in, char *b)
 void
 ipcl_g_init(void)
 {
-	ipcl_conn_cache = kmem_cache_create("ipcl_conn_cache",
+	ip_conn_cache = kmem_cache_create("ip_conn_cache",
 	    sizeof (conn_t), CACHE_ALIGN_SIZE,
-	    NULL, NULL, NULL, NULL, NULL, 0);
+	    ip_conn_constructor, ip_conn_destructor,
+	    NULL, NULL, NULL, 0);
 
-	ipcl_tcpconn_cache = kmem_cache_create("ipcl_tcpconn_cache",
-	    sizeof (itc_t), CACHE_ALIGN_SIZE,
-	    ipcl_tcpconn_constructor, ipcl_tcpconn_destructor,
+	tcp_conn_cache = kmem_cache_create("tcp_conn_cache",
+	    sizeof (itc_t) + sizeof (tcp_t), CACHE_ALIGN_SIZE,
+	    tcp_conn_constructor, tcp_conn_destructor,
+	    NULL, NULL, NULL, 0);
+
+	udp_conn_cache = kmem_cache_create("udp_conn_cache",
+	    sizeof (itc_t) + sizeof (udp_t), CACHE_ALIGN_SIZE,
+	    udp_conn_constructor, udp_conn_destructor,
+	    NULL, NULL, NULL, 0);
+
+	rawip_conn_cache = kmem_cache_create("rawip_conn_cache",
+	    sizeof (itc_t) + sizeof (icmp_t), CACHE_ALIGN_SIZE,
+	    rawip_conn_constructor, rawip_conn_destructor,
+	    NULL, NULL, NULL, 0);
+
+	rts_conn_cache = kmem_cache_create("rts_conn_cache",
+	    sizeof (itc_t) + sizeof (rts_t), CACHE_ALIGN_SIZE,
+	    rts_conn_constructor, rts_conn_destructor,
 	    NULL, NULL, NULL, 0);
 }
 
@@ -472,8 +504,11 @@ ipcl_init(ip_stack_t *ipst)
 void
 ipcl_g_destroy(void)
 {
-	kmem_cache_destroy(ipcl_conn_cache);
-	kmem_cache_destroy(ipcl_tcpconn_cache);
+	kmem_cache_destroy(ip_conn_cache);
+	kmem_cache_destroy(tcp_conn_cache);
+	kmem_cache_destroy(udp_conn_cache);
+	kmem_cache_destroy(rawip_conn_cache);
+	kmem_cache_destroy(rts_conn_cache);
 }
 
 /*
@@ -553,24 +588,11 @@ ipcl_destroy(ip_stack_t *ipst)
 conn_t *
 ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 {
-	itc_t	*itc;
 	conn_t	*connp;
 	sctp_stack_t *sctps;
+	struct kmem_cache *conn_cache;
 
 	switch (type) {
-	case IPCL_TCPCONN:
-		if ((itc = kmem_cache_alloc(ipcl_tcpconn_cache,
-		    sleep)) == NULL)
-			return (NULL);
-		connp = &itc->itc_conn;
-		connp->conn_ref = 1;
-		netstack_hold(ns);
-		connp->conn_netstack = ns;
-		IPCL_DEBUG_LVL(1,
-		    ("ipcl_conn_create: connp = %p tcp (%p)",
-		    (void *)connp, (void *)connp->conn_tcp));
-		ipcl_globalhash_insert(connp);
-		break;
 	case IPCL_SCTPCONN:
 		if ((connp = kmem_cache_alloc(sctp_conn_cache, sleep)) == NULL)
 			return (NULL);
@@ -579,27 +601,40 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 		SCTP_G_Q_REFHOLD(sctps);
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
+		return (connp);
+
+	case IPCL_TCPCONN:
+		conn_cache = tcp_conn_cache;
 		break;
+
+	case IPCL_UDPCONN:
+		conn_cache = udp_conn_cache;
+		break;
+
+	case IPCL_RAWIPCONN:
+		conn_cache = rawip_conn_cache;
+		break;
+
+	case IPCL_RTSCONN:
+		conn_cache = rts_conn_cache;
+		break;
+
 	case IPCL_IPCCONN:
-		connp = kmem_cache_alloc(ipcl_conn_cache, sleep);
-		if (connp == NULL)
-			return (NULL);
-		bzero(connp, sizeof (conn_t));
-		mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
-		cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
-		connp->conn_flags = IPCL_IPCCONN;
-		connp->conn_ref = 1;
-		netstack_hold(ns);
-		connp->conn_netstack = ns;
-		IPCL_DEBUG_LVL(1,
-		    ("ipcl_conn_create: connp = %p\n", (void *)connp));
-		ipcl_globalhash_insert(connp);
+		conn_cache = ip_conn_cache;
 		break;
+
 	default:
 		connp = NULL;
 		ASSERT(0);
 	}
 
+	if ((connp = kmem_cache_alloc(conn_cache, sleep)) == NULL)
+		return (NULL);
+
+	connp->conn_ref = 1;
+	netstack_hold(ns);
+	connp->conn_netstack = ns;
+	ipcl_globalhash_insert(connp);
 	return (connp);
 }
 
@@ -625,7 +660,7 @@ ipcl_conn_destroy(conn_t *connp)
 
 	ipcl_globalhash_remove(connp);
 
-	cv_destroy(&connp->conn_cv);
+	/* FIXME: add separate tcp_conn_free()? */
 	if (connp->conn_flags & IPCL_TCPCONN) {
 		tcp_t	*tcp = connp->conn_tcp;
 		tcp_stack_t *tcps;
@@ -645,7 +680,6 @@ ipcl_conn_destroy(conn_t *connp)
 			TCPS_REFRELE(tcps);
 		}
 
-		mutex_destroy(&connp->conn_lock);
 		tcp_free(tcp);
 		mp = tcp->tcp_timercache;
 		tcp->tcp_cred = NULL;
@@ -669,30 +703,62 @@ ipcl_conn_destroy(conn_t *connp)
 		ASSERT(connp->conn_latch == NULL);
 		ASSERT(connp->conn_policy == NULL);
 
-		bzero(connp, sizeof (itc_t));
-
-		tcp->tcp_timercache = mp;
-		connp->conn_tcp = tcp;
-		connp->conn_flags = IPCL_TCPCONN;
-		connp->conn_ulp = IPPROTO_TCP;
-		tcp->tcp_connp = connp;
 		if (ns != NULL) {
 			ASSERT(tcp->tcp_tcps == NULL);
 			connp->conn_netstack = NULL;
 			netstack_rele(ns);
 		}
-		kmem_cache_free(ipcl_tcpconn_cache, connp);
-	} else if (connp->conn_flags & IPCL_SCTPCONN) {
+
+		ipcl_conn_cleanup(connp);
+		connp->conn_flags = IPCL_TCPCONN;
+		bzero(tcp, sizeof (tcp_t));
+
+		tcp->tcp_timercache = mp;
+		tcp->tcp_connp = connp;
+		kmem_cache_free(tcp_conn_cache, connp);
+		return;
+	}
+	if (connp->conn_latch != NULL) {
+		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
+		connp->conn_latch = NULL;
+	}
+	if (connp->conn_policy != NULL) {
+		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
+		connp->conn_policy = NULL;
+	}
+	if (connp->conn_ipsec_opt_mp != NULL) {
+		freemsg(connp->conn_ipsec_opt_mp);
+		connp->conn_ipsec_opt_mp = NULL;
+	}
+
+	if (connp->conn_flags & IPCL_SCTPCONN) {
 		ASSERT(ns != NULL);
 		sctp_free(connp);
+		return;
+	}
+
+	if (ns != NULL) {
+		connp->conn_netstack = NULL;
+		netstack_rele(ns);
+	}
+	ipcl_conn_cleanup(connp);
+
+	/* leave conn_priv aka conn_udp, conn_icmp, etc in place. */
+	if (connp->conn_flags & IPCL_UDPCONN) {
+		connp->conn_flags = IPCL_UDPCONN;
+		kmem_cache_free(udp_conn_cache, connp);
+	} else if (connp->conn_flags & IPCL_RAWIPCONN) {
+		connp->conn_flags = IPCL_RAWIPCONN;
+		connp->conn_ulp = IPPROTO_ICMP;
+		kmem_cache_free(rawip_conn_cache, connp);
+	} else if (connp->conn_flags & IPCL_RTSCONN) {
+		connp->conn_flags = IPCL_RTSCONN;
+		kmem_cache_free(rts_conn_cache, connp);
 	} else {
-		ASSERT(connp->conn_udp == NULL);
-		mutex_destroy(&connp->conn_lock);
-		if (ns != NULL) {
-			connp->conn_netstack = NULL;
-			netstack_rele(ns);
-		}
-		kmem_cache_free(ipcl_conn_cache, connp);
+		connp->conn_flags = IPCL_IPCCONN;
+		ASSERT(connp->conn_flags & IPCL_IPCCONN);
+		ASSERT(connp->conn_priv == NULL);
+		kmem_cache_free(ip_conn_cache, connp);
 	}
 }
 
@@ -1940,12 +2006,17 @@ found:
 
 /* ARGSUSED */
 static int
-ipcl_tcpconn_constructor(void *buf, void *cdrarg, int kmflags)
+tcp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
 	conn_t 	*connp = &itc->itc_conn;
-	tcp_t	*tcp = &itc->itc_tcp;
-	bzero(itc, sizeof (itc_t));
+	tcp_t	*tcp = (tcp_t *)&itc[1];
+
+	bzero(connp, sizeof (conn_t));
+	bzero(tcp, sizeof (tcp_t));
+
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 	tcp->tcp_timercache = tcp_timermp_alloc(KM_NOSLEEP);
 	connp->conn_tcp = tcp;
 	connp->conn_flags = IPCL_TCPCONN;
@@ -1956,9 +2027,202 @@ ipcl_tcpconn_constructor(void *buf, void *cdrarg, int kmflags)
 
 /* ARGSUSED */
 static void
-ipcl_tcpconn_destructor(void *buf, void *cdrarg)
+tcp_conn_destructor(void *buf, void *cdrarg)
 {
-	tcp_timermp_free(((conn_t *)buf)->conn_tcp);
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	tcp_t	*tcp = (tcp_t *)&itc[1];
+
+	ASSERT(connp->conn_flags & IPCL_TCPCONN);
+	ASSERT(tcp->tcp_connp == connp);
+	ASSERT(connp->conn_tcp == tcp);
+	tcp_timermp_free(tcp);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+}
+
+/* ARGSUSED */
+static int
+ip_conn_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+
+	bzero(connp, sizeof (conn_t));
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	connp->conn_flags = IPCL_IPCCONN;
+
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+ip_conn_destructor(void *buf, void *cdrarg)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+
+	ASSERT(connp->conn_flags & IPCL_IPCCONN);
+	ASSERT(connp->conn_priv == NULL);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+}
+
+/* ARGSUSED */
+static int
+udp_conn_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	udp_t	*udp = (udp_t *)&itc[1];
+
+	bzero(connp, sizeof (conn_t));
+	bzero(udp, sizeof (udp_t));
+
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	connp->conn_udp = udp;
+	connp->conn_flags = IPCL_UDPCONN;
+	connp->conn_ulp = IPPROTO_UDP;
+	udp->udp_connp = connp;
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+udp_conn_destructor(void *buf, void *cdrarg)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	udp_t	*udp = (udp_t *)&itc[1];
+
+	ASSERT(connp->conn_flags & IPCL_UDPCONN);
+	ASSERT(udp->udp_connp == connp);
+	ASSERT(connp->conn_udp == udp);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+}
+
+/* ARGSUSED */
+static int
+rawip_conn_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	icmp_t	*icmp = (icmp_t *)&itc[1];
+
+	bzero(connp, sizeof (conn_t));
+	bzero(icmp, sizeof (icmp_t));
+
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	connp->conn_icmp = icmp;
+	connp->conn_flags = IPCL_RAWIPCONN;
+	connp->conn_ulp = IPPROTO_ICMP;
+	icmp->icmp_connp = connp;
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+rawip_conn_destructor(void *buf, void *cdrarg)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	icmp_t	*icmp = (icmp_t *)&itc[1];
+
+	ASSERT(connp->conn_flags & IPCL_RAWIPCONN);
+	ASSERT(icmp->icmp_connp == connp);
+	ASSERT(connp->conn_icmp == icmp);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+}
+
+/* ARGSUSED */
+static int
+rts_conn_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	rts_t	*rts = (rts_t *)&itc[1];
+
+	bzero(connp, sizeof (conn_t));
+	bzero(rts, sizeof (rts_t));
+
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	connp->conn_rts = rts;
+	connp->conn_flags = IPCL_RTSCONN;
+	rts->rts_connp = connp;
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+rts_conn_destructor(void *buf, void *cdrarg)
+{
+	itc_t	*itc = (itc_t *)buf;
+	conn_t 	*connp = &itc->itc_conn;
+	rts_t	*rts = (rts_t *)&itc[1];
+
+	ASSERT(connp->conn_flags & IPCL_RTSCONN);
+	ASSERT(rts->rts_connp == connp);
+	ASSERT(connp->conn_rts == rts);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+}
+
+/*
+ * Called as part of ipcl_conn_destroy to assert and clear any pointers
+ * in the conn_t.
+ */
+void
+ipcl_conn_cleanup(conn_t *connp)
+{
+	ASSERT(connp->conn_ire_cache == NULL);
+	ASSERT(connp->conn_latch == NULL);
+#ifdef notdef
+	ASSERT(connp->conn_rq == NULL);
+	ASSERT(connp->conn_wq == NULL);
+#endif
+	ASSERT(connp->conn_cred == NULL);
+	ASSERT(connp->conn_g_fanout == NULL);
+	ASSERT(connp->conn_g_next == NULL);
+	ASSERT(connp->conn_g_prev == NULL);
+	ASSERT(connp->conn_policy == NULL);
+	ASSERT(connp->conn_fanout == NULL);
+	ASSERT(connp->conn_next == NULL);
+	ASSERT(connp->conn_prev == NULL);
+#ifdef notdef
+	/*
+	 * The ill and ipif pointers are not cleared before the conn_t
+	 * goes away since they do not hold a reference on the ill/ipif.
+	 * We should replace these pointers with ifindex/ipaddr_t to
+	 * make the code less complex.
+	 */
+	ASSERT(connp->conn_xmit_if_ill == NULL);
+	ASSERT(connp->conn_nofailover_ill == NULL);
+	ASSERT(connp->conn_outgoing_ill == NULL);
+	ASSERT(connp->conn_incoming_ill == NULL);
+	ASSERT(connp->conn_outgoing_pill == NULL);
+	ASSERT(connp->conn_multicast_ipif == NULL);
+	ASSERT(connp->conn_multicast_ill == NULL);
+#endif
+	ASSERT(connp->conn_oper_pending_ill == NULL);
+	ASSERT(connp->conn_ilg == NULL);
+	ASSERT(connp->conn_drain_next == NULL);
+	ASSERT(connp->conn_drain_prev == NULL);
+	ASSERT(connp->conn_idl == NULL);
+	ASSERT(connp->conn_ipsec_opt_mp == NULL);
+	ASSERT(connp->conn_peercred == NULL);
+	ASSERT(connp->conn_netstack == NULL);
+
+	/* Clear out the conn_t fields that are not preserved */
+	bzero(&connp->conn_start_clr,
+	    sizeof (conn_t) -
+	    ((uchar_t *)&connp->conn_start_clr - (uchar_t *)connp));
+
 }
 
 /*
@@ -2042,6 +2306,7 @@ ipcl_globalhash_remove(conn_t *connp)
 	/* Better to stumble on a null pointer than to corrupt memory */
 	connp->conn_g_next = NULL;
 	connp->conn_g_prev = NULL;
+	connp->conn_g_fanout = NULL;
 }
 
 /*

@@ -2013,56 +2013,6 @@ restart_timer:
 }
 
 /*
- * The SCTP write put procedure called from IP.
- */
-void
-sctp_wput(queue_t *q, mblk_t *mp)
-{
-	uchar_t		*rptr;
-	t_scalar_t	type;
-
-	switch (mp->b_datap->db_type) {
-	case M_IOCTL:
-		sctp_wput_ioctl(q, mp);
-		break;
-	case M_DATA:
-		/* Should be handled in sctp_output() */
-		ASSERT(0);
-		freemsg(mp);
-		break;
-	case M_PROTO:
-	case M_PCPROTO:
-		rptr = mp->b_rptr;
-		if ((mp->b_wptr - rptr) >= sizeof (t_scalar_t)) {
-			type = ((union T_primitives *)rptr)->type;
-			/*
-			 * There is no "standard" way on how to respond
-			 * to T_CAPABILITY_REQ if a module does not
-			 * understand it.  And the current TI mod
-			 * has problems handling an error ack.  So we
-			 * catch the request here and reply with a response
-			 * which the TI mod knows how to respond to.
-			 */
-			switch (type) {
-			case T_CAPABILITY_REQ:
-				(void) putnextctl1(RD(q), M_ERROR, EPROTO);
-				break;
-			default:
-				if ((mp = mi_tpi_err_ack_alloc(mp,
-				    TNOTSUPPORT, 0)) != NULL) {
-					qreply(q, mp);
-					return;
-				}
-			}
-		}
-		/* FALLTHRU */
-	default:
-		freemsg(mp);
-		return;
-	}
-}
-
-/*
  * This function is called by sctp_ss_rexmit() to create a packet
  * to be retransmitted to the given fp.  The given meta and mp
  * parameters are respectively the sctp_msg_hdr_t and the mblk of the
