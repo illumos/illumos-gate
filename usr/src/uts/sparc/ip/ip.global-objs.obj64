@@ -164,6 +164,7 @@ ipsec_info_cache
 ipsec_pol_cache
 ipsec_policy_failure_msgs
 ipsec_sel_cache
+ipsec_spd_hashsize
 ipsec_weird_null_inbound_policy
 ipv4_forward_suffix
 ipv4info
@@ -308,6 +309,7 @@ tcp_winit
 tcpinfov4
 tcpinfov6
 tsol_strict_error
+tun_spd_hashsize
 udp_bind_fanout_size
 udp_conn_cache
 udp_g_t_info_ack_ipv4
