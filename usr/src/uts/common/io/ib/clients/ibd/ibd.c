@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -803,14 +803,14 @@ _ddi_srv_fifo_create(p_srv_fifo_t *handle, size_t size,
 	srv_fifo->size = size;
 	srv_fifo->max_index = size - 1;
 	srv_fifo->fifo_objs = (p_fifo_obj_t)kmem_zalloc(
-				size * sizeof (fifo_obj_t), KM_SLEEP);
+	    size * sizeof (fifo_obj_t), KM_SLEEP);
 	mutex_init(&srv_fifo->fifo_lock, "srv_fifo", MUTEX_DRIVER, NULL);
 	cv_init(&srv_fifo->fifo_cv, "srv_fifo", CV_DRIVER, NULL);
 	srv_fifo->drain_func = drain_func;
 	srv_fifo->drain_func_arg = drain_func_arg;
 	srv_fifo->running = DDI_SUCCESS;
 	srv_fifo->fifo_thread = thread_create(NULL, 0, drain_func,
-				(caddr_t)srv_fifo, 0, &p0, TS_RUN, 60);
+	    (caddr_t)srv_fifo, 0, &p0, TS_RUN, 60);
 	if (srv_fifo->fifo_thread == NULL) {
 		cv_destroy(&srv_fifo->fifo_cv);
 		mutex_destroy(&srv_fifo->fifo_lock);
@@ -848,7 +848,7 @@ _ddi_srv_fifo_begin(p_srv_fifo_t handle)
 {
 #ifndef __lock_lint
 	CALLB_CPR_INIT(&handle->cprinfo, &handle->fifo_lock,
-			callb_generic_cpr, "srv_fifo");
+	    callb_generic_cpr, "srv_fifo");
 #endif /* ! _lock_lint */
 	return (handle->drain_func_arg);
 }
@@ -911,7 +911,7 @@ _ddi_get_fifo(p_srv_fifo_t handle, p_fifo_obj_t ptr)
 			CALLB_CPR_SAFE_BEGIN(&handle->cprinfo);
 			cv_wait(&handle->fifo_cv, &handle->fifo_lock);
 			CALLB_CPR_SAFE_END(&handle->cprinfo,
-						&handle->fifo_lock);
+			    &handle->fifo_lock);
 #endif /* !_lock_lint */
 			*ptr = NULL;
 		}
@@ -1719,6 +1719,14 @@ ibd_acache_lookup(ibd_state_t *state, ipoib_mac_t *mac, int *err, int numwqe)
 			ptr = ibd_acache_find(state, &routermac, B_TRUE,
 			    numwqe);
 		}
+		state->id_ah_op = NOTSTARTED;
+	} else if ((state->id_ah_op != ONGOING) &&
+	    (bcmp(&state->id_ah_addr, mac, IPOIB_ADDRL) != 0)) {
+		/*
+		 * This case can happen when we get a higher band
+		 * packet. The easiest way is to reset the state machine
+		 * to accommodate the higher priority packet.
+		 */
 		state->id_ah_op = NOTSTARTED;
 	}
 	mutex_exit(&state->id_ac_mutex);
@@ -4751,7 +4759,7 @@ ibd_mdt_txone(gld_mac_info_t *macinfo, void *cookie, pdescinfo_t *dl_pkt_info)
 				    (uintptr_t)dl_pkt_info->pld_ary[i].pld_rptr;
 				node->w_smblk_sgl[seg].ds_key =
 				    ptx->ip_mdsc[dl_pkt_info->
-					pld_ary[i].pld_pbuf_idx + 1].md_lkey;
+				    pld_ary[i].pld_pbuf_idx + 1].md_lkey;
 				node->w_smblk_sgl[seg].ds_len = seglen;
 				seg++;
 			}
@@ -5002,7 +5010,8 @@ ibd_send(gld_mac_info_t *macinfo, mblk_t *mp)
 
 	mp->b_rptr += IPOIB_ADDRL;
 	while (((nmp = nmp->b_cont) != NULL) &&
-	    (++nmblks < (state->id_max_sqseg + 1)));
+	    (++nmblks < (state->id_max_sqseg + 1)))
+		;
 	pktsize = msgsize(mp);
 	if (pktsize > state->id_mtu) {
 		ret = GLD_BADARG;
@@ -5034,9 +5043,9 @@ ibd_send(gld_mac_info_t *macinfo, mblk_t *mp)
 				 * IBT_INSUFF_RESOURCE.
 				 */
 				if (ibt_status != IBT_INSUFF_RESOURCE)
-				    DPRINT(10, "ibd_send:%d\n",
-				    "failed in ibt_register_mem()",
-				    ibt_status);
+					DPRINT(10, "ibd_send:%d\n",
+					    "failed in ibt_register_mem()",
+					    ibt_status);
 				DPRINT(5, "ibd_send: registration failed");
 				node->w_swr.wr_nds = i;
 				/*
@@ -5762,7 +5771,8 @@ retry:
 					 * and then try again.
 					 */
 					sspin = gethrtime();
-					while (!cq_handler_ran);
+					while (!cq_handler_ran)
+						;
 					espin = gethrtime();
 					tspin += (espin - sspin);
 					cq_handler_ran = B_FALSE;
@@ -5778,7 +5788,8 @@ done:
 	 * We should really be snapshotting when we get the last
 	 * completion.
 	 */
-	while (num_completions != (packets / IBD_NUM_UNSIGNAL));
+	while (num_completions != (packets / IBD_NUM_UNSIGNAL))
+		;
 	etime = gethrtime();
 
 	cmn_err(CE_CONT, "ibd_perf_tx: # signaled completions = %d",
