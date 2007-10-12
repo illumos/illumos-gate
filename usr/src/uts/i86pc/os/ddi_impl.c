@@ -83,6 +83,8 @@ char *platform_module_list[] = {
 /* pci bus resource maps */
 struct pci_bus_resource *pci_bus_res;
 
+size_t dma_max_copybuf_size = 0x101000;		/* 1M + 4K */
+
 extern int root_is_svm;
 uint64_t ramdisk_start, ramdisk_end;
 
@@ -2803,4 +2805,71 @@ i_ddi_caut_rep_put64(ddi_acc_impl_t *hp, uint64_t *host_addr,
 {
 	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
 	    sizeof (uint64_t), repcount, flags, DDI_CTLOPS_POKE);
+}
+
+boolean_t
+i_ddi_copybuf_required(ddi_dma_attr_t *attrp)
+{
+	uint64_t hi_pa;
+
+	hi_pa = ((uint64_t)physmax + 1ull) << PAGESHIFT;
+	if (attrp->dma_attr_addr_hi < hi_pa) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+size_t
+i_ddi_copybuf_size()
+{
+	return (dma_max_copybuf_size);
+}
+
+/*
+ * i_ddi_dma_max()
+ *    returns the maximum DMA size which can be performed in a single DMA
+ *    window taking into account the devices DMA contraints (attrp), the
+ *    maximum copy buffer size (if applicable), and the worse case buffer
+ *    fragmentation.
+ */
+/*ARGSUSED*/
+uint32_t
+i_ddi_dma_max(dev_info_t *dip, ddi_dma_attr_t *attrp)
+{
+	uint64_t maxxfer;
+
+
+	/*
+	 * take the min of maxxfer and the the worse case fragementation
+	 * (e.g. every cookie <= 1 page)
+	 */
+	maxxfer = MIN(attrp->dma_attr_maxxfer,
+	    ((uint64_t)(attrp->dma_attr_sgllen - 1) << PAGESHIFT));
+
+	/*
+	 * If the DMA engine can't reach all off memory, we also need to take
+	 * the max size of the copybuf into consideration.
+	 */
+	if (i_ddi_copybuf_required(attrp)) {
+		maxxfer = MIN(i_ddi_copybuf_size(), maxxfer);
+	}
+
+	/*
+	 * we only return a 32-bit value. Make sure it's not -1. Round to a
+	 * page so it won't be mistaken for an error value during debug.
+	 */
+	if (maxxfer >= 0xFFFFFFFF) {
+		maxxfer = 0xFFFFF000;
+	}
+
+	/*
+	 * make sure the value we return is a whole multiple of the
+	 * granlarity.
+	 */
+	if (attrp->dma_attr_granular > 1) {
+		maxxfer = maxxfer - (maxxfer % attrp->dma_attr_granular);
+	}
+
+	return ((uint32_t)maxxfer);
 }

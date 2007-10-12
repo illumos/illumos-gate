@@ -118,7 +118,7 @@ extern uchar_t	scsi_cdb_size[];
 static void *st_state;
 static char *const st_label = "st";
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 /*
  * We need to use below DMA attr to alloc physically contiguous
  * memory to do I/O in big block size
@@ -540,7 +540,7 @@ static int st_scenic_route_to_begining_of_file(struct scsi_tape *un,
 static int st_space_to_begining_of_file(struct scsi_tape *un);
 static int st_space_records(struct scsi_tape *un, int records);
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 /*
  * routines for I/O in big block size
  */
@@ -989,6 +989,34 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		un->un_maxdma = (64 * ONE_K);
 	}
 
+#ifdef	__x86
+	/*
+	 * for x86, the device may be able to DMA more than the system will
+	 * allow under some circumstances. We need account for both the HBA's
+	 * and system's contraints.
+	 *
+	 * Get the maximum DMA under worse case conditions. e.g. looking at the
+	 * device constraints, the max copy buffer size, and the worse case
+	 * fragmentation. NOTE: this may differ from dma-max since dma-max
+	 * doesn't take the worse case framentation into account.
+	 *
+	 * e.g. a device may be able to DMA 16MBytes, but can only DMA 1MByte
+	 * if none of the pages are contiguous. Keeping track of both of these
+	 * values allows us to support larger tape block sizes on some devices.
+	 */
+	un->un_maxdma_arch = scsi_ifgetcap(&devp->sd_address, "dma-max-arch",
+	    1);
+
+	/*
+	 * If the dma-max-arch capability is not implemented, or the value
+	 * comes back higher than what was reported in dma-max, use dma-max.
+	 */
+	if ((un->un_maxdma_arch == -1) ||
+	    ((uint_t)un->un_maxdma < (uint_t)un->un_maxdma_arch)) {
+		un->un_maxdma_arch = un->un_maxdma;
+	}
+#endif
+
 	/*
 	 * Get the max allowable cdb size
 	 */
@@ -1166,7 +1194,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		}
 		cv_destroy(&un->un_state_cv);
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 		if (un->un_contig_mem_hdl != NULL) {
 			ddi_dma_free_handle(&un->un_contig_mem_hdl);
 		}
@@ -1492,7 +1520,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	cv_init(&un->un_queue_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&un->un_clscv, NULL, CV_DRIVER, NULL);
 	cv_init(&un->un_state_cv, NULL, CV_DRIVER, NULL);
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	cv_init(&un->un_contig_mem_cv, NULL, CV_DRIVER, NULL);
 #endif
 
@@ -1515,7 +1543,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	un->un_suspend_pos.pmode = invalid;
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	if (ddi_dma_alloc_handle(ST_DEVINFO, &st_contig_mem_dma_attr,
 	    DDI_DMA_SLEEP, NULL, &un->un_contig_mem_hdl) != DDI_SUCCESS) {
 		ST_DEBUG6(devp->sd_dev, st_label, SCSI_DEBUG,
@@ -1571,7 +1599,7 @@ error:
 		if (un->un_uscsi_rqs_buf) {
 			kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 		}
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 		if (un->un_contig_mem_hdl != NULL) {
 			ddi_dma_free_handle(&un->un_contig_mem_hdl);
 		}
@@ -2597,7 +2625,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 {
 	int err = 0;
 	int norew, count, last_state;
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	struct contig_mem *cp, *cp_temp;
 #endif
 
@@ -2945,7 +2973,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		un->un_density_known = 0;
 	}
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	/*
 	 * free any contiguous mem alloc'ed for big block I/O
 	 */
@@ -3534,15 +3562,15 @@ st_strategy(struct buf *bp)
 	    (void *)bp->b_forw, bp->b_bcount,
 	    bp->b_resid, bp->b_flags, (void *)BP_PKT(bp));
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	/*
 	 * We will replace bp with a new bp that can do big blk xfer
-	 * if the requested xfer size is bigger than ST_BIGBLK_XFER
+	 * if the requested xfer size is bigger than un->un_maxdma_arch
 	 *
 	 * Also, we need to make sure that we're handling real I/O
 	 * by checking group 0/1 SCSI I/O commands, if needed
 	 */
-	if (bp->b_bcount > ST_BIGBLK_XFER &&
+	if (bp->b_bcount > un->un_maxdma_arch &&
 	    (bp != un->un_sbufp					||
 	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_READ		||
 	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_READ_G1	||
@@ -14064,7 +14092,7 @@ st_mtbsfm_ioctl(struct scsi_tape *un, int cnt)
 	return (rval);
 }
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 
 /*
  * release contig_mem and wake up waiting thread, if any
@@ -14220,7 +14248,6 @@ st_bigblk_xfer_done(struct buf *bp)
 {
 	struct contig_mem *cp;
 	struct buf *orig_bp;
-	int remapped = 0;
 	int ioerr;
 	struct scsi_tape *un;
 
@@ -14255,14 +14282,8 @@ st_bigblk_xfer_done(struct buf *bp)
 		bioerror(orig_bp, ioerr);
 	} else if (orig_bp->b_flags & B_READ) {
 		/* copy data back to original bp */
-		if (orig_bp->b_flags & (B_PHYS | B_PAGEIO)) {
-			bp_mapin(orig_bp);
-			remapped = 1;
-		}
-		bcopy(bp->b_un.b_addr, orig_bp->b_un.b_addr,
+		(void) bp_copyout(bp->b_un.b_addr, orig_bp, 0,
 		    bp->b_bcount - bp->b_resid);
-		if (remapped)
-			bp_mapout(orig_bp);
 	}
 
 	st_release_contig_mem(un, cp);
@@ -14282,7 +14303,6 @@ st_get_bigblk_bp(struct buf *bp)
 	struct contig_mem *cp;
 	struct scsi_tape *un;
 	struct buf *cont_bp;
-	int remapped = 0;
 
 	un = ddi_get_soft_state(st_state, MTUNIT(bp->b_edev));
 	if (un == NULL) {
@@ -14334,13 +14354,7 @@ st_get_bigblk_bp(struct buf *bp)
 
 	/* get data in original bp */
 	if (bp->b_flags & B_WRITE) {
-		if (bp->b_flags & (B_PHYS | B_PAGEIO)) {
-			bp_mapin(bp);
-			remapped = 1;
-		}
-		bcopy(bp->b_un.b_addr, cont_bp->b_un.b_addr, bp->b_bcount);
-		if (remapped)
-			bp_mapout(bp);
+		(void) bp_copyin(bp, cont_bp->b_un.b_addr, 0, bp->b_bcount);
 	}
 
 	return (cont_bp);

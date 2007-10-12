@@ -731,7 +731,7 @@ typedef union {
 
 #ifdef _KERNEL
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 /* Data structure used in big block I/O on x86/x64 platform */
 
 /*
@@ -740,14 +740,6 @@ typedef union {
  */
 #define	ST_MAX_CONTIG_MEM_NUM	3
 
-/*
- * 60K is used due to the limitation(size) of the intermediate buffer
- * in DMA bind code(rootnex.c), which is 64K. If the I/O buf is page
- * aligned, HBA can do 64K DMA, but if not, HBA can only do
- * 64K - PAGESIZE = 60K DMA due to the copy to/from intermediate
- * buffer will keep the page offset.
- */
-#define	ST_BIGBLK_XFER		60 * 1024
 struct contig_mem {
 	struct contig_mem *cm_next;
 	size_t cm_len;
@@ -878,13 +870,14 @@ struct scsi_tape {
 	struct mterror_entry_stack *un_error_entry_stk;
 					/* latest sense cmd buffer */
 
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 	ddi_dma_handle_t un_contig_mem_hdl;
 	struct contig_mem *un_contig_mem;
 	int un_contig_mem_available_num;
 	int un_contig_mem_total_num;
 	size_t un_max_contig_mem_len;
 	kcondvar_t un_contig_mem_cv;
+	int un_maxdma_arch;		/* max dma xfer allowed by HBA & arch */
 #endif
 };
 
@@ -989,7 +982,7 @@ _NOTE(SCHEME_PROTECTS_DATA("save sharing",
 	scsi_tape::un_maxbsize
 	scsi_tape::un_maxdma
 ))
-#if defined(__i386) || defined(__amd64)
+#ifdef	__x86
 _NOTE(DATA_READABLE_WITHOUT_LOCK(scsi_tape::un_contig_mem_hdl))
 _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #endif

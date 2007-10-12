@@ -62,6 +62,7 @@
 #include <sys/rootnex.h>
 #include <vm/hat_i86.h>
 #include <sys/ddifm.h>
+#include <sys/ddi_isa.h>
 
 #ifdef __xpv
 #include <sys/bootinfo.h>
@@ -104,12 +105,6 @@ uint8_t *rootnex_warn_list;
  * the offset and size into ddi_dma_sync().
  */
 int rootnex_sync_ignore_params = 0;
-
-/*
- * maximum size that we will allow for a copy buffer. Can be patched on the
- * fly
- */
-size_t rootnex_max_copybuf_size = 0x100000;
 
 /*
  * For the 64-bit kernel, pre-alloc enough cookies for a 256K buffer plus 1
@@ -288,6 +283,7 @@ extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
 extern int impl_ddi_sunbus_initchild(dev_info_t *dip);
 extern void impl_ddi_sunbus_removechild(dev_info_t *dip);
+
 /*
  * Use device arena to use for device control register mappings.
  * Various kernel memory walkers (debugger, dtrace) need to know
@@ -2681,11 +2677,8 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 
 	sinfo = &dma->dp_sglinfo;
 
-	/*
-	 * read this first so it's consistent through the routine so we can
-	 * patch it on the fly.
-	 */
-	max_copybuf = rootnex_max_copybuf_size & MMU_PAGEMASK;
+	/* read this first so it's consistent through the routine  */
+	max_copybuf = i_ddi_copybuf_size() & MMU_PAGEMASK;
 
 	/* We need to call into the rootnex on ddi_dma_sync() */
 	hp->dmai_rflags &= ~DMP_NOSYNC;

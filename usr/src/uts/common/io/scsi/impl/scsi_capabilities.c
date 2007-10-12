@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,13 +32,64 @@
  */
 
 #include <sys/scsi/scsi.h>
+#ifdef	__x86
+#include <sys/ddi_isa.h>
+#endif
 
 #define	A_TO_TRAN(ap)	(ap->a_hba_tran)
+
 
 int
 scsi_ifgetcap(struct scsi_address *ap, char *cap, int whom)
 {
-	return (*A_TO_TRAN(ap)->tran_getcap)(ap, cap, whom);
+	int capability;
+#ifdef	__x86
+	ddi_dma_attr_t *dmaattr;
+	int ckey;
+#endif
+
+
+	capability = (*A_TO_TRAN(ap)->tran_getcap)(ap, cap, whom);
+
+#ifdef	__x86
+	if (cap != NULL) {
+		ckey = scsi_hba_lookup_capstr(cap);
+		dmaattr = &ap->a_hba_tran->tran_dma_attr;
+		switch (ckey) {
+		case SCSI_CAP_DMA_MAX:
+			/*
+			 * If the HBA is unable to reach all the memory in
+			 * the system, the maximum copy buffer size may limit
+			 * the size of the max DMA.
+			 */
+			if (i_ddi_copybuf_required(dmaattr)) {
+				capability = MIN(capability,
+				    i_ddi_copybuf_size());
+			}
+
+			/*
+			 * make sure the value we return is a whole multiple of
+			 * the granlarity.
+			 */
+			if (dmaattr->dma_attr_granular > 1) {
+				capability = capability -
+				    (capability % dmaattr->dma_attr_granular);
+			}
+
+			break;
+
+		case SCSI_CAP_DMA_MAX_ARCH:
+			capability = i_ddi_dma_max(ap->a_hba_tran->tran_hba_dip,
+			    dmaattr);
+
+			break;
+
+		/*FALLTHROUGH*/
+		}
+	}
+#endif
+
+	return (capability);
 }
 
 int
@@ -56,7 +107,7 @@ scsi_ifsetcap(struct scsi_address *ap, char *cap, int value, int whom)
 			 * granularity update SCSA's copy
 			 */
 			A_TO_TRAN(ap)->tran_dma_attr.dma_attr_granular =
-				value;
+			    value;
 		}
 	}
 	return (rval);

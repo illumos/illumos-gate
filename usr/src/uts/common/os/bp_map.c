@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,14 @@
 #else
 #define	BP_FLUSH(addr, size)
 #endif
+
+int bp_force_copy = 0;
+typedef enum {
+	BP_COPYIN	= 0,
+	BP_COPYOUT	= 1
+} bp_copydir_t;
+static int bp_copy_common(bp_copydir_t dir, struct buf *bp, void *driverbuf,
+    offset_t offset, size_t size);
 
 static vmem_t *bp_map_arena;
 static size_t bp_align;
@@ -233,4 +241,171 @@ bp_mapout(struct buf *bp)
 	} else
 		vmem_free(heap_arena, (void *)base, size);
 	bp->b_flags &= ~B_REMAPPED;
+}
+
+/*
+ * copy data from a KVA into a buf_t which may not be mapped in. offset
+ * is relative to the buf_t only.
+ */
+int
+bp_copyout(void *driverbuf, struct buf *bp, offset_t offset, size_t size)
+{
+	return (bp_copy_common(BP_COPYOUT, bp, driverbuf, offset, size));
+}
+
+/*
+ * copy data from a buf_t which may not be mapped in, into a KVA.. offset
+ * is relative to the buf_t only.
+ */
+int
+bp_copyin(struct buf *bp, void *driverbuf, offset_t offset, size_t size)
+{
+	return (bp_copy_common(BP_COPYIN, bp, driverbuf, offset, size));
+}
+
+
+#define	BP_COPY(dir, driverbuf, baddr, sz)	\
+	(dir == BP_COPYIN) ? \
+	bcopy(baddr, driverbuf, sz) :  bcopy(driverbuf, baddr, sz)
+
+static int
+bp_copy_common(bp_copydir_t dir, struct buf *bp, void *driverbuf,
+    offset_t offset, size_t size)
+{
+	page_t **pplist;
+	uintptr_t poff;
+	uintptr_t voff;
+	struct as *as;
+	caddr_t kaddr;
+	caddr_t addr;
+	page_t *page;
+	size_t psize;
+	page_t *pp;
+	pfn_t pfn;
+
+
+	ASSERT((offset + size) <= bp->b_bcount);
+
+	/* if the buf_t already has a KVA, just do a bcopy */
+	if (!(bp->b_flags & (B_PHYS | B_PAGEIO))) {
+		BP_COPY(dir, driverbuf, bp->b_un.b_addr + offset, size);
+		return (0);
+	}
+
+	/* if we don't have kpm enabled, we need to do the slow path */
+	if (!kpm_enable || bp_force_copy) {
+		bp_mapin(bp);
+		BP_COPY(dir, driverbuf, bp->b_un.b_addr + offset, size);
+		bp_mapout(bp);
+		return (0);
+	}
+
+	/*
+	 * kpm is enabled, and we need to map in the buf_t for the copy
+	 */
+
+	/* setup pp, plist, and make sure 'as' is right */
+	if (bp->b_flags & B_PAGEIO) {
+		pp = bp->b_pages;
+		pplist = NULL;
+	} else if (bp->b_flags & B_SHADOW) {
+		pp = NULL;
+		pplist = bp->b_shadow;
+	} else {
+		pp = NULL;
+		pplist = NULL;
+		if (bp->b_proc == NULL || (as = bp->b_proc->p_as) == NULL) {
+			as = &kas;
+		}
+	}
+
+	/*
+	 * locals for the address, the offset into the first page, and the
+	 * size of the first page we are going to copy.
+	 */
+	addr = (caddr_t)bp->b_un.b_addr;
+	poff = (uintptr_t)addr & PAGEOFFSET;
+	psize = MIN(PAGESIZE - poff, size);
+
+	/*
+	 * we always start with a 0 offset into the driverbuf provided. The
+	 * offset passed in only applies to the buf_t.
+	 */
+	voff = 0;
+
+	/* Loop until we've copied al the data */
+	while (size > 0) {
+
+		/*
+		 * for a pp or pplist, get the pfn, then go to the next page_t
+		 * for the next time around the loop.
+		 */
+		if (pp) {
+			page = pp;
+			pp = pp->p_next;
+		} else if (pplist != NULL) {
+			page = (*pplist);
+			pplist++;
+
+		/*
+		 * We have a user VA. If we are going to copy this page, (e.g.
+		 * the offset into the buf_t where we start to copy is
+		 * within this page), get the pfn. Don't waste the cycles
+		 * getting the pfn if we're not copying this page.
+		 */
+		} else if (offset < psize) {
+			pfn = hat_getpfnum(as->a_hat,
+			    (caddr_t)((uintptr_t)addr & PAGEMASK));
+			if (pfn == PFN_INVALID) {
+				return (-1);
+			}
+			page = page_numtopp_nolock(pfn);
+			addr += psize - offset;
+		} else {
+			addr += psize;
+		}
+
+		/*
+		 * if we have an initial offset into the buf_t passed in,
+		 * and it falls within the current page, account for it in
+		 * the page size (how much we will copy) and the offset into the
+		 * page (where we'll start copying from).
+		 */
+		if ((offset > 0) && (offset < psize)) {
+			psize -= offset;
+			poff += offset;
+			offset = 0;
+
+		/*
+		 * if we have an initial offset into the buf_t passed in,
+		 * and it's not within the current page, skip this page.
+		 * We don't have to worry about the first page offset and size
+		 * anymore. psize will normally be PAGESIZE now unless we are
+		 * on the last page.
+		 */
+		} else if (offset >= psize) {
+			offset -= psize;
+			psize = MIN(PAGESIZE, size);
+			poff = 0;
+			continue;
+		}
+
+		/*
+		 * get a kpm mapping to the page, them copy in/out of the
+		 * page. update size left and offset into the driverbuf passed
+		 * in for the next time around the loop.
+		 */
+		kaddr = hat_kpm_mapin(page, NULL) + poff;
+		BP_COPY(dir, (void *)((uintptr_t)driverbuf + voff), kaddr,
+		    psize);
+		hat_kpm_mapout(page, NULL, kaddr - poff);
+
+		size -= psize;
+		voff += psize;
+
+		poff = 0;
+		psize = MIN(PAGESIZE, size);
+	}
+
+	return (0);
 }

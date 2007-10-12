@@ -252,7 +252,7 @@ scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 	 * allocated
 	 */
 	((struct scsi_pkt_cache_wrapper *)buf)->pcw_granular =
-		tran->tran_dma_attr.dma_attr_granular;
+	    tran->tran_dma_attr.dma_attr_granular;
 	if (ddi_dma_alloc_handle(tran->tran_hba_dip,
 	    &tran->tran_dma_attr,
 	    kmflag == KM_SLEEP ? SLEEP_FUNC: NULL_FUNC, NULL,
@@ -289,12 +289,12 @@ scsi_hba_pkt_destructor(void *buf, void *arg)
 
 	/* make sure nobody messed with our pointers */
 	ASSERT(pkt->pkt_ha_private == (opaque_t)((char *)pkt +
-		sizeof (struct scsi_pkt_cache_wrapper)));
+	    sizeof (struct scsi_pkt_cache_wrapper)));
 	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_SCB) == 0) ||
 	    (pkt->pkt_scbp == (opaque_t)((char *)pkt +
 	    tran->tran_hba_len +
 	    (((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0)
-		? 0 : DEFAULT_CDBLEN) +
+	    ? 0 : DEFAULT_CDBLEN) +
 	    DEFAULT_PRIVLEN + sizeof (struct scsi_pkt_cache_wrapper))));
 	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0) ||
 	    (pkt->pkt_cdbp == (opaque_t)((char *)pkt +
@@ -321,8 +321,7 @@ scsi_hba_init(struct modlinkage *modlp)
 	 * Get the devops structure of the hba,
 	 * and put our busops vector in its place.
 	 */
-	hba_dev_ops = ((struct modldrv *)
-		(modlp->ml_linkage[0]))->drv_dev_ops;
+	hba_dev_ops = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
 	ASSERT(hba_dev_ops->devo_bus_ops == NULL);
 	hba_dev_ops->devo_bus_ops = &scsi_hba_busops;
 
@@ -384,7 +383,7 @@ scsi_hba_attach_setup(
 	char			*prop_name;
 	const char		*prop_value;
 	char			*errmsg =
-		"scsi_hba_attach: cannot create property '%s' for %s%d\n";
+	    "scsi_hba_attach: cannot create property '%s' for %s%d\n";
 	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
 
 	/*
@@ -463,60 +462,60 @@ scsi_hba_attach_setup(
 	prop_name = "scsi-reset-delay";
 	len = 0;
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-			NULL, &len) == DDI_PROP_NOT_FOUND) {
+	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_reset_delay;
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 
 	prop_name = "scsi-tag-age-limit";
 	len = 0;
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-			NULL, &len) == DDI_PROP_NOT_FOUND) {
+	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_tag_age_limit;
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 
 	prop_name = "scsi-watchdog-tick";
 	len = 0;
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-			NULL, &len) == DDI_PROP_NOT_FOUND) {
+	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_watchdog_tick;
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 
 	prop_name = "scsi-options";
 	len = 0;
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-			NULL, &len) == DDI_PROP_NOT_FOUND) {
+	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_options;
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 
 	prop_name = "scsi-selection-timeout";
 	len = 0;
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-			NULL, &len) == DDI_PROP_NOT_FOUND) {
+	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_selection_timeout;
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 	if ((hba_tran->tran_hba_flags & SCSI_HBA_TRAN_ALLOC) &&
@@ -525,15 +524,14 @@ scsi_hba_attach_setup(
 		prop_name = "initiator-interconnect-type";
 		len = 0;
 		if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
-				NULL, &len) == DDI_PROP_NOT_FOUND) {
+		    NULL, &len) == DDI_PROP_NOT_FOUND) {
 			value = hba_tran->tran_interconnect_type;
 			prop_value = interconnect[value];
 			if (ddi_prop_update_string(DDI_MAJOR_T_UNKNOWN, dip,
 			    prop_name, (char *)prop_value)
 			    != DDI_PROP_SUCCESS) {
 				cmn_err(CE_CONT, errmsg, prop_name,
-					ddi_get_name(dip),
-					ddi_get_instance(dip));
+				    ddi_get_name(dip), ddi_get_instance(dip));
 			}
 		}
 	}
@@ -612,7 +610,7 @@ scsi_hba_detach(dev_info_t *dip)
 	 */
 	mutex_enter(&scsi_hba_mutex);
 	for (elem = scsi_hba_list; elem != (struct scsi_hba_inst *)NULL;
-		elem = elem->inst_next) {
+	    elem = elem->inst_next) {
 		if (elem->inst_dip == dip)
 			break;
 	}
@@ -634,7 +632,7 @@ scsi_hba_detach(dev_info_t *dip)
 		scsi_hba_list_tail = elem->inst_prev;
 		if (scsi_hba_list_tail) {
 			scsi_hba_list_tail->inst_next =
-					(struct scsi_hba_inst *)NULL;
+			    (struct scsi_hba_inst *)NULL;
 		}
 	} else {
 		elem->inst_prev->inst_next = elem->inst_next;
@@ -660,8 +658,7 @@ scsi_hba_fini(struct modlinkage *modlp)
 	 * Get the devops structure of this module
 	 * and clear bus_ops vector.
 	 */
-	hba_dev_ops = ((struct modldrv *)
-		(modlp->ml_linkage[0]))->drv_dev_ops;
+	hba_dev_ops = ((struct modldrv *)(modlp->ml_linkage[0]))->drv_dev_ops;
 
 	if (hba_dev_ops->devo_cb_ops == &scsi_hba_cbops) {
 		hba_dev_ops->devo_cb_ops = NULL;
@@ -746,8 +743,8 @@ scsi_hba_bus_ctl(
 		 * is our minimum value (modulo what minxfer is).
 		 */
 		*((int *)result) = maxbit(val, ((intptr_t)arg ?
-			(1<<ddi_ffs(attr->dma_attr_burstsizes)-1) :
-			(1<<(ddi_fls(attr->dma_attr_burstsizes)-1))));
+		    (1<<ddi_ffs(attr->dma_attr_burstsizes)-1) :
+		    (1<<(ddi_fls(attr->dma_attr_burstsizes)-1))));
 
 		return (ddi_ctlops(dip, rdip, op, arg, result));
 	}
@@ -827,7 +824,7 @@ scsi_hba_bus_ctl(
 			    &t_len) != DDI_SUCCESS) {
 				if (hba->tran_get_name == NULL) {
 					kmem_free(sd,
-						sizeof (struct scsi_device));
+					    sizeof (struct scsi_device));
 					if (hba->tran_hba_flags &
 					    SCSI_HBA_TRAN_CLONE) {
 						kmem_free(hba,
@@ -989,8 +986,8 @@ failure:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			op, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    op, ddi_get_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	/*
@@ -1014,7 +1011,7 @@ scsi_hba_tran_alloc(
 	scsi_hba_tran_t		*hba_tran;
 
 	hba_tran = kmem_zalloc(sizeof (scsi_hba_tran_t),
-		(flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
+	    (flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
 
 	hba_tran->tran_interconnect_type = INTERCONNECT_PARALLEL;
 	hba_tran->tran_hba_flags |= SCSI_HBA_TRAN_ALLOC;
@@ -1074,7 +1071,7 @@ scsi_hba_pkt_alloc(
 	 */
 	if (callback != SLEEP_FUNC && callback != NULL_FUNC) {
 		cmn_err(CE_PANIC, "scsi_hba_pkt_alloc: callback must be"
-			" either SLEEP or NULL\n");
+		    " either SLEEP or NULL\n");
 	}
 
 	/*
@@ -1085,10 +1082,10 @@ scsi_hba_pkt_alloc(
 	hbalen = ROUNDUP(hbalen);
 	statuslen = ROUNDUP(statuslen);
 	pktlen = sizeof (struct scsi_pkt_wrapper)
-		+ cmdlen + tgtlen + hbalen + statuslen;
+	    + cmdlen + tgtlen + hbalen + statuslen;
 
 	hba_pkt = kmem_zalloc(pktlen,
-		(callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP);
+	    (callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP);
 	if (hba_pkt == NULL) {
 		ASSERT(callback == NULL_FUNC);
 		return (NULL);
@@ -1181,6 +1178,7 @@ scsi_hba_lookup_capstr(
 		{ "interconnect-type",	SCSI_CAP_INTERCONNECT_TYPE	},
 		{ "lun-reset",		SCSI_CAP_LUN_RESET		},
 		{ "max-cdb-length",	SCSI_CAP_CDB_LEN		},
+		{ "dma-max-arch",	SCSI_CAP_DMA_MAX_ARCH		},
 		{ NULL,			0				}
 	};
 	struct cap_strings	*cp;
@@ -1640,8 +1638,7 @@ scsi_hba_bus_config(dev_info_t *parent, uint_t flag, ddi_bus_config_op_t op,
 
 	hba = ddi_get_driver_private(parent);
 	if (hba && hba->tran_bus_config) {
-		return (hba->tran_bus_config(parent, flag, op,
-			arg, childp));
+		return (hba->tran_bus_config(parent, flag, op, arg, childp));
 	}
 
 	/*

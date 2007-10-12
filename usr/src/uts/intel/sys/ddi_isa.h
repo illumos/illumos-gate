@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -364,6 +364,10 @@ void i_ddi_caut_rep_put32(ddi_acc_impl_t *hdl, uint32_t *host_addr,
     uint32_t *dev_addr, size_t repcount, uint_t flags);
 void i_ddi_caut_rep_put64(ddi_acc_impl_t *hdl, uint64_t *host_addr,
     uint64_t *dev_addr, size_t repcount, uint_t flags);
+
+boolean_t i_ddi_copybuf_required(ddi_dma_attr_t *attrp);
+size_t i_ddi_copybuf_size();
+uint32_t i_ddi_dma_max(dev_info_t *dip, ddi_dma_attr_t *attrp);
 
 #endif	/* __STDC__ */
 
