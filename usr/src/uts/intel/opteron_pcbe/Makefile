@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,7 @@ MODULE		= pcbe.AuthenticAMD.15
 OBJECTS		= $(OPTERON_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OPTERON_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTLINK	= $(USR_PCBE_DIR)/pcbe.AuthenticAMD.16
 
 #
 #	Include common rules.
@@ -48,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_MODULE	= opteron_pcbe
 LINT_TARGET	= $(LINT_MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -78,6 +79,9 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(ROOTLINK):    $(ROOTMODULE)
+	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #
 #	Include common targets.

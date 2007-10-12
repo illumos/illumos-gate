@@ -412,8 +412,8 @@ extern "C" {
 #define	X86_CHIPREV_UNKNOWN	0x0
 
 /*
- * Definitions for AMD Family 0xf.  Minor revisions C0 and CG are
- * sufficiently different that we will distinguish them; in all other
+ * Definitions for AMD Family 0xf and AMD Family 0x10. Minor revisions C0 and
+ * CG are sufficiently different that we will distinguish them; in all other
  * case we will identify the major revision.
  */
 #define	X86_CHIPREV_AMD_F_REV_B _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0001)
@@ -423,6 +423,8 @@ extern "C" {
 #define	X86_CHIPREV_AMD_F_REV_E _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0010)
 #define	X86_CHIPREV_AMD_F_REV_F _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0020)
 #define	X86_CHIPREV_AMD_F_REV_G _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0040)
+#define	X86_CHIPREV_AMD_10_REV_B \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0001)
 
 /*
  * Various socket/package types, extended as the need to distinguish

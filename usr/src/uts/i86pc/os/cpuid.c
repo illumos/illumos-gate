@@ -268,11 +268,14 @@ static struct cpuid_info cpuid_info0;
 	cpi->cpi_family >= 0xf)
 
 /*
- * AMD family 0xf socket types.
- * First index is 0 for revs B thru E, 1 for F and G.
+ * AMD family 0xf and family 0x10 socket types.
+ * First index :
+ *		0 for family 0xf, revs B thru E
+ *		1 for family 0xf, revs F and G
+ *		2 for family 0x10, rev B
  * Second index by (model & 0x3)
  */
-static uint32_t amd_skts[2][4] = {
+static uint32_t amd_skts[3][4] = {
 	{
 		X86_SOCKET_754,		/* 0b00 */
 		X86_SOCKET_940,		/* 0b01 */
@@ -284,14 +287,18 @@ static uint32_t amd_skts[2][4] = {
 		X86_SOCKET_F1207,	/* 0b01 */
 		X86_SOCKET_UNKNOWN,	/* 0b10 */
 		X86_SOCKET_AM2		/* 0b11 */
+	},
+	{
+		X86_SOCKET_F1207,	/* 0b00 */
+		X86_SOCKET_F1207,	/* 0b01 */
+		X86_SOCKET_F1207,	/* 0b10 */
+		X86_SOCKET_F1207	/* 0b11 */
 	}
 };
 
 /*
- * Table for mapping AMD Family 0xf model/stepping combination to
- * chip "revision" and socket type.  Only rm_family 0xf is used at the
- * moment, but AMD family 0x10 will extend the exsiting revision names
- * so will likely also use this table.
+ * Table for mapping AMD Family 0xf and AMD Family 0x10 model/stepping
+ * combination to chip "revision" and socket type.
  *
  * The first member of this array that matches a given family, extended model
  * plus model range, and stepping range will be considered a match.
@@ -337,6 +344,10 @@ static const struct amd_rev_mapent {
 	 * Rev G has extended model 0x6.
 	 */
 	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", 1 },
+	/*
+	 * Family 0x10 Rev B has model 0x2.
+	 */
+	{ 0x10, 0x02, 0x02, 0x0, 0xa, X86_CHIPREV_AMD_10_REV_B, "B", 2 }
 };
 
 /*
@@ -372,9 +383,9 @@ synth_amd_info(struct cpuid_info *cpi)
 	int i;
 
 	/*
-	 * Currently only AMD family 0xf uses these fields.
+	 * Currently only AMD family 0xf and family 0x10 use these fields.
 	 */
-	if (cpi->cpi_family != 0xf)
+	if (cpi->cpi_family != 0xf && cpi->cpi_family != 0x10)
 		return;
 
 	family = cpi->cpi_family;
