@@ -37,7 +37,6 @@
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/ksynch.h>
-#include <sys/cmn_err.h>
 #include <sys/kidmap.h>
 #include "idmap_prot.h"
 #include "kidmap_priv.h"

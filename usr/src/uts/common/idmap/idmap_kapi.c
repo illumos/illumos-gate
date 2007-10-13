@@ -102,10 +102,6 @@ kidmap_rpc_call(uint32_t op, xdrproc_t xdr_args, caddr_t args,
 
 static int	kidmap_call_door(door_arg_t *arg);
 
-#ifdef	DEBUG
-static int	kidmap_rpc_ping(void);
-#endif	/* DEBUG */
-
 static void
 idmap_freeone(idmap_reg_t *p)
 {
@@ -141,10 +137,6 @@ idmap_get_door(idmap_reg_t **state, door_handle_t *dh)
 	*state = idmp;
 	if (dh != NULL)
 		*dh = idmp->idmap_door;
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "idmap: Using door_handle_t %p",
-	    (dh != NULL) ?   (void*)*dh : NULL);
-#endif	/* DEBUG */
 }
 
 void
@@ -177,9 +169,6 @@ int
 idmap_reg_dh(door_handle_t dh)
 {
 	idmap_reg_t *idmp;
-#ifdef	DEBUG
-	int status;
-#endif	/* DEBUG */
 
 	idmp = kmem_alloc(sizeof (*idmp), KM_SLEEP);
 
@@ -211,12 +200,6 @@ idmap_reg_dh(door_handle_t dh)
 	call_msg.rm_call.cb_vers = IDMAP_V1;
 
 	mutex_exit(&idmap_mutex);
-
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "idmap: Registered door_handle_t %p", (void *)dh);
-	if ((status = kidmap_rpc_ping()) != 0)
-		cmn_err(CE_WARN, "idmap: Door RPC ping failed %d\n", status);
-#endif	/* DEBUG */
 
 	return (0);
 }
@@ -1201,13 +1184,6 @@ kidmap_get_destroy(idmap_get_handle_t *get_handle)
 	kmem_free(get_handle, sizeof (idmap_get_handle_t));
 }
 
-#ifdef	DEBUG
-static int
-kidmap_rpc_ping(void)
-{
-	return (kidmap_rpc_call(0, xdr_void, NULL, xdr_void, NULL));
-}
-#endif	/* DEBUG */
 
 static int
 kidmap_rpc_call(uint32_t op, xdrproc_t xdr_args, caddr_t args,
@@ -1265,14 +1241,11 @@ retry:
 		}
 		if ((size = xdr_sizeof(xdr_args, args)) == 0) {
 #ifdef	DEBUG
-			cmn_err(CE_WARN, "idmap: xdr sizeof error");
+			cmn_err(CE_WARN, "idmap: xdr_sizeof error");
 #endif	/* DEBUG */
 			status = -1;
 			goto exit;
 		}
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "idmap: xdr args size %lu", size);
-#endif	/* DEBUG */
 		inbuf_size = size + 1024;
 		outbuf_size = size + 1024;
 		goto retry;
