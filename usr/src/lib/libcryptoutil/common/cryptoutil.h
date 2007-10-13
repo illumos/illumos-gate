@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,8 @@ extern "C" {
 #define	METASLOT_DISABLED	"disabled"
 #define	SLOT_DESCRIPTION_SIZE	64
 #define	TOKEN_LABEL_SIZE	32
+#define	TOKEN_MANUFACTURER_SIZE	32
+#define	TOKEN_SERIAL_SIZE	16
 
 /*
  * Define the following softtoken values that are used by softtoken
@@ -133,6 +135,13 @@ get_metaslot_info(boolean_t  *status_enabled, boolean_t *migrate_enabled,
 
 extern char *get_fullpath(char *dir, char *filepath);
 extern int str2lifetime(char *ltimestr, uint32_t *ltime);
+
+extern char *pkcs11_default_token(void);
+extern int pkcs11_get_pass(char *token_name, char **pdata, size_t *psize,
+    size_t min_psize, boolean_t with_confirmation);
+
+extern int pkcs11_random_data(void *dbuf, size_t dlen);
+extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
 
 #ifdef __cplusplus
 }

@@ -62,12 +62,6 @@
 #define	RESULTLEN	(512)
 
 /*
- * Default parameters for PBKDF2 algorithm
- */
-#define	PBKD2_ITERATIONS (1000)
-#define	PBKD2_SALT_SIZE 16
-
-/*
  * Exit Status codes
  */
 #ifndef	EXIT_SUCCESS
@@ -81,8 +75,6 @@
 #define	MAC_OPTIONS	"lva:k:T:K:"		/* for getopt */
 #define	DIGEST_NAME	"digest"	/* name of mac command */
 #define	DIGEST_OPTIONS	"lva:"		/* for getopt */
-#define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
-#define	PK_DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
 
 static boolean_t vflag = B_FALSE;	/* -v (verbose) flag, optional */
 static boolean_t aflag = B_FALSE;	/* -a <algorithm> flag, required */
@@ -132,8 +124,6 @@ static CK_RV do_mac(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	CK_ULONG_PTR psignaturelen);
 static CK_RV do_digest(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	int fd, CK_BYTE_PTR *pdigest, CK_ULONG_PTR pdigestlen);
-static int getkey(char *filename, CK_BYTE_PTR *pkeydata);
-static int getpasswd(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG_PTR psize);
 
 int
 main(int argc, char **argv)
@@ -283,66 +273,6 @@ algorithm_list(boolean_t mac_cmd)
 	}
 }
 
-static CK_RV
-generate_pkcs5_key(CK_SESSION_HANDLE hSession,
-		CK_BYTE_PTR	pSaltData,
-		CK_ULONG	saltLen,
-		CK_ULONG	iterations,
-		CK_BYTE_PTR	pkeydata, /* user entered passphrase */
-		CK_KEY_TYPE	keytype,
-		CK_ULONG	passwd_size,
-		CK_ULONG	keylen,	 /* desired length of generated key */
-		CK_OBJECT_HANDLE *hKey)
-{
-	CK_RV rv;
-	CK_PKCS5_PBKD2_PARAMS params;
-	CK_MECHANISM mechanism;
-	CK_OBJECT_CLASS class = CKO_SECRET_KEY;
-	CK_ATTRIBUTE tmpl[4];
-	int attrs = 0;
-
-	tmpl[attrs].type = CKA_CLASS;
-	tmpl[attrs].pValue = &class;
-	tmpl[attrs].ulValueLen = sizeof (class);
-	attrs++;
-
-	tmpl[attrs].type = CKA_KEY_TYPE;
-	tmpl[attrs].pValue = &keytype;
-	tmpl[attrs].ulValueLen = sizeof (keytype);
-	attrs++;
-
-	tmpl[attrs].type = CKA_SIGN;
-	tmpl[attrs].pValue = &true;
-	tmpl[attrs].ulValueLen = sizeof (CK_BBOOL);
-	attrs++;
-
-	if (keylen > 0) {
-		tmpl[attrs].type = CKA_VALUE_LEN;
-		tmpl[attrs].pValue = &keylen;
-		tmpl[attrs].ulValueLen = sizeof (keylen);
-		attrs++;
-	}
-
-	params.saltSource = CKZ_SALT_SPECIFIED;
-	params.pSaltSourceData = (void *)pSaltData;
-	params.ulSaltSourceDataLen = saltLen;
-	params.iterations = iterations;
-	params.prf = CKP_PKCS5_PBKD2_HMAC_SHA1;
-	params.pPrfData = NULL;
-	params.ulPrfDataLen = 0;
-	params.pPassword = (CK_UTF8CHAR_PTR)pkeydata;
-	params.ulPasswordLen = &passwd_size;
-
-	mechanism.mechanism = CKM_PKCS5_PBKD2;
-	mechanism.pParameter = &params;
-	mechanism.ulParameterLen = sizeof (params);
-
-	rv = C_GenerateKey(hSession, &mechanism, tmpl, attrs, hKey);
-
-	return (rv);
-}
-
-
 static int
 get_token_key(CK_SESSION_HANDLE hSession, CK_KEY_TYPE keytype,
     char *keylabel, CK_BYTE *password, int password_len,
@@ -448,9 +378,9 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	int exitcode = EXIT_SUCCESS;		/* return code */
 	int slot, mek;			/* index variables */
 	int mech_match = 0;
-	CK_BYTE		salt[PBKD2_SALT_SIZE];
+	CK_BYTE		salt[CK_PKCS5_PBKD2_SALT_SIZE];
 	CK_ULONG	keysize;
-	CK_ULONG	iterations = PBKD2_ITERATIONS;
+	CK_ULONG	iterations = CK_PKCS5_PBKD2_ITERATIONS;
 	CK_KEY_TYPE keytype;
 	KMF_RETURN kmfrv;
 	CK_SLOT_ID token_slot_id;
@@ -477,29 +407,34 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 
 		/* Get key to do a MAC operation */
 		if (mac_cmd) {
-			if (Kflag) {
-				int status;
+			int status;
 
+			if (Kflag) {
+				/* get the pin of the token */
 				if (token_label == NULL ||
 				    !strlen(token_label)) {
-					token_label = PK_DEFAULT_PK11TOKEN;
+					token_label = pkcs11_default_token();
 				}
 
-				status = getpasswd(token_label, &pkeydata,
-				    (CK_ULONG *)&keylen);
-				if (status == -1) {
-					cryptoerror(LOG_STDERR,
-					    gettext("invalid passphrase."));
-					return (EXIT_FAILURE);
-				}
-
+				status = pkcs11_get_pass(token_label,
+				    (char **)&pkeydata, (size_t *)&keylen,
+				    0, B_FALSE);
+			} else if (keyfile != NULL) {
+				/* get the key file */
+				status = pkcs11_read_data(keyfile,
+				    (void **)&pkeydata, (size_t *)&keylen);
 			} else {
-				keylen = getkey(keyfile, &pkeydata);
-				if (keylen <= 0 || pkeydata == NULL) {
-					cryptoerror(LOG_STDERR,
-					    gettext("invalid key."));
-					return (EXIT_FAILURE);
-				}
+				/* get the key from input */
+				status = pkcs11_get_pass(NULL,
+				    (char **)&pkeydata, (size_t *)&keylen,
+				    0, B_FALSE);
+			}
+
+			if (status == -1 || keylen == 0 || pkeydata == NULL) {
+				cryptoerror(LOG_STDERR,
+				    Kflag ? gettext("invalid passphrase.") :
+				    gettext("invalid key."));
+				return (EXIT_FAILURE);
 			}
 		}
 	}
@@ -671,6 +606,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 		 * create a key object for them.
 		 */
 		if (keyfile) {
+			/* XXX : why wasn't SUNW_C_KeyToObject used here? */
 			CK_OBJECT_CLASS class = CKO_SECRET_KEY;
 			CK_KEY_TYPE tmpl_keytype = CKK_GENERIC_SECRET;
 			CK_BBOOL false = FALSE;
@@ -737,9 +673,10 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 			 * using the same passphrase.
 			 */
 			(void) memset(salt, 0x0a, sizeof (salt));
-			rv = generate_pkcs5_key(hSession,
-			    salt, sizeof (salt), iterations, pkeydata,
-			    keytype, keylen, keysize, &key);
+			rv = pkcs11_PasswdToPBKD2Object(hSession,
+			    (char *)pkeydata, (size_t)keylen, (void *)salt,
+			    sizeof (salt), iterations, keytype, keysize,
+			    CKF_SIGN, &key);
 		}
 
 		if (rv != CKR_OK) {
@@ -1005,115 +942,4 @@ do_mac(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	} else {
 		return (rv);
 	}
-}
-
-
-/*
- * getkey - gets keydata from file specified
- *
- *  filename - name of file, if null, prompt for pass phrase
- *  pkeydata - binary key data is returned in this buf
- *
- * returns length of key, or -1 if error
- */
-static int
-getkey(char *filename, CK_BYTE_PTR *pkeydata)
-{
-	struct stat statbuf;
-	char *keybuf = NULL;
-	char *tmpbuf;
-	int keylen;
-	int fd;
-
-	if (filename != NULL) {
-
-		/* read the key file into a buffer */
-		if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) == -1) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "can't open %s\n"), filename);
-			return (-1);
-
-		}
-
-		if (fstat(fd, &statbuf) == -1) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "can't stat %s\n"), filename);
-			(void) close(fd);
-			return (-1);
-		}
-
-		if (!S_ISREG(statbuf.st_mode)) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "%s not a regular file\n"), filename);
-			(void) close(fd);
-			return (-1);
-		}
-
-		keylen = (size_t)statbuf.st_size;
-
-		if (keylen > 0) {
-			/* allocate a buffer to hold the entire key */
-			if ((keybuf = malloc(keylen)) == NULL) {
-				int err = errno;
-				cryptoerror(LOG_STDERR, gettext("malloc: %s\n"),
-				    strerror(err));
-				(void) close(fd);
-				return (-1);
-			}
-
-			if (read(fd, keybuf, keylen) != keylen) {
-				cryptoerror(LOG_STDERR, gettext(
-				    "can't read %s\n"), filename);
-				(void) close(fd);
-				return (-1);
-			}
-		}
-		(void) close(fd);
-
-	} else {
-
-		/* No file, prompt for a pass phrase */
-		tmpbuf = getpassphrase(gettext("Enter key:"));
-
-		if (tmpbuf == NULL) {
-			return (-1);	/* error */
-		} else {
-			keybuf = strdup(tmpbuf);
-			(void) memset(tmpbuf, 0, strlen(tmpbuf));
-		}
-		keylen = strlen(keybuf);
-	}
-
-	*pkeydata = (CK_BYTE_PTR)keybuf;
-
-	return (keylen);
-}
-
-static int
-getpasswd(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG *psize)
-{
-	char *databuf;
-	char *tmpbuf;
-	char prompt[1024];
-
-	if (token_spec == NULL)
-		return (-1);
-
-	(void) snprintf(prompt, sizeof (prompt), DEFAULT_TOKEN_PROMPT,
-	    token_spec);
-	tmpbuf = getpassphrase(gettext(prompt));
-
-	if (tmpbuf == NULL) {
-		return (-1);	/* error */
-	}
-
-	databuf = strdup(tmpbuf);
-	(void) memset(tmpbuf, 0, strlen(tmpbuf));
-	if (databuf == NULL)
-		return (-1);
-
-	*pdata = (CK_BYTE_PTR)databuf;
-	*psize = (CK_ULONG)strlen(databuf);
-
-	return (0);
 }

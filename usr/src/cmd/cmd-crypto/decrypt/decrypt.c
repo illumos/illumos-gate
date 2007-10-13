@@ -79,9 +79,6 @@
 #define	BLOCKSIZE	(128)		/* Largest guess for block size */
 #define	PROGRESSSIZE	(BUFFERSIZE*20)	/* stdin progress indicator size */
 
-#define	PBKD2_ITERATIONS (1000)
-#define	PBKD2_SALT_SIZE	16
-
 #define	SUNW_ENCRYPT_FILE_VERSION 1
 
 /*
@@ -94,14 +91,10 @@
 
 #define	EXIT_USAGE	2	/* usage/syntax error */
 
-#define	RANDOM_DEVICE	"/dev/urandom"	/* random device name */
-
 #define	ENCRYPT_NAME	"encrypt"	/* name of encrypt command */
 #define	ENCRYPT_OPTIONS "a:T:K:k:i:o:lv"	/* options for encrypt */
 #define	DECRYPT_NAME	"decrypt"	/* name of decrypt command */
 #define	DECRYPT_OPTIONS "a:T:K:k:i:o:lv"	/* options for decrypt */
-#define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
-#define	PK_DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
 
 /*
  * Structure containing info for encrypt/decrypt
@@ -188,10 +181,6 @@ static int status_pos = 0; /* current position of progress bar element */
  */
 static void usage(struct CommandInfo *cmd);
 static int execute_cmd(struct CommandInfo *cmd, char *algo_str);
-static int cryptogetdata(char *, CK_BYTE_PTR *pkeydata, CK_ULONG_PTR pkeysize);
-static int cryptoreadfile(char *filename, CK_BYTE_PTR *pdata,
-	CK_ULONG_PTR pdatalen);
-static int get_random_data(CK_BYTE_PTR pivbuf, int ivlen);
 static int crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 	int infd, int outfd, off_t insize);
 
@@ -335,71 +324,6 @@ algorithm_list()
 	}
 }
 
-static CK_RV
-generate_pkcs5_key(CK_SESSION_HANDLE hSession,
-		CK_BYTE		*pSaltData,
-		CK_ULONG	saltLen,
-		CK_ULONG	iterations,
-		CK_BYTE		*pkeydata, /* user entered passphrase */
-		CK_KEY_TYPE	keytype,
-		CK_ULONG	passwd_size,
-		CK_ULONG	keylen,  /* desired length of generated key */
-		CK_ATTRIBUTE_TYPE operation,
-		CK_OBJECT_HANDLE *hKey)
-{
-	CK_RV rv;
-	CK_PKCS5_PBKD2_PARAMS params;
-	CK_MECHANISM mechanism;
-	CK_OBJECT_CLASS class = CKO_SECRET_KEY;
-	CK_ATTRIBUTE tmpl[4];
-	int attrs = 0;
-
-	mechanism.mechanism = CKM_PKCS5_PBKD2;
-	mechanism.pParameter = &params;
-	mechanism.ulParameterLen = sizeof (params);
-
-	tmpl[attrs].type = CKA_CLASS;
-	tmpl[attrs].pValue = &class;
-	tmpl[attrs].ulValueLen = sizeof (class);
-	attrs++;
-
-	tmpl[attrs].type = CKA_KEY_TYPE;
-	tmpl[attrs].pValue = &keytype;
-	tmpl[attrs].ulValueLen = sizeof (keytype);
-	attrs++;
-
-	tmpl[attrs].type = operation;
-	tmpl[attrs].pValue = &truevalue;
-	tmpl[attrs].ulValueLen = sizeof (CK_BBOOL);
-	attrs++;
-
-	if (keylen > 0) {
-		tmpl[attrs].type = CKA_VALUE_LEN;
-		tmpl[attrs].pValue = &keylen;
-		tmpl[attrs].ulValueLen = sizeof (keylen);
-		attrs++;
-	}
-
-	params.saltSource = CKZ_SALT_SPECIFIED;
-	params.pSaltSourceData = (void *)pSaltData;
-	params.ulSaltSourceDataLen = saltLen;
-	params.iterations = iterations;
-	params.prf = CKP_PKCS5_PBKD2_HMAC_SHA1;
-	params.pPrfData = NULL;
-	params.ulPrfDataLen = 0;
-	params.pPassword = (CK_UTF8CHAR_PTR)pkeydata;
-	params.ulPasswordLen = &passwd_size;
-
-	mechanism.mechanism = CKM_PKCS5_PBKD2;
-	mechanism.pParameter = &params;
-	mechanism.ulParameterLen = sizeof (params);
-
-	rv = C_GenerateKey(hSession, &mechanism, tmpl,
-	    attrs, hKey);
-
-	return (rv);
-}
-
 /*
  * This function will login into the token with the provided password and
  * find the token key object with the specified keytype and keylabel.
@@ -496,7 +420,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	CK_MECHANISM mech;
 	CK_SESSION_HANDLE hSession = CK_INVALID_HANDLE;
 	CK_BYTE_PTR	pkeydata = NULL;
-	CK_BYTE		salt[PBKD2_SALT_SIZE];
+	CK_BYTE		salt[CK_PKCS5_PBKD2_SALT_SIZE];
 	CK_ULONG	keysize = 0;
 	int i, slot, mek;		/* index variables */
 	int status;
@@ -512,7 +436,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	CK_BYTE_PTR	pivbuf = NULL_PTR;
 	CK_ULONG	ivlen = 0L;
 	int mech_match = 0;
-	CK_ULONG	iterations = PBKD2_ITERATIONS;
+	CK_ULONG	iterations = CK_PKCS5_PBKD2_ITERATIONS;
 	CK_ULONG	keylen;
 	int version = SUNW_ENCRYPT_FILE_VERSION;
 	CK_KEY_TYPE keytype;
@@ -546,17 +470,19 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		if (Kflag) {
 			/* get the pin of the token */
 			if (token_label == NULL || !strlen(token_label)) {
-				token_label = PK_DEFAULT_PK11TOKEN;
+				token_label = pkcs11_default_token();
 			}
 
-			status = cryptogetdata(token_label, &pkeydata,
-			    &keysize);
+			status = pkcs11_get_pass(token_label,
+			    (char **)&pkeydata, (size_t *)&keysize, 0, B_FALSE);
 		} else if (kflag) {
 			/* get the key file */
-			status = cryptoreadfile(keyfile, &pkeydata, &keysize);
+			status = pkcs11_read_data(keyfile, (void **)&pkeydata,
+			    (size_t *)&keysize);
 		} else {
 			/* get the key from input */
-			status = cryptogetdata(NULL, &pkeydata, &keysize);
+			status = pkcs11_get_pass(NULL, (char **)&pkeydata,
+			    (size_t *)&keysize, 0, B_FALSE);
 		}
 
 		if (status == -1 || keysize == 0L) {
@@ -723,7 +649,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	}
 
 	if (cmd->type == CKA_ENCRYPT) {
-		if ((get_random_data(pivbuf,
+		if ((pkcs11_random_data((void *)pivbuf,
 		    mech_aliases[mech_match].ivlen)) != 0) {
 			cryptoerror(LOG_STDERR, gettext(
 			    "Unable to generate random "
@@ -879,7 +805,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			goto do_crypto;
 		}
 	} else if (cmd->type == CKA_ENCRYPT) {
-		rv = get_random_data(salt, sizeof (salt));
+		rv = pkcs11_random_data((void *)salt, sizeof (salt));
 		if (rv != 0) {
 			cryptoerror(LOG_STDERR,
 			gettext("unable to generate random "
@@ -896,6 +822,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	 * key to address security concerns with RC4 keys.
 	 */
 	if (kflag && keyfile != NULL && keytype != CKK_RC4) {
+		/* XXX : why wasn't SUNW_C_KeyToObject used here? */
 		CK_OBJECT_CLASS objclass = CKO_SECRET_KEY;
 		CK_ATTRIBUTE template[5];
 		int nattr = 0;
@@ -942,10 +869,9 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		 * the key read from the file given (-k keyfile) or
 		 * the passphrase entered by the user.
 		 */
-		rv = generate_pkcs5_key(hSession,
-		    salt, sizeof (salt), iterations,
-		    pkeydata, keytype, keysize,
-		    keylen, cmd->type, &key);
+		rv = pkcs11_PasswdToPBKD2Object(hSession, (char *)pkeydata,
+		    (size_t)keysize, (void *)salt, sizeof (salt), iterations,
+		    keytype, keylen, cmd->flags, &key);
 	}
 
 	if (rv != CKR_OK) {
@@ -1268,150 +1194,4 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 	} else {
 		return (0);
 	}
-}
-
-/*
- * cryptoreadfile - reads file into a buffer
- *  This function can be used for reading files
- *  containing key or initialization vector data.
- *
- *  filename - name of file
- *  pdata - entire file returned in this buffer
- *	must be freed by caller using free()
- *  pdatalen - length of data returned
- *
- * returns 0 if success, -1 if error
- */
-static int
-cryptoreadfile(char *filename, CK_BYTE_PTR *pdata, CK_ULONG_PTR pdatalen)
-{
-	struct stat statbuf;
-	char *filebuf;
-	int filesize;
-	int fd;
-
-	if (filename == NULL)
-		return (-1);
-
-	/* read the file into a buffer */
-	if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) == -1) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "cannot open %s"), filename);
-		return (-1);
-
-	}
-
-	if (fstat(fd, &statbuf) == -1) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "cannot stat %s"), filename);
-		(void) close(fd);
-		return (-1);
-	}
-
-	if (!S_ISREG(statbuf.st_mode)) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "%s not a regular file"), filename);
-		(void) close(fd);
-		return (-1);
-	}
-
-	filesize = (size_t)statbuf.st_size;
-
-	if (filesize == 0) {
-		(void) close(fd);
-		return (-1);
-	}
-
-	/* allocate a buffer to hold the entire key */
-	if ((filebuf = malloc(filesize)) == NULL) {
-		int err = errno;
-		cryptoerror(LOG_STDERR, gettext("malloc: %s"), strerror(err));
-		(void) close(fd);
-		return (-1);
-	}
-
-	if (read(fd, filebuf, filesize) != filesize) {
-		int err = errno;
-		cryptoerror(LOG_STDERR, gettext("error reading file: %s"),
-		    strerror(err));
-		(void) close(fd);
-		free(filebuf);
-		return (-1);
-	}
-
-	(void) close(fd);
-
-	*pdata = (CK_BYTE_PTR)filebuf;
-	*pdatalen = (CK_ULONG)filesize;
-
-	return (0);
-}
-
-/*
- * cryptogetdata - prompt user for a key or the PIN for a token
- *
- *   pdata - buffer for returning key or pin data
- *	must be freed by caller using free()
- *   psize - size of buffer returned
- *
- * returns
- *   0 for success, -1 for failure
- */
-
-static int
-cryptogetdata(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG_PTR psize)
-{
-	char *databuf = NULL;
-	char *tmpbuf = NULL;
-	char prompt[1024];
-
-	if (token_spec != NULL) {
-		(void) snprintf(prompt, sizeof (prompt),
-		    DEFAULT_TOKEN_PROMPT, token_spec);
-		tmpbuf = getpassphrase(gettext(prompt));
-	} else {
-		tmpbuf = getpassphrase(gettext("Enter key:"));
-	}
-
-	if (tmpbuf == NULL) {
-		return (-1);	/* error */
-	} else {
-		databuf = strdup(tmpbuf);
-		(void) memset(tmpbuf, 0, strlen(tmpbuf)); /* clean up */
-		if (databuf == NULL)
-			return (-1);
-	}
-
-	*pdata = (CK_BYTE_PTR)databuf;
-	*psize = (CK_ULONG)strlen(databuf);
-
-	return (0);
-}
-
-/*
- * get_random_data - generate initialization vector data
- *             iv data is random bytes
- *  hSession - a pkcs session
- *  pivbuf - buffer where data is returned
- *  ivlen - size of iv data
- */
-static int
-get_random_data(CK_BYTE_PTR pivbuf, int ivlen)
-{
-	int fd;
-
-	if (ivlen == 0) {
-		/* nothing to generate */
-		return (0);
-	}
-
-	/* Read random data directly from /dev/random */
-	if ((fd = open(RANDOM_DEVICE, O_RDONLY)) != -1) {
-		if (read(fd, pivbuf, (size_t)ivlen) == ivlen) {
-			(void) close(fd);
-			return (0);
-		}
-	}
-	(void) close(fd);
-	return (-1);
 }

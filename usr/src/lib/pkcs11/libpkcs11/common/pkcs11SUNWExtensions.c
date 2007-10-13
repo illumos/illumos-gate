@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ static CK_OBJECT_CLASS objclass = CKO_SECRET_KEY;
 static CK_BBOOL falsevalue = FALSE;
 static CK_BBOOL truevalue = TRUE;
 
-#define	NUM_SECRETKEY_ATTRS	8
+#define	NUM_SECRETKEY_ATTRS	12
 
 typedef struct _ATTRTYPE_MECHINFO_MAPPING {
 	CK_ATTRIBUTE_TYPE attr;
@@ -53,7 +53,9 @@ ATTRTYPE_MECHINFO_MAPPING mapping[] = {
 	{CKA_ENCRYPT, CKF_ENCRYPT},
 	{CKA_DECRYPT, CKF_DECRYPT},
 	{CKA_SIGN, CKF_SIGN},
-	{CKA_VERIFY, CKF_VERIFY}
+	{CKA_VERIFY, CKF_VERIFY},
+	{CKA_WRAP, CKF_WRAP},
+	{CKA_UNWRAP, CKF_UNWRAP}
 };
 
 
@@ -68,6 +70,25 @@ CK_MECHANISM_TYPE asymmetric_mechs[] = {
 	CKM_DSA_PARAMETER_GEN, CKM_ECDSA_KEY_PAIR_GEN, CKM_EC_KEY_PAIR_GEN,
 	CKM_ECDSA, CKM_ECDSA_SHA1, CKM_ECDH1_DERIVE,
 	CKM_ECDH1_COFACTOR_DERIVE, CKM_ECMQV_DERIVE
+};
+
+
+typedef struct _KEY_TYPE_SIZE_MAPPING {
+	CK_KEY_TYPE type;
+	CK_ULONG len;
+} KEY_TYPE_SIZE_MAPPING;
+
+/*
+ * List of secret key types that have fixed sizes and their sizes.
+ * These key types do not allow CKA_VALUE_LEN for key generation.
+ * The sizes are in bytes.
+ *
+ * Discrete-sized keys, such as AES and Twofish, and variable sized
+ * keys, such as Blowfish, are not in this list.
+ */
+KEY_TYPE_SIZE_MAPPING fixed_size_secrets[] = {
+	{CKK_DES, 8}, {CKK_DES2, 16}, {CKK_DES3, 24}, {CKK_IDEA, 16},
+	{CKK_CDMF, 8}, {CKK_SKIPJACK, 12}, {CKK_BATON, 40}, {CKK_JUNIPER, 40}
 };
 
 
@@ -184,15 +205,13 @@ SUNW_C_KeyToObject(CK_SESSION_HANDLE hSession, CK_MECHANISM_TYPE mech,
 		}
 	}
 
-	/* set the attribute type flag on object based on mechanism */
 	rv = C_GetSessionInfo(hSession, &session_info);
 	if (rv != CKR_OK) {
-		goto cleanup;
+		return (rv);
 	}
 
 	slot_id = session_info.slotID;
 
-	/* create a generic object first */
 	i = 0;
 	template[i].type = CKA_CLASS;
 	template[i].pValue = &objclass;
@@ -212,9 +231,10 @@ SUNW_C_KeyToObject(CK_SESSION_HANDLE hSession, CK_MECHANISM_TYPE mech,
 
 	rv = C_GetMechanismInfo(slot_id, mech, &mech_info);
 	if (rv != CKR_OK) {
-		goto cleanup;
+		return (rv);
 	}
 
+	/* set the attribute type flag on object based on mechanism */
 	num_mapping = sizeof (mapping) / sizeof (ATTRTYPE_MECHINFO_MAPPING);
 	for (j = 0; j < num_mapping; j++) {
 		assert(i < NUM_SECRETKEY_ATTRS);
@@ -241,14 +261,213 @@ SUNW_C_KeyToObject(CK_SESSION_HANDLE hSession, CK_MECHANISM_TYPE mech,
 	i++;
 
 	rv = C_CreateObject(hSession, template, i, obj);
+	return (rv);
+}
+
+
+/*
+ * pkcs11_PasswdToPBKD2Object will create a secret key from the given string
+ * (e.g. passphrase) using PKCS#5 Password-Based Key Derivation Function 2
+ * (PBKD2).
+ *
+ * Session must be open.  Salt and iterations use defaults.
+ */
+CK_RV
+pkcs11_PasswdToPBKD2Object(CK_SESSION_HANDLE hSession, char *passphrase,
+    size_t passphrase_len, void *salt, size_t salt_len, CK_ULONG iterations,
+    CK_KEY_TYPE key_type, CK_ULONG key_len, CK_FLAGS key_flags,
+    CK_OBJECT_HANDLE_PTR obj)
+{
+	CK_RV rv;
+	CK_PKCS5_PBKD2_PARAMS params;
+	CK_MECHANISM mechanism;
+	CK_KEY_TYPE asym_key_type;
+	CK_ULONG i, j, num_asym_mechs, num_fixed_secs, num_mapping;
+	CK_ATTRIBUTE template[NUM_SECRETKEY_ATTRS];
+
+	if (hSession == NULL || obj == NULL ||
+	    passphrase == NULL || passphrase_len == 0 ||
+	    iterations == 0UL) {
+		return (CKR_ARGUMENTS_BAD);
+	}
+
+	/*
+	 * Check to make sure key type is not asymmetric.  This function
+	 * is only applicable to generating secret key.
+	 */
+	num_asym_mechs = sizeof (asymmetric_mechs) / sizeof (CK_MECHANISM_TYPE);
+	for (i = 0; i < num_asym_mechs; i++) {
+		rv = pkcs11_mech2keytype(asymmetric_mechs[i], &asym_key_type);
+		assert(rv == CKR_OK);
+		if (key_type == asym_key_type) {
+			return (CKR_KEY_TYPE_INCONSISTENT);
+		}
+	}
+
+	/*
+	 * Key length must either be 0 or the correct size for PBKD of
+	 * fixed-size secret keys.  However, underlying key generation
+	 * cannot have CKA_VALUE_LEN set for the key length attribute.
+	 */
+	num_fixed_secs =
+	    sizeof (fixed_size_secrets) / sizeof (KEY_TYPE_SIZE_MAPPING);
+	for (i = 0; i < num_fixed_secs; i++) {
+		if (key_type == fixed_size_secrets[i].type) {
+			if (key_len == fixed_size_secrets[i].len) {
+				key_len = 0;
+			}
+			if (key_len == 0) {
+				break;
+			}
+			return (CKR_KEY_SIZE_RANGE);
+		}
+	}
+
+	if (salt == NULL || salt_len == 0) {
+		params.saltSource = 0;
+		params.pSaltSourceData = NULL;
+		params.ulSaltSourceDataLen = 0;
+	} else {
+		params.saltSource = CKZ_SALT_SPECIFIED;
+		params.pSaltSourceData = salt;
+		params.ulSaltSourceDataLen = salt_len;
+	}
+	params.iterations = iterations;
+	params.prf = CKP_PKCS5_PBKD2_HMAC_SHA1;
+	params.pPrfData = NULL;
+	params.ulPrfDataLen = 0;
+	params.pPassword = (CK_UTF8CHAR_PTR)passphrase;
+	params.ulPasswordLen = (CK_ULONG_PTR)&passphrase_len;
+	/*
+	 * PKCS#11 spec error, ulPasswordLen should have been pulPasswordLen,
+	 * or its type should have been CK_ULONG instead of CK_ULONG_PTR,
+	 * but it's legacy now
+	 */
+
+	mechanism.mechanism = CKM_PKCS5_PBKD2;
+	mechanism.pParameter = &params;
+	mechanism.ulParameterLen = sizeof (params);
+
+	i = 0;
+	template[i].type = CKA_CLASS;
+	template[i].pValue = &objclass;
+	template[i].ulValueLen = sizeof (objclass);
+	i++;
+
+	assert(i < NUM_SECRETKEY_ATTRS);
+	template[i].type = CKA_KEY_TYPE;
+	template[i].pValue = &key_type;
+	template[i].ulValueLen = sizeof (key_type);
+	i++;
+
+	assert(i < NUM_SECRETKEY_ATTRS);
+	template[i].type = CKA_TOKEN;
+	template[i].pValue = &falsevalue;
+	template[i].ulValueLen = sizeof (falsevalue);
+	i++;
+
+	if (key_len != 0) {
+		assert(i < NUM_SECRETKEY_ATTRS);
+		template[i].type = CKA_VALUE_LEN;
+		template[i].pValue = &key_len;
+		template[i].ulValueLen = sizeof (key_len);
+		i++;
+	}
+
+	/*
+	 * C_GenerateKey may not implicitly set capability attributes,
+	 * e.g. CKA_ENCRYPT, CKA_DECRYPT, CKA_WRAP, CKA_UNWRAP, ...
+	 */
+	num_mapping = sizeof (mapping) / sizeof (ATTRTYPE_MECHINFO_MAPPING);
+	for (j = 0; j < num_mapping; j++) {
+		assert(i < NUM_SECRETKEY_ATTRS);
+		template[i].type = mapping[j].attr;
+		template[i].pValue = (key_flags & ((mapping[j]).flag)) ?
+		    &truevalue : &falsevalue;
+		template[i].ulValueLen = sizeof (falsevalue);
+		i++;
+	}
+
+	rv = C_GenerateKey(hSession, &mechanism, template, i, obj);
+	return (rv);
+}
+
+/*
+ * pkcs11_ObjectToKey gets the rawkey data from a secret key object.
+ * The caller is responsible to free the allocated rawkey data.
+ *
+ * Optionally the object can be destroyed after the value is retrieved.
+ * As an example, after using pkcs11_PasswdToPBKD2Object() to create a
+ * secret key object from a passphrase, an app may call pkcs11_ObjectToKey
+ * to get the rawkey data.  The intermediate object may no longer be needed
+ * and should be destroyed.
+ */
+CK_RV
+pkcs11_ObjectToKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE obj,
+    void **rawkey, size_t *rawkey_len, boolean_t destroy_obj)
+{
+	CK_RV rv;
+	CK_ATTRIBUTE template;
+
+	if (hSession == NULL || rawkey == NULL || rawkey_len == NULL ||
+	    *rawkey_len == 0) {
+		return (CKR_ARGUMENTS_BAD);
+	}
+
+	template.type = CKA_VALUE;
+	template.pValue = NULL;
+	template.ulValueLen = 0;
+
+	/* First get the size of the rawkey */
+	rv = C_GetAttributeValue(hSession, obj, &template, 1);
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
-	return (rv);
+	template.pValue = malloc(template.ulValueLen);
+	if (template.pValue == NULL) {
+		return (CKR_HOST_MEMORY);
+	}
 
-cleanup:
-	/* This cleanup is only for failure cases */
-	(void) C_DestroyObject(hSession, *obj);
+	/* Then get the rawkey data */
+	rv = C_GetAttributeValue(hSession, obj, &template, 1);
+	if (rv != CKR_OK) {
+		free(template.pValue);
+		return (rv);
+	}
+
+	if (destroy_obj) {
+		/*
+		 * Could have asserted rv == CKR_OK, making threaded
+		 * apps that share objects see stars.  Here mercy is ok.
+		 */
+		(void) C_DestroyObject(hSession, obj);
+	}
+
+	*rawkey = template.pValue;
+	*rawkey_len = template.ulValueLen;
+
+	return (CKR_OK);
+}
+
+/*
+ * pkcs11_PasswdToKey will create PKCS#5 PBKD2 rawkey data from the
+ * given passphrase.  The caller is responsible to free the allocated
+ * rawkey data.
+ */
+CK_RV
+pkcs11_PasswdToKey(CK_SESSION_HANDLE hSession, char *passphrase,
+    size_t passphrase_len, void *salt, size_t salt_len, CK_KEY_TYPE key_type,
+    CK_ULONG key_len, void **rawkey, size_t *rawkey_len)
+{
+	CK_RV rv;
+	CK_OBJECT_HANDLE obj;
+
+	rv = pkcs11_PasswdToPBKD2Object(hSession, passphrase, passphrase_len,
+	    salt, salt_len, CK_PKCS5_PBKD2_ITERATIONS, key_type, key_len, 0,
+	    &obj);
+	if (rv != CKR_OK)
+		return (rv);
+	rv = pkcs11_ObjectToKey(hSession, obj, rawkey, rawkey_len, B_TRUE);
 	return (rv);
 }

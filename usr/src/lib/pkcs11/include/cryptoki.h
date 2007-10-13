@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.   All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.   All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +74,12 @@ extern "C" {
 
 #include <security/pkcs11.h>
 
+/* Default salt len to generate PKCS#5 key */
+#define	CK_PKCS5_PBKD2_SALT_SIZE	(16UL)
+
+/* Default number of iterations to generate PKCS#5 key */
+#define	CK_PKCS5_PBKD2_ITERATIONS	(1000UL)
+
 /* Solaris specific functions */
 
 #include <stdlib.h>
@@ -95,6 +100,34 @@ CK_RV SUNW_C_KeyToObject(CK_SESSION_HANDLE hSession,
     CK_MECHANISM_TYPE mech, const void *rawkey, size_t rawkey_len,
     CK_OBJECT_HANDLE_PTR obj);
 
+/*
+ * pkcs11_PasswdToPBKD2Object will create a secret key from the given string
+ * (e.g. passphrase) using PKCS#5 Password-Based Key Derivation Function 2
+ * (PBKD2).
+ */
+CK_RV
+pkcs11_PasswdToPBKD2Object(CK_SESSION_HANDLE hSession, char *passphrase,
+    size_t passphrase_len, void *salt, size_t salt_len, CK_ULONG iterations,
+    CK_KEY_TYPE key_type, CK_ULONG key_len, CK_FLAGS key_flags,
+    CK_OBJECT_HANDLE_PTR obj);
+
+/*
+ * pkcs11_ObjectToKey gets the rawkey data from a secret key object.
+ * The caller is responsible to free the allocated rawkey data.
+ */
+CK_RV
+pkcs11_ObjectToKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE obj,
+    void **rawkey, size_t *rawkey_len, boolean_t destroy_obj);
+
+/*
+ * pkcs11_PasswdToKey will create PKCS#5 PBKD2 rawkey data from the
+ * given passphrase.  The caller is responsible to free the allocated
+ * rawkey data.
+ */
+CK_RV
+pkcs11_PasswdToKey(CK_SESSION_HANDLE hSession, char *passphrase,
+    size_t passphrase_len, void *salt, size_t salt_len, CK_KEY_TYPE key_type,
+    CK_ULONG key_len, void **rawkey, size_t *rawkey_len);
 
 #ifdef	__cplusplus
 }

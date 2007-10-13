@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,6 +97,15 @@ SUNW_1.1 {
 	C_WrapKey;
 	SUNW_C_GetMechSession;
 	SUNW_C_KeyToObject;
+    local:
+	*;
+};
+
+SUNWprivate {
+    global:
+	pkcs11_ObjectToKey;
+	pkcs11_PasswdToPBKD2Object;
+	pkcs11_PasswdToKey;
     local:
 	*;
 };

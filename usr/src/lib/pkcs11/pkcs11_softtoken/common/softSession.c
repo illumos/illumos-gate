@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -222,7 +222,7 @@ clean_exit:
 	 */
 	SES_REFRELE(session_p, lock_held);
 
-	return (CKR_OK);
+	return (rv);
 }
 
 
