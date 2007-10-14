@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +103,8 @@ static const struct cmd {
 	const char *cmd_desc;
 } cmds[] = {
 { cmd_config, "config", NULL, "display fault manager configuration" },
-{ cmd_faulty, "faulty", "[-ai]", "display list of faulty resources" },
+{ cmd_faulty, "faulty", "[-afgiprsv] [-u <uuid>] [-n <max_fault>]",
+	"display list of faulty resources" },
 { cmd_flush, "flush", "<fmri> ...", "flush cached state for resource" },
 { cmd_gc, "gc", "<module>", NULL },
 { cmd_load, "load", "<path>", "load specified fault manager module" },

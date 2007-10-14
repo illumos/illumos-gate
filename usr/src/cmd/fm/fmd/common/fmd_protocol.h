@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,9 +70,11 @@ extern nvlist_t *fmd_protocol_fmri_module(struct fmd_module *);
 extern nvlist_t *fmd_protocol_fault(const char *,
     uint8_t, nvlist_t *, nvlist_t *, nvlist_t *, const char *);
 extern nvlist_t *fmd_protocol_list(const char *, nvlist_t *,
-    const char *, const char *, uint_t, nvlist_t **, uint8_t *, int);
+    const char *, const char *, uint_t, nvlist_t **, uint8_t *, int,
+    struct timeval *);
 extern nvlist_t *fmd_protocol_rsrc_asru(const char *, nvlist_t *,
-    const char *, const char *, boolean_t, boolean_t, boolean_t, nvlist_t *);
+    const char *, const char *, boolean_t, boolean_t, boolean_t, nvlist_t *,
+    struct timeval *);
 extern nvlist_t *fmd_protocol_fmderror(int, const char *, va_list);
 extern nvlist_t *fmd_protocol_moderror(struct fmd_module *, int, const char *);
 extern nvlist_t *fmd_protocol_xprt_ctl(struct fmd_module *,

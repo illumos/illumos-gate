@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,8 @@ static const char *const _fmd_case_snames[] = {
 	"CLOSED",	/* FMD_CASE_CLOSED */
 	"REPAIRED"	/* FMD_CASE_REPAIRED */
 };
+
+extern volatile uint32_t fmd_asru_fake_not_present;
 
 fmd_case_hash_t *
 fmd_case_hash_create(void)
@@ -268,7 +270,16 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 		if (nvlist_lookup_nvlist(cis->cis_nvl,
 		    FM_FAULT_ASRU, &fmri) == 0 && (asru =
 		    fmd_asru_hash_lookup_nvl(ahp, fmri, FMD_B_FALSE)) != NULL) {
-			*bp++ = (asru->asru_flags & FMD_ASRU_FAULTY) != 0;
+			*bp = 0;
+			if (fmd_asru_fake_not_present ||
+			    !fmd_fmri_present(asru->asru_fmri))
+				*bp |= FM_SUSPECT_NOT_PRESENT;
+			if (fmd_asru_fake_not_present ||
+			    fmd_fmri_unusable(asru->asru_fmri))
+				*bp |= FM_SUSPECT_UNUSABLE;
+			if (asru->asru_flags & FMD_ASRU_FAULTY)
+				*bp |= FM_SUSPECT_FAULTY;
+			bp++;
 			fmd_asru_hash_release(ahp, asru);
 		} else
 			*bp++ = 0;
@@ -279,8 +290,11 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 	if (cip->ci_code == NULL)
 		(void) fmd_case_mkcode(cp);
 
-	nvl = fmd_protocol_list(class, cip->ci_mod->mod_fmri,
-	    cip->ci_uuid, cip->ci_code, cip->ci_nsuspects, nva, ba, msg);
+	if (msg == B_FALSE)
+		cip->ci_flags |= FMD_CF_INVISIBLE;
+
+	nvl = fmd_protocol_list(class, cip->ci_mod->mod_fmri, cip->ci_uuid,
+	    cip->ci_code, cip->ci_nsuspects, nva, ba, msg, &cip->ci_tv);
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 	return (nvl);
@@ -363,12 +377,14 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 
 	switch (state) {
 	case FMD_CASE_SOLVED:
+		(void) pthread_mutex_lock(&cip->ci_lock);
+		if (cip->ci_tv_valid == 0) {
+			fmd_time_gettimeofday(&cip->ci_tv);
+			cip->ci_tv_valid = 1;
+		}
+		(void) pthread_mutex_unlock(&cip->ci_lock);
 		fmd_case_convict(cp);
 		nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
-		(void) pthread_mutex_lock(&cip->ci_lock);
-		if (cip->ci_diag == NULL)
-			(void) nvlist_xdup(nvl, &cip->ci_diag, &fmd.d_nva);
-		(void) pthread_mutex_unlock(&cip->ci_lock);
 		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 
 		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -675,9 +691,6 @@ fmd_case_destroy(fmd_case_t *cp, int visible)
 	fmd_free(cip->ci_code, cip->ci_codelen);
 	(void) fmd_buf_hash_destroy(&cip->ci_bufs);
 
-	if (cip->ci_diag != NULL)
-		nvlist_free(cip->ci_diag);
-
 	fmd_module_rele(cip->ci_mod);
 	fmd_free(cip, sizeof (fmd_case_impl_t));
 }
@@ -831,6 +844,7 @@ fmd_case_recreate_suspect(fmd_case_t *cp, nvlist_t *nvl)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_case_susp_t *cis = fmd_alloc(sizeof (fmd_case_susp_t), FMD_SLEEP);
+	boolean_t b;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
 	ASSERT(cip->ci_state == FMD_CASE_CLOSED);
@@ -838,6 +852,10 @@ fmd_case_recreate_suspect(fmd_case_t *cp, nvlist_t *nvl)
 
 	cis->cis_next = cip->ci_suspects;
 	cis->cis_nvl = nvl;
+
+	if (nvlist_lookup_boolean_value(nvl,
+	    FM_SUSPECT_MESSAGE, &b) == 0 && b == B_FALSE)
+		cip->ci_flags |= FMD_CF_INVISIBLE;
 
 	cip->ci_suspects = cis;
 	cip->ci_nsuspects++;
@@ -879,7 +897,7 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 	ASSERT(state <= FMD_CASE_REPAIRED);
 	(void) pthread_mutex_lock(&cip->ci_lock);
 
-	if (!(cip->ci_flags & FMD_CF_SOLVED))
+	if (!(cip->ci_flags & FMD_CF_SOLVED) && !(flags & FMD_CF_SOLVED))
 		flags &= ~(FMD_CF_ISOLATED | FMD_CF_REPAIRED);
 
 	cip->ci_flags |= flags;
@@ -996,7 +1014,7 @@ fmd_case_transition_update(fmd_case_t *cp, uint_t state, uint_t flags)
 	fmd_asru_t *asru;
 	nvlist_t *nvl;
 
-	int present = 0;	/* are any suspects present? */
+	int faulty = 0;		/* are any suspects faulty? */
 	int usable = 0;		/* are any suspects usable? */
 
 	ASSERT(state >= FMD_CASE_SOLVED);
@@ -1007,11 +1025,11 @@ fmd_case_transition_update(fmd_case_t *cp, uint_t state, uint_t flags)
 		    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
 		    fmd.d_asrus, nvl, FMD_B_TRUE)) != NULL) {
 
-			if ((asru->asru_flags & FMD_ASRU_INTERNAL) ||
-			    fmd_fmri_present(asru->asru_fmri) > 0)
-				present++;
+			if (asru->asru_flags & FMD_ASRU_FAULTY)
+				faulty++;
 
-			if (fmd_fmri_unusable(asru->asru_fmri) <= 0)
+			if (fmd_asru_fake_not_present == 0 &&
+			    fmd_fmri_unusable(asru->asru_fmri) <= 0)
 				usable++;
 
 			fmd_asru_hash_release(fmd.d_asrus, asru);
@@ -1020,7 +1038,12 @@ fmd_case_transition_update(fmd_case_t *cp, uint_t state, uint_t flags)
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
-	if (!present) {
+	/*
+	 * If none of the suspects were faulty, it implies they were either
+	 * repaired already or not present and the rsrc.age time has expired.
+	 * We can move the state on to repaired.
+	 */
+	if (!faulty) {
 		state = MAX(state, FMD_CASE_CLOSE_WAIT);
 		flags |= FMD_CF_REPAIRED;
 	} else if (!usable) {
@@ -1104,7 +1127,7 @@ fmd_case_update(fmd_case_t *cp)
 		if (nvlist_lookup_nvlist(cis->cis_nvl, FM_FAULT_ASRU,
 		    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
 		    fmd.d_asrus, nvl, FMD_B_FALSE)) != NULL) {
-			astate |= fmd_asru_getstate(asru);
+			astate |= (asru->asru_flags & FMD_ASRU_STATE);
 			fmd_asru_hash_release(fmd.d_asrus, asru);
 		}
 	}
@@ -1327,4 +1350,12 @@ int
 fmd_case_orphaned(fmd_case_t *cp)
 {
 	return (((fmd_case_impl_t *)cp)->ci_mod == fmd.d_rmod);
+}
+
+void
+fmd_case_settime(fmd_case_t *cp, time_t tv_sec, suseconds_t tv_usec)
+{
+	((fmd_case_impl_t *)cp)->ci_tv.tv_sec = tv_sec;
+	((fmd_case_impl_t *)cp)->ci_tv.tv_usec = tv_usec;
+	((fmd_case_impl_t *)cp)->ci_tv_valid = 1;
 }

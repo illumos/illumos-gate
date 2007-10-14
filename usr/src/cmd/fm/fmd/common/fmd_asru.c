@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +59,8 @@ static const char *const _fmd_asru_events[] = {
 static const char *const _fmd_asru_snames[] = {
 	"uf", "uF", "Uf", "UF"			/* same order as above */
 };
+
+volatile uint32_t fmd_asru_fake_not_present = 0;
 
 static fmd_asru_t *
 fmd_asru_create(fmd_asru_hash_t *ahp, const char *uuid,
@@ -170,6 +171,8 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	boolean_t f, u, m;
 	fmd_asru_t *ap;
 	int ps, us;
+	int64_t *diag_time;
+	uint_t nelem;
 
 	/*
 	 * Extract the resource FMRI and most recent values of 'faulty' and
@@ -185,12 +188,22 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	}
 
 	/*
+	 * If this resource has been explicitly repaired, then return and
+	 * discard the log. This is consistant with the behaviour when rsrc.age
+	 * expires below.
+	 */
+	if (!f)
+		return;
+
+	/*
 	 * Check to see if the resource is still present in the system.  If
 	 * so, then update the value of the unusable bit based on the current
 	 * system configuration.  If not, then either keep the entry in our
 	 * cache if it is recent, or return and discard it if it is too old.
 	 */
-	if ((ps = fmd_fmri_present(fmri)) == -1) {
+	if (fmd_asru_fake_not_present)
+		ps = 0;
+	else if ((ps = fmd_fmri_present(fmri)) == -1) {
 		fmd_error(EFMD_ASRU_FMRI, "failed to locate %s", lp->log_name);
 		ahp->ah_error = EFMD_ASRU_FMRI;
 		return;
@@ -204,11 +217,16 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		} else
 			u = us != 0;
 
-	} else if ((hrtime_t)(lp->log_stat.st_atime -
-	    lp->log_stat.st_mtime) * NANOSEC < ahp->ah_lifetime) {
-		u = FMD_B_TRUE;	/* not present; set unusable */
-	} else
-		return;		/* too old; discard this log */
+	} else {
+		struct timeval tv;
+
+		fmd_time_gettimeofday(&tv);
+		if ((hrtime_t)(tv.tv_sec -
+		    lp->log_stat.st_mtime) * NANOSEC < ahp->ah_lifetime) {
+			u = FMD_B_TRUE; /* not present; set unusable */
+		} else
+			return;	 /* too old; discard this log */
+	}
 
 	/*
 	 * In order to insert the ASRU into our hash, convert the FMRI from
@@ -261,35 +279,37 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		ap->asru_flags |= FMD_ASRU_INVISIBLE;
 
 	/*
-	 * If the ASRU is present and the Faulty bit is set and a case event is
-	 * saved in the log, attempt to recreate the case in the CLOSED state.
-	 * If the case is already present, fmd_case_recreate() will return it.
-	 * If not, we'll create a new orphaned case, in which case we use the
-	 * ASRU event to insert a suspect into the partially-restored case.
+	 * Recreate the case in the CLOSED state. If the case is not closed,
+	 * fmd_case_transition_update() will set it to the correct state later.
+	 * If the case is already present, fmd_case_recreate() will return
+	 * as an orphaned case. If not, it will create a new orphaned case.
+	 * Either way we use the ASRU event to insert a suspect into the
+	 * restored case.
 	 */
 	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_UUID, &case_uuid);
 	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_CODE, &case_code);
+	(void) nvlist_lookup_nvlist(nvl, FM_RSRC_ASRU_EVENT, &flt);
 
-	if (ps > 0 && !(ap->asru_flags & FMD_ASRU_INTERNAL) &&
-	    (ap->asru_flags & FMD_ASRU_FAULTY) && case_uuid != NULL &&
-	    nvlist_lookup_nvlist(nvl, FM_RSRC_ASRU_EVENT, &flt) == 0) {
+	fmd_module_lock(fmd.d_rmod);
 
-		fmd_module_lock(fmd.d_rmod);
+	ap->asru_case = fmd_case_recreate(fmd.d_rmod, NULL,
+	    FMD_CASE_CLOSED, case_uuid, case_code);
+	ASSERT(ap->asru_case != NULL);
 
-		ap->asru_case = fmd_case_recreate(fmd.d_rmod, NULL,
-		    FMD_CASE_CLOSED, case_uuid, case_code);
+	ASSERT(fmd_case_orphaned(ap->asru_case));
 
-		if (ap->asru_case != NULL)
-			fmd_case_hold(ap->asru_case);
+	fmd_case_hold(ap->asru_case);
+	fmd_module_unlock(fmd.d_rmod);
 
-		fmd_module_unlock(fmd.d_rmod);
+	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
+	    &nelem) == 0 && nelem >= 2)
+		fmd_case_settime(ap->asru_case, diag_time[0], diag_time[1]);
+	else
+		fmd_case_settime(ap->asru_case, lp->log_stat.st_ctime, 0);
 
-		if (ap->asru_case != NULL && fmd_case_orphaned(ap->asru_case)) {
-			(void) nvlist_xdup(flt, &ap->asru_event, &fmd.d_nva);
-			(void) nvlist_xdup(flt, &flt_copy, &fmd.d_nva);
-			fmd_case_recreate_suspect(ap->asru_case, flt_copy);
-		}
-	}
+	(void) nvlist_xdup(flt, &ap->asru_event, &fmd.d_nva);
+	(void) nvlist_xdup(flt, &flt_copy, &fmd.d_nva);
+	fmd_case_recreate_suspect(ap->asru_case, flt_copy);
 
 	ASSERT(!(ap->asru_flags & FMD_ASRU_VALID));
 	ap->asru_flags |= FMD_ASRU_VALID;
@@ -423,6 +443,8 @@ fmd_asru_hash_create(const char *root, const char *dir)
 	(void) snprintf(path, sizeof (path), "%s/%s", root, dir);
 	ahp->ah_dirpath = fmd_strdup(path, FMD_SLEEP);
 	(void) fmd_conf_getprop(fmd.d_conf, "rsrc.age", &ahp->ah_lifetime);
+	(void) fmd_conf_getprop(fmd.d_conf, "fakenotpresent",
+	    (uint32_t *)&fmd_asru_fake_not_present);
 	ahp->ah_count = 0;
 	ahp->ah_error = 0;
 
@@ -678,6 +700,7 @@ fmd_asru_logevent(fmd_asru_t *ap)
 
 	ASSERT(MUTEX_HELD(&ap->asru_lock));
 	cip = (fmd_case_impl_t *)ap->asru_case;
+	ASSERT(cip != NULL);
 
 	if ((lp = ap->asru_log) == NULL)
 		lp = fmd_log_open(ap->asru_root, ap->asru_uuid, FMD_LOG_ASRU);
@@ -686,8 +709,8 @@ fmd_asru_logevent(fmd_asru_t *ap)
 		return; /* can't log events if we can't open the log */
 
 	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[f | (u << 1)],
-	    ap->asru_fmri, cip ? cip->ci_uuid : NULL,
-	    cip ? cip->ci_code : NULL, f, u, m, ap->asru_event);
+	    ap->asru_fmri, cip->ci_uuid, cip->ci_code, f, u, m, ap->asru_event,
+	    &cip->ci_tv);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -826,7 +849,7 @@ fmd_asru_getstate(fmd_asru_t *ap)
 	int us, st;
 
 	if (!(ap->asru_flags & FMD_ASRU_INTERNAL) &&
-	    fmd_fmri_present(ap->asru_fmri) <= 0)
+	    (fmd_asru_fake_not_present || fmd_fmri_present(ap->asru_fmri) <= 0))
 		return (0); /* do not report non-fmd non-present resources */
 
 	us = fmd_fmri_unusable(ap->asru_fmri);

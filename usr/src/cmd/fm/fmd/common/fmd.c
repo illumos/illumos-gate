@@ -255,6 +255,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "debug", &fmd_debug_ops, NULL },		/* daemon debugging flags */
 { "dictdir", &fmd_conf_string, "usr/lib/fm/dict" }, /* default diagcode dir */
 { "domain", &fmd_conf_string, NULL },		/* domain id for de auth */
+{ "fakenotpresent", &fmd_conf_bool, "false" },	/* simulate rsrc not present */
 { "fg", &fmd_conf_bool, "false" },		/* run daemon in foreground */
 { "gc_interval", &fmd_conf_time, "1d" },	/* garbage collection intvl */
 { "ids.avg", &fmd_conf_uint32, "4" },		/* desired idspace chain len */

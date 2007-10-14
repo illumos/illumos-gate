@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,10 @@ extern "C" {
 
 #define	FM_SUSPECT_VERS0		0
 #define	FM_SUSPECT_VERSION		FM_SUSPECT_VERS0
+
+#define	FM_SUSPECT_FAULTY		0x1
+#define	FM_SUSPECT_UNUSABLE		0x2
+#define	FM_SUSPECT_NOT_PRESENT		0x4
 
 /* fault event versions and payload member names */
 #define	FM_FAULT_VERS0			0

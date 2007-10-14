@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,14 +355,17 @@ fmd_adm_rsrclist_asru(fmd_asru_t *ap, void *arg)
 	void *p;
 
 	/*
+	 * Skip the ASRU if this fault is marked as invisible.
 	 * If rrl_all is false, we take a quick look at asru_flags with no lock
-	 * held to see if the ASRU is either not faulty or invisible.  If so,
+	 * held to see if the ASRU is not faulty.  If so,
 	 * we don't want to report it by default and can just skip this ASRU.
 	 * This helps keep overhead low in the common case, as the call to
 	 * fmd_asru_getstate() can be expensive depending on the scheme.
 	 */
-	if (rrl->rrl_all == B_FALSE && (ap->asru_flags & (FMD_ASRU_FAULTY |
-	    FMD_ASRU_INVISIBLE)) != FMD_ASRU_FAULTY)
+
+	if (ap->asru_flags & FMD_ASRU_INVISIBLE)
+		return;
+	if (rrl->rrl_all == B_FALSE && !(ap->asru_flags & FMD_ASRU_FAULTY))
 		return;
 
 	if (rrl->rrl_err != 0 || fmd_asru_getstate(ap) == 0)
@@ -701,6 +704,12 @@ fmd_adm_caselist_case(fmd_case_t *cp, void *arg)
 		return;
 
 	/*
+	 * skip invisible cases
+	 */
+	if (cip->ci_flags & FMD_CF_INVISIBLE)
+		return;
+
+	/*
 	 * Lock the case and reallocate rcl_buf[] to be large enough to hold
 	 * another string, doubling it as needed.  Then copy the new string
 	 * on to the end, and increment rcl_len to indicate the used space.
@@ -760,7 +769,7 @@ bool_t
 fmd_adm_caseinfo_1_svc(char *uuid, struct fmd_rpc_caseinfo *rvp,
     struct svc_req *req)
 {
-	fmd_case_impl_t *cip;
+	fmd_case_t *cp;
 	nvlist_t *nvl;
 	int err = 0;
 
@@ -771,46 +780,28 @@ fmd_adm_caseinfo_1_svc(char *uuid, struct fmd_rpc_caseinfo *rvp,
 		return (TRUE);
 	}
 
-	if ((cip = (fmd_case_impl_t *)fmd_case_hash_lookup(fmd.d_cases, uuid))
-	    == NULL) {
+	if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) == NULL) {
 		rvp->rci_err = FMD_ADM_ERR_CASESRCH;
 		return (TRUE);
 	}
 
-	if (!(cip->ci_flags & FMD_CF_SOLVED)) {
-		fmd_case_rele((fmd_case_t *)cip);
+	if (!(((fmd_case_impl_t *)cp)->ci_flags & FMD_CF_SOLVED)) {
+		fmd_case_rele(cp);
 		rvp->rci_err = FMD_ADM_ERR_CASESRCH;
 		return (TRUE);
 	}
 
-	/*
-	 * Avoid a race on cip->ci_diag; we can't call fmd_case_mkevent
-	 * while holding the case lock, so we do this dance instead.
-	 */
-	(void) pthread_mutex_lock(&cip->ci_lock);
-	nvl = cip->ci_diag;
-	(void) pthread_mutex_unlock(&cip->ci_lock);
-
-	if (nvl == NULL)
-		nvl = fmd_case_mkevent((fmd_case_t *)cip,
-		    FM_LIST_SUSPECT_CLASS);
-
-	(void) pthread_mutex_lock(&cip->ci_lock);
-	if (cip->ci_diag == NULL) {
-		cip->ci_diag = nvl;
-	} else if (nvl != cip->ci_diag) {
-		nvlist_free(nvl);
-		nvl = cip->ci_diag;
-	}
-	(void) pthread_mutex_unlock(&cip->ci_lock);
+	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
 
 	err = nvlist_pack(nvl, &rvp->rci_evbuf.rci_evbuf_val,
 	    &rvp->rci_evbuf.rci_evbuf_len, NV_ENCODE_XDR, 0);
 
+	nvlist_free(nvl);
+
 	if (err != 0)
 		rvp->rci_err = FMD_ADM_ERR_NOMEM;
 
-	fmd_case_rele((fmd_case_t *)cip);
+	fmd_case_rele(cp);
 
 	return (TRUE);
 }

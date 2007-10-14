@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,16 +139,15 @@ fmd_protocol_fault(const char *class, uint8_t certainty,
 
 nvlist_t *
 fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
-    const char *code, uint_t argc, nvlist_t **argv, uint8_t *flagv, int domsg)
+    const char *code, uint_t argc, nvlist_t **argv, uint8_t *flagv, int domsg,
+    struct timeval *tvp)
 {
-	struct timeval tv;
 	int64_t tod[2];
 	nvlist_t *nvl;
 	int err = 0;
 
-	fmd_time_gettimeofday(&tv);
-	tod[0] = tv.tv_sec;
-	tod[1] = tv.tv_usec;
+	tod[0] = tvp->tv_sec;
+	tod[1] = tvp->tv_usec;
 
 	if (nvlist_xalloc(&nvl, NV_UNIQUE_NAME, &fmd.d_nva) != 0)
 		fmd_panic("failed to xalloc suspect list nvlist");
@@ -182,10 +181,15 @@ fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
 nvlist_t *
 fmd_protocol_rsrc_asru(const char *class,
     nvlist_t *fmri, const char *uuid, const char *code,
-    boolean_t faulty, boolean_t unusable, boolean_t message, nvlist_t *event)
+    boolean_t faulty, boolean_t unusable, boolean_t message, nvlist_t *event,
+    struct timeval *tvp)
 {
 	nvlist_t *nvl;
+	int64_t tod[2];
 	int err = 0;
+
+	tod[0] = tvp->tv_sec;
+	tod[1] = tvp->tv_usec;
 
 	if (nvlist_xalloc(&nvl, NV_UNIQUE_NAME, &fmd.d_nva) != 0)
 		fmd_panic("failed to xalloc resource nvlist");
@@ -203,6 +207,7 @@ fmd_protocol_rsrc_asru(const char *class,
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_FAULTY, faulty);
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE, unusable);
 	err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_MESSAGE, message);
+	err |= nvlist_add_int64_array(nvl, FM_SUSPECT_DIAG_TIME, tod, 2);
 
 	if (event != NULL)
 		err |= nvlist_add_nvlist(nvl, FM_RSRC_ASRU_EVENT, event);

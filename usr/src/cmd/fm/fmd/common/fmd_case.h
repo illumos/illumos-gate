@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,8 @@ typedef struct fmd_case_impl {
 	uint_t ci_nsuspects;		/* number of ci_suspects */
 	size_t ci_nvsz;			/* packed suspect nvlist array size */
 	fmd_buf_hash_t ci_bufs;		/* hash of bufs associated with case */
-	nvlist_t *ci_diag;		/* cached event payload */
+	struct timeval ci_tv;		/* time of original diagnosis */
+	int ci_tv_valid;		/* time of original diagnosis valid */
 } fmd_case_impl_t;
 
 #define	FMD_CASE_CURRENT	-1u	/* flag for current state */
@@ -89,6 +90,7 @@ typedef struct fmd_case_impl {
 #define	FMD_CF_ISOLATED		0x04	/* case has been isolated */
 #define	FMD_CF_REPAIRED		0x08	/* case has been repaired */
 #define	FMD_CF_REPAIRING	0x10	/* case repair in progress */
+#define	FMD_CF_INVISIBLE	0x20	/* case should be invisible */
 
 typedef struct fmd_case_hash {
 	pthread_rwlock_t ch_lock;	/* lock protecting case hash */
@@ -128,6 +130,7 @@ extern void fmd_case_commit(fmd_case_t *);
 extern void fmd_case_update(fmd_case_t *);
 extern void fmd_case_delete(fmd_case_t *);
 extern void fmd_case_discard(fmd_case_t *);
+extern void fmd_case_settime(fmd_case_t *, time_t, suseconds_t);
 
 extern int fmd_case_repair(fmd_case_t *);
 extern int fmd_case_contains(fmd_case_t *, fmd_event_t *);
