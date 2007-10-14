@@ -266,11 +266,6 @@ DRV_KMODS	+= evtchn
 DRV_KMODS	+= balloon
 
 #
-#	CPU Modules
-#
-CPU_KMODS	+= generic_cpu
-
-#
 #	Exec Class Modules (/kernel/exec):
 #
 EXEC_KMODS	+=

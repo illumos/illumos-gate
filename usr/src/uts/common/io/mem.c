@@ -1134,12 +1134,12 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 	uint8_t version;
 	uint64_t pa;
 	char *scheme;
+	int err;
 #ifdef __sparc
 	uint64_t offset;
 	char *unum;
 	char **serids;
 	uint_t nserids;
-	int err;
 #endif
 
 	/* Verify FMRI scheme name and version number */
@@ -1183,7 +1183,8 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 		}
 	}
 #elif defined(__x86)
-	if (cmi_mc_unumtopa(NULL, nvl, &pa) == 0)
+	if ((err = cmi_mc_unumtopa(NULL, nvl, &pa)) != CMI_SUCCESS &&
+	    err != CMIERR_MC_PARTIALUNUMTOPA)
 		return (EINVAL);
 #else
 #error "port me"

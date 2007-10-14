@@ -1494,17 +1494,24 @@ mp_startup(void)
 
 	(void) spl0();				/* enable interrupts */
 
-	/*
-	 * Set up the CPU module for this CPU.  This can't be done before
-	 * this CPU is made CPU_READY, because we may (in heterogeneous systems)
-	 * need to go load another CPU module.  The act of attempting to load
-	 * a module may trigger a cross-call, which will ASSERT unless this
-	 * cpu is CPU_READY.
-	 */
-	cmi_init();
+#ifndef __xpv
+	{
+		/*
+		 * Set up the CPU module for this CPU.  This can't be done
+		 * before this CPU is made CPU_READY, because we may (in
+		 * heterogeneous systems) need to go load another CPU module.
+		 * The act of attempting to load a module may trigger a
+		 * cross-call, which will ASSERT unless this cpu is CPU_READY.
+		 */
+		cmi_hdl_t hdl;
 
-	if (x86_feature & X86_MCA)
-		cmi_mca_init();
+		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
+		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
+			if (x86_feature & X86_MCA)
+				cmi_mca_init(hdl);
+		}
+	}
+#endif /* __xpv */
 
 	if (boothowto & RB_DEBUG)
 		kdi_cpu_init();
@@ -1598,17 +1605,34 @@ cpu_enable_intr(struct cpu *cp)
 }
 
 
-
+/*ARGSUSED*/
 void
 mp_cpu_faulted_enter(struct cpu *cp)
 {
-	cmi_faulted_enter(cp);
+#ifndef __xpv
+	cmi_hdl_t hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
+	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+
+	if (hdl != NULL) {
+		cmi_faulted_enter(hdl);
+		cmi_hdl_rele(hdl);
+	}
+#endif
 }
 
+/*ARGSUSED*/
 void
 mp_cpu_faulted_exit(struct cpu *cp)
 {
-	cmi_faulted_exit(cp);
+#ifndef __xpv
+	cmi_hdl_t hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
+	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
+
+	if (hdl != NULL) {
+		cmi_faulted_exit(hdl);
+		cmi_hdl_rele(hdl);
+	}
+#endif
 }
 
 /*

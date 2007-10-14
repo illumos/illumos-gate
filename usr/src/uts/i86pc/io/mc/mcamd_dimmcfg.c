@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -335,13 +335,13 @@ static const struct {
 	const struct mcdcfg_csmapline *map;
 	int nmapents;
 } csmap_tbls[DCFG_NTBL] = {
-	{ MC_REVS_BCDE, 0, &csmap_nomod64mux_preF[0],
+	{ MC_F_REVS_BCDE, 0, &csmap_nomod64mux_preF[0],
 	    sizeof (csmap_nomod64mux_preF) / sizeof (struct mcdcfg_csmapline) },
-	{ MC_REVS_BCDE, 1, &csmap_mod64mux_preF[0],
+	{ MC_F_REVS_BCDE, 1, &csmap_mod64mux_preF[0],
 	    sizeof (csmap_mod64mux_preF) / sizeof (struct mcdcfg_csmapline) },
-	{ MC_REVS_FG, 0, &csmap_nomod64mux_fg[0],
+	{ MC_F_REVS_FG, 0, &csmap_nomod64mux_fg[0],
 	    sizeof (csmap_nomod64mux_fg) / sizeof (struct mcdcfg_csmapline) },
-	{ MC_REVS_FG, 1, &csmap_mod64mux_fg[0],
+	{ MC_F_REVS_FG, 1, &csmap_mod64mux_fg[0],
 	    sizeof (csmap_mod64mux_fg) / sizeof (struct mcdcfg_csmapline) }
 };
 

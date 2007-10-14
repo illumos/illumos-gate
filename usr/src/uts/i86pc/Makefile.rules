@@ -49,15 +49,21 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.s
-	$(COMPILE.s) -o $@ $<
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/authenticamd/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.s
-	$(COMPILE.s) -o $@ $<
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/intel_nb5000/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/%.c
 	$(COMPILE.c) -o $@ $<
@@ -225,14 +231,17 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/conf/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/authenticamd/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/intel_nb5000/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

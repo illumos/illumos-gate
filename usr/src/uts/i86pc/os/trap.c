@@ -99,6 +99,7 @@
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #endif
+#include <sys/contract/process_impl.h>
 
 #define	USER	0x10000		/* user-mode flag added to trap type */
 
@@ -580,12 +581,14 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	case T_PGFLT:		/* system page fault */
 		/*
 		 * If we're under on_trap() protection (see <sys/ontrap.h>),
-		 * set ot_trap and longjmp back to the on_trap() call site.
+		 * set ot_trap and bounce back to the on_trap() call site
+		 * via the installed trampoline.
 		 */
 		if ((ct->t_ontrap != NULL) &&
 		    (ct->t_ontrap->ot_prot & OT_DATA_ACCESS)) {
 			ct->t_ontrap->ot_trap |= OT_DATA_ACCESS;
-			longjmp(&curthread->t_ontrap->ot_jmpbuf);
+			rp->r_pc = ct->t_ontrap->ot_trampoline;
+			goto cleanup;
 		}
 
 		/*
@@ -1098,7 +1101,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 
 		/*
 		 * If we're under on_trap() protection (see <sys/ontrap.h>),
-		 * set ot_trap and longjmp back to the on_trap() call site
+		 * set ot_trap and trampoline back to the on_trap() call site
 		 * for OT_DATA_ACCESS or OT_SEGMENT_ACCESS.
 		 */
 		if (ct->t_ontrap != NULL) {
@@ -1109,7 +1112,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				ct->t_ontrap->ot_trap |= ttype;
 				if (tudebug)
 					showregs(type, rp, (caddr_t)0);
-				longjmp(&curthread->t_ontrap->ot_jmpbuf);
+				rp->r_pc = ct->t_ontrap->ot_trampoline;
+				goto cleanup;
 			}
 		}
 
@@ -1144,7 +1148,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			ct->t_ontrap->ot_trap |= OT_SEGMENT_ACCESS;
 			if (tudebug)
 				showregs(type, rp, (caddr_t)0);
-			longjmp(&curthread->t_ontrap->ot_jmpbuf);
+			rp->r_pc = ct->t_ontrap->ot_trampoline;
+			goto cleanup;
 		}
 #endif	/* __amd64 */
 		/*FALLTHROUGH*/
@@ -1305,8 +1310,15 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 */
 		goto cleanup;
 
-	case T_AST + USER:		/* profiling or resched pseudo trap */
-		if (lwp->lwp_pcb.pcb_flags & CPC_OVERFLOW) {
+	case T_AST + USER:	/* profiling, resched, h/w error pseudo trap */
+		if (lwp->lwp_pcb.pcb_flags & ASYNC_HWERR) {
+			proc_t *p = ttoproc(curthread);
+
+			lwp->lwp_pcb.pcb_flags &= ~ASYNC_HWERR;
+			contract_process_hwerr(p->p_ct_process, p);
+			siginfo.si_signo = SIGKILL;
+			siginfo.si_code = SI_NOINFO;
+		} else if (lwp->lwp_pcb.pcb_flags & CPC_OVERFLOW) {
 			lwp->lwp_pcb.pcb_flags &= ~CPC_OVERFLOW;
 			if (kcpc_overflow_ast()) {
 				/*
@@ -1321,6 +1333,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				fault = FLTCPCOVF;
 			}
 		}
+
 		break;
 	}
 

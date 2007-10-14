@@ -425,8 +425,33 @@ mcamd_mkhdl(mcamd_hdl_t *hdl)
 	hdl->mcamd_debug = mcamd_debug;
 }
 
+cmi_errno_t
+mcamd_cmierr(int err, mcamd_hdl_t *hdl)
+{
+	if (err == 0)
+		return (CMI_SUCCESS);
+
+	switch (mcamd_errno(hdl)) {
+	case EMCAMD_SYNDINVALID:
+		return (CMIERR_MC_SYNDROME);
+
+	case EMCAMD_TREEINVALID:
+		return (CMIERR_MC_BADSTATE);
+
+	case EMCAMD_NOADDR:
+		return (CMIERR_MC_NOADDR);
+
+	case EMCAMD_INSUFF_RES:
+		return (CMIERR_MC_ADDRBITS);
+
+	default:
+		return (CMIERR_UNKNOWN);
+	}
+
+}
+
 /*ARGSUSED*/
-static int
+cmi_errno_t
 mcamd_patounum_wrap(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
     uint32_t synd, int syndtype, mc_unum_t *unump)
 {
@@ -457,7 +482,7 @@ mcamd_patounum_wrap(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
 #endif
 	rw_exit(&mc_lock);
 
-	return (rc == 0);
+	return (mcamd_cmierr(rc, &mcamd));
 }
 
 static int
@@ -475,6 +500,7 @@ fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
 
 
 	bzero(unump, sizeof (mc_unum_t));
+	unump->unum_chan = MC_INVALNUM;
 	for (i = 0; i < MC_UNUM_NDIMM; i++)
 		unump->unum_dimms[i] = MC_INVALNUM;
 
@@ -507,19 +533,18 @@ fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
 }
 
 /*ARGSUSED*/
-static int
+cmi_errno_t
 mcamd_unumtopa_wrap(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 {
 	mcamd_hdl_t mcamd;
 	int rc;
 	mc_unum_t unum;
 
-	if (unump != NULL && nvl != NULL)
-		return (0);
+	ASSERT(unump == NULL || nvl == NULL);	/* enforced at cmi level */
 
 	if (unump == NULL) {
 		if (!fmri2unum(nvl, &unum))
-			return (0);
+			return (CMIERR_MC_INVALUNUM);
 		unump = &unum;
 	}
 
@@ -529,18 +554,7 @@ mcamd_unumtopa_wrap(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 	rc = mcamd_unumtopa(&mcamd, (mcamd_node_t *)mc_list, unump, pap);
 	rw_exit(&mc_lock);
 
-	return (rc == 0);
-}
-
-static const cmi_mc_ops_t mcamd_mc_ops = {
-	mcamd_patounum_wrap,
-	mcamd_unumtopa_wrap
-};
-
-void
-mcamd_mc_register(cpu_t *cp)
-{
-	cmi_mc_register(cp, &mcamd_mc_ops, NULL);
+	return (mcamd_cmierr(rc, &mcamd));
 }
 
 static void
@@ -659,4 +673,16 @@ mcamd_ereport_post(mc_t *mc, const char *class_sfx, mc_unum_t *unump,
 
 	(void) fm_ereport_post(ereport, EVCH_TRYHARD);
 	fm_nvlist_destroy(ereport, FM_NVA_FREE);
+}
+
+static const cmi_mc_ops_t mcamd_mc_ops = {
+	mcamd_patounum_wrap,	/* cmi_mc_patounum */
+	mcamd_unumtopa_wrap,	/* cmi_mc_unumtopa */
+	NULL			/* cmi_mc_logout */
+};
+
+void
+mcamd_mc_register(cmi_hdl_t hdl, mc_t *mc)
+{
+	cmi_mc_register(hdl, &mcamd_mc_ops, mc);
 }

@@ -29,8 +29,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/mca_x86.h>
+
 /*
- * Constants the Memory Check Architecture as implemented on AMD CPUs.
+ * Constants for the Machine Check Architecture as implemented on AMD CPUs.
  */
 
 #ifdef __cplusplus
@@ -83,9 +85,6 @@ extern "C" {
 #define	AMD_MCG_EN_BU			0x04
 #define	AMD_MCG_EN_LS			0x08
 #define	AMD_MCG_EN_NB			0x10
-#define	AMD_MCG_EN_ALL \
-	(AMD_MCG_EN_DC | AMD_MCG_EN_IC | AMD_MCG_EN_BU | AMD_MCG_EN_LS | \
-	AMD_MCG_EN_NB)
 
 /*
  * Data Cache (DC) bank error-detection enabling bits and CTL register
@@ -298,14 +297,18 @@ extern "C" {
 #define	AMD_NB_CFG_GENCRCERRBYTE0	0x00010000
 #define	AMD_NB_CFG_GENCRCERRBYTE1	0x00020000
 
-/* Generic bank status register bits */
-#define	AMD_BANK_STAT_VALID		0x8000000000000000ULL
-#define	AMD_BANK_STAT_OVER		0x4000000000000000ULL
-#define	AMD_BANK_STAT_UC		0x2000000000000000ULL
-#define	AMD_BANK_STAT_EN		0x1000000000000000ULL
-#define	AMD_BANK_STAT_MISCV		0x0800000000000000ULL
-#define	AMD_BANK_STAT_ADDRV		0x0400000000000000ULL
-#define	AMD_BANK_STAT_PCC		0x0200000000000000ULL
+/*
+ * The AMD extended error code is just one nibble of the upper 16 bits
+ * of the bank status (the resy being used for syndrome etc).  So we use
+ * AMD_EXT_ERRCODE to retrieve that extended error code, not the generic
+ * MCAX86_MSERRCODE.
+ */
+#define	_AMD_ERREXT_MASK		0x00000000000f0000ULL
+#define	_AMD_ERREXT_SHIFT		16
+#define	AMD_EXT_ERRCODE(stat) \
+	(((stat) & _AMD_ERREXT_MASK) >> _AMD_ERREXT_SHIFT)
+#define	AMD_EXT_MKERRCODE(errcode) \
+	(((errcode) << _AMD_ERREXT_SHIFT) & _AMD_ERREXT_MASK)
 
 #define	AMD_BANK_STAT_CECC		0x0000400000000000ULL
 #define	AMD_BANK_STAT_UECC		0x0000200000000000ULL
@@ -338,87 +341,26 @@ extern "C" {
 	((((uint64_t)(synd) << AMD_NB_STAT_CKSYND_SHIFT) & \
 	AMD_NB_STAT_CKSYND_MASK) | AMD_BANK_MKSYND(synd))
 
-#define	AMD_ERRCODE_MASK		0x000000000000ffffULL
 #define	AMD_ERREXT_MASK			0x00000000000f0000ULL
 #define	AMD_ERREXT_SHIFT		16
-
-#define	AMD_ERRCODE_TT_MASK		0x000c
-#define	AMD_ERRCODE_TT_SHIFT		2
-#define	AMD_ERRCODE_TT_INSTR		0x0
-#define	AMD_ERRCODE_TT_DATA		0x1
-#define	AMD_ERRCODE_TT_GEN		0x2
-
-#define	AMD_ERRCODE_LL_MASK		0x0003
-#define	AMD_ERRCODE_LL_L0		0x0
-#define	AMD_ERRCODE_LL_L1		0x1
-#define	AMD_ERRCODE_LL_L2		0x2
-#define	AMD_ERRCODE_LL_LG		0x3
-
-#define	AMD_ERRCODE_R4_MASK		0x00f0
-#define	AMD_ERRCODE_R4_SHIFT		4
-#define	AMD_ERRCODE_R4_GEN		0x0
-#define	AMD_ERRCODE_R4_RD		0x1
-#define	AMD_ERRCODE_R4_WR		0x2
-#define	AMD_ERRCODE_R4_DRD		0x3
-#define	AMD_ERRCODE_R4_DWR		0x4
-#define	AMD_ERRCODE_R4_IRD		0x5
-#define	AMD_ERRCODE_R4_PREFETCH		0x6
-#define	AMD_ERRCODE_R4_EVICT		0x7
-#define	AMD_ERRCODE_R4_SNOOP		0x8
-
-#define	AMD_ERRCODE_PP_MASK		0x0600
-#define	AMD_ERRCODE_PP_SHIFT		9
-#define	AMD_ERRCODE_PP_SRC		0x0
-#define	AMD_ERRCODE_PP_RSP		0x1
-#define	AMD_ERRCODE_PP_OBS		0x2
-#define	AMD_ERRCODE_PP_GEN		0x3
-
-#define	AMD_ERRCODE_T_MASK		0x0100
-#define	AMD_ERRCODE_T_SHIFT		8
-#define	AMD_ERRCODE_T_NONE		0x0
-#define	AMD_ERRCODE_T_TIMEOUT		0x1
-
-#define	AMD_ERRCODE_II_MASK		0x000c
-#define	AMD_ERRCODE_II_SHIFT		2
-#define	AMD_ERRCODE_II_MEM		0x0
-#define	AMD_ERRCODE_II_IO		0x2
-#define	AMD_ERRCODE_II_GEN		0x3
 
 #define	AMD_ERRCODE_TLB_BIT		4
 #define	AMD_ERRCODE_MEM_BIT		8
 #define	AMD_ERRCODE_BUS_BIT		11
 
 #define	AMD_ERRCODE_TLB_MASK		0xfff0
-#define	AMD_ERRCODE_TLB_VAL		0x0010
 #define	AMD_ERRCODE_MEM_MASK		0xff00
-#define	AMD_ERRCODE_MEM_VAL		0x0100
 #define	AMD_ERRCODE_BUS_MASK		0xf800
-#define	AMD_ERRCODE_BUS_VAL		0x0800
 
-#define	AMD_ERRCODE_MKTLB(tt, ll) \
-	(AMD_ERRCODE_TLB_VAL | \
-	(((tt) << AMD_ERRCODE_TT_SHIFT) & AMD_ERRCODE_TT_MASK) | \
-	((ll) & AMD_ERRCODE_LL_MASK))
-#define	AMD_ERRCODE_ISTLB(code) \
-	(((code) & AMD_ERRCODE_TLB_MASK) == AMD_ERRCODE_TLB_VAL)
+#define	AMD_ERRCODE_MKTLB(tt, ll) MCAX86_MKERRCODE_TLB(tt, ll)
+#define	AMD_ERRCODE_ISTLB(code) MCAX86_ERRCODE_ISTLB(code)
 
-#define	AMD_ERRCODE_MKMEM(r4, tt, ll) \
-	(AMD_ERRCODE_MEM_VAL | \
-	(((r4) << AMD_ERRCODE_R4_SHIFT) & AMD_ERRCODE_R4_MASK) | \
-	(((tt) << AMD_ERRCODE_TT_SHIFT) & AMD_ERRCODE_TT_MASK) | \
-	((ll) & AMD_ERRCODE_LL_MASK))
-#define	AMD_ERRCODE_ISMEM(code) \
-	(((code) & AMD_ERRCODE_MEM_MASK) == AMD_ERRCODE_MEM_VAL)
+#define	AMD_ERRCODE_MKMEM(r4, tt, ll) MCAX86_MKERRCODE_MEMHIER(r4, tt, ll)
+#define	AMD_ERRCODE_ISMEM(code) MCAX86_ERRCODE_ISMEMHIER(code)
 
 #define	AMD_ERRCODE_MKBUS(pp, t, r4, ii, ll) \
-	(AMD_ERRCODE_BUS_VAL | \
-	(((pp) << AMD_ERRCODE_PP_SHIFT) & AMD_ERRCODE_PP_MASK) | \
-	(((t) << AMD_ERRCODE_T_SHIFT) & AMD_ERRCODE_T_MASK) | \
-	(((r4) << AMD_ERRCODE_R4_SHIFT) & AMD_ERRCODE_R4_MASK) | \
-	(((ii) << AMD_ERRCODE_II_SHIFT) & AMD_ERRCODE_II_MASK) | \
-	((ll) & AMD_ERRCODE_LL_MASK))
-#define	AMD_ERRCODE_ISBUS(code) \
-	(((code) & AMD_ERRCODE_BUS_MASK) == AMD_ERRCODE_BUS_VAL)
+	MCAX86_MKERRCODE_BUS_INTERCONNECT(pp, t, r4, ii, ll)
+#define	AMD_ERRCODE_ISBUS(code) MCAX86_ERRCODE_ISBUS_INTERCONNECT(code)
 
 #define	AMD_NB_ADDRLO_MASK		0xfffffff8
 #define	AMD_NB_ADDRHI_MASK		0x000000ff
@@ -437,11 +379,12 @@ extern "C" {
 #define	AMD_NB_SCRUBCTL_RATE_MAX	0x16
 
 #define	AMD_NB_SCRUBADDR_LO_MASK	0xffffffc0
+#define	AMD_NB_SCRUBADDR_LO_SHIFT	6
 #define	AMD_NB_SCRUBADDR_LO_SCRUBREDIREN 0x1
 #define	AMD_NB_SCRUBADDR_HI_MASK	0x000000ff
 
 #define	AMD_NB_SCRUBADDR_MKLO(addr) \
-	((addr) & AMD_NB_SCRUBADDR_LO_MASK)
+	(((addr) & AMD_NB_SCRUBADDR_LO_MASK) >> AMD_NB_SCRUBADDR_LO_SHIFT)
 
 #define	AMD_NB_SCRUBADDR_MKHI(addr) \
 	(((addr) >> 32) & AMD_NB_SCRUBADDR_HI_MASK)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,10 +40,13 @@ extern "C" {
 
 typedef void * mc_pcicfg_hdl_t;
 
-/* MC PCI config where we have attached to an MC dev/function */
+/*
+ * MC PCI config where we have attached to an MC dev/function.
+ */
 extern int mc_pcicfg_setup(mc_t *, enum mc_funcnum, mc_pcicfg_hdl_t *);
 extern void mc_pcicfg_teardown(mc_pcicfg_hdl_t);
 extern uint32_t mc_pcicfg_get32(mc_pcicfg_hdl_t, off_t);
+extern void mc_pcicfg_put32(mc_pcicfg_hdl_t cookie, off_t offset, uint32_t val);
 
 /* MC PCI config where we have not attached to the dev/function */
 extern uint32_t mc_pcicfg_get32_nohdl(mc_t *, enum mc_funcnum, off_t);

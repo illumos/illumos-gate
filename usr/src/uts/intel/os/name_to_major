@@ -116,6 +116,7 @@ pcie_pci 184
 kssl 185
 mc-amd 186
 tzmon 187
+intel_nb5000 188
 xpvd 191
 xnf 192
 xdf 193

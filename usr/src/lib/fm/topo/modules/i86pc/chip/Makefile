@@ -27,7 +27,7 @@
 MODULE = chip
 ARCH = i86pc
 CLASS = arch
-MODULESRCS = chip_label.c chip.c
+MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c
 
 include ../../Makefile.plugin
 

@@ -40,7 +40,9 @@
 #include <sys/sunddi.h>
 #include <sys/ksynch.h>
 #include <sys/mc_amd.h>
+#include <sys/cpu_module.h>
 #include <mcamd_api.h>
+#include <mcamd_err.h>
 #include <mcamd_dimmcfg.h>
 
 #ifdef __cplusplus
@@ -185,11 +187,14 @@ typedef struct mc_cfgregs {
 	mcamd_cfgreg_t mcr_drammisc;
 	mcamd_cfgreg_t mcr_nbcfg;
 	mcamd_cfgreg_t mcr_sparectl;
+	mcamd_cfgreg_t mcr_scrubctl;
+	mcamd_cfgreg_t mcr_scrubaddrlo;
+	mcamd_cfgreg_t mcr_scrubaddrhi;
 } mc_cfgregs_t;
 
 struct mc {
 	mc_hdr_t mc_hdr;			/* id */
-	struct mc *mc_next;			/* linear, doubly-linked list */
+	struct mc *mc_next;			/* next MC instance */
 	const char *mc_revname;			/* revision name string */
 	uint32_t mc_socket;			/* Package type */
 	uint_t mc_ref;				/* reference (attach) count */
@@ -217,8 +222,21 @@ extern mc_t *mc_list;
 extern krwlock_t mc_lock;
 
 extern void mcamd_mkhdl(mcamd_hdl_t *);
-extern void mcamd_mc_register(struct cpu *);
+extern void mcamd_mc_register(cmi_hdl_t, mc_t *);
 extern void mcamd_ereport_post(mc_t *, const char *, mc_unum_t *, uint64_t);
+
+/*
+ * mcamd_mc_ops prototypes
+ */
+extern cmi_errno_t mcamd_patounum_wrap(void *, uint64_t, uint8_t, uint8_t,
+    uint32_t, int, mc_unum_t *);
+extern cmi_errno_t mcamd_unumtopa_wrap(void *, mc_unum_t *, nvlist_t *,
+    uint64_t *);
+
+/*
+ * Internal functions
+ */
+cmi_errno_t mcamd_cmierr(int, mcamd_hdl_t *);
 
 #ifdef __cplusplus
 }

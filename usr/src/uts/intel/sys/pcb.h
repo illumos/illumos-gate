@@ -69,6 +69,7 @@ typedef struct pcb {
 #define	CPC_OVERFLOW	0x40	/* performance counters overflowed */
 #define	REQUEST_STEP	0x100	/* request pending to single-step this lwp */
 #define	REQUEST_NOSTEP	0x200	/* request pending to disable single-step */
+#define	ASYNC_HWERR	0x400	/* hardware error has corrupted context  */
 
 /* fpu_flags */
 #define	FPU_EN		0x1	/* flag signifying fpu in use */

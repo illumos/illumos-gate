@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@ UTSBASE = ../..
 #
 #       Define the module and object file sets.
 #
-MODULE		= cpu.AuthenticAMD.15
+MODULE		= cpu_ms.AuthenticAMD.15
 #
 OBJECTS		= $(CPU_AO_OBJS:%=$(OBJS_DIR)/%)
 LINTS           = $(CPU_AO_OBJS:%.o=$(LINTS_DIR)/%.ln)
@@ -67,14 +67,6 @@ CLEANFILES	+= $(AO_MCA_DISP_C)
 CPPFLAGS	+= -I$(SRCDIR) -I$(OBJS_DIR)
 ASFLAGS		+= -I$(SRCDIR) -I$(OBJS_DIR)
 LDFLAGS		+= -dy -N misc/acpica
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #       Default build targets.

@@ -31,6 +31,7 @@
 #include <kstat.h>
 #include <libnvpair.h>
 #include <fm/libtopo.h>
+#include <fm/topo_mod.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,6 +93,37 @@ extern int simple_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
 
 extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+
+/*
+ * Support functions of chip_subr.c
+ */
+extern void whinge(topo_mod_t *, int *, const char *, ...);
+extern int nvprop_add(topo_mod_t *, nvpair_t *, const char *, tnode_t *);
+extern int add_kstat_strprop(topo_mod_t *, tnode_t *, kstat_t *,
+    const char *, const char *, const char **);
+extern int add_kstat_longprop(topo_mod_t *, tnode_t *, kstat_t *,
+    const char *, const char *, int32_t *);
+extern int add_kstat_longprops(topo_mod_t *, tnode_t *, kstat_t *,
+    const char *, int32_t *, ...);
+extern int mkrsrc(topo_mod_t *, tnode_t *, const char *, int,
+    nvlist_t *, nvlist_t **);
+extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
+extern nvlist_t *mem_fmri_create(topo_mod_t *, const char *);
+extern int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
+
+/*
+ * Prototypes for chip_amd.c
+ */
+extern void amd_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *,
+    int, int, int, int *);
+
+/*
+ * Prototypes for chip_intel.c
+ */
+extern int mc_offchip_open(void);
+extern int mc_offchip_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
 
 #ifdef __cplusplus
 }

@@ -31,7 +31,7 @@
     <range name='chip' min='0' max='100'>
 
         <propset type='product'
-	    set='Sun-Fire-V20z|Sun-Fire-V40z|W1100z/2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
+	    set='Sun-Fire-V20z|Sun-Fire-V40z|W1100z-2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >

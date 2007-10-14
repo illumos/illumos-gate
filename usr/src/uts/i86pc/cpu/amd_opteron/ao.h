@@ -33,7 +33,7 @@
 #include <sys/mc.h>
 #include <sys/mca_amd.h>
 #include <sys/mc_amd.h>
-#include <sys/cpu_module_impl.h>
+#include <sys/cpu_module_ms_impl.h>
 #include <sys/nvpair.h>
 #include <sys/cyclic.h>
 #include <sys/errorq.h>
@@ -44,17 +44,11 @@
 extern "C" {
 #endif
 
+#define	AO_MAX_CHIPS		8
+
 #define	AO_MCA_MAX_ERRORS	10
 
-typedef struct ao_data ao_data_t;
-
-typedef struct ao_bank_regs {
-	uint32_t abr_status;
-	uint32_t abr_addr;
-	uint32_t abr_misc;
-} ao_bank_regs_t;
-
-extern ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT];
+typedef struct ao_ms_data ao_ms_data_t;
 
 /*
  * Rather than using torturous conditionals, we match errors using a table of
@@ -76,15 +70,26 @@ extern ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT];
 #define	AO_AED_PANIC_IFMCE	0x01
 #define	AO_AED_PANIC_ALWAYS	0x80
 
-#define	AO_AED_F_CORRECTABLE	0x01
-#define	AO_AED_F_LOFAULT_OK	0x02
-#define	AO_AED_F_LINEAR		0x04	/* MCi_ADDR is a linear address */
-#define	AO_AED_F_PHYSICAL	0x08	/* MCi_ADDR is a physical address */
-#define	AO_AED_F_PAGEALIGNED	0x10	/* MCi_ADDR aligns to page size */
-#define	AO_AED_F_L2SETWAY	0x20	/* 3:0 = way, 15/14/13/12:6 = set */
+/*
+ * The AO_AED_F_* flags tell us how to interpret aspects of the error
+ * telemetry, such as which bits of the captured address are valid for
+ * this error.
+ */
+					/* MCi_ADDR ... */
+#define	AO_AED_F_LINEAR		0x01	/* is a linear address */
+#define	AO_AED_F_PHYSICAL	0x02	/* is a physical address */
+#define	AO_AED_F_PAGEALIGNED	0x04	/* aligns to page size */
+#define	AO_AED_F_L2SETWAY	0x08	/* 3:0 = way, 15/14/13/12:6 = set */
 
 #define	AO_AED_FLAGS_ADDRTYPE	(AO_AED_F_LINEAR | AO_AED_F_PHYSICAL | \
     AO_AED_F_PAGEALIGNED | AO_AED_F_L2SETWAY)
+
+/*
+ * The AO_AED_ET_* flags group individual error dispositions into
+ * error types.  This is used to nominate additional telemetry beyond the
+ * architectural bank registers to capture for this error type.
+ */
+#define	AO_AED_ET_MEMECC		0x0001	/* Main memory ECC error */
 
 typedef struct ao_error_disp {
 	const char *aed_class;		/* ereport class for use if match */
@@ -99,175 +104,96 @@ typedef struct ao_error_disp {
 	uint8_t aed_addrvalid_hi;	/* most significant valid addr bit */
 	uint8_t aed_addrvalid_lo;	/* least significant valid addr bit */
 	uint8_t aed_panic_when;		/* extra conditions for panic */
-	uint8_t aed_flags;		/* AO_AED_F_* */
+	uint16_t aed_flags;		/* AO_AED_F_* */
+	uint16_t aed_errtype;		/* AO_AED_ET_* */
 } ao_error_disp_t;
 
 /*
- * The poller has two parts.  First is the omni cyclic, which runs on all
- * CPUs, and which polls the error MSRs at some fixed (long) interval.  This
- * cyclic will run on all machines, all the time, and thus must have minimal
- * runtime impact.  The second portion of the poller is manually-initiated, and
- * is used by the error injector/synthesizer to request an immediate poll of the
- * error state registers.
- *
- * With this number of moving parts, it is essential that we have some sort of
- * audit log for post-mortem analysis.  A circular array of trace buffers
- * (ao_mca_poll_trace_t structures) is kept to record this activity.  Whenever
- * an event occurs that is of interest to the poller, an entry is made in
- * the trace array describing that event.
+ * We store non-architectutal config as inherited from the BIOS to assist
+ * in troubleshooting.
  */
-#define	AO_MPT_WHAT_CYC_ERR		0	/* cyclic-induced poll */
-#define	AO_MPT_WHAT_POKE_ERR		1	/* manually-induced poll */
-#define	AO_MPT_WHAT_UNFAULTING		2	/* discarded error state */
-
-typedef struct ao_mca_poll_trace {
-	hrtime_t mpt_when;		/* timestamp of event */
-	uint8_t mpt_what;		/* AO_MPT_WHAT_* (which event?) */
-	uint8_t mpt_nerr;		/* number of errors discovered */
-	uint16_t mpt_pad1;
-	uint32_t mpt_pad2;
-} ao_mca_poll_trace_t;
-
-/*
- * Processor error state is saved in logout areas.  There are three separate
- * logout areas, each used for a different purpose.  The logout areas are stored
- * in an array (ao_mca_logout), indexed by the AO_MCA_LOGOUT_* macros.
- *
- * The save areas are:
- *
- * 1. Exception handler MSR save - Written to by the initial portion of the #mc
- *    handler.  Read from by the main body of the exception handler.
- *
- * 3. Poller MSR save - Used by the poller to store error state MSR values.
- *    While this logout area doesn't necessarily have to live in the ao_mca_t,
- *    it does so to enhance observability.
- *
- * The logout areas contain both global error state (acl_ip, acl_timestamp,
- * etc.), as well as a bank array.  The bank array contains one ao_bank_logout_t
- * per error reporting bank.
- */
-
-typedef struct ao_bank_logout {
-	uint64_t abl_status;		/* Saved MCi_STATUS register */
-	uint64_t abl_addr;		/* Saved MCi_ADDR register */
-	uint64_t abl_misc;		/* Saved MCi_MISC register */
-	uint8_t abl_addr_type;		/* flags & AO_AED_FLAGS_ADDRTYPE */
-	uint8_t abl_addr_valid_hi;	/* most significant valid addr bit */
-	uint8_t abl_addr_valid_lo;	/* least significant valid addr bit */
-} ao_bank_logout_t;
-
-#define	AO_ACL_F_PRIV		0x1	/* #mc in kernel mode (else user) */
-#define	AO_ACL_F_FATAL		0x2	/* logout detected fatal error(s) */
-
-typedef struct ao_cpu_logout {
-	ao_data_t *acl_ao;		/* pointer to per-cpu ao_data_t */
-	uintptr_t acl_ip;		/* instruction pointer if #mc trap */
-	uint64_t acl_timestamp;		/* gethrtime() at time of logout */
-	uint64_t acl_mcg_status;	/* MCG_STATUS register value */
-	ao_bank_logout_t acl_banks[AMD_MCA_BANK_COUNT]; /* bank state saves */
-	pc_t acl_stack[FM_STK_DEPTH];	/* saved stack trace (if any) */
-	int acl_stackdepth;		/* saved stack trace depth */
-	uint_t acl_flags;		/* flags (see AO_ACL_F_* above) */
-} ao_cpu_logout_t;
-
-/* Index for ao_mca_logout, below */
-#define	AO_MCA_LOGOUT_EXCEPTION		0
-#define	AO_MCA_LOGOUT_POLLER		1
-#define	AO_MCA_LOGOUT_NUM		2
-
-#define	AO_MCA_F_UNFAULTING		0x1	/* CPU exiting faulted state */
-
-/*
- * We store config as inherited from the BIOS to assist in troubleshooting.
- * The NorthBridge config is stored in the chipshared structure below.
- */
-typedef struct ao_bios_cfg {
-	uint64_t bcfg_bank_ctl[AMD_MCA_BANK_COUNT];
-	uint64_t bcfg_bank_mask[AMD_MCA_BANK_COUNT];
-	uint64_t bcfg_bank_misc[AMD_MCA_BANK_COUNT];
-} ao_bios_cfg_t;
+struct ao_bios_cfg {
+	uint64_t *bcfg_bank_mask;
+};
 
 /*
  * The master data structure used to hold MCA-related state.
  */
-typedef struct ao_mca {
-	ao_bios_cfg_t ao_mca_bios_cfg;	/* Bank and NB config before our init */
-	ao_cpu_logout_t ao_mca_logout[AO_MCA_LOGOUT_NUM]; /* save areas */
+typedef struct ao_ms_mca {
+	struct ao_bios_cfg ao_mca_bios_cfg;
 	kmutex_t ao_mca_poll_lock;	/* keep pollers from colliding */
-	ao_mca_poll_trace_t *ao_mca_poll_trace; /* trace buffers for this cpu */
-	uint_t ao_mca_poll_curtrace;	/* most recently-filled trace buffer */
 	uint_t ao_mca_flags;		/* AO_MCA_F_* */
-} ao_mca_t;
+} ao_ms_mca_t;
 
 /*
- * Per-chip state
+ * Per-chip shared state
  */
 struct ao_chipshared {
-	uint32_t aos_chiprev;		/* Chip revision */
+	uint32_t aos_chiprev;
 	volatile ulong_t aos_cfgonce;	/* Config performed once per chip */
-	kmutex_t aos_nb_poll_lock;	/* Keep NB pollers from colliding */
-	uint64_t aos_nb_poll_timestamp;	/* Timestamp of last NB poll */
-	int aos_nb_poll_owner;		/* The cpuid of current NB poller */
-	uint64_t aos_bcfg_nb_ctl;	/* BIOS value of MC4_CTL */
-	uint64_t aos_bcfg_nb_mask;	/* BIOS value of MC4_MASK */
-	uint64_t aos_bcfg_nb_misc;	/* BIOS value of MC4_MISC */
+	hrtime_t aos_nb_poll_timestamp;
+	cmi_hdl_t aos_nb_poll_owner;
+	uint64_t aos_bcfg_nb_misc;	/* BIOS value of MC4_MISC MSR */
 	uint32_t aos_bcfg_nb_cfg;	/* BIOS value of NB MCA Config */
 	uint32_t aos_bcfg_nb_sparectl;	/* BIOS value of Online Spare Control */
 	uint32_t aos_bcfg_dcfg_lo;	/* BIOS value of DRAM Config Low */
 	uint32_t aos_bcfg_dcfg_hi;	/* BIOS value of DRAM Config High */
+	uint32_t aos_bcfg_scrubctl;	/* BIOS value of scrub control */
 };
 
-/* Bit numbers for aos_cfgonce */
+/* Bit numbers for once-per-chip operations policed by cms_once */
 enum ao_cfgonce_bitnum {
 	AO_CFGONCE_NBMCA,
+	AO_CFGONCE_NBCFG,
 	AO_CFGONCE_DRAMCFG
 };
 
 /*
- * Per-CPU state
+ * Per-CPU model-specific state
  */
-struct ao_data {
-	ao_mca_t ao_mca;			/* MCA state for this CPU */
-	cpu_t *ao_cpu;				/* link to CPU's cpu_t */
-	const cmi_mc_ops_t *ao_mc_ops;		/* memory controller ops */
-	void *ao_mc_data;			/* argument for MC ops */
-	struct ao_chipshared *ao_shared;	/* Shared state for the chip */
+struct ao_ms_data {
+	cmi_hdl_t ao_ms_hdl;
+	ao_ms_mca_t ao_ms_mca;
+	struct ao_chipshared *ao_ms_shared;
+	uint64_t ao_ms_hwcr_val;
 };
 
 #ifdef _KERNEL
 
 struct regs;
 
-extern errorq_t *ao_mca_queue;
-extern const cmi_ops_t _cmi_ops;
+/*
+ * Our cms_ops operations and function prototypes for all non-NULL members.
+ */
+extern const cms_ops_t _cms_ops;
 
-extern void ao_faulted_enter(void *);
-extern void ao_faulted_exit(void *);
-extern int ao_scrubber_enable(void *, uint64_t, uint64_t, int);
+extern int ao_ms_init(cmi_hdl_t, void **);
+extern void ao_ms_post_startup(cmi_hdl_t);
+extern void ao_ms_post_mpstartup(cmi_hdl_t);
+extern uint64_t ao_ms_mcgctl_val(cmi_hdl_t, int, uint64_t);
+extern boolean_t ao_ms_bankctl_skipinit(cmi_hdl_t, int);
+extern uint64_t ao_ms_bankctl_val(cmi_hdl_t, int, uint64_t);
+extern void ao_ms_mca_init(cmi_hdl_t, int);
+extern uint64_t ao_ms_poll_ownermask(cmi_hdl_t, hrtime_t);
+extern uint32_t ao_ms_error_action(cmi_hdl_t, int, int, uint64_t,
+    uint64_t, uint64_t, void *);
+extern cms_cookie_t ao_ms_disp_match(cmi_hdl_t, int, uint64_t, uint64_t,
+    uint64_t, void *);
+extern void ao_ms_ereport_class(cmi_hdl_t, cms_cookie_t, const char **,
+    const char **);
+extern boolean_t ao_ms_ereport_includestack(cmi_hdl_t, cms_cookie_t);
+extern void ao_ms_ereport_add_logout(cmi_hdl_t, nvlist_t *,
+    nv_alloc_t *, int, uint64_t, uint64_t, uint64_t, void *, void *);
+extern cms_errno_t ao_ms_msrinject(cmi_hdl_t, uint_t, uint64_t);
 
-extern void ao_mca_post_init(void *);
-extern void ao_mca_init(void *);
-extern int ao_mca_trap(void *, struct regs *);
-extern int ao_mca_inject(void *, cmi_mca_regs_t *, uint_t);
-extern void ao_mca_poke(void *);
-extern void ao_mca_poll_init(ao_data_t *, int);
-extern void ao_mca_poll_start(void);
-
-extern int ao_mca_logout(ao_cpu_logout_t *, struct regs *, int *, int,
-    uint32_t);
-extern void ao_mca_drain(void *, const void *, const errorq_elem_t *);
-extern nvlist_t *ao_fmri_create(ao_data_t *, nv_alloc_t *);
-
-extern void ao_mc_register(void *, const cmi_mc_ops_t *, void *);
-extern const struct cmi_mc_ops *ao_mc_getops(void *);
-extern int ao_mc_patounum(ao_data_t *, uint64_t, uint8_t, uint8_t, uint32_t,
-    int, mc_unum_t *);
-extern int ao_mc_unumtopa(ao_data_t *, mc_unum_t *, nvlist_t *, uint64_t *);
-
+/*
+ * Local functions
+ */
+extern void ao_chip_scrubber_enable(cmi_hdl_t, ao_ms_data_t *);
 extern void ao_pcicfg_write(uint_t, uint_t, uint_t, uint32_t);
 extern uint32_t ao_pcicfg_read(uint_t, uint_t, uint_t);
-
-extern int ao_chip_once(ao_data_t *, enum ao_cfgonce_bitnum);
+extern void ao_bankstatus_prewrite(cmi_hdl_t, ao_ms_data_t *);
+extern void ao_bankstatus_postwrite(cmi_hdl_t, ao_ms_data_t *);
 
 #endif /* _KERNEL */
 

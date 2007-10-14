@@ -95,7 +95,7 @@ static int		moduninstall(struct modctl *);
 static struct modctl	*mod_hold_by_name_common(struct modctl *, const char *);
 static struct modctl	*mod_hold_next_by_id(modid_t);
 static struct modctl	*mod_hold_loaded_mod(struct modctl *, char *, int *);
-static struct modctl	*mod_hold_installed_mod(char *, int, int *);
+static struct modctl	*mod_hold_installed_mod(char *, int, int, int *);
 
 static void		mod_release(struct modctl *);
 static void		mod_make_requisite(struct modctl *, struct modctl *);
@@ -361,7 +361,7 @@ modctl_modload(int use_path, char *filename, int *rvp)
 	}
 
 	filenamep[MOD_MAXPATH - 1] = 0;
-	modp = mod_hold_installed_mod(filenamep, use_path, &retval);
+	modp = mod_hold_installed_mod(filenamep, use_path, 0, &retval);
 
 	if (modp == NULL)
 		goto out;
@@ -2429,7 +2429,7 @@ modrload(char *subdir, char *filename, struct modctl **rmodp)
 		fullname = filename;
 	}
 
-	modp = mod_hold_installed_mod(fullname, 1, &retval);
+	modp = mod_hold_installed_mod(fullname, 1, 0, &retval);
 	if (modp != NULL) {
 		id = modp->mod_id;
 		if (rmodp) {
@@ -2463,16 +2463,19 @@ modload(char *subdir, char *filename)
 /*
  * Load a module using a series of qualified names from most specific to least
  * specific, e.g. for subdir "foo", p1 "bar", p2 "baz", we might try:
+ *			Value returned in *chosen
+ * foo/bar.baz.1.2.3	3
+ * foo/bar.baz.1.2	2
+ * foo/bar.baz.1	1
+ * foo/bar.baz		0
  *
- * foo/bar.baz.1.2.3
- * foo/bar.baz.1.2
- * foo/bar.baz.1
- *
- * Return the module ID on success; -1 if no module was loaded.
+ * Return the module ID on success; -1 if no module was loaded.  On success
+ * and if 'chosen' is not NULL we also return the number of suffices that
+ * were in the module we chose to load.
  */
 int
 modload_qualified(const char *subdir, const char *p1,
-    const char *p2, const char *delim, uint_t suffv[], int suffc)
+    const char *p2, const char *delim, uint_t suffv[], int suffc, int *chosen)
 {
 	char path[MOD_MAXPATH];
 	size_t n, resid = sizeof (path);
@@ -2511,12 +2514,14 @@ modload_qualified(const char *subdir, const char *p1,
 
 	for (i = suffc; i >= 0; i--) {
 		dotv[i][0] = '\0';
-		mp = mod_hold_installed_mod(path, 1, &rc);
+		mp = mod_hold_installed_mod(path, 1, 1, &rc);
 
 		if (mp != NULL) {
 			kmem_free(dotv, sizeof (char *) * (suffc + 1));
 			id = mp->mod_id;
 			mod_release_mod(mp);
+			if (chosen != NULL)
+				*chosen = i;
 			return (id);
 		}
 	}
@@ -2849,7 +2854,7 @@ mod_hold_loaded_mod(struct modctl *dep, char *filename, int *status)
  * hold, load, and install the named module
  */
 static struct modctl *
-mod_hold_installed_mod(char *name, int usepath, int *r)
+mod_hold_installed_mod(char *name, int usepath, int forcecheck, int *r)
 {
 	struct modctl *modp;
 	int retval;
@@ -2858,7 +2863,7 @@ mod_hold_installed_mod(char *name, int usepath, int *r)
 	 * Verify that that module in question actually exists on disk
 	 * before allocation of module structure by mod_hold_by_name.
 	 */
-	if (modrootloaded && swaploaded) {
+	if (modrootloaded && swaploaded || forcecheck) {
 		if (!kobj_path_exists(name, usepath)) {
 			*r = ENOENT;
 			return (NULL);

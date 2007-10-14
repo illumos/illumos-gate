@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,7 @@ getcsprops(struct mcamd_hdl *hdl, mcamd_node_t *cs, const char *caller,
 		mcamd_dprintf(hdl, MCAMD_DBG_ERR, "%s: failed to read cs "
 		    "props for cs 0x%p\n", caller, cs);
 		return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
-	    }
+	}
 
 	return (0);
 }
@@ -452,7 +452,7 @@ mc_pa_to_offset(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *cs,
 
 	offset_un.do_valid = 1;
 	offset_un.do_version = MCAMD_OFFSET_VERSION;
-	offset_un.do_rank = csp.dimmrank;
+	offset_un.do_rank = (uint32_t)csp.dimmrank;
 	offset_un.do_row = rowaddr;
 	offset_un.do_bank = bankaddr;
 	offset_un.do_col = coladdr;

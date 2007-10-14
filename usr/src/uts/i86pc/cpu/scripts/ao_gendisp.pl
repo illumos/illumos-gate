@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,6 +111,7 @@ sub print_errout() {
 }
 
 sub print_header() {
+	print "#include <sys/mca_x86.h>\n";
 	print "#include \"ao_mca_disp.h\"\n\n";
 }
 
@@ -244,30 +245,30 @@ sub state_code() {
 	my %ll_values = ( l0 => 1, l1 => 1, l2 => 1, lg => 1 );
 
 	my %r4_values = (
-		gen => 'gen',
-		rd => 'rd',
-		wr => 'wr',
-		drd => 'drd',
-		dwr => 'dwr',
-		ird => 'ird',
-		pf => 'prefetch',
-		ev => 'evict',
-		snp => 'snoop',
+		'err' => 'err',
+		'rd' => 'rd',
+		'wr' => 'wr',
+		'drd' => 'drd',
+		'dwr' => 'dwr',
+		'ird' => 'ird',
+		'pf' => 'prefetch',
+		'ev' => 'evict',
+		'snp' => 'snoop',
 	        '-' => '-');
 
 	my %pp_values = (
-		src => 'src',
-		rsp => 'rsp',
-		obs => 'obs',
-		gen => 'gen',
+		'src' => 'src',
+		'res' => 'res',
+		'obs' => 'obs',
+		'gen' => 'gen',
 		'-' => '-' );
 
 	my %t_values = ( 0 => 1, 1 => 1, '-' => 1 );
 
 	my %ii_values = (
-		mem => 'mem',
-		io => 'io',
-		gen => 'gen',
+		'mem' => 'mem',
+		'io' => 'io',
+		'gen' => 'gen',
 		'-' => '-' );
 
 	my $instance = &code_lines();
@@ -308,10 +309,10 @@ sub state_code() {
 
 		$::codeoutlen += &errout_N($instance, "\tAMD_ERRCODE_MKBUS(" .
 		    "0, " . # pp
-		    "AMD_ERRCODE_T_" . ($t ? "TIMEOUT" : "NONE") . ", " .
+		    "MCAX86_ERRCODE_T_" . ($t ? "TIMEOUT" : "NONE") . ", " .
 		    "0, " . # r4
 		    "0, " . # ii
-		    "AMD_ERRCODE_LL_$ll),\n");
+		    "MCAX86_ERRCODE_LL_$ll),\n");
 
 	} elsif ($type eq "mem") {
 		if ($r4 eq "-" || $tt eq "-" || $ll eq "-" ||
@@ -321,8 +322,8 @@ sub state_code() {
 
 		$::codeoutlen += &errout_N($instance, "\tAMD_ERRCODE_MKMEM(" .
 		    "0, " . # r4
-		    "AMD_ERRCODE_TT_$tt, " .
-		    "AMD_ERRCODE_LL_$ll),\n");
+		    "MCAX86_ERRCODE_TT_$tt, " .
+		    "MCAX86_ERRCODE_LL_$ll),\n");
 
 	} elsif ($type eq "tlb") {
 		if ($tt eq "-" || $ll eq "-" ||
@@ -331,8 +332,8 @@ sub state_code() {
 		}
 
 		$::codeoutlen += &errout_N($instance, "\tAMD_ERRCODE_MKTLB(" .
-		    "AMD_ERRCODE_TT_$tt, " .
-		    "AMD_ERRCODE_LL_$ll),\n");
+		    "MCAX86_ERRCODE_TT_$tt, " .
+		    "MCAX86_ERRCODE_LL_$ll),\n");
 	} else {
 		&parsebail("unknown code type `$type'");
 	}
@@ -380,6 +381,14 @@ sub state_flags() {
 	&errout(&print_bits("flags", @flags));
 }
 
+sub state_errtype() {
+	my @types = split(/,\s*/, $_[0]);
+
+	@types = map { tr/[a-z]/[A-Z]/; "AO_AED_ET_" . $_; } @types;
+
+	&errout(&print_bits("errtype", @types));
+}
+
 my %stateparse = (
 	funcunit	=> [ \&state_funcunit, 'desc' ],
 	desc		=> [ \&state_desc, 'error' ],
@@ -388,7 +397,8 @@ my %stateparse = (
 	'mask off'	=> [ \&state_mask_off, 'code' ],
 	code		=> [ \&state_code, 'code|panic' ],
 	panic		=> [ \&state_panic, 'flags' ],
-	flags		=> [ \&state_flags, 'initial' ]
+	flags		=> [ \&state_flags, 'errtype' ],
+	errtype		=> [ \&state_errtype, 'initial' ]
 );
 
 usage unless (@ARGV == 1);

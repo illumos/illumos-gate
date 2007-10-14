@@ -432,7 +432,7 @@ kcpc_unbind(kcpc_set_t *set)
 		 * freectx() calling kcpc_free().
 		 */
 		if (t == curthread &&
-			(ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) == 0) {
+		    (ctx->kc_flags & KCPC_CTX_INVALID_STOPPED) == 0) {
 			kpreempt_disable();
 			pcbe_ops->pcbe_allstop();
 			atomic_or_uint(&ctx->kc_flags,
@@ -746,7 +746,7 @@ kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx)
 		if (ks->ks_req[i].kr_nattrs > 0) {
 			cks->ks_req[i].kr_attr =
 			    kmem_alloc(ks->ks_req[i].kr_nattrs *
-				sizeof (kcpc_attr_t), KM_SLEEP);
+			    sizeof (kcpc_attr_t), KM_SLEEP);
 		}
 		for (j = 0; j < ks->ks_req[i].kr_nattrs; j++) {
 			(void) strncpy(cks->ks_req[i].kr_attr[j].ka_name,
@@ -1550,5 +1550,5 @@ kcpc_pcbe_tryload(const char *prefix, uint_t first, uint_t second, uint_t third)
 	s[2] = third;
 
 	return (modload_qualified("pcbe",
-	    "pcbe", prefix, ".", s, 3) < 0 ? -1 : 0);
+	    "pcbe", prefix, ".", s, 3, NULL) < 0 ? -1 : 0);
 }

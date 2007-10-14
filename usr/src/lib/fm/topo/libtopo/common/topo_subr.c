@@ -318,7 +318,8 @@ topo_search_path(topo_mod_t *mod, const char *rootdir, const char *file)
  * SMBIOS serial numbers can contain characters (particularly ':' and ' ')
  * that are invalid for the authority and can break FMRI parsing.  We translate
  * any invalid characters to a safe '-', as well as trimming any leading or
- * trailing whitespace.
+ * trailing whitespace.  Similarly, '/' can be found in some product names
+ * so we translate that to '-'.
  */
 char *
 topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
@@ -344,7 +345,7 @@ topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
 		return (NULL);
 
 	(void) snprintf(buf, count, "%s", begin);
-	while ((str = strpbrk(buf, " :=")) != NULL)
+	while ((str = strpbrk(buf, " :=/")) != NULL)
 		*str = '-';
 
 	pp = topo_hdl_strdup(thp, buf);

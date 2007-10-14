@@ -403,8 +403,7 @@ topo_node_lookup(tnode_t *pnode, const char *name, topo_instance_t inst)
 int
 topo_node_hash(topo_nodehash_t *nhp, topo_instance_t inst)
 {
-	return (nhp->th_range.tr_max == 0 ?
-	    nhp->th_range.tr_max : inst % (nhp->th_range.tr_max + 1));
+	return ((inst - nhp->th_range.tr_min) % nhp->th_arrlen);
 }
 
 static tnode_t *

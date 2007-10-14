@@ -51,7 +51,6 @@ extern "C" {
 typedef void *cpu_pri_lev_t;
 
 struct cpuid_info;
-struct cmi;
 struct cpu_ucode_info;
 
 /*
@@ -104,8 +103,6 @@ struct	machcpu {
 
 	struct cpuid_info	 *mcpu_cpi;
 
-	struct cmi	*mcpu_cmi;	/* CPU module state */
-	void		*mcpu_cmidata;
 #if defined(__amd64)
 	greg_t	mcpu_rtmp_rsp;		/* syscall: temporary %rsp stash */
 	greg_t	mcpu_rtmp_r15;		/* syscall: temporary %r15 stash */

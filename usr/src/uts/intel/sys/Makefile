@@ -56,9 +56,9 @@ HDRS	=			\
 	machtypes.h		\
 	mc.h			\
 	mc_amd.h		\
+	mc_intel.h		\
 	mca_amd.h		\
 	mca_x86.h		\
-	memtest.h		\
 	mii.h			\
 	miipriv.h		\
 	mutex_impl.h		\
@@ -95,6 +95,7 @@ HDRS	=			\
 	x86_archext.h
 
 CLOSEDHDRS = \
+	memtest.h \
 	sbpro.h
 
 SUBHDRS	=			\

@@ -38,6 +38,8 @@ CORE_OBJS +=			\
 	biosdisk.o		\
 	cbe.o			\
 	cmi.o			\
+	cmi_hw.o		\
+	cms.o			\
 	confunix.o		\
 	cpuid.o			\
 	cpupm.o			\

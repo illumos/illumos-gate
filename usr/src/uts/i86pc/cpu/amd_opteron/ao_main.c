@@ -33,7 +33,8 @@
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/sunddi.h>
-#include <sys/cpu_module_impl.h>
+#include <sys/cpu_module.h>
+#include <sys/cpu_module_ms_impl.h>
 #include <sys/cpuvar.h>
 #include <sys/x86_archext.h>
 #include <sys/kmem.h>
@@ -44,7 +45,9 @@
 
 #include "ao.h"
 
-static struct ao_chipshared *ao_shared[NCPU];
+int ao_ms_support_disable = 0;
+
+static struct ao_chipshared *ao_shared[AO_MAX_CHIPS];
 
 /*
  * This cpu module supports AMD family 0xf revisions B/C/D/E/F/G.  If
@@ -53,39 +56,38 @@ static struct ao_chipshared *ao_shared[NCPU];
  */
 uint_t ao_model_limit = 0x6f;
 
-static int
-ao_init(cpu_t *cp, void **datap)
+int
+ao_ms_init(cmi_hdl_t hdl, void **datap)
 {
-	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
+	uint_t chipid = cmi_hdl_chipid(hdl);
 	struct ao_chipshared *sp, *osp;
-	ao_data_t *ao;
+	ao_ms_data_t *ao;
 	uint64_t cap;
 
-	if (cpuid_getmodel(cp) >= ao_model_limit)
+	if (ao_ms_support_disable || cmi_hdl_model(hdl) >= ao_model_limit)
 		return (ENOTSUP);
 
 	if (!(x86_feature & X86_MCA))
 		return (ENOTSUP);
 
-	cap = rdmsr(IA32_MSR_MCG_CAP);
+	if (cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_CAP, &cap) != CMI_SUCCESS)
+		return (ENOTSUP);
+
 	if (!(cap & MCG_CAP_CTL_P))
 		return (ENOTSUP);
 
-	/*
-	 * Arrange to fallback to generic.cpu if the bank count is not
-	 * as expected.  We're not silent about this - if we have X86_MCA
-	 * and MCG_CAP_CTL_P then we appear not to be virtualized.
-	 */
 	if ((cap & MCG_CAP_COUNT_MASK) != AMD_MCA_BANK_COUNT) {
-		cmn_err(CE_WARN, "CPU %d has %llu MCA banks; expected %u: "
-		    "disabling AMD-specific MCA support on this CPU",
-		    cp->cpu_id, (u_longlong_t)cap & MCG_CAP_COUNT_MASK,
+		cmn_err(CE_WARN, "Chip %d core %d has %llu MCA banks, "
+		    "expected %u: disabling AMD-specific MCA support on "
+		    "this CPU", chipid, cmi_hdl_coreid(hdl),
+		    (u_longlong_t)cap & MCG_CAP_COUNT_MASK,
 		    AMD_MCA_BANK_COUNT);
 		return (ENOTSUP);
 	}
 
-	ao = *datap = kmem_zalloc(sizeof (ao_data_t), KM_SLEEP);
-	ao->ao_cpu = cp;
+	ao = *datap = kmem_zalloc(sizeof (ao_ms_data_t), KM_SLEEP);
+	cmi_hdl_hold(hdl);	/* release in fini */
+	ao->ao_ms_hdl = hdl;
 
 	/*
 	 * Allocate the chipshared structure if it appears not to have been
@@ -99,45 +101,50 @@ ao_init(cpu_t *cp, void **datap)
 		if (osp != NULL) {
 			kmem_free(sp, sizeof (struct ao_chipshared));
 			sp = osp;
+		} else {
+			sp->aos_chiprev = cmi_hdl_chiprev(hdl);
 		}
 	}
-	ao->ao_shared = sp;
+	ao->ao_ms_shared = sp;
 
 	return (0);
 }
 
 /*ARGSUSED*/
-static void
-ao_post_mpstartup(void *data)
+void
+ao_ms_post_mpstartup(cmi_hdl_t hdl)
 {
 	(void) ddi_install_driver("mc-amd");
 }
 
-static void
-ao_fini(void *data)
-{
-	kmem_free(data, sizeof (ao_data_t));
-}
+cms_api_ver_t _cms_api_version = CMS_API_VERSION_0;
 
-const cmi_ops_t _cmi_ops = {
-	ao_init,
-	ao_mca_post_init,
-	ao_post_mpstartup,
-	ao_fini,
-	ao_faulted_enter,
-	ao_faulted_exit,
-	ao_scrubber_enable,
-	ao_mca_init,
-	ao_mca_trap,
-	ao_mca_inject,
-	ao_mca_poke,
-	ao_mc_register,
-	ao_mc_getops
+const cms_ops_t _cms_ops = {
+	ao_ms_init,			/* cms_init */
+	ao_ms_post_startup,		/* cms_post_startup */
+	ao_ms_post_mpstartup,		/* cms_post_mpstartup */
+	NULL,				/* cms_logout_size */
+	ao_ms_mcgctl_val,		/* cms_mcgctl_val */
+	ao_ms_bankctl_skipinit,		/* cms_bankctl_skipinit */
+	ao_ms_bankctl_val,		/* cms_bankctl_val */
+	NULL,				/* cms_bankstatus_skipinit */
+	NULL,				/* cms_bankstatus_val */
+	ao_ms_mca_init,			/* cms_mca_init */
+	ao_ms_poll_ownermask,		/* cms_poll_ownermask */
+	NULL,				/* cms_bank_logout */
+	ao_ms_error_action,		/* cms_error_action */
+	ao_ms_disp_match,		/* cms_disp_match */
+	ao_ms_ereport_class,		/* cms_ereport_class */
+	NULL,				/* cms_ereport_detector */
+	ao_ms_ereport_includestack,	/* cms_ereport_includestack */
+	ao_ms_ereport_add_logout,	/* cms_ereport_add_logout */
+	ao_ms_msrinject,		/* cms_msrinject */
+	NULL,				/* cms_fini */
 };
 
 static struct modlcpu modlcpu = {
 	&mod_cpuops,
-	"AMD Athlon64/Opteron CPU Module"
+	"AMD Athlon64/Opteron Model-Specific Support"
 };
 
 static struct modlinkage modlinkage = {
@@ -149,21 +156,7 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int err;
-
-	ao_mca_queue = errorq_create("ao_mca_queue",
-	    ao_mca_drain, NULL, AO_MCA_MAX_ERRORS * (max_ncpus + 1),
-	    sizeof (ao_cpu_logout_t), 1, ERRORQ_VITAL);
-
-	if (ao_mca_queue == NULL)
-		return (EAGAIN); /* errorq_create() logs a message for us */
-
-	if ((err = mod_install(&modlinkage)) != 0) {
-		errorq_destroy(ao_mca_queue);
-		ao_mca_queue = NULL;
-	}
-
-	return (err);
+	return (mod_install(&modlinkage));
 }
 
 int
@@ -175,10 +168,5 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	int err;
-
-	if ((err = mod_remove(&modlinkage)) == 0)
-		errorq_destroy(ao_mca_queue);
-
-	return (err);
+	return (mod_remove(&modlinkage));
 }

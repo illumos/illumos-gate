@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +36,15 @@ USR_PLAT_FM_DIR= $(ROOT)/usr/platform/$(EFT_PLAT)/lib/fm
 USR_PLAT_EFT_DIR= $(USR_PLAT_FM_DIR)/eft
 USR_PLAT_EFT_FILES= $(EFT_PLAT_FILES:%=$(USR_PLAT_EFT_DIR)/%)
 
+#
+# Default target - specify before including Makefile.rootdirs which would
+# otherwise provide a default
+#
+install: all
+
 include $(SRC)/cmd/fm/eversholt/Makefile.rootdirs
 
 all:= FILEMODE =	0444
-
-install: all
 
 all: $(ROOT_EFT_ROOT) $(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES)
 

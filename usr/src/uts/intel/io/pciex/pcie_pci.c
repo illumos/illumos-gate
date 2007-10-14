@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include <sys/hotplug/pci/pciehpc.h>
 #include <io/pciex/pcie_error.h>
 #include <io/pciex/pcie_nvidia.h>
+#include <io/pciex/pcie_nb5000.h>
 
 #ifdef DEBUG
 static int pepb_debug = 0;
@@ -158,7 +159,7 @@ struct dev_ops pepb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe to PCI nexus driver %I%",
+	"PCIe to PCI nexus driver 1.10",
 	&pepb_ops,	/* driver ops */
 };
 
@@ -247,7 +248,7 @@ static int	pepb_pcie_port_type(dev_info_t *dip,
 static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
 static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
 static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
-static int	pepb_is_nvidia_root_port(dev_info_t *);
+static int	pepb_intr_on_root_port(dev_info_t *);
 static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
 static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 
@@ -378,7 +379,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
 
 	if (pepb_enable_msi && (intr_types & DDI_INTR_TYPE_MSI) &&
-	    pepb_is_nvidia_root_port(devi) == DDI_SUCCESS) {
+	    pepb_intr_on_root_port(devi) == DDI_SUCCESS) {
 		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
 			goto next_step;
 		else
@@ -425,9 +426,9 @@ next_step:
 		 */
 		if (pepb->inband_hpc == INBAND_HPC_PCIE &&
 		    pciehpc_init(devi, NULL) != DDI_SUCCESS) {
-		    pepb->inband_hpc = INBAND_HPC_NONE;
-		    cmn_err(CE_CONT, "!Failed to initialize inband hotplug "
-			"controller");
+			pepb->inband_hpc = INBAND_HPC_NONE;
+			cmn_err(CE_CONT, "!Failed to initialize inband hotplug "
+			    "controller");
 		}
 	}
 
@@ -927,7 +928,7 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	isr_tab = kmem_alloc(isr_tab_size, KM_SLEEP);
 	if (pepb_enable_msi && pepb_p->intr_count == 2 &&
 	    intr_type == DDI_INTR_TYPE_MSI &&
-	    pepb_is_nvidia_root_port(dip) == DDI_SUCCESS) {
+	    pepb_intr_on_root_port(dip) == DDI_SUCCESS) {
 		isr_tab[0] = pepb_pwr_msi_intr;
 		isr_tab[1] = pepb_err_msi_intr;
 	} else
@@ -1054,21 +1055,27 @@ pepb_intx_intr(caddr_t arg, caddr_t arg2)
 }
 
 /*
- * pepb_is_nvidia_root_port()
+ * pepb_intr_on_root_port()
  *
- * This helper function checks if the device is a Nvidia RC or not
+ * This helper function checks if the device is a Nvidia RC, Intel 5000 or 7300
+ * or not
  */
 static int
-pepb_is_nvidia_root_port(dev_info_t *dip)
+pepb_intr_on_root_port(dev_info_t *dip)
 {
 	int ret = DDI_FAILURE;
 	ddi_acc_handle_t handle;
+	uint16_t vendor_id, device_id;
 
 	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
 		return (ret);
 
-	if ((pci_config_get16(handle, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
-	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(handle, PCI_CONF_DEVID)))
+	vendor_id = pci_config_get16(handle, PCI_CONF_VENID);
+	device_id = pci_config_get16(handle, PCI_CONF_DEVID);
+	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
+		ret = DDI_SUCCESS;
+	else if ((vendor_id == INTEL_VENDOR_ID) &&
+	    INTEL_NB5000_PCIE_DEV_ID(device_id) && !pcie_intel_error_disable)
 		ret = DDI_SUCCESS;
 
 	pci_config_teardown(&handle);
@@ -1107,7 +1114,7 @@ pepb_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 
 	return (cap_loc == PCI_CAP_NEXT_PTR_NULL ? -1 :
 	    pci_config_get16(handle, cap_loc + PCIE_PCIECAP) &
-		PCIE_PCIECAP_DEV_TYPE_MASK);
+	    PCIE_PCIECAP_DEV_TYPE_MASK);
 }
 
 /*ARGSUSED*/

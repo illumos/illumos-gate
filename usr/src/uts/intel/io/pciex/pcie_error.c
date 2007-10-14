@@ -42,8 +42,10 @@
 #include <sys/promif.h>
 #include <io/pciex/pcie_error.h>
 #include <io/pciex/pcie_nvidia.h>
+#include <io/pciex/pcie_nb5000.h>
 
 extern uint32_t pcie_expected_ue_mask;
+int pcie_intel_error_disable = 1;
 
 #ifdef  DEBUG
 uint_t	pcie_error_debug_flags = 0;
@@ -149,9 +151,9 @@ static void	pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *,
 		    boolean_t *);
 static uint16_t pcie_error_find_cap_reg(ddi_acc_handle_t, uint8_t);
 static uint16_t	pcie_error_find_ext_aer_capid(ddi_acc_handle_t);
-static void	pcie_nvidia_error_init(dev_info_t *, ddi_acc_handle_t,
-		    uint16_t, uint16_t);
-static void	pcie_nvidia_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
+static void	pcie_error_init(dev_info_t *, ddi_acc_handle_t,
+    uint16_t, uint16_t);
+static void	pcie_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
 
 /*
  * modload support
@@ -182,6 +184,18 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+
+static int
+pcie_error_supported(uint16_t vendor_id, uint16_t device_id)
+{
+	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
+		return (1);
+	if ((vendor_id == INTEL_VENDOR_ID) &&
+	    INTEL_NB5000_PCIE_DEV_ID(device_id) && !pcie_intel_error_disable)
+		return (1);
+
+	return (0);
 }
 
 /*
@@ -324,14 +338,14 @@ pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	}
 
 	/*
-	 * For Nvidia chipset, call pcie_nvidia_error_init().
+	 * For Nvidia, Intel 5000 and 7300 chipset, call pcie_error_init().
 	 *
-	 * For non-Nvidia Root Ports, disable UR for all child devices by
+	 * For other Root Ports, disable UR for all child devices by
 	 * changing the default ue mask (for AER devices) and the default
 	 * device control value (for non-AER device).
 	 */
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
-		pcie_nvidia_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
+	if (pcie_error_supported(vendor_id, device_id))
+		pcie_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
 	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
 		pcie_expected_ue_mask |= PCIE_AER_UCE_UR;
 		pcie_device_ctrl_default &= ~PCIE_DEVCTL_UR_REPORTING_EN;
@@ -437,18 +451,18 @@ pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
 
 /* ARGSUSED */
 static void
-pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
+pcie_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
     uint16_t cap_ptr, uint16_t aer_ptr)
 {
 	uint16_t	rc_ctl;
 
 	/* Program SERR_FORWARD bit in NV_XVR_INTR_BCR */
-	rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2);
-	pci_config_put16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2,
-	    rc_ctl | NVIDIA_INTR_BCR_SERR_FORWARD_BIT);
+	rc_ctl = pci_config_get16(cfg_hdl, PCI_BCNF_BCNTRL);
+	pci_config_put16(cfg_hdl, PCI_BCNF_BCNTRL,
+	    rc_ctl | PCI_BCNF_BCNTRL_SERR_ENABLE);
 	PCIE_ERROR_DBG("%s: PCIe NV_XVR_INTR_BCR=0x%x->0x%x\n",
 	    ddi_driver_name(child), rc_ctl,
-	    pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2));
+	    pci_config_get16(cfg_hdl, PCI_BCNF_BCNTRL));
 
 #if defined(__xpv)
 	/*
@@ -562,8 +576,8 @@ pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 	/*
 	 * Only disable these set of errors for CK8-04/IO-4 devices
 	 */
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
-		pcie_nvidia_error_fini(cfg_hdl, cap_ptr, aer_ptr);
+	if (pcie_error_supported(vendor_id, device_id))
+		pcie_error_fini(cfg_hdl, cap_ptr, aer_ptr);
 
 	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
 		return;
@@ -591,7 +605,7 @@ pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 
 
 static void
-pcie_nvidia_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
+pcie_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
     uint16_t aer_ptr)
 {
 	uint16_t	rc_ctl;

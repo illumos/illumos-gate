@@ -30,7 +30,7 @@
 #include <sys/sunddi.h>
 
 #include <mcamd_pcicfg.h>
-#include <sys/pci_cfgspace_impl.h>
+#include <sys/pci_cfgspace.h>
 
 struct _mc_pcicfg_hdl {
 	mc_t *cfh_mc;
@@ -43,6 +43,9 @@ mccfgsetup(struct _mc_pcicfg_hdl *hdlp, mc_t *mc, enum mc_funcnum func)
 {
 	hdlp->cfh_mc = mc;
 	hdlp->cfh_func = func;
+
+	if (mc->mc_funcs[func].mcf_devi == NULL)
+		return (DDI_FAILURE);
 
 	if (pci_config_setup(mc->mc_funcs[func].mcf_devi, &hdlp->cfh_hdl) !=
 	    DDI_SUCCESS)
@@ -83,19 +86,25 @@ mc_pcicfg_get32(mc_pcicfg_hdl_t cookie, off_t offset)
 	return (pci_config_get32(hdlp->cfh_hdl, offset));
 }
 
+void
+mc_pcicfg_put32(mc_pcicfg_hdl_t cookie, off_t offset, uint32_t val)
+{
+	struct _mc_pcicfg_hdl *hdlp = cookie;
+
+	pci_config_put32(hdlp->cfh_hdl, offset, val);
+}
+
 uint32_t
 mc_pcicfg_get32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset)
 {
-	return (pci_mech1_getl(0,
-		    MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
-		    func, offset));
+	return ((*pci_getl_func)(0, MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
+	    func, offset));
 }
 
 void
 mc_pcicfg_put32_nohdl(mc_t *mc, enum mc_funcnum func, off_t offset,
     uint32_t val)
 {
-	pci_mech1_putl(0,
-	    MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
+	(*pci_putl_func)(0, MC_AMD_DEV_OFFSET + mc->mc_props.mcp_num,
 	    func, offset, val);
 }

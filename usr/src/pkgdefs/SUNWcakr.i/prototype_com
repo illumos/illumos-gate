@@ -63,9 +63,13 @@ d none platform/i86pc/kernel/amd64 755 root sys
 f none platform/i86pc/kernel/amd64/unix 755 root sys
 d none platform/i86pc/kernel/cpu 755 root sys
 d none platform/i86pc/kernel/cpu/amd64 755 root sys
-f none platform/i86pc/kernel/cpu/amd64/cpu.AuthenticAMD.15 755 root sys
+f none platform/i86pc/kernel/cpu/amd64/cpu_ms.AuthenticAMD 755 root sys
+f none platform/i86pc/kernel/cpu/amd64/cpu_ms.AuthenticAMD.15 755 root sys
+f none platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel 755 root sys
 f none platform/i86pc/kernel/cpu/amd64/cpu.generic 755 root sys
-f none platform/i86pc/kernel/cpu/cpu.AuthenticAMD.15 755 root sys
+f none platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD 755 root sys
+f none platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 755 root sys
+f none platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel 755 root sys
 f none platform/i86pc/kernel/cpu/cpu.generic 755 root sys
 d none platform/i86pc/kernel/dacf 755 root sys
 f none platform/i86pc/kernel/dacf/consconfig_dacf 755 root sys
@@ -76,6 +80,7 @@ d none platform/i86pc/kernel/drv/amd64 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
+f none platform/i86pc/kernel/drv/amd64/intel_nb5000 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
@@ -83,6 +88,8 @@ f none platform/i86pc/kernel/drv/cpudrv 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd.conf 644 root sys
+f none platform/i86pc/kernel/drv/intel_nb5000 755 root sys
+f none platform/i86pc/kernel/drv/intel_nb5000.conf 644 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
 f none platform/i86pc/kernel/drv/pit_beep 755 root sys

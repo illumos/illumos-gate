@@ -5337,6 +5337,20 @@ mondo_loop() {
 	rm -f $usr/lib/fm/prtopo
 
 	#
+	# Remove old AMD cpu module, to be replaced by extended cpu.generic
+	# with AMD-specific support layered on top as a model-specific module.
+	# Also remove the corresponding mdb and kmdb support.  Backwards BFU
+	# will reintroduce these files.
+	rm -f $root/platform/i86pc/kernel/cpu/cpu.AuthenticAMD.15
+	rm -f $root/platform/i86pc/kernel/cpu/amd64/cpu.AuthenticAMD.15
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/cpu.AuthenticAMD.15.so
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.AuthenticAMD.15.so
+
+	# Remove cpu.generic from i86xpv platform
+	rm -f $root/platform/i86xpv/kernel/cpu/cpu.generic
+	rm -f $root/platform/i86xpv/kernel/cpu/amd64/cpu.generic
+
+	#
 	# Remove obsolete buildmnttab script.  Backwards BFUs will
 	# resurrect it by extracting it from the archives.
 	#

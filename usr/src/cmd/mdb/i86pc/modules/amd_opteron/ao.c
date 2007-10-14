@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,141 +361,7 @@ ao_mci_mask(uintptr_t val, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (ao_mci_ctlmask_common(val, flags, argc, argv, AO_MCI_MASK));
 }
 
-/*ARGSUSED3*/
-static int
-ao_mpt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	static const char *const whatstrs[] = {
-		"cyc-err", "poke-err", "unfault"
-	};
-
-	ao_mca_poll_trace_t mpt;
-	const char *what;
-
-	if (argc != 0 || !(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	if (mdb_vread(&mpt, sizeof (mpt), addr) != sizeof (mpt)) {
-		mdb_warn("failed to read ao_mca_poll_trace_t at %p", addr);
-		return (DCMD_ERR);
-	}
-
-	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%?s%</u> %<u>%?s%</u> %<u>%9s%</u> "
-		    "%<u>%4s%</u>\n", "ADDR", "WHEN", "WHAT", "NERR");
-	}
-
-	if (mpt.mpt_what < sizeof (whatstrs) / sizeof (char *))
-		what = whatstrs[mpt.mpt_what];
-	else
-		what = "???";
-
-	mdb_printf("%?p %?p %9s %4u\n", addr, mpt.mpt_when, what,
-	    mpt.mpt_nerr);
-
-	return (DCMD_OK);
-}
-
-typedef struct mptwalk_data {
-	uintptr_t mw_traceaddr;
-	ao_mca_poll_trace_t *mw_trace;
-	size_t mw_tracesz;
-	uint_t mw_tracenent;
-	uint_t mw_curtrace;
-} mptwalk_data_t;
-
-static int
-ao_mptwalk_init(mdb_walk_state_t *wsp)
-{
-	ao_mca_poll_trace_t *mpt;
-	mptwalk_data_t *mw;
-	GElf_Sym sym;
-	uint_t nent, i;
-	hrtime_t latest;
-
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("the address of a poll trace array must be specified");
-		return (WALK_ERR);
-	}
-
-	if (mdb_lookup_by_name("ao_mca_poll_trace_nent", &sym) < 0 ||
-	    sym.st_size != sizeof (uint_t) || mdb_vread(&nent, sizeof (uint_t),
-	    sym.st_value) != sizeof (uint_t)) {
-		mdb_warn("failed to read ao_mca_poll_trace_nent from kernel");
-		return (WALK_ERR);
-	}
-
-	mw = mdb_alloc(sizeof (mptwalk_data_t), UM_SLEEP);
-	mw->mw_traceaddr = wsp->walk_addr;
-	mw->mw_tracenent = nent;
-	mw->mw_tracesz = nent * sizeof (ao_mca_poll_trace_t);
-	mw->mw_trace = mdb_alloc(mw->mw_tracesz, UM_SLEEP);
-
-	if (mdb_vread(mw->mw_trace, mw->mw_tracesz, wsp->walk_addr) !=
-	    mw->mw_tracesz) {
-		mdb_free(mw->mw_trace, mw->mw_tracesz);
-		mdb_free(mw, sizeof (mptwalk_data_t));
-		mdb_warn("failed to read poll trace array from kernel");
-		return (WALK_ERR);
-	}
-
-	latest = 0;
-	mw->mw_curtrace = 0;
-	for (mpt = mw->mw_trace, i = 0; i < mw->mw_tracenent; i++, mpt++) {
-		if (mpt->mpt_when > latest) {
-			latest = mpt->mpt_when;
-			mw->mw_curtrace = i;
-		}
-	}
-
-	if (latest == 0) {
-		mdb_free(mw->mw_trace, mw->mw_tracesz);
-		mdb_free(mw, sizeof (mptwalk_data_t));
-		return (WALK_DONE); /* trace array is empty */
-	}
-
-	wsp->walk_data = mw;
-
-	return (WALK_NEXT);
-}
-
-static int
-ao_mptwalk_step(mdb_walk_state_t *wsp)
-{
-	mptwalk_data_t *mw = wsp->walk_data;
-	ao_mca_poll_trace_t *thismpt, *prevmpt;
-	int prev, rv;
-
-	thismpt = &mw->mw_trace[mw->mw_curtrace];
-
-	rv = wsp->walk_callback(mw->mw_traceaddr + (mw->mw_curtrace *
-	    sizeof (ao_mca_poll_trace_t)), thismpt, wsp->walk_cbdata);
-
-	if (rv != WALK_NEXT)
-		return (rv);
-
-	prev = (mw->mw_curtrace - 1) % mw->mw_tracenent;
-	prevmpt = &mw->mw_trace[prev];
-
-	if (prevmpt->mpt_when == 0 || prevmpt->mpt_when > thismpt->mpt_when)
-		return (WALK_DONE);
-
-	mw->mw_curtrace = prev;
-
-	return (WALK_NEXT);
-}
-
-static void
-ao_mptwalk_fini(mdb_walk_state_t *wsp)
-{
-	mptwalk_data_t *mw = wsp->walk_data;
-
-	mdb_free(mw->mw_trace, mw->mw_tracesz);
-	mdb_free(mw, sizeof (mptwalk_data_t));
-}
-
 static const mdb_dcmd_t dcmds[] = {
-	{ "ao_poll_trace", ":", "dump a poll trace buffer", ao_mpt_dump },
 	{ "ao_nbcfg", ":", "decode Northbridge config bits",
 	    ao_nbcfg_describe },
 	{ "ao_scrubctl", ":", "decode Scrub Control Register",
@@ -510,8 +376,6 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
-	{ "ao_poll_trace", "walks poll trace buffers in reverse chronological "
-	    "order", ao_mptwalk_init, ao_mptwalk_step, ao_mptwalk_fini },
 	{ NULL }
 };
 

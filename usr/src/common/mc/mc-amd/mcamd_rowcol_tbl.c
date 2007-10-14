@@ -21,7 +21,7 @@
 
 /*
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +46,9 @@ static const struct _bnkaddrmode_tbldesc {
 	int	nmodes;
 	const struct rct_bnkaddrmode *modetbl;
 } bnkaddr_tbls[] = {
-	{ MC_REVS_BC, 7, bnkaddr_tbls_pre_d },
-	{ MC_REVS_DE, 11, bnkaddr_tbls_d_e },
-	{ MC_REVS_FG, 12, bnkaddr_tbls_f },
+	{ MC_F_REVS_BC, 7, bnkaddr_tbls_pre_d },
+	{ MC_F_REVS_DE, 11, bnkaddr_tbls_d_e },
+	{ MC_F_REVS_FG, 12, bnkaddr_tbls_f },
 };
 
 /*
@@ -306,7 +306,7 @@ static const struct rct_bnkaddrmode bnkaddr_tbls_f[] = {
  * See BKDG 3.29 3.5.6 Table 7.
  */
 static const struct _rcbmap_tbl dram_addrmap_pre_d_64 = {
-	MC_REVS_BC,
+	MC_F_REVS_BC,
 	64,
 	{
 	{   /* 000 */
@@ -356,7 +356,7 @@ static const struct _rcbmap_tbl dram_addrmap_pre_d_64 = {
  * See BKDG 3.29 3.5.6 Table 8.
  */
 static const struct _rcbmap_tbl dram_addrmap_pre_d_128 = {
-	MC_REVS_BC,
+	MC_F_REVS_BC,
 	128,
 	{
 	{   /* 000 */
@@ -405,7 +405,7 @@ static const struct _rcbmap_tbl dram_addrmap_pre_d_128 = {
  * See BKDG 3.29 3.5.6 Table 9.
  */
 static const struct _rcbmap_tbl dram_addrmap_d_e_64 = {
-	MC_REVS_DE,
+	MC_F_REVS_DE,
 	64,
 	{
 	{   /* 0000 */
@@ -474,7 +474,7 @@ static const struct _rcbmap_tbl dram_addrmap_d_e_64 = {
  * See BKDG 3.29 3.5.6 Table 9.
  */
 static const struct _rcbmap_tbl dram_addrmap_d_e_128 = {
-	MC_REVS_DE,
+	MC_F_REVS_DE,
 	128,
 	{
 	{   /* 0000 */
@@ -542,7 +542,7 @@ static const struct _rcbmap_tbl dram_addrmap_d_e_128 = {
  * Row/Column/Bank address mappings for revs F/G in 64-bit mode, no interleave.
  */
 static const struct _rcbmap_tbl dram_addrmap_f_64 = {
-	MC_REVS_FG,
+	MC_F_REVS_FG,
 	64,
 	{
 	{	/* 0000 */
@@ -617,7 +617,7 @@ static const struct _rcbmap_tbl dram_addrmap_f_64 = {
  * Row/Column/Bank address mappings for revs F/G in 128-bit mode, no interleave.
  */
 static const struct _rcbmap_tbl dram_addrmap_f_128 = {
-	MC_REVS_FG,
+	MC_F_REVS_FG,
 	128,
 	{
 	{	/* 0000 */
@@ -705,7 +705,7 @@ static const struct _rcbmap_tbl dram_addrmap_f_128 = {
  */
 
 static const struct _bnkswzl_tbl bnswzl_info_e_64 = {
-	MC_REV_E,
+	MC_F_REV_E,
 	64,
 	{
 	    {
@@ -717,7 +717,7 @@ static const struct _bnkswzl_tbl bnswzl_info_e_64 = {
 };
 
 static const struct _bnkswzl_tbl bnswzl_info_e_128 = {
-	MC_REV_E,
+	MC_F_REV_E,
 	128,
 	{
 	    {
@@ -729,7 +729,7 @@ static const struct _bnkswzl_tbl bnswzl_info_e_128 = {
 };
 
 static const struct _bnkswzl_tbl bnswzl_info_f_64 = {
-	MC_REVS_FG,
+	MC_F_REVS_FG,
 	64,
 	{
 	    {
@@ -741,7 +741,7 @@ static const struct _bnkswzl_tbl bnswzl_info_f_64 = {
 };
 
 static const struct _bnkswzl_tbl bnswzl_info_f_128 = {
-	MC_REVS_FG,
+	MC_F_REVS_FG,
 	128,
 	{
 	    {
@@ -872,8 +872,8 @@ rct_csintlv_bits(uint_t mcrev, int width, uint_t csmode, int factor,
 	 * not implemented prior to rev F.
 	 */
 	if (factor == 8 && width == 128 &&
-	    ((MC_REV_MATCH(mcrev, MC_REVS_BC) && csmode == 0x6) ||
-	    (MC_REV_MATCH(mcrev, MC_REVS_DE) &&
+	    ((MC_REV_MATCH(mcrev, MC_F_REVS_BC) && csmode == 0x6) ||
+	    (MC_REV_MATCH(mcrev, MC_F_REVS_DE) &&
 	    (csmode == 0x9 || csmode == 0xa)))) {
 		csid->csi_factor = 0;
 		return;

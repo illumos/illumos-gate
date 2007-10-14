@@ -28,6 +28,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mc.h>
+#include <sys/isa_defs.h>
 #include <sys/x86_archext.h>
 
 #ifdef __cplusplus
@@ -124,13 +125,16 @@ extern "C" {
 
 /*
  * Memory controller registers are read via PCI config space accesses on
- * bus 0, device 24 + NodeId, and function as follows:
+ * bus 0, device 0x18 + NodeId, and function as follows:
  *
  * Function 0: HyperTransport Technology Configuration
  * Function 1: Address Map
  * Function 2: DRAM Controller & HyperTransport Technology Trace Mode
  * Function 3: Miscellaneous Control
  */
+
+#define	MC_AMD_DEV_OFFSET	0x18	/* node ID + offset == PCI dev num */
+
 enum mc_funcnum {
 	MC_FUNC_HTCONFIG = 0,
 	MC_FUNC_ADDRMAP	= 1,
@@ -197,7 +201,17 @@ enum mc_funcnum {
 #define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
 
 /*
- * Registers will be represented as unions, with one fixed-width unsigned
+ * MC4_MISC MSR and MC4_MISCj MSRs
+ */
+#define	MC_MSR_NB_MISC0		0x413
+#define	MC_MSR_NB_MISC1		0xc0000408
+#define	MC_MSR_NB_MISC2		0xc0000409
+#define	MC_MSR_NB_MISC3		0xc000040a
+#define	MC_MSR_NB_MISC(j) \
+	((j) == 0 ? MC_MSR_NB_MISC0 : MC_MSR_NB_MISC1 + (j) - 1)
+
+/*
+ * PCI registers will be represented as unions, with one fixed-width unsigned
  * integer member providing access to the raw register value and one or more
  * structs breaking the register out into bitfields (more than one struct if
  * the register definitions varies across processor revisions).
@@ -209,8 +223,9 @@ enum mc_funcnum {
  * processor revision to which it applies.  At this point the only xxx
  * values in use are:
  *			'cmn' - applies to all revisions
- *			'preF' - applies to revisions E and earlier
- *			'revFG' - applies to revisions F and G
+ *			'f_preF' - applies to revisions E and earlier
+ *			'f_revFG' - applies to revisions F and G
+ *
  * Variants such as 'preD', 'revDE', 'postCG' etc should be introduced
  * as requirements arise.  The MC_REV_* and MC_REV_MATCH etc macros
  * will also need to grow to match.  Use MCREG_FIELD_* to access the
@@ -222,20 +237,26 @@ enum mc_funcnum {
  */
 
 #define	MC_REV_UNKNOWN	X86_CHIPREV_UNKNOWN
-#define	MC_REV_B	X86_CHIPREV_AMD_F_REV_B
-#define	MC_REV_C	(X86_CHIPREV_AMD_F_REV_C0 | X86_CHIPREV_AMD_F_REV_CG)
-#define	MC_REV_D	X86_CHIPREV_AMD_F_REV_D
-#define	MC_REV_E	X86_CHIPREV_AMD_F_REV_E
-#define	MC_REV_F	X86_CHIPREV_AMD_F_REV_F
-#define	MC_REV_G	X86_CHIPREV_AMD_F_REV_G
+
+#define	MC_F_REV_B	X86_CHIPREV_AMD_F_REV_B
+#define	MC_F_REV_C	(X86_CHIPREV_AMD_F_REV_C0 | X86_CHIPREV_AMD_F_REV_CG)
+#define	MC_F_REV_D	X86_CHIPREV_AMD_F_REV_D
+#define	MC_F_REV_E	X86_CHIPREV_AMD_F_REV_E
+#define	MC_F_REV_F	X86_CHIPREV_AMD_F_REV_F
+#define	MC_F_REV_G	X86_CHIPREV_AMD_F_REV_G
+
+#define	MC_10_REV_A	X86_CHIPREV_AMD_10_REV_A
+#define	MC_10_REV_B	X86_CHIPREV_AMD_10_REV_B
 
 /*
  * The most common groupings for memory controller features.
  */
-#define	MC_REVS_BC	(MC_REV_B | MC_REV_C)
-#define	MC_REVS_DE	(MC_REV_D | MC_REV_E)
-#define	MC_REVS_BCDE	(MC_REVS_BC | MC_REVS_DE)
-#define	MC_REVS_FG	(MC_REV_F | MC_REV_G)
+#define	MC_F_REVS_BC	(MC_F_REV_B | MC_F_REV_C)
+#define	MC_F_REVS_DE	(MC_F_REV_D | MC_F_REV_E)
+#define	MC_F_REVS_BCDE	(MC_F_REVS_BC | MC_F_REVS_DE)
+#define	MC_F_REVS_FG	(MC_F_REV_F | MC_F_REV_G)
+
+#define	MC_10_REVS_AB	(MC_10_REV_A | MC_10_REV_B)
 
 /*
  * Is 'rev' included in the 'revmask' bitmask?
@@ -251,9 +272,30 @@ enum mc_funcnum {
 
 #define	MCREG_VAL32(up) ((up)->_val32)
 
+/*
+ * Access a field that has the same structure in all families and revisions
+ */
 #define	MCREG_FIELD_CMN(up, field)	_MCREG_FIELD(up, cmn, field)
-#define	MCREG_FIELD_preF(up, field)	_MCREG_FIELD(up, preF, field)
-#define	MCREG_FIELD_revFG(up, field)	_MCREG_FIELD(up, revFG, field)
+
+/*
+ * Access a field as defined for family 0xf prior to revision F
+ */
+#define	MCREG_FIELD_F_preF(up, field)	_MCREG_FIELD(up, f_preF, field)
+
+/*
+ * Access a field as defined for family 0xf revisions F and G
+ */
+#define	MCREG_FIELD_F_revFG(up, field)	_MCREG_FIELD(up, f_revFG, field)
+
+/*
+ * Access a field as defined for family 0x10 revisions A and
+ */
+#define	MCREG_FIELD_10_revAB(up, field)	_MCREG_FIELD(up, 10_revAB, field)
+
+/*
+ * We will only define the register bitfields for little-endian order
+ */
+#ifdef	_BIT_FIELDS_LTOH
 
 /*
  * Function 0 - HT Configuration: Routing Table Node Register
@@ -370,7 +412,7 @@ union mcreg_dramhole {
 union mcreg_csbase {
 	uint32_t	_val32;
 	/*
-	 * Register format in revisions E and earlier
+	 * Register format in family 0xf revisions E and earlier
 	 */
 	struct {
 		uint32_t	CSEnable:1;	/*  0:0  - CS Bank Enable */
@@ -378,9 +420,9 @@ union mcreg_csbase {
 		uint32_t	BaseAddrLo:7;	/* 15:9  - Base Addr 19:13 */
 		uint32_t	reserved2:5;	/* 20:16 */
 		uint32_t	BaseAddrHi:11;	/* 31:21 - Base Addr 35:25 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	CSEnable:1;	/*  0:0  - CS Bank Enable */
@@ -391,14 +433,14 @@ union mcreg_csbase {
 		uint32_t	reserved2:5;	/* 18:14 */
 		uint32_t	BaseAddrHi:10;	/* 28:19 - Base Addr 36:27 */
 		uint32_t	reserved3:3;	/* 31:39 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
-#define	MC_CSBASE(up, rev) (MC_REV_MATCH(rev, MC_REVS_FG) ?	\
-	(uint64_t)MCREG_FIELD_revFG(up, BaseAddrHi) << 27 |		\
-	(uint64_t)MCREG_FIELD_revFG(up, BaseAddrLo) << 13 :		\
-	(uint64_t)MCREG_FIELD_preF(up, BaseAddrHi) << 25 |		\
-	(uint64_t)MCREG_FIELD_preF(up, BaseAddrLo) << 13)
+#define	MC_CSBASE(up, rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ?	\
+	(uint64_t)MCREG_FIELD_F_revFG(up, BaseAddrHi) << 27 |		\
+	(uint64_t)MCREG_FIELD_F_revFG(up, BaseAddrLo) << 13 :		\
+	(uint64_t)MCREG_FIELD_F_preF(up, BaseAddrHi) << 25 |		\
+	(uint64_t)MCREG_FIELD_F_preF(up, BaseAddrLo) << 13)
 
 /*
  * Function 2 - DRAM Controller: DRAM CS Mask Registers
@@ -407,7 +449,7 @@ union mcreg_csbase {
 union mcreg_csmask {
 	uint32_t	_val32;
 	/*
-	 * Register format in revisions E and earlier
+	 * Register format in family 0xf revisions E and earlier
 	 */
 	struct {
 		uint32_t	reserved1:9;	/*  8:0 */
@@ -415,9 +457,9 @@ union mcreg_csmask {
 		uint32_t	reserved2:5;	/* 20:16 */
 		uint32_t	AddrMaskHi:9;	/* 29:21 - Addr Mask 33:25 */
 		uint32_t	reserved3:2;	/* 31:30 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	reserved1:5;	/*  4:0 */
@@ -425,22 +467,22 @@ union mcreg_csmask {
 		uint32_t	reserved2:5;	/* 18:14 */
 		uint32_t	AddrMaskHi:10;	/* 28:19 - Addr Mask 36:27 */
 		uint32_t	reserved3:3;	/* 31:29 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
-#define	MC_CSMASKLO_LOBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 13 : 13)
-#define	MC_CSMASKLO_HIBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 21 : 19)
+#define	MC_CSMASKLO_LOBIT(rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? 13 : 13)
+#define	MC_CSMASKLO_HIBIT(rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? 21 : 19)
 
-#define	MC_CSMASKHI_LOBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 27 : 25)
-#define	MC_CSMASKHI_HIBIT(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 36 : 33)
+#define	MC_CSMASKHI_LOBIT(rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? 27 : 25)
+#define	MC_CSMASKHI_HIBIT(rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? 36 : 33)
 
-#define	MC_CSMASK_UNMASKABLE(rev) (MC_REV_MATCH(rev, MC_REVS_FG) ? 0 : 2)
+#define	MC_CSMASK_UNMASKABLE(rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? 0 : 2)
 
-#define	MC_CSMASK(up, rev) (MC_REV_MATCH(rev, MC_REVS_FG) ?		\
-	(uint64_t)MCREG_FIELD_revFG(up, AddrMaskHi) << 27 |		\
-	(uint64_t)MCREG_FIELD_revFG(up, AddrMaskLo) << 13 | 0x7c01fff :	\
-	(uint64_t)MCREG_FIELD_preF(up, AddrMaskHi) << 25 |		\
-	(uint64_t)MCREG_FIELD_preF(up, AddrMaskLo) << 13 | 0x1f01fff)
+#define	MC_CSMASK(up, rev) (MC_REV_MATCH(rev, MC_F_REVS_FG) ? \
+	(uint64_t)MCREG_FIELD_F_revFG(up, AddrMaskHi) << 27 | \
+	(uint64_t)MCREG_FIELD_F_revFG(up, AddrMaskLo) << 13 | 0x7c01fff : \
+	(uint64_t)MCREG_FIELD_F_preF(up, AddrMaskHi) << 25 | \
+	(uint64_t)MCREG_FIELD_F_preF(up, AddrMaskLo) << 13 | 0x1f01fff)
 
 /*
  * Function 2 - DRAM Controller: DRAM Bank Address Mapping Registers
@@ -449,7 +491,7 @@ union mcreg_csmask {
 union mcreg_bankaddrmap {
 	uint32_t	_val32;
 	/*
-	 * Register format in revisions E and earlier
+	 * Register format in family 0xf revisions E and earlier
 	 */
 	struct {
 		uint32_t	cs10:4;			/*  3:0  - CS1/0 */
@@ -459,9 +501,9 @@ union mcreg_bankaddrmap {
 		uint32_t	reserved1:14;		/* 29:16 */
 		uint32_t	BankSwizzleMode:1;	/* 30:30 */
 		uint32_t	reserved2:1;		/* 31:31 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	cs10:4;			/*  3:0  - CS1/0 */
@@ -469,7 +511,7 @@ union mcreg_bankaddrmap {
 		uint32_t	cs54:4;			/* 11:8  - CS5/4 */
 		uint32_t	cs76:4;			/* 15:12 - CS7/6 */
 		uint32_t	reserved1:16;		/* 31:16 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 	/*
 	 * Accessing all mode encodings as one uint16
 	 */
@@ -492,7 +534,7 @@ union mcreg_bankaddrmap {
 union mcreg_dramcfg_lo {
 	uint32_t _val32;
 	/*
-	 * Register format in revisions E and earlier.
+	 * Register format in family 0xf revisions E and earlier.
 	 * Bit 7 is a BIOS ScratchBit in revs D and earlier,
 	 * PwrDwnTriEn in revision E;  we don't use it so
 	 * we'll call it ambig1.
@@ -523,9 +565,9 @@ union mcreg_dramcfg_lo {
 		uint32_t	En2T:1;		/* 28 */
 		uint32_t	UpperCSMap:1;	/* 29 */
 		uint32_t	PwrDownCtl:2;	/* 31:30 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	InitDram:1;		/* 0 */
@@ -543,7 +585,7 @@ union mcreg_dramcfg_lo {
 		uint32_t	reserved3:2;		/* 18:17 */
 		uint32_t	DimmEccEn:1;		/* 19 */
 		uint32_t	reserved4:12;		/* 31:20 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
 /*
@@ -553,7 +595,7 @@ union mcreg_dramcfg_lo {
 union mcreg_drammisc {
 	uint32_t _val32;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	reserved2:1;		/* 0 */
@@ -566,13 +608,13 @@ union mcreg_drammisc {
 		uint32_t	PwrSavingsEn:1;		/* 10 */
 		uint32_t	reserved1:13;		/* 23:11 */
 		uint32_t	MemClkDis:8;		/* 31:24 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
 union mcreg_dramcfg_hi {
 	uint32_t _val32;
 	/*
-	 * Register format in revisions E and earlier.
+	 * Register format in family 0xf revisions E and earlier.
 	 */
 	struct {
 		uint32_t	AsyncLat:4;		/* 3:0 */
@@ -592,9 +634,9 @@ union mcreg_dramcfg_hi {
 		uint32_t	MC3_EN:1;		/* 29 */
 		uint32_t	reserved4:1;		/* 30 */
 		uint32_t	OddDivisorCorrect:1;	/* 31 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	MemClkFreq:3;		/* 2:0 */
@@ -615,7 +657,7 @@ union mcreg_dramcfg_hi {
 		uint32_t	undocumented1:1;	/* 23 */
 		uint32_t	DcqBypassMax:4;		/* 27:24 */
 		uint32_t	FourActWindow:4;	/* 31:28 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
 /*
@@ -634,6 +676,23 @@ union mcreg_scrubctl {
 	} _fmt_cmn;
 };
 
+union mcreg_dramscrublo {
+	uint32_t _val32;
+	struct {
+		uint32_t	ScrubReDirEn:1;		/* 0 */
+		uint32_t	reserved:5;		/* 5:1 */
+		uint32_t	ScrubAddrLo:26;		/* 31:6 */
+	} _fmt_cmn;
+};
+
+union mcreg_dramscrubhi {
+	uint32_t _val32;
+	struct {
+		uint32_t	ScrubAddrHi:8;		/* 7:0 */
+		uint32_t	reserved:24;		/* 31:8 */
+	} _fmt_cmn;
+};
+
 /*
  * Function 3 - Miscellaneous Control: On-Line Spare Control Register
  */
@@ -641,7 +700,7 @@ union mcreg_scrubctl {
 union mcreg_nbcfg {
 	uint32_t _val32;
 	/*
-	 * Register format in revisions E and earlier.
+	 * Register format in family 0xf revisions E and earlier.
 	 */
 	struct {
 		uint32_t	CpuEccErrEn:1;			/* 0 */
@@ -668,9 +727,9 @@ union mcreg_nbcfg {
 		uint32_t	reserved2:1;			/* 26 */
 		uint32_t	NbMcaToMstCpuEn:1;		/* 27 */
 		uint32_t	reserved3:4;			/* 31:28 */
-	} _fmt_preF;
+	} _fmt_f_preF;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	CpuEccErrEn:1;			/* 0 */
@@ -701,7 +760,7 @@ union mcreg_nbcfg {
 		uint32_t	SyncOnDramAdrParErrEn:1;	/* 30 */
 		uint32_t	reserved3:1;			/* 31 */
 
-	} _fmt_revFG;
+	} _fmt_f_revFG;
 };
 
 /*
@@ -711,7 +770,7 @@ union mcreg_nbcfg {
 union mcreg_sparectl {
 	uint32_t _val32;
 	/*
-	 * Register format in revisions F and G
+	 * Register format in family 0xf revisions F and G
 	 */
 	struct {
 		uint32_t	SwapEn:1;		/* 0 */
@@ -728,8 +787,125 @@ union mcreg_sparectl {
 		uint32_t	EccErrCntWrEn:1;	/* 23 */
 		uint32_t	EccErrCnt:4;		/* 27:24 */
 		uint32_t	reserved5:4;		/* 31:28 */
-	} _fmt_revFG;
+	} _fmt_f_revFG;
+	/*
+	 * Regiser format in family 0x10 revisions A and B
+	 */
+	struct {
+		uint32_t	SwapEn0:1;		/* 0 */
+		uint32_t	SwapDone0:1;		/* 1 */
+		uint32_t	SwapEn1:1;		/* 2 */
+		uint32_t	SwapDone1:1;		/* 3 */
+		uint32_t	BadDramCs0:3;		/* 6:4 */
+		uint32_t	reserved1:1;		/* 7 */
+		uint32_t	BadDramCs1:3;		/* 10:8 */
+		uint32_t	reserved2:1;		/* 11 */
+		uint32_t	SwapDoneInt:2;		/* 13:12 */
+		uint32_t	EccErrInt:2;		/* 15:14 */
+		uint32_t	EccErrCntDramCs:4;	/* 19:16 */
+		uint32_t	EccErrCntDramChan:2;	/* 21:20 */
+		uint32_t	reserved4:1;		/* 22 */
+		uint32_t	EccErrCntWrEn:1;	/* 23 */
+		uint32_t	EccErrCnt:4;		/* 27:24 */
+		uint32_t	LvtOffset:4;		/* 31:28 */
+	} _fmt_10_revAB;
 };
+
+/*
+ * Since the NB is on-chip some registers are also accessible as MSRs.
+ * We will represent such registers as bitfields as in the 32-bit PCI
+ * registers above, with the restriction that we must compile for 32-bit
+ * kernels and so 64-bit bitfields cannot be used.
+ */
+
+#define	_MCMSR_FIELD(up, revsuffix, field) ((up)->_fmt_##revsuffix.field)
+
+#define	MCMSR_VAL(up) ((up)->_val64)
+
+#define	MCMSR_FIELD_CMN(up, field)	_MCMSR_FIELD(up, cmn, field)
+#define	MCMSR_FIELD_F_preF(up, field)	_MCMSR_FIELD(up, f_preF, field)
+#define	MCMSR_FIELD_F_revFG(up, field)	_MCMSR_FIELD(up, f_revFG, field)
+#define	MCMSR_FIELD_10_revAB(up, field)	_MCMSR_FIELD(up, 10_revAB, field)
+
+/*
+ * The NB MISC registers.  On family 0xf rev F this was introduced with
+ * a 12-bit ECC error count of all ECC errors observed on this memory-
+ * controller (regardless of channel or chip-select) and the ability to
+ * raise an interrupt or SMI on overflow.  In family 0x10 it has a similar
+ * purpose, but the register is is split into 4 misc registers
+ * MC4_MISC{0,1,2,3} accessible via both MSRs and PCI config space;
+ * they perform thresholding for dram, l3, HT errors.
+ */
+
+union mcmsr_nbmisc {
+	uint64_t _val64;
+	/*
+	 * MSR format in family 0xf revision F and later
+	 */
+	struct {
+		/*
+		 * Lower 32 bits
+		 */
+		struct {
+			uint32_t _reserved;			/* 31:0 */
+		} _mcimisc_lo;
+		/*
+		 * Upper 32 bits
+		 */
+		struct {
+			uint32_t _ErrCount:12;			/* 43:32 */
+			uint32_t _reserved1:4;			/* 47:44 */
+			uint32_t _Ovrflw:1;			/* 48 */
+			uint32_t _IntType:2;			/* 50:49 */
+			uint32_t _CntEn:1;			/* 51 */
+			uint32_t _LvtOff:4;			/* 55:52 */
+			uint32_t _reserved2:5;			/* 60:56 */
+			uint32_t _Locked:1;			/* 61 */
+			uint32_t _CntP:1;			/* 62 */
+			uint32_t _Valid:1;			/* 63 */
+		} _mcimisc_hi;
+	} _fmt_f_revFG;
+	/*
+	 * MSR format in family 0x10 revisions A and B
+	 */
+	struct {
+		/*
+		 * Lower 32 bits
+		 */
+		struct {
+			uint32_t _reserved:24;			/* 23:0 */
+			uint32_t _BlkPtr:8;			/* 31:24 */
+		} _mcimisc_lo;
+		/*
+		 * Upper 32 bits
+		 */
+		struct {
+			uint32_t _ErrCnt:12;			/* 43:32 */
+			uint32_t _reserved1:4;			/* 47:44 */
+			uint32_t _Ovrflw:1;			/* 48 */
+			uint32_t _IntType:2;			/* 50:49 */
+			uint32_t _CntEn:1;			/* 51 */
+			uint32_t _LvtOff:4;			/* 55:52 */
+			uint32_t _reserved2:5;			/* 60:56 */
+			uint32_t _Locked:1;			/* 61 */
+			uint32_t _CntP:1;			/* 62 */
+			uint32_t _Valid:1;			/* 63 */
+
+		} _mcimisc_hi;
+	} _fmt_10_revAB;
+};
+
+#define	mcmisc_BlkPtr	_mcimisc_lo._BlkPtr
+#define	mcmisc_ErrCount	_mcimisc_hi._ErrCount
+#define	mcmisc_Ovrflw	_mcimisc_hi._Ovrflw
+#define	mcmisc_IntType	_mcimisc_hi._IntType
+#define	mcmisc_CntEn	_mcimisc_hi._CntEn
+#define	mcmisc_LvtOff	_mcimisc_hi._LvtOff
+#define	mcmisc_Locked	_mcimisc_hi._Locked
+#define	mcmisc_CntP	_mcimisc_hi._CntP
+#define	mcmisc_Valid	_mcimisc_hi._Valid
+
+#endif /* _BIT_FIELDS_LTOH */
 
 #ifdef __cplusplus
 }

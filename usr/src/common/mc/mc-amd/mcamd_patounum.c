@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,27 +263,28 @@ unum_fill(struct mcamd_hdl *hdl, mcamd_node_t *cs, int which,
 	}
 
 	unump->unum_board = 0;
-	unump->unum_chip = chipnum;
+	unump->unum_chip = (int)chipnum;
 	unump->unum_mc = 0;
-	unump->unum_cs = csnum;
-	unump->unum_rank = ranknum;
+	unump->unum_chan = MC_INVALNUM;
+	unump->unum_cs = (int)csnum;
+	unump->unum_rank = (int)ranknum;
 
 	for (i = 0; i < MC_UNUM_NDIMM; i++) {
 		unump->unum_dimms[i] = MC_INVALNUM;
 	}
 	switch (which) {
 	case CSDIMM1:
-		unump->unum_dimms[0] = dimm1;
-		offsetdimm = dimm1;
+		unump->unum_dimms[0] = (int)dimm1;
+		offsetdimm = (int)dimm1;
 		break;
 	case CSDIMM2:
-		unump->unum_dimms[0] = dimm2;
-		offsetdimm = dimm2;
+		unump->unum_dimms[0] = (int)dimm2;
+		offsetdimm = (int)dimm2;
 		break;
 	case CSDIMM1 | CSDIMM2:
-		unump->unum_dimms[0] = dimm1;
-		unump->unum_dimms[1] = dimm2;
-		offsetdimm = dimm1;
+		unump->unum_dimms[0] = (int)dimm1;
+		unump->unum_dimms[1] = (int)dimm2;
+		offsetdimm = (int)dimm1;
 		break;
 	}
 
@@ -528,7 +529,7 @@ mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 		}
 	}
 
-	if (!MC_REV_MATCH(rev, MC_REVS_FG))
+	if (!MC_REV_MATCH(rev, MC_F_REVS_FG))
 		InputAddr <<= 4;
 
 	for (cs = mcamd_cs_next(hdl, mc, NULL); cs != NULL;
@@ -556,7 +557,7 @@ mc_bkdg_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 		 * CSBase =			Register already read
 		 * CSEn =			We only keep enabled cs.
 		 */
-		if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+		if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
 			CSBase &= 0x1ff83fe0;
 			/* CSMask = Get_PCI()		Retrieved above */
 			CSMask = (CSMask | 0x0007c01f) & 0x1fffffff;
@@ -667,6 +668,7 @@ mc_patounum(struct mcamd_hdl *hdl, mcamd_node_t *mc, uint64_t pa,
 	} else if (!(unump->unum_board == bkdg_unum.unum_board &&
 	    unump->unum_chip == bkdg_unum.unum_chip &&
 	    unump->unum_mc == bkdg_unum.unum_mc &&
+	    unump->unum_chan == bkdg_unum.unum_chan &&
 	    unump->unum_cs == bkdg_unum.unum_cs &&
 	    unump->unum_dimms[0] == bkdg_unum.unum_dimms[0] &&
 	    unump->unum_dimms[1] == bkdg_unum.unum_dimms[1])) {

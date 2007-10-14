@@ -93,6 +93,7 @@ f none usr/include/sys/mc.h 644 root bin
 f none usr/include/sys/mc_amd.h 644 root bin
 f none usr/include/sys/mca_amd.h 644 root bin
 f none usr/include/sys/mca_x86.h 644 root bin
+f none usr/include/sys/mc_intel.h 644 root bin
 f none usr/include/sys/mutex_impl.h 644 root bin
 f none usr/include/sys/obpdefs.h 644 root bin
 f none usr/include/sys/pcic_reg.h 644 root bin

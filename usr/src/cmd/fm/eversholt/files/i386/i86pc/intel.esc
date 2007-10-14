@@ -1,0 +1,732 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/* 
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+ * Use is subject to license terms. 
+ */ 
+ 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma dictionary "INTEL" 
+
+/*
+ * Eversholt rules for the intel CPU/Memory
+ */
+
+/* CPU errors detected through MCA */
+
+fru motherboard/chip;
+
+asru motherboard/chip/cpu;
+
+/*
+ * Ereports for Simple error codes.
+ */
+
+#define SMPL_EVENT(leafclass, t) \
+	event ereport.cpu.intel.leafclass@chip/cpu { within(t) }
+
+SMPL_EVENT(unknown, 1s);	
+SMPL_EVENT(unclassified, 1s);
+SMPL_EVENT(microcode_rom_parity, 1s);
+SMPL_EVENT(external, 1s);
+SMPL_EVENT(frc, 1s);
+SMPL_EVENT(internal_timer, 1s);
+SMPL_EVENT(internal_unclassified, 1s);
+
+/*
+ * Propogations for all but "external" and "unknown" simple errors.
+ * If the error is uncorrected we produce a fault immediately, otherwise
+ * we diagnose it to an upset and decalre a fault when the SERD engine
+ * trips.
+ */
+
+/* Simple fault event */
+event fault.cpu.intel.internal@chip/cpu,
+    ASRU=motherboard/chip/cpu, FRU=motherboard/chip,
+    FITrate=1000;
+
+/* Produced when the correctable engine trips */
+event ereport.cpu.intel.simple_trip@chip/cpu { within(1s) };
+
+/* Upset to diagnose corrected events to */
+event upset.cpu.intel.simple@chip/cpu
+    engine=serd.cpu.intel.simple@chip/cpu;
+
+/* SERD engine for corrected simple errors */
+engine serd.cpu.intel.simple@chip/cpu,
+	N=3, T=72h, method=persistent,
+	trip=ereport.cpu.intel.simple_trip@chip/cpu;
+
+#define STATUS_UC \
+	(payloadprop("error_uncorrected") + 0 == 1)
+
+/* Diagnose corrected events to upsets */
+prop upset.cpu.intel.simple@chip/cpu
+    { !STATUS_UC } (1)->
+    ereport.cpu.intel.microcode_rom_parity@chip/cpu,
+    ereport.cpu.intel.internal_timer@chip/cpu,
+    ereport.cpu.intel.unclassified@chip/cpu,
+    ereport.cpu.intel.internal_unclassified@chip/cpu,
+    ereport.cpu.intel.frc@chip/cpu;
+
+/* When the correctable engine trips, diagnose a fault */
+prop fault.cpu.intel.internal@chip/cpu (0)->
+	ereport.cpu.intel.simple_trip@chip/cpu;
+
+/* Diagnose uncorrected events to faults */
+prop fault.cpu.intel.internal@chip/cpu
+    { STATUS_UC } (0)->
+    ereport.cpu.intel.microcode_rom_parity@chip/cpu,
+    ereport.cpu.intel.internal_timer@chip/cpu,
+    ereport.cpu.intel.unclassified@chip/cpu,
+    ereport.cpu.intel.internal_unclassified@chip/cpu,
+    ereport.cpu.intel.frc@chip/cpu;
+
+/*
+ * Ereports for Compound error codes.  These are in pairs "foo" and "foo_uc"
+ * for the corrected and uncorrected version of each error type.  All are
+ * detected at chip/cpu.
+ */
+
+#define	CMPND_EVENT(leafclass, t) \
+	event ereport.cpu.intel.leafclass@chip/cpu { within(t) }; \
+	event ereport.cpu.intel.leafclass/**/_uc@chip/cpu { within(t) }
+
+/*
+ * Ereports for Compound error codes - intel errors
+ */
+CMPND_EVENT(l0cache, 1s);
+CMPND_EVENT(l1cache, 1s);
+CMPND_EVENT(l2cache, 1s);
+CMPND_EVENT(cache, 1s);
+
+/*
+ * Ereports for Compound error codes - TLB errors
+ */
+CMPND_EVENT(l0dtlb, 1s);
+CMPND_EVENT(l1dtlb, 1s);
+CMPND_EVENT(l2dtlb, 1s);
+CMPND_EVENT(dtlb, 1s);
+
+CMPND_EVENT(l0itlb, 1s);
+CMPND_EVENT(l1itlb, 1s);
+CMPND_EVENT(l2itlb, 1s);
+CMPND_EVENT(itlb, 1s);
+
+CMPND_EVENT(l0tlb, 1s);
+CMPND_EVENT(l1tlb, 1s);
+CMPND_EVENT(l2tlb, 1s);
+CMPND_EVENT(tlb, 1s);
+
+/*
+ * Ereports for Compound error codes - memory hierarchy errors
+ */
+CMPND_EVENT(l0dcache, 1s);
+CMPND_EVENT(l1dcache, 1s);
+CMPND_EVENT(l2dcache, 1s);
+CMPND_EVENT(dcache, 1s);
+
+CMPND_EVENT(l0icache, 1s);
+CMPND_EVENT(l1icache, 1s);
+CMPND_EVENT(l2icache, 1s);
+CMPND_EVENT(icache, 1s);
+
+/*
+ * Ereports for Compound error codes - bus and interconnect errors
+ */
+CMPND_EVENT(bus_interconnect, 1s);
+CMPND_EVENT(bus_interconnect_memory, 1s);
+CMPND_EVENT(bus_interconnect_io, 1s);
+
+/*
+ * Compound error propogations.
+ *
+ * We resist the temptation propogate, for example, a single dcache fault
+ * to all ereports mentioning dcache (l0dcache, l1dcache, l2dcache, dcache).
+ * Instead we will diagnose a distinct fault for each possible cache level,
+ * whether or not current chips have dcaches at all levels.
+ *
+ * Corrected errors are SERDed and produce a fault when the engine fires;
+ * the same fault is diagnosed immediately for a corresponding uncorrected
+ * error.
+ */
+
+#define	CMPND_FLT_PROP_1(erptleaf, fltleaf, n, t) \
+	/* Declare the fault that we can diagnose here */		\
+	event fault.cpu.intel.fltleaf@chip/cpu,			\
+	    FITrate=1000,						\
+	    FRU=motherboard/chip,					\
+	    ASRU=motherboard/chip/cpu;					\
+									\
+	/* Produced when the correctable engine trips */		\
+	event ereport.cpu.intel.fltleaf/**/_error@chip/cpu { within(1s) }; \
+									\
+	/* Upset to diagnose corrected events to */			\
+	event upset.cpu.intel.fltleaf@chip/cpu,			\
+	    engine=serd.cpu.intel.fltleaf@chip/cpu;		\
+									\
+	/* SERD engine for corrected events */				\
+	engine serd.cpu.intel.fltleaf@chip/cpu,			\
+	    N=n, T=t, method=persistent,				\
+	    trip=ereport.cpu.intel.fltleaf/**/_error@chip/cpu;	\
+									\
+	/* Diagnose corrected events to the corresponding upset	*/	\
+	prop upset.cpu.intel.fltleaf@chip/cpu (1)->		\
+	    ereport.cpu.intel.erptleaf@chip/cpu;			\
+									\
+	/* When the engine trip, diagnose a fault */			\
+	prop fault.cpu.intel.fltleaf@chip/cpu (0)->		\
+	    ereport.cpu.intel.fltleaf/**/_error@chip/cpu;		\
+									\
+	/* Produce immediate faults for uncorrected errors */		\
+	prop fault.cpu.intel.fltleaf@chip/cpu (0)->		\
+	    ereport.cpu.intel.erptleaf/**/_uc@chip/cpu
+
+#define	CMPND_FLT_PROP_2(erptleaf, fltleaf, n, t) \
+	/* Declare the fault that we can diagnose here */		\
+	event fault.cpu.intel.fltleaf@chip/cpu,			\
+	    FITrate=1,						\
+	    ASRU=motherboard/chip/cpu;					\
+									\
+	/* Produced when the correctable engine trips */		\
+	event ereport.cpu.intel.fltleaf/**/_error@chip/cpu { within(1s) }; \
+									\
+	/* Upset to diagnose corrected events to */			\
+	event upset.cpu.intel.fltleaf@chip/cpu,			\
+	    engine=serd.cpu.intel.fltleaf@chip/cpu;		\
+									\
+	/* SERD engine for corrected events */				\
+	engine serd.cpu.intel.fltleaf@chip/cpu,			\
+	    N=n, T=t, method=persistent,				\
+	    trip=ereport.cpu.intel.fltleaf/**/_error@chip/cpu;	\
+									\
+	/* Diagnose corrected events to the corresponding upset	*/	\
+	prop upset.cpu.intel.fltleaf@chip/cpu (1)->		\
+	    ereport.cpu.intel.erptleaf@chip/cpu;			\
+									\
+	/* When the engine trip, diagnose a fault */			\
+	prop fault.cpu.intel.fltleaf@chip/cpu (0)->		\
+	    ereport.cpu.intel.fltleaf/**/_error@chip/cpu;		\
+									\
+	/* Produce immediate faults for uncorrected errors */		\
+	prop fault.cpu.intel.fltleaf@chip/cpu (0)->		\
+	    ereport.cpu.intel.erptleaf/**/_uc@chip/cpu
+
+
+CMPND_FLT_PROP_1(l0cache, l0cache, 3, 72h);
+CMPND_FLT_PROP_1(l1cache, l1cache, 3, 72h);
+CMPND_FLT_PROP_1(l2cache, l2cache, 3, 72h);
+CMPND_FLT_PROP_1(cache, cache, 12, 72h);
+
+CMPND_FLT_PROP_1(l0dtlb, l0dtlb, 3, 72h);
+CMPND_FLT_PROP_1(l1dtlb, l1dtlb, 3, 72h);
+CMPND_FLT_PROP_1(l2dtlb, l2dtlb, 3, 72h);
+CMPND_FLT_PROP_1(dtlb, dtlb, 12, 72h);
+
+CMPND_FLT_PROP_1(l0itlb, l0itlb, 3, 72h);
+CMPND_FLT_PROP_1(l1itlb, l1itlb, 3, 72h);
+CMPND_FLT_PROP_1(l2itlb, l2itlb, 3, 72h);
+CMPND_FLT_PROP_1(itlb, itlb, 12, 72h);
+
+CMPND_FLT_PROP_1(l0tlb, litlb, 3, 72h);
+CMPND_FLT_PROP_1(l1tlb, litlb, 3, 72h);
+CMPND_FLT_PROP_1(l2tlb, litlb, 3, 72h);
+CMPND_FLT_PROP_1(tlb, tlb, 12, 72h);
+
+CMPND_FLT_PROP_1(l0dcache, l0dcache, 3, 72h);
+CMPND_FLT_PROP_1(l1dcache, l1dcache, 3, 72h);
+CMPND_FLT_PROP_1(l2dcache, l2dcache, 3, 72h);
+CMPND_FLT_PROP_1(dcache, dcache, 12, 72h);
+
+CMPND_FLT_PROP_1(l0icache, l0icache, 3, 72h);
+CMPND_FLT_PROP_1(l1icache, l1icache, 3, 72h);
+CMPND_FLT_PROP_1(l2icache, l2icache, 3, 72h);
+CMPND_FLT_PROP_1(icache, icache, 12, 72h);
+
+CMPND_FLT_PROP_2(bus_interconnect, bus_interconnect, 10, 72h);
+CMPND_FLT_PROP_2(bus_interconnect_memory, bus_interconnect_memory, 10, 72h);
+CMPND_FLT_PROP_2(bus_interconnect_io, bus_interconnect_io, 10, 72h);
+
+event upset.discard@chip/cpu;
+
+prop upset.discard@chip/cpu (0)->
+    ereport.cpu.intel.external@chip/cpu,
+    ereport.cpu.intel.unknown@chip/cpu;
+
+/* errors detected in northbridge */
+
+
+/*
+ * SET_ADDR and SET_OFFSET are used to set a payload value in the fault that
+ * we diagnose for page faults, to record the physical address of the faulting
+ * page.  The "asru-" prefix is hooked in the "rewrite-ASRU" confcalls made on
+ * diagnosis of associated faults when the libtopo mem scheme rewrites the
+ * asru in "mem" scheme.
+ */
+#define	SET_ADDR (!payloadprop_defined("physaddr") || \
+    setpayloadprop("asru-physaddr", payloadprop("physaddr")))
+
+#define SET_OFFSET (!payloadprop_defined("offset") || \
+    setpayloadprop("asru-offset", payloadprop("offset")))
+
+#define	CE_PGFLTS \
+    (count(stat.ce_pgflt@motherboard/memory-controller/dram-channel/dimm))
+#define	UE_DIMM \
+    (count(stat.ue_dimm@motherboard/memory-controller/dram-channel/dimm))
+
+#define PAGE_FIT        1
+#define PAGE_CE_COUNT   2
+#define PAGE_CE_TIME    72h
+
+fru motherboard;
+asru motherboard;
+fru motherboard/memory-controller/dram-channel;
+asru motherboard/memory-controller/dram-channel;
+fru motherboard/memory-controller/dram-channel/dimm;
+asru motherboard/memory-controller/dram-channel/dimm;
+asru motherboard/memory-controller/dram-channel/dimm/rank;
+asru motherboard/chip;
+
+engine stat.ce_pgflt@motherboard/memory-controller/dram-channel/dimm;
+engine stat.ue_dimm@motherboard/memory-controller/dram-channel/dimm;
+
+event ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller{within(12s)};
+event ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller{within(12s)};
+event fault.memory.intel.page_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=PAGE_FIT,
+    ASRU=motherboard/memory-controller/dram-channel/dimm/rank, message=0,
+    action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
+event ereport.memory.page_ue_trip@motherboard/memory-controller{within(12s)};
+engine serd.memory.intel.page_ue@motherboard/memory-controller,
+    N=0, T=1h, method=persistent,
+    trip=ereport.memory.page_ue_trip@motherboard/memory-controller;
+event upset.memory.intel.page_ue@motherboard/memory-controller,
+    engine=serd.memory.intel.page_ue@motherboard/memory-controller;
+
+prop upset.memory.intel.page_ue@motherboard/memory-controller (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+prop upset.memory.intel.page_ue@motherboard/memory-controller (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop fault.memory.intel.page_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank[rank_num]
+    { UE_DIMM > 0 && payloadprop_defined("rank") &&
+    rank_num == payloadprop("rank") &&
+    (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+    SET_ADDR && SET_OFFSET } (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop fault.memory.intel.page_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.memory.page_ue_trip@motherboard/memory-controller;
+
+event upset.memory.intel.discard@motherboard/memory-controller{within(1s)};
+
+prop upset.memory.intel.discard@motherboard/memory-controller
+    { !payloadprop_defined("rank") || (!payloadprop_defined("physaddr") &&
+    !payloadprop_defined("offset")) } (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop upset.memory.intel.discard@motherboard/memory-controller (0)->
+    ereport.memory.page_ue_trip@motherboard/memory-controller,
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+#define DIMM_UE_FIT     1000
+
+event fault.memory.intel.dimm_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=DIMM_UE_FIT, FRU=motherboard/memory-controller/dram-channel/dimm,
+    ASRU=motherboard/memory-controller/dram-channel/dimm/rank,
+    count=stat.dimm_flt@motherboard/memory-controller/dram-channel/dimm,
+    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
+event ereport.memory.dimm_ue_trip@motherboard/memory-controller{within(12s)};
+engine serd.memory.intel.dimm_ue@motherboard/memory-controller,
+    N=0, T=1h, method=persistent,
+    trip=ereport.memory.dimm_ue_trip@motherboard/memory-controller;
+event upset.memory.intel.dimm_ue@motherboard/memory-controller,
+    engine=serd.memory.intel.dimm_ue@motherboard/memory-controller;
+
+prop upset.memory.intel.dimm_ue@ motherboard/memory-controller (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop fault.memory.intel.dimm_ue@
+    motherboard/memory-controller/dram-channel<channel_num>/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop upset.memory.intel.dimm_ue@
+    motherboard/memory-controller (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+prop fault.memory.intel.dimm_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+prop fault.memory.intel.dimm_ue@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.memory.dimm_ue_trip@motherboard/memory-controller;
+
+event upset.memory.intel.discard1@motherboard/memory-controller{within(1s)};
+
+prop upset.memory.intel.discard1@motherboard/memory-controller 
+    { !payloadprop_defined("rank") } (1)->
+    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
+
+prop upset.memory.intel.discard1@motherboard/memory-controller (0)->
+    ereport.memory.dimm_ue_trip@motherboard/memory-controller,
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.memory.intel.page_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
+event ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
+
+engine serd.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    N=PAGE_CE_COUNT, T=PAGE_CE_TIME, method=persistent,
+    trip=ereport.memory.intel.page_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+event upset.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    engine=serd.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+event fault.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=PAGE_FIT,
+    ASRU=motherboard/memory-controller/dram-channel/dimm/rank, message=0,
+    count=stat.ce_pgflt@motherboard/memory-controller/dram-channel/dimm,
+    action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
+
+prop fault.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.memory.intel.page_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop fault.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank
+    { (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+    SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop upset.memory.intel.page_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank
+    { (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+    SET_ADDR && SET_OFFSET } (1)->
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+#define DIMM_CE_FIT 2000
+#define DIMM_CE_COUNT   10
+#define DIMM_CE_TIME    1week
+
+event fault.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=DIMM_CE_FIT, FRU=motherboard/memory-controller/dram-channel/dimm,
+    ASRU=motherboard/memory-controller/dram-channel/dimm/rank,
+    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
+event upset.memory.discard@motherboard/memory-controller/dram-channel/dimm/rank;
+
+event ereport.memory.intel.dimm_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(1s)};
+#define	DIMM_CE(label, dimm_size, n, t, fault_rate) \
+	engine serd.memory.intel.dimm_ce.label/**/@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank, \
+	    N=n, T=t, method=persistent, \
+	    trip=ereport.memory.intel.dimm_trip@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank; \
+	event upset.memory.intel.dimm_ce.label/**/@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank, \
+	    engine=serd.memory.intel.dimm_ce.label/**/@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank; \
+	prop upset.memory.intel.dimm_ce.label/**/@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank \
+	    {confprop_defined( \
+	    fru(motherboard/memory-controller/dram-channel/dimm), \
+	    "dimm-size") && \
+	    confprop(fru(motherboard/memory-controller/dram-channel/dimm), \
+	    "dimm-size") == dimm_size && CE_PGFLTS > fault_rate} (1)-> \
+	    ereport.cpu.intel.nb.mem_ce@ \
+	    motherboard/memory-controller/dram-channel/dimm/rank;
+
+DIMM_CE(eight_g, "8G", 8, 1week, 2000)
+DIMM_CE(four_g, "4G", 4, 1week, 1500)
+DIMM_CE(two_g, "2G", 4, 2week, 1000)
+DIMM_CE(one_g, "1G", 4, 4week, 500)
+DIMM_CE(half_g, "512M", 4, 8week, 250)
+DIMM_CE(quarter_g, "256M", 4, 16week, 125)
+
+engine serd.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    N=DIMM_CE_COUNT, T=DIMM_CE_TIME, method=persistent,
+    trip=ereport.memory.intel.dimm_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+event upset.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    engine=serd.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+prop upset.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank
+    {!confprop_defined(fru(motherboard/memory-controller/dram-channel/dimm),
+    "dimm-size") && CE_PGFLTS > 512} (1)->
+    ereport.cpu.intel.nb.mem_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop fault.memory.intel.dimm_ce@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.memory.intel.dimm_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop upset.memory.discard@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.memory.intel.dimm_trip@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+event ereport.cpu.intel.nb.fbd.alert@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
+event fault.memory.intel.fbd.alert@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=100, ASRU=motherboard/memory-controller/dram-channel/dimm/rank,
+    FRU=motherboard/memory-controller/dram-channel/dimm;
+
+prop fault.memory.intel.fbd.alert@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.cpu.intel.nb.fbd.alert@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop fault.memory.intel.fbd.alert@
+    motherboard/memory-controller/dram-channel/dimm/rank (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.fbd.crc@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
+event fault.memory.intel.fbd.crc@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=100, ASRU=motherboard/memory-controller/dram-channel/dimm/rank,
+    FRU=motherboard/memory-controller/dram-channel/dimm;
+
+prop fault.memory.intel.fbd.crc@
+    motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.cpu.intel.nb.fbd.crc@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop fault.memory.intel.fbd.crc@
+    motherboard/memory-controller/dram-channel/dimm/rank (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.fbd.reset_timeout@motherboard/memory-controller
+    {within(12s)};
+event fault.memory.intel.fbd.reset_timeout@motherboard/memory-controller,
+    FITrate=1000, ASRU=motherboard/memory-controller/dram-channel/dimm,
+    FRU=motherboard/memory-controller/dram-channel/dimm;
+
+prop fault.memory.intel.fbd.reset_timeout@motherboard/memory-controller (1)->
+    ereport.cpu.intel.nb.fbd.reset_timeout@motherboard/memory-controller;
+
+prop fault.memory.intel.fbd.reset_timeout@motherboard/memory-controller (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel
+    {within(12s)};
+event fault.memory.intel.fbd.ch@motherboard/memory-controller/dram-channel,
+    FITrate=100, ASRU=motherboard/memory-controller/dram-channel/dimm,
+    FRU=motherboard/memory-controller/dram-channel/dimm;
+event upset.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel,
+    engine=serd.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel;
+event ereport.cpu.intel.nb.fbd_ch@motherboard/memory-controller/dram-channel
+    {within(12s)};
+
+engine serd.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel,
+    N=2, T=1month, method=persistent,
+    trip=ereport.cpu.intel.nb.fbd_ch@motherboard/memory-controller/dram-channel;
+
+prop upset.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel (1)->
+    ereport.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel;
+
+prop upset.cpu.intel.nb.fbd.ch@motherboard/memory-controller/dram-channel (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+prop fault.memory.intel.fbd.ch@
+    motherboard/memory-controller/dram-channel (1)->
+    ereport.cpu.intel.nb.fbd_ch@motherboard/memory-controller/dram-channel;
+
+event ereport.cpu.intel.nb.fbd.otf@motherboard/memory-controller/dram-channel
+    {within(12s)};
+event fault.memory.intel.fbd.otf@motherboard/memory-controller/dram-channel,
+    FITrate=100, ASRU=motherboard/memory-controller/dram-channel;
+event upset.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel,
+    engine=serd.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel;
+event ereport.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel
+    {within(12s)};
+
+engine serd.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel,
+    N=2, T=1week, method=persistent,
+    trip=ereport.cpu.intel.nb.fbd_otf@
+    motherboard/memory-controller/dram-channel;
+
+prop upset.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel (1)->
+    ereport.cpu.intel.nb.fbd.otf@motherboard/memory-controller/dram-channel;
+
+prop fault.memory.intel.fbd.otf@
+    motherboard/memory-controller/dram-channel (1)->
+    ereport.cpu.intel.nb.fbd_otf@motherboard/memory-controller/dram-channel;
+
+event ereport.cpu.intel.nb.unknown@motherboard/memory-controller {within(12s)};
+event ereport.cpu.intel.nb.unknown@motherboard/memory-controller/dram-channel
+    {within(12s)};
+event upset.discard@motherboard/memory-controller;
+
+prop upset.discard@motherboard/memory-controller (0)->
+    ereport.cpu.intel.nb.unknown@motherboard/memory-controller,
+    ereport.cpu.intel.nb.unknown@motherboard/memory-controller/dram-channel;
+
+event ereport.cpu.intel.nb.mem_ds@motherboard/memory-controller{within(30s)};
+
+event fault.memory.intel.fbd.mem_ds@
+    motherboard/memory-controller/dram-channel/dimm/rank,
+    FITrate=DIMM_UE_FIT,
+    ASRU=motherboard/memory-controller/dram-channel/dimm/rank,
+    FRU=motherboard/memory-controller/dram-channel/dimm;
+
+prop fault.memory.intel.fbd.mem_ds@
+    motherboard/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
+    ereport.cpu.intel.nb.mem_ds@motherboard/memory-controller;
+
+event ereport.cpu.intel.nb.fsb@motherboard/chip{within(12s)};
+event fault.cpu.intel.nb.fsb@motherboard/chip,
+    FITrate=10000, ASRU=motherboard/chip, FRU=motherboard/chip;
+
+prop fault.cpu.intel.nb.fsb@motherboard/chip (1)->
+    ereport.cpu.intel.nb.fsb@motherboard/chip;
+
+prop fault.cpu.intel.nb.fsb@motherboard/chip (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.ie@motherboard{within(12s)};
+event fault.cpu.intel.nb.ie@motherboard,
+    FITrate=10000, ASRU=motherboard, FRU=motherboard;
+
+prop fault.cpu.intel.nb.ie@motherboard (1)->
+    ereport.cpu.intel.nb.ie@motherboard;
+
+prop fault.cpu.intel.nb.ie@motherboard (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.dma@motherboard{within(12s)};
+event fault.cpu.intel.nb.dma@motherboard,
+    FITrate=10000, ASRU=motherboard;
+
+prop fault.cpu.intel.nb.dma@motherboard (1)->
+    ereport.cpu.intel.nb.dma@motherboard;
+
+prop fault.cpu.intel.nb.dma@motherboard (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.esi@motherboard{within(12s)};
+event ereport.cpu.intel.nb.pex@motherboard/hostbridge{within(12s)};
+event upset.cpu.intel.nb.pex@motherboard/hostbridge;
+
+prop upset.cpu.intel.nb.pex@motherboard/hostbridge (1)->
+    ereport.cpu.intel.nb.esi@motherboard,
+    ereport.cpu.intel.nb.pex@motherboard/hostbridge;
+
+prop upset.cpu.intel.nb.pex@motherboard/hostbridge (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+
+event ereport.cpu.intel.nb.unknown@
+    motherboard/memory-controller/dram-channel/dimm/rank{within(12s)};
+event upset.discard@motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop upset.discard@motherboard/memory-controller/dram-channel/dimm/rank (1)->
+    ereport.cpu.intel.nb.unknown@
+    motherboard/memory-controller/dram-channel/dimm/rank;
+
+prop upset.discard@motherboard/memory-controller/dram-channel/dimm/rank (0)->
+    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,
+    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,
+    ereport.cpu.intel.bus_interconnect@chip/cpu,
+    ereport.cpu.intel.external@chip/cpu;
+

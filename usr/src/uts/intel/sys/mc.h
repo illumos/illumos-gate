@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,12 +41,13 @@ extern "C" {
 #define	MC_UNUM_NDIMM		2
 
 typedef struct mc_unum {
-	int unum_board;
-	int unum_chip;
-	int unum_mc;
-	int unum_cs;
-	int unum_rank;
-	uint64_t unum_offset;
+	int unum_board;			/* system board */
+	int unum_chip;			/* chip/socket */
+	int unum_mc;			/* memory-controller or branch */
+	int unum_chan;			/* DRAM channel */
+	int unum_cs;			/* chip-select */
+	int unum_rank;			/* rank */
+	uint64_t unum_offset;		/* row, column, bank-select etc */
 	int unum_dimms[MC_UNUM_NDIMM];
 } mc_unum_t;
 
@@ -54,8 +55,6 @@ typedef struct mc_unum {
  * Invalid marker used in some numeric properties
  */
 #define	MC_INVALNUM		((uint32_t)-1)
-
-#define	MC_AMD_DEV_OFFSET	24	/* node ID + offset == PCI dev num */
 
 /*
  * /dev/mc/mc* ioctl cmds

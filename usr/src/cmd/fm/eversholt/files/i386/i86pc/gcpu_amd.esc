@@ -1,0 +1,347 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Eversholt rules for generic AMD with on-chip memory-controller(s), as seen
+ * in AMD family 0xf and 0x10.
+ *
+ * In the absence of any model-specific support, any memory errors that
+ * are observed via MCA (typically through an on-chip memory-controller)
+ * will surface as ereport.cpu.generic-x86.bus_interconnect_memory[_uc]
+ * ereports and are diagnosed via generic rules in gcpu.esc.
+ *
+ * If full model-specific support is available, including full NorthBridge
+ * support, then memory ereports will surface in a more-specific subclass
+ * such as ereport.cpu.amd.mem_ce; these are diagnosed in amd64.esc.
+ *
+ * In the case where some "vendor generic" support is present, memory errors
+ * are reported as ereport.cpu.generic-x86.mem_{ce,ue} and include a
+ * syndrome and syndrome-type, and usually also a resource FMRI to identify
+ * the affected resource.  In the AMD case a resource FMRI is included for
+ * those chip versions that include an Online Spare Control register; this
+ * register provides counts of ECC errors seen per channel and chip-select
+ * on a NorthBridge node.  The resource FMRI has form
+ * 	hc:///motherboard/chip/memory-controller/dram-channel/chip-select
+ * in these cases.
+ */
+
+#pragma dictionary "GMCA"
+
+/*
+ * The number of pages that must be faulted on a chip-select for repeated
+ * correctable errors before we will consider one of the component dimms
+ * faulty.
+ */
+#define	CS_DIMMSB_THRESH	64
+
+/*
+ * The maximum number of pages we will diagnose as faulty on any one
+ * chip-select (must be at least CS_PAGEFLT_THRESH).  If a chip-select
+ * has a fault that will affect zillions of pages this limit stops us
+ * diagnosing excessive numbers of page faults.
+ */
+#define	CS_PAGEFLT_MAX		(2 * CS_DIMMSB_THRESH)
+
+/*
+ * SERD paramters for individual page faults.  When more than PAGE_SB_COUNT
+ * correctable ereports are experienced on a single chip-select within
+ * PAGE_SB_TIME the engine will fire and we will fault the most recent
+ * page.
+ */
+#define	PAGE_SB_COUNT		3
+#define	PAGE_SB_TIME		24h
+
+fru chip;
+
+#define	CSPATH	chip/memory-controller/dram-channel/chip-select
+
+asru chip/cpu;
+asru CSPATH;
+
+/*
+ * ADDR_VALID is true if the ereport payload includes IA32_MCi_ADDR.
+ */
+#define	ADDR_VALID (payloadprop_defined("IA32_MCi_ADDR"))
+
+/*
+ * CONTAINS_CS is true if the resource nvlist array exists and one of its
+ * members matches the chip-select path.  This is used to constrain
+ * propogations to those for which a resource element matches the
+ * chip-select path of the propogation.  This is necessary because the
+ * detector element of memory ereports is a cpu and not the chip-select itself.
+ */
+#define	CONTAINS_CS (payloadprop_contains("resource", asru(CSPATH)))
+
+#define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("IA32_MCi_ADDR"))) 
+/* Generic memory ereports. */
+event ereport.cpu.generic-x86.mem_ce@chip/cpu { within(1s) };
+event ereport.cpu.generic-x86.mem_ue@chip/cpu { within(1s) };
+
+/*
+ *	 ========= Propogations for correctable page faults ============
+ *	|								|	
+ *	| Discard mem_ce with no resource in the ereport payload.	|
+ *	| Discard mem_ce with no address info - we can't fault the	|
+ *	| corresponding page without it.				|
+ *	|								|
+ *	| For a mem_ce ereport detected by a given chip/cpu (as per	|
+ *	| the payload detector info) whose resource payload member	|
+ *	| includes a chip/memory-controller/dram-channel/chip-select	|
+ *	| (CSPATH) for the same chip number, diagnose to an upset event	|
+ *	| associated with a per-CSPATH SERD engine as long as we are	|
+ *	| below the page fault limit for this CSPATH (defined below);	|
+ *	| if we are over that limit then discard the event since we	|
+ *	| will already have faulted a dimm and there is no point in	|
+ *	| continuing to diagnose endless page faults from a dimm with	|
+ *	| something like a pin failure.					|
+ *	|								|
+ *	| When the per-CSPATH SERD engine fires we fault the page	|
+ *	| containing the address included in the ereport that caused	|
+ *	| the trip, and increment a per-CSPATH counter to count page	|
+ *	| faults on that chip-select from repeated correctable errors.	|
+ *	|								|
+ *	| A mem_ue ereport produces an immediate page_ue fault.		|
+ *	|===============================================================| 
+ */
+
+/* Counter for page faults diagnosed on a chip-select */
+engine stat.cepgflt@CSPATH;
+
+#define	CS_PGFLT_LIMIT_REACHED (count(stat.cepgflt@CSPATH) > CS_PAGEFLT_MAX)
+
+/* Page fault event for repeated correctable errors */
+event fault.memory.generic-x86.page_ce@CSPATH,
+    FITrate=1000,			/* meaningless */
+    message=0,				/* do not message individual pageflts */
+    ASRU=CSPATH,
+    count=stat.cepgflt@CSPATH,		/* increment on pageflt diagnosis */
+    action=confcall("rewrite-ASRU");	/* identify page in chip-select */
+
+/* Upset to diagnose correctable ereports to */
+event upset.memory.generic-x86.page_ce@CSPATH,
+    engine=serd.memory.generic-x86.page_ce@CSPATH;
+
+/* Synthetic ereport generated when page_ce SERD engine trips */
+event ereport.memory.generic-x86.page_ce_trip@CSPATH { within(1s) };
+
+/* SERD engine for each chip-select */
+engine serd.memory.generic-x86.page_ce@CSPATH,
+    N=PAGE_SB_COUNT, T=PAGE_SB_TIME,
+    method=persistent,
+    trip=ereport.memory.generic-x86.page_ce_trip@CSPATH;
+
+/* Upset to discard events to when we're over limit */
+event upset.memory.generic-x86.overpgfltlimit@CSPATH;
+
+/*
+ * Discard ereports with no resource or no address info
+ */
+event upset.memory.generic-x86.discard@chip/cpu;
+prop upset.memory.generic-x86.discard@chip/cpu
+    { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
+    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+
+/*
+ * For as long as we are below the page fault limit diagnose correctable ereport
+ * observations as upsets to feed the SERD engine.
+ */
+prop upset.memory.generic-x86.page_ce@CSPATH
+    { ADDR_VALID && CONTAINS_CS && !CS_PGFLT_LIMIT_REACHED } (0)->
+    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+
+/*
+ * Discard ereports if we are above the page fault limit on this chip-select,
+ */
+prop upset.memory.generic-x86.overpgfltlimit@CSPATH
+    { ADDR_VALID && CONTAINS_CS && CS_PGFLT_LIMIT_REACHED } (1)->
+    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+
+/* Diagnose a page fault when the pagefault SERD engine trips */
+prop fault.memory.generic-x86.page_ce@CSPATH (1)->
+    ereport.memory.generic-x86.page_ce_trip@CSPATH;
+
+/* Include address info in the page fault diagnosed, for rewrite-ASRU */
+prop fault.memory.generic-x86.page_ce@CSPATH
+    { ADDR_VALID && CONTAINS_CS && SET_ADDR } (0)->
+    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+
+/*
+ *	 ========= Propogations for correctable DIMM faults ============
+ *	|								|
+ *	| A dimm_ce fault is diagnosed when we have faulted an		|
+ *	| excessive number of page_ce faults on a chip-select - more	|
+ *	| than CE_DIMMSB_THRESH.					|
+ * 	|								|
+ *	| A dimm_ue fault is diagnosed on the first uncorrectable	|
+ *	| ereport from a chip-select.					|
+ *	|===============================================================| 
+ */
+
+/* DIMM fault event for CE failures */
+event fault.memory.generic-x86.dimm_ce@CSPATH,
+    ASRU=CSPATH,
+    FITrate=1000,			/* meaningless */
+    action=confcall("rewrite-ASRU");	/* rewrite in "mem" FMRI scheme */
+
+#define	CS_DIMMSB_THRESH_REACHED \
+	(count(stat.cepgflt@CSPATH) == CS_DIMMSB_THRESH)
+
+/*
+ * This upset is diagnosed in parallel with upset.memory.generic-x86.page_ce
+ * on the CSPATH, and the associated SERD engine has the same parameters
+ * as serd.memory.generic-x86.page_ce@CSPATH so they fire at the same time.
+ * When this one fires we check whether we have reached the diagnosis
+ * threshold for a dimm_ce.
+ */
+event upset.memory.generic-x86.dimm_ce@CSPATH,
+    engine=serd.memory.generic-x86.dimm_ce_limitchk@CSPATH;
+
+event ereport.memory.generic-x86.dimm_ce_limitchk@CSPATH { within(1s) };
+
+engine serd.memory.generic-x86.dimm_ce_limitchk@CSPATH,
+    N=PAGE_SB_COUNT, T=PAGE_SB_TIME,
+    method=persistent,
+    trip=ereport.memory.generic-x86.dimm_ce_limitchk@CSPATH;
+
+prop upset.memory.generic-x86.dimm_ce@CSPATH
+    { ADDR_VALID && CONTAINS_CS } (0)->
+    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+
+prop fault.memory.generic-x86.dimm_ce@CSPATH
+    { CS_DIMMSB_THRESH_REACHED } (0)->
+    ereport.memory.generic-x86.dimm_ce_limitchk@CSPATH;
+
+event upset.memory.generic-x86.discard2@CSPATH;
+prop upset.memory.generic-x86.discard2@CSPATH
+    { !CS_DIMMSB_THRESH_REACHED } (0)->
+    ereport.memory.generic-x86.dimm_ce_limitchk@CSPATH;
+
+/*
+ *	 ========= Propogations for uncorrectable page faults ==========
+ *	|								|
+ *	| A UE produces an immediate page fault.  But we also want a	|
+ *	| corresponding dimm fault and since we do not like multi-entry	|
+ *	| suspect lists we arrange two distinct fault management	|
+ *	| exercises by diagnosing a mem_ue to two upset events that	|
+ *	| feed instant-trip SERD engines.  Yuck.			|
+ *	|===============================================================| 
+ */
+
+/* Page fault event for uncorrectable errors */
+event fault.memory.generic-x86.page_ue@CSPATH,
+    FITrate=1000,			/* meaningless */
+    message=0,				/* do not message individual pageflts */
+    count=stat.cepgflt@CSPATH,		/* increment on pageflt diagnosis */
+    action=confcall("rewrite-ASRU");	/* identify page in chip-select */
+
+/* Upset for page fault */
+event upset.memory.generic-x86.page_ue@CSPATH,
+    engine=serd.memory.generic-x86.page_ue@CSPATH;
+
+/* Synthetic erport generated when the page_ue SERD engine trips */
+event ereport.memory.generic-x86.page_ue_trip@CSPATH { within(1s) };
+
+/* Instant-trip engine for page fault */
+engine serd.memory.generic-x86.page_ue@CSPATH,
+    N=0, T=1h,	/* trip on first upset */
+    method=persistent,
+    trip=ereport.memory.generic-x86.page_ue_trip@CSPATH;
+
+/* Discard events with no address info */
+event upset.memory.generic-x86.discard3@CSPATH;
+prop upset.memory.generic-x86.discard3@CSPATH
+    { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
+    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+
+/* Diagnose a page_ue upset on a mem_ue event */
+prop upset.memory.generic-x86.page_ue@CSPATH
+    { ADDR_VALID && CONTAINS_CS } (0)->
+    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+
+/* On the immediate SERD trip diagnose a page fault */
+prop fault.memory.generic-x86.page_ue@CSPATH (1)->
+    ereport.memory.generic-x86.page_ue_trip@CSPATH;
+
+/* Include address info in the page fault diagnosed, for rewrite-ASRU */
+prop fault.memory.generic-x86.page_ue@CSPATH
+    { ADDR_VALID && CONTAINS_CS && SET_ADDR } (0)->
+    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+
+/*
+ *	 ========= Propogations for uncorrectable dimm faults ==========
+ *	|								|
+ *	| A UE produces an immediate dimm fault.  As explained in the	|
+ *	| page_ue block comment above we split the exercise in two in	|
+ *	| order to produce independent page_ue and dimm_ue diagnoses.	|
+ *	|===============================================================| 
+ */
+
+/* Dimm fault for an uncorrectable error */
+event fault.memory.generic-x86.dimm_ue@CSPATH,
+    ASRU=CSPATH,
+    FITrate=1000,			/* meaningless */
+    action=confcall("rewrite-ASRU");	/* rewrite in "mem" FMRI scheme */
+
+/* Upset for dimm fault */
+event upset.memory.generic-x86.dimm_ue@CSPATH,
+    engine=serd.memory.generic-x86.dimm_ue@CSPATH;
+
+/* Sythetic ereport generated when the dimm_ue SERD engine trips */
+event ereport.memory.generic-x86.dimm_ue_trip@CSPATH { within(1s) };
+
+/* Instant-trip engine for dimm fault */
+engine serd.memory.generic-x86.dimm_ue@CSPATH,
+    N=0, T=1h,	/* trip on first upset */
+    method=persistent,
+    trip=ereport.memory.generic-x86.dimm_ue_trip@CSPATH;
+
+/* Diagnose a dimm_ue upset on a mem_ue event (in addition to page_ue upset) */
+prop upset.memory.generic-x86.dimm_ue@CSPATH
+    { CONTAINS_CS } (0)->
+    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+
+/* On the immediate SERD trip diagnose a dimm fault */
+prop fault.memory.generic-x86.dimm_ue@CSPATH (1)->
+    ereport.memory.generic-x86.dimm_ue_trip@CSPATH;
+
+/*
+ *	 ========= Propogations for GART Table Walk Errors =============
+ *	|								|
+ *	| These are usually due to software mis-programming of the GART	|
+ *	| TLB rather than from hardware errors.  It would be incorrect	|
+ *	| to fault and potentially offline a cpu in response to these	|
+ *	| so they have their own fault class to facilitate us ignoring	|
+ *	| them.								|
+ *	|===============================================================| 
+ */
+
+event ereport.cpu.generic-x86.gart_tbl_walk@chip/cpu { within(1s) };
+event upset.cpu.generic-x86.gart_tbl_walk@chip/cpu;
+
+prop upset.cpu.generic-x86.gart_tbl_walk@chip/cpu (1)->
+    ereport.cpu.generic-x86.gart_tbl_walk@chip/cpu;

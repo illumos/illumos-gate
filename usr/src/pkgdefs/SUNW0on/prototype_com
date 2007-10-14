@@ -47,6 +47,8 @@ f none usr/lib/locale/C/LC_MESSAGES/AMD.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/DISK.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/FMD.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/NXGE.po              644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/GMCA.po              644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/INTEL.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SCF.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin

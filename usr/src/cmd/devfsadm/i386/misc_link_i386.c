@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
-#include <sys/mc.h>
+#include <sys/mc_amd.h>
 #include <bsm/devalloc.h>
 
 extern int system_labeled;
@@ -551,11 +551,17 @@ mc_node(di_minor_t minor, di_node_t node)
 	errno = 0;
 	unitaddr = strtol(busaddr, &c, 16);
 
-	if (errno != 0 || unitaddr < MC_AMD_DEV_OFFSET)
+	if (errno != 0)
 		return (DEVFSADM_CONTINUE);
 
-	(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
-	    unitaddr - MC_AMD_DEV_OFFSET);
+	if (unitaddr == 0) {
+		(void) snprintf(linkpath, sizeof (linkpath), "mc/mc");
+	} else if (unitaddr >= MC_AMD_DEV_OFFSET) {
+		(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
+		    unitaddr - MC_AMD_DEV_OFFSET);
+	} else {
+		return (DEVFSADM_CONTINUE);
+	}
 	(void) devfsadm_mklink(linkpath, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

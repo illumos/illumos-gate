@@ -539,7 +539,7 @@ extern int moddebug;
 extern modctl_t modules;
 
 extern int modload_qualified(const char *,
-    const char *, const char *, const char *, uint_t[], int);
+    const char *, const char *, const char *, uint_t[], int, int *);
 
 extern void	mod_setup(void);
 extern int	modload(char *, char *);

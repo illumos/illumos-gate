@@ -38,11 +38,13 @@ d none usr/platform/i86pc/lib 755 root bin
 d none usr/platform/i86pc/lib/mdb 755 root sys
 d none usr/platform/i86pc/lib/mdb/kvm 755 root sys
 d none usr/platform/i86pc/lib/mdb/kvm/amd64 755 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.AuthenticAMD.15.so 555 root sys
+f none usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.generic.so 555 root sys
+f none usr/platform/i86pc/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/pcplusmp.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/uppc.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/unix.so 555 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/cpu.AuthenticAMD.15.so 555 root sys
+f none usr/platform/i86pc/lib/mdb/kvm/cpu.generic.so 555 root sys
+f none usr/platform/i86pc/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/pcplusmp.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/uppc.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/unix.so 555 root sys

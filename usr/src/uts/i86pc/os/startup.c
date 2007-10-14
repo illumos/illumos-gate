@@ -1428,17 +1428,22 @@ startup_modules(void)
 	 */
 	setup_ddi();
 
-	/*
-	 * Set up the CPU module subsystem.  Modifies the device tree, so it
-	 * must be done after setup_ddi().
-	 */
-	cmi_init();
+#ifndef __xpv
+	{
+		/*
+		 * Set up the CPU module subsystem.  Modifies the device tree,
+		 * so it must be done after setup_ddi().
+		 */
 
-	/*
-	 * Initialize the MCA handlers
-	 */
-	if (x86_feature & X86_MCA)
-		cmi_mca_init();
+		cmi_hdl_t hdl;
+
+		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
+		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
+			if (x86_feature & X86_MCA)
+				cmi_mca_init(hdl);
+		}
+	}
+#endif	/* __xpv */
 
 	/*
 	 * Fake a prom tree such that /dev/openprom continues to work
@@ -2041,7 +2046,7 @@ post_startup(void)
 	/*
 	 * Complete CPU module initialization
 	 */
-	cmi_post_init();
+	cmi_post_startup();
 
 	/*
 	 * Perform forceloading tasks for /etc/system.

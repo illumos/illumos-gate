@@ -56,6 +56,11 @@
 #include <sys/fm/cpu/AMD.h>
 
 /*
+ * Set to prevent mc-amd from attaching.
+ */
+int mc_no_attach = 0;
+
+/*
  * Of the 754/939/940 packages, only socket 940 supports quadrank registered
  * dimms.  Unfortunately, no memory-controller register indicates the
  * presence of quadrank dimm support or presence (i.e., in terms of number
@@ -72,6 +77,23 @@ int mc_hold_attached = 1;
 
 #define	MAX(m, n) ((m) >= (n) ? (m) : (n))
 #define	MIN(m, n) ((m) <= (n) ? (m) : (n))
+
+/*
+ * The following tuneable is used to determine the DRAM scrubbing rate.
+ * The values range from 0x00-0x16 as described in the BKDG.  Zero
+ * disables DRAM scrubbing.  Values above zero indicate rates in descending
+ * order.
+ *
+ * The default value below is used on several Sun systems.  In the future
+ * this code should assign values dynamically based on memory sizing.
+ */
+uint32_t mc_scrub_rate_dram = 0xd;	/* 64B every 163.8 us; 1GB per 45 min */
+
+enum {
+	MC_SCRUB_BIOSDEFAULT,	/* retain system default value */
+	MC_SCRUB_FIXED,		/* assign mc_scrub_rate_* values */
+	MC_SCRUB_MAX		/* assign max of system and tunables */
+} mc_scrub_policy = MC_SCRUB_MAX;
 
 static void
 mc_snapshot_destroy(mc_t *mc)
@@ -183,8 +205,9 @@ mc_ecc_enabled(mc_t *mc)
 
 	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
 
-	return (MC_REV_MATCH(rev, MC_REVS_BCDE) ?
-	    MCREG_FIELD_preF(&nbcfg, EccEn) : MCREG_FIELD_revFG(&nbcfg, EccEn));
+	return (MC_REV_MATCH(rev, MC_F_REVS_BCDE) ?
+	    MCREG_FIELD_F_preF(&nbcfg, EccEn) :
+	    MCREG_FIELD_F_revFG(&nbcfg, EccEn));
 }
 
 static uint32_t
@@ -195,9 +218,9 @@ mc_ck_enabled(mc_t *mc)
 
 	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
 
-	return (MC_REV_MATCH(rev, MC_REVS_BCDE) ?
-	    MCREG_FIELD_preF(&nbcfg, ChipKillEccEn) :
-	    MCREG_FIELD_revFG(&nbcfg, ChipKillEccEn));
+	return (MC_REV_MATCH(rev, MC_F_REVS_BCDE) ?
+	    MCREG_FIELD_F_preF(&nbcfg, ChipKillEccEn) :
+	    MCREG_FIELD_F_revFG(&nbcfg, ChipKillEccEn));
 }
 
 static void
@@ -525,15 +548,15 @@ mc_dimmlist_create(mc_t *mc)
 	if (mc->mc_socket == X86_SOCKET_940)
 		r4 = mc_quadranksupport != 0;
 	else if (mc->mc_socket == X86_SOCKET_F1207)
-		r4 = MCREG_FIELD_revFG(drcfghip, FourRankRDimm);
+		r4 = MCREG_FIELD_F_revFG(drcfghip, FourRankRDimm);
 
 	/*
 	 * Are we dealing with quadrank SO-DIMMs?  These are supported
 	 * in AM2 and S1g1 packages only, but in all rev F/G cases we
 	 * can detect their presence via a bit in the dram config high reg.
 	 */
-	if (MC_REV_MATCH(rev, MC_REVS_FG))
-		s4 = MCREG_FIELD_revFG(drcfghip, FourRankSODimm);
+	if (MC_REV_MATCH(rev, MC_F_REVS_FG))
+		s4 = MCREG_FIELD_F_revFG(drcfghip, FourRankSODimm);
 
 	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
 		mcdcfg_rslt_t rslt;
@@ -597,6 +620,7 @@ mc_report_testfails(mc_t *mc)
 			unum.unum_board = 0;
 			unum.unum_chip = mc->mc_props.mcp_num;
 			unum.unum_mc = 0;
+			unum.unum_chan = MC_INVALNUM;
 			unum.unum_cs = mccs->mccs_props.csp_num;
 			unum.unum_rank = mccs->mccs_props.csp_dimmrank;
 			unum.unum_offset = MCAMD_RC_INVALID_OFFSET;
@@ -646,48 +670,31 @@ mc_mkprops_htcfg(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 static void
 mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 {
-	union mcreg_drambase base[MC_CHIP_MAXNODES];
-	union mcreg_dramlimit lim[MC_CHIP_MAXNODES];
+	union mcreg_drambase basereg;
+	union mcreg_dramlimit limreg;
 	mc_props_t *mcp = &mc->mc_props;
 	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
 	union mcreg_dramhole hole;
-	int i;
+	int nodeid = mc->mc_props.mcp_num;
 
-	mc_prop_read_pair(cfghdl,
-	    (uint32_t *)base, MC_AM_REG_DRAMBASE_0, MC_CHIP_MAXNODES,
-	    (uint32_t *)lim, MC_AM_REG_DRAMLIM_0, MC_CHIP_MAXNODES,
-	    MC_AM_REG_DRAM_INCR);
+	mcr->mcr_drambase = MCREG_VAL32(&basereg) = mc_pcicfg_get32(cfghdl,
+	    MC_AM_REG_DRAMBASE_0 + nodeid * MC_AM_REG_DRAM_INCR);
 
-	for (i = 0; i < MC_CHIP_MAXNODES; i++) {
-		/*
-		 * Don't create properties for empty nodes.
-		 */
-		if (MCREG_FIELD_CMN(&lim[i], DRAMLimiti) == 0)
-			continue;
+	mcr->mcr_dramlimit = MCREG_VAL32(&limreg) = mc_pcicfg_get32(cfghdl,
+	    MC_AM_REG_DRAMLIM_0 + nodeid * MC_AM_REG_DRAM_INCR);
 
-		/*
-		 * Skip all nodes but the one that matches the chip id
-		 * for the mc currently being attached.  Since the chip id
-		 * is the HT id this loop and the preceding read of all
-		 * base/limit pairs is overkill.
-		 */
-		if (MCREG_FIELD_CMN(&lim[i], DstNode) != mc->mc_props.mcp_num)
-			continue;
-
-		/*
-		 * Stash raw register values for this node
-		 */
-		mcr->mcr_drambase = MCREG_VAL32(&base[i]);
-		mcr->mcr_dramlimit = MCREG_VAL32(&lim[i]);
-
-		/*
-		 * Derive some "cooked" properties
-		 */
-		mcp->mcp_base = MC_DRAMBASE(&base[i]);
-		mcp->mcp_lim = MC_DRAMLIM(&lim[i]);
-		mcp->mcp_ilen = MCREG_FIELD_CMN(&base[i], IntlvEn);
-		mcp->mcp_ilsel = MCREG_FIELD_CMN(&lim[i], IntlvSel);
-
+	/*
+	 * Derive some "cooked" properties for nodes that have a range of
+	 * physical addresses that are read or write enabled and for which
+	 * the DstNode matches the node we are attaching.
+	 */
+	if (MCREG_FIELD_CMN(&limreg, DRAMLimiti) != 0 &&
+	    MCREG_FIELD_CMN(&limreg, DstNode) == nodeid &&
+	    (MCREG_FIELD_CMN(&basereg, WE) || MCREG_FIELD_CMN(&basereg, RE))) {
+		mcp->mcp_base = MC_DRAMBASE(&basereg);
+		mcp->mcp_lim = MC_DRAMLIM(&limreg);
+		mcp->mcp_ilen = MCREG_FIELD_CMN(&basereg, IntlvEn);
+		mcp->mcp_ilsel = MCREG_FIELD_CMN(&limreg, IntlvSel);
 	}
 
 	/*
@@ -696,14 +703,12 @@ mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	 * hole base and offset for this node.  This was introduced in
 	 * revision E.
 	 */
-	if (MC_REV_ATLEAST(mc->mc_props.mcp_rev, MC_REV_E)) {
-		MCREG_VAL32(&hole) =
+	if (MC_REV_ATLEAST(mc->mc_props.mcp_rev, MC_F_REV_E)) {
+		mcr->mcr_dramhole = MCREG_VAL32(&hole) =
 		    mc_pcicfg_get32(cfghdl, MC_AM_REG_HOLEADDR);
-		mcr->mcr_dramhole = MCREG_VAL32(&hole);
 
-		if (MCREG_FIELD_CMN(&hole, DramHoleValid)) {
+		if (MCREG_FIELD_CMN(&hole, DramHoleValid))
 			mcp->mcp_dramhole_size = MC_DRAMHOLE_SIZE(&hole);
-		}
 	}
 }
 
@@ -721,14 +726,14 @@ mc_getmiscctl(mc_t *mc)
 	mc->mc_cfgregs.mcr_nbcfg = MCREG_VAL32(&nbcfg) =
 	    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG);
 
-	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+	if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
 		mc->mc_cfgregs.mcr_sparectl = MCREG_VAL32(&sparectl) =
 		    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL,
 		    MC_CTL_REG_SPARECTL);
 
-		if (MCREG_FIELD_revFG(&sparectl, SwapDone)) {
+		if (MCREG_FIELD_F_revFG(&sparectl, SwapDone)) {
 			mc->mc_props.mcp_badcs =
-			    MCREG_FIELD_revFG(&sparectl, BadDramCs);
+			    MCREG_FIELD_F_revFG(&sparectl, BadDramCs);
 		}
 	}
 }
@@ -796,10 +801,10 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	 * Note the DRAM controller width.  The 64/128 bit is in a different
 	 * bit position for revision F and G.
 	 */
-	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
-		wide = MCREG_FIELD_revFG(&drcfg_lo, Width128);
+	if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
+		wide = MCREG_FIELD_F_revFG(&drcfg_lo, Width128);
 	} else {
-		wide = MCREG_FIELD_preF(&drcfg_lo, Width128);
+		wide = MCREG_FIELD_F_preF(&drcfg_lo, Width128);
 	}
 	mcp->mcp_accwidth = wide ? 128 : 64;
 
@@ -808,12 +813,12 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	 * revs that support it.  This include the Mod64Mux indication on
 	 * these revs - for rev E it is in DRAM config low.
 	 */
-	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+	if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
 		mcr->mcr_drammisc = MCREG_VAL32(&drmisc) =
 		    mc_pcicfg_get32(cfghdl, MC_DC_REG_DRAMMISC);
-		mcp->mcp_mod64mux = MCREG_FIELD_revFG(&drmisc, Mod64Mux);
-	} else if (MC_REV_MATCH(rev, MC_REV_E)) {
-		mcp->mcp_mod64mux = MCREG_FIELD_preF(&drcfg_lo, Mod64BitMux);
+		mcp->mcp_mod64mux = MCREG_FIELD_F_revFG(&drmisc, Mod64Mux);
+	} else if (MC_REV_MATCH(rev, MC_F_REV_E)) {
+		mcp->mcp_mod64mux = MCREG_FIELD_F_preF(&drcfg_lo, Mod64BitMux);
 	}
 
 	/*
@@ -830,10 +835,11 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	 * introduced as an option in rev E,  but the bit that indicates it
 	 * is enabled has moved in revs F/G.
 	 */
-	if (MC_REV_MATCH(rev, MC_REV_E)) {
-		mcp->mcp_bnkswzl = MCREG_FIELD_preF(&baddrmap, BankSwizzleMode);
-	} else if (MC_REV_MATCH(rev, MC_REVS_FG)) {
-		mcp->mcp_bnkswzl = MCREG_FIELD_revFG(&drcfg_hi,
+	if (MC_REV_MATCH(rev, MC_F_REV_E)) {
+		mcp->mcp_bnkswzl =
+		    MCREG_FIELD_F_preF(&baddrmap, BankSwizzleMode);
+	} else if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
+		mcp->mcp_bnkswzl = MCREG_FIELD_F_revFG(&drcfg_hi,
 		    BankSwizzleMode);
 	}
 
@@ -842,7 +848,7 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 	 * to F have an equal number of base and mask registers; revision F
 	 * has twice as many base registers as masks.
 	 */
-	maskdivisor = MC_REV_MATCH(rev, MC_REVS_FG) ? 2 : 1;
+	maskdivisor = MC_REV_MATCH(rev, MC_F_REVS_FG) ? 2 : 1;
 
 	mc_prop_read_pair(cfghdl,
 	    (uint32_t *)base, MC_DC_REG_CSBASE_0, MC_CHIP_NCS,
@@ -860,12 +866,12 @@ mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 		size_t sz;
 		int csbe, spare, testfail;
 
-		if (MC_REV_MATCH(rev, MC_REVS_FG)) {
-			csbe = MCREG_FIELD_revFG(&base[i], CSEnable);
-			spare = MCREG_FIELD_revFG(&base[i], Spare);
-			testfail = MCREG_FIELD_revFG(&base[i], TestFail);
+		if (MC_REV_MATCH(rev, MC_F_REVS_FG)) {
+			csbe = MCREG_FIELD_F_revFG(&base[i], CSEnable);
+			spare = MCREG_FIELD_F_revFG(&base[i], Spare);
+			testfail = MCREG_FIELD_F_revFG(&base[i], TestFail);
 		} else {
-			csbe = MCREG_FIELD_preF(&base[i], CSEnable);
+			csbe = MCREG_FIELD_F_preF(&base[i], CSEnable);
 			spare = 0;
 			testfail = 0;
 		}
@@ -1043,7 +1049,7 @@ mc_onlinespare(mc_t *mc, int csnum)
 
 	ASSERT(RW_WRITE_HELD(&mc_lock));
 
-	if (!MC_REV_MATCH(mcp->mcp_rev, MC_REVS_FG))
+	if (!MC_REV_MATCH(mcp->mcp_rev, MC_F_REVS_FG))
 		return (ENOTSUP);	/* MC rev does not offer online spare */
 	else if (mcp->mcp_sparecs == MC_INVALNUM)
 		return (ENODEV);	/* Supported, but no spare configured */
@@ -1074,16 +1080,16 @@ mc_onlinespare(mc_t *mc, int csnum)
 	MCREG_VAL32(&sparectl) = mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL,
 	    MC_CTL_REG_SPARECTL);
 
-	if (MCREG_FIELD_revFG(&sparectl, SwapDone))
+	if (MCREG_FIELD_F_revFG(&sparectl, SwapDone))
 		return (EBUSY);
 
 	/* Write to the BadDramCs field */
-	MCREG_FIELD_revFG(&sparectl, BadDramCs) = csnum;
+	MCREG_FIELD_F_revFG(&sparectl, BadDramCs) = csnum;
 	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL,
 	    MCREG_VAL32(&sparectl));
 
 	/* And request that the swap to the spare start */
-	MCREG_FIELD_revFG(&sparectl, SwapEn) = 1;
+	MCREG_FIELD_F_revFG(&sparectl, SwapEn) = 1;
 	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL,
 	    MCREG_VAL32(&sparectl));
 
@@ -1111,10 +1117,10 @@ mc_onlinespare(mc_t *mc, int csnum)
 
 		MCREG_VAL32(&sparectl) = mc_pcicfg_get32_nohdl(mc,
 		    MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL);
-	} while (!MCREG_FIELD_revFG(&sparectl, SwapDone) &&
+	} while (!MCREG_FIELD_F_revFG(&sparectl, SwapDone) &&
 	    gethrtime() < tmax);
 
-	if (!MCREG_FIELD_revFG(&sparectl, SwapDone))
+	if (!MCREG_FIELD_F_revFG(&sparectl, SwapDone))
 		return (ETIME);		/* Operation timed out */
 
 	mcp->mcp_badcs = csnum;
@@ -1261,55 +1267,50 @@ mc_fm_init(dev_info_t *dip)
 	ddi_fm_handler_register(dip, mc_fm_handle, NULL);
 }
 
-static void
-mc_fm_fini(dev_info_t *dip)
+/*ARGSUSED*/
+static int
+mc_create_cb(cmi_hdl_t whdl, void *arg1, void *arg2, void *arg3)
 {
-	pci_ereport_teardown(dip);
-	ddi_fm_fini(dip);
+	chipid_t chipid = *((chipid_t *)arg1);
+	cmi_hdl_t *hdlp = (cmi_hdl_t *)arg2;
+
+	if (cmi_hdl_chipid(whdl) == chipid) {
+		cmi_hdl_hold(whdl);	/* short-term hold */
+		*hdlp = whdl;
+		return (CMI_HDL_WALK_DONE);
+	} else {
+		return (CMI_HDL_WALK_NEXT);
+	}
 }
 
 static mc_t *
 mc_create(chipid_t chipid)
 {
 	mc_t *mc;
-	cpu_t *cpu;
+	cmi_hdl_t hdl = NULL;
 
 	ASSERT(RW_WRITE_HELD(&mc_lock));
 
-	mc = kmem_zalloc(sizeof (mc_t), KM_SLEEP);
-
 	/*
-	 * Find one of a chip's CPU.
+	 * Find a handle for one of a chip's CPU.
 	 *
 	 * We can use one of the chip's CPUs since all cores
 	 * of a chip share the same revision and socket type.
 	 */
-	kpreempt_disable();
-	cpu = cpu_list;
-	do {
-		if (cpuid_get_chipid(cpu) == chipid)
-			break;
-	} while ((cpu = cpu->cpu_next) != cpu_list);
+	cmi_hdl_walk(mc_create_cb, (void *)&chipid, (void *)&hdl, NULL);
+	if (hdl == NULL)
+		return (NULL);	/* no cpu for this chipid found! */
 
-	if (cpuid_get_chipid(cpu) != chipid) {
-		/*
-		 * Couldn't find a cpu with the specified chipid
-		 */
-		kpreempt_enable();
-		kmem_free(mc, sizeof (mc_t));
-		return (NULL);
-	}
+	mc = kmem_zalloc(sizeof (mc_t), KM_SLEEP);
 
 	mc->mc_hdr.mch_type = MC_NT_MC;
 	mc->mc_props.mcp_num = chipid;
 	mc->mc_props.mcp_sparecs = MC_INVALNUM;
 	mc->mc_props.mcp_badcs = MC_INVALNUM;
 
-	mc->mc_props.mcp_rev = cpuid_getchiprev(cpu);
-	mc->mc_revname = cpuid_getchiprevstr(cpu);
-	mc->mc_socket = cpuid_getsockettype(cpu);
-
-	kpreempt_enable();
+	mc->mc_props.mcp_rev = cmi_hdl_chiprev(hdl);
+	mc->mc_revname = cmi_hdl_chiprevstr(hdl);
+	mc->mc_socket = cmi_hdl_getsockettype(hdl);
 
 	if (mc_list == NULL)
 		mc_list = mc;
@@ -1319,7 +1320,161 @@ mc_create(chipid_t chipid)
 	mc->mc_next = NULL;
 	mc_last = mc;
 
+	cmi_hdl_rele(hdl);
+
 	return (mc);
+}
+
+/*
+ * Return the maximum scrubbing rate between r1 and r2, where r2 is extracted
+ * from the specified 'cfg' register value using 'mask' and 'shift'.  If a
+ * value is zero, scrubbing is off so return the opposite value.  Otherwise
+ * the maximum rate is the smallest non-zero value of the two values.
+ */
+static uint32_t
+mc_scrubber_max(uint32_t r1, uint32_t cfg, uint32_t mask, uint32_t shift)
+{
+	uint32_t r2 = (cfg & mask) >> shift;
+
+	if (r1 != 0 && r2 != 0)
+		return (MIN(r1, r2));
+
+	return (r1 ? r1 : r2);
+}
+
+
+/*
+ * Enable the memory scrubber.  We must use the mc_pcicfg_{get32,put32}_nohdl
+ * interfaces since we do not bind to function 3.
+ */
+cmi_errno_t
+mc_scrubber_enable(mc_t *mc)
+{
+	mc_props_t *mcp = &mc->mc_props;
+	chipid_t chipid = (chipid_t)mcp->mcp_num;
+	uint32_t rev = (uint32_t)mcp->mcp_rev;
+	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
+	union mcreg_scrubctl scrubctl;
+	union mcreg_dramscrublo dalo;
+	union mcreg_dramscrubhi dahi;
+
+	mcr->mcr_scrubctl = MCREG_VAL32(&scrubctl) =
+	    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL);
+
+	mcr->mcr_scrubaddrlo = MCREG_VAL32(&dalo) =
+	    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_LO);
+
+	mcr->mcr_scrubaddrhi = MCREG_VAL32(&dahi) =
+	    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_HI);
+
+	if (mc_scrub_policy == MC_SCRUB_BIOSDEFAULT)
+		return (MCREG_FIELD_CMN(&scrubctl, DramScrub) !=
+		    AMD_NB_SCRUBCTL_RATE_NONE ?
+		    CMI_SUCCESS : CMIERR_MC_NOMEMSCRUB);
+
+	/*
+	 * Disable DRAM scrubbing while we fiddle.
+	 */
+	MCREG_FIELD_CMN(&scrubctl, DramScrub) = AMD_NB_SCRUBCTL_RATE_NONE;
+	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL,
+	    MCREG_VAL32(&scrubctl));
+
+	/*
+	 * Setup DRAM Scrub Address Low and High registers for the
+	 * base address of this node, and to select srubber redirect.
+	 */
+	MCREG_FIELD_CMN(&dalo, ScrubReDirEn) = 1;
+	MCREG_FIELD_CMN(&dalo, ScrubAddrLo) =
+	    AMD_NB_SCRUBADDR_MKLO(mcp->mcp_base);
+
+	MCREG_FIELD_CMN(&dahi, ScrubAddrHi) =
+	    AMD_NB_SCRUBADDR_MKHI(mcp->mcp_base);
+
+	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_LO,
+	    MCREG_VAL32(&dalo));
+	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_HI,
+	    MCREG_VAL32(&dahi));
+
+	if (mc_scrub_rate_dram > AMD_NB_SCRUBCTL_RATE_MAX) {
+		cmn_err(CE_WARN, "mc_scrub_rate_dram is too large; "
+		    "resetting to 0x%x\n", AMD_NB_SCRUBCTL_RATE_MAX);
+		mc_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_MAX;
+	}
+
+	switch (mc_scrub_policy) {
+	case MC_SCRUB_FIXED:
+		/* Use the system value checked above */
+		break;
+
+	default:
+		cmn_err(CE_WARN, "Unknown mc_scrub_policy value %d - "
+		    "using default policy of MC_SCRUB_MAX", mc_scrub_policy);
+		/*FALLTHRU*/
+
+	case MC_SCRUB_MAX:
+		mc_scrub_rate_dram = mc_scrubber_max(mc_scrub_rate_dram,
+		    mcr->mcr_scrubctl, AMD_NB_SCRUBCTL_DRAM_MASK,
+		    AMD_NB_SCRUBCTL_DRAM_SHIFT);
+		break;
+	}
+
+#ifdef	OPTERON_ERRATUM_99
+	/*
+	 * This erratum applies on revisions D and earlier.
+	 *
+	 * Do not enable the dram scrubber is the chip-select ranges
+	 * for the node are not contiguous.
+	 */
+	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE &&
+	    mc->mc_csdiscontig &&
+	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
+		    "%s chip %d because DRAM hole is present on this node",
+		    mc->mc_revname, chipid);
+		mc_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_NONE;
+	}
+#endif
+
+#ifdef OPTERON_ERRATUM_101
+	/*
+	 * This erratum applies on revisions D and earlier.
+	 *
+	 * If the DRAM Base Address register's IntlvEn field indicates that
+	 * node interleaving is enabled, we must disable the DRAM scrubber
+	 * and return zero to indicate that Solaris should use s/w instead.
+	 */
+	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE &&
+	    mcp->mcp_ilen != 0 &&
+	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
+		    "%s chip %d because DRAM memory is node-interleaved",
+		    mc->mc_revname, chipid);
+		mc_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_NONE;
+	}
+#endif
+
+	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE) {
+		MCREG_FIELD_CMN(&scrubctl, DramScrub) = mc_scrub_rate_dram;
+		mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL,
+		    MCREG_VAL32(&scrubctl));
+	}
+
+	return (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE ?
+	    CMI_SUCCESS : CMIERR_MC_NOMEMSCRUB);
+}
+
+/*ARGSUSED*/
+static int
+mc_attach_cb(cmi_hdl_t whdl, void *arg1, void *arg2, void *arg3)
+{
+	mc_t *mc = (mc_t *)arg1;
+	mcamd_prop_t chipid = *((mcamd_prop_t *)arg2);
+
+	if (cmi_hdl_chipid(whdl) == chipid) {
+		mcamd_mc_register(whdl, mc);
+	}
+
+	return (CMI_HDL_WALK_NEXT);
 }
 
 static int mc_sw_scrub_disabled = 0;
@@ -1334,10 +1489,9 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	enum mc_funcnum func;
 	long unitaddr;
 	int chipid, rc;
-	cpu_t *cpu;
 	mc_t *mc;
 
-	if (cmd != DDI_ATTACH)
+	if (cmd != DDI_ATTACH || mc_no_attach != 0)
 		return (DDI_FAILURE);
 
 	bindnm = ddi_binding_name(dip);
@@ -1411,8 +1565,6 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mc->mc_ref++;
 
-	rw_downgrade(&mc_lock);
-
 	/*
 	 * Add the common properties to this node, and then add any properties
 	 * that are specific to this node based upon its configuration space.
@@ -1437,16 +1589,13 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (func == MC_FUNC_DEVIMAP) {
 		mc_props_t *mcp = &mc->mc_props;
 		int dram_present = 0;
-		pg_cpu_itr_t itr;
-		pghw_t *chp;
-		cpu_t *cpup;
 
 		if (ddi_create_minor_node(dip, "mc-amd", S_IFCHR,
-		    mc->mc_props.mcp_num, "ddi_mem_ctrl",
+		    mcp->mcp_num, "ddi_mem_ctrl",
 		    0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "failed to create minor node for chip "
 			    "%d memory controller\n",
-			    (chipid_t)mc->mc_props.mcp_num);
+			    (chipid_t)mcp->mcp_num);
 		}
 
 		/*
@@ -1454,40 +1603,13 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 *
 		 * If there is memory present on this node and ECC is enabled
 		 * attempt to enable h/w memory scrubbers for this node.
-		 * Note that if the generic cpu module has loaded then this
-		 * will have no effect and cmi_scrubber_enable will return
-		 * 0.  If we are successful in enabling the hardware scrubbers,
+		 * If we are successful in enabling *any* hardware scrubbers,
 		 * disable the software memory scrubber.
 		 */
-		kpreempt_disable();	/* prevent cpu list from changing */
+		cmi_hdl_walk(mc_attach_cb, (void *)mc, (void *)&mcp->mcp_num,
+		    NULL);
 
-		chp = pghw_find_by_instance(mc->mc_props.mcp_num, PGHW_CHIP);
-		if (chp == NULL) {
-			/*
-			 * No chip grouping was found (single core processors).
-			 * Find the CPU to register by searching the CPU list.
-			 */
-			cpu = cpu_list;
-			do {
-				if (cpuid_get_chipid(cpu) ==
-				    mc->mc_props.mcp_num)
-					break;
-			} while ((cpu = cpu->cpu_next) != cpu_list);
-			ASSERT(cpuid_get_chipid(cpu) == mc->mc_props.mcp_num);
-
-			mcamd_mc_register(cpu);
-		} else {
-			/*
-			 * Iterate over / register the chip's CPUs
-			 */
-			PG_CPU_ITR_INIT(chp, itr);
-			cpup = cpu = pg_cpu_next(&itr);
-			do {
-				mcamd_mc_register(cpup);
-			} while ((cpup = pg_cpu_next(&itr)) != NULL);
-		}
-
-		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
+		if (mcp->mcp_lim != mcp->mcp_base) {
 			/*
 			 * This node may map non-dram memory alone, so we
 			 * must check for an enabled chip-select to be
@@ -1520,14 +1642,17 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			/* No memory on this node - others decide memscrub */
 			rc = 0;
 		} else {
-			/* There is memory on this node and ECC is enabled */
-			rc = cmi_scrubber_enable(cpu, mcp->mcp_base,
-			    mcp->mcp_ilen, mc->mc_csdiscontig);
+			/*
+			 * There is memory on this node and ECC is enabled.
+			 * Call via the cpu module to enable memory scrubbing
+			 * on this node - we could call directly but then
+			 * we may overlap with a request to enable chip-cache
+			 * scrubbing.
+			 */
+			rc = mc_scrubber_enable(mc);
 		}
 
-		kpreempt_enable();
-
-		if (rc && !mc_sw_scrub_disabled++)
+		if (rc == CMI_SUCCESS && !mc_sw_scrub_disabled++)
 			memscrub_disable();
 
 		mc_report_testfails(mc);

@@ -264,6 +264,9 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
 #
 CPU_KMODS	+= amd_opteron
 CPU_KMODS	+= generic_cpu
+CPU_KMODS	+= authenticamd
+CPU_KMODS	+= genuineintel
+CPU_KMODS	+= intel_nb5000
 
 #
 #	Exec Class Modules (/kernel/exec):

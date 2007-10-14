@@ -276,23 +276,37 @@ static struct cpuid_info cpuid_info0;
  * Second index by (model & 0x3)
  */
 static uint32_t amd_skts[3][4] = {
+	/*
+	 * Family 0xf revisions B through E
+	 */
+#define	A_SKTS_0			0
 	{
 		X86_SOCKET_754,		/* 0b00 */
 		X86_SOCKET_940,		/* 0b01 */
 		X86_SOCKET_754,		/* 0b10 */
 		X86_SOCKET_939		/* 0b11 */
 	},
+	/*
+	 * Family 0xf revisions F and G
+	 */
+#define	A_SKTS_1			1
 	{
 		X86_SOCKET_S1g1,	/* 0b00 */
 		X86_SOCKET_F1207,	/* 0b01 */
 		X86_SOCKET_UNKNOWN,	/* 0b10 */
 		X86_SOCKET_AM2		/* 0b11 */
 	},
+	/*
+	 * Family 0x10 revisions A and B
+	 * It is not clear whether, as new sockets release, that
+	 * model & 0x3 will id socket for this family
+	 */
+#define	A_SKTS_2			2
 	{
 		X86_SOCKET_F1207,	/* 0b00 */
 		X86_SOCKET_F1207,	/* 0b01 */
 		X86_SOCKET_F1207,	/* 0b10 */
-		X86_SOCKET_F1207	/* 0b11 */
+		X86_SOCKET_F1207,	/* 0b11 */
 	}
 };
 
@@ -314,40 +328,56 @@ static const struct amd_rev_mapent {
 	int rm_sktidx;
 } amd_revmap[] = {
 	/*
+	 * =============== AuthenticAMD Family 0xf ===============
+	 */
+
+	/*
 	 * Rev B includes model 0x4 stepping 0 and model 0x5 stepping 0 and 1.
 	 */
-	{ 0xf, 0x04, 0x04, 0x0, 0x0, X86_CHIPREV_AMD_F_REV_B, "B", 0 },
-	{ 0xf, 0x05, 0x05, 0x0, 0x1, X86_CHIPREV_AMD_F_REV_B, "B", 0 },
+	{ 0xf, 0x04, 0x04, 0x0, 0x0, X86_CHIPREV_AMD_F_REV_B, "B", A_SKTS_0 },
+	{ 0xf, 0x05, 0x05, 0x0, 0x1, X86_CHIPREV_AMD_F_REV_B, "B", A_SKTS_0 },
 	/*
 	 * Rev C0 includes model 0x4 stepping 8 and model 0x5 stepping 8
 	 */
-	{ 0xf, 0x04, 0x05, 0x8, 0x8, X86_CHIPREV_AMD_F_REV_C0, "C0", 0 },
+	{ 0xf, 0x04, 0x05, 0x8, 0x8, X86_CHIPREV_AMD_F_REV_C0, "C0", A_SKTS_0 },
 	/*
 	 * Rev CG is the rest of extended model 0x0 - i.e., everything
 	 * but the rev B and C0 combinations covered above.
 	 */
-	{ 0xf, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_CG, "CG", 0 },
+	{ 0xf, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_CG, "CG", A_SKTS_0 },
 	/*
 	 * Rev D has extended model 0x1.
 	 */
-	{ 0xf, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_D, "D", 0 },
+	{ 0xf, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_D, "D", A_SKTS_0 },
 	/*
 	 * Rev E has extended model 0x2.
 	 * Extended model 0x3 is unused but available to grow into.
 	 */
-	{ 0xf, 0x20, 0x3f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_E, "E", 0 },
+	{ 0xf, 0x20, 0x3f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_E, "E", A_SKTS_0 },
 	/*
 	 * Rev F has extended models 0x4 and 0x5.
 	 */
-	{ 0xf, 0x40, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_F, "F", 1 },
+	{ 0xf, 0x40, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_F, "F", A_SKTS_1 },
 	/*
 	 * Rev G has extended model 0x6.
 	 */
-	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", 1 },
+	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", A_SKTS_1 },
+
 	/*
-	 * Family 0x10 Rev B has model 0x2.
+	 * =============== AuthenticAMD Family 0x10 ===============
 	 */
-	{ 0x10, 0x02, 0x02, 0x0, 0xa, X86_CHIPREV_AMD_10_REV_B, "B", 2 }
+
+	/*
+	 * Rev A has model 0 and stepping 0/1/2 for DR-{A0,A1,A2}.
+	 * Give all of model 0 stepping range to rev A.
+	 */
+	{ 0x10, 0x00, 0x00, 0x0, 0x2, X86_CHIPREV_AMD_10_REV_A, "A", A_SKTS_2 },
+
+	/*
+	 * Rev B has model 2 and steppings 0/1/0xa/2 for DR-{B0,B1,BA,B2}.
+	 * Give all of model 2 stepping range to rev B.
+	 */
+	{ 0x10, 0x02, 0x02, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_B, "B", A_SKTS_2 },
 };
 
 /*

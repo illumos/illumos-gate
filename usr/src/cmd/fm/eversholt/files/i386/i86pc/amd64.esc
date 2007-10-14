@@ -52,7 +52,7 @@ asru chip/memory-controller/chip-select;
  * diagnosis of associated faults when the libtopo mem scheme rewrites the
  * asru in "mem" scheme.
  */
-#define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("addr")))
+#define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("IA32_MCi_ADDR")))
 
 #define	SET_OFFSET (setpayloadprop("asru-offset", \
 	payloadprop("resource[0].hc-specific.offset")))
@@ -535,7 +535,7 @@ event ereport.cpu.amd.nb.dramaddr_par@chip/cpu{within(5s)};
 event fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel,
     FITrate=1000, ASRU=dram-channel;
 
-#define GET_CHANNEL ($chan = (payloadprop("bank-status") >> 32 & 0x200) ? \
+#define GET_CHANNEL ($chan = (payloadprop("IA32_MCi_STATUS") >> 32 & 0x200) ? \
     1 : 0)
 
 prop fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel[y] (0)->

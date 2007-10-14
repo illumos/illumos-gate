@@ -38,7 +38,9 @@ common_DCNAMES = \
 	SCA1000
 
 i386_DCNAMES = \
-	AMD
+	AMD \
+	INTEL \
+	GMCA
 
 sparc_DCNAMES = \
 	SCF \
