@@ -339,7 +339,40 @@ __no_rupdate_msg:
  *
  * Or in other words, we have no registers available at all.
  * Only swapgs can save us!
+ *
+ * Under the hypervisor, the swapgs has happened already.  However, the
+ * state of the world is very different from that we're familiar with.
+ *
+ * In particular, we have a stack structure like that for interrupt
+ * gates, except that the %cs and %ss registers are modified for reasons
+ * that are not entirely clear.  Critically, the %rcx/%r11 values do
+ * *not* reflect the usage of those registers under a 'real' syscall[1];
+ * the stack, therefore, looks like this:
+ *
+ *	0x0(rsp)	potentially junk %rcx
+ *	0x8(rsp)	potentially junk %r11
+ *	0x10(rsp)	user %rip
+ *	0x18(rsp)	modified %cs
+ *	0x20(rsp)	user %rflags
+ *	0x28(rsp)	user %rsp
+ *	0x30(rsp)	modified %ss
+ *
+ *
+ * and before continuing on, we must load the %rip into %rcx and the
+ * %rflags into %r11.
+ *
+ * [1] They used to, and we relied on it, but this was broken in 3.1.1.
+ * Sigh.
  */
+
+#if defined(__xpv)
+#define	XPV_SYSCALL_PROD		\
+	XPV_TRAP_POP;			\
+	movq	(%rsp), %rcx;		\
+	movq	0x10(%rsp), %r11
+#else
+#define	XPV_SYSCALL_PROD /* nothing */
+#endif
 
 #if defined(__lint)
 
@@ -358,47 +391,26 @@ size_t _allsyscalls_size;
 
 	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
 	SWAPGS				/* kernel gsbase */
-	XPV_TRAP_POP
+	XPV_SYSCALL_PROD
 	BRAND_CALLBACK(BRAND_CB_SYSCALL)
 	SWAPGS				/* user gsbase */
 
 #if defined(__xpv)
-	/*
-	 * Note that swapgs is handled for us by the hypervisor. Here
-	 * it is empty.
-	 */
-	jmp	nopop_sys_syscall
+	jmp	noprod_sys_syscall
 #endif
 	
 	ALTENTRY(sys_syscall)
 	SWAPGS				/* kernel gsbase */
-#if defined(__xpv)
-	/*
-	 * Even though we got here by a syscall instruction from user land
-	 * the hypervisor constructs our stack the same way as is done
-	 * for interrupt gates. The only exception is that it pushes kernel
-	 * cs and ss instead of user cs and ss for some reason.  This is all
-	 * different from running native on the metal.
-	 *
-	 * Stack on entry:
-	 *      (0x0)rsp	rcx	(user rip)
-	 *      (0x8)rsp	r11	(user rflags)
-	 *      (0x10)rsp	user rip
-	 *      (0x18)rsp	kernel cs
-	 *      (0x20)rsp	user rflags 
-	 *      (0x28)rsp	user rsp
-	 *      (0x30)rsp	kernel ss
-	 */
+	XPV_SYSCALL_PROD
 
-	XPV_TRAP_POP
-nopop_sys_syscall:
+noprod_sys_syscall:
 	ASSERT_UPCALL_MASK_IS_SET
 
 	movq	%r15, %gs:CPU_RTMP_R15
+#if defined(__xpv)
 	movq	0x18(%rsp), %r15		/* save user stack */
 	movq	%r15, %gs:CPU_RTMP_RSP
 #else
-	movq	%r15, %gs:CPU_RTMP_R15
 	movq	%rsp, %gs:CPU_RTMP_RSP
 #endif	/* __xpv */
 
