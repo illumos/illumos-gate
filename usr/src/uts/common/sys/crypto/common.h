@@ -82,6 +82,21 @@ typedef struct CK_AES_CCM_PARAMS {
 	uchar_t *authData;
 } CK_AES_CCM_PARAMS;
 
+
+#ifdef _KERNEL
+/*
+ * CK_ECDH1_DERIVE_PARAMS provides the parameters to the
+ * CKM_ECDH1_KEY_DERIVE mechanism
+ */
+typedef struct CK_ECDH1_DERIVE_PARAMS {
+	ulong_t		kdf;
+	ulong_t		ulSharedDataLen;
+	uchar_t		*pSharedData;
+	ulong_t		ulPublicDataLen;
+	uchar_t		*pPublicData;
+} CK_ECDH1_DERIVE_PARAMS;
+#endif
+
 #ifdef _KERNEL
 #ifdef  _SYSCALL32
 
@@ -100,6 +115,14 @@ typedef struct CK_AES_CCM_PARAMS32 {
 	caddr32_t nonce;
 	caddr32_t authData;
 } CK_AES_CCM_PARAMS32;
+
+typedef struct CK_ECDH1_DERIVE_PARAMS32 {
+	uint32_t	kdf;
+	uint32_t	ulSharedDataLen;
+	caddr32_t	pSharedData;
+	uint32_t	ulPublicDataLen;
+	caddr32_t	pPublicData;
+} CK_ECDH1_DERIVE_PARAMS32;
 
 #endif  /* _SYSCALL32 */
 #endif /* _KERNEL */

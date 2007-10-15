@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@ typedef int BIG_ERR_CODE;
 #ifdef BIGNUM_CHUNK_32
 #define	BIG_CHUNK_SIZE		32
 #define	BIG_CHUNK_TYPE		uint32_t
+#define	BIG_CHUNK_TYPE_SIGNED	int32_t
 #define	BIG_CHUNK_HIGHBIT	0x80000000
 #define	BIG_CHUNK_ALLBITS	0xffffffff
 #define	BIG_CHUNK_LOWHALFBITS	0xffff
@@ -49,6 +50,7 @@ typedef int BIG_ERR_CODE;
 #else
 #define	BIG_CHUNK_SIZE		64
 #define	BIG_CHUNK_TYPE		uint64_t
+#define	BIG_CHUNK_TYPE_SIGNED	int64_t
 #define	BIG_CHUNK_HIGHBIT	0x8000000000000000ULL
 #define	BIG_CHUNK_ALLBITS	0xffffffffffffffffULL
 #define	BIG_CHUNK_LOWHALFBITS	0xffffffffULL
@@ -116,6 +118,7 @@ typedef struct {
 #define	BIG_DIV_BY_0 -3
 #define	BIG_NO_RANDOM -4
 #define	BIG_TEST_FAILED -5
+#define	BIG_BUFFER_TOO_SMALL -6
 
 #define	arraysize(x) (sizeof (x) / sizeof (x[0]))
 
@@ -133,13 +136,23 @@ BIG_ERR_CODE ncp_big_init(BIGNUM *number, int size);
 BIG_ERR_CODE ncp_big_extend(BIGNUM *number, int size);
 void ncp_big_finish(BIGNUM *number);
 int ncp_big_is_zero(BIGNUM *n);
+int ncp_big_equals_one(BIGNUM *aa);
 void ncp_kcl2bignum(BIGNUM *bn, uchar_t *kn, size_t len);
 void ncp_bignum2kcl(uchar_t *kn, BIGNUM *bn, size_t len);
+BIG_ERR_CODE ncp_kcl_to_bignum(BIGNUM *bn,
+    uint8_t *kn, int knlen, int check, int mont,
+    int ispoly, BIGNUM *nn, int nndegree, BIG_CHUNK_TYPE nprime, BIGNUM *R);
+BIG_ERR_CODE ncp_bignum_to_kcl(uint8_t *kn, int *knlength,
+    BIGNUM *bn, int shorten, int mont, int ispoly,
+    BIGNUM *nn, BIG_CHUNK_TYPE nprime, BIGNUM *Rinv);
+BIG_ERR_CODE ncp_big_set_int(BIGNUM *tgt, BIG_CHUNK_TYPE_SIGNED value);
+BIG_ERR_CODE ncp_big_shiftright(BIGNUM *result, BIGNUM *aa, int offs);
 BIG_ERR_CODE ncp_DSA_key_init(DSAkey *key, int size);
 void ncp_DSA_key_finish(DSAkey *key);
 BIG_ERR_CODE ncp_RSA_key_init(RSAkey *key, int psize, int qsize);
 void ncp_RSA_key_finish(RSAkey *key);
 BIG_ERR_CODE ncp_big_mont_rr(BIGNUM *result, BIGNUM *n);
+BIG_CHUNK_TYPE ncp_big_n0(BIG_CHUNK_TYPE n);
 BIG_ERR_CODE ncp_big_modexp(BIGNUM *result, BIGNUM *a, BIGNUM *e,
     BIGNUM *n, BIGNUM *n_rr, void *ncp, void *reqp);
 BIG_ERR_CODE ncp_big_modexp_crt(BIGNUM *result, BIGNUM *a, BIGNUM *dmodpminus1,
@@ -153,12 +166,34 @@ BIG_ERR_CODE ncp_big_ext_gcd_pos(BIGNUM *gcd, BIGNUM *cm, BIGNUM *ce,
     BIGNUM *m, BIGNUM *e);
 BIG_ERR_CODE ncp_big_add(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE ncp_big_mul(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
+BIG_ERR_CODE ncp_big_mul_extend(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE ncp_big_nextprime_pos(BIGNUM *result, BIGNUM *n, void *ncp,
     void *reqp);
 BIG_ERR_CODE ncp_big_sub_pos(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 BIG_ERR_CODE ncp_big_copy(BIGNUM *dest, BIGNUM *src);
 BIG_ERR_CODE ncp_big_sub(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
 int ncp_big_bitlength(BIGNUM *n);
+int ncp_big_MSB(BIGNUM *X);
+int ncp_big_extract_bit(BIGNUM *aa, int k);
+BIG_ERR_CODE ncp_big_mod_add(BIGNUM *result,
+    BIGNUM *aa, BIGNUM *bb, BIGNUM *nn);
+BIG_ERR_CODE ncp_big_mod_sub(BIGNUM *result,
+    BIGNUM *aa, BIGNUM *bb, BIGNUM *nn);
+int ncp_big_poly_bit_k(BIGNUM *target, int k, BIGNUM *nn, unsigned int minlen);
+BIG_ERR_CODE ncp_big_mont_encode(BIGNUM *result, BIGNUM *input,
+    int ispoly, BIGNUM *nn, BIG_CHUNK_TYPE nprime, BIGNUM *R);
+BIG_ERR_CODE ncp_big_mont_decode(BIGNUM *result, BIGNUM *input,
+    int ispoly, BIGNUM *nn, BIG_CHUNK_TYPE nprime, BIGNUM *Rinv);
+BIG_ERR_CODE ncp_big_reduce(BIGNUM *target, BIGNUM *modulus, int ispoly);
+BIG_CHUNK_TYPE ncp_big_poly_nprime(BIGNUM *nn, int nndegree);
+BIG_ERR_CODE ncp_big_poly_add(BIGNUM *result, BIGNUM *aa, BIGNUM *bb);
+BIG_ERR_CODE ncp_big_poly_mont_mul(BIGNUM *result,
+    BIGNUM *aa, BIGNUM *bb, BIGNUM *nn, BIG_CHUNK_TYPE nprime);
+BIG_ERR_CODE ncp_big_mont_mul_extend(BIGNUM *ret,
+    BIGNUM *a, BIGNUM *b, BIGNUM *n, BIG_CHUNK_TYPE n0);
+BIG_ERR_CODE ncp_big_inverse(BIGNUM *result,
+    BIGNUM *aa, BIGNUM *nn, int poly, int mont,
+    BIGNUM *R2, BIG_CHUNK_TYPE nprime);
 
 #ifdef	__cplusplus
 }
