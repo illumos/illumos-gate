@@ -5406,12 +5406,12 @@ mondo_loop() {
 	rm -f $root/kernel/strmod/icmp6		\
 	    $root/kernel/strmod/ip6		\
 	    $root/kernel/strmod/tcp6		\
-	    $root/kernel/strmod/udp6		\
+	    $root/kernel/strmod/udp6
 
 	rm -f $root/kernel/strmod/sparcv9/icmp6 \
 	    $root/kernel/strmod/sparcv9/ip6	\
 	    $root/kernel/strmod/sparcv9/tcp6	\
-	    $root/kernel/strmod/sparcv9/udp6	\
+	    $root/kernel/strmod/sparcv9/udp6
 
 	#
 	# Remove old ZFS binaries (back when it was three modules)
