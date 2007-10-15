@@ -22843,7 +22843,7 @@ blocked:
 				up = IPH_UDPH_CHECKSUMP(ipha, hlen);
 				max_frag = ire->ire_max_frag;
 				if (*up != 0) {
-					IP_CKSUM_XMIT(ire_ill, ire, mp, ipha,
+					IP_CKSUM_XMIT(out_ill, ire, mp, ipha,
 					    up, PROTO, hlen, LENGTH, max_frag,
 					    ipsec_len, cksum);
 					/* Software checksum? */
