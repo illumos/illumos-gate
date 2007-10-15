@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -18,21 +19,20 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
- 
-include ../Makefile.com
 
-DATAFILES += depend
-
-.KEEP_STATE:
-
-all: $(FILES) postinstall postremove
-install: all pkg
-
-include ../Makefile.targ
+BD=${BASEDIR:-/}
+if grep -w amd8111s $BD/etc/name_to_major > /dev/null 2>&1
+then
+	rem_drv -b ${BD} amd8111s
+	if [ $? -ne 0 ]
+	then
+		exit 1 	
+	fi
+fi
+exit 0

@@ -353,6 +353,7 @@ DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= rge
+DRV_KMODS	+= amd8111s
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #

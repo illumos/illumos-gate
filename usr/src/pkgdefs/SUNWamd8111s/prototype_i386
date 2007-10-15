@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,3 +46,4 @@
 # SUNWamd8111s
 #
 d none kernel/drv/amd64 0755 root sys
+f none kernel/drv/amd64/amd8111s 0755 root sys
