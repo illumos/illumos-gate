@@ -79,9 +79,6 @@ static page_t *bln_spare_list_front, *bln_spare_list_back;
 
 int balloon_zero_memory = 1;
 size_t balloon_minkmem = (8 * 1024 * 1024);
-static caddr_t balloon_kva;
-static kmutex_t balloon_kva_mutex;
-static void balloon_zero_page(pfn_t pfn);
 
 /*
  * reassign_pfn() calls update_contig_pfnlist(), which can cause a large
@@ -385,6 +382,9 @@ balloon_inc_reservation(ulong_t credit)
 	page_t	*pp;
 	page_t	*new_list_front, *new_list_back;
 
+	/* Make sure we're single-threaded. */
+	ASSERT(MUTEX_HELD(&bln_mutex));
+
 	rv = 0;
 	new_list_front = new_list_back = NULL;
 	meta_pg_start = meta_pg_end = 0;
@@ -434,22 +434,36 @@ balloon_inc_reservation(ulong_t credit)
 	}
 	cnt = i;
 	locked = balloon_lock_contig_pfnlist(cnt);
-	for (i = 0, pp = new_list_front; (i < meta_pg_start) && (pp != NULL);
+	for (i = 0, pp = new_list_front; i < meta_pg_start;
 	    i++, pp = pp->p_next) {
 		reassign_pfn(pp->p_pagenum, mfn_frames[i]);
 	}
-	for (i = meta_pg_end; (i < cnt) && (pp != NULL); i++, pp = pp->p_next) {
+	for (i = meta_pg_end; i < cnt; i++, pp = pp->p_next) {
 		reassign_pfn(pp->p_pagenum, mfn_frames[i]);
 	}
 	if (locked)
 		unlock_contig_pfnlist();
+
+	/*
+	 * Make sure we don't allow pages without pfn->mfn mappings
+	 * into the system.
+	 */
+	ASSERT(pp == NULL);
+
 	while (new_list_front != NULL) {
 		pp = new_list_front;
 		new_list_front = pp->p_next;
 		page_free(pp, 1);
 	}
-	page_unresv(cnt - (meta_pg_end - meta_pg_start));
 
+	/*
+	 * Variable review: at this point, rv contains the number of pages
+	 * the hypervisor gave us.  cnt contains the number of pages for which
+	 * we had page_t structures.  i contains the number of pages
+	 * where we set up pfn <-> mfn mappings.  If this ASSERT trips, that
+	 * means we somehow lost page_t's from our local list.
+	 */
+	ASSERT(cnt == i);
 	if (cnt < rv) {
 		/*
 		 * We couldn't get page structures.
@@ -457,17 +471,21 @@ balloon_inc_reservation(ulong_t credit)
 		 * This shouldn't happen, but causes no real harm if it does.
 		 * On debug kernels, we'll flag it.  On all kernels, we'll
 		 * give back the pages we couldn't assign.
+		 *
+		 * Since these pages are new to the system and haven't been
+		 * used, we don't bother zeroing them.
 		 */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "Could only assign %d of %ld pages", i, rv);
+		cmn_err(CE_WARN, "Could only assign %d of %ld pages", cnt, rv);
 #endif	/* DEBUG */
 
-		(void) balloon_free_pages(rv - i, &mfn_frames[i], NULL, NULL);
+		(void) balloon_free_pages(rv - cnt, &mfn_frames[i], NULL, NULL);
 
-		rv = i;
+		rv = cnt;
 	}
 
 	xen_allow_migrate();
+	page_unresv(rv - (meta_pg_end - meta_pg_start));
 	return (rv);
 }
 
@@ -481,6 +499,7 @@ balloon_dec_reservation(ulong_t debit)
 {
 	int	i, locked;
 	long	rv;
+	ulong_t	request;
 	page_t	*pp;
 
 	bzero(mfn_frames, sizeof (mfn_frames));
@@ -489,6 +508,7 @@ balloon_dec_reservation(ulong_t debit)
 	if (debit > FRAME_ARRAY_SIZE) {
 		debit = FRAME_ARRAY_SIZE;
 	}
+	request = debit;
 
 	/*
 	 * Don't bother if there isn't a safe amount of kmem left.
@@ -499,7 +519,7 @@ balloon_dec_reservation(ulong_t debit)
 			return (0);
 	}
 
-	if (page_resv(debit, KM_NOSLEEP) == 0) {
+	if (page_resv(request, KM_NOSLEEP) == 0) {
 		return (0);
 	}
 	xen_block_migrate();
@@ -528,7 +548,18 @@ balloon_dec_reservation(ulong_t debit)
 	}
 	if (debit == 0) {
 		xen_allow_migrate();
+		page_unresv(request);
 		return (0);
+	}
+
+	/*
+	 * We zero all the pages before we start reassigning them in order to
+	 * minimize the time spent holding the lock on the contig pfn list.
+	 */
+	if (balloon_zero_memory) {
+		for (i = 0; i < debit; i++) {
+			pfnzero(pfn_frames[i], 0, PAGESIZE);
+		}
 	}
 
 	/*
@@ -553,6 +584,8 @@ balloon_dec_reservation(ulong_t debit)
 	}
 
 	xen_allow_migrate();
+	if (debit != request)
+		page_unresv(request - debit);
 	return (rv);
 }
 
@@ -719,10 +752,6 @@ balloon_init(pgcnt_t nr_pages)
 	bln_stats.bln_max_pages = nr_pages;
 	cv_init(&bln_cv, NULL, CV_DEFAULT, NULL);
 
-	/* init balloon zero logic */
-	balloon_kva = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
-	mutex_init(&balloon_kva_mutex, NULL, MUTEX_DRIVER, NULL);
-
 	bln_stats.bln_hard_limit = (spgcnt_t)HYPERVISOR_memory_op(
 	    XENMEM_maximum_reservation, &domid);
 
@@ -774,9 +803,10 @@ balloon_alloc_pages(uint_t page_cnt, mfn_t *mfns)
 /*
  * balloon_free_pages()
  *    free page_cnt pages, using any combination of mfns, pfns, and kva as long
- *    as they refer to the same mapping. We need to zero the pages before
- *    giving them back to the hypervisor. kva space is not free'd up in case
- *    the caller wants to re-use it.
+ *    as they refer to the same mapping.  If an array of mfns is passed in, we
+ *    assume they were already cleared.  Otherwise, we need to zero the pages
+ *    before giving them back to the hypervisor. kva space is not free'd up in
+ *    case the caller wants to re-use it.
  */
 long
 balloon_free_pages(uint_t page_cnt, mfn_t *mfns, caddr_t kva, pfn_t *pfns)
@@ -831,7 +861,7 @@ balloon_free_pages(uint_t page_cnt, mfn_t *mfns, caddr_t kva, pfn_t *pfns)
 			 * need to do this *before* we give back the MFN
 			 */
 			if ((kva == NULL) && (balloon_zero_memory)) {
-				balloon_zero_page(pfn);
+				pfnzero(pfn, 0, PAGESIZE);
 			}
 
 			/*
@@ -869,18 +899,6 @@ balloon_free_pages(uint_t page_cnt, mfn_t *mfns, caddr_t kva, pfn_t *pfns)
 					    "hypervisor.\n");
 				}
 			}
-		}
-
-	/*
-	 * if all we were given was an array of MFN's, we only need to zero out
-	 * each page. The MFNs will be free'd up below.
-	 */
-	} else if (balloon_zero_memory) {
-		ASSERT(mfns != NULL);
-		for (i = 0; i < page_cnt; i++) {
-			pfn = xen_assign_pfn(mfns[i]);
-			balloon_zero_page(pfn);
-			xen_release_pfn(pfn);
 		}
 	}
 
@@ -1018,28 +1036,6 @@ balloon_replace_pages(uint_t nextents, page_t **pp, uint_t addr_bits,
 	return (cnt);
 }
 
-
-/*
- * balloon_zero_page()
- *    zero out the page.
- */
-static void
-balloon_zero_page(pfn_t pfn)
-{
-	/* balloon_init() should have been called first */
-	ASSERT(balloon_kva != NULL);
-
-	mutex_enter(&balloon_kva_mutex);
-
-	/* map the pfn into kva, zero the page, then unmap the pfn */
-	hat_devload(kas.a_hat, balloon_kva, PAGESIZE, pfn,
-	    HAT_STORECACHING_OK | PROT_READ | PROT_WRITE | HAT_NOSYNC,
-	    HAT_LOAD_LOCK);
-	bzero(balloon_kva, PAGESIZE);
-	hat_unload(kas.a_hat, balloon_kva, PAGESIZE, HAT_UNLOAD);
-
-	mutex_exit(&balloon_kva_mutex);
-}
 
 /*
  * Called from the driver - return the requested stat.

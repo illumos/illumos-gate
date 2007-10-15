@@ -3288,28 +3288,34 @@ faulted:
 	return (ret);
 }
 
-/*
- * Zero the physical page from off to off + len given by `pp'
- * without changing the reference and modified bits of page.
- *
- * We use this using CPU private page address #2, see ppcopy() for more info.
- * pagezero() must not be called at interrupt level.
- */
 void
 pagezero(page_t *pp, uint_t off, uint_t len)
 {
+	ASSERT(PAGE_LOCKED(pp));
+	pfnzero(page_pptonum(pp), off, len);
+}
+
+/*
+ * Zero the physical page from off to off + len given by pfn
+ * without changing the reference and modified bits of page.
+ *
+ * We use this using CPU private page address #2, see ppcopy() for more info.
+ * pfnzero() must not be called at interrupt level.
+ */
+void
+pfnzero(pfn_t pfn, uint_t off, uint_t len)
+{
 	caddr_t		pp_addr2;
 	hat_mempte_t	pte2;
-	kmutex_t	*ppaddr_mutex;
+	kmutex_t	*ppaddr_mutex = NULL;
 
 	ASSERT_STACK_ALIGNED();
 	ASSERT(len <= MMU_PAGESIZE);
 	ASSERT(off <= MMU_PAGESIZE);
 	ASSERT(off + len <= MMU_PAGESIZE);
-	ASSERT(PAGE_LOCKED(pp));
 
-	if (kpm_enable) {
-		pp_addr2 = hat_kpm_page2va(pp, 0);
+	if (kpm_enable && !pfn_is_foreign(pfn)) {
+		pp_addr2 = hat_kpm_pfn2va(pfn);
 		kpreempt_disable();
 	} else {
 		kpreempt_disable();
@@ -3320,7 +3326,7 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 		ppaddr_mutex = &CPU->cpu_ppaddr_mutex;
 		mutex_enter(ppaddr_mutex);
 
-		hat_mempte_remap(page_pptonum(pp), pp_addr2, pte2,
+		hat_mempte_remap(pfn, pp_addr2, pte2,
 		    PROT_READ | PROT_WRITE | HAT_STORECACHING_OK,
 		    HAT_LOAD_NOCONSIST);
 	}
@@ -3359,18 +3365,20 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 		bzero(pp_addr2 + off, len);
 	}
 
+	if (!kpm_enable || pfn_is_foreign(pfn)) {
 #ifdef __xpv
-	/*
-	 * On the hypervisor this page might get used for a page table before
-	 * any intervening change to this mapping, so blow it away.
-	 */
-	if (!kpm_enable && HYPERVISOR_update_va_mapping((uintptr_t)pp_addr2, 0,
-	    UVMF_INVLPG) < 0)
-		panic("HYPERVISOR_update_va_mapping() failed");
+		/*
+		 * On the hypervisor this page might get used for a page
+		 * table before any intervening change to this mapping,
+		 * so blow it away.
+		 */
+		if (HYPERVISOR_update_va_mapping((uintptr_t)pp_addr2, 0,
+		    UVMF_INVLPG) < 0)
+			panic("HYPERVISOR_update_va_mapping() failed");
 #endif
-
-	if (!kpm_enable)
 		mutex_exit(ppaddr_mutex);
+	}
+
 	kpreempt_enable();
 }
 

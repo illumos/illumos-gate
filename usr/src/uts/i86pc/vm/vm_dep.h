@@ -512,6 +512,7 @@ extern page_t *page_freelist_split(uchar_t,
 extern page_t *page_freelist_coalesce(int, uchar_t, uint_t, uint_t, int,
     pfn_t);
 extern uint_t page_get_pagecolors(uint_t);
+extern void pfnzero(pfn_t, uint_t, uint_t);
 
 #ifdef	__cplusplus
 }

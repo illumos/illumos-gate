@@ -4143,6 +4143,7 @@ hat_kpm_pfn2va(pfn_t pfn)
 {
 	uintptr_t vaddr = (uintptr_t)kpm_vbase + mmu_ptob(pfn);
 
+	ASSERT(!pfn_is_foreign(pfn));
 	return ((caddr_t)vaddr);
 }
 

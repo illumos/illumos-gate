@@ -48,6 +48,7 @@
 #include <sys/balloon_impl.h>
 #include <sys/evtchn_impl.h>
 #include <sys/gnttab.h>
+#include <vm/vm_dep.h>
 
 #include <sys/gld.h>
 #include <inet/ip.h>
@@ -506,6 +507,11 @@ static void
 xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 {
 	int r;
+	pfn_t pfn;
+
+	pfn = xen_assign_pfn(mfn);
+	pfnzero(pfn, 0, PAGESIZE);
+	xen_release_pfn(pfn);
 
 	/*
 	 * This happens only in the error path, so batching is
