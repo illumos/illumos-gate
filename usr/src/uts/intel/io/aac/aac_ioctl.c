@@ -76,8 +76,12 @@ static int aac_get_pci_info(struct aac_softstate *, intptr_t, int);
 static int aac_query_disk(struct aac_softstate *, intptr_t, int);
 static int aac_delete_disk(struct aac_softstate *, intptr_t, int);
 static int aac_supported_features(struct aac_softstate *, intptr_t, int);
-static int aac_return_aif(struct aac_softstate *, struct aac_fib_context *,
-    caddr_t, int);
+
+/*
+ * Warlock directives
+ */
+_NOTE(SCHEME_PROTECTS_DATA("unique to each handling function", aac_features
+    aac_pci_info aac_query_disk aac_revision))
 
 int
 aac_do_ioctl(struct aac_softstate *softs, int cmd, intptr_t arg, int mode)
@@ -166,15 +170,16 @@ aac_send_fib(struct aac_softstate *softs, struct aac_cmd *acp)
 {
 	int rval;
 
-	acp->flags |= AAC_CMD_NO_INTR | AAC_CMD_SYNC;
+	acp->flags |= AAC_CMD_NO_CB | AAC_CMD_SYNC;
 	acp->ac_comp = aac_ioctl_complete;
 	acp->timeout = AAC_IOCTL_TIMEOUT;
-	acp->dvp = NULL;
 
-	if (softs->state == AAC_STATE_DEAD)
+	mutex_enter(&softs->io_lock);
+	if (softs->state & AAC_STATE_DEAD) {
+		mutex_exit(&softs->io_lock);
 		return (ENXIO);
+	}
 
-	rw_enter(&softs->errlock, RW_READER);
 	rval = aac_do_io(softs, acp);
 	if (rval == TRAN_ACCEPT) {
 		rval = 0;
@@ -185,7 +190,7 @@ aac_send_fib(struct aac_softstate *softs, struct aac_cmd *acp)
 		AACDB_PRINT(softs, CE_CONT, "User SendFib failed EBUSY");
 		rval = EBUSY;
 	}
-	rw_exit(&softs->errlock);
+	mutex_exit(&softs->io_lock);
 
 	return (rval);
 }
@@ -196,7 +201,7 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	int hbalen;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
-	unsigned fib_size;
+	uint16_t fib_size;
 	int rval = 0;
 
 	DBCALLED(softs, 2);
@@ -314,6 +319,25 @@ aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 }
 
 static int
+aac_return_aif(struct aac_softstate *softs,
+    struct aac_fib_context *ctx, caddr_t uptr, int mode)
+{
+	int current;
+
+	current = ctx->ctx_idx;
+	if (current == softs->aifq_idx && !ctx->ctx_filled)
+		return (EAGAIN); /* Empty */
+	if (ddi_copyout(&softs->aifq[current], (void *)uptr,
+	    sizeof (struct aac_fib), mode) != 0)
+		return (EFAULT);
+
+	ctx->ctx_filled = 0;
+	ctx->ctx_idx = (current + 1) % AAC_AIFQ_LENGTH;
+
+	return (0);
+}
+
+static int
 aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	struct aac_get_adapter_fib af;
@@ -325,35 +349,38 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	if (ddi_copyin((void *)arg, &af, sizeof (af), mode) != 0)
 		return (EFAULT);
 
+	mutex_enter(&softs->aifq_mutex);
 	for (ctx = softs->fibctx; ctx; ctx = ctx->next) {
 		if (af.context == ctx->unique)
 			break;
 	}
-	if (!ctx)
-		return (EFAULT);
-
+	if (ctx) {
 #ifdef	_LP64
-	rval = aac_return_aif(softs, ctx, (caddr_t)(uint64_t)af.aif_fib, mode);
+		rval = aac_return_aif(softs, ctx,
+		    (caddr_t)(uint64_t)af.aif_fib, mode);
 #else
-	rval = aac_return_aif(softs, ctx, (caddr_t)af.aif_fib, mode);
+		rval = aac_return_aif(softs, ctx, (caddr_t)af.aif_fib, mode);
 #endif
-	if (rval == EAGAIN && af.wait) {
-		AACDB_PRINT(softs, CE_NOTE,
-		    "aac_next_getadapter_fib(): waiting for AIF");
-		mutex_enter(&softs->aifq_mutex);
-		rval = cv_wait_sig(&softs->aifv, &softs->aifq_mutex);
-		mutex_exit(&softs->aifq_mutex);
-		if (rval == 0)
-			rval = EINTR;
-		else
+		if (rval == EAGAIN && af.wait) {
+			AACDB_PRINT(softs, CE_NOTE,
+			    "aac_next_getadapter_fib(): waiting for AIF");
+			rval = cv_wait_sig(&softs->aifv, &softs->aifq_mutex);
+			if (rval > 0) {
 #ifdef	_LP64
-			rval = aac_return_aif(softs, ctx,
-			    (caddr_t)(uint64_t)af.aif_fib, mode);
+				rval = aac_return_aif(softs, ctx,
+				    (caddr_t)(uint64_t)af.aif_fib, mode);
 #else
-			rval = aac_return_aif(softs, ctx,
-			    (caddr_t)af.aif_fib, mode);
+				rval = aac_return_aif(softs, ctx,
+				    (caddr_t)af.aif_fib, mode);
 #endif
+			} else {
+				rval = EINTR;
+			}
+		}
+	} else {
+		rval = EFAULT;
 	}
+	mutex_exit(&softs->aifq_mutex);
 
 	return (rval);
 }
@@ -401,7 +428,7 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	uint_t dma_flags = DDI_DMA_CONSISTENT;
 	struct aac_sg_entry *sgp;
 	struct aac_sg_entry64 *sg64p;
-	uint32_t fib_size;
+	uint16_t fib_size;
 	uint32_t srb_sg_bytecount;
 	uint64_t srb_sg_address;
 	int rval;
@@ -518,7 +545,6 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 				rval = EFAULT;
 				goto finish;
 			}
-
 			(void) ddi_dma_sync(acp->buf_dma_handle, 0, 0,
 			    DDI_DMA_SYNC_FORDEV);
 		}
@@ -554,7 +580,6 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		fib_size += acp->left_cookien * sizeof (struct aac_sg_entry);
 	}
 	fibp->Header.Size = fib_size;
-
 
 	/* Fill in sg elements */
 	srb->sg.SgCount = acp->left_cookien;
@@ -643,6 +668,7 @@ static int
 aac_query_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	struct aac_query_disk qdisk;
+	struct aac_container *dvp;
 
 	DBCALLED(softs, 2);
 
@@ -661,9 +687,12 @@ aac_query_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 		return (EINVAL);
 	}
 
-	qdisk.valid = softs->container[qdisk.container_no].valid;
-	qdisk.locked = softs->container[qdisk.container_no].locked;
-	qdisk.deleted = softs->container[qdisk.container_no].deleted;
+	mutex_enter(&softs->io_lock);
+	dvp = &softs->container[qdisk.container_no];
+	qdisk.valid = dvp->valid;
+	qdisk.locked = dvp->locked;
+	qdisk.deleted = dvp->deleted;
+	mutex_exit(&softs->io_lock);
 
 	if (ddi_copyout(&qdisk, (void *)arg, sizeof (qdisk), mode) != 0)
 		return (EFAULT);
@@ -674,23 +703,31 @@ static int
 aac_delete_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 {
 	struct aac_delete_disk ddisk;
+	struct aac_container *dvp;
+	int rval = 0;
 
 	DBCALLED(softs, 2);
 
 	if (ddi_copyin((void *)arg, &ddisk, sizeof (ddisk), mode) != 0)
 		return (EFAULT);
 
-	if (ddisk.container_no > AAC_MAX_CONTAINERS)
+	if (ddisk.container_no >= AAC_MAX_CONTAINERS)
 		return (EINVAL);
-	if (softs->container[ddisk.container_no].locked)
-		return (EBUSY);
 
+	mutex_enter(&softs->io_lock);
+	dvp = &softs->container[ddisk.container_no];
 	/*
 	 * We don't trust the userland to tell us when to delete
 	 * a container, rather we rely on an AIF coming from the
 	 * controller.
 	 */
-	return (0);
+	if (dvp->valid) {
+		if (dvp->locked)
+			rval = EBUSY;
+	}
+	mutex_exit(&softs->io_lock);
+
+	return (rval);
 }
 
 /*
@@ -731,31 +768,5 @@ aac_supported_features(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	if (ddi_copyout(&f, (void *)arg, sizeof (f), mode) != 0)
 		return (EFAULT);
-	return (0);
-}
-
-static int
-aac_return_aif(struct aac_softstate *softs,
-    struct aac_fib_context *ctx, caddr_t uptr, int mode)
-{
-	int current;
-
-	mutex_enter(&softs->aifq_mutex);
-	current = ctx->ctx_idx;
-	if (current == softs->aifq_idx && !ctx->ctx_filled) {
-		/* Empty */
-		mutex_exit(&softs->aifq_mutex);
-		return (EAGAIN);
-	}
-	if (ddi_copyout(&softs->aifq[current], (void *)uptr,
-	    sizeof (struct aac_fib), mode) != 0) {
-		mutex_exit(&softs->aifq_mutex);
-		return (EFAULT);
-	}
-
-	ctx->ctx_filled = 0;
-	ctx->ctx_idx = (current + 1) % AAC_AIFQ_LENGTH;
-	mutex_exit(&softs->aifq_mutex);
-
 	return (0);
 }

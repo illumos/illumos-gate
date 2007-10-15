@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		17
+#define	AAC_DRIVER_BUGFIX_LEVEL		18
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -72,8 +72,6 @@ extern "C" {
 #define	AAC_MAX_ADAPTERS		64
 
 /* Definitions for mode sense */
-#define	MODE_FORMAT_SIZE		(sizeof (struct mode_format))
-
 #ifndef	SD_MODE_SENSE_PAGE3_CODE
 #define	SD_MODE_SENSE_PAGE3_CODE	0x03
 #endif
@@ -106,6 +104,32 @@ extern "C" {
 #define	AAC_TYPE_SATA			2
 #define	AAC_TYPE_SAS			3
 
+/*
+ * AAC_CMDQ_SYNC should be 0 and AAC_CMDQ_ASYNC be 1 for Sync FIB io
+ * to be served before async FIB io, see aac_start_waiting_io().
+ * So that io requests sent by interactive userland commands get
+ * responded asap.
+ */
+enum aac_cmdq {
+	AAC_CMDQ_SYNC,	/* sync FIB queue */
+	AAC_CMDQ_ASYNC,	/* async FIB queue */
+	AAC_CMDQ_NUM
+};
+
+/*
+ * IO command flags
+ */
+#define	AAC_IOCMD_SYNC		(1 << AAC_CMDQ_SYNC)
+#define	AAC_IOCMD_ASYNC		(1 << AAC_CMDQ_ASYNC)
+#define	AAC_IOCMD_OUTSTANDING	(1 << AAC_CMDQ_NUM)
+#define	AAC_IOCMD_ALL		(AAC_IOCMD_SYNC | AAC_IOCMD_ASYNC | \
+				AAC_IOCMD_OUTSTANDING)
+
+struct aac_cmd_queue {
+	struct aac_cmd *q_head; /* also as the header of aac_cmd */
+	struct aac_cmd *q_tail;
+};
+
 struct aac_card_type {
 	uint16_t vendor;	/* PCI Vendor ID */
 	uint16_t device;	/* PCI Device ID */
@@ -120,13 +144,15 @@ struct aac_card_type {
 
 /* Array description */
 struct aac_container {
-	uint16_t valid;
+	uint8_t valid;
 	uint32_t cid;		/* container id */
 	uint32_t uid;		/* container uid */
-	uint64_t size;		/* 64-bit LBA */
-	uint16_t locked;
-	uint16_t deleted;
-	uint16_t reset;		/* container is being reseted */
+	uint64_t size;		/* in block */
+	uint8_t locked;
+	uint8_t deleted;
+	uint8_t reset;		/* container is being reseted */
+	int ncmds[AAC_CMDQ_NUM];	/* outstanding cmds of the device */
+	int throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the device */
 };
 
 struct sync_mode_res {
@@ -135,12 +161,7 @@ struct sync_mode_res {
 	kmutex_t mutex;
 };
 
-struct aac_cmd_queue {
-	kmutex_t q_mutex;
-	struct aac_cmd *q_head;
-	struct aac_cmd *q_tail;
-	uint32_t q_len;
-};
+_NOTE(MUTEX_PROTECTS_DATA(sync_mode_res::mutex, sync_mode_res))
 
 /*
  * The firmware can support a lot of outstanding commands. Each aac_slot
@@ -148,8 +169,8 @@ struct aac_cmd_queue {
  * associated DMA resource for FIB command.
  */
 struct aac_slot {
-	int next;		/* index of next slot */
-	int index;		/* index of this slot if used, or -1 if free */
+	struct aac_slot *next;	/* next slot in the free slot list */
+	int index;		/* index of this slot */
 	ddi_acc_handle_t fib_acc_handle;
 	ddi_dma_handle_t fib_dma_handle;
 	uint64_t fib_phyaddr;	/* physical address of FIB memory */
@@ -157,7 +178,7 @@ struct aac_slot {
 	struct aac_fib *fibp;	/* virtual address of FIB memory */
 };
 
-/* flags for attach tracking */
+/* Flags for attach tracking */
 #define	AAC_ATTACH_SOFTSTATE_ALLOCED	(1 << 0)
 #define	AAC_ATTACH_CARD_DETECTED	(1 << 1)
 #define	AAC_ATTACH_PCI_MEM_MAPPED	(1 << 2)
@@ -169,23 +190,29 @@ struct aac_slot {
 #define	AAC_ATTACH_CREATE_DEVCTL	(1 << 8)
 #define	AAC_ATTACH_CREATE_SCSI		(1 << 9)
 
-/* driver running states */
-#define	AAC_STATE_STOPPED		0
-#define	AAC_STATE_RUN			1
-#define	AAC_STATE_QUIESCE		2
-#define	AAC_STATE_RESET			3
-#define	AAC_STATE_DEAD			4
+/* Driver running states */
+#define	AAC_STATE_STOPPED	0
+#define	AAC_STATE_RUN		(1 << 0)
+#define	AAC_STATE_RESET		(1 << 1)
+#define	AAC_STATE_QUIESCED	(1 << 2)
+#define	AAC_STATE_DEAD		(1 << 3)
 
-/* flags for aac firmware */
+/*
+ * Flags for aac firmware
+ * Note: Quirks are only valid for the older cards. These cards only supported
+ * old comm. Thus they are not valid for any cards that support new comm.
+ */
 #define	AAC_FLAGS_SG_64BIT	(1 << 0) /* Use 64-bit S/G addresses */
 #define	AAC_FLAGS_4GB_WINDOW	(1 << 1) /* Can access host mem 2-4GB range */
-#define	AAC_FLAGS_NO4GB		(1 << 2) /* Can't access host mem >2GB */
-#define	AAC_FLAGS_256FIBS	(1 << 3) /* Can only do 256 commands */
+#define	AAC_FLAGS_NO4GB	(1 << 2)	/* quirk: FIB addresses must reside */
+					/*	  between 0x2000 & 0x7FFFFFFF */
+#define	AAC_FLAGS_256FIBS	(1 << 3) /* quirk: Can only do 256 commands */
 #define	AAC_FLAGS_NEW_COMM	(1 << 4) /* New comm. interface supported */
 #define	AAC_FLAGS_RAW_IO	(1 << 5) /* Raw I/O interface */
 #define	AAC_FLAGS_ARRAY_64BIT	(1 << 6) /* 64-bit array size */
 #define	AAC_FLAGS_LBA_64BIT	(1 << 7) /* 64-bit LBA supported */
-#define	AAC_FLAGS_PERC		(1 << 8) /* PERC has much shorter S/G len */
+#define	AAC_FLAGS_17SG		(1 << 8) /* quirk: 17 scatter gather maximum */
+#define	AAC_FLAGS_34SG		(1 << 9) /* quirk: 34 scatter gather maximum */
 
 struct aac_softstate;
 struct aac_interface {
@@ -256,7 +283,7 @@ struct aac_softstate {
 	ddi_iblock_cookie_t iblock_cookie;
 	ddi_softintr_t softint_id;	/* soft intr */
 
-	krwlock_t errlock;		/* hold IO requests at reset */
+	kmutex_t io_lock;
 	int state;			/* driver state */
 
 	struct aac_container container[AAC_MAX_LD];
@@ -265,28 +292,28 @@ struct aac_softstate {
 	/*
 	 * Command queues
 	 * Each aac command flows through wait(or wait_sync) queue,
-	 * io_slot and comp queue sequentially.
+	 * busy queue, and complete queue sequentially.
 	 */
-	struct aac_cmd_queue q_wait_sync; /* sync FIB requests */
-	struct aac_cmd_queue q_wait;	/* async FIB requests */
+	struct aac_cmd_queue q_wait[AAC_CMDQ_NUM];
+	struct aac_cmd_queue q_busy;	/* outstanding cmd queue */
+	kmutex_t q_comp_mutex;
 	struct aac_cmd_queue q_comp;	/* completed io requests */
 
 	/* I/O slots and FIBs */
 	int total_slots;		/* total slots allocated */
 	int total_fibs;			/* total FIBs allocated */
 	struct aac_slot *io_slot;	/* static list for allocated slots */
-	int free_io_slot_head;
-	int free_io_slot_tail;
-	int free_io_slot_len;
-	int slot_hold;			/* hold slots from being used */
-	kmutex_t slot_mutex;		/* for io_slot */
+	struct aac_slot *free_io_slot_head;
 
-	kmutex_t fib_mutex;		/* for message queues */
-	timeout_id_t timeout_id;
-	uint32_t timeout_count;
+	timeout_id_t timeout_id;	/* for timeout daemon */
 
-	kmutex_t event_mutex;		/* for ioctl_send_fib() */
-	kcondvar_t event;
+	kcondvar_t event;		/* for ioctl_send_fib() and sync IO */
+
+	int bus_ncmds[AAC_CMDQ_NUM];	/* total outstanding async cmds */
+	int bus_throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the bus */
+	int ndrains;			/* number of draining threads */
+	timeout_id_t drain_timeid;	/* for outstanding cmd drain */
+	kcondvar_t drain_cv;		/* for quiesce drain */
 
 	/* AIF */
 	kmutex_t aifq_mutex;		/* for AIF queue aifq */
@@ -309,6 +336,18 @@ struct aac_softstate {
 #endif
 };
 
+_NOTE(SCHEME_PROTECTS_DATA("stable data", aac_softstate::{flags slen \
+    buf_dma_attr pci_mem_handle pci_mem_base_vaddr sync_mode \
+    comm_space_acc_handle comm_space_dma_handle aac_max_fib_size \
+    aac_sg_tablesize aac_cmd_fib debug_flags debug_fw_flags debug_buf_offset \
+    debug_buf_size debug_header_size}))
+_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::io_lock, aac_softstate::{ \
+    state container container_count q_wait q_busy total_slots total_fibs \
+    io_slot free_io_slot_head timeout_id drain_timeid ndrains drain_cv event}))
+_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::q_comp_mutex, aac_softstate::q_comp))
+_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::aifq_mutex, aac_softstate::{ \
+    aifv aifq aifq_idx aifq_wrap fibctx devcfg_wait_on}))
+
 /* aac_cmd flags */
 #define	AAC_CMD_CONSISTENT		(1 << 0)
 #define	AAC_CMD_DMA_PARTIAL		(1 << 1)
@@ -316,19 +355,26 @@ struct aac_softstate {
 #define	AAC_CMD_BUF_READ		(1 << 3)
 #define	AAC_CMD_BUF_WRITE		(1 << 4)
 #define	AAC_CMD_SYNC			(1 << 5) /* use sync FIB */
-#define	AAC_CMD_NO_INTR			(1 << 6) /* poll IO, no intr to sd */
-#define	AAC_CMD_CMPLT			(1 << 7)
-#define	AAC_CMD_ABORT			(1 << 8)
-#define	AAC_CMD_TIMEOUT			(1 << 9)
-#define	AAC_CMD_ERR			(1 << 10)
+#define	AAC_CMD_NO_INTR			(1 << 6) /* poll IO, no intr */
+#define	AAC_CMD_NO_CB			(1 << 7) /* sync IO, no callback */
+#define	AAC_CMD_NTAG			(1 << 8)
+#define	AAC_CMD_CMPLT			(1 << 9) /* cmd exec'ed by driver/fw */
+#define	AAC_CMD_ABORT			(1 << 10)
+#define	AAC_CMD_TIMEOUT			(1 << 11)
+#define	AAC_CMD_ERR			(1 << 12)
 
 struct aac_cmd {
+	/*
+	 * Note: should be the first member for aac_cmd_queue to work
+	 * correctly.
+	 */
 	struct aac_cmd *next;
+	struct aac_cmd *prev;
+
 	struct scsi_pkt *pkt;
 	int cmdlen;
 	int flags;
-	time_t start_time;	/* time when the cmd is sent to the adapter */
-	time_t timeout;		/* max time in seconds for cmd to complete */
+	uint32_t timeout; /* time when the cmd should have completed */
 	struct buf *bp;
 	ddi_dma_handle_t buf_dma_handle;
 
@@ -406,7 +452,6 @@ extern void aac_print_fib(struct aac_softstate *, struct aac_fib *);
 #define	AACDB_PRINT(s, lev, ...)
 #define	AACDB_PRINT_IOCTL(s, ...)
 #define	AACDB_PRINT_TRAN(s, ...)
-#define	AACDB_PRINT_FUNC(s)
 #define	AACDB_PRINT_FIB(s, x)
 #define	AACDB_PRINT_SCMD(s, x)
 #define	AACDB_PRINT_AIF(s, x)

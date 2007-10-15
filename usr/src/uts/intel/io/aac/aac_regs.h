@@ -71,6 +71,7 @@ extern "C" {
 #define	AAC_IDBR		0x20	/* inbound doorbell reg */
 #define	AAC_ODBR		0x2c	/* outbound doorbell reg */
 #define	AAC_OIMR		0x34	/* outbound interrupt mask reg */
+#define	AAC_IRCSR		0x38	/* inbound dual cores reset (SRL) */
 #define	AAC_IQUE		0x40	/* inbound queue */
 #define	AAC_OQUE		0x44	/* outbound queue */
 #define	AAC_RX_MAILBOX		0x50	/* mailbox, size=20bytes, rx */
@@ -88,6 +89,9 @@ extern "C" {
 #define	AAC_MONKER_GETCOMMPREF	0x26
 #define	AAC_IOP_RESET		0x1000
 
+/* Sunrise Lake dual core reset */
+#define	AAC_IRCSR_CORES_RST	3
+
 #define	AAC_SECTOR_SIZE		512
 #define	AAC_NUMBER_OF_HEADS	255
 #define	AAC_SECTORS_PER_TRACK	63
@@ -98,7 +102,6 @@ extern "C" {
 #define	AAC_ANSI_VER		2
 #define	AAC_RESP_DATA_FORMAT	2
 
-#define	AAC_NSEG		17	/* max number of segments */
 #define	AAC_MAX_LD		64	/* max number of logical disks */
 #define	AAC_BLK_SIZE		AAC_SECTOR_SIZE
 #define	AAC_DMA_ALIGN		4
@@ -708,6 +711,34 @@ struct aac_pause_command {
 	uint32_t	Parm3;
 	uint32_t	Parm4;
 	uint32_t	Count;
+};
+
+/*
+ * The following two definitions come from Adaptec:
+ *
+ * Used to flush drive cache for container "cid"
+ */
+struct aac_synchronize_command {
+	uint32_t	Command;	/* VM_ContainerConfig */
+	uint32_t	Type;		/* CT_FLUSH_CACHE */
+	uint32_t	Cid;
+	uint32_t	Parm1;
+	uint32_t	Parm2;
+	uint32_t	Parm3;
+	uint32_t	Parm4;
+	uint32_t	Count;
+};
+
+struct aac_synchronize_reply {
+	uint32_t	Dummy0;
+	uint32_t	Dummy1;
+	uint32_t	Status;
+	uint32_t	Parm1;
+	uint32_t	Parm2;
+	uint32_t	Parm3;
+	uint32_t	Parm4;
+	uint32_t	Parm5;
+	uint8_t		Data[16];
 };
 
 /*
