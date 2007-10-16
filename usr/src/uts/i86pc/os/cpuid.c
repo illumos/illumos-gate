@@ -916,6 +916,14 @@ cpuid_pass1(cpu_t *cpu)
 			feature |= X86_SSE2;
 		if (cp->cp_ecx & CPUID_INTC_ECX_SSE3)
 			feature |= X86_SSE3;
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSSE3)
+				feature |= X86_SSSE3;
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_1)
+				feature |= X86_SSE4_1;
+			if (cp->cp_ecx & CPUID_INTC_ECX_SSE4_2)
+				feature |= X86_SSE4_2;
+		}
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE)
 		feature |= X86_DE;
@@ -2017,6 +2025,15 @@ cpuid_pass4(cpu_t *cpu)
 		if ((x86_feature & X86_SSE3) == 0)
 			*ecx &= ~CPUID_INTC_ECX_SSE3;
 
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			if ((x86_feature & X86_SSSE3) == 0)
+				*ecx &= ~CPUID_INTC_ECX_SSSE3;
+			if ((x86_feature & X86_SSE4_1) == 0)
+				*ecx &= ~CPUID_INTC_ECX_SSE4_1;
+			if ((x86_feature & X86_SSE4_2) == 0)
+				*ecx &= ~CPUID_INTC_ECX_SSE4_2;
+		}
+
 		/*
 		 * [no explicit support required beyond x87 fp context]
 		 */
@@ -2035,6 +2052,14 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_SSE2;
 		if (*ecx & CPUID_INTC_ECX_SSE3)
 			hwcap_flags |= AV_386_SSE3;
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			if (*ecx & CPUID_INTC_ECX_SSSE3)
+				hwcap_flags |= AV_386_SSSE3;
+			if (*ecx & CPUID_INTC_ECX_SSE4_1)
+				hwcap_flags |= AV_386_SSE4_1;
+			if (*ecx & CPUID_INTC_ECX_SSE4_2)
+				hwcap_flags |= AV_386_SSE4_2;
+		}
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;
 		if (*edx & CPUID_INTC_EDX_FPU)

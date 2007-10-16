@@ -106,11 +106,13 @@ extern "C" {
 						/* 0x00010000 - reserved */
 						/* 0x00020000 - reserved */
 #define	CPUID_INTC_ECX_DCA	0x00040000	/* direct cache access */
+#define	CPUID_INTC_ECX_SSE4_1	0x00080000	/* SSE4.1 insns */
+#define	CPUID_INTC_ECX_SSE4_2	0x00100000	/* SSE4.2 insns */
 #define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\30popcnt\23dca"					\
+	"\30popcnt\25sse4.2\24sse4.1\23dca"			\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
 	"\10est\7smx\6vmx\5dscpl\4mon\1sse3"
 
@@ -324,10 +326,13 @@ extern "C" {
 #define	X86_MWAIT	0x00400000
 #define	X86_SSE4A	0x00800000
 #define	X86_CPUID	0x01000000
+#define	X86_SSSE3	0x02000000
+#define	X86_SSE4_1	0x04000000
+#define	X86_SSE4_2	0x08000000
 
 #define	FMT_X86_FEATURE						\
 	"\20"							\
-	"\31cpuid"						\
+	"\34sse4_2\33sse4_1\32ssse3\31cpuid"			\
 	"\30sse4a\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"\
 	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
 	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"

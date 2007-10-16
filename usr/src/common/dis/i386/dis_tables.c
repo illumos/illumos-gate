@@ -1,4 +1,5 @@
 /*
+ *
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -149,6 +150,7 @@ enum {
 	CWD,		/* so data16 can be evaluated for cwd and variants */
 	RET,		/* single immediate 16-bit operand */
 	MOVZ,		/* for movs and movz, with different size operands */
+	CRC32,		/* for crc32, with different size operands */
 	XADDB,		/* for xaddb */
 	MOVSXZ,		/* AMD64 mov sign extend 32 to 64 bit instruction */
 
@@ -163,6 +165,7 @@ enum {
 	MMOS,		/* Prefixable MMX/SIMD-Int	mm	-> mm/mem */
 	MMOMS,		/* Prefixable MMX/SIMD-Int	mm	-> mem */
 	MMOPM,		/* MMX/SIMD-Int			mm/mem	-> mm,imm8 */
+	MMOPM_66o,	/* MMX/SIMD-Int 0x66 optional	mm/mem	-> mm,imm8 */
 	MMOPRM,		/* Prefixable MMX/SIMD-Int	r32/mem	-> mm,imm8 */
 	MMOSH,		/* Prefixable MMX		mm,imm8	*/
 	MM,		/* MMX/SIMD-Int			mm/mem	-> mm	*/
@@ -177,12 +180,19 @@ enum {
 	XMMOM,		/* Prefixable SIMD		xmm	-> mem */
 	XMMOMS,		/* Prefixable SIMD		mem	-> xmm */
 	XMM,		/* SIMD 			xmm/mem	-> xmm */
+	XMM_66r,	/* SIMD 0x66 prefix required	xmm/mem	-> xmm */
+	XMM_66o,	/* SIMD 0x66 prefix optional 	xmm/mem	-> xmm */
 	XMMXIMPL,	/* SIMD				xmm	-> xmm (mem) */
 	XMM3P,		/* SIMD				xmm	-> r32,imm8 */
+	XMM3PM_66r,	/* SIMD 0x66 prefix required	xmm	-> r32/mem,imm8 */
 	XMMP,		/* SIMD 			xmm/mem w/to xmm,imm8 */
+	XMMP_66o,	/* SIMD 0x66 prefix optional	xmm/mem w/to xmm,imm8 */
+	XMMP_66r,	/* SIMD 0x66 prefix required	xmm/mem w/to xmm,imm8 */
 	XMMPRM,		/* SIMD 			r32/mem -> xmm,imm8 */
+	XMMPRM_66r,	/* SIMD 0x66 prefix required	r32/mem -> xmm,imm8 */
 	XMMS,		/* SIMD				xmm	-> xmm/mem */
 	XMMM,		/* SIMD 			mem	-> xmm */
+	XMMM_66r,	/* SIMD	0x66 prefix required	mem	-> xmm */
 	XMMMS,		/* SIMD				xmm	-> mem */
 	XMM3MX,		/* SIMD 			r32/mem -> xmm */
 	XMM3MXS,	/* SIMD 			xmm	-> r32/mem */
@@ -792,6 +802,170 @@ const instable_t dis_opSIMDrepz[256] = {
 
 /*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E4]  */	INVALID,		INVALID,		TNSZ("cvtdq2pd",XMM,8),	INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+const instable_t dis_op0F38[256] = {
+/*  [00]  */	TNSZ("pshufb",XMM_66o,16),TNSZ("phaddw",XMM_66o,16),TNSZ("phaddd",XMM_66o,16),TNSZ("phaddsw",XMM_66o,16),
+/*  [04]  */	TNSZ("pmaddubsw",XMM_66o,16),TNSZ("phsubw",XMM_66o,16),	TNSZ("phsubd",XMM_66o,16),TNSZ("phsubsw",XMM_66o,16),
+/*  [08]  */	TNSZ("psignb",XMM_66o,16),TNSZ("psignw",XMM_66o,16),TNSZ("psignd",XMM_66o,16),TNSZ("pmulhrsw",XMM_66o,16),
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	TNSZ("pblendvb",XMM_66r,16),INVALID,		INVALID,		INVALID,
+/*  [14]  */	TNSZ("blendvps",XMM_66r,16),TNSZ("blendvpd",XMM_66r,16),INVALID,	TNSZ("ptest",XMM_66r,16),
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	TNSZ("pabsb",XMM_66o,16),TNSZ("pabsw",XMM_66o,16),TNSZ("pabsd",XMM_66o,16),INVALID,
+
+/*  [20]  */	TNSZ("pmovsxbw",XMM_66r,16),TNSZ("pmovsxbd",XMM_66r,16),TNSZ("pmovsxbq",XMM_66r,16),TNSZ("pmovsxwd",XMM_66r,16),
+/*  [24]  */	TNSZ("pmovsxwq",XMM_66r,16),TNSZ("pmovsxdq",XMM_66r,16),INVALID,	INVALID,
+/*  [28]  */	TNSZ("pmuldq",XMM_66r,16),TNSZ("pcmpeqq",XMM_66r,16),TNSZ("movntdqa",XMMM_66r,16),TNSZ("packusdw",XMM_66r,16),
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	TNSZ("pmovzxbw",XMM_66r,16),TNSZ("pmovzxbd",XMM_66r,16),TNSZ("pmovzxbq",XMM_66r,16),TNSZ("pmovzxwd",XMM_66r,16),
+/*  [34]  */	TNSZ("pmovzxwq",XMM_66r,16),TNSZ("pmovzxdq",XMM_66r,16),INVALID,	TNSZ("pcmpgtq",XMM_66r,16),
+/*  [38]  */	TNSZ("pminsb",XMM_66r,16),TNSZ("pminsd",XMM_66r,16),TNSZ("pminuw",XMM_66r,16),TNSZ("pminud",XMM_66r,16),
+/*  [3C]  */	TNSZ("pmaxsb",XMM_66r,16),TNSZ("pmaxsd",XMM_66r,16),TNSZ("pmaxuw",XMM_66r,16),TNSZ("pmaxud",XMM_66r,16),
+
+/*  [40]  */	TNSZ("pmulld",XMM_66r,16),TNSZ("phminposuw",XMM_66r,16),INVALID,	INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [8C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	TNS("crc32b",CRC32),	TS("crc32",CRC32),	INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+const instable_t dis_op0F3A[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	TNSZ("roundps",XMMP_66r,16),TNSZ("roundpd",XMMP_66r,16),TNSZ("roundss",XMMP_66r,16),TNSZ("roundsd",XMMP_66r,16),
+/*  [0C]  */	TNSZ("blendps",XMMP_66r,16),TNSZ("blendpd",XMMP_66r,16),TNSZ("pblendw",XMMP_66r,16),TNSZ("palignr",XMMP_66o,16),
+
+/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [14]  */	TNSZ("pextrb",XMM3PM_66r,8),TNSZ("pextrw",XMM3PM_66r,16),TSZ("pextr",XMM3PM_66r,16),TNSZ("extractps",XMM3PM_66r,16),
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	TNSZ("pinsrb",XMMPRM_66r,8),TNSZ("insertps",XMMP_66r,16),TSZ("pinsr",XMMPRM_66r,16),INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	TNSZ("dpps",XMMP_66r,16),TNSZ("dppd",XMMP_66r,16),TNSZ("mpsadbw",XMMP_66r,16),INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	TNSZ("pcmpestrm",XMMP_66r,16),TNSZ("pcmpestri",XMMP_66r,16),TNSZ("pcmpistrm",XMMP_66r,16),TNSZ("pcmpistri",XMMP_66r,16),
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [8C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
@@ -1758,6 +1932,8 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	uint_t	rex_prefix = 0;	/* amd64 register extension prefix */
 	size_t	off;
 
+	instable_t dp_mmx;
+
 	x->d86_len = 0;
 	x->d86_rmindex = -1;
 	x->d86_error = 0;
@@ -1910,6 +2086,74 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 			dp = (instable_t *)&dis_op0F7123[opcode5][subcode];
 		} else if ((opcode4 == 0xc) && (opcode5 >= 0x8)) {
 			dp = (instable_t *)&dis_op0FC8[0];
+		} else if ((opcode4 == 0x3) && (opcode5 == 0xA)) {
+			if (dtrace_get_opcode(x, &opcode6, &opcode7) != 0)
+				goto error;
+			if (opnd_size == SIZE16)
+				opnd_size = SIZE32;
+
+			dp = (instable_t *)&dis_op0F3A[(opcode6<<4)|opcode7];
+#ifdef DIS_TEXT
+			if (strcmp(dp->it_name, "INVALID") == 0)
+				goto error;
+#endif
+			switch (dp->it_adrmode) {
+				case XMMP_66r:
+				case XMMPRM_66r:
+				case XMM3PM_66r:
+					if (opnd_size_prefix == 0) {
+						goto error;
+					}
+					break;
+				case XMMP_66o:
+					if (opnd_size_prefix == 0) {
+						/* SSSE3 MMX instructions */
+						dp_mmx = *dp;
+						dp = &dp_mmx;
+						dp->it_adrmode = MMOPM_66o;
+#ifdef	DIS_MEM
+						dp->it_size = 8;
+#endif
+					}
+					break;
+				default:
+					goto error;
+			}
+		} else if ((opcode4 == 0x3) && (opcode5 == 0x8)) {
+			if (dtrace_get_opcode(x, &opcode6, &opcode7) != 0)
+				goto error;
+			dp = (instable_t *)&dis_op0F38[(opcode6<<4)|opcode7];
+#ifdef DIS_TEXT
+			if (strcmp(dp->it_name, "INVALID") == 0)
+				goto error;
+#endif
+			switch (dp->it_adrmode) {
+				case XMM_66r:
+				case XMMM_66r:
+					if (opnd_size_prefix == 0) {
+						goto error;
+					}
+					break;
+				case XMM_66o:
+					if (opnd_size_prefix == 0) {
+						/* SSSE3 MMX instructions */
+						dp_mmx = *dp;
+						dp = &dp_mmx;
+						dp->it_adrmode = MM;
+#ifdef	DIS_MEM
+						dp->it_size = 8;
+#endif
+					}
+					break;
+				case CRC32:
+					if (rep_prefix != 0xF2) {
+						goto error;
+					}
+					rep_prefix = 0;
+					break;
+				default:
+					goto error;
+			}
 		} else {
 			dp = (instable_t *)&dis_op0F[opcode4][opcode5];
 		}
@@ -2164,6 +2408,20 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 1);
 		x->d86_opnd_size = opnd_size = SIZE16;
 		wbit = WBIT(opcode5);
+		dtrace_get_operand(x, mode, r_m, wbit, 0);
+		break;
+	case CRC32:
+		opnd_size = SIZE32;
+		if (rex_prefix & REX_W)
+			opnd_size = SIZE64;
+		x->d86_opnd_size = opnd_size;
+
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
+		dtrace_get_operand(x, REG_ONLY, reg, LONG_OPND, 1);
+		wbit = WBIT(opcode7);
+		if (opnd_size_prefix)
+			x->d86_opnd_size = opnd_size = SIZE16;
 		dtrace_get_operand(x, mode, r_m, wbit, 0);
 		break;
 
@@ -2549,12 +2807,19 @@ xmm3p:
 		NOMEM;
 		break;
 
+	case XMM3PM_66r:
+		wbit = XMM_OPND;
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, LONG_OPND, 1);
+		break;
+
 	/* MMX/SIMD-Int predicated r32/mem to mm reg */
 	case MMOPRM:
 		wbit = LONG_OPND;
 		w2 = MM_OPND;
 		goto xmmprm;
 	case XMMPRM:
+	case XMMPRM_66r:
 		wbit = LONG_OPND;
 		w2 = XMM_OPND;
 xmmprm:
@@ -2563,6 +2828,7 @@ xmmprm:
 
 	/* MMX/SIMD-Int predicated mm/mem to mm reg */
 	case MMOPM:
+	case MMOPM_66o:
 		wbit = w2 = MM_OPND;
 		goto xmmprm;
 
@@ -2578,6 +2844,8 @@ xmmprm:
 
 	/* SIMD memory or xmm reg operand to xmm reg		*/
 	case XMM:
+	case XMM_66o:
+	case XMM_66r:
 	case XMMO:
 	case XMMXIMPL:
 		wbit = XMM_OPND;
@@ -2622,6 +2890,7 @@ xmmprm:
 
 	/* SIMD memory to xmm reg */
 	case XMMM:
+	case XMMM_66r:
 	case XMMOM:
 		wbit = XMM_OPND;
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
@@ -2684,6 +2953,8 @@ xmmprm:
 
 	/* SIMD predicated memory or xmm reg with/to xmm reg */
 	case XMMP:
+	case XMMP_66r:
+	case XMMP_66o:
 	case XMMOPM:
 		wbit = XMM_OPND;
 		THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, XMM_OPND, 1);
