@@ -50,7 +50,9 @@ static kmem_cache_t *req_cache;		/* kmem cache for timeout request */
 /*
  * taskq for timer
  */
-static int timer_taskq_num = 16;	/* initial thread number */
+int timer_taskq_num = 1;		/* initial thread number */
+int timer_taskq_min_num = 4;		/* minimum taskq thread pool */
+int timer_taskq_max_num = 16;		/* maximum taskq thread pool */
 static taskq_t *tm_taskq;		/* taskq thread pool */
 static kthread_t *tm_work_thread;	/* work thread invoking taskq */
 
@@ -693,7 +695,7 @@ timer_init(void)
 	/* Create a taskq thread pool */
 	tm_taskq = taskq_create_instance("timeout_taskq", 0,
 	    timer_taskq_num, MAXCLSYSPRI,
-	    timer_taskq_num, 2 * timer_taskq_num,
+	    timer_taskq_min_num, timer_taskq_max_num,
 	    TASKQ_PREPOPULATE | TASKQ_CPR_SAFE);
 
 	/*

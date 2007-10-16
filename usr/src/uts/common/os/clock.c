@@ -251,6 +251,7 @@ static int tod_broken = 0;	/* clock chip doesn't work */
 time_t	boot_time = 0;		/* Boot time in seconds since 1970 */
 cyclic_id_t clock_cyclic;	/* clock()'s cyclic_id */
 cyclic_id_t deadman_cyclic;	/* deadman()'s cyclic_id */
+cyclic_id_t ddi_timer_cyclic;	/* cyclic_timer()'s cyclic_id */
 
 static int lgrp_ticks;		/* counter to schedule lgrp load calcs */
 
@@ -1056,7 +1057,7 @@ clock_init(void)
 	hdlr.cyh_arg = NULL;
 
 	mutex_enter(&cpu_lock);
-	clock_cyclic = cyclic_add(&hdlr, &when);
+	ddi_timer_cyclic = cyclic_add(&hdlr, &when);
 	mutex_exit(&cpu_lock);
 }
 
