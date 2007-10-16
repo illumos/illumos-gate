@@ -50,6 +50,7 @@
 #define	INDENT 3
 #define	TIMESTRINGLEN 128
 #define	TEMPERATURE_OFFSET 73
+#define	MIN_VERSION 17
 
 static void	(*print_node)(fru_node_t fru_type, const char *path,
 				const char *name, end_node_fp_t *end_node,
@@ -68,6 +69,8 @@ int iterglobal = 0;
 int FMAmessageR = -1;
 int Fault_Install_DataR_flag = 0;
 int Power_On_DataR_flag = 0;
+int spd_memtype = 0;
+int spd_revision = 0;
 /*
  * Definition for data elements found in devices but not found in
  * the system's version of libfrureg
@@ -344,23 +347,14 @@ output_dtd(void)
  */
 static void convertbcdtobinary(int *val)
 {
-	int newval, tmpval, rem, origval, poweroften;
-	int i;
-	tmpval = 0;
-	newval = 0;
-	i = 0;
-	rem = 0;
-	poweroften = 1;
-	origval = (int)(*val);
-	tmpval = (int)(*val);
-	while (tmpval != 0) {
-		if (i >= 1)
-			poweroften = poweroften * 10;
-		origval = tmpval;
-		tmpval = (int)(tmpval/16);
-		rem = origval - (tmpval * 16);
-		newval = newval +(int)(poweroften * rem);
-		i ++;
+	unsigned int newval = (unsigned int)*val, tmpval = 0;
+	while (newval > 0) {
+		tmpval = (tmpval << 4) | (newval & 0xF);
+		newval >>= 4;
+	}
+	while (tmpval > 0) {
+		newval = (newval * 10) + (tmpval & 0xF);
+		tmpval >>= 4;
 	}
 	*val = newval;
 }
@@ -414,7 +408,11 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 			if ((value != 0) &&
 			    (strcmp(def->name, "SPD_Manufacture_Week") == 0)) {
 				valueint = (int)value;
-				convertbcdtobinary(&valueint);
+				if (spd_memtype && spd_revision) {
+					convertbcdtobinary(&valueint);
+					spd_memtype = 0;
+					spd_revision = 0;
+				}
 				output("%d", valueint);
 				return;
 			}
@@ -498,6 +496,12 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 "FMA Event Data R") == 0)
 						FMAmessageR = 0;
 				}
+				if (strcmp(def->name,
+"SPD_Fundamental_Memory_Type") == 0) {
+					if (strcmp(def->enumTable[i].text,
+"DDR II SDRAM") == 0)
+						spd_memtype = 1;
+				}
 				safeputs(def->enumTable[i].text);
 				return;
 			}
@@ -525,6 +529,17 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 			}
 			break;
 		default:
+			if (strcmp(def->name,
+			"SPD_Data_Revision_Code") == 0) {
+				value = 0;
+				valueint = 0;
+				(void) memcpy((((uint8_t *)&value)
+				    + sizeof (value) - def->payloadLen),
+				    field, def->payloadLen);
+				valueint = (int)value;
+				if ((valueint >= MIN_VERSION) && (spd_memtype))
+					spd_revision = 1;
+			}
 			for (i = 0; i < def->payloadLen; i++)
 				output("%2.2X", field[i]);
 			break;
