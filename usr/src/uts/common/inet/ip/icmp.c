@@ -3128,7 +3128,6 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	uint_t			ipvers;
 	ip6_pkt_t		ipp;
 	uint8_t			nexthdr;
-	boolean_t		recvif = B_FALSE;
 	ip_pktinfo_t		*pinfo = NULL;
 	mblk_t			*options_mp = NULL;
 	uint_t			icmp_opt = 0;
@@ -3254,13 +3253,13 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	if (icmp->icmp_family == AF_INET) {
 		ASSERT(ipvers == IPV4_VERSION);
 		udi_size =  sizeof (struct T_unitdata_ind) + sizeof (sin_t);
-		if (icmp->icmp_recvif && recvif &&
+		if (icmp->icmp_recvif && (pinfo != NULL) &&
 		    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (uint_t);
 		}
 
-		if (icmp->icmp_ip_recvpktinfo && recvif &&
+		if (icmp->icmp_ip_recvpktinfo && (pinfo != NULL) &&
 		    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (struct in_pktinfo);
@@ -3308,7 +3307,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			char *dstopt;
 
 			dstopt = (char *)&sin[1];
-			if (icmp->icmp_recvif && recvif &&
+			if (icmp->icmp_recvif && (pinfo != NULL) &&
 			    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
 
 				struct T_opthdr *toh;
@@ -3324,7 +3323,6 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 				dstptr = (uint_t *)dstopt;
 				*dstptr = pinfo->ip_pkt_ifindex;
 				dstopt += sizeof (uint_t);
-				freeb(options_mp);
 				udi_size -= toh->len;
 			}
 			if (icmp->icmp_timestamp) {
@@ -3344,7 +3342,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
-			if (icmp->icmp_ip_recvpktinfo && recvif &&
+			if (icmp->icmp_ip_recvpktinfo && (pinfo != NULL) &&
 			    (pinfo->ip_pkt_flags & IPF_RECVADDR)) {
 				struct	T_opthdr *toh;
 				struct	in_pktinfo *pktinfop;
@@ -3370,6 +3368,9 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			/* Consumed all of allocated space */
 			ASSERT(udi_size == 0);
 		}
+
+		if (options_mp != NULL)
+			freeb(options_mp);
 
 		BUMP_MIB(&is->is_rawip_mib, rawipInDatagrams);
 		putnext(connp->conn_rq, mp);

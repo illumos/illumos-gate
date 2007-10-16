@@ -6168,6 +6168,10 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	if (DEV_Q_IS_FLOW_CTLED(dev_q)) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsHCOutRequests);
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+		if (ipst->ips_ip_output_queue)
+			(void) putq(connp->conn_wq, mp);
+		else
+			freemsg(mp);
 		ire_refrele(ire);
 		return;
 	}
