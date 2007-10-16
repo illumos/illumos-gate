@@ -623,6 +623,8 @@ again:
 		(void)read_config_file(_PATH_HOST_CONFIG_FILE, host, &options);
 	}
 
+	process_unknown_options(&options);
+
 	/* Fill configuration defaults. */
 	fill_default_options(&options);
 

@@ -129,7 +129,7 @@ typedef enum {
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oFallBackToRsh, oUseRsh, oConnectTimeout, oHashKnownHosts,
 	oServerAliveInterval, oServerAliveCountMax, oDisableBanner,
-	oDeprecated
+	oIgnoreIfUnknown, oDeprecated
 } OpCodes;
 
 /* Textual representations of the tokens. */
@@ -220,6 +220,7 @@ static struct {
 	{ "serveralivecountmax", oServerAliveCountMax },
 	{ "disablebanner", oDisableBanner },
 	{ "hashknownhosts", oHashKnownHosts },
+	{ "ignoreifunknown", oIgnoreIfUnknown },
 	{ NULL, oBadOption }
 };
 
@@ -291,7 +292,7 @@ parse_token(const char *cp, const char *filename, int linenum)
 		if (strcasecmp(cp, keywords[i].name) == 0)
 			return keywords[i].opcode;
 
-	error("%s: line %d: Bad configuration option: %s",
+	debug("%s: line %d: unknown configuration option: %s",
 	    filename, linenum, cp);
 	return oBadOption;
 }
@@ -307,9 +308,10 @@ process_config_line(Options *options, const char *host,
 		    int *activep)
 {
 	char buf[256], *s, *string, **charptr, *endofnumber, *keyword, *arg;
-	int opcode, *intptr, value;
+	int opcode, *intptr, value, i;
 	u_short fwd_port, fwd_host_port;
 	char sfwd_host_port[6];
+	StoredOption *so;
 
 	s = line;
 	/* Get the keyword. (Each line is supposed to begin with a keyword). */
@@ -324,8 +326,27 @@ process_config_line(Options *options, const char *host,
 
 	switch (opcode) {
 	case oBadOption:
-		/* don't panic, but count bad options */
-		return -1;
+		if (options->unknown_opts_num == MAX_UNKNOWN_OPTIONS) {
+			error("we can't have more than %d unknown options:",
+			    MAX_UNKNOWN_OPTIONS);
+			for (i = 0; i < MAX_UNKNOWN_OPTIONS; ++i) {
+				so = &options->unknown_opts[i];
+				error("%s:%d:%s",
+				    so->filename, so->linenum, so->keyword);
+				xfree(so->keyword);
+				xfree(so->filename);
+			}
+			fatal("too many unknown options found, can't continue");
+		}
+
+		/* unknown options will be processed later */
+		so = &options->unknown_opts[options->unknown_opts_num];
+		so->keyword = xstrdup(keyword);
+		so->filename = xstrdup(filename);
+		so->linenum = linenum;
+		options->unknown_opts_num++;
+		return (0);
+
 		/* NOTREACHED */
 	case oConnectTimeout:
 		intptr = &options->connection_timeout;
@@ -775,6 +796,10 @@ parse_int:
 			    "argument.", filename, linenum);
 		break;
 
+	case oIgnoreIfUnknown:
+		charptr = &options->ignore_if_unknown;
+		goto parse_string;
+
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
 		    filename, linenum, keyword);
@@ -805,7 +830,6 @@ read_config_file(const char *filename, const char *host, Options *options)
 	FILE *f;
 	char line[1024];
 	int active, linenum;
-	int bad_options = 0;
 
 	/* Open the file. */
 	f = fopen(filename, "r");
@@ -823,13 +847,9 @@ read_config_file(const char *filename, const char *host, Options *options)
 	while (fgets(line, sizeof(line), f)) {
 		/* Update line number counter. */
 		linenum++;
-		if (process_config_line(options, host, line, filename, linenum, &active) != 0)
-			bad_options++;
+		process_config_line(options, host, line, filename, linenum, &active);
 	}
 	fclose(f);
-	if (bad_options > 0)
-		fatal("%s: terminating, %d bad configuration options",
-		    filename, bad_options);
 	return 1;
 }
 
@@ -915,6 +935,8 @@ initialize_options(Options * options)
 	options->server_alive_interval = -1;
 	options->server_alive_count_max = -1;
 	options->hash_known_hosts = -1;
+	options->ignore_if_unknown = NULL;
+	options->unknown_opts_num = 0;
 	options->disable_banner = -1;
 }
 
@@ -1065,4 +1087,52 @@ fill_default_options(Options * options)
 	/* options->hostname will be set in the main program if appropriate */
 	/* options->host_key_alias should not be set by default */
 	/* options->preferred_authentications will be set in ssh */
+	/* options->ignore_if_unknown should not be set by default */
+}
+
+/*
+ * Process previously stored unknown options. When this function is called we
+ * already have IgnoreIfUnknown set so finally we can decide whether each
+ * unknown option is to be ignored or not.
+ */
+void
+process_unknown_options(Options *options)
+{
+	StoredOption *so;
+	int m, i, bad_options = 0;
+
+	/* if there is no unknown option we are done */
+	if (options->unknown_opts_num == 0)
+		return;
+
+	/*
+	 * Now go through the list of unknown options and report any one that
+	 * is not explicitly listed in IgnoreIfUnknown option. If at least one
+	 * such as that is found it's a show stopper.
+	 */
+	for (i = 0; i < options->unknown_opts_num; ++i) {
+		so = &options->unknown_opts[i];
+		if (options->ignore_if_unknown == NULL)
+			m = 0;
+		else
+			m = match_pattern_list(tolowercase(so->keyword),
+			    options->ignore_if_unknown,
+			    strlen(options->ignore_if_unknown), 1);
+		if (m == 1) {
+			debug("%s: line %d: ignoring unknown option: %s",
+			    so->filename, so->linenum, so->keyword);
+		}
+		else {
+			error("%s: line %d: unknown configuration option: %s",
+			    so->filename, so->linenum, so->keyword);
+			bad_options++;
+		}
+		xfree(so->keyword);
+		xfree(so->filename);
+	}
+
+	/* exit if we found at least one unignored unknown option */
+	if (bad_options > 0)
+		fatal("terminating, %d bad configuration option(s)",
+		    bad_options);
 }

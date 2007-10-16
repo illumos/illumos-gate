@@ -26,8 +26,14 @@
 extern "C" {
 #endif
 
-
 #include "key.h"
+
+/*
+ * We accept only fixed amount of unknown options. Note that we must treat all
+ * options in different Host sections separately since we need to remember the
+ * line number. See IgnoreIfUnknown for more information.
+ */
+#define	MAX_UNKNOWN_OPTIONS	64
 
 /* Data structure for representing a forwarding request. */
 
@@ -37,6 +43,13 @@ typedef struct {
 	u_short	  host_port;	/* Port to connect on host. */
 }       Forward;
 /* Data structure for representing option data. */
+
+/* For postponed processing of option keywords. */
+typedef struct {
+	char   *keyword;	/* option keyword name */
+	char   *filename;	/* config file it was found in */
+	int	linenum;	/* line number in the config file */
+}	StoredOption;
 
 typedef struct {
 	int     forward_agent;	/* Forward authentication agent. */
@@ -114,6 +127,16 @@ typedef struct {
 	char   *smartcard_device; /* Smartcard reader device */
 	int	disable_banner;	/* Disable display of banner */
 
+	/*
+	 * Unknown options listed in IgnoreIfUnknown will not cause ssh to
+	 * exit. So, we must store all unknown options here and can't process
+	 * them before the command line options and all config files are read
+	 * and IgnoreIfUnknown is properly set.
+	 */
+	char   *ignore_if_unknown;
+	int	unknown_opts_num;
+	StoredOption unknown_opts[MAX_UNKNOWN_OPTIONS];
+
 	int     num_identity_files;	/* Number of files for RSA/DSA identities. */
 	char   *identity_files[SSH_MAX_IDENTITY_FILES];
 	Key    *identity_keys[SSH_MAX_IDENTITY_FILES];
@@ -143,6 +166,8 @@ process_config_line(Options *, const char *, char *, const char *, int, int *);
 
 void	 add_local_forward(Options *, u_short, const char *, u_short);
 void	 add_remote_forward(Options *, u_short, const char *, u_short);
+
+void	 process_unknown_options(Options *options);
 
 #ifdef __cplusplus
 }

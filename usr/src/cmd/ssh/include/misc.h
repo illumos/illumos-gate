@@ -38,6 +38,7 @@ char	*tohex(const void *, size_t);
 void	 sanitise_stdfd(void);
 int	 get_yes_no_flag(int *option, const char *arg, const char *filename,
 		    int linenum, int active);
+char    *tolowercase(const char *s);
 
 struct passwd	*pwcopy(struct passwd *);
 void		 pwfree(struct passwd **);

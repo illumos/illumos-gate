@@ -571,3 +571,30 @@ get_yes_no_flag(int *option, const char *arg, const char *filename, int linenum,
 
 	return (value != -1);
 }
+
+/*
+ * Convert a string to lowercase. The string returned is an internally allocated
+ * one so the consumer of this function is not expected to change it or free it.
+ */
+char *
+tolowercase(const char *s)
+{
+	int i, len;
+	static int lenret = 0;
+	static char *ret = NULL;
+	
+	/* allocate a new string if the old one it not long enough to store s */
+	len = strlen(s) + 1;
+	if (len > lenret) {
+		if (ret != NULL)
+			xfree(ret);
+		ret = xmalloc(len);
+		lenret = len;
+	}
+
+	/* process the string including the ending '\0' */
+	for (i = 0; i < len; ++i)
+		ret[i] = tolower(s[i]);
+
+	return (ret);
+}
