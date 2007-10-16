@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2007 Chad Mynhier
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -584,6 +586,9 @@ again:	/* Come back here if we lose it in the Window of Vulnerability */
 		case EPERM:
 			rc = G_PERM;
 			break;
+		case EMFILE:
+			rc = G_NOFD;
+			break;
 		case EBUSY:
 			if (!(flags & PGRAB_FORCE) || geteuid() != 0) {
 				rc = G_BUSY;
@@ -607,6 +612,9 @@ again:	/* Come back here if we lose it in the Window of Vulnerability */
 		case ENOENT:
 			rc = G_NOPROC;
 			break;
+		case EMFILE:
+			rc = G_NOFD;
+			break;
 		default:
 			dprintf("Pgrab: failed to open %s: %s\n",
 			    procname, strerror(errno));
@@ -624,6 +632,9 @@ again:	/* Come back here if we lose it in the Window of Vulnerability */
 			switch (errno) {
 			case ENOENT:
 				rc = G_NOPROC;
+				break;
+			case EMFILE:
+				rc = G_NOFD;
 				break;
 			default:
 				dprintf("Pgrab: failed to open %s: %s\n",
@@ -904,6 +915,9 @@ Pgrab_error(int error)
 		break;
 	case G_BADLWPS:
 		str = "bad lwp specification";
+		break;
+	case G_NOFD:
+		str = "too many open files";
 		break;
 	default:
 		str = "unknown error";

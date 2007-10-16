@@ -21,6 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2007 Chad Mynhier
  */
 
 /*
@@ -150,6 +152,7 @@ extern	int	_libproc_no_qsort;	/* set non-zero to inhibit sorting */
 #define	G_NOTE		14	/* Required PT_NOTE Phdr not present in core */
 #define	G_ISAINVAL	15	/* Wrong ELF machine type */
 #define	G_BADLWPS	16	/* Bad '/lwps' specification */
+#define	G_NOFD		17	/* No more file descriptors */
 
 
 /* Flags accepted by Prelease */
