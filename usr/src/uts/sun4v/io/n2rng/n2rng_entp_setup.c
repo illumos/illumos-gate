@@ -130,7 +130,7 @@ int
 n2rng_logic_test(n2rng_t *n2rng)
 {
 	n2rng_setup_t	logictest;
-	uint64_t	buffer[2];
+	uint64_t	buffer[LOGIC_TEST_WORDS];
 	uint64_t	reg;
 	int		rv;
 	int		i, j;

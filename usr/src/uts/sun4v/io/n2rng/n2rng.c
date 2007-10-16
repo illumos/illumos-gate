@@ -307,13 +307,14 @@ n2rng_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/* unregister with KCF---also tears down FIPS state */
-	rv = n2rng_uninit(n2rng) ? DDI_FAILURE : DDI_SUCCESS;
-
+	/* Destroy task queue first to insure configuration has completed */
 	if (n2rng->n_taskq != NULL) {
 		ddi_taskq_destroy(n2rng->n_taskq);
 		n2rng->n_taskq = NULL;
 	}
+
+	/* unregister with KCF---also tears down FIPS state */
+	rv = n2rng_uninit(n2rng) ? DDI_FAILURE : DDI_SUCCESS;
 
 	if (rng_hsvc_available == B_TRUE) {
 		(void) hsvc_unregister(&rng_hsvc);
