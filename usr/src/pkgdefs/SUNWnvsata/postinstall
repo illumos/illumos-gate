@@ -206,7 +206,8 @@ process_bootenvrc_for_install() {
  
 	${GREP} "cmdk@" ${BOOTENVRC} | while read bootpath_line
 	do
-		old_path=`echo ${bootpath_line} | ${CUT} -d' ' -f3`
+		old_path=`echo ${bootpath_line} | ${CUT} -d' ' -f3 \
+			|$SED "s/\'//g"`
 		devname=`echo ${old_path} | $CUT -d/ -f4- | $SED "{
 			s/ide@/disk@/
 			s/\/cmdk@.//
@@ -545,7 +546,8 @@ process_system_for_install() {
 		exit 1
 	fi
 
-	rootdev=`echo ${rootdev_line} | ${CUT} -d: -f2-`
+	rootdev=`echo ${rootdev_line} | ${CUT} -d: -f2- \
+		| $SED "s/\'//g"`
 	devname=`echo ${rootdev} | $CUT -d/ -f4- | $SED "{
 		s/ide@/disk@/
 		s/\/cmdk@.//
@@ -821,6 +823,7 @@ process_power_conf_for_install() {
 				dn=`echo $i | $CUT -d/ -f4- | $SED "{
 					s/ide@/disk@/
 					s/\/cmdk@.//
+					s/\'//g
 					}"`
 				for x in `$LS -l /dev/dsk | $GREP $dn \
 					| $NAWK '{print $11}'`
@@ -1066,7 +1069,8 @@ process_devlink_for_install() {
         $LS -l "${ROOT}/dev/dsk" | $GREP "cmdk@" | while read line1
         do
                 logical_disk=`echo $line1 | $NAWK '{print $9}'`
-                old_path=`echo $line1 | $NAWK '{print $11}'`
+		old_path=`echo $line1 | $NAWK '{print $11}' \
+			| $SED "s/\'//g"`
 		devname=`echo ${old_path} | $CUT -d/ -f6- | $SED "{
 			s/ide@/disk@/
 			s/\/cmdk@.//
@@ -1318,8 +1322,9 @@ fi
 line=`$MOUNT | $GREP "/ "`
 first_field=`echo $line | $NAWK '{print $1}'`
 third_field=`echo $line | $NAWK '{print $3}'`
+echo ${third_field} |$GREP "ramdisk:a" > /dev/null
 
-if [ ${first_field} = "/" -a ${third_field} = "/ramdisk:a" ]
+if [ ${first_field} = "/" -a $? -eq 0 ]
 then
 	# It is either an install/upgrade.
 	if [ -f ${UPGRADE_LOG} ]
