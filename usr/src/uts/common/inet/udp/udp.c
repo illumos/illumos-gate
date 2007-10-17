@@ -251,7 +251,7 @@ static struct qinit udp_rinitv6 = {
 };
 
 static struct qinit udp_winit = {
-	(pfi_t)udp_wput, NULL, NULL, NULL, NULL,
+	(pfi_t)udp_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL,
 	&udp_mod_info, NULL, NULL, NULL, STRUIOT_NONE
 };
 

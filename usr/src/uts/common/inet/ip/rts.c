@@ -962,10 +962,10 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 			return;
 		case T_SVR4_OPTMGMT_REQ:
 			(void) svr4_optcom_req(q, mp, cr, &rts_opt_obj,
-			    B_FALSE);
+			    B_TRUE);
 			return;
 		case T_OPTMGMT_REQ:
-			(void) tpi_optcom_req(q, mp, cr, &rts_opt_obj, B_FALSE);
+			(void) tpi_optcom_req(q, mp, cr, &rts_opt_obj, B_TRUE);
 			return;
 		case O_T_CONN_RES:
 		case T_CONN_RES:

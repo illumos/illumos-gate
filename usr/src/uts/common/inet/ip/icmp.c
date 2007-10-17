@@ -180,7 +180,7 @@ static struct qinit icmprinitv6 = {
 };
 
 static struct qinit icmpwinit = {
-	(pfi_t)icmp_wput, NULL, NULL, NULL, NULL, &icmp_mod_info
+	(pfi_t)icmp_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL, &icmp_mod_info
 };
 
 /* For AF_INET aka /dev/icmp */

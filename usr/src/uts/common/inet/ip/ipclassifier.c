@@ -2176,6 +2176,12 @@ rts_conn_destructor(void *buf, void *cdrarg)
 /*
  * Called as part of ipcl_conn_destroy to assert and clear any pointers
  * in the conn_t.
+ *
+ * Below we list all the pointers in the conn_t as a documentation aid.
+ * The ones that we can not ASSERT to be NULL are #ifdef'ed out.
+ * If you add any pointers to the conn_t please add an ASSERT here
+ * and #ifdef it out if it can't be actually asserted to be NULL.
+ * In any case, we bzero most of the conn_t at the end of the function.
  */
 void
 ipcl_conn_cleanup(conn_t *connp)
@@ -2183,6 +2189,7 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_ire_cache == NULL);
 	ASSERT(connp->conn_latch == NULL);
 #ifdef notdef
+	/* These are not cleared */
 	ASSERT(connp->conn_rq == NULL);
 	ASSERT(connp->conn_wq == NULL);
 #endif
@@ -2213,7 +2220,10 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_ilg == NULL);
 	ASSERT(connp->conn_drain_next == NULL);
 	ASSERT(connp->conn_drain_prev == NULL);
+#ifdef notdef
+	/* conn_idl is not cleared when removed from idl list */
 	ASSERT(connp->conn_idl == NULL);
+#endif
 	ASSERT(connp->conn_ipsec_opt_mp == NULL);
 	ASSERT(connp->conn_peercred == NULL);
 	ASSERT(connp->conn_netstack == NULL);
