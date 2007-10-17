@@ -3385,7 +3385,7 @@ int *nfreedp;
 frentry_t **listp;
 ipf_stack_t *ifs;
 {
-	int freed = 0, i;
+	int freed = 0;
 	frentry_t *fp;
 
 	while ((fp = *listp) != NULL) {
@@ -3396,8 +3396,7 @@ ipf_stack_t *ifs;
 		}
 		*listp = fp->fr_next;
 		if (fp->fr_grp != NULL) {
-			i = frflushlist(set, unit, nfreedp, fp->fr_grp, ifs);
-			fp->fr_ref -= i;
+			(void) frflushlist(set, unit, nfreedp, fp->fr_grp, ifs);
 		}
 
 		if (fp->fr_grhead != NULL) {
@@ -4499,8 +4498,6 @@ ipf_stack_t *ifs;
 			    (f->fr_isc != (struct ipscan *)-1))
 				ipsc_detachfr(f);
 #endif
-			if ((fg != NULL) && (fg->fg_head != NULL))
-				fg->fg_head->fr_ref--;
 			if (unit == IPL_LOGAUTH) {
 				error = fr_preauthcmd(req, f, ftail, ifs);
 				goto done;
@@ -4528,8 +4525,6 @@ ipf_stack_t *ifs;
 			} else
 				f = fp;
 			if (f != NULL) {
-				if (fg != NULL && fg->fg_head != NULL)
-					fg->fg_head->fr_ref++;
 				if (fp != f)
 					bcopy((char *)fp, (char *)f,
 					      sizeof(*f));

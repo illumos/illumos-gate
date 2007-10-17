@@ -63,9 +63,11 @@ struct file;
 # include <sys/byteorder.h>
 # ifdef _KERNEL
 #  include <sys/dditypes.h>
+#  include <sys/strsubr.h>
 # endif
 # include <sys/stream.h>
 # include <sys/kmem.h>
+# include <sys/pattr.h>
 #endif
 #if __FreeBSD__ > 2
 # include <sys/queue.h>
@@ -474,6 +476,8 @@ nat_t *nat;
 #endif
 	tcphdr_t *tcp = NULL;
 	udphdr_t *udp = NULL;
+	void *tcpudp = NULL;
+	u_short *csump;
 	ap_session_t *aps;
 	aproxy_t *apr;
 	ip_t *ip;
@@ -580,14 +584,16 @@ nat_t *nat;
 		 * inbound packets always need to be adjusted.
 		 */
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
-		if (err != 0 && (!fin->fin_out ||
-	    	    !NET_IS_HCK_L3_FULL(net_data_p, fin->fin_m))) {
+		if (err != 0) {
 			short adjlen = err & 0xffff;
 
 			s1 = LONG_SUM(ip->ip_len - adjlen);
 			s2 = LONG_SUM(ip->ip_len);
 			CALC_SUMD(s1, s2, sd);
-			fix_outcksum(&ip->ip_sum, sd);
+			sd = (sd & 0xffff) + (sd >> 16);
+			if (!fin->fin_out ||
+			    !NET_IS_HCK_L3_FULL(net_data_p, fin->fin_m))
+				fix_outcksum(&ip->ip_sum, sd);
 		}
 #endif
 
@@ -596,32 +602,44 @@ nat_t *nat;
 		 * acknowledgement numbers to reflect changes in size of the
 		 * data stream.
 		 *
-		 * For both TCP and UDP, recalculate the layer 4 checksum,
-		 * regardless, as we can't tell (here) if data has been
+		 * For both TCP and UDP, recalculate the layer 4 checksum in
+		 * software checksum case, as we can't tell if data has been
 		 * changed or not.
 		 */
 		if (tcp != NULL) {
-			err = appr_fixseqack(fin, ip, aps, APR_INC(err));
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (!fin->fin_out ||
-			    !NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) &&
-			    !NET_IS_HCK_L4_PART(net_data_p, fin->fin_m))
-				tcp->th_sum = fr_cksum(fin->fin_qfm, ip,
-						       IPPROTO_TCP, tcp);
+			tcpudp = tcp;
+			csump = &tcp->th_sum;
+			(void) appr_fixseqack(fin, ip, aps, APR_INC(err));
+		} else if (udp != NULL) {
+			tcpudp = udp;
+			csump = &udp->uh_sum;
+		}
+
+		if (tcpudp) {
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(MENTAT)
+			if (!fin->fin_out) {
+				/*
+				 * We are incapable of adjusting partial hcksum
+				 * result for inbound packets here, as the
+				 * partial hcksum calculation range might not
+				 * cover the whole payload, and the payload data
+				 * might be changed by proxy.
+				 */
+				DB_CKSUMFLAGS(fin->fin_m) &= ~HCK_PARTIALCKSUM;
+
+				/* Inbound packets always need recalculation. */
+				*csump = fr_cksum(fin->fin_qfm, ip,
+						  fin->fin_p, tcpudp);
+			} else if (NET_IS_HCK_L4_PART(net_data_p, fin->fin_m)) {
+				if (err != 0) {
+					DB_CKSUMEND(fin->fin_m) += (short)err;
+					fix_incksum(csump, sd);
+				}
+			} else if (!NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m))
+				*csump = fr_cksum(fin->fin_qfm, ip,
+						  fin->fin_p, tcpudp);
 #else
-			tcp->th_sum = fr_cksum(fin->fin_m, ip,
-					       IPPROTO_TCP, tcp);
-#endif
-		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (!fin->fin_out ||
-			    !NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) &&
-			    !NET_IS_HCK_L4_PART(net_data_p, fin->fin_m))
-				udp->uh_sum = fr_cksum(fin->fin_qfm, ip,
-						       IPPROTO_UDP, udp);
-#else
-			udp->uh_sum = fr_cksum(fin->fin_m, ip,
-					       IPPROTO_UDP, udp);
+			*csump = fr_cksum(fin->fin_m, ip, fin->fin_p, tcpudp);
 #endif
 		}
 		aps->aps_bytes += fin->fin_plen;

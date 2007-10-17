@@ -4062,8 +4062,7 @@ int natadd;
 u_32_t nflags;
 {
 	icmphdr_t *icmp;
-	u_short *csump, *csump1;
-	u_32_t sumd;
+	u_short *csump;
 	tcphdr_t *tcp;
 	ipnat_t *np;
 	int i;
@@ -4155,31 +4154,36 @@ u_32_t nflags;
 
 	nat_update(fin, nat, np);
 
-#if SOLARIS && defined(_KERNEL)
-	if (nflags & IPN_TCPUDP &&
-	    NET_IS_HCK_L4_PART(net_data_p, fin->fin_m)) {
-		sumd = nat->nat_sumd[1];
-		csump1 = &(fin->fin_m->b_datap->db_struioun.cksum.cksum_val.u16);
-		if (csump1 != NULL) {
-			if (nat->nat_dir == NAT_OUTBOUND)
-				fix_incksum(csump1, sumd);
-			else
-				fix_outcksum(csump1, sumd);
-		}
-	} else
-#endif
-		sumd = nat->nat_sumd[0];
-
 	/*
-	 * Inbound packets always need to have their address adjusted in case	
-	 * code following this validates it.
+	 * In case they are being forwarded, inbound packets always need to have
+	 * their checksum adjusted even if hardware checksum validation said OK.
 	 */
 	if (csump != NULL) {
 		if (nat->nat_dir == NAT_OUTBOUND)
-			fix_incksum(csump, sumd);
+			fix_incksum(csump, nat->nat_sumd[0]);
 		else
-			fix_outcksum(csump, sumd);
+			fix_outcksum(csump, nat->nat_sumd[0]);
 	}
+
+#if SOLARIS && defined(_KERNEL)
+	if (nflags & IPN_TCPUDP &&
+	    NET_IS_HCK_L4_PART(net_data_p, fin->fin_m)) {
+		/*
+		 * Need to adjust the partial checksum result stored in
+		 * db_cksum16, which will be used for validation in IP.
+		 * See IP_CKSUM_RECV().
+		 * Adjustment data should be the inverse of the IP address
+		 * changes, because db_cksum16 is supposed to be the complement
+		 * of the pesudo header.
+		 */
+		csump = &fin->fin_m->b_datap->db_cksum16;
+		if (nat->nat_dir == NAT_OUTBOUND)
+			fix_outcksum(csump, nat->nat_sumd[1]);
+		else
+			fix_incksum(csump, nat->nat_sumd[1]);
+	}
+#endif
+
 	ATOMIC_INCL(ifs->ifs_nat_stats.ns_mapped[0]);
 	fin->fin_flx |= FI_NATED;
 	if (np != NULL && np->in_tag.ipt_num[0] != 0)
