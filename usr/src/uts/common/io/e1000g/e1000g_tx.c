@@ -156,7 +156,8 @@ e1000g_m_tx(void *arg, mblk_t *mp)
 
 	rw_enter(&Adapter->chip_lock, RW_READER);
 
-	if (!Adapter->started || (Adapter->link_state != LINK_STATE_UP)) {
+	if ((Adapter->chip_state != E1000G_START) ||
+	    (Adapter->link_state != LINK_STATE_UP)) {
 		freemsgchain(mp);
 		mp = NULL;
 	}
@@ -575,6 +576,11 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 		E1000_WRITE_REG(hw, E1000_TDT,
 		    (uint32_t)(next_desc - tx_ring->tbd_first));
 
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		Adapter->chip_state = E1000G_ERROR;
+	}
+
 	/* Put the pending SwPackets to the "Used" list */
 	mutex_enter(&tx_ring->usedlist_lock);
 	QUEUE_APPEND(&tx_ring->used_list, pending_list);
@@ -769,6 +775,12 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	/* Sync the Tx descriptor DMA buffer */
 	(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORKERNEL);
+	if (e1000g_check_dma_handle(
+	    tx_ring->tbd_dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		Adapter->chip_state = E1000G_ERROR;
+		return (0);
+	}
 
 	/*
 	 * While there are still TxSwPackets in the used queue check them

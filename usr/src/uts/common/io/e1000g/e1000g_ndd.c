@@ -477,6 +477,9 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 		break;
 	}
 
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
+
 	rw_exit(&Adapter->chip_lock);
 }
 
@@ -741,6 +744,9 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 
 finished:
 	rw_exit(&Adapter->chip_lock);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 }
 
 int

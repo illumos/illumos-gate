@@ -70,6 +70,7 @@ static ddi_device_acc_attr_t e1000g_desc_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 /* DMA access attributes for DMA buffers */
@@ -100,7 +101,7 @@ static ddi_dma_attr_t e1000g_tx_dma_attr = {
 	0xffffffffffffffffULL,	/* maximum segment length */
 	16,			/* maximum number of segments */
 	1,			/* granularity */
-	0,			/* flags (reserved) */
+	DDI_DMA_FLAGERR,	/* dma_attr_flags */
 };
 
 /* DMA attributes for pre-allocated rx/tx buffers */
@@ -116,7 +117,7 @@ static ddi_dma_attr_t e1000g_buf_dma_attr = {
 	0xffffffffffffffffULL,	/* maximum segment length */
 	1,			/* maximum number of segments */
 	1,			/* granularity */
-	0,			/* flags (reserved) */
+	DDI_DMA_FLAGERR,	/* dma_attr_flags */
 };
 
 /* DMA attributes for rx/tx descriptors */
@@ -132,7 +133,7 @@ static ddi_dma_attr_t e1000g_desc_dma_attr = {
 	0xffffffffffffffffULL,	/* maximum segment length */
 	1,			/* maximum number of segments */
 	1,			/* granularity */
-	0,			/* flags (reserved) */
+	DDI_DMA_FLAGERR,	/* dma_attr_flags */
 };
 
 #ifdef __sparc
@@ -1325,4 +1326,24 @@ e1000g_release_dma_resources(struct e1000g *Adapter)
 {
 	e1000g_free_descriptors(Adapter);
 	e1000g_free_packets(Adapter);
+}
+
+void
+e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag)
+{
+	if (acc_flag) {
+		e1000g_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+	} else {
+		e1000g_desc_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+	}
+
+	if (dma_flag) {
+		e1000g_tx_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		e1000g_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+		e1000g_desc_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+	} else {
+		e1000g_tx_dma_attr.dma_attr_flags = 0;
+		e1000g_buf_dma_attr.dma_attr_flags = 0;
+		e1000g_desc_dma_attr.dma_attr_flags = 0;
+	}
 }

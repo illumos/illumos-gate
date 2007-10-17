@@ -543,3 +543,8 @@ Notes on packaging:
    6579605 Sunvts netlbtest internal loopback failed on Northstar fiber card
    6595668 e1000g postinstall script missed 5 device ids which had been supported by shared code
 
+5.2.3
+======
+  This version has the following fix:
+   6335851 e1000g needs to support FMA
+

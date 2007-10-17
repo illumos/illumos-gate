@@ -426,6 +426,11 @@ e1000g_receive(struct e1000g *Adapter)
 	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORKERNEL);
 
+	if (e1000g_check_dma_handle(rx_ring->rbd_dma_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		Adapter->chip_state = E1000G_ERROR;
+	}
+
 	current_desc = rx_ring->rbd_next;
 	if (!(current_desc->status & E1000_RXD_STAT_DD)) {
 		/*
@@ -485,6 +490,13 @@ e1000g_receive(struct e1000g *Adapter)
 		    E1000G_IPALIGNROOM, length,
 		    DDI_DMA_SYNC_FORKERNEL);
 #endif
+
+		if (e1000g_check_dma_handle(
+		    rx_buf->dma_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(Adapter->dip,
+			    DDI_SERVICE_DEGRADED);
+			Adapter->chip_state = E1000G_ERROR;
+		}
 
 		accept_frame = (current_desc->errors == 0) ||
 		    ((current_desc->errors &
@@ -800,6 +812,11 @@ rx_next_desc:
 	E1000_WRITE_REG(hw, E1000_RDT,
 	    (uint32_t)(last_desc - rx_ring->rbd_first));
 
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		Adapter->chip_state = E1000G_ERROR;
+	}
+
 	return (ret_mp);
 
 rx_drop:
@@ -837,6 +854,11 @@ rx_drop:
 	 */
 	E1000_WRITE_REG(hw, E1000_RDT,
 	    (uint32_t)(last_desc - rx_ring->rbd_first));
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		Adapter->chip_state = E1000G_ERROR;
+	}
 
 	return (ret_mp);
 }

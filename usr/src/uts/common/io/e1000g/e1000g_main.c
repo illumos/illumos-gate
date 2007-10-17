@@ -49,9 +49,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.2";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.3";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.2";
+static char e1000g_version[] = "Driver Ver. 5.2.3";
 
 /*
  * Proto types for DDI entry points
@@ -144,6 +144,10 @@ static boolean_t e1000g_find_mac_address(struct e1000g *);
 #endif
 static void e1000g_get_phy_state(struct e1000g *);
 static void e1000g_free_priv_devi_node(struct e1000g *, boolean_t);
+static int e1000g_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
+    const void *impl_data);
+static void e1000g_fm_init(struct e1000g *Adapter);
+static void e1000g_fm_fini(struct e1000g *Adapter);
 
 static struct cb_ops cb_ws_ops = {
 	nulldev,		/* cb_open */
@@ -195,6 +199,7 @@ static ddi_device_acc_attr_t e1000g_regs_acc_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_STRUCTURE_LE_ACC,
 	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 #define	E1000G_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
@@ -397,6 +402,16 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(devinfo, (caddr_t)Adapter);
 
 	/*
+	 * Initialize for fma support
+	 */
+	Adapter->fm_capabilities = e1000g_get_prop(Adapter, "fm-capable",
+	    0, 0x0f,
+	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+	e1000g_fm_init(Adapter);
+	Adapter->attach_progress |= ATTACH_PROGRESS_FMINIT;
+
+	/*
 	 * PCI Configure
 	 */
 	if (pci_config_setup(devinfo, &osdep->cfg_handle) != DDI_SUCCESS) {
@@ -429,6 +444,11 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	Adapter->attach_progress |= ATTACH_PROGRESS_SETUP;
+
+	if (e1000g_check_acc_handle(Adapter->osdep.cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
+		goto attach_fail;
+	}
 
 	/*
 	 * Initialize interrupts
@@ -871,7 +891,8 @@ e1000g_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	}
 	Adapter->attach_progress &= ~ATTACH_PROGRESS_MAC;
 
-	if (Adapter->started)
+
+	if (Adapter->chip_state != E1000G_STOP)
 		e1000g_stop(Adapter, B_TRUE);
 
 	rx_drain = e1000g_rx_drain(Adapter);
@@ -987,7 +1008,10 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_INIT) {
 		stop_link_timer(Adapter);
-		e1000_reset_hw(&Adapter->shared);
+		if (e1000_reset_hw(&Adapter->shared) != 0) {
+			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
+			ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
+		}
 	}
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_REGS_MAP) {
@@ -1004,6 +1028,10 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_LOCKS) {
 		e1000g_destroy_locks(Adapter);
+	}
+
+	if (Adapter->attach_progress & ATTACH_PROGRESS_FMINIT) {
+		e1000g_fm_fini(Adapter);
 	}
 
 	e1000_remove_device(&Adapter->shared);
@@ -1115,7 +1143,10 @@ e1000g_init(struct e1000g *Adapter)
 	 * reset to put the hardware in a known state
 	 * before we try to do anything with the eeprom
 	 */
-	(void) e1000_reset_hw(hw);
+	if (e1000_reset_hw(hw) != 0) {
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
+	}
 
 	if (e1000_validate_nvm_checksum(hw) < 0) {
 		/*
@@ -1127,6 +1158,7 @@ e1000g_init(struct e1000g *Adapter)
 			e1000g_log(Adapter, CE_WARN,
 			    "Invalid NVM checksum. Please contact "
 			    "the vendor to update the NVM.");
+			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 			goto init_fail;
 		}
 	}
@@ -1139,6 +1171,7 @@ e1000g_init(struct e1000g *Adapter)
 	if (!e1000g_find_mac_address(Adapter)) {
 		if (e1000_read_mac_addr(hw) < 0) {
 			e1000g_log(Adapter, CE_WARN, "Read mac addr failed");
+			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 			goto init_fail;
 		}
 	}
@@ -1146,6 +1179,7 @@ e1000g_init(struct e1000g *Adapter)
 	/* Get the local ethernet address. */
 	if (e1000_read_mac_addr(hw) < 0) {
 		e1000g_log(Adapter, CE_WARN, "Read mac addr failed");
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
 #endif
@@ -1153,6 +1187,7 @@ e1000g_init(struct e1000g *Adapter)
 	/* check for valid mac address */
 	if (!is_valid_mac_addr(hw->mac.addr)) {
 		e1000g_log(Adapter, CE_WARN, "Invalid mac addr");
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
 
@@ -1229,7 +1264,10 @@ e1000g_init(struct e1000g *Adapter)
 	/*
 	 * Reset the adapter hardware the second time.
 	 */
-	(void) e1000_reset_hw(hw);
+	if (e1000_reset_hw(hw) != 0) {
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
+	}
 
 	/* disable wakeup control by default */
 	if (hw->mac.type >= e1000_82544)
@@ -1243,6 +1281,7 @@ e1000g_init(struct e1000g *Adapter)
 	 */
 	if (e1000_init_hw(hw) < 0) {
 		e1000g_log(Adapter, CE_WARN, "Initialize hw failed");
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
 
@@ -1298,12 +1337,20 @@ e1000g_init(struct e1000g *Adapter)
 
 	Adapter->init_count++;
 
+	if (e1000g_check_acc_handle(Adapter->osdep.cfg_handle) != DDI_FM_OK) {
+		goto init_fail;
+	}
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		goto init_fail;
+	}
+
 	rw_exit(&Adapter->chip_lock);
 
 	return (DDI_SUCCESS);
 
 init_fail:
 	rw_exit(&Adapter->chip_lock);
+	ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 	return (DDI_FAILURE);
 }
 
@@ -1435,6 +1482,9 @@ static void e1000g_m_blank(void *arg, time_t ticks, uint32_t count)
 		E1000_WRITE_REG(&Adapter->shared, E1000_ITR,
 		    Adapter->intr_throttling_rate);
 	}
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
 }
 
 static void
@@ -1497,7 +1547,13 @@ e1000g_start(struct e1000g *Adapter, boolean_t global)
 	if (Adapter->tx_intr_enable)
 		e1000g_mask_tx_interrupt(Adapter);
 
-	Adapter->started = B_TRUE;
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		rw_exit(&Adapter->chip_lock);
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
+		return (ENOTACTIVE);
+	}
+
+	Adapter->chip_state = E1000G_START;
 	Adapter->attach_progress |= ATTACH_PROGRESS_INIT;
 
 	rw_exit(&Adapter->chip_lock);
@@ -1522,7 +1578,7 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 	/* Set stop flags */
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
-	Adapter->started = B_FALSE;
+	Adapter->chip_state = E1000G_STOP;
 	Adapter->attach_progress &= ~ATTACH_PROGRESS_INIT;
 
 	rw_exit(&Adapter->chip_lock);
@@ -1539,10 +1595,16 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
 	e1000g_clear_all_interrupts(Adapter);
-	e1000_reset_hw(&Adapter->shared);
+	if (e1000_reset_hw(&Adapter->shared) != 0) {
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
+	}
 
 	/* Release resources still held by the TX descriptors */
 	e1000g_tx_clean(Adapter);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 
 	/* Clean the pending rx jumbo packet fragment */
 	e1000g_rx_clean(Adapter);
@@ -1704,6 +1766,21 @@ e1000g_reset(struct e1000g *Adapter)
 	return (B_TRUE);
 }
 
+boolean_t
+e1000g_global_reset(struct e1000g *Adapter)
+{
+	e1000g_stop(Adapter, B_TRUE);
+
+	Adapter->init_count = 0;
+
+	if (e1000g_start(Adapter, B_TRUE)) {
+		e1000g_log(Adapter, CE_WARN, "Reset failed");
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * e1000g_intr_pciexpress - ISR for PCI Express chipsets
  *
@@ -1719,6 +1796,9 @@ e1000g_intr_pciexpress(caddr_t arg)
 
 	Adapter = (struct e1000g *)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 
 	if (icr & E1000_ICR_INT_ASSERTED) {
 		/*
@@ -1753,6 +1833,9 @@ e1000g_intr(caddr_t arg)
 	Adapter = (struct e1000g *)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
 
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+
 	if (icr) {
 		/*
 		 * Any bit was set in ICR:
@@ -1781,11 +1864,11 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 {
 	rw_enter(&Adapter->chip_lock, RW_READER);
 	/*
-	 * Here we need to check the "started" flag within the chip_lock to
+	 * Here we need to check the "chip_state" flag within the chip_lock to
 	 * ensure the receive routine will not execute when the adapter is
 	 * being reset.
 	 */
-	if (!Adapter->started) {
+	if (Adapter->chip_state != E1000G_START) {
 		rw_exit(&Adapter->chip_lock);
 		return;
 	}
@@ -1899,7 +1982,7 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 	hw = &Adapter->shared;
 
-	if (Adapter->init_count == 0) {
+	if (!Adapter->unicst_init) {
 		/* Initialize the multiple unicast addresses */
 		Adapter->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
 
@@ -1921,6 +2004,8 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 		for (slot = 1; slot < Adapter->unicst_total; slot++)
 			Adapter->unicst_addr[slot].mac.set = 0;
+
+		Adapter->unicst_init = B_TRUE;
 	} else {
 		/* Recover the default mac address */
 		bcopy(Adapter->unicst_addr[0].mac.addr, hw->mac.addr,
@@ -1937,6 +2022,9 @@ e1000g_init_unicst(struct e1000g *Adapter)
 			e1000_rar_set(hw,
 			    Adapter->unicst_addr[slot].mac.addr, slot);
 	}
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 }
 
 static int
@@ -2008,6 +2096,11 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 #endif
 
 	rw_exit(&Adapter->chip_lock);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -2209,6 +2302,11 @@ multicst_add(struct e1000g *Adapter, const uint8_t *multiaddr)
 
 done:
 	rw_exit(&Adapter->chip_lock);
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		res = EIO;
+	}
+
 	return (res);
 }
 
@@ -2249,6 +2347,11 @@ multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 
 done:
 	rw_exit(&Adapter->chip_lock);
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
+
 	return (0);
 }
 
@@ -2387,6 +2490,11 @@ e1000g_m_promisc(void *arg, boolean_t on)
 	Adapter->e1000g_promisc = on;
 
 	rw_exit(&Adapter->chip_lock);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -2716,7 +2824,7 @@ e1000g_link_check(struct e1000g *Adapter)
 			e1000g_smartspeed(Adapter);
 		}
 
-		if (Adapter->started) {
+		if (Adapter->chip_state == E1000G_START) {
 			if (Adapter->tx_link_down_timeout <
 			    MAX_TX_LINK_DOWN_TIMEOUT) {
 				Adapter->tx_link_down_timeout++;
@@ -2727,6 +2835,9 @@ e1000g_link_check(struct e1000g *Adapter)
 			}
 		}
 	}
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 
 	return (link_changed);
 }
@@ -2741,13 +2852,31 @@ e1000g_local_timer(void *ws)
 
 	hw = &Adapter->shared;
 
+	if (Adapter->chip_state == E1000G_ERROR) {
+		Adapter->reset_count++;
+		if (e1000g_global_reset(Adapter))
+			ddi_fm_service_impact(Adapter->dip,
+			    DDI_SERVICE_RESTORED);
+		else
+			ddi_fm_service_impact(Adapter->dip,
+			    DDI_SERVICE_LOST);
+		return;
+	}
+
 	(void) e1000g_tx_freemsg(Adapter->tx_ring);
 
 	if (e1000g_stall_check(Adapter)) {
 		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 		    "Tx stall detected. Activate automatic recovery.\n");
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_STALL);
 		Adapter->reset_count++;
-		(void) e1000g_reset(Adapter);
+		if (e1000g_reset(Adapter))
+			ddi_fm_service_impact(Adapter->dip,
+			    DDI_SERVICE_RESTORED);
+		else
+			ddi_fm_service_impact(Adapter->dip,
+			    DDI_SERVICE_LOST);
+		return;
 	}
 
 	link_changed = B_FALSE;
@@ -2810,6 +2939,9 @@ e1000g_local_timer(void *ws)
 	 * Set Timer Interrupts
 	 */
 	E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
+
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 
 	restart_watchdog_timer(Adapter);
 }
@@ -3587,6 +3719,11 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 	iocp->ioc_count = size;
 	iocp->ioc_error = 0;
 
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (IOC_INVAL);
+	}
+
 	return (IOC_REPLY);
 }
 
@@ -4328,4 +4465,123 @@ e1000g_get_phy_state(struct e1000g *Adapter)
 	e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
 	e1000_read_phy_reg(hw, PHY_1000T_STATUS, &Adapter->phy_1000t_status);
 	e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
+}
+
+/*
+ * FMA support
+ */
+
+int
+e1000g_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+int
+e1000g_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+/*
+ * The IO fault service error handling callback function
+ */
+static int
+e1000g_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+static void
+e1000g_fm_init(struct e1000g *Adapter)
+{
+	ddi_iblock_cookie_t iblk;
+	int fma_acc_flag, fma_dma_flag;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (Adapter->fm_capabilities & DDI_FM_ACCCHK_CAPABLE) {
+		e1000g_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		fma_acc_flag = 1;
+	} else {
+		e1000g_regs_acc_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		fma_acc_flag = 0;
+	}
+
+	if (Adapter->fm_capabilities & DDI_FM_DMACHK_CAPABLE) {
+		fma_dma_flag = 1;
+	} else {
+		fma_dma_flag = 0;
+	}
+
+	(void) e1000g_set_fma_flags(Adapter, fma_acc_flag, fma_dma_flag);
+
+	if (Adapter->fm_capabilities) {
+
+		/* Register capabilities with IO Fault Services */
+		ddi_fm_init(Adapter->dip, &Adapter->fm_capabilities, &iblk);
+
+		/*
+		 * Initialize pci ereport capabilities if ereport capable
+		 */
+		if (DDI_FM_EREPORT_CAP(Adapter->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(Adapter->fm_capabilities))
+			pci_ereport_setup(Adapter->dip);
+
+		/*
+		 * Register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(Adapter->fm_capabilities))
+			ddi_fm_handler_register(Adapter->dip,
+			    e1000g_fm_error_cb, (void*) Adapter);
+	}
+}
+
+static void
+e1000g_fm_fini(struct e1000g *Adapter)
+{
+	/* Only unregister FMA capabilities if we registered some */
+	if (Adapter->fm_capabilities) {
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(Adapter->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(Adapter->fm_capabilities))
+			pci_ereport_teardown(Adapter->dip);
+
+		/*
+		 * Un-register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(Adapter->fm_capabilities))
+			ddi_fm_handler_unregister(Adapter->dip);
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(Adapter->dip);
+	}
+}
+
+void
+e1000g_fm_ereport(struct e1000g *Adapter, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(Adapter->fm_capabilities)) {
+		ddi_fm_ereport_post(Adapter->dip, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+	}
 }

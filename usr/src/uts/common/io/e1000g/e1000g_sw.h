@@ -71,6 +71,10 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
 #include "e1000_api.h"
 
 
@@ -200,6 +204,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_NDD		0x0200	/* NDD initialized */
 #define	ATTACH_PROGRESS_MAC		0x0400	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x0800	/* DDI interrupts enabled */
+#define	ATTACH_PROGRESS_FMINIT		0x1000	/* FMA initiated */
 
 /*
  * Speed and Duplex Settings
@@ -548,6 +553,12 @@ typedef enum {
 	USE_DMA
 } dma_type_t;
 
+typedef enum {
+	E1000G_STOP,
+	E1000G_START,
+	E1000G_ERROR
+} chip_state_t;
+
 typedef struct _dma_buffer {
 	caddr_t address;
 	uint64_t dma_address;
@@ -838,7 +849,7 @@ typedef struct e1000g {
 	struct e1000_hw shared;
 	struct e1000g_osdep osdep;
 
-	boolean_t started;
+	chip_state_t chip_state;
 	boolean_t e1000g_promisc;
 	boolean_t strip_crc;
 	boolean_t rx_buffer_setup;
@@ -904,6 +915,7 @@ typedef struct e1000g {
 	 */
 	krwlock_t chip_lock;
 
+	boolean_t unicst_init;
 	uint32_t unicst_avail;
 	uint32_t unicst_total;
 	e1000g_ether_addr_t unicst_addr[MAX_NUM_UNICAST_ADDRESSES];
@@ -944,6 +956,10 @@ typedef struct e1000g {
 	uint16_t phy_1000t_status;	/* contents of PHY_1000T_STATUS */
 	uint16_t phy_lp_able;		/* contents of PHY_LP_ABILITY */
 
+	/*
+	 * FMA capabilities
+	 */
+	int fm_capabilities;
 } e1000g_t;
 
 
@@ -983,6 +999,10 @@ void e1000g_mask_tx_interrupt(struct e1000g *Adapter);
 void phy_spd_state(struct e1000_hw *hw, boolean_t enable);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
 void e1000g_get_driver_control(struct e1000_hw *hw);
+int e1000g_check_acc_handle(ddi_acc_handle_t handle);
+int e1000g_check_dma_handle(ddi_dma_handle_t handle);
+void e1000g_fm_ereport(struct e1000g *Adapter, char *detail);
+void e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag);
 
 #pragma inline(e1000_rar_set)
 
