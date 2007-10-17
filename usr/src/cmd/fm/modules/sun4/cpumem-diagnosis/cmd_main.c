@@ -166,6 +166,7 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.asic.mac.ptrl-ue",			cmd_opl_mac_common },
 	{ "ereport.asic.mac.mi-ce",			cmd_opl_mac_common },
 	{ "ereport.asic.mac.ptrl-ce",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-ice",			cmd_opl_mac_common },
 	{ "ereport.asic.mac.mi-cmpe",			cmd_opl_mac_common },
 	{ "ereport.asic.mac.ptrl-cmpe",			cmd_opl_mac_common },
 	{ "ereport.asic.mac.mi-sue",			cmd_opl_mac_common },

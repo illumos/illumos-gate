@@ -265,28 +265,53 @@ opl_ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 
 /*
  * This is the common function for processing MAC detected
- * Permanent CE.
+ * Intermittent and Permanent CEs.
  */
-/*ARGSUSED*/
+
 cmd_evdisp_t
-cmd_opl_mac_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+cmd_opl_mac_ce(fmd_hdl_t *hdl, fmd_event_t *ep, const char *class,
     nvlist_t *asru, nvlist_t *fru, uint64_t pa)
 {
 	cmd_dimm_t *dimm;
 	const char *uuid;
 
 	fmd_hdl_debug(hdl,
-	    "Processing Permanent CE ereport\n");
+	    "Processing CE ereport\n");
 
 	if ((dimm = cmd_dimm_lookup(hdl, asru)) == NULL &&
 	    (dimm = cmd_dimm_create(hdl, asru)) == NULL)
 		return (CMD_EVD_UNUSED);
 
-	CMD_STAT_BUMP(ce_sticky);
-
 	if (dimm->dimm_case.cc_cp == NULL) {
 		dimm->dimm_case.cc_cp = cmd_case_create(hdl,
 		    &dimm->dimm_header, CMD_PTR_DIMM_CASE, &uuid);
+	}
+
+	if (strcmp(class, "ereport.asic.mac.ptrl-ice") == 0) {
+		CMD_STAT_BUMP(ce_interm);
+		fmd_hdl_debug(hdl, "adding FJ-Intermittent event "
+		    "to CE serd engine\n");
+
+		if (dimm->dimm_case.cc_serdnm == NULL) {
+			dimm->dimm_case.cc_serdnm =
+			    cmd_mem_serdnm_create(hdl,
+			    "dimm", dimm->dimm_unum);
+			fmd_serd_create(hdl, dimm->dimm_case.cc_serdnm,
+			    fmd_prop_get_int32(hdl, "ce_n"),
+			    fmd_prop_get_int64(hdl, "ce_t"));
+		}
+
+		if (fmd_serd_record(hdl, dimm->dimm_case.cc_serdnm, ep) ==
+		    FMD_B_FALSE) {
+			return (CMD_EVD_OK); /* engine hasn't fired */
+		}
+		fmd_hdl_debug(hdl, "ce serd fired\n");
+		fmd_case_add_serd(hdl, dimm->dimm_case.cc_cp,
+		    dimm->dimm_case.cc_serdnm);
+		fmd_serd_reset(hdl, dimm->dimm_case.cc_serdnm);
+
+	} else {
+		CMD_STAT_BUMP(ce_sticky);
 	}
 
 	dimm->dimm_nretired++;
@@ -356,13 +381,14 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	}
 
 	/*
-	 * process PCE to create DIMM fault
+	 * process PCE and ICE to create DIMM fault
 	 */
 	if (strcmp(class, "ereport.asic.mac.mi-ce") == 0 ||
-	    strcmp(class, "ereport.asic.mac.ptrl-ce") == 0) {
+	    strcmp(class, "ereport.asic.mac.ptrl-ce") == 0 ||
+	    strcmp(class, "ereport.asic.mac.ptrl-ice") == 0) {
 		cmd_evdisp_t ret;
 
-		ret = cmd_opl_mac_ce(hdl, ep, nvl, asru, fru, pa);
+		ret = cmd_opl_mac_ce(hdl, ep, class, asru, fru, pa);
 		nvlist_free(asru);
 		nvlist_free(fru);
 		if (ret != CMD_EVD_OK) {
@@ -372,6 +398,8 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		} else
 			return (CMD_EVD_OK);
 	}
+
+	/* The following code handles page retires for UEs and CMPEs.  */
 
 	cmd_page_fault(hdl, asru, fru, ep, pa);
 	nvlist_free(asru);

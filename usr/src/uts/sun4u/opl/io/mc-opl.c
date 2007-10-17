@@ -830,7 +830,8 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 	cs = SLOT_TO_CS(d_slot);
 
 	if (plat_model == MODEL_DC) {
-		if (mf_type == FLT_TYPE_PERMANENT_CE) {
+		if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
+		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
 			dimmnm = mc_dc_dimm_unum_table[i];
 			snprintf(buf, buflen, "/%s%02d/MEM%s",
@@ -844,7 +845,8 @@ mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
 			    mc_dc_dimm_unum_table[j + 1]);
 		}
 	} else {
-		if (mf_type == FLT_TYPE_PERMANENT_CE) {
+		if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
+		    mf_type == FLT_TYPE_PERMANENT_CE) {
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 			dimmnm = mc_ff_dimm_unum_table[i];
 			memb_num = dimmnm[0];
@@ -931,7 +933,8 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	fm_payload_set(ereport, MC_OPL_PA, DATA_TYPE_UINT64,
 	    flt_stat->mf_flt_paddr, NULL);
 
-	if (flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
+	if (flt_stat->mf_type == FLT_TYPE_INTERMITTENT_CE ||
+	    flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
 		fm_payload_set(ereport, MC_OPL_FLT_TYPE, DATA_TYPE_UINT8,
 		    ECC_STICKY, NULL);
 	}
@@ -951,8 +954,9 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_err_add;
 
-	/* offset is set only for PCE */
-	if (mc_aflt->mflt_stat[0]->mf_type == FLT_TYPE_PERMANENT_CE) {
+	/* offset is set only for PCE and ICE */
+	if (mc_aflt->mflt_stat[0]->mf_type == FLT_TYPE_INTERMITTENT_CE ||
+	    mc_aflt->mflt_stat[0]->mf_type == FLT_TYPE_PERMANENT_CE) {
 		offset = values[0];
 
 	}
@@ -1056,7 +1060,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	/*
 	 * we come here only when we have:
 	 * In mirror mode: MUE, SUE
-	 * In normal mode: UE, Permanent CE
+	 * In normal mode: UE, Permanent CE, Intermittent CE
 	 */
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
 		rv = mcaddr_to_pa(mc_aflt->mflt_mcp,
@@ -1078,10 +1082,12 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 		return;
 	case EIO:
 		/*
-		 * Do page retirement except for the PCE case.
+		 * Do page retirement except for the PCE and ICE cases.
 		 * This is taken care by the OPL DE
 		 */
-		if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
+		if (mc_aflt->mflt_stat[0]->mf_type !=
+		    FLT_TYPE_INTERMITTENT_CE &&
+		    mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
 			MC_LOG("offline page at pa %lx error %x\n", pa,
 			    mc_aflt->mflt_pr);
 			(void) page_retire(pa, mc_aflt->mflt_pr);
@@ -1800,7 +1806,10 @@ mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 		/* Error type can change after scrubbing */
 		mc_scrub_ce(mcp, bank, flt_stat, ptrl_error);
 
-		if (flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
+		if (flt_stat->mf_type == FLT_TYPE_INTERMITTENT_CE) {
+			mc_aflt->mflt_erpt_class = MC_OPL_ICE;
+			mc_aflt->mflt_pr = PR_MCE;
+		} else if (flt_stat->mf_type == FLT_TYPE_PERMANENT_CE) {
 			mc_aflt->mflt_erpt_class = MC_OPL_CE;
 			mc_aflt->mflt_pr = PR_MCE;
 		} else if (flt_stat->mf_type == FLT_TYPE_UE) {
@@ -3243,7 +3252,8 @@ mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int sb,
 	int	ret;
 	char	*dimmnm;
 
-	if (mf_type == FLT_TYPE_PERMANENT_CE) {
+	if (mf_type == FLT_TYPE_INTERMITTENT_CE ||
+	    mf_type == FLT_TYPE_PERMANENT_CE) {
 		if (plat_model == MODEL_DC) {
 			id = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
 			dimmnm = mc_dc_dimm_unum_table[id];

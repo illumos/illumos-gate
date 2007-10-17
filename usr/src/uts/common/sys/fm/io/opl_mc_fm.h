@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@ extern "C" {
  */
 #define	MC_OPL_UE	"ue"
 #define	MC_OPL_CE	"ce"
+#define	MC_OPL_ICE	"ice"
 #define	MC_OPL_CMPE	"cmpe"
 #define	MC_OPL_MUE	"mue"
 #define	MC_OPL_SUE	"sue"
