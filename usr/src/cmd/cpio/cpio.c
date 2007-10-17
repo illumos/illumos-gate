@@ -1422,7 +1422,8 @@ creat_hdr(void)
 
 	ftype = SrcSt.st_mode & Ftype;
 	Adir = (ftype == S_IFDIR);
-	Aspec = (ftype == S_IFBLK || ftype == S_IFCHR || ftype == S_IFIFO);
+	Aspec = (ftype == S_IFBLK || ftype == S_IFCHR || ftype == S_IFIFO ||
+	    ftype == S_IFSOCK);
 	switch (Hdr_type) {
 		case BIN:
 			Gen.g_magic = CMN_BIN;
@@ -1699,6 +1700,7 @@ creat_lnk(int dirfd, char *name1_p, char *name2_p)
  *       character special file
  *       block special file
  *       fifo
+ *	 socket
  */
 
 static int
@@ -1851,7 +1853,9 @@ creat_spec(int dirfd)
 		} else if (ustar_spec() || Aspec) {
 			/*
 			 * The archive file is block special,
-			 * char special or a fifo.
+			 * char special, socket, or a fifo.
+			 * Note that, for a socket, the third
+			 * parameter to mknod() is ignored.
 			 */
 
 			result = mknod(nam_p, (int)G_p->g_mode,
@@ -3604,8 +3608,8 @@ gethdr(void)
 			}
 			ftype = Gen.g_mode & Ftype;
 			Adir = ftype == S_IFDIR;
-			Aspec = (ftype == S_IFBLK ||
-			    ftype == S_IFCHR || ftype == S_IFIFO);
+			Aspec = (ftype == S_IFBLK || ftype == S_IFCHR ||
+			    ftype == S_IFIFO || ftype == S_IFSOCK);
 
 			if (Gen.g_attrnam_p[0] == '.' &&
 			    Gen.g_attrnam_p[1] == '\0' &&
@@ -3720,7 +3724,8 @@ gethdr(void)
 	} /* acl */
 
 	Adir = (ftype == S_IFDIR);
-	Aspec = (ftype == S_IFBLK || ftype == S_IFCHR || ftype == S_IFIFO);
+	Aspec = (ftype == S_IFBLK || ftype == S_IFCHR || ftype == S_IFIFO ||
+	    ftype == S_IFSOCK);
 
 	/*
 	 * Skip any trailing slashes
