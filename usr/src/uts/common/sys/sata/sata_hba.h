@@ -404,7 +404,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
  * being transported to the HBA.
  *
  * Translated head-of-queue-tagged scsi commands and commands that are
- * to be put at the head of the queue are treated as SATA_QUEUE_OTAG_CMD
+ * to be put at the head of the queue are treated as sata_queue_otag
  * tagged commands.
  */
 
