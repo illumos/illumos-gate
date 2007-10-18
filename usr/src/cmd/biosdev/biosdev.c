@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -395,10 +395,15 @@ match_edd(biosdev_data_t *bdata)
 		return (-1);
 	}
 
-	if (debug)
-		(void) printf("interface type %s pci channel %x target %x\n",
-		    bd->interface_type, bd->interfacepath.pci.channel,
+	if (debug) {
+		int i;
+		(void) printf("interface type ");
+		for (i = 0; i < 8; i++)
+			(void) printf("%c", bd->interface_type[i]);
+		(void) printf(" pci channel %x target %x\n",
+		    bd->interfacepath.pci.channel,
 		    bd->devicepath.scsi.target);
+	}
 
 	if (strncmp(bd->interface_type, "SCSI", 4) == 0) {
 
@@ -549,10 +554,11 @@ int
 main(int argc, char *argv[])
 {
 	biosdev_data_t		*biosdata;
-	int len, i, c, j;
+	int i, c, j;
 	int matchedindex = -1;
 	char biospropname[BIOSPROPNAME_TMPL_LEN];
 	int totalmatches = 0;
+	biosdev_data_t *biosdataarray[BIOSDEV_NUM];
 
 
 	while ((c = getopt(argc, argv, "d")) != -1)  {
@@ -586,37 +592,37 @@ main(int argc, char *argv[])
 	/* get a list of all disks in the system */
 	build_disk_list();
 
-	/* for each property try to match with a disk */
+	/*  Get property values that were created at boot up time */
 	for (i = 0; i < BIOSDEV_NUM; i++) {
 
 		(void) snprintf((char *)biospropname, BIOSPROPNAME_TMPL_LEN,
 		    BIOSPROPNAME_TMPL, i + STARTING_DRVNUM);
+		if (di_prop_lookup_bytes(DDI_DEV_T_ANY, root_allnode,
+		    biospropname, (uchar_t **)&biosdataarray[i]) <= 0)
+			biosdataarray[i] = NULL;
+	}
 
-		len = di_prop_lookup_bytes(DDI_DEV_T_ANY, root_allnode,
-		    biospropname, (uchar_t **)&biosdata);
+	/* Try to match based on device/interface path info from BIOS */
+	for (i = 0; i < BIOSDEV_NUM; i++) {
 
-		if (len <= 0) {
+		if ((biosdata = biosdataarray[i]) == NULL)
 			continue;
-		}
-
 		if (debug)
-			(void) printf("matching %s\n", biospropname);
+			(void) printf("matching edd 0x%x\n",
+			    i + STARTING_DRVNUM);
 
 		matchedindex = match_edd(biosdata);
 
-		if (matchedindex == -1) {
-			matchedindex = match_first_block(biosdata);
-			if (debug && matchedindex != -1)
-				(void) printf("matched first block\n");
-		} else if (debug)
-			(void) printf("matched thru edd\n");
-
 		if (matchedindex != -1) {
-			mapinfo[i].disklist_index = matchedindex;
-			mapinfo[i].matchcount++;
-			if (debug)
+			if (debug) {
+				(void) printf("matched by edd\n");
 				(void) printf("0x%x %s\n", i + STARTING_DRVNUM,
 				    disk_list[matchedindex]);
+			}
+
+			mapinfo[i].disklist_index = matchedindex;
+			mapinfo[i].matchcount++;
+
 			for (j = 0; j < i; j++) {
 				if (mapinfo[j].matchcount > 0 &&
 				    mapinfo[j].disklist_index == matchedindex) {
@@ -625,10 +631,72 @@ main(int argc, char *argv[])
 				}
 			}
 
-		} else if (debug)
-			(void) fprintf(stderr, "Could not match %s\n",
-			    biospropname);
+		} else
+			if (debug)
+				(void) printf("No matches by edd\n");
 	}
+
+	/*
+	 * Go through the list and ignore any found matches that are dups.
+	 * This is to workaround issues with BIOSes that do not implement
+	 * providing interface/device path info correctly.
+	 */
+
+	for (i = 0; i < BIOSDEV_NUM; i++) {
+		if (mapinfo[i].matchcount > 1) {
+			if (debug)
+				(void) printf("Ignoring dup match_edd\n(count "
+				    "%d): 0x%x %s\n", mapinfo[i].matchcount,
+				    i + STARTING_DRVNUM,
+				    disk_list[mapinfo[i].disklist_index]);
+
+			mapinfo[i].matchcount = 0;
+			mapinfo[i].disklist_index = 0;
+		}
+	}
+
+
+	/*
+	 * For each bios dev number that we do not have exactly one match
+	 * already, try to match based on first block
+	 */
+	for (i = 0; i < BIOSDEV_NUM; i++) {
+		if (mapinfo[i].matchcount == 1)
+			continue;
+
+		if ((biosdata = biosdataarray[i]) == NULL)
+			continue;
+
+		if (debug)
+			(void) printf("matching first block 0x%x\n",
+			    i + STARTING_DRVNUM);
+
+		matchedindex = match_first_block(biosdata);
+		if (matchedindex != -1) {
+			if (debug) {
+				(void) printf("matched by first block\n");
+				(void) printf("0x%x %s\n", i + STARTING_DRVNUM,
+				    disk_list[matchedindex]);
+			}
+
+			mapinfo[i].disklist_index = matchedindex;
+			mapinfo[i].matchcount++;
+
+			for (j = 0; j < i; j++) {
+				if (mapinfo[j].matchcount > 0 &&
+				    mapinfo[j].disklist_index == matchedindex) {
+					mapinfo[j].matchcount++;
+					mapinfo[i].matchcount++;
+				}
+			}
+		} else
+			if (debug) {
+				(void) printf(" No matches by first block\n");
+				(void) fprintf(stderr, "Could not match 0x%x\n",
+				    i + STARTING_DRVNUM);
+			}
+	}
+
 
 	for (i = 0; i < BIOSDEV_NUM; i++) {
 		if (mapinfo[i].matchcount == 1) {
