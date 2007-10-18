@@ -102,7 +102,6 @@ sparc_SUBDIRS= \
 sparc_XMODS=
 
 i386_SUBDIRS= \
-	BRCMbnx \
 	SUNWaac \
 	SUNWad810 \
 	SUNWadixp \
@@ -145,6 +144,7 @@ i386_SUBDIRS= \
 	SUNWxsvc
 
 i386_XMODS= \
+	BRCMbnx \
 	SUNWadpu320 \
 	SUNWlsimega \
 	SUNWnge
