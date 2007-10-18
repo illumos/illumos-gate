@@ -1346,7 +1346,8 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
 			continue;
 
 		if (cpu_map[cpu_id]->mpa->ProcessorId == acpi_id) {
-			cpu_map[cpu_id]->obj = obj;
+			if (cpu_map[cpu_id]->obj == NULL)
+				cpu_map[cpu_id]->obj = obj;
 			break;
 		}
 	}
