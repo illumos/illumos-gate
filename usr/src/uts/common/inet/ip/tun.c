@@ -471,7 +471,9 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	q->q_ptr = WR(q)->q_ptr = atp;
 	atp->tun_wq = WR(q);
+	mutex_enter(&ns->netstack_tun->tuns_global_lock);
 	tun_add_byaddr(atp);
+	mutex_exit(&ns->netstack_tun->tuns_global_lock);
 	ii = (ipsec_info_t *)hello->b_rptr;
 	hello->b_wptr = hello->b_rptr + sizeof (*ii);
 	hello->b_datap->db_type = M_CTL;
@@ -488,10 +490,12 @@ tun_close(queue_t *q, int flag, cred_t *cred_p)
 {
 	tun_t *atp = (tun_t *)q->q_ptr;
 	netstack_t *ns;
+	tun_stack_t *tuns;
 
 	ASSERT(atp != NULL);
 
 	ns = atp->tun_netstack;
+	tuns = ns->netstack_tun;
 
 	/* Cancel outstanding qtimeouts() or qbufcalls() */
 	tun_cancel_rec_evs(q, &atp->tun_events);
@@ -512,7 +516,9 @@ tun_close(queue_t *q, int flag, cred_t *cred_p)
 	mutex_destroy(&atp->tun_lock);
 
 	/* remove tun_t from global list */
+	mutex_enter(&tuns->tuns_global_lock);
 	tun_rem_tun_byaddr_list(atp);
+	mutex_exit(&tuns->tuns_global_lock);
 
 	/* free per-instance struct  */
 	kmem_free(atp, sizeof (tun_t));
@@ -970,11 +976,8 @@ tun_add_byaddr(tun_t *atp)
 
 	tun1dbg(("tun_add_byaddr: index = %d\n", index));
 
+	ASSERT(MUTEX_HELD(&tuns->tuns_global_lock));
 	ASSERT(atp->tun_next == NULL);
-	/*
-	 * it's ok to grab global lock while holding tun_lock/perimeter
-	 */
-	mutex_enter(&tuns->tuns_global_lock);
 
 	/*
 	 * walk through list of tun_t looking for a match of
@@ -994,7 +997,7 @@ tun_add_byaddr(tun_t *atp)
 			    "tun_stats 0x%p\n", (void *)atp, ppa,
 			    (void *)tun_list));
 			tun1dbg(("tun_add_byaddr: Nothing to do."));
-			mutex_exit(&tuns->tuns_global_lock);
+			/* Collision, do nothing. */
 			return;
 		}
 	}
@@ -1006,7 +1009,6 @@ tun_add_byaddr(tun_t *atp)
 	if (tuns->tuns_byaddr_list[index] != NULL)
 		tuns->tuns_byaddr_list[index]->tun_ptpn = &(atp->tun_next);
 	tuns->tuns_byaddr_list[index] = atp;
-	mutex_exit(&tuns->tuns_global_lock);
 }
 
 /*
@@ -1118,9 +1120,17 @@ tun_add_stat(queue_t *q)
 static void
 tun_rem_tun_byaddr_list(tun_t *atp)
 {
-	tun_stack_t *tuns = atp->tun_netstack->netstack_tun;
+	ASSERT(MUTEX_HELD(&atp->tun_netstack->netstack_tun->tuns_global_lock));
 
-	mutex_enter(&tuns->tuns_global_lock);
+	if (atp->tun_ptpn == NULL) {
+		/*
+		 * If we reach here, it means that this tun_t was passed into
+		 * tun_add_byaddr() and hit a collision when trying to insert
+		 * itself into a list.  (See "Collision, do nothing"
+		 * earlier.)  Therefore this tun_t needs no removal.
+		 */
+		goto bail;
+	}
 
 	/*
 	 * remove tunnel instance from list of tun_t
@@ -1132,8 +1142,8 @@ tun_rem_tun_byaddr_list(tun_t *atp)
 	}
 	atp->tun_ptpn = NULL;
 
+bail:
 	ASSERT(atp->tun_next == NULL);
-	mutex_exit(&tuns->tuns_global_lock);
 }
 
 /*
@@ -1639,6 +1649,7 @@ tun_sparam(queue_t *q, mblk_t *mp)
 	size_t	size;
 	boolean_t new;
 	ipsec_stack_t *ipss = atp->tun_netstack->netstack_ipsec;
+	tun_stack_t *tuns = atp->tun_netstack->netstack_tun;
 
 	/* don't allow changes after dl_bind_req */
 	if (atp->tun_state  == DL_IDLE) {
@@ -1796,8 +1807,10 @@ tun_sparam(queue_t *q, mblk_t *mp)
 		 */
 		atp->tun_flags |= TUN_DST;
 		/* tun_faddr changed, move to proper hash bucket */
+		mutex_enter(&tuns->tuns_global_lock);
 		tun_rem_tun_byaddr_list(atp);
 		tun_add_byaddr(atp);
+		mutex_exit(&tuns->tuns_global_lock);
 	}
 
 	if (new && (ta->ifta_flags & IFTUN_HOPLIMIT)) {
