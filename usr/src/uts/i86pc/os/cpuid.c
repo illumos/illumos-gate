@@ -1124,6 +1124,8 @@ cpuid_pass1(cpu_t *cpu)
 			cpi->cpi_ncore_per_chip = 1;
 			break;
 		}
+	} else {
+		cpi->cpi_ncore_per_chip = 1;
 	}
 
 	/*

@@ -51,6 +51,11 @@
 #include "gcpu.h"
 
 /*
+ * Set to suppress logging of telemetry found at initialization.
+ */
+int gcpu_suppress_log_on_init = 0;
+
+/*
  * gcpu_mca_stack_flag is a debug assist option to capture a stack trace at
  * error logout time.  The stack will be included in the ereport if the
  * error type selects stack inclusion, or in all cases if
@@ -1074,8 +1079,19 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * Log any valid telemetry lurking in the MCA banks, but do not
 	 * clear the status registers.  Ignore the disposition returned -
 	 * we have already paniced or reset for any nasty errors found here.
+	 *
+	 * Intel vol 3A says that we should not do this on family 0x6,
+	 * and that for any extended family the BIOS clears things
+	 * on power-on reset so you'll only potentially find valid telemetry
+	 * on warm reset (we do it for both - on power-on reset we should
+	 * just see zeroes).
+	 *
+	 * AMD docs since K7 say we should process anything we find here.
 	 */
-	gcpu_mca_logout(hdl, NULL, -1ULL, NULL, B_FALSE);
+	if (!gcpu_suppress_log_on_init &&
+	    (vendor == X86_VENDOR_Intel && family >= 0xf ||
+	    vendor == X86_VENDOR_AMD))
+		gcpu_mca_logout(hdl, NULL, -1ULL, NULL, B_FALSE);
 
 	/*
 	 * Initialize all MCi_CTL and clear all MCi_STATUS, allowing the
