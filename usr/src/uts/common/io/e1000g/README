@@ -547,4 +547,5 @@ Notes on packaging:
 ======
   This version has the following fix:
    6335851 e1000g needs to support FMA
+   6605171 WARNING: pciex8086,105e - e1000g[0] : Initialize hw failed
 

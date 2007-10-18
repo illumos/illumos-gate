@@ -705,7 +705,6 @@ e1000_get_cfg_done_82571(struct e1000_hw *hw)
 	}
 	if (!timeout) {
 		DEBUGOUT("MNG configuration cycle has not completed.\n");
-		ret_val = -E1000_ERR_RESET;
 		goto out;
 	}
 
