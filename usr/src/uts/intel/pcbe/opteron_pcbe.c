@@ -176,7 +176,7 @@ typedef struct _amd_event {
 	{ "FR_retired_resyncs",				0xC7, 0x0 },	\
 	{ "FR_retired_near_rets",			0xC8, 0x0 },	\
 	{ "FR_retired_near_rets_mispred",		0xC9, 0x0 },	\
-	{ "FR_retired_taken_branches_mispred_addr_miscop",	0xCA, 0x0 },\
+	{ "FR_retired_taken_branches_mispred_addr_miscomp",	0xCA, 0x0 },\
 	{ "FR_retired_fastpath_double_op_instr",	0xCC, 0x7 },	\
 	{ "FR_intr_masked_cycles",			0xCD, 0x0 },	\
 	{ "FR_intr_masked_while_pending_cycles",	0xCE, 0x0 },	\
@@ -191,7 +191,7 @@ typedef struct _amd_event {
 	{ "FR_dispatch_stall_fpu_full",			0xD7, 0x0 },	\
 	{ "FR_dispatch_stall_ls_full",			0xD8, 0x0 },	\
 	{ "FR_dispatch_stall_waiting_all_quiet",	0xD9, 0x0 },	\
-	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branc_pend",	0xDA, 0x0 },\
+	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branch_pend",	0xDA, 0x0 },\
 	{ "FR_fpu_exception",				0xDB, 0xF },	\
 	{ "FR_num_brkpts_dr0",				0xDC, 0x0 },	\
 	{ "FR_num_brkpts_dr1",				0xDD, 0x0 },	\
