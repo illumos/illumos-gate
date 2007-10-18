@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		18
+#define	AAC_DRIVER_BUGFIX_LEVEL		19
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -237,6 +237,10 @@ typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *, int);
 struct aac_softstate {
 	int card;		/* index to aac_cards */
 	uint16_t hwif;		/* card chip type: i960 or Rocket */
+	uint16_t vendid;	/* vendor id */
+	uint16_t subvendid;	/* sub vendor id */
+	uint16_t devid;		/* device id */
+	uint16_t subsysid;	/* sub system id */
 	char vendor_name[AAC_VENDOR_LEN + 1];
 	char product_name[AAC_PRODUCT_LEN + 1];
 	uint32_t support_opt;	/* firmware features */

@@ -1511,7 +1511,6 @@ static int
 aac_check_card_type(struct aac_softstate *softs)
 {
 	ddi_acc_handle_t pci_config_handle;
-	uint16_t vendid, subvendid, devid, subsysid;
 	int card_index;
 	uint32_t pci_cmd;
 
@@ -1522,16 +1521,19 @@ aac_check_card_type(struct aac_softstate *softs)
 		return (AACERR);
 	}
 
-	vendid = pci_config_get16(pci_config_handle, PCI_CONF_VENID);
-	devid = pci_config_get16(pci_config_handle, PCI_CONF_DEVID);
-	subvendid = pci_config_get16(pci_config_handle, PCI_CONF_SUBVENID);
-	subsysid = pci_config_get16(pci_config_handle, PCI_CONF_SUBSYSID);
+	softs->vendid = pci_config_get16(pci_config_handle, PCI_CONF_VENID);
+	softs->devid = pci_config_get16(pci_config_handle, PCI_CONF_DEVID);
+	softs->subvendid = pci_config_get16(pci_config_handle,
+	    PCI_CONF_SUBVENID);
+	softs->subsysid = pci_config_get16(pci_config_handle,
+	    PCI_CONF_SUBSYSID);
+
 	card_index = 0;
 	while (!CARD_IS_UNKNOWN(card_index)) {
-		if ((aac_cards[card_index].vendor == vendid) &&
-		    (aac_cards[card_index].device == devid) &&
-		    (aac_cards[card_index].subvendor == subvendid) &&
-		    (aac_cards[card_index].subsys == subsysid)) {
+		if ((aac_cards[card_index].vendor == softs->vendid) &&
+		    (aac_cards[card_index].device == softs->devid) &&
+		    (aac_cards[card_index].subvendor == softs->subvendid) &&
+		    (aac_cards[card_index].subsys == softs->subsysid)) {
 			break;
 		}
 		card_index++;
@@ -1546,12 +1548,12 @@ aac_check_card_type(struct aac_softstate *softs)
 	 * support the new cards in the aac family
 	 */
 	if (CARD_IS_UNKNOWN(card_index)) {
-		if (vendid != 0x9005) {
+		if (softs->vendid != 0x9005) {
 			AACDB_PRINT(softs, CE_WARN,
-			    "Unknown vendor 0x%x", vendid);
+			    "Unknown vendor 0x%x", softs->vendid);
 			goto error;
 		}
-		switch (devid) {
+		switch (softs->devid) {
 		case 0x285:
 			softs->hwif = AAC_HWIF_I960RX;
 			break;
@@ -1560,7 +1562,7 @@ aac_check_card_type(struct aac_softstate *softs)
 			break;
 		default:
 			AACDB_PRINT(softs, CE_WARN,
-			    "Unknown device \"pci9005,%x\"", devid);
+			    "Unknown device \"pci9005,%x\"", softs->devid);
 			goto error;
 		}
 	}
@@ -1608,16 +1610,6 @@ aac_check_card_type(struct aac_softstate *softs)
 
 	pci_config_teardown(&pci_config_handle);
 
-	cmn_err(CE_NOTE,
-	    "!aac driver %d.%02d.%02d-%d, found card: " \
-	    "%s %s(pci0x%x.%x.%x.%x) at 0x%x",
-	    AAC_DRIVER_MAJOR_VERSION,
-	    AAC_DRIVER_MINOR_VERSION,
-	    AAC_DRIVER_BUGFIX_LEVEL,
-	    AAC_DRIVER_BUILD,
-	    softs->vendor_name, softs->product_name,
-	    vendid, devid, subvendid, subsysid,
-	    softs->pci_mem_base_paddr);
 	return (AACOK); /* card type detected */
 
 error:
@@ -1677,7 +1669,7 @@ aac_check_firmware(struct aac_softstate *softs)
 	/* Process supported options */
 	if ((options & AAC_SUPPORTED_4GB_WINDOW) != 0 &&
 	    (softs->flags & AAC_FLAGS_NO4GB) == 0) {
-		cmn_err(CE_NOTE, "!Enable FIB map 4GB window");
+		AACDB_PRINT(softs, CE_NOTE, "!Enable FIB map 4GB window");
 		softs->flags |= AAC_FLAGS_4GB_WINDOW;
 	} else {
 		/*
@@ -1691,7 +1683,7 @@ aac_check_firmware(struct aac_softstate *softs)
 	}
 
 	if ((options & AAC_SUPPORTED_SGMAP_HOST64) != 0) {
-		cmn_err(CE_NOTE, "!Enable SG map 64-bit address");
+		AACDB_PRINT(softs, CE_NOTE, "!Enable SG map 64-bit address");
 		softs->buf_dma_attr.dma_attr_addr_hi = 0xffffffffffffffffull;
 		softs->buf_dma_attr.dma_attr_seg = 0xffffffffffffffffull;
 		softs->flags |= AAC_FLAGS_SG_64BIT;
@@ -1699,7 +1691,7 @@ aac_check_firmware(struct aac_softstate *softs)
 
 	if (options & AAC_SUPPORTED_64BIT_ARRAYSIZE) {
 		softs->flags |= AAC_FLAGS_ARRAY_64BIT;
-		cmn_err(CE_NOTE, "!Enable 64-bit array size");
+		AACDB_PRINT(softs, CE_NOTE, "!Enable 64-bit array size");
 	}
 
 	/* Read preferred settings */
@@ -1729,7 +1721,8 @@ aac_check_firmware(struct aac_softstate *softs)
 		}
 		if (atu_size == softs->map_size) {
 			softs->flags |= AAC_FLAGS_NEW_COMM;
-			cmn_err(CE_NOTE, "!Enable New Comm. interface");
+			AACDB_PRINT(softs, CE_NOTE,
+			    "!Enable New Comm. interface");
 		}
 	}
 
@@ -1741,7 +1734,7 @@ aac_check_firmware(struct aac_softstate *softs)
 		softs->aac_sg_tablesize = sg_tablesize;
 
 		softs->flags |= AAC_FLAGS_RAW_IO;
-		cmn_err(CE_NOTE, "!Enable RawIO");
+		AACDB_PRINT(softs, CE_NOTE, "!Enable RawIO");
 	} else {
 		softs->aac_max_fibs =
 		    (softs->flags & AAC_FLAGS_256FIBS) ? 256 : 512;
@@ -1766,7 +1759,7 @@ aac_check_firmware(struct aac_softstate *softs)
 	if ((softs->flags & AAC_FLAGS_RAW_IO) &&
 	    (softs->flags & AAC_FLAGS_ARRAY_64BIT)) {
 		softs->flags |= AAC_FLAGS_LBA_64BIT;
-		cmn_err(CE_NOTE, "!Enable 64-bit array");
+		AACDB_PRINT(softs, CE_NOTE, "!Enable 64-bit array");
 	}
 	softs->buf_dma_attr.dma_attr_sgllen = softs->aac_sg_tablesize;
 	softs->buf_dma_attr.dma_attr_maxxfer = softs->aac_max_sectors << 9;
@@ -1797,7 +1790,7 @@ aac_check_firmware(struct aac_softstate *softs)
 	    softs->slen < AAC_ARQ64_LENGTH)
 		softs->slen = AAC_ARQ64_LENGTH;
 
-	cmn_err(CE_NOTE,
+	AACDB_PRINT(softs, CE_NOTE,
 	    "!max_fibs %d max_fibsize 0x%x max_sectors %d max_sg %d",
 	    softs->aac_max_fibs, softs->aac_max_fib_size,
 	    softs->aac_max_sectors, softs->aac_sg_tablesize);
@@ -2088,11 +2081,19 @@ aac_common_attach(struct aac_softstate *softs)
 					(void *)strncpy(softs->product_name,
 					    p0, AAC_PRODUCT_LEN);
 			}
-			AACDB_PRINT(softs, CE_NOTE,
-			    "adapter: vendor = \"%s\", product = \"%s\"",
-			    softs->vendor_name, softs->product_name);
 		}
 	}
+
+	cmn_err(CE_NOTE,
+	    "!aac driver %d.%02d.%02d-%d, found card: " \
+	    "%s %s(pci0x%x.%x.%x.%x) at 0x%x",
+	    AAC_DRIVER_MAJOR_VERSION,
+	    AAC_DRIVER_MINOR_VERSION,
+	    AAC_DRIVER_BUGFIX_LEVEL,
+	    AAC_DRIVER_BUILD,
+	    softs->vendor_name, softs->product_name,
+	    softs->vendid, softs->devid, softs->subvendid, softs->subsysid,
+	    softs->pci_mem_base_paddr);
 
 	/* Perform acceptance of adapter-detected config changes if possible */
 	if (aac_handle_adapter_config_issues(softs) != AACMPE_OK) {
@@ -2591,7 +2592,7 @@ next:
 
 	softs->container_count = count;
 	aac_release_sync_fib(softs);
-	cmn_err(CE_CONT, "?Total %d container(s) found", total);
+	AACDB_PRINT(softs, CE_CONT, "?Total %d container(s) found", total);
 
 	return (AACOK);
 }
