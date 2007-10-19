@@ -521,8 +521,29 @@ sosctp_accept(struct sonode *lso, int fflag, struct sonode **nsop)
 
 	/*
 	 * accept() needs remote address right away.
+	 * since sosctp_getpeername() is called with
+	 * socket lock released, the connection may
+	 * get aborted before we return from the
+	 * routine. So, we need to to handle aborted
+	 * socket connection here.
 	 */
-	(void) sosctp_getpeername(nso);
+	error = sosctp_getpeername(nso);
+	if (error != 0) {
+		vnode_t *nvp;
+		nvp = SOTOV(nso);
+		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+		VN_RELE(nvp);
+
+		/*
+		 * We can't return ENOTCONN to accept. accept
+		 * either returns connected socket in case no error
+		 * has occured or the connection which is getting
+		 * accepted is being aborted. This is the reason we
+		 * return ECONNABORTED in case sosctp_getpeername()
+		 * returns ENOTCONN.
+		 */
+		return ((error == ENOTCONN) ? ECONNABORTED : error);
+	}
 
 	dprint(2, ("sosctp_accept: new %p\n", nso));
 
