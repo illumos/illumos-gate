@@ -4618,6 +4618,10 @@ sadb_new_algdesc(uint8_t *start, uint8_t *limit,
 	mutex_enter(&ipss->ipsec_alg_lock);
 	algp = ipss->ipsec_alglists[(algtype == SADB_X_ALGTYPE_AUTH) ?
 	    IPSEC_ALG_AUTH : IPSEC_ALG_ENCR][alg];
+	if (algp == NULL) {
+		mutex_exit(&ipss->ipsec_alg_lock);
+		return (NULL);	/* Algorithm doesn't exist.  Fail gracefully. */
+	}
 	if (minbits < algp->alg_ef_minbits)
 		minbits = algp->alg_ef_minbits;
 	if (maxbits > algp->alg_ef_maxbits)

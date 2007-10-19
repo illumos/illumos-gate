@@ -10201,7 +10201,7 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	if (pout4 == NULL)
 		goto enomem;
 
-	if (connp->conn_pkt_isv6) {
+	if (connp->conn_af_isv6) {
 		/*
 		 * We're looking at a v6 socket, also allocate the
 		 * v6-specific entries...
