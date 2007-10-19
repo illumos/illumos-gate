@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +115,8 @@ extern "C" {
 #define	AC97_MIXER_ADC_GAIN_REGISTER	0x64
 #define	MIXER_GAIN_MUTE	0x8000
 #define	MIXER_0db_GAIN_	0x0000
+/* Check for poweron status every 10 ms */
+#define	AD1981_POWERON_DELAY_USEC	10000
 
 /* PCI CFG SPACE REGISTERS for Audio (Device 29, Function 0) */
 #define	M1575_PCIID_REG		0x00	/* Vendor ID 32 */
