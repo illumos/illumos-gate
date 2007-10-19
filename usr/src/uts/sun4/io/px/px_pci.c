@@ -200,7 +200,7 @@ static void plx_ro_disable(pxb_devstate_t *pxb);
 /* Hotplug related functions */
 static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
-static void pxb_init_hotplug(pxb_devstate_t *pxb);
+static int pxb_init_hotplug(pxb_devstate_t *pxb);
 static void pxb_id_props(pxb_devstate_t *pxb);
 
 static struct dev_ops pxb_ops = {
@@ -515,12 +515,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    PCI_COMM_INTX_DISABLE);
 #endif /* PX_PLX */
 
-		pxb_init_hotplug(pxb);
-	}
-
-	/* Attach interrupt only if hotplug functionality is required */
-	if (pxb->pxb_hotplug_capable == B_TRUE) {
-		if (pxb_intr_attach(pxb) != DDI_SUCCESS)
+		if (pxb_init_hotplug(pxb) != DDI_SUCCESS)
 			goto fail;
 	}
 
@@ -590,14 +585,14 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 				(void) pciehpc_uninit(devi);
 			else if (pxb->pxb_hpc_type == HPC_SHPC)
 				(void) pcishpc_uninit(devi);
+
+			pxb_intr_fini(pxb);
 		}
 		else
 			ddi_remove_minor_node(devi, "devctl");
 
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, devi, "device_type");
 
-		if (pxb->pxb_hotplug_capable != B_FALSE)
-			pxb_intr_fini(pxb);
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
 			pxb_fm_fini(pxb);
 
@@ -1320,48 +1315,58 @@ pxb_removechild(dev_info_t *dip)
  * properly.
  */
 /*ARGSUSED*/
-static void
+static int
 pxb_init_hotplug(pxb_devstate_t *pxb)
 {
-	int rv;
-
-	pxb->pxb_hpc_type = HPC_NONE;
+	int rv = DDI_FAILURE;
 
 	if (((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
 	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) &&
 	    (pxb_pciehpc_probe(pxb->pxb_dip,
 	    pxb->pxb_config_handle) == DDI_SUCCESS)) {
-		rv = pciehpc_init(pxb->pxb_dip, NULL);
-		if (rv == DDI_SUCCESS)
-			pxb->pxb_hpc_type = HPC_PCIE;
+		pxb->pxb_hpc_type = HPC_PCIE;
 	} else if ((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
-		    (pxb_pcishpc_probe(pxb->pxb_dip,
-		    pxb->pxb_config_handle) == DDI_SUCCESS)) {
+	    (pxb_pcishpc_probe(pxb->pxb_dip,
+	    pxb->pxb_config_handle) == DDI_SUCCESS)) {
+		pxb->pxb_hpc_type = HPC_SHPC;
+	} else {
+		pxb->pxb_hpc_type = HPC_NONE;
+		return (DDI_SUCCESS);
+	}
+
+	pxb->pxb_hotplug_capable = B_TRUE;
+	if (pxb_intr_attach(pxb) != DDI_SUCCESS)
+		goto fail;
+
+	if (pxb->pxb_hpc_type == HPC_PCIE)
+		rv = pciehpc_init(pxb->pxb_dip, NULL);
+	else if (pxb->pxb_hpc_type == HPC_SHPC)
 		rv = pcishpc_init(pxb->pxb_dip);
-		if (rv == DDI_SUCCESS)
-			pxb->pxb_hpc_type = HPC_SHPC;
+
+	if (rv != DDI_SUCCESS)
+		goto fail;
+
+	if (pcihp_init(pxb->pxb_dip) != DDI_SUCCESS) {
+		if (pxb->pxb_hpc_type == HPC_PCIE)
+			(void) pciehpc_uninit(pxb->pxb_dip);
+		else if (pxb->pxb_hpc_type == HPC_SHPC)
+			(void) pcishpc_uninit(pxb->pxb_dip);
+
+		goto fail;
 	}
 
-	if (pxb->pxb_hpc_type != HPC_NONE) {
-		if (pcihp_init(pxb->pxb_dip) != DDI_SUCCESS) {
-			if (pxb->pxb_hpc_type == HPC_PCIE)
-				(void) pciehpc_uninit(pxb->pxb_dip);
-			else if (pxb->pxb_hpc_type == HPC_SHPC)
-				(void) pcishpc_uninit(pxb->pxb_dip);
+	(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
+	    "hotplug-capable");
 
-			pxb->pxb_hpc_type = HPC_NONE;
-			cmn_err(CE_WARN,
-			    "%s%d: Failed setting hotplug framework",
-			    ddi_driver_name(pxb->pxb_dip),
-			    ddi_get_instance(pxb->pxb_dip));
-		}
-	}
+	return (DDI_SUCCESS);
 
-	pxb->pxb_hotplug_capable = (pxb->pxb_hpc_type != HPC_NONE);
+fail:
+	pxb->pxb_hpc_type = HPC_NONE;
+	pxb->pxb_hotplug_capable = B_FALSE;
+	cmn_err(CE_WARN, "%s%d: Failed setting hotplug framework",
+	    ddi_driver_name(pxb->pxb_dip), ddi_get_instance(pxb->pxb_dip));
 
-	if (pxb->pxb_hotplug_capable == B_TRUE)
-		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
-		    "hotplug-capable");
+	return (DDI_FAILURE);
 }
 
 static void
