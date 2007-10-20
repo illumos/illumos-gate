@@ -977,3 +977,8 @@ usr/include/sqlite/sqlite.h		sparc
 usr/include/sys/kiconv_emea1.h		sparc
 usr/include/sys/kiconv_emea2.h		sparc
 usr/include/sys/kiconv_latin1.h		sparc
+#
+# This header file is shared only between the power commands and
+# ppm/srn modules # and should not be in any package
+#
+usr/include/sys/srn.h			sparc

@@ -160,6 +160,7 @@ static hrtime_t	shadow_tsc_hrtime_base;
 static hrtime_t	shadow_tsc_last;
 static uint_t	shadow_nsec_scale;
 static uint32_t	shadow_hres_lock;
+int get_tsc_ready();
 
 hrtime_t
 tsc_gethrtime(void)
@@ -409,7 +410,8 @@ tsc_digest(processorid_t target)
 	if ((tdelta > max) || ((tdelta >= 0) && update)) {
 		TSC_CONVERT_AND_ADD(tdelta, hdelta, nsec_scale);
 		tsc_sync_delta[target] = tsc_sync_delta[source] - hdelta;
-		tsc_sync_tick_delta[target] = -tdelta;
+		tsc_sync_tick_delta[target] = tsc_sync_tick_delta[source]
+		    -tdelta;
 		gethrtimef = tsc_gethrtime_delta;
 		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
 		return;
@@ -419,7 +421,8 @@ tsc_digest(processorid_t target)
 	if ((tdelta > max) || update) {
 		TSC_CONVERT_AND_ADD(tdelta, hdelta, nsec_scale);
 		tsc_sync_delta[target] = tsc_sync_delta[source] + hdelta;
-		tsc_sync_tick_delta[target] = tdelta;
+		tsc_sync_tick_delta[target] = tsc_sync_tick_delta[source]
+		    + tdelta;
 		gethrtimef = tsc_gethrtime_delta;
 		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
 	}
@@ -620,4 +623,167 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 	scalehrtimef = tsc_scalehrtime;
 	hrtime_tick = tsc_tick;
 	gethrtime_hires = 1;
+}
+
+int
+get_tsc_ready()
+{
+	return (tsc_ready);
+}
+
+/*
+ * Adjust all the deltas by adding the passed value to the array.
+ * Then use the "delt" versions of the the gethrtime functions.
+ * Note that 'tdelta' _could_ be a negative number, which should
+ * reduce the values in the array (used, for example, if the Solaris
+ * instance was moved by a virtual manager to a machine with a higher
+ * value of tsc).
+ */
+void
+tsc_adjust_delta(hrtime_t tdelta)
+{
+	int		i;
+	hrtime_t	hdelta = 0;
+
+	TSC_CONVERT(tdelta, hdelta, nsec_scale);
+
+	for (i = 0; i < NCPU; i++) {
+		tsc_sync_delta[i] += hdelta;
+		tsc_sync_tick_delta[i] += tdelta;
+	}
+
+	gethrtimef = tsc_gethrtime_delta;
+	gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
+}
+
+/*
+ * Functions to manage TSC and high-res time on suspend and resume.
+ */
+
+/*
+ * declarations needed for time adjustment
+ */
+extern void	rtcsync(void);
+extern tod_ops_t *tod_ops;
+/* There must be a better way than exposing nsec_scale! */
+extern uint_t	nsec_scale;
+static uint64_t tsc_saved_tsc = 0; /* 1 in 2^64 chance this'll screw up! */
+static timestruc_t tsc_saved_ts;
+static int	tsc_needs_resume = 0;	/* We only want to do this once. */
+int		tsc_delta_onsuspend = 0;
+int		tsc_adjust_seconds = 1;
+int		tsc_suspend_count = 0;
+int		tsc_resume_in_cyclic = 0;
+
+/*
+ * Let timestamp.c know that we are suspending.  It needs to take
+ * snapshots of the current time, and do any pre-suspend work.
+ */
+void
+tsc_suspend(void)
+{
+/*
+ * What we need to do here, is to get the time we suspended, so that we
+ * know how much we should add to the resume.
+ * This routine is called by each CPU, so we need to handle reentry.
+ */
+	if (tsc_gethrtime_enable) {
+		/*
+		 * We put the tsc_read() inside the lock as it
+		 * as no locking constraints, and it puts the
+		 * aquired value closer to the time stamp (in
+		 * case we delay getting the lock).
+		 */
+		mutex_enter(&tod_lock);
+		tsc_saved_tsc = tsc_read();
+		tsc_saved_ts = TODOP_GET(tod_ops);
+		mutex_exit(&tod_lock);
+		/* We only want to do this once. */
+		if (tsc_needs_resume == 0) {
+			if (tsc_delta_onsuspend) {
+				tsc_adjust_delta(tsc_saved_tsc);
+			} else {
+				tsc_adjust_delta(nsec_scale);
+			}
+			tsc_suspend_count++;
+		}
+	}
+
+	invalidate_cache();
+	tsc_needs_resume = 1;
+}
+
+/*
+ * Restore all timestamp state based on the snapshots taken at
+ * suspend time.
+ */
+void
+tsc_resume(void)
+{
+	/*
+	 * We only need to (and want to) do this once.  So let the first
+	 * caller handle this (we are locked by the cpu lock), as it
+	 * is preferential that we get the earliest sync.
+	 */
+	if (tsc_needs_resume) {
+		/*
+		 * If using the TSC, adjust the delta based on how long
+		 * we were sleeping (or away).  We also adjust for
+		 * migration and a grown TSC.
+		 */
+		if (tsc_saved_tsc != 0) {
+			timestruc_t	ts;
+			hrtime_t	now, sleep_tsc = 0;
+			int		sleep_sec;
+			extern void	tsc_tick(void);
+			extern uint64_t cpu_freq_hz;
+
+			/* tsc_read() MUST be before TODOP_GET() */
+			mutex_enter(&tod_lock);
+			now = tsc_read();
+			ts = TODOP_GET(tod_ops);
+			mutex_exit(&tod_lock);
+
+			/* Compute seconds of sleep time */
+			sleep_sec = ts.tv_sec - tsc_saved_ts.tv_sec;
+
+			/*
+			 * If the saved sec is less that or equal to
+			 * the current ts, then there is likely a
+			 * problem with the clock.  Assume at least
+			 * one second has passed, so that time goes forward.
+			 */
+			if (sleep_sec <= 0) {
+				sleep_sec = 1;
+			}
+
+			/* How many TSC's should have occured while sleeping */
+			if (tsc_adjust_seconds)
+				sleep_tsc = sleep_sec * cpu_freq_hz;
+
+			/*
+			 * We also want to subtract from the "sleep_tsc"
+			 * the current value of tsc_read(), so that our
+			 * adjustment accounts for the amount of time we
+			 * have been resumed _or_ an adjustment based on
+			 * the fact that we didn't actually power off the
+			 * CPU (migration is another issue, but _should_
+			 * also comply with this calculation).  If the CPU
+			 * never powered off, then:
+			 *    'now == sleep_tsc + saved_tsc'
+			 * and the delta will effectively be "0".
+			 */
+			sleep_tsc -= now;
+			if (tsc_delta_onsuspend) {
+				tsc_adjust_delta(sleep_tsc);
+			} else {
+				tsc_adjust_delta(tsc_saved_tsc + sleep_tsc);
+			}
+			tsc_saved_tsc = 0;
+
+			tsc_tick();
+		}
+		tsc_needs_resume = 0;
+	}
+
 }

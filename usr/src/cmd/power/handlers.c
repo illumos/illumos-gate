@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,9 @@
 #include <sys/mnttab.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <sys/pm.h>
+#include <kstat.h>
+#include <sys/smbios.h>
 
 
 #define	STRCPYLIM(dst, src, str) strcpy_limit(dst, src, sizeof (dst), str)
@@ -44,6 +47,7 @@ static char bad_thresh_fmt[] = "bad threshold(s)\n";
 static char stat_fmt[] = "cannot stat \"%s\", %s\n";
 static char always_on[] = "always-on";
 
+#define	PM_DEFAULT_ALGORITHM -1
 /*
  * When lines in a config file (usually "/etc/power.conf") start with
  * a recognized keyword, a "handler" routine is called for specific
@@ -53,6 +57,59 @@ static char always_on[] = "always-on";
  * routines for all keywords:
  */
 
+
+static char pm_cmd_string[32];
+
+static char *
+pm_map(int cmd)
+{
+	pm_req_t req;
+
+	req.value = cmd;
+	req.data = (void *)pm_cmd_string;
+	req.datasize = sizeof (pm_cmd_string);
+
+	if (ioctl(pm_fd, PM_GET_CMD_NAME, &req) < 0) {
+		perror("PM cmd name lookup:");
+		return ("??");
+	}
+	return (pm_cmd_string);
+}
+
+static int
+isonlist(char *listname, const char *man, const char *prod)
+{
+	pm_searchargs_t sl;
+	int ret;
+
+	sl.pms_listname = listname;
+	sl.pms_manufacturer = (char *)man;
+	sl.pms_product = (char *)prod;
+	ret = ioctl(pm_fd, PM_SEARCH_LIST, &sl);
+	mesg(MDEBUG, "PM_SEARCH_LIST %s for %s,%s returns %d\n",
+	    listname, man, prod, ret);
+	return (ret == 0);
+}
+
+static int
+do_ioctl(int ioctl_cmd, char *keyword, char *behavior, int suppress)
+{
+	mesg(MDEBUG, "doing ioctl %s for %s ", pm_map(ioctl_cmd), keyword);
+	if (ioctl(pm_fd, ioctl_cmd, NULL) == -1) {
+		int suppressed = suppress == -1 || suppress == errno;
+		mesg(MDEBUG, "%s failed, %s (%ssuppressed)\n", behavior,
+		    strerror(errno), (suppressed ? "" : "not "));
+		if (!suppressed) {
+			mesg(MERR, "%s %s failed, %s\n", keyword, behavior,
+			    strerror(errno));
+			return (NOUP);
+		} else {
+			return (OKUP);
+		}
+	}
+	mesg(MDEBUG, "succeeded\n");
+	return (OKUP);
+}
 
 /*
  * Check for valid cpupm behavior and communicate it to the kernel.
@@ -91,6 +148,231 @@ cpupm(void)
 
 
 /*
+ * Two decisions are identical except for the list names and ioctl commands
+ * inputs: whitelist, blacklist, yes, no
+ * if (! ("S3" kstat exists))
+ *	return (no)
+ * if (SystemInformation.Manufacturer == "Sun Microsystems" &&
+ *    (Pref_PM_Profile == Workstation || Pref_PM_Profile == Desktop)) {
+ *	if (platform on blacklist)
+ *		return (no)
+ *	return (yes)
+ * } else {
+ *	if (platform on whitelist)
+ *		return (yes)
+ *	return (no)
+ * }
+ */
+
+int
+S3_helper(char *whitelist, char *blacklist, int yes, int no, char *keyword,
+	char *behavior, int *didyes, int suppress)
+{
+	int oflags = SMB_O_NOCKSUM | SMB_O_NOVERS;
+	smbios_hdl_t *shp;
+	smbios_system_t sys;
+	id_t id;
+	int ret;
+	kstat_ctl_t *kc;
+	kstat_t *ksp;
+	kstat_named_t *dp;
+	smbios_info_t info;
+	int preferred_pm_profile = 0;
+	char yesstr[32], nostr[32];	/* DEBUG */
+
+	*didyes = 0;
+
+	strncpy(yesstr, pm_map(yes), sizeof (yesstr));
+	strncpy(nostr, pm_map(no), sizeof (nostr));
+	mesg(MDEBUG, "S3_helper(%s, %s, %s, %s, %s, %s)\n", whitelist,
+	    blacklist, yesstr, nostr, keyword, behavior);
+	if ((kc = kstat_open()) == NULL) {
+		mesg(MDEBUG, "kstat_open failed\n");
+		return (OKUP);
+	}
+	ksp = kstat_lookup(kc, "acpi", -1, "acpi");
+	if (ksp == NULL) {
+		mesg(MDEBUG, "kstat_lookup 'acpi', -1, 'acpi' failed\n");
+		kstat_close(kc);
+		return (OKUP);
+	}
+	(void) kstat_read(kc, ksp,  NULL);
+	dp = kstat_data_lookup(ksp, "S3");
+	if (dp == NULL || dp->value.l == 0) {
+		mesg(MDEBUG, "kstat_data_lookup 'S3' fails\n");
+		if (dp != NULL)
+			mesg(MDEBUG, "value.l %lx\n", dp->value.l);
+		kstat_close(kc);
+		return (do_ioctl(no, keyword, behavior, suppress));
+	}
+	mesg(MDEBUG, "kstat indicates S3 support (%lx)\n", dp->value.l);
+
+	if (!whitelist_only) {
+		/*
+		 * We still have an ACPI ksp, search it again for
+		 * 'preferred_pm_profile' (needs to be valid if we don't
+		 * aren't only using a whitelist).
+		 */
+		dp = kstat_data_lookup(ksp, "preferred_pm_profile");
+		if (dp == NULL) {
+			mesg(MDEBUG, "kstat_data_lookup 'ppmp fails\n");
+			kstat_close(kc);
+			return (do_ioctl(no, keyword, behavior, suppress));
+		}
+		mesg(MDEBUG, "kstat indicates preffered_pm_profile is %lx\n",
+		    dp->value.l);
+		preferred_pm_profile = dp->value.l;
+	}
+	kstat_close(kc);
+
+	if ((shp = smbios_open(NULL,
+	    SMB_VERSION, oflags, &ret)) == NULL) {
+		/* we promised not to complain */
+		/* we bail leaving it to the kernel default */
+		mesg(MDEBUG, "smbios_open failed %d\n", errno);
+		return (OKUP);
+	}
+	if ((id = smbios_info_system(shp, &sys)) == SMB_ERR) {
+		mesg(MDEBUG, "smbios_info_system failed %d\n", errno);
+		smbios_close(shp);
+		return (OKUP);
+	}
+	if (smbios_info_common(shp, id, &info) == SMB_ERR) {
+		mesg(MDEBUG, "smbios_info_common failed %d\n", errno);
+		smbios_close(shp);
+		return (OKUP);
+	}
+	mesg(MDEBUG, "Manufacturer: %s\n", info.smbi_manufacturer);
+	mesg(MDEBUG, "Product: %s\n", info.smbi_product);
+	smbios_close(shp);
+
+	if (!whitelist_only) {
+#define	PPP_DESKTOP 1
+#define	PPP_WORKSTATION 3
+		if (strcmp(info.smbi_manufacturer, "Sun Microsystems") == 0 &&
+		    (preferred_pm_profile == PPP_DESKTOP ||
+		    preferred_pm_profile == PPP_WORKSTATION)) {
+			if (isonlist(blacklist,
+			    info.smbi_manufacturer, info.smbi_product)) {
+				return (do_ioctl(no, keyword, behavior,
+				    suppress));
+			} else {
+				ret = do_ioctl(yes, keyword, behavior,
+				    suppress);
+				*didyes = (ret == OKUP);
+				return (ret);
+			}
+		}
+	}
+	if (isonlist(whitelist,
+	    info.smbi_manufacturer, info.smbi_product)) {
+		ret = do_ioctl(yes, keyword, behavior, suppress);
+		*didyes = (ret == OKUP);
+		return (ret);
+	} else {
+		return (do_ioctl(no, keyword, behavior, suppress));
+	}
+}
+
+int
+S3sup(void)	/* S3-support keyword handler */
+{
+	struct btoc {
+		char *behavior;
+		int cmd;
+	};
+	static struct btoc blist[] = {
+		"default",	PM_DEFAULT_ALGORITHM,
+		"enable",	PM_ENABLE_S3,
+		"disable",	PM_DISABLE_S3,
+		NULL,		0
+	};
+	struct btoc *bp;
+	char *behavior;
+	int dontcare;
+
+	for (behavior = LINEARG(1), bp = blist; bp->cmd; bp++) {
+		if (strcmp(behavior, bp->behavior) == 0)
+			break;
+	}
+	if (bp->cmd == 0) {
+		mesg(MERR, "invalid S3-support behavior \"%s\"\n", behavior);
+		return (NOUP);
+	}
+
+
+	switch (bp->cmd) {
+
+	case PM_ENABLE_S3:
+	case PM_DISABLE_S3:
+		return (do_ioctl(bp->cmd, "S3-support", behavior, EBUSY));
+
+	case PM_DEFAULT_ALGORITHM:
+		/*
+		 * we suppress errors in the "default" case because we
+		 * already did an invisible default call, so we know we'll
+		 * get EBUSY
+		 */
+		return (S3_helper("S3-support-enable", "S3-support-disable",
+		    PM_ENABLE_S3, PM_DISABLE_S3, "S3-support", behavior,
+		    &dontcare, EBUSY));
+
+	default:
+		mesg(MERR, "S3-support %s failed, %s\n", behavior,
+		    strerror(errno));
+		return (NOUP);
+	}
+}
+
+/*
+ * Check for valid autoS3 behavior and save after ioctl success.
+ */
+int
+autoS3(void)
+{
+	struct btoc {
+		char *behavior;
+		int cmd;
+	};
+	static struct btoc blist[] = {
+		"default",	PM_DEFAULT_ALGORITHM,
+		"disable",	PM_STOP_AUTOS3,
+		"enable",	PM_START_AUTOS3,
+		NULL,		0
+	};
+	struct btoc *bp;
+	char *behavior;
+	int dontcare;
+
+	for (behavior = LINEARG(1), bp = blist; bp->cmd; bp++) {
+		if (strcmp(behavior, bp->behavior) == 0)
+			break;
+	}
+	if (bp->cmd == 0) {
+		mesg(MERR, "invalid autoS3 behavior \"%s\"\n", behavior);
+		return (NOUP);
+	}
+
+	switch (bp->cmd) {
+	default:
+		mesg(MERR, "autoS3 %s failed, %s\n",
+		    behavior, strerror(errno));
+		mesg(MDEBUG, "unknown command\n", bp->cmd);
+		return (OKUP);
+
+	case PM_STOP_AUTOS3:
+	case PM_START_AUTOS3:
+		return (do_ioctl(bp->cmd, "autoS3", behavior, EBUSY));
+
+	case PM_DEFAULT_ALGORITHM:
+		return (S3_helper("S3-autoenable", "S3-autodisable",
+		    PM_START_AUTOS3, PM_STOP_AUTOS3, "autoS3", behavior,
+		    &dontcare, EBUSY));
+	}
+}
+
+
+/*
  * Check for valid autopm behavior and save after ioctl success.
  */
 int
@@ -101,7 +383,7 @@ autopm(void)
 		int cmd, Errno, isdef;
 	};
 	static struct btoc blist[] = {
-		"default",	PM_START_PM,	EBUSY,	1,
+		"default",	PM_START_PM,	-1,	1,
 		"disable",	PM_STOP_PM,	EINVAL,	0,
 		"enable",	PM_START_PM,	EBUSY,	0,
 		NULL,		0,		0,	0,
@@ -121,6 +403,7 @@ autopm(void)
 	/*
 	 * for "default" behavior, do not enable autopm if not ESTAR_V3
 	 */
+#if defined(__sparc)
 	if (!bp->isdef || (estar_vers == ESTAR_V3)) {
 		if (ioctl(pm_fd, bp->cmd, NULL) == -1 && errno != bp->Errno) {
 			mesg(MERR, "autopm %s failed, %s\n",
@@ -130,6 +413,30 @@ autopm(void)
 	}
 	(void) strcpy(new_cc.apm_behavior, behavior);
 	return (OKUP);
+#endif
+#if defined(__x86)
+	if (!bp->isdef) {
+		if (ioctl(pm_fd, bp->cmd, NULL) == -1 && errno != bp->Errno) {
+			mesg(MERR, "autopm %s failed, %s\n",
+			    behavior, strerror(errno));
+			return (NOUP);
+		}
+		mesg(MDEBUG, "autopm %s succeeded\n", behavior);
+
+		return (OKUP);
+	} else {
+		int didenable;
+		int ret = S3_helper("autopm-enable", "autopm-disable",
+		    PM_START_PM, PM_STOP_PM, "autopm", behavior, &didenable,
+		    bp->Errno);
+		if (didenable) {
+			/* tell powerd to attach all devices */
+			new_cc.is_autopm_default = 1;
+			(void) strcpy(new_cc.apm_behavior, behavior);
+		}
+		return (ret);
+	}
+#endif
 }
 
 

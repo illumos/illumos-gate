@@ -30,8 +30,9 @@
  * PSMI 1.2 extensions are supported only in 2.7 and later versions.
  * PSMI 1.3 and 1.4 extensions are supported in Solaris 10.
  * PSMI 1.5 extensions are supported in Solaris Nevada.
+ * PSMI 1.6 extensions are supported in Solaris Nevada.
  */
-#define	PSMI_1_5
+#define	PSMI_1_6
 
 #include <sys/processor.h>
 #include <sys/time.h>
@@ -3988,4 +3989,183 @@ apic_is_ioapic_AMD_813x(uint32_t physaddr)
 	/* The ioapics node was held by ddi_find_devinfo, so release it */
 	ndi_rele_devi(ioapicsnode);
 	return (rv);
+}
+
+struct apic_state {
+	int32_t as_task_reg;
+	int32_t as_dest_reg;
+	int32_t as_format_reg;
+	int32_t as_local_timer;
+	int32_t as_pcint_vect;
+	int32_t as_int_vect0;
+	int32_t as_int_vect1;
+	int32_t as_err_vect;
+	int32_t as_init_count;
+	int32_t as_divide_reg;
+	int32_t as_spur_int_reg;
+	int32_t as_ioapic[6][24];	/* spec says 23 */
+};
+
+
+static void
+apic_save_state(struct apic_state *sp)
+{
+	int	i;
+
+	PMD(PMD_SX, ("apic_save_state %p\n", (void *)sp))
+	/*
+	 * First the local APIC.
+	 */
+	sp->as_task_reg = apicadr[APIC_TASK_REG];
+	sp->as_dest_reg = apicadr[APIC_DEST_REG];
+	sp->as_format_reg = apicadr[APIC_FORMAT_REG];
+	sp->as_local_timer = apicadr[APIC_LOCAL_TIMER];
+	sp->as_pcint_vect = apicadr[APIC_PCINT_VECT];
+	sp->as_int_vect0 = apicadr[APIC_INT_VECT0];
+	sp->as_int_vect1 = apicadr[APIC_INT_VECT1];
+	sp->as_err_vect = apicadr[APIC_ERR_VECT];
+	sp->as_init_count = apicadr[APIC_INIT_COUNT];
+	sp->as_divide_reg = apicadr[APIC_DIVIDE_REG];
+	sp->as_spur_int_reg = apicadr[APIC_SPUR_INT_REG];
+
+	/*
+	 * if on the boot processor then save the IO APICs.
+	 */
+	if (psm_get_cpu_id() == 0) {
+		for (i = 0; i < apic_io_max; i++) {
+			volatile uint32_t *ioapic = apicioadr[i];
+			int	intin_max, j;
+
+			/* Bits 23-16 define the maximum redirection entries */
+			ioapic[APIC_IO_REG] = APIC_VERS_CMD;
+			intin_max = (ioapic[APIC_IO_DATA] >> 16) & 0xff;
+#if 0	/* debug */
+			prom_printf("\nIOAPIC %d (%d redirs):\n",
+			    i, intin_max+1);
+#endif	/* debug */
+			for (j = 0; j <= intin_max; j++) {
+				ioapic[APIC_IO_REG] = APIC_RDT_CMD + 2*j;
+				sp->as_ioapic[i][j] = ioapic[APIC_IO_DATA];
+#if 0	/* debug */
+				prom_printf("\t%d: %x\n", j, as_ioapic[i][j]);
+#endif	/* debug */
+			}
+		}
+	}
+}
+
+static void
+apic_restore_state(struct apic_state *sp)
+{
+	int	i;
+	int	iflag;
+	apic_irq_t	*irqp;
+	int	rv;
+	int	retval = 0;
+
+	/*
+	 * First the local APIC.
+	 */
+	apicadr[APIC_TASK_REG] = sp->as_task_reg;
+	apicadr[APIC_DEST_REG] = sp->as_dest_reg;
+	apicadr[APIC_FORMAT_REG] = sp->as_format_reg;
+	apicadr[APIC_LOCAL_TIMER] = sp->as_local_timer;
+	apicadr[APIC_PCINT_VECT] = sp->as_pcint_vect;
+	apicadr[APIC_INT_VECT0] = sp->as_int_vect0;
+	apicadr[APIC_INT_VECT1] = sp->as_int_vect1;
+	apicadr[APIC_ERR_VECT] = sp->as_err_vect;
+	apicadr[APIC_INIT_COUNT] = sp->as_init_count;
+	apicadr[APIC_DIVIDE_REG] = sp->as_divide_reg;
+	apicadr[APIC_SPUR_INT_REG] = sp->as_spur_int_reg;
+
+	/*
+	 * the following only needs to be done once, so we do it on the
+	 * boot processor, since we know that we only have one of those
+	 */
+	if (psm_get_cpu_id() == 0) {
+		/*
+		 * regenerate the IO APICs.
+		 */
+
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+
+		for (i = apic_min_device_irq; i < apic_max_device_irq; i++) {
+			if ((irqp = apic_irq_table[i]) == NULL)
+				continue;
+			for (; irqp; irqp = irqp->airq_next) {
+				if (irqp->airq_mps_intr_index == FREE_INDEX)
+					continue;
+				if (irqp->airq_temp_cpu != IRQ_UNINIT) {
+					rv = apic_setup_io_intr(irqp, i,
+					    B_FALSE);
+					if (rv) {
+						PMD(PMD_SX,
+						    ("apic_setup_io_intr(%p, "
+						    "%d) %d\n", (void *)irqp,
+						    i, rv));
+					}
+					retval |= rv;
+				}
+			}
+		}
+
+		PMD(PMD_SX, ("apic_restore_state retval %x\n", retval))
+
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
+
+
+		/*
+		 * restore acpi link device mappings
+		 */
+		acpi_restore_link_devices();
+	}
+}
+
+/*
+ * Returns 0 on success
+ */
+int
+apic_state(psm_state_request_t *rp)
+{
+	PMD(PMD_SX, ("apic_state "))
+	switch (rp->psr_cmd) {
+	case PSM_STATE_ALLOC:
+		rp->req.psm_state_req.psr_state =
+		    kmem_zalloc(sizeof (struct apic_state), KM_NOSLEEP);
+		if (rp->req.psm_state_req.psr_state == NULL)
+			return (ENOMEM);
+		rp->req.psm_state_req.psr_state_size =
+		    sizeof (struct apic_state);
+		PMD(PMD_SX, (":STATE_ALLOC: state %p, size %lx\n",
+		    rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size))
+		return (0);
+
+	case PSM_STATE_FREE:
+		kmem_free(rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size);
+		PMD(PMD_SX, (" STATE_FREE: state %p, size %lx\n",
+		    rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size))
+		return (0);
+
+	case PSM_STATE_SAVE:
+		PMD(PMD_SX, (" STATE_SAVE: state %p, size %lx\n",
+		    rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size))
+		apic_save_state(rp->req.psm_state_req.psr_state);
+		return (0);
+
+	case PSM_STATE_RESTORE:
+		apic_restore_state(rp->req.psm_state_req.psr_state);
+		PMD(PMD_SX, (" STATE_RESTORE: state %p, size %lx\n",
+		    rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size))
+		return (0);
+
+	default:
+		return (EINVAL);
+	}
 }

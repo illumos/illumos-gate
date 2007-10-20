@@ -40,14 +40,20 @@ extern "C" {
 struct tod_ops;
 typedef struct tod_ops tod_ops_t;
 
+/*
+ * TOD Ops.
+ * The only functions that _must_ be defined are the tod_get() and
+ * tod_set() functions.  All others may be unused, and need to be
+ * checked for NULL before using.
+ */
 struct tod_ops {
 	int		tod_version;
 	timestruc_t	(*tod_get)(tod_ops_t *);
 	void		(*tod_set)(tod_ops_t *, timestruc_t);
-	/*
-	 * On SPARC, additional operations include setting
-	 * and clearing a watchdog timer, as well as power alarms.
-	 */
+	uint_t		(*tod_set_watchdog_timer)(tod_ops_t *, int);
+	uint_t		(*tod_clear_watchdog_timer)(tod_ops_t *);
+	void		(*tod_set_wake_alarm)(tod_ops_t *, int);
+	void		(*tod_clear_wake_alarm)(tod_ops_t *);
 	struct tod_ops	*tod_next;
 };
 
@@ -58,6 +64,10 @@ extern char		*tod_module_name;
 
 #define	TODOP_GET(top)		((top)->tod_get(top))
 #define	TODOP_SET(top, ts)	((top)->tod_set(top, ts))
+#define	TODOP_SETWD(top, nsec)	((top)->tod_set_watchdog_timer(top, nsec))
+#define	TODOP_CLRWD(top)	((top)->tod_clear_watchdog_timer(top))
+#define	TODOP_SETWAKE(top, nsec) ((top)->tod_set_wake_alarm(top, nsec))
+#define	TODOP_CLRWAKE(top)	((top)->tod_clear_wake_alarm(top))
 
 #ifdef	__cplusplus
 }

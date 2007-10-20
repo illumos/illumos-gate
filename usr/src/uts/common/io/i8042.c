@@ -382,6 +382,23 @@ static void i8042_send(struct i8042 *global, int reg, unsigned char cmd);
 
 unsigned int i8042_unclaimed_interrupts = 0;
 
+static void
+i8042_discard_junk_data(struct i8042 *global)
+{
+	/* Discard any junk data that may have been left around */
+	for (;;) {
+		unsigned char		stat;
+
+		stat = ddi_get8(global->io_handle,
+		    global->io_addr + I8042_STAT);
+		if (! (stat & I8042_STAT_OUTBF))
+			break;
+		(void) ddi_get8(global->io_handle,
+		    global->io_addr + I8042_DATA);
+
+	}
+}
+
 static int
 i8042_cleanup(struct i8042 *global)
 {
@@ -508,7 +525,7 @@ i8042_purge_outbuf(struct i8042 *global)
 		if (i8042_wait_obf(global))
 			break;
 		(void) ddi_get8(global->io_handle,
-			global->io_addr + I8042_DATA);
+		    global->io_addr + I8042_DATA);
 	}
 
 	/*
@@ -537,10 +554,9 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_RESUME:
-#ifdef __sparc
 		global = (struct i8042 *)ddi_get_driver_private(dip);
+		i8042_discard_junk_data(global);
 		i8042_write_command_byte(global, I8042_CMD_ENABLE_ALL);
-#endif
 		return (DDI_SUCCESS);
 
 	case DDI_ATTACH:
@@ -628,7 +644,7 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		global->iblock_cookies = NULL;
 
 	mutex_init(&global->i8042_mutex, NULL, MUTEX_DRIVER,
-		(global->nintrs > 0) ? global->iblock_cookies[0] : NULL);
+	    (global->nintrs > 0) ? global->iblock_cookies[0] : NULL);
 
 	mutex_init(&global->i8042_out_mutex, NULL, MUTEX_DRIVER, NULL);
 
@@ -816,8 +832,8 @@ i8042_map(
 		}
 		if (rnumber < 0 || rnumber >= iprop_len) {
 			cmn_err(CE_WARN, "%s #%d:  bad map request for %s@%s",
-				DRIVER_NAME(dip), ddi_get_instance(dip),
-				ddi_node_name(rdip), ddi_get_name_addr(rdip));
+			    DRIVER_NAME(dip), ddi_get_instance(dip),
+			    ddi_node_name(rdip), ddi_get_name_addr(rdip));
 			return (DDI_FAILURE);
 		}
 #endif
@@ -838,9 +854,9 @@ i8042_map(
 	default:
 #if defined(DEBUG)
 		cmn_err(CE_WARN, "%s #%d:  unknown map type %d for %s@%s",
-			DRIVER_NAME(dip), ddi_get_instance(dip),
-			mp->map_type,
-			ddi_node_name(rdip), ddi_get_name_addr(rdip));
+		    DRIVER_NAME(dip), ddi_get_instance(dip),
+		    mp->map_type,
+		    ddi_node_name(rdip), ddi_get_name_addr(rdip));
 #endif
 		return (DDI_FAILURE);
 	}
@@ -848,9 +864,9 @@ i8042_map(
 #if defined(DEBUG)
 	if (offset != 0 || len != 0) {
 		cmn_err(CE_WARN,
-			"%s #%d:  partial mapping attempt for %s@%s ignored",
-				DRIVER_NAME(dip), ddi_get_instance(dip),
-				ddi_node_name(rdip), ddi_get_name_addr(rdip));
+		    "%s #%d:  partial mapping attempt for %s@%s ignored",
+		    DRIVER_NAME(dip), ddi_get_instance(dip),
+		    ddi_node_name(rdip), ddi_get_name_addr(rdip));
 	}
 #endif
 
@@ -901,7 +917,7 @@ i8042_map(
 
 	default:
 		cmn_err(CE_WARN, "%s:  map operation %d not supported",
-			DRIVER_NAME(dip), mp->map_op);
+		    DRIVER_NAME(dip), mp->map_op);
 		return (DDI_FAILURE);
 	}
 }
@@ -986,7 +1002,7 @@ i8042_intr(caddr_t arg)
 #if defined(DEBUG)
 		if (port->overruns % 50 == 1) {
 			cmn_err(CE_WARN, "i8042/%d: %d overruns\n",
-				which_port, port->overruns);
+			    which_port, port->overruns);
 		}
 #endif
 		mutex_exit(&global->i8042_mutex);
@@ -1039,7 +1055,7 @@ i8042_send(struct i8042 *global, int reg, unsigned char val)
 	/*CONSTANTCONDITION*/
 	while (1) {
 		stat = ddi_get8(global->io_handle,
-			global->io_addr + I8042_STAT);
+		    global->io_addr + I8042_STAT);
 
 		if ((stat & I8042_STAT_INBF) == 0) {
 			ddi_put8(global->io_handle, global->io_addr+reg, val);
@@ -1113,7 +1129,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 		} else {
 #if defined(DEBUG)
 			cmn_err(CE_WARN,
-				"i8042:  Tried to read from empty buffer");
+			    "i8042:  Tried to read from empty buffer");
 #endif
 			ret = 0;
 		}
@@ -1127,7 +1143,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 	case I8042_INT_OUTPUT_DATA:
 	case I8042_POLL_OUTPUT_DATA:
 		cmn_err(CE_WARN, "i8042:  read of write-only register 0x%p",
-			(void *)addr);
+		    (void *)addr);
 		ret = 0;
 		break;
 #endif
@@ -1137,7 +1153,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 			return (B_TRUE);
 		for (;;) {
 			stat = ddi_get8(global->io_handle,
-				global->io_addr + I8042_STAT);
+			    global->io_addr + I8042_STAT);
 			if ((stat & I8042_STAT_OUTBF) == 0)
 				return (B_FALSE);
 			switch (port->which) {
@@ -1151,13 +1167,13 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 				break;
 			default:
 				cmn_err(CE_WARN, "data from unknown port: %d",
-					port->which);
+				    port->which);
 			}
 			/*
 			 * Data for wrong port pending; discard it.
 			 */
 			(void) ddi_get8(global->io_handle,
-					global->io_addr + I8042_DATA);
+			    global->io_addr + I8042_DATA);
 		}
 
 		/* NOTREACHED */
@@ -1170,7 +1186,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 		}
 
 		stat = ddi_get8(global->io_handle,
-			    global->io_addr + I8042_STAT);
+		    global->io_addr + I8042_STAT);
 		if ((stat & I8042_STAT_OUTBF) == 0) {
 #if defined(DEBUG)
 			prom_printf("I8042_POLL_INPUT_DATA:  no data!\n");
@@ -1178,7 +1194,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 			return (0);
 		}
 		ret = ddi_get8(global->io_handle,
-			    global->io_addr + I8042_DATA);
+		    global->io_addr + I8042_DATA);
 		switch (port->which) {
 		case MAIN_PORT:
 			if ((stat & I8042_STAT_AUXBF) == 0)
@@ -1197,7 +1213,7 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 	default:
 #if defined(DEBUG)
 		cmn_err(CE_WARN, "i8042:  read of undefined register 0x%p",
-			(void *)addr);
+		    (void *)addr);
 #endif
 		ret = 0;
 		break;
@@ -1240,12 +1256,12 @@ i8042_put8(ddi_acc_impl_t *handlep, uint8_t *addr, uint8_t value)
 	case I8042_POLL_INPUT_AVAIL:
 	case I8042_POLL_INPUT_DATA:
 		cmn_err(CE_WARN, "i8042:  write of read-only register 0x%p",
-			(void *)addr);
+		    (void *)addr);
 		break;
 
 	default:
 		cmn_err(CE_WARN, "i8042:  read of undefined register 0x%p",
-			(void *)addr);
+		    (void *)addr);
 		break;
 #endif
 	}
@@ -1391,7 +1407,7 @@ i8042_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		(void) sprintf(name, "%d", which_port);
 		ddi_set_name_addr(child, name);
 		ddi_set_parent_data(child,
-			(caddr_t)&global->i8042_ports[which_port]);
+		    (caddr_t)&global->i8042_ports[which_port]);
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_UNINITCHILD:
@@ -1402,8 +1418,8 @@ i8042_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_REPORTDEV:
 		cmn_err(CE_CONT, "?8042 device:  %s@%s, %s # %d\n",
-			ddi_node_name(rdip), ddi_get_name_addr(rdip),
-			DRIVER_NAME(rdip), ddi_get_instance(rdip));
+		    ddi_node_name(rdip), ddi_get_name_addr(rdip),
+		    DRIVER_NAME(rdip), ddi_get_instance(rdip));
 		return (DDI_SUCCESS);
 
 	default:

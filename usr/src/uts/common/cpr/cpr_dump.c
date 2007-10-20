@@ -54,17 +54,20 @@
 #include <sys/ddi.h>
 #include <sys/panic.h>
 #include <sys/thread.h>
+#include <sys/note.h>
 
 /* Local defines and variables */
 #define	BTOb(bytes)	((bytes) << 3)		/* Bytes to bits, log2(NBBY) */
 #define	bTOB(bits)	((bits) >> 3)		/* bits to Bytes, log2(NBBY) */
 
+#if defined(__sparc)
 static uint_t cpr_pages_tobe_dumped;
 static uint_t cpr_regular_pgs_dumped;
-
 static int cpr_dump_regular_pages(vnode_t *);
 static int cpr_count_upages(int, bitfunc_t);
 static int cpr_compress_and_write(vnode_t *, uint_t, pfn_t, pgcnt_t);
+#endif
+
 int cpr_flush_write(vnode_t *);
 
 int cpr_contig_pages(vnode_t *, int);
@@ -75,6 +78,8 @@ extern size_t cpr_get_devsize(dev_t);
 extern int i_cpr_dump_setup(vnode_t *);
 extern int i_cpr_blockzero(char *, char **, int *, vnode_t *);
 extern int cpr_test_mode;
+int cpr_setbit(pfn_t, int);
+int cpr_clrbit(pfn_t, int);
 
 ctrm_t cpr_term;
 
@@ -87,13 +92,16 @@ int cpr_nbitmaps;
 char *cpr_pagedata;		/* page buffer for compression / tmp copy */
 size_t cpr_pagedata_size;	/* page buffer size in bytes */
 
+#if defined(__sparc)
 static char *cpr_wptr;		/* keep track of where to write to next */
 static int cpr_file_bn;		/* cpr state-file block offset */
 static int cpr_disk_writes_ok;
 static size_t cpr_dev_space = 0;
+#endif
 
 char cpr_pagecopy[CPR_MAXCONTIG * MMU_PAGESIZE];
 
+#if defined(__sparc)
 /*
  * On some platforms bcopy may modify the thread structure
  * during bcopy (eg, to prevent cpu migration).  If the
@@ -194,6 +202,7 @@ cpr_write_header(vnode_t *vp)
 	struct cpr_dump_desc cdump;
 	pgcnt_t bitmap_pages;
 	pgcnt_t kpages, vpages, upages;
+	pgcnt_t cpr_count_kpages(int mapflag, bitfunc_t bitfunc);
 
 	cdump.cdd_magic = (uint_t)CPR_DUMP_MAGIC;
 	cdump.cdd_version = CPR_VERSION;
@@ -237,19 +246,20 @@ cpr_write_header(vnode_t *vp)
 	 * Roundup will be done in the file allocation code.
 	 */
 	STAT->cs_nocomp_statefsz = sizeof (cdd_t) + sizeof (cmd_t) +
-		(sizeof (cbd_t) * cdump.cdd_bitmaprec) +
-		(sizeof (cpd_t) * cdump.cdd_dumppgsize) +
-		mmu_ptob(cdump.cdd_dumppgsize + bitmap_pages);
+	    (sizeof (cbd_t) * cdump.cdd_bitmaprec) +
+	    (sizeof (cpd_t) * cdump.cdd_dumppgsize) +
+	    mmu_ptob(cdump.cdd_dumppgsize + bitmap_pages);
 
 	/*
 	 * If the estimated statefile is not big enough,
 	 * go retry now to save un-necessary operations.
 	 */
 	if (!(CPR->c_flags & C_COMPRESSING) &&
-		(STAT->cs_nocomp_statefsz > STAT->cs_est_statefsz)) {
+	    (STAT->cs_nocomp_statefsz > STAT->cs_est_statefsz)) {
 		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG7))
-		    prom_printf("cpr_write_header: STAT->cs_nocomp_statefsz > "
-			"STAT->cs_est_statefsz\n");
+			prom_printf("cpr_write_header: "
+			    "STAT->cs_nocomp_statefsz > "
+			    "STAT->cs_est_statefsz\n");
 		return (ENOSPC);
 	}
 
@@ -272,10 +282,10 @@ cpr_write_terminator(vnode_t *vp)
 
 	/* count the last one (flush) */
 	cpr_term.real_statef_size = STAT->cs_real_statefsz +
-		btod(cpr_wptr - cpr_buf) * DEV_BSIZE;
+	    btod(cpr_wptr - cpr_buf) * DEV_BSIZE;
 
 	CPR_DEBUG(CPR_DEBUG9, "cpr_dump: Real Statefile Size: %ld\n",
-		STAT->cs_real_statefsz);
+	    STAT->cs_real_statefsz);
 
 	cpr_tod_get(&cpr_term.tm_shutdown);
 
@@ -382,6 +392,7 @@ cpr_write_statefile(vnode_t *vp)
 
 	return (error);
 }
+#endif
 
 
 /*
@@ -393,9 +404,13 @@ cpr_write_statefile(vnode_t *vp)
  *    - writes the remaining user pages
  *    - writes the kernel pages
  */
+#if defined(__x86)
+	_NOTE(ARGSUSED(0))
+#endif
 int
 cpr_dump(vnode_t *vp)
 {
+#if defined(__sparc)
 	int error;
 
 	if (cpr_buf == NULL) {
@@ -484,11 +499,13 @@ cpr_dump(vnode_t *vp)
 
 	if (error = i_cpr_blockzero(cpr_buf, &cpr_wptr, &cpr_file_bn, vp))
 		return (error);
+#endif
 
 	return (0);
 }
 
 
+#if defined(__sparc)
 /*
  * cpr_xwalk() is called many 100x with a range within kvseg or kvseg_reloc;
  * a page-count from each range is accumulated at arg->pages.
@@ -633,7 +650,8 @@ cpr_sparse_seg_check(struct seg *seg)
 
 	for (; ste->st_seg; ste++) {
 		tseg = (ste->st_addrtype == KSEG_PTR_ADDR) ?
-				*ste->st_seg : (struct seg *)ste->st_seg;
+		    *ste->st_seg : (struct seg *)ste->st_seg;
+
 		if (seg == tseg)
 			return (ste);
 	}
@@ -690,7 +708,8 @@ cpr_count_kpages(int mapflag, bitfunc_t bitfunc)
 
 	CPR_DEBUG(CPR_DEBUG9, "cpr_count_kpages: kas_cnt=%ld\n", kas_cnt);
 	CPR_DEBUG(CPR_DEBUG7, "\ncpr_count_kpages: %ld pages, 0x%lx bytes\n",
-		kas_cnt, mmu_ptob(kas_cnt));
+	    kas_cnt, mmu_ptob(kas_cnt));
+
 	return (kas_cnt);
 }
 
@@ -796,7 +815,7 @@ cpr_count_upages(int mapflag, bitfunc_t bitfunc)
 		extern struct vnode prom_ppages;
 		if (pp->p_vnode == NULL || PP_ISKAS(pp) ||
 		    pp->p_vnode == &prom_ppages ||
-			PP_ISFREE(pp) && PP_ISAGED(pp))
+		    PP_ISFREE(pp) && PP_ISAGED(pp))
 #else
 		if (pp->p_vnode == NULL || PP_ISKAS(pp) ||
 		    PP_ISFREE(pp) && PP_ISAGED(pp))
@@ -813,9 +832,10 @@ cpr_count_upages(int mapflag, bitfunc_t bitfunc)
 
 	STAT->cs_upage2statef = dcnt;
 	CPR_DEBUG(CPR_DEBUG9, "cpr_count_upages: dirty=%ld total=%ld\n",
-		dcnt, tcnt);
+	    dcnt, tcnt);
 	CPR_DEBUG(CPR_DEBUG7, "cpr_count_upages: %ld pages, 0x%lx bytes\n",
-		dcnt, mmu_ptob(dcnt));
+	    dcnt, mmu_ptob(dcnt));
+
 	return (dcnt);
 }
 
@@ -907,7 +927,7 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 	i_cpr_mapin(CPR->c_mapping_area, npg, pfn);
 
 	CPR_DEBUG(CPR_DEBUG3, "mapped-in %ld pages, vaddr 0x%p, pfn 0x%lx\n",
-		npg, CPR->c_mapping_area, pfn);
+	    npg, CPR->c_mapping_area, pfn);
 
 	/*
 	 * Fill cpr page descriptor.
@@ -1181,3 +1201,4 @@ cpr_dump_regular_pages(vnode_t *vp)
 		CPR_DEBUG(CPR_DEBUG7, "cpr_dump_regular_pages() done.\n");
 	return (error);
 }
+#endif

@@ -59,7 +59,7 @@ cpr_signal_user(int sig)
 	for (p = practive; p; p = p->p_next) {
 		/* only user threads */
 		if (p->p_exec == NULL || p->p_stat == SZOMB ||
-			p == proc_init || p == ttoproc(curthread))
+		    p == proc_init || p == ttoproc(curthread))
 			continue;
 
 		mutex_enter(&p->p_lock);
@@ -87,7 +87,7 @@ cpr_stop_user_threads()
 			return (ESRCH);
 		cpr_stop_user(count * count * CPR_UTSTOP_WAIT);
 	} while (cpr_check_user_threads() &&
-		(count < CPR_UTSTOP_RETRY || CPR->c_fcn != AD_CPR_FORCE));
+	    (count < CPR_UTSTOP_RETRY || CPR->c_fcn != AD_CPR_FORCE));
 
 	return (0);
 }
@@ -194,11 +194,11 @@ cpr_check_user_threads()
 			CPR_DEBUG(CPR_DEBUG1, "Suspend failed: "
 			    "cannot stop uthread\n");
 			cpr_err(CE_WARN, "Suspend cannot stop "
-				"process %s (%p:%x).",
-				ttoproc(tp)->p_user.u_psargs, (void *)tp,
-				tp->t_state);
+			    "process %s (%p:%x).",
+			    ttoproc(tp)->p_user.u_psargs, (void *)tp,
+			    tp->t_state);
 			cpr_err(CE_WARN, "Process may be waiting for"
-				" network request, please try again.");
+			    " network request, please try again.");
 			}
 
 			CPR_DEBUG(CPR_DEBUG2, "cant stop t=%p state=%x pfg=%x "
@@ -284,8 +284,6 @@ int
 cpr_stop_kernel_threads(void)
 {
 	caddr_t	name;
-	kthread_id_t tp;
-	proc_t *p;
 
 	callb_lock_table();	/* Note: we unlock the table in resume. */
 
@@ -297,6 +295,25 @@ cpr_stop_kernel_threads(void)
 		    "Please try again later.", name);
 		return (EBUSY);
 	}
+
+	CPR_DEBUG(CPR_DEBUG1, ("done\n"));
+	return (0);
+}
+
+/*
+ * Check to see that kernel threads are stopped.
+ * This should be called while CPU's are paused, and the caller is
+ * effectively running single user, or else we are virtually guaranteed
+ * to fail.  The routine should not ASSERT on the paused state or spl
+ * level, as there may be a use for this to verify that things are running
+ * again.
+ */
+int
+cpr_threads_are_stopped(void)
+{
+	caddr_t	name;
+	kthread_id_t tp;
+	proc_t *p;
 
 	/*
 	 * We think we stopped all the kernel threads.  Just in case
@@ -320,8 +337,7 @@ cpr_stop_kernel_threads(void)
 			return (EBUSY);
 		}
 	} while ((tp = tp->t_next) != curthread);
-	mutex_exit(&pidlock);
 
-	CPR_DEBUG(CPR_DEBUG1, "done\n");
+	mutex_exit(&pidlock);
 	return (0);
 }

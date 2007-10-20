@@ -35,6 +35,7 @@
 #include <sys/avintr.h>
 #include <sys/pic.h>
 #include <sys/xc_levels.h>
+#include <sys/psm_types.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,6 +71,7 @@ extern void (*psm_timer_reprogram)(hrtime_t); /* timer reprogram	*/
 extern void (*psm_timer_enable)(void);		/* timer enable		*/
 extern void (*psm_timer_disable)(void);		/* timer disable	*/
 extern void (*psm_post_cyclic_setup)(void *arg); /* psm cyclic setup	*/
+extern int (*psm_state)(psm_state_request_t *); /* psm state save/restore */
 
 extern int (*slvltovect)(int);	/* ipl interrupt priority level		*/
 extern int (*setlvl)(int, int *); /* set intr pri represented by vect	*/

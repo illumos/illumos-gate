@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# SUNWcpr postremove script
+
+#
+# Unload old copy of cpr from system
+# In the current version of x86, none of the files to be removed will exist
+#
+
+CPRLOWER="${PKG_INSTALL_ROOT}/.cpr_generic_info \
+		${PKG_INSTALL_ROOT}/.cpr_turbo_info \
+		${PKG_INSTALL_ROOT}/.cpr_defaultboot_info \
+		${PKG_INSTALL_ROOT}/.cpr_config \
+		${PKG_INSTALL_ROOT}/.cpr_default"
+CPRFILES="${CPRLOWER} ${PKG_INSTALL_ROOT}/.CPR_TB ${PKG_INSTALL_ROOT}/.CPR"
+
+if [ "$BASEDIR" = "/" ] ; then
+	old_cpr=`/usr/sbin/modinfo | grep -w "cpr" | awk '{print $1}'`
+	if [ "X${old_cpr}" != "X" ] ; then
+		/usr/sbin/modunload -i ${old_cpr}
+	fi
+	
+	if [ -s ${PKG_INSTALL_ROOT}/etc/power.conf ]; then
+		state_filesystem=`/usr/bin/grep "^[	 ]*statefile[ 	]" \
+					${PKG_INSTALL_ROOT}/etc/power.conf`
+		if [ "X${state_filesystem}" != "X" ] ; then
+			set - ${state_filesystem}
+			CPRSF=${PKG_INSTALL_ROOT}/"$2" 
+		fi
+	fi
+
+	rm -f ${CPRFILES} ${CPRSF}
+fi
+
+exit 0

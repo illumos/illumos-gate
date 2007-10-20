@@ -337,6 +337,15 @@ cpr_spinning_bar(void)
 		idx = 0;
 }
 
+void
+cpr_resume_notice(void)
+{
+	static char cstr[] = "\014" "\033[1P" "\033[18;21H";
+
+	prom_printf(cstr);
+	prom_printf("Restoring System State. Please Wait... ");
+}
+
 /*
  * Convert a full device path to its shortest unambiguous equivalent.
  * For example, a path which starts out /iommu@x,y/sbus@i,j/espdma . . .

@@ -38,6 +38,7 @@
 #include <sys/kmem.h>
 #include <sys/cpr.h>
 #include <sys/conf.h>
+#include <sys/machclock.h>
 
 /*
  * CPR miscellaneous support routines
@@ -61,11 +62,14 @@ extern char *cpr_pagedata;
 extern int cpr_bufs_allocated;
 extern int cpr_bitmaps_allocated;
 
+#if defined(__sparc)
 static struct cprconfig cprconfig;
 static int cprconfig_loaded = 0;
 static int cpr_statefile_ok(vnode_t *, int);
 static int cpr_p_online(cpu_t *, int);
 static void cpr_save_mp_state(void);
+#endif
+
 int cpr_is_ufs(struct vfs *);
 
 char cpr_default_path[] = CPR_DEFAULT;
@@ -112,6 +116,10 @@ cpr_init(int fcn)
 		CPR->c_flags |= C_REUSABLE;
 	else
 		CPR->c_flags |= C_SUSPENDING;
+	if (fcn == AD_SUSPEND_TO_RAM || fcn == DEV_SUSPEND_TO_RAM) {
+		return (0);
+	}
+#if defined(__sparc)
 	if (fcn != AD_CPR_NOCOMPRESS && fcn != AD_CPR_TESTNOZ)
 		CPR->c_flags |= C_COMPRESSING;
 	/*
@@ -126,6 +134,7 @@ cpr_init(int fcn)
 	if (cpr_debug & CPR_DEBUG3)
 		cpr_err(CE_CONT, "Reserved virtual range from 0x%p for writing "
 		    "kas\n", (void *)CPR->c_mapping_area);
+#endif
 
 	return (0);
 }
@@ -157,6 +166,7 @@ cpr_done(void)
 }
 
 
+#if defined(__sparc)
 /*
  * reads config data into cprconfig
  */
@@ -815,6 +825,7 @@ cpr_get_reusable_mode(void)
 
 	return (0);
 }
+#endif
 
 /*
  * clock/time related routines
@@ -828,7 +839,7 @@ cpr_tod_get(cpr_time_t *ctp)
 	timestruc_t ts;
 
 	mutex_enter(&tod_lock);
-	ts = tod_get();
+	ts = TODOP_GET(tod_ops);
 	mutex_exit(&tod_lock);
 	ctp->tv_sec = (time32_t)ts.tv_sec;
 	ctp->tv_nsec = (int32_t)ts.tv_nsec;
@@ -857,6 +868,7 @@ cpr_restore_time(void)
 	clkset(cpr_time_stamp);
 }
 
+#if defined(__sparc)
 /*
  * CPU ONLINE/OFFLINE CODE
  */
@@ -1104,16 +1116,6 @@ cpr_reusable_mount_check(void)
 }
 
 /*
- * Force a fresh read of the cprinfo per uadmin 3 call
- */
-void
-cpr_forget_cprconfig(void)
-{
-	cprconfig_loaded = 0;
-}
-
-
-/*
  * return statefile offset in DEV_BSIZE units
  */
 int
@@ -1121,3 +1123,13 @@ cpr_statefile_offset(void)
 {
 	return (cpr_statefile_is_spec() ? btod(CPR_SPEC_OFFSET) : 0);
 }
+
+/*
+ * Force a fresh read of the cprinfo per uadmin 3 call
+ */
+void
+cpr_forget_cprconfig(void)
+{
+	cprconfig_loaded = 0;
+}
+#endif

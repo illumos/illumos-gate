@@ -73,6 +73,7 @@ static struct cmpkt *dadk_pktprep(struct dadk *dadkp, struct cmpkt *in_pktp,
 static int  dadk_pkt(opaque_t com_data, struct buf *bp, int (*func)(caddr_t),
     caddr_t arg);
 static void dadk_transport(opaque_t com_data, struct buf *bp);
+static int dadk_ctl_ioctl(struct dadk *, uint32_t, uintptr_t, int);
 
 struct tgcom_objops dadk_com_ops = {
 	nodev,
@@ -336,6 +337,8 @@ dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp, opaque_t queobjp,
 	BBH_INIT(bbhobjp);
 
 	dadkp->dad_flcobjp = flcobjp;
+	mutex_init(&dadkp->dad_cmd_mutex, NULL, MUTEX_DRIVER, NULL);
+	dadkp->dad_cmd_count = 0;
 	return (FLC_INIT(flcobjp, &(dadkp->dad_com), queobjp, lkarg));
 }
 
@@ -364,6 +367,7 @@ dadk_cleanup(struct tgdk_obj *dkobjp)
 		FLC_FREE(dadkp->dad_flcobjp);
 		dadkp->dad_flcobjp = NULL;
 	}
+	mutex_destroy(&dadkp->dad_cmd_mutex);
 }
 
 /* ARGSUSED */
@@ -376,7 +380,7 @@ dadk_probe(opaque_t objp, int kmsflg)
 
 	devp = dadkp->dad_sd;
 	if (!devp->sd_inq || (devp->sd_inq->inq_dtype == DTYPE_NOTPRESENT) ||
-		(devp->sd_inq->inq_dtype == DTYPE_UNKNOWN)) {
+	    (devp->sd_inq->inq_dtype == DTYPE_UNKNOWN)) {
 		return (DDI_PROBE_FAILURE);
 	}
 
@@ -454,21 +458,23 @@ dadk_open(opaque_t objp, int flag)
 			return (DDI_SUCCESS);
 		}
 	} else {
-	    mutex_enter(&dadkp->dad_mutex);
-	    dadkp->dad_iostate = DKIO_NONE;
-	    cv_broadcast(&dadkp->dad_state_cv);
-	    mutex_exit(&dadkp->dad_mutex);
+		mutex_enter(&dadkp->dad_mutex);
+		dadkp->dad_iostate = DKIO_NONE;
+		cv_broadcast(&dadkp->dad_state_cv);
+		mutex_exit(&dadkp->dad_mutex);
 
-	    if (dadk_rmb_ioctl(dadkp, DCMD_START_MOTOR, 0, 0, DADK_SILENT) ||
-		dadk_rmb_ioctl(dadkp, DCMD_LOCK, 0, 0, DADK_SILENT) ||
-		dadk_rmb_ioctl(dadkp, DCMD_UPDATE_GEOM, 0, 0, DADK_SILENT)) {
-		    return (DDI_FAILURE);
-	    }
+		if (dadk_rmb_ioctl(dadkp, DCMD_START_MOTOR, 0, 0,
+		    DADK_SILENT) ||
+		    dadk_rmb_ioctl(dadkp, DCMD_LOCK, 0, 0, DADK_SILENT) ||
+		    dadk_rmb_ioctl(dadkp, DCMD_UPDATE_GEOM, 0, 0,
+		    DADK_SILENT)) {
+			return (DDI_FAILURE);
+		}
 
-	    mutex_enter(&dadkp->dad_mutex);
-	    dadkp->dad_iostate = DKIO_INSERTED;
-	    cv_broadcast(&dadkp->dad_state_cv);
-	    mutex_exit(&dadkp->dad_mutex);
+		mutex_enter(&dadkp->dad_mutex);
+		dadkp->dad_iostate = DKIO_INSERTED;
+		cv_broadcast(&dadkp->dad_state_cv);
+		mutex_exit(&dadkp->dad_mutex);
 	}
 
 	/*
@@ -482,20 +488,20 @@ dadk_open(opaque_t objp, int flag)
 	 * is added to the driver to change WCE, dad_wce
 	 * must be updated appropriately.
 	 */
-	error = CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETWCE,
+	error = dadk_ctl_ioctl(dadkp, DIOCTL_GETWCE,
 	    (uintptr_t)&wce, FKIOCTL | FNATIVE);
 	mutex_enter(&dadkp->dad_mutex);
 	dadkp->dad_wce = (error != 0) || (wce != 0);
 	mutex_exit(&dadkp->dad_mutex);
 
 	/* logical disk geometry */
-	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETGEOM,
+	(void) dadk_ctl_ioctl(dadkp, DIOCTL_GETGEOM,
 	    (uintptr_t)&dadkp->dad_logg, FKIOCTL | FNATIVE);
 	if (dadkp->dad_logg.g_cap == 0)
 		return (DDI_FAILURE);
 
 	/* get physical disk geometry */
-	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETPHYGEOM,
+	(void) dadk_ctl_ioctl(dadkp, DIOCTL_GETPHYGEOM,
 	    (uintptr_t)&dadkp->dad_phyg, FKIOCTL | FNATIVE);
 	if (dadkp->dad_phyg.g_cap == 0)
 		return (DDI_FAILURE);
@@ -507,7 +513,7 @@ dadk_open(opaque_t objp, int flag)
 
 	/* start profiling */
 	FLC_START_KSTAT(dadkp->dad_flcobjp, "disk",
-		ddi_get_instance(CTL_DIP_DEV(dadkp->dad_ctlobjp)));
+	    ddi_get_instance(CTL_DIP_DEV(dadkp->dad_ctlobjp)));
 
 	return (DDI_SUCCESS);
 }
@@ -534,7 +540,8 @@ dadk_setcap(struct dadk *dadkp)
 
 	/* set sec,block shift factor - (512->0, 1024->1, 2048->2, etc.) */
 	totsize >>= SCTRSHFT;
-	for (i = 0; totsize != 1; i++, totsize >>= 1);
+	for (i = 0; totsize != 1; i++, totsize >>= 1)
+		;
 	dadkp->dad_blkshf = i;
 	dadkp->dad_secshf = i + SCTRSHFT;
 }
@@ -594,14 +601,14 @@ dadk_create_errstats(struct dadk *dadkp, int instance)
 	dep->dadk_model.value.c[0] = 0;
 	dadk_ioc_string.is_buf = &dep->dadk_model.value.c[0];
 	dadk_ioc_string.is_size = sizeof (dep->dadk_model.value.c);
-	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETMODEL,
+	(void) dadk_ctl_ioctl(dadkp, DIOCTL_GETMODEL,
 	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
 
 	/* get serial */
 	dep->dadk_serial.value.c[0] = 0;
 	dadk_ioc_string.is_buf = &dep->dadk_serial.value.c[0];
 	dadk_ioc_string.is_size = sizeof (dep->dadk_serial.value.c);
-	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETSERIAL,
+	(void) dadk_ctl_ioctl(dadkp, DIOCTL_GETSERIAL,
 	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
 
 	/* Get revision */
@@ -659,6 +666,9 @@ dadk_strategy(opaque_t objp, struct buf *bp)
 	}
 
 	SET_BP_SEC(bp, (LBLK2SEC(GET_BP_SEC(bp), dadkp->dad_blkshf)));
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count++;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 	FLC_ENQUE(dadkp->dad_flcobjp, bp);
 
 	return (DDI_SUCCESS);
@@ -715,7 +725,7 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 
 	switch (cmd) {
 	case DKIOCGETDEF:
-	    {
+		{
 		struct buf	*bp;
 		int		err, head;
 		unsigned char	*secbuf;
@@ -752,6 +762,9 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 		bp->b_forw = (struct buf *)dadkp;
 		bp->b_back = (struct buf *)DCMD_GETDEF;
 
+		mutex_enter(&dadkp->dad_cmd_mutex);
+		dadkp->dad_cmd_count++;
+		mutex_exit(&dadkp->dad_cmd_mutex);
 		FLC_ENQUE(dadkp->dad_flcobjp, bp);
 		err = biowait(bp);
 		if (!err) {
@@ -762,9 +775,9 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 		kmem_free(secbuf, NBPSCTR);
 		freerbuf(bp);
 		return (err);
-	    }
+		}
 	case DIOCTL_RWCMD:
-	    {
+		{
 		struct dadkio_rwcmd *rwcmdp;
 		int status, rw;
 
@@ -794,8 +807,8 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 				return (status);
 			default:
 				return (EINVAL);
+			}
 		}
-	    }
 	case DKIOC_UPDATEFW:
 
 		/*
@@ -805,7 +818,7 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 		if (PRIV_POLICY(cred_p, PRIV_ALL, B_FALSE, EPERM, NULL) != 0)
 			return (EPERM);
 		else
-			return (CTL_IOCTL(dadkp->dad_ctlobjp, cmd, arg, flag));
+			return (dadk_ctl_ioctl(dadkp, cmd, arg, flag));
 
 	case DKIOCFLUSHWRITECACHE:
 		{
@@ -884,6 +897,9 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 
 			CTL_IOSETUP(dadkp->dad_ctlobjp, pktp);
 
+			mutex_enter(&dadkp->dad_cmd_mutex);
+			dadkp->dad_cmd_count++;
+			mutex_exit(&dadkp->dad_cmd_mutex);
 			FLC_ENQUE(dadkp->dad_flcobjp, bp);
 
 			if (is_sync) {
@@ -894,16 +910,16 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 		}
 	default:
 		if (!dadkp->dad_rmb)
-			return (CTL_IOCTL(dadkp->dad_ctlobjp, cmd, arg, flag));
+			return (dadk_ctl_ioctl(dadkp, cmd, arg, flag));
 	}
 
 	switch (cmd) {
 	case CDROMSTOP:
 		return (dadk_rmb_ioctl(dadkp, DCMD_STOP_MOTOR, 0,
-			0, DADK_SILENT));
+		    0, DADK_SILENT));
 	case CDROMSTART:
 		return (dadk_rmb_ioctl(dadkp, DCMD_START_MOTOR, 0,
-			0, DADK_SILENT));
+		    0, DADK_SILENT));
 	case DKIOCLOCK:
 		return (dadk_rmb_ioctl(dadkp, DCMD_LOCK, 0, 0, DADK_SILENT));
 	case DKIOCUNLOCK:
@@ -914,11 +930,11 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 			int ret;
 
 			if (ret = dadk_rmb_ioctl(dadkp, DCMD_UNLOCK, 0, 0,
-				DADK_SILENT)) {
+			    DADK_SILENT)) {
 				return (ret);
 			}
 			if (ret = dadk_rmb_ioctl(dadkp, DCMD_EJECT, 0, 0,
-				DADK_SILENT)) {
+			    DADK_SILENT)) {
 				return (ret);
 			}
 			mutex_enter(&dadkp->dad_mutex);
@@ -1036,7 +1052,7 @@ dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 	iobp->b_psec  = LBLK2SEC(blkno, dadkp->dad_blkshf);
 	iobp->b_pbyteoff = (blkno & ((1<<dadkp->dad_blkshf) - 1)) << SCTRSHFT;
 	iobp->b_pbytecnt = ((iobp->b_pbyteoff + xfer + dadkp->DAD_SECSIZ - 1)
-				>> dadkp->dad_secshf) << dadkp->dad_secshf;
+	    >> dadkp->dad_secshf) << dadkp->dad_secshf;
 
 	bp->b_un.b_addr = 0;
 	/*
@@ -1107,6 +1123,9 @@ dadk_iob_xfer(opaque_t objp, struct tgdk_iob *iobp, int rw)
 	bp->b_resid = 0;
 
 	/* call flow control */
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count++;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 	FLC_ENQUE(dadkp->dad_flcobjp, bp);
 	err = biowait(bp);
 
@@ -1253,16 +1272,15 @@ dadk_ioretry(struct cmpkt *pktp, int action)
 		if (pktp->cp_retry++ < DADK_RETRY_COUNT) {
 			CTL_IOSETUP(dadkp->dad_ctlobjp, pktp);
 			if (CTL_TRANSPORT(dadkp->dad_ctlobjp, pktp) ==
-				CTL_SEND_SUCCESS) {
+			    CTL_SEND_SUCCESS) {
 				return (JUST_RETURN);
 			}
 			gda_log(dadkp->dad_sd->sd_dev, dadk_name,
-				CE_WARN,
-				"transport of command fails\n");
+			    CE_WARN, "transport of command fails\n");
 		} else
 			gda_log(dadkp->dad_sd->sd_dev,
-				dadk_name, CE_WARN,
-				"exceeds maximum number of retries\n");
+			    dadk_name, CE_WARN,
+			    "exceeds maximum number of retries\n");
 		bioerror(pktp->cp_bp, ENXIO);
 		/*FALLTHROUGH*/
 	case COMMAND_DONE_ERROR:
@@ -1378,7 +1396,7 @@ dadk_chkerr(struct cmpkt *pktp)
 
 	if (pktp->cp_retry) {
 		err_blkno = pktp->cp_srtsec + ((pktp->cp_bytexfer -
-			pktp->cp_resid) >> dadkp->dad_secshf);
+		    pktp->cp_resid) >> dadkp->dad_secshf);
 	} else
 		err_blkno = -1;
 
@@ -1468,11 +1486,10 @@ dadk_recorderr(struct cmpkt *pktp, struct dadkio_rwcmd *rwcmdp)
 
 
 	rwcmdp->status.failed_blk = rwcmdp->blkaddr +
-		((pktp->cp_bytexfer -
-		pktp->cp_resid) >> dadkp->dad_secshf);
+	    ((pktp->cp_bytexfer - pktp->cp_resid) >> dadkp->dad_secshf);
 
 	rwcmdp->status.resid = pktp->cp_bp->b_resid +
-		pktp->cp_byteleft - pktp->cp_bytexfer + pktp->cp_resid;
+	    pktp->cp_byteleft - pktp->cp_bytexfer + pktp->cp_resid;
 	switch ((int)(* (char *)pktp->cp_scbp)) {
 	case DERR_AMNF:
 	case DERR_ABORT:
@@ -1504,14 +1521,22 @@ dadk_recorderr(struct cmpkt *pktp, struct dadkio_rwcmd *rwcmdp)
 	if (rwcmdp->flags & DADKIO_FLAG_SILENT)
 		return;
 	gda_errmsg(dadkp->dad_sd, pktp, dadk_name, dadk_errtab[scb].d_severity,
-		rwcmdp->blkaddr, rwcmdp->status.failed_blk,
-		dadk_cmds, dadk_sense);
+	    rwcmdp->blkaddr, rwcmdp->status.failed_blk,
+	    dadk_cmds, dadk_sense);
 }
 
 /*ARGSUSED*/
 static void
 dadk_polldone(struct buf *bp)
 {
+	struct cmpkt *pktp;
+	struct dadk *dadkp;
+
+	pktp  = GDA_BP_PKT(bp);
+	dadkp = PKT2DADK(pktp);
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count--;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 }
 
 static void
@@ -1544,6 +1569,9 @@ dadk_iodone(struct buf *bp)
 	if (pktp->cp_private)
 		BBH_FREEHANDLE(dadkp->dad_bbhobjp, pktp->cp_private);
 	gda_free(dadkp->dad_ctlobjp, pktp, NULL);
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count--;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 	biodone(bp);
 }
 
@@ -1558,7 +1586,7 @@ dadk_check_media(opaque_t objp, int *state)
 #ifdef DADK_DEBUG
 	if (dadk_debug & DSTATE)
 		PRF("dadk_check_media: user state %x disk state %x\n",
-			*state, dadkp->dad_iostate);
+		    *state, dadkp->dad_iostate);
 #endif
 	/*
 	 * If state already changed just return
@@ -1676,7 +1704,7 @@ dadk_rmb_ioctl(struct dadk *dadkp, int cmd, intptr_t arg, int flags, int silent)
 	bp->b_forw  = (struct buf *)dadkp->dad_flcobjp;
 	pktp->cp_passthru = (opaque_t)(intptr_t)silent;
 
-	err = CTL_IOCTL(dadkp->dad_ctlobjp, cmd, (uintptr_t)pktp, flags);
+	err = dadk_ctl_ioctl(dadkp, cmd, (uintptr_t)pktp, flags);
 	freerbuf(bp);
 	gda_free(dadkp->dad_ctlobjp, pktp, NULL);
 	return (err);
@@ -1698,6 +1726,9 @@ dadk_rmb_iodone(struct buf *bp)
 	/* Start next one */
 	FLC_DEQUE(dadkp->dad_flcobjp, bp);
 
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count--;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 	biodone(bp);
 }
 
@@ -1769,5 +1800,42 @@ dadk_dk(struct dadk *dadkp, struct dadkio_rwcmd *rwcmdp, struct buf *bp)
 
 	(void) dadk_ioprep(dadkp, pktp);
 
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count++;
+	mutex_exit(&dadkp->dad_cmd_mutex);
 	FLC_ENQUE(dadkp->dad_flcobjp, bp);
+}
+
+/*
+ * There is no existing way to notify cmdk module
+ * when the command completed, so add this function
+ * to calculate how many on-going commands.
+ */
+int
+dadk_getcmds(opaque_t objp)
+{
+	struct dadk *dadkp = (struct dadk *)objp;
+	int count;
+
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	count = dadkp->dad_cmd_count;
+	mutex_exit(&dadkp->dad_cmd_mutex);
+	return (count);
+}
+
+/*
+ * this function was used to calc the cmd for CTL_IOCTL
+ */
+static int
+dadk_ctl_ioctl(struct dadk *dadkp, uint32_t cmd, uintptr_t arg, int flag)
+{
+	int error;
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count++;
+	mutex_exit(&dadkp->dad_cmd_mutex);
+	error = CTL_IOCTL(dadkp->dad_ctlobjp, cmd, arg, flag);
+	mutex_enter(&dadkp->dad_cmd_mutex);
+	dadkp->dad_cmd_count--;
+	mutex_exit(&dadkp->dad_cmd_mutex);
+	return (error);
 }

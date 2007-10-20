@@ -1491,6 +1491,17 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int chipid, rc;
 	mc_t *mc;
 
+	/*
+	 * This driver has no hardware state, but does
+	 * claim to have a reg property, so it will be
+	 * called on suspend.  It is probably better to
+	 * make sure it doesn't get called on suspend,
+	 * but it is just as easy to make sure we just
+	 * return DDI_SUCCESS if called.
+	 */
+	if (cmd == DDI_RESUME)
+		return (DDI_SUCCESS);
+
 	if (cmd != DDI_ATTACH || mc_no_attach != 0)
 		return (DDI_FAILURE);
 
@@ -1672,7 +1683,14 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 mc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	return (DDI_FAILURE);
+	/*
+	 * See the comment about suspend in
+	 * mc_attach().
+	 */
+	if (cmd == DDI_SUSPEND)
+		return (DDI_SUCCESS);
+	else
+		return (DDI_FAILURE);
 }
 
 static struct dev_ops mc_ops = {

@@ -699,6 +699,7 @@ extern int apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu);
 extern int apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type);
 extern int apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
     psm_intr_op_t intr_op, int *result);
+extern int apic_state(psm_state_request_t *);
 extern boolean_t apic_cpu_in_range(int cpu);
 extern int apic_check_msi_support();
 extern apic_irq_t *apic_find_irq(dev_info_t *dip, struct intrspec *ispec,

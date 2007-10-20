@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,9 @@ typedef struct cinfo cinfo_t;
 
 typedef void (*vact_t)(char *, size_t, cinfo_t *);
 
+/* Suspend/Resume flags */
+extern int whitelist_only;
+extern int verify;
 
 /*
  * "conf.c"
@@ -105,7 +108,6 @@ extern uid_t ruid;
 extern int def_src;
 extern void mesg(int, char *, ...);
 
-
 /*
  * "parse.c"
  */
@@ -118,6 +120,9 @@ extern void parse_conf_file(char *, vact_t);
 /*
  * handlers.c
  */
+extern int S3_helper(char *, char *, int, int, char *, char *, int *, int);
+extern int S3sup(void);
+extern int autoS3(void);
 extern int autopm(void);
 extern int autosd(void);
 extern int cpupm(void);

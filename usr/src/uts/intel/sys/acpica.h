@@ -128,6 +128,8 @@ extern ACPI_STATUS acpica_get_handle(dev_info_t *, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_eval_int(ACPI_HANDLE, char *, int *);
 extern void acpica_map_cpu(processorid_t, MADT_PROCESSOR_APIC *);
 extern void acpica_build_processor_map();
+extern void acpica_ddi_save_resources(dev_info_t *);
+extern void acpica_ddi_restore_resources(dev_info_t *);
 
 #ifdef __cplusplus
 }

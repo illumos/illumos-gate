@@ -98,6 +98,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/seg_kpm.h>
 #include <vm/hat_i86.h>
+#include <sys/callb.h>		/* CPR callback */
 
 static caddr_t	memscrub_window;
 static hat_mempte_t memscrub_pte;
@@ -252,7 +253,7 @@ compute_interval_sec()
 		return (memscrub_period_sec);
 	else
 		return (memscrub_period_sec/
-			(memscrub_phys_pages/memscrub_span_pages));
+		    (memscrub_phys_pages/memscrub_span_pages));
 }
 
 void
@@ -266,6 +267,12 @@ memscrubber()
 	struct memlist *mlp;
 
 	extern void scan_memory(caddr_t, size_t);
+	callb_cpr_t cprinfo;
+
+	/*
+	 * notify CPR of our existence
+	 */
+	CALLB_CPR_INIT(&cprinfo, &memscrub_lock, callb_generic_cpr, "memscrub");
 
 	if (memscrub_memlist == NULL) {
 		cmn_err(CE_WARN, "memscrub_memlist not initialized.");
@@ -314,6 +321,12 @@ memscrubber()
 		}
 
 		/*
+		 * it is safe from our standpoint for CPR to
+		 * suspend the system
+		 */
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+
+		/*
 		 * hit the snooze bar
 		 */
 		(void) timeout(memscrub_wakeup, NULL, interval_sec * hz);
@@ -322,6 +335,9 @@ memscrubber()
 		 * go to sleep
 		 */
 		cv_wait(&memscrub_cv, &memscrub_lock);
+
+		/* we need to goto work */
+		CALLB_CPR_SAFE_END(&cprinfo, &memscrub_lock);
 
 		mutex_exit(&memscrub_lock);
 
@@ -393,6 +409,12 @@ memscrub_exit:
 
 	if (!disable_memscrub_quietly)
 		cmn_err(CE_NOTE, "memory scrubber exiting.");
+	/*
+	 * We are about to bail, but don't have the memscrub_lock,
+	 * and it is needed for CALLB_CPR_EXIT.
+	 */
+	mutex_enter(&memscrub_lock);
+	CALLB_CPR_EXIT(&cprinfo);
 
 	cv_destroy(&memscrub_cv);
 
@@ -448,7 +470,7 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 	memscrub_printmemlist("memscrub_memlist before", memscrub_memlist);
 	cmn_err(CE_CONT, "memscrub_phys_pages: 0x%x\n", memscrub_phys_pages);
 	cmn_err(CE_CONT, "memscrub_add_span: address: 0x%llx"
-		" size: 0x%llx\n", start, bytes);
+	    " size: 0x%llx\n", start, bytes);
 #endif /* MEMSCRUB_DEBUG */
 
 	/*

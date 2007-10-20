@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,8 @@ OBJS = 		$(SRCS:%.c=%.o)
 SCRIPTS =	sysidpm.sh
 SYSIDPM = 	sysidpm
 PROG =		$(DAEMON) $(PMCFG) $(SYSIDPM)
-ETCFILES =	power.conf
+POWERCONF=	power.conf
+ETCFILES =	$(POWERCONF)
 POWERPERM =	power
 DEFAULTFILES =	power.dfl
 
@@ -58,13 +59,14 @@ POFILES=	$(PMCFG_SRCS:%.c=%.po)
 # SCCS control here.
 OPOFILES=	sysidpm.po
 
-#
-# we only need libdevinfo on sparc
+# pmconfig only needs libdevinfo on sparc
 sparc_LDEVINFO=	-ldevinfo
 i386_LDEVINFO=
 
-DAEMON_LDLIBS =	$(LDLIBS.cmd) -lkstat $($(MACH)_LDEVINFO)
-PMCFG_LDLIBS =	$(LDLIBS.cmd) $($(MACH)_LDEVINFO)
+LDEVINFO=	-ldevinfo
+
+DAEMON_LDLIBS =	$(LDLIBS.cmd) -lkstat $(LDEVINFO)
+PMCFG_LDLIBS =	$(LDLIBS.cmd) -lcmd -lsmbios -lkstat $($(MACH)_LDEVINFO)
 
 OWNER= root
 ROOTUSRSBINPMCFG= $(PMCFG:%=$(ROOTUSRSBIN)/%)
@@ -97,6 +99,8 @@ CFLAGS += $(CCVERBOSE)
 all: $(PROG) $(POWERPERM).dfl $(ETCFILES) $(SCRIPTS)
 
 install clean:
+
+$(POWERCONF): $(POWERCONF).$(MACH)
 
 $(DAEMON_OBJS): $(DAEMON_SRCS)
 	$(CC) $(CFLAGS) -D_REENTRANT $(CPPFLAGS) -o $@ -c $<
@@ -134,7 +138,7 @@ $(POFILE):	$(POFILES) $(OPOFILES)
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(OBJS) $(SYSIDPM)
+	$(RM) $(OBJS) $(SYSIDPM) $(POWERCONF)
 	$(RM) $(POFILE) $(POFILES)
 
 lint := LINTFLAGS=-auxn
@@ -144,5 +148,9 @@ lint:
 
 cstyle:
 	$(CSTYLE) $(SRCS)
+
+%:	%.$(MACH)
+	$(RM) $@
+	cat $< > $@
 
 include ../Makefile.targ

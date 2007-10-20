@@ -148,7 +148,7 @@ init_cpu_info(struct cpu *cp)
  * Configure syscall support on this CPU.
  */
 /*ARGSUSED*/
-static void
+void
 init_cpu_syscall(struct cpu *cp)
 {
 	kpreempt_disable();

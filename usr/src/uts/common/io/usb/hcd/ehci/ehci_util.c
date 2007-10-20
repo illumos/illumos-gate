@@ -54,6 +54,7 @@ extern void *ehci_statep;
 extern void ehci_handle_endpoint_reclaimation(ehci_state_t *);
 
 extern uint_t ehci_vt62x2_workaround;
+extern int force_ehci_off;
 
 /* Adjustable variables for the size of the pools */
 int ehci_qh_pool_size = EHCI_QH_POOL_SIZE;
@@ -2006,7 +2007,7 @@ ehci_cpr_suspend(ehci_state_t	*ehcip)
 	 * Stop the ehci host controller
 	 * if usb keyboard is not connected.
 	 */
-	if (ehcip->ehci_polled_kbd_count == 0) {
+	if (ehcip->ehci_polled_kbd_count == 0 || force_ehci_off != 0) {
 		Set_OpReg(ehci_command,
 		    Get_OpReg(ehci_command) & ~EHCI_CMD_HOST_CTRL_RUN);
 	}

@@ -178,6 +178,9 @@ struct cprconfig {
 
 extern int	cpr_debug;
 
+#define	errp	prom_printf
+#define	DPRINT
+
 /*
  * CPR_DEBUG1 displays the main flow of CPR. Use it to identify which
  * sub-module of CPR causes problems.
@@ -393,6 +396,7 @@ typedef struct cpr_terminator ctrm_t;
 #define	AD_CPR_TESTZ		8	/* test mode, auto-restart compress */
 #define	AD_CPR_PRINT		9	/* print out stats */
 #define	AD_CPR_NOCOMPRESS	10	/* store state file uncompressed */
+#define	AD_CPR_SUSP_DEVICES	11	/* Only suspend resume devices */
 #define	AD_CPR_DEBUG0		100	/* clear debug flag */
 #define	AD_CPR_DEBUG1		101	/* display CPR main flow via prom */
 #define	AD_CPR_DEBUG2		102	/* misc small/mid size loops */
@@ -402,6 +406,31 @@ typedef struct cpr_terminator ctrm_t;
 #define	AD_CPR_DEBUG7		107	/* debug bitmap code */
 #define	AD_CPR_DEBUG8		108
 #define	AD_CPR_DEBUG9		109	/* display stat data on console */
+
+/*
+ * Suspend to RAM test points.
+ * Probably belong above, but are placed here for now.
+ */
+/* S3 leave hardware on and return success */
+#define	AD_LOOPBACK_SUSPEND_TO_RAM_PASS	22
+
+/* S3 leave hardware on and return failure */
+#define	AD_LOOPBACK_SUSPEND_TO_RAM_FAIL	23
+
+/* S3 ignored devices that fail to suspend */
+#define	AD_FORCE_SUSPEND_TO_RAM		24
+
+/* S3 on a specified device */
+#define	AD_DEVICE_SUSPEND_TO_RAM	25
+
+
+
+/*
+ * Temporary definition of the Suspend to RAM development subcommands
+ * so that non-ON apps will work after initial integration.
+ */
+#define	DEV_SUSPEND_TO_RAM	200
+#define	DEV_CHECK_SUSPEND_TO_RAM	201
 
 /*
  * cprboot related information and definitions.
@@ -506,6 +535,8 @@ extern cpr_t cpr_state;
 #define	C_ST_SETPROPS_0			10
 #define	C_ST_DUMP_NOSPC			11
 #define	C_ST_REUSABLE			12
+#define	C_ST_NODUMP			13
+#define	C_ST_MP_PAUSED			14
 
 #define	cpr_set_substate(a)	(CPR->c_substate = (a))
 
@@ -547,18 +578,25 @@ struct cpr_walkinfo {
  */
 #define	DCF_CPR_SUSPENDED	0x1	/* device went through cpr_suspend */
 
+/*
+ * Values used to differentiate between suspend to disk and suspend to ram
+ * in cpr_suspend and cpr_resume
+ */
+
+#define	CPR_TORAM	3
+#define	CPR_TODISK	4
+
 #ifndef _ASM
 
 extern char *cpr_build_statefile_path(void);
 extern char *cpr_enumerate_promprops(char **, size_t *);
 extern char *cpr_get_statefile_prom_path(void);
-extern int cpr_clrbit(pfn_t, int);
 extern int cpr_contig_pages(vnode_t *, int);
 extern int cpr_default_setup(int);
 extern int cpr_dump(vnode_t *);
 extern int cpr_get_reusable_mode(void);
 extern int cpr_isset(pfn_t, int);
-extern int cpr_main(void);
+extern int cpr_main(int);
 extern int cpr_mp_offline(void);
 extern int cpr_mp_online(void);
 extern int cpr_nobit(pfn_t, int);
@@ -570,10 +608,10 @@ extern int cpr_read_phys_page(int, uint_t, int *);
 extern int cpr_read_terminator(int, ctrm_t *, caddr_t);
 extern int cpr_resume_devices(dev_info_t *, int);
 extern int cpr_set_properties(int);
-extern int cpr_setbit(pfn_t, int);
 extern int cpr_statefile_is_spec(void);
 extern int cpr_statefile_offset(void);
 extern int cpr_stop_kernel_threads(void);
+extern int cpr_threads_are_stopped(void);
 extern int cpr_stop_user_threads(void);
 extern int cpr_suspend_devices(dev_info_t *);
 extern int cpr_validate_definfo(int);
@@ -585,9 +623,7 @@ extern int i_cpr_dump_sensitive_kpages(vnode_t *);
 extern int i_cpr_save_sensitive_kpages(void);
 extern pgcnt_t cpr_count_kpages(int, bitfunc_t);
 extern pgcnt_t cpr_count_pages(caddr_t, size_t, int, bitfunc_t, int);
-extern pgcnt_t cpr_count_seg_pages(int, bitfunc_t);
 extern pgcnt_t cpr_count_volatile_pages(int, bitfunc_t);
-extern pgcnt_t cpr_scan_kvseg(int, bitfunc_t, struct seg *);
 extern pgcnt_t i_cpr_count_sensitive_kpages(int, bitfunc_t);
 extern pgcnt_t i_cpr_count_special_kpages(int, bitfunc_t);
 extern pgcnt_t i_cpr_count_storage_pages(int, bitfunc_t);
@@ -607,6 +643,9 @@ extern void cpr_stat_record_events(void);
 extern void cpr_tod_get(cpr_time_t *ctp);
 extern void cpr_tod_fault_reset(void);
 extern void i_cpr_bitmap_cleanup(void);
+extern void i_cpr_stop_other_cpus(void);
+extern void i_cpr_alloc_cpus(void);
+extern void i_cpr_free_cpus(void);
 
 /*PRINTFLIKE2*/
 extern void cpr_err(int, const char *, ...) __KPRINTFLIKE(2);

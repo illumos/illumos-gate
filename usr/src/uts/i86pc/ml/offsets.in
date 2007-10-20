@@ -60,6 +60,7 @@
 #include <sys/lgrp.h>
 #include <sys/dtrace.h>
 #include <sys/brand.h>
+#include <sys/cpr_wakecode.h>
 
 proc		PROCSIZE
 	p_link
@@ -387,3 +388,52 @@ brand
 
 zone
 	zone_brand_data
+
+wc_cpu	WC_CPU_SIZE
+	wc_retaddr
+	wc_virtaddr
+	wc_cr0
+	wc_cr3
+	wc_cr4
+	wc_cr8
+	wc_fs
+	wc_fsbase
+	wc_gs
+	wc_gsbase
+	wc_kgsbase
+	wc_r8
+	wc_r9
+	wc_r10
+	wc_r11
+	wc_r12
+	wc_r13
+	wc_r14
+	wc_r15
+	wc_rax
+	wc_rbp
+	wc_rbx
+	wc_rcx
+	wc_rdi
+	wc_rdx
+	wc_rsi
+	wc_rsp
+	wc_gdt_limit	WC_GDT
+	wc_gdt_base
+	wc_idt_limit	WC_IDT
+	wc_idt_base
+	wc_tr
+	wc_ldt
+	wc_eflags
+	wc_ebx
+	wc_edi
+	wc_esi
+	wc_ebp
+	wc_esp
+	wc_esp
+	wc_ss
+	wc_cs
+	wc_ds
+	wc_es
+
+wc_wakecode
+	wc_cpu

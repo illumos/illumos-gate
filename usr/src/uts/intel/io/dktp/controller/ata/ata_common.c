@@ -99,6 +99,12 @@ static	int	ata_check_revert_to_defaults(ata_drv_t *ata_drvp);
 static  void	ata_show_transfer_mode(ata_ctl_t *, ata_drv_t *);
 static	int	ata_spec_init_controller(dev_info_t *dip);
 
+static void	ata_init_pm(dev_info_t *);
+static int	ata_suspend(dev_info_t *);
+static int	ata_resume(dev_info_t *);
+static int	ata_power(dev_info_t *, int, int);
+static int	ata_change_power(dev_info_t *, uint8_t);
+static int	ata_is_pci(dev_info_t *);
 
 /*
  * Local static data
@@ -113,6 +119,21 @@ int	ata_process_intr_watchdog = 1000;
 int	ata_reset_bus_watchdog = 1000;
 
 
+/*
+ * Use local or framework power management
+ */
+
+#ifdef	ATA_USE_AUTOPM
+#define	ATA_BUSY_COMPONENT(d, c)	((void)pm_busy_component(d, c))
+#define	ATA_IDLE_COMPONENT(d, c)	((void)pm_idle_component(d, c))
+#define	ATA_RAISE_POWER(d, c, l)	pm_raise_power(d, c, l)
+#define	ATA_LOWER_POWER(d, c, l)	pm_lower_power(d, c, l)
+#else
+#define	ATA_BUSY_COMPONENT(d, c)
+#define	ATA_IDLE_COMPONENT(d, c)
+#define	ATA_RAISE_POWER(d, c, l)	ata_power(d, c, l)
+#define	ATA_LOWER_POWER(d, c, l)	ata_power(d, c, l)
+#endif
 /*
  * number of seconds to wait during various operations
  */
@@ -228,7 +249,8 @@ ata_devo_reset(
 		if ((ata_drvp->ad_flags & AD_DISK) != 0 &&
 		    ((ata_drvp->ad_flags & AD_NORVRT) == 0)) {
 			/* Enable revert to defaults when reset */
-			(void) ata_set_feature(ata_ctlp, ata_drvp, 0xCC, 0);
+			(void) ata_set_feature(ata_ctlp, ata_drvp,
+			    ATSF_ENA_REVPOD, 0);
 		}
 
 		/*
@@ -245,7 +267,7 @@ ata_devo_reset(
 			 */
 			rc = ata_flush_cache(ata_ctlp, ata_drvp);
 			ADBG_WARN(("ata_flush_cache %s\n",
-				rc ? "okay" : "failed"));
+			    rc ? "okay" : "failed"));
 
 			if (!rc)
 				flush_okay = FALSE;
@@ -297,7 +319,8 @@ static struct dev_ops	ata_ops = {
 	ata_detach,		/* detach */
 	ata_devo_reset,		/* reset */
 	&ata_cb_ops,		/* driver operations */
-	NULL			/* bus operations */
+	NULL,			/* bus operations */
+	ata_power		/* power */
 };
 
 /* driver loadable module wrapper */
@@ -419,8 +442,14 @@ ata_attach(
 		debug_enter("\nATA_ATTACH\n\n");
 #endif
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		return (ata_resume(dip));
+	default:
 		return (DDI_FAILURE);
+	}
 
 	/* initialize controller */
 	ata_ctlp = ata_init_controller(dip);
@@ -476,14 +505,14 @@ ata_attach(
 	 * confused by non-existent drives.
 	 */
 	ddi_put8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_drvhd,
-		first_drvp->ad_drive_bits);
+	    first_drvp->ad_drive_bits);
 	ata_nsecwait(400);
 
 	/*
 	 * make certain the drive selected
 	 */
 	if (!ata_wait(ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
-			0, ATS_BSY, 5000000)) {
+	    0, ATS_BSY, 5000000)) {
 		ADBG_ERROR(("ata_attach: select failed\n"));
 	}
 
@@ -525,6 +554,8 @@ ata_attach(
 	ata_ctlp->ac_flags |= AC_ATTACHED;
 	mutex_exit(&ata_ctlp->ac_ccc.ccc_hba_mutex);
 
+	ata_init_pm(dip);
+
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
 
@@ -550,8 +581,14 @@ ata_detach(
 
 	ADBG_TRACE(("ata_detach entered\n"));
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		return (ata_suspend(dip));
+	default:
 		return (DDI_FAILURE);
+	}
 
 	instance = ddi_get_instance(dip);
 	ata_ctlp = ddi_get_soft_state(ata_state, instance);
@@ -559,6 +596,17 @@ ata_detach(
 	if (!ata_ctlp)
 		return (DDI_SUCCESS);
 
+	if (ata_ctlp->ac_pm_support) {
+		ATA_BUSY_COMPONENT(dip, 0);
+		if (ata_ctlp->ac_pm_level != PM_LEVEL_D0) {
+			if (ATA_RAISE_POWER(dip, 0, PM_LEVEL_D0) !=
+			    DDI_SUCCESS) {
+				ATA_IDLE_COMPONENT(dip, 0);
+				return (DDI_FAILURE);
+			}
+		}
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "pm-components");
+	}
 	ata_ctlp->ac_flags &= ~AC_ATTACHED;
 
 	/* destroy ata module */
@@ -641,8 +689,8 @@ ata_bus_ctl(
 
 		/* These ops shouldn't be called by a target driver */
 		ADBG_ERROR(("ata_bus_ctl: %s%d: invalid op (%d) from %s%d\n",
-			ddi_driver_name(d), ddi_get_instance(d), o,
-			ddi_driver_name(r), ddi_get_instance(r)));
+		    ddi_driver_name(d), ddi_get_instance(d), o,
+		    ddi_driver_name(r), ddi_get_instance(r)));
 
 		return (DDI_FAILURE);
 
@@ -683,7 +731,7 @@ ata_bus_ctl(
 			target_type = ATA_DEV_ATAPI;
 		else {
 			ADBG_WARN(("ata_bus_ctl: invalid target class %s\n",
-				bufp));
+			    bufp));
 			ddi_prop_free(bufp);
 			return (DDI_FAILURE);
 		}
@@ -710,17 +758,17 @@ ata_bus_ctl(
 		/* get (target,lun) of child device */
 
 		targ = ddi_prop_get_int(DDI_DEV_T_ANY, tdip, DDI_PROP_DONTPASS,
-					"target", -1);
+		    "target", -1);
 		if (targ == -1) {
 			ADBG_WARN(("ata_bus_ctl: failed to get targ num\n"));
 			return (DDI_FAILURE);
 		}
 
 		lun = ddi_prop_get_int(DDI_DEV_T_ANY, tdip, DDI_PROP_DONTPASS,
-			"lun", 0);
+		    "lun", 0);
 
 		if ((targ < 0) || (targ >= ATA_MAXTARG) ||
-				(lun < 0) || (lun >= ATA_MAXLUN)) {
+		    (lun < 0) || (lun >= ATA_MAXLUN)) {
 			return (DDI_FAILURE);
 		}
 
@@ -743,7 +791,7 @@ ata_bus_ctl(
 		if (strcmp(ddi_get_name(tdip), "cmdk") == 0) {
 
 			if ((target_type == ATA_DEV_DISK) &&
-				(target_type != drive_type))
+			    (target_type != drive_type))
 				return (DDI_FAILURE);
 
 			target_type = drive_type;
@@ -757,9 +805,9 @@ ata_bus_ctl(
 				if (ndi_prop_update_string(DDI_DEV_T_NONE, tdip,
 				    "disk", disk_prop) != DDI_PROP_SUCCESS) {
 					ADBG_WARN(("ata_bus_ctl: failed to "
-						"create disk prop\n"));
+					    "create disk prop\n"));
 					return (DDI_FAILURE);
-				    }
+				}
 			}
 
 			if (ndi_prop_update_string(DDI_DEV_T_NONE, tdip,
@@ -820,7 +868,7 @@ ata_hba_complete(
 	ata_pktp = GCMD2APKT(gcmdp);
 	if (ata_pktp->ap_complete)
 		(*ata_pktp->ap_complete)(ata_drvp, ata_pktp,
-			do_callback);
+		    do_callback);
 }
 
 /* GHD ccc_timeout_func callback */
@@ -919,7 +967,7 @@ ata_init_controller(
 
 	if (ata_ctlp == NULL) {
 		ADBG_WARN(("ata_init_controller: failed to find "
-				"controller struct\n"));
+		    "controller struct\n"));
 		return (NULL);
 	}
 
@@ -933,14 +981,14 @@ ata_init_controller(
 	 * map the device registers
 	 */
 	if (!ata_setup_ioaddr(dip, &ata_ctlp->ac_iohandle1, &ioaddr1,
-			&ata_ctlp->ac_iohandle2, &ioaddr2,
-			&ata_ctlp->ac_bmhandle, &ata_ctlp->ac_bmaddr)) {
+	    &ata_ctlp->ac_iohandle2, &ioaddr2,
+	    &ata_ctlp->ac_bmhandle, &ata_ctlp->ac_bmaddr)) {
 		(void) ata_detach(dip, DDI_DETACH);
 		return (NULL);
 	}
 
 	ADBG_INIT(("ata_init_controller: ioaddr1 = 0x%p, ioaddr2 = 0x%p\n",
-			ioaddr1, ioaddr2));
+	    ioaddr1, ioaddr2));
 
 	/*
 	 * Do ARQ setup
@@ -980,12 +1028,12 @@ ata_init_controller(
 	 * drop after a resume.
 	 */
 	ata_ctlp->ac_timing_flags = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dip, DDI_PROP_DONTPASS, "timing_flags", 0);
+	    dip, DDI_PROP_DONTPASS, "timing_flags", 0);
 	/*
 	 * get max transfer size, default to 256 sectors
 	 */
 	ata_ctlp->ac_max_transfer = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dip, DDI_PROP_DONTPASS, "max_transfer", 0x100);
+	    dip, DDI_PROP_DONTPASS, "max_transfer", 0x100);
 	if (ata_ctlp->ac_max_transfer < 1)
 		ata_ctlp->ac_max_transfer = 1;
 	if (ata_ctlp->ac_max_transfer > 0x100)
@@ -995,7 +1043,7 @@ ata_init_controller(
 	 * Get the standby timer value
 	 */
 	ata_ctlp->ac_standby_time = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dip, DDI_PROP_DONTPASS, "standby", -1);
+	    dip, DDI_PROP_DONTPASS, "standby", -1);
 
 	/*
 	 * If this is a /pci/pci-ide instance check to see if
@@ -1011,9 +1059,9 @@ ata_init_controller(
 			return (NULL);
 		}
 		(void) sprintf(prop_buf, "SUNW-ata-%04x-isa",
-			addr1);
+		    addr1);
 		if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(),
-				    DDI_PROP_DONTPASS, prop_buf)) {
+		    DDI_PROP_DONTPASS, prop_buf)) {
 			(void) ata_detach(dip, DDI_DETACH);
 			return (NULL);
 		}
@@ -1029,11 +1077,11 @@ ata_init_controller(
 	GHD_WAITQ_INIT(&ata_ctlp->ac_ccc.ccc_waitq, NULL, 1);
 
 	if (!ghd_register("ata", &ata_ctlp->ac_ccc, dip, 0, ata_ctlp,
-			atapi_ccballoc, atapi_ccbfree,
-			ata_pciide_dma_sg_func, ata_hba_start,
-			ata_hba_complete, ata_intr,
-			ata_get_status, ata_process_intr, ata_timeout_func,
-			&ata_timer_conf, NULL)) {
+	    atapi_ccballoc, atapi_ccbfree,
+	    ata_pciide_dma_sg_func, ata_hba_start,
+	    ata_hba_complete, ata_intr,
+	    ata_get_status, ata_process_intr, ata_timeout_func,
+	    &ata_timer_conf, NULL)) {
 		(void) ata_detach(dip, DDI_DETACH);
 		return (NULL);
 	}
@@ -1094,7 +1142,7 @@ ata_init_drive(
 	int	valid_version = 0;
 
 	ADBG_TRACE(("ata_init_drive entered, targ = %d, lun = %d\n",
-		    targ, lun));
+	    targ, lun));
 
 	/* check if device already exists */
 
@@ -1114,7 +1162,7 @@ ata_init_drive(
 	ata_drvp->ad_ctlp = ata_ctlp;
 	ata_drvp->ad_targ = targ;
 	ata_drvp->ad_drive_bits =
-		(ata_drvp->ad_targ == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1);
+	    (ata_drvp->ad_targ == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1);
 	/*
 	 * Add the LUN for SFF-8070i support
 	 */
@@ -1127,11 +1175,11 @@ ata_init_drive(
 	 */
 
 	drive_type = ata_drive_type(ata_drvp->ad_drive_bits,
-				    ata_ctlp->ac_iohandle1,
-				    ata_ctlp->ac_ioaddr1,
-				    ata_ctlp->ac_iohandle2,
-				    ata_ctlp->ac_ioaddr2,
-				    aidp);
+	    ata_ctlp->ac_iohandle1,
+	    ata_ctlp->ac_ioaddr1,
+	    ata_ctlp->ac_iohandle2,
+	    ata_ctlp->ac_ioaddr2,
+	    aidp);
 
 	switch (drive_type) {
 	case ATA_DEV_NONE:
@@ -1150,11 +1198,11 @@ ata_init_drive(
 	 */
 	if (!ata_strncmp(nec_260, aidp->ai_model, sizeof (aidp->ai_model))) {
 		swab(aidp->ai_drvser, aidp->ai_drvser,
-			sizeof (aidp->ai_drvser));
+		    sizeof (aidp->ai_drvser));
 		swab(aidp->ai_fw, aidp->ai_fw,
-			sizeof (aidp->ai_fw));
+		    sizeof (aidp->ai_fw));
 		swab(aidp->ai_model, aidp->ai_model,
-			sizeof (aidp->ai_model));
+		    sizeof (aidp->ai_model));
 	}
 
 	/*
@@ -1177,8 +1225,8 @@ ata_init_drive(
 		buf[i] = '\0';
 
 	ATAPRT(("?\t%s device at targ %d, lun %d lastlun 0x%x\n",
-		(ATAPIDRV(ata_drvp) ? "ATAPI":"IDE"),
-		ata_drvp->ad_targ, ata_drvp->ad_lun, aidp->ai_lastlun));
+	    (ATAPIDRV(ata_drvp) ? "ATAPI":"IDE"),
+	    ata_drvp->ad_targ, ata_drvp->ad_lun, aidp->ai_lastlun));
 
 	ATAPRT(("?\tmodel %s\n", buf));
 
@@ -1191,21 +1239,21 @@ ata_init_drive(
 		}
 		ATAPRT((
 		    "?\tATA/ATAPI-%d supported, majver 0x%x minver 0x%x\n",
-			valid_version,
-			aidp->ai_majorversion,
-			aidp->ai_minorversion));
+		    valid_version,
+		    aidp->ai_majorversion,
+		    aidp->ai_minorversion));
 	}
 
 	if (ata_capability_data) {
 
 		ATAPRT(("?\t\tstat %x, err %x\n",
-			ddi_get8(ata_ctlp->ac_iohandle2,
-				ata_ctlp->ac_altstatus),
-			ddi_get8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_error)));
+		    ddi_get8(ata_ctlp->ac_iohandle2,
+		    ata_ctlp->ac_altstatus),
+		    ddi_get8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_error)));
 
 		ATAPRT(("?\t\tcfg 0x%x, cap 0x%x\n",
-			aidp->ai_config,
-			aidp->ai_cap));
+		    aidp->ai_config,
+		    aidp->ai_cap));
 
 		/*
 		 * Be aware that ATA-6 and later drives may not provide valid
@@ -1220,34 +1268,34 @@ ata_init_drive(
 			 * Supported version less then ATA-6
 			 */
 			ATAPRT(("?\t\tcyl %d, hd %d, sec/trk %d\n",
-				aidp->ai_fixcyls,
-				aidp->ai_heads,
-				aidp->ai_sectors));
+			    aidp->ai_fixcyls,
+			    aidp->ai_heads,
+			    aidp->ai_sectors));
 		}
 		ATAPRT(("?\t\tmult1 0x%x, mult2 0x%x\n",
-			aidp->ai_mult1,
-			aidp->ai_mult2));
+		    aidp->ai_mult1,
+		    aidp->ai_mult2));
 		if (valid_version && aidp->ai_majorversion < ATAC_MAJVER_4) {
 			ATAPRT((
 			"?\t\tpiomode 0x%x, dmamode 0x%x, advpiomode 0x%x\n",
-				aidp->ai_piomode,
-				aidp->ai_dmamode,
-				aidp->ai_advpiomode));
+			    aidp->ai_piomode,
+			    aidp->ai_dmamode,
+			    aidp->ai_advpiomode));
 		} else {
 			ATAPRT(("?\t\tadvpiomode 0x%x\n",
-				aidp->ai_advpiomode));
+			    aidp->ai_advpiomode));
 		}
 		ATAPRT(("?\t\tminpio %d, minpioflow %d\n",
-			aidp->ai_minpio,
-			aidp->ai_minpioflow));
+		    aidp->ai_minpio,
+		    aidp->ai_minpioflow));
 		if (valid_version && aidp->ai_majorversion >= ATAC_MAJVER_4 &&
 		    (aidp->ai_validinfo & ATAC_VALIDINFO_83)) {
 			ATAPRT(("?\t\tdwdma 0x%x, ultradma 0x%x\n",
-				aidp->ai_dworddma,
-				aidp->ai_ultradma));
+			    aidp->ai_dworddma,
+			    aidp->ai_ultradma));
 		} else {
 			ATAPRT(("?\t\tdwdma 0x%x\n",
-				aidp->ai_dworddma));
+			    aidp->ai_dworddma));
 		}
 	}
 
@@ -1268,7 +1316,7 @@ ata_init_drive(
 	 * lock the drive's current settings in case I have to
 	 * reset the drive due to some sort of error
 	 */
-	(void) ata_set_feature(ata_ctlp, ata_drvp, 0x66, 0);
+	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
 
 	return (ata_drvp);
 
@@ -1299,14 +1347,14 @@ ata_uninit_drive(
 	 * Select the correct drive
 	 */
 	ddi_put8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_drvhd,
-		ata_drvp->ad_drive_bits);
+	    ata_drvp->ad_drive_bits);
 	ata_nsecwait(400);
 
 	/*
 	 * Disable interrupts from the drive
 	 */
 	ddi_put8(ata_ctlp->ac_iohandle2, ata_ctlp->ac_devctl,
-		(ATDC_D3 | ATDC_NIEN));
+	    (ATDC_D3 | ATDC_NIEN));
 #endif
 
 	/* interface specific clean-ups */
@@ -1352,7 +1400,7 @@ ata_drive_type(
 	 * make certain the drive is selected, and wait for not busy
 	 */
 	(void) ata_wait3(io_hdl2, ioaddr2, 0, ATS_BSY, 0x7f, 0, 0x7f, 0,
-		5 * 1000000);
+	    5 * 1000000);
 
 	status = ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS);
 
@@ -1481,12 +1529,12 @@ ata_wait3(
 		 * check for error conditions
 		 */
 		if ((val & failure_onbits2) == failure_onbits2 &&
-				(val & failure_offbits2) == 0) {
+		    (val & failure_offbits2) == 0) {
 			return (FALSE);
 		}
 
 		if ((val & failure_onbits3) == failure_onbits3 &&
-				(val & failure_offbits3) == 0) {
+		    (val & failure_offbits3) == 0) {
 			return (FALSE);
 		}
 
@@ -1564,7 +1612,7 @@ ata_id_common(
 	 * make sure we give them enough time to respond.
 	 */
 	(void) ata_wait3(io_hdl2, ioaddr2, 0, ATS_BSY,
-			ATS_ERR, ATS_BSY, 0x7f, 0, 5 * 1000000);
+	    ATS_ERR, ATS_BSY, 0x7f, 0, 5 * 1000000);
 
 	/*
 	 * read the status byte and clear the pending interrupt
@@ -1581,8 +1629,8 @@ ata_id_common(
 
 	if (status & ATS_BSY) {
 		ADBG_ERROR(("ata_id_common: BUSY status 0x%x error 0x%x\n",
-			ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
-			ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
+		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
+		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
 		return (FALSE);
 	}
 
@@ -1596,8 +1644,8 @@ ata_id_common(
 		 */
 		if (!ata_wait(io_hdl2, ioaddr2, ATS_DRQ, ATS_BSY, 1000000)) {
 		ADBG_WARN(("ata_id_common: !DRQ status 0x%x error 0x%x\n",
-			ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
-			ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
+		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 +AT_ALTSTATUS),
+		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
 		return (FALSE);
 		}
 	}
@@ -1606,7 +1654,7 @@ ata_id_common(
 	 * transfer the data
 	 */
 	ddi_rep_get16(io_hdl1, (ushort_t *)aidp, (ushort_t *)ioaddr1 + AT_DATA,
-		NBPSCTR >> 1, DDI_DEV_NO_AUTOINCR);
+	    NBPSCTR >> 1, DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
 	ata_nsecwait(400);
@@ -1624,10 +1672,10 @@ ata_id_common(
 	 *
 	 */
 	if (!ata_wait(io_hdl2, ioaddr2, (uchar_t)(expect_drdy ? ATS_DRDY : 0),
-					(ATS_BSY | ATS_DRQ), 1000000)) {
+	    (ATS_BSY | ATS_DRQ), 1000000)) {
 		ADBG_WARN(("ata_id_common: bad status 0x%x error 0x%x\n",
-			ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS),
-			ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
+		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS),
+		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
 		return (FALSE);
 	}
 
@@ -1639,8 +1687,8 @@ ata_id_common(
 	 */
 	if (status & (ATS_DF | ATS_ERR)) {
 		ADBG_WARN(("ata_id_common: status 0x%x error 0x%x \n",
-			ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS),
-			ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
+		    ddi_get8(io_hdl2, (uchar_t *)ioaddr2 + AT_ALTSTATUS),
+		    ddi_get8(io_hdl1, (uchar_t *)ioaddr1 + AT_ERROR)));
 		return (FALSE);
 	}
 	return (TRUE);
@@ -1677,13 +1725,13 @@ ata_command(
 
 	/* make certain the drive selected */
 	if (!ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2,
-			(uchar_t)(expect_drdy ? ATS_DRDY : 0),
-			ATS_BSY, busy_wait)) {
+	    (uchar_t)(expect_drdy ? ATS_DRDY : 0),
+	    ATS_BSY, busy_wait)) {
 		ADBG_ERROR(("ata_command: select failed "
-			    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
-			    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
-			    expect_drdy, cmd, feature, count,
-			    sector, head, cyl_low, cyl_hi));
+		    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
+		    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
+		    expect_drdy, cmd, feature, count,
+		    sector, head, cyl_low, cyl_hi));
 		return (FALSE);
 	}
 
@@ -1706,10 +1754,10 @@ ata_command(
 	/* wait for not busy */
 	if (!ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2, 0, ATS_BSY, busy_wait)) {
 		ADBG_ERROR(("ata_command: BSY too long!"
-			    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
-			    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
-			    expect_drdy, cmd, feature, count,
-			    sector, head, cyl_low, cyl_hi));
+		    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
+		    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
+		    expect_drdy, cmd, feature, count,
+		    sector, head, cyl_low, cyl_hi));
 		return (FALSE);
 	}
 
@@ -1717,10 +1765,10 @@ ata_command(
 	 * wait for DRDY before continuing
 	 */
 	(void) ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2,
-			ATS_DRDY, ATS_BSY, /* okay */
-			ATS_ERR, ATS_BSY, /* cmd failed */
-			ATS_DF, ATS_BSY, /* drive failed */
-			busy_wait);
+	    ATS_DRDY, ATS_BSY, /* okay */
+	    ATS_ERR, ATS_BSY, /* cmd failed */
+	    ATS_DF, ATS_BSY, /* drive failed */
+	    busy_wait);
 
 	/* read status to clear IRQ, and check for error */
 	status =  ddi_get8(io_hdl1, ata_ctlp->ac_status);
@@ -1730,12 +1778,12 @@ ata_command(
 
 	if (!silent) {
 		ADBG_ERROR(("ata_command status 0x%x error 0x%x "
-			    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
-			    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
-			    ddi_get8(io_hdl1, ata_ctlp->ac_status),
-			    ddi_get8(io_hdl1, ata_ctlp->ac_error),
-			    expect_drdy, cmd, feature, count,
-			    sector, head, cyl_low, cyl_hi));
+		    "DRDY 0x%x CMD 0x%x F 0x%x N 0x%x  "
+		    "S 0x%x H 0x%x CL 0x%x CH 0x%x\n",
+		    ddi_get8(io_hdl1, ata_ctlp->ac_status),
+		    ddi_get8(io_hdl1, ata_ctlp->ac_error),
+		    expect_drdy, cmd, feature, count,
+		    sector, head, cyl_low, cyl_hi));
 	}
 	return (FALSE);
 }
@@ -1758,8 +1806,8 @@ ata_set_feature(
 	int		 rc;
 
 	rc = ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, ata_set_feature_wait,
-		ATC_SET_FEAT, feature, value, 0, 0, 0, 0);
-		/* feature, count, sector, head, cyl_low, cyl_hi */
+	    ATC_SET_FEAT, feature, value, 0, 0, 0, 0);
+	/* feature, count, sector, head, cyl_low, cyl_hi */
 
 	if (rc) {
 		return (TRUE);
@@ -1784,8 +1832,8 @@ ata_flush_cache(
 {
 	/* this command is optional so fail silently */
 	return (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE,
-			    ata_flush_cache_wait,
-			    ATC_FLUSH_CACHE, 0, 0, 0, 0, 0, 0));
+	    ata_flush_cache_wait,
+	    ATC_FLUSH_CACHE, 0, 0, 0, 0, 0, 0));
 }
 
 /*
@@ -1812,7 +1860,6 @@ ata_setup_ioaddr(
 	caddr_t		 *bm_addrp)
 {
 	ddi_device_acc_attr_t dev_attr;
-	char	*bufp;
 	int	 rnumber;
 	int	 rc;
 	off_t	 regsize;
@@ -1824,14 +1871,14 @@ ata_setup_ioaddr(
 	rc = ddi_dev_regsize(dip, 0, &regsize);
 	if (rc != DDI_SUCCESS || regsize <= AT_CMD) {
 		ADBG_INIT(("ata_setup_ioaddr(1): rc %d regsize %lld\n",
-			    rc, (long long)regsize));
+		    rc, (long long)regsize));
 		return (FALSE);
 	}
 
 	rc = ddi_dev_regsize(dip, 1, &regsize);
 	if (rc != DDI_SUCCESS || regsize <= AT_ALTSTATUS) {
 		ADBG_INIT(("ata_setup_ioaddr(2): rc %d regsize %lld\n",
-			    rc, (long long)regsize));
+		    rc, (long long)regsize));
 		return (FALSE);
 	}
 
@@ -1859,24 +1906,15 @@ ata_setup_ioaddr(
 	/* else, it's ISA or PCI-IDE, check further */
 	rnumber = 0;
 
-	rc = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				    DDI_PROP_DONTPASS, "device_type", &bufp);
-	if (rc != DDI_PROP_SUCCESS) {
-		ADBG_ERROR(("ata_setup_ioaddr !device_type\n"));
-		goto not_pciide;
-	}
-
-	if (strcmp(bufp, "pci-ide") != 0) {
+	if (!ata_is_pci(dip)) {
 		/*
 		 * If it's not a PCI-IDE, there are only two reg tuples
 		 * and the first one contains the I/O base (170 or 1f0)
 		 * rather than the controller instance number.
 		 */
 		ADBG_TRACE(("ata_setup_ioaddr !pci-ide\n"));
-		ddi_prop_free(bufp);
 		goto not_pciide;
 	}
-	ddi_prop_free(bufp);
 
 
 	/*
@@ -1889,7 +1927,7 @@ ata_setup_ioaddr(
 	rc = ddi_dev_regsize(dip, 2, &regsize);
 	if (rc != DDI_SUCCESS || regsize < 8) {
 		ADBG_INIT(("ata_setup_ioaddr(3): rc %d regsize %lld\n",
-			    rc, (long long)regsize));
+		    rc, (long long)regsize));
 		goto not_pciide;
 	}
 
@@ -1898,7 +1936,7 @@ ata_setup_ioaddr(
 	if (rc != DDI_SUCCESS) {
 		/* map failed, try to use in non-pci-ide mode */
 		ADBG_WARN(("ata_setup_ioaddr bus master map failed, rc=0x%x\n",
-			rc));
+		    rc));
 		*bm_hdlp = NULL;
 	}
 
@@ -1908,7 +1946,7 @@ not_pciide:
 	 */
 
 	rc = ddi_regs_map_setup(dip, rnumber, addr1p, 0, 0, &dev_attr,
-				handle1p);
+	    handle1p);
 
 	if (rc != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "ata: reg tuple 0 map failed, rc=0x%x\n", rc);
@@ -1930,7 +1968,7 @@ not_pciide:
 	 * map the upper control block registers
 	 */
 	rc = ddi_regs_map_setup(dip, rnumber + 1, addr2p, 0, 0, &dev_attr,
-				handle2p);
+	    handle2p);
 	if (rc == DDI_SUCCESS)
 		return (TRUE);
 
@@ -2010,7 +2048,7 @@ ata_init_pciide(
 	if (ata_check_pciide_blacklist(dip, ATA_BL_NODMA)) {
 		ata_ctlp->ac_pciide_bm = FALSE;
 		ata_cntrl_DMA_sel_msg =
-			"cntrl blacklisted/DMA engine broken";
+		    "cntrl blacklisted/DMA engine broken";
 		return;
 	}
 
@@ -2023,11 +2061,11 @@ ata_init_pciide(
 	 */
 
 	class_code = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-		DDI_PROP_DONTPASS, "class-code", 0);
+	    DDI_PROP_DONTPASS, "class-code", 0);
 	if ((class_code & PCIIDE_BM_CAP_MASK) != PCIIDE_BM_CAP_MASK) {
 		ata_ctlp->ac_pciide_bm = FALSE;
 		ata_cntrl_DMA_sel_msg =
-			"cntrl not Bus Master DMA capable";
+		    "cntrl not Bus Master DMA capable";
 		return;
 	}
 
@@ -2036,7 +2074,7 @@ ata_init_pciide(
 	 * between channels
 	 */
 	status = ddi_get8(ata_ctlp->ac_bmhandle,
-			(uchar_t *)ata_ctlp->ac_bmaddr + PCIIDE_BMISX_REG);
+	    (uchar_t *)ata_ctlp->ac_bmaddr + PCIIDE_BMISX_REG);
 	/*
 	 * Some motherboards have CSB5's that are wired "to emulate CSB4 mode".
 	 * In such a mode, the simplex bit is asserted,  but in fact testing
@@ -2138,7 +2176,7 @@ ata_init_drive_pcidma(
 	}
 
 	ata_options = ddi_prop_get_int(DDI_DEV_T_ANY, ata_ctlp->ac_dip,
-			0, "ata-options", 0);
+	    0, "ata-options", 0);
 
 	if (!(ata_options & ATA_OPTIONS_DMA)) {
 		/*
@@ -2146,7 +2184,7 @@ ata_init_drive_pcidma(
 		 * DMA is not enabled by this property
 		 */
 		ata_dev_DMA_sel_msg =
-			"disabled by \"ata-options\" property";
+		    "disabled by \"ata-options\" property";
 
 		return (ATA_DMA_OFF);
 	}
@@ -2178,13 +2216,13 @@ ata_init_drive_pcidma(
 	}
 
 	dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
-		0, "ata-dma-enabled", TRUE);
+	    0, "ata-dma-enabled", TRUE);
 	disk_dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
-		0, "ata-disk-dma-enabled", TRUE);
+	    0, "ata-disk-dma-enabled", TRUE);
 	cd_dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
-		0, "atapi-cd-dma-enabled", FALSE);
+	    0, "atapi-cd-dma-enabled", FALSE);
 	atapi_dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
-		0, "atapi-other-dma-enabled", TRUE);
+	    0, "atapi-other-dma-enabled", TRUE);
 
 	if (dma == FALSE) {
 		cmn_err(CE_CONT, "?ata_init_drive_pcidma: "
@@ -2288,7 +2326,7 @@ ata_prop_create(
 
 	if (strcmp("atapi", name) == 0) {
 		rc =  ndi_prop_update_string(DDI_DEV_T_NONE, tgt_dip,
-			"variant", name);
+		    "variant", name);
 		if (rc != DDI_PROP_SUCCESS)
 			return (FALSE);
 	}
@@ -2297,7 +2335,7 @@ ata_prop_create(
 		return (TRUE);
 
 	rc =  ndi_prop_update_byte_array(DDI_DEV_T_NONE, tgt_dip, name,
-		(uchar_t *)&ata_drvp->ad_id, sizeof (ata_drvp->ad_id));
+	    (uchar_t *)&ata_drvp->ad_id, sizeof (ata_drvp->ad_id));
 	if (rc != DDI_PROP_SUCCESS) {
 		ADBG_ERROR(("ata_prop_create failed, rc=%d\n", rc));
 	}
@@ -2469,7 +2507,7 @@ ata_ctlr_fsm(
 	 * Start ARQ pkt if necessary
 	 */
 	if ((ata_pktp->ap_flags & AP_ARQ_NEEDED) == AP_ARQ_NEEDED &&
-			(ata_pktp->ap_status & ATS_ERR)) {
+	    (ata_pktp->ap_status & ATS_ERR)) {
 
 		/* set controller state back to active */
 		ata_ctlp->ac_state = current_state;
@@ -2552,7 +2590,7 @@ ata_start_arq(
 	arq_pktp->ap_resid = senselen;
 	arq_pktp->ap_flags = AP_ATAPI | AP_READ;
 	arq_pktp->ap_cdb_pad =
-	((unsigned)(ata_drvp->ad_cdb_len - arq_pktp->ap_cdb_len)) >> 1;
+	    ((unsigned)(ata_drvp->ad_cdb_len - arq_pktp->ap_cdb_len)) >> 1;
 
 	bytes = min(senselen, ATAPI_MAX_BYTES_PER_DRQ);
 	arq_pktp->ap_hicyl = (uchar_t)(bytes >> 8);
@@ -2591,7 +2629,7 @@ ata_reset_bus(
 	fsm_func = ATA_FSM_RESET;
 	for (watchdog = ata_reset_bus_watchdog; watchdog > 0; watchdog--) {
 		switch (ata_ctlr_fsm(fsm_func, ata_ctlp, NULL, NULL,
-						&DoneFlg)) {
+		    &DoneFlg)) {
 		case ATA_FSM_RC_OKAY:
 			rc = TRUE;
 			goto fsm_done;
@@ -2737,7 +2775,7 @@ wait_for_not_busy:
 	 */
 	usecs_left = (deadline - gethrtime()) / 1000;
 	(void) ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2, 0, ATS_BSY,
-		ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, usecs_left);
+	    ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, usecs_left);
 
 	return (TRUE);
 }
@@ -2987,7 +3025,7 @@ ata_hba_start(
 	request_started = FALSE;
 	for (watchdog = ata_hba_start_watchdog; watchdog > 0; watchdog--) {
 		switch (ata_ctlr_fsm(fsm_func, ata_ctlp, ata_drvp, ata_pktp,
-				NULL)) {
+		    NULL)) {
 		case ATA_FSM_RC_OKAY:
 			request_started = TRUE;
 			goto fsm_done;
@@ -3037,15 +3075,15 @@ ata_check_pciide_blacklist(
 
 
 	vendorid = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				    DDI_PROP_DONTPASS, "vendor-id", 0);
+	    DDI_PROP_DONTPASS, "vendor-id", 0);
 	deviceid = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				    DDI_PROP_DONTPASS, "device-id", 0);
+	    DDI_PROP_DONTPASS, "device-id", 0);
 
 	/*
 	 * first check for a match in the "pci-ide-blacklist" property
 	 */
 	rc = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0,
-		"pci-ide-blacklist", &propp, &count);
+	    "pci-ide-blacklist", &propp, &count);
 
 	if (rc == DDI_PROP_SUCCESS) {
 		count = (count * sizeof (uint_t)) / sizeof (pcibl_t);
@@ -3053,12 +3091,12 @@ ata_check_pciide_blacklist(
 		while (count--) {
 			/* check for matching ID */
 			if ((vendorid & blp->b_vmask)
-					!= (blp->b_vendorid & blp->b_vmask)) {
+			    != (blp->b_vendorid & blp->b_vmask)) {
 				blp++;
 				continue;
 			}
 			if ((deviceid & blp->b_dmask)
-					!= (blp->b_deviceid & blp->b_dmask)) {
+			    != (blp->b_deviceid & blp->b_dmask)) {
 				blp++;
 				continue;
 			}
@@ -3099,7 +3137,7 @@ ata_check_drive_blacklist(
 
 	for (blp = ata_drive_blacklist; blp->b_model; blp++) {
 		if (!ata_strncmp(blp->b_model, aidp->ai_model,
-				sizeof (aidp->ai_model)))
+		    sizeof (aidp->ai_model)))
 			continue;
 		if (blp->b_flags & flags)
 			return (TRUE);
@@ -3152,7 +3190,7 @@ ata_queue_cmd(
 	 * ap_start function is called.
 	 */
 	rc = ghd_transport(&ata_ctlp->ac_ccc, gcmdp, gcmdp->cmd_gtgtp,
-		0, TRUE, NULL);
+	    0, TRUE, NULL);
 
 	if (rc != TRAN_ACCEPT) {
 		/* this should never, ever happen */
@@ -3230,7 +3268,7 @@ ata_check_revert_to_defaults(
 
 	/* look for a disk-specific "revert" property" */
 	propval = ddi_getprop(DDI_DEV_T_ANY, ata_ctlp->ac_dip,
-		DDI_PROP_DONTPASS, prop_buf, -1);
+	    DDI_PROP_DONTPASS, prop_buf, -1);
 	if (propval == 0)
 		return (FALSE);
 	else if (propval != -1)
@@ -3238,7 +3276,7 @@ ata_check_revert_to_defaults(
 
 	/* look for a global "revert" property" */
 	propval = ddi_getprop(DDI_DEV_T_ANY, ata_ctlp->ac_dip,
-		0, ATA_REVERT_PROP_GLOBAL, -1);
+	    0, ATA_REVERT_PROP_GLOBAL, -1);
 	if (propval == 0)
 		return (FALSE);
 	else if (propval != -1)
@@ -3262,7 +3300,7 @@ ata_show_transfer_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 		}
 		ATAPRT(("?\tPIO mode %d selected\n",
 		    (ata_drvp->ad_id.ai_advpiomode & ATAC_ADVPIO_4_SUP) ==
-			ATAC_ADVPIO_4_SUP ? 4 : 3));
+		    ATAC_ADVPIO_4_SUP ? 4 : 3));
 	} else {
 		/* Using DMA */
 		if (ata_drvp->ad_id.ai_dworddma & ATAC_MDMA_SEL_MASK) {
@@ -3271,10 +3309,10 @@ ata_show_transfer_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 			 * selected, not both.
 			 */
 			ATAPRT(("?\tMultiwordDMA mode %d selected\n",
-			(ata_drvp->ad_id.ai_dworddma & ATAC_MDMA_2_SEL) ==
+			    (ata_drvp->ad_id.ai_dworddma & ATAC_MDMA_2_SEL) ==
 			    ATAC_MDMA_2_SEL ? 2 :
 			    (ata_drvp->ad_id.ai_dworddma & ATAC_MDMA_1_SEL) ==
-				ATAC_MDMA_1_SEL ? 1 : 0));
+			    ATAC_MDMA_1_SEL ? 1 : 0));
 		} else {
 			for (i = 0; i <= 6; i++) {
 				if (ata_drvp->ad_id.ai_ultradma &
@@ -3330,9 +3368,9 @@ ata_spec_init_controller(dev_info_t *dip)
 	struct ata_ctl_spec	*ctlsp;
 
 	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				    DDI_PROP_DONTPASS, "vendor-id", 0);
+	    DDI_PROP_DONTPASS, "vendor-id", 0);
 	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				    DDI_PROP_DONTPASS, "device-id", 0);
+	    DDI_PROP_DONTPASS, "device-id", 0);
 
 	/* Locate controller specific ops, if they exist */
 	ctlsp = ata_cntrls_spec;
@@ -3375,7 +3413,7 @@ ata_prop_lookup_int(dev_t match_dev, dev_info_t *dip,
 	int proprc;
 
 	proprc = ddi_prop_lookup_string(match_dev, dip,
-		flags, name, &bufp);
+	    flags, name, &bufp);
 
 	if (proprc == DDI_PROP_SUCCESS) {
 		cp = bufp;
@@ -3389,4 +3427,288 @@ ata_prop_lookup_int(dev_t match_dev, dev_info_t *dip,
 	}
 
 	return (rc);
+}
+
+/*
+ * Initialize the power management components
+ */
+static void
+ata_init_pm(dev_info_t *dip)
+{
+	char		pmc_name[16];
+	char		*pmc[] = {
+				NULL,
+				"0=Sleep (PCI D3 State)",
+				"3=PowerOn (PCI D0 State)",
+				NULL
+			};
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+
+
+	instance = ddi_get_instance(dip);
+	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+	ata_ctlp->ac_pm_support = 0;
+
+	/* check PCI capabilities */
+	if (!ata_is_pci(dip))
+		return;
+
+	(void) sprintf(pmc_name, "NAME=ata%d", instance);
+	pmc[0] = pmc_name;
+
+#ifdef	ATA_USE_AUTOPM
+	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+	    "pm-components", pmc, 3) != DDI_PROP_SUCCESS) {
+		return;
+	}
+#endif
+
+	ata_ctlp->ac_pm_support = 1;
+	ata_ctlp->ac_pm_level = PM_LEVEL_D0;
+
+	ATA_BUSY_COMPONENT(dip, 0);
+	if (ATA_RAISE_POWER(dip, 0, PM_LEVEL_D0) != DDI_SUCCESS) {
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "pm-components");
+	}
+	ATA_IDLE_COMPONENT(dip, 0);
+}
+
+/*
+ * resume the hard drive
+ */
+static void
+ata_resume_drive(ata_drv_t *ata_drvp)
+{
+	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
+	int drive_type;
+	struct ata_id id;
+	uint8_t udma;
+
+	ADBG_TRACE(("ata_resume_drive entered\n"));
+
+	drive_type = ata_drive_type(ata_drvp->ad_drive_bits,
+	    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
+	    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
+	    &id);
+	if (drive_type == ATA_DEV_NONE)
+		return;
+
+	/* Reset Ultra DMA mode */
+	udma = ATACM_UDMA_SEL(&ata_drvp->ad_id);
+	if (udma != 0) {
+		uint8_t mode;
+		for (mode = 0; mode < 8; mode++)
+			if (((1 << mode) & udma) != 0)
+				break;
+		ASSERT(mode != 8);
+
+		mode |= ATF_XFRMOD_UDMA;
+
+		if (!ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD, mode))
+			return;
+	}
+
+	if (!ATAPIDRV(ata_drvp)) {
+		if (!ata_disk_setup_parms(ata_ctlp, ata_drvp))
+			return;
+		(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
+	}
+}
+
+/*
+ * resume routine, it will be run when get the command
+ * DDI_RESUME at attach(9E) from system power management
+ */
+static int
+ata_resume(dev_info_t *dip)
+{
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+	ddi_acc_handle_t io_hdl2;
+	caddr_t		ioaddr2;
+
+	instance = ddi_get_instance(dip);
+	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+
+	if (!ata_ctlp->ac_pm_support)
+		return (DDI_FAILURE);
+	if (ata_ctlp->ac_pm_level == PM_LEVEL_D0)
+		return (DDI_SUCCESS);
+
+	ATA_BUSY_COMPONENT(dip, 0);
+	if (ATA_RAISE_POWER(dip, 0, PM_LEVEL_D0) == DDI_FAILURE)
+		return (DDI_FAILURE);
+	ATA_IDLE_COMPONENT(dip, 0);
+
+	/* enable interrupts from the device */
+	io_hdl2 = ata_ctlp->ac_iohandle2;
+	ioaddr2 = ata_ctlp->ac_ioaddr2;
+	ddi_put8(io_hdl2, (uchar_t *)ioaddr2 + AT_DEVCTL, ATDC_D3);
+	ata_ctlp->ac_pm_level = PM_LEVEL_D0;
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * suspend routine, it will be run when get the command
+ * DDI_SUSPEND at detach(9E) from system power management
+ */
+static int
+ata_suspend(dev_info_t *dip)
+{
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+	ddi_acc_handle_t io_hdl2;
+
+	instance = ddi_get_instance(dip);
+	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+
+	if (!ata_ctlp->ac_pm_support)
+		return (DDI_FAILURE);
+	if (ata_ctlp->ac_pm_level == PM_LEVEL_D3)
+		return (DDI_SUCCESS);
+
+	/* disable interrupts and turn the software reset bit on */
+	io_hdl2 = ata_ctlp->ac_iohandle2;
+	ddi_put8(io_hdl2, ata_ctlp->ac_devctl, (ATDC_D3 | ATDC_SRST));
+
+	(void) ata_reset_bus(ata_ctlp);
+	(void) ata_change_power(dip, ATC_SLEEP);
+	ata_ctlp->ac_pm_level = PM_LEVEL_D3;
+	return (DDI_SUCCESS);
+}
+
+int ata_save_pci_config = 0;
+/*
+ * ata specific power management entry point, it was
+ * used to change the power management component
+ */
+static int
+ata_power(dev_info_t *dip, int component, int level)
+{
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+	uint8_t		cmd;
+
+	ADBG_TRACE(("ata_power entered, component = %d, level = %d\n",
+	    component, level));
+
+	instance = ddi_get_instance(dip);
+	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+	if (ata_ctlp == NULL || component != 0)
+		return (DDI_FAILURE);
+
+	if (!ata_ctlp->ac_pm_support)
+		return (DDI_FAILURE);
+
+	switch (level) {
+	case PM_LEVEL_D0:
+		if (ata_save_pci_config)
+			(void) pci_restore_config_regs(dip);
+		ata_ctlp->ac_pm_level = PM_LEVEL_D0;
+		cmd = ATC_STANDBY_IM;
+		break;
+	case PM_LEVEL_D3:
+		if (ata_save_pci_config)
+			(void) pci_save_config_regs(dip);
+		ata_ctlp->ac_pm_level = PM_LEVEL_D3;
+		cmd = ATC_SLEEP;
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
+	return (ata_change_power(dip, cmd));
+}
+
+/*
+ * sent commands to ata controller to change the power level
+ */
+static int
+ata_change_power(dev_info_t *dip, uint8_t cmd)
+{
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+	ata_drv_t	*ata_drvp;
+	uchar_t		targ;
+	struct ata_id 	id;
+	uchar_t		lun;
+	uchar_t		lastlun;
+
+	ADBG_TRACE(("ata_change_power entered, cmd = %d\n", cmd));
+
+	instance = ddi_get_instance(dip);
+	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+	/*
+	 * Issue command on each disk device on the bus.
+	 */
+	for (targ = 0; targ < ATA_MAXTARG; targ++) {
+		ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
+		if (ata_drvp == NULL)
+			continue;
+		if (ata_drive_type(ata_drvp->ad_drive_bits,
+		    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
+		    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
+		    &id) != ATA_DEV_DISK)
+			continue;
+		(void) ata_flush_cache(ata_ctlp, ata_drvp);
+		if (!ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
+		    cmd, 0, 0, 0, 0, 0, 0)) {
+			cmn_err(CE_WARN, "!ata_controller - Can not put "
+			    "drive %d in to power mode %u", targ, cmd);
+			(void) ata_devo_reset(dip, DDI_RESET_FORCE);
+			return (DDI_FAILURE);
+		}
+	}
+
+	if (cmd == ATC_SLEEP)
+		return (DDI_SUCCESS);
+
+	for (targ = 0; targ < ATA_MAXTARG; targ++) {
+		ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
+		if ((ata_drvp == NULL) || !(ata_drvp->ad_flags & AD_DISK))
+			continue;
+		ata_resume_drive(ata_drvp);
+
+		if (ATAPIDRV(ata_drvp))
+			lastlun = ata_drvp->ad_id.ai_lastlun;
+		else
+			lastlun = 0;
+		if (!ata_enable_atapi_luns)
+			lastlun = 0;
+		for (lun = 1; lun <= lastlun && lun < ATA_MAXLUN; lun++) {
+			ata_drvp = CTL2DRV(ata_ctlp, targ, lun);
+			if (ata_drvp != NULL)
+				ata_resume_drive(ata_drvp);
+		}
+		(void) ata_software_reset(ata_ctlp);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * return 1 when ata controller is a pci device,
+ * otherwise return 0
+ */
+static int
+ata_is_pci(dev_info_t *dip)
+{
+	int rc;
+	char *bufp;
+	int ispci;
+
+	rc = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_get_parent(dip),
+	    DDI_PROP_DONTPASS, "device_type", &bufp);
+
+	if (rc != DDI_PROP_SUCCESS) {
+		ADBG_ERROR(("ata_is_pci !device_type\n"));
+		return (0);
+	}
+
+	ispci = (strcmp(bufp, "pci-ide") == 0);
+
+	ddi_prop_free(bufp);
+
+	return (ispci);
 }

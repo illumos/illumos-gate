@@ -117,6 +117,7 @@ i386_SUBDIRS= \
 	SUNWcar.i  \
 	SUNWcarx.i  \
 	SUNWcpc.i \
+	SUNWcpr.i \
 	SUNWdfb.i  \
 	SUNWdrmr \
 	SUNWgrub \

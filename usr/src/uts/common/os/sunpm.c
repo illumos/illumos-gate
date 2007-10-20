@@ -174,6 +174,11 @@
 #include <sys/disp.h>
 #include <sys/sobject.h>
 #include <sys/sunmdi.h>
+#include <sys/systm.h>
+#include <sys/cpuvar.h>
+#include <sys/cyclic.h>
+#include <sys/uadmin.h>
+#include <sys/srn.h>
 
 
 /*
@@ -341,6 +346,37 @@ int		autopm_enabled;
 pm_cpupm_t	cpupm = PM_CPUPM_NOTSET;
 
 /*
+ * AutoS3 depends on autopm being enabled, and must be enabled by
+ * PM_START_AUTOS3 command.
+ */
+int		autoS3_enabled;
+
+#if !defined(__sparc)
+/*
+ * on sparc these live in fillsysinfo.c
+ *
+ * If this variable is non-zero, cpr should return "not supported" when
+ * it is queried even though it would normally be supported on this platform.
+ */
+int cpr_supported_override;
+
+/*
+ * Some platforms may need to support CPR even in the absence of
+ * having the correct platform id information.  If this
+ * variable is non-zero, cpr should proceed even in the absence
+ * of otherwise being qualified.
+ */
+int cpr_platform_enable = 0;
+
+#endif
+
+/*
+ * pm_S3_enabled indicates that we believe the platform can support S3,
+ * which we get from pmconfig(1M)
+ */
+int		pm_S3_enabled;
+
+/*
  * This flag is true while processes are stopped for a checkpoint/resume.
  * Controlling processes of direct pm'd devices are not available to
  * participate in power level changes, so we bypass them when this is set.
@@ -352,6 +388,7 @@ static int	pm_processes_stopped;
 /*
  * see common/sys/epm.h for PMD_* values
  */
+
 uint_t		pm_debug = 0;
 
 /*
@@ -364,6 +401,7 @@ uint_t		pm_debug = 0;
  * deadlocks and decremented at the end of pm_set_power()
  */
 uint_t		pm_divertdebug = 1;
+volatile uint_t pm_debug_to_console = 0;
 kmutex_t	pm_debug_lock;		/* protects pm_divertdebug */
 
 void prdeps(char *);
@@ -410,6 +448,13 @@ uint_t		pm_poll_cnt[PM_MAX_CLONE];	/* count of events for poll */
 unsigned char	pm_interest[PM_MAX_CLONE];
 struct pollhead	pm_pollhead;
 
+/*
+ * Data structures shared with common/io/srn.c
+ */
+kmutex_t	srn_clone_lock;		/* protects srn_signal, srn_inuse */
+void (*srn_signal)(int type, int event);
+int srn_inuse;				/* stop srn detach */
+
 extern int	hz;
 extern char	*platform_module_list[];
 
@@ -447,7 +492,6 @@ pscc_t *pm_pscc_direct;
 #define	PM_IS_NEXUS(dip) NEXUS_DRV(devopsp[PM_MAJOR(dip)])
 #define	POWERING_ON(old, new) ((old) == 0 && (new) != 0)
 #define	POWERING_OFF(old, new) ((old) != 0 && (new) == 0)
-#define	PPM(dip) ((dev_info_t *)DEVI(dip)->devi_pm_ppm)
 
 #define	PM_INCR_NOTLOWEST(dip) {					\
 	mutex_enter(&pm_compcnt_lock);					\
@@ -510,14 +554,14 @@ typedef struct lock_loan {
 static lock_loan_t lock_loan_head;	/* list head is a dummy element */
 
 #ifdef	DEBUG
-#ifdef PMDDEBUG
+#ifdef	PMDDEBUG
 #define	PMD_FUNC(func, name)	char *(func) = (name);
-#else
+#else	/* !PMDDEBUG */
 #define	PMD_FUNC(func, name)
-#endif
-#else
+#endif	/* PMDDEBUG */
+#else	/* !DEBUG */
 #define	PMD_FUNC(func, name)
-#endif
+#endif	/* DEBUG */
 
 
 /*
@@ -607,7 +651,7 @@ static boolean_t
 pm_halt_callb(void *arg, int code)
 {
 	_NOTE(ARGUNUSED(arg, code))
-	return (B_TRUE);	/* XXX for now */
+	return (B_TRUE);
 }
 
 /*
@@ -2057,6 +2101,25 @@ pm_ppm_notify_all_lowest(dev_info_t *dip, int mode)
 		(void) pm_ctlops((dev_info_t *)ppmcp->ppmc_dip, dip,
 		    DDI_CTLOPS_POWER, &power_req, &result);
 	mutex_exit(&ppm_lock);
+	if (mode == PM_ALL_LOWEST) {
+		if (autoS3_enabled) {
+			PMD(PMD_SX, ("pm_ppm_notify_all_lowest triggering "
+			    "autos3\n"))
+			mutex_enter(&srn_clone_lock);
+			if (srn_signal) {
+				srn_inuse++;
+				PMD(PMD_SX, ("(*srn_signal)(AUTOSX, 3)\n"))
+				(*srn_signal)(SRN_TYPE_AUTOSX, 3);
+				srn_inuse--;
+			} else {
+				PMD(PMD_SX, ("srn_signal NULL\n"))
+			}
+			mutex_exit(&srn_clone_lock);
+		} else {
+			PMD(PMD_SX, ("pm_ppm_notify_all_lowest autos3 "
+			    "disabled\n"));
+		}
+	}
 }
 
 static void
@@ -3161,10 +3224,11 @@ pm_register_ppm(int (*func)(dev_info_t *), dev_info_t *dip)
 	if (i >= MAX_PPM_HANDLERS)
 		return (DDI_FAILURE);
 	while ((dip = ddi_get_parent(dip)) != NULL) {
-		if (PM_GET_PM_INFO(dip) == NULL)
+		if (dip != ddi_root_node() && PM_GET_PM_INFO(dip) == NULL)
 			continue;
 		pm_ppm_claim(dip);
-		if (pm_ppm_claimed(dip)) {
+		/* don't bother with the not power-manageable nodes */
+		if (pm_ppm_claimed(dip) && PM_GET_PM_INFO(dip)) {
 			/*
 			 * Tell ppm about this.
 			 */
@@ -7549,7 +7613,7 @@ pm_cfb_setup(const char *stdout_path)
 	 * IF console is fb and is power managed, don't do prom_printfs from
 	 * pm debug macro
 	 */
-	if (pm_cfb_enabled) {
+	if (pm_cfb_enabled && !pm_debug_to_console) {
 		if (pm_debug)
 			prom_printf("pm debug output will be to log only\n");
 		pm_divertdebug++;
@@ -7652,14 +7716,16 @@ pm_cfb_setup_intr(void)
 	extern void prom_set_outfuncs(void (*)(void), void (*)(void));
 	void pm_cfb_check_and_powerup(void);
 
+	mutex_init(&pm_cfb_lock, NULL, MUTEX_SPIN, (void *)ipltospl(SPL8));
+#ifdef PMDDEBUG
+	mutex_init(&pm_debug_lock, NULL, MUTEX_SPIN, (void *)ipltospl(SPL8));
+#endif
+
 	if (!stdout_is_framebuffer) {
 		PMD(PMD_CFB, ("%s: console not fb\n", pmf))
 		return;
 	}
-	mutex_init(&pm_cfb_lock, NULL, MUTEX_SPIN, (void *)ipltospl(SPL8));
-#ifdef DEBUG
-	mutex_init(&pm_debug_lock, NULL, MUTEX_SPIN, (void *)ipltospl(SPL8));
-#endif
+
 	/*
 	 * setup software interrupt handler
 	 */
@@ -7811,13 +7877,25 @@ pm_path_to_major(char *path)
 }
 
 #ifdef DEBUG
+#ifndef sparc
+clock_t pt_sleep = 1;
+#endif
 
-char *pm_msgp;
-char *pm_bufend;
-char *pm_msgbuf = NULL;
-int   pm_logpages = 2;
+char	*pm_msgp;
+char	*pm_bufend;
+char	*pm_msgbuf = NULL;
+int	pm_logpages = 0x100;
+#include <sys/sunldi.h>
+#include <sys/uio.h>
+clock_t	pm_log_sleep = 1000;
+int	pm_extra_cr = 1;
+volatile int pm_tty = 1;
 
 #define	PMLOGPGS	pm_logpages
+
+#if defined(__x86)
+void pm_printf(char *s);
+#endif
 
 /*PRINTFLIKE1*/
 void
@@ -7841,15 +7919,30 @@ pm_log(const char *fmt, ...)
 		(void) vsnprintf(pm_msgbuf, size, fmt, adx);
 		if (!pm_divertdebug)
 			prom_printf("%s", pm_msgp);
+#if defined(__x86)
+		if (pm_tty) {
+			pm_printf(pm_msgp);
+			if (pm_extra_cr)
+				pm_printf("\r");
+		}
+#endif
 		pm_msgp = pm_msgbuf + size;
 	} else {
 		(void) vsnprintf(pm_msgp, size, fmt, adx);
+#if defined(__x86)
+		if (pm_tty) {
+			pm_printf(pm_msgp);
+			if (pm_extra_cr)
+				pm_printf("\r");
+		}
+#endif
 		if (!pm_divertdebug)
 			prom_printf("%s", pm_msgp);
 		pm_msgp += size;
 	}
 	va_end(adx);
 	mutex_exit(&pm_debug_lock);
+	drv_usecwait((clock_t)pm_log_sleep);
 }
 #endif	/* DEBUG */
 
@@ -9108,16 +9201,19 @@ pm_desc_pwrchk_walk(dev_info_t *dip, void *arg)
 	PMD_FUNC(pmf, "desc_pwrchk")
 	pm_desc_pwrchk_t *pdpchk = (pm_desc_pwrchk_t *)arg;
 	pm_info_t *info = PM_GET_PM_INFO(dip);
-	int i, curpwr, ce_level;
+	int i;
+	/* LINTED */
+	int curpwr, ce_level;
 
 	if (!info)
 		return (DDI_WALK_CONTINUE);
 
 	PMD(PMD_SET, ("%s: %s@%s(%s#%d)\n", pmf, PM_DEVICE(dip)))
 	for (i = 0; i < PM_NUMCMPTS(dip); i++) {
-		curpwr = PM_CURPOWER(dip, i);
-		if (curpwr == 0)
+		/* LINTED */
+		if ((curpwr = PM_CURPOWER(dip, i)) == 0)
 			continue;
+		/* E_FUNC_SET_NOT_USED */
 		ce_level = (pdpchk->pdpc_par_involved == 0) ? CE_PANIC :
 		    CE_WARN;
 		PMD(PMD_SET, ("%s: %s@%s(%s#%d) is powered off while desc "
@@ -9169,4 +9265,59 @@ pm_return_lock(void)
 	prev->pmlk_next = cur->pmlk_next;
 	mutex_exit(&pm_loan_lock);
 	kmem_free(cur, sizeof (*cur));
+}
+
+#if defined(__x86)
+
+#define	CPR_RXR	0x1
+#define	CPR_TXR	0x20
+#define	CPR_DATAREG	0x3f8
+#define	CPR_LSTAT	0x3fd
+#define	CPR_INTRCTL	0x3f9
+
+char
+pm_getchar(void)
+{
+	while ((inb(CPR_LSTAT) & CPR_RXR) != CPR_RXR)
+		drv_usecwait(10);
+
+	return (inb(CPR_DATAREG));
+
+}
+
+void
+pm_putchar(char c)
+{
+	while ((inb(CPR_LSTAT) & CPR_TXR) == 0)
+		drv_usecwait(10);
+
+	outb(CPR_DATAREG, c);
+}
+
+void
+pm_printf(char *s)
+{
+	while (*s) {
+		pm_putchar(*s++);
+	}
+}
+
+#endif
+
+int
+pm_ppm_searchlist(pm_searchargs_t *sp)
+{
+	power_req_t power_req;
+	int result = 0;
+	/* LINTED */
+	int ret;
+
+	power_req.request_type = PMR_PPM_SEARCH_LIST;
+	power_req.req.ppm_search_list_req.searchlist = sp;
+	ASSERT(DEVI(ddi_root_node())->devi_pm_ppm);
+	ret = pm_ctlops((dev_info_t *)DEVI(ddi_root_node())->devi_pm_ppm,
+	    ddi_root_node(), DDI_CTLOPS_POWER, &power_req, &result);
+	PMD(PMD_SX, ("pm_ppm_searchlist returns %d, result %d\n",
+	    ret, result))
+	return (result);
 }

@@ -73,9 +73,10 @@
  */
 
 /*
- * No platform drivers on this platform
+ * Platform drivers on this platform
  */
 char *platform_module_list[] = {
+	"acpippm",
 	"ppm",
 	(char *)0
 };
@@ -1947,9 +1948,18 @@ get_vga_properties(void)
 	char property_val[50];
 	void *bop_staging_area;
 
-	major = ddi_name_to_major("vgatext");
-	if (major == (major_t)-1)
-		return;
+	/*
+	 * XXXX Hack Allert!
+	 * There really needs to be a better way for identifying various
+	 * console framebuffers and their related issues.  Till then,
+	 * check for this one as a replacement to vgatext.
+	 */
+	major = ddi_name_to_major("ragexl");
+	if (major == (major_t)-1) {
+		major = ddi_name_to_major("vgatext");
+		if (major == (major_t)-1)
+			return;
+	}
 	devi = devnamesp[major].dn_head;
 	if (devi == NULL)
 		return;

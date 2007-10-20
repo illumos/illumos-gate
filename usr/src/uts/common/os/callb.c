@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,7 +254,7 @@ callb_execute_class(int class, int code)
 
 #ifdef CALLB_DEBUG
 		printf("callb_execute: name=%s func=%p arg=%p\n",
-			cp->c_name, (void *)cp->c_func, (void *)cp->c_arg);
+		    cp->c_name, (void *)cp->c_func, (void *)cp->c_arg);
 #endif /* CALLB_DEBUG */
 
 		mutex_exit(&ct->ct_lock);
@@ -294,12 +293,14 @@ callb_generic_cpr(void *arg, int code)
 	switch (code) {
 	case CB_CODE_CPR_CHKPT:
 		cp->cc_events |= CALLB_CPR_START;
+#ifdef CPR_NOT_THREAD_SAFE
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
 			/* cv_timedwait() returns -1 if it times out. */
 			if ((ret = cv_timedwait(&cp->cc_callb_cv,
 			    cp->cc_lockp,
 			    lbolt + callb_timeout_sec * hz)) == -1)
 				break;
+#endif
 		break;
 
 	case CB_CODE_CPR_RESUME:

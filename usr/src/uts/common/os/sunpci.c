@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -334,10 +334,12 @@ pci_save_config_regs(dev_info_t *dip)
 	off_t offset = 0;
 	uint8_t cap_ptr, cap_id;
 	int pcie = 0;
+	PMD(PMD_SX, ("pci_save_config_regs %s:%d\n", ddi_driver_name(dip),
+	    ddi_get_instance(dip)))
 
 	if (pci_config_setup(dip, &confhdl) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d can't get config handle",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 		return (DDI_FAILURE);
 	}
@@ -364,7 +366,7 @@ pci_save_config_regs(dev_info_t *dip)
 	if (pcie) {
 		/* PCI express device. Can have data in all 4k space */
 		regbuf = (uint32_t *)kmem_zalloc((size_t)PCIE_CONF_HDR_SIZE,
-			    KM_SLEEP);
+		    KM_SLEEP);
 		p = regbuf;
 		/*
 		 * Allocate space for mask.
@@ -406,12 +408,12 @@ pci_save_config_regs(dev_info_t *dip)
 		kmem_free(regbuf, (size_t)PCIE_CONF_HDR_SIZE);
 	} else {
 		regbuf = (uint32_t *)kmem_zalloc((size_t)PCI_CONF_HDR_SIZE,
-			    KM_SLEEP);
+		    KM_SLEEP);
 		chsp = (pci_config_header_state_t *)regbuf;
 
 		chsp->chs_command = pci_config_get16(confhdl, PCI_CONF_COMM);
 		chsp->chs_header_type =	pci_config_get8(confhdl,
-			    PCI_CONF_HEADER);
+		    PCI_CONF_HEADER);
 		if ((chsp->chs_header_type & PCI_HEADER_TYPE_M) ==
 		    PCI_HEADER_ONE)
 			chsp->chs_bridge_control =
@@ -766,4 +768,275 @@ restoreconfig_err:
 	}
 	pci_config_teardown(&confhdl);
 	return (DDI_FAILURE);
+}
+
+/*ARGSUSED*/
+static int
+pci_lookup_pmcap(dev_info_t *dip, ddi_acc_handle_t conf_hdl,
+	uint16_t *pmcap_offsetp)
+{
+	uint8_t cap_ptr;
+	uint8_t cap_id;
+	uint8_t header_type;
+	uint16_t status;
+
+	header_type = pci_config_get8(conf_hdl, PCI_CONF_HEADER);
+	header_type &= PCI_HEADER_TYPE_M;
+
+	/* we don't deal with bridges, etc here */
+	if (header_type != PCI_HEADER_ZERO) {
+		return (DDI_FAILURE);
+	}
+
+	status = pci_config_get16(conf_hdl, PCI_CONF_STAT);
+	if ((status & PCI_STAT_CAP) == 0) {
+		return (DDI_FAILURE);
+	}
+
+	cap_ptr = pci_config_get8(conf_hdl, PCI_CONF_CAP_PTR);
+
+	/*
+	 * Walk the capabilities searching for a PM entry.
+	 */
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cap_id = pci_config_get8(conf_hdl, cap_ptr + PCI_CAP_ID);
+		if (cap_id == PCI_CAP_ID_PM) {
+			break;
+		}
+		cap_ptr = pci_config_get8(conf_hdl,
+		    cap_ptr + PCI_CAP_NEXT_PTR);
+	}
+
+	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL) {
+		return (DDI_FAILURE);
+	}
+	*pmcap_offsetp = cap_ptr;
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Do common pci-specific suspend actions:
+ *  - enable wakeup if appropriate for the device
+ *  - put device in lowest D-state that supports wakeup, or D3 if none
+ *  - turn off bus mastering in control register
+ * For lack of per-dip storage (parent private date is pretty busy)
+ * we use properties to store the necessary context
+ * To avoid grotting through pci config space on every suspend,
+ * we leave the prop in existence after resume, cause we know that
+ * the detach framework code will dispose of it for us.
+ */
+
+typedef struct pci_pm_context {
+	int		ppc_flags;
+	uint16_t	ppc_cap_offset;	/* offset in config space to pm cap */
+	uint16_t	ppc_pmcsr;	/* need this too */
+	uint16_t	ppc_suspend_level;
+} pci_pm_context_t;
+
+#define	SAVED_PM_CONTEXT	"pci-pm-context"
+
+/* values for ppc_flags	*/
+#define	PPCF_NOPMCAP	1
+
+/*
+ * Handle pci-specific suspend processing
+ *   PM CSR and PCI CMD are saved by pci_save_config_regs().
+ *   If device can wake up system via PME, enable it to do so
+ *   Set device power level to lowest that can generate PME, or D3 if none can
+ *   Turn off bus master enable in pci command register
+ */
+#if defined(__x86)
+extern int acpi_ddi_setwake(dev_info_t *dip, int level);
+#endif
+
+int
+pci_post_suspend(dev_info_t *dip)
+{
+	pci_pm_context_t *p;
+	uint16_t	pmcap, pmcsr, pcicmd;
+	uint_t length;
+	int ret;
+	int fromprop = 1;	/* source of memory *p */
+	ddi_acc_handle_t hdl;
+
+	PMD(PMD_SX, ("pci_post_suspend %s:%d\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip)))
+
+	if (pci_save_config_regs(dip) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (pci_config_setup(dip, &hdl) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    SAVED_PM_CONTEXT, (uchar_t **)&p, &length) != DDI_PROP_SUCCESS) {
+		p = (pci_pm_context_t *)kmem_zalloc(sizeof (*p), KM_SLEEP);
+		fromprop = 0;
+		if (pci_lookup_pmcap(dip, hdl,
+		    &p->ppc_cap_offset) != DDI_SUCCESS) {
+			p->ppc_flags |= PPCF_NOPMCAP;
+			ret = ndi_prop_update_byte_array(DDI_DEV_T_NONE, dip,
+			    SAVED_PM_CONTEXT, (uchar_t *)p,
+			    sizeof (pci_pm_context_t));
+			if (ret != DDI_PROP_SUCCESS) {
+				(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
+				    SAVED_PM_CONTEXT);
+				ret = DDI_FAILURE;
+			} else {
+				ret = DDI_SUCCESS;
+			}
+			kmem_free(p, sizeof (*p));
+			pci_config_teardown(&hdl);
+			return (DDI_SUCCESS);
+		}
+		/*
+		 * Upon suspend, set the power level to the lowest that can
+		 * wake the system.  If none can, then set to lowest.
+		 * XXX later we will need to check policy to see if this
+		 * XXX device has had wakeup disabled
+		 */
+		pmcap = pci_config_get16(hdl, p->ppc_cap_offset + PCI_PMCAP);
+		if ((pmcap & PCI_PMCAP_D3COLD_PME) != 0)
+			p->ppc_suspend_level =
+			    (PCI_PMCSR_PME_EN | PCI_PMCSR_D3HOT);
+		else if ((pmcap & (PCI_PMCAP_D3HOT_PME | PCI_PMCAP_D2_PME)) !=
+		    0)
+			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D2;
+		else if ((pmcap & PCI_PMCAP_D1_PME) != 0)
+			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D1;
+		else if ((pmcap & PCI_PMCAP_D0_PME) != 0)
+			p->ppc_suspend_level = PCI_PMCSR_PME_EN | PCI_PMCSR_D0;
+		else
+			p->ppc_suspend_level = PCI_PMCSR_D3HOT;
+
+		/*
+		 * we defer updating the property to catch the saved
+		 * register values as well
+		 */
+	}
+	/* If we set this in kmem_zalloc'd memory, we already returned above */
+	if ((p->ppc_flags & PPCF_NOPMCAP) != 0) {
+		ddi_prop_free(p);
+		pci_config_teardown(&hdl);
+		return (DDI_SUCCESS);
+	}
+
+
+	/*
+	 * Turn off (Bus) Master Enable, since acpica will be turning off
+	 * bus master aribitration
+	 */
+	pcicmd = pci_config_get16(hdl, PCI_CONF_COMM);
+	pcicmd &= ~PCI_COMM_ME;
+	pci_config_put16(hdl, PCI_CONF_COMM, pcicmd);
+
+	/*
+	 * set pm csr
+	 */
+	pmcsr = pci_config_get16(hdl, p->ppc_cap_offset + PCI_PMCSR);
+	p->ppc_pmcsr = pmcsr;
+	pmcsr &= (PCI_PMCSR_STATE_MASK);
+	pmcsr |= (PCI_PMCSR_PME_STAT | p->ppc_suspend_level);
+	pci_config_put16(hdl, p->ppc_cap_offset + PCI_PMCSR, pmcsr);
+
+#if defined(__x86)
+	/*
+	 * Arrange for platform wakeup enabling
+	 */
+	if ((p->ppc_suspend_level & PCI_PMCSR_PME_EN) != 0) {
+		int retval;
+
+		retval = acpi_ddi_setwake(dip, 3);	/* XXX 3 for now */
+		if (retval) {
+			PMD(PMD_SX, ("pci_post_suspend, setwake %s@%s rets "
+			    "%x\n", PM_NAME(dip), PM_ADDR(dip), retval));
+		}
+	}
+#endif
+
+	/*
+	 * Push out saved register values
+	 */
+	ret = ndi_prop_update_byte_array(DDI_DEV_T_NONE, dip, SAVED_PM_CONTEXT,
+	    (uchar_t *)p, sizeof (pci_pm_context_t));
+	if (ret == DDI_PROP_SUCCESS) {
+		if (fromprop)
+			ddi_prop_free(p);
+		else
+			kmem_free(p, sizeof (*p));
+		pci_config_teardown(&hdl);
+		return (DDI_SUCCESS);
+	}
+	/* Failed; put things back the way we found them */
+	(void) pci_restore_config_regs(dip);
+	if (fromprop)
+		ddi_prop_free(p);
+	else
+		kmem_free(p, sizeof (*p));
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, SAVED_PM_CONTEXT);
+	pci_config_teardown(&hdl);
+	return (DDI_FAILURE);
+}
+
+/*
+ * The inverse of pci_post_suspend; handle pci-specific resume processing
+ *   First, turn device back on, then restore config space.
+ */
+
+int
+pci_pre_resume(dev_info_t *dip)
+{
+	ddi_acc_handle_t hdl;
+	pci_pm_context_t *p;
+	/* E_FUNC_SET_NOT_USED */
+	uint16_t	pmcap, pmcsr;
+	int flags;
+	uint_t length;
+	clock_t drv_usectohz(clock_t microsecs);
+#if defined(__x86)
+	uint16_t	suspend_level;
+#endif
+
+	PMD(PMD_SX, ("pci_pre_resume %s:%d\n", ddi_driver_name(dip),
+	    ddi_get_instance(dip)))
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    SAVED_PM_CONTEXT, (uchar_t **)&p, &length) != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	flags = p->ppc_flags;
+	pmcap = p->ppc_cap_offset;
+	pmcsr = p->ppc_pmcsr;
+#if defined(__x86)
+	suspend_level = p->ppc_suspend_level;
+#endif
+	ddi_prop_free(p);
+	if ((flags & PPCF_NOPMCAP) != 0) {
+		return (DDI_SUCCESS);
+	}
+#if defined(__x86)
+	/*
+	 * Turn platform wake enable back off
+	 */
+	if ((suspend_level & PCI_PMCSR_PME_EN) != 0) {
+		int retval;
+
+		retval = acpi_ddi_setwake(dip, 0);	/* 0 for now */
+		if (retval) {
+			PMD(PMD_SX, ("pci_pre_resume, setwake %s@%s rets "
+			    "%x\n", PM_NAME(dip), PM_ADDR(dip), retval));
+		}
+	}
+#endif
+	if (pci_config_setup(dip, &hdl) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	pci_config_put16(hdl, pmcap + PCI_PMCSR, pmcsr);
+	delay(drv_usectohz(10000));	/* PCI PM spec D3->D0 (10ms) */
+	pci_config_teardown(&hdl);
+	(void) pci_restore_config_regs(dip);	/* fudges D-state! */
+	return (DDI_SUCCESS);
 }

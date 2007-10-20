@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	PSMI_1_5
+#define	PSMI_1_6
 #include <sys/smp_impldefs.h>
 #include <sys/psm.h>
 #include <sys/psm_modctl.h>
@@ -136,6 +136,8 @@ void (*psm_timer_disable)(void) = NULL;
 void (*psm_post_cyclic_setup)(void *arg) = NULL;
 int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *, psm_intr_op_t,
     int *) = mach_intr_ops;
+int (*psm_state)(psm_state_request_t *) = (int (*)(psm_state_request_t *))
+    return_instr;
 
 void (*notify_error)(int, char *) = (void (*)(int, char *))return_instr;
 void (*hrtime_tick)(void)	= return_instr;
@@ -923,6 +925,9 @@ mach_smpinit(void)
 	if (pops->psm_post_cyclic_setup)
 		psm_post_cyclic_setup = pops->psm_post_cyclic_setup;
 
+	if (pops->psm_state)
+		psm_state = pops->psm_state;
+
 	/* check for multiple cpu's */
 	if (cnt < 2)
 		return;
@@ -1306,6 +1311,18 @@ mach_cpu_start(struct cpu *cp, void *ctx)
 {
 	struct psm_ops *pops = mach_set[0];
 	processorid_t id = cp->cpu_id;
+
+#ifdef DEBUG
+	if (CPU_IN_SET(cpufailset, id))
+		return (0);
+#endif
+	return ((*pops->psm_cpu_start)(id, ctx));
+}
+
+int
+mach_cpuid_start(processorid_t id, void *ctx)
+{
+	struct psm_ops *pops = mach_set[0];
 
 #ifdef DEBUG
 	if (CPU_IN_SET(cpufailset, id))

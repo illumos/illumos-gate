@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,11 @@ void *ehci_statep;
 uint_t ehci_errmask	= (uint_t)PRINT_MASK_ALL;
 uint_t ehci_errlevel	= USB_LOG_L2;
 uint_t ehci_instance_debug = (uint_t)-1;
+
+/*
+ * Tunable to ensure host controller goes off even if a keyboard is attached.
+ */
+int force_ehci_off = 1;
 
 /* Enable all workarounds for VIA VT62x2 */
 uint_t ehci_vt62x2_workaround = EHCI_VIA_WORKAROUNDS;

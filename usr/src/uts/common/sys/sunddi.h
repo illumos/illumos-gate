@@ -1919,6 +1919,12 @@ pci_target_enqueue(uint64_t, char *, char *, uint64_t);
 void
 pci_targetq_init(void);
 
+int
+pci_post_suspend(dev_info_t *dip);
+
+int
+pci_pre_resume(dev_info_t *dip);
+
 /*
  * the prototype for the C Language Type Model inquiry.
  */

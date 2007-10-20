@@ -623,9 +623,9 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 			}
 
 			intr_flagp->intr_el = psm_acpi_edgelevel(
-					rp->Data.Irq.Triggering);
+			    rp->Data.Irq.Triggering);
 			intr_flagp->intr_po = psm_acpi_po(
-					rp->Data.Irq.Polarity);
+			    rp->Data.Irq.Polarity);
 			irq = rp->Data.Irq.Interrupts[0];
 			status = ACPI_PSM_SUCCESS;
 		} else if (rp->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
@@ -644,9 +644,9 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 			}
 
 			intr_flagp->intr_el = psm_acpi_edgelevel(
-					rp->Data.ExtendedIrq.Triggering);
+			    rp->Data.ExtendedIrq.Triggering);
 			intr_flagp->intr_po = psm_acpi_po(
-					rp->Data.ExtendedIrq.Polarity);
+			    rp->Data.ExtendedIrq.Polarity);
 			irq = rp->Data.ExtendedIrq.Interrupts[0];
 			status = ACPI_PSM_SUCCESS;
 		}
@@ -799,7 +799,7 @@ acpi_get_possible_irq_resources(acpi_psm_lnk_t *acpipsmlnkp,
 
 		/* NEEDSWORK: move this into add_irqlist_entry someday */
 		irqlist = kmem_zalloc(irqlist_len * sizeof (*irqlist),
-					    KM_SLEEP);
+		    KM_SLEEP);
 		for (i = 0; i < irqlist_len; i++)
 			if (resp->Type == ACPI_RESOURCE_TYPE_IRQ)
 				irqlist[i] = ((uint8_t *)tmplist)[i];
@@ -808,7 +808,7 @@ acpi_get_possible_irq_resources(acpi_psm_lnk_t *acpipsmlnkp,
 		intr_flags.intr_el = psm_acpi_edgelevel(el);
 		intr_flags.intr_po = psm_acpi_po(po);
 		acpi_add_irqlist_entry(irqlistp, irqlist, irqlist_len,
-				&intr_flags);
+		    &intr_flags);
 	}
 
 	AcpiOsFree(rsb.Pointer);
@@ -923,6 +923,32 @@ acpi_get_irq_lnk_cache_ent(ACPI_HANDLE lnkobj, int *pci_irqp,
 		}
 	mutex_exit(&acpi_irq_cache_mutex);
 	return (ret);
+}
+
+/*
+ * Walk the irq_cache_table and re-configure the link device to
+ * the saved state.
+ */
+void
+acpi_restore_link_devices(void)
+{
+	irq_cache_t *irqcachep;
+	acpi_psm_lnk_t psmlnk;
+	int i, status;
+
+	/* XXX: may not need to hold this mutex */
+	mutex_enter(&acpi_irq_cache_mutex);
+	for (irqcachep = irq_cache_table, i = 0; i < irq_cache_valid;
+	    irqcachep++, i++) {
+		/* only field used from psmlnk in set_irq is lnkobj */
+		psmlnk.lnkobj = irqcachep->lnkobj;
+		status = acpi_set_irq_resource(&psmlnk, irqcachep->irq);
+		/* warn if set_irq failed; soldier on */
+		if (status != ACPI_PSM_SUCCESS)
+			cmn_err(CE_WARN, "restore_link failed for IRQ 0x%x\n",
+			    irqcachep->irq);
+	}
+	mutex_exit(&acpi_irq_cache_mutex);
 }
 
 int

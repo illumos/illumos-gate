@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ static promif_owrap_t nullwrapper =
 
 static promif_owrap_t *wrapper = &nullwrapper;
 static promif_owrap_t pmwrapper;
+static promif_owrap_t *saved_wrapper;
 
 promif_owrap_t
 *promif_preout(void)
@@ -68,4 +69,18 @@ prom_set_outfuncs(void (*pref)(void), void (*postf)(void))
 	pmwrapper.preout = pref;
 	pmwrapper.postout = postf;
 	wrapper = &pmwrapper;
+}
+
+void
+prom_suspend_prepost(void)
+{
+	saved_wrapper = wrapper;
+	wrapper = &nullwrapper;
+}
+
+void
+prom_resume_prepost(void)
+{
+	wrapper = saved_wrapper;
+	saved_wrapper = NULL;
 }

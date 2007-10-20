@@ -20,7 +20,7 @@
 #
 #
 # uts/i86pc/gfx_private/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +45,8 @@ LINTS		= $(GFX_PRIVATE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 VGATEXT_FONT	= 8859-1
 VGATEXT_SRC	= $(UTSBASE)/intel/io/vgatext
+GFXP_VGATEXT	= gfxp_vgatext
+GFXP_VGATEXT_SRC	= $(UTSBASE)/i86pc/io/gfx_private
 
 #
 #	dependency

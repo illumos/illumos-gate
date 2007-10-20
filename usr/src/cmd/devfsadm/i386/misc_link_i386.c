@@ -49,6 +49,7 @@ static int agp_process(di_minor_t minor, di_node_t node);
 static int drm_node(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
 static int xsvc(di_minor_t minor, di_node_t node);
+static int srn(di_minor_t minor, di_node_t node);
 static int ucode(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
@@ -93,6 +94,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", NULL,
 	    TYPE_EXACT, ILEVEL_0, xsvc
+	},
+	{ "pseudo", "ddi_pseudo", NULL,
+	    TYPE_EXACT, ILEVEL_0, srn
 	},
 	{ "memory-controller", "ddi_mem_ctrl", NULL,
 	    TYPE_EXACT, ILEVEL_0, mc_node
@@ -575,6 +579,25 @@ xsvc(di_minor_t minor, di_node_t node)
 	char *mn;
 
 	if (strcmp(di_node_name(node), "xsvc") != 0)
+		return (DEVFSADM_CONTINUE);
+
+	mn = di_minor_name(minor);
+	if (mn == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	(void) devfsadm_mklink(mn, node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * Creates \M0 devlink for srn device
+ */
+static int
+srn(di_minor_t minor, di_node_t node)
+{
+	char *mn;
+
+	if (strcmp(di_node_name(node), "srn") != 0)
 		return (DEVFSADM_CONTINUE);
 
 	mn = di_minor_name(minor);

@@ -34,6 +34,12 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/taskq.h>
 
+/*
+ * XXXX
+ * Do we really need this include?  It may be leftover from early CPUPM code.
+ * #include <sys/processor.h>
+ */
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -225,6 +231,8 @@ typedef enum pm_cpupm
 	PM_CPUPM_DISABLE	/* do not power manage CPU devices */
 } pm_cpupm_t;
 
+#define	PPM(dip) ((dev_info_t *)DEVI(dip)->devi_pm_ppm)
+
 /*
  * The power request struct uses for the DDI_CTLOPS_POWER busctl.
  *
@@ -258,7 +266,10 @@ typedef enum {
 	PMR_PPM_TRY_LOCK_POWER,		/* ppm try lock power		*/
 	PMR_PPM_INIT_CHILD,		/* ppm init child notify	*/
 	PMR_PPM_UNINIT_CHILD,		/* ppm uninit child notify	*/
-	PMR_PPM_POWER_LOCK_OWNER	/* ppm power lock owner's address */
+	PMR_PPM_POWER_LOCK_OWNER,	/* ppm power lock owner's address */
+	PMR_PPM_ENTER_SX,		/* ppm: enter ACPI S[2-4] state	*/
+	PMR_PPM_EXIT_SX,		/* ppm: enter ACPI S[2-4] state	*/
+	PMR_PPM_SEARCH_LIST		/* ppm: search tuple list	*/
 } pm_request_type;
 
 /*
@@ -386,8 +397,46 @@ typedef struct power_req {
 			dev_info_t	*who;
 			kthread_t	*owner;
 		} ppm_power_lock_owner_req;
+		/*
+		 * PMR_PPM_POWER_ENTER_SX
+		 */
+		struct ppm_power_enter_sx_req {
+			int	sx_state;	/* S3, S4 */
+			int	test_point;	/* test point */
+			uint64_t wakephys;	/* restart vector phys addr */
+			void *psr;		/* PSM (apic) state buffer */
+		} ppm_power_enter_sx_req;
+		/*
+		 * PMR_PPM_SEARCH_LIST
+		 */
+		struct ppm_search_list {
+			pm_searchargs_t *searchlist;
+			int		result;
+		} ppm_search_list_req;
 	} req;
 } power_req_t;
+
+#define	S3	3
+#define	S4	4
+
+extern int cpr_test_point;
+extern major_t cpr_device;
+
+#define	LOOP_BACK_NONE	0
+#define	LOOP_BACK_PASS	1
+#define	LOOP_BACK_FAIL	2
+#define	FORCE_SUSPEND_TO_RAM	3
+#define	DEVICE_SUSPEND_TO_RAM	4
+
+/*
+ * Struct passed as arg to appm_ioctl
+ */
+typedef struct s3_args {
+	int		s3a_state;	/* S3, S4 */
+	int		s3a_test_point;	/* test point */
+	uint64_t	s3a_wakephys;	/* restart vector physical addr */
+	void		*s3a_psr;	/* apic state save buffer */
+} s3a_t;
 
 /*
  * Structure used by the following bus_power operations:
@@ -624,11 +673,21 @@ typedef struct pm_thresh_rec {
 #define	PMD_PIL		0x20000000	/* print out PIL when calling power */
 #define	PMD_PHC		0x40000000	/* pm_power_has_changed messages */
 #define	PMD_LOCK	0x80000000
+#define	PMD_SX		0x80000000	/* ACPI S[1234] states */
+#define	PMD_PROTO	PMD_SX		/* and other Prototype stuff */
 
 extern uint_t	pm_debug;
 extern uint_t	pm_divertdebug;
 /*PRINTFLIKE1*/
 extern void	pm_log(const char *fmt, ...) __KPRINTFLIKE(1);
+
+#if !defined(__sparc)
+/*
+ * On non-sparc machines, PMDDEBUG isn't as big a deal as Sparc, so we
+ * define PMDDEUG here for use on non-sparc platforms.
+ */
+#define	PMDDEBUG
+#endif /* !__sparc */
 
 #ifdef PMDDEBUG
 #define	PMD(level, arglist) { 			\
@@ -636,13 +695,64 @@ extern void	pm_log(const char *fmt, ...) __KPRINTFLIKE(1);
 		pm_log arglist;			\
 	}					\
 }
-#else
+#else /* !PMDDEBUG */
 #define	PMD(level, arglist)	((void)0);
+#endif /* PMDDEBUG */
+#ifndef	sparc
+extern clock_t pt_sleep;
+/* code is char hex number to display on POST LED */
+#define	PT(code) {outb(0x80, (char)code); drv_usecwait(pt_sleep); }
+#else
+#define	PT(code)
 #endif
-
 #else
 #define	PMD(level, arglist)
+#define	PT(code)
 #endif
+/*
+ * Code	Value	Indication
+ *
+ */
+#define	PT_SPL7		0x01	/* pm_suspend spl7 */
+#define	PT_PMSRET	0x02	/* pm_suspend returns */
+#define	PT_PPMCTLOP	0x03	/* invoking ppm_ctlops */
+#define	PT_ACPISDEV	0x04	/* acpi suspend devices */
+#define	PT_IC		0x05	/* acpi intr_clear */
+#define	PT_1to1		0x06	/* 1:1 mapping */
+#define	PT_SC		0x07	/* save context */
+#define	PT_SWV		0x08	/* set waking vector */
+#define	PT_SWV_FAIL	0x09	/* set waking vector failed */
+#define	PT_EWE		0x0a	/* enable wake events */
+#define	PT_EWE_FAIL	0x0b	/* enable wake events failed */
+#define	PT_RTCW		0x0c	/* setting rtc wakeup */
+#define	PT_RTCW_FAIL	0x0d	/* setting rtc wakeup failed */
+#define	PT_TOD		0x0e	/* setting tod */
+#define	PT_SXP		0x0f	/* sx prep */
+#define	PT_SXE		0x10	/* sx enter */
+#define	PT_SXE_FAIL	0x11	/* sx enter failed */
+#define	PT_INSOM	0x12	/* insomnia label */
+#define	PT_WOKE		0x20	/* woke up */
+#define	PT_UNDO1to1	0x21	/* Undo 1:1 mapping */
+#define	PT_LSS		0x22	/* leave sleep state */
+#define	PT_LSS_FAIL	0x23	/* leave sleep state failed */
+#define	PT_DPB		0x24	/* disable power button */
+#define	PT_DPB_FAIL	0x25	/* disable power button failed */
+#define	PT_DRTC_FAIL	0x26	/* disable rtc fails */
+#define	PT_ACPIREINIT	0x27	/* reinit apic */
+#define	PT_ACPIRESTORE	0x28	/* restore apic */
+#define	PT_INTRRESTORE	0x28	/* restore interrupts */
+#define	PT_RESDEV	0x2a	/* ressume acpi devices */
+#define	PT_CPU		0x2b	/* init_cpu_syscall */
+#define	PT_PRESUME	0x30	/* pm_resume entered */
+#define	PT_RSUS		0x31	/* pm_resume "suspended" */
+#define	PT_RKERN	0x32	/* pm_resume "kernel" */
+#define	PT_RDRV		0x33	/* pm_resume "driver" */
+#define	PT_RDRV_FAIL	0x34	/* pm_resume "driver" failed */
+#define	PT_RRNOINVOL	0x35	/* pm_resume "reattach_noinvol" */
+#define	PT_RUSER	0x36	/* pm_resume "user" */
+#define	PT_RAPMSIG	0x37	/* pm_resume APM/SRN signal */
+#define	PT_RMPO		0x38	/* pm_resume "mp_online" */
+#define	PT_RDONE	0x39	/* pm_resume done */
 
 extern void	pm_detaching(dev_info_t *);
 extern void	pm_detach_failed(dev_info_t *);
@@ -721,7 +831,7 @@ extern int	pm_is_cfb(dev_info_t *);
 extern int	pm_cfb_is_up(void);
 #endif
 
-#ifdef DEBUG
+#ifdef DIPLOCKDEBUG
 #define	PM_LOCK_DIP(dip)	{ PMD(PMD_LOCK, ("dip lock %s@%s(%s#%d) " \
 				    "%s %d\n", PM_DEVICE(dip),		  \
 				    __FILE__, __LINE__)) 		  \

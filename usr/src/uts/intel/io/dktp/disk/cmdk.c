@@ -163,6 +163,11 @@ static int cmdkprobe(dev_info_t *dip);
 static int cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
+static void cmdk_setup_pm(dev_info_t *dip, struct cmdk *dkp);
+static int cmdkresume(dev_info_t *dip);
+static int cmdksuspend(dev_info_t *dip);
+static int cmdkpower(dev_info_t *dip, int component, int level);
+
 struct dev_ops cmdk_ops = {
 	DEVO_REV, 		/* devo_rev, */
 	0, 			/* refcnt  */
@@ -173,7 +178,8 @@ struct dev_ops cmdk_ops = {
 	cmdkdetach,		/* detach */
 	nodev, 			/* reset */
 	&cmdk_cb_ops, 		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	cmdkpower		/* power */
 };
 
 /*
@@ -322,12 +328,21 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	struct		cmdk *dkp;
 	char 		*node_type;
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		return (cmdkresume(dip));
+	default:
 		return (DDI_FAILURE);
+	}
 
 	instance = ddi_get_instance(dip);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
 		return (DDI_FAILURE);
+
+	dkp->dk_pm_level = CMDK_SPINDLE_UNINIT;
+	mutex_init(&dkp->dk_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	mutex_enter(&dkp->dk_mutex);
 
@@ -386,6 +401,13 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_KERNEL_IOCTL, NULL, 0);
 	ddi_report_dev(dip);
 
+	/*
+	 * Initialize power management
+	 */
+	mutex_init(&dkp->dk_pm_mutex, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&dkp->dk_suspend_cv,   NULL, CV_DRIVER, NULL);
+	cmdk_setup_pm(dip, dkp);
+
 	return (DDI_SUCCESS);
 
 fail1:
@@ -408,7 +430,13 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	int 		instance;
 	int		max_instance;
 
-	if (cmd != DDI_DETACH) {
+	switch (cmd) {
+	case DDI_DETACH:
+		/* return (DDI_FAILURE); */
+		break;
+	case DDI_SUSPEND:
+		return (cmdksuspend(dip));
+	default:
 #ifdef CMDK_DEBUG
 		if (cmdk_debug & DIO) {
 			PRF("cmdkdetach: cmd = %d unknown\n", cmd);
@@ -454,6 +482,8 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&dkp->dk_mutex);
 	mutex_destroy(&dkp->dk_mutex);
 	rw_destroy(&dkp->dk_bbh_mutex);
+	mutex_destroy(&dkp->dk_pm_mutex);
+	cv_destroy(&dkp->dk_suspend_cv);
 	ddi_soft_state_free(cmdk_state, instance);
 
 	return (DDI_SUCCESS);
@@ -487,6 +517,145 @@ cmdkinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		default:
 			return (DDI_FAILURE);
 	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Initialize the power management components
+ */
+static void
+cmdk_setup_pm(dev_info_t *dip, struct cmdk *dkp)
+{
+	char *pm_comp[] = { "NAME=cmdk", "0=off", "1=on", NULL };
+
+	/*
+	 * Since the cmdk device does not the 'reg' property,
+	 * cpr will not call its DDI_SUSPEND/DDI_RESUME entries.
+	 * The following code is to tell cpr that this device
+	 * DOES need to be suspended and resumed.
+	 */
+	(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
+	    "pm-hardware-state", "needs-suspend-resume");
+
+	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+	    "pm-components", pm_comp, 3) == DDI_PROP_SUCCESS) {
+		if (pm_raise_power(dip, 0, CMDK_SPINDLE_ON) == DDI_SUCCESS) {
+			mutex_enter(&dkp->dk_pm_mutex);
+			dkp->dk_pm_level = CMDK_SPINDLE_ON;
+			dkp->dk_pm_is_enabled = 1;
+			mutex_exit(&dkp->dk_pm_mutex);
+		} else {
+			mutex_enter(&dkp->dk_pm_mutex);
+			dkp->dk_pm_level = CMDK_SPINDLE_OFF;
+			dkp->dk_pm_is_enabled = 0;
+			mutex_exit(&dkp->dk_pm_mutex);
+		}
+	} else {
+		mutex_enter(&dkp->dk_pm_mutex);
+		dkp->dk_pm_level = CMDK_SPINDLE_UNINIT;
+		dkp->dk_pm_is_enabled = 0;
+		mutex_exit(&dkp->dk_pm_mutex);
+	}
+}
+
+/*
+ * suspend routine, it will be run when get the command
+ * DDI_SUSPEND at detach(9E) from system power management
+ */
+static int
+cmdksuspend(dev_info_t *dip)
+{
+	struct cmdk	*dkp;
+	int		instance;
+	clock_t		count = 0;
+
+	instance = ddi_get_instance(dip);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
+		return (DDI_FAILURE);
+	mutex_enter(&dkp->dk_mutex);
+	if (dkp->dk_flag & CMDK_SUSPEND) {
+		mutex_exit(&dkp->dk_mutex);
+		return (DDI_SUCCESS);
+	}
+	dkp->dk_flag |= CMDK_SUSPEND;
+
+	/* need to wait a while */
+	while (dadk_getcmds(DKTP_DATA) != 0) {
+		delay(drv_usectohz(1000000));
+		if (count > 60) {
+			dkp->dk_flag &= ~CMDK_SUSPEND;
+			cv_broadcast(&dkp->dk_suspend_cv);
+			mutex_exit(&dkp->dk_mutex);
+			return (DDI_FAILURE);
+		}
+		count++;
+	}
+	mutex_exit(&dkp->dk_mutex);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * resume routine, it will be run when get the command
+ * DDI_RESUME at attach(9E) from system power management
+ */
+static int
+cmdkresume(dev_info_t *dip)
+{
+	struct cmdk	*dkp;
+	int		instance;
+
+	instance = ddi_get_instance(dip);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
+		return (DDI_FAILURE);
+	mutex_enter(&dkp->dk_mutex);
+	if (!(dkp->dk_flag & CMDK_SUSPEND)) {
+		mutex_exit(&dkp->dk_mutex);
+		return (DDI_FAILURE);
+	}
+	dkp->dk_pm_level = CMDK_SPINDLE_ON;
+	dkp->dk_flag &= ~CMDK_SUSPEND;
+	cv_broadcast(&dkp->dk_suspend_cv);
+	mutex_exit(&dkp->dk_mutex);
+	return (DDI_SUCCESS);
+
+}
+
+/*
+ * power management entry point, it was used to
+ * change power management component.
+ * Actually, the real hard drive suspend/resume
+ * was handled in ata, so this function is not
+ * doing any real work other than verifying that
+ * the disk is idle.
+ */
+static int
+cmdkpower(dev_info_t *dip, int component, int level)
+{
+	struct cmdk	*dkp;
+	int		instance;
+
+	instance = ddi_get_instance(dip);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)) ||
+	    component != 0 || level > CMDK_SPINDLE_ON ||
+	    level < CMDK_SPINDLE_OFF) {
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&dkp->dk_pm_mutex);
+	if (dkp->dk_pm_is_enabled && dkp->dk_pm_level == level) {
+		mutex_exit(&dkp->dk_pm_mutex);
+		return (DDI_SUCCESS);
+	}
+	mutex_exit(&dkp->dk_pm_mutex);
+
+	if ((level == CMDK_SPINDLE_OFF) &&
+	    (dadk_getcmds(DKTP_DATA) != 0)) {
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&dkp->dk_pm_mutex);
+	dkp->dk_pm_level = level;
+	mutex_exit(&dkp->dk_pm_mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -676,6 +845,12 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	instance = CMDKUNIT(dev);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
 		return (ENXIO);
+
+	mutex_enter(&dkp->dk_mutex);
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+	mutex_exit(&dkp->dk_mutex);
 
 	bzero(data, sizeof (data));
 
@@ -873,6 +1048,10 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+
 	part = CMDKPART(dev);
 	partbit = 1 << part;
 
@@ -925,6 +1104,12 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 
 	if (otyp >= OTYPCNT)
 		return (EINVAL);
+
+	mutex_enter(&dkp->dk_mutex);
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+	mutex_exit(&dkp->dk_mutex);
 
 	part = CMDKPART(dev);
 	partbit = 1 << part;
@@ -1040,12 +1225,38 @@ cmdkmin(struct buf *bp)
 static int
 cmdkrw(dev_t dev, struct uio *uio, int flag)
 {
+	int 		instance;
+	struct	cmdk	*dkp;
+
+	instance = CMDKUNIT(dev);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
+		return (ENXIO);
+
+	mutex_enter(&dkp->dk_mutex);
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+	mutex_exit(&dkp->dk_mutex);
+
 	return (physio(cmdkstrategy, (struct buf *)0, dev, flag, cmdkmin, uio));
 }
 
 static int
 cmdkarw(dev_t dev, struct aio_req *aio, int flag)
 {
+	int 		instance;
+	struct	cmdk	*dkp;
+
+	instance = CMDKUNIT(dev);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
+		return (ENXIO);
+
+	mutex_enter(&dkp->dk_mutex);
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+	mutex_exit(&dkp->dk_mutex);
+
 	return (aphysio(cmdkstrategy, anocancel, dev, flag, cmdkmin, aio));
 }
 
@@ -1069,6 +1280,12 @@ cmdkstrategy(struct buf *bp)
 		biodone(bp);
 		return (0);
 	}
+
+	mutex_enter(&dkp->dk_mutex);
+	while (dkp->dk_flag & CMDK_SUSPEND) {
+		cv_wait(&dkp->dk_suspend_cv, &dkp->dk_mutex);
+	}
+	mutex_exit(&dkp->dk_mutex);
 
 	bp->b_flags &= ~(B_DONE|B_ERROR);
 	bp->b_resid = 0;
@@ -1895,7 +2112,7 @@ cmdk_bbh_gethandle(opaque_t bbh_data, struct buf *bp)
 		/* at least one bad sector in our section.  break it. */
 		/* CASE 5: */
 		if ((lastsec >= altp->bad_start) &&
-			    (lastsec <= altp->bad_end)) {
+		    (lastsec <= altp->bad_end)) {
 			ckp[idx+1].ck_seclen = lastsec - altp->bad_start + 1;
 			ckp[idx].ck_seclen -= ckp[idx+1].ck_seclen;
 			ckp[idx+1].ck_sector = altp->good_start;

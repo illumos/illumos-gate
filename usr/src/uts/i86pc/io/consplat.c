@@ -54,7 +54,8 @@ static char *
 gfxdrv_name[] = {
 	"vgatext",
 	"i915",
-	"nvidia"
+	"atiatom",
+	"nvidia",
 };
 
 int

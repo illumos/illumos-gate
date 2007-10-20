@@ -127,6 +127,8 @@ evtchn 197
 xdb 199
 domcaps 200
 balloon 201
+acpippm 202
+srn 203
 did 239
 lx_ptm 240
 lx_systrace 241

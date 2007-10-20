@@ -47,6 +47,9 @@
 
 extern void real_mode_start(void);
 extern void real_mode_end(void);
+extern void *(*cpu_pause_func)(void *);
+
+void rmp_gdt_init(rm_platter_t *);
 
 /*
  * Fill up the real mode platter to make it easy for real mode code to
@@ -68,8 +71,8 @@ mach_cpucontext_init(void)
 	 * setup secondary cpu bios boot up vector
 	 */
 	*vec = (ushort_t)((caddr_t)
-		((struct rm_platter *)rm_platter_va)->rm_code - rm_platter_va
-		+ ((ulong_t)rm_platter_va & 0xf));
+	    ((struct rm_platter *)rm_platter_va)->rm_code - rm_platter_va
+	    + ((ulong_t)rm_platter_va & 0xf));
 	vec[1] = (ushort_t)(rm_platter_pa >> 4);
 	warm_reset_vector = vec;
 
@@ -162,6 +165,16 @@ mach_cpucontext_alloc(struct cpu *cp)
 	rm->rm_x86feature = x86_feature;
 	rm->rm_cr4 = getcr4();
 
+	rmp_gdt_init(rm);
+
+	return (ct);
+}
+
+/*ARGSUSED*/
+void
+rmp_gdt_init(rm_platter_t *rm)
+{
+
 #if defined(__amd64)
 
 	if (getcr3() > 0xffffffffUL)
@@ -197,7 +210,6 @@ mach_cpucontext_alloc(struct cpu *cp)
 	    ((uint32_t)long_mode_64 - (uint32_t)real_mode_start);
 #endif	/* __amd64 */
 
-	return (ct);
 }
 
 /*ARGSUSED*/

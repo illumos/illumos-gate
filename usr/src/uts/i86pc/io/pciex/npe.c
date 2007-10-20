@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,6 +228,9 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int instance = ddi_get_instance(devi);
 	pci_state_t *pcip = NULL;
 
+	if (cmd == DDI_RESUME)
+		return (DDI_SUCCESS);
+
 	if (ddi_prop_update_string(DDI_DEV_T_NONE, devi, "device_type",
 	    "pciex") != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "npe:  'device_type' prop create failed");
@@ -282,20 +285,29 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	pcip = ddi_get_soft_state(npe_statep, ddi_get_instance(devi));
 
-	/* Uninitialize pcitool support. */
-	pcitool_uninit(devi);
+	switch (cmd) {
+	case DDI_DETACH:
 
-	/*
-	 * Uninitialize hotplug support on this bus.
-	 */
-	(void) pcihp_uninit(devi);
+		/* Uninitialize pcitool support. */
+		pcitool_uninit(devi);
 
-	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
-		ddi_fm_handler_unregister(devi);
+		/*
+		 * Uninitialize hotplug support on this bus.
+		 */
+		(void) pcihp_uninit(devi);
 
-	ddi_fm_fini(devi);
-	ddi_soft_state_free(npe_statep, instance);
-	return (DDI_SUCCESS);
+		if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
+			ddi_fm_handler_unregister(devi);
+
+		ddi_fm_fini(devi);
+		ddi_soft_state_free(npe_statep, instance);
+		return (DDI_SUCCESS);
+
+	case DDI_SUSPEND:
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
+	}
 }
 
 
@@ -598,6 +610,7 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int		totreg;
 	uint_t		reglen;
 	pci_regspec_t	*drv_regp;
+	struct	attachspec *asp;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -661,6 +674,30 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_PEEK:
 	case DDI_CTLOPS_POKE:
 		return (pci_common_peekpoke(dip, rdip, ctlop, arg, result));
+
+	/* X86 systems support PME wakeup from suspended state */
+	case DDI_CTLOPS_ATTACH:
+		asp = (struct attachspec *)arg;
+		/* only do this for immediate children */
+		if (asp->cmd == DDI_RESUME && asp->when == DDI_PRE &&
+		    ddi_get_parent(rdip) == dip)
+			if (pci_pre_resume(rdip) != DDI_SUCCESS) {
+				/* Not good, better stop now. */
+				cmn_err(CE_PANIC,
+				    "Couldn't pre-resume device %p",
+				    (void *) dip);
+				/* NOTREACHED */
+			}
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+
+	case DDI_CTLOPS_DETACH:
+		asp = (struct attachspec *)arg;
+		/* only do this for immediate children */
+		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST &&
+		    ddi_get_parent(rdip) == dip)
+			if (pci_post_suspend(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	default:
 		break;

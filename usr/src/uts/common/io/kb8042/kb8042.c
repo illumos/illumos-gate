@@ -431,6 +431,14 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		kb8042->w_init = 0;
 		kb8042_init(kb8042, B_TRUE);
 		kb8042_setled(kb8042, leds, B_FALSE);
+		mutex_enter(&kb8042->w_hw_mutex);
+		kb8042->suspended = B_FALSE;
+		if (kb8042->w_qp != NULL) {
+			enableok(WR(kb8042->w_qp));
+			qenable(WR(kb8042->w_qp));
+		}
+		cv_broadcast(&kb8042->suspend_cv);
+		mutex_exit(&kb8042->w_hw_mutex);
 		return (DDI_SUCCESS);
 
 	case DDI_ATTACH:
@@ -480,7 +488,8 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&kb8042->w_hw_mutex, NULL, MUTEX_DRIVER, kb8042->w_iblock);
-
+	cv_init(&kb8042->ops_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&kb8042->suspend_cv, NULL, CV_DRIVER, NULL);
 	kb8042->init_state |= KB8042_HW_MUTEX_INITTED;
 
 	kb8042_init(kb8042, B_FALSE);
@@ -552,6 +561,12 @@ kb8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_SUSPEND:
+		mutex_enter(&kb8042->w_hw_mutex);
+		ASSERT(kb8042->ops >= 0);
+		while (kb8042->ops > 0)
+			cv_wait(&kb8042->ops_cv, &kb8042->w_hw_mutex);
+		kb8042->suspended = B_TRUE;
+		mutex_exit(&kb8042->w_hw_mutex);
 		return (DDI_SUCCESS);
 
 	case DDI_DETACH:
@@ -606,8 +621,11 @@ kb8042_cleanup(struct kb8042 *kb8042)
 {
 	ASSERT(kb8042_dip != NULL);
 
-	if (kb8042->init_state & KB8042_HW_MUTEX_INITTED)
+	if (kb8042->init_state & KB8042_HW_MUTEX_INITTED) {
+		cv_destroy(&kb8042->suspend_cv);
+		cv_destroy(&kb8042->ops_cv);
 		mutex_destroy(&kb8042->w_hw_mutex);
+	}
 
 	if (kb8042->init_state & KB8042_INTR_ADDED)
 		ddi_remove_intr(kb8042_dip, 0, kb8042->w_iblock);
@@ -660,15 +678,29 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kb8042 = &Kdws;
 
+	mutex_enter(&kb8042->w_hw_mutex);
+	while (kb8042->suspended) {
+		if (cv_wait_sig(&kb8042->suspend_cv, &kb8042->w_hw_mutex) ==
+		    0) {
+			mutex_exit(&kb8042->w_hw_mutex);
+			return (EINTR);
+		}
+	}
+
 	kb8042->w_dev = *devp;
 
 	if (qp->q_ptr) {
+		mutex_exit(&kb8042->w_hw_mutex);
 		return (0);
 	}
 	qp->q_ptr = (caddr_t)kb8042;
 	WR(qp)->q_ptr = qp->q_ptr;
 	if (!kb8042->w_qp)
 		kb8042->w_qp = qp;
+
+	ASSERT(kb8042->ops >= 0);
+	kb8042->ops++;
+	mutex_exit(&kb8042->w_hw_mutex);
 
 	kb8042_get_initial_leds(kb8042, &initial_leds, &initial_led_mask);
 	err = kbtrans_streams_init(qp, sflag, credp,
@@ -700,6 +732,13 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kbtrans_streams_enable(kb8042->hw_kbtrans);
 
+	mutex_enter(&kb8042->w_hw_mutex);
+	ASSERT(kb8042->ops > 0);
+	kb8042->ops--;
+	if (kb8042->ops == 0)
+		cv_broadcast(&kb8042->ops_cv);
+	mutex_exit(&kb8042->w_hw_mutex);
+
 	return (0);
 }
 
@@ -714,10 +753,30 @@ kb8042_close(queue_t *qp, int flag, cred_t *credp)
 
 	kb8042 = (struct kb8042 *)qp->q_ptr;
 
+	mutex_enter(&kb8042->w_hw_mutex);
+	while (kb8042->suspended) {
+		if (cv_wait_sig(&kb8042->suspend_cv, &kb8042->w_hw_mutex) ==
+		    0) {
+			mutex_exit(&kb8042->w_hw_mutex);
+			return (EINTR);
+		}
+	}
+
+	ASSERT(kb8042->ops >= 0);
+	kb8042->ops++;
+	mutex_exit(&kb8042->w_hw_mutex);
+
 	(void) kbtrans_streams_fini(kb8042->hw_kbtrans);
 
 	kb8042->w_qp = (queue_t *)NULL;
 	qprocsoff(qp);
+
+	mutex_enter(&kb8042->w_hw_mutex);
+	ASSERT(kb8042->ops > 0);
+	kb8042->ops--;
+	if (kb8042->ops == 0)
+		cv_broadcast(&kb8042->ops_cv);
+	mutex_exit(&kb8042->w_hw_mutex);
 
 	return (0);
 }
@@ -728,10 +787,27 @@ kb8042_wsrv(queue_t *qp)
 	struct kb8042 *kb8042;
 
 	mblk_t	*mp;
+	boolean_t suspended;
 
 	kb8042 = (struct kb8042 *)qp->q_ptr;
 
+	mutex_enter(&kb8042->w_hw_mutex);
+	suspended = kb8042->suspended;
+	ASSERT(kb8042->ops >= 0);
+	if (!suspended)
+		kb8042->ops++;
+	mutex_exit(&kb8042->w_hw_mutex);
+
+#ifdef NO_KB_DEBUG
+	while (!suspended && (mp = getq(qp)) != NULL) {
+#else
+	/*
+	 * Not taking keyboard input while suspending can make debugging
+	 * difficult.  However, we still do the ops counting so that we
+	 * don't suspend at a bad time.
+	 */
 	while ((mp = getq(qp))) {
+#endif
 		switch (kbtrans_streams_message(kb8042->hw_kbtrans, mp)) {
 		case KBTRANS_MESSAGE_HANDLED:
 			continue;
@@ -765,6 +841,16 @@ kb8042_wsrv(queue_t *qp)
 			continue;
 		}
 	}
+
+	mutex_enter(&kb8042->w_hw_mutex);
+	if (!suspended) {
+		ASSERT(kb8042->ops > 0);
+		kb8042->ops--;
+		if (kb8042->ops == 0)
+			cv_broadcast(&kb8042->ops_cv);
+	}
+	mutex_exit(&kb8042->w_hw_mutex);
+
 	return (0);
 }
 

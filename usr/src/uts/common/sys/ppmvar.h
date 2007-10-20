@@ -135,6 +135,12 @@ struct ppm_dc {
 	ldi_handle_t	lh;	/* layered (ldi) handle			*/
 	char	*path;		/* control device prom pathname		*/
 	uint_t	cmd;		/* search key: op to be performed	*/
+				/* one of: PPMDC_CPU_NEXT		*/
+				/* PPMDC_CPU_GO, PPMDC_FET_ON,		*/
+				/* PPMDC_FET_OFF, PPMDC_LED_ON,		*/
+				/* PPMDC_LED_OFF, PPMDC_PCI_ON,		*/
+				/* PPMDC_ENTER_S3, PPMDC_PCI_OFF	*/
+				/* PPMDC_EXIT_S3 commands		*/
 	uint_t	method;		/* control method / union selector	*/
 				/* one of PPMDC_KIO, PPMDC_I2CKIO,	*/
 				/* PPMDC_CPUSPEEDKIO			*/
@@ -157,6 +163,7 @@ struct ppm_dc {
 			uint_t	post_delay; /* post delay, if any	*/
 		} kio;
 
+#ifdef sun4u
 		/* PPMDC_I2CKIO: KIO requires 'arg' as struct i2c_gpio	*/
 		/*    (defined in i2c_client.h)				*/
 		struct m_i2ckio {
@@ -169,6 +176,7 @@ struct ppm_dc {
 					/* operation can be carried out	*/
 			uint_t	post_delay; /* post delay, if any	*/
 		} i2c;
+#endif
 
 		/* PPMDC_CPUSPEEDKIO, PPMDC_VCORE: cpu estar related	*/
 		/* simple KIO						*/
@@ -203,6 +211,8 @@ typedef struct ppm_dc ppm_dc_t;
 #define	PPMDC_PWR_ON		16
 #define	PPMDC_RESET_OFF		17
 #define	PPMDC_RESET_ON		18
+#define	PPMDC_ENTER_S3		19
+#define	PPMDC_EXIT_S3		20
 
 /*
  * ppm_dc.method field - select union element
@@ -210,7 +220,9 @@ typedef struct ppm_dc ppm_dc_t;
 #define	PPMDC_KIO  		1	/* simple ioctl with val as arg	*/
 #define	PPMDC_CPUSPEEDKIO	2	/* ioctl with speed index arg	*/
 #define	PPMDC_VCORE		3	/* CPU Vcore change operation */
+#ifdef sun4u
 #define	PPMDC_I2CKIO		4	/* ioctl with i2c_gpio_t as arg	*/
+#endif
 
 /*
  * devices that are powered by the same source
@@ -245,6 +257,7 @@ typedef struct ppm_domain ppm_domain_t;
 #define	PPMD_PCI		4	/* PCI pm model */
 #define	PPMD_PCI_PROP		5	/* PCI_PROP pm model */
 #define	PPMD_PCIE		6	/* PCI Express pm model */
+#define	PPMD_SX			7	/* ACPI Sx pm model */
 
 #define	PPMD_IS_PCI(model) \
 	((model) == PPMD_PCI || (model) == PPMD_PCI_PROP)

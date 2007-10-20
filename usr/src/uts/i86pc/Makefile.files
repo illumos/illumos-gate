@@ -34,6 +34,7 @@
 #	object lists
 #
 CORE_OBJS +=			\
+	acpi_stubs.o		\
 	biosdisk.o		\
 	bios_call.o		\
 	cbe.o			\
@@ -179,6 +180,8 @@ MCAMD_OBJS	+= \
 CPUDRV_OBJS	+= cpudrv.o cpudrv_plat.o cpu_acpi.o speedstep.o
 PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
+ACPIPPM_OBJS	+= acpippm.o acpisleep.o
+
 ROOTNEX_OBJS += rootnex.o
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
@@ -213,7 +216,10 @@ ASSYM_DEPS      += 		\
 	sseblk.o		\
 	swtch.o			\
 	syscall_asm.o		\
-	syscall_asm_amd64.o
+	syscall_asm_amd64.o	\
+	cpr_wakecode.o
+
+CPR_IMPL_OBJS	= cpr_impl.o	cpr_wakecode.o
 
 $(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
 

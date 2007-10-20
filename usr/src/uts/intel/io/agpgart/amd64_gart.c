@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,8 +173,17 @@ amd64_gart_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int			status;
 	char			buf[80];
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	default:
 		return (DDI_FAILURE);
+
+	case DDI_RESUME:
+		/* Nothing special is needed for resume. */
+		return (DDI_SUCCESS);
+
+	case DDI_ATTACH:
+		break;
+	}
 
 	instance = ddi_get_instance(dip);
 
@@ -209,8 +218,17 @@ amd64_gart_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	amd64_gart_softstate_t	*sc;
 	char			buf[80];
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	default:
 		return (DDI_FAILURE);
+
+	case DDI_SUSPEND:
+		/* Nothing special is needed for suspend */
+		return (DDI_SUCCESS);
+
+	case DDI_DETACH:
+		break;
+	}
 
 	instance = ddi_get_instance(dip);
 	sc = ddi_get_soft_state(amd64_gart_glob_soft_handle, instance);

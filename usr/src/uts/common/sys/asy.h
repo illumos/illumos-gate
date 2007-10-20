@@ -275,6 +275,15 @@ struct asycom {
 	ddi_iblock_cookie_t asy_iblock;
 	kmutex_t	asy_excl;	/* asy adaptive mutex */
 	kmutex_t	asy_excl_hi;	/* asy spinlock mutex */
+
+	/*
+	 * The asy_soft_sr mutex should only be taken by the soft interrupt
+	 * handler and the driver DDI_SUSPEND/DDI_RESUME code.  It
+	 * shouldn't be taken by any code that may get called indirectly
+	 * by the soft interrupt handler (e.g. as a result of a put or
+	 * putnext call).
+	 */
+	kmutex_t	asy_soft_sr;	/* soft int suspend/resume mutex */
 	uchar_t		asy_msr;	/* saved modem status */
 	uchar_t		asy_mcr;	/* soft carrier bits */
 	uchar_t		asy_lcr;	/* console lcr bits */
@@ -300,11 +309,13 @@ struct asycom {
 struct asyncline {
 	int		async_flags;	/* random flags */
 	kcondvar_t	async_flags_cv; /* condition variable for flags */
+	kcondvar_t	async_ops_cv;	/* condition variable for async_ops */
 	dev_t		async_dev;	/* device major/minor numbers */
 	mblk_t		*async_xmitblk;	/* transmit: active msg block */
 	struct asycom	*async_common;	/* device common data */
 	tty_common_t 	async_ttycommon; /* tty driver common data */
 	bufcall_id_t	async_wbufcid;	/* id for pending write-side bufcall */
+	size_t		async_wbufcds;	/* Buffer size requested in bufcall */
 	timeout_id_t	async_polltid;	/* softint poll timeout id */
 	timeout_id_t    async_dtrtid;   /* delaying DTR turn on */
 	timeout_id_t    async_utbrktid; /* hold minimum untimed break time id */
@@ -343,6 +354,10 @@ struct asyncline {
 	short		async_ext;	/* modem status change count */
 	short		async_work;	/* work to do flag */
 	timeout_id_t	async_timer;	/* close drain progress timer */
+
+	mblk_t		*async_suspqf;	/* front of suspend queue */
+	mblk_t		*async_suspqb;	/* back of suspend queue */
+	int		async_ops;	/* active operations counter */
 };
 
 /* definitions for async_flags field */
@@ -372,6 +387,8 @@ struct asyncline {
 #define	ASYNC_OUT_FLW_RESUME 0x00100000 /* output need to be resumed */
 					/* because of transition of flow */
 					/* control from stop to start */
+#define	ASYNC_DDI_SUSPENDED  0x00200000	/* suspended by DDI */
+#define	ASYNC_RESUME_BUFCALL 0x00400000	/* call bufcall when resumed by DDI */
 
 /* asy_hwtype definitions */
 #define	ASY8250A	0x2		/* 8250A or 16450 */
@@ -389,6 +406,7 @@ struct asyncline {
 #define	ASY_RTS_DTR_OFF	0x00000020
 #define	ASY_IGNORE_CD	0x00000040
 #define	ASY_CONSOLE	0x00000080
+#define	ASY_DDI_SUSPENDED	0x00000100 /* suspended by DDI */
 
 /* definitions for asy_flags2 field */
 #define	ASY2_NO_LOOPBACK 0x00000001	/* Device doesn't support loopback */

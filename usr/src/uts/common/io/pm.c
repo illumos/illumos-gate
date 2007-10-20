@@ -56,10 +56,10 @@
 #include <sys/policy.h>
 
 /*
- * Minor number is instance<<8 + clone minor from range 1-255; (0 reserved
- * for "original"
+ * Minor number is instance<<8 + clone minor from range 1-254; (0 reserved
+ * for "original")
  */
-#define	PM_MINOR_TO_CLONE(minor) ((minor) & (PM_MAX_CLONE - 1))
+#define	PM_MINOR_TO_CLONE(minor) ((minor) & (PM_MAX_CLONE -1))
 
 #define	PM_NUMCMPTS(dip) (DEVI(dip)->devi_pm_num_components)
 #define	PM_IS_CFB(dip) (DEVI(dip)->devi_pm_flags & PMC_CONSOLE_FB)
@@ -67,6 +67,8 @@
 #define	PM_RELE(dip) ddi_release_devi(dip)
 
 #define	PM_IDLEDOWN_TIME	10
+#define	MAXSMBIOSSTRLEN 64	/* from SMBIOS spec */
+#define	MAXCOPYBUF 	(MAXSMBIOSSTRLEN + 1)
 
 extern kmutex_t	pm_scan_lock;	/* protects autopm_enable, pm_scans_disabled */
 extern kmutex_t	pm_clone_lock;	/* protects pm_clones array */
@@ -77,6 +79,19 @@ extern int	pm_system_idle_threshold;
 extern int	pm_cpu_idle_threshold;
 extern kcondvar_t pm_clones_cv[PM_MAX_CLONE];
 extern uint_t	pm_poll_cnt[PM_MAX_CLONE];
+extern int	autoS3_enabled;
+extern void	pm_record_thresh(pm_thresh_rec_t *);
+extern void	pm_register_watcher(int, dev_info_t *);
+extern int	pm_get_current_power(dev_info_t *, int, int *);
+extern int	pm_interest_registered(int);
+extern void	pm_all_to_default_thresholds(void);
+extern int	pm_current_threshold(dev_info_t *, int, int *);
+extern void	pm_deregister_watcher(int, dev_info_t *);
+extern void	pm_unrecord_threshold(char *);
+extern int	pm_S3_enabled;
+extern int	pm_ppm_searchlist(pm_searchargs_t *);
+extern psce_t	*pm_psc_clone_to_direct(int);
+extern psce_t	*pm_psc_clone_to_interest(int);
 
 /*
  * The soft state of the power manager.  Since there will only
@@ -181,7 +196,7 @@ pm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmstp->pm_instance = ddi_get_instance(dip);
 		if (ddi_create_minor_node(dip, "pm", S_IFCHR,
 		    (pmstp->pm_instance << 8) + 0,
-			DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
 		pmstp->pm_dip = dip;	/* pm_init and getinfo depend on it */
@@ -271,6 +286,7 @@ pm_close_direct_pm_device(dev_info_t *dip, void *arg)
 #define	NODEP		5
 #define	DEP		6
 #define	PM_PSC		7
+#define	PM_SRCH		8
 
 #define	CHECKPERMS	0x001
 #define	SU		0x002
@@ -405,6 +421,8 @@ static struct pm_cmd_info pmci[] = {
 	{PM_RESET_DEVICE_THRESHOLD, "PM_RESET_DEVICE_THRESHOLD", 1, PM_REQ,
 	    INWHO, DIP, NODEP, SU},
 	{PM_GET_PM_STATE, "PM_GET_PM_STATE", 1, NOSTRUCT},
+	{PM_GET_AUTOS3_STATE, "PM_GET_AUTOS3_STATE", 1, NOSTRUCT},
+	{PM_GET_S3_SUPPORT_STATE, "PM_GET_S3_SUPPORT_STATE", 1, NOSTRUCT},
 	{PM_GET_DEVICE_TYPE, "PM_GET_DEVICE_TYPE", 1, PM_REQ, INWHO,
 	    DIP, NODEP},
 	{PM_SET_COMPONENT_THRESHOLDS, "PM_SET_COMPONENT_THRESHOLDS", 1, PM_REQ,
@@ -431,6 +449,14 @@ static struct pm_cmd_info pmci[] = {
 	{PM_SET_CPU_THRESHOLD, "PM_SET_CPU_THRESHOLD", 1, NOSTRUCT,
 	    0, 0, 0, SU},
 	{PM_GET_CPUPM_STATE, "PM_GET_CPUPM_STATE", 1, NOSTRUCT},
+	{PM_START_AUTOS3, "PM_START_AUTOS3", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_STOP_AUTOS3, "PM_STOP_AUTOS3", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_ENABLE_S3, "PM_ENABLE_S3", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_DISABLE_S3, "PM_DISABLE_S3", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_ENTER_S3, "PM_ENTER_S3", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_SEARCH_LIST, "PM_SEARCH_LIST", 1, PM_SRCH, 0, 0, 0, SU},
+	{PM_GET_CMD_NAME, "PM_GET_CMD_NAME", 1, PM_REQ, INDATAOUT, NODIP,
+	    NODEP, 0},
 	{0, NULL}
 };
 
@@ -729,8 +755,6 @@ static void
 pm_discard_entries(int clone)
 {
 	psce_t	*pscep;
-	psce_t			*pm_psc_clone_to_direct(int);
-	psce_t			*pm_psc_clone_to_interest(int);
 	int			direct = 0;
 
 	mutex_enter(&pm_clone_lock);
@@ -901,26 +925,21 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	size_t		wholen;			/* copyinstr length */
 	size_t		deplen = MAXNAMELEN;
 	char		*dep, i_dep_buf[MAXNAMELEN];
-	char		*pathbuf;
+	char		pathbuf[MAXNAMELEN];
 	struct pm_component *cp;
 #ifdef	_MULTI_DATAMODEL
 	pm_state_change32_t		*pscp32;
 	pm_state_change32_t		psc32;
+	pm_searchargs32_t		psa32;
 	size_t				copysize32;
 #endif
 	pm_state_change_t		*pscp;
 	pm_state_change_t		psc;
+	pm_searchargs_t		psa;
+	char		listname[MAXCOPYBUF];
+	char		manufacturer[MAXCOPYBUF];
+	char		product[MAXCOPYBUF];
 	size_t		copysize;
-	extern void	pm_record_thresh(pm_thresh_rec_t *);
-	psce_t		*pm_psc_clone_to_direct(int);
-	psce_t		*pm_psc_clone_to_interest(int);
-	extern	void	pm_register_watcher(int, dev_info_t *);
-	extern	int	pm_get_current_power(dev_info_t *, int, int *);
-	extern	int	pm_interest_registered(int);
-	extern	void	pm_all_to_default_thresholds(void);
-	extern	int	pm_current_threshold(dev_info_t *, int, int *);
-	extern void	pm_deregister_watcher(int, dev_info_t *);
-	extern void	pm_unrecord_threshold(char *);
 
 	PMD(PMD_IOCTL, ("ioctl: %s: begin\n", cmdstr))
 
@@ -955,6 +974,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	}
 	switch (pcip->str_type) {
 	case PM_REQ:
+	{
 #ifdef	_MULTI_DATAMODEL
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_ILP32) {
 			pm_req32_t	req32;
@@ -979,9 +999,9 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 					break;
 				}
 				req.physpath = who;
+				PMD(PMD_IOCTL, ("ioctl: %s: physpath=%s\n",
+				    cmdstr, req.physpath))
 			}
-			PMD(PMD_IOCTL, ("ioctl: %s: physpath=%s\n", cmdstr,
-			    req.physpath))
 			if (pcip->inargs & INDATA) {
 				req.data = (void *)(uintptr_t)req32.data;
 				req.datasize = req32.datasize;
@@ -1053,9 +1073,8 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				ASSERT(!(pcip->inargs & INDATAINT));
 				ASSERT(pcip->deptype == DEP);
 				if (req32.data != NULL) {
-					size_t dummy;
 					if (copyinstr((void *)(uintptr_t)
-					    req32.data, dep, deplen, &dummy)) {
+					    req32.data, dep, deplen, NULL)) {
 						PMD(PMD_ERROR, ("ioctl: %s: "
 						    "0x%p dep size %lx, EFAULT"
 						    "\n", cmdstr,
@@ -1096,9 +1115,9 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 					break;
 				}
 				req.physpath = who;
+				PMD(PMD_IOCTL, ("ioctl: %s: physpath=%s\n",
+				    cmdstr, req.physpath))
 			}
-			PMD(PMD_IOCTL, ("ioctl: %s: physpath=%s\n", cmdstr,
-			    req.physpath))
 			if (!(pcip->inargs & INDATA)) {
 				req.data = NULL;
 				req.datasize = 0;
@@ -1154,9 +1173,8 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				ASSERT(!(pcip->inargs & INDATAINT));
 				ASSERT(pcip->deptype == DEP);
 				if (req.data != NULL) {
-					size_t dummy;
 					if (copyinstr((caddr_t)req.data,
-					    dep, deplen, &dummy)) {
+					    dep, deplen, NULL)) {
 						PMD(PMD_ERROR, ("ioctl: %s: "
 						    "0x%p dep size %lu, "
 						    "EFAULT\n", cmdstr,
@@ -1222,6 +1240,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		}
 
 		case PM_GET_DEVICE_THRESHOLD:
+		{
 			PM_LOCK_DIP(dip);
 			if (!PM_GET_PM_INFO(dip) || PM_ISBC(dip)) {
 				PM_UNLOCK_DIP(dip);
@@ -1234,6 +1253,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			PM_UNLOCK_DIP(dip);
 			ret = 0;
 			break;
+		}
 
 		case PM_DIRECT_PM:
 		{
@@ -1248,11 +1268,9 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			 * Check to see if we are there is a dependency on
 			 * this kept device, if so, return EBUSY.
 			 */
-			pathbuf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 			(void) ddi_pathname(dip, pathbuf);
 			pm_dispatch_to_dep_thread(PM_DEP_WK_CHECK_KEPT,
 			    NULL, pathbuf, PM_DEP_WAIT, &has_dep, 0);
-			kmem_free(pathbuf, MAXPATHLEN);
 			if (has_dep) {
 				PMD(PMD_ERROR | PMD_DPM, ("%s EBUSY\n",
 				    cmdstr))
@@ -1301,11 +1319,9 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			info->pmi_dev_pm_state &= ~PM_DIRECT;
 			PM_UNLOCK_DIP(dip);
 			/* Bring ourselves up if there is a keeper. */
-			pathbuf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 			(void) ddi_pathname(dip, pathbuf);
 			pm_dispatch_to_dep_thread(PM_DEP_WK_BRINGUP_SELF,
 			    NULL, pathbuf, PM_DEP_WAIT, NULL, 0);
-			kmem_free(pathbuf, MAXPATHLEN);
 			pm_discard_entries(clone);
 			pm_deregister_watcher(clone, dip);
 			/*
@@ -1426,6 +1442,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		}
 
 		case PM_GET_CURRENT_POWER:
+		{
 			if (pm_get_current_power(dip, req.component,
 			    rval_p) != DDI_SUCCESS) {
 				PMD(PMD_ERROR | PMD_DPM, ("ioctl: %s "
@@ -1440,6 +1457,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			else
 				ret = 0;
 			break;
+		}
 
 		case PM_GET_TIME_IDLE:
 		{
@@ -1629,11 +1647,14 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		}
 
 		case PM_GET_NUM_COMPONENTS:
+		{
 			ret = 0;
 			*rval_p = PM_NUMCMPTS(dip);
 			break;
+		}
 
 		case PM_GET_DEVICE_TYPE:
+		{
 			ret = 0;
 			if ((info = PM_GET_PM_INFO(dip)) == NULL) {
 				PMD(PMD_ERROR, ("ioctl: %s: "
@@ -1647,6 +1668,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				*rval_p = PM_AUTOPM;
 			}
 			break;
+		}
 
 		case PM_SET_COMPONENT_THRESHOLDS:
 		{
@@ -1981,6 +2003,8 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 					    cmdstr, PM_DEVICE(dip),
 					    (void *)req.data))
 					ASSERT(!dipheld);
+					kmem_free(timestamp,
+					    comps * sizeof (time_t));
 					return (EFAULT);
 				}
 				rvaddr = (caddr_t)req.data;
@@ -1994,7 +2018,24 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			break;
 		}
 
+		case PM_GET_CMD_NAME:
+		{
+			PMD(PMD_IOCTL, ("%s: %s\n", cmdstr,
+			    pm_decode_cmd(req.value)))
+			if (ret = copyoutstr(pm_decode_cmd(req.value),
+			    (char *)req.data, req.datasize, &lencopied)) {
+				PMD(PMD_ERROR, ("ioctl: %s: %s@%s(%s#%d) "
+				    "copyoutstr %p failed--EFAULT\n", cmdstr,
+				    PM_DEVICE(dip), (void *)req.data))
+				break;
+			}
+			*rval_p = lencopied;
+			ret = 0;
+			break;
+		}
+
 		case PM_GET_COMPONENT_NAME:
+		{
 			ASSERT(dip);
 			if (!e_pm_valid_comp(dip, req.component, &cp)) {
 				PMD(PMD_ERROR, ("ioctl: %s: %s@%s(%s#%d) "
@@ -2014,6 +2055,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			*rval_p = lencopied;
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_POWER_NAME:
 		{
@@ -2118,6 +2160,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 
 
 		case PM_GET_NUM_POWER_LEVELS:
+		{
 			if (!e_pm_valid_comp(dip, req.component, &cp)) {
 				PMD(PMD_ERROR, ("ioctl: %s: %s@%s(%s#%d) "
 				    "component %d > numcmpts - 1 %d--EINVAL\n",
@@ -2129,8 +2172,10 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			*rval_p = cp->pmc_comp.pmc_numlevels;
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_DEVICE_THRESHOLD_BASIS:
+		{
 			ret = 0;
 			PM_LOCK_DIP(dip);
 			if ((info = PM_GET_PM_INFO(dip)) == NULL) {
@@ -2172,9 +2217,23 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			PM_UNLOCK_DIP(dip);
 			break;
 		}
+		default:
+			/*
+			 * Internal error, invalid ioctl description
+			 * force debug entry even if pm_debug not set
+			 */
+#ifdef	DEBUG
+			pm_log("invalid diptype %d for cmd %d (%s)\n",
+			    pcip->diptype, cmd, pcip->name);
+#endif
+			ASSERT(0);
+			return (EIO);
+		}
 		break;
+	}
 
 	case PM_PSC:
+	{
 		/*
 		 * Commands that require pm_state_change_t as arg
 		 */
@@ -2461,7 +2520,7 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			if ((mode & DATAMODEL_MASK) == DATAMODEL_ILP32) {
 				if (ddi_copyout(&psc32.component,
 				    &pscp32->component, copysize32, mode)
-					!= 0) {
+				    != 0) {
 					PMD(PMD_ERROR, ("ioctl: %s: copyout "
 					    "failed--EFAULT\n", cmdstr))
 					ret = EFAULT;
@@ -2482,14 +2541,128 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			break;
 		}
 		default:
+			/*
+			 * Internal error, invalid ioctl description
+			 * force debug entry even if pm_debug not set
+			 */
+#ifdef	DEBUG
+			pm_log("invalid diptype %d for cmd %d (%s)\n",
+			    pcip->diptype, cmd, pcip->name);
+#endif
 			ASSERT(0);
+			return (EIO);
 		}
 		break;
+	}
+
+	case PM_SRCH:		/* command that takes a pm_searchargs_t arg */
+	{
+		/*
+		 * If no ppm, then there is nothing to search.
+		 */
+		if (DEVI(ddi_root_node())->devi_pm_ppm == NULL) {
+			ret = ENODEV;
+			break;
+		}
+
+#ifdef	_MULTI_DATAMODEL
+		if ((mode & DATAMODEL_MASK) == DATAMODEL_ILP32) {
+			if (ddi_copyin((caddr_t)arg, &psa32,
+			    sizeof (psa32), mode) != 0) {
+				PMD(PMD_ERROR, ("ioctl: %s: ddi_copyin "
+				    "EFAULT\n\n", cmdstr))
+				return (EFAULT);
+			}
+			if (copyinstr((void *)(uintptr_t)psa32.pms_listname,
+			    listname, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)(uintptr_t)psa32.pms_listname,
+				    MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+			if (copyinstr((void *)(uintptr_t)psa32.pms_manufacturer,
+			    manufacturer, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)(uintptr_t)psa32.pms_manufacturer,
+				    MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+			if (copyinstr((void *)(uintptr_t)psa32.pms_product,
+			    product, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)(uintptr_t)psa32.pms_product,
+				    MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+		} else
+#endif /* _MULTI_DATAMODEL */
+		{
+			if (ddi_copyin((caddr_t)arg, &psa,
+			    sizeof (psa), mode) != 0) {
+				PMD(PMD_ERROR, ("ioctl: %s: ddi_copyin "
+				    "EFAULT\n\n", cmdstr))
+				return (EFAULT);
+			}
+			if (copyinstr(psa.pms_listname,
+			    listname, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)psa.pms_listname, MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+			if (copyinstr(psa.pms_manufacturer,
+			    manufacturer, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)psa.pms_manufacturer, MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+			if (copyinstr(psa.pms_product,
+			    product, MAXCOPYBUF, NULL)) {
+				PMD(PMD_ERROR, ("ioctl: %s: 0x%p MAXCOPYBUF "
+				    "%d, " "EFAULT\n", cmdstr,
+				    (void *)psa.pms_product, MAXCOPYBUF))
+				ret = EFAULT;
+				break;
+			}
+		}
+		psa.pms_listname = listname;
+		psa.pms_manufacturer = manufacturer;
+		psa.pms_product = product;
+		switch (cmd) {
+		case PM_SEARCH_LIST:
+			ret = pm_ppm_searchlist(&psa);
+			break;
+
+		default:
+			/*
+			 * Internal error, invalid ioctl description
+			 * force debug entry even if pm_debug not set
+			 */
+#ifdef	DEBUG
+			pm_log("invalid diptype %d for cmd %d (%s)\n",
+			    pcip->diptype, cmd, pcip->name);
+#endif
+			ASSERT(0);
+			return (EIO);
+		}
+		break;
+	}
 
 	case NOSTRUCT:
+	{
 		switch (cmd) {
 		case PM_START_PM:
 		case PM_START_CPUPM:
+		{
 			mutex_enter(&pm_scan_lock);
 			if ((cmd == PM_START_PM && autopm_enabled) ||
 			    (cmd == PM_START_CPUPM && PM_CPUPM_ENABLED)) {
@@ -2500,13 +2673,14 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				break;
 			}
 			if (cmd == PM_START_PM)
-			    autopm_enabled = 1;
+				autopm_enabled = 1;
 			else
-			    cpupm = PM_CPUPM_ENABLE;
+				cpupm = PM_CPUPM_ENABLE;
 			mutex_exit(&pm_scan_lock);
 			ddi_walk_devs(ddi_root_node(), pm_start_pm_walk, &cmd);
 			ret = 0;
 			break;
+		}
 
 		case PM_RESET_PM:
 		case PM_STOP_PM:
@@ -2523,13 +2697,16 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				ret = EINVAL;
 				break;
 			}
-			if (cmd == PM_STOP_PM)
-			    autopm_enabled = 0;
-			else if (cmd == PM_STOP_CPUPM)
-			    cpupm = PM_CPUPM_DISABLE;
-			else {
-			    autopm_enabled = 0;
-			    cpupm = PM_CPUPM_NOTSET;
+			if (cmd == PM_STOP_PM) {
+				autopm_enabled = 0;
+				pm_S3_enabled = 0;
+				autoS3_enabled = 0;
+			} else if (cmd == PM_STOP_CPUPM) {
+				cpupm = PM_CPUPM_DISABLE;
+			} else {
+				autopm_enabled = 0;
+				autoS3_enabled = 0;
+				cpupm = PM_CPUPM_NOTSET;
 			}
 			mutex_exit(&pm_scan_lock);
 
@@ -2553,22 +2730,29 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		}
 
 		case PM_GET_SYSTEM_THRESHOLD:
+		{
 			*rval_p = pm_system_idle_threshold;
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_DEFAULT_SYSTEM_THRESHOLD:
+		{
 			*rval_p = pm_default_idle_threshold;
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_CPU_THRESHOLD:
+		{
 			*rval_p = pm_cpu_idle_threshold;
 			ret = 0;
 			break;
+		}
 
 		case PM_SET_SYSTEM_THRESHOLD:
 		case PM_SET_CPU_THRESHOLD:
+		{
 			if ((int)arg < 0) {
 				PMD(PMD_ERROR, ("ioctl: %s: arg 0x%x < 0"
 				    "--EINVAL\n", cmdstr, (int)arg))
@@ -2583,20 +2767,24 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				pm_cpu_idle_threshold = (int)arg;
 			}
 			ddi_walk_devs(ddi_root_node(), pm_set_idle_thresh_walk,
-				    (void *) &cmd);
+			    (void *) &cmd);
 
 			ret = 0;
 			break;
+		}
 
 		case PM_IDLE_DOWN:
+		{
 			if (pm_timeout_idledown() != 0) {
 				ddi_walk_devs(ddi_root_node(),
 				    pm_start_idledown, (void *)PMID_IOC);
 			}
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_PM_STATE:
+		{
 			if (autopm_enabled) {
 				*rval_p = PM_SYSTEM_PM_ENABLED;
 			} else {
@@ -2604,8 +2792,10 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			}
 			ret = 0;
 			break;
+		}
 
 		case PM_GET_CPUPM_STATE:
+		{
 			if (PM_CPUPM_ENABLED)
 				*rval_p = PM_CPU_PM_ENABLED;
 			else if (PM_CPUPM_DISABLED)
@@ -2615,7 +2805,96 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			ret = 0;
 			break;
 		}
+
+		case PM_GET_AUTOS3_STATE:
+		{
+			if (autoS3_enabled) {
+				*rval_p = PM_AUTOS3_ENABLED;
+			} else {
+				*rval_p = PM_AUTOS3_DISABLED;
+			}
+			ret = 0;
+			break;
+		}
+
+		case PM_GET_S3_SUPPORT_STATE:
+		{
+			if (pm_S3_enabled) {
+				*rval_p = PM_S3_SUPPORT_ENABLED;
+			} else {
+				*rval_p = PM_S3_SUPPORT_DISABLED;
+			}
+			ret = 0;
+			break;
+		}
+
+		/*
+		 * pmconfig tells us if the platform supports S3
+		 */
+		case PM_ENABLE_S3:
+		{
+			mutex_enter(&pm_scan_lock);
+			if (pm_S3_enabled) {
+				mutex_exit(&pm_scan_lock);
+				PMD(PMD_ERROR, ("ioctl: %s: EBUSY\n",
+				    cmdstr))
+				ret = EBUSY;
+				break;
+			}
+			pm_S3_enabled = 1;
+			mutex_exit(&pm_scan_lock);
+			ret = 0;
+			break;
+		}
+
+		case PM_DISABLE_S3:
+		{
+			mutex_enter(&pm_scan_lock);
+			pm_S3_enabled = 0;
+			mutex_exit(&pm_scan_lock);
+			ret = 0;
+			break;
+		}
+
+		case PM_START_AUTOS3:
+		{
+			mutex_enter(&pm_scan_lock);
+			if (autoS3_enabled) {
+				mutex_exit(&pm_scan_lock);
+				PMD(PMD_ERROR, ("ioctl: %s: EBUSY\n",
+				    cmdstr))
+				ret = EBUSY;
+				break;
+			}
+			autoS3_enabled = 1;
+			mutex_exit(&pm_scan_lock);
+			ret = 0;
+			break;
+		}
+
+		case PM_STOP_AUTOS3:
+		{
+			mutex_enter(&pm_scan_lock);
+			autoS3_enabled = 0;
+			mutex_exit(&pm_scan_lock);
+			ret = 0;
+			break;
+		}
+
+		default:
+			/*
+			 * Internal error, invalid ioctl description
+			 * force debug entry even if pm_debug not set
+			 */
+#ifdef	DEBUG
+			pm_log("invalid diptype %d for cmd %d (%s)\n",
+			    pcip->diptype, cmd, pcip->name);
+#endif
+			ASSERT(0);
+			return (EIO);
+		}
 		break;
+	}
 
 	default:
 		/*

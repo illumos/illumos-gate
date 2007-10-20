@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,7 +319,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    DDI_FM_EREPORT_CAPABLE))
 			pci_ereport_setup(devi);
 		if (ppb->ppb_fmcap & DDI_FM_ERRCB_CAPABLE)
-		    ddi_fm_handler_register(devi, ppb_fm_callback, NULL);
+			ddi_fm_handler_register(devi, ppb_fm_callback, NULL);
 
 		if (pci_config_setup(devi, &config_handle) != DDI_SUCCESS) {
 			if (ppb->ppb_fmcap & DDI_FM_ERRCB_CAPABLE)
@@ -348,7 +348,8 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * to this bus.
 		 */
 		if (pcihp_init(devi) != DDI_SUCCESS)
-		    cmn_err(CE_WARN, "pci: Failed to setup hotplug framework");
+			cmn_err(CE_WARN,
+			    "pci: Failed to setup hotplug framework");
 
 		ddi_report_dev(devi);
 		return (DDI_SUCCESS);
@@ -419,7 +420,7 @@ ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 	return ((DEVI(pdip)->devi_ops->devo_bus_ops->bus_map)(pdip,
-			rdip, mp, offset, len, vaddrp));
+	    rdip, mp, offset, len, vaddrp));
 }
 
 /*ARGSUSED*/
@@ -432,6 +433,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	rn;
 	int	totreg;
 	ppb_devstate_t *ppb;
+	struct attachspec *asp;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -459,6 +461,22 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		break;
 
+	/* X86 systems support PME wakeup from suspend */
+	case DDI_CTLOPS_ATTACH:
+		asp = (struct attachspec *)arg;
+		if (asp->cmd == DDI_RESUME && asp->when == DDI_PRE)
+			if (pci_pre_resume(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+
+
+	case DDI_CTLOPS_DETACH:
+		asp = (struct attachspec *)arg;
+		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST)
+			if (pci_post_suspend(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+
 	case DDI_CTLOPS_PEEK:
 	case DDI_CTLOPS_POKE:
 		ppb = ddi_get_soft_state(ppb_state, ddi_get_instance(dip));
@@ -474,8 +492,8 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	*(int *)result = 0;
 	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
-		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
+	    (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	totreg = reglen / sizeof (pci_regspec_t);
@@ -596,8 +614,8 @@ ppb_initchild(dev_info_t *child)
 	}
 
 	/* transfer select properties from PROM to kernel */
-	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "interrupts",
-		-1) != -1) {
+	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+	    "interrupts", -1) != -1) {
 		pdptr = kmem_zalloc((sizeof (struct ddi_parent_private_data) +
 		    sizeof (struct intrspec)), KM_SLEEP);
 		pdptr->par_intr = (struct intrspec *)(pdptr + 1);
@@ -660,20 +678,20 @@ ppb_save_config_regs(ppb_devstate_t *ppb_p)
 	ddi_acc_handle_t config_handle;
 
 	for (i = 0, dip = ddi_get_child(ppb_p->dip); dip != NULL;
-			i++, dip = ddi_get_next_sibling(dip)) {
+	    i++, dip = ddi_get_next_sibling(dip)) {
 
 		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d: can't config space for %s%d\n",
-				ddi_driver_name(ppb_p->dip),
-				ddi_get_instance(ppb_p->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    ddi_driver_name(ppb_p->dip),
+			    ddi_get_instance(ppb_p->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 
 		ppb_p->config_state[i].dip = dip;
 		ppb_p->config_state[i].command =
-			pci_config_get16(config_handle, PCI_CONF_COMM);
+		    pci_config_get16(config_handle, PCI_CONF_COMM);
 		pci_config_teardown(&config_handle);
 	}
 	ppb_p->config_state_index = i;
@@ -701,14 +719,14 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 		dip = ppb_p->config_state[i].dip;
 		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d: can't config space for %s%d\n",
-				ddi_driver_name(ppb_p->dip),
-				ddi_get_instance(ppb_p->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    ddi_driver_name(ppb_p->dip),
+			    ddi_get_instance(ppb_p->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 		pci_config_put16(config_handle, PCI_CONF_COMM,
-				ppb_p->config_state[i].command);
+		    ppb_p->config_state[i].command);
 		pci_config_teardown(&config_handle);
 	}
 }

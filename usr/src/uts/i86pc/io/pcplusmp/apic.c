@@ -31,8 +31,9 @@
  * PSMI 1.2 extensions are supported only in 2.7 and later versions.
  * PSMI 1.3 and 1.4 extensions are supported in Solaris 10.
  * PSMI 1.5 extensions are supported in Solaris Nevada.
+ * PSMI 1.6 extensions are supported in Solaris Nevada.
  */
-#define	PSMI_1_5
+#define	PSMI_1_6
 
 #include <sys/processor.h>
 #include <sys/time.h>
@@ -238,12 +239,13 @@ static struct	psm_ops apic_ops = {
 	apic_timer_disable,
 	apic_post_cyclic_setup,
 	apic_preshutdown,
-	apic_intr_ops			/* Advanced DDI Interrupt framework */
+	apic_intr_ops,			/* Advanced DDI Interrupt framework */
+	apic_state,			/* save, restore apic state for S3 */
 };
 
 
 static struct	psm_info apic_psm_info = {
-	PSM_INFO_VER01_5,			/* version */
+	PSM_INFO_VER01_6,			/* version */
 	PSM_OWN_EXCLUSIVE,			/* ownership */
 	(struct psm_ops *)&apic_ops,		/* operation */
 	APIC_PCPLUSMP_NAME,			/* machine name */
@@ -1371,6 +1373,9 @@ apic_preshutdown(int cmd, int fcn)
 	APIC_VERBOSE_POWEROFF(("apic_preshutdown(%d,%d); m=%d a=%d\n",
 	    cmd, fcn, apic_poweroff_method, apic_enable_acpi));
 
+	if ((cmd != A_SHUTDOWN) || (fcn != AD_POWEROFF)) {
+		return;
+	}
 }
 
 static void

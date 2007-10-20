@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,10 +73,26 @@ struct	cmdk {
 	uint32_t	dk_altused;		/* num entries in V_ALTSCTR */
 	uint32_t	*dk_slc_cnt;		/* entries per slice */
 	struct alts_ent	**dk_slc_ent;		/* link to remap data */
+
+	/*
+	 * for power management
+	 */
+	kmutex_t	dk_pm_mutex;
+	kcondvar_t	dk_suspend_cv;
+	uint32_t	dk_pm_level;
+	uint32_t	dk_pm_is_enabled;
 };
+
+/*
+ * Power Management definitions
+ */
+#define	CMDK_SPINDLE_UNINIT	((uint_t)(-1))
+#define	CMDK_SPINDLE_OFF	0x0
+#define	CMDK_SPINDLE_ON		0x1
 
 /*	common disk flags definitions					*/
 #define	CMDK_OPEN		0x1
+#define	CMDK_SUSPEND		0x2
 #define	CMDK_TGDK_OPEN		0x4
 
 #define	CMDKUNIT(dev) (getminor((dev)) >> CMDK_UNITSHF)

@@ -207,6 +207,7 @@ ppm_lookup_hndl(int model, ppm_dc_t *key_dc)
 #define	PPM_CTRL_PROP_SUFFIX		"-control"
 
 struct ppm_domit ppm_domit_data[] = {
+	"SX",  PPMD_SX, 0, PPMD_ON,
 	"CPU", PPMD_CPU, PPMD_LOCK_ALL, PPMD_ON,
 	"FET", PPMD_FET, PPMD_LOCK_ONE, PPMD_ON,
 	"PCI", PPMD_PCI, PPMD_LOCK_ONE, PPMD_ON,
@@ -401,11 +402,19 @@ ppm_lookup_dev(dev_info_t *dip)
 
 	PPM_GET_PATHNAME(dip, path);
 	for (domp = ppm_domain_p; domp; domp = domp->next) {
-		if (PPM_DOMAIN_UP(domp))
+		if (PPM_DOMAIN_UP(domp)) {
 			for (dbp = domp->conflist; dbp; dbp = dbp->next) {
+				/*
+				 * allow claiming root without knowing
+				 * its full name
+				 */
+				if (dip == ddi_root_node() &&
+				    strcmp(dbp->name, "/") == 0)
+					return (domp);
 				if (ppm_match_devs(path, dbp) == 0)
 					return (domp);
 			}
+		}
 	}
 
 	return (NULL);
@@ -514,7 +523,8 @@ ppm_match_devs(char *dev_path, ppm_db_t *dbp)
 	/* "<exact match>*"	*/
 	if (dbp->name[dbp->wcpos[0] + 1] == 0) {
 		cp = path + dbp->wcpos[0];
-		while (*cp && (*cp++ != '/'));
+		while (*cp && (*cp++ != '/'))
+			;
 		return ((*cp == 0) ? 0 : -1);
 	}
 
@@ -761,6 +771,22 @@ ppm_init_cb(dev_info_t *dip)
 
 	for (domp = ppm_domain_p; domp != NULL; domp = domp->next) {
 		for (dc = domp->dc; dc; dc = dc->next) {
+			/*
+			 * Warning: This code is rather confusing.
+			 *
+			 * It intends to ensure that ppm_init_lyr() is only
+			 * called ONCE for a device that may be associated
+			 * with more than one domain control.
+			 * So, what it does is first to check to see if
+			 * there is a handle, and then if not it goes on
+			 * to call the init_lyr() routine.
+			 *
+			 * The non-obvious thing is that the ppm_init_lyr()
+			 * routine, in addition to opening the device
+			 * associated with the dc (domain control) in
+			 * question, has the side-effect of creating the
+			 * handle for that dc as well.
+			 */
 			if (ppm_lookup_hndl(domp->model, dc) != NULL)
 				continue;
 
@@ -979,6 +1005,8 @@ struct ppm_confdefs {
 	char	*sym;
 	int	val;
 } ppm_confdefs_table[] = {
+	"ENTER_S3", PPMDC_ENTER_S3,
+	"EXIT_S3", PPMDC_EXIT_S3,
 	"CPU_NEXT", PPMDC_CPU_NEXT,
 	"PRE_CHNG", PPMDC_PRE_CHNG,
 	"CPU_GO", PPMDC_CPU_GO,
@@ -991,7 +1019,9 @@ struct ppm_confdefs {
 	"LED_OFF", PPMDC_LED_OFF,
 	"KIO", PPMDC_KIO,
 	"VCORE", PPMDC_VCORE,
+#ifdef sun4u
 	"I2CKIO", PPMDC_I2CKIO,
+#endif
 	"CPUSPEEDKIO", PPMDC_CPUSPEEDKIO,
 	"PRE_PWR_OFF", PPMDC_PRE_PWR_OFF,
 	"PRE_PWR_ON", PPMDC_PRE_PWR_ON,
@@ -1103,14 +1133,20 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 			(void) ppm_stoi(dclist[i], &dc->m_un.cpu.speeds);
 			continue;
 		}
+#ifdef sun4u
 		if (strstr(dclist[i], "mask=")) {
 			(void) ppm_stoi(dclist[i], &dc->m_un.i2c.mask);
 			continue;
 		}
+#endif
 		/* This must be before the if statement for delay */
 		if (strstr(dclist[i], "post_delay=")) {
+#ifdef sun4u
 			ASSERT(dc->method == PPMDC_KIO ||
 			    dc->method == PPMDC_I2CKIO);
+#else
+			ASSERT(dc->method == PPMDC_KIO);
+#endif
 			/*
 			 * all delays are uint_t type instead of clock_t.
 			 * If the delay is too long, it might get truncated.
@@ -1119,13 +1155,15 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 			switch (dc->method) {
 			case PPMDC_KIO:
 				(void) ppm_stoi(dclist[i],
-					    &dc->m_un.kio.post_delay);
+				    &dc->m_un.kio.post_delay);
 				break;
 
+#ifdef sun4u
 			case PPMDC_I2CKIO:
 				(void) ppm_stoi(dclist[i],
-					    &dc->m_un.i2c.post_delay);
+				    &dc->m_un.i2c.post_delay);
 				break;
+#endif
 
 			default:
 				break;
@@ -1133,9 +1171,14 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 			continue;
 		}
 		if (strstr(dclist[i], "delay=")) {
+#ifdef sun4u
 			ASSERT(dc->method == PPMDC_VCORE ||
-				dc->method == PPMDC_KIO ||
-				dc->method == PPMDC_I2CKIO);
+			    dc->method == PPMDC_KIO ||
+			    dc->method == PPMDC_I2CKIO);
+#else
+			ASSERT(dc->method == PPMDC_VCORE ||
+			    dc->method == PPMDC_KIO);
+#endif
 
 			/*
 			 * all delays are uint_t type instead of clock_t.
@@ -1148,9 +1191,11 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 				(void) ppm_stoi(dclist[i], &dc->m_un.kio.delay);
 				break;
 
+#ifdef sun4u
 			case PPMDC_I2CKIO:
 				(void) ppm_stoi(dclist[i], &dc->m_un.i2c.delay);
 				break;
+#endif
 
 			case PPMDC_VCORE:
 				(void) ppm_stoi(dclist[i], &dc->m_un.cpu.delay);
@@ -1227,6 +1272,8 @@ ppm_lookup_dc(ppm_domain_t *domp, int cmd)
 	case PPMDC_PWR_ON:
 	case PPMDC_RESET_OFF:
 	case PPMDC_RESET_ON:
+	case PPMDC_ENTER_S3:
+	case PPMDC_EXIT_S3:
 		break;
 	default:
 		PPMD(D_PPMDC, ("%s: cmd(%d) unrecognized\n", str, cmd))
@@ -1234,9 +1281,11 @@ ppm_lookup_dc(ppm_domain_t *domp, int cmd)
 	}
 
 	for (dc = domp->dc; dc; dc = dc->next) {
-		if (dc->cmd == cmd)
+		if (dc->cmd == cmd) {
 			return (dc);
+		}
 	}
+
 	return (NULL);
 }
 
@@ -1315,6 +1364,7 @@ ppm_get_ctlstr(int ctlop, uint_t mask)
 		FLINTSTR(D_LOCKS, PMR_PPM_UNLOCK_POWER),
 		FLINTSTR(D_LOCKS, PMR_PPM_TRY_LOCK_POWER),
 		FLINTSTR(D_LOCKS, PMR_PPM_POWER_LOCK_OWNER),
+		FLINTSTR(D_CTLOPS1 | D_CTLOPS2, PMR_PPM_ENTER_SX),
 		FLINTSTR(D_CTLOPS1 | D_CTLOPS2, PMR_UNKNOWN),
 	};
 
@@ -1334,13 +1384,15 @@ ppm_print_dc(ppm_dc_t *dc)
 
 	PPMD(D_PPMDC, ("\nAdds ppm_dc: path(%s),\n     cmd(%x), "
 	    "method(%x), ", d->path, d->cmd, d->method))
-	if (d->method == PPMDC_I2CKIO) {
+	if (d->method == PPMDC_KIO) {
+		PPMD(D_PPMDC, ("kio.iowr(%x), kio.val(0x%X)",
+		    d->m_un.kio.iowr, d->m_un.kio.val))
+#ifdef sun4u
+	} else if (d->method == PPMDC_I2CKIO) {
 		PPMD(D_PPMDC, ("i2c.iowr(%x), i2c.val(0x%X), "
 		    "i2c.mask(0x%X)", d->m_un.i2c.iowr,
 		    d->m_un.i2c.val,  d->m_un.i2c.mask))
-	} else if (d->method == PPMDC_KIO) {
-		PPMD(D_PPMDC, ("kio.iowr(%x), kio.val(0x%X)",
-		    d->m_un.kio.iowr, d->m_un.kio.val))
+#endif
 	} else if (d->method == PPMDC_VCORE) {
 		PPMD(D_PPMDC, ("cpu: .iord(%x), .iowr(%x), .val(0x%X), "
 		    ".delay(0x%x)",

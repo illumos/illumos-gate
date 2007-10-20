@@ -86,6 +86,15 @@
 
 #define	VGA_MMAP_FB_BASE	VGA_MEM_ADDR
 
+/*
+ * This variable allows for this driver to suspend even if it
+ * shouldn't.  Note that by setting it, the framebuffer will probably
+ * not come back.  So use it with a serial console, or with serial
+ * line debugging (say, for example, if this driver is being modified
+ * to support _some_ hardware doing suspend and resume).
+ */
+int vgatext_force_suspend = 0;
+
 static int vgatext_open(dev_t *, int, int, cred_t *);
 static int vgatext_close(dev_t, int, int, cred_t *);
 static int vgatext_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
@@ -271,7 +280,7 @@ _init(void)
 	e = mod_install(&modlinkage);
 
 	if (e) {
-	    ddi_soft_state_fini(&vgatext_softc_head);
+		ddi_soft_state_fini(&vgatext_softc_head);
 	}
 	return (e);
 }
@@ -282,7 +291,7 @@ _fini(void)
 	int e;
 
 	if ((e = mod_remove(&modlinkage)) != 0)
-	    return (e);
+		return (e);
 
 	ddi_soft_state_fini(&vgatext_softc_head);
 
@@ -334,7 +343,7 @@ vgatext_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 
 	if (pci_config_setup(devi, &pci_conf) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			MYNAME ": can't get PCI conf handle");
+		    MYNAME ": can't get PCI conf handle");
 		return;
 	}
 
@@ -410,12 +419,18 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_ATTACH:
-	    break;
+		break;
 
 	case DDI_RESUME:
-	    return (DDI_SUCCESS);
+		/*
+		 * Though vgatext doesn't really know how to resume
+		 * on a generic framebuffer, we should succeed, as
+		 * it is far better to have no console, than potentiall
+		 * have no machine.
+		 */
+		return (DDI_SUCCESS);
 	default:
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	/* DDI_ATTACH */
@@ -436,7 +451,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softc->polledio.cursor = vgatext_polled_cursor;
 
 	error = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_get_parent(devi),
-		DDI_PROP_DONTPASS, "device_type", &parent_type);
+	    DDI_PROP_DONTPASS, "device_type", &parent_type);
 	if (error != DDI_SUCCESS) {
 		cmn_err(CE_WARN, MYNAME ": can't determine parent type.");
 		goto fail;
@@ -444,47 +459,47 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (STREQ(parent_type, "isa") || STREQ(parent_type, "eisa")) {
 		reg_rnumber = vgatext_get_isa_reg_index(devi, 1, VGA_REG_ADDR,
-			&reg_offset);
+		    &reg_offset);
 		if (reg_rnumber < 0) {
 			cmn_err(CE_WARN,
-				MYNAME ": can't find reg entry for registers");
+			    MYNAME ": can't find reg entry for registers");
 			error = DDI_FAILURE;
 			goto fail;
 		}
 		softc->fb_regno = vgatext_get_isa_reg_index(devi, 0,
-			VGA_MEM_ADDR, &mem_offset);
+		    VGA_MEM_ADDR, &mem_offset);
 		if (softc->fb_regno < 0) {
 			cmn_err(CE_WARN,
-				MYNAME ": can't find reg entry for memory");
+			    MYNAME ": can't find reg entry for memory");
 			error = DDI_FAILURE;
 			goto fail;
 		}
 	} else if (STREQ(parent_type, "pci") || STREQ(parent_type, "pciex")) {
 		pci_pcie_bus = 1;
 		reg_rnumber = vgatext_get_pci_reg_index(devi,
-			PCI_REG_ADDR_M|PCI_REG_REL_M,
-			PCI_ADDR_IO|PCI_RELOCAT_B, VGA_REG_ADDR,
-			&reg_offset);
+		    PCI_REG_ADDR_M|PCI_REG_REL_M,
+		    PCI_ADDR_IO|PCI_RELOCAT_B, VGA_REG_ADDR,
+		    &reg_offset);
 		if (reg_rnumber < 0) {
 			cmn_err(CE_WARN,
-				MYNAME ": can't find reg entry for registers");
+			    MYNAME ": can't find reg entry for registers");
 			error = DDI_FAILURE;
 			goto fail;
 		}
 		softc->fb_regno = vgatext_get_pci_reg_index(devi,
-			PCI_REG_ADDR_M|PCI_REG_REL_M,
-			PCI_ADDR_MEM32|PCI_RELOCAT_B, VGA_MEM_ADDR,
-			&mem_offset);
+		    PCI_REG_ADDR_M|PCI_REG_REL_M,
+		    PCI_ADDR_MEM32|PCI_RELOCAT_B, VGA_MEM_ADDR,
+		    &mem_offset);
 		if (softc->fb_regno < 0) {
 			cmn_err(CE_WARN,
-				MYNAME ": can't find reg entry for memory");
+			    MYNAME ": can't find reg entry for memory");
 			error = DDI_FAILURE;
 			goto fail;
 		}
 		agpm = 1;	/* should have AGP master support */
 	} else {
 		cmn_err(CE_WARN, MYNAME ": unknown parent type \"%s\".",
-			parent_type);
+		    parent_type);
 		error = DDI_FAILURE;
 		goto fail;
 	}
@@ -492,8 +507,8 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	parent_type = NULL;
 
 	error = ddi_regs_map_setup(devi, reg_rnumber,
-		(caddr_t *)&softc->regs.addr, reg_offset, VGA_REG_SIZE,
-		&dev_attr, &softc->regs.handle);
+	    (caddr_t *)&softc->regs.addr, reg_offset, VGA_REG_SIZE,
+	    &dev_attr, &softc->regs.handle);
 	if (error != DDI_SUCCESS)
 		goto fail;
 	softc->regs.mapped = B_TRUE;
@@ -501,9 +516,9 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softc->fb_size = VGA_MEM_SIZE;
 
 	error = ddi_regs_map_setup(devi, softc->fb_regno,
-		(caddr_t *)&softc->fb.addr,
-		mem_offset, softc->fb_size,
-		&dev_attr, &softc->fb.handle);
+	    (caddr_t *)&softc->fb.addr,
+	    mem_offset, softc->fb_size,
+	    &dev_attr, &softc->fb.handle);
 	if (error != DDI_SUCCESS)
 		goto fail;
 	softc->fb.mapped = B_TRUE;
@@ -527,7 +542,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
-		DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) {
+	    DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) {
 		if (strcmp(cons, "graphics") == 0) {
 			happyface_boot = 1;
 			vgatext_silent = 1;
@@ -588,6 +603,28 @@ vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(devi, NULL);
 		(void) ddi_soft_state_free(vgatext_softc_head, instance);
 		return (DDI_SUCCESS);
+
+	case DDI_SUSPEND:
+		/*
+		 * This is a generic VGA file, and therefore, cannot
+		 * understand how to deal with suspend and resume on
+		 * a generic interface.  So we fail any attempt to
+		 * suspend.  At some point in the future, we might use
+		 * this as an entrypoint for display drivers and this
+		 * assumption may change.
+		 *
+		 * However, from a platform development perspective,
+		 * it is important that this driver suspend if a
+		 * developer is using a serial console and/or working
+		 * on a framebuffer driver that will support suspend
+		 * and resume.  Therefore, we have this module tunable
+		 * (purposely using a long name) that will allow for
+		 * suspend it it is set.  Otherwise we fail.
+		 */
+		if (vgatext_force_suspend != 0)
+			return (DDI_SUCCESS);
+		else
+			return (DDI_FAILURE);
 
 	default:
 		cmn_err(CE_WARN, "vgatext_detach: unknown cmd 0x%x\n", cmd);
@@ -676,59 +713,59 @@ do_gfx_ioctl(int cmd, intptr_t data, int mode, struct vgatext_softc *softc)
 
 	case VIS_DEVINIT:
 
-	    if (!(mode & FKIOCTL)) {
-		    cmn_err(CE_CONT, kernel_only, "VIS_DEVINIT");
-		    return (ENXIO);
-	    }
+		if (!(mode & FKIOCTL)) {
+			cmn_err(CE_CONT, kernel_only, "VIS_DEVINIT");
+			return (ENXIO);
+		}
 
-	    err = vgatext_devinit(softc, (struct vis_devinit *)data);
-	    if (err != 0) {
-		    cmn_err(CE_WARN,
-			"vgatext_ioctl:  could not initialize console");
-		    return (err);
-	    }
-	    break;
+		err = vgatext_devinit(softc, (struct vis_devinit *)data);
+		if (err != 0) {
+			cmn_err(CE_WARN,
+			    "vgatext_ioctl:  could not initialize console");
+			return (err);
+		}
+		break;
 
 	case VIS_CONSCOPY:	/* move */
-	{
-	    struct vis_conscopy pma;
+		{
+		struct vis_conscopy pma;
 
-	    if (ddi_copyin((void *)data, &pma,
-		sizeof (struct vis_conscopy), mode))
-		    return (EFAULT);
+		if (ddi_copyin((void *)data, &pma,
+		    sizeof (struct vis_conscopy), mode))
+			return (EFAULT);
 
-	    vgatext_cons_copy(softc, &pma);
-	    break;
-	}
+		vgatext_cons_copy(softc, &pma);
+		break;
+		}
 
 	case VIS_CONSDISPLAY:	/* display */
-	{
-	    struct vis_consdisplay display_request;
+		{
+		struct vis_consdisplay display_request;
 
-	    if (ddi_copyin((void *)data, &display_request,
-		sizeof (display_request), mode))
-		    return (EFAULT);
+		if (ddi_copyin((void *)data, &display_request,
+		    sizeof (display_request), mode))
+			return (EFAULT);
 
-	    vgatext_cons_display(softc, &display_request);
-	    break;
-	}
+		vgatext_cons_display(softc, &display_request);
+		break;
+		}
 
 	case VIS_CONSCURSOR:
-	{
-	    struct vis_conscursor cursor_request;
+		{
+		struct vis_conscursor cursor_request;
 
-	    if (ddi_copyin((void *)data, &cursor_request,
-		sizeof (cursor_request), mode))
-		    return (EFAULT);
+		if (ddi_copyin((void *)data, &cursor_request,
+		    sizeof (cursor_request), mode))
+			return (EFAULT);
 
-	    vgatext_cons_cursor(softc, &cursor_request);
+		vgatext_cons_cursor(softc, &cursor_request);
 
-	    if (cursor_request.action == VIS_GET_CURSOR &&
-		ddi_copyout(&cursor_request, (void *)data,
-		sizeof (cursor_request), mode))
-		    return (EFAULT);
-	    break;
-	}
+		if (cursor_request.action == VIS_GET_CURSOR &&
+		    ddi_copyout(&cursor_request, (void *)data,
+		    sizeof (cursor_request), mode))
+			return (EFAULT);
+		break;
+		}
 
 	case VIS_GETCMAP:
 	case VIS_PUTCMAP:
@@ -807,7 +844,7 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 		softc->current_base = softc->text_base;
 		if (softc->cursor.visible) {
 			vgatext_set_cursor(softc,
-				softc->cursor.row, softc->cursor.col);
+			    softc->cursor.row, softc->cursor.col);
 		}
 		vgatext_restore_colormap(softc);
 		break;
@@ -852,7 +889,7 @@ vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	}
 
 	if (!(off >= VGA_MMAP_FB_BASE &&
-		off < VGA_MMAP_FB_BASE + softc->fb_size)) {
+	    off < VGA_MMAP_FB_BASE + softc->fb_size)) {
 		cmn_err(CE_WARN, "vgatext: Can't map offset 0x%llx", off);
 		return (-1);
 	}
@@ -863,8 +900,8 @@ vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 		length = len;
 
 	if ((err = devmap_devmem_setup(dhp, softc->devi, NULL, softc->fb_regno,
-					off - VGA_MMAP_FB_BASE,
-					length, PROT_ALL, 0, &dev_attr)) < 0) {
+	    off - VGA_MMAP_FB_BASE,
+	    length, PROT_ALL, 0, &dev_attr)) < 0) {
 		return (err);
 	}
 
@@ -924,10 +961,10 @@ vgatext_cons_display(struct vgatext_softc *softc, struct vis_consdisplay *da)
 	 * system startup graphics.
 	 */
 	attr = (solaris_color_to_pc_color[da->bg_color & 0xf] << 4)
-		| solaris_color_to_pc_color[da->fg_color & 0xf];
+	    | solaris_color_to_pc_color[da->fg_color & 0xf];
 	string = da->data;
 	addr = (struct cgatext *)softc->current_base
-		+  (da->row * TEXT_COLS + da->col);
+	    +  (da->row * TEXT_COLS + da->col);
 	for (i = 0; i < da->width; i++) {
 		addr->ch = string[i];
 		addr->attr = attr;
@@ -1130,20 +1167,20 @@ vgatext_set_text(struct vgatext_softc *softc)
 
 	/* set sequencer registers */
 	vga_set_seq(&softc->regs, VGA_SEQ_RST_SYN,
-		(vga_get_seq(&softc->regs, VGA_SEQ_RST_SYN) &
-		~VGA_SEQ_RST_SYN_NO_SYNC_RESET));
+	    (vga_get_seq(&softc->regs, VGA_SEQ_RST_SYN) &
+	    ~VGA_SEQ_RST_SYN_NO_SYNC_RESET));
 	for (i = 1; i < NUM_SEQ_REG; i++) {
 		vga_set_seq(&softc->regs, i, VGA_SEQ_TEXT[i]);
 	}
 	vga_set_seq(&softc->regs, VGA_SEQ_RST_SYN,
-		(vga_get_seq(&softc->regs, VGA_SEQ_RST_SYN) |
-		VGA_SEQ_RST_SYN_NO_ASYNC_RESET |
-		VGA_SEQ_RST_SYN_NO_SYNC_RESET));
+	    (vga_get_seq(&softc->regs, VGA_SEQ_RST_SYN) |
+	    VGA_SEQ_RST_SYN_NO_ASYNC_RESET |
+	    VGA_SEQ_RST_SYN_NO_SYNC_RESET));
 
 	/* set crt controller registers */
 	vga_set_crtc(&softc->regs, VGA_CRTC_VRE,
-		(vga_get_crtc(&softc->regs, VGA_CRTC_VRE) &
-		~VGA_CRTC_VRE_LOCK));
+	    (vga_get_crtc(&softc->regs, VGA_CRTC_VRE) &
+	    ~VGA_CRTC_VRE_LOCK));
 	for (i = 0; i < NUM_CRTC_REG; i++) {
 		vga_set_crtc(&softc->regs, i, VGA_CRTC_TEXT[i]);
 	}
@@ -1161,8 +1198,8 @@ vgatext_set_text(struct vgatext_softc *softc)
 	/* set palette */
 	for (i = 0; i < VGA_TEXT_CMAP_ENTRIES; i++) {
 		vga_put_cmap(&softc->regs, i, VGA_TEXT_PALETTES[i][0] << 2,
-			VGA_TEXT_PALETTES[i][1] << 2,
-			VGA_TEXT_PALETTES[i][2] << 2);
+		    VGA_TEXT_PALETTES[i][1] << 2,
+		    VGA_TEXT_PALETTES[i][2] << 2);
 	}
 	for (i = VGA_TEXT_CMAP_ENTRIES; i < VGA8_CMAP_ENTRIES; i++) {
 		vga_put_cmap(&softc->regs, i, 0, 0, 0);
@@ -1185,10 +1222,10 @@ vgatext_init(struct vgatext_softc *softc)
 	vga_set_atr(&softc->regs, VGA_ATR_MODE, atr_mode);
 #if	defined(USE_BORDERS)
 	vga_set_atr(&softc->regs, VGA_ATR_BDR_CLR,
-		vga_get_atr(&softc->regs, VGA_BRIGHT_WHITE));
+	    vga_get_atr(&softc->regs, VGA_BRIGHT_WHITE));
 #else
 	vga_set_atr(&softc->regs, VGA_ATR_BDR_CLR,
-		vga_get_atr(&softc->regs, VGA_BLACK));
+	    vga_get_atr(&softc->regs, VGA_BLACK));
 #endif
 	vgatext_setfont(softc);	/* need selectable font? */
 }
@@ -1198,7 +1235,7 @@ static void
 vgatext_init_graphics(struct vgatext_softc *softc)
 {
 	vga_set_atr(&softc->regs, VGA_ATR_BDR_CLR,
-		vga_get_atr(&softc->regs, VGA_BLACK));
+	    vga_get_atr(&softc->regs, VGA_BLACK));
 }
 #endif
 
@@ -1301,9 +1338,9 @@ vgatext_save_colormap(struct vgatext_softc *softc)
 	}
 	for (i = 0; i < VGA8_CMAP_ENTRIES; i++) {
 		vga_get_cmap(&softc->regs, i,
-			&softc->colormap[i].red,
-			&softc->colormap[i].green,
-			&softc->colormap[i].blue);
+		    &softc->colormap[i].red,
+		    &softc->colormap[i].green,
+		    &softc->colormap[i].blue);
 	}
 }
 
@@ -1317,9 +1354,9 @@ vgatext_restore_colormap(struct vgatext_softc *softc)
 	}
 	for (i = 0; i < VGA8_CMAP_ENTRIES; i++) {
 		vga_put_cmap(&softc->regs, i,
-			softc->colormap[i].red,
-			softc->colormap[i].green,
-			softc->colormap[i].blue);
+		    softc->colormap[i].red,
+		    softc->colormap[i].green,
+		    softc->colormap[i].blue);
 	}
 }
 
@@ -1354,7 +1391,7 @@ vgatext_get_pci_reg_index(
 	pci_regspec_t	*reg;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"reg", (caddr_t)&reg, &length) != DDI_PROP_SUCCESS) {
+	    "reg", (caddr_t)&reg, &length) != DDI_PROP_SUCCESS) {
 		return (-1);
 	}
 
@@ -1413,7 +1450,7 @@ vgatext_get_isa_reg_index(
 	struct regspec	*reg;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"reg", (caddr_t)&reg, &length) != DDI_PROP_SUCCESS) {
+	    "reg", (caddr_t)&reg, &length) != DDI_PROP_SUCCESS) {
 		return (-1);
 	}
 

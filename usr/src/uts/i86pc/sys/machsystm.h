@@ -56,6 +56,7 @@ extern "C" {
 extern void mach_cpu_idle(void);
 extern void mach_cpu_halt(char *);
 extern int mach_cpu_start(cpu_t *, void *);
+extern int mach_cpuid_start(processorid_t, void *);
 
 extern int Cpudelay;
 extern void setcpudelay(void);
@@ -116,6 +117,7 @@ extern int mach_cpucontext_init(void);
 extern void mach_cpucontext_fini(void);
 extern void *mach_cpucontext_alloc(struct cpu *);
 extern void mach_cpucontext_free(struct cpu *, void *, int);
+extern void rmp_gdt_init(rm_platter_t *);
 
 extern uintptr_t hole_start, hole_end;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,8 @@ static uint_t	audio810_intr(caddr_t);
 /*
  * Local Routine Prototypes
  */
+static void audio810_set_busy(audio810_state_t *);
+static void audio810_set_idle(audio810_state_t *);
 static int audio810_codec_sync(audio810_state_t *);
 static int audio810_write_ac97(audio810_state_t *, int, uint16_t);
 static int audio810_read_ac97(audio810_state_t *, int, uint16_t *);
@@ -569,17 +571,49 @@ audio810_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
-
-	/*
-	 * now, no suspend/resume supported. we'll do it in the future.
-	 */
 	case DDI_RESUME:
 		ATRACE("I810_attach() DDI_RESUME", NULL);
-		audio_sup_log(NULL, CE_WARN,
-		    "%s%d: i810_attach() resume is not supported yet",
-		    audio810_name, instance);
-		return (DDI_FAILURE);
 
+		if ((statep = ddi_get_soft_state(audio810_statep, instance)) ==
+		    NULL) {
+			audio_sup_log(NULL, CE_WARN,
+			    "!attach() DDI_RESUME get soft state failed");
+			return (DDI_FAILURE);
+		}
+
+		ASSERT(dip == statep->dip);
+
+		mutex_enter(&statep->inst_lock);
+
+		ASSERT(statep->i810_suspended == I810_SUSPENDED);
+
+		statep->i810_suspended = I810_NOT_SUSPENDED;
+
+		/* Restore the audio810 chip's state */
+		if (audio810_chip_init(statep, I810_INIT_RESTORE) !=
+		    AUDIO_SUCCESS) {
+			audio_sup_log(statep->audio_handle, CE_WARN,
+			    "!attach() DDI_RESUME failed to init chip");
+			mutex_exit(&statep->inst_lock);
+			return (DDI_FAILURE);
+		}
+
+		mutex_exit(&statep->inst_lock);
+
+		/* Resume playing and recording, if required */
+		if (audio_sup_restore_state(statep->audio_handle,
+		    AUDIO_ALL_DEVICES, AUDIO_BOTH) == AUDIO_FAILURE) {
+			audio_sup_log(statep->audio_handle, CE_WARN,
+			    "!attach() DDI_RESUME audio restart failed");
+		}
+
+		mutex_enter(&statep->inst_lock);
+		cv_broadcast(&statep->i810_cv);	/* let entry points continue */
+		mutex_exit(&statep->inst_lock);
+
+		ATRACE("audio810_attach() DDI_RESUME done", NULL);
+
+		return (DDI_SUCCESS);
 	default:
 		audio_sup_log(NULL, CE_WARN,
 		    "!%s%d: attach() unknown command: 0x%x",
@@ -638,7 +672,7 @@ audio810_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* set PCI command register */
 	cmdreg = pci_config_get16(statep->pci_conf_handle, PCI_CONF_COMM);
 	pci_config_put16(statep->pci_conf_handle, PCI_CONF_COMM,
-		cmdreg | PCI_COMM_IO | PCI_COMM_MAE | PCI_COMM_ME);
+	    cmdreg | PCI_COMM_IO | PCI_COMM_MAE | PCI_COMM_ME);
 
 	if ((audio810_alloc_sample_buf(statep, I810_DMA_PCM_OUT,
 	    statep->play_buf_size) == AUDIO_FAILURE) ||
@@ -700,6 +734,7 @@ error_unmap:
 error_destroy:
 	ATRACE("audio810_attach() error_destroy", statep);
 	mutex_destroy(&statep->inst_lock);
+	cv_destroy(&statep->i810_cv);
 
 error_audiosup:
 	ATRACE("audio810_attach() error_audiosup", statep);
@@ -751,17 +786,33 @@ audio810_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		break;
-
-	/*
-	 * now, no suspend/resume supported. we'll do it in the future.
-	 */
 	case DDI_SUSPEND:
 		ATRACE("i810_detach() SUSPEND", statep);
-		audio_sup_log(NULL, CE_WARN,
-		    "%s%d: i810_detach() suspend is not supported yet",
-		    audio810_name, instance);
-		return (DDI_FAILURE);
 
+		mutex_enter(&statep->inst_lock);
+
+		ASSERT(statep->i810_suspended == I810_NOT_SUSPENDED);
+
+		statep->i810_suspended = I810_SUSPENDED; /* stop new ops */
+
+		/* wait for current operations to complete */
+		while (statep->i810_busy_cnt != 0)
+			cv_wait(&statep->i810_cv, &statep->inst_lock);
+
+		/* stop DMA engines */
+		audio810_stop_dma(statep);
+
+		if (audio_sup_save_state(statep->audio_handle,
+		    AUDIO_ALL_DEVICES, AUDIO_BOTH) == AUDIO_FAILURE) {
+			audio_sup_log(statep->audio_handle, CE_WARN,
+			    "!detach() DDI_SUSPEND audio save failed");
+		}
+
+		mutex_exit(&statep->inst_lock);
+
+		ATRACE("audio810_detach() DDI_SUSPEND successful", statep);
+
+		return (DDI_SUCCESS);
 	default:
 		ATRACE("i810_detach() unknown command", cmd);
 		audio_sup_log(statep->audio_handle, CE_WARN,
@@ -796,6 +847,7 @@ audio810_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	(void) audio_sup_unregister(statep->audio_handle);
 
 	mutex_destroy(&statep->inst_lock);
+	cv_destroy(&statep->i810_cv);
 
 	audio810_unmap_regs(statep);
 
@@ -835,6 +887,13 @@ audio810_intr(caddr_t arg)
 
 	statep = (audio810_state_t *)arg;
 	mutex_enter(&statep->inst_lock);
+
+	if (statep->i810_suspended == I810_SUSPENDED) {
+		ATRACE("audio810_intr() device suspended", NULL);
+		mutex_exit(&statep->inst_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	gsr = I810_BM_GET32(I810_REG_GSR);
 
 	/* check if device is interrupting */
@@ -883,6 +942,97 @@ audio810_intr(caddr_t arg)
 
 }	/* audio810_intr() */
 
+/*
+ * audio810_set_busy()
+ *
+ * Description:
+ *	This routine is called whenever a routine needs to guarantee
+ *	that it will not be suspended.  It will also block any routine
+ *	while a suspend is going on.
+ *
+ *	CAUTION: This routine cannot be called by routines that will
+ *		block. Otherwise DDI_SUSPEND will be blocked for a
+ *		long time. And that is the wrong thing to do.
+ *
+ * Arguments:
+ *	audio810_state_t	*statep		The device's state structure
+ *
+ * Returns:
+ *	void
+ */
+static void
+audio810_set_busy(audio810_state_t *statep)
+{
+	ATRACE("in audio810_set_busy()", statep);
+
+	ASSERT(!mutex_owned(&statep->inst_lock));
+
+	/* get the lock so we are safe */
+	mutex_enter(&statep->inst_lock);
+
+	/* block if we are suspended */
+	while (statep->i810_suspended == I810_SUSPENDED) {
+		cv_wait(&statep->i810_cv, &statep->inst_lock);
+	}
+
+	/*
+	 * Okay, we aren't suspended, so mark as busy.
+	 * This will keep us from being suspended when we release the lock.
+	 */
+	ASSERT(statep->i810_busy_cnt >= 0);
+	statep->i810_busy_cnt++;
+
+	mutex_exit(&statep->inst_lock);
+
+	ATRACE("audio810_set_busy() done", statep);
+
+	ASSERT(!mutex_owned(&statep->inst_lock));
+
+}	/* audio810_set_busy() */
+
+/*
+ * audio810_set_idle()
+ *
+ * Description:
+ *	This routine reduces the busy count. It then does a cv_broadcast()
+ *	if the count is 0 so a waiting DDI_SUSPEND will continue forward.
+ *
+ * Arguments:
+ *	audio810_state_t	*state		The device's state structure
+ *
+ * Returns:
+ *	void
+ */
+static void
+audio810_set_idle(audio810_state_t *statep)
+{
+	ATRACE("in audio810_set_idle()", statep);
+
+	ASSERT(!mutex_owned(&statep->inst_lock));
+
+	/* get the lock so we are safe */
+	mutex_enter(&statep->inst_lock);
+
+	ASSERT(statep->i810_suspended == I810_NOT_SUSPENDED);
+
+	/* decrement the busy count */
+	ASSERT(statep->i810_busy_cnt > 0);
+	statep->i810_busy_cnt--;
+
+	/* if no longer busy, then we wake up a waiting SUSPEND */
+	if (statep->i810_busy_cnt == 0) {
+		cv_broadcast(&statep->i810_cv);
+	}
+
+	/* we're done, so unlock */
+	mutex_exit(&statep->inst_lock);
+
+	ATRACE("audio810_set_idle() done", statep);
+
+	ASSERT(!mutex_owned(&statep->inst_lock));
+
+}	/* audio810_set_idle() */
+
 /* *********************** Mixer Entry Point Routines ******************* */
 /*
  * audio810_ad_set_config()
@@ -925,6 +1075,8 @@ audio810_ad_set_config(audiohdl_t ahandle, int stream, int command,
 	/* get the soft state structure */
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
+
+	audio810_set_busy(statep);
 
 	mutex_enter(&statep->inst_lock);
 	switch (command) {
@@ -1030,6 +1182,8 @@ audio810_ad_set_config(audiohdl_t ahandle, int stream, int command,
 	}
 	mutex_exit(&statep->inst_lock);
 
+	audio810_set_idle(statep);
+
 	ATRACE_32("i810_ad_set_config() returning", rc);
 
 	return (rc);
@@ -1063,6 +1217,7 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 {
 	audio810_state_t	*statep;
 	uint16_t		val;
+	int			rc = AUDIO_FAILURE;
 
 	ASSERT(precision == AUDIO_PRECISION_16);
 	ASSERT(channels == AUDIO_CHANNELS_STEREO);
@@ -1083,6 +1238,8 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
 
 	if (statep->var_sr == B_FALSE) {
@@ -1092,8 +1249,7 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 			audio_sup_log(statep->audio_handle, CE_NOTE,
 			    "!ad_set_format() bad sample rate %d\n",
 			    sample_rate);
-			mutex_exit(&statep->inst_lock);
-			return (AUDIO_FAILURE);
+			goto done;
 		}
 	} else {
 		switch (sample_rate) {
@@ -1111,8 +1267,7 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		case I810_SAMPR48000:	break;
 		default:
 			ATRACE_32("i810_ad_set_format() bad SR", sample_rate);
-			mutex_exit(&statep->inst_lock);
-			return (AUDIO_FAILURE);
+			goto done;
 		}
 	}
 
@@ -1140,8 +1295,7 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 				audio_sup_log(statep->audio_handle, CE_NOTE,
 				    "!set_format() bad output sample rate %d",
 				    sample_rate);
-				mutex_exit(&statep->inst_lock);
-				return (AUDIO_FAILURE);
+				goto done;
 			}
 		}
 
@@ -1170,8 +1324,7 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 				audio_sup_log(statep->audio_handle, CE_NOTE,
 				    "!set_format() bad input sample rate %d",
 				    sample_rate);
-				mutex_exit(&statep->inst_lock);
-				return (AUDIO_FAILURE);
+				goto done;
 			}
 		}
 
@@ -1180,12 +1333,15 @@ audio810_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		statep->i810_cprecision = precision;
 	}
 
+	rc = AUDIO_SUCCESS;
 done:
 	mutex_exit(&statep->inst_lock);
 
-	ATRACE_32("i810_ad_set_format() returning success", 0);
+	audio810_set_idle(statep);
 
-	return (AUDIO_SUCCESS);
+	ATRACE_32("i810_ad_set_format() returning", rc);
+
+	return (rc);
 
 }	/* audio810_ad_set_format() */
 
@@ -1215,6 +1371,8 @@ audio810_ad_start_play(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
 
 	if (statep->flags & I810_DMA_PLAY_PAUSED) {
@@ -1239,6 +1397,9 @@ audio810_ad_start_play(audiohdl_t ahandle, int stream)
 
 done:
 	mutex_exit(&statep->inst_lock);
+
+	audio810_set_idle(statep);
+
 	return (rc);
 
 }	/* audio810_ad_start_play() */
@@ -1269,16 +1430,19 @@ audio810_ad_pause_play(audiohdl_t ahandle, int stream)
 	ATRACE("audio810_ad_pause_play() ", ahandle);
 	ATRACE_32("i810_ad_pause_play() stream", stream);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
-	if ((statep->flags & I810_DMA_PLAY_STARTED) == 0) {
-		mutex_exit(&statep->inst_lock);
-		return;
-	}
+	if ((statep->flags & I810_DMA_PLAY_STARTED) == 0)
+		goto done;
 	cr = I810_BM_GET8(I810_PCM_OUT_CR);
 	cr &= ~I810_BM_CR_RUN;
 	I810_BM_PUT8(I810_PCM_OUT_CR, cr);
 	statep->flags |= I810_DMA_PLAY_PAUSED;
+done:
 	mutex_exit(&statep->inst_lock);
+
+	audio810_set_idle(statep);
 
 }	/* audio810_ad_pause_play() */
 
@@ -1308,6 +1472,8 @@ audio810_ad_stop_play(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
 
 	/* pause bus master */
@@ -1322,6 +1488,8 @@ audio810_ad_stop_play(audiohdl_t ahandle, int stream)
 	    |I810_DMA_PLAY_PAUSED | I810_DMA_PLAY_EMPTY);
 
 	mutex_exit(&statep->inst_lock);
+
+	audio810_set_idle(statep);
 
 }	/* audio810_ad_stop_play() */
 
@@ -1344,24 +1512,27 @@ static int
 audio810_ad_start_record(audiohdl_t ahandle, int stream)
 {
 	audio810_state_t	*statep;
-	int			rc;
+	int			rc = AUDIO_SUCCESS;
 
 	ATRACE("audio810_ad_start_record() ", ahandle);
 	ATRACE_32("i810_ad_start_record() stream", stream);
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
-	if (statep->flags & I810_DMA_RECD_STARTED) {
-		mutex_exit(&statep->inst_lock);
-		return (AUDIO_SUCCESS);
-	}
+	if (statep->flags & I810_DMA_RECD_STARTED)
+		goto done;
 
 	rc = audio810_prepare_record_buf(statep);
 	if (rc == AUDIO_SUCCESS) {
 		statep->flags |= I810_DMA_RECD_STARTED;
 	}
+done:
 	mutex_exit(&statep->inst_lock);
+
+	audio810_set_idle(statep);
 
 	return (rc);
 
@@ -1393,6 +1564,8 @@ audio810_ad_stop_record(audiohdl_t ahandle, int stream)
 	statep = audio_sup_get_private(ahandle);
 	ASSERT(statep);
 
+	audio810_set_busy(statep);
+
 	mutex_enter(&statep->inst_lock);
 	statep->flags &= ~I810_DMA_RECD_STARTED;
 
@@ -1406,6 +1579,8 @@ audio810_ad_stop_record(audiohdl_t ahandle, int stream)
 	I810_BM_PUT8(I810_PCM_IN_CR, I810_BM_CR_RST);
 
 	mutex_exit(&statep->inst_lock);
+
+	audio810_set_idle(statep);
 
 }	/* audio810_ad_stop_record() */
 
@@ -1585,6 +1760,7 @@ audio810_init_state(audio810_state_t *statep, dev_info_t *dip)
 		return (AUDIO_FAILURE);
 	}
 	mutex_init(&statep->inst_lock, NULL, MUTEX_DRIVER, statep->intr_iblock);
+	cv_init(&statep->i810_cv, NULL, CV_DRIVER, NULL);
 
 	/* fill in device info strings */
 	(void) strcpy(statep->i810_dev_info.name, I810_DEV_NAME);
@@ -2418,6 +2594,14 @@ audio810_stop_dma(audio810_state_t *statep)
 	I810_BM_PUT8(I810_MIC_CR, I810_BM_CR_RST);
 
 	statep->flags = 0;
+
+/*
+ * XXXX Not sure what these declarations are for, but I brought them from
+ * the PM gate.
+ */
+	statep->play_buf.io_started = B_FALSE;
+
+	statep->record_buf.io_started = B_FALSE;
 
 }	/* audio810_stop_dma() */
 

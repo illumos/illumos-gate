@@ -177,6 +177,15 @@ extern "C" {
  * Feature register bits
  */
 #define	ATF_ATAPI_DMA	0x01	/* ATAPI DMA enable bit */
+#define	ATF_XFRMOD_UDMA	0x40	/* Ultra DMA mode	*/
+#define	ATACM_UDMA_SEL(id)	(((id)->ai_ultradma >> 8) & 0x7f)
+
+/*
+ * Set feature register definitions.
+ */
+#define	ATSF_SET_XFRMOD	0X03	/* Set transfer mode			  */
+#define	ATSF_DIS_REVPOD	0x66	/* Disable reverting to power on defaults */
+#define	ATSF_ENA_REVPOD	0xcc	/* Enable reverting to power on defaults  */
 
 /*
  * common bits and options for set features (ATC_SET_FEAT)
@@ -281,6 +290,12 @@ typedef struct ata_ctl {
 	struct ata_pkt	*ac_arq_pktp;	  /* pkt for performing ATAPI ARQ */
 	struct ata_pkt	*ac_fault_pktp;	  /* pkt that caused ARQ */
 	uchar_t		 ac_arq_cdb[6];
+
+	/*
+	 * Power Management
+	 */
+	int		ac_pm_support;
+	int		ac_pm_level;
 } ata_ctl_t;
 
 /* ac_flags (per-controller) */

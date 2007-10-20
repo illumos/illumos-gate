@@ -135,6 +135,8 @@ extern void acpi_new_irq_cache_ent(int bus, int dev, int ipin, int pci_irq,
 extern int acpi_get_irq_cache_ent(uchar_t bus, uchar_t dev, int ipin,
     int *pci_irqp, iflag_t *intr_flagp);
 
+extern void acpi_restore_link_devices(void);
+
 extern int acpi_poweroff(void);
 
 extern void psm_set_elcr(int vecno, int val);

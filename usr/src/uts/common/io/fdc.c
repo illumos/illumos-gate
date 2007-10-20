@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -472,7 +471,7 @@ fdc_probe(dev_info_t *dip)
 	}
 
 	FCERRPRINT(FDEP_L3, FDEM_ATTA, (CE_WARN, "fdc_probe: dip %p",
-		(void*)dip));
+	    (void*)dip));
 
 	if (get_ioaddr(dip, &ioaddr) != DDI_SUCCESS)
 		return (DDI_PROBE_FAILURE);
@@ -497,7 +496,7 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char name[MAXNAMELEN];
 
 	FCERRPRINT(FDEP_L3, FDEM_ATTA, (CE_WARN, "fdc_attach: dip %p",
-		(void*)dip));
+	    (void*)dip));
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -599,6 +598,10 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		ddi_report_dev(dip);
 		return (DDI_SUCCESS);
+
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+		/* break; */
 
 	default:
 		return (DDI_FAILURE);
@@ -826,11 +829,12 @@ static int
 fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct fdcntlr *fcp;
+	struct fcu_obj *fjp;
 	int unit;
 	int rval = 0;
 
 	FCERRPRINT(FDEP_L3, FDEM_ATTA, (CE_WARN, "fdc_detach: dip %p",
-		(void*)dip));
+	    (void*)dip));
 
 	fcp = ddi_get_driver_private(dip);
 
@@ -847,8 +851,8 @@ fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		if (ddi_dmae_release(fcp->c_dip, fcp->c_dmachan) !=
 		    DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdc_detach: dma release failed, "
-				"dip %p, dmachan %x\n",
-				(void*)fcp->c_dip, fcp->c_dmachan);
+			    "dip %p, dmachan %x\n",
+			    (void*)fcp->c_dip, fcp->c_dmachan);
 		ddi_prop_remove_all(fcp->c_dip);
 		ddi_set_driver_private(fcp->c_dip, NULL);
 
@@ -858,6 +862,35 @@ fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		sema_destroy(&fcp->c_selsem);
 		ddi_soft_state_free(fdc_state_head, ddi_get_instance(dip));
 		break;
+
+	case DDI_SUSPEND:
+		/*
+		 * Following code causes the fdc (floppy controller)
+		 * to suspend as long as there are no floppy drives
+		 * attached to it.
+		 * At present the floppy driver does not support
+		 * SUSPEND/RESUME.
+		 *
+		 * Check if any FD units are attached
+		 *
+		 * For now, SUSPEND/RESUME is not supported
+		 * if a floppy drive is present.
+		 * So if any FD unit is attached return DDI_FAILURE
+		 */
+		for (unit = 0; unit < NFDUN; unit++) {
+			fjp = fcp->c_unit[unit];
+			if (fjp->fj_flags & FUNIT_DRVATCH) {
+				cmn_err(CE_WARN,
+				    "fdc_detach: fd attached, failing SUSPEND");
+				return (DDI_FAILURE);
+			}
+		}
+
+		cmn_err(CE_NOTE, "fdc_detach: SUSPEND fdc");
+
+		rval = DDI_SUCCESS;
+		break;
+
 	default:
 		rval = EINVAL;
 		break;
@@ -892,9 +925,9 @@ fdc_abort(struct fcu_obj *fjp)
 			if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) !=
 			    DDI_SUCCESS)
 				cmn_err(CE_WARN,
-					"fdc_detach: dma release failed, "
-					"dip %p, dmachan %x\n",
-					(void*)fcp->c_dip, fcp->c_dmachan);
+				    "fdc_detach: dma release failed, "
+				    "dip %p, dmachan %x\n",
+				    (void*)fcp->c_dip, fcp->c_dmachan);
 		}
 		mutex_exit(&fcp->c_lock);
 		drv_usecwait(500);
@@ -923,7 +956,7 @@ fdc_dkinfo(struct fcu_obj *fjp, struct dk_cinfo *dcp)
 	struct fdcntlr *fcp = fjp->fj_fdc;
 
 	(void) strncpy((char *)&dcp->dki_cname, ddi_get_name(fcp->c_dip),
-		DK_DEVLEN);
+	    DK_DEVLEN);
 	dcp->dki_ctype = DKC_UNKNOWN; /* no code for generic PC/AT fdc */
 	dcp->dki_flags = DKI_FMTTRK;
 	dcp->dki_addr = fcp->c_regbase;
@@ -931,7 +964,7 @@ fdc_dkinfo(struct fcu_obj *fjp, struct dk_cinfo *dcp)
 	dcp->dki_prio = fcp->c_intprio;
 	dcp->dki_vec = fcp->c_intvec;
 	(void) strncpy((char *)&dcp->dki_dname, ddi_driver_name(fjp->fj_dip),
-		DK_DEVLEN);
+	    DK_DEVLEN);
 	dcp->dki_slave = fjp->fj_unit & 3;
 	dcp->dki_maxtransfer = maxphys / DEV_BSIZE;
 	return (DDI_SUCCESS);
@@ -1149,7 +1182,7 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 	dmar_flags |= (DDI_DMA_STREAMING | DDI_DMA_PARTIAL);
 
 	if (ddi_dma_alloc_handle(fcp->c_dip, &fdc_dma_attr, DDI_DMA_SLEEP,
-			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
+	    0, &csb->csb_dmahandle) != DDI_SUCCESS) {
 		rval = EINVAL;
 		goto out;
 	}
@@ -1181,15 +1214,14 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 	} else if (rval == DDI_DMA_PARTIAL_MAP) {
 		csb->csb_handle_bound = 1;
 		if (ddi_dma_numwin(csb->csb_dmahandle, &csb->csb_dmawincnt) !=
-					DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			cmn_err(CE_WARN, "fdrw: dma numwin failed\n");
 			rval = EINVAL;
 			goto out;
 		}
 	} else {
 		cmn_err(CE_WARN,
-			"fdrw: dma addr bind handle failed, rval = %d\n",
-			rval);
+		    "fdrw: dma addr bind handle failed, rval = %d\n", rval);
 		rval = EINVAL;
 		goto out;
 	}
@@ -1269,7 +1301,7 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 	fmdatlen = 4 * numsctr;
 
 	if (ddi_dma_alloc_handle(fcp->c_dip, &fdc_dma_attr, DDI_DMA_SLEEP,
-			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
+	    0, &csb->csb_dmahandle) != DDI_SUCCESS) {
 		rval = EINVAL;
 		goto out;
 	}
@@ -1310,15 +1342,15 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 	} else if (rval == DDI_DMA_PARTIAL_MAP) {
 		csb->csb_handle_bound = 1;
 		if (ddi_dma_numwin(csb->csb_dmahandle, &csb->csb_dmawincnt) !=
-					DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			cmn_err(CE_WARN, "fdtrkformat: dma numwin failed\n");
 			rval = EINVAL;
 			goto out;
 		}
 	} else {
 		cmn_err(CE_WARN,
-			"fdtrkformat: dma buf bind handle failed, rval = %d\n",
-			rval);
+		    "fdtrkformat: dma buf bind handle failed, rval = %d\n",
+		    rval);
 		rval = EINVAL;
 		goto out;
 	}
@@ -1579,15 +1611,15 @@ fdcquiesce(struct fdcntlr *fcp)
 	int unit;
 
 	FCERRPRINT(FDEP_L2, FDEM_RESE, (CE_NOTE, "fdcquiesce fcp %p",
-		(void*)fcp));
+	    (void*)fcp));
 	ASSERT(MUTEX_HELD(&fcp->c_lock));
 
 	mutex_enter(&fcp->c_dorlock);
 
 	if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) != DDI_SUCCESS)
 		cmn_err(CE_WARN, "fdcquiesce: dmae stop failed, "
-			"dip %p, dmachan %x\n",
-			(void*)fcp->c_dip, fcp->c_dmachan);
+		    "dip %p, dmachan %x\n",
+		    (void*)fcp->c_dip, fcp->c_dmachan);
 
 	fcp->c_digout = (fcp->c_digout & (FD_DMTREN | FD_DRSEL)) | FD_ENABLE;
 	outb(fcp->c_regbase + FCR_DOR, fcp->c_digout);
@@ -2158,7 +2190,7 @@ retry:
 		 */
 		mutex_enter(&fcp->c_dorlock);
 		(void) fdc_motorsm(fjp, FMI_RSTARTCMD,
-			fjp->fj_drive->fdd_motoron);
+		    fjp->fj_drive->fdd_motoron);
 		/*
 		 * Return value ignored - fdcmotort deals with failure.
 		 */
@@ -2202,8 +2234,8 @@ retry:
 		if (ddi_dmae_prog(fcp->c_dip, &dmaereq, &csb->csb_dmacookie,
 		    fcp->c_dmachan) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdc_exec: dmae prog failed, "
-				"dip %p, dmachan %x\n",
-				(void*)fcp->c_dip, fcp->c_dmachan);
+			    "dip %p, dmachan %x\n",
+			    (void*)fcp->c_dip, fcp->c_dmachan);
 	}
 
 	if ((fdc_statemach(fcp) == FXS_DOWT) && !sleep) {
@@ -2400,7 +2432,9 @@ fdrecover(struct fdcntlr *fcp)
 				    (void*)fcp->c_dip, fcp->c_dmachan,
 				    residual);
 			FCERRPRINT(FDEP_L2, FDEM_RECO,
-	(CE_NOTE, "fd unit %d: %s error: dma count=0x%lx residual=0x%x",
+			    (CE_NOTE,
+			    "fd unit %d: %s error: "
+			    "dma count=0x%lx residual=0x%x",
 			    csb->csb_drive,
 			    fdcmds[*csb->csb_cmd & 0x1f].cmdname,
 			    csb->csb_dmacookie.dmac_size, residual));
@@ -2412,8 +2446,10 @@ fdrecover(struct fdcntlr *fcp)
 			 */
 			if (++csb->csb_ourtrys <= OURUN_TRIES) {
 				FCERRPRINT(FDEP_L2, FDEM_RECO,
-(CE_NOTE, "fd unit %d: %s error: over/under-run",
-csb->csb_drive, fdcmds[*csb->csb_cmd & 0x1f].cmdname));
+				    (CE_NOTE,
+				    "fd unit %d: %s error: over/under-run",
+				    csb->csb_drive,
+				    fdcmds[*csb->csb_cmd & 0x1f].cmdname));
 				return (0);
 			} else
 				/*
@@ -2445,9 +2481,12 @@ csb->csb_drive, fdcmds[*csb->csb_cmd & 0x1f].cmdname));
 				if (csb->csb_opflags &
 				    (CSB_OFDMARD | CSB_OFDMAWT)) {
 					FCERRPRINT(FDEP_L4, FDEM_RECO,
-(CE_WARN, "fd unit %d: %s error: st0=0x%x st1=0x%x st2=0x%x",
+					    (CE_WARN,
+					    "fd unit %d: %s error: "
+					    "st0=0x%x st1=0x%x st2=0x%x",
 					    csb->csb_drive,
-fdcmds[*csb->csb_cmd & 0x1f].cmdname,
+					    fdcmds[*csb->csb_cmd &
+					    0x1f].cmdname,
 					    *csb->csb_rslt, csb->csb_rslt[1],
 					    csb->csb_rslt[2]));
 				}
@@ -2681,8 +2720,8 @@ fdwatch(void *arg)
 	if (fcp->c_flags & FCFLG_WAITING) {
 		if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdwatch: dmae stop failed, "
-				"dip %p, dmachan %x\n",
-				(void*)fcp->c_dip, fcp->c_dmachan);
+			    "dip %p, dmachan %x\n",
+			    (void*)fcp->c_dip, fcp->c_dmachan);
 		csb = &fcp->c_csb;
 		FCERRPRINT(FDEP_L3, FDEM_WATC,
 		    (CE_WARN, "fdcwatch unit %d: xstate = %d",
@@ -3168,7 +3207,7 @@ get_ioaddr(dev_info_t *dip, int *ioaddr)
 	} *reglist;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
+	    "reg", (caddr_t)&reglist, &reglen) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "fdc: reg property not found");
 		return (DDI_FAILURE);
 	}

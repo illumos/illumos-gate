@@ -65,6 +65,10 @@
 #include <vm/vm_dep.h>
 
 extern	void cpr_clear_bitmaps(void);
+extern	int cpr_setbit(pfn_t ppn, int mapflag);
+extern	int cpr_clrbit(pfn_t ppn, int mapflag);
+extern	pgcnt_t cpr_scan_kvseg(int mapflag, bitfunc_t bitfunc, struct seg *seg);
+extern	pgcnt_t cpr_count_seg_pages(int mapflag, bitfunc_t bitfunc);
 extern	void dtlb_wr_entry(uint_t, tte_t *, uint64_t *);
 extern	void itlb_wr_entry(uint_t, tte_t *, uint64_t *);
 
@@ -641,12 +645,6 @@ i_cpr_save_machdep_info(void)
 }
 
 
-void
-i_cpr_set_tbr(void)
-{
-}
-
-
 /*
  * cpu0 should contain bootcpu info
  */
@@ -656,6 +654,11 @@ i_cpr_bootcpu(void)
 	return (&cpu0);
 }
 
+processorid_t
+i_cpr_bootcpuid(void)
+{
+	return (0);
+}
 
 /*
  * Return the virtual address of the mapping area
@@ -1761,13 +1764,16 @@ i_cpr_dump_setup(vnode_t *vp)
 
 
 int
-i_cpr_is_supported(void)
+i_cpr_is_supported(int sleeptype)
 {
 	char es_prop[] = "energystar-v2";
 	pnode_t node;
 	int last;
 	extern int cpr_supported_override;
 	extern int cpr_platform_enable;
+
+	if (sleeptype != CPR_TODISK)
+		return (0);
 
 	/*
 	 * The next statement tests if a specific platform has turned off
@@ -1923,4 +1929,104 @@ i_cpr_alloc_bitmaps(void)
 	if (err)
 		i_cpr_bitmap_cleanup();
 	return (err);
+}
+
+
+
+/*
+ * Power down the system.
+ */
+int
+i_cpr_power_down(int sleeptype)
+{
+	int is_defined = 0;
+	char *wordexists = "p\" power-off\" find nip swap l! ";
+	char *req = "power-off";
+
+	ASSERT(sleeptype == CPR_TODISK);
+
+	/*
+	 * is_defined has value -1 when defined
+	 */
+	prom_interpret(wordexists, (uintptr_t)&is_defined, 0, 0, 0, 0);
+	if (is_defined) {
+		CPR_DEBUG(CPR_DEBUG1, "\ncpr: %s...\n", req);
+		prom_interpret(req, 0, 0, 0, 0, 0);
+	}
+	/*
+	 * Only returns if failed
+	 */
+	return (EIO);
+}
+
+void
+i_cpr_stop_other_cpus(void)
+{
+	stop_other_cpus();
+}
+
+/*
+ *	Save context for the specified CPU
+ */
+/* ARGSUSED */
+void *
+i_cpr_save_context(void *arg)
+{
+	/*
+	 * Not yet
+	 */
+	ASSERT(0);
+	return (NULL);
+}
+
+void
+i_cpr_pre_resume_cpus(void)
+{
+	/*
+	 * Not yet
+	 */
+	ASSERT(0);
+}
+
+void
+i_cpr_post_resume_cpus(void)
+{
+	/*
+	 * Not yet
+	 */
+	ASSERT(0);
+}
+
+/*
+ * nothing to do
+ */
+void
+i_cpr_alloc_cpus(void)
+{
+}
+
+/*
+ * nothing to do
+ */
+void
+i_cpr_free_cpus(void)
+{
+}
+
+/* ARGSUSED */
+void
+i_cpr_save_configuration(dev_info_t *dip)
+{
+	/*
+	 * this is a no-op on sparc
+	 */
+}
+
+/* ARGSUSED */
+void
+i_cpr_restore_configuration(dev_info_t *dip)
+{
+	/*
+	 * this is a no-op on sparc
+	 */
 }

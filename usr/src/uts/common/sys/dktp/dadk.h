@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,8 @@ struct	dadk {
 	uchar_t		dad_thread_cnt;	/* reference count on removable	*/
 					/* - disk state watcher thread	*/
 	kstat_t		*dad_errstats;	/* error stats			*/
+	kmutex_t	dad_cmd_mutex;
+	int		dad_cmd_count;
 };
 
 #define	DAD_SECSIZ	dad_phyg.g_secsiz
@@ -131,6 +133,8 @@ int dadk_check_media(opaque_t objp, int *state);
 static void dadk_watch_thread(struct dadk *dadkp);
 int dadk_inquiry(opaque_t objp, opaque_t *inqpp);
 void dadk_cleanup(struct tgdk_obj *dkobjp);
+
+int dadk_getcmds(opaque_t objp);
 
 #ifdef	__cplusplus
 }

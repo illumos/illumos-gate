@@ -255,7 +255,11 @@ DRV_KMODS	+= tzmon
 DRV_KMODS	+= battery
 
 DRV_KMODS	+= cpudrv
-DRV_KMODS	+= ppm
+
+#
+# Platform Power Modules
+# 
+DRV_KMODS	+= ppm acpippm
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
 
@@ -307,3 +311,8 @@ DACF_KMODS	+= consconfig_dacf
 #	'Mach' Modules (/kernel/mach):
 #
 MACH_KMODS     	+= uppc
+
+#
+#	CPR Misc Module.
+#
+MISC_KMODS	+= cpr

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,8 @@ prmup_t pm_status  = { 0, OKUP, "pm" };
  * must appear before a substring like "dev".
  */
 static cinfo_t conftab[] = {
+	"S3-support",		S3sup,   &pm_status,	NULL,	2, 0, 1,
+	"autoS3",		autoS3,  &pm_status,	NULL,	2, 0, 1,
 	"autopm",		autopm,  &pm_status,	NULL,	2, 0, 1,
 	"autoshutdown",		autosd,  &cpr_status,	as_cmt,	5, 0, 1,
 	"cpu-threshold",	cputhr,  &pm_status,	NULL,	2, 0, 1,
@@ -373,6 +375,14 @@ parse_conf_file(char *name, vact_t action)
 	cinfo_t *cip;
 	int linc, cnt;
 	size_t llen;
+	int dontcare;
+
+	/*
+	 * Do the "implied default" for autoS3
+	 */
+	(void) S3_helper("S3-support-enable", "S3-support-disable",
+	    PM_ENABLE_S3, PM_DISABLE_S3, "S3-support", "default",
+	    &dontcare, -1);
 
 	file_buf = get_conf_data(name);
 	mesg(MDEBUG, "\nnow parsing \"%s\"...\n", name);
@@ -446,4 +456,46 @@ parse_conf_file(char *name, vact_t action)
 	lineno = 0;
 
 	free(file_buf);
+
+	if (verify) {
+		int ret = ioctl(pm_fd, PM_GET_PM_STATE, NULL);
+		if (ret < 0) {
+			mesg(MDEBUG, "Cannot get PM state: %s\n",
+			    strerror(errno));
+		}
+		switch (ret) {
+		case PM_SYSTEM_PM_ENABLED:
+			mesg(MDEBUG, "Autopm Enabled\n");
+			break;
+		case PM_SYSTEM_PM_DISABLED:
+			mesg(MDEBUG, "Autopm Disabled\n");
+			break;
+		}
+		ret = ioctl(pm_fd, PM_GET_S3_SUPPORT_STATE, NULL);
+		if (ret < 0) {
+			mesg(MDEBUG, "Cannot get PM state: %s\n",
+			    strerror(errno));
+		}
+		switch (ret) {
+		case PM_S3_SUPPORT_ENABLED:
+			mesg(MDEBUG, "S3 support Enabled\n");
+			break;
+		case PM_S3_SUPPORT_DISABLED:
+			mesg(MDEBUG, "S3 support Disabled\n");
+			break;
+		}
+		ret = ioctl(pm_fd, PM_GET_AUTOS3_STATE, NULL);
+		if (ret < 0) {
+			mesg(MDEBUG, "Cannot get PM state: %s\n",
+			    strerror(errno));
+		}
+		switch (ret) {
+		case PM_AUTOS3_ENABLED:
+			mesg(MDEBUG, "AutoS3 Enabled\n");
+			break;
+		case PM_AUTOS3_DISABLED:
+			mesg(MDEBUG, "AutoS3  Disabled\n");
+			break;
+		}
+	}
 }

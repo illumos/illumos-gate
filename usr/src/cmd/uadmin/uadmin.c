@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,8 @@ main(int argc, char *argv[])
 	cmd = atoi(argv[1]);
 	fcn = atoi(argv[2]);
 	if (argc == 4) {	/* mdep argument given */
-		if (cmd != A_REBOOT && cmd != A_SHUTDOWN && cmd != A_DUMP) {
+		if (cmd != A_REBOOT && cmd != A_SHUTDOWN && cmd != A_DUMP &&
+		    cmd != A_FREEZE) {
 			(void) fprintf(stderr, "%s: mdep argument not "
 			    "allowed for this cmd value\n", argv[0]);
 			(void) fprintf(stderr, Usage, argv[0]);

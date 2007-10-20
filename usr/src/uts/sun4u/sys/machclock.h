@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,17 @@ struct tod_ops {
 
 extern struct tod_ops	tod_ops;
 extern char		*tod_module_name;
+
+/*
+ * These defines allow common code to use TOD functions independant
+ * of hardware platform.
+ */
+#define	TODOP_GET(top)		((top).tod_get())
+#define	TODOP_SET(top, ts)	((top).tod_set(ts))
+#define	TODOP_SETWD(top, nsec)	((top).tod_set_watchdog_timer(nsec))
+#define	TODOP_CLRWD(top)	((top).tod_clear_watchdog_timer())
+#define	TODOP_SETWAKE(top, ts)	((top).tod_set_power_alarm(ts))
+#define	TODOP_CLRWAKE(top)	((top).tod_clear_power_alarm())
 
 #endif	/* _KERNEL */
 

@@ -894,3 +894,8 @@ usr/include/sys/kiconv_latin1.h		i386
 # At this time, the ttydefs.cleanup file is only useful on sun4u systems
 #
 etc/flash/postdeployment/ttydefs.cleanup	i386
+#
+# This header file is shared only between the power commands and
+# ppm/srn modules # and should not be in any package
+#
+usr/include/sys/srn.h			i386

@@ -459,6 +459,7 @@ CHKHDRS=			\
 	sockio.h		\
 	squeue.h		\
 	squeue_impl.h		\
+	srn.h			\
 	sservice.h		\
 	stat.h			\
 	statfs.h		\

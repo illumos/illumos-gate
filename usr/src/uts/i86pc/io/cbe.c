@@ -38,6 +38,7 @@
 #include <sys/psm.h>
 #include <sys/atomic.h>
 #include <sys/clock.h>
+#include <sys/x86_archext.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_intr.h>
 #include <sys/avintr.h>
@@ -57,6 +58,8 @@ static ddi_softint_hdl_impl_t cbe_clock_hdl =
 
 cyclic_id_t cbe_hres_cyclic;
 int cbe_psm_timer_mode = TIMER_ONESHOT;
+
+extern int tsc_gethrtime_enable;
 
 void cbe_hres_tick(void);
 
@@ -200,6 +203,43 @@ cbe_configure(cpu_t *cpu)
 	return (cpu);
 }
 
+#ifndef __xpv
+/*
+ * declarations needed for time adjustment
+ */
+extern void	tsc_suspend(void);
+extern void	tsc_resume(void);
+/*
+ * Call the resume function in the cyclic, instead of inline in the
+ * resume path.
+ */
+extern int	tsc_resume_in_cyclic;
+#endif
+
+/*ARGSUSED*/
+static void
+cbe_suspend(cyb_arg_t arg)
+{
+#ifndef __xpv
+	/*
+	 * This is an x86 backend, so let the tsc_suspend
+	 * that is specific to x86 platforms do the work.
+	 */
+	tsc_suspend();
+#endif
+}
+
+/*ARGSUSED*/
+static void
+cbe_resume(cyb_arg_t arg)
+{
+#ifndef __xpv
+	if (tsc_resume_in_cyclic) {
+		tsc_resume();
+	}
+#endif
+}
+
 void
 cbe_enable(void *arg)
 {
@@ -209,7 +249,11 @@ cbe_enable(void *arg)
 	if ((cbe_psm_timer_mode != TIMER_ONESHOT) && (me == 0))
 		return;
 
-	ASSERT(!CPU_IN_SET(cbe_enabled, me));
+	/*
+	 * Added (me == 0) to the ASSERT because the timer isn't
+	 * disabled on CPU 0, and cbe_enable is called when we resume.
+	 */
+	ASSERT((me == 0) || !CPU_IN_SET(cbe_enabled, me));
 	CPUSET_ADD(cbe_enabled, me);
 	if (cbe_psm_timer_mode == TIMER_ONESHOT)
 		(*psm_timer_enable)();
@@ -268,8 +312,8 @@ cbe_init(void)
 		cbe_set_level,		/* cyb_set_level */
 		cbe_restore_level,	/* cyb_restore_level */
 		cbe_xcall,		/* cyb_xcall */
-		NULL,			/* cyb_suspend */
-		NULL			/* cyb_resume */
+		cbe_suspend,		/* cyb_suspend */
+		cbe_resume		/* cyb_resume */
 	};
 	hrtime_t resolution;
 	cyc_handler_t hdlr;

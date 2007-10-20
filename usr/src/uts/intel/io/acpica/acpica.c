@@ -38,6 +38,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/esunddi.h>
+#include <sys/kstat.h>
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
@@ -57,10 +58,17 @@ static	struct modlinkage modlinkage = {
 };
 
 /*
+ * Local prototypes
+ */
+
+static void	acpica_init_kstats(void);
+
+/*
  * Local data
  */
 
 static kmutex_t	acpica_module_lock;
+static kstat_t	*acpica_ksp;
 
 /*
  * State of acpica subsystem
@@ -99,17 +107,23 @@ int acpica_muzzle_debug_output = 0;
 int acpica_muzzle_debug_output = 1;
 #endif
 
+/*
+ * ACPI DDI hooks
+ */
+static int acpica_ddi_setwake(dev_info_t *dip, int level);
 
 int
 _init(void)
 {
 	int error = EBUSY;
 	int	status;
+	extern int (*acpi_fp_setwake)();
 
 	mutex_init(&acpica_module_lock, NULL, MUTEX_DRIVER, NULL);
 
 	if ((error = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&acpica_module_lock);
+		goto load_error;
 	}
 
 	AcpiGbl_EnableInterpreterSlack = (acpica_enable_interpreter_slack != 0);
@@ -118,6 +132,9 @@ _init(void)
 		cmn_err(CE_WARN, "!acpica: error pre-init:1:%d", status);
 	}
 
+	acpi_fp_setwake = acpica_ddi_setwake;
+
+load_error:
 	return (error);
 }
 
@@ -388,6 +405,7 @@ acpica_init()
 		acpica_ec_init();
 
 		acpica_init_state = ACPICA_INITIALIZED;
+		acpica_init_kstats();
 error:
 		if (acpica_init_state != ACPICA_INITIALIZED) {
 			cmn_err(CE_NOTE, "!failed to initialize"
@@ -486,4 +504,197 @@ acpica_get_sci(int *sci_irq, iflag_t *sci_flags)
 		sci_flags->intr_po = INTR_PO_ACTIVE_LOW;
 
 	return (AE_OK);
+}
+
+/*
+ * Sets ACPI wake state for device referenced by dip.
+ * If level is S0 (0), disables wake event; otherwise,
+ * enables wake event which will wake system from level.
+ */
+static int
+acpica_ddi_setwake(dev_info_t *dip, int level)
+{
+	ACPI_STATUS	status;
+	ACPI_HANDLE	devobj, gpeobj;
+	ACPI_OBJECT	*prw, *gpe;
+	ACPI_BUFFER	prw_buf;
+	int		gpebit, pwr_res_count, prw_level, rv;
+
+	/*
+	 * initialize these early so we can use a common
+	 * exit point below
+	 */
+	prw_buf.Pointer = NULL;
+	prw_buf.Length = ACPI_ALLOCATE_BUFFER;
+	rv = 0;
+
+	/*
+	 * Attempt to get a handle to a corresponding ACPI object.
+	 * If no object is found, return quietly, since not all
+	 * devices have corresponding ACPI objects.
+	 */
+	status = acpica_get_handle(dip, &devobj);
+	if (ACPI_FAILURE(status)) {
+		char pathbuf[MAXPATHLEN];
+		ddi_pathname(dip, pathbuf);
+#ifdef DEBUG
+		cmn_err(CE_NOTE, "!acpica_ddi_setwake: could not get"
+		    " handle for %s, %s:%d", pathbuf, ddi_driver_name(dip),
+		    ddi_get_instance(dip));
+#endif
+		goto done;
+	}
+
+	/*
+	 * Attempt to evaluate _PRW object.
+	 * If no valid object is found, return quietly, since not all
+	 * devices have _PRW objects.
+	 */
+	status = AcpiEvaluateObject(devobj, "_PRW", NULL, &prw_buf);
+	prw = prw_buf.Pointer;
+	if (ACPI_FAILURE(status) || prw == NULL ||
+	    prw->Type != ACPI_TYPE_PACKAGE || prw->Package.Count < 2 ||
+	    prw->Package.Elements[1].Type != ACPI_TYPE_INTEGER) {
+		cmn_err(CE_NOTE, "acpica_ddi_setwake: could not "
+		    " evaluate _PRW");
+		goto done;
+	}
+
+	/* fetch the lowest wake level from the _PRW */
+	prw_level = prw->Package.Elements[1].Integer.Value;
+
+	/*
+	 * process the GPE description
+	 */
+	switch (prw->Package.Elements[0].Type) {
+	case ACPI_TYPE_INTEGER:
+		gpeobj = NULL;
+		gpebit = prw->Package.Elements[0].Integer.Value;
+		break;
+	case ACPI_TYPE_PACKAGE:
+		gpe = &prw->Package.Elements[0];
+		if (gpe->Package.Count != 2 ||
+		    gpe->Package.Elements[1].Type != ACPI_TYPE_INTEGER)
+			goto done;
+		gpeobj = gpe->Package.Elements[0].Reference.Handle;
+		gpebit = gpe->Package.Elements[1].Integer.Value;
+		if (gpeobj == NULL)
+			goto done;
+	default:
+		goto done;
+	}
+
+	rv = -1;
+	if (level == 0) {
+		if (ACPI_FAILURE(AcpiDisableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
+			goto done;
+	} else if (prw_level <= level) {
+		if (ACPI_SUCCESS(
+		    AcpiSetGpeType(gpeobj, gpebit, ACPI_GPE_TYPE_WAKE)))
+			if (ACPI_FAILURE(
+			    AcpiEnableGpe(gpeobj, gpebit, ACPI_NOT_ISR)))
+				goto done;
+	}
+	rv = 0;
+done:
+	if (prw_buf.Pointer != NULL)
+		AcpiOsFree(prw_buf.Pointer);
+	return (rv);
+}
+
+/*
+ * kstat access to a limited set of ACPI propertis
+ */
+static void
+acpica_init_kstats()
+{
+	ACPI_HANDLE	s3handle;
+	ACPI_STATUS	status;
+	FADT_DESCRIPTOR	*fadt;
+	kstat_named_t *knp;
+
+	/*
+	 * Create a small set of named kstats; just return in the rare
+	 * case of a failure, * in which case, the kstats won't be present.
+	 */
+	if ((acpica_ksp = kstat_create("acpi", 0, "acpi", "misc",
+	    KSTAT_TYPE_NAMED, 2, 0)) == NULL)
+		return;
+
+	/*
+	 * initialize kstat 'S3' to reflect the presence of \_S3 in
+	 * the ACPI namespace (1 = present, 0 = not present)
+	 */
+	knp = acpica_ksp->ks_data;
+	knp->value.l = (AcpiGetHandle(NULL, "\\_S3", &s3handle) == AE_OK);
+	kstat_named_init(knp, "S3", KSTAT_DATA_LONG);
+	knp++;		/* advance to next named kstat */
+
+	/*
+	 * initialize kstat 'preferred_pm_profile' to the value
+	 * contained in the (always present) FADT
+	 */
+	status = AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **)&fadt);
+	knp->value.l = (status == AE_OK) ? fadt->Prefer_PM_Profile : -1;
+	kstat_named_init(knp, "preferred_pm_profile", KSTAT_DATA_LONG);
+
+	/*
+	 * install the named kstats
+	 */
+	kstat_install(acpica_ksp);
+}
+
+/*
+ * Attempt to save the current ACPI settings (_CRS) for the device
+ * which corresponds to the supplied devinfo node.  The settings are
+ * saved as a property on the dip.  If no ACPI object is found to be
+ * associated with the devinfo node, no action is taken and no error
+ * is reported.
+ */
+void
+acpica_ddi_save_resources(dev_info_t *dip)
+{
+	ACPI_HANDLE	devobj;
+	ACPI_BUFFER	resbuf;
+	int		ret;
+
+	resbuf.Length = ACPI_ALLOCATE_BUFFER;
+	if (ACPI_FAILURE(acpica_get_handle(dip, &devobj)) ||
+	    ACPI_FAILURE(AcpiGetCurrentResources(devobj, &resbuf)))
+		return;
+
+	ret = ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
+	    "acpi-crs", resbuf.Pointer, resbuf.Length);
+
+	ASSERT(ret == DDI_PROP_SUCCESS);
+
+	AcpiOsFree(resbuf.Pointer);
+}
+
+/*
+ * If the supplied devinfo node has an ACPI settings property attached,
+ * restore them to the associated ACPI device using _SRS.  The property
+ * is deleted from the devinfo node afterward.
+ */
+void
+acpica_ddi_restore_resources(dev_info_t *dip)
+{
+	ACPI_HANDLE	devobj;
+	ACPI_BUFFER	resbuf;
+	uchar_t		*propdata;
+	uint_t		proplen;
+
+	if (ACPI_FAILURE(acpica_get_handle(dip, &devobj)))
+		return;
+
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "acpi-crs", &propdata, &proplen) != DDI_PROP_SUCCESS)
+		return;
+
+	resbuf.Pointer = propdata;
+	resbuf.Length = proplen;
+	(void) AcpiSetCurrentResources(devobj, &resbuf);
+	ddi_prop_free(propdata);
+	(void) ddi_prop_remove(DDI_DEV_T_ANY, dip, "acpi-crs");
 }

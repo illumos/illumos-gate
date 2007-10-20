@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,16 @@ typedef enum {
 	PM_STOP_CPUPM,
 	PM_GET_CPU_THRESHOLD,
 	PM_SET_CPU_THRESHOLD,
-	PM_GET_CPUPM_STATE
+	PM_GET_CPUPM_STATE,
+	PM_ENABLE_S3,		/* allow pm to go to S3 state */
+	PM_DISABLE_S3,		/* do not allow pm to go to S3 state */
+	PM_ENTER_S3,		/* obsolete, not supported */
+	PM_START_AUTOS3,
+	PM_STOP_AUTOS3,
+	PM_SEARCH_LIST,		/* search S3 enable/disable list */
+	PM_GET_AUTOS3_STATE,
+	PM_GET_S3_SUPPORT_STATE,
+	PM_GET_CMD_NAME
 } pm_cmds;
 
 /*
@@ -127,6 +136,17 @@ typedef struct pm_req {
 	void	*data;		/* command-dependent variable sized data */
 	size_t	datasize;	/* Size of data buffer */
 } pm_req_t;
+
+/*
+ * PM_SEARCH_LIST requires a list name, manufacturer and product name
+ * Searches the named list for a matching tuple.
+ * NOTE: This structure may be removed in a later release.
+ */
+typedef struct pm_searchargs {
+	char	*pms_listname;		/* name of list to search */
+	char	*pms_manufacturer;	/* 1st elment of tuple */
+	char	*pms_product;		/* 2nd elment of tuple */
+} pm_searchargs_t;
 
 /*
  * Use these for PM_ADD_DEPENDENT and PM_ADD_DEPENDENT_PROPERTY
@@ -208,6 +228,13 @@ typedef struct pm_state_change32 {
 	size32_t	size;		/* size of buffer physpath points to */
 } pm_state_change32_t;
 
+typedef	struct pm_searchargs32_t {
+	caddr32_t	pms_listname;
+	caddr32_t	pms_manufacturer;
+	caddr32_t	pms_product;
+} pm_searchargs32_t;
+
+
 #endif
 
 /*
@@ -228,9 +255,12 @@ typedef enum {
 	PM_CPU_THRESHOLD,
 	PM_CPU_PM_ENABLED,
 	PM_CPU_PM_DISABLED,
-	PM_CPU_PM_NOTSET
+	PM_CPU_PM_NOTSET,
+	PM_AUTOS3_ENABLED,
+	PM_AUTOS3_DISABLED,
+	PM_S3_SUPPORT_ENABLED,
+	PM_S3_SUPPORT_DISABLED
 } pm_states;
-
 
 #ifdef	__cplusplus
 }

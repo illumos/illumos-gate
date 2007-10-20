@@ -512,6 +512,7 @@ extern cpuset_t cpu_seqid_inuse;
 #define	CPU_CPR_OFFLINE		0x0
 #define	CPU_CPR_ONLINE		0x1
 #define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
+#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
 #define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)

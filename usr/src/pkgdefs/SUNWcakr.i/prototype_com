@@ -77,6 +77,10 @@ d none platform/i86pc/kernel/dacf/amd64 755 root sys
 f none platform/i86pc/kernel/dacf/amd64/consconfig_dacf 755 root sys
 d none platform/i86pc/kernel/drv 755 root sys
 d none platform/i86pc/kernel/drv/amd64 755 root sys
+f none platform/i86pc/kernel/drv/amd64/acpippm 755 root sys
+f none platform/i86pc/kernel/drv/acpippm 755 root sys
+f none platform/i86pc/kernel/drv/acpippm.conf 644 root sys
+f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
@@ -114,4 +118,3 @@ f none platform/i86pc/multiboot 755 root sys
 d none platform/i86pc/ucode 755 root sys
 v none platform/i86pc/ucode/intel-ucode.txt 444 root sys
 f none platform/i86pc/kernel/drv/amd64/cpudrv 755 root sys
-f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys

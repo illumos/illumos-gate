@@ -309,12 +309,15 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 
 	case A_FREEZE:
 	{
-		/* XXX: declare in some header file */
-		extern int cpr(int);
+		/*
+		 * This is the entrypoint for all suspend/resume actions.
+		 */
+		extern int cpr(int, void *);
 
 		if (modload("misc", "cpr") == -1)
 			return (ENOTSUP);
-		error = cpr(fcn);
+		/* Let the CPR module decide what to do with mdep */
+		error = cpr(fcn, mdep);
 		break;
 	}
 
@@ -387,7 +390,8 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	 * a boot string.  We pull that in as bootargs, if applicable.
 	 */
 	if (mdep != NULL &&
-	    (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP)) {
+	    (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP ||
+	    cmd == A_FREEZE)) {
 		bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
 		if ((error = copyinstr((const char *)mdep, bootargs,
 		    BOOTARGS_MAX, &nbytes)) != 0) {

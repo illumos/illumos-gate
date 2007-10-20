@@ -274,3 +274,6 @@ BOOTDEV_OBJS +=		\
 	bootdev.o
 
 INC_PATH	+= -I$(UTSBASE)/intel
+
+
+CPR_INTEL_OBJS +=	cpr_intel.o

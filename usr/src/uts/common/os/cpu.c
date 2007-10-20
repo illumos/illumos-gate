@@ -161,6 +161,9 @@ static struct _cpu_pause_info {
 static kmutex_t pause_free_mutex;
 static kcondvar_t pause_free_cv;
 
+void *(*cpu_pause_func)(void *) = NULL;
+
+
 static struct cpu_sys_stats_ks_data {
 	kstat_named_t cpu_ticks_idle;
 	kstat_named_t cpu_ticks_user;
@@ -738,10 +741,12 @@ weakbinding_start(void)
  * which is a good trade off.
  */
 static void
-cpu_pause(volatile char *safe)
+cpu_pause(int index)
 {
 	int s;
 	struct _cpu_pause_info *cpi = &cpu_pause_info;
+	volatile char *safe = &safe_list[index];
+	long    lindex = index;
 
 	ASSERT((curthread->t_bound_cpu != NULL) || (*safe == PAUSE_DIE));
 
@@ -766,6 +771,16 @@ cpu_pause(volatile char *safe)
 		 * setbackdq/setfrontdq.
 		 */
 		s = splhigh();
+		/*
+		 * if cpu_pause_func() has been set then call it using
+		 * index as the argument, currently only used by
+		 * cpr_suspend_cpus().  This function is used as the
+		 * code to execute on the "paused" cpu's when a machine
+		 * comes out of a sleep state and CPU's were powered off.
+		 * (could also be used for hotplugging CPU's).
+		 */
+		if (cpu_pause_func != NULL)
+			(*cpu_pause_func)((void *)lindex);
 
 		mach_cpu_pause(safe);
 
@@ -809,13 +824,13 @@ static void
 cpu_pause_alloc(cpu_t *cp)
 {
 	kthread_id_t	t;
-	int		cpun = cp->cpu_id;
+	long		cpun = cp->cpu_id;
 
 	/*
 	 * Note, v.v_nglobpris will not change value as long as I hold
 	 * cpu_lock.
 	 */
-	t = thread_create(NULL, 0, cpu_pause, (caddr_t)&safe_list[cpun],
+	t = thread_create(NULL, 0, cpu_pause, (void *)cpun,
 	    0, &p0, TS_STOPPED, v.v_nglobpris - 1);
 	thread_lock(t);
 	t->t_bound_cpu = cp;

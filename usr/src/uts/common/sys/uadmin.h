@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,12 +58,27 @@ extern "C" {
 #define	AD_POWEROFF	6	/* software poweroff */
 #define	AD_NOSYNC	7	/* do not sync filesystems on next A_DUMP */
 
+
 /*
  * Functions reserved for A_FREEZE (may not be available on all platforms)
+ * Note:  AD_COMPRESS, AD_CHECK and AD_FORCE are now obsolete
+ *	The first two are succeeded by AD_SUSPEND_TO_DISK and
+ *		AD_CHECK_SUSPEND_TO_DISK respectively.
+ *	AD_FORCE should not be used by any new application
+ *
+ *	We maintain compatibility with the earlier interfaces:
+ *	AD_COMPRESS and AD_CHECK, by preserving those values
+ *	in the corresponding new interfaces
  */
+
 #define	AD_COMPRESS	0	/* store state file compressed during CPR */
 #define	AD_FORCE	1	/* force to do AD_COMPRESS */
 #define	AD_CHECK	2	/* test if CPR module is available */
+#define	AD_SUSPEND_TO_DISK	   AD_COMPRESS	/* A_FREEZE, CPR or ACPI S4 */
+#define	AD_CHECK_SUSPEND_TO_DISK   AD_CHECK	/* A_FREEZE, CPR/S4 capable? */
+#define	AD_SUSPEND_TO_RAM	   20		/* A_FREEZE, S3 */
+#define	AD_CHECK_SUSPEND_TO_RAM	   21		/* A_FREEZE, S3 capable? */
+
 /*
  * NOTE: the following defines comprise an Unstable interface.  Their semantics
  * may change or they may be removed completely in a later release

@@ -63,7 +63,32 @@ typedef enum psm_intr_op_e {
 	PSM_INTR_OP_APIC_TYPE		/* 15. Returns APIC type */
 } psm_intr_op_t;
 
-struct psm_ops {
+/*
+ * PSM_STATE definitions
+ */
+typedef enum psm_state_op_e {
+	PSM_STATE_ALLOC = 1,
+	PSM_STATE_FREE,
+	PSM_STATE_SAVE,
+	PSM_STATE_RESTORE
+} psm_state_op_t;
+
+typedef struct psm_state_req {
+	psm_state_op_t psr_cmd;
+	union psm_req {
+		/*
+		 * PSM_STATE_ALLOC, PSM_STATE_FREE, PSM_STATE_SAVE,
+		 * PSM_STATE_RESTORE all use the same struct,
+		 * but union for later expansion
+		 */
+		struct {
+			void *psr_state;
+			size_t psr_state_size;
+		} psm_state_req;
+	} req;
+} psm_state_request_t;
+
+struct 	psm_ops {
 	int	(*psm_probe)(void);
 
 	void	(*psm_softinit)(void);
@@ -80,7 +105,8 @@ struct psm_ops {
 	void	(*psm_set_idlecpu)(processorid_t cpun);
 	void	(*psm_unset_idlecpu)(processorid_t cpun);
 
-#if defined(PSMI_1_3) || defined(PSMI_1_4) || defined(PSMI_1_5)
+#if defined(PSMI_1_3) || defined(PSMI_1_4) || defined(PSMI_1_5) || \
+    defined(PSMI_1_6)
 	int	(*psm_clkinit)(int hertz);
 #else
 	void	(*psm_clkinit)(int hertz);
@@ -91,14 +117,14 @@ struct psm_ops {
 	hrtime_t (*psm_gethrtime)(void);
 
 	processorid_t (*psm_get_next_processorid)(processorid_t cpu_id);
-#if defined(PSMI_1_5)
+#if defined(PSMI_1_5) || defined(PSMI_1_6)
 	int	(*psm_cpu_start)(processorid_t cpun, caddr_t ctxt);
 #else
 	void	(*psm_cpu_start)(processorid_t cpun, caddr_t rm_code);
 #endif
 	int	(*psm_post_cpu_start)(void);
 #if defined(PSMI_1_2) || defined(PSMI_1_3) || defined(PSMI_1_4) || \
-    defined(PSMI_1_5)
+    defined(PSMI_1_5) || defined(PSMI_1_6)
 	void	(*psm_shutdown)(int cmd, int fcn);
 #else
 	void	(*psm_shutdown)(void);
@@ -114,21 +140,25 @@ struct psm_ops {
 #endif
 	void	(*psm_notify_error)(int level, char *errmsg);
 #if defined(PSMI_1_2) || defined(PSMI_1_3) || defined(PSMI_1_4) || \
-    defined(PSMI_1_5)
+    defined(PSMI_1_5) || defined(PSMI_1_6)
 	void	(*psm_notify_func)(int msg);
 #endif
-#if defined(PSMI_1_3) || defined(PSMI_1_4) || defined(PSMI_1_5)
+#if defined(PSMI_1_3) || defined(PSMI_1_4) || defined(PSMI_1_5) || \
+    defined(PSMI_1_6)
 	void 	(*psm_timer_reprogram)(hrtime_t time);
 	void	(*psm_timer_enable)(void);
 	void 	(*psm_timer_disable)(void);
 	void 	(*psm_post_cyclic_setup)(void *arg);
 #endif
-#if defined(PSMI_1_4) || defined(PSMI_1_5)
+#if defined(PSMI_1_4) || defined(PSMI_1_5) || defined(PSMI_1_6)
 	void	(*psm_preshutdown)(int cmd, int fcn);
 #endif
-#if defined(PSMI_1_5)
+#if defined(PSMI_1_5) || defined(PSMI_1_6)
 	int	(*psm_intr_ops)(dev_info_t *dip, ddi_intr_handle_impl_t *handle,
 		    psm_intr_op_t op, int *result);
+#endif
+#if defined(PSMI_1_6)
+	int	(*psm_state)(psm_state_request_t *request);
 #endif
 };
 
@@ -153,6 +183,7 @@ struct psm_info {
 #define	PSM_INFO_VER01_3	0x8604
 #define	PSM_INFO_VER01_4	0x8605
 #define	PSM_INFO_VER01_5	0x8606
+#define	PSM_INFO_VER01_6	0x8706
 #define	PSM_INFO_VER01_X	(PSM_INFO_VER01_1 & 0xFFF0)	/* ver 1.X */
 
 /*

@@ -47,6 +47,8 @@
 /* Pointer to the state structure */
 static void *ohci_statep;
 
+int force_ohci_off = 1;
+
 /* Number of instances */
 #define	OHCI_INSTS	1
 
@@ -2353,7 +2355,7 @@ ohci_cpr_suspend(ohci_state_t	*ohcip)
 	 * Suspend the ohci host controller
 	 * if usb keyboard is not connected.
 	 */
-	if (ohcip->ohci_polled_kbd_count == 0) {
+	if (ohcip->ohci_polled_kbd_count == 0 || force_ohci_off != 0) {
 		Set_OpReg(hcr_control, HCR_CONTROL_SUSPD);
 	}
 

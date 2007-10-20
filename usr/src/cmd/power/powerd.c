@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,7 @@
 #include <sys/stropts.h>		/* for INFTIM */
 #include <sys/pbio.h>
 #include <sys/cpr.h>
+#include <sys/srn.h>
 #include <stdarg.h>
 
 #include "powerd.h"
@@ -73,6 +74,7 @@ extern int last_nfs_activity(hrtime_t *, int);
 #define	TOD		"/dev/tod"
 #define	PROM		"/dev/openprom"
 #define	PB		"/dev/power_button"
+#define	SRN		"/dev/srn"
 #define	LOGFILE		"./powerd.log"
 
 #define	PBM_THREAD	0
@@ -108,9 +110,7 @@ static int		autoshutdown_en;
 static int		do_idlecheck;
 static int		got_sighup;
 static int		estar_v2_prop;
-#ifdef sparc
 static int		estar_v3_prop;
-#endif
 static int		log_power_cycles_error = 0;
 static int		log_system_board_date_error = 0;
 static int		log_no_autoshutdown_warning = 0;
@@ -124,6 +124,11 @@ static char *autoshutdown_cmd[] = {
 static char *power_button_cmd[] = {
 	"/usr/openwin/bin/sys-suspend",
 	"-h", "-d", ":0", NULL
+};
+
+static char *autoS3_cmd[] = {
+	"/usr/openwin/bin/sys-suspend",
+	"-n", "-d", ":0", NULL
 };
 
 static char pidpath[] = PIDPATH;
@@ -148,11 +153,10 @@ static int open_pidfile(char *);
 static int write_pidfile(int, pid_t);
 static int read_cpr_config(void);
 static void system_activity_monitor(void);
-#ifdef sparc
+static void autos3_monitor(void);
 static void do_attach(void);
 static void *attach_devices(void *);
-#endif
-
+static int powerd_debug;
 
 /* PRINTFLIKE1 */
 static void
@@ -205,8 +209,11 @@ main(int argc, char *argv[])
 	 * Process options
 	 */
 	broadcast = 1;
-	while ((c = getopt(argc, argv, "n")) != EOF) {
+	while ((c = getopt(argc, argv, "nd")) != EOF) {
 		switch (c) {
+		case 'd':
+			powerd_debug = 1;
+			break;
 		case 'n':
 			broadcast = 0;
 			break;
@@ -230,7 +237,7 @@ main(int argc, char *argv[])
 	 */
 	if (mutex_init(&poweroff_mutex, USYNC_THREAD, NULL) != 0) {
 		(void) fprintf(stderr,
-			"%s: Unable to initialize mutex lock\n", prog);
+		    "%s: Unable to initialize mutex lock\n", prog);
 		exit(EXIT_FAILURE);
 	}
 
@@ -296,6 +303,8 @@ main(int argc, char *argv[])
 	 * thread to monitor the power button.
 	 */
 	if ((pb_fd = open(PB, O_RDONLY)) != -1) {
+		if (powerd_debug)
+			logerror("powerd starting power button monitor.");
 		if (thr_create(NULL, NULL,
 		    (void *(*)(void *))power_button_monitor, NULL,
 		    THR_DAEMON, NULL) != 0) {
@@ -303,18 +312,28 @@ main(int argc, char *argv[])
 		}
 	}
 
-#ifdef sparc
 	do_attach();
-#endif
 
 	/*
 	 * Create a new thread to monitor system activity and suspend
 	 * system if idle.
 	 */
+	if (powerd_debug)
+		logerror("powerd starting system activity monitor.");
 	if (thr_create(NULL, NULL,
 	    (void *(*)(void *))system_activity_monitor, NULL,
 	    THR_DAEMON, NULL) != 0) {
 		logerror("Unable to create thread to monitor system activity.");
+	}
+
+	/*
+	 * Create a new thread to handle autos3 trigger
+	 */
+	if (powerd_debug)
+		logerror("powerd starting autos3 monitor.");
+	if (thr_create(NULL, NULL,
+	    (void *(*)(void *))autos3_monitor, NULL, THR_DAEMON, NULL) != 0) {
+		logerror("Unable to create thread to monitor autos3 activity.");
 	}
 
 	/*
@@ -368,6 +387,68 @@ system_activity_monitor(void)
 	do {
 		(void) sigsuspend(&sigmask);
 	} while (errno == EINTR);
+}
+
+static void
+autos3_monitor(void)
+{
+	struct pollfd poll_fd;
+	srn_event_info_t srn_event;		/* contains suspend type */
+	int fd, ret;
+
+	fd = open(SRN, O_RDWR|O_EXCL|O_NDELAY);
+	if (fd == -1) {
+		logerror("Unable to open %s: %s", SRN, strerror(errno));
+		thr_exit((void *) errno);
+	}
+	logerror("Able to open %s", SRN);
+
+	/*
+	 * Tell device we want the special sauce
+	 */
+	ret = ioctl(fd, SRN_IOC_AUTOSX, NULL);
+	if (ret == -1) {
+		logerror("Ioctl SRN_IOC_AUTOSX failed: %s", strerror(errno));
+		close(fd);
+		thr_exit((void *) errno);
+	}
+	poll_fd.fd = fd;
+	/*CONSTCOND*/
+	while (1) {
+		poll_fd.revents = 0;
+		poll_fd.events = POLLIN;
+		if (poll(&poll_fd, 1, -1) < 0) {
+			switch (errno) {
+			case EINTR:
+			case EAGAIN:
+				continue;
+			default:
+				logerror("Poll error: %s", strerror(errno));
+				close(fd);
+				thr_exit((void *) errno);
+			}
+		}
+
+		ret = ioctl(fd, SRN_IOC_NEXTEVENT, &srn_event);
+		if (ret == -1) {
+			logerror("ioctl error: %s", strerror(errno));
+			close(fd);
+			thr_exit((void *) errno);
+		}
+		switch (srn_event.ae_type) {
+		case 3:			/* S3 */
+			if (powerd_debug)
+				logerror("ioctl returns type: %d",
+				    srn_event.ae_type);
+			break;
+		default:
+			logerror("Unsupported target state %d",
+			    srn_event.ae_type);
+			continue;
+		}
+		(void) poweroff("AutoS3", autoS3_cmd);
+		continue;
+	}
 }
 
 static int
@@ -482,7 +563,7 @@ work_handler(int sig)
 	} else if (strcmp(asinfo.as_behavior, "default") == 0) {
 		info->pd_autoshutdown = estar_v2_prop;
 	} else if (strcmp(asinfo.as_behavior, "shutdown") == 0 ||
-		strcmp(asinfo.as_behavior, "autowakeup") == 0) {
+	    strcmp(asinfo.as_behavior, "autowakeup") == 0) {
 		info->pd_autoshutdown = asinfo.is_cpr_capable;
 	} else {
 		logerror("autoshutdown behavior \"%s\" unrecognized.",
@@ -500,14 +581,15 @@ work_handler(int sig)
 		    (strcmp(asinfo.as_behavior, "autowakeup") == 0) ? 1 : 0;
 	}
 	autoshutdown_en = (asinfo.as_idle >= 0 && info->pd_autoshutdown)
-		? 1 : 0;
+	    ? 1 : 0;
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "autoshutdown_en = %d, as_idle = %d, "
-			"pd_autoresume = %d\n",
-		autoshutdown_en, asinfo.as_idle, info->pd_autoresume);
+	    "pd_autoresume = %d\n",
+	    autoshutdown_en, asinfo.as_idle, info->pd_autoresume);
+
 	(void) fprintf(stderr, " pd_start_time=%d, pd_finish_time=%d\n",
-		info->pd_start_time, info->pd_finish_time);
+	    info->pd_start_time, info->pd_finish_time);
 #endif
 
 	got_sighup = 1;
@@ -574,11 +656,10 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 		start_calc = 1;
 		time_since_last_resume = time(NULL) - last_resume;
 		next_time = info->pd_idle_time * 60 -
-				MIN(least_idle, time_since_last_resume);
+		    MIN(least_idle, time_since_last_resume);
 
 #ifdef DEBUG
-		fprintf(stderr, " check_shutdown: next_time=%d\n",
-			next_time);
+		fprintf(stderr, " check_shutdown: next_time=%d\n", next_time);
 #endif
 
 		/*
@@ -591,7 +672,7 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 			start_calc = 1;
 			time_since_last_resume = time(NULL) - last_resume;
 			next_time = info->pd_idle_time * 60 -
-				MIN(least_idle, time_since_last_resume);
+			    MIN(least_idle, time_since_last_resume);
 		}
 
 		/*
@@ -602,8 +683,8 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 			got_sighup = 0;
 			idlecheck_time = run_idlecheck();
 			next_time = info->pd_idle_time * 60 -
-				MIN(idlecheck_time, MIN(least_idle,
-				time_since_last_resume));
+			    MIN(idlecheck_time, MIN(least_idle,
+			    time_since_last_resume));
 			/*
 			 * If we have caught SIGTHAW or SIGHUP, need to
 			 * recalculate.
@@ -613,10 +694,10 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 				got_sighup = 0;
 				idlecheck_time = run_idlecheck();
 				time_since_last_resume = time(NULL) -
-					last_resume;
+				    last_resume;
 				next_time = info->pd_idle_time * 60 -
-					MIN(idlecheck_time, MIN(least_idle,
-					time_since_last_resume));
+				    MIN(idlecheck_time, MIN(least_idle,
+				    time_since_last_resume));
 			}
 		}
 
@@ -631,7 +712,7 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 					tod_fd = open(TOD, O_RDWR);
 				if (info->pd_autoresume && tod_fd != -1) {
 					wakeup_time = (*now < f) ? f :
-							(f + DAYS_TO_SECS);
+					    (f + DAYS_TO_SECS);
 					/*
 					 * A software fix for hardware
 					 * bug 1217415.
@@ -645,10 +726,9 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 						return;
 					}
 					if (ioctl(tod_fd, TOD_SET_ALARM,
-							&wakeup_time) == -1) {
-						logerror("Unable to program "
-							"TOD alarm for "
-							"autowakeup.");
+					    &wakeup_time) == -1) {
+						logerror("Unable to program TOD"
+						    " alarm for autowakeup.");
 						close(tod_fd);
 						return;
 					}
@@ -659,7 +739,7 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 
 				if (info->pd_autoresume && tod_fd != -1) {
 					if (ioctl(tod_fd, TOD_CLEAR_ALARM,
-							NULL) == -1)
+					    NULL) == -1)
 						logerror("Unable to clear "
 						    "alarm in TOD device.");
 					close(tod_fd);
@@ -668,8 +748,8 @@ check_shutdown(time_t *now, hrtime_t *hr_now)
 				(void) time(now);
 				/* wait at least 5 mins */
 				shutdown_time = *now +
-					((info->pd_idle_time * 60) > 300 ?
-					(info->pd_idle_time * 60) : 300);
+				    ((info->pd_idle_time * 60) > 300 ?
+				    (info->pd_idle_time * 60) : 300);
 			} else {
 				/* wait 5 mins */
 				shutdown_time = *now + 300;
@@ -698,8 +778,8 @@ is_ok2shutdown(time_t *now)
 	/* CONSTCOND */
 	while (1) {
 		if ((prom_fd = open(PROM, O_RDWR)) == -1 &&
-			(errno == EAGAIN))
-				continue;
+		    (errno == EAGAIN))
+			continue;
 		break;
 	}
 
@@ -760,15 +840,14 @@ is_ok2shutdown(time_t *now)
 	 * 7-year life span instead of (lifetime - date free_cycles ended).
 	 */
 	scaled_cycles = (int)(((float)life_passed / (float)LIFETIME_SECS) *
-				(power_cycle_limit - free_cycles));
+	    (power_cycle_limit - free_cycles));
 
 	if (no_power_cycles)
 		goto ckdone;
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "Actual power_cycles = %d\t"
-				"Scaled power_cycles = %d\n",
-				power_cycles, scaled_cycles);
+	    "Scaled power_cycles = %d\n", power_cycles, scaled_cycles);
 #endif
 	if (power_cycles > scaled_cycles) {
 		if (log_no_autoshutdown_warning == 0) {
@@ -807,13 +886,13 @@ check_idleness(time_t *now, hrtime_t *hr_now)
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "Idle ttychars for %d secs.\n",
-			info->pd_ttychars_idle);
+	    info->pd_ttychars_idle);
 	(void) fprintf(stderr, "Idle loadaverage for %d secs.\n",
-			info->pd_loadaverage_idle);
+	    info->pd_loadaverage_idle);
 	(void) fprintf(stderr, "Idle diskreads for %d secs.\n",
-			info->pd_diskreads_idle);
+	    info->pd_diskreads_idle);
 	(void) fprintf(stderr, "Idle nfsreqs for %d secs.\n",
-			info->pd_nfsreqs_idle);
+	    info->pd_nfsreqs_idle);
 #endif
 
 	checkidle_time = *now + IDLECHK_INTERVAL;
@@ -848,7 +927,8 @@ run_idlecheck()
 	/*
 	 * Reap any child process which has been left over.
 	 */
-	while (waitpid((pid_t)-1, &status, WNOHANG) > 0);
+	while (waitpid((pid_t)-1, &status, WNOHANG) > 0)
+		;
 
 	/*
 	 * Execute the user's idlecheck script and set variable PM_IDLETIME.
@@ -856,7 +936,7 @@ run_idlecheck()
 	 */
 	if ((child = fork1()) == 0) {
 		(void) sprintf(pm_variable, "PM_IDLETIME=%d",
-			info->pd_idle_time);
+		    info->pd_idle_time);
 		(void) putenv(pm_variable);
 		cp = strrchr(asinfo.idlecheck_path, '/');
 		if (cp == NULL)
@@ -1136,7 +1216,6 @@ power_button_monitor(void *arg)
 	}
 }
 
-#ifdef sparc
 static void
 do_attach(void)
 {
@@ -1151,6 +1230,8 @@ do_attach(void)
 	estar_v3_prop = asinfo.is_autopm_default;
 	if ((strcmp(asinfo.apm_behavior, "enable") == 0) ||
 	    (estar_v3_prop && strcmp(asinfo.apm_behavior, "default") == 0)) {
+		if (powerd_debug)
+			logerror("powerd starting device attach thread.");
 		if (thr_create(NULL, NULL, attach_devices, NULL,
 		    THR_DAEMON, NULL) != 0) {
 			logerror("Unable to create thread to attach devices.");
@@ -1179,7 +1260,6 @@ attach_devices(void *arg)
 
 	return (NULL);
 }
-#endif
 
 
 /*
@@ -1199,7 +1279,7 @@ open_pidfile(char *me)
 	const char *e3 = "%s: Cannot open /proc for pid %ld: ";
 	const char *e4 = "%s: Cannot read /proc for pid %ld: ";
 	const char *e5 = "%s: Another instance (pid %ld) is trying to exit"
-			"and may be hung.  Please contact sysadmin.\n";
+	    "and may be hung.  Please contact sysadmin.\n";
 	const char *e6 = "%s: Another daemon is running\n";
 	const char *e7 = "%s: Cannot create pid file: ";
 

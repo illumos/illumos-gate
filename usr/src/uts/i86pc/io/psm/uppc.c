@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	PSMI_1_5
+#define	PSMI_1_6
 
 #include <sys/mutex.h>
 #include <sys/types.h>

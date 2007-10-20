@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,6 +221,16 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	int instance = ddi_get_instance(devi);
 	pci_state_t *pcip = NULL;
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+
+	default:
+		return (DDI_FAILURE);
+	}
 
 	if (ddi_prop_update_string(DDI_DEV_T_NONE, devi, "device_type", "pci")
 	    != DDI_PROP_SUCCESS) {
@@ -285,23 +295,30 @@ pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	pci_state_t *pcip;
 
 	pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(devi));
-	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE) {
-		ddi_fm_handler_unregister(devi);
-		pci_ereport_teardown(devi);
+
+
+	switch (cmd) {
+	case DDI_DETACH:
+		if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE) {
+			ddi_fm_handler_unregister(devi);
+			pci_ereport_teardown(devi);
+		}
+		mutex_destroy(&pcip->pci_peek_poke_mutex);
+		mutex_destroy(&pcip->pci_err_mutex);
+		ddi_fm_fini(devi);	/* Uninitialize pcitool support. */
+		pcitool_uninit(devi);
+
+		/* Uninitialize hotplug support on this bus. */
+		(void) pcihp_uninit(devi);
+
+		ddi_soft_state_free(pci_statep, instance);
+
+		return (DDI_SUCCESS);
+	case DDI_SUSPEND:
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
 	}
-	mutex_destroy(&pcip->pci_peek_poke_mutex);
-	mutex_destroy(&pcip->pci_err_mutex);
-	ddi_fm_fini(devi);
-
-	/* Uninitialize pcitool support. */
-	pcitool_uninit(devi);
-
-	/* Uninitialize hotplug support on this bus. */
-	(void) pcihp_uninit(devi);
-
-	ddi_soft_state_free(pci_statep, instance);
-
-	return (DDI_SUCCESS);
 }
 
 static int
@@ -510,6 +527,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	rn;
 	int	totreg;
 	pci_state_t *pcip;
+	struct  attachspec *asp;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -537,8 +555,8 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 		*(int *)result = 0;
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
-				DDI_PROP_DONTPASS, "reg", (int **)&drv_regp,
-				&reglen) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "reg", (int **)&drv_regp,
+		    &reglen) != DDI_PROP_SUCCESS) {
 			return (DDI_FAILURE);
 		}
 
@@ -577,6 +595,21 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
 		    pci_common_peekpoke, &pcip->pci_err_mutex,
 		    &pcip->pci_peek_poke_mutex));
+
+	/* for now only X86 systems support PME wakeup from suspended state */
+	case DDI_CTLOPS_ATTACH:
+		asp = (struct attachspec *)arg;
+		if (asp->cmd == DDI_RESUME && asp->when == DDI_PRE)
+			if (pci_pre_resume(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+
+	case DDI_CTLOPS_DETACH:
+		asp = (struct attachspec *)arg;
+		if (asp->cmd == DDI_SUSPEND && asp->when == DDI_POST)
+			if (pci_post_suspend(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
@@ -679,8 +712,7 @@ pci_initchild(dev_info_t *child)
 	 * Support for the "command-preserve" property.
 	 */
 	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-						DDI_PROP_DONTPASS,
-						"command-preserve", 0);
+	    DDI_PROP_DONTPASS, "command-preserve", 0);
 	command = pci_config_get16(config_handle, PCI_CONF_COMM);
 	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
 	command |= (pci_command_default & ~command_preserve);

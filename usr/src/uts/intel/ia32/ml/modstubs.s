@@ -596,6 +596,8 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(klmmod, lm_svc,		nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_shutdown,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_unexport,	nomod_zero);
+	NO_UNLOAD_STUB(klmmod, lm_cprresume,	nomod_zero);
+	NO_UNLOAD_STUB(klmmod, lm_cprsuspend,	nomod_zero); 
 	NO_UNLOAD_STUB(klmmod, lm_safelock, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_safemap, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_has_sleep, nomod_zero);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,28 +56,29 @@ ghd_err(const char *fmt, ...)
 }
 
 #if defined(GHD_DEBUG)
+#include <sys/promif.h>
 #define	PRF	prom_printf
 
 static void
 ghd_dump_ccc(ccc_t *P)
 {
 	PRF("nextp 0x%p tmrp 0x%p label 0x%p &mutex 0x%p\n",
-		P->ccc_nextp, P->ccc_tmrp, P->ccc_label, &P->ccc_activel_mutex);
+	    P->ccc_nextp, P->ccc_tmrp, P->ccc_label, &P->ccc_activel_mutex);
 	PRF("&activel 0x%p dip 0x%p iblock 0x%p\n",
-		&P->ccc_activel, P->ccc_hba_dip, P->ccc_iblock);
+	    &P->ccc_activel, P->ccc_hba_dip, P->ccc_iblock);
 	PRF("softid 0x%p &hba_mutext 0x%p\n poll 0x%p\n",
-		P->ccc_soft_id, &P->ccc_hba_mutex, &P->ccc_hba_pollmode);
+	    P->ccc_soft_id, &P->ccc_hba_mutex, &P->ccc_hba_pollmode);
 	PRF("&devs 0x%p &waitq_mutex 0x%p &waitq 0x%p\n",
-		&P->ccc_devs, &P->ccc_waitq_mutex, &P->ccc_waitq);
+	    &P->ccc_devs, &P->ccc_waitq_mutex, &P->ccc_waitq);
 	PRF("waitq_freezetime 0x%p waitq_freezedelay %p\n",
-		&P->ccc_waitq_freezetime, &P->ccc_waitq_freezedelay);
+	    &P->ccc_waitq_freezetime, &P->ccc_waitq_freezedelay);
 	PRF("dq softid 0x%p &dq_mutex 0x%p &doneq 0x%p\n",
-		P->ccc_doneq_softid, &P->ccc_doneq_mutex, &P->ccc_doneq);
+	    P->ccc_doneq_softid, &P->ccc_doneq_mutex, &P->ccc_doneq);
 	PRF("handle 0x%p &ccballoc 0x%p\n",
-		P->ccc_hba_handle, &P->ccc_ccballoc);
+	    P->ccc_hba_handle, &P->ccc_ccballoc);
 	PRF("hba_reset_notify_callback 0x%p notify_list 0x%p mutex 0x%p\n",
-		P->ccc_hba_reset_notify_callback, &P->ccc_reset_notify_list,
-		&P->ccc_reset_notify_mutex);
+	    P->ccc_hba_reset_notify_callback, &P->ccc_reset_notify_list,
+	    &P->ccc_reset_notify_mutex);
 }
 
 

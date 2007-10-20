@@ -206,8 +206,10 @@ int
 _init(void)
 {
 	if (ddi_soft_state_init(
-	    &ppm_statep, sizeof (ppm_unit_t), 1) != DDI_SUCCESS)
+	    &ppm_statep, sizeof (ppm_unit_t), 1) != DDI_SUCCESS) {
+		PPMD(D_INIT, ("ppm: soft state init\n"))
 		return (DDI_FAILURE);
+	}
 
 	if (mod_install(&modlinkage) != DDI_SUCCESS) {
 		ddi_soft_state_fini(&ppm_statep);
@@ -220,7 +222,12 @@ _init(void)
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int error;
+
+	if ((error = mod_remove(&modlinkage)) == DDI_SUCCESS)
+		ddi_soft_state_fini(&ppm_statep);
+
+	return (error);
 }
 
 
@@ -679,7 +686,7 @@ err_bydom:
 
 		STRUCT_INIT(norm, mode);
 		ret = ddi_copyin((caddr_t)arg, STRUCT_BUF(norm),
-		STRUCT_SIZE(norm), mode);
+		    STRUCT_SIZE(norm), mode);
 		if (ret != 0)
 			return (EFAULT);
 
@@ -755,6 +762,10 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ppm_owned_t	*owned;
 	int		mode;
 	int		ret = DDI_SUCCESS;
+	static int	ppm_manage_sx(s3a_t *, int);
+	static int	ppm_search_list(pm_searchargs_t *);
+	int 		*res = (int *)result;
+	s3a_t s3args;
 
 #ifdef DEBUG
 	char	*str = "ppm_ctlops";
@@ -765,8 +776,9 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		    str, ddi_binding_name(rdip), ctlstr))
 #endif
 
-	if (ctlop != DDI_CTLOPS_POWER)
+	if (ctlop != DDI_CTLOPS_POWER) {
 		return (DDI_FAILURE);
+	}
 
 	unitp = (ppm_unit_t *)ddi_get_soft_state(ppm_statep, ppm_inst);
 
@@ -779,8 +791,6 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			ppm_manage_led(PPM_LED_BLINKING);
 		else
 			ppm_manage_led(PPM_LED_SOLIDON);
-		PPMD(D_LOWEST, ("%s: %sall devices are at lowest power \n",
-		    str, mode ? "" : "not "))
 		return (DDI_SUCCESS);
 
 	/* undo the claiming of 'rdip' at attach time */
@@ -984,9 +994,37 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		}
 
+	case PMR_PPM_ENTER_SX:
+	case PMR_PPM_EXIT_SX:
+		s3args.s3a_state = reqp->req.ppm_power_enter_sx_req.sx_state;
+		s3args.s3a_test_point =
+		    reqp->req.ppm_power_enter_sx_req.test_point;
+		s3args.s3a_wakephys = reqp->req.ppm_power_enter_sx_req.wakephys;
+		s3args.s3a_psr = reqp->req.ppm_power_enter_sx_req.psr;
+		ret = ppm_manage_sx(&s3args,
+		    reqp->request_type == PMR_PPM_ENTER_SX);
+		if (ret) {
+			PPMD(D_CPR, ("ppm_manage_sx returns %d\n", ret))
+			return (DDI_FAILURE);
+		} else {
+			return (DDI_SUCCESS);
+		}
+
+	case PMR_PPM_SEARCH_LIST:
+		ret = ppm_search_list(reqp->req.ppm_search_list_req.searchlist);
+		reqp->req.ppm_search_list_req.result = ret;
+		*res = ret;
+		if (ret) {
+			PPMD(D_CPR, ("ppm_search_list returns %d\n", ret))
+			return (DDI_FAILURE);
+		} else {
+			PPMD(D_CPR, ("ppm_search_list returns %d\n", ret))
+			return (DDI_SUCCESS);
+		}
+
 	default:
 		cmn_err(CE_WARN, "ppm_ctlops: unrecognized ctlops req(%d)",
-			reqp->request_type);
+		    reqp->request_type);
 		return (DDI_FAILURE);
 	}
 }
@@ -1246,7 +1284,7 @@ ppm_bringup_domains()
 		}
 		mutex_exit(&domp->lock);
 	}
-	PPMD(D_CPR, ("%s[%d]: exit, ret=%d\n", str, ppmbringup, ret))
+	PPMD(D_CPR, ("%s[%d]: exit\n", str, ppmbringup))
 
 	return (ret);
 }
@@ -1275,6 +1313,15 @@ ppm_sync_bookkeeping()
 			mutex_exit(&domp->lock);
 			continue;
 		}
+
+		/*
+		 * skip NULL .devlist slot, for some may host pci device
+		 * that can not tolerate clock off or not even participate
+		 * in PM.
+		 */
+		if (domp->devlist == NULL)
+			continue;
+
 		switch (domp->model) {
 		case PPMD_FET:
 			ret = ppm_fetset(domp, PPMD_OFF);
@@ -1291,7 +1338,7 @@ ppm_sync_bookkeeping()
 		}
 		mutex_exit(&domp->lock);
 	}
-	PPMD(D_CPR, ("%s[%d]: exit, ret=%d\n", str, ppmsyncbp, ret))
+	PPMD(D_CPR, ("%s[%d]: exit\n", str, ppmsyncbp))
 
 	return (ret);
 }
@@ -1655,14 +1702,14 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 				 * we might wait for longer than required
 				 */
 				PPMD(D_FET, ("%s : waiting %lu micro seconds "
-					"before on\n", domp->name,
-					delay - temp))
+				    "before on\n", domp->name,
+				    delay - temp));
 				drv_usecwait(delay - temp);
 			}
 		}
 	}
 	switch (dc->method) {
-#if !defined(__x86)
+#ifdef sun4u
 	case PPMDC_I2CKIO: {
 		i2c_gpio_t i2c_req;
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
@@ -1739,7 +1786,7 @@ ppm_fetget(ppm_domain_t *domp, uint8_t *lvl)
 	}
 
 	switch (dc->method) {
-#if !defined(__x86)
+#ifdef sun4u
 	case PPMDC_I2CKIO: {
 		i2c_gpio_t i2c_req;
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
@@ -1773,7 +1820,7 @@ ppm_fetget(ppm_domain_t *domp, uint8_t *lvl)
 		}
 
 		off_val = (dc->cmd == PPMDC_FET_OFF) ? dc->m_un.kio.val :
-			dc->next->m_un.kio.val;
+		    dc->next->m_un.kio.val;
 		*lvl = (kio_val == off_val) ? PPMD_OFF : PPMD_ON;
 
 		PPMD(D_FET, ("%s: %s domain FET %s\n", str, domp->name,
@@ -2187,7 +2234,7 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	}
 
 	switch (dc->method) {
-#if !defined(__x86)
+#ifdef sun4u
 	case PPMDC_I2CKIO: {
 		i2c_gpio_t i2c_req;
 		ppm_dev_t *pdev;
@@ -2223,6 +2270,7 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 		break;
 	}
 #endif
+
 	case PPMDC_KIO:
 		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
 		    (intptr_t)&(dc->m_un.kio.val), FWRITE | FKIOCTL, kcred,
@@ -2665,4 +2713,101 @@ ppm_power_down_domain(dev_info_t *dip)
 	}
 	mutex_exit(&domp->lock);
 	return (ret);
+}
+
+static int
+ppm_manage_sx(s3a_t *s3ap, int enter)
+{
+	ppm_domain_t *domp = ppm_lookup_domain("domain_estar");
+	ppm_dc_t *dc;
+	int ret = 0;
+
+	if (domp == NULL) {
+		PPMD(D_CPR, ("ppm_manage_sx: can't find estar domain\n"))
+		return (ENODEV);
+	}
+	PPMD(D_CPR, ("ppm_manage_sx %x, enter %d\n", s3ap->s3a_state,
+	    enter))
+	switch (s3ap->s3a_state) {
+	case S3:
+		if (enter) {
+			dc = ppm_lookup_dc(domp, PPMDC_ENTER_S3);
+		} else {
+			dc = ppm_lookup_dc(domp, PPMDC_EXIT_S3);
+		}
+		ASSERT(dc && dc->method == PPMDC_KIO);
+		PPMD(D_CPR,
+		    ("ppm_manage_sx: calling acpi driver (handle %p)"
+		    " with %x\n", (void *)dc->lh, dc->m_un.kio.iowr))
+		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
+		    (intptr_t)s3ap, FWRITE | FKIOCTL, kcred, NULL);
+		break;
+
+	case S4:
+		/* S4 is not supported yet */
+		return (EINVAL);
+	default:
+		ASSERT(0);
+	}
+	return (ret);
+}
+
+/*
+ * Search enable/disable lists, which are encoded in ppm.conf as an array
+ * of char strings.
+ */
+static int
+ppm_search_list(pm_searchargs_t *sl)
+{
+	int i;
+	int flags = DDI_PROP_DONTPASS;
+	ppm_unit_t *unitp = ddi_get_soft_state(ppm_statep, ppm_inst);
+	char **pp;
+	char *starp;
+	uint_t nelements;
+	char *manuf = sl->pms_manufacturer;
+	char *prod = sl->pms_product;
+
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, unitp->dip, flags,
+	    sl->pms_listname, &pp, &nelements) != DDI_PROP_SUCCESS) {
+		PPMD(D_CPR, ("ppm_search_list prop lookup %s failed--EINVAL\n",
+		    sl->pms_listname))
+		return (EINVAL);
+	}
+	ASSERT((nelements & 1) == 0);		/* must be even */
+
+	PPMD(D_CPR, ("ppm_search_list looking for %s, %s\n", manuf, prod))
+
+	for (i = 0; i < nelements; i += 2) {
+		PPMD(D_CPR, ("checking %s, %s", pp[i], pp[i+1]))
+		/* we support only a trailing '*' pattern match */
+		if ((starp = strchr(pp[i], '*')) != NULL && *(starp + 1) == 0) {
+			/* LINTED - ptrdiff overflow */
+			if (strncmp(manuf, pp[i], (starp - pp[i])) != 0) {
+				PPMD(D_CPR, (" no match %s with %s\n",
+				    manuf, pp[i + 1]))
+				continue;
+			}
+		}
+		if ((starp = strchr(pp[i + 1], '*')) != NULL &&
+		    *(starp + 1) == 0) {
+			if (strncmp(prod,
+			    /* LINTED - ptrdiff overflow */
+			    pp[i + 1], (starp - pp[i + 1])) != 0) {
+				PPMD(D_CPR, (" no match %s with %s\n",
+				    prod, pp[i + 1]))
+				continue;
+			}
+		}
+		if (strcmp(manuf, pp[i]) == 0 &&
+		    (strcmp(prod, pp[i + 1]) == 0)) {
+			PPMD(D_CPR, (" match\n"))
+			ddi_prop_free(pp);
+			return (0);
+		}
+		PPMD(D_CPR, (" no match %s with %s or %s with %s\n",
+		    manuf, pp[i], prod, pp[i + 1]))
+	}
+	ddi_prop_free(pp);
+	return (ENODEV);
 }

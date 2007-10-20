@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/pte.h>
-#include <sys/intreg.h>
 #include <sys/cpr.h>
 
 /*
@@ -111,7 +110,7 @@ cpr_stat_event_end(char *name, cpr_time_t *ctp)
 	cep->ce_sec.etime = tv.tv_sec;
 	cep->ce_sec.ltime = cep->ce_sec.etime - cep->ce_sec.stime;
 	cep->ce_sec.mtime = ((cep->ce_sec.mtime * (cep->ce_ntests - 1)) +
-		cep->ce_sec.ltime) / cep->ce_ntests;
+	    cep->ce_sec.ltime) / cep->ce_ntests;
 
 	/*
 	 * calculate 100*milliseconds
@@ -158,10 +157,10 @@ cpr_stat_record_events()
 
 		STAT->cs_real_statefsz = cpr_term.real_statef_size;
 		cur_comprate = ((longlong_t)((longlong_t)
-			STAT->cs_nocomp_statefsz*100)/
-			STAT->cs_real_statefsz);
+		    STAT->cs_nocomp_statefsz*100)/
+		    STAT->cs_real_statefsz);
 		if (STAT->cs_min_comprate == 0 ||
-			(STAT->cs_min_comprate > cur_comprate))
+		    (STAT->cs_min_comprate > cur_comprate))
 			STAT->cs_min_comprate = cur_comprate;
 	}
 }
@@ -203,25 +202,25 @@ cpr_stat_event_print()
 	 */
 	printf("\nMISCELLANEOUS STATISTICS INFORMATION (units in KBytes)\n\n");
 	printf("\tUser Pages w/o Swapspace:\t%8lu (%lu pages)\n",
-		cp->cs_nosw_pages*PAGESIZE/1000, cp->cs_nosw_pages);
+	    cp->cs_nosw_pages*PAGESIZE/1000, cp->cs_nosw_pages);
 	printf("\tTotal Upages Saved to Statefile:%8d (%d pages)\n",
-		cp->cs_upage2statef*PAGESIZE/1000, cp->cs_upage2statef);
+	    cp->cs_upage2statef*PAGESIZE/1000, cp->cs_upage2statef);
 	if (cp->cs_mclustsz)
 		printf("\tAverage Cluster Size:\t\t%8d (%d.%1d%1d pages)\n\n",
-		cp->cs_mclustsz/1000, cp->cs_mclustsz/PAGESIZE,
-		((cp->cs_mclustsz%PAGESIZE)*10/PAGESIZE),
-		((cp->cs_mclustsz%PAGESIZE)*100/PAGESIZE)%10);
+		    cp->cs_mclustsz/1000, cp->cs_mclustsz/PAGESIZE,
+		    ((cp->cs_mclustsz%PAGESIZE)*10/PAGESIZE),
+		    ((cp->cs_mclustsz%PAGESIZE)*100/PAGESIZE)%10);
 	printf("\tKernel Memory Size:\t\t%8lu\n", cp->cs_nocomp_statefsz/1000);
 	printf("\tEstimated Statefile Size:\t%8lu\n", cp->cs_est_statefsz/1000);
 	printf("\tActual Statefile Size:\t\t%8lu\n", cp->cs_real_statefsz/1000);
 	if (cp->cs_real_statefsz) {
 		int min = cp->cs_min_comprate;
 		int new = ((longlong_t)((longlong_t)
-			cp->cs_nocomp_statefsz*100)/cp->cs_real_statefsz);
+		    cp->cs_nocomp_statefsz*100)/cp->cs_real_statefsz);
 
 		printf("\tCompression Ratio:\t\t%5d.%1d%1d (worst %d.%1d%1d)\n",
-			new/100, (new%100)/10, new%10,
-			min/100, (min%100)/10, min%10);
+		    new/100, (new%100)/10, new%10,
+		    min/100, (min%100)/10, min%10);
 	}
 }
 

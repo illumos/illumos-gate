@@ -616,6 +616,7 @@ OPTIONS_OBJS += options.o
 WINLOCK_OBJS +=	winlockio.o
 
 PM_OBJS +=	pm.o
+SRN_OBJS +=	srn.o
 
 PSEUDO_OBJS +=	pseudonex.o
 

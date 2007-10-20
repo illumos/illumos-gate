@@ -78,6 +78,8 @@ clean.lint:
 
 install:	def
 
+CPPFLAGS += -I../../i86pc/io/ppm
+
 #
 # Create assym.h
 #

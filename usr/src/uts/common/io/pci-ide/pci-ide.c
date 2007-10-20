@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <sys/pci_intr_lib.h>
 
 int	pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+int	pciide_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 #define	PCIIDE_NATIVE_MODE(dip)						\
 	(!ddi_prop_exists(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, 	\
@@ -154,7 +155,7 @@ struct dev_ops pciide_ops = {
 	nulldev,		/* identify */
 	nulldev,		/* probe */
 	pciide_attach,		/* attach */
-	nodev,			/* detach */
+	pciide_detach,		/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
 	&pciide_bus_ops	/* bus operations */
@@ -203,9 +204,8 @@ pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_acc_handle_t conf_hdl = NULL;
 	int rc;
 
-
-	if (cmd == DDI_ATTACH) {
-
+	switch (cmd) {
+	case DDI_ATTACH:
 		/*
 		 * Make sure bus-mastering is enabled, even if
 		 * BIOS didn't.
@@ -225,13 +225,55 @@ pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    cmdreg | PCI_COMM_ME);
 		}
 		pci_config_teardown(&conf_hdl);
-
 		return (DDI_SUCCESS);
-	} else {
-		return (DDI_FAILURE);
+
+	case DDI_RESUME:
+		/* Restore our PCI configuration header */
+		if (pci_restore_config_regs(dip) != DDI_SUCCESS) {
+			/*
+			 * XXXX
+			 * This is a pretty bad thing.  However, for some
+			 * reason it always happens.  To further complicate
+			 * things, it appears if we just ignore this, we
+			 * properly resume.  For now, all I want to do is
+			 * to generate this message so that it doesn't get
+			 * forgotten.
+			 */
+			cmn_err(CE_WARN,
+			    "Couldn't restore PCI config regs for %s(%p)",
+			    ddi_node_name(dip), (void *) dip);
+		}
+#ifdef	DEBUG
+		/* Bus mastering should still be enabled */
+		if (pci_config_setup(dip, &conf_hdl) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+		cmdreg = pci_config_get16(conf_hdl, PCI_CONF_COMM);
+		ASSERT((cmdreg & PCI_COMM_ME) != 0);
+		pci_config_teardown(&conf_hdl);
+#endif
+		return (DDI_SUCCESS);
 	}
+
+	return (DDI_FAILURE);
 }
 
+/*ARGSUSED*/
+int
+pciide_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+	switch (cmd) {
+	case DDI_DETACH:
+		return (DDI_SUCCESS);
+	case DDI_SUSPEND:
+		/* Save our PCI configuration header */
+		if (pci_save_config_regs(dip) != DDI_SUCCESS) {
+			/* Don't suspend if we cannot save config regs */
+			return (DDI_FAILURE);
+		}
+		return (DDI_SUCCESS);
+	}
+	return (DDI_FAILURE);
+}
 
 /*ARGSUSED*/
 static int
@@ -295,9 +337,9 @@ pciide_ddi_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 			old_rnumber = rnumber;
 			new_rnumber
-				= pciide_pre26_rnumber_map(dip, old_rnumber);
+			    = pciide_pre26_rnumber_map(dip, old_rnumber);
 			PDBG(("pciide rnumber old %d new %d\n",
-				old_rnumber, new_rnumber));
+			    old_rnumber, new_rnumber));
 			rnumber = new_rnumber;
 		}
 
@@ -454,7 +496,7 @@ pciide_initchild(dev_info_t *mydip, dev_info_t *cdip)
 		 * property in the ata.conf file.
 		 */
 		vec = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-				"interrupts", -1);
+		    "interrupts", -1);
 		if (vec == -1) {
 			/* setup compatibility mode interrupts */
 			if (dev == 0) {
@@ -530,7 +572,7 @@ pciide_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		old_rnumber = mp->map_obj.rnumber;
 		new_rnumber = pciide_pre26_rnumber_map(dip, old_rnumber);
 		PDBG(("pciide rnumber old %d new %d\n",
-			old_rnumber, new_rnumber));
+		    old_rnumber, new_rnumber));
 		mp->map_obj.rnumber = new_rnumber;
 	}
 
@@ -545,7 +587,7 @@ pciide_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 */
 	pdip = ddi_get_parent(dip);
 	rc = ((*(DEVI(pdip)->devi_ops->devo_bus_ops->bus_map))
-			(pdip, dip, mp, offset, len, vaddrp));
+	    (pdip, dip, mp, offset, len, vaddrp));
 
 	PDBG(("pciide_bus_map %s\n", rc == DDI_SUCCESS ? "okay" : "!ok"));
 
@@ -751,7 +793,7 @@ pciide_compat_setup(dev_info_t *mydip, dev_info_t *cdip, int dev)
 		if ((dev == 0 && !(class_code & PCI_IDE_IF_NATIVE_PRI)) ||
 		    (dev == 1 && !(class_code & PCI_IDE_IF_NATIVE_SEC))) {
 			rc = ddi_prop_update_int(DDI_DEV_T_NONE, cdip,
-					"compatibility-mode", 1);
+			    "compatibility-mode", 1);
 			if (rc != DDI_PROP_SUCCESS)
 				cmn_err(CE_WARN,
 				    "pciide prop error %d compat-mode", rc);
@@ -765,9 +807,9 @@ pciide_compat_setup(dev_info_t *mydip, dev_info_t *cdip, int dev)
 		 */
 		class_code &= 0x00ffff00;
 		class_code |= PCI_IDE_IF_BM_CAP_MASK |
-			PCI_IDE_IF_NATIVE_PRI | PCI_IDE_IF_NATIVE_SEC;
+		    PCI_IDE_IF_NATIVE_PRI | PCI_IDE_IF_NATIVE_SEC;
 		rc = ddi_prop_update_int(DDI_DEV_T_NONE, mydip,
-			"class-code", class_code);
+		    "class-code", class_code);
 		if (rc != DDI_PROP_SUCCESS)
 			cmn_err(CE_WARN,
 			    "pciide prop error %d class-code", rc);
@@ -783,7 +825,7 @@ pciide_pre26_rnumber_map(dev_info_t *mydip, int rnumber)
 	int	class_code;
 
 	class_code = ddi_prop_get_int(DDI_DEV_T_ANY, mydip, DDI_PROP_DONTPASS,
-				"class-code", 0);
+	    "class-code", 0);
 
 	pri_native = (class_code & PCI_IDE_IF_NATIVE_PRI) ? TRUE : FALSE;
 	sec_native = (class_code & PCI_IDE_IF_NATIVE_SEC) ? TRUE : FALSE;

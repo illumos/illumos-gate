@@ -138,6 +138,7 @@ static void nv_read_signature(nv_port_t *nvp);
 static void mcp55_set_intr(nv_port_t *nvp, int flag);
 static void mcp04_set_intr(nv_port_t *nvp, int flag);
 static void nv_resume(nv_port_t *nvp);
+static void nv_suspend(nv_port_t *nvp);
 static int nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt);
 static int nv_abort_active(nv_port_t *nvp, sata_pkt_t *spkt, int abort_reason);
 static void nv_copy_registers(nv_port_t *nvp, sata_device_t *sd,
@@ -400,7 +401,7 @@ nv_get8(ddi_acc_handle_t handle, uint8_t *dev_addr)
 static int
 nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int status, attach_state, intr_types, bar, i;
+	int status, attach_state, intr_types, bar, i, command;
 	int inst = ddi_get_instance(dip);
 	ddi_acc_handle_t pci_conf_handle;
 	nv_ctl_t *nvc;
@@ -438,6 +439,20 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		attach_state |= ATTACH_PROGRESS_CONF_HANDLE;
+
+		/*
+		 * If a device is attached after a suspend/resume, sometimes
+		 * the command register is zero, as it might not be set by
+		 * BIOS or a parent.  Set it again here.
+		 */
+		command = pci_config_get16(pci_conf_handle, PCI_CONF_COMM);
+
+		if (command == 0) {
+			cmn_err(CE_WARN, "nv_sata%d: restoring PCI command"
+			    " register", inst);
+			pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
+			    PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
+		}
 
 		subclass = pci_config_get8(pci_conf_handle, PCI_CONF_SUBCLASS);
 
@@ -585,7 +600,6 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		NVLOG((NVDBG_INIT, nvc, NULL,
 		    "nv_attach(): DDI_RESUME inst %d", inst));
 
-
 		nvc->nvc_state &= ~NV_CTRL_SUSPEND;
 
 		for (i = 0; i < NV_MAX_PORTS(nvc); i++) {
@@ -716,6 +730,11 @@ nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * the current state.
 		 */
 		NVLOG((NVDBG_INIT, nvc, NULL, "nv_detach: DDI_SUSPEND"));
+
+		for (i = 0; i < NV_MAX_PORTS(nvc); i++) {
+			nv_suspend(&(nvc->nvc_port[i]));
+		}
+
 		nvc->nvc_state |= NV_CTRL_SUSPEND;
 
 		return (DDI_SUCCESS);
@@ -1226,7 +1245,7 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 		(*(nvc->nvc_set_intr))(nvp, NV_INTR_ENABLE);
 
 		NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp, "nv_sata_satapkt_sync:"
-			" done % reason %d", ret));
+		    " done % reason %d", ret));
 
 		return (ret);
 	}
@@ -2725,7 +2744,7 @@ mcp55_dma_setup_intr(nv_ctl_t *nvc, nv_port_t *nvp)
 	    MCP_SATA_AE_NCQ_SDEV_DMA_SETUP_TAG_SHIFT};
 
 	nv_cmn_err(CE_PANIC, nvc, nvp,
-		"this is should not be executed at all until NCQ");
+	    "this is should not be executed at all until NCQ");
 
 	mutex_enter(&nvp->nvp_mutex);
 
@@ -4567,6 +4586,38 @@ nv_resume(nv_port_t *nvp)
 	}
 
 	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp, NV_INTR_CLEAR_ALL|NV_INTR_ENABLE);
+
+	/*
+	 * power may have been removed to the port and the
+	 * drive, and/or a drive may have been added or removed.
+	 * Force a reset which will cause a probe and re-establish
+	 * any state needed on the drive.
+	 * nv_reset(nvp);
+	 */
+
+	nv_reset(nvp);
+
+	mutex_exit(&nvp->nvp_mutex);
+}
+
+/*
+ * The PM functions for suspend and resume are incomplete and need additional
+ * work.  It may or may not work in the current state.
+ */
+static void
+nv_suspend(nv_port_t *nvp)
+{
+	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_suspend()"));
+
+	mutex_enter(&nvp->nvp_mutex);
+
+	if (nvp->nvp_state & NV_PORT_INACTIVE) {
+		mutex_exit(&nvp->nvp_mutex);
+
+		return;
+	}
+
+	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp, NV_INTR_DISABLE);
 
 	/*
 	 * power may have been removed to the port and the
