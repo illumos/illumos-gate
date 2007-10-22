@@ -655,8 +655,8 @@ sub generateTableC {
 	  $tokenId = 'error';
 	}
 	my ($xlate, $jni) =
-	  formatTableEntry ('', $tokenId, $eventId, '', 0, 0, $tokenOrder[$sequence],
-			    'NULL', '');
+	  formatTableEntry ('', $tokenId, $eventId, '', 0, 0,
+			    $tokenOrder[$sequence], 'NULL', $omit);
 	push (@xlateEntryList, $xlate);
       }
       else {
@@ -699,7 +699,7 @@ sub generateTableC {
 	my ($xlate, $jni) =
 	  formatTableEntry($entryId, $tokenName, $eventId, $dataType, $required,
 			   $tsol, $tokenOrder[$sequence], $tokenFormat,
-			   $enumGroup, (uc $omit eq 'JNI'));
+			   $enumGroup, $omit);
 	push (@xlateEntryList, $xlate);
       }
       $sequence++;
@@ -709,8 +709,8 @@ sub generateTableC {
 }
 
 sub formatTableEntry {
-    my ($id, $token, $eventId, $type, $required, $tsol, $sequence, $format, $enumGroup,
-	$omitJNI) = @_;
+    my ($id, $token, $eventId, $type, $required, $tsol, $sequence, $format,
+	$enumGroup, $omitEntry) = @_;
 
 
     # does this map belong in the xml source?  (at least the defaults?)
@@ -788,7 +788,7 @@ sub formatTableEntry {
 	$dataSize = "sizeof (au_tid_addr_t *)";
 	$xlateLine = "{{$dataType, $dataSize}}";
 	push (@jniLine, [$id, $dataType, $format, $enumGroup, $required]);
-      } elsif ($omitJNI) {
+      } elsif (uc $omitEntry eq 'JNI') {
 	$xlateLabelRef = 'NULL';
       } else {
 	print STDERR "$type is not an implemented data type\n";
@@ -808,7 +808,7 @@ sub formatTableEntry {
       $xlateLine = "{$token,\t1,\t$xlateLabelRef,\t$sequence,\n" .
 	  "\t\t0,\t$required,\t$tsol,\t$format}EOL";
       
-      if (${$entryDef{$type}}[1]) {
+      if (uc $omitEntry ne 'ALWAYS' && ${$entryDef{$type}}[1]) {
 	  my @list = ();
 	  if ($xlateDefault{$eventId}) {
 	      @list = @{$xlateDefault{$eventId}};
@@ -858,12 +858,12 @@ sub formatTableEntry {
 	  $dataType = 'ADT_TERMIDSTAR';
 	  push (@xlateType, "\{$dataType, sizeof (au_tid_addr_t *)\}");
 	  push (@jniLine, [$jniId, $dataType, $format, $enumGroup, $required]);
-	} elsif ($omitJNI) {
+	} elsif (uc $omitEntry eq 'JNI') {
 	  # nothing to do.
 	} else {
 	  print STDERR "$dtype is not an implemented data type\n";
 	}
-	if (${$entryDef{$dtype}}[1]) {
+	if (uc $omitEntry ne 'ALWAYS' && ${$entryDef{$dtype}}[1]) {
 	  push (@default, $id, ${$entryDef{$dtype}}[1]);
 	}
       }
