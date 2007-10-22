@@ -195,6 +195,16 @@ ieee80211_notify(ieee80211com_t *ic, wpa_event_type event)
 }
 
 /*
+ * Register WPA door
+ */
+void
+ieee80211_register_door(ieee80211com_t *ic, const char *drvname, int inst)
+{
+	(void) snprintf(ic->ic_wpadoor, MAX_IEEE80211STR, "%s_%s%d",
+	    WPA_DOOR, drvname, inst);
+}
+
+/*
  * Default reset method for use with the ioctl support.  This
  * method is invoked after any state change in the 802.11
  * layer that should be propagated to the hardware but not
@@ -223,7 +233,7 @@ ieee80211_chan2ieee(ieee80211com_t *ic, struct ieee80211_channel *ch)
 		return (IEEE80211_CHAN_ANY);
 	} else if (ch != NULL) {
 		ieee80211_err("invalid channel freq %u flags %x\n",
-			ch->ich_freq, ch->ich_flags);
+		    ch->ich_freq, ch->ich_flags);
 		return (0);
 	}
 	ieee80211_err("invalid channel (NULL)\n");	/* ch == NULL */
@@ -293,7 +303,7 @@ ieee80211_start_watchdog(ieee80211com_t *ic, uint32_t timer)
 {
 	if (ic->ic_watchdog_timer == 0 && ic->ic_watchdog != NULL) {
 		ic->ic_watchdog_timer = timeout(ic->ic_watchdog, ic,
-			drv_usectohz(1000000 * timer));
+		    drv_usectohz(1000000 * timer));
 	}
 }
 
@@ -380,7 +390,7 @@ ieee80211_setmode(ieee80211com_t *ic, enum ieee80211_phymode mode)
 	/* validate new mode */
 	if ((ic->ic_modecaps & (1 << mode)) == 0) {
 		ieee80211_err("ieee80211_setmode(): mode %u not supported"
-			" (caps 0x%x)\n", mode, ic->ic_modecaps);
+		    " (caps 0x%x)\n", mode, ic->ic_modecaps);
 		return (EINVAL);
 	}
 
@@ -411,7 +421,7 @@ ieee80211_setmode(ieee80211com_t *ic, enum ieee80211_phymode mode)
 	}
 	if (achannels == 0) {
 		ieee80211_err("ieee80211_setmode(): "
-			"no channel found for mode %u\n", mode);
+		    "no channel found for mode %u\n", mode);
 		return (EINVAL);
 	}
 
@@ -501,7 +511,7 @@ ieee80211_hdrspace(const void *data)
 
 	/* NB: we don't handle control frames */
 	ASSERT((wh->i_fc[0]&IEEE80211_FC0_TYPE_MASK) !=
-		IEEE80211_FC0_TYPE_CTL);
+	    IEEE80211_FC0_TYPE_CTL);
 	if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
 		size += IEEE80211_ADDR_LEN;
 
@@ -527,7 +537,7 @@ ieee80211_getmgtframe(uint8_t **frm, int pktlen)
 		mp->b_wptr = mp->b_rptr + len;
 	} else {
 		ieee80211_err("ieee80211_getmgtframe: "
-			"alloc frame failed, %d\n", len);
+		    "alloc frame failed, %d\n", len);
 	}
 	return (mp);
 }
@@ -646,8 +656,8 @@ ieee80211_attach(ieee80211com_t *ic)
 			/* Verify driver passed us valid data */
 			if (i != ieee80211_chan2ieee(ic, ch)) {
 				ieee80211_err("bad channel ignored: "
-					"freq %u flags%x number %u\n",
-					ch->ich_freq, ch->ich_flags, i);
+				    "freq %u flags%x number %u\n",
+				    ch->ich_freq, ch->ich_flags, i);
 				ch->ich_flags = 0;
 				continue;
 			}
@@ -714,7 +724,7 @@ ieee80211_detach(ieee80211com_t *ic)
 
 static struct modlmisc	i_wifi_modlmisc = {
 	&mod_miscops,
-	"IEEE80211 Kernel Module v1.2"
+	"IEEE80211 Kernel Module v1.3"
 };
 
 static struct modlinkage	i_wifi_modlinkage = {

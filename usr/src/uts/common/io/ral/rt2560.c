@@ -2406,6 +2406,8 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    IEEE80211_C_SHPREAMBLE |	/* short preamble supported */
 	    IEEE80211_C_SHSLOT;		/* short slot time supported */
 
+	ic->ic_caps |= IEEE80211_C_WPA; /* Support WPA/WPA2 */
+
 #define	IEEE80211_CHAN_A	\
 	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM)
 
@@ -2445,6 +2447,10 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 
 	ieee80211_attach(ic);
+
+	/* register WPA door */
+	ieee80211_register_door(ic, ddi_driver_name(devinfo),
+	    ddi_get_instance(devinfo));
 
 	ic->ic_node_alloc = rt2560_node_alloc;
 	ic->ic_node_free = rt2560_node_free;

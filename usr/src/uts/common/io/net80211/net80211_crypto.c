@@ -42,6 +42,8 @@
  */
 #include <sys/types.h>
 #include <sys/note.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/api.h>
 #include "net80211_impl.h"
 
 extern const struct ieee80211_cipher wep;
@@ -436,7 +438,6 @@ ieee80211_crypto_decap(ieee80211com_t *ic, mblk_t *mp, int hdrlen)
 	return ((cip->ic_decap)(k, mp, hdrlen) ? k : NULL);
 }
 
-
 /*
  * Setup crypto support.
  */
@@ -445,6 +446,10 @@ ieee80211_crypto_attach(ieee80211com_t *ic)
 {
 	struct ieee80211_crypto_state *cs = &ic->ic_crypto;
 	int i;
+
+	(void) crypto_mech2id(SUN_CKM_RC4); /* Load RC4 */
+	(void) crypto_mech2id(SUN_CKM_AES_CBC); /* Load AES-CBC */
+	(void) crypto_mech2id(SUN_CKM_AES_CCM); /* Load AES-CCM */
 
 	/* NB: we assume everything is pre-zero'd */
 	cs->cs_def_txkey = IEEE80211_KEYIX_NONE;

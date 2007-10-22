@@ -1024,8 +1024,11 @@ ieee80211_saveie(uint8_t **iep, const uint8_t *ie)
 static void
 saveie(uint8_t **iep, const uint8_t *ie)
 {
-	if (ie == NULL)
+	if (ie == NULL) {
+		if (*iep != NULL)
+			ieee80211_free(*iep);
 		*iep = NULL;
+	}
 	else
 		ieee80211_saveie(iep, ie);
 }

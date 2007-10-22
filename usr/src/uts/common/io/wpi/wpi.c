@@ -220,6 +220,8 @@ static void	wpi_free_tx_ring(wpi_sc_t *, wpi_tx_ring_t *);
 static ieee80211_node_t *wpi_node_alloc(ieee80211com_t *);
 static void	wpi_node_free(ieee80211_node_t *);
 static int	wpi_newstate(ieee80211com_t *, enum ieee80211_state, int);
+static int	wpi_key_set(ieee80211com_t *, const struct ieee80211_key *,
+    const uint8_t mac[IEEE80211_ADDR_LEN]);
 static void	wpi_mem_lock(wpi_sc_t *);
 static void	wpi_mem_unlock(wpi_sc_t *);
 static uint32_t	wpi_mem_read(wpi_sc_t *, uint16_t);
@@ -507,11 +509,14 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ic->ic_opmode   = IEEE80211_M_STA; /* default to BSS mode */
 	ic->ic_state    = IEEE80211_S_INIT;
 	ic->ic_maxrssi  = 70; /* experimental number */
-	/*
-	 * use software WEP for the current version.
-	 */
 	ic->ic_caps = IEEE80211_C_SHPREAMBLE | IEEE80211_C_TXPMGT |
 	    IEEE80211_C_PMGT | IEEE80211_C_SHSLOT;
+
+	/*
+	 * use software WEP and TKIP, hardware CCMP;
+	 */
+	ic->ic_caps |= IEEE80211_C_AES_CCM;
+	ic->ic_caps |= IEEE80211_C_WPA; /* Support WPA/WPA2 */
 
 	/* set supported .11b and .11g rates */
 	ic->ic_sup_rates[IEEE80211_MODE_11B] = wpi_rateset_11b;
@@ -532,6 +537,10 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	ieee80211_attach(ic);
 
+	/* register WPA door */
+	ieee80211_register_door(ic, ddi_driver_name(dip),
+	    ddi_get_instance(dip));
+
 	/*
 	 * Override 80211 default routines
 	 */
@@ -539,6 +548,7 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ic->ic_newstate = wpi_newstate;
 	ic->ic_node_alloc = wpi_node_alloc;
 	ic->ic_node_free = wpi_node_free;
+	ic->ic_crypto.cs_key_set = wpi_key_set;
 	ieee80211_media_init(ic);
 	/*
 	 * initialize default tx key
@@ -1166,6 +1176,8 @@ wpi_node_free(ieee80211_node_t *in)
 	ieee80211com_t *ic = in->in_ic;
 
 	ic->ic_node_cleanup(in);
+	if (in->in_wpa_ie != NULL)
+		ieee80211_free(in->in_wpa_ie);
 	kmem_free(in, sizeof (wpi_amrr_t));
 }
 
@@ -1273,6 +1285,59 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	mutex_exit(&sc->sc_glock);
 	return (sc->sc_newstate(ic, nstate, arg));
+}
+
+/*ARGSUSED*/
+static int wpi_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
+    const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+	wpi_sc_t *sc = (wpi_sc_t *)ic;
+	wpi_node_t node;
+	int err;
+
+	switch (k->wk_cipher->ic_cipher) {
+	case IEEE80211_CIPHER_WEP:
+	case IEEE80211_CIPHER_TKIP:
+		return (1); /* sofeware do it. */
+	case IEEE80211_CIPHER_AES_CCM:
+		break;
+	default:
+		return (0);
+	}
+	sc->sc_config.filter &= ~(WPI_FILTER_NODECRYPTUNI |
+	    WPI_FILTER_NODECRYPTMUL);
+
+	mutex_enter(&sc->sc_glock);
+
+	/* update ap/multicast node */
+	(void) memset(&node, 0, sizeof (node));
+	if (IEEE80211_IS_MULTICAST(mac)) {
+		(void) memset(node.bssid, 0xff, 6);
+		node.id = WPI_ID_BROADCAST;
+	} else {
+		IEEE80211_ADDR_COPY(node.bssid, ic->ic_bss->in_bssid);
+		node.id = WPI_ID_BSS;
+	}
+	if (k->wk_flags & IEEE80211_KEY_XMIT) {
+		node.key_flags = 0;
+		node.keyp = k->wk_keyix;
+	} else {
+		node.key_flags = (1 << 14);
+		node.keyp = k->wk_keyix + 4;
+	}
+	(void) memcpy(node.key, k->wk_key, k->wk_keylen);
+	node.key_flags |= (2 | (1 << 3) | (k->wk_keyix << 8));
+	node.sta_mask = 1;
+	node.control = 1;
+	err = wpi_cmd(sc, WPI_CMD_ADD_NODE, &node, sizeof (node), 1);
+	if (err != WPI_SUCCESS) {
+		cmn_err(CE_WARN, "wpi_key_set():"
+		    "failed to update ap node\n");
+		mutex_exit(&sc->sc_glock);
+		return (0);
+	}
+	mutex_exit(&sc->sc_glock);
+	return (1);
 }
 
 /*
@@ -1911,6 +1976,22 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		err = WPI_SUCCESS;
 		goto exit;
 	}
+
+	(void) ieee80211_encap(ic, m, in);
+
+	cmd->code = WPI_CMD_TX_DATA;
+	cmd->flags = 0;
+	cmd->qid = ring->qid;
+	cmd->idx = ring->cur;
+
+	tx = (wpi_cmd_data_t *)cmd->data;
+	tx->flags = 0;
+	if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+		tx->flags |= LE_32(WPI_TX_NEED_ACK);
+	} else {
+		tx->flags &= ~(LE_32(WPI_TX_NEED_ACK));
+	}
+
 	if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 		k = ieee80211_crypto_encap(ic, m);
 		if (k == NULL) {
@@ -1918,6 +1999,12 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 			sc->sc_tx_err++;
 			err = WPI_SUCCESS;
 			goto exit;
+		}
+
+		if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_AES_CCM) {
+			tx->security = 2; /* for CCMP */
+			tx->flags |= LE_32(WPI_TX_NEED_ACK);
+			(void) memcpy(&tx->key, k->wk_key, k->wk_keylen);
 		}
 
 		/* packet header may have moved, reset our local pointer */
@@ -1963,19 +2050,6 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		bpf_mtap2(sc->sc_drvbpf, tap, sc->sc_txtap_len, m0);
 	}
 #endif
-
-	cmd->code = WPI_CMD_TX_DATA;
-	cmd->flags = 0;
-	cmd->qid = ring->qid;
-	cmd->idx = ring->cur;
-
-	tx = (wpi_cmd_data_t *)cmd->data;
-	tx->flags = 0;
-	if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-		tx->flags |= LE_32(WPI_TX_NEED_ACK);
-	} else {
-		tx->flags &= ~(LE_32(WPI_TX_NEED_ACK));
-	}
 
 	tx->flags |= (LE_32(WPI_TX_AUTO_SEQ));
 	tx->flags |= LE_32(WPI_TX_BT_DISABLE | WPI_TX_CALIBRATION);
@@ -2663,7 +2737,7 @@ wpi_config(wpi_sc_t *sc)
 	case IEEE80211_M_STA:
 		sc->sc_config.mode = WPI_MODE_STA;
 		sc->sc_config.filter |= LE_32(WPI_FILTER_MULTICAST |
-		    WPI_FILTER_NODECRYPT);
+		    WPI_FILTER_NODECRYPTUNI | WPI_FILTER_NODECRYPTMUL);
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:

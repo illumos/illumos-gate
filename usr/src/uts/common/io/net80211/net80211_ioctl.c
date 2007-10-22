@@ -473,7 +473,7 @@ wifi_cfg_keyid(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	switch (cmd) {
 	case WLAN_GET_PARAM:
 		*ow_kid = (ic->ic_def_txkey == IEEE80211_KEYIX_NONE) ?
-			0 : ic->ic_def_txkey;
+		    0 : ic->ic_def_txkey;
 		break;
 	case  WLAN_SET_PARAM:
 		if (*iw_kid >= MAX_NWEPKEYS) {
@@ -687,6 +687,10 @@ wifi_cfg_linkstatus(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	case WLAN_GET_PARAM:
 		*ow_linkstat = (ic->ic_state == IEEE80211_S_RUN) ?
 		    WL_CONNECTED : WL_NOTCONNECTED;
+		if ((ic->ic_flags & IEEE80211_F_WPA) &&
+		    (ieee80211_crypto_getciphertype(ic) != WIFI_SEC_WPA)) {
+			*ow_linkstat = WL_NOTCONNECTED;
+		}
 		break;
 	case WLAN_SET_PARAM:
 		outp->wldp_result = WL_READONLY;
@@ -717,7 +721,7 @@ wifi_cfg_suprates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	err = 0;
 	/* rate value (wl_rates_rates) is of type char */
 	buflen = offsetof(wl_rates_t, wl_rates_rates) +
-		sizeof (char) * IEEE80211_MODE_MAX * IEEE80211_RATE_MAXSIZE;
+	    sizeof (char) * IEEE80211_MODE_MAX * IEEE80211_RATE_MAXSIZE;
 	if ((omp = wifi_getoutmsg(*mp, cmd, buflen)) == NULL)
 		return (ENOMEM);
 	outp = (wldp_t *)omp->b_rptr;
@@ -791,8 +795,8 @@ wifi_cfg_desrates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	case  WLAN_GET_PARAM:
 		ow_rates->wl_rates_num = 1;
 		ow_rates->wl_rates_rates[0] =
-			(ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
-			srate : ic->ic_fixed_rate;
+		    (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
+		    srate : ic->ic_fixed_rate;
 		break;
 	case  WLAN_SET_PARAM:
 		drate = iw_rates->wl_rates_rates[0];
@@ -975,7 +979,7 @@ wifi_read_ap(void *arg, struct ieee80211_node *in)
 	uint_t i, nrates;
 
 	end = (uint8_t *)aps - WIFI_BUF_OFFSET + MAX_BUF_LEN -
-		sizeof (wl_ess_list_t);
+	    sizeof (wl_ess_list_t);
 	conf = &aps->wl_ess_list_ess[aps->wl_ess_list_num];
 	if ((uint8_t *)conf > end)
 		return;
@@ -1215,7 +1219,7 @@ wifi_cfg_caps(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	switch (cmd) {
 	case WLAN_GET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_caps: "
-			"ic_caps = %u\n", ic->ic_caps);
+		    "ic_caps = %u\n", ic->ic_caps);
 		o_caps->caps = ic->ic_caps;
 		break;
 	case WLAN_SET_PARAM:
@@ -1255,12 +1259,12 @@ wifi_cfg_wpa(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	switch (cmd) {
 	case WLAN_GET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpa: "
-			"get wpa=%u\n", wpa->wpa_flag);
+		    "get wpa=%u\n", wpa->wpa_flag);
 		o_wpa->wpa_flag = ((ic->ic_flags & IEEE80211_F_WPA)? 1 : 0);
 		break;
 	case WLAN_SET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpa: "
-			"set wpa=%u\n", wpa->wpa_flag);
+		    "set wpa=%u\n", wpa->wpa_flag);
 		if (wpa->wpa_flag > 0) {	/* enable WPA mode */
 			ic->ic_flags |= IEEE80211_F_PRIVACY;
 			ic->ic_flags |= IEEE80211_F_WPA;
@@ -1308,7 +1312,7 @@ wifi_cfg_wpakey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		break;
 	case WLAN_SET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpakey: "
-			"idx=%d\n", ik->ik_keyix);
+		    "idx=%d\n", ik->ik_keyix);
 		/* NB: cipher support is verified by ieee80211_crypt_newkey */
 		/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 		if (ik->ik_keylen > sizeof (ik->ik_keydata)) {
@@ -1338,7 +1342,7 @@ wifi_cfg_wpakey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 		KEY_UPDATE_BEGIN(ic);
 		if (ieee80211_crypto_newkey(ic, ik->ik_type,
-			ik->ik_flags, wk)) {
+		    ik->ik_flags, wk)) {
 			wk->wk_keylen = ik->ik_keylen;
 			/* NB: MIC presence is implied by cipher type */
 			if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
@@ -1401,7 +1405,7 @@ wifi_cfg_delkey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		break;
 	case WLAN_SET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_delkey: "
-			"keyix=%d\n", dk->idk_keyix);
+		    "keyix=%d\n", dk->idk_keyix);
 		kid = dk->idk_keyix;
 		if (kid == IEEE80211_KEYIX_NONE || kid >= IEEE80211_WEP_NKID) {
 			ieee80211_err("wifi_cfg_delkey: incorrect keyix\n");
@@ -1586,7 +1590,7 @@ wifi_cfg_setmlme(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		break;
 	case WLAN_SET_PARAM:
 		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_setmlme: "
-			"op=%d\n", mlme->im_op);
+		    "op=%d\n", mlme->im_op);
 		switch (mlme->im_op) {
 		case IEEE80211_MLME_DISASSOC:
 		case IEEE80211_MLME_DEAUTH:

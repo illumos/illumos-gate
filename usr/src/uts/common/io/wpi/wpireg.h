@@ -337,7 +337,8 @@ typedef struct wpi_config {
 #define	WPI_FILTER_PROMISC	(1 << 0)
 #define	WPI_FILTER_CTL		(1 << 1)
 #define	WPI_FILTER_MULTICAST	(1 << 2)
-#define	WPI_FILTER_NODECRYPT	(1 << 3)
+#define	WPI_FILTER_NODECRYPTUNI	(1 << 3)
+#define	WPI_FILTER_NODECRYPTMUL	(1 << 4)
 #define	WPI_FILTER_BSS		(1 << 5)
 #define	WPI_FILTER_BEACON	(1 << 6)
 
@@ -402,7 +403,8 @@ typedef struct wpi_node {
 	uint8_t		tkip;
 	uint8_t		reserved4;
 	uint16_t	ttak[5];
-	uint16_t	reserved5;
+	uint8_t		keyp;
+	uint8_t		reserved5;
 	uint8_t		key[16];
 	uint32_t	flags;
 	uint32_t	mask;
