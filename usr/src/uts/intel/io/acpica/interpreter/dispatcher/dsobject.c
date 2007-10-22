@@ -211,6 +211,25 @@ AcpiDsBuildInternalObject (
                 return_ACPI_STATUS (Status);
             }
         }
+
+        /*
+         * If this is a reference to a common data type, resolve it immediately.
+         * According to the ACPI spec, package elements can be "data objects" or
+         * method references.
+         */
+        switch (Op->Common.Node->Type)
+        {
+        case ACPI_TYPE_INTEGER:
+        case ACPI_TYPE_BUFFER:
+        case ACPI_TYPE_STRING:
+        case ACPI_TYPE_PACKAGE:
+            ObjDesc = Op->Common.Node->Object;
+            AcpiUtAddReference (ObjDesc);
+            goto Exit;
+
+        default:
+            break;
+        }
     }
 
     /* Create and init a new internal ACPI object */
@@ -230,6 +249,7 @@ AcpiDsBuildInternalObject (
         return_ACPI_STATUS (Status);
     }
 
+Exit:
     *ObjDescPtr = ObjDesc;
     return_ACPI_STATUS (AE_OK);
 }
