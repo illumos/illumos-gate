@@ -306,6 +306,9 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 		 * Make sure that some lwp that already exists
 		 * in the process fields the signal soon.
 		 * Wake up an interruptibly sleeping lwp if necessary.
+		 * For SIGKILL make all of the lwps see the signal;
+		 * This is needed to guarantee a sure kill for processes
+		 * with a mix of realtime and non-realtime threads.
 		 */
 		int su = 0;
 
@@ -314,11 +317,11 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 			sigaddset(&p->p_extsig, sig);
 		do {
 			thread_lock(tt);
-			if (eat_signal(tt, sig)) {
+			if (eat_signal(tt, sig) && sig != SIGKILL) {
 				thread_unlock(tt);
 				break;
 			}
-			if (sig == SIGKILL && SUSPENDED(tt))
+			if (SUSPENDED(tt))
 				su++;
 			thread_unlock(tt);
 		} while ((tt = tt->t_forw) != p->p_tlist);
@@ -534,6 +537,7 @@ issig_forreal(void)
 		if (p->p_flag & (SEXITLWPS|SKILLED)) {
 			lwp->lwp_cursig = sig = SIGKILL;
 			lwp->lwp_extsig = ext = (p->p_flag & SEXTKILLED) != 0;
+			t->t_sig_check = 1;
 			break;
 		}
 
@@ -892,7 +896,7 @@ stop(int why, int what)
 
 	case PR_JOBCONTROL:
 		ASSERT(what == SIGSTOP || what == SIGTSTP ||
-			what == SIGTTIN || what == SIGTTOU);
+		    what == SIGTTIN || what == SIGTTOU);
 		flags &= ~TS_XSTART;
 		break;
 
@@ -1447,9 +1451,20 @@ psig(void)
 #endif
 		}
 	}
-	if (ext)
+
+	/*
+	 * Generate a contract event once if the process is killed
+	 * by a signal.
+	 */
+	if (ext) {
+		proc_is_exiting(p);
+		if (exitlwps(0) != 0) {
+			mutex_enter(&p->p_lock);
+			lwp_exit();
+		}
 		contract_process_sig(p->p_ct_process, p, sig, pid, ctid,
 		    zoneid);
+	}
 
 	exit(code, sig);
 }
@@ -2192,9 +2207,9 @@ sigcheck(proc_t *p, kthread_t *t)
 		    CANTMASK0);
 
 	return (((p->p_sig.__sigbits[0] | t->t_sig.__sigbits[0]) &
-		    ~t->t_hold.__sigbits[0]) |
-		(((p->p_sig.__sigbits[1] | t->t_sig.__sigbits[1]) &
-		    ~t->t_hold.__sigbits[1]) & FILLSET1));
+	    ~t->t_hold.__sigbits[0]) |
+	    (((p->p_sig.__sigbits[1] | t->t_sig.__sigbits[1]) &
+	    ~t->t_hold.__sigbits[1]) & FILLSET1));
 }
 
 /* ONC_PLUS EXTRACT START */
@@ -2562,7 +2577,7 @@ siginfo_kto32(const k_siginfo_t *src, siginfo32_t *dest)
 		dest->si_uid = src->si_uid;
 		if (SI_CANQUEUE(src->si_code))
 			dest->si_value.sival_int =
-				(int32_t)src->si_value.sival_int;
+			    (int32_t)src->si_value.sival_int;
 		return;
 	}
 
@@ -2633,7 +2648,7 @@ siginfo_32tok(const siginfo32_t *src, k_siginfo_t *dest)
 		dest->si_uid = src->si_uid;
 		if (SI_CANQUEUE(src->si_code))
 			dest->si_value.sival_int =
-				(int)src->si_value.sival_int;
+			    (int)src->si_value.sival_int;
 		return;
 	}
 
