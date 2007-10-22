@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,14 +322,14 @@ nfs4_purge_caches(vnode_t *vp, int purge_dnlc, cred_t *cr, int asyncpg)
 				mutex_exit(&rp->r_statelock);
 
 				args = kmem_alloc(sizeof (pgflush_t),
-						KM_SLEEP);
+				    KM_SLEEP);
 				args->vp = vp;
 				VN_HOLD(args->vp);
 				args->cr = cr;
 				crhold(args->cr);
 				(void) zthread_create(NULL, 0,
-						nfs4_pgflush_thread, args, 0,
-						minclsyspri);
+				    nfs4_pgflush_thread, args, 0,
+				    minclsyspri);
 			}
 		}
 	}
@@ -444,8 +444,8 @@ nfs4_attrcache_noinval(vnode_t *vp, nfs4_ga_res_t *garp, hrtime_t t)
 
 void
 nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
-		hrtime_t t, cred_t *cr, int async,
-		change_info4 *cinfo)
+    hrtime_t t, cred_t *cr, int async,
+    change_info4 *cinfo)
 {
 	rnode4_t *rp;
 	int mtime_changed;
@@ -738,7 +738,7 @@ nfs4_attrcache_va(vnode_t *vp, nfs4_ga_res_t *garp, int set_cache_timeout)
 	if (garp->n4g_mon_fid_valid) {
 		rp->r_mntd_fid = garp->n4g_mon_fid;
 
-		if (rp->r_flags & R4SRVSTUB)
+		if (RP_ISSTUB(rp))
 			rp->r_attr.va_nodeid = rp->r_mntd_fid;
 	}
 
@@ -791,8 +791,9 @@ nfs4_getattr_otw(vnode_t *vp, nfs4_ga_res_t *garp, cred_t *cr, int get_acl)
 	(void) save_mnt_secinfo(mi->mi_curr_serv);
 
 recov_retry:
+
 	if ((e.error = nfs4_start_fop(mi, vp, NULL, OH_GETATTR,
-						&recov_state, NULL))) {
+	    &recov_state, NULL))) {
 		(void) check_mnt_secinfo(mi->mi_curr_serv, vp);
 		return (e.error);
 	}
@@ -805,7 +806,7 @@ recov_retry:
 		if (nfs4_start_recovery(&e, VTOMI4(vp), vp, NULL, NULL,
 		    NULL, OP_GETATTR, NULL) == FALSE)  {
 			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR,
-					&recov_state, 1);
+			    &recov_state, 1);
 			goto recov_retry;
 		}
 	}
@@ -837,7 +838,7 @@ recov_retry:
  */
 void
 nfs4_getattr_otw_norecovery(vnode_t *vp, nfs4_ga_res_t *garp,
-		nfs4_error_t *ep, cred_t *cr, int get_acl)
+    nfs4_error_t *ep, cred_t *cr, int get_acl)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -906,35 +907,28 @@ nfs4getattr(vnode_t *vp, vattr_t *vap, cred_t *cr)
 	/*
 	 * If we've got cached attributes, we're done, otherwise go
 	 * to the server to get attributes, which will update the cache
-	 * in the process.
+	 * in the process. Either way, use the cached attributes for
+	 * the caller's vattr_t.
+	 *
+	 * Note that we ignore the gar set by the OTW call: the attr caching
+	 * code may make adjustments when storing to the rnode, and we want
+	 * to see those changes here.
 	 */
 	rp = VTOR4(vp);
+	error = 0;
 	mutex_enter(&rp->r_statelock);
-	mutex_enter(&rp->r_statev4_lock);
-	if (ATTRCACHE4_VALID(vp)) {
-		mutex_exit(&rp->r_statev4_lock);
-		/*
-		 * Cached attributes are valid
-		 * Return the client's view of file size
-		 */
-		*vap = rp->r_attr;
-		vap->va_size = rp->r_size;
+	if (!ATTRCACHE4_VALID(vp)) {
 		mutex_exit(&rp->r_statelock);
-
-		ASSERT(nfs4_consistent_type(vp));
-
-		return (0);
+		error = nfs4_getattr_otw(vp, &gar, cr, 0);
+		mutex_enter(&rp->r_statelock);
 	}
-	mutex_exit(&rp->r_statev4_lock);
-	mutex_exit(&rp->r_statelock);
 
-	error = nfs4_getattr_otw(vp, &gar, cr, 0);
 	if (!error)
-		*vap = gar.n4g_va;
+		*vap = rp->r_attr;
 
 	/* Return the client's view of file size */
-	mutex_enter(&rp->r_statelock);
 	vap->va_size = rp->r_size;
+
 	mutex_exit(&rp->r_statelock);
 
 	ASSERT(nfs4_consistent_type(vp));
@@ -944,7 +938,7 @@ nfs4getattr(vnode_t *vp, vattr_t *vap, cred_t *cr)
 
 int
 nfs4_attr_otw(vnode_t *vp, nfs4_tag_type_t tag_type,
-		nfs4_ga_res_t *garp, bitmap4 reqbitmap, cred_t *cr)
+    nfs4_ga_res_t *garp, bitmap4 reqbitmap, cred_t *cr)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -989,7 +983,7 @@ recov_retry:
 	needrecov = nfs4_needs_recovery(&e, FALSE, vp->v_vfsp);
 	if (!needrecov && e.error) {
 		nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR, &recov_state,
-			    needrecov);
+		    needrecov);
 		return (e.error);
 	}
 
@@ -1000,9 +994,9 @@ recov_retry:
 		    "nfs4_attr_otw: initiating recovery\n"));
 
 		abort = nfs4_start_recovery(&e, VTOMI4(vp), vp, NULL, NULL,
-			    NULL, OP_GETATTR, NULL);
+		    NULL, OP_GETATTR, NULL);
 		nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR, &recov_state,
-				needrecov);
+		    needrecov);
 		if (!e.error) {
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 			e.error = geterrno4(res.status);
@@ -1017,17 +1011,17 @@ recov_retry:
 	} else {
 		gerp = garp->n4g_ext_res;
 		bcopy(&res.array[1].nfs_resop4_u.opgetattr.ga_res,
-			garp, sizeof (nfs4_ga_res_t));
+		    garp, sizeof (nfs4_ga_res_t));
 		garp->n4g_ext_res = gerp;
 		if (garp->n4g_ext_res &&
 		    res.array[1].nfs_resop4_u.opgetattr.ga_res.n4g_ext_res)
 			bcopy(res.array[1].nfs_resop4_u.opgetattr.
-				ga_res.n4g_ext_res,
-				garp->n4g_ext_res, sizeof (nfs4_ga_ext_res_t));
+			    ga_res.n4g_ext_res,
+			    garp->n4g_ext_res, sizeof (nfs4_ga_ext_res_t));
 	}
 	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_GETATTR, &recov_state,
-		    needrecov);
+	    needrecov);
 	return (e.error);
 }
 
@@ -1090,7 +1084,7 @@ nfs4_async_manager(vfs_t *vfsp)
 	mi = VFTOMI4(vfsp);
 
 	CALLB_CPR_INIT(&cprinfo, &mi->mi_async_lock, callb_generic_cpr,
-		    "nfs4_async_manager");
+	    "nfs4_async_manager");
 
 	mutex_enter(&mi->mi_async_lock);
 	/*
@@ -1210,8 +1204,8 @@ nfs4_async_manager_stop(vfs_t *vfsp)
 
 int
 nfs4_async_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr,
-	struct seg *seg, cred_t *cr, void (*readahead)(vnode_t *,
-	u_offset_t, caddr_t, struct seg *, cred_t *))
+    struct seg *seg, cred_t *cr, void (*readahead)(vnode_t *,
+    u_offset_t, caddr_t, struct seg *, cred_t *))
 {
 	rnode4_t *rp;
 	mntinfo4_t *mi;
@@ -1407,7 +1401,7 @@ nfs4_async_start(struct vfs *vfsp)
 		if (*mi->mi_async_curr == NULL ||
 		    --mi->mi_async_clusters[args->a_io] == 0) {
 			mi->mi_async_clusters[args->a_io] =
-						mi->mi_async_init_clusters;
+			    mi->mi_async_init_clusters;
 			mi->mi_async_curr++;
 			if (mi->mi_async_curr ==
 			    &mi->mi_async_reqs[NFS4_ASYNC_TYPES])
@@ -1427,26 +1421,25 @@ nfs4_async_start(struct vfs *vfsp)
 		 */
 		if (args->a_io == NFS4_READ_AHEAD && mi->mi_max_threads > 0) {
 			(*args->a_nfs4_readahead)(args->a_vp,
-					args->a_nfs4_blkoff,
-					args->a_nfs4_addr, args->a_nfs4_seg,
-					args->a_cred);
+			    args->a_nfs4_blkoff, args->a_nfs4_addr,
+			    args->a_nfs4_seg, args->a_cred);
 		} else if (args->a_io == NFS4_PUTAPAGE) {
 			(void) (*args->a_nfs4_putapage)(args->a_vp,
-					args->a_nfs4_pp, args->a_nfs4_off,
-					args->a_nfs4_len, args->a_nfs4_flags,
-					args->a_cred);
+			    args->a_nfs4_pp, args->a_nfs4_off,
+			    args->a_nfs4_len, args->a_nfs4_flags,
+			    args->a_cred);
 		} else if (args->a_io == NFS4_PAGEIO) {
 			(void) (*args->a_nfs4_pageio)(args->a_vp,
-					args->a_nfs4_pp, args->a_nfs4_off,
-					args->a_nfs4_len, args->a_nfs4_flags,
-					args->a_cred);
+			    args->a_nfs4_pp, args->a_nfs4_off,
+			    args->a_nfs4_len, args->a_nfs4_flags,
+			    args->a_cred);
 		} else if (args->a_io == NFS4_READDIR) {
 			(void) ((*args->a_nfs4_readdir)(args->a_vp,
-					args->a_nfs4_rdc, args->a_cred));
+			    args->a_nfs4_rdc, args->a_cred));
 		} else if (args->a_io == NFS4_COMMIT) {
 			(*args->a_nfs4_commit)(args->a_vp, args->a_nfs4_plist,
-					args->a_nfs4_offset, args->a_nfs4_count,
-					args->a_cred);
+			    args->a_nfs4_offset, args->a_nfs4_count,
+			    args->a_cred);
 		} else if (args->a_io == NFS4_INACTIVE) {
 			nfs4_inactive_otw(args->a_vp, args->a_cred);
 		}
@@ -1476,7 +1469,7 @@ nfs4_inactive_thread(mntinfo4_t *mi)
 	vfs_t *vfsp = mi->mi_vfsp;
 
 	CALLB_CPR_INIT(&cprinfo, &mi->mi_async_lock, callb_generic_cpr,
-		    "nfs4_inactive_thread");
+	    "nfs4_inactive_thread");
 
 	for (;;) {
 		mutex_enter(&mi->mi_async_lock);
@@ -1625,8 +1618,8 @@ interrupted:
 
 int
 nfs4_async_putapage(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
-	int flags, cred_t *cr, int (*putapage)(vnode_t *, page_t *,
-	u_offset_t, size_t, int, cred_t *))
+    int flags, cred_t *cr, int (*putapage)(vnode_t *, page_t *,
+    u_offset_t, size_t, int, cred_t *))
 {
 	rnode4_t *rp;
 	mntinfo4_t *mi;
@@ -1748,8 +1741,8 @@ noasync:
 
 int
 nfs4_async_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr, int (*pageio)(vnode_t *, page_t *, u_offset_t,
-	size_t, int, cred_t *))
+    int flags, cred_t *cr, int (*pageio)(vnode_t *, page_t *, u_offset_t,
+    size_t, int, cred_t *))
 {
 	rnode4_t *rp;
 	mntinfo4_t *mi;
@@ -1879,7 +1872,7 @@ noasync:
 
 void
 nfs4_async_readdir(vnode_t *vp, rddir4_cache *rdc, cred_t *cr,
-	int (*readdir)(vnode_t *, rddir4_cache *, cred_t *))
+    int (*readdir)(vnode_t *, rddir4_cache *, cred_t *))
 {
 	rnode4_t *rp;
 	mntinfo4_t *mi;
@@ -1966,8 +1959,8 @@ noasync:
 
 void
 nfs4_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
-	cred_t *cr, void (*commit)(vnode_t *, page_t *, offset3, count3,
-	cred_t *))
+    cred_t *cr, void (*commit)(vnode_t *, page_t *, offset3, count3,
+    cred_t *))
 {
 	rnode4_t *rp;
 	mntinfo4_t *mi;
@@ -2133,7 +2126,7 @@ nfs4_async_inactive(vnode_t *vp, cred_t *cr)
 		 */
 		if (rp->r_deleg_type != OPEN_DELEGATE_NONE) {
 			(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER,
-				FALSE);
+			    FALSE);
 			(void) nfs4delegreturn(rp, NFS4_DR_DISCARD);
 			nfs_rw_exit(&mi->mi_recovlock);
 		}
@@ -2231,8 +2224,8 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		 * created and mapped at base.
 		 */
 		pagecreate = pgcreated ||
-			((offset & PAGEOFFSET) == 0 &&
-			(n == PAGESIZE || ((offset + n) >= rp->r_size)));
+		    ((offset & PAGEOFFSET) == 0 &&
+		    (n == PAGESIZE || ((offset + n) >= rp->r_size)));
 
 		mutex_exit(&rp->r_statelock);
 
@@ -2251,7 +2244,7 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 			 */
 			if (pgcreated == 0)
 				(void) segmap_pagecreate(segkmap, base,
-							(uint_t)n, 1);
+				    (uint_t)n, 1);
 			saved_base = base;
 			saved_n = n;
 		}
@@ -2279,7 +2272,7 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 			 * with zeros.
 			 */
 			error = vpm_data_copy(vp, offset, n, uio,
-				!pagecreate, NULL, 0, S_WRITE);
+			    !pagecreate, NULL, 0, S_WRITE);
 		} else {
 			error = uiomove(base, n, UIO_WRITE, uio);
 		}
@@ -2329,8 +2322,8 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 				 * segmap_pagecreate().
 				 */
 				sm_error = segmap_fault(kas.a_hat, segkmap,
-					saved_base, saved_n,
-					F_SOFTUNLOCK, S_WRITE);
+				    saved_base, saved_n,
+				    F_SOFTUNLOCK, S_WRITE);
 				if (error == 0)
 					error = sm_error;
 			}
@@ -2408,7 +2401,7 @@ nfs4_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 		 * the dirty pages.
 		 */
 		error = pvn_vplist_dirty(vp, off, rp->r_putapage,
-					flags, cr);
+		    flags, cr);
 
 		/*
 		 * If an error occured and the file was marked as dirty
@@ -2491,7 +2484,7 @@ nfs4_invalidate_pages(vnode_t *vp, u_offset_t off, cred_t *cr)
 	rp->r_truncaddr = off;
 	mutex_exit(&rp->r_statelock);
 	(void) pvn_vplist_dirty(vp, off, rp->r_putapage,
-		B_INVAL | B_TRUNC, cr);
+	    B_INVAL | B_TRUNC, cr);
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags &= ~R4TRUNCATE;
 	cv_broadcast(&rp->r_cv);
@@ -2532,8 +2525,8 @@ nfs4_mnt_kstat_update(kstat_t *ksp, int rw)
 	 * sv_currsec is NULL if no security negotiation takes place.
 	 */
 	mik->mik_secmod = mi->mi_curr_serv->sv_currsec ?
-			mi->mi_curr_serv->sv_currsec->secmod :
-			mi->mi_curr_serv->sv_secdata->secmod;
+	    mi->mi_curr_serv->sv_currsec->secmod :
+	    mi->mi_curr_serv->sv_secdata->secmod;
 	mik->mik_curread = (uint32_t)mi->mi_curread;
 	mik->mik_curwrite = (uint32_t)mi->mi_curwrite;
 	mik->mik_retrans = mi->mi_retrans;
@@ -2666,7 +2659,7 @@ nfs4_safemap(const vnode_t *vp)
 	ASSERT(nfs_rw_lock_held(&rp->r_lkserlock, RW_WRITER));
 
 	NFS4_DEBUG(nfs4_client_map_debug, (CE_NOTE, "nfs4_safemap: "
-		"vp = %p", (void *)vp));
+	    "vp = %p", (void *)vp));
 
 	/*
 	 * Review all the locks for the vnode, both ones that have been
@@ -2701,7 +2694,7 @@ nfs4_safemap(const vnode_t *vp)
 	}
 
 	NFS4_DEBUG(nfs4_client_map_debug, (CE_NOTE, "nfs4_safemap: %s",
-		safe ? "safe" : "unsafe"));
+	    safe ? "safe" : "unsafe"));
 	return (safe);
 }
 
@@ -3157,7 +3150,7 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 	kmutex_t cpr_lock;
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_renew_lease_thread: acting on sp 0x%p", (void*)sp));
+	    "nfs4_renew_lease_thread: acting on sp 0x%p", (void*)sp));
 	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr, "nfsv4Lease");
 
@@ -3169,34 +3162,34 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 
 	for (;;) {
 		if (!sp->state_ref_count ||
-			sp->lease_valid != NFS4_LEASE_VALID) {
+		    sp->lease_valid != NFS4_LEASE_VALID) {
 
 			kip_secs = MAX((sp->s_lease_time >> 1) -
-				(3 * sp->propagation_delay.tv_sec), 1);
+			    (3 * sp->propagation_delay.tv_sec), 1);
 
 			tick_delay = SEC_TO_TICK(kip_secs);
 
 			NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-				"nfs4_renew_lease_thread: no renew : thread "
-				"wait %ld secs", kip_secs));
+			    "nfs4_renew_lease_thread: no renew : thread "
+			    "wait %ld secs", kip_secs));
 
 			NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-				"nfs4_renew_lease_thread: no renew : "
-				"state_ref_count %d, lease_valid %d",
-				sp->state_ref_count, sp->lease_valid));
+			    "nfs4_renew_lease_thread: no renew : "
+			    "state_ref_count %d, lease_valid %d",
+			    sp->state_ref_count, sp->lease_valid));
 
 			mutex_enter(&cpr_lock);
 			CALLB_CPR_SAFE_BEGIN(&cpr_info);
 			mutex_exit(&cpr_lock);
 			time_left = cv_timedwait(&sp->cv_thread_exit,
-				&sp->s_lock, tick_delay + lbolt);
+			    &sp->s_lock, tick_delay + lbolt);
 			mutex_enter(&cpr_lock);
 			CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
 			mutex_exit(&cpr_lock);
 
 			NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-				"nfs4_renew_lease_thread: no renew: "
-				"time left %ld", time_left));
+			    "nfs4_renew_lease_thread: no renew: "
+			    "time left %ld", time_left));
 
 			if (sp->s_thread_exit == NFS4_THREAD_EXIT)
 				goto die;
@@ -3206,43 +3199,43 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 		tmp_last_renewal_time = sp->last_renewal_time;
 
 		tmp_time = gethrestime_sec() - sp->last_renewal_time +
-			(3 * sp->propagation_delay.tv_sec);
+		    (3 * sp->propagation_delay.tv_sec);
 
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_renew_lease_thread: tmp_time %ld, "
-			"sp->last_renewal_time %ld", tmp_time,
-			sp->last_renewal_time));
+		    "nfs4_renew_lease_thread: tmp_time %ld, "
+		    "sp->last_renewal_time %ld", tmp_time,
+		    sp->last_renewal_time));
 
 		kip_secs = MAX((sp->s_lease_time >> 1) - tmp_time, 1);
 
 		tick_delay = SEC_TO_TICK(kip_secs);
 
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_renew_lease_thread: valid lease: sleep for %ld "
-			"secs", kip_secs));
+		    "nfs4_renew_lease_thread: valid lease: sleep for %ld "
+		    "secs", kip_secs));
 
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_BEGIN(&cpr_info);
 		mutex_exit(&cpr_lock);
 		time_left = cv_timedwait(&sp->cv_thread_exit, &sp->s_lock,
-			tick_delay + lbolt);
+		    tick_delay + lbolt);
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
 		mutex_exit(&cpr_lock);
 
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_renew_lease_thread: valid lease: time left %ld :"
-			"sp last_renewal_time %ld, nfs4_client_resumed %ld, "
-			"tmp_last_renewal_time %ld", time_left,
-			sp->last_renewal_time, nfs4_client_resumed,
-			tmp_last_renewal_time));
+		    "nfs4_renew_lease_thread: valid lease: time left %ld :"
+		    "sp last_renewal_time %ld, nfs4_client_resumed %ld, "
+		    "tmp_last_renewal_time %ld", time_left,
+		    sp->last_renewal_time, nfs4_client_resumed,
+		    tmp_last_renewal_time));
 
 		if (sp->s_thread_exit == NFS4_THREAD_EXIT)
 			goto die;
 
 		if (tmp_last_renewal_time == sp->last_renewal_time ||
-			(nfs4_client_resumed != 0 &&
-			nfs4_client_resumed > sp->last_renewal_time)) {
+		    (nfs4_client_resumed != 0 &&
+		    nfs4_client_resumed > sp->last_renewal_time)) {
 			/*
 			 * Issue RENEW op since we haven't renewed the lease
 			 * since we slept.
@@ -3268,20 +3261,20 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 				 * we waited for a reply for our RENEW call.
 				 */
 				if (tmp_last_renewal_time ==
-					sp->last_renewal_time) {
+				    sp->last_renewal_time) {
 					/* no implicit renew came */
 					sp->last_renewal_time = tmp_now_time;
 				} else {
 					NFS4_DEBUG(nfs4_client_lease_debug,
-						(CE_NOTE, "renew_thread: did "
-						"implicit renewal before reply "
-						"from server for RENEW"));
+					    (CE_NOTE, "renew_thread: did "
+					    "implicit renewal before reply "
+					    "from server for RENEW"));
 				}
 			} else {
 				/* figure out error */
 				NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-					"renew_thread: nfs4renew returned error"
-					" %d", error));
+				    "renew_thread: nfs4renew returned error"
+				    " %d", error));
 			}
 
 		}
@@ -3289,14 +3282,14 @@ nfs4_renew_lease_thread(nfs4_server_t *sp)
 
 die:
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_renew_lease_thread: thread exiting"));
+	    "nfs4_renew_lease_thread: thread exiting"));
 
 	while (sp->s_otw_call_count != 0) {
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_renew_lease_thread: waiting for outstanding "
-			"otw calls to finish for sp 0x%p, current "
-			"s_otw_call_count %d", (void *)sp,
-			sp->s_otw_call_count));
+		    "nfs4_renew_lease_thread: waiting for outstanding "
+		    "otw calls to finish for sp 0x%p, current "
+		    "s_otw_call_count %d", (void *)sp,
+		    sp->s_otw_call_count));
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_SAFE_BEGIN(&cpr_info);
 		mutex_exit(&cpr_lock);
@@ -3317,7 +3310,7 @@ done:
 	mutex_destroy(&cpr_lock);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_renew_lease_thread: renew thread exit officially"));
+	    "nfs4_renew_lease_thread: renew thread exit officially"));
 
 	zthread_exit();
 	/* NOT REACHED */
@@ -3401,26 +3394,26 @@ recov_retry:
 	    "nfs4renew: %s call, sp 0x%p", needrecov ? "recov" : "first",
 	    (void*)sp));
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "before: %ld s %ld ns ",
-		prop_time.tv_sec, prop_time.tv_nsec));
+	    prop_time.tv_sec, prop_time.tv_nsec));
 
 	DTRACE_PROBE2(nfs4__renew__start, nfs4_server_t *, sp,
-			mntinfo4_t *, mi);
+	    mntinfo4_t *, mi);
 
 	rfs4call(mi, &args, &res, cr, &doqueue, 0, &e);
 	crfree(cr);
 
 	DTRACE_PROBE2(nfs4__renew__end, nfs4_server_t *, sp,
-			mntinfo4_t *, mi);
+	    mntinfo4_t *, mi);
 
 	gethrestime(&after_time);
 
 	mutex_enter(&sp->s_lock);
 	sp->propagation_delay.tv_sec =
-		MAX(1, after_time.tv_sec - prop_time.tv_sec);
+	    MAX(1, after_time.tv_sec - prop_time.tv_sec);
 	mutex_exit(&sp->s_lock);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "after : %ld s %ld ns ",
-		after_time.tv_sec, after_time.tv_nsec));
+	    after_time.tv_sec, after_time.tv_nsec));
 
 	if (e.error == 0 && res.status == NFS4ERR_CB_PATH_DOWN) {
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
@@ -3455,7 +3448,7 @@ recov_retry:
 			VFS_RELE(mi->mi_vfsp);
 			if (!e.error)
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
-								(caddr_t)&res);
+				    (caddr_t)&res);
 			mutex_enter(&sp->s_lock);
 			goto recov_retry;
 		}
@@ -3511,8 +3504,8 @@ nfs4_inc_state_ref_count_nolock(nfs4_server_t *sp, mntinfo4_t *mi)
 
 	sp->state_ref_count++;
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_inc_state_ref_count: state_ref_count now %d",
-		sp->state_ref_count));
+	    "nfs4_inc_state_ref_count: state_ref_count now %d",
+	    sp->state_ref_count));
 
 	if (sp->lease_valid == NFS4_LEASE_UNINITIALIZED)
 		sp->lease_valid = NFS4_LEASE_VALID;
@@ -3556,20 +3549,20 @@ nfs4_dec_state_ref_count_nolock(nfs4_server_t *sp, mntinfo4_t *mi)
 	sp->state_ref_count--;
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_dec_state_ref_count: state ref count now %d",
-		sp->state_ref_count));
+	    "nfs4_dec_state_ref_count: state ref count now %d",
+	    sp->state_ref_count));
 
 	mi->mi_open_files--;
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_dec_state_ref_count: mi open files %d, v4 flags 0x%x",
-		mi->mi_open_files, mi->mi_flags));
+	    "nfs4_dec_state_ref_count: mi open files %d, v4 flags 0x%x",
+	    mi->mi_open_files, mi->mi_flags));
 
 	/* We don't have to hold the mi_lock to test mi_flags */
 	if (mi->mi_open_files == 0 &&
 	    (mi->mi_flags & MI4_REMOVE_ON_LAST_CLOSE)) {
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_dec_state_ref_count: remove mntinfo4 %p since "
-			"we have closed the last open file", (void*)mi));
+		    "nfs4_dec_state_ref_count: remove mntinfo4 %p since "
+		    "we have closed the last open file", (void*)mi));
 		nfs4_remove_mi_from_server(mi, sp);
 	}
 }
@@ -3623,7 +3616,7 @@ void
 sfh4_createtab(avl_tree_t *tab)
 {
 	avl_create(tab, sfh4cmp, sizeof (nfs4_sharedfh_t),
-		offsetof(nfs4_sharedfh_t, sfh_tree));
+	    offsetof(nfs4_sharedfh_t, sfh_tree));
 }
 
 /*
@@ -3657,7 +3650,7 @@ sfh4_put(const nfs_fh4 *fh, mntinfo4_t *mi, nfs4_sharedfh_t *key)
 	nsfh->sfh_flags = SFH4_IN_TREE;
 	nsfh->sfh_mi = mi;
 	NFS4_DEBUG(nfs4_sharedfh_debug, (CE_NOTE, "sfh4_get: new object (%p)",
-			(void *)nsfh));
+	    (void *)nsfh));
 
 	(void) nfs_rw_enter_sig(&mi->mi_fh_lock, RW_WRITER, 0);
 	sfh = avl_find(&mi->mi_filehandles, key, &where);
@@ -3716,8 +3709,8 @@ sfh4_get(const nfs_fh4 *fh, mntinfo4_t *mi)
 		mutex_enter(&sfh->sfh_lock);
 		sfh->sfh_refcnt++;
 		NFS4_DEBUG(nfs4_sharedfh_debug, (CE_NOTE,
-			"sfh4_get: found existing %p, new refcnt=%d",
-			(void *)sfh, sfh->sfh_refcnt));
+		    "sfh4_get: found existing %p, new refcnt=%d",
+		    (void *)sfh, sfh->sfh_refcnt));
 		mutex_exit(&sfh->sfh_lock);
 		nfs_rw_exit(&mi->mi_fh_lock);
 		return (sfh);
@@ -3739,8 +3732,8 @@ sfh4_hold(nfs4_sharedfh_t *sfh)
 	mutex_enter(&sfh->sfh_lock);
 	sfh->sfh_refcnt++;
 	NFS4_DEBUG(nfs4_sharedfh_debug,
-		(CE_NOTE, "sfh4_hold %p, new refcnt=%d",
-		(void *)sfh, sfh->sfh_refcnt));
+	    (CE_NOTE, "sfh4_hold %p, new refcnt=%d",
+	    (void *)sfh, sfh->sfh_refcnt));
 	mutex_exit(&sfh->sfh_lock);
 }
 
@@ -3786,7 +3779,7 @@ sfh4_rele(nfs4_sharedfh_t **sfhpp)
 	}
 
 	NFS4_DEBUG(nfs4_sharedfh_debug, (CE_NOTE,
-		"sfh4_rele %p, last ref", (void *)sfh));
+	    "sfh4_rele %p, last ref", (void *)sfh));
 	if (sfh->sfh_flags & SFH4_IN_TREE) {
 		avl_remove(&mi->mi_filehandles, sfh);
 		sfh->sfh_flags &= ~SFH4_IN_TREE;
@@ -3966,8 +3959,8 @@ fn_get(nfs4_fname_t *parent, char *name)
 	avl_create(&fnp->fn_children, fncmp, sizeof (nfs4_fname_t),
 	    offsetof(nfs4_fname_t, fn_tree));
 	NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
-		"fn_get %p:%s, a new nfs4_fname_t!",
-		(void *)fnp, fnp->fn_name));
+	    "fn_get %p:%s, a new nfs4_fname_t!",
+	    (void *)fnp, fnp->fn_name));
 	if (parent != NULL) {
 		avl_insert(&parent->fn_children, fnp, where);
 		mutex_exit(&parent->fn_lock);
@@ -3981,8 +3974,8 @@ fn_hold(nfs4_fname_t *fnp)
 {
 	atomic_add_32(&fnp->fn_refcnt, 1);
 	NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
-		"fn_hold %p:%s, new refcnt=%d",
-		(void *)fnp, fnp->fn_name, fnp->fn_refcnt));
+	    "fn_hold %p:%s, new refcnt=%d",
+	    (void *)fnp, fnp->fn_name, fnp->fn_refcnt));
 }
 
 /*
@@ -4008,8 +4001,8 @@ recur:
 	newref = atomic_add_32_nv(&fnp->fn_refcnt, -1);
 	if (newref > 0) {
 		NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
-			"fn_rele %p:%s, new refcnt=%d",
-			(void *)fnp, fnp->fn_name, fnp->fn_refcnt));
+		    "fn_rele %p:%s, new refcnt=%d",
+		    (void *)fnp, fnp->fn_name, fnp->fn_refcnt));
 		if (parent != NULL)
 			mutex_exit(&parent->fn_lock);
 		mutex_exit(&fnp->fn_lock);
@@ -4017,8 +4010,8 @@ recur:
 	}
 
 	NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
-		"fn_rele %p:%s, last reference, deleting...",
-		(void *)fnp, fnp->fn_name));
+	    "fn_rele %p:%s, last reference, deleting...",
+	    (void *)fnp, fnp->fn_name));
 	if (parent != NULL) {
 		avl_remove(&parent->fn_children, fnp);
 		mutex_exit(&parent->fn_lock);
@@ -4242,8 +4235,8 @@ nfs4_consistent_type(vnode_t *vp)
 	if (nfs4_vtype_debug && vp->v_type != VNON &&
 	    rp->r_attr.va_type != VNON && vp->v_type != rp->r_attr.va_type) {
 		cmn_err(CE_PANIC, "vnode %p type mismatch; v_type=%d, "
-			"rnode attr type=%d", (void *)vp, vp->v_type,
-			rp->r_attr.va_type);
+		    "rnode attr type=%d", (void *)vp, vp->v_type,
+		    rp->r_attr.va_type);
 	}
 
 	return (1);

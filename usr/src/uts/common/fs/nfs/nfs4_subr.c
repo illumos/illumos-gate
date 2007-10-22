@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -433,7 +433,7 @@ nfs4_log_badowner(mntinfo4_t *mi, nfs_opnum4 op)
 	 * Happens once per client <-> server pair.
 	 */
 	if (nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER,
-		mi->mi_flags & MI4_INT))
+	    mi->mi_flags & MI4_INT))
 		return;
 
 	server = find_nfs4_server(mi);
@@ -469,8 +469,6 @@ nfs4_log_badowner(mntinfo4_t *mi, nfs_opnum4 op)
 	}
 	mutex_exit(&mi->mi_lock);
 }
-
-
 
 int
 nfs4_time_ntov(nfstime4 *ntime, timestruc_t *vatime)
@@ -546,7 +544,7 @@ utf8_to_fn(utf8string *u8s, uint_t *lenp, char *s)
 	ASSERT(lenp != NULL);
 
 	if (u8s == NULL || u8s->utf8string_len <= 0 ||
-					u8s->utf8string_val == NULL)
+	    u8s->utf8string_val == NULL)
 		return (NULL);
 
 	/*
@@ -659,9 +657,9 @@ utf8_copy(utf8string *src, utf8string *dest)
 
 	if (src->utf8string_len > 0) {
 		dest->utf8string_val = kmem_alloc(src->utf8string_len,
-			KM_SLEEP);
+		    KM_SLEEP);
 		bcopy(src->utf8string_val, dest->utf8string_val,
-			src->utf8string_len);
+		    src->utf8string_len);
 		dest->utf8string_len = src->utf8string_len;
 	} else {
 		dest->utf8string_val = NULL;
@@ -778,10 +776,10 @@ authget(servinfo4_t *svp, CLIENT *ch_client, cred_t *cr)
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 	if ((svp->sv_flags & SV4_TRYSECINFO) && svp->sv_secinfo) {
 		for (i = svp->sv_secinfo->index; i < svp->sv_secinfo->count;
-								i++) {
+		    i++) {
 			if (!(error = sec_clnt_geth(ch_client,
-				&svp->sv_secinfo->sdata[i],
-				cr, &ch_client->cl_auth))) {
+			    &svp->sv_secinfo->sdata[i],
+			    cr, &ch_client->cl_auth))) {
 
 				svp->sv_currsec = &svp->sv_secinfo->sdata[i];
 				svp->sv_secinfo->index = i;
@@ -804,11 +802,11 @@ authget(servinfo4_t *svp, CLIENT *ch_client, cred_t *cr)
 		/* sv_currsec points to one of the entries in sv_secinfo */
 		if (svp->sv_currsec) {
 			error = sec_clnt_geth(ch_client, svp->sv_currsec, cr,
-				&ch_client->cl_auth);
+			    &ch_client->cl_auth);
 		} else {
 			/* If it's null, use sv_secdata. */
 			error = sec_clnt_geth(ch_client, svp->sv_secdata, cr,
-				&ch_client->cl_auth);
+			    &ch_client->cl_auth);
 		}
 	}
 	nfs_rw_exit(&svp->sv_lock);
@@ -854,7 +852,7 @@ top:
 		    ch->ch_vers == ci->cl_vers &&
 		    ch->ch_dev == svp->sv_knconf->knc_rdev &&
 		    (strcmp(ch->ch_protofmly,
-			svp->sv_knconf->knc_protofmly) == 0))
+		    svp->sv_knconf->knc_protofmly) == 0))
 			break;
 		plistp = &ch->ch_next;
 	}
@@ -1126,7 +1124,7 @@ clreclaim4_zone(struct nfs4_clnt *nfscl, uint_t cl_holdtime)
 		cpl = ch->ch_list;
 		cpp = &ch->ch_list;
 		while (cpl != NULL &&
-			cpl->ch_freed + cl_holdtime > gethrestime_sec()) {
+		    cpl->ch_freed + cl_holdtime > gethrestime_sec()) {
 			cpp = &cpl->ch_list;
 			cpl = cpl->ch_list;
 		}
@@ -1279,9 +1277,9 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 		tryagain = FALSE;
 
 		NFS4_DEBUG(nfs4_rfscall_debug, (CE_NOTE,
-			"nfs4_rfscall: vfs_flag=0x%x, %s",
-			mi->mi_vfsp->vfs_flag,
-			is_recov ? "recov thread" : "not recov thread"));
+		    "nfs4_rfscall: vfs_flag=0x%x, %s",
+		    mi->mi_vfsp->vfs_flag,
+		    is_recov ? "recov thread" : "not recov thread"));
 
 		/*
 		 * It's possible while we're retrying the admin
@@ -1461,7 +1459,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	} while (tryagain);
 
 	DTRACE_PROBE2(nfs4__rfscall_debug, enum clnt_stat, status,
-			int, rpcerr.re_errno);
+	    int, rpcerr.re_errno);
 
 	if (status != RPC_SUCCESS) {
 		zoneid_t zoneid = mi->mi_zone->zone_id;
@@ -1563,7 +1561,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
  */
 void
 rfs4call(mntinfo4_t *mi, COMPOUND4args_clnt *argsp, COMPOUND4res_clnt *resp,
-	cred_t *cr, int *doqueue, int flags, nfs4_error_t *ep)
+    cred_t *cr, int *doqueue, int flags, nfs4_error_t *ep)
 {
 	int i, error;
 	enum clnt_stat rpc_status = NFS4_OK;
@@ -1584,9 +1582,9 @@ rfs4call(mntinfo4_t *mi, COMPOUND4args_clnt *argsp, COMPOUND4res_clnt *resp,
 	resp->decode_len = 0;
 
 	error = nfs4_rfscall(mi, NFSPROC4_COMPOUND,
-		xdr_COMPOUND4args_clnt, (caddr_t)argsp,
-		xdr_COMPOUND4res_clnt, (caddr_t)resp, cr,
-		doqueue, &rpc_status, flags, nfscl);
+	    xdr_COMPOUND4args_clnt, (caddr_t)argsp,
+	    xdr_COMPOUND4res_clnt, (caddr_t)resp, cr,
+	    doqueue, &rpc_status, flags, nfscl);
 
 	/* Return now if it was an RPC error */
 	if (error) {
@@ -1639,10 +1637,10 @@ nfs4rename_update(vnode_t *renvp, vnode_t *ndvp, nfs_fh4 *nfh4p, char *nnm)
 
 static void
 remap_lookup(nfs4_fname_t *fname, vnode_t *rootvp,
-	int filetype, cred_t *cr,
-	nfs_fh4 *fhp, nfs4_ga_res_t *garp,	/* fh, attrs for object */
-	nfs_fh4 *pfhp, nfs4_ga_res_t *pgarp,	/* fh, attrs for parent */
-	nfs4_error_t *ep)
+    int filetype, cred_t *cr,
+    nfs_fh4 *fhp, nfs4_ga_res_t *garp,		/* fh, attrs for object */
+    nfs_fh4 *pfhp, nfs4_ga_res_t *pgarp,	/* fh, attrs for parent */
+    nfs4_error_t *ep)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -1773,6 +1771,7 @@ exit:
 void
 nfs4_remap_file(mntinfo4_t *mi, vnode_t *vp, int flags, nfs4_error_t *ep)
 {
+	int is_stub;
 	rnode4_t *rp = VTOR4(vp);
 	vnode_t *rootvp = NULL;
 	vnode_t *dvp = NULL;
@@ -1811,7 +1810,7 @@ get_remap_cred:
 	 * Puts a hold on the cred_otw and the new osp (if found).
 	 */
 	cred_otw = nfs4_get_otw_cred_by_osp(rp, cr, &osp,
-		&first_time, &last_time);
+	    &first_time, &last_time);
 	ASSERT(cred_otw != NULL);
 
 	if (rp->r_flags & R4ISXATTR) {
@@ -1830,7 +1829,7 @@ get_remap_cred:
 
 again:
 	remap_lookup(rp->r_svnode.sv_name, rootvp, filetype, cred_otw,
-			&newfh, &gar, &newpfh, &pgar, ep);
+	    &newfh, &gar, &newpfh, &pgar, ep);
 
 	NFS4_DEBUG(nfs4_client_failover_debug, (CE_NOTE,
 	    "nfs4_remap_file: remap_lookup returned %d/%d",
@@ -1909,8 +1908,8 @@ again:
 	mutex_enter(&rp->r_statelock);
 	if (flags & NFS4_REMAP_CKATTRS) {
 		if (vp->v_type != gar.n4g_va.va_type ||
-			(vp->v_type != VDIR &&
-			rp->r_size != gar.n4g_va.va_size)) {
+		    (vp->v_type != VDIR &&
+		    rp->r_size != gar.n4g_va.va_size)) {
 			NFS4_DEBUG(nfs4_client_failover_debug, (CE_NOTE,
 			    "nfs4_remap_file: size %d vs. %d, type %d vs. %d",
 			    (int)rp->r_size, (int)gar.n4g_va.va_size,
@@ -1926,21 +1925,32 @@ again:
 	ASSERT(gar.n4g_va.va_type != VNON);
 	rp->r_server = mi->mi_curr_serv;
 
+	/*
+	 * Turn this object into a "stub" object if we
+	 * crossed an underlying server fs boundary.
+	 *
+	 * This stub will be for a mirror-mount.
+	 *
+	 * See comment in r4_do_attrcache() for more details.
+	 */
+	is_stub = 0;
 	if (gar.n4g_fsid_valid) {
 		(void) nfs_rw_enter_sig(&rp->r_server->sv_lock, RW_READER, 0);
 		rp->r_srv_fsid = gar.n4g_fsid;
-		if (FATTR4_FSID_EQ(&gar.n4g_fsid, &rp->r_server->sv_fsid))
-			rp->r_flags &= ~R4SRVSTUB;
-		else
-			rp->r_flags |= R4SRVSTUB;
+		if (!FATTR4_FSID_EQ(&gar.n4g_fsid, &rp->r_server->sv_fsid))
+			is_stub = 1;
 		nfs_rw_exit(&rp->r_server->sv_lock);
 #ifdef DEBUG
 	} else {
 		NFS4_DEBUG(nfs4_client_failover_debug, (CE_NOTE,
-			"remap_file: fsid attr not provided by server.  rp=%p",
-			(void *)rp));
+		    "remap_file: fsid attr not provided by server.  rp=%p",
+		    (void *)rp));
 #endif
 	}
+	if (is_stub)
+		r4_stub_mirrormount(rp);
+	else
+		r4_stub_none(rp);
 	mutex_exit(&rp->r_statelock);
 	nfs4_attrcache_noinval(vp, &gar, gethrtime()); /* force update */
 	sfh4_update(rp->r_fh, &newfh);
@@ -2232,7 +2242,7 @@ sv4_free(servinfo4_t *svp)
 		if (svp->sv_secdata)
 			sec_clnt_freeinfo(svp->sv_secdata);
 		if (svp->sv_save_secinfo &&
-				svp->sv_save_secinfo != svp->sv_secinfo)
+		    svp->sv_save_secinfo != svp->sv_secinfo)
 			secinfo_free(svp->sv_save_secinfo);
 		if (svp->sv_secinfo)
 			secinfo_free(svp->sv_secinfo);
@@ -2348,7 +2358,7 @@ rddir4_cache_create(rnode4_t *rp)
 	rp->r_dir = kmem_alloc(sizeof (avl_tree_t), KM_SLEEP);
 
 	avl_create(rp->r_dir, rddir4_cache_compar, sizeof (rddir4_cache_impl),
-			offsetof(rddir4_cache_impl, tree));
+	    offsetof(rddir4_cache_impl, tree));
 }
 
 /*
@@ -2544,14 +2554,14 @@ top:
 				rddir4_cache_rele(rp, rdc);
 				mutex_exit(&rp->r_statelock);
 				(void) nfs_rw_enter_sig(&rp->r_rwlock,
-					RW_READER, FALSE);
+				    RW_READER, FALSE);
 				mutex_enter(&rp->r_statelock);
 				return (NULL);
 			}
 		}
 		mutex_exit(&rp->r_statelock);
 		(void) nfs_rw_enter_sig(&rp->r_rwlock,
-			RW_READER, FALSE);
+		    RW_READER, FALSE);
 		mutex_enter(&rp->r_statelock);
 	}
 
@@ -2684,8 +2694,8 @@ cl4_snapshot(kstat_t *ksp, void *buf, int rw)
 		 * add the check just for paranoia.
 		 */
 		if (INGLOBALZONE(curproc))
-		    bcopy((char *)buf + sizeof (clstat4_tmpl), &clstat4_debug,
-			    sizeof (clstat4_debug));
+			bcopy((char *)buf + sizeof (clstat4_tmpl),
+			    &clstat4_debug, sizeof (clstat4_debug));
 #endif
 	} else {
 		bcopy(ksp->ks_private, buf, sizeof (clstat4_tmpl));
@@ -2792,8 +2802,8 @@ nfs4_subr_init(void)
 	 * Allocate and initialize the client handle cache
 	 */
 	chtab4_cache = kmem_cache_create("client_handle4_cache",
-		sizeof (struct chtab), 0, NULL, NULL, clreclaim4, NULL,
-		NULL, 0);
+	    sizeof (struct chtab), 0, NULL, NULL, clreclaim4, NULL,
+	    NULL, 0);
 
 	/*
 	 * Initialize the list of per-zone client handles (and associated data).
@@ -3015,7 +3025,7 @@ try_failover(enum clnt_stat rpc_status)
 		err = ETIMEDOUT;
 #ifdef	DEBUG
 		cmn_err(CE_NOTE, "try_failover: unexpected rpc error %d",
-			rpc_status);
+		    rpc_status);
 #endif
 	} else
 		err = try_failover_table[rpc_status].error;
@@ -3023,8 +3033,8 @@ try_failover(enum clnt_stat rpc_status)
 done:
 	if (rpc_status)
 		NFS4_DEBUG(nfs4_client_failover_debug, (CE_NOTE,
-			"nfs4_try_failover: %strying failover on error %d",
-			err ? "" : "NOT ", rpc_status));
+		    "nfs4_try_failover: %strying failover on error %d",
+		    err ? "" : "NOT ", rpc_status));
 
 	return (err);
 }

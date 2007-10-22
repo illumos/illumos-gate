@@ -84,12 +84,13 @@
  */
 
 typedef struct {
-	vfs_t *fm_vfsp;
-	cred_t *fm_cr;
+	vfs_t	*fm_vfsp;
+	int	fm_flag;
+	cred_t	*fm_cr;
 } freemountargs_t;
 
-static void	async_free_mount(vfs_t *, cred_t *);
-static void	nfs4_free_mount(vfs_t *, cred_t *);
+static void	async_free_mount(vfs_t *, int, cred_t *);
+static void	nfs4_free_mount(vfs_t *, int, cred_t *);
 static void	nfs4_free_mount_thread(freemountargs_t *);
 static int nfs4_chkdup_servinfo4(servinfo4_t *, servinfo4_t *);
 
@@ -135,7 +136,7 @@ static int nfs4_max_mount_retry = 2;
 /*
  * nfs4 vfs operations.
  */
-static int	nfs4_mount(vfs_t *, vnode_t *, struct mounta *, cred_t *);
+int		nfs4_mount(vfs_t *, vnode_t *, struct mounta *, cred_t *);
 static int	nfs4_unmount(vfs_t *, int, cred_t *);
 static int	nfs4_root(vfs_t *, vnode_t **);
 static int	nfs4_statvfs(vfs_t *, struct statvfs64 *);
@@ -157,6 +158,9 @@ static void nfs4setclientid_otw(mntinfo4_t *, servinfo4_t *,  cred_t *,
 		struct nfs4_server *, nfs4_error_t *, int *);
 static void	destroy_nfs4_server(nfs4_server_t *);
 static void	remove_mi(nfs4_server_t *, mntinfo4_t *);
+
+extern void nfs4_ephemeral_init(void);
+extern void nfs4_ephemeral_fini(void);
 
 /*
  * Initialize the vfs structure
@@ -188,28 +192,48 @@ nfs4init(int fstyp, char *name)
 	};
 	int error;
 
+	nfs4_vfsops = NULL;
+	nfs4_vnodeops = NULL;
+	nfs4_trigger_vnodeops = NULL;
+
 	error = vfs_setfsops(fstyp, nfs4_vfsops_template, &nfs4_vfsops);
 	if (error != 0) {
 		zcmn_err(GLOBAL_ZONEID, CE_WARN,
 		    "nfs4init: bad vfs ops template");
-		return (error);
+		goto out;
 	}
 
 	error = vn_make_ops(name, nfs4_vnodeops_template, &nfs4_vnodeops);
 	if (error != 0) {
-		(void) vfs_freevfsops_by_type(fstyp);
 		zcmn_err(GLOBAL_ZONEID, CE_WARN,
 		    "nfs4init: bad vnode ops template");
-		return (error);
+		goto out;
+	}
+
+	error = vn_make_ops("nfs4_trigger", nfs4_trigger_vnodeops_template,
+	    &nfs4_trigger_vnodeops);
+	if (error != 0) {
+		zcmn_err(GLOBAL_ZONEID, CE_WARN,
+		    "nfs4init: bad trigger vnode ops template");
+		goto out;
 	}
 
 	nfs4fstyp = fstyp;
-
 	(void) nfs4_vfsinit();
-
 	(void) nfs4_init_dot_entries();
 
-	return (0);
+out:
+	if (error) {
+		if (nfs4_trigger_vnodeops != NULL)
+			vn_freevnodeops(nfs4_trigger_vnodeops);
+
+		if (nfs4_vnodeops != NULL)
+			vn_freevnodeops(nfs4_vnodeops);
+
+		(void) vfs_freevfsops_by_type(fstyp);
+	}
+
+	return (error);
 }
 
 void
@@ -227,7 +251,7 @@ nfs4fini(void)
  *
  * sec_data can be freed by sec_clnt_freeinfo().
  */
-struct sec_data *
+static struct sec_data *
 create_authdh_data(char *netname, int nlen, struct netbuf *syncaddr,
 		struct knetconfig *knconf) {
 	struct sec_data *secdata;
@@ -272,6 +296,74 @@ create_authdh_data(char *netname, int nlen, struct netbuf *syncaddr,
 	return (secdata);
 }
 
+/*
+ * Returns (deep) copy of sec_data_t. Allocates all memory required; caller
+ * is responsible for freeing.
+ */
+sec_data_t *
+copy_sec_data(sec_data_t *fsecdata) {
+	sec_data_t *tsecdata;
+
+	if (fsecdata == NULL)
+		return (NULL);
+
+	if (fsecdata->rpcflavor == AUTH_DH) {
+		dh_k4_clntdata_t *fdata = (dh_k4_clntdata_t *)fsecdata->data;
+
+		if (fdata == NULL)
+			return (NULL);
+
+		tsecdata = (sec_data_t *)create_authdh_data(fdata->netname,
+		    fdata->netnamelen, &fdata->syncaddr, fdata->knconf);
+
+		return (tsecdata);
+	}
+
+	tsecdata = kmem_zalloc(sizeof (sec_data_t), KM_SLEEP);
+
+	tsecdata->secmod = fsecdata->secmod;
+	tsecdata->rpcflavor = fsecdata->rpcflavor;
+	tsecdata->flags = fsecdata->flags;
+	tsecdata->uid = fsecdata->uid;
+
+	if (fsecdata->rpcflavor == RPCSEC_GSS) {
+		gss_clntdata_t *gcd = (gss_clntdata_t *)fsecdata->data;
+
+		tsecdata->data = (caddr_t)copy_sec_data_gss(gcd);
+	} else {
+		tsecdata->data = NULL;
+	}
+
+	return (tsecdata);
+}
+
+gss_clntdata_t *
+copy_sec_data_gss(gss_clntdata_t *fdata)
+{
+	gss_clntdata_t *tdata;
+
+	if (fdata == NULL)
+		return (NULL);
+
+	tdata = kmem_zalloc(sizeof (gss_clntdata_t), KM_SLEEP);
+
+	tdata->mechanism.length = fdata->mechanism.length;
+	tdata->mechanism.elements = kmem_zalloc(fdata->mechanism.length,
+	    KM_SLEEP);
+	bcopy(fdata->mechanism.elements, tdata->mechanism.elements,
+	    fdata->mechanism.length);
+
+	tdata->service = fdata->service;
+
+	(void) strcpy(tdata->uname, fdata->uname);
+	(void) strcpy(tdata->inst, fdata->inst);
+	(void) strcpy(tdata->realm, fdata->realm);
+
+	tdata->qop = fdata->qop;
+
+	return (tdata);
+}
+
 static int
 nfs4_chkdup_servinfo4(servinfo4_t *svp_head, servinfo4_t *svp)
 {
@@ -293,9 +385,9 @@ nfs4_chkdup_servinfo4(servinfo4_t *svp_head, servinfo4_t *svp)
 			continue;
 		if (si->sv_addr.len == svp->sv_addr.len &&
 		    strcmp(si->sv_knconf->knc_protofmly,
-			svp->sv_knconf->knc_protofmly) == 0 &&
+		    svp->sv_knconf->knc_protofmly) == 0 &&
 		    bcmp(si->sv_addr.buf, svp->sv_addr.buf,
-			si->sv_addr.len) == 0) {
+		    si->sv_addr.len) == 0) {
 			/* it's a duplicate */
 			return (1);
 		}
@@ -310,7 +402,7 @@ nfs4_free_args(struct nfs_args *nargs)
 	if (nargs->knconf) {
 		if (nargs->knconf->knc_protofmly)
 			kmem_free(nargs->knconf->knc_protofmly,
-				KNC_STRSIZE);
+			    KNC_STRSIZE);
 		if (nargs->knconf->knc_proto)
 			kmem_free(nargs->knconf->knc_proto, KNC_STRSIZE);
 		kmem_free(nargs->knconf, sizeof (*nargs->knconf));
@@ -353,7 +445,7 @@ nfs4_free_args(struct nfs_args *nargs)
 
 	if (nargs->nfs_ext_u.nfs_extA.secdata) {
 		sec_clnt_freeinfo(
-			nargs->nfs_ext_u.nfs_extA.secdata);
+		    nargs->nfs_ext_u.nfs_extA.secdata);
 		nargs->nfs_ext_u.nfs_extA.secdata = NULL;
 	}
 }
@@ -490,7 +582,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 	 */
 	if (flags & NFSMNT_HOSTNAME) {
 		error = copyinstr(STRUCT_FGETP(args, hostname),
-				netname, sizeof (netname), &hlen);
+		    netname, sizeof (netname), &hlen);
 		if (error)
 			goto errout;
 		nargs->hostname = kmem_zalloc(hlen, KM_SLEEP);
@@ -512,7 +604,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 		/* get syncaddr */
 		STRUCT_INIT(addr_tmp, get_udatamodel());
 		if (copyin(STRUCT_FGETP(args, syncaddr), STRUCT_BUF(addr_tmp),
-			STRUCT_SIZE(addr_tmp))) {
+		    STRUCT_SIZE(addr_tmp))) {
 			error = EINVAL;
 			goto errout;
 		}
@@ -531,7 +623,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 
 		/* get server's netname */
 		if (copyinstr(STRUCT_FGETP(args, netname), netname,
-			sizeof (netname), &nlen)) {
+		    sizeof (netname), &nlen)) {
 			error = EFAULT;
 			goto errout;
 		}
@@ -548,7 +640,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 	if (flags & NFSMNT_NEWARGS) {
 		nargs->nfs_args_ext = STRUCT_FGET(args, nfs_args_ext);
 		if (nargs->nfs_args_ext == NFS_ARGS_EXTA ||
-			nargs->nfs_args_ext == NFS_ARGS_EXTB) {
+		    nargs->nfs_args_ext == NFS_ARGS_EXTB) {
 			/*
 			 * Indicating the application is using the new
 			 * sec_data structure to pass in the security
@@ -558,7 +650,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 			    nfs_ext_u.nfs_extA.secdata) != NULL) {
 				error = sec_clnt_loadinfo(
 				    (struct sec_data *)STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extA.secdata),
+				    nfs_ext_u.nfs_extA.secdata),
 				    &secdata, get_udatamodel());
 			}
 			nargs->nfs_ext_u.nfs_extA.secdata = secdata;
@@ -578,7 +670,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 	 */
 	if (nargs->nfs_args_ext == NFS_ARGS_EXTB)
 		nargs->nfs_ext_u.nfs_extB.next =
-			STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
+		    STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
 
 errout:
 	if (error)
@@ -592,7 +684,7 @@ errout:
  * nfs mount vfsop
  * Set up mount info record and attach it to vfs struct.
  */
-static int
+int
 nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
 	char *data = uap->dataptr;
@@ -616,6 +708,7 @@ nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		return (EPERM);
 	if (mvp->v_type != VDIR)
 		return (ENOTDIR);
+
 	/*
 	 * get arguments
 	 *
@@ -640,7 +733,6 @@ more:
 		args = (struct nfs_args *)data;
 	}
 
-
 	flags = args->flags;
 
 	/*
@@ -664,15 +756,38 @@ more:
 		return (0);
 	}
 
+	/*
+	 * For ephemeral mount trigger stub vnodes, we have two problems
+	 * to solve: racing threads will likely fail the v_count check, and
+	 * we want only one to proceed with the mount.
+	 *
+	 * For stubs, if the mount has already occurred (via a racing thread),
+	 * just return success. If not, skip the v_count check and proceed.
+	 * Note that we are already serialised at this point.
+	 */
 	mutex_enter(&mvp->v_lock);
-	if (!(uap->flags & MS_OVERLAY) &&
-	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
-		mutex_exit(&mvp->v_lock);
-		if (!(uap->flags & MS_SYSSPACE)) {
-			nfs4_free_args(args);
-			kmem_free(args, sizeof (*args));
+	if (vn_matchops(mvp, nfs4_trigger_vnodeops)) {
+		/* mntpt is a v4 stub vnode */
+		ASSERT(RP_ISSTUB(VTOR4(mvp)));
+		ASSERT(!(uap->flags & MS_OVERLAY));
+		ASSERT(!(mvp->v_flag & VROOT));
+		if (vn_mountedvfs(mvp) != NULL) {
+			/* ephemeral mount has already occurred */
+			ASSERT(uap->flags & MS_SYSSPACE);
+			mutex_exit(&mvp->v_lock);
+			return (0);
 		}
-		return (EBUSY);
+	} else {
+		/* mntpt is a non-v4 or v4 non-stub vnode */
+		if (!(uap->flags & MS_OVERLAY) &&
+		    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
+			mutex_exit(&mvp->v_lock);
+			if (!(uap->flags & MS_SYSSPACE)) {
+				nfs4_free_args(args);
+				kmem_free(args, sizeof (*args));
+			}
+			return (EBUSY);
+		}
 	}
 	mutex_exit(&mvp->v_lock);
 
@@ -684,11 +799,10 @@ more:
 	/*
 	 * A valid knetconfig structure is required.
 	 */
-
 	if (!(flags & NFSMNT_KNCONF) ||
-		args->knconf == NULL || args->knconf->knc_protofmly == NULL ||
-		args->knconf->knc_proto == NULL ||
-		(strcmp(args->knconf->knc_proto, NC_UDP) == 0)) {
+	    args->knconf == NULL || args->knconf->knc_protofmly == NULL ||
+	    args->knconf->knc_proto == NULL ||
+	    (strcmp(args->knconf->knc_proto, NC_UDP) == 0)) {
 		if (!(uap->flags & MS_SYSSPACE)) {
 			nfs4_free_args(args);
 			kmem_free(args, sizeof (*args));
@@ -697,14 +811,13 @@ more:
 	}
 
 	if ((strlen(args->knconf->knc_protofmly) >= KNC_STRSIZE) ||
-		(strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
+	    (strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
 		if (!(uap->flags & MS_SYSSPACE)) {
 			nfs4_free_args(args);
 			kmem_free(args, sizeof (*args));
 		}
 		return (EINVAL);
 	}
-
 
 	/*
 	 * Allocate a servinfo4 struct.
@@ -723,11 +836,9 @@ more:
 	svp->sv_knconf = args->knconf;
 	args->knconf = NULL;
 
-
 	/*
 	 * Get server address
 	 */
-
 	if (args->addr == NULL || args->addr->buf == NULL) {
 		error = EINVAL;
 		goto errout;
@@ -737,7 +848,6 @@ more:
 	svp->sv_addr.len = args->addr->len;
 	svp->sv_addr.buf = args->addr->buf;
 	args->addr->buf = NULL;
-
 
 	/*
 	 * Get the root fhandle
@@ -756,7 +866,7 @@ more:
 	 */
 	if (flags & NFSMNT_HOSTNAME) {
 		if (args->hostname == NULL || (strlen(args->hostname) >
-			MAXNETNAMELEN)) {
+		    MAXNETNAMELEN)) {
 			error = EINVAL;
 			goto errout;
 		}
@@ -785,7 +895,7 @@ more:
 			addr_type = AF_INET6;
 
 		if (rdma_reachable(addr_type, &svp->sv_addr,
-			&rdma_knconf) == 0) {
+		    &rdma_knconf) == 0) {
 			/*
 			 * If successful, hijack the orignal knconf and
 			 * replace with the new one, depending on the flags.
@@ -811,12 +921,10 @@ more:
 				 * Check if more servers are specified;
 				 * Failover case, otherwise bail out of mount.
 				 */
-				if (args->nfs_args_ext ==
-					NFS_ARGS_EXTB &&
-					args->nfs_ext_u.nfs_extB.next
-					!= NULL) {
+				if (args->nfs_args_ext == NFS_ARGS_EXTB &&
+				    args->nfs_ext_u.nfs_extB.next != NULL) {
 					data = (char *)
-						args->nfs_ext_u.nfs_extB.next;
+					    args->nfs_ext_u.nfs_extB.next;
 					if (uap->flags & MS_RDONLY &&
 					    !(flags & NFSMNT_SOFT)) {
 						if (svp_head->sv_next == NULL) {
@@ -873,8 +981,8 @@ more:
 	 */
 	if (args->flags & NFSMNT_SECURE) {
 		svp->sv_dhsec = create_authdh_data(args->netname,
-			strlen(args->netname),
-			args->syncaddr, svp->sv_knconf);
+		    strlen(args->netname),
+		    args->syncaddr, svp->sv_knconf);
 	}
 
 	/*
@@ -922,12 +1030,15 @@ more:
 	} else if (flags & NFSMNT_SECURE) {
 		/*
 		 * NFSMNT_SECURE is deprecated but we keep it
-		 * to support the rouge user generated application
+		 * to support the rogue user-generated application
 		 * that may use this undocumented interface to do
-		 * AUTH_DH security.
+		 * AUTH_DH security, e.g. our own rexd.
+		 *
+		 * Also note that NFSMNT_SECURE is used for passing
+		 * AUTH_DH info to be used in negotiation.
 		 */
 		secdata = create_authdh_data(args->netname,
-			strlen(args->netname), args->syncaddr, svp->sv_knconf);
+		    strlen(args->netname), args->syncaddr, svp->sv_knconf);
 
 	} else {
 		secdata = kmem_alloc(sizeof (*secdata), KM_SLEEP);
@@ -1005,7 +1116,6 @@ more:
 	 */
 proceed:
 	error = nfs4rootvp(&rtvp, vfsp, svp_head, flags, cr, mntzone);
-
 	if (error) {
 		/* if nfs4rootvp failed, it will free svp_head */
 		svp_head = NULL;
@@ -1019,6 +1129,7 @@ proceed:
 	 */
 	nfs4_error_zinit(&n4e);
 	nfs4setclientid(mi, cr, FALSE, &n4e);
+
 	error = n4e.error;
 
 	if (error)
@@ -1034,6 +1145,14 @@ proceed:
 		mutex_exit(&mi->mi_lock);
 	}
 	error = nfs4_setopts(rtvp, DATAMODEL_NATIVE, args);
+	if (error)
+		goto errout;
+
+	/*
+	 * Time to tie in the mirror mount info at last!
+	 */
+	if (flags & NFSMNT_EPHEMERAL)
+		nfs4_record_ephemeral_mount(mi, mvp);
 
 errout:
 	if (error) {
@@ -1099,8 +1218,7 @@ errout:
  */
 static int
 getlinktext_otw(mntinfo4_t *mi, nfs_fh4 *fh, char **linktextp, cred_t *cr,
-	int flags)
-
+    int flags)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -1151,14 +1269,14 @@ recov_retry:
 	if (needrecov && !recovery && num_retry-- > 0) {
 
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-			"getlinktext_otw: initiating recovery\n"));
+		    "getlinktext_otw: initiating recovery\n"));
 
 		if (nfs4_start_recovery(&e, mi, NULL, NULL, NULL, NULL,
-			OP_READLINK, NULL) == FALSE) {
-		nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
-		if (!e.error)
-			(void) xdr_free(xdr_COMPOUND4res_clnt,
-				(caddr_t)&res);
+		    OP_READLINK, NULL) == FALSE) {
+			nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
+			if (!e.error)
+				(void) xdr_free(xdr_COMPOUND4res_clnt,
+				    (caddr_t)&res);
 			goto recov_retry;
 		}
 	}
@@ -1229,7 +1347,7 @@ pathname_skipslashdot(struct pathname *pnp)
  */
 int
 resolve_sympath(mntinfo4_t *mi, servinfo4_t *svp, int nth, nfs_fh4 *fh,
-		cred_t *cr, int flags)
+    cred_t *cr, int flags)
 {
 	char *oldpath;
 	char *symlink, *newpath;
@@ -1353,7 +1471,7 @@ out:
 
 static void
 nfs4getfh_otw(struct mntinfo4 *mi, servinfo4_t *svp, vtype_t *vtp,
-		int flags, cred_t *cr, nfs4_error_t *ep)
+    int flags, cred_t *cr, nfs4_error_t *ep)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -1387,7 +1505,7 @@ recov_retry:
 
 	if (!recovery) {
 		ep->error = nfs4_start_fop(mi, NULL, NULL, OH_MOUNT,
-				&recov_state, NULL);
+		    &recov_state, NULL);
 
 		/*
 		 * If recovery has been started and this request as
@@ -1472,10 +1590,10 @@ recov_retry:
 		if (recovery) {
 			nfs4args_lookup_free(argop, num_argops);
 			kmem_free(argop,
-					lookuparg.arglen * sizeof (nfs_argop4));
+			    lookuparg.arglen * sizeof (nfs_argop4));
 			if (!ep->error)
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
-								(caddr_t)&res);
+				    (caddr_t)&res);
 			return;
 		}
 
@@ -1483,7 +1601,7 @@ recov_retry:
 		    (CE_NOTE, "nfs4getfh_otw: initiating recovery\n"));
 
 		abort = nfs4_start_recovery(ep, mi, NULL,
-			    NULL, NULL, NULL, OP_GETFH, NULL);
+		    NULL, NULL, NULL, OP_GETFH, NULL);
 		if (!ep->error) {
 			ep->error = geterrno4(res.status);
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
@@ -1505,7 +1623,7 @@ recov_retry:
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
 		if (!recovery)
 			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
-				needrecov);
+			    needrecov);
 		return;
 	}
 
@@ -1515,7 +1633,7 @@ is_link_err:
 	if (res.status && res.status != NFS4ERR_SYMLINK) {
 		if (!recovery) {
 			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
-				needrecov);
+			    needrecov);
 		}
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
@@ -1556,10 +1674,10 @@ is_link_err:
 		 */
 		if (!recovery)
 			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
-				needrecov);
+			    needrecov);
 
 		ep->error = resolve_sympath(mi, svp, nthcomp, tmpfhp, cr,
-					    flags);
+		    flags);
 
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
@@ -1595,24 +1713,24 @@ is_link_err:
 
 	if (garp->n4g_ext_res->n4g_maxread == 0)
 		mi->mi_tsize =
-			MIN(MAXBSIZE, mi->mi_tsize);
+		    MIN(MAXBSIZE, mi->mi_tsize);
 	else
 		mi->mi_tsize =
-			MIN(garp->n4g_ext_res->n4g_maxread,
-			    mi->mi_tsize);
+		    MIN(garp->n4g_ext_res->n4g_maxread,
+		    mi->mi_tsize);
 
 	if (garp->n4g_ext_res->n4g_maxwrite == 0)
 		mi->mi_stsize =
-			MIN(MAXBSIZE, mi->mi_stsize);
+		    MIN(MAXBSIZE, mi->mi_stsize);
 	else
 		mi->mi_stsize =
-			MIN(garp->n4g_ext_res->n4g_maxwrite,
-			    mi->mi_stsize);
+		    MIN(garp->n4g_ext_res->n4g_maxwrite,
+		    mi->mi_stsize);
 
 	if (garp->n4g_ext_res->n4g_maxfilesize != 0)
 		mi->mi_maxfilesize =
-			MIN(garp->n4g_ext_res->n4g_maxfilesize,
-			    mi->mi_maxfilesize);
+		    MIN(garp->n4g_ext_res->n4g_maxfilesize,
+		    mi->mi_maxfilesize);
 
 	/*
 	 * If the final component is a a symbolic link, resolve the symlink,
@@ -1639,10 +1757,10 @@ is_link_err:
 		 */
 		if (!recovery)
 			nfs4_end_fop(mi, NULL, NULL, OH_MOUNT, &recov_state,
-				needrecov);
+			    needrecov);
 
 		ep->error = resolve_sympath(mi, svp, nthcomp, resfhp, cr,
-					flags);
+		    flags);
 
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
@@ -1690,7 +1808,7 @@ is_link_err:
 	/* initialize fsid and supp_attrs for server fs */
 	svp->sv_fsid = garp->n4g_fsid;
 	svp->sv_supp_attrs =
-		garp->n4g_ext_res->n4g_suppattrs | FATTR4_MANDATTR_MASK;
+	    garp->n4g_ext_res->n4g_suppattrs | FATTR4_MANDATTR_MASK;
 
 	nfs_rw_exit(&svp->sv_lock);
 
@@ -1726,9 +1844,9 @@ nfs4_remap_root(mntinfo4_t *mi, nfs4_error_t *ep, int flags)
 remap_retry:
 	svp = mi->mi_curr_serv;
 	getfh_flags =
-		(flags & NFS4_REMAP_NEEDSOP) ? NFS4_GETFH_NEEDSOP : 0;
+	    (flags & NFS4_REMAP_NEEDSOP) ? NFS4_GETFH_NEEDSOP : 0;
 	getfh_flags |=
-		(mi->mi_flags & MI4_PUBLIC) ? NFS4_GETFH_PUBLIC : 0;
+	    (mi->mi_flags & MI4_PUBLIC) ? NFS4_GETFH_PUBLIC : 0;
 	mutex_exit(&mi->mi_lock);
 
 	/*
@@ -1792,8 +1910,8 @@ remap_retry:
 	if (vtype != VNON && vtype != mi->mi_type) {
 		/* shouldn't happen */
 		zcmn_err(mi->mi_zone->zone_id, CE_WARN,
-			"nfs4_remap_root: server root vnode type (%d) doesn't "
-			"match mount info (%d)", vtype, mi->mi_type);
+		    "nfs4_remap_root: server root vnode type (%d) doesn't "
+		    "match mount info (%d)", vtype, mi->mi_type);
 	}
 
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
@@ -1817,7 +1935,7 @@ remap_retry:
 
 static int
 nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
-	int flags, cred_t *cr, zone_t *zone)
+    int flags, cred_t *cr, zone_t *zone)
 {
 	vnode_t *rtvp = NULL;
 	mntinfo4_t *mi;
@@ -1862,6 +1980,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		mi->mi_flags |= MI4_INT;
 	if (flags & NFSMNT_PUBLIC)
 		mi->mi_flags |= MI4_PUBLIC;
+	if (flags & NFSMNT_MIRRORMOUNT)
+		mi->mi_flags |= MI4_MIRRORMOUNT;
 	mi->mi_retrans = NFS_RETRIES;
 	if (svp->sv_knconf->knc_semantics == NC_TPI_COTS_ORD ||
 	    svp->sv_knconf->knc_semantics == NC_TPI_COTS)
@@ -2007,8 +2127,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	for (svp = svp_head; svp; svp = svp->sv_next) {
 		if (nfs4_chkdup_servinfo4(svp_head, svp)) {
 			nfs_cmn_err(error, CE_WARN,
-				VERS_MSG "Host %s is a duplicate%s",
-				svp->sv_hostname, droptext);
+			    VERS_MSG "Host %s is a duplicate%s",
+			    svp->sv_hostname, droptext);
 			(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 			svp->sv_flags |= SV4_NOTINUSE;
 			nfs_rw_exit(&svp->sv_lock);
@@ -2050,7 +2170,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 			if (orig_sv_pathlen != svp->sv_pathlen) {
 				kmem_free(svp->sv_path, svp->sv_pathlen);
 				svp->sv_path = kmem_alloc(orig_sv_pathlen,
-							KM_SLEEP);
+				    KM_SLEEP);
 				svp->sv_pathlen = orig_sv_pathlen;
 			}
 			bcopy(orig_sv_path, svp->sv_path, orig_sv_pathlen);
@@ -2061,8 +2181,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 		error = e.error ? e.error : geterrno4(e.stat);
 		if (error) {
 			nfs_cmn_err(error, CE_WARN,
-				VERS_MSG "initial call to %s failed%s: %m",
-				svp->sv_hostname, droptext);
+			    VERS_MSG "initial call to %s failed%s: %m",
+			    svp->sv_hostname, droptext);
 			(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 			svp->sv_flags |= SV4_NOTINUSE;
 			nfs_rw_exit(&svp->sv_lock);
@@ -2073,8 +2193,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 
 		if (tmp_vtype == VBAD) {
 			zcmn_err(mi->mi_zone->zone_id, CE_WARN,
-				VERS_MSG "%s returned a bad file type for "
-				"root%s", svp->sv_hostname, droptext);
+			    VERS_MSG "%s returned a bad file type for "
+			    "root%s", svp->sv_hostname, droptext);
 			(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 			svp->sv_flags |= SV4_NOTINUSE;
 			nfs_rw_exit(&svp->sv_lock);
@@ -2085,8 +2205,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 			vtype = tmp_vtype;
 		} else if (vtype != tmp_vtype) {
 			zcmn_err(mi->mi_zone->zone_id, CE_WARN,
-				VERS_MSG "%s returned a different file type "
-				"for root%s", svp->sv_hostname, droptext);
+			    VERS_MSG "%s returned a different file type "
+			    "for root%s", svp->sv_hostname, droptext);
 			(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 			svp->sv_flags |= SV4_NOTINUSE;
 			nfs_rw_exit(&svp->sv_lock);
@@ -2134,7 +2254,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	MI4_HOLD(mi);
 	VFS_HOLD(vfsp);	/* add reference for thread */
 	mi->mi_manager_thread = zthread_create(NULL, 0, nfs4_async_manager,
-					vfsp, 0, minclsyspri);
+	    vfsp, 0, minclsyspri);
 	ASSERT(mi->mi_manager_thread != NULL);
 
 	/*
@@ -2144,7 +2264,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	 */
 	MI4_HOLD(mi);
 	mi->mi_inactive_thread = zthread_create(NULL, 0, nfs4_inactive_thread,
-					mi, 0, minclsyspri);
+	    mi, 0, minclsyspri);
 	ASSERT(mi->mi_inactive_thread != NULL);
 
 	/* If we didn't get a type, get one now */
@@ -2173,6 +2293,7 @@ bad:
 	 */
 	if (lcr != NULL)
 		crfree(lcr);
+
 	if (rtvp != NULL) {
 		/*
 		 * We need to release our reference to the root vnode and
@@ -2206,9 +2327,13 @@ bad:
 static int
 nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 {
-	mntinfo4_t *mi;
-	ushort_t omax;
-	int removed;
+	mntinfo4_t		*mi;
+	ushort_t		omax;
+	int			removed;
+
+	bool_t			must_unlock = FALSE;
+
+	nfs4_ephemeral_tree_t	*eph_tree;
 
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);
@@ -2227,44 +2352,60 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 			NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 			    "nfs4_unmount x-zone forced unmount of vfs %p\n",
 			    (void *)vfsp));
-			nfs4_free_mount(vfsp, cr);
+			nfs4_free_mount(vfsp, flag, cr);
 		} else {
 			/*
 			 * Free data structures asynchronously, to avoid
 			 * blocking the current thread (for performance
 			 * reasons only).
 			 */
-			async_free_mount(vfsp, cr);
+			async_free_mount(vfsp, flag, cr);
 		}
+
 		return (0);
 	}
+
 	/*
 	 * Wait until all asynchronous putpage operations on
 	 * this file system are complete before flushing rnodes
 	 * from the cache.
 	 */
 	omax = mi->mi_max_threads;
-	if (nfs4_async_stop_sig(vfsp)) {
-
+	if (nfs4_async_stop_sig(vfsp))
 		return (EINTR);
-	}
+
 	r4flush(vfsp, cr);
+
+	(void) nfs4_ephemeral_umount(mi, flag, cr,
+	    &must_unlock, &eph_tree);
+
 	/*
 	 * If there are any active vnodes on this file system,
-	 * then the file system is busy and can't be umounted.
+	 * then the file system is busy and can't be unmounted.
 	 */
 	if (check_rtable4(vfsp)) {
+		nfs4_ephemeral_umount_unlock(&must_unlock, &eph_tree);
+
 		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = omax;
 		mutex_exit(&mi->mi_async_lock);
+
 		return (EBUSY);
 	}
+
 	/*
-	 * The unmount can't fail from now on, and there are no active
-	 * files that could require over-the-wire calls to the server,
-	 * so stop the async manager and the inactive thread.
+	 * The unmount can't fail from now on, so record any
+	 * ephemeral changes.
+	 */
+	nfs4_ephemeral_umount_activate(mi, &must_unlock, &eph_tree);
+
+	/*
+	 * There are no active files that could require over-the-wire
+	 * calls to the server, so stop the async manager and the
+	 * inactive thread.
 	 */
 	nfs4_async_manager_stop(vfsp);
+
 	/*
 	 * Destroy all rnodes belonging to this file system from the
 	 * rnode hash queues and purge any resources allocated to
@@ -2370,7 +2511,7 @@ nfs4_statvfs(vfs_t *vfsp, struct statvfs64 *sbp)
 	error = nfs4_statfs_otw(vp, sbp, cr);
 	if (!error) {
 		(void) strncpy(sbp->f_basetype,
-			vfssw[vfsp->vfs_fstype].vsw_name, FSTYPSZ);
+		    vfssw[vfsp->vfs_fstype].vsw_name, FSTYPSZ);
 		sbp->f_flag = vf_to_stf(vfsp->vfs_flag);
 	} else {
 		nfs4_purge_stale_fh(error, vp, cr);
@@ -2609,12 +2750,14 @@ nfs4_vfsinit(void)
 {
 	mutex_init(&nfs4_syncbusy, NULL, MUTEX_DEFAULT, NULL);
 	nfs4setclientid_init();
+	nfs4_ephemeral_init();
 	return (0);
 }
 
 void
 nfs4_vfsfini(void)
 {
+	nfs4_ephemeral_fini();
 	nfs4setclientid_fini();
 	mutex_destroy(&nfs4_syncbusy);
 }
@@ -2799,7 +2942,7 @@ recov_retry:
 			np->s_cred = lcr;
 			mutex_exit(&np->s_lock);
 			nfs4setclientid_otw(mi, svp, lcr, np, n4ep,
-				&retry_inuse);
+			    &retry_inuse);
 		}
 	}
 	mutex_enter(&np->s_lock);
@@ -2819,7 +2962,7 @@ recov_retry:
 		 */
 		if (FAILOVER_MOUNT4(mi) && nfs4_try_failover(n4ep)) {
 			(void) nfs4_start_recovery(n4ep, mi, NULL,
-				    NULL, NULL, NULL, OP_SETCLIENTID, NULL);
+			    NULL, NULL, NULL, OP_SETCLIENTID, NULL);
 			/*
 			 * Don't retry here, just return and let
 			 * recovery take over.
@@ -2827,23 +2970,23 @@ recov_retry:
 			if (recovery)
 				retry = FALSE;
 		} else if (nfs4_rpc_retry_error(n4ep->error) ||
-			    n4ep->stat == NFS4ERR_RESOURCE ||
-			    n4ep->stat == NFS4ERR_STALE_CLIENTID) {
+		    n4ep->stat == NFS4ERR_RESOURCE ||
+		    n4ep->stat == NFS4ERR_STALE_CLIENTID) {
 
-				retry = TRUE;
-				/*
-				 * Always retry if in recovery or once had
-				 * contact with the server (but now it's
-				 * overloaded).
-				 */
-				if (recovery == TRUE ||
-				    n4ep->error == ETIMEDOUT ||
-				    n4ep->error == ECONNRESET)
-					num_retries = 0;
-		} else if (retry_inuse && n4ep->error == 0 &&
-			    n4ep->stat == NFS4ERR_CLID_INUSE) {
-				retry = TRUE;
+			retry = TRUE;
+			/*
+			 * Always retry if in recovery or once had
+			 * contact with the server (but now it's
+			 * overloaded).
+			 */
+			if (recovery == TRUE ||
+			    n4ep->error == ETIMEDOUT ||
+			    n4ep->error == ECONNRESET)
 				num_retries = 0;
+		} else if (retry_inuse && n4ep->error == 0 &&
+		    n4ep->stat == NFS4ERR_CLID_INUSE) {
+			retry = TRUE;
+			num_retries = 0;
 		}
 	} else {
 		/*
@@ -2893,7 +3036,7 @@ int nfs4setclientid_otw_debug = 0;
  */
 static void
 nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
-	struct nfs4_server *np, nfs4_error_t *ep, int *retry_inusep)
+    struct nfs4_server *np, nfs4_error_t *ep, int *retry_inusep)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -2992,7 +3135,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 
 		if (!(*retry_inusep)) {
 			clid_inuse = &res.array->nfs_resop4_u.
-				opsetclientid.SETCLIENTID4res_u.client_using;
+			    opsetclientid.SETCLIENTID4res_u.client_using;
 
 			zcmn_err(mi->mi_zone->zone_id, CE_NOTE,
 			    "NFS4 mount (SETCLIENTID failed)."
@@ -3016,7 +3159,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 	}
 
 	s_resok = &res.array[2].nfs_resop4_u.
-		opsetclientid.SETCLIENTID4res_u.resok4;
+	    opsetclientid.SETCLIENTID4res_u.resok4;
 
 	tmp_clientid = s_resok->clientid;
 
@@ -3055,23 +3198,23 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 	gethrestime(&prop_time);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4setlientid_otw: "
-		"start time: %ld sec %ld nsec", prop_time.tv_sec,
-		prop_time.tv_nsec));
+	    "start time: %ld sec %ld nsec", prop_time.tv_sec,
+	    prop_time.tv_nsec));
 
 	rfs4call(mi, &args, &res, cr, &doqueue, 0, ep);
 
 	gethrestime(&after_time);
 	mutex_enter(&np->s_lock);
 	np->propagation_delay.tv_sec =
-		MAX(1, after_time.tv_sec - prop_time.tv_sec);
+	    MAX(1, after_time.tv_sec - prop_time.tv_sec);
 	mutex_exit(&np->s_lock);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4setlcientid_otw: "
-		"finish time: %ld sec ", after_time.tv_sec));
+	    "finish time: %ld sec ", after_time.tv_sec));
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4setclientid_otw: "
-		"propagation delay set to %ld sec",
-		np->propagation_delay.tv_sec));
+	    "propagation delay set to %ld sec",
+	    np->propagation_delay.tv_sec));
 
 	if (ep->error)
 		return;
@@ -3081,7 +3224,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 
 		if (!(*retry_inusep)) {
 			clid_inuse = &res.array->nfs_resop4_u.
-				opsetclientid.SETCLIENTID4res_u.client_using;
+			    opsetclientid.SETCLIENTID4res_u.client_using;
 
 			zcmn_err(mi->mi_zone->zone_id, CE_NOTE,
 			    "SETCLIENTID_CONFIRM failed.  "
@@ -3114,7 +3257,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 
 		np->s_refcnt++;		/* pass reference to thread */
 		(void) zthread_create(NULL, 0, nfs4_renew_lease_thread, np, 0,
-				    minclsyspri);
+		    minclsyspri);
 	}
 	mutex_exit(&np->s_lock);
 
@@ -3138,16 +3281,16 @@ nfs4_add_mi_to_server(nfs4_server_t *sp, mntinfo4_t *mi)
 	ASSERT(MUTEX_HELD(&sp->s_lock));
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_add_mi_to_server: add mi %p to sp %p",
-		    (void*)mi, (void*)sp));
+	    "nfs4_add_mi_to_server: add mi %p to sp %p",
+	    (void*)mi, (void*)sp));
 
 	for (tmi = sp->mntinfo4_list;
 	    tmi != NULL;
 	    tmi = tmi->mi_clientid_next) {
 		if (tmi == mi) {
 			NFS4_DEBUG(nfs4_client_lease_debug,
-				(CE_NOTE,
-				"nfs4_add_mi_to_server: mi in list"));
+			    (CE_NOTE,
+			    "nfs4_add_mi_to_server: mi in list"));
 			in_list = 1;
 		}
 	}
@@ -3160,7 +3303,7 @@ nfs4_add_mi_to_server(nfs4_server_t *sp, mntinfo4_t *mi)
 		VFS_HOLD(mi->mi_vfsp);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4_add_mi_to_server: "
-		"hold vfs %p for mi: %p", (void*)mi->mi_vfsp, (void*)mi));
+	    "hold vfs %p for mi: %p", (void*)mi->mi_vfsp, (void*)mi));
 
 	if (!in_list) {
 		if (sp->mntinfo4_list)
@@ -3200,8 +3343,8 @@ static void
 nfs4_remove_mi_from_server_nolock(mntinfo4_t *mi, nfs4_server_t *sp)
 {
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-		"nfs4_remove_mi_from_server_nolock: remove mi %p from sp %p",
-		(void*)mi, (void*)sp));
+	    "nfs4_remove_mi_from_server_nolock: remove mi %p from sp %p",
+	    (void*)mi, (void*)sp));
 
 	ASSERT(sp != NULL);
 	ASSERT(MUTEX_HELD(&sp->s_lock));
@@ -3213,8 +3356,8 @@ nfs4_remove_mi_from_server_nolock(mntinfo4_t *mi, nfs4_server_t *sp)
 	 */
 	if (mi->mi_open_files > 0) {
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"nfs4_remove_mi_from_server_nolock: don't "
-			"remove mi since it still has files open"));
+		    "nfs4_remove_mi_from_server_nolock: don't "
+		    "remove mi since it still has files open"));
 
 		mutex_enter(&mi->mi_lock);
 		mi->mi_flags |= MI4_REMOVE_ON_LAST_CLOSE;
@@ -3229,7 +3372,7 @@ nfs4_remove_mi_from_server_nolock(mntinfo4_t *mi, nfs4_server_t *sp)
 	if (sp->mntinfo4_list == NULL) {
 		/* last fs unmounted, kill the thread */
 		NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE,
-			"remove_mi_from_nfs4_server_nolock: kill the thread"));
+		    "remove_mi_from_nfs4_server_nolock: kill the thread"));
 		nfs4_mark_srv_dead(sp);
 	}
 }
@@ -3607,7 +3750,7 @@ servinfo4_to_nfs4_server(servinfo4_t *srv_p)
 		if (np->zoneid == zoneid &&
 		    np->saddr.len == srv_p->sv_addr.len &&
 		    bcmp(np->saddr.buf, srv_p->sv_addr.buf,
-			    np->saddr.len) == 0 &&
+		    np->saddr.len) == 0 &&
 		    np->s_thread_exit != NFS4_THREAD_EXIT) {
 			mutex_enter(&np->s_lock);
 			np->s_refcnt++;
@@ -3674,7 +3817,7 @@ find_nfs4_server_all(mntinfo4_t *mi, int all)
 	if (nfs4_server_t_debug) {
 		/* mi->mi_clientid is unprotected, ok for debug output */
 		dumpnfs4slist("find_nfs4_server", mi, mi->mi_clientid,
-			mi->mi_curr_serv);
+		    mi->mi_curr_serv);
 	}
 #endif
 	for (np = nfs4_server_lst.forw; np != &nfs4_server_lst; np = np->forw) {
@@ -3781,13 +3924,14 @@ nfs4_server_vlock(nfs4_server_t *sp, int all)
  */
 
 static void
-async_free_mount(vfs_t *vfsp, cred_t *cr)
+async_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 {
 	freemountargs_t *args;
 	args = kmem_alloc(sizeof (freemountargs_t), KM_SLEEP);
 	args->fm_vfsp = vfsp;
 	VFS_HOLD(vfsp);
 	MI4_HOLD(VFTOMI4(vfsp));
+	args->fm_flag = flag;
 	args->fm_cr = cr;
 	crhold(cr);
 	(void) zthread_create(NULL, 0, nfs4_free_mount_thread, args, 0,
@@ -3798,7 +3942,7 @@ static void
 nfs4_free_mount_thread(freemountargs_t *args)
 {
 	mntinfo4_t *mi;
-	nfs4_free_mount(args->fm_vfsp, args->fm_cr);
+	nfs4_free_mount(args->fm_vfsp, args->fm_flag, args->fm_cr);
 	mi = VFTOMI4(args->fm_vfsp);
 	crfree(args->fm_cr);
 	VFS_RELE(args->fm_vfsp);
@@ -3812,14 +3956,17 @@ nfs4_free_mount_thread(freemountargs_t *args)
  * Thread to free the data structures for a given filesystem.
  */
 static void
-nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
+nfs4_free_mount(vfs_t *vfsp, int flag, cred_t *cr)
 {
-	mntinfo4_t	*mi = VFTOMI4(vfsp);
-	nfs4_server_t	*sp;
-	callb_cpr_t	cpr_info;
-	kmutex_t	cpr_lock;
-	boolean_t	async_thread;
-	int		removed;
+	mntinfo4_t		*mi = VFTOMI4(vfsp);
+	nfs4_server_t		*sp;
+	callb_cpr_t		cpr_info;
+	kmutex_t		cpr_lock;
+	boolean_t		async_thread;
+	int			removed;
+
+	bool_t			must_unlock = FALSE;
+	nfs4_ephemeral_tree_t	*eph_tree;
 
 	/*
 	 * We need to participate in the CPR framework if this is a kernel
@@ -3878,6 +4025,10 @@ nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
 		}
 	}
 	mutex_exit(&mi->mi_lock);
+
+	(void) nfs4_ephemeral_umount(mi, flag, cr,
+	    &must_unlock, &eph_tree);
+	nfs4_ephemeral_umount_activate(mi, &must_unlock, &eph_tree);
 
 	/*
 	 * The original purge of the dnlc via 'dounmount'

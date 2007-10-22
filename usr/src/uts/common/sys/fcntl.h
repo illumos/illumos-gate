@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -349,6 +349,7 @@ typedef struct fshare {
 #define	AT_FDCWD			0xffd19553
 #define	AT_SYMLINK_NOFOLLOW		0x1000
 #define	AT_REMOVEDIR			0x1
+#define	_AT_TRIGGER			0x2
 #endif
 
 #ifdef	__cplusplus

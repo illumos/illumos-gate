@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +110,7 @@ gss_clnt_loadinfo(caddr_t usrdata, caddr_t *kdata, model_t model)
 		} else {
 			data->mechanism.length = gd32.mechanism.length;
 			data->mechanism.elements =
-				(caddr_t)(uintptr_t)gd32.mechanism.elements;
+			    (caddr_t)(uintptr_t)gd32.mechanism.elements;
 			data->service = gd32.service;
 			bcopy(gd32.uname, data->uname, sizeof (gd32.uname));
 			bcopy(gd32.inst, data->inst, sizeof (gd32.inst));
@@ -441,6 +440,9 @@ sec_clnt_geth(CLIENT *client, struct sec_data *secdata, cred_t *cr, AUTH **ap)
 
 	authflavor = secdata->rpcflavor;
 	for (;;) {
+		int nlen;
+		char *netname;
+
 		switch (authflavor) {
 		case AUTH_NONE:
 			/*
@@ -482,12 +484,28 @@ sec_clnt_geth(CLIENT *client, struct sec_data *secdata, cred_t *cr, AUTH **ap)
 			 */
 			savecred = curthread->t_cred;
 			curthread->t_cred = cr;
+
+			/*
+			 * Note that authdes_create() expects a
+			 * NUL-terminated string for netname, but
+			 * dh_k4_clntdata_t gives us netname & netnamelen.
+			 *
+			 * We must create a string for authdes_create();
+			 * the latter takes a copy of it, so we may
+			 * immediately free it.
+			 */
 			desdata = (dh_k4_clntdata_t *)secdata->data;
-			stat = authdes_create(desdata->netname, authdes_win,
-				&desdata->syncaddr, desdata->knconf,
-				(des_block *)NULL,
-				(secdata->flags & AUTH_F_RPCTIMESYNC) ? 1 : 0,
-				&auth);
+			nlen = desdata->netnamelen;
+			/* must be NUL-terminated */
+			netname = kmem_zalloc(nlen + 1, KM_SLEEP);
+			bcopy(desdata->netname, netname, nlen);
+			stat = authdes_create(netname, authdes_win,
+			    &desdata->syncaddr, desdata->knconf,
+			    (des_block *)NULL,
+			    (secdata->flags & AUTH_F_RPCTIMESYNC) ? 1 : 0,
+			    &auth);
+			kmem_free(netname, nlen + 1);
+
 			curthread->t_cred = savecred;
 			*ap = auth;
 
@@ -566,7 +584,7 @@ sec_clnt_geth(CLIENT *client, struct sec_data *secdata, cred_t *cr, AUTH **ap)
 			}
 
 			RPCLOG(1, "sec_clnt_geth: rpc_gss_secget"
-					" failed with %d", stat);
+			    " failed with %d", stat);
 			return (stat);
 
 		default:
@@ -596,14 +614,14 @@ sec_clnt_freeh(AUTH *auth)
 	case AUTH_DES:
 		mutex_enter(&desauthtab_lock);
 		if (desauthtab != NULL) {
-		    for (da = desauthtab;
-			da < &desauthtab[clnt_authdes_cachesz]; da++) {
-			if (da->da_auth == auth) {
-				da->da_inuse = 0;
-				mutex_exit(&desauthtab_lock);
-				return;
+			for (da = desauthtab;
+			    da < &desauthtab[clnt_authdes_cachesz]; da++) {
+				if (da->da_auth == auth) {
+					da->da_inuse = 0;
+					mutex_exit(&desauthtab_lock);
+					return;
+				}
 			}
-		    }
 		}
 		mutex_exit(&desauthtab_lock);
 		auth_destroy(auth);	/* was overflow */
@@ -615,7 +633,7 @@ sec_clnt_freeh(AUTH *auth)
 
 	default:
 		cmn_err(CE_NOTE, "sec_clnt_freeh: unknown authflavor %d",
-			auth->ah_cred.oa_flavor);
+		    auth->ah_cred.oa_flavor);
 		break;
 	}
 }
@@ -678,11 +696,12 @@ sec_clnt_revoke(int rpcflavor, uid_t uid, cred_t *cr, void *mechanism,
 	case AUTH_DES:
 		mutex_enter(&desauthtab_lock);
 		if (desauthtab != NULL) {
-		    for (da = desauthtab;
-			da < &desauthtab[clnt_authdes_cachesz]; da++) {
-			if (uid == da->da_uid && zoneid == da->da_zoneid)
-				revoke_key(da->da_auth, 1);
-		    }
+			for (da = desauthtab;
+			    da < &desauthtab[clnt_authdes_cachesz]; da++) {
+				if (uid == da->da_uid &&
+				    zoneid == da->da_zoneid)
+					revoke_key(da->da_auth, 1);
+			}
 		}
 		mutex_exit(&desauthtab_lock);
 		return (0);
@@ -751,13 +770,13 @@ purge_authtab(struct sec_data *secdata)
 	case AUTH_DES:
 		mutex_enter(&desauthtab_lock);
 		if (desauthtab != NULL) {
-		    for (da = desauthtab;
-			da < &desauthtab[clnt_authdes_cachesz]; da++) {
-			if (da->da_data == secdata) {
-				da->da_data = NULL;
-				da->da_inuse = 0;
+			for (da = desauthtab;
+			    da < &desauthtab[clnt_authdes_cachesz]; da++) {
+				if (da->da_data == secdata) {
+					da->da_data = NULL;
+					da->da_inuse = 0;
+				}
 			}
-		    }
 		}
 		mutex_exit(&desauthtab_lock);
 		return;

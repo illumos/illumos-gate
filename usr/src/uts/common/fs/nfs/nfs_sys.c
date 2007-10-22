@@ -358,6 +358,19 @@ nfssys(enum nfssys_op opcode, void *arg)
 		break;
 	}
 
+	case NFS4_EPHEMERAL_MOUNT_TO: {
+		uint_t	mount_to;
+
+		/*
+		 * Not a very complicated call.
+		 */
+		if (copyin(arg, &mount_to, sizeof (mount_to)))
+			return (set_errno(EFAULT));
+		nfs4_ephemeral_set_mount_to(mount_to);
+		error = 0;
+		break;
+	}
+
 	case MOUNTD_ARGS: {
 		uint_t	did;
 

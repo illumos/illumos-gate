@@ -942,7 +942,6 @@ extern int nfs4_seqid_sync;
 extern int nfs4_client_map_debug;
 extern int nfs4_client_inactive_debug;
 extern int nfs4_client_recov_debug;
-extern int nfs4_client_recov_stub_debug;
 extern int nfs4_client_failover_debug;
 extern int nfs4_client_call_debug;
 extern int nfs4_client_foo_debug;
@@ -1328,6 +1327,8 @@ extern kstat_named_t	*rfsproccnt_v4_ptr;
 extern struct vfsops	*nfs4_vfsops;
 extern struct vnodeops	*nfs4_vnodeops;
 extern const struct	fs_operation_def nfs4_vnodeops_template[];
+extern vnodeops_t	*nfs4_trigger_vnodeops;
+extern const struct	fs_operation_def nfs4_trigger_vnodeops_template[];
 
 extern uint_t nfs4_tsize(struct knetconfig *);
 extern uint_t rfs4_tsize(struct svc_req *);

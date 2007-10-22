@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <nfs/rnode.h>
 #include <sys/avl.h>
 #include <sys/list.h>
+#include <rpc/auth.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -823,6 +824,8 @@ typedef struct nfs4_debug_msg {
  *		mi_foo_max
  *		mi_lost_state
  *		mi_bseqid_list
+ *		mi_ephemeral
+ *		mi_ephemeral_tree
  *
  *	Normally the netconfig information for the mount comes from
  *	mi_curr_serv and mi_klmconfig is NULL.  If NLM calls need to use a
@@ -881,8 +884,19 @@ typedef struct nfs4_debug_msg {
  *
  * mi_zone_node is linkage into the mi4_globals.mig_list, and is
  * protected by mi4_globals.mig_list_lock.
+ *
+ * If MI4_EPHEMERAL is set in mi_flags, then mi_ephemeral points to an
+ * ephemeral structure for this ephemeral mount point. It can not be
+ * NULL. Also, mi_ephemeral_tree points to the root of the ephemeral
+ * tree.
+ *
+ * If MI4_EPHEMERAL is not set in mi_flags, then mi_ephemeral has
+ * to be NULL. If mi_ephemeral_tree is non-NULL, then this node
+ * is the enclosing mntinfo4 for the ephemeral tree.
  */
 struct zone;
+struct nfs4_ephemeral;
+struct nfs4_ephemeral_tree;
 typedef struct mntinfo4 {
 	kmutex_t	mi_lock;	/* protects mntinfo4 fields */
 	struct servinfo4 *mi_servers;   /* server list */
@@ -1003,6 +1017,12 @@ typedef struct mntinfo4 {
 	 */
 	struct zone	*mi_zone; /* Zone mounted in */
 	list_node_t	mi_zone_node;  /* linkage into per-zone mi list */
+
+	/*
+	 * Links for unmounting ephemeral mounts.
+	 */
+	struct nfs4_ephemeral		*mi_ephemeral;
+	struct nfs4_ephemeral_tree	*mi_ephemeral_tree;
 } mntinfo4_t;
 
 /*
@@ -1019,7 +1039,11 @@ typedef struct mntinfo4 {
  *	MI4_SHUTDOWN		 System is rebooting or shutting down
  *	MI4_LINK		 server supports link
  *	MI4_SYMLINK		 server supports symlink
+ *	MI4_EPHEMERAL_RECURSED	 an ephemeral mount being unmounted
+ *				 due to a recursive call - no need
+ *				 for additional recursion
  *	MI4_ACL			 server supports NFSv4 ACLs
+ *	MI4_MIRRORMOUNT		 is a mirrormount
  *	MI4_NOPRINT		 don't print messages
  *	MI4_DIRECTIO		 do direct I/O
  *	MI4_RECOV_ACTIV		 filesystem has recovery a thread
@@ -1034,6 +1058,7 @@ typedef struct mntinfo4 {
  *	MI4_BADOWNER_DEBUG	 badowner error msg per mount
  *	MI4_ASYNC_MGR_STOP	 tell async manager to die
  *	MI4_TIMEDOUT		 saw a timeout during zone shutdown
+ *	MI4_EPHEMERAL		 is an ephemeral mount
  */
 #define	MI4_HARD		 0x1
 #define	MI4_PRINTED		 0x2
@@ -1046,9 +1071,10 @@ typedef struct mntinfo4 {
 #define	MI4_SHUTDOWN		 0x200
 #define	MI4_LINK		 0x400
 #define	MI4_SYMLINK		 0x800
-/* 0x1000 is available */
+#define	MI4_EPHEMERAL_RECURSED	 0x1000
 #define	MI4_ACL			 0x2000
-/* 0x4000 is available */
+/* MI4_MIRRORMOUNT is also defined in nfsstat.c */
+#define	MI4_MIRRORMOUNT		 0x4000
 /* 0x8000 is available */
 /* 0x10000 is available */
 #define	MI4_NOPRINT		 0x20000
@@ -1066,6 +1092,12 @@ typedef struct mntinfo4 {
 #define	MI4_BADOWNER_DEBUG	 0x20000000
 #define	MI4_ASYNC_MGR_STOP	 0x40000000
 #define	MI4_TIMEDOUT		 0x80000000
+
+/*
+ * Note that when we add referrals, then MI4_EPHEMERAL
+ * will be MI4_MIRRORMOUNT | MI4_REFERRAL.
+ */
+#define	MI4_EPHEMERAL		MI4_MIRRORMOUNT
 
 #define	INTR4(vp)	(VTOMI4(vp)->mi_flags & MI4_INT)
 
@@ -1252,6 +1284,114 @@ typedef enum {
 } nfs4_op_hint_t;
 
 /*
+ * This data structure is used to track ephemeral mounts for both
+ * mirror mounts and referrals.
+ *
+ * Note that each nfs4_ephemeral can only have one other nfs4_ephemeral
+ * pointing at it. So we don't need two backpointers to walk
+ * back up the tree.
+ *
+ * An ephemeral tree is pointed to by an enclosing non-ephemeral
+ * mntinfo4. The root is also pointed to by its ephemeral
+ * mntinfo4. ne_child will get us back to it, while ne_prior
+ * will get us back to the non-ephemeral mntinfo4. This is an
+ * edge case we will need to be wary of when walking back up the
+ * tree.
+ *
+ * The way we handle this edge case is to have ne_prior be NULL
+ * for the root nfs4_ephemeral node.
+ */
+typedef struct nfs4_ephemeral {
+	mntinfo4_t		*ne_mount;	/* who encloses us */
+	struct nfs4_ephemeral	*ne_child;	/* first child node */
+	struct nfs4_ephemeral	*ne_peer;	/* next sibling */
+	struct nfs4_ephemeral	*ne_prior;	/* who points at us */
+	time_t			ne_ref_time;	/* time last referenced */
+	uint_t			ne_mount_to;	/* timeout at */
+	int			ne_state;	/* used to traverse */
+} nfs4_ephemeral_t;
+
+/*
+ * State for the node (set in ne_state):
+ */
+#define	NFS4_EPHEMERAL_OK		0x0
+#define	NFS4_EPHEMERAL_VISIT_CHILD	0x1
+#define	NFS4_EPHEMERAL_VISIT_SIBLING	0x2
+#define	NFS4_EPHEMERAL_PROCESS_ME	0x4
+#define	NFS4_EPHEMERAL_CHILD_ERROR	0x8
+#define	NFS4_EPHEMERAL_PEER_ERROR	0x10
+
+/*
+ * These are the locks used in processing ephemeral data:
+ *
+ * mi->mi_lock
+ *
+ * net->net_tree_lock
+ *     This lock is used to gate all tree operations.
+ *     If it is held, then no other process may
+ *     traverse the tree. This allows us to not
+ *     throw a hold on each vfs_t in the tree.
+ *     Can be held for a "long" time.
+ *
+ * net->net_cnt_lock
+ *     Used to protect refcnt and status.
+ *     Must be held for a really short time.
+ *
+ * nfs4_ephemeral_thread_lock
+ *     Is only held to create the harvester for the zone.
+ *     There is no ordering imposed on it.
+ *     Held for a really short time.
+ *
+ * Some further detail on the interactions:
+ *
+ * net_tree_lock controls access to net_root. Access needs to first be
+ * attempted in a non-blocking check.
+ *
+ * net_cnt_lock controls access to net_refcnt and net_status. It must only be
+ * held for very short periods of time, unless the refcnt is 0 and the status
+ * is INVALID.
+ *
+ * Before a caller can grab net_tree_lock, it must first grab net_cnt_lock
+ * to bump the net_refcnt. It then releases it and does the action specific
+ * algorithm to get the net_tree_lock. Once it has that, then it is okay to
+ * grab the net_cnt_lock and change the status. The status can only be
+ * changed if the caller has the net_tree_lock held as well.
+ *
+ * When a caller is done with net_tree_lock, it can decrement the net_refcnt
+ * either before it releases net_tree_lock or after.
+ *
+ * In either event, to decrement net_refcnt, it must hold net_cnt_lock.
+ *
+ * Note that the overall locking scheme for the nodes is to control access
+ * via the tree. The current scheme could easily be extended such that
+ * the enclosing root referenced a "forest" of trees. The underlying trees
+ * would be autonomous with respect to locks.
+ *
+ * Note that net_next is controlled by external locks
+ * particular to the data structure that the tree is being added to.
+ */
+typedef struct nfs4_ephemeral_tree {
+	mntinfo4_t			*net_mount;
+	nfs4_ephemeral_t		*net_root;
+	struct nfs4_ephemeral_tree	*net_next;
+	kmutex_t			net_tree_lock;
+	kmutex_t			net_cnt_lock;
+	uint_t				net_status;
+	uint_t				net_refcnt;
+} nfs4_ephemeral_tree_t;
+
+/*
+ * State for the tree (set in net_status):
+ */
+#define	NFS4_EPHEMERAL_TREE_OK		0x0
+#define	NFS4_EPHEMERAL_TREE_BUILDING	0x1
+#define	NFS4_EPHEMERAL_TREE_DEROOTING	0x2
+#define	NFS4_EPHEMERAL_TREE_INVALID	0x4
+#define	NFS4_EPHEMERAL_TREE_MOUNTING	0x8
+#define	NFS4_EPHEMERAL_TREE_UMOUNTING	0x10
+#define	NFS4_EPHEMERAL_TREE_LOCKED	0x20
+
+/*
  * This macro evaluates to non-zero if the given op releases state at the
  * server.
  */
@@ -1335,9 +1475,13 @@ extern void	nfs4open_confirm(vnode_t *, seqid4*, stateid4 *, cred_t *,
 		    nfs4_error_t *, int *);
 extern void	nfs4_error_zinit(nfs4_error_t *);
 extern void	nfs4_error_init(nfs4_error_t *, int);
+extern void	nfs4_free_args(struct nfs_args *);
 
 extern void 	mi_hold(mntinfo4_t *);
 extern void	mi_rele(mntinfo4_t *);
+
+extern sec_data_t	*copy_sec_data(sec_data_t *);
+extern gss_clntdata_t	*copy_sec_data_gss(gss_clntdata_t *);
 
 #ifdef DEBUG
 extern int	nfs4_consistent_type(vnode_t *);
@@ -1813,6 +1957,25 @@ extern int	nfs4_start_fop(struct mntinfo4 *, vnode_t *, vnode_t *,
 extern void	nfs4_end_fop(struct mntinfo4 *, vnode_t *, vnode_t *,
 				nfs4_op_hint_t, nfs4_recov_state_t *, bool_t);
 extern char	*nfs4_recov_action_to_str(nfs4_recov_t);
+
+/*
+ * In sequence, code desiring to unmount an ephemeral tree must
+ * call nfs4_ephemeral_umount, nfs4_ephemeral_umount_activate,
+ * and nfs4_ephemeral_umount_unlock. The _unlock must also be
+ * called on all error paths that occur before it would naturally
+ * be invoked.
+ *
+ * The caller must also provde a pointer to a boolean to keep track
+ * of whether or not the code in _unlock is to be ran.
+ */
+extern void	nfs4_ephemeral_umount_activate(mntinfo4_t *,
+    bool_t *, nfs4_ephemeral_tree_t **);
+extern int	nfs4_ephemeral_umount(mntinfo4_t *, int, cred_t *,
+    bool_t *, nfs4_ephemeral_tree_t **);
+extern void	nfs4_ephemeral_umount_unlock(bool_t *,
+    nfs4_ephemeral_tree_t **);
+
+extern void	nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp);
 
 extern int	wait_for_recall(vnode_t *, vnode_t *, nfs4_op_hint_t,
 			nfs4_recov_state_t *);

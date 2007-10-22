@@ -158,17 +158,35 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 
 	AUTOFS_DPRINT((4, "auto_getattr vp %p\n", (void *)vp));
 
-	/*
-	 * Recursive auto_getattr/mount; go to the vfsp == NULL
-	 * case.
-	 */
-	if (vn_vfswlock_held(vp))
-		goto defattr;
+	if (flags & ATTR_TRIGGER) {
+		/*
+		 * Pre-trigger the mount
+		 */
+		error = auto_trigger_mount(vp, cred, &newvp);
+		if (error)
+			return (error);
 
-	if (error = vn_vfsrlock_wait(vp))
-		return (error);
+		if (newvp == NULL)
+			goto defattr;
 
-	vfsp = vn_mountedvfs(vp);
+		if (error = vn_vfsrlock_wait(vp))
+			return (error);
+
+		vfsp = newvp->v_vfsp;
+	} else {
+		/*
+		 * Recursive auto_getattr/mount; go to the vfsp == NULL
+		 * case.
+		 */
+		if (vn_vfswlock_held(vp))
+			goto defattr;
+
+		if (error = vn_vfsrlock_wait(vp))
+			return (error);
+
+		vfsp = vn_mountedvfs(vp);
+	}
+
 	if (vfsp != NULL) {
 		/*
 		 * Node is mounted on.
@@ -299,7 +317,7 @@ auto_access(vnode_t *vp, int mode, int flags, cred_t *cred)
 		mode &= ~(fnp->fn_mode << shift);
 		if (mode != 0)
 			error = secpolicy_vnode_access(cred, vp, fnp->fn_uid,
-									mode);
+			    mode);
 	}
 
 done:
@@ -602,9 +620,9 @@ top:
 		break;
 	default:
 		auto_log(dfnp->fn_globals->fng_verbose,
-			dfnp->fn_globals->fng_zoneid, CE_WARN,
-			"auto_lookup: unknown "
-		    "operation %d", operation);
+		    dfnp->fn_globals->fng_zoneid, CE_WARN,
+		    "auto_lookup: unknown operation %d",
+		    operation);
 	}
 
 	AUTOFS_DPRINT((5, "auto_lookup: name=%s *vpp=%p return=%d\n",
@@ -914,13 +932,13 @@ again:
 		rda.uid = crgetuid(cred);
 
 		error = auto_calldaemon(fngp->fng_zoneid,
-			AUTOFS_READDIR,
-			xdr_autofs_rddirargs,
-			&rda,
-			xdr_autofs_rddirres,
-			(void *)&rd,
-			sizeof (autofs_rddirres),
-			TRUE);
+		    AUTOFS_READDIR,
+		    xdr_autofs_rddirargs,
+		    &rda,
+		    xdr_autofs_rddirres,
+		    (void *)&rd,
+		    sizeof (autofs_rddirres),
+		    TRUE);
 
 		/*
 		 * reacquire previously dropped lock
@@ -954,7 +972,7 @@ again:
 			do {
 				this_reclen = cdp->d_reclen;
 				if (auto_search(fnp, cdp->d_name,
-					NULL, cred)) {
+				    NULL, cred)) {
 					/*
 					 * entry not found in kernel list,
 					 * include it in readdir output.
@@ -966,7 +984,7 @@ again:
 					 */
 					if (cdp != odp)
 						bcopy(cdp, odp,
-							(size_t)this_reclen);
+						    (size_t)this_reclen);
 					odp = nextdp(odp);
 					outcount += this_reclen;
 				} else {
@@ -982,7 +1000,7 @@ again:
 				}
 				count += this_reclen;
 				cdp = (struct dirent64 *)
-					((char *)cdp + this_reclen);
+				    ((char *)cdp + this_reclen);
 			} while (count < rd.rd_rddir.rddir_size);
 
 			if (outcount)
@@ -1029,7 +1047,7 @@ again:
 		/* use strncpy(9f) to zero out uninitialized bytes */
 
 		(void) strncpy(dp->d_name, ".",
-			DIRENT64_NAMELEN(this_reclen));
+		    DIRENT64_NAMELEN(this_reclen));
 		outcount += dp->d_reclen;
 		dp = nextdp(dp);
 
@@ -1045,7 +1063,7 @@ again:
 		/* use strncpy(9f) to zero out uninitialized bytes */
 
 		(void) strncpy(dp->d_name, "..",
-			DIRENT64_NAMELEN(this_reclen));
+		    DIRENT64_NAMELEN(this_reclen));
 		outcount += dp->d_reclen;
 		dp = nextdp(dp);
 	}
@@ -1056,7 +1074,7 @@ again:
 		nfnp = cfnp->fn_next;
 		offset = cfnp->fn_offset;
 		if ((offset >= uiop->uio_offset) &&
-			(!(cfnp->fn_flags & MF_LOOKUP))) {
+		    (!(cfnp->fn_flags & MF_LOOKUP))) {
 			int reclen;
 
 			/*
@@ -1088,7 +1106,7 @@ again:
 			/* use strncpy(9f) to zero out uninitialized bytes */
 
 			(void) strncpy(dp->d_name, cfnp->fn_name,
-				DIRENT64_NAMELEN(reclen));
+			    DIRENT64_NAMELEN(reclen));
 			outcount += dp->d_reclen;
 			dp = nextdp(dp);
 		}
@@ -1097,6 +1115,7 @@ again:
 
 	if (outcount)
 		error = uiomove(outbuf, outcount, UIO_READ, uiop);
+
 	if (!error) {
 		if (reached_max) {
 			/*
@@ -1109,12 +1128,12 @@ again:
 			if (outcount == 0)
 				error = EINVAL;
 		} else if (autofs_nobrowse ||
-			auto_nobrowse_option(fnip->fi_opts) ||
-			(fnip->fi_flags & MF_DIRECT) ||
-			(fnp->fn_trigger != NULL) ||
-			(((vp->v_flag & VROOT) == 0) &&
-				((fntovn(fnp->fn_parent))->v_flag & VROOT) &&
-				(fnp->fn_dirents == NULL))) {
+		    auto_nobrowse_option(fnip->fi_opts) ||
+		    (fnip->fi_flags & MF_DIRECT) ||
+		    (fnp->fn_trigger != NULL) ||
+		    (((vp->v_flag & VROOT) == 0) &&
+		    ((fntovn(fnp->fn_parent))->v_flag & VROOT) &&
+		    (fnp->fn_dirents == NULL))) {
 			/*
 			 * done reading directory entries
 			 */
@@ -1132,7 +1151,7 @@ again:
 done:
 	kmem_free(outbuf, alloc_count);
 	AUTOFS_DPRINT((5, "auto_readdir vp=%p offset=%lld eof=%d\n",
-		(void *)vp, uiop->uio_loffset, myeof));
+	    (void *)vp, uiop->uio_loffset, myeof));
 	return (error);
 }
 

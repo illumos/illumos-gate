@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -41,6 +40,11 @@ extern "C" {
 #include <nfs/nfs4_clnt.h>
 #include <sys/thread.h>
 #include <sys/sysmacros.h>	/* for offsetof */
+
+typedef enum nfs4_stub_type {
+	NFS4_STUB_NONE,
+	NFS4_STUB_MIRRORMOUNT
+} nfs4_stub_type_t;
 
 typedef enum nfs4_access_type {
 	NFS4_ACCESS_UNKNOWN,
@@ -319,7 +323,9 @@ typedef struct rnode4 {
 	fattr4_fsid	r_srv_fsid;	/* fsid of srv fs containing object */
 					/* when rnode created; compare with */
 					/* sv_fsid (servinfo4_t) to see why */
-					/* R4SRVSTUB was set		    */
+					/* stub type was set		    */
+	nfs4_stub_type_t	r_stub_type;
+					/* e.g. mirror-mount */
 } rnode4_t;
 
 #define	r_vnode	r_svnode.sv_r_vnode
@@ -343,7 +349,6 @@ typedef struct rnode4 {
 #define	R4RECOVERR	0x2000	/* couldn't recover */
 #define	R4RECEXPFH	0x4000	/* recovering expired filehandle */
 #define	R4RECOVERRP	0x8000	/* R4RECOVERR pending, but not set (yet) */
-#define	R4SRVSTUB	0x10000	/* server stub / fs mntpnt */
 #define	R4ISXATTR	0x20000	/* rnode is a named attribute */
 #define	R4DELMAPLIST	0x40000	/* delmap callers tracked for as callback */
 #define	R4PGFLUSH	0x80000	/* page flush thread active */
@@ -353,6 +358,9 @@ typedef struct rnode4 {
  */
 #define	RTOV4(rp)	((rp)->r_vnode)
 #define	VTOR4(vp)	((rnode4_t *)((vp)->v_data))
+
+#define	RP_ISSTUB(rp)	(((rp)->r_stub_type != NFS4_STUB_NONE))
+#define	RP_ISSTUB_MIRRORMOUNT(rp) ((rp)->r_stub_type == NFS4_STUB_MIRRORMOUNT)
 
 /*
  * Open file instances.
@@ -473,6 +481,9 @@ extern void	rddir4_cache_purge(rnode4_t *);
 extern void	rddir4_cache_destroy(rnode4_t *);
 extern rddir4_cache *rddir4_cache_lookup(rnode4_t *, offset_t, int);
 extern void	rddir4_cache_rele(rnode4_t *, rddir4_cache *);
+
+extern void	r4_stub_mirrormount(rnode4_t *);
+extern void	r4_stub_none(rnode4_t *);
 
 #ifdef DEBUG
 extern char	*rddir4_cache_buf_alloc(size_t, int);

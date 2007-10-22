@@ -116,6 +116,13 @@ static int count;		/* number of iterations the stat is printed */
 #define	MAX_COLUMNS	80
 #define	MAX_PATHS	50	/* max paths that can be taken by -m */
 
+/*
+ * MI4_MIRRORMOUNT is canonically defined in nfs4_clnt.h, but we cannot
+ * include that file here.
+ */
+#define	MI4_MIRRORMOUNT 0x4000
+#define	NFS_V4		4
+
 static int req_width(kstat_t *, int);
 static int stat_width(kstat_t *, int);
 static char *path [MAX_PATHS] = {NULL};  /* array to store the multiple paths */
@@ -157,7 +164,7 @@ main(int argc, char *argv[])
 	int vflag = 0;		/* version specified, 0 specifies all */
 	int zflag = 0;		/* zero stats after printing */
 	char *split_line = "*******************************************"
-		"*************************************";
+	    "*************************************";
 
 	interval = 0;
 	count = 0;
@@ -226,7 +233,8 @@ main(int argc, char *argv[])
 	} else if (mflag) {
 
 		if (cflag || rflag || sflag || zflag || nflag || aflag || vflag)
-		    fail(0, "The -m flag may not be used with any other flags");
+			fail(0,
+			    "The -m flag may not be used with any other flags");
 
 		for (j = 0; (argc - optind > 0) && (j < (MAX_PATHS - 1)); j++) {
 			path[j] =  argv[optind];
@@ -238,8 +246,7 @@ main(int argc, char *argv[])
 		path[j] = NULL;
 		if (argc - optind > 0)
 			fprintf(stderr, "Only the first 50 paths "
-				"will be searched for\n");
-
+			    "will be searched for\n");
 	}
 
 	setup();
@@ -270,8 +277,8 @@ main(int argc, char *argv[])
 			    (rpc_clts_client_kstat == NULL ||
 			    nfs_client_kstat == NULL)) {
 				fprintf(stderr,
-					"nfsstat: kernel is not configured with"
-					" the client nfs and rpc code.\n");
+				    "nfsstat: kernel is not configured with"
+				    " the client nfs and rpc code.\n");
 			}
 			if (cflag || (!sflag && !cflag)) {
 				if (rflag || (!rflag && !nflag && !aflag))
@@ -537,7 +544,7 @@ req_width(kstat_t *req, int field_width)
 		else
 			per = 0;
 		(void) sprintf(fixlen, "%" PRIu64 " %d%%",
-				knp[i].value.ui64, per);
+		    knp[i].value.ui64, per);
 		len = strlen(fixlen) + 1;
 		if (field_width < len)
 			field_width = len;
@@ -577,15 +584,12 @@ cr_print(int zflag)
 		return;
 
 	stat_print("\nClient rpc:\nConnection oriented:",
-		    rpc_cots_client_kstat,
-		    &old_rpc_cots_client_kstat.kst, field_width,
-		    zflag);
+	    rpc_cots_client_kstat,
+	    &old_rpc_cots_client_kstat.kst, field_width, zflag);
 	stat_print("Connectionless:", rpc_clts_client_kstat,
-		    &old_rpc_clts_client_kstat.kst, field_width,
-		    zflag);
+	    &old_rpc_clts_client_kstat.kst, field_width, zflag);
 	stat_print("RDMA based:", rpc_rdma_client_kstat,
-		    &old_rpc_rdma_client_kstat.kst, field_width,
-		    zflag);
+	    &old_rpc_rdma_client_kstat.kst, field_width, zflag);
 }
 
 static void
@@ -598,14 +602,11 @@ sr_print(int zflag)
 		return;
 
 	stat_print("\nServer rpc:\nConnection oriented:", rpc_cots_server_kstat,
-		    &old_rpc_cots_server_kstat.kst, field_width,
-		    zflag);
+	    &old_rpc_cots_server_kstat.kst, field_width, zflag);
 	stat_print("Connectionless:", rpc_clts_server_kstat,
-		    &old_rpc_clts_server_kstat.kst, field_width,
-		    zflag);
+	    &old_rpc_clts_server_kstat.kst, field_width, zflag);
 	stat_print("RDMA based:", rpc_rdma_server_kstat,
-		    &old_rpc_rdma_server_kstat.kst, field_width,
-		    zflag);
+	    &old_rpc_rdma_server_kstat.kst, field_width, zflag);
 }
 
 static void
@@ -620,37 +621,35 @@ cn_print(int zflag, int vflag)
 	if (vflag == 0) {
 		kstat_sum(nfs_client_kstat, nfs4_client_kstat, ksum_kstat);
 		stat_print("\nClient nfs:", ksum_kstat, &old_ksum_kstat.kst,
-			    field_width, zflag);
+		    field_width, zflag);
 	}
 
 	if (vflag == 2 || vflag == 3) {
 		stat_print("\nClient nfs:", nfs_client_kstat,
-			    &old_nfs_client_kstat.kst,
-			    field_width, zflag);
+		    &old_nfs_client_kstat.kst, field_width, zflag);
 	}
 
 	if (vflag == 4) {
 		stat_print("\nClient nfs:", nfs4_client_kstat,
-			    &old_nfs4_client_kstat.kst,
-			    field_width, zflag);
+		    &old_nfs4_client_kstat.kst, field_width, zflag);
 	}
 
 	if (vflag == 2 || vflag == 0) {
 		field_width = getstats_rfsreq(2);
 		req_print(rfsreqcnt_v2_kstat, &old_rfsreqcnt_v2_kstat.kst,
-			    2, field_width, zflag);
+		    2, field_width, zflag);
 	}
 
 	if (vflag == 3 || vflag == 0) {
 		field_width = getstats_rfsreq(3);
 		req_print(rfsreqcnt_v3_kstat, &old_rfsreqcnt_v3_kstat.kst, 3,
-			    field_width, zflag);
+		    field_width, zflag);
 	}
 
 	if (vflag == 4 || vflag == 0) {
 		field_width = getstats_rfsreq(4);
 		req_print_v4(rfsreqcnt_v4_kstat, &old_rfsreqcnt_v4_kstat.kst,
-			    field_width, zflag);
+		    field_width, zflag);
 	}
 }
 
@@ -665,39 +664,35 @@ sn_print(int zflag, int vflag)
 
 	if (vflag == 2 || vflag == 0) {
 		stat_print("\nServer NFSv2:", nfs_server_v2_kstat,
-			    &old_nfs_server_v2_kstat.kst,
-			    field_width, zflag);
+		    &old_nfs_server_v2_kstat.kst, field_width, zflag);
 	}
 
 	if (vflag == 3 || vflag == 0) {
 		stat_print("\nServer NFSv3:", nfs_server_v3_kstat,
-			    &old_nfs_server_v3_kstat.kst,
-			    field_width, zflag);
+		    &old_nfs_server_v3_kstat.kst, field_width, zflag);
 	}
 
 	if (vflag == 4 || vflag == 0) {
 		stat_print("\nServer NFSv4:", nfs_server_v4_kstat,
-			    &old_nfs_server_v4_kstat.kst,
-			    field_width, zflag);
+		    &old_nfs_server_v4_kstat.kst, field_width, zflag);
 	}
 
 	if (vflag == 2 || vflag == 0) {
 		field_width = getstats_rfsproc(2);
 		req_print(rfsproccnt_v2_kstat, &old_rfsproccnt_v2_kstat.kst,
-			    2, field_width, zflag);
+		    2, field_width, zflag);
 	}
 
 	if (vflag == 3 || vflag == 0) {
 		field_width = getstats_rfsproc(3);
 		req_print(rfsproccnt_v3_kstat, &old_rfsproccnt_v3_kstat.kst,
-			    3, field_width, zflag);
-
+		    3, field_width, zflag);
 	}
 
 	if (vflag == 4 || vflag == 0) {
 		field_width = getstats_rfsproc(4);
 		req_print_v4(rfsproccnt_v4_kstat, &old_rfsproccnt_v4_kstat.kst,
-			    field_width, zflag);
+		    field_width, zflag);
 	}
 }
 
@@ -714,12 +709,12 @@ ca_print(int zflag, int vflag)
 
 	if (vflag == 2 || vflag == 0) {
 		req_print(aclreqcnt_v2_kstat, &old_aclreqcnt_v2_kstat.kst, 2,
-			    field_width, zflag);
+		    field_width, zflag);
 	}
 
 	if (vflag == 3 || vflag == 0) {
 		req_print(aclreqcnt_v3_kstat, &old_aclreqcnt_v3_kstat.kst,
-			    3, field_width, zflag);
+		    3, field_width, zflag);
 	}
 }
 
@@ -736,12 +731,12 @@ sa_print(int zflag, int vflag)
 
 	if (vflag == 2 || vflag == 0) {
 		req_print(aclproccnt_v2_kstat, &old_aclproccnt_v2_kstat.kst,
-			    2, field_width, zflag);
+		    2, field_width, zflag);
 	}
 
 	if (vflag == 3 || vflag == 0) {
 		req_print(aclproccnt_v3_kstat, &old_aclproccnt_v3_kstat.kst,
-			    3, field_width, zflag);
+		    3, field_width, zflag);
 	}
 }
 
@@ -749,7 +744,7 @@ sa_print(int zflag, int vflag)
 
 static void
 req_print(kstat_t *req, kstat_t *req_old, int ver, int field_width,
-	    int zflag)
+    int zflag)
 {
 	int i, j, nreq, per, ncolumns;
 	uint64_t tot, old_tot;
@@ -803,9 +798,9 @@ req_print(kstat_t *req, kstat_t *req_old, int ver, int field_width,
 			else
 				per = 0;
 			(void) sprintf(fixlen, "%" PRIu64 " %d%% ",
-				((interval && knp_old != NULL) ?
-				    (knp[j].value.ui64 - knp_old[j].value.ui64)
-				    : knp[j].value.ui64), per);
+			    ((interval && knp_old != NULL) ?
+			    (knp[j].value.ui64 - knp_old[j].value.ui64)
+			    : knp[j].value.ui64), per);
 			printf("%-*s", field_width, fixlen);
 		}
 		if (zflag) {
@@ -889,9 +884,9 @@ req_print_v4(kstat_t *req, kstat_t *req_old, int field_width, int zflag)
 			else
 				per = 0;
 			(void) sprintf(fixlen, "%" PRIu64 " %d%% ",
-				((interval && kptr_old != NULL) ?
-				    (knp[j].value.ui64 - kptr_old[j].value.ui64)
-				    : knp[j].value.ui64), per);
+			    ((interval && kptr_old != NULL) ?
+			    (knp[j].value.ui64 - kptr_old[j].value.ui64)
+			    : knp[j].value.ui64), per);
 			printf("%-*s", field_width, fixlen);
 		}
 		printf("\n");
@@ -912,9 +907,9 @@ req_print_v4(kstat_t *req, kstat_t *req_old, int field_width, int zflag)
 			else
 				per = 0;
 			(void) sprintf(fixlen, "%" PRIu64 " %d%% ",
-				((interval && kptr_old != NULL) ?
-				    (knp[j].value.ui64 - kptr_old[j].value.ui64)
-				    : knp[j].value.ui64), per);
+			    ((interval && kptr_old != NULL) ?
+			    (knp[j].value.ui64 - kptr_old[j].value.ui64)
+			    : knp[j].value.ui64), per);
 			printf("%-*s", field_width, fixlen);
 		}
 		printf("\n");
@@ -931,7 +926,7 @@ req_print_v4(kstat_t *req, kstat_t *req_old, int field_width, int zflag)
 
 static void
 stat_print(const char *title_string, kstat_t *req, kstat_t  *req_old,
-	    int field_width, int zflag)
+    int field_width, int zflag)
 {
 	int i, j, nreq, ncolumns;
 	char fixlen[128];
@@ -961,9 +956,9 @@ stat_print(const char *title_string, kstat_t *req, kstat_t  *req_old,
 		/* prints out the stat numbers */
 		for (j = i; j < MIN(i + ncolumns, nreq); j++) {
 			(void) sprintf(fixlen, "%" PRIu64 " ",
-				(interval && knp_old != NULL) ?
-				    (knp[j].value.ui64 - knp_old[j].value.ui64)
-				    : knp[j].value.ui64);
+			    (interval && knp_old != NULL) ?
+			    (knp[j].value.ui64 - knp_old[j].value.ui64)
+			    : knp[j].value.ui64);
 			printf("%-*s", field_width, fixlen);
 		}
 		printf("\n");
@@ -1050,7 +1045,7 @@ mi_print(void)
 		 * Check to see here if user gave a path(s) to
 		 * only show the mount point they wanted
 		 * Iterate through the list of paths the user gave and see
-		 * if any of them match the our current nfs mount
+		 * if any of them match our current nfs mount
 		 */
 		if (path[0] != NULL) {
 			found = 0;
@@ -1081,7 +1076,7 @@ mi_print(void)
 			 * So save the mount point now
 			 */
 			if ((mrp->ig_path = malloc(
-				    strlen(m.mnt_mountp) + 1)) == 0) {
+			    strlen(m.mnt_mountp) + 1)) == 0) {
 				fprintf(stderr, "nfsstat: not enough memory\n");
 				exit(1);
 			}
@@ -1122,7 +1117,7 @@ mi_print(void)
 				if (strcmp(mrp->ig_path, m.mnt_special) == 0) {
 					mrp->ig_path = 0;
 					(void) strcpy(mrp->my_dir,
-							m.mnt_mountp);
+					    m.mnt_mountp);
 				}
 			}
 		}
@@ -1221,13 +1216,18 @@ mi_print(void)
 		if (mik.mik_flags & MI_ACL)
 			printf(",acl");
 
+		if (mik.mik_vers >= NFS_V4) {
+			if (mik.mik_flags & MI4_MIRRORMOUNT)
+				printf(",mirrormount");
+		}
+
 		printf(",rsize=%d,wsize=%d,retrans=%d,timeo=%d",
-			mik.mik_curread, mik.mik_curwrite, mik.mik_retrans,
-			mik.mik_timeo);
+		    mik.mik_curread, mik.mik_curwrite, mik.mik_retrans,
+		    mik.mik_timeo);
 		printf("\n");
 		printf(" Attr cache:	acregmin=%d,acregmax=%d"
-			",acdirmin=%d,acdirmax=%d\n", mik.mik_acregmin,
-			mik.mik_acregmax, mik.mik_acdirmin, mik.mik_acdirmax);
+		    ",acdirmin=%d,acdirmax=%d\n", mik.mik_acregmin,
+		    mik.mik_acregmax, mik.mik_acdirmin, mik.mik_acdirmax);
 
 		if (transport_flag) {
 			printf(" Transport:	proto=rdma, plugin=%s\n",
@@ -1243,13 +1243,13 @@ mi_print(void)
 			j = (i == NFS_CALLTYPES ? i - 1 : i);
 			if (mik.mik_timers[j].srtt ||
 			    mik.mik_timers[j].rtxcur) {
-				printf(
-		" %s:     srtt=%d (%dms), dev=%d (%dms), cur=%u (%ums)\n",
-				timer_name[i],
-				srtt_to_ms(mik.mik_timers[i].srtt),
-				dev_to_ms(mik.mik_timers[i].deviate),
-				mik.mik_timers[i].rtxcur,
-				mik.mik_timers[i].rtxcur * 20);
+				printf(" %s:     srtt=%d (%dms), "
+				    "dev=%d (%dms), cur=%u (%ums)\n",
+				    timer_name[i],
+				    srtt_to_ms(mik.mik_timers[i].srtt),
+				    dev_to_ms(mik.mik_timers[i].deviate),
+				    mik.mik_timers[i].rtxcur,
+				    mik.mik_timers[i].rtxcur * 20);
 			}
 		}
 
@@ -1297,7 +1297,6 @@ ignore(char *opts)
 void
 usage(void)
 {
-
 	fprintf(stderr, "Usage: nfsstat [-cnrsza [-v version] "
 	    "[interval [count]]\n");
 	fprintf(stderr, "Usage: nfsstat -m [pathname..]\n");

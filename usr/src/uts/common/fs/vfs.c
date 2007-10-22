@@ -957,7 +957,7 @@ stripzonepath(const char *strpath)
 
 /*
  * Common mount code.  Called from the system call entry point, from autofs,
- * and from pxfs.
+ * nfsv4 trigger mounts, and from pxfs.
  *
  * Takes the effective file system type, mount arguments, the mount point
  * vnode, flags specifying whether the mount is a remount and whether it

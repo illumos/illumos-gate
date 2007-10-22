@@ -20,7 +20,8 @@
 #
 #
 # uts/sparc/nfs/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,6 +65,8 @@ MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 CFLAGS		+= $(CCVERBOSE)
+
+INC_PATH	+= -I$(SRC)/common
 
 #
 # For now, disable these lint checks; maintainers should endeavor

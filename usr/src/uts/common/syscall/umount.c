@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +50,72 @@
 #include <sys/policy.h>
 #include <sys/zone.h>
 
+#define	UMOUNT2_SET_ERRNO(e, is_syscall) ((is_syscall) ? set_errno((e)) : (e))
+
+/*
+ * The heart of the umount2 call - it is pulled out to allow kernel
+ * level particpation when the only reference is the vfs pointer.
+ *
+ * Note that some of the callers may not be in the context of a
+ * syscall (created by zthread_create() for example) and as such
+ * may not have an associated curthread->t_lwp. This is handled
+ * by is_syscall.
+ */
+int
+umount2_engine(vfs_t *vfsp, int flag, cred_t *cr, int is_syscall)
+{
+	int	error;
+
+	/*
+	 * Protect the call to vn_vfswlock() with the vfs reflock.  This
+	 * ensures vfs_vnodecovered will either be NULL (because someone
+	 * beat us to the umount) or valid (because vfs_lock() prevents
+	 * another umount from getting through here until we've called
+	 * vn_vfswlock() on the covered vnode).
+	 *
+	 * At one point, we did the non-blocking version (vfs_lock()),
+	 * and if it failed, bailed out with EBUSY.  However, dounmount()
+	 * calls vfs_lock_wait() and we drop the vfs lock before calling
+	 * dounmount(), so there's no difference between waiting here
+	 * for the lock or waiting there because grabbed it as soon as
+	 * we drop it below.  No returning with EBUSY at this point
+	 * reduces the number of spurious unmount failures that happen
+	 * as a side-effect of fsflush() and other mount and unmount
+	 * operations that might be going on simultaneously.
+	 */
+	vfs_lock_wait(vfsp);
+
+	/*
+	 * Call vn_vfswlock() on the covered vnode so that dounmount()
+	 * can do its thing.  It will call the corresponding vn_vfsunlock().
+	 * Note that vfsp->vfs_vnodecovered can be NULL here, either because
+	 * someone did umount on "/" or because someone beat us to the umount
+	 * before we did the vfs_lock() above.  In these cases, vn_vfswlock()
+	 * returns EBUSY and we just pass that up.  Also note that we're
+	 * looking at a vnode without doing a VN_HOLD() on it.  This is
+	 * safe because it can't go away while something is mounted on it
+	 * and we're locking out other umounts at this point.
+	 */
+	if (vn_vfswlock(vfsp->vfs_vnodecovered)) {
+		vfs_unlock(vfsp);
+		VFS_RELE(vfsp);
+		return (UMOUNT2_SET_ERRNO(EBUSY, is_syscall));
+	}
+
+	/*
+	 * Now that the VVFSLOCK in the covered vnode is protecting this
+	 * path, we don't need the vfs reflock or the hold on the vfs anymore.
+	 */
+	vfs_unlock(vfsp);
+	VFS_RELE(vfsp);
+
+	/*
+	 * Perform the unmount.
+	 */
+	if ((error = dounmount(vfsp, flag, cr)) != 0)
+		return (UMOUNT2_SET_ERRNO(error, is_syscall));
+	return (0);
+}
 
 /*
  * New umount() system call (for force unmount flag and perhaps others later).
@@ -126,55 +191,7 @@ umount2(char *pathp, int flag)
 	}
 	pn_free(&pn);
 
-	/*
-	 * Protect the call to vn_vfswlock() with the vfs reflock.  This
-	 * ensures vfs_vnodecovered will either be NULL (because someone
-	 * beat us to the umount) or valid (because vfs_lock() prevents
-	 * another umount from getting through here until we've called
-	 * vn_vfswlock() on the covered vnode).
-	 *
-	 * At one point, we did the non-blocking version (vfs_lock()),
-	 * and if it failed, bailed out with EBUSY.  However, dounmount()
-	 * calls vfs_lock_wait() and we drop the vfs lock before calling
-	 * dounmount(), so there's no difference between waiting here
-	 * for the lock or waiting there because grabbed it as soon as
-	 * we drop it below.  No returning with EBUSY at this point
-	 * reduces the number of spurious unmount failures that happen
-	 * as a side-effect of fsflush() and other mount and unmount
-	 * operations that might be going on simultaneously.
-	 */
-	vfs_lock_wait(vfsp);
-
-	/*
-	 * Call vn_vfswlock() on the covered vnode so that dounmount()
-	 * can do its thing.  It will call the corresponding vn_vfsunlock().
-	 * Note that vfsp->vfs_vnodecovered can be NULL here, either because
-	 * someone did umount on "/" or because someone beat us to the umount
-	 * before we did the vfs_lock() above.  In these cases, vn_vfswlock()
-	 * returns EBUSY and we just pass that up.  Also note that we're
-	 * looking at a vnode without doing a VN_HOLD() on it.  This is
-	 * safe because it can't go away while something is mounted on it
-	 * and we're locking out other umounts at this point.
-	 */
-	if (vn_vfswlock(vfsp->vfs_vnodecovered)) {
-		vfs_unlock(vfsp);
-		VFS_RELE(vfsp);
-		return (set_errno(EBUSY));
-	}
-
-	/*
-	 * Now that the VVFSLOCK in the covered vnode is protecting this
-	 * path, we don't need the vfs reflock or the hold on the vfs anymore.
-	 */
-	vfs_unlock(vfsp);
-	VFS_RELE(vfsp);
-
-	/*
-	 * Perform the unmount.
-	 */
-	if ((error = dounmount(vfsp, flag, CRED())) != 0)
-		return (set_errno(error));
-	return (0);
+	return (umount2_engine(vfsp, flag, CRED(), 1));
 }
 
 /*

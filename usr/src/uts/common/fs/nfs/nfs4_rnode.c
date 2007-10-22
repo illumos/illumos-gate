@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,7 @@ static void	nfs4_reclaim(void *);
 static int	isrootfh(nfs4_sharedfh_t *, rnode4_t *);
 static void	uninit_rnode4(rnode4_t *);
 static void	destroy_rnode4(rnode4_t *);
+static void	r4_stub_set(rnode4_t *, nfs4_stub_type_t);
 
 #ifdef DEBUG
 static int r4_check_for_dups = 0; /* Flag to enable dup rnode detection. */
@@ -303,7 +304,7 @@ badrootfh_check(nfs4_sharedfh_t *fh, nfs4_fname_t *nm, mntinfo4_t *mi,
 	ASSERT(strcmp(s, "..") != 0);
 
 	if ((s[0] == '.' && s[1] == '\0') && fh &&
-					!SFH4_SAME(mi->mi_rootfh, fh)) {
+	    !SFH4_SAME(mi->mi_rootfh, fh)) {
 #ifdef DEBUG
 		nfs4_fhandle_t fhandle;
 
@@ -316,13 +317,13 @@ badrootfh_check(nfs4_sharedfh_t *fh, nfs4_fname_t *nm, mntinfo4_t *mi,
 		/* print the bad fh */
 		fhandle.fh_len = fh->sfh_fh.nfs_fh4_len;
 		bcopy(fh->sfh_fh.nfs_fh4_val, fhandle.fh_buf,
-			fhandle.fh_len);
+		    fhandle.fh_len);
 		nfs4_printfhandle(&fhandle);
 
 		/* print mi_rootfh */
 		fhandle.fh_len = mi->mi_rootfh->sfh_fh.nfs_fh4_len;
 		bcopy(mi->mi_rootfh->sfh_fh.nfs_fh4_val, fhandle.fh_buf,
-			fhandle.fh_len);
+		    fhandle.fh_len);
 		nfs4_printfhandle(&fhandle);
 #endif
 		/* use mi_rootfh instead; fh will be rele by the caller */
@@ -338,6 +339,7 @@ void
 r4_do_attrcache(vnode_t *vp, nfs4_ga_res_t *garp, int newnode,
     hrtime_t t, cred_t *cr, int index)
 {
+	int is_stub;
 	vattr_t *attr;
 	/*
 	 * Don't add to attrcache if time overflow, but
@@ -354,9 +356,9 @@ r4_do_attrcache(vnode_t *vp, nfs4_ga_res_t *garp, int newnode,
 			if (vp->v_type != attr->va_type &&
 			    vp->v_type != VNON && attr->va_type != VNON) {
 				zcmn_err(VTOMI4(vp)->mi_zone->zone_id, CE_WARN,
-					"makenfs4node: type (%d) doesn't "
-					"match type of found node at %p (%d)",
-					attr->va_type, (void *)vp, vp->v_type);
+				    "makenfs4node: type (%d) doesn't "
+				    "match type of found node at %p (%d)",
+				    attr->va_type, (void *)vp, vp->v_type);
 			}
 #endif
 			nfs4_attr_cache(vp, garp, t, cr, TRUE, NULL);
@@ -368,38 +370,46 @@ r4_do_attrcache(vnode_t *vp, nfs4_ga_res_t *garp, int newnode,
 
 			/*
 			 * Turn this object into a "stub" object if we
-			 * crossed an underlying server fs boundary.  To
-			 * make this check, during mount we save the
+			 * crossed an underlying server fs boundary.
+			 * To make this check, during mount we save the
 			 * fsid of the server object being mounted.
 			 * Here we compare this object's server fsid
 			 * with the fsid we saved at mount.  If they
 			 * are different, we crossed server fs boundary.
 			 *
-			 * The stub flag is set (or not) at rnode
+			 * The stub type is set (or not) at rnode
 			 * creation time and it never changes for life
-			 * of rnode.
+			 * of the rnode.
 			 *
-			 * We don't bother with taking r_state_lock
-			 * to set R4SRVSTUB flag because this is a new
-			 * rnode and we're holding rtable lock.  No other
-			 * thread could have obtained access to this
-			 * rnode.
+			 * The stub type is also set during RO failover,
+			 * nfs4_remap_file().
+			 *
+			 * This stub will be for a mirror-mount.
+			 *
+			 * We don't bother with taking r_state_lock to
+			 * set the stub type because this is a new rnode
+			 * and we're holding the hash bucket r_lock RW_WRITER.
+			 * No other thread could have obtained access
+			 * to this rnode.
 			 */
+			is_stub = 0;
 			if (garp->n4g_fsid_valid) {
-				rp->r_srv_fsid = garp->n4g_fsid;
+				fattr4_fsid ga_fsid = garp->n4g_fsid;
+				servinfo4_t *svp = rp->r_server;
 
-				if (vp->v_type == VDIR) {
-					servinfo4_t *svp = rp->r_server;
+				rp->r_srv_fsid = ga_fsid;
 
-					(void) nfs_rw_enter_sig(&svp->sv_lock,
-								RW_READER, 0);
-					if (!FATTR4_FSID_EQ(&garp->n4g_fsid,
-							    &svp->sv_fsid)) {
-						rp->r_flags |= R4SRVSTUB;
-					}
-					nfs_rw_exit(&svp->sv_lock);
-				}
+				(void) nfs_rw_enter_sig(&svp->sv_lock,
+				    RW_READER, 0);
+				if (!FATTR4_FSID_EQ(&ga_fsid, &svp->sv_fsid))
+					is_stub = 1;
+				nfs_rw_exit(&svp->sv_lock);
 			}
+
+			if (is_stub)
+				r4_stub_mirrormount(rp);
+			else
+				r4_stub_none(rp);
 
 			/* Can not cache partial attr */
 			if (attr->va_mask == AT_ALL)
@@ -427,8 +437,8 @@ r4_do_attrcache(vnode_t *vp, nfs4_ga_res_t *garp, int newnode,
 
 vnode_t *
 makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
-	nfs4_fname_t **npp, nfs4_ga_res_t *garp,
-	mntinfo4_t *mi, cred_t *cr, hrtime_t t)
+    nfs4_fname_t **npp, nfs4_ga_res_t *garp,
+    mntinfo4_t *mi, cred_t *cr, hrtime_t t)
 {
 	vfs_t *vfsp = mi->mi_vfsp;
 	int newnode = 0;
@@ -480,7 +490,7 @@ makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
  */
 vnode_t *
 makenfs4node(nfs4_sharedfh_t *fh, nfs4_ga_res_t *garp, struct vfs *vfsp,
-	hrtime_t t, cred_t *cr, vnode_t *dvp, nfs4_fname_t *nm)
+    hrtime_t t, cred_t *cr, vnode_t *dvp, nfs4_fname_t *nm)
 {
 	vnode_t *vp;
 	int newnode;
@@ -775,7 +785,7 @@ rp4_addfree(rnode4_t *rp, cred_t *cr)
 		 */
 		if (rp->r_deleg_type != OPEN_DELEGATE_NONE) {
 			(void) nfs4delegreturn(rp,
-				NFS4_DR_FORCE|NFS4_DR_PUSH|NFS4_DR_REOPEN);
+			    NFS4_DR_FORCE|NFS4_DR_PUSH|NFS4_DR_REOPEN);
 		}
 
 		r4inactive(rp, cr);
@@ -838,7 +848,7 @@ again:
 	if (rp->r_deleg_type != OPEN_DELEGATE_NONE) {
 		rw_exit(&rp->r_hashq->r_lock);
 		(void) nfs4delegreturn(rp,
-			NFS4_DR_FORCE|NFS4_DR_PUSH|NFS4_DR_REOPEN);
+		    NFS4_DR_FORCE|NFS4_DR_PUSH|NFS4_DR_REOPEN);
 		goto again;
 	}
 
@@ -986,7 +996,6 @@ rp4_rmhash_locked(rnode4_t *rp)
 void
 rp4_rmhash(rnode4_t *rp)
 {
-
 	rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 	rp4_rmhash_locked(rp);
 	rw_exit(&rp->r_hashq->r_lock);
@@ -1102,7 +1111,7 @@ check_rtable4(struct vfs *vfsp)
 				if (rp->r_freef == NULL) {
 					busy = "not on free list";
 				} else if (nfs4_has_pages(vp) &&
-					    (rp->r_flags & R4DIRTY)) {
+				    (rp->r_flags & R4DIRTY)) {
 					busy = "dirty pages";
 				} else if (rp->r_count > 0) {
 					busy = "r_count > 0";
@@ -1131,7 +1140,7 @@ check_rtable4(struct vfs *vfsp)
 /*
  * Destroy inactive vnodes from the hash queues which
  * belong to this vfs. All of the vnodes should be inactive.
- * It is essential that we destory all rnodes in case of
+ * It is essential that we destroy all rnodes in case of
  * forced unmount as well as in normal unmount case.
  */
 
@@ -1539,7 +1548,6 @@ nfs4_rnode_reclaim(void)
 static void
 nfs4_reclaim(void *cdrarg)
 {
-
 #ifdef DEBUG
 	clstat4_debug.reclaim.value.ui64++;
 #endif
@@ -1679,14 +1687,14 @@ r4mkopenlist(mntinfo4_t *mi)
 				 * Add a new open instance to the list
 				 */
 				rep = kmem_zalloc(sizeof (*reopenlist),
-					KM_SLEEP);
+				    KM_SLEEP);
 				rep->re_next = reopenlist;
 				reopenlist = rep;
 
 				rep->re_vp = vp;
 				rep->re_osp = kmem_zalloc(
-					numosp * sizeof (*(rep->re_osp)),
-					KM_SLEEP);
+				    numosp * sizeof (*(rep->re_osp)),
+				    KM_SLEEP);
 				rep->re_numosp = numosp;
 
 				j = 0;
@@ -1724,7 +1732,7 @@ r4mkopenlist(mntinfo4_t *mi)
 				 */
 				if (numosp > 0)
 					rp->r_deleg_needs_recovery =
-							rp->r_deleg_type;
+					    rp->r_deleg_type;
 			}
 			/* Save the delegation type for use outside the lock */
 			dtype = rp->r_deleg_type;
@@ -1758,7 +1766,7 @@ r4releopenlist(nfs4_opinst_t *reopenp)
 		next = rep->re_next;
 
 		for (i = 0; i < rep->re_numosp; i++)
-		    open_stream_rele(rep->re_osp[i], VTOR4(rep->re_vp));
+			open_stream_rele(rep->re_osp[i], VTOR4(rep->re_vp));
 
 		VN_RELE(rep->re_vp);
 		kmem_free(rep->re_osp,
@@ -1838,6 +1846,45 @@ isrootfh(nfs4_sharedfh_t *fh, rnode4_t *rp)
 		isroot = 1;
 
 	return (isroot);
+}
+
+/*
+ * The r4_stub_* routines assume that the rnode is newly activated, and
+ * that the caller either holds the hash bucket r_lock for this rnode as
+ * RW_WRITER, or holds r_statelock.
+ */
+static void
+r4_stub_set(rnode4_t *rp, nfs4_stub_type_t type)
+{
+	vnode_t *vp = RTOV4(rp);
+	krwlock_t *hash_lock = &rp->r_hashq->r_lock;
+
+	ASSERT(RW_WRITE_HELD(hash_lock) || MUTEX_HELD(&rp->r_statelock));
+
+	rp->r_stub_type = type;
+
+	/*
+	 * Safely switch this vnode to the trigger vnodeops.
+	 *
+	 * Currently, we don't ever switch a trigger vnode back to using
+	 * "regular" v4 vnodeops. NFS4_STUB_NONE is only used to note that
+	 * a new v4 object is not a trigger, and it will already have the
+	 * correct v4 vnodeops by default. So, no "else" case required here.
+	 */
+	if (type != NFS4_STUB_NONE)
+		vn_setops(vp, nfs4_trigger_vnodeops);
+}
+
+void
+r4_stub_mirrormount(rnode4_t *rp)
+{
+	r4_stub_set(rp, NFS4_STUB_MIRRORMOUNT);
+}
+
+void
+r4_stub_none(rnode4_t *rp)
+{
+	r4_stub_set(rp, NFS4_STUB_NONE);
 }
 
 #ifdef DEBUG

@@ -869,7 +869,7 @@ NFS_OBJS +=	nfs_client.o	nfs_common.o	nfs_dump.o \
 		nfs4_acache.o	nfs4_common.o	nfs4_client_state.o \
 		nfs4_callback.o	nfs4_recovery.o nfs4_client_secinfo.o \
 		nfs4_client_debug.o	nfs_stats.o \
-		nfs4_acl.o
+		nfs4_acl.o	nfs4_stub_vnops.o
 
 NFSSRV_OBJS +=	nfs_server.o	nfs_srv.o	nfs3_srv.o \
 		nfs_acl_srv.o	nfs_auth.o	nfs_auth_xdr.o \

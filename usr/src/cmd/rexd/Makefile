@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,8 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 SRCS=		$(PROG:%=%.c)
 
 #OBJS=		errprintf.o mount_nfs.o rex_xdr.o unix_login.o mntent.o
-OBJS=		errprintf.o mount_nfs.o rex.o unix_login.o mntent.o
+TYPEOBJS=	nfs_subr.o
+OBJS=		errprintf.o mount_nfs.o rex.o unix_login.o mntent.o $(TYPEOBJS)
 REXDOBJS=	rpc.rexd.o errprintf.o mount_nfs.o rex.o unix_login.o mntent.o
 ONOBJS= 	on.o sharetab.o where.o rex.o mntent.o
 #WHEREOBJS=	sharetab.o where.o where_main.o mntent.o
@@ -57,6 +58,8 @@ CPPFLAGS =	-I. $(CPPFLAGS.master)
 
 LDLIBS +=	-lsocket -lnsl
 rpc.rexd :=	LDLIBS += -lrpcsvc -lbsm -lpam
+
+TYPESRCS=	../nfs/lib/nfs_subr.c
 
 # install rule
 # don't re-install directories created by Targetdirs
@@ -113,3 +116,6 @@ rpc.rexd.o:		rex.h
 unix_login.o:	rex.h
 
 rex.o:		rex.h
+
+nfs_subr.o:	../fs.d/nfs/lib/nfs_subr.c
+	$(COMPILE.c)  ../fs.d/nfs/lib/nfs_subr.c

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	nfs_subr.c
- *
- *	Copyright (c) 1996 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +32,11 @@
 #include <sys/utsname.h>
 #include <nfs/nfs.h>
 #include "nfs_subr.h"
+#include <errno.h>
+#include <deflt.h>
+
+#include <nfs/nfssys.h>
+extern int _nfssys(enum nfssys_op, void *);
 
 /*
  * This function is added to detect compatibility problem with SunOS4.x.
@@ -75,8 +77,8 @@ remote_lock(char *fshost, caddr_t fh)
 		return (0);
 
 	rpc_stat = clnt_call(cl, NLM_GRANTED,
-			xdr_nlm_testargs, (caddr_t)&rlm_args,
-			xdr_nlm_res, (caddr_t)&rlm_res, timeout);
+	    xdr_nlm_testargs, (caddr_t)&rlm_args,
+	    xdr_nlm_res, (caddr_t)&rlm_res, timeout);
 	clnt_destroy(cl);
 
 	return (rpc_stat == RPC_CANTDECODEARGS);
@@ -241,4 +243,35 @@ convert_special(char **specialp, char *host, char *oldpath, char *newpath,
 
 	free(url);
 	return (0);
+}
+
+/*
+ * Solaris autofs configuration file location
+ */
+#define	AUTOFSADMIN		"/etc/default/autofs"
+#define	AUTOFS_MOUNT_TIMEOUT	600	/* default min time mount will */
+
+void
+set_nfsv4_ephemeral_mount_to(void)
+{
+	char	*defval;
+
+	uint_t	mount_to = AUTOFS_MOUNT_TIMEOUT;
+
+	/*
+	 * Get the value from /etc/default/autofs
+	 */
+	if ((defopen(AUTOFSADMIN)) == 0) {
+		if ((defval = defread("AUTOMOUNT_TIMEOUT=")) != NULL) {
+			errno = 0;
+			mount_to = strtoul(defval, (char **)NULL, 10);
+			if (errno != 0)
+				mount_to = AUTOFS_MOUNT_TIMEOUT;
+		}
+
+		/* close defaults file */
+		defopen(NULL);
+	}
+
+	(void) _nfssys(NFS4_EPHEMERAL_MOUNT_TO, &mount_to);
 }

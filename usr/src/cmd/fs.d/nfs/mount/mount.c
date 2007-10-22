@@ -82,6 +82,9 @@
 #include "webnfs.h"
 #include <rpcsvc/nfs4_prot.h>
 
+#include <nfs/nfssys.h>
+extern int _nfssys(enum nfssys_op, void *);
+
 #ifndef	NFS_VERSMAX
 #define	NFS_VERSMAX	4
 #endif
@@ -175,6 +178,8 @@ static seconfig_t nfs_sec;
 static int sec_opt = 0;	/* any security option ? */
 static bool_t snego_done;
 static void sigusr1(int);
+
+extern void set_nfsv4_ephemeral_mount_to(void);
 
 /*
  * list of support services needed
@@ -320,13 +325,13 @@ main(int argc, char *argv[])
 	 */
 	read_default();
 	if (vers_min_default > vers_max_default ||
-		vers_min_default < NFS_VERSMIN ||
-		vers_max_default > NFS_VERSMAX) {
+	    vers_min_default < NFS_VERSMIN ||
+	    vers_max_default > NFS_VERSMAX) {
 		pr_err("%s %s\n%s %s\n",
-			gettext("Incorrect configuration of client\'s"),
-			NFSADMIN,
-			gettext("NFS_CLIENT_VERSMIN or NFS_CLIENT_VERSMAX"),
-			gettext("is either out of range or overlaps."));
+		    gettext("Incorrect configuration of client\'s"),
+		    NFSADMIN,
+		    gettext("NFS_CLIENT_VERSMIN or NFS_CLIENT_VERSMAX"),
+		    gettext("is either out of range or overlaps."));
 	}
 
 	SET_ERR_RET(&retry_error, ERR_PROTO_NONE, 0);
@@ -482,7 +487,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 				cb = strchr(host, ']');
 				if (cb == NULL) {
 					pr_err(gettext(
-						"illegal nfs url syntax\n"));
+					    "illegal nfs url syntax\n"));
 					last_error = RET_ERR;
 					goto out;
 				} else {
@@ -491,7 +496,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 					cb++;
 					if (*cb == ':')
 						port = htons((ushort_t)
-							atoi(cb+1));
+						    atoi(cb+1));
 				}
 			} else {
 				sport = strchr(host, ':');
@@ -534,14 +539,14 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 
 		if (replicated && !(mntflags & MS_RDONLY)) {
 			pr_err(gettext(
-				"replicated mounts must be read-only\n"));
+			    "replicated mounts must be read-only\n"));
 			last_error = RET_ERR;
 			goto out;
 		}
 
 		if (replicated && (argp->flags & NFSMNT_SOFT)) {
 			pr_err(gettext(
-				"replicated mounts must not be soft\n"));
+			    "replicated mounts must not be soft\n"));
 			last_error = RET_ERR;
 			goto out;
 		}
@@ -557,7 +562,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 		 */
 		if ((use_pubfh == TRUE) || (url == TRUE)) {
 			r = get_fh_via_pub(argp, host, path, url, use_pubfh,
-				&vers, &nconf, port);
+			    &vers, &nconf, port);
 
 			if (r != RET_OK) {
 				/*
@@ -597,7 +602,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 				loud_on_mnt_err = TRUE;
 
 			r = get_fh(argp, host, path, &vers,
-				loud_on_mnt_err, &nconf, port);
+			    loud_on_mnt_err, &nconf, port);
 
 			if (r != RET_OK) {
 
@@ -622,7 +627,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 					strcat(newpath, path);
 
 					r = get_fh(argp, host, newpath, &vers,
-						TRUE, &nconf, port);
+					    TRUE, &nconf, port);
 
 					if (r == RET_OK)
 						path = newpath;
@@ -669,7 +674,7 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 			    host, path);
 			(void) fprintf(stderr, gettext(
 			    " contact admin to install server change\n"));
-				argp->flags |= NFSMNT_LLOCK;
+			argp->flags |= NFSMNT_LLOCK;
 		}
 
 		if (self_check(host))
@@ -684,8 +689,8 @@ mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 			if (!(argp->flags & NFSMNT_KNCONF)) {
 				nconf = NULL;
 				if (r = getaddr_nfs(argp, host, &nconf,
-					FALSE, path, port, retry_error,
-					TRUE)) {
+				    FALSE, path, port, retry_error,
+				    TRUE)) {
 						last_error = r;
 						goto out;
 				}
@@ -760,19 +765,25 @@ cont:
 	if (!qflg)
 		saveopts = strdup(mntp->mnt_mntopts);
 
+	/*
+	 * And make sure that we have the ephemeral mount_to
+	 * set for this zone.
+	 */
+	set_nfsv4_ephemeral_mount_to();
+
 	if (mount(mntp->mnt_special, mntp->mnt_mountp, mntflags, fstype, args,
-		sizeof (*args), mntp->mnt_mntopts, MAX_MNTOPT_STR) < 0) {
+	    sizeof (*args), mntp->mnt_mntopts, MAX_MNTOPT_STR) < 0) {
 		if (errno != ENOENT) {
 			pr_err(gettext("mount: %s: %s\n"),
-				mntp->mnt_mountp, strerror(errno));
+			    mntp->mnt_mountp, strerror(errno));
 		} else {
 			struct stat sb;
 			if (stat(mntp->mnt_mountp, &sb) < 0 && errno == ENOENT)
 				pr_err(gettext("mount: %s: %s\n"),
-					mntp->mnt_mountp, strerror(ENOENT));
+				    mntp->mnt_mountp, strerror(ENOENT));
 			else
 				pr_err("%s: %s\n", mntp->mnt_special,
-					strerror(ENOENT));
+				    strerror(ENOENT));
 		}
 
 		last_error = RET_ERR;
@@ -1027,9 +1038,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 
 		case OPT_SECURE:
 			if (nfs_getseconfig_byname("dh", &nfs_sec)) {
-			    pr_err(gettext("can not get \"dh\" from %s\n"),
-						NFSSEC_CONF);
-			    goto badopt;
+				pr_err(gettext("can not get \"dh\" from %s\n"),
+				    NFSSEC_CONF);
+				goto badopt;
 			}
 			sec_opt++;
 			break;
@@ -1070,7 +1081,7 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			if (bad(val))
 				goto badopt;
 			args->acdirmin = args->acregmin = args->acdirmax
-				= args->acregmax = atoi(val);
+			    = args->acregmax = atoi(val);
 			break;
 		case OPT_ACREGMIN:
 			args->flags |= NFSMNT_ACREGMIN;
@@ -1130,12 +1141,15 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 
 			(void) strncpy(nfs_proto, val, strlen(val)+1);
 			break;
+
 		case OPT_NOPRINT:
 			args->flags |= NFSMNT_NOPRINT;
 			break;
+
 		case OPT_LARGEFILES:
 			largefiles = 1;
 			break;
+
 		case OPT_NOLARGEFILES:
 			pr_err(gettext("NFS can't support \"nolargefiles\"\n"));
 			free(optstr);
@@ -1143,9 +1157,9 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 
 		case OPT_SEC:
 			if (nfs_getseconfig_byname(val, &nfs_sec)) {
-			    pr_err(gettext("can not get \"%s\" from %s\n"),
-						val, NFSSEC_CONF);
-			    return (RET_ERR);
+				pr_err(gettext("can not get \"%s\" from %s\n"),
+				    val, NFSSEC_CONF);
+				return (RET_ERR);
 			}
 			sec_opt++;
 			break;
@@ -1244,18 +1258,18 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 	 */
 	if (!snego_done && !sec_opt) {
 		/*
-		 *  Get default security mode.
-		 *  AUTH_UNIX has been the default choice for a long time.
-		 *  The better NFS security service becomes, the better chance
-		 *  we will set stronger security service as the default NFS
-		 *  security mode.
-		 *
+		 * Get default security mode.
+		 * AUTH_UNIX has been the default choice for a long time.
+		 * The better NFS security service becomes, the better chance
+		 * we will set stronger security service as the default NFS
+		 * security mode.
 		 */
-	    if (nfs_getseconfig_default(&nfs_sec)) {
-		pr_err(gettext("error getting default security entry\n"));
-		return (-1);
-	    }
-	    args->flags |= NFSMNT_SECDEFAULT;
+		if (nfs_getseconfig_default(&nfs_sec)) {
+			pr_err(gettext("error getting default"
+			    " security entry\n"));
+			return (-1);
+		}
+		args->flags |= NFSMNT_SECDEFAULT;
 	}
 
 	/*
@@ -1280,10 +1294,9 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 		 * If using the public fh or nfsv4, we will not contact the
 		 * remote RPCBINDer, since it is possibly behind a firewall.
 		 */
-		if (use_pubfh == FALSE && vers != NFS_V4) {
+		if (use_pubfh == FALSE && vers != NFS_V4)
 			syncaddr = get_the_addr(hostname, RPCBPROG, RPCBVERS,
-				nconf, 0, NULL, NULL, FALSE, NULL, NULL);
-		}
+			    nconf, 0, NULL, NULL, FALSE, NULL, NULL);
 
 		if (syncaddr != NULL) {
 			/* for flags in sec_data */
@@ -1298,9 +1311,9 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 			error = netdir_getbyname(nconf, &hs, &retaddrs);
 
 			if (error != ND_OK && (nfs_sec.sc_rpcnum == AUTH_DH)) {
-			    pr_err(gettext("%s: secure: no time service\n"),
-						hostname);
-			    return (-1);
+				pr_err(gettext("%s: secure: no time service\n"),
+				    hostname);
+				return (-1);
 			}
 
 			if (error == ND_OK)
@@ -1312,15 +1325,15 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 			 * and netname data.
 			 */
 			if (vers == NFS_V4 && syncaddr &&
-				    host2netname(netname, hostname, NULL)) {
-			    args->syncaddr = malloc(sizeof (struct netbuf));
-			    args->syncaddr->buf = malloc(syncaddr->len);
-			    (void) memcpy(args->syncaddr->buf, syncaddr->buf,
-							syncaddr->len);
-			    args->syncaddr->len = syncaddr->len;
-			    args->syncaddr->maxlen = syncaddr->maxlen;
-			    args->netname = strdup(netname);
-			    args->flags |= NFSMNT_SECURE;
+			    host2netname(netname, hostname, NULL)) {
+				args->syncaddr = malloc(sizeof (struct netbuf));
+				args->syncaddr->buf = malloc(syncaddr->len);
+				(void) memcpy(args->syncaddr->buf,
+				    syncaddr->buf, syncaddr->len);
+				args->syncaddr->len = syncaddr->len;
+				args->syncaddr->maxlen = syncaddr->maxlen;
+				args->netname = strdup(netname);
+				args->flags |= NFSMNT_SECURE;
 			}
 		}
 	}
@@ -1332,7 +1345,7 @@ make_secure(struct nfs_args *args, char *hostname, struct netconfig *nconf,
 	 * extended data structure.
 	 */
 	if (!(secdata = nfs_clnt_secdata(&nfs_sec, hostname, args->knconf,
-					syncaddr, flags))) {
+	    syncaddr, flags))) {
 		pr_err(gettext("errors constructing security related data\n"));
 		if (flags & AUTH_F_RPCTIMESYNC) {
 			free(syncaddr->buf);
@@ -1382,11 +1395,11 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 		return (NULL);
 
 	if ((fd = t_open(nconf->nc_device, O_RDWR, tinfo)) == -1)
-		    goto done;
+		goto done;
 
 	/* LINTED pointer alignment */
 	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR))
-		== NULL)
+	    == NULL)
 		goto done;
 
 	/*
@@ -1402,7 +1415,7 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 		/* NFS where vers==4 does not support UDP */
 		if (vers == NFS_V4 &&
 		    strncasecmp(nconf->nc_proto, NC_UDP,
-				strlen(NC_UDP)) == 0) {
+		    strlen(NC_UDP)) == 0) {
 			SET_ERR_RET(error, ERR_PROTO_UNSUPP, 0);
 			goto done;
 		}
@@ -1425,7 +1438,7 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 			goto done;
 		}
 		memcpy(tbind->addr.buf, retaddrs->n_addrs->buf,
-			retaddrs->n_addrs->len);
+		    retaddrs->n_addrs->len);
 		tbind->addr.len = retaddrs->n_addrs->len;
 		netdir_free((void *)retaddrs, ND_ADDRLIST);
 		(void) netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL);
@@ -1441,10 +1454,10 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 		/* LINTED pointer alignment */
 		if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
 			((struct sockaddr_in *)tbind->addr.buf)->sin_port
-				= port;
+			    = port;
 		else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
 			((struct sockaddr_in6 *)tbind->addr.buf)->sin6_port
-				= port;
+			    = port;
 
 	}
 
@@ -1476,139 +1489,145 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 	(void) clnt_control(cl, CLSET_TIMEOUT, (char *)&tv);
 
 	if ((get_pubfh == TRUE) && (vers != NFS_V4)) {
-	    enum snego_stat sec;
+		enum snego_stat sec;
 
-	    if (!snego_done) {
-		/*
-		 * negotiate sec flavor.
-		 */
-		snego.cnt = 0;
-		if ((sec = nfs_sec_nego(vers, cl, fspath, &snego)) ==
-			SNEGO_SUCCESS) {
-		    int jj;
+		if (!snego_done) {
+			/*
+			 * negotiate sec flavor.
+			 */
+			snego.cnt = 0;
+			if ((sec = nfs_sec_nego(vers, cl, fspath, &snego)) ==
+			    SNEGO_SUCCESS) {
+				int jj;
 
-		/*
-		 * check if server supports the one
-		 * specified in the sec= option.
-		 */
-		    if (sec_opt) {
-			for (jj = 0; jj < snego.cnt; jj++) {
-			    if (snego.array[jj] == nfs_sec.sc_nfsnum) {
-				snego_done = TRUE;
-				break;
-			    }
-			}
-		    }
-
-		/*
-		 * find a common sec flavor
-		 */
-		    if (!snego_done) {
-			if (sec_opt) {
-			    pr_err(gettext(
-				"Server does not support the security"
-				" flavor specified.\n"));
-			}
-			for (jj = 0; jj < snego.cnt; jj++) {
-			    if (!nfs_getseconfig_bynumber(snego.array[jj],
-				&nfs_sec)) {
-				snego_done = TRUE;
+				/*
+				 * check if server supports the one
+				 * specified in the sec= option.
+				 */
 				if (sec_opt) {
-				    pr_err(gettext(
-					"Security flavor %d was negotiated and"
-					" will be used.\n"),
-					nfs_sec.sc_nfsnum);
+					for (jj = 0; jj < snego.cnt; jj++) {
+						if (snego.array[jj] ==
+						    nfs_sec.sc_nfsnum) {
+							snego_done = TRUE;
+							break;
+						}
+					}
 				}
-				break;
-			    }
+
+				/*
+				 * find a common sec flavor
+				 */
+				if (!snego_done) {
+					if (sec_opt) {
+						pr_err(gettext(
+						    "Server does not support"
+						    " the security flavor"
+						    " specified.\n"));
+					}
+
+					for (jj = 0; jj < snego.cnt; jj++) {
+						if (!nfs_getseconfig_bynumber(
+						    snego.array[jj],
+						    &nfs_sec)) {
+							snego_done = TRUE;
+#define	EMSG80SUX "Security flavor %d was negotiated and will be used.\n"
+							if (sec_opt)
+								pr_err(gettext(
+								    EMSG80SUX),
+								    nfs_sec.
+								    sc_nfsnum);
+							break;
+						}
+					}
+				}
+
+				if (!snego_done)
+					return (NULL);
+
+				/*
+				 * Now that the flavor has been
+				 * negotiated, get the fh.
+				 *
+				 * First, create an auth handle using the
+				 * negotiated sec flavor in the next lookup to
+				 * fetch the filehandle.
+				 */
+				new_ah = nfs_create_ah(cl, hostname, &nfs_sec);
+				if (new_ah == NULL)
+					goto done;
+				cl->cl_auth = new_ah;
+			} else if (sec == SNEGO_ARRAY_TOO_SMALL || sec ==
+			    SNEGO_FAILURE) {
+				goto done;
 			}
-		    }
-		    if (!snego_done)
-			return (NULL);
 
-		/*
-		 * Now that the flavor has been
-		 * negotiated, get the fh.
-		 *
-		 * First, create an auth handle using the negotiated
-		 * sec flavor in the next lookup to
-		 * fetch the filehandle.
-		 */
-		    new_ah = nfs_create_ah(cl, hostname, &nfs_sec);
-		    if (new_ah == NULL)
-			goto done;
-		    cl->cl_auth = new_ah;
-		} else if (sec == SNEGO_ARRAY_TOO_SMALL || sec ==
-		    SNEGO_FAILURE) {
-			goto done;
-		}
-		/*
-		 * Note that if sec == SNEGO_DEF_VALID
-		 * default sec flavor is acceptable.
-		 * Use it to get the filehandle.
-		 */
-	    }
-
-	    if (vers == NFS_VERSION) {
-		wnl_diropargs arg;
-		wnl_diropres *res;
-
-		memset((char *)&arg.dir, 0, sizeof (wnl_fh));
-		arg.name = fspath;
-		res = wnlproc_lookup_2(&arg, cl);
-
-		if (res == NULL || res->status != NFS_OK)
-		    goto done;
-		*fhp = malloc(sizeof (wnl_fh));
-
-		if (*fhp == NULL) {
-		    pr_err(gettext("no memory\n"));
-		    goto done;
+			/*
+			 * Note that if sec == SNEGO_DEF_VALID
+			 * default sec flavor is acceptable.
+			 * Use it to get the filehandle.
+			 */
 		}
 
-		memcpy((char *)*fhp,
-		    (char *)&res->wnl_diropres_u.wnl_diropres.file,
-		    sizeof (wnl_fh));
-	    } else {
-		WNL_LOOKUP3args arg;
-		WNL_LOOKUP3res *res;
-		nfs_fh3 *fh3p;
+		if (vers == NFS_VERSION) {
+			wnl_diropargs arg;
+			wnl_diropres *res;
 
-		memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
-		arg.what.name = fspath;
-		res = wnlproc3_lookup_3(&arg, cl);
+			memset((char *)&arg.dir, 0, sizeof (wnl_fh));
+			arg.name = fspath;
+			res = wnlproc_lookup_2(&arg, cl);
 
-		if (res == NULL || res->status != NFS3_OK)
-		    goto done;
+			if (res == NULL || res->status != NFS_OK)
+				goto done;
+			*fhp = malloc(sizeof (wnl_fh));
 
-		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
+			if (*fhp == NULL) {
+				pr_err(gettext("no memory\n"));
+				goto done;
+			}
 
-		if (fh3p == NULL) {
-		    pr_err(gettext("no memory\n"));
-		    CLNT_FREERES(cl, xdr_WNL_LOOKUP3res, (char *)res);
-		    goto done;
+			memcpy((char *)*fhp,
+			    (char *)&res->wnl_diropres_u.wnl_diropres.file,
+			    sizeof (wnl_fh));
+		} else {
+			WNL_LOOKUP3args arg;
+			WNL_LOOKUP3res *res;
+			nfs_fh3 *fh3p;
+
+			memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
+			arg.what.name = fspath;
+			res = wnlproc3_lookup_3(&arg, cl);
+
+			if (res == NULL || res->status != NFS3_OK)
+				goto done;
+
+			fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
+
+			if (fh3p == NULL) {
+				pr_err(gettext("no memory\n"));
+				CLNT_FREERES(cl, xdr_WNL_LOOKUP3res,
+				    (char *)res);
+				goto done;
+			}
+
+			fh3p->fh3_length =
+			    res->WNL_LOOKUP3res_u.res_ok.object.data.data_len;
+			memcpy(fh3p->fh3_u.data,
+			    res->WNL_LOOKUP3res_u.res_ok.object.data.data_val,
+			    fh3p->fh3_length);
+
+			*fhp = (caddr_t)fh3p;
+			CLNT_FREERES(cl, xdr_WNL_LOOKUP3res, (char *)res);
 		}
-
-		fh3p->fh3_length =
-		    res->WNL_LOOKUP3res_u.res_ok.object.data.data_len;
-		memcpy(fh3p->fh3_u.data,
-		    res->WNL_LOOKUP3res_u.res_ok.object.data.data_val,
-		    fh3p->fh3_length);
-
-		*fhp = (caddr_t)fh3p;
-
-		CLNT_FREERES(cl, xdr_WNL_LOOKUP3res, (char *)res);
-	    }
 	} else {
 		void *res;
 		struct rpc_err r_err;
 
 		if (vers == NFS_VERSION)
-		    res = wnlproc_null_2(NULL, cl);
+			res = wnlproc_null_2(NULL, cl);
 		else if (vers == NFS_V3)
-		    res = wnlproc3_null_3(NULL, cl);
+			res = wnlproc3_null_3(NULL, cl);
 		else
-		    res = wnlproc4_null_4(NULL, cl);
+			res = wnlproc4_null_4(NULL, cl);
 
 		if (res == NULL) {
 			clnt_geterr(cl, &r_err);
@@ -1645,14 +1664,14 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 
 done:
 	if (cl) {
-	    if (ah != NULL) {
-		if (new_ah != NULL)
-		    AUTH_DESTROY(ah);
-		AUTH_DESTROY(cl->cl_auth);
-		cl->cl_auth = NULL;
-	    }
-	    clnt_destroy(cl);
-	    cl = NULL;
+		if (ah != NULL) {
+			if (new_ah != NULL)
+				AUTH_DESTROY(ah);
+			AUTH_DESTROY(cl->cl_auth);
+			cl->cl_auth = NULL;
+		}
+		clnt_destroy(cl);
+		cl = NULL;
 	}
 	if (tbind) {
 		t_free((char *)tbind, T_BIND);
@@ -1661,6 +1680,34 @@ done:
 	if (fd >= 0)
 		(void) t_close(fd);
 	return (nb);
+}
+
+static int
+check_nconf(struct netconfig *nconf, int nthtry, int *valid_proto)
+{
+	int	try_test = 0;
+	int	valid_family;
+	char	*proto = NULL;
+
+
+	if (nthtry == FIRST_TRY) {
+		try_test = ((nconf->nc_semantics == NC_TPI_COTS_ORD) ||
+		    (nconf->nc_semantics == NC_TPI_COTS));
+		proto = NC_TCP;
+	} else if (nthtry == SECOND_TRY) {
+		try_test = (nconf->nc_semantics == NC_TPI_CLTS);
+		proto = NC_UDP;
+	}
+
+	if (proto &&
+	    (strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+	    strcmp(nconf->nc_protofmly, NC_INET6) == 0) &&
+	    (strcmp(nconf->nc_proto, proto) == 0))
+		*valid_proto = TRUE;
+	else
+		*valid_proto = FALSE;
+
+	return (try_test);
 }
 
 /*
@@ -1704,7 +1751,7 @@ get_addr(char *hostname, ulong_t prog, ulong_t vers, struct netconfig **nconfp,
 
 	if (nconfp && *nconfp)
 		return (get_the_addr(hostname, prog, vers, *nconfp, port,
-			tinfo, fhp, get_pubfh, fspath, error));
+		    tinfo, fhp, get_pubfh, fspath, error));
 	/*
 	 * No nconf passed in.
 	 *
@@ -1739,17 +1786,15 @@ get_addr(char *hostname, ulong_t prog, ulong_t vers, struct netconfig **nconfp,
 			SET_ERR_RET(error, ERR_PROTO_UNSUPP, 0);
 
 			if ((port != 0) &&
-				((strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
-				strcmp(nconf->nc_protofmly, NC_INET6) == 0) &&
-				(strcmp(nconf->nc_proto, NC_TCP) != 0 &&
-				strcmp(nconf->nc_proto, NC_UDP) != 0)))
-
+			    ((strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+			    strcmp(nconf->nc_protofmly, NC_INET6) == 0) &&
+			    (strcmp(nconf->nc_proto, NC_TCP) != 0 &&
+			    strcmp(nconf->nc_proto, NC_UDP) != 0))) {
 				continue;
-
-			else {
+			} else {
 				nb = get_the_addr(hostname, prog,
-					vers, nconf, port, tinfo,
-						fhp, get_pubfh, fspath, error);
+				    vers, nconf, port, tinfo,
+				    fhp, get_pubfh, fspath, error);
 
 				if (nb != NULL)
 					break;
@@ -1758,12 +1803,12 @@ get_addr(char *hostname, ulong_t prog, ulong_t vers, struct netconfig **nconfp,
 				if (error) {
 					if (error->error_type == ERR_NOHOST)
 						SET_ERR_RET(&errsave_nohost,
-							error->error_type,
-							error->error_value);
+						    error->error_type,
+						    error->error_value);
 					if (error->error_type == ERR_RPCERROR)
 						SET_ERR_RET(&errsave_rpcerr,
-							error->error_type,
-							error->error_value);
+						    error->error_type,
+						    error->error_value);
 				}
 				/*
 				 * continue with same protocol
@@ -1777,51 +1822,24 @@ get_addr(char *hostname, ulong_t prog, ulong_t vers, struct netconfig **nconfp,
 			goto done;
 
 		if ((nb = get_the_addr(hostname, prog, vers, nconf, port,
-				tinfo, fhp, get_pubfh, fspath, error)) == NULL)
+		    tinfo, fhp, get_pubfh, fspath, error)) == NULL)
 			goto done;
-
-
 	} else {
 retry:
 		SET_ERR_RET(error, ERR_NETPATH, 0);
 		while (nconf = getnetpath(nc)) {
 			SET_ERR_RET(error, ERR_PROTO_NONE, 0);
+
 			if (nconf->nc_flag & NC_VISIBLE) {
-				if (nthtry == FIRST_TRY) {
-					if ((nconf->nc_semantics ==
-						NC_TPI_COTS_ORD) ||
-					    (nconf->nc_semantics ==
-						NC_TPI_COTS)) {
+				int	valid_proto;
 
-						if (port == 0)
-							break;
+				if (check_nconf(nconf,
+				    nthtry, &valid_proto)) {
+					if (port == 0)
+						break;
 
-						if ((strcmp(nconf->nc_protofmly,
-							NC_INET) == 0 ||
-							strcmp(nconf->
-							nc_protofmly,
-							NC_INET6) == 0) &&
-						    (strcmp(nconf->nc_proto,
-							NC_TCP) == 0))
-
-							break;
-					}
-				}
-				if (nthtry == SECOND_TRY) {
-					if (nconf->nc_semantics ==
-						NC_TPI_CLTS) {
-						if (port == 0)
-							break;
-						if ((strcmp(nconf->nc_protofmly,
-							NC_INET) == 0 ||
-							strcmp(nconf->
-							nc_protofmly, NC_INET6)
-							== 0) &&
-							(strcmp(
-							nconf->nc_proto,
-							NC_UDP) == 0))
-							break;
-					}
+					if (valid_proto == TRUE)
+						break;
 				}
 			}
 		} /* while */
@@ -1835,18 +1853,18 @@ retry:
 				goto done;
 		} else {
 			if ((nb = get_the_addr(hostname, prog, vers, nconf,
-				port, tinfo, fhp, get_pubfh, fspath, error))
-				== NULL) {
+			    port, tinfo, fhp, get_pubfh, fspath, error))
+			    == NULL) {
 				/* nb is NULL - deal with errors */
 				if (error) {
 					if (error->error_type == ERR_NOHOST)
 						SET_ERR_RET(&errsave_nohost,
-							error->error_type,
-							error->error_value);
+						    error->error_type,
+						    error->error_value);
 					if (error->error_type == ERR_RPCERROR)
 						SET_ERR_RET(&errsave_rpcerr,
-							error->error_type,
-							error->error_value);
+						    error->error_type,
+						    error->error_value);
 				}
 				/*
 				 * Continue the same search path in the
@@ -1880,11 +1898,11 @@ done:
 		 */
 		if (errsave_nohost.error_type != ERR_PROTO_NONE)
 			SET_ERR_RET(error, errsave_nohost.error_type,
-					errsave_nohost.error_value);
+			    errsave_nohost.error_value);
 
 		if (errsave_rpcerr.error_type != ERR_PROTO_NONE)
 			SET_ERR_RET(error, errsave_rpcerr.error_type,
-					errsave_rpcerr.error_value);
+			    errsave_rpcerr.error_value);
 	}
 
 	return (nb);
@@ -1913,9 +1931,8 @@ get_fh_via_pub(struct nfs_args *args, char *fshost, char *fspath, bool_t url,
 	if (url == FALSE) {
 		path = malloc(strlen(fspath) + 2);
 		if (path == NULL) {
-			if (loud == TRUE)  {
+			if (loud == TRUE)
 				pr_err(gettext("no memory\n"));
-			}
 			return (RET_ERR);
 		}
 
@@ -1932,7 +1949,7 @@ get_fh_via_pub(struct nfs_args *args, char *fshost, char *fspath, bool_t url,
 		 * getaddr_nfs will also fill in the fh for us.
 		 */
 		r = getaddr_nfs(args, fshost, nconfp,
-				TRUE, path, port, NULL, FALSE);
+		    TRUE, path, port, NULL, FALSE);
 
 		if (r == RET_OK) {
 			/*
@@ -1959,13 +1976,12 @@ get_fh_via_pub(struct nfs_args *args, char *fshost, char *fspath, bool_t url,
 		}
 	}
 
-	if (fspath != path) {
+	if (fspath != path)
 		free(path);
-	}
 
 	if (loud == TRUE) {
 		pr_err(gettext("Could not use public filehandle in request to"
-			" server %s\n"), fshost);
+		    " server %s\n"), fshost);
 	}
 
 	return (r);
@@ -2041,9 +2057,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 		/* Let's hope for the best */
 		nfsvers_to_use = NFS_V4;
-		retval =
-			getaddr_nfs(args, fshost, nconfp, FALSE,
-				    fspath, port, &error, vers_min == NFS_V4);
+		retval = getaddr_nfs(args, fshost, nconfp, FALSE,
+		    fspath, port, &error, vers_min == NFS_V4);
 
 		if (retval == RET_OK) {
 			*versp = nfsvers_to_use = NFS_V4;
@@ -2060,9 +2075,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 		vers_to_try--;
 		/* If no more versions to try, let the user know. */
-		if (vers_to_try < vers_min) {
+		if (vers_to_try < vers_min)
 			return (retval);
-		}
 
 		/*
 		 * If we are here, there are more versions to try but
@@ -2076,7 +2090,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 	}
 
 	while ((cl = clnt_create_vers(fshost, MOUNTPROG, &outvers,
-			vers_min, vers_to_try, "datagram_v")) == NULL) {
+	    vers_min, vers_to_try, "datagram_v")) == NULL) {
 		if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST) {
 			pr_err(gettext("%s: %s\n"), fshost,
 			    clnt_spcreateerror(""));
@@ -2087,7 +2101,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 * We don't want to downgrade version on lost packets
 		 */
 		if ((rpc_createerr.cf_stat == RPC_TIMEDOUT) ||
-			(rpc_createerr.cf_stat == RPC_PMAPFAILURE)) {
+		    (rpc_createerr.cf_stat == RPC_PMAPFAILURE)) {
 			pr_err(gettext("%s: %s\n"), fshost,
 			    clnt_spcreateerror(""));
 			return (RET_RETRY);
@@ -2148,7 +2162,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 	case MOUNTVERS_POSIX:
 		*versp = nfsvers_to_use = NFS_VERSION;
 		rpc_stat = clnt_call(cl, MOUNTPROC_MNT, xdr_dirpath,
-			(caddr_t)&fspath, xdr_fhstatus, (caddr_t)&fhs, timeout);
+		    (caddr_t)&fspath, xdr_fhstatus, (caddr_t)&fhs, timeout);
 		if (rpc_stat != RPC_SUCCESS) {
 			pr_err(gettext("%s:%s: server not responding %s\n"),
 			    fshost, fspath, clnt_sperror(cl, ""));
@@ -2158,13 +2172,14 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 		if ((errno = fhs.fhs_status) != MNT_OK) {
 			if (loud_on_mnt_err) {
-			    if (errno == EACCES) {
-				pr_err(gettext("%s:%s: access denied\n"),
-				    fshost, fspath);
-			    } else {
-				pr_err(gettext("%s:%s: %s\n"), fshost, fspath,
-				    strerror(errno));
-			    }
+				if (errno == EACCES) {
+					pr_err(gettext(
+					    "%s:%s: access denied\n"),
+					    fshost, fspath);
+				} else {
+					pr_err(gettext("%s:%s: %s\n"), fshost,
+					    fspath, strerror(errno));
+				}
 			}
 			clnt_destroy(cl);
 			return (RET_MNTERR);
@@ -2175,11 +2190,11 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			return (RET_ERR);
 		}
 		memcpy((caddr_t)args->fh, (caddr_t)&fhs.fhstatus_u.fhs_fhandle,
-			sizeof (fhs.fhstatus_u.fhs_fhandle));
+		    sizeof (fhs.fhstatus_u.fhs_fhandle));
 		if (!errno && posix) {
 			rpc_stat = clnt_call(cl, MOUNTPROC_PATHCONF,
-				xdr_dirpath, (caddr_t)&fspath, xdr_ppathcnf,
-				(caddr_t)&p, timeout);
+			    xdr_dirpath, (caddr_t)&fspath, xdr_ppathcnf,
+			    (caddr_t)&p, timeout);
 			if (rpc_stat != RPC_SUCCESS) {
 				pr_err(gettext(
 				    "%s:%s: server not responding %s\n"),
@@ -2205,15 +2220,15 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 				return (RET_ERR);
 			}
 			memcpy((caddr_t)args->pathconf, (caddr_t)&p,
-				sizeof (p));
+			    sizeof (p));
 		}
 		break;
 
 	case MOUNTVERS3:
 		*versp = nfsvers_to_use = NFS_V3;
 		rpc_stat = clnt_call(cl, MOUNTPROC_MNT, xdr_dirpath,
-				(caddr_t)&fspath,
-				xdr_mountres3, (caddr_t)&mountres3, timeout);
+		    (caddr_t)&fspath, xdr_mountres3, (caddr_t)&mountres3,
+		    timeout);
 		if (rpc_stat != RPC_SUCCESS) {
 			pr_err(gettext("%s:%s: server not responding %s\n"),
 			    fshost, fspath, clnt_sperror(cl, ""));
@@ -2226,25 +2241,26 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 * codes map into E* errors.
 		 */
 		if ((errno = mountres3.fhs_status) != MNT_OK) {
-		    if (loud_on_mnt_err) {
-			switch (errno) {
-			case MNT3ERR_NAMETOOLONG:
-				msg = "path name is too long";
-				break;
-			case MNT3ERR_NOTSUPP:
-				msg = "operation not supported";
-				break;
-			case MNT3ERR_SERVERFAULT:
-				msg = "server fault";
-				break;
-			default:
-				msg = strerror(errno);
-				break;
+			if (loud_on_mnt_err) {
+				switch (errno) {
+				case MNT3ERR_NAMETOOLONG:
+					msg = "path name is too long";
+					break;
+				case MNT3ERR_NOTSUPP:
+					msg = "operation not supported";
+					break;
+				case MNT3ERR_SERVERFAULT:
+					msg = "server fault";
+					break;
+				default:
+					msg = strerror(errno);
+					break;
+				}
+				pr_err(gettext("%s:%s: %s\n"), fshost,
+				    fspath, msg);
 			}
-			pr_err(gettext("%s:%s: %s\n"), fshost, fspath, msg);
-		    }
-		    clnt_destroy(cl);
-		    return (RET_MNTERR);
+			clnt_destroy(cl);
+			return (RET_MNTERR);
 		}
 
 		fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
@@ -2253,10 +2269,10 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 			return (RET_ERR);
 		}
 		fh3p->fh3_length =
-			mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len;
+		    mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len;
 		(void) memcpy(fh3p->fh3_u.data,
-			mountres3.mountres3_u.mountinfo.fhandle.fhandle3_val,
-			fh3p->fh3_length);
+		    mountres3.mountres3_u.mountinfo.fhandle.fhandle3_val,
+		    fh3p->fh3_length);
 		args->fh = (caddr_t)fh3p;
 		fstype = MNTTYPE_NFS3;
 
@@ -2274,30 +2290,33 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 *
 		 */
 		auths =
-		mountres3.mountres3_u.mountinfo.auth_flavors.auth_flavors_val;
+		    mountres3.mountres3_u.mountinfo.auth_flavors
+		    .auth_flavors_val;
 		count =
-		mountres3.mountres3_u.mountinfo.auth_flavors.auth_flavors_len;
+		    mountres3.mountres3_u.mountinfo.auth_flavors
+		    .auth_flavors_len;
 
 		if (sec_opt) {
 			for (i = 0; i < count; i++) {
 				if (auths[i] == nfs_sec.sc_nfsnum)
-				    break;
+					break;
 			}
-			if (i >= count) {
+			if (i >= count)
 				goto autherr;
-			}
 		} else {
-		    if (count > 0) {
-			for (i = 0; i < count; i++) {
-			    if (!nfs_getseconfig_bynumber(auths[i], &nfs_sec)) {
-				sec_opt++;
+			if (count < 0)
 				break;
-			    }
+
+			for (i = 0; i < count; i++) {
+				if (!nfs_getseconfig_bynumber(auths[i],
+				    &nfs_sec)) {
+					sec_opt++;
+					break;
+				}
 			}
-			if (i >= count) {
-			    goto autherr;
-			}
-		    }
+
+			if (i >= count)
+				goto autherr;
 		}
 		break;
 	default:
@@ -2312,8 +2331,8 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 
 autherr:
 	pr_err(gettext(
-		"security mode does not match the server exporting %s:%s\n"),
-		fshost, fspath);
+	    "security mode does not match the server exporting %s:%s\n"),
+	    fshost, fspath);
 	clnt_destroy(cl);
 	return (RET_ERR);
 }
@@ -2388,19 +2407,19 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 					/* no error print at this time */
 					break;
 				pr_err(gettext("%s NFS service not"
-					    " available %s\n"), fshost,
+				    " available %s\n"), fshost,
 				    clnt_sperrno(addr_error.error_value));
 				printed = 1;
 				break;
 			case ERR_NETPATH:
 				pr_err(gettext("%s: Error in NETPATH.\n"),
-					fshost);
+				    fshost);
 				printed = 1;
 				break;
 			case ERR_PROTO_INVALID:
 				pr_err(gettext("%s: NFS service does not"
-					" recognize protocol: %s.\n"), fshost,
-					nfs_proto);
+				    " recognize protocol: %s.\n"), fshost,
+				    nfs_proto);
 				printed = 1;
 				break;
 			case ERR_PROTO_UNSUPP:
@@ -2423,8 +2442,8 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 					 * and retry below.
 					 */
 					pr_err(gettext("%s: NFS service does"
-						" not support protocol: %s.\n"),
-						fshost, nfs_proto);
+					    " not support protocol: %s.\n"),
+					    fshost, nfs_proto);
 				}
 				break;
 			case ERR_NOHOST:
@@ -2434,20 +2453,20 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 			default:
 				/* case ERR_PROTO_NONE falls through */
 				pr_err(gettext("%s: NFS service not responding"
-					"\n"), fshost);
+				    "\n"), fshost);
 				printed = 1;
 				break;
 			}
 		}
 		SET_ERR_RET(error,
-			addr_error.error_type, addr_error.error_value);
+		    addr_error.error_type, addr_error.error_value);
 		if (addr_error.error_type == ERR_PROTO_NONE)
 			return (RET_RETRY);
 		else if (addr_error.error_type == ERR_RPCERROR &&
-			! IS_UNRECOVERABLE_RPC(addr_error.error_value)) {
+		    !IS_UNRECOVERABLE_RPC(addr_error.error_value)) {
 			return (RET_RETRY);
 		} else if (nfsvers == 0 && addr_error.error_type ==
-			ERR_PROTO_UNSUPP && nfsvers_to_use != NFS_VERSMIN) {
+		    ERR_PROTO_UNSUPP && nfsvers_to_use != NFS_VERSMIN) {
 			/*
 			 * If no version is specified, and the error is due
 			 * to an unsupported transport, then decrement the
@@ -2520,10 +2539,10 @@ retry(struct mnttab *mntp, int ro)
 			break;
 
 		if (count > 0) {
-		    (void) sleep(delay);
-		    delay *= 2;
-		    if (delay > 120)
-			    delay = 120;
+			(void) sleep(delay);
+			delay *= 2;
+			if (delay > 120)
+				delay = 120;
 		}
 	}
 

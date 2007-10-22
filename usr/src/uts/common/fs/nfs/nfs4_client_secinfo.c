@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,8 +92,8 @@ nfs4_secinfo_init(void)
 	secinfo_support = kmem_alloc(sizeof (SECINFO4res), KM_SLEEP);
 	secinfo_support->SECINFO4resok_len = SECINFO_SUPPORT_COUNT;
 	val = kmem_alloc(
-		secinfo_support->SECINFO4resok_len * sizeof (secinfo4),
-		KM_SLEEP);
+	    secinfo_support->SECINFO4resok_len * sizeof (secinfo4),
+	    KM_SLEEP);
 
 	val[0].flavor = AUTH_SYS;
 	val[0].flavor_info.oid.sec_oid4_len = 0;
@@ -136,7 +136,7 @@ nfs4_secinfo_fini(void)
 {
 
 	kmem_free(secinfo_support->SECINFO4resok_val,
-		secinfo_support->SECINFO4resok_len * sizeof (secinfo4));
+	    secinfo_support->SECINFO4resok_len * sizeof (secinfo4));
 	kmem_free(secinfo_support, sizeof (SECINFO4res));
 }
 
@@ -158,7 +158,7 @@ secinfo2nfsflavor(sec_oid4 *mech_oid, rpc_gss_svc_t service)
 {
 	/* Is this kerberos_v5? */
 	if (bcmp(mech_oid->sec_oid4_val, krb5_oid.sec_oid4_val,
-		krb5_oid.sec_oid4_len) != 0) {
+	    krb5_oid.sec_oid4_len) != 0) {
 		return (0);
 	}
 
@@ -229,7 +229,7 @@ secinfo_create(servinfo4_t *svp, SECINFO4res *sec_info, char *servname)
 			data->qop = (uint_t)info->qop;
 			data->mechanism.length = info->oid.sec_oid4_len;
 			data->mechanism.elements =
-				kmem_alloc(info->oid.sec_oid4_len, KM_SLEEP);
+			    kmem_alloc(info->oid.sec_oid4_len, KM_SLEEP);
 			bcopy(info->oid.sec_oid4_val,
 			    data->mechanism.elements, info->oid.sec_oid4_len);
 			data->uname[0] = 'n'; data->uname[1] = 'f';
@@ -238,7 +238,7 @@ secinfo_create(servinfo4_t *svp, SECINFO4res *sec_info, char *servname)
 
 			sdata[scnt].data = (caddr_t)data;
 			sdata[scnt].secmod =
-				secinfo2nfsflavor(&info->oid, info->service);
+			    secinfo2nfsflavor(&info->oid, info->service);
 			scnt++;
 			break;
 		case AUTH_DH:
@@ -280,32 +280,35 @@ secinfo_free(sv_secinfo_t *secinfo)
 		return;
 
 	for (i = 0; i < secinfo->count; i++) {
-	    if (secinfo->sdata[i].rpcflavor == RPCSEC_GSS) {
-		gss_clntdata_t *data = (gss_clntdata_t *)
-						secinfo->sdata[i].data;
+		if (secinfo->sdata[i].rpcflavor == RPCSEC_GSS) {
+			gss_clntdata_t *data = (gss_clntdata_t *)
+			    secinfo->sdata[i].data;
 
-		/*
-		 * An auth handle may already cached in rpcsec_gss module
-		 * per this secdata. Purge the cache entry before freeing
-		 * up this secdata. Can't use sec_clnt_freeinfo since
-		 * the allocation of secinfo is different from sec_data.
-		 */
-		(void) rpc_gss_secpurge((void *)&secinfo->sdata[i]);
+			/*
+			 * An auth handle may already cached in rpcsec_gss
+			 * module per this secdata. Purge the cache entry
+			 * before freeing up this secdata. Can't use
+			 * sec_clnt_freeinfo since the allocation of secinfo
+			 * is different from sec_data.
+			 */
+			(void) rpc_gss_secpurge((void *)&secinfo->sdata[i]);
 
-		kmem_free(data->mechanism.elements, data->mechanism.length);
-		kmem_free(data, sizeof (gss_clntdata_t));
-	    }
+			kmem_free(data->mechanism.elements,
+			    data->mechanism.length);
+			kmem_free(data, sizeof (gss_clntdata_t));
+		}
 
-	    if (secinfo->sdata[i].rpcflavor == AUTH_DH) {
+		if (secinfo->sdata[i].rpcflavor == AUTH_DH) {
 
-		secinfo->sdata[i].data = NULL; /* release ref to sv_dhsec */
+			/* release ref to sv_dhsec */
+			secinfo->sdata[i].data = NULL;
 
-		/*
-		 * No need to purge the auth_dh cache entry (e.g. call
-		 * purge_authtab()) since the AUTH_DH data used here
-		 * are always the same.
-		 */
-	    }
+			/*
+			 * No need to purge the auth_dh cache entry (e.g. call
+			 * purge_authtab()) since the AUTH_DH data used here
+			 * are always the same.
+			 */
+		}
 	}
 	kmem_free(secinfo->sdata, sizeof (sec_data_t) * secinfo->count);
 	kmem_free(secinfo, sizeof (sv_secinfo_t));
@@ -329,7 +332,7 @@ secinfo_check(servinfo4_t *svp)
 	if (svp->sv_secinfo->index < svp->sv_secinfo->count) {
 		svp->sv_flags |= SV4_TRYSECINFO;
 		svp->sv_currsec =
-			&svp->sv_secinfo->sdata[svp->sv_secinfo->index];
+		    &svp->sv_secinfo->sdata[svp->sv_secinfo->index];
 		nfs_rw_exit(&svp->sv_lock);
 		return (TRUE);
 	} else {
@@ -371,7 +374,7 @@ secinfo_update(servinfo4_t *svp, SECINFO4res *sec_info)
 		svp->sv_secinfo->index = 0;
 		svp->sv_flags |= SV4_TRYSECINFO;
 		svp->sv_currsec =
-			&svp->sv_secinfo->sdata[svp->sv_secinfo->index];
+		    &svp->sv_secinfo->sdata[svp->sv_secinfo->index];
 	} else {
 		svp->sv_flags &= ~SV4_TRYSECINFO;
 		svp->sv_currsec = NULL;
@@ -391,7 +394,6 @@ secinfo_update(servinfo4_t *svp, SECINFO4res *sec_info)
 void
 save_mnt_secinfo(servinfo4_t *svp)
 {
-
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 	if (svp->sv_currsec) {
 		svp->sv_savesec = svp->sv_currsec;
@@ -418,9 +420,9 @@ check_mnt_secinfo(servinfo4_t *svp, vnode_t *vp)
 
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
 
-	is_restore = (vp == NULL || (VTOR4(vp)->r_flags & R4SRVSTUB)) &&
-			svp->sv_save_secinfo &&
-			(svp->sv_secinfo != svp->sv_save_secinfo);
+	is_restore = (vp == NULL || (RP_ISSTUB(VTOR4(vp)))) &&
+	    svp->sv_save_secinfo &&
+	    (svp->sv_secinfo != svp->sv_save_secinfo);
 
 	if (is_restore) {
 		secinfo_free(svp->sv_secinfo);
@@ -435,7 +437,7 @@ check_mnt_secinfo(servinfo4_t *svp, vnode_t *vp)
 		}
 	} else {
 		if (svp->sv_save_secinfo &&
-				svp->sv_save_secinfo != svp->sv_secinfo)
+		    svp->sv_save_secinfo != svp->sv_secinfo)
 			secinfo_free(svp->sv_save_secinfo);
 	}
 
@@ -666,9 +668,9 @@ retry:
 	num_argops = args.array_len;
 	argop[num_argops - 1].argop = OP_SECINFO;
 	argop[num_argops - 1].nfs_argop4_u.opsecinfo.name.utf8string_len =
-					comp.utf8string_len;
+	    comp.utf8string_len;
 	argop[num_argops - 1].nfs_argop4_u.opsecinfo.name.utf8string_val =
-					comp.utf8string_val;
+	    comp.utf8string_val;
 
 	doqueue = 1;
 
@@ -701,7 +703,7 @@ retry:
 			ncomp = tcomp;
 			nfs4args_lookup_free(argop, num_argops);
 			kmem_free(argop,
-					lookuparg.arglen * sizeof (nfs_argop4));
+			    lookuparg.arglen * sizeof (nfs_argop4));
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 			kmem_free(tmp_path, path_len + 1);
 
@@ -730,22 +732,24 @@ retry:
 
 		/* If not in a recovery thread, bail out */
 		if (!isrecov) {
+			if (!e.error) {
+				e.error = geterrno4(res.status);
+				(void) xdr_free(xdr_COMPOUND4res_clnt,
+				    (caddr_t)&res);
+			}
 
-		    if (!e.error) {
-			e.error = geterrno4(res.status);
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-		    }
-		    nfs4args_lookup_free(argop, num_argops);
-		    kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-		    kmem_free(tmp_path, path_len + 1);
-		    return (e.error);
+			nfs4args_lookup_free(argop, num_argops);
+			kmem_free(argop,
+			    lookuparg.arglen * sizeof (nfs_argop4));
+			kmem_free(tmp_path, path_len + 1);
+			return (e.error);
 		}
 
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 		    "nfs4secinfo_otw: recovery in a recovery thread\n"));
 
 		abort = nfs4_start_recovery(&e, mi, NULL,
-			    NULL, NULL, NULL, OP_SECINFO, NULL);
+		    NULL, NULL, NULL, OP_SECINFO, NULL);
 		if (!e.error) {
 			e.error = geterrno4(res.status);
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
@@ -838,7 +842,6 @@ retry:
 int
 nfs4_secinfo_path(mntinfo4_t *mi, cred_t *cr, int isrecov)
 {
-
 	int error = 0;
 	int ncomp;
 	servinfo4_t *svp = mi->mi_curr_serv;

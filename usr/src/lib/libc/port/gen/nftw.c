@@ -175,16 +175,17 @@ struct Var {
 	dev_t	cur_mount;
 	struct FTW state;
 	int	walklevel;
-	int	(*statf)(const char *, struct stat *, struct Save *);
-	int	(*savedstatf)(const char *, struct stat *, struct Save *);
+	int	(*statf)(const char *, struct stat *, struct Save *, int flags);
+	int	(*savedstatf)(const char *, struct stat *, struct Save *,
+	    int flags);
 	DIR	*(*opendirf)(const char *);
 };
 
 static int oldclose(struct Save *);
-static int cdlstat(const char *, struct stat *, struct Save *);
-static int cdstat(const char *, struct stat *, struct Save *);
-static int nocdlstat(const char *, struct stat *, struct Save *);
-static int nocdstat(const char *, struct stat *, struct Save *);
+static int cdlstat(const char *, struct stat *, struct Save *, int flags);
+static int cdstat(const char *, struct stat *, struct Save *, int flags);
+static int nocdlstat(const char *, struct stat *, struct Save *, int flags);
+static int nocdstat(const char *, struct stat *, struct Save *, int flags);
 static DIR *cdopendir(const char *);
 static DIR *nocdopendir(const char *);
 static const char *get_unrooted(const char *);
@@ -234,8 +235,11 @@ walk(char *component,
 
 	/*
 	 * Determine the type of the component.
+	 *
+	 * Note that if the component is a trigger mount, this
+	 * will cause it to load.
 	 */
-	if ((*vp->statf)(comp, &statb, last) >= 0) {
+	if ((*vp->statf)(comp, &statb, last, _AT_TRIGGER) >= 0) {
 		if ((statb.st_mode & S_IFMT) == S_IFDIR) {
 			type = FTW_D;
 			if (depth <= 1)
@@ -253,17 +257,6 @@ walk(char *component,
 					depth = 1;
 				} else {
 					type = FTW_DNR;
-					goto fail;
-				}
-			}
-			if (statb.st_fstype[0] == 'a' &&
-			    strcmp(statb.st_fstype, "autofs") == 0) {
-				/*
-				 * this dir is on autofs
-				 */
-				if (fstat(this.fd->dd_fd, &statb) < 0) {
-					(void) closedir(this.fd);
-					type = FTW_NS;
 					goto fail;
 				}
 			}
@@ -293,10 +286,10 @@ walk(char *component,
 		 * link.
 		 */
 		if (((vp->statf == cdstat) &&
-		    (cdlstat(comp, &statb, last) >= 0) &&
+		    (cdlstat(comp, &statb, last, 0) >= 0) &&
 		    ((statb.st_mode & S_IFMT) == S_IFLNK)) ||
 		    ((vp->statf == nocdstat) &&
-		    (nocdlstat(comp, &statb, last) >= 0) &&
+		    (nocdlstat(comp, &statb, last, 0) >= 0) &&
 		    ((statb.st_mode & S_IFMT) == S_IFLNK))) {
 
 			/*
@@ -492,7 +485,7 @@ quit:
 			}
 		} else {
 			if ((cdval = chdir("..")) >= 0) {
-				if ((*vp->statf)(".", &statb, last) < 0 ||
+				if ((*vp->statf)(".", &statb, last, 0) < 0 ||
 				    statb.st_ino != last->inode ||
 				    statb.st_dev != last->dev)
 					cdval = -1;
@@ -502,18 +495,20 @@ quit:
 				if (chdir(vp->fullpath) < 0) {
 					rc = -1;
 				} else {
-				    /* Security check */
-				    if ((vp->curflags & FTW_PHYS) &&
-					((*vp->statf)(".", &statb, last) < 0 ||
-					statb.st_ino != last->inode ||
-					statb.st_dev != last->dev)) {
-					    errno = EAGAIN;
-					    rc = -1;
-				    }
+					/* Security check */
+					if ((vp->curflags & FTW_PHYS) &&
+					    ((*vp->statf)(".", &statb,
+					    last, 0) < 0 ||
+					    statb.st_ino != last->inode ||
+					    statb.st_dev != last->dev)) {
+						errno = EAGAIN;
+						rc = -1;
+					}
 				}
 			}
 		}
 	}
+
 	if (this.fd)
 		(void) closedir(this.fd);
 	if (val > rc)
@@ -610,7 +605,7 @@ _nftw(const char *path,
 	 * save the current mount point.
 	 */
 	if (flags & FTW_MOUNT) {
-		if ((*var.statf)(savepath, &statb, NULL) >= 0)
+		if ((*var.statf)(savepath, &statb, NULL, 0) >= 0)
 			var.cur_mount = statb.st_dev;
 		else
 			goto done;
@@ -641,8 +636,9 @@ done:
  */
 /*ARGSUSED1*/
 static int
-cdstat(const char *path, struct stat *statp, struct Save *lp) {
-	return (stat(path, statp));
+cdstat(const char *path, struct stat *statp, struct Save *lp, int flags)
+{
+	return (fstatat(AT_FDCWD, path, statp, flags));
 }
 
 /*
@@ -650,44 +646,56 @@ cdstat(const char *path, struct stat *statp, struct Save *lp) {
  */
 /*ARGSUSED1*/
 static int
-cdlstat(const char *path, struct stat *statp, struct Save *lp)
+cdlstat(const char *path, struct stat *statp, struct Save *lp, int flags)
 {
-	return (lstat(path, statp));
+	return (fstatat(AT_FDCWD, path, statp,
+	    flags | AT_SYMLINK_NOFOLLOW));
 }
 
 /*
  * Get stat info on path when FTW_CHDIR is not set.
  */
 static int
-nocdstat(const char *path, struct stat *statp, struct Save *lp)
+nocdstat(const char *path, struct stat *statp, struct Save *lp, int flags)
 {
-	const char *unrootp;
+	int		fd;
+	const char	*basepath;
 
 	if (lp && lp->fd) {
 		/* get basename of path */
-		unrootp = get_unrooted(path);
-		return (fstatat(lp->fd->dd_fd, unrootp, statp, 0));
+		basepath = get_unrooted(path);
+
+		fd = lp->fd->dd_fd;
 	} else {
-		return (stat(path, statp));
+		basepath = path;
+
+		fd = AT_FDCWD;
 	}
+
+	return (fstatat(fd, basepath, statp, flags));
 }
 
 /*
  * Get lstat info on path when FTW_CHDIR is not set.
  */
 static int
-nocdlstat(const char *path, struct stat *statp, struct Save *lp)
+nocdlstat(const char *path, struct stat *statp, struct Save *lp, int flags)
 {
-	const char *unrootp;
+	int		fd;
+	const char	*basepath;
 
 	if (lp && lp->fd) {
 		/* get basename of path */
-		unrootp = get_unrooted(path);
-		return (fstatat(lp->fd->dd_fd, unrootp, statp,
-		    AT_SYMLINK_NOFOLLOW));
+		basepath = get_unrooted(path);
+
+		fd = lp->fd->dd_fd;
 	} else {
-		return (lstat(path, statp));
+		basepath = path;
+
+		fd = AT_FDCWD;
 	}
+
+	return (fstatat(fd, basepath, statp, flags | AT_SYMLINK_NOFOLLOW));
 }
 
 /*
@@ -716,23 +724,23 @@ nocdopendir(const char *path)
 			return (NULL);
 		}
 		if ((token = strtok_r(dirp, "/", &ptr)) != NULL) {
-		    if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
-			(void) free(dirp);
-			errno = ENAMETOOLONG;
-			return (NULL);
-		    }
-		    while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
-			if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
-			    (void) close(fd);
-			    (void) free(dirp);
-			    errno = ENAMETOOLONG;
-			    return (NULL);
+			if ((fd = openat(AT_FDCWD, dirp, O_RDONLY)) < 0) {
+				(void) free(dirp);
+				errno = ENAMETOOLONG;
+				return (NULL);
 			}
-			(void) close(fd);
-			fd = cfd;
-		    }
-		    (void) free(dirp);
-		    return (fdopendir(fd));
+			while ((token = strtok_r(NULL, "/", &ptr)) != NULL) {
+				if ((cfd = openat(fd, token, O_RDONLY)) < 0) {
+					(void) close(fd);
+					(void) free(dirp);
+					errno = ENAMETOOLONG;
+					return (NULL);
+				}
+				(void) close(fd);
+				fd = cfd;
+			}
+			(void) free(dirp);
+			return (fdopendir(fd));
 		}
 		(void) free(dirp);
 		errno = ENAMETOOLONG;
@@ -740,7 +748,11 @@ nocdopendir(const char *path)
 	return (fdd);
 }
 
-/* return pointer basename of path, which may contain trailing slashes */
+/*
+ * return pointer basename of path, which may contain trailing slashes
+ *
+ * We do this when we do not chdir() on the input.
+ */
 static const char *
 get_unrooted(const char *path)
 {

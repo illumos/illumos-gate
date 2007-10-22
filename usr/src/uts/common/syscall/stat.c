@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +196,9 @@ fstat(int fd, struct stat *sb)
 int
 fstatat(int fd, char *name, struct stat *sb, int flags)
 {
-	return (cstatat(fd, name, 2, sb, flags, 0));
+	return (cstatat(fd, name, 2, sb,
+	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
+	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
 }
 
 #if defined(__i386) || defined(__i386_COMPAT)
@@ -357,9 +359,11 @@ fstat32(int fd, struct stat32 *sb)
 }
 
 int
-fstatat32(int fd, char *name, struct stat32 *sb, int flag)
+fstatat32(int fd, char *name, struct stat32 *sb, int flags)
 {
-	return (cstatat32(fd, name, 2, sb, flag, 0));
+	return (cstatat32(fd, name, 2, sb,
+	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
+	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
 }
 
 #if defined(__i386_COMPAT)
@@ -503,7 +507,9 @@ fstat64(int fd, struct stat64 *sb)
 int
 fstatat64(int fd, char *name, struct stat64 *sb, int flags)
 {
-	return (cstatat64(fd, name, 2, sb, flags, 0));
+	return (cstatat64(fd, name, 2, sb,
+	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
+	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
 }
 
 static int
@@ -604,9 +610,11 @@ fstat64_32(int fd, struct stat64_32 *sb)
 }
 
 int
-fstatat64_32(int fd, char *name, struct stat64_32 *sb, int flag)
+fstatat64_32(int fd, char *name, struct stat64_32 *sb, int flags)
 {
-	return (cstatat64_32(fd, name, 2, sb, flag, 0));
+	return (cstatat64_32(fd, name, 2, sb,
+	    flags & AT_SYMLINK_NOFOLLOW ? AT_SYMLINK_NOFOLLOW : 0,
+	    flags & _AT_TRIGGER ? ATTR_TRIGGER : 0));
 }
 
 static int

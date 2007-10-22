@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,10 +17,12 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 
@@ -32,32 +33,34 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	NFSCLIENT
-#include	<sys/types.h>
-#include	<memory.h>
-#include	<netconfig.h>
-#include	<netdb.h>
-#include	<netdir.h>
-#include	<netinet/in.h>
-#include	<stdarg.h>
-#include	<stdio.h>
-#include	<stdlib.h>
-#include	<string.h>
-#include	<unistd.h>
-#include	<syslog.h>
+#include <sys/types.h>
+#include <memory.h>
+#include <netconfig.h>
+#include <netdb.h>
+#include <netdir.h>
+#include <netinet/in.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <syslog.h>
 
-#include	<rpc/rpc.h>
-#include	<rpc/clnt_soc.h>
-#include	<rpc/pmap_prot.h>
-#include	<nfs/nfs.h>
-#include	<nfs/mount.h>
-#include	<rpcsvc/mount.h>
-#include	<errno.h>
-#include	<sys/mntent.h>
-#include	<sys/mnttab.h>
-#include	<sys/mount.h>
-#include	<sys/param.h>
-#include	<sys/socket.h>
-#include	<sys/stat.h>
+#include <rpc/rpc.h>
+#include <rpc/clnt_soc.h>
+#include <rpc/pmap_prot.h>
+#include <nfs/nfs.h>
+#include <nfs/mount.h>
+#include <rpcsvc/mount.h>
+#include <errno.h>
+#include <sys/mntent.h>
+#include <sys/mnttab.h>
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+
+#include <deflt.h>
 
 static struct knetconfig *get_knconf(struct netconfig *nconf);
 static int bindudp_resvport(CLIENT *client);
@@ -67,6 +70,8 @@ static enum clnt_stat pingnfs(char *hostname, rpcvers_t *versp);
 static void netbuf_free(struct netbuf *nb);
 static struct netbuf *get_addr(char *hostname, int prog, int vers,
     struct netconfig **nconfp);
+
+extern void set_nfsv4_ephemeral_mount_to(void);
 
 #define	TIME_MAX	16
 
@@ -91,10 +96,7 @@ void		free_knconf(struct knetconfig *);
  * 	The "error" string returns the error message.
  */
 int
-mount_nfs(fsname, dir, error)
-	char *fsname;
-	char *dir;
-	char *error;
+mount_nfs(char *fsname, char *dir, char *error)
 {
 	struct sockaddr_in sin;
 	struct hostent *hp;
@@ -156,7 +158,7 @@ mount_nfs(fsname, dir, error)
 	 */
 	if ((hp = gethostbyname(host)) == NULL) {
 		errprintf(error, "mount %s: %s not in hosts database\n",
-			fsname, host);
+		    fsname, host);
 		return (1);
 	}
 
@@ -171,11 +173,11 @@ mount_nfs(fsname, dir, error)
 			fprintf(stderr, "h_aliases %s\n\t", "<none>");
 		if (hp->h_addrtype == AF_INET)
 			fprintf(stderr,
-				"h_addrtype AF_INET\n\th_adth_length %u\n\t",
-				hp->h_length);
+			    "h_addrtype AF_INET\n\th_adth_length %u\n\t",
+			    hp->h_length);
 		else
 			fprintf(stderr, "h_addrtype %u\n\th_adth_length %u\n\t",
-				hp->h_addrtype, hp->h_length);
+			    hp->h_addrtype, hp->h_length);
 		if (hp->h_addr_list[0] && *hp->h_addr_list[0])
 			fprintf(stderr, "h_addr_list <apparent list>\n");
 		else
@@ -196,19 +198,19 @@ mount_nfs(fsname, dir, error)
 		printf("clnt_create for mountproc (%d)\n", errno);
 
 	client = clnt_create_vers(host, MOUNTPROG, &vers, MOUNTVERS, vers,
-				"udp");
+	    "udp");
 	if (client == NULL) {
 		errprintf(error, "%s %s\n", host,
-			  clnt_spcreateerror("mount server not responding"));
+		    clnt_spcreateerror("mount server not responding"));
 		return (1);
 	}
 
 	if (Debug)
 		printf("call bindudp_resvport for mountproc (%d)\n", errno);
 
- 	if (bindudp_resvport(client) < 0) {
+	if (bindudp_resvport(client) < 0) {
 		errprintf(error, "mount %s:%s: %s\n", host, path,
-			  "Couldn't bind to reserved port");
+		    "Couldn't bind to reserved port");
 		if (Debug)
 			printf("could not bind to reserved port\n");
 		clnt_destroy(client);
@@ -219,7 +221,7 @@ mount_nfs(fsname, dir, error)
 		auth_destroy(client->cl_auth);
 	if ((client->cl_auth = authsys_create_default()) == NULL) {
 		errprintf(error, "mount %s:%s: %s\n", host, path,
-			  "Couldn't create authsys structure");
+		    "Couldn't create authsys structure");
 		if (Debug)
 			printf("could not create authsys structure\n");
 		clnt_destroy(client);
@@ -234,7 +236,7 @@ mount_nfs(fsname, dir, error)
  */
 
 	/* set mount args */
-	memset(&args, 0, sizeof(args));
+	memset(&args, 0, sizeof (args));
 
 	/* Get fhandle of remote path from server's mountd */
 
@@ -245,14 +247,16 @@ mount_nfs(fsname, dir, error)
 	case MOUNTVERS:
 	case MOUNTVERS_POSIX:
 		rpc_stat = clnt_call(client, MOUNTPROC_MNT,
-				xdr_dirpath, (caddr_t)&path,
-				xdr_fhstatus, (caddr_t)&fhs, timeout);
+		    xdr_dirpath, (caddr_t)&path,
+		    xdr_fhstatus, (caddr_t)&fhs, timeout);
 
 		if (rpc_stat != RPC_SUCCESS) {
-			/* Given the way "clnt_sperror" works, the "%s" */
-			/* following the "not responding" is correct. */
+			/*
+			 * Given the way "clnt_sperror" works, the "%s"
+			 * following the "not responding" is correct.
+			 */
 			errprintf(error, "mount server %s not responding %s\n",
-				host, clnt_sperror(client, ""));
+			    host, clnt_sperror(client, ""));
 			clnt_destroy(client);
 			return (1);
 		}
@@ -262,11 +266,11 @@ mount_nfs(fsname, dir, error)
 		if ((errno = fhs.fhs_status) != MNT_OK) {
 			if (errno == EACCES) {
 				errprintf(error,
-				  "rexd mount: not in EXPORT list for %s\n",
-				  fsname);
+				    "rexd mount: not in EXPORT list for %s\n",
+				    fsname);
 			} else {
 				errprintf(error, "rexd mount: error %d %s\n",
-					errno, strerror(errno));
+				    errno, strerror(errno));
 			}
 			return (1);
 		}
@@ -277,14 +281,16 @@ mount_nfs(fsname, dir, error)
 	case MOUNTVERS3:
 		memset((char *)&res3, '\0', sizeof (res3));
 		rpc_stat = clnt_call(client, MOUNTPROC_MNT,
-				xdr_dirpath, (char *)&path,
-				xdr_mountres3, (char *)&res3, timeout);
+		    xdr_dirpath, (char *)&path,
+		    xdr_mountres3, (char *)&res3, timeout);
 
 		if (rpc_stat != RPC_SUCCESS) {
-			/* Given the way "clnt_sperror" works, the "%s" */
-			/* following the "not responding" is correct. */
+			/*
+			 * Given the way "clnt_sperror" works, the "%s"
+			 * following the "not responding" is correct.
+			 */
 			errprintf(error, "mount server %s not responding %s\n",
-				host, clnt_sperror(client, ""));
+			    host, clnt_sperror(client, ""));
 			clnt_destroy(client);
 			return (1);
 		}
@@ -294,11 +300,11 @@ mount_nfs(fsname, dir, error)
 		if ((errno = res3.fhs_status) != MNT_OK) {
 			if (errno == EACCES) {
 				errprintf(error,
-				  "rexd mount: not in EXPORT list for %s\n",
-				  fsname);
+				    "rexd mount: not in EXPORT list for %s\n",
+				    fsname);
 			} else {
 				errprintf(error, "rexd mount: error %d %s\n",
-					errno, strerror(errno));
+				    errno, strerror(errno));
 			}
 			return (1);
 		}
@@ -322,7 +328,7 @@ mount_nfs(fsname, dir, error)
 		break;
 	default:
 		errprintf(error, "rexd mount: unknown MOUNT version %ld\n",
-			vers);
+		    vers);
 		return (1);
 	}
 
@@ -353,12 +359,18 @@ mount_nfs(fsname, dir, error)
 
 	flags = MS_NOSUID | MS_DATA;
 
+	/*
+	 * And make sure that we have the ephemeral mount_to
+	 * set for this zone.
+	 */
+	set_nfsv4_ephemeral_mount_to();
+
 	/* Provide the mounted resource name when mounting. */
-	if (mount(fsname, dir, flags, fstype, &args, sizeof(args)) < 0) {
+	if (mount(fsname, dir, flags, fstype, &args, sizeof (args)) < 0) {
 		netbuf_free(args.addr);
 		free_knconf(args.knconf);
 		errprintf(error, "unable to mount %s on %s: %s\n",
-			fsname, dir, strerror(errno));
+		    fsname, dir, strerror(errno));
 		return (1);
 	}
 
@@ -397,8 +409,7 @@ mount_nfs(fsname, dir, error)
  * umount_nfs - unmount a file system when finished
  */
 int
-umount_nfs(fsname, dir)
-char *fsname, *dir;
+umount_nfs(char *fsname, char *dir)
 {
 	char *p;
 	char *hostname;
@@ -443,7 +454,7 @@ char *fsname, *dir;
 	}
 	if (bindudp_resvport(client) < 0) {
 		errprintf(NULL, "umount %s:%s:%s", hostname, p,
-			  "Could not bind to reserved port\n");
+		    "Could not bind to reserved port\n");
 		clnt_destroy(client);
 		return (1);
 	}
@@ -456,8 +467,8 @@ char *fsname, *dir;
 	timeout.tv_usec = 0;
 	timeout.tv_sec = 25;
 
-	rpc_stat = clnt_call(client, MOUNTPROC_UMNT, xdr_dirpath, (caddr_t) &p,
-			     xdr_void, (char *)NULL, timeout);
+	rpc_stat = clnt_call(client, MOUNTPROC_UMNT, xdr_dirpath, (caddr_t)&p,
+	    xdr_void, (char *)NULL, timeout);
 
 	clnt_destroy(client);
 
@@ -470,12 +481,8 @@ char *fsname, *dir;
 	return (0);
 }
 
-
-
-
 static struct mnttab *
-dupmnttab(mnt)
-struct mnttab *mnt;
+dupmnttab(struct mnttab *mnt)
 {
 	struct mnttab *new;
 	void freemnttab();
@@ -502,7 +509,8 @@ struct mnttab *mnt;
 
 	return (new);
 
-      alloc_failed:
+alloc_failed:
+
 	errprintf(NULL, "dupmnttab: memory allocation failed\n");
 	freemnttab(new);
 	return (NULL);
@@ -514,8 +522,7 @@ struct mnttab *mnt;
  * Free a single mnttab structure
  */
 static void
-freemnttab(mnt)
-struct mnttab *mnt;
+freemnttab(struct mnttab *mnt)
 {
 	if (mnt) {
 		if (mnt->mnt_special)
@@ -545,8 +552,7 @@ struct mntlist {
  * Free a list of mnttab structures
  */
 static void
-freemntlist(mntl)
-struct mntlist *mntl;
+freemntlist(struct mntlist *mntl)
 {
 	struct mntlist *mntl_tmp;
 
@@ -568,25 +574,20 @@ struct mntlist *mntl;
  *	Returns NULL on errors.
  */
 char *
-parsefs(fullname, error)
-char	*fullname;
-char	*error;
+parsefs(char *fullname, char *error)
 {
-	char	*dir,
-	*subdir;
+	char	*dir, *subdir;
 	struct exportnode	*ex = NULL;
 	int	err;
 	int	bestlen = 0;
-	int	len,
-	dirlen;
+	int	len, dirlen;
 
 	if (Debug && errno)
 		printf("parsefs of %s entered with errno %d %s\n",
-			fullname, errno, strerror(errno));
+		    fullname, errno, strerror(errno));
 
 	dir = strchr(fullname, ':');
 	if (dir == NULL) {
-
 		errprintf(error, "No host name in %s\n", fullname);
 		return (NULL);
 	}
@@ -596,20 +597,18 @@ char	*error;
 		printf("parsefs before rpc_call: ERRNO:%d\n", errno);
 
 	if (err = rpc_call(fullname, MOUNTPROG, MOUNTVERS, MOUNTPROC_EXPORT,
-			xdr_void, 0, xdr_exports, (char *)&ex, "udp")) {
+	    xdr_void, 0, xdr_exports, (char *)&ex, "udp")) {
 
 		if (err == (int)RPC_TIMEDOUT)
 			errprintf(error, "Host %s is not running mountd\n",
-				fullname);
+			    fullname);
 		else
 			errprintf(error, "RPC error %d with host %s (%s)\n",
-				err, fullname, clnt_sperrno(err));
+			    err, fullname, clnt_sperrno(err));
 
 		if (Debug && errno) {
 			printf("parsefs: mount call to %s returned %d %s\n",
-				fullname,
-				err,
-				clnt_sperrno(err));
+			    fullname, err, clnt_sperrno(err));
 			printf("with errno %d:\t%s\n",	errno, strerror(errno));
 		}
 		return (NULL);
@@ -622,9 +621,7 @@ char	*error;
 
 	if (Debug && errno) {
 		printf("parsefs: mount call to %s returned %d %s\n",
-			fullname,
-			err,
-			clnt_sperrno(err));
+		    fullname, err, clnt_sperrno(err));
 		printf("with errno %d:\t%s\n", errno, strerror(errno));
 	}
 
@@ -644,7 +641,7 @@ char	*error;
 
 	if (bestlen == 0) {
 		errprintf(error, "%s not exported by %s\n",
-			dir, fullname);
+		    dir, fullname);
 		return (NULL);
 	}
 
@@ -659,7 +656,6 @@ char	*error;
 	return (subdir);
 }
 
-
 /*
  * Get the network address for the service identified by "prog"
  * and "vers" on "hostname".  The netconfig address is returned
@@ -667,13 +663,8 @@ char	*error;
  * If the hostname is the same as the last call, then the same
  * transport is used as last time (same netconfig entry).
  */
-
-
 static struct netbuf *
-get_addr(hostname, prog, vers, nconfp)
-char *hostname;
-int prog, vers;
-struct netconfig **nconfp;
+get_addr(char *hostname, int prog, int vers, struct netconfig **nconfp)
 {
 	static char prevhost[MAXHOSTNAMELEN+1];
 	static struct netconfig *nconf;
@@ -712,12 +703,12 @@ struct netconfig **nconfp;
 	if (fd < 0)
 		goto done;
 
-	tbind = (struct t_bind *) t_alloc(fd, T_BIND, T_ADDR);
+	tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
 	if (tbind == NULL)
 		goto done;
 
 	if (rpcb_getaddr(prog, vers, nconf, &tbind->addr, hostname) == 0) {
-		t_free((char *) tbind, T_BIND);
+		t_free((char *)tbind, T_BIND);
 		tbind = NULL;
 		goto retry;
 	}
@@ -726,7 +717,7 @@ struct netconfig **nconfp;
 	/*
 	 * Make a copy of the netbuf to return
 	 */
-	nb = (struct netbuf *) malloc(sizeof (struct netbuf));
+	nb = (struct netbuf *)malloc(sizeof (struct netbuf));
 	if (nb == NULL) {
 		errprintf(NULL, "no memory");
 		goto done;
@@ -743,15 +734,14 @@ struct netconfig **nconfp;
 
 done:
 	if (tbind)
-		t_free((char *) tbind, T_BIND);
+		t_free((char *)tbind, T_BIND);
 	if (fd >= 0)
 		(void) t_close(fd);
 	return (nb);
 }
 
 static struct knetconfig *
-get_knconf(nconf)
-struct netconfig *nconf;
+get_knconf(struct netconfig *nconf)
 {
 	struct stat stbuf;
 	struct knetconfig *k;
@@ -760,7 +750,7 @@ struct netconfig *nconf;
 		errprintf(NULL, "get_knconf: stat %s: %m", nconf->nc_device);
 		return (NULL);
 	}
-	k = (struct knetconfig *) malloc(sizeof (*k));
+	k = (struct knetconfig *)malloc(sizeof (*k));
 	if (k == NULL)
 		goto nomem;
 	k->knc_semantics = nconf->nc_semantics;
@@ -781,8 +771,7 @@ nomem:
 }
 
 static void
-free_knconf(k)
-struct knetconfig *k;
+free_knconf(struct knetconfig *k)
 {
 	if (k == NULL)
 		return;
@@ -794,8 +783,7 @@ struct knetconfig *k;
 }
 
 static void
-netbuf_free(nb)
-struct netbuf *nb;
+netbuf_free(struct netbuf *nb)
 {
 	if (nb == NULL)
 		return;
@@ -806,9 +794,7 @@ struct netbuf *nb;
 
 
 static enum clnt_stat
-pingnfs(hostname, versp)
-char *hostname;
-rpcvers_t *versp;
+pingnfs(char *hostname, rpcvers_t *versp)
 {
 	CLIENT *cl;
 	enum clnt_stat clnt_stat;
@@ -828,10 +814,10 @@ rpcvers_t *versp;
 	/* ping the NFS nullproc on the server */
 
 	cl = clnt_create_vers(hostname, NFS_PROGRAM, versp, NFS_VERSMIN,
-			NFS_VERSMAX, "udp");
+	    NFS_VERSMAX, "udp");
 	if (cl == NULL) {
 		errprintf(NULL, "pingnfs: %s%s",
-			  hostname, clnt_spcreateerror(""));
+		    hostname, clnt_spcreateerror(""));
 		if (Debug)
 			printf("clnt_create failed\n");
 		clnt_stat = RPC_TIMEDOUT;
@@ -850,13 +836,12 @@ rpcvers_t *versp;
 
 	if (Debug)
 		(void) printf("%s\n", clnt_stat == RPC_SUCCESS ?
-				"OK" : "NO RESPONSE");
+		    "OK" : "NO RESPONSE");
 
 	return (clnt_stat);
 }
 
-static int bindudp_resvport(client)
-CLIENT *client;
+static int bindudp_resvport(CLIENT *client)
 {
 	struct netconfig *udpnconf;
 	int clfd;
@@ -868,8 +853,9 @@ CLIENT *client;
 		return (-1);
 	}
 
-	if (clnt_control(client, CLGET_FD, (char *) &clfd) == FALSE) {
-		errprintf(NULL, "Could not get file dscriptor for client handle\n");
+	if (clnt_control(client, CLGET_FD, (char *)&clfd) == FALSE) {
+		errprintf(NULL,
+		    "Could not get file dscriptor for client handle\n");
 		return (-1);
 	}
 
@@ -882,7 +868,7 @@ CLIENT *client;
 		}
 	}
 
-	if ((udpnconf = getnetconfigent("udp")) == (struct netconfig *) NULL) {
+	if ((udpnconf = getnetconfigent("udp")) == (struct netconfig *)NULL) {
 		errprintf(NULL, "no netconfig information about \"udp\"\n");
 		return (-1);
 	}
@@ -892,7 +878,7 @@ CLIENT *client;
 	}
 
 	if ((rv = netdir_options(udpnconf, ND_SET_RESERVEDPORT, clfd,
-				(char *) NULL)) == -1) {
+	    (char *)NULL)) == -1) {
 		if (Debug) {
 			printf("netdir_options fails rv=%d\n", rv);
 		}

@@ -993,6 +993,7 @@ extern struct vnode zvp;
 #define	ATTR_COMM	0x04	/* yield common vp attributes */
 #define	ATTR_HINT	0x08	/* information returned will be `hint' */
 #define	ATTR_REAL	0x10	/* yield attributes of the real vp */
+#define	ATTR_TRIGGER	0x40	/* Mount first if vnode is a trigger mount */
 
 /*
  * Generally useful macros.

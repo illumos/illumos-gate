@@ -85,6 +85,8 @@
 #include <tsol/label.h>
 #include <zone.h>
 
+extern void set_nfsv4_ephemeral_mount_to(void);
+
 extern char *nfs_get_qop_name();
 extern AUTH *nfs_create_ah();
 extern enum snego_stat nfs_sec_nego();
@@ -2376,6 +2378,12 @@ try_mnt_slash:
 	if (trace > 1) {
 		trace_prt(1, "	mount %s %s (%s)\n", mnttabtext, mntpnt, mopts);
 	}
+
+	/*
+	 * About to do a nfs mount, make sure the mount_to is set for
+	 * potential ephemeral mounts with NFSv4.
+	 */
+	set_nfsv4_ephemeral_mount_to();
 
 	/*
 	 * If no action list pointer then do the mount, otherwise
