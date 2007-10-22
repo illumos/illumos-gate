@@ -1,5 +1,26 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -668,7 +689,7 @@ main(int argc, char *argv[])
 	if (fi < 0) {
 		saverr = errno;
 		msg(gettext("Cannot open dump device `%s': %s\n"),
-			disk, strerror(saverr));
+		    disk, strerror(saverr));
 		Exit(X_ABORT);
 	}
 
@@ -773,7 +794,7 @@ restart:
 		msg(gettext("Date of this level %c dump: %s\n"),
 		    incno, prdate(spcl.c_date));
 		msg(gettext("Date of last level %c dump: %s\n"),
-			(uchar_t)lastincno, prdate(spcl.c_ddate));
+		    (uchar_t)lastincno, prdate(spcl.c_ddate));
 		msg(gettext("Dumping %s "), disk);
 		if (filesystem != 0)
 			msgtail("(%.*s:%s) ",
@@ -784,7 +805,7 @@ restart:
 
 	esize = f_esize = o_esize = 0;
 	msiz = roundup(d_howmany(sblock->fs_ipg * sblock->fs_ncg, NBBY),
-		TP_BSIZE_MAX);
+	    TP_BSIZE_MAX);
 	if (!doingactive) {
 		clrmap = (uchar_t *)xcalloc(msiz, sizeof (*clrmap));
 		filmap = (uchar_t *)xcalloc(msiz, sizeof (*filmap));
@@ -1044,7 +1065,7 @@ restart:
 			nextstate(DS_DIRS);
 			if (!doingverify) {
 				msgp = gettext(
-					"Dumping (Pass III) [directories]\n");
+				    "Dumping (Pass III) [directories]\n");
 				msg(msgp);
 			}
 			/* FALLTHROUGH */
@@ -1054,7 +1075,7 @@ restart:
 			nextstate(DS_FILES);
 			if (!doingverify) {
 				msgp = gettext(
-					"Dumping (Pass IV) [regular files]\n");
+				    "Dumping (Pass IV) [regular files]\n");
 				msg(msgp);
 			}
 			/* FALLTHROUGH */
@@ -1105,7 +1126,7 @@ restart:
 		(void) snprintf(kbsbuf, sizeof (kbsbuf),
 		    gettext(" at %ld KB/sec"),
 		    (long)(((float)spcl.c_tapea / (float)timeclock((time_t)0))
-			* 1000.0));
+		    * 1000.0));
 		(void) strcat(msgbuf, kbsbuf);
 	}
 	(void) strcat(msgbuf, "\n");
@@ -1283,18 +1304,18 @@ timeclock(time32_t state)
 		if ((fd = open("/dev/zero", O_RDWR)) < 0) {
 			saverr = errno;
 			msg(gettext("Cannot open `%s': %s\n"),
-				"/dev/zero", strerror(saverr));
+			    "/dev/zero", strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
 		}
 		/*LINTED [mmap always returns an aligned value]*/
 		currentState = (int *)mmap((char *)0, getpagesize(),
-			PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)0);
+		    PROT_READ|PROT_WRITE, MAP_SHARED, fd, (off_t)0);
 		if (currentState == (int *)-1) {
 			saverr = errno;
 			msg(gettext(
-				"Cannot memory map monitor variables: %s\n"),
-				strerror(saverr));
+			    "Cannot memory map monitor variables: %s\n"),
+			    strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -1348,9 +1369,15 @@ statcmp(const struct stat64 *left, const struct stat64 *right)
 	    (left->st_ctim.tv_sec == right->st_ctim.tv_sec) &&
 	    (left->st_ctim.tv_nsec == right->st_ctim.tv_nsec) &&
 	    (left->st_mtim.tv_sec == right->st_mtim.tv_sec) &&
-	    (left->st_mtim.tv_nsec == right->st_mtim.tv_nsec) &&
-	    (left->st_blksize == right->st_blksize) &&
-	    (left->st_blocks == right->st_blocks)) {
+	    (left->st_mtim.tv_nsec == right->st_mtim.tv_nsec)) {
+		/*
+		 * Unlike in the ufsrestore version
+		 * st_blocks and st_blksiz are not
+		 * compared. The reason for this is
+		 * problems with zfs dump files. Zfs
+		 * changes it's statistics in those
+		 * fields.
+		 */
 		result = 0;
 	}
 
@@ -1431,8 +1458,8 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			 * time is updated by open(2).
 			 */
 			if (statcmp(&pre_lstat, &post_lstat) != 0) {
-				errtext = gettext(
-	    "Unexpected change detected: %s's lstat(2) information changed\n");
+				errtext = gettext("Unexpected change detected: "
+				    "%s's lstat(2) information changed\n");
 				msg(errtext, filename);
 				syslog(LOG_WARNING, errtext, filename);
 				errno = EPERM;
@@ -1440,9 +1467,9 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			}
 
 			if (statcmp(&pre_stat, &post_stat) != 0) {
-				errtext = gettext(
-	    "Unexpected change detected: %s's stat(2) information changed\n"),
-				msg(errtext, filename);
+				errtext = gettext("Unexpected change detected: "
+				    "%s's stat(2) information changed\n"),
+				    msg(errtext, filename);
 				syslog(LOG_WARNING, errtext, filename);
 				errno = EPERM;
 				return (-1);
@@ -1458,9 +1485,9 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			if (device && !(S_ISCHR(post_stat.st_mode)) &&
 			    !(S_ISFIFO(post_stat.st_mode)) &&
 			    !(S_ISREG(post_lstat.st_mode))) {
-				errtext = gettext(
-	    "Unexpected condition detected: %s is not a supported device\n"),
-				msg(errtext, filename);
+				errtext = gettext("Unexpected condition "
+				    "detected: %s is not a supported device\n"),
+				    msg(errtext, filename);
 				syslog(LOG_WARNING, errtext, filename);
 				(void) close(fd);
 				errno = EPERM;
@@ -1469,9 +1496,9 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			    (!S_ISREG(post_lstat.st_mode) ||
 			    (post_stat.st_ino != post_lstat.st_ino) ||
 			    (post_stat.st_dev != post_lstat.st_dev))) {
-				errtext = gettext(
-	    "Unexpected condition detected: %s is not a regular file\n"),
-				msg(errtext, filename);
+				errtext = gettext("Unexpected condition "
+				    "detected: %s is not a regular file\n"),
+				    msg(errtext, filename);
 				syslog(LOG_WARNING, errtext, filename);
 				(void) close(fd);
 				errno = EPERM;
@@ -1484,9 +1511,9 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			 * shouldn't step on.
 			 */
 			if (post_lstat.st_nlink != 1) {
-				errtext = gettext(
-	    "Unexpected condition detected: %s must have exactly one link\n"),
-				msg(errtext, filename);
+				errtext = gettext("Unexpected condition "
+				    "detected: %s must have exactly one "
+				    "link\n"), msg(errtext, filename);
 				syslog(LOG_WARNING, errtext, filename);
 				(void) close(fd);
 				errno = EPERM;
@@ -1499,9 +1526,10 @@ safe_open_common(const char *filename, int mode, int perms, int device)
 			 */
 			if (post_lstat.st_uid != getuid() &&
 			    post_lstat.st_uid != 0) {
-				errtext = gettext(
-"Unsupported condition detected: %s must be owned by uid %ld or 0\n"),
-				msg(errtext, filename, (long)getuid());
+				errtext = gettext("Unsupported "
+				    "condition detected: %s "
+				    "must be owned by uid %ld or 0\n"),
+				    msg(errtext, filename, (long)getuid());
 				syslog(LOG_WARNING, errtext, filename,
 				    (long)getuid());
 				(void) close(fd);
@@ -1591,7 +1619,7 @@ safe_fopen(const char *filename, const char *smode, int perms)
 	 * caller is expected to report error.
 	 */
 	if (fd >= 0)
-	    return (fdopen(fd, smode));
+		return (fdopen(fd, smode));
 
 	return ((FILE *)NULL);
 }
