@@ -58,12 +58,15 @@ LIBS=	$(DYNLIB) $(LINTLIB)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS		+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc 
-LDLIBS64	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd -lpkcs11 -lnsl -lsocket -lc 
+LAZYLIBS=	$(ZLAZYLOAD) -lpkcs11 $(ZNOLAZYLOAD)
+lint		:=	LAZYLIBS =	-lpkcs11
+
+LDLIBS		+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd $(LAZYLIBS) -lnsl -lsocket -lc 
+LDLIBS64	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd $(LAZYLIBS) -lnsl -lsocket -lc 
 
 # DYNLIB libraries do not have lint libs and are not linted
-$(DYNLIB) :=    LDLIBS += -lxml2
-$(DYNLIB64) :=  LDLIBS64 += -lxml2
+$(DYNLIB) :=    LDLIBS += $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
+$(DYNLIB64) :=  LDLIBS64 += $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
 
 CPPFLAGS	+=	-I$(INCDIR) -I/usr/include/libxml2 -I../../ber_der/inc -I$(SRCDIR)
 

@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +36,11 @@ include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBLINKS=	$(DYNLIB:.so.1=.so)
 KMFINC=		-I../../../include -I../../../ber_der/inc
-BERLIB=		-lkmf -lkmfberder
+LAZYLIBS=	$(ZLAZYLOAD) -lkmf $(ZNOLAZYLOAD) -lkmfberder
+
+lint:=	LAZYLIBS	=	-lkmf -lkmfberder
+
+BERLIB=		$(LAZYLIBS)
 BERLIB64=	$(BERLIB)
 
 OPENSSLLIBS=	$(BERLIB) $(OPENSSL_DYNFLAGS) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc

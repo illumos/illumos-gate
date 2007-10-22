@@ -154,7 +154,10 @@ KMF_PLUGIN_ITEM plugin_list[] = {
 
 
 
+static KMF_RETURN InitializePlugin(KMF_KEYSTORE_TYPE, char *, KMF_PLUGIN **);
+static KMF_RETURN AddPlugin(KMF_HANDLE_T, KMF_PLUGIN *);
 static void free_extensions(KMF_X509_EXTENSIONS *extns);
+static void DestroyPlugin(KMF_PLUGIN *);
 
 KMF_RETURN
 init_pk11()
@@ -182,17 +185,43 @@ KMF_PLUGIN *
 FindPlugin(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE kstype)
 {
 	KMF_PLUGIN_LIST *node;
+	KMF_RETURN ret = KMF_OK;
 
 	if (handle == NULL)
 		return (NULL);
 
 	node = handle->plugins;
 
+	/* See if the desired plugin was already initialized. */
 	while (node != NULL && node->plugin->type != kstype)
 		node = node->next;
 
-	/* If it is NULL, that is indication enough of an error */
-	return (node ? node->plugin : NULL);
+	/* If the plugin was not found, try to initialize it here. */
+	if (node == NULL) {
+		int i;
+		KMF_PLUGIN *pluginrec = NULL;
+		int numitems = sizeof (plugin_list)/sizeof (KMF_PLUGIN_ITEM);
+		for (i = 0; i < numitems; i++) {
+			if (plugin_list[i].kstype == kstype) {
+				ret = InitializePlugin(plugin_list[i].kstype,
+				    plugin_list[i].path, &pluginrec);
+				break;
+			}
+		}
+
+		/* No matching plugins found in the available list */
+		if (ret != KMF_OK || pluginrec == NULL)
+			return (NULL);
+
+		ret = AddPlugin(handle, pluginrec);
+		if (ret != KMF_OK) {
+			DestroyPlugin(pluginrec);
+			pluginrec = NULL;
+		}
+		return (pluginrec);
+	} else {
+		return (node->plugin);
+	}
 }
 
 static KMF_RETURN
@@ -216,7 +245,7 @@ InitializePlugin(KMF_KEYSTORE_TYPE kstype, char *path, KMF_PLUGIN **plugin)
 		free(p);
 		return (KMF_ERR_MEMORY);
 	}
-	p->dldesc = dlopen(path, RTLD_NOW | RTLD_GROUP | RTLD_PARENT);
+	p->dldesc = dlopen(path, RTLD_LAZY | RTLD_GROUP | RTLD_PARENT);
 	if (p->dldesc == NULL) {
 		free(p->path);
 		free(p);
@@ -294,12 +323,9 @@ Cleanup_KMF_Handle(KMF_HANDLE_T handle)
 			KMF_PLUGIN_LIST *next = handle->plugins->next;
 
 			DestroyPlugin(handle->plugins->plugin);
-
 			free(handle->plugins);
-
 			handle->plugins = next;
 		}
-
 		kmf_free_policy_record(handle->policy);
 		free(handle->policy);
 	}
@@ -323,8 +349,6 @@ kmf_initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *handle = NULL;
-	KMF_PLUGIN *pluginrec = NULL;
-	int i, numitems;
 
 	if (outhandle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -343,28 +367,6 @@ kmf_initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	    policyname == NULL ? KMF_DEFAULT_POLICY_NAME : policyname);
 	if (ret != KMF_OK)
 		goto errout;
-
-	numitems = sizeof (plugin_list)/sizeof (KMF_PLUGIN_ITEM);
-	for (i = 0; i < numitems; i++) {
-		ret = InitializePlugin(plugin_list[i].kstype,
-		    plugin_list[i].path, &pluginrec);
-		if (ret != KMF_OK) {
-			cryptoerror(
-			    plugin_list[i].critical ? LOG_WARNING : LOG_DEBUG,
-			    "KMF was unable to load %s plugin module %s\n",
-			    plugin_list[i].critical ? "critical" : "optional",
-			    plugin_list[i].path);
-
-			if (plugin_list[i].critical == FALSE)
-				ret = KMF_OK;
-			else
-				goto errout;
-		}
-		if (pluginrec != NULL) {
-			if ((ret = AddPlugin(handle, pluginrec)))
-				goto errout;
-		}
-	}
 
 	CLEAR_ERROR(handle, ret);
 errout:
