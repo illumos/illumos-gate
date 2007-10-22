@@ -874,6 +874,8 @@ $(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
 # which is used to label all binaries in the build:
 #
 # 	RELEASE		Specific release of the build, eg: 5.2
+#	RELEASE_MAJOR	Major version number part of $(RELEASE)
+#	RELEASE_MINOR	Minor version number part of $(RELEASE)
 #	VERSION		Version of the build (alpha, beta, Generic)
 #	PATCHID		If this is a patch this value should contain
 #			the patchid value (eg: "Generic 100832-01"), otherwise
@@ -883,7 +885,9 @@ $(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
 #			will default to the RELEASE_DATE
 #
 ONVERS=		"11.11"
-RELEASE=	5.11
+RELEASE_MAJOR=	5
+RELEASE_MINOR=	11
+RELEASE=	$(RELEASE_MAJOR).$(RELEASE_MINOR)
 VERSION=	SunOS Development
 PATCHID=	$(VERSION)
 RELEASE_DATE=	October 2007

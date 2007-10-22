@@ -25,12 +25,9 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# Fetch minor version from RELEASE, e.g. "10" for "5.10", "11" for "5.11" etc.
-GETRELEASEMINOR = /usr/bin/ksh -c 'x=$(RELEASE) ; print "$${x$(POUND_SIGN)$(POUND_SIGN)*.}"'
-
 # Platform-specific config
 # Note that "HOSTTYPE" matches the value used by AT&T upstream.
-ASTPLATFORMCPPFLAGS = '-DHOSTTYPE="sol$(GETRELEASEMINOR:sh).i386"'
+ASTPLATFORMCPPFLAGS = '-DHOSTTYPE="sol$(RELEASE_MINOR).i386"'
 
 # platform-specific sources
 OBJECTS = \
