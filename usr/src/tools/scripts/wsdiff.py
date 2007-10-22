@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -344,10 +344,15 @@ def getTheFileType(f) :
 		       'jar'	:	'Java Archive',
 		       'html'	:	'HTML',
 		       'ln'	:	'Lint Library',
+		       'esa'	:	'Elfsign Activation',
 		       'db'	:	'Sqlite Database' }
 	
-	if os.stat(f)[ST_SIZE] == 0 :
-		return 'ASCII'
+	try:
+		if os.stat(f)[ST_SIZE] == 0 :
+			return 'ASCII'
+	except:
+		error("failed to stat " + f)
+		return 'Error'
 
 	if isELF(f) == 1 :
 		return 'ELF'
@@ -998,6 +1003,33 @@ def compareByDumping(base, ptch, quiet, fileType) :
 	return 0
 
 #####
+# Compare two elfsign activation files. This ignores the activation
+# files themselves and reports a difference if and only if the
+# corresponding base files are different.
+#
+# Returns 1 if difference detected
+#         0 if no difference detected
+#        -1 on error
+#
+def compareActivation(base, ptch, quiet, fileType) :
+
+	fileName = fnFormat(base)
+
+	# Drop the .esa suffix from both filenames.
+	base = base[0:base.rfind('.esa')]
+	ptch = ptch[0:ptch.rfind('.esa')]
+
+	result = compareOneFile(base, ptch, True)
+	if result == -1 :
+		error("unable to compare " + fileName)
+	elif result == 1 :
+		if not quiet :
+			difference(fileName, fileType, \
+				"change in corresponding ELF file")
+
+	return result
+
+#####
 # Compare two objects. Detect type changes.
 # Vector off to the appropriate type specific
 # compare routine based on the type.
@@ -1009,10 +1041,14 @@ def compareOneFile(base, ptch, quiet) :
 	btype = getTheFileType(base)
 	ptype = getTheFileType(ptch)
 
+	if btype == 'Error' or ptype == 'Error' :
+		return -1
+
 	fileName = fnFormat(base)
 
 	if (btype != ptype) :
-		difference(fileName, "file type", btype + " to " + ptype)
+		if not quiet :
+			difference(fileName, "file type", btype + " to " + ptype)
 		return 1
 	else :
 		fileType = btype
@@ -1031,6 +1067,10 @@ def compareOneFile(base, ptch, quiet) :
 
 	elif ( fileType == 'Sqlite Database' ) :
 		return compareByDumping(base, ptch, quiet, fileType)
+
+	elif ( fileType == 'Elfsign Activation' ) :
+		return compareActivation(base, ptch, quiet, fileType)
+
 	else :
 		# it has to be some variety of text file
 		return compareBasic(base, ptch, quiet, fileType)
