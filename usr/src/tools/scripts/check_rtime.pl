@@ -215,6 +215,7 @@ $UnusedNoise = qr{
 	libmapmalloc\.so\.1;\ unused |
 	unused\ dependency\ of\ .*libstdc\+\+\.so\.6 |
 	unreferenced\ object=.*libstdc\+\+\.so\.6 |
+	unused\ dependency\ of\ .*libnetsnmp\.so\.5 |
 	unused\ dependency\ of\ .*libnetsnmphelpers\.so\.5 |
 	unused\ dependency\ of\ .*libnetsnmpmibs\.so\.5 |
 	unused\ dependency\ of\ .*libnetsnmpagent\.so\.5

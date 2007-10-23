@@ -48,8 +48,10 @@ d none usr/lib 755 root bin
 d none usr/lib/hal 755 root bin
 f none usr/lib/hal/hald 555 root bin
 f none usr/lib/hal/hald-addon-acpi 555 root bin
+f none usr/lib/hal/hald-addon-network-discovery 555 root bin
 f none usr/lib/hal/hald-addon-storage 555 root bin
 f none usr/lib/hal/hald-probe-battery 555 root bin
+f none usr/lib/hal/hald-probe-network-printer 555 root bin
 f none usr/lib/hal/hald-probe-printer 555 root bin
 f none usr/lib/hal/hald-probe-storage 555 root bin
 f none usr/lib/hal/hald-probe-volume 555 root bin

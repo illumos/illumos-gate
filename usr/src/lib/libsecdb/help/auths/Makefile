@@ -78,6 +78,7 @@ HTMLENTS = \
 	SmfModifyHeader.html \
 	SmfModifyMethod.html \
 	SmfNscdStates.html \
+	SmfNADDStates.html \
 	SmfNWAMStates.html \
 	SmfPowerStates.html \
 	SmfRoutingStates.html \
@@ -89,6 +90,7 @@ HTMLENTS = \
 	SmfValueIPsec.html \
 	SmfValueIscsitgt.html \
 	SmfValueMDNS.html \
+	SmfValueNADD.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \
 	SmfWpaStates.html \

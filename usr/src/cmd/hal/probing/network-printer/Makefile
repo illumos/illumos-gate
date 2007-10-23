@@ -25,18 +25,44 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = storage volume printer network-printer battery
+PROG =		hald-probe-network-printer
+OBJS =		probe-network-printer.o logger.o probe-snmp.o printer.o
+SRCS =		probe-network-printer.c
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
+include ../../../Makefile.cmd
+include ../../Makefile.hal
+
+ROOTCMDDIR =	$(ROOTLIB_HAL)
+
+LDLIBS +=	-lc -ldbus-1 -lhal
+LDLIBS +=	-L$(SFWLIBDIR) -R$(SFWLIBDIR) $(ZIGNORE) -lnetsnmp
+
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../utils -I../../hald
+CPPFLAGS +=	-I$(SFWINCDIR)
+C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
-all install clean clobber: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+logger.o: ../../hald/logger.c
+	$(COMPILE.c) -o $@ ../../hald/logger.c
+	$(POST_PROCESS_O)
+
+printer.o: ../../utils/printer.c
+	$(COMPILE.c) -o $@ ../../utils/printer.c
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTCMD)
+
+clean:
+	$(RM) $(OBJS)
 
 FRC:
+
+include ../../../Makefile.targ

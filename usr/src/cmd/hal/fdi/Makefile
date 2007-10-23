@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,13 +44,15 @@ FDIS =		information/10freedesktop/10-camera-ptp.fdi \
 		information/10freedesktop/10-wireless-mice.fdi \
 		policy/10osvendor/10-keyboard-policy.fdi \
 		policy/10osvendor/10-laptop-panel-mgmt-policy.fdi \
+		policy/10osvendor/10-network-attached.fdi \
 		policy/10osvendor/10-power-mgmt-policy.fdi \
 		policy/10osvendor/10-toshiba-buttons.fdi \
 		policy/10osvendor/20-storage-methods.fdi \
 		policy/10osvendor/20-zfs-methods.fdi \
 		preprobe/10osvendor/10-ide-drives.fdi \
 		preprobe/10osvendor/20-ignore-fixed-storage.fdi \
-		preprobe/10osvendor/20-ignore-lofi.fdi
+		preprobe/10osvendor/20-ignore-lofi.fdi \
+		preprobe/10osvendor/20-printers.fdi
 FDIDIR =	$(ROOT_HAL_FDI)
 ROOTFDIS =	$(FDIS:%=$(FDIDIR)/%)
 

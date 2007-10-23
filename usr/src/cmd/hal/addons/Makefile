@@ -25,7 +25,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = storage acpi
+SUBDIRS = storage acpi network-devices
 
 all :=		TARGET= all
 install :=	TARGET= install

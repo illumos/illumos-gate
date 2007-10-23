@@ -25,24 +25,37 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG =		hald-probe-printer
-OBJS =		probe-printer.o logger.o printer.o
-SRCS =		probe-printer.c
+PROG =		hald-addon-network-discovery
+OBJS =		addon-network-discovery.o probe-snmp.o snmp.o logger.o cache.o common.o printer.o
+
+MANIFEST =	network-discovery.xml
+SVCMETHOD =	svc-network-discovery
 
 include ../../../Makefile.cmd
 include ../../Makefile.hal
 
+ROOTMANIFESTDIR =	$(ROOTSVCNETWORK)
+$(ROOTMANIFEST) :=	FILEMODE = 444
+$(ROOTLIBSVCMETHOD)/$(SVCMETHOD):= FILEMODE = 555
+
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
-LDLIBS +=	-lc -ldbus-1 -lhal
+LDLIBS +=	-lc -ldbus-1 -lhal -lglib-2.0 -ldbus-glib-1
+LDLIBS +=	-lnsl -lsocket
+LDLIBS +=	-L$(SFWLIBDIR) -R$(SFWLIBDIR) $(ZIGNORE) -lnetsnmp
 
-CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../utils -I../../hald
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald -I../../utils
+CPPFLAGS +=	-I$(SFWINCDIR)
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
 all: $(PROG)
+
+probe-snmp.o: ../../probing/network-printer/probe-snmp.c
+	$(COMPILE.c) -o $@ ../../probing/network-printer/probe-snmp.c
+	$(POST_PROCESS_O)
 
 logger.o: ../../hald/logger.c
 	$(COMPILE.c) -o $@ ../../hald/logger.c
@@ -56,10 +69,12 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTCMD)
+install: all $(ROOTCMD) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check: $(CHKMANIFEST)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(PROG)
 
 FRC:
 

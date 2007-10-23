@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+  Use is subject to license terms.
+
+  Licensed under the Academic Free License version 2.1
+
+  ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<deviceinfo version="0.2">
+
+  <!--
+	Create a place holder in the HAL device tree for the network attached
+	device discovery service to attach.
+  -->
+  <device>
+    <match key="system.kernel.name" string="SunOS">
+      <spawn udi="/org/freedesktop/Hal/devices/network_attached"/>
+    </match>
+  </device>
+
+  <!--
+	Attach an instance of the network attached device discovery service to
+	the new HAL device tree node.
+  -->
+  <device>
+    <match key="info.udi" string="/org/freedesktop/Hal/devices/network_attached">
+
+      <append key="info.product" type="strlist">Network Attached Devices</append>
+      <append key="info.capabilities" type="strlist">network_device_discovery</append>
+      <append key="info.addons" type="strlist">hald-addon-network-discovery</append>
+      <!--
+        The addon implements the 'org.freedesktop.Hal.Device.NetworkDiscovery'
+        interface.  This interface controls the operation of the addon module.
+      -->
+
+    </match>
+  </device>
+
+</deviceinfo>

@@ -251,6 +251,7 @@ f none usr/lib/help/auths/locale/SmfModifyHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyMethod.html 444 root bin
 f none usr/lib/help/auths/locale/SmfIPsecStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNscdStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfNADDStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfRoutingStates.html 444 root bin
@@ -262,6 +263,7 @@ f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIPsec.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIscsitgt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueMDNS.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueNADD.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNWAM.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin

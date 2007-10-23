@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,6 +68,7 @@ d none etc/hal/fdi/policy 755 root bin
 d none etc/hal/fdi/policy/10osvendor 755 root bin
 f none etc/hal/fdi/policy/10osvendor/10-keyboard-policy.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-laptop-panel-mgmt-policy.fdi 444 root bin
+f none etc/hal/fdi/policy/10osvendor/10-network-attached.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-power-mgmt-policy.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/10-toshiba-buttons.fdi 444 root bin
 f none etc/hal/fdi/policy/10osvendor/20-storage-methods.fdi 444 root bin
@@ -79,14 +80,18 @@ d none etc/hal/fdi/preprobe/10osvendor 755 root bin
 f none etc/hal/fdi/preprobe/10osvendor/10-ide-drives.fdi 444 root bin
 f none etc/hal/fdi/preprobe/10osvendor/20-ignore-fixed-storage.fdi 444 root bin
 f none etc/hal/fdi/preprobe/10osvendor/20-ignore-lofi.fdi 444 root bin
+f none etc/hal/fdi/preprobe/10osvendor/20-printers.fdi 444 root bin
 d none etc/hal/fdi/preprobe/20thirdparty 755 root bin
 d none etc/hal/fdi/preprobe/30user 755 root bin
 d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/svc-hal 555 root bin
+f none lib/svc/method/svc-network-discovery 555 root bin
 d none var 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
+d none var/svc/manifest/network 755 root sys
+f manifest var/svc/manifest/network/network-discovery.xml 444 root sys
 d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/hal.xml 444 root sys
