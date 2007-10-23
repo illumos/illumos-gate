@@ -1,0 +1,58 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.1 {
+    global:
+	sdp_parse;
+	sdp_find_media;
+	sdp_find_attribute;
+	sdp_find_media_rtpmap;
+	sdp_clone_session;
+	sdp_new_session;
+	sdp_add_origin;	
+	sdp_add_name;		
+	sdp_add_information;
+	sdp_add_uri;	
+	sdp_add_email;			
+	sdp_add_phone;			
+	sdp_add_connection;
+	sdp_add_bandwidth;	
+	sdp_add_repeat;
+	sdp_add_time;		
+	sdp_add_zone;		
+	sdp_add_key;		
+	sdp_add_attribute;
+	sdp_add_media;	
+	sdp_session_to_str;
+	sdp_delete_all_field;	
+	sdp_delete_all_media_field;
+	sdp_delete_media;	
+	sdp_delete_attribute;
+	sdp_free_session;
+    local:
+	*;
+};

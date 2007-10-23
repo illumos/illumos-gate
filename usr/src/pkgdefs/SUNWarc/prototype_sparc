@@ -68,6 +68,7 @@ s none usr/lib/sparcv9/llib-lbsm.ln=../../../lib/sparcv9/llib-lbsm.ln
 s none usr/lib/sparcv9/llib-lpam.ln=../../../lib/sparcv9/llib-lpam.ln
 s none usr/lib/sparcv9/llib-lc.ln=../../../lib/sparcv9/llib-lc.ln
 f none usr/lib/sparcv9/llib-lcfgadm.ln 644 root bin
+f none usr/lib/sparcv9/llib-lcommputil.ln 644 root bin
 s none usr/lib/sparcv9/llib-lcontract.ln=../../../lib/sparcv9/llib-lcontract.ln
 s none usr/lib/sparcv9/llib-lctf.ln=../../../lib/sparcv9/llib-lctf.ln
 f none usr/lib/sparcv9/llib-lcrypt.ln 644 root bin

@@ -73,6 +73,7 @@ SUBDIRS += \
 	libsocket		.WAIT	\
 	libsctp			\
 	libsip			\
+	libcommputil		\
 	libresolv			\
 	libresolv2		.WAIT	\
 	libw			.WAIT	\
@@ -381,6 +382,7 @@ HDRSUBDIRS=		\
 	librcm		\
 	libscf		\
 	libsip		\
+	libcommputil	\
 	libsmbios	\
 	librestart	\
 	librpcsvc	\

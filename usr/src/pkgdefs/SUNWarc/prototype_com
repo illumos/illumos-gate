@@ -84,6 +84,8 @@ f none usr/lib/llib-lcrypt 644 root bin
 f none usr/lib/llib-lcrypt.ln 644 root bin
 f none usr/lib/llib-lcfgadm 644 root bin
 f none usr/lib/llib-lcfgadm.ln 644 root bin
+f none usr/lib/llib-lcommputil 644 root bin
+f none usr/lib/llib-lcommputil.ln 644 root bin
 s none usr/lib/llib-lcontract=../../lib/llib-lcontract
 s none usr/lib/llib-lcontract.ln=../../lib/llib-lcontract.ln
 s none usr/lib/llib-lctf=../../lib/llib-lctf

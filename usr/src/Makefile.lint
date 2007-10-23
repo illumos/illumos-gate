@@ -312,6 +312,7 @@ COMMON_SUBDIRS = \
 	lib/libc_db \
 	lib/libcfgadm \
 	lib/libcmdutils \
+	lib/libcommputil \
 	lib/libcontract \
 	lib/libcryptoutil \
 	lib/libctf \

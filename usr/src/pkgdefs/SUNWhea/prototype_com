@@ -574,6 +574,7 @@ f none usr/include/rtld_db.h 644 root bin
 f none usr/include/sched.h 644 root bin
 f none usr/include/schedctl.h 644 root bin
 f none usr/include/sac.h 644 root bin
+f none usr/include/sdp.h 644 root bin
 f none usr/include/sip.h 644 root bin
 d none usr/include/sasl 0755 root bin
 f none usr/include/sasl/prop.h 0644 root bin
