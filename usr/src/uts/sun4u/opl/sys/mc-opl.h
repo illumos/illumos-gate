@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,15 @@ typedef struct mc_dimm_info {
 	char	md_partnum[MCOPL_MAX_PARTNUM + 1];
 } mc_dimm_info_t;
 
+typedef struct mc_retry_info {
+	struct mc_retry_info *ri_next;
+#define	RETRY_STATE_PENDING	0
+#define	RETRY_STATE_ACTIVE	1
+#define	RETRY_STATE_REWRITE	2
+	int		   ri_state;
+	uint32_t	   ri_addr;
+} mc_retry_info_t;
+
 typedef struct mc_opl_state {
 	struct mc_opl_state *next;
 	dev_info_t *mc_dip;
@@ -107,7 +116,17 @@ typedef struct mc_opl_state {
 		uint32_t  mcb_status;
 #define	BANK_INSTALLED		0x80000000
 #define	BANK_MIRROR_MODE	0x40000000	/* 0: normal  1: mirror */
+#define	BANK_REWRITE_MODE	0x10000000
+
 #define	BANK_PTRL_RUNNING	0x00000001
+
+#define	MC_RETRY_COUNT	2
+		mc_retry_info_t  mcb_retry_infos[MC_RETRY_COUNT];
+		mc_retry_info_t	*mcb_retry_freelist;
+		mc_retry_info_t	*mcb_retry_pending;
+		mc_retry_info_t *mcb_active;
+		int	  mcb_rewrite_count;
+
 		uint64_t  mcb_reg_base;
 		uint32_t  mcb_ptrl_cntl;
 	} mc_bank[BANKNUM_PER_SB];
@@ -298,6 +317,18 @@ extern void mc_write_cntl(mc_opl_t *, int, uint32_t);
 
 #define	OPL_BOARD_MAX	16
 #define	OPL_BANK_MAX	8
+
+#define	MC_SET_REWRITE_MODE(mcp, bank)				\
+	((mcp)->mc_bank[bank].mcb_status |= BANK_REWRITE_MODE)
+
+#define	MC_CLEAR_REWRITE_MODE(mcp, bank)				\
+	((mcp)->mc_bank[bank].mcb_status &= ~BANK_REWRITE_MODE)
+
+#define	MC_REWRITE_MODE(mcp, bank)				\
+	((mcp)->mc_bank[bank].mcb_status & BANK_REWRITE_MODE)
+
+#define	MC_REWRITE_ACTIVE(mcp, bank)					\
+	((mcp)->mc_bank[bank].mcb_active)
 
 /*
  * MAC_BANKm_EG_ADD_Register

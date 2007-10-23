@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
+ * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2007
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -100,6 +100,9 @@ static void mc_free_dimm_list(mc_dimm_info_t *d);
 static void mc_get_mlist(mc_opl_t *);
 static void mc_polling(void);
 static int mc_opl_get_physical_board(int);
+
+static void mc_clear_rewrite(mc_opl_t *mcp, int i);
+static void mc_set_rewrite(mc_opl_t *mcp, int bank, uint32_t addr, int state);
 
 #ifdef	DEBUG
 static int mc_ioctl_debug(dev_t, int, intptr_t, int, cred_t *, int *);
@@ -275,6 +278,7 @@ int mc_max_scf_loop = 2;
 int mc_scf_delay = 100;
 int mc_pce_dropped = 0;
 int mc_poll_priority = MINCLSYSPRI;
+int mc_max_rewrite_retry = 6 * 60;
 
 
 /*
@@ -1128,6 +1132,9 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 	uint64_t pa;
 	int rv;
 
+	if (MC_REWRITE_MODE(mcp, bank)) {
+		return (0);
+	}
 	if (rsaddr_info == NULL || (rsaddr_info->mi_valid == 0)) {
 		MAC_PTRL_START(mcp, bank);
 		return (0);
@@ -1168,47 +1175,47 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 		uint64_t origpa = pa;
 		while (wrapcount < 2) {
 			if (!pa_is_valid(mcp, pa)) {
-				/*
-				 * Not in physinstall - advance to the
-				 * next memory isolation blocksize
-				 */
-				MC_LOG("Invalid PA\n");
-				pa = roundup(pa + 1, mc_isolation_bsize);
+			/*
+			 * Not in physinstall - advance to the
+			 * next memory isolation blocksize
+			 */
+			MC_LOG("Invalid PA\n");
+			pa = roundup(pa + 1, mc_isolation_bsize);
 			} else {
-				int rv;
-				if ((rv = page_retire_check(pa, NULL)) != 0 &&
-				    rv != EAGAIN) {
+			int rv;
+			if ((rv = page_retire_check(pa, NULL)) != 0 &&
+			    rv != EAGAIN) {
 					/*
 					 * The page is "good" (not retired),
 					 * we will use automatic HW restart
 					 * algorithm if this is the original
 					 * current starting page.
 					 */
-					if (pa == origpa) {
-						MC_LOG("Page has no error. "
-						    "Auto restart\n");
-						MAC_PTRL_START(mcp, bank);
-						return (0);
-					} else {
-						/*
-						 * found a subsequent good page
-						 */
-						break;
-					}
+				if (pa == origpa) {
+					MC_LOG("Page has no error. "
+					    "Auto restart\n");
+					MAC_PTRL_START(mcp, bank);
+					return (0);
+				} else {
+					/*
+					 * found a subsequent good page
+					 */
+					break;
 				}
-
-				/*
-				 * Skip to the next page
-				 */
-				pa = roundup(pa + 1, PAGESIZE);
-				MC_LOG("Skipping bad page to %lx\n", pa);
 			}
 
-			/* Check to see if we hit the end of the memory range */
+			/*
+			 * Skip to the next page
+			 */
+			pa = roundup(pa + 1, PAGESIZE);
+			MC_LOG("Skipping bad page to %lx\n", pa);
+			}
+
+		    /* Check to see if we hit the end of the memory range */
 			if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
-				MC_LOG("Wrap around\n");
-				pa = mcp->mc_start_address;
-				wrapcount++;
+			MC_LOG("Wrap around\n");
+			pa = mcp->mc_start_address;
+			wrapcount++;
 			}
 		}
 
@@ -1234,6 +1241,27 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 	return (0);
 }
 
+static void
+mc_retry_info_put(mc_retry_info_t **q, mc_retry_info_t *p)
+{
+	ASSERT(p != NULL);
+	p->ri_next = *q;
+	*q = p;
+}
+
+static mc_retry_info_t *
+mc_retry_info_get(mc_retry_info_t **q)
+{
+	mc_retry_info_t *p;
+
+	if ((p = *q) != NULL) {
+		*q = p->ri_next;
+		return (p);
+	} else {
+		return (NULL);
+	}
+}
+
 /*
  * Rewriting is used for two purposes.
  *  - to correct the error in memory.
@@ -1246,34 +1274,54 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
  * Note that rewrite operation doesn't change RAW_UE to Marked UE.
  * Therefore, we use it only CE case.
  */
+
 static uint32_t
-do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr)
+do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr, int retrying)
 {
 	uint32_t cntl;
 	int count = 0;
+	int max_count;
+	int retry_state;
+
+	if (retrying)
+		max_count = 1;
+	else
+		max_count = mc_max_rewrite_loop;
+
+	retry_state = RETRY_STATE_PENDING;
+
+	if (!retrying && MC_REWRITE_MODE(mcp, bank)) {
+		goto timeout;
+	}
+
+	retry_state = RETRY_STATE_ACTIVE;
 
 	/* first wait to make sure PTRL_STATUS is 0 */
-	while (count++ < mc_max_rewrite_loop) {
+	while (count++ < max_count) {
 		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
-		if (!(cntl & MAC_CNTL_PTRL_STATUS))
+		if (!(cntl & MAC_CNTL_PTRL_STATUS)) {
+			count = 0;
 			break;
+		}
 		drv_usecwait(mc_rewrite_delay);
 	}
-	if (count >= mc_max_rewrite_loop)
-		goto bad;
+	if (count >= max_count)
+		goto timeout;
 
 	count = 0;
 
 	ST_MAC_REG(MAC_REWRITE_ADD(mcp, bank), dimm_addr);
 	MAC_REW_REQ(mcp, bank);
 
+	retry_state = RETRY_STATE_REWRITE;
+
 	do {
-		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
-		if (count++ >= mc_max_rewrite_loop) {
-			goto bad;
+		if (count++ > max_count) {
+			goto timeout;
 		} else {
 			drv_usecwait(mc_rewrite_delay);
 		}
+		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
 	/*
 	 * If there are other MEMORY or PCI activities, this
 	 * will be BUSY, else it should be set immediately
@@ -1282,15 +1330,83 @@ do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr)
 
 	MAC_CLEAR_ERRS(mcp, bank, MAC_CNTL_REW_ERRS);
 	return (cntl);
-bad:
-	/* This is bad.  Just reset the circuit */
-	cmn_err(CE_WARN, "mc-opl rewrite timeout on /LSB%d/B%d\n",
-	    mcp->mc_board_num, bank);
-	cntl = MAC_CNTL_REW_END;
-	MAC_CMD(mcp, bank, MAC_CNTL_PTRL_RESET);
-	MAC_CLEAR_ERRS(mcp, bank, MAC_CNTL_REW_ERRS);
-	return (cntl);
+timeout:
+	mc_set_rewrite(mcp, bank, dimm_addr, retry_state);
+
+	return (0);
 }
+
+void
+mc_clear_rewrite(mc_opl_t *mcp, int bank)
+{
+	struct mc_bank *bankp;
+	mc_retry_info_t *retry;
+	uint32_t rew_addr;
+
+	bankp = &(mcp->mc_bank[bank]);
+	retry = bankp->mcb_active;
+	bankp->mcb_active = NULL;
+	mc_retry_info_put(&bankp->mcb_retry_freelist, retry);
+
+again:
+	bankp->mcb_rewrite_count = 0;
+
+	while (retry = mc_retry_info_get(&bankp->mcb_retry_pending)) {
+		rew_addr = retry->ri_addr;
+		mc_retry_info_put(&bankp->mcb_retry_freelist, retry);
+		if (do_rewrite(mcp, bank, rew_addr, 1) == 0)
+			break;
+	}
+
+	/* we break out if no more pending rewrite or we got timeout again */
+
+	if (!bankp->mcb_active && !bankp->mcb_retry_pending) {
+		if (!IS_MIRROR(mcp, bank)) {
+			MC_CLEAR_REWRITE_MODE(mcp, bank);
+		} else {
+			int mbank = bank ^ 1;
+			bankp = &(mcp->mc_bank[mbank]);
+			if (!bankp->mcb_active && !bankp->mcb_retry_pending) {
+			MC_CLEAR_REWRITE_MODE(mcp, bank);
+			MC_CLEAR_REWRITE_MODE(mcp, mbank);
+			} else {
+			bank = mbank;
+			goto again;
+			}
+		}
+	}
+}
+
+void
+mc_set_rewrite(mc_opl_t *mcp, int bank, uint32_t addr, int state)
+{
+	mc_retry_info_t *retry;
+	struct mc_bank *bankp;
+
+	bankp = &mcp->mc_bank[bank];
+
+	retry = mc_retry_info_get(&bankp->mcb_retry_freelist);
+
+	ASSERT(retry != NULL);
+
+	retry->ri_addr = addr;
+	retry->ri_state = state;
+
+	MC_SET_REWRITE_MODE(mcp, bank);
+
+	if ((state > RETRY_STATE_PENDING)) {
+		ASSERT(bankp->mcb_active == NULL);
+		bankp->mcb_active = retry;
+	} else {
+		mc_retry_info_put(&bankp->mcb_retry_pending, retry);
+	}
+
+	if (IS_MIRROR(mcp, bank)) {
+		int mbank = bank ^1;
+		MC_SET_REWRITE_MODE(mcp, mbank);
+	}
+}
+
 void
 mc_process_scf_log(mc_opl_t *mcp)
 {
@@ -1302,43 +1418,43 @@ mc_process_scf_log(mc_opl_t *mcp)
 	for (bank = 0; bank < BANKNUM_PER_SB; bank++) {
 		while ((p = mcp->mc_scf_log[bank]) != NULL &&
 		    (n < mc_max_errlog_processed)) {
-			ASSERT(bank == p->sl_bank);
-			count = 0;
-			while ((LD_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank))
-			    & MAC_STATIC_ERR_VLD)) {
-				if (count++ >= (mc_max_scf_loop)) {
-					break;
-				}
-				drv_usecwait(mc_scf_delay);
+		ASSERT(bank == p->sl_bank);
+		count = 0;
+		while ((LD_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank))
+		    & MAC_STATIC_ERR_VLD)) {
+			if (count++ >= (mc_max_scf_loop)) {
+				break;
 			}
+			drv_usecwait(mc_scf_delay);
+		}
 
-			if (count < mc_max_scf_loop) {
-				ST_MAC_REG(MAC_STATIC_ERR_LOG(mcp, p->sl_bank),
-				    p->sl_err_log);
+		if (count < mc_max_scf_loop) {
+			ST_MAC_REG(MAC_STATIC_ERR_LOG(mcp, p->sl_bank),
+			    p->sl_err_log);
 
-				ST_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank),
-				    p->sl_err_add|MAC_STATIC_ERR_VLD);
-				mcp->mc_scf_retry[bank] = 0;
+			ST_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank),
+			    p->sl_err_add|MAC_STATIC_ERR_VLD);
+			mcp->mc_scf_retry[bank] = 0;
+		} else {
+			/*
+			 * if we try too many times, just drop the req
+			 */
+			if (mcp->mc_scf_retry[bank]++ <=
+			    mc_max_scf_retry) {
+				return;
 			} else {
-				/*
-				 * if we try too many times, just drop the req
-				 */
-				if (mcp->mc_scf_retry[bank]++ <=
-				    mc_max_scf_retry) {
-					return;
-				} else {
-					if ((++mc_pce_dropped & 0xff) == 0) {
-						cmn_err(CE_WARN, "Cannot "
-						    "report Permanent CE to "
-						    "SCF\n");
-					}
+				if ((++mc_pce_dropped & 0xff) == 0) {
+					cmn_err(CE_WARN, "Cannot "
+					    "report Permanent CE to "
+					    "SCF\n");
 				}
 			}
-			n++;
-			mcp->mc_scf_log[bank] = p->sl_next;
-			mcp->mc_scf_total[bank]--;
-			ASSERT(mcp->mc_scf_total[bank] >= 0);
-			kmem_free(p, sizeof (scf_log_t));
+		}
+		n++;
+		mcp->mc_scf_log[bank] = p->sl_next;
+		mcp->mc_scf_total[bank]--;
+		ASSERT(mcp->mc_scf_total[bank] >= 0);
+		kmem_free(p, sizeof (scf_log_t));
 		}
 	}
 }
@@ -1398,7 +1514,12 @@ mc_scrub_ce(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat, int ptrl_error)
 	 * if REW_CE = 1, then it is permanent CE.
 	 */
 	for (i = 0; i < 2; i++) {
-		cntl = do_rewrite(mcp, bank, flt_stat->mf_err_add);
+		cntl = do_rewrite(mcp, bank, flt_stat->mf_err_add, 0);
+
+		if (cntl == 0) {
+			/* timeout case */
+			return;
+		}
 		/*
 		 * If the error becomes UE or CMPE
 		 * we return to the caller immediately.
@@ -1543,6 +1664,8 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	int ptrl_error = mc_aflt->mflt_is_ptrl;
 	int i;
 	int rv = 0;
+	int bank;
+	int rewrite_timeout = 0;
 
 	MC_LOG("process mirror errors cntl[0] = %x, cntl[1] = %x\n",
 	    flt_stat[0].mf_cntl, flt_stat[1].mf_cntl);
@@ -1563,13 +1686,18 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	 */
 	for (i = 0; i < 2; i++) {
 		if (IS_CE_ONLY(flt_stat[i].mf_cntl, ptrl_error)) {
-			MC_LOG("CE detected on bank %d\n",
-			    flt_stat[i].mf_flt_maddr.ma_bank);
-			mc_scrub_ce(mcp, flt_stat[i].mf_flt_maddr.ma_bank,
-			    &flt_stat[i], ptrl_error);
+			bank = flt_stat[i].mf_flt_maddr.ma_bank;
+			MC_LOG("CE detected on bank %d\n", bank);
+			mc_scrub_ce(mcp, bank, &flt_stat[i], ptrl_error);
+			if (MC_REWRITE_ACTIVE(mcp, bank)) {
+				rewrite_timeout = 1;
+			}
 			rv = 1;
 		}
 	}
+
+	if (rewrite_timeout)
+		return (0);
 
 	/* The above scrubbing can turn CE into UE or CMPE */
 
@@ -1621,16 +1749,14 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 
 		/* Now the only case is UE/CE, UE/OK, or don't care */
 		for (i = 0; i < 2; i++) {
-			if (!IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
-				continue;
-			}
+			if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
 
 			/* rewrite can clear the one side UE error */
 
 			if (IS_OK(flt_stat[i^1].mf_cntl, ptrl_error)) {
 				(void) do_rewrite(mcp,
 				    flt_stat[i].mf_flt_maddr.ma_bank,
-				    flt_stat[i].mf_flt_maddr.ma_dimm_addr);
+				    flt_stat[i].mf_flt_maddr.ma_dimm_addr, 0);
 			}
 			flt_stat[i].mf_type = FLT_TYPE_UE;
 			MAC_SET_ERRLOG_INFO(&flt_stat[i]);
@@ -1641,6 +1767,7 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			mc_err_drain(mc_aflt);
 			/* Once we hit a UE/CE or UE/OK case, done */
 			return (1);
+			}
 		}
 
 	} else {
@@ -1675,7 +1802,8 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
 				(void) do_rewrite(mcp,
 				    flt_stat[i].mf_flt_maddr.ma_bank,
-				    flt_stat[i].mf_flt_maddr.ma_dimm_addr);
+				    flt_stat[i].mf_flt_maddr.ma_dimm_addr,
+				    0);
 				flt_stat[i].mf_type = FLT_TYPE_UE;
 				MAC_SET_ERRLOG_INFO(&flt_stat[i]);
 				mc_aflt->mflt_erpt_class = MC_OPL_SUE;
@@ -1805,6 +1933,9 @@ mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 
 		/* Error type can change after scrubbing */
 		mc_scrub_ce(mcp, bank, flt_stat, ptrl_error);
+		if (MC_REWRITE_ACTIVE(mcp, bank)) {
+			return (0);
+		}
 
 		if (flt_stat->mf_type == FLT_TYPE_INTERMITTENT_CE) {
 			mc_aflt->mflt_erpt_class = MC_OPL_ICE;
@@ -1908,6 +2039,62 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
  */
 
 static void
+mc_process_rewrite(mc_opl_t *mcp, int bank)
+{
+	uint32_t rew_addr, cntl;
+	mc_retry_info_t *retry;
+	struct mc_bank *bankp;
+
+	bankp = &(mcp->mc_bank[bank]);
+	retry = bankp->mcb_active;
+	if (retry == NULL)
+		return;
+
+	if (retry->ri_state <= RETRY_STATE_ACTIVE) {
+		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
+		if (cntl & MAC_CNTL_PTRL_STATUS)
+			return;
+		rew_addr = retry->ri_addr;
+		ST_MAC_REG(MAC_REWRITE_ADD(mcp, bank), rew_addr);
+		MAC_REW_REQ(mcp, bank);
+
+		retry->ri_state = RETRY_STATE_REWRITE;
+	}
+
+	cntl = ldphysio(MAC_PTRL_CNTL(mcp, bank));
+
+	if (cntl & MAC_CNTL_REW_END) {
+		MAC_CLEAR_ERRS(mcp, bank,
+		    MAC_CNTL_REW_ERRS);
+		mc_clear_rewrite(mcp, bank);
+	} else {
+		/*
+		 * If the rewrite does not complete in
+		 * 1 hour, we have to consider this a HW
+		 * failure.  However, there is no recovery
+		 * mechanism.  The only thing we can do
+		 * to to print a warning message to the
+		 * console.  We continue to increment the
+		 * counter but we only print the message
+		 * once.  It will take the counter a long
+		 * time to wrap around and the user might
+		 * see a second message.  In practice,
+		 * we have never hit this condition but
+		 * we have to keep the code here just in case.
+		 */
+		if (++mcp->mc_bank[bank].mcb_rewrite_count
+		    == mc_max_rewrite_retry) {
+			cmn_err(CE_WARN, "Memory patrol feature is"
+			" partly suspended on /LSB%d/B%d"
+			" due to heavy memory load,"
+			" and it will restart"
+			" automatically.\n", mcp->mc_board_num,
+			    bank);
+		}
+	}
+}
+
+static void
 mc_check_errors_func(mc_opl_t *mcp)
 {
 	mc_rsaddr_info_t rsaddr_info;
@@ -1925,6 +2112,9 @@ mc_check_errors_func(mc_opl_t *mcp)
 
 	for (i = 0; i < BANKNUM_PER_SB; i++) {
 		if (mcp->mc_bank[i].mcb_status & BANK_INSTALLED) {
+			if (MC_REWRITE_ACTIVE(mcp, i)) {
+				mc_process_rewrite(mcp, i);
+			}
 			stat = ldphysio(MAC_PTRL_STAT(mcp, i));
 			cntl = ldphysio(MAC_PTRL_CNTL(mcp, i));
 			running = cntl & MAC_CNTL_PTRL_START;
@@ -2462,7 +2652,9 @@ mc_board_add(mc_opl_t *mcp)
 
 	for (i = 0; i < len / sizeof (struct mc_addr_spec); i++) {
 		struct mc_bank *bankp;
+		mc_retry_info_t *retry;
 		uint32_t reg;
+		int k;
 
 		/*
 		 * setup bank
@@ -2471,6 +2663,14 @@ mc_board_add(mc_opl_t *mcp)
 		bankp = &(mcp->mc_bank[bk]);
 		bankp->mcb_status = BANK_INSTALLED;
 		bankp->mcb_reg_base = REGS_PA(macaddr, i);
+
+		bankp->mcb_retry_freelist = NULL;
+		bankp->mcb_retry_pending = NULL;
+		bankp->mcb_active = NULL;
+		retry = &bankp->mcb_retry_infos[0];
+		for (k = 0; k < MC_RETRY_COUNT; k++, retry++) {
+			mc_retry_info_put(&bankp->mcb_retry_freelist, retry);
+		}
 
 		reg = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bk));
 		bankp->mcb_ptrl_cntl = (reg & MAC_CNTL_PTRL_PRESERVE_BITS);
@@ -2661,7 +2861,7 @@ mc_resume(mc_opl_t *mcp, uint32_t flag)
 		mcp->mc_status |= MC_POLL_RUNNING;
 		for (i = 0; i < BANKNUM_PER_SB; i++) {
 			if (mcp->mc_bank[i].mcb_status & BANK_INSTALLED) {
-				restart_patrol(mcp, i, NULL);
+				mc_check_errors_func(mcp);
 			}
 		}
 	}
