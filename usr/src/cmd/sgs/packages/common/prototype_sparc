@@ -75,6 +75,7 @@ f none $SGSDIR/usr/lib/elfedit/sparcv9/dyn.so=usr/lib/elfedit/sparcv9/dyn.so 755
 f none $SGSDIR/usr/lib/elfedit/sparcv9/ehdr.so=usr/lib/elfedit/sparcv9/ehdr.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/sparcv9/phdr.so=usr/lib/elfedit/sparcv9/phdr.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/sparcv9/shdr.so=usr/lib/elfedit/sparcv9/shdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/sparcv9/str.so=usr/lib/elfedit/sparcv9/str.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/sparcv9/sym.so=usr/lib/elfedit/sparcv9/sym.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/sparcv9/syminfo.so=usr/lib/elfedit/sparcv9/syminfo.so 755 root bin
 d none $SGSDIR/usr/lib/link_audit/sparcv9 755 root bin

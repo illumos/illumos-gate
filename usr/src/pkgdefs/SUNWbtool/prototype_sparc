@@ -73,5 +73,6 @@ f none usr/lib/elfedit/sparcv9/dyn.so 755 root bin
 f none usr/lib/elfedit/sparcv9/ehdr.so 755 root bin
 f none usr/lib/elfedit/sparcv9/phdr.so 755 root bin
 f none usr/lib/elfedit/sparcv9/shdr.so 755 root bin
+f none usr/lib/elfedit/sparcv9/str.so 755 root bin
 f none usr/lib/elfedit/sparcv9/sym.so 755 root bin
 f none usr/lib/elfedit/sparcv9/syminfo.so 755 root bin

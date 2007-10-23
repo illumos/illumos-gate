@@ -73,5 +73,6 @@ f none usr/lib/elfedit/amd64/dyn.so 755 root bin
 f none usr/lib/elfedit/amd64/ehdr.so 755 root bin
 f none usr/lib/elfedit/amd64/phdr.so 755 root bin
 f none usr/lib/elfedit/amd64/shdr.so 755 root bin
+f none usr/lib/elfedit/amd64/str.so 755 root bin
 f none usr/lib/elfedit/amd64/sym.so 755 root bin
 f none usr/lib/elfedit/amd64/syminfo.so 755 root bin

@@ -110,5 +110,6 @@ f none usr/lib/elfedit/dyn.so 755 root bin
 f none usr/lib/elfedit/ehdr.so 755 root bin
 f none usr/lib/elfedit/phdr.so 755 root bin
 f none usr/lib/elfedit/shdr.so 755 root bin
+f none usr/lib/elfedit/str.so 755 root bin
 f none usr/lib/elfedit/sym.so 755 root bin
 f none usr/lib/elfedit/syminfo.so 755 root bin

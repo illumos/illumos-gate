@@ -1291,3 +1291,4 @@ Bugid   Risk Synopsis
 	PSARC/2007/559 new symbol visibilities - EXPORTED, SINGLETON, and
 	ELIMINATE
 6570616 elfdump should display incorrectly aligned note section
+6614968 elfedit needs string table module (D)

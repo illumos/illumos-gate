@@ -104,7 +104,7 @@
    The syminfo section augments the information found in the\n\
    dynamic symbol table.\n\
    \n\
-   If sym:dump is called without arguments, syminfo information\n\
+   If syminfo:dump is called without arguments, syminfo information\n\
    for every symbol in the symbol table is shown. If called with\n\
    the sym argument, the information for that symbol is\n\
    displayed.\n"

@@ -113,6 +113,7 @@ f none $SGSDIR/usr/lib/elfedit/dyn.so=usr/lib/elfedit/dyn.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/ehdr.so=usr/lib/elfedit/ehdr.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/phdr.so=usr/lib/elfedit/phdr.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/shdr.so=usr/lib/elfedit/shdr.so 755 root bin
+f none $SGSDIR/usr/lib/elfedit/str.so=usr/lib/elfedit/str.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/sym.so=usr/lib/elfedit/sym.so 755 root bin
 f none $SGSDIR/usr/lib/elfedit/syminfo.so=usr/lib/elfedit/syminfo.so 755 root bin
 d none $SGSDIR/usr/lib/link_audit 755 root bin

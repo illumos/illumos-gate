@@ -63,6 +63,10 @@ $(SHDR_LIB): $(SHDR_PICS)
 		$(BUILD.SO) $(LLDFLAGS)
 		$(POST_PROCESS_SO)
 
+$(STR_LIB): $(STR_PICS)
+		$(BUILD.SO) $(LLDFLAGS)
+		$(POST_PROCESS_SO)
+
 $(SYM_LIB): $(SYM_PICS)
 		$(BUILD.SO) $(LLDFLAGS)
 		$(POST_PROCESS_SO)
@@ -106,6 +110,7 @@ catalog:	$(SGSMSGDIR)/elfedit_cap \
 		$(SGSMSGDIR)/elfedit_ehdr \
 		$(SGSMSGDIR)/elfedit_phdr \
 		$(SGSMSGDIR)/elfedit_shdr \
+		$(SGSMSGDIR)/elfedit_str \
 		$(SGSMSGDIR)/elfedit_sym \
 		$(SGSMSGDIR)/elfedit_syminfo
 		
@@ -116,6 +121,7 @@ chkmsg:		$(SRCS)
 		sh $(CHKMSG) -m ../common/ehdr.msg ../common/ehdr.c
 		sh $(CHKMSG) -m ../common/phdr.msg ../common/phdr.c
 		sh $(CHKMSG) -m ../common/shdr.msg ../common/shdr.c
+		sh $(CHKMSG) -m ../common/str.msg ../common/str.c
 		sh $(CHKMSG) -m ../common/sym.msg ../common/sym.c
 		sh $(CHKMSG) -m ../common/syminfo.msg ../common/syminfo.c
 
@@ -135,6 +141,9 @@ lint:
 		@echo "\nLint of: shdr.so"		>> $(LINTOUT)
 		@echo "========================"	>> $(LINTOUT)
 		$(LINT.c) ../common/shdr.c 		>> $(LINTOUT) 2>&1
+		@echo "\nLint of: str.so"		>> $(LINTOUT)
+		@echo "========================"	>> $(LINTOUT)
+		$(LINT.c) ../common/str.c 		>> $(LINTOUT) 2>&1
 		@echo "\nLint of: sym.so"		>> $(LINTOUT)
 		@echo "========================"	>> $(LINTOUT)
 		$(LINT.c) ../common/sym.c 		>> $(LINTOUT) 2>&1

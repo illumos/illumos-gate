@@ -52,7 +52,8 @@ POFILES=	ld		ldd		libld		liblddbg \
 # elfedit messages. Otherwise they are the same thing as POFILES
 POFILES_ELFEDIT_MODULES = \
 		elfedit_cap 	elfedit_dyn	elfedit_ehdr	elfedit_phdr \
-		elfedit_shdr 	elfedit_sym	elfedit_syminfo	lari
+		elfedit_shdr 	elfedit_str	elfedit_sym	elfedit_syminfo\
+		lari
 
 
 # Define a local version of the message catalog.  Test using: LANG=piglatin

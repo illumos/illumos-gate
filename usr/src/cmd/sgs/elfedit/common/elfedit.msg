@@ -98,7 +98,7 @@
 @ MSG_DEBUG_FNDVERSYM	"[%d: %s]: versym section: [%d: %s]\n"
 @ MSG_DEBUG_FNDXSHNDX	"[%d: %s]: extended section index section: [%d: %s]\n"
 @ MSG_DEBUG_EXISTSTR	"[%d: %s][%d]: Found existing string in section: %s\n"
-@ MSG_DEBUG_ADDSTR	"[%d: %s][%d]: Using %d/%d byes from reserved area \
+@ MSG_DEBUG_ADDSTR	"[%d: %s][%d]: Using %d/%d bytes from reserved area \
 			 to add string: %s\n"
 @ MSG_DEBUG_NULL2DYNFL1	"[%d: %s]: No existing flags1 field to modify. \
 			 Will use extra DT_NULL in slot [%d] \n"
