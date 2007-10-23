@@ -2478,7 +2478,7 @@ usbvc_parse_format_group(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
 		    altif_n_cvs);
 		usbvc_parse_frames(usbvcp, fmtgrp, cvs_data, cvs_num,
 		    altif_n_cvs);
-		fmtgrp->v4l2_bpp = 16;
+		fmtgrp->v4l2_bpp = fmt->fmt.uncompressed.bBitsPerPixel / 8;
 		fmtgrp->v4l2_pixelformat = usbvc_v4l2_guid2fcc(
 		    (uint8_t *)&fmt->fmt.uncompressed.guidFormat);
 
