@@ -151,6 +151,17 @@ kmem_cache_t	*vlp_hash_cache;
 struct hatstats hatstat;
 
 /*
+ * Some earlier hypervisor versions do not emulate cmpxchg of PTEs
+ * correctly.  For such hypervisors we must set PT_USER for kernel
+ * entries ourselves (normally the emulation would set PT_USER for
+ * kernel entries and PT_USER|PT_GLOBAL for user entries).  pt_kern is
+ * thus set appropriately.  Note that dboot/kbm is OK, as only the full
+ * HAT uses cmpxchg() and the other paths (hypercall etc.) were never
+ * incorrect.
+ */
+int pt_kern;
+
+/*
  * useful stuff for atomic access/clearing/setting REF/MOD/RO bits in page_t's.
  */
 extern void atomic_orb(uchar_t *addr, uchar_t val);
@@ -564,10 +575,7 @@ mmu_init(void)
 	}
 
 	for (i = 0; i <= mmu.max_page_level; ++i) {
-		mmu.pte_bits[i] = PT_VALID;
-#if defined(__xpv) && defined(__amd64)
-		mmu.pte_bits[i] |= PT_USER;
-#endif
+		mmu.pte_bits[i] = PT_VALID | pt_kern;
 		if (i > 0)
 			mmu.pte_bits[i] |= PT_PAGESIZE;
 	}

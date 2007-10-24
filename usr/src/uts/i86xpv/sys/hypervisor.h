@@ -101,7 +101,7 @@ extern hrtime_t xpv_getsystime(void);
 extern void xpv_time_suspend(void);
 extern void xpv_time_resume(void);
 
-extern void xen_version(void);
+extern void startup_xen_version(void);
 
 extern void mach_cpucontext_reset(cpu_t *);
 extern void mach_cpucontext_restore(cpu_t *);

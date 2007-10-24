@@ -663,6 +663,9 @@ startup(void)
 #endif
 	progressbar_init();
 	startup_init();
+#if defined(__xpv)
+	startup_xen_version();
+#endif
 	startup_memlist();
 	startup_kmem();
 	startup_vm();
@@ -1283,10 +1286,6 @@ startup_kmem(void)
 	 * Factor in colorequiv to check additional 'equivalent' bins
 	 */
 	page_set_colorequiv_arr();
-
-#if defined(__xpv)
-	xen_version();
-#endif
 
 	/*
 	 * print this out early so that we know what's going on

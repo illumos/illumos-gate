@@ -82,10 +82,11 @@
 #define	_XSD_ERRORS_DEFINED
 #include <sys/hypervisor.h>
 #include <sys/mach_mmu.h>
+#include <sys/taskq.h>
+#include <sys/sdt.h>
 #include <xen/sys/xenbus_impl.h>
 #include <xen/sys/xenbus_comms.h>
 #include <xen/sys/xendev.h>
-#include <sys/taskq.h>
 #include <xen/public/io/xs_wire.h>
 
 #define	streq(a, b) (strcmp((a), (b)) == 0)
@@ -779,6 +780,9 @@ register_xenbus_watch(struct xenbus_watch *watch)
 		list_insert_tail(&watches, watch);
 	mutex_exit(&watches_lock);
 
+	DTRACE_XPV3(xenbus__register__watch, const char *, watch->node,
+	    uintptr_t, watch->callback, struct xenbus_watch *, watch);
+
 	err = xs_watch(watch->node, token);
 
 	/* Ignore errors due to multiple registration. */
@@ -819,6 +823,9 @@ unregister_xenbus_watch(struct xenbus_watch *watch)
 	ASSERT(find_watch(token));
 	list_remove(&watches, watch);
 	mutex_exit(&watches_lock);
+
+	DTRACE_XPV3(xenbus__unregister__watch, const char *, watch->node,
+	    uintptr_t, watch->callback, struct xenbus_watch *, watch);
 
 	err = xs_unwatch(watch->node, token);
 	if (err)
@@ -883,6 +890,7 @@ static void
 xenwatch_thread(void)
 {
 	struct xs_stored_msg *msg;
+	struct xenbus_watch *watch;
 
 	for (;;) {
 		mutex_enter(&watch_events_lock);
@@ -891,11 +899,20 @@ xenwatch_thread(void)
 		msg = list_head(&watch_events);
 		ASSERT(msg != NULL);
 		list_remove(&watch_events, msg);
+		watch = msg->un.watch.handle;
 		mutex_exit(&watch_events_lock);
 
 		mutex_enter(&xenwatch_mutex);
-		msg->un.watch.handle->callback(msg->un.watch.handle,
-		    (const char **)msg->un.watch.vec, msg->un.watch.vec_size);
+
+		DTRACE_XPV4(xenbus__fire__watch,
+		    const char *, watch->node,
+		    uintptr_t, watch->callback,
+		    struct xenbus_watch *, watch,
+		    const char *, msg->un.watch.vec[XS_WATCH_PATH]);
+
+		watch->callback(watch, (const char **)msg->un.watch.vec,
+		    msg->un.watch.vec_size);
+
 		free_stored_msg(msg);
 		mutex_exit(&xenwatch_mutex);
 	}
@@ -929,6 +946,7 @@ process_msg(void)
 	body[mlen - 1] = '\0';
 
 	if (msg->hdr.type == XS_WATCH_EVENT) {
+		const char *token;
 		msg->un.watch.vec = split(body, msg->hdr.len + 1,
 		    &msg->un.watch.vec_size);
 		if (msg->un.watch.vec == NULL) {
@@ -937,10 +955,16 @@ process_msg(void)
 		}
 
 		mutex_enter(&watches_lock);
-		msg->un.watch.handle = find_watch(
-		    msg->un.watch.vec[XS_WATCH_TOKEN]);
-		if (msg->un.watch.handle != NULL) {
+		token = msg->un.watch.vec[XS_WATCH_TOKEN];
+		if ((msg->un.watch.handle = find_watch(token)) != NULL) {
 			mutex_enter(&watch_events_lock);
+
+			DTRACE_XPV4(xenbus__enqueue__watch,
+			    const char *, msg->un.watch.handle->node,
+			    uintptr_t, msg->un.watch.handle->callback,
+			    struct xenbus_watch *, msg->un.watch.handle,
+			    const char *, msg->un.watch.vec[XS_WATCH_PATH]);
+
 			list_insert_tail(&watch_events, msg);
 			cv_broadcast(&watch_events_cv);
 			mutex_exit(&watch_events_lock);

@@ -33,6 +33,7 @@
 #include <sys/cpuvar.h>
 #include <sys/cpupart.h>
 #include <sys/disp.h>
+#include <sys/taskq_impl.h>
 
 typedef struct thread_walk {
 	kthread_t *tw_thread;
@@ -428,8 +429,7 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* process information */
 	if (oflags & TF_PROC) {
 		SPACER();
-		mdb_printf(" %?p %?p %?p",
-			t.t_procp, t.t_lwp, t.t_cred);
+		mdb_printf(" %?p %?p %?p", t.t_procp, t.t_lwp, t.t_cred);
 	}
 
 	/* priority/interrupt information */
@@ -485,7 +485,7 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (oflags & TF_SIG) {
 		SPACER();
 		mdb_printf(" %?p %016llx %016llx",
-			t.t_sigqueue, t.t_sig, t.t_hold);
+		    t.t_sigqueue, t.t_sig, t.t_hold);
 	}
 
 	/* dispatcher stuff */
@@ -528,7 +528,9 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int i;
 	uint_t count =  0;
 	uint_t verbose = FALSE;
+	uint_t notaskq = FALSE;
 	kthread_t t;
+	taskq_t tq;
 	proc_t p;
 	char cmd[80];
 	mdb_arg_t cmdarg;
@@ -542,6 +544,7 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	i = mdb_getopts(argc, argv,
+	    't', MDB_OPT_SETBITS, TRUE, &notaskq,
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL);
 
 	if (i != argc) {
@@ -568,6 +571,9 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (notaskq && t.t_taskq != NULL)
+		return (DCMD_OK);
+
 	if (t.t_state == TS_FREE)
 		return (DCMD_OK);
 
@@ -576,6 +582,9 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (mdb_vread(&tq, sizeof (taskq_t), (uintptr_t)t.t_taskq) == -1)
+		tq.tq_name[0] = '\0';
+
 	if (verbose) {
 		mdb_printf("%0?p %?p %?p %3u %3d %?p\n",
 		    addr, t.t_procp, t.t_lwp, t.t_cid, t.t_pri, t.t_wchan);
@@ -583,10 +592,14 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_inc_indent(2);
 
 		mdb_printf("PC: %a", t.t_pc);
-		if (t.t_tid == 0)
-			mdb_printf("    THREAD: %a()\n", t.t_startpc);
-		else
+		if (t.t_tid == 0) {
+			if (tq.tq_name[0] != '\0')
+				mdb_printf("    TASKQ: %s\n", tq.tq_name);
+			else
+				mdb_printf("    THREAD: %a()\n", t.t_startpc);
+		} else {
 			mdb_printf("    CMD: %s\n", p.p_user.u_psargs);
+		}
 
 		mdb_snprintf(cmd, sizeof (cmd), "<.$c%d", count);
 		cmdarg.a_type = MDB_TYPE_STRING;
@@ -599,10 +612,14 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("\n");
 	} else {
 		mdb_printf("%0?p %?p %?p", addr, t.t_procp, t.t_lwp);
-		if (t.t_tid == 0)
-			mdb_printf(" %a()\n", t.t_startpc);
-		else
+		if (t.t_tid == 0) {
+			if (tq.tq_name[0] != '\0')
+				mdb_printf(" tq:%s\n", tq.tq_name);
+			else
+				mdb_printf(" %a()\n", t.t_startpc);
+		} else {
 			mdb_printf(" %s/%u\n", p.p_user.u_comm, t.t_tid);
+		}
 	}
 
 	return (DCMD_OK);
@@ -613,5 +630,6 @@ threadlist_help(void)
 {
 	mdb_printf(
 	    "   -v         print verbose output including C stack trace\n"
+	    "   -t         skip threads belonging to a taskq\n"
 	    "   count      print no more than count arguments (default 0)\n");
 }

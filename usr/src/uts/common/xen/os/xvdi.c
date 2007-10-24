@@ -184,7 +184,7 @@ static dev_info_t *xendev_dip = NULL;
 #define	XVDI_DBG_PROBE	0x02
 
 #ifdef DEBUG
-static int i_xvdi_debug = 0;
+int i_xvdi_debug = 0;
 
 #define	XVDI_DPRINTF(flag, format, ...)			\
 {							\

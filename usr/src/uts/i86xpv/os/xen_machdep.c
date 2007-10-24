@@ -119,6 +119,7 @@ struct xenver {
 	ulong_t xv_minor;
 	ulong_t xv_revision;
 	xen_extraversion_t xv_ver;
+	ulong_t xv_is_xvm;
 	xen_changeset_info_t xv_chgset;
 	xen_compile_info_t xv_build;
 	xen_capabilities_info_t xv_caps;
@@ -161,6 +162,13 @@ xen_set_version(xen_version_t idx)
 		cmn_err(CE_WARN, "Cannot extract revision on this hypervisor "
 		    "version: v%s, unexpected version format",
 		    xenver[idx].xv_ver);
+
+	xenver[idx].xv_is_xvm = 0;
+
+	if (strlen(xenver[idx].xv_ver) >= 4 &&
+	    strncmp(xenver[idx].xv_ver + strlen(xenver[idx].xv_ver) - 4,
+	    "-xvm", 4) == 0)
+		xenver[idx].xv_is_xvm = 1;
 
 	(void) HYPERVISOR_xen_version(XENVER_changeset,
 	    &xenver[idx].xv_chgset);
@@ -207,14 +215,35 @@ xen_hypervisor_supports_solaris(xen_hypervisor_check_t check)
 		return (1);
 	if (XENVER_CURRENT(xv_revision) < 4)
 		return (0);
-	if (XENVER_CURRENT(xv_revision) == 4 && check == XEN_SUSPEND_CHECK) {
-		if (strlen(XENVER_CURRENT(xv_ver)) < 4)
-			return (0);
-		if (strncmp(XENVER_CURRENT(xv_ver) +
-		    strlen(XENVER_CURRENT(xv_ver)) - 4, "-xvm", 4))
-			return (0);
-	}
+	if (check == XEN_SUSPEND_CHECK && XENVER_CURRENT(xv_revision) == 4 &&
+	    !XENVER_CURRENT(xv_is_xvm))
+		return (0);
+
 	return (1);
+}
+
+/*
+ * If the hypervisor is -xvm, or 3.1.2 or higher, we don't need the
+ * workaround.
+ */
+static void
+xen_pte_workaround(void)
+{
+#if defined(__amd64)
+	extern int pt_kern;
+
+	if (XENVER_CURRENT(xv_major) != 3)
+		return;
+	if (XENVER_CURRENT(xv_minor) > 1)
+		return;
+	if (XENVER_CURRENT(xv_minor) == 1 &&
+	    XENVER_CURRENT(xv_revision) > 1)
+		return;
+	if (XENVER_CURRENT(xv_is_xvm))
+		return;
+
+	pt_kern = PT_USER;
+#endif
 }
 
 void
@@ -887,7 +916,7 @@ xen_printf(const char *fmt, ...)
 #endif	/* DEBUG */
 
 void
-xen_version(void)
+startup_xen_version(void)
 {
 	xen_set_version(XENVER_BOOT_IDX);
 	if (xen_hypervisor_supports_solaris(XEN_RUN_CHECK) == 0)
@@ -895,6 +924,7 @@ xen_version(void)
 		    "but need at least version v3.0.4",
 		    XENVER_CURRENT(xv_major), XENVER_CURRENT(xv_minor),
 		    XENVER_CURRENT(xv_ver));
+	xen_pte_workaround();
 }
 
 /*

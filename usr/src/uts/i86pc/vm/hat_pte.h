@@ -60,12 +60,12 @@ extern "C" {
 
 /*
  * Handy macro to check if 2 PTE's are the same - ignores REF/MOD bits.
- * On the 64 bit hypervisor we also have to ignore the high order software
- * bits and the global bit which are set/cleared capriciously (by the
- * hypervisor!)
+ * On the 64 bit hypervisor we also have to ignore the high order
+ * software bits and the global/user bit which are set/cleared
+ * capriciously (by the hypervisor!)
  */
 #if defined(__amd64) && defined(__xpv)
-#define	PT_IGNORE	((0x7fful << 52) | PT_GLOBAL)
+#define	PT_IGNORE	((0x7fful << 52) | PT_GLOBAL | PT_USER)
 #else
 #define	PT_IGNORE	(0)
 #endif

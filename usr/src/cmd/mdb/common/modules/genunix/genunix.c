@@ -3500,7 +3500,7 @@ static const mdb_dcmd_t dcmds[] = {
 	/* from thread.c */
 	{ "thread", "?[-bdfimps]", "display a summarized kthread_t", thread,
 		thread_help },
-	{ "threadlist", "?[-v [count]]",
+	{ "threadlist", "?[-t] [-v [count]]",
 		"display threads and associated C stack traces", threadlist,
 		threadlist_help },
 
