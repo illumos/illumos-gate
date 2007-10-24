@@ -751,20 +751,24 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 	if (!zpool_name_valid(hdl, B_FALSE, pool))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, msg));
 
+	if (zcmd_write_conf_nvlist(hdl, &zc, nvroot) != 0)
+		return (-1);
+
 	if (props && (props = zpool_validate_properties(hdl, pool, props,
 	    SPA_VERSION_1, B_TRUE, msg)) == NULL)
 		return (-1);
 
-	if (zcmd_write_conf_nvlist(hdl, &zc, nvroot) != 0)
+	if (props && zcmd_write_src_nvlist(hdl, &zc, props) != 0) {
+		nvlist_free(props);
 		return (-1);
-
-	if (props && zcmd_write_src_nvlist(hdl, &zc, props) != 0)
-		return (-1);
+	}
 
 	(void) strlcpy(zc.zc_name, pool, sizeof (zc.zc_name));
 
 	if (zfs_ioctl(hdl, ZFS_IOC_POOL_CREATE, &zc) != 0) {
+
 		zcmd_free_nvlists(&zc);
+		nvlist_free(props);
 
 		switch (errno) {
 		case EBUSY:
@@ -805,7 +809,6 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 			return (zpool_standard_error(hdl, errno, msg));
 		}
 	}
-	zcmd_free_nvlists(&zc);
 
 	/*
 	 * If this is an alternate root pool, then we automatically set the
@@ -822,6 +825,8 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 		zfs_close(zhp);
 	}
 
+	zcmd_free_nvlists(&zc);
+	nvlist_free(props);
 	return (0);
 }
 
@@ -1058,10 +1063,12 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		    &version) == 0);
 
 		if ((props = zpool_validate_properties(hdl, origname,
-		    props, version, B_TRUE, errbuf)) == NULL)
+		    props, version, B_TRUE, errbuf)) == NULL) {
 			return (-1);
-		else if (zcmd_write_src_nvlist(hdl, &zc, props) != 0)
+		} else if (zcmd_write_src_nvlist(hdl, &zc, props) != 0) {
+			nvlist_free(props);
 			return (-1);
+		}
 	}
 
 	(void) strlcpy(zc.zc_name, thename, sizeof (zc.zc_name));
@@ -1069,8 +1076,10 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 	    &zc.zc_guid) == 0);
 
-	if (zcmd_write_conf_nvlist(hdl, &zc, config) != 0)
+	if (zcmd_write_conf_nvlist(hdl, &zc, config) != 0) {
+		nvlist_free(props);
 		return (-1);
+	}
 
 	ret = 0;
 	if (zfs_ioctl(hdl, ZFS_IOC_POOL_IMPORT, &zc) != 0) {
@@ -1116,8 +1125,9 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 
 	}
 
-
 	zcmd_free_nvlists(&zc);
+	nvlist_free(props);
+
 	return (ret);
 }
 

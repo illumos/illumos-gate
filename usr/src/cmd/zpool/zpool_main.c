@@ -3204,7 +3204,6 @@ zpool_do_upgrade(int argc, char **argv)
 	boolean_t showversions = B_FALSE;
 	char *end;
 
-	cb.cb_version = SPA_VERSION;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "avV:")) != -1) {
@@ -3217,7 +3216,8 @@ zpool_do_upgrade(int argc, char **argv)
 			break;
 		case 'V':
 			cb.cb_version = strtoll(optarg, &end, 10);
-			if (*end != '\0') {
+			if (*end != '\0' || cb.cb_version > SPA_VERSION ||
+			    cb.cb_version < SPA_VERSION_1) {
 				(void) fprintf(stderr,
 				    gettext("invalid version '%s'\n"), optarg);
 				usage(B_FALSE);
@@ -3235,6 +3235,14 @@ zpool_do_upgrade(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if (cb.cb_version == 0) {
+		cb.cb_version = SPA_VERSION;
+	} else if (!cb.cb_all && argc == 0) {
+		(void) fprintf(stderr, gettext("-V option is "
+		    "incompatible with other arguments\n"));
+		usage(B_FALSE);
+	}
+
 	if (showversions) {
 		if (cb.cb_all || argc != 0) {
 			(void) fprintf(stderr, gettext("-v option is "
@@ -3243,8 +3251,8 @@ zpool_do_upgrade(int argc, char **argv)
 		}
 	} else if (cb.cb_all) {
 		if (argc != 0) {
-			(void) fprintf(stderr, gettext("-a option is "
-			    "incompatible with other arguments\n"));
+			(void) fprintf(stderr, gettext("-a option should not "
+			    "be used along with a pool name\n"));
 			usage(B_FALSE);
 		}
 	}
