@@ -33,7 +33,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -3178,6 +3177,7 @@ main(int argc, char *argv[])
 	FILE *infile = stdin, *savefile;
 	boolean_t dosave = B_FALSE, readfile = B_FALSE;
 	char *configfile = NULL;
+	struct stat sbuf;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -3219,6 +3219,28 @@ main(int argc, char *argv[])
 			if (infile == NULL) {
 				EXIT_BADCONFIG2("Unable to open configuration "
 				    "file: %s\n", optarg);
+			}
+			/*
+			 * Check file permissions/ownership and warn or
+			 * fail depending on state of SMF control.
+			 */
+			if (fstat(fileno(infile), &sbuf) == -1) {
+				(void) fclose(infile);
+				EXIT_BADCONFIG2("Unable to stat configuration "
+				    "file: %s\n", optarg);
+			}
+			if (INSECURE_PERMS(sbuf)) {
+				if (my_fmri != NULL) {
+					(void) fclose(infile);
+					EXIT_BADCONFIG2("Config file "
+					    "%s has insecure permissions.",
+					    optarg);
+				} else 	{
+					(void) fprintf(stderr, "%s %s\n",
+					    optarg, gettext(
+					    "has insecure permissions, will be "
+					    "rejected in permanent config."));
+				}
 			}
 			configfile = strdup(optarg);
 			readfile = B_TRUE;

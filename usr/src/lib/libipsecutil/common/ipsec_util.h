@@ -79,6 +79,11 @@ extern "C" {
 #define	TBUF_SIZE	50
 #define	TIME_MAX	LONG_MAX
 
+#ifndef INSECURE_PERMS
+#define	INSECURE_PERMS(sbuf)	(((sbuf).st_uid != 0) || \
+	((sbuf).st_mode & S_IRWXG) || ((sbuf).st_mode & S_IRWXO))
+#endif
+
 /* For keyword-lookup tables */
 typedef struct keywdtab {
 	uint_t	kw_tag;

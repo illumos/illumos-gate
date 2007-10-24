@@ -7124,6 +7124,21 @@ mondo_loop() {
 	fi
 
 	echo
+
+	#
+	# Change permissions of public IKE certificates and CRLs
+	# that may have been incorrectly created as private
+	# PKCS#11 hints files must be left root-only readable.
+	# Make sure this files starts with "30 82"
+	#
+	for file in `ls $rootprefix/etc/inet/ike/crls/* \
+	    $rootprefix/etc/inet/ike/publickeys/* 2>/dev/null`; do
+		if /bin/od -tx1 -N3 < $file | grep '30 82' >/dev/null 2>&1
+		then
+			chmod 644 $file
+		fi
+	done
+
 	# Simulate installation of SUNWcry* - these are in the bfu archives.
 	if [ -f $rootprefix/etc/crypto/kcf.conf -a \
 	    -f $rootprefix/etc/crypto/pkcs11.conf ]; then
