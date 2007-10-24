@@ -130,7 +130,7 @@ package_dep:	package_dep_ .WAIT $(SUBDIRS1) .WAIT \
 	$(PKGDIRS) .WAIT $(SUBDIRS2)
 
 package_dep_:	FRC
-		@ cd ../tools; pwd; $(MAKE) proto && ./proto
+		@ cd ../tools; pwd; $(MAKE) proto && ./proto $(RELEASE)
 		@ cd $(SRC)/common/mapfiles/gen ; pwd; $(MAKE) install
 		@ cd $(SRC)/head; pwd; $(MAKE) \
 			$(ROOT)/usr/include/dlfcn.h \

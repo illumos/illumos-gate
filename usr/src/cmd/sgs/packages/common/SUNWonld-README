@@ -1292,3 +1292,5 @@ Bugid   Risk Synopsis
 	ELIMINATE
 6570616 elfdump should display incorrectly aligned note section
 6614968 elfedit needs string table module (D)
+6620533 HWCAP filtering can leave uninitialized data behind - results in
+	"rejected: Invalid argument"

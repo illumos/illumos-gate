@@ -2343,9 +2343,10 @@ load_path(Lm_list *lml, Aliste lmco, const char **name, Rt_map *clmp,
 			if (fmap->fm_maddr)
 #endif
 				(void) munmap(fmap->fm_maddr, fmap->fm_msize);
+
+			*fmap = cfdp->fd_fmap;
 		}
 		nfdp = *cfdp;
-		*fmap = cfdp->fd_fmap;
 	}
 
 	lmp = _load_path(lml, lmco, name, clmp, nmode, flags, hdl, &nfdp, rej);
@@ -2357,7 +2358,7 @@ load_path(Lm_list *lml, Aliste lmco, const char **name, Rt_map *clmp,
 	 * this mapping needs to be reset to insure it doesn't mistakenly get
 	 * unmapped as part of HWCAP cleanup.
 	 */
-	if (flags & FLG_RT_HWCAP) {
+	if ((flags & FLG_RT_HWCAP) && (cfdp->fd_lmp == 0)) {
 		cfdp->fd_fmap.fm_maddr = fmap->fm_maddr;
 		cfdp->fd_fmap.fm_mflags = fmap->fm_mflags;
 		cfdp->fd_fd = nfdp.fd_fd;

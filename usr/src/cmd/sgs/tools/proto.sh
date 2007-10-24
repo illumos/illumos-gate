@@ -30,13 +30,31 @@
 # sufficient to support the sgs build.
 #
 # Currently, the following releases are supported:
-#	5.11, 5.10, 5.9 and 5.8
+#	5.11, 5.10, and 5.9.
 #
 
 if [ "X$CODEMGR_WS" = "X" -o "X$MACH" = "X" ] ; then
-	echo "CODEMGR_WS and MACH environment variables must be set"
+	echo "usage: CODEMGR_WS and MACH environment variables must be set"
 	exit 1
 fi
+
+RELEASE=$1
+
+if [ "X$RELEASE" = "X" ] ; then
+	echo "usage: proto release"
+	exit 1;
+fi
+
+IS_THIS_UNIFIED=1
+
+case $RELEASE in
+	"5.11") break;;
+	"5.10") break;;
+	"5.9") IS_THIS_UNIFIED=0;  break;;
+	*)
+	echo "usage: unsupported release $RELEASE specified"
+	exit 1;;
+esac
 
 dirs="	$CODEMGR_WS/proto \
 	$CODEMGR_WS/proto/root_$MACH \
@@ -106,25 +124,6 @@ do
 	fi
 done
 
-#
-# Get the target release from ${SRC}/Makefile.master
-#
-RELEASE=`grep "^[ 	]*RELEASE=" ${SRC}/Makefile.master |\
-	sed -e "s/^[ 	]*RELEASE=[ 	]*//"`
-
-IS_THIS_UNIFIED=1
-case $RELEASE in
-	"5.11") break;;
-	"5.10") break;;
-	"5.9") IS_THIS_UNIFIED=0;  break;;
-	"5.8") IS_THIS_UNIFIED=0;  break;;
-	"5.7") IS_THIS_UNIFIED=0;  break;;
-	*)
-	echo "Unsupported release $RELEASE specified in ${SRC}/Makefile.master"
-	exit 1;;
-esac
-
-
 # We need a local copy of libc_pic.a (we should get this from the parent
 # workspace, but as we can't be sure how the proto area is constructed there
 # simply take it from a stashed copy on the linkers server. If
@@ -133,7 +132,6 @@ esac
 if [ "$LINKERS_EXPORT" = "" ]; then
     LINKERS_EXPORT=/net/linkers.central/export
 fi
-
 
 if [ $MACH = "sparc" ]; then
 	PLATS="sparc sparcv9"
