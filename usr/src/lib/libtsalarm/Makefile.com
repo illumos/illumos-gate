@@ -38,10 +38,21 @@ SRCDIR =	../common
 
 CPPFLAGS +=	-I../../libpcp/common
 
+LINKED_DIRS	= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
+LINKED_LIB_DIRS	= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)
+LINKED_LIBTSALARM_DIR	= \
+	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/libtsalarm.so)
+LINKED_LIBTSALARM1_DIR	= \
+	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/libtsalarm.so.1)
+LINKED_INCL_DIRS = $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/include)
+
 LIBS = $(DYNLIB)
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-L$(USR_PLAT_DIR)/$(PLATFORM)/lib -lpcp -lc
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib
+INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libtsalarm.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libtsalarm.so $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink8=	$(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@ $(CHOWNLINK) $(CHGRPLINK)
 
 .KEEP_STATE:
 

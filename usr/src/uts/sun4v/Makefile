@@ -36,6 +36,7 @@ include Makefile.huron
 include Makefile.maramba
 include Makefile.thunder
 include Makefile.turgo
+include Makefile.congo
 
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
@@ -203,7 +204,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_THUNDER_DIR) $(USR_THUNDER_SBIN_DIR) \
 			$(USR_THUNDER_LIB_DIR) \
 			$(USR_TURGO_DIR) $(USR_TURGO_SBIN_DIR) \
-			$(USR_TURGO_LIB_DIR)
+			$(USR_TURGO_LIB_DIR) \
+			$(USR_CONGO_DIR) $(USR_CONGO_SBIN_DIR) \
+			$(USR_CONGO_LIB_DIR)
 
 
 #
@@ -271,6 +274,15 @@ $(USR_TURGO_SBIN_DIR):		$(USR_TURGO_DIR)
 	$(INS.slink5)
 
 $(USR_TURGO_LIB_DIR):		$(USR_TURGO_DIR)
+	-$(INS.dir.root.bin)
+
+$(USR_CONGO_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_CONGO_SBIN_DIR):		$(USR_CONGO_DIR)
+	$(INS.slink5)
+
+$(USR_CONGO_LIB_DIR):		$(USR_CONGO_DIR)
 	-$(INS.dir.root.bin)
 
 #

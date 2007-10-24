@@ -33,9 +33,11 @@ PLATINCS += -I$(USR_PLAT_DIR)/sun4v/include -I$(UTSBASE)/sun4v
 PLATFORM_OBJECTS= tsalarm.o
 
 #
-# platform library directory (/usr/platform/SUNW,Netra-T5220/lib)
+# platform library directory (/usr/platform/sun4v/lib)
 #
-PLATFORM=SUNW,Netra-T5220
+PLATFORM=sun4v
+LINKED_PLATFORMS = SUNW,Netra-T5220
+LINKED_PLATFORMS += SUNW,Netra-T5440
 
 include ../Makefile.com
 
@@ -60,6 +62,24 @@ $(USR_PSM_INCL_DIR)/%:	../common/% $(USR_PSM_INCL_DIR)
 $(USR_PSM_INCL_DIR):
 	$(INS.dir.root.sys)
 
-install: all install_h $(USR_PSM_LIBS) $(PLATLIBS)/libtsalarm.so
+$(LINKED_DIRS):	$(USR_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(LINKED_LIB_DIRS):	$(LINKED_DIRS)
+	-$(INS.dir.root.sys)
+
+$(LINKED_LIBTSALARM_DIR):	$(USR_PLAT_DIR)
+	-$(INS.slink7)
+
+$(LINKED_LIBTSALARM1_DIR):	$(USR_PLAT_DIR)
+	-$(INS.slink6)
+
+$(LINKED_INCL_DIRS):	$(LINKED_DIRS)
+	-$(INS.slink8)
+
+install: all install_h $(USR_PSM_LIBS) $(PLATLIBS)/libtsalarm.so \
+	$(LINKED_DIRS) $(LINKED_LIB_DIRS) \
+	$(LINKED_LIBTSALARM_DIR) $(LINKED_LIBTSALARM1_DIR) \
+	$(LINKED_INCL_DIRS)
 
 install_h: $(USR_PSM_INCL_DIR)/tsalarm.h

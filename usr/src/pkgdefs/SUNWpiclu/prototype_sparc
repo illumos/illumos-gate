@@ -168,6 +168,12 @@ d none usr/platform/SUNW,Netra-T5220/lib/picl 755 root sys
 d none usr/platform/SUNW,Netra-T5220/lib/picl/plugins 755 root sys
 s none usr/platform/SUNW,Netra-T5220/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
 s none usr/platform/SUNW,Netra-T5220/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+d none usr/platform/SUNW,Netra-T5440 755 root sys
+d none usr/platform/SUNW,Netra-T5440/lib 755 root bin
+d none usr/platform/SUNW,Netra-T5440/lib/picl 755 root sys
+d none usr/platform/SUNW,Netra-T5440/lib/picl/plugins 755 root sys
+s none usr/platform/SUNW,Netra-T5440/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+s none usr/platform/SUNW,Netra-T5440/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V240/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
