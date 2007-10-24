@@ -726,12 +726,15 @@ icmp_close_free(conn_t *connp)
 	icmp_t *icmp = connp->conn_icmp;
 
 	/* If there are any options associated with the stream, free them. */
-	if (icmp->icmp_ip_snd_options)
+	if (icmp->icmp_ip_snd_options != NULL) {
 		mi_free((char *)icmp->icmp_ip_snd_options);
+		icmp->icmp_ip_snd_options = NULL;
+	}
 
-	if (icmp->icmp_filter != NULL)
+	if (icmp->icmp_filter != NULL) {
 		kmem_free(icmp->icmp_filter, sizeof (icmp6_filter_t));
-
+		icmp->icmp_filter = NULL;
+	}
 	/* Free memory associated with sticky options */
 	if (icmp->icmp_sticky_hdrs_len != 0) {
 		kmem_free(icmp->icmp_sticky_hdrs,

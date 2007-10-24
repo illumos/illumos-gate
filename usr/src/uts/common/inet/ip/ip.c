@@ -5623,6 +5623,19 @@ ip_close(queue_t *q, int flags)
 	return (0);
 }
 
+/*
+ * Wapper around putnext() so that ip_rts_request can merely use
+ * conn_recv.
+ */
+/*ARGSUSED2*/
+static void
+ip_conn_input(void *arg1, mblk_t *mp, void *arg2)
+{
+	conn_t *connp = (conn_t *)arg1;
+
+	putnext(connp->conn_rq, mp);
+}
+
 /* Return the IP checksum for the IP header at "iph". */
 uint16_t
 ip_csum_hdr(ipha_t *ipha)
@@ -9829,6 +9842,12 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * connp->conn_cred is crfree()ed in ipcl_conn_destroy()
 	 */
 	connp->conn_cred = credp;
+
+	/*
+	 * Handle IP_RTS_REQUEST and other ioctls which use conn_recv
+	 */
+	connp->conn_recv = ip_conn_input;
+
 	crhold(connp->conn_cred);
 
 	/*

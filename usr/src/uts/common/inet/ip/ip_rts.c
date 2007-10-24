@@ -325,8 +325,20 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	 * next block. If there is no next block
 	 * this is an indication from routing module
 	 * that it is a routing socket stream queue.
+	 * We need to support that for compatibility with SDP since
+	 * it has a contract private interface to use IP_IOC_RTS_REQUEST.
 	 */
-	ASSERT(mp->b_cont != NULL);
+	if (mp->b_cont == NULL) {
+		/*
+		 * This is a message from SDP
+		 * indicating that this is a Routing Socket
+		 * Stream. Insert this conn_t in routing
+		 * socket client list.
+		 */
+		connp->conn_loopback = 1;
+		ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
+		goto done;
+	}
 	mp1 = dupmsg(mp->b_cont);
 	if (mp1 == NULL) {
 		error  = ENOBUFS;
