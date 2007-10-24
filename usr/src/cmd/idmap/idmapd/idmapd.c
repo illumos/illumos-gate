@@ -49,6 +49,7 @@
 #include <sys/time.h>
 #include <zone.h>
 #include <door.h>
+#include <port.h>
 #include <tsol/label.h>
 #include <sys/resource.h>
 #include <sys/sid.h>
@@ -69,6 +70,9 @@ int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
 int _rpcsvccount = 0;		/* Number of requests being serviced */
 mutex_t _svcstate_lock;		/* lock for _rpcsvcstate, _rpcsvccount */
 idmapd_state_t	_idmapdstate;
+
+int hupped;
+extern int hup_ev_port;
 
 SVCXPRT *xprt = NULL;
 
@@ -111,19 +115,11 @@ app_krb5_user_uid(void)
 /*ARGSUSED*/
 static void
 hup_handler(int sig) {
-	(void) idmapdlog(LOG_INFO, "idmapd: Refreshing config.");
-	WRLOCK_CONFIG();
-	(void) idmap_cfg_fini(_idmapdstate.cfg);
-	_idmapdstate.cfg = NULL;
-	if (load_config() < 0) {
-		UNLOCK_CONFIG();
-		(void) idmapdlog(LOG_NOTICE,
-			"idmapd: Failed to reload config");
-		term_handler(sig);
-	}
-	UNLOCK_CONFIG();
-	print_idmapdstate();
+	hupped = 1;
+	if (hup_ev_port >= 0)
+		(void) port_send(hup_ev_port, 1, &sig /* any ptr will do */);
 }
+
 
 /*ARGSUSED*/
 static void
@@ -284,15 +280,6 @@ init_idmapd() {
 		error = errno;
 		idmapdlog(LOG_ERR,
 	"idmapd: unable to determine hostname, error: %d",
-			error);
-		exit(1);
-	}
-
-	if (sysinfo(SI_SRPC_DOMAIN, _idmapdstate.domainname,
-			sizeof (_idmapdstate.domainname)) == -1) {
-		error = errno;
-		idmapdlog(LOG_ERR,
-	"idmapd: unable to determine name service domain, error: %d",
 			error);
 		exit(1);
 	}

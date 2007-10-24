@@ -70,69 +70,145 @@ fini_mapping_system() {
 
 int
 load_config() {
+	idmap_pg_config_t *pgcfg;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
 		idmapdlog(LOG_ERR, "%s: failed to initialize config", me);
+		degrade_svc();
 		return (-1);
 	}
-	if (_idmapdstate.ad != NULL)
-		idmap_ad_free(&_idmapdstate.ad);
-	if (idmap_cfg_load(_idmapdstate.cfg) < 0) {
+	pgcfg = &_idmapdstate.cfg->pgcfg;
+
+	if (idmap_cfg_load(&_idmapdstate.cfg->handles,
+	    &_idmapdstate.cfg->pgcfg) < 0) {
+		degrade_svc();
 		idmapdlog(LOG_ERR, "%s: failed to load config", me);
 		return (-1);
 	}
-	if (_idmapdstate.cfg->pgcfg.mapping_domain == NULL ||
-	    _idmapdstate.cfg->pgcfg.mapping_domain[0] == '\0') {
-		idmapdlog(LOG_ERR, "%s: Joined AD domain not configured; name "
-			"based and ephemeral mapping will not function", me);
-	} else if (idmap_ad_alloc(&_idmapdstate.ad,
-		    _idmapdstate.cfg->pgcfg.mapping_domain,
-		    IDMAP_AD_GLOBAL_CATALOG) != 0) {
-		idmapdlog(LOG_ERR, "%s: could not initialize AD context",
-			me);
-		return (-1);
+
+	if (pgcfg->default_domain == NULL ||
+	    pgcfg->default_domain[0] == '\0') {
+		idmapdlog(LOG_ERR, "%s: Default domain not configured; "
+		    "AD lookup disabled", me);
+		degrade_svc();
 	}
-	if (_idmapdstate.cfg->pgcfg.global_catalog == NULL ||
-	    _idmapdstate.cfg->pgcfg.global_catalog[0] == '\0') {
+	if (pgcfg->domain_name == NULL ||
+	    pgcfg->domain_name[0] == '\0') {
+		degrade_svc();
+		idmapdlog(LOG_ERR,
+		    "%s: AD joined domain is not configured; "
+		    "AD lookup disabled", me);
+	}
+	if (pgcfg->global_catalog == NULL ||
+	    pgcfg->global_catalog[0].host[0] == '\0') {
+		degrade_svc();
 		idmapdlog(LOG_ERR,
 		    "%s: Global catalog server is not configured; "
-		    "name-based and ephemeral mapping will not function", me);
-	} else if (idmap_add_ds(_idmapdstate.ad,
-		    _idmapdstate.cfg->pgcfg.global_catalog, 0) != 0) {
-		idmapdlog(LOG_ERR, "%s: could not initialize AD DS context",
-			me);
-		return (-1);
+		    "AD lookup disabled", me);
 	}
+
+	(void) reload_ad();
+
+	if (idmap_cfg_start_updates(_idmapdstate.cfg) < 0)
+		idmapdlog(LOG_ERR, "%s: could not start config updater",
+			me);
 	return (0);
 }
 
+
+int
+reload_ad() {
+	int	i;
+	ad_t	*old;
+	ad_t	*new;
+
+	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+
+	if (pgcfg->default_domain == NULL ||
+	    pgcfg->global_catalog == NULL) {
+		if (_idmapdstate.ad == NULL)
+			idmapdlog(LOG_ERR, "%s: AD lookup disabled", me);
+		else
+			idmapdlog(LOG_ERR, "%s: cannot update AD context", me);
+		return (-1);
+	}
+
+	old = _idmapdstate.ad;
+
+	if (idmap_ad_alloc(&new, pgcfg->default_domain,
+	    IDMAP_AD_GLOBAL_CATALOG) != 0) {
+		if (old == NULL)
+			degrade_svc();
+		idmapdlog(LOG_ERR, "%s: could not initialize AD context", me);
+		return (-1);
+	}
+
+	for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++) {
+		if (idmap_add_ds(new,
+		    pgcfg->global_catalog[i].host,
+		    pgcfg->global_catalog[i].port) != 0) {
+			idmap_ad_free(&new);
+			if (old == NULL)
+				degrade_svc();
+			idmapdlog(LOG_ERR,
+			    "%s: could not initialize AD DS context", me);
+			return (-1);
+		}
+	}
+
+	_idmapdstate.ad = new;
+
+	if (old != NULL)
+		idmap_ad_free(&old);
+
+	return (0);
+}
+
+
 void
 print_idmapdstate() {
+	int i;
+	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+
 	RDLOCK_CONFIG();
 
-	if (_idmapdstate.daemon_mode == FALSE) {
-		(void) fprintf(stderr, "%s: daemon_mode=%s\n",
-			me, _idmapdstate.daemon_mode == TRUE?"true":"false");
-		(void) fprintf(stderr, "%s: hostname=%s\n",
-			me, _idmapdstate.hostname);
-		(void) fprintf(stderr, "%s: name service domain=%s\n", me,
-			_idmapdstate.domainname);
-
-		(void) fprintf(stderr, "%s: config=%s\n", me,
-			_idmapdstate.cfg?"not null":"null");
+	if (_idmapdstate.cfg == NULL) {
+		idmapdlog(LOG_INFO, "%s: Null configuration", me);
+		UNLOCK_CONFIG();
+		return;
 	}
-	if (_idmapdstate.cfg == NULL || _idmapdstate.daemon_mode == TRUE)
-		goto out;
-	(void) fprintf(stderr, "%s: list_size_limit=%llu\n", me,
-		_idmapdstate.cfg->pgcfg.list_size_limit);
-	(void) fprintf(stderr, "%s: mapping_domain=%s\n", me,
-		CHECK_NULL(_idmapdstate.cfg->pgcfg.mapping_domain));
-	(void) fprintf(stderr, "%s: machine_sid=%s\n", me,
-		CHECK_NULL(_idmapdstate.cfg->pgcfg.machine_sid));
-	(void) fprintf(stderr, "%s: global_catalog=%s\n", me,
-		CHECK_NULL(_idmapdstate.cfg->pgcfg.global_catalog));
-	(void) fprintf(stderr, "%s: domain_controller=%s\n", me,
-		CHECK_NULL(_idmapdstate.cfg->pgcfg.domain_controller));
-out:
+
+	idmapdlog(LOG_DEBUG, "%s: list_size_limit=%llu", me,
+	    pgcfg->list_size_limit);
+	idmapdlog(LOG_DEBUG, "%s: default_domain=%s", me,
+	    CHECK_NULL(pgcfg->default_domain));
+	idmapdlog(LOG_DEBUG, "%s: domain_name=%s", me,
+	    CHECK_NULL(pgcfg->domain_name));
+	idmapdlog(LOG_DEBUG, "%s: machine_sid=%s", me,
+	    CHECK_NULL(pgcfg->machine_sid));
+	if (pgcfg->domain_controller == NULL ||
+	    pgcfg->domain_controller[0].host[0] == '\0') {
+		idmapdlog(LOG_DEBUG, "%s: No domain controllers known", me);
+	} else {
+		for (i = 0; pgcfg->domain_controller[i].host[0] != '\0'; i++)
+			idmapdlog(LOG_DEBUG, "%s: domain_controller=%s port=%d",
+			    me, pgcfg->domain_controller[i].host,
+			    pgcfg->domain_controller[i].port);
+	}
+	idmapdlog(LOG_DEBUG, "%s: forest_name=%s", me,
+	    CHECK_NULL(pgcfg->forest_name));
+	idmapdlog(LOG_DEBUG, "%s: site_name=%s", me,
+	    CHECK_NULL(pgcfg->site_name));
+	if (pgcfg->global_catalog == NULL ||
+	    pgcfg->global_catalog[0].host[0] == '\0') {
+		idmapdlog(LOG_DEBUG, "%s: No global catalog servers known", me);
+	} else {
+		for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++)
+			idmapdlog(LOG_DEBUG, "%s: global_catalog=%s port=%d",
+			    me,
+			    pgcfg->global_catalog[i].host,
+			    pgcfg->global_catalog[i].port);
+	}
+
 	UNLOCK_CONFIG();
 }
 

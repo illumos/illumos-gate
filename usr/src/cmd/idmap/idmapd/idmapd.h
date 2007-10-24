@@ -68,7 +68,6 @@ typedef struct idmapd_state {
 	idmap_cfg_t	*cfg;			/* config */
 	bool_t		daemon_mode;		/* daemon mode? yes/no */
 	char		hostname[MAX_NAME_LEN];	/* my hostname */
-	char	domainname[IDMAP_MAX_NAME_LEN];	/* my domain */
 	uid_t		next_uid;
 	gid_t		next_gid;
 	uid_t		limit_uid;
@@ -154,7 +153,10 @@ extern void	fini_mapping_system();
 extern void	print_idmapdstate();
 extern int	create_directory(const char *, uid_t, gid_t);
 extern int	load_config();
+extern int	reload_ad();
 extern int	idmap_init_tsd_key(void);
+extern void	degrade_svc(void);
+extern void	restore_svc(void);
 
 
 extern int		init_dbs();

@@ -106,6 +106,7 @@ struct ad {
 	char			*basedn;	/* derived from dflt domain */
 	pthread_mutex_t		lock;
 	uint32_t		ref;
+	ad_host_t		*last_adh;
 	idmap_ad_partition_t	partition;	/* Data or global catalog? */
 };
 
@@ -168,7 +169,8 @@ static pthread_mutex_t	adhostlock = PTHREAD_MUTEX_INITIALIZER;
 static void
 idmap_lookup_unlock_batch(idmap_query_state_t **state);
 
-
+static void
+delete_ds(ad_t *ad, const char *host, int port);
 
 /*ARGSUSED*/
 static int
@@ -425,6 +427,7 @@ void
 idmap_ad_free(ad_t **ad)
 {
 	ad_host_t *p;
+	ad_host_t *prev;
 
 	if (ad == NULL || *ad == NULL)
 		return;
@@ -437,11 +440,23 @@ idmap_ad_free(ad_t **ad)
 		return;
 	}
 
-	for (p = host_head; p != NULL; p = p->next) {
-		if (p->owner != (*ad))
+	(void) pthread_mutex_lock(&adhostlock);
+	prev = NULL;
+	p = host_head;
+	while (p != NULL) {
+		if (p->owner != (*ad)) {
+			prev = p;
+			p = p->next;
 			continue;
-		idmap_delete_ds((*ad), p->host, p->port);
+		} else {
+			delete_ds((*ad), p->host, p->port);
+			if (prev == NULL)
+				p = host_head;
+			else
+				p = prev->next;
+		}
 	}
+	(void) pthread_mutex_unlock(&adhostlock);
 
 	free((*ad)->basedn);
 
@@ -453,54 +468,72 @@ idmap_ad_free(ad_t **ad)
 	*ad = NULL;
 }
 
+
 static
 int
 idmap_open_conn(ad_host_t *adh)
 {
-	int	rc, ldversion;
+	int zero = 0;
+	int timeoutms = 30 * 1000;
+	int ldversion, rc;
 
-	if (adh->dead && adh->ld != NULL) {
+	if (adh == NULL)
+		return (0);
+
+	(void) pthread_mutex_lock(&adh->lock);
+
+	if (!adh->dead && adh->ld != NULL)
+		/* done! */
+		goto out;
+
+	if (adh->ld != NULL) {
 		(void) ldap_unbind(adh->ld);
 		adh->ld = NULL;
-		adh->dead = 0;
 	}
 
+	atomic_inc_64(&adh->generation);
+
+	/* Open and bind an LDAP connection */
+	adh->ld = ldap_init(adh->host, adh->port);
 	if (adh->ld == NULL) {
-		int zero = 0;
-		int timeoutms = 30 * 1000;
+		idmapdlog(LOG_INFO, "ldap_init() to server "
+		    "%s port %d failed. (%s)", adh->host,
+		    adh->port, strerror(errno));
+		goto out;
+	}
+	ldversion = LDAP_VERSION3;
+	(void) ldap_set_option(adh->ld, LDAP_OPT_PROTOCOL_VERSION, &ldversion);
+	(void) ldap_set_option(adh->ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
+	(void) ldap_set_option(adh->ld, LDAP_OPT_TIMELIMIT, &zero);
+	(void) ldap_set_option(adh->ld, LDAP_OPT_SIZELIMIT, &zero);
+	(void) ldap_set_option(adh->ld, LDAP_X_OPT_CONNECT_TIMEOUT, &timeoutms);
+	(void) ldap_set_option(adh->ld, LDAP_OPT_RESTART, LDAP_OPT_ON);
+	rc = ldap_sasl_interactive_bind_s(adh->ld, "" /* binddn */,
+	    adh->saslmech, NULL, NULL, adh->saslflags, &idmap_saslcallback,
+	    NULL);
 
-		atomic_inc_64(&adh->generation);
-		adh->ld = ldap_init(adh->host, adh->port);
-		if (adh->ld == NULL)
-			return (-1);
-
-		ldversion = LDAP_VERSION3;
-		(void) ldap_set_option(adh->ld, LDAP_OPT_PROTOCOL_VERSION,
-		    &ldversion);
-
-		(void) ldap_set_option(adh->ld, LDAP_OPT_REFERRALS,
-		    LDAP_OPT_OFF);
-		(void) ldap_set_option(adh->ld, LDAP_OPT_TIMELIMIT, &zero);
-		(void) ldap_set_option(adh->ld, LDAP_OPT_SIZELIMIT, &zero);
-		/* setup TCP/IP connect timeout */
-		(void) ldap_set_option(adh->ld, LDAP_X_OPT_CONNECT_TIMEOUT,
-		    &timeoutms);
-		(void) ldap_set_option(adh->ld, LDAP_OPT_RESTART, LDAP_OPT_ON);
-		rc = ldap_sasl_interactive_bind_s(adh->ld,
-		    "" /* binddn */, adh->saslmech, NULL, NULL, adh->saslflags,
-		    &idmap_saslcallback, NULL /* defaults */);
-
-		if (rc != LDAP_SUCCESS) {
-			idmapdlog(LOG_ERR, "ldap_sasl_interactive_bind_s() "
-			    "to server %s:%d failed. (%s)",
-			    adh->host, adh->port, ldap_err2string(rc));
-			return (rc);
-		}
+	if (rc != LDAP_SUCCESS) {
+		(void) ldap_unbind(adh->ld);
+		adh->ld = NULL;
+		idmapdlog(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
+		    "%s port %d failed. (%s)", adh->host, adh->port,
+		    ldap_err2string(rc));
 	}
 
-	adh->idletime = time(NULL);
+	idmapdlog(LOG_DEBUG, "Using global catalog server %s:%d",
+	    adh->host, adh->port);
 
-	return (LDAP_SUCCESS);
+out:
+	if (adh->ld != NULL) {
+		atomic_inc_32(&adh->ref);
+		adh->idletime = time(NULL);
+		adh->dead = 0;
+		(void) pthread_mutex_unlock(&adh->lock);
+		return (1);
+	}
+
+	(void) pthread_mutex_unlock(&adh->lock);
+	return (0);
 }
 
 
@@ -509,39 +542,79 @@ idmap_open_conn(ad_host_t *adh)
  */
 static
 ad_host_t *
-idmap_get_conn(const ad_t *ad)
+idmap_get_conn(ad_t *ad)
 {
 	ad_host_t	*adh = NULL;
-	int		rc;
+	ad_host_t	*first_adh, *next_adh;
+	int		seen_last;
+	int		tries = -1;
 
+retry:
 	(void) pthread_mutex_lock(&adhostlock);
 
-	/*
-	 * Search for any ad_host_t, preferably one with an open
-	 * connection
-	 */
-	for (adh = host_head; adh != NULL; adh = adh->next) {
-		if (adh->owner == ad) {
-			break;
-		}
+	if (host_head == NULL)
+		goto out;
+
+	/* Try as many DSs as we have, once each; count them once */
+	if (tries < 0) {
+		for (adh = host_head, tries = 0; adh != NULL; adh = adh->next)
+			tries++;
 	}
 
-	if (adh != NULL)
-		atomic_inc_32(&adh->ref);
+	/*
+	 * Find a suitable ad_host_t (one associated with this ad_t,
+	 * preferably one that's already connected and not dead),
+	 * possibly round-robining through the ad_host_t list.
+	 *
+	 * If we can't find a non-dead ad_host_t and we've had one
+	 * before (ad->last_adh != NULL) then pick the next one or, if
+	 * there is no next one, the first one (i.e., round-robin).
+	 *
+	 * If we've never had one then (ad->last_adh == NULL) then pick
+	 * the first one.
+	 *
+	 * If we ever want to be more clever, such as preferring DSes
+	 * with better average response times, adjusting for weights
+	 * from SRV RRs, and so on, then this is the place to do it.
+	 */
 
+	for (adh = host_head, first_adh = NULL, next_adh = NULL, seen_last = 0;
+	    adh != NULL; adh = adh->next) {
+		if (adh->owner != ad)
+			continue;
+		if (first_adh == NULL)
+			first_adh = adh;
+		if (adh == ad->last_adh)
+			seen_last++;
+		else if (seen_last)
+			next_adh = adh;
+
+		/* First time or current adh is live -> done */
+		if (ad->last_adh == NULL || (!adh->dead && adh->ld != NULL))
+			break;
+	}
+
+	/* Round-robin */
+	if (adh == NULL)
+		adh = (next_adh != NULL) ? next_adh : first_adh;
+
+	if (adh != NULL)
+		ad->last_adh = adh;
+
+out:
 	(void) pthread_mutex_unlock(&adhostlock);
 
-	if (adh == NULL)
-		return (NULL);
+	/* Found suitable DS, open it if not already opened */
+	if (idmap_open_conn(adh))
+		return (adh);
 
-	/* found connection, open it if not opened */
-	(void) pthread_mutex_lock(&adh->lock);
-	rc = idmap_open_conn(adh);
-	(void) pthread_mutex_unlock(&adh->lock);
-	if (rc != LDAP_SUCCESS)
-		return (NULL);
+	if (tries-- > 0)
+		goto retry;
 
-	return (adh);
+	idmapdlog(LOG_ERR, "Couldn't open an LDAP connection to any global "
+	    "catalog server!");
+
+	return (NULL);
 }
 
 static
@@ -576,7 +649,7 @@ idmap_add_ds(ad_t *ad, const char *host, int port)
 
 		if (strcmp(host, p->host) == 0 && p->port == port) {
 			/* already added */
-			ret = -2;
+			ret = 0;
 			goto err;
 		}
 	}
@@ -627,20 +700,20 @@ err:
 }
 
 /*
- * free a DS configuration
+ * Free a DS configuration.
+ * Caller must lock the adhostlock mutex
  */
-void
-idmap_delete_ds(ad_t *ad, const char *host, int port)
+static void
+delete_ds(ad_t *ad, const char *host, int port)
 {
 	ad_host_t	**p, *q;
 
-	(void) pthread_mutex_lock(&adhostlock);
 	for (p = &host_head; *p != NULL; p = &((*p)->next)) {
 		if ((*p)->owner != ad || strcmp(host, (*p)->host) != 0 ||
 		    (*p)->port != port)
 			continue;
 		/* found */
-		if (atomic_dec_32_nv(&((*p)->ref)) > 0)
+		if ((*p)->ref > 0)
 			break;	/* still in use */
 
 		q = *p;
@@ -655,8 +728,9 @@ idmap_delete_ds(ad_t *ad, const char *host, int port)
 		free(q);
 		break;
 	}
-	(void) pthread_mutex_unlock(&adhostlock);
+
 }
+
 
 /*
  * Convert a binary SID in a BerValue to a sid_t

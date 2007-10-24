@@ -29,6 +29,7 @@
  * Database related utility routines
  */
 
+#include <atomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,8 @@
 #include "string.h"
 #include "idmap_priv.h"
 
+
+static int degraded = 0;	/* whether the FMRI has been marked degraded */
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 		sqlite_vm **, int *, int, const char ***);
@@ -153,6 +156,34 @@ idmap_get_tsd(void)
 	return (tsd);
 }
 
+/*
+ * Wrappers for smf_degrade/restore_instance()
+ *
+ * smf_restore_instance() is too heavy duty to be calling every time we
+ * have a successful AD name<->SID lookup.
+ */
+void
+degrade_svc(void)
+{
+	membar_consumer();
+	if (degraded)
+		return;
+	(void) smf_degrade_instance(NULL, 0);
+	membar_producer();
+	degraded = 1;
+}
+
+
+void
+restore_svc(void)
+{
+	membar_consumer();
+	if (!degraded)
+		return;
+	(void) smf_restore_instance(NULL);
+	membar_producer();
+	degraded = 0;
+}
 
 
 /*
@@ -705,8 +736,8 @@ add_namerule(sqlite *db, idmap_namerule *rule) {
 
 	RDLOCK_CONFIG();
 	if (dom == NULL) {
-		if (_idmapdstate.cfg->pgcfg.mapping_domain)
-			dom = _idmapdstate.cfg->pgcfg.mapping_domain;
+		if (_idmapdstate.cfg->pgcfg.default_domain)
+			dom = _idmapdstate.cfg->pgcfg.default_domain;
 		else
 			dom = "";
 	}
@@ -1371,10 +1402,13 @@ retry:
 	ret = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
 		&state->ad_lookup);
 	if (ret != 0) {
+		degrade_svc();
 		idmapdlog(LOG_ERR,
 		"Failed to create sid2name batch for AD lookup");
 		return (IDMAP_ERR_INTERNAL);
 	}
+
+	restore_svc();
 
 	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
 		req = &batch->idmap_mapping_batch_val[i];
@@ -1409,6 +1443,8 @@ retry:
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
+	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
+		degrade_svc();
 
 	return (retcode);
 
@@ -1685,8 +1721,8 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 		windomain = "";
 	} else {
 		RDLOCK_CONFIG();
-		if (_idmapdstate.cfg->pgcfg.mapping_domain != NULL) {
-			if (strcasecmp(_idmapdstate.cfg->pgcfg.mapping_domain,
+		if (_idmapdstate.cfg->pgcfg.default_domain != NULL) {
+			if (strcasecmp(_idmapdstate.cfg->pgcfg.default_domain,
 			    windomain) == 0)
 				i = 1;
 		}
@@ -2342,10 +2378,13 @@ lookup_win_name2sid(const char *name, const char *domain, char **sidprefix,
 retry:
 	ret = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
 	if (ret != 0) {
+		degrade_svc();
 		idmapdlog(LOG_ERR,
 		"Failed to create name2sid batch for AD lookup");
 		return (IDMAP_ERR_INTERNAL);
 	}
+
+	restore_svc();
 
 	retcode = idmap_name2sid_batch_add1(qs, name, domain, sidprefix,
 					rid, type, &rc);
@@ -2367,6 +2406,8 @@ out:
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
+	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
+		degrade_svc();
 
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_NOTICE, "Windows user/group name to SID lookup "
@@ -2438,7 +2479,7 @@ static idmap_retcode
 name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 		int is_user, idmap_mapping *req, idmap_id_res *res) {
 	const char	*winname, *windomain;
-	char		*mapping_domain = NULL;
+	char		*default_domain = NULL;
 	char		*sql = NULL, *errmsg = NULL;
 	idmap_retcode	retcode;
 	char		*end;
@@ -2448,10 +2489,10 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 	const char	*me = "name_based_mapping_pid2sid";
 
 	RDLOCK_CONFIG();
-	if (_idmapdstate.cfg->pgcfg.mapping_domain != NULL) {
-		mapping_domain =
-			strdup(_idmapdstate.cfg->pgcfg.mapping_domain);
-		if (mapping_domain == NULL) {
+	if (_idmapdstate.cfg->pgcfg.default_domain != NULL) {
+		default_domain =
+			strdup(_idmapdstate.cfg->pgcfg.default_domain);
+		if (default_domain == NULL) {
 			UNLOCK_CONFIG();
 			idmapdlog(LOG_ERR, "Out of memory");
 			retcode = IDMAP_ERR_MEMORY;
@@ -2501,8 +2542,8 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 			winname = (values[0][0] == '*')?unixname:values[0];
 			if (values[1] != NULL)
 				windomain = values[1];
-			else if (mapping_domain != NULL)
-				windomain = mapping_domain;
+			else if (default_domain != NULL)
+				windomain = default_domain;
 			else {
 				idmapdlog(LOG_ERR,
 					"%s: no domain", me);
@@ -2548,9 +2589,9 @@ out:
 
 		req->id2name = strdup(winname);
 		if (req->id2name != NULL) {
-			if (windomain == mapping_domain) {
+			if (windomain == default_domain) {
 				req->id2domain = (char *)windomain;
-				mapping_domain = NULL;
+				default_domain = NULL;
 			} else {
 				req->id2domain = strdup(windomain);
 			}
@@ -2558,8 +2599,8 @@ out:
 	}
 	if (vm != NULL)
 		(void) sqlite_finalize(vm, NULL);
-	if (mapping_domain != NULL)
-		free(mapping_domain);
+	if (default_domain != NULL)
+		free(default_domain);
 	return (retcode);
 }
 
@@ -2674,11 +2715,14 @@ lookup_win_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
 
 	ret = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
 	if (ret != 0) {
+		degrade_svc();
 		idmapdlog(LOG_ERR,
 		"Failed to create sid2name batch for AD lookup");
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
+
+	restore_svc();
 
 	ret = idmap_sid2name_batch_add1(
 			qs, sidprefix, &rid, name, domain, type, &rc);
@@ -2692,6 +2736,8 @@ lookup_win_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
 out:
 	if (qs != NULL) {
 		ret = idmap_lookup_batch_end(&qs, NULL);
+		if (ret == IDMAP_ERR_RETRIABLE_NET_ERR)
+			degrade_svc();
 		if (ret != 0) {
 			idmapdlog(LOG_ERR,
 			"Failed to execute sid2name AD lookup");
@@ -2800,13 +2846,13 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 				retcode = IDMAP_ERR_MEMORY;
 		} else {
 			RDLOCK_CONFIG();
-			if (_idmapdstate.cfg->pgcfg.mapping_domain != NULL) {
+			if (_idmapdstate.cfg->pgcfg.default_domain != NULL) {
 			/*
 			 * otherwise use the mapping domain
 			 */
 				mapping->id1domain =
 				    strdup(_idmapdstate.cfg->
-					pgcfg.mapping_domain);
+					pgcfg.default_domain);
 				if (mapping->id1domain == NULL)
 					retcode = IDMAP_ERR_MEMORY;
 			}

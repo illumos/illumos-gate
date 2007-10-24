@@ -27,7 +27,7 @@
 
 PROG =		idmapd
 MANIFEST =	idmap.xml
-SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o \
+SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o addisc.o\
 	idmap_config.o
 SERVERSRCS =	$(SERVEROBJS:%.o=%.c)
 OBJS =		$(SERVEROBJS)
@@ -60,7 +60,7 @@ $(POFILE) := CPPFLAGS += $(INCS)
 CLOBBERFILES += $(IDMAP_PROT_H)
 
 CFLAGS += -v
-LDLIBS += -lsecdb -lnsl -lidmap -lscf -lldap -luuid
+LDLIBS += -lsecdb -lresolv -lsocket -lnsl -lidmap -lscf -lldap -luuid
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 $(PROG) := LDFLAGS += $(MAPFILES:%=-M%)
@@ -72,6 +72,8 @@ GROUP = sys
 
 lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT
 lint := LDLIBS += $(SQLITELINT)
+
+LINTFLAGS += -erroff=E_CONSTANT_CONDITION
 
 .KEEP_STATE:
 
