@@ -772,46 +772,77 @@ tsc_read(void)
 	return (0);
 }
 
-void
-patch_tsc(void)
-{}
-
 #else	/* __lint */
 
 #if defined(__amd64)
 
 	ENTRY_NP(tsc_read)
+	movq	%rbx, %r11
+	movl	$0, %eax
+	cpuid
+	rdtsc
+	movq	%r11, %rbx
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+	.globl _tsc_mfence_start
+_tsc_mfence_start:
+	mfence
 	rdtsc
 	shlq	$32, %rdx
 	orq	%rdx, %rax
 	ret
+	.globl _tsc_mfence_end
+_tsc_mfence_end:
+	.globl _tscp_start
+_tscp_start:
+	.byte	0x0f, 0x01, 0xf9	/* rdtscp instruction */
+	shlq	$32, %rdx
+	orq	%rdx, %rax
+	ret
+	.globl _tscp_end
+_tscp_end:
+	.globl _no_rdtsc_start
+_no_rdtsc_start:
+	xorl	%edx, %edx
+	xorl	%eax, %eax
+	ret
+	.globl _no_rdtsc_end
+_no_rdtsc_end:
 	SET_SIZE(tsc_read)
 
-#else  /* __i386 */
-
-	/*
-	 * To cope with processors that do not implement the rdtsc instruction,
-	 * we patch the kernel to use rdtsc if that feature is detected on the
-	 * CPU.  On an unpatched kernel, tsc_read() just returns zero.
-	 */
-	ENTRY_NP(patch_tsc)
-	movw	_rdtsc_bytes, %cx
-	movw	%cx, _tsc_patch_point
-	ret
-_rdtsc_bytes:
-	rdtsc
-	SET_SIZE(patch_tsc)
+#else /* __i386 */
 
 	ENTRY_NP(tsc_read)
-	xorl	%eax, %eax
-	xorl	%edx, %edx
-	.globl _tsc_patch_point
-_tsc_patch_point:
-	nop; nop
+	pushl	%ebx
+	movl	$0, %eax
+	cpuid
+	rdtsc
+	popl	%ebx
 	ret
+	.globl _tsc_mfence_start
+_tsc_mfence_start:
+	mfence
+	rdtsc
+	ret
+	.globl _tsc_mfence_end
+_tsc_mfence_end:
+	.globl	_tscp_start
+_tscp_start:
+	.byte	0x0f, 0x01, 0xf9	/* rdtscp instruction */
+	ret
+	.globl _tscp_end
+_tscp_end:
+	.globl _no_rdtsc_start
+_no_rdtsc_start:
+	xorl	%edx, %edx
+	xorl	%eax, %eax
+	ret
+	.globl _no_rdtsc_end
+_no_rdtsc_end:
 	SET_SIZE(tsc_read)
 
-#endif /* __i386 */
+#endif	/* __i386 */
 
 #endif	/* __lint */
 

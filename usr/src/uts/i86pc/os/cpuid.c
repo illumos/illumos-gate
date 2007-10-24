@@ -1059,7 +1059,8 @@ cpuid_pass1(cpu_t *cpu)
 			if (x86_vendor == X86_VENDOR_AMD)
 				feature &= ~X86_SEP;
 #endif
-			if (cp->cp_edx & CPUID_AMD_EDX_TSCP)
+			if (x86_vendor == X86_VENDOR_AMD &&
+			    cp->cp_edx & CPUID_AMD_EDX_TSCP)
 				feature |= X86_TSCP;
 			break;
 		default:
@@ -3658,6 +3659,29 @@ cpuid_mwait_free(cpu_t *cpu)
 
 	cpu->cpu_m.mcpu_cpi->cpi_mwait.buf_actual = NULL;
 	cpu->cpu_m.mcpu_cpi->cpi_mwait.size_actual = 0;
+}
+
+void
+patch_tsc_read(int flag)
+{
+	size_t cnt;
+
+	switch (flag) {
+	case X86_NO_TSC:
+		cnt = &_no_rdtsc_end - &_no_rdtsc_start;
+		memcpy((void *)tsc_read, (void *)&_no_rdtsc_start, cnt);
+		break;
+	case X86_HAVE_TSCP:
+		cnt = &_tscp_end - &_tscp_start;
+		memcpy((void *)tsc_read, (void *)&_tscp_start, cnt);
+		break;
+	case X86_TSC_MFENCE:
+		cnt = &_tsc_mfence_end - &_tsc_mfence_start;
+		memcpy((void *)tsc_read, (void *)&_tsc_mfence_start, cnt);
+		break;
+	default:
+		break;
+	}
 }
 
 #endif	/* !__xpv */

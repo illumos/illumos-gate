@@ -330,6 +330,13 @@ extern "C" {
 #define	X86_SSE4_1	0x04000000
 #define	X86_SSE4_2	0x08000000
 
+/*
+ * flags to patch tsc_read routine.
+ */
+#define	X86_NO_TSC		0x0
+#define	X86_HAVE_TSCP		0x1
+#define	X86_TSC_MFENCE		0x2
+
 #define	FMT_X86_FEATURE						\
 	"\20"							\
 	"\34sse4_2\33sse4_1\32ssse3\31cpuid"			\
@@ -568,6 +575,15 @@ extern void ucode_alloc_space(struct cpu *);
 extern void ucode_free_space(struct cpu *);
 extern void ucode_check(struct cpu *);
 extern void ucode_free();
+#endif
+
+#if !defined(__xpv)
+extern	char _tsc_mfence_start;
+extern	char _tsc_mfence_end;
+extern	char _tscp_start;
+extern	char _tscp_end;
+extern	char _no_rdtsc_start;
+extern	char _no_rdtsc_end;
 #endif
 
 extern uint_t workaround_errata(struct cpu *);

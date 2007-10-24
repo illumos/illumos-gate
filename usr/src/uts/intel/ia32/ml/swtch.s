@@ -128,21 +128,9 @@
 	movq	P_AS(hatp), scratch_reg;		\
 	movq	A_HAT(scratch_reg), hatp
 
-#if defined (__xpv)
-
 #define	TSC_READ()					\
 	call	tsc_read;				\
 	movq	%rax, %r14;
-
-#else
-
-#define	TSC_READ()					\
-	rdtsc;						\
-	shlq	$32, %rdx;				\
-	movl	%eax, %r14d;				\
-	orq	%rdx, %r14
-
-#endif
 
 /*
  * If we are resuming an interrupt thread, store a timestamp in the thread

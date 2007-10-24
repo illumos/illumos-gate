@@ -157,7 +157,6 @@ extern void block_zero_no_xmm(void *dst, int len);
 
 extern void (*kcpc_hw_enable_cpc_intr)(void);
 
-extern void patch_tsc(void);
 extern void init_desctbls(void);
 
 extern user_desc_t *cpu_get_gdt(void);
@@ -188,6 +187,7 @@ extern int xpv_panicking;
 #else
 extern void setup_mca(void);
 extern void pat_sync(void);
+extern void patch_tsc_read(int);
 #define	cpr_dprintf prom_printf
 #define	IN_XPV_PANIC() (__lintzero)
 #endif

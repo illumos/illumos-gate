@@ -71,23 +71,6 @@ extern __inline__ hrtime_t __rdtsc_insn(void)
 #endif
 }
 
-#else /* __xpv */
-
-/*
- * rdtsc may not exist on 32-bit, so we don't have an inline for it.
- */
-#if defined(__amd64)
-extern __inline__ hrtime_t tsc_read(void)
-{
-	uint32_t lobits, hibits;
-
-	__asm__ __volatile__(
-	    "rdtsc"
-	    : "=a" (lobits), "=d" (hibits));
-	return (lobits | ((hrtime_t)hibits << 32));
-}
-#endif /* __amd64 */
-
 #endif /* __xpv */
 
 #endif	/* !__lint && __GNUC__ */

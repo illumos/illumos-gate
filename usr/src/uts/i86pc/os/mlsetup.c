@@ -159,18 +159,40 @@ mlsetup(struct regs *rp)
 	 */
 	init_desctbls();
 
+#if !defined(__xpv)
+
+	/*
+	 * Patch the tsc_read routine with appropriate set of instructions,
+	 * depending on the processor family and architecure, to read the
+	 * time-stamp counter while ensuring no out-of-order execution.
+	 * Patch it while the kernel text is still writable.
+	 *
+	 * Note: tsc_read is not patched for intel processors whose family
+	 * is >6 and for amd whose family >f (in case they don't support rdtscp
+	 * instruction, unlikely). By default tsc_read will use cpuid for
+	 * serialization in such cases. The following code needs to be
+	 * revisited if intel processors of family >= f retains the
+	 * instruction serialization nature of mfence instruction.
+	 */
+	if (x86_feature & X86_TSCP)
+		patch_tsc_read(X86_HAVE_TSCP);
+	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
+	    cpuid_getfamily(CPU) <= 0xf)
+		patch_tsc_read(X86_TSC_MFENCE);
+	else if (cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
+	    cpuid_getfamily(CPU) <= 6)
+		patch_tsc_read(X86_TSC_MFENCE);
+
+#endif	/* !__xpv */
 
 #if defined(__i386) && !defined(__xpv)
 	/*
 	 * Some i386 processors do not implement the rdtsc instruction,
-	 * or at least they do not implement it correctly.
-	 *
-	 * For those that do, patch in the rdtsc instructions in
-	 * various parts of the kernel right now while the text is
-	 * still writable.
+	 * or at least they do not implement it correctly. Patch them to
+	 * return 0.
 	 */
-	if (x86_feature & X86_TSC)
-		patch_tsc();
+	if ((x86_feature & X86_TSC) == 0)
+		patch_tsc_read(X86_NO_TSC);
 #endif	/* __i386 && !__xpv */
 
 #if !defined(__xpv)
