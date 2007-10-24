@@ -47,6 +47,8 @@ f none opt/onbld/bin/i386/install 555 root bin
 l none opt/onbld/bin/i386/install.bin=./install
 f none opt/onbld/bin/i386/lintdump 555 root bin
 f none opt/onbld/bin/i386/mbh_patch 555 root bin
+f none opt/onbld/bin/i386/ndrgen 555 root bin
+f none opt/onbld/bin/i386/ndrgen1 555 root bin
 f none opt/onbld/bin/i386/pmodes 555 root bin
 f none opt/onbld/bin/i386/protocmp 555 root bin
 f none opt/onbld/bin/i386/protolist 555 root bin

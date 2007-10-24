@@ -43,6 +43,7 @@ COMMON_SUBDIRS= \
 	env \
 	fastfs \
 	findunref \
+	ndrgen \
 	pmodes \
 	gk \
 	install.bin \
@@ -72,6 +73,7 @@ LINTSUBDIRS= \
 	cw \
 	findunref \
 	lintdump \
+	ndrgen \
 	protocmp \
 	protolist
 

@@ -205,6 +205,13 @@ mkbfu
 	makes cpio archives out of the proto area suitable for bfu'ing.
 	Used by 'nightly' and 'makebfu'.
 
+ndrgen
+	Network Data Language (NDL) RPC protocol compiler to support DCE
+	RPC/MSRPC and SMB/CIFS.  ndrgen takes an input protocol definition
+	file (say, proto.ndl) and generates an output C source file
+	(proto_ndr.c) containing the Network Data Representation (NDR)
+	marshalling routines to implement the RPC protocol.
+
 nightly
 	nightly build script. Takes an environment (or 'env') file describing
 	such things as the workspace, the parent, and what to build. See
