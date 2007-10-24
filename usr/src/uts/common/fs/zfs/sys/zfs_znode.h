@@ -34,6 +34,7 @@
 #include <sys/list.h>
 #include <sys/dmu.h>
 #include <sys/zfs_vfsops.h>
+#include <sys/rrwlock.h>
 #endif
 #include <sys/zfs_acl.h>
 #include <sys/zil.h>
@@ -153,6 +154,7 @@ typedef struct znode {
 	uint_t		z_seq;		/* modification sequence number */
 	uint64_t	z_mapcnt;	/* number of pages mapped to file */
 	uint64_t	z_last_itx;	/* last ZIL itx on this znode */
+	uint64_t	z_gen;		/* generation (same as zp_gen) */
 	uint32_t	z_sync_cnt;	/* synchronous open count */
 	kmutex_t	z_acl_lock;	/* acl data lock */
 	list_node_t	z_link_node;	/* all znodes in fs link */
@@ -189,18 +191,27 @@ typedef struct znode {
 /*
  * ZFS_ENTER() is called on entry to each ZFS vnode and vfs operation.
  * ZFS_EXIT() must be called before exitting the vop.
+ * ZFS_ENTER_VERIFY_ZP() does ZFS_ENTER plus verifies the znode is valid.
  */
 #define	ZFS_ENTER(zfsvfs) \
 	{ \
-		if (rw_tryenter(&(zfsvfs)->z_unmount_lock, RW_READER) == 0) \
-			return (EIO); \
+		rrw_enter(&(zfsvfs)->z_teardown_lock, RW_READER, FTAG); \
 		if ((zfsvfs)->z_unmounted) { \
 			ZFS_EXIT(zfsvfs); \
 			return (EIO); \
 		} \
 	}
 
-#define	ZFS_EXIT(zfsvfs) rw_exit(&(zfsvfs)->z_unmount_lock)
+#define	ZFS_EXIT(zfsvfs) rrw_exit(&(zfsvfs)->z_teardown_lock, FTAG)
+
+#define	ZFS_ENTER_VERIFY_ZP(zfsvfs, zp) \
+	{ \
+		ZFS_ENTER((zfsvfs)); \
+		if (!(zp)->z_dbuf_held) { \
+			ZFS_EXIT(zfsvfs); \
+			return (EIO); \
+		} \
+	}
 
 /*
  * Macros for dealing with dmu_buf_hold
@@ -250,6 +261,7 @@ extern int	zfs_freesp(znode_t *, uint64_t, uint64_t, int, boolean_t);
 extern void	zfs_znode_init(void);
 extern void	zfs_znode_fini(void);
 extern int	zfs_zget(zfsvfs_t *, uint64_t, znode_t **);
+extern int	zfs_rezget(znode_t *);
 extern void	zfs_zinactive(znode_t *);
 extern void	zfs_znode_delete(znode_t *, dmu_tx_t *);
 extern void	zfs_znode_free(znode_t *);

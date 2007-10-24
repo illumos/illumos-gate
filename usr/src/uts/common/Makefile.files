@@ -1010,6 +1010,7 @@ ZFS_OBJS +=			\
 	zfs_log.o		\
 	zfs_replay.o		\
 	zfs_rlock.o		\
+	rrwlock.o		\
 	zfs_vfsops.o		\
 	zfs_vnops.o		\
 	zvol.o

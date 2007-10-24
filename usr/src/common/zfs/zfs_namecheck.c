@@ -54,14 +54,14 @@ valid_char(char c)
 	return ((c >= 'a' && c <= 'z') ||
 	    (c >= 'A' && c <= 'Z') ||
 	    (c >= '0' && c <= '9') ||
-	    c == '-' || c == '_' || c == '.' || c == ':');
+	    c == '-' || c == '_' || c == '.' || c == ':' || c == '%');
 }
 
 /*
  * Snapshot names must be made up of alphanumeric characters plus the following
  * characters:
  *
- * 	[-_.:]
+ * 	[-_.:%]
  */
 int
 snapshot_namecheck(const char *path, namecheck_err_t *why, char *what)
@@ -126,7 +126,7 @@ permset_namecheck(const char *path, namecheck_err_t *why, char *what)
  * Where each component is made up of alphanumeric characters plus the following
  * characters:
  *
- * 	[-_.:]
+ * 	[-_.:%]
  */
 int
 dataset_namecheck(const char *path, namecheck_err_t *why, char *what)

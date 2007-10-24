@@ -53,6 +53,16 @@
  * reliable way to auto-unmount the filesystem when it's "no longer in use".
  * When the user unmounts a filesystem, we call zfsctl_unmount(), which
  * unmounts any snapshots within the snapshot directory.
+ *
+ * The '.zfs', '.zfs/snapshot', and all directories created under
+ * '.zfs/snapshot' (ie: '.zfs/snapshot/<snapname>') are all GFS nodes and
+ * share the same vfs_t as the head filesystem (what '.zfs' lives under).
+ *
+ * File systems mounted ontop of the GFS nodes '.zfs/snapshot/<snapname>'
+ * (ie: snapshots) are ZFS nodes and have their own unique vfs_t.
+ * However, vnodes within these mounted on file systems have their v_vfsp
+ * fields set to the head filesystem to make NFS happy (see
+ * zfsctl_snapdir_lookup()).
  */
 
 #include <fs/fs_subr.h>
@@ -578,6 +588,9 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	return (err);
 }
 
+/*
+ * This creates a snapshot under '.zfs/snapshot'.
+ */
 /* ARGSUSED */
 static int
 zfsctl_snapdir_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t  **vpp,
@@ -711,6 +724,9 @@ domount:
 	if (err == 0) {
 		/*
 		 * Return the mounted root rather than the covered mount point.
+		 * Takes the GFS vnode at .zfs/snapshot/<snapname> and returns
+		 * the ZFS vnode mounted on top of the GFS node.  This ZFS
+		 * vnode is the root the newly created vfsp.
 		 */
 		VFS_RELE(vfsp);
 		err = traverse(vpp);
@@ -718,11 +734,11 @@ domount:
 
 	if (err == 0) {
 		/*
-		 * Fix up the root vnode.
+		 * Fix up the root vnode mounted on .zfs/snapshot/<snapname>.
 		 *
 		 * This is where we lie about our v_vfsp in order to
-		 * make .zfs/snapshot/<snapdir> accessible over NFS
-		 * without requiring manual mounts of <snapdir>.
+		 * make .zfs/snapshot/<snapname> accessible over NFS
+		 * without requiring manual mounts of <snapname>.
 		 */
 		ASSERT(VTOZ(*vpp)->z_zfsvfs != zfsvfs);
 		VTOZ(*vpp)->z_zfsvfs->z_parent = zfsvfs;
@@ -771,6 +787,13 @@ zfsctl_snapdir_readdir_cb(vnode_t *vp, struct dirent64 *dp, int *eofp,
 	return (0);
 }
 
+/*
+ * pvp is the '.zfs' directory (zfsctl_node_t).
+ * Creates vp, which is '.zfs/snapshot' (zfsctl_snapdir_t).
+ *
+ * This function is the callback to create a GFS vnode for '.zfs/snapshot'
+ * when a lookup is performed on .zfs for "snapshot".
+ */
 vnode_t *
 zfsctl_mknode_snapdir(vnode_t *pvp)
 {
@@ -838,6 +861,13 @@ static const fs_operation_def_t zfsctl_tops_snapdir[] = {
 	{ NULL }
 };
 
+/*
+ * pvp is the GFS vnode '.zfs/snapshot'.
+ *
+ * This creates a GFS node under '.zfs/snapshot' representing each
+ * snapshot.  This newly created GFS node is what we mount snapshot
+ * vfs_t's ontop of.
+ */
 static vnode_t *
 zfsctl_snapshot_mknode(vnode_t *pvp, uint64_t objset)
 {
@@ -937,6 +967,12 @@ zfsctl_lookup_objset(vfs_t *vfsp, uint64_t objsetid, zfsvfs_t **zfsvfsp)
 
 	if (sep != NULL) {
 		VN_HOLD(vp);
+		/*
+		 * Return the mounted root rather than the covered mount point.
+		 * Takes the GFS vnode at .zfs/snapshot/<snapshot objsetid>
+		 * and returns the ZFS vnode mounted on top of the GFS node.
+		 * This ZFS vnode is the root of the vfs for objset 'objsetid'.
+		 */
 		error = traverse(&vp);
 		if (error == 0) {
 			if (vp == sep->se_root)

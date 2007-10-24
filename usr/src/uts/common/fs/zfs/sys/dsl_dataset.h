@@ -138,6 +138,7 @@ dsl_syncfunc_t dsl_dataset_snapshot_sync;
 int dsl_dataset_rollback(dsl_dataset_t *ds);
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
 int dsl_dataset_promote(const char *name);
+int dsl_dataset_clone_swap(const char *name, boolean_t force);
 
 void *dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
     void *p, dsl_dataset_evict_func_t func);
@@ -147,6 +148,8 @@ blkptr_t *dsl_dataset_get_blkptr(dsl_dataset_t *ds);
 void dsl_dataset_set_blkptr(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
 
 spa_t *dsl_dataset_get_spa(dsl_dataset_t *ds);
+
+boolean_t dsl_dataset_modified_since_lastsnap(dsl_dataset_t *ds);
 
 void dsl_dataset_sync(dsl_dataset_t *os, zio_t *zio, dmu_tx_t *tx);
 

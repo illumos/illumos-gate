@@ -533,6 +533,8 @@ extern int dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
     uint64_t *id, uint64_t *offp);
 extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
     uint64_t *idp, uint64_t *offp);
+extern void dmu_objset_set_user(objset_t *os, void *user_ptr);
+extern void *dmu_objset_get_user(objset_t *os);
 
 /*
  * Return the txg number for the given assigned transaction.
@@ -573,7 +575,9 @@ void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
 
 int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, struct vnode *vp);
 int dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
-    boolean_t force, struct vnode *vp, uint64_t voffset);
+    boolean_t force, boolean_t online, struct vnode *vp, uint64_t voffset,
+    char *cosname);
+int dmu_replay_end_snapshot(char *name, struct drr_begin *drrb);
 
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */

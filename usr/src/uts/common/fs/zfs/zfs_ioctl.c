@@ -63,6 +63,8 @@
 #include <sys/zvol.h>
 #include <sharefs/share.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_vfsops.h>
+#include <sys/dmu_objset.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -1671,7 +1673,8 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	default:
 		cbfunc = NULL;
 	}
-	if (strchr(zc->zc_name, '@'))
+	if (strchr(zc->zc_name, '@') ||
+	    strchr(zc->zc_name, '%'))
 		return (EINVAL);
 
 	if (zc->zc_nvlist_src != NULL &&
@@ -1847,7 +1850,8 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	boolean_t recursive = zc->zc_cookie & 1;
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
-	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0)
+	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
+	    strchr(zc->zc_value, '%'))
 		return (EINVAL);
 
 	/*
@@ -1869,21 +1873,84 @@ static int
 zfs_ioc_recvbackup(zfs_cmd_t *zc)
 {
 	file_t *fp;
-	int error, fd;
 	offset_t new_off;
+	objset_t *os;
+	zfsvfs_t *zfsvfs = NULL;
+	char *cp;
+	char cosname[MAXNAMELEN];
+	boolean_t force = (boolean_t)zc->zc_guid;
+	int error, fd;
 
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
-	    strchr(zc->zc_value, '@') == NULL)
+	    strchr(zc->zc_value, '@') == NULL ||
+	    strchr(zc->zc_value, '%'))
 		return (EINVAL);
 
 	fd = zc->zc_cookie;
 	fp = getf(fd);
 	if (fp == NULL)
 		return (EBADF);
-	error = dmu_recvbackup(zc->zc_value, &zc->zc_begin_record,
-	    &zc->zc_cookie, (boolean_t)zc->zc_guid, fp->f_vnode,
-	    fp->f_offset);
 
+	/*
+	 * Get the zfsvfs for the receiving objset. There
+	 * won't be one if we're operating on a zvol, if the
+	 * objset doesn't exist yet, or is not mounted.
+	 */
+	cp = strchr(zc->zc_value, '@');
+	*cp = '\0';
+	error = dmu_objset_open(zc->zc_value, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	*cp = '@';
+	if (!error) {
+		if (dmu_objset_type(os) == DMU_OST_ZFS) {
+			mutex_enter(&os->os->os_user_ptr_lock);
+			zfsvfs = dmu_objset_get_user(os);
+			if (zfsvfs != NULL)
+				VFS_HOLD(zfsvfs->z_vfs);
+			mutex_exit(&os->os->os_user_ptr_lock);
+		}
+		dmu_objset_close(os);
+	}
+
+	error = dmu_recvbackup(zc->zc_value, &zc->zc_begin_record,
+	    &zc->zc_cookie, force, zfsvfs != NULL, fp->f_vnode,
+	    fp->f_offset, cosname);
+
+	/*
+	 * For incremental snapshots where we created a
+	 * temporary clone, we now swap zfsvfs::z_os with
+	 * the newly created and received "cosname".
+	 */
+	if (!error && zfsvfs != NULL) {
+		char osname[MAXNAMELEN];
+		int mode;
+
+		error = zfs_suspend_fs(zfsvfs, osname, &mode);
+		if (!error) {
+			int swap_err;
+			int snap_err = 0;
+
+			swap_err = dsl_dataset_clone_swap(cosname, force);
+			if (!swap_err) {
+				char *cp = strrchr(zc->zc_value, '@');
+
+				*cp = '\0';
+				snap_err = dmu_replay_end_snapshot(zc->zc_value,
+				    &zc->zc_begin_record);
+				*cp = '@';
+			}
+			error = zfs_resume_fs(zfsvfs, osname, mode);
+			if (!error)
+				error = swap_err;
+			if (!error)
+				error = snap_err;
+		}
+
+		/* destroy the clone we created */
+		(void) dmu_objset_destroy(cosname);
+	}
+	if (zfsvfs != NULL)
+		VFS_RELE(zfsvfs->z_vfs);
 	new_off = fp->f_offset + zc->zc_cookie;
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &new_off) == 0)
 		fp->f_offset = new_off;
@@ -2327,6 +2394,7 @@ static struct modlinkage modlinkage = {
 
 
 uint_t zfs_fsyncer_key;
+extern uint_t rrw_tsd_key;
 
 int
 _init(void)
@@ -2345,6 +2413,7 @@ _init(void)
 	}
 
 	tsd_create(&zfs_fsyncer_key, NULL);
+	tsd_create(&rrw_tsd_key, NULL);
 
 	error = ldi_ident_from_mod(&modlinkage, &zfs_li);
 	ASSERT(error == 0);

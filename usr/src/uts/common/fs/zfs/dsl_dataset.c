@@ -1535,6 +1535,21 @@ dsl_dataset_space(dsl_dataset_t *ds,
 	*availobjsp = DN_MAX_OBJECT - *usedobjsp;
 }
 
+boolean_t
+dsl_dataset_modified_since_lastsnap(dsl_dataset_t *ds)
+{
+	dsl_pool_t *dp = ds->ds_dir->dd_pool;
+
+	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock) ||
+	    dsl_pool_sync_context(dp));
+	if (ds->ds_prev == NULL)
+		return (B_FALSE);
+	if (ds->ds_phys->ds_bp.blk_birth >
+	    ds->ds_prev->ds_phys->ds_creation_txg)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
 /* ARGSUSED */
 static int
 dsl_dataset_snapshot_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
@@ -1601,7 +1616,7 @@ dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2,
 	dsl_dataset_close(hds, DS_MODE_NONE, FTAG);
 }
 
-struct renamearg {
+struct renamesnaparg {
 	dsl_sync_task_group_t *dstg;
 	char failed[MAXPATHLEN];
 	char *oldsnap;
@@ -1611,7 +1626,7 @@ struct renamearg {
 static int
 dsl_snapshot_rename_one(char *name, void *arg)
 {
-	struct renamearg *ra = arg;
+	struct renamesnaparg *ra = arg;
 	dsl_dataset_t *ds = NULL;
 	char *cp;
 	int err;
@@ -1659,7 +1674,7 @@ static int
 dsl_recursive_rename(char *oldname, const char *newname)
 {
 	int err;
-	struct renamearg *ra;
+	struct renamesnaparg *ra;
 	dsl_sync_task_t *dst;
 	spa_t *spa;
 	char *cp, *fsname = spa_strdup(oldname);
@@ -1674,7 +1689,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 		kmem_free(fsname, len + 1);
 		return (err);
 	}
-	ra = kmem_alloc(sizeof (struct renamearg), KM_SLEEP);
+	ra = kmem_alloc(sizeof (struct renamesnaparg), KM_SLEEP);
 	ra->dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 
 	ra->oldsnap = strchr(oldname, '@') + 1;
@@ -1704,7 +1719,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 		(void) strcpy(oldname, ra->failed);
 
 	dsl_sync_task_group_destroy(ra->dstg);
-	kmem_free(ra, sizeof (struct renamearg));
+	kmem_free(ra, sizeof (struct renamesnaparg));
 	spa_close(spa, FTAG);
 	return (err);
 }
@@ -2048,6 +2063,186 @@ dsl_dataset_promote(const char *name)
 	    dsl_dataset_promote_check,
 	    dsl_dataset_promote_sync, ds, &pa, 2 + 2 * doi.doi_physical_blks);
 	dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+	return (err);
+}
+
+#define	SWITCH64(x, y) \
+	{ \
+		uint64_t __tmp = (x); \
+		(x) = (y); \
+		(y) = __tmp; \
+	}
+
+/* ARGSUSED */
+static int
+dsl_dataset_clone_swap_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dataset_t *cds = arg1;	/* clone to become new head */
+	boolean_t *forcep = arg2;
+	dsl_dir_t *cdd = cds->ds_dir;
+	dsl_pool_t *dp = cds->ds_dir->dd_pool;
+	dsl_dataset_t *ods;	/* the snapshot cds is cloned off of */
+	dsl_dataset_t *ohds = NULL;
+	dsl_dir_t *odd;
+	int err;
+
+	/* check that it is a clone */
+	if (cdd->dd_phys->dd_clone_parent_obj == 0)
+		return (EINVAL);
+
+	/* check that cds is not a snapshot */
+	if (dsl_dataset_is_snapshot(cds))
+		return (EINVAL);
+
+	/* open the origin */
+	if (err = dsl_dataset_open_obj(dp, cdd->dd_phys->dd_clone_parent_obj,
+	    NULL, DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ods))
+		return (err);
+	odd = ods->ds_dir;
+
+	/* make sure the clone is descendant of origin */
+	if (cdd->dd_parent != odd) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/* check that there are no snapshots after the origin */
+	if (cds->ds_phys->ds_prev_snap_obj != ods->ds_object ||
+	    ods->ds_phys->ds_next_snap_obj !=
+	    odd->dd_phys->dd_head_dataset_obj) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Verify origin head dataset hasn't been modified or
+	 * 'force' has been passed down.
+	 */
+	if (!(*forcep) &&
+	    (err = dsl_dataset_open_obj(cdd->dd_pool,
+	    odd->dd_phys->dd_head_dataset_obj, NULL, DS_MODE_EXCLUSIVE,
+	    FTAG, &ohds)) == 0) {
+		if (dsl_dataset_modified_since_lastsnap(ohds))
+			err = ETXTBSY;
+		dsl_dataset_close(ohds, DS_MODE_EXCLUSIVE, FTAG);
+	}
+out:
+	dsl_dataset_close(ods, DS_MODE_STANDARD, FTAG);
+	return (err);
+}
+
+/* ARGSUSED */
+static void
+dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	dsl_dataset_t *cds = arg1;	/* clone to become new head */
+	dsl_dir_t *cdd = cds->ds_dir;
+	dsl_pool_t *dp = cds->ds_dir->dd_pool;
+	dsl_dataset_t *ods, *ohds;
+	dsl_dir_t *odd;
+	uint64_t itor = 0;
+	blkptr_t bp;
+	uint64_t unique = 0;
+	int err;
+
+	ASSERT(cdd->dd_phys->dd_clone_parent_obj != 0);
+	ASSERT(dsl_dataset_is_snapshot(cds) == 0);
+
+	/* open the origin */
+	VERIFY(0 == dsl_dataset_open_obj(dp, cdd->dd_phys->dd_clone_parent_obj,
+	    NULL, DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ods));
+	odd = ods->ds_dir;
+	ASSERT(cds->ds_phys->ds_prev_snap_obj == ods->ds_object);
+	ASSERT(ods->ds_phys->ds_next_snap_obj ==
+	    odd->dd_phys->dd_head_dataset_obj);
+
+	/* open the origin head */
+	VERIFY(0 == dsl_dataset_open_obj(cdd->dd_pool,
+	    odd->dd_phys->dd_head_dataset_obj, NULL, DS_MODE_EXCLUSIVE,
+	    FTAG, &ohds));
+	ASSERT(odd == ohds->ds_dir);
+
+	dmu_buf_will_dirty(cds->ds_dbuf, tx);
+	dmu_buf_will_dirty(ohds->ds_dbuf, tx);
+	dmu_buf_will_dirty(ods->ds_dbuf, tx);
+
+	/* compute unique space */
+	while ((err = bplist_iterate(&cds->ds_deadlist, &itor, &bp)) == 0) {
+		if (bp.blk_birth > ods->ds_phys->ds_prev_snap_txg)
+			unique += bp_get_dasize(cdd->dd_pool->dp_spa, &bp);
+	}
+	VERIFY(err == ENOENT);
+
+	/* reset origin's unique bytes */
+	ods->ds_phys->ds_unique_bytes = unique;
+
+	/* swap blkptrs */
+	{
+		blkptr_t tmp;
+		tmp = ohds->ds_phys->ds_bp;
+		ohds->ds_phys->ds_bp = cds->ds_phys->ds_bp;
+		cds->ds_phys->ds_bp = tmp;
+	}
+
+	/* set dd_*_bytes */
+	{
+		int64_t dused, dcomp, duncomp;
+		uint64_t cdl_used, cdl_comp, cdl_uncomp;
+		uint64_t odl_used, odl_comp, odl_uncomp;
+
+		VERIFY(0 == bplist_space(&cds->ds_deadlist, &cdl_used,
+		    &cdl_comp, &cdl_uncomp));
+		VERIFY(0 == bplist_space(&ohds->ds_deadlist, &odl_used,
+		    &odl_comp, &odl_uncomp));
+		dused = cds->ds_phys->ds_used_bytes + cdl_used -
+		    (ohds->ds_phys->ds_used_bytes + odl_used);
+		dcomp = cds->ds_phys->ds_compressed_bytes + cdl_comp -
+		    (ohds->ds_phys->ds_compressed_bytes + odl_comp);
+		duncomp = cds->ds_phys->ds_uncompressed_bytes + cdl_uncomp -
+		    (ohds->ds_phys->ds_uncompressed_bytes + odl_uncomp);
+
+		dsl_dir_diduse_space(odd, dused, dcomp, duncomp, tx);
+		dsl_dir_diduse_space(cdd, -dused, -dcomp, -duncomp, tx);
+	}
+
+	/* swap ds_*_bytes */
+	SWITCH64(ohds->ds_phys->ds_used_bytes, cds->ds_phys->ds_used_bytes);
+	SWITCH64(ohds->ds_phys->ds_compressed_bytes,
+	    cds->ds_phys->ds_compressed_bytes);
+	SWITCH64(ohds->ds_phys->ds_uncompressed_bytes,
+	    cds->ds_phys->ds_uncompressed_bytes);
+
+	/* swap deadlists */
+	bplist_close(&cds->ds_deadlist);
+	bplist_close(&ohds->ds_deadlist);
+	SWITCH64(ohds->ds_phys->ds_deadlist_obj, cds->ds_phys->ds_deadlist_obj);
+	VERIFY(0 == bplist_open(&cds->ds_deadlist, dp->dp_meta_objset,
+	    cds->ds_phys->ds_deadlist_obj));
+	VERIFY(0 == bplist_open(&ohds->ds_deadlist, dp->dp_meta_objset,
+	    ohds->ds_phys->ds_deadlist_obj));
+
+	dsl_dataset_close(ohds, DS_MODE_EXCLUSIVE, FTAG);
+	dsl_dataset_close(ods, DS_MODE_STANDARD, FTAG);
+}
+
+/*
+ * Swap the clone "cosname" with its origin head file system.
+ */
+int
+dsl_dataset_clone_swap(const char *cosname, boolean_t force)
+{
+	dsl_dataset_t *ds;
+	int err;
+
+	err = dsl_dataset_open(cosname,
+	    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT, FTAG, &ds);
+	if (err)
+		return (err);
+
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    dsl_dataset_clone_swap_check,
+	    dsl_dataset_clone_swap_sync, ds, &force, 9);
+	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (err);
 }
 

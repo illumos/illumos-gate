@@ -59,6 +59,7 @@
 #include <sys/bootconf.h>
 #include <sys/sunddi.h>
 #include <sys/dnlc.h>
+#include <sys/dmu_objset.h>
 
 int zfsfstype;
 vfsops_t *zfs_vfsops = NULL;
@@ -498,6 +499,76 @@ unregister:
 }
 
 static int
+zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
+{
+	uint_t readonly;
+	int error;
+
+	error = zfs_register_callbacks(zfsvfs->z_vfs);
+	if (error)
+		return (error);
+
+	/*
+	 * Set the objset user_ptr to track its zfsvfs.
+	 */
+	mutex_enter(&zfsvfs->z_os->os->os_user_ptr_lock);
+	dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
+	mutex_exit(&zfsvfs->z_os->os->os_user_ptr_lock);
+
+	/*
+	 * If we are not mounting (ie: online recv), then we don't
+	 * have to worry about replaying the log as we blocked all
+	 * operations out since we closed the ZIL.
+	 */
+	if (mounting) {
+		/*
+		 * During replay we remove the read only flag to
+		 * allow replays to succeed.
+		 */
+		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
+		if (readonly != 0)
+			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
+		else
+			zfs_unlinked_drain(zfsvfs);
+
+		/*
+		 * Parse and replay the intent log.
+		 *
+		 * Because of ziltest, this must be done after
+		 * zfs_unlinked_drain().  (Further note: ziltest doesn't
+		 * use readonly mounts, where zfs_unlinked_drain() isn't
+		 * called.)  This is because ziltest causes spa_sync()
+		 * to think it's committed, but actually it is not, so
+		 * the intent log contains many txg's worth of changes.
+		 *
+		 * In particular, if object N is in the unlinked set in
+		 * the last txg to actually sync, then it could be
+		 * actually freed in a later txg and then reallocated in
+		 * a yet later txg.  This would write a "create object
+		 * N" record to the intent log.  Normally, this would be
+		 * fine because the spa_sync() would have written out
+		 * the fact that object N is free, before we could write
+		 * the "create object N" intent log record.
+		 *
+		 * But when we are in ziltest mode, we advance the "open
+		 * txg" without actually spa_sync()-ing the changes to
+		 * disk.  So we would see that object N is still
+		 * allocated and in the unlinked set, and there is an
+		 * intent log record saying to allocate it.
+		 */
+		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
+		    zfs_replay_vector);
+
+		zfsvfs->z_vfs->vfs_flag |= readonly; /* restore readonly bit */
+	}
+
+	if (!zil_disable)
+		zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
+
+	return (0);
+}
+
+static int
 zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 {
 	dev_t mount_dev;
@@ -525,8 +596,8 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
 	    offsetof(znode_t, z_link_node));
-	rw_init(&zfsvfs->z_unmount_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&zfsvfs->z_unmount_inactive_lock, NULL, RW_DEFAULT, NULL);
+	rrw_init(&zfsvfs->z_teardown_lock);
+	rw_init(&zfsvfs->z_teardown_inactive_lock, NULL, RW_DEFAULT, NULL);
 
 	/* Initialize the generic filesystem structure. */
 	vfsp->vfs_bcount = 0;
@@ -583,54 +654,7 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		xattr_changed_cb(zfsvfs, xattr);
 		zfsvfs->z_issnap = B_TRUE;
 	} else {
-		uint_t readonly;
-
-		error = zfs_register_callbacks(vfsp);
-		if (error)
-			goto out;
-
-		/*
-		 * During replay we remove the read only flag to
-		 * allow replays to succeed.
-		 */
-		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
-		if (readonly != 0)
-			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
-		else
-			zfs_unlinked_drain(zfsvfs);
-
-		/*
-		 * Parse and replay the intent log.
-		 *
-		 * Because of ziltest, this must be done after
-		 * zfs_unlinked_drain().  (Further note: ziltest doesn't
-		 * use readonly mounts, where zfs_unlinked_drain() isn't
-		 * called.)  This is because ziltest causes spa_sync()
-		 * to think it's committed, but actually it is not, so
-		 * the intent log contains many txg's worth of changes.
-		 *
-		 * In particular, if object N is in the unlinked set in
-		 * the last txg to actually sync, then it could be
-		 * actually freed in a later txg and then reallocated in
-		 * a yet later txg.  This would write a "create object
-		 * N" record to the intent log.  Normally, this would be
-		 * fine because the spa_sync() would have written out
-		 * the fact that object N is free, before we could write
-		 * the "create object N" intent log record.
-		 *
-		 * But when we are in ziltest mode, we advance the "open
-		 * txg" without actually spa_sync()-ing the changes to
-		 * disk.  So we would see that object N is still
-		 * allocated and in the unlinked set, and there is an
-		 * intent log record saying to allocate it.
-		 */
-		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
-		    zfs_replay_vector);
-
-		zfsvfs->z_vfs->vfs_flag |= readonly; /* restore readonly bit */
-
-		if (!zil_disable)
-			zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
+		error = zfsvfs_setup(zfsvfs, B_TRUE);
 	}
 
 	if (!zfsvfs->z_issnap)
@@ -641,8 +665,8 @@ out:
 			dmu_objset_close(zfsvfs->z_os);
 		mutex_destroy(&zfsvfs->z_znodes_lock);
 		list_destroy(&zfsvfs->z_all_znodes);
-		rw_destroy(&zfsvfs->z_unmount_lock);
-		rw_destroy(&zfsvfs->z_unmount_inactive_lock);
+		rrw_destroy(&zfsvfs->z_teardown_lock);
+		rw_destroy(&zfsvfs->z_teardown_inactive_lock);
 		kmem_free(zfsvfs, sizeof (zfsvfs_t));
 	} else {
 		atomic_add_32(&zfs_active_fs_count, 1);
@@ -1019,13 +1043,130 @@ zfs_root(vfs_t *vfsp, vnode_t **vpp)
 	return (error);
 }
 
+/*
+ * Teardown the zfsvfs::z_os.
+ *
+ * Note, if 'unmounting' if FALSE, we return with the 'z_teardown_lock'
+ * and 'z_teardown_inactive_lock' held.
+ */
+static int
+zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
+{
+	objset_t *os = zfsvfs->z_os;
+	znode_t	*zp, *nextzp;
+	znode_t markerzp;
+
+	rrw_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
+
+	if (!unmounting) {
+		/*
+		 * We purge the parent filesystem's vfsp as the parent
+		 * filesystem and all of its snapshots have their vnode's
+		 * v_vfsp set to the parent's filesystem's vfsp.  Note,
+		 * 'z_parent' is self referential for non-snapshots.
+		 */
+		(void) dnlc_purge_vfsp(zfsvfs->z_parent->z_vfs, 0);
+	}
+
+	/*
+	 * Close the zil. NB: Can't close the zil while zfs_inactive
+	 * threads are blocked as zil_close can call zfs_inactive.
+	 */
+	if (zfsvfs->z_log) {
+		zil_close(zfsvfs->z_log);
+		zfsvfs->z_log = NULL;
+	}
+
+	rw_enter(&zfsvfs->z_teardown_inactive_lock, RW_WRITER);
+
+	/*
+	 * If we are not unmounting (ie: online recv) and someone already
+	 * unmounted this file system while we were doing the switcheroo,
+	 * or a reopen of z_os failed then just bail out now.
+	 */
+	if (!unmounting && (zfsvfs->z_unmounted || zfsvfs->z_os == NULL)) {
+		rw_exit(&zfsvfs->z_teardown_inactive_lock);
+		rrw_exit(&zfsvfs->z_teardown_lock, FTAG);
+		return (EIO);
+	}
+
+	/*
+	 * At this point there are no vops active, and any new vops will
+	 * fail with EIO since we have z_teardown_lock for writer (only
+	 * relavent for forced unmount).
+	 *
+	 * Release all holds on dbufs.
+	 * Note, the dmu can still callback via znode_pageout_func()
+	 * which can zfs_znode_free() the znode.  So we lock
+	 * z_all_znodes; search the list for a held dbuf; drop the lock
+	 * (we know zp can't disappear if we hold a dbuf lock) then
+	 * regrab the lock and restart.
+	 *
+	 * Since we have to restart the search after finding each held dbuf,
+	 * we do two things to speed up searching: we insert a dummy znode
+	 * ('markerzp') to detect the original tail of the list, and move
+	 * non-held znodes to the end of the list.  Once we hit 'markerzp',
+	 * we know we've looked at each znode and can break out.
+	 */
+	mutex_enter(&zfsvfs->z_znodes_lock);
+	list_insert_tail(&zfsvfs->z_all_znodes, &markerzp);
+	for (zp = list_head(&zfsvfs->z_all_znodes); zp != &markerzp;
+	    zp = nextzp) {
+		nextzp = list_next(&zfsvfs->z_all_znodes, zp);
+		if (zp->z_dbuf_held) {
+			/* dbufs should only be held when force unmounting */
+			zp->z_dbuf_held = 0;
+			mutex_exit(&zfsvfs->z_znodes_lock);
+			dmu_buf_rele(zp->z_dbuf, NULL);
+			/* Start again */
+			mutex_enter(&zfsvfs->z_znodes_lock);
+			nextzp = list_head(&zfsvfs->z_all_znodes);
+		} else {
+			list_remove(&zfsvfs->z_all_znodes, zp);
+			list_insert_tail(&zfsvfs->z_all_znodes, zp);
+		}
+	}
+	list_remove(&zfsvfs->z_all_znodes, &markerzp);
+	mutex_exit(&zfsvfs->z_znodes_lock);
+
+	/*
+	 * If we are unmounting, set the unmounted flag and let new vops
+	 * unblock.  zfs_inactive will have the unmounted behavior, and all
+	 * other vops will fail with EIO.
+	 */
+	if (unmounting) {
+		zfsvfs->z_unmounted = B_TRUE;
+		rrw_exit(&zfsvfs->z_teardown_lock, FTAG);
+		rw_exit(&zfsvfs->z_teardown_inactive_lock);
+	}
+
+	/*
+	 * z_os will be NULL if there was an error in attempting to reopen
+	 * zfsvfs, so just return as the properties had already been
+	 * unregistered and cached data had been evicted before.
+	 */
+	if (zfsvfs->z_os == NULL)
+		return (0);
+
+	/*
+	 * Unregister properties.
+	 */
+	zfs_unregister_callbacks(zfsvfs);
+
+	/*
+	 * Evict cached data
+	 */
+	(void) dmu_objset_evict_dbufs(os);
+
+	return (0);
+}
+
 /*ARGSUSED*/
 static int
 zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
-	objset_t *os = zfsvfs->z_os;
-	znode_t	*zp, *nextzp;
+	objset_t *os;
 	int ret;
 
 	ret = secpolicy_fs_unmount(cr, vfsp);
@@ -1069,77 +1210,33 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 				return (EBUSY);
 		} else {
 			if (vfsp->vfs_count > 2 ||
-			    zfsvfs->z_ctldir->v_count > 1) {
+			    zfsvfs->z_ctldir->v_count > 1)
 				return (EBUSY);
-			}
 		}
 	}
 
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
 
-	rw_enter(&zfsvfs->z_unmount_lock, RW_WRITER);
-	rw_enter(&zfsvfs->z_unmount_inactive_lock, RW_WRITER);
+	VERIFY(zfsvfs_teardown(zfsvfs, B_TRUE) == 0);
+	os = zfsvfs->z_os;
 
 	/*
-	 * At this point there are no vops active, and any new vops will
-	 * fail with EIO since we have z_unmount_lock for writer (only
-	 * relavent for forced unmount).
-	 *
-	 * Release all holds on dbufs.
-	 * Note, the dmu can still callback via znode_pageout_func()
-	 * which can zfs_znode_free() the znode.  So we lock
-	 * z_all_znodes; search the list for a held dbuf; drop the lock
-	 * (we know zp can't disappear if we hold a dbuf lock) then
-	 * regrab the lock and restart.
+	 * z_os will be NULL if there was an error in
+	 * attempting to reopen zfsvfs.
 	 */
-	mutex_enter(&zfsvfs->z_znodes_lock);
-	for (zp = list_head(&zfsvfs->z_all_znodes); zp; zp = nextzp) {
-		nextzp = list_next(&zfsvfs->z_all_znodes, zp);
-		if (zp->z_dbuf_held) {
-			/* dbufs should only be held when force unmounting */
-			zp->z_dbuf_held = 0;
-			mutex_exit(&zfsvfs->z_znodes_lock);
-			dmu_buf_rele(zp->z_dbuf, NULL);
-			/* Start again */
-			mutex_enter(&zfsvfs->z_znodes_lock);
-			nextzp = list_head(&zfsvfs->z_all_znodes);
-		}
+	if (os != NULL) {
+		/*
+		 * Unset the objset user_ptr.
+		 */
+		mutex_enter(&os->os->os_user_ptr_lock);
+		dmu_objset_set_user(os, NULL);
+		mutex_exit(&os->os->os_user_ptr_lock);
+
+		/*
+		 * Finally close the objset
+		 */
+		dmu_objset_close(os);
 	}
-	mutex_exit(&zfsvfs->z_znodes_lock);
-
-	/*
-	 * Set the unmounted flag and let new vops unblock.
-	 * zfs_inactive will have the unmounted behavior, and all other
-	 * vops will fail with EIO.
-	 */
-	zfsvfs->z_unmounted = B_TRUE;
-	rw_exit(&zfsvfs->z_unmount_lock);
-	rw_exit(&zfsvfs->z_unmount_inactive_lock);
-
-	/*
-	 * Unregister properties.
-	 */
-	if (!dmu_objset_is_snapshot(os))
-		zfs_unregister_callbacks(zfsvfs);
-
-	/*
-	 * Close the zil. NB: Can't close the zil while zfs_inactive
-	 * threads are blocked as zil_close can call zfs_inactive.
-	 */
-	if (zfsvfs->z_log) {
-		zil_close(zfsvfs->z_log);
-		zfsvfs->z_log = NULL;
-	}
-
-	/*
-	 * Evict cached data
-	 */
-	(void) dmu_objset_evict_dbufs(os);
-
-	/*
-	 * Finally close the objset
-	 */
-	dmu_objset_close(os);
 
 	/*
 	 * We can now safely destroy the '.zfs' directory node.
@@ -1234,6 +1331,77 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	return (0);
 }
 
+/*
+ * Block out VOPs and close zfsvfs_t::z_os
+ *
+ * Note, if successful, then we return with the 'z_teardown_lock' and
+ * 'z_teardown_inactive_lock' write held.
+ */
+int
+zfs_suspend_fs(zfsvfs_t *zfsvfs, char *name, int *mode)
+{
+	int error;
+
+	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0)
+		return (error);
+
+	*mode = zfsvfs->z_os->os_mode;
+	dmu_objset_name(zfsvfs->z_os, name);
+	dmu_objset_close(zfsvfs->z_os);
+
+	return (0);
+}
+
+/*
+ * Reopen zfsvfs_t::z_os and release VOPs.
+ */
+int
+zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname, int mode)
+{
+	int err;
+
+	ASSERT(RRW_WRITE_HELD(&zfsvfs->z_teardown_lock));
+	ASSERT(RW_WRITE_HELD(&zfsvfs->z_teardown_inactive_lock));
+
+	err = dmu_objset_open(osname, DMU_OST_ZFS, mode, &zfsvfs->z_os);
+	if (err) {
+		zfsvfs->z_os = NULL;
+	} else {
+		znode_t *zp;
+
+		VERIFY(zfsvfs_setup(zfsvfs, B_FALSE) == 0);
+
+		/*
+		 * Attempt to re-establish all the active znodes with
+		 * their dbufs.  If a zfs_rezget() fails, then we'll let
+		 * any potential callers discover that via ZFS_ENTER_VERIFY_VP
+		 * when they try to use their znode.
+		 */
+		mutex_enter(&zfsvfs->z_znodes_lock);
+		for (zp = list_head(&zfsvfs->z_all_znodes); zp;
+		    zp = list_next(&zfsvfs->z_all_znodes, zp)) {
+			ASSERT(!zp->z_dbuf_held);
+			(void) zfs_rezget(zp);
+		}
+		mutex_exit(&zfsvfs->z_znodes_lock);
+
+	}
+
+	/* release the VOPs */
+	rw_exit(&zfsvfs->z_teardown_inactive_lock);
+	rrw_exit(&zfsvfs->z_teardown_lock, FTAG);
+
+	if (err) {
+		/*
+		 * Since we couldn't reopen zfsvfs::z_os, force
+		 * unmount this file system.
+		 */
+		if (vn_vfswlock(zfsvfs->z_vfs->vfs_vnodecovered) == 0)
+			(void) dounmount(zfsvfs->z_vfs, MS_FORCE, CRED());
+	}
+	return (err);
+}
+
 static void
 zfs_freevfs(vfs_t *vfsp)
 {
@@ -1245,8 +1413,8 @@ zfs_freevfs(vfs_t *vfsp)
 
 	mutex_destroy(&zfsvfs->z_znodes_lock);
 	list_destroy(&zfsvfs->z_all_znodes);
-	rw_destroy(&zfsvfs->z_unmount_lock);
-	rw_destroy(&zfsvfs->z_unmount_inactive_lock);
+	rrw_destroy(&zfsvfs->z_teardown_lock);
+	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));
 
 	atomic_add_32(&zfs_active_fs_count, -1);

@@ -44,7 +44,6 @@
 #include <sys/dmu_impl.h>
 #include <sys/zfs_ioctl.h>
 
-
 spa_t *
 dmu_objset_spa(objset_t *os)
 {
@@ -244,6 +243,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 
 	mutex_init(&osi->os_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&osi->os_obj_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&osi->os_user_ptr_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	osi->os_meta_dnode = dnode_special_open(osi,
 	    &osi->os_phys->os_meta_dnode, DMU_META_DNODE_OBJECT);
@@ -266,10 +266,10 @@ int
 dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp)
 {
-	dsl_dataset_t *ds;
-	int err;
 	objset_t *os;
+	dsl_dataset_t *ds;
 	objset_impl_t *osi;
+	int err;
 
 	os = kmem_alloc(sizeof (objset_t), KM_SLEEP);
 	err = dsl_dataset_open(name, mode, os, &ds);
@@ -387,6 +387,7 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 	VERIFY(arc_buf_remove_ref(osi->os_phys_buf, &osi->os_phys_buf) == 1);
 	mutex_destroy(&osi->os_lock);
 	mutex_destroy(&osi->os_obj_lock);
+	mutex_destroy(&osi->os_user_ptr_lock);
 	kmem_free(osi, sizeof (objset_impl_t));
 }
 
@@ -1048,4 +1049,18 @@ dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 	if (do_self)
 		err = func(name, arg);
 	return (err);
+}
+
+void
+dmu_objset_set_user(objset_t *os, void *user_ptr)
+{
+	ASSERT(MUTEX_HELD(&os->os->os_user_ptr_lock));
+	os->os->os_user_ptr = user_ptr;
+}
+
+void *
+dmu_objset_get_user(objset_t *os)
+{
+	ASSERT(MUTEX_HELD(&os->os->os_user_ptr_lock));
+	return (os->os->os_user_ptr);
 }

@@ -41,7 +41,6 @@
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/kmem.h>
-#include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/unistd.h>
 #include <sys/mode.h>
@@ -417,6 +416,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;
 	zp->z_sync_cnt = 0;
+	zp->z_gen = zp->z_phys->zp_gen;
 
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	list_insert_tail(&zfsvfs->z_all_znodes, zp);
@@ -703,6 +703,53 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 	zfs_znode_dmu_init(zp);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 	*zpp = zp;
+	return (0);
+}
+
+int
+zfs_rezget(znode_t *zp)
+{
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	dmu_object_info_t doi;
+	dmu_buf_t *db;
+	uint64_t obj_num = zp->z_id;
+	int err;
+
+	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj_num);
+
+	err = dmu_bonus_hold(zfsvfs->z_os, obj_num, NULL, &db);
+	if (err) {
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
+		return (err);
+	}
+
+	dmu_object_info_from_db(db, &doi);
+	if (doi.doi_bonus_type != DMU_OT_ZNODE ||
+	    doi.doi_bonus_size < sizeof (znode_phys_t)) {
+		dmu_buf_rele(db, NULL);
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
+		return (EINVAL);
+	}
+
+	ASSERT(db->db_object == obj_num);
+	ASSERT(db->db_offset == -1);
+	ASSERT(db->db_data != NULL);
+
+	if (((znode_phys_t *)db->db_data)->zp_gen != zp->z_gen) {
+		dmu_buf_rele(db, NULL);
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
+		return (EIO);
+	}
+
+	zp->z_dbuf = db;
+	zp->z_phys = db->db_data;
+	zfs_znode_dmu_init(zp);
+	zp->z_unlinked = (zp->z_phys->zp_links == 0);
+
+	/* release the hold from zfs_znode_dmu_init() */
+	VFS_RELE(zfsvfs->z_vfs);
+	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
+
 	return (0);
 }
 

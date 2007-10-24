@@ -33,6 +33,7 @@
 #include <sys/list.h>
 #include <sys/vfs.h>
 #include <sys/zil.h>
+#include <sys/rrwlock.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -53,8 +54,8 @@ struct zfsvfs {
 	uint_t		z_acl_inherit;	/* acl inheritance behavior */
 	boolean_t	z_atime;	/* enable atimes mount option */
 	boolean_t	z_unmounted;	/* unmounted */
-	krwlock_t	z_unmount_lock;
-	krwlock_t	z_unmount_inactive_lock;
+	rrwlock_t	z_teardown_lock;
+	krwlock_t	z_teardown_inactive_lock;
 	list_t		z_all_znodes;	/* all vnodes in the fs */
 	kmutex_t	z_znodes_lock;	/* lock for z_all_znodes */
 	vnode_t		*z_ctldir;	/* .zfs directory pointer */
@@ -114,6 +115,9 @@ typedef struct zfid_long {
 #define	LONG_FID_LEN	(sizeof (zfid_long_t) - sizeof (uint16_t))
 
 extern uint_t zfs_fsyncer_key;
+
+extern int zfs_suspend_fs(zfsvfs_t *zfsvfs, char *osname, int *mode);
+extern int zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname, int mode);
 
 #ifdef	__cplusplus
 }

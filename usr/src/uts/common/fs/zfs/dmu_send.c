@@ -295,12 +295,9 @@ struct restorearg {
 	zio_cksum_t zc;
 };
 
-/* ARGSUSED */
 static int
-replay_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
+replay_incremental_check(dsl_dataset_t *ds, struct drr_begin *drrb)
 {
-	dsl_dataset_t *ds = arg1;
-	struct drr_begin *drrb = arg2;
 	const char *snapname;
 	int err;
 	uint64_t val;
@@ -312,10 +309,6 @@ replay_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/* most recent snapshot must match fromguid */
 	if (ds->ds_prev->ds_phys->ds_guid != drrb->drr_fromguid)
 		return (ENODEV);
-	/* must not have any changes since most recent snapshot */
-	if (ds->ds_phys->ds_bp.blk_birth >
-	    ds->ds_prev->ds_phys->ds_creation_txg)
-		return (ETXTBSY);
 
 	/* new snapshot name must not exist */
 	snapname = strrchr(drrb->drr_toname, '@');
@@ -326,16 +319,31 @@ replay_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
 	    ds->ds_phys->ds_snapnames_zapobj, snapname, 8, 1, &val);
 	if (err == 0)
-		return (EEXIST);
+	return (EEXIST);
 	if (err != ENOENT)
-		return (err);
+	return (err);
 
 	return (0);
 }
 
 /* ARGSUSED */
+static int
+replay_offline_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	struct drr_begin *drrb = arg2;
+
+	/* must not have any changes since most recent snapshot */
+	if (dsl_dataset_modified_since_lastsnap(ds))
+		return (ETXTBSY);
+
+	return (replay_incremental_check(ds, drrb));
+}
+
+/* ARGSUSED */
 static void
-replay_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+replay_offline_incremental_sync(void *arg1, void *arg2, cred_t *cr,
+    dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
@@ -400,6 +408,57 @@ replay_full_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	*cp = '@';
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+}
+
+struct onlineincarg {
+	dsl_dir_t *dd;
+	dsl_dataset_t *ohds;
+	boolean_t force;
+	const char *cosname;
+};
+
+/* ARGSUSED */
+static int
+replay_online_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	struct onlineincarg *oia = arg1;
+
+	if (dsl_dataset_modified_since_lastsnap(oia->ohds) && !oia->force)
+		return (ETXTBSY);
+
+	return (replay_incremental_check(oia->ohds, arg2));
+}
+
+/* ARGSUSED */
+static void
+replay_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	struct onlineincarg *oia = arg1;
+	dsl_dataset_t *ohds = oia->ohds;
+	dsl_dir_t *dd = oia->dd;
+	dsl_dataset_t *ods, *ds;
+	uint64_t dsobj;
+
+	VERIFY(0 == dsl_dataset_open_obj(ohds->ds_dir->dd_pool,
+	    ohds->ds_phys->ds_prev_snap_obj, NULL,
+	    DS_MODE_STANDARD, FTAG, &ods));
+
+	dsobj = dsl_dataset_create_sync(dd, strrchr(oia->cosname, '/') + 1,
+	    ods, tx);
+
+	/* open the temporary clone */
+	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
+	    DS_MODE_EXCLUSIVE, FTAG, &ds));
+
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
+
+	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
+	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
+	    ds->ds_phys->ds_dir_obj);
+
+	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+	dsl_dataset_close(ods, DS_MODE_STANDARD, FTAG);
 }
 
 static int
@@ -729,13 +788,16 @@ restore_free(struct restorearg *ra, objset_t *os,
 
 int
 dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
-    boolean_t force, vnode_t *vp, uint64_t voffset)
+    boolean_t force, boolean_t online, vnode_t *vp, uint64_t voffset,
+    char *cosname)
 {
 	struct restorearg ra;
 	dmu_replay_record_t *drr;
 	char *cp;
 	objset_t *os = NULL;
 	zio_cksum_t pzc;
+	char *clonebuf = NULL;
+	size_t len;
 
 	bzero(&ra, sizeof (ra));
 	ra.vp = vp;
@@ -790,8 +852,9 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 	/*
 	 * Process the begin in syncing context.
 	 */
-	if (drrb->drr_fromguid) {
-		/* incremental backup */
+	if (drrb->drr_fromguid && !online) {
+		/* offline incremental receive */
+
 		dsl_dataset_t *ds = NULL;
 
 		cp = strchr(tosnap, '@');
@@ -816,11 +879,52 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 			(void) dsl_dataset_rollback(ds);
 		}
 		ra.err = dsl_sync_task_do(ds->ds_dir->dd_pool,
-		    replay_incremental_check, replay_incremental_sync,
-		    ds, drrb, 1);
+		    replay_offline_incremental_check,
+		    replay_offline_incremental_sync, ds, drrb, 1);
 		dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+	} else if (drrb->drr_fromguid && online) {
+		/* online incremental receive */
+
+		const char *tail;
+		struct onlineincarg oia = { 0 };
+
+		/*
+		 * Get the dsl_dir for the parent of the
+		 * temporary clone.
+		 */
+		cp = strchr(tosnap, '@');
+		*cp = '\0';
+
+		/* tmp clone is: tonsap + '/' + '%' + "snapX" */
+		len = strlen(tosnap) + 2 + strlen(cp + 1) + 1;
+		clonebuf = kmem_alloc(len, KM_SLEEP);
+		(void) snprintf(clonebuf, len, "%s%c%c%s%c",
+		    tosnap, '/', '%', cp + 1, '\0');
+		ra.err = dsl_dir_open(tosnap, FTAG, &oia.dd, &tail);
+		*cp = '@';
+		if (ra.err)
+			goto out;
+
+		/* open the dataset we are logically receiving into */
+		*cp = '\0';
+		ra.err = dsl_dataset_open(tosnap, DS_MODE_STANDARD,
+		    FTAG, &oia.ohds);
+		*cp = '@';
+		if (ra.err) {
+			dsl_dir_close(oia.dd, FTAG);
+			goto out;
+		}
+
+		oia.force = force;
+		oia.cosname = clonebuf;
+		ra.err = dsl_sync_task_do(oia.dd->dd_pool,
+		    replay_online_incremental_check,
+		    replay_online_incremental_sync, &oia, drrb, 5);
+		dsl_dataset_close(oia.ohds, DS_MODE_STANDARD, FTAG);
+		dsl_dir_close(oia.dd, FTAG);
 	} else {
 		/* full backup */
+
 		dsl_dir_t *dd = NULL;
 		const char *tail;
 
@@ -854,8 +958,8 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 
 	cp = strchr(tosnap, '@');
 	*cp = '\0';
-	ra.err = dmu_objset_open(tosnap, DMU_OST_ANY,
-	    DS_MODE_PRIMARY | DS_MODE_INCONSISTENT, &os);
+	ra.err = dmu_objset_open(clonebuf == NULL ? tosnap : clonebuf,
+	    DMU_OST_ANY, DS_MODE_PRIMARY | DS_MODE_INCONSISTENT, &os);
 	*cp = '@';
 	ASSERT3U(ra.err, ==, 0);
 
@@ -918,9 +1022,11 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 				goto out;
 			}
 
-			ra.err = dsl_sync_task_do(dmu_objset_ds(os)->
-			    ds_dir->dd_pool, replay_end_check, replay_end_sync,
-			    os, drrb, 3);
+			if (clonebuf == NULL) {
+				ra.err = dsl_sync_task_do(dmu_objset_ds(os)->
+				    ds_dir->dd_pool, replay_end_check,
+				    replay_end_sync, os, drrb, 3);
+			}
 			goto out;
 		}
 		default:
@@ -931,8 +1037,11 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 	}
 
 out:
-	if (os)
+	if (os) {
+		if (drrb->drr_fromguid && online && !ra.err)
+			dmu_objset_name(os, cosname);
 		dmu_objset_close(os);
+	}
 
 	/*
 	 * Make sure we don't rollback/destroy unless we actually
@@ -949,15 +1058,29 @@ out:
 
 		cp = strchr(tosnap, '@');
 		*cp = '\0';
-		err = dsl_dataset_open(tosnap,
+		err = dsl_dataset_open(clonebuf == NULL ? tosnap : clonebuf,
 		    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT,
 		    FTAG, &ds);
 		if (err == 0) {
 			txg_wait_synced(ds->ds_dir->dd_pool, 0);
 			if (drrb->drr_fromguid) {
-				/* incremental: rollback to most recent snap */
-				(void) dsl_dataset_rollback(ds);
-				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+				if (clonebuf != NULL) {
+					/*
+					 * online incremental: destroy
+					 * the temporarily created clone.
+					 */
+					dsl_dataset_close(ds, DS_MODE_EXCLUSIVE,
+					    FTAG);
+					(void) dmu_objset_destroy(clonebuf);
+				} else {
+					/*
+					 * offline incremental: rollback to
+					 * most recent snapshot.
+					 */
+					(void) dsl_dataset_rollback(ds);
+					dsl_dataset_close(ds, DS_MODE_EXCLUSIVE,
+					    FTAG);
+				}
 			} else {
 				/* full: destroy whole fs */
 				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
@@ -967,8 +1090,26 @@ out:
 		*cp = '@';
 	}
 
+	if (clonebuf != NULL)
+		kmem_free(clonebuf, len);
 	kmem_free(ra.buf, ra.bufsize);
 	if (sizep)
 		*sizep = ra.voff;
 	return (ra.err);
+}
+
+int
+dmu_replay_end_snapshot(char *name, struct drr_begin *drrb)
+{
+	objset_t *os;
+	int err;
+
+	err = dmu_objset_open(name, DMU_OST_ZFS, DS_MODE_STANDARD, &os);
+	if (err)
+		return (err);
+
+	err = dsl_sync_task_do(dmu_objset_ds(os)->ds_dir->dd_pool,
+	    replay_end_check, replay_end_sync, os, drrb, 3);
+	dmu_objset_close(os);
+	return (err);
 }

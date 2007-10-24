@@ -130,7 +130,8 @@ path_to_str(const char *path, int types)
  * 'buf' detailing exactly why the name was not valid.
  */
 static int
-zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type)
+zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type,
+    boolean_t modifying)
 {
 	namecheck_err_t why;
 	char what;
@@ -203,13 +204,20 @@ zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type)
 		return (0);
 	}
 
+	if (modifying && strchr(path, '%') != NULL) {
+		if (hdl != NULL)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "invalid character %c in name"), '%');
+		return (0);
+	}
+
 	return (-1);
 }
 
 int
 zfs_name_valid(const char *name, zfs_type_t type)
 {
-	return (zfs_validate_name(NULL, name, type));
+	return (zfs_validate_name(NULL, name, type, B_FALSE));
 }
 
 /*
@@ -420,7 +428,7 @@ zfs_open(libzfs_handle_t *hdl, const char *path, int types)
 	/*
 	 * Validate the name before we even try to open it.
 	 */
-	if (!zfs_validate_name(hdl, path, ZFS_TYPE_DATASET)) {
+	if (!zfs_validate_name(hdl, path, ZFS_TYPE_DATASET, B_FALSE)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "invalid dataset name"));
 		(void) zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
@@ -2428,7 +2436,7 @@ zfs_dataset_exists(libzfs_handle_t *hdl, const char *path, zfs_type_t types)
 {
 	zfs_handle_t *zhp;
 
-	if (!zfs_validate_name(hdl, path, types))
+	if (!zfs_validate_name(hdl, path, types, B_FALSE))
 		return (B_FALSE);
 
 	/*
@@ -2486,7 +2494,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	    "cannot create '%s'"), path);
 
 	/* validate the path, taking care to note the extended error message */
-	if (!zfs_validate_name(hdl, path, type))
+	if (!zfs_validate_name(hdl, path, type, B_TRUE))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	/* validate parents exist */
@@ -2777,7 +2785,7 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 	    "cannot create '%s'"), target);
 
 	/* validate the target name */
-	if (!zfs_validate_name(hdl, target, ZFS_TYPE_FILESYSTEM))
+	if (!zfs_validate_name(hdl, target, ZFS_TYPE_FILESYSTEM, B_TRUE))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	/* validate parents exist */
@@ -3042,7 +3050,7 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 	    "cannot snapshot '%s'"), path);
 
 	/* validate the target name */
-	if (!zfs_validate_name(hdl, path, ZFS_TYPE_SNAPSHOT))
+	if (!zfs_validate_name(hdl, path, ZFS_TYPE_SNAPSHOT, B_TRUE))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	/* make sure the parent exists and is of the appropriate type */
@@ -3246,7 +3254,6 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	dmu_replay_record_t drr;
 	struct drr_begin *drrb = &zc.zc_begin_record;
 	char errbuf[1024];
-	prop_changelist_t *clp;
 	char chopprefix[ZFS_MAXNAMELEN];
 
 	begin_time = time(NULL);
@@ -3331,7 +3338,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	(void) strcpy(zc.zc_value, tosnap);
 	(void) strncat(zc.zc_value, drr.drr_u.drr_begin.drr_toname+choplen,
 	    sizeof (zc.zc_value));
-	if (!zfs_validate_name(hdl, zc.zc_value, ZFS_TYPE_SNAPSHOT))
+	if (!zfs_validate_name(hdl, zc.zc_value, ZFS_TYPE_SNAPSHOT, B_TRUE))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	(void) strcpy(zc.zc_name, zc.zc_value);
@@ -3347,26 +3354,10 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		if (h == NULL)
 			return (-1);
-		if (!dryrun) {
-			/*
-			 * We need to unmount all the dependents of the dataset
-			 * and the dataset itself. If it's a volume
-			 * then remove device link.
-			 */
-			if (h->zfs_type == ZFS_TYPE_FILESYSTEM) {
-				clp = changelist_gather(h, ZFS_PROP_NAME, 0);
-				if (clp == NULL)
-					return (-1);
-				if (changelist_prefix(clp) != 0) {
-					changelist_free(clp);
-					return (-1);
-				}
-			} else {
-				if (zvol_remove_link(hdl, h->zfs_name) != 0) {
-					zfs_close(h);
-					return (-1);
-				}
-
+		if (!dryrun && h->zfs_type == ZFS_TYPE_VOLUME) {
+			if (zvol_remove_link(hdl, h->zfs_name) != 0) {
+				zfs_close(h);
+				return (-1);
 			}
 		}
 		zfs_close(h);
@@ -3474,13 +3465,8 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 				if (err == 0 && ioctl_err == 0)
 					err = zvol_create_link(hdl,
 					    zc.zc_value);
-			} else {
-				if (drrb->drr_fromguid) {
-					err = changelist_postfix(clp);
-					changelist_free(clp);
-				} else {
-					err = zfs_mount(h, NULL, 0);
-				}
+			} else if (!drrb->drr_fromguid) {
+				err = zfs_mount(h, NULL, 0);
 			}
 		zfs_close(h);
 		}
@@ -3750,7 +3736,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 				    errbuf));
 			}
 		}
-		if (!zfs_validate_name(hdl, target, zhp->zfs_type))
+		if (!zfs_validate_name(hdl, target, zhp->zfs_type, B_TRUE))
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 	} else {
 		if (recursive) {
@@ -3759,7 +3745,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
 		}
 
-		if (!zfs_validate_name(hdl, target, zhp->zfs_type))
+		if (!zfs_validate_name(hdl, target, zhp->zfs_type, B_TRUE))
 			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		uint64_t unused;
 

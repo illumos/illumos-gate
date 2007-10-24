@@ -86,6 +86,10 @@ typedef struct objset_impl {
 	list_t os_free_dnodes[TXG_SIZE];
 	list_t os_dnodes;
 	list_t os_downgraded_dbufs;
+
+	/* stuff we store for the user */
+	kmutex_t os_user_ptr_lock;
+	void *os_user_ptr;
 } objset_impl_t;
 
 #define	DMU_META_DNODE_OBJECT	0
