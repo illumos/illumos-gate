@@ -95,7 +95,7 @@
 #include <sys/ddi.h>
 #include <sys/int_fmtio.h>
 
-#include <util/string.h>
+#include <sys/sunddi.h>
 
 /*
  * The automatic unmounter thread stuff!
