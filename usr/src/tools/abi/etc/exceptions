@@ -204,6 +204,7 @@ PSARC 2004/619: RULE E10: usr/xpg4/lib/amd64/libcurses.so.2: SUNW_1.2
 4773624: RULE W1: usr/lib/cfgadm/
 4773624: RULE W1: usr/lib/devfsadm/
 4773624: RULE W1: usr/lib/efcode/
+6614968: RULE W1: usr/lib/elfedit/
 4773624: RULE W1: usr/lib/inet/ppp/
 4773624: RULE W1: usr/lib/mdb/
 4773624: RULE W1: usr/lib/picl/plugins/
