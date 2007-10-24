@@ -270,6 +270,7 @@ extern "C" {
 #define	defopen			_defopen
 #define	defread			_defread
 #define	dgettext		_dgettext
+#define	dirfd			_dirfd
 #define	dirname			_dirname
 #define	dladdr1			_dladdr1
 #define	dladdr			_dladdr

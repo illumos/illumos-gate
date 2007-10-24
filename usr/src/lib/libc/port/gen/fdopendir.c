@@ -27,7 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * fdopendir -- C library extension routine
+ * fdopendir, dirfd -- C library extension routines
  *
  * We use lmalloc()/lfree() rather than malloc()/free() in
  * order to allow opendir()/readdir()/closedir() to be called
@@ -35,6 +35,7 @@
  */
 
 #pragma weak fdopendir = _fdopendir
+#pragma weak dirfd = _dirfd
 
 #include "synonyms.h"
 #include <mtlib.h>
@@ -86,4 +87,10 @@ fail:
 	if (error)
 		errno = error;
 	return (NULL);
+}
+
+int
+dirfd(DIR *dirp)
+{
+	return (dirp->dd_fd);
 }

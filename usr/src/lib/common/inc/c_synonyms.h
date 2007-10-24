@@ -229,6 +229,7 @@ extern "C" {
 #define	defopen				_defopen
 #define	defread				_defread
 #define	dgettext			_dgettext
+#define	dirfd				_dirfd
 #define	dladdr1				_dladdr1
 #define	dladdr				_dladdr
 #define	dlamd64getunwind		_dlamd64getunwind

@@ -48,6 +48,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	clock_gettime;
 	clock_nanosleep;
 	clock_settime;
+	dirfd;
 	door_bind;
 	door_call;
 	door_create;
@@ -1484,6 +1485,7 @@ SUNWprivate_1.1 {
 	_defread;
 	_delete;
 	_dgettext;
+	_dirfd;
 	_door_bind = 			NODYNSORT;
 	_door_call = 			NODYNSORT;
 	_door_create;

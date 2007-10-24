@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _DIRENT_H
 #define	_DIRENT_H
@@ -102,6 +101,7 @@ extern DIR		*opendir(const char *);
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern DIR		*fdopendir(int);
+extern int		dirfd(DIR *);
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
 extern int		scandir(const char *, struct dirent *(*[]),
@@ -139,6 +139,7 @@ extern DIR		*opendir();
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern DIR		*fdopendir();
+extern int		dirfd();
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) ... */
 extern struct dirent	*readdir();
 #if defined(__EXTENSIONS__) || !defined(_POSIX_C_SOURCE) || \
