@@ -57,6 +57,7 @@
 
 #define	THE_EPOCH	1970
 #define	END_OF_TIME	2099
+extern int hsfs_lostpage;
 
 #ifdef __STDC__
 static time_t hs_date_to_gmtime(int year, int mon, int day, int gmtoff);
@@ -127,7 +128,25 @@ struct hsfs_error {
 	1, 0,
 };
 
+/*
+ * Local datatype for defining tables of (Offset, Name) pairs for
+ * kstats.
+ */
+typedef struct {
+	offset_t	index;
+	char		*name;
+} hsfs_ksindex_t;
 
+static const hsfs_ksindex_t hsfs_kstats[] = {
+	{ 0,		"mountpoint"		},
+	{ 1,		"pages_lost"		},
+	{ 2,		"physical_read_pages"	},
+	{ 3,		"cache_read_pages"	},
+	{ 4,		"readahead_pages"	},
+	{ 5,		"coalesced_pages"	},
+	{ 6,		"total_pages_requested"	},
+	{-1,		NULL 			}
+};
 
 /*
  * hs_parse_dirdate
@@ -319,4 +338,108 @@ hs_log_bogus_disk_warning(fsp, errtype, data)
 		cmn_err(CE_CONT, "\n");
 
 	fsp->hsfs_err_flags |= (1 << errtype);
+}
+
+/*
+ * Callback from kstat framework. Grab a snapshot of the current hsfs
+ * counters and populate the kstats.
+ */
+static int
+hsfs_kstats_update(kstat_t *ksp, int flag)
+{
+	struct hsfs *fsp;
+	kstat_named_t *knp;
+	uint64_t pages_lost;
+	uint64_t physical_read_bytes;
+	uint64_t cache_read_pages;
+	uint64_t readahead_bytes;
+	uint64_t coalesced_bytes;
+	uint64_t total_pages_requested;
+
+	if (flag != KSTAT_READ)
+		return (EACCES);
+
+	fsp = ksp->ks_private;
+	knp = ksp->ks_data;
+
+	mutex_enter(&(fsp->hqueue->strategy_lock));
+	mutex_enter(&(fsp->hqueue->hsfs_queue_lock));
+
+	cache_read_pages = fsp->cache_read_pages;
+	pages_lost = hsfs_lostpage;
+	physical_read_bytes = fsp->physical_read_bytes;
+	readahead_bytes =  fsp->readahead_bytes;
+	coalesced_bytes = fsp->coalesced_bytes;
+	total_pages_requested = fsp->total_pages_requested;
+
+	mutex_exit(&(fsp->hqueue->strategy_lock));
+	mutex_exit(&(fsp->hqueue->hsfs_queue_lock));
+
+	knp++;
+	(knp++)->value.ui64 = pages_lost;
+	(knp++)->value.ui64 = howmany(physical_read_bytes, PAGESIZE);
+	(knp++)->value.ui64 = cache_read_pages;
+	(knp++)->value.ui64 = howmany(readahead_bytes, PAGESIZE);
+	(knp++)->value.ui64 = howmany(coalesced_bytes, PAGESIZE);
+	(knp++)->value.ui64 = total_pages_requested;
+
+	return (0);
+}
+
+/*
+ * Initialize hsfs kstats, which are all name value pairs with
+ * values being various counters.
+ */
+static kstat_t *
+hsfs_setup_named_kstats(struct hsfs *fsp, int fsid, char *name,
+    const hsfs_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
+{
+	kstat_t *ksp;
+	kstat_named_t *knp;
+	char *np;
+	char *mntpt = fsp->hsfs_fsmnt;
+
+	size /= sizeof (hsfs_ksindex_t);
+	ksp = kstat_create("hsfs_fs", fsid, name, "hsfs",
+	    KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_VIRTUAL);
+	if (ksp == NULL)
+		return (NULL);
+
+	ksp->ks_data = kmem_alloc(sizeof (kstat_named_t) * size, KM_SLEEP);
+	ksp->ks_private = fsp;
+	ksp->ks_update = update;
+	ksp->ks_data_size += strlen(mntpt) + 1;
+	knp = ksp->ks_data;
+	kstat_named_init(knp, ksip->name, KSTAT_DATA_STRING);
+	kstat_named_setstr(knp, mntpt);
+	knp++;
+	ksip++;
+
+	for (; (np = ksip->name) != NULL; ++knp, ++ksip) {
+		kstat_named_init(knp, np, KSTAT_DATA_UINT64);
+	}
+	kstat_install(ksp);
+
+	return (ksp);
+}
+
+void
+hsfs_init_kstats(struct hsfs *fsp, int fsid)
+{
+	fsp->hsfs_kstats = hsfs_setup_named_kstats(fsp, fsid, "hsfs_read_stats",
+	    hsfs_kstats, sizeof (hsfs_kstats), hsfs_kstats_update);
+}
+
+void
+hsfs_fini_kstats(struct hsfs *fsp)
+{
+	void *data;
+
+	if (fsp->hsfs_kstats != NULL) {
+		data = fsp->hsfs_kstats->ks_data;
+		kstat_delete(fsp->hsfs_kstats);
+		kmem_free(data, (sizeof (hsfs_kstats)) / \
+		    (sizeof (hsfs_ksindex_t)));
+	}
+	fsp->hsfs_kstats = NULL;
 }

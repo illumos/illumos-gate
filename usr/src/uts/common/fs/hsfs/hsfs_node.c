@@ -609,6 +609,9 @@ hs_makenode(
 			hp->hs_dir_off = off;
 			hp->hs_nodeid = nodeid;
 			hp->hs_seq = 0;
+			hp->hs_prev_offset = 0;
+			hp->hs_num_contig = 0;
+			hp->hs_ra_bytes = 0;
 			hp->hs_flags = HREF;
 			if (off > HS_SECTOR_SIZE)
 				cmn_err(CE_WARN, "hs_makenode: bad offset");

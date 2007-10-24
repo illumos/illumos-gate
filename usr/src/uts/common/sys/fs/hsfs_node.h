@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+#include <sys/taskq.h>
+
 struct	hs_direntry {
 	uint_t		ext_lbn;	/* LBN of start of extent */
 	uint_t		ext_size;    	/* no. of data bytes in extent */
@@ -99,6 +101,9 @@ struct  hsnode {
 	long		hs_mapcnt;	/* mappings to file pages */
 	uint_t		hs_seq;		/* sequence number */
 	uint_t		hs_flags;	/* (see below) */
+	u_offset_t	hs_prev_offset; /* Last read end offset (readahead) */
+	int		hs_num_contig;  /* Count of contiguous reads */
+	int		hs_ra_bytes;    /* Bytes to readahead */
 	kmutex_t	hs_contents_lock;	/* protects hsnode contents */
 						/* 	except hs_offset */
 };
@@ -165,6 +170,76 @@ struct	hs_volume {
 #define	HS_DUMMY_INO	16	/* dummy inode number for empty files */
 
 /*
+ * Hsfs I/O Scheduling parameters and data structures.
+ * Deadline for reads is set at 5000 usec.
+ */
+#define	HSFS_READ_DEADLINE 5000
+#define	HSFS_NORMAL 0x0
+
+/*
+ * This structure holds information for a read request that is enqueued
+ * for processing by the scheduling function. An AVL tree is used to
+ * access the read requests in a sorted manner.
+ */
+struct hio {
+	struct buf	*bp;		/* The buf for this read */
+	struct hio	*contig_chain;  /* Next adjacent read if any */
+	offset_t	io_lblkno;	/* Starting disk block of io */
+	u_offset_t	nblocks;	/* # disk blocks */
+	uint64_t	io_timestamp;	/* usec timestamp for deadline */
+	ksema_t		*sema;		/* Completion flag */
+	avl_node_t	io_offset_node; /* Avl tree requirements */
+	avl_node_t	io_deadline_node;
+};
+
+/*
+ * This structure holds information about all the read requests issued
+ * during a read-ahead invocation. This is then enqueued on a task-queue
+ * for processing by a background thread that takes this read-ahead to
+ * completion and cleans up.
+ */
+struct hio_info {
+	struct buf	*bufs;	/* array of bufs issued for this R/A */
+	caddr_t		*vas;	/* The kmem_alloced chunk for the bufs */
+	ksema_t		*sema;	/* Semaphores used in the bufs */
+	uint_t		bufsused; /* # of bufs actually used */
+	uint_t		bufcnt;   /* Tot bufs allocated. */
+	struct page	*pp;	  /* The list of I/O locked pages */
+	struct hsfs	*fsp; /* The filesystem structure */
+};
+
+/*
+ * This is per-filesystem structure that stores toplevel data structures for
+ * the I/O scheduler.
+ */
+struct hsfs_queue {
+	/*
+	 * A dummy hio holding the LBN of the last read processed. Easy
+	 * to use in AVL_NEXT for Circular Look behavior.
+	 */
+	struct hio	*next;
+
+	/*
+	 * A pre-allocated buf for issuing coalesced reads. The scheduling
+	 * function is mostly single threaded by necessity.
+	 */
+	struct buf	*nbuf;
+	kmutex_t	hsfs_queue_lock; /* Protects the AVL trees */
+
+	/*
+	 * Makes most of the scheduling function Single-threaded.
+	 */
+	kmutex_t	strategy_lock;
+	avl_tree_t	read_tree;	 /* Reads ordered by LBN */
+	avl_tree_t	deadline_tree;	 /* Reads ordered by timestamp */
+	taskq_t		*ra_task;	 /* Read-ahead Q */
+	int		max_ra_bytes;	 /* Max read-ahead quantum */
+
+	/* Device Max Transfer size in DEV_BSIZE */
+	uint_t		dev_maxtransfer;
+};
+
+/*
  * High Sierra filesystem structure.
  * There is one of these for each mounted High Sierra filesystem.
  */
@@ -198,6 +273,18 @@ struct hsfs {
 	kmutex_t	hsfs_free_lock;	/* protects free list */
 	struct hsnode	*hsfs_free_f;	/* first entry of free list */
 	struct hsnode	*hsfs_free_b;	/* last entry of free list */
+
+	/*
+	 * Counters exported through kstats.
+	 */
+	uint64_t	physical_read_bytes;
+	uint64_t	cache_read_pages;
+	uint64_t	readahead_bytes;
+	uint64_t	coalesced_bytes;
+	uint64_t	total_pages_requested;
+	kstat_t		*hsfs_kstats;
+
+	struct hsfs_queue *hqueue;	/* I/O Scheduling parameters */
 };
 
 /*

@@ -137,6 +137,12 @@ static mntopts_t hsfs_proto_opttbl = {
 	hsfs_options
 };
 
+/*
+ * Indicates whether to enable the I/O scheduling and readahead logic
+ * 1 - Enable, 0 - Do not Enable.
+ * Debugging purposes.
+ */
+int do_schedio = 1;
 static int hsfsfstype;
 static int hsfsinit(int, char *);
 
@@ -157,6 +163,10 @@ static struct modlinkage modlinkage = {
 };
 
 char _depends_on[] = "fs/specfs";
+
+extern void hsched_init_caches(void);
+extern void hsched_fini_caches(void);
+
 
 int
 _init(void)
@@ -185,6 +195,7 @@ _fini(void)
 	vn_freevnodeops(hsfs_vnodeops);
 
 	hs_fini_hsnode_cache();
+	hsched_fini_caches();
 	return (0);
 }
 
@@ -203,6 +214,12 @@ struct hsfs *hs_mounttab = NULL;
 mode_t hsfs_default_mode = 0555;
 uid_t hsfs_default_uid = 0;
 gid_t hsfs_default_gid = 3;
+
+extern void hsched_init(struct hsfs *fsp, int fsid,
+					struct modlinkage *modlinkage);
+extern void hsched_fini(struct hsfs_queue *hqueue);
+extern void hsfs_init_kstats(struct hsfs *fsp, int fsid);
+extern void hsfs_fini_kstats(struct hsfs *fsp);
 
 static int hsfs_mount(struct vfs *vfsp, struct vnode *mvp,
 	struct mounta *uap, struct cred *cr);
@@ -261,6 +278,7 @@ hsfsinit(int fstype, char *name)
 	hsfsfstype = fstype;
 	mutex_init(&hs_mounttab_lock, NULL, MUTEX_DEFAULT, NULL);
 	hs_init_hsnode_cache();
+	hsched_init_caches();
 	return (0);
 }
 
@@ -388,6 +406,7 @@ hsfs_unmount(
 
 	mutex_exit(&hs_mounttab_lock);
 
+	hsfs_fini_kstats(fsp);
 	(void) VOP_CLOSE(fsp->hsfs_devvp, FREAD, 1, (offset_t)0, cr);
 	VN_RELE(fsp->hsfs_devvp);
 	/* free path table space */
@@ -401,6 +420,9 @@ hsfs_unmount(
 	/* free "mounted on" pathame */
 	if (fsp->hsfs_fsmnt != NULL)
 		kmem_free(fsp->hsfs_fsmnt, strlen(fsp->hsfs_fsmnt) + 1);
+
+	hsched_fini(fsp->hqueue);
+	kmem_free(fsp->hqueue, sizeof (struct hsfs_queue));
 
 	mutex_destroy(&fsp->hsfs_free_lock);
 	rw_destroy(&fsp->hsfs_hash_lock);
@@ -887,6 +909,19 @@ hs_mountfs(
 	 * Add the HSFSMNT_INODE pseudo mount flag to the current mount flags.
 	 */
 	fsp->hsfs_flags = mount_flags | (fsp->hsfs_flags & HSFSMNT_INODE);
+
+	/*
+	 * Setup I/O Scheduling structures
+	 */
+	if (do_schedio) {
+		fsp->hqueue = kmem_alloc(sizeof (struct hsfs_queue), KM_SLEEP);
+		hsched_init(fsp, fsid, &modlinkage);
+	}
+
+	/*
+	 * Setup kstats
+	 */
+	hsfs_init_kstats(fsp, fsid);
 
 	DTRACE_PROBE1(mount__done, struct hsfs *, fsp);
 
