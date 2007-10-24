@@ -374,7 +374,7 @@
 6164:AUE_rexd:rexd:lo
 6165:AUE_ftpd:ftp access:lo
 6166:AUE_init_solaris:init(1m):ss
-6167:AUE_uadmin_solaris:uadmin(1m):ss
+6167:AUE_uadmin_solaris:uadmin(1m):no
 6168:AUE_shutdown_solaris:shutdown(1b):ss
 6169:AUE_poweroff_solaris:poweroff(1m):ss
 6170:AUE_crontab_mod:crontab-modify:ua
@@ -437,6 +437,13 @@
 6234:AUE_pool_export:export device from pool:ot
 6235:AUE_dladm_create_secobj:create network security object:as,cy
 6236:AUE_dladm_delete_secobj:delete network security object:as,cy
+6237:AUE_uadmin_shutdown:uadmin(1m) - shutdown:ss
+6238:AUE_uadmin_reboot:uadmin(1m) - reboot:ss
+6239:AUE_uadmin_dump:uadmin(1m) - dump:ss
+6240:AUE_uadmin_freeze:uadmin(1m) - freeze:ss
+6241:AUE_uadmin_remount:uadmin(1m) - remount:ss
+6242:AUE_uadmin_ftrace:uadmin(1m) - ftrace:ss
+6243:AUE_uadmin_swapctl:uadmin(1m) - swapctl:ss
 #
 # Trusted Extensions events:
 #

@@ -387,7 +387,30 @@ EOF
 	        $start = "$comma\t";
 	    }
 	    $text = "(no token will be generated)" unless $text;
-	    print Hfile "\tADT_$shortName", "_$id$start\t/* $text */\n";
+	    my $line = "\tADT_$shortName"."_$id$start\t/* ";
+	    # ensure whole line does not exceed 80 chars
+	    my $eline = $line.$text;
+	    #expand tabs
+	    1 while $eline =~ s/\t+/' ' x (length($&) * 8 - length($`) % 8)/e;
+	    if ((length($eline) > 77) && ($line =~ /\t\t/)) {
+	    	# 77 = 80 - length(" */")
+		# strip off double tab so that comment can be longer
+		$line =~ s/\t\t/\t/;
+		# shorten eline; don't mind where the spaces are removed, it is
+		# only $eline length which matters
+		$eline =~ s/ {8}//; 
+	    }
+	    if (length($eline) > 77) { # 80 - length(" */")
+	    	# here we use negative length in substr to leave off from the
+		# right side; 74 = 77 - length("...")
+	    	$line .= substr($text, 0, 74 - length($eline));
+		# strip off part of last word (already cut)
+		$line =~ s/\s(\S+)$/ /;
+		$line .= "...";
+	    } else {
+	    	$line .= $text;
+	    }
+	    print Hfile "$line */\n";
 	    $start = '';
 	}
 	print Hfile "};\n";

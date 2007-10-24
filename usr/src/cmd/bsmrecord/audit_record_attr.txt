@@ -2301,9 +2301,10 @@ label=AUE_smserverd
 # code shows a third token, path, but it isn't implemented.
 
 label=AUE_uadmin_solaris
-  title=uadmin
-  program=/sbin/uadmin;/usr/sbin/uadmin
+  title=uadmin (obsolete)
+  program=
+  see=
   format=text1:text2
   comment=function code:argument code
-# See audit_uadmin.c
+# not used. Replaced by AUE_uadmin_* events, see uadmin.c, adt.xml
 

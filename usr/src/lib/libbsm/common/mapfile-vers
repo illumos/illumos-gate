@@ -224,8 +224,6 @@ SUNWprivate_1.1 {
 	audit_shutdown_setup;
 	audit_shutdown_success;
 	__audit_syslog;
-	audit_uadmin_setup;
-	audit_uadmin_success;
 	aug_audit;
 	aug_get_machine;
 	aug_get_port;

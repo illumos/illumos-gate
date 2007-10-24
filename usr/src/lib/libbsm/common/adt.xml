@@ -179,9 +179,12 @@ Use is subject to license terms.
 			- id is the name to be used for this group of text
 			  strings in adt_event.h
 			- header is as defined for <event>
+			- start is a number where produced enum type begins;
+			  ensure msg lists do not overlap
 			Within a msg_list block, <msg> and <debug> are defined.
 			The order of <msg> tags in a msg_list is reflected
-			directly in adt_event.h
+			directly in adt_event.h. Also add ADT_LIST_<<id>> to
+			enum adt_msg_list in adt_xlate.h.
 
 	msg		Define one string.
 			- id is the name to be used in the enum describing
@@ -1134,8 +1137,102 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+    <!-- uadmin(1m) events -->
+    <event id="AUE_uadmin_generic" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>next action</comment>
+	</entry>
+	<entry id="mdep">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>machine dependent argument</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_uadmin_generic_fcn" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="fcn">
+	    <internal token="text"/>
+	    <external opt="required" type="msg uadmin_fcn"/>
+	    <comment>next action</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_uadmin_shutdown" instance_of="AUE_uadmin_generic"
+        header="0" idNo="51" omit="JNI">
+    	<title>uadmin shutdown</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_reboot" instance_of="AUE_uadmin_generic"
+        header="0" idNo="52" omit="JNI">
+    	<title>uadmin reboot</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_dump" instance_of="AUE_uadmin_generic"
+        header="0" idNo="53" omit="JNI">
+    	<title>uadmin dump</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_freeze" instance_of="AUE_uadmin_generic"
+        header="0" idNo="54" omit="JNI">
+    	<title>uadmin freeze</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_remount" header="0" idNo="55" omit="JNI">
+    	<title>uadmin remount</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <!-- uadmin ftrace and swapctl are not documented in uadmin(2) -->
+    <event id="AUE_uadmin_ftrace" instance_of="AUE_uadmin_generic_fcn"
+        header="0" idNo="56" omit="JNI">
+    	<title>uadmin ftrace</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+    <event id="AUE_uadmin_swapctl" instance_of="AUE_uadmin_generic_fcn"
+        header="0" idNo="57" omit="JNI">
+    	<title>uadmin swapctl</title>
+	<program>/sbin/uadmin</program>
+	<program>/usr/sbin/uadmin</program>
+	<see>uadmin(1M)</see>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 50, so next is 51, then fix this comment -->
+<!-- Highest idNo is 57, so next is 58, then fix this comment -->
 <!-- end of C Only events -->
 
 
@@ -1306,4 +1403,25 @@ Use is subject to license terms.
 	<msg id="ANON_USER">No anonymous</msg>
     </msg_list>
 
+<!-- msg list for uadmin(1m) fcn argument (next action, see uadmin(2)) -->
+    <msg_list id="uadmin_fcn" header="0" start="3000" public="true">
+    	<msg id="AD_HALT">Halt the processor(s)</msg>
+	<msg id="AD_POWEROFF">Halt the processor(s) and turn off the power</msg>
+	<msg id="AD_BOOT">Reboot the system using the kernel file</msg>
+	<msg id="AD_IBOOT">Interactive reboot</msg>
+	<msg id="AD_SUSPEND_TO_DISK">Save the system state to the state file</msg>
+	<msg id="AD_CHECK_SUSPEND_TO_DISK">Check if system supports suspend to disk</msg>
+	<msg id="AD_FORCE">Force suspend to disk even when threads of user
+	applications are not suspendable</msg>
+	<msg id="AD_SUSPEND_TO_RAM">Save the system state to memory</msg>
+	<msg id="AD_CHECK_SUSPEND_TO_RAM">Check if system supports suspend to memory</msg>
+	<msg id="AD_SBOOT">Single-user reboot</msg>
+	<msg id="AD_SIBOOT">Single-user interactive reboot</msg>
+	<msg id="AD_NOSYNC">Do not sync filesystems on next A_DUMP</msg>
+	<msg id="AD_REUSEINIT">Prepare for AD_REUSABLE</msg>
+	<msg id="AD_REUSABLE">Create reusable statefile</msg>
+	<msg id="AD_REUSEFINI">Revert to normal CPR mode (not reusable)</msg>
+	<msg id="AD_FTRACE_START">ftrace start</msg>
+	<msg id="AD_FTRACE_STOP">ftrace stop</msg>
+    </msg_list>
 </specification>

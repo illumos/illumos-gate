@@ -670,8 +670,8 @@ adt_to_text(datadef *def, void *p_data, int required,
 		list = &adt_msg_text[(enum adt_login_text)def->dd_input_size];
 		list_index = ((union convert *)p_data)->msg_selector;
 
-		if ((list_index < list->ml_min_index) |
-		    (list_index > list->ml_max_index))
+		if ((list_index + list->ml_offset < list->ml_min_index) ||
+		    (list_index + list->ml_offset > list->ml_max_index))
 			string = "Invalid message index";
 		else
 			string = list->ml_msg_list[list_index +

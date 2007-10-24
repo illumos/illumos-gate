@@ -517,8 +517,10 @@ close_log(dirlist_t *currentdir, char *oname, char *newname)
 	 * newname is "" if binfile is being closed down.
 	 */
 	(void) write_file_token(currentdir->dl_fd, newname);
-	if (currentdir->dl_fd >= 0)
+	if (currentdir->dl_fd >= 0) {
+		(void) fsync(currentdir->dl_fd);
 		(void) close(currentdir->dl_fd);
+	}
 	currentdir->dl_fd = -1;
 	(void) rename(currentdir->dl_filename, oldname);
 

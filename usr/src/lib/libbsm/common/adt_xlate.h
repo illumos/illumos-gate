@@ -21,7 +21,7 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -81,7 +81,8 @@ union union_of_events {
 enum adt_msg_list {
 	ADT_LIST_FAIL_PAM,
 	ADT_LIST_FAIL_VALUE,
-	ADT_LIST_LOGIN_TEXT};
+	ADT_LIST_LOGIN_TEXT,
+	ADT_LIST_UADMIN_FCN};
 
 enum datatype {ADT_UNDEFINED = 0,
     ADT_DATE,

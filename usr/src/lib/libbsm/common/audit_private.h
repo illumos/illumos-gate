@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Do not add to this file unless it is to cover an existing private
@@ -178,27 +178,6 @@ extern	void 	audit_rexd_fail(char *, char *, char *, uid_t, gid_t,
 extern	void	audit_rexd_success(char *, char *, uid_t, gid_t,
     char *, char **);
 extern	void	audit_rexd_setup(void);
-
-/*
- * audit_uadmin.c
- * interface user
- * uadmin
- */
-extern	int	audit_uadmin_setup(int, char **);
-extern	int	audit_uadmin_success(void);
-
-/*
- * audit_su.c
- * interface user
- * su
- */
-extern	void	audit_su_bad_authentication(void);
-extern	void	audit_su_bad_uid(uid_t);
-extern	void	audit_su_bad_username(void);
-extern	void	audit_su_init_info(char *, char *);
-extern	void	audit_su_reset_ai(void);
-extern	void	audit_su_success(void);
-extern	void	audit_su_unknown_failure(void);
 
 #ifdef	__cplusplus
 }
