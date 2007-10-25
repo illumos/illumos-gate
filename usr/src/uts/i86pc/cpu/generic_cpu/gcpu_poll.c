@@ -201,6 +201,9 @@ gcpu_ntv_mca_poll_wrapper(cmi_hdl_t hdl, int what)
 {
 	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
 
+	if (gcpu->gcpu_mca.gcpu_mca_lgsz == 0)
+		return;
+
 	kpreempt_disable();
 	mutex_enter(&gcpu->gcpu_shared->gcpus_poll_lock);
 	gcpu_ntv_mca_poll(hdl, what);
@@ -260,6 +263,8 @@ gcpu_ntv_mca_poll_offline(void *arg, cpu_t *cpu, void *cyh_arg)
  * common logging code.
  */
 
+static int gcpu_mca_poll_inits;
+
 void
 gcpu_mca_poll_init(cmi_hdl_t hdl)
 {
@@ -276,6 +281,7 @@ gcpu_mca_poll_init(cmi_hdl_t hdl)
 		}
 		mca->gcpu_mca_polltrace.mptc_tbufs = tbufs;
 		mca->gcpu_mca_polltrace.mptc_curtrace = 0;
+		gcpu_mca_poll_inits++;
 		break;
 	}
 
@@ -300,7 +306,7 @@ gcpu_ntv_mca_poll_start(void)
 #ifndef	__xpv
 	cyc_omni_handler_t cyo;
 
-	if (gcpu_mca_poll_interval == 0)
+	if (gcpu_mca_poll_interval == 0 || gcpu_mca_poll_inits == 0)
 		return;
 
 	cyo.cyo_online = gcpu_ntv_mca_poll_online;

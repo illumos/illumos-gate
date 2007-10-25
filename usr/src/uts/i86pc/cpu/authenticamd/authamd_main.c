@@ -50,6 +50,7 @@
 #include <sys/controlregs.h>
 #include <sys/pghw.h>
 #include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 #include <sys/cpu_module_ms_impl.h>
 
 #include "authamd.h"
@@ -99,6 +100,20 @@ int authamd_ms_support_disable = 0;
 	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
 
 /*
+ * Families/revisions for which we will perform NB MCA Config changes
+ */
+#define	AUTHAMD_DO_NBMCACFG(rev) \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) || \
+	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+
+/*
+ * Families/revisions that have chip cache scrubbers.
+ */
+#define	AUTHAMD_HAS_CHIPSCRUB(rev) \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) || \
+	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+
+/*
  * Families/revisions that have a NB misc register or registers -
  * evaluates to 0 if no support, otherwise the number of MC4_MISCj.
  */
@@ -113,6 +128,12 @@ int authamd_ms_support_disable = 0;
 #define	AUTHAMD_NOGARTTBLWLK_MC(rev) \
 	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
 	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+
+/*
+ * Families/revisions that are potentially L3 capable
+ */
+#define	AUTHAMD_L3CAPABLE(rev) \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
 
 /*
  * We recognise main memory ECC errors for AUTHAMD_MEMECC_RECOGNISED
@@ -539,6 +560,74 @@ authamd_bankctl_val(cmi_hdl_t hdl, int bank, uint64_t proposed)
 }
 
 /*
+ * Bits to add to NB MCA config (after watchdog config).
+ */
+uint32_t authamd_nb_mcacfg_add = AMD_NB_CFG_ADD_CMN;
+
+/*
+ * Bits to remove from NB MCA config (after watchdog config)
+ */
+uint32_t authamd_nb_mcacfg_remove = AMD_NB_CFG_REMOVE_CMN;
+
+/*
+ * NB Watchdog policy, and rate we use if enabling.
+ */
+enum {
+	AUTHAMD_NB_WDOG_LEAVEALONE,
+	AUTHAMD_NB_WDOG_DISABLE,
+	AUTHAMD_NB_WDOG_ENABLE_IF_DISABLED,
+	AUTHAMD_NB_WDOG_ENABLE_FORCE_RATE
+} authamd_nb_watchdog_policy = AUTHAMD_NB_WDOG_ENABLE_IF_DISABLED;
+
+uint32_t authamd_nb_mcacfg_wdog = AMD_NB_CFG_WDOGTMRCNTSEL_4095 |
+    AMD_NB_CFG_WDOGTMRBASESEL_1MS;
+
+/*
+ * Per-core cache scrubbing policy and rates.
+ */
+enum {
+	AUTHAMD_SCRUB_BIOSDEFAULT,	/* leave as BIOS configured */
+	AUTHAMD_SCRUB_FIXED,		/* assign our chosen rate */
+	AUTHAMD_SCRUB_MAX		/* use higher of ours and BIOS rate */
+} authamd_scrub_policy = AUTHAMD_SCRUB_MAX;
+
+uint32_t authamd_scrub_rate_dcache = 0xf;	/* 64K per 0.67 seconds */
+uint32_t authamd_scrub_rate_l2cache = 0xe;	/* 1MB per 5.3 seconds */
+uint32_t authamd_scrub_rate_l3cache = 0xd;	/* 1MB per 2.7 seconds */
+
+static uint32_t
+authamd_scrubrate(uint32_t osrate, uint32_t biosrate, const char *varnm)
+{
+	uint32_t rate;
+
+	if (osrate > AMD_NB_SCRUBCTL_RATE_MAX) {
+		cmn_err(CE_WARN, "%s is too large, resetting to 0x%x\n",
+		    varnm, AMD_NB_SCRUBCTL_RATE_MAX);
+		osrate = AMD_NB_SCRUBCTL_RATE_MAX;
+	}
+
+	switch (authamd_scrub_policy) {
+	case AUTHAMD_SCRUB_FIXED:
+		rate = osrate;
+		break;
+
+	default:
+		cmn_err(CE_WARN, "Unknown authamd_scrub_policy %d - "
+		    "using default policy of AUTHAMD_SCRUB_MAX",
+		    authamd_scrub_policy);
+		/*FALLTHRU*/
+
+	case AUTHAMD_SCRUB_MAX:
+		if (osrate != 0 && biosrate != 0)
+			rate = MIN(osrate, biosrate);	/* small is fast */
+		else
+			rate = osrate ? osrate : biosrate;
+	}
+
+	return (rate);
+}
+
+/*
  * cms_mca_init entry point.
  */
 /*ARGSUSED*/
@@ -547,6 +636,7 @@ authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
 	uint32_t rev = authamd->amd_shared->acs_rev;
+	uint_t chipid = authamd->amd_shared->acs_chipid;
 
 	/*
 	 * On chips with a NB online spare control register take control
@@ -590,6 +680,123 @@ authamd_mca_init(cmi_hdl_t hdl, int nbanks)
 
 		authamd_bankstatus_postwrite(hdl, authamd);
 	}
+
+	/*
+	 * NB MCA Configuration Register.
+	 */
+	if (AUTHAMD_DO_NBMCACFG(rev) &&
+	    authamd_chip_once(authamd, AUTHAMD_CFGONCE_NBMCACFG)) {
+		uint32_t val = authamd_pcicfg_read(chipid, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_NBCFG);
+
+		switch (authamd_nb_watchdog_policy) {
+		case AUTHAMD_NB_WDOG_LEAVEALONE:
+			break;
+
+		case AUTHAMD_NB_WDOG_DISABLE:
+			val &= ~(AMD_NB_CFG_WDOGTMRBASESEL_MASK |
+			    AMD_NB_CFG_WDOGTMRCNTSEL_MASK);
+			val |= AMD_NB_CFG_WDOGTMRDIS;
+			break;
+
+		default:
+			cmn_err(CE_NOTE, "authamd_nb_watchdog_policy=%d "
+			    "unrecognised, using default policy",
+			    authamd_nb_watchdog_policy);
+			/*FALLTHRU*/
+
+		case AUTHAMD_NB_WDOG_ENABLE_IF_DISABLED:
+			if (!(val & AMD_NB_CFG_WDOGTMRDIS))
+				break;	/* if enabled leave rate intact */
+			/*FALLTHRU*/
+
+		case AUTHAMD_NB_WDOG_ENABLE_FORCE_RATE:
+			val &= ~(AMD_NB_CFG_WDOGTMRBASESEL_MASK |
+			    AMD_NB_CFG_WDOGTMRCNTSEL_MASK |
+			    AMD_NB_CFG_WDOGTMRDIS);
+			val |= authamd_nb_mcacfg_wdog;
+			break;
+		}
+
+		/*
+		 * Bit 0 of the NB MCA Config register is reserved on family
+		 * 0x10.
+		 */
+		if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+			authamd_nb_mcacfg_add &= ~AMD_NB_CFG_CPUECCERREN;
+
+		val &= ~authamd_nb_mcacfg_remove;
+		val |= authamd_nb_mcacfg_add;
+
+		authamd_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG,
+		    val);
+	}
+
+	/*
+	 * Cache scrubbing.  We can't enable DRAM scrubbing since
+	 * we don't know the DRAM base for this node.
+	 */
+	if (AUTHAMD_HAS_CHIPSCRUB(rev) &&
+	    authamd_scrub_policy != AUTHAMD_SCRUB_BIOSDEFAULT &&
+	    authamd_chip_once(authamd, AUTHAMD_CFGONCE_CACHESCRUB)) {
+		uint32_t val = authamd_pcicfg_read(chipid, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_SCRUBCTL);
+		int l3cap = 0;
+
+		if (AUTHAMD_L3CAPABLE(rev)) {
+			l3cap = (authamd_pcicfg_read(chipid, MC_FUNC_MISCCTL,
+			    MC_CTL_REG_NBCAP) & MC_NBCAP_L3CAPABLE) != 0;
+		}
+
+		authamd_scrub_rate_dcache =
+		    authamd_scrubrate(authamd_scrub_rate_dcache,
+		    (val & AMD_NB_SCRUBCTL_DC_MASK) >> AMD_NB_SCRUBCTL_DC_SHIFT,
+		    "authamd_scrub_rate_dcache");
+
+		authamd_scrub_rate_l2cache =
+		    authamd_scrubrate(authamd_scrub_rate_l2cache,
+		    (val & AMD_NB_SCRUBCTL_L2_MASK) >> AMD_NB_SCRUBCTL_L2_SHIFT,
+		    "authamd_scrub_rate_l2cache");
+
+		authamd_scrub_rate_l3cache = l3cap ?
+		    authamd_scrubrate(authamd_scrub_rate_l3cache,
+		    (val & AMD_NB_SCRUBCTL_L3_MASK) >> AMD_NB_SCRUBCTL_L3_SHIFT,
+		    "authamd_scrub_rate_l3cache") : 0;
+
+		val = AMD_NB_MKSCRUBCTL(authamd_scrub_rate_l3cache,
+		    authamd_scrub_rate_dcache, authamd_scrub_rate_l2cache,
+		    val & AMD_NB_SCRUBCTL_DRAM_MASK);
+
+		authamd_pcicfg_write(chipid, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_SCRUBCTL, val);
+	}
+
+}
+
+/*
+ * cms_poll_ownermask entry point.
+ */
+uint64_t
+authamd_poll_ownermask(cmi_hdl_t hdl, hrtime_t pintvl)
+{
+	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
+	struct authamd_chipshared *acsp = authamd->amd_shared;
+	hrtime_t now = gethrtime_waitfree();
+	hrtime_t last = acsp->acs_poll_timestamp;
+	int dopoll = 0;
+
+	if (now - last > 2 * pintvl || last == 0) {
+		acsp->acs_pollowner = hdl;
+		dopoll = 1;
+	} else if (acsp->acs_pollowner == hdl) {
+		dopoll = 1;
+	}
+
+	if (dopoll)
+		acsp->acs_poll_timestamp = now;
+
+	return (dopoll ? -1ULL : ~(1 << AMD_MCA_BANK_NB));
+
 }
 
 /*
@@ -853,7 +1060,7 @@ const cms_ops_t _cms_ops = {
 	NULL,				/* cms_bankstatus_skipinit */
 	NULL,				/* cms_bankstatus_val */
 	authamd_mca_init,		/* cms_mca_init */
-	NULL,				/* cms_poll_ownermask */
+	authamd_poll_ownermask,		/* cms_poll_ownermask */
 	authamd_bank_logout,		/* cms_bank_logout */
 	authamd_error_action,		/* cms_error_action */
 	authamd_disp_match,		/* cms_disp_match */

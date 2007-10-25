@@ -433,7 +433,7 @@ ao_nb_cfg(ao_ms_data_t *ao, uint32_t rev)
 		/*FALLTHRU*/
 
 	case AO_NB_WDOG_ENABLE_IF_DISABLED:
-		if (val & AMD_NB_CFG_WDOGTMRDIS)
+		if (!(val & AMD_NB_CFG_WDOGTMRDIS))
 			break;	/* if enabled leave rate intact */
 		/*FALLTHRU*/
 

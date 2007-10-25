@@ -73,11 +73,15 @@ struct authamd_chipshared {
 	uint_t acs_family;		/* family number */
 	uint32_t acs_rev;		/* revision per cpuid_getchiprev */
 	volatile ulong_t acs_cfgonce;	/* Config performed once per chip */
+	hrtime_t acs_poll_timestamp;	/* Checks poll owner is alive */
+	cmi_hdl_t acs_pollowner;	/* poller of shared resources */
 };
 
 enum authamd_cfgonce_bitnum {
 	AUTHAMD_CFGONCE_ONLNSPRCFG,
-	AUTHAMD_CFGONCE_NBTHRESH
+	AUTHAMD_CFGONCE_NBTHRESH,
+	AUTHAMD_CFGONCE_NBMCACFG,
+	AUTHAMD_CFGONCE_CACHESCRUB
 };
 
 /*

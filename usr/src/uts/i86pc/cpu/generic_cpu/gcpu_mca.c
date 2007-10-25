@@ -1118,9 +1118,22 @@ gcpu_mca_init(cmi_hdl_t hdl)
 			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, ADDR),
 			    &bcfgp->bios_bank_addr);
 
-		if (bcfgp->bios_bank_status & MSR_MC_STATUS_MISCV)
-			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, MISC),
-			    &bcfgp->bios_bank_misc);
+		/*
+		 * In some old BIOS the status value after boot can indicate
+		 * MISCV when there is actually no MISC register for
+		 * that bank.  The following read could therefore
+		 * aggravate a general protection fault.  This should be
+		 * caught by on_trap, but the #GP fault handler is busted
+		 * and can suffer a double fault even before we get to
+		 * trap() to check for on_trap protection.  Until that
+		 * issue is fixed we remove the one access that we know
+		 * can cause a #GP.
+		 *
+		 * if (bcfgp->bios_bank_status & MSR_MC_STATUS_MISCV)
+		 *	(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, MISC),
+		 *	    &bcfgp->bios_bank_misc);
+		 */
+		bcfgp->bios_bank_misc = 0;
 
 		if (!(mca->gcpu_actv_banks & 1 << i))
 			continue;

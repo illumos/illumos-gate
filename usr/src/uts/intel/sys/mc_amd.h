@@ -191,14 +191,17 @@ enum mc_funcnum {
 #define	MC_DC_REG_DRAMMISC	0xa0	/* DRAM Miscellaneous */
 
 /*
- * Function 3 (misc control) offset for NB MCA config, scrubber control
- * and online spare control.
+ * Function 3 (misc control) offset for NB MCA config, scrubber control,
+ * online spare control and NB capabilities.
  */
 #define	MC_CTL_REG_NBCFG	0x44	/* MCA NB configuration register */
 #define	MC_CTL_REG_SCRUBCTL	0x58	/* Scrub control register */
 #define	MC_CTL_REG_SCRUBADDR_LO	0x5c	/* DRAM Scrub Address Low */
 #define	MC_CTL_REG_SCRUBADDR_HI	0x60	/* DRAM Scrub Address High */
 #define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
+#define	MC_CTL_REG_NBCAP	0xe8	/* NB Capabilities */
+
+#define	MC_NBCAP_L3CAPABLE	0x02000000
 
 /*
  * MC4_MISC MSR and MC4_MISCj MSRs
