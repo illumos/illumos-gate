@@ -1534,14 +1534,16 @@ udp_close_free(conn_t *connp)
 	udp_t *udp = connp->conn_udp;
 
 	/* If there are any options associated with the stream, free them. */
-	if (udp->udp_ip_snd_options) {
+	if (udp->udp_ip_snd_options != NULL) {
 		mi_free((char *)udp->udp_ip_snd_options);
 		udp->udp_ip_snd_options = NULL;
+		udp->udp_ip_snd_options_len = 0;
 	}
 
-	if (udp->udp_ip_rcv_options) {
+	if (udp->udp_ip_rcv_options != NULL) {
 		mi_free((char *)udp->udp_ip_rcv_options);
 		udp->udp_ip_rcv_options = NULL;
+		udp->udp_ip_rcv_options_len = 0;
 	}
 
 	/* Free memory associated with sticky options */
@@ -1553,6 +1555,16 @@ udp_close_free(conn_t *connp)
 	}
 
 	ip6_pkt_free(&udp->udp_sticky_ipp);
+
+	/*
+	 * Clear any fields which the kmem_cache constructor clears.
+	 * Only udp_connp needs to be preserved.
+	 * TBD: We should make this more efficient to avoid clearing
+	 * everything.
+	 */
+	ASSERT(udp->udp_connp == connp);
+	bzero(udp, sizeof (udp_t));
+	udp->udp_connp = connp;
 }
 
 /*

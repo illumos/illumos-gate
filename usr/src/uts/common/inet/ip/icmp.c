@@ -729,6 +729,7 @@ icmp_close_free(conn_t *connp)
 	if (icmp->icmp_ip_snd_options != NULL) {
 		mi_free((char *)icmp->icmp_ip_snd_options);
 		icmp->icmp_ip_snd_options = NULL;
+		icmp->icmp_ip_snd_options_len = 0;
 	}
 
 	if (icmp->icmp_filter != NULL) {
@@ -743,6 +744,16 @@ icmp_close_free(conn_t *connp)
 		icmp->icmp_sticky_hdrs_len = 0;
 	}
 	ip6_pkt_free(&icmp->icmp_sticky_ipp);
+
+	/*
+	 * Clear any fields which the kmem_cache constructor clears.
+	 * Only icmp_connp needs to be preserved.
+	 * TBD: We should make this more efficient to avoid clearing
+	 * everything.
+	 */
+	ASSERT(icmp->icmp_connp == connp);
+	bzero(icmp, sizeof (icmp_t));
+	icmp->icmp_connp = connp;
 }
 
 static int
